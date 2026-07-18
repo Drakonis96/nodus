@@ -17,6 +17,7 @@ import {
   TextCell,
   anchorStyle,
   useAnchoredCoords,
+  wrappedCellHeight,
 } from '../components/dbGrid';
 import { confirm, promptText, toast } from '../components/feedback';
 import { notifyDataChanged } from '../hooks';
@@ -86,6 +87,7 @@ function cellPreview(col: DatabaseColumn, row: DatabaseRow): string {
       .map((id) => col.options.find((o) => o.id === id)?.label ?? '')
       .join(' ');
   if (col.type === 'attachment' || col.type === 'ai_image') return (row.attachments?.[col.id] ?? []).map((a) => a.fileName ?? '').join(' ');
+  if (col.type === 'rollup') return row.rollups?.[col.id] ?? '';
   return raw ?? '';
 }
 
@@ -362,9 +364,11 @@ export function DatabasesView({ databaseId, onDatabasesChanged, onCreateDatabase
       const maxLen = rows.reduce((m, r) => Math.max(m, cellPreview(col, r).length), col.name.length);
       const w = Math.max(MIN_COL_WIDTH, Math.min(MAX_COL_WIDTH, maxLen * 8 + 48));
       setWidthOverrides((prev) => ({ ...prev, [col.id]: w }));
-      void persistWidth(col, w);
+      void window.nodus
+        .updateDatabaseColumn(col.id, { config: { ...col.config, width: w, fitContent: true } })
+        .then(reloadColumns);
     },
-    [rows, persistWidth]
+    [rows, reloadColumns]
   );
   /**
    * Forget a column's stored width so it falls back to the default for its type. Fitting to
@@ -378,11 +382,22 @@ export function DatabasesView({ databaseId, onDatabasesChanged, onCreateDatabase
         delete next[col.id];
         return next;
       });
-      const { width: _width, ...rest } = col.config;
+      const { width: _width, fitContent: _fitContent, ...rest } = col.config;
       await window.nodus.updateDatabaseColumn(col.id, { config: rest });
       await reloadColumns();
     },
     [reloadColumns]
+  );
+
+  const fittedColumns = useMemo(() => columns.filter((col) => Boolean(col.config.fitContent)), [columns]);
+  const rowHeightOf = useCallback(
+    (row: DatabaseRow) =>
+      fittedColumns.reduce(
+        (height, col) =>
+          Math.max(height, wrappedCellHeight(cellPreview(col, row), widthOf(col), col.type === 'ai' ? 30 : 0)),
+        ROW_HEIGHT
+      ),
+    [fittedColumns, widthOf]
   );
   const reorderColumn = useCallback(
     async (fromId: string, toId: string) => {
@@ -538,7 +553,7 @@ export function DatabasesView({ databaseId, onDatabasesChanged, onCreateDatabase
             <VirtualList
               className="flex-1 min-h-0 overflow-x-hidden"
               items={visibleRows}
-              itemHeight={ROW_HEIGHT}
+              itemHeight={fittedColumns.length > 0 ? rowHeightOf : ROW_HEIGHT}
               getKey={(r) => r.id}
               empty={
                 <div className="p-8 text-center text-sm text-neutral-500">
@@ -550,7 +565,7 @@ export function DatabasesView({ databaseId, onDatabasesChanged, onCreateDatabase
                 </div>
               }
               renderItem={(row) => (
-                <div className="flex border-b border-neutral-900 hover:bg-neutral-900/40 group" style={{ height: ROW_HEIGHT }}>
+                <div className="flex border-b border-neutral-900 hover:bg-neutral-900/40 group" style={{ minHeight: ROW_HEIGHT, height: '100%' }}>
                   <div style={{ width: GUTTER_WIDTH }} className="shrink-0 flex items-center justify-center gap-1">
                     <button
                       className="opacity-0 group-hover:opacity-100 text-neutral-500 hover:text-indigo-400 transition-opacity"
@@ -578,6 +593,7 @@ export function DatabasesView({ databaseId, onDatabasesChanged, onCreateDatabase
                       formulaError={row.formulaErrors?.[col.id]}
                       rowId={row.id}
                       attachments={row.attachments?.[col.id] ?? []}
+                      wrap={Boolean(col.config.fitContent)}
                       onChange={(raw) => void setCell(row.id, col.id, raw)}
                       onOptionsChanged={reloadColumns}
                       onAttachmentsChanged={() => void refreshRow(row.id)}
@@ -1331,12 +1347,16 @@ function RecordModal({
   const title = row ? rowTitle(row, columns) : '';
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+    <div className="database-record-backdrop fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
       <div
-        className="card-modal w-full max-w-2xl flex flex-col max-h-[90vh] overflow-hidden"
+        className="database-record-modal card-modal w-full max-w-2xl flex flex-col max-h-[90vh] overflow-hidden"
+        data-testid="database-record-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label={title || databaseName}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center gap-2 px-5 py-3 border-b border-neutral-800">
+        <div className="database-record-header flex items-center gap-2 px-5 py-3 border-b border-neutral-800">
           <span className="text-xs text-neutral-500">{databaseName}</span>
           <div className="flex-1" />
           <button className="text-neutral-500 hover:text-neutral-300" onClick={onClose} title={t('Cerrar')}>
@@ -1352,12 +1372,12 @@ function RecordModal({
               {columns.map((col) => {
                 const def = columnTypeDef(col.type);
                 return (
-                  <div key={col.id} className="flex items-start gap-4 rounded-lg px-2 py-1.5 hover:bg-neutral-900/40 transition-colors">
+                  <div key={col.id} className="database-record-row flex items-start gap-4 rounded-lg px-2 py-1.5 hover:bg-neutral-900/40 transition-colors">
                     <label className="w-36 shrink-0 pt-2 flex items-center gap-1.5 text-xs text-neutral-500">
                       <Icon name={def.icon} size={12} className="opacity-60 shrink-0" />
                       <span className="truncate">{col.name}</span>
                     </label>
-                    <div className="flex-1 min-w-0 rounded-md border border-neutral-800/70 bg-neutral-900/30 min-h-[2.25rem] flex items-center hover:border-neutral-700/80 focus-within:border-neutral-600 transition-colors">
+                    <div className="database-record-field flex-1 min-w-0 rounded-md border border-neutral-800/70 bg-neutral-900/30 min-h-[2.25rem] flex items-center hover:border-neutral-700/80 focus-within:border-neutral-600 transition-colors">
                       <RecordField
                         col={col}
                         row={row}
@@ -1411,7 +1431,7 @@ function RecordField({
   if (col.type === 'checkbox') return <CheckboxCell value={value} onChange={onChange} align="start" />;
   if (col.type === 'select') return <SelectCell column={col} value={value} onChange={onChange} onOptionsChanged={onOptionsChanged} multi={false} />;
   if (col.type === 'multi_select') return <SelectCell column={col} value={value} onChange={onChange} onOptionsChanged={onOptionsChanged} multi />;
-  if (col.type === 'ai') return <AiCell column={col} rowId={row.id} value={value} onRan={onAttachmentsChanged} />;
+  if (col.type === 'ai') return <AiCell column={col} rowId={row.id} value={value} onChange={onChange} onRan={onAttachmentsChanged} wrap />;
   if (col.type === 'relation') return <RelationCell column={col} rowId={row.id} />;
   if (col.type === 'rollup') return <RollupCell value={row.rollups?.[col.id] ?? ''} />;
   if (col.type === 'formula')
@@ -1774,6 +1794,7 @@ function Cell({
   formulaError,
   rowId,
   attachments,
+  wrap,
   onChange,
   onOptionsChanged,
   onAttachmentsChanged,
@@ -1786,38 +1807,39 @@ function Cell({
   formulaError?: string;
   rowId: string;
   attachments: DatabaseAttachment[];
+  wrap: boolean;
   onChange: (raw: string | null) => void;
   onOptionsChanged: () => void;
   onAttachmentsChanged: () => void;
 }) {
   return (
-    <div style={{ width }} className="shrink-0 border-r border-neutral-900 overflow-hidden">
+    <div style={{ width }} className="shrink-0 h-full border-r border-neutral-900 overflow-hidden">
       {column.type === 'formula' ? (
-        <FormulaCell column={column} value={value} color={formulaColor} error={formulaError} />
+        <FormulaCell column={column} value={value} color={formulaColor} error={formulaError} wrap={wrap} />
       ) : column.type === 'checkbox' ? (
         <CheckboxCell value={value} onChange={onChange} />
       ) : column.type === 'select' ? (
-        <SelectCell column={column} value={value} onChange={onChange} onOptionsChanged={onOptionsChanged} multi={false} />
+        <SelectCell column={column} value={value} onChange={onChange} onOptionsChanged={onOptionsChanged} multi={false} wrap={wrap} />
       ) : column.type === 'multi_select' ? (
-        <SelectCell column={column} value={value} onChange={onChange} onOptionsChanged={onOptionsChanged} multi />
+        <SelectCell column={column} value={value} onChange={onChange} onOptionsChanged={onOptionsChanged} multi wrap={wrap} />
       ) : column.type === 'attachment' ? (
         <AttachmentCell rowId={rowId} columnId={column.id} attachments={attachments} onChanged={onAttachmentsChanged} />
       ) : column.type === 'ai_image' ? (
         <AiImageCell column={column} rowId={rowId} attachments={attachments} onChanged={onAttachmentsChanged} />
       ) : column.type === 'ai' ? (
-        <AiCell column={column} rowId={rowId} value={value} onRan={onAttachmentsChanged} />
+        <AiCell column={column} rowId={rowId} value={value} onChange={onChange} onRan={onAttachmentsChanged} wrap={wrap} />
       ) : column.type === 'relation' ? (
         <RelationCell column={column} rowId={rowId} />
       ) : column.type === 'rollup' ? (
-        <RollupCell value={rollup ?? ''} />
+        <RollupCell value={rollup ?? ''} wrap={wrap} />
       ) : column.type === 'number' ? (
-        <TextCell value={value} onChange={onChange} inputType="number" align="right" />
+        <TextCell value={value} onChange={onChange} inputType="number" align="right" wrap={wrap} />
       ) : column.type === 'date' ? (
-        <TextCell value={value} onChange={onChange} inputType="date" />
+        <TextCell value={value} onChange={onChange} inputType="date" wrap={wrap} />
       ) : column.type === 'time' ? (
-        <TextCell value={value} onChange={onChange} inputType="time" />
+        <TextCell value={value} onChange={onChange} inputType="time" wrap={wrap} />
       ) : (
-        <LongTextCell value={value} onChange={onChange} markdown={column.type === 'text'} />
+        <LongTextCell value={value} onChange={onChange} markdown={column.type === 'text'} wrap={wrap} />
       )}
     </div>
   );
@@ -1923,12 +1945,14 @@ function SelectCell({
   onChange,
   onOptionsChanged,
   multi,
+  wrap = false,
 }: {
   column: DatabaseColumn;
   value: string | null;
   onChange: (raw: string | null) => void;
   onOptionsChanged: () => void;
   multi: boolean;
+  wrap?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -1990,7 +2014,7 @@ function SelectCell({
     <div className="w-full h-full">
       <button
         ref={btnRef}
-        className="w-full h-full px-2 flex items-center gap-1 overflow-hidden hover:bg-neutral-800/40"
+        className={`w-full h-full px-2 flex items-center gap-1 overflow-hidden hover:bg-neutral-800/40 ${wrap ? 'flex-wrap content-center py-1' : ''}`}
         onClick={() => setOpen((v) => !v)}
       >
         {selected.length === 0 ? (
@@ -2068,7 +2092,21 @@ function SelectCell({
 
 // ── AI columns ────────────────────────────────────────────────────────────────
 
-function AiCell({ column, rowId, value, onRan }: { column: DatabaseColumn; rowId: string; value: string | null; onRan: () => void }) {
+function AiCell({
+  column,
+  rowId,
+  value,
+  onChange,
+  onRan,
+  wrap = false,
+}: {
+  column: DatabaseColumn;
+  rowId: string;
+  value: string | null;
+  onChange: (raw: string | null) => void;
+  onRan: () => void;
+  wrap?: boolean;
+}) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const hasPrompt = Boolean(String(column.config.aiPrompt ?? '').trim());
@@ -2085,12 +2123,18 @@ function AiCell({ column, rowId, value, onRan }: { column: DatabaseColumn; rowId
     }
   };
   return (
-    <div className="w-full h-full flex items-center gap-1 px-2 group/ai">
-      <span className={`flex-1 truncate text-sm ${value == null ? 'text-neutral-600' : ''}`} title={error ?? value ?? ''}>
-        {value ? value.replace(/\s+/g, ' ') : hasPrompt ? '' : t('Configura el prompt →')}
-      </span>
+    <div className="w-full h-full flex items-center gap-1 group/ai">
+      <div className="flex-1 min-w-0 h-full">
+        <LongTextCell
+          value={value}
+          onChange={onChange}
+          markdown={false}
+          wrap={wrap}
+          emptyLabel={hasPrompt ? undefined : t('Configura el prompt →')}
+        />
+      </div>
       <button
-        className="shrink-0 opacity-60 group-hover/ai:opacity-100 text-indigo-400 hover:text-indigo-300 disabled:opacity-40"
+        className="shrink-0 mr-2 opacity-60 group-hover/ai:opacity-100 text-indigo-400 hover:text-indigo-300 disabled:opacity-40"
         title={error ?? t('Generar con IA')}
         onClick={() => void run()}
         disabled={busy || !hasPrompt}
@@ -2454,10 +2498,10 @@ function RelationCell({ column, rowId }: { column: DatabaseColumn; rowId: string
 // ── Rollup columns ─────────────────────────────────────────────────────────────
 
 /** Read-only cell showing a rollup's computed value (aggregated from related rows). */
-function RollupCell({ value }: { value: string }) {
+function RollupCell({ value, wrap = false }: { value: string; wrap?: boolean }) {
   return (
     <div className="w-full h-full px-2 flex items-center overflow-hidden text-sm text-neutral-300">
-      <span className="truncate" title={value}>
+      <span className={wrap ? 'whitespace-pre-wrap break-words py-1' : 'truncate'} title={value}>
         {value}
       </span>
     </div>
@@ -2475,12 +2519,14 @@ function FormulaCell({
   color,
   error,
   large = false,
+  wrap = false,
 }: {
   column: DatabaseColumn;
   value: string | null;
   color?: string;
   error?: string;
   large?: boolean;
+  wrap?: boolean;
 }) {
   const numeric = comparableType(column) === 'number';
   const text = value == null || value === '' ? '' : numeric ? formatFormulaNumber(value, column) : value;
@@ -2488,7 +2534,7 @@ function FormulaCell({
     return (
       <div className={`w-full ${large ? '' : 'h-full'} px-2 flex items-center gap-1 overflow-hidden text-xs text-amber-400`} title={error}>
         <Icon name="alert" size={12} className="shrink-0" />
-        <span className="truncate">{t(error)}</span>
+        <span className={wrap ? 'whitespace-pre-wrap break-words py-1' : 'truncate'}>{t(error)}</span>
       </div>
     );
   }
@@ -2498,14 +2544,14 @@ function FormulaCell({
     <div className={`w-full ${large ? '' : 'h-full'} px-2 flex items-center overflow-hidden text-sm ${numeric ? 'justify-end' : ''}`}>
       {color ? (
         <span
-          className="truncate rounded px-1.5 py-0.5 text-xs font-medium"
+          className={`${wrap ? 'whitespace-pre-wrap break-words' : 'truncate'} rounded px-1.5 py-0.5 text-xs font-medium`}
           style={{ backgroundColor: `${color}26`, color }}
           title={text}
         >
           {text || '—'}
         </span>
       ) : (
-        <span className="truncate text-neutral-300" title={text}>
+        <span className={wrap ? 'whitespace-pre-wrap break-words py-1 text-neutral-300' : 'truncate text-neutral-300'} title={text}>
           {text || <span className="text-neutral-600">—</span>}
         </span>
       )}

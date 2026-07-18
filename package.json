@@ -15,6 +15,7 @@
     "verify:nodi-overlay": "npm run build && node scripts/verify-nodi-overlay.mjs",
     "verify:study-whisper": "node scripts/verify-study-whisper.mjs",
     "verify:study-improve-local": "node scripts/verify-study-improve-local.mjs",
+    "verify:database-records": "node scripts/verify-database-records.mjs",
     "verify:api-key-recovery-macos": "node scripts/verify-api-key-recovery-macos.mjs",
     "verify:toolkit-heic": "node scripts/verify-toolkit-heic.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p electron/tsconfig.json",

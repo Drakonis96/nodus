@@ -25,6 +25,20 @@ export const ADD_COLUMN_WIDTH = 44;
 export const MIN_COL_WIDTH = 80;
 export const MAX_COL_WIDTH = 640;
 
+/**
+ * Conservative height estimate for a wrapped grid cell. CSS does the final line
+ * breaking; this estimate deliberately allows slightly more room so proportional
+ * fonts and long words are never clipped by the virtual row container.
+ */
+export function wrappedCellHeight(value: string, width: number, reservedWidth = 0): number {
+  const available = Math.max(24, width - 16 - reservedWidth);
+  const charactersPerLine = Math.max(1, Math.floor(available / 7.5));
+  const lines = (value || ' ')
+    .split(/\r?\n/)
+    .reduce((total, line) => total + Math.max(1, Math.ceil(line.length / charactersPerLine)), 0);
+  return Math.max(ROW_HEIGHT, lines * 20 + 8);
+}
+
 /** Palette offered when creating/recoloring a select option or a chip. */
 export const OPTION_COLORS = ['#ef4444', '#f59e0b', '#eab308', '#10b981', '#3b82f6', '#8b5cf6', '#ec4899', '#14b8a6'];
 
@@ -141,11 +155,13 @@ export function TextCell({
   onChange,
   inputType,
   align = 'left',
+  wrap = false,
 }: {
   value: string | null;
   onChange: (raw: string | null) => void;
   inputType: 'text' | 'number' | 'date' | 'time';
   align?: 'left' | 'right';
+  wrap?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value ?? '');
@@ -179,7 +195,7 @@ export function TextCell({
   const display = inputType === 'number' && value != null ? String(decodeNumber(value) ?? value) : value ?? '';
   return (
     <button
-      className={`w-full h-full px-2 text-sm truncate text-left hover:bg-neutral-800/40 ${align === 'right' ? 'text-right' : ''} ${
+      className={`w-full h-full px-2 text-sm text-left hover:bg-neutral-800/40 ${wrap ? 'whitespace-normal break-words py-1' : 'truncate'} ${align === 'right' ? 'text-right' : ''} ${
         value == null ? 'text-neutral-600' : ''
       }`}
       onClick={() => setEditing(true)}
@@ -194,7 +210,19 @@ export function TextCell({
  * one line; clicking opens a popover with the FULL text in a growing textarea plus a
  * Markdown preview toggle. Commits on close.
  */
-export function LongTextCell({ value, onChange, markdown }: { value: string | null; onChange: (raw: string | null) => void; markdown: boolean }) {
+export function LongTextCell({
+  value,
+  onChange,
+  markdown,
+  wrap = false,
+  emptyLabel,
+}: {
+  value: string | null;
+  onChange: (raw: string | null) => void;
+  markdown: boolean;
+  wrap?: boolean;
+  emptyLabel?: string;
+}) {
   const [open, setOpen] = useState(false);
   const [preview, setPreview] = useState(false);
   const [draft, setDraft] = useState(value ?? '');
@@ -216,11 +244,11 @@ export function LongTextCell({ value, onChange, markdown }: { value: string | nu
     <div className="w-full h-full">
       <button
         ref={btnRef}
-        className={`w-full h-full px-2 text-sm truncate text-left hover:bg-neutral-800/40 ${value == null ? 'text-neutral-600' : ''}`}
+        className={`w-full h-full px-2 text-sm text-left hover:bg-neutral-800/40 ${wrap ? 'whitespace-pre-wrap break-words py-1' : 'truncate'} ${value == null ? 'text-neutral-600' : ''}`}
         onClick={() => setOpen(true)}
         title={value ?? ''}
       >
-        {value ? value.replace(/\s+/g, ' ') : ' '}
+        {value ? (wrap ? value : value.replace(/\s+/g, ' ')) : emptyLabel || ' '}
       </button>
       {open && coords &&
         createPortal(

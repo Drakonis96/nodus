@@ -97,6 +97,8 @@ export interface DatabaseColumnConfig {
   numberFormat?: 'plain' | 'integer' | 'decimal';
   /** Column width in px (user-resized); falls back to a per-type default. */
   width?: number;
+  /** Show the complete cell value, wrapping it and growing the row when necessary. */
+  fitContent?: boolean;
   /** ai columns: the user prompt, whether it auto-recomputes, and an optional source. */
   aiPrompt?: string;
   aiAuto?: boolean;
