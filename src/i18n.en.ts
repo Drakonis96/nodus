@@ -6280,4 +6280,9 @@ export const EN: Record<string, string> = {
   "No apto": "Fail",
   "No presentado": "Not presented",
   "Situación": "Status",
+  "Análisis de preguntas": "Question analysis",
+  "Bandas según Baladrón y otros (FEM, 2016) y la guía SEDEM (2014).": "Bands after Baladrón et al. (FEM, 2016) and the SEDEM guide (2014).",
+  "Dificultad: proporción de la puntuación obtenida, así que un valor ALTO significa pregunta FÁCIL. Grupos extremos: {pct} %.": "Difficulty: the share of the marks obtained, so a HIGH value means an EASY question. Extreme groups: {pct}%.",
+  "Discriminación": "Discrimination",
+  "{n} calificaciones · media {mean} · mediana {median} · aprueban {rate} %": "{n} grades · mean {mean} · median {median} · {rate}% pass",
 };

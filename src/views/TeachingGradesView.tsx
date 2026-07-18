@@ -18,6 +18,7 @@ import { Icon, ModalBackdrop, Spinner } from '../components/ui';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { AssessmentPlanEditor } from './AssessmentPlanEditor';
 import { GUTTER_WIDTH, TextCell } from '../components/dbGrid';
+import { analyseItems, gradeDistribution, EXTREME_GROUP_FRACTION } from '@shared/itemAnalysis';
 import { t, tx, errorText, getActiveLang } from '../i18n';
 
 /**
@@ -54,6 +55,7 @@ export function TeachingGradesView() {
   const [explain, setExplain] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [analysing, setAnalysing] = useState(false);
 
   const reloadPlans = useCallback(async () => setPlans(await window.nodus.listAssessmentPlans()), []);
 
@@ -295,6 +297,10 @@ export function TeachingGradesView() {
               {group ? tx('{n} alumnos · {g}', { n: (group.students ?? []).length, g: group.name }) : t('Elige un grupo para empezar.')}
             </p>
           </div>
+          <button className="btn btn-ghost h-8" data-testid="grades-analysis" disabled={!grid}
+            onClick={() => setAnalysing(true)}>
+            <Icon name="chartBar" size={13} />{t('Analizar')}
+          </button>
           <button className="btn btn-ghost h-8" data-testid="grades-export" disabled={!grid}
             onClick={() => setExporting(true)}>
             <Icon name="download" size={13} />{t('Exportar')}
@@ -439,6 +445,17 @@ export function TeachingGradesView() {
         )}
       </div>
 
+      {analysing && grid && plan && group && (
+        <AnalysisModal
+          plan={plan}
+          items={items}
+          entries={entries}
+          students={group.students ?? []}
+          results={grid.results}
+          onClose={() => setAnalysing(false)}
+        />
+      )}
+
       {exporting && grid && plan && group && (
         <ExportModal
           onCancel={() => setExporting(false)}
@@ -530,6 +547,109 @@ function exportLabels() {
     notPresented: t('No presentado'), honours: t('Mención'), breakdown: t('Desglose'),
     weight: t('Peso'), signature: t('Firma'), generated: t('Generado con Nodus'),
   };
+}
+
+/**
+ * Group summary and, when the plan has an exam block, classical item analysis.
+ *
+ * The convention is printed next to the numbers rather than assumed. Spanish sources
+ * disagree on which way the difficulty index runs, and a teacher reading it backwards
+ * would "fix" precisely the questions that worked.
+ */
+function AnalysisModal({
+  plan, items, entries, students, results, onClose,
+}: {
+  plan: AssessmentPlan;
+  items: AssessmentItem[];
+  entries: GradeEntry[];
+  students: { id: string; pseudonymCode: string }[];
+  results: Record<string, { record: { numeric: number | null } }>;
+  onClose: () => void;
+}) {
+  const studentIds = students.map((s) => s.id);
+  const finals = studentIds
+    .map((id) => results[id]?.record.numeric)
+    .filter((v): v is number => v != null);
+  const dist = gradeDistribution(finals, plan.rules.passAt, plan.rules.scaleMax);
+
+  // Only leaves that belong to an exam block: item analysis is about questions.
+  const questions = items.filter((i) => i.sourceExamQuestionId && !items.some((c) => c.parentId === i.id));
+  const stats = questions.length > 0
+    ? analyseItems(questions.map((q) => ({
+        itemId: q.id, name: q.name, maxPoints: q.maxPoints,
+        marks: Object.fromEntries(entries
+          .filter((e) => e.itemId === q.id && e.status === 'evaluated' && e.rawValue != null)
+          .map((e) => [e.studentId, e.rawValue as number])),
+      })), studentIds)
+    : [];
+
+  const maxBucket = Math.max(1, ...dist.buckets.map((b) => b.count));
+
+  return (
+    <ModalBackdrop onClose={onClose}>
+      <section className="card-modal flex max-h-[86vh] w-full max-w-2xl flex-col p-5" role="dialog" aria-modal="true"
+        aria-label={t('Analizar')} data-testid="analysis-modal">
+        <h2 className="text-base font-semibold">{t('Analizar')}</h2>
+
+        <div className="mt-3 min-h-0 flex-1 overflow-auto">
+          <p className="text-xs text-neutral-500">
+            {tx('{n} calificaciones · media {mean} · mediana {median} · aprueban {rate} %', {
+              n: dist.n, mean: dist.mean, median: dist.median, rate: Math.round(dist.passRate * 100),
+            })}
+          </p>
+
+          <div className="mt-3 flex items-end gap-2" data-testid="analysis-distribution">
+            {dist.buckets.map((bucket) => (
+              <div key={bucket.label} className="flex flex-1 flex-col items-center gap-1">
+                <div className="w-full rounded-t bg-indigo-600/15" style={{ height: `${(bucket.count / maxBucket) * 90 + 4}px` }} />
+                <span className="text-[10px] text-neutral-500">{bucket.label}</span>
+                <span className="text-[10px] font-medium">{bucket.count}</span>
+              </div>
+            ))}
+          </div>
+
+          {stats.length > 0 && (
+            <>
+              <h3 className="mt-5 text-sm font-semibold">{t('Análisis de preguntas')}</h3>
+              <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-400" data-testid="analysis-convention">
+                {tx('Dificultad: proporción de la puntuación obtenida, así que un valor ALTO significa pregunta FÁCIL. Grupos extremos: {pct} %.',
+                  { pct: Math.round(EXTREME_GROUP_FRACTION * 100) })}
+              </p>
+              <table className="mt-2 w-full border-collapse text-xs" data-testid="analysis-items">
+                <thead className="study-browser-table-head">
+                  <tr className="text-left">
+                    <th className="px-2 py-1 font-medium">{t('Pregunta')}</th>
+                    <th className="w-[70px] px-2 py-1 text-right font-medium">{t('Media')}</th>
+                    <th className="w-[90px] px-2 py-1 text-right font-medium">{t('Dificultad')}</th>
+                    <th className="w-[110px] px-2 py-1 text-right font-medium">{t('Discriminación')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stats.map((row) => (
+                    <tr key={row.itemId} className="border-t border-neutral-200 dark:border-neutral-800/60">
+                      <td className="max-w-[220px] truncate px-2 py-1">{row.name}</td>
+                      <td className="px-2 py-1 text-right text-neutral-500">{row.mean}</td>
+                      <td className="px-2 py-1 text-right">{row.difficulty}</td>
+                      <td className={`px-2 py-1 text-right ${
+                        row.discriminationBand === 'muy_mala' || row.discriminationBand === 'mala'
+                          ? 'text-red-500' : ''}`}>{row.discrimination}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="mt-2 text-[10px] text-neutral-500">
+                {t('Bandas según Baladrón y otros (FEM, 2016) y la guía SEDEM (2014).')}
+              </p>
+            </>
+          )}
+        </div>
+
+        <div className="mt-4 flex justify-end">
+          <button className="btn btn-primary" data-testid="analysis-close" onClick={onClose}>{t('Cerrar')}</button>
+        </div>
+      </section>
+    </ModalBackdrop>
+  );
 }
 
 function ExportModal({ onCancel, onExport }: { onCancel: () => void; onExport: (format: 'pdf' | 'docx' | 'csv' | 'xlsx') => Promise<void> }) {

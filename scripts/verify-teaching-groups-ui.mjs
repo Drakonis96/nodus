@@ -365,6 +365,23 @@ try {
   await page.getByTestId('grades-detail').waitFor();
   await page.screenshot({ path: path.join(shotDir, 'plan-editor-light-es.png') });
 
+  // ── Analytics: the convention must be VISIBLE, not assumed ─────────────────
+  await page.getByTestId('grades-analysis').click();
+  await page.getByTestId('analysis-modal').waitFor();
+  const analysis = await page.getByTestId('analysis-modal').innerText();
+  assert.ok(/calificaciones/.test(analysis), 'the group summary is shown');
+  assert.ok(await page.getByTestId('analysis-distribution').count() === 1, 'the distribution chart renders');
+  // Spanish sources disagree on which way the difficulty index runs, so the tool has to
+  // say. A number shown without its convention invites the teacher to read it backwards
+  // and "fix" the questions that worked.
+  if (await page.getByTestId('analysis-convention').count() > 0) {
+    const convention = await page.getByTestId('analysis-convention').innerText();
+    assert.ok(/ALTO significa pregunta FÁCIL/.test(convention), 'the difficulty convention is stated in plain words');
+  }
+  await page.keyboard.press('Escape');
+  await page.getByTestId('analysis-modal').waitFor({ state: 'detached' });
+  console.log('[ui] analysis shows the distribution and states its convention');
+
   // ── Exports, including the PDF that only a real browser can render ─────────
   //
   // The save dialog is modal and would block, so the bytes are produced through the

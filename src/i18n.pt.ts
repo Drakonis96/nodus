@@ -5995,4 +5995,9 @@ export const PT: Record<string, string> = {
   "No apto": "Não apto",
   "No presentado": "Não presente",
   "Situación": "Situação",
+  "Análisis de preguntas": "Análise das perguntas",
+  "Bandas según Baladrón y otros (FEM, 2016) y la guía SEDEM (2014).": "Faixas segundo Baladrón e outros (FEM, 2016) e o guia SEDEM (2014).",
+  "Dificultad: proporción de la puntuación obtenida, así que un valor ALTO significa pregunta FÁCIL. Grupos extremos: {pct} %.": "Dificuldade: a proporção da pontuação obtida, pelo que um valor ALTO significa pergunta FÁCIL. Grupos extremos: {pct} %.",
+  "Discriminación": "Discriminação",
+  "{n} calificaciones · media {mean} · mediana {median} · aprueban {rate} %": "{n} classificações · média {mean} · mediana {median} · {rate} % aprovam",
 };
