@@ -80,6 +80,23 @@
   .gh-badge svg { width: 16px; height: 16px; fill: currentColor; }
   .gh-badge .stars { display: inline-flex; align-items: center; gap: 4px; padding-left: 10px; border-left: 1px solid var(--border); color: var(--amber); }
   .gh-badge .stars svg { width: 13px; height: 13px; fill: var(--amber); }
+  .release-downloads {
+    position: relative; display: inline-flex; min-width: 104px; align-items: center; justify-content: center; gap: 5px;
+    padding: 7px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--card);
+    color: var(--text-2) !important; font-size: 13px; font-weight: 600; transition: all 0.2s;
+  }
+  .release-downloads:hover, .release-downloads:focus-visible { border-color: rgba(167,139,250,0.5); color: var(--text) !important; }
+  .release-downloads:focus-visible { outline: 2px solid var(--violet-2); outline-offset: 2px; }
+  .release-downloads > svg { width: 15px; height: 15px; flex: 0 0 auto; }
+  .release-downloads[data-state="loading"] .download-value { opacity: 0.55; }
+  .release-downloads[data-state="error"] { opacity: 0.72; }
+  .download-tooltip {
+    position: absolute; z-index: 60; top: calc(100% + 9px); right: 0; width: max-content; max-width: min(310px, 80vw);
+    padding: 8px 10px; border: 1px solid var(--border); border-radius: 9px; background: var(--bg2); color: var(--text);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.28); font-size: 11.5px; font-weight: 500; line-height: 1.4;
+    opacity: 0; pointer-events: none; transform: translateY(-3px); transition: opacity 0.15s, transform 0.15s;
+  }
+  .release-downloads:hover .download-tooltip, .release-downloads:focus-visible .download-tooltip { opacity: 1; transform: translateY(0); }
   .lang-picker { position: relative; }
   .lang-trigger {
     display: inline-flex; align-items: center; gap: 8px; min-width: 146px; height: 36px; padding: 0 10px;
@@ -643,7 +660,8 @@
     .story .step { margin-left: 10px; padding-left: 30px; grid-template-columns: 1fr; }
     .story .step .num { left: -26px; width: 48px; height: 48px; font-size: 16px; top: 40px; }
     .story .step h3, .story .step p, .story .step .views { grid-column: 1; }
-    .nav .links a.hideS, .gh-badge .lbl { display: none; }
+    .nav .links a.hideS, .gh-badge .lbl, .release-downloads .download-word { display: none; }
+    .release-downloads { min-width: 58px; padding-right: 10px; padding-left: 10px; }
   }
   @media (max-width: 620px) {
     .nav { padding: 12px 16px; gap: 12px; }
@@ -654,6 +672,12 @@
     .lang-menu { position: fixed; top: 65px; right: 12px; width: min(250px, calc(100vw - 24px)); }
     .faq-item summary { align-items: flex-start; flex-direction: column; gap: 4px; padding-left: 16px; }
     .faq-answer { padding-left: 16px; padding-right: 16px; }
+  }
+  @media (max-width: 420px) {
+    .nav { padding: 10px; gap: 8px; }
+    .nav .logo { gap: 0; font-size: 0; }
+    .nav .links { gap: 8px; }
+    .gh-badge { padding-right: 10px; padding-left: 10px; }
   }
 
   /* ---------- vaults ---------- */
@@ -767,6 +791,12 @@
       <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.42 7.42 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
       <span class="lbl">Star</span>
       <span class="stars"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 .25a.75.75 0 0 1 .67.42l1.88 3.8 4.2.62c.61.09.86.84.41 1.28l-3.04 2.96.72 4.18a.75.75 0 0 1-1.09.79L8 12.35l-3.76 1.97a.75.75 0 0 1-1.08-.79l.72-4.18L.83 6.37a.75.75 0 0 1 .41-1.28l4.2-.61L7.32.67A.75.75 0 0 1 8 .25Z"/></svg><span id="star-count" aria-label="Stars on GitHub">·</span></span>
+    </a>
+    <a class="release-downloads" id="release-downloads" data-state="loading" href="https://github.com/Drakonis96/nodus/releases" target="_blank" rel="noopener" aria-describedby="release-downloads-tooltip">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      <span class="download-value" id="release-download-count">—</span>
+      <span class="download-word" id="release-download-word">downloads</span>
+      <span class="download-tooltip" id="release-downloads-tooltip" role="tooltip">Package downloads from GitHub Releases · updated daily</span>
     </a>
     <a class="btn primary" href="demo/index.html" data-i18n="nav.demo">Try the live demo</a>
   </div>
@@ -1666,6 +1696,51 @@ fetch('https://api.github.com/repos/Drakonis96/nodus', { cache: 'no-store' })
       .catch(() => {})
   );
 
+// GitHub Actions aggregates every release page once per day and publishes this
+// shared file with the site. The browser only reads that cached result; it never
+// calls the Releases API or receives a GitHub token.
+window._releaseDownloadTotal = null;
+function updateReleaseDownloads() {
+  const badge = document.getElementById('release-downloads');
+  const value = document.getElementById('release-download-count');
+  const word = document.getElementById('release-download-word');
+  const tooltip = document.getElementById('release-downloads-tooltip');
+  if (!badge || !value || !word || !tooltip) return;
+
+  const dict = window._dict || {};
+  const locale = document.documentElement.lang || 'en';
+  const total = window._releaseDownloadTotal;
+  const formatted = Number.isFinite(total)
+    ? new Intl.NumberFormat(locale, { notation: 'compact', maximumFractionDigits: 1 }).format(total)
+    : '—';
+  const template = dict['github.downloads'] || '{n} downloads';
+  const fullLabel = template.replace('{n}', formatted);
+  const parts = fullLabel.split(formatted);
+
+  value.textContent = formatted;
+  word.textContent = (parts.length > 1 ? parts.slice(1).join(formatted) : '').trim() || 'downloads';
+  badge.setAttribute('aria-label', fullLabel);
+  tooltip.textContent = dict['github.downloads.tooltip']
+    || 'Package downloads from GitHub Releases · updated daily';
+}
+
+fetch('data/github-release-downloads.json')
+  .then((response) => {
+    if (!response.ok) throw new Error('release download stats unavailable');
+    return response.json();
+  })
+  .then((stats) => {
+    const total = Number(stats && stats.total);
+    if (!Number.isFinite(total) || total < 0) throw new Error('invalid release download stats');
+    window._releaseDownloadTotal = total;
+    document.getElementById('release-downloads')?.setAttribute('data-state', 'ready');
+    updateReleaseDownloads();
+  })
+  .catch(() => {
+    document.getElementById('release-downloads')?.setAttribute('data-state', 'error');
+    updateReleaseDownloads();
+  });
+
 // The download modal resolves the newest release live from the GitHub API and
 // matches assets by suffix (…-mac-arm64.dmg / …-win-x64.exe), so a new release
 // is reflected here automatically, no site redeploy needed. cache:no-store
@@ -1994,6 +2069,7 @@ const I18N = {
 const I18N_V2 = {
   es: {
     'nav.vaults': `Vaults`, 'nav.contrib': `Contribuir`,
+    'github.downloads': `{n} descargas`, 'github.downloads.tooltip': `Descargas de paquetes desde GitHub Releases · actualizado diariamente`,
     'vaults.kicker': `Los vaults`, 'vaults.title': `El mismo motor, adaptado a tu trabajo.`,
     'vaults.lead': `Un vault es un único archivo en tu dispositivo con un proyecto dentro. Su modo decide qué secciones aparecen y cómo se instruye al asistente de IA. El motor, el almacenamiento privado y los ajustes son los mismos en todos los modos. Hoy hay cinco modos disponibles; Fuentes primarias, Testimonio y Prosopografía muestran lo que llegará después.`,
     'vaults.academic.t': `Académico`,
@@ -2101,6 +2177,7 @@ const I18N_V2 = {
   },
   fr: {
     'nav.vaults': `Coffres`, 'nav.contrib': `Contribuer`,
+    'github.downloads': `{n} téléchargements`, 'github.downloads.tooltip': `Téléchargements de paquets depuis GitHub Releases · mis à jour quotidiennement`,
     'vaults.kicker': `Les coffres`, 'vaults.title': `Le même moteur, adapté à votre travail.`,
     'vaults.lead': `Un coffre est un seul fichier sur votre appareil, contenant un projet. Son mode décide des sections affichées et de la façon dont l'assistant IA est briefé. Le moteur, le stockage privé et les réglages restent les mêmes dans chaque mode. Cinq modes sont disponibles aujourd'hui ; Sources primaires, Témoignages et Prosopographie montrent ce qui viendra ensuite.`,
     'vaults.academic.t': `Académique`,
@@ -2167,6 +2244,7 @@ const I18N_V2 = {
   },
   it: {
     'nav.vaults': `Vault`, 'nav.contrib': `Contribuisci`,
+    'github.downloads': `{n} download`, 'github.downloads.tooltip': `Download dei pacchetti da GitHub Releases · aggiornato ogni giorno`,
     'vaults.kicker': `I vault`, 'vaults.title': `Lo stesso motore, adattato al tuo lavoro.`,
     'vaults.lead': `Un vault è un unico file sul tuo dispositivo, con dentro un progetto. La sua modalità decide quali sezioni compaiono e come viene istruito l'assistente IA. Il motore, l'archiviazione privata e le impostazioni restano gli stessi in ogni modalità. Oggi sono disponibili cinque modalità; Fonti primarie, Testimonianze e Prosopografia mostrano ciò che arriverà in seguito.`,
     'vaults.academic.t': `Accademico`,
@@ -2233,6 +2311,7 @@ const I18N_V2 = {
   },
   de: {
     'nav.vaults': `Tresore`, 'nav.contrib': `Mitmachen`,
+    'github.downloads': `{n} Downloads`, 'github.downloads.tooltip': `Paket-Downloads aus GitHub Releases · täglich aktualisiert`,
     'vaults.kicker': `Die Tresore`, 'vaults.title': `Dieselbe Engine, auf deine Arbeit zugeschnitten.`,
     'vaults.lead': `Ein Tresor ist eine einzige Datei auf deinem Gerät, die ein Projekt enthält. Sein Modus entscheidet, welche Bereiche erscheinen und wie der KI-Assistent gebrieft wird. Engine, privater Speicher und Einstellungen bleiben in jedem Modus gleich. Fünf Modi sind heute verfügbar; Primärquellen, Zeugnisse und Prosopographie zeigen, was als Nächstes kommt.`,
     'vaults.academic.t': `Akademisch`,
@@ -2299,6 +2378,7 @@ const I18N_V2 = {
   },
   pt: {
     'nav.vaults': `Cofres`, 'nav.contrib': `Contribuir`,
+    'github.downloads': `{n} downloads`, 'github.downloads.tooltip': `Downloads de pacotes do GitHub Releases · atualizado diariamente`,
     'vaults.kicker': `Os cofres`, 'vaults.title': `O mesmo motor, adaptado ao teu trabalho.`,
     'vaults.lead': `Um cofre é um único ficheiro no teu dispositivo, com um projeto lá dentro. O seu modo decide que secções aparecem e como o assistente de IA é instruído. O motor, o armazenamento privado e as definições são os mesmos em cada modo. Hoje há cinco modos disponíveis; Fontes primárias, Testemunhos e Prosopografia mostram o que virá a seguir.`,
     'vaults.academic.t': `Acadêmico`,
@@ -2365,6 +2445,7 @@ const I18N_V2 = {
   },
   tr: {
     'nav.vaults': `Kasalar`, 'nav.contrib': `Katkıda bulun`,
+    'github.downloads': `{n} indirme`, 'github.downloads.tooltip': `GitHub Releases paket indirmeleri · günlük güncellenir`,
     'vaults.kicker': `Kasalar`, 'vaults.title': `Aynı motor, işine göre biçimlenir.`,
     'vaults.lead': `Bir kasa, cihazınızda tek bir projeyi tutan tek bir dosyadır. Modu, hangi bölümlerin görüneceğine ve yapay zekâ asistanının nasıl bilgilendirileceğine karar verir. Motor, özel depolama ve ayarlar her modda aynı kalır. Bugün beş mod kullanılabilir; Birincil Kaynaklar, Tanıklıklar ve Prosopografi sırada ne olduğunu gösterir.`,
     'vaults.academic.t': `Akademik`,
@@ -2431,6 +2512,7 @@ const I18N_V2 = {
   },
   zh: {
     'nav.vaults': `保险库`, 'nav.contrib': `参与贡献`,
+    'github.downloads': `{n} 次下载`, 'github.downloads.tooltip': `GitHub Releases 软件包下载量 · 每日更新`,
     'vaults.kicker': `保险库`, 'vaults.title': `同一引擎，因你的工作而变。`,
     'vaults.lead': `保险库就是你设备上的一个文件，里面装着一个项目。它的模式决定显示哪些板块、如何设定 AI 助手的身份。底层的引擎、私密存储和设置在每种模式下都相同。目前有五种模式可用；原始档案、口述证言与群体传记研究展示接下来将推出的方向。`,
     'vaults.academic.t': `学术`,
@@ -2749,6 +2831,7 @@ function setLang(lang) {
   if (window.renderFaq) window.renderFaq(lang);
   window.applyDlVersion();
   document.documentElement.lang = lang;
+  updateReleaseDownloads();
   try { localStorage.setItem('nodus.lang', lang); } catch (e) {}
   const choice = LANGS.find((item) => item.c === lang) || LANGS.find((item) => item.c === 'en');
   const flag = document.getElementById('lang-current-flag'); if (flag) flag.textContent = choice.f;
