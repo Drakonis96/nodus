@@ -290,6 +290,7 @@ import * as studyRecordings from './db/studyRecordingsRepo';
 import * as teachingExams from './db/teachingExamsRepo';
 import * as teachingRubrics from './db/teachingRubricsRepo';
 import * as teachingGroups from './db/teachingGroupsRepo';
+import * as teachingGrades from './db/teachingGradesRepo';
 import type { TeachingGroupInput } from '@shared/teachingGroups';
 import * as teachingLogos from './db/teachingLogosRepo';
 import { fillRubricCell, generateRubric } from './ai/teachingRubrics';
@@ -2417,6 +2418,32 @@ export function registerIpc(
   h('study:recordings:list', async (_e, options?: StudyRecordingListOptions) => studyRecordings.listStudyRecordings(options));
   h('study:recordings:get', async (_e, id: string) => studyRecordings.getStudyRecording(id));
   h('study:recordings:content', async (_e, id: string) => studyRecordings.getStudyRecordingContent(id));
+  // ---- Gradebook (teaching vault) ----
+  h('teaching:plans:list', async (_e, options?: { subjectId?: string | null; academicYearId?: string | null }) => teachingGrades.listAssessmentPlans(options ?? {}));
+  h('teaching:plans:get', async (_e, id: string) => teachingGrades.getAssessmentPlan(id));
+  h('teaching:plans:create', async (_e, input: Parameters<typeof teachingGrades.createAssessmentPlan>[0]) => teachingGrades.createAssessmentPlan(input));
+  h('teaching:plans:update', async (_e, id: string, patch: Parameters<typeof teachingGrades.updateAssessmentPlan>[1]) => teachingGrades.updateAssessmentPlan(id, patch));
+  h('teaching:plans:publish', async (_e, id: string) => teachingGrades.publishAssessmentPlan(id));
+  h('teaching:plans:revise', async (_e, id: string) => teachingGrades.reviseAssessmentPlan(id));
+  h('teaching:plans:delete', async (_e, id: string) => {
+    teachingGrades.deleteAssessmentPlan(id);
+    return null;
+  });
+  h('teaching:items:create', async (_e, planId: string, input: Parameters<typeof teachingGrades.createAssessmentItem>[1]) => teachingGrades.createAssessmentItem(planId, input));
+  h('teaching:items:update', async (_e, id: string, patch: Parameters<typeof teachingGrades.updateAssessmentItem>[1]) => teachingGrades.updateAssessmentItem(id, patch));
+  h('teaching:items:delete', async (_e, id: string) => {
+    teachingGrades.deleteAssessmentItem(id);
+    return null;
+  });
+  h('teaching:items:reorder', async (_e, planId: string, orderedIds: string[]) => teachingGrades.reorderAssessmentItems(planId, orderedIds));
+  h('teaching:entries:list', async (_e, planId: string, convocatoria?: string) => teachingGrades.listGradeEntries(planId, convocatoria ?? 'ordinaria'));
+  h('teaching:entries:set', async (_e, input: Parameters<typeof teachingGrades.setGradeEntry>[0]) => teachingGrades.setGradeEntry(input));
+  h('teaching:entries:clear', async (_e, studentId: string, itemId: string, convocatoria?: string) => {
+    teachingGrades.clearGradeEntry(studentId, itemId, convocatoria ?? 'ordinaria');
+    return null;
+  });
+  h('teaching:entries:cohort', async (_e, planId: string, groupId: string, convocatoria?: string) => teachingGrades.cohortStats(planId, groupId, convocatoria ?? 'ordinaria'));
+
   // ---- Student groups (teaching vault) ----
   h('teaching:groups:list', async (_e, options?: { subjectId?: string | null; academicYearId?: string | null }) => teachingGroups.listTeachingGroups(options ?? {}));
   h('teaching:groups:get', async (_e, id: string) => teachingGroups.getTeachingGroup(id));

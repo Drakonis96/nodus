@@ -155,6 +155,8 @@ import type {
 } from './teachingRubrics';
 import type { TeachingGroup, TeachingGroupInput, TeachingStudent } from './teachingGroups';
 export type { TeachingGroup, TeachingGroupInput, TeachingStudent } from './teachingGroups';
+import type { AssessmentItem, AssessmentPlan, GradeEntry, PlanRules } from './assessment/model';
+export type * from './assessment/model';
 import type {
   StudyIdeaDetail,
   StudyIdeaSummary,
@@ -5410,6 +5412,22 @@ export interface NodusApi {
   listStudyRecordings(options?: StudyRecordingListOptions): Promise<StudyRecordingSummary[]>;
   getStudyRecording(id: string): Promise<StudyRecordingDetail>;
   getStudyRecordingContent(id: string): Promise<StudyRecordingContent>;
+  // Gradebook (teaching vault). The plan is the programación / guía docente.
+  listAssessmentPlans(options?: { subjectId?: string | null; academicYearId?: string | null }): Promise<AssessmentPlan[]>;
+  getAssessmentPlan(id: string): Promise<{ plan: AssessmentPlan; items: AssessmentItem[] }>;
+  createAssessmentPlan(input: { name: string; subjectId: string; academicYearId?: string | null; profile?: string }): Promise<AssessmentPlan>;
+  updateAssessmentPlan(id: string, patch: { name?: string; academicYearId?: string | null; profile?: string; rules?: PlanRules }): Promise<AssessmentPlan>;
+  publishAssessmentPlan(id: string): Promise<AssessmentPlan>;
+  reviseAssessmentPlan(id: string): Promise<AssessmentPlan>;
+  deleteAssessmentPlan(id: string): Promise<void>;
+  createAssessmentItem(planId: string, input: Partial<AssessmentItem>): Promise<AssessmentItem>;
+  updateAssessmentItem(id: string, patch: Partial<AssessmentItem>): Promise<AssessmentItem>;
+  deleteAssessmentItem(id: string): Promise<void>;
+  reorderAssessmentItems(planId: string, orderedIds: string[]): Promise<AssessmentItem[]>;
+  listGradeEntries(planId: string, convocatoria?: string): Promise<GradeEntry[]>;
+  setGradeEntry(input: { studentId: string; itemId: string; convocatoria?: string; rawValue?: number | null; status?: GradeEntry['status']; isOverride?: boolean; note?: string }): Promise<GradeEntry>;
+  clearGradeEntry(studentId: string, itemId: string, convocatoria?: string): Promise<void>;
+  gradebookCohortStats(planId: string, groupId: string, convocatoria?: string): Promise<{ maxByItem: Record<string, number> }>;
   // Student groups (teaching vault). `academicYearId: null` scopes to the groups that
   // predate academic years; omitting it returns every year.
   listTeachingGroups(options?: { subjectId?: string | null; academicYearId?: string | null }): Promise<TeachingGroup[]>;

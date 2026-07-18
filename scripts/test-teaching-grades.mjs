@@ -1,0 +1,307 @@
+// Gradebook persistence (teaching vault): schema 87 + repo.
+//
+// The invariants that matter here are the ones a grade challenge depends on:
+//
+//   · a published plan is frozen, and revising it COPIES rather than rewrites, so a
+//     mark given last term can still be recomputed against the rules of last term
+//   · the copy re-points every parent link at the new tree — a child left pointing at
+//     the old plan's parent would silently merge two versions
+//   · a cell is keyed on (student, item, convocatoria), so an ordinary and an
+//     extraordinary mark coexist instead of overwriting each other
+//   · deleting a subject, a plan or a student takes exactly what it should with it
+
+import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import fs from 'node:fs';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { createRequire } from 'node:module';
+import os from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const require = createRequire(import.meta.url);
+
+if (!process.argv.includes('--electron-teaching-grades-test')) {
+  execFileSync(path.join(repoRoot, 'node_modules/.bin/electron'),
+    [path.join(repoRoot, 'scripts/test-teaching-grades.mjs'), '--electron-teaching-grades-test'],
+    { cwd: repoRoot, env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' }, stdio: 'inherit' });
+  process.exit(0);
+}
+
+const root = await mkdtemp(path.join(os.tmpdir(), 'nodus-teaching-grades-'));
+installRuntimeHooks(root);
+
+let closeDb = () => undefined;
+try {
+  const { SCHEMA_VERSION, migrations, runMigrations } = require(path.join(repoRoot, 'electron/db/migrations.ts'));
+  const repo = require(path.join(repoRoot, 'electron/db/teachingGradesRepo.ts'));
+  const groups = require(path.join(repoRoot, 'electron/db/teachingGroupsRepo.ts'));
+  const { computeGrade } = require(path.join(repoRoot, 'shared/assessment/index.ts'));
+  const { getDb, ...db } = require(path.join(repoRoot, 'electron/db/database.ts'));
+  closeDb = db.closeDb;
+
+  assert.equal(SCHEMA_VERSION, Math.max(...migrations.map((m) => m.version)), 'SCHEMA_VERSION matches the highest migration');
+  assert.ok(SCHEMA_VERSION >= 87, 'the gradebook ships at schema 87 or later');
+
+  const sql = getDb();
+  assert.equal(sql.pragma('user_version', { simple: true }), SCHEMA_VERSION, 'a fresh vault migrates to head');
+
+  // ── Fixtures ───────────────────────────────────────────────────────────────
+  const stamp = new Date().toISOString();
+  sql.prepare(`INSERT INTO study_academic_years (id, short_id, label, start_date, end_date, position, created_at, updated_at)
+               VALUES ('y1','y1','2024/2025','2024-09-01','2025-06-30',0,?,?)`).run(stamp, stamp);
+  sql.prepare(`INSERT INTO study_courses (id, short_id, name, position, created_at, updated_at)
+               VALUES ('c1','c1','Curso',0,?,?)`).run(stamp, stamp);
+  sql.prepare(`INSERT INTO study_subjects (id, short_id, course_id, name, position, created_at, updated_at)
+               VALUES ('sub1','sub1','c1','Historia',0,?,?)`).run(stamp, stamp);
+
+  const group = groups.createTeachingGroup({ name: '1ºA', subjectId: 'sub1', academicYearId: 'y1', expectedSize: 3 });
+  const [ana, juan, rosa] = group.students;
+  groups.updateTeachingStudent(ana.id, { givenNames: 'Ana', surnames: 'Peña' });
+
+  // ── Plans ──────────────────────────────────────────────────────────────────
+  const plan = repo.createAssessmentPlan({ name: 'Historia 2024/25', subjectId: 'sub1', academicYearId: 'y1', profile: 'universidad' });
+  assert.match(plan.id, /[0-9a-f-]{36}/);
+  assert.equal(plan.version, 1);
+  assert.equal(plan.publishedAt, null);
+  // The preset seeded real rules rather than an empty object.
+  assert.equal(plan.rules.decimals, 1, 'the preset seeded its rules');
+  assert.ok(plan.rules.advisories.source.length > 0, 'and its cited advisory');
+
+  // Rules are fully editable — nothing about a preset is binding.
+  const retuned = repo.updateAssessmentPlan(plan.id, {
+    rules: { ...plan.rules, passAt: 0.45, rounding: 'threshold', roundingThreshold: 0.7, decimals: 0 },
+  });
+  assert.equal(retuned.rules.passAt, 0.45, 'every rule can be overridden');
+  assert.equal(retuned.rules.rounding, 'threshold');
+  repo.updateAssessmentPlan(plan.id, { rules: plan.rules });
+
+  // Year scoping uses `IS ?`, so NULL-year plans stay reachable.
+  const unscoped = repo.createAssessmentPlan({ name: 'Suelto', subjectId: 'sub1', academicYearId: null });
+  assert.deepEqual(repo.listAssessmentPlans({ subjectId: 'sub1', academicYearId: null }).map((p) => p.id), [unscoped.id]);
+  assert.deepEqual(repo.listAssessmentPlans({ subjectId: 'sub1', academicYearId: 'y1' }).map((p) => p.id), [plan.id]);
+  repo.deleteAssessmentPlan(unscoped.id);
+
+  // ── Item tree ──────────────────────────────────────────────────────────────
+  const examen = repo.createAssessmentItem(plan.id, { name: 'Examen', kind: 'block', weight: 50, aggregation: 'sum', minToAverage: 0.4 });
+  const q1 = repo.createAssessmentItem(plan.id, { name: 'P1', parentId: examen.id, maxPoints: 4 });
+  const q2 = repo.createAssessmentItem(plan.id, { name: 'P2', parentId: examen.id, maxPoints: 6 });
+  const practica = repo.createAssessmentItem(plan.id, { name: 'Práctica', weight: 30 });
+  const aprov = repo.createAssessmentItem(plan.id, { name: 'Aprovechamiento', weight: 20, aggregation: 'normalizeGroupMax' });
+
+  assert.equal(repo.listAssessmentItems(plan.id).length, 5);
+  assert.equal(examen.minToAverage, 0.4, 'a threshold survives the round trip');
+  assert.equal(q1.parentId, examen.id);
+  // Positions are per-parent, so the first child of a block starts at 0 again.
+  assert.equal(q1.position, 0);
+  assert.equal(practica.position, 1, 'top-level items number independently of children');
+
+  const renamed = repo.updateAssessmentItem(q1.id, { name: 'Pregunta 1', maxPoints: 3, isMandatory: true });
+  assert.equal(renamed.name, 'Pregunta 1');
+  assert.equal(renamed.maxPoints, 3);
+  assert.equal(renamed.isMandatory, true, 'booleans survive the integer column');
+  repo.updateAssessmentItem(q1.id, { maxPoints: 4, isMandatory: false });
+
+  repo.reorderAssessmentItems(plan.id, [aprov.id, practica.id, examen.id]);
+  const reordered = repo.listAssessmentItems(plan.id).filter((i) => i.parentId === null);
+  assert.deepEqual(reordered.map((i) => i.name), ['Aprovechamiento', 'Práctica', 'Examen']);
+  repo.reorderAssessmentItems(plan.id, [examen.id, practica.id, aprov.id]);
+
+  // ── Entries ────────────────────────────────────────────────────────────────
+  repo.setGradeEntry({ studentId: ana.id, itemId: q1.id, rawValue: 4 });
+  repo.setGradeEntry({ studentId: ana.id, itemId: q2.id, rawValue: 5 });
+  repo.setGradeEntry({ studentId: ana.id, itemId: practica.id, rawValue: 8 });
+  repo.setGradeEntry({ studentId: ana.id, itemId: aprov.id, rawValue: 6 });
+
+  let entries = repo.listGradeEntries(plan.id);
+  assert.equal(entries.length, 4);
+  // Typing a value into an empty cell implies it has been assessed.
+  assert.equal(entries.find((e) => e.itemId === q1.id).status, 'evaluated', 'a typed value implies "evaluated"');
+
+  // Upsert on the natural key: editing the same cell must not create a second row.
+  repo.setGradeEntry({ studentId: ana.id, itemId: q1.id, rawValue: 3.5 });
+  entries = repo.listGradeEntries(plan.id);
+  assert.equal(entries.length, 4, 'editing a cell updates it rather than duplicating');
+  assert.equal(entries.find((e) => e.itemId === q1.id).rawValue, 3.5);
+
+  // Status without a value is a first-class thing, not an empty cell.
+  repo.setGradeEntry({ studentId: juan.id, itemId: practica.id, status: 'not_submitted' });
+  const juanEntry = repo.listGradeEntries(plan.id).find((e) => e.studentId === juan.id);
+  assert.equal(juanEntry.status, 'not_submitted');
+  assert.equal(juanEntry.rawValue, null, 'a non-submission carries no number');
+
+  // A convocatoria is part of the key: both marks coexist.
+  repo.setGradeEntry({ studentId: juan.id, itemId: practica.id, convocatoria: 'extraordinaria', rawValue: 5 });
+  assert.equal(repo.listGradeEntries(plan.id, 'ordinaria').find((e) => e.studentId === juan.id).status, 'not_submitted');
+  assert.equal(repo.listGradeEntries(plan.id, 'extraordinaria').find((e) => e.studentId === juan.id).rawValue, 5,
+    'the resit mark does not overwrite the ordinary one');
+  assert.throws(
+    () => sql.prepare(`INSERT INTO teaching_grade_entries (id, student_id, item_id, convocatoria, created_at, updated_at)
+                       VALUES ('dup', ?, ?, 'ordinaria', ?, ?)`).run(juan.id, practica.id, stamp, stamp),
+    /UNIQUE/,
+    'the key is enforced by the index, not only by the repo',
+  );
+
+  repo.clearGradeEntry(juan.id, practica.id, 'extraordinaria');
+  assert.equal(repo.listGradeEntries(plan.id, 'extraordinaria').length, 0);
+
+  // ── Cohort statistics for the class-relative aggregation ───────────────────
+  repo.setGradeEntry({ studentId: juan.id, itemId: aprov.id, rawValue: 10 });
+  repo.setGradeEntry({ studentId: rosa.id, itemId: aprov.id, status: 'not_submitted' });
+  const cohort = repo.cohortStats(plan.id, group.id);
+  assert.equal(cohort.maxByItem[aprov.id], 10, 'the class maximum comes from real marks');
+  assert.equal(cohort.maxByItem[practica.id], 8, 'and only from marks that were actually earned');
+
+  // A value can survive a status change (marking a cell exempt does not wipe what was
+  // typed), so the ceiling must be filtered by STATUS, not merely by "has a number".
+  // Otherwise one exempt student silently rescales the whole class.
+  repo.setGradeEntry({ studentId: rosa.id, itemId: aprov.id, rawValue: 20, status: 'exempt' });
+  assert.equal(
+    repo.cohortStats(plan.id, group.id).maxByItem[aprov.id], 10,
+    'an exempt mark never sets the class ceiling, even when it holds a number',
+  );
+  repo.setGradeEntry({ studentId: rosa.id, itemId: aprov.id, rawValue: null, status: 'not_submitted' });
+
+  // ── The repo feeds the engine ──────────────────────────────────────────────
+  {
+    const { plan: loaded, items } = repo.getAssessmentPlan(plan.id);
+    const mine = repo.listGradeEntries(plan.id).filter((e) => e.studentId === ana.id);
+    const result = computeGrade({ plan: loaded, items, entries: mine, cohort });
+    // examen = (3.5+5)/10 = 0.85 ; 8.5*0.5 + 8*0.3 + (6/10)*10*0.2 = 4.25+2.4+1.2 = 7.85 → 7.9
+    assert.equal(result.record.numeric, 7.9, 'stored rows compute the grade end to end');
+    assert.ok(result.trace, 'and carry their derivation');
+  }
+
+  // ── Publish and revise ─────────────────────────────────────────────────────
+  const published = repo.publishAssessmentPlan(plan.id);
+  assert.ok(published.publishedAt, 'publishing stamps the plan');
+
+  const revised = repo.reviseAssessmentPlan(plan.id);
+  assert.equal(revised.version, 2);
+  assert.equal(revised.parentVersionId, plan.id, 'the new version points back at the old one');
+  assert.equal(revised.publishedAt, null, 'a revision starts unpublished');
+  assert.ok(repo.getAssessmentPlan(plan.id).plan.publishedAt, 'the published version is untouched');
+
+  const copied = repo.listAssessmentItems(revised.id);
+  assert.equal(copied.length, 5, 'the whole tree came across');
+  // The critical bit: children must point at the NEW parents, never the old ones.
+  const oldIds = new Set(repo.listAssessmentItems(plan.id).map((i) => i.id));
+  for (const copy of copied) {
+    assert.ok(!oldIds.has(copy.id), 'copied items get fresh ids');
+    if (copy.parentId) {
+      assert.ok(!oldIds.has(copy.parentId), 'and their parent link is re-pointed at the copy');
+      assert.ok(copied.some((c) => c.id === copy.parentId), 'to an item inside the same new plan');
+    }
+  }
+  const copiedExam = copied.find((i) => i.name === 'Examen');
+  assert.equal(copied.filter((i) => i.parentId === copiedExam.id).length, 2, 'the tree keeps its shape');
+  assert.equal(copiedExam.minToAverage, 0.4, 'and its rules');
+  // Marks stay with the version they were given under.
+  assert.equal(repo.listGradeEntries(revised.id).length, 0, 'a revision starts with no marks of its own');
+  assert.ok(repo.listGradeEntries(plan.id).length > 0, 'while the published version keeps its own');
+
+  // ── Referential rules ──────────────────────────────────────────────────────
+  const count = (table, where, ...args) => sql.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE ${where}`).get(...args).n;
+
+  // Deleting a student takes their marks, not the plan.
+  const before = count('teaching_grade_entries', '1=1');
+  groups.deleteTeachingStudent(rosa.id);
+  assert.ok(count('teaching_grade_entries', '1=1') < before, 'a deleted student takes their marks with them');
+  assert.equal(repo.listAssessmentItems(plan.id).length, 5, 'and leaves the plan alone');
+
+  // Deleting an item takes its own marks and its children.
+  repo.deleteAssessmentItem(examen.id);
+  assert.equal(count('teaching_assessment_items', 'id IN (?,?)', q1.id, q2.id), 0, 'children cascade with their block');
+  assert.equal(count('teaching_grade_entries', 'item_id IN (?,?)', q1.id, q2.id), 0, 'and so do their marks');
+
+  // Deleting the subject takes the whole plan.
+  sql.prepare('DELETE FROM study_subjects WHERE id = ?').run('sub1');
+  assert.equal(count('teaching_assessment_plans', 'subject_id = ?', 'sub1'), 0, 'plans cascade with their subject');
+  assert.equal(count('teaching_assessment_items', 'plan_id = ?', plan.id), 0, 'taking their items');
+
+  console.log('teaching grades (repo): OK');
+
+  // ── Legacy upgrade v86 → head ──────────────────────────────────────────────
+  {
+    const Database = require('better-sqlite3');
+    const legacy = new Database(path.join(root, 'legacy.db'));
+    for (const m of migrations.filter((m) => m.version <= 86).sort((a, b) => a.version - b.version)) {
+      legacy.exec(m.up);
+      legacy.pragma(`user_version = ${m.version}`);
+    }
+    legacy.pragma('foreign_keys = ON');
+    legacy.prepare(`INSERT INTO study_courses (id, short_id, name, position, created_at, updated_at)
+                    VALUES ('lc','lc','Curso',0,?,?)`).run(stamp, stamp);
+    legacy.prepare(`INSERT INTO study_subjects (id, short_id, course_id, name, position, created_at, updated_at)
+                    VALUES ('ls','ls','lc','Historia',0,?,?)`).run(stamp, stamp);
+    legacy.prepare(`INSERT INTO teaching_groups (id, short_id, name, subject_id, created_at, updated_at)
+                    VALUES ('lg','lg','1ºA','ls',?,?)`).run(stamp, stamp);
+    legacy.prepare(`INSERT INTO teaching_students (id, group_id, given_names, pseudonym_code, created_at, updated_at)
+                    VALUES ('lst','lg','Ana','STU_7K3Q',?,?)`).run(stamp, stamp);
+
+    runMigrations(legacy);
+
+    assert.equal(legacy.pragma('user_version', { simple: true }), SCHEMA_VERSION, 'an old vault reaches head');
+    assert.equal(legacy.prepare('SELECT given_names FROM teaching_students WHERE id = ?').get('lst').given_names, 'Ana',
+      'pre-existing rosters survive the upgrade untouched');
+    assert.equal(legacy.prepare('SELECT COUNT(*) AS n FROM teaching_assessment_plans').get().n, 0,
+      'the new tables arrive empty rather than backfilled');
+    // Usable, not merely present.
+    legacy.prepare(`INSERT INTO teaching_assessment_plans (id, short_id, name, subject_id, rules_json, created_at, updated_at)
+                    VALUES ('lp','lp','Plan','ls','{}',?,?)`).run(stamp, stamp);
+    legacy.prepare(`INSERT INTO teaching_assessment_items (id, plan_id, name, created_at, updated_at)
+                    VALUES ('li','lp','Examen',?,?)`).run(stamp, stamp);
+    legacy.prepare(`INSERT INTO teaching_grade_entries (id, student_id, item_id, raw_value, status, created_at, updated_at)
+                    VALUES ('le','lst','li',7,'evaluated',?,?)`).run(stamp, stamp);
+    assert.equal(legacy.prepare('SELECT raw_value FROM teaching_grade_entries WHERE id = ?').get('le').raw_value, 7);
+    legacy.close();
+  }
+
+  console.log('teaching grades (migration): OK');
+} finally {
+  closeDb();
+  await rm(root, { recursive: true, force: true });
+}
+
+function installRuntimeHooks(userData) {
+  const Module = require('node:module');
+  const ts = require('typescript');
+
+  const originalResolve = Module._resolveFilename;
+  Module._resolveFilename = function (request, ...args) {
+    if (request.startsWith('@shared/')) {
+      const rest = request.slice('@shared/'.length);
+      const direct = path.join(repoRoot, 'shared', `${rest}.ts`);
+      const asIndex = path.join(repoRoot, 'shared', rest, 'index.ts');
+      return originalResolve.call(this, fs.existsSync(direct) ? direct : asIndex, ...args);
+    }
+    return originalResolve.call(this, request, ...args);
+  };
+
+  const electronStub = {
+    app: { getPath: () => userData, getName: () => 'Nodus', getVersion: () => '0.0.0-test', on: () => undefined },
+    safeStorage: {
+      isEncryptionAvailable: () => false,
+      encryptString: (s) => Buffer.from(s, 'utf8'),
+      decryptString: (b) => Buffer.from(b).toString('utf8'),
+    },
+    dialog: { showMessageBoxSync: () => 0 },
+    BrowserWindow: { getAllWindows: () => [] },
+    ipcMain: { handle: () => undefined, on: () => undefined },
+  };
+  const originalLoad = Module._load;
+  Module._load = function (request, ...args) {
+    if (request === 'electron') return electronStub;
+    return originalLoad.call(this, request, ...args);
+  };
+
+  require.extensions['.ts'] = (module, filename) => {
+    const source = fs.readFileSync(filename, 'utf8');
+    const { outputText } = ts.transpileModule(source, {
+      compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2021, esModuleInterop: true },
+      fileName: filename,
+    });
+    module._compile(outputText, filename);
+  };
+}
