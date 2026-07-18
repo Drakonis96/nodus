@@ -255,7 +255,68 @@ try {
   const explain = await page.getByTestId('explain-modal').innerText();
   assert.ok(explain.includes('Cómo se ha calculado'), 'the derivation panel opens');
   assert.ok(/7/.test(explain), 'and shows the parts that produced the mark');
-  console.log('[ui] "how this was worked out" panel opens with the derivation');
+  // Escape must dismiss it: a dialog that only closes via its own button traps the
+  // user, and silently swallows every later click.
+  await page.keyboard.press('Escape');
+  await page.getByTestId('explain-modal').waitFor({ state: 'detached' });
+  console.log('[ui] "how this was worked out" panel opens with the derivation and closes on Escape');
+
+  // ── The plan editor: every rule must be reachable and editable ─────────────
+  await page.evaluate(() => window.nodus.updateSettings({ uiLanguage: 'es', theme: 'light' }));
+  await page.getByTestId('plan-edit').click();
+  await page.getByTestId('plan-editor').waitFor();
+  await page.getByTestId('plan-structure').waitFor();
+
+  // Weight sum is live feedback, not validation-on-save.
+  const structure = await page.getByTestId('plan-structure').innerText();
+  assert.ok(/Suma de pesos/.test(structure), 'the weight total is shown while editing');
+
+  // Per-item options open and expose the aggregation vocabulary.
+  const itemId = await page.locator('[data-testid^="item-more-"]').first().getAttribute('data-testid');
+  await page.getByTestId(itemId).click();
+  const aggId = itemId.replace('item-more-', 'item-agg-');
+  await page.getByTestId(aggId).waitFor();
+  await page.selectOption(`[data-testid="${aggId}"]`, 'normalizeGroupMax');
+  await page.waitForFunction(() => /la nota de un alumno cambia si otro/.test(document.body.innerText));
+  console.log('[ui] the class-relative caveat is surfaced, not hidden');
+  await page.selectOption(`[data-testid="${aggId}"]`, 'weighted');
+
+  // The rules tab is where a centre adapts the tool to its own norms.
+  await page.getByTestId('plan-tab-rules').click();
+  await page.getByTestId('plan-rules').waitFor();
+  await page.selectOption('[data-testid="rule-rounding"]', 'threshold');
+  await page.getByTestId('rule-threshold').waitFor();
+  // Commit each field the way a person does — type, then move on — and let the save
+  // land before the next one, so this checks persistence rather than a race.
+  await page.getByTestId('rule-threshold').fill('0.7');
+  await page.getByTestId('rule-threshold').press('Tab');
+  await page.waitForFunction(async () => {
+    const plans = await window.nodus.listAssessmentPlans();
+    return (await window.nodus.getAssessmentPlan(plans[0].id)).plan.rules.roundingThreshold === 0.7;
+  });
+  await page.getByTestId('rule-passat').fill('0.45');
+  await page.getByTestId('rule-passat').press('Tab');
+  await page.waitForFunction(async () => {
+    const plans = await window.nodus.listAssessmentPlans();
+    return (await window.nodus.getAssessmentPlan(plans[0].id)).plan.rules.passAt === 0.45;
+  });
+  const savedRules = await page.evaluate(async () => {
+    const plans = await window.nodus.listAssessmentPlans();
+    const detail = await window.nodus.getAssessmentPlan(plans[0].id);
+    return detail.plan.rules;
+  });
+  assert.equal(savedRules.rounding, 'threshold', 'the rounding rule is persisted');
+  assert.equal(savedRules.roundingThreshold, 0.7, 'including a non-standard threshold');
+  assert.equal(savedRules.passAt, 0.45, 'and a pass mark that is not 5');
+  console.log('[ui] plan rules persist, including a 0,7 threshold and a 4,5 pass mark');
+
+  // Publishing freezes the plan; revising must offer a new version instead.
+  await page.getByTestId('plan-publish').click();
+  await page.getByTestId('plan-revise').waitFor();
+  console.log('[ui] publishing freezes the plan and offers a new version');
+  await page.getByTestId('plan-editor-close').click();
+  await page.getByTestId('grades-detail').waitFor();
+  await page.screenshot({ path: path.join(shotDir, 'plan-editor-light-es.png') });
 
   const gradesFit = await page.evaluate(() => {
     const el = document.querySelector('[data-testid="grades-grid"]');

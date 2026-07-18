@@ -14,8 +14,9 @@ import {
   type TraceNode,
   type TraceRule,
 } from '@shared/assessment';
-import { Icon, Spinner } from '../components/ui';
+import { Icon, ModalBackdrop, Spinner } from '../components/ui';
 import { ConfirmModal } from '../components/ConfirmModal';
+import { AssessmentPlanEditor } from './AssessmentPlanEditor';
 import { GUTTER_WIDTH, TextCell } from '../components/dbGrid';
 import { t, tx, errorText, getActiveLang } from '../i18n';
 
@@ -51,6 +52,7 @@ export function TeachingGradesView() {
   const [creating, setCreating] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<AssessmentPlan | null>(null);
   const [explain, setExplain] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
 
   const reloadPlans = useCallback(async () => setPlans(await window.nodus.listAssessmentPlans()), []);
 
@@ -292,6 +294,9 @@ export function TeachingGradesView() {
               {group ? tx('{n} alumnos · {g}', { n: (group.students ?? []).length, g: group.name }) : t('Elige un grupo para empezar.')}
             </p>
           </div>
+          <button className="btn btn-ghost h-8" data-testid="plan-edit" onClick={() => setEditing(true)}>
+            <Icon name="settings" size={13} />{t('Plan de evaluación')}
+          </button>
         </div>
 
         <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -429,6 +434,21 @@ export function TeachingGradesView() {
         )}
       </div>
 
+      {editing && (
+        <AssessmentPlanEditor
+          plan={plan}
+          items={items}
+          onClose={() => setEditing(false)}
+          onChanged={async () => {
+            const detail = await window.nodus.getAssessmentPlan(plan.id);
+            setPlan(detail.plan);
+            setItems(detail.items);
+            await refresh();
+            await reloadPlans();
+          }}
+        />
+      )}
+
       {explain && grid && (
         <ExplainModal
           name={rowLabel(rows.find((r) => r.id === explain))}
@@ -504,7 +524,7 @@ function ExplainModal({
   );
 
   return (
-    <div className="fixed inset-0 z-[130] grid place-items-center bg-black/60 p-4">
+    <ModalBackdrop onClose={onClose}>
       <section className="card-modal flex max-h-[80vh] w-full max-w-xl flex-col p-5" role="dialog" aria-modal="true"
         aria-label={t('Cómo se ha calculado')} data-testid="explain-modal">
         <h2 className="text-base font-semibold">{t('Cómo se ha calculado')}</h2>
@@ -524,7 +544,7 @@ function ExplainModal({
           <button className="btn btn-ghost" onClick={onClose}>{t('Cerrar')}</button>
         </div>
       </section>
-    </div>
+    </ModalBackdrop>
   );
 }
 
@@ -564,7 +584,7 @@ function NewPlanModal({
   const chosen = ASSESSMENT_PROFILES.find((p) => p.id === profile);
 
   return (
-    <div className="fixed inset-0 z-[130] grid place-items-center bg-black/60 p-4">
+    <ModalBackdrop onClose={onCancel}>
       <section className="card-modal w-full max-w-lg p-5" role="dialog" aria-modal="true" aria-label={t('Nuevo cuaderno')} data-testid="plan-new-modal">
         <h2 className="text-base font-semibold">{t('Nuevo cuaderno')}</h2>
         <p className="mt-1 text-xs text-neutral-500">{t('Elige un modelo de partida. Todas sus reglas se pueden cambiar después.')}</p>
@@ -598,6 +618,6 @@ function NewPlanModal({
           </button>
         </div>
       </section>
-    </div>
+    </ModalBackdrop>
   );
 }

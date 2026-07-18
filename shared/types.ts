@@ -5416,7 +5416,7 @@ export interface NodusApi {
   listAssessmentPlans(options?: { subjectId?: string | null; academicYearId?: string | null }): Promise<AssessmentPlan[]>;
   getAssessmentPlan(id: string): Promise<{ plan: AssessmentPlan; items: AssessmentItem[] }>;
   createAssessmentPlan(input: { name: string; subjectId: string; academicYearId?: string | null; profile?: string }): Promise<AssessmentPlan>;
-  updateAssessmentPlan(id: string, patch: { name?: string; academicYearId?: string | null; profile?: string; rules?: PlanRules }): Promise<AssessmentPlan>;
+  updateAssessmentPlan(id: string, patch: { name?: string; academicYearId?: string | null; profile?: string; rules?: Partial<PlanRules> }): Promise<AssessmentPlan>;
   publishAssessmentPlan(id: string): Promise<AssessmentPlan>;
   reviseAssessmentPlan(id: string): Promise<AssessmentPlan>;
   deleteAssessmentPlan(id: string): Promise<void>;

@@ -154,9 +154,18 @@ export function createAssessmentPlan(input: {
   return getAssessmentPlan(id).plan;
 }
 
+/**
+ * `rules` is a PARTIAL patch, merged against what is stored.
+ *
+ * The editor writes one field at a time and several edits can be in flight at once
+ * (blurring one input focuses the next). If the client sent the whole rules object,
+ * the last write would silently clobber every edit made since it read them — losing
+ * work for anyone who tabs through the form quickly. Merging here, against the row,
+ * makes concurrent field edits compose instead of race.
+ */
 export function updateAssessmentPlan(
   id: string,
-  patch: { name?: string; academicYearId?: string | null; profile?: string; rules?: PlanRules },
+  patch: { name?: string; academicYearId?: string | null; profile?: string; rules?: Partial<PlanRules> },
 ): AssessmentPlan {
   const sets: string[] = [];
   const values: unknown[] = [];
@@ -173,8 +182,9 @@ export function updateAssessmentPlan(
     values.push(patch.profile);
   }
   if (patch.rules !== undefined) {
+    const current = getAssessmentPlan(id).plan.rules;
     sets.push('rules_json = ?');
-    values.push(JSON.stringify(patch.rules));
+    values.push(JSON.stringify({ ...current, ...patch.rules }));
   }
   if (sets.length) {
     sets.push('updated_at = ?');

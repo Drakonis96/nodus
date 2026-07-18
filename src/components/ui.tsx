@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import type { EdgeType, ModelRef, GraphNodeType } from '@shared/types';
 import { t } from '../i18n';
 
@@ -249,4 +249,41 @@ export function Spinner({ label }: { label?: string }) {
 export function TypeDot({ type }: { type: GraphNodeType }) {
   const color = type === 'author' ? '#a3a3a3' : NODE_COLORS[type];
   return <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }} />;
+}
+
+/**
+ * Backdrop for the app's ad-hoc modals.
+ *
+ * Closes on Escape and on a click outside the panel, which ConfirmModal already did
+ * and every hand-rolled modal did not — a dialog that can only be dismissed by finding
+ * its button traps the user, and traps automated checks too.
+ */
+export function ModalBackdrop({
+  onClose,
+  children,
+  zIndex = 130,
+}: {
+  onClose: () => void;
+  children: React.ReactNode;
+  zIndex?: number;
+}) {
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 grid place-items-center bg-black/60 p-4"
+      style={{ zIndex }}
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      {children}
+    </div>
+  );
 }
