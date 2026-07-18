@@ -30,12 +30,18 @@ export interface NodusLocalModelStatus {
   downloadedBytes: number;
   totalBytes: number;
   path: string;
+  /** Main-process transfer state, retained while renderer views mount/unmount. */
+  downloading: boolean;
+  progress: number;
 }
 
 export interface NodusLocalRuntimeStatus {
   version: string;
   ready: boolean;
   executablePath: string | null;
+  /** Main-process transfer state, retained while renderer views mount/unmount. */
+  downloading: boolean;
+  progress: number;
 }
 
 export interface NodusLocalAiStatus {
