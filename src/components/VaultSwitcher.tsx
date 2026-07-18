@@ -84,9 +84,7 @@ export function vaultTypeIcon(type: VaultType): string {
 }
 
 function vaultTypePhase(type: VaultType): VaultPhase | null {
-  if (type === 'estudio') return 'pre-alpha';
-  if (type === 'genealogy') return 'alpha';
-  if (type === 'databases') return 'beta';
+  if (type === 'estudio' || type === 'genealogy' || type === 'databases') return 'beta';
   return null;
 }
 
