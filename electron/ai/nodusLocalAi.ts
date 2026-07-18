@@ -17,7 +17,14 @@ import {
 import type { ModelInfo } from '@shared/types';
 
 const LLAMA_CPP_VERSION = 'b10002';
-const activeDownloads = new Map<string, Promise<NodusLocalAiStatus>>();
+interface ActiveLocalAiDownload {
+  progress: number;
+  promise: Promise<NodusLocalAiStatus>;
+  listeners: Set<(fraction: number) => void>;
+}
+
+const activeDownloads = new Map<string, ActiveLocalAiDownload>();
+let activeRuntimeDownload: ActiveLocalAiDownload | null = null;
 const embeddingPipelines = new Map<string, Promise<any>>();
 
 interface RuntimeAsset {
@@ -123,25 +130,54 @@ async function modelStatus(model: NodusLocalModelDefinition) {
   let downloaded = true;
   for (const asset of model.assets) {
     const stat = await fsp.stat(path.join(directory, asset.file)).catch(() => null);
-    downloadedBytes += stat?.isFile() ? Math.min(stat.size, asset.bytes) : 0;
+    const partial = stat?.isFile() ? null : await fsp.stat(`${path.join(directory, asset.file)}.download`).catch(() => null);
+    downloadedBytes += stat?.isFile()
+      ? Math.min(stat.size, asset.bytes)
+      : partial?.isFile() ? Math.min(partial.size, asset.bytes) : 0;
     if (!stat?.isFile() || stat.size !== asset.bytes) downloaded = false;
   }
+  const active = activeDownloads.get(model.id);
   return {
     id: model.id,
     downloaded,
     downloadedBytes,
     totalBytes: nodusLocalModelBytes(model),
     path: directory,
+    downloading: Boolean(active),
+    progress: active?.progress ?? (downloaded ? 1 : 0),
   };
 }
 
 export async function getNodusLocalAiStatus(): Promise<NodusLocalAiStatus> {
   const executablePath = await llamaServerPath();
   return {
-    runtime: { version: LLAMA_CPP_VERSION, ready: Boolean(executablePath), executablePath },
+    runtime: {
+      version: LLAMA_CPP_VERSION,
+      ready: Boolean(executablePath),
+      executablePath,
+      downloading: Boolean(activeRuntimeDownload),
+      progress: activeRuntimeDownload?.progress ?? (executablePath ? 1 : 0),
+    },
     models: await Promise.all(NODUS_LOCAL_MODELS.map(modelStatus)),
     activeModelId: activeServer?.modelId ?? null,
   };
+}
+
+function reportDownloadProgress(job: ActiveLocalAiDownload, fraction: number): void {
+  job.progress = Math.max(0, Math.min(1, fraction));
+  for (const listener of job.listeners) {
+    try { listener(job.progress); } catch { /* Progress observers never own the transfer. */ }
+  }
+}
+
+function followDownload(
+  job: ActiveLocalAiDownload,
+  onProgress?: (fraction: number) => void
+): Promise<NodusLocalAiStatus> {
+  if (!onProgress) return job.promise;
+  job.listeners.add(onProgress);
+  onProgress(job.progress);
+  return job.promise.finally(() => job.listeners.delete(onProgress));
 }
 
 async function downloadFile(
@@ -201,28 +237,41 @@ function run(command: string, args: string[], cwd?: string): Promise<void> {
 export async function installNodusLocalRuntime(onProgress?: (fraction: number) => void): Promise<NodusLocalAiStatus> {
   const existing = await llamaServerPath();
   if (existing) return getNodusLocalAiStatus();
-  const asset = runtimeAsset();
-  const root = runtimeDirectory();
-  const archive = path.join(rootDirectory(), `${asset.name}.download`);
-  await fsp.rm(root, { recursive: true, force: true });
-  await fsp.mkdir(rootDirectory(), { recursive: true });
-  let downloaded = 0;
-  await downloadFile(asset.url, archive, asset.bytes, asset.sha256, (bytes) => {
-    downloaded += bytes;
-    onProgress?.(Math.min(0.9, (downloaded / asset.bytes) * 0.9));
-  });
-  await fsp.mkdir(root, { recursive: true });
-  if (asset.archive === 'zip') {
-    new AdmZip(archive).extractAllTo(root, true);
-  } else {
-    await run('tar', ['-xzf', archive, '-C', root]);
-  }
-  await fsp.rm(archive, { force: true });
-  const executable = await llamaServerPath();
-  if (!executable) throw new Error('El runtime se descargó, pero no contiene llama-server.');
-  if (process.platform !== 'win32') await fsp.chmod(executable, 0o755);
-  onProgress?.(1);
-  return getNodusLocalAiStatus();
+  if (activeRuntimeDownload) return followDownload(activeRuntimeDownload, onProgress);
+
+  const job: ActiveLocalAiDownload = {
+    progress: 0,
+    promise: null as unknown as Promise<NodusLocalAiStatus>,
+    listeners: new Set(),
+  };
+  activeRuntimeDownload = job;
+  job.promise = (async () => {
+    const asset = runtimeAsset();
+    const root = runtimeDirectory();
+    const archive = path.join(rootDirectory(), `${asset.name}.download`);
+    await fsp.rm(root, { recursive: true, force: true });
+    await fsp.mkdir(rootDirectory(), { recursive: true });
+    let downloaded = 0;
+    await downloadFile(asset.url, archive, asset.bytes, asset.sha256, (bytes) => {
+      downloaded += bytes;
+      reportDownloadProgress(job, Math.min(0.9, (downloaded / asset.bytes) * 0.9));
+    });
+    await fsp.mkdir(root, { recursive: true });
+    if (asset.archive === 'zip') {
+      new AdmZip(archive).extractAllTo(root, true);
+    } else {
+      await run('tar', ['-xzf', archive, '-C', root]);
+    }
+    await fsp.rm(archive, { force: true });
+    const executable = await llamaServerPath();
+    if (!executable) throw new Error('El runtime se descargó, pero no contiene llama-server.');
+    if (process.platform !== 'win32') await fsp.chmod(executable, 0o755);
+    reportDownloadProgress(job, 1);
+    return getNodusLocalAiStatus();
+  })().finally(() => {
+    if (activeRuntimeDownload === job) activeRuntimeDownload = null;
+  }).then(() => getNodusLocalAiStatus());
+  return followDownload(job, onProgress);
 }
 
 async function downloadModelAssets(
@@ -259,16 +308,23 @@ export async function downloadNodusLocalModel(
   const model = getNodusLocalModel(modelId);
   if (!model) throw new Error(`Modelo local no soportado: ${modelId}`);
   const running = activeDownloads.get(modelId);
-  if (running) return running;
-  const promise = (async () => {
+  if (running) return followDownload(running, onProgress);
+  const job: ActiveLocalAiDownload = {
+    progress: 0,
+    promise: null as unknown as Promise<NodusLocalAiStatus>,
+    listeners: new Set(),
+  };
+  activeDownloads.set(modelId, job);
+  job.promise = (async () => {
     if (model.runtime === 'llama_cpp' && !(await llamaServerPath())) {
-      await installNodusLocalRuntime((fraction) => onProgress?.(fraction * 0.2));
-      return downloadModelAssets(model, (fraction) => onProgress?.(0.2 + fraction * 0.8));
+      await installNodusLocalRuntime((fraction) => reportDownloadProgress(job, fraction * 0.2));
+      return downloadModelAssets(model, (fraction) => reportDownloadProgress(job, 0.2 + fraction * 0.8));
     }
-    return downloadModelAssets(model, onProgress);
-  })().finally(() => activeDownloads.delete(modelId));
-  activeDownloads.set(modelId, promise);
-  return promise;
+    return downloadModelAssets(model, (fraction) => reportDownloadProgress(job, fraction));
+  })().finally(() => {
+    if (activeDownloads.get(modelId) === job) activeDownloads.delete(modelId);
+  }).then(() => getNodusLocalAiStatus());
+  return followDownload(job, onProgress);
 }
 
 export async function deleteNodusLocalModel(modelId: string): Promise<NodusLocalAiStatus> {

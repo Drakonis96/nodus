@@ -42,15 +42,20 @@ try {
     readFile(path.join(root, 'shared/studyAi.ts'), 'utf8'),
   ]);
   assert.match(manager, /\.download/, 'downloads use partial files before atomic rename');
+  assert.match(manager, /fsp\.stat\(`\$\{path\.join\(directory, asset\.file\)\}\.download`\)/, 'status includes bytes from an in-progress partial asset');
   assert.match(manager, /createHash\('sha256'\)/, 'downloads verify SHA-256');
   assert.match(manager, /'--mmproj'/, 'llama-server receives the multimodal projector');
   assert.match(manager, /'--embedding', '--pooling', 'mean'/, 'BGE runs through llama.cpp embedding mode');
   assert.match(manager, /pipeline\('feature-extraction'/, 'INT8 ONNX models run through Transformers.js');
   assert.match(manager, /model\.runtime === 'llama_cpp'.*llamaServerPath/s, 'llama.cpp is installed automatically before a dependent model download');
   assert.match(manager, /installNodusLocalRuntime.*downloadModelAssets/s, 'runtime installation continues immediately into the requested model download');
+  assert.match(manager, /activeRuntimeDownload.*ActiveLocalAiDownload/s, 'runtime downloads persist in main-process state');
+  assert.match(manager, /activeDownloads\.get\(model\.id\)/, 'model status reconnects to a main-process download job');
+  assert.match(manager, /return followDownload\(running, onProgress\)/, 'duplicate requests follow the existing download');
   assert.match(aiClient, /ensureNodusLocalServer\(model\.model, 'chat'\)/, 'chat completions start the managed local server');
   assert.match(aiClient, /embedWithNodusLocal/, 'embedding calls route to the integrated runtime');
   assert.match(ipc, /ai:nodusLocal:downloadModel/, 'main IPC exposes model downloads');
+  assert.match(ipc, /if \(!event\.sender\.isDestroyed\(\)\) event\.sender\.send\('ai:nodusLocal:progress'/, 'progress cannot abort a download after its renderer is destroyed');
   assert.match(preload, /ai:nodusLocal:progress/, 'preload forwards download progress safely');
   assert.match(settings, /Cambiar modelo de embeddings/, 'embedding changes require an explicit compatibility confirmation');
   assert.match(ui, /ConfirmModal/, 'deleting a local model uses the styled confirmation modal');
@@ -58,6 +63,11 @@ try {
   assert.match(ui, /nodus-local-embedding-list/, 'embedding models use the shared settings list pattern');
   assert.match(ui, /nodus-local-chat-list/, 'chat models use the shared settings list pattern');
   assert.match(ui, /Preparando motor…/, 'the UI explains the automatic dependency stage');
+  assert.match(ui, /status\?\.runtime\.downloading \|\| status\?\.models\.some\(\(model\) => model\.downloading\)/, 'the UI restores active transfers from the status snapshot');
+  assert.match(ui, /window\.setInterval\(\(\) => \{[\s\S]*refresh\(\)/, 'a remounted settings view follows the persistent download through completion');
+  assert.match(ui, /await window\.nodus\.downloadNodusLocalModel\(model\.id, setProgress\)/, 'one main-process request owns runtime preparation and model download');
+  assert.doesNotMatch(ui, /await window\.nodus\.installNodusLocalRuntime\([\s\S]{0,300}await window\.nodus\.downloadNodusLocalModel/, 'the renderer does not split a model transfer into dependent stages');
+  assert.match(ui, /nodus-local-download-progress/, 'rehydrated progress has a stable UI hook');
   assert.match(ui, /exposeDownloadedChatModels/, 'downloaded local chat models are exposed to the shared dropdowns');
   assert.doesNotMatch(ui, /SettingsModelDot|selectedEmbedding|selectedGeneral|selectedVision/, 'the download catalog must not present models as active selections');
   assert.doesNotMatch(ui, /onSelectEmbedding|selectChat|Usar para embeddings|Usar como general|Usar para visión|Modelo general|Modelo de visión/, 'model assignment belongs exclusively to the shared dropdowns');
