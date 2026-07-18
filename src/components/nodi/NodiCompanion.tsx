@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { deriveNodiNoteTitle } from '@shared/nodiNotes';
 import type { AppSettings, ModelRef, NodiChatMessage, NodiContextKind, NodiConversation, NodiNote, NodiNotification, NodiOverlayPlacement, VaultType } from '@shared/types';
 import { vaultTypeColor } from '@shared/vaultTypes';
 import { type NodiRole, type NodiState } from './Nodi';
@@ -75,33 +76,15 @@ function IconNotes() {
   );
 }
 
-/** A quick note's title is its first meaningful line, stripped of Markdown markers.
- *  Derived live from the draft so the header updates as you type. */
-function deriveNoteTitle(content: string): string {
-  for (const raw of content.split('\n')) {
-    const line = raw
-      .replace(/^\s{0,3}#{1,6}\s+/, '')
-      .replace(/^\s{0,3}[-*+>]\s+/, '')
-      .replace(/[*_`~]/g, '')
-      .trim();
-    if (line) return line.slice(0, 80);
-  }
-  return '';
-}
-
-/** A one-line preview of everything after the title line, for the notes list. */
+/** A compact plain-text preview of the Markdown content for the notes list. */
 function noteSnippet(content: string): string {
-  const rest: string[] = [];
-  let started = false;
-  for (const raw of content.split('\n')) {
-    const line = raw.trim();
-    if (!started) {
-      if (line) started = true;
-      continue;
-    }
-    if (line) rest.push(line.replace(/^\s{0,3}[-*+>]\s+/, '').replace(/[*_`~#]/g, ''));
-  }
-  return rest.join(' ').trim().slice(0, 140);
+  return content
+    .split('\n')
+    .map((raw) => raw.trim().replace(/^\s{0,3}[-*+>]\s+/, '').replace(/[*_`~#]/g, ''))
+    .filter(Boolean)
+    .join(' ')
+    .trim()
+    .slice(0, 140);
 }
 
 function relTime(ts: number): string {
@@ -127,6 +110,7 @@ const RADIAL_MAX_SPAN_DEG = 88;
 // Normal clicks commonly move a few pixels between press and release. Keeping a
 // comfortable dead zone prevents those tiny movements from swallowing the click.
 const DRAG_THRESHOLD_PX = 7;
+const NOTE_AUTOSAVE_DELAY_MS = 600;
 
 export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: boolean }) {
   const isOverlay = context === 'overlay';
@@ -161,17 +145,22 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
   const [notes, setNotes] = useState<NodiNote[]>([]);
   const [noteView, setNoteView] = useState<'list' | 'editor'>('list');
   const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
+  const [noteTitle, setNoteTitle] = useState('');
   const [noteDraft, setNoteDraft] = useState('');
   const [noteDirty, setNoteDirty] = useState(false);
+  const [noteSaving, setNoteSaving] = useState(false);
   const [noteSearch, setNoteSearch] = useState('');
   const [notePreview, setNotePreview] = useState(false);
   const [deleteNoteTarget, setDeleteNoteTarget] = useState<NodiNote | null>(null);
   const noteEditorRef = useRef<HTMLTextAreaElement | null>(null);
+  const noteSessionRef = useRef(0);
+  const noteSaveChainRef = useRef<Promise<void>>(Promise.resolve());
+  const noteSavesInFlightRef = useRef(0);
   // Mirror the in-flight note so the leave-editor flush reads live values without a
   // stale closure (a lesson from the study-vault useMemo bug: closures over editor
   // state go stale between renders).
-  const noteRef = useRef({ id: activeNoteId, draft: noteDraft, dirty: noteDirty });
-  noteRef.current = { id: activeNoteId, draft: noteDraft, dirty: noteDirty };
+  const noteRef = useRef({ session: 0, id: activeNoteId, title: noteTitle, draft: noteDraft, dirty: noteDirty });
+  noteRef.current = { session: noteSessionRef.current, id: activeNoteId, title: noteTitle, draft: noteDraft, dirty: noteDirty };
 
   // Resolve the app theme locally so the independent always-on-top renderer receives
   // the same surface treatment as in-window Nodi.
@@ -240,54 +229,78 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
   }, []);
   useEffect(() => { if (panel === 'notes') refreshNotes(); }, [panel, refreshNotes]);
 
-  const persistNote = useCallback(async (id: string | null, draft: string) => {
-    try {
-      const saved = await window.nodus.saveNodiNote({ id, content: draft });
-      setNotes((cur) => [saved, ...cur.filter((n) => n.id !== saved.id)]);
-      // A save may finish after the user has opened another note or continued
-      // typing. Only mark the editor clean when it still shows this exact snapshot.
-      const current = noteRef.current;
-      if (current.id === id && current.draft === draft) {
-        noteRef.current = { id: saved.id, draft, dirty: false };
-        setActiveNoteId(saved.id);
-        setNoteDirty(false);
+  const persistNote = useCallback((session: number, id: string | null, title: string, draft: string) => {
+    noteSavesInFlightRef.current += 1;
+    setNoteSaving(true);
+    const task = noteSaveChainRef.current.then(async () => {
+      // A second autosave may have been queued before the first one assigned its id.
+      // Reuse the live id for the same editor session instead of creating duplicates.
+      const before = noteRef.current;
+      const effectiveId = before.session === session ? before.id : id;
+      try {
+        const saved = await window.nodus.saveNodiNote({ id: effectiveId, title, content: draft });
+        setNotes((cur) => [saved, ...cur.filter((n) => n.id !== saved.id)]);
+        const current = noteRef.current;
+        if (current.session === session && (current.id === effectiveId || current.id === id)) {
+          const unchanged = current.title === title && current.draft === draft;
+          noteRef.current = { ...current, id: saved.id, dirty: !unchanged };
+          setActiveNoteId(saved.id);
+          setNoteDirty(!unchanged);
+        }
+      } catch {
+        const current = noteRef.current;
+        if (current.session === session && current.title === title && current.draft === draft) {
+          noteRef.current = { ...current, dirty: true };
+          setNoteDirty(true);
+        }
+      } finally {
+        noteSavesInFlightRef.current -= 1;
+        if (noteSavesInFlightRef.current === 0) setNoteSaving(false);
       }
-      return saved;
-    } catch {
-      const current = noteRef.current;
-      if (current.id === id && current.draft === draft) {
-        noteRef.current = { ...current, dirty: true };
-        setNoteDirty(true);
-      }
-      return null;
-    }
+    });
+    noteSaveChainRef.current = task.then(() => undefined, () => undefined);
+    return task;
   }, []);
 
   // Fire-and-forget save used when the editor is left by any route (panel closed,
   // switched, vault change, overlay dismissed). Mark the snapshot clean before the
   // IPC call so opening another note cannot enqueue the same save twice.
   const flushNote = useCallback(() => {
-    const { id, draft, dirty } = noteRef.current;
-    if (!dirty || !draft.trim()) return;
-    noteRef.current = { id, draft, dirty: false };
+    const { session, id, title, draft, dirty } = noteRef.current;
+    if (!dirty || (!title.trim() && !draft.trim() && !id)) return;
+    noteRef.current = { session, id, title, draft, dirty: false };
     setNoteDirty(false);
-    void persistNote(id, draft);
+    void persistNote(session, id, title, draft);
   }, [persistNote]);
   const leftEditor = panel !== 'notes' || noteView !== 'editor';
   useEffect(() => { if (leftEditor) flushNote(); }, [leftEditor, flushNote]);
 
   const saveNote = useCallback(async () => {
-    const { id, draft, dirty } = noteRef.current;
-    if (!dirty || !draft.trim()) return;
-    noteRef.current = { id, draft, dirty: false };
+    const { session, id, title, draft, dirty } = noteRef.current;
+    if (!dirty || (!title.trim() && !draft.trim() && !id)) return;
+    noteRef.current = { session, id, title, draft, dirty: false };
     setNoteDirty(false);
-    await persistNote(id, draft);
+    await persistNote(session, id, title, draft);
   }, [persistNote]);
+
+  useEffect(() => {
+    if (panel !== 'notes' || noteView !== 'editor' || !noteDirty) return;
+    const timer = window.setTimeout(() => { void saveNote(); }, NOTE_AUTOSAVE_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, [noteDirty, noteDraft, noteTitle, noteView, panel, saveNote]);
+  useEffect(() => () => flushNote(), [flushNote]);
 
   const openNoteEditor = (note: NodiNote | null) => {
     flushNote();
-    setActiveNoteId(note?.id ?? null);
-    setNoteDraft(note?.content ?? '');
+    const session = noteSessionRef.current + 1;
+    const id = note?.id ?? null;
+    const title = note?.titleExplicit ? note.title : '';
+    const draft = note?.content ?? '';
+    noteSessionRef.current = session;
+    noteRef.current = { session, id, title, draft, dirty: false };
+    setActiveNoteId(id);
+    setNoteTitle(title);
+    setNoteDraft(draft);
     setNoteDirty(false);
     setNotePreview(false);
     setNoteView('editor');
@@ -304,11 +317,18 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
   const confirmDeleteNote = async () => {
     if (!deleteNoteTarget) return;
     const id = deleteNoteTarget.id;
+    if (activeNoteId === id) {
+      noteSessionRef.current += 1;
+      noteRef.current = { session: noteSessionRef.current, id: null, title: '', draft: '', dirty: false };
+      setNoteDirty(false);
+    }
+    await noteSaveChainRef.current;
     const deleted = await window.nodus.deleteNodiNote(id).then(() => true).catch(() => false);
     if (!deleted) return;
     setNotes((cur) => cur.filter((n) => n.id !== id));
     if (activeNoteId === id) {
       setActiveNoteId(null);
+      setNoteTitle('');
       setNoteDraft('');
       setNoteDirty(false);
       setNoteView('list');
@@ -915,8 +935,8 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
               {noteView === 'editor' && (
                 <button className="nodi-head-icon" onClick={backToNotes} title={t('Volver')} aria-label={t('Volver')}><Icon name="arrowLeft" size={15} /></button>
               )}
-              <span className="nodi-chat-title" title={noteView === 'editor' ? (deriveNoteTitle(noteDraft) || t('Nueva nota')) : t('Notas rápidas')}>
-                {noteView === 'editor' ? (deriveNoteTitle(noteDraft) || t('Nueva nota')) : t('Notas rápidas')}
+              <span className="nodi-chat-title" title={noteView === 'editor' ? (noteTitle.trim() || deriveNodiNoteTitle(noteDraft) || t('Nueva nota')) : t('Notas rápidas')}>
+                {noteView === 'editor' ? (noteTitle.trim() || deriveNodiNoteTitle(noteDraft) || t('Nueva nota')) : t('Notas rápidas')}
               </span>
               <span className="grow" />
               {noteView === 'list' && (
@@ -958,11 +978,23 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
             ) : (
               <>
                 {!notePreview && (
-                  <div className="nodi-note-toolbar">
-                    {noteFormats.map((f) => (
-                      <button key={f.id} type="button" className="nodi-note-tool" data-format={f.id} onMouseDown={(e) => e.preventDefault()} onClick={f.run} title={f.label} aria-label={f.label}><Icon name={f.icon} size={15} /></button>
-                    ))}
-                  </div>
+                  <>
+                    <div className="nodi-note-title-field">
+                      <input
+                        className="nodi-note-title-input"
+                        value={noteTitle}
+                        maxLength={100}
+                        placeholder={t('Título (opcional)')}
+                        aria-label={t('Título (opcional)')}
+                        onChange={(e) => { setNoteTitle(e.target.value); setNoteDirty(true); }}
+                      />
+                    </div>
+                    <div className="nodi-note-toolbar">
+                      {noteFormats.map((f) => (
+                        <button key={f.id} type="button" className="nodi-note-tool" data-format={f.id} onMouseDown={(e) => e.preventDefault()} onClick={f.run} title={f.label} aria-label={f.label}><Icon name={f.icon} size={15} /></button>
+                      ))}
+                    </div>
+                  </>
                 )}
                 <div className="nodi-note-body">
                   {notePreview ? (
@@ -992,9 +1024,8 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
                   {activeNoteId && (
                     <button className="nodi-note-remove" onClick={() => { const note = notes.find((n) => n.id === activeNoteId); if (note) setDeleteNoteTarget(note); }} title={t('Borrar nota')} aria-label={t('Borrar nota')}><Icon name="trash" size={13} /></button>
                   )}
-                  <span className="nodi-note-state">{noteDirty ? t('Sin guardar') : activeNoteId ? t('Guardado') : ''}</span>
+                  <span className="nodi-note-state">{noteSaving ? t('Guardando…') : noteDirty ? t('Sin guardar') : activeNoteId ? t('Guardado automáticamente') : ''}</span>
                   <span className="grow" />
-                  <button className="nodi-note-save" onClick={() => void saveNote()} disabled={!noteDraft.trim() || !noteDirty}><Icon name="save" size={14} /> {t('Guardar')}</button>
                 </div>
               </>
             )}
