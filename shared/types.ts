@@ -4768,11 +4768,12 @@ export interface NodiConversationInput {
   model?: ModelRef | null;
 }
 
-/** A quick Markdown note kept by the Nodi companion (local, per install). The
- *  title is derived from the first non-empty line when the note is saved. */
+/** A quick Markdown note kept by the Nodi companion (local, per install). */
 export interface NodiNote {
   id: string;
   title: string;
+  /** Distinguishes a user-assigned title from the three-word fallback. */
+  titleExplicit: boolean;
   content: string;
   createdAt: number;
   updatedAt: number;
@@ -4780,6 +4781,8 @@ export interface NodiNote {
 
 export interface NodiNoteInput {
   id?: string | null;
+  /** Optional explicit title; the first three content words are used when empty. */
+  title?: string;
   content: string;
 }
 
