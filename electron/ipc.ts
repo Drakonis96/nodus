@@ -289,6 +289,8 @@ import * as studyMaterials from './db/studyMaterialsRepo';
 import * as studyRecordings from './db/studyRecordingsRepo';
 import * as teachingExams from './db/teachingExamsRepo';
 import * as teachingRubrics from './db/teachingRubricsRepo';
+import * as teachingGroups from './db/teachingGroupsRepo';
+import type { TeachingGroupInput } from '@shared/teachingGroups';
 import * as teachingLogos from './db/teachingLogosRepo';
 import { fillRubricCell, generateRubric } from './ai/teachingRubrics';
 import { rubricDocxBytes, rubricPdfBytes } from './export/rubricExport';
@@ -2415,6 +2417,23 @@ export function registerIpc(
   h('study:recordings:list', async (_e, options?: StudyRecordingListOptions) => studyRecordings.listStudyRecordings(options));
   h('study:recordings:get', async (_e, id: string) => studyRecordings.getStudyRecording(id));
   h('study:recordings:content', async (_e, id: string) => studyRecordings.getStudyRecordingContent(id));
+  // ---- Student groups (teaching vault) ----
+  h('teaching:groups:list', async (_e, options?: { subjectId?: string | null; academicYearId?: string | null }) => teachingGroups.listTeachingGroups(options ?? {}));
+  h('teaching:groups:get', async (_e, id: string) => teachingGroups.getTeachingGroup(id));
+  h('teaching:groups:create', async (_e, input: TeachingGroupInput) => teachingGroups.createTeachingGroup(input));
+  h('teaching:groups:update', async (_e, id: string, patch: Parameters<typeof teachingGroups.updateTeachingGroup>[1]) => teachingGroups.updateTeachingGroup(id, patch));
+  h('teaching:groups:delete', async (_e, id: string) => {
+    teachingGroups.deleteTeachingGroup(id);
+    return null;
+  });
+  h('teaching:groups:student:add', async (_e, groupId: string, count?: number) => teachingGroups.addTeachingStudent(groupId, count ?? 1));
+  h('teaching:groups:student:update', async (_e, id: string, patch: Parameters<typeof teachingGroups.updateTeachingStudent>[1]) => teachingGroups.updateTeachingStudent(id, patch));
+  h('teaching:groups:student:delete', async (_e, id: string) => {
+    teachingGroups.deleteTeachingStudent(id);
+    return null;
+  });
+  h('teaching:groups:import', async (_e, targetGroupId: string, sourceGroupId: string) => teachingGroups.importStudentsFromGroup(targetGroupId, sourceGroupId));
+
   // ---- Rubric builder (teaching vault) ----
   h('teaching:rubrics:list', async (_e, options?: { subjectId?: string | null; search?: string }) => teachingRubrics.listTeachingRubrics(options ?? {}));
   h('teaching:rubrics:get', async (_e, id: string) => teachingRubrics.getTeachingRubric(id));

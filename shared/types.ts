@@ -153,6 +153,8 @@ import type {
   TeachingRubric,
   TeachingRubricInput,
 } from './teachingRubrics';
+import type { TeachingGroup, TeachingGroupInput, TeachingStudent } from './teachingGroups';
+export type { TeachingGroup, TeachingGroupInput, TeachingStudent } from './teachingGroups';
 import type {
   StudyIdeaDetail,
   StudyIdeaSummary,
@@ -1158,6 +1160,13 @@ export interface AppSettings {
   /** Legacy mirror kept for older settings payloads; privacyMode is authoritative. */
   studyAiLocalOnly: boolean;
   studyAiConfirmExternal: boolean;
+  /**
+   * Replace student names with opaque codes (`STU_7K3Q`) before any teaching text
+   * reaches an AI provider, and map them back on the way in. On by default: rosters
+   * hold the names of minors. Covers chat and structured (JSON) calls only —
+   * embeddings, image analysis and audio transcription still see the raw text.
+   */
+  studentPseudonymsEnabled: boolean;
   studyAiMaxInputChars: number;
   studyAiMaxOutputTokens: number;
   studyAiTemperature: number;
@@ -5401,6 +5410,23 @@ export interface NodusApi {
   listStudyRecordings(options?: StudyRecordingListOptions): Promise<StudyRecordingSummary[]>;
   getStudyRecording(id: string): Promise<StudyRecordingDetail>;
   getStudyRecordingContent(id: string): Promise<StudyRecordingContent>;
+  // Student groups (teaching vault). `academicYearId: null` scopes to the groups that
+  // predate academic years; omitting it returns every year.
+  listTeachingGroups(options?: { subjectId?: string | null; academicYearId?: string | null }): Promise<TeachingGroup[]>;
+  getTeachingGroup(id: string): Promise<TeachingGroup>;
+  createTeachingGroup(input: TeachingGroupInput): Promise<TeachingGroup>;
+  updateTeachingGroup(
+    id: string,
+    patch: Partial<Pick<TeachingGroup, 'name' | 'academicYearId' | 'expectedSize' | 'position'>>,
+  ): Promise<TeachingGroup>;
+  deleteTeachingGroup(id: string): Promise<void>;
+  addTeachingStudent(groupId: string, count?: number): Promise<TeachingGroup>;
+  updateTeachingStudent(
+    id: string,
+    patch: Partial<Pick<TeachingStudent, 'givenNames' | 'surnames' | 'comments' | 'position'>>,
+  ): Promise<TeachingStudent>;
+  deleteTeachingStudent(id: string): Promise<void>;
+  importStudentsFromGroup(targetGroupId: string, sourceGroupId: string): Promise<TeachingGroup>;
   // Rubric builder (teaching vault).
   listTeachingRubrics(options?: { subjectId?: string | null; search?: string }): Promise<TeachingRubric[]>;
   getTeachingRubric(id: string): Promise<TeachingRubric>;

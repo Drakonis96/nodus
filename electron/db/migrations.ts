@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 85;
+export const SCHEMA_VERSION = 86;
 
 export const migrations: Migration[] = [
   {
@@ -2881,6 +2881,58 @@ export const migrations: Migration[] = [
       ALTER TABLE teaching_exam_questions
         ADD COLUMN parent_id TEXT REFERENCES teaching_exam_questions(id) ON DELETE CASCADE;
       CREATE INDEX idx_teaching_exam_questions_parent ON teaching_exam_questions(parent_id, position);
+    `,
+  },
+  {
+    version: 86,
+    up: /* sql */ `
+      -- Student groups (teaching vault): the class list a teacher keeps per subject.
+      --
+      -- A group hangs off a SUBJECT, not a course, because the per-student comment is
+      -- inherently subject-scoped — what you note about a student in History is not what
+      -- you note in Geography. Modelling groups as shared rosters (group ⇄ subject
+      -- many-to-many) would force splitting identity from annotation into two tables to
+      -- save nothing but retyping, which the "import from another group" action below
+      -- solves far more cheaply.
+      --
+      -- academic_year_id is carried HERE rather than inherited from the subject: a group
+      -- belongs to one academic year the same way a course does, and that is exactly what
+      -- makes a new year start from an empty list instead of dragging last year's
+      -- students along. It is SET NULL rather than CASCADE so deleting a year archives
+      -- the scoping, never the roster.
+      CREATE TABLE teaching_groups (
+        id TEXT PRIMARY KEY,
+        short_id TEXT NOT NULL UNIQUE,
+        name TEXT NOT NULL,
+        subject_id TEXT NOT NULL REFERENCES study_subjects(id) ON DELETE CASCADE,
+        academic_year_id TEXT REFERENCES study_academic_years(id) ON DELETE SET NULL,
+        -- The "total number of students" the teacher declares up front; used once to
+        -- pre-create that many blank rows. A starting point, never a limit.
+        expected_size INTEGER NOT NULL DEFAULT 0,
+        position INTEGER NOT NULL DEFAULT 0,
+        archived_at TEXT,
+        deleted_at TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_teaching_groups_subject ON teaching_groups(subject_id, academic_year_id);
+
+      -- pseudonym_code is a STORED column, not derived from the name: it has to survive
+      -- a rename, and deriving it from the name (initials, a hash) would defeat the
+      -- point of showing it to an AI instead of the name. See shared/studentPseudonyms.ts.
+      CREATE TABLE teaching_students (
+        id TEXT PRIMARY KEY,
+        group_id TEXT NOT NULL REFERENCES teaching_groups(id) ON DELETE CASCADE,
+        given_names TEXT NOT NULL DEFAULT '',
+        surnames TEXT NOT NULL DEFAULT '',
+        comments TEXT NOT NULL DEFAULT '',
+        pseudonym_code TEXT NOT NULL,
+        position INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE UNIQUE INDEX idx_teaching_students_code ON teaching_students(group_id, pseudonym_code);
+      CREATE INDEX idx_teaching_students_group ON teaching_students(group_id, position);
     `,
   },
 ];

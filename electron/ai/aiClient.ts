@@ -18,6 +18,13 @@ import { jsonrepair } from 'jsonrepair';
 import { startPerf, type PerfContext } from '../perf';
 import { embedWithNodusLocal, ensureNodusLocalServer } from './nodusLocalAi';
 import { getNodusLocalModel } from '@shared/localAiModels';
+import { currentPrivacyScope, type ActivePrivacyScope } from './studentPrivacyContext';
+import {
+  anonymizeText,
+  createStreamDeanonymizer,
+  deanonymizeDeep,
+  findResidualNames,
+} from '@shared/studentPseudonyms';
 
 export class AiError extends Error {
   /**
@@ -164,6 +171,9 @@ interface CallOpts {
   /** Skip the vault-type prompt pack (keep only the output-language directive). Used
    *  for tasks that need consistent output regardless of vault type (image analysis). */
   plainContext?: boolean;
+  /** Opt out of student pseudonymisation for a call that provably carries no roster
+   *  data. Deliberately explicit: see electron/ai/studentPrivacyContext.ts. */
+  skipStudentPseudonyms?: true;
 }
 
 /** Streaming delta. `kind` distinguishes the final answer (`content`, default) from
@@ -292,6 +302,75 @@ function isBadRequest(e: any): boolean {
   return (e?.status ?? e?.response?.status) === 400;
 }
 
+/**
+ * Swaps student names for opaque codes when a teaching feature has opened a privacy
+ * scope. Sits at the very top of both transports, ABOVE the provider branch, so local
+ * and cloud are covered by the same code — the two diverge further down, and the
+ * fallback model can flip a request from one to the other mid-flight.
+ *
+ * FAILS CLOSED. If anonymisation throws, or if a name that should have gone is still
+ * in the payload, nothing is sent. The costs are wildly asymmetric: failing open turns
+ * a bug into an undetectable, irreversible disclosure of minors' names to a third
+ * party, while failing closed costs a blocked action with an obvious way out. A
+ * privacy layer that silently degrades to no privacy is worse than none, because it
+ * manufactures confidence.
+ *
+ * The residual check is what gives "fails closed" any teeth: the likely bug is not an
+ * exception but a silent no-op — an empty scope, a regex that matched nothing — and a
+ * no-op is indistinguishable from success without it.
+ */
+function anonymizeCallOpts(opts: CallOpts): { sent: CallOpts; privacy: ActivePrivacyScope | null } {
+  if (opts.skipStudentPseudonyms) return { sent: opts, privacy: null };
+  const privacy = currentPrivacyScope();
+  if (!privacy) return { sent: opts, privacy: null };
+
+  // Text substitution cannot redact a name written on a scanned exam, and silently
+  // exempting images is exactly the leak this layer claims to prevent.
+  if (opts.images?.length) {
+    throw new AiError(
+      'No se pueden enviar imágenes mientras la seudonimización del alumnado está activa: ' +
+        'el nombre escrito en una imagen no se puede sustituir. Desactívala en Ajustes si aceptas el riesgo.',
+      false
+    );
+  }
+
+  const system = anonymizeText(opts.system, privacy.scope);
+  const user = anonymizeText(opts.user, privacy.scope);
+  privacy.warnings.push(...system.warnings, ...user.warnings);
+
+  const residual = [
+    ...findResidualNames(system.text, privacy.scope),
+    ...findResidualNames(user.text, privacy.scope),
+  ];
+  if (residual.length) {
+    throw new AiError(
+      'No se pudo anonimizar el nombre del alumnado; la solicitud no se ha enviado. ' +
+        'Revisa el listado del grupo o desactiva la seudonimización en Ajustes si aceptas el riesgo.',
+      false
+    );
+  }
+
+  return { sent: { ...opts, system: system.text, user: user.text }, privacy };
+}
+
+/**
+ * Maps codes back to real names on the way in.
+ *
+ * FAILS OPEN, unlike the outbound half: by this point the payload has already been
+ * transmitted, so withholding the answer protects nothing and destroys a result the
+ * user has already paid for. An unresolvable code renders raw rather than being
+ * guessed at.
+ */
+function deanonymizeResult<T>(value: T): T {
+  const privacy = currentPrivacyScope();
+  if (!privacy) return value;
+  try {
+    return deanonymizeDeep(value, privacy.scope);
+  } catch {
+    return value;
+  }
+}
+
 async function rawComplete(
   model: ModelRef,
   opts: CallOpts,
@@ -300,6 +379,12 @@ async function rawComplete(
 ): Promise<string> {
   const key = resolveProviderKey(model.provider);
   if (!key) throw new AiError(`Falta la clave de IA para ${model.provider}. Configúrala en Ajustes.`, false, true);
+
+  // Student names out. Note the asymmetry: what we RETURN stays in code space, because
+  // parseOrRepair may feed this very text back to the model and a repair round-trip
+  // must never re-encounter a real name. The mapping back happens in the public
+  // entry points (completeJson / completeText / completeTextNeutral).
+  opts = anonymizeCallOpts(opts).sent;
 
   if (model.provider === 'anthropic') {
     const Anthropic = (await import('@anthropic-ai/sdk')).default;
@@ -540,7 +625,7 @@ export async function completeJson<T>(
     try {
       const parsed = await parseOrRepair(resolved, text, guard, langOpts.perf);
       if (i > 0) retryDone({ status: 'ok' });
-      return parsed;
+      return deanonymizeResult(parsed);
     } catch (e) {
       retryDone({ status: 'error', error: errorMessage(e), retry: i < attempts.length - 1 });
       lastErr = e;
@@ -553,7 +638,7 @@ export async function completeJson<T>(
 export async function completeText(opts: CallOpts, model?: ModelRef | null): Promise<string> {
   const resolved = resolveModel(model);
   const reasoning = opts.reasoning ?? getSettings().chatReasoning ?? 'off';
-  return rawComplete(resolved, withPromptContext(opts), false, reasoning);
+  return deanonymizeResult(await rawComplete(resolved, withPromptContext(opts), false, reasoning));
 }
 
 /**
@@ -564,7 +649,7 @@ export async function completeText(opts: CallOpts, model?: ModelRef | null): Pro
 export async function completeTextNeutral(opts: CallOpts, model?: ModelRef | null): Promise<string> {
   const resolved = resolveModel(model);
   const reasoning = opts.reasoning ?? 'off';
-  return rawComplete(resolved, opts, false, reasoning);
+  return deanonymizeResult(await rawComplete(resolved, opts, false, reasoning));
 }
 
 /** Plain-text streaming completion. The returned string is the full accumulated answer. */
@@ -589,17 +674,47 @@ async function rawCompleteStream(
   const key = resolveProviderKey(model.provider);
   if (!key) throw new AiError(`Falta la clave de IA para ${model.provider}. Configúrala en Ajustes.`, false, true);
 
+  const { sent, privacy } = anonymizeCallOpts(opts);
+  opts = sent;
+
   let full = '';
+  // Placeholders arrive split across chunk boundaries ("STU_" + "7K3Q"), so the reverse
+  // mapping has to buffer rather than rewrite each delta on its own. Content and
+  // reasoning are independent streams and MUST NOT share a rewriter.
+  const contentRw = privacy ? createStreamDeanonymizer(privacy.scope) : null;
+  const reasoningRw = privacy ? createStreamDeanonymizer(privacy.scope) : null;
+
   // Content deltas accumulate into the returned answer; reasoning deltas are streamed
   // for live display only and never become part of the saved answer.
   const emitContent = (delta: string | null | undefined) => {
     if (!delta) return;
-    full += delta;
-    onDelta(delta, 'content');
+    const text = contentRw ? contentRw.push(delta) : delta;
+    if (!text) return; // the rewriter is holding a partial placeholder
+    full += text;
+    onDelta(text, 'content');
   };
   const emitReasoning = (delta: string | null | undefined) => {
     if (!delta) return;
-    onDelta(delta, 'reasoning');
+    const text = reasoningRw ? reasoningRw.push(delta) : delta;
+    if (!text) return;
+    onDelta(text, 'reasoning');
+  };
+
+  /**
+   * Drains both rewriters. This MUST run on every exit path, including the abort
+   * returns below: an interrupted stream would otherwise silently lose its last few
+   * characters. A `finally` block cannot do this job — `return full` evaluates before
+   * `finally` runs, so the flushed text would never reach the caller.
+   */
+  const finish = (): string => {
+    const restContent = contentRw?.flush();
+    if (restContent) {
+      full += restContent;
+      onDelta(restContent, 'content');
+    }
+    const restReasoning = reasoningRw?.flush();
+    if (restReasoning) onDelta(restReasoning, 'reasoning');
+    return full;
   };
 
   if (model.provider === 'anthropic') {
@@ -625,11 +740,13 @@ async function rawCompleteStream(
     } catch (e: any) {
       // A user-triggered stop surfaces as an abort here — keep the partial answer
       // that already streamed instead of failing the whole turn.
-      if (signal?.aborted) return full;
+      if (signal?.aborted) return finish();
       throw wrapProviderError(e);
     }
-    if (!full.trim()) throw new AiError('Respuesta vacía del proveedor de IA.', false);
-    return full;
+    // Flush before the emptiness check: the held tail can be the whole answer.
+    const answer = finish();
+    if (!answer.trim()) throw new AiError('Respuesta vacía del proveedor de IA.', false);
+    return answer;
   }
 
   const baseURL = model.provider === 'nodus'
@@ -687,12 +804,14 @@ async function rawCompleteStream(
     }
   } catch (e: any) {
     // A user-triggered stop surfaces as an abort here — keep the partial answer.
-    if (signal?.aborted) return full;
+    if (signal?.aborted) return finish();
     if (e instanceof AiError) throw e;
     throw wrapProviderError(e);
   }
-  if (!full.trim()) throw new AiError('Respuesta vacía del proveedor de IA.', false);
-  return full;
+  // Flush before the emptiness check: the held tail can be the whole answer.
+  const answer = finish();
+  if (!answer.trim()) throw new AiError('Respuesta vacía del proveedor de IA.', false);
+  return answer;
 }
 
 function embeddingConfig(): { provider: EmbeddingProvider; modelId: string } {

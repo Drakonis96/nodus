@@ -9,6 +9,7 @@ export type TeachingView =
   | 'studyLibrary'
   | 'studyRecordings'
   | 'studyQuestions'
+  | 'teachingGroups'
   | 'teachingExams'
   | 'teachingRubrics';
 
@@ -23,8 +24,8 @@ interface TeachingGroup { label: string; items: TeachingItem[] }
  */
 const TEACHING_GROUPS: TeachingGroup[] = [
   { label: 'Organización', items: [
-    { label: 'Cursos y asignaturas', icon: 'graduation', view: 'studyCourses' },
-    { label: 'Grupos', icon: 'users' },
+    { label: 'Cursos, asignaturas y grupos', icon: 'graduation', view: 'studyCourses' },
+    { label: 'Grupos', icon: 'users', view: 'teachingGroups' },
     { label: 'Horarios', icon: 'clock', view: 'studySchedule' },
     { label: 'Calendario', icon: 'calendar', view: 'studyCalendar' },
     { label: 'Materiales', icon: 'book', view: 'studyLibrary' },

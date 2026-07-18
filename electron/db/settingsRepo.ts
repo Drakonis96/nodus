@@ -60,6 +60,7 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys' | 'lockedProviderKeys'> = {
   studyAiExcludedSubjectIds: [],
   studyAiLocalOnly: false,
   studyAiConfirmExternal: true,
+  studentPseudonymsEnabled: true,
   studyAiMaxInputChars: 120000,
   studyAiMaxOutputTokens: 4000,
   studyAiTemperature: 0.15,

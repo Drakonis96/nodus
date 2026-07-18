@@ -1402,6 +1402,7 @@ body {
 .docencia .border-indigo-700\/60 { border-color: rgba(194, 65, 12, 0.6); }
 .docencia .border-indigo-800\/60 { border-color: rgba(154, 52, 18, 0.6); }
 .docencia .hover\:border-indigo-700\/60:hover { border-color: rgba(194, 65, 12, 0.6); }
+.docencia .hover\:bg-indigo-600\/20:hover { background-color: rgba(234, 88, 12, 0.20); }
 .docencia .ring-indigo-500 { --tw-ring-color: #f97316; }
 
 .light.docencia .bg-indigo-950,
@@ -1414,6 +1415,7 @@ body {
 .light.docencia .bg-indigo-900\/50 { background-color: #fed7aa; }
 .light.docencia .bg-indigo-600\/15 { background-color: rgba(234, 88, 12, 0.10); }
 .light.docencia .bg-indigo-600\/20 { background-color: rgba(234, 88, 12, 0.14); }
+.light.docencia .hover\:bg-indigo-600\/20:hover { background-color: rgba(234, 88, 12, 0.18); }
 .light.docencia .text-indigo-100,
 .light.docencia .text-indigo-200 { color: #7c2d12; }
 .light.docencia .text-indigo-300 { color: #c2410c; }

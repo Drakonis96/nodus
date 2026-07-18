@@ -1301,6 +1301,17 @@ export function Settings({
               </select>
             </Row>
             <Row
+              label={t('Ocultar los nombres del alumnado a la IA')}
+              hint={t('Los nombres de los grupos se sustituyen por identificadores antes de enviarlos, y se restauran al recibir la respuesta. No cubre transcripción de audio, análisis de imágenes ni embeddings.')}
+            >
+              <input
+                type="checkbox"
+                data-testid="settings-student-pseudonyms"
+                checked={settings.studentPseudonymsEnabled}
+                onChange={(e) => patch({ studentPseudonymsEnabled: e.target.checked })}
+              />
+            </Row>
+            <Row
               label={t('OpenRouter: priorizar velocidad')}
               hint={t('Enruta hacia el proveedor más rápido disponible. Puede aumentar ligeramente el coste.')}
             >
