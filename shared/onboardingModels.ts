@@ -1,5 +1,5 @@
 import type { AiProvider, EmbeddingProvider, ModelInfo, ModelRef } from './types';
-import { AI_PROVIDERS, EMBEDDING_PROVIDERS, PROVIDER_LABELS, isLocalProvider } from './providers';
+import { AI_PROVIDERS, EMBEDDING_PROVIDERS, PROVIDER_LABELS, SECRET_PROVIDERS, isLocalProvider } from './providers';
 
 // Pure helpers behind the setup wizard's provider step. The wizard asks the user
 // for nothing it can find out on its own: it queries every provider that already
@@ -35,12 +35,12 @@ export function autoDiscoverableEmbeddingProviders(keys: ProviderKeyMap): Embedd
 /** Cloud providers with no key yet — the only ones worth offering in the "add a
  *  key" prompt, since local ones are already reachable without one. */
 export function providersMissingKey(keys: ProviderKeyMap): AiProvider[] {
-  return AI_PROVIDERS.filter((provider) => !isLocalProvider(provider) && !keys[provider]);
+  return SECRET_PROVIDERS.filter((provider) => !isLocalProvider(provider) && !keys[provider]);
 }
 
 /** Cloud providers whose key is already stored, in picker order. */
 export function configuredKeyProviders(keys: ProviderKeyMap): AiProvider[] {
-  return AI_PROVIDERS.filter((provider) => !isLocalProvider(provider) && Boolean(keys[provider]));
+  return SECRET_PROVIDERS.filter((provider) => !isLocalProvider(provider) && Boolean(keys[provider]));
 }
 
 export interface ModelChoice {

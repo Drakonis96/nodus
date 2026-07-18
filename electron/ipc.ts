@@ -187,6 +187,23 @@ import { recoverLegacyApiKeys } from './secrets/legacySecretRecovery';
 import { runAutoBackupNow } from './export/autoBackup';
 import { MIN_BACKUP_PASSWORD_LENGTH } from './export/backupCrypto';
 import { listEmbeddingModels, listModels, testLocalProvider } from './ai/providers';
+import {
+  cancelChatGptSubscriptionLogin,
+  getChatGptSubscriptionStatus,
+  listChatGptSubscriptionModels,
+  logoutChatGptSubscription,
+  onChatGptSubscriptionStatusChanged,
+  startChatGptSubscriptionLogin,
+} from './ai/codexSubscription';
+import {
+  cancelGitHubCopilotSubscriptionLogin,
+  getGitHubCopilotSubscriptionStatus,
+  listGitHubCopilotSubscriptionModels,
+  logoutGitHubCopilotSubscription,
+  onGitHubCopilotSubscriptionStatusChanged,
+  startGitHubCopilotSubscriptionLogin,
+} from './ai/githubCopilotSubscription';
+import { getOpenCodeGoUsageStatus, onOpenCodeGoUsageStatusChanged } from './ai/openCodeGoUsage';
 import { listImageModels } from './ai/imageModels';
 import {
   applyDecorativeImageOption,
@@ -655,6 +672,22 @@ export function registerIpc(
   const studyImproveAborters = new Map<string, AbortController>();
   const studyAssistantAborters = new Map<string, AbortController>();
   const studyGradingAborters = new Map<string, AbortController>();
+
+  onChatGptSubscriptionStatusChanged((status) => {
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) win.webContents.send('ai:chatgptSubscription:statusChanged', status);
+    }
+  });
+  onGitHubCopilotSubscriptionStatusChanged((status) => {
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) win.webContents.send('ai:githubCopilotSubscription:statusChanged', status);
+    }
+  });
+  onOpenCodeGoUsageStatusChanged((status) => {
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) win.webContents.send('ai:openCodeGo:usageChanged', status);
+    }
+  });
 
   const emitVaultChanged = () => {
     const payload = withVaultKeyProviders(getActiveVault());
@@ -1688,8 +1721,24 @@ export function registerIpc(
     return result;
   });
 
+  h('ai:chatgptSubscription:status', async () => getChatGptSubscriptionStatus());
+  h('ai:chatgptSubscription:login', async () => startChatGptSubscriptionLogin());
+  h('ai:chatgptSubscription:cancelLogin', async (_event, loginId: string) =>
+    cancelChatGptSubscriptionLogin(loginId)
+  );
+  h('ai:chatgptSubscription:logout', async () => logoutChatGptSubscription());
+  h('ai:githubCopilotSubscription:status', async () => getGitHubCopilotSubscriptionStatus());
+  h('ai:githubCopilotSubscription:login', async () => startGitHubCopilotSubscriptionLogin());
+  h('ai:githubCopilotSubscription:cancelLogin', async () => cancelGitHubCopilotSubscriptionLogin());
+  h('ai:githubCopilotSubscription:logout', async () => logoutGitHubCopilotSubscription());
+  h('ai:openCodeGo:usage', async () => getOpenCodeGoUsageStatus());
+
   // AI model discovery (OpenRouter needs no key; others use the stored key).
-  h('ai:listModels', async (_e, provider: AiProvider) => listModels(provider, getApiKey(provider)));
+  h('ai:listModels', async (_e, provider: AiProvider) => {
+    if (provider === 'codex') return listChatGptSubscriptionModels();
+    if (provider === 'github-copilot') return listGitHubCopilotSubscriptionModels();
+    return listModels(provider, getApiKey(provider));
+  });
   h('ai:listEmbeddingModels', async (_e, provider: EmbeddingProvider) =>
     listEmbeddingModels(provider, getApiKey(provider))
   );

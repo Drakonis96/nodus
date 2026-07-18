@@ -1088,6 +1088,84 @@ export const DE: Record<string, string> = {
   'sin claves': 'keine Schlüssel',
   'Las claves de API y los modelos configurados se comparten entre todas tus bóvedas.':
     'API-Schlüssel und die konfigurierten Modelle werden von allen Ihren Arbeitsbereichen gemeinsam genutzt.',
+  'comprobando…': 'wird geprüft…',
+  'suscripción conectada': 'Abonnement verbunden',
+  'sin conectar': 'nicht verbunden',
+  'Conexión mediante el protocolo oficial Codex App Server y el acceso gestionado de ChatGPT. Nodus no lee ni almacena tus credenciales.':
+    'Verbindung über das offizielle Codex-App-Server-Protokoll und die verwaltete ChatGPT-Anmeldung. Nodus liest oder speichert Ihre Zugangsdaten nicht.',
+  'Nodus es una aplicación independiente y no está afiliada, certificada ni respaldada por OpenAI.':
+    'Nodus ist eine unabhängige Anwendung und weder mit OpenAI verbunden noch von OpenAI zertifiziert oder unterstützt.',
+  'El uso consume la cuota o los créditos de Codex incluidos en tu plan de ChatGPT; no consume saldo de la API de OpenAI.':
+    'Die Nutzung verbraucht das in Ihrem ChatGPT-Tarif enthaltene Codex-Kontingent bzw. Guthaben, nicht das OpenAI-API-Guthaben.',
+  'Funciona como motor de Nodi, análisis y Deep Research de Nodus. No es el producto Deep Research de la web de ChatGPT.':
+    'Die Laufzeit betreibt Nodi, Analysen und Nodus Deep Research. Sie ist nicht das Deep-Research-Produkt der ChatGPT-Webseite.',
+  'Cada petición usa un hilo efímero aislado, sin acceso de escritura, sin red de herramientas y sin cargar tus MCP, plugins o instrucciones personales.':
+    'Jede Anfrage nutzt einen isolierten, flüchtigen Thread ohne Schreibzugriff, ohne Werkzeugnetzwerk und ohne Ihre MCP-Server, Plugins oder persönlichen Anweisungen zu laden.',
+  'Documentación oficial de Codex App Server ↗': 'Offizielle Dokumentation zu Codex App Server ↗',
+  'Conectado': 'Verbunden',
+  'Actualizar estado': 'Status aktualisieren',
+  'Cerrar sesión': 'Abmelden',
+  'Límite principal': 'Primäres Limit',
+  'Límite secundario': 'Sekundäres Limit',
+  'Cargar modelos de Codex': 'Codex-Modelle laden',
+  'Cada modelo muestra únicamente los niveles de razonamiento publicados por Codex. «Predeterminado» usa el nivel recomendado por el modelo.':
+    'Jedes Modell zeigt nur die von Codex veröffentlichten Reasoning-Stufen. „Standard“ verwendet die vom Modell empfohlene Stufe.',
+  'Razonamiento de {model}': 'Reasoning für {model}',
+  '{level} (predeterminado)': '{level} (Standard)',
+  Ninguno: 'Keines',
+  Alto: 'Hoch',
+  'Muy alto': 'Sehr hoch',
+  Ultra: 'Ultra',
+  'Esperando acceso en el navegador…': 'Warten auf die Anmeldung im Browser…',
+  'Conectar suscripción de ChatGPT': 'ChatGPT-Abonnement verbinden',
+  'Cancelar acceso': 'Anmeldung abbrechen',
+  'Comprobar estado': 'Status prüfen',
+  'Se restablece: {time}': 'Zurücksetzung: {time}',
+  'Créditos adicionales': 'Zusätzliche Credits',
+  'Ilimitados': 'Unbegrenzt',
+  'Disponibles': 'Verfügbar',
+  'Sin créditos': 'Keine Credits',
+  '{n}% restante': '{n} % verbleibend',
+  '{n}% usado': '{n} % verwendet',
+  'SDK oficial · preview': 'Offizielles SDK · Vorschau',
+  'Nodus usa el SDK y el runtime oficiales de GitHub Copilot. Cada petición se factura a la suscripción de GitHub del usuario; no requiere claves de los modelos.':
+    'Nodus verwendet das offizielle GitHub-Copilot-SDK und die offizielle Laufzeit. Jede Anfrage wird dem GitHub-Abonnement des Benutzers angerechnet; Modell-API-Schlüssel sind nicht erforderlich.',
+  'La integración oficial está en public preview. Nodus es independiente y no está afiliada, certificada ni respaldada por GitHub.':
+    'Die offizielle Integration befindet sich in der öffentlichen Vorschau. Nodus ist unabhängig und weder mit GitHub verbunden noch von GitHub zertifiziert oder unterstützt.',
+  'Cada petición se ejecuta en una sesión efímera sin herramientas, MCP, memoria, acceso a archivos, GitHub ni instrucciones del proyecto.':
+    'Jede Anfrage läuft in einer flüchtigen Sitzung ohne Tools, MCP, Speicher, Datei- oder GitHub-Zugriff und ohne Projektanweisungen.',
+  'Documentación oficial del SDK de Copilot ↗': 'Offizielle Copilot-SDK-Dokumentation ↗',
+  'Actualizar cuota': 'Kontingent aktualisieren',
+  'GitHub no devolvió un contador de cuota para esta cuenta.': 'GitHub hat für dieses Konto keinen Kontingentzähler zurückgegeben.',
+  'Última petición en Nodus: {cost} créditos/solicitudes premium · {input} tokens de entrada · {output} de salida':
+    'Letzte Nodus-Anfrage: {cost} Credits/Premium-Anfragen · {input} Eingabe-Token · {output} Ausgabe-Token',
+  'Cargar modelos de Copilot': 'Copilot-Modelle laden',
+  'Esperando acceso de GitHub en el navegador…': 'Warten auf die GitHub-Anmeldung im Browser…',
+  'Conectar GitHub Copilot': 'GitHub Copilot verbinden',
+  'El runtime oficial abre el flujo OAuth de dispositivo y guarda su credencial en el almacén seguro del sistema. Si ya usas GitHub CLI, puede reutilizar esa sesión sin modificarla.':
+    'Die offizielle Laufzeit öffnet den OAuth-Gerätefluss und speichert die Anmeldedaten im sicheren Systemspeicher. Eine vorhandene GitHub-CLI-Sitzung kann unverändert wiederverwendet werden.',
+  'Créditos / solicitudes premium': 'Credits / Premium-Anfragen',
+  'Ilimitado según GitHub': 'Laut GitHub unbegrenzt',
+  '{remaining} de {total} restantes · {used} usadas': '{remaining} von {total} verbleibend · {used} verwendet',
+  '{n} de uso adicional': '{n} zusätzliche Nutzung',
+  'OpenCode documenta el uso directo de la suscripción Go mediante esta clave y sus endpoints oficiales. Nodus es independiente y no está afiliada, certificada ni respaldada por OpenCode.':
+    'OpenCode dokumentiert die direkte Nutzung des Go-Abonnements über diesen Schlüssel und seine offiziellen Endpunkte. Nodus ist unabhängig und weder mit OpenCode verbunden noch zertifiziert oder unterstützt.',
+  'Límites generales publicados: 12 USD cada 5 horas, 30 USD por semana y 60 USD por mes. Algunos modelos tienen un límite mensual efectivo inferior (15 USD); el número de peticiones depende del modelo y puede cambiar.':
+    'Veröffentlichte allgemeine Limits: 12 USD je 5 Stunden, 30 USD pro Woche und 60 USD pro Monat. Einige Modelle haben ein niedrigeres effektives Monatslimit (15 USD); die Anzahl der Anfragen hängt vom Modell ab und kann sich ändern.',
+  'Saldo restante oficial: OpenCode solo lo publica en Console; no ofrece una API de cuota compatible con la clave de usuario. Nodus no usa cookies ni endpoints privados.':
+    'Offizieller Restsaldo: OpenCode veröffentlicht ihn nur in Console und bietet keine mit dem Benutzerschlüssel kompatible Kontingent-API. Nodus verwendet weder Cookies noch private Endpunkte.',
+  'Últimas 5 horas': 'Letzte 5 Stunden',
+  'Últimos 7 días': 'Letzte 7 Tage',
+  'Últimos 30 días': 'Letzte 30 Tage',
+  'El gasto observado es una estimación local de las peticiones hechas por Nodus con precios oficiales; no incluye otros clientes y no equivale al saldo restante.':
+    'Die beobachteten Ausgaben sind eine lokale Schätzung der von Nodus gestellten Anfragen zu offiziellen Preisen; andere Clients sind nicht enthalten und sie entsprechen nicht dem Restsaldo.',
+  'Ver saldo restante oficial en OpenCode Console ↗': 'Offiziellen Restsaldo in OpenCode Console anzeigen ↗',
+  'Documentación oficial de OpenCode Go ↗': 'Offizielle OpenCode-Go-Dokumentation ↗',
+  '{requests} peticiones · ~${spent} observados · ${cap} de tope general de referencia': '{requests} Anfragen · ~${spent} beobachtet · ${cap} allgemeines Referenzlimit',
+  '{n} sin precio estimable': '{n} ohne schätzbaren Preis',
+  'Anthropic no permite que aplicaciones de terceros ofrezcan inicio de sesión de Claude.ai ni utilicen credenciales de suscripciones Free, Pro o Max. Por ello Claude se conecta aquí únicamente mediante la API oficial.':
+    'Anthropic gestattet Drittanbieter-Apps weder die Claude.ai-Anmeldung noch die Nutzung von Zugangsdaten für Free-, Pro- oder Max-Abonnements. Claude wird hier daher ausschließlich über die offizielle API verbunden.',
+  'Política oficial de Anthropic ↗': 'Offizielle Anthropic-Richtlinie ↗',
   'Nodus ha encontrado claves de API cifradas que todavía no puede leer.': 'Nodus hat verschlüsselte API-Schlüssel gefunden, die es noch nicht lesen kann.',
   'No se han borrado. Pulsa recuperar y autoriza el acceso al Llavero de macOS si el sistema lo solicita.':
     'Sie wurden nicht gelöscht. Wählen Sie „Wiederherstellen“ und autorisieren Sie den Zugriff auf den macOS-Schlüsselbund, falls das System danach fragt.',
@@ -1327,8 +1405,8 @@ export const DE: Record<string, string> = {
   'Reindexar todo': 'Alles neu indexieren',
   'Llamadas simultáneas': 'Gleichzeitige Aufrufe',
   'Razonamiento (chat/tutor/escritura)': 'Reasoning (Chat/Tutor/Schreiben)',
-  'Los escaneos siempre usan razonamiento desactivado para ir más rápido. Esto solo afecta a las respuestas conversacionales.':
-    'Scans laufen zur Beschleunigung immer mit deaktiviertem Reasoning. Dies betrifft nur die Chat-Antworten.',
+  'Los escaneos siempre usan razonamiento desactivado para ir más rápido. Esto solo afecta a las respuestas conversacionales. En Codex se configura por modelo dentro de Proveedores.':
+    'Scans laufen zur Beschleunigung immer mit deaktiviertem Reasoning. Dies betrifft nur die Chat-Antworten. Für Codex wird es pro Modell unter Anbieter eingestellt.',
   'Desactivado (más rápido)': 'Deaktiviert (schneller)',
   'Bajo': 'Niedrig',
   'Medio': 'Mittel',

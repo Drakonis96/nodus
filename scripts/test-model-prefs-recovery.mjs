@@ -112,6 +112,12 @@ const prefs = JSON.parse(readFileSync(path.join(userData, 'app-prefs.json'), 'ut
 assert.equal(prefs.v23ModelPrefsRecoveryVersion, 1, 'the repair is marked as one-shot');
 settingsRepo.updateSettings({ embeddingProvider: 'openai', embeddingModel: 'text-embedding-3-small' });
 assert.equal(settingsRepo.getSettings().embeddingProvider, 'openai', 'a later intentional change is not reverted');
+settingsRepo.updateSettings({ codexReasoningEfforts: { 'gpt-test': 'xhigh', 'stale-model': '../turbo' } });
+assert.deepEqual(
+  settingsRepo.getSettings().codexReasoningEfforts,
+  { 'gpt-test': 'xhigh' },
+  'Codex reasoning preferences reject unsafe values outside the protocol identifier shape'
+);
 
 database.closeDb();
 registry.setActiveVault(secondary.id);
@@ -124,6 +130,7 @@ db.prepare(`INSERT INTO ideas (
 const secondarySettings = settingsRepo.getSettings();
 assert.equal(secondarySettings.embeddingProvider, 'openai', 'each vault recovers against its own independent index');
 assert.equal(secondarySettings.embeddingModel, 'text-embedding-3-small');
+assert.deepEqual(secondarySettings.codexReasoningEfforts, { 'gpt-test': 'xhigh' }, 'Codex reasoning preferences are shared across vaults');
 
 database.closeDb();
 console.log('2.3 model preference recovery tests passed');

@@ -780,6 +780,9 @@ export interface ExternalRef {
 export type AiProvider =
   | 'anthropic'
   | 'openai'
+  | 'codex'
+  | 'github-copilot'
+  | 'opencode-go'
   | 'openrouter'
   | 'groq'
   | 'cerebras'
@@ -810,6 +813,94 @@ export interface LocalProviderTestResult {
   modelCount?: number;
   /** Human-readable error when `ok` is false. */
   message?: string;
+}
+
+/** A rolling usage window reported by the official Codex App Server. */
+export interface ChatGptSubscriptionRateLimitWindow {
+  usedPercent: number;
+  windowDurationMins: number | null;
+  /** Unix timestamp (seconds), as returned by Codex. */
+  resetsAt: number | null;
+}
+
+/** ChatGPT-plan quota exposed by Codex. This is separate from OpenAI API billing. */
+export interface ChatGptSubscriptionRateLimits {
+  primary: ChatGptSubscriptionRateLimitWindow | null;
+  secondary: ChatGptSubscriptionRateLimitWindow | null;
+  credits: { hasCredits: boolean; unlimited: boolean; balance: string | null } | null;
+}
+
+/** Renderer-safe view of the managed ChatGPT login. OAuth tokens never cross IPC. */
+export interface ChatGptSubscriptionStatus {
+  available: boolean;
+  connected: boolean;
+  loginPending: boolean;
+  email: string | null;
+  planType: string | null;
+  rateLimits: ChatGptSubscriptionRateLimits | null;
+  error: string | null;
+}
+
+export interface ChatGptSubscriptionLogin {
+  loginId: string;
+  authUrl: string;
+}
+
+/** One account-level quota bucket returned by the official GitHub Copilot runtime. */
+export interface GitHubCopilotSubscriptionQuotaWindow {
+  id: string;
+  unlimited: boolean;
+  entitlementRequests: number;
+  usedRequests: number;
+  remainingRequests: number | null;
+  remainingPercentage: number;
+  overage: number;
+  overageAllowed: boolean;
+  usageAllowedAfterExhaustion: boolean;
+  resetDate: string | null;
+  tokenBasedBilling: boolean;
+  hasQuota: boolean;
+}
+
+export interface GitHubCopilotSessionUsage {
+  model: string;
+  premiumRequestCost: number;
+  userRequests: number;
+  inputTokens: number;
+  outputTokens: number;
+}
+
+/** Renderer-safe status. GitHub tokens and keychain records never cross IPC. */
+export interface GitHubCopilotSubscriptionStatus {
+  available: boolean;
+  connected: boolean;
+  loginPending: boolean;
+  login: string | null;
+  authType: string | null;
+  statusMessage: string | null;
+  canLogout: boolean;
+  quota: GitHubCopilotSubscriptionQuotaWindow[];
+  lastSession: GitHubCopilotSessionUsage | null;
+  error: string | null;
+}
+
+/** Usage Nodus can observe locally for OpenCode Go. The authoritative balance
+ * remains in OpenCode Console because no supported user-key quota API exists. */
+export interface OpenCodeGoUsagePeriod {
+  requests: number;
+  estimatedCostUsd: number;
+  unpricedRequests: number;
+}
+
+export interface OpenCodeGoUsageStatus {
+  officialUsageUrl: string;
+  limitsUsd: { fiveHours: number; week: number; month: number };
+  observed: {
+    fiveHours: OpenCodeGoUsagePeriod;
+    week: OpenCodeGoUsagePeriod;
+    month: OpenCodeGoUsagePeriod;
+  };
+  lastUpdatedAt: string | null;
 }
 export type DecorativeImageEntityKind = 'immersion' | 'deep_research';
 export type DecorativeImageStatus = 'not_requested' | 'pending' | 'ready' | 'failed';
@@ -909,6 +1000,13 @@ export interface ModelInfo {
   group?: string;
   /** For OpenRouter: true when the model is a reasoning model (slower for scans). */
   reasoning?: boolean;
+  /** Codex App Server: exact effort choices advertised for this model. */
+  supportedReasoningEfforts?: Array<{
+    reasoningEffort: CodexReasoningEffort;
+    description: string;
+  }>;
+  /** Codex App Server's recommended effort when the user leaves the model on default. */
+  defaultReasoningEffort?: CodexReasoningEffort;
   // ── Local-provider metadata (Ollama / LM Studio). All optional; other
   //    providers omit them and the UI only renders what is present. ────────────
   /** On-disk size in bytes (Ollama). */
@@ -931,6 +1029,12 @@ export interface ModelInfo {
 /** How hard a model should "think" before answering. `off` skips the chain-of-thought
  *  on reasoning models where the provider supports it (much faster for scanning). */
 export type ReasoningEffort = 'off' | 'low' | 'medium' | 'high';
+
+/** Codex deliberately types effort as an extensible string. The literals preserve
+ * autocomplete for current catalogs; availability still comes from each ModelInfo. */
+export type CodexReasoningEffort =
+  | 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra'
+  | (string & {});
 
 // ── Audio / text-to-speech ───────────────────────────────────────────────────
 /** Audio (text-to-speech) backends. Both current providers run fully local in the
@@ -1249,6 +1353,8 @@ export interface AppSettings {
   // Reasoning effort for interactive long-form calls (chat, tutor, debate, writing).
   // Scans always run with reasoning off for speed, regardless of this value.
   chatReasoning: ReasoningEffort;
+  /** Per-model Codex reasoning overrides. Missing means use that model's advertised default. */
+  codexReasoningEfforts: Record<string, CodexReasoningEffort>;
   // When using OpenRouter, bias routing toward the fastest upstream provider.
   openRouterThroughput: boolean;
   unpaywallEmail: string;
@@ -5143,6 +5249,25 @@ export interface NodusApi {
   onApiKeysRecovered(
     cb: (result: { recoveredProviders: AiProvider[]; remainingLockedProviders: AiProvider[] }) => void
   ): () => void;
+
+  // Managed ChatGPT subscription login through the official Codex App Server.
+  // Credentials remain in Codex's OS-keychain-backed store and never cross IPC.
+  getChatGptSubscriptionStatus(): Promise<ChatGptSubscriptionStatus>;
+  startChatGptSubscriptionLogin(): Promise<ChatGptSubscriptionLogin>;
+  cancelChatGptSubscriptionLogin(loginId: string): Promise<ChatGptSubscriptionStatus>;
+  logoutChatGptSubscription(): Promise<ChatGptSubscriptionStatus>;
+  onChatGptSubscriptionStatusChanged(cb: (status: ChatGptSubscriptionStatus) => void): () => void;
+
+  // GitHub Copilot subscription access through GitHub's official SDK/CLI.
+  getGitHubCopilotSubscriptionStatus(): Promise<GitHubCopilotSubscriptionStatus>;
+  startGitHubCopilotSubscriptionLogin(): Promise<GitHubCopilotSubscriptionStatus>;
+  cancelGitHubCopilotSubscriptionLogin(): Promise<GitHubCopilotSubscriptionStatus>;
+  logoutGitHubCopilotSubscription(): Promise<GitHubCopilotSubscriptionStatus>;
+  onGitHubCopilotSubscriptionStatusChanged(cb: (status: GitHubCopilotSubscriptionStatus) => void): () => void;
+
+  // OpenCode Go exposes inference/models by API key, but live remaining quota in Console.
+  getOpenCodeGoUsageStatus(): Promise<OpenCodeGoUsageStatus>;
+  onOpenCodeGoUsageStatusChanged(cb: (status: OpenCodeGoUsageStatus) => void): () => void;
 
   // AI model discovery
   listModels(provider: AiProvider): Promise<ModelInfo[]>;

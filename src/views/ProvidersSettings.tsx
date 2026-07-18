@@ -2,11 +2,17 @@ import { useEffect, useMemo, useState } from 'react';
 import type {
   AiProvider,
   AppSettings,
+  ChatGptSubscriptionRateLimitWindow,
+  ChatGptSubscriptionStatus,
+  CodexReasoningEffort,
+  GitHubCopilotSubscriptionQuotaWindow,
+  GitHubCopilotSubscriptionStatus,
   ImageModelInfo,
   LocalProvider,
   LocalProviderTestResult,
   ModelInfo,
   ModelRef,
+  OpenCodeGoUsageStatus,
 } from '@shared/types';
 import { DECORATIVE_IMAGE_STYLES } from '@shared/imageStyles';
 import { DEFAULT_LOCAL_BASE_URLS } from '@shared/providers';
@@ -100,7 +106,25 @@ export function ProvidersSettings({
 
       <div className="space-y-2">
         {AI_PROVIDERS.map((p) =>
-          isLocalAiProvider(p) ? (
+          p === 'codex' ? (
+            <ChatGptSubscriptionRow
+              key={p}
+              settings={settings}
+              expanded={open === p}
+              onToggle={() => setOpen(open === p ? null : p)}
+              onChange={onChange}
+              isFav={isFav}
+              toggleFav={toggleFav}
+            />
+          ) : p === 'github-copilot' ? (
+            <GitHubCopilotSubscriptionRow
+              key={p}
+              expanded={open === p}
+              onToggle={() => setOpen(open === p ? null : p)}
+              isFav={isFav}
+              toggleFav={toggleFav}
+            />
+          ) : isLocalAiProvider(p) ? (
             <LocalProviderRow
               key={p}
               provider={p as LocalProvider}
@@ -127,6 +151,375 @@ export function ProvidersSettings({
       </div>
     </section>
     </>
+  );
+}
+
+function ChatGptSubscriptionRow({
+  settings,
+  expanded,
+  onToggle,
+  onChange,
+  isFav,
+  toggleFav,
+}: {
+  settings: AppSettings;
+  expanded: boolean;
+  onToggle: () => void;
+  onChange: () => Promise<unknown>;
+  isFav: (m: ModelRef) => boolean;
+  toggleFav: (m: ModelRef) => Promise<void>;
+}) {
+  const [status, setStatus] = useState<ChatGptSubscriptionStatus | null>(null);
+  const [loginId, setLoginId] = useState<string | null>(null);
+  const [models, setModels] = useState<ModelInfo[] | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadingModels, setLoadingModels] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+
+  const refresh = async () => {
+    setLoading(true);
+    setError(null);
+    try { setStatus(await window.nodus.getChatGptSubscriptionStatus()); }
+    catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+    finally { setLoading(false); }
+  };
+
+  useEffect(() => {
+    void refresh();
+    return window.nodus.onChatGptSubscriptionStatusChanged((next) => {
+      setStatus(next);
+      if (!next.loginPending) setLoginId(null);
+    });
+  }, []);
+
+  const connect = async () => {
+    setError(null);
+    try {
+      const login = await window.nodus.startChatGptSubscriptionLogin();
+      setLoginId(login.loginId);
+      await window.nodus.openExternal(login.authUrl);
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+  };
+
+  const cancelLogin = async () => {
+    if (!loginId) return;
+    setError(null);
+    try { setStatus(await window.nodus.cancelChatGptSubscriptionLogin(loginId)); }
+    catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+    finally { setLoginId(null); }
+  };
+
+  const logout = async () => {
+    setError(null);
+    try {
+      setStatus(await window.nodus.logoutChatGptSubscription());
+      setModels(null);
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+  };
+
+  const loadModels = async () => {
+    setLoadingModels(true);
+    setError(null);
+    try { setModels(await window.nodus.listModels('codex')); }
+    catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+    finally { setLoadingModels(false); }
+  };
+
+  const setReasoning = async (model: string, effort: CodexReasoningEffort | null) => {
+    const next = { ...(settings.codexReasoningEfforts ?? {}) };
+    if (effort) next[model] = effort;
+    else delete next[model];
+    await window.nodus.updateSettings({ codexReasoningEfforts: next });
+    await onChange();
+  };
+
+  const filtered = (models ?? []).filter((model) => {
+    const query = search.toLowerCase();
+    return !query || model.id.toLowerCase().includes(query) || (model.name ?? '').toLowerCase().includes(query);
+  });
+
+  return (
+    <div className="rounded-lg border border-indigo-200 bg-indigo-50/60 dark:border-indigo-700/50 dark:bg-indigo-950/10" data-testid="chatgpt-subscription-provider">
+      <button className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm" onClick={onToggle}>
+        <span className="text-neutral-500">{expanded ? '▾' : '▸'}</span>
+        <span className="font-medium">{PROVIDER_LABELS.codex}</span>
+        {loading ? (
+          <span className="text-xs text-neutral-600">{t('comprobando…')}</span>
+        ) : (
+          <span className={status?.connected ? 'text-emerald-400 text-xs' : 'text-neutral-600 text-xs'}>
+            {status?.connected ? `● ${t('suscripción conectada')}` : `○ ${t('sin conectar')}`}
+          </span>
+        )}
+        {status?.planType && <span className="ml-auto text-[10px] uppercase tracking-wide text-indigo-700 dark:text-indigo-300">{status.planType}</span>}
+      </button>
+
+      {expanded && (
+        <div className="space-y-3 px-3 pb-3">
+          <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-xs leading-5 text-neutral-600 dark:border-indigo-800/60 dark:bg-indigo-950/20 dark:text-neutral-400">
+            <p>{t('Conexión mediante el protocolo oficial Codex App Server y el acceso gestionado de ChatGPT. Nodus no lee ni almacena tus credenciales.')}</p>
+            <p className="mt-1">{t('Nodus es una aplicación independiente y no está afiliada, certificada ni respaldada por OpenAI.')}</p>
+            <p className="mt-1">{t('El uso consume la cuota o los créditos de Codex incluidos en tu plan de ChatGPT; no consume saldo de la API de OpenAI.')}</p>
+            <p className="mt-1">{t('Funciona como motor de Nodi, análisis y Deep Research de Nodus. No es el producto Deep Research de la web de ChatGPT.')}</p>
+            <p className="mt-1">{t('Cada petición usa un hilo efímero aislado, sin acceso de escritura, sin red de herramientas y sin cargar tus MCP, plugins o instrucciones personales.')}</p>
+            <button className="mt-1 text-indigo-700 hover:text-indigo-800 dark:text-indigo-300 dark:hover:text-indigo-200" onClick={() => window.nodus.openExternal('https://learn.chatgpt.com/docs/app-server')}>
+              {t('Documentación oficial de Codex App Server ↗')}
+            </button>
+          </div>
+
+          {status?.connected ? (
+            <>
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <span className="text-emerald-600 dark:text-emerald-400">{t('Conectado')}</span>
+                {status.email && <span className="text-neutral-600 dark:text-neutral-400">{status.email}</span>}
+                <button className="btn btn-ghost border border-neutral-300 dark:border-neutral-700" onClick={() => void refresh()} disabled={loading}>
+                  {t('Actualizar estado')}
+                </button>
+                <button className="btn btn-ghost text-red-600 dark:text-red-400" onClick={() => void logout()}>{t('Cerrar sesión')}</button>
+              </div>
+              {status.rateLimits && (
+                <>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <RateLimitCard label={t('Límite principal')} window={status.rateLimits.primary} />
+                    <RateLimitCard label={t('Límite secundario')} window={status.rateLimits.secondary} />
+                  </div>
+                  {status.rateLimits.credits && (
+                    <div className="rounded-lg border border-neutral-200 p-2 text-[11px] text-neutral-500 dark:border-neutral-800">
+                      <div className="flex justify-between gap-3">
+                        <span>{t('Créditos adicionales')}</span>
+                        <span className="text-neutral-700 dark:text-neutral-300">
+                          {status.rateLimits.credits.unlimited
+                            ? t('Ilimitados')
+                            : status.rateLimits.credits.balance ?? (status.rateLimits.credits.hasCredits ? t('Disponibles') : t('Sin créditos'))}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+              <div className="flex gap-2 items-center">
+                <button className="btn btn-ghost border border-neutral-300 dark:border-neutral-700" onClick={() => void loadModels()} disabled={loadingModels}>
+                  {loadingModels ? t('Cargando…') : t('Cargar modelos de Codex')}
+                </button>
+                {models && <input className="input flex-1" placeholder={t('Buscar modelo…')} value={search} onChange={(e) => setSearch(e.target.value)} />}
+                {models && <span className="text-xs text-neutral-500">{filtered.length}</span>}
+              </div>
+              {models && (
+                <>
+                  <p className="text-[11px] leading-5 text-neutral-500">
+                    {t('Cada modelo muestra únicamente los niveles de razonamiento publicados por Codex. «Predeterminado» usa el nivel recomendado por el modelo.')}
+                  </p>
+                  <SettingsModelList className="max-h-72 overflow-y-auto" data-testid="provider-model-list-codex">
+                    <ModelList
+                      provider="codex"
+                      models={filtered.slice(0, 300)}
+                      isFav={isFav}
+                      toggleFav={toggleFav}
+                      codexReasoningEfforts={settings.codexReasoningEfforts}
+                      onCodexReasoningChange={setReasoning}
+                    />
+                  </SettingsModelList>
+                </>
+              )}
+            </>
+          ) : (
+            <div className="flex flex-wrap items-center gap-2">
+              <button className="btn btn-primary" onClick={() => void connect()} disabled={status?.loginPending}>
+                {status?.loginPending ? t('Esperando acceso en el navegador…') : t('Conectar suscripción de ChatGPT')}
+              </button>
+              {status?.loginPending && loginId && (
+                <button className="btn btn-ghost" onClick={() => void cancelLogin()}>{t('Cancelar acceso')}</button>
+              )}
+              <button className="btn btn-ghost border border-neutral-300 dark:border-neutral-700" onClick={() => void refresh()} disabled={loading}>{t('Comprobar estado')}</button>
+            </div>
+          )}
+
+          {(error || status?.error) && <div className="text-xs text-red-600 dark:text-red-400">{error || status?.error}</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RateLimitCard({ label, window }: { label: string; window: ChatGptSubscriptionRateLimitWindow | null }) {
+  if (!window) return null;
+  const used = Math.max(0, Math.min(100, Math.round(window.usedPercent)));
+  const remaining = 100 - used;
+  const reset = window.resetsAt ? new Date(window.resetsAt * 1_000).toLocaleString() : null;
+  return (
+    <div className="rounded-lg border border-neutral-200 p-2 text-[11px] text-neutral-500 dark:border-neutral-800">
+      <div className="flex justify-between"><span>{label}</span><span>{tx('{n}% restante', { n: remaining })}</span></div>
+      <div className="mt-1 h-1.5 overflow-hidden rounded bg-neutral-200 dark:bg-neutral-800"><div className="h-full bg-emerald-500" style={{ width: `${remaining}%` }} /></div>
+      <div className="mt-1">{tx('{n}% usado', { n: used })}</div>
+      {reset && <div className="mt-1">{tx('Se restablece: {time}', { time: reset })}</div>}
+    </div>
+  );
+}
+
+function GitHubCopilotSubscriptionRow({
+  expanded,
+  onToggle,
+  isFav,
+  toggleFav,
+}: {
+  expanded: boolean;
+  onToggle: () => void;
+  isFav: (m: ModelRef) => boolean;
+  toggleFav: (m: ModelRef) => Promise<void>;
+}) {
+  const [status, setStatus] = useState<GitHubCopilotSubscriptionStatus | null>(null);
+  const [models, setModels] = useState<ModelInfo[] | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadingModels, setLoadingModels] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+
+  const refresh = async () => {
+    setLoading(true);
+    setError(null);
+    try { setStatus(await window.nodus.getGitHubCopilotSubscriptionStatus()); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); }
+    finally { setLoading(false); }
+  };
+
+  useEffect(() => {
+    void refresh();
+    return window.nodus.onGitHubCopilotSubscriptionStatusChanged(setStatus);
+  }, []);
+
+  const connect = async () => {
+    setError(null);
+    try { setStatus(await window.nodus.startGitHubCopilotSubscriptionLogin()); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); }
+  };
+
+  const cancel = async () => {
+    setError(null);
+    try { setStatus(await window.nodus.cancelGitHubCopilotSubscriptionLogin()); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); }
+  };
+
+  const logout = async () => {
+    setError(null);
+    try {
+      setStatus(await window.nodus.logoutGitHubCopilotSubscription());
+      setModels(null);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); }
+  };
+
+  const loadModels = async () => {
+    setLoadingModels(true);
+    setError(null);
+    try { setModels(await window.nodus.listModels('github-copilot')); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); }
+    finally { setLoadingModels(false); }
+  };
+
+  const filtered = (models ?? []).filter((model) => {
+    const query = search.toLowerCase();
+    return !query || model.id.toLowerCase().includes(query) || (model.name ?? '').toLowerCase().includes(query);
+  });
+
+  return (
+    <div className="rounded-lg border border-sky-200 bg-sky-50/60 dark:border-sky-700/50 dark:bg-sky-950/10" data-testid="github-copilot-subscription-provider">
+      <button className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm" onClick={onToggle}>
+        <span className="text-neutral-500">{expanded ? '▾' : '▸'}</span>
+        <span className="font-medium">{PROVIDER_LABELS['github-copilot']}</span>
+        {loading ? <span className="text-xs text-neutral-600">{t('comprobando…')}</span> : (
+          <span className={status?.connected ? 'text-emerald-400 text-xs' : 'text-neutral-600 text-xs'}>
+            {status?.connected ? `● ${t('suscripción conectada')}` : `○ ${t('sin conectar')}`}
+          </span>
+        )}
+        <span className="ml-auto text-[10px] uppercase tracking-wide text-sky-700 dark:text-sky-300">{t('SDK oficial · preview')}</span>
+      </button>
+
+      {expanded && (
+        <div className="space-y-3 px-3 pb-3">
+          <div className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-xs leading-5 text-neutral-600 dark:border-sky-800/60 dark:bg-sky-950/20 dark:text-neutral-400">
+            <p>{t('Nodus usa el SDK y el runtime oficiales de GitHub Copilot. Cada petición se factura a la suscripción de GitHub del usuario; no requiere claves de los modelos.')}</p>
+            <p className="mt-1">{t('La integración oficial está en public preview. Nodus es independiente y no está afiliada, certificada ni respaldada por GitHub.')}</p>
+            <p className="mt-1">{t('Cada petición se ejecuta en una sesión efímera sin herramientas, MCP, memoria, acceso a archivos, GitHub ni instrucciones del proyecto.')}</p>
+            <button className="mt-1 text-sky-700 hover:text-sky-800 dark:text-sky-300 dark:hover:text-sky-200" onClick={() => window.nodus.openExternal('https://docs.github.com/en/copilot/how-tos/copilot-sdk/auth/authenticate')}>
+              {t('Documentación oficial del SDK de Copilot ↗')}
+            </button>
+          </div>
+
+          {status?.connected ? (
+            <>
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <span className="text-emerald-600 dark:text-emerald-400">{t('Conectado')}</span>
+                {status.login && <span className="text-neutral-700 dark:text-neutral-300">@{status.login}</span>}
+                {status.authType && <span className="text-neutral-500">{status.authType}</span>}
+                <button className="btn btn-ghost border border-neutral-300 dark:border-neutral-700" onClick={() => void refresh()} disabled={loading}>{t('Actualizar cuota')}</button>
+                {status.canLogout && <button className="btn btn-ghost text-red-600 dark:text-red-400" onClick={() => void logout()}>{t('Cerrar sesión')}</button>}
+              </div>
+              {status.quota.length > 0 ? (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {status.quota.map((quota) => <GitHubQuotaCard key={quota.id} quota={quota} />)}
+                </div>
+              ) : <div className="text-xs text-neutral-500">{t('GitHub no devolvió un contador de cuota para esta cuenta.')}</div>}
+              {status.lastSession && (
+                <div className="rounded-lg border border-neutral-200 p-2 text-[11px] text-neutral-500 dark:border-neutral-800">
+                  {tx('Última petición en Nodus: {cost} créditos/solicitudes premium · {input} tokens de entrada · {output} de salida', {
+                    cost: status.lastSession.premiumRequestCost.toLocaleString(),
+                    input: status.lastSession.inputTokens.toLocaleString(),
+                    output: status.lastSession.outputTokens.toLocaleString(),
+                  })}
+                </div>
+              )}
+              <div className="flex gap-2 items-center">
+                <button className="btn btn-ghost border border-neutral-300 dark:border-neutral-700" onClick={() => void loadModels()} disabled={loadingModels}>
+                  {loadingModels ? t('Cargando…') : t('Cargar modelos de Copilot')}
+                </button>
+                {models && <input className="input flex-1" placeholder={t('Buscar modelo…')} value={search} onChange={(event) => setSearch(event.target.value)} />}
+                {models && <span className="text-xs text-neutral-500">{filtered.length}</span>}
+              </div>
+              {models && (
+                <SettingsModelList className="max-h-64 overflow-y-auto" data-testid="provider-model-list-github-copilot">
+                  <ModelList provider="github-copilot" models={filtered.slice(0, 300)} isFav={isFav} toggleFav={toggleFav} />
+                </SettingsModelList>
+              )}
+            </>
+          ) : (
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <button className="btn btn-primary" onClick={() => void connect()} disabled={status?.loginPending}>
+                  {status?.loginPending ? t('Esperando acceso de GitHub en el navegador…') : t('Conectar GitHub Copilot')}
+                </button>
+                {status?.loginPending && <button className="btn btn-ghost" onClick={() => void cancel()}>{t('Cancelar acceso')}</button>}
+                <button className="btn btn-ghost border border-neutral-300 dark:border-neutral-700" onClick={() => void refresh()} disabled={loading}>{t('Comprobar estado')}</button>
+              </div>
+              <p className="text-[11px] leading-4 text-neutral-500">{t('El runtime oficial abre el flujo OAuth de dispositivo y guarda su credencial en el almacén seguro del sistema. Si ya usas GitHub CLI, puede reutilizar esa sesión sin modificarla.')}</p>
+            </div>
+          )}
+          {(error || status?.error) && <div className="text-xs whitespace-pre-wrap text-red-600 dark:text-red-400">{error || status?.error}</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function GitHubQuotaCard({ quota }: { quota: GitHubCopilotSubscriptionQuotaWindow }) {
+  const label = quota.id === 'premium_interactions'
+    ? t('Créditos / solicitudes premium')
+    : quota.id === 'chat' ? t('Chat') : quota.id === 'completions' ? t('Completado') : quota.id;
+  const remaining = Math.max(0, Math.min(100, Math.round(quota.remainingPercentage)));
+  const reset = quota.resetDate ? new Date(quota.resetDate).toLocaleString() : null;
+  const detail = quota.unlimited
+    ? t('Ilimitado según GitHub')
+    : tx('{remaining} de {total} restantes · {used} usadas', {
+        remaining: (quota.remainingRequests ?? 0).toLocaleString(),
+        total: quota.entitlementRequests.toLocaleString(),
+        used: quota.usedRequests.toLocaleString(),
+      });
+  return (
+    <div className="rounded-lg border border-neutral-200 p-2 text-[11px] text-neutral-500 dark:border-neutral-800">
+      <div className="flex justify-between gap-2"><span>{label}</span><span className="text-neutral-700 dark:text-neutral-300">{quota.unlimited ? '∞' : tx('{n}% restante', { n: remaining })}</span></div>
+      <div className="mt-1 h-1.5 overflow-hidden rounded bg-neutral-200 dark:bg-neutral-800"><div className="h-full bg-emerald-500" style={{ width: `${quota.unlimited ? 100 : remaining}%` }} /></div>
+      <div className="mt-1">{detail}</div>
+      {quota.overage > 0 && <div className="mt-1 text-amber-700 dark:text-amber-400">{tx('{n} de uso adicional', { n: quota.overage })}</div>}
+      {reset && <div className="mt-1">{tx('Se restablece: {time}', { time: reset })}</div>}
+    </div>
   );
 }
 
@@ -331,11 +724,11 @@ function ProviderRow({
   const shown = filtered.slice(0, 300);
 
   return (
-    <div className="border border-neutral-800 rounded-lg">
+    <div className="rounded-lg border border-neutral-200 dark:border-neutral-800" data-testid={`provider-${provider}`}>
       <button className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm" onClick={onToggle}>
         <span className="text-neutral-500">{expanded ? '▾' : '▸'}</span>
         <span className="font-medium">{PROVIDER_LABELS[provider]}</span>
-        <span className={hasKey ? 'text-emerald-400 text-xs' : 'text-neutral-600 text-xs'}>
+        <span className={hasKey ? 'text-xs text-emerald-600 dark:text-emerald-400' : 'text-xs text-neutral-500 dark:text-neutral-600'}>
           {hasKey ? `● ${t('clave guardada')}` : `○ ${t('sin clave')}`}
         </span>
         {provider === 'openrouter' && <span className="text-neutral-600 text-xs">{t('(modelos públicos)')}</span>}
@@ -355,14 +748,25 @@ function ProviderRow({
               {t('Guardar')}
             </button>
             {hasKey && (
-              <button className="btn btn-ghost text-red-400" onClick={() => window.nodus.clearApiKey(provider).then(onChange)}>
+              <button className="btn btn-ghost text-red-600 dark:text-red-400" onClick={() => window.nodus.clearApiKey(provider).then(onChange)}>
                 {t('Borrar')}
               </button>
             )}
           </div>
 
+          {provider === 'opencode-go' && <OpenCodeGoUsagePanel />}
+
+          {provider === 'anthropic' && (
+            <div className="rounded-lg border border-amber-800/60 bg-amber-950/20 p-3 text-xs leading-5 text-neutral-400">
+              <p>{t('Anthropic no permite que aplicaciones de terceros ofrezcan inicio de sesión de Claude.ai ni utilicen credenciales de suscripciones Free, Pro o Max. Por ello Claude se conecta aquí únicamente mediante la API oficial.')}</p>
+              <button className="mt-1 text-amber-300 hover:text-amber-200" onClick={() => window.nodus.openExternal('https://code.claude.com/docs/en/legal-and-compliance')}>
+                {t('Política oficial de Anthropic ↗')}
+              </button>
+            </div>
+          )}
+
           <div className="flex gap-2 items-center">
-            <button className="btn btn-ghost border border-neutral-700" onClick={loadModels} disabled={loading}>
+            <button className="btn btn-ghost border border-neutral-300 dark:border-neutral-700" onClick={loadModels} disabled={loading}>
               {loading ? t('Cargando…') : t('Cargar modelos')}
             </button>
             {models && (
@@ -371,7 +775,7 @@ function ProviderRow({
             {models && <span className="text-xs text-neutral-500">{filtered.length}</span>}
           </div>
 
-          {error && <div className="text-xs text-red-400">{error}</div>}
+          {error && <div className="text-xs text-red-600 dark:text-red-400">{error}</div>}
 
           {models && (
             <SettingsModelList className="max-h-64 overflow-y-auto" data-testid={`provider-model-list-${provider}`}>
@@ -383,6 +787,61 @@ function ProviderRow({
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function OpenCodeGoUsagePanel() {
+  const [usage, setUsage] = useState<OpenCodeGoUsageStatus | null>(null);
+  useEffect(() => {
+    void window.nodus.getOpenCodeGoUsageStatus().then(setUsage);
+    return window.nodus.onOpenCodeGoUsageStatusChanged(setUsage);
+  }, []);
+
+  return (
+    <div className="rounded-lg border border-violet-200 bg-violet-50 p-3 text-xs leading-5 text-neutral-600 dark:border-violet-800/60 dark:bg-violet-950/20 dark:text-neutral-400" data-testid="opencode-go-usage">
+      <p>{t('OpenCode documenta el uso directo de la suscripción Go mediante esta clave y sus endpoints oficiales. Nodus es independiente y no está afiliada, certificada ni respaldada por OpenCode.')}</p>
+      <p className="mt-1">{t('Límites generales publicados: 12 USD cada 5 horas, 30 USD por semana y 60 USD por mes. Algunos modelos tienen un límite mensual efectivo inferior (15 USD); el número de peticiones depende del modelo y puede cambiar.')}</p>
+      <p className="mt-1 text-amber-700 dark:text-amber-300">{t('Saldo restante oficial: OpenCode solo lo publica en Console; no ofrece una API de cuota compatible con la clave de usuario. Nodus no usa cookies ni endpoints privados.')}</p>
+      {usage && (
+        <div className="mt-2 grid gap-2 sm:grid-cols-3">
+          <OpenCodeObservedCard label={t('Últimas 5 horas')} period={usage.observed.fiveHours} cap={usage.limitsUsd.fiveHours} />
+          <OpenCodeObservedCard label={t('Últimos 7 días')} period={usage.observed.week} cap={usage.limitsUsd.week} />
+          <OpenCodeObservedCard label={t('Últimos 30 días')} period={usage.observed.month} cap={usage.limitsUsd.month} />
+        </div>
+      )}
+      <p className="mt-2 text-[11px] text-neutral-500">{t('El gasto observado es una estimación local de las peticiones hechas por Nodus con precios oficiales; no incluye otros clientes y no equivale al saldo restante.')}</p>
+      <div className="mt-2 flex flex-wrap gap-3">
+        <button className="text-violet-700 hover:text-violet-800 dark:text-violet-300 dark:hover:text-violet-200" onClick={() => window.nodus.openExternal(usage?.officialUsageUrl ?? 'https://opencode.ai/auth')}>
+          {t('Ver saldo restante oficial en OpenCode Console ↗')}
+        </button>
+        <button className="text-violet-700 hover:text-violet-800 dark:text-violet-300 dark:hover:text-violet-200" onClick={() => window.nodus.openExternal('https://opencode.ai/docs/go/')}>
+          {t('Documentación oficial de OpenCode Go ↗')}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function OpenCodeObservedCard({
+  label,
+  period,
+  cap,
+}: {
+  label: string;
+  period: OpenCodeGoUsageStatus['observed']['fiveHours'];
+  cap: number;
+}) {
+  const spend = period.estimatedCostUsd;
+  return (
+    <div className="rounded border border-neutral-200 p-2 text-[11px] dark:border-neutral-800">
+      <div className="text-neutral-700 dark:text-neutral-300">{label}</div>
+      <div>{tx('{requests} peticiones · ~${spent} observados · ${cap} de tope general de referencia', {
+        requests: period.requests,
+        spent: spend.toFixed(spend < 0.01 ? 4 : 2),
+        cap: cap.toFixed(0),
+      })}</div>
+      {period.unpricedRequests > 0 && <div className="text-amber-700 dark:text-amber-400">{tx('{n} sin precio estimable', { n: period.unpricedRequests })}</div>}
     </div>
   );
 }
@@ -581,11 +1040,15 @@ function ModelList({
   models,
   isFav,
   toggleFav,
+  codexReasoningEfforts,
+  onCodexReasoningChange,
 }: {
   provider: AiProvider;
   models: ModelInfo[];
   isFav: (m: ModelRef) => boolean;
   toggleFav: (m: ModelRef) => Promise<void>;
+  codexReasoningEfforts?: Record<string, CodexReasoningEffort>;
+  onCodexReasoningChange?: (model: string, effort: CodexReasoningEffort | null) => Promise<void>;
 }) {
   // OpenRouter: render grouped by upstream provider.
   const rows: JSX.Element[] = [];
@@ -630,8 +1093,45 @@ function ModelList({
             {t('razona')}
           </span>
         )}
+        {provider === 'codex' && (m.supportedReasoningEfforts?.length ?? 0) > 0 && (
+          <select
+            className="input h-7 w-36 shrink-0 py-0 text-[10px]"
+            data-testid={`codex-reasoning-${m.id}`}
+            aria-label={tx('Razonamiento de {model}', { model: m.name ?? m.id })}
+            value={codexReasoningEfforts?.[m.id] ?? ''}
+            onChange={(event) => void onCodexReasoningChange?.(
+              m.id,
+              event.target.value ? event.target.value as CodexReasoningEffort : null
+            )}
+          >
+            <option value="">
+              {m.defaultReasoningEffort
+                ? tx('{level} (predeterminado)', { level: codexReasoningLabel(m.defaultReasoningEffort) })
+                : t('Predeterminado')}
+            </option>
+            {(m.supportedReasoningEfforts ?? []).map((option) => (
+              <option key={option.reasoningEffort} value={option.reasoningEffort} title={option.description}>
+                {codexReasoningLabel(option.reasoningEffort)}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
     );
   }
   return <div>{rows}</div>;
+}
+
+function codexReasoningLabel(effort: CodexReasoningEffort): string {
+  switch (effort) {
+    case 'none': return t('Ninguno');
+    case 'minimal': return t('Mínimo');
+    case 'low': return t('Bajo');
+    case 'medium': return t('Medio');
+    case 'high': return t('Alto');
+    case 'xhigh': return t('Muy alto');
+    case 'max': return t('Máximo');
+    case 'ultra': return t('Ultra');
+    default: return effort.replace(/[_-]+/g, ' ').replace(/^./, (letter) => letter.toUpperCase());
+  }
 }

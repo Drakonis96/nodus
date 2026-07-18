@@ -19,6 +19,16 @@ const DEFAULT_LOCAL_PROVIDERS: AppSettings['localProviders'] = {
   lmstudio: { baseUrl: DEFAULT_LOCAL_BASE_URLS.lmstudio },
 };
 
+function sanitizeCodexReasoningEfforts(value: unknown): AppSettings['codexReasoningEfforts'] {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  return Object.fromEntries(
+    Object.entries(value)
+      // The official protocol intentionally leaves effort extensible. Accept a small,
+      // identifier-shaped value here; the live model catalog validates support again.
+      .filter(([model, effort]) => model.trim().length > 0 && /^[a-z][a-z0-9_-]{0,31}$/.test(String(effort)))
+  ) as AppSettings['codexReasoningEfforts'];
+}
+
 const DEFAULTS: Omit<AppSettings, 'providerKeys' | 'lockedProviderKeys'> = {
   embeddingProvider: 'openai',
   embeddingModel: DEFAULT_EMBEDDING_MODELS.openai,
@@ -105,6 +115,7 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys' | 'lockedProviderKeys'> = {
   mascotOrbColor: NODI_ORB_DEFAULT_COLOR,
   concurrency: 1,
   chatReasoning: 'off',
+  codexReasoningEfforts: {},
   openRouterThroughput: true,
   unpaywallEmail: '',
   onboardingComplete: false,
@@ -189,6 +200,7 @@ export function getSettings(): AppSettings {
     }
   }
   const merged = { ...DEFAULTS, ...parsed };
+  merged.codexReasoningEfforts = sanitizeCodexReasoningEfforts(parsed.codexReasoningEfforts);
   merged.studyImproveToolbarStyleIds = [...new Set((Array.isArray(merged.studyImproveToolbarStyleIds) ? merged.studyImproveToolbarStyleIds : [])
     .filter((value): value is string => typeof value === 'string' && value.trim().length > 0))].slice(0, 4);
   // Pre-2.3 builds called the Transformers.js worker simply "local".
@@ -238,6 +250,7 @@ export function getSettings(): AppSettings {
       seed[key] = merged[key];
     }
   }
+  merged.codexReasoningEfforts = sanitizeCodexReasoningEfforts(merged.codexReasoningEfforts);
   if ((merged.sttProvider as string) === 'local') {
     merged.sttProvider = 'transformers';
     seed.sttProvider = 'transformers';
@@ -276,6 +289,9 @@ export function getSettings(): AppSettings {
 }
 
 export function updateSettings(patch: Partial<AppSettings>): AppSettings {
+  if (patch.codexReasoningEfforts !== undefined) {
+    patch = { ...patch, codexReasoningEfforts: sanitizeCodexReasoningEfforts(patch.codexReasoningEfforts) };
+  }
   if (patch.studyImproveToolbarStyleIds) {
     patch = { ...patch, studyImproveToolbarStyleIds: [...new Set(patch.studyImproveToolbarStyleIds.filter((value) => typeof value === 'string' && value.trim()))].slice(0, 4) };
   }

@@ -10,7 +10,7 @@ import {
   localContextWindow,
 } from './providers';
 import { DEFAULT_EMBEDDING_MODELS, normalizeEmbeddingModel, PROVIDER_LABELS } from '@shared/providers';
-import type { AiProvider, EmbeddingProvider, LocalProvider, ModelRef, PromptLanguage, ReasoningEffort } from '@shared/types';
+import type { AiProvider, CodexReasoningEffort, EmbeddingProvider, LocalProvider, ModelRef, PromptLanguage, ReasoningEffort } from '@shared/types';
 import { vaultTypePromptPack } from '@shared/vaultTypes';
 import { anthropicVisionContent, openAiVisionContent, type VisionImagePart } from '@shared/imageAnalysis';
 import { getActiveVault } from '../vaults/vaultRegistry';
@@ -25,6 +25,10 @@ import {
   deanonymizeDeep,
   findResidualNames,
 } from '@shared/studentPseudonyms';
+import { completeWithChatGptSubscription } from './codexSubscription';
+import { completeWithGitHubCopilotSubscription } from './githubCopilotSubscription';
+import { completeWithOpenCodeGo } from './openCodeGoCompletion';
+import { recordOpenCodeGoUsage } from './openCodeGoUsage';
 
 export class AiError extends Error {
   /**
@@ -162,6 +166,9 @@ interface CallOpts {
   /** Reasoning effort. Defaults to `off` for JSON/scan calls and to the configured
    *  `chatReasoning` for conversational calls. */
   reasoning?: ReasoningEffort;
+  /** Let Codex use its per-model setting while retaining an explicit portable effort
+   * for other providers (used by latency-sensitive conversational surfaces). */
+  useConfiguredCodexReasoning?: boolean;
   /** Disable SDK/compatibility retries for explicitly single-attempt workflows. */
   noRetry?: boolean;
   /** Per-request transport timeout override. */
@@ -375,16 +382,67 @@ async function rawComplete(
   model: ModelRef,
   opts: CallOpts,
   jsonMode = true,
-  reasoning: ReasoningEffort = 'off'
+  reasoning: ReasoningEffort = 'off',
+  codexReasoning?: CodexReasoningEffort | null
 ): Promise<string> {
+  // Student names must leave before any provider-specific branch. Subscription
+  // providers do not use API keys, so this deliberately precedes key resolution.
+  // The public entry points map the opaque codes back after parsing/repair.
+  opts = anonymizeCallOpts(opts).sent;
+
+  if (model.provider === 'codex') {
+    try {
+      return await completeWithChatGptSubscription({
+        model: model.model,
+        system: opts.system,
+        user: opts.user,
+        reasoning: codexReasoning === undefined ? reasoning : codexReasoning,
+        timeoutMs: opts.timeoutMs,
+        images: opts.images,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new AiError(message, /límite|limit|tempor|timeout|conexión/i.test(message), /conecta|suscripción|autentic/i.test(message));
+    }
+  }
+  if (model.provider === 'github-copilot') {
+    try {
+      return await completeWithGitHubCopilotSubscription({
+        model: model.model,
+        system: opts.system,
+        user: opts.user,
+        reasoning,
+        timeoutMs: opts.timeoutMs,
+        images: opts.images,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new AiError(message, /límite|limit|tempor|timeout|conexión|quota|credit/i.test(message), /conecta|suscripción|autentic|cuenta/i.test(message));
+    }
+  }
   const key = resolveProviderKey(model.provider);
   if (!key) throw new AiError(`Falta la clave de IA para ${model.provider}. Configúrala en Ajustes.`, false, true);
 
-  // Student names out. Note the asymmetry: what we RETURN stays in code space, because
-  // parseOrRepair may feed this very text back to the model and a repair round-trip
-  // must never re-encounter a real name. The mapping back happens in the public
-  // entry points (completeJson / completeText / completeTextNeutral).
-  opts = anonymizeCallOpts(opts).sent;
+  if (model.provider === 'opencode-go') {
+    try {
+      const result = await completeWithOpenCodeGo({
+        apiKey: key,
+        model: model.model,
+        system: opts.system,
+        user: opts.user,
+        temperature: opts.temperature,
+        maxTokens: opts.maxTokens,
+        reasoning,
+        jsonMode,
+        timeoutMs: opts.timeoutMs,
+        images: opts.images,
+      });
+      await recordOpenCodeGoUsage(model.model, result.usage);
+      return result.text;
+    } catch (error: any) {
+      throw wrapProviderError(error);
+    }
+  }
 
   if (model.provider === 'anthropic') {
     const Anthropic = (await import('@anthropic-ai/sdk')).default;
@@ -638,7 +696,10 @@ export async function completeJson<T>(
 export async function completeText(opts: CallOpts, model?: ModelRef | null): Promise<string> {
   const resolved = resolveModel(model);
   const reasoning = opts.reasoning ?? getSettings().chatReasoning ?? 'off';
-  return deanonymizeResult(await rawComplete(resolved, withPromptContext(opts), false, reasoning));
+  const codexReasoning = resolved.provider === 'codex' && (opts.reasoning === undefined || opts.useConfiguredCodexReasoning)
+    ? getSettings().codexReasoningEfforts?.[resolved.model] ?? null
+    : undefined;
+  return deanonymizeResult(await rawComplete(resolved, withPromptContext(opts), false, reasoning, codexReasoning));
 }
 
 /**
@@ -661,7 +722,10 @@ export async function completeTextStream(
 ): Promise<string> {
   const resolved = resolveModel(model);
   const reasoning = opts.reasoning ?? getSettings().chatReasoning ?? 'off';
-  return rawCompleteStream(resolved, withPromptContext(opts), onDelta, reasoning, signal);
+  const codexReasoning = resolved.provider === 'codex' && (opts.reasoning === undefined || opts.useConfiguredCodexReasoning)
+    ? getSettings().codexReasoningEfforts?.[resolved.model] ?? null
+    : undefined;
+  return rawCompleteStream(resolved, withPromptContext(opts), onDelta, reasoning, signal, codexReasoning);
 }
 
 async function rawCompleteStream(
@@ -669,11 +733,9 @@ async function rawCompleteStream(
   opts: CallOpts,
   onDelta: TextDeltaHandler,
   reasoning: ReasoningEffort = 'off',
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  codexReasoning?: CodexReasoningEffort | null
 ): Promise<string> {
-  const key = resolveProviderKey(model.provider);
-  if (!key) throw new AiError(`Falta la clave de IA para ${model.provider}. Configúrala en Ajustes.`, false, true);
-
   const { sent, privacy } = anonymizeCallOpts(opts);
   opts = sent;
 
@@ -716,6 +778,78 @@ async function rawCompleteStream(
     if (restReasoning) onDelta(restReasoning, 'reasoning');
     return full;
   };
+
+  if (model.provider === 'codex') {
+    try {
+      const answer = await completeWithChatGptSubscription({
+        model: model.model,
+        system: opts.system,
+        user: opts.user,
+        reasoning: codexReasoning === undefined ? reasoning : codexReasoning,
+        timeoutMs: opts.timeoutMs,
+        images: opts.images,
+        signal,
+        onDelta: emitContent,
+      });
+      if (!full && answer) emitContent(answer);
+      return finish();
+    } catch (error) {
+      if (signal?.aborted) return finish();
+      const message = error instanceof Error ? error.message : String(error);
+      throw new AiError(message, /límite|limit|tempor|timeout|conexión/i.test(message), /conecta|suscripción|autentic/i.test(message));
+    }
+  }
+
+  if (model.provider === 'github-copilot') {
+    try {
+      const answer = await completeWithGitHubCopilotSubscription({
+        model: model.model,
+        system: opts.system,
+        user: opts.user,
+        reasoning,
+        timeoutMs: opts.timeoutMs,
+        images: opts.images,
+        signal,
+        onDelta: emitContent,
+        onReasoningDelta: emitReasoning,
+      });
+      if (!full && answer) emitContent(answer);
+      return finish();
+    } catch (error) {
+      if (signal?.aborted) return finish();
+      const message = error instanceof Error ? error.message : String(error);
+      throw new AiError(message, /límite|limit|tempor|timeout|conexión|quota|credit/i.test(message), /conecta|suscripción|autentic|cuenta/i.test(message));
+    }
+  }
+
+  const key = resolveProviderKey(model.provider);
+  if (!key) throw new AiError(`Falta la clave de IA para ${model.provider}. Configúrala en Ajustes.`, false, true);
+
+  if (model.provider === 'opencode-go') {
+    try {
+      const result = await completeWithOpenCodeGo({
+        apiKey: key,
+        model: model.model,
+        system: opts.system,
+        user: opts.user,
+        temperature: opts.temperature,
+        maxTokens: opts.maxTokens,
+        reasoning,
+        jsonMode: false,
+        timeoutMs: opts.timeoutMs,
+        images: opts.images,
+        signal,
+        onDelta: emitContent,
+        onReasoningDelta: emitReasoning,
+      });
+      await recordOpenCodeGoUsage(model.model, result.usage);
+      if (!full && result.text) emitContent(result.text);
+      return finish();
+    } catch (error: any) {
+      if (signal?.aborted) return finish();
+      throw wrapProviderError(error);
+    }
+  }
 
   if (model.provider === 'anthropic') {
     const Anthropic = (await import('@anthropic-ai/sdk')).default;

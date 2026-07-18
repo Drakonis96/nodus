@@ -9,6 +9,25 @@ import type { AiProvider, EmbeddingProvider, LocalProvider, ModelRef } from './t
 export const AI_PROVIDERS: AiProvider[] = [
   'anthropic',
   'openai',
+  'codex',
+  'github-copilot',
+  'opencode-go',
+  'openrouter',
+  'groq',
+  'cerebras',
+  'deepseek',
+  'gemini',
+  'xiaomi',
+  'ollama',
+  'lmstudio',
+];
+
+/** Providers whose credentials are Nodus-managed API keys/tokens. ChatGPT's
+ * managed OAuth session belongs to Codex and must never enter backup/recovery. */
+export const SECRET_PROVIDERS: Exclude<AiProvider, 'codex' | 'github-copilot' | 'nodus'>[] = [
+  'anthropic',
+  'openai',
+  'opencode-go',
   'openrouter',
   'groq',
   'cerebras',
@@ -22,6 +41,9 @@ export const AI_PROVIDERS: AiProvider[] = [
 export const PROVIDER_LABELS: Record<AiProvider, string> = {
   anthropic: 'Anthropic',
   openai: 'OpenAI',
+  codex: 'ChatGPT · Codex',
+  'github-copilot': 'GitHub Copilot',
+  'opencode-go': 'OpenCode Go',
   openrouter: 'OpenRouter',
   groq: 'Groq',
   cerebras: 'Cerebras',
