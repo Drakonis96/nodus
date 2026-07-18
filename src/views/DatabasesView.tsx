@@ -23,6 +23,17 @@ import { confirm, promptText, toast } from '../components/feedback';
 import { notifyDataChanged } from '../hooks';
 import { t, tx } from '../i18n';
 import {
+  clearBackgroundJob,
+  databaseAiImageCellJobKey,
+  databaseAiTextCellJobKey,
+  getBackgroundJob,
+  startDatabaseAiImageCellJob,
+  startDatabaseAiTextCellJob,
+  subscribeBackgroundJob,
+  type DatabaseAiImageCellJob,
+  type DatabaseAiTextCellJob,
+} from '../backgroundJobs';
+import {
   attachmentKind,
   availableColumnTypes,
   columnTypeDef,
@@ -2107,20 +2118,25 @@ function AiCell({
   onRan: () => void;
   wrap?: boolean;
 }) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const jobKey = databaseAiTextCellJobKey(rowId, column.id);
+  const [job, setJob] = useState<DatabaseAiTextCellJob | null>(() => getBackgroundJob(jobKey));
   const hasPrompt = Boolean(String(column.config.aiPrompt ?? '').trim());
-  const run = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      await window.nodus.runDatabaseAiCell(rowId, column.id);
-      onRan();
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
+  const busy = job?.status === 'running';
+  const error = job?.status === 'failed' ? job.error : null;
+
+  useEffect(
+    () => subscribeBackgroundJob(jobKey, (current) => setJob(current as DatabaseAiTextCellJob | null)),
+    [jobKey]
+  );
+  useEffect(() => {
+    if (job?.status !== 'completed') return;
+    onRan();
+    clearBackgroundJob(jobKey, job.id);
+  }, [job, jobKey, onRan]);
+
+  const run = () => {
+    clearBackgroundJob(jobKey);
+    startDatabaseAiTextCellJob(rowId, column.id);
   };
   return (
     <div className="w-full h-full flex items-center gap-1 group/ai">
@@ -2136,7 +2152,7 @@ function AiCell({
       <button
         className="shrink-0 mr-2 opacity-60 group-hover/ai:opacity-100 text-indigo-400 hover:text-indigo-300 disabled:opacity-40"
         title={error ?? t('Generar con IA')}
-        onClick={() => void run()}
+        onClick={run}
         disabled={busy || !hasPrompt}
       >
         <Icon name={busy ? 'sync' : 'wand'} size={14} className={busy ? 'animate-spin' : ''} />
@@ -2255,20 +2271,25 @@ function AiImageCell({
   onChanged: () => void;
   large?: boolean;
 }) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const jobKey = databaseAiImageCellJobKey(rowId, column.id);
+  const [job, setJob] = useState<DatabaseAiImageCellJob | null>(() => getBackgroundJob(jobKey));
   const hasPrompt = Boolean(String(column.config.aiPrompt ?? '').trim());
-  const generate = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      await window.nodus.generateDatabaseAiImage(rowId, column.id);
-      onChanged();
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
+  const busy = job?.status === 'running';
+  const error = job?.status === 'failed' ? job.error : null;
+
+  useEffect(
+    () => subscribeBackgroundJob(jobKey, (current) => setJob(current as DatabaseAiImageCellJob | null)),
+    [jobKey]
+  );
+  useEffect(() => {
+    if (job?.status !== 'completed') return;
+    onChanged();
+    clearBackgroundJob(jobKey, job.id);
+  }, [job, jobKey, onChanged]);
+
+  const generate = () => {
+    clearBackgroundJob(jobKey);
+    startDatabaseAiImageCellJob(rowId, column.id);
   };
   const remove = async (att: DatabaseAttachment) => {
     await window.nodus.deleteDatabaseAttachment(att.id);
@@ -2283,7 +2304,7 @@ function AiImageCell({
       <button
         className={`shrink-0 ${btnBox} rounded flex items-center justify-center text-indigo-400 border border-dashed border-neutral-700 hover:bg-neutral-800 hover:text-indigo-300 disabled:opacity-40`}
         title={error ?? (hasPrompt ? (attachments.length ? t('Regenerar imagen') : t('Generar imagen con IA')) : t('Configura el prompt primero'))}
-        onClick={() => void generate()}
+        onClick={generate}
         disabled={busy || !hasPrompt}
       >
         <Icon name={busy ? 'sync' : attachments.length ? 'sync' : 'wand'} size={large ? 18 : 14} className={busy ? 'animate-spin' : ''} />
