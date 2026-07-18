@@ -29,6 +29,29 @@ const RELEASE_SCOPE_META: Record<ReleaseNoteScope, { icon: string; color: string
   languages: { icon: 'languages', color: '#db2777', label: 'Idiomas' },
 };
 
+// Present every release uniformly: cluster its highlights by scope and order the
+// clusters by how many changes each carries (most first), keeping a stable
+// first-appearance order for ties and preserving each cluster's internal order.
+// Applied at render time so the whole history — not just the newest release —
+// reads the same way, regardless of how the raw notes happen to be authored.
+function groupHighlightsByScope<T extends { scope: ReleaseNoteScope }>(highlights: readonly T[]): T[] {
+  const order: ReleaseNoteScope[] = [];
+  const groups = new Map<ReleaseNoteScope, T[]>();
+  for (const h of highlights) {
+    let bucket = groups.get(h.scope);
+    if (!bucket) {
+      bucket = [];
+      groups.set(h.scope, bucket);
+      order.push(h.scope);
+    }
+    bucket.push(h);
+  }
+  return order
+    .map((scope, index) => ({ items: groups.get(scope)!, index }))
+    .sort((a, b) => b.items.length - a.items.length || a.index - b.index)
+    .flatMap((group) => group.items);
+}
+
 function readLastSeen(): string | null {
   try {
     return localStorage.getItem(LAST_SEEN_KEY);
@@ -127,7 +150,7 @@ export function WhatsNewModal({
             <section key={note.version} className="whats-new-release-card">
               <div className="whats-new-release-version">v{note.version}</div>
               <ul>
-                {note.highlights.map((h, i) => {
+                {groupHighlightsByScope(note.highlights).map((h, i) => {
                   const scope = h.scope;
                   const scopeMeta = RELEASE_SCOPE_META[scope];
                   const scopeLabel = t(scopeMeta.label);

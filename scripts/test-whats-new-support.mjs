@@ -21,7 +21,9 @@ assert.match(modal, /data-testid="whats-new-footer-support-paypal"/);
 assert.equal((modal.match(/https:\/\/paypal\.me\/Jorgepb96/g) ?? []).length, 1);
 assert.match(modal, /<footer className="whats-new-footer">[\s\S]*whats-new-footer-support[\s\S]*Explorar las novedades[\s\S]*<\/footer>/);
 assert.match(modal, /<div className="whats-new-release-version">v\{note\.version\}<\/div>/);
-assert.match(modal, /note\.highlights\.map[\s\S]*<li key=\{i\}>/);
+assert.match(modal, /groupHighlightsByScope\(note\.highlights\)\.map[\s\S]*<li key=\{i\}>/);
+// The uniform-view grouping clusters highlights by scope and orders clusters by size.
+assert.match(modal, /function groupHighlightsByScope[\s\S]*b\.items\.length - a\.items\.length \|\| a\.index - b\.index/);
 assert.match(modal, /releaseNotesForMajor\(current\)/);
 assert.match(modal, /if \(showSeenReleaseNotes\) return releaseNotesForMajor\(current\);/);
 assert.doesNotMatch(modal, /releaseNotesSince/);
