@@ -1287,7 +1287,7 @@ export function Settings({
             </Row>
             <Row
               label={t('Razonamiento (chat/tutor/escritura)')}
-              hint={t('Los escaneos siempre usan razonamiento desactivado para ir más rápido. Esto solo afecta a las respuestas conversacionales.')}
+              hint={t('Los escaneos siempre usan razonamiento desactivado para ir más rápido. Esto solo afecta a las respuestas conversacionales. En Codex se configura por modelo dentro de Proveedores.')}
             >
               <select
                 className="input"

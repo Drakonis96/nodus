@@ -49,6 +49,9 @@ export function openAiCompatBase(provider: AiProvider): string | null {
       // Local servers expose an OpenAI-compatible surface under {baseUrl}/v1.
       return `${localBaseUrl(provider)}/v1`;
     case 'anthropic':
+    case 'codex':
+    case 'github-copilot':
+    case 'opencode-go':
     case 'nodus':
       return null;
   }
@@ -122,6 +125,15 @@ export function reasoningBody(provider: AiProvider, effort: ReasoningEffort): Re
     case 'anthropic':
       // Anthropic uses its own SDK path, not this OpenAI-compat reasoning knob.
       return {};
+    case 'codex':
+      // The App Server receives effort as a first-class turn parameter.
+      return {};
+    case 'github-copilot':
+      // The official SDK receives effort as a first-class session parameter.
+      return {};
+    case 'opencode-go':
+      // Go serves a mixed OpenAI/Anthropic catalogue through dedicated paths.
+      return {};
   }
 }
 
@@ -150,6 +162,12 @@ export async function listModels(provider: AiProvider, key: string | null): Prom
       return listAnthropic(key);
     case 'openai':
       return listOpenAiStyle('https://api.openai.com/v1/models', key, true);
+    case 'codex':
+      throw new Error('Los modelos de Codex se consultan mediante el runtime de suscripción gestionado.');
+    case 'github-copilot':
+      throw new Error('Los modelos de GitHub Copilot se consultan mediante su runtime oficial.');
+    case 'opencode-go':
+      return listOpenCodeGo();
     case 'deepseek':
       return listOpenAiStyle('https://api.deepseek.com/models', key, false);
     case 'openrouter':
@@ -169,6 +187,43 @@ export async function listModels(provider: AiProvider, key: string | null): Prom
     case 'nodus':
       return listNodusLocalChatModels();
   }
+}
+
+const OPENCODE_GO_MODEL_NAMES: Record<string, string> = {
+  'grok-4.5': 'Grok 4.5',
+  'glm-5.2': 'GLM-5.2',
+  'glm-5.1': 'GLM-5.1',
+  'glm-5': 'GLM-5',
+  'kimi-k3': 'Kimi K3',
+  'kimi-k2.7-code': 'Kimi K2.7 Code',
+  'kimi-k2.6': 'Kimi K2.6',
+  'kimi-k2.5': 'Kimi K2.5',
+  'deepseek-v4-pro': 'DeepSeek V4 Pro',
+  'deepseek-v4-flash': 'DeepSeek V4 Flash',
+  'mimo-v2.5': 'MiMo-V2.5',
+  'mimo-v2.5-pro': 'MiMo-V2.5-Pro',
+  'mimo-v2-pro': 'MiMo-V2-Pro',
+  'mimo-v2-omni': 'MiMo-V2-Omni',
+  'minimax-m3': 'MiniMax M3',
+  'minimax-m2.7': 'MiniMax M2.7',
+  'minimax-m2.5': 'MiniMax M2.5',
+  'qwen3.7-max': 'Qwen3.7 Max',
+  'qwen3.7-plus': 'Qwen3.7 Plus',
+  'qwen3.6-plus': 'Qwen3.6 Plus',
+  'qwen3.5-plus': 'Qwen3.5 Plus',
+  'hy3-preview': 'HY 3 Preview',
+};
+
+/** Public catalogue documented by OpenCode Go. Authentication is required only
+ * for inference, so Settings can show what the subscription offers before a key
+ * is pasted. The response intentionally carries no inferred vision capability. */
+async function listOpenCodeGo(): Promise<ModelInfo[]> {
+  const res = await fetch('https://opencode.ai/zen/go/v1/models');
+  if (!res.ok) throw new Error(`OpenCode Go /models HTTP ${res.status}`);
+  const data = (await res.json()) as { data?: { id?: string }[] };
+  return (data.data ?? [])
+    .flatMap((model) => model.id ? [{ id: model.id, name: OPENCODE_GO_MODEL_NAMES[model.id] ?? model.id }] : [])
+    .sort(byId);
 }
 
 /** Fetch embedding-capable models for the configured embedding provider. */

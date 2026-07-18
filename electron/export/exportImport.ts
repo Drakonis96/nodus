@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { dialog, app } from 'electron';
 import type { AiProvider, AppSettings, BackupSelection } from '@shared/types';
-import { AI_PROVIDERS } from '@shared/providers';
+import { SECRET_PROVIDERS } from '@shared/providers';
 import { closeDb, getDb, replaceDbFile, SCHEMA_VERSION } from '../db/database';
 import { getSettings } from '../db/settingsRepo';
 import { listVaults, getActiveVault, restoreVaultDatabase, setActiveVault } from '../vaults/vaultRegistry';
@@ -85,7 +85,7 @@ interface BackupInventory {
   };
   modelSettings: Pick<
     AppSettings,
-    | 'embeddingProvider' | 'embeddingModel' | 'favorites' | 'defaultModel' | 'modelSettingsMode' | 'modelSettingsVersion'
+    | 'embeddingProvider' | 'embeddingModel' | 'favorites' | 'codexReasoningEfforts' | 'defaultModel' | 'modelSettingsMode' | 'modelSettingsVersion'
     | 'extractionModel' | 'synthesisModel' | 'summaryModel' | 'fusionModel'
     | 'chatModel' | 'nodiModel' | 'deepResearchModel' | 'immersionModel' | 'writingModel'
     | 'argumentMapModel' | 'authorModel' | 'studyModel' | 'tutorModel' | 'hypothesisModel'
@@ -766,7 +766,7 @@ function settingsMatchInventory(
 function modelSettings(
   settings: Pick<
     AppSettings,
-    | 'embeddingProvider' | 'embeddingModel' | 'favorites' | 'defaultModel' | 'modelSettingsMode' | 'modelSettingsVersion'
+    | 'embeddingProvider' | 'embeddingModel' | 'favorites' | 'codexReasoningEfforts' | 'defaultModel' | 'modelSettingsMode' | 'modelSettingsVersion'
     | 'extractionModel' | 'synthesisModel' | 'summaryModel' | 'fusionModel'
     | 'chatModel' | 'nodiModel' | 'deepResearchModel' | 'immersionModel' | 'writingModel'
     | 'argumentMapModel' | 'authorModel' | 'studyModel' | 'tutorModel' | 'hypothesisModel'
@@ -779,6 +779,7 @@ function modelSettings(
     embeddingProvider: settings.embeddingProvider,
     embeddingModel: settings.embeddingModel,
     favorites: settings.favorites,
+    codexReasoningEfforts: settings.codexReasoningEfforts,
     defaultModel: settings.defaultModel,
     modelSettingsMode: settings.modelSettingsMode,
     modelSettingsVersion: settings.modelSettingsVersion,
@@ -824,7 +825,7 @@ function quoteIdentifier(value: string): string {
 
 function readApiKeys(): Partial<Record<AiProvider, string>> {
   return Object.fromEntries(
-    AI_PROVIDERS.flatMap((provider) => {
+    SECRET_PROVIDERS.flatMap((provider) => {
       const key = getApiKey(provider);
       return key ? [[provider, key]] : [];
     })
@@ -832,7 +833,7 @@ function readApiKeys(): Partial<Record<AiProvider, string>> {
 }
 
 function restoreApiKeys(keys: Partial<Record<AiProvider, string>>): void {
-  for (const provider of AI_PROVIDERS) {
+  for (const provider of SECRET_PROVIDERS) {
     const key = keys[provider];
     // Merge-only recovery: an absent provider can mean that the source snapshot
     // was created while its OS keychain was temporarily unavailable. Never erase

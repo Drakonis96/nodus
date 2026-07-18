@@ -36,6 +36,7 @@ const mainExternals = [
   '@modelcontextprotocol/sdk/server/mcp.js',
   '@modelcontextprotocol/sdk/server/streamableHttp.js',
   '@modelcontextprotocol/sdk/types.js',
+  '@github/copilot-sdk',
   'openai',
   'electron-updater',
 ];

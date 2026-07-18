@@ -23,6 +23,8 @@ import { startStudyCalendarReminders, stopStudyCalendarReminders } from './study
 import { restorePersistedDockIcon } from './dockIcon';
 import { recoverLegacyApiKeys } from './secrets/legacySecretRecovery';
 import type { UpdateCheckResponse, UpdateProgressEvent } from '@shared/types';
+import { stopChatGptSubscriptionServer } from './ai/codexSubscription';
+import { stopGitHubCopilotSubscription } from './ai/githubCopilotSubscription';
 
 const require = createRequire(__filename);
 const { autoUpdater } = require('electron-updater') as typeof import('electron-updater');
@@ -498,6 +500,8 @@ app.on('before-quit', () => {
   interruptDecorativeImageGenerations();
   void stopMcpServer();
   void stopCopilotServer();
+  void stopChatGptSubscriptionServer();
+  void stopGitHubCopilotSubscription();
   closeDb();
 });
 
@@ -508,5 +512,7 @@ updateAwareApp.on('before-quit-for-update', () => {
   interruptDecorativeImageGenerations();
   void stopMcpServer();
   void stopCopilotServer();
+  void stopChatGptSubscriptionServer();
+  void stopGitHubCopilotSubscription();
   closeDb();
 });

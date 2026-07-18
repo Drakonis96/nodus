@@ -1,0 +1,316 @@
+import { app } from 'electron';
+import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import { createRequire } from 'node:module';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { CopilotClient, RuntimeConnection, type ModelInfo as CopilotModelInfo } from '@github/copilot-sdk';
+import type {
+  GitHubCopilotSessionUsage,
+  GitHubCopilotSubscriptionQuotaWindow,
+  GitHubCopilotSubscriptionStatus,
+  ModelInfo,
+  ReasoningEffort,
+} from '@shared/types';
+import type { VisionImagePart } from '@shared/imageAnalysis';
+import { runIsolatedGitHubCopilotCompletion } from './githubCopilotCompletion';
+
+interface CompletionOptions {
+  model: string;
+  system: string;
+  user: string;
+  reasoning: ReasoningEffort;
+  timeoutMs?: number;
+  images?: VisionImagePart[];
+  onDelta?: (delta: string) => void;
+  onReasoningDelta?: (delta: string) => void;
+  signal?: AbortSignal;
+}
+
+const EMPTY_STATUS: GitHubCopilotSubscriptionStatus = {
+  available: false,
+  connected: false,
+  loginPending: false,
+  login: null,
+  authType: null,
+  statusMessage: null,
+  canLogout: false,
+  quota: [],
+  lastSession: null,
+  error: null,
+};
+
+const listeners = new Set<(status: GitHubCopilotSubscriptionStatus) => void>();
+let client: CopilotClient | null = null;
+let loginProcess: ChildProcessWithoutNullStreams | null = null;
+let loginDiagnostic = '';
+let lastSession: GitHubCopilotSessionUsage | null = null;
+let modelCache: CopilotModelInfo[] | null = null;
+
+function copilotHome(): string {
+  const dir = path.join(app.getPath('userData'), 'github-copilot-subscription');
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  try { fs.chmodSync(dir, 0o700); } catch { /* Windows */ }
+  return dir;
+}
+
+function unpackedAsarPath(file: string): string {
+  const marker = `${path.sep}app.asar${path.sep}`;
+  return file.includes(marker) ? file.replace(marker, `${path.sep}app.asar.unpacked${path.sep}`) : file;
+}
+
+export function resolveGitHubCopilotBinaryPath(): string {
+  const packageName = (() => {
+    if (process.platform === 'darwin' && process.arch === 'arm64') return '@github/copilot-darwin-arm64';
+    if (process.platform === 'darwin' && process.arch === 'x64') return '@github/copilot-darwin-x64';
+    if (process.platform === 'linux' && process.arch === 'arm64') return '@github/copilot-linux-arm64';
+    if (process.platform === 'linux' && process.arch === 'x64') return '@github/copilot-linux-x64';
+    if (process.platform === 'win32' && process.arch === 'arm64') return '@github/copilot-win32-arm64';
+    if (process.platform === 'win32' && process.arch === 'x64') return '@github/copilot-win32-x64';
+    return null;
+  })();
+  if (!packageName) throw new Error(`GitHub Copilot no es compatible con ${process.platform}/${process.arch}.`);
+
+  const require = createRequire(__filename);
+  let executable: string;
+  try {
+    executable = require.resolve(packageName);
+  } catch {
+    try {
+      const loader = require.resolve('@github/copilot/package.json');
+      executable = path.join(path.dirname(loader), 'node_modules', ...packageName.split('/'), process.platform === 'win32' ? 'copilot.exe' : 'copilot');
+    } catch {
+      throw new Error('No se encontró el runtime oficial de GitHub Copilot incluido con Nodus.');
+    }
+  }
+  executable = unpackedAsarPath(executable);
+  if (!fs.existsSync(executable)) throw new Error('El ejecutable oficial de GitHub Copilot no está disponible en esta instalación.');
+  return executable;
+}
+
+function sanitizedEnv(): Record<string, string> {
+  const env: Record<string, string> = {};
+  for (const [name, value] of Object.entries(process.env)) {
+    if (value === undefined) continue;
+    if (/(?:API_?KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL|COOKIE|SESSION)/i.test(name)) continue;
+    env[name] = value;
+  }
+  delete env.NODE_OPTIONS;
+  env.COPILOT_HOME = copilotHome();
+  return env;
+}
+
+function getClient(): CopilotClient {
+  if (client) return client;
+  const home = copilotHome();
+  client = new CopilotClient({
+    connection: RuntimeConnection.forStdio({ path: resolveGitHubCopilotBinaryPath(), env: sanitizedEnv() }),
+    mode: 'empty',
+    baseDirectory: home,
+    workingDirectory: home,
+    useLoggedInUser: true,
+    logLevel: 'none',
+  });
+  return client;
+}
+
+function emit(status: GitHubCopilotSubscriptionStatus): void {
+  for (const listener of listeners) listener(status);
+}
+
+export function onGitHubCopilotSubscriptionStatusChanged(
+  listener: (status: GitHubCopilotSubscriptionStatus) => void
+): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
+function mapQuota(id: string, raw: any): GitHubCopilotSubscriptionQuotaWindow {
+  const entitlement = Number(raw?.entitlementRequests ?? 0);
+  const used = Number(raw?.usedRequests ?? 0);
+  const unlimited = Boolean(raw?.isUnlimitedEntitlement);
+  return {
+    id,
+    unlimited,
+    entitlementRequests: entitlement,
+    usedRequests: used,
+    remainingRequests: unlimited ? null : Math.max(0, entitlement - used),
+    remainingPercentage: Math.max(0, Math.min(100, Number(raw?.remainingPercentage ?? 0))),
+    overage: Number(raw?.overage ?? 0),
+    overageAllowed: Boolean(raw?.overageAllowedWithExhaustedQuota),
+    usageAllowedAfterExhaustion: Boolean(raw?.usageAllowedWithExhaustedQuota),
+    resetDate: typeof raw?.resetDate === 'string' ? raw.resetDate : null,
+    tokenBasedBilling: Boolean(raw?.tokenBasedBilling),
+    hasQuota: raw?.hasQuota === undefined ? unlimited || entitlement > used : Boolean(raw.hasQuota),
+  };
+}
+
+async function readStatus(): Promise<GitHubCopilotSubscriptionStatus> {
+  try {
+    const runtime = getClient();
+    await runtime.start();
+    const auth = await runtime.getAuthStatus();
+    if (!auth.isAuthenticated) {
+      return {
+        ...EMPTY_STATUS,
+        available: true,
+        loginPending: loginProcess !== null,
+        statusMessage: auth.statusMessage ?? null,
+        lastSession,
+        error: loginDiagnostic || null,
+      };
+    }
+    let quota: GitHubCopilotSubscriptionQuotaWindow[] = [];
+    try {
+      const response = await runtime.rpc.account.getQuota({});
+      quota = Object.entries(response.quotaSnapshots ?? {})
+        .flatMap(([id, value]) => value ? [mapQuota(id, value)] : [])
+        .sort((a, b) => Number(b.id === 'premium_interactions') - Number(a.id === 'premium_interactions') || a.id.localeCompare(b.id));
+    } catch { /* authentication/catalogue still useful without a quota snapshot */ }
+    return {
+      available: true,
+      connected: true,
+      loginPending: loginProcess !== null,
+      login: auth.login ?? null,
+      authType: auth.authType ?? null,
+      statusMessage: auth.statusMessage ?? null,
+      // Never log the user out of GitHub CLI or revoke environment credentials.
+      canLogout: auth.authType === 'user',
+      quota,
+      lastSession,
+      error: null,
+    };
+  } catch (error) {
+    return {
+      ...EMPTY_STATUS,
+      loginPending: loginProcess !== null,
+      lastSession,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+async function refresh(): Promise<GitHubCopilotSubscriptionStatus> {
+  const status = await readStatus();
+  emit(status);
+  return status;
+}
+
+export async function getGitHubCopilotSubscriptionStatus(): Promise<GitHubCopilotSubscriptionStatus> {
+  return refresh();
+}
+
+export async function startGitHubCopilotSubscriptionLogin(): Promise<GitHubCopilotSubscriptionStatus> {
+  const current = await readStatus();
+  if (current.connected || loginProcess) return current;
+  loginDiagnostic = '';
+  const child = spawn(resolveGitHubCopilotBinaryPath(), ['login', '--host', 'https://github.com'], {
+    env: sanitizedEnv(),
+    stdio: ['pipe', 'pipe', 'pipe'],
+    windowsHide: true,
+  });
+  loginProcess = child;
+  child.stdin.end();
+  const capture = (chunk: Buffer | string) => {
+    loginDiagnostic = `${loginDiagnostic}${String(chunk)}`
+      .replace(/(?:gh[oupsr]_|github_pat_)[A-Za-z0-9_]+/g, '[credencial ocultada]')
+      .slice(-2_000);
+  };
+  child.stdout.on('data', capture);
+  child.stderr.on('data', capture);
+  child.once('error', (error) => {
+    loginDiagnostic = error.message;
+    if (loginProcess === child) loginProcess = null;
+    void refresh();
+  });
+  child.once('exit', (code) => {
+    if (loginProcess === child) loginProcess = null;
+    if (code === 0) loginDiagnostic = '';
+    void stopClient().finally(() => refresh());
+  });
+  emit({ ...current, available: true, loginPending: true, error: null });
+  return { ...current, available: true, loginPending: true, error: null };
+}
+
+export async function cancelGitHubCopilotSubscriptionLogin(): Promise<GitHubCopilotSubscriptionStatus> {
+  const child = loginProcess;
+  loginProcess = null;
+  if (child && child.exitCode === null) {
+    try { child.kill('SIGTERM'); } catch { /* already exited */ }
+  }
+  loginDiagnostic = '';
+  return refresh();
+}
+
+export async function logoutGitHubCopilotSubscription(): Promise<GitHubCopilotSubscriptionStatus> {
+  const runtime = getClient();
+  await runtime.start();
+  const auth = await runtime.getAuthStatus();
+  if (auth.authType !== 'user') {
+    throw new Error('Esta conexión procede de GitHub CLI o del entorno. Nodus no cerrará una sesión global de GitHub; gestiónala en GitHub CLI.');
+  }
+  const current = await runtime.rpc.account.getCurrentAuth();
+  if (current.authInfo) await runtime.rpc.account.logout({ authInfo: current.authInfo });
+  await stopClient();
+  return refresh();
+}
+
+async function copilotModels(): Promise<CopilotModelInfo[]> {
+  if (modelCache) return modelCache;
+  const runtime = getClient();
+  await runtime.start();
+  const auth = await runtime.getAuthStatus();
+  if (!auth.isAuthenticated) throw new Error('Conecta primero tu cuenta de GitHub Copilot en Proveedores y modelos.');
+  modelCache = await runtime.listModels();
+  return modelCache;
+}
+
+export async function listGitHubCopilotSubscriptionModels(): Promise<ModelInfo[]> {
+  return (await copilotModels()).map((model) => ({
+    id: model.id,
+    name: model.name || model.id,
+    contextLength: model.capabilities?.limits?.max_context_window_tokens,
+    vision: model.capabilities?.supports?.vision,
+    reasoning: model.capabilities?.supports?.reasoningEffort,
+  }));
+}
+
+export async function completeWithGitHubCopilotSubscription(options: CompletionOptions): Promise<string> {
+  const models = await copilotModels();
+  const selected = models.find((model) => model.id === options.model);
+  if (!selected) throw new Error(`El modelo «${options.model}» no está disponible en tu suscripción de GitHub Copilot.`);
+  if (options.images?.length && !selected.capabilities?.supports?.vision) {
+    throw new Error(`El modelo «${options.model}» de GitHub Copilot no admite imágenes.`);
+  }
+
+  const workdir = await fs.promises.mkdtemp(path.join(app.getPath('temp') || os.tmpdir(), 'nodus-github-copilot-'));
+  try { await fs.promises.chmod(workdir, 0o700); } catch { /* Windows */ }
+  try {
+    const result = await runIsolatedGitHubCopilotCompletion(getClient(), {
+      ...options,
+      supportsReasoning: Boolean(selected.capabilities?.supports?.reasoningEffort),
+      workdir,
+    });
+    if (result.usage) lastSession = result.usage;
+    void refresh();
+    return result.text;
+  } finally {
+    await fs.promises.rm(workdir, { recursive: true, force: true });
+  }
+}
+
+async function stopClient(): Promise<void> {
+  const current = client;
+  client = null;
+  modelCache = null;
+  if (current) await current.stop();
+}
+
+export async function stopGitHubCopilotSubscription(): Promise<void> {
+  const child = loginProcess;
+  loginProcess = null;
+  if (child && child.exitCode === null) {
+    try { child.kill('SIGTERM'); } catch { /* already exited */ }
+  }
+  await stopClient();
+}

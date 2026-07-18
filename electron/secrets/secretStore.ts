@@ -2,7 +2,7 @@ import { app, safeStorage } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { AiProvider } from '@shared/types';
-import { AI_PROVIDERS as PROVIDERS } from '@shared/providers';
+import { AI_PROVIDERS, SECRET_PROVIDERS as PROVIDERS } from '@shared/providers';
 import { activeVaultDir, listVaults } from '../vaults/vaultRegistry';
 
 // AI API keys are stored per provider, encrypted-at-rest via Electron safeStorage,
@@ -81,6 +81,8 @@ function readKeyFile(file: string): string | null {
 }
 
 export function setApiKey(provider: AiProvider, key: string): void {
+  if (provider === 'codex') throw new Error('ChatGPT usa acceso gestionado; Nodus no almacena una clave para este proveedor.');
+  if (provider === 'github-copilot') throw new Error('GitHub Copilot usa el acceso oficial de GitHub; Nodus no almacena una clave para este proveedor.');
   if (!key) {
     clearApiKey(provider);
     return;
@@ -101,6 +103,7 @@ export function setApiKey(provider: AiProvider, key: string): void {
 }
 
 export function getApiKey(provider: AiProvider): string | null {
+  if (provider === 'codex' || provider === 'github-copilot') return null;
   const canonical = keyFile(provider);
   const fromGlobal = readKeyFile(canonical);
   if (fromGlobal !== null) return fromGlobal;
@@ -123,6 +126,7 @@ export function hasApiKey(provider: AiProvider): boolean {
 }
 
 export function clearApiKey(provider: AiProvider): void {
+  if (provider === 'codex' || provider === 'github-copilot') return;
   // An explicit delete applies to every released storage location; otherwise an
   // old per-vault copy could silently recreate the key on the next read.
   for (const file of apiKeyCandidateFiles(provider)) {
@@ -307,7 +311,7 @@ export function clearBackupRecoveryKey(): void {
 
 /** Map of provider -> whether a key is stored, for the renderer (no keys exposed). */
 export function providerKeyMap(): Record<AiProvider, boolean> {
-  return Object.fromEntries(PROVIDERS.map((p) => [p, hasApiKey(p)])) as Record<AiProvider, boolean>;
+  return Object.fromEntries(AI_PROVIDERS.map((p) => [p, p === 'codex' || p === 'github-copilot' ? false : hasApiKey(p)])) as Record<AiProvider, boolean>;
 }
 
 /** Providers with a configured key. Keys are shared globally, so the vault id is
