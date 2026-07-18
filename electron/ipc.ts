@@ -292,6 +292,8 @@ import * as teachingRubrics from './db/teachingRubricsRepo';
 import * as teachingGroups from './db/teachingGroupsRepo';
 import * as teachingGrades from './db/teachingGradesRepo';
 import { importAssessmentPlan, draftStudentFeedback } from './ai/assessmentImport';
+import { actaPdfBytes, actaDocxBytes, boletinPdfBytes, gradebookCsv, gradebookXlsx } from './export/gradebookExport';
+import type { ActaExportInput, BoletinExportInput, GradebookExportFormat } from './export/gradebookExport';
 import type { TeachingGroupInput } from '@shared/teachingGroups';
 import * as teachingLogos from './db/teachingLogosRepo';
 import { fillRubricCell, generateRubric } from './ai/teachingRubrics';
@@ -2442,6 +2444,31 @@ export function registerIpc(
   h('teaching:entries:clear', async (_e, studentId: string, itemId: string, convocatoria?: string) => {
     teachingGrades.clearGradeEntry(studentId, itemId, convocatoria ?? 'ordinaria');
     return null;
+  });
+  h('teaching:export:acta', async (_e, format: GradebookExportFormat, input: ActaExportInput, grid?: { columns: unknown[]; rows: unknown[] }) => {
+    const base = (input.header.subject || 'acta').replace(/[\\/:*?"<>|]+/g, '-') || 'acta';
+    const picked = await dialog.showSaveDialog(getWindow() ?? undefined!, {
+      title: 'Descargar acta',
+      defaultPath: `${base}.${format}`,
+      filters: [{ name: format.toUpperCase(), extensions: [format] }],
+    });
+    if (picked.canceled || !picked.filePath) return null;
+    if (format === 'pdf') fs.writeFileSync(picked.filePath, await actaPdfBytes(input));
+    else if (format === 'docx') fs.writeFileSync(picked.filePath, await actaDocxBytes(input));
+    else if (format === 'xlsx') fs.writeFileSync(picked.filePath, gradebookXlsx((grid?.columns ?? []) as never, (grid?.rows ?? []) as never));
+    else fs.writeFileSync(picked.filePath, gradebookCsv((grid?.columns ?? []) as never, (grid?.rows ?? []) as never), 'utf8');
+    return { path: picked.filePath };
+  });
+  h('teaching:export:boletin', async (_e, input: BoletinExportInput) => {
+    const base = (input.student.name || input.student.code || 'boletin').replace(/[\\/:*?"<>|]+/g, '-');
+    const picked = await dialog.showSaveDialog(getWindow() ?? undefined!, {
+      title: 'Descargar boletín',
+      defaultPath: `${base}.pdf`,
+      filters: [{ name: 'PDF', extensions: ['pdf'] }],
+    });
+    if (picked.canceled || !picked.filePath) return null;
+    fs.writeFileSync(picked.filePath, await boletinPdfBytes(input));
+    return { path: picked.filePath };
   });
   h('teaching:items:fromExam', async (_e, planId: string, examId: string, weight?: number) => teachingGrades.addExamBlock(planId, examId, weight ?? 0));
   h('teaching:items:fromRubric', async (_e, planId: string, rubricId: string, weight?: number) => teachingGrades.addRubricItem(planId, rubricId, weight ?? 0));

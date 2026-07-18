@@ -53,6 +53,7 @@ export function TeachingGradesView() {
   const [pendingDelete, setPendingDelete] = useState<AssessmentPlan | null>(null);
   const [explain, setExplain] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const reloadPlans = useCallback(async () => setPlans(await window.nodus.listAssessmentPlans()), []);
 
@@ -294,6 +295,10 @@ export function TeachingGradesView() {
               {group ? tx('{n} alumnos · {g}', { n: (group.students ?? []).length, g: group.name }) : t('Elige un grupo para empezar.')}
             </p>
           </div>
+          <button className="btn btn-ghost h-8" data-testid="grades-export" disabled={!grid}
+            onClick={() => setExporting(true)}>
+            <Icon name="download" size={13} />{t('Exportar')}
+          </button>
           <button className="btn btn-ghost h-8" data-testid="plan-edit" onClick={() => setEditing(true)}>
             <Icon name="settings" size={13} />{t('Plan de evaluación')}
           </button>
@@ -434,6 +439,40 @@ export function TeachingGradesView() {
         )}
       </div>
 
+      {exporting && grid && plan && group && (
+        <ExportModal
+          onCancel={() => setExporting(false)}
+          onExport={async (format) => {
+            await guard(async () => {
+              const rows = (group.students ?? []).map((student) => {
+                const result = grid.results[student.id];
+                return {
+                  code: student.pseudonymCode,
+                  name: [student.givenNames, student.surnames].filter(Boolean).join(' '),
+                  numeric: result?.record.numeric ?? null,
+                  qualitative: result?.record.qualitative ?? null,
+                  notPresented: !!result?.record.notPresented,
+                  passed: !!result?.passed,
+                };
+              });
+              const done = await window.nodus.exportGradebookActa(format, {
+                header: {
+                  subject: subjectName(plan.subjectId),
+                  group: group.name,
+                  convocatoria: convocatoria === 'ordinaria' ? t('Convocatoria ordinaria') : t('Convocatoria extraordinaria'),
+                  date: new Date().toLocaleDateString(getActiveLang()),
+                },
+                rows,
+                labels: exportLabels(),
+                showCodes: settings?.studentPseudonymsEnabled ?? true,
+              }, { columns: grid.columns, rows: grid.rows });
+              setExporting(false);
+              if (done) setMessage(t('Documento descargado.'));
+            });
+          }}
+        />
+      )}
+
       {editing && (
         <AssessmentPlanEditor
           plan={plan}
@@ -455,9 +494,62 @@ export function TeachingGradesView() {
           result={grid.results[explain]}
           scaleMax={plan.rules.scaleMax}
           onClose={() => setExplain(null)}
+          onDownload={async () => {
+            const student = (group?.students ?? []).find((s) => s.id === explain);
+            if (!student || !plan) return;
+            await guard(async () => {
+              const done = await window.nodus.exportGradebookBoletin({
+                header: {
+                  subject: subjectName(plan.subjectId),
+                  group: group?.name,
+                  date: new Date().toLocaleDateString(getActiveLang()),
+                },
+                student: {
+                  code: student.pseudonymCode,
+                  name: [student.givenNames, student.surnames].filter(Boolean).join(' '),
+                },
+                result: grid.results[student.id],
+                scaleMax: plan.rules.scaleMax,
+                labels: exportLabels(),
+              });
+              if (done) setMessage(t('Documento descargado.'));
+            });
+          }}
         />
       )}
     </div>
+  );
+}
+
+/** Document wording, translated at the call site so the file follows the UI language. */
+function exportLabels() {
+  return {
+    acta: t('Acta de calificaciones'), boletin: t('Boletín de calificaciones'),
+    student: t('Alumno/a'), identifier: t('Identificador'), grade: t('Calificación'),
+    status: t('Situación'), passed: t('Apto'), failed: t('No apto'),
+    notPresented: t('No presentado'), honours: t('Mención'), breakdown: t('Desglose'),
+    weight: t('Peso'), signature: t('Firma'), generated: t('Generado con Nodus'),
+  };
+}
+
+function ExportModal({ onCancel, onExport }: { onCancel: () => void; onExport: (format: 'pdf' | 'docx' | 'csv' | 'xlsx') => Promise<void> }) {
+  return (
+    <ModalBackdrop onClose={onCancel}>
+      <section className="card-modal w-full max-w-sm p-5" role="dialog" aria-modal="true"
+        aria-label={t('Exportar')} data-testid="export-modal">
+        <h2 className="text-base font-semibold">{t('Exportar')}</h2>
+        <p className="mt-1 text-xs text-neutral-500">{t('El acta lleva los nombres: es un documento para el centro.')}</p>
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          {(['pdf', 'docx', 'csv', 'xlsx'] as const).map((format) => (
+            <button key={format} className="btn btn-ghost h-9" data-testid={`export-${format}`}
+              onClick={() => void onExport(format)}>{format.toUpperCase()}</button>
+          ))}
+        </div>
+        <div className="mt-4 flex justify-end">
+          <button className="btn btn-ghost" onClick={onCancel}>{t('Cancelar')}</button>
+        </div>
+      </section>
+    </ModalBackdrop>
   );
 }
 
@@ -497,12 +589,13 @@ function warningText(warning: { code: string; detail: Record<string, number | st
  * really carried, and every rule that changed the outcome.
  */
 function ExplainModal({
-  name, result, scaleMax, onClose,
+  name, result, scaleMax, onClose, onDownload,
 }: {
   name: string;
   result: { raw: number | null; record: { numeric: number | null; qualitative: string | null }; trace: TraceNode | null; rules: TraceRule[] } | undefined;
   scaleMax: number;
   onClose: () => void;
+  onDownload?: () => Promise<void>;
 }) {
   if (!result) return null;
   const renderNode = (node: TraceNode, depth: number) => (
@@ -541,7 +634,14 @@ function ExplainModal({
           <span className="text-sm">
             {t('Calificación')}: <strong data-testid="explain-final">{result.record.numeric ?? result.record.qualitative ?? '—'}</strong>
           </span>
-          <button className="btn btn-ghost" onClick={onClose}>{t('Cerrar')}</button>
+          <span className="flex gap-2">
+            {onDownload && (
+              <button className="btn btn-ghost" data-testid="explain-download" onClick={() => void onDownload()}>
+                <Icon name="download" size={13} />{t('Boletín')}
+              </button>
+            )}
+            <button className="btn btn-ghost" onClick={onClose}>{t('Cerrar')}</button>
+          </span>
         </div>
       </section>
     </ModalBackdrop>

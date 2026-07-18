@@ -5432,6 +5432,8 @@ export interface NodusApi {
   gradebookCohortStats(planId: string, groupId: string, convocatoria?: string): Promise<{ maxByItem: Record<string, number> }>;
   importAssessmentPlan(request: { planId: string; text: string }): Promise<ProposedPlan>;
   applyProposedPlan(planId: string, proposal: ProposedPlan): Promise<AssessmentItem[]>;
+  exportGradebookActa(format: 'pdf' | 'docx' | 'csv' | 'xlsx', input: unknown, grid?: { columns: unknown[]; rows: unknown[] }): Promise<{ path: string } | null>;
+  exportGradebookBoletin(input: unknown): Promise<{ path: string } | null>;
   addExamBlock(planId: string, examId: string, weight?: number): Promise<AssessmentItem[]>;
   addRubricItem(planId: string, rubricId: string, weight?: number): Promise<AssessmentItem[]>;
   setRubricEvaluation(input: { studentId: string; itemId: string; convocatoria?: string; levels: Record<string, string> }): Promise<GradeEntry>;

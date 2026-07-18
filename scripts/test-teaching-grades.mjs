@@ -326,6 +326,95 @@ try {
       're-marking replaces the previous evaluation');
   }
 
+  // ── Exports: the four formats are OPENED and inspected, not merely produced ──
+  {
+    const exp = require(path.join(repoRoot, 'electron/export/gradebookExport.ts'));
+    const { gradebookToGrid } = require(path.join(repoRoot, 'shared/assessment/index.ts'));
+    const zlib = require('node:zlib');
+
+    const p4 = repo.createAssessmentPlan({ name: 'Salidas', subjectId: 'sub2', profile: 'universidad' });
+    const t1 = repo.createAssessmentItem(p4.id, { name: 'Examen', weight: 100 });
+    const g4 = groups.createTeachingGroup({ name: 'Z', subjectId: 'sub2', expectedSize: 2 });
+    groups.updateTeachingStudent(g4.students[0].id, { givenNames: 'Ana', surnames: 'Peña' });
+    groups.updateTeachingStudent(g4.students[1].id, { givenNames: 'Juan', surnames: 'García' });
+    repo.setGradeEntry({ studentId: g4.students[0].id, itemId: t1.id, rawValue: 8 });
+    repo.setGradeEntry({ studentId: g4.students[1].id, itemId: t1.id, status: 'not_submitted' });
+
+    const detail = repo.getAssessmentPlan(p4.id);
+    const students = repo.getTeachingGroupStudents
+      ? repo.getTeachingGroupStudents(g4.id)
+      : groups.getTeachingGroup(g4.id).students;
+    const grid = gradebookToGrid({
+      plan: detail.plan, items: detail.items,
+      entries: repo.listGradeEntries(p4.id),
+      students: students.map((s) => ({ id: s.id, givenNames: s.givenNames, surnames: s.surnames, pseudonymCode: s.pseudonymCode, position: s.position })),
+    });
+    const actaRows = students.map((s) => {
+      const r = grid.results[s.id];
+      return {
+        code: s.pseudonymCode, name: `${s.givenNames} ${s.surnames}`.trim(),
+        numeric: r.record.numeric, qualitative: r.record.qualitative,
+        notPresented: r.record.notPresented, passed: r.passed,
+      };
+    });
+    const header = { subject: 'Lengua', group: 'Z', date: '2026-01-01' };
+
+    // PDF is deliberately NOT tested here: it renders through a real BrowserWindow,
+    // which this as-Node harness cannot create. It is verified in the GUI walkthrough
+    // (scripts/verify-teaching-groups-ui.mjs), where a browser exists — asserting it
+    // here would only prove that a stub throws.
+    //
+    // What IS testable here is the HTML both PDF and DOCX are built from.
+    const { renderActaHtml: renderActa, renderBoletinHtml } = require(path.join(repoRoot, 'shared/gradebookHtml.ts'));
+    const actaHtml = renderActa(header, actaRows);
+    assert.ok(actaHtml.includes('Ana'), 'the acta HTML names the students');
+    assert.ok(/No presentado/.test(actaHtml), 'and marks the non-submission as not presented');
+    assert.ok(!/undefined|NaN/.test(actaHtml), 'with no undefined or NaN leaking into the document');
+    const boletinHtml = renderBoletinHtml(header, { code: 'STU_7K3Q', name: 'Ana Peña' },
+      grid.results[students[0].id], 10);
+    assert.ok(boletinHtml.includes('Examen'), 'the boletín shows the parts that produced the mark');
+    assert.ok(!/undefined|NaN/.test(boletinHtml));
+
+    // DOCX: a real zip whose document.xml carries the marks.
+    const docx = await exp.actaDocxBytes({ header, rows: actaRows });
+    assert.equal(docx.subarray(0, 2).toString('latin1'), 'PK', 'the acta DOCX is a zip');
+    const xml = extractFromZip(docx, 'word/document.xml', zlib);
+    assert.ok(xml.includes('Ana'), 'the DOCX names the student');
+    assert.ok(xml.includes('8'), 'and carries the mark');
+    assert.ok(/No presentado|No apto/.test(xml), 'and states each situation');
+
+    // CSV: header row plus one line per student, with the non-submission visible.
+    const csv = exp.gradebookCsv(grid.columns, grid.rows);
+    const lines = csv.split('\r\n');
+    assert.equal(lines.length, students.length + 1, 'one header row plus one row per student');
+    assert.ok(lines[0].includes('Identificador'), 'the header carries the column names');
+    assert.ok(csv.includes('Ana'), 'and the body the students');
+
+    // XLSX: a zip whose sheet holds the numbers AS numbers, not as text.
+    const xlsx = exp.gradebookXlsx(grid.columns, grid.rows);
+    assert.equal(xlsx.subarray(0, 2).toString('latin1'), 'PK', 'the XLSX is a zip');
+    const sheet = extractFromZip(xlsx, 'xl/worksheets/sheet1.xml', zlib);
+    assert.ok(sheet.includes('Ana'), 'the sheet carries the roster');
+    assert.ok(/<v>8<\/v>/.test(sheet), 'and the mark is a real number cell, not text');
+
+    // A qualitative-only plan must emit NO number anywhere in the acta.
+    repo.updateAssessmentPlan(p4.id, { rules: { record: 'qualitative' } });
+    const qual = repo.getAssessmentPlan(p4.id);
+    const qualGrid = gradebookToGrid({
+      plan: qual.plan, items: qual.items, entries: repo.listGradeEntries(p4.id),
+      students: students.map((s) => ({ id: s.id, givenNames: s.givenNames, surnames: s.surnames, pseudonymCode: s.pseudonymCode, position: s.position })),
+    });
+    const { renderActaHtml } = require(path.join(repoRoot, 'shared/gradebookHtml.ts'));
+    const qualRows = students.map((s) => {
+      const r = qualGrid.results[s.id];
+      return { code: s.pseudonymCode, name: s.givenNames, numeric: r.record.numeric, qualitative: r.record.qualitative,
+               notPresented: r.record.notPresented, passed: r.passed };
+    });
+    const qualHtml = renderActaHtml(header, qualRows);
+    assert.ok(/NT|SB|BI|SU|IN/.test(qualHtml), 'a qualitative plan records a term');
+    assert.ok(qualRows.every((r) => r.numeric === null), 'and no number at all — the projection decides, not the renderer');
+  }
+
   console.log('teaching grades (repo): OK');
 
   // ── Legacy upgrade v86 → head ──────────────────────────────────────────────
@@ -368,6 +457,24 @@ try {
 } finally {
   closeDb();
   await rm(root, { recursive: true, force: true });
+}
+
+/** Minimal stored/deflated zip entry reader, so an export can be OPENED in the test. */
+function extractFromZip(buffer, name, zlib) {
+  const target = Buffer.from(name, 'utf8');
+  for (let i = 0; i < buffer.length - 4; i++) {
+    if (buffer.readUInt32LE(i) !== 0x04034b50) continue;
+    const method = buffer.readUInt16LE(i + 8);
+    const compressed = buffer.readUInt32LE(i + 18);
+    const nameLen = buffer.readUInt16LE(i + 26);
+    const extraLen = buffer.readUInt16LE(i + 28);
+    const start = i + 30;
+    if (!buffer.subarray(start, start + nameLen).equals(target)) continue;
+    const dataStart = start + nameLen + extraLen;
+    const data = buffer.subarray(dataStart, dataStart + compressed);
+    return (method === 0 ? data : zlib.inflateRawSync(data)).toString('utf8');
+  }
+  throw new Error(`${name} not found in the archive`);
 }
 
 function installRuntimeHooks(userData) {

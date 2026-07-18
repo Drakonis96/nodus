@@ -629,6 +629,8 @@ const api: NodusApi = {
   setGradeEntry: (input) => ipcRenderer.invoke('teaching:entries:set', input),
   clearGradeEntry: (studentId, itemId, convocatoria) => ipcRenderer.invoke('teaching:entries:clear', studentId, itemId, convocatoria).then(() => undefined),
   gradebookCohortStats: (planId, groupId, convocatoria) => ipcRenderer.invoke('teaching:entries:cohort', planId, groupId, convocatoria),
+  exportGradebookActa: (format, input, grid) => ipcRenderer.invoke('teaching:export:acta', format, input, grid),
+  exportGradebookBoletin: (input) => ipcRenderer.invoke('teaching:export:boletin', input),
   addExamBlock: (planId, examId, weight) => ipcRenderer.invoke('teaching:items:fromExam', planId, examId, weight),
   addRubricItem: (planId, rubricId, weight) => ipcRenderer.invoke('teaching:items:fromRubric', planId, rubricId, weight),
   setRubricEvaluation: (input) => ipcRenderer.invoke('teaching:entries:rubric:set', input),

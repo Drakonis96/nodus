@@ -12,7 +12,7 @@
 // Shots land in <repo>/.tmp-shots/.
 
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import os from 'node:os';
@@ -31,6 +31,19 @@ const userData = await mkdtemp(path.join(os.tmpdir(), 'nodus-groups-ui-'));
 const shotDir = path.join(repoRoot, '.tmp-shots');
 await mkdir(shotDir, { recursive: true });
 const appVersion = require(path.join(repoRoot, 'package.json')).version;
+
+/** Polls until the export has actually been written, then returns its bytes. */
+async function waitForFile(filePath, timeoutMs = 30_000) {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    try {
+      const bytes = await readFile(filePath);
+      if (bytes.length > 0) return bytes;
+    } catch { /* not written yet */ }
+    if (Date.now() > deadline) throw new Error(`Timed out waiting for ${filePath}`);
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+}
 
 let app = null;
 try {
@@ -351,6 +364,69 @@ try {
   await page.getByTestId('plan-editor-close').click();
   await page.getByTestId('grades-detail').waitFor();
   await page.screenshot({ path: path.join(shotDir, 'plan-editor-light-es.png') });
+
+  // ── Exports, including the PDF that only a real browser can render ─────────
+  //
+  // The save dialog is modal and would block, so the bytes are produced through the
+  // main process directly. What this adds over the node-side test is the PDF path,
+  // which needs a BrowserWindow that only exists here.
+  const pdfCheck = await page.evaluate(async () => {
+    const plans = await window.nodus.listAssessmentPlans();
+    const detail = await window.nodus.getAssessmentPlan(plans[0].id);
+    const groups = await window.nodus.listTeachingGroups();
+    const group = await window.nodus.getTeachingGroup(groups[0].id);
+    return { plan: detail.plan.name, students: (group.students ?? []).length };
+  });
+  assert.ok(pdfCheck.students > 0, 'the export has a roster to work from');
+
+  await page.getByTestId('grades-export').click();
+  await page.getByTestId('export-modal').waitFor();
+  const exportCopy = await page.getByTestId('export-modal').innerText();
+  assert.ok(/nombres/.test(exportCopy), 'the export modal says the acta carries names');
+  for (const format of ['pdf', 'docx', 'csv', 'xlsx']) {
+    assert.equal(await page.getByTestId(`export-${format}`).count(), 1, `${format} is offered`);
+  }
+  await page.keyboard.press('Escape');
+  await page.getByTestId('export-modal').waitFor({ state: 'detached' });
+  console.log('[ui] export modal offers all four formats and states what the acta contains');
+
+  // The PDF path renders through a real BrowserWindow, so it can only be exercised
+  // here. Drive the REAL export by stubbing the save dialog, then open the bytes: a
+  // file that exists proves nothing if it is empty or is HTML with the wrong suffix.
+  //
+  for (const attempt of [1]) {
+    const target = path.join(shotDir, `acta-check-${attempt}.pdf`);
+    await app.evaluate(async ({ dialog }, filePath) => {
+      dialog.showSaveDialog = async () => ({ canceled: false, filePath });
+    }, target);
+
+    await page.getByTestId('grades-export').click();
+    await page.getByTestId('export-modal').waitFor();
+    await page.getByTestId('export-pdf').click();
+    // Wait for the FILE, not for the on-screen message: the previous export's message
+    // is still visible for a few seconds and would satisfy the check instantly.
+    const bytes = await waitForFile(target);
+    assert.ok(bytes.length > 1000, `export ${attempt}: the acta PDF has content (${bytes.length} bytes)`);
+    assert.equal(bytes.subarray(0, 5).toString('latin1'), '%PDF-', `export ${attempt}: it really is a PDF`);
+    await page.keyboard.press('Escape').catch(() => {});
+  }
+  console.log('[ui] acta exports to a real PDF');
+
+  // And the individual report, from the derivation panel.
+  {
+    const target = path.join(shotDir, 'boletin-check.pdf');
+    await app.evaluate(async ({ dialog }, filePath) => {
+      dialog.showSaveDialog = async () => ({ canceled: false, filePath });
+    }, target);
+    await page.locator('[data-testid^="grade-final-"]').first().click();
+    await page.getByTestId('explain-modal').waitFor();
+    await page.getByTestId('explain-download').click();
+    const bytes = await waitForFile(target);
+    assert.equal(bytes.subarray(0, 5).toString('latin1'), '%PDF-', 'the boletín is a real PDF');
+    assert.ok(bytes.length > 1000);
+    await page.keyboard.press('Escape');
+    console.log('[ui] individual report exports to a real PDF');
+  }
 
   const gradesFit = await page.evaluate(() => {
     const el = document.querySelector('[data-testid="grades-grid"]');
