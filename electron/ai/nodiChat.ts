@@ -151,7 +151,7 @@ export async function streamNodiChat(
   ].filter(Boolean).join('\n\n');
   const settings = getSettings();
   return completeTextStream(
-    { system: buildSystemPrompt(request, context.sources), user, maxTokens: 1_200, temperature: 0.2, reasoning: 'off', plainContext: true },
+    { system: buildSystemPrompt(request, context.sources), user, maxTokens: 1_200, temperature: 0.2, reasoning: 'off', useConfiguredCodexReasoning: true, plainContext: true },
     (delta, kind) => { if (kind === 'content') onDelta(delta); },
     request.model ?? settings.nodiModel ?? settings.chatModel,
     signal

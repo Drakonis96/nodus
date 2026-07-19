@@ -330,6 +330,31 @@ const api: NodusApi = {
     return () => ipcRenderer.removeListener('settings:apiKeysRecovered', listener);
   },
 
+  getChatGptSubscriptionStatus: () => ipcRenderer.invoke('ai:chatgptSubscription:status'),
+  startChatGptSubscriptionLogin: () => ipcRenderer.invoke('ai:chatgptSubscription:login'),
+  cancelChatGptSubscriptionLogin: (loginId) => ipcRenderer.invoke('ai:chatgptSubscription:cancelLogin', loginId),
+  logoutChatGptSubscription: () => ipcRenderer.invoke('ai:chatgptSubscription:logout'),
+  onChatGptSubscriptionStatusChanged: (cb) => {
+    const listener = (_e: unknown, status: Parameters<typeof cb>[0]) => cb(status);
+    ipcRenderer.on('ai:chatgptSubscription:statusChanged', listener);
+    return () => ipcRenderer.removeListener('ai:chatgptSubscription:statusChanged', listener);
+  },
+  getGitHubCopilotSubscriptionStatus: () => ipcRenderer.invoke('ai:githubCopilotSubscription:status'),
+  startGitHubCopilotSubscriptionLogin: () => ipcRenderer.invoke('ai:githubCopilotSubscription:login'),
+  cancelGitHubCopilotSubscriptionLogin: () => ipcRenderer.invoke('ai:githubCopilotSubscription:cancelLogin'),
+  logoutGitHubCopilotSubscription: () => ipcRenderer.invoke('ai:githubCopilotSubscription:logout'),
+  onGitHubCopilotSubscriptionStatusChanged: (cb) => {
+    const listener = (_e: unknown, status: Parameters<typeof cb>[0]) => cb(status);
+    ipcRenderer.on('ai:githubCopilotSubscription:statusChanged', listener);
+    return () => ipcRenderer.removeListener('ai:githubCopilotSubscription:statusChanged', listener);
+  },
+  getOpenCodeGoUsageStatus: () => ipcRenderer.invoke('ai:openCodeGo:usage'),
+  onOpenCodeGoUsageStatusChanged: (cb) => {
+    const listener = (_e: unknown, status: Parameters<typeof cb>[0]) => cb(status);
+    ipcRenderer.on('ai:openCodeGo:usageChanged', listener);
+    return () => ipcRenderer.removeListener('ai:openCodeGo:usageChanged', listener);
+  },
+
   listModels: (provider) => ipcRenderer.invoke('ai:listModels', provider),
   listEmbeddingModels: (provider) => ipcRenderer.invoke('ai:listEmbeddingModels', provider),
   testLocalProvider: (provider) => ipcRenderer.invoke('ai:testLocalProvider', provider),

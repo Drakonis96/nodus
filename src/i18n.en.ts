@@ -1096,6 +1096,84 @@ export const EN: Record<string, string> = {
   'sin claves': 'no keys',
   'Las claves de API y los modelos configurados se comparten entre todas tus bóvedas.':
     'API keys and the models you configure are shared across all your vaults.',
+  'comprobando…': 'checking…',
+  'suscripción conectada': 'subscription connected',
+  'sin conectar': 'not connected',
+  'Conexión mediante el protocolo oficial Codex App Server y el acceso gestionado de ChatGPT. Nodus no lee ni almacena tus credenciales.':
+    'Connection through the official Codex App Server protocol and managed ChatGPT sign-in. Nodus does not read or store your credentials.',
+  'Nodus es una aplicación independiente y no está afiliada, certificada ni respaldada por OpenAI.':
+    'Nodus is an independent application and is not affiliated with, certified by, or endorsed by OpenAI.',
+  'El uso consume la cuota o los créditos de Codex incluidos en tu plan de ChatGPT; no consume saldo de la API de OpenAI.':
+    'Usage consumes the Codex quota or credits included in your ChatGPT plan; it does not consume OpenAI API balance.',
+  'Funciona como motor de Nodi, análisis y Deep Research de Nodus. No es el producto Deep Research de la web de ChatGPT.':
+    'It powers Nodi, analysis and Nodus Deep Research. It is not the Deep Research product on the ChatGPT website.',
+  'Cada petición usa un hilo efímero aislado, sin acceso de escritura, sin red de herramientas y sin cargar tus MCP, plugins o instrucciones personales.':
+    'Each request uses an isolated ephemeral thread, with no write access, no tool network, and without loading your MCP servers, plugins or personal instructions.',
+  'Documentación oficial de Codex App Server ↗': 'Official Codex App Server documentation ↗',
+  'Conectado': 'Connected',
+  'Actualizar estado': 'Refresh status',
+  'Cerrar sesión': 'Sign out',
+  'Límite principal': 'Primary limit',
+  'Límite secundario': 'Secondary limit',
+  'Cargar modelos de Codex': 'Load Codex models',
+  'Cada modelo muestra únicamente los niveles de razonamiento publicados por Codex. «Predeterminado» usa el nivel recomendado por el modelo.':
+    'Each model shows only the reasoning levels published by Codex. “Default” uses the model’s recommended level.',
+  'Razonamiento de {model}': 'Reasoning for {model}',
+  '{level} (predeterminado)': '{level} (default)',
+  Ninguno: 'None',
+  Alto: 'High',
+  'Muy alto': 'Very high',
+  Ultra: 'Ultra',
+  'Esperando acceso en el navegador…': 'Waiting for browser sign-in…',
+  'Conectar suscripción de ChatGPT': 'Connect ChatGPT subscription',
+  'Cancelar acceso': 'Cancel sign-in',
+  'Comprobar estado': 'Check status',
+  'Se restablece: {time}': 'Resets: {time}',
+  'Créditos adicionales': 'Additional credits',
+  'Ilimitados': 'Unlimited',
+  'Disponibles': 'Available',
+  'Sin créditos': 'No credits',
+  '{n}% restante': '{n}% remaining',
+  '{n}% usado': '{n}% used',
+  'SDK oficial · preview': 'Official SDK · preview',
+  'Nodus usa el SDK y el runtime oficiales de GitHub Copilot. Cada petición se factura a la suscripción de GitHub del usuario; no requiere claves de los modelos.':
+    "Nodus uses the official GitHub Copilot SDK and runtime. Each request is billed to the user's GitHub subscription; model API keys are not required.",
+  'La integración oficial está en public preview. Nodus es independiente y no está afiliada, certificada ni respaldada por GitHub.':
+    'The official integration is in public preview. Nodus is independent and is not affiliated with, certified by, or endorsed by GitHub.',
+  'Cada petición se ejecuta en una sesión efímera sin herramientas, MCP, memoria, acceso a archivos, GitHub ni instrucciones del proyecto.':
+    'Each request runs in an ephemeral session with no tools, MCP, memory, file or GitHub access, or project instructions.',
+  'Documentación oficial del SDK de Copilot ↗': 'Official Copilot SDK documentation ↗',
+  'Actualizar cuota': 'Refresh quota',
+  'GitHub no devolvió un contador de cuota para esta cuenta.': 'GitHub did not return a quota meter for this account.',
+  'Última petición en Nodus: {cost} créditos/solicitudes premium · {input} tokens de entrada · {output} de salida':
+    'Last Nodus request: {cost} AI credits/premium requests · {input} input tokens · {output} output tokens',
+  'Cargar modelos de Copilot': 'Load Copilot models',
+  'Esperando acceso de GitHub en el navegador…': 'Waiting for GitHub sign-in in the browser…',
+  'Conectar GitHub Copilot': 'Connect GitHub Copilot',
+  'El runtime oficial abre el flujo OAuth de dispositivo y guarda su credencial en el almacén seguro del sistema. Si ya usas GitHub CLI, puede reutilizar esa sesión sin modificarla.':
+    'The official runtime opens the OAuth device flow and stores its credential in the system secure store. If you already use GitHub CLI, it can reuse that session without changing it.',
+  'Créditos / solicitudes premium': 'AI credits / premium requests',
+  'Ilimitado según GitHub': 'Unlimited according to GitHub',
+  '{remaining} de {total} restantes · {used} usadas': '{remaining} of {total} remaining · {used} used',
+  '{n} de uso adicional': '{n} additional usage',
+  'OpenCode documenta el uso directo de la suscripción Go mediante esta clave y sus endpoints oficiales. Nodus es independiente y no está afiliada, certificada ni respaldada por OpenCode.':
+    'OpenCode documents direct use of the Go subscription through this key and its official endpoints. Nodus is independent and is not affiliated with, certified by, or endorsed by OpenCode.',
+  'Límites generales publicados: 12 USD cada 5 horas, 30 USD por semana y 60 USD por mes. Algunos modelos tienen un límite mensual efectivo inferior (15 USD); el número de peticiones depende del modelo y puede cambiar.':
+    'Published general limits: USD 12 every 5 hours, USD 30 per week, and USD 60 per month. Some models have a lower effective monthly limit (USD 15); request counts depend on the model and may change.',
+  'Saldo restante oficial: OpenCode solo lo publica en Console; no ofrece una API de cuota compatible con la clave de usuario. Nodus no usa cookies ni endpoints privados.':
+    'Official remaining balance: OpenCode only publishes it in Console and does not offer a quota API compatible with the user key. Nodus does not use cookies or private endpoints.',
+  'Últimas 5 horas': 'Last 5 hours',
+  'Últimos 7 días': 'Last 7 days',
+  'Últimos 30 días': 'Last 30 days',
+  'El gasto observado es una estimación local de las peticiones hechas por Nodus con precios oficiales; no incluye otros clientes y no equivale al saldo restante.':
+    'Observed spend is a local estimate of requests made by Nodus using official prices; it excludes other clients and is not the remaining balance.',
+  'Ver saldo restante oficial en OpenCode Console ↗': 'View official remaining balance in OpenCode Console ↗',
+  'Documentación oficial de OpenCode Go ↗': 'Official OpenCode Go documentation ↗',
+  '{requests} peticiones · ~${spent} observados · ${cap} de tope general de referencia': '{requests} requests · ~${spent} observed · ${cap} general reference cap',
+  '{n} sin precio estimable': '{n} without an estimable price',
+  'Anthropic no permite que aplicaciones de terceros ofrezcan inicio de sesión de Claude.ai ni utilicen credenciales de suscripciones Free, Pro o Max. Por ello Claude se conecta aquí únicamente mediante la API oficial.':
+    'Anthropic does not allow third-party apps to offer Claude.ai sign-in or use Free, Pro or Max subscription credentials. Claude therefore connects here only through the official API.',
+  'Política oficial de Anthropic ↗': 'Official Anthropic policy ↗',
   'Nodus ha encontrado claves de API cifradas que todavía no puede leer.':
     'Nodus found encrypted API keys that it cannot read yet.',
   'No se han borrado. Pulsa recuperar y autoriza el acceso al Llavero de macOS si el sistema lo solicita.':
@@ -1338,8 +1416,8 @@ export const EN: Record<string, string> = {
   'Reindexar todo': 'Reindex all',
   'Llamadas simultáneas': 'Concurrent calls',
   'Razonamiento (chat/tutor/escritura)': 'Reasoning (chat/tutor/writing)',
-  'Los escaneos siempre usan razonamiento desactivado para ir más rápido. Esto solo afecta a las respuestas conversacionales.':
-    'Scans always run with reasoning off for speed. This only affects conversational responses.',
+  'Los escaneos siempre usan razonamiento desactivado para ir más rápido. Esto solo afecta a las respuestas conversacionales. En Codex se configura por modelo dentro de Proveedores.':
+    'Scans always run with reasoning off for speed. This only affects conversational responses. For Codex, configure it per model under Providers.',
   'Desactivado (más rápido)': 'Off (faster)',
   Bajo: 'Low',
   Medio: 'Medium',
@@ -5242,6 +5320,8 @@ export const EN: Record<string, string> = {
     'Conversation, analysis, summaries and fallback for any task without its own model.',
   'Conversación, análisis, resúmenes y demás tareas de texto.':
     'Conversation, analysis, summaries, and other text tasks.',
+  'Este modelo consume la cuota de tu suscripción, no crédito de API. Un análisis completo del corpus puede agotar el límite semanal o mensual de tu plan.':
+    'This model draws on your subscription quota, not on API credit. A full corpus analysis can exhaust your plan\'s weekly or monthly limit.',
   'Vault actual': 'Current vault',
   'Ajustes avanzados del vault {vault}': 'Advanced settings for the {vault} vault',
   'Ajustes avanzados comunes': 'Shared advanced settings',

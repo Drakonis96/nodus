@@ -9,8 +9,8 @@ import {
   isLocalProvider,
   localContextWindow,
 } from './providers';
-import { DEFAULT_EMBEDDING_MODELS, normalizeEmbeddingModel, PROVIDER_LABELS } from '@shared/providers';
-import type { AiProvider, EmbeddingProvider, LocalProvider, ModelRef, PromptLanguage, ReasoningEffort } from '@shared/types';
+import { DEFAULT_EMBEDDING_MODELS, normalizeEmbeddingModel, PROVIDER_LABELS, supportsSamplingControls } from '@shared/providers';
+import type { AiProvider, CodexReasoningEffort, EmbeddingProvider, LocalProvider, ModelRef, PromptLanguage, ReasoningEffort } from '@shared/types';
 import { vaultTypePromptPack } from '@shared/vaultTypes';
 import { anthropicVisionContent, openAiVisionContent, type VisionImagePart } from '@shared/imageAnalysis';
 import { getActiveVault } from '../vaults/vaultRegistry';
@@ -25,6 +25,11 @@ import {
   deanonymizeDeep,
   findResidualNames,
 } from '@shared/studentPseudonyms';
+import { classifyProviderError } from './providerErrors';
+import { completeWithChatGptSubscription } from './codexSubscription';
+import { completeWithGitHubCopilotSubscription } from './githubCopilotSubscription';
+import { completeWithOpenCodeGo } from './openCodeGoCompletion';
+import { recordOpenCodeGoUsage } from './openCodeGoUsage';
 
 export class AiError extends Error {
   /**
@@ -35,6 +40,23 @@ export class AiError extends Error {
   constructor(message: string, public retriable = false, public config = false) {
     super(message);
   }
+}
+
+/** Subscription providers carry no HTTP status, so `wrapProviderError` cannot read
+ *  them. They classify themselves instead — see `providerErrors.ts`. */
+function subscriptionError(error: unknown): AiError {
+  const { message, retriable, config } = classifyProviderError(error);
+  return new AiError(message, retriable, config);
+}
+
+/**
+ * The subscription runtimes accept no `response_format`, so JSON mode can only be
+ * asked for in words. Without this `jsonMode` was silently inert for them and every
+ * structured call leaned entirely on the repair round-trip.
+ */
+function withJsonModeDirective(system: string, jsonMode: boolean): string {
+  if (!jsonMode) return system;
+  return `${system}\n\nReturn only a single valid JSON value. No prose, no explanation, no Markdown code fences.`;
 }
 
 /** Stored key for a provider, or a harmless placeholder for local providers
@@ -162,6 +184,9 @@ interface CallOpts {
   /** Reasoning effort. Defaults to `off` for JSON/scan calls and to the configured
    *  `chatReasoning` for conversational calls. */
   reasoning?: ReasoningEffort;
+  /** Let Codex use its per-model setting while retaining an explicit portable effort
+   * for other providers (used by latency-sensitive conversational surfaces). */
+  useConfiguredCodexReasoning?: boolean;
   /** Disable SDK/compatibility retries for explicitly single-attempt workflows. */
   noRetry?: boolean;
   /** Per-request transport timeout override. */
@@ -375,16 +400,65 @@ async function rawComplete(
   model: ModelRef,
   opts: CallOpts,
   jsonMode = true,
-  reasoning: ReasoningEffort = 'off'
+  reasoning: ReasoningEffort = 'off',
+  codexReasoning?: CodexReasoningEffort | null
 ): Promise<string> {
+  // Student names must leave before any provider-specific branch. Subscription
+  // providers do not use API keys, so this deliberately precedes key resolution.
+  // The public entry points map the opaque codes back after parsing/repair.
+  opts = anonymizeCallOpts(opts).sent;
+
+  if (model.provider === 'codex') {
+    try {
+      return await completeWithChatGptSubscription({
+        model: model.model,
+        system: withJsonModeDirective(opts.system, jsonMode),
+        user: opts.user,
+        reasoning: codexReasoning === undefined ? reasoning : codexReasoning,
+        timeoutMs: opts.timeoutMs,
+        images: opts.images,
+      });
+    } catch (error) {
+      throw subscriptionError(error);
+    }
+  }
+  if (model.provider === 'github-copilot') {
+    try {
+      return await completeWithGitHubCopilotSubscription({
+        model: model.model,
+        system: withJsonModeDirective(opts.system, jsonMode),
+        user: opts.user,
+        reasoning,
+        timeoutMs: opts.timeoutMs,
+        images: opts.images,
+      });
+    } catch (error) {
+      throw subscriptionError(error);
+    }
+  }
   const key = resolveProviderKey(model.provider);
   if (!key) throw new AiError(`Falta la clave de IA para ${model.provider}. Configúrala en Ajustes.`, false, true);
 
-  // Student names out. Note the asymmetry: what we RETURN stays in code space, because
-  // parseOrRepair may feed this very text back to the model and a repair round-trip
-  // must never re-encounter a real name. The mapping back happens in the public
-  // entry points (completeJson / completeText / completeTextNeutral).
-  opts = anonymizeCallOpts(opts).sent;
+  if (model.provider === 'opencode-go') {
+    try {
+      const result = await completeWithOpenCodeGo({
+        apiKey: key,
+        model: model.model,
+        system: opts.system,
+        user: opts.user,
+        temperature: opts.temperature,
+        maxTokens: opts.maxTokens,
+        reasoning,
+        jsonMode,
+        timeoutMs: opts.timeoutMs,
+        images: opts.images,
+      });
+      await recordOpenCodeGoUsage(model.model, result.usage);
+      return result.text;
+    } catch (error: any) {
+      throw wrapProviderError(error);
+    }
+  }
 
   if (model.provider === 'anthropic') {
     const Anthropic = (await import('@anthropic-ai/sdk')).default;
@@ -603,11 +677,20 @@ export async function completeJson<T>(
   // JSON/structured calls (scans, extraction) default to reasoning off for speed.
   const reasoning = langOpts.reasoning ?? 'off';
   let lastErr: unknown;
-  const attempts = [
-    { temperature: langOpts.temperature ?? 0.15, jsonMode: true },
-    { temperature: 0, jsonMode: true },
-    { temperature: 0, jsonMode: false },
-  ];
+  // Each rung escalates by lowering temperature, then by dropping JSON mode. A
+  // provider that honours neither (the subscription runtimes) would send the exact
+  // same request three times and bill three turns for it, so it gets one retry —
+  // the only lever left there is a fresh sample — instead of two identical ones.
+  const attempts = supportsSamplingControls(resolved.provider)
+    ? [
+        { temperature: langOpts.temperature ?? 0.15, jsonMode: true },
+        { temperature: 0, jsonMode: true },
+        { temperature: 0, jsonMode: false },
+      ]
+    : [
+        { temperature: langOpts.temperature ?? 0.15, jsonMode: true },
+        { temperature: langOpts.temperature ?? 0.15, jsonMode: true },
+      ];
   for (let i = 0; i < attempts.length; i++) {
     const attempt = attempts[i];
     const retryDone = startPerf('JSON retry', langOpts.perf, { attempt: i + 1, jsonMode: attempt.jsonMode });
@@ -638,7 +721,10 @@ export async function completeJson<T>(
 export async function completeText(opts: CallOpts, model?: ModelRef | null): Promise<string> {
   const resolved = resolveModel(model);
   const reasoning = opts.reasoning ?? getSettings().chatReasoning ?? 'off';
-  return deanonymizeResult(await rawComplete(resolved, withPromptContext(opts), false, reasoning));
+  const codexReasoning = resolved.provider === 'codex' && (opts.reasoning === undefined || opts.useConfiguredCodexReasoning)
+    ? getSettings().codexReasoningEfforts?.[resolved.model] ?? null
+    : undefined;
+  return deanonymizeResult(await rawComplete(resolved, withPromptContext(opts), false, reasoning, codexReasoning));
 }
 
 /**
@@ -661,7 +747,10 @@ export async function completeTextStream(
 ): Promise<string> {
   const resolved = resolveModel(model);
   const reasoning = opts.reasoning ?? getSettings().chatReasoning ?? 'off';
-  return rawCompleteStream(resolved, withPromptContext(opts), onDelta, reasoning, signal);
+  const codexReasoning = resolved.provider === 'codex' && (opts.reasoning === undefined || opts.useConfiguredCodexReasoning)
+    ? getSettings().codexReasoningEfforts?.[resolved.model] ?? null
+    : undefined;
+  return rawCompleteStream(resolved, withPromptContext(opts), onDelta, reasoning, signal, codexReasoning);
 }
 
 async function rawCompleteStream(
@@ -669,11 +758,9 @@ async function rawCompleteStream(
   opts: CallOpts,
   onDelta: TextDeltaHandler,
   reasoning: ReasoningEffort = 'off',
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  codexReasoning?: CodexReasoningEffort | null
 ): Promise<string> {
-  const key = resolveProviderKey(model.provider);
-  if (!key) throw new AiError(`Falta la clave de IA para ${model.provider}. Configúrala en Ajustes.`, false, true);
-
   const { sent, privacy } = anonymizeCallOpts(opts);
   opts = sent;
 
@@ -716,6 +803,76 @@ async function rawCompleteStream(
     if (restReasoning) onDelta(restReasoning, 'reasoning');
     return full;
   };
+
+  if (model.provider === 'codex') {
+    try {
+      const answer = await completeWithChatGptSubscription({
+        model: model.model,
+        system: opts.system,
+        user: opts.user,
+        reasoning: codexReasoning === undefined ? reasoning : codexReasoning,
+        timeoutMs: opts.timeoutMs,
+        images: opts.images,
+        signal,
+        onDelta: emitContent,
+      });
+      if (!full && answer) emitContent(answer);
+      return finish();
+    } catch (error) {
+      if (signal?.aborted) return finish();
+      throw subscriptionError(error);
+    }
+  }
+
+  if (model.provider === 'github-copilot') {
+    try {
+      const answer = await completeWithGitHubCopilotSubscription({
+        model: model.model,
+        system: opts.system,
+        user: opts.user,
+        reasoning,
+        timeoutMs: opts.timeoutMs,
+        images: opts.images,
+        signal,
+        onDelta: emitContent,
+        onReasoningDelta: emitReasoning,
+      });
+      if (!full && answer) emitContent(answer);
+      return finish();
+    } catch (error) {
+      if (signal?.aborted) return finish();
+      throw subscriptionError(error);
+    }
+  }
+
+  const key = resolveProviderKey(model.provider);
+  if (!key) throw new AiError(`Falta la clave de IA para ${model.provider}. Configúrala en Ajustes.`, false, true);
+
+  if (model.provider === 'opencode-go') {
+    try {
+      const result = await completeWithOpenCodeGo({
+        apiKey: key,
+        model: model.model,
+        system: opts.system,
+        user: opts.user,
+        temperature: opts.temperature,
+        maxTokens: opts.maxTokens,
+        reasoning,
+        jsonMode: false,
+        timeoutMs: opts.timeoutMs,
+        images: opts.images,
+        signal,
+        onDelta: emitContent,
+        onReasoningDelta: emitReasoning,
+      });
+      await recordOpenCodeGoUsage(model.model, result.usage);
+      if (!full && result.text) emitContent(result.text);
+      return finish();
+    } catch (error: any) {
+      if (signal?.aborted) return finish();
+      throw wrapProviderError(error);
+    }
+  }
 
   if (model.provider === 'anthropic') {
     const Anthropic = (await import('@anthropic-ai/sdk')).default;

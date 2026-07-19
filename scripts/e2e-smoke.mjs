@@ -134,6 +134,9 @@ try {
     hasStudyAiPolicy: typeof window.nodus?.getStudyAiUsageSummary === 'function' && typeof window.nodus?.clearStudyAiUsage === 'function',
     hasStudyDemo: typeof window.nodus?.seedStudyDemoData === 'function',
     hasNodusLocalAi: typeof window.nodus?.getNodusLocalAiStatus === 'function' && typeof window.nodus?.downloadNodusLocalModel === 'function' && typeof window.nodus?.deleteNodusLocalModel === 'function',
+    hasChatGptSubscription: typeof window.nodus?.getChatGptSubscriptionStatus === 'function' && typeof window.nodus?.startChatGptSubscriptionLogin === 'function' && typeof window.nodus?.logoutChatGptSubscription === 'function',
+    hasGitHubCopilotSubscription: typeof window.nodus?.getGitHubCopilotSubscriptionStatus === 'function' && typeof window.nodus?.startGitHubCopilotSubscriptionLogin === 'function' && typeof window.nodus?.logoutGitHubCopilotSubscription === 'function',
+    hasOpenCodeGoUsage: typeof window.nodus?.getOpenCodeGoUsageStatus === 'function' && typeof window.nodus?.onOpenCodeGoUsageStatusChanged === 'function',
   }));
   assert.equal(bridge.hasNodus, true, 'window.nodus bridge exposed');
   assert.equal(bridge.hasGetGraph, true, 'getGraph available');
@@ -151,6 +154,13 @@ try {
   assert.equal(bridge.hasStudyAiPolicy, true, 'study AI policy and usage bridge available');
   assert.equal(bridge.hasStudyDemo, true, 'study sample-data bridge available');
   assert.equal(bridge.hasNodusLocalAi, true, 'integrated local AI model manager bridge available');
+  assert.equal(bridge.hasChatGptSubscription, true, 'managed ChatGPT subscription bridge available');
+  assert.equal(bridge.hasGitHubCopilotSubscription, true, 'managed GitHub Copilot subscription bridge available');
+  assert.equal(bridge.hasOpenCodeGoUsage, true, 'OpenCode Go usage bridge available');
+  const signedOutChatGpt = await page.evaluate(() => window.nodus.getChatGptSubscriptionStatus());
+  assert.equal(signedOutChatGpt.available, true, `official Codex runtime is available: ${signedOutChatGpt.error ?? 'ok'}`);
+  assert.equal(signedOutChatGpt.connected, false, 'throwaway profile starts without a ChatGPT account');
+  assert.equal(signedOutChatGpt.loginPending, false, 'throwaway profile has no pending OAuth flow');
   console.log('[e2e] preload bridge ok');
 
   // ── Essential tutorial: first screen, language preferences, seen-once gate ──
@@ -374,6 +384,55 @@ try {
   await page.waitForFunction(() => document.querySelector('header'));
   assert.equal(await page.locator('header select[data-tour="model"]').count(), 0, 'global header model selector removed');
   await page.locator('[data-tour="nav-settings"]').click();
+  await page.getByRole('button', { name: 'Proveedores', exact: true }).click();
+  const chatGptProvider = page.getByTestId('chatgpt-subscription-provider');
+  await chatGptProvider.waitFor();
+  await chatGptProvider.locator('button').first().click();
+  await chatGptProvider.getByRole('button', { name: 'Conectar suscripción de ChatGPT', exact: true }).waitFor();
+  await chatGptProvider.getByText('El uso consume la cuota o los créditos de Codex incluidos en tu plan de ChatGPT; no consume saldo de la API de OpenAI.', { exact: true }).waitFor();
+  const githubCopilotProvider = page.getByTestId('github-copilot-subscription-provider');
+  await githubCopilotProvider.waitFor();
+  await githubCopilotProvider.locator('button').first().click();
+  await githubCopilotProvider.getByText('Nodus usa el SDK y el runtime oficiales de GitHub Copilot. Cada petición se factura a la suscripción de GitHub del usuario; no requiere claves de los modelos.', { exact: true }).waitFor();
+  await githubCopilotProvider.getByText('Cada petición se ejecuta en una sesión efímera sin herramientas, MCP, memoria, acceso a archivos, GitHub ni instrucciones del proyecto.', { exact: true }).waitFor();
+  await page.getByRole('button', { name: /OpenCode Go/ }).first().click();
+  const openCodeUsage = page.getByTestId('opencode-go-usage');
+  await openCodeUsage.waitFor();
+  await openCodeUsage.getByText('Límites generales publicados: 12 USD cada 5 horas, 30 USD por semana y 60 USD por mes. Algunos modelos tienen un límite mensual efectivo inferior (15 USD); el número de peticiones depende del modelo y puede cambiar.', { exact: true }).waitFor();
+  await openCodeUsage.getByText('Saldo restante oficial: OpenCode solo lo publica en Console; no ofrece una API de cuota compatible con la clave de usuario. Nodus no usa cookies ni endpoints privados.', { exact: true }).waitFor();
+  const providerThemeStyles = await page.evaluate(() => {
+    const root = document.documentElement;
+    const github = document.querySelector('[data-testid="github-copilot-subscription-provider"]');
+    const openCode = document.querySelector('[data-testid="provider-opencode-go"]');
+    const openCodeUsage = document.querySelector('[data-testid="opencode-go-usage"]');
+    if (!github || !openCode || !openCodeUsage) throw new Error('provider theme surfaces are missing');
+    const original = { light: root.classList.contains('light'), dark: root.classList.contains('dark') };
+    const read = () => ({
+      githubBackground: getComputedStyle(github).backgroundColor,
+      githubBorder: getComputedStyle(github).borderTopColor,
+      openCodeBorder: getComputedStyle(openCode).borderTopColor,
+      openCodeUsageBackground: getComputedStyle(openCodeUsage).backgroundColor,
+      openCodeUsageText: getComputedStyle(openCodeUsage).color,
+    });
+    root.classList.add('light');
+    root.classList.remove('dark');
+    const light = read();
+    root.classList.remove('light');
+    root.classList.add('dark');
+    const dark = read();
+    root.classList.toggle('light', original.light);
+    root.classList.toggle('dark', original.dark);
+    return { light, dark };
+  });
+  const colorBrightness = (color) => (color.match(/[\d.]+/g) ?? []).slice(0, 3).reduce((sum, channel) => sum + Number(channel), 0);
+  assert.ok(colorBrightness(providerThemeStyles.light.githubBackground) > colorBrightness(providerThemeStyles.dark.githubBackground) + 300, 'Copilot uses a genuinely light surface in light mode');
+  assert.ok(colorBrightness(providerThemeStyles.light.openCodeUsageBackground) > colorBrightness(providerThemeStyles.dark.openCodeUsageBackground) + 300, 'OpenCode Go uses a genuinely light surface in light mode');
+  assert.notEqual(providerThemeStyles.light.githubBorder, providerThemeStyles.dark.githubBorder, 'Copilot border follows the active theme');
+  assert.notEqual(providerThemeStyles.light.openCodeBorder, providerThemeStyles.dark.openCodeBorder, 'OpenCode Go provider border follows the active theme');
+  assert.notEqual(providerThemeStyles.light.openCodeUsageText, providerThemeStyles.dark.openCodeUsageText, 'OpenCode Go body text follows the active theme');
+  await page.getByRole('button', { name: /Anthropic/ }).click();
+  await page.getByText(/Anthropic no permite que aplicaciones de terceros ofrezcan inicio de sesión de Claude\.ai/).waitFor();
+  console.log('[e2e] provider UI exposes subscriptions, usage limits and real light/dark surfaces');
   await page.getByRole('button', { name: 'Modelos IA', exact: true }).click();
   await page.getByText('Generación de imágenes', { exact: true }).waitFor({ timeout: 30_000 });
   assert.equal(await page.getByText('gemini-3.1-flash-lite-image', { exact: false }).count() > 0, true, 'image settings render selected verified model');
@@ -1250,12 +1309,12 @@ try {
   await annotationCanvas.click({ position: { x: 180, y: 160 } });
   await page.getByTestId('study-pdf-sticky-dialog').locator('textarea').fill('Sticker smoke');
   await page.getByRole('button', { name: 'Guardar sticker', exact: true }).click();
-  await page.getByText('Sticker smoke', { exact: true }).waitFor();
+  await page.getByTestId('study-material-annotations-sidebar').getByText('Sticker smoke', { exact: true }).waitFor();
   await page.getByTestId('study-pdf-tool-comment').click();
   await annotationCanvas.click({ position: { x: 220, y: 210 } });
   await page.getByTestId('study-pdf-inline-comment').locator('textarea').fill('Comentario smoke');
   await page.getByTestId('study-pdf-inline-comment').getByRole('button', { name: 'Guardar', exact: true }).click();
-  await page.getByTestId('study-material-annotations-sidebar').getByText('Comentario smoke', { exact: true }).waitFor();
+  await page.getByTestId('study-material-annotations-sidebar').getByText('Comentario smoke', { exact: true }).last().waitFor();
   await page.getByText('Crear apunte', { exact: true }).last().click();
   await waitForCondition('apunte creado desde material', () => page.evaluate(async () => (await window.nodus.getStudyWorkspace()).documents.some((document) => document.title.includes('fuente-smoke'))));
   assert.ok(await page.evaluate(async () => (await window.nodus.getStudyWorkspace()).documents.some((document) => document.contentMarkdown.includes('nodus://study/material/'))), 'highlight creates a note with a durable source link');

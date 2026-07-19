@@ -56,6 +56,7 @@ export type GlobalPrefKey = (typeof GLOBAL_PREF_KEYS)[number];
 
 export const SHARED_MODEL_KEYS = [
   'favorites',
+  'codexReasoningEfforts',
   'localProviders',
   'extractionModel',
   'visionModel',
