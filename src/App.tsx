@@ -20,6 +20,7 @@ import { AdvancedTour } from './views/AdvancedTour';
 import { GenealogyTour } from './views/GenealogyTour';
 import { DatabasesTour } from './views/DatabasesTour';
 import { StudyTour } from './views/StudyTour';
+import { TeachingTour } from './views/TeachingTour';
 import { BASICS_TUTORIAL_VERSION, BasicsTutorial } from './views/BasicsTutorial';
 import { preferencesForTutorialLanguage } from '@shared/tutorialPreferences';
 import { hasPendingWhatsNew, WhatsNewModal } from './components/WhatsNewModal';
@@ -583,6 +584,21 @@ export function App() {
     setDemoBusy(true);
     try {
       const seeded = await window.nodus.seedStudyDemoData();
+      if (seeded) {
+        await reloadSettings();
+        await refreshHasData();
+        notifyDataChanged();
+        setView('home');
+      }
+    } finally {
+      setDemoBusy(false);
+    }
+  }, [reloadSettings, refreshHasData]);
+
+  const loadTeachingDemo = useCallback(async () => {
+    setDemoBusy(true);
+    try {
+      const seeded = await window.nodus.seedTeachingDemoData();
       if (seeded) {
         await reloadSettings();
         await refreshHasData();
@@ -1312,6 +1328,9 @@ export function App() {
             <TeachingHome
               onNavigate={setView}
               onOpenDocument={(id) => { setStudyTarget({ kind: 'document', id }); setView('studyCourses'); }}
+              showDemoOffer={hasData === false && !settings.demoMode}
+              demoBusy={demoBusy}
+              onLoadDemo={loadTeachingDemo}
             />
           )}
           {view === 'home' && isPreviewVault && activeVault && (
@@ -1564,6 +1583,16 @@ export function App() {
         />
       )}
 
+      {settings.onboardingComplete && settings.basicsTutorialVersion > 0 && isDocencia && !settings.docenciaTourComplete && (
+        <TeachingTour
+          onNavigate={setView}
+          onClose={async () => {
+            await window.nodus.updateSettings({ docenciaTourComplete: true });
+            void reloadSettings();
+          }}
+        />
+      )}
+
       {csvPlan && (
         <CsvImportModal
           plan={csvPlan}
@@ -1599,7 +1628,8 @@ export function App() {
         settings.advancedTourComplete &&
         (!isGenealogy || settings.genealogyTourComplete) &&
         (!isDatabases || settings.databasesTourComplete) &&
-        (!isEstudio || settings.studyTourComplete) && (
+        (!isEstudio || settings.studyTourComplete) &&
+        (!isDocencia || settings.docenciaTourComplete) && (
           <WhatsNewModal uiLanguage={settings.uiLanguage} onSettled={() => setWhatsNewSettled(true)} />
         )}
 

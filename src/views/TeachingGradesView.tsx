@@ -229,6 +229,7 @@ export function TeachingGradesView() {
             </div>
             <button
               data-testid="plan-new"
+              data-tour="plan-new"
               className="btn btn-primary"
               disabled={!workspace?.subjects.length}
               title={workspace?.subjects.length ? undefined : t('Crea antes una asignatura.')}
@@ -251,7 +252,7 @@ export function TeachingGradesView() {
               </p>
             </div>
           ) : (
-            <table className="w-full min-w-[720px] border-collapse text-xs" data-testid="plan-table">
+            <table className="w-full min-w-[720px] border-collapse text-xs" data-testid="plan-table" data-tour="plan-table">
               <thead className="study-browser-table-head sticky top-0 z-10">
                 <tr className="text-left">
                   <th className="w-[34%] px-4 py-2 font-medium">{t('Cuaderno')}</th>

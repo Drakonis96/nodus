@@ -4,7 +4,7 @@ import type { StudyWorkspace } from '@shared/studyOrg';
 import { t } from '../i18n';
 import { Icon } from '../components/ui';
 import { useDataRefresh } from '../hooks';
-import { HomeIntroCard } from './HomeView';
+import { DemoOfferCard, HomeIntroCard } from './HomeView';
 
 /**
  * Landing page for the teaching ('docencia') vault. It mirrors the study home but
@@ -20,7 +20,19 @@ const TEACHING_DESTINATIONS: Array<{ view: View; icon: string; title: string; de
   { view: 'studyRecordings', icon: 'microphone', title: 'Grabaciones', description: 'Graba clases, transcribe y crea apuntes enlazados.' },
 ];
 
-export function TeachingHome({ onNavigate, onOpenDocument }: { onNavigate: (view: View) => void; onOpenDocument?: (id: string) => void }) {
+export function TeachingHome({
+  onNavigate,
+  onOpenDocument,
+  showDemoOffer = false,
+  demoBusy = false,
+  onLoadDemo,
+}: {
+  onNavigate: (view: View) => void;
+  onOpenDocument?: (id: string) => void;
+  showDemoOffer?: boolean;
+  demoBusy?: boolean;
+  onLoadDemo?: () => void | Promise<void>;
+}) {
   const [workspace, setWorkspace] = useState<StudyWorkspace | null>(null);
   const [materialCount, setMaterialCount] = useState(0);
   const reload = useCallback(async () => {
@@ -46,6 +58,10 @@ export function TeachingHome({ onNavigate, onOpenDocument }: { onNavigate: (view
           description={t('Organiza cursos, materiales y clases, planifica horarios y calendario, y graba tus sesiones desde un espacio local y privado.')}
           icon="presentation"
         />
+
+        {showDemoOffer && (
+          <DemoOfferCard variant="teaching" demoBusy={demoBusy} onLoadTeachingDemo={onLoadDemo} />
+        )}
 
         <section className="grid gap-3 sm:grid-cols-3">
           {[

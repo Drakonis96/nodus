@@ -339,7 +339,7 @@ export function ExamBuilderView() {
               <h1 className="text-xl font-semibold">{t('Exámenes')}</h1>
               <p className="mt-1 text-xs text-neutral-500">{t('Construye el examen pregunta a pregunta y descárgalo en Word o PDF.')}</p>
             </div>
-            <button data-testid="exam-new" className="btn btn-primary" onClick={() => void createExam()}><Icon name="plus" />{t('Nuevo examen')}</button>
+            <button data-testid="exam-new" data-tour="exam-new" className="btn btn-primary" onClick={() => void createExam()}><Icon name="plus" />{t('Nuevo examen')}</button>
           </div>
         </header>
         <div className="min-h-0 flex-1 overflow-y-auto p-5">
@@ -350,7 +350,7 @@ export function ExamBuilderView() {
               <p className="text-sm text-neutral-500">{t('Todavía no has creado ningún examen.')}</p>
             </div>
           ) : (
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" data-tour="exam-list">
               {exams.map((item) => {
                 const subject = subjects.find((entry) => entry.id === item.subjectId);
                 return (

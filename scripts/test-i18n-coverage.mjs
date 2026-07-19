@@ -119,7 +119,7 @@ const INDIRECT_KEY_SOURCES = [
   // Convert view.
   { file: 'shared/toolkitTypes.ts', pattern: /\b(?:label|description|placeholder):\s*(["'])((?:\\.|(?!\1).)*?)\1/g },
   // Tour steps are plain object literals fed through t() by the tour engine.
-  ...['Tour', 'AdvancedTour', 'StudyTour', 'GenealogyTour', 'DatabasesTour'].map((name) => ({
+  ...['Tour', 'AdvancedTour', 'StudyTour', 'GenealogyTour', 'DatabasesTour', 'TeachingTour'].map((name) => ({
     file: `src/views/${name}.tsx`,
     pattern: /(?:title|body):\s*(["'])((?:\\.|(?!\1).)*?)\1/g,
   })),

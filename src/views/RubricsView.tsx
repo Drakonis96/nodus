@@ -128,7 +128,7 @@ export function RubricsView() {
               <h1 className="text-xl font-semibold">{t('Rúbricas')}</h1>
               <p className="mt-1 text-xs text-neutral-500">{t('Crea rúbricas de evaluación por criterios y niveles, con ayuda de la IA.')}</p>
             </div>
-            <button data-testid="rubric-new" className="btn btn-primary" onClick={() => void createRubric()}><Icon name="plus" />{t('Nueva rúbrica')}</button>
+            <button data-testid="rubric-new" data-tour="rubric-new" className="btn btn-primary" onClick={() => void createRubric()}><Icon name="plus" />{t('Nueva rúbrica')}</button>
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <input className="input h-8 min-w-56 flex-1 text-xs" placeholder={t('Buscar rúbricas…')} value={search} onChange={(event) => setSearch(event.target.value)} />
@@ -142,7 +142,7 @@ export function RubricsView() {
               <p className="text-sm text-neutral-500">{t('Todavía no has creado ninguna rúbrica.')}</p>
             </div>
           ) : (
-            <table className="w-full min-w-[820px] border-collapse text-xs" data-testid="rubric-table">
+            <table className="w-full min-w-[820px] border-collapse text-xs" data-testid="rubric-table" data-tour="rubric-table">
               <thead className="study-browser-table-head sticky top-0 z-10">
                 <tr className="text-left">
                   <th className="w-[320px] px-4 py-2 font-medium">{t('Rúbrica')}</th>
