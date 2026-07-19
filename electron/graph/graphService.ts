@@ -1,4 +1,5 @@
 import { getDb } from '../db/database';
+import { SubstringIndex } from '@shared/substringIndex';
 import type {
   GraphData,
   GraphNode,
@@ -1099,9 +1100,11 @@ export function buildReadingPath(request: ReadingPathRequest = {}): ReadingPathP
   const maxDependency = Math.max(1, ...rows.map((r) => r.dependency_count));
   const gapSignals = collectGapSignals();
   const coreThemes = collectCoreThemes(rows, gapSignals, researchBrief);
-  const citedWorks = collectCitedWorks();
+  // Counted for every work in a single pass over the references, before the
+  // scoring loop, rather than rescanning them once per work.
+  const citationCounts = approximateCitationCounts(rows, collectCitedWorks());
 
-  const entries = rows.map((row) =>
+  const entries = rows.map((row, index) =>
     toReadingEntry(row, {
       strategy,
       researchBrief,
@@ -1111,7 +1114,7 @@ export function buildReadingPath(request: ReadingPathRequest = {}): ReadingPathP
       maxDependency,
       gapSignals,
       coreThemes,
-      citedWorks,
+      citedBy: citationCounts[index] ?? 0,
     })
   );
 
@@ -1235,7 +1238,7 @@ function toReadingEntry(
     maxDependency: number;
     gapSignals: GapSignals;
     coreThemes: Set<string>;
-    citedWorks: string[];
+    citedBy: number;
   }
 ): ReadingPathEntry {
   const authors = parseAuthors(row.authors_json);
@@ -1276,7 +1279,7 @@ function toReadingEntry(
   const coreThemeScore = themes.length
     ? themes.filter((theme) => opts.coreThemes.has(normalizeThemeLabel(theme))).length / Math.max(1, Math.min(3, themes.length))
     : 0;
-  const citedBy = approximateCitationCount(row, opts.citedWorks);
+  const citedBy = opts.citedBy;
   const olderScore = row.year == null || opts.maxYear === opts.minYear ? 0.35 : 1 - (row.year - opts.minYear) / (opts.maxYear - opts.minYear);
   const foundationalScore = clamp01(
     Math.min(0.34, row.idea_count * 0.035) +
@@ -1521,13 +1524,50 @@ function collectCitedWorks(): string[] {
   return rows.map((r) => normalizeText(r.cited_work)).filter(Boolean);
 }
 
-function approximateCitationCount(row: ReadingWorkRow, citedWorks: string[]): number {
-  if (citedWorks.length === 0) return 0;
+/** The author and title needles this work is looked up by, as before. */
+function citationPatterns(row: ReadingWorkRow): string[] {
   const title = normalizeText(row.title).slice(0, 80);
   const firstAuthor = parseAuthors(row.authors_json)[0]?.split(/[,\s]/)[0] ?? '';
   const author = normalizeText(firstAuthor);
-  if (!author && !title) return 0;
-  return citedWorks.filter((ref) => (author && ref.includes(author)) || (title.length > 20 && ref.includes(title))).length;
+  const patterns: string[] = [];
+  if (author) patterns.push(author);
+  if (title.length > 20) patterns.push(title);
+  return patterns;
+}
+
+/**
+ * Approximate citation counts for every work in one pass over the references.
+ *
+ * This replaces a per-work `citedWorks.filter(ref => ref.includes(...))`, which
+ * was O(works x refs) substring searches — 3,000 works against 60,000
+ * references measured 13 s of blocked main process, in a synchronous IPC
+ * handler, so the Reading Path simply never finished loading on a large
+ * library.
+ *
+ * Aho-Corasick rather than a word or token index, because it preserves
+ * `includes` semantics exactly: a surname occurring inside a longer word still
+ * matches, so the resulting ranking is unchanged.
+ */
+function approximateCitationCounts(rows: ReadingWorkRow[], citedWorks: string[]): number[] {
+  const counts = new Array<number>(rows.length).fill(0);
+  if (citedWorks.length === 0 || rows.length === 0) return counts;
+
+  const index = new SubstringIndex();
+  const groupsByPattern: number[][] = [];
+  let any = false;
+  rows.forEach((row, group) => {
+    for (const pattern of citationPatterns(row)) {
+      const id = index.add(pattern);
+      if (id < 0) continue;
+      // A pattern is shared when two works have the same first author, so the
+      // mapping is one pattern to many works.
+      (groupsByPattern[id] ??= []).push(group);
+      any = true;
+    }
+  });
+  if (!any) return counts;
+  for (let id = 0; id < groupsByPattern.length; id += 1) groupsByPattern[id] ??= [];
+  return index.countContainingHaystacksByGroup(citedWorks, groupsByPattern, rows.length);
 }
 
 function scoreForStrategy(
