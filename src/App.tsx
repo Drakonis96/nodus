@@ -40,7 +40,8 @@ import type {
   PendingLibraryNavigationTarget,
   View,
 } from './navigation';
-import { groupedNav, NAV_ITEMS, NAV_GROUPS } from './navigation';
+import { groupedNav, NAV_ITEMS, NAV_GROUPS, TOOLKIT_TOOLS } from './navigation';
+import type { ToolkitPage } from './navigation';
 import { placeHeaderBadge, type HeaderBadgePlacement } from './headerLayout';
 import { effectiveSidebarHidden, isPreviewVaultType, isViewAllowedForVaultType, viewsDisallowedForType } from '@shared/vaultTypes';
 import { CommandPalette, type Command } from './components/CommandPalette';
@@ -188,6 +189,10 @@ export function App() {
     typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches
   );
   const [view, setView] = useState<View>('home');
+  // Página activa dentro de Herramientas. Vive aquí (y no en ToolkitView) porque
+  // el sidebar navega directamente a una herramienta, y porque así salir de la
+  // sección y volver no pierde el sitio aunque la vista se desmonte.
+  const [toolkitPage, setToolkitPage] = useState<ToolkitPage>('home');
   const [navCollapsed, setNavCollapsed] = useState(() => localStorage.getItem('nodus.navCollapsed') === '1');
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const stored = Number(localStorage.getItem('nodus.sidebarWidth'));
@@ -1071,9 +1076,19 @@ export function App() {
                   disabled={disabled}
                   aria-disabled={disabled}
                   title={disabled ? t('Próximamente') : undefined}
-                  onClick={() => { if (!disabled) setView(n.id); }}
+                  onClick={() => {
+                    if (disabled) return;
+                    // La sección Herramientas siempre entra por el catálogo; sus
+                    // herramientas tienen su propio botón anidado.
+                    if (n.id === 'toolkit') setToolkitPage('home');
+                    setView(n.id);
+                  }}
                   className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-left transition-colors ${
-                    disabled ? 'cursor-not-allowed text-neutral-700 opacity-65' : view === n.id ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:bg-neutral-900'
+                    disabled
+                      ? 'cursor-not-allowed text-neutral-700 opacity-65'
+                      : view === n.id && (n.id !== 'toolkit' || toolkitPage === 'home')
+                        ? 'bg-indigo-600 text-white'
+                        : 'text-neutral-400 hover:bg-neutral-900'
                   }`}
                 >
                   <Icon name={n.icon} className="opacity-70" />
@@ -1100,13 +1115,50 @@ export function App() {
                   {t(label)}
                 </button>
               );
+              // Las herramientas del toolkit se anidan bajo su sección: no son
+              // vistas propias (no entran en NAV_ITEMS ni en sidebarOrder), sólo
+              // atajos a una página del hub. Las que aún no existen se muestran
+              // deshabilitadas, igual que sus tarjetas en el catálogo.
+              const toolkitSubNav = () => (
+                <div className="ml-4 flex flex-col gap-1 border-l border-neutral-800 pl-2">
+                  {TOOLKIT_TOOLS.map((tool) => {
+                    const disabled = tool.state === 'soon';
+                    const active = view === 'toolkit' && toolkitPage === tool.page;
+                    return (
+                      <button
+                        key={tool.page}
+                        data-testid={`nav-toolkit-${tool.testid}`}
+                        disabled={disabled}
+                        aria-disabled={disabled}
+                        title={disabled ? t('Próximamente') : tool.name}
+                        onClick={() => { if (!disabled) { setToolkitPage(tool.page); setView('toolkit'); } }}
+                        className={`flex items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[13px] transition-colors ${
+                          disabled
+                            ? 'cursor-not-allowed text-neutral-700 opacity-65'
+                            : active
+                              ? 'bg-indigo-600 text-white'
+                              : 'text-neutral-400 hover:bg-neutral-900'
+                        }`}
+                      >
+                        <Icon name={tool.icon} size={14} className="shrink-0 opacity-70" />
+                        <span className="flex-1 truncate">{tool.shortName}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              );
               const renderGroup = (group: (typeof navGroups)[number]) => {
                 const collapsed = collapsedGroups.has(group.id);
                 const hasActive = group.items.some((n) => n.id === view);
                 return (
                   <div key={group.id} className="mt-2 flex flex-col gap-1">
                     <div className="flex items-center px-3">{groupHeaderButton(group.id, group.label, collapsed, hasActive)}</div>
-                    {!collapsed && group.items.map((n) => navButton(n))}
+                    {!collapsed && group.items.map((n) => (n.id === 'toolkit' ? (
+                      <div key={n.id} className="flex flex-col gap-1">
+                        {navButton(n)}
+                        {toolkitSubNav()}
+                      </div>
+                    ) : navButton(n)))}
                   </div>
                 );
               };
@@ -1442,7 +1494,7 @@ export function App() {
           {view === 'notes' && (
             <NotesView onOpenGraph={(target) => navigate('graph', target)} focusNote={noteTarget} />
           )}
-          {view === 'toolkit' && <ToolkitView />}
+          {view === 'toolkit' && <ToolkitView page={toolkitPage} onNavigate={setToolkitPage} />}
           {view === 'settings' && (
             <Settings
               settings={settings}

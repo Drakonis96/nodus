@@ -1,18 +1,12 @@
 // Nodus Toolkit — el hub de Herramientas: utilidades locales de proceso de
 // archivos (conversión, presentación de PDFs, OCR asistido). La navegación
-// interna (hub ↔ herramienta) vive aquí y no añade ids a la union View: el
-// sidebar tiene una única entrada y cada herramienta se abre desde sus
-// tarjetas, con un botón para volver al hub.
-import { useState } from 'react';
+// interna (catálogo ↔ herramienta) no añade ids a la union View: el sidebar
+// tiene una única entrada de sección con las herramientas anidadas debajo, y la
+// página activa la controla App (así el estado sobrevive a salir de la sección).
 import { Icon } from '../components/ui';
 import { t } from '../i18n';
+import { TOOLKIT_TOOLS, type ToolkitPage } from '../navigation';
 import { ToolkitConvertView } from './ToolkitConvertView';
-
-type ToolkitPage = 'home' | 'convert';
-
-// Se recuerda la última página a nivel de módulo para que salir de la sección
-// y volver no pierda el sitio (mismo patrón que otras vistas con sub-estado).
-let lastToolkitPage: ToolkitPage = 'home';
 
 interface ToolCardProps {
   testid: string;
@@ -62,17 +56,20 @@ function ToolCard({ testid, icon, name, description, state, onOpen }: ToolCardPr
   );
 }
 
-export function ToolkitView() {
-  const [page, setPageState] = useState<ToolkitPage>(lastToolkitPage);
-  const setPage = (next: ToolkitPage) => {
-    lastToolkitPage = next;
-    setPageState(next);
-  };
-
+export function ToolkitView({
+  page,
+  onNavigate,
+}: {
+  page: ToolkitPage;
+  onNavigate: (page: ToolkitPage) => void;
+}) {
   return (
     <div className="h-full overflow-y-auto px-6 py-6 max-md:px-4">
+      {/* Sólo Convert tiene página propia; las otras dos herramientas están
+          deshabilitadas en el catálogo y en el sidebar, así que cualquier otra
+          página cae en el catálogo en lugar de dejar el panel en blanco. */}
       {page === 'convert' ? (
-        <ToolkitConvertView onBack={() => setPage('home')} />
+        <ToolkitConvertView onBack={() => onNavigate('home')} />
       ) : (
         <div data-testid="toolkit-home" className="mx-auto max-w-5xl space-y-6">
           <header className="flex items-start gap-3">
@@ -87,28 +84,17 @@ export function ToolkitView() {
             </div>
           </header>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <ToolCard
-              testid="toolkit-card-convert"
-              icon="swap"
-              name="Nodus Convert"
-              description={t('Convierte documentos, PDF e imágenes, con OCR ligero y utilidades de texto, de uno en uno o en lote.')}
-              state="wip"
-              onOpen={() => setPage('convert')}
-            />
-            <ToolCard
-              testid="toolkit-card-presenter"
-              icon="presentation"
-              name="PDF Presenter"
-              description={t('Presenta PDFs como diapositivas, con vista del presentador, notas del orador y anotaciones en directo.')}
-              state="soon"
-            />
-            <ToolCard
-              testid="toolkit-card-aiocr"
-              icon="scanText"
-              name="OCR Workspace"
-              description={t('OCR asistido por IA para escaneados difíciles, con revisión página a página e integración con tus bóvedas.')}
-              state="soon"
-            />
+            {TOOLKIT_TOOLS.map((tool) => (
+              <ToolCard
+                key={tool.page}
+                testid={`toolkit-card-${tool.testid}`}
+                icon={tool.icon}
+                name={tool.name}
+                description={t(tool.description)}
+                state={tool.state}
+                onOpen={() => onNavigate(tool.page)}
+              />
+            ))}
           </div>
         </div>
       )}

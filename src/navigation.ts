@@ -93,6 +93,63 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'settings', label: 'Ajustes', icon: 'settings' },
 ];
 
+/** Pages inside the Herramientas section. The toolkit keeps a SINGLE entry in the
+ * View union — its tools are addressed by this id instead — so that adding a tool
+ * never turns into a new top-level view (and never leaks into sidebarOrder, the
+ * per-vault-type allow-lists or the reordering UI). The sidebar nests one button
+ * per tool under the section, and 'home' is the catalogue. */
+export type ToolkitPage = 'home' | 'convert' | 'presenter' | 'ocr';
+
+export interface ToolkitToolDef {
+  page: Exclude<ToolkitPage, 'home'>;
+  /** Marca de la herramienta; NO se traduce. */
+  name: string;
+  /** Etiqueta del botón anidado del sidebar: la marca sin el prefijo que ya
+   * aporta la sección, porque el nombre completo no cabe en el ancho por
+   * defecto y se cortaba («Nodus Con…»). El nombre completo sigue en el title
+   * y en la tarjeta del catálogo. */
+  shortName: string;
+  /** Clave i18n (español) de la descripción de la tarjeta. */
+  description: string;
+  icon: string;
+  /** 'wip' = navegable pero en construcción; 'soon' = todavía no existe. */
+  state: 'wip' | 'soon';
+  /** Sufijo de los data-testid (tarjeta del hub y botón del sidebar). */
+  testid: string;
+}
+
+/** Single source of truth for the toolkit catalogue: the hub cards and the nested
+ * sidebar buttons render from this list, so they can never drift apart. */
+export const TOOLKIT_TOOLS: ToolkitToolDef[] = [
+  {
+    page: 'convert',
+    name: 'Nodus Convert',
+    shortName: 'Convert',
+    description: 'Convierte documentos, PDF e imágenes, con OCR ligero y utilidades de texto, de uno en uno o en lote.',
+    icon: 'swap',
+    state: 'wip',
+    testid: 'convert',
+  },
+  {
+    page: 'presenter',
+    name: 'PDF Presenter',
+    shortName: 'Presenter',
+    description: 'Presenta PDFs como diapositivas, con vista del presentador, notas del orador y anotaciones en directo.',
+    icon: 'presentation',
+    state: 'soon',
+    testid: 'presenter',
+  },
+  {
+    page: 'ocr',
+    name: 'OCR Workspace',
+    shortName: 'OCR',
+    description: 'OCR asistido por IA para escaneados difíciles, con revisión página a página e integración con tus bóvedas.',
+    icon: 'scanText',
+    state: 'soon',
+    testid: 'aiocr',
+  },
+];
+
 /**
  * Resolve the sidebar items for a user-defined order. Home is pinned first and
  * Settings is pinned last; neither is ever part of the saved order. Any sections
