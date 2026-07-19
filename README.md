@@ -24,10 +24,10 @@ Download the installer for your computer and open it. There is no server to conf
 
 | Platform | Latest installer |
 | --- | --- |
-| macOS with Apple silicon | [Download DMG](https://github.com/Drakonis96/nodus/releases/download/v2.2.0/Nodus-2.2.0-mac-arm64.dmg) |
-| Windows 10 and 11 | [Download EXE](https://github.com/Drakonis96/nodus/releases/download/v2.2.0/Nodus-2.2.0-win-x64.exe) |
-| Ubuntu and Debian | [Download DEB](https://github.com/Drakonis96/nodus/releases/download/v2.2.0/Nodus-2.2.0-linux-amd64.deb) |
-| Other Linux distributions | [Download AppImage](https://github.com/Drakonis96/nodus/releases/download/v2.2.0/Nodus-2.2.0-linux-x86_64.AppImage) |
+| macOS with Apple silicon | [Download DMG](https://github.com/Drakonis96/nodus/releases/latest/download/Nodus-mac-arm64.dmg) |
+| Windows 10 and 11 | [Download EXE](https://github.com/Drakonis96/nodus/releases/latest/download/Nodus-win-x64.exe) |
+| Ubuntu and Debian | [Download DEB](https://github.com/Drakonis96/nodus/releases/latest/download/Nodus-linux-amd64.deb) |
+| Other Linux distributions | [Download AppImage](https://github.com/Drakonis96/nodus/releases/latest/download/Nodus-linux-x86_64.AppImage) |
 
 The [latest release page](https://github.com/Drakonis96/nodus/releases/latest) always contains the newest available installers and release notes.
 
