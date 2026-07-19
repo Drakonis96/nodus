@@ -42,6 +42,16 @@ export interface ItemStats {
   pointBiserial: number;
   difficultyBand: 'muy_facil' | 'facil' | 'optima' | 'dificil' | 'muy_dificil';
   discriminationBand: 'excelente' | 'buena' | 'revisable' | 'mala' | 'muy_mala';
+  /** How many of the strong / weak group actually have a mark on this item. */
+  strongN: number;
+  weakN: number;
+  /**
+   * False when the numbers above are arithmetic but not interpretable: too few
+   * students, an extreme group with no mark on this item, or no spread at all in the
+   * totals. A discrimination of 0 computed from one empty group is not "mala
+   * discriminación", and labelling it so sends a teacher to rewrite a fine question.
+   */
+  reliable: boolean;
 }
 
 /**
@@ -114,6 +124,10 @@ export function analyseItems(items: ItemInput[], studentIds: string[]): ItemStat
   const groupSize = Math.max(1, Math.round(ranked.length * EXTREME_GROUP_FRACTION));
   const strong = ranked.slice(0, groupSize);
   const weak = ranked.slice(-groupSize);
+  // No spread in the totals means the extreme groups are the same cohort split by tie
+  // order: every difference they produce is an artefact.
+  const totalValues = ranked.map((id) => totals.get(id) ?? 0);
+  const hasSpread = Math.max(...totalValues) - Math.min(...totalValues) > 1e-9;
 
   return items.map((item) => {
     const present = studentIds.filter((id) => item.marks[id] != null);
@@ -122,11 +136,22 @@ export function analyseItems(items: ItemInput[], studentIds: string[]): ItemStat
     const mean = n === 0 ? 0 : present.reduce((sum, id) => sum + item.marks[id], 0) / n;
     const difficulty = Math.min(1, Math.max(0, mean / max));
 
-    const groupMean = (ids: string[]) => {
+    // Null, not 0, when nobody in the group has a mark: "absent" and "scored zero" are
+    // the distinction this whole module exists to preserve, and collapsing them here
+    // made an unanswered question look like a perfectly discriminating one.
+    const groupMean = (ids: string[]): number | null => {
       const withMark = ids.filter((id) => item.marks[id] != null);
-      return withMark.length === 0 ? 0 : withMark.reduce((sum, id) => sum + item.marks[id], 0) / withMark.length;
+      if (withMark.length === 0) return null;
+      return withMark.reduce((sum, id) => sum + item.marks[id], 0) / withMark.length;
     };
-    const discrimination = Math.max(-1, Math.min(1, (groupMean(strong) - groupMean(weak)) / max));
+    const strongMean = groupMean(strong);
+    const weakMean = groupMean(weak);
+    const strongN = strong.filter((id) => item.marks[id] != null).length;
+    const weakN = weak.filter((id) => item.marks[id] != null).length;
+    const discrimination = strongMean == null || weakMean == null
+      ? 0
+      : Math.max(-1, Math.min(1, (strongMean - weakMean) / max));
+    const reliable = n >= 2 && strongN > 0 && weakN > 0 && hasSpread;
 
     // Point-biserial against the total EXCLUDING this item, which is the corrected
     // form: leaving the item inside correlates it partly with itself, and on a short
@@ -146,6 +171,9 @@ export function analyseItems(items: ItemInput[], studentIds: string[]): ItemStat
       pointBiserial: Math.round(pointBiserial * 1000) / 1000,
       difficultyBand: difficultyBand(difficulty),
       discriminationBand: discriminationBand(discrimination),
+      strongN,
+      weakN,
+      reliable,
     };
   });
 }
@@ -162,19 +190,29 @@ export interface GradeDistribution {
   buckets: { label: string; count: number }[];
 }
 
+/**
+ * The plan's scale. Passed whole rather than as a bare `scaleMax` because the minimum
+ * is not always 0 — FP records modules on 1–10 — and a pass mark computed as
+ * `passAt * scaleMax` puts the 5 in a different place from the one the engine records.
+ */
+export interface GradeScale {
+  min: number;
+  max: number;
+}
+
 /** Distribution of the final marks, for the group summary. */
-export function gradeDistribution(values: number[], passAt: number, scaleMax: number): GradeDistribution {
+export function gradeDistribution(values: number[], passAt: number, scale: GradeScale): GradeDistribution {
   const sorted = [...values].filter((v) => Number.isFinite(v)).sort((a, b) => a - b);
   const n = sorted.length;
   if (n === 0) return { n: 0, mean: 0, median: 0, min: 0, max: 0, passRate: 0, buckets: [] };
   const mean = sorted.reduce((a, b) => a + b, 0) / n;
   const median = n % 2 ? sorted[(n - 1) / 2] : (sorted[n / 2 - 1] + sorted[n / 2]) / 2;
-  const passMark = passAt * scaleMax;
+  const passMark = scale.min + passAt * (scale.max - scale.min);
   const buckets: { label: string; count: number }[] = [];
-  const step = scaleMax / 5;
+  const step = (scale.max - scale.min) / 5;
   for (let i = 0; i < 5; i++) {
-    const lo = i * step;
-    const hi = i === 4 ? scaleMax : (i + 1) * step;
+    const lo = scale.min + i * step;
+    const hi = i === 4 ? scale.max : scale.min + (i + 1) * step;
     buckets.push({
       label: `${Math.round(lo * 10) / 10}–${Math.round(hi * 10) / 10}`,
       // Last bucket is closed at the top so a perfect mark is not dropped.

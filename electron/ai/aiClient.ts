@@ -9,7 +9,7 @@ import {
   isLocalProvider,
   localContextWindow,
 } from './providers';
-import { DEFAULT_EMBEDDING_MODELS, normalizeEmbeddingModel, PROVIDER_LABELS } from '@shared/providers';
+import { DEFAULT_EMBEDDING_MODELS, normalizeEmbeddingModel, PROVIDER_LABELS, supportsSamplingControls } from '@shared/providers';
 import type { AiProvider, CodexReasoningEffort, EmbeddingProvider, LocalProvider, ModelRef, PromptLanguage, ReasoningEffort } from '@shared/types';
 import { vaultTypePromptPack } from '@shared/vaultTypes';
 import { anthropicVisionContent, openAiVisionContent, type VisionImagePart } from '@shared/imageAnalysis';
@@ -25,6 +25,7 @@ import {
   deanonymizeDeep,
   findResidualNames,
 } from '@shared/studentPseudonyms';
+import { classifyProviderError } from './providerErrors';
 import { completeWithChatGptSubscription } from './codexSubscription';
 import { completeWithGitHubCopilotSubscription } from './githubCopilotSubscription';
 import { completeWithOpenCodeGo } from './openCodeGoCompletion';
@@ -39,6 +40,23 @@ export class AiError extends Error {
   constructor(message: string, public retriable = false, public config = false) {
     super(message);
   }
+}
+
+/** Subscription providers carry no HTTP status, so `wrapProviderError` cannot read
+ *  them. They classify themselves instead — see `providerErrors.ts`. */
+function subscriptionError(error: unknown): AiError {
+  const { message, retriable, config } = classifyProviderError(error);
+  return new AiError(message, retriable, config);
+}
+
+/**
+ * The subscription runtimes accept no `response_format`, so JSON mode can only be
+ * asked for in words. Without this `jsonMode` was silently inert for them and every
+ * structured call leaned entirely on the repair round-trip.
+ */
+function withJsonModeDirective(system: string, jsonMode: boolean): string {
+  if (!jsonMode) return system;
+  return `${system}\n\nReturn only a single valid JSON value. No prose, no explanation, no Markdown code fences.`;
 }
 
 /** Stored key for a provider, or a harmless placeholder for local providers
@@ -394,30 +412,28 @@ async function rawComplete(
     try {
       return await completeWithChatGptSubscription({
         model: model.model,
-        system: opts.system,
+        system: withJsonModeDirective(opts.system, jsonMode),
         user: opts.user,
         reasoning: codexReasoning === undefined ? reasoning : codexReasoning,
         timeoutMs: opts.timeoutMs,
         images: opts.images,
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      throw new AiError(message, /límite|limit|tempor|timeout|conexión/i.test(message), /conecta|suscripción|autentic/i.test(message));
+      throw subscriptionError(error);
     }
   }
   if (model.provider === 'github-copilot') {
     try {
       return await completeWithGitHubCopilotSubscription({
         model: model.model,
-        system: opts.system,
+        system: withJsonModeDirective(opts.system, jsonMode),
         user: opts.user,
         reasoning,
         timeoutMs: opts.timeoutMs,
         images: opts.images,
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      throw new AiError(message, /límite|limit|tempor|timeout|conexión|quota|credit/i.test(message), /conecta|suscripción|autentic|cuenta/i.test(message));
+      throw subscriptionError(error);
     }
   }
   const key = resolveProviderKey(model.provider);
@@ -661,11 +677,20 @@ export async function completeJson<T>(
   // JSON/structured calls (scans, extraction) default to reasoning off for speed.
   const reasoning = langOpts.reasoning ?? 'off';
   let lastErr: unknown;
-  const attempts = [
-    { temperature: langOpts.temperature ?? 0.15, jsonMode: true },
-    { temperature: 0, jsonMode: true },
-    { temperature: 0, jsonMode: false },
-  ];
+  // Each rung escalates by lowering temperature, then by dropping JSON mode. A
+  // provider that honours neither (the subscription runtimes) would send the exact
+  // same request three times and bill three turns for it, so it gets one retry —
+  // the only lever left there is a fresh sample — instead of two identical ones.
+  const attempts = supportsSamplingControls(resolved.provider)
+    ? [
+        { temperature: langOpts.temperature ?? 0.15, jsonMode: true },
+        { temperature: 0, jsonMode: true },
+        { temperature: 0, jsonMode: false },
+      ]
+    : [
+        { temperature: langOpts.temperature ?? 0.15, jsonMode: true },
+        { temperature: langOpts.temperature ?? 0.15, jsonMode: true },
+      ];
   for (let i = 0; i < attempts.length; i++) {
     const attempt = attempts[i];
     const retryDone = startPerf('JSON retry', langOpts.perf, { attempt: i + 1, jsonMode: attempt.jsonMode });
@@ -795,8 +820,7 @@ async function rawCompleteStream(
       return finish();
     } catch (error) {
       if (signal?.aborted) return finish();
-      const message = error instanceof Error ? error.message : String(error);
-      throw new AiError(message, /límite|limit|tempor|timeout|conexión/i.test(message), /conecta|suscripción|autentic/i.test(message));
+      throw subscriptionError(error);
     }
   }
 
@@ -817,8 +841,7 @@ async function rawCompleteStream(
       return finish();
     } catch (error) {
       if (signal?.aborted) return finish();
-      const message = error instanceof Error ? error.message : String(error);
-      throw new AiError(message, /límite|limit|tempor|timeout|conexión|quota|credit/i.test(message), /conecta|suscripción|autentic|cuenta/i.test(message));
+      throw subscriptionError(error);
     }
   }
 

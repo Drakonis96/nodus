@@ -2,10 +2,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { CodexReasoningEffort, ReasoningEffort } from '@shared/types';
 import type { VisionImagePart } from '@shared/imageAnalysis';
+import { ProviderRuntimeError } from './providerErrors';
 
 export interface CodexCompletionTransport {
   request<T>(method: string, params?: unknown, timeoutMs?: number): Promise<T>;
   onNotification(handler: (method: string, params: unknown) => void): () => void;
+  /** Whether the underlying runtime is live. Best-effort cleanup is skipped when it
+   *  is not, so tearing a turn down cannot respawn the process it belongs to. */
+  isRunning?(): boolean;
 }
 
 export interface IsolatedCodexCompletionOptions {
@@ -75,6 +79,17 @@ export async function runIsolatedCodexCompletion(
   let unsubscribe: () => void = () => undefined;
   let timeout: NodeJS.Timeout | null = null;
   let abortHandler: (() => void) | null = null;
+  let settleAborted: ((value: string) => void) | null = null;
+  const abortedEarly = new Promise<string>((resolve) => { settleAborted = resolve; });
+
+  // Teardown is best-effort and must never restart a dead runtime: every transport
+  // request goes through ensureStarted(), so an unguarded `turn/interrupt` or
+  // `thread/unsubscribe` after a crash would respawn the whole Codex process just to
+  // clean up a thread that no longer exists — and block for the request timeout.
+  const cleanupRequest = (method: string, params: unknown): Promise<unknown> => {
+    if (runtime.isRunning?.() === false) return Promise.resolve(undefined);
+    return runtime.request(method, params).catch(() => undefined);
+  };
 
   try {
     const input: any[] = [{ type: 'text', text: options.user, text_elements: [] }];
@@ -136,7 +151,7 @@ export async function runIsolatedCodexCompletion(
           'imageView',
           'imageGeneration',
         ].includes(params?.item?.type)) {
-          void runtime.request('turn/interrupt', { threadId, turnId: params.turnId }).catch(() => undefined);
+          void cleanupRequest('turn/interrupt', { threadId, turnId: params.turnId });
           reject(new Error('Codex intentó usar una herramienta deshabilitada; Nodus interrumpió la petición.'));
           return;
         }
@@ -153,14 +168,19 @@ export async function runIsolatedCodexCompletion(
           .find((item: any) => item?.type === 'agentMessage' && typeof item.text === 'string' && item.text.trim());
         if (turn?.status === 'interrupted') return resolve(full || final?.text || '');
         const answer = final?.text || full;
-        if (!answer.trim()) return reject(new Error('ChatGPT devolvió una respuesta vacía.'));
+        if (!answer.trim()) return reject(new ProviderRuntimeError('ChatGPT devolvió una respuesta vacía.', 'unavailable'));
         resolve(answer);
       });
     });
 
     abortHandler = () => {
       aborted = true;
-      if (threadId && turnId) void runtime.request('turn/interrupt', { threadId, turnId }).catch(() => undefined);
+      if (threadId && turnId) void cleanupRequest('turn/interrupt', { threadId, turnId });
+      // Settle on whatever already streamed instead of waiting for `turn/completed`.
+      // The runtime is not guaranteed to emit it after an interrupt, and the caller
+      // has already cancelled — holding them for the remaining timeout is the one
+      // outcome a cancel must never produce.
+      settleAborted?.(full);
     };
     options.signal?.addEventListener('abort', abortHandler, { once: true });
 
@@ -175,14 +195,21 @@ export async function runIsolatedCodexCompletion(
       summary: 'none',
     }, 60_000);
     turnId = started.turn.id;
-    if (aborted) await runtime.request('turn/interrupt', { threadId, turnId }).catch(() => undefined);
+    // Aborted before the turn id existed: the 'abort' event already fired, so the
+    // listener could not interrupt anything and will never fire again. Interrupt now
+    // and return directly rather than racing a promise that can no longer settle.
+    if (aborted) {
+      await cleanupRequest('turn/interrupt', { threadId, turnId });
+      return full;
+    }
 
     return await Promise.race([
       completed,
+      abortedEarly,
       new Promise<string>((_resolve, reject) => {
         timeout = setTimeout(() => {
-          if (threadId && turnId) void runtime.request('turn/interrupt', { threadId, turnId }).catch(() => undefined);
-          reject(new Error('ChatGPT no completó la petición dentro del tiempo esperado.'));
+          if (threadId && turnId) void cleanupRequest('turn/interrupt', { threadId, turnId });
+          reject(new ProviderRuntimeError('ChatGPT no completó la petición dentro del tiempo esperado.', 'timeout'));
         }, options.timeoutMs ?? 180_000);
       }),
     ]);
@@ -190,6 +217,6 @@ export async function runIsolatedCodexCompletion(
     if (timeout) clearTimeout(timeout);
     unsubscribe();
     if (abortHandler) options.signal?.removeEventListener('abort', abortHandler);
-    if (threadId) await runtime.request('thread/unsubscribe', { threadId }).catch(() => undefined);
+    if (threadId) await cleanupRequest('thread/unsubscribe', { threadId });
   }
 }

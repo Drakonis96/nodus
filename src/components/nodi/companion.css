@@ -587,11 +587,20 @@
 .nodi-notes-search button:hover { background: rgba(255, 255, 255, 0.06); color: #f3e6c2; }
 
 .nodi-notes-list { flex: 1; min-height: 0; overflow-y: auto; padding: 6px 10px; display: flex; flex-direction: column; gap: 3px; }
-.nodi-note-row { display: flex; align-items: stretch; gap: 3px; border-radius: 9px; background: transparent; }
+.nodi-note-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 30px;
+  align-items: stretch;
+  gap: 3px;
+  overflow: hidden;
+  border-radius: 9px;
+  background: transparent;
+}
 .nodi-note-row:hover { background: rgba(212, 175, 55, 0.08); }
 .nodi-note-open {
-  flex: 1;
   min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -606,10 +615,9 @@
 .nodi-note-snippet { font-size: 11px; color: #98a3b4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nodi-note-time { font-size: 9.5px; color: #6b7688; margin-top: 1px; }
 .nodi-note-delete {
-  flex: 0 0 auto;
   display: grid;
   place-items: center;
-  width: 30px;
+  width: 100%;
   border: 0;
   border-radius: 8px;
   background: transparent;

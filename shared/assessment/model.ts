@@ -225,6 +225,21 @@ export interface PlanRules {
   advisories: PlanAdvisories;
 }
 
+/**
+ * A partial edit of the rules, one level deep.
+ *
+ * The editor has one input per LEAF setting, so it must be able to say "just the NP
+ * code" instead of resending the whole `np` object built from the props it happened to
+ * render with. That resend is how two quick edits to the same group of settings used to
+ * lose the first one. `honours: null` stays expressible: it means the plan awards none.
+ */
+export type PlanRulesPatch = Omit<Partial<PlanRules>, 'minNotMet' | 'np' | 'honours' | 'advisories'> & {
+  minNotMet?: Partial<MinNotMetPolicy>;
+  np?: Partial<NotPresentedPolicy>;
+  honours?: Partial<HonoursPolicy> | null;
+  advisories?: Partial<PlanAdvisories>;
+};
+
 export interface AssessmentPlan {
   id: string;
   name: string;

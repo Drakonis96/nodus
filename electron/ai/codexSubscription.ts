@@ -14,6 +14,7 @@ import type {
 import type { VisionImagePart } from '@shared/imageAnalysis';
 import { CodexAppServerClient } from './codexAppServerClient';
 import { resolveCodexReasoningEffort, runIsolatedCodexCompletion } from './codexCompletion';
+import { ProviderRuntimeError } from './providerErrors';
 
 interface CodexAccountResponse {
   account: null | { type: 'apiKey' } | { type: 'chatgpt'; email: string | null; planType: string } | { type: 'amazonBedrock' };
@@ -222,6 +223,34 @@ async function readStatus(refreshToken = false): Promise<ChatGptSubscriptionStat
   }
 }
 
+// A connected account stays connected between calls, so re-reading it before every
+// single generation cost two extra round trips and a forced network token refresh
+// per completion — which a scan pipeline pays hundreds of times. Confirm at most
+// once per window instead, and drop the cache whenever the session may have changed.
+let connectedAt = 0;
+let connectedCached = false;
+const CONNECTED_TTL_MS = 60_000;
+
+function invalidateConnectedCache(): void {
+  connectedAt = 0;
+  connectedCached = false;
+}
+
+/** Gate a generation on a connected account, reusing a recent check. Keeps the
+ *  forced token refresh, but pays for it once per window rather than per call. */
+async function ensureConnectedForCompletion(): Promise<void> {
+  if (connectedCached && Date.now() - connectedAt < CONNECTED_TTL_MS) return;
+  const status = await readStatus(true);
+  connectedCached = status.connected;
+  connectedAt = Date.now();
+  if (!status.connected) {
+    throw new ProviderRuntimeError(
+      'La suscripción de ChatGPT no está conectada. Ábrela en Proveedores y modelos.',
+      'auth'
+    );
+  }
+}
+
 async function refreshAndEmitStatus(): Promise<ChatGptSubscriptionStatus> {
   const status = await readStatus(false);
   emitStatus(status);
@@ -259,6 +288,7 @@ export async function logoutChatGptSubscription(): Promise<ChatGptSubscriptionSt
   await getClient().request('account/logout');
   pendingLoginId = null;
   modelCatalog = new Map();
+  invalidateConnectedCache();
   return refreshAndEmitStatus();
 }
 
@@ -283,8 +313,13 @@ async function readModelCatalog(force = false): Promise<CodexModel[]> {
 
 export async function listChatGptSubscriptionModels(): Promise<ModelInfo[]> {
   const status = await readStatus(false);
-  if (!status.connected) throw new Error('Conecta primero una suscripción de ChatGPT en Proveedores y modelos.');
+  if (!status.connected) {
+    throw new ProviderRuntimeError('Conecta primero una suscripción de ChatGPT en Proveedores y modelos.', 'auth');
+  }
   const models = await readModelCatalog(true);
+  // Resolved once: finding it inside the comparator re-scanned the catalogue on
+  // every comparison.
+  const defaultId = models.find((model) => model.isDefault)?.id;
   return models
     .filter((model) => !model.hidden)
     .map((model) => ({
@@ -295,13 +330,12 @@ export async function listChatGptSubscriptionModels(): Promise<ModelInfo[]> {
       supportedReasoningEfforts: model.supportedReasoningEfforts,
       defaultReasoningEffort: model.defaultReasoningEffort,
     }))
-    .sort((a, b) => Number(b.id === models.find((m) => m.isDefault)?.id) - Number(a.id === models.find((m) => m.isDefault)?.id) || a.id.localeCompare(b.id));
+    .sort((a, b) => Number(b.id === defaultId) - Number(a.id === defaultId) || a.id.localeCompare(b.id));
 }
 
 /** Text/vision completion backed by an ephemeral, isolated Codex thread. */
 export async function completeWithChatGptSubscription(options: CodexCompletionOptions): Promise<string> {
-  const status = await readStatus(true);
-  if (!status.connected) throw new Error('La suscripción de ChatGPT no está conectada. Ábrela en Proveedores y modelos.');
+  await ensureConnectedForCompletion();
 
   const runtime = getClient();
   const catalog = await readModelCatalog(false);
@@ -315,15 +349,31 @@ export async function completeWithChatGptSubscription(options: CodexCompletionOp
 
   try {
     return await runIsolatedCodexCompletion(runtime, { ...options, reasoning, workdir });
+  } catch (error) {
+    // The cached check can outlive the session it vouched for (revoked, expired,
+    // signed out elsewhere). Any failure re-arms the full check for the next call
+    // so a stale "connected" cannot pin the provider in a broken state.
+    invalidateConnectedCache();
+    throw error;
   } finally {
     await fs.promises.rm(workdir, { recursive: true, force: true });
   }
 }
 
-export async function stopChatGptSubscriptionServer(): Promise<void> {
+/**
+ * Shut the runtime down from Electron's quit handlers.
+ *
+ * Synchronous on purpose: `before-quit` cannot await, so the graceful drain — which
+ * only escalates to a signal after a 1.5s timer — was abandoned half-way and left
+ * the runtime alive as an orphan holding a keyring session. Killing outright is the
+ * only teardown that actually completes in a synchronous handler, and nothing is
+ * lost by it: credentials are written at login, not at shutdown.
+ */
+export function killChatGptSubscriptionServer(): void {
   clientUnsubscribe?.();
   clientUnsubscribe = null;
+  invalidateConnectedCache();
   const current = client;
   client = null;
-  if (current) await current.stop();
+  current?.killNow();
 }

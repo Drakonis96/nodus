@@ -679,11 +679,20 @@ try {
   }
   await page.getByTestId('toolkit-card-presenter').click({ force: true });
   assert.equal(await page.getByTestId('toolkit-home').count(), 1, 'a coming-soon card never navigates away from the hub');
-  // Nodus Convert opens: the workspace chrome (category rail + dropzone) is present.
+  // Nodus Convert opens on its empty state: the dropzone plus the catalogue of
+  // formats it accepts, so the drop is never a blind guess.
   await page.getByTestId('toolkit-card-convert').click();
   await page.getByTestId('toolkit-convert-page').waitFor({ timeout: 10_000 });
-  await page.getByTestId('toolkit-cat-documents').waitFor();
   await page.getByTestId('toolkit-dropzone').waitFor();
+  const formatsPanel = page.getByTestId('toolkit-formats');
+  await formatsPanel.waitFor();
+  const formatsText = await formatsPanel.innerText();
+  for (const ext of ['pdf', 'docx', 'epub', 'heic', 'srt']) {
+    assert.match(formatsText, new RegExp(`\\b${ext}\\b`, 'i'), `the supported-formats panel advertises .${ext}`);
+  }
+  // Nothing is convertible until files are added, so the run button stays inert.
+  assert.equal(await page.getByTestId('toolkit-run').isDisabled(), true, 'Convertir is disabled with no files');
+  assert.equal(await page.getByTestId('toolkit-op-picker').count(), 0, 'the conversion menu appears only once files are in');
 
   // Real conversion through the whole stack: Markdown → PDF uses printToPDF in the
   // main process (A5), which no unit test can reach. Drive it via the IPC API with a

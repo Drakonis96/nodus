@@ -116,7 +116,9 @@ try {
 
   // ── Distribution ───────────────────────────────────────────────────────────
   {
-    const dist = gradeDistribution([2, 4, 5, 6, 8, 10], 0.5, 10);
+    /** The scale is passed whole: its minimum is not always 0 (FP records on 1–10). */
+    const SCALE = { min: 0, max: 10 };
+    const dist = gradeDistribution([2, 4, 5, 6, 8, 10], 0.5, SCALE);
     assert.equal(dist.n, 6);
     assert.equal(dist.mean, 5.83);
     assert.equal(dist.median, 5.5);
@@ -127,14 +129,45 @@ try {
       'every mark lands in exactly one bucket — a perfect 10 must not fall off the top');
     // The top bucket is closed at both ends on purpose: with a half-open interval a
     // perfect mark would fall off the end and vanish from the chart.
-    const perfect = gradeDistribution([10], 0.5, 10);
+    const perfect = gradeDistribution([10], 0.5, SCALE);
     assert.equal(perfect.buckets[perfect.buckets.length - 1].count, 1, 'a perfect mark lands in the last bucket');
     assert.equal(perfect.buckets.reduce((sum, b) => sum + b.count, 0), 1, 'and is counted exactly once');
 
     // A pass mark that is not 5 changes the rate, which is the whole point of it
     // being configurable.
-    assert.equal(gradeDistribution([4, 4.6], 0.45, 10).passRate, 0.5);
-    assert.equal(gradeDistribution([], 0.5, 10).n, 0, 'no marks is not a crash');
+    assert.equal(gradeDistribution([4, 4.6], 0.45, SCALE).passRate, 0.5);
+    assert.equal(gradeDistribution([], 0.5, SCALE).n, 0, 'no marks is not a crash');
+
+    // A scale that does not start at 0. `passAt` is a fraction OF THE SCALE, so on
+    // 1–10 the pass mark sits at 1 + 0.5·9 = 5.5, and the buckets have to start at 1.
+    const fp = { min: 1, max: 10 };
+    const fpDist = gradeDistribution([5, 5.4, 5.6, 9], 0.5, fp);
+    assert.equal(fpDist.passRate, 0.5, 'on 1–10 a 5 is below the halfway pass mark');
+    assert.equal(fpDist.buckets[0].label.startsWith('1'), true, 'the buckets start at the scale minimum');
+    assert.equal(fpDist.buckets.reduce((sum, b) => sum + b.count, 0), 4, 'and every mark still lands in one');
+  }
+
+  // ── Absent is not zero, and a number nobody can interpret says so ───────────
+  {
+    // An extreme group with no mark on the item used to yield groupMean 0, which turned
+    // an unanswered question into a perfectly discriminating one.
+    const students = ['s0', 's1', 's2', 's3', 's4', 's5'];
+    const totals = { s0: 1, s1: 1, s2: 1, s3: 0, s4: 0, s5: 0 };
+    const partial = { itemId: 'q', name: 'Q', maxPoints: 1, marks: { s0: 1, s1: 1 } };
+    const spread = { itemId: 'f', name: 'F', maxPoints: 1, marks: totals };
+    const [stats] = analyseItems([partial, spread], students);
+    assert.equal(stats.weakN, 0, 'nobody in the weak group answered this question');
+    assert.equal(stats.reliable, false, 'so its discrimination is not interpretable');
+
+    // A single student is arithmetic without meaning too, and the caller is told.
+    const [one] = analyseItems([{ itemId: 'q', name: 'Q', maxPoints: 1, marks: { s0: 1 } }], ['s0']);
+    assert.equal(one.reliable, false, 'n = 1 is never interpretable');
+    assert.equal(one.n, 1, 'and n is reported so the table can show it');
+
+    // Everyone identical: the extreme groups are a tie-order artefact.
+    const flatMarks = { s0: 1, s1: 1, s2: 1, s3: 1, s4: 1, s5: 1 };
+    const [flat] = analyseItems([{ itemId: 'q', name: 'Q', maxPoints: 1, marks: flatMarks }], students);
+    assert.equal(flat.reliable, false, 'no spread in the totals means no extreme groups');
   }
 
   console.log('item analysis: OK');

@@ -44,6 +44,19 @@ const SECONDARY_BANDS: QualitativeBand[] = [
   { code: 'SB', label: 'Sobresaliente', min: 0.9 },
 ];
 
+/**
+ * The same five terms on a 1–10 scale.
+ *
+ * `min` is a FRACTION of the scale, not a mark, so a band list written for 0–10 says
+ * something different once `scaleMin` is 1: there, 0.5 is 5,5 and not 5. These are the
+ * secondary bands re-expressed for that scale — 5, 6, 7 and 9 as fractions of 1–10.
+ */
+const FP_BANDS: QualitativeBand[] = SECONDARY_BANDS.map((band) => ({
+  ...band,
+  // fraction on 1–10 for the mark that fraction denoted on 0–10
+  min: band.min === 0 ? 0 : (band.min * 10 - 1) / 9,
+}));
+
 /** Progress levels, as used by criterion-native official gradebooks. */
 const COMPETENCY_BANDS: QualitativeBand[] = [
   { code: 'NI', label: 'No iniciado', min: 0 },
@@ -206,7 +219,11 @@ export const ASSESSMENT_PROFILES: AssessmentProfile[] = [
       record: 'numeric',
       decimals: 0,
       rounding: 'halfUp',
-      qualitativeBands: SECONDARY_BANDS,
+      // `passAt` is a fraction of the scale, and this scale starts at 1: leaving it at
+      // 0.5 would put the pass mark at 5,5. A module is passed with a 5, which on
+      // 1–10 is (5 − 1) / (10 − 1).
+      passAt: 4 / 9,
+      qualitativeBands: FP_BANDS,
       np: { enabled: true, code: 'RC', value: null, triggerPct: null },
       honours: null,
       advisories: { maxMinToAverage: null, maxNonRecoverablePct: null, equalSiblingWeights: false, source: '' },
@@ -224,4 +241,4 @@ export function assessmentProfile(id: string): AssessmentProfile {
   return ASSESSMENT_PROFILES.find((p) => p.id === id) ?? ASSESSMENT_PROFILES[ASSESSMENT_PROFILES.length - 1];
 }
 
-export { UNIVERSITY_BANDS, SECONDARY_BANDS, COMPETENCY_BANDS };
+export { UNIVERSITY_BANDS, SECONDARY_BANDS, COMPETENCY_BANDS, FP_BANDS };

@@ -24,7 +24,7 @@ import { restorePersistedDockIcon } from './dockIcon';
 import { stopAllWhisperCpp } from './stt/whisperCpp';
 import { recoverLegacyApiKeys } from './secrets/legacySecretRecovery';
 import type { UpdateCheckResponse, UpdateProgressEvent } from '@shared/types';
-import { stopChatGptSubscriptionServer } from './ai/codexSubscription';
+import { killChatGptSubscriptionServer } from './ai/codexSubscription';
 import { stopGitHubCopilotSubscription } from './ai/githubCopilotSubscription';
 import { installProcessSafetyNet } from './util/processSafety';
 
@@ -593,7 +593,9 @@ app.on('before-quit', () => {
   interruptDecorativeImageGenerations();
   void stopMcpServer();
   void stopCopilotServer();
-  void stopChatGptSubscriptionServer();
+  // Kill synchronously: this handler cannot await, so the graceful stops below would
+  // be abandoned mid-drain and leave the vendor runtimes running as orphans.
+  killChatGptSubscriptionServer();
   void stopGitHubCopilotSubscription();
   closeDb();
 });
@@ -609,7 +611,9 @@ updateAwareApp.on('before-quit-for-update', () => {
   stopAllWhisperCpp();
   void stopMcpServer();
   void stopCopilotServer();
-  void stopChatGptSubscriptionServer();
+  // Kill synchronously: this handler cannot await, so the graceful stops below would
+  // be abandoned mid-drain and leave the vendor runtimes running as orphans.
+  killChatGptSubscriptionServer();
   void stopGitHubCopilotSubscription();
   closeDb();
 });

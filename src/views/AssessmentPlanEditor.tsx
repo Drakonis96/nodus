@@ -8,9 +8,11 @@ import {
   type AssessmentItem,
   type AssessmentPlan,
   type PlanRules,
+  type PlanRulesPatch,
   type RoundingMode,
 } from '@shared/assessment';
 import { Icon, ModalBackdrop, Spinner } from '../components/ui';
+import { ConfirmModal } from '../components/ConfirmModal';
 import { proposedWeightTotal, countProposedItems, type ProposedPlan } from '@shared/assessmentImport';
 import { t, tx } from '../i18n';
 
@@ -54,12 +56,18 @@ const ROUNDING_LABELS: Record<RoundingMode, string> = {
 };
 
 export function AssessmentPlanEditor({
-  plan, items, onClose, onChanged,
+  plan, items, onClose, onChanged, onReplaced,
 }: {
   plan: AssessmentPlan;
   items: AssessmentItem[];
   onClose: () => void;
   onChanged: () => Promise<void>;
+  /**
+   * A new version was created and IS a different plan. Without this the editor kept
+   * reloading the old id, so the frozen version stayed on screen with the button still
+   * offering to revise it — three clicks made three orphan versions nobody could reach.
+   */
+  onReplaced?: (next: AssessmentPlan) => Promise<void>;
 }) {
   const [tab, setTab] = useState<'structure' | 'rules'>('structure');
   const [busy, setBusy] = useState(false);
@@ -67,6 +75,7 @@ export function AssessmentPlanEditor({
   const [expanded, setExpanded] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const [picking, setPicking] = useState<'exam' | 'rubric' | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<AssessmentItem | null>(null);
 
   const warnings = useMemo(() => validatePlan(plan, items), [plan, items]);
   const byParent = useMemo(() => {
@@ -94,7 +103,7 @@ export function AssessmentPlanEditor({
     run(() => window.nodus.updateAssessmentItem(id, patch));
   // Send ONLY the changed fields: the repo merges them against the stored row, so two
   // edits in flight at once compose instead of the later one clobbering the earlier.
-  const patchRules = (patch: Partial<PlanRules>) =>
+  const patchRules = (patch: PlanRulesPatch) =>
     run(() => window.nodus.updateAssessmentPlan(plan.id, { rules: patch }));
 
   const published = !!plan.publishedAt;
@@ -117,7 +126,10 @@ export function AssessmentPlanEditor({
           </div>
           {published ? (
             <button className="btn btn-ghost h-8" data-testid="plan-revise"
-              onClick={() => void run(() => window.nodus.reviseAssessmentPlan(plan.id))}>
+              onClick={() => void run(async () => {
+                const next = await window.nodus.reviseAssessmentPlan(plan.id);
+                if (onReplaced) await onReplaced(next);
+              })}>
               <Icon name="copy" size={13} />{t('Crear versión nueva')}
             </button>
           ) : (
@@ -166,7 +178,11 @@ export function AssessmentPlanEditor({
               onAdd={(parentId) => run(() => window.nodus.createAssessmentItem(plan.id, {
                 parentId, name: t('Nuevo elemento'), weight: 0,
               }))}
-              onDelete={(id) => run(() => window.nodus.deleteAssessmentItem(id))}
+              onDelete={async (id) => {
+                // Deleting an item cascades to every descendant AND to every mark
+                // recorded under them. One click is not enough authority for that.
+                setPendingDelete(items.find((i) => i.id === id) ?? null);
+              }}
               onFromExam={async () => setPicking('exam')}
               onFromRubric={async () => setPicking('rubric')}
             />
@@ -194,6 +210,24 @@ export function AssessmentPlanEditor({
           }}
         />
       )}
+      {pendingDelete && (
+        <ConfirmModal
+          title={t('Eliminar elemento')}
+          message={countDescendants(items, pendingDelete.id) > 0
+            ? tx('Se eliminarán «{name}», sus {n} elementos internos y todas sus calificaciones. Esta acción no se puede deshacer.',
+                { name: pendingDelete.name || t('Nuevo elemento'), n: countDescendants(items, pendingDelete.id) })
+            : tx('Se eliminará «{name}» y todas sus calificaciones. Esta acción no se puede deshacer.',
+                { name: pendingDelete.name || t('Nuevo elemento') })}
+          confirmLabel={t('Eliminar')}
+          danger
+          onConfirm={async () => {
+            const target = pendingDelete.id;
+            setPendingDelete(null);
+            await run(() => window.nodus.deleteAssessmentItem(target));
+          }}
+          onCancel={() => setPendingDelete(null)}
+        />
+      )}
       {importing && (
         <ImportModal
           planId={plan.id}
@@ -203,6 +237,12 @@ export function AssessmentPlanEditor({
       )}
     </ModalBackdrop>
   );
+}
+
+/** How many items would go with this one. Shown before a cascade, never after. */
+function countDescendants(items: AssessmentItem[], id: string): number {
+  const direct = items.filter((i) => i.parentId === id);
+  return direct.reduce((total, child) => total + 1 + countDescendants(items, child.id), 0);
 }
 
 /* ------------------------------------------------------------------ source --- */
@@ -571,7 +611,13 @@ function RulesTab({
   rules, onPatch,
 }: {
   rules: PlanRules;
-  onPatch: (patch: Partial<PlanRules>) => Promise<void>;
+  /**
+   * Takes a patch one level deep, and each control sends ONLY the leaf it owns.
+   * Rebuilding `np` or `honours` from `rules` here would resend the values this
+   * component was rendered with, undoing any edit made since — which is exactly what
+   * the repo's merge is there to prevent.
+   */
+  onPatch: (patch: PlanRulesPatch) => Promise<void>;
 }) {
   return (
     <div data-testid="plan-rules">
@@ -597,8 +643,13 @@ function RulesTab({
           defaultValue={rules.passAt} onBlur={(e) => void onPatch({ passAt: Number(e.target.value) })} />
       </Row>
 
-      <Row label={t('Decimales')}>
+      {/* "Al entero más cercano" is the one mode that overrides this field rather than
+          honouring it. Saying so beats letting a teacher configure two decimals and
+          then wonder why the acta shows none. */}
+      <Row label={t('Decimales')}
+        hint={rules.rounding === 'integer' ? t('El redondeo al entero ignora este ajuste.') : undefined}>
         <input type="number" min="0" max="3" className="input h-7 w-16 text-xs" data-testid="rule-decimals"
+          disabled={rules.rounding === 'integer'}
           defaultValue={rules.decimals} onBlur={(e) => void onPatch({ decimals: Number(e.target.value) })} />
       </Row>
 
@@ -611,7 +662,7 @@ function RulesTab({
 
       {rules.rounding === 'threshold' && (
         <Row label={t('Sube a partir de este decimal')} hint={t('Por ejemplo 0,7: un 6,69 se queda en 6 y un 6,7 pasa a 7.')}>
-          <input type="number" step="0.05" min="0" max="1" className="input h-7 w-20 text-xs" data-testid="rule-threshold"
+          <input type="number" step="0.05" min="0.05" max="1" className="input h-7 w-20 text-xs" data-testid="rule-threshold"
             defaultValue={rules.roundingThreshold}
             onBlur={(e) => void onPatch({ roundingThreshold: Number(e.target.value) })} />
         </Row>
@@ -637,14 +688,14 @@ function RulesTab({
       <Row label={t('Si no se alcanza una nota mínima')}>
         <span className="flex items-center gap-1">
           <select className="input h-7 text-xs" data-testid="rule-minnotmet" value={rules.minNotMet.mode}
-            onChange={(e) => void onPatch({ minNotMet: { ...rules.minNotMet, mode: e.target.value as 'raw' | 'cap' } })}>
+            onChange={(e) => void onPatch({ minNotMet: { mode: e.target.value as 'raw' | 'cap' } })}>
             <option value="raw">{t('Dejar la media real')}</option>
             <option value="cap">{t('Limitar a')}</option>
           </select>
           {rules.minNotMet.mode === 'cap' && (
             <input type="number" step="0.1" className="input h-7 w-16 text-xs" data-testid="rule-capat"
               defaultValue={rules.minNotMet.capAt}
-              onBlur={(e) => void onPatch({ minNotMet: { ...rules.minNotMet, capAt: Number(e.target.value) } })} />
+              onBlur={(e) => void onPatch({ minNotMet: { capAt: Number(e.target.value) } })} />
           )}
         </span>
       </Row>
@@ -657,25 +708,25 @@ function RulesTab({
 
       <Row label={t('Usar «no presentado»')}>
         <input type="checkbox" data-testid="rule-np" checked={rules.np.enabled}
-          onChange={(e) => void onPatch({ np: { ...rules.np, enabled: e.target.checked } })} />
+          onChange={(e) => void onPatch({ np: { enabled: e.target.checked } })} />
       </Row>
 
       {rules.np.enabled && (
         <>
           <Row label={t('Código en el acta')}>
             <input className="input h-7 w-20 text-xs" data-testid="rule-npcode" defaultValue={rules.np.code}
-              onBlur={(e) => void onPatch({ np: { ...rules.np, code: e.target.value } })} />
+              onBlur={(e) => void onPatch({ np: { code: e.target.value } })} />
           </Row>
           <Row label={t('Equivalencia numérica')} hint={t('Déjalo vacío si no debe contar en ninguna media.')}>
             <input type="number" className="input h-7 w-20 text-xs" data-testid="rule-npvalue"
               defaultValue={rules.np.value == null ? '' : rules.np.value}
-              onBlur={(e) => void onPatch({ np: { ...rules.np, value: e.target.value === '' ? null : Number(e.target.value) } })} />
+              onBlur={(e) => void onPatch({ np: { value: e.target.value === '' ? null : Number(e.target.value) } })} />
           </Row>
           <Row label={t('Se considera no presentado al dejar sin hacer más de')}
             hint={t('Como fracción del total. Vacío para no aplicarlo automáticamente.')}>
             <input type="number" step="0.05" min="0" max="1" className="input h-7 w-20 text-xs" data-testid="rule-nptrigger"
               defaultValue={rules.np.triggerPct == null ? '' : rules.np.triggerPct}
-              onBlur={(e) => void onPatch({ np: { ...rules.np, triggerPct: e.target.value === '' ? null : Number(e.target.value) } })} />
+              onBlur={(e) => void onPatch({ np: { triggerPct: e.target.value === '' ? null : Number(e.target.value) } })} />
           </Row>
         </>
       )}
@@ -683,9 +734,13 @@ function RulesTab({
       <Row label={t('Conceder mención honorífica')} hint={t('El cupo y su redondeo varían entre instituciones.')}>
         <input type="checkbox" data-testid="rule-honours" checked={!!rules.honours?.enabled}
           onChange={(e) => void onPatch({
+            // The defaults only apply the first time; afterwards the repo merges this
+            // over whatever is stored, so re-enabling keeps the quota the teacher set.
             honours: e.target.checked
-              ? { threshold: 0.9, quotaPct: 0.05, unit: 'group', rounding: 'halfUp', minCohortForOne: 20, ...(rules.honours ?? {}), enabled: true }
-              : rules.honours ? { ...rules.honours, enabled: false } : null,
+              ? (rules.honours
+                ? { enabled: true }
+                : { enabled: true, threshold: 0.9, quotaPct: 0.05, unit: 'group', rounding: 'halfUp', minCohortForOne: 20 })
+              : rules.honours ? { enabled: false } : null,
           })} />
       </Row>
 
@@ -694,11 +749,11 @@ function RulesTab({
           <Row label={t('Cupo sobre el grupo')}>
             <input type="number" step="0.01" min="0" max="1" className="input h-7 w-20 text-xs" data-testid="rule-quota"
               defaultValue={rules.honours.quotaPct}
-              onBlur={(e) => void onPatch({ honours: { ...rules.honours!, quotaPct: Number(e.target.value) } })} />
+              onBlur={(e) => void onPatch({ honours: { quotaPct: Number(e.target.value) } })} />
           </Row>
           <Row label={t('Redondeo del cupo')}>
             <select className="input h-7 text-xs" data-testid="rule-quota-rounding" value={rules.honours.rounding}
-              onChange={(e) => void onPatch({ honours: { ...rules.honours!, rounding: e.target.value as 'up' | 'halfUp' | 'down' } })}>
+              onChange={(e) => void onPatch({ honours: { rounding: e.target.value as 'up' | 'halfUp' | 'down' } })}>
               <option value="up">{t('Hacia arriba')}</option>
               <option value="halfUp">{t('Al más cercano (0,5 sube)')}</option>
               <option value="down">{t('Hacia abajo')}</option>
@@ -711,13 +766,13 @@ function RulesTab({
         <input type="number" step="0.05" min="0" max="1" className="input h-7 w-20 text-xs" data-testid="rule-advisory-min"
           defaultValue={rules.advisories.maxMinToAverage == null ? '' : rules.advisories.maxMinToAverage}
           onBlur={(e) => void onPatch({
-            advisories: { ...rules.advisories, maxMinToAverage: e.target.value === '' ? null : Number(e.target.value) },
+            advisories: { maxMinToAverage: e.target.value === '' ? null : Number(e.target.value) },
           })} />
       </Row>
 
       <Row label={t('Avisar si los criterios hermanos tienen pesos distintos')}>
         <input type="checkbox" data-testid="rule-advisory-equal" checked={rules.advisories.equalSiblingWeights}
-          onChange={(e) => void onPatch({ advisories: { ...rules.advisories, equalSiblingWeights: e.target.checked } })} />
+          onChange={(e) => void onPatch({ advisories: { equalSiblingWeights: e.target.checked } })} />
       </Row>
     </div>
   );

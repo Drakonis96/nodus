@@ -255,12 +255,60 @@ try {
   // Wire the plan to the group created earlier, then type a mark.
   await page.selectOption('[data-testid="grades-group"]', { index: 1 });
   await page.getByTestId('grades-grid').waitFor();
-  const firstCell = page.locator('[data-testid^="grade-row-"]').first().locator('div').filter({ has: page.locator('button') }).nth(1);
-  await firstCell.click();
-  await page.keyboard.type('7');
+  // Anchored on the cell's own test id rather than on the DOM shape: the editable cell
+  // now carries a status control BESIDE the value, and a locator that counted <div>s
+  // containing a <button> silently started pointing somewhere else. Clicking the cell
+  // wrapper is not enough either — the leftmost thing in it is the status select, so
+  // the mark has to be typed into the value field itself.
+  const firstCell = page.locator('[data-testid^="grade-cell-"]').first();
+  await firstCell.locator('[data-testid^="grade-value-"]').click();
+  // Wait for the editor to actually open before typing: the cell swaps a button for an
+  // input on click, and typing into the button silently goes nowhere.
+  const valueInput = firstCell.locator('input[type="number"]');
+  await valueInput.waitFor();
+  await valueInput.fill('7');
   await page.keyboard.press('Enter');
   await page.waitForFunction(() => /\b7\b/.test(document.querySelector('[data-testid="grades-grid"]')?.innerText ?? ''));
   console.log('[ui] a mark can be typed straight into the grid');
+
+  // Every entry status must be REACHABLE. Until the cell grew this control the grid
+  // could only ever send `evaluated` or `not_assessed`, so "no entregado", "exento" and
+  // "convalidado" were implemented in the engine and unreachable from the interface —
+  // and a teacher had no way to say a blank cell was a non-submission rather than
+  // something not marked yet. That is the difference between a blank and a zero.
+  //
+  // Done on the SECOND student so the mark just typed above survives for the
+  // derivation panel below.
+  const statusSelect = page.locator('[data-testid^="grade-status-"]').nth(1);
+  const statuses = await statusSelect.evaluate((el) => Array.from(el.options).map((o) => o.value));
+  assert.deepEqual(statuses.sort(), ['evaluated', 'exempt', 'not_assessed', 'not_submitted', 'validated'].sort(),
+    'all five entry statuses are offered in the cell');
+  await statusSelect.selectOption('not_submitted');
+  // Assert on the cell's OWN label, not on the grid's text: a native <select> puts
+  // every option's wording into innerText, so matching there would pass regardless of
+  // what the cell actually shows.
+  const statusLabel = page.locator('[data-testid^="grade-status-label-"]').first();
+  await statusLabel.waitFor();
+  assert.match(await statusLabel.innerText(), /No entregado/,
+    'the cell shows the chosen status instead of a bare blank');
+  console.log('[ui] the five entry statuses are reachable from the grid');
+
+  // The family-comment drafter shows the teacher EXACTLY what would leave the machine
+  // before anything is sent. Asserting on that panel is how a future edit that starts
+  // leaking a name gets caught by a human reading a screen, not only by a unit test.
+  await page.locator('[data-testid^="grade-final-"]').first().click();
+  await page.getByTestId('explain-modal').waitFor();
+  await page.getByTestId('explain-feedback').click();
+  await page.getByTestId('feedback-modal').waitFor();
+  const payload = await page.getByTestId('feedback-payload').innerText();
+  assert.match(payload, /STU_[2-9A-HJKMNP-TV-Z]{4}/, `the payload carries the identifier: ${payload}`);
+  assert.ok(!/Nombre|Apellidos/.test(payload), `no name column may reach the payload: ${payload}`);
+  assert.match(payload, /\b7\b/, `the marks travel: ${payload}`);
+  await page.keyboard.press('Escape');
+  await page.getByTestId('feedback-modal').waitFor({ state: 'detached' });
+  await page.keyboard.press('Escape');
+  await page.getByTestId('explain-modal').waitFor({ state: 'detached' });
+  console.log('[ui] the family-comment drafter shows the anonymised payload before sending');
 
   // The derivation panel is the reclamación defence: it must open and show the maths.
   await page.locator('[data-testid^="grade-final-"]').first().click();
