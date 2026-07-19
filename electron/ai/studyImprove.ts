@@ -100,6 +100,8 @@ export async function improveStudyText(
   const aiSettings = getSettings();
   let streamed = '';
   let visibleStreamed = '';
+  /** How much of `streamed` has already been restored and emitted. */
+  let restoredUpTo = 0;
   const completed = await runStudyAiTask<string>({ task: 'improve', explicitModel: requestedModel, subjectId: request.subjectId, inputChars: prompt.system.length + prompt.user.length, outputChars: (value) => value.length, allowFallback: () => !streamed }, (model) => {
     return completeTextStream({
       system: prompt.system,
@@ -112,12 +114,20 @@ export async function improveStudyText(
       streamed += delta;
       // Provider chunks can split a protected marker. Hold an unfinished marker
       // and expose only restored, user-facing text to the preview.
-      const safePrefix = completeProtectedStreamPrefix(streamed);
-      const visiblePrefix = restoreProtectedSpans(safePrefix, protectedValue.spans);
-      if (visiblePrefix.startsWith(visibleStreamed)) {
-        const visibleDelta = visiblePrefix.slice(visibleStreamed.length);
-        visibleStreamed = visiblePrefix;
-        if (visibleDelta) onDelta(visibleDelta);
+      //
+      // Only the newly-safe slice is restored, never the whole accumulated
+      // prefix: re-restoring everything on every token made the cost quadratic
+      // in the length of the answer. The cut point is safe by construction —
+      // completeProtectedStreamPrefix never ends inside a marker, and it only
+      // ever moves forward — so restoring slice-by-slice yields exactly the
+      // same text as restoring the prefix in one go.
+      const safeEnd = completeProtectedStreamPrefix(streamed).length;
+      if (safeEnd <= restoredUpTo) return;
+      const visibleDelta = restoreProtectedSpans(streamed.slice(restoredUpTo, safeEnd), protectedValue.spans);
+      restoredUpTo = safeEnd;
+      if (visibleDelta) {
+        visibleStreamed += visibleDelta;
+        onDelta(visibleDelta);
       }
     }, model, signal);
   });

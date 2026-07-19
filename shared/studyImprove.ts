@@ -252,8 +252,42 @@ export function missingProtectedSpans(text: string, spans: StudyProtectedSpan[])
   return spans.filter((span) => !text.includes(span.placeholder));
 }
 
+/** Matches any placeholder minted by `protectStudyText`. */
+const PROTECTED_PLACEHOLDER_RE = /⟦NODUS_PROTECTED_\d+⟧/gu;
+
+/**
+ * Placeholder→value lookups, cached per span list.
+ *
+ * Streaming calls this once per chunk with the same `spans` array, so building
+ * the map inside the function would rebuild thousands of entries on every
+ * token — which is quadratic again, just with a smaller constant.
+ */
+const lookupCache = new WeakMap<StudyProtectedSpan[], Map<string, string>>();
+
+function placeholderLookup(spans: StudyProtectedSpan[]): Map<string, string> {
+  const cached = lookupCache.get(spans);
+  if (cached) return cached;
+  const built = new Map(spans.map((span) => [span.placeholder, span.value]));
+  lookupCache.set(spans, built);
+  return built;
+}
+
 export function restoreProtectedSpans(text: string, spans: StudyProtectedSpan[]): string {
-  return spans.reduce((restored, span) => restored.split(span.placeholder).join(span.value), text);
+  if (spans.length === 0) return text;
+  // One pass over the text, not one pass per span.
+  //
+  // The previous `spans.reduce((acc, span) => acc.split(...).join(...))` walked
+  // the whole string once for every protected span, so a document with 600
+  // spans was scanned 600 times. During streaming that ran on the growing
+  // prefix for every token, which measured 84s of blocked main process on a
+  // 109k-character document.
+  //
+  // Replacing in a single pass also removes a subtle hazard: with the reduce,
+  // a restored value containing something that looked like a later
+  // placeholder would have been substituted again. Here each match is
+  // replaced exactly once and the result is never re-scanned.
+  const byPlaceholder = placeholderLookup(spans);
+  return text.replace(PROTECTED_PLACEHOLDER_RE, (match) => byPlaceholder.get(match) ?? match);
 }
 
 export function renderStudyStylePrompt(template: string, variables: StudyImproveVariables): string {
