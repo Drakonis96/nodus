@@ -450,6 +450,7 @@ export function Settings({
                 <option value="de">Deutsch</option>
                 <option value="pt">Português (Portugal)</option>
                 <option value="pt-BR">Português (Brasil)</option>
+                <option value="it">Italiano</option>
               </select>
             </Row>
             <Row label={t('Idioma de los prompts (idioma de las ideas generadas)')}>
@@ -1093,7 +1094,8 @@ export function Settings({
                 </button>
               </div>
               <p className="mt-1 text-xs text-neutral-500">
-                {t('Lleva tus notas, datos de estudio, materiales y grabaciones, borradores, búsquedas guardadas, auditorías de relaciones y bases de datos a otro equipo. Al importar se fusiona: gana la versión más reciente y los borrados se propagan, pero todo lo sustituido o eliminado se conserva y puedes recuperarlo.')}
+                {t('Lleva tus notas, datos de estudio, materiales y grabaciones, borradores, búsquedas guardadas, auditorías de relaciones y bases de datos a otro equipo. Al importar se fusiona: gana la versión más reciente y los borrados se propagan, pero todo lo sustituido o eliminado se conserva y puedes recuperarlo.')}{' '}
+                {t('Las Copias protegidas también viajan y conservan su borrado lógico.')}
               </p>
               {importSyncPromptOpen && (
                 <div className="mt-2 flex flex-wrap items-center gap-2">

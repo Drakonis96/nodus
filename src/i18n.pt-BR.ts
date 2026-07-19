@@ -4,7 +4,10 @@
  * A missing key falls back to English, and
  * `scripts/test-i18n-coverage.mjs` requires every key the UI asks for to be here.
  */
+import { PROTECT_TRANSLATIONS } from './i18n.protect';
+
 export const PT_BR: Record<string, string> = {
+  ...PROTECT_TRANSLATIONS['pt-BR'],
   // ── Dados de interface em runtime (Electron → renderer) ──────────────────
   'No se pudo traducir este mensaje.': 'Não foi possível traduzir esta mensagem.',
   'Analizando fragmento {current}/{total} con IA… ({seconds}s)': 'Analisando o trecho {current}/{total} com IA… ({seconds}s)',
@@ -4996,8 +4999,8 @@ export const PT_BR: Record<string, string> = {
   'Sin modelo alternativo': 'Sem modelo alternativo',
   'Modelo del proveedor': 'Modelo do provedor',
   'Heredar modelo principal': 'Herdar modelo principal',
-  'Lleva tus notas, datos de estudio, materiales y grabaciones, borradores, búsquedas guardadas, auditorías de relaciones y bases de datos a otro equipo. Al importar se fusiona: gana la versión más reciente y nunca se borra nada local.':
-    'Leve suas notas, dados de estudo, materiais e gravações, rascunhos, buscas salvas, auditorias de relações e bancos de dados para outro computador. Ao importar, tudo é mesclado: a versão mais recente prevalece e nada local é excluído.',
+  'Lleva tus notas, datos de estudio, materiales y grabaciones, borradores, búsquedas guardadas, auditorías de relaciones, bases de datos y Copias protegidas a otro equipo. Al importar se fusiona por fecha: gana la versión más reciente; las eliminaciones de Copias protegidas también se sincronizan mediante borrado lógico.':
+    'Leve suas notas, dados de estudo, materiais e gravações, rascunhos, buscas salvas, auditorias de relações, bancos de dados e Cópias protegidas para outro computador. Na importação, os dados são mesclados por data: a versão mais recente prevalece; as exclusões de Cópias protegidas também são sincronizadas por exclusão lógica.',
   'Esta acción elimina datos de forma permanente. ¿Quieres continuar?': 'Esta ação exclui dados permanentemente. Deseja continuar?',
   'Administración del vault de estudio': 'Administração do espaço de estudo',
   'Comprobaciones locales de SQLite, almacenamiento, índices, huérfanos y papelera.':

@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 89;
+export const SCHEMA_VERSION = 90;
 
 export const migrations: Migration[] = [
   {
@@ -3098,6 +3098,30 @@ export const migrations: Migration[] = [
         PRIMARY KEY (table_name, row_key)
       );
       CREATE INDEX idx_sync_tombstones_deleted ON sync_tombstones(deleted_at);
+    `,
+  },
+  {
+    version: 90,
+    up: /* sql */ `
+      -- Nodus Protect output library. The final, already-rasterised artifact is
+      -- kept as a vault BLOB so it follows full backups and portable sync. A
+      -- soft-delete marker prevents an older .nodussync package from
+      -- resurrecting a copy the user removed on another machine.
+      CREATE TABLE protect_copies (
+        id           TEXT PRIMARY KEY,
+        file_name    TEXT NOT NULL,
+        mime_type    TEXT NOT NULL,
+        bytes        INTEGER NOT NULL DEFAULT 0,
+        sha256       TEXT NOT NULL,
+        blob         BLOB,
+        source_kind  TEXT,
+        source_label TEXT,
+        created_at   TEXT NOT NULL,
+        updated_at   TEXT NOT NULL,
+        deleted_at   TEXT
+      );
+      CREATE INDEX idx_protect_copies_updated ON protect_copies(deleted_at, updated_at DESC);
+      CREATE INDEX idx_protect_copies_sha256 ON protect_copies(sha256);
     `,
   },
 ];

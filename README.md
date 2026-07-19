@@ -24,10 +24,10 @@ Download the installer for your computer and open it. There is no server to conf
 
 | Platform | Latest installer |
 | --- | --- |
-| macOS with Apple silicon | [Download DMG](https://github.com/Drakonis96/nodus/releases/download/v2.2.0/Nodus-2.2.0-mac-arm64.dmg) |
-| Windows 10 and 11 | [Download EXE](https://github.com/Drakonis96/nodus/releases/download/v2.2.0/Nodus-2.2.0-win-x64.exe) |
-| Ubuntu and Debian | [Download DEB](https://github.com/Drakonis96/nodus/releases/download/v2.2.0/Nodus-2.2.0-linux-amd64.deb) |
-| Other Linux distributions | [Download AppImage](https://github.com/Drakonis96/nodus/releases/download/v2.2.0/Nodus-2.2.0-linux-x86_64.AppImage) |
+| macOS with Apple silicon | [Download DMG](https://github.com/Drakonis96/nodus/releases/latest/download/Nodus-mac-arm64.dmg) |
+| Windows 10 and 11 | [Download EXE](https://github.com/Drakonis96/nodus/releases/latest/download/Nodus-win-x64.exe) |
+| Ubuntu and Debian | [Download DEB](https://github.com/Drakonis96/nodus/releases/latest/download/Nodus-linux-amd64.deb) |
+| Other Linux distributions | [Download AppImage](https://github.com/Drakonis96/nodus/releases/latest/download/Nodus-linux-x86_64.AppImage) |
 
 The [latest release page](https://github.com/Drakonis96/nodus/releases/latest) always contains the newest available installers and release notes.
 
@@ -73,6 +73,12 @@ Teaching tools cover private student rosters, gradebooks, reusable rubrics and e
 
 ![Teaching vault demo in Nodus](docs/screenshots/readme-teaching-demo.jpg)
 
+## Nodus Toolkit
+
+The Toolkit provides cross-vault, local-first document utilities. **Nodus Convert** converts and processes documents, PDFs, images and text. **Nodus Protect** combines PDFs and images, permanently redacts or blurs sensitive areas, adds watermarks and a legal footer, creates fully rasterised PNG/PDF/ZIP results and can issue or verify IDPS v1 traceable copies. PDF Presenter and OCR Workspace remain marked as upcoming.
+
+Protect can read files selected from disk or compatible sources in the active vault and can save each result back to disk, share it through the operating system or store it in the vault’s Protected Copies library. Its document processing is entirely local: it does not send protected documents to AI providers or any external service. This statement applies specifically to Nodus Protect; other optional Nodus features can use network providers when the user configures and invokes them.
+
 ## Meet Nodi
 
 Nodi is the friendly guide that lives inside Nodus. It helps new users understand a vault, points out useful next steps and keeps notifications easy to follow without taking over the workspace.
@@ -86,7 +92,7 @@ Nodi is the friendly guide that lives inside Nodus. It helps new users understan
 - Separate vaults keep unrelated projects and roles from becoming one large, confusing library
 - Local storage and encrypted backups help institutions retain control of their work
 - Demo modes let anyone explore realistic workspaces before importing personal material
-- English, Spanish, French and other interface languages support international teams and classrooms
+- Spanish, English, French, German, European Portuguese, Brazilian Portuguese and Italian interfaces support international teams and classrooms
 - Light and dark themes make long reading and writing sessions more comfortable
 
 Nodus is useful for individual work today and is designed with universities, research groups, teaching teams and learning communities in mind.

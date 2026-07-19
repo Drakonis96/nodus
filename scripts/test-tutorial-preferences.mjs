@@ -26,8 +26,11 @@ test('tutorial choice selects the available UI and prompt translations', () => {
   for (const language of ['de', 'pt', 'pt-BR']) {
     assert.deepEqual(preferencesForTutorialLanguage(language), { uiLanguage: language, promptLanguage: language });
   }
+  // Italian now has a complete UI table, while PromptLanguage intentionally
+  // remains unchanged and therefore continues in English.
+  assert.deepEqual(preferencesForTutorialLanguage('it'), { uiLanguage: 'it', promptLanguage: 'en' });
   // Everything else is tutorial-only: English on both axes.
-  for (const language of ['it', 'zh', 'ja', 'ru', 'uk']) {
+  for (const language of ['zh', 'ja', 'ru', 'uk']) {
     assert.deepEqual(preferencesForTutorialLanguage(language), { uiLanguage: 'en', promptLanguage: 'en' });
   }
 });

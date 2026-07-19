@@ -1,9 +1,9 @@
-# Nodus Toolkit — Plan de implementación
+# Nodus Toolkit — Plan de implementación original
 
-> Estado: **aprobado para planificación** (2026-07-17). Alcance de este plan: la sección
-> Herramientas (hub) completa + la primera herramienta, **Nodus Convert**. Las otras dos
-> herramientas (PDF Presenter, AI OCR) aparecen en el hub como "Próximamente" y se
-> diseñarán en planes posteriores.
+> Estado: **Nodus Convert implementado; ampliado con Nodus Protect** (2026-07-19).
+> Este documento conserva las decisiones históricas del primer lanzamiento del Toolkit.
+> La especificación y matriz de aceptación vigente de la cuarta tarjeta están en
+> [`nodus-protect-parity-v0.4.1.md`](nodus-protect-parity-v0.4.1.md).
 
 ---
 
@@ -11,12 +11,13 @@
 
 **Nodus Toolkit** es una nueva sección de primer nivel ("Herramientas" en el sidebar)
 que centraliza utilidades de proceso de archivos para investigación, docencia y estudio,
-al estilo ConvertX pero con los formatos del ámbito académico. Contendrá tres
+al estilo ConvertX pero con los formatos del ámbito académico. Contiene cuatro
 herramientas, cada una con su propia página:
 
 | Herramienta | id interno | Estado v1 | Descripción de tarjeta (ES) |
 |---|---|---|---|
 | **Nodus Convert** | `convert` | ✅ se implementa ahora | Convierte documentos, PDFs e imágenes; OCR ligero y utilidades de texto, individual o en bulk. |
+| **Nodus Protect** | `protect` | ✅ disponible | Oculta datos, marca documentos y crea o verifica copias trazables mediante procesamiento local. |
 | **PDF Presenter** | `presenter` | 🔜 Próximamente | Presenta PDFs como diapositivas para clase. |
 | **OCR Workspace** | `aiOcr` | 🔜 Próximamente | Transcripción de documentos difíciles con modelos de visión. |
 

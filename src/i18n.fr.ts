@@ -4,7 +4,10 @@
  * A missing key falls back to English, and
  * `scripts/test-i18n-coverage.mjs` requires every key the UI asks for to be here.
  */
+import { PROTECT_TRANSLATIONS } from './i18n.protect';
+
 export const FR: Record<string, string> = {
+  ...PROTECT_TRANSLATIONS.fr,
   // ── Charges utiles de l’interface (Electron → renderer) ──────────────────
   'No se pudo traducir este mensaje.': 'Ce message n’a pas pu être traduit.',
   'Analizando fragmento {current}/{total} con IA… ({seconds}s)': 'Analyse du fragment {current}/{total} avec l’IA… ({seconds}s)',
@@ -5032,8 +5035,8 @@ export const FR: Record<string, string> = {
   'Sin modelo alternativo': 'Aucun modèle de repli',
   'Modelo del proveedor': 'Modèle du fournisseur',
   'Heredar modelo principal': 'Hériter du modèle principal',
-  'Lleva tus notas, datos de estudio, materiales y grabaciones, borradores, búsquedas guardadas, auditorías de relaciones y bases de datos a otro equipo. Al importar se fusiona: gana la versión más reciente y nunca se borra nada local.':
-    'Emportez vos notes, données d\'étude, documents et enregistrements, brouillons, recherches enregistrées, audits de relations et bases de données vers un autre ordinateur. L\'importation fusionne les données : la version la plus récente l\'emporte et rien de local n\'est jamais supprimé.',
+  'Lleva tus notas, datos de estudio, materiales y grabaciones, borradores, búsquedas guardadas, auditorías de relaciones, bases de datos y Copias protegidas a otro equipo. Al importar se fusiona por fecha: gana la versión más reciente; las eliminaciones de Copias protegidas también se sincronizan mediante borrado lógico.':
+    'Emportez vos notes, données d\'étude, documents et enregistrements, brouillons, recherches enregistrées, audits de relations, bases de données et Copies protégées vers un autre ordinateur. L\'importation fusionne par date : la version la plus récente l\'emporte ; les suppressions de Copies protégées sont également synchronisées par suppression logique.',
   'Esta acción elimina datos de forma permanente. ¿Quieres continuar?': 'Cette action supprime des données de façon permanente. Voulez-vous continuer ?',
   'Administración del vault de estudio': 'Administration de l\'espace d\'étude',
   'Comprobaciones locales de SQLite, almacenamiento, índices, huérfanos y papelera.':

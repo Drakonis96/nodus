@@ -93,11 +93,17 @@ try {
     NODUS_E2E_FORCE_STUDY_AI_FAILURE: '1',
   };
   delete childEnv.ELECTRON_RUN_AS_NODE;
+  const packagedExecutable = process.env.NODUS_E2E_EXECUTABLE;
   app = await electron.launch({
-    executablePath: require('electron'),
-    args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', repoRoot],
+    executablePath: packagedExecutable || require('electron'),
+    args: [
+      '--use-fake-device-for-media-stream',
+      '--use-fake-ui-for-media-stream',
+      ...(packagedExecutable ? [] : [repoRoot]),
+    ],
     env: childEnv,
   });
+  if (packagedExecutable) console.log(`[e2e] packaged executable: ${packagedExecutable}`);
 
   // ── Window + renderer mount ─────────────────────────────────────────────────
   const page = await app.firstWindow();
@@ -137,6 +143,7 @@ try {
     hasChatGptSubscription: typeof window.nodus?.getChatGptSubscriptionStatus === 'function' && typeof window.nodus?.startChatGptSubscriptionLogin === 'function' && typeof window.nodus?.logoutChatGptSubscription === 'function',
     hasGitHubCopilotSubscription: typeof window.nodus?.getGitHubCopilotSubscriptionStatus === 'function' && typeof window.nodus?.startGitHubCopilotSubscriptionLogin === 'function' && typeof window.nodus?.logoutGitHubCopilotSubscription === 'function',
     hasOpenCodeGoUsage: typeof window.nodus?.getOpenCodeGoUsageStatus === 'function' && typeof window.nodus?.onOpenCodeGoUsageStatusChanged === 'function',
+    hasProtect: typeof window.nodus?.pickProtectFiles === 'function' && typeof window.nodus?.readProtectSource === 'function' && typeof window.nodus?.saveProtectArtifactToVault === 'function' && typeof window.nodus?.downloadProtectCopy === 'function',
   }));
   assert.equal(bridge.hasNodus, true, 'window.nodus bridge exposed');
   assert.equal(bridge.hasGetGraph, true, 'getGraph available');
@@ -157,6 +164,7 @@ try {
   assert.equal(bridge.hasChatGptSubscription, true, 'managed ChatGPT subscription bridge available');
   assert.equal(bridge.hasGitHubCopilotSubscription, true, 'managed GitHub Copilot subscription bridge available');
   assert.equal(bridge.hasOpenCodeGoUsage, true, 'OpenCode Go usage bridge available');
+  assert.equal(bridge.hasProtect, true, 'Nodus Protect secure bridge available');
   const signedOutChatGpt = await page.evaluate(() => window.nodus.getChatGptSubscriptionStatus());
   assert.equal(signedOutChatGpt.available, true, `official Codex runtime is available: ${signedOutChatGpt.error ?? 'ok'}`);
   assert.equal(signedOutChatGpt.connected, false, 'throwaway profile starts without a ChatGPT account');
@@ -205,6 +213,7 @@ try {
     de: ['start', 'erkunden', 'bibliothek', 'ideen', 'analysieren', 'schreiben', 'einstellungen'],
     pt: ['início', 'explorar', 'biblioteca', 'ideias', 'analisar', 'escrever', 'definições'],
     'pt-BR': ['início', 'explorar', 'biblioteca', 'ideias', 'analisar', 'escrever', 'configurações'],
+    it: ['casa', 'esplora', 'biblioteca', 'idee', 'analizzare', 'scrivi', 'impostazioni'],
   };
   for (const [language, labels] of Object.entries(SIDEBAR_BY_LANGUAGE)) {
     await page.evaluate((lang) => window.nodus.updateSettings({ uiLanguage: lang }), language);
@@ -638,11 +647,17 @@ try {
   }
 
   // ── Nodus Toolkit: hub geometry, tool navigation and the way back ──────────
-  // The hub's promise is three cards that read as one set, so the sizes are
+  // The preceding Nodi test deliberately restores the companion. Hide it for the
+  // remaining workflow so its floating hit target cannot cover a control on a
+  // smaller CI viewport; Toolkit clicks below must still pass normal actionability
+  // checks and are never forced through an overlay.
+  await page.evaluate(() => window.nodus.updateSettings({ mascotEnabled: false }));
+  await nodiFigure.waitFor({ state: 'detached', timeout: 5_000 });
+  // The hub's promise is four cards that read as one set, so the sizes are
   // measured on the real rendered shell rather than trusted from the classes.
   await page.locator('[data-tour="toolkit"]').click();
   await page.getByTestId('toolkit-home').waitFor({ timeout: 30_000 });
-  const toolCards = ['toolkit-card-convert', 'toolkit-card-presenter', 'toolkit-card-aiocr'];
+  const toolCards = ['toolkit-card-convert', 'toolkit-card-protect', 'toolkit-card-presenter', 'toolkit-card-aiocr'];
   const cardBoxes = [];
   for (const testId of toolCards) {
     const box = await page.getByTestId(testId).boundingBox();
@@ -654,7 +669,7 @@ try {
     1,
     `every toolkit card has the same dimensions: ${cardBoxes.map((b) => `${b.testId} ${Math.round(b.width)}x${Math.round(b.height)}`).join(', ')}`
   );
-  assert.equal(new Set(cardBoxes.map((b) => Math.round(b.y))).size, 1, 'the cards share one baseline row');
+  assert.equal(new Set(cardBoxes.map((b) => Math.round(b.y))).size, 2, 'the cards form two aligned rows');
   // Each card's icon tile is square and its glyph sits dead centre in it.
   for (const testId of toolCards) {
     const centring = await page.getByTestId(testId).evaluate((card) => {
@@ -726,7 +741,91 @@ try {
   await page.getByTestId('toolkit-back').click();
   await page.getByTestId('toolkit-home').waitFor({ timeout: 10_000 });
   assert.equal(await page.getByTestId('toolkit-convert-page').count(), 0, 'back returns to the hub');
-  console.log('[e2e] toolkit: hub geometry, a real Markdown→PDF conversion, and a way back');
+  await page.getByTestId('toolkit-card-protect').click();
+  await page.getByTestId('protect-home').waitFor({ timeout: 10_000 });
+  await page.getByText('Proteger documentos', { exact: true }).waitFor();
+  await page.getByText('Verificar una copia trazable', { exact: true }).waitFor();
+  await page.getByText('El procesamiento de Nodus Protect es local. No envía tus documentos a IA, proveedores ni servicios externos.', { exact: true }).waitFor();
+
+  // Full Protect round-trip without a native dialog: seed one valid image in the
+  // active vault, redact it through the real canvas UI, emit a traceable PNG to
+  // Protected Copies, then load that exact BLOB again and authenticate IDPS v1.
+  const { createCanvas: createNativeCanvas } = await import('@napi-rs/canvas');
+  const protectFixtureCanvas = createNativeCanvas(480, 300);
+  const protectFixtureContext = protectFixtureCanvas.getContext('2d');
+  protectFixtureContext.fillStyle = '#f7f1e5';
+  protectFixtureContext.fillRect(0, 0, 480, 300);
+  protectFixtureContext.fillStyle = '#1d6fd6';
+  protectFixtureContext.fillRect(28, 28, 424, 70);
+  protectFixtureContext.fillStyle = '#171512';
+  protectFixtureContext.font = '28px sans-serif';
+  protectFixtureContext.fillText('Documento E2E · 12345678Z', 54, 190);
+  const protectFixtureBase64 = protectFixtureCanvas.toBuffer('image/png').toString('base64');
+  const seededProtectCopy = await page.evaluate(async (base64) => {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+    return window.nodus.saveProtectArtifactToVault({
+      fileName: 'e2e-source.png', mimeType: 'image/png', format: 'png', pageCount: 1, bytes,
+      sourceKind: 'disk', sourceLabel: 'E2E fixture',
+    });
+  }, protectFixtureBase64);
+  assert.match(seededProtectCopy.id, /^[0-9a-f-]{36}$/i, 'Protect vault copies use stable UUIDs');
+
+  await page.getByTestId('protect-start-protect').click();
+  await page.getByTestId('protect-source').waitFor();
+  await page.getByTestId('protect-source-tab-vault').click();
+  await page.getByText('e2e-source.png', { exact: true }).waitFor();
+  await page.getByText('e2e-source.png', { exact: true }).click();
+  await page.getByTestId('protect-source-continue').getByRole('button').click();
+  await page.getByTestId('protect-redact').waitFor({ timeout: 30_000 });
+  const protectEditorCanvas = page.getByTestId('protect-editor-host').locator('canvas');
+  await protectEditorCanvas.waitFor();
+  const protectCanvasBox = await protectEditorCanvas.boundingBox();
+  assert.ok(protectCanvasBox, 'Protect renders its real redaction canvas');
+  await page.mouse.move(protectCanvasBox.x + protectCanvasBox.width * 0.28, protectCanvasBox.y + protectCanvasBox.height * 0.56);
+  await page.mouse.down();
+  await page.mouse.move(protectCanvasBox.x + protectCanvasBox.width * 0.72, protectCanvasBox.y + protectCanvasBox.height * 0.56, { steps: 8 });
+  await page.mouse.up();
+  await page.getByText(/1 ocultaciones o desenfoques añadidos/).waitFor();
+  await page.getByTestId('protect-redact-continue').getByRole('button').click({ force: true });
+  await page.getByTestId('protect-watermark').waitFor();
+  await page.getByTestId('protect-watermark-continue').getByRole('button').evaluate((button) => button.click());
+  await page.getByTestId('protect-result').waitFor();
+  await page.getByTestId('protect-trace-toggle').check();
+  await page.getByTestId('protect-trace-label').fill('Recorrido E2E');
+  await page.getByTestId('protect-save-vault').getByRole('button').click({ force: true });
+  await page.getByText('Copia guardada en esta bóveda.', { exact: true }).waitFor({ timeout: 30_000 });
+  const protectedCopiesAfterSave = await page.evaluate(() => window.nodus.listProtectCopies());
+  const emittedProtectCopy = protectedCopiesAfterSave.find((copy) => copy.fileName === 'e2e-source-protegido.png');
+  assert.ok(emittedProtectCopy, 'the completed Protect action stores the emitted artifact in the active vault');
+  assert.notEqual(emittedProtectCopy.id, seededProtectCopy.id, 'the output is a distinct vault artifact');
+  await page.getByText('Recorrido E2E', { exact: true }).waitFor();
+
+  await page.getByRole('button', { name: 'Volver a Nodus Protect', exact: true }).click({ force: true });
+  await page.getByTestId('protect-home').waitFor();
+  await page.getByTestId('protect-start-verify').click();
+  await page.getByTestId('protect-source-tab-vault').click();
+  await page.getByText('e2e-source-protegido.png', { exact: true }).waitFor();
+  await page.getByText('e2e-source-protegido.png', { exact: true }).click();
+  await page.getByTestId('protect-source-continue').getByRole('button').click({ force: true });
+  await page.getByTestId('protect-verify').waitFor();
+  await page.getByTestId('protect-verify-action').getByRole('button').click({ force: true });
+  await page.getByText('Marca verificada', { exact: true }).waitFor({ timeout: 30_000 });
+  await page.getByText('Abierto', { exact: true }).waitFor();
+  await page.getByText(/Coincide: Recorrido E2E/).waitFor();
+  await page.getByRole('button', { name: 'Volver a Nodus Protect', exact: true }).click({ force: true });
+  await page.getByTestId('protect-home').waitFor();
+  await page.getByTestId('toolkit-protect-back').click();
+  await page.getByTestId('toolkit-home').waitFor({ timeout: 10_000 });
+  console.log('[e2e] toolkit: hub geometry, Convert regression, and full Protect redact → trace → vault → verify round-trip');
+  if (process.env.NODUS_E2E_TOOLKIT_ONLY === '1') {
+    assert.deepEqual(pageErrors, [], `renderer errors: ${pageErrors.map((error) => error.message).join(' | ')}`);
+    await closeElectronApp(app); app = null;
+    await rm(userData, { recursive: true, force: true });
+    console.log('[e2e] focused Toolkit + Nodus Protect smoke passed');
+    process.exit(0);
+  }
 
   // ── Search result: an idea reuses the Ideas section's detail modal ─────────
   assert.equal(await page.evaluate(() => window.nodus.seedDemoData()), true, 'demo corpus seeded for search smoke');

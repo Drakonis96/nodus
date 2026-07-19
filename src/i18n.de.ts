@@ -4,7 +4,10 @@
  * A missing key falls back to English, and
  * `scripts/test-i18n-coverage.mjs` requires every key the UI asks for to be here.
  */
+import { PROTECT_TRANSLATIONS } from './i18n.protect';
+
 export const DE: Record<string, string> = {
+  ...PROTECT_TRANSLATIONS.de,
   // ── UI-Laufzeitdaten (Electron → Renderer) ───────────────────────────────
   'No se pudo traducir este mensaje.': 'Diese Nachricht konnte nicht übersetzt werden.',
   'Analizando fragmento {current}/{total} con IA… ({seconds}s)': 'Abschnitt {current}/{total} wird mit KI analysiert… ({seconds}s)',
@@ -5038,8 +5041,8 @@ export const DE: Record<string, string> = {
   'Sin modelo alternativo': 'Kein Fallback-Modell',
   'Modelo del proveedor': 'Anbietermodell',
   'Heredar modelo principal': 'Primärmodell übernehmen',
-  'Lleva tus notas, datos de estudio, materiales y grabaciones, borradores, búsquedas guardadas, auditorías de relaciones y bases de datos a otro equipo. Al importar se fusiona: gana la versión más reciente y nunca se borra nada local.':
-    'Übertragen Sie Ihre Notizen, Studiendaten, Materialien und Aufnahmen, Entwürfe, gespeicherte Suchen, Beziehungsprüfungen und Datenbanken auf einen anderen Computer. Beim Importieren wird zusammengeführt: Die neueste Version gewinnt, und lokale Daten werden nie gelöscht.',
+  'Lleva tus notas, datos de estudio, materiales y grabaciones, borradores, búsquedas guardadas, auditorías de relaciones, bases de datos y Copias protegidas a otro equipo. Al importar se fusiona por fecha: gana la versión más reciente; las eliminaciones de Copias protegidas también se sincronizan mediante borrado lógico.':
+    'Übertragen Sie Ihre Notizen, Studiendaten, Materialien und Aufnahmen, Entwürfe, gespeicherte Suchen, Beziehungsprüfungen, Datenbanken und Geschützten Kopien auf einen anderen Computer. Beim Import wird nach Datum zusammengeführt: Die neueste Version gewinnt; Löschungen Geschützter Kopien werden ebenfalls als logische Löschung synchronisiert.',
   'Esta acción elimina datos de forma permanente. ¿Quieres continuar?': 'Diese Aktion löscht Daten dauerhaft. Möchten Sie fortfahren?',
   'Administración del vault de estudio': 'Verwaltung des Studien-Arbeitsbereichs',
   'Comprobaciones locales de SQLite, almacenamiento, índices, huérfanos y papelera.':

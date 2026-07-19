@@ -43,6 +43,7 @@ const SYNC_GROUPS: { key: SyncGroupKey; prefix?: string; tables?: string[] }[] =
   { key: 'edgeFeedback', tables: ['edge_feedback'] },
   { key: 'curation', tables: ['match_feedback'] },
   { key: 'databases', prefix: 'db_' },
+  { key: 'protect', tables: ['protect_copies'] },
   { key: 'study', prefix: 'study_' },
   { key: 'teaching', prefix: 'teaching_' },
   {

@@ -37,6 +37,7 @@ try {
   fs.writeFileSync(path.join(invalidRoot, 'unrelated.txt'), 'do not overwrite');
   assert.equal(recovery.inspectRecoveryFolder(recoveryRoot).kind, 'empty');
   assert.match(recovery.inspectRecoveryFolder(recoveryRoot, 'en').message, /Empty folder/, 'folder inspection follows UI language');
+  assert.match(recovery.inspectRecoveryFolder(recoveryRoot, 'it').message, /Cartella vuota/, 'Italian recovery never falls back to English');
   assert.equal(recovery.inspectRecoveryFolder(invalidRoot).kind, 'invalid', 'non-empty unrelated folder rejected');
 
   const active = vaults.getActiveVault();
