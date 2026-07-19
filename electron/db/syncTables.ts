@@ -1,7 +1,7 @@
 import type Database from 'better-sqlite3';
 import type { SyncGroupKey } from '@shared/types';
 import { getDb } from './database';
-import { identityColumns, quoteIdentifier, tableColumns } from './rowIdentity';
+import { identityColumns, tableColumns } from './rowIdentity';
 
 /**
  * Which tables travel between machines, and which deliberately do not.

@@ -9,7 +9,7 @@ import { closeDb, getDb, replaceDbFile, SCHEMA_VERSION } from '../db/database';
 import { getSettings } from '../db/settingsRepo';
 import { listVaults, getActiveVault, restoreVaultDatabase, setActiveVault } from '../vaults/vaultRegistry';
 import type { VaultType } from '@shared/types';
-import { getApiKey, getAudioKey, getBackupPassword, lockedApiKeyProviders, setApiKey, setAudioKey } from '../secrets/secretStore';
+import { getApiKey, getAudioKey, getBackupPassword, setApiKey, setAudioKey } from '../secrets/secretStore';
 import {
   decryptBackupPayload,
   encryptBackupPayload,

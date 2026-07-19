@@ -2136,7 +2136,8 @@ function SupersededVersions({ reloadKey }: { reloadKey: number }) {
 
   useEffect(() => {
     void reload();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Intentionally keyed only on reloadKey: `reload` is recreated every render, and this
+    // project has no exhaustive-deps rule that would flag the omission.
   }, [reloadKey]);
 
   // Nothing was ever discarded: say nothing rather than showing an empty panel.
@@ -2265,7 +2266,7 @@ function SyncPassphrase({ onChange }: { onChange: (has: boolean) => void }) {
       setHas(next);
       onChange(next);
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Runs once: the callback only reports the initial state upward.
   }, []);
 
   if (has === null) return null;
