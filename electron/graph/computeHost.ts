@@ -26,8 +26,21 @@ let worker: Worker | null = null;
 let workerBroken = false;
 let nextRequestId = 1;
 const pending = new Map<number, Pending>();
+let consecutiveTimeouts = 0;
 
-const REQUEST_TIMEOUT_MS = 120_000;
+const DEFAULT_REQUEST_TIMEOUT_MS = 120_000;
+
+/**
+ * After this many timeouts in a row, stop paying the spawn + vector-transfer
+ * cost and route everything to the chunked in-process path instead.
+ */
+const MAX_CONSECUTIVE_TIMEOUTS = 2;
+
+/** Overridable so tests can exercise the timeout path without waiting 2 minutes. */
+function requestTimeoutMs(): number {
+  const override = Number(process.env.NODUS_COMPUTE_TIMEOUT_MS);
+  return Number.isFinite(override) && override > 0 ? override : DEFAULT_REQUEST_TIMEOUT_MS;
+}
 
 function workerFile(): string {
   // Bundled next to main.js by the vite worker entry; __dirname comes from the
@@ -42,6 +55,36 @@ function workerDisabled(): boolean {
 function failAllPending(err: Error): void {
   for (const p of pending.values()) p.reject(err);
   pending.clear();
+}
+
+/**
+ * Abandon a worker that blew the timeout.
+ *
+ * The worker runs each request as one synchronous loop, so a request that
+ * overran cannot be cancelled cooperatively and will not answer a message: the
+ * thread keeps burning a core until the process exits. Dropping the pending
+ * entry alone (the previous behaviour) left that thread running forever AND
+ * left every later request queued behind it in the worker's serial message
+ * queue, each waiting out its own full timeout.
+ *
+ * Terminating is therefore the only real recovery. The next request lazily
+ * spawns a fresh worker with an empty queue; callers of the failed request fall
+ * back to the chunked in-process path, which yields to the event loop.
+ */
+function abandonTimedOutWorker(reason: string): void {
+  consecutiveTimeouts += 1;
+  const doomed = worker;
+  worker = null;
+  if (consecutiveTimeouts >= MAX_CONSECUTIVE_TIMEOUTS) {
+    // Repeated timeouts mean the workload simply exceeds the budget; stop
+    // re-spawning and let everything take the chunked path from here.
+    workerBroken = true;
+  }
+  if (doomed) {
+    void doomed.terminate().catch(() => undefined);
+  }
+  // Anything still queued was waiting behind the stuck job on the same thread.
+  failAllPending(new Error(reason));
 }
 
 function getWorker(): Worker | null {
@@ -118,11 +161,14 @@ export async function computeThemeMatches(
     return await new Promise<CentroidMatch[]>((resolve, reject) => {
       const timer = setTimeout(() => {
         pending.delete(id);
+        // Kill the thread before rejecting: it is still spinning on this job.
+        abandonTimedOutWorker('compute worker timed out');
         reject(new Error('compute worker timed out'));
-      }, REQUEST_TIMEOUT_MS);
+      }, requestTimeoutMs());
       pending.set(id, {
         resolve: (m) => {
           clearTimeout(timer);
+          consecutiveTimeouts = 0;
           resolve(m as CentroidMatch[]);
         },
         reject: (e) => {
@@ -170,11 +216,14 @@ export async function computeNearestNeighbors(
     return await new Promise<NeighborMatch[]>((resolve, reject) => {
       const timer = setTimeout(() => {
         pending.delete(id);
+        // Kill the thread before rejecting: it is still spinning on this job.
+        abandonTimedOutWorker('nearest-neighbor worker timed out');
         reject(new Error('nearest-neighbor worker timed out'));
-      }, REQUEST_TIMEOUT_MS);
+      }, requestTimeoutMs());
       pending.set(id, {
         resolve: (matches) => {
           clearTimeout(timer);
+          consecutiveTimeouts = 0;
           resolve(matches as NeighborMatch[]);
         },
         reject: (error) => {
