@@ -3,6 +3,7 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes, scryptSync }
 const PASSWORD_BYTES = 24;
 const SALT_BYTES = 16;
 const IV_BYTES = 12;
+const AUTH_TAG_BYTES = 16;
 const KEY_BYTES = 32;
 const SCRYPT_N = 32768;
 const SCRYPT_R = 8;
@@ -55,6 +56,60 @@ function deriveKey(password: string, salt: Buffer): Buffer {
     parallelization: SCRYPT_P,
     maxmem: SCRYPT_MAXMEM,
   });
+}
+
+export type KdfDescriptor = BackupCipherMetadata['kdf'];
+
+/**
+ * Derive the key ONCE for a payload made of many separately-encrypted pieces.
+ *
+ * The sync package encrypts each table and each attachment as its own zip entry, so that
+ * no point in the process holds the whole package as a single buffer — that is what made
+ * large vaults impossible to sync. Running scrypt per entry would cost ~100 ms each and
+ * turn a 500-entry package into a minute of waiting, so the salt is stored once in the
+ * manifest and the derived key is reused across entries with a fresh IV per entry.
+ */
+export function newKdfDescriptor(): KdfDescriptor {
+  return {
+    name: 'scrypt',
+    salt: randomBytes(SALT_BYTES).toString('base64'),
+    keyLength: KEY_BYTES,
+    N: SCRYPT_N,
+    r: SCRYPT_R,
+    p: SCRYPT_P,
+  };
+}
+
+export function deriveKeyFromDescriptor(password: string, kdf: KdfDescriptor): Buffer {
+  if (kdf.name !== 'scrypt') throw new Error('Formato de cifrado no soportado.');
+  const clean = cleanPassword(password);
+  if (clean.length < MIN_BACKUP_PASSWORD_LENGTH) {
+    throw new Error('La contraseña no es válida.');
+  }
+  return scryptSync(clean, Buffer.from(kdf.salt, 'base64'), kdf.keyLength, {
+    cost: kdf.N,
+    blockSize: kdf.r,
+    parallelization: kdf.p,
+    maxmem: SCRYPT_MAXMEM,
+  });
+}
+
+/** One self-contained encrypted chunk: `IV ‖ authTag ‖ ciphertext`. Each chunk carries
+ *  its own IV, which is mandatory — reusing an IV under one key breaks GCM entirely. */
+export function encryptWithKey(plaintext: Buffer, key: Buffer): Buffer {
+  const iv = randomBytes(IV_BYTES);
+  const cipher = createCipheriv('aes-256-gcm', key, iv);
+  const ciphertext = Buffer.concat([cipher.update(plaintext), cipher.final()]);
+  return Buffer.concat([iv, cipher.getAuthTag(), ciphertext]);
+}
+
+export function decryptWithKey(sealed: Buffer, key: Buffer): Buffer {
+  if (sealed.length < IV_BYTES + AUTH_TAG_BYTES) throw new Error('Fragmento cifrado incompleto.');
+  const iv = sealed.subarray(0, IV_BYTES);
+  const authTag = sealed.subarray(IV_BYTES, IV_BYTES + AUTH_TAG_BYTES);
+  const decipher = createDecipheriv('aes-256-gcm', key, iv);
+  decipher.setAuthTag(authTag);
+  return Buffer.concat([decipher.update(sealed.subarray(IV_BYTES + AUTH_TAG_BYTES)), decipher.final()]);
 }
 
 export function encryptBackupPayload(plaintext: Buffer, password: string): { ciphertext: Buffer; metadata: BackupCipherMetadata } {

@@ -285,6 +285,48 @@ export function clearBackupPassword(): void {
   if (fs.existsSync(file)) fs.unlinkSync(file);
 }
 
+// ── Sync passphrase ──────────────────────────────────────────────────────────
+// Sync packages are encrypted, and unlike a one-off export this is a RECURRENT
+// operation: a fresh random key per export would mean copying a new secret every single
+// time, which nobody sustains. So the user sets one passphrase and types it on both
+// machines.
+//
+// Deliberately NOT the backup master password: restoring with the recovery key mints a
+// new random master password, so two machines would silently end up with different ones
+// and sync would fail for no visible reason.
+
+function syncPassphraseFile(): string {
+  return path.join(globalSecretsDir(), 'sync_passphrase.bin');
+}
+
+export function setSyncPassphrase(passphrase: string): void {
+  const clean = passphrase.trim();
+  if (!clean) {
+    clearSyncPassphrase();
+    return;
+  }
+  const file = syncPassphraseFile();
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  if (!safeStorage.isEncryptionAvailable()) {
+    fs.writeFileSync(file, Buffer.from(`b64:${Buffer.from(clean).toString('base64')}`));
+    return;
+  }
+  fs.writeFileSync(file, safeStorage.encryptString(clean));
+}
+
+export function getSyncPassphrase(): string | null {
+  return readKeyFile(syncPassphraseFile());
+}
+
+export function hasSyncPassphrase(): boolean {
+  return getSyncPassphrase() !== null;
+}
+
+export function clearSyncPassphrase(): void {
+  const file = syncPassphraseFile();
+  if (fs.existsSync(file)) fs.unlinkSync(file);
+}
+
 export function setBackupRecoveryKey(recoveryKey: string): void {
   const clean = recoveryKey.trim();
   if (!clean) {

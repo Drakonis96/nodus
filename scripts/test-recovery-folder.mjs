@@ -74,6 +74,36 @@ try {
   const safetyFiles = fs.readdirSync(path.join(userData, 'restore-safety')).filter((name) => name.endsWith('.nodus'));
   assert.equal(safetyFiles.length, 1, 'successful restore retains a pre-restore encrypted safety snapshot');
 
+  // ── Backup health must state the truth, not the last happy status ───────────
+  // Every one of these used to be invisible: a broken schedule left `lastAutoBackupAt`
+  // frozen on the last success, so the UI kept reporting "ok" while nothing was being
+  // written. That is the failure a backup system cannot afford.
+  const settingsRepo = require(path.join(repoRoot, 'electron/db/settingsRepo.ts'));
+  assert.equal(recovery.getRecoveryStatus().health.level, 'ok', 'a working setup reads as healthy');
+
+  settingsRepo.updateSettings({ lastAutoBackupStatus: 'error: no se pudo leer la contraseña maestra' });
+  const failedHealth = recovery.getRecoveryStatus().health;
+  assert.equal(failedHealth.code, 'last-run-failed', 'a failed run is surfaced');
+  assert.equal(failedHealth.level, 'critical', 'and it is critical, not a footnote');
+
+  settingsRepo.updateSettings({ lastAutoBackupStatus: 'ok: copia verificada' });
+  settingsRepo.updateSettings({ lastAutoBackupAt: new Date(Date.now() - 40 * 86400e3).toISOString() });
+  const staleHealth = recovery.getRecoveryStatus().health;
+  assert.equal(staleHealth.code, 'stale', 'a long gap since the last snapshot is surfaced');
+  assert.equal(staleHealth.daysSinceLastBackup, 40, 'the age is reported so the user can judge it');
+
+  settingsRepo.updateSettings({ lastAutoBackupAt: new Date().toISOString() });
+  fs.rmSync(path.join(recoveryRoot, 'nodus-recovery.json'), { force: true });
+  assert.equal(
+    recovery.getRecoveryStatus().health.code,
+    'folder-unreachable',
+    'an unusable destination outranks a successful last run'
+  );
+
+  settingsRepo.updateSettings({ autoBackupEnabled: false });
+  assert.equal(recovery.getRecoveryStatus().health.code, 'disabled', 'no protection at all is reported as critical');
+  assert.equal(recovery.getRecoveryStatus().health.level, 'critical');
+
   closeDb();
   console.log('Recovery folder integration test passed!');
 } finally {

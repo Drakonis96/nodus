@@ -269,8 +269,22 @@ export function restoreVaultDatabase(
     registry.vaults.push(record);
   }
   fs.mkdirSync(path.dirname(record.path), { recursive: true });
-  removeSqliteDatabaseFiles(record.path);
-  fs.copyFileSync(sourceFile, record.path);
+  // Stage the incoming database as a sibling first. Copying straight over the live
+  // file means a failure mid-copy (disk full, volume unmounted, power loss) leaves a
+  // truncated file where a vault used to be — and the caller's rollback would hit the
+  // same wall. A rename() within one directory is atomic and writes no content, so the
+  // old vault survives every failure up to the instant it is replaced.
+  const staged = `${record.path}.incoming-${process.pid}-${Math.random().toString(36).slice(2)}`;
+  try {
+    fs.copyFileSync(sourceFile, staged);
+    // Only metadata operations from here on: the stale WAL/SHM must not outlive the
+    // file they describe, and Windows refuses to rename onto an existing target.
+    removeSqliteDatabaseFiles(record.path);
+    fs.renameSync(staged, record.path);
+  } catch (error) {
+    fs.rmSync(staged, { force: true });
+    throw error;
+  }
   writeVaultManifest(record);
   writeRegistry(registry);
 }

@@ -5,11 +5,14 @@ import type {
   EmbeddingProvider,
   McpServerStatus,
   ModelInfo,
+  RecoveryHealth,
   StudyDataOverview,
+  SupersededEntry,
   UpdateProgressEvent,
   VaultSummary,
   VaultType,
 } from '@shared/types';
+import { recoveryHealthAdvice, recoveryHealthAge, recoveryHealthHeadline } from '../recoveryHealth';
 import { ImageGenerationSettings, ProvidersSettings } from './ProvidersSettings';
 import { AudioGenerationSettings } from './AudioGenerationSettings';
 import { ConfirmModal } from '../components/ConfirmModal';
@@ -55,6 +58,7 @@ export function Settings({
   settings,
   vaults: _vaults,
   activeVault,
+  recoveryHealth,
   onChange,
   onVaultsChanged: _onVaultsChanged,
   onOpenWhatsNew,
@@ -62,11 +66,17 @@ export function Settings({
   settings: AppSettings;
   vaults: VaultSummary[];
   activeVault: VaultSummary | null;
+  /** Assessed in the main process (it alone can reach the destination folder). */
+  recoveryHealth: RecoveryHealth | null;
   onChange: () => Promise<unknown>;
   onVaultsChanged: () => Promise<unknown>;
   onOpenWhatsNew: () => void;
 }) {
   const [saved, setSaved] = useState<string | null>(null);
+  const [supersededReloadKey, setSupersededReloadKey] = useState(0);
+  const [syncHasPassphrase, setSyncHasPassphrase] = useState(true);
+  const [importSyncPassphrase, setImportSyncPassphrase] = useState('');
+  const [importSyncPromptOpen, setImportSyncPromptOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<SettingsTabId>('providers');
   const [settingsQuery, setSettingsQuery] = useState('');
   // Reset-graph flow: a confirm() dialog, then a modal that requires typing a
@@ -1002,12 +1012,19 @@ export function Settings({
             </p>
             <div className="mt-2 border-t border-neutral-800 pt-3">
               <label className="text-sm">{t('Sincronización entre equipos')}</label>
+              <SyncPassphrase onChange={setSyncHasPassphrase} />
               <div className="mt-2 flex flex-wrap gap-2">
                 <button
                   className="btn btn-ghost border border-neutral-700"
+                  disabled={!syncHasPassphrase}
+                  title={syncHasPassphrase ? undefined : t('Configura primero una frase de sincronización.')}
                   onClick={async () => {
-                    const result = await window.nodus.exportSyncPackage();
-                    if (result) flash(`${t('Exportado')}: ${result.path}`);
+                    try {
+                      const result = await window.nodus.exportSyncPackage();
+                      if (result) flash(`${t('Exportado')}: ${result.path}`);
+                    } catch (e) {
+                      flash(e instanceof Error ? e.message : String(e));
+                    }
                   }}
                 >
                   <Icon name="download" /> {t('Exportar paquete de sync (.nodussync)')}
@@ -1016,20 +1033,44 @@ export function Settings({
                   className="btn btn-ghost border border-neutral-700"
                   onClick={async () => {
                     try {
-                      const summary = await window.nodus.importSyncPackage();
+                      const summary = await window.nodus.importSyncPackage(importSyncPassphrase.trim() || undefined);
                       if (!summary) return;
-                      const total = (c: { inserted: number; updated: number }) => c.inserted + c.updated;
-                      const applied =
-                        total(summary.notes) +
-                        total(summary.noteFolders) +
-                        total(summary.writingDrafts) +
-                        total(summary.savedSearches) +
-                        total(summary.edgeFeedback) +
-                        total(summary.databases) +
-                        total(summary.study);
-                      flash(`${t('Sincronización fusionada')}: ${applied} ${t('cambios aplicados (nada local se ha borrado).')}`);
+                      setImportSyncPassphrase('');
+                      const applied = Object.values(summary.groups).reduce((sum, c) => sum + c.inserted + c.updated, 0);
+                      // Anything that did NOT apply is stated outright. A bare success
+                      // count let users believe a module had travelled when it had not.
+                      const notApplied = summary.conflicts.reduce((sum, c) => sum + c.rows, 0);
+                      const parts = [`${t('Sincronización fusionada')}: ${applied} ${t('cambios aplicados (nada local se ha borrado).')}`];
+                      if (notApplied > 0) {
+                        parts.push(`${notApplied} ${t('fila(s) no se pudieron aplicar:')} ${[...new Set(summary.conflicts.map((c) => c.table))].join(', ')}.`);
+                      }
+                      if (summary.unknownTables.length > 0) {
+                        parts.push(`${t('Datos no reconocidos por esta versión:')} ${summary.unknownTables.join(', ')}.`);
+                      }
+                      if (summary.deletionsApplied > 0) {
+                        parts.push(`${summary.deletionsApplied} ${t('elemento(s) borrado(s) en el otro equipo se han eliminado aquí.')}`);
+                      }
+                      if (summary.supersededKept > 0) {
+                        parts.push(`${summary.supersededKept} ${t('versión(es) sustituida(s) se han conservado y puedes recuperarlas abajo.')}`);
+                      }
+                      if (summary.predatesTombstoneHorizon) {
+                        parts.push(t('Aviso: el paquete es muy antiguo, así que algunos elementos borrados pueden haber reaparecido.'));
+                      }
+                      if (summary.clockSkewAheadMs > 60_000) {
+                        // Only the "sender ahead" direction is detectable, and it is the
+                        // one that silently wins every conflict.
+                        parts.push(
+                          `${t('Aviso: el reloj del otro equipo va adelantado unos')} ${Math.round(summary.clockSkewAheadMs / 60_000)} ${t('minuto(s), así que sus versiones ganan siempre. Revisa la hora en ese equipo.')}`
+                        );
+                      }
+                      setSupersededReloadKey((key) => key + 1);
+                      flash(parts.join(' '));
                     } catch (e) {
-                      flash(e instanceof Error ? e.message : String(e));
+                      const message = e instanceof Error ? e.message : String(e);
+                      // A package from a machine set up separately needs ITS passphrase,
+                      // not this one's; ask instead of leaving the user stuck.
+                      if (/frase|descifrar|cifrado/i.test(message)) setImportSyncPromptOpen(true);
+                      flash(message);
                     }
                   }}
                 >
@@ -1037,8 +1078,21 @@ export function Settings({
                 </button>
               </div>
               <p className="mt-1 text-xs text-neutral-500">
-                {t('Lleva tus notas, datos de estudio, materiales y grabaciones, borradores, búsquedas guardadas, auditorías de relaciones y bases de datos a otro equipo. Al importar se fusiona: gana la versión más reciente y nunca se borra nada local.')}
+                {t('Lleva tus notas, datos de estudio, materiales y grabaciones, borradores, búsquedas guardadas, auditorías de relaciones y bases de datos a otro equipo. Al importar se fusiona: gana la versión más reciente y los borrados se propagan, pero todo lo sustituido o eliminado se conserva y puedes recuperarlo.')}
               </p>
+              {importSyncPromptOpen && (
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <input
+                    type="password"
+                    className="input w-72"
+                    placeholder={t('Frase de sincronización del equipo que generó el paquete')}
+                    value={importSyncPassphrase}
+                    onChange={(event) => setImportSyncPassphrase(event.target.value)}
+                  />
+                  <span className="text-xs text-neutral-500">{t('Vuelve a pulsar Importar con esta frase.')}</span>
+                </div>
+              )}
+              <SupersededVersions reloadKey={supersededReloadKey} />
             </div>
             <div className="mt-2 border-t border-neutral-800 pt-3">
               <div className="flex items-center justify-between gap-4">
@@ -1196,13 +1250,25 @@ export function Settings({
                     >
                       <Icon name="download" /> {autoBackupRunning ? t('Copiando…') : t('Hacer copia ahora')}
                     </button>
-                    {settings.lastAutoBackupStatus && (
-                      <span className="min-w-0 flex-1 truncate text-xs text-neutral-500" title={settings.lastAutoBackupStatus}>
-                        {settings.lastAutoBackupAt ? `${new Date(settings.lastAutoBackupAt).toLocaleString()} · ` : ''}
-                        {settings.lastAutoBackupStatus}
-                      </span>
-                    )}
                   </div>
+                  {recoveryHealth && (
+                    <div data-testid="backup-health" data-level={recoveryHealth.level} className="backup-health">
+                      <div className="backup-health-title">
+                        <Icon name={recoveryHealth.level === 'ok' ? 'check' : 'alert'} size={14} />
+                        {recoveryHealthHeadline(recoveryHealth)}
+                      </div>
+                      {recoveryHealthAdvice(recoveryHealth) && (
+                        <p className="backup-health-advice">{recoveryHealthAdvice(recoveryHealth)}</p>
+                      )}
+                      <p className="backup-health-age">
+                        {[
+                          recoveryHealthAge(recoveryHealth),
+                          settings.lastAutoBackupAt ? new Date(settings.lastAutoBackupAt).toLocaleString() : null,
+                        ].filter(Boolean).join(' · ')}
+                      </p>
+                      {recoveryHealth.detail && <p className="backup-health-detail">{recoveryHealth.detail}</p>}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -2024,6 +2090,234 @@ function EmbeddingModelControl({
       </p>
       <p className="rounded-lg border border-amber-900/60 bg-amber-950/20 px-3 py-2 text-xs leading-5 text-amber-200">
         {t('Si cambias de modelo de embeddings, los vectores anteriores no servirán con el nuevo modelo y tendrás que reindexar.')}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * Versions a sync merge discarded, and the way back.
+ *
+ * Merging resolves conflicts by comparing wall-clock timestamps, so a machine whose
+ * clock is behind loses every comparison it takes part in. Whatever lost used to be
+ * overwritten with no trace; it is kept now, and this is where it can be put back.
+ *
+ * Defined at module level on purpose: a component declared inside another is a new type
+ * on every render, which remounts it and throws away its state on each keystroke.
+ */
+function SupersededVersions({ reloadKey }: { reloadKey: number }) {
+  const [entries, setEntries] = useState<SupersededEntry[] | null>(null);
+  const [count, setCount] = useState(0);
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+
+  const reload = async () => {
+    const next = await window.nodus.countSupersededVersions();
+    setCount(next);
+    if (next === 0) {
+      setEntries([]);
+      setOpen(false);
+      return;
+    }
+    setEntries(await window.nodus.listSupersededVersions(100, 0));
+  };
+
+  useEffect(() => {
+    void reload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reloadKey]);
+
+  // Nothing was ever discarded: say nothing rather than showing an empty panel.
+  if (count === 0) return null;
+
+  const originLabel = (origin: SupersededEntry['origin']) =>
+    origin === 'local-overwritten'
+      ? t('Tu versión fue reemplazada por la del otro equipo')
+      : origin === 'incoming-lost'
+        ? t('La versión del otro equipo no se aplicó')
+        : origin === 'deleted-remotely'
+          ? t('Se borró en el otro equipo y se eliminó aquí')
+          : t('Sustituida al restaurar otra versión');
+
+  return (
+    <div className="mt-3 rounded-lg border border-neutral-200 p-3 dark:border-neutral-800" data-testid="superseded-versions">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0">
+          <label className="text-sm">{t('Versiones sustituidas')}</label>
+          <p className="mt-0.5 text-xs text-neutral-500">
+            {t('Al fusionar gana la versión más reciente y los borrados del otro equipo se aplican aquí. Se guarda lo que no se aplicó y lo que se eliminó, por si la resolución no fue la correcta (por ejemplo, si un equipo tiene la hora mal).')}
+          </p>
+        </div>
+        <button className="btn btn-ghost shrink-0 border border-neutral-300 text-xs dark:border-neutral-700" onClick={() => setOpen((value) => !value)}>
+          <Icon name={open ? 'chevronDown' : 'chevronRight'} /> {count} {t('guardadas')}
+        </button>
+      </div>
+
+      {note && <p className="mt-2 text-xs text-neutral-500">{note}</p>}
+
+      {open && (
+        <div className="mt-3 space-y-2">
+          {(entries ?? []).map((entry) => (
+            <div key={entry.id} className="rounded-md border border-neutral-200 p-2 text-xs dark:border-neutral-800">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="font-medium">{originLabel(entry.origin)}</span>
+                <span className="text-neutral-500">{new Date(entry.createdAt).toLocaleString()}</span>
+              </div>
+              <p className="mt-1 text-neutral-500">
+                {entry.tableName} · {entry.rowKey.join(' / ')}
+              </p>
+              <ul className="mt-1 space-y-0.5">
+                {entry.fields
+                  .filter((field) => field.name !== 'updated_at' && field.name !== 'created_at')
+                  .slice(0, 6)
+                  .map((field) => (
+                    <li key={field.name} className="truncate text-neutral-500" title={`${field.name}: ${field.value}`}>
+                      <span className="text-neutral-400">{field.name}:</span> {field.value}
+                    </li>
+                  ))}
+              </ul>
+              {entry.hasOmittedBlobs && (
+                <p className="mt-1 text-amber-600 dark:text-amber-400">
+                  {t('Los archivos adjuntos no se guardaron: al restaurar se conservan los actuales.')}
+                </p>
+              )}
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button
+                  className="btn btn-ghost border border-neutral-300 text-xs dark:border-neutral-700"
+                  disabled={busy !== null}
+                  onClick={async () => {
+                    setBusy(entry.id);
+                    try {
+                      const result = await window.nodus.restoreSupersededVersion(entry.id);
+                      setNote(result.message);
+                      await reload();
+                    } finally {
+                      setBusy(null);
+                    }
+                  }}
+                >
+                  <Icon name="undo" /> {busy === entry.id ? t('Restaurando…') : t('Restaurar esta versión')}
+                </button>
+                <button
+                  className="btn btn-ghost border border-neutral-300 text-xs dark:border-neutral-700"
+                  disabled={busy !== null}
+                  onClick={async () => {
+                    const ok = await confirm({
+                      title: t('Descartar versión guardada'),
+                      message: t('Esta copia de la versión que no se aplicó se eliminará y no podrás recuperarla.'),
+                      confirmLabel: t('Descartar'),
+                      danger: true,
+                    });
+                    if (!ok) return;
+                    await window.nodus.clearSupersededVersions([entry.id]);
+                    await reload();
+                  }}
+                >
+                  <Icon name="trash" /> {t('Descartar')}
+                </button>
+              </div>
+            </div>
+          ))}
+          {count > (entries?.length ?? 0) && (
+            <p className="text-xs text-neutral-500">
+              {t('Se muestran las más recientes.')} {count - (entries?.length ?? 0)} {t('más guardadas.')}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+/**
+ * The passphrase that encrypts sync packages.
+ *
+ * Deliberately its own secret rather than the backup master password: restoring with the
+ * recovery key mints a NEW random master password, so two machines would silently end up
+ * with different ones and sync would fail for no visible reason. And deliberately not a
+ * fresh key per export — syncing is recurrent, and a secret you must copy every time is
+ * a secret people stop using.
+ *
+ * Module-level, like the panel below it: a component declared inside another is a new
+ * type on every render and loses its state on each keystroke.
+ */
+function SyncPassphrase({ onChange }: { onChange: (has: boolean) => void }) {
+  const [has, setHas] = useState<boolean | null>(null);
+  const [value, setValue] = useState('');
+  const [reveal, setReveal] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+
+  useEffect(() => {
+    void window.nodus.hasSyncPassphrase().then((next) => {
+      setHas(next);
+      onChange(next);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (has === null) return null;
+
+  return (
+    <div className="mt-2" data-testid="sync-passphrase">
+      {has ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-emerald-600 dark:text-emerald-400">
+            {t('Frase de sincronización configurada. Los paquetes se exportan cifrados.')}
+          </span>
+          <button
+            className="btn btn-ghost border border-neutral-300 text-xs dark:border-neutral-700"
+            onClick={async () => {
+              await window.nodus.clearSyncPassphrase();
+              setHas(false);
+              onChange(false);
+              setNote(t('Los paquetes ya exportados siguen necesitando la frase anterior.'));
+            }}
+          >
+            {t('Cambiar frase')}
+          </button>
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative w-72">
+            <input
+              type={reveal ? 'text' : 'password'}
+              className="input w-full pr-10"
+              placeholder={t('Frase de sincronización (mín. 8 caracteres)')}
+              value={value}
+              onChange={(event) => setValue(event.target.value)}
+            />
+            <button
+              type="button"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-100"
+              onClick={() => setReveal((current) => !current)}
+              aria-label={t(reveal ? 'Ocultar contraseña' : 'Mostrar contraseña')}
+            >
+              <Icon name={reveal ? 'eyeOff' : 'eye'} size={17} />
+            </button>
+          </div>
+          <button
+            className="btn btn-ghost border border-neutral-300 text-xs dark:border-neutral-700"
+            disabled={value.trim().length < 8}
+            onClick={async () => {
+              try {
+                await window.nodus.setSyncPassphrase(value);
+                setValue('');
+                setHas(true);
+                onChange(true);
+                setNote(t('Escribe la misma frase en el otro equipo. Queda incluida en el kit de recuperación.'));
+              } catch (e) {
+                setNote(e instanceof Error ? e.message : String(e));
+              }
+            }}
+          >
+            {t('Guardar frase')}
+          </button>
+        </div>
+      )}
+      <p className="mt-1 text-xs text-neutral-500">
+        {note ?? t('Los paquetes de sincronización van cifrados con esta frase. Tendrás que escribir la misma en el otro equipo.')}
       </p>
     </div>
   );

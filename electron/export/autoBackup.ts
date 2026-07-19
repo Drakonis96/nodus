@@ -3,9 +3,9 @@ import os from 'node:os';
 import path from 'node:path';
 import type { AutoBackupResult } from '@shared/types';
 import { getSettings, updateSettings } from '../db/settingsRepo';
-import { getBackupPassword, getBackupRecoveryKey, setBackupRecoveryKey } from '../secrets/secretStore';
+import { getBackupPassword, getBackupRecoveryKey, lockedApiKeyProviders, setBackupRecoveryKey } from '../secrets/secretStore';
 import { generateBackupPassword } from './backupCrypto';
-import { createBackupArchive } from './exportImport';
+import { createBackupArchive, verifyBackupArchive } from './exportImport';
 import { resolveBackupOutputDir } from '../recovery/recoveryPaths';
 
 /**
@@ -207,8 +207,27 @@ export async function runAutoBackupNow(appVersion: string): Promise<AutoBackupRe
     const tmp = `${target}.tmp`;
     fs.writeFileSync(tmp, archive);
     fs.renameSync(tmp, target);
+
+    // Prove the snapshot is recoverable BEFORE retention deletes older ones. Re-read
+    // from disk rather than trusting the in-memory buffer, so a truncated or corrupted
+    // write is caught here instead of on the day it is needed.
+    const verification = verifyBackupArchive(fs.readFileSync(target), password);
+    if (!verification.ok) {
+      fs.rmSync(target, { force: true });
+      return finish({
+        ok: false,
+        message: `La copia se escribió pero no se pudo verificar, así que se descartó y no se ha podado ninguna anterior: ${verification.message}`,
+      });
+    }
+
     const prunedCount = pruneBackups(folder, hostname);
-    return finish({ ok: true, message: `Copia guardada en ${target}`, path: target, prunedCount });
+    // A key the keychain can no longer read is reported, not fatal: the library was
+    // still backed up, and restoreApiKeys never erases a local key it did not receive.
+    const locked = lockedApiKeyProviders();
+    const warning = locked.length > 0
+      ? ` Aviso: las claves de ${locked.join(', ')} no se pudieron leer del almacén seguro y no viajan en esta copia.`
+      : '';
+    return finish({ ok: true, message: `Copia verificada y guardada en ${target}.${warning}`, path: target, prunedCount });
   } catch (e) {
     return finish({ ok: false, message: e instanceof Error ? e.message : String(e) });
   }
@@ -223,7 +242,19 @@ export async function runAutoBackupNow(appVersion: string): Promise<AutoBackupRe
 export async function maybeRunAutoBackup(appVersion: string): Promise<AutoBackupResult | null> {
   const settings = getSettings();
   if (!settings.autoBackupEnabled) return null;
-  if (!settings.autoBackupFolder || !getBackupPassword()) return null;
+  // A configured-but-broken setup must never fail silently. Returning early without
+  // recording anything leaves `lastAutoBackupStatus` frozen on the last success, so the
+  // UI keeps showing "ok" for months while nothing is being backed up — the one failure
+  // mode a backup system cannot afford. `getBackupPassword()` also returns null when the
+  // blob exists but the OS keychain can no longer decrypt it (new login password,
+  // machine migration), which is precisely when the user must be told.
+  if (!settings.autoBackupFolder || !getBackupPassword()) {
+    const reason = !settings.autoBackupFolder
+      ? 'No hay carpeta de destino configurada.'
+      : 'No se pudo leer la contraseña maestra del almacén seguro del sistema. Vuelve a introducirla en Ajustes para reanudar las copias.';
+    updateSettings({ lastAutoBackupStatus: `error: ${reason}` });
+    return { ok: false, message: reason };
+  }
   const days = Array.isArray(settings.autoBackupDays) ? settings.autoBackupDays : [];
   const hour = Number.isFinite(settings.autoBackupHour) ? settings.autoBackupHour : 3;
   const minute = Number.isFinite(settings.autoBackupMinute) ? settings.autoBackupMinute : 0;

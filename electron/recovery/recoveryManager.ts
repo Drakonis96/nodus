@@ -4,6 +4,7 @@ import path from 'node:path';
 import type {
   AppLanguage,
   RecoveryFolderInspection,
+  RecoveryHealth,
   RecoverySetupResult,
   RecoverySnapshotSummary,
   RecoveryStatus,
@@ -132,11 +133,51 @@ export function inspectRecoveryFolder(folder: string, language: AppLanguage = 'e
   };
 }
 
+/** How many days a snapshot may age before protection counts as lapsed. The scheduler
+ *  aims for a slot per chosen weekday, so a week without one is already anomalous. */
+const STALE_AFTER_DAYS = 8;
+
+/**
+ * Decide whether the user is actually protected right now. Deliberately pessimistic:
+ * anything that would stop the next snapshot from being written — or that already did —
+ * outranks the reassuring "last run was ok" string.
+ */
+function assessRecoveryHealth(
+  settings: ReturnType<typeof getSettings>,
+  folder: RecoveryFolderInspection | null
+): RecoveryHealth {
+  const detail = settings.lastAutoBackupStatus ?? '';
+  const lastAt = settings.lastAutoBackupAt ? Date.parse(settings.lastAutoBackupAt) : NaN;
+  const daysSinceLastBackup = Number.isNaN(lastAt)
+    ? null
+    : Math.max(0, Math.floor((Date.now() - lastAt) / 86400000));
+
+  if (!settings.autoBackupEnabled || !settings.autoBackupFolder) {
+    return { level: 'critical', code: 'disabled', daysSinceLastBackup, detail };
+  }
+  // An unreachable destination means the next snapshot cannot be written, whatever the
+  // last recorded status says.
+  if (folder && folder.kind !== 'recovery' && folder.kind !== 'empty') {
+    return { level: 'critical', code: 'folder-unreachable', daysSinceLastBackup, detail };
+  }
+  if (detail.startsWith('error:')) {
+    return { level: 'critical', code: 'last-run-failed', daysSinceLastBackup, detail };
+  }
+  if (daysSinceLastBackup === null) {
+    return { level: 'warning', code: 'never-run', daysSinceLastBackup, detail };
+  }
+  if (daysSinceLastBackup >= STALE_AFTER_DAYS) {
+    return { level: 'warning', code: 'stale', daysSinceLastBackup, detail };
+  }
+  return { level: 'ok', code: 'ok', daysSinceLastBackup, detail };
+}
+
 export function getRecoveryStatus(): RecoveryStatus {
   const settings = getSettings();
   const configuredRoot = settings.autoBackupFolder?.trim() ?? '';
   const folder = configuredRoot ? inspectRecoveryFolder(configuredRoot, settings.uiLanguage) : null;
   return {
+    health: assessRecoveryHealth(settings, folder),
     setupVersion: settings.recoverySetupVersion ?? 0,
     // A previously completed setup is not turned into a blocking full-screen wizard
     // merely because a removable/cloud volume is temporarily offline. Settings and

@@ -168,13 +168,14 @@ try {
   assert.ok(appSettings.lastAutoBackupAt, 'lastAutoBackupAt recorded');
   assert.ok(String(appSettings.lastAutoBackupStatus).startsWith('ok:'), 'status recorded');
 
-  // A blob that exists but cannot be decrypted must never produce a newer
-  // "complete" snapshot with an empty api-keys.json or prune the last good one.
+  // A blob the keychain can no longer decrypt must NOT cost the user their library
+  // snapshot. The backup runs, the library is protected, and the unreadable providers
+  // are named in the status so the omission is visible rather than silent. Restoring is
+  // merge-only, so a key missing from the archive never erases the local one.
   globalThis.__backupTestLocked = ['openai'];
   const lockedRun = await autoBackup.runAutoBackupNow('9.9.9-test');
-  assert.equal(lockedRun.ok, false, 'locked API keys stop the full-state backup');
-  assert.match(lockedRun.message, /proteger tus claves API/);
-  assert.equal((await readdir(backupDir)).filter((f) => f.endsWith('.nodus')).length, 1, 'last good snapshot preserved while secrets are locked');
+  assert.equal(lockedRun.ok, true, 'locked API keys no longer block the library backup');
+  assert.match(lockedRun.message, /Aviso: las claves de openai no se pudieron leer/);
   globalThis.__backupTestLocked = [];
 
   // ── maybeRunAutoBackup gating ───────────────────────────────────────────────
@@ -185,9 +186,13 @@ try {
   const scheduled = await autoBackup.maybeRunAutoBackup('9.9.9-test');
   assert.equal(scheduled?.ok, true, 'overdue → scheduler runs a backup');
 
-  // Missing password pauses cleanly instead of erroring.
+  // An unreadable master password must be REPORTED, not silently skipped: otherwise
+  // lastAutoBackupStatus stays frozen on the last success and the UI keeps claiming the
+  // user is protected while nothing is being written.
   globalThis.__backupTestPassword = null;
-  assert.equal(await autoBackup.maybeRunAutoBackup('9.9.9-test'), null, 'no master password → paused, no error');
+  const unreadable = await autoBackup.maybeRunAutoBackup('9.9.9-test');
+  assert.equal(unreadable?.ok, false, 'unreadable master password reports a failure');
+  assert.match(String(settingsRepo.getSettings().lastAutoBackupStatus), /^error:/, 'the failure reaches the UI status');
   globalThis.__backupTestPassword = 'mi-frase-maestra';
 
   // ── Manual exports also provide a second independent recovery credential ───
@@ -201,6 +206,51 @@ try {
     crypto.decryptBackupPayload(manualZip.getEntry('backup.bin').getData(), manualRecoveryKey, manualManifest.cipher)
   );
   assert.ok(manualPayload.getEntry('api-keys.json'), 'manual export still carries keys');
+
+  // ── verifyBackupArchive: the gate that must hold before retention deletes ──────
+  // Retention only runs when this returns ok, so a false positive here is what would
+  // let Nodus prune the last recoverable snapshot in favour of an unreadable one.
+  assert.equal(
+    exportImport.verifyBackupArchive(manual, manualRecoveryKey).ok,
+    true,
+    'a good archive verifies with the recovery key'
+  );
+  assert.equal(
+    exportImport.verifyBackupArchive(manual, 'clave-manual-larga').ok,
+    true,
+    'a good archive verifies with the master password'
+  );
+  assert.equal(
+    exportImport.verifyBackupArchive(manual, 'una-contraseña-que-no-es').ok,
+    false,
+    'a wrong credential fails verification'
+  );
+  assert.equal(exportImport.verifyBackupArchive(manual, '   ').ok, false, 'a blank credential fails verification');
+
+  // Flipping a single ciphertext byte must be caught: GCM authentication and the
+  // payload hashes are exactly what a silently corrupted cloud write would break.
+  const tamperedZip = new AdmZip(manual);
+  const goodCipher = tamperedZip.getEntry('backup.bin').getData();
+  const corrupted = Buffer.from(goodCipher);
+  corrupted[Math.floor(corrupted.length / 2)] ^= 0xff;
+  tamperedZip.updateFile('backup.bin', corrupted);
+  assert.equal(
+    exportImport.verifyBackupArchive(tamperedZip.toBuffer(), manualRecoveryKey).ok,
+    false,
+    'a single flipped ciphertext byte fails verification'
+  );
+
+  // Truncation (a half-synced cloud file) must not read as a valid backup.
+  assert.equal(
+    exportImport.verifyBackupArchive(manual.subarray(0, Math.floor(manual.length / 2)), manualRecoveryKey).ok,
+    false,
+    'a truncated archive fails verification'
+  );
+
+  // The scheduled path reports verification, so "ok" in the UI means "decryptable".
+  const verifiedRun = await autoBackup.runAutoBackupNow('9.9.9-test');
+  assert.equal(verifiedRun.ok, true, 'scheduled backup succeeds');
+  assert.match(verifiedRun.message, /verificada/, 'success message states the snapshot was verified');
 
   db.close();
   console.log('auto backup (master password + GFS retention) test passed');
@@ -229,6 +279,9 @@ async function bundleModules() {
       'export function clearApiKey() {}',
       'export function providerKeyMap() { return {}; }',
       'export function lockedApiKeyProviders() { return globalThis.__backupTestLocked ?? []; }',
+      "export function getAudioKey(name) { return globalThis.__backupTestAudioKeys?.[name] ?? null; }",
+      'export function setAudioKey(name, value) { (globalThis.__backupTestAudioKeys ??= {})[name] = value; }',
+      'export function clearAudioKey(name) { delete globalThis.__backupTestAudioKeys?.[name]; }',
     ].join('\n')
   );
   const entry = path.join(root, 'entry.ts');

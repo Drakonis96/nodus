@@ -1,31 +1,54 @@
 import AdmZip from 'adm-zip';
-import type { SyncMergeSummary, SyncTableCounts } from '@shared/types';
+import { createHash, randomUUID } from 'node:crypto';
+import type { SyncConflict, SyncGroupKey, SyncMergeSummary, SyncTableCounts } from '@shared/types';
 import { getDb, SCHEMA_VERSION } from '../db/database';
-import {
-  serializeDatabasesForSync,
-  replaceDatabaseFromSync,
-  getDatabaseUpdatedAt,
-  type DbSyncUnit,
-} from '../db/databasesRepo';
+import { decryptWithKey, deriveKeyFromDescriptor, encryptWithKey, newKdfDescriptor, type KdfDescriptor } from './backupCrypto';
+import { identityColumns, identityWhere, quoteIdentifier, tableColumns, type TableColumn } from '../db/rowIdentity';
+import { measureClockSkewAhead, packageIsOlderThanHorizon, type TombstoneRow } from '../db/tombstones';
+import { describeSyncCoverage, groupOfTable, localTableNames, syncedTablesByGroup } from '../db/syncTables';
+
+/** Re-exported so the sync package stays the single entry point for callers. */
+export { describeSyncCoverage };
+import { recordSuperseded } from '../db/syncSupersededRepo';
 
 /**
- * Portable sync package for the USER layer: notes (+ folders), saved writing
- * drafts, saved searches, edge-audit verdicts and structured databases (the
- * Databases vault — whole db_* trees incl. attachment blobs). Unlike the
- * encrypted full backup (which REPLACES the whole database), importing a sync
- * package MERGES: rows are matched by stable id (or pair key for edge
- * feedback), the newer side wins per row, and nothing local is ever deleted.
- * Databases merge as atomic units (newest-wins by db_databases.updated_at):
- * unknown databases are inserted whole, and a newer incoming copy replaces the
- * whole local tree. This is the piece that makes working on two machines
- * survivable — Zotero already syncs the library; this carries the layer Nodus
- * derives nothing from: what the user wrote.
+ * Portable sync package for the USER layer — everything the user authored, as opposed
+ * to what Nodus derives from the Zotero corpus (works, ideas, themes, edges, passages,
+ * embeddings), which is rebuilt locally and deliberately stays out.
+ *
+ * Unlike the encrypted full backup (which REPLACES a database), importing a package
+ * MERGES: rows are matched by primary key, the newer side wins per row, and nothing
+ * local is ever deleted.
+ *
+ * Three properties this format is built around, each learned from a real failure:
+ *
+ *  1. **Nothing is hardcoded.** Tables and their columns are discovered from the live
+ *     schema. The previous version listed columns by hand and had already gone stale
+ *     twice (`db_attachments.thumb`, `note_folders.summary` silently stopped
+ *     travelling), so every future migration was one more silent gap.
+ *  2. **Rows, not trees.** Databases used to merge as whole units: a newer `updated_at`
+ *     on either side deleted the peer's entire database and replaced it. One row added
+ *     here could erase fifty added there. Conflicts are now resolved per row.
+ *  3. **A package can never brick sync.** Colliding natural keys are reconciled by id
+ *     remapping, constraint failures are isolated per row, and dangling foreign keys are
+ *     dropped before COMMIT — so one bad row is reported instead of aborting the whole
+ *     merge forever, in both directions.
  *
  * Core functions are dialog-free so they can run headless (tests, MCP).
  */
 
 export const SYNC_FORMAT = 'nodus.sync-package';
-export const SYNC_FORMAT_VERSION = 1;
+/**
+ * v1: one `user-layer.json` with base64 blobs inline.
+ * v2: one entry per table plus binary blobs as their own zip entries.
+ * v3: the same layout, encrypted — every entry sealed under one derived key, and the
+ *     list of what the entries ARE moved into an encrypted index so the file does not
+ *     announce that it contains, say, a gradebook.
+ *
+ * Only v3 is written. v1 and v2 are still read: users hold packages made by the previous
+ * builds, and refusing them would strand that work on the machine that produced it.
+ */
+export const SYNC_FORMAT_VERSION = 3;
 
 interface SyncManifest {
   format: typeof SYNC_FORMAT;
@@ -33,230 +56,503 @@ interface SyncManifest {
   schemaVersion: number;
   appVersion: string;
   date: string;
+  /** Row count per table, validated on import. v3 keeps this inside the encrypted index
+   *  instead: table names and sizes are themselves information about the user. */
+  counts?: Record<string, number>;
+  /** Which group each table belongs to, so the destination can report by module. */
+  groups?: Partial<Record<SyncGroupKey, string[]>>;
+  /** v3 only: how to derive the key. Left in the clear because it is useless without the
+   *  passphrase, and because rejecting an incompatible package should not require one. */
+  kdf?: KdfDescriptor;
+}
+
+/** v3: the encrypted directory of the package. */
+interface SyncIndex {
   counts: Record<string, number>;
+  groups?: Partial<Record<SyncGroupKey, string[]>>;
+  /** table name → zip entry holding its encrypted rows. */
+  tables: Record<string, string>;
+  /** blob content hash → zip entry holding its encrypted bytes. */
+  blobs: Record<string, string>;
 }
 
-interface SyncPayload {
-  note_folders: FolderRow[];
-  notes: NoteRow[];
-  writing_saved_drafts: DraftRow[];
-  saved_searches: SearchRow[];
-  edge_feedback: FeedbackRow[];
-  databases: DbSyncUnit[];
-  /** Every study_* table is carried independently. Older v1 packages simply
-   * omit these keys, so the extension remains backwards compatible. */
-  [table: `study_${string}`]: PortableRow[];
-}
-
-type PortableScalar = string | number | null | { __nodusBuffer: string };
+type PortableScalar = string | number | null | { __nodusBuffer: string } | { __nodusBlob: string };
 type PortableRow = Record<string, PortableScalar>;
+type TableRows = Map<string, PortableRow[]>;
 
-interface FolderRow {
-  id: string;
-  parent_id: string | null;
-  name: string;
-  order_idx: number;
-  created_at: string;
-  updated_at: string;
-}
-interface NoteRow {
-  id: string;
-  folder_id: string | null;
-  title: string;
-  kind: string;
-  content: string;
-  source_json: string | null;
-  order_idx: number;
-  created_at: string;
-  updated_at: string;
-}
-interface DraftRow {
-  id: string;
-  title: string;
-  brief_json: string;
-  selection_json: string;
-  model_json: string | null;
-  draft_json: string;
-  created_at: string;
-  updated_at: string;
-}
-interface SearchRow {
-  id: string;
-  name: string;
-  query: string;
-  mode: string;
-  kinds_json: string;
-  created_at: string;
-}
-interface FeedbackRow {
-  from_id: string;
-  to_id: string;
-  type: string;
-  verdict: string;
-  note: string;
-  created_at: string;
-}
+interface ForeignKey { table: string; from: string; to: string | null }
 
-/** Snapshot the user layer into a zip buffer with a validating manifest. */
-export function buildSyncPackage(appVersion: string): { buffer: Buffer; counts: Record<string, number> } {
+/**
+ * Rows whose real identity the primary key does not capture, normalised against the
+ * local database before matching.
+ *
+ * An edge verdict is a judgement about an UNORDERED pair of ideas: the same verdict can
+ * legitimately arrive as A→B on one machine and B→A on the other. Matching on the
+ * literal primary key would store both, and the two computers would then disagree about
+ * the verdict permanently, each convinced it held the newer row.
+ */
+const ROW_NORMALIZERS: Record<string, (row: Record<string, unknown>) => void> = {
+  edge_feedback: (row) => {
+    const db = getDb();
+    const exact = db
+      .prepare('SELECT 1 FROM edge_feedback WHERE type = ? AND from_id = ? AND to_id = ?')
+      .get(row.type as string, row.from_id as string, row.to_id as string);
+    if (exact) return;
+    const reversed = db
+      .prepare('SELECT from_id, to_id FROM edge_feedback WHERE type = ? AND from_id = ? AND to_id = ?')
+      .get(row.type as string, row.to_id as string, row.from_id as string) as { from_id: string; to_id: string } | undefined;
+    if (reversed) {
+      row.from_id = reversed.from_id;
+      row.to_id = reversed.to_id;
+    }
+  },
+};
+
+/**
+ * Rows that carry no timestamp of their own, and the ancestor whose `updated_at` speaks
+ * for them. A cell has only (row_id, column_id, value_text) — editing it bumps
+ * `db_rows.updated_at`, not the cell — so without this the generic "keep the local copy
+ * when you cannot tell which is newer" rule would mean an edited cell never travels at
+ * all. Each hop names the foreign key to follow.
+ */
+const INHERITED_TIMESTAMPS: Record<string, { fk: string; table: string; key: string }[]> = {
+  db_cells: [{ fk: 'row_id', table: 'db_rows', key: 'id' }],
+  db_columns: [{ fk: 'database_id', table: 'db_databases', key: 'id' }],
+  db_views: [{ fk: 'database_id', table: 'db_databases', key: 'id' }],
+  db_select_options: [
+    { fk: 'column_id', table: 'db_columns', key: 'id' },
+    { fk: 'database_id', table: 'db_databases', key: 'id' },
+  ],
+};
+
+/** Follow an inheritance chain to the ancestor's `updated_at`, in the incoming package
+ *  (`rows`) or in the live database (`rows` omitted). */
+function inheritedStamp(
+  table: string,
+  row: Record<string, unknown>,
+  incoming: TableRows | null
+): string | null {
+  const chain = INHERITED_TIMESTAMPS[table];
+  if (!chain) return null;
   const db = getDb();
-  const payload = {
-    note_folders: db.prepare('SELECT id, parent_id, name, order_idx, created_at, updated_at FROM note_folders').all() as FolderRow[],
-    notes: db
-      .prepare('SELECT id, folder_id, title, kind, content, source_json, order_idx, created_at, updated_at FROM notes')
-      .all() as NoteRow[],
-    writing_saved_drafts: db
-      .prepare('SELECT id, title, brief_json, selection_json, model_json, draft_json, created_at, updated_at FROM writing_saved_drafts')
-      .all() as DraftRow[],
-    saved_searches: db.prepare('SELECT id, name, query, mode, kinds_json, created_at FROM saved_searches').all() as SearchRow[],
-    edge_feedback: db.prepare('SELECT from_id, to_id, type, verdict, note, created_at FROM edge_feedback').all() as FeedbackRow[],
-    databases: serializeDatabasesForSync(),
-  } as SyncPayload;
-  for (const table of listStudyTables()) {
-    payload[table as `study_${string}`] = (db.prepare(`SELECT * FROM ${quoteIdentifier(table)}`).all() as Record<string, unknown>[])
-      .map(encodePortableRow);
+  let current: Record<string, unknown> | undefined = row;
+  for (const hop of chain) {
+    const value = current?.[hop.fk];
+    if (value === null || value === undefined) return null;
+    if (incoming) {
+      const candidates = incoming.get(hop.table) ?? [];
+      current = candidates.find((candidate) => String(candidate[hop.key]) === String(value)) as Record<string, unknown> | undefined;
+      // A parent absent from the package is not an error: fall back to the live row, so
+      // a partial package still resolves against what this machine already holds.
+      if (!current) {
+        current = db
+          .prepare(`SELECT * FROM ${quoteIdentifier(hop.table)} WHERE ${quoteIdentifier(hop.key)} = ?`)
+          .get(value as string) as Record<string, unknown> | undefined;
+      }
+    } else {
+      current = db
+        .prepare(`SELECT * FROM ${quoteIdentifier(hop.table)} WHERE ${quoteIdentifier(hop.key)} = ?`)
+        .get(value as string) as Record<string, unknown> | undefined;
+    }
+    if (!current) return null;
   }
-  const counts = Object.fromEntries(Object.entries(payload).map(([table, rows]) => [table, rows.length]));
+  const stamp = current?.updated_at;
+  return typeof stamp === 'string' ? stamp : null;
+}
+
+// ── Build ────────────────────────────────────────────────────────────────────
+
+function sha256(data: Buffer): string {
+  return createHash('sha256').update(data).digest('hex');
+}
+
+/**
+ * Snapshot the user layer into an encrypted zip.
+ *
+ * Blobs are their own entries rather than base64 inside one JSON string — that is what
+ * used to exceed V8's maximum string length and make large vaults impossible to sync —
+ * and each entry is sealed separately, so encryption does not reintroduce a moment where
+ * the whole package exists as a single buffer.
+ *
+ * The table names live in the encrypted index, not in the zip directory: a file sitting
+ * in a shared folder should not announce that it contains a gradebook.
+ */
+export function buildSyncPackage(appVersion: string, passphrase: string): { buffer: Buffer; counts: Record<string, number> } {
+  if (!passphrase?.trim()) {
+    throw new Error('Configura una frase de sincronización en Ajustes antes de exportar: los paquetes van cifrados.');
+  }
+  const db = getDb();
+  const zip = new AdmZip();
+  const kdf = newKdfDescriptor();
+  const key = deriveKeyFromDescriptor(passphrase, kdf);
+  const counts: Record<string, number> = {};
+  const groups: Partial<Record<SyncGroupKey, string[]>> = {};
+  const tableEntries: Record<string, string> = {};
+  const blobEntries: Record<string, string> = {};
+
+  const opaqueName = () => `e/${randomUUID().replace(/-/g, '')}`;
+  const seal = (name: string, plaintext: Buffer) => zip.addFile(name, encryptWithKey(plaintext, key));
+
+  const encodeValue = (value: unknown, column: string): PortableScalar => {
+    if (Buffer.isBuffer(value)) {
+      const hash = sha256(value);
+      if (!blobEntries[hash]) {
+        const name = opaqueName();
+        seal(name, value);
+        blobEntries[hash] = name;
+      }
+      return { __nodusBlob: hash };
+    }
+    if (value === null || value === undefined) return null;
+    if (typeof value === 'string' || typeof value === 'number') return value;
+    if (typeof value === 'bigint') return Number(value);
+    throw new Error(`El campo ${column} contiene un valor no portable.`);
+  };
+
+  for (const group of syncedTablesByGroup()) {
+    if (group.tables.length === 0) continue;
+    groups[group.key] = group.tables;
+    for (const table of group.tables) {
+      const rows = (db.prepare(`SELECT * FROM ${quoteIdentifier(table)}`).all() as Record<string, unknown>[]).map((row) =>
+        Object.fromEntries(Object.entries(row).map(([key_, value]) => [key_, encodeValue(value, key_)]))
+      );
+      counts[table] = rows.length;
+      const name = opaqueName();
+      seal(name, Buffer.from(JSON.stringify(rows)));
+      tableEntries[table] = name;
+    }
+  }
+
+  const index: SyncIndex = { counts, groups, tables: tableEntries, blobs: blobEntries };
+  seal('index.bin', Buffer.from(JSON.stringify(index)));
+
   const manifest: SyncManifest = {
     format: SYNC_FORMAT,
     formatVersion: SYNC_FORMAT_VERSION,
     schemaVersion: SCHEMA_VERSION,
     appVersion,
+    // Kept in the clear so an incompatible package can be refused, and its age reported,
+    // without asking for a passphrase first.
     date: new Date().toISOString(),
-    counts,
+    kdf,
   };
-  const zip = new AdmZip();
   zip.addFile('manifest.json', Buffer.from(JSON.stringify(manifest, null, 2)));
-  zip.addFile('user-layer.json', Buffer.from(JSON.stringify(payload, null, 2)));
   return { buffer: zip.toBuffer(), counts };
 }
 
-/**
- * Merge a sync package into the live database. Additive and newest-wins:
- * unknown rows are inserted, rows present on both sides take whichever
- * `updated_at` (or `created_at`) is newer, and local rows absent from the
- * package are always left alone.
- */
-export function mergeSyncPackage(buffer: Buffer): SyncMergeSummary {
-  let zip: AdmZip;
-  try {
-    zip = new AdmZip(buffer);
-  } catch {
-    throw new Error('Archivo de sincronización ilegible.');
-  }
-  const manifestEntry = zip.getEntry('manifest.json');
-  const payloadEntry = zip.getEntry('user-layer.json');
-  if (!manifestEntry || !payloadEntry) throw new Error('Paquete inválido: faltan manifest o datos.');
+// ── Read ─────────────────────────────────────────────────────────────────────
 
-  const manifest = JSON.parse(zip.readAsText(manifestEntry)) as SyncManifest;
-  if (manifest.format !== SYNC_FORMAT || manifest.formatVersion !== SYNC_FORMAT_VERSION) {
-    throw new Error('Formato de paquete de sincronización no soportado.');
-  }
+/** Reads one attachment out of the package. v2 stores it under its hash in the clear;
+ *  v3 stores it under an opaque name, sealed. */
+type BlobResolver = (hash: string) => Buffer;
 
-  const payload = JSON.parse(zip.readAsText(payloadEntry)) as SyncPayload;
-  for (const [table, expected] of Object.entries(manifest.counts)) {
-    const rows = (payload as unknown as Record<string, unknown[]>)[table];
-    if (!Array.isArray(rows) || rows.length !== expected) {
-      throw new Error(`Paquete inválido: el recuento de ${table} no coincide con su manifiesto.`);
-    }
-  }
-
-  const db = getDb();
-  const summary: SyncMergeSummary = {
-    noteFolders: zeroCounts(),
-    notes: zeroCounts(),
-    writingDrafts: zeroCounts(),
-    savedSearches: zeroCounts(),
-    edgeFeedback: zeroCounts(),
-    databases: zeroCounts(),
-    study: zeroCounts(),
-  };
-
-  const tx = db.transaction(() => {
-    mergeFolders(payload.note_folders ?? [], summary.noteFolders);
-    mergeNotes(payload.notes ?? [], summary.notes);
-    mergeDrafts(payload.writing_saved_drafts ?? [], summary.writingDrafts);
-    mergeSearches(payload.saved_searches ?? [], summary.savedSearches);
-    mergeFeedback(payload.edge_feedback ?? [], summary.edgeFeedback);
-    mergeDatabases(payload.databases ?? [], summary.databases);
-    mergeStudyTables(payload, summary.study);
-  });
-  tx();
-  return summary;
-}
-
-function quoteIdentifier(value: string): string {
-  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(value)) throw new Error('Identificador de tabla no válido.');
-  return `"${value}"`;
-}
-
-function listStudyTables(): string[] {
-  return (getDb().prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'study\\_%' ESCAPE '\\' ORDER BY name").all() as { name: string }[])
-    .map((row) => row.name)
-    .filter((name) => /^study_[A-Za-z0-9_]+$/.test(name));
-}
-
-function encodePortableRow(row: Record<string, unknown>): PortableRow {
-  return Object.fromEntries(Object.entries(row).map(([key, value]) => {
-    if (Buffer.isBuffer(value)) return [key, { __nodusBuffer: value.toString('base64') }];
-    if (value === null || typeof value === 'string' || typeof value === 'number') return [key, value];
-    throw new Error(`El campo ${key} contiene un valor no portable.`);
-  })) as PortableRow;
-}
-
-function decodePortableValue(value: PortableScalar): string | number | Buffer | null {
+function decodeValue(value: PortableScalar, resolveBlob: BlobResolver): string | number | Buffer | null {
   if (value && typeof value === 'object') {
-    if (typeof value.__nodusBuffer !== 'string') throw new Error('Valor binario no válido en el paquete de sincronización.');
-    return Buffer.from(value.__nodusBuffer, 'base64');
+    if ('__nodusBuffer' in value) {
+      if (typeof value.__nodusBuffer !== 'string') throw new Error('Valor binario no válido en el paquete de sincronización.');
+      return Buffer.from(value.__nodusBuffer, 'base64');
+    }
+    if (typeof value.__nodusBlob !== 'string') throw new Error('Valor binario no válido en el paquete de sincronización.');
+    return resolveBlob(value.__nodusBlob);
   }
   return value;
 }
 
-interface TableColumn { name: string; pk: number }
+/** v1 packages kept everything in one JSON object, with databases as nested trees.
+ *  Flattened here so a single merge engine serves both formats. */
+function readLegacyPayload(zip: AdmZip): TableRows {
+  const entry = zip.getEntry('user-layer.json');
+  if (!entry) throw new Error('Paquete inválido: faltan los datos.');
+  const payload = JSON.parse(zip.readAsText(entry)) as Record<string, unknown>;
+  const tables: TableRows = new Map();
+  for (const [key, rows] of Object.entries(payload)) {
+    if (key === 'databases' || !Array.isArray(rows)) continue;
+    tables.set(key, rows as PortableRow[]);
+  }
+  const units = Array.isArray(payload.databases) ? (payload.databases as Record<string, PortableRow[] | PortableRow>[]) : [];
+  const push = (table: string, rows: PortableRow[]) => tables.set(table, [...(tables.get(table) ?? []), ...rows]);
+  for (const unit of units) {
+    push('db_databases', [unit.database as PortableRow]);
+    push('db_columns', (unit.columns ?? []) as PortableRow[]);
+    push('db_select_options', (unit.options ?? []) as PortableRow[]);
+    push('db_rows', (unit.rows ?? []) as PortableRow[]);
+    push('db_cells', (unit.cells ?? []) as PortableRow[]);
+    push('db_relations', (unit.relations ?? []) as PortableRow[]);
+    push('db_views', (unit.views ?? []) as PortableRow[]);
+    // v1 stored attachment bytes as `blob_b64`; the column is `blob`.
+    push(
+      'db_attachments',
+      ((unit.attachments ?? []) as PortableRow[]).map(({ blob_b64: b64, ...rest }) => ({
+        ...rest,
+        blob: typeof b64 === 'string' ? { __nodusBuffer: b64 } : null,
+      }))
+    );
+  }
+  return tables;
+}
+
+interface OpenedPackage {
+  tables: TableRows;
+  counts: Record<string, number>;
+  resolveBlob: BlobResolver;
+}
 
 /**
- * Merge every study row as an atomic record. Primary keys identify conflicts;
- * updated_at (or created_at) decides which side wins. The complete row is
- * written in one statement, including binary material/audio/embedding fields.
- * Foreign keys are deferred until the transaction ends so an arbitrary table
- * name order cannot split a course/document/material tree mid-import.
+ * Read a package of any format version into the one shape the merge engine consumes.
+ *
+ * v3 is encrypted: the key is derived once and every entry is unsealed on demand, so a
+ * package full of recordings never becomes one enormous buffer. v1 and v2 are read as
+ * they always were — users still hold those files and stranding them would be the same
+ * kind of data loss this whole effort is about.
  */
-function mergeStudyTables(payload: SyncPayload, counts: SyncTableCounts): void {
+function openPackage(zip: AdmZip, manifest: SyncManifest, passphrase: string | undefined): OpenedPackage {
+  if (manifest.formatVersion < 3) {
+    const tables = manifest.formatVersion === 1 ? readLegacyPayload(zip) : new Map<string, PortableRow[]>();
+    if (manifest.formatVersion === 2) {
+      for (const table of Object.keys(manifest.counts ?? {})) {
+        const entry = zip.getEntry(`tables/${table}.json`);
+        if (!entry) throw new Error(`Paquete inválido: falta la tabla ${table}.`);
+        tables.set(table, JSON.parse(entry.getData().toString('utf8')) as PortableRow[]);
+      }
+    }
+    return {
+      tables,
+      counts: manifest.counts ?? {},
+      resolveBlob: (hash) => {
+        const entry = zip.getEntry(`blobs/${hash}`);
+        if (!entry) throw new Error('Paquete incompleto: falta un adjunto referenciado.');
+        return entry.getData();
+      },
+    };
+  }
+
+  if (!manifest.kdf) throw new Error('Paquete inválido: falta la descripción del cifrado.');
+  if (!passphrase?.trim()) {
+    throw new Error('Este paquete está cifrado. Introduce la frase de sincronización del equipo que lo generó.');
+  }
+  const indexEntry = zip.getEntry('index.bin');
+  if (!indexEntry) throw new Error('Paquete inválido: falta el índice cifrado.');
+
+  const key = deriveKeyFromDescriptor(passphrase, manifest.kdf);
+  let index: SyncIndex;
+  try {
+    index = JSON.parse(decryptWithKey(indexEntry.getData(), key).toString('utf8')) as SyncIndex;
+  } catch {
+    // The index is authenticated, so a failure here is a wrong passphrase or a damaged
+    // file — and there is no way to tell which, by design.
+    throw new Error('No se pudo descifrar el paquete. Revisa la frase de sincronización.');
+  }
+
+  const unseal = (entryName: string, what: string): Buffer => {
+    const entry = zip.getEntry(entryName);
+    if (!entry) throw new Error(`Paquete incompleto: falta ${what}.`);
+    return decryptWithKey(entry.getData(), key);
+  };
+
+  const tables: TableRows = new Map();
+  for (const [table, entryName] of Object.entries(index.tables ?? {})) {
+    tables.set(table, JSON.parse(unseal(entryName, `la tabla ${table}`).toString('utf8')) as PortableRow[]);
+  }
+  return {
+    tables,
+    counts: index.counts ?? {},
+    // Unsealed only when a row actually references it, so unused attachments cost nothing.
+    resolveBlob: (hash) => {
+      const entryName = index.blobs?.[hash];
+      if (!entryName) throw new Error('Paquete incompleto: falta un adjunto referenciado.');
+      return unseal(entryName, 'un adjunto');
+    },
+  };
+}
+
+// ── Merge ────────────────────────────────────────────────────────────────────
+
+/**
+ * Natural-key collisions across machines are the same real-world thing created twice,
+ * not a conflict: both computers independently made academic year "2024/2025" with
+ * different ids, and a UNIQUE index made the insert fail. That aborted the entire
+ * transaction — every table, in both directions, permanently.
+ *
+ * Rather than skipping the row (which would leave its children pointing at an id that
+ * never arrives, so COMMIT fails on the foreign keys instead), the incoming id is
+ * rewritten to the local one everywhere it is referenced. The two records become one.
+ */
+function buildIdRemap(tables: TableRows, present: Set<string>): Map<string, Map<string, string>> {
   const db = getDb();
-  const localTables = new Set(listStudyTables());
-  const incomingTables = Object.keys(payload).filter((name) => /^study_[A-Za-z0-9_]+$/.test(name)).sort();
-  if (incomingTables.length === 0) return;
-  db.pragma('defer_foreign_keys = ON');
-  for (const table of incomingTables) {
-    const rows = payload[table as `study_${string}`];
-    if (!Array.isArray(rows)) continue;
-    if (!localTables.has(table)) {
-      counts.skipped += rows.length;
-      continue;
-    }
+  const remap = new Map<string, Map<string, string>>();
+  for (const [table, rows] of tables) {
+    if (!present.has(table) || rows.length === 0) continue;
     const columns = db.pragma(`table_info(${quoteIdentifier(table)})`) as TableColumn[];
-    const allowed = new Set(columns.map((column) => column.name));
-    const primaryKeys = columns.filter((column) => column.pk > 0).sort((a, b) => a.pk - b.pk).map((column) => column.name);
-    if (primaryKeys.length === 0) {
-      counts.skipped += rows.length;
+    const pk = columns.filter((c) => c.pk > 0).sort((a, b) => a.pk - b.pk).map((c) => c.name);
+    if (pk.length !== 1) continue; // composite keys have no single id to rewrite
+
+    const indexes = db.pragma(`index_list(${quoteIdentifier(table)})`) as { name: string; unique: number; origin: string }[];
+    const uniqueKeys = indexes
+      .filter((index) => index.unique === 1 && index.origin !== 'pk')
+      .map((index) => (db.pragma(`index_info(${JSON.stringify(index.name)})`) as { name: string | null }[])
+        .map((info) => info.name)
+        .filter((name): name is string => typeof name === 'string'));
+    if (uniqueKeys.length === 0) continue;
+
+    const table_ = new Map<string, string>();
+    for (const row of rows) {
+      const incomingId = row[pk[0]];
+      if (typeof incomingId !== 'string' && typeof incomingId !== 'number') continue;
+      for (const key of uniqueKeys) {
+        if (key.some((column) => row[column] === undefined || row[column] === null)) continue;
+        const where = key.map((column) => `${quoteIdentifier(column)} = ?`).join(' AND ');
+        const local = db
+          .prepare(`SELECT ${quoteIdentifier(pk[0])} AS id FROM ${quoteIdentifier(table)} WHERE ${where}`)
+          .get(...key.map((column) => row[column] as string | number)) as { id: string | number } | undefined;
+        if (local && String(local.id) !== String(incomingId)) {
+          table_.set(String(incomingId), String(local.id));
+          break;
+        }
+      }
+    }
+    if (table_.size > 0) remap.set(table, table_);
+  }
+  return remap;
+}
+
+/** Apply the id remap to primary keys and to every column that is a declared foreign
+ *  key into a remapped table. Only real FK columns are rewritten — never free text. */
+function applyRemap(tables: TableRows, present: Set<string>, remap: Map<string, Map<string, string>>): void {
+  if (remap.size === 0) return;
+  const db = getDb();
+  for (const [table, rows] of tables) {
+    if (!present.has(table)) continue;
+    const columns = db.pragma(`table_info(${quoteIdentifier(table)})`) as TableColumn[];
+    const pk = columns.filter((c) => c.pk > 0).sort((a, b) => a.pk - b.pk).map((c) => c.name);
+    const ownRemap = remap.get(table);
+    const foreignKeys = (db.pragma(`foreign_key_list(${quoteIdentifier(table)})`) as ForeignKey[])
+      .filter((fk) => remap.has(fk.table));
+    if (!ownRemap && foreignKeys.length === 0) continue;
+    for (const row of rows) {
+      if (ownRemap && pk.length === 1) {
+        const mapped = ownRemap.get(String(row[pk[0]]));
+        if (mapped !== undefined) row[pk[0]] = mapped;
+      }
+      for (const fk of foreignKeys) {
+        const value = row[fk.from];
+        if (value === null || value === undefined) continue;
+        const mapped = remap.get(fk.table)?.get(String(value));
+        if (mapped !== undefined) row[fk.from] = mapped;
+      }
+    }
+  }
+}
+
+/**
+ * Do these two versions of a row actually hold different content? Only real differences
+ * are worth keeping: two rows whose timestamps moved but whose fields are identical are
+ * not a conflict, and storing them would bury the genuine ones in noise.
+ */
+function rowsDiffer(incoming: Record<string, unknown>, local: Record<string, unknown>): boolean {
+  for (const [name, value] of Object.entries(incoming)) {
+    if (name === 'updated_at' || name === 'created_at') continue;
+    const other = local[name];
+    if (Buffer.isBuffer(value) || Buffer.isBuffer(other)) {
+      if (!Buffer.isBuffer(value) || !Buffer.isBuffer(other) || !value.equals(other)) return true;
       continue;
     }
-    for (const portable of rows) {
-      const row = Object.fromEntries(Object.entries(portable).filter(([key]) => allowed.has(key)).map(([key, value]) => [key, decodePortableValue(value)]));
-      if (primaryKeys.some((key) => row[key] === undefined)) throw new Error(`Paquete inválido: falta la clave primaria de ${table}.`);
-      const where = primaryKeys.map((key) => `${quoteIdentifier(key)} = ?`).join(' AND ');
-      const keyValues = primaryKeys.map((key) => row[key]);
-      const local = db.prepare(`SELECT * FROM ${quoteIdentifier(table)} WHERE ${where}`).get(...keyValues) as Record<string, unknown> | undefined;
+    // NULL and "column absent" are the same absence for this purpose.
+    if ((value ?? null) !== (other ?? null)) return true;
+  }
+  return false;
+}
+
+/** Merge one table's rows: insert unknown primary keys, take the newer side otherwise.
+ *  A row that violates a constraint is recorded and skipped — never fatal. */
+function mergeTable(
+  table: string,
+  rows: PortableRow[],
+  resolveBlob: BlobResolver,
+  counts: SyncTableCounts,
+  conflicts: SyncConflict[],
+  insertedRowIds: Map<string, Set<number>>,
+  incomingTables: TableRows,
+  packageDate: string | null,
+  supersededKept: { count: number },
+  localTombstones: Map<string, string>
+): void {
+  const db = getDb();
+  if (rows.length === 0) return;
+  const columns = db.pragma(`table_info(${quoteIdentifier(table)})`) as TableColumn[];
+  const allowed = new Set(columns.map((column) => column.name));
+  const primaryKeys = identityColumns(table, columns);
+  if (primaryKeys.length === 0) {
+    counts.skipped += rows.length;
+    conflicts.push({ table, reason: 'no-primary-key', rows: rows.length, detail: '' });
+    return;
+  }
+  const where = identityWhere(columns, primaryKeys);
+  const selectLocal = db.prepare(`SELECT * FROM ${quoteIdentifier(table)} WHERE ${where}`);
+
+  for (const portable of rows) {
+    try {
+      const row = Object.fromEntries(
+        Object.entries(portable)
+          .filter(([key]) => allowed.has(key))
+          .map(([key, value]) => [key, decodeValue(value, resolveBlob)])
+      );
+      if (primaryKeys.some((key) => row[key] === undefined)) {
+        counts.skipped += 1;
+        conflicts.push({ table, reason: 'missing-primary-key', rows: 1, detail: '' });
+        continue;
+      }
+      ROW_NORMALIZERS[table]?.(row);
+      const keyValues = primaryKeys.map((key) => row[key] as string | number);
+      const local = selectLocal.get(...keyValues) as Record<string, unknown> | undefined;
       const names = Object.keys(row);
       if (!local) {
-        const placeholders = names.map(() => '?').join(', ');
-        db.prepare(`INSERT INTO ${quoteIdentifier(table)} (${names.map(quoteIdentifier).join(', ')}) VALUES (${placeholders})`).run(...names.map((name) => row[name]));
+        // The row is unknown here because it was DELETED here. Re-inserting it is the
+        // resurrection that made deletion impossible across two machines: the package
+        // was simply built before the other computer heard about the deletion.
+        const tombstone = localTombstones.get(tombstoneKey(table, JSON.stringify(keyValues)));
+        if (tombstone) {
+          const stamp = row.updated_at !== undefined ? 'updated_at' : row.created_at !== undefined ? 'created_at' : null;
+          const rowStamp = stamp ? String(row[stamp] ?? '') : '';
+          // Unless the other machine edited it AFTER the deletion, which makes the edit
+          // the later fact and the row genuinely worth bringing back.
+          if (!rowStamp || rowStamp <= tombstone) {
+            counts.skipped += 1;
+            continue;
+          }
+        }
+        const result = db.prepare(
+          `INSERT INTO ${quoteIdentifier(table)} (${names.map(quoteIdentifier).join(', ')}) VALUES (${names.map(() => '?').join(', ')})`
+        ).run(...names.map((name) => row[name]));
+        // Remembered so the foreign-key sweep can only ever remove rows THIS merge
+        // created. A database that already contained a dangling reference must not lose
+        // that row because an unrelated import happened to run.
+        if (!insertedRowIds.has(table)) insertedRowIds.set(table, new Set());
+        insertedRowIds.get(table)!.add(Number(result.lastInsertRowid));
         counts.inserted += 1;
         continue;
       }
-      const timestampKey = row.updated_at !== undefined ? 'updated_at' : row.created_at !== undefined ? 'created_at' : null;
-      if (!timestampKey || String(row[timestampKey] ?? '') <= String(local[timestampKey] ?? '')) {
+      // Newest-wins. A row with no timestamp of its own defers to the ancestor that
+      // carries one (a cell's row); failing that it is immutable content (link tables,
+      // message bodies) and the local copy stands.
+      const stamp = row.updated_at !== undefined ? 'updated_at' : row.created_at !== undefined ? 'created_at' : null;
+      const incomingStamp = stamp ? String(row[stamp] ?? '') : inheritedStamp(table, row, incomingTables);
+      const localStamp = stamp ? String(local[stamp] ?? '') : inheritedStamp(table, local, null);
+      if (!incomingStamp || !localStamp || incomingStamp <= localStamp) {
         counts.skipped += 1;
+        // The arriving version lost. If it differs from what is here, it is real work
+        // from the other machine that this merge is choosing not to apply — keep it, so
+        // a wrong clock costs a review rather than the edit itself.
+        if (rowsDiffer(row, local)) {
+          if (recordSuperseded({
+            tableName: table,
+            rowKey: keyValues,
+            origin: 'incoming-lost',
+            row,
+            rowStamp: incomingStamp,
+            winnerStamp: localStamp,
+            packageDate,
+          })) supersededKept.count += 1;
+        }
         continue;
       }
       const mutable = names.filter((name) => !primaryKeys.includes(name));
@@ -264,10 +560,85 @@ function mergeStudyTables(payload: SyncPayload, counts: SyncTableCounts): void {
         counts.skipped += 1;
         continue;
       }
-      db.prepare(`UPDATE ${quoteIdentifier(table)} SET ${mutable.map((name) => `${quoteIdentifier(name)} = ?`).join(', ')} WHERE ${where}`)
-        .run(...mutable.map((name) => row[name]), ...keyValues);
+      // The arriving version won and is about to replace what is on this machine. This
+      // is the direction that used to destroy the user's own work with no trace of it.
+      if (rowsDiffer(row, local)) {
+        if (recordSuperseded({
+          tableName: table,
+          rowKey: keyValues,
+          origin: 'local-overwritten',
+          row: local,
+          rowStamp: localStamp,
+          winnerStamp: incomingStamp,
+          packageDate,
+        })) supersededKept.count += 1;
+      }
+      db.prepare(
+        `UPDATE ${quoteIdentifier(table)} SET ${mutable.map((name) => `${quoteIdentifier(name)} = ?`).join(', ')} WHERE ${where}`
+      ).run(...mutable.map((name) => row[name]), ...keyValues);
       counts.updated += 1;
+    } catch (error) {
+      // SQLite rolls back the failed STATEMENT, not the transaction, so the merge
+      // carries on and the user gets a report instead of a dead sync.
+      counts.skipped += 1;
+      conflicts.push({
+        table,
+        reason: 'constraint',
+        rows: 1,
+        detail: error instanceof Error ? error.message : String(error),
+      });
     }
+  }
+}
+
+/**
+ * Drop rows whose foreign keys point nowhere. Deferred FK violations surface at COMMIT
+ * and take the whole transaction with them, so they are resolved before that: the
+ * offending rows are removed and reported. Repeated because deleting a parent can
+ * orphan a child that was itself just inserted.
+ */
+function dropDanglingRows(insertedRowIds: Map<string, Set<number>>, conflicts: SyncConflict[]): void {
+  const db = getDb();
+  if (insertedRowIds.size === 0) return;
+  for (let pass = 0; pass < 5; pass++) {
+    let removed = 0;
+    // Scoped to the tables this merge inserted into: checking the whole database would
+    // be slow on a real corpus and would surface pre-existing problems this import did
+    // not cause and must not "fix" by deleting the user's rows.
+    for (const [table, rowIds] of insertedRowIds) {
+      const violations = db.pragma(`foreign_key_check(${quoteIdentifier(table)})`) as {
+        table: string;
+        rowid: number | null;
+        parent: string;
+      }[];
+      for (const violation of violations) {
+        if (violation.rowid === null || !rowIds.has(Number(violation.rowid))) continue;
+        try {
+          // Undoing an insert this merge just made is housekeeping, not a user deleting
+          // something. The DELETE trigger cannot tell the difference, so the tombstone it
+          // writes is removed — otherwise the next sync would carry a deletion nobody
+          // asked for back to the machine the row came from.
+          const identity = identityColumns(table);
+          const key = identity.length
+            ? JSON.stringify(
+              identity.map(
+                (column) =>
+                  (db.prepare(`SELECT ${quoteIdentifier(column)} AS v FROM ${quoteIdentifier(table)} WHERE rowid = ?`)
+                    .get(violation.rowid) as { v: unknown } | undefined)?.v ?? null
+              )
+            )
+            : null;
+          db.prepare(`DELETE FROM ${quoteIdentifier(table)} WHERE rowid = ?`).run(violation.rowid);
+          if (key !== null) db.prepare('DELETE FROM sync_tombstones WHERE table_name = ? AND row_key = ?').run(table, key);
+          rowIds.delete(Number(violation.rowid));
+          removed += 1;
+          conflicts.push({ table, reason: 'missing-parent', rows: 1, detail: violation.parent });
+        } catch {
+          /* a WITHOUT ROWID table cannot be addressed this way; it is reported below */
+        }
+      }
+    }
+    if (removed === 0) return;
   }
 }
 
@@ -275,170 +646,214 @@ function zeroCounts(): SyncTableCounts {
   return { inserted: 0, updated: 0, skipped: 0 };
 }
 
-/** Parents before children so foreign keys resolve on insert. */
-function sortFoldersTopologically(folders: FolderRow[]): FolderRow[] {
-  const byId = new Map(folders.map((f) => [f.id, f]));
-  const depth = (f: FolderRow, seen = new Set<string>()): number => {
-    if (!f.parent_id || seen.has(f.id)) return 0;
-    const parent = byId.get(f.parent_id);
-    if (!parent) return 0;
-    seen.add(f.id);
-    return 1 + depth(parent, seen);
-  };
-  return [...folders].sort((a, b) => depth(a) - depth(b));
-}
-
-function mergeFolders(incoming: FolderRow[], counts: SyncTableCounts): void {
-  const db = getDb();
-  const localIds = new Set((db.prepare('SELECT id FROM note_folders').all() as { id: string }[]).map((r) => r.id));
-  for (const folder of sortFoldersTopologically(incoming)) {
-    const parentOk = folder.parent_id === null || localIds.has(folder.parent_id);
-    const parentId = parentOk ? folder.parent_id : null;
-    if (!localIds.has(folder.id)) {
-      db.prepare('INSERT INTO note_folders (id, parent_id, name, order_idx, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)').run(
-        folder.id,
-        parentId,
-        folder.name,
-        folder.order_idx,
-        folder.created_at,
-        folder.updated_at
-      );
-      localIds.add(folder.id);
-      counts.inserted += 1;
-      continue;
-    }
-    const local = db.prepare('SELECT updated_at FROM note_folders WHERE id = ?').get(folder.id) as { updated_at: string };
-    if (folder.updated_at > local.updated_at) {
-      db.prepare('UPDATE note_folders SET parent_id = ?, name = ?, order_idx = ?, updated_at = ? WHERE id = ?').run(
-        parentId,
-        folder.name,
-        folder.order_idx,
-        folder.updated_at,
-        folder.id
-      );
-      counts.updated += 1;
-    } else {
-      counts.skipped += 1;
-    }
+/**
+ * Merge a sync package into the live database. Additive and newest-wins: unknown rows
+ * are inserted, rows present on both sides take whichever `updated_at` (or
+ * `created_at`) is newer, and local rows absent from the package are left alone.
+ */
+export function mergeSyncPackage(buffer: Buffer, passphrase?: string): SyncMergeSummary {
+  let zip: AdmZip;
+  try {
+    zip = new AdmZip(buffer);
+  } catch {
+    throw new Error('Archivo de sincronización ilegible.');
   }
-}
+  const manifestEntry = zip.getEntry('manifest.json');
+  if (!manifestEntry) throw new Error('Paquete inválido: faltan manifest o datos.');
 
-function mergeNotes(incoming: NoteRow[], counts: SyncTableCounts): void {
-  const db = getDb();
-  const folderIds = new Set((db.prepare('SELECT id FROM note_folders').all() as { id: string }[]).map((r) => r.id));
-  for (const note of incoming) {
-    const folderId = note.folder_id && folderIds.has(note.folder_id) ? note.folder_id : null;
-    const local = db.prepare('SELECT updated_at FROM notes WHERE id = ?').get(note.id) as { updated_at: string } | undefined;
-    if (!local) {
-      db.prepare(
-        'INSERT INTO notes (id, folder_id, title, kind, content, source_json, order_idx, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
-      ).run(note.id, folderId, note.title, note.kind, note.content, note.source_json, note.order_idx, note.created_at, note.updated_at);
-      counts.inserted += 1;
-    } else if (note.updated_at > local.updated_at) {
-      db.prepare(
-        'UPDATE notes SET folder_id = ?, title = ?, kind = ?, content = ?, source_json = ?, order_idx = ?, updated_at = ? WHERE id = ?'
-      ).run(folderId, note.title, note.kind, note.content, note.source_json, note.order_idx, note.updated_at, note.id);
-      counts.updated += 1;
-    } else {
-      counts.skipped += 1;
-    }
+  const manifest = JSON.parse(zip.readAsText(manifestEntry)) as SyncManifest;
+  if (manifest.format !== SYNC_FORMAT || !(manifest.formatVersion >= 1 && manifest.formatVersion <= SYNC_FORMAT_VERSION)) {
+    throw new Error('Formato de paquete de sincronización no soportado.');
   }
-}
-
-function mergeDrafts(incoming: DraftRow[], counts: SyncTableCounts): void {
-  const db = getDb();
-  for (const draft of incoming) {
-    const local = db.prepare('SELECT updated_at FROM writing_saved_drafts WHERE id = ?').get(draft.id) as
-      | { updated_at: string }
-      | undefined;
-    if (!local) {
-      db.prepare(
-        'INSERT INTO writing_saved_drafts (id, title, brief_json, selection_json, model_json, draft_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-      ).run(draft.id, draft.title, draft.brief_json, draft.selection_json, draft.model_json, draft.draft_json, draft.created_at, draft.updated_at);
-      counts.inserted += 1;
-    } else if (draft.updated_at > local.updated_at) {
-      db.prepare(
-        'UPDATE writing_saved_drafts SET title = ?, brief_json = ?, selection_json = ?, model_json = ?, draft_json = ?, updated_at = ? WHERE id = ?'
-      ).run(draft.title, draft.brief_json, draft.selection_json, draft.model_json, draft.draft_json, draft.updated_at, draft.id);
-      counts.updated += 1;
-    } else {
-      counts.skipped += 1;
-    }
-  }
-}
-
-function mergeSearches(incoming: SearchRow[], counts: SyncTableCounts): void {
-  const db = getDb();
-  for (const search of incoming) {
-    const exists = db.prepare('SELECT 1 FROM saved_searches WHERE id = ?').get(search.id);
-    if (exists) {
-      counts.skipped += 1;
-      continue;
-    }
-    db.prepare('INSERT INTO saved_searches (id, name, query, mode, kinds_json, created_at) VALUES (?, ?, ?, ?, ?, ?)').run(
-      search.id,
-      search.name,
-      search.query,
-      search.mode,
-      search.kinds_json,
-      search.created_at
+  // A package from a newer schema carries columns and tables this build does not know.
+  // Merging it anyway silently DROPS them, and because the truncated row keeps the newer
+  // timestamp, the next sync back propagates the loss to the machine that was up to
+  // date. Refusing is the only safe answer.
+  if (Number.isFinite(manifest.schemaVersion) && manifest.schemaVersion > SCHEMA_VERSION) {
+    throw new Error(
+      `El paquete procede de una versión más reciente de Nodus (esquema v${manifest.schemaVersion}, este equipo usa v${SCHEMA_VERSION}). Actualiza la app antes de importarlo.`
     );
-    counts.inserted += 1;
   }
-}
 
-function mergeFeedback(incoming: FeedbackRow[], counts: SyncTableCounts): void {
-  const db = getDb();
-  for (const fb of incoming) {
-    const local = db
-      .prepare(
-        'SELECT from_id, to_id, created_at FROM edge_feedback WHERE type = ? AND ((from_id = ? AND to_id = ?) OR (from_id = ? AND to_id = ?))'
-      )
-      .get(fb.type, fb.from_id, fb.to_id, fb.to_id, fb.from_id) as { from_id: string; to_id: string; created_at: string } | undefined;
-    if (!local) {
-      db.prepare('INSERT INTO edge_feedback (from_id, to_id, type, verdict, note, created_at) VALUES (?, ?, ?, ?, ?, ?)').run(
-        fb.from_id,
-        fb.to_id,
-        fb.type,
-        fb.verdict,
-        fb.note,
-        fb.created_at
-      );
-      counts.inserted += 1;
-    } else if (fb.created_at > local.created_at) {
-      db.prepare('UPDATE edge_feedback SET verdict = ?, note = ?, created_at = ? WHERE from_id = ? AND to_id = ? AND type = ?').run(
-        fb.verdict,
-        fb.note,
-        fb.created_at,
-        local.from_id,
-        local.to_id,
-        fb.type
-      );
-      counts.updated += 1;
-    } else {
-      counts.skipped += 1;
+  const { tables, counts: declaredCounts, resolveBlob } = openPackage(zip, manifest, passphrase);
+  for (const [table, expected] of Object.entries(declaredCounts)) {
+    const rows = tables.get(table);
+    if (!Array.isArray(rows) || rows.length !== expected) {
+      throw new Error(`Paquete inválido: el recuento de ${table} no coincide con su manifiesto.`);
     }
   }
+
+  const db = getDb();
+  const present = localTableNames();
+  const tableGroup = groupOfTable();
+  const groups = Object.fromEntries(syncedTablesByGroup().map((group) => [group.key, zeroCounts()])) as Record<SyncGroupKey, SyncTableCounts>;
+  const conflicts: SyncConflict[] = [];
+  const unknownTables: string[] = [];
+  const insertedRowIds = new Map<string, Set<number>>();
+  const supersededKept = { count: 0 };
+  const packageDate = typeof manifest.date === 'string' ? manifest.date : null;
+  // Newest-wins compares wall clocks, so a machine whose clock runs ahead wins every
+  // conflict it takes part in. That is the only direction a one-way package can reveal
+  // (an old package and a slow clock look identical), so it is measured and reported —
+  // and the LOSER of every comparison is kept regardless, which is what actually makes a
+  // wrong clock survivable rather than silent.
+  const clockSkewAheadMs = measureClockSkewAhead(packageDate);
+
+  const deletions = { applied: 0 };
+
+  const tx = db.transaction(() => {
+    // Children may arrive before parents, and remapping can move a parent id, so
+    // constraints are only enforced once the whole package is in place.
+    db.pragma('defer_foreign_keys = ON');
+    const remap = buildIdRemap(tables, present);
+    applyRemap(tables, present, remap);
+
+    // Deletions are applied FIRST, and the local tombstone table is consulted while
+    // merging, so a row deleted here is never re-inserted and then removed again — the
+    // round trip would fire the triggers and leave the two machines arguing.
+    const incomingTombstones = (tables.get('sync_tombstones') ?? []) as unknown as TombstoneRow[];
+    applyIncomingTombstones(incomingTombstones, present, groups.tombstones, conflicts, supersededKept, deletions, packageDate);
+    const localTombstones = readLocalTombstones();
+
+    for (const [table, rows] of tables) {
+      if (table === 'sync_tombstones') continue; // handled above, not as ordinary rows
+      const group = tableGroup.get(table);
+      if (!present.has(table) || !group) {
+        // A table this build does not know (older app, newer package) is reported by
+        // name instead of vanishing into an aggregate "skipped" number.
+        if (rows.length > 0) unknownTables.push(table);
+        continue;
+      }
+      mergeTable(table, rows, resolveBlob, groups[group], conflicts, insertedRowIds, tables, packageDate, supersededKept, localTombstones);
+    }
+    dropDanglingRows(insertedRowIds, conflicts);
+  });
+  tx();
+
+  return {
+    groups,
+    conflicts,
+    unknownTables: [...new Set(unknownTables)].sort(),
+    packageSchemaVersion: Number.isFinite(manifest.schemaVersion) ? manifest.schemaVersion : 0,
+    localSchemaVersion: SCHEMA_VERSION,
+    supersededKept: supersededKept.count,
+    deletionsApplied: deletions.applied,
+    // A package built before the tombstone horizon may predate deletions this machine
+    // has already forgotten, so rows it carries can legitimately come back.
+    predatesTombstoneHorizon: packageIsOlderThanHorizon(packageDate),
+    clockSkewAheadMs,
+  };
+}
+
+/** One function builds the lookup key on both sides. When the reader and the writer
+ *  each formatted it themselves, a single mistyped separator made every lookup miss and
+ *  deletions silently stopped being suppressed — with no error anywhere. */
+function tombstoneKey(table: string, rowKey: string): string {
+  return `${table}\u0000${rowKey}`;
+}
+
+/** Every deletion this machine knows about, keyed the same way the triggers write it. */
+function readLocalTombstones(): Map<string, string> {
+  const rows = getDb().prepare('SELECT table_name, row_key, deleted_at FROM sync_tombstones').all() as TombstoneRow[];
+  return new Map(rows.map((row) => [tombstoneKey(row.table_name, row.row_key), row.deleted_at]));
 }
 
 /**
- * Databases merge as atomic units. Absent locally → insert the whole tree.
- * Present on both → the newer `updated_at` wins: a newer incoming copy replaces
- * the entire local tree (columns, rows, cells, attachment blobs, relations,
- * views); an older-or-equal one is skipped. Nothing local is deleted unless a
- * strictly newer replacement arrives for the same database id.
+ * Apply the deletions the other machine performed.
+ *
+ * A tombstone only wins if it is newer than the row here: if this machine edited the row
+ * after the other deleted it, that edit is the later fact and the row stays. Whatever is
+ * removed is kept in `sync_superseded` first, so a deletion arriving from another
+ * computer is never the end of the story.
  */
-function mergeDatabases(incoming: DbSyncUnit[], counts: SyncTableCounts): void {
-  for (const unit of incoming) {
-    const localUpdatedAt = getDatabaseUpdatedAt(unit.database.id);
-    if (localUpdatedAt === null) {
-      replaceDatabaseFromSync(unit);
-      counts.inserted += 1;
-    } else if (unit.database.updated_at > localUpdatedAt) {
-      replaceDatabaseFromSync(unit);
-      counts.updated += 1;
-    } else {
+function applyIncomingTombstones(
+  incoming: TombstoneRow[],
+  present: Set<string>,
+  counts: SyncTableCounts,
+  conflicts: SyncConflict[],
+  supersededKept: { count: number },
+  deletions: { applied: number },
+  packageDate: string | null
+): void {
+  const db = getDb();
+  const upsert = db.prepare(
+    `INSERT INTO sync_tombstones (table_name, row_key, deleted_at) VALUES (?, ?, ?)
+     ON CONFLICT(table_name, row_key) DO UPDATE SET deleted_at = excluded.deleted_at
+     WHERE excluded.deleted_at > sync_tombstones.deleted_at`
+  );
+
+  for (const tombstone of incoming) {
+    const table = typeof tombstone.table_name === 'string' ? tombstone.table_name : '';
+    const rowKey = typeof tombstone.row_key === 'string' ? tombstone.row_key : '';
+    const deletedAt = typeof tombstone.deleted_at === 'string' ? tombstone.deleted_at : '';
+    if (!table || !rowKey || !deletedAt) continue;
+    // A tombstone for a table this build does not have is still recorded, so it can be
+    // passed on to a third machine that does.
+    if (!present.has(table)) {
+      upsert.run(table, rowKey, deletedAt);
       counts.skipped += 1;
+      continue;
+    }
+
+    let keyValues: unknown[];
+    try {
+      const parsed = JSON.parse(rowKey);
+      if (!Array.isArray(parsed)) throw new Error('bad key');
+      keyValues = parsed;
+    } catch {
+      continue;
+    }
+
+    try {
+      const columns = tableColumns(table);
+      const identity = identityColumns(table, columns);
+      if (identity.length === 0 || identity.length !== keyValues.length) {
+        upsert.run(table, rowKey, deletedAt);
+        counts.skipped += 1;
+        continue;
+      }
+      const where = identityWhere(columns, identity);
+      const local = db
+        .prepare(`SELECT * FROM ${quoteIdentifier(table)} WHERE ${where}`)
+        .get(...(keyValues as (string | number | null)[])) as Record<string, unknown> | undefined;
+
+      if (local) {
+        const localStamp =
+          typeof local.updated_at === 'string' ? local.updated_at : typeof local.created_at === 'string' ? local.created_at : '';
+        // An edit made here AFTER the other machine deleted it is the later fact.
+        if (localStamp && localStamp > deletedAt) {
+          counts.skipped += 1;
+          continue;
+        }
+        if (recordSuperseded({
+          tableName: table,
+          rowKey: keyValues,
+          origin: 'deleted-remotely',
+          row: local,
+          rowStamp: localStamp || null,
+          winnerStamp: deletedAt,
+          packageDate,
+        })) supersededKept.count += 1;
+        db.prepare(`DELETE FROM ${quoteIdentifier(table)} WHERE ${where}`).run(...(keyValues as (string | number | null)[]));
+        deletions.applied += 1;
+        counts.updated += 1;
+      } else {
+        counts.inserted += 1;
+      }
+      // The DELETE above fired the trigger, which wrote a tombstone stamped now; force
+      // the original time so both machines agree on WHEN the row died.
+      db.prepare(
+        `INSERT INTO sync_tombstones (table_name, row_key, deleted_at) VALUES (?, ?, ?)
+         ON CONFLICT(table_name, row_key) DO UPDATE SET deleted_at = excluded.deleted_at`
+      ).run(table, rowKey, deletedAt);
+    } catch (error) {
+      counts.skipped += 1;
+      conflicts.push({
+        table,
+        reason: 'constraint',
+        rows: 1,
+        detail: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 }

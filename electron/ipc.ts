@@ -265,6 +265,8 @@ import {
   restoreRecoverySnapshot,
 } from './recovery/recoveryManager';
 import { buildSyncPackage, mergeSyncPackage } from './export/syncPackage';
+import { clearSuperseded, countSuperseded, listSuperseded, restoreSuperseded } from './db/syncSupersededRepo';
+import { clearSyncPassphrase, getSyncPassphrase, hasSyncPassphrase, setSyncPassphrase } from './secrets/secretStore';
 import { parsePageNumber, zoteroOpenPdfUrl, zoteroSelectUrl } from '@shared/pageLocation';
 import { hasAnyData, seedDemoData, clearDemoData } from './db/demoData';
 import { seedGenealogyDemoData } from './db/genealogyDemoData';
@@ -3202,11 +3204,24 @@ export function registerIpc(
       filters: [{ name: 'Nodus Sync', extensions: ['nodussync'] }],
     });
     if (canceled || !filePath) return null;
-    const { buffer, counts } = buildSyncPackage(app.getVersion());
+    const passphrase = getSyncPassphrase();
+    if (!passphrase) {
+      throw new Error('Configura una frase de sincronización en Ajustes: los paquetes van cifrados y la necesitarás en el otro equipo.');
+    }
+    const { buffer, counts } = buildSyncPackage(app.getVersion(), passphrase);
     fs.writeFileSync(filePath, buffer);
     return { path: filePath, counts };
   });
   // automatic encrypted backups (master password lives in the OS keychain)
+  h('sync:hasPassphrase', async () => hasSyncPassphrase());
+  h('sync:setPassphrase', async (_e, passphrase: string) => {
+    const clean = passphrase.trim();
+    if (clean.length < MIN_BACKUP_PASSWORD_LENGTH) {
+      throw new Error(`La frase de sincronización debe tener al menos ${MIN_BACKUP_PASSWORD_LENGTH} caracteres.`);
+    }
+    setSyncPassphrase(clean);
+  });
+  h('sync:clearPassphrase', async () => clearSyncPassphrase());
   h('backup:setPassword', async (_e, password: string) => {
     const clean = password.trim();
     if (clean.length < MIN_BACKUP_PASSWORD_LENGTH) {
@@ -3241,7 +3256,8 @@ export function registerIpc(
       (es ? [
         'NODUS — KIT DE RECUPERACIÓN DE COPIAS DE SEGURIDAD', '',
         `Contraseña maestra: ${password}`,
-        `Clave de recuperación independiente: ${recoveryKey ?? 'No disponible en copias antiguas'}`, '',
+        `Clave de recuperación independiente: ${recoveryKey ?? 'No disponible en copias antiguas'}`,
+        `Frase de sincronización (.nodussync): ${getSyncPassphrase() ?? 'No configurada'}`, '',
         'Puedes restaurar las copias nuevas con cualquiera de las dos credenciales.',
         'Guárdalas fuera de este dispositivo, preferiblemente en un gestor de contraseñas',
         'o impresas en un lugar seguro. Las copias cifradas incluyen todo Nodus,',
@@ -3250,7 +3266,8 @@ export function registerIpc(
       ] : [
         'NODUS — BACKUP RECOVERY KIT', '',
         `Master password: ${password}`,
-        `Independent recovery key: ${recoveryKey ?? 'Not available for legacy snapshots'}`, '',
+        `Independent recovery key: ${recoveryKey ?? 'Not available for legacy snapshots'}`,
+        `Sync passphrase (.nodussync): ${getSyncPassphrase() ?? 'Not configured'}`, '',
         'New snapshots can be restored with either credential.',
         'Store them away from this device, preferably in a password manager or',
         'printed in a safe place. Encrypted snapshots include all of Nodus, including',
@@ -3285,7 +3302,7 @@ export function registerIpc(
     return result;
   });
 
-  h('data:importSync', async () => {
+  h('data:importSync', async (_e, passphrase?: string) => {
     if (getActiveVault().type === 'estudio' && !getSettings().studySyncEnabled) throw new Error('La sincronización del vault de estudio está desactivada en Ajustes.');
     const { canceled, filePaths } = await dialog.showOpenDialog({
       title: 'Importar paquete de sincronización',
@@ -3293,8 +3310,15 @@ export function registerIpc(
       filters: [{ name: 'Nodus Sync', extensions: ['nodussync'] }],
     });
     if (canceled || filePaths.length === 0) return null;
-    return mergeSyncPackage(fs.readFileSync(filePaths[0]));
+    // The local passphrase is tried first; the renderer prompts only if it does not fit,
+    // which is the case where the package came from a machine set up separately.
+    return mergeSyncPackage(fs.readFileSync(filePaths[0]), passphrase?.trim() || getSyncPassphrase() || undefined);
   });
+  // Versions a merge discarded. Read/restore only — nothing here deletes on a timer.
+  h('sync:supersededCount', async () => countSuperseded());
+  h('sync:supersededList', async (_e, limit?: number, offset?: number) => listSuperseded(limit, offset));
+  h('sync:supersededRestore', async (_e, id: string) => restoreSuperseded(id));
+  h('sync:supersededClear', async (_e, ids?: string[]) => clearSuperseded(ids));
   h('study:data:overview', async () => studyDataAdmin.getStudyDataOverview());
   h('study:data:exportScope', async (_e, scope, format) => {
     if (!getSettings().studySharingEnabled) throw new Error('La exportación para compartir está desactivada en Ajustes.');
