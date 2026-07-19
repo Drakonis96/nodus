@@ -24,10 +24,11 @@ import {
   type TeachingExamDetail,
   type TeachingLogo,
 } from '@shared/teachingExams';
+import { nextIdFor } from '@shared/sequentialIds';
 import { renderExamHtml } from '@shared/examHtml';
 import { Icon, Spinner } from '../components/ui';
 import { ConfirmModal } from '../components/ConfirmModal';
-import { t, errorText, getActiveLang } from '../i18n';
+import { t, tx, errorText, getActiveLang } from '../i18n';
 
 const LANGUAGE_LABELS: Record<ExamLanguage, string> = {
   es: 'Español',
@@ -120,7 +121,10 @@ export function ExamBuilderView() {
     if (!exam) return;
     try {
       const updated = await window.nodus.updateTeachingExamQuestion(id, patch);
-      setExam({ ...exam, questions: exam.questions.map((question) => (question.id === id ? updated : question)) });
+      // Functional update on purpose. `exam` here is the snapshot from the render that
+      // started this call, and an AI generation takes seconds: rebuilding the exam from
+      // it silently reverted everything typed into other questions in the meantime.
+      setExam((prev) => (prev ? { ...prev, questions: prev.questions.map((question) => (question.id === id ? updated : question)) } : prev));
     } catch (cause) {
       setError(errorText(cause));
     }
@@ -197,15 +201,17 @@ export function ExamBuilderView() {
    * and the sum of its parts cannot drift apart on the printed paper.
    */
   const setSectionTotal = async (block: ExamBlock, total: number) => {
+    // `NaN` is what an empty field reads as, and it used to fall through to
+    // `Math.max(0, NaN)` and zero every sub-question. Nothing typed is nothing to do.
     if (!exam || !block.questions.length || !Number.isFinite(total)) return;
     const shares = distributeSectionPoints(Math.max(0, total), block.questions.length);
-    setExam({
-      ...exam,
-      questions: exam.questions.map((entry) => {
+    setExam((prev) => (prev ? {
+      ...prev,
+      questions: prev.questions.map((entry) => {
         const position = block.questions.findIndex((child) => child.question.id === entry.id);
         return position >= 0 ? { ...entry, points: shares[position] } : entry;
       }),
-    });
+    } : prev));
     try {
       await Promise.all(
         block.questions.map((child, position) => window.nodus.updateTeachingExamQuestion(child.question.id, { points: shares[position] }))
@@ -270,6 +276,13 @@ export function ExamBuilderView() {
 
   const exportExam = async (format: 'docx' | 'pdf') => {
     if (!exam) return;
+    // `validateExam` documents itself as blocking export, and nothing enforced it: a
+    // paper with an image question and no image printed a blank box for the student.
+    const blocking = validateExam(exam, exam.questions);
+    if (blocking.length > 0) {
+      setError(tx('Revisa {n} avisos antes de exportar.', { n: blocking.length }));
+      return;
+    }
     setExporting(format);
     setError('');
     try {
@@ -293,9 +306,14 @@ export function ExamBuilderView() {
   );
   // The preview shows the document exactly as it will print: the teacher's chosen
   // language if they set one, otherwise the interface language.
+  // `lang` is in the dependency list because `getActiveLang()` is read INSIDE the memo.
+  // Without it the preview kept rendering in the previous language after a switch while
+  // the exported file used the new one — and this project has no exhaustive-deps rule
+  // to catch that.
+  const lang = getActiveLang();
   const previewExam = useMemo(
-    () => (exam ? { ...exam, language: effectiveExamLanguage(exam, getActiveLang()) } : null),
-    [exam]
+    () => (exam ? { ...exam, language: effectiveExamLanguage(exam, lang) } : null),
+    [exam, lang]
   );
   const previewHtml = useMemo(
     () => (previewExam ? renderExamHtml(previewExam, previewExam.questions, { forPreview: true, content: exportContent }) : ''),
@@ -418,10 +436,14 @@ export function ExamBuilderView() {
               </button>
             )}
           </label>
-          <button className="btn btn-ghost h-9" disabled={exporting !== null} onClick={() => void exportExam('docx')} data-testid="exam-export-docx">
+          <button className="btn btn-ghost h-9" disabled={exporting !== null || issues.length > 0}
+            title={issues.length > 0 ? t('Resuelve los avisos para poder exportar.') : undefined}
+            onClick={() => void exportExam('docx')} data-testid="exam-export-docx">
             {exporting === 'docx' ? <Icon name="sync" className="animate-spin" /> : <Icon name="download" />}Word
           </button>
-          <button className="btn btn-primary h-9" disabled={exporting !== null} onClick={() => void exportExam('pdf')} data-testid="exam-export-pdf">
+          <button className="btn btn-primary h-9" disabled={exporting !== null || issues.length > 0}
+            title={issues.length > 0 ? t('Resuelve los avisos para poder exportar.') : undefined}
+            onClick={() => void exportExam('pdf')} data-testid="exam-export-pdf">
             {exporting === 'pdf' ? <Icon name="sync" className="animate-spin" /> : <Icon name="download" />}PDF
           </button>
         </div>
@@ -542,6 +564,10 @@ export function ExamBuilderView() {
                     <span className="text-[10px] uppercase tracking-wider text-neutral-500">{t('Preguntas del enunciado')}</span>
                     <label className="ml-auto flex items-center gap-1 text-[10px] text-neutral-500" title={t('Se reparte entre las preguntas de este enunciado')}>
                       {t('Total del enunciado')}
+                      {/* Uncontrolled and committed on blur: writing on every keystroke
+                          meant typing "10" over "4" passed through 1 first, and clearing
+                          the field to retype it zeroed every sub-question. `key` remounts
+                          it when the real total changes elsewhere, so it stays truthful. */}
                       <input
                         data-testid={`exam-section-total-${block.number}`}
                         className="input h-6 w-16 px-1.5 text-xs"
@@ -549,8 +575,13 @@ export function ExamBuilderView() {
                         min="0"
                         step="0.25"
                         disabled={!block.questions.length}
-                        value={block.points}
-                        onChange={(event) => void setSectionTotal(block, Number(event.target.value))}
+                        key={`section-total-${block.number}-${block.points}`}
+                        defaultValue={block.points}
+                        onBlur={(event) => {
+                          if (event.target.value.trim() === '') return;
+                          void setSectionTotal(block, Number(event.target.value));
+                        }}
+                        onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }}
                       />
                     </label>
                   </div>
@@ -734,9 +765,17 @@ function QuestionCard({
         <div className="mt-2 space-y-1">
           <div className="flex items-center gap-2 text-[10px] text-neutral-500">
             {t('Opciones')}
-            <input className="input h-6 w-14 px-1.5 text-xs" type="number" min="2" max="10" value={question.options.length}
-              onChange={(event) => local({ options: resizeExamOptions(question.options, Number(event.target.value)) })}
-              onBlur={(event) => onPatch({ options: resizeExamOptions(question.options, Number(event.target.value)) })} />
+            {/* Uncontrolled, committed on blur. Resizing on every keystroke meant typing
+                "10" over "4" was read as "1" first, clamped to 2, and options 3 and 4
+                were deleted with whatever had been written in them. */}
+            <input className="input h-6 w-14 px-1.5 text-xs" type="number" min="2" max="10"
+              key={`options-${question.id}-${question.options.length}`}
+              defaultValue={question.options.length}
+              onBlur={(event) => {
+                if (event.target.value.trim() === '') return;
+                onPatch({ options: resizeExamOptions(question.options, Number(event.target.value)) });
+              }}
+              onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }} />
             <span>{t('Marca la correcta')}</span>
           </div>
           {question.options.map((option, optionIndex) => (
@@ -766,7 +805,7 @@ function QuestionCard({
               <button className="btn btn-ghost h-7 w-7 p-0 text-red-500" title={t('Quitar')} aria-label={t('Quitar')} onClick={() => onPatch({ pairs: question.pairs.filter((_, i) => i !== pairIndex) })}><Icon name="x" size={11} /></button>
             </div>
           ))}
-          <button className="btn btn-ghost h-7 text-xs" onClick={() => onPatch({ pairs: [...question.pairs, { id: `P${question.pairs.length + 1}`, left: '', right: '' }] })}><Icon name="plus" size={11} />{t('Añadir pareja')}</button>
+          <button className="btn btn-ghost h-7 text-xs" onClick={() => onPatch({ pairs: [...question.pairs, { id: nextIdFor('P', question.pairs), left: '', right: '' }] })}><Icon name="plus" size={11} />{t('Añadir pareja')}</button>
         </div>
       )}
 

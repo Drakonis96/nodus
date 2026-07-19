@@ -13,6 +13,7 @@
  * the same split exams and rubrics already use.
  */
 import type { GradeResult, TraceNode, TraceRule } from './assessment/model';
+import type { GradeScale } from './itemAnalysis';
 
 export interface GradebookDocHeader {
   institution?: string;
@@ -146,13 +147,18 @@ export function renderBoletinHtml(
   header: GradebookDocHeader,
   student: { code: string; name: string },
   result: Pick<GradeResult, 'record' | 'passed' | 'trace' | 'rules'>,
-  scaleMax: number,
+  scale: GradeScale,
   labels: GradebookDocLabels = GRADEBOOK_LABELS_ES,
   ruleText: (rule: TraceRule) => string = () => '',
 ): string {
   const rows: string[] = [];
   const walk = (node: TraceNode, depth: number) => {
-    const value = node.fraction == null ? '—' : String(Math.round(node.fraction * scaleMax * 100) / 100);
+    // Projected through the whole scale, minimum included: a boletín whose breakdown
+    // is computed differently from the final mark above it is a boletín that loses a
+    // reclamación instead of answering one.
+    const value = node.fraction == null
+      ? '—'
+      : String(Math.round((scale.min + node.fraction * (scale.max - scale.min)) * 100) / 100);
     const share = node.effectiveWeight > 0 && node.effectiveWeight <= 1
       ? `${Math.round(node.effectiveWeight * 100)} %` : '';
     const notes = node.rules.map(ruleText).filter(Boolean)
