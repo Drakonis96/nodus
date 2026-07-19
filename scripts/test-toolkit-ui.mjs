@@ -137,6 +137,148 @@ test('a tool page returns to the hub and keeps the header action row uniform', a
   assert.match(app, /const ToolkitView = lazy\(/, 'the view is code-split like its siblings');
 });
 
+test('Convert leads with the formats it accepts, then offers a grouped searchable menu', async () => {
+  const convert = await read('src/views/ToolkitConvertView.tsx');
+  const toolkit = loadModule('shared/toolkitTypes.ts');
+
+  // The empty state advertises what can be dropped — a dropzone with no catalogue
+  // is the blind guess this redesign removes.
+  assert.ok(convert.includes('data-testid="toolkit-formats"'), 'the supported-formats panel is addressable');
+  assert.match(convert, /\{\(!hasFiles \|\| availableOps\.length === 0\) && <SupportedFormats \/>\}/,
+    'the catalogue shows on the empty state and again when nothing matches');
+  // Every category contributes to the panel, and the checksum operation's
+  // "any file" case is stated rather than silently dropped.
+  assert.equal(toolkit.TOOLKIT_CATEGORIES.length, 5, 'all five families are catalogued');
+  assert.ok(toolkit.TOOLKIT_OPS.some((op) => op.inputExts.length === 0), 'an any-file operation exists');
+  assert.match(convert, /anyFile: ops\.some\(\(op\) => op\.inputExts\.length === 0\)/, 'the panel marks the any-file family');
+
+  // The operation menu replaced the category rail: categories are group headers
+  // inside one searchable popover, not a pre-filter the user has to guess first.
+  assert.ok(!convert.includes('toolkit-cat-'), 'the category rail is gone');
+  assert.ok(convert.includes('data-testid="toolkit-op-picker"'), 'the conversion menu has a trigger');
+  assert.ok(convert.includes('data-testid="toolkit-op-search"'), 'the menu has a search box');
+  assert.match(convert, /opsForInputs\(files\)/, 'the menu offers operations from every category, not one');
+  assert.match(convert, /createPortal\(/, 'the menu is portaled out of the overflow-hidden shell');
+  // Accent-insensitive search, or "imagenes" finds nothing under "Imágenes".
+  assert.match(convert, /normalize\('NFD'\)/, 'search folds accents');
+
+  // Only compatible operations are listed, so the menu can never offer a failure.
+  const forPdf = toolkit.opsForInputs(['/tmp/a.pdf']).map((op) => op.id);
+  assert.ok(forPdf.includes('pdf-to-txt') && forPdf.includes('ocr-pdf-searchable'), 'a PDF spans several categories');
+  assert.ok(!forPdf.includes('heic-convert'), 'an incompatible operation is never offered');
+  assert.ok(!forPdf.includes('pdf-merge'), 'a merge needing two inputs is withheld from a single file');
+  assert.deepEqual(toolkit.opsForInputs([]), [], 'nothing is offered before a file is added');
+});
+
+test('a batch reports its progress on a bar, and says why a file failed', async () => {
+  const convert = await read('src/views/ToolkitConvertView.tsx');
+  const { jobOverallProgress, jobCurrentFile } = loadModule('shared/toolkitTypes.ts');
+
+  const file = (inputPath, status, pct = null, error = null) => ({ inputPath, status, pct, outputPaths: [], error });
+  const snapshot = (files, activeIndex, done, extra = {}) => ({
+    jobId: 'j', files, activeIndex, done, total: files.length, cancelled: false, finished: false, ...extra,
+  });
+
+  // A batch advances by completed files…
+  const batch = [file('/a.pdf', 'done'), file('/b.pdf', 'processing', 0.5), file('/c.pdf', 'pending'), file('/d.pdf', 'pending')];
+  assert.equal(jobOverallProgress(snapshot(batch, 1, 1)), 0.375, '1 done + half of the second, out of 4');
+
+  // …and a single long file still moves, instead of sitting at 0 until it flips
+  // to 100 — the whole point of the bar for a slow OCR run.
+  const solo = [file('/scan.pdf', 'processing', 0.4)];
+  assert.equal(jobOverallProgress(snapshot(solo, 0, 0)), 0.4, 'intra-file progress drives the bar');
+  assert.equal(jobOverallProgress(snapshot(solo, 0, 0, { finished: true })), 1, 'a finished job reads full');
+  assert.equal(
+    jobOverallProgress(snapshot(batch, 1, 1, { finished: true, cancelled: true })),
+    0.25,
+    'a cancelled job reports what it actually got through, not 100 %'
+  );
+  assert.equal(jobOverallProgress(snapshot([], -1, 0)), 0, 'an empty batch never divides by zero');
+
+  // The ordinal and the file name must come from the same file. Between two files
+  // activeIndex still points at the one that just finished, which used to render
+  // as "Procesando 2 de 5" beside the name of file 1.
+  const between = [file('/a.pdf', 'done'), file('/b.pdf', 'pending'), file('/c.pdf', 'pending')];
+  const current = jobCurrentFile(snapshot(between, 0, 1));
+  assert.equal(current.file.inputPath, '/b.pdf', 'the next pending file is the one being announced');
+  assert.equal(current.ordinal, 2, 'its ordinal matches its own position');
+  assert.equal(jobCurrentFile(snapshot(between, 0, 1, { finished: true })), null, 'a finished job announces no file');
+
+  // The view renders that as an accessible bar, and no longer swallows the reason
+  // a file failed.
+  assert.ok(convert.includes('data-testid="toolkit-progress"'), 'the progress card is addressable');
+  assert.match(convert, /role="progressbar"/, 'the bar is exposed to assistive tech');
+  assert.match(convert, /aria-valuenow=\{Math\.round\(overallPct \* 100\)\}/, 'the bar reports its real value');
+  assert.match(convert, /\{tr\(fp\.error\)\}/, 'a failed file shows its (localised) reason, not just a red pill');
+});
+
+test('leaving the page never stops the batch, and coming back restores it', async () => {
+  // The promise driving a conversion lives in the module-level background store,
+  // not in the component, so unmounting the view (navigating to another section)
+  // must not touch the work in flight.
+  const store = loadModule('src/backgroundJobs.ts');
+  const { TOOLKIT_JOB_KEY, startToolkitJob, getBackgroundJob, subscribeBackgroundJob, clearBackgroundJob } = store;
+
+  const seen = [];
+  let emit;
+  let settle;
+  globalThis.window = {
+    nodus: {
+      runToolkitJob: (_request, handlers) => {
+        emit = handlers.onProgress;
+        return new Promise((resolve) => { settle = resolve; });
+      },
+    },
+  };
+
+  const request = { opId: 'pdf-to-txt', inputPaths: ['/a.pdf', '/b.pdf'], outputFormat: 'txt', options: {}, outputDir: null, mergedName: null, zipOutput: false, zipName: null, openFolderOnDone: false };
+  const unsubscribe = subscribeBackgroundJob(TOOLKIT_JOB_KEY, (job) => seen.push(job?.progress?.done ?? null));
+  startToolkitJob(request);
+  await new Promise((r) => setImmediate(r));
+
+  emit({ jobId: 'j', files: [], activeIndex: 0, done: 1, total: 2, cancelled: false, finished: false });
+  assert.equal(getBackgroundJob(TOOLKIT_JOB_KEY).progress.done, 1);
+
+  // "Leaving the page": every subscriber goes away.
+  unsubscribe();
+  assert.equal(
+    clearBackgroundJob(TOOLKIT_JOB_KEY),
+    false,
+    'a running job is never dropped from the store — that would orphan the work'
+  );
+
+  // Work continues while nothing is listening, and the store keeps recording it.
+  emit({ jobId: 'j', files: [], activeIndex: 1, done: 2, total: 2, cancelled: false, finished: true });
+  settle({ jobId: 'j', files: [], cancelled: false, zipPath: null });
+  await new Promise((r) => setImmediate(r));
+
+  const after = getBackgroundJob(TOOLKIT_JOB_KEY);
+  assert.equal(after.progress.done, 2, 'progress advanced with no subscriber attached');
+  assert.equal(after.status, 'completed', 'the job ran to completion after the view unmounted');
+  // "Coming back": a fresh subscriber is handed the finished job immediately.
+  let onReturn = null;
+  subscribeBackgroundJob(TOOLKIT_JOB_KEY, (job) => { onReturn = job; })();
+  assert.equal(onReturn.status, 'completed');
+  assert.deepEqual(onReturn.request.inputPaths, ['/a.pdf', '/b.pdf'], 'the batch is recoverable from the job itself');
+  delete globalThis.window;
+
+  // …which is exactly what the view seeds itself from. Without this the user
+  // returns to the empty "drop files here" state with a stray progress card, and
+  // loses the "Mostrar" links to the outputs that were just produced.
+  const convert = await read('src/views/ToolkitConvertView.tsx');
+  assert.match(convert, /function restoredRequest\(\)/, 'the view can read the in-flight job request');
+  for (const [state, field] of [
+    ['files', 'inputPaths'], ['opId', 'opId'], ['outputFormat', 'outputFormat'], ['options', 'options'],
+    ['outputDir', 'outputDir'], ['zipOverride', 'zipOutput'], ['openOnDone', 'openFolderOnDone'],
+  ]) {
+    assert.match(
+      convert,
+      new RegExp(`\\[${state}, set\\w+\\] = useState[^\\n]*restoredRequest\\(\\)\\?\\.${field}`),
+      `${state} is restored from the running job`
+    );
+  }
+});
+
 test('Nodi documents the toolkit with its real, honest state', async () => {
   const docs = await read('shared/nodiDocumentation.ts');
   assert.match(docs, /## Herramientas \(Nodus Toolkit\)/);
