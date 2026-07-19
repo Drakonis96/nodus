@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 // Nodus Toolkit — the Herramientas section (hub + per-tool pages). These checks
 // cover the wiring that no e2e step can see cheaply: that the view is registered
 // in the canonical nav tables, that it stays universal across vault types, and
-// that the hub's three cards keep the structure the design requires (identical
+// that the hub's four cards keep the structure the design requires (identical
 // shape, centred icons, honest state badges). The real rendering is asserted by
 // the toolkit steps in scripts/e2e-smoke.mjs.
 
@@ -60,7 +60,7 @@ test('every sidebar icon stays unique so a collapsed sidebar keeps sections apar
 
 test('the toolkit icons exist in the shared catalogue', async () => {
   const ui = await read('src/components/ui.tsx');
-  for (const icon of ['tools', 'swap', 'scanText', 'presentation', 'chevronLeft']) {
+  for (const icon of ['tools', 'swap', 'shield', 'scanText', 'presentation', 'chevronLeft']) {
     assert.match(ui, new RegExp(`\\n\\s{2}${icon}: '`), `${icon} is defined in ICON_PATHS`);
   }
 });
@@ -85,7 +85,7 @@ test('the toolkit shows in every vault type, including databases and study', () 
   assert.deepEqual(tools.items.map((n) => n.id), ['toolkit']);
 });
 
-test('the hub renders three tools and only Nodus Convert can be opened', async () => {
+test('the hub renders four tools and Protect is in development', async () => {
   const view = await read('src/views/ToolkitView.tsx');
   assert.ok(view.includes('data-testid="toolkit-home"'), 'the hub is addressable');
   // The cards receive their testid as a prop; ToolCard is what stamps it onto the DOM.
@@ -96,17 +96,17 @@ test('the hub renders three tools and only Nodus Convert can be opened', async (
   // set of tools from each other.
   assert.deepEqual(
     navigation.TOOLKIT_TOOLS.map((tool) => `toolkit-card-${tool.testid}`),
-    ['toolkit-card-convert', 'toolkit-card-presenter', 'toolkit-card-aiocr']
+    ['toolkit-card-convert', 'toolkit-card-protect', 'toolkit-card-presenter', 'toolkit-card-aiocr']
   );
   assert.deepEqual(
     navigation.TOOLKIT_TOOLS.map((tool) => tool.name),
-    ['Nodus Convert', 'PDF Presenter', 'OCR Workspace'],
+    ['Nodus Convert', 'Nodus Protect', 'PDF Presenter', 'OCR Workspace'],
     'brand names stay untranslated'
   );
   assert.match(view, /name=\{tool\.name\}/, 'the card shows the brand name verbatim, never through t()');
   assert.match(view, /description=\{t\(tool\.description\)\}/, 'only the description is translated');
 
-  // Honesty: the two unbuilt tools are inert, and only Convert has a page.
+  // Honesty: the two unbuilt tools are inert; Convert and Protect are openable.
   assert.deepEqual(
     navigation.TOOLKIT_TOOLS.filter((tool) => tool.state === 'soon').map((tool) => tool.page),
     ['presenter', 'ocr'],
@@ -114,16 +114,38 @@ test('the hub renders three tools and only Nodus Convert can be opened', async (
   );
   assert.deepEqual(
     navigation.TOOLKIT_TOOLS.filter((tool) => tool.state === 'wip').map((tool) => tool.page),
-    ['convert'],
-    'only Nodus Convert is openable'
+    ['convert', 'protect'],
+    'Nodus Convert and Protect use the in-development badge'
   );
   assert.match(view, /const disabled = state === 'soon'/);
   assert.match(view, /onClick=\{disabled \? undefined : onOpen\}/, 'a coming-soon card has no click handler');
   // The convert card now opens the real converter, not a placeholder.
   assert.match(view, /<ToolkitConvertView onBack=/, 'Nodus Convert renders the functional converter');
-  // Any page other than 'convert' falls back to the catalogue rather than
+  assert.match(view, /<ToolkitProtectView onBack=/, 'Nodus Protect renders the functional protection flow');
+  // Any page other than 'convert' or 'protect' falls back to the catalogue rather than
   // rendering an empty pane.
-  assert.match(view, /\{page === 'convert' \? \(/, 'the converter is the only special-cased page');
+  assert.match(view, /page === 'protect'/, 'Protect has its own routed workspace');
+});
+
+test('Protect exposes the complete local workflow and the secure preload boundary', async () => {
+  const [view, preload, ipc, shared] = await Promise.all([
+    read('src/views/ToolkitProtectView.tsx'),
+    read('electron/preload.ts'),
+    read('electron/ipc.ts'),
+    read('shared/protectTypes.ts'),
+  ]);
+  for (const marker of ['protect-home', 'Proteger documentos', 'Verificar una copia trazable', 'Guardar como…', 'Guardar en esta bóveda', 'Compartir']) {
+    assert.ok(view.includes(marker), `Protect includes ${marker}`);
+  }
+  assert.match(view, /data-testid="toolkit-protect-back"/);
+  assert.match(view, /maxLength=\{120\}/, 'trace labels are capped');
+  assert.match(view, /verifyPayloadCache/, 'passphrase retries reuse the loaded bytes');
+  assert.match(view, /\(pixel\.flags & 1\) !== 0/, 'verification derives open/keyed mode from the frozen IDPS flag');
+  assert.match(preload, /webUtils\.getPathForFile/, 'dropped File objects become trusted native paths only in preload');
+  assert.match(ipc, /protect\.invalidateProtectVaultReferences\(\)/, 'switching vault revokes main-process source capabilities');
+  for (const typeName of ['ProtectSourceRef', 'ProtectSourceSummary', 'ProtectFilePayload', 'ProtectArtifact', 'ProtectVaultCopySummary']) {
+    assert.ok(shared.includes(`interface ${typeName}`) || shared.includes(`type ${typeName}`), `${typeName} is shared`);
+  }
 });
 
 test('the toolkit nests one sidebar button per tool under its section', async () => {
@@ -169,9 +191,9 @@ test('the toolkit nests one sidebar button per tool under its section', async ()
 
 test('the hub cards share one shape: equal size, centred icons, pinned badges', async () => {
   const view = await read('src/views/ToolkitView.tsx');
-  // One ToolCard component renders all three, so they cannot drift apart.
+  // One ToolCard component renders all four, so they cannot drift apart.
   assert.equal((view.match(/<ToolCard\b/g) ?? []).length, 1, 'a single ToolCard renders the whole catalogue');
-  assert.match(view, /grid gap-4 sm:grid-cols-2 lg:grid-cols-3/, 'cards share a grid track');
+  assert.match(view, /grid gap-4 sm:grid-cols-2/, 'the four cards use a 2×2 grid when space permits');
   assert.match(view, /className=\{`flex h-full flex-col/, 'each card fills its grid cell');
   assert.match(view, /h-12 w-12 shrink-0 items-center justify-center/, 'the card icon sits in a fixed centred tile');
   assert.match(view, /mt-auto inline-flex items-center/, 'the state badge pins to the bottom');
@@ -180,15 +202,17 @@ test('the hub cards share one shape: equal size, centred icons, pinned badges', 
 });
 
 test('a tool page returns to the hub and keeps the header action row uniform', async () => {
-  const [view, convert, app] = await Promise.all([
+  const [view, convert, protect, app] = await Promise.all([
     read('src/views/ToolkitView.tsx'),
     read('src/views/ToolkitConvertView.tsx'),
+    read('src/views/ToolkitProtectView.tsx'),
     read('src/App.tsx'),
   ]);
   // The convert workspace owns its own back-to-hub control.
   assert.ok(convert.includes('data-testid="toolkit-back"'), 'the back control exists');
   assert.match(convert, /<Icon name="chevronLeft"/, 'back uses the shared chevron icon');
   assert.match(convert, /aria-label=\{t\('Volver a Herramientas'\)\}/, 'the back control is labelled for screen readers');
+  assert.ok(protect.includes('data-testid="toolkit-protect-back"'), 'Protect owns its back-to-hub control');
   assert.match(view, /onBack=\{\(\) => onNavigate\('home'\)\}/, 'the hub passes a back handler to the tool');
   // Header actions are icon-only buttons of one height; the toolkit must not be
   // the odd one out.

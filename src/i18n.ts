@@ -4,6 +4,7 @@ import { FR } from './i18n.fr';
 import { DE } from './i18n.de';
 import { PT } from './i18n.pt';
 import { PT_BR } from './i18n.pt-BR';
+import { IT } from './i18n.it';
 import { looksLikeSpanishUiText, normalizeUiLanguage } from '@shared/uiLanguage';
 
 /**
@@ -31,6 +32,7 @@ const TABLES: Record<Exclude<AppLanguage, 'es'>, Record<string, string>> = {
   de: DE,
   pt: PT,
   'pt-BR': PT_BR,
+  it: IT,
 };
 
 let activeLang: AppLanguage = 'es';

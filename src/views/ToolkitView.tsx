@@ -1,5 +1,5 @@
 // Nodus Toolkit — el hub de Herramientas: utilidades locales de proceso de
-// archivos (conversión, presentación de PDFs, OCR asistido). La navegación
+// archivos (conversión, protección, presentación de PDFs y OCR asistido). La navegación
 // interna (catálogo ↔ herramienta) no añade ids a la union View: el sidebar
 // tiene una única entrada de sección con las herramientas anidadas debajo, y la
 // página activa la controla App (así el estado sobrevive a salir de la sección).
@@ -7,6 +7,7 @@ import { Icon } from '../components/ui';
 import { t } from '../i18n';
 import { TOOLKIT_TOOLS, type ToolkitPage } from '../navigation';
 import { ToolkitConvertView } from './ToolkitConvertView';
+import { ToolkitProtectView } from './ToolkitProtectView';
 
 interface ToolCardProps {
   testid: string;
@@ -19,7 +20,7 @@ interface ToolCardProps {
   onOpen?: () => void;
 }
 
-/** Tarjeta del hub. Las tres se renderizan con la MISMA estructura y altura
+/** Tarjeta del hub. Las cuatro se renderizan con la MISMA estructura y altura
  *  (grid + h-full); el icono va en una loseta cuadrada fija para que quede
  *  perfectamente centrado, y el badge se ancla abajo con mt-auto para que el
  *  texto variable no desalinee las tarjetas entre sí. */
@@ -65,11 +66,13 @@ export function ToolkitView({
 }) {
   return (
     <div className="h-full overflow-y-auto px-6 py-6 max-md:px-4">
-      {/* Sólo Convert tiene página propia; las otras dos herramientas están
+      {/* Convert y Protect tienen página propia; las otras dos herramientas están
           deshabilitadas en el catálogo y en el sidebar, así que cualquier otra
           página cae en el catálogo en lugar de dejar el panel en blanco. */}
       {page === 'convert' ? (
         <ToolkitConvertView onBack={() => onNavigate('home')} />
+      ) : page === 'protect' ? (
+        <ToolkitProtectView onBack={() => onNavigate('home')} />
       ) : (
         <div data-testid="toolkit-home" className="mx-auto max-w-5xl space-y-6">
           <header className="flex items-start gap-3">
@@ -83,7 +86,7 @@ export function ToolkitView({
               </p>
             </div>
           </header>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2">
             {TOOLKIT_TOOLS.map((tool) => (
               <ToolCard
                 key={tool.page}

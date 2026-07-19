@@ -732,6 +732,7 @@ export function mergeSyncPackage(buffer: Buffer, passphrase?: string): SyncMerge
 
   return {
     groups,
+    protectCopies: groups.protect,
     conflicts,
     unknownTables: [...new Set(unknownTables)].sort(),
     packageSchemaVersion: Number.isFinite(manifest.schemaVersion) ? manifest.schemaVersion : 0,

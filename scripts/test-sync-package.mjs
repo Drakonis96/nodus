@@ -74,6 +74,7 @@ try {
   assert.ok(coverage.included.teaching?.includes('teaching_grade_entries'), 'the gradebook is carried');
   assert.ok(coverage.included.genealogy?.includes('archive_items'), 'the evidence archive is carried');
   assert.ok(coverage.included.writing?.includes('project_chapters'), 'writing workshop chapters are carried');
+  assert.ok(coverage.included.protect?.includes('protect_copies'), 'Nodus Protect copies are carried');
   assert.ok(coverage.excluded.includes('passages'), 'corpus-derived data stays out');
 
   // ── Machine A: notes, a draft, a search, a verdict ──────────────────────────
@@ -106,6 +107,10 @@ try {
   // ── Machine A: study docs with binary payloads ─────────────────────────────
   ins(dbA, 'study_docs', { id: 'docShared', short_id: 'DOC-A', title: 'Tema 1', content_markdown: '# versión A', embedding: Buffer.from('EMBED-A'), created_at: T0, updated_at: T1 });
 
+  // ── Machine A: protected copies, including a soft-delete marker ───────────
+  ins(dbA, 'protect_copies', { id: 'pcShared', file_name: 'copia.pdf', mime_type: 'application/pdf', bytes: 8, sha256: 'hash-new', blob: Buffer.from('COPY-NEW'), source_kind: 'disk', source_label: 'Documento', created_at: T0, updated_at: T1, deleted_at: null });
+  ins(dbA, 'protect_copies', { id: 'pcDeleted', file_name: 'borrada.png', mime_type: 'image/png', bytes: 0, sha256: 'hash-del', blob: null, source_kind: 'disk', source_label: null, created_at: T0, updated_at: T2, deleted_at: T2 });
+
   // ── Machine A: a database with an attachment blob AND a thumb ──────────────
   // `thumb` was added by migration 80 and was missing from the hand-written column
   // list, so it silently stopped travelling. Dynamic columns make that impossible.
@@ -120,6 +125,9 @@ try {
   ins(dbB, 'notes', { id: 'n3', folder_id: null, title: 'Solo B', kind: 'markdown', content: 'local de B', order_idx: 0, created_at: T0, updated_at: T0 });
   ins(dbB, 'edge_feedback', { from_id: 'iB', to_id: 'iA', type: 'contradicts', verdict: 'confirmed', note: '', created_at: T0 });
   ins(dbB, 'study_docs', { id: 'docShared', short_id: 'DOC-A', title: 'Tema local más nuevo', content_markdown: '# versión B', embedding: Buffer.from('EMBED-B'), created_at: T0, updated_at: T2 });
+  ins(dbB, 'protect_copies', { id: 'pcShared', file_name: 'vieja.pdf', mime_type: 'application/pdf', bytes: 8, sha256: 'hash-old', blob: Buffer.from('COPY-OLD'), source_kind: 'disk', source_label: null, created_at: T0, updated_at: T0, deleted_at: null });
+  ins(dbB, 'protect_copies', { id: 'pcDeleted', file_name: 'borrada.png', mime_type: 'image/png', bytes: 8, sha256: 'hash-del', blob: Buffer.from('COPY-OLD'), source_kind: 'disk', source_label: null, created_at: T0, updated_at: T0, deleted_at: null });
+  ins(dbB, 'protect_copies', { id: 'pcLocal', file_name: 'local.png', mime_type: 'image/png', bytes: 5, sha256: 'hash-local', blob: Buffer.from('LOCAL'), source_kind: 'disk', source_label: null, created_at: T0, updated_at: T0, deleted_at: null });
 
   // ── Machine B: the SAME academic year, created independently ───────────────
   // Different id, byte-identical label. The UNIQUE index on `label` used to make the
@@ -141,6 +149,7 @@ try {
   assert.equal(pkg.counts.teaching_grade_entries, 1, 'the gradebook is in the package');
   assert.equal(pkg.counts.persons, 1, 'genealogy persons are in the package');
   assert.equal(pkg.counts.projects, 1, 'writing projects are in the package');
+  assert.equal(pkg.counts.protect_copies, 2, 'protected copies and soft-delete markers are in the package');
 
   // Every payload is its own zip entry — that is what keeps a vault full of recordings
   // from ever becoming one buffer larger than V8's maximum string length — and every one
@@ -184,6 +193,7 @@ try {
   const summary = sync.mergeSyncPackage(pkg.buffer, PASS);
   assert.deepEqual(summary.conflicts, [], `merge is clean: ${JSON.stringify(summary.conflicts)}`);
   assert.deepEqual(summary.unknownTables, [], 'both machines understand every table');
+  assert.deepEqual(summary.protectCopies, { inserted: 0, updated: 2, skipped: 0 }, 'newer protected copy and soft-delete marker win');
 
   // The gradebook arrived — the headline gap.
   assert.equal(dbB.prepare("SELECT raw_value FROM teaching_grade_entries WHERE id = 'geA'").get().raw_value, 8.5, 'the grade travelled');
@@ -194,6 +204,9 @@ try {
   assert.equal(dbB.prepare("SELECT summary FROM note_folders WHERE id = 'f2'").get().summary, 'resumen IA', 'folder summary travels (was dropped by the hand-written column list)');
   assert.equal(dbB.prepare("SELECT thumb FROM db_attachments WHERE id = 'attA'").get().thumb.toString(), 'THUMB!', 'attachment thumb travels (added by a later migration)');
   assert.equal(dbB.prepare("SELECT blob FROM db_attachments WHERE id = 'attA'").get().blob.toString(), 'PNGDATA', 'attachment bytes are byte-exact');
+  assert.equal(dbB.prepare("SELECT blob FROM protect_copies WHERE id = 'pcShared'").get().blob.toString(), 'COPY-NEW', 'protected-copy bytes travel intact');
+  assert.equal(dbB.prepare("SELECT blob FROM protect_copies WHERE id = 'pcDeleted'").get().blob, null, 'a protected-copy soft delete clears its BLOB');
+  assert.equal(dbB.prepare("SELECT blob FROM protect_copies WHERE id = 'pcLocal'").get().blob.toString(), 'LOCAL', 'a local protected copy absent from the package remains');
 
   // The duplicate academic year reconciled instead of bricking: one row, and A's
   // course now points at B's local id.
@@ -223,6 +236,7 @@ try {
   const applied = Object.values(again.groups).reduce((sum, c) => sum + c.inserted + c.updated, 0);
   assert.equal(applied, 0, 'a second merge of the same package changes nothing');
   assert.deepEqual(again.conflicts, [], 're-merging produces no conflicts');
+  assert.deepEqual(again.protectCopies, { inserted: 0, updated: 0, skipped: 2 }, 'protected-copy merge is idempotent');
   assert.equal(dbB.prepare('SELECT COUNT(*) AS n FROM notes').get().n, 3, 'row counts stable');
   assert.equal(dbB.prepare("SELECT COUNT(*) AS n FROM study_academic_years").get().n, 1, 'the remap is stable across merges');
 

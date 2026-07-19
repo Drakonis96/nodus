@@ -1,5 +1,6 @@
 import type { TreePersonAttr } from './treeLayout';
 import type { AppLanguage } from './types';
+import { TREE_KINSHIP_ROLE_LABEL_IT } from './treeKinship.it';
 
 export type TreeBranch = 'paternal' | 'maternal' | 'neutral';
 export type TreeKinshipRole =
@@ -223,6 +224,7 @@ export const TREE_KINSHIP_ROLE_LABELS: Record<AppLanguage, Record<TreeKinshipRol
   de: TREE_KINSHIP_ROLE_LABEL_DE,
   pt: TREE_KINSHIP_ROLE_LABEL_PT,
   'pt-BR': TREE_KINSHIP_ROLE_LABEL_PT_BR,
+  it: TREE_KINSHIP_ROLE_LABEL_IT as Record<TreeKinshipRole, string>,
 };
 
 /** The languages kinship labels exist in; derived so it cannot drift from the tables. */
@@ -242,6 +244,7 @@ const SPOUSE_WORD: Record<AppLanguage, readonly [string, string, string]> = {
   de: ['Ehemann', 'Ehefrau', 'Ehepartner'],
   pt: ['Marido', 'Esposa', 'Cônjuge'],
   'pt-BR': ['Marido', 'Esposa', 'Cônjuge'],
+  it: ['Marito', 'Moglie', 'Coniuge'],
 };
 
 const SPOUSE_OF: Record<AppLanguage, (spouse: string, relation: string) => string> = {
@@ -251,6 +254,7 @@ const SPOUSE_OF: Record<AppLanguage, (spouse: string, relation: string) => strin
   de: (spouse, relation) => `${spouse} von ${relation}`,
   pt: (spouse, relation) => `${spouse} de ${relation}`,
   'pt-BR': (spouse, relation) => `${spouse} de ${relation}`,
+  it: (spouse, relation) => `${spouse} di ${relation}`,
 };
 
 /** "<relation> of their spouse" — the noun is fixed, so the possessive can agree. */
@@ -261,6 +265,7 @@ const OF_SPOUSE: Record<AppLanguage, (base: string) => string> = {
   de: (base) => `${base} Ihres Ehepartners`,
   pt: (base) => `${base} do seu cônjuge`,
   'pt-BR': (base) => `${base} do seu cônjuge`,
+  it: (base) => `${base} del coniuge`,
 };
 
 const CONNECTION_LABEL: Record<AppLanguage, string> = {
@@ -270,6 +275,7 @@ const CONNECTION_LABEL: Record<AppLanguage, string> = {
   de: 'Familiäre Verbindung',
   pt: 'Ligação familiar',
   'pt-BR': 'Conexão familiar',
+  it: 'Legame familiare',
 };
 
 export interface TreeKinshipContext {
@@ -332,6 +338,10 @@ function ordinalDe(value: number): string {
   return `${value}.`;
 }
 
+function ordinalIt(value: number, feminine = false): string {
+  return `${value}.${feminine ? 'ª' : 'º'}`;
+}
+
 function descendantContext(sex: string | undefined, depth: number): TreeKinshipContext {
   let role: TreeKinshipRole;
   if (depth === 1) role = sexRole(sex, 'son', 'daughter', 'child');
@@ -350,6 +360,7 @@ function descendantContext(sex: string | undefined, depth: number): TreeKinshipC
           pt: `Descendente da ${ordinalPt(depth, true)} geração`,
           'pt-BR': `Descendente da ${ordinalPt(depth, true)} geração`,
           de: `Nachkomme der ${ordinalDe(depth)} Generation`,
+          it: `Discendente di ${ordinalIt(depth, true)} generazione`,
         },
       }
       : {}),
@@ -372,6 +383,7 @@ function niblingContext(sex: string | undefined, depth: number, branch: TreeBran
           pt: `Sobrinho/a da ${ordinalPt(depth, true)} geração`,
           'pt-BR': `Sobrinho/a da ${ordinalPt(depth, true)} geração`,
           de: `Neffe/Nichte der ${ordinalDe(depth)} Generation`,
+          it: `Nipote di ${ordinalIt(depth, true)} generazione`,
         },
       }
       : {}),
@@ -398,6 +410,7 @@ function uncleContext(sex: string | undefined, level: number, branch: TreeBranch
   const branchFr = branch === 'paternal' ? ' paternel(le)' : branch === 'maternal' ? ' maternel(le)' : '';
   const branchPt = branch === 'paternal' ? ' paterno/a' : branch === 'maternal' ? ' materno/a' : '';
   const branchDe = branch === 'paternal' ? ' väterlicherseits' : branch === 'maternal' ? ' mütterlicherseits' : '';
+  const branchIt = branch === 'paternal' ? ' paterno/a' : branch === 'maternal' ? ' materno/a' : '';
   return {
     role, branch, tone, depth: level,
     ...(level > 3
@@ -409,6 +422,7 @@ function uncleContext(sex: string | undefined, level: number, branch: TreeBranch
           pt: `Tio/a${branchPt} da ${ordinalPt(level, true)} geração`,
           'pt-BR': `Tio/a${branchPt} da ${ordinalPt(level, true)} geração`,
           de: `Onkel/Tante${branchDe} der ${ordinalDe(level)} Generation`,
+          it: `Zio/zia${branchIt} di ${ordinalIt(level, true)} generazione`,
         },
       }
       : {}),
@@ -423,11 +437,13 @@ function cousinContext(sex: string | undefined, degree: number, removal: number,
   const genderFr = sex === 'male' ? 'Cousin' : sex === 'female' ? 'Cousine' : 'Cousin/e';
   const genderPt = sex === 'male' ? 'Primo' : sex === 'female' ? 'Prima' : 'Primo/a';
   const genderDe = sex === 'male' ? 'Cousin' : sex === 'female' ? 'Cousine' : 'Cousin/Cousine';
+  const genderIt = sex === 'male' ? 'Cugino' : sex === 'female' ? 'Cugina' : 'Cugino/a';
   const removalEs = removal === 1 ? ', 1 generación de diferencia' : removal > 1 ? `, ${removal} generaciones de diferencia` : '';
   const removalEn = removal === 1 ? ', once removed' : removal === 2 ? ', twice removed' : removal > 2 ? `, ${removal} times removed` : '';
   const removalFr = removal === 1 ? ", à 1 génération d'écart" : removal > 1 ? `, à ${removal} générations d'écart` : '';
   const removalPt = removal === 1 ? ', 1 geração de diferença' : removal > 1 ? `, ${removal} gerações de diferença` : '';
   const removalDe = removal === 1 ? ', 1 Generation entfernt' : removal > 1 ? `, ${removal} Generationen entfernt` : '';
+  const removalIt = removal === 1 ? ', con 1 generazione di differenza' : removal > 1 ? `, con ${removal} generazioni di differenza` : '';
   return {
     role, branch, tone, depth: 0, cousinDegree: degree, cousinRemoval: removal,
     labels: {
@@ -437,6 +453,7 @@ function cousinContext(sex: string | undefined, degree: number, removal: number,
       pt: `${genderPt} de ${ordinalPt(degree)} grau${removalPt}`,
       'pt-BR': `${genderPt} de ${ordinalPt(degree)} grau${removalPt}`,
       de: `${genderDe} ${ordinalDe(degree)} Grades${removalDe}`,
+      it: `${genderIt} di ${ordinalIt(degree)} grado${removalIt}`,
     },
   };
 }
@@ -543,6 +560,7 @@ export function deriveTreeKinship(input: TreeKinshipInput): Map<string, TreeKins
       const branchFr = branch === 'paternal' ? ' paternel(le)' : branch === 'maternal' ? ' maternel(le)' : '';
       const branchPt = branch === 'paternal' ? ' paterno/a' : branch === 'maternal' ? ' materno/a' : '';
       const branchDe = branch === 'paternal' ? ' väterlicherseits' : branch === 'maternal' ? ' mütterlicherseits' : '';
+      const branchIt = branch === 'paternal' ? ' paterno/a' : branch === 'maternal' ? ' materno/a' : '';
       context.labels = {
         es: `Ascendiente${branchEs} de ${info.distance}.ª generación`,
         en: `${ordinalEn(info.distance)}-generation${branchEn} ancestor`,
@@ -550,6 +568,7 @@ export function deriveTreeKinship(input: TreeKinshipInput): Map<string, TreeKins
         pt: `Ascendente${branchPt} da ${ordinalPt(info.distance, true)} geração`,
         'pt-BR': `Ascendente${branchPt} da ${ordinalPt(info.distance, true)} geração`,
         de: `Vorfahre${branchDe} der ${ordinalDe(info.distance)} Generation`,
+        it: `Ascendente${branchIt} di ${ordinalIt(info.distance, true)} generazione`,
       };
     }
     return context;
@@ -691,18 +710,22 @@ export function deriveTreeKinship(input: TreeKinshipInput): Map<string, TreeKins
     parent: {
       es: ['padre', 'madre', 'progenitor/a'], en: ['father', 'mother', 'parent'], fr: ['père', 'mère', 'parent'],
       de: ['Vater', 'Mutter', 'Elternteil'], pt: ['pai', 'mãe', 'progenitor/a'], 'pt-BR': ['pai', 'mãe', 'genitor/a'],
+      it: ['padre', 'madre', 'genitore'],
     },
     child: {
       es: ['hijo', 'hija', 'hijo/a'], en: ['son', 'daughter', 'child'], fr: ['fils', 'fille', 'enfant'],
       de: ['Sohn', 'Tochter', 'Kind'], pt: ['filho', 'filha', 'filho/a'], 'pt-BR': ['filho', 'filha', 'filho/a'],
+      it: ['figlio', 'figlia', 'figlio/a'],
     },
     spouse: {
       es: ['esposo', 'esposa', 'cónyuge'], en: ['husband', 'wife', 'spouse'], fr: ['époux', 'épouse', 'conjoint'],
       de: ['Ehemann', 'Ehefrau', 'Ehepartner'], pt: ['marido', 'esposa', 'cônjuge'], 'pt-BR': ['marido', 'esposa', 'cônjuge'],
+      it: ['marito', 'moglie', 'coniuge'],
     },
     sibling: {
       es: ['hermano', 'hermana', 'hermano/a'], en: ['brother', 'sister', 'sibling'], fr: ['frère', 'sœur', 'frère/sœur'],
       de: ['Bruder', 'Schwester', 'Geschwister'], pt: ['irmão', 'irmã', 'irmão/ã'], 'pt-BR': ['irmão', 'irmã', 'irmão/ã'],
+      it: ['fratello', 'sorella', 'fratello/sorella'],
     },
   };
   const stepFor = (sex: string | undefined, kind: keyof typeof STEP_WORDS): ConnectionStep => {
