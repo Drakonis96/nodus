@@ -127,6 +127,7 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys' | 'lockedProviderKeys'> = {
   genealogyTourComplete: false,
   databasesTourComplete: false,
   studyTourComplete: false,
+  docenciaTourComplete: false,
   preferZoteroFulltext: true,
   ocrEnabled: false,
   ocrLanguages: 'spa+eng',

@@ -3,6 +3,7 @@ import { getSettings, updateSettings } from './settingsRepo';
 import { clearGenealogyDemoData } from './genealogyDemoData';
 import { clearDatabasesDemoData } from './databasesDemoData';
 import { clearStudyDemoData } from './studyDemoData';
+import { clearTeachingDemoData } from './teachingDemoData';
 
 // A small, self-consistent corpus on the science of learning. It exists so a
 // first-time user can see every static view (graph, ideas, debates, gaps, notes,
@@ -378,7 +379,14 @@ export function hasAnyData(): boolean {
     count('study_docs') > 0 ||
     count('study_materials') > 0 ||
     count('study_recordings') > 0 ||
-    count('study_questions') > 0
+    count('study_questions') > 0 ||
+    // Teaching-vault content. A teacher can have a full class list, rubrics, exams and
+    // a gradebook without ever creating a study_* row, so leaving these out reported an
+    // established workspace as empty and offered to seed the demo on top of it.
+    count('teaching_groups') > 0 ||
+    count('teaching_rubrics') > 0 ||
+    count('teaching_exams') > 0 ||
+    count('teaching_assessment_plans') > 0
   );
 }
 
@@ -532,6 +540,7 @@ export function clearDemoData(): void {
   clearGenealogyDemoData();
   clearDatabasesDemoData();
   clearStudyDemoData();
+  clearTeachingDemoData();
   const db = getDb();
   const tx = db.transaction(() => {
     db.exec(`

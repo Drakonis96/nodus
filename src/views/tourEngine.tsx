@@ -10,6 +10,9 @@ export interface TourStep {
   view?: string;
 }
 
+/** Tailwind indigo-400 — what every tour used before the accent became a prop. */
+const DEFAULT_ACCENT = '#818cf8';
+
 interface Rect {
   top: number;
   left: number;
@@ -25,11 +28,19 @@ interface Rect {
 export function TourOverlay({
   steps,
   label = 'Tutorial',
+  accent = DEFAULT_ACCENT,
   onClose,
   onNavigate,
 }: {
   steps: TourStep[];
   label?: string;
+  /**
+   * Spotlight colour. The eyebrow and the progress dots are Tailwind `indigo-*`
+   * utilities, which the per-vault `.<type>` blocks in index.css already remap; the
+   * spotlight outline is an inline style, so no CSS rule can reach it and the vault
+   * accent has to be passed in explicitly.
+   */
+  accent?: string;
   onClose: () => void;
   onNavigate: (view: string) => void;
 }) {
@@ -44,29 +55,42 @@ export function TourOverlay({
     if (step.view) onNavigate(step.view);
   }, [i, step.view, onNavigate]);
 
+  /**
+   * Measure the target, RETRYING until it appears.
+   *
+   * A single measurement after two frames is not enough: `step.view` only asks the app
+   * to switch, and several sections replace their whole body with a spinner while their
+   * first IPC round-trip is in flight (the gradebook is one). Measuring once caught the
+   * spinner, found no anchor, and fell back to the centred card — which looks like a
+   * deliberately target-less step, so the tour silently stopped pointing at anything.
+   * Polling to a deadline keeps the fallback for genuinely absent anchors while letting
+   * a slow view catch up.
+   */
   useLayoutEffect(() => {
-    let raf = 0;
+    if (!step.target) {
+      setRect(null);
+      return;
+    }
+    let cancelled = false;
+    let timer = 0;
+    const deadline = Date.now() + 5_000;
     const measure = () => {
-      if (!step.target) {
-        setRect(null);
-        return;
-      }
+      if (cancelled) return;
       const el = document.querySelector<HTMLElement>(`[data-tour="${step.target}"]`);
-      if (!el) {
-        setRect(null);
-        return;
+      const r = el?.getBoundingClientRect();
+      if (r && r.width > 0 && r.height > 0) {
+        setRect({ top: r.top, left: r.left, width: r.width, height: r.height });
+        return; // found — the resize listener keeps it fresh from here
       }
-      const r = el.getBoundingClientRect();
-      if (r.width === 0 || r.height === 0) {
-        setRect(null); // element present but not laid out → center
-        return;
-      }
-      setRect({ top: r.top, left: r.left, width: r.width, height: r.height });
+      setRect(null); // absent or not laid out yet → centre, and keep looking
+      if (Date.now() < deadline) timer = window.setTimeout(measure, 100);
     };
-    raf = requestAnimationFrame(() => requestAnimationFrame(measure));
+    const raf = requestAnimationFrame(() => requestAnimationFrame(measure));
     window.addEventListener('resize', measure);
     return () => {
+      cancelled = true;
       cancelAnimationFrame(raf);
+      clearTimeout(timer);
       window.removeEventListener('resize', measure);
     };
   }, [i, step.target]);
@@ -103,6 +127,7 @@ export function TourOverlay({
     <div className="fixed inset-0 z-[100]">
       {spotlight ? (
         <div
+          data-testid="tour-spotlight"
           className="fixed rounded-lg transition-all duration-200 pointer-events-none"
           style={{
             top: spotlight.top,
@@ -110,14 +135,14 @@ export function TourOverlay({
             width: spotlight.width,
             height: spotlight.height,
             boxShadow: '0 0 0 9999px rgba(0,0,0,0.66)',
-            outline: '2px solid #818cf8',
+            outline: `2px solid ${accent}`,
           }}
         />
       ) : (
         <div className="fixed inset-0 bg-black/70" />
       )}
 
-      <div style={ttStyle} className="card bg-neutral-900 border border-neutral-700 p-4 shadow-2xl text-sm">
+      <div data-testid="tour-card" style={ttStyle} className="card bg-neutral-900 border border-neutral-700 p-4 shadow-2xl text-sm">
         <div className="flex items-center justify-between mb-2">
           <div className="text-[11px] uppercase tracking-wide text-indigo-400">
             {t(label)} · {i + 1}/{steps.length}

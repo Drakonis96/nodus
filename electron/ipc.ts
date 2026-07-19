@@ -272,6 +272,7 @@ import { hasAnyData, seedDemoData, clearDemoData } from './db/demoData';
 import { seedGenealogyDemoData } from './db/genealogyDemoData';
 import { seedDatabasesDemoData } from './db/databasesDemoData';
 import { seedStudyDemoData } from './db/studyDemoData';
+import { seedTeachingDemoData } from './db/teachingDemoData';
 import { generateDemoPortraits, hasDemoPortraitKey } from './ai/genealogyDemoPortraits';
 import { exportNotes } from './export/notesExport';
 import { reorderNotesByAI } from './ai/notesOrder';
@@ -3384,6 +3385,9 @@ export function registerIpc(
   h('data:seedDatabasesDemo', async () => seedDatabasesDemoData());
   // Study demo stays entirely local and is only accepted by an empty study vault.
   h('data:seedStudyDemo', async () => seedStudyDemoData());
+  // Teaching demo, likewise local-only. Unlike genealogy and databases it never
+  // converts the active vault: it is refused outside a `docencia` vault instead.
+  h('data:seedTeachingDemo', async () => seedTeachingDemoData());
 
   h('updates:check', async () => checkForUpdates());
   h('updates:install', async () => installUpdate());

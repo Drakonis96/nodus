@@ -737,6 +737,21 @@ export function Settings({
                 </button>
               </div>
             )}
+            {activeVault?.type === 'docencia' && (
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <label className="text-sm text-neutral-300">{t('Tutorial de docencia')}</label>
+                  <p className="text-xs text-neutral-500 mt-0.5">{t('Cursos, grupos, horarios, materiales, rúbricas, exámenes y calificaciones.')}</p>
+                </div>
+                <button
+                  data-testid="teaching-tour-replay"
+                  className="btn btn-ghost border border-neutral-700"
+                  onClick={() => patch({ docenciaTourComplete: false }).then(() => flash(t('Se mostrará el tutorial de docencia.')))}
+                >
+                  <Icon name="presentation" /> {t('Ver de nuevo')}
+                </button>
+              </div>
+            )}
           </Section>
       )}
 

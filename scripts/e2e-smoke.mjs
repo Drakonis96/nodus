@@ -1814,6 +1814,69 @@ try {
   await page.getByTestId('study-demo-offer').waitFor({ timeout: 30_000 });
   console.log('[e2e] reversible study sample workspace works through the real UI and IPC bridge');
 
+  // The teaching vault gets the same treatment: its own demo offer, its own guided
+  // tutorial, and — unlike the other tours — a spotlight that has to come out ORANGE.
+  // The eyebrow and dots are remappable indigo utilities, but the spotlight outline is
+  // an inline style no CSS rule can reach, so this is the assertion that catches an
+  // accent regression.
+  const studyDemoVaultId = await page.evaluate(async () => (await window.nodus.getActiveVault()).id);
+  await page.evaluate(async () => {
+    const created = await window.nodus.createVault({ name: 'Teaching demo smoke', type: 'docencia' });
+    const switched = await window.nodus.switchVault(created.vault.id);
+    if (!switched.ok) throw new Error(switched.message);
+    await window.nodus.updateSettings({ onboardingComplete: true, tourComplete: true, advancedTourComplete: true, docenciaTourComplete: true });
+  });
+  await page.reload();
+  await page.getByTestId('teaching-demo-offer').waitFor({ timeout: 30_000 });
+  await page.getByRole('button', { name: 'Cargar demo de docencia', exact: true }).click();
+  await waitForCondition('datos de ejemplo de docencia cargados', () => page.evaluate(async () => {
+    const [groups, rubrics, exams, plans] = await Promise.all([
+      window.nodus.listTeachingGroups(), window.nodus.listTeachingRubrics(),
+      window.nodus.listTeachingExams(), window.nodus.listAssessmentPlans(),
+    ]);
+    return groups.length === 1 && rubrics.length === 1 && exams.length === 1 && plans.length === 1;
+  }));
+  const tourCard = page.getByTestId('tour-card');
+  const teachingTourLabel = tourCard.getByText(/^Tutorial de docencia/);
+  await teachingTourLabel.waitFor({ timeout: 30_000 });
+  // Step 1 is target-less and centres; step 2 spotlights the courses nav entry.
+  await tourCard.getByRole('button', { name: 'Sí, enséñame', exact: true }).click();
+  const spotlight = page.getByTestId('tour-spotlight');
+  await spotlight.waitFor({ timeout: 30_000 });
+  assert.equal(
+    await spotlight.evaluate((node) => getComputedStyle(node).outlineColor),
+    'rgb(234, 88, 12)',
+    'the teaching tutorial spotlights in the vault accent (orange), not the default indigo',
+  );
+  // Then walk every remaining step. A step whose `data-tour` anchor does not exist
+  // degrades silently to a centred card, which looks deliberate and hides the bug, so
+  // each middle step has to prove it landed on a laid-out element. This also mounts
+  // every teaching view in turn, so the renderer-error assertion at the end covers them.
+  const stepCounter = tourCard.getByText(/^Tutorial de docencia · \d+\/\d+$/);
+  const totalSteps = Number((await stepCounter.textContent()).split('/')[1]);
+  assert.ok(totalSteps >= 10, `the teaching tutorial covers every section, got ${totalSteps} steps`);
+  for (let step = 2; step < totalSteps; step += 1) {
+    await waitForCondition(`el paso ${step}/${totalSteps} del tutorial de docencia enfoca un elemento real`, async () => {
+      const box = await spotlight.boundingBox().catch(() => null);
+      return Boolean(box && box.width > 0 && box.height > 0);
+    });
+    await tourCard.getByRole('button', { name: 'Siguiente', exact: true }).click();
+  }
+  await tourCard.getByRole('button', { name: 'Empezar', exact: true }).waitFor({ timeout: 30_000 });
+  await tourCard.getByRole('button', { name: /^Saltar/ }).click();
+  await teachingTourLabel.waitFor({ state: 'detached', timeout: 30_000 });
+  await page.getByRole('button', { name: 'Salir del modo demo', exact: true }).click();
+  await waitForCondition('datos de ejemplo de docencia eliminados', () => page.evaluate(async () => (await window.nodus.listTeachingGroups()).length === 0));
+  await page.getByTestId('teaching-demo-offer').waitFor({ timeout: 30_000 });
+  console.log('[e2e] teaching sample workspace + orange-accented guided tutorial work through the real UI');
+
+  // Hand the empty study-demo vault back to the genealogy checks below.
+  await page.evaluate(async (id) => {
+    const switched = await window.nodus.switchVault(id);
+    if (!switched.ok) throw new Error(switched.message);
+  }, studyDemoVaultId);
+  await page.reload();
+
   // The empty study-demo vault can now host the genealogy fixture without
   // disturbing earlier checks. Verify the real SVG renderer, including custom
   // user colours and recalculation when the focus changes to the co-parent.

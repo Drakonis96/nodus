@@ -830,13 +830,15 @@ export function DemoOfferCard({
   onLoadGenealogyDemo,
   onLoadDatabasesDemo,
   onLoadStudyDemo,
+  onLoadTeachingDemo,
 }: {
-  variant?: 'academic' | 'genealogy' | 'databases' | 'study';
+  variant?: 'academic' | 'genealogy' | 'databases' | 'study' | 'teaching';
   demoBusy: boolean;
   onLoadDemo?: () => Promise<void>;
   onLoadGenealogyDemo?: () => Promise<void>;
   onLoadDatabasesDemo?: () => Promise<void>;
   onLoadStudyDemo?: () => void | Promise<void>;
+  onLoadTeachingDemo?: () => void | Promise<void>;
 }) {
   const card =
     variant === 'genealogy'
@@ -863,6 +865,14 @@ export function DemoOfferCard({
               label: t('Cargar datos de ejemplo'),
               onClick: onLoadStudyDemo ?? (async () => {}),
             }
+          : variant === 'teaching'
+            ? {
+                title: t('Explora un curso de ejemplo'),
+                desc: t('Carga una unidad completa con su horario, materiales, grupo de alumnado, una rúbrica ponderada, un examen imprimible y un cuaderno de calificaciones ya publicado. Incluye un tutorial guiado.'),
+                icon: 'graduation',
+                label: t('Cargar demo de docencia'),
+                onClick: onLoadTeachingDemo ?? (async () => {}),
+              }
         : {
             title: t('Explora una investigación de ejemplo'),
             desc: t('Seis obras sobre la ciencia del aprendizaje con grafo, notas, mapa de investigación, inmersión, borradores, informe profundo y proyecto guardado; sin conectar Zotero ni configurar IA.'),

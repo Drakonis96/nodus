@@ -25,6 +25,7 @@ try {
   const genealogy = require(path.join(repoRoot, 'electron/db/genealogyDemoData.ts'));
   const databases = require(path.join(repoRoot, 'electron/db/databasesDemoData.ts'));
   const study = require(path.join(repoRoot, 'electron/db/studyDemoData.ts'));
+  const teaching = require(path.join(repoRoot, 'electron/db/teachingDemoData.ts'));
   const vaults = require(path.join(repoRoot, 'electron/vaults/vaultRegistry.ts'));
   const studyChat = require(path.join(repoRoot, 'electron/ai/studyAssistant.ts'));
   const { getDb, closeDb } = require(path.join(repoRoot, 'electron/db/database.ts'));
@@ -74,6 +75,25 @@ try {
   study.clearStudyDemoData();
   assert.equal(count('study_courses', "id LIKE 'demo-study-%'"), 0);
   assert.equal(studyChat.listStudyAssistantConversations(true).filter((item) => item.id.startsWith('demo-study-')).length, 0);
+
+  vaults.setVaultType(vaults.getActiveVault().id, 'docencia');
+  assert.equal(teaching.seedTeachingDemoData(), true);
+  for (const [label, table, where] of [
+    ['courses/subjects', 'study_courses', "id LIKE 'demo-teaching-%'"], ['notes', 'study_docs', "id LIKE 'demo-teaching-%'"],
+    ['materials', 'study_materials', "id LIKE 'demo-teaching-%'"], ['recordings', 'study_recordings', "id LIKE 'demo-teaching-%'"],
+    ['transcripts', 'study_transcripts', "id LIKE 'demo-teaching-%'"], ['question bank', 'study_questions', "id LIKE 'demo-teaching-%'"],
+    ['schedule', 'study_schedule_periods', "id LIKE 'demo-teaching-%'"], ['calendar', 'study_calendar_events', "id LIKE 'demo-teaching-%'"],
+    ['groups', 'teaching_groups', "id LIKE 'demo-teaching-%'"], ['students', 'teaching_students', "id LIKE 'demo-teaching-%'"],
+    ['rubrics', 'teaching_rubrics', "id LIKE 'demo-teaching-%'"], ['exams', 'teaching_exams', "id LIKE 'demo-teaching-%'"],
+    ['exam questions', 'teaching_exam_questions', "id LIKE 'demo-teaching-%'"],
+    ['gradebook plan', 'teaching_assessment_plans', "id LIKE 'demo-teaching-%'"],
+    ['gradebook tree', 'teaching_assessment_items', "id LIKE 'demo-teaching-%'"],
+    ['grades', 'teaching_grade_entries', "id LIKE 'demo-teaching-%'"],
+    ['rubric marks', 'teaching_rubric_evaluations', "id LIKE 'demo-teaching-%'"],
+  ]) assert.ok(count(table, where) > 0, `teaching ${label} is populated`);
+  teaching.clearTeachingDemoData();
+  assert.equal(count('study_courses', "id LIKE 'demo-teaching-%'"), 0);
+  assert.equal(count('teaching_groups', "id LIKE 'demo-teaching-%'"), 0);
   assert.deepEqual(db.pragma('foreign_key_check'), []);
   closeDb();
   console.log('Cross-vault demo coverage tests passed!');
@@ -92,7 +112,13 @@ function installRuntimeHooks(userDataPath) {
     dialog: {}, shell: {}, BrowserWindow: class {}, nativeImage: { createFromBuffer: () => ({ isEmpty: () => true }) },
   };
   Module._resolveFilename = function (request, parent, isMain, options) {
-    if (request.startsWith('@shared/')) return path.join(repoRoot, `${request.replace('@shared/', 'shared/')}.ts`);
+    // `@shared/assessment` is a directory, so a blind `.ts` suffix misses its index.
+    if (request.startsWith('@shared/')) {
+      const rest = request.slice('@shared/'.length);
+      const direct = path.join(repoRoot, 'shared', `${rest}.ts`);
+      const asIndex = path.join(repoRoot, 'shared', rest, 'index.ts');
+      return fs.existsSync(direct) ? direct : asIndex;
+    }
     return originalResolveFilename.call(this, request, parent, isMain, options);
   };
   Module._load = function (request, parent, isMain) { if (request === 'electron') return electronStub; return originalLoad.call(this, request, parent, isMain); };
