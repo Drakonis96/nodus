@@ -1181,6 +1181,10 @@ function coverAttachment(row: DatabaseRow, columns: DatabaseColumn[]): DatabaseA
 
 const GALLERY_COLS_MIN = 5;
 const GALLERY_COLS_MAX = 15;
+/** `gap-3` in pixels — the virtualizer needs the real spacing to place rows. */
+const GALLERY_GAP_PX = 12;
+/** The card's fixed text block below the square image (`h-[4.25rem]`). */
+const GALLERY_CARD_TEXT_PX = 68;
 
 function GalleryView({
   rows,
@@ -1202,8 +1206,39 @@ function GalleryView({
   useEffect(() => localStorage.setItem('nodus.db.galleryCols', String(cols)), [cols]);
   useEffect(() => localStorage.setItem('nodus.db.galleryFit', fit), [fit]);
 
+  // Available width, so the virtualized row height can be derived from the real
+  // card size. Cards are `aspect-square` plus a fixed text block, so once the
+  // width is known every grid row is exactly the same height.
+  //
+  // The element is held in state rather than a ref: a ref callback's return
+  // value is ignored on React 18, so disconnecting the observer has to happen
+  // in an effect or it would leak one observer per gallery mount.
+  const [gridEl, setGridEl] = useState<HTMLDivElement | null>(null);
+  const [gridWidth, setGridWidth] = useState(0);
+  useEffect(() => {
+    if (!gridEl) return;
+    const update = () => setGridWidth(gridEl.clientWidth);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(gridEl);
+    return () => observer.disconnect();
+  }, [gridEl]);
+
+  // One virtual item per grid ROW, not per card: the gallery previously mounted
+  // every card at once, and each one fires an IPC call for its thumbnail and
+  // holds a Blob URL. At 7,000 rows that flooded the main process and pinned
+  // hundreds of megabytes of encoded images.
+  const rowGroups = useMemo(() => {
+    const groups: DatabaseRow[][] = [];
+    for (let index = 0; index < rows.length; index += cols) groups.push(rows.slice(index, index + cols));
+    return groups;
+  }, [rows, cols]);
+
+  const cardWidth = gridWidth > 0 ? (gridWidth - GALLERY_GAP_PX * (cols - 1)) / cols : 0;
+  const groupHeight = cardWidth + GALLERY_CARD_TEXT_PX + GALLERY_GAP_PX;
+
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto p-4">
+    <div className="flex-1 min-h-0 flex flex-col p-4">
       {rows.length === 0 ? (
         <div className="p-8 text-center text-sm text-neutral-500">{t('Sin filas todavía. Añade la primera.')}</div>
       ) : (
@@ -1247,10 +1282,31 @@ function GalleryView({
               </button>
             </div>
           </div>
-          <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
-            {rows.map((row) => (
-              <GalleryCard key={row.id} row={row} columns={columns} chipCols={chipCols} fit={fit} onOpen={() => onOpen(row.id)} />
-            ))}
+          {/* Measured by the ref; the list only renders once a real width is known
+              so the row height is never derived from a zero-width layout pass. */}
+          <div ref={setGridEl} className="flex-1 min-h-0">
+            {gridWidth > 0 && (
+              <VirtualList
+                items={rowGroups}
+                itemHeight={groupHeight}
+                getKey={(_group, index) => index}
+                className="h-full"
+                renderItem={(group) => (
+                  <div
+                    className="grid gap-3"
+                    style={{
+                      gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
+                      height: groupHeight - GALLERY_GAP_PX,
+                      marginBottom: GALLERY_GAP_PX,
+                    }}
+                  >
+                    {group.map((row) => (
+                      <GalleryCard key={row.id} row={row} columns={columns} chipCols={chipCols} fit={fit} onOpen={() => onOpen(row.id)} />
+                    ))}
+                  </div>
+                )}
+              />
+            )}
           </div>
         </>
       )}
@@ -1275,11 +1331,18 @@ function GalleryCard({
   const url = useAttachmentImageUrl(cover ?? ({ id: '', mimeType: null, hasBlob: false } as DatabaseAttachment));
   return (
     <button
+      data-testid="gallery-card"
       className="card p-0 overflow-hidden text-left hover:border-indigo-600/70 transition-colors flex flex-col"
       onClick={onOpen}
     >
       {/* Fixed square so every card is the same size, regardless of image (or none). */}
-      <div className="aspect-square shrink-0 bg-neutral-900/60 flex items-center justify-center overflow-hidden">
+      {/* `w-full` is what actually makes the square square. `aspect-square` alone
+          needs a definite width to derive its height from; as a column flex item
+          with no image inside, it collapsed to the placeholder icon's 26px, so
+          image-less cards were a third the height of the rest — contradicting the
+          comment above. A definite width makes every card the same size for real,
+          which is also what lets the gallery virtualize on a known row height. */}
+      <div className="w-full aspect-square shrink-0 bg-neutral-900/60 flex items-center justify-center overflow-hidden">
         {cover && url ? (
           <img src={url} alt="" className={`w-full h-full ${fit === 'cover' ? 'object-cover' : 'object-contain'}`} />
         ) : (

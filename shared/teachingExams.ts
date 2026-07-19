@@ -371,6 +371,9 @@ export function flattenExamBlocks(blocks: ExamBlock[]): ExamNumberedQuestion[] {
  */
 export function distributeSectionPoints(total: number, count: number): number[] {
   if (count <= 0) return [];
+  // A non-finite total is an empty or half-typed field, not a request to zero the
+  // exercise: `Math.max(0, NaN)` is NaN, and it propagated into every sub-question.
+  if (!Number.isFinite(total)) return [];
   const quarters = Math.max(0, Math.round(total * 4));
   const base = Math.floor(quarters / count);
   const remainder = quarters - base * count;

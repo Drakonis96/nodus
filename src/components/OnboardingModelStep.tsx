@@ -16,6 +16,7 @@ import {
 } from '@shared/onboardingModels';
 import { t, tx } from '../i18n';
 import { SearchableModelSelect } from './SearchableModelSelect';
+import { SubscriptionQuotaNotice } from './ModelPicker';
 import { Icon } from './ui';
 
 const errorText = (cause: unknown) => (cause instanceof Error ? cause.message : String(cause));
@@ -168,6 +169,12 @@ export function OnboardingModelStep({
               emptyLabel={t('Ningún proveedor respondió todavía.')}
               noteFor={localNote}
             />
+          </div>
+          {/* Onboarding writes this choice to `synthesisModel` in basic mode, which
+              is the fallback for every batch pipeline — so the quota caveat belongs
+              here as much as in Settings. */}
+          <div className="mt-1.5">
+            <SubscriptionQuotaNotice model={aiModel} />
           </div>
         </label>
         <label className="block text-sm">

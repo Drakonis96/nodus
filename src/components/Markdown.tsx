@@ -4,8 +4,9 @@ import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
-import type { CitationPreview, CitationRef } from '@shared/types';
+import type { CitationPreview } from '@shared/types';
 import { t } from '../i18n';
+import { VERIFY_DEBOUNCE_MS, planCitationVerification } from '../citationVerification';
 
 const nodusUrlTransform = (value: string) => {
   if (value.startsWith('nodus://')) return value;
@@ -48,19 +49,39 @@ export function Markdown({
   // is still being checked (treated as neutral); `false` means it did not resolve.
   const [validity, setValidity] = useState<Record<string, boolean>>({});
 
+  // Verification is deliberately deferred rather than run per render.
+  //
+  // While an answer streams, `content` grows by one delta at a time — dozens of
+  // changes a second. Verifying on each of them fired an IPC round-trip whose
+  // main-process handler runs a synchronous SQLite lookup *per citation*, and
+  // since the citation list grows as the answer does, the total cost was
+  // quadratic in the length of the answer. That starved the main process for
+  // the whole duration of every cited response.
+  //
+  // Waiting for the content to settle collapses a whole stream into one call,
+  // and skipping unchanged reference lists means edits that do not touch
+  // citations cost nothing at all.
+  const lastVerifiedRef = useRef<string>('');
   useEffect(() => {
     if (!verify) return;
-    const refs = collectCitations(content);
-    if (refs.length === 0) {
-      setValidity({});
+    const plan = planCitationVerification(content, lastVerifiedRef.current);
+    if (plan.action === 'skip') return;
+    if (plan.action === 'clear') {
+      lastVerifiedRef.current = '';
+      setValidity((current) => (Object.keys(current).length === 0 ? current : {}));
       return;
     }
+
     let on = true;
-    void window.nodus.verifyCitations(refs).then((map) => {
-      if (on) setValidity(map);
-    });
+    const timer = setTimeout(() => {
+      lastVerifiedRef.current = plan.key;
+      void window.nodus.verifyCitations(plan.refs).then((map) => {
+        if (on) setValidity(map);
+      });
+    }, VERIFY_DEBOUNCE_MS);
     return () => {
       on = false;
+      clearTimeout(timer);
     };
   }, [content, verify]);
 
@@ -227,23 +248,6 @@ function CitationLink({
       )}
     </span>
   );
-}
-
-/** Find every distinct `nodus://kind/id` citation referenced in the markdown. */
-function collectCitations(content: string): CitationRef[] {
-  const refs: CitationRef[] = [];
-  const seen = new Set<string>();
-  const re = /nodus:\/\/(idea|work|gap|contradiction|passage)\/([^\s)"'<>]+)/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(content)) !== null) {
-    const kind = m[1] as CitationRef['kind'];
-    const id = decodeURIComponent(m[2]);
-    const key = `${kind}:${id}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    refs.push({ kind, id });
-  }
-  return refs;
 }
 
 function parseCitation(href: string | undefined): MarkdownCitation | null {

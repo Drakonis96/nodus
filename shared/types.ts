@@ -155,7 +155,7 @@ import type {
 } from './teachingRubrics';
 import type { TeachingGroup, TeachingGroupInput, TeachingStudent } from './teachingGroups';
 export type { TeachingGroup, TeachingGroupInput, TeachingStudent } from './teachingGroups';
-import type { AssessmentItem, AssessmentPlan, GradeEntry, PlanRules } from './assessment/model';
+import type { AssessmentItem, AssessmentPlan, GradeEntry, PlanRulesPatch } from './assessment/model';
 import type { ProposedPlan } from './assessmentImport';
 export type * from './assessmentImport';
 export type * from './assessment/model';
@@ -2650,6 +2650,11 @@ export interface DebateWork {
   authors: string[];
   year: number | null;
   role: 'principal' | 'secondary';
+  /**
+   * Empty in list responses. `getDebates()` returns every contradiction in the
+   * corpus at once and nothing renders this prose, so shipping it meant tens of
+   * megabytes structured-cloned across IPC per call. `getDebate()` fills it.
+   */
   development: string;
   evidence: Evidence[];
 }
@@ -5643,7 +5648,7 @@ export interface NodusApi {
   listAssessmentPlans(options?: { subjectId?: string | null; academicYearId?: string | null }): Promise<AssessmentPlan[]>;
   getAssessmentPlan(id: string): Promise<{ plan: AssessmentPlan; items: AssessmentItem[] }>;
   createAssessmentPlan(input: { name: string; subjectId: string; academicYearId?: string | null; profile?: string }): Promise<AssessmentPlan>;
-  updateAssessmentPlan(id: string, patch: { name?: string; academicYearId?: string | null; profile?: string; rules?: Partial<PlanRules> }): Promise<AssessmentPlan>;
+  updateAssessmentPlan(id: string, patch: { name?: string; academicYearId?: string | null; profile?: string; rules?: PlanRulesPatch }): Promise<AssessmentPlan>;
   publishAssessmentPlan(id: string): Promise<AssessmentPlan>;
   reviseAssessmentPlan(id: string): Promise<AssessmentPlan>;
   deleteAssessmentPlan(id: string): Promise<void>;
@@ -5655,6 +5660,8 @@ export interface NodusApi {
   setGradeEntry(input: { studentId: string; itemId: string; convocatoria?: string; rawValue?: number | null; status?: GradeEntry['status']; isOverride?: boolean; note?: string }): Promise<GradeEntry>;
   clearGradeEntry(studentId: string, itemId: string, convocatoria?: string): Promise<void>;
   gradebookCohortStats(planId: string, groupId: string, convocatoria?: string): Promise<{ maxByItem: Record<string, number> }>;
+  /** studentId → itemId → fraction already earned in an earlier convocatoria (ratchet rule). */
+  gradebookRatchetBaseline(planId: string, groupId: string, convocatoria?: string): Promise<Record<string, Record<string, number>>>;
   importAssessmentPlan(request: { planId: string; text: string }): Promise<ProposedPlan>;
   applyProposedPlan(planId: string, proposal: ProposedPlan): Promise<AssessmentItem[]>;
   exportGradebookActa(format: 'pdf' | 'docx' | 'csv' | 'xlsx', input: unknown, grid?: { columns: unknown[]; rows: unknown[] }): Promise<{ path: string } | null>;

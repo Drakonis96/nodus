@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { CopilotClient, RuntimeConnection, type ModelInfo as CopilotModelInfo } from '@github/copilot-sdk';
+import { ProviderRuntimeError } from './providerErrors';
 import type {
   GitHubCopilotSessionUsage,
   GitHubCopilotSubscriptionQuotaWindow,
@@ -46,6 +47,10 @@ let loginProcess: ChildProcessWithoutNullStreams | null = null;
 let loginDiagnostic = '';
 let lastSession: GitHubCopilotSessionUsage | null = null;
 let modelCache: CopilotModelInfo[] | null = null;
+let modelCacheAt = 0;
+/** The catalogue follows the GitHub plan, so a tier change or a newly released model
+ *  has to become visible without making the user sign out or restart Nodus. */
+const MODEL_CACHE_TTL_MS = 10 * 60_000;
 
 function copilotHome(): string {
   const dir = path.join(app.getPath('userData'), 'github-copilot-subscription');
@@ -92,7 +97,12 @@ function sanitizedEnv(): Record<string, string> {
   const env: Record<string, string> = {};
   for (const [name, value] of Object.entries(process.env)) {
     if (value === undefined) continue;
-    if (/(?:API_?KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL|COOKIE|SESSION)/i.test(name)) continue;
+    // `SESSION` is deliberately absent: it matched DBUS_SESSION_BUS_ADDRESS,
+    // XDG_SESSION_* and macOS SECURITYSESSIONID, which are desktop-integration
+    // handles rather than credentials — and the CLI needs them to open a browser
+    // and reach the keyring during login. Real session credentials still match
+    // TOKEN/SECRET.
+    if (/(?:API_?KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL|COOKIE)/i.test(name)) continue;
     env[name] = value;
   }
   delete env.NODE_OPTIONS;
@@ -256,13 +266,17 @@ export async function logoutGitHubCopilotSubscription(): Promise<GitHubCopilotSu
 }
 
 async function copilotModels(): Promise<CopilotModelInfo[]> {
-  if (modelCache) return modelCache;
+  if (modelCache && Date.now() - modelCacheAt < MODEL_CACHE_TTL_MS) return modelCache;
   const runtime = getClient();
   await runtime.start();
   const auth = await runtime.getAuthStatus();
-  if (!auth.isAuthenticated) throw new Error('Conecta primero tu cuenta de GitHub Copilot en Proveedores y modelos.');
-  modelCache = await runtime.listModels();
-  return modelCache;
+  if (!auth.isAuthenticated) {
+    throw new ProviderRuntimeError('Conecta primero tu cuenta de GitHub Copilot en Proveedores y modelos.', 'auth');
+  }
+  const models = await runtime.listModels();
+  modelCache = models;
+  modelCacheAt = Date.now();
+  return models;
 }
 
 export async function listGitHubCopilotSubscriptionModels(): Promise<ModelInfo[]> {
@@ -303,6 +317,7 @@ async function stopClient(): Promise<void> {
   const current = client;
   client = null;
   modelCache = null;
+  modelCacheAt = 0;
   if (current) await current.stop();
 }
 

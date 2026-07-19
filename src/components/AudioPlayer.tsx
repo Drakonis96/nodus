@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { t } from '../i18n';
+import { AudioClipCache } from '../audioClipCache';
 
 // A single app-wide audio player. One <audio> element and one bottom "strip" of
 // controls serve every narration, so playback survives navigation between views
@@ -32,7 +33,7 @@ export function useAudioPlayer(): PlayerApi {
 
 export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const urlCache = useRef<Map<string, string>>(new Map());
+  const urlCache = useRef<AudioClipCache>(new AudioClipCache());
   const tracksRef = useRef<PlayerTrack[]>([]);
   const indexRef = useRef(0);
   const rateRef = useRef(1);

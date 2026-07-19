@@ -24,6 +24,15 @@ export async function rubricDocxBytes(rubric: TeachingRubric, options: RubricExp
 
   const labels = rubricDocumentLabels(rubric.language);
   const showScores = options.includeScores !== false;
+
+  /**
+   * One TextRun per LINE. `docx` drops "\n" outright, so a descriptor written on three
+   * lines arrived in Word as one — while the PDF, built from the shared HTML, showed
+   * the breaks. Both documents come from the same data and must read the same.
+   */
+  const textRuns = (text: string, props: Record<string, unknown> = {}) =>
+    String(text ?? '').split(/\r?\n/).map((line, index) =>
+      new TextRun({ ...props, text: line, ...(index > 0 ? { break: 1 } : {}) }));
   const border = { style: BorderStyle.SINGLE, size: 6, color: '999999' };
   const cellBorders = { top: border, bottom: border, left: border, right: border };
 
@@ -53,7 +62,7 @@ export async function rubricDocxBytes(rubric: TeachingRubric, options: RubricExp
   const bodyRows = rubric.criteria.map((criterion) => {
     const criterionParagraphs = [new Paragraph({ children: [new TextRun({ text: criterion.name, bold: true, size: 18 })] })];
     if (criterion.description.trim()) {
-      criterionParagraphs.push(new Paragraph({ children: [new TextRun({ text: criterion.description, size: 16, color: '666666' })] }));
+      criterionParagraphs.push(new Paragraph({ children: textRuns(criterion.description, { size: 16, color: '666666' }) }));
     }
     if (rubric.weighted) {
       criterionParagraphs.push(
@@ -67,7 +76,7 @@ export async function rubricDocxBytes(rubric: TeachingRubric, options: RubricExp
           (level) =>
             new TableCell({
               borders: cellBorders,
-              children: [new Paragraph({ children: [new TextRun({ text: criterion.cells[level.id] ?? '', size: 17 })] })],
+              children: [new Paragraph({ children: textRuns(criterion.cells[level.id] ?? '', { size: 17 }) })],
             })
         ),
         ...(options.includeScoreColumn ? [new TableCell({ borders: cellBorders, children: [new Paragraph({ text: '' })] })] : []),
@@ -93,7 +102,7 @@ export async function rubricDocxBytes(rubric: TeachingRubric, options: RubricExp
         children: [
           new Paragraph({ spacing: { after: 60 }, children: [new TextRun({ text: rubric.title || 'Rúbrica', bold: true, size: 30 })] }),
           ...(rubric.description.trim()
-            ? [new Paragraph({ spacing: { after: 160 }, children: [new TextRun({ text: rubric.description, size: 17, color: '555555' })] })]
+            ? [new Paragraph({ spacing: { after: 160 }, children: textRuns(rubric.description, { size: 17, color: '555555' }) })]
             : [new Paragraph({ spacing: { after: 120 }, children: [] })]),
           new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [new TableRow({ children: headerCells, tableHeader: true }), ...bodyRows] }),
           new Paragraph({

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell } from 'electron';
+import { app, BrowserWindow, dialog, shell } from 'electron';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { constants as fsConstants, promises as fs } from 'node:fs';
@@ -21,10 +21,16 @@ import { applyMascotWindow, destroyMascotWindow } from './mascotWindow';
 import { seedWelcomeNotification } from './notifications';
 import { startStudyCalendarReminders, stopStudyCalendarReminders } from './studyCalendarReminders';
 import { restorePersistedDockIcon } from './dockIcon';
+import { stopAllWhisperCpp } from './stt/whisperCpp';
 import { recoverLegacyApiKeys } from './secrets/legacySecretRecovery';
 import type { UpdateCheckResponse, UpdateProgressEvent } from '@shared/types';
-import { stopChatGptSubscriptionServer } from './ai/codexSubscription';
+import { killChatGptSubscriptionServer } from './ai/codexSubscription';
 import { stopGitHubCopilotSubscription } from './ai/githubCopilotSubscription';
+import { installProcessSafetyNet } from './util/processSafety';
+
+// Before anything else: a stray rejection from any of the fire-and-forget
+// timers below would otherwise terminate the process under Node's default.
+installProcessSafetyNet();
 
 const require = createRequire(__filename);
 const { autoUpdater } = require('electron-updater') as typeof import('electron-updater');
@@ -48,6 +54,32 @@ if (process.env.NODUS_USERDATA) {
   app.setPath('userData', process.env.NODUS_USERDATA);
 }
 
+/**
+ * Only one Nodus may own a profile at a time.
+ *
+ * Every vault is a SQLite file plus a registry of which vault is active. Two
+ * processes opening the same profile write to both concurrently: the second
+ * one's vault switch rewrites the registry underneath the first, and their
+ * writes interleave in the database itself. That is data loss, not slowness,
+ * and it is silent until something fails to open.
+ *
+ * The lock is deliberately taken AFTER the userData override above, because
+ * Electron scopes it to the profile directory. Isolated profiles — tests, the
+ * demo instance, a second vault opened on purpose with NODUS_USERDATA — each
+ * get their own lock and still run side by side. Only a genuine second copy of
+ * the same profile is refused.
+ *
+ * The macOS unsigned updater is unaffected: its helper script waits for this
+ * process to exit (`while kill -0 "$PID"`) before it replaces the bundle and
+ * runs `open -n`, so the lock is already released by then.
+ */
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
+if (!hasSingleInstanceLock) {
+  // Hand over to the copy that already owns this profile and leave. Nothing
+  // below has run yet, so no database or window has been touched.
+  app.quit();
+}
+
 let mainWindow: BrowserWindow | null = null;
 let updateCheckTimer: NodeJS.Timeout | null = null;
 let installingUpdate = false;
@@ -56,6 +88,11 @@ let downloadedUpdateFile: string | null = null;
 let lastUpdateEvent: UpdateProgressEvent | null = null;
 let installUpdateTimer: NodeJS.Timeout | null = null;
 let useUnsignedMacUpdaterFallback = false;
+let autoBackupTimer: NodeJS.Timeout | null = null;
+let autoBackupFirstTimer: NodeJS.Timeout | null = null;
+let autoBackupRunning = false;
+/** Set once shutdown starts, so timers that fire mid-quit do not reopen the DB. */
+let quitting = false;
 
 const UPDATE_CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000;
 
@@ -410,7 +447,21 @@ function setupAutoUpdates(): void {
   updateCheckTimer = setInterval(() => void checkForUpdates('scheduled'), UPDATE_CHECK_INTERVAL_MS);
 }
 
+// A second copy of this profile tried to start. It has already quit; bring the
+// window the user was actually looking for to the front.
+app.on('second-instance', () => {
+  if (!mainWindow) {
+    createWindow();
+    return;
+  }
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  if (!mainWindow.isVisible()) mainWindow.show();
+  mainWindow.focus();
+});
+
 app.whenReady().then(() => {
+  // Losing the lock queues a quit; do not open the database or a window.
+  if (!hasSingleInstanceLock) return;
   restorePersistedDockIcon();
   // Nodus Toolkit OCR caches its Tesseract language traineddata here (the one
   // opt-in network call), so downloads persist across sessions in userData.
@@ -454,12 +505,32 @@ app.whenReady().then(() => {
   // heavy work (SQLite snapshot + scrypt + AES) is a single async pass and the
   // schedule state lives in settings, so missed ticks self-correct.
   const autoBackupTick = () => {
-    void maybeRunAutoBackup(app.getVersion()).then((result) => {
-      if (result) console.log(`[backup] ${result.ok ? 'ok' : 'error'}: ${result.message}`);
-    });
+    // A backup snapshots every vault, so on a large library it can outlast the
+    // 30-minute heartbeat. Overlapping runs would hold two full copies of the
+    // whole library in memory at once, so a tick that arrives while one is
+    // still running is dropped — the schedule lives in settings, so the next
+    // tick picks it up.
+    if (autoBackupRunning) {
+      console.log('[backup] skipped: the previous backup is still running');
+      return;
+    }
+    if (quitting) return;
+    autoBackupRunning = true;
+    void maybeRunAutoBackup(app.getVersion())
+      .then((result) => {
+        if (result) console.log(`[backup] ${result.ok ? 'ok' : 'error'}: ${result.message}`);
+      })
+      .catch((error) => {
+        // Without this the rejection was unhandled, which under Node's default
+        // terminates the process — unattended, every 30 minutes.
+        console.error(`[backup] failed: ${error instanceof Error ? error.message : String(error)}`);
+      })
+      .finally(() => {
+        autoBackupRunning = false;
+      });
   };
-  setTimeout(autoBackupTick, 2 * 60 * 1000);
-  setInterval(autoBackupTick, 30 * 60 * 1000);
+  autoBackupFirstTimer = setTimeout(autoBackupTick, 2 * 60 * 1000);
+  autoBackupTimer = setInterval(autoBackupTick, 30 * 60 * 1000);
 
   if (settings.syncMode === 'realtime') startRealtimeSync();
   if (settings.mcpEnabled) void startMcpServer();
@@ -481,38 +552,68 @@ app.whenReady().then(() => {
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
+}).catch((error) => {
+  // Startup opens and migrates the database before the first window exists, so
+  // a failure here used to leave no window and no message — the app simply
+  // never appeared. Tell the user which step failed instead.
+  const message = error instanceof Error ? error.message : String(error);
+  console.error(`[startup] failed before the window was ready: ${message}`);
+  dialog.showErrorBox(
+    'Nodus no pudo iniciarse',
+    `Fallo al preparar la biblioteca:\n\n${message}\n\n` +
+      'Si el problema persiste, restaura una copia de seguridad o abre otra bóveda.'
+  );
+  app.quit();
 });
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
+    quitting = true;
+    if (autoBackupTimer) clearInterval(autoBackupTimer);
+    if (autoBackupFirstTimer) clearTimeout(autoBackupFirstTimer);
     stopRealtimeSync();
     interruptDecorativeImageGenerations();
+    stopAllWhisperCpp();
     closeDb();
     app.quit();
   }
 });
 
 app.on('before-quit', () => {
+  quitting = true;
   stopStudyCalendarReminders();
+  stopAllWhisperCpp();
   if (updateCheckTimer) clearInterval(updateCheckTimer);
   if (installUpdateTimer) clearTimeout(installUpdateTimer);
+  // getDb() reopens (and re-migrates) lazily, so a backup tick landing after
+  // closeDb() would resurrect the database on a shutting-down process.
+  if (autoBackupTimer) clearInterval(autoBackupTimer);
+  if (autoBackupFirstTimer) clearTimeout(autoBackupFirstTimer);
   stopRealtimeSync();
   interruptDecorativeImageGenerations();
   void stopMcpServer();
   void stopCopilotServer();
-  void stopChatGptSubscriptionServer();
+  // Kill synchronously: this handler cannot await, so the graceful stops below would
+  // be abandoned mid-drain and leave the vendor runtimes running as orphans.
+  killChatGptSubscriptionServer();
   void stopGitHubCopilotSubscription();
   closeDb();
 });
 
 const updateAwareApp = app as typeof app & { on(event: 'before-quit-for-update', listener: () => void): typeof app };
 updateAwareApp.on('before-quit-for-update', () => {
+  quitting = true;
   if (updateCheckTimer) clearInterval(updateCheckTimer);
+  if (autoBackupTimer) clearInterval(autoBackupTimer);
+  if (autoBackupFirstTimer) clearTimeout(autoBackupFirstTimer);
   stopRealtimeSync();
   interruptDecorativeImageGenerations();
+  stopAllWhisperCpp();
   void stopMcpServer();
   void stopCopilotServer();
-  void stopChatGptSubscriptionServer();
+  // Kill synchronously: this handler cannot await, so the graceful stops below would
+  // be abandoned mid-drain and leave the vendor runtimes running as orphans.
+  killChatGptSubscriptionServer();
   void stopGitHubCopilotSubscription();
   closeDb();
 });

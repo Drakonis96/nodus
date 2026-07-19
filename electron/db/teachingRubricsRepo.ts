@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import { getDb } from './database';
 import { createStudyShortId } from '@shared/studyOrg';
 import {
+  clampRubricScale,
   defaultRubric,
   normalizeRubricLanguage,
   type RubricCriterion,
@@ -93,7 +94,7 @@ export function createTeachingRubric(input: TeachingRubricInput = {}): TeachingR
       input.subjectId ?? null,
       input.courseId ?? null,
       language,
-      Number(input.scaleMax ?? base.scaleMax),
+      clampRubricScale(input.scaleMax ?? base.scaleMax),
       input.weighted ?? base.weighted ? 1 : 0,
       JSON.stringify(input.levels ?? base.levels),
       JSON.stringify(input.criteria ?? base.criteria),
@@ -116,7 +117,7 @@ export function updateTeachingRubric(id: string, patch: Partial<TeachingRubricIn
   if (patch.subjectId !== undefined) set('subject_id', patch.subjectId ?? null);
   if (patch.courseId !== undefined) set('course_id', patch.courseId ?? null);
   if (patch.language !== undefined) set('language', normalizeRubricLanguage(patch.language));
-  if (patch.scaleMax !== undefined) set('scale_max', Math.max(1, Number(patch.scaleMax) || 5));
+  if (patch.scaleMax !== undefined) set('scale_max', clampRubricScale(patch.scaleMax));
   if (patch.weighted !== undefined) set('weighted', patch.weighted ? 1 : 0);
   if (patch.levels !== undefined) set('levels_json', JSON.stringify(patch.levels));
   if (patch.criteria !== undefined) set('criteria_json', JSON.stringify(patch.criteria));

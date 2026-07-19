@@ -1,5 +1,6 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { createInterface } from 'node:readline';
+import { ProviderRuntimeError } from './providerErrors';
 
 type JsonRpcId = number;
 type JsonObject = Record<string, unknown>;
@@ -46,6 +47,12 @@ export class CodexAppServerClient {
     return this.sendRequest<T>(method, params, timeoutMs);
   }
 
+  /** Live child, without starting one. Lets callers skip best-effort teardown
+   *  instead of having `request()` respawn the runtime they are cleaning up after. */
+  isRunning(): boolean {
+    return this.child !== null && this.child.exitCode === null;
+  }
+
   async stop(): Promise<void> {
     this.stopping = true;
     const child = this.child;
@@ -55,7 +62,7 @@ export class CodexAppServerClient {
 
     for (const pending of this.pending.values()) {
       clearTimeout(pending.timer);
-      pending.reject(new Error('El runtime de ChatGPT se ha cerrado.'));
+      pending.reject(new ProviderRuntimeError('El runtime de ChatGPT se ha cerrado.', 'unavailable'));
     }
     this.pending.clear();
 
@@ -66,10 +73,35 @@ export class CodexAppServerClient {
     }, 1_500);
     await Promise.race([exited, new Promise<void>((resolve) => setTimeout(resolve, 2_500))]);
     clearTimeout(timer);
-    if (child.exitCode === null && !child.killed) {
+    // Escalate on liveness alone. `child.killed` only means "a signal was delivered
+    // to the OS", so the SIGTERM above sets it and testing it here would make this
+    // branch unreachable in exactly the case it exists for: a child that ignored
+    // SIGTERM and is still running.
+    if (child.exitCode === null) {
       try { child.kill('SIGKILL'); } catch { /* process already gone */ }
     }
     this.stopping = false;
+  }
+
+  /**
+   * Synchronous teardown for app shutdown. Electron's `before-quit` cannot await, so
+   * {@link stop}'s graceful drain — which only sends SIGTERM after a 1.5s timer —
+   * never gets to run there and the runtime survives as an orphan holding a keyring
+   * session. Killing outright is the only teardown that actually completes in a
+   * synchronous handler.
+   */
+  killNow(): void {
+    this.stopping = true;
+    const child = this.child;
+    this.child = null;
+    this.startPromise = null;
+    for (const pending of this.pending.values()) {
+      clearTimeout(pending.timer);
+      pending.reject(new ProviderRuntimeError('El runtime de ChatGPT se ha cerrado.', 'unavailable'));
+    }
+    this.pending.clear();
+    if (!child || child.exitCode !== null) return;
+    try { child.kill('SIGKILL'); } catch { /* process already gone */ }
   }
 
   private async ensureStarted(): Promise<void> {
@@ -115,6 +147,15 @@ export class CodexAppServerClient {
     );
     this.child = child;
 
+    // A dying child races every write: the `exitCode === null` guards below can pass
+    // and the pipe still be gone by the time the data lands, and an unhandled stream
+    // 'error' is an uncaught exception that takes down the whole main process. These
+    // listeners swallow it deliberately — the real failure is reported by the 'exit'
+    // handler, which rejects every pending request with a description of the exit.
+    child.stdin.on('error', () => { /* reported via 'exit' */ });
+    child.stdout.on('error', () => { /* reported via 'exit' */ });
+    child.stderr.on('error', () => { /* reported via 'exit' */ });
+
     const lines = createInterface({ input: child.stdout, crlfDelay: Infinity });
     lines.on('line', (line) => this.handleLine(line));
     child.stderr.setEncoding('utf8');
@@ -127,8 +168,9 @@ export class CodexAppServerClient {
       if (this.child === child) this.child = null;
       if (!this.stopping) {
         const detail = this.stderrTail.trim();
-        this.handleExit(new Error(
-          `El runtime oficial de Codex se cerró inesperadamente (${signal ?? code ?? 'sin código'}).${detail ? ` ${detail}` : ''}`
+        this.handleExit(new ProviderRuntimeError(
+          `El runtime oficial de Codex se cerró inesperadamente (${signal ?? code ?? 'sin código'}).${detail ? ` ${detail}` : ''}`,
+          'unavailable'
         ));
       }
     });
@@ -159,8 +201,13 @@ export class CodexAppServerClient {
     // The model has no execution tools, but do not pass unrelated credentials to
     // the child process in the first place. Keep ordinary runtime variables such
     // as PATH, HOME, locale and proxy configuration untouched.
+    // `SESSION` is deliberately absent: it matched DBUS_SESSION_BUS_ADDRESS,
+    // XDG_SESSION_* and macOS SECURITYSESSIONID, which are desktop-integration
+    // handles rather than credentials, and dropping them can stop the runtime from
+    // opening a browser or reaching the keyring during login. Genuine session
+    // credentials (AWS_SESSION_TOKEN, SESSION_SECRET, …) still match TOKEN/SECRET.
     for (const name of Object.keys(env)) {
-      if (/(?:API_?KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL|COOKIE|SESSION|AUTH_SOCK)/i.test(name)) delete env[name];
+      if (/(?:API_?KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL|COOKIE|AUTH_SOCK)/i.test(name)) delete env[name];
     }
     delete env.NODE_OPTIONS;
     env.CODEX_HOME = this.options.codexHome;
@@ -170,14 +217,16 @@ export class CodexAppServerClient {
   private sendRequest<T>(method: string, params?: unknown, timeoutMs?: number): Promise<T> {
     const id = this.nextId++;
     const child = this.child;
-    if (!child || child.exitCode !== null) return Promise.reject(new Error('El runtime oficial de Codex no está disponible.'));
+    if (!child || child.exitCode !== null) {
+      return Promise.reject(new ProviderRuntimeError('El runtime oficial de Codex no está disponible.', 'unavailable'));
+    }
     const payload: JsonObject = { id, method };
     if (params !== undefined) payload.params = params;
 
     return new Promise<T>((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(id);
-        reject(new Error(`Codex no respondió a «${method}» dentro del tiempo esperado.`));
+        reject(new ProviderRuntimeError(`Codex no respondió a «${method}» dentro del tiempo esperado.`, 'timeout'));
       }, timeoutMs ?? this.options.requestTimeoutMs ?? 30_000);
       this.pending.set(id, { resolve: resolve as (value: unknown) => void, reject, timer });
       child.stdin.write(`${JSON.stringify(payload)}\n`, (error) => {

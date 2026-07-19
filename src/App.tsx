@@ -4,6 +4,7 @@ import { Onboarding } from './views/Onboarding';
 import { HomeView, GenealogyHome, DatabasesHome } from './views/HomeView';
 import type { CsvImportPlanData } from './views/DatabasesView';
 import { FeedbackModal } from './views/FeedbackModal';
+import { RoadmapFeedbackModal, type RoadmapTopicKey } from './views/RoadmapFeedbackModal';
 import { RoadmapModal } from './views/RoadmapModal';
 import { QueueBar } from './components/QueueBar';
 import { EmbeddingProgressBar } from './components/EmbeddingProgressBar';
@@ -203,6 +204,8 @@ export function App() {
   const [collectionsOpen, setCollectionsOpen] = useState(false);
   const [researchOpen, setResearchOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  // Planned teaching section whose feedback thread is open, if any.
+  const [roadmapTopic, setRoadmapTopic] = useState<RoadmapTopicKey | null>(null);
   const [roadmapOpen, setRoadmapOpen] = useState(false);
   // The trigger element that opened the vault panel (the centre badge or the
   // right-rail vaults icon), or null when closed. The panel anchors under it.
@@ -1153,6 +1156,7 @@ export function App() {
                     <TeachingSidebar
                       activeView={view}
                       onNavigate={(targetView) => { setStudyTarget(null); if (targetView !== 'studyLibrary') setStudyMaterialTarget(null); if (targetView !== 'studyRecordings') setStudyRecordingTarget(null); setStudyGraphTarget(null); setView(targetView); }}
+                      onOpenRoadmap={setRoadmapTopic}
                     />
                     {/* Only the tools group: Explorar/Analizar/Escribir are already
                         covered by TeachingSidebar, so rendering them would duplicate. */}
@@ -1465,6 +1469,7 @@ export function App() {
         />
       )}
       {feedbackOpen && <FeedbackModal onClose={() => setFeedbackOpen(false)} />}
+      {roadmapTopic && <RoadmapFeedbackModal topic={roadmapTopic} onClose={() => setRoadmapTopic(null)} />}
       {roadmapOpen && <RoadmapModal onClose={() => setRoadmapOpen(false)} />}
 
       {!isPreviewVault && settings.onboardingComplete && settings.basicsTutorialVersion > 0 && !settings.tourComplete && !isGenealogy && !isDatabases && !isEstudio && !isDocencia && (
