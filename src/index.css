@@ -1831,38 +1831,6 @@ select.input optgroup {
   color: #171717;
 }
 
-.model-picker-menu { position: relative; width: 100%; }
-.model-picker-trigger {
-  display: flex; width: 100%; min-height: 38px; align-items: center; gap: .5rem;
-  border: 1px solid #404040; border-radius: .5rem; background: #171717; padding: .375rem .65rem;
-  color: #e5e5e5; text-align: left; font-size: .875rem; outline: none;
-}
-.model-picker-menu.compact .model-picker-trigger { min-height: 31px; font-size: .75rem; }
-.model-picker-trigger:hover { border-color: #525252; background: #1f1f1f; }
-.model-picker-trigger:focus-visible { border-color: #6366f1; box-shadow: 0 0 0 2px rgba(99,102,241,.2); }
-.model-picker-trigger:disabled { cursor: default; opacity: .5; }
-.model-picker-trigger > span { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.model-picker-trigger > svg { flex: 0 0 auto; color: #a3a3a3; }
-.model-picker-options {
-  position: relative; z-index: 30; display: grid; max-height: 190px; gap: 2px; overflow-y: auto;
-  margin-top: 5px; border: 1px solid #404040; border-radius: .6rem; background: #171717; padding: 4px;
-  box-shadow: 0 12px 30px rgba(0,0,0,.35);
-}
-.model-picker-options button {
-  display: flex; width: 100%; align-items: center; gap: .5rem; border: 0; border-radius: .4rem;
-  background: transparent; padding: .45rem .55rem; color: #d4d4d4; text-align: left; font-size: .75rem;
-}
-.model-picker-options button > span { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.model-picker-options button:hover { background: #262626; color: #fff; }
-.model-picker-options button.selected { background: rgba(79,70,229,.2); color: #c7d2fe; }
-.model-picker-empty { padding: .6rem; color: #737373; font-size: .75rem; text-align: center; }
-.light .model-picker-trigger { border-color: #d4d4d4; background: #fff; color: #171717; }
-.light .model-picker-trigger:hover { border-color: #a3a3a3; background: #fafafa; }
-.light .model-picker-options { border-color: #d4d4d4; background: #fff; box-shadow: 0 12px 30px rgba(0,0,0,.15); }
-.light .model-picker-options button { color: #404040; }
-.light .model-picker-options button:hover { background: #f5f5f5; color: #171717; }
-.light .model-picker-options button.selected { background: #eef2ff; color: #4338ca; }
-
 .graph-detail-panel {
   font-size: var(--detail-font-size, 14px);
 }
