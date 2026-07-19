@@ -2478,6 +2478,7 @@ export function registerIpc(
   h('teaching:plans:apply', async (_e, planId: string, proposal: Parameters<typeof teachingGrades.applyProposedPlan>[1]) => teachingGrades.applyProposedPlan(planId, proposal));
   h('teaching:feedback:draft', async (_e, request: Parameters<typeof draftStudentFeedback>[0]) => draftStudentFeedback(request));
   h('teaching:entries:cohort', async (_e, planId: string, groupId: string, convocatoria?: string) => teachingGrades.cohortStats(planId, groupId, convocatoria ?? 'ordinaria'));
+  h('teaching:entries:ratchet', async (_e, planId: string, groupId: string, convocatoria?: string) => teachingGrades.ratchetBaseline(planId, groupId, convocatoria ?? 'ordinaria'));
 
   // ---- Student groups (teaching vault) ----
   h('teaching:groups:list', async (_e, options?: { subjectId?: string | null; academicYearId?: string | null }) => teachingGroups.listTeachingGroups(options ?? {}));

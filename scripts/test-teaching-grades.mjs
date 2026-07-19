@@ -205,6 +205,67 @@ try {
   assert.equal(repo.listGradeEntries(revised.id).length, 0, 'a revision starts with no marks of its own');
   assert.ok(repo.listGradeEntries(plan.id).length > 0, 'while the published version keeps its own');
 
+  // ── Rule edits compose instead of clobbering each other ────────────────────
+  {
+    // The editor has one input per LEAF setting. Sending the whole `np` object built
+    // from the props a control was rendered with is how editing the acta code and then
+    // its numeric equivalent used to lose the code.
+    repo.updateAssessmentPlan(plan.id, { rules: { np: { code: 'NP-X' } } });
+    repo.updateAssessmentPlan(plan.id, { rules: { np: { value: 3 } } });
+    const merged = repo.getAssessmentPlan(plan.id).plan.rules;
+    assert.equal(merged.np.code, 'NP-X', 'the first edit survives the second');
+    assert.equal(merged.np.value, 3);
+    assert.equal(merged.np.enabled, true, 'and the fields nobody touched are untouched');
+
+    // The same for every nested group, and a scalar edit must not disturb them.
+    repo.updateAssessmentPlan(plan.id, { rules: { minNotMet: { capAt: 4.5 } } });
+    repo.updateAssessmentPlan(plan.id, { rules: { decimals: 2 } });
+    const after = repo.getAssessmentPlan(plan.id).plan.rules;
+    assert.equal(after.minNotMet.capAt, 4.5);
+    assert.equal(after.minNotMet.mode, 'cap', 'the mode the preset seeded is still there');
+    assert.equal(after.np.code, 'NP-X');
+
+    // `honours: null` means "this plan awards none" and must not be merged away.
+    repo.updateAssessmentPlan(plan.id, { rules: { honours: null } });
+    assert.equal(repo.getAssessmentPlan(plan.id).plan.rules.honours, null, 'null clears the policy');
+      repo.updateAssessmentPlan(plan.id, { rules: { decimals: 1, honours: plan.rules.honours ?? null } });
+  }
+
+  // ── A cycle would hang the main process, so it is refused ──────────────────
+  {
+    const a = repo.createAssessmentItem(plan.id, { name: 'A' });
+    const b = repo.createAssessmentItem(plan.id, { name: 'B', parentId: a.id });
+    assert.throws(() => repo.updateAssessmentItem(a.id, { parentId: b.id }),
+      /ciclo/i, 'an item cannot be re-parented under its own descendant');
+    assert.throws(() => repo.updateAssessmentItem(a.id, { parentId: a.id }),
+      /sí mismo/i, 'nor under itself');
+    // A legitimate move still works.
+    const moved = repo.updateAssessmentItem(b.id, { parentId: null });
+    assert.equal(moved.parentId, null);
+    repo.deleteAssessmentItem(a.id);
+    repo.deleteAssessmentItem(b.id);
+  }
+
+  // ── The ratchet has a baseline to compare against ──────────────────────────
+  {
+    // `computeGrade` takes `previous` and nothing filled it, so the "lo conseguido no
+    // se pierde" checkbox was a promise with no consumer: a resit could lower a mark
+    // the student had already earned.
+    assert.deepEqual(repo.ratchetBaseline(plan.id, group.id, 'ordinaria'), {},
+      'the first convocatoria has nothing behind it');
+    const baseline = repo.ratchetBaseline(plan.id, group.id, 'extraordinaria');
+    assert.ok(Math.abs(baseline[ana.id][practica.id] - 0.8) < 1e-9,
+      'the resit sees the fraction earned in the ordinary sitting');
+    // Only cells that were actually evaluated make it in, and a fraction is clamped:
+    // an over-max entry must not hand a student more than 100 % to ratchet against.
+    for (const byItem of Object.values(baseline)) {
+      for (const fraction of Object.values(byItem)) {
+        assert.ok(fraction >= 0 && fraction <= 1, 'baselines are fractions of the item');
+      }
+    }
+    assert.equal(baseline[rosa.id], undefined, 'a student with no ordinary marks has no baseline');
+  }
+
   // ── Referential rules ──────────────────────────────────────────────────────
   const count = (table, where, ...args) => sql.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE ${where}`).get(...args).n;
 
@@ -309,14 +370,34 @@ try {
       const wItem = wItems.find((i) => i.sourceRubricId === weighted.id);
       const top = wr.levels.reduce((a, b) => (a.score >= b.score ? a : b));
 
-      // Top level on the 60 % criterion only: the mark must reflect THAT criterion's
-      // share, not one third of the scale.
+      // Only the 60 % criterion marked, and marked at the top. The other criteria are
+      // NOT zeros — they are unassessed — so the mark is renormalised over what was
+      // actually evaluated. Scoring them as zeros used to record a 3/5 for a student
+      // whose every marked criterion was perfect, indistinguishable from a mediocre
+      // performance and impossible to tell apart in the acta.
       const only = repo.setRubricEvaluation({
         studentId: g3.students[0].id, itemId: wItem.id, levels: { [wr.criteria[0].id]: top.id },
       });
-      const expected = (wr.scaleMax * 60) / 100;
-      assert.ok(Math.abs(only.rawValue - expected) < 0.05,
-        `a weighted criterion contributes its own share: expected ~${expected}, got ${only.rawValue}`);
+      assert.ok(Math.abs(only.rawValue - wr.scaleMax) < 0.05,
+        `a partial evaluation scores over what was assessed: expected ~${wr.scaleMax}, got ${only.rawValue}`);
+
+      // With a second criterion marked, the WEIGHTS are what decides: the 60 % criterion
+      // at the top and the 20 % one at the bottom must not average to a half.
+      const worstLevel = wr.levels.reduce((a, b) => (a.score <= b.score ? a : b));
+      const best = Math.max(...wr.levels.map((l) => l.score), 1);
+      const two = repo.setRubricEvaluation({
+        studentId: g3.students[0].id,
+        itemId: wItem.id,
+        levels: { [wr.criteria[0].id]: top.id, [wr.criteria[1].id]: worstLevel.id },
+      });
+      const share = (60 + (worstLevel.score / best) * 20) / 80;
+      assert.ok(Math.abs(two.rawValue - share * wr.scaleMax) < 0.05,
+        `weights decide the split: expected ~${share * wr.scaleMax}, got ${two.rawValue}`);
+
+      // And nothing chosen at all is an empty cell, not a zero.
+      const none = repo.setRubricEvaluation({ studentId: g3.students[0].id, itemId: wItem.id, levels: {} });
+      assert.equal(none.rawValue, null, 'an untouched rubric leaves the cell empty');
+      assert.equal(none.status, 'not_assessed');
     }
 
     // Re-marking replaces the previous picks rather than accumulating them.
@@ -371,7 +452,7 @@ try {
     assert.ok(/No presentado/.test(actaHtml), 'and marks the non-submission as not presented');
     assert.ok(!/undefined|NaN/.test(actaHtml), 'with no undefined or NaN leaking into the document');
     const boletinHtml = renderBoletinHtml(header, { code: 'STU_7K3Q', name: 'Ana Peña' },
-      grid.results[students[0].id], 10);
+      grid.results[students[0].id], { min: 0, max: 10 });
     assert.ok(boletinHtml.includes('Examen'), 'the boletín shows the parts that produced the mark');
     assert.ok(!/undefined|NaN/.test(boletinHtml));
 

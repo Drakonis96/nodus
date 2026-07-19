@@ -15,7 +15,7 @@
  */
 import type { DatabaseColumn, DatabaseRow } from '../databases';
 import type { AssessmentItem, AssessmentPlan, CohortStats, GradeEntry } from './model';
-import { computeGrade } from './engine';
+import { computeGrade, toScale } from './engine';
 
 /** The subset of a student a grid row needs. Keeps this module free of teachingGroups. */
 export interface GridStudent {
@@ -108,7 +108,7 @@ export interface GradebookGridInput {
    * also the header row of every CSV/XLSX export, so they have to follow the user's
    * language rather than this module's. Defaults are Spanish, the source language.
    */
-  labels?: Partial<Record<'code' | 'givenNames' | 'surnames' | 'grade', string>>;
+  labels?: Partial<Record<'code' | 'givenNames' | 'surnames' | 'grade' | 'qualitative', string>>;
 }
 
 export function gradebookToGrid(input: GradebookGridInput): GradebookGrid {
@@ -118,6 +118,7 @@ export function gradebookToGrid(input: GradebookGridInput): GradebookGrid {
 
   const labels = {
     code: 'Identificador', givenNames: 'Nombre', surnames: 'Apellidos', grade: 'Calificación',
+    qualitative: 'Calificación cualitativa',
     ...input.labels,
   };
   const columns: DatabaseColumn[] = [];
@@ -147,11 +148,17 @@ export function gradebookToGrid(input: GradebookGridInput): GradebookGrid {
     }));
   }
   if (plan.rules.record !== 'numeric') {
-    columns.push(column(GRID_COL.qualitative, labels.grade, 'text', position++, { width: 110 }));
+    // Only a plan that records BOTH needs the two columns told apart; a qualitative-only
+    // plan has exactly one "Calificación" and naming it anything else would be noise.
+    const name = plan.rules.record === 'both' ? labels.qualitative : labels.grade;
+    columns.push(column(GRID_COL.qualitative, name, 'text', position++, { width: 110 }));
   }
 
   const entriesByStudent = new Map<string, GradeEntry[]>();
   for (const entry of input.entries) {
+    // The engine grades ONE convocatoria: mixing the ordinaria and the extraordinaria
+    // would let a resit silently overwrite the first sitting's mark.
+    if (input.convocatoria != null && entry.convocatoria !== input.convocatoria) continue;
     const list = entriesByStudent.get(entry.studentId) ?? [];
     list.push(entry);
     entriesByStudent.set(entry.studentId, list);
@@ -182,8 +189,11 @@ export function gradebookToGrid(input: GradebookGridInput): GradebookGrid {
         // Blocks show their computed subtotal on the plan's scale; leaves show what
         // was actually typed, so a teacher always recognises their own number.
         const isBlock = items.some((child) => child.parentId === item.id);
+        // `toScale`, not `fraction * scaleMax`: the scale does not always start at 0,
+        // and a block subtotal that disagrees with the engine's own projection is a
+        // column the teacher cannot reconcile with the final mark next to it.
         const value = isBlock
-          ? node?.fraction == null ? null : node.fraction * plan.rules.scaleMax
+          ? node?.fraction == null ? null : toScale(node.fraction, plan.rules)
           : node?.points ?? null;
         cells[item.id] = value == null ? null : String(round(value, decimals));
       }
@@ -224,4 +234,29 @@ export function anonymousGrid(grid: GradebookGrid): { columns: DatabaseColumn[];
     return { ...row, cells };
   });
   return { columns, rows };
+}
+
+/**
+ * One student's marks as plain text, ready to hand to a model.
+ *
+ * Built from `anonymousGrid` rather than from the row directly, and that is the whole
+ * design: the identifying columns are removed BY CONSTRUCTION, so there is no ordering
+ * of edits to this function that can start leaking a name. The pseudonymisation layer
+ * downstream is the second line of defence, not the first.
+ *
+ * The identifier column rides along on purpose — the model is asked to open with it,
+ * and `withStudentPseudonyms` turns it back into a real name for the teacher.
+ */
+export function anonymousStudentSummary(grid: GradebookGrid, studentId: string): string {
+  const { columns, rows } = anonymousGrid(grid);
+  const row = rows.find((entry) => entry.id === studentId);
+  if (!row) return '';
+
+  const lines: string[] = [];
+  for (const column of columns) {
+    const value = row.cells[column.id];
+    if (value == null || value === '') continue;
+    lines.push(`${column.name}: ${value}`);
+  }
+  return lines.join('\n');
 }

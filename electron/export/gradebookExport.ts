@@ -24,6 +24,7 @@ import {
   type GradebookDocLabels,
 } from '@shared/gradebookHtml';
 import type { GradeResult, TraceRule } from '@shared/assessment';
+import type { GradeScale } from '@shared/itemAnalysis';
 
 export type GradebookExportFormat = 'pdf' | 'docx' | 'csv' | 'xlsx';
 
@@ -96,7 +97,8 @@ export interface BoletinExportInput {
   header: GradebookDocHeader;
   student: { code: string; name: string };
   result: Pick<GradeResult, 'record' | 'passed' | 'trace' | 'rules'>;
-  scaleMax: number;
+  /** The plan's full scale: its minimum is not always 0. */
+  scale: GradeScale;
   labels?: GradebookDocLabels;
   /** Injected so the rule wording follows the user's language, not this module's. */
   ruleText?: (rule: TraceRule) => string;
@@ -104,7 +106,7 @@ export interface BoletinExportInput {
 
 export async function boletinPdfBytes(input: BoletinExportInput): Promise<Buffer> {
   return htmlToPdfBytes(renderBoletinHtml(
-    input.header, input.student, input.result, input.scaleMax,
+    input.header, input.student, input.result, input.scale,
     input.labels ?? GRADEBOOK_LABELS_ES, input.ruleText,
   ));
 }

@@ -106,6 +106,18 @@ export async function examDocxBytes(exam: TeachingExam, questions: ExamQuestion[
 
   const wantsPaper = content !== 'keyOnly';
 
+  /**
+   * One TextRun per LINE, joined by explicit breaks.
+   *
+   * `docx` does not interpret "\n" — it drops it — so a prompt written as several
+   * paragraphs arrived in Word as one run-on line, while the PDF (built from HTML)
+   * showed it correctly. The two documents have to say the same thing.
+   */
+  const textRuns = (text: string, props: Record<string, unknown> = {}) => {
+    const lines = String(text ?? '').split(/\r?\n/);
+    return lines.map((line, index) => new TextRun({ ...props, text: line, ...(index > 0 ? { break: 1 } : {}) }));
+  };
+
   // ---- Header band: logos | title block | grade box ----
   const logoRuns = exam.logos
     .map((logo) => dataUrlToBuffer(logo.dataUrl))
@@ -154,9 +166,19 @@ export async function examDocxBytes(exam: TeachingExam, questions: ExamQuestion[
         : [new Paragraph({ text: '' })],
     }),
   ];
-  children.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, borders: noBorders, rows: [new TableRow({ children: headerCells })] }));
-
-  children.push(new Paragraph({ border: { bottom: { style: BorderStyle.SINGLE, size: 12, color: '111111' } }, spacing: { after: 160 }, children: [] }));
+  if (wantsPaper) {
+    children.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, borders: noBorders, rows: [new TableRow({ children: headerCells })] }));
+    children.push(new Paragraph({ border: { bottom: { style: BorderStyle.SINGLE, size: 12, color: '111111' } }, spacing: { after: 160 }, children: [] }));
+  } else {
+    // "Solo el solucionario" is a sheet for the teacher, so it gets its own plain
+    // heading — not the paper's letterhead, and above all not the grade box, which
+    // used to be printed on a document no student ever sees. The HTML path already
+    // did this; the DOCX kept emitting the full exam header.
+    children.push(new Paragraph({ spacing: { after: 60 }, children: [new TextRun({ text: header.examTitle?.trim() || exam.title, bold: true, size: 26 })] }));
+    if (metaParts.length) {
+      children.push(new Paragraph({ spacing: { after: 160 }, children: [new TextRun({ text: metaParts.join('  ·  '), size: 18, color: '444444' })] }));
+    }
+  }
 
   // ---- Student identification fields ----
   const fieldLine = (label: string, filler: number) => new TextRun({ text: `${label}: ${'_'.repeat(filler)}   `, size: 20 });
@@ -173,7 +195,7 @@ export async function examDocxBytes(exam: TeachingExam, questions: ExamQuestion[
       new Paragraph({
         shading: { fill: 'F4F4F4' },
         spacing: { after: 200 },
-        children: [new TextRun({ text: `${labels.instructions}: `, bold: true, size: 19 }), new TextRun({ text: header.instructions, size: 19 })],
+        children: [new TextRun({ text: `${labels.instructions}: `, bold: true, size: 19 }), ...textRuns(header.instructions, { size: 19 })],
       })
     );
   }
@@ -196,7 +218,7 @@ export async function examDocxBytes(exam: TeachingExam, questions: ExamQuestion[
         indent: { left: indent },
         children: [
           new TextRun({ text: `${number}${nested ? ') ' : '. '}`, bold: true }),
-          new TextRun({ text: question.prompt }),
+          ...textRuns(question.prompt),
           ...(points ? [new TextRun({ text: points, size: 17, color: '444444' })] : []),
         ],
       })
@@ -312,7 +334,7 @@ export async function examDocxBytes(exam: TeachingExam, questions: ExamQuestion[
           children: [
             new TextRun({ text: `${labels.question} ${number} `, bold: true, size: 19 }),
             new TextRun({ text: `(${def.label}): `, size: 19, color: '555555' }),
-            new TextRun({ text: answer || '—', size: 19 }),
+            ...textRuns(answer || '—', { size: 19 }),
           ],
         })
       );

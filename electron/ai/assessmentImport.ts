@@ -128,6 +128,20 @@ export async function draftStudentFeedback(request: FeedbackRequest): Promise<{ 
           ? `«${warning.token}» es también una palabra corriente: se ha enviado sin sustituir.`
           : `Identificador no reconocido: ${warning.code}.`,
     );
+
+    // The instruction asks the model to OPEN with the identifier, which is then mapped
+    // back into the student's name. Weaker models ignore it and write "el estudiante"
+    // instead — harmless, but the teacher would otherwise have no way to know the
+    // comment never names the child they are about to send it about. Detected here
+    // rather than trusted: an instruction is a request, not a guarantee.
+    const student = students.find((entry) => entry.id === request.studentId);
+    const expected = [student?.givenNames, student?.surnames]
+      .filter((part): part is string => !!part && part.trim().length > 0)
+      .flatMap((part) => part.trim().split(/\s+/));
+    if (expected.length > 0 && !expected.some((token) => text.includes(token))) {
+      warnings.push('El comentario no nombra al estudiante: el modelo no ha usado el identificador.');
+    }
+
     return { text, warnings };
   });
 }
