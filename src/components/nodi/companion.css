@@ -1,4 +1,8 @@
-.nodi-companion { font-family: inherit; }
+.nodi-companion {
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+.nodi-companion,
+.nodi-companion * { box-sizing: border-box; }
 .nodi-anchor { position: absolute; }
 
 .nodi-figure {
@@ -427,7 +431,7 @@
   font-size: 11px;
 }
 .nodi-chat-tool .model-picker-trigger:hover { border-color: rgba(212,175,55,.45); background: #151e2d; }
-.nodi-chat-tool .model-picker-options { max-height: 128px; border-color: rgba(255,255,255,.13); background: #111824; box-shadow: none; }
+.nodi-chat-tool .model-picker-options { max-height: 160px; border-color: rgba(255,255,255,.13); background: #111824; box-shadow: none; }
 .nodi-chat-tool .model-picker-options button { color: #cbd3df; font-size: 10px; }
 .nodi-chat-tool .model-picker-options button:hover { background: rgba(255,255,255,.06); color: #fff; }
 .nodi-chat-tool .model-picker-options button.selected { background: rgba(212,175,55,.12); color: #f3d67a; }

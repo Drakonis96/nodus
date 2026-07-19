@@ -71,11 +71,12 @@ test('Nodi and the genealogy assistant receive tags relative to the persisted tr
 });
 
 test('Nodi chat keeps model selection inside settings and exposes deletable history and dedicated scrollbars', async () => {
-  const [component, css, settings, picker, globalCss] = await Promise.all([
+  const [component, css, settings, picker, pickerCss, globalCss] = await Promise.all([
     read('src/components/nodi/NodiCompanion.tsx'),
     read('src/components/nodi/companion.css'),
     read('src/views/Settings.tsx'),
     read('src/components/ModelPicker.tsx'),
+    read('src/components/modelPicker.css'),
     read('src/index.css'),
   ]);
   for (const tool of ['history', 'contexts', 'settings']) assert.match(component, new RegExp(`'${tool}'`));
@@ -101,7 +102,10 @@ test('Nodi chat keeps model selection inside settings and exposes deletable hist
   assert.match(settings, /settings\.nodiModel[^\n]* compact menu/);
   assert.match(picker, /if \(menu\)/);
   assert.match(picker, /model-picker-options/);
-  assert.match(globalCss, /\.model-picker-trigger/);
+  assert.match(picker, /import '\.\/modelPicker\.css'/);
+  assert.match(pickerCss, /\.model-picker-trigger/);
+  assert.match(pickerCss, /position:\s*absolute/);
+  assert.match(pickerCss, /font-family:\s*inherit/);
   assert.match(globalCss, /background-repeat: no-repeat/);
 });
 

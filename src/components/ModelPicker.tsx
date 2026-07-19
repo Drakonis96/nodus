@@ -4,6 +4,7 @@ import { isSubscriptionProvider } from '@shared/providers';
 import { modelLabel, sameModel, sortModelRefs } from './ui';
 import { Icon } from './ui';
 import { t } from '../i18n';
+import './modelPicker.css';
 
 /**
  * Shown next to the pickers that drive high-volume work (scans, extraction, vision,
