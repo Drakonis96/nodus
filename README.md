@@ -14,7 +14,7 @@
 
 Nodus is a desktop centre for university work. It brings sources, notes, data, ideas and learning materials together without forcing every project into the same shape.
 
-Each vault is a focused workspace. Researchers can build a connected corpus, historians can document a family tree, teams can explore structured data and students can organise an entire degree. You can move between them from one calm, consistent app.
+Each vault is a focused workspace. Researchers can build a connected corpus, historians can document a family tree, teams can explore structured data, teachers can plan and assess their courses, and students can organise an entire degree. You can move between them from one calm, consistent app.
 
 Nodus is local first. Your vaults and search indexes live on your computer. You decide when a feature may use an online AI provider, and you can also work with compatible local models.
 
@@ -31,7 +31,7 @@ Download the installer for your computer and open it. There is no server to conf
 
 The [latest release page](https://github.com/Drakonis96/nodus/releases/latest) always contains the newest available installers and release notes.
 
-## One app, four working vaults
+## One app, five working vaults
 
 ### Academic vault
 
@@ -65,6 +65,14 @@ Nodus turns those materials into study support grounded in your own course conte
 
 ![Study vault demo in Nodus](docs/screenshots/readme-study-demo.jpg)
 
+### Teaching vault
+
+Plan academic years, courses, subjects and teaching groups in a workspace built for educators. Timetables, calendars, materials and recordings remain connected to the classes they support.
+
+Teaching tools cover private student rosters, gradebooks, reusable rubrics and exam building. When AI assists with feedback or assessment, Nodus can replace student names with anonymous identifiers before any text reaches the provider.
+
+![Teaching vault demo in Nodus](docs/screenshots/readme-teaching-demo.jpg)
+
 ## Meet Nodi
 
 Nodi is the friendly guide that lives inside Nodus. It helps new users understand a vault, points out useful next steps and keeps notifications easy to follow without taking over the workspace.
@@ -89,12 +97,11 @@ Nodus is growing through new vaults rather than adding every possible tool to on
 
 | Vault | What it will bring |
 | --- | --- |
-| Teaching | Course planning, learning materials, assessment and feedback in one teaching workspace |
 | Primary sources | Archival description, source criticism and evidence-led work with historical material |
 | Testimonies | Interviews, transcription, coding and oral history workflows |
 | Worldbuilding | Characters, places, rules and narratives for research-based creative projects |
 
-Teaching and Worldbuilding can already be opened as previews. Primary Sources and Testimonies are planned next. Preview vaults are clearly marked in the app and are not presented as finished features.
+Worldbuilding can already be opened as a preview. Primary Sources and Testimonies are planned next. Preview vaults are clearly marked in the app and are not presented as finished features.
 
 ## Explore before importing anything
 
