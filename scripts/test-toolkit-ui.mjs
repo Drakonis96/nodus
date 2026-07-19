@@ -90,26 +90,87 @@ test('the hub renders three tools and only Nodus Convert can be opened', async (
   assert.ok(view.includes('data-testid="toolkit-home"'), 'the hub is addressable');
   // The cards receive their testid as a prop; ToolCard is what stamps it onto the DOM.
   assert.match(view, /data-testid=\{testid\}/, 'ToolCard exposes its testid to the DOM');
-  for (const testid of ['toolkit-card-convert', 'toolkit-card-presenter', 'toolkit-card-aiocr']) {
-    assert.ok(view.includes(`testid="${testid}"`), `${testid} is rendered`);
-  }
-  for (const name of ['Nodus Convert', 'PDF Presenter', 'OCR Workspace']) {
-    assert.ok(view.includes(`name="${name}"`), `${name} keeps its brand name untranslated`);
-  }
-  // Honesty: the two unbuilt tools are inert, and the convert page never claims
-  // to convert anything yet.
-  assert.equal((view.match(/state="soon"/g) ?? []).length, 2, 'presenter and OCR workspace are marked coming soon');
-  assert.equal((view.match(/state="wip"/g) ?? []).length, 1, 'only Nodus Convert is openable');
+
+  // The catalogue is data, not markup: the hub cards and the nested sidebar
+  // buttons both render from TOOLKIT_TOOLS, so they cannot describe a different
+  // set of tools from each other.
+  assert.deepEqual(
+    navigation.TOOLKIT_TOOLS.map((tool) => `toolkit-card-${tool.testid}`),
+    ['toolkit-card-convert', 'toolkit-card-presenter', 'toolkit-card-aiocr']
+  );
+  assert.deepEqual(
+    navigation.TOOLKIT_TOOLS.map((tool) => tool.name),
+    ['Nodus Convert', 'PDF Presenter', 'OCR Workspace'],
+    'brand names stay untranslated'
+  );
+  assert.match(view, /name=\{tool\.name\}/, 'the card shows the brand name verbatim, never through t()');
+  assert.match(view, /description=\{t\(tool\.description\)\}/, 'only the description is translated');
+
+  // Honesty: the two unbuilt tools are inert, and only Convert has a page.
+  assert.deepEqual(
+    navigation.TOOLKIT_TOOLS.filter((tool) => tool.state === 'soon').map((tool) => tool.page),
+    ['presenter', 'ocr'],
+    'presenter and OCR workspace are marked coming soon'
+  );
+  assert.deepEqual(
+    navigation.TOOLKIT_TOOLS.filter((tool) => tool.state === 'wip').map((tool) => tool.page),
+    ['convert'],
+    'only Nodus Convert is openable'
+  );
   assert.match(view, /const disabled = state === 'soon'/);
   assert.match(view, /onClick=\{disabled \? undefined : onOpen\}/, 'a coming-soon card has no click handler');
   // The convert card now opens the real converter, not a placeholder.
   assert.match(view, /<ToolkitConvertView onBack=/, 'Nodus Convert renders the functional converter');
+  // Any page other than 'convert' falls back to the catalogue rather than
+  // rendering an empty pane.
+  assert.match(view, /\{page === 'convert' \? \(/, 'the converter is the only special-cased page');
+});
+
+test('the toolkit nests one sidebar button per tool under its section', async () => {
+  const app = await read('src/App.tsx');
+  // The tools are NOT views: they must never enter NAV_ITEMS, or they would show
+  // up in sidebarOrder, the reordering UI and the vault-type allow-lists.
+  const toolPages = new Set(navigation.TOOLKIT_TOOLS.map((tool) => tool.page));
+  assert.ok(
+    !navigation.NAV_ITEMS.some((n) => toolPages.has(n.id)),
+    'the tools stay out of the canonical nav table'
+  );
+  assert.match(app, /const toolkitSubNav = \(\) =>/, 'the sidebar renders the nested tool buttons');
+  assert.match(app, /TOOLKIT_TOOLS\.map\(\(tool\) => \{/, 'the buttons come from the shared catalogue');
+  assert.match(app, /data-testid=\{`nav-toolkit-\$\{tool\.testid\}`\}/, 'each nested button is addressable');
+  assert.match(app, /n\.id === 'toolkit' \? \(/, 'the nested list hangs off the toolkit item');
+  // Clicking a tool jumps straight to it; clicking the section always lands on
+  // the catalogue, which is the whole point of keeping both buttons.
+  assert.match(
+    app,
+    /setToolkitPage\(tool\.page\); setView\('toolkit'\)/,
+    'a nested button opens its tool directly'
+  );
+  assert.match(app, /if \(n\.id === 'toolkit'\) setToolkitPage\('home'\);/, 'the section button opens the catalogue');
+  // A coming-soon tool is inert in the sidebar too, not just on its card.
+  assert.match(app, /const disabled = tool\.state === 'soon';/, 'unbuilt tools are disabled in the sidebar');
+  // The full brand name does not fit the default 176px sidebar and used to
+  // render as "Nodus Con…"; the nested button drops the prefix the section
+  // already supplies and keeps the full name in its title.
+  assert.match(app, /\{tool\.shortName\}/, 'the nested button uses the short label');
+  assert.match(app, /title=\{disabled \? t\('Próximamente'\) : tool\.name\}/, 'hovering still gives the full brand name');
+  for (const tool of navigation.TOOLKIT_TOOLS) {
+    assert.ok(tool.shortName.length <= 10, `${tool.name} has a sidebar-sized label (${tool.shortName})`);
+    assert.ok(tool.name.includes(tool.shortName), `${tool.shortName} is part of the brand name, not a new word`);
+  }
+  // The section is only highlighted when the catalogue itself is on screen —
+  // otherwise both the parent and the open tool would read as active.
+  assert.match(
+    app,
+    /view === n\.id && \(n\.id !== 'toolkit' \|\| toolkitPage === 'home'\)/,
+    'the section and its open tool never highlight at once'
+  );
 });
 
 test('the hub cards share one shape: equal size, centred icons, pinned badges', async () => {
   const view = await read('src/views/ToolkitView.tsx');
   // One ToolCard component renders all three, so they cannot drift apart.
-  assert.equal((view.match(/<ToolCard\b/g) ?? []).length, 3);
+  assert.equal((view.match(/<ToolCard\b/g) ?? []).length, 1, 'a single ToolCard renders the whole catalogue');
   assert.match(view, /grid gap-4 sm:grid-cols-2 lg:grid-cols-3/, 'cards share a grid track');
   assert.match(view, /className=\{`flex h-full flex-col/, 'each card fills its grid cell');
   assert.match(view, /h-12 w-12 shrink-0 items-center justify-center/, 'the card icon sits in a fixed centred tile');
@@ -128,12 +189,16 @@ test('a tool page returns to the hub and keeps the header action row uniform', a
   assert.ok(convert.includes('data-testid="toolkit-back"'), 'the back control exists');
   assert.match(convert, /<Icon name="chevronLeft"/, 'back uses the shared chevron icon');
   assert.match(convert, /aria-label=\{t\('Volver a Herramientas'\)\}/, 'the back control is labelled for screen readers');
-  assert.match(view, /onBack=\{\(\) => setPage\('home'\)\}/, 'the hub passes a back handler to the tool');
+  assert.match(view, /onBack=\{\(\) => onNavigate\('home'\)\}/, 'the hub passes a back handler to the tool');
   // Header actions are icon-only buttons of one height; the toolkit must not be
   // the odd one out.
   assert.match(app, /icon="tools"\n\s+label=\{t\('Herramientas'\)\}/, 'the header exposes the toolkit');
   assert.match(app, /title=\{t\('Abrir Nodus Toolkit'\)\}/);
-  assert.match(app, /\{view === 'toolkit' && <ToolkitView \/>\}/, 'the view is rendered by the shell');
+  assert.match(
+    app,
+    /\{view === 'toolkit' && <ToolkitView page=\{toolkitPage\} onNavigate=\{setToolkitPage\} \/>\}/,
+    'the view is rendered by the shell, with the active page owned by App'
+  );
   assert.match(app, /const ToolkitView = lazy\(/, 'the view is code-split like its siblings');
 });
 
