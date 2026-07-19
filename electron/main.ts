@@ -54,6 +54,32 @@ if (process.env.NODUS_USERDATA) {
   app.setPath('userData', process.env.NODUS_USERDATA);
 }
 
+/**
+ * Only one Nodus may own a profile at a time.
+ *
+ * Every vault is a SQLite file plus a registry of which vault is active. Two
+ * processes opening the same profile write to both concurrently: the second
+ * one's vault switch rewrites the registry underneath the first, and their
+ * writes interleave in the database itself. That is data loss, not slowness,
+ * and it is silent until something fails to open.
+ *
+ * The lock is deliberately taken AFTER the userData override above, because
+ * Electron scopes it to the profile directory. Isolated profiles — tests, the
+ * demo instance, a second vault opened on purpose with NODUS_USERDATA — each
+ * get their own lock and still run side by side. Only a genuine second copy of
+ * the same profile is refused.
+ *
+ * The macOS unsigned updater is unaffected: its helper script waits for this
+ * process to exit (`while kill -0 "$PID"`) before it replaces the bundle and
+ * runs `open -n`, so the lock is already released by then.
+ */
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
+if (!hasSingleInstanceLock) {
+  // Hand over to the copy that already owns this profile and leave. Nothing
+  // below has run yet, so no database or window has been touched.
+  app.quit();
+}
+
 let mainWindow: BrowserWindow | null = null;
 let updateCheckTimer: NodeJS.Timeout | null = null;
 let installingUpdate = false;
@@ -421,7 +447,21 @@ function setupAutoUpdates(): void {
   updateCheckTimer = setInterval(() => void checkForUpdates('scheduled'), UPDATE_CHECK_INTERVAL_MS);
 }
 
+// A second copy of this profile tried to start. It has already quit; bring the
+// window the user was actually looking for to the front.
+app.on('second-instance', () => {
+  if (!mainWindow) {
+    createWindow();
+    return;
+  }
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  if (!mainWindow.isVisible()) mainWindow.show();
+  mainWindow.focus();
+});
+
 app.whenReady().then(() => {
+  // Losing the lock queues a quit; do not open the database or a window.
+  if (!hasSingleInstanceLock) return;
   restorePersistedDockIcon();
   // Nodus Toolkit OCR caches its Tesseract language traineddata here (the one
   // opt-in network call), so downloads persist across sessions in userData.
