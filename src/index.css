@@ -1335,12 +1335,18 @@ body {
 .estudio .bg-indigo-950\/25 { background-color: rgba(4, 47, 46, 0.25); }
 .estudio .bg-indigo-950\/30 { background-color: rgba(4, 47, 46, 0.3); }
 .estudio .bg-indigo-950\/40 { background-color: rgba(4, 47, 46, 0.4); }
+.estudio .border-indigo-200 { border-color: #99f6e4; }
+.estudio .border-indigo-400 { border-color: #2dd4bf; }
 .estudio .border-indigo-500 { border-color: #14b8a6; }
 .estudio .border-indigo-600 { border-color: #0d9488; }
 .estudio .border-indigo-700 { border-color: #0f766e; }
 .estudio .border-indigo-800 { border-color: #115e59; }
 .estudio .border-indigo-700\/60 { border-color: rgba(15, 118, 110, 0.6); }
+.estudio .border-indigo-600\/70 { border-color: rgba(13, 148, 136, 0.7); }
 .estudio .border-indigo-800\/60 { border-color: rgba(17, 94, 89, 0.6); }
+.estudio .border-indigo-800\/70 { border-color: rgba(17, 94, 89, 0.7); }
+.estudio .border-indigo-900\/70 { border-color: rgba(19, 78, 74, 0.7); }
+.estudio .ring-indigo-600\/40 { --tw-ring-color: rgba(15, 118, 110, 0.4); }
 .estudio .hover\:border-indigo-700\/60:hover { border-color: rgba(15, 118, 110, 0.6); }
 .estudio .ring-indigo-500 { --tw-ring-color: #14b8a6; }
 
@@ -1395,12 +1401,19 @@ body {
 .docencia .bg-indigo-950\/25 { background-color: rgba(67, 20, 7, 0.25); }
 .docencia .bg-indigo-950\/30 { background-color: rgba(67, 20, 7, 0.3); }
 .docencia .bg-indigo-950\/40 { background-color: rgba(67, 20, 7, 0.4); }
+.docencia .border-indigo-200 { border-color: #fed7aa; }
+.docencia .border-indigo-400 { border-color: #fb923c; }
 .docencia .border-indigo-500 { border-color: #f97316; }
+.docencia .hover\:text-indigo-700:hover { color: #c2410c; }
 .docencia .border-indigo-600 { border-color: #ea580c; }
 .docencia .border-indigo-700 { border-color: #c2410c; }
 .docencia .border-indigo-800 { border-color: #9a3412; }
 .docencia .border-indigo-700\/60 { border-color: rgba(194, 65, 12, 0.6); }
 .docencia .border-indigo-800\/60 { border-color: rgba(154, 52, 18, 0.6); }
+.docencia .border-indigo-600\/70 { border-color: rgba(234, 88, 12, 0.7); }
+.docencia .border-indigo-800\/70 { border-color: rgba(154, 52, 18, 0.7); }
+.docencia .border-indigo-900\/70 { border-color: rgba(124, 45, 18, 0.7); }
+.docencia .ring-indigo-600\/40 { --tw-ring-color: rgba(234, 88, 12, 0.4); }
 .docencia .hover\:border-indigo-700\/60:hover { border-color: rgba(194, 65, 12, 0.6); }
 .docencia .hover\:bg-indigo-600\/20:hover { background-color: rgba(234, 88, 12, 0.20); }
 .docencia .ring-indigo-500 { --tw-ring-color: #f97316; }
@@ -1559,6 +1572,119 @@ body {
 .light.databases .border-indigo-900\/70 { border-color: rgba(179, 3, 51, 0.28); }
 .light.databases .ring-indigo-600\/40 { --tw-ring-color: rgba(179, 3, 51, 0.35); }
 
+/* Dark-variant accent remaps.
+   Tailwind emits a dark utility as `.dark .dark\:<util>`, so the plain
+   `.<vault> .<util>` rules above never reach it: they match a class literally named
+   `bg-indigo-950/30`, not `dark:bg-indigo-950/30`. Every vault accent written as a
+   `dark:` utility therefore stayed indigo in dark mode, which is why themed surfaces
+   still showed blue. The `.<vault>.dark` shape mirrors the teal→orange block above and
+   carries one extra class, so it wins the specificity tie against Tailwind's own rule.
+
+   Each declaration below is copied verbatim from the vault's existing base rule for the
+   same utility — no new colours are invented here. Only utilities the app actually uses
+   behind `dark:` are emitted; a `dark:` accent with no base rule is skipped, so adding
+   the base rule above is what makes its dark variant work.
+
+   Coverage is enforced by scripts/test-vault-accent-remaps.mjs, which fails when a vault
+   remaps a utility that the app also uses behind `dark:` without remapping the variant. */
+/* genealogy */
+.genealogy.dark .dark\:bg-indigo-400 { background-color: #fbbf24; }
+.genealogy.dark .dark\:bg-indigo-600\/15 { background-color: rgba(202, 138, 4, 0.15); }
+.genealogy.dark .dark\:bg-indigo-900\/40 { background-color: rgba(120, 53, 15, 0.4); }
+.genealogy.dark .dark\:bg-indigo-900\/50 { background-color: rgba(120, 53, 15, 0.5); }
+.genealogy.dark .dark\:bg-indigo-950 { background-color: #451a03; }
+.genealogy.dark .dark\:bg-indigo-950\/20 { background-color: rgba(69, 26, 3, 0.2); }
+.genealogy.dark .dark\:bg-indigo-950\/25 { background-color: rgba(69, 26, 3, 0.25); }
+.genealogy.dark .dark\:bg-indigo-950\/30 { background-color: rgba(69, 26, 3, 0.3); }
+.genealogy.dark .dark\:bg-indigo-950\/40 { background-color: rgba(69, 26, 3, 0.4); }
+.genealogy.dark .dark\:border-indigo-400 { border-color: #fbbf24; }
+.genealogy.dark .dark\:border-indigo-600 { border-color: #ca8a04; }
+.genealogy.dark .dark\:border-indigo-600\/70 { border-color: rgba(202, 138, 4, 0.7); }
+.genealogy.dark .dark\:border-indigo-700 { border-color: #a16207; }
+.genealogy.dark .dark\:border-indigo-700\/60 { border-color: rgba(161, 98, 7, 0.6); }
+.genealogy.dark .dark\:border-indigo-800 { border-color: #854d0e; }
+.genealogy.dark .dark\:border-indigo-800\/60 { border-color: rgba(133, 77, 14, 0.6); }
+.genealogy.dark .dark\:border-indigo-800\/70 { border-color: rgba(133, 77, 14, 0.7); }
+.genealogy.dark .dark\:hover\:text-indigo-300:hover { color: #fcd34d; }
+.genealogy.dark .dark\:text-indigo-100 { color: #fef3c7; }
+.genealogy.dark .dark\:text-indigo-200 { color: #fde68a; }
+.genealogy.dark .dark\:text-indigo-300 { color: #fcd34d; }
+.genealogy.dark .dark\:text-indigo-400 { color: #fbbf24; }
+
+/* estudio */
+.estudio.dark .dark\:bg-indigo-400 { background-color: #2dd4bf; }
+.estudio.dark .dark\:bg-indigo-600\/15 { background-color: rgba(15, 118, 110, 0.15); }
+.estudio.dark .dark\:bg-indigo-900\/40 { background-color: rgba(19, 78, 74, 0.4); }
+.estudio.dark .dark\:bg-indigo-900\/50 { background-color: rgba(19, 78, 74, 0.5); }
+.estudio.dark .dark\:bg-indigo-950 { background-color: #042f2e; }
+.estudio.dark .dark\:bg-indigo-950\/20 { background-color: rgba(4, 47, 46, 0.2); }
+.estudio.dark .dark\:bg-indigo-950\/25 { background-color: rgba(4, 47, 46, 0.25); }
+.estudio.dark .dark\:bg-indigo-950\/30 { background-color: rgba(4, 47, 46, 0.3); }
+.estudio.dark .dark\:bg-indigo-950\/40 { background-color: rgba(4, 47, 46, 0.4); }
+.estudio.dark .dark\:border-indigo-400 { border-color: #2dd4bf; }
+.estudio.dark .dark\:border-indigo-600 { border-color: #0d9488; }
+.estudio.dark .dark\:border-indigo-600\/70 { border-color: rgba(13, 148, 136, 0.7); }
+.estudio.dark .dark\:border-indigo-700 { border-color: #0f766e; }
+.estudio.dark .dark\:border-indigo-700\/60 { border-color: rgba(15, 118, 110, 0.6); }
+.estudio.dark .dark\:border-indigo-800 { border-color: #115e59; }
+.estudio.dark .dark\:border-indigo-800\/60 { border-color: rgba(17, 94, 89, 0.6); }
+.estudio.dark .dark\:border-indigo-800\/70 { border-color: rgba(17, 94, 89, 0.7); }
+.estudio.dark .dark\:hover\:text-indigo-300:hover { color: #5eead4; }
+.estudio.dark .dark\:text-indigo-100 { color: #ccfbf1; }
+.estudio.dark .dark\:text-indigo-200 { color: #99f6e4; }
+.estudio.dark .dark\:text-indigo-300 { color: #5eead4; }
+.estudio.dark .dark\:text-indigo-400 { color: #2dd4bf; }
+
+/* docencia */
+.docencia.dark .dark\:bg-indigo-400 { background-color: #fb923c; }
+.docencia.dark .dark\:bg-indigo-600\/15 { background-color: rgba(234, 88, 12, 0.15); }
+.docencia.dark .dark\:bg-indigo-900\/40 { background-color: rgba(124, 45, 18, 0.4); }
+.docencia.dark .dark\:bg-indigo-900\/50 { background-color: rgba(124, 45, 18, 0.5); }
+.docencia.dark .dark\:bg-indigo-950 { background-color: #431407; }
+.docencia.dark .dark\:bg-indigo-950\/20 { background-color: rgba(67, 20, 7, 0.2); }
+.docencia.dark .dark\:bg-indigo-950\/25 { background-color: rgba(67, 20, 7, 0.25); }
+.docencia.dark .dark\:bg-indigo-950\/30 { background-color: rgba(67, 20, 7, 0.3); }
+.docencia.dark .dark\:bg-indigo-950\/40 { background-color: rgba(67, 20, 7, 0.4); }
+.docencia.dark .dark\:border-indigo-400 { border-color: #fb923c; }
+.docencia.dark .dark\:border-indigo-600 { border-color: #ea580c; }
+.docencia.dark .dark\:border-indigo-600\/70 { border-color: rgba(234, 88, 12, 0.7); }
+.docencia.dark .dark\:border-indigo-700 { border-color: #c2410c; }
+.docencia.dark .dark\:border-indigo-700\/60 { border-color: rgba(194, 65, 12, 0.6); }
+.docencia.dark .dark\:border-indigo-800 { border-color: #9a3412; }
+.docencia.dark .dark\:border-indigo-800\/60 { border-color: rgba(154, 52, 18, 0.6); }
+.docencia.dark .dark\:border-indigo-800\/70 { border-color: rgba(154, 52, 18, 0.7); }
+.docencia.dark .dark\:hover\:border-teal-800:hover { border-color: #9a3412; }
+.docencia.dark .dark\:hover\:text-indigo-300:hover { color: #fdba74; }
+.docencia.dark .dark\:ring-teal-900 { --tw-ring-color: #7c2d12; }
+.docencia.dark .dark\:text-indigo-100 { color: #ffedd5; }
+.docencia.dark .dark\:text-indigo-200 { color: #fed7aa; }
+.docencia.dark .dark\:text-indigo-300 { color: #fdba74; }
+.docencia.dark .dark\:text-indigo-400 { color: #fb923c; }
+
+/* databases */
+.databases.dark .dark\:bg-indigo-400 { background-color: #e23a63; }
+.databases.dark .dark\:bg-indigo-600\/15 { background-color: rgba(179, 3, 51, 0.15); }
+.databases.dark .dark\:bg-indigo-900\/40 { background-color: rgba(77, 1, 22, 0.4); }
+.databases.dark .dark\:bg-indigo-900\/50 { background-color: rgba(77, 1, 22, 0.5); }
+.databases.dark .dark\:bg-indigo-950 { background-color: #2b0010; }
+.databases.dark .dark\:bg-indigo-950\/20 { background-color: rgba(43, 0, 16, 0.2); }
+.databases.dark .dark\:bg-indigo-950\/25 { background-color: rgba(43, 0, 16, 0.25); }
+.databases.dark .dark\:bg-indigo-950\/30 { background-color: rgba(43, 0, 16, 0.3); }
+.databases.dark .dark\:bg-indigo-950\/40 { background-color: rgba(43, 0, 16, 0.4); }
+.databases.dark .dark\:border-indigo-400 { border-color: #e23a63; }
+.databases.dark .dark\:border-indigo-600 { border-color: #b30333; }
+.databases.dark .dark\:border-indigo-600\/70 { border-color: rgba(179, 3, 51, 0.7); }
+.databases.dark .dark\:border-indigo-700 { border-color: #8a0227; }
+.databases.dark .dark\:border-indigo-700\/60 { border-color: rgba(138, 2, 39, 0.6); }
+.databases.dark .dark\:border-indigo-800 { border-color: #6b011e; }
+.databases.dark .dark\:border-indigo-800\/60 { border-color: rgba(107, 1, 30, 0.6); }
+.databases.dark .dark\:border-indigo-800\/70 { border-color: rgba(107, 1, 30, 0.7); }
+.databases.dark .dark\:hover\:text-indigo-300:hover { color: #f27a97; }
+.databases.dark .dark\:text-indigo-100 { color: #ffe4ec; }
+.databases.dark .dark\:text-indigo-200 { color: #f9b4c4; }
+.databases.dark .dark\:text-indigo-300 { color: #f27a97; }
+.databases.dark .dark\:text-indigo-400 { color: #e23a63; }
+
 /* The full database record is rendered above the workspace, so neutral modal
    utilities used to make it look like a grey/white form detached from the active
    crimson vault. These semantic surfaces keep the record in the Databases theme
@@ -1625,6 +1751,16 @@ body {
 .light .input {
   @apply bg-white border-neutral-300 text-neutral-900 placeholder:text-neutral-500;
 }
+/* The focus colour above is baked into `.input`'s own rule by `@apply`, so it lands as
+   `.input:focus` — a selector no `.<vault> .border-indigo-500` remap can reach, since the
+   element never carries that class. Every field in a themed vault therefore lit up indigo
+   on focus while the surface around it was orange/teal/gold/crimson. These overrides carry
+   the vault class as an extra ancestor, which outranks `.input:focus`. Colours match each
+   vault's own `.border-indigo-500` remap. */
+.genealogy .input:focus { border-color: #d4a017; }
+.estudio .input:focus { border-color: #14b8a6; }
+.docencia .input:focus { border-color: #f97316; }
+.databases .input:focus { border-color: #cc0a3a; }
 /* `.input` is declared after `@tailwind utilities`, so its `px-3` wins over a
    plain `pl-*` utility (same specificity, later in source). For an input with a
    leading icon, use this class instead of `pl-*` — its two-class selector wins. */
