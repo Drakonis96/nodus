@@ -18,6 +18,7 @@ import { startEmbedding, getEmbeddingSnapshot } from '../ai/embeddingPipeline';
 import { startPassageEmbedding, getPassageSnapshot } from '../ai/passageEmbeddingPipeline';
 import { startPerf } from '../perf';
 import { addNotification } from '../notifications';
+import { coalesce } from '../util/coalesce';
 import { uiText } from '@shared/uiLanguage';
 
 type ProgressListener = (p: QueueProgress) => void;
@@ -57,15 +58,41 @@ class ScanQueue {
     return () => this.listeners.delete(cb);
   }
 
-  private emit(): void {
+  /**
+   * Progress is emitted at most this often.
+   *
+   * Every emit copies the whole queue and structured-clones it across IPC, and
+   * emits are driven by work, not by time: once per extracted PDF page, once
+   * per AI chunk, once per enqueued item. Resuming a 3,000-work library sent
+   * 3,000 messages averaging 1,500 items each — millions of cloned objects
+   * before the window had even settled — and a single 400-page PDF late in a
+   * batch cloned a 2,500-element array 400 times.
+   *
+   * Coalescing to a fixed cadence makes that cost proportional to elapsed time
+   * instead of to the amount of work done. 250ms is well below the threshold
+   * where a progress bar looks unresponsive.
+   */
+  private static readonly EMIT_INTERVAL_MS = 250;
+
+  private readonly emitter = coalesce(() => {
     const p = this.snapshot();
     for (const l of this.listeners) l(p);
+  }, ScanQueue.EMIT_INTERVAL_MS);
+
+  private emit(): void {
+    this.emitter.schedule();
   }
 
   snapshot(): QueueProgress {
-    const done = this.items.filter((i) => i.state === 'done').length;
-    const failed = this.items.filter((i) => i.state === 'failed').length;
-    const current = this.items.find((i) => i.state === 'running');
+    // One pass rather than two filters plus a find over the same array.
+    let done = 0;
+    let failed = 0;
+    let current: QueueItem | undefined;
+    for (const item of this.items) {
+      if (item.state === 'done') done += 1;
+      else if (item.state === 'failed') failed += 1;
+      else if (item.state === 'running' && !current) current = item;
+    }
     return {
       paused: this.paused,
       pausedReason: this.pausedReason,

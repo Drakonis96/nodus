@@ -1,4 +1,5 @@
 import { getDb } from '../db/database';
+import { SubstringIndex } from '@shared/substringIndex';
 import type {
   GraphData,
   GraphNode,
@@ -847,13 +848,27 @@ function clip(value: string, max: number): string {
 }
 
 /** Build one side of a debate (idea + backing works/authors/evidence) from the DB. */
-function buildDebateSide(ideaId: string): DebateSide | null {
+/**
+ * Evidence quotes kept per work in list responses.
+ *
+ * The debates list renders `works.slice(0, 2)` and `evidence.slice(0, 1)` per
+ * side, and never renders `development` at all, while MCP's list search only
+ * matches on tension, themes, labels, statements, authors and work titles. So
+ * every quote past the first, and all of the development prose, was assembled
+ * and shipped for nothing — tens of megabytes in one IPC message on a large
+ * corpus. `getDebate()` still returns everything.
+ */
+const DEBATE_LIST_EVIDENCE_PER_WORK = 1;
+
+function buildDebateSide(ideaId: string, opts: { lean?: boolean } = {}): DebateSide | null {
   const detail = getIdeaDetail(ideaId);
   if (!detail) return null;
   const evidenceByWork = new Map<string, Evidence[]>();
   for (const ev of detail.evidence) {
     if (!evidenceByWork.has(ev.nodus_id)) evidenceByWork.set(ev.nodus_id, []);
-    evidenceByWork.get(ev.nodus_id)!.push(ev);
+    const bucket = evidenceByWork.get(ev.nodus_id)!;
+    if (opts.lean && bucket.length >= DEBATE_LIST_EVIDENCE_PER_WORK) continue;
+    bucket.push(ev);
   }
   const works: DebateWork[] = detail.occurrences.map((o) => ({
     nodus_id: o.nodus_id,
@@ -862,7 +877,7 @@ function buildDebateSide(ideaId: string): DebateSide | null {
     authors: o.work.authors,
     year: o.work.year,
     role: o.role,
-    development: o.development,
+    development: opts.lean ? '' : o.development,
     evidence: evidenceByWork.get(o.nodus_id) ?? [],
   }));
   const authors = Array.from(new Set(works.flatMap((w) => w.authors).filter(Boolean)));
@@ -903,10 +918,11 @@ function assembleDebate(
   clusterId: string,
   clusterSize: number,
   supportCount: Map<string, number>,
-  themesByIdea: Map<string, Set<string>>
+  themesByIdea: Map<string, Set<string>>,
+  opts: { lean?: boolean } = {}
 ): Debate | null {
-  const sideA = buildDebateSide(row.from_id);
-  const sideB = buildDebateSide(row.to_id);
+  const sideA = buildDebateSide(row.from_id, opts);
+  const sideB = buildDebateSide(row.to_id, opts);
   if (!sideA || !sideB) return null;
 
   const themesA = themesByIdea.get(row.from_id) ?? new Set<string>();
@@ -1015,7 +1031,7 @@ export function getDebates(): Debate[] {
   const debates = rows
     .map((row) => {
       const root = clusterId.get(row.id)!;
-      return assembleDebate(row, root, clusterSize.get(root) ?? 1, supportCount, themesByIdea);
+      return assembleDebate(row, root, clusterSize.get(root) ?? 1, supportCount, themesByIdea, { lean: true });
     })
     .filter((d): d is Debate => d !== null);
 
@@ -1099,9 +1115,11 @@ export function buildReadingPath(request: ReadingPathRequest = {}): ReadingPathP
   const maxDependency = Math.max(1, ...rows.map((r) => r.dependency_count));
   const gapSignals = collectGapSignals();
   const coreThemes = collectCoreThemes(rows, gapSignals, researchBrief);
-  const citedWorks = collectCitedWorks();
+  // Counted for every work in a single pass over the references, before the
+  // scoring loop, rather than rescanning them once per work.
+  const citationCounts = approximateCitationCounts(rows, collectCitedWorks());
 
-  const entries = rows.map((row) =>
+  const entries = rows.map((row, index) =>
     toReadingEntry(row, {
       strategy,
       researchBrief,
@@ -1111,7 +1129,7 @@ export function buildReadingPath(request: ReadingPathRequest = {}): ReadingPathP
       maxDependency,
       gapSignals,
       coreThemes,
-      citedWorks,
+      citedBy: citationCounts[index] ?? 0,
     })
   );
 
@@ -1235,7 +1253,7 @@ function toReadingEntry(
     maxDependency: number;
     gapSignals: GapSignals;
     coreThemes: Set<string>;
-    citedWorks: string[];
+    citedBy: number;
   }
 ): ReadingPathEntry {
   const authors = parseAuthors(row.authors_json);
@@ -1276,7 +1294,7 @@ function toReadingEntry(
   const coreThemeScore = themes.length
     ? themes.filter((theme) => opts.coreThemes.has(normalizeThemeLabel(theme))).length / Math.max(1, Math.min(3, themes.length))
     : 0;
-  const citedBy = approximateCitationCount(row, opts.citedWorks);
+  const citedBy = opts.citedBy;
   const olderScore = row.year == null || opts.maxYear === opts.minYear ? 0.35 : 1 - (row.year - opts.minYear) / (opts.maxYear - opts.minYear);
   const foundationalScore = clamp01(
     Math.min(0.34, row.idea_count * 0.035) +
@@ -1521,13 +1539,50 @@ function collectCitedWorks(): string[] {
   return rows.map((r) => normalizeText(r.cited_work)).filter(Boolean);
 }
 
-function approximateCitationCount(row: ReadingWorkRow, citedWorks: string[]): number {
-  if (citedWorks.length === 0) return 0;
+/** The author and title needles this work is looked up by, as before. */
+function citationPatterns(row: ReadingWorkRow): string[] {
   const title = normalizeText(row.title).slice(0, 80);
   const firstAuthor = parseAuthors(row.authors_json)[0]?.split(/[,\s]/)[0] ?? '';
   const author = normalizeText(firstAuthor);
-  if (!author && !title) return 0;
-  return citedWorks.filter((ref) => (author && ref.includes(author)) || (title.length > 20 && ref.includes(title))).length;
+  const patterns: string[] = [];
+  if (author) patterns.push(author);
+  if (title.length > 20) patterns.push(title);
+  return patterns;
+}
+
+/**
+ * Approximate citation counts for every work in one pass over the references.
+ *
+ * This replaces a per-work `citedWorks.filter(ref => ref.includes(...))`, which
+ * was O(works x refs) substring searches — 3,000 works against 60,000
+ * references measured 13 s of blocked main process, in a synchronous IPC
+ * handler, so the Reading Path simply never finished loading on a large
+ * library.
+ *
+ * Aho-Corasick rather than a word or token index, because it preserves
+ * `includes` semantics exactly: a surname occurring inside a longer word still
+ * matches, so the resulting ranking is unchanged.
+ */
+function approximateCitationCounts(rows: ReadingWorkRow[], citedWorks: string[]): number[] {
+  const counts = new Array<number>(rows.length).fill(0);
+  if (citedWorks.length === 0 || rows.length === 0) return counts;
+
+  const index = new SubstringIndex();
+  const groupsByPattern: number[][] = [];
+  let any = false;
+  rows.forEach((row, group) => {
+    for (const pattern of citationPatterns(row)) {
+      const id = index.add(pattern);
+      if (id < 0) continue;
+      // A pattern is shared when two works have the same first author, so the
+      // mapping is one pattern to many works.
+      (groupsByPattern[id] ??= []).push(group);
+      any = true;
+    }
+  });
+  if (!any) return counts;
+  for (let id = 0; id < groupsByPattern.length; id += 1) groupsByPattern[id] ??= [];
+  return index.countContainingHaystacksByGroup(citedWorks, groupsByPattern, rows.length);
 }
 
 function scoreForStrategy(

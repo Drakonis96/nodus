@@ -217,3 +217,48 @@ export async function transcribeWhisperCpp(
 export function cancelWhisperCpp(requestId: string): void {
   active.get(requestId)?.kill('SIGTERM');
 }
+
+/**
+ * Kill every running transcription. Call this on app quit.
+ *
+ * whisper-cli is spawned with up to 8 threads and is not in our process group,
+ * so it does NOT die with the app: without this, quitting Nodus mid-transcription
+ * left a detached process saturating those cores with no UI left to stop it, and
+ * every subsequent run added another one.
+ *
+ * SIGKILL rather than the SIGTERM used by `cancelWhisperCpp`: the app is going
+ * away, so there is no result to deliver and no reason to let the child choose
+ * whether to exit. Returns the number of children signalled so shutdown can be
+ * observed in tests and logs.
+ */
+export function stopAllWhisperCpp(): number {
+  let killed = 0;
+  for (const [requestId, child] of active) {
+    if (!child.killed && child.exitCode === null) {
+      child.kill('SIGKILL');
+      killed += 1;
+    }
+    // Best-effort: the `close` handler that normally removes the temp WAV may
+    // not run before the app exits.
+    try {
+      fs.rmSync(path.join(os.tmpdir(), `nodus-whisper-${requestId}.wav`), { force: true });
+    } catch {
+      // tmpdir cleanup is not worth blocking shutdown over
+    }
+  }
+  active.clear();
+  return killed;
+}
+
+/** Test seam: how many transcriptions are currently running. */
+export function activeWhisperCppCount(): number {
+  return active.size;
+}
+
+/**
+ * Test seam: register a child as if `transcribeWithWhisperCpp` had spawned it.
+ * Exercising shutdown otherwise requires a real whisper-cli install.
+ */
+export function __testRegisterWhisperChild(requestId: string, child: ChildProcess): void {
+  active.set(requestId, child);
+}
