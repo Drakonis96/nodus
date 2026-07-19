@@ -23,7 +23,7 @@ import { startStudyCalendarReminders, stopStudyCalendarReminders } from './study
 import { restorePersistedDockIcon } from './dockIcon';
 import { recoverLegacyApiKeys } from './secrets/legacySecretRecovery';
 import type { UpdateCheckResponse, UpdateProgressEvent } from '@shared/types';
-import { stopChatGptSubscriptionServer } from './ai/codexSubscription';
+import { killChatGptSubscriptionServer } from './ai/codexSubscription';
 import { stopGitHubCopilotSubscription } from './ai/githubCopilotSubscription';
 
 const require = createRequire(__filename);
@@ -500,7 +500,9 @@ app.on('before-quit', () => {
   interruptDecorativeImageGenerations();
   void stopMcpServer();
   void stopCopilotServer();
-  void stopChatGptSubscriptionServer();
+  // Kill synchronously: this handler cannot await, so the graceful stops below would
+  // be abandoned mid-drain and leave the vendor runtimes running as orphans.
+  killChatGptSubscriptionServer();
   void stopGitHubCopilotSubscription();
   closeDb();
 });
@@ -512,7 +514,9 @@ updateAwareApp.on('before-quit-for-update', () => {
   interruptDecorativeImageGenerations();
   void stopMcpServer();
   void stopCopilotServer();
-  void stopChatGptSubscriptionServer();
+  // Kill synchronously: this handler cannot await, so the graceful stops below would
+  // be abandoned mid-drain and leave the vendor runtimes running as orphans.
+  killChatGptSubscriptionServer();
   void stopGitHubCopilotSubscription();
   closeDb();
 });

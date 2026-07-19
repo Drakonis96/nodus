@@ -53,6 +53,24 @@ function apiError(status: number, payload: unknown): Error & { status: number } 
   return Object.assign(new Error(`OpenCode Go rechazó la solicitud: ${detail}`), { status });
 }
 
+/**
+ * Status to attribute to an error delivered *inside* a 200 stream.
+ *
+ * `wrapProviderError` classifies by status, and the response status is 200 by the
+ * time these arrive — so passing it through marked every mid-stream overload or rate
+ * limit as permanent. Map the payload's own error type instead, and default to 502:
+ * the request was accepted and the upstream failed afterwards, which is transient.
+ */
+function streamErrorStatus(payload: unknown): number {
+  const body = payload as any;
+  const kind = String(body?.error?.type ?? body?.error?.code ?? body?.type ?? '').toLowerCase();
+  if (kind.includes('overload')) return 529;
+  if (kind.includes('rate_limit') || kind.includes('quota')) return 429;
+  if (kind.includes('authentication') || kind.includes('api_key') || kind.includes('permission')) return 401;
+  if (kind.includes('invalid_request') || kind.includes('not_found')) return 400;
+  return 502;
+}
+
 async function readError(response: Response): Promise<never> {
   const raw = await response.text();
   let payload: unknown = raw;
@@ -102,8 +120,47 @@ async function* sseEvents(response: Response): AsyncGenerator<{ event: string | 
       if (data.length) yield { event: null, data: data.join('\n') };
     }
   } finally {
+    // Releasing the lock alone leaves the body undrained when the consumer throws
+    // mid-stream (an inline error event), so the connection was leaked on exactly
+    // the path that fires most often under load. Cancel first, then release.
+    try { await reader.cancel(); } catch { /* already closed */ }
     reader.releaseLock();
   }
+}
+
+/**
+ * OpenCode Go's Chat Completions surface forwards OpenAI's `reasoning_effort` to the
+ * reasoning models in its catalogue — the streaming side already parses the
+ * `reasoning`/`reasoning_content` deltas they send back. This used to be accepted as
+ * an option and never read, so picking an effort silently did nothing.
+ */
+function reasoningExtras(reasoning: ReasoningEffort | undefined): Record<string, unknown> {
+  return !reasoning || reasoning === 'off' ? {} : { reasoning_effort: reasoning };
+}
+
+/**
+ * Send the optional params, and on a 400 retry once without them.
+ *
+ * The generic OpenAI path in `aiClient` has always done this, which is what makes it
+ * safe to be optimistic about `response_format` and `reasoning_effort` on a mixed
+ * catalogue. This branch returned before reaching that fallback, so a single model
+ * rejecting an optional field turned every structured call into a hard failure.
+ */
+async function postWithOptionalExtras(
+  url: string,
+  headers: Record<string, string>,
+  signal: AbortSignal,
+  body: Record<string, unknown>,
+  extras: Record<string, unknown>
+): Promise<Response> {
+  const send = (payload: Record<string, unknown>) =>
+    fetch(url, { method: 'POST', headers, signal, body: JSON.stringify(payload) });
+
+  const response = await send({ ...body, ...extras });
+  if (response.status !== 400 || Object.keys(extras).length === 0) return response;
+  // Discard the rejected body so the retry does not leak the connection.
+  try { await response.body?.cancel(); } catch { /* already closed */ }
+  return send(body);
 }
 
 function assertText(text: string): string {
@@ -136,23 +193,26 @@ function anthropicUsage(usage: any): OpenCodeGoNormalizedUsage | null {
 
 async function completeOpenAi(options: OpenCodeGoCompletionOptions, url: string, signal: AbortSignal): Promise<OpenCodeGoCompletionResult> {
   const streaming = Boolean(options.onDelta);
-  const response = await fetch(`${url}/v1/chat/completions`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${options.apiKey}`, 'Content-Type': 'application/json' },
+  const response = await postWithOptionalExtras(
+    `${url}/v1/chat/completions`,
+    { Authorization: `Bearer ${options.apiKey}`, 'Content-Type': 'application/json' },
     signal,
-    body: JSON.stringify({
+    {
       model: options.model,
       temperature: options.temperature ?? 0.15,
       max_tokens: options.maxTokens ?? 8_000,
       stream: streaming,
       ...(streaming ? { stream_options: { include_usage: true } } : {}),
-      ...(options.jsonMode ? { response_format: { type: 'json_object' } } : {}),
       messages: [
         { role: 'system', content: options.system },
         { role: 'user', content: options.user },
       ],
-    }),
-  });
+    },
+    {
+      ...reasoningExtras(options.reasoning),
+      ...(options.jsonMode ? { response_format: { type: 'json_object' } } : {}),
+    }
+  );
   if (!response.ok) return readError(response);
 
   if (!streaming) {
@@ -172,7 +232,7 @@ async function completeOpenAi(options: OpenCodeGoCompletionOptions, url: string,
     if (event.data === '[DONE]') continue;
     let chunk: any;
     try { chunk = JSON.parse(event.data); } catch { continue; }
-    if (chunk?.error) throw apiError(response.status, chunk);
+    if (chunk?.error) throw apiError(streamErrorStatus(chunk), chunk);
     const delta = chunk?.choices?.[0]?.delta;
     const reasoning = delta?.reasoning ?? delta?.reasoning_content;
     if (typeof reasoning === 'string') options.onReasoningDelta?.(reasoning);
@@ -201,7 +261,13 @@ async function completeAnthropic(options: OpenCodeGoCompletionOptions, url: stri
     signal,
     body: JSON.stringify({
       model: options.model,
-      system: options.system,
+      // The Messages surface has no `response_format`, so the only way to honour
+      // jsonMode on this route is to ask in words. Without it the flag was inert
+      // here while the Chat Completions route enforced it — the same request shape
+      // behaved differently depending on which model the caller happened to pick.
+      system: options.jsonMode
+        ? `${options.system}\n\nReturn only a single valid JSON value. No prose, no explanation, no Markdown code fences.`
+        : options.system,
       temperature: options.temperature ?? 0.15,
       max_tokens: options.maxTokens ?? 8_000,
       stream: streaming,
@@ -227,7 +293,7 @@ async function completeAnthropic(options: OpenCodeGoCompletionOptions, url: stri
   for await (const event of sseEvents(response)) {
     let chunk: any;
     try { chunk = JSON.parse(event.data); } catch { continue; }
-    if (chunk?.type === 'error' || chunk?.error) throw apiError(response.status, chunk);
+    if (chunk?.type === 'error' || chunk?.error) throw apiError(streamErrorStatus(chunk), chunk);
     if (chunk?.type === 'message_start') inputUsage = chunk.message?.usage ?? inputUsage;
     if (chunk?.type === 'message_delta') {
       outputUsage = chunk.usage ?? outputUsage;

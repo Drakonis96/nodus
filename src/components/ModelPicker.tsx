@@ -1,8 +1,28 @@
 import { useEffect, useRef, useState } from 'react';
 import type { AppSettings, ModelRef } from '@shared/types';
+import { isSubscriptionProvider } from '@shared/providers';
 import { modelLabel, sameModel, sortModelRefs } from './ui';
 import { Icon } from './ui';
 import { t } from '../i18n';
+
+/**
+ * Shown next to the pickers that drive high-volume work (scans, extraction, vision,
+ * summaries, fusion). Those providers bill a personal plan with weekly and monthly
+ * caps instead of pay-per-use credit, so a single full-corpus run can exhaust the
+ * quota. This informs rather than blocks: the choice stays the user's.
+ */
+export function SubscriptionQuotaNotice({ model }: { model: ModelRef | null | undefined }) {
+  if (!model || !isSubscriptionProvider(model.provider)) return null;
+  return (
+    <p
+      role="note"
+      data-testid="subscription-quota-notice"
+      className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-200"
+    >
+      {t('Este modelo consume la cuota de tu suscripción, no crédito de API. Un análisis completo del corpus puede agotar el límite semanal o mensual de tu plan.')}
+    </p>
+  );
+}
 
 /**
  * Shared selector over favorite models plus the currently persisted value.

@@ -5077,6 +5077,8 @@ export const FR: Record<string, string> = {
   'Conversación, análisis, resúmenes y fallback de cualquier tarea sin modelo propio.':
     'Conversation, analyse, résumés et repli pour toute tâche sans modèle propre.',
   'Conversación, análisis, resúmenes y demás tareas de texto.': 'Conversation, analyse, résumés et autres tâches de texte.',
+  'Este modelo consume la cuota de tu suscripción, no crédito de API. Un análisis completo del corpus puede agotar el límite semanal o mensual de tu plan.':
+    "Ce modèle consomme le quota de votre abonnement, et non du crédit d'API. Une analyse complète du corpus peut épuiser la limite hebdomadaire ou mensuelle de votre offre.",
   'Vault actual': 'Espace actuel',
   'Ajustes avanzados del vault {vault}': 'Paramètres avancés de l\'espace {vault}',
   'Ajustes avanzados comunes': 'Paramètres avancés communs',

@@ -5320,6 +5320,8 @@ export const EN: Record<string, string> = {
     'Conversation, analysis, summaries and fallback for any task without its own model.',
   'Conversación, análisis, resúmenes y demás tareas de texto.':
     'Conversation, analysis, summaries, and other text tasks.',
+  'Este modelo consume la cuota de tu suscripción, no crédito de API. Un análisis completo del corpus puede agotar el límite semanal o mensual de tu plan.':
+    'This model draws on your subscription quota, not on API credit. A full corpus analysis can exhaust your plan\'s weekly or monthly limit.',
   'Vault actual': 'Current vault',
   'Ajustes avanzados del vault {vault}': 'Advanced settings for the {vault} vault',
   'Ajustes avanzados comunes': 'Shared advanced settings',
