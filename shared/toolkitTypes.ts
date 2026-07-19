@@ -771,6 +771,36 @@ export function opsForInputs(inputPaths: string[], category?: ToolkitCategory): 
   });
 }
 
+/**
+ * Overall completion (0..1) of a job snapshot, for the Convert progress bar.
+ * The finished files are blended with the active file's OWN progress, so a job
+ * that is one long file (OCR of a big scan) still advances instead of sitting at
+ * 0 until it flips to 100. A cancelled job reports what it actually got through.
+ */
+export function jobOverallProgress(progress: ToolkitJobProgress): number {
+  if (progress.total <= 0) return 0;
+  if (progress.finished) return progress.cancelled ? progress.done / progress.total : 1;
+  const active = progress.files[progress.activeIndex];
+  const partial = active?.status === 'processing' && active.pct != null ? active.pct : 0;
+  return Math.min(1, (progress.done + partial) / progress.total);
+}
+
+/**
+ * The file a progress line should name, with its 1-based position in the batch.
+ * Between two files `activeIndex` still points at the one that just finished, so
+ * the next pending file is used instead — otherwise the ordinal and the file name
+ * disagree ("Procesando 2 de 5" next to the name of file 1).
+ */
+export function jobCurrentFile(
+  progress: ToolkitJobProgress,
+): { file: ToolkitFileProgress; ordinal: number } | null {
+  if (progress.finished) return null;
+  const active = progress.files[progress.activeIndex];
+  const file = active?.status === 'processing' ? active : progress.files.find((f) => f.status === 'pending');
+  if (!file) return null;
+  return { file, ordinal: progress.files.indexOf(file) + 1 };
+}
+
 /** Default option values for an operation, ready to seed the UI state. */
 export function defaultOptions(op: ToolkitOp): Record<string, string | number | boolean> {
   const out: Record<string, string | number | boolean> = {};

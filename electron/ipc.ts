@@ -3398,9 +3398,13 @@ export function registerIpc(
   });
   h('toolkit:pickFiles', async (e, extensions: string[]) => {
     const win = BrowserWindow.fromWebContents(e.sender);
+    // "Todos los archivos" stays reachable even when a compatible-extension list is
+    // given: the checksum operation accepts any file at all, so a hard filter would
+    // make it unusable from the picker (drag-and-drop would be the only way in).
+    const allFiles = { name: 'Todos los archivos', extensions: ['*'] };
     const filters = extensions.length
-      ? [{ name: 'Archivos compatibles', extensions }]
-      : [{ name: 'Todos los archivos', extensions: ['*'] }];
+      ? [{ name: 'Archivos compatibles', extensions }, allFiles]
+      : [allFiles];
     const picked = await dialog.showOpenDialog(win ?? undefined!, {
       title: 'Añadir archivos',
       properties: ['openFile', 'multiSelections'],
