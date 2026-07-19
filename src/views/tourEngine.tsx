@@ -46,6 +46,10 @@ export function TourOverlay({
 }) {
   const [i, setI] = useState(0);
   const [rect, setRect] = useState<Rect | null>(null);
+  // The card node lives in state rather than a ref so the first measurement happens as
+  // soon as it mounts; a plain ref is still null on the pass that positions it.
+  const [card, setCard] = useState<HTMLDivElement | null>(null);
+  const [cardHeight, setCardHeight] = useState(180);
   const step = steps[i];
   const isFirst = i === 0;
   const isLast = i === steps.length - 1;
@@ -95,6 +99,16 @@ export function TourOverlay({
     };
   }, [i, step.target]);
 
+  // Re-measure whenever the step changes the copy, or the window resizes and reflows it.
+  useLayoutEffect(() => {
+    if (!card) return;
+    const measure = () => setCardHeight(card.getBoundingClientRect().height);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(card);
+    return () => observer.disconnect();
+  }, [card, i]);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -113,12 +127,18 @@ export function TourOverlay({
   const TT_W = 360;
   let ttStyle: React.CSSProperties;
   if (spotlight) {
+    // Clamp against the card's MEASURED height, not a guessed 180px. A step whose body
+    // runs longer than the guess produced a card taller than the space reserved for it,
+    // so on a short window it hung off the bottom of the viewport with "Siguiente"
+    // out of reach — the tour became impossible to advance rather than merely ugly.
     const below = spotlight.top + spotlight.height + 12;
-    const placeBelow = below + 180 < window.innerHeight;
-    const top = placeBelow ? below : Math.max(12, spotlight.top - 12 - 180);
+    const placeBelow = below + cardHeight + 12 <= window.innerHeight;
+    const desired = placeBelow ? below : spotlight.top - 12 - cardHeight;
+    const maxTop = Math.max(12, window.innerHeight - cardHeight - 12);
+    const top = Math.min(Math.max(12, desired), maxTop);
     let left = spotlight.left + spotlight.width / 2 - TT_W / 2;
     left = Math.max(12, Math.min(left, window.innerWidth - TT_W - 12));
-    ttStyle = { position: 'fixed', top, left, width: TT_W };
+    ttStyle = { position: 'fixed', top, left, width: TT_W, maxHeight: `calc(100vh - 24px)`, overflowY: 'auto' };
   } else {
     ttStyle = { position: 'fixed', top: '50%', left: '50%', width: TT_W, transform: 'translate(-50%, -50%)' };
   }
@@ -142,7 +162,7 @@ export function TourOverlay({
         <div className="fixed inset-0 bg-black/70" />
       )}
 
-      <div data-testid="tour-card" style={ttStyle} className="card bg-neutral-900 border border-neutral-700 p-4 shadow-2xl text-sm">
+      <div ref={setCard} data-testid="tour-card" style={ttStyle} className="card bg-neutral-900 border border-neutral-700 p-4 shadow-2xl text-sm">
         <div className="flex items-center justify-between mb-2">
           <div className="text-[11px] uppercase tracking-wide text-indigo-400">
             {t(label)} · {i + 1}/{steps.length}

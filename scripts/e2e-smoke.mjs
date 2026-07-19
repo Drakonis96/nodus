@@ -1855,14 +1855,35 @@ try {
   const stepCounter = tourCard.getByText(/^Tutorial de docencia · \d+\/\d+$/);
   const totalSteps = Number((await stepCounter.textContent()).split('/')[1]);
   assert.ok(totalSteps >= 10, `the teaching tutorial covers every section, got ${totalSteps} steps`);
+  // Deliberately short window. The card is placed against its own height, and a step
+  // whose copy runs longer than the space reserved for it used to hang off the bottom
+  // of the viewport with "Siguiente" unreachable — the tour could not be advanced at
+  // all. A tall window hides that entirely, which is why CI saw it first.
+  await app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows()[0];
+    if (win) win.setBounds({ width: 1280, height: 700 });
+  }).catch(() => {});
+  await page.waitForTimeout(300);
   for (let step = 2; step < totalSteps; step += 1) {
     await waitForCondition(`el paso ${step}/${totalSteps} del tutorial de docencia enfoca un elemento real`, async () => {
       const box = await spotlight.boundingBox().catch(() => null);
       return Boolean(box && box.width > 0 && box.height > 0);
     });
+    const cardBox = await tourCard.boundingBox();
+    const viewportHeight = await page.evaluate(() => window.innerHeight);
+    assert.ok(
+      cardBox && cardBox.y >= 0 && cardBox.y + cardBox.height <= viewportHeight + 1,
+      `step ${step}/${totalSteps} keeps its card on screen (y=${cardBox?.y}, height=${cardBox?.height}, viewport=${viewportHeight})`,
+    );
     await tourCard.getByRole('button', { name: 'Siguiente', exact: true }).click();
   }
   await tourCard.getByRole('button', { name: 'Empezar', exact: true }).waitFor({ timeout: 30_000 });
+  // Give the window back its height so the genealogy checks below are unaffected.
+  await app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows()[0];
+    if (win) win.setBounds({ width: 1440, height: 900 });
+  }).catch(() => {});
+  await page.waitForTimeout(300);
   await tourCard.getByRole('button', { name: /^Saltar/ }).click();
   await teachingTourLabel.waitFor({ state: 'detached', timeout: 30_000 });
   await page.getByRole('button', { name: 'Salir del modo demo', exact: true }).click();
