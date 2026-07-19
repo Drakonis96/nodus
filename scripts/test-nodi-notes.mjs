@@ -71,6 +71,8 @@ try {
   assert.match(component, /t\('Guardado automáticamente'\)/, 'the footer communicates autosave');
   assert.doesNotMatch(component, /className="nodi-note-save"/, 'the editor no longer requires a manual save action');
   assert.match(css, /\.nodi-notes-list\s*\{[^}]*padding:\s*6px 10px/s, 'the list keeps a small lateral margin');
+  assert.match(css, /\.nodi-note-row\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\) 30px/s, 'each note reserves a fixed column for its delete action');
+  assert.match(css, /\.nodi-note-open\s*\{[^}]*overflow:\s*hidden/s, 'note text is clipped before the delete action');
 
   console.log('Nodi quick-note autosave tests passed!');
 } finally {
