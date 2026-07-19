@@ -20,10 +20,39 @@ export type {
   ToolkitJobProgress,
   ToolkitJobResult,
 } from './toolkitTypes';
+export type {
+  ProtectInputExtension,
+  ProtectSourceKind,
+  ProtectSourceRef,
+  ProtectSourceSummary,
+  ProtectFilePayload,
+  ProtectListSourcesRequest,
+  ProtectArtifactFormat,
+  ProtectArtifact,
+  ProtectArtifactWriteResult,
+  ProtectShareResult,
+  ProtectVaultCopySummary,
+  ProtectIssuedCopy,
+  ProtectWatermarkPattern,
+  ProtectManualWatermarkItem,
+  ProtectWatermark,
+  ProtectExportFooter,
+  ProtectTraceOptions,
+} from './protectTypes';
 
 // Type-only import (erased at compile time) — keeps the no-runtime-import rule intact.
 import type { VaultType } from './vaultTypes';
 import type { ToolkitJobRequest, ToolkitJobProgress, ToolkitJobResult } from './toolkitTypes';
+import type {
+  ProtectArtifact,
+  ProtectArtifactWriteResult,
+  ProtectFilePayload,
+  ProtectListSourcesRequest,
+  ProtectShareResult,
+  ProtectSourceRef,
+  ProtectSourceSummary,
+  ProtectVaultCopySummary,
+} from './protectTypes';
 import type { CsvImportPlanData } from './databaseCsv';
 import type { BulkAttachOptions } from './databaseBulk';
 import type {
@@ -978,7 +1007,7 @@ export type DeepContextMode = 'standard' | 'long';
 /** Languages Nodus can speak. `uiLanguage` localizes the interface; `promptLanguage`
  *  is injected into the AI prompts and so determines the language of generated content
  *  (ideas, themes, tutor narrative, drafts, assistant answers). */
-export type AppLanguage = 'es' | 'en' | 'fr' | 'de' | 'pt' | 'pt-BR';
+export type AppLanguage = 'es' | 'en' | 'fr' | 'de' | 'pt' | 'pt-BR' | 'it';
 /** Single source of truth for the prompt languages: the union below is derived from
  *  it, and runtime validators (the MCP tool schemas) enumerate it instead of
  *  re-spelling the list — which is how `tr` once ended up accepted everywhere except
@@ -2451,6 +2480,7 @@ export type SyncGroupKey =
   | 'edgeFeedback'
   | 'curation'
   | 'databases'
+  | 'protect'
   | 'study'
   | 'teaching'
   | 'genealogy'
@@ -2502,6 +2532,8 @@ export interface SupersededRestoreResult {
 
 export interface SyncMergeSummary {
   groups: Record<SyncGroupKey, SyncTableCounts>;
+  /** Convenience alias for the Nodus Protect group, retained for sync callers. */
+  protectCopies: SyncTableCounts;
   /** Rows that could not be applied. Empty when everything merged cleanly. */
   conflicts: SyncConflict[];
   /** Tables in the package this build does not recognise (named, not silently dropped). */
@@ -6157,6 +6189,19 @@ export interface NodusApi {
   pickToolkitOutputDir(): Promise<string | null>;
   /** Reveal a produced file in the OS file manager. */
   revealToolkitOutput(filePath: string): Promise<void>;
+
+  // Nodus Protect — all filesystem and vault references are registered and
+  // validated in the main process before bytes are exposed to the renderer.
+  pickProtectFiles(multiple: boolean): Promise<ProtectSourceSummary[]>;
+  registerProtectDroppedFiles(files: unknown[]): Promise<ProtectSourceSummary[]>;
+  listProtectVaultSources(request?: ProtectListSourcesRequest): Promise<ProtectSourceSummary[]>;
+  readProtectSource(ref: ProtectSourceRef): Promise<ProtectFilePayload>;
+  saveProtectArtifactToDisk(artifact: ProtectArtifact): Promise<ProtectArtifactWriteResult>;
+  shareProtectArtifact(artifact: ProtectArtifact): Promise<ProtectShareResult>;
+  listProtectCopies(query?: string): Promise<ProtectVaultCopySummary[]>;
+  saveProtectArtifactToVault(artifact: ProtectArtifact): Promise<ProtectVaultCopySummary>;
+  downloadProtectCopy(copyId: string): Promise<ProtectArtifactWriteResult>;
+  deleteProtectCopy(copyId: string): Promise<void>;
 }
 
 export interface WorkFilter {

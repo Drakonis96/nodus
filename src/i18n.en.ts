@@ -1,9 +1,12 @@
+import { PROTECT_TRANSLATIONS } from './i18n.protect';
+
 /**
  * English translations keyed by the Spanish source string (see {@link ../i18n}).
  * Grouped by surface for maintainability. English is the mandatory fallback for
  * every non-Spanish interface language.
  */
 export const EN: Record<string, string> = {
+  ...PROTECT_TRANSLATIONS.en,
   // ── Runtime UI payloads (Electron → renderer) ────────────────────────────
   'No se pudo traducir este mensaje.': 'This message could not be translated.',
   'Analizando fragmento {current}/{total} con IA… ({seconds}s)': 'Analysing chunk {current}/{total} with AI… ({seconds}s)',
@@ -5274,8 +5277,8 @@ export const EN: Record<string, string> = {
   'Heredar modelo principal': 'Inherit primary model',
 
   // ── Study vault · portability, storage and privacy ────────────────────────
-  'Lleva tus notas, datos de estudio, materiales y grabaciones, borradores, búsquedas guardadas, auditorías de relaciones y bases de datos a otro equipo. Al importar se fusiona: gana la versión más reciente y nunca se borra nada local.':
-    'Take notes, study data, materials and recordings, drafts, saved searches, relationship audits and databases to another computer. Import merges them: the newest version wins and no local data is deleted.',
+  'Lleva tus notas, datos de estudio, materiales y grabaciones, borradores, búsquedas guardadas, auditorías de relaciones, bases de datos y Copias protegidas a otro equipo. Al importar se fusiona por fecha: gana la versión más reciente; las eliminaciones de Copias protegidas también se sincronizan mediante borrado lógico.':
+    'Take your notes, study data, materials and recordings, drafts, saved searches, relationship audits, databases and Protected Copies to another computer. Imports merge by date: the newest version wins; deletions of Protected Copies are also synchronized through soft deletion.',
   'Esta acción elimina datos de forma permanente. ¿Quieres continuar?': 'This action permanently deletes data. Do you want to continue?',
   'Administración del vault de estudio': 'Study vault administration',
   'Comprobaciones locales de SQLite, almacenamiento, índices, huérfanos y papelera.': 'Local SQLite, storage, index, orphan and trash checks.',

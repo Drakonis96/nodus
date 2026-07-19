@@ -1173,6 +1173,19 @@ const api: NodusApi = {
   pickToolkitFiles: (extensions) => ipcRenderer.invoke('toolkit:pickFiles', extensions),
   pickToolkitOutputDir: () => ipcRenderer.invoke('toolkit:pickOutputDir'),
   revealToolkitOutput: (filePath) => ipcRenderer.invoke('toolkit:showInFolder', filePath).then(() => undefined),
+  pickProtectFiles: (multiple) => ipcRenderer.invoke('protect:pickFiles', multiple),
+  registerProtectDroppedFiles: (files) => ipcRenderer.invoke(
+    'protect:registerDroppedFiles',
+    files.map((file) => webUtils.getPathForFile(file as Parameters<typeof webUtils.getPathForFile>[0])),
+  ),
+  listProtectVaultSources: (request) => ipcRenderer.invoke('protect:listVaultSources', request),
+  readProtectSource: (ref) => ipcRenderer.invoke('protect:readSource', ref),
+  saveProtectArtifactToDisk: (artifact) => ipcRenderer.invoke('protect:saveDisk', artifact),
+  shareProtectArtifact: (artifact) => ipcRenderer.invoke('protect:share', artifact),
+  listProtectCopies: (query) => ipcRenderer.invoke('protect:copies:list', query),
+  saveProtectArtifactToVault: (artifact) => ipcRenderer.invoke('protect:copies:save', artifact),
+  downloadProtectCopy: (copyId) => ipcRenderer.invoke('protect:copies:download', copyId),
+  deleteProtectCopy: (copyId) => ipcRenderer.invoke('protect:copies:delete', copyId).then(() => undefined),
 };
 
 contextBridge.exposeInMainWorld('nodus', api);

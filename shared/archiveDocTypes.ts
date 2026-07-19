@@ -18,6 +18,8 @@
 
 import type { AppLanguage } from './types';
 import { parseHistoricalDate } from './genealogyDates';
+import { DOC_FACET_LABEL_IT, DOC_TYPE_LABEL_IT } from './archiveDocTypes.it';
+export { DOC_TYPE_LABEL_IT } from './archiveDocTypes.it';
 
 // ── Categories (dropdown grouping; ES label via i18n) ───────────────────────────
 export type ArchiveDocCategory =
@@ -70,6 +72,7 @@ export interface FacetValue {
   de: string;
   pt: string;
   'pt-BR': string;
+  it?: string;
 }
 export type FacetDimensionId =
   | 'naturaleza'
@@ -140,6 +143,10 @@ export const SOPORTE_FISICO: FacetValue[] = [
   { id: 'objeto', es: 'Objeto', en: 'Object', fr: 'Objet', de: 'Objekt', pt: 'Objeto', 'pt-BR': 'Objeto' },
 ];
 export const GENEALOGIA: FacetValue[] = [{ id: 'si', es: 'Útil para genealogía', en: 'Useful for genealogy', fr: 'Utile pour la généalogie', de: 'Nützlich für die Genealogie', pt: 'Útil para a genealogia', 'pt-BR': 'Útil para genealogia' }];
+
+for (const value of [...NATURALEZA, ...EPOCA, ...AMBITO, ...FUNCION, ...SOPORTE_MONUMENTAL, ...ESTATUS, ...SOPORTE_FISICO, ...GENEALOGIA]) {
+  value.it = DOC_FACET_LABEL_IT[value.en] ?? value.en;
+}
 
 /** Filter-bar dimensions in display order (dimension name via i18n; values in-data). */
 export const DOC_FACET_DIMENSIONS: { id: FacetDimensionId; label: string; values: FacetValue[] }[] = [
@@ -1257,6 +1264,7 @@ function expand(row: RawDocType): ArchiveDocTypeDef {
       de: DOC_TYPE_LABEL_DE[id] ?? labelEn,
       pt: DOC_TYPE_LABEL_PT[id] ?? labelEn,
       'pt-BR': DOC_TYPE_LABEL_PT_BR[id] ?? labelEn,
+      it: DOC_TYPE_LABEL_IT[id] ?? labelEn,
     },
     category,
     fields,

@@ -48,6 +48,7 @@ const TRANSLATIONS = [
   { name: 'German', file: 'src/i18n.de.ts', export: 'DE' },
   { name: 'European Portuguese', file: 'src/i18n.pt.ts', export: 'PT' },
   { name: 'Brazilian Portuguese', file: 'src/i18n.pt-BR.ts', export: 'PT_BR' },
+  { name: 'Italian', file: 'src/i18n.it.ts', export: 'IT' },
 ].map((entry) => ({ ...entry, table: loadModule(entry.file)[entry.export] }));
 
 const EN = TRANSLATIONS[0].table;
@@ -354,7 +355,7 @@ test('all non-Spanish translation fallbacks resolve to English, never Spanish', 
 test('legacy Spanish Electron errors cannot leak into a non-Spanish interface', () => {
   const { localizeIpcPayload, localizeRuntimeError, uiText } = loadModule('shared/uiLanguage.ts');
   const spanish = 'No se puede cambiar de bóveda mientras hay un análisis activo.';
-  for (const language of ['en', 'fr', 'de', 'pt', 'pt-BR', 'unknown']) {
+  for (const language of ['en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'unknown']) {
     const localized = localizeRuntimeError(spanish, language);
     assert.notEqual(localized, spanish, `${language} leaked the Spanish runtime error`);
   }
@@ -368,7 +369,7 @@ test('legacy Spanish Electron errors cannot leak into a non-Spanish interface', 
 
 test('issue #12 queue payloads translate at runtime', () => {
   const runtime = loadModule('src/i18n.ts');
-  for (const language of ['en', 'fr', 'de', 'pt', 'pt-BR']) {
+  for (const language of ['en', 'fr', 'de', 'pt', 'pt-BR', 'it']) {
     runtime.setActiveLang(language);
     assert.notEqual(runtime.tr('Descubrir relaciones semánticas'), 'Descubrir relaciones semánticas');
     assert.notEqual(runtime.tr('Analizando fragmento 2/5 con IA… (8s)'), 'Analizando fragmento 2/5 con IA… (8s)');
@@ -444,7 +445,7 @@ test('the two Portuguese variants are really different', () => {
 
 // The languages that in-data labels must also carry. Spanish and English are the
 // source pair every table already had.
-const IN_DATA_LANGUAGES = ['fr', 'de', 'pt', 'pt-BR'];
+const IN_DATA_LANGUAGES = ['fr', 'de', 'pt', 'pt-BR', 'it'];
 
 test('in-data labels are translated alongside the i18n table', () => {
   // These labels ship inside shared/ data rather than the i18n table, so the
@@ -456,7 +457,7 @@ test('in-data labels are translated alongside the i18n table', () => {
   // Assert against the source maps, not the expanded `labels`: those are
   // `DOC_TYPE_LABEL_XX[id] ?? labelEn`, so a missing id would silently look fine.
   // A label equal to the English one is legitimate ("Illustration", "Notes").
-  const docTypeMaps = { fr: docTypes.DOC_TYPE_LABEL_FR, de: docTypes.DOC_TYPE_LABEL_DE, pt: docTypes.DOC_TYPE_LABEL_PT, 'pt-BR': docTypes.DOC_TYPE_LABEL_PT_BR };
+  const docTypeMaps = { fr: docTypes.DOC_TYPE_LABEL_FR, de: docTypes.DOC_TYPE_LABEL_DE, pt: docTypes.DOC_TYPE_LABEL_PT, 'pt-BR': docTypes.DOC_TYPE_LABEL_PT_BR, it: docTypes.DOC_TYPE_LABEL_IT };
   for (const language of IN_DATA_LANGUAGES) {
     const map = docTypeMaps[language];
     assert.ok(map, `no doc-type label map for ${language}`);

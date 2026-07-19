@@ -98,7 +98,7 @@ export const NAV_ITEMS: NavItem[] = [
  * never turns into a new top-level view (and never leaks into sidebarOrder, the
  * per-vault-type allow-lists or the reordering UI). The sidebar nests one button
  * per tool under the section, and 'home' is the catalogue. */
-export type ToolkitPage = 'home' | 'convert' | 'presenter' | 'ocr';
+export type ToolkitPage = 'home' | 'convert' | 'protect' | 'presenter' | 'ocr';
 
 export interface ToolkitToolDef {
   page: Exclude<ToolkitPage, 'home'>;
@@ -129,6 +129,15 @@ export const TOOLKIT_TOOLS: ToolkitToolDef[] = [
     icon: 'swap',
     state: 'wip',
     testid: 'convert',
+  },
+  {
+    page: 'protect',
+    name: 'Nodus Protect',
+    shortName: 'Protect',
+    description: 'Oculta datos, añade marcas de agua y crea o verifica copias trazables, siempre mediante procesamiento local.',
+    icon: 'shield',
+    state: 'wip',
+    testid: 'protect',
   },
   {
     page: 'presenter',

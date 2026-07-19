@@ -5,6 +5,7 @@
 // version bumps.
 
 import type { VaultType } from './vaultTypes';
+import { RELEASE_NOTES_IT } from './releaseNotes.it';
 
 // Beyond the vault types, a highlight can belong to a cross-vault surface with an
 // identity of its own: the MCP server, the Nodi mascot, the tools hub or a new
@@ -12,7 +13,7 @@ import type { VaultType } from './vaultTypes';
 // into 'general'.
 export type ReleaseNoteScope = 'general' | VaultType | 'mcp' | 'nodi' | 'toolkit' | 'languages';
 
-export interface ReleaseHighlight {
+interface RawReleaseHighlight {
   es: string;
   en: string;
   fr: string;
@@ -23,6 +24,8 @@ export interface ReleaseHighlight {
   scope: ReleaseNoteScope;
 }
 
+export interface ReleaseHighlight extends RawReleaseHighlight { it: string }
+
 export interface ReleaseNote {
   version: string;
   /** ISO date (YYYY-MM-DD) the version shipped. */
@@ -30,7 +33,9 @@ export interface ReleaseNote {
   highlights: ReleaseHighlight[];
 }
 
-export const RELEASE_NOTES: ReleaseNote[] = [
+interface RawReleaseNote extends Omit<ReleaseNote, 'highlights'> { highlights: RawReleaseHighlight[] }
+
+const RAW_RELEASE_NOTES: RawReleaseNote[] = [
   {
     version: '2.4.0',
     date: '2026-07-18',
@@ -70,6 +75,24 @@ export const RELEASE_NOTES: ReleaseNote[] = [
         de: 'Nodus Convert wächst weiter: PDF zu Bildern, komprimieren und in Graustufen umwandeln, Seitenzahlen, Wasserzeichen und Randbeschnitt hinzufügen; neue Optionen zum Zuschneiden, Drehen, Spiegeln und für Wasserzeichen bei Bildern; und Stapelaufträge werden jetzt gebündelt in einer einzigen ZIP-Datei ausgegeben.',
         pt: 'O Nodus Convert continua a crescer: PDF para imagens, comprimir e converter para escala de cinzentos, adicionar números de página, marcas de água e recortar margens; novas opções de recorte, rotação, inversão e marca de água para imagens; e os trabalhos em lote são agora entregues empacotados num único ZIP.',
         'pt-BR': 'O Nodus Convert continua crescendo: PDF para imagens, comprimir e converter para tons de cinza, adicionar números de página, marcas d’água e recortar margens; novas opções de recorte, rotação, inversão e marca d’água para imagens; e os trabalhos em lote agora são entregues empacotados em um único ZIP.',
+      },
+      {
+        scope: 'toolkit',
+        es: 'Llega Nodus Protect: combina PDF e imágenes, oculta o desenfoca datos, recorta, gira y endereza, añade siete tipos de marca de agua y un pie legal, y exporta copias rasterizadas sin capas ni texto oculto. Puede usar archivos del disco o de la bóveda, guardar en la biblioteca Copias protegidas y crear o verificar marcas trazables IDPS v1 compatibles con IDprotector. Todo el procesamiento del documento es local.',
+        en: 'Nodus Protect arrives: combine PDFs and images, redact or blur data, crop, rotate and straighten, add seven watermark patterns and a legal footer, and export rasterised copies without hidden text or layers. It can use files from disk or the vault, save to the Protected Copies library, and create or verify IDPS v1 traceable marks compatible with IDprotector. All document processing is local.',
+        fr: 'Nodus Protect arrive : combinez PDF et images, masquez ou floutez des données, recadrez, faites pivoter et redressez, ajoutez sept motifs de filigrane et un pied de page juridique, puis exportez des copies rastérisées sans texte ni calque caché. Il utilise des fichiers du disque ou de l’espace, les conserve dans la bibliothèque Copies protégées et crée ou vérifie des marques traçables IDPS v1 compatibles avec IDprotector. Tout le traitement documentaire est local.',
+        de: 'Nodus Protect ist da: Kombiniere PDFs und Bilder, schwärze oder verwische Daten, schneide zu, drehe und begradige, füge sieben Wasserzeichenmuster und eine rechtliche Fußzeile hinzu und exportiere gerasterte Kopien ohne verborgenen Text oder Ebenen. Dateien können vom Datenträger oder aus dem Arbeitsbereich stammen, in der Bibliothek Geschützte Kopien gespeichert und als IDPS-v1-Markierungen kompatibel mit IDprotector erstellt oder geprüft werden. Die gesamte Dokumentverarbeitung erfolgt lokal.',
+        pt: 'Chega o Nodus Protect: combine PDF e imagens, oculte ou desfoque dados, recorte, rode e endireite, adicione sete padrões de marca de água e um rodapé legal e exporte cópias rasterizadas sem texto nem camadas ocultas. Pode usar ficheiros do disco ou do espaço, guardar na biblioteca Cópias protegidas e criar ou verificar marcas rastreáveis IDPS v1 compatíveis com o IDprotector. Todo o processamento documental é local.',
+        'pt-BR': 'Chega o Nodus Protect: combine PDFs e imagens, oculte ou desfoque dados, recorte, gire e endireite, adicione sete padrões de marca d’água e um rodapé legal e exporte cópias rasterizadas sem texto nem camadas ocultas. Ele usa arquivos do disco ou do espaço, salva na biblioteca Cópias protegidas e cria ou verifica marcas rastreáveis IDPS v1 compatíveis com o IDprotector. Todo o processamento de documentos é local.',
+      },
+      {
+        scope: 'languages',
+        es: 'La interfaz completa de Nodus ya está disponible también en italiano, como séptimo idioma global. Incluye navegación, ajustes, tutoriales, recuperación, mensajes de runtime, vocabulario de cada bóveda, notas de versión y Nodus Protect; la configuración independiente del idioma de los prompts de IA no cambia.',
+        en: 'The complete Nodus interface is now also available in Italian as its seventh global language. It covers navigation, settings, tutorials, recovery, runtime messages, each vault’s vocabulary, release notes and Nodus Protect; the separate AI prompt-language setting is unchanged.',
+        fr: 'L’interface complète de Nodus est désormais aussi disponible en italien, septième langue globale. Elle couvre la navigation, les réglages, les tutoriels, la récupération, les messages d’exécution, le vocabulaire de chaque espace, les notes de version et Nodus Protect ; le réglage indépendant de la langue des prompts d’IA ne change pas.',
+        de: 'Die vollständige Nodus-Oberfläche ist nun auch auf Italienisch als siebte globale Sprache verfügbar. Dies umfasst Navigation, Einstellungen, Tutorials, Wiederherstellung, Laufzeitmeldungen, das Vokabular jedes Arbeitsbereichs, Versionshinweise und Nodus Protect; die separate Spracheinstellung für KI-Prompts bleibt unverändert.',
+        pt: 'A interface completa do Nodus está agora também disponível em italiano, como sétimo idioma global. Abrange navegação, definições, tutoriais, recuperação, mensagens de execução, vocabulário de cada espaço, notas de versão e Nodus Protect; a definição independente do idioma dos prompts de IA não muda.',
+        'pt-BR': 'A interface completa do Nodus agora também está disponível em italiano, como sétimo idioma global. Ela abrange navegação, configurações, tutoriais, recuperação, mensagens de execução, vocabulário de cada espaço, notas de versão e Nodus Protect; a configuração separada do idioma dos prompts de IA não muda.',
       },
       {
         scope: 'general',
@@ -935,6 +958,14 @@ export const RELEASE_NOTES: ReleaseNote[] = [
     ],
   },
 ];
+
+export const RELEASE_NOTES: ReleaseNote[] = RAW_RELEASE_NOTES.map((note) => ({
+  ...note,
+  highlights: note.highlights.map((highlight, index) => ({
+    ...highlight,
+    it: RELEASE_NOTES_IT[note.version]?.[index] ?? highlight.en,
+  })),
+}));
 
 /** Compare two dotted numeric versions. Returns >0 if a>b, <0 if a<b, 0 if equal. */
 export function compareVersions(a: string, b: string): number {

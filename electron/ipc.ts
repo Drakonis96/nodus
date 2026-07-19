@@ -158,6 +158,9 @@ import { getSettings, updateSettings } from './db/settingsRepo';
 import { runToolkitJob, type ToolkitSignal } from './toolkit/toolkitJobs';
 import { TOOLKIT_REGISTRY } from './toolkit/convert';
 import type { ToolkitJobRequest } from '@shared/toolkitTypes';
+import type { ProtectArtifact, ProtectListSourcesRequest, ProtectSourceRef } from '@shared/protectTypes';
+import { PROTECT_INPUT_EXTENSIONS } from '@shared/protectTypes';
+import * as protect from './protect/protectService';
 import { localizeIpcPayload, localizeRuntimeError } from '@shared/uiLanguage';
 import { getMcpStatus, regenerateMcpToken, restartMcpServer, startMcpServer, stopMcpServer } from './mcp';
 import { getCopilotStatus, regenerateCopilotToken, restartCopilotServer, startCopilotServer, stopCopilotServer } from './copilot/server';
@@ -741,6 +744,7 @@ export function registerIpc(
     await stopMcpServer();
     await stopCopilotServer();
     interruptDecorativeImageGenerations();
+    protect.invalidateProtectVaultReferences();
     closeCrossVaultConnections(); // drop read-only handles to sibling vaults before switching
     closeDb();
     setActiveVault(id);
@@ -3288,6 +3292,7 @@ export function registerIpc(
       de: mode === 'restore' ? 'Nodus-Wiederherstellungsordner auswählen' : 'Leeren Ordner zum Schutz von Nodus auswählen',
       pt: mode === 'restore' ? 'Selecionar uma pasta de recuperação do Nodus' : 'Selecionar uma pasta vazia para proteger o Nodus',
       'pt-BR': mode === 'restore' ? 'Selecionar uma pasta de recuperação do Nodus' : 'Selecionar uma pasta vazia para proteger o Nodus',
+      it: mode === 'restore' ? 'Seleziona una cartella di ripristino Nodus' : 'Seleziona una cartella vuota per proteggere Nodus',
     };
     const { canceled, filePaths } = await dialog.showOpenDialog(getWindow() ?? undefined!, {
       title: titles[language],
@@ -3295,10 +3300,10 @@ export function registerIpc(
     });
     return canceled || filePaths.length === 0 ? null : inspectRecoveryFolder(filePaths[0], language);
   });
-  h('recovery:initialize', async (_e, folder: string, password: string, language: 'es' | 'en' = 'es') =>
+  h('recovery:initialize', async (_e, folder: string, password: string, language: AppLanguage = 'es') =>
     initializeRecoveryFolder(folder, password, app.getVersion(), language)
   );
-  h('recovery:restore', async (_e, root: string, fileName: string, password: string, language: 'es' | 'en' = 'es') => {
+  h('recovery:restore', async (_e, root: string, fileName: string, password: string, language: AppLanguage = 'es') => {
     const result = await restoreRecoverySnapshot(root, fileName, password, app.getVersion(), language);
     if (result.ok) await stopMcpServer();
     return result;
@@ -3452,6 +3457,68 @@ export function registerIpc(
   h('toolkit:showInFolder', async (_e, filePath: string) => {
     shell.showItemInFolder(filePath);
   });
+
+  // ── Nodus Protect ──────────────────────────────────────────────────────────
+  h('protect:pickFiles', async (e, multiple = true) => {
+    const win = BrowserWindow.fromWebContents(e.sender);
+    const picked = await dialog.showOpenDialog(win ?? undefined!, {
+      title: 'Seleccionar documentos para Nodus Protect',
+      properties: multiple ? ['openFile', 'multiSelections'] : ['openFile'],
+      filters: [{ name: 'PDF e imágenes compatibles', extensions: [...PROTECT_INPUT_EXTENSIONS] }],
+    });
+    return picked.canceled ? [] : protect.registerProtectDiskSources(picked.filePaths);
+  });
+  h('protect:registerDroppedFiles', async (_e, filePaths: string[]) => {
+    if (!Array.isArray(filePaths) || filePaths.length > 500) throw new Error('Selección de archivos no válida.');
+    return protect.registerProtectDiskSources(filePaths);
+  });
+  h('protect:listVaultSources', async (_e, request?: ProtectListSourcesRequest) =>
+    protect.listProtectVaultSources(request));
+  h('protect:readSource', async (_e, ref: ProtectSourceRef) => protect.readProtectSource(ref));
+  h('protect:saveDisk', async (e, artifact: ProtectArtifact) => {
+    artifact = protect.validateProtectArtifact(artifact);
+    const win = BrowserWindow.fromWebContents(e.sender);
+    const ext = artifact.format;
+    const picked = await dialog.showSaveDialog(win ?? undefined!, {
+      title: 'Guardar copia protegida',
+      defaultPath: path.basename(artifact.fileName),
+      filters: [{ name: ext.toUpperCase(), extensions: [ext] }],
+    });
+    if (picked.canceled || !picked.filePath) return { saved: false, canceled: true, path: null };
+    protect.writeArtifactAtomically(picked.filePath, artifact.bytes);
+    return { saved: true, canceled: false, path: picked.filePath };
+  });
+  h('protect:share', async (e, artifact: ProtectArtifact) => {
+    const win = BrowserWindow.fromWebContents(e.sender);
+    const result = await protect.shareProtectArtifact(artifact, win);
+    if (!result.fallbackRequired) return result;
+    const ext = artifact.format;
+    const picked = await dialog.showSaveDialog(win ?? undefined!, {
+      title: 'Guardar para compartir', defaultPath: path.basename(artifact.fileName),
+      filters: [{ name: ext.toUpperCase(), extensions: [ext] }],
+    });
+    if (picked.canceled || !picked.filePath) return { shared: false, canceled: true, fallbackRequired: true, message: result.message };
+    protect.writeArtifactAtomically(picked.filePath, artifact.bytes);
+    return { shared: true, canceled: false, fallbackRequired: true, message: result.message };
+  });
+  h('protect:copies:list', async (_e, query?: string) => {
+    if (query != null && (typeof query !== 'string' || query.length > 300)) throw new Error('Consulta no válida.');
+    return protect.listProtectCopies(query);
+  });
+  h('protect:copies:save', async (_e, artifact: ProtectArtifact) => protect.saveProtectCopy(artifact));
+  h('protect:copies:download', async (e, copyId: string) => {
+    const artifact = protect.getProtectCopyArtifact(copyId);
+    const win = BrowserWindow.fromWebContents(e.sender);
+    const ext = artifact.format;
+    const picked = await dialog.showSaveDialog(win ?? undefined!, {
+      title: 'Descargar copia protegida', defaultPath: artifact.fileName,
+      filters: [{ name: ext.toUpperCase(), extensions: [ext] }],
+    });
+    if (picked.canceled || !picked.filePath) return { canceled: true, path: null };
+    protect.writeArtifactAtomically(picked.filePath, artifact.bytes);
+    return { canceled: false, path: picked.filePath };
+  });
+  h('protect:copies:delete', async (_e, copyId: string) => protect.deleteProtectCopy(copyId));
 
   // Stream queue progress to the renderer.
   scanQueue.onProgress((p) => {

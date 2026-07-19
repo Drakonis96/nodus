@@ -10,7 +10,6 @@ export const NODUS_ROADMAP = [
   { title: 'Vault de worldbuilding', detail: 'Personajes, lugares, cronologías y reglas de mundos narrativos.' },
   { title: 'Servidor', detail: 'Infraestructura opcional para nuevas capacidades conectadas.' },
   { title: 'Compartir vaults y trabajo colaborativo', detail: 'Compartir espacios y colaborar con control sobre los datos.' },
-  { title: 'Nodus Toolkit', detail: 'Herramientas prácticas y local-first para convertir archivos y procesar documentos, integradas en Nodus.' },
   { title: 'Nodus PDF Presenter', detail: 'Presentar archivos PDF con vista del presentador, control remoto desde el móvil, notas del orador y herramientas de anotación en directo.' },
   { title: 'Nodus OCR Workspace', detail: 'OCR asistido por IA para PDF escaneados e imágenes, con revisión página a página, limpieza de texto, reprocesamiento e integración directa con las bóvedas de Nodus.' },
   { title: 'Otros vaults sugeridos por usuarios', detail: 'Nuevos ámbitos con especialistas, colaboración activa y testers.' },
@@ -79,15 +78,18 @@ ${ROADMAP_GUIDE}
 
 ## Herramientas (Nodus Toolkit)
 - Herramientas es una sección de la barra lateral, en su propio grupo, y también tiene un icono en la cabecera. Aparece en todos los tipos de vault.
-- Su página principal es un hub con tres tarjetas: Nodus Convert, PDF Presenter y OCR Workspace.
+- Su página principal es un hub 2 × 2 con cuatro tarjetas: Nodus Convert, Nodus Protect, PDF Presenter y OCR Workspace.
 - Nodus Convert ya funciona: convierte y procesa archivos en local, de uno en uno o en lote, en cinco categorías —Documentos (PDF, DOCX, EPUB, Markdown, HTML, texto), utilidades PDF (unir, dividir, rotar, reordenar, extraer imágenes, metadatos, imágenes→PDF), OCR ligero (imagen o PDF escaneado a texto, y PDF buscable), Imágenes (convertir formato incluido HEIC, redimensionar, comprimir) y Texto (limpiar texto pegado de PDF, mayúsculas/minúsculas, subtítulos a texto, checksums).
+- Nodus Protect ya funciona: admite PDF e imágenes del disco o de la bóveda activa, concatena documentos, permite ocultar o desenfocar datos, recortar, rotar, enderezar, convertir a escala de grises, añadir siete patrones de marca de agua y un pie legal, y exportar copias rasterizadas como PNG, ZIP o PDF.
+- Protect puede guardar una copia en disco, compartirla o incorporarla a la biblioteca «Copias protegidas» de la bóveda. También crea y verifica marcas trazables IDPS v1 compatibles con IDprotector; la marca autentica una copia, pero no la cifra y puede perderse por JPEG, capturas, reescalado o recompresión.
 - PDF Presenter y OCR Workspace son tarjetas marcadas «Próximamente» y todavía no se pueden abrir.
 - Nodus Convert es determinista y 100 % offline (no hay IA), nunca modifica el archivo original y no sube nada a ningún servicio; la única llamada de red opcional es la descarga de idiomas de OCR de Tesseract, que el usuario decide.
+- El procesamiento documental de Nodus Protect es local y no envía documentos a IA, proveedores ni servicios externos. Esta afirmación se refiere a Protect, no a todas las funciones opcionales de red de Nodus.
 - Dentro de una herramienta, un botón a la izquierda de su título vuelve al hub de Herramientas.
 
 ## Tipos no disponibles todavía
 - Fuentes primarias, Testimonios, Worldbuilding y Docencia figuran como tipos futuros; no deben describirse como vaults seleccionables actualmente.
-- El roadmap también contempla Servidor, compartir vaults y trabajo colaborativo, y otros vaults sugeridos por usuarios. Nodus Convert ya está disponible dentro de Nodus Toolkit; PDF Presenter y OCR Workspace siguen en desarrollo.
+- El roadmap también contempla Servidor, compartir vaults y trabajo colaborativo, y otros vaults sugeridos por usuarios. Nodus Convert y Nodus Protect ya están disponibles dentro de Nodus Toolkit; PDF Presenter y OCR Workspace siguen en desarrollo.
 
 ## Protocolo para responder sobre la interfaz
 - Usa los nombres exactos de esta guía y, si está seleccionada, la Vista actual.
