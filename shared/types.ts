@@ -2550,6 +2550,11 @@ export interface DebateWork {
   authors: string[];
   year: number | null;
   role: 'principal' | 'secondary';
+  /**
+   * Empty in list responses. `getDebates()` returns every contradiction in the
+   * corpus at once and nothing renders this prose, so shipping it meant tens of
+   * megabytes structured-cloned across IPC per call. `getDebate()` fills it.
+   */
   development: string;
   evidence: Evidence[];
 }

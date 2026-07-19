@@ -17,6 +17,7 @@
     "verify:study-improve-local": "node scripts/verify-study-improve-local.mjs",
     "verify:database-records": "node scripts/verify-database-records.mjs",
     "verify:gallery-virtualization": "node scripts/verify-gallery-virtualization.mjs",
+    "verify:debates-payload": "node scripts/verify-debates-payload.mjs",
     "verify:api-key-recovery-macos": "node scripts/verify-api-key-recovery-macos.mjs",
     "verify:toolkit-heic": "node scripts/verify-toolkit-heic.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p electron/tsconfig.json",

@@ -848,13 +848,27 @@ function clip(value: string, max: number): string {
 }
 
 /** Build one side of a debate (idea + backing works/authors/evidence) from the DB. */
-function buildDebateSide(ideaId: string): DebateSide | null {
+/**
+ * Evidence quotes kept per work in list responses.
+ *
+ * The debates list renders `works.slice(0, 2)` and `evidence.slice(0, 1)` per
+ * side, and never renders `development` at all, while MCP's list search only
+ * matches on tension, themes, labels, statements, authors and work titles. So
+ * every quote past the first, and all of the development prose, was assembled
+ * and shipped for nothing — tens of megabytes in one IPC message on a large
+ * corpus. `getDebate()` still returns everything.
+ */
+const DEBATE_LIST_EVIDENCE_PER_WORK = 1;
+
+function buildDebateSide(ideaId: string, opts: { lean?: boolean } = {}): DebateSide | null {
   const detail = getIdeaDetail(ideaId);
   if (!detail) return null;
   const evidenceByWork = new Map<string, Evidence[]>();
   for (const ev of detail.evidence) {
     if (!evidenceByWork.has(ev.nodus_id)) evidenceByWork.set(ev.nodus_id, []);
-    evidenceByWork.get(ev.nodus_id)!.push(ev);
+    const bucket = evidenceByWork.get(ev.nodus_id)!;
+    if (opts.lean && bucket.length >= DEBATE_LIST_EVIDENCE_PER_WORK) continue;
+    bucket.push(ev);
   }
   const works: DebateWork[] = detail.occurrences.map((o) => ({
     nodus_id: o.nodus_id,
@@ -863,7 +877,7 @@ function buildDebateSide(ideaId: string): DebateSide | null {
     authors: o.work.authors,
     year: o.work.year,
     role: o.role,
-    development: o.development,
+    development: opts.lean ? '' : o.development,
     evidence: evidenceByWork.get(o.nodus_id) ?? [],
   }));
   const authors = Array.from(new Set(works.flatMap((w) => w.authors).filter(Boolean)));
@@ -904,10 +918,11 @@ function assembleDebate(
   clusterId: string,
   clusterSize: number,
   supportCount: Map<string, number>,
-  themesByIdea: Map<string, Set<string>>
+  themesByIdea: Map<string, Set<string>>,
+  opts: { lean?: boolean } = {}
 ): Debate | null {
-  const sideA = buildDebateSide(row.from_id);
-  const sideB = buildDebateSide(row.to_id);
+  const sideA = buildDebateSide(row.from_id, opts);
+  const sideB = buildDebateSide(row.to_id, opts);
   if (!sideA || !sideB) return null;
 
   const themesA = themesByIdea.get(row.from_id) ?? new Set<string>();
@@ -1016,7 +1031,7 @@ export function getDebates(): Debate[] {
   const debates = rows
     .map((row) => {
       const root = clusterId.get(row.id)!;
-      return assembleDebate(row, root, clusterSize.get(root) ?? 1, supportCount, themesByIdea);
+      return assembleDebate(row, root, clusterSize.get(root) ?? 1, supportCount, themesByIdea, { lean: true });
     })
     .filter((d): d is Debate => d !== null);
 
