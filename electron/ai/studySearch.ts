@@ -78,11 +78,22 @@ function modelConfig(): { provider: string; model: string } {
   return { provider: settings.embeddingProvider ?? 'openai', model: settings.embeddingModel ?? '' };
 }
 
-function statusFrom(store = readStore()): StudySearchIndexStatus {
+/**
+ * @param collected Already-gathered corpus entries, when the caller has them.
+ *   `collectStudySearchEntries` re-reads every study document, material,
+ *   transcript, question and exam from SQLite, re-chunks all their markdown
+ *   into 1400-character pieces and SHA1-hashes each one. The indexing loop
+ *   emits progress twice per 16-entry batch, so a 2,000-fragment corpus paid
+ *   for ~250 full re-collections of data it was already holding — and during
+ *   indexing the result is always 0 pending, because the store being reported
+ *   contains exactly those entries.
+ */
+function statusFrom(store = readStore(), collected?: StudySearchIndexEntry[]): StudySearchIndexStatus {
   let pendingEntries = 0;
   try {
     const indexedHashes = new Set(store.entries.map((entry) => entry.contentHash));
-    pendingEntries = collectStudySearchEntries().filter((entry) => !indexedHashes.has(entry.contentHash)).length;
+    const source = collected ?? collectStudySearchEntries();
+    pendingEntries = source.filter((entry) => !indexedHashes.has(entry.contentHash)).length;
   } catch { /* the schema can still be migrating during early startup */ }
   return {
     state: runtime.state === 'indexing' || runtime.state === 'paused' || runtime.state === 'error'
@@ -98,12 +109,12 @@ function statusFrom(store = readStore()): StudySearchIndexStatus {
   };
 }
 
-function progress(store = readStore()): StudySearchProgress {
-  return { ...statusFrom(store), processedEntries: runtime.processedEntries, totalEntries: runtime.totalEntries, currentTitle: runtime.currentTitle };
+function progress(store = readStore(), collected?: StudySearchIndexEntry[]): StudySearchProgress {
+  return { ...statusFrom(store, collected), processedEntries: runtime.processedEntries, totalEntries: runtime.totalEntries, currentTitle: runtime.currentTitle };
 }
 
-function emit(store?: StudySearchStore): void {
-  const snapshot = progress(store);
+function emit(store?: StudySearchStore, collected?: StudySearchIndexEntry[]): void {
+  const snapshot = progress(store, collected);
   for (const listener of runtime.listeners) listener(snapshot);
 }
 
@@ -308,21 +319,21 @@ export async function rebuildStudySearchIndex(): Promise<StudySearchProgress> {
       ? old.entries.filter((entry) => entry.embedding?.length).map((entry) => [entry.contentHash, entry.embedding]) : []);
     const excluded = new Set(old.excludedSourceIds);
     for (const entry of entries) { entry.embedding = oldByHash.get(entry.contentHash) ?? entry.embedding ?? null; entry.excluded = excluded.has(entry.sourceId); }
-    emit({ ...old, entries });
+    emit({ ...old, entries }, entries);
     const pending = entries.filter((entry) => !entry.excluded && !entry.embedding?.length);
     for (let offset = 0; offset < pending.length; offset += 16) {
       if (runtime.stopRequested || await waitIfPaused()) break;
-      const batch = pending.slice(offset, offset + 16); runtime.currentTitle = batch[0]?.title ?? null; emit({ ...old, entries });
+      const batch = pending.slice(offset, offset + 16); runtime.currentTitle = batch[0]?.title ?? null; emit({ ...old, entries }, entries);
       const vectors = await embedMany(batch.map((entry) => `${entry.title}\n${entry.text}`));
       batch.forEach((entry, index) => { entry.embedding = vectors[index] ?? null; runtime.processedEntries++; });
-      emit({ ...old, entries });
+      emit({ ...old, entries }, entries);
     }
     const store: StudySearchStore = {
       ...old, updatedAt: now(), modelProvider: config.provider, modelName: config.model, entries,
       excludedSourceIds: [...excluded],
     };
-    writeStore(store); runtime.state = entries.length ? 'ready' : 'empty'; runtime.currentTitle = null; emit(store);
-    return progress(store);
+    writeStore(store); runtime.state = entries.length ? 'ready' : 'empty'; runtime.currentTitle = null; emit(store, entries);
+    return progress(store, entries);
   } catch (cause) {
     runtime.error = cause instanceof Error ? cause.message : String(cause); runtime.state = 'error'; emit(); return progress();
   } finally { runtime.paused = false; runtime.stopRequested = false; }
