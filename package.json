@@ -184,6 +184,6 @@
       "category": "Office",
       "maintainer": "Drakonis96 <Drakonis96@users.noreply.github.com>"
     },
-    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}"
+    "artifactName": "${productName}-${os}-${arch}.${ext}"
   }
 }

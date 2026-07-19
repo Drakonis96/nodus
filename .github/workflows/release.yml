@@ -125,3 +125,27 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npx electron-builder ${{ matrix.platform }} --publish always
+
+  verify-release-assets:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Verify stable installer assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          assets="$(gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')"
+          for asset in \
+            Nodus-mac-arm64.dmg \
+            Nodus-win-x64.exe \
+            Nodus-linux-amd64.deb \
+            Nodus-linux-x86_64.AppImage
+          do
+            if ! grep -Fxq "$asset" <<< "$assets"; then
+              echo "::error::Missing release asset: $asset"
+              exit 1
+            fi
+          done
