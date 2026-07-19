@@ -45,6 +45,7 @@ try {
     defaultEntry,
     gradebookToGrid,
     anonymousGrid,
+    anonymousStudentSummary,
     GRID_COL,
     assessmentProfile,
     ASSESSMENT_PROFILES,
@@ -385,6 +386,166 @@ try {
     assert.equal(honoursQuota(ranked.length, { ...policy, minCohortForOne: 0, quotaPct: 0.2 }), 1);
   }
 
+  // ── 14b. A distinction presupposes a pass ──────────────────────────────────
+  {
+    const policy = { enabled: true, threshold: 0.9, quotaPct: 0.5, unit: 'group', rounding: 'up', minCohortForOne: 0 };
+    const rules = assessmentProfile('universidad').rules;
+    // Ranking on the number alone would hand the top distinction to a student recorded
+    // as not-presented, and the next one to somebody whose 9,5 is held back by an
+    // unmet minimum. Both are failures, not top marks.
+    const ranked = [
+      { studentId: 'np', raw: 9.9, passed: false, notPresented: true },
+      { studentId: 'blocked', raw: 9.5, passed: false, notPresented: false },
+      { studentId: 'real', raw: 9.2, passed: true, notPresented: false },
+    ];
+    assert.deepEqual(awardHonours(ranked, policy, rules), ['real'],
+      'neither a not-presented nor a blocked student may take a distinction');
+    // Callers that know nothing about the pass state keep the old behaviour.
+    assert.deepEqual(
+      awardHonours([{ studentId: 'x', raw: 9.5 }], policy, rules), ['x'],
+      'an unqualified candidate is still eligible',
+    );
+  }
+
+  // ── 14c. The not-presented trigger measures SHARE OF THE PLAN ──────────────
+  {
+    // `weight` is relative to an item's siblings, so adding weights across different
+    // parents compares numbers on different scales. Here EXAMEN and PRÁCTICAS are 50/50,
+    // but PRÁCTICAS holds ten leaves of weight 10 and EXAMEN two of weight 1: a raw sum
+    // makes the practicals 98 % of the plan and writes off a student who sat the whole
+    // exam as "no presentado".
+    const plan = planWith('universidad'); // triggerPct 0.5
+    const items = [
+      item('examen', { weight: 50 }),
+      ...[0, 1].map((i) => item(`e${i}`, { parentId: 'examen', weight: 1, position: i })),
+      item('practicas', { weight: 50 }),
+      ...Array.from({ length: 10 }, (_, i) => item(`p${i}`, { parentId: 'practicas', weight: 10, position: i })),
+    ];
+
+    const examOnly = computeGrade({ plan, items, entries: [mark('e0', 7), mark('e1', 7)] });
+    assert.equal(examOnly.record.notPresented, false,
+      'half the subject attempted is exactly the trigger, not above it');
+    assert.equal(examOnly.record.numeric, 7, 'and the mark is the half that was assessed');
+
+    // The mirror image must behave the same way, which it did not before: 2 % of
+    // "missing weight" let a student who sat only the two exam questions through.
+    const practicalsOnly = computeGrade({
+      plan, items,
+      entries: Array.from({ length: 10 }, (_, i) => mark(`p${i}`, 7)),
+    });
+    assert.equal(practicalsOnly.record.notPresented, false, 'and so is the other half');
+
+    // Genuinely absent: one practical out of the whole plan is 5 %.
+    const barely = computeGrade({ plan, items, entries: [mark('p0', 7)] });
+    assert.equal(barely.record.notPresented, true, 'attempting 5 % of the plan is not presented');
+  }
+
+  // ── 14d. A discarded child cannot hold the branch back ─────────────────────
+  {
+    // "Mejores 3 de 4", every test needing a 4/10 to average, marks 9-9-9-2. The 2 is
+    // thrown away by `bestOf`, so it never entered the average — but it used to mark the
+    // minimum as unmet anyway, capping a 9 at 4,9 and failing the student.
+    const plan = planWith('universidad'); // minNotMet: cap at 4.9
+    const items = [
+      item('pruebas', { weight: 100, aggregation: 'bestOf', bestOf: 3 }),
+      ...[9, 9, 9, 2].map((_, i) => item(`t${i}`, { parentId: 'pruebas', position: i, minToAverage: 0.4 })),
+    ];
+    const entries = [9, 9, 9, 2].map((value, i) => mark(`t${i}`, value));
+    const result = computeGrade({ plan, items, entries });
+    assert.equal(gradeOf(result), 9, 'the discarded test does not cap the grade');
+    assert.equal(result.passed, true);
+    assert.ok(!result.rules.some((r) => r.code === 'capped'), 'and no cap is recorded');
+
+    // The trace still SHOWS the missed minimum on the test itself: it happened, it just
+    // did not propagate. And the weight printed for a discarded test is 0, because the
+    // derivation is the document that answers a reclamación.
+    const discarded = result.trace.children.find((c) => c.itemId === 't3');
+    assert.ok(discarded.rules.some((r) => r.code === 'min_not_met'), 'the trace still records it');
+    assert.equal(discarded.effectiveWeight, 0, 'a discarded test carries no weight in the derivation');
+    const kept = result.trace.children.find((c) => c.itemId === 't0');
+    assert.ok(Math.abs(kept.effectiveWeight - 1 / 3) < 1e-9, 'the three that counted split the branch');
+
+    // When the low mark is NOT discarded it still blocks, which is the rule's point.
+    const strict = computeGrade({
+      plan,
+      items: items.map((i) => (i.id === 'pruebas' ? { ...i, bestOf: 4 } : i)),
+      entries,
+    });
+    assert.ok(strict.rules.some((r) => r.code === 'capped'), 'a counted test below its minimum still caps');
+  }
+
+  // ── 14e. Rounding modes agree with each other ──────────────────────────────
+  {
+    // Values that ARRIVE from a weighted average, not literals: 4.999999999999999 is
+    // what a real plan produces and what a mode without an epsilon records as 4,9.
+    const computed = 0.7 * 5 + 0.3 * 5; // 5, up to binary representation
+    const truncatePlan = planWith('universidad', { rounding: 'truncate', decimals: 1 });
+    assert.equal(roundValue(4.999999999999999, truncatePlan.rules), 5,
+      'truncate must not fail a student over a binary representation');
+    assert.equal(roundValue(computed, truncatePlan.rules), 5);
+    assert.equal(roundValue(4.94, truncatePlan.rules), 4.9, 'a genuine 4,94 still truncates');
+
+    const halfDown = planWith('universidad', { rounding: 'halfDown', decimals: 0 });
+    assert.equal(roundValue(4.5, halfDown.rules), 4, 'exactly a half goes down — that is the mode');
+    assert.equal(roundValue(4.500000000000001, halfDown.rules), 4, 'and noise does not flip it up');
+    assert.equal(roundValue(4.6, halfDown.rules), 5);
+
+    // `threshold` honours `decimals`: with two of them the rule is about the third.
+    const twoDecimals = planWith('universidad', { rounding: 'threshold', roundingThreshold: 0.7, decimals: 2 });
+    assert.equal(roundValue(6.55, twoDecimals.rules), 6.55, 'it no longer collapses to the units digit');
+    assert.equal(roundValue(6.557, twoDecimals.rules), 6.56, 'and rounds up from the configured threshold');
+    assert.equal(roundValue(6.556, twoDecimals.rules), 6.55, 'but not below it');
+
+    // A threshold of 0 is allowed by the editor and must not push every exact value up.
+    const zero = planWith('universidad', { rounding: 'threshold', roundingThreshold: 0, decimals: 0 });
+    assert.equal(roundValue(6, zero.rules), 6, 'an exact 6 stays a 6');
+    assert.equal(roundValue(6.01, zero.rules), 7, 'anything above it rounds up');
+  }
+
+  // ── 14f. FP: a scale that does not start at zero ───────────────────────────
+  {
+    // Modules are recorded 1–10 and passed with a 5. `passAt` is a fraction OF THE
+    // SCALE, so 0.5 would have put the pass mark at 5,5 — and three consumers projected
+    // with `fraction * scaleMax`, which put the same student on both sides of it.
+    const fp = assessmentProfile('fp');
+    assert.equal(fp.rules.scaleMin, 1);
+    assert.ok(Math.abs(fp.rules.passAt - 4 / 9) < 1e-9, 'a 5 on 1–10 is 4/9 of the scale');
+
+    const plan = planWith('fp');
+    const items = [item('t', { weight: 100, maxPoints: 10 })];
+    // 4.7/10 of the item is a fraction of 0.47, which on 1–10 is 1 + 0.47·9 = 5.23 → 5.
+    const result = computeGrade({ plan, items, entries: [mark('t', 4.7)] });
+    assert.equal(gradeOf(result), 5, 'the record is on the plan\'s own scale');
+    assert.equal(result.passed, true, 'and the pass decision agrees with the number recorded');
+
+    // 1 + 0.4·9 = 4.6, which this profile rounds to 5. The engine decides the pass on
+    // the ROUNDED value on purpose — a student is not failed by a decimal nobody can
+    // see — so this is a pass, and the two must agree.
+    const borderline = computeGrade({ plan, items, entries: [mark('t', 4)] });
+    assert.equal(gradeOf(borderline), 5);
+    assert.equal(borderline.passed, true, 'the pass decision reads the number that is recorded');
+
+    // Genuinely below: 1 + 0.3·9 = 3.7 → 4.
+    const failing = computeGrade({ plan, items, entries: [mark('t', 3)] });
+    assert.equal(gradeOf(failing), 4);
+    assert.equal(failing.passed, false);
+
+    // The grid projects through the same function, so a block subtotal cannot disagree
+    // with the final mark printed beside it.
+    const nested = [
+      item('bloque', { weight: 100, aggregation: 'mean' }),
+      item('x', { parentId: 'bloque', maxPoints: 10 }),
+    ];
+    // One decimal, so the two formulas cannot both round to the same thing:
+    // `toScale` gives 1 + 0.47·9 = 5.23 → 5.2, while `fraction * scaleMax` gives 4.7.
+    const grid = gradebookToGrid({
+      plan: planWith('fp', { decimals: 1 }), items: nested,
+      entries: [defaultEntry('s0', 'x', { rawValue: 4.7, status: 'evaluated' })],
+      students: [{ id: 's0', givenNames: 'A', surnames: 'B', pseudonymCode: 'STU_0001', position: 0 }],
+    });
+    assert.equal(grid.rows[0].cells.bloque, '5.2', 'the block subtotal is projected onto 1–10 too');
+  }
+
   // ── 15. Advisories warn, never refuse ──────────────────────────────────────
   {
     const plan = planWith('universidad'); // caps at 0.4 / 0.3
@@ -532,6 +693,19 @@ try {
       'no student name survives into an analysable grid');
     assert.equal(anon.rows[0].cells[GRID_COL.code], 'STU_7K3Q', 'but the identifier does, so rows stay traceable');
     assert.equal(anon.rows[0].cells.examen, '9', 'and so do the marks');
+
+    // The summary handed to a model is built FROM the anonymous grid, so the names are
+    // gone by construction rather than by remembering to strip them here.
+    const summary = anonymousStudentSummary(grid, 'st1');
+    assert.ok(summary.includes('STU_7K3Q'), 'the identifier travels, so the reply can be mapped back');
+    assert.ok(/examen/i.test(summary), 'the marks travel');
+    assert.ok(!/Ana|Peña|Nombre|Apellidos/.test(summary),
+      `no name and no name-column header may appear in what leaves the machine: ${summary}`);
+    assert.equal(anonymousStudentSummary(grid, 'nobody'), '', 'an unknown student summarises to nothing');
+
+    // Even when the caller translated the headers — the anonymiser keys on id.
+    const translatedSummary = anonymousStudentSummary(translated, 'st1');
+    assert.ok(!/First name|Surname/.test(translatedSummary), 'translated name headers are stripped too');
   }
 
   // ── 19. The grid really is consumable by the database machinery ────────────

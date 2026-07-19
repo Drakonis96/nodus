@@ -18,6 +18,7 @@ import {
   type RubricLanguage,
   type TeachingRubric,
 } from '@shared/teachingRubrics';
+import { nextIdFor } from '@shared/sequentialIds';
 import { renderRubricHtml } from '@shared/rubricHtml';
 import { Icon, Spinner } from '../components/ui';
 import { ConfirmModal } from '../components/ConfirmModal';
@@ -345,7 +346,7 @@ export function RubricsView() {
                   {rubric.levels.length < MAX_RUBRIC_LEVELS && (
                     <button data-testid="rubric-add-level" className="btn btn-ghost h-7 w-7 p-0" title={t('Añadir nivel')} aria-label={t('Añadir nivel')}
                       onClick={() => {
-                        const next = [...rubric.levels, { id: `L${rubric.levels.length + 1}`, label: '', score: 0 }];
+                        const next = [...rubric.levels, { id: nextIdFor('L', rubric.levels), label: '', score: 0 }];
                         const scores = distributeLevelScores(next.length, rubric.scaleMax);
                         void patch({ levels: next.map((level, i) => ({ ...level, score: scores[i] })) });
                       }}><Icon name="plus" size={12} /></button>
@@ -424,7 +425,7 @@ export function RubricsView() {
 
         <div className="mt-3 flex flex-wrap items-center gap-2">
           {rubric.criteria.length < MAX_RUBRIC_CRITERIA && (
-            <button data-testid="rubric-add-criterion" className="btn btn-primary" onClick={() => void patch({ criteria: [...rubric.criteria, emptyRubricCriterion(`C${rubric.criteria.length + 1}`)] })}>
+            <button data-testid="rubric-add-criterion" className="btn btn-primary" onClick={() => void patch({ criteria: [...rubric.criteria, emptyRubricCriterion(nextIdFor('C', rubric.criteria))] })}>
               <Icon name="plus" />{t('Añadir criterio')}
             </button>
           )}

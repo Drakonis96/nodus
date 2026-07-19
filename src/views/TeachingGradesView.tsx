@@ -4,16 +4,25 @@ import type { AppSettings } from '@shared/types';
 import type { TeachingGroup } from '@shared/teachingGroups';
 import {
   ASSESSMENT_PROFILES,
+  ENTRY_STATUSES,
   GRID_COL,
+  anonymousStudentSummary,
+  awardHonours,
   gradebookToGrid,
+  toScale,
   validatePlan,
   type AssessmentItem,
   type AssessmentPlan,
   type AssessmentTrack,
+  type EntryStatus,
   type GradeEntry,
+  type PlanRules,
   type TraceNode,
   type TraceRule,
 } from '@shared/assessment';
+import type { TeachingRubric } from '@shared/teachingRubrics';
+import { criterionMaxPoints } from '@shared/teachingRubrics';
+import { isStudentFilled } from '@shared/teachingGroups';
 import { Icon, ModalBackdrop, Spinner } from '../components/ui';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { AssessmentPlanEditor } from './AssessmentPlanEditor';
@@ -45,6 +54,10 @@ export function TeachingGradesView() {
   const [entries, setEntries] = useState<GradeEntry[]>([]);
   const [group, setGroup] = useState<TeachingGroup | null>(null);
   const [cohort, setCohort] = useState<{ maxByItem: Record<string, number> }>({ maxByItem: {} });
+  /** studentId → itemId → fraction already earned earlier. Feeds the ratchet rule. */
+  const [previous, setPrevious] = useState<Record<string, Record<string, number>>>({});
+  const [rubricCell, setRubricCell] = useState<{ studentId: string; item: AssessmentItem } | null>(null);
+  const [feedbackFor, setFeedbackFor] = useState<string | null>(null);
   const [track, setTrack] = useState<AssessmentTrack>('continua');
   const [convocatoria, setConvocatoria] = useState('ordinaria');
   const [loading, setLoading] = useState(true);
@@ -109,13 +122,24 @@ export function TeachingGradesView() {
   const selectGroup = async (planId: string, next: TeachingGroup) => {
     const detail = await window.nodus.getTeachingGroup(next.id);
     setGroup(detail);
-    setCohort(await window.nodus.gradebookCohortStats(planId, next.id, convocatoria));
+    const [stats, baseline] = await Promise.all([
+      window.nodus.gradebookCohortStats(planId, next.id, convocatoria),
+      window.nodus.gradebookRatchetBaseline(planId, next.id, convocatoria),
+    ]);
+    setCohort(stats);
+    setPrevious(baseline);
   };
 
   const refresh = async () => {
     if (!plan) return;
     setEntries(await window.nodus.listGradeEntries(plan.id, convocatoria));
-    if (group) setCohort(await window.nodus.gradebookCohortStats(plan.id, group.id, convocatoria));
+    if (!group) return;
+    const [stats, baseline] = await Promise.all([
+      window.nodus.gradebookCohortStats(plan.id, group.id, convocatoria),
+      window.nodus.gradebookRatchetBaseline(plan.id, group.id, convocatoria),
+    ]);
+    setCohort(stats);
+    setPrevious(baseline);
   };
 
   // Deliberately keyed on the convocatoria alone: the ordinary and the resit marks are
@@ -141,16 +165,49 @@ export function TeachingGradesView() {
       })),
       cohort,
       track,
+      previous,
+      convocatoria,
       showCodes: settings?.studentPseudonymsEnabled ?? true,
       labels: {
         code: t('Identificador'), givenNames: t('Nombre'),
         surnames: t('Apellidos'), grade: t('Calificación'),
+        qualitative: t('Calificación cualitativa'),
       },
     });
-  }, [plan, items, entries, group, cohort, track, settings, lang]);
+  }, [plan, items, entries, group, cohort, track, previous, convocatoria, settings, lang]);
+
+  /**
+   * Who gets a distinction. The quota is counted over everyone ENROLLED, so the blank
+   * rows a group pre-creates would enlarge the denominator and quietly shrink the quota:
+   * only real students count.
+   */
+  const honours = useMemo(() => {
+    const policy = plan?.rules.honours;
+    if (!plan || !policy?.enabled || !grid) return new Set<string>();
+    const roster = (group?.students ?? []).filter(isStudentFilled);
+    const ids = awardHonours(
+      roster.map((student) => {
+        const result = grid.results[student.id];
+        return {
+          studentId: student.id,
+          raw: result?.raw ?? null,
+          passed: result?.passed,
+          notPresented: result?.record.notPresented,
+        };
+      }),
+      policy,
+      plan.rules,
+    );
+    return new Set(ids);
+  }, [plan, grid, group]);
 
   const warnings = useMemo(() => (plan ? validatePlan(plan, items) : []), [plan, items]);
   const itemById = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
+  const entryByCell = useMemo(() => {
+    const map = new Map<string, GradeEntry>();
+    for (const entry of entries) map.set(`${entry.studentId}|${entry.itemId}`, entry);
+    return map;
+  }, [entries]);
   const isEditable = (columnId: string) => {
     const item = itemById.get(columnId);
     // Only leaves take a typed mark: a block's cell is its computed subtotal.
@@ -403,25 +460,33 @@ export function TeachingGradesView() {
                     }
                     if (col.id === GRID_COL.final || col.id === GRID_COL.qualitative) {
                       return (
-                        <div key={col.id} style={{ width }} className="shrink-0 px-2 py-1">
+                        <div key={col.id} style={{ width }} className="flex shrink-0 items-center px-2 py-1">
                           <button type="button" data-testid={`grade-final-${row.id}`}
-                            className="w-full rounded-md px-2 py-1 text-left text-sm font-medium hover:bg-neutral-100 dark:hover:bg-neutral-900/40"
+                            className="min-w-0 flex-1 rounded-md px-2 py-1 text-left text-sm font-medium hover:bg-neutral-100 dark:hover:bg-neutral-900/40"
                             title={t('Ver cómo se ha calculado')}
                             onClick={() => setExplain(row.id)}>
                             {row.cells[col.id] ?? '—'}
                           </button>
+                          {col.id === GRID_COL.final && honours.has(row.id) && (
+                            <span className="shrink-0 text-[11px] text-amber-500" data-testid={`grade-honours-${row.id}`}
+                              title={t('Mención')} aria-label={t('Mención')}>★</span>
+                          )}
                         </div>
                       );
                     }
+                    const item = itemById.get(col.id);
                     const editable = isEditable(col.id);
                     return (
-                      <div key={col.id} style={{ width }} className={`h-9 shrink-0 ${editable ? '' : 'bg-neutral-100/60 dark:bg-neutral-900/30'}`}>
-                        {editable ? (
-                          <TextCell
+                      <div key={col.id} style={{ width }}
+                        data-testid={editable ? `grade-cell-${row.id}-${col.id}` : undefined}
+                        className={`h-9 shrink-0 ${editable ? '' : 'bg-neutral-100/60 dark:bg-neutral-900/30'}`}>
+                        {editable && item ? (
+                          <GradeCell
+                            studentId={row.id}
+                            item={item}
                             value={row.cells[col.id]}
-                            inputType="number"
-                            align="right"
-                            onChange={(raw) => void guard(async () => {
+                            status={entryByCell.get(`${row.id}|${item.id}`)?.status ?? 'not_assessed'}
+                            onSetValue={(raw) => void guard(async () => {
                               await window.nodus.setGradeEntry({
                                 studentId: row.id, itemId: col.id, convocatoria,
                                 rawValue: raw == null || raw.trim() === '' ? null : Number(raw),
@@ -429,6 +494,17 @@ export function TeachingGradesView() {
                               });
                               await refresh();
                             })}
+                            onSetStatus={(status) => void guard(async () => {
+                              // A status that carries no mark clears the value: leaving the
+                              // old number behind would make "no entregado" still average.
+                              const keepsValue = status === 'evaluated' || status === 'validated';
+                              await window.nodus.setGradeEntry({
+                                studentId: row.id, itemId: col.id, convocatoria,
+                                status, ...(keepsValue ? {} : { rawValue: null }),
+                              });
+                              await refresh();
+                            })}
+                            onOpenRubric={() => setRubricCell({ studentId: row.id, item })}
                           />
                         ) : (
                           <div className="px-2 py-2 text-right text-sm text-neutral-500" title={t('Subtotal calculado')}>
@@ -445,12 +521,35 @@ export function TeachingGradesView() {
         )}
       </div>
 
+      {feedbackFor && grid && group && (
+        <FeedbackModal
+          planId={plan.id}
+          groupId={group.id}
+          studentId={feedbackFor}
+          studentName={rowLabel(rows.find((r) => r.id === feedbackFor))}
+          summary={anonymousStudentSummary(grid, feedbackFor)}
+          onClose={() => setFeedbackFor(null)}
+        />
+      )}
+
+      {rubricCell && (
+        <RubricCellModal
+          studentId={rubricCell.studentId}
+          item={rubricCell.item}
+          convocatoria={convocatoria}
+          onClose={() => setRubricCell(null)}
+          onSaved={refresh}
+        />
+      )}
+
       {analysing && grid && plan && group && (
         <AnalysisModal
           plan={plan}
           items={items}
           entries={entries}
-          students={group.students ?? []}
+          // Only real students: the blank rows a group pre-creates carry no marks, and
+          // counting them as zeros makes every question look excellent (see E1).
+          students={(group.students ?? []).filter(isStudentFilled)}
           results={grid.results}
           onClose={() => setAnalysing(false)}
         />
@@ -470,6 +569,7 @@ export function TeachingGradesView() {
                   qualitative: result?.record.qualitative ?? null,
                   notPresented: !!result?.record.notPresented,
                   passed: !!result?.passed,
+                  honours: honours.has(student.id),
                 };
               });
               const done = await window.nodus.exportGradebookActa(format, {
@@ -495,6 +595,12 @@ export function TeachingGradesView() {
           plan={plan}
           items={items}
           onClose={() => setEditing(false)}
+          onReplaced={async (next) => {
+            // A revision is a NEW plan. Staying on the old id left the editor showing
+            // the frozen version and let the same button mint orphan copies.
+            await guard(() => openPlan(next.id));
+            await reloadPlans();
+          }}
           onChanged={async () => {
             const detail = await window.nodus.getAssessmentPlan(plan.id);
             setPlan(detail.plan);
@@ -509,8 +615,9 @@ export function TeachingGradesView() {
         <ExplainModal
           name={rowLabel(rows.find((r) => r.id === explain))}
           result={grid.results[explain]}
-          scaleMax={plan.rules.scaleMax}
+          rules={plan.rules}
           onClose={() => setExplain(null)}
+          onDraftFeedback={() => setFeedbackFor(explain)}
           onDownload={async () => {
             const student = (group?.students ?? []).find((s) => s.id === explain);
             if (!student || !plan) return;
@@ -526,7 +633,7 @@ export function TeachingGradesView() {
                   name: [student.givenNames, student.surnames].filter(Boolean).join(' '),
                 },
                 result: grid.results[student.id],
-                scaleMax: plan.rules.scaleMax,
+                scale: { min: plan.rules.scaleMin, max: plan.rules.scaleMax },
                 labels: exportLabels(),
               });
               if (done) setMessage(t('Documento descargado.'));
@@ -535,6 +642,293 @@ export function TeachingGradesView() {
         />
       )}
     </div>
+  );
+}
+
+/**
+ * One editable cell: the mark, and — just as importantly — its STATUS.
+ *
+ * The status menu is the whole point. Until it existed the grid could only ever send
+ * `evaluated` or `not_assessed`, so three of the five statuses the engine implements
+ * were unreachable from the interface and a teacher had no way to say "no lo entregó"
+ * as opposed to "todavía no lo he corregido". That distinction is the difference
+ * between a blank cell and a zero, which is the single most consequential difference in
+ * a gradebook.
+ *
+ * A native `<select>` on purpose: the browser renders its list outside the grid, so it
+ * cannot be clipped by the scroll container the way a custom dropdown would be.
+ */
+const STATUS_CODE: Record<EntryStatus, string> = {
+  evaluated: '·', not_submitted: 'NE', not_assessed: '—', exempt: 'EX', validated: 'CV',
+};
+
+function statusLabel(status: EntryStatus): string {
+  switch (status) {
+    case 'not_submitted': return t('No entregado');
+    case 'not_assessed': return t('Sin evaluar');
+    case 'exempt': return t('Exento');
+    case 'validated': return t('Convalidado');
+    case 'evaluated':
+    default: return t('Evaluado');
+  }
+}
+
+function GradeCell({
+  studentId, item, value, status, onSetValue, onSetStatus, onOpenRubric,
+}: {
+  studentId: string;
+  item: AssessmentItem;
+  value: string | null;
+  status: EntryStatus;
+  onSetValue: (raw: string | null) => void;
+  onSetStatus: (status: EntryStatus) => void;
+  onOpenRubric: () => void;
+}) {
+  const carriesValue = status === 'evaluated' || status === 'not_assessed' || status === 'validated';
+  const isRubric = item.entryMode === 'rubric' && !!item.sourceRubricId;
+  return (
+    <div className="flex h-full items-center gap-0.5 px-0.5">
+      <select
+        className="input h-7 w-9 shrink-0 px-0.5 text-center text-[10px]"
+        data-testid={`grade-status-${studentId}-${item.id}`}
+        aria-label={t('Situación de la entrega')}
+        title={statusLabel(status)}
+        value={status}
+        onChange={(event) => onSetStatus(event.target.value as EntryStatus)}
+      >
+        {ENTRY_STATUSES.map((option) => (
+          <option key={option} value={option}>{STATUS_CODE[option]} {statusLabel(option)}</option>
+        ))}
+      </select>
+      {!carriesValue ? (
+        <span className="flex-1 pr-2 text-right text-sm text-neutral-500"
+          data-testid={`grade-status-label-${studentId}-${item.id}`}>{statusLabel(status)}</span>
+      ) : isRubric ? (
+        <button type="button" data-testid={`grade-rubric-${studentId}-${item.id}`}
+          className="h-7 flex-1 rounded-md px-2 text-right text-sm hover:bg-neutral-100 dark:hover:bg-neutral-900/40"
+          title={t('Evaluar con la rúbrica')} onClick={onOpenRubric}>
+          {value ?? '—'}
+        </button>
+      ) : (
+        // `h-full` matters: TextCell's own hit area is `h-full`, so with nothing to
+        // resolve against it collapses to a sliver and the cell stops taking clicks —
+        // the mark simply does not go in.
+        <div className="h-full min-w-0 flex-1" data-testid={`grade-value-${studentId}-${item.id}`}>
+          <TextCell value={value} inputType="number" align="right" onChange={onSetValue} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The rubric grid, as the way to mark a rubric column.
+ *
+ * The plan editor promises "se evalúa abriendo la rúbrica" and `setRubricEvaluation`
+ * existed with no caller, so the promise had nowhere to land. Criteria left unmarked
+ * are not zeros: the repo renormalises over the ones actually chosen, and this panel
+ * says how many are still pending so the teacher knows the mark is provisional.
+ */
+function RubricCellModal({
+  studentId, item, convocatoria, onClose, onSaved,
+}: {
+  studentId: string;
+  item: AssessmentItem;
+  convocatoria: string;
+  onClose: () => void;
+  onSaved: () => Promise<void>;
+}) {
+  const [rubric, setRubric] = useState<TeachingRubric | null>(null);
+  const [levels, setLevels] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      try {
+        const [detail, chosen] = await Promise.all([
+          window.nodus.getTeachingRubric(item.sourceRubricId as string),
+          window.nodus.getRubricEvaluation(studentId, item.id, convocatoria),
+        ]);
+        if (!active) return;
+        setRubric(detail);
+        setLevels(chosen);
+      } catch (cause) {
+        if (active) setError(errorText(cause));
+      }
+    })();
+    return () => { active = false; };
+  }, [studentId, item.id, item.sourceRubricId, convocatoria]);
+
+  const pending = rubric ? rubric.criteria.filter((c) => !levels[c.id]).length : 0;
+
+  return (
+    <ModalBackdrop onClose={onClose}>
+      <section className="card-modal flex max-h-[86vh] w-full max-w-3xl flex-col p-5" role="dialog" aria-modal="true"
+        aria-label={t('Evaluar con la rúbrica')} data-testid="rubric-cell-modal">
+        <h2 className="text-base font-semibold">{t('Evaluar con la rúbrica')}</h2>
+        {error && <p className="mt-2 text-sm text-red-500">{error}</p>}
+        {!rubric ? (
+          <div className="grid h-40 place-items-center"><Spinner label={t('Cargando…')} /></div>
+        ) : (
+          <>
+            <p className="mt-1 text-xs text-neutral-500">
+              {pending > 0
+                ? tx('Quedan {n} criterios sin marcar; la nota se calcula solo sobre los evaluados.', { n: pending })
+                : t('Todos los criterios están evaluados.')}
+            </p>
+            <div className="mt-3 min-h-0 flex-1 overflow-auto">
+              <table className="w-full border-collapse text-xs">
+                <thead className="study-browser-table-head">
+                  <tr className="text-left">
+                    <th className="px-2 py-1 font-medium">{t('Criterio')}</th>
+                    {rubric.levels.map((level) => (
+                      <th key={level.id} className="px-2 py-1 text-center font-medium">{level.label}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rubric.criteria.map((criterion) => (
+                    <tr key={criterion.id} className="border-t border-neutral-200 dark:border-neutral-800/60">
+                      <td className="px-2 py-1">
+                        <span className="block">{criterion.name || '—'}</span>
+                        <span className="block text-[10px] text-neutral-500">
+                          {tx('hasta {n} puntos', { n: criterionMaxPoints(rubric, criterion) })}
+                        </span>
+                      </td>
+                      {rubric.levels.map((level) => (
+                        <td key={level.id} className="px-2 py-1 text-center">
+                          <input
+                            type="radio"
+                            name={`criterion-${criterion.id}`}
+                            data-testid={`rubric-pick-${criterion.id}-${level.id}`}
+                            aria-label={`${criterion.name} · ${level.label}`}
+                            checked={levels[criterion.id] === level.id}
+                            onChange={() => setLevels((prev) => ({ ...prev, [criterion.id]: level.id }))}
+                          />
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+        <div className="mt-4 flex justify-end gap-2">
+          <button className="btn btn-ghost" onClick={onClose}>{t('Cancelar')}</button>
+          <button className="btn btn-primary" data-testid="rubric-cell-save" disabled={busy || !rubric}
+            onClick={() => {
+              setBusy(true);
+              void (async () => {
+                try {
+                  await window.nodus.setRubricEvaluation({ studentId, itemId: item.id, convocatoria, levels });
+                  await onSaved();
+                  onClose();
+                } catch (cause) {
+                  setError(errorText(cause));
+                } finally {
+                  setBusy(false);
+                }
+              })();
+            }}>
+            {busy ? t('Guardando…') : t('Guardar')}
+          </button>
+        </div>
+      </section>
+    </ModalBackdrop>
+  );
+}
+
+/**
+ * Drafts the comment a family reads, from marks alone.
+ *
+ * The summary handed to the model comes from `anonymousStudentSummary`, which builds it
+ * out of the ANONYMOUS grid: the name columns are gone before the text exists, so no
+ * ordering of edits here can start leaking one. `draftStudentFeedback` then opens the
+ * pseudonymisation scope, so the identifier the model writes comes back as a real name
+ * for the teacher and never travelled as one.
+ *
+ * The draft is offered, never saved: a comment about a child is the teacher's to write.
+ */
+function FeedbackModal({
+  planId, groupId, studentId, studentName, summary, onClose,
+}: {
+  planId: string;
+  groupId: string;
+  studentId: string;
+  studentName: string;
+  summary: string;
+  onClose: () => void;
+}) {
+  const [text, setText] = useState('');
+  const [warnings, setWarnings] = useState<string[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [copied, setCopied] = useState(false);
+
+  const draft = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      const result = await window.nodus.draftStudentFeedback({ planId, groupId, studentId, summary });
+      setText(result.text);
+      setWarnings(result.warnings ?? []);
+    } catch (cause) {
+      setError(errorText(cause));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <ModalBackdrop onClose={onClose}>
+      <section className="card-modal flex max-h-[80vh] w-full max-w-lg flex-col p-5" role="dialog" aria-modal="true"
+        aria-label={t('Comentario para la familia')} data-testid="feedback-modal">
+        <h2 className="text-base font-semibold">{t('Comentario para la familia')}</h2>
+        <p className="mt-1 text-xs text-neutral-500">{studentName}</p>
+        <p className="mt-2 text-[11px] text-neutral-500">
+          {t('La IA solo ve las notas y un identificador, nunca el nombre. Revísalo antes de usarlo.')}
+        </p>
+
+        {error && <p className="mt-2 text-sm text-red-500" data-testid="feedback-error">{error}</p>}
+
+        <div className="mt-3 min-h-0 flex-1 overflow-auto">
+          <p className="text-[10px] font-medium uppercase tracking-wider text-neutral-500">{t('Lo que se envía')}</p>
+          <pre className="mt-1 whitespace-pre-wrap rounded-lg bg-neutral-100 p-2 text-[11px] dark:bg-neutral-900/40"
+            data-testid="feedback-payload">{summary || '—'}</pre>
+
+          {text && (
+            <>
+              <p className="mt-3 text-[10px] font-medium uppercase tracking-wider text-neutral-500">{t('Borrador')}</p>
+              <textarea className="input mt-1 min-h-[120px] w-full text-xs" data-testid="feedback-text"
+                value={text} onChange={(event) => setText(event.target.value)} />
+            </>
+          )}
+          {warnings.length > 0 && (
+            <div className="mt-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[11px] text-amber-800 dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-300"
+              data-testid="feedback-warnings">
+              {warnings.map((warning, index) => <p key={index}>{warning}</p>)}
+            </div>
+          )}
+        </div>
+
+        <div className="mt-4 flex justify-end gap-2">
+          <button className="btn btn-ghost" onClick={onClose}>{t('Cerrar')}</button>
+          {text && (
+            <button className="btn btn-ghost" data-testid="feedback-copy"
+              onClick={() => void navigator.clipboard.writeText(text).then(() => setCopied(true))}>
+              <Icon name="copy" size={13} />{copied ? t('Copiado') : t('Copiar')}
+            </button>
+          )}
+          <button className="btn btn-primary" data-testid="feedback-draft" disabled={busy || !summary}
+            onClick={() => void draft()}>
+            {busy ? <Spinner label={t('Redactando…')} /> : text ? t('Volver a redactar') : t('Redactar')}
+          </button>
+        </div>
+      </section>
+    </ModalBackdrop>
   );
 }
 
@@ -570,7 +964,11 @@ function AnalysisModal({
   const finals = studentIds
     .map((id) => results[id]?.record.numeric)
     .filter((v): v is number => v != null);
-  const dist = gradeDistribution(finals, plan.rules.passAt, plan.rules.scaleMax);
+  const dist = gradeDistribution(finals, plan.rules.passAt, { min: plan.rules.scaleMin, max: plan.rules.scaleMax });
+  // A qualitative-only plan records no number by design, so `numeric` is null for
+  // everyone. Saying "0 calificaciones" would read as "nobody has been graded";
+  // the honest statement is that a numeric distribution does not apply here.
+  const numericApplies = plan.rules.record !== 'qualitative';
 
   // Only leaves that belong to an exam block: item analysis is about questions.
   const questions = items.filter((i) => i.sourceExamQuestionId && !items.some((c) => c.parentId === i.id));
@@ -592,21 +990,29 @@ function AnalysisModal({
         <h2 className="text-base font-semibold">{t('Analizar')}</h2>
 
         <div className="mt-3 min-h-0 flex-1 overflow-auto">
-          <p className="text-xs text-neutral-500">
-            {tx('{n} calificaciones · media {mean} · mediana {median} · aprueban {rate} %', {
-              n: dist.n, mean: dist.mean, median: dist.median, rate: Math.round(dist.passRate * 100),
-            })}
-          </p>
+          {!numericApplies ? (
+            <p className="text-xs text-neutral-500" data-testid="analysis-no-numeric">
+              {t('Este cuaderno registra la calificación en términos cualitativos, así que la distribución numérica no se aplica.')}
+            </p>
+          ) : (
+            <>
+              <p className="text-xs text-neutral-500">
+                {tx('{n} calificaciones · media {mean} · mediana {median} · aprueban {rate} %', {
+                  n: dist.n, mean: dist.mean, median: dist.median, rate: Math.round(dist.passRate * 100),
+                })}
+              </p>
 
-          <div className="mt-3 flex items-end gap-2" data-testid="analysis-distribution">
-            {dist.buckets.map((bucket) => (
-              <div key={bucket.label} className="flex flex-1 flex-col items-center gap-1">
-                <div className="w-full rounded-t bg-indigo-600/15" style={{ height: `${(bucket.count / maxBucket) * 90 + 4}px` }} />
-                <span className="text-[10px] text-neutral-500">{bucket.label}</span>
-                <span className="text-[10px] font-medium">{bucket.count}</span>
+              <div className="mt-3 flex items-end gap-2" data-testid="analysis-distribution">
+                {dist.buckets.map((bucket) => (
+                  <div key={bucket.label} className="flex flex-1 flex-col items-center gap-1">
+                    <div className="w-full rounded-t bg-indigo-600/15" style={{ height: `${(bucket.count / maxBucket) * 90 + 4}px` }} />
+                    <span className="text-[10px] text-neutral-500">{bucket.label}</span>
+                    <span className="text-[10px] font-medium">{bucket.count}</span>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            </>
+          )}
 
           {stats.length > 0 && (
             <>
@@ -619,6 +1025,7 @@ function AnalysisModal({
                 <thead className="study-browser-table-head">
                   <tr className="text-left">
                     <th className="px-2 py-1 font-medium">{t('Pregunta')}</th>
+                    <th className="w-[50px] px-2 py-1 text-right font-medium" title={t('Alumnado con nota en esta pregunta')}>n</th>
                     <th className="w-[70px] px-2 py-1 text-right font-medium">{t('Media')}</th>
                     <th className="w-[90px] px-2 py-1 text-right font-medium">{t('Dificultad')}</th>
                     <th className="w-[110px] px-2 py-1 text-right font-medium">{t('Discriminación')}</th>
@@ -628,11 +1035,20 @@ function AnalysisModal({
                   {stats.map((row) => (
                     <tr key={row.itemId} className="border-t border-neutral-200 dark:border-neutral-800/60">
                       <td className="max-w-[220px] truncate px-2 py-1">{row.name}</td>
+                      <td className="px-2 py-1 text-right text-neutral-500">{row.n}</td>
                       <td className="px-2 py-1 text-right text-neutral-500">{row.mean}</td>
                       <td className="px-2 py-1 text-right">{row.difficulty}</td>
+                      {/* A discrimination computed from one student, or from a group with
+                          no marks, is arithmetic without meaning. Showing "—" beats
+                          labelling a perfectly good question "mala discriminación". */}
                       <td className={`px-2 py-1 text-right ${
-                        row.discriminationBand === 'muy_mala' || row.discriminationBand === 'mala'
-                          ? 'text-red-500' : ''}`}>{row.discrimination}</td>
+                        row.reliable && (row.discriminationBand === 'muy_mala' || row.discriminationBand === 'mala')
+                          ? 'text-red-500' : ''}`}
+                        data-testid={`analysis-discrimination-${row.itemId}`}>
+                        {row.reliable
+                          ? row.discrimination
+                          : <span className="text-neutral-500" title={t('Datos insuficientes para interpretar este valor.')}>—</span>}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -709,13 +1125,15 @@ function warningText(warning: { code: string; detail: Record<string, number | st
  * really carried, and every rule that changed the outcome.
  */
 function ExplainModal({
-  name, result, scaleMax, onClose, onDownload,
+  name, result, rules, onClose, onDownload, onDraftFeedback,
 }: {
   name: string;
   result: { raw: number | null; record: { numeric: number | null; qualitative: string | null }; trace: TraceNode | null; rules: TraceRule[] } | undefined;
-  scaleMax: number;
+  /** The whole rule set: the scale's minimum is not always 0, so `toScale` is needed. */
+  rules: PlanRules;
   onClose: () => void;
   onDownload?: () => Promise<void>;
+  onDraftFeedback?: () => void;
 }) {
   if (!result) return null;
   const renderNode = (node: TraceNode, depth: number) => (
@@ -726,7 +1144,7 @@ function ExplainModal({
           <span className="shrink-0 text-[10px] text-neutral-500">{Math.round(node.effectiveWeight * 100)}%</span>
         )}
         <span className="w-12 shrink-0 text-right font-medium">
-          {node.fraction == null ? '—' : Math.round(node.fraction * scaleMax * 100) / 100}
+          {node.fraction == null ? '—' : Math.round(toScale(node.fraction, rules) * 100) / 100}
         </span>
       </div>
       {node.rules.map((rule, index) => (
@@ -755,6 +1173,11 @@ function ExplainModal({
             {t('Calificación')}: <strong data-testid="explain-final">{result.record.numeric ?? result.record.qualitative ?? '—'}</strong>
           </span>
           <span className="flex gap-2">
+            {onDraftFeedback && (
+              <button className="btn btn-ghost" data-testid="explain-feedback" onClick={onDraftFeedback}>
+                <Icon name="bulb" size={13} />{t('Comentario para la familia')}
+              </button>
+            )}
             {onDownload && (
               <button className="btn btn-ghost" data-testid="explain-download" onClick={() => void onDownload()}>
                 <Icon name="download" size={13} />{t('Boletín')}

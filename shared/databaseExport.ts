@@ -51,8 +51,21 @@ export function exportCellValue(col: DatabaseColumn, row: DatabaseRow): string |
   }
 }
 
+/**
+ * Neutralises a cell a spreadsheet would otherwise read as a formula.
+ *
+ * A value starting with `=`, `+`, `-` or `@` is executed on open by Excel, LibreOffice
+ * and Sheets — that is CSV injection, and the content here is user data: a database cell
+ * or, in the gradebook, a name typed into a roster. The single quote is the standard
+ * mitigation; it is not shown as part of the value once the file is opened.
+ */
+function neutraliseFormula(s: string): string {
+  return /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
+}
+
 function csvCell(s: string): string {
-  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  const safe = neutraliseFormula(s);
+  return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
 }
 
 export function databaseToCsv(columns: DatabaseColumn[], rows: DatabaseRow[]): string {

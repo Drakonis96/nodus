@@ -7,6 +7,7 @@ import {
   type AssessmentPlan,
   type GradeEntry,
   type PlanRules,
+  type PlanRulesPatch,
 } from '@shared/assessment';
 import type { ProposedPlan as ProposedPlanShape, ProposedItem as ProposedItemShape } from '@shared/assessmentImport';
 import { flattenExamBlocks, groupExamQuestions, examTotalPoints } from '@shared/teachingExams';
@@ -160,6 +161,29 @@ export function createAssessmentPlan(input: {
 }
 
 /**
+ * The rule keys whose value is an object rather than a scalar.
+ *
+ * A shallow merge is not enough for these. The editor has one input per LEAF ("código
+ * en el acta", "equivalencia numérica"), so a shallow merge forces it to rebuild the
+ * whole `np` object from the props it was rendered with — and that is precisely the
+ * stale snapshot this merge exists to protect against: editing the code and then its
+ * numeric equivalent lost the code. One level of depth is all these shapes have.
+ */
+const NESTED_RULE_KEYS = ['minNotMet', 'np', 'honours', 'advisories'] as const;
+
+function mergeRules(current: PlanRules, patch: PlanRulesPatch): PlanRules {
+  const merged = { ...current, ...patch } as Record<string, unknown>;
+  for (const key of NESTED_RULE_KEYS) {
+    const incoming = patch[key];
+    // `honours: null` means "no distinctions in this plan" and must not be merged away.
+    if (incoming == null || typeof incoming !== 'object') continue;
+    const base = current[key];
+    merged[key] = base && typeof base === 'object' ? { ...base, ...incoming } : incoming;
+  }
+  return merged as unknown as PlanRules;
+}
+
+/**
  * `rules` is a PARTIAL patch, merged against what is stored.
  *
  * The editor writes one field at a time and several edits can be in flight at once
@@ -170,7 +194,7 @@ export function createAssessmentPlan(input: {
  */
 export function updateAssessmentPlan(
   id: string,
-  patch: { name?: string; academicYearId?: string | null; profile?: string; rules?: Partial<PlanRules> },
+  patch: { name?: string; academicYearId?: string | null; profile?: string; rules?: PlanRulesPatch },
 ): AssessmentPlan {
   const sets: string[] = [];
   const values: unknown[] = [];
@@ -189,7 +213,7 @@ export function updateAssessmentPlan(
   if (patch.rules !== undefined) {
     const current = getAssessmentPlan(id).plan.rules;
     sets.push('rules_json = ?');
-    values.push(JSON.stringify({ ...current, ...patch.rules }));
+    values.push(JSON.stringify(mergeRules(current, patch.rules)));
   }
   if (sets.length) {
     sets.push('updated_at = ?');
@@ -316,7 +340,30 @@ const ITEM_COLUMNS: Record<string, string> = {
   competencyCode: 'competency_code', criterionCode: 'criterion_code', parentId: 'parent_id',
 };
 
+/**
+ * Refuses a re-parenting that would make an item its own ancestor.
+ *
+ * Nothing in the UI sends one today, but the tree walk is plain recursion with no depth
+ * guard: a cycle does not produce a wrong grade, it hangs the main process — and the
+ * main process is the one holding the database.
+ */
+function assertNoCycle(id: string, parentId: string | null): void {
+  if (parentId == null) return;
+  if (parentId === id) throw new Error('Un elemento no puede colgar de sí mismo.');
+  const db = getDb();
+  const seen = new Set<string>([id]);
+  let cursor: string | null = parentId;
+  while (cursor) {
+    if (seen.has(cursor)) throw new Error('Ese movimiento crearía un ciclo en el plan.');
+    seen.add(cursor);
+    const row = db.prepare('SELECT parent_id FROM teaching_assessment_items WHERE id = ?').get(cursor) as Row | undefined;
+    if (!row) break;
+    cursor = row.parent_id == null ? null : String(row.parent_id);
+  }
+}
+
 export function updateAssessmentItem(id: string, patch: Partial<AssessmentItem>): AssessmentItem {
+  if (patch.parentId !== undefined) assertNoCycle(id, patch.parentId);
   const sets: string[] = [];
   const values: unknown[] = [];
   for (const [key, column] of Object.entries(ITEM_COLUMNS)) {
@@ -516,21 +563,36 @@ export function setRubricEvaluation(input: {
   if (!item?.source_rubric_id) throw new Error('Esta columna no se evalúa con rúbrica.');
   const rubric = getTeachingRubric(String(item.source_rubric_id));
 
-  let total = 0;
+  // Criteria with no level chosen are NOT zeros. Skipping them while still dividing by
+  // the whole rubric turned "three of five criteria marked at the top" into 60 %, which
+  // is indistinguishable from a bad performance and would be recorded as one. They are
+  // excluded from both sides and the result is renormalised over what was actually
+  // assessed — the same rule the engine applies to an unassessed column.
+  const best = Math.max(...rubric.levels.map((l) => l.score), 1);
+  let earned = 0;
+  let assessedMax = 0;
+  let assessed = 0;
   for (const criterion of rubric.criteria) {
     const levelId = input.levels[criterion.id];
     const level = rubric.levels.find((l) => l.id === levelId);
     if (!level) continue;
-    const best = Math.max(...rubric.levels.map((l) => l.score), 1);
-    total += (level.score / best) * criterionMaxPoints(rubric, criterion);
+    assessed += 1;
+    const max = criterionMaxPoints(rubric, criterion);
+    assessedMax += max;
+    earned += (level.score / best) * max;
   }
+
+  // Nothing chosen at all is an empty cell, not a zero.
+  const total = assessed === 0 || assessedMax <= 0
+    ? null
+    : (earned / assessedMax) * rubricMaxScore(rubric);
 
   const entry = setGradeEntry({
     studentId: input.studentId,
     itemId: input.itemId,
     convocatoria,
-    rawValue: Math.round(total * 100) / 100,
-    status: 'evaluated',
+    rawValue: total == null ? null : Math.round(total * 100) / 100,
+    status: total == null ? 'not_assessed' : 'evaluated',
   });
 
   const row = db
@@ -595,6 +657,54 @@ export function applyProposedPlan(planId: string, proposal: ProposedPlanShape): 
     insert(proposal.items, null);
   })();
   return listAssessmentItems(planId);
+}
+
+/** Convocatorias in the order a course runs them. Anything unknown sorts last. */
+const CONVOCATORIA_ORDER = ['ordinaria', 'extraordinaria'];
+
+/**
+ * What the ratchet rule ("lo ya conseguido no se pierde") compares against.
+ *
+ * Returns, per student and item, the highest fraction that student had already reached
+ * in an EARLIER convocatoria of the same plan. Without this the checkbox in the plan
+ * editor was a promise with no consumer: `computeGrade` takes `previous` and nobody
+ * filled it, so a resit could silently lower a mark the student had already earned.
+ *
+ * Fractions, not raw values, because that is the unit the engine ratchets in.
+ */
+export function ratchetBaseline(
+  planId: string,
+  groupId: string,
+  convocatoria = 'ordinaria',
+): Record<string, Record<string, number>> {
+  const rank = CONVOCATORIA_ORDER.indexOf(convocatoria);
+  const earlier = rank <= 0 ? [] : CONVOCATORIA_ORDER.slice(0, rank);
+  if (earlier.length === 0) return {};
+
+  const placeholders = earlier.map(() => '?').join(', ');
+  const rows = getDb()
+    .prepare(
+      `SELECT e.student_id AS student_id, e.item_id AS item_id, e.raw_value AS raw_value,
+              i.max_points AS max_points
+         FROM teaching_grade_entries e
+         JOIN teaching_assessment_items i ON i.id = e.item_id
+         JOIN teaching_students s ON s.id = e.student_id
+        WHERE i.plan_id = ? AND s.group_id = ? AND e.status = 'evaluated'
+          AND e.raw_value IS NOT NULL AND e.convocatoria IN (${placeholders})`,
+    )
+    .all(planId, groupId, ...earlier) as Row[];
+
+  const out: Record<string, Record<string, number>> = {};
+  for (const row of rows) {
+    const max = Number(row.max_points);
+    if (!Number.isFinite(max) || max <= 0) continue;
+    const fraction = Math.min(1, Math.max(0, Number(row.raw_value) / max));
+    const studentId = String(row.student_id);
+    const itemId = String(row.item_id);
+    const byItem = (out[studentId] ??= {});
+    if (byItem[itemId] == null || fraction > byItem[itemId]) byItem[itemId] = fraction;
+  }
+  return out;
 }
 
 /**

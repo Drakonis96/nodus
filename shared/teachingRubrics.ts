@@ -234,7 +234,14 @@ export function emptyRubricCriterion(id: string, name = ''): RubricCriterion {
 }
 
 /** A blank but usable rubric: four levels, three criteria, equal weights. */
-export function defaultRubric(language: RubricLanguage = 'es', scaleMax = 5): Pick<TeachingRubricInput, 'levels' | 'criteria' | 'scaleMax' | 'language' | 'weighted'> {
+/** The rubric scale a teacher may choose. Bounded so a stray paste cannot break the grid. */
+export function clampRubricScale(value: unknown): number {
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.min(100, Math.max(1, Math.round(n))) : 5;
+}
+
+export function defaultRubric(language: RubricLanguage = 'es', rawScaleMax = 5): Pick<TeachingRubricInput, 'levels' | 'criteria' | 'scaleMax' | 'language' | 'weighted'> {
+  const scaleMax = clampRubricScale(rawScaleMax);
   const levels = buildRubricLevels('achievement4', language, scaleMax);
   const criteria = Array.from({ length: 3 }, (_, index) => ({
     ...emptyRubricCriterion(`C${index + 1}`),
@@ -243,21 +250,32 @@ export function defaultRubric(language: RubricLanguage = 'es', scaleMax = 5): Pi
   return { levels, criteria, scaleMax, language, weighted: false };
 }
 
+/** Unrounded, for anything that adds several of these up. Rounding per criterion and
+ *  then summing drifts: three shares of 33.33 % make 99.99 %, not 100 %. */
+function exactCriterionMax(rubric: Pick<TeachingRubric, 'levels' | 'weighted' | 'scaleMax'>, criterion: Pick<RubricCriterion, 'weight'>): number {
+  const best = Math.max(0, ...rubric.levels.map((level) => level.score));
+  return rubric.weighted ? (rubric.scaleMax * criterion.weight) / 100 : best;
+}
+
 /** Points a criterion contributes at its best level (its weight share of the scale). */
 export function criterionMaxPoints(rubric: Pick<TeachingRubric, 'levels' | 'weighted' | 'scaleMax'>, criterion: Pick<RubricCriterion, 'weight'>): number {
-  const best = Math.max(0, ...rubric.levels.map((level) => level.score));
-  if (!rubric.weighted) return best;
-  return Math.round(((rubric.scaleMax * criterion.weight) / 100) * 100) / 100;
+  return Math.round(exactCriterionMax(rubric, criterion) * 100) / 100;
 }
 
 /**
- * Highest achievable total. Unweighted rubrics sum the best level across criteria;
- * weighted ones normalise to the scale, so the maximum IS the scale.
+ * Highest achievable total — always the sum of what the ROWS say.
+ *
+ * Weighted rubrics normally normalise to the scale, and while the weights add to 100 %
+ * that is the same number. But a rubric whose weights add to 70 % is a document a
+ * teacher really has, and there the printed rows added to 7 while the footer said
+ * "____ / 10": the sheet contradicted itself, and whoever marked it by hand was told
+ * three points existed that no criterion could award. Deriving the total from the rows
+ * makes the two agree by construction; the weights-don't-add-up warning is where that
+ * problem gets reported, not here.
  */
 export function rubricMaxScore(rubric: Pick<TeachingRubric, 'levels' | 'criteria' | 'weighted' | 'scaleMax'>): number {
-  if (rubric.weighted) return Math.round(rubric.scaleMax * 100) / 100;
-  const best = Math.max(0, ...rubric.levels.map((level) => level.score));
-  return Math.round(best * rubric.criteria.length * 100) / 100;
+  const total = rubric.criteria.reduce((sum, criterion) => sum + exactCriterionMax(rubric, criterion), 0);
+  return Math.round(total * 100) / 100;
 }
 
 export function rubricWeightTotal(criteria: Array<Pick<RubricCriterion, 'weight'>>): number {
