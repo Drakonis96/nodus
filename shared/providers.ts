@@ -78,6 +78,32 @@ export function isLocalProvider(provider: AiProvider): provider is LocalProvider
   return provider === 'ollama' || provider === 'lmstudio';
 }
 
+/**
+ * Providers billed against a personal ChatGPT / GitHub subscription instead of
+ * pay-per-use API credit. Their runtimes are agent protocols that accept a prompt, a
+ * model and a reasoning effort and nothing else — which is why the two predicates
+ * below both key off this one list rather than repeating it.
+ */
+export const SUBSCRIPTION_PROVIDERS: AiProvider[] = ['codex', 'github-copilot'];
+
+/** Usage lands on the user's plan quota (weekly/monthly caps), not on API credit. */
+export function isSubscriptionProvider(provider: AiProvider): boolean {
+  return SUBSCRIPTION_PROVIDERS.includes(provider);
+}
+
+/**
+ * Whether a provider honours per-request sampling controls (`temperature`,
+ * `max_tokens`, `response_format`).
+ *
+ * The subscription runtimes do not. That matters to `completeJson`, whose retry
+ * ladder escalates by lowering temperature and then dropping JSON mode — for these
+ * providers every rung is a byte-identical request, so the ladder must not spend
+ * three subscription turns discovering that.
+ */
+export function supportsSamplingControls(provider: AiProvider): boolean {
+  return !isSubscriptionProvider(provider);
+}
+
 /** Server base URL each local provider ships with (no trailing slash). */
 export const DEFAULT_LOCAL_BASE_URLS: Record<LocalProvider, string> = {
   ollama: 'http://localhost:11434',
