@@ -88,6 +88,31 @@
 .light .recovery-key small { color: #52736f; }
 .light .recovery-key code { color: #0f766e; }
 .light .recovery-warning { color: #b45309 !important; }
+
+/* Backup health (Settings panel + global bar). Styled semantically rather than with
+   rose/amber/emerald utilities: those are shared with the toolkit, debates and gaps
+   views, so a `.light` remap of them would repaint unrelated UI. A warning that says
+   your data is unprotected has to be legible in BOTH themes — dark-on-light was exactly
+   the failure being reported. */
+.backup-health { border: 1px solid; border-radius: 8px; padding: 8px 12px; font-size: 12px; }
+.backup-health[data-level='ok'] { border-color: rgba(6,95,70,.6); background: rgba(2,44,34,.3); color: #6ee7b7; }
+.backup-health[data-level='warning'] { border-color: rgba(180,83,9,.6); background: rgba(69,26,3,.4); color: #fcd34d; }
+.backup-health[data-level='critical'] { border-color: rgba(190,18,60,.6); background: rgba(76,5,25,.4); color: #fecdd3; }
+.backup-health-title { display: flex; align-items: center; gap: 8px; font-weight: 500; }
+.backup-health-advice { margin-top: 4px; opacity: .9; }
+.backup-health-age { margin-top: 4px; opacity: .7; }
+.backup-health-detail { margin-top: 4px; overflow-wrap: anywhere; opacity: .6; }
+
+.light .backup-health[data-level='ok'] { border-color: #a7f3d0; background: #ecfdf5; color: #047857; }
+.light .backup-health[data-level='warning'] { border-color: #fcd34d; background: #fffbeb; color: #b45309; }
+.light .backup-health[data-level='critical'] { border-color: #fca5a5; background: #fef2f2; color: #b91c1c; }
+
+.backup-health-banner { display: flex; align-items: center; gap: 12px; flex-shrink: 0; padding: 8px 16px; font-size: 14px; border-bottom: 1px solid rgba(159,18,57,.6); background: rgba(76,5,25,.6); color: #ffe4e6; }
+.backup-health-banner .backup-health-dismiss { flex-shrink: 0; color: #fda4af; }
+.backup-health-banner .backup-health-dismiss:hover { color: #ffe4e6; }
+.light .backup-health-banner { border-bottom-color: #fca5a5; background: #fef2f2; color: #991b1b; }
+.light .backup-health-banner .backup-health-dismiss { color: #b91c1c; }
+.light .backup-health-banner .backup-health-dismiss:hover { color: #7f1d1d; }
 @media (max-width: 820px) { .recovery-card { grid-template-columns: 1fr; max-height: none; } .recovery-hero { border-right: 0; border-bottom: 1px solid rgba(99,102,241,.2); } .recovery-success { grid-template-columns: 1fr; text-align: center; } }
 .app-titlebar button,
 .app-titlebar a,

@@ -9,7 +9,7 @@ import { closeDb, getDb, replaceDbFile, SCHEMA_VERSION } from '../db/database';
 import { getSettings } from '../db/settingsRepo';
 import { listVaults, getActiveVault, restoreVaultDatabase, setActiveVault } from '../vaults/vaultRegistry';
 import type { VaultType } from '@shared/types';
-import { getApiKey, getBackupPassword, lockedApiKeyProviders, setApiKey } from '../secrets/secretStore';
+import { getApiKey, getAudioKey, getBackupPassword, setApiKey, setAudioKey } from '../secrets/secretStore';
 import {
   decryptBackupPayload,
   encryptBackupPayload,
@@ -96,9 +96,20 @@ interface BackupInventory {
   apiKeyProviders: AiProvider[];
 }
 
-const GLOBAL_AUXILIARY_FILES = ['app-prefs.json', 'nodi-chat-history.json', 'nodi-notifications.json', 'nodi-welcome.seed'] as const;
+const GLOBAL_AUXILIARY_FILES = ['app-prefs.json', 'nodi-chat-history.json', 'nodi-notes.json', 'nodi-notifications.json', 'nodi-welcome.seed'] as const;
 const VAULT_HISTORY_FILES = ['study-chat-history.json', 'study-search-index.json'] as const;
 const VAULT_MEDIA_FILES = ['study-audio-meta.json'] as const;
+/** Cloud TTS keys live outside the AI-provider store, encrypted per vault. The blobs
+ *  are safeStorage-bound and useless elsewhere, so the archive carries the plaintext
+ *  alongside `api-keys.json` and re-encrypts it on the destination machine. */
+const AUDIO_KEY_NAMES = ['hume'] as const;
+/**
+ * Settings that describe THIS computer, not the library. They live in the vault's
+ * settings row, so a restore would otherwise import another machine's absolute paths
+ * and silently break every local file lookup (a stale Zotero root is worse than an
+ * empty one, which at least falls back to probing the default locations).
+ */
+const MACHINE_LOCAL_SETTING_KEYS = ['zoteroStoragePath', 'toolkitOutputDir'] as const;
 const RECOVERY_PREF_KEYS = [
   'recoverySetupVersion',
   'backupVaultIds',
@@ -212,12 +223,14 @@ export async function createBackupArchive(options: {
     date: new Date().toISOString(),
     zoteroUserId: settings.zoteroUserId,
   };
-  const lockedProviders = lockedApiKeyProviders();
-  if (lockedProviders.length > 0) {
-    throw new Error(`La copia se ha detenido para proteger tus claves API: ${lockedProviders.join(', ')} siguen cifradas pero el almacén seguro no permite leerlas.`);
-  }
+  // A credential the OS keychain can no longer decrypt must NOT cost the user their
+  // library snapshot: restoreApiKeys is merge-only, so omitting one key never erases
+  // anything on the destination, whereas refusing to run means no backup at all — for
+  // months, since the failure is invisible until someone opens Settings. The caller
+  // surfaces `lockedApiKeyProviders()` as a warning beside the successful result.
   const includesSecrets = true;
   const apiKeys = readApiKeys();
+  const audioKeys = readAudioKeys();
 
   // Snapshot EVERY vault (all types), not just the active one, so the archive is an
   // integral copy of the whole app. Each vault's DB carries its own settings row,
@@ -239,6 +252,9 @@ export async function createBackupArchive(options: {
   addAuxiliaryFiles(files, vaults, selection);
   if (includesSecrets) {
     files['api-keys.json'] = Buffer.from(JSON.stringify(apiKeys, null, 2));
+    if (Object.keys(audioKeys).length > 0) {
+      files['audio-keys.json'] = Buffer.from(JSON.stringify(audioKeys, null, 2));
+    }
   }
 
   const payloadManifest: PayloadManifest = {
@@ -376,16 +392,44 @@ export interface BackupRestoreResult {
   usedRecoveryKey?: boolean;
 }
 
-export function restoreBackupArchive(archive: Buffer, password: string): BackupRestoreResult {
-  if (!password.trim()) return { ok: false, message: 'Importación cancelada: falta la contraseña de la copia.' };
-  const zip = new AdmZip(archive);
-  const manifestEntry = zip.getEntry('manifest.json');
-  const encryptedEntry = zip.getEntry('backup.bin');
-  if (!manifestEntry || !encryptedEntry) {
-    return { ok: false, message: 'Archivo .nodus inválido: faltan manifest o datos cifrados.' };
-  }
+interface OpenedBackup {
+  manifest: BackupManifest;
+  payload: AdmZip;
+  payloadManifest: PayloadManifest;
+  includesSecrets: boolean;
+  recoveredKey?: string;
+  usedRecoveryKey: boolean;
+}
 
-  const manifest = JSON.parse(zip.readAsText(manifestEntry)) as BackupManifest;
+/**
+ * Decrypt and fully authenticate an archive without touching any live data: format,
+ * schema compatibility, GCM tag, payload hashes and the internal manifest. Restore and
+ * post-write verification share this so a "verified" snapshot means exactly what a
+ * restore would accept — no second, weaker implementation that could drift.
+ */
+function openBackupArchive(archive: Buffer, password: string): OpenedBackup | { ok: false; message: string } {
+  // A truncated or non-zip file makes AdmZip throw, and a damaged manifest makes
+  // JSON.parse throw. Both are ordinary states for a half-synced cloud file, so they
+  // must come back as a refusal the caller can report — never as an exception that
+  // unwinds into the restore's rollback path.
+  let zip: AdmZip;
+  let manifest: BackupManifest;
+  let encryptedEntry: AdmZip.IZipEntry;
+  try {
+    zip = new AdmZip(archive);
+    const manifestEntry = zip.getEntry('manifest.json');
+    const encrypted = zip.getEntry('backup.bin');
+    if (!manifestEntry || !encrypted) {
+      return { ok: false, message: 'Archivo .nodus inválido: faltan manifest o datos cifrados.' };
+    }
+    encryptedEntry = encrypted;
+    manifest = JSON.parse(zip.readAsText(manifestEntry)) as BackupManifest;
+  } catch {
+    return { ok: false, message: 'Archivo .nodus inválido o dañado: no se pudo leer su estructura.' };
+  }
+  if (!manifest || typeof manifest !== 'object') {
+    return { ok: false, message: 'Archivo .nodus inválido: su manifiesto no es legible.' };
+  }
   const supportedVersions = [1, 2, 3, 4, 5, 6];
   if (manifest.format !== 'nodus.encrypted-backup' || !supportedVersions.includes(manifest.formatVersion)) {
     return { ok: false, message: 'Formato de copia de seguridad no soportado.' };
@@ -437,15 +481,49 @@ export function restoreBackupArchive(archive: Buffer, password: string): BackupR
       message: `El archivo usa un esquema más reciente (v${payloadManifest.schemaVersion}) que esta versión de Nodus (v${SCHEMA_VERSION}). Actualiza la app.`,
     };
   }
+  return { manifest, payload, payloadManifest, includesSecrets, recoveredKey, usedRecoveryKey };
+}
+
+/**
+ * Prove a freshly written snapshot can actually be opened with the credential the user
+ * holds. Writing a file is not the same as having a backup: a rotated or unreadable
+ * master password produces archives nobody can decrypt, and pruning would then delete
+ * the last recoverable copies. Called before retention runs.
+ */
+export function verifyBackupArchive(archive: Buffer, password: string): { ok: boolean; message: string } {
+  if (!password.trim()) return { ok: false, message: 'Falta la contraseña para verificar la copia.' };
+  const opened = openBackupArchive(archive, password);
+  if ('ok' in opened) return opened;
+  if (!opened.payloadManifest.vaults || opened.payloadManifest.vaults.length === 0) {
+    return { ok: false, message: 'La copia verificada no contiene ninguna bóveda.' };
+  }
+  // Every vault's database must be present and open as a valid SQLite file: the hash
+  // check proves the bytes survived, this proves they are still a database.
+  for (const vault of opened.payloadManifest.vaults) {
+    const entry = opened.payload.getEntry(vault.dbFile);
+    if (!entry) return { ok: false, message: `La copia verificada no contiene la bóveda «${vault.name}».` };
+  }
+  return { ok: true, message: `Copia verificada: ${opened.payloadManifest.vaults.length} bóveda(s) descifrables.` };
+}
+
+export function restoreBackupArchive(archive: Buffer, password: string): BackupRestoreResult {
+  if (!password.trim()) return { ok: false, message: 'Importación cancelada: falta la contraseña de la copia.' };
+  const opened = openBackupArchive(archive, password);
+  if ('ok' in opened) return opened;
+  const { manifest, payload, payloadManifest, includesSecrets, recoveredKey, usedRecoveryKey } = opened;
 
   const importedKeys = readJsonEntry<Partial<Record<AiProvider, string>>>(payload, 'api-keys.json') ?? {};
+  const importedAudioKeys = readJsonEntry<Record<string, string>>(payload, 'audio-keys.json') ?? {};
 
   // v4 = multi-vault archive: restore every vault (all types), keyed by its id.
   if (manifest.formatVersion >= 4) {
     const result = restoreAllVaults(payload, payloadManifest);
     if (!result.ok) return result;
     if (manifest.formatVersion >= 5) restoreAuxiliaryFiles(payload, payloadManifest);
-    if (includesSecrets) restoreApiKeys(importedKeys);
+    if (includesSecrets) {
+      restoreApiKeys(importedKeys);
+      restoreAudioKeys(importedAudioKeys);
+    }
     return {
       ok: true,
       message: includesSecrets
@@ -476,6 +554,8 @@ export function restoreBackupArchive(archive: Buffer, password: string): BackupR
     fs.unlinkSync(tmp);
     return { ok: false, message: 'Copia inválida: faltan datos o embeddings en la instantánea de base de datos.' };
   }
+  // Captured before the swap: these describe this computer, not the archived library.
+  const localPaths = captureMachineLocalSettings().get(getActiveVault().id) ?? null;
   closeDb();
   replaceDbFile(tmp);
   fs.unlinkSync(tmp);
@@ -486,13 +566,20 @@ export function restoreBackupArchive(archive: Buffer, password: string): BackupR
     const imported = JSON.parse(payload.readAsText(settingsEntry));
     // Backups created before MCP support may not have these fields; backups from
     // any version must never restore a listener or a bearer credential.
-    const restoredSettings = { ...imported, mcpEnabled: false, mcpToken: '' };
+    const restoredSettings = { ...imported, mcpEnabled: false, mcpToken: '' } as Record<string, unknown>;
+    for (const key of MACHINE_LOCAL_SETTING_KEYS) {
+      if (localPaths && localPaths[key] !== undefined) restoredSettings[key] = localPaths[key];
+      else delete restoredSettings[key];
+    }
     getDb()
       .prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
       .run('app', JSON.stringify(restoredSettings));
   }
   // Secret-free (automatic) backups leave this machine's keys untouched.
-  if (includesSecrets) restoreApiKeys(importedKeys);
+  if (includesSecrets) {
+    restoreApiKeys(importedKeys);
+    restoreAudioKeys(importedAudioKeys);
+  }
 
   return {
     ok: true,
@@ -539,7 +626,12 @@ function restoreAllVaults(
 
     // All validated — swap the live DB out and restore each vault to its path.
     closeDb();
+    // Read this computer's paths before the swap, then stamp them into each incoming
+    // snapshot so the restore never inherits another machine's Zotero root. Done on the
+    // staged temp file, so what lands in place is already correct.
+    const machineLocal = captureMachineLocalSettings();
     for (const { entry, tmp } of staged) {
+      applyMachineLocalSettings(tmp, machineLocal.get(entry.id) ?? null);
       restoreVaultDatabase({ id: entry.id, name: entry.name, type: entry.type, legacy: entry.legacy }, tmp);
     }
     const activeId = payloadManifest.activeVaultId ?? vaults[0].id;
@@ -552,6 +644,60 @@ function restoreAllVaults(
     return { ok: true, restored: staged.length };
   } finally {
     cleanup();
+  }
+}
+
+/** This machine's path settings, per vault id, read from the vaults currently on disk. */
+function captureMachineLocalSettings(): Map<string, Record<string, unknown>> {
+  const captured = new Map<string, Record<string, unknown>>();
+  let vaults: ReturnType<typeof listVaults>;
+  try {
+    vaults = listVaults();
+  } catch {
+    return captured;
+  }
+  for (const vault of vaults) {
+    try {
+      if (!fs.statSync(vault.path).isFile()) continue;
+    } catch {
+      continue; // a vault in the registry whose file is gone has nothing to preserve
+    }
+    const db = new Database(vault.path, { readonly: true, fileMustExist: true });
+    try {
+      const row = db.prepare("SELECT value FROM settings WHERE key = 'app'").get() as { value: string } | undefined;
+      const current = (row ? safeParse(row.value) : {}) as Record<string, unknown>;
+      const picked: Record<string, unknown> = {};
+      for (const key of MACHINE_LOCAL_SETTING_KEYS) {
+        if (current[key] !== undefined) picked[key] = current[key];
+      }
+      captured.set(vault.id, picked);
+    } catch {
+      /* an unreadable settings row simply contributes no local override */
+    } finally {
+      db.close();
+    }
+  }
+  return captured;
+}
+
+/**
+ * Replace the machine-local keys in a snapshot's settings row with this computer's
+ * values. `null` (no such vault here yet — a fresh device) removes them entirely, so
+ * `getSettings()` falls back to the defaults and Zotero auto-detection can run.
+ */
+function applyMachineLocalSettings(databasePath: string, local: Record<string, unknown> | null): void {
+  const db = new Database(databasePath);
+  try {
+    const row = db.prepare("SELECT value FROM settings WHERE key = 'app'").get() as { value: string } | undefined;
+    const settings = (row ? safeParse(row.value) : {}) as Record<string, unknown>;
+    for (const key of MACHINE_LOCAL_SETTING_KEYS) {
+      if (local && local[key] !== undefined) settings[key] = local[key];
+      else delete settings[key];
+    }
+    db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
+      .run('app', JSON.stringify(settings));
+  } finally {
+    db.close();
   }
 }
 
@@ -830,6 +976,29 @@ function readApiKeys(): Partial<Record<AiProvider, string>> {
       return key ? [[provider, key]] : [];
     })
   ) as Partial<Record<AiProvider, string>>;
+}
+
+function readAudioKeys(): Record<string, string> {
+  return Object.fromEntries(
+    AUDIO_KEY_NAMES.flatMap((name) => {
+      // A key the keychain cannot read is skipped, never fatal — same rule as the AI keys.
+      let key: string | null = null;
+      try {
+        key = getAudioKey(name);
+      } catch {
+        key = null;
+      }
+      return key ? [[name, key]] : [];
+    })
+  );
+}
+
+function restoreAudioKeys(keys: Record<string, string>): void {
+  for (const name of AUDIO_KEY_NAMES) {
+    const key = keys[name];
+    // Merge-only, matching restoreApiKeys: an absent entry means "unknown", not "delete".
+    if (key) setAudioKey(name, key);
+  }
 }
 
 function restoreApiKeys(keys: Partial<Record<AiProvider, string>>): void {

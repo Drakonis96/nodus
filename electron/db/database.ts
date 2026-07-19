@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import path from 'node:path';
 import fs from 'node:fs';
 import { runMigrations, SCHEMA_VERSION } from './migrations';
+import { ensureTombstoneTriggers, pruneTombstones } from './tombstones';
 import { activeVaultDbPath } from '../vaults/vaultRegistry';
 
 let db: Database.Database | null = null;
@@ -31,6 +32,11 @@ function vecCosine(a: Buffer | null, b: Buffer | null): number {
 function openDatabase(file: string): Database.Database {
   const next = new Database(file);
   runMigrations(next);
+  // Deletion tombstones are written by triggers, which are regenerated here rather than
+  // created by a migration: the set of synced tables is decided in code, so a migration
+  // could only ever capture the shape it had on the day it was written.
+  ensureTombstoneTriggers(next);
+  pruneTombstones(next);
   next.pragma('busy_timeout = 5000');
   next.pragma('synchronous = NORMAL');
   next.pragma('temp_store = MEMORY');

@@ -24,6 +24,7 @@ import { BASICS_TUTORIAL_VERSION, BasicsTutorial } from './views/BasicsTutorial'
 import { preferencesForTutorialLanguage } from '@shared/tutorialPreferences';
 import { hasPendingWhatsNew, WhatsNewModal } from './components/WhatsNewModal';
 import { StartupUpdateModal } from './components/StartupUpdateModal';
+import { recoveryHealthAdvice, recoveryHealthHeadline } from './recoveryHealth';
 import { RecoverySetupWizard } from './views/RecoverySetupWizard';
 import { NodiMascot } from './components/nodi/NodiMascot';
 import { NodiStyleModal } from './components/NodiStyleModal';
@@ -174,6 +175,7 @@ export function App() {
   const [vaults, setVaults] = useState<VaultSummary[]>([]);
   const [activeVault, setActiveVault] = useState<VaultSummary | null>(null);
   const [recoveryStatus, setRecoveryStatus] = useState<RecoveryStatus | null>(null);
+  const [backupWarningDismissed, setBackupWarningDismissed] = useState(false);
   const [whatsNewSettled, setWhatsNewSettled] = useState(() => !hasPendingWhatsNew());
   const [manualWhatsNewOpen, setManualWhatsNewOpen] = useState(false);
   // Set once the startup update check is done with the screen, so the one-time Nodi
@@ -1185,7 +1187,34 @@ export function App() {
         )}
 
         {/* Main view */}
-        <main className="flex-1 min-w-0 overflow-hidden" data-nodi-view={view}>
+        <main className="flex flex-1 min-w-0 flex-col overflow-hidden" data-nodi-view={view}>
+          {/* A backup system that fails quietly is worse than none: until now the only
+              trace of a broken schedule was a grey line inside a collapsed Settings
+              section, so a user could go months believing they were protected. Only
+              genuinely blocking states appear here, and only once per session. */}
+          {!isPreviewVault && recoveryStatus?.health.level === 'critical' && !recoveryStatus.needsSetup && !backupWarningDismissed && (
+            <div data-testid="backup-health-banner" className="backup-health-banner">
+              <Icon name="alert" size={16} className="shrink-0" />
+              <span className="min-w-0 flex-1">
+                <b>{recoveryHealthHeadline(recoveryStatus.health)}</b>
+                {recoveryHealthAdvice(recoveryStatus.health) && (
+                  <span className="ml-2 opacity-80">{recoveryHealthAdvice(recoveryStatus.health)}</span>
+                )}
+              </span>
+              <button className="btn btn-ghost shrink-0 text-xs" onClick={() => setView('settings')}>
+                {t('Revisar copias')}
+              </button>
+              <button
+                className="backup-health-dismiss"
+                aria-label={t('Ocultar aviso')}
+                title={t('Ocultar aviso')}
+                onClick={() => setBackupWarningDismissed(true)}
+              >
+                <Icon name="x" size={14} />
+              </button>
+            </div>
+          )}
+          <div className="min-h-0 flex-1 overflow-hidden">
           <Suspense fallback={<div className="grid h-full place-items-center text-sm text-neutral-500"><span className="flex items-center gap-2"><Icon name="sync" className="animate-spin" /> {t('Cargando...')}</span></div>}>
           {/* Per-view crash isolation: a render error in one section shows a
               recovery card here instead of blanking the whole window. key={view}
@@ -1400,6 +1429,7 @@ export function App() {
               settings={settings}
               vaults={vaults}
               activeVault={activeVault}
+              recoveryHealth={recoveryStatus?.health ?? null}
               onChange={reloadSettings}
               onVaultsChanged={reloadVaults}
               onOpenWhatsNew={() => setManualWhatsNewOpen(true)}
@@ -1407,6 +1437,7 @@ export function App() {
           )}
           </AppErrorBoundary>
           </Suspense>
+          </div>
         </main>
       </div>
 

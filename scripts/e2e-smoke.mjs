@@ -1651,6 +1651,88 @@ try {
     return { light, dark };
   });
   assert.notEqual(backupScopeColors.light, backupScopeColors.dark, 'automatic-backup notice exposes distinct light and dark surfaces');
+
+  // Backup health is stated plainly in the real UI. It used to be a truncated grey line
+  // that kept showing the last success while the schedule was broken.
+  const backupHealth = page.getByTestId('backup-health');
+  await backupHealth.waitFor();
+  const healthLevel = await backupHealth.getAttribute('data-level');
+  assert.ok(['ok', 'warning', 'critical'].includes(healthLevel), 'backup health reports a level');
+  assert.ok((await backupHealth.innerText()).trim().length > 0, 'backup health explains itself in words');
+
+  // Light mode must actually be light. New utility classes are dark-only until they are
+  // remapped in index.css, so a warning added without that renders dark-on-light and
+  // becomes unreadable — measure the luminance instead of trusting the class names.
+  const healthContrast = await backupHealth.evaluate(async (element) => {
+    const luminance = (value) => {
+      const [r, g, b] = value.match(/\d+(\.\d+)?/g).slice(0, 3).map(Number);
+      return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+    };
+    const sample = () => {
+      const style = getComputedStyle(element);
+      return { bg: luminance(style.backgroundColor), fg: luminance(style.color) };
+    };
+    const root = document.documentElement;
+    const hadDark = root.classList.contains('dark');
+    root.classList.add('dark');
+    root.classList.remove('light');
+    await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)));
+    const dark = sample();
+    root.classList.remove('dark');
+    root.classList.add('light');
+    await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)));
+    const light = sample();
+    root.classList.remove('light');
+    if (hadDark) root.classList.add('dark');
+    return { dark, light };
+  });
+  assert.ok(healthContrast.light.bg > 0.75, `backup health sits on a light surface in light mode (${healthContrast.light.bg})`);
+  assert.ok(healthContrast.light.fg < 0.55, `backup health text is dark in light mode (${healthContrast.light.fg})`);
+  assert.ok(healthContrast.dark.bg < 0.35, `backup health sits on a dark surface in dark mode (${healthContrast.dark.bg})`);
+  assert.ok(healthContrast.dark.fg > 0.45, `backup health text is light in dark mode (${healthContrast.dark.fg})`);
+
+  // The global bar only renders while protection is actually broken, which this run is
+  // not, so its stylesheet is probed directly rather than left unverified.
+  const bannerContrast = await page.evaluate(async () => {
+    const luminance = (value) => {
+      const [r, g, b] = value.match(/\d+(\.\d+)?/g).slice(0, 3).map(Number);
+      return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+    };
+    const probe = document.createElement('div');
+    probe.className = 'backup-health-banner';
+    document.body.appendChild(probe);
+    const root = document.documentElement;
+    const hadDark = root.classList.contains('dark');
+    const read = async (theme) => {
+      root.classList.remove('dark', 'light');
+      root.classList.add(theme);
+      await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)));
+      const style = getComputedStyle(probe);
+      return { bg: luminance(style.backgroundColor), fg: luminance(style.color) };
+    };
+    const dark = await read('dark');
+    const light = await read('light');
+    root.classList.remove('dark', 'light');
+    if (hadDark) root.classList.add('dark');
+    probe.remove();
+    return { dark, light };
+  });
+  assert.ok(bannerContrast.light.bg > 0.75, `the backup warning bar is light in light mode (${bannerContrast.light.bg})`);
+  assert.ok(bannerContrast.light.fg < 0.55, `the backup warning bar has dark text in light mode (${bannerContrast.light.fg})`);
+  assert.ok(bannerContrast.dark.bg < 0.35, `the backup warning bar is dark in dark mode (${bannerContrast.dark.bg})`);
+
+  // The health banner is inserted above the routed view, so main must still hand its
+  // full remaining height to the content: a wrong flex chain here silently collapses
+  // every scrollable view in the app.
+  const mainFills = await page.evaluate(() => {
+    const main = document.querySelector('main[data-nodi-view]');
+    const content = main?.lastElementChild;
+    if (!main || !content) return null;
+    return { main: main.getBoundingClientRect().height, content: content.getBoundingClientRect().height };
+  });
+  assert.ok(mainFills && mainFills.main > 200, 'main still occupies the window');
+  assert.ok(mainFills.content > mainFills.main - 60, 'the routed view still fills main below the banner slot');
+  console.log('[e2e] backup health surface + main layout ok');
   await page.getByTestId('study-data-admin').waitFor({ timeout: 30_000 });
   const dataFixture = await page.evaluate(async () => await window.nodus.getStudyDataOverview());
   assert.equal(dataFixture.integrityOk, true, 'study data panel runs SQLite integrity checks');

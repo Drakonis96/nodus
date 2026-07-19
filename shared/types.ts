@@ -1505,6 +1505,34 @@ export interface RecoveryFolderInspection {
   snapshots: RecoverySnapshotSummary[];
 }
 
+/**
+ * Why protection is (or is not) working right now. A backup system that fails quietly
+ * is worse than none, so this is computed on every status read and surfaced in the UI
+ * rather than left buried in a status string nobody opens.
+ */
+export type RecoveryHealthLevel = 'ok' | 'warning' | 'critical';
+export type RecoveryHealthCode =
+  | 'ok'
+  /** Enabled and configured, but no snapshot has ever completed. */
+  | 'never-run'
+  /** The destination folder is gone, offline or no longer a recovery root. */
+  | 'folder-unreachable'
+  /** The last attempt failed (unreadable master password, disk error…). */
+  | 'last-run-failed'
+  /** Backups are enabled but the newest snapshot is far older than the schedule. */
+  | 'stale'
+  /** The user has not enabled automatic backups at all. */
+  | 'disabled';
+
+export interface RecoveryHealth {
+  level: RecoveryHealthLevel;
+  code: RecoveryHealthCode;
+  /** Whole days since the last successful snapshot; null when there has never been one. */
+  daysSinceLastBackup: number | null;
+  /** The raw `lastAutoBackupStatus`, for the detailed view. */
+  detail: string;
+}
+
 export interface RecoveryStatus {
   setupVersion: number;
   needsSetup: boolean;
@@ -1513,6 +1541,7 @@ export interface RecoveryStatus {
   folder: RecoveryFolderInspection | null;
   hasPassword: boolean;
   hasRecoveryKey: boolean;
+  health: RecoveryHealth;
 }
 
 export interface RecoverySetupResult {
@@ -2409,15 +2438,86 @@ export interface SyncTableCounts {
 }
 
 /** Per-table outcome of merging a sync package. Merges are additive: nothing local is deleted. */
+/** Modules a sync package carries. Counts are aggregated per group so the UI can show
+ *  that, say, the gradebook travelled — previously whole modules were absent with no
+ *  zero anywhere to reveal it. */
+export type SyncGroupKey =
+  | 'tombstones'
+  | 'notes'
+  | 'writing'
+  | 'searches'
+  | 'edgeFeedback'
+  | 'curation'
+  | 'databases'
+  | 'study'
+  | 'teaching'
+  | 'genealogy'
+  | 'research'
+  | 'chats'
+  | 'content';
+
+export interface SyncConflict {
+  table: string;
+  /** Why the row could not be applied. Reported rather than aborting the merge. */
+  reason: 'constraint' | 'missing-parent' | 'missing-primary-key' | 'no-primary-key';
+  rows: number;
+  detail: string;
+}
+
+/**
+ * Why a version was kept instead of being discarded.
+ * - `incoming-lost`: the arriving version lost the timestamp comparison.
+ * - `local-overwritten`: the arriving version won and replaced local work.
+ * - `restored`: a superseded version was promoted back, displacing this one.
+ * - `deleted-remotely`: the other machine deleted it, and the deletion was applied here.
+ */
+export type SupersededOrigin = 'incoming-lost' | 'local-overwritten' | 'restored' | 'deleted-remotely';
+
+export interface SupersededField {
+  name: string;
+  value: string;
+  /** BLOBs are not duplicated; the field records only what was there. */
+  omittedBlob: boolean;
+}
+
+export interface SupersededEntry {
+  id: string;
+  tableName: string;
+  rowKey: string[];
+  origin: SupersededOrigin;
+  fields: SupersededField[];
+  rowStamp: string | null;
+  winnerStamp: string | null;
+  packageDate: string | null;
+  createdAt: string;
+  hasOmittedBlobs: boolean;
+}
+
+export interface SupersededRestoreResult {
+  ok: boolean;
+  message: string;
+}
+
 export interface SyncMergeSummary {
-  noteFolders: SyncTableCounts;
-  notes: SyncTableCounts;
-  writingDrafts: SyncTableCounts;
-  savedSearches: SyncTableCounts;
-  edgeFeedback: SyncTableCounts;
-  databases: SyncTableCounts;
-  /** Aggregate changes across every study_* table. */
-  study: SyncTableCounts;
+  groups: Record<SyncGroupKey, SyncTableCounts>;
+  /** Rows that could not be applied. Empty when everything merged cleanly. */
+  conflicts: SyncConflict[];
+  /** Tables in the package this build does not recognise (named, not silently dropped). */
+  unknownTables: string[];
+  packageSchemaVersion: number;
+  localSchemaVersion: number;
+  /** Versions this merge discarded and kept, recoverable from Settings → Sync. A merge
+   *  that reports 0 here overwrote nothing the user might want back. */
+  supersededKept: number;
+  /** Rows removed because the other machine deleted them. Each one is recoverable. */
+  deletionsApplied: number;
+  /** The package predates the tombstone horizon, so deletions it never heard about may
+   *  reappear. Worth telling the user rather than letting rows quietly return. */
+  predatesTombstoneHorizon: boolean;
+  /** How far the sending machine's clock appears to run AHEAD of this one. Non-zero means
+   *  that computer wins timestamp comparisons it should not; the losing versions are kept
+   *  either way, so this is a prompt to fix the clock, not a data-loss report. */
+  clockSkewAheadMs: number;
 }
 
 export interface StudyDataOverview {
@@ -5944,7 +6044,16 @@ export interface NodusApi {
   /** Export the user layer (notes, drafts, saved searches, edge verdicts) as a portable sync package. */
   exportSyncPackage(): Promise<{ path: string; counts: Record<string, number> } | null>;
   /** Merge a sync package from another machine. Additive; newest row wins; never deletes local data. */
-  importSyncPackage(): Promise<SyncMergeSummary | null>;
+  importSyncPackage(passphrase?: string): Promise<SyncMergeSummary | null>;
+  /** Sync packages are encrypted with a passphrase the user sets on both machines. */
+  hasSyncPassphrase(): Promise<boolean>;
+  setSyncPassphrase(passphrase: string): Promise<void>;
+  clearSyncPassphrase(): Promise<void>;
+  /** Versions a sync merge discarded, kept so a wrong resolution stays recoverable. */
+  countSupersededVersions(): Promise<number>;
+  listSupersededVersions(limit?: number, offset?: number): Promise<SupersededEntry[]>;
+  restoreSupersededVersion(id: string): Promise<SupersededRestoreResult>;
+  clearSupersededVersions(ids?: string[]): Promise<number>;
   getStudyDataOverview(): Promise<StudyDataOverview>;
   maintainStudyData(action: 'rebuild-indexes' | 'clear-embeddings' | 'empty-trash' | 'repair'): Promise<StudyDataMaintenanceResult>;
   exportStudyDiagnostic(): Promise<{ path: string } | null>;

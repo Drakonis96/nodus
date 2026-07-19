@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 87;
+export const SCHEMA_VERSION = 89;
 
 export const migrations: Migration[] = [
   {
@@ -3039,6 +3039,65 @@ export const migrations: Migration[] = [
       );
       CREATE UNIQUE INDEX idx_teaching_rubric_eval_key
         ON teaching_rubric_evaluations(entry_id, criterion_id);
+    `,
+  },
+  {
+    version: 88,
+    up: /* sql */ `
+      -- Every version a sync merge discarded, so "newest wins" stops destroying.
+      --
+      -- Merging two machines resolves conflicts by comparing wall-clock timestamps. That
+      -- is fine until a clock is wrong, and it silently overwrote whatever lost. The
+      -- losing version is now kept here instead: a wrong resolution becomes a decision
+      -- the user can review and undo, not lost work.
+      --
+      -- Purely additive: nothing reads or writes it except the merge and its own view,
+      -- so an older build simply ignores it.
+      CREATE TABLE sync_superseded (
+        id           TEXT PRIMARY KEY,
+        table_name   TEXT NOT NULL,
+        -- JSON array of the identity values, in the order the merge resolved them.
+        row_key      TEXT NOT NULL,
+        -- 'incoming-lost'     the arriving version lost and was not applied
+        -- 'local-overwritten' the arriving version won and replaced local work
+        -- 'restored'          a superseded version was promoted back, replacing this one
+        origin       TEXT NOT NULL,
+        -- The row as JSON. BLOB columns are replaced by a {__nodusOmittedBlob} marker:
+        -- duplicating attachments and recordings would multiply the database size.
+        row_json     TEXT NOT NULL,
+        row_stamp    TEXT,
+        winner_stamp TEXT,
+        package_date TEXT,
+        created_at   TEXT NOT NULL
+      );
+      CREATE INDEX idx_sync_superseded_created ON sync_superseded(created_at DESC);
+      CREATE INDEX idx_sync_superseded_row ON sync_superseded(table_name, row_key);
+    `,
+  },
+  {
+    version: 89,
+    up: /* sql */ `
+      -- Deletions, so they stop coming back.
+      --
+      -- A sync package carries rows, not their absence. Deleting a note on one machine
+      -- and importing any package built before the other heard about it re-inserted the
+      -- note with its original timestamps — and did so again on every future sync, in
+      -- both directions. There was no way to delete anything permanently across two
+      -- computers.
+      --
+      -- A tombstone is the record that a row was deleted, and when. It is written by
+      -- triggers generated from the synced-table registry (see db/tombstones.ts), so a
+      -- table added by a later migration is covered by the same mechanism that already
+      -- forces it to be classified.
+      CREATE TABLE sync_tombstones (
+        table_name TEXT NOT NULL,
+        -- json_array() of the identity values, byte-identical to the JSON.stringify the
+        -- merge produces, so SQL-written and JS-written keys compare equal.
+        row_key    TEXT NOT NULL,
+        deleted_at TEXT NOT NULL,
+        PRIMARY KEY (table_name, row_key)
+      );
+      CREATE INDEX idx_sync_tombstones_deleted ON sync_tombstones(deleted_at);
     `,
   },
 ];

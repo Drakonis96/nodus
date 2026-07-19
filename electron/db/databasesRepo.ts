@@ -1016,109 +1016,12 @@ export function getDatabaseDetail(id: string): DatabaseDetail | null {
 }
 
 // ── Sync serialization (.nodussync) ──────────────────────────────────────────
-// A database travels as a self-contained unit (all its db_* rows incl. attachment
-// blobs as base64). Merge is atomic per database, newest-wins by updated_at.
+// Databases no longer travel as whole trees. They used to: a newer `updated_at` on
+// either side replaced the peer's entire database via DELETE + re-insert, so one row
+// added here could erase fifty added there. `electron/export/syncPackage.ts` now
+// merges every db_* table row by row from the live schema, which also means new
+// columns are carried automatically instead of needing this file to be updated.
 
-export interface DbSyncUnit {
-  database: { id: string; short_id: string; name: string; icon: string | null; position: number; created_at: string; updated_at: string };
-  columns: { id: string; database_id: string; name: string; type: string; position: number; config_json: string | null; created_at: string }[];
-  options: { id: string; column_id: string; label: string; color: string | null; position: number }[];
-  rows: { id: string; database_id: string; position: number; created_at: string; updated_at: string }[];
-  cells: { row_id: string; column_id: string; value_text: string | null }[];
-  attachments: {
-    id: string;
-    row_id: string;
-    column_id: string;
-    file_name: string | null;
-    mime_type: string | null;
-    bytes: number;
-    blob_b64: string | null;
-    content_hash: string | null;
-    extracted_text: string | null;
-    description: string | null;
-    ai_generated: number;
-    ai_prompt: string | null;
-    position: number;
-    created_at: string;
-  }[];
-  relations: { id: string; row_id: string; column_id: string; target_kind: string; target_id: string; target_vault_id: string | null; position: number; created_at: string }[];
-  views: { id: string; database_id: string; name: string; layout: string; filter_json: string | null; sort_json: string | null; position: number; created_at: string }[];
-}
-
-export function getDatabaseUpdatedAt(id: string): string | null {
-  const r = getDb().prepare('SELECT updated_at FROM db_databases WHERE id = ?').get(id) as { updated_at: string } | undefined;
-  return r?.updated_at ?? null;
-}
-
-/** Serialize every database (with blobs) for the sync package. */
-export function serializeDatabasesForSync(): DbSyncUnit[] {
-  const db = getDb();
-  const inList = (ids: string[]) => (ids.length ? `(${ids.map(() => '?').join(',')})` : '(SELECT NULL WHERE 0)');
-  return (db.prepare('SELECT id, short_id, name, icon, position, created_at, updated_at FROM db_databases').all() as DbSyncUnit['database'][]).map(
-    (database) => {
-      const columns = db
-        .prepare('SELECT id, database_id, name, type, position, config_json, created_at FROM db_columns WHERE database_id = ?')
-        .all(database.id) as DbSyncUnit['columns'];
-      const colIds = columns.map((c) => c.id);
-      const rows = db.prepare('SELECT id, database_id, position, created_at, updated_at FROM db_rows WHERE database_id = ?').all(database.id) as DbSyncUnit['rows'];
-      const rowIds = rows.map((r) => r.id);
-      const options = colIds.length
-        ? (db.prepare(`SELECT id, column_id, label, color, position FROM db_select_options WHERE column_id IN ${inList(colIds)}`).all(...colIds) as DbSyncUnit['options'])
-        : [];
-      const cells = rowIds.length
-        ? (db.prepare(`SELECT row_id, column_id, value_text FROM db_cells WHERE row_id IN ${inList(rowIds)}`).all(...rowIds) as DbSyncUnit['cells'])
-        : [];
-      const attachments = rowIds.length
-        ? (db.prepare(`SELECT id, row_id, column_id, file_name, mime_type, bytes, blob, content_hash, extracted_text, description, ai_generated, ai_prompt, position, created_at FROM db_attachments WHERE row_id IN ${inList(rowIds)}`).all(...rowIds) as (Omit<DbSyncUnit['attachments'][number], 'blob_b64'> & { blob: Buffer | null })[]).map(
-            ({ blob, ...a }) => ({ ...a, blob_b64: blob ? Buffer.from(blob).toString('base64') : null })
-          )
-        : [];
-      const relations = rowIds.length
-        ? (db.prepare(`SELECT id, row_id, column_id, target_kind, target_id, target_vault_id, position, created_at FROM db_relations WHERE row_id IN ${inList(rowIds)}`).all(...rowIds) as DbSyncUnit['relations'])
-        : [];
-      const views = db
-        .prepare('SELECT id, database_id, name, layout, filter_json, sort_json, position, created_at FROM db_views WHERE database_id = ?')
-        .all(database.id) as DbSyncUnit['views'];
-      return { database, columns, options, rows, cells, attachments, relations, views };
-    }
-  );
-}
-
-/** Insert a database unit, replacing any existing database with the same id (cascade). */
-export function replaceDatabaseFromSync(unit: DbSyncUnit): void {
-  const db = getDb();
-  const tx = db.transaction(() => {
-    db.prepare('DELETE FROM db_databases WHERE id = ?').run(unit.database.id); // cascades all children
-    const d = unit.database;
-    db.prepare('INSERT INTO db_databases (id, short_id, name, icon, position, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
-      d.id,
-      d.short_id,
-      d.name,
-      d.icon,
-      d.position,
-      d.created_at,
-      d.updated_at
-    );
-    const insCol = db.prepare('INSERT INTO db_columns (id, database_id, name, type, position, config_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)');
-    for (const c of unit.columns) insCol.run(c.id, c.database_id, c.name, c.type, c.position, c.config_json, c.created_at);
-    const insOpt = db.prepare('INSERT INTO db_select_options (id, column_id, label, color, position) VALUES (?, ?, ?, ?, ?)');
-    for (const o of unit.options) insOpt.run(o.id, o.column_id, o.label, o.color, o.position);
-    const insRow = db.prepare('INSERT INTO db_rows (id, database_id, position, created_at, updated_at) VALUES (?, ?, ?, ?, ?)');
-    for (const r of unit.rows) insRow.run(r.id, r.database_id, r.position, r.created_at, r.updated_at);
-    const insCell = db.prepare('INSERT INTO db_cells (row_id, column_id, value_text) VALUES (?, ?, ?)');
-    for (const c of unit.cells) insCell.run(c.row_id, c.column_id, c.value_text);
-    const insAtt = db.prepare(
-      'INSERT INTO db_attachments (id, row_id, column_id, file_name, mime_type, bytes, blob, content_hash, extracted_text, description, ai_generated, ai_prompt, position, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-    );
-    for (const a of unit.attachments)
-      insAtt.run(a.id, a.row_id, a.column_id, a.file_name, a.mime_type, a.bytes, a.blob_b64 ? Buffer.from(a.blob_b64, 'base64') : null, a.content_hash, a.extracted_text, a.description, a.ai_generated ?? 0, a.ai_prompt ?? null, a.position, a.created_at);
-    const insRel = db.prepare('INSERT INTO db_relations (id, row_id, column_id, target_kind, target_id, target_vault_id, position, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
-    for (const r of unit.relations) insRel.run(r.id, r.row_id, r.column_id, r.target_kind, r.target_id, r.target_vault_id ?? null, r.position, r.created_at);
-    const insView = db.prepare('INSERT INTO db_views (id, database_id, name, layout, filter_json, sort_json, position, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
-    for (const v of unit.views) insView.run(v.id, v.database_id, v.name, v.layout, v.filter_json, v.sort_json, v.position, v.created_at);
-  });
-  tx();
-}
 
 // ── Saved views ──────────────────────────────────────────────────────────────
 
