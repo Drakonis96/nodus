@@ -15,7 +15,7 @@ import type {
   OpenCodeGoUsageStatus,
 } from '@shared/types';
 import { DECORATIVE_IMAGE_STYLES } from '@shared/imageStyles';
-import { DEFAULT_LOCAL_BASE_URLS } from '@shared/providers';
+import { DEFAULT_LOCAL_BASE_URLS, supportsFreeTierShaping } from '@shared/providers';
 import { AI_PROVIDERS, PROVIDER_LABELS, isLocalAiProvider, modelLabel, sameModel } from '../components/ui';
 import { SettingsModelDot, SettingsModelList, settingsModelRowClass } from '../components/SettingsModelList';
 import { t, tx } from '../i18n';
@@ -753,6 +753,25 @@ function ProviderRow({
               </button>
             )}
           </div>
+
+          {supportsFreeTierShaping(provider) && (
+            <label className="flex items-start gap-2 text-xs leading-5 text-neutral-600 dark:text-neutral-400" data-testid={`free-tier-${provider}`}>
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                checked={settings.providerFreeTier?.[provider] === true}
+                onChange={(e) => window.nodus.updateSettings({
+                  providerFreeTier: { ...settings.providerFreeTier, [provider]: e.target.checked },
+                }).then(onChange)}
+              />
+              <span>
+                {t('Uso mi plan gratuito de este proveedor')}
+                <span className="block text-neutral-500 dark:text-neutral-500">
+                  {t('Ajusta las peticiones a los límites del nivel gratuito (recorta la longitud de salida y espera si se alcanza el límite por minuto) para que el análisis no falle. Déjalo desmarcado si pagas por uso.')}
+                </span>
+              </span>
+            </label>
+          )}
 
           {provider === 'opencode-go' && <OpenCodeGoUsagePanel />}
 

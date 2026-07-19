@@ -5325,6 +5325,16 @@ export const EN: Record<string, string> = {
     'Conversation, analysis, summaries, and other text tasks.',
   'Este modelo consume la cuota de tu suscripción, no crédito de API. Un análisis completo del corpus puede agotar el límite semanal o mensual de tu plan.':
     'This model draws on your subscription quota, not on API credit. A full corpus analysis can exhaust your plan\'s weekly or monthly limit.',
+  'Este modelo local es de visión y no extrae ideas de forma fiable (tiende a divagar y no cerrar el JSON). Para extracción, elige Gemma 4 E2B u otro modelo mayor.':
+    'This local model is vision-oriented and does not extract ideas reliably (it tends to ramble and never close the JSON). For extraction, choose Gemma 4 E2B or a larger model.',
+  'solo visión':
+    'vision only',
+  'Este modelo no puede usarse para extracción de ideas.':
+    'This model cannot be used for idea extraction.',
+  'Uso mi plan gratuito de este proveedor':
+    'I use this provider\'s free plan',
+  'Ajusta las peticiones a los límites del nivel gratuito (recorta la longitud de salida y espera si se alcanza el límite por minuto) para que el análisis no falle. Déjalo desmarcado si pagas por uso.':
+    'Shapes requests to the free-tier limits (trims output length and waits if the per-minute limit is hit) so analysis does not fail. Leave unchecked if you pay per use.',
   'Vault actual': 'Current vault',
   'Ajustes avanzados del vault {vault}': 'Advanced settings for the {vault} vault',
   'Ajustes avanzados comunes': 'Shared advanced settings',

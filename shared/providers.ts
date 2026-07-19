@@ -92,6 +92,18 @@ export function isSubscriptionProvider(provider: AiProvider): boolean {
 }
 
 /**
+ * Providers with a free tier whose hard per-minute limits are worth shaping requests for. When the
+ * user flags one (settings.providerFreeTier), Nodus caps max_tokens to fit and retries 429s instead
+ * of failing the scan. Others ignore the flag. See freeTierMaxTokens in electron/ai/providers.ts.
+ */
+export const FREE_TIER_PROVIDERS: AiProvider[] = ['groq', 'openrouter'];
+
+/** Whether a free-tier "usar API gratuita" toggle is meaningful for this provider. */
+export function supportsFreeTierShaping(provider: AiProvider): boolean {
+  return FREE_TIER_PROVIDERS.includes(provider);
+}
+
+/**
  * Whether a provider honours per-request sampling controls (`temperature`,
  * `max_tokens`, `response_format`).
  *

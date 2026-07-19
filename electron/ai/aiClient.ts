@@ -8,6 +8,10 @@ import {
   OPENROUTER_HEADERS,
   isLocalProvider,
   localContextWindow,
+  FREE_TIER_PROVIDERS,
+  freeTierMaxTokens,
+  groqFreeTpm,
+  isGroqReasoningModel,
 } from './providers';
 import { DEFAULT_EMBEDDING_MODELS, normalizeEmbeddingModel, PROVIDER_LABELS, supportsSamplingControls } from '@shared/providers';
 import type { AiProvider, CodexReasoningEffort, EmbeddingProvider, LocalProvider, ModelRef, PromptLanguage, ReasoningEffort } from '@shared/types';
@@ -305,8 +309,37 @@ function optionalBody(model: ModelRef, jsonMode: boolean, reasoning: ReasoningEf
   return {
     ...(jsonMode && supportsJsonMode(model.provider) ? { response_format: { type: 'json_object' as const } } : {}),
     ...reasoningBody(model.provider, reasoning),
+    // Groq's reasoning models (gpt-oss/qwen3) reason at medium by default, which slows scans and
+    // burns tokens. reasoningBody can't send it (no model id), so minimise it here. Groq rejects
+    // reasoning_effort:'none' — 'low' is its floor; non-reasoning models 400 and the caller strips it.
+    ...(model.provider === 'groq' && reasoning === 'off' && isGroqReasoningModel(model.model)
+      ? { reasoning_effort: 'low' as const }
+      : {}),
     ...(model.provider === 'openrouter' ? openRouterRoutingBody(getSettings().openRouterThroughput) : {}),
   };
+}
+
+/** Whether the user flagged this provider as free-tier (so requests get shaped to its limits). */
+function isProviderFreeTier(provider: AiProvider): boolean {
+  return FREE_TIER_PROVIDERS.includes(provider) && getSettings().providerFreeTier?.[provider] === true;
+}
+
+/**
+ * The max_tokens for a free-tier request, or an actionable error when the prompt alone overflows the
+ * provider's per-minute budget (Groq's small models can't hold a full scan chunk). Refusing here — as
+ * a config error, so the queue pauses once — beats firing a request that just 413s "Request too large".
+ */
+function freeTierBudget(model: ModelRef, opts: CallOpts, localMax: number): number {
+  const promptTokens = estimateTokens(opts.system) + estimateTokens(opts.user) + 16;
+  const budget = freeTierMaxTokens(model.provider, model.model, promptTokens, localMax);
+  if (budget <= 0) {
+    throw new AiError(
+      `El nivel gratuito de ${model.provider} (modelo «${model.model}») limita a ${groqFreeTpm(model.model)} tokens/min y este fragmento ya usa ~${promptTokens}. Elige un modelo con mayor límite (p.ej. llama-3.3-70b) o desmarca «Uso mi plan gratuito» para ese proveedor.`,
+      false,
+      true,
+    );
+  }
+  return budget;
 }
 
 function openAiClientHeaders(model: ModelRef): Record<string, string> | undefined {
@@ -325,6 +358,42 @@ function completionTokensBody(model: ModelRef, maxTokens: number): Record<string
 /** True for a provider 400 (bad request) — used to retry without the optional params. */
 function isBadRequest(e: any): boolean {
   return (e?.status ?? e?.response?.status) === 400;
+}
+
+/** True for a provider 429 (rate limit) — worth waiting out on a free tier instead of failing. */
+function isRateLimited(e: any): boolean {
+  return (e?.status ?? e?.response?.status) === 429;
+}
+
+/** How long to wait after a 429, from the provider's Retry-After header (seconds), clamped to 60s. */
+function retryAfterMs(e: any): number {
+  const h = e?.headers;
+  const raw = typeof h?.get === 'function' ? h.get('retry-after') : h?.['retry-after'];
+  const secs = Number(raw);
+  if (Number.isFinite(secs) && secs > 0) return Math.min(60_000, Math.ceil(secs * 1000));
+  return 3_000; // provider gave no usable hint — a short, bounded pause
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Run a provider call, and — only on a free tier — wait out 429s (up to a few times) instead of
+ * letting the rate limit fail the whole scan. Normal (paid) usage is unchanged: no retry, the error
+ * propagates immediately so the queue's own backoff handles it.
+ */
+async function withFreeTierRateLimit<T>(freeTier: boolean, make: () => Promise<T>): Promise<T> {
+  const maxWaits = freeTier ? 4 : 0;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await make();
+    } catch (e) {
+      if (attempt < maxWaits && isRateLimited(e)) {
+        await sleep(retryAfterMs(e));
+        continue;
+      }
+      throw e;
+    }
+  }
 }
 
 /**
@@ -491,9 +560,13 @@ async function rawComplete(
   // Local models load a small, fixed context window; size the request to it (and bail
   // early with an actionable error) instead of overflowing with a cryptic llama.cpp error.
   const requestedMax = opts.maxTokens ?? 8000;
-  const maxTokens = model.provider === 'nodus'
+  const localMax = model.provider === 'nodus'
     ? nodusLocalMaxTokens(model, opts, requestedMax)
     : isLocalProvider(model.provider) ? await localMaxTokens(model, opts, requestedMax) : requestedMax;
+  // On a flagged free tier, shrink max_tokens so prompt + output fits the provider's per-minute
+  // token budget (Groq) — otherwise the request 400s with "Request too large". No-op off free tier.
+  const freeTier = isProviderFreeTier(model.provider);
+  const maxTokens = freeTier ? freeTierBudget(model, opts, localMax) : localMax;
   const OpenAI = (await import('openai')).default;
   const client = new OpenAI({
     apiKey: key,
@@ -515,12 +588,12 @@ async function rawComplete(
   try {
     let res;
     try {
-      res = await client.chat.completions.create({ ...baseBody, ...extras } as any);
+      res = await withFreeTierRateLimit(freeTier, () => client.chat.completions.create({ ...baseBody, ...extras } as any));
     } catch (e: any) {
       // The optional reasoning/JSON/routing params may be unsupported by this model.
       // Retry once as a plain request before surfacing the error.
       if (!opts.noRetry && isBadRequest(e) && Object.keys(extras).length > 0) {
-        res = await client.chat.completions.create(baseBody as any);
+        res = await withFreeTierRateLimit(freeTier, () => client.chat.completions.create(baseBody as any));
       } else {
         throw e;
       }
@@ -911,9 +984,11 @@ async function rawCompleteStream(
     : openAiCompatBase(model.provider);
   // See rawComplete: fit the request to a local model's real context window.
   const requestedMax = opts.maxTokens ?? 8000;
-  const maxTokens = model.provider === 'nodus'
+  const localMax = model.provider === 'nodus'
     ? nodusLocalMaxTokens(model, opts, requestedMax)
     : isLocalProvider(model.provider) ? await localMaxTokens(model, opts, requestedMax) : requestedMax;
+  const freeTier = isProviderFreeTier(model.provider);
+  const maxTokens = freeTier ? freeTierBudget(model, opts, localMax) : localMax;
   const OpenAI = (await import('openai')).default;
   const client = new OpenAI({
     apiKey: key,
@@ -937,10 +1012,10 @@ async function rawCompleteStream(
   try {
     let stream;
     try {
-      stream = await client.chat.completions.create({ ...baseBody, ...extras } as any, { signal });
+      stream = await withFreeTierRateLimit(freeTier, () => client.chat.completions.create({ ...baseBody, ...extras } as any, { signal }));
     } catch (e: any) {
       if (isBadRequest(e) && Object.keys(extras).length > 0) {
-        stream = await client.chat.completions.create(baseBody as any, { signal });
+        stream = await withFreeTierRateLimit(freeTier, () => client.chat.completions.create(baseBody as any, { signal }));
       } else {
         throw e;
       }

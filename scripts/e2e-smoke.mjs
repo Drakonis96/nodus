@@ -477,7 +477,7 @@ try {
   await page.getByRole('button', { name: 'Modelos IA', exact: true }).click();
   await page.getByTestId('nodus-local-ai-models').waitFor({ timeout: 30_000 });
   const localAiStatus = await page.evaluate(() => window.nodus.getNodusLocalAiStatus());
-  assert.equal(localAiStatus.models.length, 6, 'integrated local AI catalog is available over the real preload bridge');
+  assert.equal(localAiStatus.models.length, 7, 'integrated local AI catalog is available over the real preload bridge');
   assert.equal(await page.getByText('BGE-M3 Q8_0', { exact: true }).count(), 1, 'local embedding catalog renders');
   assert.equal(await page.getByText('Qwen3.5-0.8B Q4', { exact: true }).count(), 1, 'local multimodal chat catalog renders');
   for (const assignmentAction of ['Seleccionado', 'Usar para embeddings', 'Modelo general', 'Usar como general', 'Modelo de visión', 'Usar para visión']) {

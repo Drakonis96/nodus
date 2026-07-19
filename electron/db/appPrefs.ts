@@ -58,6 +58,7 @@ export const SHARED_MODEL_KEYS = [
   'favorites',
   'codexReasoningEfforts',
   'localProviders',
+  'providerFreeTier',
   'extractionModel',
   'visionModel',
   'synthesisModel',

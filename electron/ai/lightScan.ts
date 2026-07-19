@@ -1,4 +1,5 @@
 import { AiError, completeJson } from './aiClient';
+import { modelRefSupportsExtraction } from '@shared/localAiModels';
 import { PROMPT_LIGHT } from './prompts';
 import { normalizeThemeLabel, setWorkThemes } from '../db/themesRepo';
 import { setLightResult } from '../db/worksRepo';
@@ -44,6 +45,14 @@ export async function runLightScan(
 ): Promise<void> {
   const settings = getSettings();
   const scanModel = model ?? settings.extractionModel ?? settings.synthesisModel ?? null;
+  // Vision-only local models can't extract (see runDeepScan). Fail once, actionably, not silently.
+  if (!modelRefSupportsExtraction(scanModel)) {
+    throw new AiError(
+      `El modelo «${scanModel?.model}» es de visión y no puede extraer ideas. Elige Gemma 4 E2B u otro modelo mayor como modelo de extracción en Ajustes → Modelos de IA.`,
+      false,
+      true,
+    );
+  }
   const lockedLabels = options.lockedLabels ?? null;
   // Include the lock state in the hash so a previously-scanned work is re-evaluated
   // when the user switches to/from locked main themes.

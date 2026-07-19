@@ -6,10 +6,11 @@ import type {
   ModelInfo,
 } from '@shared/types';
 import { getSettings } from '../db/settingsRepo';
-import { DEFAULT_LOCAL_BASE_URLS } from '@shared/providers';
+import { DEFAULT_LOCAL_BASE_URLS, FREE_TIER_PROVIDERS } from '@shared/providers';
 import { listNodusLocalChatModels, listNodusLocalEmbeddingModels } from './nodusLocalAi';
 
 export { AI_PROVIDERS, PROVIDER_LABELS, LOCAL_PROVIDERS, isLocalProvider } from '@shared/providers';
+export { FREE_TIER_PROVIDERS } from '@shared/providers';
 
 /** The configured base URL for a local provider, without a trailing slash. */
 export function localBaseUrl(provider: LocalProvider): string {
@@ -147,6 +148,56 @@ export const OPENROUTER_HEADERS: Record<string, string> = {
   'HTTP-Referer': 'https://github.com/Drakonis96/nodus',
   'X-Title': 'Nodus',
 };
+
+// ── Free-tier request shaping ─────────────────────────────────────────────────
+// Providers offer a free tier with hard per-minute limits. When the user flags a provider as free
+// (settings.providerFreeTier), Nodus shapes the request to fit those limits instead of erroring.
+
+/**
+ * Groq's free tier caps *tokens per minute* (TPM), counting prompt + reserved max_tokens together.
+ * A scan chunk (~4.8k prompt) plus the default 8k max_tokens overshoots and 400s with "Request too
+ * large". These are the measured free-tier TPM ceilings; unknown models get the conservative floor.
+ * Verified 2026-07-19 from x-ratelimit-limit-tokens headers.
+ */
+const GROQ_FREE_TPM: Record<string, number> = {
+  'llama-3.1-8b-instant': 6000,
+  'llama-3.3-70b-versatile': 12000,
+  'openai/gpt-oss-20b': 8000,
+  'openai/gpt-oss-120b': 8000,
+};
+const GROQ_FREE_TPM_DEFAULT = 6000;
+
+/** Groq free-tier tokens-per-minute ceiling for a model (prompt + output share it). */
+export function groqFreeTpm(model: string): number {
+  return GROQ_FREE_TPM[model] ?? GROQ_FREE_TPM_DEFAULT;
+}
+
+/** True when a Groq-hosted model reasons by default (gpt-oss / qwen3 / r1), so it honours reasoning_effort. */
+export function isGroqReasoningModel(model: string): boolean {
+  return /gpt-oss|qwen3|deepseek-r1|\br1\b/i.test(model);
+}
+
+/** Smallest output worth attempting on a free tier; below this the prompt alone eats the budget. */
+export const FREE_TIER_MIN_OUTPUT_TOKENS = 256;
+
+/**
+ * The max_tokens to request on a provider's free tier so prompt + output fits the per-minute budget.
+ * Groq is token-capped; OpenRouter's free limit is per-request, not per-token, so it keeps the ask.
+ * Returns 0 when the prompt alone already overflows the budget (the caller then refuses actionably
+ * instead of firing a doomed "Request too large" — a small model's free TPM can't hold a full chunk).
+ */
+export function freeTierMaxTokens(
+  provider: AiProvider,
+  model: string,
+  promptTokens: number,
+  requestedMax: number,
+): number {
+  if (provider !== 'groq') return requestedMax;
+  // Leave ~10% headroom: other traffic and Groq's own accounting are not exact.
+  const available = Math.floor(groqFreeTpm(model) * 0.9) - promptTokens;
+  if (available < FREE_TIER_MIN_OUTPUT_TOKENS) return 0;
+  return Math.min(requestedMax, available);
+}
 
 function byId(a: ModelInfo, b: ModelInfo): number {
   return a.id.localeCompare(b.id);
