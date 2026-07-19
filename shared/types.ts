@@ -1357,6 +1357,12 @@ export interface AppSettings {
   codexReasoningEfforts: Record<string, CodexReasoningEffort>;
   // When using OpenRouter, bias routing toward the fastest upstream provider.
   openRouterThroughput: boolean;
+  /**
+   * Providers the user has flagged as running on a free tier. When set, requests to that provider
+   * are shaped to fit its free limits: max_tokens is capped to the per-minute token budget (Groq)
+   * and 429s are retried with backoff instead of failing the scan. Empty/unset = normal behaviour.
+   */
+  providerFreeTier: Partial<Record<AiProvider, boolean>>;
   unpaywallEmail: string;
   onboardingComplete: boolean;
   /** App-wide version of the introductory AI/vault tutorial already completed. */

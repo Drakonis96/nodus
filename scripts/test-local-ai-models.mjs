@@ -25,9 +25,14 @@ try {
     'BGE-M3 Q8_0', 'GTE Multilingual Base INT8', 'Multilingual E5 Small INT8',
   ]);
   assert.deepEqual(chat.map((model) => model.label), [
-    'Qwen3.5-0.8B Q4', 'Gemma 4 E2B Q4', 'LFM2.5-VL-1.6B Q4',
+    'Qwen3.5-0.8B Q4', 'Gemma 4 E2B Q4', 'Granite 4.0 Micro Q4', 'LFM2.5-VL-1.6B Q4',
   ]);
-  assert.ok(chat.every((model) => model.vision && model.projectorFile), 'every conversational model must download a vision projector');
+  // Vision chat models must ship their projector; text-only chat models (Granite) must not need one.
+  assert.ok(chat.every((model) => (model.vision ? Boolean(model.projectorFile) : !model.projectorFile)),
+    'vision models download a projector; text models do not');
+  // The extraction gate that guards the scan roles: only Gemma and Granite are trusted to extract.
+  assert.deepEqual(chat.filter((model) => model.supportsExtraction).map((model) => model.label),
+    ['Gemma 4 E2B Q4', 'Granite 4.0 Micro Q4']);
   assert.ok(catalog.NODUS_LOCAL_MODELS.every((model) => model.assets.every((asset) => asset.bytes > 0)), 'every asset has an expected byte size');
   assert.ok(catalog.NODUS_LOCAL_MODELS.every((model) => model.assets.filter((asset) => asset.bytes > 1_000_000).every((asset) => /^[a-f0-9]{64}$/.test(asset.sha256))), 'large assets are pinned by SHA-256');
 

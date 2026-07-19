@@ -18,7 +18,7 @@ import { AudioGenerationSettings } from './AudioGenerationSettings';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { confirm } from '../components/feedback';
 import { Icon, PROVIDER_LABELS } from '../components/ui';
-import { ModelPicker, SubscriptionQuotaNotice } from '../components/ModelPicker';
+import { ModelPicker, SubscriptionQuotaNotice, ExtractionCapabilityNotice } from '../components/ModelPicker';
 import { NodiStylePicker } from '../components/nodi/NodiStylePicker';
 import { vaultTypeLabel } from '../components/VaultSwitcher';
 import { SttSettings } from '../components/SttSettings';
@@ -1313,10 +1313,12 @@ export function Settings({
             </p>
             {settings.modelSettingsMode === 'basic' && <>
               <Row label={t('Modelo general de texto')} hint={t('Conversación, análisis, resúmenes y demás tareas de texto.')}>
-                <ModelPicker settings={settings} value={settings.synthesisModel} onChange={(m) => patch({ synthesisModel: m })} />
+                <ModelPicker settings={settings} value={settings.synthesisModel} onChange={(m) => patch({ synthesisModel: m })} requireExtraction />
               </Row>
               {/* In basic mode this one model runs the scans too, so it is the single
-                  most expensive place to pick a subscription-billed provider. */}
+                  most expensive place to pick a subscription-billed provider — and it must be able
+                  to extract ideas, so vision-only local models are blocked here. */}
+              <ExtractionCapabilityNotice model={settings.synthesisModel} />
               <SubscriptionQuotaNotice model={settings.synthesisModel} />
             </>}
             <Row label={t('Modelo de embeddings (similitud semántica multilingüe)')}>
@@ -1335,13 +1337,15 @@ export function Settings({
                 <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('Ajustes avanzados comunes')}</h3>
                 {/* The four selectors below drive the scan pipeline: one run covers a
                     whole corpus, so a subscription plan's quota is the real limit. */}
-                <Row label={t('Extracción de temas, ideas y evidencias')}><ModelPicker allowEmpty={false} settings={settings} value={settings.extractionModel} onChange={(extractionModel) => void patch({ extractionModel })} emptyLabel="Seleccionar modelo" /></Row>
+                <Row label={t('Extracción de temas, ideas y evidencias')}><ModelPicker allowEmpty={false} settings={settings} value={settings.extractionModel} onChange={(extractionModel) => void patch({ extractionModel })} emptyLabel="Seleccionar modelo" requireExtraction /></Row>
+                <ExtractionCapabilityNotice model={settings.extractionModel} />
                 <SubscriptionQuotaNotice model={settings.extractionModel} />
                 <Row label={t('Visión y OCR de imágenes')}><ModelPicker allowEmpty={false} settings={settings} value={settings.visionModel} onChange={(visionModel) => void patch({ visionModel })} emptyLabel="Seleccionar modelo" /></Row>
                 <SubscriptionQuotaNotice model={settings.visionModel} />
                 <Row label={t('Resúmenes de obras')}><ModelPicker allowEmpty={false} settings={settings} value={settings.summaryModel} onChange={(summaryModel) => void patch({ summaryModel })} emptyLabel="Seleccionar modelo" /></Row>
                 <SubscriptionQuotaNotice model={settings.summaryModel} />
-                <Row label={t('Fusión y deduplicación')}><ModelPicker allowEmpty={false} settings={settings} value={settings.fusionModel} onChange={(fusionModel) => void patch({ fusionModel })} emptyLabel="Seleccionar modelo" /></Row>
+                <Row label={t('Fusión y deduplicación')}><ModelPicker allowEmpty={false} settings={settings} value={settings.fusionModel} onChange={(fusionModel) => void patch({ fusionModel })} emptyLabel="Seleccionar modelo" requireExtraction /></Row>
+                <ExtractionCapabilityNotice model={settings.fusionModel} />
                 <SubscriptionQuotaNotice model={settings.fusionModel} />
                 <Row label={t('Asistente Nodi')}><ModelPicker allowEmpty={false} settings={settings} value={settings.nodiModel} onChange={(nodiModel) => void patch({ nodiModel })} emptyLabel="Seleccionar modelo" /></Row>
               </div>

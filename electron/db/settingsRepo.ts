@@ -117,6 +117,7 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys' | 'lockedProviderKeys'> = {
   chatReasoning: 'off',
   codexReasoningEfforts: {},
   openRouterThroughput: true,
+  providerFreeTier: {},
   unpaywallEmail: '',
   onboardingComplete: false,
   basicsTutorialVersion: 0,

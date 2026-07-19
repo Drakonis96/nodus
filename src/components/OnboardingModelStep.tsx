@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AiProvider, AppSettings, EmbeddingProvider, ModelRef } from '@shared/types';
 import { PROVIDER_LABELS } from '@shared/providers';
-import { getNodusLocalModel, type NodusLocalAiStatus } from '@shared/localAiModels';
+import { getNodusLocalModel, modelRefSupportsExtraction, type NodusLocalAiStatus } from '@shared/localAiModels';
 import {
   autoDiscoverableAiProviders,
   autoDiscoverableEmbeddingProviders,
@@ -86,7 +86,11 @@ export function OnboardingModelStep({
     ]);
     const ai = collectDiscovery(aiOutcomes);
     const embedding = collectDiscovery(embeddingOutcomes);
-    setAiChoices(ai.choices);
+    // The AI model becomes `synthesisModel`, which runs the scans in basic mode, so it must be able
+    // to extract ideas. Drop vision-only local models (Qwen3.5-0.8B, LFM2.5) — this both hides them
+    // here and, since Gemma is then the first local option, makes Gemma the suggested default.
+    const aiChoicesCapable = ai.choices.filter((choice) => modelRefSupportsExtraction(choice));
+    setAiChoices(aiChoicesCapable);
     setEmbeddingChoices(embedding.choices);
     // One provider can fail for both roles; report it once.
     const seen = new Set<string>();
@@ -95,7 +99,7 @@ export function OnboardingModelStep({
       seen.add(failure.provider);
       return true;
     }));
-    const nextAi = pickDefaultChoice(ai.choices, selection.current.ai ?? settings.synthesisModel, settings.favorites);
+    const nextAi = pickDefaultChoice(aiChoicesCapable, selection.current.ai ?? settings.synthesisModel, settings.favorites);
     if (nextAi) onAiChange(nextAi);
     const nextEmbedding = pickDefaultChoice(embedding.choices, selection.current.embedding);
     if (nextEmbedding) onEmbeddingChange(nextEmbedding);

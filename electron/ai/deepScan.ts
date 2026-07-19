@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
-import { completeJson, embedMany } from './aiClient';
+import { completeJson, embedMany, AiError } from './aiClient';
+import { modelRefSupportsExtraction } from '@shared/localAiModels';
 import { PROMPT_DEEP } from './prompts';
 import { fuseIdea, ExtractedIdea } from './fusion';
 import {
@@ -179,6 +180,17 @@ export async function runDeepScan(
 
     const settings = getSettings();
     const extractionModel = model ?? settings.extractionModel ?? settings.synthesisModel ?? null;
+    // A vision-only local model (Qwen3.5-0.8B, LFM2.5) loops inside the JSON and returns 0 ideas.
+    // The UI blocks picking one for this role, but a value set before that guard existed could still
+    // reach here — fail once with an actionable message (config error → the queue pauses) instead of
+    // burning minutes per work to produce nothing.
+    if (!modelRefSupportsExtraction(extractionModel)) {
+      throw new AiError(
+        `El modelo «${extractionModel?.model}» es de visión y no puede extraer ideas. Elige Gemma 4 E2B u otro modelo mayor como modelo de extracción en Ajustes → Modelos de IA.`,
+        false,
+        true,
+      );
+    }
     // Fusion runs many small dedup/relate calls; let it use a dedicated (often faster)
     // model, falling back to the synthesis model to preserve prior behavior.
     const fusionModel = model ?? settings.fusionModel ?? settings.synthesisModel ?? null;

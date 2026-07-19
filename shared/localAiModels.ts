@@ -19,6 +19,15 @@ export interface NodusLocalModelDefinition {
   contextLength?: number;
   dimensions?: number;
   vision?: boolean;
+  /**
+   * Whether this model is fit to drive idea EXTRACTION (deep/light scans) and, by extension, to be
+   * the single generic model in "basic" mode. Small vision models (Qwen3.5-0.8B, LFM2.5-VL-1.6B)
+   * are left `false`: benchmarked against a real 7000-word paper they produced 0 valid extractions —
+   * they loop/ramble inside the JSON and never close it, and no server flag, grammar, concision
+   * suffix or repetition penalty rescues them (see design/local-extraction-and-free-tier-plan.md).
+   * They stay usable for chat / vision / image. Only Gemma 4 E2B extracts reliably (20/20, 0 fails).
+   */
+  supportsExtraction?: boolean;
   modelFile: string;
   projectorFile?: string;
   assets: readonly NodusLocalModelAsset[];
@@ -57,6 +66,7 @@ const HF_REVISIONS: Record<string, string> = {
   'unsloth/Qwen3.5-0.8B-GGUF': '6ab461498e2023f6e3c1baea90a8f0fe38ab64d0',
   'google/gemma-4-E2B-it-qat-q4_0-gguf': '69536a21d70340464240401ba38223d805f6a709',
   'LiquidAI/LFM2.5-VL-1.6B-GGUF': '48c6a306939241d1ddc99b090df552cb47a066c6',
+  'ibm-granite/granite-4.0-micro-GGUF': 'ec48475f0c811d812fbfb61975717a9c36eeb652',
 };
 
 const hf = (repo: string, file: string) =>
@@ -151,6 +161,7 @@ export const NODUS_LOCAL_MODELS: readonly NodusLocalModelDefinition[] = [
     sourceUrl: 'https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF',
     contextLength: 32_768,
     vision: true,
+    supportsExtraction: false,
     modelFile: 'Qwen3.5-0.8B-Q4_K_M.gguf',
     projectorFile: 'mmproj-F16.gguf',
     assets: [
@@ -178,6 +189,7 @@ export const NODUS_LOCAL_MODELS: readonly NodusLocalModelDefinition[] = [
     sourceUrl: 'https://huggingface.co/google/gemma-4-E2B-it-qat-q4_0-gguf',
     contextLength: 32_768,
     vision: true,
+    supportsExtraction: true,
     modelFile: 'gemma-4-E2B_q4_0-it.gguf',
     projectorFile: 'gemma-4-E2B-it-mmproj.gguf',
     assets: [
@@ -196,6 +208,26 @@ export const NODUS_LOCAL_MODELS: readonly NodusLocalModelDefinition[] = [
     ],
   },
   {
+    id: 'granite-4.0-micro-q4',
+    label: 'Granite 4.0 Micro Q4',
+    kind: 'chat',
+    runtime: 'llama_cpp',
+    quantization: 'Q4_K_M',
+    description: 'Modelo de texto compacto con salida JSON fiable; alternativa ligera para extracción de ideas.',
+    sourceUrl: 'https://huggingface.co/ibm-granite/granite-4.0-micro-GGUF',
+    contextLength: 32_768,
+    supportsExtraction: true,
+    modelFile: 'granite-4.0-micro-Q4_K_M.gguf',
+    assets: [
+      {
+        file: 'granite-4.0-micro-Q4_K_M.gguf',
+        url: hf('ibm-granite/granite-4.0-micro-GGUF', 'granite-4.0-micro-Q4_K_M.gguf'),
+        bytes: 2_099_502_528,
+        sha256: '97c417dcc0534b0737c74016fb2af083cb17c3b51eaac621192d23961b7024eb',
+      },
+    ],
+  },
+  {
     id: 'lfm2.5-vl-1.6b-q4',
     label: 'LFM2.5-VL-1.6B Q4',
     kind: 'chat',
@@ -205,6 +237,7 @@ export const NODUS_LOCAL_MODELS: readonly NodusLocalModelDefinition[] = [
     sourceUrl: 'https://huggingface.co/LiquidAI/LFM2.5-VL-1.6B-GGUF',
     contextLength: 32_768,
     vision: true,
+    supportsExtraction: false,
     modelFile: 'LFM2.5-VL-1.6B-Q4_0.gguf',
     projectorFile: 'mmproj-LFM2.5-VL-1.6b-Q8_0.gguf',
     assets: [
@@ -230,4 +263,31 @@ export function getNodusLocalModel(id: string): NodusLocalModelDefinition | unde
 
 export function nodusLocalModelBytes(model: NodusLocalModelDefinition): number {
   return model.assets.reduce((sum, asset) => sum + asset.bytes, 0);
+}
+
+/**
+ * True when a built-in chat model can be trusted to drive idea extraction (and thus be the single
+ * model in basic mode). Unknown ids default to `true` — only models we have explicitly benchmarked
+ * as unfit are blocked, so a future model isn't accidentally locked out. Embedding models are `false`
+ * (they can't chat at all). See `supportsExtraction` on the definition for the why.
+ */
+export function nodusLocalModelSupportsExtraction(id: string): boolean {
+  const model = getNodusLocalModel(id);
+  if (!model) return true;
+  if (model.kind !== 'chat') return false;
+  return model.supportsExtraction !== false;
+}
+
+/** The built-in chat model recommended as the default local extractor (basic mode / scans). */
+export const NODUS_DEFAULT_EXTRACTION_MODEL_ID = 'gemma-4-e2b-q4';
+
+/**
+ * Provider-agnostic guard for "can this model reference drive idea extraction?". Cloud models are
+ * always assumed capable; only built-in Nodus models carry a benchmarked verdict. Used by the UI to
+ * gate the extraction / basic-mode-generic roles, and by the scan pipeline to warn on a bad choice.
+ */
+export function modelRefSupportsExtraction(ref: { provider: string; model: string } | null | undefined): boolean {
+  if (!ref) return true;
+  if (ref.provider !== 'nodus') return true;
+  return nodusLocalModelSupportsExtraction(ref.model);
 }
