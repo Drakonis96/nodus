@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Nodus — Teaching demo</title>
+  <meta name="description" content="Interactive demo of Nodus in Teaching mode: courses, student groups, timetables, materials, weighted rubrics, printable exams and a private gradebook."/>
+  <link rel="icon" type="image/svg+xml" href="../assets/nodus-logo.svg"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="demo.css?v=20260719-teaching1"/>
+</head>
+<body class="demo-page teach">
+  <nav class="site-nav">
+    <a class="site-logo" href="../index.html"><img src="../assets/nodus-logo.svg" alt=""/> Nodus</a>
+    <div class="site-links">
+      <a href="../index.html#story" class="hideS">How it works</a>
+      <a href="../index.html#vaults" class="hideS">Vaults</a>
+      <a href="../index.html#views" class="hideS">Views</a>
+      <a href="../index.html#contrib" class="hideS">Contribute</a>
+      <a href="../index.html#faq" class="hideS">FAQ</a>
+      <a class="site-gh" href="https://github.com/Drakonis96/nodus" target="_blank" rel="noopener" title="Star Nodus on GitHub">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.42 7.42 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+        <span class="lbl">Star</span><span class="stars"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 .25a.75.75 0 0 1 .67.42l1.88 3.8 4.2.62c.61.09.86.84.41 1.28l-3.04 2.96.72 4.18a.75.75 0 0 1-1.09.79L8 12.35l-3.76 1.97a.75.75 0 0 1-1.08-.79l.72-4.18L.83 6.37a.75.75 0 0 1 .41-1.28l4.2-.61L7.32.67A.75.75 0 0 1 8 .25Z"/></svg><span id="site-stars" aria-label="Stars on GitHub">·</span></span>
+      </a>
+    </div>
+  </nav>
+  <div class="demo-frame">
+    <div class="mac-titlebar"><span class="mac-dots"><i></i><i></i><i></i></span><span class="mac-title">Nodus — Teaching demo</span></div>
+    <div class="shell teach">
+      <header class="topbar">
+        <a href="../index.html" class="brand" style="text-decoration:none;color:inherit"><img src="../assets/nodus-logo.svg" alt="Nodus logo"/> Nodus</a>
+        <div class="vault-switch" id="vault-switch">
+          <button class="vault-btn" onclick="toggleVaultMenu(event)" aria-haspopup="true" aria-expanded="false">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="1"/><path d="M12 16v5M8 21h8"/></svg>
+            <span class="vault-name">Year 9 · History</span><span class="vault-mode teach">Teaching</span>
+            <svg class="vchev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+          <div class="vault-menu" id="vault-menu" role="menu">
+            <div class="vault-menu-label">Switch demo mode</div>
+            <a class="vault-opt active" href="teaching.html" role="menuitem"><span class="vm-dot teach"></span><span class="vm-t"><b>Teaching</b><span>Year 9 · History</span></span><span class="vm-tag">Active</span></a>
+            <a class="vault-opt" href="index.html" role="menuitem"><span class="vm-dot academic"></span><span class="vm-t"><b>Academic</b><span>Learning science library</span></span><span class="vm-load">Open</span></a>
+            <a class="vault-opt" href="study.html" role="menuitem"><span class="vm-dot st"></span><span class="vm-t"><b>Study</b><span>General Biology</span></span><span class="vm-load">Open</span></a>
+            <a class="vault-opt" href="genealogy.html" role="menuitem"><span class="vm-dot gen"></span><span class="vm-t"><b>Genealogy</b><span>Serrano family</span></span><span class="vm-load">Open</span></a>
+            <a class="vault-opt" href="databases.html" role="menuitem"><span class="vm-dot db"></span><span class="vm-t"><b>Databases</b><span>Field notebook</span></span><span class="vm-load">Open</span></a>
+            <div class="vault-menu-label">Not in the demo yet</div>
+            <button class="vault-opt disabled" disabled><span class="vm-dot soon"></span><span class="vm-t"><b>Primary Sources</b><span>Archival records + literature</span></span><span class="vm-soon">Soon</span></button>
+          </div>
+        </div>
+        <div class="spacer"></div>
+        <button class="tb-btn" onclick="go('groups')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>Class list</button>
+        <button class="tb-btn" onclick="go('grades')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Gradebook</button>
+        <button class="tb-btn primary" onclick="go('exams')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 2h12v20H6zM10 7h5M10 11h5"/></svg>Build an exam</button>
+      </header>
+      <div class="demo-banner"><span><b>Web demo · Teaching mode</b> — a real sample course distilled for the browser. The desktop app adds editing, imports, local reminders, document export and optional AI with student-name pseudonymisation.</span><a href="https://github.com/Drakonis96/nodus/releases/latest" target="_blank" rel="noopener">Get the desktop app →</a></div>
+      <div class="body"><nav class="sidebar" id="nav" aria-label="Sections"></nav><main class="main" id="main"></main></div>
+    </div>
+  </div>
+  <div id="modal-root"></div><div id="toast" role="status"></div>
+  <script src="teaching-data.js?v=20260719"></script>
+  <script src="teaching-app.js?v=20260719"></script>
+  <script src="vault-switch.js?v=20260719"></script>
+  <script>
+    (function () {
+      function paintStars(n) { if (!Number.isFinite(n)) return; var el = document.getElementById('site-stars'); if (!el) return; el.textContent = n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n); el.setAttribute('aria-label', n + ' stars on GitHub'); }
+      fetch('https://api.github.com/repos/Drakonis96/nodus', { cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) { var n = j && Number(j.stargazers_count); if (Number.isFinite(n)) paintStars(n); }).catch(function () {});
+    })();
+  </script>
+  <script src="../nodi.js?v=20260717orb2"></script>
+</body>
+</html>
