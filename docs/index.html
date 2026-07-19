@@ -909,12 +909,12 @@
         <div class="vault-panel-copy">
           <div class="vault-panel-head"><span class="vault-panel-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="1"/><path d="M12 16v5M8 21h8"/></svg></span><div><h3 data-i18n="road.teaching.t">Teaching</h3><span class="vault-status" data-i18n="vaults.status.available">Available now</span></div></div>
           <p data-i18n="vaults.teaching.b">Plan courses and classes, prepare activities and assessments, and track learner progress. All your teaching work stays connected to the materials and evidence that support it.</p>
-          <button class="vault-panel-cta" type="button" onclick="openDl()" data-i18n="vaults.teaching.cta">Download Nodus to start →</button>
+          <a class="vault-panel-cta" href="demo/teaching.html" data-i18n="vaults.teaching.cta">Open the teaching demo →</a>
         </div>
         <div class="vault-capabilities">
-          <div class="vault-capability"><span>01</span><p data-i18n="vaults.teaching.f1"><b>Plan academic years, courses and classes in one place</b>, with timetables, calendars, teaching guides and unit plans connected.</p></div>
-          <div class="vault-capability"><span>02</span><p data-i18n="vaults.teaching.f2"><b>Create learning situations, tests, exams and rubrics from your own material</b>, ready for you to review and adapt.</p></div>
-          <div class="vault-capability"><span>03</span><p data-i18n="vaults.teaching.f3"><b>Track grades, progress and feedback privately</b>, using anonymous student codes whenever AI assists.</p></div>
+          <div class="vault-capability"><span>01</span><p data-i18n="vaults.teaching.f1"><b>Organise academic years, courses, groups and subjects in one place</b>, with timetables, calendars, materials and recordings connected.</p></div>
+          <div class="vault-capability"><span>02</span><p data-i18n="vaults.teaching.f2"><b>Build question banks, weighted rubrics and printable exams</b>, then apply a published assessment plan in a gradebook that keeps non-numeric states explicit.</p></div>
+          <div class="vault-capability"><span>03</span><p data-i18n="vaults.teaching.f3"><b>Track grades, progress and feedback privately</b>, replacing names with local pseudonym codes whenever AI assists.</p></div>
         </div>
       </article>
 
@@ -1204,7 +1204,7 @@
 
       <!-- Databases 1 · computed analysis -->
       <div class="shot" data-vault-view="databases" data-view-index="1" style="--acc:#ff5f7e">
-        <div class="shot-txt"><div class="tag" data-i18n="vaults.databases.t">Databases</div><h3>You bring the data, it runs the numbers</h3>
+        <div class="shot-txt"><div class="tag" data-i18n="vaults.databases.t">Databases</div><h3>You bring the data, Nodus runs the numbers</h3>
           <p>Turn your own records into typed tables, then ask for an analysis. The assistant picks the method and the app computes it for real, so a correlation or a regression is a calculation, never a guess.</p>
           <a class="try" href="demo/databases.html#dbAnalysis">Open in the demo →</a></div>
         <div class="vig vig-db"><div class="vbar"><i></i><i></i><i></i><span>ANALYSIS · FIELD NOTEBOOK</span></div>
@@ -1266,12 +1266,12 @@
         </div>
       </div>
 
-      <!-- Teaching 1 · Gradebook, anonymised -->
+      <!-- Teaching 1 · Gradebook, pseudonymised -->
       <div class="shot" data-vault-view="teaching" data-view-index="1" style="--acc:#fb923c">
         <div class="shot-txt"><div class="tag" data-i18n="road.teaching.t">Teaching</div><h3>Classes and grades, kept private</h3>
-          <p>Manage your classes and grades in one place. When the AI helps, it only ever sees anonymous student codes, never a name.</p>
-          <span class="try soon" data-i18n="vaults.teaching.available">Available in the Teaching vault</span></div>
-        <div class="vig vig-grade"><div class="vbar"><i></i><i></i><i></i><span>GRADEBOOK · ANONYMISED FOR AI</span></div>
+          <p>Manage your classes and grades in one place. When AI helps, Nodus replaces names with local pseudonym codes before sending the request.</p>
+          <a class="try" href="demo/teaching.html#groups" data-i18n="v.open">Open in the demo →</a></div>
+        <div class="vig vig-grade"><div class="vbar"><i></i><i></i><i></i><span>GRADEBOOK · PSEUDONYMISED FOR AI</span></div>
           <div class="vbody">
             <table class="dbmini gradebook">
               <thead><tr><th>Student</th><th>Test 1</th><th>Test 2</th><th>Avg</th></tr></thead>
@@ -1288,47 +1288,47 @@
         </div>
       </div>
 
-      <!-- Teaching 2 · Guides & exams -->
+      <!-- Teaching 2 · Rubrics & exams -->
       <div class="shot" data-vault-view="teaching" data-view-index="2" style="--acc:#fb923c">
-        <div class="shot-txt"><div class="tag" data-i18n="road.teaching.t">Teaching</div><h3>Guides and exams, grounded in your material</h3>
-          <p>Draft teaching guides, unit plans and learning situations, plus tests and exams, all built from your own material. The AI stays inside what you gave it and invents nothing.</p>
-          <span class="try soon" data-i18n="vaults.teaching.available">Available in the Teaching vault</span></div>
-        <div class="vig vig-guide"><div class="vbar"><i></i><i></i><i></i><span>TEACHING GUIDE · FROM YOUR MATERIAL</span></div>
+        <div class="shot-txt"><div class="tag" data-i18n="road.teaching.t">Teaching</div><h3>Rubrics and exams, grounded in your material</h3>
+          <p>Build weighted analytic rubrics, reusable question banks and printable exams. Review every criterion, achievement level, answer and score before exporting.</p>
+          <a class="try" href="demo/teaching.html#rubrics" data-i18n="v.open">Open in the demo →</a></div>
+        <div class="vig vig-guide"><div class="vbar"><i></i><i></i><i></i><span>RUBRIC · HISTORICAL SOURCE COMMENTARY</span></div>
           <div class="vbody">
-            <div class="gsec"><span class="gsec-k">Objectives</span><div class="gsec-l" style="--w:92%"></div><div class="gsec-l" style="--w:74%"></div></div>
-            <div class="gsec"><span class="gsec-k">Unit plan</span><div class="gsec-l" style="--w:88%"></div><div class="gsec-l" style="--w:66%"></div></div>
-            <div class="gsec"><span class="gsec-k">Learning situation</span><div class="gsec-l" style="--w:80%"></div></div>
-            <div class="gsec"><span class="gsec-k">Assessment</span><div class="gsec-l" style="--w:84%"></div></div>
+            <div class="gsec"><span class="gsec-k">Historical context · 30%</span><div class="gsec-l" style="--w:92%"></div><div class="gsec-l" style="--w:74%"></div></div>
+            <div class="gsec"><span class="gsec-k">Content analysis · 30%</span><div class="gsec-l" style="--w:88%"></div><div class="gsec-l" style="--w:66%"></div></div>
+            <div class="gsec"><span class="gsec-k">Subject vocabulary · 25%</span><div class="gsec-l" style="--w:80%"></div></div>
+            <div class="gsec"><span class="gsec-k">Clarity · 15%</span><div class="gsec-l" style="--w:84%"></div></div>
             <span class="verify" style="color:#fdba74;border-color:rgba(251,146,60,0.4);background:rgba(251,146,60,0.08)">
               <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="width:11px;height:11px"><path d="m4 12.5 5 5L20 6.5"/></svg>
-              Built only from your material. Nothing invented.</span>
+              Weights 100% · quality check passed</span>
           </div>
         </div>
       </div>
 
-      <!-- Teaching 3 · Course and class planning -->
+      <!-- Teaching 3 · Published assessment plan -->
       <div class="shot" data-vault-view="teaching" data-view-index="3" style="--acc:#fb923c">
-        <div class="shot-txt"><div class="tag" data-i18n="road.teaching.t">Teaching</div><h3>From the academic year to tomorrow's class</h3>
-          <p>Plan courses, units and individual classes in one connected calendar. Keep timetables, teaching guides, materials and assessment milestones together instead of rebuilding the plan every week.</p>
-          <span class="try soon" data-i18n="vaults.teaching.available">Available in the Teaching vault</span></div>
-        <div class="vig vig-planner"><div class="vbar"><i></i><i></i><i></i><span>COURSE PLANNER · TERM 1</span></div>
+        <div class="shot-txt"><div class="tag" data-i18n="road.teaching.t">Teaching</div><h3>From the assessment plan to every final grade</h3>
+          <p>Publish the weighting rules before grading, preserve exempt, not assessed and not submitted as distinct states, and open the calculation behind any final result.</p>
+          <a class="try" href="demo/teaching.html#grades" data-i18n="v.open">Open in the demo →</a></div>
+        <div class="vig vig-planner"><div class="vbar"><i></i><i></i><i></i><span>ASSESSMENT PLAN · PUBLISHED V1</span></div>
           <div class="vbody">
-            <div class="planner-head"><b>Biology · Year 10</b><span>Unit 3 of 8</span></div>
+            <div class="planner-head"><b>History · Year 9 A</b><span>Weights 100%</span></div>
             <div class="week">
-              <div class="day"><b>Mon</b><div class="event">Cell membrane<br/>Lesson</div></div>
-              <div class="day"><b>Tue</b><div class="event">Lab setup<br/>Materials</div></div>
-              <div class="day"><b>Wed</b><div class="event">Transport<br/>Lab</div></div>
-              <div class="day"><b>Thu</b><div class="event">Review<br/>Rubric</div></div>
-              <div class="day"><b>Fri</b><div class="event">Quiz<br/>Assessment</div></div>
+              <div class="day"><b>30%</b><div class="event">Unit 3<br/>exam</div></div>
+              <div class="day"><b>20%</b><div class="event">Map<br/>test</div></div>
+              <div class="day"><b>30%</b><div class="event">Source<br/>commentary</div></div>
+              <div class="day"><b>10%</b><div class="event">Class<br/>notebook</div></div>
+              <div class="day"><b>10%</b><div class="event">Reasoned<br/>participation</div></div>
             </div>
-            <div class="planner-foot"><span>Teaching guide · linked</span><span>Assessment · ready</span></div>
+            <div class="planner-foot"><span>Non-numeric statuses · explicit</span><span>Calculation · auditable</span></div>
           </div>
         </div>
       </div>
 
     </div>
     <div style="text-align:center;margin-top:56px">
-      <a class="btn primary" href="demo/index.html" data-i18n="views.cta">Open the four live demos →</a>
+      <a class="btn primary" href="demo/index.html" data-i18n="views.cta">Open the five live demos →</a>
     </div>
   </div>
 </section>
@@ -1805,7 +1805,7 @@ const I18N = {
     'step5.t': `Escribe con pruebas`, 'step5.b': `El taller de escritura redacta secciones ancladas en el grafo, y se niega a citar nada que no corresponda a un elemento real de Zotero. Deep Research compone informes completos de varias páginas con citas. El mismo copiloto funciona en vivo dentro de Microsoft Word y LibreOffice Writer.`,
     'step6.t': `Y luego, escúchalo`, 'step6.b': `Convierte cualquier informe en audio narrado, o haz un paseo guiado e inmersivo por un rincón de tu corpus. Las voces funcionan en local (Piper, Kokoro), o usa una clave de Hume para voces en la nube.`,
     'views.kicker': `Cada vault, en movimiento`, 'views.title': `Mira lo que puede hacer cada modo.`, 'views.lead': `Cada panel de abajo es una vista real de la app, abierta en el modo al que pertenece. Cuanto más bajas, más cosas resulta que hace el mismo motor.`,
-    'views.cta': `Abre las cuatro demos en vivo →`, 'v.open': `Abrir en la demo →`,
+    'views.cta': `Abre las cinco demos en vivo →`, 'v.open': `Abrir en la demo →`,
     'v.library.t': `Entra Zotero, salen ideas`, 'v.library.b': `Sincroniza tus colecciones, conserva las etiquetas de leído, fusiona duplicados sin pérdidas. Cada obra guarda su estado de análisis, nada se escanea dos veces.`,
     'v.graph.t': `El corpus como constelación`, 'v.graph.b': `Temas, afirmaciones, hallazgos y métodos con aristas tipadas como apoya, contradice y matiza. Los ajustes preestablecidos saltan directamente a contradicciones, huecos o tu ruta de lectura.`,
     'v.ideas.t': `Afirmaciones con pruebas`, 'v.ideas.b': `Cada idea lleva evidencia literal y una referencia de página. Haz clic en una y obtienes sus relaciones, su autor y el pasaje exacto. Nunca afirmaciones huérfanas.`,
@@ -1844,7 +1844,7 @@ const I18N = {
     'step5.t': `Écrivez avec des preuves`, 'step5.b': `L'atelier d'écriture rédige des sections ancrées dans le graphe, et refuse de citer tout ce qui ne correspond pas à un véritable élément Zotero. Deep Research compose des rapports complets de plusieurs pages avec citations. Le même copilote fonctionne en direct dans Microsoft Word et LibreOffice Writer.`,
     'step6.t': `Puis écoutez-le`, 'step6.b': `Transformez n'importe quel rapport en audio narré, ou faites une promenade guidée et immersive dans un coin de votre corpus. Les voix fonctionnent en local (Piper, Kokoro), ou utilisez une clé Hume pour des voix cloud.`,
     'views.kicker': `Les vues`, 'views.title': `Voyez chaque section prendre vie.`, 'views.lead': `Chaque vignette ci-dessous reflète une vraie vue de l'application, et chacune est explorable dans la démo, dans le mode de coffre auquel elle appartient.`,
-    'views.cta': `Ouvrez les quatre démos →`, 'v.open': `Ouvrir dans la démo →`,
+    'views.cta': `Ouvrez les cinq démos →`, 'v.open': `Ouvrir dans la démo →`,
     'v.library.t': `Zotero entre, les idées sortent`, 'v.library.b': `Synchronisez vos collections, gardez les étiquettes « lu », fusionnez les doublons sans perte. Chaque ouvrage conserve son état d'analyse, rien n'est scanné deux fois.`,
     'v.graph.t': `Le corpus comme une constellation`, 'v.graph.b': `Thèmes, affirmations, résultats et méthodes avec des liens typés comme soutient, contredit et affine. Les préréglages sautent directement aux contradictions, aux lacunes ou à votre parcours de lecture.`,
     'v.ideas.t': `Des affirmations avec preuves`, 'v.ideas.b': `Chaque idée porte une preuve textuelle et une référence de page. Cliquez sur l'une d'elles et vous obtenez ses relations, son auteur et le passage exact. Jamais d'affirmations orphelines.`,
@@ -1883,7 +1883,7 @@ const I18N = {
     'step5.t': `Scrivi con prove`, 'step5.b': `Il laboratorio di scrittura redige sezioni ancorate al grafo, e si rifiuta di citare qualsiasi cosa non corrisponda a un vero elemento Zotero. Deep Research compone report completi di più pagine con citazioni. Lo stesso copilota funziona dal vivo dentro Microsoft Word e LibreOffice Writer.`,
     'step6.t': `Poi ascoltalo`, 'step6.b': `Trasforma qualsiasi report in audio narrato, o fai una passeggiata guidata e immersiva in un angolo del tuo corpus. Le voci funzionano in locale (Piper, Kokoro), o usa una chiave Hume per voci nel cloud.`,
     'views.kicker': `Le viste`, 'views.title': `Guarda ogni sezione prendere vita.`, 'views.lead': `Ogni vignetta qui sotto rispecchia una vista reale dell'app ed è esplorabile nella demo, nella modalità di vault a cui appartiene.`,
-    'views.cta': `Apri le quattro demo dal vivo →`, 'v.open': `Apri nella demo →`,
+    'views.cta': `Apri le cinque demo dal vivo →`, 'v.open': `Apri nella demo →`,
     'v.library.t': `Entra Zotero, escono idee`, 'v.library.b': `Sincronizza le tue raccolte, mantieni le etichette di lettura, unisci i duplicati senza perdite. Ogni opera conserva il suo stato di analisi, niente viene scansionato due volte.`,
     'v.graph.t': `Il corpus come costellazione`, 'v.graph.b': `Temi, affermazioni, scoperte e metodi con archi tipizzati come sostiene, contraddice e affina. I preset saltano direttamente a contraddizioni, lacune o al tuo percorso di lettura.`,
     'v.ideas.t': `Affermazioni con prove`, 'v.ideas.b': `Ogni idea porta una prova testuale e un riferimento di pagina. Cliccane una e ottieni le sue relazioni, il suo autore e il passaggio esatto. Mai affermazioni orfane.`,
@@ -1922,7 +1922,7 @@ const I18N = {
     'step5.t': `Schreibe mit Belegen`, 'step5.b': `Die Schreibwerkstatt verfasst Abschnitte, die im Graphen verankert sind, und weigert sich, irgendetwas zu zitieren, das nicht auf ein echtes Zotero-Objekt verweist. Deep Research verfasst vollständige mehrseitige Berichte mit Zitaten. Derselbe Copilot läuft live in Microsoft Word und LibreOffice Writer.`,
     'step6.t': `Und dann hör es dir an`, 'step6.b': `Verwandle jeden Bericht in erzähltes Audio oder mach einen immersiven, geführten Rundgang durch eine Ecke deines Korpus. Die Stimmen laufen lokal (Piper, Kokoro), oder nutze einen Hume-Schlüssel für Cloud-Stimmen.`,
     'views.kicker': `Die Ansichten`, 'views.title': `Sieh jeden Bereich lebendig werden.`, 'views.lead': `Jede Miniatur unten spiegelt eine echte Ansicht der App und ist in der Demo erkundbar — im Tresor-Modus, zu dem sie gehört.`,
-    'views.cta': `Öffne die vier Live-Demos →`, 'v.open': `In der Demo öffnen →`,
+    'views.cta': `Öffne die fünf Live-Demos →`, 'v.open': `In der Demo öffnen →`,
     'v.library.t': `Zotero rein, Ideen raus`, 'v.library.b': `Synchronisiere deine Sammlungen, behalte die Gelesen-Tags, führe Duplikate verlustfrei zusammen. Jedes Werk trägt seinen Analysestatus, nichts wird zweimal gescannt.`,
     'v.graph.t': `Der Korpus als Sternbild`, 'v.graph.b': `Themen, Aussagen, Befunde und Methoden mit typisierten Kanten wie stützt, widerspricht und verfeinert. Voreinstellungen springen direkt zu Widersprüchen, Lücken oder deiner Leseroute.`,
     'v.ideas.t': `Aussagen mit Belegen`, 'v.ideas.b': `Jede Idee trägt einen wörtlichen Beleg und eine Seitenangabe. Klick eine an und du erhältst ihre Beziehungen, ihren Autor und die exakte Passage. Niemals verwaiste Behauptungen.`,
@@ -1961,7 +1961,7 @@ const I18N = {
     'step5.t': `Escreva com provas`, 'step5.b': `A oficina de escrita redige seções ancoradas no grafo e se recusa a citar qualquer coisa que não corresponda a um item real do Zotero. O Deep Research compõe relatórios completos de várias páginas com citações. O mesmo copiloto funciona ao vivo dentro do Microsoft Word e do LibreOffice Writer.`,
     'step6.t': `E depois ouça`, 'step6.b': `Transforme qualquer relatório em áudio narrado, ou faça um passeio guiado e imersivo por um canto do seu corpus. As vozes funcionam localmente (Piper, Kokoro), ou use uma chave Hume para vozes na nuvem.`,
     'views.kicker': `As vistas`, 'views.title': `Veja cada seção ganhar vida.`, 'views.lead': `Cada vinheta abaixo reflete uma vista real da app e é explorável na demo, no modo de cofre a que pertence.`,
-    'views.cta': `Abre as quatro demos ao vivo →`, 'v.open': `Abrir na demo →`,
+    'views.cta': `Abre as cinco demos ao vivo →`, 'v.open': `Abrir na demo →`,
     'v.library.t': `Entra Zotero, saem ideias`, 'v.library.b': `Sincronize as suas coleções, mantenha as etiquetas de lido, mescle duplicados sem perdas. Cada obra guarda o seu estado de análise, nada é escaneado duas vezes.`,
     'v.graph.t': `O corpus como constelação`, 'v.graph.b': `Temas, afirmações, descobertas e métodos com arestas tipadas como apoia, contradiz e refina. As predefinições saltam direto para contradições, lacunas ou a sua rota de leitura.`,
     'v.ideas.t': `Afirmações com provas`, 'v.ideas.b': `Cada ideia carrega evidência literal e uma referência de página. Clique numa e você obtém as suas relações, o seu autor e a passagem exata. Nunca afirmações órfãs.`,
@@ -2000,7 +2000,7 @@ const I18N = {
     'step5.t': `Kanıtla yazın`, 'step5.b': `Yazma Atölyesi grafta temellenen bölümler taslaklar ve gerçek bir Zotero kaydına bağlanmayan hiçbir şeyi kaynak göstermez. Deep Research, atıflı ve çok sayfalı tam raporlar oluşturur. Aynı yardımcı Microsoft Word ve LibreOffice Writer içinde canlı çalışır.`,
     'step6.t': `Sonra dinleyin`, 'step6.b': `Herhangi bir raporu sesli anlatıma dönüştürün veya derleminizin bir köşesinde rehberli, sürükleyici bir yolculuğa çıkın. Sesler yerel olarak çalışır (Piper, Kokoro); bulut sesleri için kendi Hume anahtarınızı da kullanabilirsiniz.`,
     'views.kicker': `Görünümler`, 'views.title': `Her bölümün canlanışını görün.`, 'views.lead': `Aşağıdaki her küçük görsel uygulamanın gerçek bir görünümünü yansıtır ve ait olduğu kasa modunda demoda gezilebilir.`,
-    'views.cta': `Dört canlı demoyu açın →`, 'v.open': `Demoda aç →`,
+    'views.cta': `Beş canlı demoyu açın →`, 'v.open': `Demoda aç →`,
     'v.library.t': `Zotero girer, fikirler çıkar`, 'v.library.b': `Koleksiyonlarınızı eşitleyin, okundu etiketlerini koruyun ve yinelenenleri kayıpsız birleştirin. Her eser analiz durumunu saklar; hiçbir şey iki kez taranmaz.`,
     'v.graph.t': `Bir takımyıldız olarak derlem`, 'v.graph.b': `Temalar, iddialar, bulgular ve yöntemler; destekler, çelişir ve inceltir gibi türlendirilmiş kenarlarla bağlanır. Hazır görünümler sizi doğrudan çelişkilere, boşluklara veya okuma rotanıza götürür.`,
     'v.ideas.t': `Kanıtlı iddialar`, 'v.ideas.b': `Her fikir birebir kanıt ve sayfa bilgisi taşır. Birine tıklayın; ilişkilerini, yazarını ve tam pasajı görün. Kaynaksız iddia yok.`,
@@ -2039,7 +2039,7 @@ const I18N = {
     'step5.t': `有据地写作`, 'step5.b': `写作工坊撰写扎根于图谱的章节，并拒绝引用任何无法对应到真实 Zotero 条目的内容。Deep Research 撰写完整的多页引用报告。同一个副驾也在 Microsoft Word 和 LibreOffice Writer 中实时运行。`,
     'step6.t': `然后聆听它`, 'step6.b': `把任何报告变成朗读音频，或在你语料的一角来一次沉浸式的引导漫步。语音在本地运行（Piper、Kokoro），或用 Hume 密钥使用云端语音。`,
     'views.kicker': `各个视图`, 'views.title': `看每个板块活起来。`, 'views.lead': `下面每个小图都对应应用里真实的一个视图，并且都能在演示中、在它所属的保险库模式里探索。`,
-    'views.cta': `打开四个在线演示 →`, 'v.open': `在演示中打开 →`,
+    'views.cta': `打开五个在线演示 →`, 'v.open': `在演示中打开 →`,
     'v.library.t': `输入 Zotero，输出想法`, 'v.library.b': `同步你的合集，保留“已读”标签，无损合并重复项。每部作品都记录其分析状态，绝不重复扫描。`,
     'v.graph.t': `语料如星座`, 'v.graph.b': `主题、论点、发现与方法之间是有类型的连线，如支持、反驳与细化。预设可直接跳转到矛盾、空白或你的阅读路线。`,
     'v.ideas.t': `有凭据的论点`, 'v.ideas.b': `每个想法都带有原文证据和页码引用。点开一个，你就能看到它的关系、作者以及确切的段落。绝无无源之言。`,
@@ -2103,10 +2103,10 @@ const I18N_V2 = {
     'vaults.status.available': `Disponible ahora`, 'vaults.status.soon': `Próximamente`,
     'vaults.roadmap': `En la hoja de ruta`,
     'vaults.teaching.b': `Planifica cursos y clases, prepara actividades y evaluaciones, y sigue el progreso del alumnado. Todo el trabajo docente permanece conectado con los materiales y evidencias que lo sustentan.`,
-    'vaults.teaching.cta': `Descarga Nodus para empezar →`, 'vaults.teaching.available': `Disponible en el vault de Docencia`,
-    'vaults.teaching.f1': `<b>Planifica años académicos, cursos y clases en un solo sitio</b>, con horarios, calendarios, guías docentes y programaciones conectados.`,
-    'vaults.teaching.f2': `<b>Crea situaciones de aprendizaje, tests, exámenes y rúbricas a partir de tu material</b>, listos para que los revises y adaptes.`,
-    'vaults.teaching.f3': `<b>Sigue notas, progreso y feedback con privacidad</b>, usando códigos anónimos de alumnado siempre que interviene la IA.`,
+    'vaults.teaching.cta': `Abrir la demo de docencia →`, 'vaults.teaching.available': `Disponible en el vault de Docencia`,
+    'vaults.teaching.f1': `<b>Organiza años académicos, cursos, grupos y asignaturas en un solo sitio</b>, con horarios, calendarios, materiales y grabaciones conectados.`,
+    'vaults.teaching.f2': `<b>Crea bancos de preguntas, rúbricas ponderadas y exámenes imprimibles</b>, y aplica después un plan de evaluación publicado en un cuaderno que mantiene explícitos los estados no numéricos.`,
+    'vaults.teaching.f3': `<b>Sigue notas, progreso y feedback con privacidad</b>, sustituyendo los nombres por códigos seudónimos locales siempre que interviene la IA.`,
     'vaults.teaching.f4': `<b>Progreso y feedback de cada clase</b>, conectado con las actividades y las evidencias que hay detrás.`,
     'vaults.primary.b': `Trabaja con documentos de archivo, manuscritos y colecciones históricas mediante un enfoque crítico. Conserva cada transcripción, interpretación y conclusión junto a la fuente original que la respalda.`,
     'vaults.primary.f1': `<b>Crea un archivo fiel desde escaneos, fotografías y manuscritos</b>, con OCR, transcripción, procedencia e imagen original siempre juntos.`,
@@ -2121,7 +2121,7 @@ const I18N_V2 = {
     'road.t': `Modos en camino`,
     'road.b': `Nodus publica su hoja de ruta a la vista. Estos modos aparecen en el selector de vaults pero todavía no son trabajo terminado — preferimos enseñarte el plan a fingir que no existe.`,
     'road.preview': `Vista previa`, 'road.soon': `Previsto`,
-    'road.teaching.t': `Docencia`, 'road.teaching.b': `Hoy se puede crear, pero está vacío — las secciones de docencia aún se están construyendo.`,
+    'road.teaching.t': `Docencia`, 'road.teaching.b': `Disponible con grupos, horarios, materiales, rúbricas, exámenes y un cuaderno de notas con planes de evaluación publicados.`,
     'road.worldbuilding.t': `Worldbuilding`, 'road.worldbuilding.b': `El mismo esqueleto, para ficción y mundos construidos en lugar de investigación.`,
     'road.primary.t': `Fuentes primarias`, 'road.primary.b': `Documentos de archivo junto a la literatura secundaria, con extracción crítica de fuentes.`,
     'road.testimony.t': `Testimonios`, 'road.testimony.b': `Entrevistas e historia oral: quién habla, transcripciones y qué dijo cada persona exactamente.`,
@@ -2140,7 +2140,7 @@ const I18N_V2 = {
     'v.study.b': `Graba la clase, transcríbela con Whisper local y cada línea sigue siendo pulsable: la respuesta del chat cita el minuto del que sale, y los conceptos se convierten en un mapa de ideas solo de esa asignatura.`,
     'v.genealogy.t': `Una familia, reconstruida desde los registros`,
     'v.genealogy.b': `Personas, fechas y lugares salen de censos, padrones y cartas. El asistente propone cómo se conectan y espera a que lo confirmes antes de que nadie entre en el árbol.`,
-    'v.databases.t': `Tú traes los datos, él hace los números`,
+    'v.databases.t': `Tú traes los datos, Nodus hace los números`,
     'v.databases.b': `Convierte tus propios registros en tablas tipadas y pide un análisis. El asistente elige el método y la app lo calcula de verdad, así que una correlación o una regresión es un cálculo, nunca una suposición.`,
     'v.studyTest.t': `Convierte tus apuntes en un test`,
     'v.studyTest.b': `Apunta Nodus a un tema y redacta preguntas, tests y exámenes a partir de tu propio material. Practícalos, corrígete y quédate solo con los que apruebes.`,
@@ -2151,9 +2151,9 @@ const I18N_V2 = {
     'v.dataChat.t': `Pregunta a tu tabla, obtén un gráfico`,
     'v.dataChat.b': `Pregunta con palabras normales y obtén una respuesta directa sobre tus filas reales, dibujada como gráfico cuando ayuda. Nunca inventa un valor que no esté en tus datos.`,
     'v.teachGrades.t': `Clases y notas, en privado`,
-    'v.teachGrades.b': `Gestiona tus clases y tus notas en un solo sitio. Cuando la IA ayuda, solo ve códigos anónimos de alumnado, nunca un nombre.`,
-    'v.teachGuides.t': `Guías y exámenes, anclados en tu material`,
-    'v.teachGuides.b': `Redacta guías docentes, programaciones didácticas y situaciones de aprendizaje, además de tests y exámenes, todo a partir de tu propio material. La IA se queda dentro de lo que le diste y no inventa nada.`,
+    'v.teachGrades.b': `Gestiona tus clases y tus notas en un solo sitio. Cuando la IA ayuda, Nodus sustituye los nombres por códigos seudónimos locales antes de enviar la petición.`,
+    'v.teachGuides.t': `Rúbricas y exámenes, anclados en tu material`,
+    'v.teachGuides.b': `Crea rúbricas analíticas ponderadas, bancos de preguntas reutilizables y exámenes imprimibles. Revisa cada criterio, nivel de logro, respuesta y puntuación antes de exportar.`,
     'v.academicEvidence.t': `Mira dónde discrepa la literatura`,
     'v.academicEvidence.b': `Nodus enfrenta afirmaciones rivales con sus evidencias y su cronología, y convierte las conexiones que faltan en preguntas de investigación explícitas que puedes perseguir.`,
     'v.studyPlanner.t': `Todo tu curso académico, bajo control`,
@@ -2162,12 +2162,12 @@ const I18N_V2 = {
     'v.genealogyArchive.b': `Crea un archivo conectado de registros, censos, cartas y fotografías. Cada nacimiento, matrimonio, residencia y parentesco sigue siendo trazable hasta el documento exacto que lo sustenta.`,
     'v.databaseBuilder.t': `Modela tus datos sin aplanarlos`,
     'v.databaseBuilder.b': `Crea tipos de campo, relaciones, fórmulas, rollups y vistas filtradas reutilizables. Importa CSV, conecta tablas y deja que las columnas de IA clasifiquen filas sin inventar datos.`,
-    'v.teachPlanner.t': `Del curso académico a la clase de mañana`,
-    'v.teachPlanner.b': `Planifica cursos, unidades y clases en un calendario conectado. Mantén juntos horarios, guías, materiales e hitos de evaluación sin rehacer el plan cada semana.`,
+    'v.teachPlanner.t': `Del plan de evaluación a cada nota final`,
+    'v.teachPlanner.b': `Publica las ponderaciones antes de evaluar, conserva como estados distintos exento, no evaluado y no entregado, y abre el cálculo que hay detrás de cualquier resultado final.`,
     'road.t': `Lo que viene`,
     'road.b': `El selector de vaults ya muestra lo que está en camino. El siguiente que estamos construyendo convierte Nodus en un espacio completo para el profesorado.`,
     'road.teaching.sub': `Un espacio pensado para la semana real de un docente.`,
-    'road.teaching.b1': `<b>Clases y notas en un solo sitio</b>, donde la IA solo ve códigos anónimos de alumnado, nunca un nombre.`,
+    'road.teaching.b1': `<b>Clases y notas en un solo sitio</b>, donde Nodus sustituye los nombres por códigos seudónimos locales antes de enviar una petición a la IA.`,
     'road.teaching.b2': `<b>Apuntes, tests y exámenes a partir de tu material</b>, con la IA ceñida a lo que le diste y sin inventar nada.`,
     'road.teaching.b3': `<b>Guías docentes, programaciones y situaciones de aprendizaje</b>, redactadas en el formato que pide tu institución.`,
     'road.also': `También en la hoja de ruta`,
@@ -2214,7 +2214,7 @@ const I18N_V2 = {
     'road.t': `Des modes à venir`,
     'road.b': `Nodus publie sa feuille de route à découvert. Ces modes apparaissent dans le sélecteur de coffres mais ne sont pas encore terminés — nous préférons vous montrer le plan que faire comme s'il n'existait pas.`,
     'road.preview': `Aperçu`, 'road.soon': `Prévu`,
-    'road.teaching.t': `Enseignement`, 'road.teaching.b': `Sélectionnable aujourd'hui mais vide — les surfaces d'enseignement sont encore en construction.`,
+    'road.teaching.t': `Enseignement`, 'road.teaching.b': `Disponible avec groupes, emplois du temps, supports, rubriques, examens et carnet de notes fondé sur un plan d'évaluation publié.`,
     'road.worldbuilding.t': `Worldbuilding`, 'road.worldbuilding.b': `La même coquille, pour la fiction et les mondes construits plutôt que la recherche.`,
     'road.primary.t': `Sources primaires`, 'road.primary.b': `Des archives à côté de la littérature secondaire, avec une extraction critique des sources.`,
     'road.testimony.t': `Témoignages`, 'road.testimony.b': `Entretiens et histoire orale : qui parle, transcriptions et ce que chacun a réellement dit.`,
@@ -2234,13 +2234,13 @@ const I18N_V2 = {
     'v.study.b': `Enregistrez le cours, transcrivez-le avec Whisper en local, et chaque ligne reste cliquable : la réponse du chat cite l'horodatage dont elle vient, et les concepts deviennent une carte d'idées propre à cette matière.`,
     'v.genealogy.t': `Une famille, reconstituée à partir des actes`,
     'v.genealogy.b': `Les personnes, les dates et les lieux sortent des recensements, des registres et des lettres. L'assistant propose leurs liens et attend votre confirmation avant que quiconque entre dans l'arbre.`,
-    'v.databases.t': `Vous apportez les données, il fait les calculs`,
+    'v.databases.t': `Vous apportez les données, Nodus fait les calculs`,
     'v.databases.b': `Transformez vos propres relevés en tables typées, puis demandez une analyse. L'assistant choisit la méthode et l'app la calcule pour de vrai, donc une corrélation ou une régression est un calcul, jamais une supposition.`,
     'v.academicEvidence.t': `Voyez où la littérature diverge`, 'v.academicEvidence.b': `Nodus confronte les thèses concurrentes, leurs preuves et leur chronologie, puis transforme les liens manquants en questions de recherche explicites.`,
     'v.studyPlanner.t': `Toute votre année universitaire sous contrôle`, 'v.studyPlanner.b': `Classez vos documents par année, cursus et matière, puis réunissez emploi du temps, échéances, examens et révisions dans un calendrier avec rappels et progression.`,
     'v.genealogyArchive.t': `Chaque événement conserve ses preuves`, 'v.genealogyArchive.b': `Créez une archive reliée de registres, recensements, lettres et photographies. Chaque naissance, mariage, domicile et parenté reste traçable jusqu'au document exact.`,
     'v.databaseBuilder.t': `Modélisez vos données sans les aplatir`, 'v.databaseBuilder.b': `Créez des champs typés, relations, formules, agrégations et vues filtrées. Importez un CSV, reliez les tables et classez les lignes par IA sans inventer de données.`,
-    'v.teachPlanner.t': `De l'année universitaire au cours de demain`, 'v.teachPlanner.b': `Planifiez cursus, unités et séances dans un calendrier relié, avec horaires, guides, supports et jalons d'évaluation réunis.`,
+    'v.teachPlanner.t': `Du plan d'évaluation à chaque note finale`, 'v.teachPlanner.b': `Publiez les pondérations avant de noter, distinguez exempté, non évalué et non remis, puis ouvrez le calcul derrière chaque résultat final.`,
     'contrib.kicker': `Open source, ensemble`, 'contrib.title': `Chaque nœud compte.`,
     'contrib.lead': `Nodus grandit une contribution à la fois — comme des grains de sable, chacun s'ajoute à l'ensemble. Une seule personne l'a lancé ; chacun peut ajouter le grain suivant.`,
     'contrib.prs': `Voir les pull requests`, 'contrib.repo': `Parcourir le code`, 'contrib.builders': `Les personnes qui construisent Nodus`, 'contrib.loading': `Chargement des contributeurs…`, 'contrib.cap': `Chaque grain, une contribution.`, 'contrib.commits': `contributions`,
@@ -2284,7 +2284,7 @@ const I18N_V2 = {
     'road.t': `Modalità in arrivo`,
     'road.b': `Nodus pubblica la sua roadmap allo scoperto. Queste modalità compaiono nel selettore dei vault ma non sono ancora lavoro finito — preferiamo mostrarti il piano che fingere che non esista.`,
     'road.preview': `Anteprima`, 'road.soon': `Previsto`,
-    'road.teaching.t': `Didattica`, 'road.teaching.b': `Oggi si può creare, ma è vuoto — le sezioni per la didattica sono ancora in costruzione.`,
+    'road.teaching.t': `Didattica`, 'road.teaching.b': `Disponibile con gruppi, orari, materiali, rubriche, esami e registro voti basato su un piano di valutazione pubblicato.`,
     'road.worldbuilding.t': `Worldbuilding`, 'road.worldbuilding.b': `Lo stesso guscio, per la narrativa e i mondi costruiti anziché per la ricerca.`,
     'road.primary.t': `Fonti primarie`, 'road.primary.b': `Documenti d'archivio accanto alla letteratura secondaria, con estrazione critica delle fonti.`,
     'road.testimony.t': `Testimonianze`, 'road.testimony.b': `Interviste e storia orale: chi parla, trascrizioni e cosa ha detto davvero ciascuno.`,
@@ -2304,13 +2304,13 @@ const I18N_V2 = {
     'v.study.b': `Registra la lezione, trascrivila con Whisper locale e ogni riga resta cliccabile: la risposta della chat cita il minuto da cui viene, e i concetti diventano una mappa di idee solo di quella materia.`,
     'v.genealogy.t': `Una famiglia, ricostruita dai documenti`,
     'v.genealogy.b': `Persone, date e luoghi escono da censimenti, registri e lettere. L'assistente propone come si collegano e aspetta la tua conferma prima che qualcuno entri nell'albero.`,
-    'v.databases.t': `Porti i dati, ci pensa lui ai numeri`,
+    'v.databases.t': `Porti i dati, Nodus fa i calcoli`,
     'v.databases.b': `Trasforma i tuoi dati in tabelle tipizzate, poi chiedi un'analisi. L'assistente sceglie il metodo e l'app lo calcola davvero, così una correlazione o una regressione è un calcolo, mai una supposizione.`,
     'v.academicEvidence.t': `Scopri dove la letteratura è in disaccordo`, 'v.academicEvidence.b': `Nodus mette a confronto tesi rivali, prove e cronologia, poi trasforma i collegamenti mancanti in domande di ricerca esplicite.`,
     'v.studyPlanner.t': `Tutto l'anno accademico sotto controllo`, 'v.studyPlanner.b': `Organizza i materiali per anno, corso e materia, e riunisci orari, scadenze, esami e sessioni di studio in un calendario con promemoria e progressi.`,
     'v.genealogyArchive.t': `Ogni evento conserva le sue prove`, 'v.genealogyArchive.b': `Crea un archivio collegato di registri, censimenti, lettere e fotografie. Ogni nascita, matrimonio, residenza e parentela resta riconducibile al documento esatto.`,
     'v.databaseBuilder.t': `Modella i dati senza appiattirli`, 'v.databaseBuilder.b': `Crea campi tipizzati, relazioni, formule, rollup e viste filtrate. Importa CSV, collega tabelle e usa colonne IA per classificare righe senza inventare dati.`,
-    'v.teachPlanner.t': `Dall'anno accademico alla lezione di domani`, 'v.teachPlanner.b': `Pianifica corsi, unità e lezioni in un calendario collegato, tenendo insieme orari, guide, materiali e scadenze di valutazione.`,
+    'v.teachPlanner.t': `Dal piano di valutazione a ogni voto finale`, 'v.teachPlanner.b': `Pubblica i pesi prima di valutare, conserva come stati distinti esonerato, non valutato e non consegnato, e apri il calcolo dietro ogni risultato finale.`,
     'contrib.kicker': `Open source, insieme`, 'contrib.title': `Ogni nodo conta.`,
     'contrib.lead': `Nodus cresce una contribuzione alla volta — come granelli di sabbia, ognuno si aggiunge all'insieme. L'ha iniziato una sola persona; chiunque può aggiungere il prossimo granello.`,
     'contrib.prs': `Guarda le pull request`, 'contrib.repo': `Sfoglia il codice`, 'contrib.builders': `Le persone che costruiscono Nodus`, 'contrib.loading': `Caricamento contributori…`, 'contrib.cap': `Ogni granello, una contribuzione.`, 'contrib.commits': `contributi`,
@@ -2354,7 +2354,7 @@ const I18N_V2 = {
     'road.t': `Modi in Arbeit`,
     'road.b': `Nodus zeigt seine Roadmap offen. Diese Modi sind in der Tresor-Auswahl sichtbar, aber noch keine fertige Arbeit — wir zeigen dir lieber den Plan, als so zu tun, als gäbe es ihn nicht.`,
     'road.preview': `Vorschau`, 'road.soon': `Geplant`,
-    'road.teaching.t': `Lehre`, 'road.teaching.b': `Heute anlegbar, aber leer — die Lehr-Bereiche werden noch gebaut.`,
+    'road.teaching.t': `Lehre`, 'road.teaching.b': `Verfügbar mit Gruppen, Stundenplänen, Materialien, Rubriken, Prüfungen und Notenbuch auf Grundlage eines veröffentlichten Bewertungsplans.`,
     'road.worldbuilding.t': `Worldbuilding`, 'road.worldbuilding.b': `Dieselbe Hülle, für Fiktion und erfundene Welten statt Forschung.`,
     'road.primary.t': `Primärquellen`, 'road.primary.b': `Archivalien neben der Sekundärliteratur, mit quellenkritischer Extraktion.`,
     'road.testimony.t': `Zeugnisse`, 'road.testimony.b': `Interviews und Oral History: wer spricht, Transkripte und was jede Person tatsächlich gesagt hat.`,
@@ -2374,13 +2374,13 @@ const I18N_V2 = {
     'v.study.b': `Nimm die Vorlesung auf, transkribiere sie mit lokalem Whisper, und jede Zeile bleibt anklickbar: die Antwort im Chat zitiert den Zeitstempel, aus dem sie stammt, und die Konzepte werden zu einer Ideenkarte nur für dieses Fach.`,
     'v.genealogy.t': `Eine Familie, aus den Akten rekonstruiert`,
     'v.genealogy.b': `Personen, Daten und Orte kommen aus Zählungen, Registern und Briefen. Der Assistent schlägt vor, wie sie zusammenhängen, und wartet auf deine Bestätigung, bevor jemand in den Stammbaum kommt.`,
-    'v.databases.t': `Du bringst die Daten, es rechnet`,
+    'v.databases.t': `Du bringst die Daten, Nodus rechnet`,
     'v.databases.b': `Verwandle deine eigenen Aufzeichnungen in typisierte Tabellen und bitte um eine Auswertung. Der Assistent wählt die Methode, die App rechnet sie wirklich, also ist eine Korrelation oder Regression eine Berechnung, keine Vermutung.`,
     'v.academicEvidence.t': `Sieh, wo die Literatur widerspricht`, 'v.academicEvidence.b': `Nodus stellt konkurrierende Aussagen mit Belegen und Chronologie gegenüber und macht fehlende Verbindungen zu konkreten Forschungsfragen.`,
     'v.studyPlanner.t': `Das ganze Studienjahr im Griff`, 'v.studyPlanner.b': `Ordne Materialien nach Jahr, Kurs und Fach und bündele Stundenplan, Fristen, Prüfungen und Lernzeiten in einem Kalender mit Erinnerungen und Fortschritt.`,
     'v.genealogyArchive.t': `Jedes Lebensereignis behält seinen Beleg`, 'v.genealogyArchive.b': `Baue ein verknüpftes Archiv aus Registern, Zählungen, Briefen und Fotos. Geburt, Heirat, Wohnort und Verwandtschaft bleiben bis zum genauen Dokument verfolgbar.`,
     'v.databaseBuilder.t': `Modelliere Daten, ohne sie zu verflachen`, 'v.databaseBuilder.b': `Erstelle Feldtypen, Beziehungen, Formeln, Rollups und gefilterte Ansichten. Importiere CSV, verknüpfe Tabellen und klassifiziere Zeilen per KI, ohne Daten zu erfinden.`,
-    'v.teachPlanner.t': `Vom Schuljahr bis zur morgigen Stunde`, 'v.teachPlanner.b': `Plane Kurse, Einheiten und Stunden in einem verbundenen Kalender und halte Stundenpläne, Leitfäden, Material und Bewertungstermine zusammen.`,
+    'v.teachPlanner.t': `Vom Bewertungsplan bis zu jeder Endnote`, 'v.teachPlanner.b': `Veröffentliche Gewichtungen vor der Benotung, halte befreit, nicht bewertet und nicht abgegeben auseinander und öffne die Berechnung hinter jedem Endergebnis.`,
     'contrib.kicker': `Open Source, gemeinsam`, 'contrib.title': `Jeder Knoten zählt.`,
     'contrib.lead': `Nodus wächst mit jedem Beitrag — wie Sandkörner fügt sich jedes dem Ganzen hinzu. Eine einzelne Person hat es begonnen; jeder kann das nächste Korn beitragen.`,
     'contrib.prs': `Die Pull Requests ansehen`, 'contrib.repo': `Den Code durchstöbern`, 'contrib.builders': `Die Menschen, die Nodus bauen`, 'contrib.loading': `Mitwirkende werden geladen…`, 'contrib.cap': `Jedes Korn ein Beitrag.`, 'contrib.commits': `Beiträge`,
@@ -2424,7 +2424,7 @@ const I18N_V2 = {
     'road.t': `Modos a caminho`,
     'road.b': `O Nodus publica o seu roteiro à vista. Estes modos aparecem no seletor de cofres mas ainda não são trabalho terminado — preferimos mostrar-te o plano a fingir que não existe.`,
     'road.preview': `Pré-visualização`, 'road.soon': `Previsto`,
-    'road.teaching.t': `Docência`, 'road.teaching.b': `Hoje dá para criar, mas está vazio — as secções de docência ainda estão a ser construídas.`,
+    'road.teaching.t': `Docência`, 'road.teaching.b': `Disponível com turmas, horários, materiais, rubricas, exames e pauta baseada num plano de avaliação publicado.`,
     'road.worldbuilding.t': `Worldbuilding`, 'road.worldbuilding.b': `A mesma casca, para ficção e mundos construídos em vez de investigação.`,
     'road.primary.t': `Fontes primárias`, 'road.primary.b': `Documentos de arquivo ao lado da literatura secundária, com extração crítica de fontes.`,
     'road.testimony.t': `Testemunhos`, 'road.testimony.b': `Entrevistas e história oral: quem fala, transcrições e o que cada pessoa disse mesmo.`,
@@ -2444,13 +2444,13 @@ const I18N_V2 = {
     'v.study.b': `Grava a aula, transcreve-a com Whisper local e cada linha continua clicável: a resposta do chat cita o minuto de onde veio, e os conceitos tornam-se um mapa de ideias só dessa disciplina.`,
     'v.genealogy.t': `Uma família, reconstruída a partir dos registos`,
     'v.genealogy.b': `Pessoas, datas e lugares saem de censos, registos e cartas. O assistente propõe como se ligam e espera pela tua confirmação antes de alguém entrar na árvore.`,
-    'v.databases.t': `Tu trazes os dados, ele faz as contas`,
+    'v.databases.t': `Tu trazes os dados, o Nodus faz as contas`,
     'v.databases.b': `Transforma os teus registos em tabelas tipadas e pede uma análise. O assistente escolhe o método e a app calcula-o a sério, por isso uma correlação ou uma regressão é um cálculo, nunca um palpite.`,
     'v.academicEvidence.t': `Vê onde a literatura diverge`, 'v.academicEvidence.b': `O Nodus confronta afirmações rivais, evidências e cronologia, e transforma ligações em falta em perguntas de investigação explícitas.`,
     'v.studyPlanner.t': `Todo o ano letivo sob controlo`, 'v.studyPlanner.b': `Organiza materiais por ano, curso e disciplina, e reúne horários, prazos, exames e estudo num calendário com lembretes e progresso.`,
     'v.genealogyArchive.t': `Cada acontecimento conserva a sua evidência`, 'v.genealogyArchive.b': `Cria um arquivo ligado de registos, censos, cartas e fotografias. Cada nascimento, casamento, residência e parentesco fica rastreável até ao documento exato.`,
     'v.databaseBuilder.t': `Modela os dados sem os achatar`, 'v.databaseBuilder.b': `Cria campos tipados, relações, fórmulas, rollups e vistas filtradas. Importa CSV, liga tabelas e classifica linhas com IA sem inventar dados.`,
-    'v.teachPlanner.t': `Do ano letivo à aula de amanhã`, 'v.teachPlanner.b': `Planeia cursos, unidades e aulas num calendário ligado, mantendo juntos horários, guias, materiais e marcos de avaliação.`,
+    'v.teachPlanner.t': `Do plano de avaliação a cada nota final`, 'v.teachPlanner.b': `Publica as ponderações antes de avaliar, mantém isento, não avaliado e não entregue como estados distintos e abre o cálculo por trás de qualquer resultado final.`,
     'contrib.kicker': `Código aberto, juntos`, 'contrib.title': `Cada nó conta.`,
     'contrib.lead': `O Nodus cresce uma contribuição de cada vez — como grãos de areia, cada um soma ao todo. Uma só pessoa começou; qualquer um pode juntar o próximo grão.`,
     'contrib.prs': `Ver os pull requests`, 'contrib.repo': `Explorar o código`, 'contrib.builders': `As pessoas que constroem o Nodus`, 'contrib.loading': `A carregar colaboradores…`, 'contrib.cap': `Cada grão, uma contribuição.`, 'contrib.commits': `contribuições`,
@@ -2494,7 +2494,7 @@ const I18N_V2 = {
     'road.t': `Yolda olan modlar`,
     'road.b': `Nodus yol haritasını açıkta tutar. Bu modlar kasa seçicide görünür ama henüz bitmiş iş değil — planı size göstermeyi, yokmuş gibi davranmaya tercih ediyoruz.`,
     'road.preview': `Önizleme`, 'road.soon': `Planlanan`,
-    'road.teaching.t': `Öğretim`, 'road.teaching.b': `Bugün oluşturulabilir ama boş — öğretim bölümleri hâlâ yapılıyor.`,
+    'road.teaching.t': `Öğretim`, 'road.teaching.b': `Gruplar, ders programları, materyaller, rubrikler, sınavlar ve yayımlanmış değerlendirme planına dayalı not çizelgesiyle kullanılabilir.`,
     'road.worldbuilding.t': `Worldbuilding`, 'road.worldbuilding.b': `Aynı kabuk; araştırma yerine kurgu ve kurulmuş dünyalar için.`,
     'road.primary.t': `Birincil Kaynaklar`, 'road.primary.b': `İkincil literatürün yanında arşiv belgeleri, kaynak-eleştirel çıkarımla.`,
     'road.testimony.t': `Tanıklıklar`, 'road.testimony.b': `Görüşmeler ve sözlü tarih: kim konuşuyor, dökümler ve herkesin tam olarak ne dediği.`,
@@ -2514,13 +2514,13 @@ const I18N_V2 = {
     'v.study.b': `Dersi kaydedin, yerel Whisper ile yazıya dökün; her satır tıklanabilir kalır: sohbetteki yanıt geldiği zaman damgasını gösterir ve kavramlar yalnızca o dersin fikir haritasına dönüşür.`,
     'v.genealogy.t': `Kayıtlardan yeniden kurulan bir aile`,
     'v.genealogy.b': `Kişiler, tarihler ve yerler nüfus sayımlarından, kütüklerden ve mektuplardan çıkar. Asistan bağlantılarını önerir ve ağaca kimse girmeden önce onayınızı bekler.`,
-    'v.databases.t': `Veriyi siz getirin, hesabı o yapsın`,
+    'v.databases.t': `Veriyi siz getirin, hesabı Nodus yapsın`,
     'v.databases.b': `Kendi kayıtlarınızı tipli tablolara dönüştürün, sonra bir analiz isteyin. Asistan yöntemi seçer, uygulama gerçekten hesaplar, yani bir korelasyon ya da regresyon bir hesaptır, asla bir tahmin değil.`,
     'v.academicEvidence.t': `Literatürün nerede ayrıştığını görün`, 'v.academicEvidence.b': `Nodus rakip iddiaları kanıtları ve kronolojileriyle karşılaştırır, eksik bağlantıları açık araştırma sorularına dönüştürür.`,
     'v.studyPlanner.t': `Tüm akademik yıl kontrol altında`, 'v.studyPlanner.b': `Materyalleri yıl, program ve derse göre düzenleyin; takvim, son tarihler, sınavlar ve çalışma oturumlarını hatırlatıcılarla tek takvimde toplayın.`,
     'v.genealogyArchive.t': `Her yaşam olayı kanıtını korur`, 'v.genealogyArchive.b': `Kütük, sayım, mektup ve fotoğraflardan bağlı bir arşiv kurun. Her doğum, evlilik, ikamet ve akrabalık tam belgesine kadar izlenebilir.`,
     'v.databaseBuilder.t': `Verileri düzleştirmeden modelleyin`, 'v.databaseBuilder.b': `Alan türleri, ilişkiler, formüller, rollup'lar ve filtreli görünümler oluşturun. CSV içe aktarın, tabloları bağlayın ve veri uydurmadan YZ sütunlarıyla sınıflandırın.`,
-    'v.teachPlanner.t': `Akademik yıldan yarınki derse`, 'v.teachPlanner.b': `Programları, üniteleri ve dersleri bağlı bir takvimde planlayın; ders programını, kılavuzları, materyalleri ve değerlendirme aşamalarını birlikte tutun.`,
+    'v.teachPlanner.t': `Değerlendirme planından her dönem sonu notuna`, 'v.teachPlanner.b': `Not vermeden önce ağırlıkları yayımlayın; muaf, değerlendirilmedi ve teslim edilmedi durumlarını ayrı tutun ve her sonucun hesabını açın.`,
     'contrib.kicker': `Açık kaynak, birlikte`, 'contrib.title': `Her düğüm önemlidir.`,
     'contrib.lead': `Nodus her seferinde bir katkıyla büyür — kum taneleri gibi, her biri bütüne eklenir. Onu tek bir kişi başlattı; bir sonraki taneyi herkes ekleyebilir.`,
     'contrib.prs': `Pull request'leri gör`, 'contrib.repo': `Kodu incele`, 'contrib.builders': `Nodus'u inşa edenler`, 'contrib.loading': `Katkıda bulunanlar yükleniyor…`, 'contrib.cap': `Her tane bir katkı.`, 'contrib.commits': `katkı`,
@@ -2564,7 +2564,7 @@ const I18N_V2 = {
     'road.t': `即将推出的模式`,
     'road.b': `Nodus 把路线图公开摆出来。这些模式在保险库选择器里能看到，但还不是完成的工作——我们宁愿给你看计划，也不假装它不存在。`,
     'road.preview': `预览`, 'road.soon': `计划中`,
-    'road.teaching.t': `教学`, 'road.teaching.b': `今天就能创建，但里面是空的——教学相关板块仍在建设中。`,
+    'road.teaching.t': `教学`, 'road.teaching.b': `现已支持班级、课表、材料、量规、考试，以及基于已发布评价方案的成绩册。`,
     'road.worldbuilding.t': `世界构建`, 'road.worldbuilding.b': `同样的框架，面向虚构与架空世界，而非研究。`,
     'road.primary.t': `原始档案`, 'road.primary.b': `档案文献与二手文献并列，采用来源批判式抽取。`,
     'road.testimony.t': `口述与证言`, 'road.testimony.b': `访谈与口述史：谁在说、转写文本，以及每个人究竟说了什么。`,
@@ -2584,13 +2584,13 @@ const I18N_V2 = {
     'v.study.b': `录下课程，用本地 Whisper 转写，每一行都仍可点击：聊天中的回答会标出它来自哪个时间点，而其中的概念会汇成只属于这门课的概念图。`,
     'v.genealogy.t': `一个家族，从档案中重建`,
     'v.genealogy.b': `人物、日期与地点从户口、登记簿和书信中被提取出来。助手会提出他们如何相连，并在任何人进入家谱前等待你确认。`,
-    'v.databases.t': `你带来数据，它来算`,
+    'v.databases.t': `你带来数据，Nodus 来计算`,
     'v.databases.b': `把你的记录变成类型化表格，然后请求分析。助手选择方法，应用真正地计算，所以相关或回归是一次运算，而不是猜测。`,
     'v.academicEvidence.t': `看见文献在哪里分歧`, 'v.academicEvidence.b': `Nodus 将竞争性论点、证据与时间线对照，再把缺失的联系转成明确的研究问题。`,
     'v.studyPlanner.t': `整个学年，尽在掌握`, 'v.studyPlanner.b': `按学年、课程和科目整理材料，将课表、截止日期、考试和学习时段汇入带提醒与进度的日历。`,
     'v.genealogyArchive.t': `每个生命事件都保留证据`, 'v.genealogyArchive.b': `将登记簿、人口调查、书信和照片建成关联档案，使出生、婚姻、居住和亲属关系都可追溯到精确文件。`,
     'v.databaseBuilder.t': `建模数据，而不是把它压平`, 'v.databaseBuilder.b': `创建类型字段、关系、公式、汇总和过滤视图。导入 CSV、连接表格，并用 AI 列分类行而不编造数据。`,
-    'v.teachPlanner.t': `从学年到明天的课`, 'v.teachPlanner.b': `在关联日历中规划课程、单元和课堂，将课表、教学指南、材料和评价节点集中保存。`,
+    'v.teachPlanner.t': `从评价方案到每一个期末成绩`, 'v.teachPlanner.b': `评分前发布权重规则，明确区分免评、未评价和未提交，并可打开每个最终结果背后的计算。`,
     'contrib.kicker': `开源，携手同行`, 'contrib.title': `每个节点都重要。`,
     'contrib.lead': `Nodus 每次一个贡献地成长——就像一粒粒沙子，每一粒都汇入整体。它由一个人起步；任何人都能添上下一粒沙。`,
     'contrib.prs': `查看 Pull Request`, 'contrib.repo': `浏览代码`, 'contrib.builders': `参与建设 Nodus 的人`, 'contrib.loading': `正在加载贡献者…`, 'contrib.cap': `每一粒，都是一次贡献。`, 'contrib.commits': `次提交`,
@@ -2627,9 +2627,9 @@ Object.assign(I18N, {
     'vaults.databases.f2': `<b>実データ上で再現可能な分析とグラフを実行</b>し、相関、カイ二乗、ANOVA、回帰を計算します。`,
     'vaults.databases.f3': `<b>自然言語で質問しAI列で分類を自動化</b>。存在しない項目や値は捏造しません。`, 'vaults.databases.cta': `データベースデモを開く →`,
     'road.teaching.t': `教育`, 'vaults.teaching.b': `コースと授業を計画し、学習活動や評価を準備して、学習者の進捗を追跡します。教育活動は、それを支える教材や根拠と常に結びつきます。`,
-    'vaults.teaching.f1': `<b>年度、課程、授業を一か所で計画</b>し、時間割、カレンダー、シラバス、単元計画を結びます。`,
-    'vaults.teaching.f2': `<b>自分の教材から学習活動、テスト、試験、ルーブリックを作成</b>し、確認・調整できます。`,
-    'vaults.teaching.f3': `<b>成績、進捗、フィードバックを非公開で管理</b>し、AI利用時は匿名の学習者コードを使います。`, 'vaults.teaching.cta': `Nodusをダウンロードして始める →`, 'vaults.teaching.available': `教育Vaultで利用可能`,
+    'vaults.teaching.f1': `<b>年度、コース、グループ、科目を一か所で整理</b>し、時間割、カレンダー、教材、録音を結びます。`,
+    'vaults.teaching.f2': `<b>問題バンク、加重ルーブリック、印刷可能な試験を作成</b>し、公開済み評価計画を非数値状態も明示する成績簿に適用します。`,
+    'vaults.teaching.f3': `<b>成績、進捗、フィードバックを非公開で管理</b>し、AI利用時は氏名を端末内の仮名コードに置き換えます。`, 'vaults.teaching.cta': `教育デモを開く →`, 'vaults.teaching.available': `教育Vaultで利用可能`,
     'road.primary.t': `一次資料`, 'vaults.primary.b': `公文書、写本、歴史コレクションを史料批判の視点で扱います。翻刻、解釈、結論を、それを裏づける原資料のそばに保存します。`,
     'vaults.primary.f1': `<b>画像、写真、写本から忠実なアーカイブを構築</b>し、OCR、翻刻、来歴、原画像を一体で保持します。`,
     'vaults.primary.f2': `<b>人物、場所、出来事、主張の抽出時に史料批判を適用</b>し、文書の記述と研究者の推論を分けます。`,
@@ -2649,7 +2649,7 @@ Object.assign(I18N, {
     'v.studyPlanner.t': `学年全体をひとつに管理`, 'v.studyPlanner.b': `教材を年度・課程・科目別に整理し、時間割、締切、試験、学習時間をリマインダーと進捗付きカレンダーにまとめます。`,
     'v.genealogyArchive.t': `人生の各出来事に根拠を`, 'v.genealogyArchive.b': `台帳、国勢調査、書簡、写真をつなぐアーカイブを作り、出生、結婚、居住、親族関係を正確な文書へ追跡可能にします。`,
     'v.databaseBuilder.t': `データを平板化せずモデル化`, 'v.databaseBuilder.b': `型付きフィールド、関係、数式、集計、フィルタービューを作成。CSVとテーブルをつなぎ、値を捏造せずAI列で分類します。`,
-    'v.teachPlanner.t': `学年から明日の授業まで`, 'v.teachPlanner.b': `課程、単元、授業を連携カレンダーで計画し、時間割、ガイド、教材、評価日程をまとめます。`,
+    'v.teachPlanner.t': `評価計画から一人ひとりの最終成績まで`, 'v.teachPlanner.b': `採点前に重みを公開し、免除・未評価・未提出を別の状態として保持し、各最終結果の計算を確認できます。`,
     'story.kicker': `仕組み`, 'story.title': `資料から、使えるアイデアへ。`, 'views.kicker': `動くVault`, 'views.title': `各モードでできることを見る。`,
     'band.kicker': `本当に無料、ローカルファースト`, 'band.title': `完全無料。完全にあなたのもの。`, 'feat.kicker': `すべてを内蔵`, 'feat.title': `一つのアプリで、研究の全工程を。`,
     'contrib.kicker': `共につくるオープンソース`, 'contrib.title': `すべてのノードに意味がある。`, 'final.title': `あなたのライブラリと出会いませんか？`, 'final.download': `アプリをダウンロード`,
@@ -2667,7 +2667,7 @@ Object.assign(I18N, {
     'vaults.study.t': `Навчання`, 'vaults.study.b': `Упорядкуйте предмети, нотатки й матеріали в одному місці. Навчайтеся у власному темпі, готуйтеся до оцінювань і стежте за прогресом без залежності від Zotero чи завантаження файлів.`, 'vaults.study.f1': `<b>Упорядковуйте матеріали за навчальним роком, курсом і предметом</b>, додавайте розклад, дедлайни та події з нагадуваннями.`, 'vaults.study.f2': `<b>Записуйте й транскрибуйте заняття локально</b>, читайте PDF та EPUB і повертайтеся з відповіді до точної сторінки, нотатки або секунди.`, 'vaults.study.f3': `<b>Створюйте зі своїх матеріалів банки питань, тести, іспити й картки</b> з інтервальним повторенням і відстеженням прогресу.`, 'vaults.study.cta': `Відкрити демо навчання →`,
     'vaults.genealogy.t': `Генеалогія`, 'vaults.genealogy.b': `Досліджуйте родинні історії й життєві шляхи окремих людей за первинними джерелами. Зіставляйте особи, події та спорідненість і пов’язуйте кожен висновок із документами, що його підтверджують.`, 'vaults.genealogy.f1': `<b>Відтворюйте людей у родоводі, хронології та на мапі</b> з імпортом і експортом GEDCOM та доказами для кожної події.`, 'vaults.genealogy.f2': `<b>Створюйте пов’язаний архів переписів, реєстрів, листів і фотографій</b>, прив’язаний до людей, місць і подій.`, 'vaults.genealogy.f3': `<b>Перевіряйте запропоновані особи й спорідненість як доказові гіпотези</b>, не приховуючи суперечностей, давніх написань і непевних дат.`, 'vaults.genealogy.cta': `Відкрити демо генеалогії →`,
     'vaults.databases.t': `Бази даних`, 'vaults.databases.b': `Упорядковуйте польові матеріали, корпуси, каталоги й кодувальні таблиці у структурованих базах даних. Аналізуйте інформацію, зберігаючи типи полів, зв’язки та категорії ваших даних.`, 'vaults.databases.f1': `<b>Будуйте структуровані бази з реальними типами полів</b>, зв’язками, формулами, зведеннями, вкладеннями, CSV та збереженими поданнями.`, 'vaults.databases.f2': `<b>Виконуйте відтворюваний аналіз і будуйте графіки</b> — від кореляції та χ² до ANOVA й регресії.`, 'vaults.databases.f3': `<b>Ставте запитання природною мовою й автоматизуйте класифікацію</b>, не вигадуючи полів або значень, яких немає у даних.`, 'vaults.databases.cta': `Відкрити демо баз даних →`,
-    'road.teaching.t': `Викладання`, 'vaults.teaching.b': `Плануйте курси й заняття, готуйте вправи та оцінювання і стежте за поступом учнів. Уся викладацька робота залишається пов’язаною з матеріалами й доказами, на яких вона ґрунтується.`, 'vaults.teaching.f1': `<b>Плануйте навчальні роки, курси й заняття в одному місці</b> з розкладами, календарями, програмами та планами тем.`, 'vaults.teaching.f2': `<b>Створюйте навчальні ситуації, тести, іспити й рубрики зі своїх матеріалів</b>, щоб потім перевірити й адаптувати їх.`, 'vaults.teaching.f3': `<b>Конфіденційно відстежуйте оцінки, поступ і відгуки</b>, використовуючи анонімні коди учнів, коли допомагає ШІ.`, 'vaults.teaching.cta': `Завантажити Nodus і почати →`, 'vaults.teaching.available': `Доступно у сховищі викладання`,
+    'road.teaching.t': `Викладання`, 'vaults.teaching.b': `Плануйте курси й заняття, готуйте вправи та оцінювання і стежте за поступом учнів. Уся викладацька робота залишається пов’язаною з матеріалами й доказами, на яких вона ґрунтується.`, 'vaults.teaching.f1': `<b>Організуйте навчальні роки, курси, групи й предмети в одному місці</b> з розкладами, календарями, матеріалами та записами.`, 'vaults.teaching.f2': `<b>Створюйте банки запитань, зважені рубрики та друковані іспити</b>, а потім застосовуйте опублікований план оцінювання в журналі, що явно зберігає нечислові стани.`, 'vaults.teaching.f3': `<b>Конфіденційно відстежуйте оцінки, поступ і відгуки</b>, замінюючи імена локальними псевдонімними кодами, коли допомагає ШІ.`, 'vaults.teaching.cta': `Відкрити демо викладання →`, 'vaults.teaching.available': `Доступно у сховищі викладання`,
     'road.primary.t': `Первинні джерела`, 'vaults.primary.b': `Працюйте критично з архівними документами, рукописами та історичними колекціями. Зберігайте кожну транскрипцію, інтерпретацію й висновок поруч з оригінальним джерелом, що їх підтверджує.`, 'vaults.primary.f1': `<b>Створюйте точний архів зі сканів, фотографій і рукописів</b>, зберігаючи разом OCR, транскрипцію, походження та оригінал.`, 'vaults.primary.f2': `<b>Застосовуйте критику джерел під час вилучення осіб, місць, подій і тверджень</b>, відділяючи сказане документом від власних висновків.`, 'vaults.primary.f3': `<b>Поєднуйте джерела у хронологіях, мапах і дослідницьких досьє</b>, зіставляючи версії та суперечливі свідчення на рівні сторінки.`,
     'road.testimony.t': `Свідчення`, 'vaults.testimony.b': `Документуйте й аналізуйте інтерв’ю та усну історію, не втрачаючи голосу й контексту учасників. Зберігайте транскрипції, оригінальні фрагменти й умови використання впродовж усього дослідження.`, 'vaults.testimony.f1': `<b>Імпортуйте аудіо й відео з локальною транскрипцією та розділенням мовців</b>, прив’язуючи уривки до часових міток.`, 'vaults.testimony.f2': `<b>Керуйте мовцями, ролями, згодою й умовами доступу</b>, щоб етичний контекст завжди був видимим.`, 'vaults.testimony.f3': `<b>Кодуйте теми, порівнюйте розповіді й будуйте пошуковий корпус усної історії</b> з поверненням до точного фрагмента.`,
     'vaults.prosopography.t': `Просопографія`, 'vaults.prosopography.b': `Досліджуйте групи й колективні траєкторії за розпорошеними джерелами. Пов’язуйте біографії, установи, місця й події, щоб виявляти закономірності, не втрачаючи з поля зору окремих життєвих історій.`, 'vaults.prosopography.f1': `<b>Створюйте пов’язаний із джерелами біографічний каталог когорти</b> з гнучкою анкетою про імена, посади, кар’єри, зв’язки, місця й події.`, 'vaults.prosopography.f2': `<b>Розрізняйте варіанти імен, тезок і непевні особи, не приховуючи сумнівів</b>; об’єднання чи поділ підтверджує лише дослідник.`, 'vaults.prosopography.f3': `<b>Виявляйте закономірності між людьми, кар’єрами й установами</b> через порівняння когорт, мережі, хронології, мапи й статистику з посиланнями на джерела.`,
@@ -2676,7 +2676,7 @@ Object.assign(I18N, {
     'v.studyPlanner.t': `Увесь навчальний рік під контролем`, 'v.studyPlanner.b': `Упорядкуйте матеріали за роком, курсом і предметом, а розклад, дедлайни, іспити й навчання зберіть у календарі.`,
     'v.genealogyArchive.t': `Кожна життєва подія зберігає доказ`, 'v.genealogyArchive.b': `Збудуйте пов’язаний архів реєстрів, переписів, листів і світлин, щоб кожну подію можна було простежити до документа.`,
     'v.databaseBuilder.t': `Моделюйте дані, не сплющуючи їх`, 'v.databaseBuilder.b': `Створюйте типовані поля, зв’язки, формули, агрегації та подання; з’єднуйте таблиці й класифікуйте без вигаданих даних.`,
-    'v.teachPlanner.t': `Від навчального року до завтрашнього уроку`, 'v.teachPlanner.b': `Плануйте курси, теми й заняття у пов’язаному календарі з розкладами, матеріалами й оцінюванням.`,
+    'v.teachPlanner.t': `Від плану оцінювання до кожної підсумкової оцінки`, 'v.teachPlanner.b': `Опублікуйте ваги до виставлення оцінок, розрізняйте звільнено, не оцінено й не подано та відкривайте розрахунок кожного підсумку.`,
     'story.kicker': `Як це працює`, 'story.title': `Від джерел до ідей, якими можна скористатися.`, 'views.kicker': `Кожне сховище в дії`, 'views.title': `Подивіться, що вміє кожен режим.`, 'band.kicker': `Справді безкоштовно й локально`, 'band.title': `Повністю безкоштовно. Повністю ваше.`, 'feat.kicker': `Усе всередині`, 'feat.title': `Один застосунок. Увесь цикл дослідження.`, 'contrib.kicker': `Відкритий код разом`, 'contrib.title': `Кожен вузол важливий.`, 'final.title': `Готові познайомитися зі своєю бібліотекою?`, 'final.download': `Завантажити застосунок`, 'dl.title': `Завантажити Nodus`, 'dl.fetching': `Отримуємо останню версію…`, 'dl.latest': `Остання версія`, 'dl.free': `100% безкоштовно · відкритий код · без реєстрації`, 'dl.all': `Усі формати й попередні версії →`, 'dl.close': `Закрити`,
   },
   ru: {
@@ -2687,7 +2687,7 @@ Object.assign(I18N, {
     'vaults.study.t': `Учёба`, 'vaults.study.b': `Организуйте предметы, заметки и материалы в одном месте. Учитесь в своём темпе, готовьтесь к проверочным работам и следите за прогрессом без зависимости от Zotero и загрузки файлов.`, 'vaults.study.f1': `<b>Организуйте материалы по учебному году, курсу и предмету</b>, добавляя расписание, сроки и события с напоминаниями.`, 'vaults.study.f2': `<b>Записывайте и расшифровывайте занятия локально</b>, читайте PDF и EPUB и возвращайтесь от ответа к точной странице, заметке или секунде.`, 'vaults.study.f3': `<b>Создавайте из своих материалов банки вопросов, тесты, экзамены и карточки</b> с интервальным повторением и отслеживанием прогресса.`, 'vaults.study.cta': `Открыть демо учёбы →`,
     'vaults.genealogy.t': `Генеалогия`, 'vaults.genealogy.b': `Исследуйте семейные истории и жизненные пути отдельных людей по первичным источникам. Сопоставляйте личности, события и родственные связи и связывайте каждый вывод с подтверждающими документами.`, 'vaults.genealogy.f1': `<b>Восстанавливайте людей в семейном древе, хронологии и на карте</b> с импортом и экспортом GEDCOM и доказательствами каждого события.`, 'vaults.genealogy.f2': `<b>Создавайте связанный архив переписей, реестров, писем и фотографий</b>, привязанный к людям, местам и событиям.`, 'vaults.genealogy.f3': `<b>Проверяйте предполагаемые личности и родство как доказательные гипотезы</b>, сохраняя противоречия, исторические написания и неточные даты.`, 'vaults.genealogy.cta': `Открыть демо генеалогии →`,
     'vaults.databases.t': `Базы данных`, 'vaults.databases.b': `Для собственных данных: полевых материалов, корпусов, каталогов и кодировочных таблиц с настоящими типами полей.`, 'vaults.databases.f1': `<b>Создавайте структурированные базы с реальными типами полей</b>, связями, формулами, сводками, вложениями, CSV и сохранёнными представлениями.`, 'vaults.databases.f2': `<b>Выполняйте воспроизводимый анализ и строьте графики</b> — от корреляции и χ² до ANOVA и регрессии.`, 'vaults.databases.f3': `<b>Задавайте вопросы на естественном языке и автоматизируйте классификацию</b>, не выдумывая отсутствующих полей или значений.`, 'vaults.databases.cta': `Открыть демо баз данных →`,
-    'road.teaching.t': `Преподавание`, 'vaults.teaching.b': `Планируйте курсы и занятия, создавайте оценивание и отслеживайте прогресс, не отделяя материалы от работы с ними.`, 'vaults.teaching.f1': `<b>Планируйте учебные годы, курсы и занятия в одном месте</b> с расписаниями, календарями, программами и планами тем.`, 'vaults.teaching.f2': `<b>Создавайте учебные ситуации, тесты, экзамены и рубрики из своих материалов</b>, чтобы затем проверить и адаптировать их.`, 'vaults.teaching.f3': `<b>Конфиденциально отслеживайте оценки, прогресс и обратную связь</b>, используя анонимные коды учащихся при работе ИИ.`, 'vaults.teaching.cta': `Скачать Nodus и начать →`, 'vaults.teaching.available': `Доступно в хранилище преподавания`,
+    'road.teaching.t': `Преподавание`, 'vaults.teaching.b': `Планируйте курсы и занятия, создавайте оценивание и отслеживайте прогресс, не отделяя материалы от работы с ними.`, 'vaults.teaching.f1': `<b>Организуйте учебные годы, курсы, группы и предметы в одном месте</b> с расписаниями, календарями, материалами и записями.`, 'vaults.teaching.f2': `<b>Создавайте банки вопросов, взвешенные рубрики и печатные экзамены</b>, затем применяйте опубликованный план оценивания в журнале, где нечисловые статусы остаются явными.`, 'vaults.teaching.f3': `<b>Конфиденциально отслеживайте оценки, прогресс и обратную связь</b>, заменяя имена локальными псевдонимными кодами при работе ИИ.`, 'vaults.teaching.cta': `Открыть демо преподавания →`, 'vaults.teaching.available': `Доступно в хранилище преподавания`,
     'road.primary.t': `Первичные источники`, 'vaults.primary.b': `Пространство для критики архивных документов, рукописей и исторических коллекций, где каждое толкование хранится рядом с источником.`, 'vaults.primary.f1': `<b>Создавайте точный архив из сканов, фотографий и рукописей</b>, сохраняя вместе OCR, транскрипцию, происхождение и оригинал.`, 'vaults.primary.f2': `<b>Применяйте критику источников при извлечении людей, мест, событий и утверждений</b>, отделяя сказанное документом от своих выводов.`, 'vaults.primary.f3': `<b>Связывайте источники в хронологиях, картах и исследовательских досье</b>, сопоставляя версии и противоречивые свидетельства на уровне страницы.`,
     'road.testimony.t': `Свидетельства`, 'vaults.testimony.b': `Пространство для интервью и устной истории, сохраняющее голос, контекст и точные слова каждого говорящего на всём пути исследования.`, 'vaults.testimony.f1': `<b>Импортируйте аудио и видео с локальной расшифровкой и разделением говорящих</b>, связывая фрагменты с временными метками.`, 'vaults.testimony.f2': `<b>Управляйте говорящими, ролями, согласием и условиями доступа</b>, чтобы этический контекст всегда оставался видимым.`, 'vaults.testimony.f3': `<b>Кодируйте темы, сравнивайте рассказы и создавайте поисковый корпус устной истории</b> с возвратом к точному фрагменту.`,
     'vaults.prosopography.t': `Просопография`, 'vaults.prosopography.b': `Пространство коллективной биографии для восстановления заданной группы по разрозненным источникам и изучения карьер, институтов, мобильности и власти.`, 'vaults.prosopography.f1': `<b>Создавайте связанный с источниками биографический каталог когорты</b> с гибкой анкетой имён, должностей, карьер, связей, мест и событий.`, 'vaults.prosopography.f2': `<b>Различайте варианты имён, тёзок и неясные личности, не скрывая сомнений</b>; объединение или разделение подтверждает только исследователь.`, 'vaults.prosopography.f3': `<b>Выявляйте закономерности между людьми, карьерами и учреждениями</b> через сравнение когорт, сети, хронологии, карты и статистику с трассировкой к источникам.`,
@@ -2696,7 +2696,7 @@ Object.assign(I18N, {
     'v.studyPlanner.t': `Весь учебный год под контролем`, 'v.studyPlanner.b': `Организуйте материалы по году, курсу и предмету, а расписание, сроки, экзамены и занятия соберите в календаре.`,
     'v.genealogyArchive.t': `Каждое событие хранит своё доказательство`, 'v.genealogyArchive.b': `Создайте связанный архив реестров, переписей, писем и фотографий, чтобы каждое событие можно было проследить до документа.`,
     'v.databaseBuilder.t': `Моделируйте данные, не уплощая их`, 'v.databaseBuilder.b': `Создавайте типизированные поля, связи, формулы, агрегации и представления; связывайте таблицы и классифицируйте без выдуманных данных.`,
-    'v.teachPlanner.t': `От учебного года до завтрашнего урока`, 'v.teachPlanner.b': `Планируйте курсы, темы и занятия в связанном календаре с расписаниями, материалами и этапами оценивания.`,
+    'v.teachPlanner.t': `От плана оценивания до каждой итоговой оценки`, 'v.teachPlanner.b': `Опубликуйте веса до выставления оценок, различайте освобождён, не оценён и не сдано и открывайте расчёт любого итогового результата.`,
     'story.kicker': `Как это работает`, 'story.title': `От источников к идеям, которые можно использовать.`, 'views.kicker': `Каждое хранилище в действии`, 'views.title': `Посмотрите, что умеет каждый режим.`, 'band.kicker': `По-настоящему бесплатно и локально`, 'band.title': `Полностью бесплатно. Полностью ваше.`, 'feat.kicker': `Всё внутри`, 'feat.title': `Одно приложение. Весь цикл исследования.`, 'contrib.kicker': `Открытый код вместе`, 'contrib.title': `Каждый узел важен.`, 'final.title': `Готовы познакомиться со своей библиотекой?`, 'final.download': `Скачать приложение`, 'dl.title': `Скачать Nodus`, 'dl.fetching': `Получаем последнюю версию…`, 'dl.latest': `Последняя версия`, 'dl.free': `100% бесплатно · открытый код · без регистрации`, 'dl.all': `Все форматы и предыдущие версии →`, 'dl.close': `Закрыть`,
   },
 });
@@ -2743,10 +2743,10 @@ const PT_PT = {
   'vaults.databases.f3': `<b>Faz perguntas em linguagem natural e automatiza classificações com colunas de IA</b>, sem inventar campos ou valores que não existam nos teus dados.`,
   'vaults.status.available': `Disponível agora`, 'vaults.status.soon': `Em breve`, 'vaults.roadmap': `No roteiro`,
   'vaults.teaching.b': `Planeia cursos e aulas, prepara atividades e avaliações e acompanha o progresso dos alunos. Todo o trabalho docente permanece ligado aos materiais e às evidências que o sustentam.`,
-  'vaults.teaching.cta': `Descarrega o Nodus para começar →`, 'vaults.teaching.available': `Disponível no cofre de Docência`,
-  'vaults.teaching.f1': `<b>Planeia anos letivos, cursos e turmas num só lugar</b>, com horários, calendários, guias docentes e planos de unidade ligados.`,
-  'vaults.teaching.f2': `<b>Cria situações de aprendizagem, testes, exames e rubricas a partir dos teus materiais</b>, prontos para rever e adaptar.`,
-  'vaults.teaching.f3': `<b>Acompanha notas, progresso e feedback com privacidade</b>, usando códigos anónimos de alunos sempre que a IA intervém.`,
+  'vaults.teaching.cta': `Abrir a demo de docência →`, 'vaults.teaching.available': `Disponível no cofre de Docência`,
+  'vaults.teaching.f1': `<b>Organiza anos letivos, cursos, turmas e disciplinas num só lugar</b>, com horários, calendários, materiais e gravações ligados.`,
+  'vaults.teaching.f2': `<b>Cria bancos de perguntas, rubricas ponderadas e exames imprimíveis</b>, e aplica um plano de avaliação publicado numa pauta que mantém explícitos os estados não numéricos.`,
+  'vaults.teaching.f3': `<b>Acompanha notas, progresso e feedback com privacidade</b>, substituindo os nomes por códigos pseudónimos locais sempre que a IA intervém.`,
   'vaults.primary.b': `Trabalha de forma crítica com documentos de arquivo, manuscritos e coleções históricas. Conserva cada transcrição, interpretação e conclusão junto da fonte original que a sustenta.`,
   'vaults.primary.f1': `<b>Cria um arquivo fiel a partir de digitalizações, fotografias e manuscritos</b>, mantendo OCR, transcrição, proveniência e imagem original juntos.`,
   'vaults.primary.f2': `<b>Aplica crítica de fontes ao extrair pessoas, lugares, acontecimentos e afirmações</b>, separando o que o documento diz do que tu inferes.`,
@@ -2784,10 +2784,10 @@ const PT_BR = {
   'vaults.databases.f3': `<b>Faça perguntas em linguagem natural e automatize classificações com colunas de IA</b>, sem inventar campos ou valores que não existam nos seus dados.`,
   'vaults.status.available': `Disponível agora`, 'vaults.status.soon': `Em breve`, 'vaults.roadmap': `No roteiro`,
   'vaults.teaching.b': `Planeje cursos e aulas, prepare atividades e avaliações e acompanhe o progresso dos alunos. Todo o trabalho docente permanece ligado aos materiais e às evidências que o sustentam.`,
-  'vaults.teaching.cta': `Baixe o Nodus para começar →`, 'vaults.teaching.available': `Disponível no cofre de Docência`,
-  'vaults.teaching.f1': `<b>Planeje anos letivos, cursos e turmas em um só lugar</b>, com horários, calendários, planos de ensino e unidades conectados.`,
-  'vaults.teaching.f2': `<b>Crie situações de aprendizagem, testes, provas e rubricas a partir dos seus materiais</b>, prontas para revisar e adaptar.`,
-  'vaults.teaching.f3': `<b>Acompanhe notas, progresso e feedback com privacidade</b>, usando códigos anônimos de alunos sempre que a IA participar.`,
+  'vaults.teaching.cta': `Abrir a demo de docência →`, 'vaults.teaching.available': `Disponível no cofre de Docência`,
+  'vaults.teaching.f1': `<b>Organize anos letivos, cursos, turmas e disciplinas em um só lugar</b>, com horários, calendários, materiais e gravações conectados.`,
+  'vaults.teaching.f2': `<b>Crie bancos de perguntas, rubricas ponderadas e provas imprimíveis</b>, e aplique um plano de avaliação publicado em um diário que mantém explícitos os estados não numéricos.`,
+  'vaults.teaching.f3': `<b>Acompanhe notas, progresso e feedback com privacidade</b>, substituindo os nomes por códigos pseudônimos locais sempre que a IA participar.`,
   'vaults.primary.b': `Trabalhe de forma crítica com documentos de arquivo, manuscritos e coleções históricas. Mantenha cada transcrição, interpretação e conclusão junto da fonte original que a sustenta.`,
   'vaults.primary.f1': `<b>Crie um arquivo fiel a partir de digitalizações, fotografias e manuscritos</b>, mantendo OCR, transcrição, proveniência e imagem original juntos.`,
   'vaults.primary.f2': `<b>Aplique crítica de fontes ao extrair pessoas, lugares, acontecimentos e afirmações</b>, separando o que o documento diz do que você infere.`,

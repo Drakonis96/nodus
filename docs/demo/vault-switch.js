@@ -1,6 +1,5 @@
-/* Tiny controller for the demo header's vault/mode switcher — shared by the
-   academic (index.html) and genealogy (genealogy.html) demos. Toggles the
-   dropdown and closes it on an outside click or Escape. */
+/* Tiny controller shared by every live vault demo. Toggles the mode dropdown
+   and closes it on an outside click or Escape. */
 (function () {
   window.toggleVaultMenu = function (e) {
     if (e) e.stopPropagation();
