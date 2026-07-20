@@ -21,7 +21,12 @@ test('essential tutorial is global, seen-once, skippable with confirmation and r
   assert.match(types, /basicsTutorialVersion: number/);
   assert.match(defaults, /basicsTutorialVersion: 0/);
   assert.match(prefs, /'basicsTutorialVersion'/);
-  assert.match(tutorial, /BASICS_TUTORIAL_VERSION = 3/);
+  assert.match(tutorial, /BASICS_TUTORIAL_VERSION = TOOLKIT_BETA_GUIDE_TUTORIAL_VERSION/);
+  assert.match(tutorial, /ToolkitBetaSlides/);
+  assert.match(tutorial, /ToolkitOverviewPanel/);
+  assert.match(tutorial, /IdeaExtractionPanel/);
+  assert.match(tutorial, /LocalPerformancePanel/);
+  assert.match(tutorial, /SubscriptionAccessPanel/);
   assert.match(app, /settings\.basicsTutorialVersion === 0/);
   assert.doesNotMatch(app, /settings\.basicsTutorialVersion < BASICS_TUTORIAL_VERSION/);
   assert.match(app, /preferencesForTutorialLanguage\(language\)/);
@@ -77,8 +82,8 @@ test('essential tutorial teaches the complete novice AI and Nodus foundation in 
   const spanish = tutorial.slice(tutorial.indexOf('function SpanishSlides'), tutorial.indexOf('function EnglishSlides'));
   const english = tutorial.slice(tutorial.indexOf('function EnglishSlides'), tutorial.indexOf('const COMPACT_SLIDES'));
   assert.match(english, /Create and understand images/);
-  assert.equal((spanish.match(/nodi:/g) ?? []).length, 13, 'Spanish guide has thirteen complete slides');
-  assert.equal((english.match(/nodi:/g) ?? []).length, 13, 'English guide has thirteen complete slides');
+  assert.equal((spanish.match(/nodi:/g) ?? []).length, 13, 'Spanish guide keeps thirteen core slides plus the shared Toolkit supplement');
+  assert.equal((english.match(/nodi:/g) ?? []).length, 13, 'English guide keeps thirteen core slides plus the shared Toolkit supplement');
   assert.doesNotMatch(spanish, /local-first|VRAM|cuantizaci[oó]n|inferencia|Speech-to-text|Text-to-speech/);
   for (const language of ['fr', 'tr', 'de', 'it', 'pt', 'zh', 'ja', 'ru', 'uk']) assert.match(tutorial, new RegExp(`${language}: \\[`));
   assert.match(tutorial, /'pt-BR': \[/);

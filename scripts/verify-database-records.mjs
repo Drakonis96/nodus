@@ -62,7 +62,7 @@ try {
     // users, so test preferences must be applied afterwards.
     await window.nodus.updateSettings({
       onboardingComplete: true,
-      basicsTutorialVersion: 3,
+      basicsTutorialVersion: 4,
       recoverySetupVersion: 1,
       tourComplete: true,
       advancedTourComplete: true,

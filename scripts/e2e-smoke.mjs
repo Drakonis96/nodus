@@ -193,14 +193,14 @@ try {
     const settings = await window.nodus.getSettings();
     return settings.uiLanguage === 'fr' && settings.promptLanguage === 'fr';
   }));
-  assert.equal(await page.locator('.tutorial-progress button').count(), 13, 'essential guide exposes thirteen novice-friendly chapters');
+  assert.equal(await page.locator('.tutorial-progress button').count(), 17, 'essential guide exposes thirteen core chapters plus four Toolkit beta chapters');
   await page.locator('.tutorial-topbar button').click();
   // The skip dialog follows the (now French) UI language, proving the French table
   // is actually wired into a real render.
   await page.getByText('Passer le guide essentiel ?', { exact: true }).waitFor();
   await page.getByRole('button', { name: 'Passer quand même', exact: true }).click();
   await page.getByTestId('basics-tutorial').waitFor({ state: 'detached' });
-  assert.equal((await page.evaluate(() => window.nodus.getSettings())).basicsTutorialVersion, 3, 'confirmed skip records the current tutorial version globally');
+  assert.equal((await page.evaluate(() => window.nodus.getSettings())).basicsTutorialVersion, 4, 'confirmed skip records the current tutorial version globally');
 
   // Finish setup, then walk every translated language on the real shell. These labels
   // reach the DOM from navigation.ts through t(), so they prove each table is wired
@@ -368,7 +368,7 @@ try {
   const independent = await page.evaluate(({ model, chat }) =>
     window.nodus.updateSettings({
       onboardingComplete: true,
-      basicsTutorialVersion: 3,
+      basicsTutorialVersion: 4,
       recoverySetupVersion: 1,
       tourComplete: true,
       advancedTourComplete: true,
@@ -1102,7 +1102,7 @@ try {
     const created = await window.nodus.createVault({ name: 'Study smoke', type: 'estudio' });
     const switched = await window.nodus.switchVault(created.vault.id);
     if (!switched.ok) throw new Error(switched.message);
-    await window.nodus.updateSettings({ onboardingComplete: true, basicsTutorialVersion: 3, recoverySetupVersion: 1, tourComplete: true, advancedTourComplete: true, studyTourComplete: true, theme: 'light' });
+    await window.nodus.updateSettings({ onboardingComplete: true, basicsTutorialVersion: 4, recoverySetupVersion: 1, tourComplete: true, advancedTourComplete: true, studyTourComplete: true, theme: 'light' });
   });
   await page.reload();
   await page.getByRole('button', { name: 'Cursos y asignaturas', exact: true }).first().click();

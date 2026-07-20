@@ -72,7 +72,7 @@ try {
     const switched = await window.nodus.switchVault(created.vault.id);
     if (!switched.ok) throw new Error(switched.message);
     await window.nodus.updateSettings({
-      onboardingComplete: true, basicsTutorialVersion: 3, recoverySetupVersion: 1,
+      onboardingComplete: true, basicsTutorialVersion: 4, recoverySetupVersion: 1,
       tourComplete: true, advancedTourComplete: true, studyTourComplete: true,
       theme: 'light', uiLanguage: 'es',
       // Nodi's one-time style-choice modal renders a full-screen backdrop that
