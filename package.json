@@ -74,6 +74,7 @@
     "openai": "^4.73.0",
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^4.8.69",
+    "qrcode": "^1.5.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-markdown": "^10.1.0",
@@ -84,6 +85,7 @@
     "tesseract.js": "^5.1.1",
     "turndown": "^7.2.4",
     "uuid": "^11.0.3",
+    "ws": "^8.21.0",
     "zod": "^3.25.76"
   },
   "devDependencies": {
@@ -93,10 +95,12 @@
     "@types/katex": "^0.16.8",
     "@types/leaflet": "^1.9.21",
     "@types/node": "^22.9.0",
+    "@types/qrcode": "^1.5.5",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@types/turndown": "^5.0.6",
     "@types/uuid": "^10.0.0",
+    "@types/ws": "^8.18.1",
     "@typescript-eslint/eslint-plugin": "^8.15.0",
     "@typescript-eslint/parser": "^8.15.0",
     "@vitejs/plugin-react": "^4.3.3",

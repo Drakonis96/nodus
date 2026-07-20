@@ -158,6 +158,10 @@ const ICON_PATHS: Record<string, string> = {
   // The mascot's face fills the circle: at the 13px the release chip renders, rays
   // or satellite nodes turn it into a smudge.
   nodi: '<circle cx="12" cy="12" r="8.5"/><path d="M9 10.5h.01"/><path d="M15 10.5h.01"/><path d="M9 14.5a4 4 0 0 0 6 0"/>',
+  // AirPlay / Screen Mirroring (PDF Presenter).
+  cast: '<path d="M2 16.1A5 5 0 0 1 5.9 20M2 12.05A9 9 0 0 1 9.95 20M2 8V6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6"/><line x1="2" y1="20" x2="2.01" y2="20"/>',
+  // System volume (PDF Presenter).
+  volume: '<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>',
 };
 
 /** Complete renderer-owned icon catalogue. Pickers should consume this list so

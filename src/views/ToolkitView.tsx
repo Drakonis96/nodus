@@ -8,6 +8,7 @@ import { t } from '../i18n';
 import { TOOLKIT_TOOLS, type ToolkitPage } from '../navigation';
 import { ToolkitConvertView } from './ToolkitConvertView';
 import { ToolkitProtectView } from './ToolkitProtectView';
+import { ToolkitPresenterView } from './ToolkitPresenterView';
 
 interface ToolCardProps {
   testid: string;
@@ -73,6 +74,8 @@ export function ToolkitView({
         <ToolkitConvertView onBack={() => onNavigate('home')} />
       ) : page === 'protect' ? (
         <ToolkitProtectView onBack={() => onNavigate('home')} />
+      ) : page === 'presenter' ? (
+        <ToolkitPresenterView onBack={() => onNavigate('home')} />
       ) : (
         <div data-testid="toolkit-home" className="mx-auto max-w-5xl space-y-6">
           <header className="flex items-start gap-3">

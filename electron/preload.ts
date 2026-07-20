@@ -9,6 +9,7 @@ import type {
   SemanticBridgeProgress,
   ChapterRelationsProgress,
 } from '@shared/types';
+import type { PresenterAction as PresenterControlAction } from '@shared/presenterState';
 
 // Tracks the research-chat stream currently in flight so `cancelResearchChat`
 // can abort it without the renderer having to juggle request ids. Only one chat
@@ -1186,6 +1187,34 @@ const api: NodusApi = {
   saveProtectArtifactToVault: (artifact) => ipcRenderer.invoke('protect:copies:save', artifact),
   downloadProtectCopy: (copyId) => ipcRenderer.invoke('protect:copies:download', copyId),
   deleteProtectCopy: (copyId) => ipcRenderer.invoke('protect:copies:delete', copyId).then(() => undefined),
+
+  // PDF Presenter — global library of imported PDFs (Toolkit). The PDF bytes are
+  // fetched over IPC (offline; no file:// or CDN) for pdfjs to render.
+  getPresenterLibrary: () => ipcRenderer.invoke('presenter:library:get'),
+  savePresenterLibrary: (lib) => ipcRenderer.invoke('presenter:library:save', lib).then(() => undefined),
+  importPresenterPdf: () => ipcRenderer.invoke('presenter:import:pdf'),
+  getPresenterPdfData: (id) => ipcRenderer.invoke('presenter:pdf:getData', id),
+  deletePresenterPresentation: (id) => ipcRenderer.invoke('presenter:delete', id).then(() => undefined),
+  importPresenterPptxNotes: () => ipcRenderer.invoke('presenter:import:pptxNotes'),
+  startPresenter: (pdfId, startSlide) => ipcRenderer.invoke('presenter:start', pdfId, startSlide).then(() => undefined),
+  startPresenterMode: (pdfId, startSlide) => ipcRenderer.invoke('presenter:startPresenterMode', pdfId, startSlide).then(() => undefined),
+  stopPresenter: () => ipcRenderer.invoke('presenter:stop').then(() => undefined),
+  getPresenterState: () => ipcRenderer.invoke('presenter:state:get'),
+  getPresenterServerInfo: () => ipcRenderer.invoke('presenter:server:info'),
+  getPresenterVolume: () => ipcRenderer.invoke('presenter:volume:get'),
+  setPresenterVolume: (volume) => ipcRenderer.invoke('presenter:volume:set', volume).then(() => undefined),
+  openPresenterCast: () => ipcRenderer.invoke('presenter:cast'),
+  sendPresenterControl: (action) => ipcRenderer.send('presenter:control', action),
+  onPresenterControl: (cb) => {
+    const listener = (_e: unknown, action: PresenterControlAction) => cb(action);
+    ipcRenderer.on('presenter:control:event', listener);
+    return () => ipcRenderer.removeListener('presenter:control:event', listener);
+  },
+  onPresenterEnded: (cb) => {
+    const listener = () => cb();
+    ipcRenderer.on('presenter:ended', listener);
+    return () => ipcRenderer.removeListener('presenter:ended', listener);
+  },
 };
 
 contextBridge.exposeInMainWorld('nodus', api);
