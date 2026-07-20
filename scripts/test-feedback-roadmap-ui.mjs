@@ -35,12 +35,14 @@ test('roadmap follows the requested sequence and is opened from the header', asy
     'Vault de docencia',
     'Vault de fuentes primarias',
     'Vault de testimonios (historia oral)',
+    'Vaults sugeridos por usuarios',
+    'Vault de prosopografía',
     'Vault de worldbuilding',
     'Servidor',
     'Compartir vaults y trabajo colaborativo',
+    'Nodus Toolkit',
     'Nodus PDF Presenter',
     'Nodus OCR Workspace',
-    'Otros vaults sugeridos por usuarios',
   ];
   let previous = -1;
   for (const step of steps) {
@@ -48,8 +50,13 @@ test('roadmap follows the requested sequence and is opened from the header', asy
     assert.ok(current > previous, `${step} follows the requested order`);
     previous = current;
   }
-  assert.doesNotMatch(roadmapSource, /title: 'Nodus Toolkit'/, 'the shipped Toolkit is no longer presented as future work');
-  assert.match(roadmapSource, /Nodus Convert, Nodus Protect y PDF Presenter ya se pueden abrir/, 'current Toolkit availability is documented');
+  assert.match(roadmapSource, /title: 'Pulido y estabilidad'.+status: 'inProgress'/);
+  assert.match(roadmapSource, /title: 'Vault de docencia'.+status: 'inProgress'/);
+  for (const implemented of ['Nodus Toolkit', 'Nodus PDF Presenter', 'Nodus OCR Workspace']) {
+    assert.match(roadmapSource, new RegExp(`title: '${implemented}'.+status: 'implemented'`), `${implemented} is marked as implemented`);
+  }
+  assert.match(roadmapSource, /children: \[/, 'user-suggested vaults are rendered as a nested group');
+  assert.match(roadmapSource, /Nodus Toolkit, PDF Presenter y OCR Workspace figuran como implementados/, 'current Toolkit availability is documented');
   for (const description of [
     'Handy local-first tools for file conversion and document processing, built into Nodus.',
     'Present PDFs with presenter view, mobile remote control, speaker notes, and live annotation tools.',
@@ -58,6 +65,12 @@ test('roadmap follows the requested sequence and is opened from the header', asy
     assert.ok(english.includes(description), `English roadmap copy is preserved: ${description}`);
   }
   assert.match(roadmap, /NODUS_ROADMAP\.map/);
+  assert.match(roadmap, /data-testid="roadmap-cinematic-modal"/);
+  assert.match(roadmap, /data-testid="roadmap-status-legend"/);
+  assert.match(roadmap, /data-testid="roadmap-user-suggested-vaults"/);
+  for (const status of ['planned', 'inProgress', 'implemented']) {
+    assert.ok(roadmap.includes(status), `${status} has a visual state`);
+  }
   assert.match(app, /import \{ RoadmapModal \}/);
   assert.match(app, /roadmapOpen && <RoadmapModal/);
   const roadmapAction = app.lastIndexOf(`label={t('Roadmap')}`);

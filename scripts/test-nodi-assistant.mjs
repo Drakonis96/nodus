@@ -45,7 +45,8 @@ test('Nodi context is explicit, bounded and rejects invented product claims', as
   assert.match(documentation, /Roadmap está en la parte superior derecha/);
   assert.match(documentation, /NODUS_ROADMAP/);
   assert.match(documentation, /Vault de docencia/);
-  assert.match(documentation, /Tipos no disponibles todavía/);
+  assert.match(documentation, /Estado del roadmap/);
+  assert.match(documentation, /planificados, en desarrollo e implementados/);
   assert.match(app, /data-nodi-view=\{view\}/);
   assert.match(app, /setNodiViewContext/);
   assert.match(app, /slice\(0, 12_000\)/);
