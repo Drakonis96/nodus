@@ -313,10 +313,10 @@ export function ToolkitAiOcrView({ onBack, settings }: { onBack: () => void; set
   useEffect(() => { setPresets(loadPresets()); }, []);
 
   // Default to the configured vision model (falling back like the rest of the app).
-  const defaultModel = settings ? settings.visionModel ?? settings.extractionModel ?? settings.synthesisModel ?? null : null;
+  const preferredModel = settings ? settings.visionModel ?? settings.extractionModel ?? settings.synthesisModel ?? null : null;
   useEffect(() => {
-    if (!model && defaultModel) setModel(defaultModel);
-  }, [defaultModel, model]);
+    if (!model && preferredModel) setModel(preferredModel);
+  }, [preferredModel, model]);
 
   const refresh = useCallback(async () => {
     try {
