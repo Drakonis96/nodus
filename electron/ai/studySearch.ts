@@ -10,7 +10,7 @@ import type {
   StudySearchProgress,
   StudySearchResponse,
 } from '@shared/studySearch';
-import { rankStudySearchEntries, suggestStudySearchCorrections } from '@shared/studySearch';
+import { normalizeStudySearchText, rankStudySearchEntries, suggestStudySearchCorrections } from '@shared/studySearch';
 import type { StudyAssistantSourceOption } from '@shared/studyAssistant';
 import { studyAssistantSourceKey } from '@shared/studyAssistant';
 import { parseStudyMaterialMarkers } from '@shared/studyMaterials';
@@ -283,6 +283,19 @@ export function listStudyAssistantSourceOptions(): StudyAssistantSourceOption[] 
   return [...grouped.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || a.title.localeCompare(b.title));
 }
 
+function matchesAssistantRetrievalOptions(entry: StudySearchIndexEntry, options: StudySearchOptions): boolean {
+  if (options.kinds?.length && !options.kinds.includes(entry.kind)) return false;
+  if (options.courseId && entry.scope.courseId !== options.courseId) return false;
+  if (options.subjectId && entry.scope.subjectId !== options.subjectId) return false;
+  if (options.folderId && entry.scope.folderId !== options.folderId) return false;
+  if (options.topicId && entry.scope.topicId !== options.topicId) return false;
+  if (options.sourceId && entry.sourceId !== options.sourceId) return false;
+  if (options.tags?.length && !options.tags.every((tag) => entry.tags.some((entryTag) => normalizeStudySearchText(entryTag) === normalizeStudySearchText(tag)))) return false;
+  if (options.dateFrom && entry.updatedAt < options.dateFrom) return false;
+  if (options.dateTo && entry.updatedAt > `${options.dateTo}T23:59:59.999Z`) return false;
+  return true;
+}
+
 /** Hybrid retrieval without polluting the user's search history. Manual source
  * selection is strict: only selected source keys can enter the returned context. */
 export async function retrieveStudyAssistantEntries(
@@ -293,18 +306,35 @@ export async function retrieveStudyAssistantEntries(
 ): Promise<StudySearchIndexEntry[]> {
   const store = ensureLexicalIndex();
   const selected = new Set(sourceKeys);
-  const candidates = store.entries.filter((entry) => !entry.excluded && (!selected.size || selected.has(studyAssistantSourceKey(entry.kind, entry.sourceId))));
+  const candidates = store.entries.filter((entry) => !entry.excluded
+    && (!selected.size || selected.has(studyAssistantSourceKey(entry.kind, entry.sourceId)))
+    && matchesAssistantRetrievalOptions(entry, options));
   const hasVectors = candidates.some((entry) => entry.embedding?.length);
   const queryVector = hasVectors ? await embed(query).catch(() => null) : null;
   const ranked = rankStudySearchEntries(query, candidates, { ...options, limit: Math.max(limit * 3, 60) }, queryVector);
   const byId = new Map(candidates.map((entry) => [entry.indexId, entry]));
   const ordered = ranked.map((result) => byId.get(result.indexId)).filter((entry): entry is StudySearchIndexEntry => Boolean(entry));
-  if (selected.size && ordered.length < limit) {
+  // Manual selection means "use these sources", even when the wording of the
+  // question has no literal overlap. The same fallback is necessary for automatic
+  // scopes when embeddings are unavailable: otherwise a Spanish question against
+  // an English vault (or any other cross-language pair) always returns zero context.
+  if ((selected.size || !queryVector) && ordered.length < limit) {
     const rankedIds = new Set(ordered.map((entry) => entry.indexId));
-    const fallback = candidates
+    const fallbackCandidates = candidates
       .filter((entry) => !rankedIds.has(entry.indexId))
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-    ordered.push(...fallback);
+    // Prefer breadth before adding a second fragment from the same source. This
+    // gives the model useful coverage of a library rather than twenty adjacent
+    // chunks from whichever document was edited most recently.
+    const seenSources = new Set(ordered.map((entry) => studyAssistantSourceKey(entry.kind, entry.sourceId)));
+    const diverse: StudySearchIndexEntry[] = [];
+    const repeated: StudySearchIndexEntry[] = [];
+    for (const entry of fallbackCandidates) {
+      const sourceKey = studyAssistantSourceKey(entry.kind, entry.sourceId);
+      if (seenSources.has(sourceKey)) repeated.push(entry);
+      else { seenSources.add(sourceKey); diverse.push(entry); }
+    }
+    ordered.push(...diverse, ...repeated);
   }
   return ordered.slice(0, limit);
 }

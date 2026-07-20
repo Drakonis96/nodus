@@ -145,6 +145,7 @@ export function studyAssistantCitationLink(id: string): string {
 export function validateStudyAssistantAnswer(
   answer: string,
   available: StudyAssistantCitation[],
+  emptyAnswer = 'No hay información suficiente en las fuentes seleccionadas para responder con seguridad.',
 ): { answer: string; citations: StudyAssistantCitation[]; citationWarning: boolean } {
   const byId = new Map(available.map((citation) => [citation.id, citation]));
   const used = new Set<string>();
@@ -163,7 +164,7 @@ export function validateStudyAssistantAnswer(
     .trim();
   const citations = [...used].map((id) => byId.get(id)!).filter(Boolean);
   const citationWarning = available.length > 0 && citations.length === 0;
-  if (!clean) clean = 'No hay información suficiente en las fuentes seleccionadas para responder con seguridad.';
+  if (!clean) clean = emptyAnswer;
   return { answer: clean, citations, citationWarning };
 }
 

@@ -87,6 +87,15 @@ try {
   assert.equal(transcriptSearch.results[0].location.recordingId, recording.recording.id);
   const questionSearch = await search.searchStudyCorpus('qué subsistema mantiene imágenes', { kinds: ['question'] });
   assert.equal(questionSearch.results[0].sourceId, question.id);
+  const crossLanguageContext = await search.retrieveStudyAssistantEntries(
+    'How are these completely unrelated English terms explained?',
+    { subjectId: subject.id },
+    [],
+    3,
+  );
+  assert.equal(crossLanguageContext.length, 3, 'assistant falls back to scoped corpus context when cross-language lexical retrieval has no matches');
+  assert.ok(crossLanguageContext.every((entry) => entry.scope.subjectId === subject.id), 'cross-language fallback never leaks outside the selected scope');
+  assert.equal((await search.retrieveStudyAssistantEntries('anything', { subjectId: 'missing-subject' }, [], 3)).length, 0, 'fallback keeps empty scopes empty');
 
   const saved = search.saveStudySearch('Memoria clave', 'memoria', { subjectId: subject.id });
   assert.equal(search.listStudySavedSearches()[0].id, saved.id);
