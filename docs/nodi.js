@@ -1,8 +1,7 @@
-/* Nodi — the Nodus companion (orb style, ported from the app's NodiOrb) as a small
-   floating recreation for the website. Self-injecting: one <script src="nodi.js">
-   drops the orb into the bottom-right corner of every page. Click it and a speech
-   bubble pops out saying what it does. It shrinks on small screens and never covers
-   the page's own controls. The orb SVG + CSS are a faithful port of
+/* Nodi — the Nodus companion (orb style, ported from the app's NodiOrb) for the
+   website. One <script src="nodi.js"> injects the enlarged responsive orb; the
+   companion widget adds its radial help, notification, chat, notes and back-to-top
+   actions. The orb SVG + CSS are a faithful port of
    src/components/nodi/NodiOrb.tsx + nodiOrb.css. */
 (function () {
   if (window.__nodiMounted) return;
@@ -14,6 +13,10 @@
     try {
       var s = localStorage.getItem('nodus.lang');
       if (s && LINES[s]) return s;
+      var sb = (s || '').slice(0, 2).toLowerCase();
+      if (LINES[sb]) return sb;
+      var d = (document.documentElement.lang || '').slice(0, 2).toLowerCase();
+      if (LINES[d]) return d;
       var n = (navigator.language || 'en').slice(0, 2);
       if (LINES[n]) return n;
     } catch (e) {}
@@ -28,46 +31,22 @@
   style.textContent = WIDGET_CSS + '\n' + ORB_CSS;
   document.head.appendChild(style);
 
-  var root = document.createElement('div');
-  root.id = 'nodi';
-  root.innerHTML =
-    '<div class="nodi-bubble" id="nodi-bubble" role="status" aria-live="polite">'
-    + '<button class="nodi-x" id="nodi-x" aria-label="Close">\u00d7</button>'
-    + '<p class="nodi-p" id="nodi-p"></p>'
-    + '</div>'
-    + '<button class="nodi-btn" id="nodi-btn" aria-label="Nodi, the Nodus companion" aria-expanded="false">' + ORB_SVG + '</button>';
+  var currentScript = document.currentScript;
+  var widgetCss = document.createElement('link');
+  widgetCss.rel = 'stylesheet';
+  widgetCss.href = new URL('nodi-widget.css?v=20260720-menu1', currentScript && currentScript.src ? currentScript.src : location.href).href;
+  document.head.appendChild(widgetCss);
 
-  function mount() {
-    document.body.appendChild(root);
-    var btn = document.getElementById('nodi-btn');
-    var bubble = document.getElementById('nodi-bubble');
-    var p = document.getElementById('nodi-p');
-    var x = document.getElementById('nodi-x');
-    var i = 0, hideTimer = null, open = false;
-
-    function speak() {
-      var lines = LINES[lang()] || LINES.en;
-      p.textContent = lines[i % lines.length];
-      i += 1;
-      bubble.classList.add('open');
-      btn.setAttribute('aria-expanded', 'true');
-      open = true;
-      clearTimeout(hideTimer);
-      hideTimer = setTimeout(close, 7000);
-    }
-    function close() {
-      bubble.classList.remove('open');
-      btn.setAttribute('aria-expanded', 'false');
-      open = false;
-      clearTimeout(hideTimer);
-    }
-    btn.addEventListener('click', function (e) { e.stopPropagation(); speak(); });
-    x.addEventListener('click', function (e) { e.stopPropagation(); close(); });
-    bubble.addEventListener('click', function (e) { e.stopPropagation(); });
-    document.addEventListener('click', function () { if (open) close(); });
-    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && open) close(); });
+  function mountWebsiteControls() {
+    if (!window.mountNodiWebsite) return;
+    window.mountNodiWebsite({ orbSvg: ORB_SVG, language: lang });
   }
 
-  if (document.body) mount();
-  else document.addEventListener('DOMContentLoaded', mount);
+  var widgetScript = document.createElement('script');
+  widgetScript.src = new URL('nodi-widget.js?v=20260720-menu1', currentScript && currentScript.src ? currentScript.src : location.href).href;
+  widgetScript.onload = function () {
+    if (document.body) mountWebsiteControls();
+    else document.addEventListener('DOMContentLoaded', mountWebsiteControls, { once: true });
+  };
+  document.head.appendChild(widgetScript);
 })();
