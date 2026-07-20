@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
-  <link rel="stylesheet" href="demo.css?v=20260720-teaching-icons1"/>
+  <link rel="stylesheet" href="demo.css?v=20260720-vault-tabs"/>
 </head>
 <body class="demo-page teach">
   <nav class="site-nav">
@@ -31,24 +31,13 @@
     <div class="shell teach">
       <header class="topbar">
         <a href="../index.html" class="brand" style="text-decoration:none;color:inherit"><img src="../assets/nodus-logo.svg" alt="Nodus logo"/> Nodus</a>
-        <div class="vault-switch" id="vault-switch">
-          <button class="vault-btn" onclick="toggleVaultMenu(event)" aria-haspopup="true" aria-expanded="false">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="1"/><path d="M12 16v5M8 21h8"/></svg>
-            <span class="vault-name">Year 9 · History</span><span class="vault-mode teach">Teaching</span>
-            <svg class="vchev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
-          </button>
-          <div class="vault-menu" id="vault-menu" role="menu">
-            <div class="vault-menu-label">Switch demo mode</div>
-            <a class="vault-opt active" href="teaching.html" role="menuitem"><span class="vm-dot teach"></span><span class="vm-t"><b>Teaching</b><span>Year 9 · History</span></span><span class="vm-tag">Active</span></a>
-            <a class="vault-opt" href="index.html" role="menuitem"><span class="vm-dot academic"></span><span class="vm-t"><b>Academic</b><span>Learning science library</span></span><span class="vm-load">Open</span></a>
-            <a class="vault-opt" href="study.html" role="menuitem"><span class="vm-dot st"></span><span class="vm-t"><b>Study</b><span>General Biology</span></span><span class="vm-load">Open</span></a>
-            <a class="vault-opt" href="genealogy.html" role="menuitem"><span class="vm-dot gen"></span><span class="vm-t"><b>Genealogy</b><span>Serrano family</span></span><span class="vm-load">Open</span></a>
-            <a class="vault-opt" href="databases.html" role="menuitem"><span class="vm-dot db"></span><span class="vm-t"><b>Databases</b><span>Field notebook</span></span><span class="vm-load">Open</span></a>
-            <div class="vault-menu-label">Not in the demo yet</div>
-            <button class="vault-opt disabled" disabled><span class="vm-dot soon"></span><span class="vm-t"><b>Primary Sources</b><span>Archival records + literature</span></span><span class="vm-soon">Soon</span></button>
-          </div>
-        </div>
-        <div class="spacer"></div>
+        <nav class="vault-tabs" aria-label="Switch demo vault">
+          <a class="vault-tab academic" href="index.html" title="Academic · Learning science library">Academic</a>
+          <a class="vault-tab teach" href="teaching.html" aria-current="page" title="Teaching · Year 9 History">Teaching<span class="vault-active-label">Active</span></a>
+          <a class="vault-tab st" href="study.html" title="Study · General Biology">Study</a>
+          <a class="vault-tab gen" href="genealogy.html" title="Genealogy · Serrano family">Genealogy</a>
+          <a class="vault-tab db" href="databases.html" title="Databases · Field notebook">Databases</a>
+        </nav>
         <button class="tb-btn" onclick="go('groups')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>Class list</button>
         <button class="tb-btn" onclick="go('grades')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Gradebook</button>
         <button class="tb-btn primary" onclick="go('exams')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 2h12v20H6zM10 7h5M10 11h5"/></svg>Build an exam</button>
@@ -60,7 +49,6 @@
   <div id="modal-root"></div><div id="toast" role="status"></div>
   <script src="teaching-data.js?v=20260719"></script>
   <script src="teaching-app.js?v=20260719"></script>
-  <script src="vault-switch.js?v=20260719"></script>
   <script>
     (function () {
       function paintStars(n) { if (!Number.isFinite(n)) return; var el = document.getElementById('site-stars'); if (!el) return; el.textContent = n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n); el.setAttribute('aria-label', n + ' stars on GitHub'); }

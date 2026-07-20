@@ -10,15 +10,28 @@ const read = (relative) => fs.readFileSync(path.join(repoRoot, relative), 'utf8'
 
 test('the Teaching web demo is reachable from every live vault demo', () => {
   const teachingHtml = read('docs/demo/teaching.html');
-  assert.match(teachingHtml, /class="vault-opt active" href="teaching\.html"/);
+  assert.match(teachingHtml, /class="vault-tab teach" href="teaching\.html" aria-current="page"/);
   assert.match(teachingHtml, /src="teaching-data\.js/);
   assert.match(teachingHtml, /src="teaching-app\.js/);
   assert.match(teachingHtml, /student-name pseudonymisation/);
 
   for (const page of ['index.html', 'study.html', 'genealogy.html', 'databases.html']) {
     const html = read(`docs/demo/${page}`);
-    assert.match(html, /href="teaching\.html"[^>]*>[\s\S]*?<b>Teaching<\/b>/, `${page} links to Teaching`);
+    assert.match(html, /class="vault-tab teach" href="teaching\.html"/, `${page} links to Teaching`);
     assert.doesNotMatch(html, /Shell in the app · preview/, `${page} no longer labels Teaching as a preview`);
+  }
+});
+
+test('every live demo exposes the same vault tags and marks exactly one active', () => {
+  const pages = ['index.html', 'teaching.html', 'study.html', 'genealogy.html', 'databases.html'];
+  const expectedHrefs = ['index.html', 'teaching.html', 'study.html', 'genealogy.html', 'databases.html'];
+
+  for (const page of pages) {
+    const html = read(`docs/demo/${page}`);
+    const tabs = [...html.matchAll(/<a class="vault-tab [^"]+" href="([^"]+)"([^>]*)>/g)];
+    assert.deepEqual(tabs.map((match) => match[1]), expectedHrefs, `${page} keeps the visible vault order`);
+    assert.equal(tabs.filter((match) => match[2].includes('aria-current="page"')).length, 1, `${page} marks one active vault`);
+    assert.doesNotMatch(html, /vault-menu|toggleVaultMenu/, `${page} has no hidden vault dropdown`);
   }
 });
 

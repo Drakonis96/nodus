@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
-  <link rel="stylesheet" href="demo.css?v=20260717-study3"/>
+  <link rel="stylesheet" href="demo.css?v=20260720-vault-tabs"/>
 </head>
 <body class="demo-page db">
   <nav class="site-nav">
@@ -36,25 +36,13 @@
       <a href="../index.html" class="brand" style="text-decoration:none;color:inherit">
         <img src="../assets/nodus-logo.svg" alt="Nodus logo"/> Nodus
       </a>
-      <div class="vault-switch" id="vault-switch">
-        <button class="vault-btn" onclick="toggleVaultMenu(event)" aria-haspopup="true" aria-expanded="false">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg>
-          <span class="vault-name">Field notebook</span>
-          <span class="vault-mode db">Databases</span>
-          <svg class="vchev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
-        </button>
-        <div class="vault-menu" id="vault-menu" role="menu">
-          <div class="vault-menu-label">Switch demo mode</div>
-          <a class="vault-opt active" href="databases.html" role="menuitem"><span class="vm-dot db"></span><span class="vm-t"><b>Databases</b><span>Field notebook</span></span><span class="vm-tag">Active</span></a>
-          <a class="vault-opt" href="index.html" role="menuitem"><span class="vm-dot academic"></span><span class="vm-t"><b>Academic</b><span>Learning science library</span></span><span class="vm-load">Open</span></a>
-          <a class="vault-opt" href="genealogy.html" role="menuitem"><span class="vm-dot gen"></span><span class="vm-t"><b>Genealogy</b><span>Serrano family</span></span><span class="vm-load">Open</span></a>
-          <a class="vault-opt" href="study.html" role="menuitem"><span class="vm-dot st"></span><span class="vm-t"><b>Study</b><span>General Biology</span></span><span class="vm-load">Open</span></a>
-          <a class="vault-opt" href="teaching.html" role="menuitem"><span class="vm-dot teach"></span><span class="vm-t"><b>Teaching</b><span>Year 9 · History</span></span><span class="vm-load">Open</span></a>
-          <div class="vault-menu-label">Not in the demo yet</div>
-          <button class="vault-opt disabled" disabled><span class="vm-dot soon"></span><span class="vm-t"><b>Primary Sources</b><span>Archival records + literature</span></span><span class="vm-soon">Soon</span></button>
-        </div>
-      </div>
-      <div class="spacer"></div>
+      <nav class="vault-tabs" aria-label="Switch demo vault">
+        <a class="vault-tab academic" href="index.html" title="Academic · Learning science library">Academic</a>
+        <a class="vault-tab teach" href="teaching.html" title="Teaching · Year 9 History">Teaching</a>
+        <a class="vault-tab st" href="study.html" title="Study · General Biology">Study</a>
+        <a class="vault-tab gen" href="genealogy.html" title="Genealogy · Serrano family">Genealogy</a>
+        <a class="vault-tab db" href="databases.html" aria-current="page" title="Databases · Field notebook">Databases<span class="vault-active-label">Active</span></a>
+      </nav>
       <button class="tb-btn" onclick="GUI.chat()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.5 8.5 0 0 1-12.2 7.7L3 21l1.8-5.3A8.5 8.5 0 1 1 21 11.5Z"/></svg>
         Data chat</button>
@@ -79,7 +67,6 @@
   <div id="toast" role="status"></div>
   <script src="databases-data.js?v=db1"></script>
   <script src="databases-app.js?v=db1"></script>
-  <script src="vault-switch.js?v=201"></script>
   <script>
     (function () {
       function paintStars(n) {

@@ -1819,12 +1819,40 @@ addEventListener('scroll', () => {
   })();
 })();
 
-// ---------- N logo replay on click ----------
-document.getElementById('nmark').addEventListener('click', function () {
-  this.querySelectorAll('.stroke, circle').forEach((n) => {
-    n.style.animation = 'none'; void n.getBoundingClientRect(); n.style.animation = '';
+// ---------- N logo replay + vault colour cycle on click ----------
+(function () {
+  const mark = document.getElementById('nmark');
+  const vaultColours = [...document.querySelectorAll('.vault-tag')]
+    .map((tag) => getComputedStyle(tag).getPropertyValue('--vc').trim())
+    // Primary Sources intentionally shares Academic's accent. Keep each visual
+    // colour once so the N always changes on every click.
+    .filter((colour, index, colours) => colour && colours.indexOf(colour) === index);
+  let colourIndex = -1;
+
+  function tint(hex, amount) {
+    const value = hex.replace('#', '');
+    const channels = [0, 2, 4].map((offset) => parseInt(value.slice(offset, offset + 2), 16));
+    return '#' + channels.map((channel) => Math.round(channel + (255 - channel) * amount).toString(16).padStart(2, '0')).join('');
+  }
+
+  mark.addEventListener('click', function () {
+    colourIndex = (colourIndex + 1) % vaultColours.length;
+    const accent = vaultColours[colourIndex];
+    const shades = [tint(accent, .72), tint(accent, .36), accent];
+
+    this.querySelectorAll('stop').forEach((stop, index) => {
+      stop.setAttribute('stop-color', shades[Math.min(index, shades.length - 1)]);
+    });
+    this.querySelectorAll('circle').forEach((circle, index) => {
+      circle.setAttribute('fill', shades[Math.min(index, shades.length - 1)]);
+    });
+    this.dataset.vaultColour = accent;
+
+    this.querySelectorAll('.stroke, circle').forEach((node) => {
+      node.style.animation = 'none'; void node.getBoundingClientRect(); node.style.animation = '';
+    });
   });
-});
+})();
 
 // ---------- scroll reveals ----------
 const io = new IntersectionObserver((entries) => {
