@@ -1,6 +1,7 @@
 import type { ModelRef } from './types';
 
-export const STUDY_AI_TASKS = ['chat', 'improve', 'questions', 'grading', 'flashcards'] as const;
+// Student grading is deliberately absent: Study AI only generates or improves content.
+export const STUDY_AI_TASKS = ['chat', 'improve', 'questions', 'flashcards'] as const;
 export type StudyAiTask = typeof STUDY_AI_TASKS[number];
 export interface StudyAiUsage { id: string; shortId: string; task: StudyAiTask; model: ModelRef; inputChars: number; outputChars: number; estimatedCostUsd: number | null; status: 'ok' | 'error' | 'cancelled'; fallbackUsed: boolean; error: string | null; startedAt: string; finishedAt: string }
 export interface StudyAiUsageSummary { month: string; knownCostUsd: number; unknownCostCalls: number; calls: number; failedCalls: number; budgetUsd: number; percentUsed: number | null }

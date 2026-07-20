@@ -5,7 +5,7 @@ import { isLocalStudyModel } from '@shared/studyAi';
 import { getSettings } from '../db/settingsRepo';
 import { getStudyAiUsageSummary, recordStudyAiUsage } from '../db/studyAiUsageRepo';
 
-const primaryKey: Record<StudyAiTask, 'chatModel' | 'improveModel' | 'questionGenModel' | 'gradingModel' | 'flashcardModel'> = { chat: 'chatModel', improve: 'improveModel', questions: 'questionGenModel', grading: 'gradingModel', flashcards: 'flashcardModel' };
+const primaryKey: Record<StudyAiTask, 'chatModel' | 'improveModel' | 'questionGenModel' | 'flashcardModel'> = { chat: 'chatModel', improve: 'improveModel', questions: 'questionGenModel', flashcards: 'flashcardModel' };
 // A background pipeline may split one source into several AI calls. The optional
 // request key lets those calls share one confirmation without suppressing consent
 // for a later, genuinely separate user action.

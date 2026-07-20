@@ -15,6 +15,7 @@ import { StudySidebar, type StudyNavigationTarget } from './components/StudySide
 import { TeachingSidebar } from './components/TeachingSidebar';
 import { PreviewVaultSidebar } from './components/PreviewVaultSidebar';
 import { FeedbackHost } from './components/feedback';
+import { PrivacyRequestHost } from './privacyNotices';
 import { Tour } from './views/Tour';
 import { AdvancedTour } from './views/AdvancedTour';
 import { GenealogyTour } from './views/GenealogyTour';
@@ -1524,6 +1525,7 @@ export function App() {
       </div>
 
       <FeedbackHost />
+      <PrivacyRequestHost />
 
       {paletteOpen && <CommandPalette commands={paletteCommands} onClose={() => setPaletteOpen(false)} />}
 

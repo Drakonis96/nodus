@@ -112,7 +112,10 @@ export function LocalAiModelsSettings({
                 <h5 className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{model.label}</h5>
                 <button className="mt-0.5 text-neutral-400 hover:text-indigo-600 dark:text-neutral-600 dark:hover:text-indigo-300" title={t('Abrir fuente del modelo')} onClick={() => void window.nodus.openExternal(model.sourceUrl)}><Icon name="external" size={12} /></button>
               </div>
-              <p className="mt-0.5 text-[10px] text-neutral-500 dark:text-neutral-600">{model.quantization} · {formatBytes(nodusLocalModelBytes(model))}{model.dimensions ? ` · ${model.dimensions}d` : ''}{model.vision ? ` · ${t('entrada de imagen')}` : ''}</p>
+              <p className="mt-0.5 text-[10px] text-neutral-500 dark:text-neutral-600">
+                {model.quantization} · {formatBytes(nodusLocalModelBytes(model))}{model.dimensions ? ` · ${model.dimensions}d` : ''}{model.vision ? ` · ${t('entrada de imagen')}` : ''}{' · '}
+                <button className="underline decoration-dotted underline-offset-2 hover:text-indigo-600 dark:hover:text-indigo-300" title={t('Abrir licencia del modelo')} onClick={() => void window.nodus.openExternal(model.licenseUrl)}>{model.licenseLabel}</button>
+              </p>
               <p className="mt-1.5 max-w-3xl text-xs leading-5 text-neutral-600 dark:text-neutral-500">{t(model.description)}</p>
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-2 sm:mt-0 sm:max-w-[25rem] sm:justify-end">
@@ -136,9 +139,10 @@ export function LocalAiModelsSettings({
         <p className="mt-1 max-w-3xl text-xs leading-5 text-neutral-500">{t('Los modelos no vienen incluidos. Nodus los descarga bajo demanda, los ejecuta en tu equipo y no envía el contenido a terceros.')}</p>
       </div>
       <div className={`rounded-lg border px-3 py-2 text-xs ${status?.runtime.ready ? 'border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/20 dark:text-emerald-300' : 'border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-300'}`}>
-        {status?.runtime.ready
+        <div>{status?.runtime.ready
           ? `${t('Motor local listo')} · llama.cpp ${status.runtime.version}`
-          : <button className="inline-flex items-center gap-1" disabled={transferBusy} onClick={() => void installRuntime()}><Icon name={status?.runtime.downloading || busy === 'runtime' ? 'sync' : 'download'} className={status?.runtime.downloading || busy === 'runtime' ? 'animate-spin' : ''} size={12} />{status?.runtime.downloading || busy === 'runtime' ? t('Instalando motor…') : t('Instalar motor local')}</button>}
+          : <button className="inline-flex items-center gap-1" disabled={transferBusy} onClick={() => void installRuntime()}><Icon name={status?.runtime.downloading || busy === 'runtime' ? 'sync' : 'download'} className={status?.runtime.downloading || busy === 'runtime' ? 'animate-spin' : ''} size={12} />{status?.runtime.downloading || busy === 'runtime' ? t('Instalando motor…') : t('Instalar motor local')}</button>}</div>
+        <button className="mt-1 text-[10px] underline decoration-dotted underline-offset-2 opacity-80 hover:opacity-100" title={t('Abrir licencia de llama.cpp')} onClick={() => void window.nodus.openExternal('https://github.com/ggml-org/llama.cpp/blob/b10002/LICENSE')}>llama.cpp · MIT</button>
       </div>
     </div>
 

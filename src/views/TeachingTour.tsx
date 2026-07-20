@@ -35,7 +35,7 @@ const STEPS: TourStep[] = [
     target: 'group-table',
     view: 'teachingGroups',
     title: 'Los nombres no salen del programa',
-    body: 'Cuando pides ayuda a la IA, cada estudiante viaja como un código del tipo STU_4K7M y el nombre real se restituye al recibir la respuesta. El modelo nunca ve a quién estás evaluando.',
+    body: 'La IA no recibe listas, notas ni respuestas del alumnado. Nodus no ofrece ninguna función de IA para calificar, perfilar o evaluar estudiantes; esas decisiones son siempre humanas y permanecen fuera del modelo.',
   },
   {
     target: 'nav-studySchedule',

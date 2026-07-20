@@ -218,8 +218,8 @@ test('study test, exam and flashcard creation share a searchable multi-content s
   assert.match(generator, /generateStudyQuestions/);
   assert.match(generator, /kind === 'exam' \? 'essay' : 'definition'/);
   assert.match(generator, /createStudyFlashcardsFromQuestions/);
-  assert.match(generator, /gradeStudyAnswer/);
-  assert.match(generator, /Finalizar y calcular nota/);
+  assert.doesNotMatch(generator, /gradeStudyAnswer|Finalizar y calcular nota/);
+  assert.match(generator, /La IA solo genera el contenido de la actividad/);
   assert.match(app, /view === 'studyQuestions' && <StudyBankView/);
 });
 

@@ -81,6 +81,13 @@ async function waitForCondition(label, probe, { timeout = 30_000, interval = 100
   throw new Error(`Tiempo agotado esperando: ${label}.${detail}`);
 }
 
+async function acceptFileImportPrivacy(page) {
+  const dialog = page.getByRole('dialog', { name: 'Antes de incorporar un archivo' });
+  await dialog.waitFor({ timeout: 10_000 });
+  await dialog.getByRole('button', { name: 'Estoy autorizado; seleccionar', exact: true }).click();
+  await dialog.waitFor({ state: 'detached' });
+}
+
 let app = null;
 try {
   // The child must run as a real GUI app: strip the runner's as-Node flag.
@@ -135,7 +142,7 @@ try {
     hasStudyRecordings: typeof window.nodus?.createStudyRecording === 'function' && typeof window.nodus?.saveStudyTranscript === 'function',
     hasStudySearch: typeof window.nodus?.searchStudyCorpus === 'function' && typeof window.nodus?.rebuildStudySearchIndex === 'function',
     hasStudyKnowledge: typeof window.nodus?.listStudyIdeas === 'function' && typeof window.nodus?.getStudyKnowledgeGraph === 'function' && typeof window.nodus?.reanalyzeStudyKnowledgeSource === 'function',
-    hasStudyGrading: typeof window.nodus?.gradeStudyAnswer === 'function' && typeof window.nodus?.listStudyRubrics === 'function',
+    blocksAiStudyGrading: typeof window.nodus?.gradeStudyAnswer !== 'function' && typeof window.nodus?.listStudyRubrics === 'function',
     hasStudyLearning: typeof window.nodus?.createStudyFlashcard === 'function' && typeof window.nodus?.getStudyPlanner === 'function' && typeof window.nodus?.getStudyProgressDashboard === 'function',
     hasStudyAiPolicy: typeof window.nodus?.getStudyAiUsageSummary === 'function' && typeof window.nodus?.clearStudyAiUsage === 'function',
     hasStudyDemo: typeof window.nodus?.seedStudyDemoData === 'function',
@@ -156,7 +163,7 @@ try {
   assert.equal(bridge.hasStudyRecordings, true, 'study recording and transcript bridge available');
   assert.equal(bridge.hasStudySearch, true, 'study hybrid-search bridge available');
   assert.equal(bridge.hasStudyKnowledge, true, 'study ideas and knowledge-graph bridge available');
-  assert.equal(bridge.hasStudyGrading, true, 'study grading and rubric bridge available');
+  assert.equal(bridge.blocksAiStudyGrading, true, 'AI grading bridge is absent while local rubric management remains available');
   assert.equal(bridge.hasStudyLearning, true, 'study review, progress and planner bridge available');
   assert.equal(bridge.hasStudyAiPolicy, true, 'study AI policy and usage bridge available');
   assert.equal(bridge.hasStudyDemo, true, 'study sample-data bridge available');
@@ -247,6 +254,16 @@ try {
   await startupUpdateModal.getByRole('button', { name: 'Entendido', exact: false }).click();
   await startupUpdateModal.waitFor({ state: 'detached' });
   console.log('[e2e] essential tutorial language preferences + persistent seen-once gate ok');
+
+  // Native file/folder actions must first use the themed in-app privacy modal.
+  // Cancel here so the operating-system picker is never opened during automation.
+  await page.evaluate(() => { void window.nodus.pickToolkitFiles(['pdf']); });
+  const filePrivacyDialog = page.getByRole('dialog', { name: 'Antes de incorporar un archivo' });
+  await filePrivacyDialog.waitFor({ timeout: 10_000 });
+  assert.match(await filePrivacyDialog.innerText(), /localmente|autorizado|función remota/);
+  await filePrivacyDialog.getByRole('button', { name: 'Cancelar', exact: true }).click();
+  await filePrivacyDialog.waitFor({ state: 'detached' });
+  console.log('[e2e] native file actions are gated by an in-app privacy modal');
 
   // ── Nodi: absolute drag + right-click goodbye + persisted visibility ───────
   const originalMascotSettings = await page.evaluate(() => window.nodus.getSettings());
@@ -1164,6 +1181,14 @@ try {
   await dictationLanguage.selectOption('es');
   await page.getByTestId('study-dictation').getByRole('button', { name: 'Dictado', exact: true }).click();
   await page.getByTestId('study-dictation-start').click();
+  const microphonePrivacyDialog = page.getByRole('dialog', { name: 'Antes de activar el micrófono' });
+  await microphonePrivacyDialog.waitFor({ timeout: 30_000 });
+  assert.match(
+    await microphonePrivacyDialog.innerText(),
+    /localmente|base jurídica|no sustituye el consentimiento/i,
+    'the recording privacy notice blocks microphone access and explains the local/controller boundary',
+  );
+  await microphonePrivacyDialog.getByRole('button', { name: 'He informado; comenzar', exact: true }).click();
   await page.getByTestId('study-dictation-discard').waitFor({ timeout: 30_000 });
   await page.getByTestId('study-dictation-discard').click();
   await page.getByTestId('study-dictation-start').waitFor({ timeout: 30_000 });
@@ -1372,6 +1397,7 @@ try {
   await page.getByTestId('study-material-import').click();
   await page.getByTestId('study-material-import-dialog').waitFor();
   await page.getByRole('button', { name: 'Seleccionar archivos o ZIP', exact: true }).click();
+  await acceptFileImportPrivacy(page);
   await page.getByTestId('study-material-import-dialog').getByText('fuente-smoke.pdf', { exact: true }).waitFor();
   await page.getByTestId('study-material-import-confirm').click();
   await page.getByTestId('study-material-import-dialog').waitFor({ state: 'detached' });
@@ -1446,6 +1472,7 @@ try {
     await page.getByRole('button', { name: 'Materiales', exact: true }).click();
     await page.getByTestId('study-material-import').click();
     await page.getByRole('button', { name: 'Seleccionar archivos o ZIP', exact: true }).click();
+    await acceptFileImportPrivacy(page);
     await page.getByTestId('study-material-import-confirm').click();
     await page.getByText('libro-smoke', { exact: true }).waitFor({ timeout: 30_000 });
     const importedEpub = await page.evaluate(async () => (await window.nodus.listStudyMaterials()).find((item) => item.title === 'libro-smoke'));
@@ -1472,6 +1499,9 @@ try {
   const recordingSearchPadding = await page.getByPlaceholder('Buscar grabaciones o transcripciones…').evaluate((element) => Number.parseFloat(getComputedStyle(element).paddingLeft));
   assert.ok(recordingSearchPadding >= 30, 'recording search keeps its icon and text separated');
   await page.getByRole('button', { name: 'Grabar clase', exact: true }).click();
+  const recordingPrivacyDialog = page.getByRole('dialog', { name: 'Antes de activar el micrófono' });
+  await recordingPrivacyDialog.waitFor({ timeout: 10_000 });
+  await recordingPrivacyDialog.getByRole('button', { name: 'He informado; comenzar', exact: true }).click();
   const classRecorder = page.getByTestId('study-class-recorder');
   await classRecorder.waitFor({ timeout: 30_000 });
   await page.waitForTimeout(1_300);
@@ -1635,7 +1665,7 @@ try {
   assert.equal(testFixture.attempt.correctCount, 1, 'objective short answer is corrected deterministically');
   console.log('[e2e] study test construction + durable attempt + objective correction ok');
 
-  // ── Study exams: long-form autosave, delivery and pending grading ─────────
+  // ── Study exams: long-form autosave and delivery for human review ─────────
   await page.evaluate(async () => {
     await window.nodus.createStudyQuestion({
       prompt: 'Explica con argumentos cómo se conserva la procedencia en el vault de estudio.', type: 'essay', difficulty: 'medium', cognitiveLevel: 'analyze',
@@ -1666,18 +1696,10 @@ try {
     return { exam, attempt: (await window.nodus.listStudyAttempts(exam.id))[0] };
   });
   assert.equal(examFixture.attempt.status, 'submitted');
-  assert.equal(examFixture.attempt.answers[0].isCorrect, null, 'long-form answer remains pending auditable grading');
+  assert.equal(examFixture.attempt.answers[0].isCorrect, null, 'long-form answer remains pending human review');
   assert.match(examFixture.attempt.answers[0].response.text, /evidencia verificable/);
-  console.log('[e2e] written exam + autosave + pending-grading delivery ok');
-
-  // ── Study grading: rubric UI and safe no-provider failure ─────────────────
-  await page.getByTestId('study-grade-open').click();
-  await page.getByTestId('study-grading-panel').waitFor({ timeout: 30_000 });
-  assert.ok(await page.getByTestId('study-grading-panel').locator('select').first().locator('option').count() >= 2, 'built-in weighted rubrics are available');
-  await page.getByTestId('study-grade-run').click();
-  await page.getByText(/Falta la clave de IA/, { exact: false }).waitFor({ timeout: 30_000 });
-  assert.equal(await page.getByTestId('study-grading-result').count(), 0, 'provider failure never fabricates a grading result');
-  console.log('[e2e] rubric grading UI + safe provider-failure preservation ok');
+  assert.equal(await page.getByTestId('study-grade-open').count(), 0, 'no AI grading action is exposed');
+  console.log('[e2e] written exam + autosave + human-review delivery ok');
 
   // ── Study learning: flashcard review, SM-2 evidence, planner and progress ──
   await page.getByRole('button', { name: 'Repaso', exact: true }).click();

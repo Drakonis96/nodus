@@ -64,6 +64,8 @@ export const kokoroEngine: AudioEngine = {
   provider: 'kokoro',
   label: 'Kokoro',
   description: 'Un solo modelo (inglés) con muchas voces de alta calidad. Se descarga una vez.',
+  licenseLabel: 'Apache-2.0',
+  licenseUrl: 'https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX',
   modelStyle: 'single-model',
   modelSizeMb: 86,
   voices: VOICES,

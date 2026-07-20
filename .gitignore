@@ -40,6 +40,10 @@ __pycache__/
 # Locally generated analysis reports
 reports/
 
+# Verified legal texts generated immediately before packaging. Their canonical
+# URLs and SHA-256 digests are versioned in legal/remote-notices.json.
+legal/generated/
+
 # Nodus Toolkit test caches (Tesseract traineddata, etc.)
 scripts/.cache/
 

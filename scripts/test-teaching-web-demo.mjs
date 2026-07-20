@@ -13,7 +13,7 @@ test('the Teaching web demo is reachable from every live vault demo', () => {
   assert.match(teachingHtml, /class="vault-tab teach" href="teaching\.html" aria-current="page"/);
   assert.match(teachingHtml, /src="teaching-data\.js/);
   assert.match(teachingHtml, /src="teaching-app\.js/);
-  assert.match(teachingHtml, /student-name pseudonymisation/);
+  assert.match(teachingHtml, /AI for generating teaching content only; AI never evaluates students/);
 
   for (const page of ['index.html', 'study.html', 'genealogy.html', 'databases.html']) {
     const html = read(`docs/demo/${page}`);
@@ -64,6 +64,7 @@ test('landing copy describes the current Teaching scope and names Nodus directly
   assert.doesNotMatch(landing, /Teaching guide · linked/);
   assert.doesNotMatch(landing, /Open the four live demos/);
   assert.match(landing, /From the assessment plan to every final grade/);
+  assert.match(landing, /AI generates teaching content only and never grades, profiles or evaluates students/);
 });
 
 test('the FAQ documents Teaching availability in every maintained FAQ translation', () => {

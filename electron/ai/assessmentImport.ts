@@ -1,29 +1,8 @@
-/**
- * AI over the gradebook.
- *
- * Two features, and the split between them is the point:
- *
- *  · `importAssessmentPlan` reads a teacher's own guía docente or programación and
- *    proposes a STRUCTURE. It never computes a grade — the engine does that. This is
- *    the same division the database vault already uses for analysis, and it is what
- *    keeps the arithmetic auditable.
- *
- *  · `draftStudentFeedback` is the first production consumer of the student
- *    pseudonymisation layer. Names are replaced with opaque codes before anything
- *    leaves the machine and restored on the way back, so a model drafting a comment
- *    about a minor never learns who they are.
- *
- * The privacy scope is opened OUTSIDE `runStudyAiTask`, never inside: the policy layer
- * retries and can switch to a fallback model, and a map rebuilt mid-flight would make
- * two attempts disagree about who `STU_7K3Q` is.
- */
-import { completeJson, completeText } from './aiClient';
+/** AI may structure a teacher-authored assessment plan, but never student data. */
+import { completeJson } from './aiClient';
 import { runStudyAiTask } from './studyAiPolicy';
-import { withStudentPseudonyms, privacyConsentDetail } from './studentPrivacyContext';
-import { pseudonymStudentsForGroup } from '../db/teachingGroupsRepo';
 import { getAssessmentPlan } from '../db/teachingGradesRepo';
 import { isProposedPlan, type ProposedPlan } from '@shared/assessmentImport';
-import { labelFor, buildPseudonymScope } from '@shared/studentPseudonyms';
 
 const IMPORT_SYSTEM = [
   'Eres un asistente que convierte la tabla de evaluación de una guía docente o de una',
@@ -69,79 +48,4 @@ export async function importAssessmentPlan(request: ImportPlanRequest): Promise<
     (model) => completeJson<ProposedPlan>({ system: IMPORT_SYSTEM, user: text, temperature: 0 }, isProposedPlan, model),
   );
   return outcome.value;
-}
-
-export interface FeedbackRequest {
-  planId: string;
-  groupId: string;
-  studentId: string;
-  /** Pre-rendered summary of the marks, already in code space where names would be. */
-  summary: string;
-}
-
-/**
- * Drafts a short comment about one student's performance.
- *
- * Everything the model sees refers to the student by their opaque code; the reply is
- * mapped back before the teacher reads it. If pseudonymisation is switched off the
- * scope is simply not opened and the names go as they are — that is the user's choice,
- * made explicitly in Settings.
- */
-export async function draftStudentFeedback(request: FeedbackRequest): Promise<{ text: string; warnings: string[] }> {
-  const { plan } = getAssessmentPlan(request.planId);
-  const students = pseudonymStudentsForGroup(request.groupId);
-  const scope = buildPseudonymScope(students);
-  const label = labelFor(scope, request.studentId);
-
-  // "Use the identifier ALWAYS" produced text that reads badly once the codes are
-  // mapped back: "Estimada familia de <nombre>, <nombre> ha demostrado…". The model
-  // cannot know the code will become a name, so the instruction has to ask for the
-  // shape the TEACHER will read, not the shape the model sees.
-  const system = [
-    'Eres un docente redactando un comentario breve y constructivo sobre el rendimiento',
-    'de un estudiante, dirigido a su familia. Dos o tres frases, en el idioma del texto.',
-    'EMPIEZA el comentario nombrando al estudiante por su identificador exacto, y no',
-    'vuelvas a nombrarlo: a partir de ahí refiérete a él o ella con pronombres o con',
-    '«el estudiante». No empieces con fórmulas de saludo como «Estimada familia».',
-    'No inventes datos que no estén en el resumen: comenta solo lo que aparece en él.',
-  ].join('\n');
-  const user = `Estudiante: ${label}\n\n${request.summary}`;
-
-  return withStudentPseudonyms({ groupId: request.groupId, students }, async (privacy) => {
-    const outcome = await runStudyAiTask(
-      {
-        task: 'chat',
-        subjectId: plan.subjectId,
-        inputChars: user.length + system.length,
-        externalPurpose: 'Redactar un comentario sobre el rendimiento de un estudiante.',
-        externalDetail: privacyConsentDetail(privacy),
-        externalConsentKey: `feedback:${plan.id}`,
-      },
-      (model) => completeText({ system, user, temperature: 0.3 }, model),
-    );
-    const text = outcome.value;
-    // Drained after the call: warnings are raised while the payload is rewritten.
-    const warnings = (privacy?.warnings ?? []).map((warning) =>
-      warning.kind === 'ambiguous'
-        ? `«${warning.token}» puede referirse a ${warning.candidateCount} estudiantes: se ha enviado sin sustituir.`
-        : warning.kind === 'common-word'
-          ? `«${warning.token}» es también una palabra corriente: se ha enviado sin sustituir.`
-          : `Identificador no reconocido: ${warning.code}.`,
-    );
-
-    // The instruction asks the model to OPEN with the identifier, which is then mapped
-    // back into the student's name. Weaker models ignore it and write "el estudiante"
-    // instead — harmless, but the teacher would otherwise have no way to know the
-    // comment never names the child they are about to send it about. Detected here
-    // rather than trusted: an instruction is a request, not a guarantee.
-    const student = students.find((entry) => entry.id === request.studentId);
-    const expected = [student?.givenNames, student?.surnames]
-      .filter((part): part is string => !!part && part.trim().length > 0)
-      .flatMap((part) => part.trim().split(/\s+/));
-    if (expected.length > 0 && !expected.some((token) => text.includes(token))) {
-      warnings.push('El comentario no nombra al estudiante: el modelo no ha usado el identificador.');
-    }
-
-    return { text, warnings };
-  });
 }

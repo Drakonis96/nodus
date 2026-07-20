@@ -22,6 +22,9 @@ export interface AudioVoice {
   language: string;
   /** Per-voice download size in MB. Omitted for single-model / cloud providers. */
   sizeMb?: number;
+  /** Upstream model/dataset terms shown before a local voice is downloaded. */
+  licenseLabel?: string;
+  licenseUrl?: string;
   /** Cloud (Hume) only: which Hume library the voice belongs to. */
   humeProvider?: 'HUME_AI' | 'CUSTOM_VOICE';
   /** Cloud (Hume) only: compatible model versions (e.g. ["octave-2"]). */
@@ -34,6 +37,9 @@ export interface AudioEngine {
   label: string;
   /** One-line description shown under the provider selector. */
   description: string;
+  /** Terms for a locally downloaded shared runtime/model, when applicable. */
+  licenseLabel?: string;
+  licenseUrl?: string;
   //   'per-voice'    — each voice is its own downloadable model (Piper)
   //   'single-model' — one shared model powers every voice (Kokoro)
   //   'cloud'        — a hosted API; needs a key, voices are fetched (Hume)

@@ -10,6 +10,7 @@ import {
 } from '@shared/sttModels';
 import { Icon, Spinner } from '../ui';
 import { t } from '../../i18n';
+import { confirmMicrophonePrivacy } from '../../privacyNotices';
 import {
   audioBlobToWhisperWav,
   isLocalWhisperModelReady,
@@ -234,6 +235,7 @@ export function StudyDictation({
 
   const startRecording = async () => {
     setError(''); setProvisional(''); silenceStoppingRef.current = false;
+    if (!(await confirmMicrophonePrivacy())) return;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: {
         deviceId: deviceId ? { exact: deviceId } : undefined,

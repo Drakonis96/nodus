@@ -394,8 +394,8 @@ try {
   console.log('[ui] exam and rubric pickers open, explain themselves and close cleanly');
 
   // The import modal must be reachable and state plainly what the AI does and does not
-  // do. Running the model itself is covered by scripts/verify-student-pseudonyms.mjs
-  // against Ollama and Gemini; this checks the surface a teacher actually sees.
+  // do. This checks the surface a teacher actually sees; student data never enters
+  // the model path.
   await page.getByTestId('plan-import-open').click();
   await page.getByTestId('plan-import-modal').waitFor();
   const importCopy = await page.getByTestId('plan-import-modal').innerText();

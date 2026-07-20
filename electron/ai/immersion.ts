@@ -3,7 +3,6 @@ import type {
   ImmersionAnswerRecord,
   ImmersionAnswerRequest,
   ImmersionAnswerResult,
-  ImmersionAssessment,
   ImmersionBuildProgress,
   ImmersionQuizQuestion,
   ImmersionRequest,
@@ -409,7 +408,7 @@ export async function generateImmersionSession(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Answer evaluation (choice → local, open → AI with heuristic fallback)
+// Answer handling (choice → deterministic local match, open → unscored local reflection)
 // ─────────────────────────────────────────────────────────────────────────────
 
 function findQuestion(session: ImmersionSession, questionId: string): ImmersionQuizQuestion | null {
@@ -418,39 +417,6 @@ function findQuestion(session: ImmersionSession, questionId: string): ImmersionQ
     if (hit) return hit;
   }
   return session.plan.exam.questions.find((q) => q.id === questionId) ?? null;
-}
-
-interface AiImmersionAssessment {
-  verdict: 'solid' | 'partial' | 'weak';
-  score: number;
-  feedback: string;
-  missing: string[];
-}
-
-function isImmersionAssessment(value: unknown): value is AiImmersionAssessment {
-  if (!value || typeof value !== 'object') return false;
-  const o = value as Record<string, unknown>;
-  return (
-    (o.verdict === 'solid' || o.verdict === 'partial' || o.verdict === 'weak') &&
-    typeof o.score === 'number' &&
-    typeof o.feedback === 'string' &&
-    Array.isArray(o.missing)
-  );
-}
-
-function heuristicAssessment(question: ImmersionQuizQuestion, answer: string, session: ImmersionSession): ImmersionAssessment {
-  const ideaById = new Map(session.plan.ideaIndex.map((i) => [i.id, i] as const));
-  const related = question.ideaIds.map((id) => ideaById.get(id)).filter((i): i is NonNullable<typeof i> => Boolean(i));
-  const lower = answer.toLowerCase();
-  const hits = related.filter((idea) => lower.includes((idea.label.toLowerCase().split(/\s+/)[0] ?? '').trim())).length;
-  const score = Math.max(20, Math.min(75, 30 + hits * 15 + Math.floor(answer.length / 140) * 5));
-  return {
-    verdict: score >= 70 ? 'solid' : score >= 45 ? 'partial' : 'weak',
-    score,
-    feedback:
-      'Evaluación heurística (sin modelo disponible): contrasta tu respuesta con lo esperado y con las ideas de la estación.',
-    missing: related.slice(0, 3).map((idea) => idea.label),
-  };
 }
 
 export async function evaluateImmersionAnswer(request: ImmersionAnswerRequest): Promise<ImmersionAnswerResult> {
@@ -472,48 +438,14 @@ export async function evaluateImmersionAnswer(request: ImmersionAnswerRequest): 
       answeredAt: new Date().toISOString(),
     };
   } else {
-    const settings = getSettings();
-    const model = request.model ?? session.model ?? settings.immersionModel ?? settings.synthesisModel ?? null;
-    let assessment: ImmersionAssessment;
-    if (!model) {
-      assessment = heuristicAssessment(question, request.answer, session);
-    } else {
-      const ideaById = new Map(session.plan.ideaIndex.map((i) => [i.id, i] as const));
-      const related = question.ideaIds.map((id) => ideaById.get(id)).filter((i): i is NonNullable<typeof i> => Boolean(i));
-      const system =
-        'Eres un tutor académico estricto pero útil dentro del modo Inmersión de Nodus. Evalúa si la respuesta domina la pregunta según lo esperado y las ideas del corpus proporcionadas. ' +
-        'No inventes información. Devuelve exclusivamente JSON: {"verdict":"solid|partial|weak","score":0-100,"feedback":"...","missing":["..."]}.';
-      const user = JSON.stringify({
-        tema: session.plan.topic,
-        pregunta: question.question,
-        respuesta_esperada: question.expected,
-        respuesta_del_estudiante: request.answer,
-        ideas_relacionadas: related.map((idea) => ({
-          etiqueta: idea.label,
-          enunciado: idea.statement,
-          autores: idea.authors,
-          obras: idea.workTitles,
-        })),
-        idioma: session.plan.language,
-      });
-      try {
-        const ai = await completeJson<AiImmersionAssessment>({ system, user, temperature: 0.1, maxTokens: 1800 }, isImmersionAssessment, model);
-        assessment = {
-          verdict: ai.verdict,
-          score: Math.max(0, Math.min(100, Math.round(ai.score))),
-          feedback: ai.feedback.trim(),
-          missing: ai.missing.filter((m): m is string => typeof m === 'string').slice(0, 5),
-        };
-      } catch {
-        assessment = heuristicAssessment(question, request.answer, session);
-      }
-    }
+    // Open answers are private reflections. They are persisted locally verbatim and
+    // never sent to a model, heuristically scored, profiled or used to steer access.
     record = {
       questionId: question.id,
       kind: 'open',
       answer: request.answer,
       correct: null,
-      assessment,
+      assessment: null,
       answeredAt: new Date().toISOString(),
     };
   }

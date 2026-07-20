@@ -48,8 +48,6 @@ try {
   const questionBank = require(path.join(repoRoot, 'electron/db/studyQuestionsRepo.ts'));
   const learning = require(path.join(repoRoot, 'electron/db/studyLearningRepo.ts'));
   const assessments = require(path.join(repoRoot, 'electron/db/studyAssessmentsRepo.ts'));
-  const gradingRepo = require(path.join(repoRoot, 'electron/db/studyGradingRepo.ts'));
-  const gradingAi = require(path.join(repoRoot, 'electron/ai/studyGrading.ts'));
   const usageRepo = require(path.join(repoRoot, 'electron/db/studyAiUsageRepo.ts'));
   ({ closeDb } = require(path.join(repoRoot, 'electron/db/database.ts')));
   clearApiKey = () => secrets.clearApiKey('gemini');
@@ -84,7 +82,6 @@ try {
     studyModel: model,
     improveModel: model,
     questionGenModel: model,
-    gradingModel: model,
     flashcardModel: model,
   });
 
@@ -160,19 +157,7 @@ try {
   assert.equal(examGenerated.questions.length, 1, 'exam generation returned one development question');
   const examQuestion = questionBank.createStudyQuestion({ ...examGenerated.questions[0], status: 'approved', locked: true }, 'create', true);
   const exam = assessments.createStudyAssessment({ kind: 'exam', title: 'Examen shadow', subjectId: subject.id, questionIds: [examQuestion.id], points: { [examQuestion.id]: 10 } });
-  const attempt = assessments.startStudyAttempt({ assessmentId: exam.id, mode: 'exam' });
-  const answer = assessments.saveStudyAttemptAnswer(attempt.id, {
-    assessmentItemId: attempt.assessment.items[0].id,
-    response: { text: 'La fase luminosa produce ATP y NADPH en los tilacoides. El ciclo de Calvin los utiliza en el estroma para fijar dioxido de carbono y formar materia organica.' },
-  });
-  const rubric = gradingRepo.listStudyRubrics().find((item) => item.name === 'Respuesta de desarrollo') ?? gradingRepo.listStudyRubrics()[0];
-  const gradingDeltas = [];
-  const grade = await gradingAi.gradeStudyAnswer({ attemptAnswerId: answer.id, rubricId: rubric.id, severity: 'balanced', model }, (delta, kind) => {
-    if (kind === 'content' && delta) gradingDeltas.push(delta);
-  });
-  assert.ok(gradingDeltas.length > 0, 'grading streamed content');
-  assert.ok(Number.isFinite(grade.estimatedScore));
-  assert.ok(grade.result.generalFeedback.trim(), 'grading returned feedback');
+  assert.equal(exam.items.length, 1, 'AI generated exam content without receiving a student answer');
 
   const flashcardGenerated = await questionsAi.generateStudyQuestions({
     sourceKeys, count: 2, difficulty: 'medium', cognitiveLevels: ['remember', 'understand'], types: ['definition'],
@@ -186,7 +171,7 @@ try {
 
   const usage = usageRepo.listStudyAiUsage(100);
   assert.ok(usage.some((entry) => entry.task === 'flashcards' && entry.status === 'ok'), 'flashcards use the dedicated AI task/model route');
-  assert.ok(usage.some((entry) => entry.task === 'grading' && entry.status === 'ok'));
+  assert.equal(usage.some((entry) => entry.task === 'grading'), false, 'no grading task reaches Gemini');
   assert.ok(usage.some((entry) => entry.task === 'improve' && entry.status === 'ok'));
   assert.ok(usage.some((entry) => entry.task === 'questions' && entry.status === 'ok'));
 
@@ -200,7 +185,7 @@ try {
     knowledge: { ideas: ideas.length, nodes: graph.nodes.length, edges: graph.edges.length, completedJobs: knowledgeRepo.listStudyKnowledgeJobs(subject.id).filter((job) => job.status === 'done').length },
     improvement: { deltaEvents: improveDeltas.length, changed: improved.text !== originalNote, protectedSpans: improved.protectedSpanCount },
     test: { generatedQuestions: testGenerated.questions.length, assessmentItems: testAssessment.items.length },
-    exam: { generatedQuestions: examGenerated.questions.length, gradingDeltaEvents: gradingDeltas.length, score: grade.estimatedScore, maxScore: grade.result.maxScore },
+    exam: { generatedQuestions: examGenerated.questions.length, assessmentItems: exam.items.length, studentAnswersSentToAi: 0 },
     flashcards: { generatedQuestions: flashQuestions.length, cards: flashcards.length, dedicatedTaskCalls: usage.filter((entry) => entry.task === 'flashcards' && entry.status === 'ok').length },
     usage: { calls: usage.length, successful: usage.filter((entry) => entry.status === 'ok').length, failed: usage.filter((entry) => entry.status === 'error').length },
     durationMs: Date.now() - startedAt,

@@ -30,6 +30,7 @@ interface ConfirmRequest {
   confirmLabel?: string;
   cancelLabel?: string;
   danger?: boolean;
+  zIndex?: number;
   resolve: (ok: boolean) => void;
 }
 
@@ -87,6 +88,7 @@ export function confirm(opts: {
   confirmLabel?: string;
   cancelLabel?: string;
   danger?: boolean;
+  zIndex?: number;
 }): Promise<boolean> {
   return new Promise((resolve) => {
     // Only one confirm is shown at a time; cancel any stale pending request.
@@ -187,6 +189,7 @@ export function FeedbackHost() {
           confirmLabel={confirmReq.confirmLabel}
           cancelLabel={confirmReq.cancelLabel}
           danger={confirmReq.danger}
+          zIndex={confirmReq.zIndex}
           onConfirm={() => resolveConfirm(true)}
           onCancel={() => resolveConfirm(false)}
         />

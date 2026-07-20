@@ -229,6 +229,11 @@ export function AudioGenerationSettings({
             );
           })}
         </div>
+        {engine.licenseLabel && engine.licenseUrl && <button
+          className="mt-2 text-[10px] text-neutral-500 underline decoration-dotted underline-offset-2 hover:text-indigo-600 dark:hover:text-indigo-300"
+          title={t('Abrir licencia del motor de voz')}
+          onClick={() => void window.nodus.openExternal(engine.licenseUrl!)}
+        >{engine.licenseLabel}</button>}
       </div>
 
       {/* Speed */}
@@ -386,6 +391,11 @@ export function AudioGenerationSettings({
                         <span className="text-[10px] text-neutral-500">
                           {isCloud ? v.quality : t(GENDER_LABEL[v.gender])} {!isCloud && `· ${v.quality}`}{v.sizeMb ? ` · ${v.sizeMb} MB` : ''}
                         </span>
+                        {v.licenseLabel && v.licenseUrl && <button
+                          className="text-[10px] text-neutral-500 underline decoration-dotted underline-offset-2 hover:text-indigo-600 dark:hover:text-indigo-300"
+                          title={t('Abrir licencia y atribución de la voz')}
+                          onClick={() => void window.nodus.openExternal(v.licenseUrl!)}
+                        >{v.licenseLabel}</button>}
                         {selected && <span className="text-[10px] text-indigo-300">● {t('en uso')}</span>}
                       </div>
                       {downloading && (
