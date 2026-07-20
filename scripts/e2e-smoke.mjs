@@ -688,10 +688,12 @@ try {
     assert.equal(centring.square, true, `${testId} icon tile is square`);
     assert.ok(centring.dx <= 0.5 && centring.dy <= 0.5, `${testId} icon is centred (dx ${centring.dx}, dy ${centring.dy})`);
   }
-  // The one unbuilt tool must be inert, not a dead end: clicking does nothing.
-  assert.equal(await page.getByTestId('toolkit-card-aiocr').isDisabled(), true, 'toolkit-card-aiocr is not openable yet');
-  await page.getByTestId('toolkit-card-aiocr').click({ force: true });
-  assert.equal(await page.getByTestId('toolkit-home').count(), 1, 'a coming-soon card never navigates away from the hub');
+  // AI OCR is a working tool: it opens on its (empty) library and returns.
+  assert.equal(await page.getByTestId('toolkit-card-aiocr').isDisabled(), false, 'OCR Workspace opens');
+  await page.getByTestId('toolkit-card-aiocr').click();
+  await page.getByTestId('aiocr-home').waitFor({ timeout: 10_000 });
+  await page.getByTestId('toolkit-aiocr-back').click();
+  await page.getByTestId('toolkit-home').waitFor();
   // PDF Presenter is a working tool: it opens on its (empty) library and returns.
   assert.equal(await page.getByTestId('toolkit-card-presenter').isDisabled(), false, 'PDF Presenter opens');
   await page.getByTestId('toolkit-card-presenter').click();
