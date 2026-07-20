@@ -106,22 +106,23 @@ test('the hub renders four tools and Protect is in development', async () => {
   assert.match(view, /name=\{tool\.name\}/, 'the card shows the brand name verbatim, never through t()');
   assert.match(view, /description=\{t\(tool\.description\)\}/, 'only the description is translated');
 
-  // Honesty: the two unbuilt tools are inert; Convert and Protect are openable.
+  // Honesty: the one unbuilt tool is inert; Convert, Protect and Presenter open.
   assert.deepEqual(
     navigation.TOOLKIT_TOOLS.filter((tool) => tool.state === 'soon').map((tool) => tool.page),
-    ['presenter', 'ocr'],
-    'presenter and OCR workspace are marked coming soon'
+    ['ocr'],
+    'only the OCR workspace is marked coming soon'
   );
   assert.deepEqual(
     navigation.TOOLKIT_TOOLS.filter((tool) => tool.state === 'wip').map((tool) => tool.page),
-    ['convert', 'protect'],
-    'Nodus Convert and Protect use the in-development badge'
+    ['convert', 'protect', 'presenter'],
+    'Convert, Protect and PDF Presenter use the in-development badge'
   );
   assert.match(view, /const disabled = state === 'soon'/);
   assert.match(view, /onClick=\{disabled \? undefined : onOpen\}/, 'a coming-soon card has no click handler');
   // The convert card now opens the real converter, not a placeholder.
   assert.match(view, /<ToolkitConvertView onBack=/, 'Nodus Convert renders the functional converter');
   assert.match(view, /<ToolkitProtectView onBack=/, 'Nodus Protect renders the functional protection flow');
+  assert.match(view, /<ToolkitPresenterView onBack=/, 'PDF Presenter renders the functional library');
   // Any page other than 'convert' or 'protect' falls back to the catalogue rather than
   // rendering an empty pane.
   assert.match(view, /page === 'protect'/, 'Protect has its own routed workspace');
@@ -374,7 +375,8 @@ test('Nodi documents the toolkit with its real, honest state', async () => {
   // Nodus Convert is functional now; the guide says so and stays honest about the
   // two tools still to come.
   assert.match(docs, /Nodus Convert ya funciona/, 'the guide states Convert works');
-  assert.match(docs, /PDF Presenter y OCR Workspace .*«Próximamente»/, 'the guide keeps the other two as coming soon');
+  assert.match(docs, /PDF Presenter ya se puede abrir/, 'the guide states the presenter library is available');
+  assert.match(docs, /OCR Workspace .*«Próximamente»/, 'the guide keeps the OCR workspace as coming soon');
   assert.match(docs, /determinista y 100 % offline/, 'the guide states the privacy/offline principle');
   // The roadmap line must no longer list the Toolkit as merely planned.
   assert.ok(

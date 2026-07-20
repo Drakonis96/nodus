@@ -49,7 +49,7 @@ test('roadmap follows the requested sequence and is opened from the header', asy
     previous = current;
   }
   assert.doesNotMatch(roadmapSource, /title: 'Nodus Toolkit'/, 'the shipped Toolkit is no longer presented as future work');
-  assert.match(roadmapSource, /Nodus Convert y Nodus Protect ya están disponibles/, 'current Toolkit availability is documented');
+  assert.match(roadmapSource, /Nodus Convert, Nodus Protect y PDF Presenter ya se pueden abrir/, 'current Toolkit availability is documented');
   for (const description of [
     'Handy local-first tools for file conversion and document processing, built into Nodus.',
     'Present PDFs with presenter view, mobile remote control, speaker notes, and live annotation tools.',

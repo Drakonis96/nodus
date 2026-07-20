@@ -158,6 +158,12 @@ import { getSettings, updateSettings } from './db/settingsRepo';
 import { runToolkitJob, type ToolkitSignal } from './toolkit/toolkitJobs';
 import { TOOLKIT_REGISTRY } from './toolkit/convert';
 import type { ToolkitJobRequest } from '@shared/toolkitTypes';
+import * as presenterLibrary from './toolkit/presenter/library';
+import { extractPptxNotes } from './toolkit/presenter/pptxNotes';
+import * as presenterWindows from './toolkit/presenter/windows';
+import { getSystemVolume, setSystemVolume, openCastPicker } from './toolkit/presenter/systemAudio';
+import { normalizeLibrary, type PresenterLibrary } from '@shared/presenterTypes';
+import type { PresenterAction } from '@shared/presenterState';
 import type { ProtectArtifact, ProtectListSourcesRequest, ProtectSourceRef } from '@shared/protectTypes';
 import { PROTECT_INPUT_EXTENSIONS } from '@shared/protectTypes';
 import * as protect from './protect/protectService';
@@ -3456,6 +3462,64 @@ export function registerIpc(
   });
   h('toolkit:showInFolder', async (_e, filePath: string) => {
     shell.showItemInFolder(filePath);
+  });
+
+  // ── PDF Presenter (Toolkit) ─────────────────────────────────────────────────
+  // A global library of imported PDFs (copies) + folders, independent of the
+  // active vault, under userData/toolkit/presenter. The pure model + reducers
+  // live in @shared/presenterTypes; the filesystem side in toolkit/presenter.
+  const presenterDir = () => path.join(app.getPath('userData'), 'toolkit', 'presenter');
+  h('presenter:library:get', async () => presenterLibrary.readLibrary(presenterDir()));
+  h('presenter:library:save', async (_e, lib: PresenterLibrary) => {
+    presenterLibrary.writeLibrary(presenterDir(), normalizeLibrary(lib));
+  });
+  h('presenter:import:pdf', async (e) => {
+    const win = BrowserWindow.fromWebContents(e.sender);
+    const picked = await dialog.showOpenDialog(win ?? undefined!, {
+      title: 'Importar PDF',
+      properties: ['openFile'],
+      filters: [{ name: 'PDF', extensions: ['pdf'] }],
+    });
+    if (picked.canceled || picked.filePaths.length === 0) return null;
+    return presenterLibrary.importPdf(presenterDir(), picked.filePaths[0]);
+  });
+  h('presenter:pdf:getData', async (_e, id: string) => {
+    const bytes = presenterLibrary.readPdfBytes(presenterDir(), id);
+    return bytes ? new Uint8Array(bytes) : null;
+  });
+  h('presenter:delete', async (_e, id: string) => {
+    presenterLibrary.deletePresentation(presenterDir(), id);
+  });
+  h('presenter:import:pptxNotes', async (e) => {
+    const win = BrowserWindow.fromWebContents(e.sender);
+    const picked = await dialog.showOpenDialog(win ?? undefined!, {
+      title: 'Importar notas desde PowerPoint',
+      properties: ['openFile'],
+      filters: [{ name: 'PowerPoint', extensions: ['pptx'] }],
+    });
+    if (picked.canceled || picked.filePaths.length === 0) return null;
+    return extractPptxNotes(fs.readFileSync(picked.filePaths[0]));
+  });
+  // Presentation windows (audience + presenter). The control channel is fire-and-
+  // forget (ipcMain.on) because navigation/zoom fire rapidly and don't need a reply.
+  h('presenter:start', async (_e, pdfId: string, startSlide?: number) => {
+    presenterWindows.startPresentation(pdfId, startSlide ?? 1, false);
+  });
+  h('presenter:startPresenterMode', async (_e, pdfId: string, startSlide?: number) => {
+    presenterWindows.startPresentation(pdfId, startSlide ?? 1, true);
+  });
+  h('presenter:stop', async () => {
+    presenterWindows.stopPresentation();
+  });
+  h('presenter:state:get', async () => presenterWindows.getPresenterRuntimeState());
+  h('presenter:server:info', async () => presenterWindows.getServerInfoWithQr());
+  h('presenter:volume:get', async () => getSystemVolume());
+  h('presenter:volume:set', async (_e, volume: number) => {
+    await setSystemVolume(volume);
+  });
+  h('presenter:cast', async () => openCastPicker());
+  ipcMain.on('presenter:control', (e, action: PresenterAction) => {
+    presenterWindows.handlePresenterControl(e.sender, action);
   });
 
   // ── Nodus Protect ──────────────────────────────────────────────────────────

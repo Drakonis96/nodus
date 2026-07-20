@@ -46,13 +46,17 @@ export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
   },
-  // Two renderer entries: the main app (index.html) and the standalone Nodi
-  // overlay window (mascot.html) used for the always-on-top desktop mascot.
+  // Renderer entries: the main app (index.html), the standalone Nodi overlay
+  // (mascot.html), and the two PDF Presenter windows (audience + presenter view),
+  // each a lean standalone bundle loaded into its own BrowserWindow.
   build: {
     rollupOptions: {
       input: {
         main: path.resolve(__dirname, 'index.html'),
         mascot: path.resolve(__dirname, 'mascot.html'),
+        presenterAudience: path.resolve(__dirname, 'presenterAudience.html'),
+        presenterView: path.resolve(__dirname, 'presenterView.html'),
+        presenterRemote: path.resolve(__dirname, 'presenterRemote.html'),
       },
     },
   },

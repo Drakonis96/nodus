@@ -794,6 +794,7 @@ export function App() {
     }));
     const actions: Command[] = [
       { id: 'act:assistant', label: t('Asistente de investigación'), section: t('Acciones'), icon: 'chat', keywords: 'assistant chat', run: () => openAssistant() },
+      { id: 'act:presenter', label: 'PDF Presenter', section: t('Acciones'), icon: 'presentation', keywords: 'presentar diapositivas slides pdf presenter proyector herramientas toolkit', run: () => { setToolkitPage('presenter'); setView('toolkit'); } },
       { id: 'act:feedback', label: t('Sugerir función o reportar error'), section: t('Acciones'), icon: 'gitPr', keywords: 'feedback github pr bug feature sugerencia error', run: () => setFeedbackOpen(true) },
       { id: 'act:roadmap', label: t('Roadmap'), section: t('Acciones'), icon: 'route', keywords: 'roadmap hoja ruta futuro próximos pasos', run: () => setRoadmapOpen(true) },
       { id: 'act:theme', label: isDark ? t('Usar tema claro') : t('Usar tema oscuro'), section: t('Acciones'), icon: 'palette', keywords: 'tema theme claro oscuro', run: () => void window.nodus.updateSettings({ theme: isDark ? 'light' : 'dark' }).then(reloadSettings) },
