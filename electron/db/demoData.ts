@@ -5,7 +5,7 @@ import { clearDatabasesDemoData } from './databasesDemoData';
 import { clearStudyDemoData } from './studyDemoData';
 import { clearTeachingDemoData } from './teachingDemoData';
 
-// A small, self-consistent corpus on the science of learning. It exists so a
+// A self-consistent corpus on the science of learning. It exists so a
 // first-time user can see every static view (graph, ideas, debates, gaps, notes,
 // library, search) populated and connected, without a Zotero library or an API
 // key. Every id is prefixed with `demo-` so the data can be removed surgically
@@ -83,12 +83,30 @@ const WORKS: DemoWork[] = [
   { id: 'demo-w4', title: { es: 'Ansiedad ante los exámenes y rendimiento académico', en: 'Test anxiety and academic performance' }, authors: ['Putwain, D. W.'], year: 2008, read: false },
   { id: 'demo-w5', title: { es: 'Autorregulación del aprendizaje: una visión general', en: 'Self-regulated learning: an overview' }, authors: ['Zimmerman, B. J.'], year: 2002, read: true },
   { id: 'demo-w6', title: { es: 'El efecto de generación en la memoria', en: 'The generation effect in memory' }, authors: ['Slamecka, N. J.', 'Graf, P.'], year: 1978, read: false },
+  { id: 'demo-w7', title: { es: 'Mejorar el aprendizaje con técnicas eficaces', en: 'Improving learning with effective techniques' }, authors: ['Dunlosky, J.', 'Rawson, K. A.'], year: 2013, read: true },
+  { id: 'demo-w8', title: { es: 'Aprendizaje inductivo mediante práctica intercalada', en: 'Inductive learning through interleaved practice' }, authors: ['Kornell, N.', 'Bjork, R. A.'], year: 2008, read: true },
+  { id: 'demo-w9', title: { es: 'El poder de la retroalimentación', en: 'The power of feedback' }, authors: ['Hattie, J.', 'Timperley, H.'], year: 2007, read: true },
+  { id: 'demo-w10', title: { es: 'Mecanismos de autoeficacia en la agencia humana', en: 'Self-efficacy mechanisms in human agency' }, authors: ['Bandura, A.'], year: 1982, read: true },
+  { id: 'demo-w11', title: { es: 'Aprendizaje multimedia', en: 'Multimedia learning' }, authors: ['Mayer, R. E.'], year: 2009, read: false },
+  { id: 'demo-w12', title: { es: 'Aprendizaje cooperativo y rendimiento', en: 'Cooperative learning and achievement' }, authors: ['Johnson, D. W.', 'Johnson, R. T.'], year: 2009, read: true },
+  { id: 'demo-w13', title: { es: '¿Cuándo y dónde aplicamos lo aprendido?', en: 'When and where do we apply what we learn?' }, authors: ['Barnett, S. M.', 'Ceci, S. J.'], year: 2002, read: false },
+  { id: 'demo-w14', title: { es: 'Psicología educativa: una perspectiva cognitiva', en: 'Educational psychology: a cognitive view' }, authors: ['Ausubel, D. P.'], year: 1968, read: true },
+  { id: 'demo-w15', title: { es: 'El papel de la práctica deliberada en el rendimiento experto', en: 'The role of deliberate practice in expert performance' }, authors: ['Ericsson, K. A.', 'Krampe, R. T.', 'Tesch-Römer, C.'], year: 1993, read: true },
 ];
 
 const THEMES: { id: string; label: Localized }[] = [
   { id: 'demo-t1', label: { es: 'Consolidación de la memoria', en: 'Memory consolidation' } },
   { id: 'demo-t2', label: { es: 'Práctica de recuperación', en: 'Retrieval practice' } },
   { id: 'demo-t3', label: { es: 'Carga cognitiva', en: 'Cognitive load' } },
+  { id: 'demo-t4', label: { es: 'Metacognición', en: 'Metacognition' } },
+  { id: 'demo-t5', label: { es: 'Práctica intercalada', en: 'Interleaved practice' } },
+  { id: 'demo-t6', label: { es: 'Retroalimentación', en: 'Feedback' } },
+  { id: 'demo-t7', label: { es: 'Motivación y autoeficacia', en: 'Motivation and self-efficacy' } },
+  { id: 'demo-t8', label: { es: 'Aprendizaje multimedia', en: 'Multimedia learning' } },
+  { id: 'demo-t9', label: { es: 'Aprendizaje colaborativo', en: 'Collaborative learning' } },
+  { id: 'demo-t10', label: { es: 'Transferencia del aprendizaje', en: 'Learning transfer' } },
+  { id: 'demo-t11', label: { es: 'Conocimientos previos', en: 'Prior knowledge' } },
+  { id: 'demo-t12', label: { es: 'Práctica deliberada', en: 'Deliberate practice' } },
 ];
 
 const IDEAS: DemoIdea[] = [
@@ -218,6 +236,258 @@ const IDEAS: DemoIdea[] = [
     },
     evidence: { quote: 'Intervening sleep may support consolidation between spaced sessions.', location: 'p. 357', kind: 'paraphrased' },
   },
+  {
+    id: 'demo-i10', type: 'method',
+    label: { es: 'La autoevaluación calibra el conocimiento', en: 'Self-testing calibrates knowledge' },
+    statement: {
+      es: 'Comprobar lo que se recuerda revela lagunas que la relectura familiar puede ocultar.',
+      en: 'Checking what can be recalled reveals gaps that familiar rereading can conceal.',
+    },
+    workId: 'demo-w7', themeId: 'demo-t4', role: 'method', confidence: 0.87,
+    development: {
+      es: 'La recuperación funciona a la vez como estrategia de aprendizaje y como diagnóstico metacognitivo.',
+      en: 'Retrieval works both as a learning strategy and as a metacognitive diagnostic.',
+    },
+    evidence: { quote: 'Practice testing helps learners identify what they know and what still requires study.', location: 'p. 37', kind: 'paraphrased' },
+  },
+  {
+    id: 'demo-i11', type: 'finding',
+    label: { es: 'La sensación de fluidez puede engañar', en: 'A feeling of fluency can mislead' },
+    statement: {
+      es: 'La facilidad inmediata al estudiar no predice necesariamente una retención duradera.',
+      en: 'Immediate ease during study does not necessarily predict durable retention.',
+    },
+    workId: 'demo-w7', themeId: 'demo-t4', role: 'contrast', confidence: 0.82,
+    development: {
+      es: 'Las estrategias que parecen más difíciles durante la práctica pueden producir mejores resultados demorados.',
+      en: 'Strategies that feel harder during practice can produce better delayed outcomes.',
+    },
+    evidence: { quote: 'Learners often prefer techniques that increase fluency without improving long-term learning.', location: 'p. 45', kind: 'paraphrased' },
+  },
+  {
+    id: 'demo-i12', type: 'finding',
+    label: { es: 'Intercalar ejemplos mejora la discriminación', en: 'Interleaving examples improves discrimination' },
+    statement: {
+      es: 'Mezclar categorías durante la práctica ayuda a distinguir cuándo aplicar cada concepto.',
+      en: 'Mixing categories during practice helps learners distinguish when each concept applies.',
+    },
+    workId: 'demo-w8', themeId: 'demo-t5', role: 'support', confidence: 0.89,
+    development: {
+      es: 'El contraste continuo entre casos refuerza los rasgos que separan unas categorías de otras.',
+      en: 'Continual comparison between cases strengthens the features that separate categories.',
+    },
+    evidence: { quote: 'Interleaving exemplars improved later classification compared with blocking them by category.', location: 'p. 585', kind: 'explicit' },
+  },
+  {
+    id: 'demo-i13', type: 'claim',
+    label: { es: 'La práctica por bloques sobrestima el dominio', en: 'Blocked practice overstates mastery' },
+    statement: {
+      es: 'Agrupar ejercicios idénticos aumenta la fluidez aparente pero reduce la necesidad de elegir una estrategia.',
+      en: 'Grouping identical problems increases apparent fluency but reduces the need to choose a strategy.',
+    },
+    workId: 'demo-w8', themeId: 'demo-t5', role: 'contrast', confidence: 0.8,
+    development: {
+      es: 'La dificultad del intercalado es informativa: obliga a reconocer el tipo de problema antes de resolverlo.',
+      en: 'The difficulty of interleaving is informative: it forces learners to recognize the problem type before solving it.',
+    },
+    evidence: { quote: 'Blocked practice was easier during acquisition but less effective on the delayed test.', location: 'p. 587', kind: 'paraphrased' },
+  },
+  {
+    id: 'demo-i14', type: 'framework',
+    label: { es: 'La retroalimentación cierra la distancia hacia la meta', en: 'Feedback closes the gap to the goal' },
+    statement: {
+      es: 'La retroalimentación es útil cuando aclara la meta, el progreso actual y el siguiente paso.',
+      en: 'Feedback is useful when it clarifies the goal, current progress, and the next step.',
+    },
+    workId: 'demo-w9', themeId: 'demo-t6', role: 'definition', confidence: 0.91,
+    development: {
+      es: 'Un buen mensaje responde adónde voy, cómo voy y qué debo hacer después.',
+      en: 'A good message answers where am I going, how am I going, and what should I do next.',
+    },
+    evidence: { quote: 'Effective feedback answers three questions: Where am I going? How am I going? Where to next?', location: 'p. 86', kind: 'explicit' },
+  },
+  {
+    id: 'demo-i15', type: 'claim',
+    label: { es: 'Comentar la tarea supera a elogiar a la persona', en: 'Task feedback beats personal praise' },
+    statement: {
+      es: 'La información sobre la tarea y el proceso orienta mejor la mejora que los juicios generales sobre la persona.',
+      en: 'Information about the task and process guides improvement better than general judgments about the person.',
+    },
+    workId: 'demo-w9', themeId: 'demo-t6', role: 'support', confidence: 0.86,
+    development: {
+      es: 'El feedback procesable dirige la atención hacia decisiones que el estudiante puede revisar.',
+      en: 'Actionable feedback directs attention toward decisions the learner can revise.',
+    },
+    evidence: { quote: 'Feedback about the self is usually less effective than feedback about the task or process.', location: 'p. 96', kind: 'paraphrased' },
+  },
+  {
+    id: 'demo-i16', type: 'construct',
+    label: { es: 'La autoeficacia sostiene el esfuerzo', en: 'Self-efficacy sustains effort' },
+    statement: {
+      es: 'Creer que una tarea es abordable influye en la elección, la persistencia y la recuperación ante errores.',
+      en: 'Believing a task is manageable influences choice, persistence, and recovery from errors.',
+    },
+    workId: 'demo-w10', themeId: 'demo-t7', role: 'definition', confidence: 0.9,
+    development: {
+      es: 'La expectativa de eficacia no sustituye la habilidad, pero determina si se moviliza y se mantiene.',
+      en: 'Efficacy expectations do not replace skill, but they influence whether it is mobilized and sustained.',
+    },
+    evidence: { quote: 'Perceived self-efficacy affects how much effort people expend and how long they persist.', location: 'p. 123', kind: 'explicit' },
+  },
+  {
+    id: 'demo-i17', type: 'method',
+    label: { es: 'Las metas alcanzables construyen autoeficacia', en: 'Attainable goals build self-efficacy' },
+    statement: {
+      es: 'Dividir una tarea compleja en logros próximos aporta experiencias de dominio que refuerzan la confianza.',
+      en: 'Breaking a complex task into proximal accomplishments provides mastery experiences that strengthen confidence.',
+    },
+    workId: 'demo-w10', themeId: 'demo-t7', role: 'method', confidence: 0.83,
+    development: {
+      es: 'El progreso visible convierte una meta distante en una secuencia de evidencias de capacidad.',
+      en: 'Visible progress turns a distant goal into a sequence of evidence of capability.',
+    },
+    evidence: { quote: 'Proximal goals provide evidence of growing capability and strengthen perceived efficacy.', location: 'p. 136', kind: 'paraphrased' },
+  },
+  {
+    id: 'demo-i18', type: 'claim',
+    label: { es: 'La coherencia multimedia reduce carga innecesaria', en: 'Multimedia coherence reduces needless load' },
+    statement: {
+      es: 'Eliminar palabras, imágenes y sonidos irrelevantes evita que compitan por recursos cognitivos limitados.',
+      en: 'Removing irrelevant words, images, and sounds prevents them from competing for limited cognitive resources.',
+    },
+    workId: 'demo-w11', themeId: 'demo-t8', role: 'support', confidence: 0.88,
+    development: {
+      es: 'La decoración no siempre ayuda: puede desviar el procesamiento que debería integrar la explicación.',
+      en: 'Decoration does not always help: it can divert processing that should integrate the explanation.',
+    },
+    evidence: { quote: 'People learn better when extraneous material is excluded rather than included.', location: 'p. 89', kind: 'explicit' },
+  },
+  {
+    id: 'demo-i19', type: 'framework',
+    label: { es: 'Palabras e imágenes forman modelos integrados', en: 'Words and pictures form integrated models' },
+    statement: {
+      es: 'El aprendizaje multimedia exige seleccionar, organizar e integrar representaciones verbales y visuales.',
+      en: 'Multimedia learning requires selecting, organizing, and integrating verbal and visual representations.',
+    },
+    workId: 'demo-w11', themeId: 'demo-t8', role: 'definition', confidence: 0.85,
+    development: {
+      es: 'La combinación funciona cuando cada canal aporta información relevante y ambos pueden conectarse.',
+      en: 'The combination works when each channel contributes relevant information and the two can be connected.',
+    },
+    evidence: { quote: 'Meaningful learning involves building connections between verbal and pictorial representations.', location: 'p. 74', kind: 'paraphrased' },
+  },
+  {
+    id: 'demo-i20', type: 'finding',
+    label: { es: 'La cooperación estructurada mejora el rendimiento', en: 'Structured cooperation improves achievement' },
+    statement: {
+      es: 'Trabajar en grupos con interdependencia positiva produce mejores resultados que agrupar sin estructura.',
+      en: 'Working in groups with positive interdependence produces better outcomes than grouping without structure.',
+    },
+    workId: 'demo-w12', themeId: 'demo-t9', role: 'support', confidence: 0.87,
+    development: {
+      es: 'La colaboración eficaz combina una meta compartida con responsabilidad individual.',
+      en: 'Effective collaboration combines a shared goal with individual accountability.',
+    },
+    evidence: { quote: 'Cooperative structures produced higher achievement than competitive or individualistic structures.', location: 'p. 371', kind: 'explicit' },
+  },
+  {
+    id: 'demo-i21', type: 'method',
+    label: { es: 'La responsabilidad individual evita la pasividad', en: 'Individual accountability prevents passivity' },
+    statement: {
+      es: 'Cada integrante debe demostrar su aportación para que la actividad grupal genere aprendizaje distribuido.',
+      en: 'Each member must demonstrate a contribution for group activity to produce distributed learning.',
+    },
+    workId: 'demo-w12', themeId: 'demo-t9', role: 'method', confidence: 0.81,
+    development: {
+      es: 'Roles claros y comprobaciones individuales reducen que unas pocas personas resuelvan toda la tarea.',
+      en: 'Clear roles and individual checks reduce the chance that a few people complete the whole task.',
+    },
+    evidence: { quote: 'Individual accountability is essential if every group member is to learn.', location: 'p. 373', kind: 'paraphrased' },
+  },
+  {
+    id: 'demo-i22', type: 'framework',
+    label: { es: 'La transferencia depende del contexto', en: 'Transfer depends on context' },
+    statement: {
+      es: 'Aplicar lo aprendido cambia según la distancia entre el contexto de aprendizaje y la situación objetivo.',
+      en: 'Applying prior learning varies with the distance between the learning context and the target situation.',
+    },
+    workId: 'demo-w13', themeId: 'demo-t10', role: 'definition', confidence: 0.86,
+    development: {
+      es: 'La transferencia no es una propiedad única: puede cambiar de dominio, tiempo, espacio, función y modalidad.',
+      en: 'Transfer is not a single property: it can vary across domain, time, space, function, and modality.',
+    },
+    evidence: { quote: 'Transfer can be characterized along multiple dimensions of contextual distance.', location: 'p. 621', kind: 'explicit' },
+  },
+  {
+    id: 'demo-i23', type: 'method',
+    label: { es: 'Variar la práctica favorece la aplicación flexible', en: 'Varied practice supports flexible application' },
+    statement: {
+      es: 'Practicar un principio en ejemplos diversos ayuda a reconocer su estructura fuera del caso original.',
+      en: 'Practicing a principle across diverse examples helps learners recognize its structure beyond the original case.',
+    },
+    workId: 'demo-w13', themeId: 'demo-t10', role: 'method', confidence: 0.78,
+    development: {
+      es: 'La variación separa el principio general de los detalles accidentales del ejercicio inicial.',
+      en: 'Variation separates the general principle from accidental details of the initial exercise.',
+    },
+    evidence: { quote: 'Exposure to varied contexts can broaden the range over which knowledge is transferred.', location: 'p. 629', kind: 'paraphrased' },
+  },
+  {
+    id: 'demo-i24', type: 'construct',
+    label: { es: 'Los conocimientos previos organizan lo nuevo', en: 'Prior knowledge organizes new learning' },
+    statement: {
+      es: 'La información nueva se comprende al relacionarla con conceptos que ya forman parte de la estructura cognitiva.',
+      en: 'New information is understood by relating it to concepts already present in cognitive structure.',
+    },
+    workId: 'demo-w14', themeId: 'demo-t11', role: 'definition', confidence: 0.9,
+    development: {
+      es: 'Activar ideas relevantes antes de una explicación ofrece puntos de anclaje para integrarla.',
+      en: 'Activating relevant ideas before an explanation provides anchors for integrating it.',
+    },
+    evidence: { quote: 'The most important single factor influencing learning is what the learner already knows.', location: 'p. vi', kind: 'explicit' },
+  },
+  {
+    id: 'demo-i25', type: 'claim',
+    label: { es: 'Las concepciones erróneas filtran la evidencia nueva', en: 'Misconceptions filter new evidence' },
+    statement: {
+      es: 'Un conocimiento previo inexacto puede distorsionar una explicación en vez de facilitarla.',
+      en: 'Inaccurate prior knowledge can distort an explanation instead of supporting it.',
+    },
+    workId: 'demo-w14', themeId: 'demo-t11', role: 'contrast', confidence: 0.79,
+    development: {
+      es: 'Diagnosticar los modelos iniciales es necesario antes de intentar sustituirlos o refinarlos.',
+      en: 'Diagnosing initial models is necessary before attempting to replace or refine them.',
+    },
+    evidence: { quote: 'Existing cognitive structure may facilitate or interfere with the acquisition of new meanings.', location: 'p. 155', kind: 'paraphrased' },
+  },
+  {
+    id: 'demo-i26', type: 'method',
+    label: { es: 'La práctica deliberada apunta a debilidades concretas', en: 'Deliberate practice targets specific weaknesses' },
+    statement: {
+      es: 'La mejora experta exige tareas diseñadas para superar aspectos específicos del rendimiento actual.',
+      en: 'Expert improvement requires tasks designed to overcome specific aspects of current performance.',
+    },
+    workId: 'demo-w15', themeId: 'demo-t12', role: 'method', confidence: 0.91,
+    development: {
+      es: 'Repetir lo que ya resulta cómodo no equivale a practicar en el límite de la competencia.',
+      en: 'Repeating what is already comfortable is not the same as practicing at the edge of competence.',
+    },
+    evidence: { quote: 'Deliberate practice includes activities specifically designed to improve the current level of performance.', location: 'p. 368', kind: 'explicit' },
+  },
+  {
+    id: 'demo-i27', type: 'claim',
+    label: { es: 'La mejora experta requiere feedback y repetición', en: 'Expert improvement requires feedback and repetition' },
+    statement: {
+      es: 'Los intentos enfocados necesitan retroalimentación inmediata y oportunidades de corrección repetida.',
+      en: 'Focused attempts need immediate feedback and repeated opportunities for correction.',
+    },
+    workId: 'demo-w15', themeId: 'demo-t12', role: 'support', confidence: 0.88,
+    development: {
+      es: 'El ciclo de actuar, recibir información y ajustar convierte la dificultad en progreso acumulativo.',
+      en: 'The cycle of acting, receiving information, and adjusting turns difficulty into cumulative progress.',
+    },
+    evidence: { quote: 'Learners require informative feedback and repeated opportunities to correct errors.', location: 'p. 367', kind: 'paraphrased' },
+  },
 ];
 
 const EDGES: DemoEdge[] = [
@@ -227,6 +497,28 @@ const EDGES: DemoEdge[] = [
   { from: 'demo-i5', to: 'demo-i4', type: 'refines', basis: 'explicit', confidence: 0.82, sourceWork: 'demo-w2' },
   { from: 'demo-i6', to: 'demo-i1', type: 'contradicts', basis: 'inferred', confidence: 0.7, sourceWork: 'demo-w4' },
   { from: 'demo-i5', to: 'demo-i2', type: 'shares_method', basis: 'inferred', confidence: 0.62, sourceWork: 'demo-w2' },
+  { from: 'demo-i10', to: 'demo-i7', type: 'supports', basis: 'inferred', confidence: 0.79, sourceWork: 'demo-w7' },
+  { from: 'demo-i11', to: 'demo-i10', type: 'contradicts', basis: 'inferred', confidence: 0.72, sourceWork: 'demo-w7' },
+  { from: 'demo-i12', to: 'demo-i3', type: 'extends', basis: 'explicit', confidence: 0.84, sourceWork: 'demo-w8' },
+  { from: 'demo-i13', to: 'demo-i12', type: 'supports', basis: 'explicit', confidence: 0.81, sourceWork: 'demo-w8' },
+  { from: 'demo-i12', to: 'demo-i8', type: 'shares_method', basis: 'inferred', confidence: 0.7, sourceWork: 'demo-w8' },
+  { from: 'demo-i14', to: 'demo-i10', type: 'supports', basis: 'inferred', confidence: 0.76, sourceWork: 'demo-w9' },
+  { from: 'demo-i15', to: 'demo-i14', type: 'refines', basis: 'explicit', confidence: 0.86, sourceWork: 'demo-w9' },
+  { from: 'demo-i16', to: 'demo-i7', type: 'precondition_of', basis: 'inferred', confidence: 0.74, sourceWork: 'demo-w10' },
+  { from: 'demo-i17', to: 'demo-i16', type: 'supports', basis: 'explicit', confidence: 0.83, sourceWork: 'demo-w10' },
+  { from: 'demo-i18', to: 'demo-i5', type: 'applies_to', basis: 'explicit', confidence: 0.88, sourceWork: 'demo-w11' },
+  { from: 'demo-i19', to: 'demo-i18', type: 'refines', basis: 'explicit', confidence: 0.8, sourceWork: 'demo-w11' },
+  { from: 'demo-i21', to: 'demo-i20', type: 'precondition_of', basis: 'explicit', confidence: 0.85, sourceWork: 'demo-w12' },
+  { from: 'demo-i20', to: 'demo-i16', type: 'supports', basis: 'inferred', confidence: 0.65, sourceWork: 'demo-w12' },
+  { from: 'demo-i22', to: 'demo-i3', type: 'applies_to', basis: 'inferred', confidence: 0.73, sourceWork: 'demo-w13' },
+  { from: 'demo-i23', to: 'demo-i22', type: 'supports', basis: 'explicit', confidence: 0.8, sourceWork: 'demo-w13' },
+  { from: 'demo-i23', to: 'demo-i12', type: 'extends', basis: 'inferred', confidence: 0.76, sourceWork: 'demo-w13' },
+  { from: 'demo-i24', to: 'demo-i19', type: 'precondition_of', basis: 'inferred', confidence: 0.77, sourceWork: 'demo-w14' },
+  { from: 'demo-i25', to: 'demo-i24', type: 'contradicts', basis: 'inferred', confidence: 0.71, sourceWork: 'demo-w14' },
+  { from: 'demo-i26', to: 'demo-i10', type: 'applies_to', basis: 'inferred', confidence: 0.74, sourceWork: 'demo-w15' },
+  { from: 'demo-i27', to: 'demo-i26', type: 'supports', basis: 'explicit', confidence: 0.9, sourceWork: 'demo-w15' },
+  { from: 'demo-i14', to: 'demo-i27', type: 'precondition_of', basis: 'inferred', confidence: 0.82, sourceWork: 'demo-w9' },
+  { from: 'demo-i16', to: 'demo-i26', type: 'precondition_of', basis: 'inferred', confidence: 0.69, sourceWork: 'demo-w10' },
 ];
 
 const GAPS: DemoGap[] = [
@@ -234,6 +526,12 @@ const GAPS: DemoGap[] = [
   { id: 'demo-g2', workId: 'demo-w2', relatedIdea: 'demo-i4', kind: 'limitation', confidence: 0.68, statement: { es: 'Buena parte de la evidencia sobre carga cognitiva procede de tareas de laboratorio, no de aulas reales.', en: 'Much of the evidence on cognitive load comes from laboratory tasks rather than real classrooms.' } },
   { id: 'demo-g3', workId: 'demo-w3', relatedIdea: 'demo-i3', kind: 'open_question', confidence: 0.7, statement: { es: '¿Cuál es el intervalo de espaciado óptimo para retener material conceptual durante un semestre completo?', en: 'What is the optimal spacing interval for retaining conceptual material across a full semester?' } },
   { id: 'demo-g4', workId: 'demo-w1', relatedIdea: 'demo-i1', kind: 'future_work', confidence: 0.66, statement: { es: 'Faltan estudios longitudinales que midan el efecto de prueba más allá de unas pocas semanas.', en: 'Longitudinal studies measuring the testing effect beyond a few weeks are lacking.' } },
+  { id: 'demo-g5', workId: 'demo-w8', relatedIdea: 'demo-i12', kind: 'open_question', confidence: 0.69, statement: { es: '¿Qué grado de intercalado conserva el beneficio sin sobrecargar a principiantes?', en: 'How much interleaving preserves the benefit without overloading beginners?' } },
+  { id: 'demo-g6', workId: 'demo-w9', relatedIdea: 'demo-i14', kind: 'limitation', confidence: 0.71, statement: { es: 'La eficacia del feedback depende del momento y de si el estudiante puede actuar sobre él.', en: 'The effectiveness of feedback depends on timing and whether the learner can act on it.' } },
+  { id: 'demo-g7', workId: 'demo-w12', relatedIdea: 'demo-i20', kind: 'future_work', confidence: 0.65, statement: { es: 'Falta comparar estructuras colaborativas en entornos híbridos y asíncronos.', en: 'Collaborative structures still need comparison in hybrid and asynchronous settings.' } },
+  { id: 'demo-g8', workId: 'demo-w13', relatedIdea: 'demo-i22', kind: 'open_question', confidence: 0.75, statement: { es: '¿Qué señales ayudan a reconocer espontáneamente que un principio se aplica en otro contexto?', en: 'Which cues help learners spontaneously recognize that a principle applies in another context?' } },
+  { id: 'demo-g9', workId: 'demo-w14', relatedIdea: 'demo-i25', kind: 'unresolved_contradiction', confidence: 0.7, statement: { es: 'No está claro cuándo conviene confrontar una concepción errónea o construir primero un modelo alternativo.', en: 'It is unclear when to confront a misconception or first build an alternative model.' } },
+  { id: 'demo-g10', workId: 'demo-w15', relatedIdea: 'demo-i26', kind: 'limitation', confidence: 0.73, statement: { es: 'La práctica deliberada exige tiempo, feedback experto y recursos que no están igualmente disponibles.', en: 'Deliberate practice requires time, expert feedback, and resources that are not equally available.' } },
 ];
 
 const AUTHORS: { id: string; name: string }[] = [
@@ -246,6 +544,22 @@ const AUTHORS: { id: string; name: string }[] = [
   { id: 'demo-a7', name: 'Zimmerman, B. J.' },
   { id: 'demo-a8', name: 'Slamecka, N. J.' },
   { id: 'demo-a9', name: 'Graf, P.' },
+  { id: 'demo-a10', name: 'Dunlosky, J.' },
+  { id: 'demo-a11', name: 'Rawson, K. A.' },
+  { id: 'demo-a12', name: 'Kornell, N.' },
+  { id: 'demo-a13', name: 'Bjork, R. A.' },
+  { id: 'demo-a14', name: 'Hattie, J.' },
+  { id: 'demo-a15', name: 'Timperley, H.' },
+  { id: 'demo-a16', name: 'Bandura, A.' },
+  { id: 'demo-a17', name: 'Mayer, R. E.' },
+  { id: 'demo-a18', name: 'Johnson, D. W.' },
+  { id: 'demo-a19', name: 'Johnson, R. T.' },
+  { id: 'demo-a20', name: 'Barnett, S. M.' },
+  { id: 'demo-a21', name: 'Ceci, S. J.' },
+  { id: 'demo-a22', name: 'Ausubel, D. P.' },
+  { id: 'demo-a23', name: 'Ericsson, K. A.' },
+  { id: 'demo-a24', name: 'Krampe, R. T.' },
+  { id: 'demo-a25', name: 'Tesch-Römer, C.' },
 ];
 
 const WORK_AUTHORS: { workId: string; authorId: string }[] = [
@@ -255,12 +569,29 @@ const WORK_AUTHORS: { workId: string; authorId: string }[] = [
   { workId: 'demo-w4', authorId: 'demo-a6' },
   { workId: 'demo-w5', authorId: 'demo-a7' },
   { workId: 'demo-w6', authorId: 'demo-a8' }, { workId: 'demo-w6', authorId: 'demo-a9' },
+  { workId: 'demo-w7', authorId: 'demo-a10' }, { workId: 'demo-w7', authorId: 'demo-a11' },
+  { workId: 'demo-w8', authorId: 'demo-a12' }, { workId: 'demo-w8', authorId: 'demo-a13' },
+  { workId: 'demo-w9', authorId: 'demo-a14' }, { workId: 'demo-w9', authorId: 'demo-a15' },
+  { workId: 'demo-w10', authorId: 'demo-a16' },
+  { workId: 'demo-w11', authorId: 'demo-a17' },
+  { workId: 'demo-w12', authorId: 'demo-a18' }, { workId: 'demo-w12', authorId: 'demo-a19' },
+  { workId: 'demo-w13', authorId: 'demo-a20' }, { workId: 'demo-w13', authorId: 'demo-a21' },
+  { workId: 'demo-w14', authorId: 'demo-a22' },
+  { workId: 'demo-w15', authorId: 'demo-a23' }, { workId: 'demo-w15', authorId: 'demo-a24' }, { workId: 'demo-w15', authorId: 'demo-a25' },
 ];
 
 const AUTHOR_RELATIONS: { from: string; to: string; type: string; weight: number }[] = [
   { from: 'demo-a1', to: 'demo-a2', type: 'coauthor', weight: 1 },
   { from: 'demo-a4', to: 'demo-a5', type: 'coauthor', weight: 1 },
   { from: 'demo-a8', to: 'demo-a9', type: 'coauthor', weight: 1 },
+  { from: 'demo-a10', to: 'demo-a11', type: 'coauthor', weight: 1 },
+  { from: 'demo-a12', to: 'demo-a13', type: 'coauthor', weight: 1 },
+  { from: 'demo-a14', to: 'demo-a15', type: 'coauthor', weight: 1 },
+  { from: 'demo-a18', to: 'demo-a19', type: 'coauthor', weight: 1 },
+  { from: 'demo-a20', to: 'demo-a21', type: 'coauthor', weight: 1 },
+  { from: 'demo-a23', to: 'demo-a24', type: 'coauthor', weight: 1 },
+  { from: 'demo-a23', to: 'demo-a25', type: 'coauthor', weight: 1 },
+  { from: 'demo-a24', to: 'demo-a25', type: 'coauthor', weight: 1 },
 ];
 
 interface DemoNote {
@@ -288,11 +619,11 @@ const NOTES: DemoNote[] = [
       es: [
         '# Estás viendo Nodus con datos de ejemplo',
         '',
-        'Este corpus de demostración reúne seis obras sobre la **ciencia del aprendizaje** para que puedas recorrer la app sin conectar Zotero ni configurar una clave de IA.',
+        'Este corpus de demostración reúne quince obras sobre la **ciencia del aprendizaje** para que puedas recorrer la app sin conectar Zotero ni configurar una clave de IA.',
         '',
-        '- **Grafo** e **Ideas**: nueve ideas con su evidencia, agrupadas en tres temas.',
+        '- **Grafo** e **Ideas**: veintisiete ideas con su evidencia, agrupadas en doce temas.',
         '- **Debates**: una contradicción real entre el efecto de prueba y la ansiedad ante los exámenes.',
-        '- **Huecos**: cuatro huecos de investigación derivados de las obras.',
+        '- **Huecos**: diez huecos de investigación derivados de las obras.',
         '- **Notas**: estas notas y la carpeta «Marco teórico».',
         '',
         'Para empezar con tu propia biblioteca, sal del modo demo desde la cabecera o en Ajustes → Datos. Se borrará todo lo de ejemplo.',
@@ -300,11 +631,11 @@ const NOTES: DemoNote[] = [
       en: [
         '# You are viewing Nodus with sample data',
         '',
-        'This demo corpus gathers six works on the **science of learning** so you can explore the app without connecting Zotero or configuring an AI key.',
+        'This demo corpus gathers fifteen works on the **science of learning** so you can explore the app without connecting Zotero or configuring an AI key.',
         '',
-        '- **Graph** and **Ideas**: nine ideas with their evidence, grouped into three themes.',
+        '- **Graph** and **Ideas**: twenty-seven ideas with their evidence, grouped into twelve themes.',
         '- **Debates**: a real contradiction between the testing effect and test anxiety.',
-        '- **Gaps**: four research gaps derived from the works.',
+        '- **Gaps**: ten research gaps derived from the works.',
         '- **Notes**: these notes and the “Theoretical framework” folder.',
         '',
         'To start with your own library, leave demo mode from the header or in Settings → Data. All sample data will be removed.',
@@ -469,8 +800,8 @@ export function seedDemoData(): boolean {
     // Persisted examples for the sections that otherwise only show a composer.
     db.prepare(`INSERT INTO research_questions
       (id,question,notes,model_json,status,corpus_ideas,corpus_works,created_at,updated_at,mapped_at)
-      VALUES (?,?,?,NULL,'mapped',9,6,?,?,?)`)
-      .run('demo-research-question', L === 'es' ? '¿Cómo se combinan el espaciado y la práctica de recuperación para mejorar la retención?' : 'How do spacing and retrieval practice combine to improve retention?', L === 'es' ? 'Mapa de cobertura de ejemplo, editable y respaldado por el corpus demo.' : 'Editable sample coverage map backed by the demo corpus.', now, now, now);
+      VALUES (?,?,?,NULL,'mapped',?,?,?,?,?)`)
+      .run('demo-research-question', L === 'es' ? '¿Cómo se combinan el espaciado y la práctica de recuperación para mejorar la retención?' : 'How do spacing and retrieval practice combine to improve retention?', L === 'es' ? 'Mapa de cobertura de ejemplo, editable y respaldado por el corpus demo.' : 'Editable sample coverage map backed by the demo corpus.', IDEAS.length, WORKS.length, now, now, now);
     const insertSubQuestion = db.prepare('INSERT INTO research_subquestions (id,rq_id,text,rationale,order_idx,coverage_status,justification,created_at) VALUES (?,?,?,?,?,?,?,?)');
     insertSubQuestion.run('demo-research-subq-1', 'demo-research-question', L === 'es' ? '¿Qué evidencia compara recuperación y relectura?' : 'What evidence compares retrieval and rereading?', L === 'es' ? 'Establece el efecto principal.' : 'Establishes the main effect.', 0, 'covered', L === 'es' ? 'Dos ideas y una obra ofrecen evidencia directa.' : 'Two ideas and one work provide direct evidence.', now);
     insertSubQuestion.run('demo-research-subq-2', 'demo-research-question', L === 'es' ? '¿Qué intervalo de espaciado es óptimo a largo plazo?' : 'What spacing interval is optimal in the long term?', L === 'es' ? 'Identifica la frontera del corpus.' : 'Identifies the corpus frontier.', 1, 'partial', L === 'es' ? 'Hay evidencia del beneficio, pero no un intervalo universal.' : 'There is evidence of benefit, but no universal interval.', now);
