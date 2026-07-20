@@ -157,6 +157,26 @@ const MANUAL_IDEA_MARKER = 'manual-idea';
 import { getSettings, updateSettings } from './db/settingsRepo';
 import { runToolkitJob, type ToolkitSignal } from './toolkit/toolkitJobs';
 import { TOOLKIT_REGISTRY } from './toolkit/convert';
+import {
+  initAiOcr,
+  resumeAiOcr,
+  createOcrDocs,
+  listOcrDocs,
+  getOcrDoc,
+  deleteOcrDoc,
+  cancelOcrDoc,
+  reprocessOcrPage,
+  reprocessOcrDocument,
+  ocrPageImageDataUrl,
+  ocrPageText,
+  updateOcrPage,
+  ocrTranscript,
+  buildOcrExport,
+  buildOcrExportZip,
+  saveOcrToVault,
+  type AiOcrCreateInput,
+} from './toolkit/aiOcr';
+import type { AiOcrExportFormat, OcrOptions } from '@shared/aiOcrTypes';
 import type { ToolkitJobRequest } from '@shared/toolkitTypes';
 import type { ProtectArtifact, ProtectListSourcesRequest, ProtectSourceRef } from '@shared/protectTypes';
 import { PROTECT_INPUT_EXTENSIONS } from '@shared/protectTypes';
@@ -3456,6 +3476,54 @@ export function registerIpc(
   });
   h('toolkit:showInFolder', async (_e, filePath: string) => {
     shell.showItemInFolder(filePath);
+  });
+
+  // ── Nodus AI OCR (OCR Workspace) ────────────────────────────────────────────
+  // A persistent, per-document OCR library under userData. Processing runs in main and
+  // survives navigation; progress is pushed on 'aiOcr:event' (docId + snapshot). The
+  // store and manager are Electron-free; this layer binds them to the window + settings
+  // via initAiOcr, then resumes anything left unfinished by a previous session.
+  initAiOcr(getWindow);
+  void resumeAiOcr().catch((error) => console.error('[aiOcr] resume failed safely:', error));
+  h('aiOcr:create', async (_e, input: AiOcrCreateInput) => createOcrDocs(input));
+  h('aiOcr:list', async () => listOcrDocs());
+  h('aiOcr:get', async (_e, id: string) => getOcrDoc(id));
+  h('aiOcr:delete', async (_e, id: string) => deleteOcrDoc(id));
+  h('aiOcr:cancel', async (_e, id: string) => cancelOcrDoc(id));
+  h('aiOcr:reprocessPage', async (_e, id: string, index: number) => reprocessOcrPage(id, index));
+  h('aiOcr:reprocessDocument', async (_e, id: string, patch?: { model?: ModelRef | null; options?: Partial<OcrOptions> }) => reprocessOcrDocument(id, patch));
+  h('aiOcr:pageImage', async (_e, id: string, index: number) => ocrPageImageDataUrl(id, index));
+  h('aiOcr:saveToVault', async (_e, id: string) => saveOcrToVault(id));
+  h('aiOcr:pageText', async (_e, id: string, index: number) => ocrPageText(id, index));
+  h('aiOcr:updatePage', async (_e, id: string, index: number, text: string | null) => updateOcrPage(id, index, text));
+  h('aiOcr:transcript', async (_e, id: string) => ocrTranscript(id));
+  h('aiOcr:export', async (e, id: string, format: AiOcrExportFormat) => {
+    const { filename, data } = await buildOcrExport(id, format);
+    const win = BrowserWindow.fromWebContents(e.sender);
+    const picked = await dialog.showSaveDialog(win ?? undefined!, { title: 'Exportar transcripción', defaultPath: filename });
+    if (picked.canceled || !picked.filePath) return { canceled: true };
+    fs.writeFileSync(picked.filePath, data);
+    return { canceled: false, path: picked.filePath };
+  });
+  h('aiOcr:exportZip', async (e, ids: string[], format: AiOcrExportFormat) => {
+    const { filename, data } = await buildOcrExportZip(ids, format);
+    const win = BrowserWindow.fromWebContents(e.sender);
+    const picked = await dialog.showSaveDialog(win ?? undefined!, { title: 'Exportar transcripciones', defaultPath: filename });
+    if (picked.canceled || !picked.filePath) return { canceled: true };
+    fs.writeFileSync(picked.filePath, data);
+    return { canceled: false, path: picked.filePath };
+  });
+  h('aiOcr:pickFiles', async (e) => {
+    const win = BrowserWindow.fromWebContents(e.sender);
+    const picked = await dialog.showOpenDialog(win ?? undefined!, {
+      title: 'Añadir PDF o imágenes para OCR',
+      properties: ['openFile', 'multiSelections'],
+      filters: [
+        { name: 'PDF e imágenes', extensions: ['pdf', 'png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'tif', 'tiff'] },
+        { name: 'Todos los archivos', extensions: ['*'] },
+      ],
+    });
+    return picked.canceled ? [] : picked.filePaths;
   });
 
   // ── Nodus Protect ──────────────────────────────────────────────────────────

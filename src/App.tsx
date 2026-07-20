@@ -1494,7 +1494,7 @@ export function App() {
           {view === 'notes' && (
             <NotesView onOpenGraph={(target) => navigate('graph', target)} focusNote={noteTarget} />
           )}
-          {view === 'toolkit' && <ToolkitView page={toolkitPage} onNavigate={setToolkitPage} />}
+          {view === 'toolkit' && <ToolkitView page={toolkitPage} onNavigate={setToolkitPage} settings={settings} />}
           {view === 'settings' && (
             <Settings
               settings={settings}

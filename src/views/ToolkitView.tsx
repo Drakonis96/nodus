@@ -3,11 +3,13 @@
 // interna (catálogo ↔ herramienta) no añade ids a la union View: el sidebar
 // tiene una única entrada de sección con las herramientas anidadas debajo, y la
 // página activa la controla App (así el estado sobrevive a salir de la sección).
+import type { AppSettings } from '@shared/types';
 import { Icon } from '../components/ui';
 import { t } from '../i18n';
 import { TOOLKIT_TOOLS, type ToolkitPage } from '../navigation';
 import { ToolkitConvertView } from './ToolkitConvertView';
 import { ToolkitProtectView } from './ToolkitProtectView';
+import { ToolkitAiOcrView } from './ToolkitAiOcrView';
 
 interface ToolCardProps {
   testid: string;
@@ -60,19 +62,23 @@ function ToolCard({ testid, icon, name, description, state, onOpen }: ToolCardPr
 export function ToolkitView({
   page,
   onNavigate,
+  settings,
 }: {
   page: ToolkitPage;
   onNavigate: (page: ToolkitPage) => void;
+  settings: AppSettings | null;
 }) {
   return (
     <div className="h-full overflow-y-auto px-6 py-6 max-md:px-4">
-      {/* Convert y Protect tienen página propia; las otras dos herramientas están
-          deshabilitadas en el catálogo y en el sidebar, así que cualquier otra
+      {/* Convert, Protect y AI OCR tienen página propia; PDF Presenter sigue
+          deshabilitado en el catálogo y en el sidebar, así que cualquier otra
           página cae en el catálogo en lugar de dejar el panel en blanco. */}
       {page === 'convert' ? (
         <ToolkitConvertView onBack={() => onNavigate('home')} />
       ) : page === 'protect' ? (
         <ToolkitProtectView onBack={() => onNavigate('home')} />
+      ) : page === 'ocr' ? (
+        <ToolkitAiOcrView onBack={() => onNavigate('home')} settings={settings} />
       ) : (
         <div data-testid="toolkit-home" className="mx-auto max-w-5xl space-y-6">
           <header className="flex items-start gap-3">

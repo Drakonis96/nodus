@@ -20,6 +20,26 @@ export type {
   ToolkitJobProgress,
   ToolkitJobResult,
 } from './toolkitTypes';
+// Type-only re-export of the AI OCR (OCR Workspace) surface, so NodusApi and renderer
+// callers get these from '@shared/types' too. Runtime helpers live in '@shared/aiOcrTypes'.
+export type {
+  OcrBlockLabel,
+  OcrBlock,
+  OcrPageResult,
+  OcrProcessingMode,
+  OcrOutputMode,
+  OcrOptions,
+  OcrDocStatus,
+  OcrPageStatus,
+  OcrPageState,
+  OcrSourceKind,
+  OcrDoc,
+  OcrDocSummary,
+  OcrDocProgress,
+  AiOcrCreateRequest,
+  AiOcrExportFormat,
+  AiOcrExportResult,
+} from './aiOcrTypes';
 export type {
   ProtectInputExtension,
   ProtectSourceKind,
@@ -43,6 +63,7 @@ export type {
 // Type-only import (erased at compile time) — keeps the no-runtime-import rule intact.
 import type { VaultType } from './vaultTypes';
 import type { ToolkitJobRequest, ToolkitJobProgress, ToolkitJobResult } from './toolkitTypes';
+import type { AiOcrCreateRequest, AiOcrExportFormat, AiOcrExportResult, OcrDoc, OcrDocSummary, OcrDocProgress, OcrOptions } from './aiOcrTypes';
 import type {
   ProtectArtifact,
   ProtectArtifactWriteResult,
@@ -6195,6 +6216,34 @@ export interface NodusApi {
   pickToolkitOutputDir(): Promise<string | null>;
   /** Reveal a produced file in the OS file manager. */
   revealToolkitOutput(filePath: string): Promise<void>;
+
+  // Nodus AI OCR (OCR Workspace) — a persistent, per-document OCR library backed by
+  // vision models. Processing runs in main and survives navigation; progress is pushed
+  // on 'aiOcr:event' (docId + snapshot), subscribed via onOcrEvent.
+  createOcrDocs(input: AiOcrCreateRequest): Promise<OcrDoc[]>;
+  listOcrDocs(): Promise<OcrDocSummary[]>;
+  getOcrDoc(id: string): Promise<OcrDoc | null>;
+  deleteOcrDoc(id: string): Promise<void>;
+  cancelOcrDoc(id: string): Promise<void>;
+  reprocessOcrPage(id: string, index: number): Promise<void>;
+  reprocessOcrDocument(id: string, patch?: { model?: ModelRef | null; options?: Partial<OcrOptions> }): Promise<void>;
+  /** A rendered page image as a data URL, for page-by-page review. */
+  getOcrPageImage(id: string, index: number): Promise<string | null>;
+  /** The current Markdown of one page (manual edit if present, else the OCR text). */
+  getOcrPageText(id: string, index: number): Promise<string>;
+  /** Save a manual edit of one page; null reverts to the OCR reconstruction. */
+  saveOcrPageEdit(id: string, index: number, text: string | null): Promise<void>;
+  getOcrTranscript(id: string): Promise<string | null>;
+  /** Export one document's transcript to disk (native save dialog). */
+  exportOcrDoc(id: string, format: AiOcrExportFormat): Promise<AiOcrExportResult>;
+  /** Export every completed document as one ZIP in the chosen format. */
+  exportOcrDocsZip(ids: string[], format: AiOcrExportFormat): Promise<AiOcrExportResult>;
+  /** Save a document's transcript into the active vault as a Markdown note. */
+  saveOcrToVault(id: string): Promise<{ noteId: string; title: string }>;
+  /** Native picker limited to PDF + image formats. */
+  pickOcrFiles(): Promise<string[]>;
+  /** Subscribe to per-document progress; returns an unsubscribe function. */
+  onOcrEvent(cb: (docId: string, progress: OcrDocProgress) => void): () => void;
 
   // Nodus Protect — all filesystem and vault references are registered and
   // validated in the main process before bytes are exposed to the renderer.

@@ -5,8 +5,10 @@
  * `scripts/test-i18n-coverage.mjs` requires every key the UI asks for to be here.
  */
 import { PROTECT_TRANSLATIONS } from './i18n.protect';
+import { AI_OCR_TRANSLATIONS } from './i18n.aiOcr';
 
 export const DE: Record<string, string> = {
+  ...AI_OCR_TRANSLATIONS.de,
   ...PROTECT_TRANSLATIONS.de,
   // ── UI-Laufzeitdaten (Electron → Renderer) ───────────────────────────────
   'No se pudo traducir este mensaje.': 'Diese Nachricht konnte nicht übersetzt werden.',

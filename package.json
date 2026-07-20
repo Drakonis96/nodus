@@ -21,6 +21,7 @@
     "verify:single-instance": "node scripts/verify-single-instance.mjs",
     "verify:api-key-recovery-macos": "node scripts/verify-api-key-recovery-macos.mjs",
     "verify:toolkit-heic": "node scripts/verify-toolkit-heic.mjs",
+    "verify:aiocr": "node scripts/verify-aiocr.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p electron/tsconfig.json",
     "lint": "eslint . --ext .ts,.tsx",
     "icons": "node scripts/generate-icons.mjs",
