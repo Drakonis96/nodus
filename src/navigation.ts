@@ -154,7 +154,7 @@ export const TOOLKIT_TOOLS: ToolkitToolDef[] = [
     shortName: 'OCR',
     description: 'OCR asistido por IA para escaneados difíciles, con revisión página a página e integración con tus bóvedas.',
     icon: 'scanText',
-    state: 'soon',
+    state: 'wip',
     testid: 'aiocr',
   },
 ];

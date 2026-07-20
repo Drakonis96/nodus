@@ -1,7 +1,9 @@
 import { PROTECT_TRANSLATIONS } from './i18n.protect';
+import { AI_OCR_TRANSLATIONS } from './i18n.aiOcr';
 
 /** Complete static Italian interface table; coverage prohibits runtime fallbacks. */
 export const IT: Record<string, string> = {
+  ...AI_OCR_TRANSLATIONS.it,
   "No se pudo traducir este mensaje.": "Questo messaggio non può essere tradotto.",
   "Analizando fragmento {current}/{total} con IA… ({seconds}s)": "Analisi del pezzo {current}/{total} con l'intelligenza artificiale… ({seconds}s)",
   "Analizando fragmento {current}/{total} con IA…": "Analisi del pezzo {current}/{total} con l'intelligenza artificiale…",

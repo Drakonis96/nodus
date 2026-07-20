@@ -106,26 +106,29 @@ test('the hub renders four tools and Protect is in development', async () => {
   assert.match(view, /name=\{tool\.name\}/, 'the card shows the brand name verbatim, never through t()');
   assert.match(view, /description=\{t\(tool\.description\)\}/, 'only the description is translated');
 
-  // Honesty: the one unbuilt tool is inert; Convert, Protect and Presenter open.
+  // All four tools are built and openable; none is coming soon.
   assert.deepEqual(
     navigation.TOOLKIT_TOOLS.filter((tool) => tool.state === 'soon').map((tool) => tool.page),
-    ['ocr'],
-    'only the OCR workspace is marked coming soon'
+    [],
+    'no tool is marked coming soon'
   );
   assert.deepEqual(
     navigation.TOOLKIT_TOOLS.filter((tool) => tool.state === 'wip').map((tool) => tool.page),
-    ['convert', 'protect', 'presenter'],
-    'Convert, Protect and PDF Presenter use the in-development badge'
+    ['convert', 'protect', 'presenter', 'ocr'],
+    'every tool uses the in-development badge'
   );
   assert.match(view, /const disabled = state === 'soon'/);
   assert.match(view, /onClick=\{disabled \? undefined : onOpen\}/, 'a coming-soon card has no click handler');
-  // The convert card now opens the real converter, not a placeholder.
+  // The built cards open their real workspaces, not placeholders.
   assert.match(view, /<ToolkitConvertView onBack=/, 'Nodus Convert renders the functional converter');
   assert.match(view, /<ToolkitProtectView onBack=/, 'Nodus Protect renders the functional protection flow');
   assert.match(view, /<ToolkitPresenterView onBack=/, 'PDF Presenter renders the functional library');
-  // Any page other than 'convert' or 'protect' falls back to the catalogue rather than
+  assert.match(view, /<ToolkitAiOcrView onBack=/, 'OCR Workspace renders the functional library');
+  // Any page other than the built ones falls back to the catalogue rather than
   // rendering an empty pane.
   assert.match(view, /page === 'protect'/, 'Protect has its own routed workspace');
+  assert.match(view, /page === 'presenter'/, 'PDF Presenter has its own routed workspace');
+  assert.match(view, /page === 'ocr'/, 'OCR Workspace has its own routed workspace');
 });
 
 test('Protect exposes the complete local workflow and the secure preload boundary', async () => {
@@ -221,7 +224,7 @@ test('a tool page returns to the hub and keeps the header action row uniform', a
   assert.match(app, /title=\{t\('Abrir Nodus Toolkit'\)\}/);
   assert.match(
     app,
-    /\{view === 'toolkit' && <ToolkitView page=\{toolkitPage\} onNavigate=\{setToolkitPage\} \/>\}/,
+    /\{view === 'toolkit' && <ToolkitView page=\{toolkitPage\} onNavigate=\{setToolkitPage\} settings=\{settings\} \/>\}/,
     'the view is rendered by the shell, with the active page owned by App'
   );
   assert.match(app, /const ToolkitView = lazy\(/, 'the view is code-split like its siblings');

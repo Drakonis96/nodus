@@ -1,4 +1,5 @@
 import { PROTECT_TRANSLATIONS } from './i18n.protect';
+import { AI_OCR_TRANSLATIONS } from './i18n.aiOcr';
 
 /**
  * English translations keyed by the Spanish source string (see {@link ../i18n}).
@@ -6,6 +7,7 @@ import { PROTECT_TRANSLATIONS } from './i18n.protect';
  * every non-Spanish interface language.
  */
 export const EN: Record<string, string> = {
+  ...AI_OCR_TRANSLATIONS.en,
   ...PROTECT_TRANSLATIONS.en,
   // ── Runtime UI payloads (Electron → renderer) ────────────────────────────
   'No se pudo traducir este mensaje.': 'This message could not be translated.',

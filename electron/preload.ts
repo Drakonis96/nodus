@@ -1174,6 +1174,28 @@ const api: NodusApi = {
   pickToolkitFiles: (extensions) => ipcRenderer.invoke('toolkit:pickFiles', extensions),
   pickToolkitOutputDir: () => ipcRenderer.invoke('toolkit:pickOutputDir'),
   revealToolkitOutput: (filePath) => ipcRenderer.invoke('toolkit:showInFolder', filePath).then(() => undefined),
+
+  // Nodus AI OCR (OCR Workspace). Progress is pushed on 'aiOcr:event' (docId + snapshot).
+  createOcrDocs: (input) => ipcRenderer.invoke('aiOcr:create', input),
+  listOcrDocs: () => ipcRenderer.invoke('aiOcr:list'),
+  getOcrDoc: (id) => ipcRenderer.invoke('aiOcr:get', id),
+  deleteOcrDoc: (id) => ipcRenderer.invoke('aiOcr:delete', id).then(() => undefined),
+  cancelOcrDoc: (id) => ipcRenderer.invoke('aiOcr:cancel', id).then(() => undefined),
+  reprocessOcrPage: (id, index) => ipcRenderer.invoke('aiOcr:reprocessPage', id, index).then(() => undefined),
+  reprocessOcrDocument: (id, patch) => ipcRenderer.invoke('aiOcr:reprocessDocument', id, patch).then(() => undefined),
+  getOcrPageImage: (id, index) => ipcRenderer.invoke('aiOcr:pageImage', id, index),
+  getOcrPageText: (id, index) => ipcRenderer.invoke('aiOcr:pageText', id, index),
+  saveOcrPageEdit: (id, index, text) => ipcRenderer.invoke('aiOcr:updatePage', id, index, text).then(() => undefined),
+  getOcrTranscript: (id) => ipcRenderer.invoke('aiOcr:transcript', id),
+  exportOcrDoc: (id, format) => ipcRenderer.invoke('aiOcr:export', id, format),
+  exportOcrDocsZip: (ids, format) => ipcRenderer.invoke('aiOcr:exportZip', ids, format),
+  saveOcrToVault: (id) => ipcRenderer.invoke('aiOcr:saveToVault', id),
+  pickOcrFiles: () => ipcRenderer.invoke('aiOcr:pickFiles'),
+  onOcrEvent: (cb) => {
+    const listener = (_e: unknown, docId: string, progress: Parameters<typeof cb>[1]) => cb(docId, progress);
+    ipcRenderer.on('aiOcr:event', listener);
+    return () => ipcRenderer.removeListener('aiOcr:event', listener);
+  },
   pickProtectFiles: (multiple) => ipcRenderer.invoke('protect:pickFiles', multiple),
   registerProtectDroppedFiles: (files) => ipcRenderer.invoke(
     'protect:registerDroppedFiles',
