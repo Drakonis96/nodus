@@ -60,7 +60,7 @@ try {
   await page.evaluate(async () => {
     await window.nodus.seedDemoData();
     await window.nodus.updateSettings({
-      onboardingComplete: true, basicsTutorialVersion: 3, recoverySetupVersion: 1,
+      onboardingComplete: true, basicsTutorialVersion: 4, recoverySetupVersion: 1,
       tourComplete: true, advancedTourComplete: true, mascotEnabled: false, uiLanguage: 'es',
     });
   });

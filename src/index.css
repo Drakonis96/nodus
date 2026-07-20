@@ -2608,6 +2608,82 @@ select.input optgroup {
 @media (max-width: 600px) { .startup-update-backdrop { padding: 12px; } .startup-update-cinema { border-radius: 20px; } .startup-update-hero { min-height: 170px; grid-template-columns: 1fr 120px; padding: 24px 20px; } .startup-update-nodi svg { height: 130px !important; } .startup-update-content { padding: 18px; } }
 @media (prefers-reduced-motion: reduce) { .startup-update-aurora { animation: none; } }
 
+/* One-off 2.4.0 Toolkit + model guidance. The content blocks are also reused by
+   the full-screen essentials tutorial below. */
+.toolkit-guide-backdrop { position: fixed; inset: 0; z-index: 76; display: grid; place-items: center; padding: 22px; background: rgb(2 6 23 / .82); backdrop-filter: blur(12px); }
+.toolkit-guide-cinema { --tg-surface: #090d16; --tg-card: rgb(255 255 255 / .055); --tg-border: rgb(255 255 255 / .11); --tg-text: #f1f5f9; --tg-muted: #a3acba; display: flex; width: min(840px, 100%); max-height: min(calc(100vh - 32px), 830px); flex-direction: column; overflow: hidden; border: 1px solid rgb(148 163 184 / .28); border-radius: 28px; color: var(--tg-text); background: var(--tg-surface); box-shadow: 0 42px 130px rgb(0 0 0 / .62), 0 0 0 1px rgb(255 255 255 / .035) inset; }
+.light .toolkit-guide-cinema { --tg-surface: #f8fafc; --tg-card: #fff; --tg-border: #dbe3ee; --tg-text: #172033; --tg-muted: #64748b; border-color: rgb(30 41 59 / .2); box-shadow: 0 38px 110px rgb(15 23 42 / .3); }
+.toolkit-guide-hero { position: relative; display: grid; min-height: 190px; flex: 0 0 auto; grid-template-columns: minmax(0, 1fr) 210px; align-items: center; overflow: hidden; padding: 24px 38px; color: #f8fafc; background: radial-gradient(circle at 82% 34%, rgb(245 158 11 / .2), transparent 30%), radial-gradient(circle at 18% 5%, rgb(45 212 191 / .23), transparent 36%), linear-gradient(124deg, #111827, #0b1522 54%, #10140d); }
+.toolkit-guide-hero::after { content: ''; position: absolute; right: 0; bottom: 0; left: 0; height: 1px; background: linear-gradient(90deg, transparent, rgb(251 191 36 / .58), rgb(45 212 191 / .45), transparent); }
+.toolkit-guide-aurora { position: absolute; inset: -140% -30% -120% 32%; opacity: .7; filter: blur(45px); background: conic-gradient(from 190deg, transparent, rgb(45 212 191 / .2), transparent 34%, rgb(251 191 36 / .2), transparent 66%); animation: whats-new-aurora 14s linear infinite; }
+.toolkit-guide-hero-copy { position: relative; z-index: 2; }
+.toolkit-guide-kicker { display: flex; align-items: center; gap: 7px; color: #fcd34d; font-size: 10px; font-weight: 850; letter-spacing: .18em; }
+.toolkit-guide-hero h2 { max-width: 520px; margin-top: 9px; font-size: clamp(29px, 4vw, 43px); font-weight: 780; line-height: 1.02; letter-spacing: -.04em; }
+.toolkit-guide-hero p { max-width: 520px; margin-top: 12px; color: #cbd5e1; font-size: 12px; line-height: 1.6; }
+.toolkit-guide-nodi { position: relative; z-index: 2; display: grid; place-items: center; align-self: end; margin-bottom: -24px; }
+.toolkit-guide-progress { display: flex; flex: 0 0 auto; gap: 5px; padding: 13px 28px 0; background: var(--tg-surface); }
+.toolkit-guide-progress button { height: 3px; flex: 1; border-radius: 999px; background: color-mix(in srgb, var(--tg-muted) 18%, transparent); transition: transform .16s ease, background .2s ease; }
+.toolkit-guide-progress button.active { background: linear-gradient(90deg, #f59e0b, #2dd4bf); }
+.toolkit-guide-progress button:hover { transform: scaleY(2); }
+.toolkit-guide-stage { min-height: 0; flex: 1; overflow-y: auto; padding: 22px 34px 20px; }
+.toolkit-guide-eyebrow { display: flex; align-items: center; gap: 8px; color: #d49b28; font-size: 10px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+.dark .toolkit-guide-eyebrow, .tutorial-cinema .toolkit-guide-eyebrow { color: #fcd34d; }
+.toolkit-guide-stage h3 { margin-top: 8px; color: var(--tg-text); font-size: clamp(24px, 3vw, 34px); font-weight: 760; line-height: 1.08; letter-spacing: -.025em; }
+.toolkit-guide-summary { max-width: 720px; margin-top: 9px; color: var(--tg-muted); font-size: 14px; line-height: 1.55; }
+.toolkit-guide-content { display: grid; gap: 14px; margin-top: 15px; color: var(--tg-muted); font-size: 13px; line-height: 1.6; }
+.toolkit-guide-content b, .tutorial-content .toolkit-guide-models b, .tutorial-content .toolkit-guide-subscription b { color: var(--tg-text, #f5f5f4); }
+.toolkit-guide-tools { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+.toolkit-guide-tools > div { display: flex; min-width: 0; align-items: center; gap: 10px; border: 1px solid var(--tg-border, rgb(255 255 255 / .1)); border-radius: 13px; padding: 11px 12px; background: var(--tg-card, rgb(0 0 0 / .14)); }
+.toolkit-guide-tools > div > span { display: grid; width: 35px; height: 35px; flex: 0 0 auto; place-items: center; border-radius: 10px; color: #fbbf24; background: rgb(245 158 11 / .13); }
+.toolkit-guide-tools > div > div { display: grid; min-width: 0; gap: 2px; }
+.toolkit-guide-tools b { color: var(--tg-text, #f5f5f4); font-size: 12px; }
+.toolkit-guide-tools small { overflow: hidden; color: var(--tg-muted, #a8a29e); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.toolkit-guide-notice { display: flex; align-items: flex-start; gap: 10px; border: 1px solid rgb(45 212 191 / .24); border-radius: 13px; padding: 11px 13px; color: #0f766e; background: rgb(20 184 166 / .08); }
+.dark .toolkit-guide-notice, .tutorial-cinema .toolkit-guide-notice { color: #ccfbf1; }
+.toolkit-guide-notice > svg { flex: 0 0 auto; margin-top: 2px; color: #14b8a6; }
+.toolkit-guide-notice-warning { border-color: rgb(245 158 11 / .3); color: #92400e; background: rgb(245 158 11 / .09); }
+.dark .toolkit-guide-notice-warning, .tutorial-cinema .toolkit-guide-notice-warning { color: #fef3c7; }
+.toolkit-guide-notice-warning > svg { color: #f59e0b; }
+.toolkit-guide-models { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+.toolkit-guide-models > div { display: flex; gap: 11px; border: 1px solid var(--tg-border, rgb(255 255 255 / .1)); border-radius: 14px; padding: 13px; background: var(--tg-card, rgb(0 0 0 / .14)); }
+.toolkit-guide-models > div.recommended { border-color: rgb(45 212 191 / .3); background: linear-gradient(125deg, rgb(20 184 166 / .1), var(--tg-card, rgb(0 0 0 / .14))); }
+.toolkit-guide-models > div > span { display: grid; width: 25px; height: 25px; flex: 0 0 auto; place-items: center; border-radius: 8px; color: #07151a; background: #5eead4; font-size: 11px; font-weight: 850; }
+.toolkit-guide-models > div > div { display: grid; gap: 4px; }
+.toolkit-guide-models small { color: var(--tg-muted, #a8a29e); font-size: 10.5px; line-height: 1.45; }
+.toolkit-guide-hardware { display: flex; flex-wrap: wrap; gap: 8px; }
+.toolkit-guide-hardware span { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--tg-border, rgb(255 255 255 / .1)); border-radius: 999px; padding: 7px 11px; color: var(--tg-text, #f5f5f4); background: var(--tg-card, rgb(0 0 0 / .14)); font-size: 10px; }
+.toolkit-guide-hardware svg { color: #5eead4; }
+.toolkit-guide-remote-models { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.toolkit-guide-remote-models span { display: flex; align-items: center; gap: 7px; border: 1px solid var(--tg-border, rgb(255 255 255 / .1)); border-radius: 11px; padding: 10px 12px; color: var(--tg-text, #f5f5f4); background: var(--tg-card, rgb(0 0 0 / .14)); font-size: 11px; font-weight: 650; }
+.toolkit-guide-remote-models svg { color: #34d399; }
+.toolkit-guide-subscriptions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.toolkit-guide-subscription { display: grid; grid-template-columns: 40px minmax(0, 1fr); align-items: start; gap: 9px 11px; border: 1px solid var(--tg-border, rgb(255 255 255 / .1)); border-radius: 13px; padding: 10px 12px; background: var(--tg-card, rgb(0 0 0 / .14)); }
+.toolkit-guide-subscription.unavailable { border-color: rgb(217 119 87 / .3); background: linear-gradient(110deg, rgb(217 119 87 / .08), var(--tg-card, rgb(0 0 0 / .14))); }
+.toolkit-guide-brand { display: grid; width: 38px; height: 38px; place-items: center; border-radius: 11px; background: white; box-shadow: 0 5px 18px rgb(0 0 0 / .12); }
+.toolkit-guide-brand img { display: block; width: 22px; height: 22px; object-fit: contain; }
+.toolkit-guide-subscription > div { display: grid; gap: 2px; }
+.toolkit-guide-subscription-heading { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 7px; }
+.toolkit-guide-subscription b { color: var(--tg-text, #f5f5f4); font-size: 11.5px; }
+.toolkit-guide-subscription small { color: var(--tg-muted, #a8a29e); font-size: 10px; line-height: 1.45; }
+.toolkit-guide-subscription em { flex: 0 0 auto; border-radius: 999px; padding: 4px 7px; color: #047857; background: rgb(16 185 129 / .12); font-size: 8px; font-style: normal; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
+.dark .toolkit-guide-subscription em, .tutorial-cinema .toolkit-guide-subscription em { color: #6ee7b7; }
+.toolkit-guide-subscription.unavailable em { color: #b45309; background: rgb(245 158 11 / .12); }
+.dark .toolkit-guide-subscription.unavailable em, .tutorial-cinema .toolkit-guide-subscription.unavailable em { color: #fcd34d; }
+.toolkit-guide-trademark { color: var(--tg-muted, #78716c); font-size: 9px; text-align: center; }
+.toolkit-guide-tool-focus { display: grid; justify-items: center; gap: 15px; padding: 5px 0; text-align: center; }
+.toolkit-guide-tool-focus > span { display: grid; width: 76px; height: 76px; place-items: center; border: 1px solid rgb(251 191 36 / .28); border-radius: 23px; color: #fbbf24; background: linear-gradient(145deg, rgb(245 158 11 / .18), rgb(45 212 191 / .06)); box-shadow: 0 18px 45px rgb(245 158 11 / .1); }
+.toolkit-guide-tool-focus p { max-width: 610px; color: var(--tg-text); font-size: 14px; line-height: 1.7; }
+.toolkit-guide-tool-focus > div { display: inline-flex; align-items: center; gap: 7px; border-radius: 999px; padding: 6px 10px; color: #b45309; background: rgb(245 158 11 / .1); font-size: 9px; font-weight: 850; letter-spacing: .1em; }
+.dark .toolkit-guide-tool-focus > div { color: #fcd34d; }
+@media (min-width: 900px) { .tutorial-content .toolkit-guide-tools { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.toolkit-guide-footer { display: flex; min-height: 63px; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: 10px; border-top: 1px solid var(--tg-border); padding: 12px 24px; background: var(--tg-surface); }
+.toolkit-guide-footer button { display: inline-flex; min-height: 38px; align-items: center; justify-content: center; gap: 7px; border: 1px solid var(--tg-border); border-radius: 10px; padding: 9px 14px; color: var(--tg-text); background: var(--tg-card); font-size: 11px; font-weight: 800; }
+.toolkit-guide-footer button:disabled { cursor: default; opacity: .32; }
+.toolkit-guide-footer button.primary { border: 0; color: #07151a; background: linear-gradient(135deg, #fcd34d, #5eead4); box-shadow: 0 10px 25px rgb(45 212 191 / .14); }
+.toolkit-guide-footer button:not(:disabled):hover { transform: translateY(-1px); filter: brightness(1.04); }
+@media (max-width: 660px) { .toolkit-guide-backdrop { padding: 10px; } .toolkit-guide-cinema { max-height: 95vh; border-radius: 20px; } .toolkit-guide-hero { min-height: 170px; grid-template-columns: 1fr 120px; padding: 24px 20px; } .toolkit-guide-nodi svg { height: 130px !important; } .toolkit-guide-stage { padding: 19px; } .toolkit-guide-tools, .toolkit-guide-models, .toolkit-guide-remote-models, .toolkit-guide-subscriptions { grid-template-columns: 1fr; } .toolkit-guide-subscription { grid-template-columns: 38px minmax(0, 1fr); } .toolkit-guide-subscription em { display: none; } }
+@media (prefers-reduced-motion: reduce) { .toolkit-guide-aurora { animation: none; } }
+
 /* Cinematic, app-wide essentials tutorial. It deliberately owns the full viewport so
    existing tours and clickable application chrome cannot compete for focus. */
 .tutorial-cinema { position: fixed; inset: 0; z-index: 190; display: flex; min-height: 0; flex-direction: column; overflow: hidden; color: #f5f5f4; background: radial-gradient(circle at 15% 20%, #18333b 0, #0c1824 30%, #080b12 72%); }

@@ -24,6 +24,7 @@ import { TeachingTour } from './views/TeachingTour';
 import { BASICS_TUTORIAL_VERSION, BasicsTutorial } from './views/BasicsTutorial';
 import { preferencesForTutorialLanguage } from '@shared/tutorialPreferences';
 import { hasPendingWhatsNew, WhatsNewModal } from './components/WhatsNewModal';
+import { ToolkitBetaUpdateTour } from './components/ToolkitBetaGuide';
 import { StartupUpdateModal } from './components/StartupUpdateModal';
 import { recoveryHealthAdvice, recoveryHealthHeadline } from './recoveryHealth';
 import { RecoverySetupWizard } from './views/RecoverySetupWizard';
@@ -180,6 +181,9 @@ export function App() {
   const [backupWarningDismissed, setBackupWarningDismissed] = useState(false);
   const [whatsNewSettled, setWhatsNewSettled] = useState(() => !hasPendingWhatsNew());
   const [manualWhatsNewOpen, setManualWhatsNewOpen] = useState(false);
+  // The 2.4.0 toolkit/model guide queues directly behind release notes. Its own
+  // versioned guard settles immediately for new installs and for users who saw it.
+  const [toolkitBetaTourSettled, setToolkitBetaTourSettled] = useState(false);
   // Set once the startup update check is done with the screen, so the one-time Nodi
   // choice can queue up behind it instead of fighting it for the foreground.
   const [updateSettled, setUpdateSettled] = useState(false);
@@ -1649,7 +1653,15 @@ export function App() {
         />
       )}
 
-      {whatsNewSettled && !manualWhatsNewOpen && <StartupUpdateModal onSettled={() => setUpdateSettled(true)} />}
+      {whatsNewSettled && !toolkitBetaTourSettled && !manualWhatsNewOpen && (
+        <ToolkitBetaUpdateTour
+          uiLanguage={settings.uiLanguage}
+          previousTutorialVersion={settings.basicsTutorialVersion}
+          onSettled={() => setToolkitBetaTourSettled(true)}
+        />
+      )}
+
+      {whatsNewSettled && toolkitBetaTourSettled && !manualWhatsNewOpen && <StartupUpdateModal onSettled={() => setUpdateSettled(true)} />}
 
       {/* Users who already saw the cinematic tutorial were never offered the choice of
           Nodi, so it is made here instead — once, behind the update check. New users

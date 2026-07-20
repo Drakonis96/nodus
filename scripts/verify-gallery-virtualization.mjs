@@ -68,7 +68,7 @@ try {
     await window.nodus.seedDatabasesDemoData();
     await window.nodus.updateSettings({
       onboardingComplete: true,
-      basicsTutorialVersion: 3,
+      basicsTutorialVersion: 4,
       recoverySetupVersion: 1,
       tourComplete: true,
       advancedTourComplete: true,
