@@ -33,6 +33,16 @@ const MAX_CONTEXT_CHARS = 52_000;
 const MAX_SOURCE_CHARS = 3_600;
 const DEMO_CONVERSATION_ID = 'demo-study-chat-membrane';
 
+const INSUFFICIENT_INFORMATION: Record<string, string> = {
+  es: 'No hay información suficiente en las fuentes seleccionadas para responder con seguridad. Añade materiales, amplía el ámbito o selecciona otras fuentes.',
+  en: 'There is not enough information in the selected sources to answer safely. Add materials, broaden the scope, or select other sources.',
+  fr: 'Les sources sélectionnées ne contiennent pas assez d’informations pour répondre de façon fiable. Ajoutez des documents, élargissez le périmètre ou choisissez d’autres sources.',
+  de: 'Die ausgewählten Quellen enthalten nicht genügend Informationen für eine verlässliche Antwort. Füge Material hinzu, erweitere den Bereich oder wähle andere Quellen aus.',
+  pt: 'As fontes selecionadas não contêm informação suficiente para responder com segurança. Adicione materiais, alargue o âmbito ou selecione outras fontes.',
+  'pt-BR': 'As fontes selecionadas não contêm informações suficientes para responder com segurança. Adicione materiais, amplie o escopo ou selecione outras fontes.',
+  tr: 'Seçilen kaynaklarda güvenilir bir yanıt vermek için yeterli bilgi yok. Materyal ekleyin, kapsamı genişletin veya başka kaynaklar seçin.',
+};
+
 function now(): string { return new Date().toISOString(); }
 function storePath(): string { return path.join(activeVaultDir(), 'study-chat-history.json'); }
 
@@ -211,6 +221,8 @@ export async function streamStudyAssistant(
   const lastUser = [...request.messages].reverse().find((message) => message.role === 'user' && message.content.trim());
   if (!lastUser) throw new Error('Escribe una pregunta antes de enviar.');
   const settings = getSettings();
+  const responseLanguage = request.language === 'auto' ? settings.promptLanguage : request.language;
+  const insufficientAnswer = INSUFFICIENT_INFORMATION[responseLanguage] ?? INSUFFICIENT_INFORMATION.en;
   const configuredModel = request.model ?? settings.studyModel ?? settings.chatModel ?? settings.synthesisModel ?? null;
   const { citations: availableCitations, truncated } = await buildCitations(lastUser.content, normalizeSelection(request.selection));
   const sourceChars = availableCitations.reduce((sum, citation) => sum + citation.quote.length, 0);
@@ -220,13 +232,12 @@ export async function streamStudyAssistant(
     truncated, provider: configuredModel?.provider ?? '', model: configuredModel?.model ?? '',
   };
   if (!availableCitations.length && !request.allowExternalKnowledge) {
-    const answer = 'No hay información suficiente en las fuentes seleccionadas para responder con seguridad. Añade materiales, amplía el ámbito o selecciona otras fuentes.';
-    return { answer, citations: [], availableCitations: [], citationWarning: false, insufficientInformation: true, interrupted: false, stats };
+    return { answer: insufficientAnswer, citations: [], availableCitations: [], citationWarning: false, insufficientInformation: true, interrupted: false, stats };
   }
   const effectiveModel = resolveModelRef(configuredModel);
   const prompt = buildStudyAssistantPrompt(request, availableCitations);
   const raw = await completeTextStream({ ...prompt, temperature: 0.18, maxTokens: 3200 }, onDelta, effectiveModel, signal);
-  const validated = validateStudyAssistantAnswer(raw, availableCitations);
+  const validated = validateStudyAssistantAnswer(raw, availableCitations, insufficientAnswer);
   return {
     ...validated, availableCitations, insufficientInformation: !raw.trim(), interrupted: Boolean(signal?.aborted), stats,
   };

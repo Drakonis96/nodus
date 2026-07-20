@@ -337,13 +337,13 @@ test('issue #12 runtime UI payloads have a translation in every language', () =>
   }
 });
 
-test('all non-Spanish translation fallbacks resolve to English, never Spanish', () => {
+test('non-Spanish translations prefer English and preserve unknown dynamic values', () => {
   const { resolveTranslation, setActiveLang, getActiveLang } = loadModule('src/i18n.ts');
   const sparse = { en: { Clave: 'English fallback' }, fr: {}, de: {} };
   assert.equal(resolveTranslation('fr', 'Clave', sparse), 'English fallback');
   assert.equal(resolveTranslation('de', 'Clave', sparse), 'English fallback');
   assert.equal(resolveTranslation('unknown-locale', 'Clave', sparse), 'English fallback');
-  assert.equal(resolveTranslation('pt', 'Sin inglés', { en: {} }), 'Translation unavailable.');
+  assert.equal(resolveTranslation('pt', 'Already readable', { en: {} }), 'Already readable');
   setActiveLang('unknown-locale');
   assert.equal(getActiveLang(), 'en', 'an unknown locale must normalize to English');
 

@@ -75,6 +75,14 @@ try {
   assert.match(prompt.system, /No inventes ids/);
   assert.match(prompt.user, /exact_fragment/);
 
+  const settingsRepo = require(path.join(repoRoot, 'electron/db/settingsRepo.ts'));
+  settingsRepo.updateSettings({ promptLanguage: 'en' });
+  const insufficient = await assistant.streamStudyAssistant({
+    messages: [{ id: 'u-empty', role: 'user', content: 'What is missing?', createdAt: new Date().toISOString() }],
+    selection: { scope: 'manual', sourceKeys: [] }, task: 'answer', level: 'standard', tone: 'clear', language: 'auto', allowExternalKnowledge: false,
+  }, () => {});
+  assert.match(insufficient.answer, /^There is not enough information/, 'early insufficient-context responses follow the configured prompt language');
+
   const conversation = assistant.createStudyAssistantConversation({ selection: { scope: 'topic', topicId: topic.id, sourceKeys: [] } });
   const messages = [
     { id: 'u1', role: 'user', content: 'Resume la memoria.', createdAt: new Date().toISOString() },

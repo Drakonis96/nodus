@@ -61,6 +61,7 @@ export function ModelPicker({
   allowEmpty = true,
   menu = false,
   requireExtraction = false,
+  className = '',
 }: {
   settings: AppSettings;
   value: ModelRef | null;
@@ -71,6 +72,7 @@ export function ModelPicker({
   allowEmpty?: boolean;
   menu?: boolean;
   requireExtraction?: boolean;
+  className?: string;
 }) {
   const favorites = sortModelRefs(settings.favorites ?? []);
   const blocked = (m: ModelRef) => requireExtraction && !modelRefSupportsExtraction(m);
@@ -89,7 +91,7 @@ export function ModelPicker({
   if (menu) {
     const models = value && !valueIsFavorite ? [value, ...favorites] : favorites;
     const choose = (model: ModelRef | null) => { onChange(model); setOpen(false); };
-    return <div ref={rootRef} className={`model-picker-menu${compact ? ' compact' : ''}`}>
+    return <div ref={rootRef} className={`model-picker-menu${compact ? ' compact' : ''} ${className}`}>
       <button type="button" className="model-picker-trigger" disabled={disabled} aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen((current) => !current)} title={t('Seleccionar modelo')}>
         <span>{value ? modelLabel(value) : emptyLabel ? t(emptyLabel) : t('Sin modelo seleccionado')}</span><Icon name="chevronDown" size={14} />
       </button>
@@ -103,7 +105,7 @@ export function ModelPicker({
 
   return (
     <select
-      className={`input ${compact ? 'text-xs py-1' : ''}`}
+      className={`input ${compact ? 'text-xs py-1' : ''} ${className}`}
       disabled={disabled}
       value={value ? serialize(value) : ''}
       onChange={(e) => {

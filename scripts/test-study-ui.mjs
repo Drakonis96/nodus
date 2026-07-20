@@ -283,7 +283,8 @@ test('redundant study views are removed while courses, chat, review and the ques
   assert.match(chat, /data-testid="study-chat-context-toggle"/);
   assert.match(chat, /contextOpen && <aside/);
   assert.match(chat, /nodus\.studyChatContextOpen/);
-  assert.match(chat, /study-chat-header-new" className="btn btn-ghost h-8 w-8 shrink-0 p-0"/);
+  assert.match(chat, /study-chat-header-new" className="btn btn-ghost relative z-10 h-8 w-8 shrink-0 p-0"/);
+  assert.match(chat, /compact className="w-full min-w-0"/);
   assert.match(chat, /listStudyAssistantConversations/);
   assert.match(chat, /createStudyAssistantConversation/);
   assert.match(chat, /updateStudyAssistantConversation/);

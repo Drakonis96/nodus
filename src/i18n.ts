@@ -13,9 +13,8 @@ import { looksLikeSpanishUiText, normalizeUiLanguage } from '@shared/uiLanguage'
  *   - In Spanish, `t()` returns the key unchanged (zero risk, byte-identical UI).
  *   - Otherwise `t()` looks the key up in that language's table.
  *
- * Lookups fall back <lang> → EN. A gap in a translated language shows English
- * rather than Spanish, because an untranslated string is far more likely to be
- * readable to that user in English. English is mandatory; an invalid locale also
+ * Lookups fall back <lang> → EN. Dynamic values that are not translation keys are
+ * preserved as written when neither table contains them; an invalid locale still
  * normalizes to English.
  * `scripts/test-i18n-coverage.mjs` asserts every table is complete, so the
  * fallbacks are a safety net, not the plan.
@@ -37,11 +36,9 @@ const TABLES: Record<Exclude<AppLanguage, 'es'>, Record<string, string>> = {
 
 let activeLang: AppLanguage = 'es';
 
-const MISSING_ENGLISH_TRANSLATION = 'Translation unavailable.';
-
 type TranslationTables = Partial<Record<Exclude<AppLanguage, 'es'>, Record<string, string>>>;
 
-/** Resolve one key with English as the only fallback for non-Spanish locales. */
+/** Resolve one key with English first and the original dynamic value last. */
 export function resolveTranslation(
   lang: unknown,
   es: string,
@@ -49,7 +46,11 @@ export function resolveTranslation(
 ): string {
   const normalized = normalizeUiLanguage(lang);
   if (normalized === 'es') return es;
-  return tables[normalized]?.[es] ?? tables.en?.[es] ?? MISSING_ENGLISH_TRANSLATION;
+  // `t()` is also used at a few dynamic render boundaries (provider labels,
+  // imported metadata and runtime catalogues). Those values are not translation
+  // keys and must remain readable when they are absent from the static tables.
+  // Literal UI copy is still exhaustively checked by test-i18n-coverage.mjs.
+  return tables[normalized]?.[es] ?? tables.en?.[es] ?? es;
 }
 
 export function setActiveLang(lang: AppLanguage): void {
