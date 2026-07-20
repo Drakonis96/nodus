@@ -803,6 +803,26 @@
 .nodi-theme-light .nodi-msg .md td { border-color: rgba(15, 23, 42, .12); }
 .nodi-theme-light .nodi-msg .md th { color: #1f2937; background: #f1f5f9; }
 .nodi-theme-light .nodi-msg .md a { color: var(--nodi-vault-accent, #6366f1); }
+.nodi-theme-light .nodi-chat-msgs,
+.nodi-theme-light .nodi-chat-input,
+.nodi-theme-light .nodi-history,
+.nodi-theme-light .nodi-panel-body,
+.nodi-theme-light .nodi-msg .md pre { scrollbar-color: #cbd5e1 #eef2f7; }
+.nodi-theme-light .nodi-chat-msgs::-webkit-scrollbar-track,
+.nodi-theme-light .nodi-chat-input::-webkit-scrollbar-track,
+.nodi-theme-light .nodi-history::-webkit-scrollbar-track,
+.nodi-theme-light .nodi-panel-body::-webkit-scrollbar-track,
+.nodi-theme-light .nodi-msg .md pre::-webkit-scrollbar-track { background: #eef2f7; }
+.nodi-theme-light .nodi-chat-msgs::-webkit-scrollbar-thumb,
+.nodi-theme-light .nodi-chat-input::-webkit-scrollbar-thumb,
+.nodi-theme-light .nodi-history::-webkit-scrollbar-thumb,
+.nodi-theme-light .nodi-panel-body::-webkit-scrollbar-thumb,
+.nodi-theme-light .nodi-msg .md pre::-webkit-scrollbar-thumb { background: #cbd5e1; border-color: #eef2f7; }
+.nodi-theme-light .nodi-chat-msgs::-webkit-scrollbar-thumb:hover,
+.nodi-theme-light .nodi-chat-input::-webkit-scrollbar-thumb:hover,
+.nodi-theme-light .nodi-history::-webkit-scrollbar-thumb:hover,
+.nodi-theme-light .nodi-panel-body::-webkit-scrollbar-thumb:hover,
+.nodi-theme-light .nodi-msg .md pre::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 .nodi-theme-light .nodi-chat-foot { border-top-color: rgba(15, 23, 42, .08); }
 .nodi-theme-light .nodi-chat-input {
   background: #f8fafc;
