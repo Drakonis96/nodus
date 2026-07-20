@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, shell } from 'electron';
+import { app, BrowserWindow, dialog, session, shell } from 'electron';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { constants as fsConstants, promises as fs } from 'node:fs';
@@ -463,6 +463,16 @@ app.whenReady().then(() => {
   // Losing the lock queues a quit; do not open the database or a window.
   if (!hasSingleInstanceLock) return;
   restorePersistedDockIcon();
+  // YouTube (embedded by the PDF Presenter's audience overlay) flags Electron's
+  // User-Agent as a bot. Strip the Electron/app tokens so the embed loads; the
+  // change is cosmetic for every other kind of web content Nodus may open.
+  const cleanUa = session.defaultSession
+    .getUserAgent()
+    .replace(/\s*Electron\/[\S]+/g, '')
+    .replace(/\s*nodus\/[\S]+/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  session.defaultSession.setUserAgent(cleanUa);
   // Nodus Toolkit OCR caches its Tesseract language traineddata here (the one
   // opt-in network call), so downloads persist across sessions in userData.
   if (!process.env.NODUS_TESSDATA_CACHE) {

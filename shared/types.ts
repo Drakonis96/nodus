@@ -64,6 +64,8 @@ export type {
 import type { VaultType } from './vaultTypes';
 import type { ToolkitJobRequest, ToolkitJobProgress, ToolkitJobResult } from './toolkitTypes';
 import type { AiOcrCreateRequest, AiOcrExportFormat, AiOcrExportResult, OcrDoc, OcrDocSummary, OcrDocProgress, OcrOptions } from './aiOcrTypes';
+import type { Presentation, PresenterLibrary, PptxNotes } from './presenterTypes';
+import type { PresenterAction, PresenterRuntimeState } from './presenterState';
 import type {
   ProtectArtifact,
   ProtectArtifactWriteResult,
@@ -6257,6 +6259,38 @@ export interface NodusApi {
   saveProtectArtifactToVault(artifact: ProtectArtifact): Promise<ProtectVaultCopySummary>;
   downloadProtectCopy(copyId: string): Promise<ProtectArtifactWriteResult>;
   deleteProtectCopy(copyId: string): Promise<void>;
+
+  // PDF Presenter — global Toolkit library of imported PDFs. The library JSON is
+  // read/written whole; PDF bytes stream over IPC for pdfjs (offline).
+  getPresenterLibrary(): Promise<PresenterLibrary>;
+  savePresenterLibrary(lib: PresenterLibrary): Promise<void>;
+  /** Open a picker and copy the chosen PDF into the library; null when cancelled. */
+  importPresenterPdf(): Promise<Presentation | null>;
+  /** Raw PDF bytes for a presentation, or null if its copy is missing. */
+  getPresenterPdfData(id: string): Promise<Uint8Array | null>;
+  deletePresenterPresentation(id: string): Promise<void>;
+  /** Open a .pptx picker and extract its speaker notes; null when cancelled. */
+  importPresenterPptxNotes(): Promise<PptxNotes | null>;
+  /** Open the audience window (full-screen, external display when present). */
+  startPresenter(pdfId: string, startSlide?: number): Promise<void>;
+  /** Open the audience + presenter windows together. */
+  startPresenterMode(pdfId: string, startSlide?: number): Promise<void>;
+  /** Close every presentation window. */
+  stopPresenter(): Promise<void>;
+  getPresenterState(): Promise<PresenterRuntimeState>;
+  /** Mobile-remote server info + a QR data URL, or null when not presenting. */
+  getPresenterServerInfo(): Promise<{ ip: string; port: number; pin: string; url: string; qr: string } | null>;
+  /** System output volume 0–100 (macOS; 50 elsewhere). */
+  getPresenterVolume(): Promise<number>;
+  setPresenterVolume(volume: number): Promise<void>;
+  /** Open the macOS Screen Mirroring / AirPlay picker (no-op elsewhere). */
+  openPresenterCast(): Promise<boolean>;
+  /** Send a control action (navigate, black-screen, zoom, timer…) to the hub. */
+  sendPresenterControl(action: PresenterAction): void;
+  /** Subscribe to control actions relayed from the other window; returns an unsubscribe. */
+  onPresenterControl(cb: (action: PresenterAction) => void): () => void;
+  /** Fires when the presentation ends (all windows closed). */
+  onPresenterEnded(cb: () => void): () => void;
 }
 
 export interface WorkFilter {

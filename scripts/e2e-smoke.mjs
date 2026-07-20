@@ -688,12 +688,16 @@ try {
     assert.equal(centring.square, true, `${testId} icon tile is square`);
     assert.ok(centring.dx <= 0.5 && centring.dy <= 0.5, `${testId} icon is centred (dx ${centring.dx}, dy ${centring.dy})`);
   }
-  // The two unbuilt tools must be inert, not dead ends: clicking does nothing.
-  for (const testId of ['toolkit-card-presenter', 'toolkit-card-aiocr']) {
-    assert.equal(await page.getByTestId(testId).isDisabled(), true, `${testId} is not openable yet`);
-  }
-  await page.getByTestId('toolkit-card-presenter').click({ force: true });
+  // The one unbuilt tool must be inert, not a dead end: clicking does nothing.
+  assert.equal(await page.getByTestId('toolkit-card-aiocr').isDisabled(), true, 'toolkit-card-aiocr is not openable yet');
+  await page.getByTestId('toolkit-card-aiocr').click({ force: true });
   assert.equal(await page.getByTestId('toolkit-home').count(), 1, 'a coming-soon card never navigates away from the hub');
+  // PDF Presenter is a working tool: it opens on its (empty) library and returns.
+  assert.equal(await page.getByTestId('toolkit-card-presenter').isDisabled(), false, 'PDF Presenter opens');
+  await page.getByTestId('toolkit-card-presenter').click();
+  await page.getByTestId('presenter-import').waitFor({ timeout: 10_000 });
+  await page.getByTestId('presenter-back').click();
+  await page.getByTestId('toolkit-home').waitFor();
   // Nodus Convert opens on its empty state: the dropzone plus the catalogue of
   // formats it accepts, so the drop is never a blind guess.
   await page.getByTestId('toolkit-card-convert').click();

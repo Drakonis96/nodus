@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-  <link rel="stylesheet" href="demo.css?v=20260717-study3"/>
+  <link rel="stylesheet" href="demo.css?v=20260720-vault-tabs"/>
 </head>
 <body class="demo-page gen">
   <nav class="site-nav">
@@ -37,25 +37,13 @@
       <a href="../index.html" class="brand" style="text-decoration:none;color:inherit">
         <img src="../assets/nodus-logo.svg" alt="Nodus logo"/> Nodus
       </a>
-      <div class="vault-switch" id="vault-switch">
-        <button class="vault-btn" onclick="toggleVaultMenu(event)" aria-haspopup="true" aria-expanded="false">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"/></svg>
-          <span class="vault-name">Serrano family</span>
-          <span class="vault-mode gen">Genealogy</span>
-          <svg class="vchev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
-        </button>
-        <div class="vault-menu" id="vault-menu" role="menu">
-          <div class="vault-menu-label">Switch demo mode</div>
-          <a class="vault-opt active" href="genealogy.html" role="menuitem"><span class="vm-dot gen"></span><span class="vm-t"><b>Genealogy</b><span>Serrano family</span></span><span class="vm-tag">Active</span></a>
-          <a class="vault-opt" href="index.html" role="menuitem"><span class="vm-dot academic"></span><span class="vm-t"><b>Academic</b><span>Learning science library</span></span><span class="vm-load">Open</span></a>
-          <a class="vault-opt" href="databases.html" role="menuitem"><span class="vm-dot db"></span><span class="vm-t"><b>Databases</b><span>Field notebook</span></span><span class="vm-load">Open</span></a>
-          <a class="vault-opt" href="study.html" role="menuitem"><span class="vm-dot st"></span><span class="vm-t"><b>Study</b><span>General Biology</span></span><span class="vm-load">Open</span></a>
-          <a class="vault-opt" href="teaching.html" role="menuitem"><span class="vm-dot teach"></span><span class="vm-t"><b>Teaching</b><span>Year 9 · History</span></span><span class="vm-load">Open</span></a>
-          <div class="vault-menu-label">Not in the demo yet</div>
-          <button class="vault-opt disabled" disabled><span class="vm-dot soon"></span><span class="vm-t"><b>Primary Sources</b><span>Archival records + literature</span></span><span class="vm-soon">Soon</span></button>
-        </div>
-      </div>
-      <div class="spacer"></div>
+      <nav class="vault-tabs" aria-label="Switch demo vault">
+        <a class="vault-tab academic" href="index.html" title="Academic · Learning science library">Academic</a>
+        <a class="vault-tab teach" href="teaching.html" title="Teaching · Year 9 History">Teaching</a>
+        <a class="vault-tab st" href="study.html" title="Study · General Biology">Study</a>
+        <a class="vault-tab gen" href="genealogy.html" aria-current="page" title="Genealogy · Serrano family">Genealogy<span class="vault-active-label">Active</span></a>
+        <a class="vault-tab db" href="databases.html" title="Databases · Field notebook">Databases</a>
+      </nav>
       <button class="tb-btn" onclick="GUI.chat()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3Z"/></svg>
         Assistant</button>
@@ -82,7 +70,6 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="genealogy-data.js?v=204"></script>
   <script src="genealogy-app.js?v=204"></script>
-  <script src="vault-switch.js?v=201"></script>
   <script>
     (function () {
       function paintStars(n) {
@@ -102,6 +89,6 @@
         });
     })();
   </script>
-  <script src="../nodi.js?v=20260717orb2"></script>
+  <script src="../nodi.js?v=20260720-menu1"></script>
 </body>
 </html>

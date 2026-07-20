@@ -9,6 +9,7 @@ import { t } from '../i18n';
 import { TOOLKIT_TOOLS, type ToolkitPage } from '../navigation';
 import { ToolkitConvertView } from './ToolkitConvertView';
 import { ToolkitProtectView } from './ToolkitProtectView';
+import { ToolkitPresenterView } from './ToolkitPresenterView';
 import { ToolkitAiOcrView } from './ToolkitAiOcrView';
 
 interface ToolCardProps {
@@ -70,13 +71,14 @@ export function ToolkitView({
 }) {
   return (
     <div className="h-full overflow-y-auto px-6 py-6 max-md:px-4">
-      {/* Convert, Protect y AI OCR tienen página propia; PDF Presenter sigue
-          deshabilitado en el catálogo y en el sidebar, así que cualquier otra
-          página cae en el catálogo en lugar de dejar el panel en blanco. */}
+      {/* Las cuatro herramientas tienen página propia; cualquier otra página
+          cae en el catálogo en lugar de dejar el panel en blanco. */}
       {page === 'convert' ? (
         <ToolkitConvertView onBack={() => onNavigate('home')} />
       ) : page === 'protect' ? (
         <ToolkitProtectView onBack={() => onNavigate('home')} />
+      ) : page === 'presenter' ? (
+        <ToolkitPresenterView onBack={() => onNavigate('home')} />
       ) : page === 'ocr' ? (
         <ToolkitAiOcrView onBack={() => onNavigate('home')} settings={settings} />
       ) : (
