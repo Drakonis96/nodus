@@ -2,31 +2,57 @@
  * Verified product facts used by both the UI and Nodi. Keeping the roadmap here
  * prevents the assistant and the visible modal from drifting apart.
  */
-export const NODUS_ROADMAP = [
-  { title: 'Pulido y estabilidad', detail: 'Corregir errores, mejorar el rendimiento y pulir la experiencia general con feedback de usuarios.' },
-  { title: 'Vault de docencia', detail: 'Preparar clases, cursos y materiales docentes, protegiendo los datos del alumnado.' },
-  { title: 'Vault de fuentes primarias', detail: 'Organizar documentos históricos y trabajar con evidencia documental.' },
-  { title: 'Vault de testimonios (historia oral)', detail: 'Entrevistas, transcripciones y fuentes orales para historia y periodismo.' },
-  { title: 'Vault de worldbuilding', detail: 'Personajes, lugares, cronologías y reglas de mundos narrativos.' },
-  { title: 'Servidor', detail: 'Infraestructura opcional para nuevas capacidades conectadas.' },
-  { title: 'Compartir vaults y trabajo colaborativo', detail: 'Compartir espacios y colaborar con control sobre los datos.' },
-  { title: 'Nodus PDF Presenter', detail: 'Presentar archivos PDF con vista del presentador, control remoto desde el móvil, notas del orador y herramientas de anotación en directo.' },
-  { title: 'Nodus OCR Workspace', detail: 'OCR asistido por IA para PDF escaneados e imágenes, con revisión página a página, limpieza de texto, reprocesamiento e integración directa con las bóvedas de Nodus.' },
-  { title: 'Otros vaults sugeridos por usuarios', detail: 'Nuevos ámbitos con especialistas, colaboración activa y testers.' },
-] as const;
+export type RoadmapStatus = 'planned' | 'inProgress' | 'implemented';
 
-const ROADMAP_GUIDE = NODUS_ROADMAP.map((item, index) => `${index + 1}. ${item.title}: ${item.detail}`).join('\n');
+export interface RoadmapItem {
+  title: string;
+  detail: string;
+  status: RoadmapStatus;
+  children?: readonly RoadmapItem[];
+}
+
+export const NODUS_ROADMAP = [
+  { title: 'Pulido y estabilidad', detail: 'Corregir errores, mejorar el rendimiento y pulir la experiencia general con feedback de usuarios.', status: 'inProgress' },
+  { title: 'Vault de docencia', detail: 'Preparar clases, cursos y materiales docentes, protegiendo los datos del alumnado.', status: 'inProgress' },
+  { title: 'Vault de fuentes primarias', detail: 'Organizar documentos históricos y trabajar con evidencia documental.', status: 'planned' },
+  { title: 'Vault de testimonios (historia oral)', detail: 'Entrevistas, transcripciones y fuentes orales para historia y periodismo.', status: 'planned' },
+  {
+    title: 'Vaults sugeridos por usuarios',
+    detail: 'Nuevos ámbitos con especialistas, colaboración activa y testers.',
+    status: 'planned',
+    children: [
+      { title: 'Vault de prosopografía', detail: 'Personas, relaciones, identidades y evidencias biográficas para investigación histórica.', status: 'planned' },
+      { title: 'Vault de worldbuilding', detail: 'Personajes, lugares, cronologías y reglas de mundos narrativos.', status: 'planned' },
+    ],
+  },
+  { title: 'Servidor', detail: 'Infraestructura opcional para nuevas capacidades conectadas.', status: 'planned' },
+  { title: 'Compartir vaults y trabajo colaborativo', detail: 'Compartir espacios y colaborar con control sobre los datos.', status: 'planned' },
+  { title: 'Nodus Toolkit', detail: 'Herramientas prácticas y local-first para convertir archivos y procesar documentos, integradas en Nodus.', status: 'implemented' },
+  { title: 'Nodus PDF Presenter', detail: 'Presentar archivos PDF con vista del presentador, control remoto desde el móvil, notas del orador y herramientas de anotación en directo.', status: 'implemented' },
+  { title: 'Nodus OCR Workspace', detail: 'OCR asistido por IA para PDF escaneados e imágenes, con revisión página a página, limpieza de texto, reprocesamiento e integración directa con las bóvedas de Nodus.', status: 'implemented' },
+] satisfies readonly RoadmapItem[];
+
+const ROADMAP_STATUS_GUIDE: Record<RoadmapStatus, string> = {
+  planned: 'Planificado',
+  inProgress: 'En desarrollo',
+  implemented: 'Implementado',
+};
+
+const ROADMAP_GUIDE = NODUS_ROADMAP.map((item, index) => {
+  const children = item.children?.map((child) => `   - ${child.title} [${ROADMAP_STATUS_GUIDE[child.status]}]: ${child.detail}`).join('\n');
+  return `${index + 1}. ${item.title} [${ROADMAP_STATUS_GUIDE[item.status]}]: ${item.detail}${children ? `\n${children}` : ''}`;
+}).join('\n');
 
 /**
  * Compact product guide grounded only in routes and capabilities present in the
- * current source tree. Planned items live in the explicit roadmap section and
- * must never be described as already available.
+ * current source tree. Roadmap entries carry their explicit product state and
+ * must not be described with a different one.
  */
 export const NODUS_DOCUMENTATION = `# Guía interna verificable de Nodus
 
 ## Estado de las fuentes
 - Esta guía documenta la interfaz actual y el roadmap oficial visible de la aplicación.
-- Un elemento del roadmap es un plan, no una función disponible. No le atribuyas fecha, versión ni estado de desarrollo si no aparece aquí.
+- El roadmap distingue entre elementos planificados, en desarrollo e implementados. No atribuyas fechas ni versiones si no aparecen aquí.
 - Nodus es local-first: cada bóveda guarda sus datos en el equipo del usuario.
 - Las claves de proveedores se configuran en Ajustes > Proveedores. Los modelos favoritos se eligen allí y cada función conserva su propio selector.
 
@@ -83,14 +109,16 @@ ${ROADMAP_GUIDE}
 - Nodus Protect ya funciona: admite PDF e imágenes del disco o de la bóveda activa, concatena documentos, permite ocultar o desenfocar datos, recortar, rotar, enderezar, convertir a escala de grises, añadir siete patrones de marca de agua y un pie legal, y exportar copias rasterizadas como PNG, ZIP o PDF.
 - Protect puede guardar una copia en disco, compartirla o incorporarla a la biblioteca «Copias protegidas» de la bóveda. También crea y verifica marcas trazables IDPS v1 compatibles con IDprotector; la marca autentica una copia, pero no la cifra y puede perderse por JPEG, capturas, reescalado o recompresión.
 - PDF Presenter ya se puede abrir: importa archivos PDF a una biblioteca global de Herramientas (con carpetas, búsqueda, orden y miniaturas), escribe notas del orador por diapositiva o impórtalas de un PowerPoint, y añade vídeos de YouTube por diapositiva. Al presentar abre la diapositiva a pantalla completa (en la pantalla externa si hay dos) y una vista del presentador con la diapositiva actual, la siguiente, las notas, un temporizador y el reloj; incluye herramientas de anotación en directo (linterna, dibujo, puntero y lupa), pantalla en negro, y control remoto desde el móvil escaneando un código QR protegido por PIN. El único elemento que necesita conexión son los vídeos de YouTube; el resto funciona sin internet.
-- OCR Workspace es una tarjeta marcada «Próximamente» y todavía no se puede abrir.
+- OCR Workspace ya se puede abrir y ofrece un flujo asistido por IA para importar escaneados, revisar y corregir cada página y exportar el resultado.
 - Nodus Convert es determinista y 100 % offline (no hay IA), nunca modifica el archivo original y no sube nada a ningún servicio; la única llamada de red opcional es la descarga de idiomas de OCR de Tesseract, que el usuario decide.
 - El procesamiento documental de Nodus Protect es local y no envía documentos a IA, proveedores ni servicios externos. Esta afirmación se refiere a Protect, no a todas las funciones opcionales de red de Nodus.
 - Dentro de una herramienta, un botón a la izquierda de su título vuelve al hub de Herramientas.
 
-## Tipos no disponibles todavía
-- Fuentes primarias, Testimonios, Worldbuilding y Docencia figuran como tipos futuros; no deben describirse como vaults seleccionables actualmente.
-- El roadmap también contempla Servidor, compartir vaults y trabajo colaborativo, y otros vaults sugeridos por usuarios. Nodus Convert, Nodus Protect y PDF Presenter ya se pueden abrir dentro de Nodus Toolkit; OCR Workspace sigue en desarrollo.
+## Estado del roadmap
+- Fuentes primarias, Testimonios, Prosopografía y Worldbuilding figuran como planificados.
+- Pulido y estabilidad y el vault de Docencia figuran en desarrollo.
+- Nodus Toolkit, PDF Presenter y OCR Workspace figuran como implementados y se pueden abrir.
+- El roadmap también contempla Servidor, compartir vaults y trabajo colaborativo, y otros vaults sugeridos por usuarios.
 
 ## Protocolo para responder sobre la interfaz
 - Usa los nombres exactos de esta guía y, si está seleccionada, la Vista actual.

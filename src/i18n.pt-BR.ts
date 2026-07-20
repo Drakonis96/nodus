@@ -928,6 +928,10 @@ export const PT_BR: Record<string, string> = {
   'Roadmap de Nodus': 'Roadmap do Nodus',
   'Próximos pasos previstos, sin fechas cerradas y sujetos a feedback y pulido.':
     'Próximos passos previstos, sem datas fechadas e sujeitos a feedback e aprimoramentos.',
+  'Estado de cada iniciativa': 'Status de cada iniciativa',
+  'Planificado': 'Planejado',
+  'Implementado': 'Implementado',
+  'Sin fechas cerradas': 'Sem datas definidas',
   'Pulido y estabilidad': 'Aprimoramento e estabilidade',
   'Corregir errores, mejorar el rendimiento y pulir la experiencia general con feedback de usuarios.':
     'Corrigir erros, melhorar o desempenho e aprimorar a experiência geral com o feedback dos usuários.',
@@ -956,6 +960,10 @@ export const PT_BR: Record<string, string> = {
   'Compartir vaults y trabajo colaborativo': 'Compartilhamento de vaults e trabalho colaborativo',
   'Compartir espacios y colaborar con control sobre los datos.': 'Compartilhar espaços e colaborar com controle sobre os dados.',
   'Otros vaults sugeridos por usuarios': 'Outros vaults sugeridos por usuários',
+  'Vaults sugeridos por usuarios': 'Vaults sugeridos pelos usuários',
+  'Vault de prosopografía': 'Vault de prosopografia',
+  'Personas, relaciones, identidades y evidencias biográficas para investigación histórica.':
+    'Pessoas, relações, identidades e evidências biográficas para pesquisa histórica.',
   'Nuevos ámbitos con especialistas, colaboración activa y testers.': 'Novas áreas com especialistas, colaboração ativa e testers.',
   'Pronto': 'Em breve',
   'Próximamente': 'Brevemente',

@@ -375,11 +375,10 @@ test('leaving the page never stops the batch, and coming back restores it', asyn
 test('Nodi documents the toolkit with its real, honest state', async () => {
   const docs = await read('shared/nodiDocumentation.ts');
   assert.match(docs, /## Herramientas \(Nodus Toolkit\)/);
-  // Nodus Convert is functional now; the guide says so and stays honest about the
-  // two tools still to come.
+  // The Toolkit surfaces can all be opened now; the guide and roadmap say so.
   assert.match(docs, /Nodus Convert ya funciona/, 'the guide states Convert works');
   assert.match(docs, /PDF Presenter ya se puede abrir/, 'the guide states the presenter library is available');
-  assert.match(docs, /OCR Workspace .*«Próximamente»/, 'the guide keeps the OCR workspace as coming soon');
+  assert.match(docs, /OCR Workspace ya se puede abrir/, 'the guide states the OCR workspace is available');
   assert.match(docs, /determinista y 100 % offline/, 'the guide states the privacy/offline principle');
   // The roadmap line must no longer list the Toolkit as merely planned.
   assert.ok(

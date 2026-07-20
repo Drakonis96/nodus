@@ -930,6 +930,10 @@ export const EN: Record<string, string> = {
   'Roadmap de Nodus': 'Nodus roadmap',
   'Próximos pasos previstos, sin fechas cerradas y sujetos a feedback y pulido.':
     'Planned next steps, without fixed dates and subject to feedback and polish.',
+  'Estado de cada iniciativa': 'Initiative status',
+  'Planificado': 'Planned',
+  'Implementado': 'Implemented',
+  'Sin fechas cerradas': 'No fixed dates',
   'Pulido y estabilidad': 'Polish and stability',
   'Corregir errores, mejorar el rendimiento y pulir la experiencia general con feedback de usuarios.':
     'Fix bugs, improve performance, and polish the overall experience with user feedback.',
@@ -964,6 +968,10 @@ export const EN: Record<string, string> = {
   'Compartir espacios y colaborar con control sobre los datos.':
     'Share workspaces and collaborate while retaining control over data.',
   'Otros vaults sugeridos por usuarios': 'Other user-suggested vaults',
+  'Vaults sugeridos por usuarios': 'User-suggested vaults',
+  'Vault de prosopografía': 'Prosopography vault',
+  'Personas, relaciones, identidades y evidencias biográficas para investigación histórica.':
+    'People, relationships, identities, and biographical evidence for historical research.',
   'Nuevos ámbitos con especialistas, colaboración activa y testers.':
     'New fields with specialists, active collaboration, and testers.',
   Pronto: 'Soon',
