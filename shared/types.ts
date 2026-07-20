@@ -5539,6 +5539,9 @@ export interface NodusApi {
   /** Open the packaged Nodus and third-party notices using the system viewer. */
   openThirdPartyNotices(): Promise<void>;
   openPrivacyPolicy(): Promise<void>;
+  /** Receive requests for the in-app privacy modal shown before a native file picker. */
+  onFileImportPrivacyRequest(cb: (request: { requestId: string }) => void): () => void;
+  resolveFileImportPrivacyRequest(requestId: string, allowed: boolean): Promise<void>;
   uploadText(nodusId: string, filePath: string): Promise<void>;
 
   // sync

@@ -125,9 +125,25 @@ test('every file picker is blocked by the just-in-time import notice', async () 
   ]);
 
   const mainNotice = await read('electron/privacy.ts');
-  assert.match(mainNotice, /autorizado para tratar/);
-  assert.match(mainNotice, /función remota/);
-  assert.match(mainNotice, /openPrivacyPolicy/);
+  assert.match(mainNotice, /privacy:fileImport:request/);
+  assert.match(mainNotice, /requestFileImportPrivacy/);
+  assert.doesNotMatch(mainNotice, /showMessageBox/);
+
+  const [rendererNotice, app, preload, apiTypes, ipc] = await Promise.all([
+    read('src/privacyNotices.tsx'),
+    read('src/App.tsx'),
+    read('electron/preload.ts'),
+    read('shared/types.ts'),
+    read('electron/ipc.ts'),
+  ]);
+  assert.match(rendererNotice, /autorizado para tratar/);
+  assert.match(rendererNotice, /función remota/);
+  assert.match(rendererNotice, /PrivacyRequestHost/);
+  assert.match(rendererNotice, /zIndex:\s*220/);
+  assert.match(app, /<PrivacyRequestHost\s*\/>/);
+  for (const source of [preload, apiTypes, ipc]) {
+    assert.match(source, /resolveFileImportPrivacyRequest|privacy:fileImport:resolve/);
+  }
 });
 
 test('public copy matches the no-AI-student-evaluation product boundary', async () => {

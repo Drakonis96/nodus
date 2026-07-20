@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { confirm } from './components/feedback';
 import { t } from './i18n';
 
@@ -21,6 +22,7 @@ export function confirmMicrophonePrivacy(): Promise<boolean> {
     ),
     confirmLabel: t('He informado; comenzar'),
     cancelLabel: t('Cancelar'),
+    zIndex: 220,
   });
 }
 
@@ -44,5 +46,16 @@ export function confirmFileImportPrivacy(): Promise<boolean> {
     ),
     confirmLabel: t('Estoy autorizado; seleccionar'),
     cancelLabel: t('Cancelar'),
+    zIndex: 220,
   });
+}
+
+/** Bridges native-picker requests to the same themed modal used by the renderer. */
+export function PrivacyRequestHost() {
+  useEffect(() => window.nodus.onFileImportPrivacyRequest(({ requestId }) => {
+    void confirmFileImportPrivacy()
+      .then((allowed) => window.nodus.resolveFileImportPrivacyRequest(requestId, allowed))
+      .catch(() => window.nodus.resolveFileImportPrivacyRequest(requestId, false));
+  }), []);
+  return null;
 }

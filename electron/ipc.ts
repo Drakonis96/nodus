@@ -4,7 +4,11 @@ import os from 'node:os';
 import crypto from 'node:crypto';
 import AdmZip from 'adm-zip';
 import { ipcMain, shell, BrowserWindow, dialog, app } from 'electron';
-import { openPrivacyPolicy, showPrivacyAwareOpenDialog } from './privacy';
+import {
+  openPrivacyPolicy,
+  resolveFileImportPrivacyRequest,
+  showPrivacyAwareOpenDialog,
+} from './privacy';
 import type {
   AppLanguage,
   AppSettings,
@@ -2130,6 +2134,9 @@ export function registerIpc(
     if (error) throw new Error(error);
   });
   h('shell:openPrivacyPolicy', async () => openPrivacyPolicy());
+  h('privacy:fileImport:resolve', async (event, requestId: string, allowed: boolean) => {
+    resolveFileImportPrivacyRequest(event.sender.id, requestId, allowed);
+  });
   h('works:uploadText', async (_e, nodusId: string, filePath: string) => {
     const w = getDb().prepare('SELECT * FROM works WHERE nodus_id = ?').get(nodusId) as any;
     if (!w) return;

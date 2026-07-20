@@ -44,6 +44,7 @@ export function ConfirmModal({
         className="card w-full max-w-sm p-5"
         role="dialog"
         aria-modal="true"
+        aria-label={title}
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="font-semibold mb-2">{title}</h2>
