@@ -5,7 +5,7 @@
 // · stations with literal quotes and an embedded graph excerpt · contrast matrix
 // · frontiers · final exam). Sessions resume from the saved plan; restarting a
 // finished route clears learner answers without regenerating its content. No step
-// ever re-calls the AI except open-answer assessment.
+// ever sends a learner answer back to AI; open answers remain unscored local notes.
 //
 // Styling note: every color utility here either has an explicit `.light` override
 // in index.css or reads correctly in both themes; the hero uses the dedicated
@@ -2073,8 +2073,8 @@ function ExamStep({
         kicker={t('Examen final')}
         title={finished ? t('Inmersión completada') : t('Demuestra que eres experto')}
         subtitle={
-          exam.questions.length
-            ? t('Cubre todas las estaciones. Cada pregunta es opcional: respóndelas para medirte o sáltalas sin más.')
+              exam.questions.length
+            ? t('Cubre todas las estaciones. Las respuestas abiertas se guardan como reflexiones privadas y nunca se envían a una IA.')
             : t('Sesión sin preguntas: cierra con la explicación final y da la inmersión por completada.')
         }
       />
@@ -2086,12 +2086,11 @@ function ExamStep({
               <Icon name="check" size={22} className="text-emerald-300" />
             </div>
             <div>
-              <div className="text-base font-semibold text-emerald-300">{t('Dominio del corpus verificado')}</div>
+              <div className="text-base font-semibold text-emerald-300">{t('Inmersión completada')}</div>
               <div className="mt-0.5 text-xs text-emerald-300">
-                {tx('{s} estaciones · {q} preguntas respondidas{score}', {
+                {tx('{s} estaciones · {q} respuestas guardadas localmente', {
                   s: session.plan.stations.length,
                   q: summary.answered,
-                  score: summary.answered > 0 ? ` · ${t('nota media')} ${summary.avgScore}/100` : '',
                 })}
               </div>
             </div>
@@ -2163,24 +2162,16 @@ function ExamStep({
   );
 }
 
-function examSummary(session: ImmersionSession): { answered: number; avgScore: number } {
+function examSummary(session: ImmersionSession): { answered: number } {
   const examIds = new Set(session.plan.exam.questions.map((q) => q.id));
   const stationIds = new Set(session.plan.stations.flatMap((s) => s.quiz.map((q) => q.id)));
   const relevant = session.progress.answers.filter((a) => examIds.has(a.questionId) || stationIds.has(a.questionId));
-  if (relevant.length === 0) return { answered: 0, avgScore: 0 };
-  const scores = relevant.map((a) => (a.kind === 'choice' ? (a.correct ? 100 : 0) : a.assessment?.score ?? 0));
-  return { answered: relevant.length, avgScore: Math.round(scores.reduce((x, y) => x + y, 0) / scores.length) };
+  return { answered: relevant.length };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Quiz cards (choice → local check; open → AI assessment). Always skippable.
+// Quiz cards (choice → exact local check; open → unscored local reflection).
 // ─────────────────────────────────────────────────────────────────────────────
-
-const VERDICT_STYLES: Record<string, { label: string; cls: string }> = {
-  solid: { label: 'Sólida', cls: 'border-emerald-700/60 bg-emerald-900/20 text-emerald-300' },
-  partial: { label: 'Parcial', cls: 'border-amber-700/60 bg-amber-950/50 text-amber-300' },
-  weak: { label: 'Floja', cls: 'border-red-900/60 bg-red-950/40 text-red-300' },
-};
 
 function QuizCard({
   sessionId,
@@ -2262,21 +2253,19 @@ function QuizCard({
           />
           <div className="mt-2 flex items-center gap-2">
             <button className="btn btn-primary !py-1 text-xs gap-1.5" onClick={() => void submit(draft)} disabled={busy || !draft.trim()}>
-              <Icon name={busy ? 'sync' : 'wand'} size={12} className={busy ? 'animate-spin' : ''} />
-              {busy ? t('Evaluando…') : t('Evaluar con IA')}
+              <Icon name={busy ? 'sync' : 'save'} size={12} className={busy ? 'animate-spin' : ''} />
+              {busy ? t('Guardando…') : t('Guardar reflexión local')}
             </button>
             <span className="text-[11px] text-neutral-600">{t('Opcional: puedes seguir sin responder.')}</span>
           </div>
-          {saved?.kind === 'open' && saved.assessment && (
-            <div className={`mt-2 rounded-md border px-3 py-2 text-xs leading-5 ${VERDICT_STYLES[saved.assessment.verdict]?.cls ?? ''}`}>
-              <span className="font-semibold">
-                {t(VERDICT_STYLES[saved.assessment.verdict]?.label ?? saved.assessment.verdict)} · {saved.assessment.score}/100
-              </span>
-              <div className="mt-1 text-neutral-300">{saved.assessment.feedback}</div>
-              {saved.assessment.missing.length > 0 && (
-                <div className="mt-1 text-neutral-400">
-                  {t('Te faltó:')} {saved.assessment.missing.join(' · ')}
-                </div>
+          {saved?.kind === 'open' && (
+            <div className="mt-2 rounded-md border border-indigo-800/60 bg-indigo-950/20 px-3 py-2 text-xs leading-5 text-neutral-300">
+              <p>{t('Reflexión guardada localmente. Nodus no la envía a una IA ni la puntúa.')}</p>
+              {question.expected && (
+                <details className="mt-2 text-neutral-400">
+                  <summary className="cursor-pointer font-medium text-indigo-300">{t('Ver orientación para contrastarla por tu cuenta')}</summary>
+                  <p className="mt-1 whitespace-pre-wrap">{question.expected}</p>
+                </details>
               )}
             </div>
           )}

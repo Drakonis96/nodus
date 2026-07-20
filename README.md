@@ -69,7 +69,7 @@ Nodus turns those materials into study support grounded in your own course conte
 
 Plan academic years, courses, subjects and teaching groups in a workspace built for educators. Timetables, calendars, materials and recordings remain connected to the classes they support.
 
-Teaching tools cover private student rosters, gradebooks, reusable rubrics and exam building. When AI assists with feedback or assessment, Nodus can replace student names with anonymous identifiers before any text reaches the provider.
+Teaching tools cover private student rosters, gradebooks, reusable rubrics and exam building. AI can generate teaching materials, questions and rubric structures, but Nodus does not send rosters, grades or student answers to a model and does not use AI to grade, profile or evaluate students.
 
 ![Teaching vault demo in Nodus](docs/screenshots/readme-teaching-demo.jpg)
 
@@ -117,4 +117,4 @@ You can also visit the [interactive browser tour](https://drakonis96.github.io/n
 
 ## Open and evolving
 
-Nodus is released under the [MIT License](LICENSE). Ideas, bug reports and academic use cases are welcome through [GitHub Issues](https://github.com/Drakonis96/nodus/issues).
+Nodus is released under the [MIT License](LICENSE). Its [privacy policy](PRIVACY.md), [third-party notices](THIRD_PARTY_NOTICES.md) and [deployment checklist](legal/RGPD_DEPLOYMENT_CHECKLIST.md) document the privacy and licensing boundaries of each installation. Ideas, bug reports and academic use cases are welcome through [GitHub Issues](https://github.com/Drakonis96/nodus/issues).

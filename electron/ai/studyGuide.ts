@@ -1,8 +1,6 @@
 import type {
   AuthorDossier,
   ModelRef,
-  StudyAnswerAssessment,
-  StudyAnswerRequest,
   StudyGuidePlan,
   StudyPlanRequest,
   StudyRecommendedWork,
@@ -499,82 +497,5 @@ export async function generateStudySession(request: StudySessionRequest): Promis
     };
   } catch {
     return { ...fallback, passages, usedFullText: passages.length > 0 };
-  }
-}
-
-interface AiAssessment {
-  verdict: 'solid' | 'partial' | 'weak';
-  score: number;
-  feedback: string;
-  missing: string[];
-  nextReview: string[];
-}
-
-function isAssessment(value: unknown): value is AiAssessment {
-  if (!value || typeof value !== 'object') return false;
-  const o = value as Record<string, unknown>;
-  return (
-    (o.verdict === 'solid' || o.verdict === 'partial' || o.verdict === 'weak') &&
-    typeof o.score === 'number' &&
-    typeof o.feedback === 'string' &&
-    Array.isArray(o.missing) &&
-    Array.isArray(o.nextReview)
-  );
-}
-
-function fallbackAssessment(request: StudyAnswerRequest, dossier: AuthorDossier | null, model: ModelRef | null): StudyAnswerAssessment {
-  const answer = request.answer.toLowerCase();
-  const ideas = dossier?.ideas.slice(0, 10) ?? [];
-  const hits = ideas.filter((idea) => answer.includes(idea.label.toLowerCase().split(/\s+/)[0] ?? '')).length;
-  const score = Math.max(25, Math.min(75, 35 + hits * 10 + Math.floor(request.answer.length / 120) * 5));
-  return {
-    verdict: score >= 70 ? 'solid' : score >= 45 ? 'partial' : 'weak',
-    score,
-    feedback: 'Evaluacion heuristica: contrasta tu respuesta con las ideas clave y vuelve a intentarlo con mas evidencia concreta.',
-    missing: ideas.slice(0, 3).map((idea) => idea.label),
-    nextReview: ['Releer la tesis central de la ficha.', 'Abrir la obra prioritaria en Zotero.', 'Responder de nuevo citando al menos una idea concreta.'],
-    model,
-    generatedAt: new Date().toISOString(),
-  };
-}
-
-export async function evaluateStudyAnswer(request: StudyAnswerRequest): Promise<StudyAnswerAssessment> {
-  const dossier = buildAuthorDossier(request.authorId);
-  if (!dossier) throw new Error('Autor no encontrado');
-  const settings = getSettings();
-  const chosen = request.model ?? settings.studyModel ?? settings.synthesisModel ?? null;
-  if (!chosen) return fallbackAssessment(request, dossier, chosen);
-
-  const system =
-    'Eres un tutor academico estricto pero util. Evalua si la respuesta del estudiante domina al autor segun las ideas proporcionadas. ' +
-    'No inventes informacion. Devuelve exclusivamente JSON: {"verdict":"solid|partial|weak","score":0-100,"feedback":"...","missing":["..."],"nextReview":["..."]}.';
-  const user = JSON.stringify({
-    objetivo: request.objective ?? null,
-    autor: dossier.fullName || dossier.author.name,
-    pregunta: request.question,
-    respuesta: request.answer,
-    ideas: dossier.ideas.slice(0, 35).map((idea) => ({
-      id: idea.global_id,
-      etiqueta: idea.label,
-      enunciado: idea.statement,
-      desarrollo: clip(idea.development, 260),
-      obra: idea.workTitle,
-    })),
-    relaciones: dossier.relations.slice(0, 10).map((rel) => ({ autor: rel.name, tipo: rel.type })),
-  });
-
-  try {
-    const ai = await completeJson<AiAssessment>({ system, user, temperature: 0.1, maxTokens: 2800 }, isAssessment, chosen);
-    return {
-      verdict: ai.verdict,
-      score: Math.max(0, Math.min(100, Math.round(ai.score))),
-      feedback: ai.feedback.trim(),
-      missing: ai.missing.filter((item) => typeof item === 'string').slice(0, 6),
-      nextReview: ai.nextReview.filter((item) => typeof item === 'string').slice(0, 6),
-      model: chosen,
-      generatedAt: new Date().toISOString(),
-    };
-  } catch {
-    return fallbackAssessment(request, dossier, chosen);
   }
 }

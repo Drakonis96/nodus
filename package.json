@@ -22,6 +22,9 @@
     "verify:api-key-recovery-macos": "node scripts/verify-api-key-recovery-macos.mjs",
     "verify:toolkit-heic": "node scripts/verify-toolkit-heic.mjs",
     "verify:aiocr": "node scripts/verify-aiocr.mjs",
+    "licenses:generate": "node scripts/generate-third-party-licenses.mjs",
+    "licenses:verify": "npm run licenses:generate && node scripts/verify-license-compliance.mjs",
+    "privacy:verify": "node --test scripts/test-privacy-compliance.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p electron/tsconfig.json",
     "lint": "eslint . --ext .ts,.tsx",
     "icons": "node scripts/generate-icons.mjs",
@@ -55,7 +58,7 @@
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@napi-rs/canvas": "^0.1.65",
     "@openai/codex": "0.144.6",
-    "adm-zip": "^0.5.16",
+    "adm-zip": "^0.6.0",
     "better-sqlite3": "^11.5.0",
     "cytoscape": "^3.30.2",
     "diff": "^9.0.0",
@@ -124,6 +127,24 @@
       "output": "release"
     },
     "icon": "build/icon.png",
+    "extraResources": [
+      {
+        "from": "LICENSE",
+        "to": "legal/NODUS_LICENSE.txt"
+      },
+      {
+        "from": "THIRD_PARTY_NOTICES.md",
+        "to": "legal/THIRD_PARTY_NOTICES.md"
+      },
+      {
+        "from": "PRIVACY.md",
+        "to": "legal/PRIVACY.md"
+      },
+      {
+        "from": "legal",
+        "to": "legal"
+      }
+    ],
     "files": [
       "dist/**/*",
       "dist-electron/**/*",
@@ -143,7 +164,12 @@
     "afterPack": "build/afterPack.cjs",
     "asarUnpack": [
       "node_modules/@openai/codex-*/vendor/**/*",
-      "node_modules/@github/copilot-*/**/*"
+      "node_modules/@github/copilot-*/**/*",
+      "node_modules/heic-decode/**/*",
+      "node_modules/libheif-js/**/*",
+      "node_modules/sharp/**/*",
+      "node_modules/@img/sharp-*/**/*",
+      "node_modules/@img/sharp-libvips-*/**/*"
     ],
     "mac": {
       "extraFiles": [

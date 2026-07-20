@@ -135,7 +135,7 @@ try {
     hasStudyRecordings: typeof window.nodus?.createStudyRecording === 'function' && typeof window.nodus?.saveStudyTranscript === 'function',
     hasStudySearch: typeof window.nodus?.searchStudyCorpus === 'function' && typeof window.nodus?.rebuildStudySearchIndex === 'function',
     hasStudyKnowledge: typeof window.nodus?.listStudyIdeas === 'function' && typeof window.nodus?.getStudyKnowledgeGraph === 'function' && typeof window.nodus?.reanalyzeStudyKnowledgeSource === 'function',
-    hasStudyGrading: typeof window.nodus?.gradeStudyAnswer === 'function' && typeof window.nodus?.listStudyRubrics === 'function',
+    blocksAiStudyGrading: typeof window.nodus?.gradeStudyAnswer !== 'function' && typeof window.nodus?.listStudyRubrics === 'function',
     hasStudyLearning: typeof window.nodus?.createStudyFlashcard === 'function' && typeof window.nodus?.getStudyPlanner === 'function' && typeof window.nodus?.getStudyProgressDashboard === 'function',
     hasStudyAiPolicy: typeof window.nodus?.getStudyAiUsageSummary === 'function' && typeof window.nodus?.clearStudyAiUsage === 'function',
     hasStudyDemo: typeof window.nodus?.seedStudyDemoData === 'function',
@@ -156,7 +156,7 @@ try {
   assert.equal(bridge.hasStudyRecordings, true, 'study recording and transcript bridge available');
   assert.equal(bridge.hasStudySearch, true, 'study hybrid-search bridge available');
   assert.equal(bridge.hasStudyKnowledge, true, 'study ideas and knowledge-graph bridge available');
-  assert.equal(bridge.hasStudyGrading, true, 'study grading and rubric bridge available');
+  assert.equal(bridge.blocksAiStudyGrading, true, 'AI grading bridge is absent while local rubric management remains available');
   assert.equal(bridge.hasStudyLearning, true, 'study review, progress and planner bridge available');
   assert.equal(bridge.hasStudyAiPolicy, true, 'study AI policy and usage bridge available');
   assert.equal(bridge.hasStudyDemo, true, 'study sample-data bridge available');
@@ -1635,7 +1635,7 @@ try {
   assert.equal(testFixture.attempt.correctCount, 1, 'objective short answer is corrected deterministically');
   console.log('[e2e] study test construction + durable attempt + objective correction ok');
 
-  // ── Study exams: long-form autosave, delivery and pending grading ─────────
+  // ── Study exams: long-form autosave and delivery for human review ─────────
   await page.evaluate(async () => {
     await window.nodus.createStudyQuestion({
       prompt: 'Explica con argumentos cómo se conserva la procedencia en el vault de estudio.', type: 'essay', difficulty: 'medium', cognitiveLevel: 'analyze',
@@ -1666,18 +1666,10 @@ try {
     return { exam, attempt: (await window.nodus.listStudyAttempts(exam.id))[0] };
   });
   assert.equal(examFixture.attempt.status, 'submitted');
-  assert.equal(examFixture.attempt.answers[0].isCorrect, null, 'long-form answer remains pending auditable grading');
+  assert.equal(examFixture.attempt.answers[0].isCorrect, null, 'long-form answer remains pending human review');
   assert.match(examFixture.attempt.answers[0].response.text, /evidencia verificable/);
-  console.log('[e2e] written exam + autosave + pending-grading delivery ok');
-
-  // ── Study grading: rubric UI and safe no-provider failure ─────────────────
-  await page.getByTestId('study-grade-open').click();
-  await page.getByTestId('study-grading-panel').waitFor({ timeout: 30_000 });
-  assert.ok(await page.getByTestId('study-grading-panel').locator('select').first().locator('option').count() >= 2, 'built-in weighted rubrics are available');
-  await page.getByTestId('study-grade-run').click();
-  await page.getByText(/Falta la clave de IA/, { exact: false }).waitFor({ timeout: 30_000 });
-  assert.equal(await page.getByTestId('study-grading-result').count(), 0, 'provider failure never fabricates a grading result');
-  console.log('[e2e] rubric grading UI + safe provider-failure preservation ok');
+  assert.equal(await page.getByTestId('study-grade-open').count(), 0, 'no AI grading action is exposed');
+  console.log('[e2e] written exam + autosave + human-review delivery ok');
 
   // ── Study learning: flashcard review, SM-2 evidence, planner and progress ──
   await page.getByRole('button', { name: 'Repaso', exact: true }).click();

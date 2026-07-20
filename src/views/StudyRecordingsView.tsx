@@ -26,6 +26,7 @@ import { Icon, Spinner } from '../components/ui';
 import { t, getActiveLang } from '../i18n';
 import { AudioPanel } from '../components/AudioPanel';
 import { ConfirmModal } from '../components/ConfirmModal';
+import { confirmMicrophonePrivacy } from '../privacyNotices';
 
 type CaptureState = 'idle' | 'recording' | 'paused' | 'saving';
 
@@ -270,6 +271,7 @@ export function StudyRecordingsView({ onOpenDocument, initialRecordingId, initia
 
   const startRecording = async () => {
     setProcessError(''); setCaptureSeconds(0);
+    if (!(await confirmMicrophonePrivacy())) return;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: { noiseSuppression: true, echoCancellation: true, autoGainControl: true } });
       streamRef.current = stream;

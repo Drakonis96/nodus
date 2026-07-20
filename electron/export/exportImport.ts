@@ -3,6 +3,7 @@ import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
 import { dialog, app } from 'electron';
+import { showPrivacyAwareOpenDialog } from '../privacy';
 import type { AiProvider, AppSettings, BackupSelection } from '@shared/types';
 import { SECRET_PROVIDERS } from '@shared/providers';
 import { closeDb, getDb, replaceDbFile, SCHEMA_VERSION } from '../db/database';
@@ -316,7 +317,7 @@ export async function exportData(): Promise<{ path: string; password: string; re
 /** Import a password-protected `*.nodus` archive, validating schema compatibility and hashes. */
 export async function importData(password: string): Promise<{ ok: boolean; message: string }> {
   if (!password.trim()) return { ok: false, message: 'Importación cancelada: falta la contraseña de la copia.' };
-  const { canceled, filePaths } = await dialog.showOpenDialog({
+  const { canceled, filePaths } = await showPrivacyAwareOpenDialog({
     title: 'Importar biblioteca Nodus',
     properties: ['openFile'],
     filters: [{ name: 'Nodus', extensions: ['nodus'] }],

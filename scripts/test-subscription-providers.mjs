@@ -36,12 +36,15 @@ const {
 test.after(() => fs.rmSync(outDir, { recursive: true, force: true }));
 
 test('redistributed official runtimes retain the required license notices', () => {
-  const notices = fs.readFileSync(path.join(repoRoot, 'electron/assets/THIRD_PARTY_NOTICES.md'), 'utf8');
+  const notices = fs.readFileSync(path.join(repoRoot, 'THIRD_PARTY_NOTICES.md'), 'utf8');
+  const remoteManifest = JSON.parse(fs.readFileSync(path.join(repoRoot, 'legal/remote-notices.json'), 'utf8'));
   const copilotCliLicense = fs.readFileSync(path.join(repoRoot, 'node_modules/@github/copilot/LICENSE.md'), 'utf8');
-  assert.match(notices, /GitHub Copilot SDK — MIT License/);
-  assert.match(notices, /Copyright GitHub, Inc\./);
-  assert.match(notices, /OpenAI Codex — Apache License 2\.0/);
-  assert.match(notices, /TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION/);
+  assert.match(notices, /GitHub Copilot SDK .*MIT License/);
+  assert.match(notices, /OpenAI Codex CLI .*Apache License 2\.0/);
+  const pinned = new Set(remoteManifest.files.map((entry) => entry.destination));
+  assert.ok(pinned.has('GITHUB_COPILOT_SDK_LICENSE.txt'));
+  assert.ok(pinned.has('OPENAI_CODEX_LICENSE.txt'));
+  assert.ok(pinned.has('GITHUB_COPILOT_CLI_LICENSE.md'));
   assert.match(copilotCliLicense, /right to reproduce and redistribute unmodified copies/);
 });
 

@@ -19,7 +19,6 @@ let activeDbChatRequestId: string | null = null;
 let activeNodiChatRequestId: string | null = null;
 let activeStudyImproveRequestId: string | null = null;
 let activeStudyAssistantRequestId: string | null = null;
-let activeStudyGradingRequestId: string | null = null;
 let activeStudySttRequestId: string | null = null;
 
 // Minimal, typed surface exposed to the renderer. No Node, no direct IPC names leak.
@@ -458,6 +457,8 @@ const api: NodusApi = {
   openInZotero: (zoteroKey) => ipcRenderer.invoke('works:openInZotero', zoteroKey).then(() => undefined),
   openEvidenceAtPage: (nodusId, location) => ipcRenderer.invoke('works:openAtPage', nodusId, location),
   openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url).then(() => undefined),
+  openThirdPartyNotices: () => ipcRenderer.invoke('shell:openThirdPartyNotices').then(() => undefined),
+  openPrivacyPolicy: () => ipcRenderer.invoke('shell:openPrivacyPolicy').then(() => undefined),
   uploadText: (nodusId, filePath) => ipcRenderer.invoke('works:uploadText', nodusId, filePath),
 
   syncNow: () => ipcRenderer.invoke('sync:now'),
@@ -664,7 +665,6 @@ const api: NodusApi = {
   getRubricEvaluation: (studentId, itemId, convocatoria) => ipcRenderer.invoke('teaching:entries:rubric:get', studentId, itemId, convocatoria),
   importAssessmentPlan: (request) => ipcRenderer.invoke('teaching:plans:import', request),
   applyProposedPlan: (planId, proposal) => ipcRenderer.invoke('teaching:plans:apply', planId, proposal),
-  draftStudentFeedback: (request) => ipcRenderer.invoke('teaching:feedback:draft', request),
   listTeachingGroups: (options) => ipcRenderer.invoke('teaching:groups:list', options),
   getTeachingGroup: (id) => ipcRenderer.invoke('teaching:groups:get', id),
   createTeachingGroup: (input) => ipcRenderer.invoke('teaching:groups:create', input),
@@ -802,15 +802,6 @@ const api: NodusApi = {
   duplicateStudyRubric: (id) => ipcRenderer.invoke('study:grading:rubrics:duplicate', id),
   deleteStudyRubric: (id) => ipcRenderer.invoke('study:grading:rubrics:delete', id).then(() => undefined),
   listStudyGradingRuns: (attemptAnswerId) => ipcRenderer.invoke('study:grading:runs:list', attemptAnswerId),
-  gradeStudyAnswer: async (request, handlers) => {
-    const requestId = `study-grading-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    const onDelta = (_e: unknown, id: string, delta: string) => { if (id === requestId) handlers.onDelta(delta); };
-    const onReasoning = (_e: unknown, id: string, delta: string) => { if (id === requestId) handlers.onReasoning?.(delta); };
-    ipcRenderer.on('study:grading:delta', onDelta); ipcRenderer.on('study:grading:reasoning', onReasoning); activeStudyGradingRequestId = requestId;
-    try { return await ipcRenderer.invoke('study:grading:run', requestId, request); }
-    finally { if (activeStudyGradingRequestId === requestId) activeStudyGradingRequestId = null; ipcRenderer.removeListener('study:grading:delta', onDelta); ipcRenderer.removeListener('study:grading:reasoning', onReasoning); }
-  },
-  cancelStudyGrading: async () => { if (activeStudyGradingRequestId) await ipcRenderer.invoke('study:grading:cancel', activeStudyGradingRequestId); },
   setStudyGradingManualScore: (id, score, comment) => ipcRenderer.invoke('study:grading:manual', id, score, comment),
   listStudyFlashcards: (options) => ipcRenderer.invoke('study:flashcards:list', options),
   createStudyFlashcard: (input) => ipcRenderer.invoke('study:flashcards:create', input),
@@ -838,8 +829,6 @@ const api: NodusApi = {
   getStudyPlan: (request) => ipcRenderer.invoke('study:plan', request),
   setStudyProgress: (record) => ipcRenderer.invoke('study:progress:set', record),
   generateStudySession: (request) => ipcRenderer.invoke('study:session', request),
-  evaluateStudyAnswer: (request) => ipcRenderer.invoke('study:answer', request),
-
   buildImmersionScope: (request) => ipcRenderer.invoke('immersion:scope', request),
   generateImmersionSession: async (request, handlers) => {
     const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;

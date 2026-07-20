@@ -16,6 +16,9 @@ export interface NodusLocalModelDefinition {
   quantization: string;
   description: string;
   sourceUrl: string;
+  /** Upstream terms displayed next to the download action. */
+  licenseLabel: string;
+  licenseUrl: string;
   contextLength?: number;
   dimensions?: number;
   vision?: boolean;
@@ -81,6 +84,8 @@ export const NODUS_LOCAL_MODELS: readonly NodusLocalModelDefinition[] = [
     quantization: 'Q8_0',
     description: 'Embeddings multilingües de alta calidad para corpus amplios.',
     sourceUrl: 'https://huggingface.co/ggml-org/bge-m3-Q8_0-GGUF',
+    licenseLabel: 'MIT',
+    licenseUrl: 'https://huggingface.co/BAAI/bge-m3',
     contextLength: 8192,
     dimensions: 1024,
     modelFile: 'bge-m3-q8_0.gguf',
@@ -101,6 +106,8 @@ export const NODUS_LOCAL_MODELS: readonly NodusLocalModelDefinition[] = [
     quantization: 'INT8',
     description: 'Embeddings multilingües con contexto largo y buen equilibrio entre precisión y memoria.',
     sourceUrl: 'https://huggingface.co/onnx-community/gte-multilingual-base',
+    licenseLabel: 'Apache-2.0',
+    licenseUrl: 'https://huggingface.co/Alibaba-NLP/gte-multilingual-base',
     contextLength: 8192,
     dimensions: 768,
     modelFile: 'onnx/model_int8.onnx',
@@ -130,6 +137,8 @@ export const NODUS_LOCAL_MODELS: readonly NodusLocalModelDefinition[] = [
     quantization: 'INT8',
     description: 'Opción ligera y rápida para equipos con menos memoria.',
     sourceUrl: 'https://huggingface.co/Xenova/multilingual-e5-small',
+    licenseLabel: 'MIT',
+    licenseUrl: 'https://huggingface.co/intfloat/multilingual-e5-small',
     contextLength: 512,
     dimensions: 384,
     modelFile: 'onnx/model_int8.onnx',
@@ -159,6 +168,8 @@ export const NODUS_LOCAL_MODELS: readonly NodusLocalModelDefinition[] = [
     quantization: 'Q4_K_M',
     description: 'Modelo visual muy ligero para conversación, resúmenes e ideas.',
     sourceUrl: 'https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF',
+    licenseLabel: 'Apache-2.0',
+    licenseUrl: 'https://huggingface.co/Qwen/Qwen3.5-0.8B/blob/main/LICENSE',
     contextLength: 32_768,
     vision: true,
     supportsExtraction: false,
@@ -187,6 +198,8 @@ export const NODUS_LOCAL_MODELS: readonly NodusLocalModelDefinition[] = [
     quantization: 'Q4_0 QAT',
     description: 'Modelo visual de mayor calidad; requiere más almacenamiento y memoria.',
     sourceUrl: 'https://huggingface.co/google/gemma-4-E2B-it-qat-q4_0-gguf',
+    licenseLabel: 'Apache-2.0',
+    licenseUrl: 'https://huggingface.co/google/gemma-4-E2B-it-qat-q4_0-gguf',
     contextLength: 32_768,
     vision: true,
     supportsExtraction: true,
@@ -215,6 +228,8 @@ export const NODUS_LOCAL_MODELS: readonly NodusLocalModelDefinition[] = [
     quantization: 'Q4_K_M',
     description: 'Modelo de texto compacto con salida JSON fiable; alternativa ligera para extracción de ideas.',
     sourceUrl: 'https://huggingface.co/ibm-granite/granite-4.0-micro-GGUF',
+    licenseLabel: 'Apache-2.0',
+    licenseUrl: 'https://huggingface.co/ibm-granite/granite-4.0-micro-GGUF',
     contextLength: 32_768,
     supportsExtraction: true,
     modelFile: 'granite-4.0-micro-Q4_K_M.gguf',
@@ -235,6 +250,8 @@ export const NODUS_LOCAL_MODELS: readonly NodusLocalModelDefinition[] = [
     quantization: 'Q4_0',
     description: 'Modelo visual compacto orientado a documentos e imágenes.',
     sourceUrl: 'https://huggingface.co/LiquidAI/LFM2.5-VL-1.6B-GGUF',
+    licenseLabel: 'LFM Open License 1.0 · condición comercial ≥ USD 10M',
+    licenseUrl: 'https://huggingface.co/LiquidAI/LFM2.5-VL-1.6B-GGUF/blob/48c6a306939241d1ddc99b090df552cb47a066c6/LICENSE',
     contextLength: 32_768,
     vision: true,
     supportsExtraction: false,

@@ -4695,24 +4695,6 @@ export interface StudySession {
   nextActions: string[];
 }
 
-export interface StudyAnswerRequest {
-  authorId: string;
-  question: string;
-  answer: string;
-  objective?: string;
-  model?: ModelRef | null;
-}
-
-export interface StudyAnswerAssessment {
-  verdict: 'solid' | 'partial' | 'weak';
-  score: number;
-  feedback: string;
-  missing: string[];
-  nextReview: string[];
-  model: ModelRef | null;
-  generatedAt: string;
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Inmersión — a fully guided topic-mastery session. Phase 0 (the scope) is pure
 // embeddings + graph, no AI; the generated plan stores every AI answer verbatim
@@ -4939,7 +4921,7 @@ export interface ImmersionAnswerRecord {
   answer: string;
   /** Choice questions: whether the chosen option was right. */
   correct: boolean | null;
-  /** Open questions: the AI (or heuristic) assessment. */
+  /** Legacy field for old sessions; new open answers are stored with `null`. */
   assessment: ImmersionAssessment | null;
   answeredAt: string;
 }
@@ -5554,6 +5536,9 @@ export interface NodusApi {
   openEvidenceAtPage(nodusId: string, location: string | null): Promise<{ ok: boolean; mode: 'pdf-page' | 'select' | 'none'; page?: number | null }>;
   /** Open an http(s)/mailto link in the user's default browser (used by rendered Markdown). */
   openExternal(url: string): Promise<void>;
+  /** Open the packaged Nodus and third-party notices using the system viewer. */
+  openThirdPartyNotices(): Promise<void>;
+  openPrivacyPolicy(): Promise<void>;
   uploadText(nodusId: string, filePath: string): Promise<void>;
 
   // sync
@@ -5733,7 +5718,6 @@ export interface NodusApi {
   addRubricItem(planId: string, rubricId: string, weight?: number): Promise<AssessmentItem[]>;
   setRubricEvaluation(input: { studentId: string; itemId: string; convocatoria?: string; levels: Record<string, string> }): Promise<GradeEntry>;
   getRubricEvaluation(studentId: string, itemId: string, convocatoria?: string): Promise<Record<string, string>>;
-  draftStudentFeedback(request: { planId: string; groupId: string; studentId: string; summary: string }): Promise<{ text: string; warnings: string[] }>;
   // Student groups (teaching vault). `academicYearId: null` scopes to the groups that
   // predate academic years; omitting it returns every year.
   listTeachingGroups(options?: { subjectId?: string | null; academicYearId?: string | null }): Promise<TeachingGroup[]>;
@@ -5860,8 +5844,6 @@ export interface NodusApi {
   duplicateStudyRubric(id: string): Promise<StudyRubric>;
   deleteStudyRubric(id: string): Promise<void>;
   listStudyGradingRuns(attemptAnswerId?: string): Promise<StudyGradingRun[]>;
-  gradeStudyAnswer(request: StudyGradingRequest, handlers: StudyGradingStreamHandlers): Promise<StudyGradingRun>;
-  cancelStudyGrading(): Promise<void>;
   setStudyGradingManualScore(id: string, score: number, comment?: string): Promise<StudyGradingRun>;
   listStudyFlashcards(options?: { subjectId?: string; topicId?: string; dueOnly?: boolean; includeArchived?: boolean; search?: string }): Promise<StudyFlashcard[]>;
   createStudyFlashcard(input: StudyFlashcardInput): Promise<StudyFlashcard>;
@@ -5907,9 +5889,6 @@ export interface NodusApi {
   setImmersionProgress(id: string, progress: ImmersionProgress): Promise<void>;
   answerImmersionQuestion(request: ImmersionAnswerRequest): Promise<ImmersionAnswerResult>;
   deleteImmersionSession(id: string): Promise<void>;
-  /** Evaluate a learner's answer against the selected author's extracted ideas. */
-  evaluateStudyAnswer(request: StudyAnswerRequest): Promise<StudyAnswerAssessment>;
-
   // main-theme management ("temas principales")
   listManagedThemes(): Promise<ManagedTheme[]>;
   addManualTheme(label: string): Promise<ManagedTheme[]>;

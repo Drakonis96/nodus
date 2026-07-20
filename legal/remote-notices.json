@@ -1,0 +1,75 @@
+{
+  "version": 1,
+  "files": [
+    {
+      "destination": "GPL-3.0.txt",
+      "url": "https://www.gnu.org/licenses/gpl-3.0.txt",
+      "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986"
+    },
+    {
+      "destination": "LGPL-3.0.txt",
+      "url": "https://www.gnu.org/licenses/lgpl-3.0.txt",
+      "sha256": "e3a994d82e644b03a792a930f574002658412f62407f5fee083f2555c5f23118"
+    },
+    {
+      "destination": "CC-BY-4.0.txt",
+      "url": "https://creativecommons.org/licenses/by/4.0/legalcode.txt",
+      "sha256": "9ba9550ad48438d0836ddab3da480b3b69ffa0aac7b7878b5a0039e7ab429411"
+    },
+    {
+      "destination": "APACHE-2.0.txt",
+      "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "destination": "ONNX_RUNTIME_LICENSE.txt",
+      "url": "https://raw.githubusercontent.com/microsoft/onnxruntime/v1.21.0/LICENSE",
+      "sha256": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c"
+    },
+    {
+      "destination": "ONNX_RUNTIME_THIRD_PARTY_NOTICES-1.18.0.txt",
+      "url": "https://raw.githubusercontent.com/microsoft/onnxruntime/v1.18.0/ThirdPartyNotices.txt",
+      "sha256": "10fc98a2f4d478e981813d594e23d7e31b0430e66501a658c1ecab2a226a4b52"
+    },
+    {
+      "destination": "ONNX_RUNTIME_THIRD_PARTY_NOTICES-1.21.0.txt",
+      "url": "https://raw.githubusercontent.com/microsoft/onnxruntime/v1.21.0/ThirdPartyNotices.txt",
+      "sha256": "8c06e8cff286a4a117b3b246a4c7da68428a144af757823db50e3d6520941ec6"
+    },
+    {
+      "destination": "ONNX_RUNTIME_THIRD_PARTY_NOTICES-1.22.0-dev-89f8206ba4.txt",
+      "url": "https://raw.githubusercontent.com/microsoft/onnxruntime/89f8206ba4f1c22c39e0297fb55272e8ce8cd7d0/ThirdPartyNotices.txt",
+      "sha256": "e9e90971a8e75a9a8ac0c6412e29c1202d079998389915aa485f46c816c3b4cc"
+    },
+    {
+      "destination": "SHARP_LIBVIPS_LICENSE.txt",
+      "url": "https://raw.githubusercontent.com/lovell/sharp-libvips/20b5e899954907a3039d6e3d4c200aaa0ec52c4c/LICENSE",
+      "sha256": "b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1"
+    },
+    {
+      "destination": "SHARP_LIBVIPS_THIRD_PARTY_NOTICES.md",
+      "url": "https://raw.githubusercontent.com/lovell/sharp-libvips/20b5e899954907a3039d6e3d4c200aaa0ec52c4c/THIRD-PARTY-NOTICES.md",
+      "sha256": "3f416978dd2448ddab0d413d333c45fb208acdc066c280b95ebcb2f8b9f34ab9"
+    },
+    {
+      "destination": "SHARP_LIBVIPS_VERSIONS.properties",
+      "url": "https://raw.githubusercontent.com/lovell/sharp-libvips/20b5e899954907a3039d6e3d4c200aaa0ec52c4c/versions.properties",
+      "sha256": "a875eea8f3086805b41c0e7b0a2c5d0d95192a59b38f5785a36f8761cab5f36c"
+    },
+    {
+      "destination": "GITHUB_COPILOT_SDK_LICENSE.txt",
+      "url": "https://raw.githubusercontent.com/github/copilot-sdk/v1.0.7/LICENSE",
+      "sha256": "2510b446bc1f0cf9702453075d20cd88631e20e5642658edb7325d9c1eb534f7"
+    },
+    {
+      "destination": "GITHUB_COPILOT_CLI_LICENSE.md",
+      "url": "https://raw.githubusercontent.com/github/copilot-cli/v1.0.71/LICENSE.md",
+      "sha256": "1fbd0dcc55c66738b1b591632132c927de20c8443dff1d55b4851e378883e402"
+    },
+    {
+      "destination": "OPENAI_CODEX_LICENSE.txt",
+      "url": "https://raw.githubusercontent.com/openai/codex/rust-v0.144.6/LICENSE",
+      "sha256": "d17f227e4df5da1600391338865ce0f3055211760a36688f816941d58232d8dc"
+    }
+  ]
+}

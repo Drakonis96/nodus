@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { StudyWorkspace } from '@shared/studyOrg';
-import type { AppSettings } from '@shared/types';
 import { MAX_GROUP_SIZE, clampExpectedSize, type TeachingGroup } from '@shared/teachingGroups';
 import { Icon, Spinner } from '../components/ui';
 import { ConfirmModal } from '../components/ConfirmModal';
@@ -15,8 +14,8 @@ import { t, tx, errorText, getActiveLang } from '../i18n';
  * the database grid's cell editors so it looks and edits exactly like every other
  * table in the app.
  *
- * The identifier column is not decoration: it is the handle a teacher copies to ask
- * the AI about one student without typing their name. It lives in its own column
+ * The identifier column is not decoration: it supports data minimisation in exports
+ * and day-to-day references without repeating a student's name. It lives in its own column
  * rather than on the name, because the name cell is an editable field and a click
  * there has to mean "edit".
  */
@@ -24,7 +23,6 @@ export function TeachingGroupsView() {
   const [groups, setGroups] = useState<TeachingGroup[]>([]);
   const [group, setGroup] = useState<TeachingGroup | null>(null);
   const [workspace, setWorkspace] = useState<StudyWorkspace | null>(null);
-  const [settings, setSettings] = useState<AppSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -40,15 +38,13 @@ export function TeachingGroupsView() {
     let active = true;
     void (async () => {
       try {
-        const [list, ws, cfg] = await Promise.all([
+        const [list, ws] = await Promise.all([
           window.nodus.listTeachingGroups(),
           window.nodus.getStudyWorkspace(),
-          window.nodus.getSettings(),
         ]);
         if (!active) return;
         setGroups(list);
         setWorkspace(ws);
-        setSettings(cfg);
       } catch (cause) {
         if (active) setError(errorText(cause));
       } finally {
@@ -80,14 +76,7 @@ export function TeachingGroupsView() {
 
   const copyCode = async (code: string) => {
     await navigator.clipboard.writeText(code);
-    setMessage(tx('Identificador {code} copiado. Úsalo para preguntar a la IA por este alumno.', { code }));
-  };
-
-  const togglePrivacy = async () => {
-    const next = !(settings?.studentPseudonymsEnabled ?? true);
-    await window.nodus.updateSettings({ studentPseudonymsEnabled: next });
-    setSettings(await window.nodus.getSettings());
-    setMessage(next ? t('La IA verá identificadores en lugar de nombres.') : t('La IA verá los nombres reales del alumnado.'));
+    setMessage(tx('Identificador {code} copiado. Úsalo para minimizar nombres en notas y exportaciones.', { code }));
   };
 
   const filtered = useMemo(
@@ -229,8 +218,6 @@ export function TeachingGroupsView() {
 
   /* ------------------------------------------------------- roster (detail) --- */
   const students = group.students ?? [];
-  const anonymised = settings?.studentPseudonymsEnabled ?? true;
-
   return (
     <div className="flex h-full min-h-0 flex-col bg-neutral-50 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100" data-testid="group-detail">
       <header className="border-b border-neutral-200 bg-white px-5 py-4 dark:border-neutral-800 dark:bg-neutral-950">
@@ -250,28 +237,17 @@ export function TeachingGroupsView() {
           </button>
         </div>
 
-        {/* Privacy state, where the data is — not buried three screens away in Settings. */}
-        <button
-          type="button"
+        {/* The no-AI-evaluation boundary is visible where student data lives. */}
+        <div
           data-testid="group-privacy-toggle"
-          onClick={() => void guard(togglePrivacy)}
-          title={t('Cambiar en Ajustes › IA')}
-          className={`mt-3 flex w-full items-start gap-2 rounded-lg border px-3 py-2 text-left text-[11px] ${
-            anonymised
-              ? 'border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-800/60 dark:bg-emerald-950/30 dark:text-emerald-300'
-              : 'border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-300'
-          }`}
+          className="mt-3 flex w-full items-start gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-left text-[11px] text-emerald-800 dark:border-emerald-800/60 dark:bg-emerald-950/30 dark:text-emerald-300"
         >
-          <Icon name={anonymised ? 'lock' : 'alert'} size={14} className="mt-0.5 shrink-0" />
+          <Icon name="shield" size={14} className="mt-0.5 shrink-0" />
           <span>
-            <span className="font-medium">
-              {anonymised ? t('La IA no verá los nombres del alumnado.') : t('La IA verá los nombres reales del alumnado.')}
-            </span>{' '}
-            {anonymised
-              ? t('Se sustituyen por identificadores. No cubre transcripción de audio, análisis de imágenes ni embeddings.')
-              : t('Los nombres se enviarán tal cual al proveedor de IA.')}
+            <span className="font-medium">{t('La IA no accede a este listado, a las notas ni a las respuestas del alumnado.')}</span>{' '}
+            {t('Nodus no expone ninguna función de IA para calificar, perfilar o evaluar estudiantes. Los identificadores permiten minimizar nombres en usos locales y exportaciones.')}
           </span>
-        </button>
+        </div>
       </header>
 
       <div className="min-h-0 flex-1 overflow-auto p-5">

@@ -41,10 +41,16 @@ const SETTINGS_TABS: { id: SettingsTabId; label: string; icon: string; keywords:
   { id: 'integrations', label: 'Integraciones', icon: 'link', keywords: 'mcp servidor token puerto word copilot certificado addin' },
   { id: 'system', label: 'Tutoriales', icon: 'graduation', keywords: 'sistema ayuda tutorial' },
   { id: 'data', label: 'Backup / copia de seguridad', icon: 'download', keywords: 'datos backup exportar importar demo copia cifrada peligro reinicializar grafo borrar' },
-  { id: 'about', label: 'Acerca de Nodus', icon: 'info', keywords: 'acerca proyecto codigo abierto open source gratuito apoyar donacion paypal desarrollador licencia actualizaciones update version novedades ultimos cambios latest changes' },
+  { id: 'about', label: 'Acerca de Nodus', icon: 'info', keywords: 'acerca proyecto codigo abierto open source gratuito privacidad privacy rgpd gdpr datos alumnado inteligencia artificial licencia terceros legal actualizaciones update version novedades' },
 ];
 
-const ABOUT_ACTION_BUTTON_CLASS = 'btn btn-ghost w-56 shrink-0 justify-center border border-neutral-300 dark:border-neutral-700';
+const ABOUT_ACTION_BUTTON_CLASS = 'btn btn-ghost w-full shrink-0 justify-center border border-neutral-300 dark:border-neutral-700 sm:w-56';
+const ABOUT_CARD_CLASS = 'rounded-xl border border-neutral-200 bg-neutral-50 p-5 dark:border-neutral-800 dark:bg-neutral-900/50';
+const NODUS_REPOSITORY_URL = 'https://github.com/Drakonis96/nodus';
+const NODUS_PRIVACY_URL = `${NODUS_REPOSITORY_URL}/blob/main/PRIVACY.md`;
+const NODUS_GDPR_CHECKLIST_URL = `${NODUS_REPOSITORY_URL}/blob/main/legal/RGPD_DEPLOYMENT_CHECKLIST.md`;
+const NODUS_LICENSE_URL = `${NODUS_REPOSITORY_URL}/blob/main/LICENSE`;
+const NODUS_SECURITY_REPORT_URL = `${NODUS_REPOSITORY_URL}/security/advisories/new`;
 
 function normalizeSettingsText(value: string): string {
   return value
@@ -322,7 +328,7 @@ export function Settings({
     visibleSettingsSection('models', 'Modelos de IA', 'basico avanzado modelo general extraccion sintesis tutor resumen fusion embeddings transcripcion voz imagen'),
     visibleSettingsSection('extraction', 'Extracción de texto PDFs grandes', 'pdf texto zotero ocr tesseract paginas idiomas'),
     visibleSettingsSection('data', 'Zona de peligro', 'reinicializar grafo borrar ideas temas conexiones autores huecos'),
-    visibleSettingsSection('about', 'Acerca de Nodus', 'proyecto independiente codigo abierto open source gratuito apoyar donacion paypal desarrollador actualizaciones update version'),
+    visibleSettingsSection('about', 'Acerca de Nodus', 'proyecto independiente codigo abierto open source gratuito privacidad privacy rgpd gdpr datos alumnado licencia actualizaciones update version'),
   ].filter(Boolean).length;
 
   return (
@@ -756,9 +762,9 @@ export function Settings({
           </Section>
       )}
 
-      {visibleSettingsSection('about', 'Acerca de Nodus', 'proyecto independiente codigo abierto open source gratuito apoyar donacion paypal desarrollador actualizaciones update version novedades ultimos cambios latest changes') && (
+      {visibleSettingsSection('about', 'Acerca de Nodus', 'proyecto independiente codigo abierto open source gratuito privacidad privacy rgpd gdpr datos alumnado licencia terceros legal actualizaciones update version novedades') && (
         <Section title={t('Acerca de Nodus')}>
-          <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-5 dark:border-neutral-800 dark:bg-neutral-900/50">
+          <div className={ABOUT_CARD_CLASS}>
             <div className="flex items-start gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300">
                 <Icon name="network" size={22} />
@@ -790,7 +796,136 @@ export function Settings({
               {t('El enlace se abrirá en tu navegador. Nodus no procesa pagos ni recibe información de pago.')}
             </p>
           </div>
-          <div data-testid="about-latest-changes" className="flex items-center justify-between gap-4 rounded-xl border border-neutral-200 bg-neutral-50 p-5 dark:border-neutral-800 dark:bg-neutral-900/50">
+          <div data-testid="about-privacy" className={ABOUT_CARD_CLASS}>
+            <div className="flex items-start gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+                <Icon name="shield" size={19} />
+              </div>
+              <div className="max-w-3xl">
+                <h3 className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{t('Privacidad y control de datos')}</h3>
+                <p className="mt-1 text-xs leading-5 text-neutral-600 dark:text-neutral-400">
+                  {t('Nodus funciona principalmente en el dispositivo: no requiere una cuenta, no incluye publicidad, telemetría ni analítica remota y no opera un backend propio. Los archivos solo salen del equipo cuando el usuario activa de forma expresa un servicio externo identificado.')}
+                </p>
+                <p className="mt-2 text-xs font-medium leading-5 text-emerald-700 dark:text-emerald-300">
+                  {t('La IA no recibe listados, notas ni respuestas del alumnado y no puede calificar, perfilar ni evaluar estudiantes.')}
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+              <button
+                data-testid="open-privacy-policy"
+                className={ABOUT_ACTION_BUTTON_CLASS}
+                onClick={() => void window.nodus.openPrivacyPolicy()}
+              >
+                <Icon name="book" /> {t('Leer política de privacidad')}
+              </button>
+              <button
+                data-testid="open-privacy-policy-github"
+                className={ABOUT_ACTION_BUTTON_CLASS}
+                onClick={() => void window.nodus.openExternal(NODUS_PRIVACY_URL)}
+              >
+                <Icon name="external" /> {t('Ver archivo en GitHub')}
+              </button>
+            </div>
+          </div>
+
+          <div data-testid="about-gdpr" className={ABOUT_CARD_CLASS}>
+            <div className="flex items-start gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300">
+                <Icon name="globe" size={19} />
+              </div>
+              <div className="max-w-3xl">
+                <h3 className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{t('Cómo facilita Nodus el cumplimiento del RGPD')}</h3>
+                <p className="mt-1 text-xs leading-5 text-neutral-600 dark:text-neutral-400">
+                  {t('El diseño aplica minimización, privacidad por defecto y avisos justo antes de importar archivos o grabar. Distingue el tratamiento local de las conexiones opcionales y deja al responsable decidir la base jurídica, conservación, acceso y proveedores.')}
+                </p>
+                <p className="mt-2 text-xs leading-5 text-neutral-500">
+                  {t('Esta arquitectura facilita el cumplimiento del RGPD, pero no es una certificación: cada organización debe documentar su tratamiento y completar la lista de implantación.')}
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+              <button
+                data-testid="open-gdpr-checklist"
+                className={ABOUT_ACTION_BUTTON_CLASS}
+                onClick={() => void window.nodus.openExternal(NODUS_GDPR_CHECKLIST_URL)}
+              >
+                <Icon name="check" /> {t('Ver lista RGPD')}
+              </button>
+              <button
+                data-testid="open-official-gdpr"
+                className={ABOUT_ACTION_BUTTON_CLASS}
+                onClick={() => void window.nodus.openExternal('https://eur-lex.europa.eu/eli/reg/2016/679/oj')}
+              >
+                <Icon name="external" /> {t('RGPD oficial')}
+              </button>
+            </div>
+          </div>
+
+          <div data-testid="about-third-party-licenses" className={ABOUT_CARD_CLASS}>
+            <div className="flex items-start gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
+                <Icon name="book" size={19} />
+              </div>
+              <div className="max-w-3xl">
+                <h3 className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{t('Licencias y atribuciones')}</h3>
+                <p className="mt-1 text-xs leading-5 text-neutral-600 dark:text-neutral-400">
+                  {t('Nodus se publica con licencia MIT. Las licencias, atribuciones y textos exigidos por cada componente, modelo, voz o conjunto de datos de terceros se incluyen con cada versión.')}
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+              <button
+                data-testid="open-third-party-licenses"
+                className={ABOUT_ACTION_BUTTON_CLASS}
+                onClick={() => void window.nodus.openThirdPartyNotices()}
+              >
+                <Icon name="book" /> {t('Ver licencias')}
+              </button>
+              <button
+                data-testid="open-nodus-license-github"
+                className={ABOUT_ACTION_BUTTON_CLASS}
+                onClick={() => void window.nodus.openExternal(NODUS_LICENSE_URL)}
+              >
+                <Icon name="external" /> {t('Licencia MIT')}
+              </button>
+            </div>
+          </div>
+
+          <div data-testid="about-transparency-security" className={ABOUT_CARD_CLASS}>
+            <div className="flex items-start gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300">
+                <Icon name="lock" size={19} />
+              </div>
+              <div className="max-w-3xl">
+                <h3 className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{t('Transparencia y seguridad')}</h3>
+                <p className="mt-1 text-xs leading-5 text-neutral-600 dark:text-neutral-400">
+                  {t('El código, el historial y los documentos legales son públicos y auditables. Las vulnerabilidades pueden comunicarse de forma privada mediante GitHub Security Advisories.')}
+                </p>
+                <p className="mt-2 text-xs leading-5 text-neutral-500">
+                  {t('La exclusión de garantías de la licencia MIT se aplica solo en la medida permitida por la ley y no elimina obligaciones legales imperativas.')}
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+              <button
+                data-testid="open-nodus-repository"
+                className={ABOUT_ACTION_BUTTON_CLASS}
+                onClick={() => void window.nodus.openExternal(NODUS_REPOSITORY_URL)}
+              >
+                <Icon name="external" /> {t('Ver repositorio')}
+              </button>
+              <button
+                data-testid="report-security-vulnerability"
+                className={ABOUT_ACTION_BUTTON_CLASS}
+                onClick={() => void window.nodus.openExternal(NODUS_SECURITY_REPORT_URL)}
+              >
+                <Icon name="shield" /> {t('Informar de una vulnerabilidad')}
+              </button>
+            </div>
+          </div>
+
+          <div data-testid="about-latest-changes" className="flex flex-col gap-4 rounded-xl border border-neutral-200 bg-neutral-50 p-5 dark:border-neutral-800 dark:bg-neutral-900/50 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <label className="text-sm text-neutral-700 dark:text-neutral-300">{t('Últimos cambios')}</label>
               <p className="mt-0.5 text-xs text-neutral-500">{t('Consulta las novedades de la versión actual cuando quieras.')}</p>
@@ -803,7 +938,7 @@ export function Settings({
               <Icon name="star" /> {t('Ver últimos cambios')}
             </button>
           </div>
-          <div data-testid="about-updates" className="flex items-center justify-between gap-4 rounded-xl border border-neutral-200 bg-neutral-50 p-5 dark:border-neutral-800 dark:bg-neutral-900/50">
+          <div data-testid="about-updates" className="flex flex-col gap-4 rounded-xl border border-neutral-200 bg-neutral-50 p-5 dark:border-neutral-800 dark:bg-neutral-900/50 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <label className="text-sm text-neutral-700 dark:text-neutral-300">{t('Actualizaciones')}</label>
               {updateMessage && <p className="mt-0.5 text-xs text-neutral-500">{updateMessage}</p>}
@@ -1399,15 +1534,12 @@ export function Settings({
               </select>
             </Row>
             <Row
-              label={t('Ocultar los nombres del alumnado a la IA')}
-              hint={t('Los nombres de los grupos se sustituyen por identificadores antes de enviarlos, y se restauran al recibir la respuesta. No cubre transcripción de audio, análisis de imágenes ni embeddings.')}
+              label={t('IA y datos del alumnado')}
+              hint={t('La IA de Nodus no recibe listados, notas ni respuestas del alumnado y no puede calificar, perfilar ni evaluar estudiantes. Solo puede generar o estructurar contenido docente que no contenga datos del alumnado.')}
             >
-              <input
-                type="checkbox"
-                data-testid="settings-student-pseudonyms"
-                checked={settings.studentPseudonymsEnabled}
-                onChange={(e) => patch({ studentPseudonymsEnabled: e.target.checked })}
-              />
+              <span data-testid="settings-no-ai-student-evaluation" className="inline-flex items-center gap-1.5 rounded-full border border-emerald-800/60 bg-emerald-950/30 px-2.5 py-1 text-xs font-medium text-emerald-300">
+                <Icon name="shield" size={12} /> {t('Bloqueado por diseño')}
+              </span>
             </Row>
             <Row
               label={t('OpenRouter: priorizar velocidad')}
@@ -1937,7 +2069,6 @@ const STUDY_VAULT_MODEL_FIELDS = [
   { task: 'chat', label: 'Chat con el corpus', key: 'chatModel' },
   { task: 'improve', label: 'Mejora de texto', key: 'improveModel' },
   { task: 'questions', label: 'Generación de preguntas', key: 'questionGenModel' },
-  { task: 'grading', label: 'Corrección de exámenes', key: 'gradingModel' },
   { task: 'flashcards', label: 'Generación de flashcards', key: 'flashcardModel' },
 ] as const;
 

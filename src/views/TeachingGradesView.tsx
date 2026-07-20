@@ -6,7 +6,6 @@ import {
   ASSESSMENT_PROFILES,
   ENTRY_STATUSES,
   GRID_COL,
-  anonymousStudentSummary,
   awardHonours,
   gradebookToGrid,
   toScale,
@@ -57,7 +56,6 @@ export function TeachingGradesView() {
   /** studentId → itemId → fraction already earned earlier. Feeds the ratchet rule. */
   const [previous, setPrevious] = useState<Record<string, Record<string, number>>>({});
   const [rubricCell, setRubricCell] = useState<{ studentId: string; item: AssessmentItem } | null>(null);
-  const [feedbackFor, setFeedbackFor] = useState<string | null>(null);
   const [track, setTrack] = useState<AssessmentTrack>('continua');
   const [convocatoria, setConvocatoria] = useState('ordinaria');
   const [loading, setLoading] = useState(true);
@@ -522,17 +520,6 @@ export function TeachingGradesView() {
         )}
       </div>
 
-      {feedbackFor && grid && group && (
-        <FeedbackModal
-          planId={plan.id}
-          groupId={group.id}
-          studentId={feedbackFor}
-          studentName={rowLabel(rows.find((r) => r.id === feedbackFor))}
-          summary={anonymousStudentSummary(grid, feedbackFor)}
-          onClose={() => setFeedbackFor(null)}
-        />
-      )}
-
       {rubricCell && (
         <RubricCellModal
           studentId={rubricCell.studentId}
@@ -618,7 +605,6 @@ export function TeachingGradesView() {
           result={grid.results[explain]}
           rules={plan.rules}
           onClose={() => setExplain(null)}
-          onDraftFeedback={() => setFeedbackFor(explain)}
           onDownload={async () => {
             const student = (group?.students ?? []).find((s) => s.id === explain);
             if (!student || !plan) return;
@@ -842,97 +828,6 @@ function RubricCellModal({
   );
 }
 
-/**
- * Drafts the comment a family reads, from marks alone.
- *
- * The summary handed to the model comes from `anonymousStudentSummary`, which builds it
- * out of the ANONYMOUS grid: the name columns are gone before the text exists, so no
- * ordering of edits here can start leaking one. `draftStudentFeedback` then opens the
- * pseudonymisation scope, so the identifier the model writes comes back as a real name
- * for the teacher and never travelled as one.
- *
- * The draft is offered, never saved: a comment about a child is the teacher's to write.
- */
-function FeedbackModal({
-  planId, groupId, studentId, studentName, summary, onClose,
-}: {
-  planId: string;
-  groupId: string;
-  studentId: string;
-  studentName: string;
-  summary: string;
-  onClose: () => void;
-}) {
-  const [text, setText] = useState('');
-  const [warnings, setWarnings] = useState<string[]>([]);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  const [copied, setCopied] = useState(false);
-
-  const draft = async () => {
-    setBusy(true);
-    setError('');
-    try {
-      const result = await window.nodus.draftStudentFeedback({ planId, groupId, studentId, summary });
-      setText(result.text);
-      setWarnings(result.warnings ?? []);
-    } catch (cause) {
-      setError(errorText(cause));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <ModalBackdrop onClose={onClose}>
-      <section className="card-modal flex max-h-[80vh] w-full max-w-lg flex-col p-5" role="dialog" aria-modal="true"
-        aria-label={t('Comentario para la familia')} data-testid="feedback-modal">
-        <h2 className="text-base font-semibold">{t('Comentario para la familia')}</h2>
-        <p className="mt-1 text-xs text-neutral-500">{studentName}</p>
-        <p className="mt-2 text-[11px] text-neutral-500">
-          {t('La IA solo ve las notas y un identificador, nunca el nombre. Revísalo antes de usarlo.')}
-        </p>
-
-        {error && <p className="mt-2 text-sm text-red-500" data-testid="feedback-error">{error}</p>}
-
-        <div className="mt-3 min-h-0 flex-1 overflow-auto">
-          <p className="text-[10px] font-medium uppercase tracking-wider text-neutral-500">{t('Lo que se envía')}</p>
-          <pre className="mt-1 whitespace-pre-wrap rounded-lg bg-neutral-100 p-2 text-[11px] dark:bg-neutral-900/40"
-            data-testid="feedback-payload">{summary || '—'}</pre>
-
-          {text && (
-            <>
-              <p className="mt-3 text-[10px] font-medium uppercase tracking-wider text-neutral-500">{t('Borrador')}</p>
-              <textarea className="input mt-1 min-h-[120px] w-full text-xs" data-testid="feedback-text"
-                value={text} onChange={(event) => setText(event.target.value)} />
-            </>
-          )}
-          {warnings.length > 0 && (
-            <div className="mt-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[11px] text-amber-800 dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-300"
-              data-testid="feedback-warnings">
-              {warnings.map((warning, index) => <p key={index}>{warning}</p>)}
-            </div>
-          )}
-        </div>
-
-        <div className="mt-4 flex justify-end gap-2">
-          <button className="btn btn-ghost" onClick={onClose}>{t('Cerrar')}</button>
-          {text && (
-            <button className="btn btn-ghost" data-testid="feedback-copy"
-              onClick={() => void navigator.clipboard.writeText(text).then(() => setCopied(true))}>
-              <Icon name="copy" size={13} />{copied ? t('Copiado') : t('Copiar')}
-            </button>
-          )}
-          <button className="btn btn-primary" data-testid="feedback-draft" disabled={busy || !summary}
-            onClick={() => void draft()}>
-            {busy ? <Spinner label={t('Redactando…')} /> : text ? t('Volver a redactar') : t('Redactar')}
-          </button>
-        </div>
-      </section>
-    </ModalBackdrop>
-  );
-}
-
 /** Document wording, translated at the call site so the file follows the UI language. */
 function exportLabels() {
   return {
@@ -1126,7 +1021,7 @@ function warningText(warning: { code: string; detail: Record<string, number | st
  * really carried, and every rule that changed the outcome.
  */
 function ExplainModal({
-  name, result, rules, onClose, onDownload, onDraftFeedback,
+  name, result, rules, onClose, onDownload,
 }: {
   name: string;
   result: { raw: number | null; record: { numeric: number | null; qualitative: string | null }; trace: TraceNode | null; rules: TraceRule[] } | undefined;
@@ -1134,7 +1029,6 @@ function ExplainModal({
   rules: PlanRules;
   onClose: () => void;
   onDownload?: () => Promise<void>;
-  onDraftFeedback?: () => void;
 }) {
   if (!result) return null;
   const renderNode = (node: TraceNode, depth: number) => (
@@ -1174,11 +1068,6 @@ function ExplainModal({
             {t('Calificación')}: <strong data-testid="explain-final">{result.record.numeric ?? result.record.qualitative ?? '—'}</strong>
           </span>
           <span className="flex gap-2">
-            {onDraftFeedback && (
-              <button className="btn btn-ghost" data-testid="explain-feedback" onClick={onDraftFeedback}>
-                <Icon name="bulb" size={13} />{t('Comentario para la familia')}
-              </button>
-            )}
             {onDownload && (
               <button className="btn btn-ghost" data-testid="explain-download" onClick={() => void onDownload()}>
                 <Icon name="download" size={13} />{t('Boletín')}
