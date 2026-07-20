@@ -39,7 +39,7 @@ Build a research corpus from Zotero and turn reading into connected knowledge. N
 
 Its strongest tools include semantic search, an idea graph, author profiles, coverage and gap analysis, reading paths, argument maps, Deep Research and a writing workshop with verifiable citations. A Word companion is available for bringing Nodus context into a manuscript.
 
-![Academic vault demo in Nodus](docs/screenshots/readme-academic-demo.jpg)
+![Academic vault demo with a twelve-theme knowledge graph in Nodus](docs/screenshots/readme-academic-demo.jpg)
 
 ### Genealogy vault
 

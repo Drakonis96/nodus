@@ -40,6 +40,9 @@ try {
     ['research coverage', 'research_questions', "id LIKE 'demo-%'"], ['writing/deep research', 'writing_saved_drafts', "id LIKE 'demo-%'"],
     ['immersion', 'immersion_sessions', "id LIKE 'demo-%'"], ['projects', 'projects', "id LIKE 'demo-%'"],
   ]) assert.ok(count(table, where) > 0, `academic ${label} is populated`);
+  assert.equal(count('works', "nodus_id LIKE 'demo-w%'"), 15, 'academic demo has a substantial source corpus');
+  assert.equal(count('ideas', "global_id LIKE 'demo-i%'"), 27, 'academic demo has a substantial idea graph');
+  assert.equal(count('themes', "theme_id LIKE 'demo-t%'"), 12, 'academic overview has a substantial theme constellation');
   academic.clearDemoData();
 
   assert.equal(genealogy.seedGenealogyDemoData(), true);

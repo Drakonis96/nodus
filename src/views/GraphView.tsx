@@ -3318,7 +3318,11 @@ export function GraphView({
             </button>
           )}
           <div className="flex-1" />
-          <span className="text-neutral-500">{tx('{n} nodos', { n: elements.filter((e) => !(e.data as any).source).length })}</span>
+          <span className="text-neutral-500">{tx('{n} nodos', {
+            n: USE_SIGMA
+              ? (graphOverrideModel?.nodes.length ?? data.nodes.length)
+              : elements.filter((e) => !(e.data as any).source).length,
+          })}</span>
         </div>
 
         {filtersOpen && (
