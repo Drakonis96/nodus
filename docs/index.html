@@ -165,19 +165,6 @@
   .scroll-hint svg { width: 18px; height: 18px; }
   @keyframes bob { 0%,100% { transform: translate(-50%,0); } 50% { transform: translate(-50%,8px); } }
 
-  /* floating back-to-top button */
-  #to-top {
-    position: fixed; right: 22px; bottom: 22px; z-index: 45; width: 46px; height: 46px;
-    border-radius: 50%; border: 1px solid var(--border); background: rgba(20,17,32,0.85);
-    color: var(--violet-2); display: grid; place-items: center; cursor: pointer;
-    backdrop-filter: blur(10px); box-shadow: 0 8px 26px rgba(0,0,0,0.5);
-    opacity: 0; visibility: hidden; transform: translateY(12px);
-    transition: opacity 0.25s ease, transform 0.25s ease, visibility 0.25s, border-color 0.2s, background 0.2s;
-  }
-  #to-top.show { opacity: 1; visibility: visible; transform: none; }
-  #to-top:hover { border-color: rgba(167,139,250,0.6); background: rgba(139,92,246,0.18); transform: translateY(-2px); }
-  #to-top svg { width: 20px; height: 20px; }
-
   .n-mark .stroke { stroke-dasharray: 130; stroke-dashoffset: 130; animation: draw 1.6s cubic-bezier(0.6,0,0.2,1) 0.35s forwards; }
   @keyframes draw { to { stroke-dashoffset: 0; } }
   .n-mark circle { opacity: 0; transform-origin: center; animation: pop 0.5s cubic-bezier(0.2,1.6,0.4,1) forwards; }
@@ -189,7 +176,7 @@
 
   /* ---------- sections ---------- */
   section { position: relative; padding: 110px 24px; }
-  #vaults { scroll-margin-top: 64px; }
+  #vaults, #toolkit { scroll-margin-top: 64px; }
   .wrap { max-width: 1080px; margin: 0 auto; }
   .kicker {
     display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700;
@@ -741,6 +728,109 @@
   }
   @media (prefers-reduced-motion: reduce) { .vault-panel { animation: none; } }
 
+  /* ---------- Nodus Toolkit ---------- */
+  .toolkit-head { display: grid; grid-template-columns: minmax(0,.9fr) minmax(320px,1.1fr); gap: 48px; align-items: end; }
+  .toolkit-head .title { max-width: 620px; }
+  .toolkit-head .lead { justify-self: end; }
+  .toolkit-presenter {
+    --tool:#22d3ee; position: relative; overflow: hidden; display: grid; grid-template-columns: minmax(0,.82fr) minmax(420px,1.18fr); gap: 42px;
+    margin-top: 44px; padding: clamp(28px,4vw,46px); border: 1px solid color-mix(in srgb, var(--tool) 34%, var(--border)); border-radius: 24px;
+    background: linear-gradient(135deg, color-mix(in srgb, var(--tool) 9%, var(--bg2)), rgba(14,12,23,.97) 46%, rgba(8,7,13,.98));
+    box-shadow: 0 28px 70px rgba(0,0,0,.28);
+  }
+  .toolkit-presenter::before { content: ''; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--tool); }
+  .toolkit-presenter::after { content: ''; position: absolute; width: 320px; height: 320px; left: -120px; bottom: -190px; border-radius: 50%; background: var(--tool); filter: blur(110px); opacity: .12; pointer-events: none; }
+  .toolkit-copy { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: flex-start; }
+  .toolkit-label { display: inline-flex; align-items: center; gap: 8px; color: #67e8f9; font-size: 10px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+  .toolkit-label::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--tool); box-shadow: 0 0 14px color-mix(in srgb, var(--tool) 70%, transparent); }
+  .toolkit-presenter h3 { margin: 14px 0 12px; font: 700 clamp(27px,3vw,36px)/1.08 var(--serif); }
+  .toolkit-presenter p { margin: 0; color: var(--text-2); font-size: 14.5px; line-height: 1.72; }
+  .toolkit-pills { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 24px; }
+  .toolkit-pill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border: 1px solid color-mix(in srgb, var(--tool) 28%, var(--border)); border-radius: 999px; background: color-mix(in srgb, var(--tool) 8%, transparent); color: color-mix(in srgb, var(--tool) 46%, white); font-size: 11px; font-weight: 650; }
+  .toolkit-pill svg { width: 12px; height: 12px; }
+  .presenter-stage { position: relative; z-index: 1; min-height: 340px; padding: 18px 154px 64px 18px; border: 1px solid rgba(255,255,255,.1); border-radius: 18px; background: #09090d; box-shadow: inset 0 0 0 1px rgba(34,211,238,.04), 0 20px 50px rgba(0,0,0,.34); }
+  .presenter-slide { position: relative; min-height: 254px; overflow: hidden; border-radius: 10px; background: #f5f4ef; color: #18181b; box-shadow: 0 14px 35px rgba(0,0,0,.32); isolation: isolate; }
+  .presenter-slide-content { position: absolute; inset: 0; z-index: 1; padding: 28px; transform-origin: var(--tool-x,50%) var(--tool-y,50%); transition: transform .22s ease; }
+  .presenter-slide-content small { color: #0e7490; font-size: 9px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+  .presenter-slide-content strong { display: block; max-width: 260px; margin: 22px 0 20px; font: 700 22px/1.17 var(--serif); }
+  .presenter-slide-content i { display: block; width: 86%; height: 5px; margin-top: 8px; border-radius: 4px; background: #d4d4d8; }
+  .presenter-slide-content i:nth-of-type(2) { width: 68%; }
+  .presenter-page { position: absolute; right: 14px; bottom: 11px; color: #71717a; font-size: 9px; }
+  .presenter-draw-canvas, .presenter-spotlight { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .presenter-draw-canvas { z-index: 4; pointer-events: none; }
+  .presenter-stage[data-tool="draw"] .presenter-draw-canvas { pointer-events: auto; touch-action: none; cursor: crosshair; }
+  .presenter-spotlight { z-index: 3; opacity: 0; pointer-events: none; background: radial-gradient(circle 66px at var(--tool-x,50%) var(--tool-y,50%), transparent 0 52px, rgba(0,0,0,.16) 54px, rgba(0,0,0,.78) 76px); transition: opacity .16s; }
+  .presenter-stage[data-tool="spotlight"] .presenter-spotlight { opacity: 1; }
+  .presenter-laser { position: absolute; z-index: 5; left: var(--tool-x,50%); top: var(--tool-y,50%); width: 9px; height: 9px; border: 2px solid rgba(255,255,255,.85); border-radius: 50%; background: #ef4444; box-shadow: 0 0 4px #fff, 0 0 13px 5px rgba(239,68,68,.68); opacity: 0; pointer-events: none; transform: translate(-50%,-50%); transition: opacity .16s; }
+  .presenter-stage[data-tool="laser"] .presenter-laser { opacity: 1; }
+  .presenter-stage[data-tool="zoom"] .presenter-slide { cursor: zoom-in; }
+  .presenter-stage[data-tool="zoom"] .presenter-slide.zoomed { cursor: zoom-out; }
+  .presenter-slide.zoomed .presenter-slide-content { transform: scale(1.42); }
+  .presenter-tool-prompt { position: absolute; left: 36px; bottom: 62px; color: #67e8f9; font-size: 9px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; animation: presenter-prompt 1.15s ease-in-out infinite; }
+  .presenter-stage.tools-tried .presenter-tool-prompt { opacity: 0; animation: none; }
+  @keyframes presenter-prompt { 0%,100% { opacity: .55; transform: translateY(0); } 50% { opacity: 1; transform: translateY(-2px); } }
+  .presenter-toolbar { position: absolute; left: 36px; bottom: 16px; display: flex; gap: 5px; padding: 6px; border: 1px solid rgba(255,255,255,.12); border-radius: 10px; background: rgba(23,23,28,.95); box-shadow: 0 10px 30px rgba(0,0,0,.34); }
+  .presenter-toolbar button { position: relative; display: grid; width: 31px; height: 31px; padding: 0; place-items: center; border: 0; border-radius: 7px; background: transparent; color: #a1a1aa; cursor: pointer; }
+  .presenter-toolbar button:hover, .presenter-toolbar button:focus-visible { outline: none; color: #cffafe; background: rgba(34,211,238,.1); }
+  .presenter-toolbar button[aria-pressed="true"] { color: #cffafe; background: rgba(34,211,238,.18); box-shadow: inset 0 0 0 1px rgba(103,232,249,.24); }
+  .presenter-tool-name { position: absolute; left: 50%; bottom: calc(100% + 9px); width: max-content; max-width: 120px; padding: 5px 7px; border: 1px solid rgba(255,255,255,.12); border-radius: 6px; background: #18181d; color: #e4e4e7; box-shadow: 0 8px 22px rgba(0,0,0,.36); font-size: 8px; font-weight: 700; line-height: 1.2; opacity: 0; pointer-events: none; transform: translate(-50%,3px); transition: opacity .14s, transform .14s; }
+  .presenter-toolbar button:hover .presenter-tool-name, .presenter-toolbar button:focus-visible .presenter-tool-name { opacity: 1; transform: translate(-50%,0); }
+  .presenter-toolbar.is-inviting button { animation: presenter-tool-invite 1.8s ease-in-out 3; animation-delay: calc(var(--tool-order,0) * .14s); }
+  @keyframes presenter-tool-invite { 0%,42%,100% { box-shadow: none; } 18% { color: #ecfeff; background: rgba(34,211,238,.2); box-shadow: 0 0 0 4px rgba(34,211,238,.08), 0 0 14px rgba(34,211,238,.3); } }
+  .presenter-toolbar svg { width: 14px; height: 14px; }
+  .presenter-notes { position: absolute; right: 14px; bottom: 16px; width: 164px; padding: 13px; border: 1px solid rgba(255,255,255,.13); border-radius: 12px; background: #18181d; box-shadow: 0 12px 34px rgba(0,0,0,.48); }
+  .presenter-notes b { display: block; margin-bottom: 7px; color: #67e8f9; font-size: 9px; letter-spacing: .1em; text-transform: uppercase; }
+  .presenter-notes p { margin: 0; color: #d4d4d8; font-size: 10px; line-height: 1.45; }
+  .presenter-phone { position: absolute; top: 14px; right: 14px; width: 126px; height: 184px; padding: 9px 8px; border: 2px solid #3f3f46; border-radius: 19px; background: #101014; box-shadow: 0 16px 34px rgba(0,0,0,.5); }
+  .presenter-phone::before { content: ''; display: block; width: 28px; height: 3px; margin: 0 auto 7px; border-radius: 3px; background: #3f3f46; }
+  .presenter-phone-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; padding: 3px; border-radius: 7px; background: #1c1c21; }
+  .presenter-phone-tabs button { min-width: 0; padding: 4px 2px; border: 0; border-radius: 5px; background: transparent; color: #71717a; font: 700 6.5px/1 var(--sans); cursor: pointer; }
+  .presenter-phone-tabs button[aria-selected="true"] { color: #cffafe; background: rgba(34,211,238,.14); }
+  .presenter-phone-view { padding-top: 8px; }
+  .presenter-phone-view[hidden] { display: none; }
+  .presenter-remote-label { display: block; color: #a1a1aa; font-size: 7px; text-align: center; }
+  .presenter-remote-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 5px; margin-top: 9px; }
+  .presenter-remote-grid i { display: grid; height: 29px; place-items: center; border-radius: 7px; background: rgba(34,211,238,.1); color: #67e8f9; font-size: 12px; font-style: normal; }
+  .presenter-phone-slide { height: 48px; padding: 7px; border-radius: 5px; background: #efeee9; color: #18181b; }
+  .presenter-phone-slide b { display: block; width: 72%; height: 5px; margin-bottom: 7px; border-radius: 3px; background: #155e75; }
+  .presenter-phone-slide i { display: block; width: 88%; height: 3px; margin-top: 4px; border-radius: 2px; background: #c4c4c8; }
+  .presenter-phone-note b { display: block; margin: 7px 0 3px; color: #67e8f9; font-size: 6.5px; letter-spacing: .06em; text-transform: uppercase; }
+  .presenter-phone-note p { margin: 0; color: #d4d4d8; font-size: 7px; line-height: 1.35; }
+  .toolkit-tools { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 16px; margin-top: 16px; }
+  .tool-card { --tool:var(--violet-2); position: relative; overflow: hidden; min-height: 286px; padding: 25px; border: 1px solid color-mix(in srgb, var(--tool) 28%, var(--border)); border-radius: 18px; background: linear-gradient(150deg, color-mix(in srgb, var(--tool) 7%, var(--bg2)), rgba(8,7,13,.96)); transition: transform .22s, border-color .22s, box-shadow .22s; }
+  .tool-card:hover { transform: translateY(-3px); border-color: color-mix(in srgb, var(--tool) 52%, var(--border)); box-shadow: 0 18px 45px rgba(0,0,0,.27); }
+  .tool-card::after { content: ''; position: absolute; width: 150px; height: 150px; right: -75px; bottom: -90px; border-radius: 50%; background: var(--tool); filter: blur(65px); opacity: .1; }
+  .tool-icon { position: relative; z-index: 1; display: grid; width: 48px; height: 48px; place-items: center; margin-bottom: 24px; border: 1px solid color-mix(in srgb, var(--tool) 34%, var(--border)); border-radius: 14px; background: color-mix(in srgb, var(--tool) 12%, transparent); color: color-mix(in srgb, var(--tool) 58%, white); }
+  .tool-icon svg { width: 23px; height: 23px; }
+  .tool-card h3 { position: relative; z-index: 1; margin: 0 0 9px; font-size: 18px; }
+  .tool-card p { position: relative; z-index: 1; margin: 0; color: var(--text-2); font-size: 13.5px; line-height: 1.62; }
+  .tool-tags { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 7px; margin-top: 20px; }
+  .tool-tags span { padding: 4px 8px; border: 1px solid color-mix(in srgb, var(--tool) 24%, var(--border)); border-radius: 7px; color: color-mix(in srgb, var(--tool) 48%, white); background: color-mix(in srgb, var(--tool) 7%, transparent); font-size: 10px; font-weight: 700; }
+  @media (max-width: 900px) {
+    .toolkit-head, .toolkit-presenter { grid-template-columns: 1fr; }
+    .toolkit-head { gap: 18px; }
+    .toolkit-head .lead { justify-self: start; }
+    .toolkit-presenter { gap: 30px; }
+    .toolkit-tools { grid-template-columns: repeat(auto-fit,minmax(230px,1fr)); }
+  }
+  @media (max-width: 560px) {
+    .toolkit-presenter { padding: 25px 20px; border-radius: 19px; }
+    .presenter-stage { min-height: 454px; padding: 16px 16px 210px; }
+    .presenter-slide { min-height: 228px; }
+    .presenter-slide-content { padding: 22px; }
+    .presenter-slide-content strong { margin-top: 16px; font-size: 19px; }
+    .presenter-phone { top: auto; right: 16px; bottom: 13px; width: 126px; height: 184px; }
+    .presenter-notes { display: none; }
+    .presenter-toolbar { left: 24px; bottom: 206px; }
+    .presenter-tool-prompt { left: 24px; bottom: 252px; }
+    .toolkit-tools { grid-template-columns: 1fr; }
+    .tool-card { min-height: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .presenter-toolbar.is-inviting button, .presenter-tool-prompt { animation: none; }
+    .presenter-slide-content { transition: none; }
+  }
+
   /* audience strip */
   .who { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-top: 44px; }
   .who-card { padding: 20px 22px; border-radius: 16px; border: 1px solid var(--border); background: var(--card); }
@@ -971,6 +1061,92 @@
         <h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m22 9-10-5L2 9l10 5 10-5Z"/><path d="M6 11.5V16c0 1.5 2.7 3 6 3s6-1.5 6-3v-4.5"/></svg> <span data-i18n="who.study.t">If you study</span></h4>
         <p data-i18n="who.study.b">Organise materials, schedules, practice and progress in <b>Study</b>. For advanced projects, <b>Academic</b>, <b>Genealogy</b> and <b>Databases</b> are available now; <b>Primary Sources</b>, <b>Testimony</b> and <b>Prosopography</b> will add specialist paths for archival and social research.</p>
       </div>
+    </div>
+  </div>
+</section>
+
+<!-- ---------- Nodus Toolkit ---------- -->
+<section id="toolkit" style="border-top:1px solid var(--border)">
+  <div class="wrap">
+    <div class="toolkit-head">
+      <div>
+        <span class="kicker" data-i18n="toolkit.kicker">Nodus Toolkit · Included</span>
+        <h2 class="title" data-i18n="toolkit.title">Four powerful tools. Already inside Nodus.</h2>
+      </div>
+      <p class="lead" data-i18n="toolkit.lead">Vaults give each project its structure. Nodus Toolkit handles the practical jobs before, during and after it, with focused utilities included in the same private desktop app.</p>
+    </div>
+
+    <article class="toolkit-presenter">
+      <div class="toolkit-copy">
+        <span class="toolkit-label" data-i18n="toolkit.presenter.label">Present differently</span>
+        <h3 id="toolkit-presenter-title" data-i18n="toolkit.presenter.title">PDF Presenter</h3>
+        <p data-i18n="toolkit.presenter.body">Turn any PDF into a lightweight presentation. Give every page its own speaker text, import existing presenter notes or write them in Nodus, and read them from your computer or phone while you present. Use the phone as a remote to change slides and control the live tools.</p>
+        <div class="toolkit-pills">
+          <span class="toolkit-pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg><span data-i18n="toolkit.presenter.remote">Phone remote</span></span>
+          <span class="toolkit-pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg><span data-i18n="toolkit.presenter.laser">Laser pointer</span></span>
+          <span class="toolkit-pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 9 9"/><path d="M12 7a5 5 0 1 0 5 5"/></svg><span data-i18n="toolkit.presenter.spotlight">Spotlight</span></span>
+          <span class="toolkit-pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m4 20 4.5-1 10-10a2.1 2.1 0 0 0-3-3l-10 10L4 20Z"/><path d="m13.5 8 3 3"/></svg><span data-i18n="toolkit.presenter.draw">Live drawing</span></span>
+          <span class="toolkit-pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4M11 8v6M8 11h6"/></svg><span data-i18n="toolkit.presenter.zoom">Zoom</span></span>
+        </div>
+      </div>
+      <div class="presenter-stage" data-tool="none" role="group" aria-labelledby="toolkit-presenter-title">
+        <div class="presenter-slide" id="presenter-demo-slide">
+          <div class="presenter-slide-content">
+            <small data-i18n="toolkit.presenter.visual.kicker">PDF · presentation mode</small>
+            <strong data-i18n="toolkit.presenter.visual.title">Your document, page by page.</strong>
+            <i></i><i></i>
+            <span class="presenter-page" data-i18n="toolkit.presenter.visual.page">Page 12 of 24</span>
+          </div>
+          <canvas class="presenter-draw-canvas" aria-hidden="true"></canvas>
+          <div class="presenter-spotlight" aria-hidden="true"></div>
+          <span class="presenter-laser" aria-hidden="true"></span>
+        </div>
+        <div class="presenter-tool-prompt" data-i18n="toolkit.presenter.try">Try the live tools ↓</div>
+        <div class="presenter-toolbar is-inviting" role="toolbar" aria-label="Presentation tools">
+          <button type="button" data-presenter-tool="none" aria-pressed="true" style="--tool-order:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 3 12 9-6 1.5L9 20 5 3Z"/></svg><span class="presenter-tool-name" data-i18n="toolkit.presenter.tool.none">No tool</span></button>
+          <button type="button" data-presenter-tool="draw" aria-pressed="false" style="--tool-order:1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m4 20 4.5-1 10-10a2.1 2.1 0 0 0-3-3l-10 10L4 20Z"/><path d="m13.5 8 3 3"/></svg><span class="presenter-tool-name" data-i18n="toolkit.presenter.tool.draw">Draw</span></button>
+          <button type="button" data-presenter-tool="spotlight" aria-pressed="false" style="--tool-order:2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 9 9"/><path d="M12 7a5 5 0 1 0 5 5"/></svg><span class="presenter-tool-name" data-i18n="toolkit.presenter.tool.spotlight">Spotlight</span></button>
+          <button type="button" data-presenter-tool="laser" aria-pressed="false" style="--tool-order:3"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg><span class="presenter-tool-name" data-i18n="toolkit.presenter.tool.laser">Laser pointer</span></button>
+          <button type="button" data-presenter-tool="zoom" aria-pressed="false" style="--tool-order:4"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4M11 8v6M8 11h6"/></svg><span class="presenter-tool-name" data-i18n="toolkit.presenter.tool.zoom">Zoom</span></button>
+        </div>
+        <div class="presenter-notes"><b data-i18n="toolkit.presenter.visual.notes">Your notes · page 12</b><p data-i18n="toolkit.presenter.visual.note">Pause here. Compare the two sources before revealing the next page.</p></div>
+        <div class="presenter-phone">
+          <div class="presenter-phone-tabs" role="tablist" aria-label="Phone preview">
+            <button type="button" role="tab" data-phone-preview="remote" aria-selected="false" data-i18n="toolkit.presenter.phone.remote">Remote</button>
+            <button type="button" role="tab" data-phone-preview="notes" aria-selected="true" data-i18n="toolkit.presenter.phone.notes">Notes</button>
+          </div>
+          <div class="presenter-phone-view" data-phone-view="remote" role="tabpanel" hidden>
+            <span class="presenter-remote-label" data-i18n="toolkit.presenter.visual.remote">Remote</span>
+            <div class="presenter-remote-grid"><i>‹</i><i>›</i><i>●</i><i>⌕</i></div>
+          </div>
+          <div class="presenter-phone-view presenter-phone-note" data-phone-view="notes" role="tabpanel">
+            <div class="presenter-phone-slide"><b></b><i></i><i></i></div>
+            <b data-i18n="toolkit.presenter.phone.page">Page 12 · notes</b>
+            <p data-i18n="toolkit.presenter.phone.note">Compare both sources before moving on.</p>
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <div class="toolkit-tools">
+      <article class="tool-card" style="--tool:#a78bfa">
+        <span class="tool-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h11l-3-3M17 17H6l3 3M18 7l-3 3M6 17l3-3"/></svg></span>
+        <h3 data-i18n="toolkit.converter.title">Nodus Converter</h3>
+        <p data-i18n="toolkit.converter.body">Change files into the format you need from one focused workspace, without bouncing between online services or losing track of the original.</p>
+        <div class="tool-tags"><span data-i18n="toolkit.converter.tag1">Format conversion</span><span data-i18n="toolkit.converter.tag2">Original preserved</span></div>
+      </article>
+      <article class="tool-card" style="--tool:#34d399">
+        <span class="tool-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V4h3M17 4h3v3M20 17v3h-3M7 20H4v-3M7 9h10M7 12h10M7 15h7"/></svg></span>
+        <h3 data-i18n="toolkit.ocr.title">Nodus OCR</h3>
+        <p data-i18n="toolkit.ocr.body">Choose the right extraction path for each document: visual AI for difficult layouts and images, or conventional OCR engines for fast, non-AI text recognition.</p>
+        <div class="tool-tags"><span data-i18n="toolkit.ocr.tag1">Visual AI</span><span data-i18n="toolkit.ocr.tag2">Conventional OCR</span></div>
+      </article>
+      <article class="tool-card" style="--tool:#f472b6">
+        <span class="tool-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4.5 6v5.5c0 4.7 3.2 7.8 7.5 9.5 4.3-1.7 7.5-4.8 7.5-9.5V6L12 3Z"/><path d="m9 12 2 2 4-4"/></svg></span>
+        <h3 data-i18n="toolkit.protector.title">Nodus Protector</h3>
+        <p data-i18n="toolkit.protector.body">Create shareable copies with visible or invisible watermarks while keeping the untouched original safe in your workspace.</p>
+        <div class="tool-tags"><span data-i18n="toolkit.protector.tag1">Visible marks</span><span data-i18n="toolkit.protector.tag2">Invisible marks</span></div>
+      </article>
     </div>
   </div>
 </section>
@@ -1423,10 +1599,6 @@
   </div>
 </section>
 
-<button type="button" id="to-top" aria-label="Back to top">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg>
-</button>
-
 <footer>
   <div>
     <a href="https://github.com/Drakonis96/nodus" target="_blank" rel="noopener">GitHub</a> ·
@@ -1467,13 +1639,8 @@
 <script>
 // ---------- nav shadow ----------
 const nav = document.getElementById('nav');
-const toTop = document.getElementById('to-top');
-toTop.addEventListener('click', () => {
-  window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
-});
 addEventListener('scroll', () => {
   nav.classList.toggle('scrolled', scrollY > 24);
-  toTop.classList.toggle('show', scrollY > 600);
 }, { passive: true });
 
 // ---------- vault tag selector ----------
@@ -1506,6 +1673,101 @@ addEventListener('scroll', () => {
       activate(next, true);
     });
   });
+})();
+
+// ---------- PDF Presenter interactive preview ----------
+(function () {
+  const stage = document.querySelector('.presenter-stage');
+  if (!stage) return;
+  const slide = stage.querySelector('.presenter-slide');
+  const canvas = stage.querySelector('.presenter-draw-canvas');
+  const ctx = canvas.getContext('2d');
+  const toolbar = stage.querySelector('.presenter-toolbar');
+  const toolButtons = [...stage.querySelectorAll('[data-presenter-tool]')];
+  const phoneTabs = [...stage.querySelectorAll('[data-phone-preview]')];
+  const phoneViews = [...stage.querySelectorAll('[data-phone-view]')];
+  let activeTool = 'none';
+  let drawing = false;
+
+  function resizeCanvas() {
+    const rect = slide.getBoundingClientRect();
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    canvas.width = Math.max(1, Math.round(rect.width * dpr));
+    canvas.height = Math.max(1, Math.round(rect.height * dpr));
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#ef4444';
+  }
+
+  function clearDrawing() { ctx.clearRect(0, 0, canvas.width, canvas.height); }
+
+  function pointFrom(event) {
+    const rect = slide.getBoundingClientRect();
+    const x = Math.max(0, Math.min(rect.width, event.clientX - rect.left));
+    const y = Math.max(0, Math.min(rect.height, event.clientY - rect.top));
+    stage.style.setProperty('--tool-x', (x / rect.width * 100).toFixed(2) + '%');
+    stage.style.setProperty('--tool-y', (y / rect.height * 100).toFixed(2) + '%');
+    return { x, y };
+  }
+
+  function resetPreview() {
+    drawing = false;
+    clearDrawing();
+    slide.classList.remove('zoomed');
+    stage.style.setProperty('--tool-x', '50%');
+    stage.style.setProperty('--tool-y', '50%');
+  }
+
+  function selectTool(tool) {
+    resetPreview();
+    activeTool = tool;
+    stage.dataset.tool = tool;
+    stage.classList.add('tools-tried');
+    toolbar.classList.remove('is-inviting');
+    toolButtons.forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.presenterTool === tool)));
+  }
+
+  toolButtons.forEach((button) => button.addEventListener('click', () => selectTool(button.dataset.presenterTool)));
+
+  slide.addEventListener('pointermove', (event) => {
+    const point = pointFrom(event);
+    if (activeTool !== 'draw' || !drawing) return;
+    ctx.lineTo(point.x, point.y);
+    ctx.stroke();
+  });
+  slide.addEventListener('pointerdown', (event) => {
+    const point = pointFrom(event);
+    if (activeTool === 'draw') {
+      event.preventDefault();
+      drawing = true;
+      slide.setPointerCapture(event.pointerId);
+      ctx.beginPath();
+      ctx.moveTo(point.x, point.y);
+      ctx.lineTo(point.x + .01, point.y + .01);
+      ctx.stroke();
+    } else if (activeTool === 'zoom') {
+      event.preventDefault();
+      slide.classList.toggle('zoomed');
+    }
+  });
+  function endDrawing(event) {
+    drawing = false;
+    if (slide.hasPointerCapture && slide.hasPointerCapture(event.pointerId)) slide.releasePointerCapture(event.pointerId);
+  }
+  slide.addEventListener('pointerup', endDrawing);
+  slide.addEventListener('pointercancel', endDrawing);
+
+  phoneTabs.forEach((tab) => tab.addEventListener('click', () => {
+    const view = tab.dataset.phonePreview;
+    phoneTabs.forEach((item) => item.setAttribute('aria-selected', String(item === tab)));
+    phoneViews.forEach((panel) => { panel.hidden = panel.dataset.phoneView !== view; });
+  }));
+
+  resizeCanvas();
+  if ('ResizeObserver' in window) new ResizeObserver(resizeCanvas).observe(slide);
+  else window.addEventListener('resize', resizeCanvas);
 })();
 
 // ---------- hero constellation canvas ----------
@@ -2072,6 +2334,23 @@ const I18N_V2 = {
     'github.downloads': `{n} descargas`, 'github.downloads.tooltip': `Descargas de paquetes desde GitHub Releases · actualizado diariamente`,
     'vaults.kicker': `Los vaults`, 'vaults.title': `Cada proyecto, su propio espacio de trabajo.`,
     'vaults.lead': `Un vault es un único archivo en tu dispositivo con un proyecto dentro. Su modo decide qué secciones aparecen y cómo se instruye al asistente de IA. El motor, el almacenamiento privado y los ajustes son los mismos en todos los modos. Hoy hay cinco modos disponibles; Fuentes primarias, Testimonio y Prosopografía muestran lo que llegará después.`,
+    'toolkit.kicker': `Nodus Toolkit · Incluido`,
+    'toolkit.title': `Cuatro herramientas potentes. Ya dentro de Nodus.`,
+    'toolkit.lead': `Los vaults dan estructura a cada proyecto. Nodus Toolkit resuelve las tareas prácticas de antes, durante y después, con utilidades especializadas incluidas en la misma aplicación de escritorio privada.`,
+    'toolkit.presenter.label': `Otra forma de presentar`, 'toolkit.presenter.title': `PDF Presenter`,
+    'toolkit.presenter.body': `Convierte cualquier PDF en una presentación ligera. Asigna a cada página su propio texto, importa las notas del presentador o escríbelas en Nodus, y consúltalas desde el ordenador o el móvil mientras presentas. Usa el teléfono como mando para cambiar de diapositiva y controlar las herramientas en directo.`,
+    'toolkit.presenter.remote': `Mando desde el móvil`, 'toolkit.presenter.laser': `Puntero láser`, 'toolkit.presenter.spotlight': `Modo linterna`, 'toolkit.presenter.draw': `Dibujo en directo`, 'toolkit.presenter.zoom': `Zoom`,
+    'toolkit.presenter.visual.kicker': `PDF · modo presentación`, 'toolkit.presenter.visual.title': `Tu documento, página a página.`, 'toolkit.presenter.visual.page': `Página 12 de 24`,
+    'toolkit.presenter.visual.notes': `Tus notas · página 12`, 'toolkit.presenter.visual.note': `Haz una pausa aquí. Compara las dos fuentes antes de mostrar la página siguiente.`, 'toolkit.presenter.visual.remote': `Mando`,
+    'toolkit.presenter.try': `Prueba las herramientas ↓`,
+    'toolkit.presenter.tool.none': `Sin herramienta`, 'toolkit.presenter.tool.draw': `Dibujar`, 'toolkit.presenter.tool.spotlight': `Modo linterna`, 'toolkit.presenter.tool.laser': `Puntero láser`, 'toolkit.presenter.tool.zoom': `Zoom`,
+    'toolkit.presenter.phone.remote': `Mando`, 'toolkit.presenter.phone.notes': `Notas`, 'toolkit.presenter.phone.page': `Página 12 · notas`, 'toolkit.presenter.phone.note': `Compara las dos fuentes antes de continuar.`,
+    'toolkit.converter.title': `Nodus Converter`, 'toolkit.converter.body': `Convierte archivos al formato que necesites desde un único espacio, sin saltar entre servicios web ni perder de vista el original.`,
+    'toolkit.converter.tag1': `Conversión de formatos`, 'toolkit.converter.tag2': `Original conservado`,
+    'toolkit.ocr.title': `Nodus OCR`, 'toolkit.ocr.body': `Elige el método adecuado para cada documento: IA visual para imágenes y maquetaciones difíciles, o motores OCR convencionales para un reconocimiento de texto rápido y sin IA.`,
+    'toolkit.ocr.tag1': `IA visual`, 'toolkit.ocr.tag2': `OCR convencional`,
+    'toolkit.protector.title': `Nodus Protector`, 'toolkit.protector.body': `Crea copias listas para compartir con marcas de agua visibles o invisibles, mientras el original permanece intacto y seguro en tu espacio de trabajo.`,
+    'toolkit.protector.tag1': `Marcas visibles`, 'toolkit.protector.tag2': `Marcas invisibles`,
     'vaults.academic.t': `Académico`,
     'vaults.academic.b': `Conecta tu biblioteca de Zotero y convierte cada obra en una red de afirmaciones, hallazgos y métodos. Cada idea conserva el pasaje exacto y la página que la sustentan.`,
     'vaults.academic.f1': `<b>Convierte tu biblioteca de Zotero en un grafo de ideas</b>, conectando afirmaciones, hallazgos y métodos con su pasaje y página exactos.`,
@@ -3047,6 +3326,6 @@ function setLang(lang) {
   } else { start(); }
 })();
 </script>
-  <script src="nodi.js?v=20260717orb2"></script>
+  <script src="nodi.js?v=20260720-menu1"></script>
 </body>
 </html>

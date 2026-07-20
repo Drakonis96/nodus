@@ -1228,6 +1228,7 @@ textarea.search-input { resize: vertical; min-height: 74px; line-height: 1.5; }
 .teach-head .view-sub { margin-bottom: 0; }
 .teach-mark { display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 9px; flex-shrink: 0; color: var(--teach-2); background: var(--teach-soft); }
 .teach-mark svg { width: 17px; height: 17px; }
+.teach .list-row > svg { width: 16px; height: 16px; align-self: center; flex: 0 0 16px; color: var(--text-3); }
 .teach-section-title { margin: 22px 0 10px; font-size: 14px; }
 .teach-planned { border: 1px dashed rgba(251,146,60,.35); }
 .teach-planned small { margin-left: auto; color: #fdba74; font-size: 9px; text-transform: uppercase; }
