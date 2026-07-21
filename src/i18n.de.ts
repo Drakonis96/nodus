@@ -10,6 +10,11 @@ import { AI_OCR_TRANSLATIONS } from './i18n.aiOcr';
 export const DE: Record<string, string> = {
   ...AI_OCR_TRANSLATIONS.de,
   ...PROTECT_TRANSLATIONS.de,
+  'Seleccionar o desplazar': 'Auswählen oder scrollen',
+  'Editar o eliminar': 'Bearbeiten oder löschen',
+  '¿Eliminar esta anotación? No se puede deshacer.': 'Diese Anmerkung löschen? Dies kann nicht rückgängig gemacht werden.',
+  'Suelta los archivos para añadirlos a esta sección': 'Dateien hier ablegen, um sie diesem Bereich hinzuzufügen',
+  'Se importarán como materiales en la selección actual.': 'Sie werden als Materialien in die aktuelle Auswahl importiert.',
   // ── UI-Laufzeitdaten (Electron → Renderer) ───────────────────────────────
   'No se pudo traducir este mensaje.': 'Diese Nachricht konnte nicht übersetzt werden.',
   'Analizando fragmento {current}/{total} con IA… ({seconds}s)': 'Abschnitt {current}/{total} wird mit KI analysiert… ({seconds}s)',

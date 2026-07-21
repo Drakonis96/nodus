@@ -1427,6 +1427,8 @@ try {
   await page.getByTestId('study-pdf-viewer').waitFor({ timeout: 30_000 });
   await page.waitForFunction(() => document.querySelector('[data-pdf-page] .select-text span')?.textContent?.length, { timeout: 30_000 });
   assert.ok(await page.locator('[data-testid="study-pdf-viewer"] canvas').evaluateAll((canvases) => canvases.some((canvas) => canvas.width > 0 && canvas.height > 0)), 'embedded PDF page rendered to canvas');
+  // The viewer opens in the 'none' (select/scroll) tool, so pick the highlighter before selecting text.
+  await page.getByTestId('study-pdf-tool-highlight').click();
   await page.locator('[data-pdf-page] .select-text').first().evaluate((layer) => {
     const span = [...layer.querySelectorAll('span')].find((item) => item.textContent?.includes('Fragmento')) ?? layer.querySelector('span');
     if (!span) throw new Error('PDF text layer has no selectable text');

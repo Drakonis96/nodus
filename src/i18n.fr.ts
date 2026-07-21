@@ -10,6 +10,11 @@ import { AI_OCR_TRANSLATIONS } from './i18n.aiOcr';
 export const FR: Record<string, string> = {
   ...AI_OCR_TRANSLATIONS.fr,
   ...PROTECT_TRANSLATIONS.fr,
+  'Seleccionar o desplazar': 'Sélectionner ou faire défiler',
+  'Editar o eliminar': 'Modifier ou supprimer',
+  '¿Eliminar esta anotación? No se puede deshacer.': 'Supprimer cette annotation ? Action irréversible.',
+  'Suelta los archivos para añadirlos a esta sección': 'Déposez les fichiers pour les ajouter à cette section',
+  'Se importarán como materiales en la selección actual.': 'Ils seront importés comme matériels dans la sélection actuelle.',
   // ── Charges utiles de l’interface (Electron → renderer) ──────────────────
   'No se pudo traducir este mensaje.': 'Ce message n’a pas pu être traduit.',
   'Analizando fragmento {current}/{total} con IA… ({seconds}s)': 'Analyse du fragment {current}/{total} avec l’IA… ({seconds}s)',

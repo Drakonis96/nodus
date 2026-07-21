@@ -10,6 +10,11 @@ import { AI_OCR_TRANSLATIONS } from './i18n.aiOcr';
 export const PT_BR: Record<string, string> = {
   ...AI_OCR_TRANSLATIONS['pt-BR'],
   ...PROTECT_TRANSLATIONS['pt-BR'],
+  'Seleccionar o desplazar': 'Selecionar ou rolar',
+  'Editar o eliminar': 'Editar ou excluir',
+  '¿Eliminar esta anotación? No se puede deshacer.': 'Excluir esta anotação? Não é possível desfazer.',
+  'Suelta los archivos para añadirlos a esta sección': 'Solte os arquivos para adicioná-los a esta seção',
+  'Se importarán como materiales en la selección actual.': 'Serão importados como materiais na seleção atual.',
   // ── Dados de interface em runtime (Electron → renderer) ──────────────────
   'No se pudo traducir este mensaje.': 'Não foi possível traduzir esta mensagem.',
   'Analizando fragmento {current}/{total} con IA… ({seconds}s)': 'Analisando o trecho {current}/{total} com IA… ({seconds}s)',
