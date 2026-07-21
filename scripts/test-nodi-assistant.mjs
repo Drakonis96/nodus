@@ -54,6 +54,42 @@ test('Nodi context is explicit, bounded and rejects invented product claims', as
   assert.match(backend, /relevant_materials/);
 });
 
+test('Nodi cites corpus sources like the research assistant, adapted to its own light/dark UI', async () => {
+  const [backend, assistant, companion, card, css] = await Promise.all([
+    read('electron/ai/nodiChat.ts'),
+    read('electron/ai/researchAssistant.ts'),
+    read('src/components/nodi/NodiCompanion.tsx'),
+    read('src/components/nodi/NodiCitationCard.tsx'),
+    read('src/components/nodi/companion.css'),
+  ]);
+
+  // Backend: the NotebookLM citation rulebook is a single source of truth shared with the
+  // research chat, and Nodi enables it only for the academic idea-graph with a vault context.
+  assert.match(assistant, /export const CHAT_CITATION_RULES/);
+  assert.match(assistant, /export function humanizeResearchCitations/);
+  assert.match(backend, /CHAT_CITATION_RULES/);
+  assert.match(backend, /humanizeResearchCitations/);
+  assert.match(backend, /function corpusCitationsEnabled/);
+  // Only the academic vault carries citable ids — the other types are excluded.
+  for (const excluded of ['genealogy', 'primary_sources', 'databases', 'estudio']) {
+    assert.match(backend, new RegExp(`active\\.type !== '${excluded}'`));
+  }
+
+  // Frontend: answers open a Nodi-native source card, wired through the read-only IPC.
+  assert.match(companion, /import \{ NodiCitationCard \}/);
+  assert.match(companion, /citation && <NodiCitationCard/);
+  assert.match(companion, /onCitation=\{setCitation\}/);
+  for (const ipc of ['getIdeaDetail', 'getWork', 'getGapDetail', 'getEdgeDetail', 'getPassage', 'openInZotero']) {
+    assert.match(card, new RegExp(ipc));
+  }
+
+  // Design: the card + citation chips are themed for both light and dark.
+  assert.match(css, /\.nodi-cite-card/);
+  assert.match(css, /\.nodi-companion \.md \.citation-link/);
+  assert.match(css, /\.nodi-theme-light \.nodi-cite-card/);
+  assert.match(css, /\.nodi-theme-light\.nodi-companion \.md \.citation-link/);
+});
+
 test('Nodi and the genealogy assistant receive tags relative to the persisted tree focus', async () => {
   const [nodi, assistant, genealogy] = await Promise.all([
     read('electron/ai/nodiChat.ts'),
@@ -83,7 +119,8 @@ test('Nodi chat keeps model selection inside settings and exposes deletable hist
   for (const tool of ['history', 'contexts', 'settings']) assert.match(component, new RegExp(`'${tool}'`));
   assert.doesNotMatch(component, /chatTool === 'model'/);
   assert.doesNotMatch(component, /setChatTool\(\(tool\) => tool === 'model'/);
-  assert.match(component, /<Markdown content=\{m\.content\} verify=\{false\}/);
+  // Assistant answers render clickable source citations (no longer verify={false}).
+  assert.match(component, /<Markdown content=\{m\.content\} onCitation=\{setCitation\}/);
   assert.match(component, /listNodiConversations/);
   assert.match(component, /saveNodiConversation/);
   assert.match(component, /nodiOpenSettings/);
