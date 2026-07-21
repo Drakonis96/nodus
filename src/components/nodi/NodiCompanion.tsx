@@ -4,7 +4,8 @@ import type { AppSettings, ModelRef, NodiChatMessage, NodiContextKind, NodiConve
 import { vaultTypeColor } from '@shared/vaultTypes';
 import { type NodiRole, type NodiState } from './Nodi';
 import { NodiAvatar } from './NodiAvatar';
-import { Markdown } from '../Markdown';
+import { NodiCitationCard } from './NodiCitationCard';
+import { Markdown, type MarkdownCitation } from '../Markdown';
 import { ModelPicker } from '../ModelPicker';
 import { Icon } from '../ui';
 import { errorText, setActiveLang, t, tr, tx } from '../../i18n';
@@ -98,6 +99,13 @@ function relTime(ts: number): string {
 }
 
 const DOT: Record<NodiNotification['kind'], string> = { info: '#5b9bd5', success: '#3bb273', warning: '#e0a53b' };
+// Corpus openers offered on an empty chat when a vault context is active. They reuse the
+// research assistant's already-translated prompts, and run against the selected context.
+const NODI_CORPUS_STARTERS = [
+  '¿Cuáles son las ideas más centrales del corpus y por qué?',
+  'Resume las principales contradicciones y tensiones.',
+  '¿Qué huecos de investigación debería priorizar?',
+];
 // Four overlay actions collapse over 340 ms with up to 90 ms of stagger.
 // Keep the roomy native window until every button has returned to its anchor.
 const RADIAL_COLLAPSE_MS = 450;
@@ -133,6 +141,8 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
   const [conversations, setConversations] = useState<NodiConversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [chatTool, setChatTool] = useState<'none' | 'history' | 'contexts' | 'settings'>('none');
+  // The source detail opened from an inline citation in an answer (idea/work/passage/…).
+  const [citation, setCitation] = useState<MarkdownCitation | null>(null);
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [nodiModel, setNodiModel] = useState<ModelRef | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState<{ kind: 'conversation'; conversation: NodiConversation } | { kind: 'all' } | null>(null);
@@ -481,6 +491,11 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
     if (panel === 'chat' && msgsRef.current) msgsRef.current.scrollTop = msgsRef.current.scrollHeight;
   }, [messages, panel]);
 
+  // Leaving the chat panel dismisses any open source card so it never lingers behind.
+  useEffect(() => {
+    if (panel !== 'chat') setCitation(null);
+  }, [panel]);
+
   const closeAll = useCallback(() => {
     setMenuOpen(false);
     setPanel('none');
@@ -646,6 +661,14 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
 
   const nodiState: NodiState = closing ? 'closing' : streaming ? 'thinking' : greet ? 'waving' : celebrate ? 'discovering' : 'idle';
   const activeConversation = conversations.find((conversation) => conversation.id === activeConversationId) ?? null;
+  // The academic idea-graph is the only vault whose retrieval carries citable ids, so its
+  // corpus starters (and inline citations) only make sense there with a vault context on.
+  const citesCorpus =
+    (contexts.includes('vault') || contexts.includes('all_vaults')) &&
+    vaultType !== 'genealogy' &&
+    vaultType !== 'databases' &&
+    vaultType !== 'primary_sources' &&
+    vaultType !== 'estudio';
 
   type Item = { id: string; label: string; icon: React.ReactNode; onClick: () => void; badge?: number };
   const items: Item[] = useMemo(() => {
@@ -665,6 +688,7 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
     setMessages([]);
     setInput('');
     setChatTool('none');
+    setCitation(null);
   };
 
   const openConversation = (conversation: NodiConversation) => {
@@ -674,6 +698,7 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
     setContexts(conversation.contexts);
     setNodiModel(conversation.model ?? settings?.nodiModel ?? settings?.synthesisModel ?? null);
     setChatTool('none');
+    setCitation(null);
   };
 
   const confirmDeleteConversations = async () => {
@@ -699,12 +724,13 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
     void window.nodus.updateSettings({ nodiModel: model });
   };
 
-  const send = async () => {
-    const text = input.trim();
+  const send = async (explicit?: string) => {
+    const text = (explicit ?? input).trim();
     if (!text || streaming) return;
     const next: NodiChatMessage[] = [...messages, { role: 'user', content: text }];
     setMessages([...next, { role: 'assistant', content: '' }]);
-    setInput('');
+    // A starter chip passes its text explicitly; don't wipe a draft the user may be typing.
+    if (!explicit) setInput('');
     setStreaming(true);
     let conversationId = activeConversationId;
     let assistantText = '';
@@ -889,15 +915,31 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
               </div>
             )}
             <div className="nodi-chat-msgs" ref={msgsRef} style={{ flex: 1 }}>
-              {messages.length === 0 && <div className="nodi-empty">{t('Pregúntame sobre Nodus o sobre los contextos que selecciones.')}</div>}
+              {messages.length === 0 && (
+                citesCorpus ? (
+                  <div className="nodi-chat-welcome">
+                    <p className="nodi-empty">{t('Pregunta sobre ideas, autores, temas, contradicciones o documentos.')}</p>
+                    <div className="nodi-starters">
+                      {NODI_CORPUS_STARTERS.map((suggestion) => (
+                        <button key={suggestion} className="nodi-starter" disabled={streaming} onClick={() => void send(t(suggestion))}>
+                          {t(suggestion)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="nodi-empty">{t('Pregúntame sobre Nodus o sobre los contextos que selecciones.')}</div>
+                )
+              )}
               {messages.map((m, i) => (
                 <div key={i} className={`nodi-msg ${m.role}`}>
                   {m.content
-                    ? m.role === 'assistant' ? <Markdown content={m.content} verify={false} /> : m.content
+                    ? m.role === 'assistant' ? <Markdown content={m.content} onCitation={setCitation} /> : m.content
                     : streaming && i === messages.length - 1 ? <span className="nodi-typing">{t('escribiendo…')}</span> : ''}
                 </div>
               ))}
             </div>
+            {citation && <NodiCitationCard citation={citation} isOverlay={isOverlay} onClose={() => setCitation(null)} />}
             <div className="nodi-chat-foot">
               <div className="nodi-chat-row">
                 <textarea

@@ -397,6 +397,45 @@ function buildGenealogyChatSystemPrompt(compact: boolean): string {
 }
 
 /**
+ * The full NotebookLM-style citation rulebook. Exported so Nodi's companion chat can
+ * instruct the model with the SAME `nodus://` link contract as the research chat — one
+ * source of truth, so the two never drift. Every rule forbids using the raw id as the
+ * visible link text; humanizeResearchCitations repairs it deterministically regardless.
+ */
+export const CHAT_CITATION_RULES: string[] = [
+  'CITAS DE FUENTES (obligatorio, estilo NotebookLM):',
+  '- Cada vez que te refieras a una idea concreta (afirmacion, hallazgo, constructo, metodo o marco) presente en el contexto, DEBES citar su fuente inmediatamente despues de la mencion.',
+  '- La cita es un enlace markdown con el formato `[Autor, Año](nodus://idea/<id>)`, donde `<id>` es el campo `id` exacto de la idea en el contexto y `Autor, Año` provienen de la obra que la desarrolla (usa el apellido del primer autor y el año). Ejemplo: `la memoria de trabajo es limitada ([Baddeley, 1992](nodus://idea/abc-123))`.',
+  '- El texto visible del enlace es SIEMPRE «Autor, Año»; NUNCA uses el id como texto visible.',
+  '- Si la idea aparece en varias obras, cita la principal; si citas dos, repite el enlace con cada autor.',
+  '- Para citar un documento concreto sin idea asociada, usa `[Autor, Año](nodus://work/<nodus_id>)` con el `nodus_id` exacto del documento.',
+  '- Para citar una contradiccion o refutacion concreta de la seccion `contradicciones`, usa `[contradiccion](nodus://contradiction/<id>)` con el `id` exacto de esa relacion.',
+  '- Para citar un hueco concreto de la seccion `huecos_de_investigacion`, usa `[hueco](nodus://gap/<id>)` con el `id` exacto de ese hueco.',
+  '- La sección `pasajes_relevantes` contiene texto literal de las obras. Cuando sostengas una afirmación con uno de esos pasajes, cítalo inmediatamente como `[Autor, Año, p. N](nodus://passage/<id>)` usando el campo `citation` exacto del pasaje. No atribuyas al pasaje más de lo que dice literalmente.',
+  '- Si una conclusion se apoya en una idea y tambien en una contradiccion o hueco, incluye ambas citas junto a la frase relevante.',
+  '- Usa SIEMPRE el id exacto que aparece en el contexto. Nunca inventes ni abrevies los ids.',
+  '- No conviertas en enlace las citas a obras que no esten en el contexto; en ese caso nombra autor y año en texto plano.',
+  '- La sección `documentos_resumidos` contiene resúmenes de ORIENTACIÓN. Úsala para ubicar y comparar obras, pero NUNCA la cites como evidencia ni atribuyas a ella afirmaciones verificables. Las citas deben seguir apuntando a ideas, evidencias, huecos, contradicciones o la obra original.',
+];
+
+/** The terse citation contract for tiny local windows (spends fewer tokens on rules). */
+export const CHAT_CITATION_RULES_COMPACT: string[] = [
+  'CITAS: tras mencionar una idea/afirmacion del contexto, añade un enlace markdown [Autor, Año](nodus://idea/<id>) con el `id` EXACTO del campo "id".',
+  'Documentos: [Autor, Año](nodus://work/<nodus_id>). Pasajes: [Autor, Año, p. N](nodus://passage/<id>) con el campo `citation` exacto.',
+  'El texto visible del enlace debe ser «Autor, Año» (el apellido del primer autor y el año de la obra), NUNCA el id. Usa el id exacto solo dentro de los parentesis; nunca lo inventes.',
+];
+
+/**
+ * Repair citation labels in an answer against the corpus — bare ids become "Autor, Año"
+ * and bracketed bare ids become proper `nodus://` links — the same deterministic pass the
+ * research chat applies to local-model answers. Safe on any answer: only bare-id labels
+ * and links are rewritten, so a well-formed citation is never touched. Reused by Nodi.
+ */
+export function humanizeResearchCitations(answer: string): string {
+  return humanizeCitationLabels(answer, citationDisplayLabel);
+}
+
+/**
  * System prompt for the research chat. The full version carries the complete
  * NotebookLM-style citation rulebook; the compact version keeps only the essentials so a
  * small local window (≤ LOCAL_COMPACT_WINDOW) spends its scarce tokens on corpus context
@@ -409,9 +448,7 @@ function buildChatSystemPrompt(compact: boolean): string {
       'Eres el asistente de investigacion de Nodus. Responde en espanol, con rigor y usando SOLO el contexto que recibes.',
       'Se conciso y directo: prioriza terminar la respuesta antes que extenderte, porque el espacio es limitado.',
       'Si el contexto no basta para responder, dilo con claridad; no inventes.',
-      'CITAS: tras mencionar una idea/afirmacion del contexto, añade un enlace markdown [Autor, Año](nodus://idea/<id>) con el `id` EXACTO del campo "id".',
-      'Documentos: [Autor, Año](nodus://work/<nodus_id>). Pasajes: [Autor, Año, p. N](nodus://passage/<id>) con el campo `citation` exacto.',
-      'El texto visible del enlace debe ser «Autor, Año» (el apellido del primer autor y el año de la obra), NUNCA el id. Usa el id exacto solo dentro de los parentesis; nunca lo inventes.',
+      ...CHAT_CITATION_RULES_COMPACT,
     ].join('\n');
   }
   return [
@@ -421,19 +458,7 @@ function buildChatSystemPrompt(compact: boolean): string {
     'Conserva las relaciones entre autores, documentos e ideas cuando esten presentes en el contexto.',
     'No inventes contenido de documentos que no aparezca en el contexto.',
     '',
-    'CITAS DE FUENTES (obligatorio, estilo NotebookLM):',
-    '- Cada vez que te refieras a una idea concreta (afirmacion, hallazgo, constructo, metodo o marco) presente en el contexto, DEBES citar su fuente inmediatamente despues de la mencion.',
-    '- La cita es un enlace markdown con el formato `[Autor, Año](nodus://idea/<id>)`, donde `<id>` es el campo `id` exacto de la idea en el contexto y `Autor, Año` provienen de la obra que la desarrolla (usa el apellido del primer autor y el año). Ejemplo: `la memoria de trabajo es limitada ([Baddeley, 1992](nodus://idea/abc-123))`.',
-    '- El texto visible del enlace es SIEMPRE «Autor, Año»; NUNCA uses el id como texto visible.',
-    '- Si la idea aparece en varias obras, cita la principal; si citas dos, repite el enlace con cada autor.',
-    '- Para citar un documento concreto sin idea asociada, usa `[Autor, Año](nodus://work/<nodus_id>)` con el `nodus_id` exacto del documento.',
-    '- Para citar una contradiccion o refutacion concreta de la seccion `contradicciones`, usa `[contradiccion](nodus://contradiction/<id>)` con el `id` exacto de esa relacion.',
-    '- Para citar un hueco concreto de la seccion `huecos_de_investigacion`, usa `[hueco](nodus://gap/<id>)` con el `id` exacto de ese hueco.',
-    '- La sección `pasajes_relevantes` contiene texto literal de las obras. Cuando sostengas una afirmación con uno de esos pasajes, cítalo inmediatamente como `[Autor, Año, p. N](nodus://passage/<id>)` usando el campo `citation` exacto del pasaje. No atribuyas al pasaje más de lo que dice literalmente.',
-    '- Si una conclusion se apoya en una idea y tambien en una contradiccion o hueco, incluye ambas citas junto a la frase relevante.',
-    '- Usa SIEMPRE el id exacto que aparece en el contexto. Nunca inventes ni abrevies los ids.',
-    '- No conviertas en enlace las citas a obras que no esten en el contexto; en ese caso nombra autor y año en texto plano.',
-    '- La sección `documentos_resumidos` contiene resúmenes de ORIENTACIÓN. Úsala para ubicar y comparar obras, pero NUNCA la cites como evidencia ni atribuyas a ella afirmaciones verificables. Las citas deben seguir apuntando a ideas, evidencias, huecos, contradicciones o la obra original.',
+    ...CHAT_CITATION_RULES,
   ].join('\n');
 }
 

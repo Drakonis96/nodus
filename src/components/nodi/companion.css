@@ -944,6 +944,202 @@
 .nodi-theme-light .nodi-notes-panel .nodi-note-textarea::-webkit-scrollbar-thumb,
 .nodi-theme-light .nodi-notes-panel .nodi-note-preview::-webkit-scrollbar-thumb { background: #cbd5e1; border-color: #eef2f7; }
 
+/* Corpus starters on an empty chat ─────────────────────────────────────────── */
+.nodi-chat-welcome { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 18px 12px; text-align: center; }
+.nodi-chat-welcome .nodi-empty { padding: 0; }
+.nodi-starters { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.nodi-starter {
+  border: 0.5px solid rgba(212, 175, 55, 0.4);
+  border-radius: 999px;
+  background: rgba(212, 175, 55, 0.08);
+  color: #e7ebf2;
+  padding: 6px 11px;
+  font: inherit;
+  font-size: 11px;
+  line-height: 1.3;
+  cursor: pointer;
+  transition: background 0.14s, border-color 0.14s;
+}
+.nodi-starter:hover:not(:disabled) { background: rgba(212, 175, 55, 0.16); border-color: rgba(212, 175, 55, 0.7); }
+.nodi-starter:disabled { opacity: 0.5; cursor: default; }
+
+/* Inline source citations inside an answer. Scoped under .nodi-companion so they win
+ * over the app's global .md .citation-link in the main window AND are styled at all in
+ * the overlay window (which never loads index.css). */
+.nodi-companion .md .citation-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2em;
+  font-size: 0.82em;
+  font-weight: 600;
+  line-height: 1;
+  padding: 0.16em 0.44em;
+  margin: 0 0.12em;
+  border-radius: 6px;
+  border: 0.5px solid rgba(212, 175, 55, 0.5);
+  background: rgba(212, 175, 55, 0.12);
+  color: #f3d67a;
+  text-decoration: none;
+  cursor: pointer;
+  vertical-align: baseline;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.nodi-companion .md .citation-link::before {
+  content: 'src';
+  font-size: 0.62em;
+  font-weight: 700;
+  opacity: 0.85;
+  text-transform: uppercase;
+}
+.nodi-companion .md .citation-link:hover { background: rgba(212, 175, 55, 0.22); border-color: rgba(212, 175, 55, 0.8); color: #ffe9a8; }
+.nodi-companion .md .citation-link[data-verified='false'] {
+  border-color: rgba(224, 122, 95, 0.55);
+  background: rgba(224, 122, 95, 0.14);
+  color: #f0b6a3;
+}
+.nodi-companion .md .citation-link[data-verified='false']:hover { background: rgba(224, 122, 95, 0.22); }
+.nodi-companion .citation-warn { font-size: 0.9em; }
+
+/* Hover preview card (position: fixed, so it escapes the panel's clipping). */
+.nodi-companion .citation-card {
+  position: fixed;
+  z-index: 2147483200;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: max-content;
+  max-width: 300px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 0.5px solid rgba(212, 175, 55, 0.35);
+  background: #10151f;
+  box-shadow: 0 12px 30px rgba(6, 9, 16, 0.6);
+  pointer-events: none;
+  font-size: 12px;
+  line-height: 1.35;
+  color: #cbd3df;
+  animation: nodi-panel-pop 0.14s ease-out;
+}
+.nodi-companion .citation-card[data-placement='top'] { transform: translateY(-100%); }
+.nodi-companion .citation-card-kind { font-size: 10px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: #f3d67a; }
+.nodi-companion .citation-card-title { font-weight: 600; color: #f3e6c2; }
+.nodi-companion .citation-card-sub { font-size: 11px; color: #9aa6b8; }
+.nodi-companion .citation-card-snippet { color: #aab4c4; }
+.nodi-companion .citation-card-loading { color: #7a8598; }
+
+/* Source detail opened from a citation — an overlay inside the chat panel. */
+.nodi-cite-overlay { position: absolute; inset: 0; z-index: 15; display: grid; place-items: center; background: rgba(4, 7, 12, 0.72); padding: 14px; }
+.nodi-cite-card {
+  width: 100%;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 0.5px solid rgba(212, 175, 55, 0.35);
+  border-radius: 13px;
+  background: #10151f;
+  color: #e7ebf2;
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.5);
+  animation: nodi-panel-pop 0.2s cubic-bezier(0.2, 1.25, 0.4, 1);
+}
+.nodi-cite-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 0.5px solid rgba(255, 255, 255, 0.08); font-size: 12px; font-weight: 600; color: #f3e6c2; }
+.nodi-cite-head .grow { flex: 1; }
+.nodi-cite-head > svg { color: #f3d67a; }
+.nodi-cite-head button { display: grid; place-items: center; width: 24px; height: 24px; border: 0; border-radius: 6px; background: transparent; color: #9aa6b8; cursor: pointer; }
+.nodi-cite-head button:hover { background: rgba(255, 255, 255, 0.06); color: #f3e6c2; }
+.nodi-cite-body { flex: 1; min-height: 0; overflow-y: auto; padding: 12px; }
+.nodi-cite-loading, .nodi-cite-missing { color: #8b96a8; font-size: 12px; padding: 6px 0; }
+.nodi-cite-kind { display: inline-block; font-size: 9.5px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: #14213a; background: #d4af37; border-radius: 999px; padding: 2px 8px; }
+.nodi-cite-title { margin: 8px 0 0; font-size: 13.5px; font-weight: 700; line-height: 1.3; color: #f3e6c2; }
+.nodi-cite-meta { margin-top: 4px; font-size: 11px; color: #9aa6b8; }
+.nodi-cite-text { margin: 9px 0 0; font-size: 12px; line-height: 1.5; color: #cbd3df; }
+.nodi-cite-quote { margin: 10px 0 0; padding: 7px 10px; border-left: 2px solid #d4af37; border-radius: 0 8px 8px 0; background: rgba(255, 255, 255, 0.03); font-size: 11.5px; line-height: 1.5; font-style: italic; color: #c4cddc; }
+.nodi-cite-loc { font-style: normal; color: #7a8598; }
+.nodi-cite-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
+.nodi-cite-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 0.5px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #dce3ed;
+  padding: 6px 10px;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.14s;
+}
+.nodi-cite-btn:hover { background: rgba(255, 255, 255, 0.1); }
+.nodi-cite-btn.primary { border-color: rgba(212, 175, 55, 0.5); background: rgba(212, 175, 55, 0.14); color: #f3d67a; }
+.nodi-cite-btn.primary:hover { background: rgba(212, 175, 55, 0.22); }
+.nodi-cite-body { scrollbar-width: thin; scrollbar-color: #596579 #111824; }
+.nodi-cite-body::-webkit-scrollbar { width: 8px; }
+.nodi-cite-body::-webkit-scrollbar-track { background: #111824; border-radius: 999px; }
+.nodi-cite-body::-webkit-scrollbar-thumb { background: #596579; border: 2px solid #111824; border-radius: 999px; }
+
+/* Light theme — driven by Nodus' resolved theme + active vault accent. */
+.nodi-theme-light .nodi-starter {
+  border-color: color-mix(in srgb, var(--nodi-vault-accent, #6366f1) 40%, transparent);
+  background: color-mix(in srgb, var(--nodi-vault-accent, #6366f1) 8%, transparent);
+  color: #1f2937;
+}
+.nodi-theme-light .nodi-starter:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--nodi-vault-accent, #6366f1) 14%, transparent);
+  border-color: var(--nodi-vault-accent, #6366f1);
+}
+.nodi-theme-light.nodi-companion .md .citation-link {
+  border-color: color-mix(in srgb, var(--nodi-vault-accent, #6366f1) 45%, transparent);
+  background: color-mix(in srgb, var(--nodi-vault-accent, #6366f1) 10%, transparent);
+  color: var(--nodi-vault-accent, #6366f1);
+}
+.nodi-theme-light.nodi-companion .md .citation-link:hover {
+  background: color-mix(in srgb, var(--nodi-vault-accent, #6366f1) 18%, transparent);
+  border-color: var(--nodi-vault-accent, #6366f1);
+  color: var(--nodi-vault-accent, #6366f1);
+}
+.nodi-theme-light.nodi-companion .md .citation-link[data-verified='false'] { border-color: rgba(220, 38, 38, 0.5); background: rgba(220, 38, 38, 0.08); color: #b91c1c; }
+.nodi-theme-light.nodi-companion .citation-card {
+  border-color: color-mix(in srgb, var(--nodi-vault-accent, #6366f1) 35%, transparent);
+  background: #ffffff;
+  color: #334155;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.18);
+}
+.nodi-theme-light.nodi-companion .citation-card-kind { color: var(--nodi-vault-accent, #6366f1); }
+.nodi-theme-light.nodi-companion .citation-card-title { color: #0f172a; }
+.nodi-theme-light.nodi-companion .citation-card-sub { color: #64748b; }
+.nodi-theme-light.nodi-companion .citation-card-snippet { color: #475569; }
+.nodi-theme-light.nodi-companion .citation-card-loading { color: #94a3b8; }
+.nodi-theme-light .nodi-cite-overlay { background: rgba(15, 23, 42, 0.28); }
+.nodi-theme-light .nodi-cite-card {
+  border-color: color-mix(in srgb, var(--nodi-vault-accent, #6366f1) 38%, transparent);
+  background: #ffffff;
+  color: #1f2937;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.2);
+}
+.nodi-theme-light .nodi-cite-head { border-bottom-color: rgba(15, 23, 42, 0.08); color: #1f2937; }
+.nodi-theme-light .nodi-cite-head > svg { color: var(--nodi-vault-accent, #6366f1); }
+.nodi-theme-light .nodi-cite-head button { color: #94a3b8; }
+.nodi-theme-light .nodi-cite-head button:hover { background: rgba(15, 23, 42, 0.06); color: #1f2937; }
+.nodi-theme-light .nodi-cite-loading, .nodi-theme-light .nodi-cite-missing { color: #64748b; }
+.nodi-theme-light .nodi-cite-kind { color: #ffffff; background: var(--nodi-vault-accent, #6366f1); }
+.nodi-theme-light .nodi-cite-title { color: #0f172a; }
+.nodi-theme-light .nodi-cite-meta { color: #64748b; }
+.nodi-theme-light .nodi-cite-text { color: #334155; }
+.nodi-theme-light .nodi-cite-quote { border-left-color: var(--nodi-vault-accent, #6366f1); background: color-mix(in srgb, var(--nodi-vault-accent, #6366f1) 6%, transparent); color: #475569; }
+.nodi-theme-light .nodi-cite-loc { color: #94a3b8; }
+.nodi-theme-light .nodi-cite-btn { border-color: rgba(15, 23, 42, 0.14); background: #f1f5f9; color: #1f2937; }
+.nodi-theme-light .nodi-cite-btn:hover { background: #e2e8f0; }
+.nodi-theme-light .nodi-cite-btn.primary {
+  border-color: color-mix(in srgb, var(--nodi-vault-accent, #6366f1) 40%, transparent);
+  background: color-mix(in srgb, var(--nodi-vault-accent, #6366f1) 10%, transparent);
+  color: var(--nodi-vault-accent, #6366f1);
+}
+.nodi-theme-light .nodi-cite-btn.primary:hover { background: color-mix(in srgb, var(--nodi-vault-accent, #6366f1) 18%, transparent); }
+.nodi-theme-light .nodi-cite-body { scrollbar-color: #cbd5e1 #eef2f7; }
+.nodi-theme-light .nodi-cite-body::-webkit-scrollbar-track { background: #eef2f7; }
+.nodi-theme-light .nodi-cite-body::-webkit-scrollbar-thumb { background: #cbd5e1; border-color: #eef2f7; }
+
 @keyframes nodi-badge-pop { 0% { transform: scale(0); } 70% { transform: scale(1.3); } 100% { transform: scale(1); } }
 @keyframes nodi-bubble-pop { 0% { opacity: 0; transform: scale(0.6) translateY(8px); } 100% { opacity: 1; transform: scale(1) translateY(0); } }
 @keyframes nodi-panel-pop { 0% { opacity: 0; transform: scale(0.85) translateY(8px); } 100% { opacity: 1; transform: scale(1) translateY(0); } }
