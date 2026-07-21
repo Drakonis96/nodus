@@ -2167,7 +2167,7 @@ export function registerTools(server: McpServer): void {
     {
       title: 'Get database schema',
       description:
-        'Gets a database\'s columns: each column\'s id, name and type (title|text|number|date|time|select|multi_select|checkbox|attachment|ai|ai_image|relation|rollup|formula) plus the option labels for select/multi-select columns. A formula column also reports `computes` (number|text — what its values behave as, since "formula" says nothing on its own) and `formula`, a plain-language description of the recipe. Read-only.',
+        'Gets a database\'s columns: each column\'s id, name and type (title|text|number|date|time|select|multi_select|checkbox|attachment|ai|ai_image|relation|rollup|formula|comparison) plus the option labels for select/multi-select columns. A formula column also reports `computes` (number|text — what its values behave as, since "formula" says nothing on its own) and `formula`, a plain-language description of the recipe. Read-only.',
       inputSchema: { databaseId: z.string().trim().min(1) },
       annotations: { readOnlyHint: true, openWorldHint: false },
     },

@@ -6744,4 +6744,11 @@ export const EN: Record<string, string> = {
   "La IA no accede a este listado, a las notas ni a las respuestas del alumnado.": "AI has no access to this roster, grades or student answers.",
   "Nodus no expone ninguna función de IA para calificar, perfilar o evaluar estudiantes. Los identificadores permiten minimizar nombres en usos locales y exportaciones.": "Nodus exposes no AI function for grading, profiling or evaluating students. Identifiers help minimise names in local use and exports.",
   "La IA no recibe listas, notas ni respuestas del alumnado. Nodus no ofrece ninguna función de IA para calificar, perfilar o evaluar estudiantes; esas decisiones son siempre humanas y permanecen fuera del modelo.": "AI does not receive student rosters, grades or answers. Nodus offers no AI function to grade, profile or evaluate students; those decisions are always human and remain outside the model.",
+  "Columnas que comparar": "Columns to compare",
+  "Elige al menos dos columnas": "Choose at least two columns",
+  "Solo cuentan coincidencias exactas; los valores vacíos se ignoran.": "Only exact matches count; empty values are ignored.",
+  "Comparar esta fila": "Compare this row",
+  "Comparando…": "Comparing…",
+  "Comparar todas las filas": "Compare all rows",
+  "Sin mayoría": "No majority",
 };

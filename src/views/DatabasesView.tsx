@@ -2,6 +2,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { AiBadge, Icon } from '../components/ui';
+import { ModelPicker } from '../components/ModelPicker';
 import { VirtualList } from '../components/VirtualList';
 import {
   ADD_COLUMN_WIDTH,
@@ -24,14 +25,25 @@ import { notifyDataChanged } from '../hooks';
 import { t, tx } from '../i18n';
 import {
   clearBackgroundJob,
+  databaseAiImageColumnJobKey,
   databaseAiImageCellJobKey,
+  databaseAiTextColumnJobKey,
   databaseAiTextCellJobKey,
+  databaseComparisonCellJobKey,
+  databaseComparisonColumnJobKey,
   getBackgroundJob,
+  startDatabaseAiImageColumnJob,
   startDatabaseAiImageCellJob,
+  startDatabaseAiTextColumnJob,
   startDatabaseAiTextCellJob,
+  startDatabaseComparisonCellJob,
+  startDatabaseComparisonColumnJob,
   subscribeBackgroundJob,
+  type DatabaseAiColumnJob,
   type DatabaseAiImageCellJob,
   type DatabaseAiTextCellJob,
+  type DatabaseComparisonCellJob,
+  type DatabaseComparisonColumnJob,
 } from '../backgroundJobs';
 import {
   attachmentKind,
@@ -45,6 +57,7 @@ import {
 } from '@shared/databases';
 import { AI_COLUMN_PRESETS } from '@shared/databaseAi';
 import { matchFilesToRows, summarizeMatches, codeTemplateToRegex } from '@shared/databaseBulk';
+import { comparisonSourceColumns, isComparisonSource } from '@shared/databaseComparison';
 import type { CsvImportPlanData } from '@shared/databaseCsv';
 import {
   applyDatabaseFilter,
@@ -85,6 +98,10 @@ import type {
   DatabaseRelation,
   DatabaseRow,
   DatabaseSelectOption,
+  AppSettings,
+  ImageProvider,
+  ImageModelInfo,
+  ModelRef,
   RelationTarget,
   RelationTargetKind,
 } from '@shared/types';
@@ -597,6 +614,7 @@ export function DatabasesView({ databaseId, onDatabasesChanged, onCreateDatabase
                     <Cell
                       key={col.id}
                       column={col}
+                      columns={columns}
                       width={widthOf(col)}
                       value={row.cells[col.id] ?? null}
                       rollup={row.rollups?.[col.id] ?? ''}
@@ -1454,6 +1472,7 @@ function RecordModal({
                     <div className="database-record-field flex-1 min-w-0 rounded-md border border-neutral-800/70 bg-neutral-900/30 min-h-[2.25rem] flex items-center hover:border-neutral-700/80 focus-within:border-neutral-600 transition-colors">
                       <RecordField
                         col={col}
+                        columns={columns}
                         row={row}
                         onChange={(raw) => void setCell(col.id, raw)}
                         onOptionsChanged={onChanged}
@@ -1474,12 +1493,14 @@ function RecordModal({
 /** One field in the record modal — reuses the table cell editors in a form layout. */
 function RecordField({
   col,
+  columns,
   row,
   onChange,
   onOptionsChanged,
   onAttachmentsChanged,
 }: {
   col: DatabaseColumn;
+  columns: DatabaseColumn[];
   row: DatabaseRow;
   onChange: (raw: string | null) => void;
   onOptionsChanged: () => void;
@@ -1508,6 +1529,8 @@ function RecordField({
   if (col.type === 'ai') return <AiCell column={col} rowId={row.id} value={value} onChange={onChange} onRan={onAttachmentsChanged} wrap />;
   if (col.type === 'relation') return <RelationCell column={col} rowId={row.id} />;
   if (col.type === 'rollup') return <RollupCell value={row.rollups?.[col.id] ?? ''} />;
+  if (col.type === 'comparison')
+    return <ComparisonCell column={col} columns={columns} rowId={row.id} value={value} onRan={onAttachmentsChanged} large />;
   if (col.type === 'formula')
     return <FormulaCell column={col} value={value} color={row.formulaColors?.[col.id]} error={row.formulaErrors?.[col.id]} large />;
   if (col.type === 'number' || col.type === 'date' || col.type === 'time')
@@ -1681,6 +1704,7 @@ function ColumnHeader({
             {column.type === 'ai_image' && <AiImageColumnConfig column={column} onChanged={onChanged} />}
             {column.type === 'relation' && <RelationColumnConfig column={column} onChanged={onChanged} />}
             {column.type === 'rollup' && <RollupColumnConfig column={column} onChanged={onChanged} />}
+            {column.type === 'comparison' && <ComparisonColumnConfig column={column} columns={columns} onChanged={onChanged} />}
             {column.type === 'formula' && (
               <FormulaColumnConfig
                 column={column}
@@ -1861,6 +1885,7 @@ function AddColumnButton({ onAdd }: { onAdd: (name: string, type: DatabaseColumn
 
 function Cell({
   column,
+  columns,
   width,
   value,
   rollup,
@@ -1874,6 +1899,7 @@ function Cell({
   onAttachmentsChanged,
 }: {
   column: DatabaseColumn;
+  columns: DatabaseColumn[];
   width: number;
   value: string | null;
   rollup?: string;
@@ -1890,6 +1916,8 @@ function Cell({
     <div style={{ width }} className="shrink-0 h-full border-r border-neutral-900 overflow-hidden">
       {column.type === 'formula' ? (
         <FormulaCell column={column} value={value} color={formulaColor} error={formulaError} wrap={wrap} />
+      ) : column.type === 'comparison' ? (
+        <ComparisonCell column={column} columns={columns} rowId={rowId} value={value} onRan={onAttachmentsChanged} wrap={wrap} />
       ) : column.type === 'checkbox' ? (
         <CheckboxCell value={value} onChange={onChange} />
       ) : column.type === 'select' ? (
@@ -1915,6 +1943,136 @@ function Cell({
       ) : (
         <LongTextCell value={value} onChange={onChange} markdown={column.type === 'text'} wrap={wrap} />
       )}
+    </div>
+  );
+}
+
+// ── Comparison columns ───────────────────────────────────────────────────────
+
+/** Read-only result with a per-cell action to recompute this row. */
+function ComparisonCell({
+  column,
+  columns,
+  rowId,
+  value,
+  onRan,
+  large = false,
+  wrap = false,
+}: {
+  column: DatabaseColumn;
+  columns: DatabaseColumn[];
+  rowId: string;
+  value: string | null;
+  onRan: () => void;
+  large?: boolean;
+  wrap?: boolean;
+}) {
+  const jobKey = databaseComparisonCellJobKey(rowId, column.id);
+  const [job, setJob] = useState<DatabaseComparisonCellJob | null>(() => getBackgroundJob(jobKey));
+  const configured = comparisonSourceColumns(column, columns).length >= 2;
+  const busy = job?.status === 'running';
+  const error = job?.status === 'failed' ? job.error : null;
+  useEffect(
+    () => subscribeBackgroundJob(jobKey, (current) => setJob(current as DatabaseComparisonCellJob | null)),
+    [jobKey]
+  );
+  useEffect(() => {
+    if (job?.status !== 'completed') return;
+    onRan();
+    clearBackgroundJob(jobKey, job.id);
+  }, [job, jobKey, onRan]);
+  const run = () => {
+    clearBackgroundJob(jobKey);
+    startDatabaseComparisonCellJob(rowId, column.id);
+  };
+  return (
+    <div className={`w-full ${large ? 'min-h-8' : 'h-full'} flex items-center gap-1 group/comparison overflow-hidden`}>
+      <span
+        className={`flex-1 min-w-0 px-2 text-sm text-neutral-300 ${wrap ? 'whitespace-pre-wrap break-words py-1' : 'truncate'}`}
+        title={value ?? t('Sin mayoría')}
+      >
+        {value || <span className="text-neutral-600">—</span>}
+      </span>
+      <button
+        className="shrink-0 mr-2 opacity-60 group-hover/comparison:opacity-100 text-indigo-400 hover:text-indigo-300 disabled:opacity-30"
+        title={error ?? (configured ? t('Comparar esta fila') : t('Elige al menos dos columnas'))}
+        onClick={run}
+        disabled={busy || !configured}
+      >
+        <Icon name={busy ? 'sync' : 'scale'} size={14} className={busy ? 'animate-spin' : ''} />
+      </button>
+    </div>
+  );
+}
+
+/** Source selector and whole-column action in the header menu. */
+function ComparisonColumnConfig({
+  column,
+  columns,
+  onChanged,
+}: {
+  column: DatabaseColumn;
+  columns: DatabaseColumn[];
+  onChanged: () => void;
+}) {
+  const candidates = columns.filter((candidate) => candidate.id !== column.id && isComparisonSource(candidate));
+  const [selected, setSelected] = useState<string[]>(() => comparisonSourceColumns(column, columns).map((candidate) => candidate.id));
+  const jobKey = databaseComparisonColumnJobKey(column.databaseId, column.id);
+  const [job, setJob] = useState<DatabaseComparisonColumnJob | null>(() => getBackgroundJob(jobKey));
+  const busy = job?.status === 'running';
+  const runProgress = busy ? job.progress : null;
+  useEffect(() => {
+    setSelected(comparisonSourceColumns(column, columns).map((candidate) => candidate.id));
+  }, [column, columns]);
+  useEffect(
+    () => subscribeBackgroundJob(jobKey, (current) => setJob(current as DatabaseComparisonColumnJob | null)),
+    [jobKey]
+  );
+  useEffect(() => {
+    if (job?.status !== 'completed') return;
+    onChanged();
+    clearBackgroundJob(jobKey, job.id);
+  }, [job, jobKey, onChanged]);
+
+  const toggle = async (id: string) => {
+    const next = selected.includes(id) ? selected.filter((sourceId) => sourceId !== id) : [...selected, id];
+    setSelected(next);
+    await window.nodus.updateDatabaseColumn(column.id, {
+      config: { ...column.config, comparisonSourceColumnIds: next },
+    });
+    onChanged();
+  };
+  const runAll = () => {
+    clearBackgroundJob(jobKey);
+    startDatabaseComparisonColumnJob(column.databaseId, column.id);
+  };
+
+  return (
+    <div className="px-2 py-1 border-t border-neutral-800 mt-1">
+      <div className="text-[10px] uppercase tracking-wide text-neutral-500 py-1">{t('Columnas que comparar')}</div>
+      <div className="max-h-32 overflow-y-auto space-y-0.5">
+        {candidates.map((candidate) => (
+          <label key={candidate.id} className="flex items-center gap-2 rounded px-1 py-1 text-xs text-neutral-300 hover:bg-neutral-800">
+            <input type="checkbox" checked={selected.includes(candidate.id)} onChange={() => void toggle(candidate.id)} />
+            <span className="truncate">{candidate.name}</span>
+          </label>
+        ))}
+      </div>
+      {selected.length < 2 && <p className="mt-1 text-[10px] text-amber-400">{t('Elige al menos dos columnas')}</p>}
+      <p className="mt-1 text-[10px] leading-snug text-neutral-500">
+        {t('Solo cuentan coincidencias exactas; los valores vacíos se ignoran.')}
+      </p>
+      <button
+        className="btn btn-ghost border border-neutral-700 w-full gap-1.5 mt-2 text-xs"
+        onClick={runAll}
+        disabled={busy || selected.length < 2}
+        title={job?.status === 'failed' ? job.error ?? undefined : undefined}
+      >
+        <Icon name={busy ? 'sync' : 'scale'} size={13} className={busy ? 'animate-spin' : ''} />
+        {busy && runProgress && runProgress.total > 0
+          ? tx('Ejecutando… {d}/{t}', { d: runProgress.done, t: runProgress.total })
+          : busy ? t('Comparando…') : t('Comparar todas las filas')}
+      </button>
     </div>
   );
 }
@@ -2228,22 +2386,31 @@ function AiColumnConfig({ column, onChanged }: { column: DatabaseColumn; onChang
   const [prompt, setPrompt] = useState(String(column.config.aiPrompt ?? ''));
   const [auto, setAuto] = useState(Boolean(column.config.aiAuto));
   const [sourceId, setSourceId] = useState(String(column.config.aiSourceColumnId ?? ''));
+  const [model, setModel] = useState<ModelRef | null>(column.config.aiModel ?? null);
+  const [settings, setSettings] = useState<AppSettings | null>(null);
   const [attachmentCols, setAttachmentCols] = useState<DatabaseColumn[]>([]);
-  const [runProgress, setRunProgress] = useState<{ done: number; total: number } | null>(null);
+  const jobKey = databaseAiTextColumnJobKey(column.databaseId, column.id);
+  const [job, setJob] = useState<DatabaseAiColumnJob | null>(() => getBackgroundJob(jobKey));
+  const running = job?.status === 'running';
+  const runProgress = running ? job.progress : null;
   useEffect(
-    () => window.nodus.onDatabaseAiProgress((p) => setRunProgress({ done: p.done, total: p.total })),
-    []
+    () => subscribeBackgroundJob(jobKey, (current) => setJob(current as DatabaseAiColumnJob | null)),
+    [jobKey]
   );
-  const runAll = async () => {
-    setRunProgress({ done: 0, total: 0 });
-    try {
-      await window.nodus.runDatabaseAiColumn(column.databaseId, column.id);
-    } finally {
-      setRunProgress(null);
-    }
+  useEffect(() => {
+    if (job?.status !== 'completed') return;
+    onChanged();
+    clearBackgroundJob(jobKey, job.id);
+  }, [job, jobKey, onChanged]);
+  const runAll = () => {
+    clearBackgroundJob(jobKey);
+    startDatabaseAiTextColumnJob(column.databaseId, column.id);
   };
   useEffect(() => {
-    void window.nodus.getDatabaseDetail(column.databaseId).then((d) => setAttachmentCols((d?.columns ?? []).filter((c) => c.type === 'attachment')));
+    void Promise.all([window.nodus.getDatabaseDetail(column.databaseId), window.nodus.getSettings()]).then(([d, nextSettings]) => {
+      setAttachmentCols((d?.columns ?? []).filter((c) => c.type === 'attachment'));
+      setSettings(nextSettings);
+    });
   }, [column.databaseId]);
   const save = async (patch: Record<string, unknown>) => {
     await window.nodus.updateDatabaseColumn(column.id, { config: { ...column.config, ...patch } });
@@ -2274,6 +2441,27 @@ function AiColumnConfig({ column, onChanged }: { column: DatabaseColumn; onChang
           </button>
         ))}
       </div>
+      {settings && (
+        <>
+          <label className="text-[10px] uppercase tracking-wide text-neutral-500 mt-2 block">{t('Modelo')}</label>
+          <ModelPicker
+            settings={settings}
+            value={model}
+            onChange={(nextModel) => {
+              setModel(nextModel);
+              void save({ aiModel: nextModel ?? undefined });
+            }}
+            compact
+            disabled={running}
+            emptyLabel={
+              (settings.chatModel ?? settings.synthesisModel)?.model
+                ? tx('Predeterminado ({model})', { model: (settings.chatModel ?? settings.synthesisModel)!.model })
+                : t('Predeterminado')
+            }
+            className="w-full mt-1"
+          />
+        </>
+      )}
       {attachmentCols.length > 0 && (
         <>
           <label className="text-[10px] uppercase tracking-wide text-neutral-500 mt-2 block">{t('Fuente (imagen/archivo)')}</label>
@@ -2307,13 +2495,14 @@ function AiColumnConfig({ column, onChanged }: { column: DatabaseColumn; onChang
       </label>
       <button
         className="btn btn-ghost border border-neutral-700 w-full gap-1.5 mt-2 text-xs"
-        onClick={() => void runAll()}
-        disabled={runProgress != null || !prompt.trim()}
+        onClick={runAll}
+        disabled={running || !prompt.trim()}
+        title={job?.status === 'failed' ? job.error ?? undefined : undefined}
       >
-        <Icon name={runProgress != null ? 'sync' : 'wand'} size={13} className={runProgress != null ? 'animate-spin' : ''} />
-        {runProgress != null && runProgress.total > 0
+        <Icon name={running ? 'sync' : 'wand'} size={13} className={running ? 'animate-spin' : ''} />
+        {running && runProgress && runProgress.total > 0
           ? tx('Ejecutando… {d}/{t}', { d: runProgress.done, t: runProgress.total })
-          : t('Ejecutar en todas las filas')}
+          : running ? t('Calculando…') : t('Ejecutar en todas las filas')}
       </button>
     </div>
   );
@@ -2419,19 +2608,50 @@ function AiImageAttachmentActions({
 
 function AiImageColumnConfig({ column, onChanged }: { column: DatabaseColumn; onChanged: () => void }) {
   const [prompt, setPrompt] = useState(String(column.config.aiPrompt ?? ''));
-  const [runProgress, setRunProgress] = useState<{ done: number; total: number } | null>(null);
-  useEffect(() => window.nodus.onDatabaseAiProgress((p) => setRunProgress({ done: p.done, total: p.total })), []);
+  const [model, setModel] = useState<{ provider: ImageProvider; model: string } | null>(column.config.aiImageModel ?? null);
+  const [settings, setSettings] = useState<AppSettings | null>(null);
+  const [models, setModels] = useState<ImageModelInfo[]>([]);
+  const [modelsError, setModelsError] = useState<string | null>(null);
+  const jobKey = databaseAiImageColumnJobKey(column.databaseId, column.id);
+  const [job, setJob] = useState<DatabaseAiColumnJob | null>(() => getBackgroundJob(jobKey));
+  const running = job?.status === 'running';
+  const runProgress = running ? job.progress : null;
+  useEffect(
+    () => subscribeBackgroundJob(jobKey, (current) => setJob(current as DatabaseAiColumnJob | null)),
+    [jobKey]
+  );
+  useEffect(() => {
+    if (job?.status !== 'completed') return;
+    onChanged();
+    clearBackgroundJob(jobKey, job.id);
+  }, [job, jobKey, onChanged]);
+  useEffect(() => {
+    let live = true;
+    void Promise.all([window.nodus.getSettings(), window.nodus.listImageModels()])
+      .then(([nextSettings, nextModels]) => {
+        if (!live) return;
+        setSettings(nextSettings);
+        setModels(nextModels);
+        setModelsError(null);
+      })
+      .catch((reason) => {
+        if (!live) return;
+        setModelsError(reason instanceof Error ? reason.message : String(reason));
+        void window.nodus.getSettings().then((nextSettings) => {
+          if (live) setSettings(nextSettings);
+        });
+      });
+    return () => {
+      live = false;
+    };
+  }, []);
   const save = async (patch: Record<string, unknown>) => {
     await window.nodus.updateDatabaseColumn(column.id, { config: { ...column.config, ...patch } });
     onChanged();
   };
-  const runAll = async () => {
-    setRunProgress({ done: 0, total: 0 });
-    try {
-      await window.nodus.generateDatabaseAiImageColumn(column.databaseId, column.id);
-    } finally {
-      setRunProgress(null);
-    }
+  const runAll = () => {
+    clearBackgroundJob(jobKey);
+    startDatabaseAiImageColumnJob(column.databaseId, column.id);
   };
   return (
     <div className="px-2 py-1 border-t border-neutral-800 mt-1">
@@ -2443,16 +2663,43 @@ function AiImageColumnConfig({ column, onChanged }: { column: DatabaseColumn; on
         onBlur={() => void save({ aiPrompt: prompt })}
         placeholder={t('Ej.: retrato ilustrado de esta persona en estilo acuarela')}
       />
-      <p className="text-[10px] text-neutral-500 mt-1">{t('Se usa el proveedor de imagen configurado en Ajustes → Proveedores.')}</p>
+      <label className="text-[10px] uppercase tracking-wide text-neutral-500 mt-2 block">{t('Modelo')}</label>
+      <select
+        className="input w-full text-xs mt-1"
+        value={model ? `${model.provider}::${model.model}` : ''}
+        disabled={running || !settings}
+        onChange={(event) => {
+          const selected = models.find((candidate) => `${candidate.provider}::${candidate.id}` === event.target.value);
+          const nextModel = selected ? { provider: selected.provider, model: selected.id } : null;
+          setModel(nextModel);
+          void save({ aiImageModel: nextModel ?? undefined });
+        }}
+      >
+        <option value="">
+          {settings?.imageModel
+            ? tx('Predeterminado ({model})', { model: settings.imageModel })
+            : t('Predeterminado')}
+        </option>
+        {model && !models.some((candidate) => candidate.provider === model.provider && candidate.id === model.model) && (
+          <option value={`${model.provider}::${model.model}`}>{model.provider} · {model.model}</option>
+        )}
+        {models.map((candidate) => (
+          <option key={`${candidate.provider}:${candidate.id}`} value={`${candidate.provider}::${candidate.id}`}>
+            {candidate.provider} · {candidate.name}
+          </option>
+        ))}
+      </select>
+      {modelsError && <p className="text-[10px] text-red-400 mt-1">{modelsError}</p>}
       <button
         className="btn btn-ghost border border-neutral-700 w-full gap-1.5 mt-2 text-xs"
-        onClick={() => void runAll()}
-        disabled={runProgress != null || !prompt.trim()}
+        onClick={runAll}
+        disabled={running || !prompt.trim()}
+        title={job?.status === 'failed' ? job.error ?? undefined : undefined}
       >
-        <Icon name={runProgress != null ? 'sync' : 'image'} size={13} className={runProgress != null ? 'animate-spin' : ''} />
-        {runProgress != null && runProgress.total > 0
+        <Icon name={running ? 'sync' : 'image'} size={13} className={running ? 'animate-spin' : ''} />
+        {running && runProgress && runProgress.total > 0
           ? tx('Generando… {d}/{t}', { d: runProgress.done, t: runProgress.total })
-          : t('Generar en todas las filas')}
+          : running ? t('Generando…') : t('Generar en todas las filas')}
       </button>
     </div>
   );

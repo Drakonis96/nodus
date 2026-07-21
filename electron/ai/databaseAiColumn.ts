@@ -16,6 +16,7 @@ import {
 import { AI_COLUMN_SYSTEM, buildAiCellPrompt, buildAiRowContext } from '@shared/databaseAi';
 import { attachmentKind } from '@shared/databases';
 import { isVisionMime } from '@shared/imageAnalysis';
+import { AI_PROVIDERS } from '@shared/providers';
 import type { ModelRef } from '@shared/types';
 import type { VisionImagePart } from '@shared/imageAnalysis';
 
@@ -31,6 +32,16 @@ export interface AiCellDeps {
   }, model?: ModelRef | null) => Promise<string>;
   model?: ModelRef | null;
   visionModel?: ModelRef | null;
+}
+
+const VALID_MODEL_PROVIDERS = new Set<string>([...AI_PROVIDERS, 'nodus']);
+
+function configuredModel(value: unknown): ModelRef | null {
+  if (!value || typeof value !== 'object') return null;
+  const candidate = value as Partial<ModelRef>;
+  if (!candidate.provider || !VALID_MODEL_PROVIDERS.has(candidate.provider)) return null;
+  if (typeof candidate.model !== 'string' || !candidate.model.trim()) return null;
+  return { provider: candidate.provider, model: candidate.model.trim() };
 }
 
 /** Collect up to `limit` images from the AI column's configured source attachment column. */
@@ -62,8 +73,9 @@ export async function runAiCell(rowId: string, columnId: string, deps: AiCellDep
   const images = sourceImages(rowId, col.config.aiSourceColumnId as string | undefined);
 
   const settings = getSettings();
-  const model = deps.model ?? settings.chatModel ?? settings.synthesisModel ?? null;
-  const visionModel = deps.visionModel ?? settings.visionModel ?? settings.extractionModel ?? settings.synthesisModel ?? model;
+  const columnModel = configuredModel(col.config.aiModel);
+  const model = deps.model ?? columnModel ?? settings.chatModel ?? settings.synthesisModel ?? null;
+  const visionModel = deps.visionModel ?? columnModel ?? settings.visionModel ?? settings.extractionModel ?? settings.synthesisModel ?? model;
   if (!deps.complete && images.length === 0 && !model) {
     throw new Error('No hay un modelo de IA configurado. Elígelo en Ajustes.');
   }

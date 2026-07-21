@@ -11,7 +11,7 @@ import type {
   ToolkitJobProgress,
   ToolkitJobResult,
 } from '@shared/types';
-import type { DatabaseAttachment } from '@shared/databases';
+import type { DatabaseAttachment, DatabaseRow } from '@shared/databases';
 
 export type BackgroundJobStatus = 'running' | 'completed' | 'failed';
 
@@ -184,6 +184,16 @@ export interface DatabaseAiCellJobRequest {
   columnId: string;
 }
 
+export interface DatabaseColumnJobRequest {
+  databaseId: string;
+  columnId: string;
+}
+
+export interface DatabaseColumnJobProgress {
+  done: number;
+  total: number;
+}
+
 export function databaseAiTextCellJobKey(rowId: string, columnId: string): string {
   return `database:ai:text:${rowId}:${columnId}`;
 }
@@ -194,6 +204,9 @@ export function databaseAiImageCellJobKey(rowId: string, columnId: string): stri
 
 export type DatabaseAiTextCellJob = BackgroundJob<DatabaseAiCellJobRequest, never, string>;
 export type DatabaseAiImageCellJob = BackgroundJob<DatabaseAiCellJobRequest, never, DatabaseAttachment>;
+export type DatabaseComparisonCellJob = BackgroundJob<DatabaseAiCellJobRequest, never, DatabaseRow | null>;
+export type DatabaseAiColumnJob = BackgroundJob<DatabaseColumnJobRequest, DatabaseColumnJobProgress, { done: number; failed: number }>;
+export type DatabaseComparisonColumnJob = BackgroundJob<DatabaseColumnJobRequest, DatabaseColumnJobProgress, { done: number }>;
 
 export function startDatabaseAiTextCellJob(rowId: string, columnId: string): DatabaseAiTextCellJob {
   const request = { rowId, columnId };
@@ -206,6 +219,84 @@ export function startDatabaseAiImageCellJob(rowId: string, columnId: string): Da
   const request = { rowId, columnId };
   return startBackgroundJob(databaseAiImageCellJobKey(rowId, columnId), request, (current) =>
     window.nodus.generateDatabaseAiImage(current.rowId, current.columnId)
+  );
+}
+
+export function databaseComparisonCellJobKey(rowId: string, columnId: string): string {
+  return `database:comparison:cell:${rowId}:${columnId}`;
+}
+
+export function databaseComparisonColumnJobKey(databaseId: string, columnId: string): string {
+  return `database:comparison:column:${databaseId}:${columnId}`;
+}
+
+export function databaseAiTextColumnJobKey(databaseId: string, columnId: string): string {
+  return `database:ai:text:column:${databaseId}:${columnId}`;
+}
+
+export function databaseAiImageColumnJobKey(databaseId: string, columnId: string): string {
+  return `database:ai:image:column:${databaseId}:${columnId}`;
+}
+
+export function startDatabaseComparisonCellJob(rowId: string, columnId: string): DatabaseComparisonCellJob {
+  const request = { rowId, columnId };
+  return startBackgroundJob(databaseComparisonCellJobKey(rowId, columnId), request, (current) =>
+    window.nodus.runDatabaseComparisonCell(current.rowId, current.columnId)
+  );
+}
+
+export function startDatabaseComparisonColumnJob(databaseId: string, columnId: string): DatabaseComparisonColumnJob {
+  const request = { databaseId, columnId };
+  return startBackgroundJob(databaseComparisonColumnJobKey(databaseId, columnId), request, async (current, onProgress) => {
+    const unsubscribe = window.nodus.onDatabaseComparisonProgress((progress) => {
+      if (progress.databaseId === current.databaseId && progress.columnId === current.columnId) {
+        onProgress({ done: progress.done, total: progress.total });
+      }
+    });
+    try {
+      return await window.nodus.runDatabaseComparisonColumn(current.databaseId, current.columnId);
+    } finally {
+      unsubscribe();
+    }
+  });
+}
+
+function startDatabaseAiColumnJob(
+  key: string,
+  databaseId: string,
+  columnId: string,
+  run: (databaseId: string, columnId: string) => Promise<{ done: number; failed: number }>
+): DatabaseAiColumnJob {
+  const request = { databaseId, columnId };
+  return startBackgroundJob(key, request, async (current, onProgress) => {
+    const unsubscribe = window.nodus.onDatabaseAiProgress((progress) => {
+      if (progress.databaseId === current.databaseId && progress.columnId === current.columnId) {
+        onProgress({ done: progress.done, total: progress.total });
+      }
+    });
+    try {
+      return await run(current.databaseId, current.columnId);
+    } finally {
+      unsubscribe();
+    }
+  });
+}
+
+export function startDatabaseAiTextColumnJob(databaseId: string, columnId: string): DatabaseAiColumnJob {
+  return startDatabaseAiColumnJob(
+    databaseAiTextColumnJobKey(databaseId, columnId),
+    databaseId,
+    columnId,
+    (dbId, colId) => window.nodus.runDatabaseAiColumn(dbId, colId)
+  );
+}
+
+export function startDatabaseAiImageColumnJob(databaseId: string, columnId: string): DatabaseAiColumnJob {
+  return startDatabaseAiColumnJob(
+    databaseAiImageColumnJobKey(databaseId, columnId),
+    databaseId,
+    columnId,
+    (dbId, colId) => window.nodus.generateDatabaseAiImageColumn(dbId, colId)
   );
 }
 

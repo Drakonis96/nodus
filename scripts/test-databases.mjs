@@ -36,6 +36,7 @@ try {
   const filters = require(path.join(repoRoot, 'shared/databaseFilters.ts'));
   const formulaShared = require(path.join(repoRoot, 'shared/databaseFormula.ts'));
   const formulaEval = require(path.join(repoRoot, 'shared/databaseFormulaEval.ts'));
+  const comparison = require(path.join(repoRoot, 'shared/databaseComparison.ts'));
   const profile = require(path.join(repoRoot, 'shared/dataProfile.ts'));
   const chart = require(path.join(repoRoot, 'shared/chartSpec.ts'));
   const exportShared = require(path.join(repoRoot, 'shared/databaseExport.ts'));
@@ -70,6 +71,28 @@ try {
   assert.equal(shared.normalizeCellValue('number', 'abc'), null, 'invalid number normalizes to null');
   assert.equal(shared.normalizeCellValue('checkbox', 'true'), '1');
   assert.equal(shared.normalizeCellValue('text', ''), null, 'empty text normalizes to null');
+
+  const comparisonColumns = [
+    { id: 'a', databaseId: 'db', name: 'A', type: 'text', position: 0, config: {}, options: [] },
+    { id: 'b', databaseId: 'db', name: 'B', type: 'text', position: 1, config: {}, options: [] },
+    { id: 'c', databaseId: 'db', name: 'C', type: 'text', position: 2, config: {}, options: [] },
+    {
+      id: 'result', databaseId: 'db', name: 'Resultado', type: 'comparison', position: 3,
+      config: { comparisonSourceColumnIds: ['a', 'b', 'c'] }, options: [],
+    },
+  ];
+  const comparisonRow = { id: 'row', databaseId: 'db', position: 0, cells: { a: 'sol', b: 'sol', c: 'luna' } };
+  assert.equal(
+    comparison.comparisonMajorityValue(comparisonColumns[3], comparisonColumns, comparisonRow),
+    'sol',
+    'comparison returns the unique most frequent exact term'
+  );
+  comparisonRow.cells.b = 'Sol';
+  assert.equal(
+    comparison.comparisonMajorityValue(comparisonColumns[3], comparisonColumns, comparisonRow),
+    null,
+    'comparison is case-sensitive and returns no arbitrary winner on a tie'
+  );
 
   // ── Databases + unique short ids ───────────────────────────────────────────
   const db1 = dbmode.createDatabase('Fotos');
@@ -178,6 +201,29 @@ try {
   s = dbmode.databaseStats(db1.id);
   assert.equal(s.vaultTotal, 3, 'vault total spans every database');
   assert.equal(s.percent, 67, '2 of 3 rows rounds to 67%');
+
+  // ── Comparison property: one cell and the complete column ─────────────────
+  const comparisonDb = dbmode.createDatabase('Comparaciones');
+  const sourceA = dbmode.createColumn(comparisonDb.id, 'A', 'text');
+  const sourceB = dbmode.createColumn(comparisonDb.id, 'B', 'text');
+  const sourceC = dbmode.createColumn(comparisonDb.id, 'C', 'text');
+  const resultCol = dbmode.createColumn(comparisonDb.id, 'Mayoría', 'comparison', {
+    comparisonSourceColumnIds: [sourceA.id, sourceB.id, sourceC.id],
+  });
+  const comparisonRow1 = dbmode.createRow(comparisonDb.id);
+  dbmode.setCell(comparisonRow1.id, sourceA.id, 'sol');
+  dbmode.setCell(comparisonRow1.id, sourceB.id, 'sol');
+  dbmode.setCell(comparisonRow1.id, sourceC.id, 'luna');
+  assert.equal(dbmode.runComparisonCell(comparisonRow1.id, resultCol.id).cells[resultCol.id], 'sol');
+  const comparisonRow2 = dbmode.createRow(comparisonDb.id);
+  dbmode.setCell(comparisonRow2.id, sourceA.id, 'mar');
+  dbmode.setCell(comparisonRow2.id, sourceB.id, 'tierra');
+  dbmode.setCell(comparisonRow2.id, sourceC.id, 'mar');
+  assert.deepEqual(await dbmode.runComparisonColumn(comparisonDb.id, resultCol.id), { done: 2 });
+  const comparedRows = dbmode.listRows(comparisonDb.id, { sort: 'position' });
+  assert.equal(comparedRows[0].cells[resultCol.id], 'sol');
+  assert.equal(comparedRows[1].cells[resultCol.id], 'mar');
+  dbmode.deleteDatabase(comparisonDb.id);
 
   // ── Deleting an option purges it from cells ────────────────────────────────
   dbmode.deleteOption(optA.id);
@@ -351,6 +397,16 @@ try {
   });
   assert.equal(produced, 'RESUMEN: ok');
   assert.equal(dbmode.getRow(aiRow.id).cells[aiCol.id], 'RESUMEN: ok', 'AI result persisted to the cell');
+  const textColumnModel = { provider: 'openai', model: 'gpt-column-specific' };
+  dbmode.updateColumn(aiCol.id, { config: { ...aiCol.config, aiModel: textColumnModel } });
+  let seenTextModel = null;
+  await runAiCell(aiRow.id, aiCol.id, {
+    complete: async (_opts, model) => {
+      seenTextModel = model;
+      return 'MODELO PROPIO';
+    },
+  });
+  assert.deepEqual(seenTextModel, textColumnModel, 'a text AI column uses its own persisted model');
   // Batch: runAiColumn fills every row.
   const aiRow2 = dbmode.createRow(aiDb.id);
   dbmode.setCell(aiRow2.id, aiTitle.id, 'Liquen');
@@ -361,18 +417,25 @@ try {
   // ── AI image columns: generate → stored as an AI-flagged attachment ─────────
   const imgDb = dbmode.createDatabase('Retratos');
   const imgTitle = dbmode.createColumn(imgDb.id, 'Nombre', 'title');
-  const imgCol = dbmode.createColumn(imgDb.id, 'Retrato', 'ai_image', { aiPrompt: 'Retrato ilustrado de {Nombre}.' });
+  const imageColumnModel = { provider: 'openai', model: 'gpt-image-column-specific' };
+  const imgCol = dbmode.createColumn(imgDb.id, 'Retrato', 'ai_image', {
+    aiPrompt: 'Retrato ilustrado de {Nombre}.',
+    aiImageModel: imageColumnModel,
+  });
   const imgRow = dbmode.createRow(imgDb.id);
   dbmode.setCell(imgRow.id, imgTitle.id, 'Ada');
   let seenPrompt = '';
+  let seenImageModel = null;
   const genAtt = await runAiImageCell(imgRow.id, imgCol.id, {
-    generate: async (prompt) => {
+    generate: async (prompt, model) => {
       seenPrompt = prompt;
+      seenImageModel = model;
       return { image: Buffer.from('JPEGBYTES'), mimeType: 'image/jpeg' };
     },
   });
   assert.match(seenPrompt, /Retrato ilustrado/, 'image prompt carries the column instruction');
   assert.match(seenPrompt, /Ada/, 'image prompt is enriched with the row context');
+  assert.deepEqual(seenImageModel, imageColumnModel, 'an image AI column uses its own persisted model');
   assert.equal(genAtt.aiGenerated, true, 'generated attachment flagged aiGenerated');
   assert.equal(genAtt.aiPrompt, seenPrompt, 'the exact prompt is stored on the attachment');
   assert.equal(genAtt.mimeType, 'image/jpeg');

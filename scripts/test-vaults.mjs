@@ -79,6 +79,30 @@ const researchVault = registry.createVault('Investigación separada');
 assert.equal(researchVault.type, 'academic', 'createVault defaults to academic when no type is given');
 assert.equal(registry.listVaults().length, 2);
 
+// A long job keeps a dedicated connection to its source vault while the live app switches.
+// This models an AI/image/comparison column yielding to a provider and finishing afterwards.
+const scopedWrite = database.withVaultDatabase('default', async () => {
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  database.getDb().prepare('INSERT INTO settings (key, value) VALUES (?, ?)').run('background-vault-test', 'source');
+});
+registry.setActiveVault(researchVault.id);
+db = database.getDb();
+await scopedWrite;
+assert.equal(
+  db.prepare('SELECT value FROM settings WHERE key = ?').get('background-vault-test'),
+  undefined,
+  'a background write never leaks into the newly active vault'
+);
+database.closeDb();
+registry.setActiveVault('default');
+db = database.getDb();
+assert.equal(
+  db.prepare('SELECT value FROM settings WHERE key = ?').get('background-vault-test').value,
+  'source',
+  'the background write lands in its originating vault after the switch'
+);
+database.closeDb();
+
 // ── Vault types ────────────────────────────────────────────────────────────
 const studyVault = registry.createVault('Estudio de oposición', 'estudio');
 assert.equal(studyVault.type, 'estudio', 'createVault honours an explicit type');

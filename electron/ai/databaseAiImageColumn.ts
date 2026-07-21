@@ -15,10 +15,26 @@ import {
 } from '../db/databasesRepo';
 import { buildAiImagePrompt, buildAiRowContext } from '@shared/databaseAi';
 import type { DatabaseAttachment } from '@shared/databases';
+import type { ImageProvider } from '@shared/types';
+
+interface AiImageModelRef {
+  provider: ImageProvider;
+  model: string;
+}
 
 export interface AiImageDeps {
   /** Injectable image generation (defaults to the real multi-provider pipeline). */
-  generate?: (prompt: string) => Promise<{ image: Buffer; mimeType: string }>;
+  generate?: (prompt: string, model: AiImageModelRef | null) => Promise<{ image: Buffer; mimeType: string }>;
+}
+
+const IMAGE_PROVIDERS = new Set<ImageProvider>(['google', 'openai', 'openrouter']);
+
+function configuredImageModel(value: unknown): AiImageModelRef | null {
+  if (!value || typeof value !== 'object') return null;
+  const candidate = value as Partial<AiImageModelRef>;
+  if (!candidate.provider || !IMAGE_PROVIDERS.has(candidate.provider)) return null;
+  if (typeof candidate.model !== 'string' || !candidate.model.trim()) return null;
+  return { provider: candidate.provider, model: candidate.model.trim() };
 }
 
 /** Generate one AI image for a cell and persist it as its (single) attachment. */
@@ -36,7 +52,7 @@ export async function runAiImageCell(rowId: string, columnId: string, deps: AiIm
   const fullPrompt = buildAiImagePrompt(prompt, context);
 
   const generate = deps.generate ?? realGenerate;
-  const { image, mimeType } = await generate(fullPrompt);
+  const { image, mimeType } = await generate(fullPrompt, configuredImageModel(col.config.aiImageModel));
   if (!image?.length) throw new Error('El proveedor no devolvió una imagen.');
 
   // An AI-image cell holds a single current image: replace whatever was there.
@@ -55,13 +71,15 @@ export async function runAiImageCell(rowId: string, columnId: string, deps: AiIm
 }
 
 /** Real generation: lazy-loaded so tests never pull the image SDKs. */
-async function realGenerate(prompt: string): Promise<{ image: Buffer; mimeType: string }> {
+async function realGenerate(prompt: string, columnModel: AiImageModelRef | null): Promise<{ image: Buffer; mimeType: string }> {
   const settings = getSettings();
-  if (!settings.imageProvider || !settings.imageModel) {
+  const provider = columnModel?.provider ?? settings.imageProvider;
+  const model = columnModel?.model ?? settings.imageModel;
+  if (!provider || !model) {
     throw new Error('Configura un proveedor y modelo de imagen en Ajustes → Proveedores.');
   }
   const { callImageProvider, optimizedJpegs } = await import('./decorativeImages');
-  const generated = await callImageProvider(settings.imageProvider, settings.imageModel, prompt);
+  const generated = await callImageProvider(provider, model, prompt);
   const optimized = await optimizedJpegs(generated);
   return { image: optimized.image, mimeType: 'image/jpeg' };
 }

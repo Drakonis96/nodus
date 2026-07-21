@@ -447,7 +447,7 @@ import { TRANSLATION_LANGUAGES } from '@shared/types';
 import { translateMarkdown, titleFromMarkdown } from './ai/translate';
 import * as workSummaries from './db/workSummariesRepo';
 import * as projects from './db/projectsRepo';
-import { closeDb, getDb } from './db/database';
+import { closeDb, getDb, withVaultDatabase } from './db/database';
 import { exportWritingWorkshopDraft } from './export/writingWorkshopExport';
 import { generateProjectSuggestions } from './ai/projectInsertion';
 import { exportProject, exportProjectChapter } from './export/projectExport';
@@ -1476,6 +1476,18 @@ export function registerIpc(
     dbMode.deleteRow(id);
   });
   h('db:setCell', async (_e, rowId: string, columnId: string, raw: string | null) => dbMode.setCell(rowId, columnId, raw));
+  h('db:runComparisonCell', async (_e, rowId: string, columnId: string) => {
+    const vaultId = getActiveVault().id;
+    return withVaultDatabase(vaultId, () => dbMode.runComparisonCell(rowId, columnId));
+  });
+  h('db:runComparisonColumn', async (_e, databaseId: string, columnId: string) => {
+    const vaultId = getActiveVault().id;
+    return withVaultDatabase(vaultId, () =>
+      dbMode.runComparisonColumn(databaseId, columnId, (done, total) =>
+        getWindow()?.webContents.send('db:comparisonProgress', { vaultId, databaseId, columnId, done, total })
+      )
+    );
+  });
   h('db:listAttachments', async (_e, rowId: string, columnId: string) => dbMode.listAttachments(rowId, columnId));
   h('db:getAttachmentBlob', async (_e, id: string) => dbMode.getAttachmentBlob(id));
   h('db:getAttachmentThumb', async (_e, id: string) => dbMode.getAttachmentThumb(id));
@@ -1495,18 +1507,30 @@ export function registerIpc(
     fs.writeFileSync(picked.filePath, blob);
     return { canceled: false, path: picked.filePath };
   });
-  h('db:runAiCell', async (_e, rowId: string, columnId: string) => runAiCell(rowId, columnId));
-  h('db:runAiColumn', async (_e, databaseId: string, columnId: string) =>
-    runAiColumn(databaseId, columnId, (done, total) =>
-      getWindow()?.webContents.send('db:aiProgress', { columnId, done, total })
-    )
-  );
-  h('db:generateAiImage', async (_e, rowId: string, columnId: string) => runAiImageCell(rowId, columnId));
-  h('db:generateAiImageColumn', async (_e, databaseId: string, columnId: string) =>
-    runAiImageColumn(databaseId, columnId, (done, total) =>
-      getWindow()?.webContents.send('db:aiProgress', { columnId, done, total })
-    )
-  );
+  h('db:runAiCell', async (_e, rowId: string, columnId: string) => {
+    const vaultId = getActiveVault().id;
+    return withVaultDatabase(vaultId, () => runAiCell(rowId, columnId));
+  });
+  h('db:runAiColumn', async (_e, databaseId: string, columnId: string) => {
+    const vaultId = getActiveVault().id;
+    return withVaultDatabase(vaultId, () =>
+      runAiColumn(databaseId, columnId, (done, total) =>
+        getWindow()?.webContents.send('db:aiProgress', { vaultId, databaseId, columnId, done, total })
+      )
+    );
+  });
+  h('db:generateAiImage', async (_e, rowId: string, columnId: string) => {
+    const vaultId = getActiveVault().id;
+    return withVaultDatabase(vaultId, () => runAiImageCell(rowId, columnId));
+  });
+  h('db:generateAiImageColumn', async (_e, databaseId: string, columnId: string) => {
+    const vaultId = getActiveVault().id;
+    return withVaultDatabase(vaultId, () =>
+      runAiImageColumn(databaseId, columnId, (done, total) =>
+        getWindow()?.webContents.send('db:aiProgress', { vaultId, databaseId, columnId, done, total })
+      )
+    );
+  });
   h('db:pickBulkFiles', async (_e, mode: 'files' | 'folder' = 'files') => {
     const win = getWindow();
     const picked = await showImportOpenDialog(win ?? undefined!, {
@@ -1676,10 +1700,19 @@ export function registerIpc(
     return { canceled: false, path: picked.filePath };
   });
   h('db:profile', async (_e, databaseId: string) => getDatabaseProfile(databaseId));
-  h('db:analyzeReport', async (_e, databaseId: string) => generateAnalysisReport(databaseId));
-  h('db:suggestAnalyses', async (_e, databaseId: string) => suggestDatabaseAnalyses(databaseId));
+  h('db:analyzeReport', async (_e, databaseId: string) => {
+    const vaultId = getActiveVault().id;
+    return withVaultDatabase(vaultId, () => generateAnalysisReport(databaseId));
+  });
+  h('db:suggestAnalyses', async (_e, databaseId: string) => {
+    const vaultId = getActiveVault().id;
+    return withVaultDatabase(vaultId, () => suggestDatabaseAnalyses(databaseId));
+  });
   h('db:runAnalysis', async (_e, databaseId: string, request: AnalysisRequest) => runDatabaseAnalysis(databaseId, request));
-  h('db:narrateAnalysis', async (_e, result: AnalysisResult) => narrateAnalysisResult(result));
+  h('db:narrateAnalysis', async (_e, result: AnalysisResult) => {
+    const vaultId = getActiveVault().id;
+    return withVaultDatabase(vaultId, () => narrateAnalysisResult(result));
+  });
   h('db:chatStream', async (e, requestId: string, request: DatabaseChatRequest) => {
     const controller = new AbortController();
     chatAborters.set(requestId, controller);

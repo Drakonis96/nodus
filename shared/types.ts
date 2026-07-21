@@ -5352,6 +5352,11 @@ export interface NodusApi {
   createDatabaseRow(databaseId: string): Promise<DatabaseRow>;
   deleteDatabaseRow(id: string): Promise<void>;
   setDatabaseCell(rowId: string, columnId: string, raw: string | null): Promise<DatabaseRow | null>;
+  runDatabaseComparisonCell(rowId: string, columnId: string): Promise<DatabaseRow | null>;
+  runDatabaseComparisonColumn(databaseId: string, columnId: string): Promise<{ done: number }>;
+  onDatabaseComparisonProgress(
+    cb: (payload: { vaultId: string; databaseId: string; columnId: string; done: number; total: number }) => void
+  ): () => void;
   listDatabaseAttachments(rowId: string, columnId: string): Promise<DatabaseAttachment[]>;
   getDatabaseAttachmentBlob(id: string): Promise<Uint8Array | null>;
   /**
@@ -5370,7 +5375,9 @@ export interface NodusApi {
   runDatabaseAiColumn(databaseId: string, columnId: string): Promise<{ done: number; failed: number }>;
   generateDatabaseAiImage(rowId: string, columnId: string): Promise<DatabaseAttachment>;
   generateDatabaseAiImageColumn(databaseId: string, columnId: string): Promise<{ done: number; failed: number }>;
-  onDatabaseAiProgress(cb: (payload: { columnId: string; done: number; total: number }) => void): () => void;
+  onDatabaseAiProgress(
+    cb: (payload: { vaultId: string; databaseId: string; columnId: string; done: number; total: number }) => void
+  ): () => void;
   listDatabaseRelations(rowId: string, columnId: string): Promise<DatabaseRelation[]>;
   addDatabaseRelation(
     rowId: string,

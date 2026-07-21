@@ -1,11 +1,13 @@
 import Database from 'better-sqlite3';
 import path from 'node:path';
 import fs from 'node:fs';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { runMigrations, SCHEMA_VERSION } from './migrations';
 import { ensureTombstoneTriggers, pruneTombstones } from './tombstones';
-import { activeVaultDbPath } from '../vaults/vaultRegistry';
+import { activeVaultDbPath, getVault } from '../vaults/vaultRegistry';
 
 let db: Database.Database | null = null;
+const jobDatabase = new AsyncLocalStorage<Database.Database>();
 
 export function dbPath(): string {
   return activeVaultDbPath();
@@ -56,6 +58,8 @@ function openDatabase(file: string): Database.Database {
 }
 
 export function getDb(): Database.Database {
+  const scoped = jobDatabase.getStore();
+  if (scoped) return scoped;
   if (!db) {
     const target = dbPath();
     const dir = path.dirname(target);
@@ -63,6 +67,25 @@ export function getDb(): Database.Database {
     db = openDatabase(target);
   }
   return db;
+}
+
+/**
+ * Run a long-lived task against its originating vault, independently of the live UI
+ * connection. AsyncLocalStorage keeps every repository call on this dedicated connection
+ * across provider awaits, while the user remains free to close/switch the active vault.
+ */
+export async function withVaultDatabase<T>(vaultId: string, work: () => Promise<T> | T): Promise<T> {
+  const vault = getVault(vaultId);
+  if (!vault) throw new Error('Bóveda no encontrada.');
+  const existing = jobDatabase.getStore();
+  if (existing?.name === vault.path) return work();
+
+  const scoped = openDatabase(vault.path);
+  try {
+    return await jobDatabase.run(scoped, work);
+  } finally {
+    if (scoped.open) scoped.close();
+  }
 }
 
 /**

@@ -40,6 +40,9 @@ try {
   let saveCalls = 0;
   let databaseTextCalls = 0;
   let databaseImageCalls = 0;
+  let databaseTextColumnCalls = 0;
+  let databaseImageColumnCalls = 0;
+  let comparisonColumnCalls = 0;
   let releaseDatabaseText;
   let releaseDatabaseImage;
   const databaseTextGate = new Promise((resolve) => {
@@ -48,6 +51,8 @@ try {
   const databaseImageGate = new Promise((resolve) => {
     releaseDatabaseImage = resolve;
   });
+  const aiProgressListeners = new Set();
+  const comparisonProgressListeners = new Set();
   const fakeSession = { id: 'imm-1', topic: 'Tema recuperable' };
   const fakeReport = {
     draft: { title: 'Informe recuperable', brief: { kind: 'deep_research' } },
@@ -84,6 +89,32 @@ try {
         databaseImageCalls += 1;
         await databaseImageGate;
         return { id: 'image-1', rowId, columnId, fileName: 'generated.png' };
+      },
+      onDatabaseAiProgress: (listener) => {
+        aiProgressListeners.add(listener);
+        return () => aiProgressListeners.delete(listener);
+      },
+      onDatabaseComparisonProgress: (listener) => {
+        comparisonProgressListeners.add(listener);
+        return () => comparisonProgressListeners.delete(listener);
+      },
+      runDatabaseAiColumn: async (databaseId, columnId) => {
+        databaseTextColumnCalls += 1;
+        for (const listener of aiProgressListeners) listener({ databaseId, columnId, done: 2, total: 5 });
+        await Promise.resolve();
+        return { done: 5, failed: 0 };
+      },
+      generateDatabaseAiImageColumn: async (databaseId, columnId) => {
+        databaseImageColumnCalls += 1;
+        for (const listener of aiProgressListeners) listener({ databaseId, columnId, done: 1, total: 3 });
+        await Promise.resolve();
+        return { done: 3, failed: 0 };
+      },
+      runDatabaseComparisonColumn: async (databaseId, columnId) => {
+        comparisonColumnCalls += 1;
+        for (const listener of comparisonProgressListeners) listener({ databaseId, columnId, done: 4, total: 8 });
+        await Promise.resolve();
+        return { done: 8 };
       },
     },
   };
@@ -191,6 +222,28 @@ try {
   jobs.startDatabaseAiTextCellJob('row-fail', 'column-3');
   await waitFor(() => jobs.getBackgroundJob(failedKey)?.status === 'failed', 'database text failure retention');
   assert.equal(jobs.getBackgroundJob(failedKey).error, 'provider unavailable');
+
+  // Whole-column processing also lives outside the view and retains progress. This is the
+  // path used when the user leaves the database, opens another section, or switches vaults.
+  const textColumnKey = jobs.databaseAiTextColumnJobKey('db-1', 'text-column');
+  const textColumn = jobs.startDatabaseAiTextColumnJob('db-1', 'text-column');
+  const duplicateTextColumn = jobs.startDatabaseAiTextColumnJob('db-1', 'text-column');
+  assert.equal(duplicateTextColumn.id, textColumn.id, 'a running AI column cannot be launched twice');
+  await waitFor(() => jobs.getBackgroundJob(textColumnKey)?.status === 'completed', 'AI text column completion');
+  assert.deepEqual(jobs.getBackgroundJob(textColumnKey).progress, { done: 2, total: 5 });
+  assert.equal(databaseTextColumnCalls, 1);
+
+  const imageColumnKey = jobs.databaseAiImageColumnJobKey('db-1', 'image-column');
+  jobs.startDatabaseAiImageColumnJob('db-1', 'image-column');
+  await waitFor(() => jobs.getBackgroundJob(imageColumnKey)?.status === 'completed', 'AI image column completion');
+  assert.deepEqual(jobs.getBackgroundJob(imageColumnKey).progress, { done: 1, total: 3 });
+  assert.equal(databaseImageColumnCalls, 1);
+
+  const comparisonKey = jobs.databaseComparisonColumnJobKey('db-1', 'comparison-column');
+  jobs.startDatabaseComparisonColumnJob('db-1', 'comparison-column');
+  await waitFor(() => jobs.getBackgroundJob(comparisonKey)?.status === 'completed', 'comparison column completion');
+  assert.deepEqual(jobs.getBackgroundJob(comparisonKey).progress, { done: 4, total: 8 });
+  assert.equal(comparisonColumnCalls, 1);
 
   console.log('background generation jobs test passed');
 } finally {
