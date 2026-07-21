@@ -990,15 +990,15 @@ export function Settings({
 
       {visibleSettingsSection('integrations', 'Servidor MCP', 'mcp servidor puerto token cliente conexion chatgpt openai tunnel tunel') && (
           <Section title={t('Servidor MCP')}>
-            <div className="rounded-xl border border-indigo-900/70 bg-indigo-950/20 p-4">
+            <div data-testid="mcp-settings-card" className="rounded-xl border border-indigo-200 bg-indigo-50 p-4 dark:border-indigo-900/70 dark:bg-indigo-950/20">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-start gap-3">
-                  <span className={`mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full ${mcpTunnelStatus?.phase === 'connected' ? 'bg-emerald-500/15 text-emerald-300' : 'bg-indigo-500/15 text-indigo-300'}`}>
+                  <span className={`mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full ${mcpTunnelStatus?.phase === 'connected' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300' : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300'}`}>
                     <Icon name={mcpTunnelStatus?.phase === 'connected' ? 'check' : 'globe'} />
                   </span>
                   <div>
-                    <h3 className="text-sm font-medium text-neutral-100">ChatGPT</h3>
-                    <p className="mt-0.5 text-xs text-neutral-400">
+                    <h3 className="text-sm font-medium text-neutral-900 dark:text-neutral-100">ChatGPT</h3>
+                    <p className="mt-0.5 text-xs text-neutral-600 dark:text-neutral-400">
                       {mcpTunnelStatus?.phase === 'connected'
                         ? t('Conectado mediante el túnel seguro de OpenAI.')
                         : t('Configúralo con un asistente guiado, sin abrir puertos ni publicar tu biblioteca.')}
@@ -1012,10 +1012,10 @@ export function Settings({
             </div>
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-2">
-                <label className="text-sm text-neutral-300">{t('Activar servidor MCP')}</label>
+                <label className="text-sm text-neutral-700 dark:text-neutral-300">{t('Activar servidor MCP')}</label>
                 <button
                   type="button"
-                  className="text-neutral-500 hover:text-neutral-200"
+                  className="text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-200"
                   aria-label={t('Ayuda para conectar un cliente MCP')}
                   title={t('Ayuda para conectar un cliente MCP')}
                   onClick={() => setMcpHelpOpen(true)}
@@ -1039,20 +1039,20 @@ export function Settings({
                 }}
               />
             </Row>
-            <div className="rounded-lg border border-neutral-800 bg-neutral-950/50 px-3 py-2 text-xs">
+            <div className="rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs dark:border-neutral-800 dark:bg-neutral-950/50">
               {mcpStatus.running ? (
-                <span className="text-emerald-400">{t('Activo')}: {mcpStatus.url}</span>
+                <span className="text-emerald-700 dark:text-emerald-400">{t('Activo')}: {mcpStatus.url}</span>
               ) : mcpStatus.error ? (
-                <span className="text-red-400">{t('Error del servidor MCP')}: {mcpStatus.error}</span>
+                <span className="text-red-700 dark:text-red-400">{t('Error del servidor MCP')}: {mcpStatus.error}</span>
               ) : (
                 <span className="text-neutral-500">{t('Apagado')}</span>
               )}
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <button className="btn btn-ghost border border-neutral-700" onClick={() => void setMcpHelpOpen(true)}>
+              <button className="btn btn-ghost border border-neutral-300 dark:border-neutral-700" onClick={() => void setMcpHelpOpen(true)}>
                 <Icon name="link" /> {t('Ver datos de conexión')}
               </button>
-              <button className="btn btn-ghost border border-neutral-700" onClick={() => void regenerateMcpToken()}>
+              <button className="btn btn-ghost border border-neutral-300 dark:border-neutral-700" onClick={() => void regenerateMcpToken()}>
                 <Icon name="refresh" /> {t('Regenerar token')}
               </button>
             </div>

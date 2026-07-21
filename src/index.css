@@ -1635,6 +1635,7 @@ body {
 .genealogy.dark .dark\:border-indigo-800 { border-color: #854d0e; }
 .genealogy.dark .dark\:border-indigo-800\/60 { border-color: rgba(133, 77, 14, 0.6); }
 .genealogy.dark .dark\:border-indigo-800\/70 { border-color: rgba(133, 77, 14, 0.7); }
+.genealogy.dark .dark\:border-indigo-900\/70 { border-color: rgba(120, 53, 15, 0.7); }
 .genealogy.dark .dark\:hover\:text-indigo-300:hover { color: #fcd34d; }
 .genealogy.dark .dark\:text-indigo-100 { color: #fef3c7; }
 .genealogy.dark .dark\:text-indigo-200 { color: #fde68a; }
@@ -1659,6 +1660,7 @@ body {
 .estudio.dark .dark\:border-indigo-800 { border-color: #115e59; }
 .estudio.dark .dark\:border-indigo-800\/60 { border-color: rgba(17, 94, 89, 0.6); }
 .estudio.dark .dark\:border-indigo-800\/70 { border-color: rgba(17, 94, 89, 0.7); }
+.estudio.dark .dark\:border-indigo-900\/70 { border-color: rgba(19, 78, 74, 0.7); }
 .estudio.dark .dark\:hover\:text-indigo-300:hover { color: #5eead4; }
 .estudio.dark .dark\:text-indigo-100 { color: #ccfbf1; }
 .estudio.dark .dark\:text-indigo-200 { color: #99f6e4; }
@@ -1683,6 +1685,7 @@ body {
 .docencia.dark .dark\:border-indigo-800 { border-color: #9a3412; }
 .docencia.dark .dark\:border-indigo-800\/60 { border-color: rgba(154, 52, 18, 0.6); }
 .docencia.dark .dark\:border-indigo-800\/70 { border-color: rgba(154, 52, 18, 0.7); }
+.docencia.dark .dark\:border-indigo-900\/70 { border-color: rgba(124, 45, 18, 0.7); }
 .docencia.dark .dark\:hover\:border-teal-800:hover { border-color: #9a3412; }
 .docencia.dark .dark\:hover\:text-indigo-300:hover { color: #fdba74; }
 .docencia.dark .dark\:ring-teal-900 { --tw-ring-color: #7c2d12; }
@@ -1709,6 +1712,7 @@ body {
 .databases.dark .dark\:border-indigo-800 { border-color: #6b011e; }
 .databases.dark .dark\:border-indigo-800\/60 { border-color: rgba(107, 1, 30, 0.6); }
 .databases.dark .dark\:border-indigo-800\/70 { border-color: rgba(107, 1, 30, 0.7); }
+.databases.dark .dark\:border-indigo-900\/70 { border-color: rgba(77, 1, 22, 0.7); }
 .databases.dark .dark\:hover\:text-indigo-300:hover { color: #f27a97; }
 .databases.dark .dark\:text-indigo-100 { color: #ffe4ec; }
 .databases.dark .dark\:text-indigo-200 { color: #f9b4c4; }
