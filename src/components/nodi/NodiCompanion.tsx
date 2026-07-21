@@ -141,6 +141,7 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
   const [conversations, setConversations] = useState<NodiConversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [chatTool, setChatTool] = useState<'none' | 'history' | 'contexts' | 'settings'>('none');
+  const [copiedMessageIndex, setCopiedMessageIndex] = useState<number | null>(null);
   // The source detail opened from an inline citation in an answer (idea/work/passage/…).
   const [citation, setCitation] = useState<MarkdownCitation | null>(null);
   const [settings, setSettings] = useState<AppSettings | null>(null);
@@ -687,6 +688,7 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
     setActiveConversationId(null);
     setMessages([]);
     setInput('');
+    setCopiedMessageIndex(null);
     setChatTool('none');
     setCitation(null);
   };
@@ -697,8 +699,23 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
     setMessages(conversation.messages);
     setContexts(conversation.contexts);
     setNodiModel(conversation.model ?? settings?.nodiModel ?? settings?.synthesisModel ?? null);
+    setCopiedMessageIndex(null);
     setChatTool('none');
     setCitation(null);
+  };
+
+  const copyMessage = async (content: string, index: number) => {
+    const text = content.trim();
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      return;
+    }
+    setCopiedMessageIndex(index);
+    window.setTimeout(() => {
+      setCopiedMessageIndex((current) => current === index ? null : current);
+    }, 1_400);
   };
 
   const confirmDeleteConversations = async () => {
@@ -933,6 +950,15 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
               )}
               {messages.map((m, i) => (
                 <div key={i} className={`nodi-msg ${m.role}`}>
+                  <button
+                    className="nodi-msg-copy"
+                    disabled={!m.content.trim()}
+                    onClick={() => void copyMessage(m.content, i)}
+                    title={copiedMessageIndex === i ? t('Copiado') : t('Copiar en Markdown')}
+                    aria-label={copiedMessageIndex === i ? t('Copiado') : t('Copiar en Markdown')}
+                  >
+                    <Icon name={copiedMessageIndex === i ? 'check' : 'copy'} size={12} />
+                  </button>
                   {m.content
                     ? m.role === 'assistant' ? <Markdown content={m.content} onCitation={setCitation} /> : m.content
                     : streaming && i === messages.length - 1 ? <span className="nodi-typing">{t('escribiendo…')}</span> : ''}

@@ -335,9 +335,34 @@
 /* Chat */
 .nodi-panel.nodi-chat-panel { width: 372px; max-height: 480px; }
 .nodi-chat-msgs { display: flex; flex-direction: column; gap: 8px; padding: 8px; overflow-y: auto; }
-.nodi-msg { font-size: 13px; line-height: 1.5; padding: 7px 10px; border-radius: 12px; max-width: 86%; white-space: pre-wrap; word-break: break-word; }
+.nodi-chat-msgs,
+.nodi-msg,
+.nodi-msg .md { -webkit-user-select: text; user-select: text; }
+.nodi-msg { position: relative; font-size: 13px; line-height: 1.5; padding: 7px 32px 7px 10px; border-radius: 12px; max-width: 86%; white-space: pre-wrap; word-break: break-word; }
 .nodi-msg.user { align-self: flex-end; background: #24406b; color: #eaf1ff; border-bottom-right-radius: 4px; }
 .nodi-msg.assistant { align-self: flex-start; background: #1a2130; color: #e7ebf2; border-bottom-left-radius: 4px; white-space: normal; }
+.nodi-msg-copy {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: currentColor;
+  cursor: pointer;
+  opacity: .5;
+  transition: background .15s, opacity .15s;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.nodi-msg-copy:hover:not(:disabled),
+.nodi-msg-copy:focus-visible { background: rgba(255,255,255,.1); opacity: 1; outline: none; }
+.nodi-msg-copy:disabled { cursor: default; opacity: 0; }
 .nodi-msg .md { min-width: 0; }
 .nodi-msg .md > :first-child { margin-top: 0; }
 .nodi-msg .md > :last-child { margin-bottom: 0; }
@@ -791,6 +816,8 @@
 
 .nodi-theme-light .nodi-msg.user { background: var(--nodi-vault-accent, #6366f1); color: #ffffff; }
 .nodi-theme-light .nodi-msg.assistant { background: #f1f5f9; color: #1f2937; }
+.nodi-theme-light .nodi-msg-copy:hover:not(:disabled),
+.nodi-theme-light .nodi-msg-copy:focus-visible { background: rgba(15, 23, 42, .09); }
 .nodi-theme-light .nodi-msg .md h1,
 .nodi-theme-light .nodi-msg .md h2,
 .nodi-theme-light .nodi-msg .md h3,

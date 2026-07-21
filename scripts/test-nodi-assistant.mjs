@@ -147,6 +147,18 @@ test('Nodi chat keeps model selection inside settings and exposes deletable hist
   assert.match(globalCss, /background-repeat: no-repeat/);
 });
 
+test('Nodi chat messages are selectable and expose a per-message copy action', async () => {
+  const [component, css] = await Promise.all([
+    read('src/components/nodi/NodiCompanion.tsx'),
+    read('src/components/nodi/companion.css'),
+  ]);
+  assert.match(component, /navigator\.clipboard\.writeText\(text\)/, 'copy preserves the message Markdown source');
+  assert.match(component, /className="nodi-msg-copy"/);
+  assert.match(component, /name=\{copiedMessageIndex === i \? 'check' : 'copy'\}/, 'the action confirms a successful copy');
+  assert.match(css, /\.nodi-msg[\s\S]*?-webkit-user-select:\s*text;\s*user-select:\s*text;/, 'message text overrides the overlay selection lock');
+  assert.match(css, /\.nodi-msg-copy\s*\{[\s\S]*?user-select:\s*none;/, 'the icon itself does not interfere with text selection');
+});
+
 test('Nodi closes its eyes and centrifuges contracted limbs while thinking', async () => {
   const [component, figure, css] = await Promise.all([
     read('src/components/nodi/NodiCompanion.tsx'),
