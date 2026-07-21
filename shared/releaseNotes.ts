@@ -11,7 +11,7 @@ import { RELEASE_NOTES_IT } from './releaseNotes.it';
 // identity of its own: the MCP server, the Nodi mascot, the tools hub or a new
 // interface language. They get their own icon and colour instead of dissolving
 // into 'general'.
-export type ReleaseNoteScope = 'general' | VaultType | 'mcp' | 'nodi' | 'toolkit' | 'languages';
+export type ReleaseNoteScope = 'general' | VaultType | 'mcp' | 'nodi' | 'toolkit' | 'plugin' | 'languages';
 
 interface RawReleaseHighlight {
   es: string;
@@ -36,6 +36,120 @@ export interface ReleaseNote {
 interface RawReleaseNote extends Omit<ReleaseNote, 'highlights'> { highlights: RawReleaseHighlight[] }
 
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
+  {
+    version: '2.5.0',
+    date: '2026-07-21',
+    highlights: [
+      {
+        scope: 'toolkit',
+        es: 'Nuevo en Herramientas: OCR Workspace transcribe PDF escaneados e imágenes con cualquier modelo con visión —local o en la nube— y mantiene una biblioteca de OCR por documento. Reconstruye Markdown limpio, conserva el original intacto y exporta el resultado.',
+        en: 'New in Tools: OCR Workspace transcribes scanned PDFs and images with any vision-capable model — local or cloud — and keeps a per-document OCR library. It rebuilds clean Markdown, leaves the original untouched and exports the result.',
+        fr: 'Nouveau dans Outils : OCR Workspace transcrit les PDF numérisés et les images avec n’importe quel modèle doté de vision — local ou dans le cloud — et conserve une bibliothèque d’OCR par document. Il reconstitue un Markdown propre, laisse l’original intact et exporte le résultat.',
+        de: 'Neu unter Werkzeuge: OCR Workspace transkribiert gescannte PDFs und Bilder mit jedem bildfähigen Modell – lokal oder in der Cloud – und führt eine OCR-Bibliothek pro Dokument. Es erzeugt sauberes Markdown, lässt das Original unangetastet und exportiert das Ergebnis.',
+        pt: 'Novo em Ferramentas: o OCR Workspace transcreve PDF digitalizados e imagens com qualquer modelo com visão — local ou na nuvem — e mantém uma biblioteca de OCR por documento. Reconstrói Markdown limpo, mantém o original intacto e exporta o resultado.',
+        'pt-BR': 'Novo em Ferramentas: o OCR Workspace transcreve PDFs digitalizados e imagens com qualquer modelo com visão — local ou na nuvem — e mantém uma biblioteca de OCR por documento. Ele reconstrói Markdown limpo, mantém o original intacto e exporta o resultado.',
+      },
+      {
+        scope: 'toolkit',
+        es: 'PDF Presenter llega a Herramientas: presenta cualquier PDF como diapositivas con vista de presentador, notas del ponente, herramientas de anotación en vivo, vídeos de YouTube por diapositiva y un mando a distancia desde el móvil. Su biblioteca guarda copias con carpetas y búsqueda; el original nunca se toca.',
+        en: 'PDF Presenter joins Tools: present any PDF as slides with a presenter view, speaker notes, live annotation tools, per-slide YouTube videos and a phone remote. Its library keeps copies with folders and search; the original is never touched.',
+        fr: 'PDF Presenter rejoint Outils : présentez n’importe quel PDF sous forme de diapositives avec un mode présentateur, des notes de l’orateur, des outils d’annotation en direct, des vidéos YouTube par diapositive et une télécommande depuis le téléphone. Sa bibliothèque conserve des copies avec dossiers et recherche ; l’original n’est jamais modifié.',
+        de: 'PDF Presenter kommt zu Werkzeuge hinzu: Präsentiere jedes PDF als Folien mit Referentenansicht, Sprechernotizen, Live-Anmerkungswerkzeugen, YouTube-Videos pro Folie und einer Fernbedienung per Smartphone. Seine Bibliothek bewahrt Kopien mit Ordnern und Suche auf; das Original wird nie verändert.',
+        pt: 'O PDF Presenter chega às Ferramentas: apresente qualquer PDF como diapositivos com vista de apresentador, notas do orador, ferramentas de anotação ao vivo, vídeos do YouTube por diapositivo e um comando a partir do telemóvel. A sua biblioteca guarda cópias com pastas e pesquisa; o original nunca é tocado.',
+        'pt-BR': 'O PDF Presenter chega às Ferramentas: apresente qualquer PDF como slides com modo apresentador, notas do orador, ferramentas de anotação ao vivo, vídeos do YouTube por slide e um controle remoto pelo celular. Sua biblioteca guarda cópias com pastas e busca; o original nunca é tocado.',
+      },
+      {
+        scope: 'mcp',
+        es: 'El servidor MCP crece: nuevas herramientas de solo lectura para el modo Docencia, escritura de filas y celdas en las bases de datos, y una limitación por tipo de bóveda para que cada cliente solo vea las herramientas pertinentes. El alumnado se identifica siempre por un código, nunca por su nombre.',
+        en: 'The MCP server grows: new read-only tools for Teaching mode, row and cell writes into databases, and vault-type gating so each client only sees the relevant tools. Students are always identified by a code, never by name.',
+        fr: 'Le serveur MCP s’étoffe : de nouveaux outils en lecture seule pour le mode Enseignement, l’écriture de lignes et de cellules dans les bases de données, et un filtrage par type d’espace pour que chaque client ne voie que les outils pertinents. Les élèves sont toujours identifiés par un code, jamais par leur nom.',
+        de: 'Der MCP-Server wächst: neue schreibgeschützte Werkzeuge für den Lehrmodus, das Schreiben von Zeilen und Zellen in Datenbanken sowie eine Begrenzung nach Arbeitsbereichstyp, sodass jeder Client nur die relevanten Werkzeuge sieht. Lernende werden immer über einen Code identifiziert, nie über ihren Namen.',
+        pt: 'O servidor MCP cresce: novas ferramentas só de leitura para o modo Docência, escrita de linhas e células nas bases de dados e uma limitação por tipo de espaço para que cada cliente veja apenas as ferramentas pertinentes. Os alunos são sempre identificados por um código, nunca pelo nome.',
+        'pt-BR': 'O servidor MCP cresce: novas ferramentas somente leitura para o modo Docência, escrita de linhas e células nos bancos de dados e uma limitação por tipo de espaço para que cada cliente veja apenas as ferramentas pertinentes. Os alunos são sempre identificados por um código, nunca pelo nome.',
+      },
+      {
+        scope: 'plugin',
+        es: 'Nueva categoría de plugins: los copilotos de Nodus para Microsoft Word y LibreOffice Writer trabajan dentro de tu procesador de textos —el panel sigue tu cursor, analiza el párrafo, relaciona lo que escribes con tu biblioteca e inserta texto citado con IA—. El copiloto de Word suma ahora notas al pie, redacción sobre el texto seleccionado (reescribir, ampliar o rebatir) y búsqueda de pasajes citables. Se instalan desde Ajustes y la conexión se configura sola.',
+        en: 'New plugins category: Nodus’s copilots for Microsoft Word and LibreOffice Writer work right inside your word processor — the pane follows your cursor, analyses the paragraph, relates what you write to your library and inserts AI-drafted cited text. The Word copilot now adds footnotes, compose-over-selection (rewrite, expand or counter) and citable passage search. Install them from Settings and the connection configures itself.',
+        fr: 'Nouvelle catégorie de plugins : les copilotes de Nodus pour Microsoft Word et LibreOffice Writer fonctionnent directement dans votre traitement de texte — le panneau suit votre curseur, analyse le paragraphe, relie ce que vous écrivez à votre bibliothèque et insère du texte cité rédigé par IA. Le copilote Word ajoute désormais des notes de bas de page, la rédaction sur la sélection (réécrire, développer ou réfuter) et la recherche de passages citables. Installez-les depuis les Paramètres et la connexion se configure toute seule.',
+        de: 'Neue Plugin-Kategorie: Die Nodus-Copiloten für Microsoft Word und LibreOffice Writer arbeiten direkt in deiner Textverarbeitung — das Panel folgt deinem Cursor, analysiert den Absatz, verknüpft das Geschriebene mit deiner Bibliothek und fügt von KI verfassten, zitierten Text ein. Der Word-Copilot bietet nun Fußnoten, das Verfassen über der Auswahl (umschreiben, erweitern oder widerlegen) und die Suche nach zitierbaren Passagen. Installiere sie über die Einstellungen, und die Verbindung konfiguriert sich von selbst.',
+        pt: 'Nova categoria de plugins: os copilotos do Nodus para o Microsoft Word e o LibreOffice Writer funcionam dentro do seu processador de texto — o painel segue o seu cursor, analisa o parágrafo, relaciona o que escreve com a sua biblioteca e insere texto citado redigido por IA. O copiloto do Word passa a incluir notas de rodapé, redação sobre o texto selecionado (reescrever, ampliar ou rebater) e pesquisa de passagens citáveis. Instale-os a partir das Definições e a ligação configura-se sozinha.',
+        'pt-BR': 'Nova categoria de plugins: os copilotos do Nodus para o Microsoft Word e o LibreOffice Writer funcionam dentro do seu processador de texto — o painel segue seu cursor, analisa o parágrafo, relaciona o que você escreve com sua biblioteca e insere texto citado redigido por IA. O copiloto do Word agora inclui notas de rodapé, redação sobre o texto selecionado (reescrever, ampliar ou rebater) e busca de trechos citáveis. Instale-os pelas Configurações e a conexão se configura sozinha.',
+      },
+      {
+        scope: 'general',
+        es: 'Mayor transparencia sobre tus datos: Nodus muestra avisos de privacidad allí donde se procesa información, incorpora una política de privacidad y avisos de terceros, y añade salvaguardas de cumplimiento de licencias. Todo el procesamiento sensible sigue siendo local.',
+        en: 'More transparency about your data: Nodus shows privacy notices where information is processed, ships a privacy policy and third-party notices, and adds license-compliance safeguards. All sensitive processing stays local.',
+        fr: 'Plus de transparence sur vos données : Nodus affiche des avis de confidentialité là où des informations sont traitées, intègre une politique de confidentialité et des avis de tiers, et ajoute des garde-fous de conformité des licences. Tout le traitement sensible reste local.',
+        de: 'Mehr Transparenz über deine Daten: Nodus zeigt Datenschutzhinweise dort an, wo Informationen verarbeitet werden, liefert eine Datenschutzrichtlinie und Hinweise zu Drittanbietern und ergänzt Schutzmaßnahmen zur Lizenzkonformität. Die gesamte sensible Verarbeitung bleibt lokal.',
+        pt: 'Mais transparência sobre os seus dados: o Nodus mostra avisos de privacidade onde a informação é processada, inclui uma política de privacidade e avisos de terceiros e acrescenta salvaguardas de conformidade de licenças. Todo o processamento sensível continua a ser local.',
+        'pt-BR': 'Mais transparência sobre os seus dados: o Nodus mostra avisos de privacidade onde a informação é processada, inclui uma política de privacidade e avisos de terceiros e acrescenta salvaguardas de conformidade de licenças. Todo o processamento sensível continua sendo local.',
+      },
+      {
+        scope: 'general',
+        es: 'La extracción de ideas es más fiable con modelos locales y de nivel gratuito: los modelos de solo visión que devolvían resultados vacíos quedan excluidos del análisis con un aviso claro, y los escaneos profundo y ligero fallan con un error accionable en lugar de guardar datos parciales.',
+        en: 'Idea extraction is more reliable on local and free-tier models: vision-only models that returned empty results are now excluded from analysis with a clear notice, and deep and light scans fail with an actionable error instead of storing partial data.',
+        fr: 'L’extraction d’idées est plus fiable avec les modèles locaux et gratuits : les modèles uniquement visuels qui renvoyaient des résultats vides sont désormais exclus de l’analyse avec un avis clair, et les analyses approfondie et légère échouent avec une erreur exploitable au lieu d’enregistrer des données partielles.',
+        de: 'Die Ideen-Extraktion ist mit lokalen und kostenlosen Modellen zuverlässiger: Reine Bildmodelle, die leere Ergebnisse lieferten, werden nun mit einem klaren Hinweis von der Analyse ausgeschlossen, und Tief- und Leicht-Scans schlagen mit einem umsetzbaren Fehler fehl, statt Teildaten zu speichern.',
+        pt: 'A extração de ideias é mais fiável com modelos locais e de nível gratuito: os modelos apenas de visão que devolviam resultados vazios passam a ser excluídos da análise com um aviso claro, e as análises profunda e ligeira falham com um erro acionável em vez de guardar dados parciais.',
+        'pt-BR': 'A extração de ideias é mais confiável com modelos locais e de nível gratuito: os modelos apenas de visão que retornavam resultados vazios agora são excluídos da análise com um aviso claro, e as varreduras profunda e leve falham com um erro acionável em vez de guardar dados parciais.',
+      },
+      {
+        scope: 'general',
+        es: 'El mapa de ruta de Nodus estrena una vista con el estado de cada iniciativa —planificado, en desarrollo o publicado— presentada en un modal cinemático para que veas de un vistazo hacia dónde va la aplicación.',
+        en: 'Nodus’s roadmap gets a new view with the status of each initiative — planned, in progress or shipped — presented in a cinematic modal so you can see at a glance where the app is heading.',
+        fr: 'La feuille de route de Nodus inaugure une vue indiquant l’état de chaque initiative — planifiée, en cours ou livrée — présentée dans un modal cinématique pour voir d’un coup d’œil où va l’application.',
+        de: 'Die Roadmap von Nodus erhält eine neue Ansicht mit dem Status jeder Initiative – geplant, in Arbeit oder veröffentlicht – dargestellt in einem filmreifen Fenster, damit du auf einen Blick siehst, wohin sich die App entwickelt.',
+        pt: 'O roteiro do Nodus estreia uma vista com o estado de cada iniciativa — planeado, em desenvolvimento ou publicado — apresentada num modal cinemático para ver de relance para onde vai a aplicação.',
+        'pt-BR': 'O roteiro do Nodus estreia uma visão com o status de cada iniciativa — planejado, em desenvolvimento ou publicado — apresentada em um modal cinematográfico para ver rapidamente para onde o aplicativo está indo.',
+      },
+      {
+        scope: 'estudio',
+        es: 'Estudio afina su chat: mejora la recuperación de contenido para responder con lo que hay en tu bóveda, corrige varias traducciones y arregla los controles de la cabecera.',
+        en: 'Study sharpens its chat: content retrieval is improved so answers draw on what’s in your vault, several translations are corrected and the header controls are fixed.',
+        fr: 'Étude affine son chat : la récupération de contenu est améliorée pour répondre à partir de ce qui se trouve dans votre espace, plusieurs traductions sont corrigées et les commandes de l’en-tête sont réparées.',
+        de: 'Studium verfeinert seinen Chat: Die Inhaltsabfrage wurde verbessert, sodass Antworten auf dem beruhen, was in deinem Arbeitsbereich liegt, mehrere Übersetzungen wurden korrigiert und die Bedienelemente der Kopfzeile repariert.',
+        pt: 'O Estudo afina o seu chat: melhora a recuperação de conteúdo para responder com o que há no seu espaço, corrige várias traduções e repara os controlos do cabeçalho.',
+        'pt-BR': 'O Estudo afina o seu chat: melhora a recuperação de conteúdo para responder com o que há no seu espaço, corrige várias traduções e conserta os controles do cabeçalho.',
+      },
+      {
+        scope: 'estudio',
+        es: 'La gestión de materiales en Estudio y Docencia es más cómoda: súbelos arrastrando y soltando, renómbralos o elimínalos, y disfruta de un visor de PDF mejorado. Además, Nodus pide consentimiento explícito antes de enviar cualquier material a un modelo de IA, y los controles del horario permanecen dentro de su franja.',
+        en: 'Managing materials in Study and Teaching is smoother: upload them by drag-and-drop, rename or delete them, and enjoy an improved PDF viewer. Nodus also asks for explicit consent before sending any material to an AI model, and the timetable controls stay inside their slot.',
+        fr: 'La gestion des documents dans Étude et Enseignement est plus fluide : téléversez-les par glisser-déposer, renommez-les ou supprimez-les, et profitez d’un lecteur PDF amélioré. Nodus demande aussi un consentement explicite avant d’envoyer un document à un modèle d’IA, et les commandes de l’emploi du temps restent dans leur créneau.',
+        de: 'Die Verwaltung von Materialien in Studium und Lehre ist komfortabler: per Drag-and-drop hochladen, umbenennen oder löschen und ein verbesserter PDF-Betrachter. Außerdem fragt Nodus vor dem Senden eines Materials an ein KI-Modell ausdrücklich um Zustimmung, und die Stundenplan-Bedienelemente bleiben in ihrem Zeitfenster.',
+        pt: 'A gestão de materiais em Estudo e Docência é mais cómoda: carregue-os arrastando e largando, renomeie-os ou elimine-os e desfrute de um visualizador de PDF melhorado. Além disso, o Nodus pede consentimento explícito antes de enviar qualquer material a um modelo de IA, e os controlos do horário permanecem dentro da sua faixa.',
+        'pt-BR': 'A gestão de materiais em Estudo e Docência é mais cômoda: carregue-os arrastando e soltando, renomeie-os ou exclua-os e aproveite um visualizador de PDF melhorado. Além disso, o Nodus pede consentimento explícito antes de enviar qualquer material a um modelo de IA, e os controles do horário permanecem dentro da sua faixa.',
+      },
+      {
+        scope: 'academic',
+        es: 'La bóveda académica de demostración estrena un grafo de conocimiento más rico —con más ideas, temas y conexiones— para explorar cómo Nodus relaciona la literatura antes de cargar tu propio corpus.',
+        en: 'The academic demo vault ships a richer knowledge graph — more ideas, themes and connections — to explore how Nodus relates the literature before you load your own corpus.',
+        fr: 'L’espace académique de démonstration inaugure un graphe de connaissances plus riche — davantage d’idées, de thèmes et de connexions — pour explorer comment Nodus relie la littérature avant de charger votre propre corpus.',
+        de: 'Der akademische Demo-Arbeitsbereich bringt einen reichhaltigeren Wissensgraphen – mehr Ideen, Themen und Verbindungen –, um zu erkunden, wie Nodus die Literatur verknüpft, bevor du dein eigenes Korpus lädst.',
+        pt: 'O espaço académico de demonstração estreia um grafo de conhecimento mais rico — mais ideias, temas e ligações — para explorar como o Nodus relaciona a literatura antes de carregar o seu próprio corpus.',
+        'pt-BR': 'O espaço acadêmico de demonstração estreia um grafo de conhecimento mais rico — mais ideias, temas e conexões — para explorar como o Nodus relaciona a literatura antes de você carregar seu próprio corpus.',
+      },
+      {
+        scope: 'nodi',
+        es: 'El chat de Nodi ahora cita las fuentes del corpus que respaldan sus respuestas, igual que el asistente de investigación, para que puedas rastrear cada afirmación hasta tu biblioteca.',
+        en: 'Nodi’s chat now cites the corpus sources behind its answers, just like the research assistant, so you can trace every claim back to your library.',
+        fr: 'Le chat de Nodi cite désormais les sources du corpus qui étayent ses réponses, comme l’assistant de recherche, pour que vous puissiez remonter chaque affirmation jusqu’à votre bibliothèque.',
+        de: 'Nodis Chat zitiert jetzt die Korpus-Quellen hinter seinen Antworten – genau wie der Rechercheassistent –, damit du jede Aussage bis zu deiner Bibliothek zurückverfolgen kannst.',
+        pt: 'O chat do Nodi passa a citar as fontes do corpus que sustentam as suas respostas, tal como o assistente de investigação, para que possa rastrear cada afirmação até à sua biblioteca.',
+        'pt-BR': 'O chat do Nodi agora cita as fontes do corpus por trás das suas respostas, assim como o assistente de pesquisa, para que você possa rastrear cada afirmação até a sua biblioteca.',
+      },
+      {
+        scope: 'nodi',
+        es: 'Nodi pule su aspecto en tema claro: las barras de desplazamiento de sus paneles vuelven a verse correctamente.',
+        en: 'Nodi polishes its light-theme look: the scrollbars in its panels render correctly again.',
+        fr: 'Nodi peaufine son apparence en thème clair : les barres de défilement de ses panneaux s’affichent à nouveau correctement.',
+        de: 'Nodi verfeinert sein Aussehen im hellen Design: Die Bildlaufleisten seiner Panels werden wieder korrekt dargestellt.',
+        pt: 'O Nodi apura o seu aspeto no tema claro: as barras de deslocamento dos seus painéis voltam a ver-se corretamente.',
+        'pt-BR': 'O Nodi apura o seu visual no tema claro: as barras de rolagem dos seus painéis voltam a aparecer corretamente.',
+      },
+    ],
+  },
   {
     version: '2.4.0',
     date: '2026-07-18',

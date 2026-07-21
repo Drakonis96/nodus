@@ -26,6 +26,7 @@ const RELEASE_SCOPE_META: Record<ReleaseNoteScope, { icon: string; color: string
   mcp: { icon: 'plug', color: '#2563eb', label: 'Servidor MCP' },
   nodi: { icon: 'nodi', color: '#d4af37', label: 'Mascota Nodi' },
   toolkit: { icon: 'tools', color: '#059669', label: 'Herramientas' },
+  plugin: { icon: 'puzzle', color: '#0ea5e9', label: 'Plugins' },
   languages: { icon: 'languages', color: '#db2777', label: 'Idiomas' },
 };
 

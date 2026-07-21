@@ -157,6 +157,8 @@ const ICON_PATHS: Record<string, string> = {
   scanText: '<path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 8h8"/><path d="M7 12h10"/><path d="M7 16h6"/>',
   bug: '<path d="M8 2l1.5 1.5"/><path d="M16 2l-1.5 1.5"/><path d="M9 7a3 3 0 0 1 6 0v1H9V7Z"/><rect x="7" y="8" width="10" height="10" rx="5"/><path d="M12 12v6"/><path d="M7 12H3"/><path d="M21 12h-4"/><path d="M6.5 7 4 5"/><path d="M17.5 7 20 5"/><path d="M6.5 17 4 19"/><path d="M17.5 17 20 19"/>',
   plug: '<path d="M9 2v6"/><path d="M15 2v6"/><path d="M6 8h12v3a6 6 0 0 1-12 0V8Z"/><path d="M12 17v5"/>',
+  // Word / LibreOffice copilot plugins: a puzzle piece, the universal "add-in" mark.
+  puzzle: '<path d="M15.5 3a2 2 0 0 1 2 2v1.5a1 1 0 0 0 1.6.8 1.8 1.8 0 1 1 0 3.4 1 1 0 0 0-1.6.8V16a2 2 0 0 1-2 2h-2.9a1 1 0 0 1-.8-1.6 1.8 1.8 0 1 0-3 0A1 1 0 0 1 8.9 18H6a2 2 0 0 1-2-2v-2.9a1 1 0 0 1 1.6-.8 1.8 1.8 0 1 0 0-3A1 1 0 0 1 4 8.5V5a2 2 0 0 1 2-2h3.2a1 1 0 0 0 .8-1.6"/>',
   // The mascot's face fills the circle: at the 13px the release chip renders, rays
   // or satellite nodes turn it into a smudge.
   nodi: '<circle cx="12" cy="12" r="8.5"/><path d="M9 10.5h.01"/><path d="M15 10.5h.01"/><path d="M9 14.5a4 4 0 0 0 6 0"/>',

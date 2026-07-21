@@ -44,6 +44,7 @@ try {
     'mcp',
     'nodi',
     'toolkit',
+    'plugin',
     'languages',
   ]);
   for (const note of RELEASE_NOTES) {
