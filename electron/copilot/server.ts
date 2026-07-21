@@ -12,7 +12,15 @@ import { app, BrowserWindow, shell } from 'electron';
 import type { CopilotServerStatus } from '@shared/types';
 import { getSettings, updateSettings } from '../db/settingsRepo';
 import { loadCopilotCert, loadCopilotCa, certReady, copilotStateDir, renewLeafIfNeeded } from './certs';
-import { analyzeText, composeCopilotIdeaInsertion, getCopilotIdeaDetail, searchCopilotIdeas } from '../ai/liveRelations';
+import {
+  analyzeText,
+  composeCopilotIdeaInsertion,
+  composeFromSelection,
+  getCopilotIdeaDetail,
+  searchCopilotIdeas,
+  searchCopilotPassages,
+  type CopilotComposeMode,
+} from '../ai/liveRelations';
 import { embeddedIdeaCount } from '../db/ideasRepo';
 import { getDb } from '../db/database';
 
@@ -28,12 +36,20 @@ interface EditorState {
   selectionText: string;
 }
 
+// One text to place in the external editor, with the same placement options the
+// Word pane uses: as a footnote, and/or replacing the current selection.
+interface EditorInsertion {
+  text: string;
+  asFootnote: boolean;
+  replace: boolean;
+}
+
 // Bridge state for external editors (LibreOffice Writer): the macro pushes the
 // current paragraph/selection here and long-polls for texts to insert, while the
 // standalone task pane reads the state and posts insertions. Single-slot state is
 // enough: this is a local, single-user bridge.
 const editorState: EditorState = { paragraphText: '', selectionText: '' };
-let pendingInsertionResolvers: ((text: string) => void)[] = [];
+let pendingInsertionResolvers: ((insertion: EditorInsertion) => void)[] = [];
 const EDITOR_POLL_TIMEOUT_MS = 30_000;
 
 function addinUrl(port: number): string {
@@ -209,6 +225,23 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse, p
       sendJson(res, 200, { ideas });
       return;
     }
+    if (urlPath === '/api/passages' && req.method === 'POST') {
+      const body = (await readJsonBody(req)) as { query?: string; limit?: number };
+      const result = await searchCopilotPassages(String(body.query ?? ''), Number(body.limit ?? 20));
+      sendJson(res, 200, result);
+      return;
+    }
+    if (urlPath === '/api/compose' && req.method === 'POST') {
+      const body = (await readJsonBody(req)) as { mode?: string; selectionText?: string; paragraphText?: string };
+      const mode: CopilotComposeMode = body.mode === 'rewrite' || body.mode === 'counter' ? body.mode : 'expand';
+      const result = await composeFromSelection({
+        mode,
+        selectionText: String(body.selectionText ?? ''),
+        paragraphText: String(body.paragraphText ?? ''),
+      });
+      sendJson(res, 200, result);
+      return;
+    }
     if (urlPath === '/api/idea' && req.method === 'POST') {
       const body = (await readJsonBody(req)) as { ideaId?: string };
       if (!body.ideaId) {
@@ -280,10 +313,14 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse, p
       return;
     }
     if (urlPath === '/api/editor/insert' && req.method === 'POST') {
-      const body = (await readJsonBody(req)) as { text?: string };
-      const text = String(body.text ?? '');
+      const body = (await readJsonBody(req)) as { text?: string; asFootnote?: boolean; replace?: boolean };
+      const insertion: EditorInsertion = {
+        text: String(body.text ?? ''),
+        asFootnote: Boolean(body.asFootnote),
+        replace: Boolean(body.replace),
+      };
       const resolver = pendingInsertionResolvers.shift();
-      if (resolver) resolver(text);
+      if (resolver) resolver(insertion);
       // delivered:false tells the pane no editor bridge is long-polling right now,
       // so it can surface "run the macro in Writer" instead of a silent no-op.
       sendJson(res, 200, { ok: true, delivered: Boolean(resolver) });
@@ -311,7 +348,7 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse, p
           resolve();
         };
         const timeout = setTimeout(() => settle({ text: null }), EDITOR_POLL_TIMEOUT_MS);
-        const resolver = (text: string) => settle({ text });
+        const resolver = (insertion: EditorInsertion) => settle(insertion);
         // A dead poller must leave the queue immediately: otherwise a later
         // insert would be handed to it and the text silently lost. res 'close'
         // fires on premature termination (and, harmlessly for the idempotent

@@ -6,8 +6,11 @@
 
 Un complemento (task pane) de Microsoft Word que, mientras escribes, muestra en el
 panel lateral cómo el **párrafo actual** se relaciona con tu biblioteca de Nodus,
-permite buscar ideas/autores/obras, ver cada idea con sus conexiones y pedir a la
-IA configurada en Nodus que inserte una idea parafraseada con cita autor-año.
+permite buscar ideas/autores/obras **y pasajes citables del texto completo**, ver
+cada idea con sus conexiones y pedir a la IA configurada en Nodus que inserte una
+idea parafraseada con cita autor-año. Sobre la **selección** puede además
+**reescribir**, **ampliar** o redactar un **contraargumento** citado, e insertar
+cualquier resultado **en el cuerpo o como nota al pie**.
 
 No reimplementa nada del cerebro de Nodus: el add-in es solo una segunda cara. El
 análisis (embeddings + relaciones tipadas) lo hace tu app de Nodus, que sirve el
@@ -46,9 +49,18 @@ complemento y una pequeña API JSON **en el mismo origen HTTPS local**
 - Abre Nodus (con el copiloto activado) y Word. En la pestaña **Nodus**, abre el
   panel **Nodus Copilot**.
 - Escribe. Al pausar, el panel muestra las ideas relacionadas del párrafo.
-- Usa el buscador para filtrar por idea, autor u obra indexada.
+- Usa el buscador para filtrar por idea, autor u obra indexada. Con el conmutador
+  **Ideas / Pasajes** cambias a la búsqueda semántica sobre el **texto completo**:
+  cada pasaje trae su cita y un botón **Insertar cita** (lo pega entre comillas con
+  el autor-año).
 - Abre **Detalles** para ver fuentes y conexiones; **Abrir en Nodus** enfoca la
   idea en el grafo; **Insertar con IA** añade una paráfrasis citada al texto.
+- Con texto seleccionado, la fila **Selección** ofrece **Reescribir** (sustituye la
+  selección), **Ampliar** (continúa el texto) y **Rebatir** (redacta un
+  contraargumento citado a partir de las ideas que la contradicen o matizan).
+- El selector **Insertar en** manda las inserciones y contraargumentos al **cuerpo**
+  o a una **nota al pie** (requiere Word con WordApi 1.5; si no, la opción se
+  desactiva). *Reescribir* siempre trabaja sobre el cuerpo.
 
 ## Requisitos
 - Nodus en marcha con un proveedor de **embeddings** configurado (la biblioteca debe

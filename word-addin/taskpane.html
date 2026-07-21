@@ -27,9 +27,24 @@
           <input id="searchBox" type="search" placeholder="Buscar ideas, autores u obras" autocomplete="off" />
           <button id="searchBtn" class="btn icon" type="button" title="Buscar">⌕</button>
         </div>
+        <div class="segmented" id="searchMode" role="tablist">
+          <button class="seg active" data-mode="ideas" type="button" role="tab">Ideas</button>
+          <button class="seg" data-mode="passages" type="button" role="tab">Pasajes</button>
+        </div>
         <div class="toolbar">
           <label class="auto"><input type="checkbox" id="autoToggle" checked /> Auto</label>
           <button id="analyzeBtn" class="btn primary" type="button">Analizar párrafo</button>
+        </div>
+        <div class="selection-actions" id="selectionActions">
+          <span class="sa-label">Selección</span>
+          <button class="btn small" data-compose="rewrite" type="button">Reescribir</button>
+          <button class="btn small" data-compose="expand" type="button">Ampliar</button>
+          <button class="btn small" data-compose="counter" type="button">Rebatir</button>
+        </div>
+        <div class="insert-target" id="insertTarget">
+          <span class="it-label">Insertar en</span>
+          <label><input type="radio" name="insTarget" value="body" checked /> <span data-it="body">Texto</span></label>
+          <label id="footnoteOption"><input type="radio" name="insTarget" value="footnote" id="footnoteRadio" /> <span data-it="footnote">Nota al pie</span></label>
         </div>
       </section>
 

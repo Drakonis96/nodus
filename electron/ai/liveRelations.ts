@@ -15,7 +15,7 @@ import {
 } from './chapterIdeas';
 import { getSettings } from '../db/settingsRepo';
 import { findSimilarIdeas, getIdeaDetail, getIdeaEdges, getIdeaSummary } from '../db/ideasRepo';
-import { getPassageDetail } from '../db/passagesRepo';
+import { embeddedPassageCount, findSimilarPassages, getPassageDetail } from '../db/passagesRepo';
 import { getWork } from '../db/worksRepo';
 import { getDb } from '../db/database';
 
@@ -808,4 +808,219 @@ export async function analyzeText(text: string, model?: ModelRef | null): Promis
   }).sort((a, b) => b.rankScore - a.rankScore || b.similarity - a.similarity);
 
   return { available: true, relations };
+}
+
+// ── Full-text passage search (citable source excerpts) ──────────────────────────
+const LIVE_PASSAGE_MIN_SIMILARITY = 0.18;
+
+export interface CopilotPassageSearchResult {
+  passageId: string;
+  nodusId: string;
+  similarity: number;
+  pageLabel: string | null;
+  /** Short excerpt for the card; `text` carries the full chunk for quoting. */
+  snippet: string;
+  text: string;
+  workTitle: string;
+  authors: string[];
+  year: number | null;
+  authorYear: string | null;
+  zoteroKey: string | null;
+  searchString: string | null;
+}
+
+export interface CopilotPassageSearchResponse {
+  /** False when no embedding provider/key is configured (cannot embed the query). */
+  available: boolean;
+  /** False when the corpus has no embedded passages for the current model. */
+  indexed: boolean;
+  passages: CopilotPassageSearchResult[];
+}
+
+function parseAuthorsJson(json: string): string[] {
+  try {
+    const parsed = JSON.parse(json || '[]');
+    return Array.isArray(parsed) ? parsed.filter((a): a is string => typeof a === 'string' && a.length > 0) : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Semantic search over the corpus full text. Returns citable passage excerpts —
+ * the writer's counterpart to searchCopilotIdeas, but over the underlying source
+ * text (what you actually quote) rather than derived claims.
+ */
+export async function searchCopilotPassages(query: string, limit = 20): Promise<CopilotPassageSearchResponse> {
+  const cleanLimit = Math.max(1, Math.min(50, Math.floor(limit)));
+  const trimmed = query.trim();
+  if (trimmed.length < 2) return { available: true, indexed: true, passages: [] };
+
+  // Embed first: with no provider we can report "not available" without touching
+  // the passage tables, which keeps the branch cheap and side-effect free.
+  const vector = await embed(trimmed);
+  if (!vector) return { available: false, indexed: false, passages: [] };
+
+  const indexed = embeddedPassageCount() > 0;
+  if (!indexed) return { available: true, indexed: false, passages: [] };
+
+  const hits = findSimilarPassages(vector, LIVE_PASSAGE_MIN_SIMILARITY, cleanLimit);
+  const passages = hits.map((hit) => {
+    const authors = parseAuthorsJson(hit.authors_json);
+    return {
+      passageId: hit.passage_id,
+      nodusId: hit.nodus_id,
+      similarity: hit.similarity,
+      pageLabel: hit.page_label,
+      snippet: clip(hit.text, 320),
+      text: hit.text,
+      workTitle: hit.title,
+      authors,
+      year: hit.year,
+      authorYear: authorYearLabel(authors, hit.year),
+      zoteroKey: hit.zotero_key || null,
+      searchString: searchString(authors, hit.year, hit.title),
+    };
+  });
+  return { available: true, indexed, passages };
+}
+
+// ── Compose over the user's selection (rewrite / expand / counter) ───────────────
+export type CopilotComposeMode = 'rewrite' | 'expand' | 'counter';
+
+export interface CopilotComposeCitation {
+  label: string;
+  authorYear: string | null;
+  zoteroKey: string | null;
+  searchString: string | null;
+}
+
+export interface CopilotComposeResult {
+  /** False when no embedding provider is configured (relations cannot be found). */
+  available: boolean;
+  mode: CopilotComposeMode;
+  text: string;
+  citations: CopilotComposeCitation[];
+}
+
+const COMPOSE_MAX_CONTEXT = 5;
+
+function composeSystemPrompt(mode: CopilotComposeMode): string {
+  const base = [
+    'Eres Nodus Copilot dentro de un procesador de texto académico.',
+    'Trabajas SOLO con el texto del usuario y las ideas de su biblioteca que se te pasan.',
+    'No inventes autores, años, páginas ni obras: usa únicamente las citas (autor, año) proporcionadas.',
+    'Escribe en el mismo idioma que el texto del usuario, con prosa académica natural.',
+    'Cuando te apoyes en una idea de la biblioteca, incorpora su cita parentética en texto plano, p. ej. (Autor, 2019).',
+    'Devuelve SOLO el texto resultante: sin Markdown, sin viñetas, sin comillas globales de apertura/cierre, sin explicación ni encabezados.',
+  ];
+  if (mode === 'rewrite') {
+    base.push(
+      'Tarea: REESCRIBE la selección con mejor prosa académica conservando su significado; integra 1-2 citas de apoyo solo si encajan con naturalidad. El resultado SUSTITUYE a la selección.'
+    );
+  } else if (mode === 'expand') {
+    base.push(
+      'Tarea: CONTINÚA y AMPLÍA la selección con 1-3 frases que desarrollen la idea apoyándose en la biblioteca y sus citas. El resultado se AÑADE tras la selección.'
+    );
+  } else {
+    base.push(
+      'Tarea: redacta un CONTRAARGUMENTO matizado a la selección basándote en las ideas de la biblioteca que la tensionan o contradicen, con sus citas. Empieza con una fórmula del tipo «Sin embargo,» o «No obstante,». El resultado se AÑADE tras la selección.'
+    );
+  }
+  return base.join('\n');
+}
+
+function composeOutputHint(mode: CopilotComposeMode): string {
+  if (mode === 'rewrite') return 'Versión reescrita de la selección (la sustituye).';
+  if (mode === 'expand') return '1-3 frases nuevas que continúan el texto (se añaden tras la selección).';
+  return '1-3 frases de contraargumento con su(s) cita(s) (se añaden tras la selección).';
+}
+
+function normalizeComposeText(raw: string): string {
+  return raw
+    .replace(/\[([^\]]+)\]\(nodus:\/\/[^)]+\)/g, '$1')
+    .replace(/[`*_#>]/g, '')
+    .replace(/\r?\n{2,}/g, '\n')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/^["“”«»]+|["“”«»]+$/g, '')
+    .trim();
+}
+
+/**
+ * Draft text FROM the user's selection, grounded in the library: rewrite it,
+ * expand it, or build a cited counterargument. Reuses analyzeText's typed
+ * relations so 'counter' can prefer the ideas that contradict/refine the claim.
+ */
+export async function composeFromSelection(input: {
+  mode: CopilotComposeMode;
+  selectionText: string;
+  paragraphText: string;
+  model?: ModelRef | null;
+}): Promise<CopilotComposeResult> {
+  const { mode } = input;
+  const selection = (input.selectionText ?? '').trim();
+  const paragraph = (input.paragraphText ?? '').trim();
+  const focus = selection || paragraph;
+  if (focus.length < 12) {
+    throw new Error('Selecciona (o sitúate en) un fragmento con algo más de texto para trabajarlo.');
+  }
+
+  const analysis = await analyzeText(focus, input.model ?? null);
+  if (!analysis.available) return { available: false, mode, text: '', citations: [] };
+
+  const relations = analysis.relations.slice();
+  let chosen: LiveRelation[];
+  if (mode === 'counter') {
+    const opposing = relations.filter((r) => r.relation === 'contradicts' || r.relation === 'refines');
+    chosen = (opposing.length ? opposing : relations).slice(0, COMPOSE_MAX_CONTEXT);
+  } else {
+    chosen = relations.slice(0, COMPOSE_MAX_CONTEXT);
+  }
+
+  const context = chosen.map((r) => ({
+    relacion: r.relation,
+    idea: r.targetLabel,
+    enunciado: clip(r.targetStatement ?? r.rationale ?? '', 320),
+    cita: r.authorYear,
+  }));
+
+  const model = input.model ?? getSettings().synthesisModel;
+  const raw = await completeText(
+    {
+      system: composeSystemPrompt(mode),
+      user: JSON.stringify(
+        {
+          seleccion: clip(selection, 1400),
+          parrafo: clip(paragraph, 2200),
+          ideas_de_la_biblioteca: context,
+          salida: composeOutputHint(mode),
+        },
+        null,
+        2
+      ),
+      temperature: 0.25,
+      maxTokens: 480,
+    },
+    model
+  );
+
+  const text = normalizeComposeText(raw);
+  if (!text) throw new Error('La IA no devolvió texto insertable.');
+
+  const citations: CopilotComposeCitation[] = [];
+  const seen = new Set<string>();
+  for (const r of chosen) {
+    if (!r.authorYear && !r.zoteroKey) continue;
+    const key = r.zoteroKey || r.authorYear || r.targetLabel;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    citations.push({
+      label: r.targetLabel,
+      authorYear: r.authorYear,
+      zoteroKey: r.zoteroKey,
+      searchString: r.searchString,
+    });
+  }
+
+  return { available: true, mode, text, citations };
 }

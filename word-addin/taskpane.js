@@ -17,6 +17,9 @@
   var isWord = false;
   var currentParagraphText = '';
   var currentSelectionText = '';
+  var searchMode = 'ideas'; // 'ideas' | 'passages'
+  var insertTarget = 'body'; // 'body' | 'footnote'
+  var footnoteSupported = true;
 
   // The pane follows the Nodus UI language (injected by the copilot server).
   var STR = {
@@ -57,6 +60,28 @@
       editorNotListening: 'LibreOffice no está escuchando. Ejecuta la macro start_nodus_copilot en Writer.',
       wordOnly: 'Este complemento solo funciona en Word.',
       nodusError: 'Error de Nodus',
+      modeIdeas: 'Ideas',
+      modePassages: 'Pasajes',
+      selectionLabel: 'Selección',
+      composeRewrite: 'Reescribir',
+      composeExpand: 'Ampliar',
+      composeCounter: 'Rebatir',
+      insertInLabel: 'Insertar en',
+      targetBody: 'Texto',
+      targetFootnote: 'Nota al pie',
+      footnoteUnsupported: 'Tu versión de Word no admite notas al pie desde el complemento.',
+      working: 'Trabajando…',
+      needSelection: 'Selecciona el texto que quieres reescribir.',
+      composeEmpty: 'La IA no devolvió texto.',
+      rewriteDone: 'Reescrito',
+      expandDone: 'Ampliado',
+      counterDone: 'Contraargumento insertado',
+      citationsUsed: 'Citas usadas',
+      insertQuote: 'Insertar cita',
+      quoteInserted: 'Cita insertada',
+      searchingPassages: 'Buscando pasajes…',
+      noPassages: 'Sin pasajes para esa búsqueda.',
+      passagesNotIndexed: 'No hay texto completo indexado. Indexa la biblioteca en Nodus.',
       relation: { supports: 'apoya', contradicts: 'contradice', refines: 'matiza', extends: 'amplía', related: 'relacionada' },
       kind: { idea: 'idea', note: 'nota', passage: 'pasaje', work: 'obra' },
     },
@@ -97,6 +122,28 @@
       editorNotListening: 'LibreOffice is not listening. Run the start_nodus_copilot macro in Writer.',
       wordOnly: 'This add-in only works in Word.',
       nodusError: 'Nodus error',
+      modeIdeas: 'Ideas',
+      modePassages: 'Passages',
+      selectionLabel: 'Selection',
+      composeRewrite: 'Rewrite',
+      composeExpand: 'Expand',
+      composeCounter: 'Counter',
+      insertInLabel: 'Insert into',
+      targetBody: 'Body',
+      targetFootnote: 'Footnote',
+      footnoteUnsupported: 'Your Word version does not support add-in footnotes.',
+      working: 'Working…',
+      needSelection: 'Select the text you want to rewrite.',
+      composeEmpty: 'The AI returned no text.',
+      rewriteDone: 'Rewritten',
+      expandDone: 'Expanded',
+      counterDone: 'Counterargument inserted',
+      citationsUsed: 'Citations used',
+      insertQuote: 'Insert quote',
+      quoteInserted: 'Quote inserted',
+      searchingPassages: 'Searching passages…',
+      noPassages: 'No passages match that search.',
+      passagesNotIndexed: 'No full text indexed. Index your library in Nodus.',
       relation: { supports: 'supports', contradicts: 'contradicts', refines: 'refines', extends: 'extends', related: 'related' },
       kind: { idea: 'idea', note: 'note', passage: 'passage', work: 'work' },
     },
@@ -203,12 +250,15 @@
     });
   }
 
-  function insertAtCursor(text) {
+  function insertAtCursor(text, opts) {
+    opts = opts || {};
+    var asFootnote = !!opts.asFootnote && footnoteSupported;
+    var replace = !!opts.replace;
     if (!isWord) {
       return api('/api/editor/insert', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: text })
+        body: JSON.stringify({ text: text, asFootnote: !!opts.asFootnote, replace: replace })
       }).then(function (result) {
         // The server accepts the text but only a long-polling macro can place
         // it in the document; surface the miss instead of a silent no-op.
@@ -218,6 +268,16 @@
     }
     return Word.run(function (context) {
       var range = context.document.getSelection();
+      if (asFootnote) {
+        // A footnote is anchored at the end of the selection; its own text needs
+        // no leading space and never replaces the selected body text.
+        range.insertFootnote(text);
+        return context.sync();
+      }
+      if (replace) {
+        range.insertText(text, Word.InsertLocation.replace);
+        return context.sync();
+      }
       var prefix = text.charAt(0) === ' ' ? '' : ' ';
       range.insertText(prefix + text, Word.InsertLocation.end);
       return context.sync();
@@ -377,7 +437,7 @@
         });
       })
       .then(function (result) {
-        return insertAtCursor(result.text).then(function () {
+        return insertAtCursor(result.text, { asFootnote: insertTarget === 'footnote' }).then(function () {
           setStatus(T('ideaInserted'), 'ok');
         });
       })
@@ -477,10 +537,14 @@
     });
   }
 
-  function searchIdeas() {
+  function runSearch() {
     var query = els.searchBox.value.trim();
     if (query.length < 2) {
       analyze(true);
+      return;
+    }
+    if (searchMode === 'passages') {
+      searchPassages(query);
       return;
     }
     var seq = ++requestSeq;
@@ -504,6 +568,157 @@
       });
   }
 
+  function searchPassages(query) {
+    var seq = ++requestSeq;
+    els.paragraph.textContent = '';
+    els.empty.style.display = 'block';
+    els.empty.textContent = T('searchingPassages');
+    els.results.innerHTML = '';
+
+    api('/api/passages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: query, limit: 30 }),
+    })
+      .then(function (data) {
+        if (seq !== requestSeq) return;
+        if (!data.available) {
+          renderEmpty(T('needEmbeddings'));
+          return;
+        }
+        if (!data.indexed) {
+          renderEmpty(T('passagesNotIndexed'));
+          return;
+        }
+        renderPassages(data.passages || []);
+      })
+      .catch(function (e) {
+        if (seq !== requestSeq) return;
+        renderEmpty(T('searchError') + e.message);
+      });
+  }
+
+  function renderPassages(passages) {
+    els.results.innerHTML = '';
+    if (!passages.length) {
+      renderEmpty(T('noPassages'));
+      return;
+    }
+    els.empty.style.display = 'none';
+
+    passages.forEach(function (passage) {
+      var card = textEl('article', 'card', '');
+
+      var row = textEl('div', 'row', '');
+      row.appendChild(textEl('span', 'badge passage', KIND_LABEL.passage || 'passage'));
+      row.appendChild(textEl('span', 'label', passage.workTitle || T('untitled')));
+      if (passage.similarity) row.appendChild(textEl('span', 'pct', Math.round(passage.similarity * 100) + '%'));
+      card.appendChild(row);
+
+      var meta = [passage.authorYear, passage.pageLabel].filter(Boolean).join(' · ');
+      if (meta) card.appendChild(textEl('div', 'subtitle', meta));
+      if (passage.snippet) card.appendChild(textEl('p', 'rationale', passage.snippet));
+
+      var actions = textEl('div', 'actions', '');
+      actions.appendChild(button(T('insertQuote'), 'btn small primary', function () { insertPassageQuote(passage, this); }));
+      appendZoteroAction(actions, passage);
+      if (actions.childNodes.length) card.appendChild(actions);
+
+      els.results.appendChild(card);
+    });
+  }
+
+  function insertPassageQuote(passage, btn) {
+    var original = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = T('inserting');
+    var body = (passage.text || passage.snippet || '').trim();
+    var quote = '«' + body + '»';
+    if (passage.authorYear) quote += ' (' + passage.authorYear + ')';
+    insertAtCursor(quote, { asFootnote: insertTarget === 'footnote' })
+      .then(function () { setStatus(T('quoteInserted'), 'ok'); })
+      .catch(function (e) { setStatus(e.message, 'err'); })
+      .finally(function () {
+        btn.disabled = false;
+        btn.textContent = original;
+      });
+  }
+
+  var COMPOSE_DONE = { rewrite: 'rewriteDone', expand: 'expandDone', counter: 'counterDone' };
+
+  function runCompose(mode, btn) {
+    var original = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = T('working');
+    Promise.all([getCurrentParagraph(), getSelectionText()])
+      .then(function (values) {
+        var paragraphText = values[0];
+        var selectionText = values[1];
+        if (mode === 'rewrite' && !selectionText) {
+          setStatus(T('needSelection'), 'err');
+          return null;
+        }
+        return api('/api/compose', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode: mode, selectionText: selectionText, paragraphText: paragraphText }),
+        });
+      })
+      .then(function (result) {
+        if (!result) return;
+        if (!result.available) {
+          setStatus(T('needEmbeddings'), 'err');
+          return;
+        }
+        if (!result.text) {
+          setStatus(T('composeEmpty'), 'err');
+          return;
+        }
+        // Rewrite replaces the selected body text; expand/counter append and may
+        // be routed to a footnote per the user's target choice.
+        var replace = mode === 'rewrite';
+        var asFootnote = mode !== 'rewrite' && insertTarget === 'footnote';
+        return insertAtCursor(result.text, { asFootnote: asFootnote, replace: replace }).then(function () {
+          setStatus(T(COMPOSE_DONE[mode] || 'ideaInserted'), 'ok');
+          renderComposeCitations(result.citations);
+        });
+      })
+      .catch(function (e) { setStatus((e && e.message) || String(e), 'err'); })
+      .finally(function () {
+        btn.disabled = false;
+        btn.textContent = original;
+      });
+  }
+
+  function renderComposeCitations(citations) {
+    if (!citations || !citations.length) return;
+    els.empty.style.display = 'none';
+    els.results.innerHTML = '';
+    els.results.appendChild(textEl('div', 'section-title', T('citationsUsed')));
+    citations.forEach(function (citation) {
+      var card = textEl('article', 'card', '');
+      var row = textEl('div', 'row', '');
+      row.appendChild(textEl('span', 'badge idea', KIND_LABEL.work || 'work'));
+      row.appendChild(textEl('span', 'label', citation.label || T('untitled')));
+      card.appendChild(row);
+      if (citation.authorYear) card.appendChild(textEl('div', 'subtitle', citation.authorYear));
+      var actions = textEl('div', 'actions', '');
+      appendZoteroAction(actions, citation);
+      if (actions.childNodes.length) card.appendChild(actions);
+      els.results.appendChild(card);
+    });
+  }
+
+  function setSearchMode(mode) {
+    if (mode === searchMode) return;
+    searchMode = mode;
+    var buttons = els.searchModeEl ? els.searchModeEl.querySelectorAll('.seg') : [];
+    for (var i = 0; i < buttons.length; i++) {
+      buttons[i].classList.toggle('active', buttons[i].getAttribute('data-mode') === mode);
+    }
+    if (els.searchBox.value.trim().length >= 2) runSearch();
+  }
+
   function onSelectionChanged() {
     if (!autoAnalyze || els.searchBox.value.trim()) return;
     if (debounceTimer) clearTimeout(debounceTimer);
@@ -512,7 +727,7 @@
 
   function onSearchInput() {
     if (searchTimer) clearTimeout(searchTimer);
-    searchTimer = setTimeout(searchIdeas, DEBOUNCE_MS);
+    searchTimer = setTimeout(runSearch, DEBOUNCE_MS);
   }
 
   function checkHealth() {
@@ -554,6 +769,11 @@
     els.autoToggle = document.getElementById('autoToggle');
     els.searchBox = document.getElementById('searchBox');
     els.searchBtn = document.getElementById('searchBtn');
+    els.searchModeEl = document.getElementById('searchMode');
+    els.selectionActions = document.getElementById('selectionActions');
+    els.insertTargetEl = document.getElementById('insertTarget');
+    els.footnoteOption = document.getElementById('footnoteOption');
+    els.footnoteRadio = document.getElementById('footnoteRadio');
 
     document.documentElement.lang = LANG;
     els.status.textContent = T('connecting');
@@ -561,6 +781,42 @@
     els.searchBtn.title = T('searchTitle');
     els.analyzeBtn.textContent = T('analyze');
     els.empty.textContent = T('emptyInitial');
+
+    // Localize the segmented search mode, selection actions and insert target.
+    var modeButtons = els.searchModeEl.querySelectorAll('.seg');
+    for (var mi = 0; mi < modeButtons.length; mi++) {
+      modeButtons[mi].textContent = modeButtons[mi].getAttribute('data-mode') === 'passages' ? T('modePassages') : T('modeIdeas');
+    }
+    var saLabel = els.selectionActions.querySelector('.sa-label');
+    if (saLabel) saLabel.textContent = T('selectionLabel');
+    var composeButtons = els.selectionActions.querySelectorAll('[data-compose]');
+    for (var ci = 0; ci < composeButtons.length; ci++) {
+      var cmode = composeButtons[ci].getAttribute('data-compose');
+      composeButtons[ci].textContent = cmode === 'rewrite' ? T('composeRewrite') : cmode === 'expand' ? T('composeExpand') : T('composeCounter');
+    }
+    var itLabel = els.insertTargetEl.querySelector('.it-label');
+    if (itLabel) itLabel.textContent = T('insertInLabel');
+    var bodySpan = els.insertTargetEl.querySelector('[data-it="body"]');
+    var footnoteSpan = els.insertTargetEl.querySelector('[data-it="footnote"]');
+    if (bodySpan) bodySpan.textContent = T('targetBody');
+    if (footnoteSpan) footnoteSpan.textContent = T('targetFootnote');
+
+    // Footnotes need WordApi 1.5. Standalone (LibreOffice) relies on the macro,
+    // which falls back to inline if its Writer build cannot place a footnote.
+    if (isWord) {
+      try {
+        footnoteSupported = !!(Office.context.requirements && Office.context.requirements.isSetSupported('WordApi', '1.5'));
+      } catch (e) {
+        footnoteSupported = false;
+      }
+    }
+    if (!footnoteSupported) {
+      if (els.footnoteRadio) els.footnoteRadio.disabled = true;
+      if (els.footnoteOption) {
+        els.footnoteOption.classList.add('disabled');
+        els.footnoteOption.title = T('footnoteUnsupported');
+      }
+    }
 
     if (!isWord) {
       var captionEl = document.querySelector('.head .caption');
@@ -585,16 +841,33 @@
       els.searchBox.value = '';
       analyze(true);
     };
-    els.searchBtn.onclick = searchIdeas;
+    els.searchBtn.onclick = runSearch;
     els.searchBox.oninput = onSearchInput;
     els.searchBox.onkeydown = function (event) {
-      if (event.key === 'Enter') searchIdeas();
+      if (event.key === 'Enter') runSearch();
       if (event.key === 'Escape') {
         els.searchBox.value = '';
         analyze(true);
       }
     };
     els.autoToggle.onchange = function () { autoAnalyze = els.autoToggle.checked; };
+
+    for (var mb = 0; mb < modeButtons.length; mb++) {
+      (function (btn) {
+        btn.onclick = function () { setSearchMode(btn.getAttribute('data-mode')); };
+      })(modeButtons[mb]);
+    }
+    for (var cbi = 0; cbi < composeButtons.length; cbi++) {
+      (function (btn) {
+        btn.onclick = function () { runCompose(btn.getAttribute('data-compose'), btn); };
+      })(composeButtons[cbi]);
+    }
+    var targetRadios = els.insertTargetEl.querySelectorAll('input[name="insTarget"]');
+    for (var ri = 0; ri < targetRadios.length; ri++) {
+      targetRadios[ri].onchange = function () {
+        if (this.checked) insertTarget = this.value;
+      };
+    }
 
     // The status chip doubles as a retry button when Nodus is unreachable.
     els.status.style.cursor = 'pointer';

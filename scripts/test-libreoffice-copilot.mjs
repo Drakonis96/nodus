@@ -119,6 +119,84 @@ try {
     );
   }
 
+  // Insert options (footnote / replace) travel through the bridge to the poller.
+  {
+    const pollRes = mockResponse();
+    const pollPromise = server.handleRequest(
+      mockRequest('GET', '/api/editor/poll-insertion', authHeaders()),
+      pollRes,
+      4320
+    );
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    const insertRes = mockResponse();
+    await server.handleRequest(
+      mockRequest('POST', '/api/editor/insert', authHeaders(), {
+        text: 'Cita en nota al pie',
+        asFootnote: true,
+        replace: true,
+      }),
+      insertRes,
+      4320
+    );
+    assert.equal(JSON.parse(insertRes.getBody()).delivered, true);
+
+    await pollPromise;
+    const delivered = JSON.parse(pollRes.getBody());
+    assert.equal(delivered.text, 'Cita en nota al pie');
+    assert.equal(delivered.asFootnote, true, 'footnote flag must reach the poller');
+    assert.equal(delivered.replace, true, 'replace flag must reach the poller');
+  }
+
+  // Passage search with no embedding provider configured: available:false, no crash.
+  {
+    const res = mockResponse();
+    await server.handleRequest(
+      mockRequest('POST', '/api/passages', authHeaders(), { query: 'pobreza en el relato de viajes' }),
+      res,
+      4320
+    );
+    assert.equal(res.statusCode, 200);
+    const body = JSON.parse(res.getBody());
+    assert.equal(body.available, false, 'no embeddings → passages unavailable');
+    assert.deepEqual(body.passages, [], 'no passages without embeddings');
+  }
+
+  // Compose over a selection with no embeddings: graceful available:false, no throw.
+  {
+    const res = mockResponse();
+    await server.handleRequest(
+      mockRequest('POST', '/api/compose', authHeaders(), {
+        mode: 'counter',
+        selectionText: 'El turismo documenta fielmente la realidad del país.',
+        paragraphText: 'El turismo documenta fielmente la realidad del país.',
+      }),
+      res,
+      4320
+    );
+    assert.equal(res.statusCode, 200);
+    const body = JSON.parse(res.getBody());
+    assert.equal(body.available, false, 'no embeddings → compose unavailable');
+    assert.equal(body.mode, 'counter', 'compose echoes the requested mode');
+    assert.equal(body.text, '', 'no draft without embeddings');
+  }
+
+  // An unknown compose mode falls back to a valid default instead of erroring.
+  {
+    const res = mockResponse();
+    await server.handleRequest(
+      mockRequest('POST', '/api/compose', authHeaders(), {
+        mode: 'bogus',
+        selectionText: 'Una frase suficientemente larga para analizar.',
+        paragraphText: 'Una frase suficientemente larga para analizar.',
+      }),
+      res,
+      4320
+    );
+    assert.equal(res.statusCode, 200);
+    assert.equal(JSON.parse(res.getBody()).mode, 'expand', 'unknown mode defaults to expand');
+  }
+
   // Bridge discovery file: port + token for the LibreOffice macro.
   {
     const bridgeDir = path.join(root, 'bridge-state');
