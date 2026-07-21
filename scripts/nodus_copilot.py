@@ -166,14 +166,39 @@ class SelectionListener(unohelper.Base, uno.getClass("com.sun.star.view.XSelecti
         pass
 
 
-def _insert_at_cursor(doc, text_to_insert):
-    """Insert after the current selection (matching the Word pane: never replaces
-    the selected text) and leave the cursor at the end of the insertion.
-    Main-thread only."""
+def _insert_footnote(doc, view_cursor, text_to_insert):
+    """Attach a footnote at the end of the current selection and fill its text.
+    Raises on Writer builds that cannot place it, so the caller falls back inline."""
+    footnote = doc.createInstance("com.sun.star.text.Footnote")
+    view_text = view_cursor.getText()
+    view_text.insertTextContent(view_cursor.getEnd(), footnote, False)
+    fn_text = footnote.getText()
+    fn_cursor = fn_text.createTextCursor()
+    fn_text.insertString(fn_cursor, text_to_insert, False)
+
+
+def _insert_at_cursor(doc, text_to_insert, as_footnote=False, replace=False):
+    """Place AI text near the current selection. By default inserts after the
+    selection (matching the Word pane); `replace` overwrites the selected text and
+    `as_footnote` places the text in a footnote instead. Either option falls back
+    to a plain insertion so the text is never lost. Main-thread only."""
     controller = doc.getCurrentController()
     view_cursor = controller.getViewCursor() if controller else None
     if not view_cursor:
         return
+    if as_footnote:
+        try:
+            _insert_footnote(doc, view_cursor, text_to_insert)
+            return
+        except Exception as e:
+            print("[Nodus] No se pudo crear la nota al pie; se inserta en el texto: %s" % e)
+    if replace:
+        try:
+            view_cursor.setString(text_to_insert)
+            view_cursor.collapseToEnd()
+            return
+        except Exception as e:
+            print("[Nodus] No se pudo reemplazar la selección; se inserta al final: %s" % e)
     if text_to_insert and not text_to_insert[0].isspace():
         text_to_insert = " " + text_to_insert
     text = view_cursor.getText()
@@ -184,23 +209,25 @@ def _insert_at_cursor(doc, text_to_insert):
 class _InsertCallback(unohelper.Base, uno.getClass("com.sun.star.awt.XCallback")):
     """Runs one insertion on the main thread (posted via AsyncCallback)."""
 
-    def __init__(self, doc, text_to_insert):
+    def __init__(self, doc, text_to_insert, as_footnote=False, replace=False):
         self.doc = doc
         self.text_to_insert = text_to_insert
+        self.as_footnote = as_footnote
+        self.replace = replace
 
     def notify(self, data):
         try:
-            _insert_at_cursor(self.doc, self.text_to_insert)
+            _insert_at_cursor(self.doc, self.text_to_insert, self.as_footnote, self.replace)
         except Exception as e:
             print("[Nodus] Error al insertar el texto: %s" % e)
 
 
-def _schedule_insert(doc, text_to_insert):
+def _schedule_insert(doc, text_to_insert, as_footnote=False, replace=False):
     """Marshal a document mutation from a worker thread onto the main thread."""
     try:
         ctx = uno.getComponentContext()
         async_cb = ctx.ServiceManager.createInstanceWithContext("com.sun.star.awt.AsyncCallback", ctx)
-        async_cb.addCallback(_InsertCallback(doc, text_to_insert), None)
+        async_cb.addCallback(_InsertCallback(doc, text_to_insert, as_footnote, replace), None)
     except Exception as e:
         print("[Nodus] Error al programar la inserción: %s" % e)
 
@@ -238,7 +265,12 @@ def poll_insertions(doc):
                 continue
             result = _request("GET", "/api/editor/poll-insertion", timeout=POLL_TIMEOUT_S)
             if result and result.get("text") and running:
-                _schedule_insert(doc, result["text"])
+                _schedule_insert(
+                    doc,
+                    result["text"],
+                    bool(result.get("asFootnote")),
+                    bool(result.get("replace")),
+                )
         except urllib.error.URLError:
             time.sleep(5)  # server down/unreachable; back off and retry
         except Exception as e:

@@ -201,6 +201,7 @@ main {
 .badge.refines { color: var(--amber); border-color: color-mix(in srgb, var(--amber) 42%, var(--border)); }
 .badge.extends { color: var(--cyan); border-color: color-mix(in srgb, var(--cyan) 42%, var(--border)); }
 .badge.idea { color: var(--primary); border-color: color-mix(in srgb, var(--primary) 42%, var(--border)); }
+.badge.passage { color: var(--cyan); border-color: color-mix(in srgb, var(--cyan) 42%, var(--border)); }
 
 .label {
   font-size: 13px;
@@ -285,3 +286,62 @@ main {
 .connection-head { display: flex; align-items: center; gap: 6px; }
 .spin { color: var(--muted); font-size: 12px; padding: 4px 0; }
 .copied { color: var(--green); font-size: 11px; align-self: center; }
+
+/* Segmented search mode (Ideas / Passages) */
+.segmented {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+}
+.seg {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  border-radius: 5px;
+  padding: 5px 8px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  min-height: 26px;
+}
+.seg:hover { color: var(--text); }
+.seg.active {
+  background: var(--panel);
+  color: var(--text);
+  font-weight: 620;
+  box-shadow: var(--shadow);
+}
+
+/* Selection actions (Rewrite / Expand / Counter) and insert target */
+.selection-actions,
+.insert-target {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.sa-label,
+.it-label {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  margin-right: 2px;
+}
+.insert-target label {
+  font-size: 12px;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.insert-target label.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
