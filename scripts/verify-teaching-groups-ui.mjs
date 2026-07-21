@@ -63,22 +63,45 @@ try {
   page.on('pageerror', (err) => pageErrors.push(err));
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => !!document.getElementById('root')?.children.length, { timeout: 30_000 });
-  // A fresh profile would otherwise pop the what's-new modal over every click.
-  await page.evaluate((v) => localStorage.setItem('nodus.lastSeenVersion', v), appVersion);
+  // A fresh profile would otherwise pop the what's-new and startup-update modals over
+  // every click. Both have their own storage gate and both must be settled explicitly.
+  await page.evaluate((v) => {
+    localStorage.setItem('nodus.lastSeenVersion', v);
+    sessionStorage.setItem('nodus.startupUpdateChecked', '1');
+  }, appVersion);
 
-  // ── A teaching vault with a subject and an academic year to hang a group on ──
+  // ── Start with an EMPTY teaching vault. The gradebook CTA must help the user
+  // satisfy its subject prerequisite instead of looking active while silently disabled.
   await page.evaluate(async () => {
     const created = await window.nodus.createVault({ name: 'Docencia UI', type: 'docencia' });
     const switched = await window.nodus.switchVault(created.vault.id);
     if (!switched.ok) throw new Error(switched.message);
     await window.nodus.updateSettings({
       onboardingComplete: true, basicsTutorialVersion: 4, recoverySetupVersion: 1,
-      tourComplete: true, advancedTourComplete: true, studyTourComplete: true,
+      tourComplete: true, advancedTourComplete: true, studyTourComplete: true, docenciaTourComplete: true,
       theme: 'light', uiLanguage: 'es',
       // Nodi's one-time style-choice modal renders a full-screen backdrop that
       // intercepts every click; mark the choice as already made.
       mascotStyleChosen: true, mascotEnabled: false,
     });
+  });
+  await page.reload();
+  await page.waitForFunction(() => !!document.getElementById('root')?.children.length);
+
+  const emptyGradesButton = page.getByRole('button', { name: 'Calificaciones', exact: true }).first();
+  await emptyGradesButton.click();
+  await page.getByTestId('grades-list').waitFor();
+  assert.equal(await page.getByTestId('plan-new').isDisabled(), false,
+    'New gradebook remains actionable when its subject prerequisite is missing');
+  await page.getByTestId('plan-new').click();
+  await page.getByTestId('study-create-course').waitFor();
+  assert.equal(await page.getByRole('button', { name: 'Cursos, asignaturas y grupos', exact: true }).count(), 1,
+    'the empty gradebook CTA routes to Courses, subjects and groups');
+  console.log('[ui] empty gradebook CTA routes to its subject prerequisite');
+
+  // Create the prerequisite fixtures through the same application transport, then
+  // continue with the existing end-to-end group and gradebook coverage.
+  await page.evaluate(async () => {
     const year = await window.nodus.createStudyAcademicYear({ label: '2024/2025', startDate: '2024-09-01', endDate: '2025-06-30' });
     const course = await window.nodus.createStudyCourse({ name: '1º ESO', academicYearId: year.id });
     await window.nodus.createStudySubject({ courseId: course.id, name: 'Historia', academicYearId: year.id });
@@ -176,18 +199,14 @@ try {
   assert.ok(fit.lastRight <= fit.tableRight + 1, 'the actions column is not clipped');
   console.log('[ui] roster table fits its container, no column clipped');
 
-  // ── The privacy indicator states the truth, and toggles ─────────────────────
+  // ── The privacy indicator states the no-AI-evaluation boundary truthfully ──
   const privacy = page.getByTestId('group-privacy-toggle');
   await privacy.waitFor();
-  assert.match(await privacy.innerText(), /no verá los nombres/i, 'privacy is on by default and says so');
-  assert.match(await privacy.innerText(), /transcripción de audio/i, 'and is honest about what it does not cover');
-  await privacy.click();
-  await page.waitForFunction(() => /verá los nombres reales/i.test(
-    document.querySelector('[data-testid="group-privacy-toggle"]')?.innerText ?? ''));
-  assert.equal(await page.evaluate(() => window.nodus.getSettings().then((s) => s.studentPseudonymsEnabled)), false,
-    'the indicator really writes the setting');
-  await privacy.click();
-  console.log('[ui] privacy indicator reflects and controls the real setting');
+  assert.match(await privacy.innerText(), /La IA no accede a este listado, a las notas ni a las respuestas/i,
+    'the roster states that student data is outside the AI surface');
+  assert.match(await privacy.innerText(), /no expone ninguna función de IA para calificar, perfilar o evaluar/i,
+    'the indicator describes the enforced no-AI-evaluation boundary');
+  console.log('[ui] privacy indicator states the enforced no-AI-evaluation boundary');
 
   await page.screenshot({ path: path.join(shotDir, 'groups-detail-light-es.png') });
   await page.getByTestId('group-back').click();
@@ -208,9 +227,9 @@ try {
   // ALREADY-TRANSLATED string (the convention every other view follows), so it keeps
   // the language it was created in — and left on screen it would let this assertion
   // pass while the visible UI still shows Spanish.
-  await page.waitForFunction(() => !/verá identificadores|verá los nombres reales/.test(document.body.innerText), null, { timeout: 10_000 });
+  await page.waitForFunction(() => !/Identificador STU_[A-Z0-9]+ copiado/.test(document.body.innerText), null, { timeout: 10_000 });
   await page.evaluate(() => window.nodus.updateSettings({ uiLanguage: 'en', theme: 'light' }));
-  await page.waitForFunction(() => document.body.innerText.includes('Students') || document.body.innerText.includes('Identifier'));
+  await page.getByRole('columnheader', { name: 'Identifier', exact: true }).waitFor();
   const englishText = await page.evaluate(() => document.body.innerText);
   // Every Spanish key this view renders, not a hand-picked few: a partial list is how
   // an untranslated string ships while the test stays green.
@@ -292,23 +311,6 @@ try {
   assert.match(await statusLabel.innerText(), /No entregado/,
     'the cell shows the chosen status instead of a bare blank');
   console.log('[ui] the five entry statuses are reachable from the grid');
-
-  // The family-comment drafter shows the teacher EXACTLY what would leave the machine
-  // before anything is sent. Asserting on that panel is how a future edit that starts
-  // leaking a name gets caught by a human reading a screen, not only by a unit test.
-  await page.locator('[data-testid^="grade-final-"]').first().click();
-  await page.getByTestId('explain-modal').waitFor();
-  await page.getByTestId('explain-feedback').click();
-  await page.getByTestId('feedback-modal').waitFor();
-  const payload = await page.getByTestId('feedback-payload').innerText();
-  assert.match(payload, /STU_[2-9A-HJKMNP-TV-Z]{4}/, `the payload carries the identifier: ${payload}`);
-  assert.ok(!/Nombre|Apellidos/.test(payload), `no name column may reach the payload: ${payload}`);
-  assert.match(payload, /\b7\b/, `the marks travel: ${payload}`);
-  await page.keyboard.press('Escape');
-  await page.getByTestId('feedback-modal').waitFor({ state: 'detached' });
-  await page.keyboard.press('Escape');
-  await page.getByTestId('explain-modal').waitFor({ state: 'detached' });
-  console.log('[ui] the family-comment drafter shows the anonymised payload before sending');
 
   // The derivation panel is the reclamación defence: it must open and show the maths.
   await page.locator('[data-testid^="grade-final-"]').first().click();
