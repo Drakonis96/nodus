@@ -23,7 +23,7 @@ export function resolveStudyAiTaskModel(task: StudyAiTask, explicit?: ModelRef |
   return model;
 }
 
-export async function runStudyAiTask<T>(input: { task: StudyAiTask; explicitModel?: ModelRef | null; subjectId?: string | null; inputChars: number; outputChars?: (value: T) => number; allowFallback?: () => boolean; externalPurpose?: string; externalDetail?: string; externalConsentKey?: string }, operation: (model: ModelRef) => Promise<T>): Promise<{ value: T; model: ModelRef; fallbackUsed: boolean }> {
+export async function runStudyAiTask<T>(input: { task: StudyAiTask; explicitModel?: ModelRef | null; subjectId?: string | null; inputChars: number; outputChars?: (value: T) => number; allowFallback?: () => boolean; externalPurpose?: string; externalDetail?: string; externalConsentKey?: string; externalConsentModelKey?: string }, operation: (model: ModelRef) => Promise<T>): Promise<{ value: T; model: ModelRef; fallbackUsed: boolean }> {
   const settings = getSettings(); if (input.inputChars > settings.studyAiMaxInputChars) throw new Error(`La solicitud supera el límite configurado de ${settings.studyAiMaxInputChars.toLocaleString('es-ES')} caracteres.`);
   const summary = getStudyAiUsageSummary(); if (summary.budgetUsd > 0 && summary.knownCostUsd >= summary.budgetUsd) throw new Error('Se ha alcanzado el presupuesto mensual de IA para estudio.');
   const primary = resolveStudyAiTaskModel(input.task, input.explicitModel, input.subjectId);
@@ -44,7 +44,8 @@ export async function runStudyAiTask<T>(input: { task: StudyAiTask; explicitMode
     if (input.subjectId && settings.studyAiExcludedSubjectIds.includes(input.subjectId) && !isLocalStudyModel(candidate.model)) continue;
     const externalKey = `${candidate.model.provider}:${candidate.model.model}`;
     const requestConsentKey = input.externalConsentKey ? `${externalKey}:${input.externalConsentKey}` : null;
-    if (!isLocalStudyModel(candidate.model) && settings.studyAiConfirmExternal && !confirmedExternal.has(externalKey) && !(requestConsentKey && confirmedExternalRequests.has(requestConsentKey))) {
+    const externallyApproved = input.externalConsentModelKey === '*' || input.externalConsentModelKey === externalKey;
+    if (!isLocalStudyModel(candidate.model) && settings.studyAiConfirmExternal && !externallyApproved && !confirmedExternal.has(externalKey) && !(requestConsentKey && confirmedExternalRequests.has(requestConsentKey))) {
       const response = dialog.showMessageBoxSync({
         type: 'warning', title: 'Datos fuera del dispositivo',
         message: `Nodus enviará esta solicitud de estudio a ${candidate.model.provider} (${candidate.model.model}).`,

@@ -70,6 +70,7 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys' | 'lockedProviderKeys'> = {
   studyAiExcludedSubjectIds: [],
   studyAiLocalOnly: false,
   studyAiConfirmExternal: true,
+  studyKnowledgeAutoProcess: 'ask',
   studentPseudonymsEnabled: true,
   studyAiMaxInputChars: 120000,
   studyAiMaxOutputTokens: 4000,
@@ -209,6 +210,7 @@ export function getSettings(): AppSettings {
   if ((parsed as { sttProvider?: string }).sttProvider === 'local') merged.sttProvider = 'transformers';
   if (parsed.studyAiPrivacyMode === undefined && parsed.studyAiLocalOnly) merged.studyAiPrivacyMode = 'local';
   merged.studyAiLocalOnly = merged.studyAiPrivacyMode === 'local';
+  if (!['ask', 'always', 'never'].includes(merged.studyKnowledgeAutoProcess)) merged.studyKnowledgeAutoProcess = 'ask';
   // Deep-merge local-provider config so a stored partial (or a newly added
   // provider absent from an older settings blob) keeps its default base URL.
   merged.localProviders = {

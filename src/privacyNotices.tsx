@@ -1,5 +1,7 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import type { StudyMaterialAiProcessingPrompt } from '@shared/types';
 import { confirm } from './components/feedback';
+import { PROVIDER_LABELS } from './components/ui';
 import { t } from './i18n';
 
 /** Just-in-time first privacy layer. It is shown for every new microphone session. */
@@ -52,10 +54,58 @@ export function confirmFileImportPrivacy(): Promise<boolean> {
 
 /** Bridges native-picker requests to the same themed modal used by the renderer. */
 export function PrivacyRequestHost() {
-  useEffect(() => window.nodus.onFileImportPrivacyRequest(({ requestId }) => {
-    void confirmFileImportPrivacy()
-      .then((allowed) => window.nodus.resolveFileImportPrivacyRequest(requestId, allowed))
-      .catch(() => window.nodus.resolveFileImportPrivacyRequest(requestId, false));
-  }), []);
+  useEffect(() => {
+    const stopFileImport = window.nodus.onFileImportPrivacyRequest(({ requestId }) => {
+      void confirmFileImportPrivacy()
+        .then((allowed) => window.nodus.resolveFileImportPrivacyRequest(requestId, allowed))
+        .catch(() => window.nodus.resolveFileImportPrivacyRequest(requestId, false));
+    });
+    const stopAiProcessing = window.nodus.onStudyMaterialAiProcessingRequest((request) => {
+      let remember = false;
+      void confirm({
+        title: t('¿Procesar este material con IA?'),
+        message: <StudyMaterialAiProcessingNotice request={request} onRemember={(value) => { remember = value; }} />,
+        confirmLabel: t('Sí, procesar'),
+        cancelLabel: t('No, ahora no'),
+        zIndex: 220,
+      }).then((process) => window.nodus.resolveStudyMaterialAiProcessingRequest(request.requestId, { process, remember }))
+        .catch(() => window.nodus.resolveStudyMaterialAiProcessingRequest(request.requestId, { process: false, remember: false }));
+    });
+    return () => { stopFileImport(); stopAiProcessing(); };
+  }, []);
   return null;
+}
+
+function StudyMaterialAiProcessingNotice({ request, onRemember }: {
+  request: StudyMaterialAiProcessingPrompt;
+  onRemember: (value: boolean) => void;
+}) {
+  const [remember, setRemember] = useState(false);
+  const titles = request.titles.slice(0, 3);
+  return (
+    <div className="space-y-3 text-left text-sm leading-5" data-testid="study-material-ai-processing-prompt">
+      <div className="rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 dark:border-neutral-800 dark:bg-neutral-900/60">
+        {titles.map((title, index) => <p key={`${title}:${index}`} className="truncate font-medium text-neutral-800 dark:text-neutral-200">{title}</p>)}
+        {request.titles.length > titles.length && <p className="text-xs text-neutral-500">+{request.titles.length - titles.length}</p>}
+      </div>
+      <p>{t('Nodus puede extraer conceptos, relaciones y citas textuales para crear el mapa de Ideas y el grafo de estudio.')}</p>
+      <p className="text-xs text-neutral-500">
+        {request.local
+          ? t('El análisis se realizará en este dispositivo con el modelo seleccionado; el archivo no saldrá del equipo.')
+          : t('Se enviarán al proveedor indicado el título y el texto extraído necesario. El archivo original permanecerá en tu dispositivo.')}
+      </p>
+      <p className="text-xs font-medium text-neutral-600 dark:text-neutral-400">
+        {PROVIDER_LABELS[request.provider]} · {request.model}{request.inputChars > 0 ? ` · ${request.inputChars.toLocaleString()} ${t('caracteres extraídos')}` : ''}
+      </p>
+      <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-neutral-200 px-3 py-2 text-xs text-neutral-600 dark:border-neutral-800 dark:text-neutral-300">
+        <input
+          data-testid="study-material-ai-remember"
+          type="checkbox"
+          checked={remember}
+          onChange={(event) => { setRemember(event.target.checked); onRemember(event.target.checked); }}
+        />
+        {t('No volver a preguntar')}
+      </label>
+    </div>
+  );
 }

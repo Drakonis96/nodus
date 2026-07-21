@@ -12,6 +12,7 @@ import { completeJson, embed, embedMany } from './aiClient';
 import { runStudyAiTask } from './studyAiPolicy';
 import { currentEmbeddingConfig } from '../db/ideasRepo';
 import { getDb } from '../db/database';
+import { getSettings } from '../db/settingsRepo';
 import { getStudyMaterial } from '../db/studyMaterialsRepo';
 import {
   connectStudySourceIdeasSemantically,
@@ -27,7 +28,8 @@ import {
 } from '../db/studyKnowledgeRepo';
 
 type Listener = (progress: StudyKnowledgeProgress) => void;
-interface QueuedSource { kind: StudyKnowledgeSourceKind; id: string; force: boolean }
+interface QueuedSource { kind: StudyKnowledgeSourceKind; id: string; force: boolean; externalConsentModelKey: string | null }
+interface QueueOptions { approved?: boolean; externalConsentModelKey?: string | null; explicit?: boolean }
 interface SourceData { kind: StudyKnowledgeSourceKind; id: string; title: string; text: string; hash: string }
 
 const listeners = new Set<Listener>();
@@ -141,7 +143,7 @@ function emit(): void { const value = progress(); for (const listener of listene
 export function getStudyKnowledgeProgress(): StudyKnowledgeProgress { return progress(); }
 export function onStudyKnowledgeChanged(listener: Listener): () => void { listeners.add(listener); return () => listeners.delete(listener); }
 
-async function analyzeSource(source: SourceData, force: boolean): Promise<void> {
+async function analyzeSource(source: SourceData, force: boolean, externalConsentModelKey: string | null): Promise<void> {
   syncStudyKnowledgeSourceScopes(source.kind, source.id);
   const subjectIds = sourceSubjectIds(source.kind, source.id); if (!subjectIds.length) return;
   if (source.text.length < 80) {
@@ -163,6 +165,7 @@ async function analyzeSource(source: SourceData, force: boolean): Promise<void> 
         inputChars: prompt.system.length + prompt.user.length,
         externalPurpose: 'analizar el material y extraer un mapa conceptual trazable',
         externalConsentKey: `knowledge:${source.kind}:${source.id}:${source.hash}`,
+        externalConsentModelKey: externalConsentModelKey ?? undefined,
       },
         (model) => completeJson({ system: prompt.system, user: prompt.user, temperature: 0.1, maxTokens: 7000 }, isStudyKnowledgeExtraction, model));
       parts.push(completed.value);
@@ -187,18 +190,25 @@ async function drain(): Promise<void> {
   try {
     while (queue.size) {
       const [key, item] = queue.entries().next().value as [string, QueuedSource]; queue.delete(key);
-      try { const source = sourceData(item.kind, item.id); currentTitle = source?.title ?? null; if (source) await analyzeSource(source, item.force); }
+      try { const source = sourceData(item.kind, item.id); currentTitle = source?.title ?? null; if (source) await analyzeSource(source, item.force, item.externalConsentModelKey); }
       catch { /* Per-source errors are persisted by analyzeSource; deleted sources are simply skipped. */ }
       emit();
     }
   } finally { currentTitle = null; draining = false; emit(); }
 }
 
-export function queueStudyKnowledgeSources(kind: StudyKnowledgeSourceKind, ids: string[], force = false): void {
-  for (const id of ids) if (id) queue.set(`${kind}:${id}`, { kind, id, force: force || queue.get(`${kind}:${id}`)?.force === true });
+export function queueStudyKnowledgeSources(kind: StudyKnowledgeSourceKind, ids: string[], force = false, options: QueueOptions = {}): void {
+  const autoPreference = getSettings().studyKnowledgeAutoProcess;
+  if (kind === 'material' && !options.explicit && !options.approved && autoPreference !== 'always') return;
+  for (const id of ids) if (id) {
+    const key = `${kind}:${id}`; const prior = queue.get(key);
+    const rememberedApproval = kind === 'material' && autoPreference === 'always' ? '*' : null;
+    queue.set(key, { kind, id, force: force || prior?.force === true,
+      externalConsentModelKey: options.externalConsentModelKey ?? rememberedApproval ?? prior?.externalConsentModelKey ?? null });
+  }
   void drain();
 }
-export function reanalyzeStudyKnowledgeSource(kind: StudyKnowledgeSourceKind, id: string): void { queueStudyKnowledgeSources(kind, [id], true); }
+export function reanalyzeStudyKnowledgeSource(kind: StudyKnowledgeSourceKind, id: string): void { queueStudyKnowledgeSources(kind, [id], true, { explicit: true }); }
 
 function cosine(a: number[] | null, b: number[] | null): number {
   if (!a || !b) return 0; const length = Math.min(a.length, b.length); let dot = 0; let aa = 0; let bb = 0;

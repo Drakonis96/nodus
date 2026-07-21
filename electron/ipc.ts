@@ -400,6 +400,10 @@ import {
   queueStudyKnowledgeSources,
   reanalyzeStudyKnowledgeSource,
 } from './ai/studyKnowledge';
+import {
+  decideStudyMaterialAiProcessing,
+  resolveStudyMaterialAiProcessingRequest,
+} from './ai/studyKnowledgeConsent';
 import * as studyKnowledgeRepo from './db/studyKnowledgeRepo';
 import * as studyAssessments from './db/studyAssessmentsRepo';
 import { buildStudyTest } from './ai/studyTests';
@@ -705,6 +709,18 @@ export function registerIpc(
   const nodiChatAborters = new Map<string, AbortController>();
   const studyImproveAborters = new Map<string, AbortController>();
   const studyAssistantAborters = new Map<string, AbortController>();
+
+  const queueImportedStudyKnowledge = async (
+    results: Awaited<ReturnType<typeof importStudyMaterialPaths>>,
+    subjectId?: string | null,
+  ): Promise<void> => {
+    const decision = await decideStudyMaterialAiProcessing(results, subjectId, getWindow());
+    if (!decision.process) return;
+    queueStudyKnowledgeSources('material', results.map((result) => result.material.id), false, {
+      approved: true,
+      externalConsentModelKey: decision.externalConsentModelKey,
+    });
+  };
 
   onChatGptSubscriptionStatusChanged((status) => {
     for (const win of BrowserWindow.getAllWindows()) {
@@ -2137,6 +2153,9 @@ export function registerIpc(
   h('privacy:fileImport:resolve', async (event, requestId: string, allowed: boolean) => {
     resolveFileImportPrivacyRequest(event.sender.id, requestId, allowed);
   });
+  h('study:knowledge:processing:resolve', async (event, requestId: string, decision) => {
+    resolveStudyMaterialAiProcessingRequest(event.sender.id, requestId, decision);
+  });
   h('works:uploadText', async (_e, nodusId: string, filePath: string) => {
     const w = getDb().prepare('SELECT * FROM works WHERE nodus_id = ?').get(nodusId) as any;
     if (!w) return;
@@ -2388,7 +2407,7 @@ export function registerIpc(
     if (picked.canceled) return [];
     const results = await importStudyMaterialPaths(picked.filePaths, input);
     queueStudyMaterialIndex(results.map((result) => result.material.id));
-    queueStudyKnowledgeSources('material', results.map((result) => result.material.id));
+    await queueImportedStudyKnowledge(results, input?.subjectId);
     return results;
   });
   h('study:materials:importFolder', async (_e, input?: StudyMaterialImportInput) => {
@@ -2396,7 +2415,7 @@ export function registerIpc(
     if (picked.canceled) return [];
     const results = await importStudyMaterialPaths(picked.filePaths, input);
     queueStudyMaterialIndex(results.map((result) => result.material.id));
-    queueStudyKnowledgeSources('material', results.map((result) => result.material.id));
+    await queueImportedStudyKnowledge(results, input?.subjectId);
     return results;
   });
   h('study:materials:choosePaths', async (_e, folder?: boolean) => {
@@ -2412,7 +2431,7 @@ export function registerIpc(
     const safePaths = [...new Set(paths.filter((filePath): filePath is string => typeof filePath === 'string' && filePath.trim().length > 0))];
     const results = await importStudyMaterialPaths(safePaths, input);
     queueStudyMaterialIndex(results.map((result) => result.material.id));
-    queueStudyKnowledgeSources('material', results.map((result) => result.material.id));
+    await queueImportedStudyKnowledge(results, input?.subjectId);
     return results;
   });
   h('study:materials:importZotero', async (_e, input: ZoteroStudyMaterialImportInput) => {
@@ -2438,7 +2457,7 @@ export function registerIpc(
     if (!studyMaterials.supportsStudyMaterial(filePath)) throw new Error(`Formato no compatible: .${path.extname(filePath).replace(/^\./, '') || '?'}`);
     const result = await studyMaterials.importStudyMaterialFromZotero(filePath, input.library, item, attachment, placement);
     queueStudyMaterialIndex([result.material.id]);
-    queueStudyKnowledgeSources('material', [result.material.id]);
+    await queueImportedStudyKnowledge([result], input.subjectId);
     return result;
   });
   h('study:materials:openZotero', async (_e, id: string) => {
