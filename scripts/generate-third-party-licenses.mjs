@@ -24,6 +24,26 @@ function writeAtomic(file, value) {
   fs.renameSync(temporary, file);
 }
 
+async function fetchWithRetry(url, options, attempts = 4) {
+  let lastError;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      const response = await fetch(url, options);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response;
+    } catch (error) {
+      lastError = error;
+      if (attempt < attempts) {
+        // Upstream license hosts (gnu.org, apache.org, …) intermittently tarpit
+        // or drop CI egress; a short backoff rides out the transient failure.
+        const delayMs = 1000 * 2 ** (attempt - 1);
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+    }
+  }
+  throw new Error(`Unable to fetch ${url} after ${attempts} attempts: ${lastError?.message ?? lastError}`);
+}
+
 async function ensureRemoteNotices() {
   const manifest = readJson(remoteManifestPath);
   if (manifest.version !== 1 || !Array.isArray(manifest.files)) {
@@ -41,11 +61,10 @@ async function ensureRemoteNotices() {
       if (process.env.NODUS_LICENSES_OFFLINE === '1') {
         throw new Error(`Missing verified legal file in offline mode: ${entry.destination}`);
       }
-      const response = await fetch(entry.url, {
+      const response = await fetchWithRetry(entry.url, {
         redirect: 'follow',
         headers: { 'user-agent': 'Nodus-license-bundler/1.0' },
       });
-      if (!response.ok) throw new Error(`Unable to fetch ${entry.url}: HTTP ${response.status}`);
       bytes = Buffer.from(await response.arrayBuffer());
       const actual = sha256(bytes);
       if (actual !== entry.sha256) {

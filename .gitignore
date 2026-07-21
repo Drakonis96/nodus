@@ -40,9 +40,26 @@ __pycache__/
 # Locally generated analysis reports
 reports/
 
-# Verified legal texts generated immediately before packaging. Their canonical
-# URLs and SHA-256 digests are versioned in legal/remote-notices.json.
-legal/generated/
+# Locally generated legal texts (rebuilt from node_modules on every build).
+legal/generated/*
+# ...except the pinned upstream license texts, which are vendored so packaging
+# never depends on reaching gnu.org/apache.org/creativecommons.org/GitHub from
+# CI. Their canonical URLs and SHA-256 digests stay in legal/remote-notices.json;
+# the bundler reuses these whenever the digest matches instead of re-fetching.
+!legal/generated/GPL-3.0.txt
+!legal/generated/LGPL-3.0.txt
+!legal/generated/CC-BY-4.0.txt
+!legal/generated/APACHE-2.0.txt
+!legal/generated/ONNX_RUNTIME_LICENSE.txt
+!legal/generated/ONNX_RUNTIME_THIRD_PARTY_NOTICES-1.18.0.txt
+!legal/generated/ONNX_RUNTIME_THIRD_PARTY_NOTICES-1.21.0.txt
+!legal/generated/ONNX_RUNTIME_THIRD_PARTY_NOTICES-1.22.0-dev-89f8206ba4.txt
+!legal/generated/SHARP_LIBVIPS_LICENSE.txt
+!legal/generated/SHARP_LIBVIPS_THIRD_PARTY_NOTICES.md
+!legal/generated/SHARP_LIBVIPS_VERSIONS.properties
+!legal/generated/GITHUB_COPILOT_SDK_LICENSE.txt
+!legal/generated/GITHUB_COPILOT_CLI_LICENSE.md
+!legal/generated/OPENAI_CODEX_LICENSE.txt
 
 # Nodus Toolkit test caches (Tesseract traineddata, etc.)
 scripts/.cache/
