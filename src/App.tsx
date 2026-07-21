@@ -995,7 +995,7 @@ export function App() {
             icon="tools"
             label={t('Herramientas')}
             title={t('Abrir Nodus Toolkit')}
-            onClick={() => setView('toolkit')}
+            onClick={() => { setToolkitPage('home'); setView('toolkit'); }}
           />
           {/* Colecciones y Actualizar dependen de Zotero → solo en bóvedas
               académicas; genealogía, bases de datos, estudio y docencia no

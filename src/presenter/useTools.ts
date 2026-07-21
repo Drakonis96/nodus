@@ -6,7 +6,7 @@
 import type React from 'react';
 import { useCallback, useEffect, useRef, type RefObject } from 'react';
 import { ToolOverlayController } from '../lib/presenter/tools';
-import type { PresenterAction, PresenterRuntimeState, ToolName } from '@shared/presenterState';
+import { TOOL_SIZE_RANGE, type PresenterAction, type PresenterRuntimeState, type ToolName } from '@shared/presenterState';
 
 interface UseToolsOpts {
   /** The tight wrapper around the slide canvas (overlays + coordinate basis). */
@@ -18,25 +18,32 @@ interface UseToolsOpts {
   emit: (action: PresenterAction) => void;
 }
 
-const SHORTCUT_TOOL: Record<string, ToolName> = { l: 'flashlight', d: 'draw', p: 'pointer', m: 'zoom' };
+const SHORTCUT_TOOL: Record<string, ToolName> = { l: 'flashlight', d: 'draw', p: 'pointer', z: 'zoom' };
 
 export function useTools({ stageRef, getSlideCanvas, getState, emit }: UseToolsOpts) {
   const controllerRef = useRef<ToolOverlayController | null>(null);
   const drawingRef = useRef(false);
   const emitRef = useRef(emit);
   const stateRef = useRef(getState);
+  const slideCanvasRef = useRef(getSlideCanvas);
   emitRef.current = emit;
   stateRef.current = getState;
+  slideCanvasRef.current = getSlideCanvas;
 
   useEffect(() => {
     if (!stageRef.current) return;
-    controllerRef.current = new ToolOverlayController(stageRef.current, getSlideCanvas);
+    // Read the slide canvas through a ref so the controller — which owns the draw
+    // canvas and the active-tool overlays — is built ONCE and survives re-renders.
+    // (The parent passes a fresh getSlideCanvas/emit/getState each render, e.g. the
+    // presenter timer re-renders every second; rebuilding here would blank the
+    // drawing and reset the active tool on every tick.)
+    controllerRef.current = new ToolOverlayController(stageRef.current, () => slideCanvasRef.current());
     return () => {
       controllerRef.current?.destroy();
       controllerRef.current = null;
     };
-    // stageRef/getSlideCanvas are stable refs for the window's lifetime.
-  }, [stageRef, getSlideCanvas]);
+    // stageRef is a stable ref for the window's lifetime; getSlideCanvas is read live.
+  }, [stageRef]);
 
   /** Route a tool-related action to the overlay controller (local or relayed). */
   const apply = useCallback((action: PresenterAction) => {
@@ -114,6 +121,20 @@ export function useTools({ stageRef, getSlideCanvas, getState, emit }: UseToolsO
     }
   }, []);
 
+  /** Wheel over the slide grows/shrinks the ACTIVE tool's size. Returns true when it
+   *  consumed the event (so the caller skips slide-zoom). */
+  const onWheelSize = useCallback((deltaY: number): boolean => {
+    const st = stateRef.current();
+    const tool = st.toolMode;
+    if (!tool) return false;
+    const range = TOOL_SIZE_RANGE[tool];
+    const step = Math.max(1, Math.round((range.max - range.min) / 20));
+    const current = st.toolSizes[tool];
+    const next = Math.min(range.max, Math.max(range.min, current + (deltaY < 0 ? step : -step)));
+    if (next !== current) emitRef.current({ type: 'setToolSize', tool, size: next });
+    return true;
+  }, []);
+
   // ⌘/Ctrl + L/D/P/M toggle a tool.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -128,5 +149,5 @@ export function useTools({ stageRef, getSlideCanvas, getState, emit }: UseToolsO
     return () => document.removeEventListener('keydown', onKey);
   }, []);
 
-  return { apply, onSlideChanged, onMouseDown, onMouseMove, onMouseUp };
+  return { apply, onSlideChanged, onMouseDown, onMouseMove, onMouseUp, onWheelSize };
 }

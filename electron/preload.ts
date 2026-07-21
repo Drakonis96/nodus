@@ -1174,10 +1174,11 @@ const api: NodusApi = {
   // Nodus AI OCR (OCR Workspace). Progress is pushed on 'aiOcr:event' (docId + snapshot).
   createOcrDocs: (input) => ipcRenderer.invoke('aiOcr:create', input),
   listOcrDocs: () => ipcRenderer.invoke('aiOcr:list'),
+  searchOcrDocs: (query) => ipcRenderer.invoke('aiOcr:search', query),
   getOcrDoc: (id) => ipcRenderer.invoke('aiOcr:get', id),
   deleteOcrDoc: (id) => ipcRenderer.invoke('aiOcr:delete', id).then(() => undefined),
   cancelOcrDoc: (id) => ipcRenderer.invoke('aiOcr:cancel', id).then(() => undefined),
-  reprocessOcrPage: (id, index) => ipcRenderer.invoke('aiOcr:reprocessPage', id, index).then(() => undefined),
+  reprocessOcrPage: (id, index, patch) => ipcRenderer.invoke('aiOcr:reprocessPage', id, index, patch).then(() => undefined),
   reprocessOcrDocument: (id, patch) => ipcRenderer.invoke('aiOcr:reprocessDocument', id, patch).then(() => undefined),
   getOcrPageImage: (id, index) => ipcRenderer.invoke('aiOcr:pageImage', id, index),
   getOcrPageText: (id, index) => ipcRenderer.invoke('aiOcr:pageText', id, index),

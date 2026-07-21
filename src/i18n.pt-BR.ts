@@ -6343,6 +6343,7 @@ export const PT_BR: Record<string, string> = {
   "Pantalla en negro": "Tela preta",
   "Reconectando…": "Reconectando…",
   "Vista local de notas": "Visualização local de notas",
+  "Ajustar tamaño de las notas": "Ajustar o tamanho das notas",
   "Vista local": "Visualização local",
   // PDF Presenter (Toolkit) — YouTube videos
   "Añadir o editar vídeo": "Adicionar ou editar vídeo",

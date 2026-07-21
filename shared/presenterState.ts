@@ -84,6 +84,14 @@ export const NO_ZOOM: SlideZoom = { scale: 1, originX: 50, originY: 50 };
 export const DEFAULT_TOOL_SIZES: ToolSizes = { flashlight: 15, draw: 4, pointer: 20, zoom: 200 };
 export const DEFAULT_TOOL_COLOR = '#ef4444';
 
+/** Min/max for each tool's size — used by the slider, the mouse wheel and pinch. */
+export const TOOL_SIZE_RANGE: Record<ToolName, { min: number; max: number }> = {
+  flashlight: { min: 5, max: 40 },
+  draw: { min: 1, max: 20 },
+  pointer: { min: 5, max: 50 },
+  zoom: { min: 100, max: 400 },
+};
+
 export function initialPresenterState(): PresenterRuntimeState {
   return {
     presenting: false,

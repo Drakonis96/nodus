@@ -164,6 +164,7 @@ import {
   resumeAiOcr,
   createOcrDocs,
   listOcrDocs,
+  searchOcrDocs,
   getOcrDoc,
   deleteOcrDoc,
   cancelOcrDoc,
@@ -3512,10 +3513,11 @@ export function registerIpc(
   void resumeAiOcr().catch((error) => console.error('[aiOcr] resume failed safely:', error));
   h('aiOcr:create', async (_e, input: AiOcrCreateInput) => createOcrDocs(input));
   h('aiOcr:list', async () => listOcrDocs());
+  h('aiOcr:search', async (_e, query: string) => searchOcrDocs(query));
   h('aiOcr:get', async (_e, id: string) => getOcrDoc(id));
   h('aiOcr:delete', async (_e, id: string) => deleteOcrDoc(id));
   h('aiOcr:cancel', async (_e, id: string) => cancelOcrDoc(id));
-  h('aiOcr:reprocessPage', async (_e, id: string, index: number) => reprocessOcrPage(id, index));
+  h('aiOcr:reprocessPage', async (_e, id: string, index: number, patch?: { model?: ModelRef | null }) => reprocessOcrPage(id, index, patch));
   h('aiOcr:reprocessDocument', async (_e, id: string, patch?: { model?: ModelRef | null; options?: Partial<OcrOptions> }) => reprocessOcrDocument(id, patch));
   h('aiOcr:pageImage', async (_e, id: string, index: number) => ocrPageImageDataUrl(id, index));
   h('aiOcr:saveToVault', async (_e, id: string) => saveOcrToVault(id));

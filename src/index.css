@@ -1191,6 +1191,11 @@ body {
 .btn-primary {
   @apply bg-indigo-600 hover:bg-indigo-500 text-white;
 }
+/* Toolkit amber accent (PDF Presenter etc.). Solid fill so it reads clearly in both
+   themes — previously `btn-accent` was undefined and these buttons had no background. */
+.btn-accent {
+  @apply bg-amber-600 hover:bg-amber-700 text-white shadow-sm;
+}
 .btn-ghost {
   @apply hover:bg-neutral-800 text-neutral-300;
 }

@@ -6620,6 +6620,7 @@ export const EN: Record<string, string> = {
   "Pantalla en negro": "Black screen",
   "Reconectando…": "Reconnecting…",
   "Vista local de notas": "Local notes view",
+  "Ajustar tamaño de las notas": "Resize the notes",
   "Vista local": "Local view",
   // PDF Presenter (Toolkit) — YouTube videos
   "Añadir o editar vídeo": "Add or edit video",

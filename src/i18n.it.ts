@@ -5867,6 +5867,7 @@ export const IT: Record<string, string> = {
   "Pantalla en negro": "Schermo nero",
   "Reconectando…": "Riconnessione…",
   "Vista local de notas": "Vista locale delle note",
+  "Ajustar tamaño de las notas": "Regola la dimensione delle note",
   "Vista local": "Vista locale",
   // PDF Presenter (Toolkit) — YouTube videos
   "Añadir o editar vídeo": "Aggiungi o modifica video",

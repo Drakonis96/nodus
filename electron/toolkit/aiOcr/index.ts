@@ -123,6 +123,26 @@ export function listOcrDocs(): OcrDocSummary[] {
   return requireStore().listDocs();
 }
 
+/** IDs of documents whose name OR transcribed text contains `query` (case-insensitive).
+ *  Empty query returns every document. Content search reads the stored transcript, so it
+ *  matches the actual OCR output, not just the filename. */
+export function searchOcrDocs(query: string): string[] {
+  const store = requireStore();
+  const q = query.trim().toLowerCase();
+  const all = store.listDocs();
+  if (!q) return all.map((d) => d.id);
+  const ids: string[] = [];
+  for (const summary of all) {
+    if (summary.name.toLowerCase().includes(q)) {
+      ids.push(summary.id);
+      continue;
+    }
+    const transcript = store.readTranscript(summary.id);
+    if (transcript && transcript.toLowerCase().includes(q)) ids.push(summary.id);
+  }
+  return ids;
+}
+
 export function getOcrDoc(id: string): OcrDoc | null {
   return requireStore().readDoc(id);
 }
@@ -136,8 +156,13 @@ export function cancelOcrDoc(id: string): void {
   requireManager().cancel(id);
 }
 
-export async function reprocessOcrPage(id: string, index: number): Promise<void> {
-  await requireManager().reprocessPage(id, index);
+export async function reprocessOcrPage(
+  id: string,
+  index: number,
+  patch?: { model?: ModelRef | null },
+): Promise<void> {
+  const resolved = patch && patch.model !== undefined ? { model: resolveOcrModel(patch.model) } : undefined;
+  await requireManager().reprocessPage(id, index, resolved);
 }
 
 export async function reprocessOcrDocument(
