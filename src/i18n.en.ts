@@ -1325,6 +1325,7 @@ export const EN: Record<string, string> = {
     'The full flow: read critically, understand the corpus, find your contribution and write.',
   Empezar: 'Start',
   Actualizaciones: 'Updates',
+  'Actualizaciones y novedades': "Updates & what's new",
   'Últimos cambios': 'Latest changes',
   'Consulta las novedades de la versión actual cuando quieras.': 'Review what’s new in the current version whenever you like.',
   'Ver últimos cambios': 'View latest changes',

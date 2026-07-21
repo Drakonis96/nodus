@@ -1313,6 +1313,7 @@ export const FR: Record<string, string> = {
     'Le flux complet : lire avec discernement, comprendre le corpus, trouver votre contribution et écrire.',
   'Empezar': 'Commencer',
   'Actualizaciones': 'Mises à jour',
+  'Actualizaciones y novedades': 'Mises à jour et nouveautés',
   'Últimos cambios': 'Derniers changements',
   'Consulta las novedades de la versión actual cuando quieras.': 'Consultez les nouveautés de la version actuelle quand vous le souhaitez.',
   'Ver últimos cambios': 'Voir les derniers changements',

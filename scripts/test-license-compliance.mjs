@@ -47,7 +47,8 @@ test('large upstream notices are immutable and fail-closed', () => {
 });
 
 test('licenses are visible in About and before local model downloads', () => {
-  assert.match(read('src/views/Settings.tsx'), /openThirdPartyNotices/);
+  assert.match(read('src/views/Settings.tsx'), /setOpenLegalDoc\('licenses'\)/);
+  assert.match(read('src/legalDocs.ts'), /blob\/main\/THIRD_PARTY_NOTICES\.md/);
   assert.match(read('src/components/LocalAiModelsSettings.tsx'), /model\.licenseLabel/);
   assert.match(read('src/views/AudioGenerationSettings.tsx'), /v\.licenseLabel/);
   assert.match(read('shared/localAiModels.ts'), /LFM Open License 1\.0/);

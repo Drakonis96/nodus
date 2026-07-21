@@ -459,14 +459,25 @@ try {
   assert.ok(Math.max(...advancedPickerHeights) - Math.min(...advancedPickerHeights) <= 1, 'the Nodi model selector has the same height as adjacent advanced selectors');
   console.log('[e2e] image provider settings rendered');
   await page.getByRole('button', { name: 'Acerca de Nodus', exact: true }).click();
+  await page.getByTestId('about-privacy').waitFor();
+  assert.equal(await page.getByTestId('about-updates').count(), 0, 'Updates moved out of About Nodus into its own section');
+  // The privacy card opens a localized in-app modal instead of launching an external markdown file.
+  await page.getByTestId('open-privacy-policy').click();
+  await page.getByTestId('legal-doc-modal-privacy').waitFor();
+  await page.getByTestId('legal-doc-modal-privacy').getByText('Privacidad y control de datos', { exact: true }).waitFor();
+  await page.getByTestId('legal-doc-canonical-privacy').waitFor();
+  await page.getByTestId('legal-doc-close-privacy').click();
+  await page.getByTestId('legal-doc-modal-privacy').waitFor({ state: 'detached' });
+  console.log('[e2e] About legal cards open a localized in-app modal');
+
+  await page.getByRole('button', { name: 'Actualizaciones y novedades', exact: true }).click();
   await page.getByTestId('about-updates').waitFor();
-  assert.equal(await page.getByText('Guía esencial de Nodus e IA', { exact: true }).count(), 0, 'Updates is rendered under About Nodus, not Tutorials');
   await page.getByTestId('about-latest-changes').waitFor();
   const [latestChangesButtonBox, checkUpdatesButtonBox] = await Promise.all([
     page.getByTestId('open-latest-changes').boundingBox(),
     page.getByTestId('about-updates').getByRole('button', { name: 'Buscar actualización', exact: true }).boundingBox(),
   ]);
-  assert.ok(latestChangesButtonBox && checkUpdatesButtonBox, 'About Nodus renders both release-related actions');
+  assert.ok(latestChangesButtonBox && checkUpdatesButtonBox, 'The Updates section renders both release-related actions');
   assert.equal(latestChangesButtonBox.width, checkUpdatesButtonBox.width, 'Latest changes and Check for updates have the same width');
   assert.equal(latestChangesButtonBox.height, checkUpdatesButtonBox.height, 'Latest changes and Check for updates have the same height');
   await page.getByTestId('open-latest-changes').click();

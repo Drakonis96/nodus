@@ -1302,6 +1302,7 @@ export const PT_BR: Record<string, string> = {
     'O fluxo completo: ler com critério, compreender o corpus, encontrar sua contribuição e escrever.',
   'Empezar': 'Começar',
   'Actualizaciones': 'Atualizações',
+  'Actualizaciones y novedades': 'Atualizações e novidades',
   'Últimos cambios': 'Últimas alterações',
   'Consulta las novedades de la versión actual cuando quieras.': 'Consulte as novidades da versão atual quando quiser.',
   'Ver últimos cambios': 'Ver últimas alterações',

@@ -33,12 +33,28 @@ test('the distributable contains the privacy policy and controller checklist', a
   assert.match(settings, /data-testid="about-gdpr"/);
   assert.match(settings, /data-testid="about-third-party-licenses"/);
   assert.match(settings, /data-testid="about-transparency-security"/);
-  assert.match(settings, /window\.nodus\.openPrivacyPolicy\(\)/);
+  // The privacy, GDPR and licenses cards open a localized in-app modal instead of
+  // launching an external markdown file (which only existed in Spanish).
+  assert.match(settings, /setOpenLegalDoc\('privacy'\)/);
+  assert.match(settings, /setOpenLegalDoc\('gdpr'\)/);
+  assert.match(settings, /setOpenLegalDoc\('licenses'\)/);
+  assert.match(settings, /<LegalDocModal/);
   assert.match(settings, /blob\/main\/PRIVACY\.md/);
-  assert.match(settings, /blob\/main\/legal\/RGPD_DEPLOYMENT_CHECKLIST\.md/);
   assert.match(settings, /blob\/main\/LICENSE/);
   assert.match(settings, /security\/advisories\/new/);
   assert.match(settings, /no es una certificación/);
+
+  // The in-app modal content links back to the authoritative documents and is
+  // authored per UI language (no Spanish leaks into a non-Spanish UI).
+  const legalDocs = await read('src/legalDocs.ts');
+  assert.match(legalDocs, /blob\/main\/PRIVACY\.md/);
+  assert.match(legalDocs, /blob\/main\/legal\/RGPD_DEPLOYMENT_CHECKLIST\.md/);
+  assert.match(legalDocs, /blob\/main\/THIRD_PARTY_NOTICES\.md/);
+  for (const key of ['es:', 'en:', 'fr:', 'de:', 'pt:', "'pt-BR':", 'it:']) {
+    assert.ok(legalDocs.includes(key), `legalDocs must cover the ${key} language`);
+  }
+  assert.match(legalDocs, /cannot grade, profile or evaluate students/);
+
   for (const source of await Promise.all(['electron/ipc.ts', 'electron/preload.ts', 'shared/types.ts'].map(read))) {
     assert.match(source, /openPrivacyPolicy/);
   }

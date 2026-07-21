@@ -1314,6 +1314,7 @@ export const DE: Record<string, string> = {
     'Der vollständige Ablauf: kritisch lesen, den Korpus verstehen, Ihren Beitrag finden und schreiben.',
   'Empezar': 'Starten',
   'Actualizaciones': 'Aktualisierungen',
+  'Actualizaciones y novedades': 'Updates und Neuigkeiten',
   'Últimos cambios': 'Neueste Änderungen',
   'Consulta las novedades de la versión actual cuando quieras.': 'Sehen Sie sich jederzeit die Neuerungen der aktuellen Version an.',
   'Ver últimos cambios': 'Neueste Änderungen ansehen',

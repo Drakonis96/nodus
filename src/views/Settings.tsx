@@ -16,6 +16,8 @@ import { recoveryHealthAdvice, recoveryHealthAge, recoveryHealthHeadline } from 
 import { ImageGenerationSettings, ProvidersSettings } from './ProvidersSettings';
 import { AudioGenerationSettings } from './AudioGenerationSettings';
 import { ConfirmModal } from '../components/ConfirmModal';
+import { LegalDocModal } from '../components/LegalDocModal';
+import { LEGAL_DOCS, type LegalDocId } from '../legalDocs';
 import { confirm } from '../components/feedback';
 import { Icon, PROVIDER_LABELS } from '../components/ui';
 import { ModelPicker, SubscriptionQuotaNotice, ExtractionCapabilityNotice } from '../components/ModelPicker';
@@ -30,7 +32,7 @@ import { DEFAULT_EMBEDDING_MODELS, EMBEDDING_PROVIDERS } from '@shared/providers
 import { ORB_COLOR_CHOICES, orbHue } from '@shared/nodiOrb';
 import { effectiveSidebarHidden, isViewAllowedForVaultType } from '@shared/vaultTypes';
 
-type SettingsTabId = 'providers' | 'models' | 'library' | 'extraction' | 'interface' | 'integrations' | 'system' | 'data' | 'about';
+type SettingsTabId = 'providers' | 'models' | 'library' | 'extraction' | 'interface' | 'integrations' | 'system' | 'data' | 'about' | 'updates';
 
 const SETTINGS_TABS: { id: SettingsTabId; label: string; icon: string; keywords: string }[] = [
   { id: 'providers', label: 'Proveedores', icon: 'key', keywords: 'api key keys claves proveedores provider providers modelos favoritos default openai anthropic deepseek gemini google openrouter xiaomi lm studio ollama vault boveda' },
@@ -41,14 +43,14 @@ const SETTINGS_TABS: { id: SettingsTabId; label: string; icon: string; keywords:
   { id: 'integrations', label: 'Integraciones', icon: 'link', keywords: 'mcp servidor token puerto word copilot certificado addin' },
   { id: 'system', label: 'Tutoriales', icon: 'graduation', keywords: 'sistema ayuda tutorial' },
   { id: 'data', label: 'Backup / copia de seguridad', icon: 'download', keywords: 'datos backup exportar importar demo copia cifrada peligro reinicializar grafo borrar' },
-  { id: 'about', label: 'Acerca de Nodus', icon: 'info', keywords: 'acerca proyecto codigo abierto open source gratuito privacidad privacy rgpd gdpr datos alumnado inteligencia artificial licencia terceros legal actualizaciones update version novedades' },
+  { id: 'about', label: 'Acerca de Nodus', icon: 'info', keywords: 'acerca proyecto codigo abierto open source gratuito privacidad privacy rgpd gdpr datos alumnado inteligencia artificial licencia terceros legal' },
+  { id: 'updates', label: 'Actualizaciones y novedades', icon: 'sync', keywords: 'actualizaciones update actualizar version novedades ultimos cambios latest changes changelog buscar instalar reiniciar' },
 ];
 
 const ABOUT_ACTION_BUTTON_CLASS = 'btn btn-ghost w-full shrink-0 justify-center border border-neutral-300 dark:border-neutral-700 sm:w-56';
 const ABOUT_CARD_CLASS = 'rounded-xl border border-neutral-200 bg-neutral-50 p-5 dark:border-neutral-800 dark:bg-neutral-900/50';
 const NODUS_REPOSITORY_URL = 'https://github.com/Drakonis96/nodus';
 const NODUS_PRIVACY_URL = `${NODUS_REPOSITORY_URL}/blob/main/PRIVACY.md`;
-const NODUS_GDPR_CHECKLIST_URL = `${NODUS_REPOSITORY_URL}/blob/main/legal/RGPD_DEPLOYMENT_CHECKLIST.md`;
 const NODUS_LICENSE_URL = `${NODUS_REPOSITORY_URL}/blob/main/LICENSE`;
 const NODUS_SECURITY_REPORT_URL = `${NODUS_REPOSITORY_URL}/security/advisories/new`;
 
@@ -85,6 +87,7 @@ export function Settings({
   const [importSyncPromptOpen, setImportSyncPromptOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<SettingsTabId>('providers');
   const [settingsQuery, setSettingsQuery] = useState('');
+  const [openLegalDoc, setOpenLegalDoc] = useState<LegalDocId | null>(null);
   // Reset-graph flow: a confirm() dialog, then a modal that requires typing a
   // freshly generated 4-digit code so it can't be triggered by accident.
   const [resetCode, setResetCode] = useState<string | null>(null);
@@ -328,7 +331,8 @@ export function Settings({
     visibleSettingsSection('models', 'Modelos de IA', 'basico avanzado modelo general extraccion sintesis tutor resumen fusion embeddings transcripcion voz imagen'),
     visibleSettingsSection('extraction', 'Extracción de texto PDFs grandes', 'pdf texto zotero ocr tesseract paginas idiomas'),
     visibleSettingsSection('data', 'Zona de peligro', 'reinicializar grafo borrar ideas temas conexiones autores huecos'),
-    visibleSettingsSection('about', 'Acerca de Nodus', 'proyecto independiente codigo abierto open source gratuito privacidad privacy rgpd gdpr datos alumnado licencia actualizaciones update version'),
+    visibleSettingsSection('about', 'Acerca de Nodus', 'proyecto independiente codigo abierto open source gratuito privacidad privacy rgpd gdpr datos alumnado licencia'),
+    visibleSettingsSection('updates', 'Actualizaciones y novedades', 'actualizaciones update version novedades ultimos cambios latest changes changelog buscar instalar reiniciar'),
   ].filter(Boolean).length;
 
   return (
@@ -815,7 +819,7 @@ export function Settings({
               <button
                 data-testid="open-privacy-policy"
                 className={ABOUT_ACTION_BUTTON_CLASS}
-                onClick={() => void window.nodus.openPrivacyPolicy()}
+                onClick={() => setOpenLegalDoc('privacy')}
               >
                 <Icon name="book" /> {t('Leer política de privacidad')}
               </button>
@@ -848,7 +852,7 @@ export function Settings({
               <button
                 data-testid="open-gdpr-checklist"
                 className={ABOUT_ACTION_BUTTON_CLASS}
-                onClick={() => void window.nodus.openExternal(NODUS_GDPR_CHECKLIST_URL)}
+                onClick={() => setOpenLegalDoc('gdpr')}
               >
                 <Icon name="check" /> {t('Ver lista RGPD')}
               </button>
@@ -878,7 +882,7 @@ export function Settings({
               <button
                 data-testid="open-third-party-licenses"
                 className={ABOUT_ACTION_BUTTON_CLASS}
-                onClick={() => void window.nodus.openThirdPartyNotices()}
+                onClick={() => setOpenLegalDoc('licenses')}
               >
                 <Icon name="book" /> {t('Ver licencias')}
               </button>
@@ -925,6 +929,11 @@ export function Settings({
             </div>
           </div>
 
+        </Section>
+      )}
+
+      {visibleSettingsSection('updates', 'Actualizaciones y novedades', 'actualizaciones update version novedades ultimos cambios latest changes changelog buscar instalar reiniciar') && (
+        <Section title={t('Actualizaciones y novedades')}>
           <div data-testid="about-latest-changes" className="flex flex-col gap-4 rounded-xl border border-neutral-200 bg-neutral-50 p-5 dark:border-neutral-800 dark:bg-neutral-900/50 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <label className="text-sm text-neutral-700 dark:text-neutral-300">{t('Últimos cambios')}</label>
@@ -1803,6 +1812,13 @@ export function Settings({
             void patch({ embeddingProvider: next.provider, embeddingModel: next.model });
           }}
           onCancel={() => setPendingEmbeddingChange(null)}
+        />
+      )}
+      {openLegalDoc && (
+        <LegalDocModal
+          doc={LEGAL_DOCS[openLegalDoc]}
+          language={settings.uiLanguage}
+          onClose={() => setOpenLegalDoc(null)}
         />
       )}
     </div>

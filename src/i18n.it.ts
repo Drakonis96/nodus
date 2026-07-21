@@ -1190,6 +1190,7 @@ export const IT: Record<string, string> = {
   "El flujo completo: leer con criterio, comprender el corpus, encontrar tu aportación y escribir.": "Il flusso completo: leggi in modo critico, comprendi il corpus, trova il tuo contributo e scrivi.",
   "Empezar": "Inizia",
   "Actualizaciones": "Aggiornamenti",
+  "Actualizaciones y novedades": "Aggiornamenti e novità",
   "Últimos cambios": "Ultime modifiche",
   "Consulta las novedades de la versión actual cuando quieras.": "Controlla le novità della versione corrente ogni volta che vuoi.",
   "Ver últimos cambios": "Visualizza le ultime modifiche",
