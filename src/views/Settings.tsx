@@ -1469,6 +1469,21 @@ export function Settings({
               patch={patch}
             />
             <SttSettings settings={settings} patch={patch} />
+            {activeVault?.type === 'estudio' && <Row
+              label={t('Procesamiento de materiales nuevos con IA')}
+              hint={t('Controla si Nodus crea automáticamente conceptos, citas y relaciones para el mapa de Ideas y el grafo de estudio.')}
+            >
+              <select
+                data-testid="study-knowledge-auto-process"
+                className="input"
+                value={settings.studyKnowledgeAutoProcess}
+                onChange={(event) => void patch({ studyKnowledgeAutoProcess: event.target.value as AppSettings['studyKnowledgeAutoProcess'] })}
+              >
+                <option value="ask">{t('Preguntar cada vez')}</option>
+                <option value="always">{t('Procesar automáticamente')}</option>
+                <option value="never">{t('No procesar automáticamente')}</option>
+              </select>
+            </Row>}
             {settings.modelSettingsMode === 'advanced' && <>
               <div className="mt-5 space-y-3 border-t border-neutral-800 pt-4" data-testid="common-model-overrides">
                 <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('Ajustes avanzados comunes')}</h3>

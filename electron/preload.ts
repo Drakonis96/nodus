@@ -466,6 +466,13 @@ const api: NodusApi = {
   },
   resolveFileImportPrivacyRequest: (requestId, allowed) =>
     ipcRenderer.invoke('privacy:fileImport:resolve', requestId, allowed).then(() => undefined),
+  onStudyMaterialAiProcessingRequest: (cb) => {
+    const listener = (_e: unknown, request: Parameters<typeof cb>[0]) => cb(request);
+    ipcRenderer.on('study:knowledge:processing:request', listener);
+    return () => ipcRenderer.removeListener('study:knowledge:processing:request', listener);
+  },
+  resolveStudyMaterialAiProcessingRequest: (requestId, decision) =>
+    ipcRenderer.invoke('study:knowledge:processing:resolve', requestId, decision).then(() => undefined),
   uploadText: (nodusId, filePath) => ipcRenderer.invoke('works:uploadText', nodusId, filePath),
 
   syncNow: () => ipcRenderer.invoke('sync:now'),

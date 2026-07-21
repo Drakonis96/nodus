@@ -212,6 +212,8 @@ import type { ProposedPlan } from './assessmentImport';
 export type * from './assessmentImport';
 export type * from './assessment/model';
 import type {
+  StudyMaterialAiProcessingDecision,
+  StudyMaterialAiProcessingPrompt,
   StudyIdeaDetail,
   StudyIdeaSummary,
   StudyKnowledgeGraph,
@@ -222,6 +224,8 @@ export type { StudySchedule, StudyScheduleCell, StudyScheduleDay, StudyScheduleP
 export type {
   ExtractedStudyIdea,
   ExtractedStudyRelation,
+  StudyMaterialAiProcessingDecision,
+  StudyMaterialAiProcessingPrompt,
   StudyAssessmentKnowledgeContext,
   StudyIdeaConnection,
   StudyIdeaDetail,
@@ -1320,6 +1324,8 @@ export interface AppSettings {
   /** Legacy mirror kept for older settings payloads; privacyMode is authoritative. */
   studyAiLocalOnly: boolean;
   studyAiConfirmExternal: boolean;
+  /** What to do with newly imported study materials after storing them locally. */
+  studyKnowledgeAutoProcess: 'ask' | 'always' | 'never';
   /**
    * Replace student names with opaque codes (`STU_7K3Q`) before any teaching text
    * reaches an AI provider, and map them back on the way in. On by default: rosters
@@ -5542,6 +5548,8 @@ export interface NodusApi {
   /** Receive requests for the in-app privacy modal shown before a native file picker. */
   onFileImportPrivacyRequest(cb: (request: { requestId: string }) => void): () => void;
   resolveFileImportPrivacyRequest(requestId: string, allowed: boolean): Promise<void>;
+  onStudyMaterialAiProcessingRequest(cb: (request: StudyMaterialAiProcessingPrompt) => void): () => void;
+  resolveStudyMaterialAiProcessingRequest(requestId: string, decision: StudyMaterialAiProcessingDecision): Promise<void>;
   uploadText(nodusId: string, filePath: string): Promise<void>;
 
   // sync

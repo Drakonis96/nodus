@@ -5,6 +5,20 @@ export type StudyIdeaType = 'concept' | 'definition' | 'principle' | 'process' |
 export type StudyIdeaRelationType = 'related' | 'supports' | 'contrasts' | 'causes' | 'depends_on' | 'part_of' | 'applies';
 export type StudyKnowledgeJobStatus = 'pending' | 'analyzing' | 'relating' | 'done' | 'error' | 'unavailable';
 
+export interface StudyMaterialAiProcessingPrompt {
+  requestId: string;
+  titles: string[];
+  provider: ModelRef['provider'];
+  model: string;
+  local: boolean;
+  inputChars: number;
+}
+
+export interface StudyMaterialAiProcessingDecision {
+  process: boolean;
+  remember: boolean;
+}
+
 export interface StudyIdeaEvidence {
   id: string;
   quote: string;

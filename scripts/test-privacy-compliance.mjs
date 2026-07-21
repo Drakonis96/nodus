@@ -146,6 +146,32 @@ test('every file picker is blocked by the just-in-time import notice', async () 
   }
 });
 
+test('new study materials use a remembered in-app AI processing decision', async () => {
+  const [notice, settings, defaults, preload, apiTypes, ipc, consent, policy, knowledge] = await Promise.all([
+    read('src/privacyNotices.tsx'),
+    read('src/views/Settings.tsx'),
+    read('electron/db/settingsRepo.ts'),
+    read('electron/preload.ts'),
+    read('shared/types.ts'),
+    read('electron/ipc.ts'),
+    read('electron/ai/studyKnowledgeConsent.ts'),
+    read('electron/ai/studyAiPolicy.ts'),
+    read('electron/ai/studyKnowledge.ts'),
+  ]);
+  assert.match(notice, /study-material-ai-processing-prompt/);
+  assert.match(notice, /No volver a preguntar/);
+  assert.match(notice, /Sí, procesar/);
+  assert.match(notice, /No, ahora no/);
+  assert.match(settings, /data-testid="study-knowledge-auto-process"/);
+  assert.match(defaults, /studyKnowledgeAutoProcess:\s*'ask'/);
+  assert.match(consent, /decision\.process \? 'always' : 'never'/);
+  assert.match(policy, /externalConsentModelKey/);
+  assert.match(knowledge, /autoPreference !== 'always'/);
+  for (const source of [preload, apiTypes, ipc]) {
+    assert.match(source, /StudyMaterialAiProcessingRequest|study:knowledge:processing:resolve/);
+  }
+});
+
 test('public copy matches the no-AI-student-evaluation product boundary', async () => {
   const [readme, faq, landing, teachingDemo] = await Promise.all([
     read('README.md'), read('docs/faq.js'), read('docs/index.html'), read('docs/demo/teaching.html'),
