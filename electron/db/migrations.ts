@@ -3126,16 +3126,152 @@ export const migrations: Migration[] = [
   },
 ];
 
+/**
+ * A SQLite error that means the statement's object or column is ALREADY THERE. This is
+ * how a database built by a differently-numbered build announces itself: an object a
+ * migration wants to create already exists, or a column it wants to add is already
+ * present. It is never a reason to fail — the intent (that object should exist) is met —
+ * but it must be distinguished from a genuine migration error, which is not swallowed.
+ */
+function isAlreadyAppliedError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /already exists|duplicate column name/i.test(message);
+}
+
+/**
+ * A migration body that only CREATEs objects — no ALTER, DROP, RENAME or data change.
+ * Only such a body is safe to replay to backfill a missing object: replaying one that
+ * transforms data or rebuilds a table (e.g. copy-into-new-then-drop-old) could destroy
+ * data on a database where it already ran. Comments are stripped first so prose that
+ * happens to mention "delete" or "update" does not disqualify a pure-CREATE migration.
+ */
+function isCreateOnly(sql: string): boolean {
+  const bare = stripSqlComments(sql);
+  return /\bCREATE\b/i.test(bare) && !/\b(ALTER|DROP|INSERT|UPDATE|DELETE|REPLACE)\b/i.test(bare);
+}
+
+function stripSqlComments(sql: string): string {
+  return sql.replace(/--[^\n]*/g, ' ').replace(/\/\*[\s\S]*?\*\//g, ' ');
+}
+
+/** The table/index/view/trigger names a CREATE-only body brings into being. */
+function objectNamesCreatedBy(sql: string): string[] {
+  const re = /CREATE\s+(?:UNIQUE\s+)?(?:TABLE|INDEX|VIEW|TRIGGER)\s+(?:IF\s+NOT\s+EXISTS\s+)?["'`]?([A-Za-z_][A-Za-z0-9_]*)["'`]?/gi;
+  const names: string[] = [];
+  let match: RegExpExecArray | null;
+  const bare = stripSqlComments(sql);
+  while ((match = re.exec(bare)) !== null) names.push(match[1]);
+  return names;
+}
+
+/**
+ * Split a migration body into top-level statements, honouring single-quoted string
+ * literals ('' escapes included) and both comment styles so a ';' inside any of them
+ * never splits a statement. Migrations contain no triggers or BEGIN...END blocks — the
+ * only source of nested semicolons — which a test asserts stays true.
+ */
+function splitStatements(sql: string): string[] {
+  const statements: string[] = [];
+  let current = '';
+  let i = 0;
+  while (i < sql.length) {
+    const ch = sql[i];
+    const next = sql[i + 1];
+    if (ch === '-' && next === '-') {
+      while (i < sql.length && sql[i] !== '\n') { current += sql[i]; i++; }
+      continue;
+    }
+    if (ch === '/' && next === '*') {
+      current += '/*'; i += 2;
+      while (i < sql.length && !(sql[i] === '*' && sql[i + 1] === '/')) { current += sql[i]; i++; }
+      current += '*/'; i += 2;
+      continue;
+    }
+    if (ch === "'") {
+      current += ch; i++;
+      while (i < sql.length) {
+        current += sql[i];
+        if (sql[i] === "'") {
+          if (sql[i + 1] === "'") { current += sql[i + 1]; i += 2; continue; }
+          i++; break;
+        }
+        i++;
+      }
+      continue;
+    }
+    if (ch === ';') { statements.push(current.trim()); current = ''; i++; continue; }
+    current += ch; i++;
+  }
+  if (current.trim()) statements.push(current.trim());
+  return statements.filter((s) => s.length > 0);
+}
+
+/** Run a body statement by statement, skipping only statements whose object/column is
+ *  already there. Any other error still aborts, so a real failure is never masked. */
+function execSkippingApplied(db: Database.Database, sql: string): void {
+  for (const statement of splitStatements(sql)) {
+    try {
+      db.exec(statement);
+    } catch (error) {
+      if (!isAlreadyAppliedError(error)) throw error;
+    }
+  }
+}
+
+/**
+ * Create any purely-additive table or index a database is MISSING even though its
+ * user_version is already at or past the migration that introduced it. This happens when
+ * a database was migrated by a build whose migration numbering differed (a pre-release,
+ * or a feature branch that was later reordered): that build's user_version can sit above
+ * an object it never created here, so the normal `version > current` loop skips the
+ * migration forever and the table is silently absent. Restricted to CREATE-only
+ * migrations and to those the database claims as applied, so a fresh database (nothing
+ * applied yet) and data-transforming rebuilds are both left untouched.
+ */
+function backfillMissingCreateOnly(db: Database.Database, current: number): void {
+  const existing = new Set(
+    (db.prepare("SELECT name FROM sqlite_master WHERE type IN ('table','index','view','trigger')").all() as { name: string }[])
+      .map((row) => row.name)
+  );
+  const applied = migrations.filter((m) => m.version <= current && isCreateOnly(m.up));
+  const tx = db.transaction(() => {
+    for (const m of applied) {
+      const names = objectNamesCreatedBy(m.up);
+      if (names.length > 0 && names.every((name) => existing.has(name))) continue;
+      execSkippingApplied(db, m.up);
+      for (const name of names) existing.add(name);
+    }
+  });
+  tx();
+}
+
 export function runMigrations(db: Database.Database): void {
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
   const current = db.pragma('user_version', { simple: true }) as number;
+  // Repair databases that a differently-numbered build left with a purely-additive table
+  // missing below the version line, then migrate forward. Both defend against the same
+  // cause: a user_version that does not match the objects actually present.
+  backfillMissingCreateOnly(db, current);
   const pending = migrations.filter((m) => m.version > current).sort((a, b) => a.version - b.version);
   for (const m of pending) {
-    const tx = db.transaction(() => {
-      db.exec(m.up);
-      db.pragma(`user_version = ${m.version}`);
-    });
-    tx();
+    try {
+      const tx = db.transaction(() => {
+        db.exec(m.up);
+        db.pragma(`user_version = ${m.version}`);
+      });
+      tx();
+    } catch (error) {
+      // A CREATE-only migration whose objects already exist was applied under another
+      // build's number. Re-apply only what is missing and record the version, instead of
+      // failing the vault switch with "table ... already exists". Anything else — or any
+      // migration that transforms data — is re-thrown rather than risked.
+      if (!isAlreadyAppliedError(error) || !isCreateOnly(m.up)) throw error;
+      const tx = db.transaction(() => {
+        execSkippingApplied(db, m.up);
+        db.pragma(`user_version = ${m.version}`);
+      });
+      tx();
+    }
   }
 }
