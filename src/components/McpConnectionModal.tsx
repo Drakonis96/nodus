@@ -140,37 +140,37 @@ export function McpConnectionModal({
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="font-semibold">{t('Conectar Nodus')}</h2>
-            <p className="mt-1 text-sm text-neutral-400">{t('Usa tus contenidos de Nodus desde tu asistente preferido.')}</p>
+            <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">{t('Usa tus contenidos de Nodus desde tu asistente preferido.')}</p>
           </div>
           <button className="btn btn-ghost" aria-label={t('Cerrar')} onClick={onClose}><Icon name="x" /></button>
         </div>
 
-        <div className="mt-5 flex gap-1 rounded-xl border border-neutral-800 bg-neutral-950/40 p-1">
+        <div data-testid="mcp-client-tabs" className="mt-5 flex gap-1 rounded-xl border border-neutral-200 bg-neutral-100 p-1 dark:border-neutral-800 dark:bg-neutral-950/40">
           {([
             ['chatgpt', 'ChatGPT'],
             ['claude', 'Claude Desktop'],
             ['generic', t('Otro cliente')],
           ] as const).map(([id, label]) => (
-            <button key={id} className={`flex-1 rounded-lg px-3 py-2 text-sm ${tab === id ? 'bg-neutral-800 font-medium text-white' : 'text-neutral-400 hover:text-neutral-200'}`} onClick={() => setTab(id)}>{label}</button>
+            <button key={id} className={`flex-1 rounded-lg px-3 py-2 text-sm ${tab === id ? 'bg-white font-medium text-neutral-900 shadow-sm dark:bg-neutral-800 dark:text-white' : 'text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-200'}`} onClick={() => setTab(id)}>{label}</button>
           ))}
         </div>
 
         {tab === 'chatgpt' && (
           <div className="mt-5 space-y-4">
-            <div className={`rounded-xl border p-4 ${isConnected ? 'border-emerald-800/70 bg-emerald-950/20' : tunnel.phase === 'error' ? 'border-red-900/70 bg-red-950/20' : 'border-indigo-900/70 bg-indigo-950/20'}`}>
+            <div data-testid="mcp-tunnel-status" className={`rounded-xl border p-4 ${isConnected ? 'border-emerald-200 bg-emerald-50 dark:border-emerald-800/70 dark:bg-emerald-950/20' : tunnel.phase === 'error' ? 'border-red-200 bg-red-50 dark:border-red-900/70 dark:bg-red-950/20' : 'border-indigo-200 bg-indigo-50 dark:border-indigo-900/70 dark:bg-indigo-950/20'}`}>
               <div className="flex items-start gap-3">
-                <span className={`mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full ${isConnected ? 'bg-emerald-500/15 text-emerald-300' : 'bg-indigo-500/15 text-indigo-300'}`}><Icon name={isConnected ? 'check' : 'lock'} /></span>
+                <span className={`mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full ${isConnected ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300' : tunnel.phase === 'error' ? 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300' : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300'}`}><Icon name={isConnected ? 'check' : 'lock'} /></span>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h3 className="font-medium text-neutral-100">{isConnected ? t('Conectado a ChatGPT') : t('Túnel seguro de OpenAI')}</h3>
-                    <span className={`text-xs ${isConnected ? 'text-emerald-400' : tunnel.phase === 'error' ? 'text-red-400' : 'text-indigo-300'}`}>{phaseLabel(tunnel)}</span>
+                    <h3 className="font-medium text-neutral-900 dark:text-neutral-100">{isConnected ? t('Conectado a ChatGPT') : t('Túnel seguro de OpenAI')}</h3>
+                    <span className={`text-xs ${isConnected ? 'text-emerald-700 dark:text-emerald-400' : tunnel.phase === 'error' ? 'text-red-700 dark:text-red-400' : 'text-indigo-700 dark:text-indigo-300'}`}>{phaseLabel(tunnel)}</span>
                   </div>
-                  <p className="mt-1 text-sm text-neutral-400">{t('Conecta ChatGPT sin publicar tu servidor ni abrir puertos. Nodus usa el túnel seguro oficial de OpenAI.')}</p>
+                  <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">{t('Conecta ChatGPT sin publicar tu servidor ni abrir puertos. Nodus usa el túnel seguro oficial de OpenAI.')}</p>
                   {tunnel.clientVersion && <p className="mt-1 text-[11px] text-neutral-500">tunnel-client {tunnel.clientVersion}</p>}
                 </div>
               </div>
               {tunnel.installProgress != null && tunnel.phase === 'installing' && (
-                <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-neutral-800"><div className="h-full rounded-full bg-indigo-500 transition-[width]" style={{ width: `${Math.round(tunnel.installProgress * 100)}%` }} /></div>
+                <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-800"><div className="h-full rounded-full bg-indigo-500 transition-[width]" style={{ width: `${Math.round(tunnel.installProgress * 100)}%` }} /></div>
               )}
             </div>
 
@@ -181,28 +181,28 @@ export function McpConnectionModal({
                   <button className="btn btn-primary mt-3" onClick={() => void window.nodus.openExternal(CHATGPT_PLUGINS_URL)}><Icon name="external" />{t('Abrir configuración de ChatGPT')}</button>
                 </Step>
                 <div className="flex flex-wrap gap-2">
-                  {tunnel.uiUrl && <button className="btn btn-ghost border border-neutral-700" onClick={() => void window.nodus.openExternal(tunnel.uiUrl!)}><Icon name="settings" />{t('Abrir diagnóstico')}</button>}
-                  <button className="btn btn-ghost border border-neutral-700" disabled={busy} onClick={() => void disconnect()}><Icon name="stop" />{t('Desconectar')}</button>
+                  {tunnel.uiUrl && <button className="btn btn-ghost border border-neutral-300 dark:border-neutral-700" onClick={() => void window.nodus.openExternal(tunnel.uiUrl!)}><Icon name="settings" />{t('Abrir diagnóstico')}</button>}
+                  <button className="btn btn-ghost border border-neutral-300 dark:border-neutral-700" disabled={busy} onClick={() => void disconnect()}><Icon name="stop" />{t('Desconectar')}</button>
                 </div>
               </div>
             ) : (
               <div className="space-y-3">
                 <Step number="1" title={t('Crea un túnel en OpenAI')}>
                   <p>{t('Abre la página de túneles, pulsa Create y copia el identificador que empieza por tunnel_.')}</p>
-                  <button className="btn btn-ghost mt-3 border border-neutral-700" onClick={() => void window.nodus.openExternal(OPENAI_TUNNELS_URL)}><Icon name="external" />{t('Abrir túneles de OpenAI')}</button>
-                  <label className="mt-3 block text-xs font-medium text-neutral-400">{t('ID del túnel')}
-                    <input className={`input mt-1 w-full font-mono text-xs ${tunnelId && !tunnelIdValid ? 'border-red-800' : ''}`} spellCheck={false} placeholder="tunnel_0123456789abcdef0123456789abcdef" value={tunnelId} onChange={(event) => setTunnelId(event.target.value.trim())} />
+                  <button className="btn btn-ghost mt-3 border border-neutral-300 dark:border-neutral-700" onClick={() => void window.nodus.openExternal(OPENAI_TUNNELS_URL)}><Icon name="external" />{t('Abrir túneles de OpenAI')}</button>
+                  <label className="mt-3 block text-xs font-medium text-neutral-600 dark:text-neutral-400">{t('ID del túnel')}
+                    <input className={`input mt-1 w-full font-mono text-xs ${tunnelId && !tunnelIdValid ? 'border-red-400 dark:border-red-800' : ''}`} spellCheck={false} placeholder="tunnel_0123456789abcdef0123456789abcdef" value={tunnelId} onChange={(event) => setTunnelId(event.target.value.trim())} />
                   </label>
-                  {tunnelId && !tunnelIdValid && <p className="mt-1 text-xs text-red-400">{t('El ID debe empezar por tunnel_ y contener los 32 caracteres que muestra OpenAI.')}</p>}
+                  {tunnelId && !tunnelIdValid && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{t('El ID debe empezar por tunnel_ y contener los 32 caracteres que muestra OpenAI.')}</p>}
                 </Step>
 
                 <Step number="2" title={t('Crea una clave de ejecución')}>
                   <p>{t('La clave necesita permisos Tunnels Read + Use. Nodus la guarda en el almacén protegido de este dispositivo y nunca vuelve a mostrarla.')}</p>
-                  <button className="btn btn-ghost mt-3 border border-neutral-700" onClick={() => void window.nodus.openExternal(OPENAI_RUNTIME_KEYS_URL)}><Icon name="external" />{t('Crear clave de ejecución')}</button>
-                  <label className="mt-3 block text-xs font-medium text-neutral-400">{t('Clave de ejecución')}
+                  <button className="btn btn-ghost mt-3 border border-neutral-300 dark:border-neutral-700" onClick={() => void window.nodus.openExternal(OPENAI_RUNTIME_KEYS_URL)}><Icon name="external" />{t('Crear clave de ejecución')}</button>
+                  <label className="mt-3 block text-xs font-medium text-neutral-600 dark:text-neutral-400">{t('Clave de ejecución')}
                     <div className="mt-1 flex gap-2">
                       <input className="input min-w-0 flex-1 font-mono text-xs" type={showApiKey ? 'text' : 'password'} autoComplete="off" spellCheck={false} placeholder={tunnel.hasApiKey ? t('Ya hay una clave guardada; déjalo vacío para conservarla.') : t('Pega aquí la clave nueva')} value={apiKey} onChange={(event) => setApiKey(event.target.value)} />
-                      <button className="btn btn-ghost border border-neutral-700" type="button" onClick={() => setShowApiKey((value) => !value)}><Icon name={showApiKey ? 'eyeOff' : 'eye'} />{showApiKey ? t('Ocultar') : t('Mostrar')}</button>
+                      <button className="btn btn-ghost border border-neutral-300 dark:border-neutral-700" type="button" onClick={() => setShowApiKey((value) => !value)}><Icon name={showApiKey ? 'eyeOff' : 'eye'} />{showApiKey ? t('Ocultar') : t('Mostrar')}</button>
                     </div>
                   </label>
                 </Step>
@@ -217,34 +217,34 @@ export function McpConnectionModal({
             )}
 
             {(tunnel.errorCode || actionError) && (
-              <div className="rounded-xl border border-red-900/70 bg-red-950/20 p-3 text-sm text-red-200">
+              <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-900/70 dark:bg-red-950/20 dark:text-red-200">
                 <p>{actionError || tunnelErrorLabel(tunnel.errorCode)}</p>
-                {tunnel.errorDetail && <details className="mt-2 text-xs text-red-300/70"><summary className="cursor-pointer">{t('Ver detalle técnico')}</summary><pre className="mt-2 max-h-36 overflow-auto whitespace-pre-wrap break-words rounded bg-black/20 p-2">{tunnel.errorDetail}</pre></details>}
+                {tunnel.errorDetail && <details className="mt-2 text-xs text-red-700 dark:text-red-300/70"><summary className="cursor-pointer">{t('Ver detalle técnico')}</summary><pre className="mt-2 max-h-36 overflow-auto whitespace-pre-wrap break-words rounded bg-red-100/70 p-2 text-red-900 dark:bg-black/20 dark:text-red-100">{tunnel.errorDetail}</pre></details>}
               </div>
             )}
 
-            <div className="rounded-xl border border-amber-900/50 bg-amber-950/15 p-3 text-xs leading-5 text-amber-200/80">
+            <div data-testid="mcp-privacy-notice" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-800 dark:border-amber-800/60 dark:bg-amber-950/20 dark:text-amber-200">
               <Icon name="shield" size={13} className="mr-1" />
               {t('Cuando uses Nodus desde ChatGPT, OpenAI recibirá las consultas y los resultados que ChatGPT solicite. Las bóvedas permanecen en este equipo y el servidor local no se publica en Internet.')}
             </div>
 
             {tunnel.configured && !isConnected && (
-              <div className="flex justify-end"><button className="text-xs text-red-400 hover:text-red-300" disabled={busy} onClick={() => void forget()}>{t('Borrar conexión guardada')}</button></div>
+              <div className="flex justify-end"><button className="text-xs text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300" disabled={busy} onClick={() => void forget()}>{t('Borrar conexión guardada')}</button></div>
             )}
           </div>
         )}
 
         {tab === 'claude' && (
           <div className="mt-5 space-y-3">
-            <p className="text-sm text-neutral-400">{t('Claude Desktop puede conectar directamente con el servidor local de Nodus mediante este puente stdio:')}</p>
-            <pre className="overflow-x-auto rounded-lg border border-neutral-800 bg-neutral-950 p-3 text-xs text-neutral-300">{claudeConfig}</pre>
+            <p className="text-sm text-neutral-600 dark:text-neutral-400">{t('Claude Desktop puede conectar directamente con el servidor local de Nodus mediante este puente stdio:')}</p>
+            <pre className="overflow-x-auto rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-xs text-neutral-800 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-300">{claudeConfig}</pre>
             <p className="text-xs text-neutral-500">{t('Copia esta configuración en Claude Desktop y reinicia la aplicación.')}</p>
           </div>
         )}
 
         {tab === 'generic' && (
           <div className="mt-5 space-y-3">
-            <p className="text-sm text-neutral-400">{t('Usa Streamable HTTP con la URL local y la cabecera bearer siguientes.')}</p>
+            <p className="text-sm text-neutral-600 dark:text-neutral-400">{t('Usa Streamable HTTP con la URL local y la cabecera bearer siguientes.')}</p>
             <ConnectionValue label={t('URL del servidor')} value={url} copied={copied === 'url'} onCopy={() => void onCopy('url', url)} />
             <ConnectionValue label={t('Bearer token')} value={token || t('Activa el servidor para generar un token.')} copied={copied === 'token'} onCopy={() => void onCopy('token', token)} />
           </div>
@@ -258,10 +258,10 @@ export function McpConnectionModal({
 
 function Step({ number, title, children }: { number: string; title: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-xl border border-neutral-800 p-4">
+    <section data-testid="mcp-setup-step" className="rounded-xl border border-neutral-200 p-4 dark:border-neutral-800">
       <div className="flex items-start gap-3">
-        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-indigo-500/15 text-xs font-semibold text-indigo-300">{number}</span>
-        <div className="min-w-0 flex-1 text-sm text-neutral-400"><h3 className="font-medium text-neutral-100">{title}</h3><div className="mt-1">{children}</div></div>
+        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-indigo-100 text-xs font-semibold text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300">{number}</span>
+        <div className="min-w-0 flex-1 text-sm text-neutral-600 dark:text-neutral-400"><h3 className="font-medium text-neutral-900 dark:text-neutral-100">{title}</h3><div className="mt-1">{children}</div></div>
       </div>
     </section>
   );
@@ -271,8 +271,8 @@ function ConnectionValue({ label, value, copied, onCopy }: { label: string; valu
   return (
     <div>
       <div className="mb-1 text-xs font-medium uppercase tracking-wide text-neutral-500">{label}</div>
-      <div className="flex items-center gap-2 rounded-lg border border-neutral-800 bg-neutral-950/60 p-2">
-        <code className="min-w-0 flex-1 break-all text-xs text-neutral-200">{value}</code>
+      <div className="flex items-center gap-2 rounded-lg border border-neutral-200 bg-neutral-50 p-2 dark:border-neutral-800 dark:bg-neutral-950/60">
+        <code className="min-w-0 flex-1 break-all text-xs text-neutral-800 dark:text-neutral-200">{value}</code>
         <button className="btn btn-ghost shrink-0" disabled={!value} onClick={onCopy}><Icon name={copied ? 'check' : 'copy'} />{copied ? t('Copiado') : t('Copiar')}</button>
       </div>
     </div>

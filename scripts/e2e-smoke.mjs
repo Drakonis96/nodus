@@ -451,6 +451,73 @@ try {
   await page.getByRole('button', { name: /Anthropic/ }).click();
   await page.getByText(/Anthropic no permite que aplicaciones de terceros ofrezcan inicio de sesión de Claude\.ai/).waitFor();
   console.log('[e2e] provider UI exposes subscriptions, usage limits and real light/dark surfaces');
+
+  // ── ChatGPT MCP connector: every semantic surface must work in both themes ──
+  await page.getByRole('button', { name: 'Integraciones', exact: true }).click();
+  const mcpSettingsCard = page.getByTestId('mcp-settings-card');
+  await mcpSettingsCard.waitFor();
+  await mcpSettingsCard.getByRole('button', { name: /Conectar con ChatGPT|Administrar conexión/ }).click();
+  await page.getByTestId('mcp-privacy-notice').waitFor();
+  const mcpThemeStyles = await page.evaluate(() => {
+    const root = document.documentElement;
+    const settingsCard = document.querySelector('[data-testid="mcp-settings-card"]');
+    const notice = document.querySelector('[data-testid="mcp-privacy-notice"]');
+    const status = document.querySelector('[data-testid="mcp-tunnel-status"]');
+    const tabs = document.querySelector('[data-testid="mcp-client-tabs"]');
+    const step = document.querySelector('[data-testid="mcp-setup-step"]');
+    const settingsHeading = settingsCard?.querySelector('h3');
+    const statusHeading = status?.querySelector('h3');
+    if (!settingsCard || !notice || !status || !tabs || !step || !settingsHeading || !statusHeading) {
+      throw new Error('MCP theme surfaces are missing');
+    }
+    const original = { light: root.classList.contains('light'), dark: root.classList.contains('dark') };
+    const read = () => ({
+      settingsBackground: getComputedStyle(settingsCard).backgroundColor,
+      settingsText: getComputedStyle(settingsHeading).color,
+      noticeBackground: getComputedStyle(notice).backgroundColor,
+      noticeText: getComputedStyle(notice).color,
+      noticeBorder: getComputedStyle(notice).borderTopColor,
+      statusBackground: getComputedStyle(status).backgroundColor,
+      statusText: getComputedStyle(statusHeading).color,
+      tabsBackground: getComputedStyle(tabs).backgroundColor,
+      stepBorder: getComputedStyle(step).borderTopColor,
+    });
+    root.classList.add('light');
+    root.classList.remove('dark');
+    const light = read();
+    root.classList.remove('light');
+    root.classList.add('dark');
+    const dark = read();
+    root.classList.toggle('light', original.light);
+    root.classList.toggle('dark', original.dark);
+    return { light, dark };
+  });
+  const rgbChannels = (color) => (color.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number);
+  const relativeLuminance = (color) => {
+    const channels = rgbChannels(color).map((channel) => {
+      const value = channel / 255;
+      return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+  };
+  const contrastRatio = (foreground, background) => {
+    const a = relativeLuminance(foreground);
+    const b = relativeLuminance(background);
+    return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+  };
+  assert.ok(contrastRatio(mcpThemeStyles.light.noticeText, mcpThemeStyles.light.noticeBackground) >= 4.5, 'MCP privacy notice meets WCAG AA contrast in light mode');
+  assert.ok(contrastRatio(mcpThemeStyles.dark.noticeText, mcpThemeStyles.dark.noticeBackground) >= 4.5, 'MCP privacy notice meets WCAG AA contrast in dark mode');
+  assert.ok(contrastRatio(mcpThemeStyles.light.statusText, mcpThemeStyles.light.statusBackground) >= 4.5, 'MCP status heading is readable in light mode');
+  assert.ok(contrastRatio(mcpThemeStyles.dark.statusText, mcpThemeStyles.dark.statusBackground) >= 4.5, 'MCP status heading is readable in dark mode');
+  assert.ok(contrastRatio(mcpThemeStyles.light.settingsText, mcpThemeStyles.light.settingsBackground) >= 4.5, 'MCP Settings heading is readable in light mode');
+  assert.notEqual(mcpThemeStyles.light.noticeBackground, mcpThemeStyles.dark.noticeBackground, 'MCP privacy notice follows the active theme');
+  assert.notEqual(mcpThemeStyles.light.noticeBorder, mcpThemeStyles.dark.noticeBorder, 'MCP privacy border follows the active theme');
+  assert.notEqual(mcpThemeStyles.light.statusBackground, mcpThemeStyles.dark.statusBackground, 'MCP status panel follows the active theme');
+  assert.notEqual(mcpThemeStyles.light.tabsBackground, mcpThemeStyles.dark.tabsBackground, 'MCP client tabs follow the active theme');
+  assert.notEqual(mcpThemeStyles.light.stepBorder, mcpThemeStyles.dark.stepBorder, 'MCP setup steps follow the active theme');
+  await page.getByRole('dialog', { name: 'Conectar Nodus' }).getByRole('button', { name: 'Cerrar', exact: true }).last().click();
+  console.log('[e2e] ChatGPT MCP connector has readable light/dark surfaces');
+
   await page.getByRole('button', { name: 'Modelos IA', exact: true }).click();
   await page.getByText('Generación de imágenes', { exact: true }).waitFor({ timeout: 30_000 });
   assert.equal(await page.getByText('gemini-3.1-flash-lite-image', { exact: false }).count() > 0, true, 'image settings render selected verified model');
