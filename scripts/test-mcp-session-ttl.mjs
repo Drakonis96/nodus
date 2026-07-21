@@ -104,7 +104,11 @@ function installRuntimeHooks(userDataPath) {
 
   Module._resolveFilename = function resolveFilename(request, parent, isMain, options) {
     if (request.startsWith('@shared/')) {
-      return path.join(repoRoot, `${request.replace('@shared/', 'shared/')}.ts`);
+      // A shared entry is either a file (shared/x.ts) or a directory barrel
+      // (shared/x/index.ts) — fall back to the index so a package-style import resolves.
+      const base = path.join(repoRoot, request.replace('@shared/', 'shared/'));
+      const asFile = `${base}.ts`;
+      return fs.existsSync(asFile) ? asFile : path.join(base, 'index.ts');
     }
     return originalResolveFilename.call(this, request, parent, isMain, options);
   };

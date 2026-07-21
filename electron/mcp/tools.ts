@@ -38,7 +38,14 @@ import * as workSummaries from '../db/workSummariesRepo';
 import { listPersons, getPerson, listEvents, listEvidenceFor, recordCounts } from '../db/entitiesRepo';
 import * as archive from '../db/archiveRepo';
 import * as dbMode from '../db/databasesRepo';
-import { decodeCheckbox, decodeMultiSelect, decodeNumber } from '@shared/databases';
+import {
+  decodeCheckbox,
+  decodeMultiSelect,
+  decodeNumber,
+  encodeNumber,
+  encodeMultiSelect,
+  normalizeCellValue,
+} from '@shared/databases';
 import { comparableType, type FormulaSpec } from '@shared/databaseFormula';
 import { describeFormula } from '@shared/databaseFormulaEval';
 import {
@@ -57,6 +64,14 @@ import * as writingDrafts from '../db/writingDraftsRepo';
 import * as studyOrg from '../db/studyOrgRepo';
 import * as studyQuestions from '../db/studyQuestionsRepo';
 import * as studyLearning from '../db/studyLearningRepo';
+import * as studySchedule from '../db/studyScheduleRepo';
+import * as teachingGroups from '../db/teachingGroupsRepo';
+import * as teachingGrades from '../db/teachingGradesRepo';
+import * as teachingExams from '../db/teachingExamsRepo';
+import * as teachingRubrics from '../db/teachingRubricsRepo';
+import { gradebookToGrid, anonymousGrid, GRID_COL, type GridStudent } from '@shared/assessment';
+import { isStudentFilled } from '@shared/teachingGroups';
+import { normalizeVaultType, type VaultType } from '@shared/vaultTypes';
 import { searchStudyCorpus } from '../ai/studySearch';
 import { buildAuthorGraph, getDebate, getDebates } from '../graph/graphService';
 import { embed, AiError } from '../ai/aiClient';
@@ -394,19 +409,33 @@ function count(table: 'ideas' | 'works' | 'gaps' | 'authors' | 'notes' | 'themes
 }
 
 /**
- * Describes the vault these tools are actually serving, plus the vaults available to
- * switch to. `active` is resolved from the database file this process has OPEN, not from
- * the registry's activeVaultId: the connection is cached until an explicit vault switch,
- * while the registry is a file any second Nodus instance can rewrite underneath us.
- * Trusting the registry there would label another vault's data with this vault's name —
- * a silent misattribution. When the two disagree we serve (and say) the open one, and
- * hand the client a `warning` it can relay instead of guessing.
+ * The vault these tools actually serve, resolved from the database file this process
+ * has OPEN rather than the registry's activeVaultId: the connection is cached until an
+ * explicit vault switch, while the registry is a file any second Nodus instance can
+ * rewrite underneath us. Trusting the registry would label another vault's data with
+ * this vault's name — a silent misattribution — so we serve (and report) the open one.
  */
-function vaultContext() {
+function servingVault() {
   const vaults = listVaults();
   const registryActive = getActiveVault();
   const openPath = openDbPath();
-  const serving = (openPath ? vaults.find((vault) => path.resolve(vault.path) === path.resolve(openPath)) : null) ?? registryActive;
+  const serving =
+    (openPath ? vaults.find((vault) => path.resolve(vault.path) === path.resolve(openPath)) : null) ?? registryActive;
+  return { vaults, registryActive, serving };
+}
+
+/** The vault type the MCP surface is scoped to for the current session. */
+export function resolveServingVaultType(): VaultType {
+  return normalizeVaultType(servingVault().serving.type);
+}
+
+/**
+ * Describes the vault these tools are actually serving, plus the vaults available to
+ * switch to. When the open vault and the registry disagree we hand the client a
+ * `warning` it can relay instead of guessing.
+ */
+function vaultContext() {
+  const { vaults, registryActive, serving } = servingVault();
   const diverged = serving.id !== registryActive.id;
   return {
     active: { id: serving.id, name: serving.name, type: serving.type },
@@ -655,6 +684,127 @@ function asDraft(draft: z.infer<typeof writingDraftSchema>): WritingWorkshopDraf
   return draft as WritingWorkshopDraft;
 }
 
+// ── Tool surface scoped to the active vault type ─────────────────────────────
+// A Nodus install holds vaults of different types, and each type only populates
+// some of the data layers. Advertising every tool in every vault clutters the
+// calling model's tool list with 30+ tools that can only ever return empty, so the
+// surface is filtered to the layers the active vault type actually has — the same
+// principle behind VAULT_TYPE_SCOPED_VIEWS in the app. A tool NOT listed here is
+// universal (capabilities, notes/folders) and shows in every vault. The gate is
+// resolved once, when the session's server is built; a mid-session vault switch is
+// covered by the `warning` on nodus_get_capabilities, exactly as data reads are.
+
+/** Vault types whose corpus is analysed works (the research/authoring graph). */
+const RESEARCH_VAULTS: VaultType[] = ['academic', 'primary_sources', 'genealogy', 'testimonios'];
+/** Vault types with a persons / timeline / evidence-archive records layer. */
+const RECORDS_VAULTS: VaultType[] = ['primary_sources', 'genealogy'];
+/** Vault types with the structured-tables (databases) layer. */
+const DATABASE_VAULTS: VaultType[] = ['databases'];
+/** Vault types with the study organisation layer (courses, materials, questions). */
+const STUDY_VAULTS: VaultType[] = ['estudio', 'docencia'];
+/** Vault types with the teaching layer (groups, gradebook, exams, rubrics). */
+const TEACHING_VAULTS: VaultType[] = ['docencia'];
+
+/** Tool name → the vault types it is offered in. Absent = universal. */
+const TOOL_VAULT_SCOPE: Record<string, VaultType[]> = {
+  // Research & authoring graph.
+  nodus_list_ideas: RESEARCH_VAULTS,
+  nodus_get_idea: RESEARCH_VAULTS,
+  nodus_get_ideas_by_work: RESEARCH_VAULTS,
+  nodus_search_ideas: RESEARCH_VAULTS,
+  nodus_analyze_passage: RESEARCH_VAULTS,
+  nodus_get_copilot_idea: RESEARCH_VAULTS,
+  nodus_compose_insertion: RESEARCH_VAULTS,
+  nodus_list_debates: RESEARCH_VAULTS,
+  nodus_get_debate: RESEARCH_VAULTS,
+  nodus_list_gaps: RESEARCH_VAULTS,
+  nodus_get_gap: RESEARCH_VAULTS,
+  nodus_search_authors: RESEARCH_VAULTS,
+  nodus_get_author_relations: RESEARCH_VAULTS,
+  nodus_get_author_synthesis: RESEARCH_VAULTS,
+  nodus_list_works: RESEARCH_VAULTS,
+  nodus_get_work: RESEARCH_VAULTS,
+  nodus_list_work_passages: RESEARCH_VAULTS,
+  nodus_get_passage: RESEARCH_VAULTS,
+  nodus_search_passages: RESEARCH_VAULTS,
+  nodus_list_themes: RESEARCH_VAULTS,
+  nodus_get_theme: RESEARCH_VAULTS,
+  nodus_list_tutor_routes: RESEARCH_VAULTS,
+  nodus_get_tutor_route: RESEARCH_VAULTS,
+  nodus_list_projects: RESEARCH_VAULTS,
+  nodus_get_project: RESEARCH_VAULTS,
+  nodus_list_coverage_questions: RESEARCH_VAULTS,
+  nodus_get_coverage_question: RESEARCH_VAULTS,
+  nodus_ask_coverage_question: RESEARCH_VAULTS,
+  nodus_writing_snapshot: RESEARCH_VAULTS,
+  nodus_generate_writing_draft: RESEARCH_VAULTS,
+  nodus_save_writing_draft: RESEARCH_VAULTS,
+  nodus_list_writing_drafts: RESEARCH_VAULTS,
+  nodus_generate_deep_research: RESEARCH_VAULTS,
+  nodus_finalize_deep_research: RESEARCH_VAULTS,
+  // Records layer.
+  nodus_list_persons: RECORDS_VAULTS,
+  nodus_get_person: RECORDS_VAULTS,
+  nodus_list_kin_suggestions: RECORDS_VAULTS,
+  nodus_list_events: RECORDS_VAULTS,
+  nodus_list_archive_items: RECORDS_VAULTS,
+  nodus_get_archive_item: RECORDS_VAULTS,
+  nodus_search_archive: RECORDS_VAULTS,
+  // Databases layer (read + the additive writes).
+  nodus_list_databases: DATABASE_VAULTS,
+  nodus_get_database_schema: DATABASE_VAULTS,
+  nodus_query_database: DATABASE_VAULTS,
+  nodus_get_database_row: DATABASE_VAULTS,
+  nodus_create_database_row: DATABASE_VAULTS,
+  nodus_set_database_cell: DATABASE_VAULTS,
+  // Study organisation layer (shared with teaching).
+  nodus_study_get_workspace: STUDY_VAULTS,
+  nodus_study_get_document: STUDY_VAULTS,
+  nodus_study_search: STUDY_VAULTS,
+  nodus_study_list_questions: STUDY_VAULTS,
+  nodus_study_get_progress: STUDY_VAULTS,
+  nodus_study_get_schedule: STUDY_VAULTS,
+  // Teaching layer.
+  nodus_teaching_list_groups: TEACHING_VAULTS,
+  nodus_teaching_get_group: TEACHING_VAULTS,
+  nodus_teaching_list_assessment_plans: TEACHING_VAULTS,
+  nodus_teaching_get_assessment_plan: TEACHING_VAULTS,
+  nodus_teaching_get_gradebook: TEACHING_VAULTS,
+  nodus_teaching_list_exams: TEACHING_VAULTS,
+  nodus_teaching_get_exam: TEACHING_VAULTS,
+  nodus_teaching_list_rubrics: TEACHING_VAULTS,
+  nodus_teaching_get_rubric: TEACHING_VAULTS,
+};
+
+/** Whether a tool is offered for a vault type. Universal tools (absent from the map)
+ *  are always offered; a preview vault type still gets only its universal tools. */
+export function isToolAllowedForVaultType(toolName: string, vaultType: VaultType): boolean {
+  const scope = TOOL_VAULT_SCOPE[toolName];
+  return scope ? scope.includes(vaultType) : true;
+}
+
+/**
+ * Registers the surface scoped to one vault type. Passing `null` registers every tool
+ * (used by the test harness and any caller that wants the full surface). Wraps the
+ * server so a disallowed `registerTool` call is skipped without touching a single one
+ * of the ~60 call sites in registerTools, keeping their strong typing intact.
+ */
+export function registerToolsForVault(server: McpServer, vaultType: VaultType | null): void {
+  if (!vaultType) {
+    registerTools(server);
+    return;
+  }
+  const gated = new Proxy(server, {
+    get(target, prop, receiver) {
+      if (prop !== 'registerTool') return Reflect.get(target, prop, receiver);
+      const original = Reflect.get(target, prop, receiver) as (name: string, ...rest: unknown[]) => unknown;
+      return (name: string, ...rest: unknown[]) =>
+        isToolAllowedForVaultType(name, vaultType) ? original.call(target, name, ...rest) : undefined;
+    },
+  });
+  registerTools(gated);
+}
+
 /** Register the complete external MCP surface. Derived graph entities are intentionally read-only. */
 export function registerTools(server: McpServer): void {
   server.registerTool(
@@ -669,6 +819,7 @@ export function registerTools(server: McpServer): void {
     tool(() => {
       const records = recordCounts();
       const studyWorkspace = studyOrg.getStudyWorkspace();
+      const teachingGroupList = teachingGroups.listTeachingGroups();
       return {
         version: app.getVersion(),
         vault: vaultContext(),
@@ -688,6 +839,11 @@ export function registerTools(server: McpServer): void {
           studyCourses: studyWorkspace.courses.length,
           studyDocuments: studyWorkspace.documents.length,
           studyQuestions: studyQuestions.listStudyQuestions().length,
+          teachingGroups: teachingGroupList.length,
+          teachingStudents: teachingGroupList.reduce((sum, group) => sum + (group.studentCount ?? 0), 0),
+          teachingAssessmentPlans: teachingGrades.listAssessmentPlans().length,
+          teachingExams: teachingExams.listTeachingExams().length,
+          teachingRubrics: teachingRubrics.listTeachingRubrics().length,
         },
         enums: { ideaTypes: IDEA_TYPES, edgeTypes: EDGE_TYPES, gapKinds: GAP_KINDS, eventTypes: EVENT_TYPES },
       };
@@ -2272,4 +2428,427 @@ export function registerTools(server: McpServer): void {
       planner: studyLearning.getStudyPlanner(),
     }))
   );
+
+  server.registerTool(
+    'nodus_study_get_schedule',
+    {
+      title: 'Get weekly schedule',
+      description:
+        'Returns the weekly timetable grid (periods and day/period cells) of a study or teaching vault. Pass academicYearId to read a specific course year; omit it for the unscoped timetable. Cells reference subjectId (resolve names via nodus_study_get_workspace). Read-only; empty in vaults without a study layer.',
+      inputSchema: {
+        academicYearId: z.string().trim().min(1).nullable().default(null),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ academicYearId }) => tool(() => studySchedule.getStudySchedule(academicYearId))()
+  );
+
+  // ── Teaching vault (read-only) ─────────────────────────────────────────────
+  // The teacher's own workspace: class groups, assessment schemes, the computed
+  // gradebook, exams and rubrics. Two invariants make this surface safe to hand to
+  // an external model: STUDENTS ARE ONLY EVER IDENTIFIED BY THEIR OPAQUE PSEUDONYM
+  // CODE (never given names, surnames or comments), and grades are a read-only
+  // PROJECTION computed by the shared assessment engine — the MCP never records one.
+  server.registerTool(
+    'nodus_teaching_list_groups',
+    {
+      title: 'List class groups',
+      description:
+        'Lists the teaching groups (class cohorts) of a docencia vault with their student counts. Optional filters: subjectId, and academicYearId (pass null to scope to groups with no year). No student names are returned. Read-only; empty in vaults without a teaching layer.',
+      inputSchema: {
+        subjectId: z.string().trim().min(1).optional(),
+        academicYearId: z.string().trim().min(1).nullable().optional(),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ subjectId, academicYearId }) =>
+      tool(() =>
+        teachingGroups
+          .listTeachingGroups({ subjectId, academicYearId })
+          .map((group) => ({
+            id: group.id,
+            shortId: group.shortId,
+            name: group.name,
+            subjectId: group.subjectId,
+            academicYearId: group.academicYearId,
+            expectedSize: group.expectedSize,
+            studentCount: group.studentCount ?? 0,
+          }))
+      )()
+  );
+
+  server.registerTool(
+    'nodus_teaching_get_group',
+    {
+      title: 'Get class group roster',
+      description:
+        'Gets one teaching group and its roster BY PSEUDONYM CODE ONLY — each student is returned as an opaque code (e.g. "STU_7K3Q") plus its position and whether the teacher has filled in a real identity, never the name itself. Use the code to line up with nodus_teaching_get_gradebook. Read-only.',
+      inputSchema: { groupId: z.string().trim().min(1) },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ groupId }) =>
+      tool(() => {
+        let group;
+        try {
+          group = teachingGroups.getTeachingGroup(groupId);
+        } catch {
+          throw notFound('teaching group', groupId);
+        }
+        return {
+          id: group.id,
+          shortId: group.shortId,
+          name: group.name,
+          subjectId: group.subjectId,
+          academicYearId: group.academicYearId,
+          expectedSize: group.expectedSize,
+          students: (group.students ?? []).map((student) => ({
+            code: student.pseudonymCode,
+            position: student.position,
+            filled: isStudentFilled(student),
+          })),
+        };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_teaching_list_assessment_plans',
+    {
+      title: 'List assessment plans',
+      description:
+        'Lists the assessment plans (grading schemes) of a docencia vault: the weighting profile and the version/publication state. Optional filters: subjectId, academicYearId (null = plans with no year). Use nodus_teaching_get_assessment_plan for the item tree and rules. Read-only.',
+      inputSchema: {
+        subjectId: z.string().trim().min(1).optional(),
+        academicYearId: z.string().trim().min(1).nullable().optional(),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ subjectId, academicYearId }) =>
+      tool(() =>
+        teachingGrades.listAssessmentPlans({ subjectId, academicYearId }).map((plan) => ({
+          id: plan.id,
+          name: plan.name,
+          subjectId: plan.subjectId,
+          academicYearId: plan.academicYearId,
+          profile: plan.profile,
+          version: plan.version,
+          published: plan.publishedAt != null,
+        }))
+      )()
+  );
+
+  server.registerTool(
+    'nodus_teaching_get_assessment_plan',
+    {
+      title: 'Get assessment plan',
+      description:
+        'Gets one assessment plan with its full item tree (blocks, activities and criteria with their weights, aggregation, entry mode and thresholds) and its computation rules (rounding, pass mark, qualitative bands, not-presented policy). This is the scheme; nodus_teaching_get_gradebook applies it to a group. Read-only.',
+      inputSchema: { planId: z.string().trim().min(1) },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ planId }) =>
+      tool(() => {
+        try {
+          return teachingGrades.getAssessmentPlan(planId);
+        } catch {
+          throw notFound('assessment plan', planId);
+        }
+      })()
+  );
+
+  server.registerTool(
+    'nodus_teaching_get_gradebook',
+    {
+      title: 'Get computed gradebook',
+      description:
+        'Applies an assessment plan to a group and returns the COMPUTED gradebook, fully anonymised: one row per student pseudonym code with the per-item marks, the final grade (the numeric/qualitative projection the engine derives — never stored), and whether the student passed or is not-presented; plus a cohort distribution (evaluated count, pass rate, mean/median/min/max, counts per qualitative band). Grades are read-only. Optional convocatoria ("ordinaria" by default) and track ("continua"/"no_continua"). Read-only.',
+      inputSchema: {
+        planId: z.string().trim().min(1),
+        groupId: z.string().trim().min(1),
+        convocatoria: z.string().trim().min(1).default('ordinaria'),
+        track: z.enum(['continua', 'no_continua']).default('continua'),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ planId, groupId, convocatoria, track }) =>
+      tool(() => {
+        let plan, items, group;
+        try {
+          ({ plan, items } = teachingGrades.getAssessmentPlan(planId));
+        } catch {
+          throw notFound('assessment plan', planId);
+        }
+        try {
+          group = teachingGroups.getTeachingGroup(groupId);
+        } catch {
+          throw notFound('teaching group', groupId);
+        }
+        const students: GridStudent[] = (group.students ?? []).map((student) => ({
+          id: student.id,
+          givenNames: student.givenNames,
+          surnames: student.surnames,
+          pseudonymCode: student.pseudonymCode,
+          position: student.position,
+        }));
+        const filledById = new Map((group.students ?? []).map((student) => [student.id, isStudentFilled(student)]));
+        const grid = gradebookToGrid({
+          plan,
+          items,
+          entries: teachingGrades.listGradeEntries(planId, convocatoria),
+          students,
+          cohort: teachingGrades.cohortStats(planId, groupId, convocatoria),
+          track,
+          previous: teachingGrades.ratchetBaseline(planId, groupId, convocatoria),
+          convocatoria,
+          // MCP always anonymises regardless of the app's pseudonym setting: the code
+          // column is the identifier a model is allowed to see.
+          showCodes: true,
+        });
+        // Drop the identifying columns by construction, then relabel each row by its code.
+        const anon = anonymousGrid(grid);
+        const markColumns = anon.columns
+          .filter((column) => column.id !== GRID_COL.code)
+          .map((column) => ({ id: column.id, name: column.name }));
+        const rows = anon.rows.map((row) => {
+          const result = grid.results[row.id];
+          const cells: Record<string, string | null> = {};
+          for (const column of markColumns) cells[column.id] = row.cells[column.id] ?? null;
+          return {
+            code: row.cells[GRID_COL.code] ?? null,
+            filled: filledById.get(row.id) ?? false,
+            cells,
+            final: {
+              raw: result?.raw ?? null,
+              numeric: result?.record.numeric ?? null,
+              qualitative: result?.record.qualitative ?? null,
+              passed: result?.passed ?? false,
+              notPresented: result?.record.notPresented ?? false,
+            },
+          };
+        });
+        const numeric = rows
+          .filter((row) => row.filled && !row.final.notPresented && row.final.numeric != null)
+          .map((row) => row.final.numeric as number);
+        const sorted = [...numeric].sort((a, b) => a - b);
+        const sum = sorted.reduce((total, value) => total + value, 0);
+        const byQualitative: Record<string, number> = {};
+        for (const row of rows) {
+          if (!row.filled) continue;
+          const band = row.final.qualitative;
+          if (band) byQualitative[band] = (byQualitative[band] ?? 0) + 1;
+        }
+        const distribution = {
+          enrolled: rows.filter((row) => row.filled).length,
+          evaluated: sorted.length,
+          passed: rows.filter((row) => row.filled && row.final.passed).length,
+          notPresented: rows.filter((row) => row.filled && row.final.notPresented).length,
+          passRate: sorted.length ? rows.filter((row) => row.filled && row.final.passed).length / rows.filter((row) => row.filled).length : null,
+          mean: sorted.length ? sum / sorted.length : null,
+          median: sorted.length ? (sorted.length % 2 ? sorted[(sorted.length - 1) / 2] : (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2) : null,
+          min: sorted.length ? sorted[0] : null,
+          max: sorted.length ? sorted[sorted.length - 1] : null,
+          byQualitative,
+        };
+        return {
+          plan: { id: plan.id, name: plan.name, profile: plan.profile },
+          convocatoria,
+          track,
+          markColumns,
+          students: rows,
+          distribution,
+        };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_teaching_list_exams',
+    {
+      title: 'List exams',
+      description:
+        'Lists the exam papers of a docencia vault (title, language, subject/course and question count). Optional subjectId filter and includeArchived. Image data is never returned. Use nodus_teaching_get_exam for the questions. Read-only.',
+      inputSchema: {
+        subjectId: z.string().trim().min(1).optional(),
+        includeArchived: z.boolean().default(false),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ subjectId, includeArchived }) =>
+      tool(() =>
+        teachingExams.listTeachingExams({ subjectId, includeArchived }).map((exam) => ({
+          id: exam.id,
+          shortId: exam.shortId,
+          title: exam.title,
+          subjectId: exam.subjectId,
+          courseId: exam.courseId,
+          language: exam.language,
+          targetQuestionCount: exam.targetQuestionCount,
+        }))
+      )()
+  );
+
+  server.registerTool(
+    'nodus_teaching_get_exam',
+    {
+      title: 'Get exam',
+      description:
+        'Gets one exam with its header configuration and questions (prompt, type, points, options/pairs/items and the model solution when set). Inline image data is replaced by a hasImage flag and its caption; logos are reported as a count. Read-only.',
+      inputSchema: { examId: z.string().trim().min(1) },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ examId }) =>
+      tool(() => {
+        let detail;
+        try {
+          detail = teachingExams.getTeachingExam(examId);
+        } catch {
+          throw notFound('exam', examId);
+        }
+        const { logos, questions, ...exam } = detail;
+        return {
+          ...exam,
+          logoCount: logos.length,
+          questions: questions.map(({ imageDataUrl, ...question }) => ({
+            ...question,
+            hasImage: imageDataUrl != null,
+          })),
+        };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_teaching_list_rubrics',
+    {
+      title: 'List rubrics',
+      description:
+        'Lists the analytic rubrics of a docencia vault. Optional subjectId and search (matches title). Use nodus_teaching_get_rubric for the criteria, levels and cell descriptors. Read-only.',
+      inputSchema: {
+        subjectId: z.string().trim().min(1).optional(),
+        query: querySchema,
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ subjectId, query }) =>
+      tool(() =>
+        teachingRubrics.listTeachingRubrics({ subjectId, search: query }).map((rubric) => ({
+          id: rubric.id,
+          shortId: rubric.shortId,
+          title: rubric.title,
+          subjectId: rubric.subjectId,
+          criteria: rubric.criteria.length,
+          levels: rubric.levels.length,
+        }))
+      )()
+  );
+
+  server.registerTool(
+    'nodus_teaching_get_rubric',
+    {
+      title: 'Get rubric',
+      description:
+        'Gets one analytic rubric: its performance levels, its criteria (with weights) and the descriptor text in every criterion×level cell. Read-only.',
+      inputSchema: { rubricId: z.string().trim().min(1) },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ rubricId }) =>
+      tool(() => {
+        try {
+          return teachingRubrics.getTeachingRubric(rubricId);
+        } catch {
+          throw notFound('rubric', rubricId);
+        }
+      })()
+  );
+
+  // ── Databases mode (additive writes) ───────────────────────────────────────
+  // The write policy is deliberate and transversal: the derived graph and personal
+  // data (grades, confirmed kinship) stay read-only through MCP; only user-authored
+  // structured data can be written. For databases that means adding a row and editing
+  // its cells — additive/edit only. Deletes and schema changes (dropping rows,
+  // columns or whole tables) are intentionally not exposed here.
+  server.registerTool(
+    'nodus_create_database_row',
+    {
+      title: 'Create a database row',
+      description:
+        'Appends a new, empty row to a database and returns its id and position. Fill it with nodus_set_database_cell. User-authored data only; available in databases vaults. Not read-only.',
+      inputSchema: { databaseId: z.string().trim().min(1) },
+      annotations: { readOnlyHint: false, openWorldHint: false },
+    },
+    ({ databaseId }) =>
+      tool(() => {
+        if (!dbMode.getDatabase(databaseId)) throw notFound('database', databaseId);
+        const row = dbMode.createRow(databaseId);
+        return { databaseId, row: { id: row.id, position: row.position } };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_set_database_cell',
+    {
+      title: 'Set a database cell',
+      description:
+        'Sets one cell of a database row and returns the updated row. Accepts a typed value: a string for text/title/date/time/url, a number for number, a boolean for checkbox, an option LABEL (or id) for select, and an array of labels/ids for multi_select. Pass null to clear. Computed and binary columns (formula, rollup, relation, attachment, ai, ai_image) cannot be set here. User-authored data only; available in databases vaults. Not read-only.',
+      inputSchema: {
+        rowId: z.string().trim().min(1),
+        columnId: z.string().trim().min(1),
+        value: z.union([z.string(), z.number(), z.boolean(), z.array(z.string()), z.null()]),
+      },
+      annotations: { readOnlyHint: false, openWorldHint: false },
+    },
+    ({ rowId, columnId, value }) =>
+      tool(() => {
+        const row = dbMode.getRow(rowId);
+        if (!row) throw notFound('database row', rowId);
+        const column = dbMode.getColumn(columnId);
+        if (!column || column.databaseId !== row.databaseId) throw notFound('database column', columnId);
+        const raw = encodeCellForWrite(column, value);
+        const updated = dbMode.setCell(rowId, columnId, raw);
+        if (!updated) throw notFound('database row', rowId);
+        return { row: dbRowRecord(dbMode.getColumns(row.databaseId), updated) };
+      })()
+  );
+}
+
+/** Encodes an MCP-supplied typed value into the text cell a column stores, resolving
+ *  select/multi_select labels to option ids and rejecting computed/binary columns. */
+function encodeCellForWrite(column: DatabaseColumn, value: string | number | boolean | string[] | null): string | null {
+  const writable = new Set(['title', 'text', 'number', 'date', 'time', 'select', 'multi_select', 'checkbox']);
+  if (!writable.has(column.type)) {
+    throw new McpToolError(
+      'invalid_input',
+      `Column "${column.name}" is of type ${column.type}, which is computed or binary and cannot be set through MCP.`,
+    );
+  }
+  if (value === null) return null;
+  switch (column.type) {
+    case 'number': {
+      const n = typeof value === 'number' ? value : Number(value);
+      if (!Number.isFinite(n)) throw new McpToolError('invalid_input', `Column "${column.name}" needs a number.`);
+      return encodeNumber(n);
+    }
+    case 'checkbox':
+      return (typeof value === 'boolean' ? value : String(value) === 'true') ? '1' : '0';
+    case 'select': {
+      const id = resolveOptionId(column, String(value));
+      return id;
+    }
+    case 'multi_select': {
+      const list = Array.isArray(value) ? value : [String(value)];
+      return encodeMultiSelect(list.map((entry) => resolveOptionId(column, entry)));
+    }
+    default:
+      return normalizeCellValue(column.type, String(value));
+  }
+}
+
+/** Maps an option label (case-insensitively) or a raw option id to the stored id. */
+function resolveOptionId(column: DatabaseColumn, labelOrId: string): string {
+  const options = dbMode.getOptions(column.id);
+  const term = labelOrId.trim();
+  const match = options.find((option) => option.id === term)
+    ?? options.find((option) => option.label.toLowerCase() === term.toLowerCase());
+  if (!match) {
+    const available = options.map((option) => option.label).join(', ') || '(none defined)';
+    throw new McpToolError('invalid_input', `"${term}" is not an option of "${column.name}". Options: ${available}.`);
+  }
+  return match.id;
 }
