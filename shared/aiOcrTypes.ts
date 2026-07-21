@@ -62,7 +62,14 @@ export interface OcrOptions {
   /** Cap the longest edge of each rendered page image (px). Lower it for small local
    *  models so a page image fits their context window. Undefined = the rasterizer default. */
   rasterMaxEdge?: number;
+  /** How many page requests to send to the model at once. Higher = faster on cloud
+   *  providers (bounded by their rate limits, which the manager retries); local models
+   *  serve one at a time, so >1 rarely helps there. Undefined = the manager default. */
+  concurrency?: number;
 }
+
+/** Selectable "pages at a time" values for the OCR concurrency control. */
+export const OCR_CONCURRENCY_OPTIONS: readonly number[] = [1, 5, 10, 15, 20];
 
 export const DEFAULT_OCR_OPTIONS: OcrOptions = {
   outputMode: 'structured',

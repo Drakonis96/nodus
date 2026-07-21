@@ -4,23 +4,24 @@
 // owns the tool state and relays changes to the other window.
 import { Icon } from '../components/ui';
 import { t } from '../i18n';
-import type { ToolName } from '@shared/presenterState';
+import { TOOL_SIZE_RANGE, type ToolName } from '@shared/presenterState';
 
-export const PRESENTER_TOOLS: { name: ToolName; icon: string; label: string; shortcut: string }[] = [
-  { name: 'flashlight', icon: 'bulb', label: 'Linterna', shortcut: '⌘L' },
-  { name: 'draw', icon: 'edit', label: 'Dibujo', shortcut: '⌘D' },
-  { name: 'pointer', icon: 'target', label: 'Puntero', shortcut: '⌘P' },
-  { name: 'zoom', icon: 'search', label: 'Lupa', shortcut: '⌘M' },
+export const PRESENTER_TOOLS: { name: ToolName; icon: string; label: string; key: string }[] = [
+  { name: 'flashlight', icon: 'bulb', label: 'Linterna', key: 'L' },
+  { name: 'draw', icon: 'edit', label: 'Dibujo', key: 'D' },
+  { name: 'pointer', icon: 'target', label: 'Puntero', key: 'P' },
+  { name: 'zoom', icon: 'search', label: 'Lupa', key: 'Z' },
 ];
+
+/** ⌘ on Apple platforms, Ctrl elsewhere — matches the ⌘/Ctrl+key handler in useTools. */
+const MOD = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.platform) ? '⌘' : 'Ctrl+';
+export function toolShortcut(key: string): string {
+  return `${MOD}${key}`;
+}
 
 const COLORS = ['#6366f1', '#ef4444', '#22c55e', '#ffffff'];
 const ZOOM_FACTORS = [1.5, 2, 2.5, 3];
-const SIZE_RANGE: Record<ToolName, { min: number; max: number }> = {
-  flashlight: { min: 5, max: 40 },
-  draw: { min: 1, max: 20 },
-  pointer: { min: 5, max: 50 },
-  zoom: { min: 100, max: 400 },
-};
+const SIZE_RANGE = TOOL_SIZE_RANGE;
 
 export function PresenterToolbar({
   activeTool,
@@ -32,6 +33,7 @@ export function PresenterToolbar({
   onSetSize,
   onSetZoomFactor,
   onClear,
+  showShortcuts = false,
 }: {
   activeTool: ToolName | null;
   color: string;
@@ -42,6 +44,8 @@ export function PresenterToolbar({
   onSetSize: (size: number) => void;
   onSetZoomFactor: (factor: number) => void;
   onClear: () => void;
+  /** Show the ⌘/Ctrl+key hint under each tool (desktop windows; the phone has no keys). */
+  showShortcuts?: boolean;
 }) {
   const range = activeTool ? SIZE_RANGE[activeTool] : SIZE_RANGE.pointer;
   return (
@@ -50,13 +54,14 @@ export function PresenterToolbar({
         <button
           key={tool.name}
           type="button"
-          title={`${t(tool.label)} (${tool.shortcut})`}
+          title={`${t(tool.label)} (${toolShortcut(tool.key)})`}
           onClick={() => onSetTool(activeTool === tool.name ? null : tool.name)}
-          className={`flex h-8 w-8 items-center justify-center rounded-md transition-colors ${
-            activeTool === tool.name ? 'bg-amber-500/25 text-amber-300' : 'hover:bg-white/10'
-          }`}
+          className={`flex flex-col items-center justify-center gap-0.5 rounded-md px-1.5 py-1 transition-colors ${
+            showShortcuts ? '' : 'h-8 w-8'
+          } ${activeTool === tool.name ? 'bg-amber-500/25 text-amber-300' : 'hover:bg-white/10'}`}
         >
           <Icon name={tool.icon} size={17} />
+          {showShortcuts && <span className="text-[9px] font-medium leading-none opacity-70">{toolShortcut(tool.key)}</span>}
         </button>
       ))}
 

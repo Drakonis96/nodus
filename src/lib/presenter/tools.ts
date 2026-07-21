@@ -20,6 +20,10 @@ export class ToolOverlayController {
   private drawing = false;
   private lastX = 0;
   private lastY = 0;
+  /** Last position (in % of the stage) of the pointer/flashlight/zoom overlay, so a
+   *  size or magnification change re-paints in place instead of waiting for the next move. */
+  private overlayX = 50;
+  private overlayY = 50;
 
   constructor(
     private readonly stage: HTMLElement,
@@ -71,16 +75,40 @@ export class ToolOverlayController {
     this.drawCanvas.style.display = tool === 'draw' ? 'block' : 'none';
     this.zoom.style.display = tool === 'zoom' ? 'block' : 'none';
     if (tool === 'draw') this.resizeDrawToStage();
+    else this.repaintActive(); // show the overlay at its last position right away
   }
 
   setSize(tool: ToolName, size: number): void {
     this.sizes = { ...this.sizes, [tool]: size };
-    if (tool === 'pointer' && this.active === 'pointer') this.applyPointerSize();
-    if (tool === 'zoom' && this.active === 'zoom') this.applyZoomSize();
+    if (tool === this.active) this.repaintActive(); // reflect the slider immediately
   }
 
   setZoomFactor(factor: number): void {
     this.zoomFactor = factor;
+    if (this.active === 'zoom') this.repaintActive();
+  }
+
+  /** Re-paint the active pointer/flashlight/zoom overlay at its last known position
+   *  (called when its size or magnification changes, or when it is (re)activated). */
+  private repaintActive(): void {
+    if (this.active === 'pointer') {
+      this.pointer.style.left = `${this.overlayX}%`;
+      this.pointer.style.top = `${this.overlayY}%`;
+      this.applyPointerSize();
+    } else if (this.active === 'flashlight') {
+      this.paintFlashlight(this.overlayX, this.overlayY);
+    } else if (this.active === 'zoom') {
+      this.zoom.style.left = `${this.overlayX}%`;
+      this.zoom.style.top = `${this.overlayY}%`;
+      this.applyZoomSize();
+      this.paintZoom(this.overlayX, this.overlayY);
+    }
+  }
+
+  private paintFlashlight(xPercent: number, yPercent: number): void {
+    const r = this.sizes.flashlight;
+    this.flashlight.style.background =
+      `radial-gradient(circle at ${xPercent}% ${yPercent}%, rgba(0,0,0,0) 0, rgba(0,0,0,0) ${r}%, rgba(0,0,0,0.85) ${r + 1}%)`;
   }
 
   clearDraw(): void {
@@ -101,22 +129,27 @@ export class ToolOverlayController {
   applyToolData(data: ToolData): void {
     switch (data.tool) {
       case 'pointer':
-        this.pointer.style.left = `${data.x}%`;
-        this.pointer.style.top = `${data.y}%`;
+        this.overlayX = data.x ?? this.overlayX;
+        this.overlayY = data.y ?? this.overlayY;
+        this.pointer.style.left = `${this.overlayX}%`;
+        this.pointer.style.top = `${this.overlayY}%`;
         if (data.size) this.sizes = { ...this.sizes, pointer: data.size };
         this.applyPointerSize();
         break;
       case 'flashlight': {
-        const r = data.r ?? this.sizes.flashlight;
-        this.flashlight.style.background =
-          `radial-gradient(circle at ${data.x}% ${data.y}%, rgba(0,0,0,0) 0, rgba(0,0,0,0) ${r}%, rgba(0,0,0,0.85) ${r + 1}%)`;
+        this.overlayX = data.x ?? this.overlayX;
+        this.overlayY = data.y ?? this.overlayY;
+        if (data.r) this.sizes = { ...this.sizes, flashlight: data.r };
+        this.paintFlashlight(this.overlayX, this.overlayY);
         break;
       }
       case 'zoom':
-        this.zoom.style.left = `${data.x}%`;
-        this.zoom.style.top = `${data.y}%`;
+        this.overlayX = data.x ?? this.overlayX;
+        this.overlayY = data.y ?? this.overlayY;
+        this.zoom.style.left = `${this.overlayX}%`;
+        this.zoom.style.top = `${this.overlayY}%`;
         this.applyZoomSize();
-        this.paintZoom(data.x ?? 50, data.y ?? 50);
+        this.paintZoom(this.overlayX, this.overlayY);
         break;
       case 'draw':
         this.paintDraw(data);

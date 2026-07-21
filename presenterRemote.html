@@ -11,6 +11,12 @@
       content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; child-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ws: wss:"
     />
     <title>PDF Presenter — Mando</title>
+    <style>
+      /* The remote is a single fixed screen: never let the page itself scroll or
+         rubber-band (pull-to-refresh reloads the mando mid-presentation). */
+      html, body, #presenter-root { height: 100%; margin: 0; overflow: hidden; overscroll-behavior: none; }
+      html, body { position: fixed; inset: 0; width: 100%; touch-action: manipulation; }
+    </style>
   </head>
   <body>
     <div id="presenter-root"></div>

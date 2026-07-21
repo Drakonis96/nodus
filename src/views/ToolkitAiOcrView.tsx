@@ -20,6 +20,7 @@ import type {
   OcrProcessingMode,
 } from '@shared/types';
 import { isLocalProvider } from '@shared/providers';
+import { OCR_CONCURRENCY_OPTIONS } from '@shared/aiOcrTypes';
 import { Icon, Spinner, modelLabel } from '../components/ui';
 import { ModelPicker, SubscriptionQuotaNotice } from '../components/ModelPicker';
 import { ConfirmModal } from '../components/ConfirmModal';
@@ -143,9 +144,37 @@ function savePresetsToStorage(list: PromptPreset[]): void {
   try { localStorage.setItem(PRESETS_KEY, JSON.stringify(list)); } catch { /* storage unavailable */ }
 }
 
+// Reprocess picks a model in a modal before re-running (so a page/document can be
+// retried with a stronger — or a local — model without leaving the workspace).
+function ReprocessModelModal({ settings, initial, title, onConfirm, onCancel }: {
+  settings: AppSettings;
+  initial: ModelRef | null;
+  title?: string;
+  onConfirm: (model: ModelRef | null) => void;
+  onCancel: () => void;
+}) {
+  const [choice, setChoice] = useState<ModelRef | null>(initial);
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={(event) => { if (event.target === event.currentTarget) onCancel(); }}>
+      <div data-testid="aiocr-reprocess-modal" className="w-full max-w-md space-y-4 rounded-2xl border border-neutral-200 bg-white p-5 shadow-xl dark:border-neutral-800 dark:bg-neutral-900">
+        <div className="space-y-1">
+          <h3 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">{title ?? t('Reprocesar documento')}</h3>
+          <p className="text-sm text-neutral-500 dark:text-neutral-400">{t('Elige el modelo para volver a procesar.')}</p>
+        </div>
+        <ModelPicker settings={settings} value={choice} onChange={setChoice} allowEmpty={false} emptyLabel="Seleccionar modelo" />
+        <SubscriptionQuotaNotice model={choice} />
+        <div className="flex justify-end gap-2">
+          <button type="button" onClick={onCancel} className="rounded-lg border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200">{t('Cancelar')}</button>
+          <button type="button" disabled={!choice} onClick={() => onConfirm(choice)} className="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700 disabled:opacity-50"><Icon name="refresh" size={15} />{t('Reprocesar')}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Page-by-page review + editor ───────────────────────────────────────────────
 
-function DocReview({ docId, onBack }: { docId: string; onBack: () => void }) {
+function DocReview({ docId, settings, onBack }: { docId: string; settings: AppSettings | null; onBack: () => void }) {
   const [doc, setDoc] = useState<OcrDoc | null>(null);
   const [pageIndex, setPageIndex] = useState(0);
   const [image, setImage] = useState<string | null>(null);
@@ -155,6 +184,7 @@ function DocReview({ docId, onBack }: { docId: string; onBack: () => void }) {
   const [notice, setNotice] = useState<Notice>(null);
   const [exportFormat, setExportFormat] = useState<AiOcrExportFormat>('md');
   const [exporting, setExporting] = useState(false);
+  const [reprocessMode, setReprocessMode] = useState<'page' | 'doc' | null>(null);
 
   const loadDoc = useCallback(async () => {
     try { setDoc(await window.nodus.getOcrDoc(docId)); }
@@ -191,15 +221,17 @@ function DocReview({ docId, onBack }: { docId: string; onBack: () => void }) {
     catch (error) { setNotice({ kind: 'error', text: ocrErrorText(error) }); }
     finally { setBusy(false); }
   };
-  const reprocessThisPage = async () => {
+  const reprocessThisPage = async (model: ModelRef | null) => {
+    setReprocessMode(null);
     setBusy(true); setNotice(null);
-    try { await window.nodus.reprocessOcrPage(docId, pageIndex); await loadDoc(); }
+    try { await window.nodus.reprocessOcrPage(docId, pageIndex, model ? { model } : undefined); await loadDoc(); }
     catch (error) { setNotice({ kind: 'error', text: ocrErrorText(error) }); }
     finally { setBusy(false); }
   };
-  const reprocessAll = async () => {
+  const reprocessAll = async (model: ModelRef | null) => {
+    setReprocessMode(null);
     setBusy(true); setNotice(null);
-    try { await window.nodus.reprocessOcrDocument(docId); await loadDoc(); }
+    try { await window.nodus.reprocessOcrDocument(docId, model ? { model } : undefined); await loadDoc(); }
     catch (error) { setNotice({ kind: 'error', text: ocrErrorText(error) }); }
     finally { setBusy(false); }
   };
@@ -237,7 +269,7 @@ function DocReview({ docId, onBack }: { docId: string; onBack: () => void }) {
         <div className="flex shrink-0 items-center gap-1">
           <button type="button" disabled={!canExport || busy} title={t('Guardar en la bóveda')} aria-label={t('Guardar en la bóveda')} onClick={() => void saveToVault()} className="rounded-lg p-2 text-neutral-500 hover:bg-neutral-100 hover:text-amber-700 disabled:opacity-50 dark:hover:bg-neutral-800"><Icon name="archive" size={16} /></button>
           <button type="button" title={t('Copiar transcripción')} aria-label={t('Copiar transcripción')} onClick={() => void copyAll()} className="rounded-lg p-2 text-neutral-500 hover:bg-neutral-100 hover:text-amber-700 dark:hover:bg-neutral-800"><Icon name="copy" size={16} /></button>
-          <button type="button" disabled={active || busy} title={t('Reprocesar documento')} aria-label={t('Reprocesar documento')} onClick={() => void reprocessAll()} className="rounded-lg p-2 text-neutral-500 hover:bg-neutral-100 hover:text-amber-700 disabled:opacity-50 dark:hover:bg-neutral-800"><Icon name="refresh" size={16} /></button>
+          <button type="button" disabled={active || busy} title={t('Reprocesar documento')} aria-label={t('Reprocesar documento')} onClick={() => setReprocessMode('doc')} className="rounded-lg p-2 text-neutral-500 hover:bg-neutral-100 hover:text-amber-700 disabled:opacity-50 dark:hover:bg-neutral-800"><Icon name="refresh" size={16} className={busy ? 'animate-spin' : undefined} /></button>
         </div>
       </header>
       <NoticeBar notice={notice} onClose={() => setNotice(null)} />
@@ -276,11 +308,20 @@ function DocReview({ docId, onBack }: { docId: string; onBack: () => void }) {
               />
               <div className="flex flex-wrap items-center gap-2">
                 <button type="button" disabled={!dirty || active || busy} onClick={() => void save()} className="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-50"><Icon name="check" size={16} />{t('Guardar cambios')}</button>
-                <button type="button" disabled={active || busy} onClick={() => void reprocessThisPage()} className="inline-flex items-center gap-2 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-100 disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200"><Icon name="refresh" size={16} />{t('Reprocesar página')}</button>
+                <button type="button" disabled={active || busy} onClick={() => setReprocessMode('page')} className="inline-flex items-center gap-2 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-100 disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200"><Icon name="refresh" size={16} className={busy ? 'animate-spin' : undefined} />{t('Reprocesar página')}</button>
               </div>
             </div>
           </div>
         </>
+      )}
+      {reprocessMode && settings && (
+        <ReprocessModelModal
+          settings={settings}
+          initial={doc?.model ?? null}
+          title={reprocessMode === 'page' ? tx('Reprocesar página {n}', { n: pageIndex + 1 }) : t('Reprocesar documento')}
+          onConfirm={(model) => void (reprocessMode === 'page' ? reprocessThisPage(model) : reprocessAll(model))}
+          onCancel={() => setReprocessMode(null)}
+        />
       )}
     </div>
   );
@@ -305,10 +346,15 @@ export function ToolkitAiOcrView({ onBack, settings }: { onBack: () => void; set
   const [splitColumns, setSplitColumns] = useState(false);
   const [pageRange, setPageRange] = useState('');
   const [smallImages, setSmallImages] = useState(false);
+  const [concurrency, setConcurrency] = useState(1);
   const [presets, setPresets] = useState<PromptPreset[]>([]);
   const [presetName, setPresetName] = useState('');
   const [libFormat, setLibFormat] = useState<AiOcrExportFormat>('md');
   const [exportingZip, setExportingZip] = useState(false);
+  const [query, setQuery] = useState('');
+  const [matchIds, setMatchIds] = useState<string[] | null>(null);
+  const [reprocessTarget, setReprocessTarget] = useState<OcrDocSummary | null>(null);
+  const [tab, setTab] = useState<'new' | 'library'>('new');
 
   useEffect(() => { setPresets(loadPresets()); }, []);
 
@@ -343,6 +389,26 @@ export function ToolkitAiOcrView({ onBack, settings }: { onBack: () => void; set
 
   const cloudModel = model ? !isLocalProvider(model.provider) : false;
 
+  // Concurrency is provider-shaped: local models transcribe one page at a time, so the
+  // control locks to 1; cloud providers benefit from parallel requests. Reset to the
+  // category's default whenever the model flips between local and cloud.
+  useEffect(() => {
+    setConcurrency(cloudModel ? 5 : 1);
+  }, [cloudModel]);
+
+  // Debounced title+content search over the library (content match happens in main,
+  // which has the transcripts). null = no active filter. Re-runs as documents change so
+  // freshly-transcribed content becomes searchable.
+  useEffect(() => {
+    const q = query.trim();
+    if (!q) { setMatchIds(null); return undefined; }
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      void window.nodus.searchOcrDocs(q).then((ids) => { if (!cancelled) setMatchIds(ids); });
+    }, 200);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [query, docs]);
+
   const buildOptions = (): OcrOptions => ({
     outputMode: simpleText ? 'text' : 'structured',
     processingMode: mode,
@@ -353,6 +419,7 @@ export function ToolkitAiOcrView({ onBack, settings }: { onBack: () => void; set
     splitColumns,
     pageRange: pageRange.trim() || undefined,
     rasterMaxEdge: smallImages ? 1400 : undefined,
+    concurrency: cloudModel ? concurrency : 1,
   });
 
   const savePreset = () => {
@@ -374,6 +441,7 @@ export function ToolkitAiOcrView({ onBack, settings }: { onBack: () => void; set
     try {
       await window.nodus.createOcrDocs({ sourcePaths: paths, options: buildOptions(), model });
       await refresh();
+      setTab('library'); // jump to the library so processing progress is visible
     } catch (error) {
       setNotice({ kind: 'error', text: ocrErrorText(error) });
     } finally {
@@ -398,9 +466,12 @@ export function ToolkitAiOcrView({ onBack, settings }: { onBack: () => void; set
   const cancel = async (id: string) => {
     try { await window.nodus.cancelOcrDoc(id); } catch (error) { setNotice({ kind: 'error', text: ocrErrorText(error) }); }
   };
-  const reprocess = async (id: string) => {
+  const confirmReprocess = async (chosen: ModelRef | null) => {
+    const target = reprocessTarget;
+    setReprocessTarget(null);
+    if (!target) return;
     setNotice(null);
-    try { await window.nodus.reprocessOcrDocument(id); await refresh(); }
+    try { await window.nodus.reprocessOcrDocument(target.id, chosen ? { model: chosen } : undefined); await refresh(); }
     catch (error) { setNotice({ kind: 'error', text: ocrErrorText(error) }); }
   };
   const remove = async (doc: OcrDocSummary) => {
@@ -413,6 +484,11 @@ export function ToolkitAiOcrView({ onBack, settings }: { onBack: () => void; set
   };
 
   const sortedDocs = useMemo(() => [...docs].sort((a, b) => b.updatedAt - a.updatedAt), [docs]);
+  const visibleDocs = useMemo(() => {
+    if (matchIds === null) return sortedDocs;
+    const set = new Set(matchIds);
+    return sortedDocs.filter((doc) => set.has(doc.id));
+  }, [sortedDocs, matchIds]);
   const doneIds = useMemo(() => docs.filter((d) => d.status === 'done').map((d) => d.id), [docs]);
 
   const exportAll = async () => {
@@ -426,7 +502,7 @@ export function ToolkitAiOcrView({ onBack, settings }: { onBack: () => void; set
   };
 
   if (openId) {
-    return <DocReview docId={openId} onBack={() => { setOpenId(null); void refresh(); }} />;
+    return <DocReview docId={openId} settings={settings} onBack={() => { setOpenId(null); void refresh(); }} />;
   }
 
   return (
@@ -443,6 +519,25 @@ export function ToolkitAiOcrView({ onBack, settings }: { onBack: () => void; set
       </header>
       <NoticeBar notice={notice} onClose={() => setNotice(null)} />
 
+      {/* Tabs: process new documents vs. browse the OCR library */}
+      <div className="flex gap-1 rounded-lg bg-neutral-100 p-1 dark:bg-neutral-900/60">
+        {([['new', t('Nuevo OCR')], ['library', t('Biblioteca')]] as const).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            data-testid={`aiocr-tab-${id}`}
+            onClick={() => setTab(id)}
+            className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+              tab === id ? 'bg-white text-amber-700 shadow-sm dark:bg-neutral-800 dark:text-amber-300' : 'text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200'
+            }`}
+          >
+            {label}
+            {id === 'library' && docs.length > 0 ? ` (${docs.length})` : ''}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'new' && <>
       {/* Options */}
       <section className="space-y-4 rounded-xl border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-900/40">
         <div className="space-y-2">
@@ -476,7 +571,16 @@ export function ToolkitAiOcrView({ onBack, settings }: { onBack: () => void; set
           )}
           <label className="block text-sm">
             <span className="mb-1 block font-medium text-neutral-700 dark:text-neutral-200">{t('Páginas (solo PDF)')}</span>
-            <input className="input" value={pageRange} onChange={(event) => setPageRange(event.target.value)} placeholder={t('Todas · ej.: 1-3,5')} />
+            <input className="input w-full" value={pageRange} onChange={(event) => setPageRange(event.target.value)} placeholder={t('Todas · ej.: 1-3,5')} />
+          </label>
+          <label className="block text-sm">
+            <span className="mb-1 block font-medium text-neutral-700 dark:text-neutral-200">{t('Páginas en paralelo')}</span>
+            <select className="input w-full disabled:opacity-60" value={cloudModel ? concurrency : 1} disabled={!cloudModel} onChange={(event) => setConcurrency(parseInt(event.target.value, 10))}>
+              {OCR_CONCURRENCY_OPTIONS.map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+            <span className="mt-1 block text-xs text-neutral-500 dark:text-neutral-400">
+              {cloudModel ? t('Envía varias páginas a la vez para transcribir más rápido.') : t('Los modelos locales transcriben de una en una.')}
+            </span>
           </label>
         </div>
 
@@ -484,7 +588,7 @@ export function ToolkitAiOcrView({ onBack, settings }: { onBack: () => void; set
           <div className="space-y-2">
             <label className="block text-sm">
               <span className="mb-1 block font-medium text-neutral-700 dark:text-neutral-200">{t('Instrucciones adicionales')}</span>
-              <textarea className="input min-h-[64px]" value={customPrompt} onChange={(event) => setCustomPrompt(event.target.value)} placeholder={t('Ej.: transcribe solo las notas al margen')} />
+              <textarea className="input w-full min-h-[96px] resize-y" value={customPrompt} onChange={(event) => setCustomPrompt(event.target.value)} placeholder={t('Ej.: transcribe solo las notas al margen')} />
             </label>
             <div className="flex flex-wrap items-center gap-2">
               <select className="input w-auto py-1 text-xs" value="" onChange={(event) => { const p = presets.find((x) => x.name === event.target.value); if (p) setCustomPrompt(p.prompt); }}>
@@ -538,8 +642,10 @@ export function ToolkitAiOcrView({ onBack, settings }: { onBack: () => void; set
           <span className="text-xs text-neutral-500">PDF, PNG, JPEG, WebP, GIF · {t('se transcriben al soltarlos')}</span>
         </>}
       </button>
+      </>}
 
-      {/* Library */}
+      {tab === 'library' && (
+      /* Library */
       <section className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">{t('Tu biblioteca de OCR')}</h2>
@@ -547,13 +653,30 @@ export function ToolkitAiOcrView({ onBack, settings }: { onBack: () => void; set
             <ExportControl format={libFormat} onFormat={setLibFormat} onExport={() => void exportAll()} label={t('Exportar todo (ZIP)')} busy={exportingZip} />
           )}
         </div>
+        {sortedDocs.length > 0 && (
+          <div className="relative">
+            <Icon name="search" size={15} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400" />
+            <input
+              data-testid="aiocr-search"
+              type="search"
+              className="input input-with-leading-icon w-full"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder={t('Buscar por título o contenido…')}
+            />
+          </div>
+        )}
         {sortedDocs.length === 0 ? (
           <div className="rounded-xl border border-dashed border-neutral-300 p-8 text-center text-sm text-neutral-500 dark:border-neutral-700">
             {t('Aún no has transcrito ningún documento. Añade un PDF o una imagen para empezar.')}
           </div>
+        ) : visibleDocs.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-neutral-300 p-8 text-center text-sm text-neutral-500 dark:border-neutral-700">
+            {tx('No hay resultados para «{q}».', { q: query.trim() })}
+          </div>
         ) : (
           <ul className="divide-y divide-neutral-200 overflow-hidden rounded-xl border border-neutral-200 dark:divide-neutral-800 dark:border-neutral-800">
-            {sortedDocs.map((doc) => {
+            {visibleDocs.map((doc) => {
               const active = doc.status === 'processing' || doc.status === 'pending';
               return (
                 <li key={doc.id} data-testid={`aiocr-doc-${doc.status}`} className="flex items-center gap-3 bg-white p-3 dark:bg-neutral-900/40">
@@ -573,7 +696,9 @@ export function ToolkitAiOcrView({ onBack, settings }: { onBack: () => void; set
                         {doc.errorCount > 0 ? ` · ${tx('{count} con error', { count: doc.errorCount })}` : ''}
                       </span>
                     </div>
-                    {active && <ProgressBar done={doc.doneCount} total={doc.pageCount} />}
+                    {active && (doc.pageCount > 1
+                      ? <ProgressBar done={doc.doneCount} total={doc.pageCount} />
+                      : <Icon name="refresh" size={14} className="animate-spin text-amber-600 dark:text-amber-400" />)}
                   </button>
                   <div className="flex shrink-0 items-center gap-1">
                     {active ? (
@@ -581,7 +706,7 @@ export function ToolkitAiOcrView({ onBack, settings }: { onBack: () => void; set
                     ) : (
                       <>
                         {doc.pageCount > 0 && <button type="button" title={t('Revisar')} aria-label={t('Revisar')} onClick={() => setOpenId(doc.id)} className="rounded-lg p-2 text-neutral-500 hover:bg-neutral-100 hover:text-amber-700 dark:hover:bg-neutral-800"><Icon name="scanText" size={16} /></button>}
-                        <button type="button" title={t('Reprocesar')} aria-label={t('Reprocesar')} onClick={() => void reprocess(doc.id)} className="rounded-lg p-2 text-neutral-500 hover:bg-neutral-100 hover:text-amber-700 dark:hover:bg-neutral-800"><Icon name="refresh" size={16} /></button>
+                        <button type="button" title={t('Reprocesar')} aria-label={t('Reprocesar')} onClick={() => setReprocessTarget(doc)} className="rounded-lg p-2 text-neutral-500 hover:bg-neutral-100 hover:text-amber-700 dark:hover:bg-neutral-800"><Icon name="refresh" size={16} /></button>
                       </>
                     )}
                     <button type="button" title={t('Eliminar')} aria-label={t('Eliminar')} onClick={() => setConfirmDelete(doc)} className="rounded-lg p-2 text-neutral-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40"><Icon name="trash" size={16} /></button>
@@ -592,6 +717,16 @@ export function ToolkitAiOcrView({ onBack, settings }: { onBack: () => void; set
           </ul>
         )}
       </section>
+      )}
+
+      {reprocessTarget && settings && (
+        <ReprocessModelModal
+          settings={settings}
+          initial={reprocessTarget.model ?? model}
+          onConfirm={(chosen) => void confirmReprocess(chosen)}
+          onCancel={() => setReprocessTarget(null)}
+        />
+      )}
 
       {confirmDelete && (
         <ConfirmModal

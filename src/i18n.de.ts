@@ -6393,6 +6393,7 @@ export const DE: Record<string, string> = {
   "Pantalla en negro": "Schwarzer Bildschirm",
   "Reconectando…": "Erneut verbinden…",
   "Vista local de notas": "Lokale Notizansicht",
+  "Ajustar tamaño de las notas": "Notizgröße anpassen",
   "Vista local": "Lokale Ansicht",
   // PDF Presenter (Toolkit) — YouTube videos
   "Añadir o editar vídeo": "Video hinzufügen oder bearbeiten",

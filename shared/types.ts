@@ -6211,10 +6211,12 @@ export interface NodusApi {
   // on 'aiOcr:event' (docId + snapshot), subscribed via onOcrEvent.
   createOcrDocs(input: AiOcrCreateRequest): Promise<OcrDoc[]>;
   listOcrDocs(): Promise<OcrDocSummary[]>;
+  /** IDs of documents whose title or transcribed content matches the query (empty = all). */
+  searchOcrDocs(query: string): Promise<string[]>;
   getOcrDoc(id: string): Promise<OcrDoc | null>;
   deleteOcrDoc(id: string): Promise<void>;
   cancelOcrDoc(id: string): Promise<void>;
-  reprocessOcrPage(id: string, index: number): Promise<void>;
+  reprocessOcrPage(id: string, index: number, patch?: { model?: ModelRef | null }): Promise<void>;
   reprocessOcrDocument(id: string, patch?: { model?: ModelRef | null; options?: Partial<OcrOptions> }): Promise<void>;
   /** A rendered page image as a data URL, for page-by-page review. */
   getOcrPageImage(id: string, index: number): Promise<string | null>;

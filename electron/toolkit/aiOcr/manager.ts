@@ -62,7 +62,7 @@ export interface CreateOcrInput {
 
 export interface OcrManager {
   createDocument(input: CreateOcrInput): Promise<OcrDoc>;
-  reprocessPage(id: string, index: number): Promise<void>;
+  reprocessPage(id: string, index: number, patch?: { model?: ModelRef | null }): Promise<void>;
   reprocessDocument(id: string, patch?: { model?: ModelRef | null; options?: OcrOptions }): Promise<void>;
   /** Save a manual edit of a page (null reverts to the OCR reconstruction) and
    *  regenerate the transcript. Throws while the document is still processing. */
@@ -110,7 +110,7 @@ export function createOcrManager(deps: OcrManagerDeps): OcrManager {
     return Math.min(BACKOFF_MAX_MS, BACKOFF_BASE_MS * 2 ** (attempt - 1));
   }
 
-  async function runPool<T>(items: T[], worker: (item: T) => Promise<void>): Promise<void> {
+  async function runPool<T>(items: T[], worker: (item: T) => Promise<void>, poolSize: number): Promise<void> {
     let i = 0;
     const runNext = async (): Promise<void> => {
       while (i < items.length) {
@@ -118,7 +118,7 @@ export function createOcrManager(deps: OcrManagerDeps): OcrManager {
         await worker(item);
       }
     };
-    await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, runNext));
+    await Promise.all(Array.from({ length: Math.min(poolSize, items.length) }, runNext));
   }
 
   function regenerateTranscript(doc: OcrDoc): void {
@@ -289,7 +289,9 @@ export function createOcrManager(deps: OcrManagerDeps): OcrManager {
       }
 
       const pending = doc.pages.filter((p) => p.status === 'pending' || p.status === 'processing');
-      await runPool(pending, (page) => processOnePage(doc, page, signal));
+      // Per-document concurrency (chosen in the UI), falling back to the injected default.
+      const poolSize = Math.max(1, doc.options.concurrency ?? concurrency);
+      await runPool(pending, (page) => processOnePage(doc, page, signal), poolSize);
       finalize(doc, signal);
     } catch (error) {
       const doc = store.readDoc(id);
@@ -330,12 +332,13 @@ export function createOcrManager(deps: OcrManagerDeps): OcrManager {
       return doc;
     },
 
-    async reprocessPage(id: string, index: number): Promise<void> {
+    async reprocessPage(id: string, index: number, patch?: { model?: ModelRef | null }): Promise<void> {
       if (active.has(id)) throw new Error('El documento ya se está procesando.');
       const doc = store.readDoc(id);
       if (!doc) throw new Error('Documento OCR no encontrado.');
       const page = doc.pages.find((p) => p.index === index);
       if (!page) throw new Error(`La página ${index + 1} no existe.`);
+      if (patch?.model !== undefined) doc.model = patch.model; // reprocess this page with the chosen model
       page.status = 'pending';
       page.lastError = null;
       page.editedText = null;

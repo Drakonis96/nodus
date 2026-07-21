@@ -172,6 +172,11 @@ function AudienceApp() {
   };
 
   const onWheel = (e: React.WheelEvent) => {
+    if (stateRef.current.toolMode) {
+      e.preventDefault();
+      tools.onWheelSize(e.deltaY);
+      return;
+    }
     if (!(e.ctrlKey || e.metaKey)) return;
     e.preventDefault();
     zoomAt(e.clientX, e.clientY, e.deltaY > 0 ? -0.15 : 0.15);
@@ -247,6 +252,7 @@ function AudienceApp() {
           onSetSize={(size) => ui.toolMode && dispatch({ type: 'setToolSize', tool: ui.toolMode, size }, true)}
           onSetZoomFactor={(factor) => dispatch({ type: 'setZoomFactor', factor }, true)}
           onClear={() => dispatch({ type: 'clearDraw' }, true)}
+          showShortcuts
         />
       </div>
     </div>

@@ -42,6 +42,9 @@ function RemoteApp() {
   const [videos, setVideos] = useState<Record<string, unknown>>({});
   const [carouselOpen, setCarouselOpen] = useState(false);
   const [volume, setVolume] = useState(50);
+  // Notes panel height (px). null = the default ~third of the screen; the divider above
+  // the notes lets the presenter trade slide-preview space for more room to read notes.
+  const [notesH, setNotesH] = useState<number | null>(null);
 
   const stateRef = useRef(ui);
   const wsRef = useRef<WebSocket | null>(null);
@@ -53,6 +56,8 @@ function RemoteApp() {
   const rendererRef = useRef<FittedSlideRenderer | null>(null);
   const toolCtlRef = useRef<ToolOverlayController | null>(null);
   const carouselRef = useRef<HTMLDivElement | null>(null);
+  const notesRef = useRef<HTMLDivElement | null>(null);
+  const draggingNotesRef = useRef(false);
   const sessionRef = useRef<ThumbSession | null>(null);
   const localPreviewRef = useRef(false);
   const localSlideRef = useRef(1);
@@ -168,20 +173,28 @@ function RemoteApp() {
     };
   }, [loadDeck]);
 
-  // Set up renderer + tool overlay once the preview canvas exists.
+  // Set up renderer + tool overlay whenever the preview UI is (re)mounted. A momentary
+  // WS drop unmounts the whole remote screen (screen !== 'remote') and remounts a FRESH
+  // canvas on reconnect; keying on connected+presenting (i.e. the preview being on screen)
+  // rebinds the renderer to that new canvas and repaints — otherwise rendererRef keeps
+  // drawing to the old, detached canvas and the visible preview stays black.
+  const previewMounted = connected && ui.presenting;
   useEffect(() => {
-    if (previewCanvasRef.current && previewContainerRef.current && !rendererRef.current) {
+    if (!previewMounted) return undefined;
+    if (previewCanvasRef.current && previewContainerRef.current) {
       rendererRef.current = new FittedSlideRenderer(previewCanvasRef.current, previewContainerRef.current);
     }
-    if (previewWrapRef.current && !toolCtlRef.current) {
+    if (previewWrapRef.current) {
       toolCtlRef.current = new ToolOverlayController(previewWrapRef.current, () => previewCanvasRef.current);
       toolCtlRef.current.setActiveTool(stateRef.current.toolMode);
     }
+    renderDisplayed(displayedRef.current); // paint the current slide onto the fresh canvas
     return () => {
       toolCtlRef.current?.destroy();
       toolCtlRef.current = null;
+      rendererRef.current = null;
     };
-  }, [ui.presenting]);
+  }, [previewMounted, renderDisplayed]);
 
   // Re-render when the displayed slide changes.
   useEffect(() => {
@@ -224,6 +237,19 @@ function RemoteApp() {
       return nextVal;
     });
   }, []);
+
+  // ── Notes/preview divider (drag up = taller notes, shorter slide preview) ────────
+  const onDividerDown = (e: React.PointerEvent) => {
+    draggingNotesRef.current = true;
+    (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
+  };
+  const onDividerMove = (e: React.PointerEvent) => {
+    if (!draggingNotesRef.current) return;
+    const bottom = notesRef.current?.getBoundingClientRect().bottom ?? window.innerHeight;
+    const max = Math.max(140, window.innerHeight * 0.7);
+    setNotesH(Math.min(max, Math.max(72, bottom - e.clientY)));
+  };
+  const onDividerUp = () => { draggingNotesRef.current = false; };
 
   // ── Touch: tools (1 finger), swipe (1 finger, no tool), pinch zoom (2 fingers) ──
   const posOf = (touch: { clientX: number; clientY: number }) => {
@@ -379,9 +405,11 @@ function RemoteApp() {
             {ui.blackScreen && !localPreview && (
               <div className="absolute inset-0 flex items-center justify-center bg-black text-xs text-neutral-600">{t('Pantalla en negro')}</div>
             )}
-            {/* Touch surface (tools / swipe / pinch) */}
+            {/* Touch surface (tools / swipe / pinch). touch-action:none keeps the browser
+                from scrolling/refreshing so the tool tracks the finger 1:1. */}
             <div
               className="absolute inset-0 z-10"
+              style={{ touchAction: 'none' }}
               onTouchStart={onTouchStart}
               onTouchMove={onTouchMove}
               onTouchEnd={onTouchEnd}
@@ -426,8 +454,26 @@ function RemoteApp() {
             <span className="w-6 text-right text-xs tabular-nums">{volume}</span>
           </div>
 
+          {/* Drag handle: resize notes vs. slide preview */}
+          <div
+            onPointerDown={onDividerDown}
+            onPointerMove={onDividerMove}
+            onPointerUp={onDividerUp}
+            onPointerCancel={onDividerUp}
+            style={{ touchAction: 'none' }}
+            title={t('Ajustar tamaño de las notas')}
+            aria-label={t('Ajustar tamaño de las notas')}
+            className="flex h-5 shrink-0 cursor-row-resize items-center justify-center border-t border-white/10 bg-neutral-900 active:bg-white/5"
+          >
+            <div className="h-1 w-10 rounded-full bg-white/25" />
+          </div>
+
           {/* Notes */}
-          <div className="flex max-h-[32%] min-h-24 flex-col border-t border-white/10 p-2">
+          <div
+            ref={notesRef}
+            className={`flex flex-col p-2 ${notesH == null ? 'max-h-[32%] min-h-24' : 'shrink-0'}`}
+            style={notesH == null ? undefined : { height: notesH }}
+          >
             <div className="mb-1 flex items-center justify-between text-xs text-neutral-500">
               <span>{t('Notas')}</span>
               <div className="flex items-center gap-2">
@@ -440,7 +486,7 @@ function RemoteApp() {
                 </button>
               </div>
             </div>
-            <div className="min-h-0 flex-1 overflow-y-auto" style={{ fontSize: `${notesFont}px` }}>
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain" style={{ fontSize: `${notesFont}px` }}>
               {paras.length ? (
                 paras.map((p, i) => (
                   <p key={i} className="mb-2 whitespace-pre-wrap leading-relaxed text-neutral-200">

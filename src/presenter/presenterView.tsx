@@ -249,8 +249,13 @@ function PresenterViewApp() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  // Ctrl/⌘ + wheel zoom on the current slide.
+  // Wheel over the slide: with a tool active it resizes that tool; otherwise Ctrl/⌘ + wheel zooms.
   const onWheel = (e: React.WheelEvent) => {
+    if (stateRef.current.toolMode) {
+      e.preventDefault();
+      tools.onWheelSize(e.deltaY);
+      return;
+    }
     if (!(e.ctrlKey || e.metaKey)) return;
     e.preventDefault();
     const wrap = currentWrapRef.current;
@@ -385,6 +390,7 @@ function PresenterViewApp() {
               onSetSize={(size) => ui.toolMode && dispatch({ type: 'setToolSize', tool: ui.toolMode, size }, true)}
               onSetZoomFactor={(factor) => dispatch({ type: 'setZoomFactor', factor }, true)}
               onClear={() => dispatch({ type: 'clearDraw' }, true)}
+              showShortcuts
             />
           </div>
         </div>

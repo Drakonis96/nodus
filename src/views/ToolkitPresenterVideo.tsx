@@ -82,9 +82,10 @@ export function PresenterVideoModal({
           y: Math.min(Math.max(d.box.y + dy, 0), 100 - d.box.h),
         };
       }
-      const aspect = d.box.w / d.box.h;
-      const w = Math.min(Math.max(d.box.w + dx, 10), 100 - d.box.x);
-      return { ...d.box, w, h: Math.min(w / aspect, 100 - d.box.y) };
+      // Free resize: width and height move independently so the box can take any shape.
+      const w = Math.min(Math.max(d.box.w + dx, 8), 100 - d.box.x);
+      const h = Math.min(Math.max(d.box.h + dy, 8), 100 - d.box.y);
+      return { ...d.box, w, h };
     });
   }, []);
 

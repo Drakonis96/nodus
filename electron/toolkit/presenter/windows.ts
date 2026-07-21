@@ -55,13 +55,13 @@ function loadEntry(win: BrowserWindow, htmlFile: string, query: Record<string, s
   }
 }
 
-function baseWindowOptions(display: Electron.Display): Electron.BrowserWindowConstructorOptions {
+function baseWindowOptions(display: Electron.Display, fullscreen = true): Electron.BrowserWindowConstructorOptions {
   return {
     x: display.bounds.x,
     y: display.bounds.y,
     width: display.bounds.width,
     height: display.bounds.height,
-    fullscreen: true,
+    fullscreen,
     backgroundColor: '#000000',
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
@@ -72,9 +72,9 @@ function baseWindowOptions(display: Electron.Display): Electron.BrowserWindowCon
   };
 }
 
-function createAudienceWindow(pdfId: string, startSlide: number): void {
+function createAudienceWindow(pdfId: string, startSlide: number, fullscreen = true): void {
   const { audience } = pickDisplays();
-  const win = new BrowserWindow(baseWindowOptions(audience));
+  const win = new BrowserWindow(baseWindowOptions(audience, fullscreen));
   audienceWindow = win;
   loadEntry(win, 'presenterAudience.html', { pdfId, startSlide: String(startSlide), role: 'audience' });
   win.on('closed', () => {
@@ -111,7 +111,13 @@ function stopPowerSave(): void {
 export function startPresentation(pdfId: string, startSlide = 1, withPresenter = false): void {
   stopPresentation();
   state = beginPresentation(pdfId, startSlide);
-  createAudienceWindow(pdfId, startSlide);
+  // On a single display, presenter mode can't show BOTH windows fullscreen at once:
+  // macOS gives each fullscreen window its own Space, so the audience (opened first)
+  // ends up hiding the presenter console entirely. Keep the audience as a plain
+  // window in that case so the console — created last, and fullscreen — is what the
+  // user actually lands on. With two displays each window gets its own screen.
+  const singleDisplay = screen.getAllDisplays().length <= 1;
+  createAudienceWindow(pdfId, startSlide, !(withPresenter && singleDisplay));
   if (withPresenter) createPresenterWindow(pdfId, startSlide);
   startPowerSave();
   // The mobile remote is best-effort: a server failure must not break presenting.

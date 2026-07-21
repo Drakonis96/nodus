@@ -333,6 +333,12 @@ export class ProtectEditor {
   private panStart: { x: number; y: number; tx: number; ty: number } | null = null;
   private pointers = new Map<number, ProtectPoint>();
   private pinch: { dist: number; cx: number; cy: number } | null = null;
+  // Live size/intensity preview for the brush + blur tools: a translucent ghost of the
+  // current thickness that follows the cursor and flashes at the page centre while the
+  // slider is being dragged, so the user can gauge the size before committing a mark.
+  private hoverPoint: ProtectPoint | null = null;
+  private sizePreviewUntil = 0;
+  private sizePreviewTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly resizeObserver: ResizeObserver;
   private readonly keyHandler: (event: KeyboardEvent) => void;
 
@@ -359,6 +365,7 @@ export class ProtectEditor {
   destroy(): void {
     this.resizeObserver.disconnect();
     globalThis.removeEventListener('keydown', this.keyHandler);
+    if (this.sizePreviewTimer) clearTimeout(this.sizePreviewTimer);
     this.canvas.remove();
   }
 
@@ -381,13 +388,27 @@ export class ProtectEditor {
       this.selectedIndex = -1;
       this.notifySelection();
     }
+    if (tool !== 'brush' && tool !== 'blur') this.hoverPoint = null;
     this.render();
   }
 
-  setBrush(value: number): void { this.brush = value; }
-  setBlurThickness(value: number): void { this.blurThickness = value; }
-  setBlurIntensity(value: number): void { this.blurIntensity = value; }
+  setBrush(value: number): void { this.brush = value; this.flashSizePreview(); }
+  setBlurThickness(value: number): void { this.blurThickness = value; this.flashSizePreview(); }
+  setBlurIntensity(value: number): void { this.blurIntensity = value; this.flashSizePreview(); }
   setGrayscale(value: boolean): void { this.grayscale = value; this.render(); }
+
+  /** Show the size ghost at the page centre for a beat after a slider change. */
+  private flashSizePreview(): void {
+    if (this.tool !== 'brush' && this.tool !== 'blur') return;
+    this.sizePreviewUntil = this.now() + 1100;
+    this.render();
+    if (this.sizePreviewTimer) clearTimeout(this.sizePreviewTimer);
+    this.sizePreviewTimer = setTimeout(() => { this.sizePreviewTimer = null; this.render(); }, 1160);
+  }
+
+  private now(): number {
+    return globalThis.performance?.now?.() ?? Date.now();
+  }
 
   private currentStraighten(): number {
     return this.page && Math.abs(this.page.straighten || 0) >= 0.05 ? this.page.straighten : 0;
@@ -512,6 +533,33 @@ export class ProtectEditor {
     if (this.pending) paintProtectItem(this.ctx, this.page, this.pending, this.grayscale);
     this.drawSelection(matrix);
     this.drawCrop(matrix);
+    this.drawSizePreview(matrix);
+    this.ctx.restore();
+  }
+
+  /** Translucent ghost of the brush/blur mark at the current thickness + blur intensity,
+   *  shown under the cursor (hover) or at the page centre right after a slider change. */
+  private drawSizePreview(matrix: { s: number }): void {
+    if (!this.page || this.drawing || this.editing) return;
+    if (this.tool !== 'brush' && this.tool !== 'blur') return;
+    const point = this.hoverPoint ?? (this.now() < this.sizePreviewUntil
+      ? { x: this.page.base.width / 2, y: this.page.base.height / 2 }
+      : null);
+    if (!point) return;
+    const thickness = this.tool === 'blur' ? this.blurThickness : this.brush;
+    const half = Math.min(this.page.base.width * 0.42, Math.max(70, thickness * 1.4));
+    const preview = this.makeStroke({ x: point.x - half, y: point.y }, { x: point.x + half, y: point.y });
+    this.ctx.save();
+    this.ctx.globalAlpha = 0.55;
+    paintProtectItem(this.ctx, this.page, preview, this.grayscale);
+    this.ctx.restore();
+    this.ctx.save();
+    this.ctx.translate(preview.cx, preview.cy);
+    this.ctx.rotate(preview.angle);
+    this.ctx.lineWidth = Math.max(1, 1.5 / matrix.s);
+    this.ctx.setLineDash([Math.max(4, 7 / matrix.s), Math.max(3, 4 / matrix.s)]);
+    this.ctx.strokeStyle = '#f59e0b';
+    this.ctx.strokeRect(-preview.w / 2, -preview.h / 2, preview.w, preview.h);
     this.ctx.restore();
   }
 
@@ -791,7 +839,13 @@ export class ProtectEditor {
         this.cropDraft = normalizeCrop(this.cropAnchor, point, this.page); this.render(); return;
       }
       if (this.editing) { this.updateEdit(point); return; }
-      if (this.drawing) this.updateStroke(point);
+      if (this.drawing) { this.updateStroke(point); return; }
+      // Idle over the page with the brush/blur tool: track the cursor for the size ghost.
+      if (this.tool === 'brush' || this.tool === 'blur') { this.hoverPoint = point; this.render(); }
+    });
+
+    canvas.addEventListener('pointerleave', () => {
+      if (this.hoverPoint) { this.hoverPoint = null; this.render(); }
     });
 
     const endPointer = (event: PointerEvent) => {
