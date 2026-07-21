@@ -6508,4 +6508,11 @@ export const FR: Record<string, string> = {
   "La IA no accede a este listado, a las notas ni a las respuestas del alumnado.": "L’IA n’accède ni à cette liste, ni aux notes, ni aux réponses des élèves.",
   "Nodus no expone ninguna función de IA para calificar, perfilar o evaluar estudiantes. Los identificadores permiten minimizar nombres en usos locales y exportaciones.": "Nodus n’expose aucune fonction d’IA pour noter, profiler ou évaluer des élèves. Les identifiants permettent de minimiser les noms dans les usages locaux et les exportations.",
   "La IA no recibe listas, notas ni respuestas del alumnado. Nodus no ofrece ninguna función de IA para calificar, perfilar o evaluar estudiantes; esas decisiones son siempre humanas y permanecen fuera del modelo.": "L’IA ne reçoit ni listes, ni notes, ni réponses d’élèves. Nodus ne propose aucune fonction d’IA pour noter, profiler ou évaluer des élèves ; ces décisions sont toujours humaines et restent hors du modèle.",
+  "Columnas que comparar": "Colonnes à comparer",
+  "Elige al menos dos columnas": "Choisissez au moins deux colonnes",
+  "Solo cuentan coincidencias exactas; los valores vacíos se ignoran.": "Seules les correspondances exactes comptent ; les valeurs vides sont ignorées.",
+  "Comparar esta fila": "Comparer cette ligne",
+  "Comparando…": "Comparaison…",
+  "Comparar todas las filas": "Comparer toutes les lignes",
+  "Sin mayoría": "Aucune majorité",
 };

@@ -17,6 +17,7 @@ import {
   type RollupFunction,
 } from '@shared/databases';
 import { splitMultiValue, normalizeCsvValue, typeStoresImportedText } from '@shared/databaseCsv';
+import { comparisonMajorityValue, comparisonSourceColumns } from '@shared/databaseComparison';
 import { computeFormulas } from '@shared/databaseFormulaEval';
 import type { FormulaSpec } from '@shared/databaseFormula';
 import type { DatabaseFilterState, DatabaseSavedView, SavedViewInput, SortRule } from '@shared/databaseFilters';
@@ -691,6 +692,60 @@ export function setCell(rowId: string, columnId: string, raw: string | null): Da
   touchRow(rowId);
   touchDatabase(col.databaseId);
   return getRow(rowId);
+}
+
+// ── Comparison cells ────────────────────────────────────────────────────────
+
+/** Recompute one comparison cell from the configured source columns. */
+export function runComparisonCell(rowId: string, columnId: string): DatabaseRow | null {
+  const column = getColumn(columnId);
+  const row = getRow(rowId);
+  if (!column || column.type !== 'comparison' || !row || row.databaseId !== column.databaseId) return row;
+  const columns = getColumns(column.databaseId);
+  if (comparisonSourceColumns(column, columns).length < 2) return row;
+  return setCell(rowId, columnId, comparisonMajorityValue(column, columns, row));
+}
+
+/**
+ * Recompute a complete comparison column in bounded transactions. Unlike calling setCell
+ * for every row, this avoids reloading formulas and rollups N times; yielding between batches
+ * keeps navigation and vault switching responsive on large databases.
+ */
+export async function runComparisonColumn(
+  databaseId: string,
+  columnId: string,
+  onProgress?: (done: number, total: number) => void
+): Promise<{ done: number }> {
+  const column = getColumn(columnId);
+  if (!column || column.type !== 'comparison' || column.databaseId !== databaseId) return { done: 0 };
+  const columns = getColumns(databaseId);
+  if (comparisonSourceColumns(column, columns).length < 2) return { done: 0 };
+  const rows = listRows(databaseId, { sort: 'position' });
+  const db = getDb();
+  const upsert = db.prepare(
+    'INSERT INTO db_cells (row_id, column_id, value_text) VALUES (?, ?, ?) ON CONFLICT(row_id, column_id) DO UPDATE SET value_text = excluded.value_text'
+  );
+  const clear = db.prepare('DELETE FROM db_cells WHERE row_id = ? AND column_id = ?');
+  const touch = db.prepare('UPDATE db_rows SET updated_at = ? WHERE id = ?');
+  const batchSize = 250;
+  for (let start = 0; start < rows.length; start += batchSize) {
+    const batch = rows.slice(start, start + batchSize);
+    const ts = now();
+    db.transaction(() => {
+      for (const row of batch) {
+        const result = comparisonMajorityValue(column, columns, row);
+        if (result == null) clear.run(row.id, columnId);
+        else upsert.run(row.id, columnId, result);
+        touch.run(ts, row.id);
+      }
+    })();
+    onProgress?.(Math.min(start + batch.length, rows.length), rows.length);
+    // Let navigation and a vault switch be handled between batches. The scoped database
+    // remains pinned to this job's source vault across the yield.
+    if (start + batch.length < rows.length) await new Promise<void>((resolve) => setImmediate(resolve));
+  }
+  touchDatabase(databaseId);
+  return { done: rows.length };
 }
 
 // ── Attachments ──────────────────────────────────────────────────────────────

@@ -5932,4 +5932,11 @@ export const IT: Record<string, string> = {
   "Vídeo de la diapositiva": "Video della diapositiva",
   // PDF Presenter (Toolkit) — macOS extras
   "AirPlay / Duplicar pantalla": "AirPlay / Duplicazione dello schermo",
+  "Columnas que comparar": "Colonne da confrontare",
+  "Elige al menos dos columnas": "Scegli almeno due colonne",
+  "Solo cuentan coincidencias exactas; los valores vacíos se ignoran.": "Contano solo le corrispondenze esatte; i valori vuoti vengono ignorati.",
+  "Comparar esta fila": "Confronta questa riga",
+  "Comparando…": "Confronto…",
+  "Comparar todas las filas": "Confronta tutte le righe",
+  "Sin mayoría": "Nessuna maggioranza",
 };

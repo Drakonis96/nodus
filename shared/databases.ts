@@ -13,6 +13,7 @@
 // Type-only (erased at compile time), so this module stays runtime-dependency-free even
 // though databaseFormula.ts imports its column types back.
 import type { FormulaColorRule, FormulaSpec } from './databaseFormula';
+import type { ImageProvider, ModelRef } from './types';
 
 // ── Column types ───────────────────────────────────────────────────────────────
 
@@ -30,7 +31,8 @@ export type DatabaseColumnType =
   | 'ai_image' // AI-generated image, stored as an attachment
   | 'relation' // Phase 3
   | 'rollup' // Rollup: aggregate a property across related rows
-  | 'formula'; // Computed from other columns by a visual recipe (see databaseFormula.ts)
+  | 'formula' // Computed from other columns by a visual recipe (see databaseFormula.ts)
+  | 'comparison'; // Most frequent exact value across two or more columns
 
 export interface ColumnTypeDef {
   id: DatabaseColumnType;
@@ -60,6 +62,7 @@ export const COLUMN_TYPES: ColumnTypeDef[] = [
   { id: 'relation', label: 'Relación', icon: 'link', hasOptions: false, available: true },
   { id: 'rollup', label: 'Rollup', icon: 'layers', hasOptions: false, available: true },
   { id: 'formula', label: 'Fórmula', icon: 'sigma', hasOptions: false, available: true },
+  { id: 'comparison', label: 'Comparación', icon: 'scale', hasOptions: false, available: true },
 ];
 
 const COLUMN_TYPE_BY_ID = new Map<DatabaseColumnType, ColumnTypeDef>(COLUMN_TYPES.map((d) => [d.id, d]));
@@ -104,6 +107,10 @@ export interface DatabaseColumnConfig {
   aiAuto?: boolean;
   /** ai columns: an attachment column whose file(s) feed the prompt (vision/OCR/summary). */
   aiSourceColumnId?: string;
+  /** ai columns: an optional per-column text/vision model; absent inherits Settings. */
+  aiModel?: ModelRef | null;
+  /** ai_image columns: an optional per-column image model; absent inherits Settings. */
+  aiImageModel?: { provider: ImageProvider; model: string } | null;
   /** relation columns: what the relation points at, and (for db_row) which database. */
   relationTargetKind?: RelationTargetKind;
   relationTargetDatabaseId?: string;
@@ -115,6 +122,8 @@ export interface DatabaseColumnConfig {
   formula?: FormulaSpec;
   formulaColors?: FormulaColorRule[];
   formulaDecimals?: number;
+  /** comparison columns: source columns whose exact visible values vote for the result. */
+  comparisonSourceColumnIds?: string[];
   [key: string]: unknown;
 }
 

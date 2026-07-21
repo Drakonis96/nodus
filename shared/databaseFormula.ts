@@ -222,6 +222,7 @@ export function emptyFormula(kind: FormulaKind): FormulaSpec {
  * import it without this one having to import the filter engine back.
  */
 export function comparableType(column: DatabaseColumn): DatabaseColumnType {
+  if (column.type === 'comparison') return 'text';
   if (column.type !== 'formula') return column.type;
   return formulaResultKind(column.config.formula as FormulaSpec | undefined);
 }

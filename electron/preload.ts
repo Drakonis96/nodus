@@ -236,6 +236,16 @@ const api: NodusApi = {
   createDatabaseRow: (databaseId) => ipcRenderer.invoke('db:createRow', databaseId),
   deleteDatabaseRow: (id) => ipcRenderer.invoke('db:deleteRow', id).then(() => undefined),
   setDatabaseCell: (rowId, columnId, raw) => ipcRenderer.invoke('db:setCell', rowId, columnId, raw),
+  runDatabaseComparisonCell: (rowId, columnId) => ipcRenderer.invoke('db:runComparisonCell', rowId, columnId),
+  runDatabaseComparisonColumn: (databaseId, columnId) => ipcRenderer.invoke('db:runComparisonColumn', databaseId, columnId),
+  onDatabaseComparisonProgress: (cb) => {
+    const listener = (
+      _e: unknown,
+      payload: { vaultId: string; databaseId: string; columnId: string; done: number; total: number }
+    ) => cb(payload);
+    ipcRenderer.on('db:comparisonProgress', listener);
+    return () => ipcRenderer.removeListener('db:comparisonProgress', listener);
+  },
   listDatabaseAttachments: (rowId, columnId) => ipcRenderer.invoke('db:listAttachments', rowId, columnId),
   getDatabaseAttachmentBlob: (id) => ipcRenderer.invoke('db:getAttachmentBlob', id),
   getDatabaseAttachmentThumb: (id) => ipcRenderer.invoke('db:getAttachmentThumb', id),
@@ -247,7 +257,10 @@ const api: NodusApi = {
   generateDatabaseAiImage: (rowId, columnId) => ipcRenderer.invoke('db:generateAiImage', rowId, columnId),
   generateDatabaseAiImageColumn: (databaseId, columnId) => ipcRenderer.invoke('db:generateAiImageColumn', databaseId, columnId),
   onDatabaseAiProgress: (cb) => {
-    const listener = (_e: unknown, payload: { columnId: string; done: number; total: number }) => cb(payload);
+    const listener = (
+      _e: unknown,
+      payload: { vaultId: string; databaseId: string; columnId: string; done: number; total: number }
+    ) => cb(payload);
     ipcRenderer.on('db:aiProgress', listener);
     return () => ipcRenderer.removeListener('db:aiProgress', listener);
   },
