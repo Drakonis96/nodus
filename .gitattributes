@@ -1,0 +1,6 @@
+# Vendored upstream license texts are verified by SHA-256 against
+# legal/remote-notices.json during packaging. Any end-of-line conversion would
+# change their bytes and force a network re-fetch on checkout (which breaks the
+# Windows release build when the upstream host is unreachable). Keep them byte
+# for byte as committed on every platform.
+legal/generated/** -text
