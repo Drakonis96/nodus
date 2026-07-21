@@ -3768,7 +3768,7 @@ export const IT: Record<string, string> = {
   "Clave de API de Hume (se guarda cifrada, nunca se exporta)": "Chiave API Hume (memorizzata crittografata, mai esportata)",
   "Guardar clave": "Salva chiave",
   "El audio se genera con tu cuenta de Hume y se factura a tu clave. El texto de la sección se envía a Hume para sintetizarlo.": "L'audio viene generato con il tuo account Hume e fatturato sulla tua chiave. Il testo della sezione viene inviato a Hume per sintetizzarlo.",
-  "Modelo {label} (inglés)": "Modello {label} (inglese)",
+  "Modelo {label}": "Modello {label}",
   "~{n} MB · una sola descarga para todas las voces": "~{n} MB · un unico download per tutte le voci",
   "{n}%": "{n}%",
   "Descargar modelo": "Scarica il modello",

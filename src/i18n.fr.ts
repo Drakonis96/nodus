@@ -4227,7 +4227,7 @@ export const FR: Record<string, string> = {
   'Guardar clave': 'Enregistrer la clé',
   'El audio se genera con tu cuenta de Hume y se factura a tu clave. El texto de la sección se envía a Hume para sintetizarlo.':
     'L\'audio est généré avec votre compte Hume et facturé à votre clé. Le texte de la section est envoyé à Hume pour être synthétisé.',
-  'Modelo {label} (inglés)': 'Modèle {label} (anglais)',
+  'Modelo {label}': 'Modèle {label}',
   '~{n} MB · una sola descarga para todas las voces': '~{n} Mo · un seul téléchargement pour toutes les voix',
   '{n}%': '{n} %',
   'Descargar modelo': 'Télécharger le modèle',
