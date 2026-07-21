@@ -3163,6 +3163,7 @@ export const FR: Record<string, string> = {
   'Todo el espacio de notas': 'Tout l\'espace de notes',
   'Ver esta idea conectada en el grafo': 'Voir cette idée connectée dans le graphe',
   'Aceptar': 'Accepter',
+  'Aceptar y no volver a mostrar': 'Accepter et ne plus afficher',
   'Aplicar': 'Appliquer',
   'Aplicar todas verificadas': 'Appliquer toutes les vérifiées',
   'Aún no hay proyectos. Crea uno para vincular notas, materiales y capítulos.':
@@ -6424,7 +6425,7 @@ export const FR: Record<string, string> = {
   "La IA no recibe listados, notas ni respuestas del alumnado y no puede calificar, perfilar ni evaluar estudiantes.": "L’IA ne reçoit ni listes, ni notes, ni réponses d’élèves et ne peut pas noter, profiler ou évaluer les élèves.",
   "Ver archivo en GitHub": "Voir le fichier sur GitHub",
   "Cómo facilita Nodus el cumplimiento del RGPD": "Comment Nodus facilite la conformité au RGPD",
-  "El diseño aplica minimización, privacidad por defecto y avisos justo antes de importar archivos o grabar. Distingue el tratamiento local de las conexiones opcionales y deja al responsable decidir la base jurídica, conservación, acceso y proveedores.": "La conception applique la minimisation des données, la protection par défaut et des avis juste avant l’importation de fichiers ou l’enregistrement. Elle distingue le traitement local des connexions facultatives et laisse au responsable le choix de la base juridique, de la conservation, des accès et des fournisseurs.",
+  "El diseño aplica minimización, privacidad por defecto y avisos justo antes de grabar. Distingue el tratamiento local de las conexiones opcionales y deja al responsable decidir la base jurídica, conservación, acceso y proveedores.": "La conception applique la minimisation des données, la protection par défaut et des avis juste avant l’enregistrement. Elle distingue le traitement local des connexions facultatives et laisse au responsable le choix de la base juridique, de la conservation, des accès et des fournisseurs.",
   "Esta arquitectura facilita el cumplimiento del RGPD, pero no es una certificación: cada organización debe documentar su tratamiento y completar la lista de implantación.": "Cette architecture facilite la conformité au RGPD, mais ne constitue pas une certification : chaque organisation doit documenter son traitement et compléter la liste de contrôle de déploiement.",
   "Ver lista RGPD": "Voir la liste de contrôle RGPD",
   "RGPD oficial": "RGPD officiel",

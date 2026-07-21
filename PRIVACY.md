@@ -83,9 +83,9 @@ base jurídica ni sustituye el consentimiento de las personas afectadas**.
 
 ## 4. Archivos y grabaciones
 
-Antes de abrir un selector de archivos, Nodus informa de que la incorporación es
-local y recuerda al usuario que debe tener autorización para tratar su contenido.
-Antes de activar el micrófono se muestra un aviso independiente.
+Los archivos que el usuario incorpora se tratan localmente y no se suben a un
+servidor de Nodus. Antes de activar el micrófono se muestra un aviso previo, que el
+usuario puede aceptar puntualmente o recordar para no volver a mostrarlo.
 
 Quien grabe debe:
 

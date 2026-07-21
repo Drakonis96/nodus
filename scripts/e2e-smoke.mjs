@@ -81,13 +81,6 @@ async function waitForCondition(label, probe, { timeout = 30_000, interval = 100
   throw new Error(`Tiempo agotado esperando: ${label}.${detail}`);
 }
 
-async function acceptFileImportPrivacy(page) {
-  const dialog = page.getByRole('dialog', { name: 'Antes de incorporar un archivo' });
-  await dialog.waitFor({ timeout: 10_000 });
-  await dialog.getByRole('button', { name: 'Estoy autorizado; seleccionar', exact: true }).click();
-  await dialog.waitFor({ state: 'detached' });
-}
-
 let app = null;
 try {
   // The child must run as a real GUI app: strip the runner's as-Node flag.
@@ -255,15 +248,14 @@ try {
   await startupUpdateModal.waitFor({ state: 'detached' });
   console.log('[e2e] essential tutorial language preferences + persistent seen-once gate ok');
 
-  // Native file/folder actions must first use the themed in-app privacy modal.
-  // Cancel here so the operating-system picker is never opened during automation.
-  await page.evaluate(() => { void window.nodus.pickToolkitFiles(['pdf']); });
-  const filePrivacyDialog = page.getByRole('dialog', { name: 'Antes de incorporar un archivo' });
-  await filePrivacyDialog.waitFor({ timeout: 10_000 });
-  assert.match(await filePrivacyDialog.innerText(), /localmente|autorizado|función remota/);
-  await filePrivacyDialog.getByRole('button', { name: 'Cancelar', exact: true }).click();
-  await filePrivacyDialog.waitFor({ state: 'detached' });
-  console.log('[e2e] native file actions are gated by an in-app privacy modal');
+  // File imports open the OS picker directly — there is no in-app privacy modal.
+  // Stub the native dialog so automation never opens a real picker, then assert
+  // that invoking an importer resolves without any consent dialog appearing.
+  await app.evaluate(({ dialog }) => { dialog.showOpenDialog = async () => ({ canceled: true, filePaths: [] }); });
+  const toolkitPick = await page.evaluate(() => window.nodus.pickToolkitFiles(['pdf']));
+  assert.deepEqual(toolkitPick, [], 'a cancelled toolkit import returns no files without prompting');
+  assert.equal(await page.getByRole('dialog', { name: 'Antes de incorporar un archivo' }).count(), 0, 'no file-import privacy modal is shown');
+  console.log('[e2e] file imports open the native picker directly, with no privacy modal');
 
   // ── Nodi: absolute drag + right-click goodbye + persisted visibility ───────
   const originalMascotSettings = await page.evaluate(() => window.nodus.getSettings());
@@ -1188,7 +1180,7 @@ try {
     /localmente|base jurídica|no sustituye el consentimiento/i,
     'the recording privacy notice blocks microphone access and explains the local/controller boundary',
   );
-  await microphonePrivacyDialog.getByRole('button', { name: 'He informado; comenzar', exact: true }).click();
+  await microphonePrivacyDialog.getByRole('button', { name: 'Aceptar', exact: true }).click();
   await page.getByTestId('study-dictation-discard').waitFor({ timeout: 30_000 });
   await page.getByTestId('study-dictation-discard').click();
   await page.getByTestId('study-dictation-start').waitFor({ timeout: 30_000 });
@@ -1397,7 +1389,6 @@ try {
   await page.getByTestId('study-material-import').click();
   await page.getByTestId('study-material-import-dialog').waitFor();
   await page.getByRole('button', { name: 'Seleccionar archivos o ZIP', exact: true }).click();
-  await acceptFileImportPrivacy(page);
   await page.getByTestId('study-material-import-dialog').getByText('fuente-smoke.pdf', { exact: true }).waitFor();
   await page.getByTestId('study-material-import-confirm').click();
   await page.getByTestId('study-material-import-dialog').waitFor({ state: 'detached' });
@@ -1474,7 +1465,6 @@ try {
     await page.getByRole('button', { name: 'Materiales', exact: true }).click();
     await page.getByTestId('study-material-import').click();
     await page.getByRole('button', { name: 'Seleccionar archivos o ZIP', exact: true }).click();
-    await acceptFileImportPrivacy(page);
     await page.getByTestId('study-material-import-confirm').click();
     await page.getByText('libro-smoke', { exact: true }).waitFor({ timeout: 30_000 });
     const importedEpub = await page.evaluate(async () => (await window.nodus.listStudyMaterials()).find((item) => item.title === 'libro-smoke'));
@@ -1503,7 +1493,7 @@ try {
   await page.getByRole('button', { name: 'Grabar clase', exact: true }).click();
   const recordingPrivacyDialog = page.getByRole('dialog', { name: 'Antes de activar el micrófono' });
   await recordingPrivacyDialog.waitFor({ timeout: 10_000 });
-  await recordingPrivacyDialog.getByRole('button', { name: 'He informado; comenzar', exact: true }).click();
+  await recordingPrivacyDialog.getByRole('button', { name: 'Aceptar', exact: true }).click();
   const classRecorder = page.getByTestId('study-class-recorder');
   await classRecorder.waitFor({ timeout: 30_000 });
   await page.waitForTimeout(1_300);

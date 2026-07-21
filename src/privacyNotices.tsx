@@ -1,12 +1,31 @@
 import { useEffect, useState } from 'react';
 import type { StudyMaterialAiProcessingPrompt } from '@shared/types';
-import { confirm } from './components/feedback';
+import { confirm, confirmWithRemember } from './components/feedback';
 import { PROVIDER_LABELS } from './components/ui';
 import { t } from './i18n';
 
-/** Just-in-time first privacy layer. It is shown for every new microphone session. */
+/**
+ * Once the user picks "accept and don't show again" on the recording notice, this
+ * flag skips the modal on every later microphone session on this device.
+ */
+const MIC_PRIVACY_ACK_KEY = 'nodus.micPrivacyAcknowledged';
+
+function microphonePrivacyAcknowledged(): boolean {
+  try {
+    return localStorage.getItem(MIC_PRIVACY_ACK_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Just-in-time privacy layer for microphone capture. Shown before every new
+ * recording session unless the user chose to remember their acceptance. Offers
+ * three choices: accept once, accept and don't ask again, or reject.
+ */
 export function confirmMicrophonePrivacy(): Promise<boolean> {
-  return confirm({
+  if (microphonePrivacyAcknowledged()) return Promise.resolve(true);
+  return confirmWithRemember({
     title: t('Antes de activar el micrófono'),
     message: (
       <div className="space-y-2 text-left text-sm leading-5">
@@ -22,44 +41,25 @@ export function confirmMicrophonePrivacy(): Promise<boolean> {
         </button>
       </div>
     ),
-    confirmLabel: t('He informado; comenzar'),
-    cancelLabel: t('Cancelar'),
+    confirmLabel: t('Aceptar'),
+    rememberLabel: t('Aceptar y no volver a mostrar'),
+    cancelLabel: t('Rechazar'),
     zIndex: 220,
+  }).then(({ ok, remember }) => {
+    if (ok && remember) {
+      try {
+        localStorage.setItem(MIC_PRIVACY_ACK_KEY, '1');
+      } catch {
+        /* storage unavailable — fall back to asking every time */
+      }
+    }
+    return ok;
   });
 }
 
-/** Just-in-time first privacy layer for renderer-owned file inputs. */
-export function confirmFileImportPrivacy(): Promise<boolean> {
-  return confirm({
-    title: t('Antes de incorporar un archivo'),
-    message: (
-      <div className="space-y-2 text-left text-sm leading-5">
-        <p>{t('El archivo se incorporará localmente a Nodus y no se subirá a un servidor de Nodus.')}</p>
-        <p>{t('Continúa solo si estás autorizado para tratar su contenido y evita datos personales o confidenciales que no sean necesarios.')}</p>
-        <p className="text-xs text-neutral-500">{t('Si después activas una función remota, esa acción puede enviar al proveedor elegido el contenido necesario bajo sus condiciones.')}</p>
-        <button
-          type="button"
-          className="text-xs font-medium text-indigo-400 underline underline-offset-2 hover:text-indigo-300"
-          onClick={() => void window.nodus.openPrivacyPolicy()}
-        >
-          {t('Leer política de privacidad')}
-        </button>
-      </div>
-    ),
-    confirmLabel: t('Estoy autorizado; seleccionar'),
-    cancelLabel: t('Cancelar'),
-    zIndex: 220,
-  });
-}
-
-/** Bridges native-picker requests to the same themed modal used by the renderer. */
+/** Bridges the study-material AI-processing request to the themed renderer modal. */
 export function PrivacyRequestHost() {
   useEffect(() => {
-    const stopFileImport = window.nodus.onFileImportPrivacyRequest(({ requestId }) => {
-      void confirmFileImportPrivacy()
-        .then((allowed) => window.nodus.resolveFileImportPrivacyRequest(requestId, allowed))
-        .catch(() => window.nodus.resolveFileImportPrivacyRequest(requestId, false));
-    });
     const stopAiProcessing = window.nodus.onStudyMaterialAiProcessingRequest((request) => {
       let remember = false;
       void confirm({
@@ -71,7 +71,7 @@ export function PrivacyRequestHost() {
       }).then((process) => window.nodus.resolveStudyMaterialAiProcessingRequest(request.requestId, { process, remember }))
         .catch(() => window.nodus.resolveStudyMaterialAiProcessingRequest(request.requestId, { process: false, remember: false }));
     });
-    return () => { stopFileImport(); stopAiProcessing(); };
+    return () => { stopAiProcessing(); };
   }, []);
   return null;
 }

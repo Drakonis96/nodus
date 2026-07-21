@@ -3167,6 +3167,7 @@ export const DE: Record<string, string> = {
   'Todo el espacio de notas': 'Der gesamte Notizbereich',
   'Ver esta idea conectada en el grafo': 'Diese Idee verbunden im Graphen ansehen',
   'Aceptar': 'Annehmen',
+  'Aceptar y no volver a mostrar': 'Annehmen und nicht mehr anzeigen',
   'Aplicar': 'Anwenden',
   'Aplicar todas verificadas': 'Alle verifizierten anwenden',
   'Aún no hay proyectos. Crea uno para vincular notas, materiales y capítulos.':
@@ -6433,7 +6434,7 @@ export const DE: Record<string, string> = {
   "La IA no recibe listados, notas ni respuestas del alumnado y no puede calificar, perfilar ni evaluar estudiantes.": "Die KI erhält keine Schülerlisten, Noten oder Antworten und kann Lernende weder benoten noch profilieren oder bewerten.",
   "Ver archivo en GitHub": "Datei auf GitHub anzeigen",
   "Cómo facilita Nodus el cumplimiento del RGPD": "Wie Nodus die DSGVO-Konformität unterstützt",
-  "El diseño aplica minimización, privacidad por defecto y avisos justo antes de importar archivos o grabar. Distingue el tratamiento local de las conexiones opcionales y deja al responsable decidir la base jurídica, conservación, acceso y proveedores.": "Das Design setzt Datenminimierung, Datenschutz durch Voreinstellungen und Hinweise unmittelbar vor Dateiimporten oder Aufnahmen um. Es trennt lokale Verarbeitung von optionalen Verbindungen und überlässt dem Verantwortlichen die Festlegung von Rechtsgrundlage, Aufbewahrung, Zugriff und Anbietern.",
+  "El diseño aplica minimización, privacidad por defecto y avisos justo antes de grabar. Distingue el tratamiento local de las conexiones opcionales y deja al responsable decidir la base jurídica, conservación, acceso y proveedores.": "Das Design setzt Datenminimierung, Datenschutz durch Voreinstellungen und Hinweise unmittelbar vor Aufnahmen um. Es trennt lokale Verarbeitung von optionalen Verbindungen und überlässt dem Verantwortlichen die Festlegung von Rechtsgrundlage, Aufbewahrung, Zugriff und Anbietern.",
   "Esta arquitectura facilita el cumplimiento del RGPD, pero no es una certificación: cada organización debe documentar su tratamiento y completar la lista de implantación.": "Diese Architektur unterstützt die Einhaltung der DSGVO, ist aber keine Zertifizierung: Jede Organisation muss ihre Verarbeitung dokumentieren und die Bereitstellungscheckliste ausfüllen.",
   "Ver lista RGPD": "DSGVO-Checkliste anzeigen",
   "RGPD oficial": "Offizielle DSGVO",

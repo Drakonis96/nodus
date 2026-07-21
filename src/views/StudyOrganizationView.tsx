@@ -19,7 +19,6 @@ import type { StudyQuestion } from '@shared/studyQuestions';
 import { announceStudyWorkspaceChanged, STUDY_WORKSPACE_CHANGED, type StudyNavigationTarget } from '../components/StudySidebar';
 import { t } from '../i18n';
 import { ZoteroMaterialImportModal } from '../components/ZoteroMaterialImportModal';
-import { confirmFileImportPrivacy } from '../privacyNotices';
 
 const StudyEditor = lazy(() => import('../components/editor/StudyEditor').then((module) => ({ default: module.StudyEditor })));
 
@@ -223,7 +222,7 @@ function StudyCreateDialog({
         </div>
 
         <div className="grid gap-3 sm:grid-cols-[1fr_120px]">
-          <div className="block text-xs text-neutral-500">{t('Imagen')}<button type="button" className="btn btn-ghost mt-1 flex w-full justify-start border border-neutral-700 bg-neutral-950/25 text-xs hover:border-indigo-700" onClick={() => void confirmFileImportPrivacy().then((allowed) => { if (allowed) imageFileRef.current?.click(); })}><Icon name="upload" size={14} /><span>{t(imageData ? 'Cambiar archivo' : 'Seleccionar archivo')}</span></button><input ref={imageFileRef} data-testid="study-create-image" className="sr-only" type="file" accept="image/*" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; if (!file) return; void imageFileToDataUrl(file).then(setImageData).catch((reason) => setError(reason instanceof Error ? reason.message : String(reason))); }} /><span className="mt-1 block text-[10px] text-neutral-600">{t('PNG, JPEG, WebP o GIF; máximo 2 MB.')}</span></div>
+          <div className="block text-xs text-neutral-500">{t('Imagen')}<button type="button" className="btn btn-ghost mt-1 flex w-full justify-start border border-neutral-700 bg-neutral-950/25 text-xs hover:border-indigo-700" onClick={() => imageFileRef.current?.click()}><Icon name="upload" size={14} /><span>{t(imageData ? 'Cambiar archivo' : 'Seleccionar archivo')}</span></button><input ref={imageFileRef} data-testid="study-create-image" className="sr-only" type="file" accept="image/*" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; if (!file) return; void imageFileToDataUrl(file).then(setImageData).catch((reason) => setError(reason instanceof Error ? reason.message : String(reason))); }} /><span className="mt-1 block text-[10px] text-neutral-600">{t('PNG, JPEG, WebP o GIF; máximo 2 MB.')}</span></div>
           <label className="block text-xs text-neutral-500">{t('Color')}<input data-testid="study-create-color" className="mt-1 h-[34px] w-full cursor-pointer rounded-lg border border-neutral-300 bg-transparent p-1 dark:border-neutral-700" type="color" value={color} onChange={(event) => setColor(event.target.value)} /></label>
         </div>
         {imageData && <div className="flex items-center gap-3"><img className="h-20 w-20 rounded-xl object-cover" src={imageData} alt="" /><button type="button" className="btn btn-ghost text-xs text-red-400" onClick={() => setImageData('')}>{t('Quitar imagen')}</button></div>}

@@ -6,8 +6,7 @@ import AdmZip from 'adm-zip';
 import { ipcMain, shell, BrowserWindow, dialog, app } from 'electron';
 import {
   openPrivacyPolicy,
-  resolveFileImportPrivacyRequest,
-  showPrivacyAwareOpenDialog,
+  showImportOpenDialog,
 } from './privacy';
 import type {
   AppLanguage,
@@ -1009,7 +1008,7 @@ export function registerIpc(
   // Portraits
   h('entities:setPersonPortraitFromFile', async (_e, personId: string) => {
     const win = getWindow();
-    const picked = await showPrivacyAwareOpenDialog(win ?? undefined!, {
+    const picked = await showImportOpenDialog(win ?? undefined!, {
       title: 'Elegir retrato',
       properties: ['openFile'],
       filters: [{ name: 'Imágenes', extensions: ['png', 'jpg', 'jpeg', 'webp', 'bmp', 'tif', 'tiff'] }],
@@ -1173,7 +1172,7 @@ export function registerIpc(
   // GEDCOM import / export
   h('genealogy:importGedcom', async () => {
     const win = getWindow();
-    const picked = await showPrivacyAwareOpenDialog(win ?? undefined!, {
+    const picked = await showImportOpenDialog(win ?? undefined!, {
       title: 'Importar GEDCOM',
       properties: ['openFile'],
       filters: [{ name: 'GEDCOM', extensions: ['ged', 'gedcom'] }],
@@ -1301,7 +1300,7 @@ export function registerIpc(
   });
   h('archive:pickAndIngest', async (_e, folderId?: string | null, docType?: string | null) => {
     const win = getWindow();
-    const picked = await showPrivacyAwareOpenDialog(win ?? undefined!, {
+    const picked = await showImportOpenDialog(win ?? undefined!, {
       title: 'Añadir al archivo de evidencias',
       properties: ['openFile', 'multiSelections'],
       filters: [
@@ -1328,7 +1327,7 @@ export function registerIpc(
     return { added, duplicates, items };
   });
   h('archive:chooseEntryFiles', async () => {
-    const picked = await showPrivacyAwareOpenDialog(getWindow() ?? undefined!, {
+    const picked = await showImportOpenDialog(getWindow() ?? undefined!, {
       title: 'Adjuntar archivos a la entrada genealógica',
       properties: ['openFile', 'multiSelections'],
       filters: [{ name: 'Todos los archivos', extensions: ['*'] }],
@@ -1373,7 +1372,7 @@ export function registerIpc(
     const item = getItem(itemId);
     if (!item) throw new Error('Elemento no encontrado.');
     const win = getWindow();
-    const picked = await showPrivacyAwareOpenDialog(win ?? undefined!, {
+    const picked = await showImportOpenDialog(win ?? undefined!, {
       title: 'Reemplazar el archivo adjunto',
       properties: ['openFile'],
       filters: [
@@ -1491,7 +1490,7 @@ export function registerIpc(
   );
   h('db:pickBulkFiles', async (_e, mode: 'files' | 'folder' = 'files') => {
     const win = getWindow();
-    const picked = await showPrivacyAwareOpenDialog(win ?? undefined!, {
+    const picked = await showImportOpenDialog(win ?? undefined!, {
       title: mode === 'folder' ? 'Elegir una carpeta para subida masiva' : 'Elegir archivos para subida masiva',
       properties: mode === 'folder' ? ['openDirectory'] : ['openFile', 'multiSelections'],
       ...(mode === 'folder' ? {} : { filters: [{ name: 'Todos los archivos', extensions: ['*'] }] }),
@@ -1605,7 +1604,7 @@ export function registerIpc(
   });
   h('db:parseCsvForImport', async () => {
     const win = getWindow();
-    const picked = await showPrivacyAwareOpenDialog(win ?? undefined!, {
+    const picked = await showImportOpenDialog(win ?? undefined!, {
       title: 'Importar CSV',
       properties: ['openFile'],
       filters: [{ name: 'CSV', extensions: ['csv', 'tsv', 'txt'] }],
@@ -1697,7 +1696,7 @@ export function registerIpc(
   );
   h('db:pickAndAttach', async (_e, rowId: string, columnId: string) => {
     const win = getWindow();
-    const picked = await showPrivacyAwareOpenDialog(win ?? undefined!, {
+    const picked = await showImportOpenDialog(win ?? undefined!, {
       title: 'Adjuntar archivos',
       properties: ['openFile', 'multiSelections'],
       filters: [
@@ -2150,9 +2149,6 @@ export function registerIpc(
     if (error) throw new Error(error);
   });
   h('shell:openPrivacyPolicy', async () => openPrivacyPolicy());
-  h('privacy:fileImport:resolve', async (event, requestId: string, allowed: boolean) => {
-    resolveFileImportPrivacyRequest(event.sender.id, requestId, allowed);
-  });
   h('study:knowledge:processing:resolve', async (event, requestId: string, decision) => {
     resolveStudyMaterialAiProcessingRequest(event.sender.id, requestId, decision);
   });
@@ -2327,7 +2323,7 @@ export function registerIpc(
   h('study:stt:whisperCpp:install', async () => installWhisperCpp());
   h('study:stt:whisperCpp:uninstall', async () => uninstallWhisperCpp());
   h('study:stt:whisperCpp:chooseExecutable', async () => {
-    const picked = await showPrivacyAwareOpenDialog(getWindow() ?? undefined!, {
+    const picked = await showImportOpenDialog(getWindow() ?? undefined!, {
       title: 'Seleccionar whisper-cli',
       properties: ['openFile'],
     });
@@ -2361,7 +2357,7 @@ export function registerIpc(
     return { path: picked.filePath };
   });
   h('study:styles:import', async () => {
-    const picked = await showPrivacyAwareOpenDialog(getWindow() ?? undefined!, {
+    const picked = await showImportOpenDialog(getWindow() ?? undefined!, {
       title: 'Importar estilos de estudio', properties: ['openFile'], filters: [{ name: 'Nodus Study Styles', extensions: ['json'] }],
     });
     if (picked.canceled || !picked.filePaths[0]) return [];
@@ -2400,7 +2396,7 @@ export function registerIpc(
     return { path: picked.filePath };
   });
   h('study:materials:import', async (_e, input?: StudyMaterialImportInput) => {
-    const picked = await showPrivacyAwareOpenDialog(getWindow() ?? undefined!, {
+    const picked = await showImportOpenDialog(getWindow() ?? undefined!, {
       title: 'Añadir materiales de estudio', properties: ['openFile', 'multiSelections'],
       filters: [{ name: 'Materiales de estudio', extensions: ['pdf', 'docx', 'md', 'markdown', 'pptx', 'txt', 'html', 'htm', 'epub', 'png', 'jpg', 'jpeg', 'webp', 'tif', 'tiff', 'mp3', 'wav', 'm4a', 'ogg', 'zip'] }],
     });
@@ -2411,7 +2407,7 @@ export function registerIpc(
     return results;
   });
   h('study:materials:importFolder', async (_e, input?: StudyMaterialImportInput) => {
-    const picked = await showPrivacyAwareOpenDialog(getWindow() ?? undefined!, { title: 'Añadir carpeta de materiales', properties: ['openDirectory'] });
+    const picked = await showImportOpenDialog(getWindow() ?? undefined!, { title: 'Añadir carpeta de materiales', properties: ['openDirectory'] });
     if (picked.canceled) return [];
     const results = await importStudyMaterialPaths(picked.filePaths, input);
     queueStudyMaterialIndex(results.map((result) => result.material.id));
@@ -2419,7 +2415,7 @@ export function registerIpc(
     return results;
   });
   h('study:materials:choosePaths', async (_e, folder?: boolean) => {
-    const picked = await showPrivacyAwareOpenDialog(getWindow() ?? undefined!, folder ? {
+    const picked = await showImportOpenDialog(getWindow() ?? undefined!, folder ? {
       title: 'Seleccionar carpeta de materiales', properties: ['openDirectory'],
     } : {
       title: 'Seleccionar materiales de estudio', properties: ['openFile', 'multiSelections'],
@@ -2469,7 +2465,7 @@ export function registerIpc(
     await shell.openExternal(zoteroSelectUrl(key));
   });
   h('study:materials:replace', async (_e, id: string, ocr?: boolean) => {
-    const picked = await showPrivacyAwareOpenDialog(getWindow() ?? undefined!, {
+    const picked = await showImportOpenDialog(getWindow() ?? undefined!, {
       title: 'Sustituir fichero del material', properties: ['openFile'],
       filters: [{ name: 'Materiales de estudio', extensions: ['pdf', 'docx', 'md', 'markdown', 'pptx', 'txt', 'html', 'htm', 'epub', 'png', 'jpg', 'jpeg', 'webp', 'tif', 'tiff', 'mp3', 'wav', 'm4a', 'ogg'] }],
     });
@@ -2624,7 +2620,7 @@ export function registerIpc(
   h('teaching:rubrics:cell:fill', async (_e, request: RubricCellFillRequest) => fillRubricCell(request));
   h('teaching:rubrics:generate', async (_e, request: RubricGenerationRequest) => generateRubric(request));
   h('teaching:rubrics:pickFile', async () => {
-    const picked = await showPrivacyAwareOpenDialog(getWindow() ?? undefined!, {
+    const picked = await showImportOpenDialog(getWindow() ?? undefined!, {
       title: 'Elegir el documento con las instrucciones de la tarea',
       properties: ['openFile'],
       filters: [{ name: 'Documentos', extensions: ['pdf', 'docx', 'doc', 'txt', 'md', 'rtf', 'odt'] }],
@@ -2665,7 +2661,7 @@ export function registerIpc(
   h('teaching:exams:question:reorder', async (_e, examId: string, orderedIds: string[]) => teachingExams.reorderTeachingExamQuestions(examId, orderedIds));
   h('teaching:exams:question:generate', async (_e, request: ExamQuestionGenerationRequest) => generateExamQuestion(request));
   h('teaching:exams:pickImage', async (_e, kind: 'logo' | 'figure') => {
-    const picked = await showPrivacyAwareOpenDialog(getWindow() ?? undefined!, {
+    const picked = await showImportOpenDialog(getWindow() ?? undefined!, {
       title: kind === 'logo' ? 'Elegir logotipo' : 'Elegir imagen de la pregunta',
       properties: ['openFile'],
       filters: [{ name: 'Imágenes', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'tif', 'tiff'] }],
@@ -2683,7 +2679,7 @@ export function registerIpc(
   h('teaching:logos:list', async () => teachingLogos.listTeachingLogos());
   h('teaching:logos:add', async (_e, name: string, dataUrl: string) => teachingLogos.addTeachingLogo(name, dataUrl));
   h('teaching:logos:import', async () => {
-    const picked = await showPrivacyAwareOpenDialog(getWindow() ?? undefined!, {
+    const picked = await showImportOpenDialog(getWindow() ?? undefined!, {
       title: 'Añadir logotipo a la biblioteca',
       properties: ['openFile'],
       filters: [{ name: 'Imágenes', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'tif', 'tiff'] }],
@@ -2717,7 +2713,7 @@ export function registerIpc(
 
   h('study:recordings:create', async (_e, input: StudyRecordingCreateInput) => studyRecordings.createStudyRecording(input));
   h('study:recordings:import', async (_e, scope?: Omit<StudyRecordingCreateInput, 'bytes' | 'fileName' | 'mimeType'>) => {
-    const picked = await showPrivacyAwareOpenDialog(getWindow() ?? undefined!, {
+    const picked = await showImportOpenDialog(getWindow() ?? undefined!, {
       title: 'Añadir grabaciones de clase', properties: ['openFile', 'multiSelections'],
       filters: [{ name: 'Grabaciones de audio', extensions: ['mp3', 'wav', 'm4a', 'ogg', 'webm'] }],
     });
@@ -2803,7 +2799,7 @@ export function registerIpc(
     return { path: picked.filePath };
   });
   h('study:questions:import', async () => {
-    const picked = await showPrivacyAwareOpenDialog(getWindow() ?? undefined!, {
+    const picked = await showImportOpenDialog(getWindow() ?? undefined!, {
       title: 'Importar banco de preguntas', properties: ['openFile'], filters: [{ name: 'Nodus Study Questions', extensions: ['json'] }],
     });
     if (picked.canceled || !picked.filePaths[0]) return [];
@@ -3169,7 +3165,7 @@ export function registerIpc(
   h('projects:chapters:import', async (_e, input: ImportProjectChapterInput) => {
     let filePath = input.filePath?.trim() || null;
     if (!filePath) {
-      const result = await showPrivacyAwareOpenDialog({
+      const result = await showImportOpenDialog({
         title: 'Importar capítulo',
         properties: ['openFile'],
         filters: [
@@ -3287,7 +3283,7 @@ export function registerIpc(
   h('backup:clearPassword', async () => clearBackupPassword());
   h('backup:hasPassword', async () => hasBackupPassword());
   h('backup:chooseFolder', async () => {
-    const { canceled, filePaths } = await showPrivacyAwareOpenDialog({
+    const { canceled, filePaths } = await showImportOpenDialog({
       title: 'Elegir carpeta para copias automáticas',
       properties: ['openDirectory', 'createDirectory'],
     });
@@ -3343,7 +3339,7 @@ export function registerIpc(
       'pt-BR': mode === 'restore' ? 'Selecionar uma pasta de recuperação do Nodus' : 'Selecionar uma pasta vazia para proteger o Nodus',
       it: mode === 'restore' ? 'Seleziona una cartella di ripristino Nodus' : 'Seleziona una cartella vuota per proteggere Nodus',
     };
-    const { canceled, filePaths } = await showPrivacyAwareOpenDialog(getWindow() ?? undefined!, {
+    const { canceled, filePaths } = await showImportOpenDialog(getWindow() ?? undefined!, {
       title: titles[language],
       properties: mode === 'restore' ? ['openDirectory'] : ['openDirectory', 'createDirectory'],
     });
@@ -3360,7 +3356,7 @@ export function registerIpc(
 
   h('data:importSync', async (_e, passphrase?: string) => {
     if (getActiveVault().type === 'estudio' && !getSettings().studySyncEnabled) throw new Error('La sincronización del vault de estudio está desactivada en Ajustes.');
-    const { canceled, filePaths } = await showPrivacyAwareOpenDialog({
+    const { canceled, filePaths } = await showImportOpenDialog({
       title: 'Importar paquete de sincronización',
       properties: ['openFile'],
       filters: [{ name: 'Nodus Sync', extensions: ['nodussync'] }],
@@ -3488,7 +3484,7 @@ export function registerIpc(
     const filters = extensions.length
       ? [{ name: 'Archivos compatibles', extensions }, allFiles]
       : [allFiles];
-    const picked = await showPrivacyAwareOpenDialog(win ?? undefined!, {
+    const picked = await showImportOpenDialog(win ?? undefined!, {
       title: 'Añadir archivos',
       properties: ['openFile', 'multiSelections'],
       filters,
@@ -3497,7 +3493,7 @@ export function registerIpc(
   });
   h('toolkit:pickOutputDir', async (e) => {
     const win = BrowserWindow.fromWebContents(e.sender);
-    const picked = await showPrivacyAwareOpenDialog(win ?? undefined!, {
+    const picked = await showImportOpenDialog(win ?? undefined!, {
       title: 'Carpeta de salida',
       properties: ['openDirectory', 'createDirectory'],
     });
@@ -3544,7 +3540,7 @@ export function registerIpc(
   });
   h('aiOcr:pickFiles', async (e) => {
     const win = BrowserWindow.fromWebContents(e.sender);
-    const picked = await showPrivacyAwareOpenDialog(win ?? undefined!, {
+    const picked = await showImportOpenDialog(win ?? undefined!, {
       title: 'Añadir PDF o imágenes para OCR',
       properties: ['openFile', 'multiSelections'],
       filters: [
@@ -3566,7 +3562,7 @@ export function registerIpc(
   });
   h('presenter:import:pdf', async (e) => {
     const win = BrowserWindow.fromWebContents(e.sender);
-    const picked = await showPrivacyAwareOpenDialog(win ?? undefined!, {
+    const picked = await showImportOpenDialog(win ?? undefined!, {
       title: 'Importar PDF',
       properties: ['openFile'],
       filters: [{ name: 'PDF', extensions: ['pdf'] }],
@@ -3583,7 +3579,7 @@ export function registerIpc(
   });
   h('presenter:import:pptxNotes', async (e) => {
     const win = BrowserWindow.fromWebContents(e.sender);
-    const picked = await showPrivacyAwareOpenDialog(win ?? undefined!, {
+    const picked = await showImportOpenDialog(win ?? undefined!, {
       title: 'Importar notas desde PowerPoint',
       properties: ['openFile'],
       filters: [{ name: 'PowerPoint', extensions: ['pptx'] }],
@@ -3616,7 +3612,7 @@ export function registerIpc(
   // ── Nodus Protect ──────────────────────────────────────────────────────────
   h('protect:pickFiles', async (e, multiple = true) => {
     const win = BrowserWindow.fromWebContents(e.sender);
-    const picked = await showPrivacyAwareOpenDialog(win ?? undefined!, {
+    const picked = await showImportOpenDialog(win ?? undefined!, {
       title: 'Seleccionar documentos para Nodus Protect',
       properties: multiple ? ['openFile', 'multiSelections'] : ['openFile'],
       filters: [{ name: 'PDF e imágenes compatibles', extensions: [...PROTECT_INPUT_EXTENSIONS] }],
