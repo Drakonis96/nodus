@@ -9,6 +9,11 @@ import { AI_OCR_TRANSLATIONS } from './i18n.aiOcr';
 export const EN: Record<string, string> = {
   ...AI_OCR_TRANSLATIONS.en,
   ...PROTECT_TRANSLATIONS.en,
+  'Seleccionar o desplazar': 'Select or scroll',
+  'Editar o eliminar': 'Edit or delete',
+  '¿Eliminar esta anotación? No se puede deshacer.': 'Delete this annotation? This cannot be undone.',
+  'Suelta los archivos para añadirlos a esta sección': 'Drop files to add them to this section',
+  'Se importarán como materiales en la selección actual.': 'They will be imported as materials into the current selection.',
   // ── Runtime UI payloads (Electron → renderer) ────────────────────────────
   'No se pudo traducir este mensaje.': 'This message could not be translated.',
   'Analizando fragmento {current}/{total} con IA… ({seconds}s)': 'Analysing chunk {current}/{total} with AI… ({seconds}s)',
