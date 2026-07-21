@@ -296,7 +296,7 @@ export function AudioGenerationSettings({
             <div className="flex min-w-0 flex-1 items-start gap-3">
               <SettingsModelDot selected={modelReady} />
               <div className="min-w-0 flex-1">
-                <div className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{tx('Modelo {label} (inglés)', { label: engine.label })}</div>
+                <div className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{tx('Modelo {label}', { label: engine.label })}</div>
                 <div className="text-[10px] text-neutral-500">{tx('~{n} MB · una sola descarga para todas las voces', { n: engine.modelSizeMb ?? 0 })}</div>
                 {progress[MODEL_KEY] != null && (
                   <div className="mt-1.5 h-1 w-full overflow-hidden rounded bg-neutral-200 dark:bg-neutral-800">
