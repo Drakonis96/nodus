@@ -15,7 +15,7 @@ import { getActiveVault } from './vaults/vaultRegistry';
 import { generateDemoPortraits, hasDemoPortraitKey, demoPortraitsPending } from './ai/genealogyDemoPortraits';
 import { interruptDecorativeImageGenerations } from './ai/decorativeImages';
 import { startRealtimeSync, stopRealtimeSync } from './sync/syncService';
-import { startMcpServer, stopMcpServer } from './mcp';
+import { killMcpTunnelSync, startMcpServer, startMcpTunnelIfConfigured, stopMcpServer } from './mcp';
 import { setCopilotWindowProvider, startCopilotServer, stopCopilotServer } from './copilot/server';
 import { applyMascotWindow, destroyMascotWindow } from './mascotWindow';
 import { seedWelcomeNotification } from './notifications';
@@ -543,7 +543,7 @@ app.whenReady().then(() => {
   autoBackupTimer = setInterval(autoBackupTick, 30 * 60 * 1000);
 
   if (settings.syncMode === 'realtime') startRealtimeSync();
-  if (settings.mcpEnabled) void startMcpServer();
+  if (settings.mcpEnabled) void startMcpServer().then(() => startMcpTunnelIfConfigured());
   if (settings.copilotEnabled) void startCopilotServer();
   // Nodi mascot: open the always-on-top desktop window when the user has opted into it.
   seedWelcomeNotification(settings.uiLanguage);
@@ -601,6 +601,7 @@ app.on('before-quit', () => {
   if (autoBackupFirstTimer) clearTimeout(autoBackupFirstTimer);
   stopRealtimeSync();
   interruptDecorativeImageGenerations();
+  killMcpTunnelSync();
   void stopMcpServer();
   void stopCopilotServer();
   // Kill synchronously: this handler cannot await, so the graceful stops below would
@@ -619,6 +620,7 @@ updateAwareApp.on('before-quit-for-update', () => {
   stopRealtimeSync();
   interruptDecorativeImageGenerations();
   stopAllWhisperCpp();
+  killMcpTunnelSync();
   void stopMcpServer();
   void stopCopilotServer();
   // Kill synchronously: this handler cannot await, so the graceful stops below would

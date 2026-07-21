@@ -1,10 +1,10 @@
 # Política de privacidad de Nodus
 
-**Versión:** 1.0
+**Versión:** 1.1
 
-**Fecha de vigencia:** 20 de julio de 2026
+**Fecha de vigencia:** 21 de julio de 2026
 
-**Ámbito:** aplicación de escritorio Nodus 2.4 y posteriores
+**Ámbito:** aplicación de escritorio Nodus 2.5 y posteriores
 
 ## Resumen claro
 
@@ -17,9 +17,10 @@ guardan en el dispositivo del usuario.
 Seleccionar un archivo o iniciar una grabación **no lo publica ni lo sube a Nodus**.
 Algunas funciones opcionales sí pueden contactar con servicios de terceros: por
 ejemplo, un proveedor de IA en la nube elegido por el usuario, Zotero, Unpaywall,
-GitHub para comprobar actualizaciones o Hugging Face para descargar modelos. Esos
-servicios reciben los datos estrictamente necesarios para la operación solicitada
-y aplican sus propias condiciones y políticas.
+GitHub para comprobar actualizaciones, Hugging Face para descargar modelos o el
+túnel MCP seguro de OpenAI para usar Nodus desde ChatGPT. Esos servicios reciben
+los datos necesarios para la operación solicitada y aplican sus propias condiciones
+y políticas.
 
 Nodus **no usa IA para puntuar, calificar, clasificar, perfilar ni evaluar a ningún
 estudiante**. Las notas y rúbricas las introduce o confirma una persona. Las
@@ -131,9 +132,19 @@ configurada o es necesaria para la operación indicada:
 - **Unpaywall y servidores de publicaciones:** consulta un DOI y puede descargar el
   texto accesible; el correo configurado para Unpaywall se incluye en la petición.
 - **GitHub:** comprobación y descarga de actualizaciones, apertura de incidencias y
-  descargas del proyecto. GitHub puede recibir datos de red como la dirección IP.
+  descargas del proyecto. También aloja la descarga oficial del cliente de túnel de
+  OpenAI, cuya integridad verifica Nodus antes de ejecutarlo. GitHub puede recibir
+  datos de red como la dirección IP.
 - **Hugging Face u otros repositorios fijados:** descarga opcional de modelos, voces
   y runtimes. El repositorio puede recibir datos de red.
+- **OpenAI Secure MCP Tunnel y ChatGPT:** si el usuario configura expresamente esta
+  integración, Nodus ejecuta el cliente oficial de OpenAI y abre una conexión HTTPS
+  saliente a OpenAI. El servidor MCP de Nodus continúa escuchando solo en localhost:
+  no se abre ningún puerto entrante ni se publica una URL de Nodus. OpenAI y ChatGPT
+  reciben las solicitudes de herramientas y sus resultados, que pueden contener
+  fragmentos, metadatos y contenido de la bóveda activa solicitado por el usuario o
+  por el modelo. La clave de ejecución del túnel se guarda en el almacén de
+  credenciales del dispositivo y no se incluye en las copias de seguridad.
 - **Enlaces externos:** PayPal, calendarios, páginas de licencias y otros enlaces solo
   se abren cuando el usuario los solicita.
 

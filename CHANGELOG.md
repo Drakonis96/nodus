@@ -1,5 +1,22 @@
 # Changelog
 
+## 2.5.2 — 2026-07-21
+
+### Added
+
+- **Guided ChatGPT connection via OpenAI Secure MCP Tunnel.** Settings now walks
+  non-technical users through creating a tunnel, saving a runtime key, and
+  attaching it in ChatGPT. Nodus downloads the current official tunnel client,
+  verifies its SHA-256 digest before installation, diagnoses permissions, and
+  reconnects automatically without exposing the local MCP listener.
+- Runtime credentials stay outside renderer state and process arguments, and
+  users can disconnect temporarily or forget the saved connection entirely.
+
+### Notes
+
+- ChatGPT developer-mode permission remains a separate workspace setting managed
+  by the user or their ChatGPT administrator.
+
 ## 2.3.2 — 2026-07-15
 
 ### Fixed
