@@ -5,8 +5,9 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import type { McpServerStatus } from '@shared/types';
+import type { VaultType } from '@shared/vaultTypes';
 import { getSettings, updateSettings } from '../db/settingsRepo';
-import { registerTools } from './tools';
+import { registerToolsForVault, resolveServingVaultType } from './tools';
 
 const MCP_PATH = '/mcp';
 const MAX_REQUEST_BYTES = 2 * 1024 * 1024;
@@ -116,11 +117,20 @@ function makeMcpServer(): McpServer {
       'To situate a draft passage in the corpus, nodus_analyze_passage returns its typed relations (supports/contradicts/refines/…) with citable Zotero items; nodus_get_copilot_idea expands one idea with its citation, and nodus_compose_insertion drafts a cited sentence to insert.',
       'To locate where the corpus discusses a topic, nodus_search_passages returns citable full-text passages ranked by semantic similarity; nodus_search_ideas does the same over derived ideas.',
       'Semantic search only finds what Nodus has indexed. Every semantic tool reports `indexed`/`indexable` and adds a `warning` when nothing is indexed: in that case an empty result means the vault was never indexed (or its embedding model changed), NOT that the corpus lacks the topic. Never report absence of evidence from an unindexed search — relay the warning and suggest indexing in Nodus.',
-      'Vault types add their own read-only layers. Genealogy / primary-source vaults: persons and kinship (nodus_list_persons, nodus_get_person, nodus_list_kin_suggestions), the timeline (nodus_list_events) and the evidence archive (nodus_list_archive_items, nodus_get_archive_item, nodus_search_archive) — kinship suggestions are hypotheses only the user can confirm in the app. Databases vaults: nodus_list_databases, nodus_get_database_schema, nodus_query_database (typed filters and sorts) and nodus_get_database_row. Study vaults: nodus_study_get_workspace, nodus_study_get_document, nodus_study_search, nodus_study_list_questions and nodus_study_get_progress. These tools return empty results in vaults without that layer.',
+      'The tool surface is scoped to the active vault type: only the layers this vault actually has are exposed, so a tool you expect may simply not be listed here — that means the active vault is of a different type, not that Nodus lacks the feature. Genealogy / primary-source vaults add persons and kinship (nodus_list_persons, nodus_get_person, nodus_list_kin_suggestions), the timeline (nodus_list_events) and the evidence archive (nodus_list_archive_items, nodus_get_archive_item, nodus_search_archive) — kinship suggestions are hypotheses only the user can confirm in the app. Databases vaults add nodus_list_databases, nodus_get_database_schema, nodus_query_database (typed filters and sorts), nodus_get_database_row, and the additive writes nodus_create_database_row / nodus_set_database_cell. Study and teaching vaults add nodus_study_get_workspace, nodus_study_get_document, nodus_study_search, nodus_study_list_questions, nodus_study_get_progress and nodus_study_get_schedule. Teaching (docencia) vaults also add nodus_teaching_* — class groups, assessment plans, the computed gradebook and cohort statistics, exams and rubrics.',
+      'Writes are deliberately narrow: the derived graph and personal data (student names, grades, confirmed kinship) are read-only through MCP; only user-authored content — notes, folders, coverage questions, writing drafts and database rows/cells — can be created or edited. Students are always identified by an opaque pseudonym code, never by name.',
       'All data remains on this machine. Do not claim a relation, evidence or source that is not returned by a Nodus tool.',
     ].join('\n'),
   });
-  registerTools(server);
+  // Scope the surface to the active vault type. If resolution ever fails, fall back to
+  // the full surface (null) rather than letting a gating hiccup break session creation.
+  let vaultType: VaultType | null = null;
+  try {
+    vaultType = resolveServingVaultType();
+  } catch (error) {
+    console.warn('[mcp] could not resolve active vault type; serving full surface', error);
+  }
+  registerToolsForVault(server, vaultType);
   return server;
 }
 

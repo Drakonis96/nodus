@@ -32,7 +32,7 @@ FakeServer.prototype.registerTool = function registerTool(name, meta, handler) {
 };
 
 try {
-  const { registerTools } = require(path.join(repoRoot, 'electron/mcp/tools.ts'));
+  const { registerTools, registerToolsForVault } = require(path.join(repoRoot, 'electron/mcp/tools.ts'));
   const { getDb, closeDb } = require(path.join(repoRoot, 'electron/db/database.ts'));
   const server = new FakeServer();
   registerTools(server);
@@ -96,8 +96,44 @@ try {
     'nodus_study_search',
     'nodus_study_list_questions',
     'nodus_study_get_progress',
+    'nodus_study_get_schedule',
+    'nodus_teaching_list_groups',
+    'nodus_teaching_get_group',
+    'nodus_teaching_list_assessment_plans',
+    'nodus_teaching_get_assessment_plan',
+    'nodus_teaching_get_gradebook',
+    'nodus_teaching_list_exams',
+    'nodus_teaching_get_exam',
+    'nodus_teaching_list_rubrics',
+    'nodus_teaching_get_rubric',
+    'nodus_create_database_row',
+    'nodus_set_database_cell',
   ];
   assert.deepEqual([...server.tools.keys()], expectedTools);
+
+  // Vault-type gating: the surface a session advertises is scoped to the active
+  // vault type. Universal tools (capabilities, notes) are everywhere; layer tools
+  // only appear in the vault types that own the layer. Registering with null keeps
+  // the full surface (what the FakeServer above exercises).
+  const surfaceFor = (vaultType) => {
+    const scoped = new FakeServer();
+    registerToolsForVault(scoped, vaultType);
+    return new Set(scoped.tools.keys());
+  };
+  const docencia = surfaceFor('docencia');
+  assert.ok(docencia.has('nodus_get_capabilities') && docencia.has('nodus_create_note'), 'docencia keeps the universal tools');
+  assert.ok(docencia.has('nodus_teaching_get_gradebook') && docencia.has('nodus_study_get_workspace'), 'docencia exposes teaching + study layers');
+  assert.ok(!docencia.has('nodus_list_ideas') && !docencia.has('nodus_list_databases') && !docencia.has('nodus_list_persons'), 'docencia hides research/database/records tools');
+  const databases = surfaceFor('databases');
+  assert.ok(databases.has('nodus_create_database_row') && databases.has('nodus_set_database_cell'), 'databases exposes the additive write tools');
+  assert.ok(!databases.has('nodus_teaching_get_gradebook') && !databases.has('nodus_list_ideas') && !databases.has('nodus_study_get_workspace'), 'databases hides teaching/research/study tools');
+  const academic = surfaceFor('academic');
+  assert.ok(academic.has('nodus_list_ideas') && academic.has('nodus_search_passages'), 'academic exposes the research surface');
+  assert.ok(!academic.has('nodus_list_databases') && !academic.has('nodus_teaching_get_gradebook') && !academic.has('nodus_list_persons'), 'academic hides database/teaching/records tools');
+  const genealogy = surfaceFor('genealogy');
+  assert.ok(genealogy.has('nodus_list_persons') && genealogy.has('nodus_list_ideas'), 'genealogy exposes records + research layers');
+  assert.ok(!genealogy.has('nodus_list_databases') && !genealogy.has('nodus_teaching_get_gradebook'), 'genealogy hides database/teaching tools');
+  assert.equal(surfaceFor(null).size, expectedTools.length, 'a null vault type registers the full surface');
 
   seedMcpDatabase(getDb());
 
@@ -120,6 +156,11 @@ try {
   assert.equal(capabilities.counts.persons, 0, 'capabilities reports the records-layer person count');
   assert.equal(capabilities.counts.events, 0, 'capabilities reports the records-layer event count');
   assert.equal(capabilities.counts.archiveItems, 0, 'capabilities reports the archive count');
+  assert.equal(capabilities.counts.teachingGroups, 0, 'capabilities reports the teaching group count');
+  assert.equal(capabilities.counts.teachingStudents, 0, 'capabilities reports the teaching student count');
+  assert.equal(capabilities.counts.teachingAssessmentPlans, 0, 'capabilities reports the assessment-plan count');
+  assert.equal(capabilities.counts.teachingExams, 0, 'capabilities reports the exam count');
+  assert.equal(capabilities.counts.teachingRubrics, 0, 'capabilities reports the rubric count');
   assert.ok(Array.isArray(capabilities.enums.eventTypes), 'capabilities exposes the event-type vocabulary');
   assert.ok(capabilities.vault.active.type, 'capabilities exposes the active vault type');
 
@@ -381,6 +422,29 @@ try {
   assert.equal(rowDetail.database.name, 'MCP DB', 'row detail names its parent database');
   assert.deepEqual(rowDetail.fields['Vínculo'], [{ label: 'Enlazado', kind: 'db_row' }], 'row detail resolves relation targets to labels');
 
+  // Additive writes: create a row, then set its cells by typed value. User-authored
+  // structured data is the only thing MCP is allowed to write into a databases vault.
+  const created = await callTool(server, 'nodus_create_database_row', { databaseId: mdb.id });
+  assert.ok(created.row.id, 'nodus_create_database_row returns the new row id');
+  await callTool(server, 'nodus_set_database_cell', { rowId: created.row.id, columnId: mName.id, value: 'Tortuga' });
+  await callTool(server, 'nodus_set_database_cell', { rowId: created.row.id, columnId: mNum.id, value: 7 });
+  const setSelect = await callTool(server, 'nodus_set_database_cell', { rowId: created.row.id, columnId: mSel.id, value: 'vivo' });
+  assert.equal(setSelect.row.fields.Nombre, 'Tortuga', 'set_database_cell stores a title value');
+  assert.equal(setSelect.row.fields.Estado, 'vivo', 'set_database_cell resolves a select label to its option');
+  assert.strictEqual(setSelect.row.fields.Peso, 7, 'set_database_cell stores a typed number');
+  const writtenBack = await callTool(server, 'nodus_query_database', { databaseId: mdb.id, query: 'tortuga', limit: 10, offset: 0 });
+  assert.equal(writtenBack.total, 1, 'a row written over MCP is queryable');
+  // A bad option label is rejected with the available labels, never silently stored.
+  const badSet = await callToolRaw(server, 'nodus_set_database_cell', { rowId: created.row.id, columnId: mSel.id, value: 'zombi' });
+  assert.equal(badSet.isError, true);
+  assert.match(JSON.parse(badSet.content[0].text).error.message, /vivo/, 'unknown-option write lists the available labels');
+  // Computed/binary columns cannot be written through MCP.
+  const badFormula = await callToolRaw(server, 'nodus_set_database_cell', { rowId: created.row.id, columnId: mDoble.id, value: 3 });
+  assert.equal(badFormula.isError, true);
+  assert.match(JSON.parse(badFormula.content[0].text).error.message, /formula/, 'a formula column refuses a direct write');
+  // Clean the write-test row back out so later row-count assertions stay stable.
+  dbmode.deleteRow(created.row.id);
+
   // Read-only study-vault tools expose organisation, grounded search, questions
   // and progress without allowing an MCP client to mutate learning state.
   const studyOrg = require(path.join(repoRoot, 'electron/db/studyOrgRepo.ts'));
@@ -429,6 +493,69 @@ try {
   const studyProgress = await callTool(server, 'nodus_study_get_progress');
   assert.equal(typeof studyProgress.progress.dueCards, 'number');
   assert.ok(Array.isArray(studyProgress.planner.events));
+  const schedule = await callTool(server, 'nodus_study_get_schedule', { academicYearId: null });
+  assert.ok(Array.isArray(schedule.periods) && Array.isArray(schedule.cells), 'schedule returns the weekly grid');
+
+  // Read-only teaching-vault tools. Two invariants under test: students are only ever
+  // returned by pseudonym code (a name set here must never reach the client), and the
+  // gradebook is a computed projection with cohort statistics.
+  const teachingGroups = require(path.join(repoRoot, 'electron/db/teachingGroupsRepo.ts'));
+  const teachingGrades = require(path.join(repoRoot, 'electron/db/teachingGradesRepo.ts'));
+  const teachingExamsRepo = require(path.join(repoRoot, 'electron/db/teachingExamsRepo.ts'));
+  const teachingRubricsRepo = require(path.join(repoRoot, 'electron/db/teachingRubricsRepo.ts'));
+
+  const teachGroup = teachingGroups.createTeachingGroup({ name: 'Grupo MCP', subjectId: studySubject.id, expectedSize: 2 });
+  const [alumnaA, alumnaB] = teachGroup.students;
+  teachingGroups.updateTeachingStudent(alumnaA.id, { givenNames: 'Ada', surnames: 'Lovelace' });
+  teachingGroups.updateTeachingStudent(alumnaB.id, { givenNames: 'Grace', surnames: 'Hopper' });
+  const teachPlan = teachingGrades.createAssessmentPlan({ name: 'Plan MCP', subjectId: studySubject.id });
+  const itemExam = teachingGrades.createAssessmentItem(teachPlan.id, { name: 'Examen', kind: 'activity', weight: 1, maxPoints: 10, entryMode: 'numeric' });
+  const itemWork = teachingGrades.createAssessmentItem(teachPlan.id, { name: 'Trabajo', kind: 'activity', weight: 1, maxPoints: 10, entryMode: 'numeric' });
+  teachingGrades.setGradeEntry({ studentId: alumnaA.id, itemId: itemExam.id, rawValue: 8 });
+  teachingGrades.setGradeEntry({ studentId: alumnaA.id, itemId: itemWork.id, rawValue: 6 });
+  teachingGrades.setGradeEntry({ studentId: alumnaB.id, itemId: itemExam.id, rawValue: 4 });
+  teachingGrades.setGradeEntry({ studentId: alumnaB.id, itemId: itemWork.id, rawValue: 2 });
+
+  const groupList = await callTool(server, 'nodus_teaching_list_groups', {});
+  assert.equal(groupList.length, 1, 'list_groups returns the group');
+  assert.equal(groupList[0].studentCount, 2, 'list_groups reports the roster size');
+  const rosterRaw = await callToolRaw(server, 'nodus_teaching_get_group', { groupId: teachGroup.id });
+  assert.equal(rosterRaw.structuredContent.students.length, 2, 'get_group returns the roster');
+  assert.ok(rosterRaw.structuredContent.students.every((s) => /^STU_/.test(s.code)), 'roster identifies students by pseudonym code');
+  assert.equal(rosterRaw.content[0].text.includes('Lovelace'), false, 'get_group never leaks a student name');
+
+  const planList = await callTool(server, 'nodus_teaching_list_assessment_plans', {});
+  assert.equal(planList.length, 1, 'list_assessment_plans returns the plan');
+  const planDetail = await callTool(server, 'nodus_teaching_get_assessment_plan', { planId: teachPlan.id });
+  assert.equal(planDetail.items.length, 2, 'get_assessment_plan returns the item tree');
+
+  const gradebookRaw = await callToolRaw(server, 'nodus_teaching_get_gradebook', { planId: teachPlan.id, groupId: teachGroup.id, convocatoria: 'ordinaria', track: 'continua' });
+  const gradebook = gradebookRaw.structuredContent;
+  assert.equal(gradebook.students.length, 2, 'gradebook has a row per student');
+  assert.ok(gradebook.students.every((row) => /^STU_/.test(row.code)), 'gradebook rows are keyed by pseudonym code');
+  assert.equal(gradebook.distribution.evaluated, 2, 'gradebook cohort stats count the evaluated students');
+  assert.ok(gradebook.students.some((row) => typeof row.final.numeric === 'number'), 'gradebook projects a numeric final grade');
+  assert.equal(gradebookRaw.content[0].text.includes('Lovelace'), false, 'gradebook never leaks a student name');
+  assert.equal(gradebookRaw.content[0].text.includes('Hopper'), false, 'gradebook never leaks a student name');
+  const gradebookMissing = await callToolRaw(server, 'nodus_teaching_get_gradebook', { planId: 'plan_missing', groupId: teachGroup.id, convocatoria: 'ordinaria', track: 'continua' });
+  assert.equal(gradebookMissing.isError, true);
+  assert.equal(JSON.parse(gradebookMissing.content[0].text).error.category, 'not_found');
+
+  const teachExam = teachingExamsRepo.createTeachingExam({ title: 'Examen MCP', subjectId: studySubject.id });
+  teachingExamsRepo.addTeachingExamQuestion(teachExam.id, { type: 'short_answer', prompt: 'Define célula', points: 2, imageDataUrl: 'data:image/png;base64,AAAA' });
+  const examList = await callTool(server, 'nodus_teaching_list_exams', {});
+  assert.equal(examList.length, 1, 'list_exams returns the exam');
+  const examDetail = await callTool(server, 'nodus_teaching_get_exam', { examId: teachExam.id });
+  assert.equal(examDetail.questions.length, 1, 'get_exam returns questions');
+  assert.equal(examDetail.questions[0].hasImage, true, 'get_exam flags an image without returning its data');
+  assert.equal('imageDataUrl' in examDetail.questions[0], false, 'get_exam strips inline image data');
+  assert.equal(typeof examDetail.logoCount, 'number', 'get_exam reports a logo count, not the logo blobs');
+
+  const teachRubric = teachingRubricsRepo.createTeachingRubric({ title: 'Rúbrica MCP', subjectId: studySubject.id });
+  const rubricList = await callTool(server, 'nodus_teaching_list_rubrics', {});
+  assert.ok(rubricList.some((r) => r.id === teachRubric.id), 'list_rubrics returns the rubric');
+  const rubricDetail = await callTool(server, 'nodus_teaching_get_rubric', { rubricId: teachRubric.id });
+  assert.ok(Array.isArray(rubricDetail.criteria) && Array.isArray(rubricDetail.levels), 'get_rubric returns criteria and levels');
 
   const ideas = await callTool(server, 'nodus_list_ideas', { limit: 1, offset: 0, query: 'turismo' });
   assert.equal(ideas.total, 1);
@@ -778,7 +905,11 @@ function installRuntimeHooks(userDataPath) {
 
   Module._resolveFilename = function resolveFilename(request, parent, isMain, options) {
     if (request.startsWith('@shared/')) {
-      return path.join(repoRoot, `${request.replace('@shared/', 'shared/')}.ts`);
+      // A shared entry is either a file (shared/x.ts) or a directory barrel
+      // (shared/x/index.ts) — fall back to the index so a package-style import resolves.
+      const base = path.join(repoRoot, request.replace('@shared/', 'shared/'));
+      const asFile = `${base}.ts`;
+      return fs.existsSync(asFile) ? asFile : path.join(base, 'index.ts');
     }
     return originalResolveFilename.call(this, request, parent, isMain, options);
   };
