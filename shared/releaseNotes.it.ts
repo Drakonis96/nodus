@@ -1,5 +1,9 @@
 /** Italian history, indexed by release and highlight order. */
 export const RELEASE_NOTES_IT: Record<string, string[]> = {
+  "2.5.2": [
+    "Importare file è più diretto: il selettore di sistema si apre subito, senza finestre intermedie. L'avviso prima di registrare con il microfono — dove avvertire le persone che potrebbero essere registrate conta davvero — ora ti permette di accettarlo una volta, accettarlo e non mostrarlo più su questo dispositivo, oppure rifiutarlo.",
+    "Corretto un errore per cui cambiare deposito poteva fallire con «table … already exists». I database creati da una versione precedente con una numerazione delle migrazioni diversa si riparano da soli — conservando i tuoi dati — invece di impedire l'apertura."
+  ],
   "2.5.0": [
     "Novità in Strumenti: OCR Workspace trascrive PDF scansionati e immagini con qualsiasi modello dotato di visione — locale o nel cloud — e mantiene una libreria di OCR per documento. Ricostruisce un Markdown pulito, lascia intatto l'originale ed esporta il risultato.",
     "PDF Presenter arriva in Strumenti: presenta qualsiasi PDF come diapositive con vista relatore, note del relatore, strumenti di annotazione in tempo reale, video di YouTube per diapositiva e un telecomando dal telefono. La sua libreria conserva copie con cartelle e ricerca; l'originale non viene mai toccato.",

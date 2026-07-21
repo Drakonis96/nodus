@@ -37,6 +37,30 @@ interface RawReleaseNote extends Omit<ReleaseNote, 'highlights'> { highlights: R
 
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
   {
+    version: '2.5.2',
+    date: '2026-07-21',
+    highlights: [
+      {
+        scope: 'general',
+        es: 'Importar archivos es más directo: el selector del sistema se abre al instante, sin ventanas intermedias. El aviso antes de grabar con el micrófono —donde advertir a quienes pueden quedar grabados sí importa— ahora te deja aceptarlo una vez, aceptarlo y no volver a mostrarlo en este equipo, o rechazarlo.',
+        en: 'Importing files is more direct: the system picker opens instantly, with no modal in between. The notice before recording with the microphone — where warning the people who might be recorded actually matters — now lets you accept it once, accept and stop showing it on this device, or decline.',
+        fr: 'L’import de fichiers est plus direct : le sélecteur du système s’ouvre instantanément, sans fenêtre intermédiaire. L’avis avant d’enregistrer au micro — là où prévenir les personnes susceptibles d’être enregistrées compte vraiment — vous permet désormais de l’accepter une fois, de l’accepter et de ne plus l’afficher sur cet appareil, ou de le refuser.',
+        de: 'Das Importieren von Dateien ist direkter: Die System-Dateiauswahl öffnet sich sofort, ohne Zwischenfenster. Der Hinweis vor der Aufnahme mit dem Mikrofon – dort, wo das Warnen der möglicherweise aufgenommenen Personen wirklich zählt – lässt dich nun einmalig zustimmen, zustimmen und ihn auf diesem Gerät nicht mehr anzeigen, oder ablehnen.',
+        pt: 'Importar ficheiros é mais direto: o seletor do sistema abre-se de imediato, sem janelas intermédias. O aviso antes de gravar com o microfone — onde avisar quem pode ficar gravado realmente importa — passa a permitir aceitá-lo uma vez, aceitá-lo e não voltar a mostrá-lo neste equipamento, ou recusá-lo.',
+        'pt-BR': 'Importar arquivos é mais direto: o seletor do sistema abre na hora, sem janelas intermediárias. O aviso antes de gravar com o microfone — onde avisar quem pode acabar gravado realmente importa — agora permite aceitá-lo uma vez, aceitá-lo e não mostrar novamente neste dispositivo, ou recusá-lo.',
+      },
+      {
+        scope: 'general',
+        es: 'Corregido un error por el que cambiar de bóveda podía fallar con «table … already exists». Las bases de datos creadas por una versión previa con distinta numeración de migraciones se reparan solas —conservando tus datos— en lugar de bloquear la apertura.',
+        en: 'Fixed a bug where switching vaults could fail with “table … already exists”. Databases created by an earlier build with different migration numbering now heal themselves — keeping your data — instead of blocking the vault from opening.',
+        fr: 'Correction d’un bug où changer d’espace pouvait échouer avec « table … already exists ». Les bases créées par une version antérieure avec une numérotation de migrations différente se réparent d’elles-mêmes — en conservant vos données — au lieu d’empêcher l’ouverture.',
+        de: 'Ein Fehler wurde behoben, bei dem der Wechsel des Arbeitsbereichs mit „table … already exists“ scheitern konnte. Datenbanken, die von einer früheren Version mit abweichender Migrationsnummerierung erstellt wurden, reparieren sich nun selbst – unter Erhalt deiner Daten – statt das Öffnen zu blockieren.',
+        pt: 'Corrigido um erro em que mudar de espaço podia falhar com «table … already exists». As bases de dados criadas por uma versão anterior com numeração de migrações diferente reparam-se sozinhas — preservando os seus dados — em vez de bloquear a abertura.',
+        'pt-BR': 'Corrigido um erro em que trocar de espaço podia falhar com “table … already exists”. Os bancos de dados criados por uma versão anterior com numeração de migrações diferente se reparam sozinhos — preservando seus dados — em vez de bloquear a abertura.',
+      },
+    ],
+  },
+  {
     version: '2.5.0',
     date: '2026-07-21',
     highlights: [
