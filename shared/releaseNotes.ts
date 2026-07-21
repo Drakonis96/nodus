@@ -58,6 +58,15 @@ const RAW_RELEASE_NOTES: RawReleaseNote[] = [
         pt: 'Corrigido um erro em que mudar de espaço podia falhar com «table … already exists». As bases de dados criadas por uma versão anterior com numeração de migrações diferente reparam-se sozinhas — preservando os seus dados — em vez de bloquear a abertura.',
         'pt-BR': 'Corrigido um erro em que trocar de espaço podia falhar com “table … already exists”. Os bancos de dados criados por uma versão anterior com numeração de migrações diferente se reparam sozinhos — preservando seus dados — em vez de bloquear a abertura.',
       },
+      {
+        scope: 'mcp',
+        es: 'ChatGPT ya puede usar Nodus mediante el túnel MCP seguro de OpenAI. Un asistente guiado instala y verifica el cliente oficial, protege las credenciales y explica cada paso sin abrir puertos ni publicar tu biblioteca.',
+        en: 'ChatGPT can now use Nodus through OpenAI’s secure MCP tunnel. A guided assistant installs and verifies the official client, protects credentials, and explains every step without opening ports or publishing your library.',
+        fr: 'ChatGPT peut désormais utiliser Nodus via le tunnel MCP sécurisé d’OpenAI. Un assistant guidé installe et vérifie le client officiel, protège les identifiants et explique chaque étape sans ouvrir de ports ni publier votre bibliothèque.',
+        de: 'ChatGPT kann Nodus jetzt über OpenAIs sicheren MCP-Tunnel verwenden. Ein geführter Assistent installiert und prüft den offiziellen Client, schützt die Zugangsdaten und erklärt jeden Schritt, ohne Ports zu öffnen oder deine Bibliothek zu veröffentlichen.',
+        pt: 'O ChatGPT já pode usar o Nodus através do túnel MCP seguro da OpenAI. Um assistente guiado instala e verifica o cliente oficial, protege as credenciais e explica cada passo sem abrir portas nem publicar a sua biblioteca.',
+        'pt-BR': 'O ChatGPT agora pode usar o Nodus pelo túnel MCP seguro da OpenAI. Um assistente guiado instala e verifica o cliente oficial, protege as credenciais e explica cada etapa sem abrir portas nem publicar sua biblioteca.',
+      },
     ],
   },
   {

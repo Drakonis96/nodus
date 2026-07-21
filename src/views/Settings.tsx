@@ -4,6 +4,7 @@ import type {
   CopilotServerStatus,
   EmbeddingProvider,
   McpServerStatus,
+  McpTunnelStatus,
   ModelInfo,
   RecoveryHealth,
   StudyDataOverview,
@@ -25,6 +26,7 @@ import { NodiStylePicker } from '../components/nodi/NodiStylePicker';
 import { vaultTypeLabel } from '../components/VaultSwitcher';
 import { SttSettings } from '../components/SttSettings';
 import { LocalAiModelsSettings } from '../components/LocalAiModelsSettings';
+import { McpConnectionModal } from '../components/McpConnectionModal';
 import { NAV_GROUPS, orderedNav } from '../navigation';
 import { t, tx } from '../i18n';
 import { updateStatusMessage } from '../updateStatus';
@@ -40,7 +42,7 @@ const SETTINGS_TABS: { id: SettingsTabId; label: string; icon: string; keywords:
   { id: 'library', label: 'Biblioteca', icon: 'book', keywords: 'zotero sincronizacion tag lectura automatizacion cola analisis resumen relaciones' },
   { id: 'extraction', label: 'Texto y OCR', icon: 'search', keywords: 'pdf texto fulltext zotero ocr tesseract paginas idiomas' },
   { id: 'interface', label: 'Interfaz', icon: 'palette', keywords: 'idioma tema claro oscuro animaciones barra lateral menu navegacion accesibilidad contraste escala fuente lectura enfoque' },
-  { id: 'integrations', label: 'Integraciones', icon: 'link', keywords: 'mcp servidor token puerto word copilot certificado addin' },
+  { id: 'integrations', label: 'Integraciones', icon: 'link', keywords: 'mcp servidor token puerto chatgpt openai tunnel tunel word copilot certificado addin' },
   { id: 'system', label: 'Tutoriales', icon: 'graduation', keywords: 'sistema ayuda tutorial' },
   { id: 'data', label: 'Backup / copia de seguridad', icon: 'download', keywords: 'datos backup exportar importar demo copia cifrada peligro reinicializar grafo borrar' },
   { id: 'about', label: 'Acerca de Nodus', icon: 'info', keywords: 'acerca proyecto codigo abierto open source gratuito privacidad privacy rgpd gdpr datos alumnado inteligencia artificial licencia terceros legal' },
@@ -117,6 +119,7 @@ export function Settings({
   const [showAutoBackupPassword, setShowAutoBackupPassword] = useState(false);
   const [autoBackupRunning, setAutoBackupRunning] = useState(false);
   const [mcpStatus, setMcpStatus] = useState<McpServerStatus>({ running: false, port: null, url: null, error: null });
+  const [mcpTunnelStatus, setMcpTunnelStatus] = useState<McpTunnelStatus | null>(null);
   const [copilotStatus, setCopilotStatus] = useState<CopilotServerStatus>({ running: false, port: null, addinUrl: null, certReady: false, error: null });
   const [copilotBusy, setCopilotBusy] = useState(false);
   const [copilotInstallBusy, setCopilotInstallBusy] = useState(false);
@@ -148,8 +151,11 @@ export function Settings({
   useEffect(() => {
     let active = true;
     const refresh = async () => {
-      const next = await window.nodus.getMcpStatus();
-      if (active) setMcpStatus(next);
+      const [next, tunnel] = await Promise.all([window.nodus.getMcpStatus(), window.nodus.getMcpTunnelStatus()]);
+      if (active) {
+        setMcpStatus(next);
+        setMcpTunnelStatus(tunnel);
+      }
     };
     void refresh();
     const interval = window.setInterval(() => void refresh(), 1500);
@@ -324,7 +330,7 @@ export function Settings({
     visibleSettingsSection('interface', 'Mascota Nodi', 'nodi mascota mascot flotante superpuesta always on top encima escritorio companion acompanante'),
     visibleSettingsSection('interface', 'Barra lateral', 'menu lateral ordenar ocultar mostrar navegacion'),
     visibleSettingsSection('system', 'Ayuda', 'tutorial uso avanzado actualizaciones version update reiniciar'),
-    visibleSettingsSection('integrations', 'Servidor MCP', 'mcp servidor puerto token cliente conexion'),
+    visibleSettingsSection('integrations', 'Servidor MCP', 'mcp servidor puerto token cliente conexion chatgpt openai tunnel tunel'),
     visibleSettingsSection('integrations', 'Copiloto de escritura Word', 'word copilot addin certificado token localhost'),
     visibleSettingsSection('integrations', 'Copiloto de escritura LibreOffice', 'libreoffice copilot macro python install instalacion instalando'),
     visibleSettingsSection('data', 'Backup / copia de seguridad', 'datos demo exportar importar copia backup cifrada contraseña'),
@@ -982,8 +988,28 @@ export function Settings({
         </Section>
       )}
 
-      {visibleSettingsSection('integrations', 'Servidor MCP', 'mcp servidor puerto token cliente conexion') && (
+      {visibleSettingsSection('integrations', 'Servidor MCP', 'mcp servidor puerto token cliente conexion chatgpt openai tunnel tunel') && (
           <Section title={t('Servidor MCP')}>
+            <div className="rounded-xl border border-indigo-900/70 bg-indigo-950/20 p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-start gap-3">
+                  <span className={`mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full ${mcpTunnelStatus?.phase === 'connected' ? 'bg-emerald-500/15 text-emerald-300' : 'bg-indigo-500/15 text-indigo-300'}`}>
+                    <Icon name={mcpTunnelStatus?.phase === 'connected' ? 'check' : 'globe'} />
+                  </span>
+                  <div>
+                    <h3 className="text-sm font-medium text-neutral-100">ChatGPT</h3>
+                    <p className="mt-0.5 text-xs text-neutral-400">
+                      {mcpTunnelStatus?.phase === 'connected'
+                        ? t('Conectado mediante el túnel seguro de OpenAI.')
+                        : t('Configúralo con un asistente guiado, sin abrir puertos ni publicar tu biblioteca.')}
+                    </p>
+                  </div>
+                </div>
+                <button className="btn btn-primary shrink-0" onClick={() => setMcpHelpOpen(true)}>
+                  <Icon name="link" />{mcpTunnelStatus?.phase === 'connected' ? t('Administrar conexión') : t('Conectar con ChatGPT')}
+                </button>
+              </div>
+            </div>
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-2">
                 <label className="text-sm text-neutral-300">{t('Activar servidor MCP')}</label>
@@ -1702,6 +1728,7 @@ export function Settings({
           token={settings.mcpToken}
           copied={mcpCopied}
           onCopy={copyMcpValue}
+          onSettingsChanged={onChange}
           onClose={() => setMcpHelpOpen(false)}
         />
       )}
@@ -1821,89 +1848,6 @@ export function Settings({
           onClose={() => setOpenLegalDoc(null)}
         />
       )}
-    </div>
-  );
-}
-
-function McpConnectionModal({
-  url,
-  token,
-  copied,
-  onCopy,
-  onClose,
-}: {
-  url: string;
-  token: string;
-  copied: 'url' | 'token' | null;
-  onCopy: (kind: 'url' | 'token', value: string) => Promise<void>;
-  onClose: () => void;
-}) {
-  const auth = `Authorization: Bearer ${token || '<token>'}`;
-  const claudeConfig = JSON.stringify(
-    {
-      mcpServers: {
-        nodus: {
-          command: 'npx',
-          args: ['mcp-remote', url, '--header', auth],
-        },
-      },
-    },
-    null,
-    2
-  );
-
-  return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-6" onClick={onClose}>
-      <div className="card max-h-[90vh] w-full max-w-2xl overflow-y-auto p-5" role="dialog" aria-modal="true" aria-label={t('Conectar un cliente MCP')} onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 className="font-semibold">{t('Conectar un cliente MCP')}</h2>
-            <p className="mt-1 text-sm text-neutral-400">{t('Usa la URL y el bearer token actuales. No necesitas claves adicionales.')}</p>
-          </div>
-          <button className="btn btn-ghost" aria-label={t('Cerrar')} onClick={onClose}>
-            <Icon name="x" />
-          </button>
-        </div>
-
-        <div className="mt-5 space-y-3">
-          <ConnectionValue label={t('URL del servidor')} value={url} copied={copied === 'url'} onCopy={() => void onCopy('url', url)} />
-          <ConnectionValue label={t('Bearer token')} value={token || t('Activa el servidor para generar un token.')} copied={copied === 'token'} onCopy={() => void onCopy('token', token)} />
-
-          <div className="rounded-lg border border-neutral-800 p-3 text-sm text-neutral-300">
-            <h3 className="font-medium text-neutral-100">Claude Desktop</h3>
-            <p className="mt-1 text-neutral-400">{t('Si tu versión permite conectores MCP remotos, añade la URL y la cabecera de autorización. Como alternativa compatible, usa este puente stdio y reinicia Claude Desktop:')}</p>
-            <pre className="mt-3 overflow-x-auto rounded bg-neutral-950 p-3 text-xs text-neutral-300">{claudeConfig}</pre>
-          </div>
-
-          <div className="rounded-lg border border-neutral-800 p-3 text-sm text-neutral-300">
-            <h3 className="font-medium text-neutral-100">ChatGPT</h3>
-            <p className="mt-1 text-neutral-400">{t('Añade un servidor MCP con esta URL y la cabecera de autorización en Connectors/Developer mode. ChatGPT web no puede acceder a 127.0.0.1: necesitarías un túnel HTTPS externo, que no forma parte de Nodus. Si expones el servidor, protege el token.')}</p>
-          </div>
-
-          <div className="rounded-lg border border-neutral-800 p-3 text-sm text-neutral-300">
-            <h3 className="font-medium text-neutral-100">{t('Cliente genérico')}</h3>
-            <p className="mt-1 text-neutral-400">{t('Transporte: Streamable HTTP. Endpoint: la URL anterior. Auth: la cabecera Authorization: Bearer <token>.')}</p>
-          </div>
-        </div>
-
-        <div className="mt-5 flex justify-end">
-          <button className="btn btn-primary" onClick={onClose}>{t('Cerrar')}</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ConnectionValue({ label, value, copied, onCopy }: { label: string; value: string; copied: boolean; onCopy: () => void }) {
-  return (
-    <div>
-      <div className="mb-1 text-xs font-medium uppercase tracking-wide text-neutral-500">{label}</div>
-      <div className="flex items-center gap-2 rounded-lg border border-neutral-800 bg-neutral-950/60 p-2">
-        <code className="min-w-0 flex-1 break-all text-xs text-neutral-200">{value}</code>
-        <button className="btn btn-ghost shrink-0" disabled={!value} onClick={onCopy}>
-          <Icon name={copied ? 'check' : 'copy'} /> {copied ? t('Copiado') : t('Copiar')}
-        </button>
-      </div>
     </div>
   );
 }

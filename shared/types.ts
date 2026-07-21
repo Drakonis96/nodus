@@ -2236,6 +2236,50 @@ export interface McpServerStatus {
   error: string | null;
 }
 
+export type McpTunnelPhase =
+  | 'not_configured'
+  | 'stopped'
+  | 'installing'
+  | 'checking'
+  | 'connecting'
+  | 'connected'
+  | 'error';
+
+export type McpTunnelErrorCode =
+  | 'invalid_tunnel_id'
+  | 'missing_api_key'
+  | 'unsupported_platform'
+  | 'download_failed'
+  | 'integrity_failed'
+  | 'api_key_rejected'
+  | 'permission_denied'
+  | 'tunnel_not_found'
+  | 'network'
+  | 'local_server'
+  | 'client_stopped'
+  | 'unknown';
+
+/** Runtime state of OpenAI's outbound-only Secure MCP Tunnel client. Secrets never cross this boundary. */
+export interface McpTunnelStatus {
+  configured: boolean;
+  enabled: boolean;
+  hasApiKey: boolean;
+  phase: McpTunnelPhase;
+  tunnelId: string | null;
+  clientVersion: string | null;
+  installProgress: number | null;
+  uiUrl: string | null;
+  errorCode: McpTunnelErrorCode | null;
+  /** Redacted diagnostic detail for support; never contains either API key or bearer token. */
+  errorDetail: string | null;
+}
+
+export interface McpTunnelConnectInput {
+  tunnelId: string;
+  /** Optional when replacing/restarting a connection that already has a stored runtime key. */
+  apiKey?: string;
+}
+
 /** Runtime state of the opt-in localhost copilot HTTPS server (for the Word add-in). */
 export interface CopilotServerStatus {
   running: boolean;
@@ -5387,6 +5431,10 @@ export interface NodusApi {
   ): () => void;
   getMcpStatus(): Promise<McpServerStatus>;
   regenerateMcpToken(): Promise<string>;
+  getMcpTunnelStatus(): Promise<McpTunnelStatus>;
+  connectMcpTunnel(input: McpTunnelConnectInput): Promise<McpTunnelStatus>;
+  disconnectMcpTunnel(): Promise<McpTunnelStatus>;
+  forgetMcpTunnel(): Promise<McpTunnelStatus>;
   getCopilotStatus(): Promise<CopilotServerStatus>;
   regenerateCopilotToken(): Promise<string>;
   /** Generate + trust a localhost TLS cert for the copilot server (idempotent). */

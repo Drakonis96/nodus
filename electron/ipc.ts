@@ -190,7 +190,20 @@ import type { ProtectArtifact, ProtectListSourcesRequest, ProtectSourceRef } fro
 import { PROTECT_INPUT_EXTENSIONS } from '@shared/protectTypes';
 import * as protect from './protect/protectService';
 import { localizeIpcPayload, localizeRuntimeError } from '@shared/uiLanguage';
-import { getMcpStatus, regenerateMcpToken, restartMcpServer, startMcpServer, stopMcpServer } from './mcp';
+import {
+  connectMcpTunnel,
+  disconnectMcpTunnel,
+  forgetMcpTunnel,
+  getMcpStatus,
+  getMcpTunnelStatus,
+  regenerateMcpToken,
+  restartMcpServer,
+  restartMcpTunnelIfConfigured,
+  startMcpServer,
+  startMcpTunnelIfConfigured,
+  stopMcpServer,
+  stopMcpTunnel,
+} from './mcp';
 import { getCopilotStatus, regenerateCopilotToken, restartCopilotServer, startCopilotServer, stopCopilotServer } from './copilot/server';
 import {
   applyMascotWindow,
@@ -783,6 +796,7 @@ export function registerIpc(
     }
 
     stopRealtimeSync();
+    await stopMcpTunnel();
     await stopMcpServer();
     await stopCopilotServer();
     interruptDecorativeImageGenerations();
@@ -795,7 +809,7 @@ export function registerIpc(
 
     const settings = getSettings();
     if (settings.syncMode === 'realtime') startRealtimeSync();
-    if (settings.mcpEnabled) void startMcpServer();
+    if (settings.mcpEnabled) void startMcpServer().then(() => startMcpTunnelIfConfigured());
     if (settings.copilotEnabled) void startCopilotServer();
 
     const activeVault = withVaultKeyProviders(getActiveVault());
@@ -817,8 +831,11 @@ export function registerIpc(
       else stopRealtimeSync();
     }
     if (patch.mcpEnabled !== undefined || patch.mcpPort !== undefined || patch.mcpToken !== undefined) {
-      if (next.mcpEnabled) await restartMcpServer();
-      else await stopMcpServer();
+      await stopMcpTunnel();
+      if (next.mcpEnabled) {
+        await restartMcpServer();
+        void startMcpTunnelIfConfigured();
+      } else await stopMcpServer();
     }
     if (patch.copilotEnabled !== undefined || patch.copilotPort !== undefined) {
       if (next.copilotEnabled) await restartCopilotServer();
@@ -969,6 +986,7 @@ export function registerIpc(
       const busy = vaultBusyMessage();
       if (busy) throw new Error(busy);
       stopRealtimeSync();
+      await stopMcpTunnel();
       await stopMcpServer();
       await stopCopilotServer();
       interruptDecorativeImageGenerations();
@@ -978,7 +996,7 @@ export function registerIpc(
       reconcileAuthorLayerOnce();
       const settings = getSettings();
       if (settings.syncMode === 'realtime') startRealtimeSync();
-      if (settings.mcpEnabled) void startMcpServer();
+      if (settings.mcpEnabled) void startMcpServer().then(() => startMcpTunnelIfConfigured());
       if (settings.copilotEnabled) void startCopilotServer();
       emitVaultChanged();
       return withVaultKeyProviders(reset);
@@ -1736,7 +1754,16 @@ export function registerIpc(
   });
 
   h('mcp:status', async () => getMcpStatus());
-  h('mcp:regenerateToken', async () => regenerateMcpToken());
+  h('mcp:regenerateToken', async () => {
+    await stopMcpTunnel();
+    const token = await regenerateMcpToken();
+    void restartMcpTunnelIfConfigured();
+    return token;
+  });
+  h('mcp:tunnel:status', async () => getMcpTunnelStatus());
+  h('mcp:tunnel:connect', async (_e, input) => connectMcpTunnel(input));
+  h('mcp:tunnel:disconnect', async () => disconnectMcpTunnel());
+  h('mcp:tunnel:forget', async () => forgetMcpTunnel());
   h('copilot:status', async () => getCopilotStatus());
   h('copilot:regenerateToken', async () => regenerateCopilotToken());
   h('copilot:ensureCert', async () => {
@@ -3350,7 +3377,10 @@ export function registerIpc(
   );
   h('recovery:restore', async (_e, root: string, fileName: string, password: string, language: AppLanguage = 'es') => {
     const result = await restoreRecoverySnapshot(root, fileName, password, app.getVersion(), language);
-    if (result.ok) await stopMcpServer();
+    if (result.ok) {
+      await stopMcpTunnel();
+      await stopMcpServer();
+    }
     return result;
   });
 
@@ -3396,7 +3426,10 @@ export function registerIpc(
     const result = await importData(password);
     // Imports intentionally restore MCP as disabled and tokenless. Stop any
     // listener from the previous local profile once the swap succeeds.
-    if (result.ok) await stopMcpServer();
+    if (result.ok) {
+      await stopMcpTunnel();
+      await stopMcpServer();
+    }
     return result;
   });
   h('data:resetGraph', async () => {

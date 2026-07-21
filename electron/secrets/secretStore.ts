@@ -327,6 +327,44 @@ export function clearSyncPassphrase(): void {
   if (fs.existsSync(file)) fs.unlinkSync(file);
 }
 
+// ── OpenAI Secure MCP Tunnel runtime key ───────────────────────────────────
+// This is deliberately separate from the user's OpenAI model-provider key. It is an
+// organization-scoped runtime credential whose only job is to poll one Secure MCP
+// Tunnel. It is app-global, never returned to the renderer, and is not part of backups.
+
+function mcpTunnelApiKeyFile(): string {
+  return path.join(globalSecretsDir(), 'mcp_tunnel_api_key.bin');
+}
+
+export function setMcpTunnelApiKey(apiKey: string): void {
+  const clean = apiKey.trim();
+  if (!clean) {
+    clearMcpTunnelApiKey();
+    return;
+  }
+  const file = mcpTunnelApiKeyFile();
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  writeSecretAtomically(
+    file,
+    safeStorage.isEncryptionAvailable()
+      ? safeStorage.encryptString(clean)
+      : Buffer.from(`b64:${Buffer.from(clean).toString('base64')}`),
+  );
+}
+
+export function getMcpTunnelApiKey(): string | null {
+  return readKeyFile(mcpTunnelApiKeyFile());
+}
+
+export function hasMcpTunnelApiKey(): boolean {
+  return getMcpTunnelApiKey() !== null;
+}
+
+export function clearMcpTunnelApiKey(): void {
+  const file = mcpTunnelApiKeyFile();
+  if (fs.existsSync(file)) fs.unlinkSync(file);
+}
+
 export function setBackupRecoveryKey(recoveryKey: string): void {
   const clean = recoveryKey.trim();
   if (!clean) {
