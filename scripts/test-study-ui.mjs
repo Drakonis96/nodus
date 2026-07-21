@@ -344,6 +344,9 @@ test('study timetable exposes editable weekdays, periods and subject styling', a
   assert.match(css, /\.light \.study-schedule-panel tbody th/);
   assert.match(css, /\[data-testid='study-schedule-subject-styles'\]/);
   assert.match(css, /\.study-schedule-panel input\[type='time'\]/);
+  assert.match(view, /data-study-schedule-period-header/);
+  assert.match(view, /data-study-schedule-time-controls className="mt-2 grid min-w-0 grid-cols-\[minmax\(0,1fr\)_auto_minmax\(0,1fr\)\]/);
+  assert.doesNotMatch(view, /<div className="mt-2 flex items-center gap-1"><input aria-label=\{t\('Hora de inicio'\)\}/);
   assert.match(css, /min-width: 108px/);
   assert.match(css, /\.study-schedule-subject-cell\.has-color/);
   assert.match(css, /var\(--subject-color\) 34%/);
