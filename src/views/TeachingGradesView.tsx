@@ -43,7 +43,7 @@ import { t, tx, errorText, getActiveLang } from '../i18n';
  * programaciones contain weights that do not sum, and refusing to open them would make
  * the tool useless for the documents teachers actually have.
  */
-export function TeachingGradesView() {
+export function TeachingGradesView({ onOpenOrganization }: { onOpenOrganization: () => void }) {
   const [workspace, setWorkspace] = useState<StudyWorkspace | null>(null);
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [plans, setPlans] = useState<AssessmentPlan[]>([]);
@@ -229,9 +229,11 @@ export function TeachingGradesView() {
               data-testid="plan-new"
               data-tour="plan-new"
               className="btn btn-primary"
-              disabled={!workspace?.subjects.length}
               title={workspace?.subjects.length ? undefined : t('Crea antes una asignatura.')}
-              onClick={() => setCreating(true)}
+              onClick={() => {
+                if (workspace?.subjects.length) setCreating(true);
+                else onOpenOrganization();
+              }}
             >
               <Icon name="plus" />{t('Nuevo cuaderno')}
             </button>

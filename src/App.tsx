@@ -1438,7 +1438,7 @@ export function App() {
           />}
           {view === 'teachingExams' && <ExamBuilderView />}
           {view === 'teachingGroups' && <TeachingGroupsView />}
-          {view === 'teachingGrades' && <TeachingGradesView />}
+          {view === 'teachingGrades' && <TeachingGradesView onOpenOrganization={() => setView('studyCourses')} />}
           {view === 'teachingRubrics' && <RubricsView />}
           {view === 'studyReview' && <StudyReviewView />}
           {view === 'studyDeepResearch' && <DeepResearchView
