@@ -837,7 +837,7 @@ export function Settings({
               <div className="max-w-3xl">
                 <h3 className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{t('Cómo facilita Nodus el cumplimiento del RGPD')}</h3>
                 <p className="mt-1 text-xs leading-5 text-neutral-600 dark:text-neutral-400">
-                  {t('El diseño aplica minimización, privacidad por defecto y avisos justo antes de importar archivos o grabar. Distingue el tratamiento local de las conexiones opcionales y deja al responsable decidir la base jurídica, conservación, acceso y proveedores.')}
+                  {t('El diseño aplica minimización, privacidad por defecto y avisos justo antes de grabar. Distingue el tratamiento local de las conexiones opcionales y deja al responsable decidir la base jurídica, conservación, acceso y proveedores.')}
                 </p>
                 <p className="mt-2 text-xs leading-5 text-neutral-500">
                   {t('Esta arquitectura facilita el cumplimiento del RGPD, pero no es una certificación: cada organización debe documentar su tratamiento y completar la lista de implantación.')}

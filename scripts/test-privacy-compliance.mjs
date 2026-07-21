@@ -100,9 +100,17 @@ test('every microphone access is blocked by the just-in-time recording notice', 
   const notice = await read('src/privacyNotices.tsx');
   assert.match(notice, /base jurídica y autorización/);
   assert.match(notice, /no sustituye el consentimiento/);
+  // The notice offers three choices — accept once, accept and remember, reject —
+  // and a remembered acceptance skips it on later sessions.
+  assert.match(notice, /confirmWithRemember/);
+  assert.match(notice, /micPrivacyAcknowledged/);
+  assert.match(notice, /Aceptar y no volver a mostrar/);
+  assert.match(notice, /Rechazar/);
 });
 
-test('every file picker is blocked by the just-in-time import notice', async () => {
+test('file pickers open directly, with no import privacy modal', async () => {
+  // Native pickers stay centralised in a single audited entry point, so future
+  // importers cannot quietly reach dialog.showOpenDialog on their own.
   const electronFiles = await sourceFiles('electron', new Set(['.ts']));
   const rawDialogs = [];
   for (const file of electronFiles) {
@@ -111,24 +119,21 @@ test('every file picker is blocked by the just-in-time import notice', async () 
   }
   assert.deepEqual(rawDialogs, ['electron/privacy.ts']);
 
-  const rendererFiles = await sourceFiles('src');
-  const fileInputs = [];
-  for (const file of rendererFiles) {
-    const source = await readFile(file, 'utf8');
-    if (!/type=["']file["']/.test(source)) continue;
-    fileInputs.push(path.relative(repoRoot, file));
-    assert.match(source, /confirmFileImportPrivacy/, `${file}: renderer file input needs the privacy gate`);
-  }
-  assert.deepEqual(fileInputs.sort(), [
-    'src/components/DecorativeImageModal.tsx',
-    'src/views/StudyOrganizationView.tsx',
-  ]);
-
+  // That entry point opens the OS picker directly: file imports are processed
+  // locally and no longer interrupt the user with an in-app consent modal.
   const mainNotice = await read('electron/privacy.ts');
-  assert.match(mainNotice, /privacy:fileImport:request/);
-  assert.match(mainNotice, /requestFileImportPrivacy/);
+  assert.doesNotMatch(mainNotice, /privacy:fileImport:request|requestFileImportPrivacy/);
   assert.doesNotMatch(mainNotice, /showMessageBox/);
 
+  // No renderer surface keeps the removed file-import gate.
+  const rendererFiles = await sourceFiles('src');
+  for (const file of rendererFiles) {
+    const source = await readFile(file, 'utf8');
+    assert.doesNotMatch(source, /confirmFileImportPrivacy/, `${file}: the file-import privacy gate must be gone`);
+  }
+
+  // The bridge host survives for the AI-processing prompt, but neither the preload
+  // nor the typed API still carries the file-import modal plumbing.
   const [rendererNotice, app, preload, apiTypes, ipc] = await Promise.all([
     read('src/privacyNotices.tsx'),
     read('src/App.tsx'),
@@ -136,13 +141,10 @@ test('every file picker is blocked by the just-in-time import notice', async () 
     read('shared/types.ts'),
     read('electron/ipc.ts'),
   ]);
-  assert.match(rendererNotice, /autorizado para tratar/);
-  assert.match(rendererNotice, /función remota/);
   assert.match(rendererNotice, /PrivacyRequestHost/);
-  assert.match(rendererNotice, /zIndex:\s*220/);
   assert.match(app, /<PrivacyRequestHost\s*\/>/);
-  for (const source of [preload, apiTypes, ipc]) {
-    assert.match(source, /resolveFileImportPrivacyRequest|privacy:fileImport:resolve/);
+  for (const source of [rendererNotice, preload, apiTypes, ipc]) {
+    assert.doesNotMatch(source, /FileImportPrivacyRequest|privacy:fileImport/);
   }
 });
 

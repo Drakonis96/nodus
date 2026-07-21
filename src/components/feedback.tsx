@@ -29,9 +29,10 @@ interface ConfirmRequest {
   message: ReactNode;
   confirmLabel?: string;
   cancelLabel?: string;
+  rememberLabel?: string;
   danger?: boolean;
   zIndex?: number;
-  resolve: (ok: boolean) => void;
+  resolve: (ok: boolean, remember: boolean) => void;
 }
 
 interface PromptRequest {
@@ -92,17 +93,39 @@ export function confirm(opts: {
 }): Promise<boolean> {
   return new Promise((resolve) => {
     // Only one confirm is shown at a time; cancel any stale pending request.
-    if (confirmReq) confirmReq.resolve(false);
-    confirmReq = { ...opts, resolve };
+    if (confirmReq) confirmReq.resolve(false, false);
+    confirmReq = { ...opts, resolve: (ok) => resolve(ok) };
     emit();
   });
 }
 
-function resolveConfirm(ok: boolean): void {
+/**
+ * Like {@link confirm} but with a third "accept and don't ask again" button.
+ * Resolves `{ ok, remember }`: `ok` is true when either accept button is pressed,
+ * and `remember` is true only for the second one, so callers can persist the
+ * choice and skip the dialog next time.
+ */
+export function confirmWithRemember(opts: {
+  title: string;
+  message: ReactNode;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  rememberLabel: string;
+  danger?: boolean;
+  zIndex?: number;
+}): Promise<{ ok: boolean; remember: boolean }> {
+  return new Promise((resolve) => {
+    if (confirmReq) confirmReq.resolve(false, false);
+    confirmReq = { ...opts, resolve: (ok, remember) => resolve({ ok, remember }) };
+    emit();
+  });
+}
+
+function resolveConfirm(ok: boolean, remember = false): void {
   const req = confirmReq;
   confirmReq = null;
   emit();
-  req?.resolve(ok);
+  req?.resolve(ok, remember);
 }
 
 /**
@@ -188,10 +211,12 @@ export function FeedbackHost() {
           message={confirmReq.message}
           confirmLabel={confirmReq.confirmLabel}
           cancelLabel={confirmReq.cancelLabel}
+          rememberLabel={confirmReq.rememberLabel}
           danger={confirmReq.danger}
           zIndex={confirmReq.zIndex}
-          onConfirm={() => resolveConfirm(true)}
-          onCancel={() => resolveConfirm(false)}
+          onConfirm={() => resolveConfirm(true, false)}
+          onCancel={() => resolveConfirm(false, false)}
+          onRemember={confirmReq.rememberLabel ? () => resolveConfirm(true, true) : undefined}
         />
       )}
       {promptReq && (

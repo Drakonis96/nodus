@@ -459,13 +459,6 @@ const api: NodusApi = {
   openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url).then(() => undefined),
   openThirdPartyNotices: () => ipcRenderer.invoke('shell:openThirdPartyNotices').then(() => undefined),
   openPrivacyPolicy: () => ipcRenderer.invoke('shell:openPrivacyPolicy').then(() => undefined),
-  onFileImportPrivacyRequest: (cb) => {
-    const listener = (_e: unknown, request: Parameters<typeof cb>[0]) => cb(request);
-    ipcRenderer.on('privacy:fileImport:request', listener);
-    return () => ipcRenderer.removeListener('privacy:fileImport:request', listener);
-  },
-  resolveFileImportPrivacyRequest: (requestId, allowed) =>
-    ipcRenderer.invoke('privacy:fileImport:resolve', requestId, allowed).then(() => undefined),
   onStudyMaterialAiProcessingRequest: (cb) => {
     const listener = (_e: unknown, request: Parameters<typeof cb>[0]) => cb(request);
     ipcRenderer.on('study:knowledge:processing:request', listener);

@@ -3,7 +3,6 @@ import type { DecorativeImage, DecorativeImageStyle } from '@shared/types';
 import { DECORATIVE_IMAGE_STYLES, DEFAULT_DECORATIVE_IMAGE_STYLE, imageStyleTemplate } from '@shared/imageStyles';
 import { Icon } from './ui';
 import { t } from '../i18n';
-import { confirmFileImportPrivacy } from '../privacyNotices';
 
 export type DecorativeImageQueueAction = 'generate' | 'retry' | 'regenerate';
 
@@ -146,7 +145,7 @@ export function DecorativeImageModal({
             <div className="flex flex-wrap items-center gap-2">
               <button
                 className="btn btn-ghost gap-1.5 border border-neutral-300 dark:border-neutral-700"
-                onClick={() => void confirmFileImportPrivacy().then((allowed) => { if (allowed) fileRef.current?.click(); })}
+                onClick={() => fileRef.current?.click()}
                 disabled={busy || status === 'pending'}
               >
                 <Icon name="upload" size={14} /> {t('Subir mi imagen')}
