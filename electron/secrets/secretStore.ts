@@ -365,6 +365,56 @@ export function clearMcpTunnelApiKey(): void {
   if (fs.existsSync(file)) fs.unlinkSync(file);
 }
 
+// ── Nodus Server device token ──────────────────────────────────────────────
+// A shared-server pairing grants one vault permission to publish into one remote
+// space. Keep that credential beside the vault and OS-encrypted: unlike the public
+// server URL/space id it must never enter settings JSON, backups, sync packages or the
+// renderer. This is intentionally unrelated to the localhost MCP bearer token.
+
+function nodusServerTokenFile(): string {
+  return path.join(activeVaultDir(), 'nodus_server_token.bin');
+}
+
+// If the OS keychain is unavailable, keep the publisher credential only for the
+// lifetime of this process. Persisting a reversible base64 token would turn a
+// local file read into remote publishing access. The user can pair again after
+// restarting once a supported keychain is available.
+let transientNodusServerToken: string | null = null;
+
+export function setNodusServerToken(value: string): void {
+  const clean = value.trim();
+  if (!clean) {
+    clearNodusServerToken();
+    return;
+  }
+  const file = nodusServerTokenFile();
+  if (!safeStorage.isEncryptionAvailable()) {
+    transientNodusServerToken = clean;
+    if (fs.existsSync(file)) fs.unlinkSync(file);
+    return;
+  }
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  writeSecretAtomically(file, safeStorage.encryptString(clean));
+  transientNodusServerToken = null;
+}
+
+export function getNodusServerToken(): string | null {
+  if (transientNodusServerToken !== null) return transientNodusServerToken;
+  try { return readKeyFile(nodusServerTokenFile()); } catch { return null; }
+}
+
+export function hasNodusServerToken(): boolean {
+  return getNodusServerToken() !== null;
+}
+
+export function clearNodusServerToken(): void {
+  transientNodusServerToken = null;
+  try {
+    const file = nodusServerTokenFile();
+    if (fs.existsSync(file)) fs.unlinkSync(file);
+  } catch { /* no active vault yet */ }
+}
+
 export function setBackupRecoveryKey(recoveryKey: string): void {
   const clean = recoveryKey.trim();
   if (!clean) {

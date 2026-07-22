@@ -1,0 +1,33 @@
+services:
+  nodus-server:
+    image: ghcr.io/drakonis96/nodus-server:main
+    pull_policy: always
+    restart: unless-stopped
+    environment:
+      NODUS_PUBLIC_URL: ${NODUS_PUBLIC_URL}
+      NODUS_SETUP_TOKEN: ${NODUS_SETUP_TOKEN}
+    volumes:
+      - nodus_data:/data
+    ports:
+      - "127.0.0.1:7443:7443"
+
+  caddy:
+    image: caddy:2-alpine
+    profiles: ["proxy"]
+    restart: unless-stopped
+    depends_on: [nodus-server]
+    environment:
+      NODUS_DOMAIN: ${NODUS_DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  nodus_data:
+  caddy_data:
+  caddy_config:

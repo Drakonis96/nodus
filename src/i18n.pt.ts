@@ -7,11 +7,13 @@
 import { PROTECT_TRANSLATIONS } from './i18n.protect';
 import { AI_OCR_TRANSLATIONS } from './i18n.aiOcr';
 import { TOOLKIT_APPS_TRANSLATIONS } from './i18n.toolkitApps';
+import { SERVER_TRANSLATIONS } from './i18n.server';
 
 export const PT: Record<string, string> = {
   ...AI_OCR_TRANSLATIONS.pt,
   ...PROTECT_TRANSLATIONS.pt,
   ...TOOLKIT_APPS_TRANSLATIONS.pt,
+  ...SERVER_TRANSLATIONS.pt,
   'Traduce texto, documentos y adjuntos de Zotero con el modelo que elijas, incluido un modo PDF facsímil.': 'Traduza texto, documentos e anexos do Zotero com o modelo que escolher, incluindo um modo fac-símile de PDF.',
   'Traducir texto, documentos y adjuntos de Zotero con el modelo elegido, conservando la estructura de DOCX y EPUB y la apariencia de los PDF mediante un modo facsímil.': 'Traduzir texto, documentos e anexos do Zotero com o modelo escolhido, mantendo a estrutura de DOCX e EPUB e a aparência dos PDF através do modo fac-símile.',
   'Mover documento a la papelera': 'Mover documento para o lixo',

@@ -99,6 +99,26 @@ test('no production bridge can send student work to AI for grading, feedback or 
   assert.doesNotMatch(immersion, /respuesta_del_estudiante|EVALUA LA RESPUESTA|open → AI|heuristic fallback/i);
 });
 
+test('remote vault publication excludes credentials, files and student administration tables', async () => {
+  const [snapshot, secretStore, backup, settings] = await Promise.all([
+    read('electron/serverSync/serverSnapshot.ts'),
+    read('electron/secrets/secretStore.ts'),
+    read('electron/export/exportImport.ts'),
+    read('src/views/Settings.tsx'),
+  ]);
+  assert.match(snapshot, /const TEACHING_TABLES = \[[\s\S]*'teaching_exams'[\s\S]*'teaching_rubrics'/);
+  assert.doesNotMatch(snapshot, /table\.startsWith\('teaching_'\)/);
+  for (const sensitive of ['teaching_students', 'teaching_groups', 'teaching_grade_entries', 'teaching_rubric_evaluations']) {
+    assert.doesNotMatch(snapshot, new RegExp(`['"]${sensitive}['"]`));
+  }
+  assert.match(snapshot, /embedding[\s\S]*file_path[\s\S]*api_key[\s\S]*access_token/);
+  assert.match(secretStore, /nodus_server_token\.bin/);
+  assert.match(backup, /nodusServerEnabled = false/);
+  assert.match(backup, /obj\.nodusServerUrl = ''/);
+  assert.match(settings, /Nunca: archivos PDF, claves API, contraseñas, rutas locales, embeddings/);
+  assert.match(settings, /listas de alumnos, grupos, calificaciones/);
+});
+
 test('every microphone access is blocked by the just-in-time recording notice', async () => {
   const files = await sourceFiles('src');
   const microphoneSources = [];

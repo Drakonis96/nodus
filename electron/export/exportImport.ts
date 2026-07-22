@@ -567,7 +567,15 @@ export function restoreBackupArchive(archive: Buffer, password: string): BackupR
     const imported = JSON.parse(payload.readAsText(settingsEntry));
     // Backups created before MCP support may not have these fields; backups from
     // any version must never restore a listener or a bearer credential.
-    const restoredSettings = { ...imported, mcpEnabled: false, mcpToken: '' } as Record<string, unknown>;
+    const restoredSettings = {
+      ...imported,
+      mcpEnabled: false,
+      mcpToken: '',
+      nodusServerEnabled: false,
+      nodusServerUrl: '',
+      nodusServerSpaceId: '',
+      nodusServerSpaceName: '',
+    } as Record<string, unknown>;
     for (const key of MACHINE_LOCAL_SETTING_KEYS) {
       if (localPaths && localPaths[key] !== undefined) restoredSettings[key] = localPaths[key];
       else delete restoredSettings[key];
@@ -776,12 +784,16 @@ function restoreAuxiliaryFiles(payload: AdmZip, payloadManifest: PayloadManifest
   }
 }
 
-/** Strip the MCP token/listener and any stray secrets from a settings object. */
+/** Strip listeners, remote publication bindings and any stray secrets from settings. */
 function scrubSettings(raw: unknown): BackupSettings {
   const obj = (raw && typeof raw === 'object' ? { ...(raw as Record<string, unknown>) } : {}) as Record<string, unknown>;
   delete obj.mcpToken;
   delete obj.providerKeys;
   obj.mcpEnabled = false;
+  obj.nodusServerEnabled = false;
+  obj.nodusServerUrl = '';
+  obj.nodusServerSpaceId = '';
+  obj.nodusServerSpaceName = '';
   return obj as unknown as BackupSettings;
 }
 

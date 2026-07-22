@@ -31,6 +31,12 @@ Download the installer for your computer and open it. There is no server to conf
 
 The [latest release page](https://github.com/Drakonis96/nodus/releases/latest) always contains the newest available installers and release notes.
 
+## Share a vault with Nodus Server
+
+Nodus Server is an optional, self-hosted companion for courses and research groups. A vault owner can explicitly publish a filtered read-only copy, give each student or researcher access to selected spaces, and connect those spaces to ChatGPT or Claude through OAuth-protected remote MCP. The desktop app sends only outbound HTTPS traffic and keeps this publisher completely separate from its localhost MCP server.
+
+The server runs with Docker on Windows, macOS or Linux and supports the bundled Caddy HTTPS proxy as well as an existing Caddy, Nginx or Traefik installation. Setup and user management happen in a web page; starting the containers is the only terminal step. See the [Nodus Server installation guide](server/README.md).
+
 ## One app, five working vaults
 
 ### Academic vault
