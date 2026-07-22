@@ -1,0 +1,15 @@
+{
+  "manifest_version": 2,
+  "name": "Nodus for Zotero",
+  "version": "0.0.7",
+  "description": "Nodus research assistant integrated into Zotero. Proof-of-concept: adds a toolbar button.",
+  "author": "Nodus",
+  "applications": {
+    "zotero": {
+      "id": "nodus-zotero@nodus.app",
+      "update_url": "https://nodus.app/zotero/updates.json",
+      "strict_min_version": "6.999",
+      "strict_max_version": "10.*"
+    }
+  }
+}

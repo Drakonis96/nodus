@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <link rel="stylesheet" href="chrome://nodus/content/sidebar.css" />
+</head>
+<body>
+  <div id="nodus-app">
+    <header id="nd-header">
+      <span id="nd-logo" aria-hidden="true"></span>
+      <span id="nd-title">Nodus</span>
+      <span id="nd-mode-pill" class="nd-mode-pill" title=""></span>
+      <span id="nd-conn" class="nd-conn" title=""></span>
+      <button id="nd-close" class="nd-iconbtn nd-close" title="Close" aria-label="Close" data-i18n-title="close">✕</button>
+    </header>
+
+    <nav id="nd-tabs">
+      <button class="nd-tab nd-tab--active" data-tab="chat" data-i18n="tab.chat">Chat</button>
+      <button class="nd-tab" data-tab="providers" data-i18n="tab.providers">Providers</button>
+      <button class="nd-tab" data-tab="settings" data-i18n="tab.settings">Settings</button>
+    </nav>
+
+    <!-- CHAT -->
+    <section class="nd-panel nd-panel--active" data-panel="chat">
+      <div id="nd-chatbar">
+        <button id="nd-new" class="nd-iconbtn" data-i18n-title="chat.new" title="New conversation">＋</button>
+        <button id="nd-history-btn" class="nd-iconbtn" data-i18n-title="chat.history" title="Conversations">🕑</button>
+        <button id="nd-agent-btn" class="nd-iconbtn" data-i18n-title="agent.mode" title="Agent mode">🛠</button>
+        <select id="nd-model" title="Model"></select>
+      </div>
+      <div id="nd-item"></div>
+      <div id="nd-selection" hidden></div>
+      <div id="nd-messages"></div>
+      <div id="nd-prompt-menu" class="nd-menu" hidden></div>
+      <div id="nd-composer">
+        <button id="nd-prompt-btn" class="nd-iconbtn" title="Prompts" data-i18n-title="chat.prompts">✦</button>
+        <textarea id="nd-input" rows="2" data-i18n-ph="composer.placeholder" placeholder="Ask about this document…"></textarea>
+        <button id="nd-stop" class="nd-sendbtn nd-stopbtn" title="Stop" data-i18n-title="chat.stop" hidden>■</button>
+        <button id="nd-send" class="nd-sendbtn" title="Send" data-i18n-title="composer.send">➤</button>
+      </div>
+    </section>
+
+    <!-- PROVIDERS -->
+    <section class="nd-panel" data-panel="providers">
+      <p class="nd-muted" data-i18n="providers.intro">Add API keys per provider, load their models, and pin the ones you want in the model menu. Used in Standalone mode.</p>
+      <div id="nd-providers"></div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section class="nd-panel" data-panel="settings">
+      <div class="nd-field">
+        <label data-i18n="settings.mode">Mode</label>
+        <div id="nd-mode-seg" class="nd-seg">
+          <button class="nd-seg-btn" data-mode="connected" data-i18n="mode.connected">Connected (Nodus)</button>
+          <button class="nd-seg-btn" data-mode="standalone" data-i18n="mode.standalone">Standalone</button>
+        </div>
+        <div id="nd-mode-hint" class="nd-muted"></div>
+      </div>
+      <div class="nd-field">
+        <label data-i18n="settings.context">Context</label>
+        <label class="nd-check"><input type="checkbox" id="nd-ctx-fulltext" /> <span data-i18n="settings.useFulltext">Send document text</span></label>
+        <label class="nd-check" data-nodus-only><input type="checkbox" id="nd-ctx-ideas" /> <span data-i18n="settings.useIdeas">Use Nodus ideas when available</span></label>
+        <label class="nd-check" data-nodus-only><input type="checkbox" id="nd-ctx-corpus" /> <span data-i18n="settings.useCorpus">Search my Nodus library for related passages</span></label>
+        <div class="nd-muted" data-nodus-only-hint hidden data-i18n="settings.standaloneNote">Nodus-only features are unavailable in Standalone mode.</div>
+      </div>
+      <div class="nd-field">
+        <label data-i18n="agent.mode">Agent mode</label>
+        <label class="nd-check"><input type="checkbox" id="nd-agent" /> <span data-i18n="agent.modeDesc">Let Nodus act on your Zotero library (create notes, highlight, tag) — with your approval.</span></label>
+        <label class="nd-check"><input type="checkbox" id="nd-agent-auto" /> <span data-i18n="agent.auto">Auto-approve actions (no confirmation each time)</span></label>
+        <div class="nd-muted" data-i18n="agent.hint">Each action asks for permission unless auto-approve is on.</div>
+      </div>
+      <div class="nd-field">
+        <label data-i18n="settings.language">Language</label>
+        <select id="nd-lang"><option value="en">English</option><option value="es">Español</option></select>
+      </div>
+      <div class="nd-field" data-nodus-only>
+        <label data-i18n="settings.connection">Nodus connection</label>
+        <div id="nd-conn-detail" class="nd-muted"></div>
+        <button id="nd-test" data-i18n="settings.test">Test connection</button>
+        <div class="nd-row" style="margin-top:6px">
+          <input id="nd-port" type="number" placeholder="4321" />
+          <input id="nd-token" type="text" data-i18n-ph="settings.token" placeholder="token" />
+        </div>
+        <div class="nd-muted" data-i18n="settings.manualHint">Leave empty to auto-detect from Nodus.</div>
+      </div>
+    </section>
+
+    <!-- HISTORY OVERLAY -->
+    <div id="nd-history" class="nd-overlay" hidden>
+      <div class="nd-overlay-head">
+        <input id="nd-history-search" data-i18n-ph="history.search" placeholder="Search conversations…" />
+        <button id="nd-history-close" class="nd-iconbtn" title="Close">✕</button>
+      </div>
+      <div id="nd-history-list"></div>
+      <button id="nd-history-clear" class="nd-danger" data-i18n="history.clearAll">Delete all conversations</button>
+    </div>
+
+    <!-- CONFIRM MODAL -->
+    <div id="nd-modal" class="nd-modal" hidden>
+      <div class="nd-modal-box">
+        <div id="nd-modal-msg"></div>
+        <div class="nd-modal-actions">
+          <button id="nd-modal-cancel" class="nd-btn-ghost" data-i18n="modal.cancel">Cancel</button>
+          <button id="nd-modal-ok" class="nd-danger" data-i18n="modal.delete">Delete</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="chrome://nodus/content/providers.js"></script>
+  <script src="chrome://nodus/content/store.js"></script>
+  <script src="chrome://nodus/content/agent.js"></script>
+  <script src="chrome://nodus/content/sidebar.js"></script>
+</body>
+</html>

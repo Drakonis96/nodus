@@ -6,6 +6,7 @@ import type {
   McpServerStatus,
   McpTunnelStatus,
   ModelInfo,
+  ZoteroPluginServerStatus,
   RecoveryHealth,
   StudyDataOverview,
   SupersededEntry,
@@ -122,6 +123,8 @@ export function Settings({
   const [mcpStatus, setMcpStatus] = useState<McpServerStatus>({ running: false, port: null, url: null, error: null });
   const [mcpTunnelStatus, setMcpTunnelStatus] = useState<McpTunnelStatus | null>(null);
   const [copilotStatus, setCopilotStatus] = useState<CopilotServerStatus>({ running: false, port: null, addinUrl: null, certReady: false, error: null });
+  const [zoteroStatus, setZoteroStatus] = useState<ZoteroPluginServerStatus>({ running: false, port: null, url: null, error: null });
+  const [zoteroInstallBusy, setZoteroInstallBusy] = useState(false);
   const [copilotBusy, setCopilotBusy] = useState(false);
   const [copilotInstallBusy, setCopilotInstallBusy] = useState(false);
   const [copilotInstallMessage, setCopilotInstallMessage] = useState<string | null>(null);
@@ -181,6 +184,20 @@ export function Settings({
       window.clearInterval(interval);
     };
   }, [settings.copilotEnabled, settings.copilotPort, settings.copilotToken]);
+
+  useEffect(() => {
+    let active = true;
+    const refresh = async () => {
+      const next = await window.nodus.getZoteroPluginStatus();
+      if (active) setZoteroStatus(next);
+    };
+    void refresh();
+    const interval = window.setInterval(() => void refresh(), 1500);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, [settings.zoteroPluginEnabled, settings.zoteroPluginPort, settings.zoteroPluginToken]);
 
   useEffect(() => {
     if (!mcpHelpOpen) return;
@@ -334,6 +351,7 @@ export function Settings({
     visibleSettingsSection('integrations', 'Servidor MCP', 'mcp servidor puerto token cliente conexion chatgpt openai tunnel tunel'),
     visibleSettingsSection('integrations', 'Copiloto de escritura Word', 'word copilot addin certificado token localhost'),
     visibleSettingsSection('integrations', 'Copiloto de escritura LibreOffice', 'libreoffice copilot macro python install instalacion instalando'),
+    visibleSettingsSection('integrations', 'Nodus para Zotero', 'zotero plugin sidebar chat servidor puerto token pagina citas conexiones'),
     visibleSettingsSection('data', 'Backup / copia de seguridad', 'datos demo exportar importar copia backup cifrada contraseña'),
     visibleSettingsSection('models', 'Modelos de IA', 'basico avanzado modelo general extraccion sintesis tutor resumen fusion embeddings transcripcion voz imagen'),
     visibleSettingsSection('extraction', 'Extracción de texto PDFs grandes', 'pdf texto zotero ocr tesseract paginas idiomas'),
@@ -1123,6 +1141,90 @@ export function Settings({
             <p className="text-xs text-neutral-500">
               {t('Sirve Nodus Copilot en https://localhost, busca ideas del corpus, muestra conexiones y permite insertar una idea con la IA configurada en Nodus.')}
             </p>
+          </Section>
+      )}
+
+      {visibleSettingsSection('integrations', 'Nodus para Zotero', 'zotero plugin sidebar chat servidor puerto token pagina citas conexiones') && (
+          <Section title={`${t('Nodus para Zotero')} · beta`}>
+            <p className="text-xs text-neutral-500">
+              {t('Chat de Nodus dentro de Zotero: pregunta sobre el ítem abierto con el contexto de tu biblioteca (resumen, ideas, conexiones). Instala el plugin en Zotero; se conecta a Nodus automáticamente.')}
+            </p>
+            <div className="flex items-center justify-between gap-4">
+              <label className="text-sm text-neutral-300">{t('Activar el servidor de Nodus para Zotero')}</label>
+              <input type="checkbox" checked={settings.zoteroPluginEnabled} onChange={(e) => void patch({ zoteroPluginEnabled: e.target.checked })} />
+            </div>
+            <div className="flex items-center justify-between gap-4">
+              <label className="text-sm text-neutral-300">{t('Puerto')}</label>
+              <input
+                type="number"
+                className="input w-28"
+                defaultValue={settings.zoteroPluginPort}
+                onBlur={(e) => {
+                  const p = Math.min(65535, Math.max(1024, Number(e.target.value) || 4321));
+                  if (p !== settings.zoteroPluginPort) void patch({ zoteroPluginPort: p });
+                }}
+              />
+            </div>
+            <div className="rounded-lg border border-neutral-800 bg-neutral-950/50 px-3 py-2 text-xs">
+              {zoteroStatus.running ? (
+                <span className="text-emerald-400">{t('Activo')}: {zoteroStatus.url}</span>
+              ) : zoteroStatus.error ? (
+                <span className="text-red-400">{t('Error')}: {zoteroStatus.error}</span>
+              ) : (
+                <span className="text-neutral-500">{t('Apagado')}</span>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                className="btn btn-primary"
+                disabled={zoteroInstallBusy}
+                onClick={async () => {
+                  const info = await window.nodus.getZoteroInstallInfo();
+                  if (!info.profileFound) { flash(t('No se encontró Zotero en este equipo. Instala el plugin manualmente.')); return; }
+                  if (info.running) {
+                    const ok = await confirm({
+                      title: t('Instalar el plugin en Zotero'),
+                      message: t('Zotero está abierto y se cerrará para instalar el plugin; se reabrirá al terminar. ¿Continuar?'),
+                      confirmLabel: t('Continuar'),
+                    });
+                    if (!ok) return;
+                  }
+                  setZoteroInstallBusy(true);
+                  try {
+                    const r = await window.nodus.installZoteroPlugin();
+                    if (r.ok) flash(r.reopened ? t('Plugin instalado. Zotero se ha reabierto.') : t('Plugin instalado. Se cargará al abrir Zotero.'));
+                    else flash(r.message);
+                  } finally {
+                    setZoteroInstallBusy(false);
+                  }
+                }}
+              >
+                <Icon name={zoteroInstallBusy ? 'sync' : 'download'} className={zoteroInstallBusy ? 'animate-spin' : ''} />
+                {zoteroInstallBusy ? t('Instalando…') : t('Instalar/actualizar en Zotero')}
+              </button>
+              <button
+                className="btn btn-ghost border border-neutral-700"
+                onClick={async () => {
+                  const r = await window.nodus.downloadZoteroPluginXpi();
+                  if (r.ok && r.path) flash(`${t('Plugin guardado en:')} ${r.path}`);
+                  else if (r.message) flash(r.message);
+                }}
+              >
+                <Icon name="download" /> {t('Descargar .xpi')}
+              </button>
+              <button
+                className="btn btn-ghost border border-neutral-700"
+                onClick={() => void navigator.clipboard.writeText(settings.zoteroPluginToken).then(() => flash(t('Token copiado.')))}
+              >
+                <Icon name="copy" /> {t('Copiar token')}
+              </button>
+              <button
+                className="btn btn-ghost border border-neutral-700"
+                onClick={() => void window.nodus.regenerateZoteroPluginToken().then(() => flash(t('Token regenerado.')))}
+              >
+                <Icon name="refresh" /> {t('Regenerar token')}
+              </button>
+            </div>
           </Section>
       )}
 
