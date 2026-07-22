@@ -186,6 +186,7 @@ import { extractPptxNotes } from './toolkit/presenter/pptxNotes';
 import * as presenterWindows from './toolkit/presenter/windows';
 import { getSystemVolume, setSystemVolume, openCastPicker } from './toolkit/presenter/systemAudio';
 import { normalizeLibrary, type PresenterLibrary } from '@shared/presenterTypes';
+import { parsePresenterNotesTxt, serializePresenterNotesTxt } from '@shared/presenterNotesTxt';
 import type { PresenterAction } from '@shared/presenterState';
 import type { ProtectArtifact, ProtectListSourcesRequest, ProtectSourceRef } from '@shared/protectTypes';
 import { PROTECT_INPUT_EXTENSIONS } from '@shared/protectTypes';
@@ -3666,6 +3667,37 @@ export function registerIpc(
     });
     if (picked.canceled || picked.filePaths.length === 0) return null;
     return extractPptxNotes(fs.readFileSync(picked.filePaths[0]));
+  });
+  h('presenter:export:txtNotes', async (e, rawPresentation: unknown) => {
+    const presentation = normalizeLibrary({ presentations: [rawPresentation], folders: [] }).presentations[0];
+    if (!presentation?.totalPages) throw new Error('Presentation has no slides');
+    const win = BrowserWindow.fromWebContents(e.sender);
+    const safeName = Array.from((presentation.name || 'presentation').replace(/[<>:"/\\|?*]/g, '_'))
+      .map((char) => (char.charCodeAt(0) < 32 ? '_' : char))
+      .join('')
+      .trim() || 'presentation';
+    const picked = await dialog.showSaveDialog(win ?? undefined!, {
+      title: 'Exportar notas del presentador',
+      defaultPath: `${safeName} - notas.txt`,
+      filters: [{ name: 'Texto', extensions: ['txt'] }],
+    });
+    if (picked.canceled || !picked.filePath) return false;
+    fs.writeFileSync(
+      picked.filePath,
+      serializePresenterNotesTxt(presentation.notes, presentation.totalPages),
+      'utf-8',
+    );
+    return true;
+  });
+  h('presenter:import:txtNotes', async (e) => {
+    const win = BrowserWindow.fromWebContents(e.sender);
+    const picked = await showImportOpenDialog(win ?? undefined!, {
+      title: 'Importar notas desde TXT',
+      properties: ['openFile'],
+      filters: [{ name: 'Texto', extensions: ['txt'] }],
+    });
+    if (picked.canceled || picked.filePaths.length === 0) return null;
+    return parsePresenterNotesTxt(fs.readFileSync(picked.filePaths[0], 'utf-8'));
   });
   // Presentation windows (audience + presenter). The control channel is fire-and-
   // forget (ipcMain.on) because navigation/zoom fire rapidly and don't need a reply.

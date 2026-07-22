@@ -6317,6 +6317,10 @@ export interface NodusApi {
   deletePresenterPresentation(id: string): Promise<void>;
   /** Open a .pptx picker and extract its speaker notes; null when cancelled. */
   importPresenterPptxNotes(): Promise<PptxNotes | null>;
+  /** Save every slide's speaker notes in the versioned, re-importable TXT format. */
+  exportPresenterNotesTxt(presentation: Presentation): Promise<boolean>;
+  /** Open a TXT notes export and parse it; null when cancelled. */
+  importPresenterNotesTxt(): Promise<PptxNotes | null>;
   /** Open the audience window (full-screen, external display when present). */
   startPresenter(pdfId: string, startSlide?: number): Promise<void>;
   /** Open the audience + presenter windows together. */
