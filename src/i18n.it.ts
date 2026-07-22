@@ -1,9 +1,11 @@
 import { PROTECT_TRANSLATIONS } from './i18n.protect';
 import { AI_OCR_TRANSLATIONS } from './i18n.aiOcr';
+import { TOOLKIT_APPS_TRANSLATIONS } from './i18n.toolkitApps';
 
 /** Complete static Italian interface table; coverage prohibits runtime fallbacks. */
 export const IT: Record<string, string> = {
   ...AI_OCR_TRANSLATIONS.it,
+  ...TOOLKIT_APPS_TRANSLATIONS.it,
   'Mover documento a la papelera': 'Sposta il documento nel cestino',
   'Mover documentos a la papelera': 'Sposta i documenti nel cestino',
   '«{name}» dejará de aparecer. Podrás recuperarlo desde la administración de datos.': '«{name}» non sarà più visibile. Potrai recuperarlo dalla gestione dei dati.',

@@ -1242,6 +1242,31 @@ const api: NodusApi = {
   downloadProtectCopy: (copyId) => ipcRenderer.invoke('protect:copies:download', copyId),
   deleteProtectCopy: (copyId) => ipcRenderer.invoke('protect:copies:delete', copyId).then(() => undefined),
 
+  // Nodus Apps — sandboxed mini-app generation + temporary LAN sessions.
+  generateToolkitApp: async (request, onProgress) => {
+    const requestId = `toolkit-app-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const listener = (_e: unknown, id: string, progress: Parameters<NonNullable<typeof onProgress>>[0]) => {
+      if (id === requestId) onProgress?.(progress);
+    };
+    ipcRenderer.on('toolkitApps:generate:progress', listener);
+    try {
+      return await ipcRenderer.invoke('toolkitApps:generate', requestId, request);
+    } finally {
+      ipcRenderer.removeListener('toolkitApps:generate:progress', listener);
+    }
+  },
+  downloadToolkitAppPackage: (manifest) => ipcRenderer.invoke('toolkitApps:package:download', manifest),
+  startToolkitAppSession: (manifest) => ipcRenderer.invoke('toolkitApps:session:start', manifest),
+  stopToolkitAppSession: () => ipcRenderer.invoke('toolkitApps:session:stop').then(() => undefined),
+  getToolkitAppSessionInfo: () => ipcRenderer.invoke('toolkitApps:session:info'),
+  getToolkitAppSessionSnapshot: () => ipcRenderer.invoke('toolkitApps:session:snapshot'),
+  sendToolkitAppSessionMessage: (channel, payload) => ipcRenderer.invoke('toolkitApps:session:send', channel, payload).then(() => undefined),
+  onToolkitAppSessionEvent: (cb) => {
+    const listener = (_e: unknown, event: Parameters<typeof cb>[0]) => cb(event);
+    ipcRenderer.on('toolkitApps:session:event', listener);
+    return () => ipcRenderer.removeListener('toolkitApps:session:event', listener);
+  },
+
   // PDF Presenter — global library of imported PDFs (Toolkit). The PDF bytes are
   // fetched over IPC (offline; no file:// or CDN) for pdfjs to render.
   getPresenterLibrary: () => ipcRenderer.invoke('presenter:library:get'),

@@ -85,7 +85,7 @@ test('the toolkit shows in every vault type, including databases and study', () 
   assert.deepEqual(tools.items.map((n) => n.id), ['toolkit']);
 });
 
-test('the hub renders four tools and Protect is in development', async () => {
+test('the hub renders five tools and Protect is in development', async () => {
   const view = await read('src/views/ToolkitView.tsx');
   assert.ok(view.includes('data-testid="toolkit-home"'), 'the hub is addressable');
   // The cards receive their testid as a prop; ToolCard is what stamps it onto the DOM.
@@ -96,17 +96,17 @@ test('the hub renders four tools and Protect is in development', async () => {
   // set of tools from each other.
   assert.deepEqual(
     navigation.TOOLKIT_TOOLS.map((tool) => `toolkit-card-${tool.testid}`),
-    ['toolkit-card-convert', 'toolkit-card-protect', 'toolkit-card-presenter', 'toolkit-card-aiocr']
+    ['toolkit-card-apps', 'toolkit-card-convert', 'toolkit-card-protect', 'toolkit-card-presenter', 'toolkit-card-aiocr']
   );
   assert.deepEqual(
     navigation.TOOLKIT_TOOLS.map((tool) => tool.name),
-    ['Nodus Convert', 'Nodus Protect', 'PDF Presenter', 'OCR Workspace'],
+    ['Nodus Apps', 'Nodus Convert', 'Nodus Protect', 'PDF Presenter', 'OCR Workspace'],
     'brand names stay untranslated'
   );
   assert.match(view, /name=\{tool\.name\}/, 'the card shows the brand name verbatim, never through t()');
   assert.match(view, /description=\{t\(tool\.description\)\}/, 'only the description is translated');
 
-  // All four tools are built and openable; none is coming soon.
+  // All five tools are built and openable; none is coming soon.
   assert.deepEqual(
     navigation.TOOLKIT_TOOLS.filter((tool) => tool.state === 'soon').map((tool) => tool.page),
     [],
@@ -114,12 +114,13 @@ test('the hub renders four tools and Protect is in development', async () => {
   );
   assert.deepEqual(
     navigation.TOOLKIT_TOOLS.filter((tool) => tool.state === 'wip').map((tool) => tool.page),
-    ['convert', 'protect', 'presenter', 'ocr'],
+    ['apps', 'convert', 'protect', 'presenter', 'ocr'],
     'every tool uses the in-development badge'
   );
   assert.match(view, /const disabled = state === 'soon'/);
   assert.match(view, /onClick=\{disabled \? undefined : onOpen\}/, 'a coming-soon card has no click handler');
   // The built cards open their real workspaces, not placeholders.
+  assert.match(view, /<ToolkitAppsView onBack=/, 'Nodus Apps renders the functional catalogue');
   assert.match(view, /<ToolkitConvertView onBack=/, 'Nodus Convert renders the functional converter');
   assert.match(view, /<ToolkitProtectView onBack=/, 'Nodus Protect renders the functional protection flow');
   assert.match(view, /<ToolkitPresenterView onBack=/, 'PDF Presenter renders the functional library');
@@ -195,9 +196,9 @@ test('the toolkit nests one sidebar button per tool under its section', async ()
 
 test('the hub cards share one shape: equal size, centred icons, pinned badges', async () => {
   const view = await read('src/views/ToolkitView.tsx');
-  // One ToolCard component renders all four, so they cannot drift apart.
+  // One ToolCard component renders all five, so they cannot drift apart.
   assert.equal((view.match(/<ToolCard\b/g) ?? []).length, 1, 'a single ToolCard renders the whole catalogue');
-  assert.match(view, /grid gap-4 sm:grid-cols-2/, 'the four cards use a 2×2 grid when space permits');
+  assert.match(view, /grid gap-4 sm:grid-cols-2/, 'the cards use a two-column grid when space permits');
   assert.match(view, /className=\{`flex h-full flex-col/, 'each card fills its grid cell');
   assert.match(view, /h-12 w-12 shrink-0 items-center justify-center/, 'the card icon sits in a fixed centred tile');
   assert.match(view, /mt-auto inline-flex items-center/, 'the state badge pins to the bottom');

@@ -98,7 +98,7 @@ export const NAV_ITEMS: NavItem[] = [
  * never turns into a new top-level view (and never leaks into sidebarOrder, the
  * per-vault-type allow-lists or the reordering UI). The sidebar nests one button
  * per tool under the section, and 'home' is the catalogue. */
-export type ToolkitPage = 'home' | 'convert' | 'protect' | 'presenter' | 'ocr';
+export type ToolkitPage = 'home' | 'convert' | 'protect' | 'presenter' | 'ocr' | 'apps';
 
 export interface ToolkitToolDef {
   page: Exclude<ToolkitPage, 'home'>;
@@ -121,6 +121,15 @@ export interface ToolkitToolDef {
 /** Single source of truth for the toolkit catalogue: the hub cards and the nested
  * sidebar buttons render from this list, so they can never drift apart. */
 export const TOOLKIT_TOOLS: ToolkitToolDef[] = [
+  {
+    page: 'apps',
+    name: 'Nodus Apps',
+    shortName: 'Apps',
+    description: 'Crea herramientas para investigar, estudiar o enseñar con IA; adáptalas hablando y compártelas por QR.',
+    icon: 'grid',
+    state: 'wip',
+    testid: 'apps',
+  },
   {
     page: 'convert',
     name: 'Nodus Convert',

@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { execFileSync } from 'node:child_process';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
@@ -67,4 +67,15 @@ test('contentTypeFor covers the served asset kinds', () => {
   assert.match(A.contentTypeFor('/x/app.js'), /javascript/);
   assert.match(A.contentTypeFor('/x/w.wasm'), /application\/wasm/);
   assert.equal(A.contentTypeFor('/x/thing.bin'), 'application/octet-stream');
+});
+
+test('the shared Presenter link omits the PIN and its mobile page asks for it', async () => {
+  const serverSource = await readFile(path.join(repoRoot, 'electron/toolkit/presenter/server.ts'), 'utf8');
+  const remoteSource = await readFile(path.join(repoRoot, 'src/presenter/remote/main.tsx'), 'utf8');
+  assert.match(serverSource, /presenterRemote\.html`/);
+  assert.doesNotMatch(serverSource, /presenterRemote\.html\?pin=/);
+  assert.doesNotMatch(serverSource, /pathname === ['"]\/api\/qr['"]/);
+  assert.match(remoteSource, /data-testid="presenter-pin-gate"/);
+  assert.match(remoteSource, /event\.code === 4001/);
+  assert.match(remoteSource, /pattern="\[0-9\]\{6\}"/);
 });

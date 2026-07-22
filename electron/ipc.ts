@@ -191,6 +191,11 @@ import {
   presenterImportFormat,
 } from './toolkit/presenter/conversion';
 import * as presenterWindows from './toolkit/presenter/windows';
+import { generateToolkitApp } from './ai/toolkitApps';
+import * as toolkitAppSession from './toolkit/apps/server';
+import { buildToolkitAppPackage, toolkitAppPackageFileName } from './toolkit/apps/export';
+import { isToolkitAppManifest } from '@shared/toolkitApps';
+import type { ToolkitAppGenerationProgress, ToolkitAppGenerationRequest, ToolkitAppJsonValue, ToolkitAppManifest } from '@shared/toolkitApps';
 import { getSystemVolume, setSystemVolume, openCastPicker } from './toolkit/presenter/systemAudio';
 import { normalizeLibrary, type PresenterLibrary } from '@shared/presenterTypes';
 import { parsePresenterNotesTxt, serializePresenterNotesTxt } from '@shared/presenterNotesTxt';
@@ -3792,6 +3797,38 @@ export function registerIpc(
     if (picked.canceled || picked.filePaths.length === 0) return null;
     return parsePresenterNotesTxt(fs.readFileSync(picked.filePaths[0], 'utf-8'));
   });
+  // Nodus Apps — sandboxed bundle generation and ephemeral LAN runtime.
+  h('toolkitApps:generate', async (e, requestId: string, request: ToolkitAppGenerationRequest) => generateToolkitApp(request, (progress: ToolkitAppGenerationProgress) => {
+    if (!e.sender.isDestroyed()) e.sender.send('toolkitApps:generate:progress', requestId, progress);
+  }));
+  h('toolkitApps:package:download', async (e, manifest: ToolkitAppManifest) => {
+    if (!isToolkitAppManifest(manifest)) throw new Error('La app no es válida y no se puede descargar.');
+    const win = BrowserWindow.fromWebContents(e.sender);
+    const picked = await dialog.showSaveDialog(win ?? undefined!, {
+      title: 'Descargar paquete de la app',
+      defaultPath: toolkitAppPackageFileName(manifest),
+      filters: [{ name: 'Paquete ZIP', extensions: ['zip'] }],
+    });
+    if (picked.canceled || !picked.filePath) return null;
+    fs.writeFileSync(picked.filePath, buildToolkitAppPackage(manifest));
+    return picked.filePath;
+  });
+  h('toolkitApps:session:start', async (e, manifest: ToolkitAppManifest) => {
+    const sender = e.sender;
+    return toolkitAppSession.startToolkitAppSession(manifest, (next) => {
+      if (!sender.isDestroyed()) sender.send('toolkitApps:session:event', { type: 'snapshot', snapshot: next });
+    });
+  });
+  h('toolkitApps:session:stop', async (e) => {
+    toolkitAppSession.stopToolkitAppSession();
+    if (!e.sender.isDestroyed()) e.sender.send('toolkitApps:session:event', { type: 'stopped' });
+  });
+  h('toolkitApps:session:info', async () => toolkitAppSession.getToolkitAppSessionInfo());
+  h('toolkitApps:session:snapshot', async () => toolkitAppSession.getToolkitAppSessionSnapshot());
+  h('toolkitApps:session:send', async (_e, channel: string, payload: ToolkitAppJsonValue) => {
+    toolkitAppSession.sendToolkitAppSessionMessage(channel, payload);
+  });
+
   // Presentation windows (audience + presenter). The control channel is fire-and-
   // forget (ipcMain.on) because navigation/zoom fire rapidly and don't need a reply.
   h('presenter:start', async (_e, pdfId: string, startSlide?: number) => {

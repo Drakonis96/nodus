@@ -9,6 +9,10 @@ import claudeLogo from '../assets/brands/claude.svg';
 import { Icon } from './ui';
 import { NodiAvatar } from './nodi/NodiAvatar';
 
+// This guide belongs to the 2.4.0 release, so its four-tool snapshot must not
+// change when newer Toolkit entries (such as Nodus Apps) are added later.
+const BETA_TOOLS = TOOLKIT_TOOLS.filter((tool) => tool.page !== 'apps');
+
 /** This announcement belongs only to the 2.4.0 update. New installations learn the
  * same material inside BasicsTutorial v4 and therefore never see the second tour. */
 export const TOOLKIT_BETA_GUIDE_RELEASE = '2.4.0';
@@ -106,8 +110,8 @@ function GuideNotice({ icon, children, warning = false }: { icon: string; childr
 
 function ToolGrid({ language }: { language: GuideLanguage }) {
   const c = toolkitBetaGuideCopy(language);
-  return <div className="toolkit-guide-tools">{TOOLKIT_TOOLS.map((tool) => (
-    <div key={tool.page}><span><Icon name={tool.icon} size={18} /></span><div><b>{tool.name}</b><small>{c.toolSummaries[TOOLKIT_TOOLS.indexOf(tool)]}</small></div></div>
+  return <div className="toolkit-guide-tools">{BETA_TOOLS.map((tool) => (
+    <div key={tool.page}><span><Icon name={tool.icon} size={18} /></span><div><b>{tool.name}</b><small>{c.toolSummaries[BETA_TOOLS.indexOf(tool)]}</small></div></div>
   ))}</div>;
 }
 
@@ -144,7 +148,7 @@ export function SubscriptionAccessPanel({ language }: { language: GuideLanguage 
 type TourStep = { icon: string; title: string; summary: string; content: ReactNode };
 
 function toolStep(index: number, language: GuideLanguage): TourStep {
-  const tool = TOOLKIT_TOOLS[index];
+  const tool = BETA_TOOLS[index];
   const details = language === 'es' ? [
     <>Convierte documentos, PDF e imágenes de uno en uno o en lote. Incluye utilidades de PDF, OCR ligero, compresión, cambio de formato y operaciones de texto.</>,
     <>Oculta o desenfoca datos, añade marcas de agua y pies legales, rasteriza copias y crea o verifica marcas trazables. Todo el procesamiento del documento es local.</>,

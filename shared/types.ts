@@ -59,10 +59,35 @@ export type {
   ProtectExportFooter,
   ProtectTraceOptions,
 } from './protectTypes';
+export type {
+  ToolkitAppCategory,
+  ToolkitAppAccent,
+  ToolkitAppJsonValue,
+  ToolkitAppManifest,
+  StoredToolkitApp,
+  ToolkitAppGenerationRequest,
+  ToolkitAppGenerationProgress,
+  ToolkitAppGenerationResult,
+  ToolkitAppSessionInfo,
+  ToolkitAppParticipant,
+  ToolkitAppSessionMessage,
+  ToolkitAppSessionSnapshot,
+  ToolkitAppSessionEvent,
+} from './toolkitApps';
 
 // Type-only import (erased at compile time) — keeps the no-runtime-import rule intact.
 import type { VaultType } from './vaultTypes';
 import type { ToolkitJobRequest, ToolkitJobProgress, ToolkitJobResult } from './toolkitTypes';
+import type {
+  ToolkitAppGenerationRequest,
+  ToolkitAppGenerationProgress,
+  ToolkitAppGenerationResult,
+  ToolkitAppManifest,
+  ToolkitAppJsonValue,
+  ToolkitAppSessionEvent,
+  ToolkitAppSessionInfo,
+  ToolkitAppSessionSnapshot,
+} from './toolkitApps';
 import type { AiOcrCreateRequest, AiOcrExportFormat, AiOcrExportResult, OcrDoc, OcrDocSummary, OcrDocProgress, OcrOptions } from './aiOcrTypes';
 import type {
   Presentation,
@@ -6319,6 +6344,16 @@ export interface NodusApi {
   saveProtectArtifactToVault(artifact: ProtectArtifact): Promise<ProtectVaultCopySummary>;
   downloadProtectCopy(copyId: string): Promise<ProtectArtifactWriteResult>;
   deleteProtectCopy(copyId: string): Promise<void>;
+
+  // Nodus Apps — generated sandboxed mini-apps and ephemeral LAN sessions.
+  generateToolkitApp(request: ToolkitAppGenerationRequest, onProgress?: (progress: ToolkitAppGenerationProgress) => void): Promise<ToolkitAppGenerationResult>;
+  downloadToolkitAppPackage(manifest: ToolkitAppManifest): Promise<string | null>;
+  startToolkitAppSession(manifest: ToolkitAppManifest): Promise<ToolkitAppSessionInfo>;
+  stopToolkitAppSession(): Promise<void>;
+  getToolkitAppSessionInfo(): Promise<ToolkitAppSessionInfo | null>;
+  getToolkitAppSessionSnapshot(): Promise<ToolkitAppSessionSnapshot>;
+  sendToolkitAppSessionMessage(channel: string, payload: ToolkitAppJsonValue): Promise<void>;
+  onToolkitAppSessionEvent(cb: (event: ToolkitAppSessionEvent) => void): () => void;
 
   // PDF Presenter — global Toolkit library of imported PDFs. The library JSON is
   // read/written whole; PDF bytes stream over IPC for pdfjs (offline).
