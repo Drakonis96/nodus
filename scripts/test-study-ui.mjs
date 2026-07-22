@@ -133,6 +133,21 @@ test('study materials expose downloadable hover actions and pedagogical Deep Res
   assert.match(markdown, /const studyMaterial = href/);
 });
 
+test('shared study and teaching material tables center every column header', async () => {
+  const materials = await read('src/views/StudyMaterialsView.tsx');
+
+  for (const tableId of ['study-material-notes-table', 'study-material-table']) {
+    const header = materials.match(new RegExp(`data-testid="${tableId}">([\\s\\S]*?)</thead>`))?.[1];
+    assert.ok(header, `${tableId} has a table header`);
+
+    const headerClasses = [...header.matchAll(/<th className="([^"]+)"/g)].map((match) => match[1]);
+    assert.ok(headerClasses.length > 0, `${tableId} exposes column headers`);
+    for (const classes of headerClasses) {
+      assert.match(classes, /(?:^|\s)text-center(?:\s|$)/, `${tableId} centers ${classes}`);
+    }
+  }
+});
+
 test('study actions use renderer dialogs and the sidebar has no onboarding spacer', async () => {
   const [view, editor, sidebar, css] = await Promise.all([
     read('src/views/StudyOrganizationView.tsx'),
