@@ -40,6 +40,23 @@ the controller's data-protection officer or legal advice.
   monitor or otherwise evaluate a student. Nodus deliberately exposes no AI endpoint
   for those purposes.
 
+## Self-hosted Nodus Server
+
+- Record who operates the server, where it is hosted, who administers it and whether
+  that operator is a controller or processor; conclude the appropriate agreement.
+- Use a dedicated HTTPS domain, keep port 7443 private, patch Docker and the reverse
+  proxy, require strong accounts and review memberships and publishing devices.
+- Create separate spaces for distinct classes or research groups and grant each
+  person only the spaces they need. Test revocation from both ChatGPT and Claude.
+- Leave passages and authored content disabled unless the sharing purpose, legal
+  basis, copyright permission and recipients have been reviewed.
+- Do not treat the publication toggle as permission to share student data. Nodus
+  excludes rosters, groups, grades and assessment results; verify that exported
+  teaching materials do not contain those details in free text.
+- Define retention for published snapshots, OAuth accounts, access logs and backups.
+  Test the web deletion flow, token revocation and restoration from a protected
+  backup of the Docker volume.
+
 ## DPIA decision
 
 Document whether Article 35 GDPR requires a data-protection impact assessment. A

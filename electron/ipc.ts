@@ -316,6 +316,15 @@ import * as themes from './db/themesRepo';
 import { aggregateGaps, aggregateGapsPage, contradictionCount, getGapDetail } from './db/gapsRepo';
 import { getSyncLog } from './db/syncRepo';
 import { fullSync, ingestZoteroItem, startRealtimeSync, stopRealtimeSync } from './sync/syncService';
+import {
+  disconnectNodusServer,
+  getNodusServerStatus,
+  pairNodusServer,
+  restartNodusServerSync,
+  startNodusServerSync,
+  stopNodusServerSync,
+  syncNodusServerNow,
+} from './serverSync/serverSyncService';
 import { scanQueue } from './pipeline/scanQueue';
 import { buildIdeaGraph, buildIdeaGraphOverview, buildIdeaThemeGraph, buildAuthorGraph, getContradictions, getDebates, buildReadingPath } from './graph/graphService';
 import { streamDebateAnalysis } from './ai/debate';
@@ -823,6 +832,7 @@ export function registerIpc(
     }
 
     stopRealtimeSync();
+    stopNodusServerSync();
     await stopMcpTunnel();
     await stopMcpServer();
     await stopCopilotServer();
@@ -836,6 +846,7 @@ export function registerIpc(
 
     const settings = getSettings();
     if (settings.syncMode === 'realtime') startRealtimeSync();
+    startNodusServerSync();
     if (settings.mcpEnabled) void startMcpServer().then(() => startMcpTunnelIfConfigured());
     if (settings.copilotEnabled) void startCopilotServer();
 
@@ -863,6 +874,16 @@ export function registerIpc(
         await restartMcpServer();
         void startMcpTunnelIfConfigured();
       } else await stopMcpServer();
+    }
+    if (
+      patch.nodusServerEnabled !== undefined ||
+      patch.nodusServerAutoSync !== undefined ||
+      patch.nodusServerUrl !== undefined ||
+      patch.nodusServerSpaceId !== undefined ||
+      patch.nodusServerIncludeUserContent !== undefined ||
+      patch.nodusServerIncludePassages !== undefined
+    ) {
+      restartNodusServerSync();
     }
     if (patch.copilotEnabled !== undefined || patch.copilotPort !== undefined) {
       if (next.copilotEnabled) await restartCopilotServer();
@@ -1013,6 +1034,7 @@ export function registerIpc(
       const busy = vaultBusyMessage();
       if (busy) throw new Error(busy);
       stopRealtimeSync();
+      stopNodusServerSync();
       await stopMcpTunnel();
       await stopMcpServer();
       await stopCopilotServer();
@@ -1023,6 +1045,7 @@ export function registerIpc(
       reconcileAuthorLayerOnce();
       const settings = getSettings();
       if (settings.syncMode === 'realtime') startRealtimeSync();
+      startNodusServerSync();
       if (settings.mcpEnabled) void startMcpServer().then(() => startMcpTunnelIfConfigured());
       if (settings.copilotEnabled) void startCopilotServer();
       emitVaultChanged();
@@ -1824,6 +1847,10 @@ export function registerIpc(
   h('mcp:tunnel:connect', async (_e, input) => connectMcpTunnel(input));
   h('mcp:tunnel:disconnect', async () => disconnectMcpTunnel());
   h('mcp:tunnel:forget', async () => forgetMcpTunnel());
+  h('nodusServer:status', async () => getNodusServerStatus());
+  h('nodusServer:pair', async (_e, url: string, code: string) => pairNodusServer(url, code));
+  h('nodusServer:syncNow', async () => syncNodusServerNow());
+  h('nodusServer:disconnect', async () => disconnectNodusServer());
   h('copilot:status', async () => getCopilotStatus());
   h('copilot:regenerateToken', async () => regenerateCopilotToken());
   h('copilot:ensureCert', async () => {
@@ -3460,6 +3487,7 @@ export function registerIpc(
   h('recovery:restore', async (_e, root: string, fileName: string, password: string, language: AppLanguage = 'es') => {
     const result = await restoreRecoverySnapshot(root, fileName, password, app.getVersion(), language);
     if (result.ok) {
+      stopNodusServerSync();
       await stopMcpTunnel();
       await stopMcpServer();
     }

@@ -15,6 +15,7 @@ import { getActiveVault } from './vaults/vaultRegistry';
 import { generateDemoPortraits, hasDemoPortraitKey, demoPortraitsPending } from './ai/genealogyDemoPortraits';
 import { interruptDecorativeImageGenerations } from './ai/decorativeImages';
 import { startRealtimeSync, stopRealtimeSync } from './sync/syncService';
+import { startNodusServerSync, stopNodusServerSync } from './serverSync/serverSyncService';
 import { killMcpTunnelSync, startMcpServer, startMcpTunnelIfConfigured, stopMcpServer } from './mcp';
 import { setCopilotWindowProvider, startCopilotServer, stopCopilotServer } from './copilot/server';
 import { applyMascotWindow, destroyMascotWindow } from './mascotWindow';
@@ -543,6 +544,7 @@ app.whenReady().then(() => {
   autoBackupTimer = setInterval(autoBackupTick, 30 * 60 * 1000);
 
   if (settings.syncMode === 'realtime') startRealtimeSync();
+  startNodusServerSync();
   if (settings.mcpEnabled) void startMcpServer().then(() => startMcpTunnelIfConfigured());
   if (settings.copilotEnabled) void startCopilotServer();
   // Nodi mascot: open the always-on-top desktop window when the user has opted into it.
@@ -582,6 +584,7 @@ app.on('window-all-closed', () => {
     if (autoBackupTimer) clearInterval(autoBackupTimer);
     if (autoBackupFirstTimer) clearTimeout(autoBackupFirstTimer);
     stopRealtimeSync();
+    stopNodusServerSync();
     interruptDecorativeImageGenerations();
     stopAllWhisperCpp();
     closeDb();
@@ -600,6 +603,7 @@ app.on('before-quit', () => {
   if (autoBackupTimer) clearInterval(autoBackupTimer);
   if (autoBackupFirstTimer) clearTimeout(autoBackupFirstTimer);
   stopRealtimeSync();
+  stopNodusServerSync();
   interruptDecorativeImageGenerations();
   killMcpTunnelSync();
   void stopMcpServer();
@@ -618,6 +622,7 @@ updateAwareApp.on('before-quit-for-update', () => {
   if (autoBackupTimer) clearInterval(autoBackupTimer);
   if (autoBackupFirstTimer) clearTimeout(autoBackupFirstTimer);
   stopRealtimeSync();
+  stopNodusServerSync();
   interruptDecorativeImageGenerations();
   stopAllWhisperCpp();
   killMcpTunnelSync();

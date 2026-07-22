@@ -1520,6 +1520,19 @@ export interface AppSettings {
   mcpPort: number;
   /** Bearer token for the local MCP endpoint. This is intentionally visible in Settings. */
   mcpToken: string;
+  /** Publish this vault to an independent Nodus Server. Never starts a local listener. */
+  nodusServerEnabled: boolean;
+  /** Canonical HTTPS origin of the remote Nodus Server. */
+  nodusServerUrl: string;
+  /** Remote space selected during one-time pairing. */
+  nodusServerSpaceId: string;
+  nodusServerSpaceName: string;
+  /** Include user-authored notes, projects and study/teaching tables in the publication. */
+  nodusServerIncludeUserContent: boolean;
+  /** Include citable extracted passages. Off by default because full text may be licensed. */
+  nodusServerIncludePassages: boolean;
+  /** Low-cost periodic publication while the desktop app remains open. */
+  nodusServerAutoSync: boolean;
   /** Opt-in local HTTPS server that serves the Word writing-copilot add-in + its JSON API. */
   copilotEnabled: boolean;
   /** Localhost TCP port for the copilot HTTPS server (serves /addin and /api). */
@@ -2285,6 +2298,31 @@ export interface McpServerStatus {
   port: number | null;
   url: string | null;
   error: string | null;
+}
+
+export type NodusServerSyncPhase = 'disconnected' | 'idle' | 'checking' | 'syncing' | 'ok' | 'error';
+
+/** Runtime state of the outbound Nodus Server publisher. It never includes its device token. */
+export interface NodusServerSyncStatus {
+  configured: boolean;
+  enabled: boolean;
+  autoSync: boolean;
+  phase: NodusServerSyncPhase;
+  url: string | null;
+  spaceId: string | null;
+  spaceName: string | null;
+  lastSyncAt: string | null;
+  lastError: string | null;
+  lastBytes: number | null;
+  /** Human-readable proof that the remote publisher and localhost MCP do not share a listener. */
+  transport: 'outbound-https';
+}
+
+export interface NodusServerPairResult {
+  ok: boolean;
+  serverName: string;
+  spaceId: string;
+  spaceName: string;
 }
 
 export type McpTunnelPhase =
@@ -5493,6 +5531,10 @@ export interface NodusApi {
   connectMcpTunnel(input: McpTunnelConnectInput): Promise<McpTunnelStatus>;
   disconnectMcpTunnel(): Promise<McpTunnelStatus>;
   forgetMcpTunnel(): Promise<McpTunnelStatus>;
+  getNodusServerStatus(): Promise<NodusServerSyncStatus>;
+  pairNodusServer(url: string, code: string): Promise<NodusServerPairResult>;
+  syncNodusServerNow(): Promise<NodusServerSyncStatus>;
+  disconnectNodusServer(): Promise<NodusServerSyncStatus>;
   getCopilotStatus(): Promise<CopilotServerStatus>;
   regenerateCopilotToken(): Promise<string>;
   /** Generate + trust a localhost TLS cert for the copilot server (idempotent). */

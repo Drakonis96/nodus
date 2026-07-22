@@ -1,0 +1,4 @@
+{$NODUS_DOMAIN} {
+  encode zstd gzip
+  reverse_proxy nodus-server:7443
+}

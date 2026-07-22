@@ -1,0 +1,52 @@
+services:
+  nodus-server:
+    image: ghcr.io/drakonis96/nodus-server:main
+    pull_policy: always
+    restart: unless-stopped
+    environment:
+      NODUS_PUBLIC_URL: https://${NODUS_DOMAIN}
+      NODUS_SETUP_TOKEN: ${NODUS_SETUP_TOKEN}
+    volumes:
+      - nodus_data:/data
+    expose:
+      - "7443"
+    networks:
+      - nodus_internal
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - nodus-server
+    command:
+      - caddy
+      - reverse-proxy
+      - --from
+      - ${NODUS_DOMAIN}
+      - --to
+      - nodus-server:7443
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - nodus_internal
+
+networks:
+  nodus_internal:
+    internal: false
+
+volumes:
+  nodus_data:
+  caddy_data:
+  caddy_config:

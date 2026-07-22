@@ -1,6 +1,7 @@
 import { PROTECT_TRANSLATIONS } from './i18n.protect';
 import { AI_OCR_TRANSLATIONS } from './i18n.aiOcr';
 import { TOOLKIT_APPS_TRANSLATIONS } from './i18n.toolkitApps';
+import { SERVER_TRANSLATIONS } from './i18n.server';
 
 /** Complete static Italian interface table; coverage prohibits runtime fallbacks. */
 export const IT: Record<string, string> = {
@@ -5884,6 +5885,7 @@ export const IT: Record<string, string> = {
   "Nodus no expone ninguna función de IA para calificar, perfilar o evaluar estudiantes. Los identificadores permiten minimizar nombres en usos locales y exportaciones.": "Nodus non espone alcuna funzione di IA per assegnare voti, profilare o valutare studenti. Gli identificatori consentono di ridurre al minimo i nomi negli usi locali e nelle esportazioni.",
   "La IA no recibe listas, notas ni respuestas del alumnado. Nodus no ofrece ninguna función de IA para calificar, perfilar o evaluar estudiantes; esas decisiones son siempre humanas y permanecen fuera del modelo.": "L’IA non riceve elenchi, voti o risposte degli studenti. Nodus non offre alcuna funzione di IA per assegnare voti, profilare o valutare studenti; queste decisioni sono sempre umane e restano fuori dal modello.",
   ...PROTECT_TRANSLATIONS.it,
+  ...SERVER_TRANSLATIONS.it,
   'Seleccionar o desplazar': 'Seleziona o scorri',
   'Editar o eliminar': 'Modifica o elimina',
   '¿Eliminar esta anotación? No se puede deshacer.': 'Eliminare questa annotazione? Operazione irreversibile.',
