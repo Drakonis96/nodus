@@ -181,6 +181,13 @@ import {
 } from './toolkit/aiOcr';
 import type { AiOcrExportFormat, OcrOptions } from '@shared/aiOcrTypes';
 import type { ToolkitJobRequest } from '@shared/toolkitTypes';
+import type { TranslateJobRequest } from '@shared/toolkitTranslateTypes';
+import {
+  runTranslateJob,
+  suggestedTextFilename,
+  type TranslateSignal,
+} from './toolkit/translate';
+import { listTranslateHistory, removeTranslateHistory } from './toolkit/translate/history';
 import * as presenterLibrary from './toolkit/presenter/library';
 import { extractPptxNotes } from './toolkit/presenter/pptxNotes';
 import {
@@ -191,6 +198,11 @@ import {
   presenterImportFormat,
 } from './toolkit/presenter/conversion';
 import * as presenterWindows from './toolkit/presenter/windows';
+import { generateToolkitApp } from './ai/toolkitApps';
+import * as toolkitAppSession from './toolkit/apps/server';
+import { buildToolkitAppPackage, toolkitAppPackageFileName } from './toolkit/apps/export';
+import { isToolkitAppManifest } from '@shared/toolkitApps';
+import type { ToolkitAppGenerationProgress, ToolkitAppGenerationRequest, ToolkitAppJsonValue, ToolkitAppManifest } from '@shared/toolkitApps';
 import { getSystemVolume, setSystemVolume, openCastPicker } from './toolkit/presenter/systemAudio';
 import { normalizeLibrary, type PresenterLibrary } from '@shared/presenterTypes';
 import { parsePresenterNotesTxt, serializePresenterNotesTxt } from '@shared/presenterNotesTxt';
@@ -312,6 +324,16 @@ import * as themes from './db/themesRepo';
 import { aggregateGaps, aggregateGapsPage, contradictionCount, getGapDetail } from './db/gapsRepo';
 import { getSyncLog } from './db/syncRepo';
 import { fullSync, ingestZoteroItem, startRealtimeSync, stopRealtimeSync } from './sync/syncService';
+import {
+  disconnectNodusServer,
+  getNodusServerStatus,
+  pairNodusServer,
+  restartNodusServerSync,
+  setNodusServerLanguage,
+  startNodusServerSync,
+  stopNodusServerSync,
+  syncNodusServerNow,
+} from './serverSync/serverSyncService';
 import { scanQueue } from './pipeline/scanQueue';
 import { buildIdeaGraph, buildIdeaGraphOverview, buildIdeaThemeGraph, buildAuthorGraph, getContradictions, getDebates, buildReadingPath } from './graph/graphService';
 import { streamDebateAnalysis } from './ai/debate';
@@ -819,6 +841,7 @@ export function registerIpc(
     }
 
     stopRealtimeSync();
+    stopNodusServerSync();
     await stopMcpTunnel();
     await stopMcpServer();
     await stopCopilotServer();
@@ -833,6 +856,7 @@ export function registerIpc(
 
     const settings = getSettings();
     if (settings.syncMode === 'realtime') startRealtimeSync();
+    startNodusServerSync();
     if (settings.mcpEnabled) void startMcpServer().then(() => startMcpTunnelIfConfigured());
     if (settings.copilotEnabled) void startCopilotServer();
     if (settings.zoteroPluginEnabled) void startZoteroPluginServer();
@@ -861,6 +885,16 @@ export function registerIpc(
         await restartMcpServer();
         void startMcpTunnelIfConfigured();
       } else await stopMcpServer();
+    }
+    if (
+      patch.nodusServerEnabled !== undefined ||
+      patch.nodusServerAutoSync !== undefined ||
+      patch.nodusServerUrl !== undefined ||
+      patch.nodusServerSpaceId !== undefined ||
+      patch.nodusServerIncludeUserContent !== undefined ||
+      patch.nodusServerIncludePassages !== undefined
+    ) {
+      restartNodusServerSync();
     }
     if (patch.copilotEnabled !== undefined || patch.copilotPort !== undefined) {
       if (next.copilotEnabled) await restartCopilotServer();
@@ -1019,6 +1053,7 @@ export function registerIpc(
       const busy = vaultBusyMessage();
       if (busy) throw new Error(busy);
       stopRealtimeSync();
+      stopNodusServerSync();
       await stopMcpTunnel();
       await stopMcpServer();
       await stopCopilotServer();
@@ -1030,6 +1065,7 @@ export function registerIpc(
       reconcileAuthorLayerOnce();
       const settings = getSettings();
       if (settings.syncMode === 'realtime') startRealtimeSync();
+      startNodusServerSync();
       if (settings.mcpEnabled) void startMcpServer().then(() => startMcpTunnelIfConfigured());
       if (settings.copilotEnabled) void startCopilotServer();
       if (settings.zoteroPluginEnabled) void startZoteroPluginServer();
@@ -1832,6 +1868,11 @@ export function registerIpc(
   h('mcp:tunnel:connect', async (_e, input) => connectMcpTunnel(input));
   h('mcp:tunnel:disconnect', async () => disconnectMcpTunnel());
   h('mcp:tunnel:forget', async () => forgetMcpTunnel());
+  h('nodusServer:status', async () => getNodusServerStatus());
+  h('nodusServer:pair', async (_e, url: string, code: string) => pairNodusServer(url, code));
+  h('nodusServer:setLanguage', async (_e, language: AppLanguage) => setNodusServerLanguage(language));
+  h('nodusServer:syncNow', async () => syncNodusServerNow());
+  h('nodusServer:disconnect', async () => disconnectNodusServer());
   h('copilot:status', async () => getCopilotStatus());
   h('copilot:regenerateToken', async () => regenerateCopilotToken());
   h('copilot:ensureCert', async () => {
@@ -3473,6 +3514,7 @@ export function registerIpc(
   h('recovery:restore', async (_e, root: string, fileName: string, password: string, language: AppLanguage = 'es') => {
     const result = await restoreRecoverySnapshot(root, fileName, password, app.getVersion(), language);
     if (result.ok) {
+      stopNodusServerSync();
       await stopMcpTunnel();
       await stopMcpServer();
     }
@@ -3629,6 +3671,48 @@ export function registerIpc(
   });
   h('toolkit:showInFolder', async (_e, filePath: string) => {
     shell.showItemInFolder(filePath);
+  });
+
+  // ── Nodus Translate ─────────────────────────────────────────────────────────
+  const translateSignals = new Map<string, TranslateSignal>();
+  h('translate:job:run', async (e, jobId: string, request: TranslateJobRequest) => {
+    const signal: TranslateSignal = { cancelled: false };
+    translateSignals.set(jobId, signal);
+    try {
+      const result = await runTranslateJob(jobId, request, {
+        signal,
+        onProgress: (progress) => e.sender.send('translate:job:event', jobId, progress),
+      });
+      if (request.openFolderOnDone && !result.cancelled && result.outputs[0]?.outputPath) {
+        shell.showItemInFolder(result.outputs[0].outputPath);
+      }
+      return result;
+    } finally {
+      translateSignals.delete(jobId);
+    }
+  });
+  h('translate:job:cancel', async (_e, jobId: string) => {
+    const signal = translateSignals.get(jobId);
+    if (signal) signal.cancelled = true;
+  });
+  h('translate:text:save', async (e, text: string, targetLanguage: string, extension: 'txt' | 'md' | 'html' = 'txt') => {
+    const win = BrowserWindow.fromWebContents(e.sender);
+    const picked = await dialog.showSaveDialog(win ?? undefined!, {
+      title: 'Guardar traducción',
+      defaultPath: suggestedTextFilename(targetLanguage, extension),
+      filters: [{ name: extension.toUpperCase(), extensions: [extension] }],
+    });
+    if (picked.canceled || !picked.filePath) return { canceled: true };
+    fs.writeFileSync(picked.filePath, text, 'utf8');
+    return { canceled: false, path: picked.filePath };
+  });
+  h('translate:history:list', async () => listTranslateHistory());
+  h('translate:history:remove', async (_e, id: string, deleteOutput = false) => {
+    const entry = listTranslateHistory().find((candidate) => candidate.id === id);
+    if (deleteOutput && entry?.outputPath && fs.existsSync(entry.outputPath)) {
+      await shell.trashItem(entry.outputPath);
+    }
+    return removeTranslateHistory(id);
   });
 
   // ── Nodus AI OCR (OCR Workspace) ────────────────────────────────────────────
@@ -3817,6 +3901,38 @@ export function registerIpc(
     if (picked.canceled || picked.filePaths.length === 0) return null;
     return parsePresenterNotesTxt(fs.readFileSync(picked.filePaths[0], 'utf-8'));
   });
+  // Nodus Apps — sandboxed bundle generation and ephemeral LAN runtime.
+  h('toolkitApps:generate', async (e, requestId: string, request: ToolkitAppGenerationRequest) => generateToolkitApp(request, (progress: ToolkitAppGenerationProgress) => {
+    if (!e.sender.isDestroyed()) e.sender.send('toolkitApps:generate:progress', requestId, progress);
+  }));
+  h('toolkitApps:package:download', async (e, manifest: ToolkitAppManifest) => {
+    if (!isToolkitAppManifest(manifest)) throw new Error('La app no es válida y no se puede descargar.');
+    const win = BrowserWindow.fromWebContents(e.sender);
+    const picked = await dialog.showSaveDialog(win ?? undefined!, {
+      title: 'Descargar paquete de la app',
+      defaultPath: toolkitAppPackageFileName(manifest),
+      filters: [{ name: 'Paquete ZIP', extensions: ['zip'] }],
+    });
+    if (picked.canceled || !picked.filePath) return null;
+    fs.writeFileSync(picked.filePath, buildToolkitAppPackage(manifest));
+    return picked.filePath;
+  });
+  h('toolkitApps:session:start', async (e, manifest: ToolkitAppManifest) => {
+    const sender = e.sender;
+    return toolkitAppSession.startToolkitAppSession(manifest, (next) => {
+      if (!sender.isDestroyed()) sender.send('toolkitApps:session:event', { type: 'snapshot', snapshot: next });
+    });
+  });
+  h('toolkitApps:session:stop', async (e) => {
+    toolkitAppSession.stopToolkitAppSession();
+    if (!e.sender.isDestroyed()) e.sender.send('toolkitApps:session:event', { type: 'stopped' });
+  });
+  h('toolkitApps:session:info', async () => toolkitAppSession.getToolkitAppSessionInfo());
+  h('toolkitApps:session:snapshot', async () => toolkitAppSession.getToolkitAppSessionSnapshot());
+  h('toolkitApps:session:send', async (_e, channel: string, payload: ToolkitAppJsonValue) => {
+    toolkitAppSession.sendToolkitAppSessionMessage(channel, payload);
+  });
+
   // Presentation windows (audience + presenter). The control channel is fire-and-
   // forget (ipcMain.on) because navigation/zoom fire rapidly and don't need a reply.
   h('presenter:start', async (_e, pdfId: string, startSlide?: number) => {

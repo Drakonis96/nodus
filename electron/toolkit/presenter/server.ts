@@ -13,7 +13,6 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { WebSocketServer, WebSocket } from 'ws';
-import QRCode from 'qrcode';
 import type { PresenterAction, PresenterRuntimeState } from '@shared/presenterState';
 import { readLibrary } from './library';
 import { contentTypeFor, isAuthorized, makePin, safePdfPath, safeStaticPath } from './serverAuth';
@@ -84,16 +83,6 @@ function handleRequest(req: IncomingMessage, res: ServerResponse): void {
   const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
   const remote = req.socket.remoteAddress;
 
-  // The QR encodes the PIN, so serving the page itself is open; the WS handshake and
-  // the data endpoints below are what enforce the PIN.
-  if (url.pathname === '/api/qr') {
-    void QRCode.toDataURL(currentInfo()?.url ?? '', { width: 320, margin: 2 }).then(
-      (qr) => res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ qr, ...currentInfo() })),
-      () => res.writeHead(500).end('QR error'),
-    );
-    return;
-  }
-
   if (url.pathname.startsWith('/api/')) {
     if (!isAuthorized(remote, url.searchParams.get('pin'), pin)) {
       res.writeHead(403).end('Forbidden');
@@ -151,7 +140,7 @@ function currentInfo(): PresenterServerInfo | null {
   const address = server.address();
   const port = typeof address === 'object' && address ? address.port : 0;
   const ip = getLanIp();
-  return { ip, port, pin, url: `http://${ip}:${port}/presenterRemote.html?pin=${pin}` };
+  return { ip, port, pin, url: `http://${ip}:${port}/presenterRemote.html` };
 }
 
 export function startPresenterServer(d: PresenterServerDeps): Promise<PresenterServerInfo> {

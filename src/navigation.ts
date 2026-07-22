@@ -98,7 +98,7 @@ export const NAV_ITEMS: NavItem[] = [
  * never turns into a new top-level view (and never leaks into sidebarOrder, the
  * per-vault-type allow-lists or the reordering UI). The sidebar nests one button
  * per tool under the section, and 'home' is the catalogue. */
-export type ToolkitPage = 'home' | 'convert' | 'protect' | 'presenter' | 'ocr';
+export type ToolkitPage = 'home' | 'apps' | 'convert' | 'translate' | 'protect' | 'presenter' | 'ocr';
 
 export interface ToolkitToolDef {
   page: Exclude<ToolkitPage, 'home'>;
@@ -122,6 +122,15 @@ export interface ToolkitToolDef {
  * sidebar buttons render from this list, so they can never drift apart. */
 export const TOOLKIT_TOOLS: ToolkitToolDef[] = [
   {
+    page: 'apps',
+    name: 'Nodus Apps',
+    shortName: 'Apps',
+    description: 'Crea herramientas para investigar, estudiar o enseñar con IA; adáptalas hablando y compártelas por QR.',
+    icon: 'grid',
+    state: 'wip',
+    testid: 'apps',
+  },
+  {
     page: 'convert',
     name: 'Nodus Convert',
     shortName: 'Convert',
@@ -138,6 +147,15 @@ export const TOOLKIT_TOOLS: ToolkitToolDef[] = [
     icon: 'shield',
     state: 'wip',
     testid: 'protect',
+  },
+  {
+    page: 'translate',
+    name: 'Nodus Translate',
+    shortName: 'Translate',
+    description: 'Traduce texto, documentos y adjuntos de Zotero con el modelo que elijas, incluido un modo PDF facsímil.',
+    icon: 'languages',
+    state: 'wip',
+    testid: 'translate',
   },
   {
     page: 'presenter',

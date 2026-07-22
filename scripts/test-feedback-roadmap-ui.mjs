@@ -45,6 +45,7 @@ test('roadmap follows the requested sequence and is opened from the header', asy
     'Servidor',
     'Compartir vaults y trabajo colaborativo',
     'Nodus Toolkit',
+    'Nodus Translate',
     'Nodus PDF Presenter',
     'Nodus OCR Workspace',
   ];
@@ -56,11 +57,11 @@ test('roadmap follows the requested sequence and is opened from the header', asy
   }
   assert.match(roadmapSource, /title: 'Pulido y estabilidad'.+status: 'inProgress'/);
   assert.match(roadmapSource, /title: 'Vault de docencia'.+status: 'inProgress'/);
-  for (const implemented of ['Nodus Toolkit', 'Nodus PDF Presenter', 'Nodus OCR Workspace']) {
+  for (const implemented of ['Nodus Toolkit', 'Nodus Translate', 'Nodus PDF Presenter', 'Nodus OCR Workspace']) {
     assert.match(roadmapSource, new RegExp(`title: '${implemented}'.+status: 'implemented'`), `${implemented} is marked as implemented`);
   }
   assert.match(roadmapSource, /children: \[/, 'user-suggested vaults are rendered as a nested group');
-  assert.match(roadmapSource, /Nodus Toolkit, PDF Presenter y OCR Workspace figuran como implementados/, 'current Toolkit availability is documented');
+  assert.match(roadmapSource, /Nodus Toolkit, Nodus Translate, PDF Presenter y OCR Workspace figuran como implementados/, 'current Toolkit availability is documented');
   for (const description of [
     'Handy local-first tools for file conversion and document processing, built into Nodus.',
     'Present PDFs and externally authored presentations with presenter view, mobile remote control, speaker notes, and live annotation tools.',

@@ -6,10 +6,16 @@
  */
 import { PROTECT_TRANSLATIONS } from './i18n.protect';
 import { AI_OCR_TRANSLATIONS } from './i18n.aiOcr';
+import { TOOLKIT_APPS_TRANSLATIONS } from './i18n.toolkitApps';
+import { SERVER_TRANSLATIONS } from './i18n.server';
 
 export const PT_BR: Record<string, string> = {
   ...AI_OCR_TRANSLATIONS['pt-BR'],
   ...PROTECT_TRANSLATIONS['pt-BR'],
+  ...TOOLKIT_APPS_TRANSLATIONS['pt-BR'],
+  ...SERVER_TRANSLATIONS['pt-BR'],
+  'Traduce texto, documentos y adjuntos de Zotero con el modelo que elijas, incluido un modo PDF facsímil.': 'Traduza textos, documentos e anexos do Zotero com o modelo que você escolher, incluindo um modo fac-símile de PDF.',
+  'Traducir texto, documentos y adjuntos de Zotero con el modelo elegido, conservando la estructura de DOCX y EPUB y la apariencia de los PDF mediante un modo facsímil.': 'Traduzir textos, documentos e anexos do Zotero com o modelo escolhido, preservando a estrutura de DOCX e EPUB e a aparência dos PDFs por meio do modo fac-símile.',
   'Mover documento a la papelera': 'Mover documento para a lixeira',
   'Mover documentos a la papelera': 'Mover documentos para a lixeira',
   '«{name}» dejará de aparecer. Podrás recuperarlo desde la administración de datos.': '“{name}” deixará de aparecer. Você poderá recuperá-lo no gerenciamento de dados.',

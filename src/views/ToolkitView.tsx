@@ -11,6 +11,8 @@ import { ToolkitConvertView } from './ToolkitConvertView';
 import { ToolkitProtectView } from './ToolkitProtectView';
 import { ToolkitPresenterView } from './ToolkitPresenterView';
 import { ToolkitAiOcrView } from './ToolkitAiOcrView';
+import { ToolkitAppsView } from './ToolkitAppsView';
+import { ToolkitTranslateView } from './ToolkitTranslateView';
 
 interface ToolCardProps {
   testid: string;
@@ -23,7 +25,7 @@ interface ToolCardProps {
   onOpen?: () => void;
 }
 
-/** Tarjeta del hub. Las cuatro se renderizan con la MISMA estructura y altura
+/** Tarjeta del hub. Todas se renderizan con la MISMA estructura y altura
  *  (grid + h-full); el icono va en una loseta cuadrada fija para que quede
  *  perfectamente centrado, y el badge se ancla abajo con mt-auto para que el
  *  texto variable no desalinee las tarjetas entre sí. */
@@ -71,10 +73,14 @@ export function ToolkitView({
 }) {
   return (
     <div className="h-full overflow-y-auto px-6 py-6 max-md:px-4">
-      {/* Las cuatro herramientas tienen página propia; cualquier otra página
+      {/* Las herramientas tienen página propia; cualquier otra página
           cae en el catálogo en lugar de dejar el panel en blanco. */}
       {page === 'convert' ? (
         <ToolkitConvertView onBack={() => onNavigate('home')} />
+      ) : page === 'apps' ? (
+        <ToolkitAppsView onBack={() => onNavigate('home')} settings={settings} />
+      ) : page === 'translate' ? (
+        <ToolkitTranslateView onBack={() => onNavigate('home')} settings={settings} />
       ) : page === 'protect' ? (
         <ToolkitProtectView onBack={() => onNavigate('home')} />
       ) : page === 'presenter' ? (
@@ -94,7 +100,7 @@ export function ToolkitView({
               </p>
             </div>
           </header>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2 auto-rows-fr">
             {TOOLKIT_TOOLS.map((tool) => (
               <ToolCard
                 key={tool.page}

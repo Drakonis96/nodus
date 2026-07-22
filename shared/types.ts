@@ -41,6 +41,21 @@ export type {
   AiOcrExportResult,
 } from './aiOcrTypes';
 export type {
+  TranslateInputKind,
+  TranslatePdfMode,
+  TranslateOutputFormat,
+  TranslateMarkupKind,
+  TranslateZoteroSource,
+  TranslateJobRequest,
+  TranslateJobStage,
+  TranslateJobProgress,
+  TranslateOutputResult,
+  TranslateJobResult,
+  TranslateHistoryEntry,
+  TranslateSegment,
+  TranslateSegmentResult,
+} from './toolkitTranslateTypes';
+export type {
   ProtectInputExtension,
   ProtectSourceKind,
   ProtectSourceRef,
@@ -59,10 +74,36 @@ export type {
   ProtectExportFooter,
   ProtectTraceOptions,
 } from './protectTypes';
+export type {
+  ToolkitAppCategory,
+  ToolkitAppAccent,
+  ToolkitAppJsonValue,
+  ToolkitAppManifest,
+  StoredToolkitApp,
+  ToolkitAppGenerationRequest,
+  ToolkitAppGenerationProgress,
+  ToolkitAppGenerationResult,
+  ToolkitAppSessionInfo,
+  ToolkitAppParticipant,
+  ToolkitAppSessionMessage,
+  ToolkitAppSessionSnapshot,
+  ToolkitAppSessionEvent,
+} from './toolkitApps';
 
 // Type-only import (erased at compile time) — keeps the no-runtime-import rule intact.
 import type { VaultType } from './vaultTypes';
 import type { ToolkitJobRequest, ToolkitJobProgress, ToolkitJobResult } from './toolkitTypes';
+import type {
+  ToolkitAppGenerationRequest,
+  ToolkitAppGenerationProgress,
+  ToolkitAppGenerationResult,
+  ToolkitAppManifest,
+  ToolkitAppJsonValue,
+  ToolkitAppSessionEvent,
+  ToolkitAppSessionInfo,
+  ToolkitAppSessionSnapshot,
+} from './toolkitApps';
+import type { TranslateHistoryEntry, TranslateJobRequest, TranslateJobProgress, TranslateJobResult } from './toolkitTranslateTypes';
 import type { AiOcrCreateRequest, AiOcrExportFormat, AiOcrExportResult, OcrDoc, OcrDocSummary, OcrDocProgress, OcrOptions } from './aiOcrTypes';
 import type {
   Presentation,
@@ -1479,6 +1520,21 @@ export interface AppSettings {
   mcpPort: number;
   /** Bearer token for the local MCP endpoint. This is intentionally visible in Settings. */
   mcpToken: string;
+  /** Publish this vault to an independent Nodus Server. Never starts a local listener. */
+  nodusServerEnabled: boolean;
+  /** Canonical HTTPS origin of the remote Nodus Server. */
+  nodusServerUrl: string;
+  /** Remote space selected during one-time pairing. */
+  nodusServerSpaceId: string;
+  nodusServerSpaceName: string;
+  /** Language used by the paired Nodus Server web interface. English is the server default. */
+  nodusServerLanguage: AppLanguage;
+  /** Include user-authored notes, projects and study/teaching tables in the publication. */
+  nodusServerIncludeUserContent: boolean;
+  /** Include citable extracted passages. Off by default because full text may be licensed. */
+  nodusServerIncludePassages: boolean;
+  /** Low-cost periodic publication while the desktop app remains open. */
+  nodusServerAutoSync: boolean;
   /** Opt-in local HTTPS server that serves the Word writing-copilot add-in + its JSON API. */
   copilotEnabled: boolean;
   /** Localhost TCP port for the copilot HTTPS server (serves /addin and /api). */
@@ -2250,6 +2306,33 @@ export interface McpServerStatus {
   port: number | null;
   url: string | null;
   error: string | null;
+}
+
+export type NodusServerSyncPhase = 'disconnected' | 'idle' | 'checking' | 'syncing' | 'ok' | 'error';
+
+/** Runtime state of the outbound Nodus Server publisher. It never includes its device token. */
+export interface NodusServerSyncStatus {
+  configured: boolean;
+  enabled: boolean;
+  autoSync: boolean;
+  phase: NodusServerSyncPhase;
+  url: string | null;
+  spaceId: string | null;
+  spaceName: string | null;
+  language: AppLanguage;
+  lastSyncAt: string | null;
+  lastError: string | null;
+  lastBytes: number | null;
+  /** Human-readable proof that the remote publisher and localhost MCP do not share a listener. */
+  transport: 'outbound-https';
+}
+
+export interface NodusServerPairResult {
+  ok: boolean;
+  serverName: string;
+  spaceId: string;
+  spaceName: string;
+  language: AppLanguage;
 }
 
 export type McpTunnelPhase =
@@ -5489,6 +5572,11 @@ export interface NodusApi {
   connectMcpTunnel(input: McpTunnelConnectInput): Promise<McpTunnelStatus>;
   disconnectMcpTunnel(): Promise<McpTunnelStatus>;
   forgetMcpTunnel(): Promise<McpTunnelStatus>;
+  getNodusServerStatus(): Promise<NodusServerSyncStatus>;
+  pairNodusServer(url: string, code: string): Promise<NodusServerPairResult>;
+  setNodusServerLanguage(language: AppLanguage): Promise<NodusServerSyncStatus>;
+  syncNodusServerNow(): Promise<NodusServerSyncStatus>;
+  disconnectNodusServer(): Promise<NodusServerSyncStatus>;
   getCopilotStatus(): Promise<CopilotServerStatus>;
   regenerateCopilotToken(): Promise<string>;
   /** Runtime state of the opt-in local server for the Nodus-for-Zotero plugin. */
@@ -6323,6 +6411,17 @@ export interface NodusApi {
   /** Reveal a produced file in the OS file manager. */
   revealToolkitOutput(filePath: string): Promise<void>;
 
+  // Nodus Translate — AI translation of pasted text, local files and Zotero
+  // attachments. Like Convert, the renderer re-attaches to progress after navigation.
+  runTranslateJob(
+    request: TranslateJobRequest,
+    handlers: { onProgress: (progress: TranslateJobProgress) => void },
+  ): Promise<TranslateJobResult>;
+  cancelTranslateJob(jobId: string): Promise<void>;
+  saveTranslatedText(text: string, targetLanguage: string, extension?: 'txt' | 'md' | 'html'): Promise<{ canceled: boolean; path?: string }>;
+  listTranslateHistory(): Promise<TranslateHistoryEntry[]>;
+  removeTranslateHistory(id: string, deleteOutput?: boolean): Promise<TranslateHistoryEntry[]>;
+
   // Nodus AI OCR (OCR Workspace) — a persistent, per-document OCR library backed by
   // vision models. Processing runs in main and survives navigation; progress is pushed
   // on 'aiOcr:event' (docId + snapshot), subscribed via onOcrEvent.
@@ -6365,6 +6464,16 @@ export interface NodusApi {
   saveProtectArtifactToVault(artifact: ProtectArtifact): Promise<ProtectVaultCopySummary>;
   downloadProtectCopy(copyId: string): Promise<ProtectArtifactWriteResult>;
   deleteProtectCopy(copyId: string): Promise<void>;
+
+  // Nodus Apps — generated sandboxed mini-apps and ephemeral LAN sessions.
+  generateToolkitApp(request: ToolkitAppGenerationRequest, onProgress?: (progress: ToolkitAppGenerationProgress) => void): Promise<ToolkitAppGenerationResult>;
+  downloadToolkitAppPackage(manifest: ToolkitAppManifest): Promise<string | null>;
+  startToolkitAppSession(manifest: ToolkitAppManifest): Promise<ToolkitAppSessionInfo>;
+  stopToolkitAppSession(): Promise<void>;
+  getToolkitAppSessionInfo(): Promise<ToolkitAppSessionInfo | null>;
+  getToolkitAppSessionSnapshot(): Promise<ToolkitAppSessionSnapshot>;
+  sendToolkitAppSessionMessage(channel: string, payload: ToolkitAppJsonValue): Promise<void>;
+  onToolkitAppSessionEvent(cb: (event: ToolkitAppSessionEvent) => void): () => void;
 
   // PDF Presenter — global Toolkit library of imported PDFs. The library JSON is
   // read/written whole; PDF bytes stream over IPC for pdfjs (offline).

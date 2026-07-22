@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
+import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 // Single place to load the pdfjs legacy build (no DOM) and open a document.
@@ -19,8 +20,14 @@ export async function loadPdfjs(): Promise<any> {
 
 export async function openPdf(filePath: string): Promise<any> {
   const pdfjs = await loadPdfjs();
+  const requireFromHere = createRequire(__filename);
+  const pdfjsRoot = path.dirname(requireFromHere.resolve('pdfjs-dist/package.json'));
   const data = new Uint8Array(fs.readFileSync(filePath));
-  const task = pdfjs.getDocument({ data, useSystemFonts: true, isEvalSupported: false, disableFontFace: true });
+  // Supplying PDF.js' bundled standard fonts is essential for raster output.
+  // Without it, PDFs using Helvetica/Times can expose a valid text layer while
+  // rendering blank glyphs in the Node canvas used by facsimile translation.
+  const standardFontDataUrl = pathToFileURL(path.join(pdfjsRoot, 'standard_fonts') + path.sep).href;
+  const task = pdfjs.getDocument({ data, useSystemFonts: true, standardFontDataUrl, isEvalSupported: false, disableFontFace: false });
   return task.promise;
 }
 

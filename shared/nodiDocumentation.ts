@@ -28,6 +28,7 @@ export const NODUS_ROADMAP = [
   { title: 'Servidor', detail: 'Infraestructura opcional para nuevas capacidades conectadas.', status: 'planned' },
   { title: 'Compartir vaults y trabajo colaborativo', detail: 'Compartir espacios y colaborar con control sobre los datos.', status: 'planned' },
   { title: 'Nodus Toolkit', detail: 'Herramientas prácticas y local-first para convertir archivos y procesar documentos, integradas en Nodus.', status: 'implemented' },
+  { title: 'Nodus Translate', detail: 'Traducir texto, documentos y adjuntos de Zotero con el modelo elegido, conservando la estructura de DOCX y EPUB y la apariencia de los PDF mediante un modo facsímil.', status: 'implemented' },
   { title: 'Nodus PDF Presenter', detail: 'Presentar archivos PDF y presentaciones externas con vista del presentador, control remoto desde el móvil, notas del orador y herramientas de anotación en directo.', status: 'implemented' },
   { title: 'Nodus OCR Workspace', detail: 'OCR asistido por IA para PDF escaneados e imágenes, con revisión página a página, limpieza de texto, reprocesamiento e integración directa con las bóvedas de Nodus.', status: 'implemented' },
 ] satisfies readonly RoadmapItem[];
@@ -104,10 +105,13 @@ ${ROADMAP_GUIDE}
 
 ## Herramientas (Nodus Toolkit)
 - Herramientas es una sección de la barra lateral, en su propio grupo, y también tiene un icono en la cabecera. Aparece en todos los tipos de vault.
-- Su página principal es un hub 2 × 2 con cuatro tarjetas: Nodus Convert, Nodus Protect, PDF Presenter y OCR Workspace.
+- Su página principal es un hub con cinco tarjetas: Nodus Convert, Nodus Protect, Nodus Translate, PDF Presenter y OCR Workspace.
 - Nodus Convert ya funciona: convierte y procesa archivos en local, de uno en uno o en lote, en cinco categorías —Documentos (PDF, DOCX, EPUB, Markdown, HTML, texto), utilidades PDF (unir, dividir, rotar, reordenar, extraer imágenes, metadatos, imágenes→PDF), OCR ligero (imagen o PDF escaneado a texto, y PDF buscable), Imágenes (convertir formato incluido HEIC, redimensionar, comprimir) y Texto (limpiar texto pegado de PDF, mayúsculas/minúsculas, subtítulos a texto, checksums).
 - Nodus Protect ya funciona: admite PDF e imágenes del disco o de la bóveda activa, concatena documentos, permite ocultar o desenfocar datos, recortar, rotar, enderezar, convertir a escala de grises, añadir siete patrones de marca de agua y un pie legal, y exportar copias rasterizadas como PNG, ZIP o PDF.
 - Protect puede guardar una copia en disco, compartirla o incorporarla a la biblioteca «Copias protegidas» de la bóveda. También crea y verifica marcas trazables IDPS v1 compatibles con IDprotector; la marca autentica una copia, pero no la cifra y puede perderse por JPEG, capturas, reescalado o recompresión.
+- Nodus Translate ya funciona: traduce texto pegado, archivos TXT, Markdown, HTML, DOCX, EPUB y PDF, así como adjuntos importados de Zotero. Permite elegir idioma de destino, modelo, carpeta y formato de salida, además de añadir idioma de origen y glosario opcionales.
+- En DOCX y EPUB, Translate conserva directamente estilos, jerarquía, cabeceras, pies, notas, enlaces e imágenes del archivo original. En PDF ofrece un modo de lectura redistribuida y un modo facsímil rasterizado que mantiene páginas, geometría, fondos e imágenes y sustituye visiblemente el texto en su posición; puede usar visión para escaneados y texto dentro de imágenes. Si una traducción no cabe, reduce el tamaño y avisa de las páginas afectadas.
+- La traducción requiere el proveedor de IA seleccionado y puede enviarle el texto o las páginas que deban reconocerse. El archivo original nunca se modifica: el resultado se guarda como una copia nueva.
 - PDF Presenter ya se puede abrir: importa archivos PDF o presentaciones creadas en PowerPoint, LibreOffice o Keynote a una biblioteca global de Herramientas (con carpetas, búsqueda, orden y miniaturas). Las presentaciones externas se convierten localmente a PDF, tras avisar de que las animaciones y transiciones no se conservan; las notas de los PowerPoint modernos se importan automáticamente. También permite escribir notas por diapositiva, exportarlas e importarlas juntas en TXT y añadir vídeos de YouTube por diapositiva. Al presentar abre la diapositiva a pantalla completa (en la pantalla externa si hay dos) y una vista del presentador con la diapositiva actual, la siguiente, las notas, un temporizador y el reloj; incluye herramientas de anotación en directo (linterna, dibujo, puntero y lupa), pantalla en negro, y control remoto desde el móvil escaneando un código QR protegido por PIN. El único elemento que necesita conexión son los vídeos de YouTube; el resto funciona sin internet.
 - OCR Workspace ya se puede abrir y ofrece un flujo asistido por IA para importar escaneados, revisar y corregir cada página y exportar el resultado.
 - Nodus Convert es determinista y 100 % offline (no hay IA), nunca modifica el archivo original y no sube nada a ningún servicio; la única llamada de red opcional es la descarga de idiomas de OCR de Tesseract, que el usuario decide.
@@ -117,7 +121,7 @@ ${ROADMAP_GUIDE}
 ## Estado del roadmap
 - Fuentes primarias, Testimonios, Prosopografía y Worldbuilding figuran como planificados.
 - Pulido y estabilidad y el vault de Docencia figuran en desarrollo.
-- Nodus Toolkit, PDF Presenter y OCR Workspace figuran como implementados y se pueden abrir.
+- Nodus Toolkit, Nodus Translate, PDF Presenter y OCR Workspace figuran como implementados y se pueden abrir.
 - El roadmap también contempla Servidor, compartir vaults y trabajo colaborativo, y otros vaults sugeridos por usuarios.
 
 ## Protocolo para responder sobre la interfaz

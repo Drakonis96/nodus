@@ -10,6 +10,9 @@ import type {
   ToolkitJobRequest,
   ToolkitJobProgress,
   ToolkitJobResult,
+  TranslateJobRequest,
+  TranslateJobProgress,
+  TranslateJobResult,
 } from '@shared/types';
 import type { DatabaseAttachment, DatabaseRow } from '@shared/databases';
 
@@ -171,6 +174,17 @@ export type ToolkitConvertJob = BackgroundJob<ToolkitJobRequest, ToolkitJobProgr
 export function startToolkitJob(request: ToolkitJobRequest): ToolkitConvertJob {
   return startBackgroundJob(TOOLKIT_JOB_KEY, request, (currentRequest, onProgress) =>
     window.nodus.runToolkitJob(currentRequest, { onProgress }),
+  );
+}
+
+// ── Nodus Translate ──────────────────────────────────────────────────────────
+export const TRANSLATE_JOB_KEY = 'toolkit:translate';
+
+export type ToolkitTranslateJob = BackgroundJob<TranslateJobRequest, TranslateJobProgress, TranslateJobResult>;
+
+export function startTranslateJob(request: TranslateJobRequest): ToolkitTranslateJob {
+  return startBackgroundJob(TRANSLATE_JOB_KEY, request, (currentRequest, onProgress) =>
+    window.nodus.runTranslateJob(currentRequest, { onProgress }),
   );
 }
 

@@ -6,6 +6,7 @@ import type {
   McpServerStatus,
   McpTunnelStatus,
   ModelInfo,
+  NodusServerSyncStatus,
   ZoteroPluginServerStatus,
   RecoveryHealth,
   StudyDataOverview,
@@ -36,7 +37,7 @@ import { DEFAULT_EMBEDDING_MODELS, EMBEDDING_PROVIDERS } from '@shared/providers
 import { ORB_COLOR_CHOICES, orbHue } from '@shared/nodiOrb';
 import { effectiveSidebarHidden, isViewAllowedForVaultType } from '@shared/vaultTypes';
 
-type SettingsTabId = 'providers' | 'models' | 'library' | 'extraction' | 'interface' | 'integrations' | 'system' | 'data' | 'about' | 'updates';
+type SettingsTabId = 'providers' | 'models' | 'library' | 'extraction' | 'interface' | 'integrations' | 'server' | 'system' | 'data' | 'about' | 'updates';
 
 const SETTINGS_TABS: { id: SettingsTabId; label: string; icon: string; keywords: string }[] = [
   { id: 'providers', label: 'Proveedores', icon: 'key', keywords: 'api key keys claves proveedores provider providers modelos favoritos default openai anthropic deepseek gemini google openrouter xiaomi lm studio ollama vault boveda' },
@@ -45,6 +46,7 @@ const SETTINGS_TABS: { id: SettingsTabId; label: string; icon: string; keywords:
   { id: 'extraction', label: 'Texto y OCR', icon: 'search', keywords: 'pdf texto fulltext zotero ocr tesseract paginas idiomas' },
   { id: 'interface', label: 'Interfaz', icon: 'palette', keywords: 'idioma tema claro oscuro animaciones barra lateral menu navegacion accesibilidad contraste escala fuente lectura enfoque' },
   { id: 'integrations', label: 'Integraciones', icon: 'link', keywords: 'mcp servidor token puerto chatgpt openai tunnel tunel word copilot certificado addin' },
+  { id: 'server', label: 'Servidor', icon: 'globe', keywords: 'servidor docker compartir vault boveda estudiantes investigadores dominio subdominio oauth claude chatgpt reverse proxy caddy nginx publicar sincronizar' },
   { id: 'system', label: 'Tutoriales', icon: 'graduation', keywords: 'sistema ayuda tutorial' },
   { id: 'data', label: 'Backup / copia de seguridad', icon: 'download', keywords: 'datos backup exportar importar demo copia cifrada peligro reinicializar grafo borrar' },
   { id: 'about', label: 'Acerca de Nodus', icon: 'info', keywords: 'acerca proyecto codigo abierto open source gratuito privacidad privacy rgpd gdpr datos alumnado inteligencia artificial licencia terceros legal' },
@@ -54,6 +56,7 @@ const SETTINGS_TABS: { id: SettingsTabId; label: string; icon: string; keywords:
 const ABOUT_ACTION_BUTTON_CLASS = 'btn btn-ghost w-full shrink-0 justify-center border border-neutral-300 dark:border-neutral-700 sm:w-56';
 const ABOUT_CARD_CLASS = 'rounded-xl border border-neutral-200 bg-neutral-50 p-5 dark:border-neutral-800 dark:bg-neutral-900/50';
 const NODUS_REPOSITORY_URL = 'https://github.com/Drakonis96/nodus';
+const NODUS_SERVER_GUIDE_URL = `${NODUS_REPOSITORY_URL}/blob/main/server/README.md`;
 const NODUS_PRIVACY_URL = `${NODUS_REPOSITORY_URL}/blob/main/PRIVACY.md`;
 const NODUS_LICENSE_URL = `${NODUS_REPOSITORY_URL}/blob/main/LICENSE`;
 const NODUS_SECURITY_REPORT_URL = `${NODUS_REPOSITORY_URL}/security/advisories/new`;
@@ -122,6 +125,25 @@ export function Settings({
   const [autoBackupRunning, setAutoBackupRunning] = useState(false);
   const [mcpStatus, setMcpStatus] = useState<McpServerStatus>({ running: false, port: null, url: null, error: null });
   const [mcpTunnelStatus, setMcpTunnelStatus] = useState<McpTunnelStatus | null>(null);
+  const [nodusServerStatus, setNodusServerStatus] = useState<NodusServerSyncStatus>({
+    configured: false,
+    enabled: false,
+    autoSync: false,
+    phase: 'disconnected',
+    url: null,
+    spaceId: null,
+    spaceName: null,
+    language: 'en',
+    lastSyncAt: null,
+    lastError: null,
+    lastBytes: null,
+    transport: 'outbound-https',
+  });
+  const [nodusServerUrlInput, setNodusServerUrlInput] = useState(settings.nodusServerUrl);
+  const [nodusServerPairCode, setNodusServerPairCode] = useState('');
+  const [nodusServerBusy, setNodusServerBusy] = useState(false);
+  const [nodusServerMessage, setNodusServerMessage] = useState<string | null>(null);
+  const [nodusServerGuideOpen, setNodusServerGuideOpen] = useState(false);
   const [copilotStatus, setCopilotStatus] = useState<CopilotServerStatus>({ running: false, port: null, addinUrl: null, certReady: false, error: null });
   const [zoteroStatus, setZoteroStatus] = useState<ZoteroPluginServerStatus>({ running: false, port: null, url: null, error: null });
   const [zoteroInstallBusy, setZoteroInstallBusy] = useState(false);
@@ -170,6 +192,22 @@ export function Settings({
   }, [settings.mcpEnabled, settings.mcpPort, settings.mcpToken]);
 
   useEffect(() => setMcpPortInput(String(settings.mcpPort)), [settings.mcpPort]);
+
+  useEffect(() => setNodusServerUrlInput(settings.nodusServerUrl), [settings.nodusServerUrl]);
+
+  useEffect(() => {
+    let active = true;
+    const refresh = async () => {
+      const next = await window.nodus.getNodusServerStatus();
+      if (active) setNodusServerStatus(next);
+    };
+    void refresh();
+    const interval = window.setInterval(() => void refresh(), 3000);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, [settings.nodusServerEnabled, settings.nodusServerUrl, settings.nodusServerSpaceId]);
 
   useEffect(() => {
     let active = true;
@@ -308,6 +346,73 @@ export function Settings({
     setTimeout(() => setMcpCopied(null), 1500);
   };
 
+  const pairWithNodusServer = async () => {
+    setNodusServerBusy(true);
+    setNodusServerMessage(null);
+    try {
+      const result = await window.nodus.pairNodusServer(nodusServerUrlInput, nodusServerPairCode);
+      setNodusServerPairCode('');
+      await onChange();
+      const next = await window.nodus.getNodusServerStatus();
+      setNodusServerStatus(next);
+      setNodusServerMessage(next.lastError || `${t('Conectado a')} ${result.serverName} · ${result.spaceName}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setNodusServerStatus((current) => ({ ...current, phase: 'error', lastError: message }));
+      setNodusServerMessage(message);
+    } finally {
+      setNodusServerBusy(false);
+    }
+  };
+
+  const syncWithNodusServer = async () => {
+    setNodusServerBusy(true);
+    setNodusServerMessage(null);
+    try {
+      const next = await window.nodus.syncNodusServerNow();
+      setNodusServerStatus(next);
+      setNodusServerMessage(next.lastError || t('Vault publicado correctamente.'));
+    } finally {
+      setNodusServerBusy(false);
+    }
+  };
+
+  const changeNodusServerLanguage = async (language: AppSettings['nodusServerLanguage']) => {
+    setNodusServerBusy(true);
+    setNodusServerMessage(null);
+    try {
+      const next = await window.nodus.setNodusServerLanguage(language);
+      setNodusServerStatus(next);
+      await onChange();
+      setNodusServerMessage(t('Idioma del servidor actualizado.'));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setNodusServerStatus((current) => ({ ...current, phase: 'error', lastError: message }));
+      setNodusServerMessage(message);
+    } finally {
+      setNodusServerBusy(false);
+    }
+  };
+
+  const disconnectFromNodusServer = async () => {
+    const accepted = await confirm({
+      title: t('Desconectar Nodus Server'),
+      message: t('Nodus dejará de publicar este vault. La última copia seguirá en el servidor hasta que su administrador la elimine.'),
+      confirmLabel: t('Desconectar'),
+      danger: true,
+    });
+    if (!accepted) return;
+    setNodusServerBusy(true);
+    try {
+      const next = await window.nodus.disconnectNodusServer();
+      setNodusServerStatus(next);
+      setNodusServerMessage(t('Servidor desconectado.'));
+      await onChange();
+    } finally {
+      setNodusServerBusy(false);
+    }
+  };
+
   const importBackup = async () => {
     if (!importPassword.trim()) {
       flash(t('Introduce la contraseña de la copia.'));
@@ -349,6 +454,7 @@ export function Settings({
     visibleSettingsSection('interface', 'Barra lateral', 'menu lateral ordenar ocultar mostrar navegacion'),
     visibleSettingsSection('system', 'Ayuda', 'tutorial uso avanzado actualizaciones version update reiniciar'),
     visibleSettingsSection('integrations', 'Servidor MCP', 'mcp servidor puerto token cliente conexion chatgpt openai tunnel tunel'),
+    visibleSettingsSection('server', 'Nodus Server', 'docker compartir vault boveda estudiantes investigadores dominio oauth reverse proxy caddy nginx sincronizacion remota'),
     visibleSettingsSection('integrations', 'Copiloto de escritura Word', 'word copilot addin certificado token localhost'),
     visibleSettingsSection('integrations', 'Copiloto de escritura LibreOffice', 'libreoffice copilot macro python install instalacion instalando'),
     visibleSettingsSection('integrations', 'Nodus para Zotero', 'zotero plugin sidebar chat servidor puerto token pagina citas conexiones'),
@@ -1079,6 +1185,191 @@ export function Settings({
               {t('Solo escucha en este ordenador. Las herramientas de escritura están activas mientras el servidor esté encendido.')}
             </p>
           </Section>
+      )}
+
+      {visibleSettingsSection('server', 'Nodus Server', 'docker compartir vault boveda estudiantes investigadores dominio oauth reverse proxy caddy nginx sincronizacion remota') && (
+        <Section title={t('Nodus Server')}>
+          <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-300">
+            {t('Versión experimental recomendada solo para testers. Guarda copias de seguridad y reporta cualquier error desde el botón superior.')}
+          </p>
+          <button
+            className="btn btn-ghost w-full justify-center border border-indigo-300 text-indigo-700 dark:border-indigo-800 dark:text-indigo-300 sm:w-auto"
+            onClick={() => setNodusServerGuideOpen(true)}
+          >
+            <Icon name="graduation" /> {t('Guía de instalación paso a paso')}
+          </button>
+          <div
+            data-testid="nodus-server-settings-card"
+            className="rounded-xl border border-indigo-200 bg-indigo-50 p-4 dark:border-indigo-900/70 dark:bg-indigo-950/20"
+          >
+            <div className="flex items-start gap-3">
+              <span className={`mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full ${nodusServerStatus.phase === 'ok' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300' : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300'}`}>
+                <Icon name={nodusServerStatus.phase === 'ok' ? 'check' : 'globe'} />
+              </span>
+              <div>
+                <h3 className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                  {t('Vault compartido, siempre actualizado')}
+                </h3>
+                <p className="mt-1 text-xs leading-5 text-neutral-600 dark:text-neutral-400">
+                  {t('Nodus publica una copia lógica y filtrada de este vault mediante HTTPS saliente. No abre ningún puerto en tu ordenador y no comparte listener, puerto ni token con el MCP local.')}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {!nodusServerStatus.configured ? (
+            <div className="space-y-4 rounded-xl border border-neutral-200 p-4 dark:border-neutral-800">
+              <div>
+                <h3 className="text-sm font-medium">{t('Conectar este vault')}</h3>
+                <p className="mt-1 text-xs text-neutral-500">
+                  {t('Entra en la administración web del servidor, crea un espacio y genera un código de conexión de un solo uso.')}
+                </p>
+              </div>
+              <Row label={t('Dirección del servidor')}>
+                <input
+                  className="input w-full sm:w-96"
+                  type="url"
+                  value={nodusServerUrlInput}
+                  onChange={(event) => setNodusServerUrlInput(event.target.value)}
+                  placeholder="https://nodus.ejemplo.es"
+                  autoComplete="url"
+                />
+              </Row>
+              <Row label={t('Código temporal')}>
+                <input
+                  className="input w-52 font-mono uppercase tracking-wider"
+                  value={nodusServerPairCode}
+                  onChange={(event) => setNodusServerPairCode(event.target.value.toUpperCase())}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' && nodusServerUrlInput.trim() && nodusServerPairCode.trim()) void pairWithNodusServer();
+                  }}
+                  placeholder="ABCD-EFGH"
+                  autoComplete="one-time-code"
+                />
+              </Row>
+              <button
+                className="btn btn-primary"
+                disabled={nodusServerBusy || !nodusServerUrlInput.trim() || !nodusServerPairCode.trim()}
+                onClick={() => void pairWithNodusServer()}
+              >
+                <Icon name={nodusServerBusy ? 'sync' : 'link'} className={nodusServerBusy ? 'animate-spin' : ''} />
+                {nodusServerBusy ? t('Conectando…') : t('Conectar vault')}
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="rounded-xl border border-neutral-200 p-4 dark:border-neutral-800">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h3 className="text-sm font-medium">{nodusServerStatus.spaceName || t('Espacio compartido')}</h3>
+                    <p className="mt-1 break-all text-xs text-neutral-500">{nodusServerStatus.url}</p>
+                    <p className="mt-1 text-xs text-neutral-500">
+                      {nodusServerStatus.phase === 'syncing'
+                        ? t('Publicando cambios…')
+                        : nodusServerStatus.phase === 'error'
+                          ? `${t('Error')}: ${nodusServerStatus.lastError}`
+                          : nodusServerStatus.lastSyncAt
+                            ? `${t('Última publicación')}: ${new Date(nodusServerStatus.lastSyncAt).toLocaleString()}`
+                            : t('Pendiente de la primera publicación.')}
+                      {nodusServerStatus.lastBytes != null ? ` · ${Math.max(1, Math.round(nodusServerStatus.lastBytes / 1024))} KiB` : ''}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      className="btn btn-primary"
+                      disabled={nodusServerBusy || !settings.nodusServerEnabled}
+                      onClick={() => void syncWithNodusServer()}
+                    >
+                      <Icon name="sync" className={nodusServerStatus.phase === 'syncing' ? 'animate-spin' : ''} />
+                      {t('Publicar ahora')}
+                    </button>
+                    {nodusServerStatus.url && (
+                      <button className="btn btn-ghost border border-neutral-300 dark:border-neutral-700" onClick={() => void window.nodus.openExternal(nodusServerStatus.url!)}>
+                        <Icon name="external" /> {t('Administrar')}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <Row
+                label={t('Idioma de la interfaz del servidor')}
+                hint={t('Cambia la administración web y las pantallas de acceso para todos los usuarios. El idioma inicial es inglés.')}
+              >
+                <select
+                  className="input w-full sm:w-64"
+                  value={nodusServerStatus.language}
+                  disabled={nodusServerBusy}
+                  onChange={(event) => void changeNodusServerLanguage(event.target.value as AppSettings['nodusServerLanguage'])}
+                >
+                  <option value="en">English</option>
+                  <option value="es">Español</option>
+                  <option value="fr">Français</option>
+                  <option value="de">Deutsch</option>
+                  <option value="pt">Português (Portugal)</option>
+                  <option value="pt-BR">Português (Brasil)</option>
+                  <option value="it">Italiano</option>
+                </select>
+              </Row>
+
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <label className="text-sm text-neutral-700 dark:text-neutral-300">{t('Publicar este vault')}</label>
+                  <p className="mt-0.5 text-xs text-neutral-500">{t('Detiene o reanuda los envíos sin borrar la configuración.')}</p>
+                </div>
+                <input type="checkbox" checked={settings.nodusServerEnabled} onChange={(event) => void patch({ nodusServerEnabled: event.target.checked })} />
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <label className="text-sm text-neutral-700 dark:text-neutral-300">{t('Mantener actualizado en segundo plano')}</label>
+                  <p className="mt-0.5 text-xs text-neutral-500">{t('Comprueba un contador ligero cada 30 segundos y solo publica tras cambios y un minuto de reposo.')}</p>
+                </div>
+                <input type="checkbox" checked={settings.nodusServerAutoSync} onChange={(event) => void patch({ nodusServerAutoSync: event.target.checked })} />
+              </div>
+
+              <div className="border-t border-neutral-200 pt-4 dark:border-neutral-800">
+                <h3 className="text-sm font-medium">{t('Qué se publica')}</h3>
+                <p className="mt-1 text-xs text-neutral-500">
+                  {t('Siempre: referencias, autores, temas, ideas, evidencias, conexiones y preguntas. Nunca: archivos PDF, claves API, contraseñas, rutas locales, embeddings, listas de alumnos, grupos, calificaciones, resultados de evaluación ni la base SQLite original.')}
+                </p>
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <label className="text-sm text-neutral-700 dark:text-neutral-300">{t('Incluir contenido creado por mí')}</label>
+                  <p className="mt-0.5 text-xs text-neutral-500">{t('Incluye notas, proyectos, borradores y contenido de docencia o estudio.')}</p>
+                </div>
+                <input type="checkbox" checked={settings.nodusServerIncludeUserContent} onChange={(event) => void patch({ nodusServerIncludeUserContent: event.target.checked })} />
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <label className="text-sm text-neutral-700 dark:text-neutral-300">{t('Incluir pasajes extraídos')}</label>
+                  <p className="mt-0.5 text-xs text-amber-700 dark:text-amber-400">{t('Puede incluir texto protegido por derechos de autor. Actívalo solo si tienes permiso para compartirlo.')}</p>
+                </div>
+                <input type="checkbox" checked={settings.nodusServerIncludePassages} onChange={(event) => void patch({ nodusServerIncludePassages: event.target.checked })} />
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 border-t border-neutral-200 pt-4 dark:border-neutral-800">
+                <button className="btn btn-ghost border border-red-300 text-red-700 dark:border-red-900 dark:text-red-300" disabled={nodusServerBusy} onClick={() => void disconnectFromNodusServer()}>
+                  <Icon name="x" /> {t('Desconectar')}
+                </button>
+                <p className="text-xs text-neutral-500">
+                  {t('Los estudiantes e investigadores inician sesión por OAuth desde ChatGPT o Claude; solo ven los espacios que el administrador les haya asignado.')}
+                </p>
+              </div>
+            </>
+          )}
+
+          {nodusServerMessage && (
+            <p className={`text-xs ${nodusServerStatus.phase === 'error' ? 'text-red-600 dark:text-red-400' : 'text-emerald-700 dark:text-emerald-400'}`}>
+              {nodusServerMessage}
+            </p>
+          )}
+
+          <div className="rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-3 text-xs leading-5 text-neutral-600 dark:border-neutral-800 dark:bg-neutral-950/50 dark:text-neutral-400">
+            <strong className="text-neutral-800 dark:text-neutral-200">{t('Instalación del servidor')}:</strong>{' '}
+            {t('se ejecuta con Docker en otro equipo o VPS. Puede usar el Caddy incluido o tu Caddy/Nginx existente con un dominio o subdominio y HTTPS. La configuración inicial y la gestión de usuarios se hacen desde el navegador.')}
+          </div>
+        </Section>
       )}
 
       {visibleSettingsSection('integrations', 'Copiloto de escritura Word', 'word copilot addin certificado token localhost') && (
@@ -1836,6 +2127,12 @@ export function Settings({
           onClose={() => setMcpHelpOpen(false)}
         />
       )}
+      {nodusServerGuideOpen && (
+        <NodusServerGuideModal
+          onOpenGuide={() => void window.nodus.openExternal(NODUS_SERVER_GUIDE_URL)}
+          onClose={() => setNodusServerGuideOpen(false)}
+        />
+      )}
       {backupResult && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-6" onClick={() => setBackupResult(null)}>
           <div className="card w-full max-w-lg p-5" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
@@ -1952,6 +2249,61 @@ export function Settings({
           onClose={() => setOpenLegalDoc(null)}
         />
       )}
+    </div>
+  );
+}
+
+const NODUS_SERVER_GUIDE_STEPS = [
+  ['1. Prepara el equipo', 'Instala Docker Desktop en Windows o macOS, o Docker Engine en Linux. También puedes usar un VPS y administrar el Stack desde Portainer. El equipo debe permanecer encendido.'],
+  ['2. Elige una dirección', 'Crea un dominio o subdominio para Nodus. Haz que su DNS apunte a la IP pública del servidor; si la IP cambia, configura DDNS. Caddy obtiene HTTPS, pero no crea el registro DNS.'],
+  ['3. Despliega el Stack', 'En Portainer abre Stacks, crea uno nuevo, pega el Stack oficial y define NODUS_DOMAIN y un NODUS_SETUP_TOKEN aleatorio de al menos 16 caracteres. Después pulsa Deploy the stack.'],
+  ['4. Publica HTTPS de forma segura', 'Si no tienes proxy, el Stack con Caddy utiliza los puertos 80 y 443. Si ya usas Caddy o Nginx, despliega solo Nodus Server y dirige el proxy a 127.0.0.1:7443 o nodus-server:7443. Cloudflare Tunnel también puede apuntar a ese destino. Nunca expongas 7443 directamente a Internet.'],
+  ['5. Completa la configuración web', 'Abre https://tu-dominio/setup, introduce el token de instalación y crea la cuenta administradora. Después borra NODUS_SETUP_TOKEN del Stack y vuelve a desplegarlo. La contraseña se cambia desde Mi cuenta.'],
+  ['6. Crea usuarios y espacios', 'En la administración web crea un espacio, crea las cuentas lectoras y concede a cada persona únicamente los espacios que debe consultar. El administrador puede restablecer contraseñas temporales.'],
+  ['7. Conecta este vault', 'En el servidor genera un código para Nodus. Aquí, en Ajustes → Servidor, escribe la dirección HTTPS y ese código de un solo uso. Nodus enviará una copia filtrada y la mantendrá actualizada mientras la aplicación esté abierta.'],
+  ['8. Conecta ChatGPT o Claude', 'Añade https://tu-dominio/mcp como servidor MCP remoto. El cliente abrirá OAuth: cada persona inicia sesión, autoriza la lectura y solo puede consultar los espacios que tenga asignados.'],
+  ['9. Mantén el servidor', 'Actualiza periódicamente la imagen main, conserva copias del volumen nodus_data y prueba su restauración. Las contraseñas, tokens, archivos PDF, rutas locales y la base SQLite original no se publican desde el vault.'],
+] as const;
+
+function NodusServerGuideModal({ onOpenGuide, onClose }: { onOpenGuide: () => void; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-3 sm:p-6" onClick={onClose}>
+      <div
+        className="card flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="nodus-server-guide-title"
+        data-testid="nodus-server-guide-modal"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-start gap-3 border-b border-neutral-200 p-5 dark:border-neutral-800">
+          <div className="min-w-0 flex-1">
+            <h2 id="nodus-server-guide-title" className="text-lg font-semibold">{t('Cómo instalar y conectar Nodus Server')}</h2>
+            <p className="mt-1 text-sm text-neutral-500">{t('Sigue estos pasos en orden. No necesitas abrir puertos en el ordenador donde utilizas Nodus Desktop.')}</p>
+          </div>
+          <button className="btn btn-ghost shrink-0" onClick={onClose} aria-label={t('Cerrar')} title={t('Cerrar')}>
+            <Icon name="x" />
+          </button>
+        </div>
+        <div className="overflow-y-auto p-5">
+          <ol className="space-y-3">
+            {NODUS_SERVER_GUIDE_STEPS.map(([title, description]) => (
+              <li key={title} className="rounded-xl border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-800 dark:bg-neutral-950/50">
+                <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{t(title)}</h3>
+                <p className="mt-1 text-sm leading-6 text-neutral-600 dark:text-neutral-400">{t(description)}</p>
+              </li>
+            ))}
+          </ol>
+          <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm leading-6 text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-300">
+            <strong>{t('Regla de seguridad')}:</strong>{' '}
+            {t('Solo el reverse proxy o el túnel debe ser público y siempre con HTTPS. No guardes el token de instalación después del primer arranque ni compartas contraseñas por mensajes sin cifrar.')}
+          </div>
+        </div>
+        <div className="flex flex-col-reverse gap-2 border-t border-neutral-200 p-4 dark:border-neutral-800 sm:flex-row sm:justify-end">
+          <button className="btn btn-ghost" onClick={onClose}>{t('Cerrar')}</button>
+          <button className="btn btn-primary" onClick={onOpenGuide}><Icon name="external" /> {t('Abrir guía completa')}</button>
+        </div>
+      </div>
     </div>
   );
 }

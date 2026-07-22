@@ -1,9 +1,14 @@
 import { PROTECT_TRANSLATIONS } from './i18n.protect';
 import { AI_OCR_TRANSLATIONS } from './i18n.aiOcr';
+import { TOOLKIT_APPS_TRANSLATIONS } from './i18n.toolkitApps';
+import { SERVER_TRANSLATIONS } from './i18n.server';
 
 /** Complete static Italian interface table; coverage prohibits runtime fallbacks. */
 export const IT: Record<string, string> = {
   ...AI_OCR_TRANSLATIONS.it,
+  ...TOOLKIT_APPS_TRANSLATIONS.it,
+  'Traduce texto, documentos y adjuntos de Zotero con el modelo que elijas, incluido un modo PDF facsímil.': 'Traduci testo, documenti e allegati Zotero con il modello che preferisci, inclusa una modalità facsimile PDF.',
+  'Traducir texto, documentos y adjuntos de Zotero con el modelo elegido, conservando la estructura de DOCX y EPUB y la apariencia de los PDF mediante un modo facsímil.': 'Tradurre testo, documenti e allegati Zotero con il modello scelto, mantenendo la struttura di DOCX ed EPUB e l’aspetto dei PDF tramite la modalità facsimile.',
   'Mover documento a la papelera': 'Sposta il documento nel cestino',
   'Mover documentos a la papelera': 'Sposta i documenti nel cestino',
   '«{name}» dejará de aparecer. Podrás recuperarlo desde la administración de datos.': '«{name}» non sarà più visibile. Potrai recuperarlo dalla gestione dei dati.',
@@ -5880,6 +5885,7 @@ export const IT: Record<string, string> = {
   "Nodus no expone ninguna función de IA para calificar, perfilar o evaluar estudiantes. Los identificadores permiten minimizar nombres en usos locales y exportaciones.": "Nodus non espone alcuna funzione di IA per assegnare voti, profilare o valutare studenti. Gli identificatori consentono di ridurre al minimo i nomi negli usi locali e nelle esportazioni.",
   "La IA no recibe listas, notas ni respuestas del alumnado. Nodus no ofrece ninguna función de IA para calificar, perfilar o evaluar estudiantes; esas decisiones son siempre humanas y permanecen fuera del modelo.": "L’IA non riceve elenchi, voti o risposte degli studenti. Nodus non offre alcuna funzione di IA per assegnare voti, profilare o valutare studenti; queste decisioni sono sempre umane e restano fuori dal modello.",
   ...PROTECT_TRANSLATIONS.it,
+  ...SERVER_TRANSLATIONS.it,
   'Seleccionar o desplazar': 'Seleziona o scorri',
   'Editar o eliminar': 'Modifica o elimina',
   '¿Eliminar esta anotación? No se puede deshacer.': 'Eliminare questa annotazione? Operazione irreversibile.',

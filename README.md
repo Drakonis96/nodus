@@ -31,6 +31,12 @@ Download the installer for your computer and open it. There is no server to conf
 
 The [latest release page](https://github.com/Drakonis96/nodus/releases/latest) always contains the newest available installers and release notes.
 
+## Share a vault with Nodus Server
+
+Nodus Server is an optional, self-hosted companion for courses and research groups. A vault owner can explicitly publish a filtered read-only copy, give each student or researcher access to selected spaces, and connect those spaces to ChatGPT or Claude through OAuth-protected remote MCP. The desktop app sends only outbound HTTPS traffic and keeps this publisher completely separate from its localhost MCP server.
+
+The server runs with Docker on Windows, macOS or Linux and supports the bundled Caddy HTTPS proxy as well as an existing Caddy, Nginx or Traefik installation. Setup and user management happen in a web page; starting the containers is the only terminal step. See the [Nodus Server installation guide](server/README.md).
+
 ## One app, five working vaults
 
 ### Academic vault
@@ -75,7 +81,7 @@ Teaching tools cover private student rosters, gradebooks, reusable rubrics and e
 
 ## Nodus Toolkit
 
-The Toolkit provides cross-vault, local-first document utilities. **Nodus Convert** converts and processes documents, PDFs, images and text. **Nodus Protect** combines PDFs and images, permanently redacts or blurs sensitive areas, adds watermarks and a legal footer, creates fully rasterised PNG/PDF/ZIP results and can issue or verify IDPS v1 traceable copies. PDF Presenter and OCR Workspace remain marked as upcoming.
+The Toolkit provides cross-vault document utilities. **Nodus Convert** converts and processes documents, PDFs, images and text. **Nodus Protect** combines PDFs and images, permanently redacts or blurs sensitive areas, adds watermarks and a legal footer, creates fully rasterised PNG/PDF/ZIP results and can issue or verify IDPS v1 traceable copies. **Nodus Translate** translates pasted text, files and Zotero attachments with a chosen AI model; it preserves DOCX/EPUB structure and includes a rasterised PDF facsimile mode that retains page geometry, backgrounds and images while replacing visible text. PDF Presenter and OCR Workspace are also available.
 
 Protect can read files selected from disk or compatible sources in the active vault and can save each result back to disk, share it through the operating system or store it in the vault’s Protected Copies library. Its document processing is entirely local: it does not send protected documents to AI providers or any external service. This statement applies specifically to Nodus Protect; other optional Nodus features can use network providers when the user configures and invokes them.
 

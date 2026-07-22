@@ -274,6 +274,9 @@ function collectTranslatableStrings() {
   const unescape = (s) => s.replace(/\\'/g, "'").replace(/\\"/g, '"').replace(/\\`/g, '`');
 
   for (const f of walk(path.join(repoRoot, 'src'))) {
+    // Bundled mini-apps run in their own iframe and use a private seven-language
+    // copy table. scripts/test-toolkit-apps.mjs checks those tables independently.
+    if (/[/\\]toolkitApps[/\\]included(?:Roulette|TopicDistributor)\.ts$/.test(f)) continue;
     const src = fs.readFileSync(f, 'utf8');
     for (const arg of translationCallArgs(src)) {
       if (arg.length > 600) continue; // a long expression, not a literal key

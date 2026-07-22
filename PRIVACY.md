@@ -1,8 +1,8 @@
 # Política de privacidad de Nodus
 
-**Versión:** 1.1
+**Versión:** 1.2
 
-**Fecha de vigencia:** 21 de julio de 2026
+**Fecha de vigencia:** 22 de julio de 2026
 
 **Ámbito:** aplicación de escritorio Nodus 2.5 y posteriores
 
@@ -10,9 +10,9 @@
 
 Nodus es una aplicación gratuita, de código abierto y principalmente local. No
 requiere una cuenta de Nodus, no incorpora publicidad, telemetría, analítica remota
-ni un servidor propio al que se envíe el contenido de los vaults. Las bases de
-datos, archivos, grabaciones, transcripciones, notas, expedientes y resultados se
-guardan en el dispositivo del usuario.
+ni envía contenido a una nube operada por el proyecto. Las bases de datos, archivos,
+grabaciones, transcripciones, notas, expedientes y resultados se guardan en el
+dispositivo del usuario salvo que este active expresamente una función remota.
 
 Seleccionar un archivo o iniciar una grabación **no lo publica ni lo sube a Nodus**.
 Algunas funciones opcionales sí pueden contactar con servicios de terceros: por
@@ -22,6 +22,14 @@ túnel MCP seguro de OpenAI para usar Nodus desde ChatGPT. Esos servicios recibe
 los datos necesarios para la operación solicitada y aplican sus propias condiciones
 y políticas.
 
+**Nodus Server es opcional y autohospedado.** Si el usuario lo conecta en Ajustes,
+la aplicación publica por HTTPS una copia lógica y minimizada del vault en el
+servidor elegido por el usuario o su organización. Nunca sube la base SQLite, claves,
+contraseñas, rutas locales, embeddings ni archivos PDF. Los pasajes y el contenido
+creado por el usuario solo se incluyen si este activa sus opciones específicas. Las
+listas de estudiantes, grupos, calificaciones y resultados de evaluación no se
+publican mediante esta función.
+
 Nodus **no usa IA para puntuar, calificar, clasificar, perfilar ni evaluar a ningún
 estudiante**. Las notas y rúbricas las introduce o confirma una persona. Las
 preguntas de opción múltiple pueden corregirse localmente mediante una coincidencia
@@ -30,8 +38,9 @@ determinista con la respuesta marcada como correcta; no interviene ningún model
 ## 1. Quién trata los datos
 
 El proyecto Nodus, mantenido por Jorge Pérez Burgueño, publica el software pero no
-recibe ni puede acceder al contenido almacenado en una instalación normal. Nodus no
-opera una nube, cuenta o backend propio. Para incidencias de seguridad que no deban
+recibe ni puede acceder al contenido almacenado en una instalación normal o en un
+Nodus Server autohospedado por terceros. El proyecto no opera una nube, cuenta o
+backend central. Para incidencias de seguridad que no deban
 ser públicas puede utilizarse el canal privado de GitHub:
 https://github.com/Drakonis96/nodus/security/advisories/new
 
@@ -47,6 +56,11 @@ proveedor actúa como encargado o como responsable independiente, revisar sus
 condiciones, formalizar en su caso el contrato del artículo 28 RGPD y comprobar las
 garantías para transferencias internacionales. Nodus no celebra esos contratos en
 nombre del usuario.
+
+Quien instala y administra Nodus Server determina sus usuarios, permisos, dominio,
+alojamiento, copias y plazos de conservación. Esa persona u organización es
+normalmente responsable —o, según el contexto, encargado— del tratamiento efectuado
+en su servidor y debe informar a las personas con acceso.
 
 ## 2. Datos que puede almacenar la aplicación
 
@@ -84,8 +98,10 @@ base jurídica ni sustituye el consentimiento de las personas afectadas**.
 
 ## 4. Archivos y grabaciones
 
-Los archivos que el usuario incorpora se tratan localmente y no se suben a un
-servidor de Nodus. Antes de activar el micrófono se muestra un aviso previo, que el
+Los archivos que el usuario incorpora se tratan localmente y no se suben a Nodus
+Server. La publicación opcional puede incluir metadatos, contenido académico
+derivado y, solo con opciones separadas, pasajes o contenido creado por el usuario.
+Antes de activar el micrófono se muestra un aviso previo, que el
 usuario puede aceptar puntualmente o recordar para no volver a mostrarlo.
 
 Quien grabe debe:
@@ -145,6 +161,16 @@ configurada o es necesaria para la operación indicada:
   fragmentos, metadatos y contenido de la bóveda activa solicitado por el usuario o
   por el modelo. La clave de ejecución del túnel se guarda en el almacén de
   credenciales del dispositivo y no se incluye en las copias de seguridad.
+- **Nodus Server autohospedado, ChatGPT y Claude:** si el usuario empareja un vault,
+  Nodus abre una conexión HTTPS saliente al dominio configurado y publica una
+  proyección filtrada. El token de dispositivo se cifra con el almacén seguro del
+  sistema; si este no está disponible, solo se conserva en memoria hasta cerrar Nodus.
+  Permanece fuera del renderer y de los backups, y es distinto del token y
+  puerto del MCP local. Los lectores acceden al endpoint MCP remoto mediante OAuth;
+  el servidor comprueba usuario, espacio, caducidad, audiencia y permisos en cada
+  petición. El administrador del servidor y los proveedores de IA utilizados por
+  los lectores reciben los datos consultados. Los PDF, credenciales y datos de
+  calificación o alumnado no forman parte de la publicación.
 - **Enlaces externos:** PayPal, calendarios, páginas de licencias y otros enlaces solo
   se abren cuando el usuario los solicita.
 
@@ -163,14 +189,19 @@ copias adicionales; deben revisarse y borrarse conforme al plazo definido por el
 responsable. Desinstalar la aplicación no garantiza que se borren automáticamente
 las bases de datos, exports o backups del usuario.
 
-Los proveedores externos aplican sus propios plazos. El responsable debe
-configurarlos y documentarlos antes de transmitir datos personales.
+Los proveedores externos y cada Nodus Server autohospedado aplican sus propios
+plazos. Desconectar un vault detiene nuevos envíos, pero no borra automáticamente la
+última publicación del servidor; el administrador debe eliminarla conforme a su
+política. El responsable debe configurar y documentar estos plazos antes de
+transmitir datos personales.
 
 ## 8. Seguridad
 
 Nodus aplica minimización por defecto, procesamiento local, aislamiento de Electron,
 almacenamiento seguro de credenciales compatible con el sistema, avisos justo a
-tiempo y exportaciones o backups protegibles. Sin embargo, **local no significa
+tiempo y exportaciones o backups protegibles. Nodus Server exige HTTPS fuera de
+localhost, tokens de emparejamiento de un solo uso, OAuth con PKCE, sesiones con CSRF,
+control de acceso por espacio y tokens de acceso breves. Sin embargo, **local no significa
 cifrado automático de toda la base de datos**. El usuario o la organización debe
 proteger la cuenta del sistema, activar cifrado completo del disco, instalar
 actualizaciones, limitar permisos, cifrar backups y controlar el acceso físico.
