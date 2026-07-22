@@ -18,6 +18,7 @@ import { startRealtimeSync, stopRealtimeSync } from './sync/syncService';
 import { startNodusServerSync, stopNodusServerSync } from './serverSync/serverSyncService';
 import { killMcpTunnelSync, startMcpServer, startMcpTunnelIfConfigured, stopMcpServer } from './mcp';
 import { setCopilotWindowProvider, startCopilotServer, stopCopilotServer } from './copilot/server';
+import { setZoteroPluginWindowProvider, startZoteroPluginServer, stopZoteroPluginServer } from './zotero-plugin/server';
 import { applyMascotWindow, destroyMascotWindow } from './mascotWindow';
 import { seedWelcomeNotification } from './notifications';
 import { startStudyCalendarReminders, stopStudyCalendarReminders } from './studyCalendarReminders';
@@ -487,6 +488,7 @@ app.whenReady().then(() => {
   const prunedIdeas = pruneDormantIdeas();
   if (prunedIdeas > 0) console.log(`[maintenance] pruned ${prunedIdeas} long-dormant ideas`);
   setCopilotWindowProvider(() => mainWindow);
+  setZoteroPluginWindowProvider(() => mainWindow);
   registerIpc(() => mainWindow, () => checkForUpdates('manual'), installDownloadedUpdate);
   createWindow();
 
@@ -547,6 +549,7 @@ app.whenReady().then(() => {
   startNodusServerSync();
   if (settings.mcpEnabled) void startMcpServer().then(() => startMcpTunnelIfConfigured());
   if (settings.copilotEnabled) void startCopilotServer();
+  if (settings.zoteroPluginEnabled) void startZoteroPluginServer();
   // Nodi mascot: open the always-on-top desktop window when the user has opted into it.
   seedWelcomeNotification(settings.uiLanguage);
   startStudyCalendarReminders();
@@ -608,6 +611,7 @@ app.on('before-quit', () => {
   killMcpTunnelSync();
   void stopMcpServer();
   void stopCopilotServer();
+  void stopZoteroPluginServer();
   // Kill synchronously: this handler cannot await, so the graceful stops below would
   // be abandoned mid-drain and leave the vendor runtimes running as orphans.
   killChatGptSubscriptionServer();
@@ -628,6 +632,7 @@ updateAwareApp.on('before-quit-for-update', () => {
   killMcpTunnelSync();
   void stopMcpServer();
   void stopCopilotServer();
+  void stopZoteroPluginServer();
   // Kill synchronously: this handler cannot await, so the graceful stops below would
   // be abandoned mid-drain and leave the vendor runtimes running as orphans.
   killChatGptSubscriptionServer();

@@ -1541,6 +1541,12 @@ export interface AppSettings {
   copilotPort: number;
   /** Bearer token for the copilot API. Intentionally visible in Settings. */
   copilotToken: string;
+  /** Opt-in local HTTP server for the "Nodus for Zotero" plugin (chat about the open item). */
+  zoteroPluginEnabled: boolean;
+  /** Localhost TCP port for the Zotero-plugin JSON/NDJSON API. */
+  zoteroPluginPort: number;
+  /** Bearer token for the Zotero-plugin API. Intentionally visible in Settings. */
+  zoteroPluginToken: string;
   /**
    * User-defined order of the sidebar sections, as view ids. Excludes 'home'
    * (always pinned first) and 'settings' (always pinned last). Empty means the
@@ -2382,6 +2388,37 @@ export interface CopilotServerStatus {
   /** Whether a trusted localhost TLS certificate was found/loaded. */
   certReady: boolean;
   error: string | null;
+}
+
+/** Runtime state of the opt-in localhost HTTP server for the "Nodus for Zotero" plugin. */
+export interface ZoteroPluginServerStatus {
+  running: boolean;
+  port: number | null;
+  url: string | null;
+  error: string | null;
+}
+
+/** Whether Zotero + its profile are detected, and whether Zotero is running now. */
+export interface ZoteroInstallInfo {
+  profileFound: boolean;
+  running: boolean;
+  profilePath: string | null;
+}
+
+/** Result of installing/updating the Nodus-for-Zotero plugin into the Zotero profile. */
+export interface ZoteroInstallResult {
+  ok: boolean;
+  message: string;
+  running: boolean;
+  reopened: boolean;
+}
+
+/** Result of saving the packaged .xpi to disk for manual installation. */
+export interface ZoteroExportResult {
+  ok: boolean;
+  path: string | null;
+  canceled: boolean;
+  message?: string;
 }
 
 /** Result of installing/updating the local Word add-in manifest from Settings. */
@@ -5542,6 +5579,15 @@ export interface NodusApi {
   disconnectNodusServer(): Promise<NodusServerSyncStatus>;
   getCopilotStatus(): Promise<CopilotServerStatus>;
   regenerateCopilotToken(): Promise<string>;
+  /** Runtime state of the opt-in local server for the Nodus-for-Zotero plugin. */
+  getZoteroPluginStatus(): Promise<ZoteroPluginServerStatus>;
+  regenerateZoteroPluginToken(): Promise<string>;
+  /** Detect Zotero + profile, and whether Zotero is currently running. */
+  getZoteroInstallInfo(): Promise<ZoteroInstallInfo>;
+  /** Install/update the Nodus-for-Zotero plugin (closes + reopens Zotero if running). */
+  installZoteroPlugin(): Promise<ZoteroInstallResult>;
+  /** Save the packaged .xpi to a chosen location for manual installation. */
+  downloadZoteroPluginXpi(): Promise<ZoteroExportResult>;
   /** Generate + trust a localhost TLS cert for the copilot server (idempotent). */
   ensureCopilotCert(): Promise<{ ok: boolean; message: string }>;
   /** Copy a port-aware Nodus Copilot manifest into Word's local add-in catalog. */

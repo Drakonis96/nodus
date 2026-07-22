@@ -227,6 +227,14 @@ import {
 } from './mcp';
 import { getCopilotStatus, regenerateCopilotToken, restartCopilotServer, startCopilotServer, stopCopilotServer } from './copilot/server';
 import {
+  getZoteroPluginStatus,
+  regenerateZoteroPluginToken,
+  restartZoteroPluginServer,
+  startZoteroPluginServer,
+  stopZoteroPluginServer,
+} from './zotero-plugin/server';
+import { exportZoteroPluginXpi, getZoteroInstallInfo, installZoteroPlugin } from './zotero-plugin/install';
+import {
   applyMascotWindow,
   beginMascotWindowDrag,
   dragMascotWindow,
@@ -837,6 +845,7 @@ export function registerIpc(
     await stopMcpTunnel();
     await stopMcpServer();
     await stopCopilotServer();
+    await stopZoteroPluginServer();
     interruptDecorativeImageGenerations();
     protect.invalidateProtectVaultReferences();
     closeCrossVaultConnections(); // drop read-only handles to sibling vaults before switching
@@ -850,6 +859,7 @@ export function registerIpc(
     startNodusServerSync();
     if (settings.mcpEnabled) void startMcpServer().then(() => startMcpTunnelIfConfigured());
     if (settings.copilotEnabled) void startCopilotServer();
+    if (settings.zoteroPluginEnabled) void startZoteroPluginServer();
 
     const activeVault = withVaultKeyProviders(getActiveVault());
     emitVaultChanged();
@@ -889,6 +899,14 @@ export function registerIpc(
     if (patch.copilotEnabled !== undefined || patch.copilotPort !== undefined) {
       if (next.copilotEnabled) await restartCopilotServer();
       else await stopCopilotServer();
+    }
+    if (
+      patch.zoteroPluginEnabled !== undefined ||
+      patch.zoteroPluginPort !== undefined ||
+      patch.zoteroPluginToken !== undefined
+    ) {
+      if (next.zoteroPluginEnabled) await restartZoteroPluginServer();
+      else await stopZoteroPluginServer();
     }
     if (patch.mascotEnabled !== undefined || patch.mascotAlwaysOnTop !== undefined) {
       applyMascotWindow();
@@ -1039,6 +1057,7 @@ export function registerIpc(
       await stopMcpTunnel();
       await stopMcpServer();
       await stopCopilotServer();
+      await stopZoteroPluginServer();
       interruptDecorativeImageGenerations();
       closeDb();
       const reset = resetVaultDatabase(id);
@@ -1049,6 +1068,7 @@ export function registerIpc(
       startNodusServerSync();
       if (settings.mcpEnabled) void startMcpServer().then(() => startMcpTunnelIfConfigured());
       if (settings.copilotEnabled) void startCopilotServer();
+      if (settings.zoteroPluginEnabled) void startZoteroPluginServer();
       emitVaultChanged();
       return withVaultKeyProviders(reset);
     }
@@ -1862,6 +1882,11 @@ export function registerIpc(
   });
   h('copilot:installAddin', async () => installCopilotAddin(app.getAppPath(), app.getVersion()));
   h('copilot:installLibreOffice', async () => installLibreOfficeCopilot(app.getAppPath()));
+  h('zoteroPlugin:status', async () => getZoteroPluginStatus());
+  h('zoteroPlugin:regenerateToken', async () => regenerateZoteroPluginToken());
+  h('zoteroPlugin:installInfo', async () => getZoteroInstallInfo());
+  h('zoteroPlugin:install', async () => installZoteroPlugin());
+  h('zoteroPlugin:downloadXpi', async () => exportZoteroPluginXpi());
   h('app:info', async () => {
     const osName =
       process.platform === 'darwin' ? 'macOS' : process.platform === 'win32' ? 'Windows' : process.platform === 'linux' ? 'Linux' : process.platform;
