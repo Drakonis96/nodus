@@ -27,6 +27,7 @@ import type { UpdateCheckResponse, UpdateProgressEvent } from '@shared/types';
 import { killChatGptSubscriptionServer } from './ai/codexSubscription';
 import { stopGitHubCopilotSubscription } from './ai/githubCopilotSubscription';
 import { installProcessSafetyNet } from './util/processSafety';
+import { restoreAppWindows } from './windowLifecycle';
 
 // Before anything else: a stray rejection from any of the fire-and-forget
 // timers below would otherwise terminate the process under Node's default.
@@ -450,13 +451,12 @@ function setupAutoUpdates(): void {
 // A second copy of this profile tried to start. It has already quit; bring the
 // window the user was actually looking for to the front.
 app.on('second-instance', () => {
-  if (!mainWindow) {
-    createWindow();
-    return;
-  }
-  if (mainWindow.isMinimized()) mainWindow.restore();
-  if (!mainWindow.isVisible()) mainWindow.show();
-  mainWindow.focus();
+  restoreAppWindows(mainWindow, createWindow, applyMascotWindow);
+  const win = mainWindow;
+  if (!win) return;
+  if (win.isMinimized()) win.restore();
+  if (!win.isVisible()) win.show();
+  win.focus();
 });
 
 app.whenReady().then(() => {
@@ -560,7 +560,7 @@ app.whenReady().then(() => {
   }
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    restoreAppWindows(mainWindow, createWindow, applyMascotWindow);
   });
 }).catch((error) => {
   // Startup opens and migrates the database before the first window exists, so
