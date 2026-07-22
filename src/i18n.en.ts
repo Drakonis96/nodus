@@ -958,8 +958,8 @@ export const EN: Record<string, string> = {
   'Herramientas prácticas y local-first para convertir archivos y procesar documentos, integradas en Nodus.':
     'Handy local-first tools for file conversion and document processing, built into Nodus.',
   'Nodus PDF Presenter': 'Nodus PDF Presenter',
-  'Presentar archivos PDF con vista del presentador, control remoto desde el móvil, notas del orador y herramientas de anotación en directo.':
-    'Present PDFs with presenter view, mobile remote control, speaker notes, and live annotation tools.',
+  'Presentar archivos PDF y presentaciones externas con vista del presentador, control remoto desde el móvil, notas del orador y herramientas de anotación en directo.':
+    'Present PDFs and externally authored presentations with presenter view, mobile remote control, speaker notes, and live annotation tools.',
   'Nodus OCR Workspace': 'Nodus OCR Workspace',
   'OCR asistido por IA para PDF escaneados e imágenes, con revisión página a página, limpieza de texto, reprocesamiento e integración directa con las bóvedas de Nodus.':
     'AI-powered OCR for scanned PDFs and images, with page-by-page review, text cleanup, reprocessing, and direct integration with your Nodus vaults.',
@@ -6119,8 +6119,8 @@ export const EN: Record<string, string> = {
     'Local utilities for research, teaching and study: convert and process files without leaving Nodus.',
   'Convierte documentos, PDF e imágenes, con OCR ligero y utilidades de texto, de uno en uno o en lote.':
     'Convert documents, PDFs and images, with light OCR and text utilities, one at a time or in bulk.',
-  'Presenta PDFs como diapositivas, con vista del presentador, notas del orador y anotaciones en directo.':
-    'Present PDFs as slides, with a presenter view, speaker notes and live annotations.',
+  'Presenta PDF y presentaciones externas como diapositivas, con vista del presentador, notas del orador y anotaciones en directo.':
+    'Present PDFs and externally authored presentations as slides, with a presenter view, speaker notes and live annotations.',
   'OCR asistido por IA para escaneados difíciles, con revisión página a página e integración con tus bóvedas.':
     'AI-assisted OCR for difficult scans, with page-by-page review and integration with your vaults.',
   'En desarrollo': 'In development',
@@ -6653,6 +6653,18 @@ export const EN: Record<string, string> = {
   "Las secciones del grupo «Crear» —guía docente, unidades didácticas, situaciones de aprendizaje, adaptaciones— aún no existen: ábrelas para contarme qué necesitas antes de que se construyan. Puedes repetir este tutorial desde Ajustes.": "The sections in the \"Create\" group — course guide, teaching units, learning situations, adaptations — do not exist yet: open them to tell me what you need before they are built. You can replay this tutorial from Settings.",
   // PDF Presenter (Toolkit) — library
   "Importar PDF": "Import PDF",
+  "Importar PDF o presentación": "Import PDF or presentation",
+  "Importa un PDF o una presentación para empezar": "Import a PDF or presentation to get started",
+  "Elige una presentación de la lista para ver sus diapositivas, o importa un PDF o una presentación nueva.": "Pick a presentation from the list to see its slides, or import a new PDF or presentation.",
+  "Convertir presentación a PDF": "Convert presentation to PDF",
+  "Para ofrecer una presentación fluida y estable, Nodus convertirá este archivo a PDF antes de importarlo. Las animaciones, transiciones y otros elementos interactivos no se conservarán. El archivo original no se modificará. ¿Quieres continuar?": "To provide a smooth and stable presentation, Nodus will convert this file to PDF before importing it. Animations, transitions, and other interactive elements will not be preserved. The original file will not be modified. Do you want to continue?",
+  "Convertir e importar": "Convert and import",
+  "No hay una aplicación compatible": "No compatible application found",
+  "Nodus no encontró PowerPoint, Keynote ni LibreOffice en este equipo. Instala LibreOffice o exporta la presentación a PDF desde la aplicación con la que la creaste.": "Nodus could not find PowerPoint, Keynote, or LibreOffice on this computer. Install LibreOffice or export the presentation to PDF from the application you used to create it.",
+  "Formato no compatible": "Unsupported format",
+  "Selecciona un archivo PDF, PowerPoint, OpenDocument Presentation o Keynote compatible.": "Select a compatible PDF, PowerPoint, OpenDocument Presentation, or Keynote file.",
+  "No se pudo importar la presentación": "Could not import the presentation",
+  "Nodus no pudo convertir este archivo. Prueba a abrirlo en la aplicación con la que lo creaste y expórtalo a PDF.": "Nodus could not convert this file. Try opening it in the application you used to create it and export it to PDF.",
   "Buscar presentaciones…": "Search presentations…",
   "Aún no hay presentaciones": "No presentations yet",
   "Prueba con otra búsqueda": "Try another search",

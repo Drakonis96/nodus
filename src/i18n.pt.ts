@@ -955,8 +955,8 @@ export const PT: Record<string, string> = {
   'Herramientas prácticas y local-first para convertir archivos y procesar documentos, integradas en Nodus.':
     'Ferramentas práticas e local-first para converter ficheiros e processar documentos, integradas no Nodus.',
   'Nodus PDF Presenter': 'Nodus PDF Presenter',
-  'Presentar archivos PDF con vista del presentador, control remoto desde el móvil, notas del orador y herramientas de anotación en directo.':
-    'Apresentar ficheiros PDF com vista de apresentador, controlo remoto a partir do telemóvel, notas do orador e ferramentas de anotação em direto.',
+  'Presentar archivos PDF y presentaciones externas con vista del presentador, control remoto desde el móvil, notas del orador y herramientas de anotación en directo.':
+    'Apresentar ficheiros PDF e apresentações externas com vista de apresentador, controlo remoto a partir do telemóvel, notas do orador e ferramentas de anotação em direto.',
   'Nodus OCR Workspace': 'Nodus OCR Workspace',
   'OCR asistido por IA para PDF escaneados e imágenes, con revisión página a página, limpieza de texto, reprocesamiento e integración directa con las bóvedas de Nodus.':
     'OCR assistido por IA para PDF digitalizados e imagens, com revisão página a página, limpeza de texto, reprocessamento e integração direta com os espaços do Nodus.',
@@ -5834,8 +5834,8 @@ export const PT: Record<string, string> = {
     'Utilitários locais para investigação, docência e estudo: converta e processe ficheiros sem sair do Nodus.',
   'Convierte documentos, PDF e imágenes, con OCR ligero y utilidades de texto, de uno en uno o en lote.':
     'Converta documentos, PDF e imagens, com OCR ligeiro e utilitários de texto, um a um ou em lote.',
-  'Presenta PDFs como diapositivas, con vista del presentador, notas del orador y anotaciones en directo.':
-    'Apresente PDFs como diapositivos, com vista do apresentador, notas do orador e anotações em direto.',
+  'Presenta PDF y presentaciones externas como diapositivas, con vista del presentador, notas del orador y anotaciones en directo.':
+    'Apresente PDFs e apresentações externas como diapositivos, com vista do apresentador, notas do orador e anotações em direto.',
   'OCR asistido por IA para escaneados difíciles, con revisión página a página e integración con tus bóvedas.':
     'OCR assistido por IA para digitalizações difíceis, com revisão página a página e integração com os seus espaços.',
   'En desarrollo': 'Em desenvolvimento',
@@ -6368,6 +6368,18 @@ export const PT: Record<string, string> = {
   "Las secciones del grupo «Crear» —guía docente, unidades didácticas, situaciones de aprendizaje, adaptaciones— aún no existen: ábrelas para contarme qué necesitas antes de que se construyan. Puedes repetir este tutorial desde Ajustes.": "As secções do grupo «Criar» — guia docente, unidades didáticas, situações de aprendizagem, adaptações — ainda não existem: abre-as para me dizeres do que precisas antes de serem construídas. Podes repetir este tutorial nas Definições.",
   // PDF Presenter (Toolkit) — library
   "Importar PDF": "Importar PDF",
+  "Importar PDF o presentación": "Importar PDF ou apresentação",
+  "Importa un PDF o una presentación para empezar": "Importa um PDF ou uma apresentação para começar",
+  "Elige una presentación de la lista para ver sus diapositivas, o importa un PDF o una presentación nueva.": "Escolhe uma apresentação da lista para veres os diapositivos, ou importa um novo PDF ou uma nova apresentação.",
+  "Convertir presentación a PDF": "Converter a apresentação em PDF",
+  "Para ofrecer una presentación fluida y estable, Nodus convertirá este archivo a PDF antes de importarlo. Las animaciones, transiciones y otros elementos interactivos no se conservarán. El archivo original no se modificará. ¿Quieres continuar?": "Para garantir uma apresentação fluida e estável, o Nodus converterá este ficheiro em PDF antes de o importar. As animações, transições e outros elementos interativos não serão mantidos. O ficheiro original não será alterado. Queres continuar?",
+  "Convertir e importar": "Converter e importar",
+  "No hay una aplicación compatible": "Não foi encontrada uma aplicação compatível",
+  "Nodus no encontró PowerPoint, Keynote ni LibreOffice en este equipo. Instala LibreOffice o exporta la presentación a PDF desde la aplicación con la que la creaste.": "O Nodus não encontrou o PowerPoint, o Keynote nem o LibreOffice neste computador. Instala o LibreOffice ou exporta a apresentação para PDF a partir da aplicação em que a criaste.",
+  "Formato no compatible": "Formato não suportado",
+  "Selecciona un archivo PDF, PowerPoint, OpenDocument Presentation o Keynote compatible.": "Seleciona um ficheiro PDF, PowerPoint, OpenDocument Presentation ou Keynote compatível.",
+  "No se pudo importar la presentación": "Não foi possível importar a apresentação",
+  "Nodus no pudo convertir este archivo. Prueba a abrirlo en la aplicación con la que lo creaste y expórtalo a PDF.": "O Nodus não conseguiu converter este ficheiro. Tenta abri-lo na aplicação em que o criaste e exporta-o para PDF.",
   "Buscar presentaciones…": "Procurar apresentações…",
   "Aún no hay presentaciones": "Ainda não há apresentações",
   "Prueba con otra búsqueda": "Tenta outra pesquisa",

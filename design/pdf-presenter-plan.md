@@ -110,7 +110,9 @@ QR propio sin dependencia — posible pero `qrcode` es más fiable.)*
    reductor **Electron-free** (`presenterState.ts`) para poder testearlo.
 
 5. **Almacenamiento global del Toolkit.** `app.getPath('userData')/toolkit/presenter/`:
-   PDFs como `<id>.pdf` + `library.json` (`{ presentations, folders }`). Módulo
+   PDFs internos como `<id>.pdf` + `library.json` (`{ presentations, folders }`).
+   Los formatos de presentación externos se convierten localmente mediante una
+   suite instalada, tras advertir de la pérdida de animaciones. Módulo
    **Electron-free** `presenterLibrary.ts` (CRUD puro dada una ruta) + envoltura IPC.
    Nunca se toca el original: se **copia** al importar (regla de oro del Toolkit).
 
@@ -121,7 +123,7 @@ QR propio sin dependencia — posible pero `qrcode` es más fiable.)*
 
 ### 3.1 Superficie IPC nueva (`presenter:*`)
 Espejo del `preload`/`ipc` del Toolkit, p. ej.:
-`presenter:library:get|save`, `presenter:import:pdf`, `presenter:import:pptxNotes`,
+`presenter:library:get|save`, `presenter:import:pick|file`, `presenter:import:pptxNotes`,
 `presenter:pdf:getData`, `presenter:delete`, `presenter:start` /
 `presenter:startPresenterMode` / `presenter:stop`, `presenter:server:info`,
 `presenter:control` (audiencia↔presentador↔servidor), `presenter:state:update`,
@@ -163,12 +165,13 @@ Espejo del `preload`/`ipc` del Toolkit, p. ej.:
   miniaturas con badges, detalle).
 - `electron/toolkit/presenter/library.ts` (**Electron-free**: CRUD de
   `library.json`, colisión de nombres, mover a carpeta, borrado).
-- IPC `presenter:library:*`, `presenter:import:pdf`, `presenter:pdf:getData`,
+- IPC `presenter:library:*`, `presenter:import:pick|file`, `presenter:pdf:getData`,
   `presenter:delete` + preload.
 - Miniaturas: reutilizar el motor perezoso de la referencia (IntersectionObserver
   + concurrencia + liberación), portado a React con pdfjs bundleado.
 - **Tests:** `test-presenter-library.mjs` (crear/mover/borrar/colisión, backward-compat).
-- **Verificar:** importar un PDF real, verlo en la lista con miniaturas, carpetas.
+- **Verificar:** importar un PDF y un PowerPoint reales, verlos en la lista con
+  miniaturas y comprobar la conversión y las notas.
 
 ### F1 — Notas del presentador (núcleo pedido explícitamente)
 - Visor de notas a pantalla completa: canvas + textarea por diapositiva, sidebar

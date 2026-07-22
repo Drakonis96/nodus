@@ -3,8 +3,9 @@
 // (scripts/test-presenter-library.mjs); the IPC layer in electron/ipc.ts wires
 // these to `app.getPath('userData')/toolkit/presenter`.
 //
-// Golden rule of the Toolkit: the original file is never touched. Importing COPIES
-// the PDF into the library dir as `<id>.pdf`; deleting removes only the copy.
+// Golden rule of the Toolkit: the original file is never touched. Importing copies
+// a PDF (either selected directly or generated from a presentation) into the library
+// as `<id>.pdf`; deleting removes only that internal copy.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -66,24 +67,28 @@ export function pdfPath(baseDir: string, id: string): string {
 }
 
 /**
- * Copy a PDF into the library and register it. Returns the new {@link Presentation}
- * (already appended to the persisted library). `srcPath` is the user-chosen file;
- * it is only read, never moved.
+ * Copy a PDF into the library and register it. The PDF may be the user's selection
+ * or a temporary conversion; `originalFileName` preserves the external deck name.
  */
-export function importPdf(baseDir: string, srcPath: string, now = new Date()): Presentation {
+export function importPdf(
+  baseDir: string,
+  srcPath: string,
+  now = new Date(),
+  options: { originalFileName?: string; notes?: Record<string, string> } = {},
+): Presentation {
   ensureDir(baseDir);
   const id = makeId();
-  const fileName = path.basename(srcPath);
+  const fileName = options.originalFileName ? path.basename(options.originalFileName) : path.basename(srcPath);
   fs.copyFileSync(srcPath, pdfPath(baseDir, id));
 
   const presentation: Presentation = {
     id,
-    name: fileName.replace(/\.pdf$/i, ''),
+    name: fileName.replace(/\.[^.]+$/i, ''),
     fileName,
     createdAt: now.toISOString(),
     folder: '',
     totalPages: 0,
-    notes: {},
+    notes: { ...(options.notes ?? {}) },
     videos: {},
   };
 

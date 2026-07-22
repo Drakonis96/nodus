@@ -144,6 +144,23 @@ test('deletePresentation removes the entry and the copy, and is idempotent', asy
   await rm(dir, { recursive: true, force: true });
 });
 
+test('converted imports keep the original presentation name and extracted notes', async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), 'nodus-presenter-converted-'));
+  const generatedPdf = path.join(dir, 'converted.pdf');
+  fs.writeFileSync(generatedPdf, Buffer.from('%PDF-1.4 generated'));
+
+  const p = lib.importPdf(dir, generatedPdf, new Date('2026-07-22T10:00:00Z'), {
+    originalFileName: 'Seminario.PPTX',
+    notes: { '1': 'Primera nota' },
+  });
+  assert.equal(p.name, 'Seminario');
+  assert.equal(p.fileName, 'Seminario.PPTX');
+  assert.deepEqual(p.notes, { '1': 'Primera nota' });
+  assert.deepEqual(lib.readPdfBytes(dir, p.id), Buffer.from('%PDF-1.4 generated'));
+
+  await rm(dir, { recursive: true, force: true });
+});
+
 test('readLibrary recovers from a corrupt meta file instead of throwing', async () => {
   const dir = await mkdtemp(path.join(os.tmpdir(), 'nodus-presenter-corrupt-'));
   fs.mkdirSync(dir, { recursive: true });

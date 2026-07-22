@@ -143,7 +143,7 @@ export const TOOLKIT_TOOLS: ToolkitToolDef[] = [
     page: 'presenter',
     name: 'PDF Presenter',
     shortName: 'Presenter',
-    description: 'Presenta PDFs como diapositivas, con vista del presentador, notas del orador y anotaciones en directo.',
+    description: 'Presenta PDF y presentaciones externas como diapositivas, con vista del presentador, notas del orador y anotaciones en directo.',
     icon: 'presentation',
     state: 'wip',
     testid: 'presenter',
