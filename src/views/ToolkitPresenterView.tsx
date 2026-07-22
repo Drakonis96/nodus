@@ -237,6 +237,40 @@ export function ToolkitPresenterView({ onBack }: { onBack: () => void }) {
     });
   }, [selected, library, commit]);
 
+  const exportTxtNotes = useCallback(async () => {
+    if (!selected) return;
+    try {
+      await window.nodus.exportPresenterNotesTxt(selected);
+    } catch {
+      setNotice({ title: t('Error'), body: t('No se pudieron exportar las notas a TXT.') });
+    }
+  }, [selected]);
+
+  const importTxtNotes = useCallback(async () => {
+    if (!selected) return;
+    try {
+      const result = await window.nodus.importPresenterNotesTxt();
+      if (!result) return;
+      if (result.totalSlides !== selected.totalPages) {
+        setNotice({
+          title: t('El número de diapositivas no coincide'),
+          body: tx('El TXT tiene {txt} diapositivas y el PDF tiene {pdf}. Deben coincidir para importar las notas.', {
+            txt: result.totalSlides,
+            pdf: selected.totalPages,
+          }),
+        });
+        return;
+      }
+      commit(upsertPresentation(library, { ...selected, notes: result.notes }));
+      setNotice({
+        title: t('Notas importadas'),
+        body: tx('Se importaron notas para {n} diapositivas.', { n: Object.keys(result.notes).length }),
+      });
+    } catch {
+      setNotice({ title: t('Error'), body: t('El archivo TXT de notas no tiene un formato válido.') });
+    }
+  }, [selected, library, commit]);
+
   return (
     <div className="mx-auto flex h-full max-w-6xl flex-col gap-4">
       {/* Breadcrumb header — Herramientas / PDF Presenter */}
@@ -445,6 +479,26 @@ export function ToolkitPresenterView({ onBack }: { onBack: () => void }) {
                 >
                   <Icon name="upload" size={16} className="shrink-0" />
                   {t('Importar notas (.pptx)')}
+                </button>
+                <button
+                  type="button"
+                  onClick={exportTxtNotes}
+                  disabled={!selected.totalPages}
+                  data-testid="presenter-export-notes-txt"
+                  className="btn btn-ghost h-9 min-h-9 gap-1.5 px-3 text-sm disabled:opacity-50"
+                >
+                  <Icon name="download" size={16} className="shrink-0" />
+                  {t('Exportar notas')} (.txt)
+                </button>
+                <button
+                  type="button"
+                  onClick={importTxtNotes}
+                  disabled={!selected.totalPages}
+                  data-testid="presenter-import-notes-txt"
+                  className="btn btn-ghost h-9 min-h-9 gap-1.5 px-3 text-sm disabled:opacity-50"
+                >
+                  <Icon name="upload" size={16} className="shrink-0" />
+                  {t('Importar notas (.txt)')}
                 </button>
               </div>
               {/* Thumbnails grid — imperatively populated by the thumb session. */}
