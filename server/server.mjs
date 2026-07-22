@@ -5,7 +5,7 @@ import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import { gunzipSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { Store, digest, token } from './lib/store.mjs';
-import { body, cookies, escapeHtml, form, html, json, jsonBody, redirect } from './lib/http.mjs';
+import { body, contentSecurityPolicy, cookies, escapeHtml, form, html, json, jsonBody, redirect } from './lib/http.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = process.env.NODUS_DATA_DIR || path.join(ROOT, 'data');
@@ -97,6 +97,15 @@ function validRedirectUri(value) {
   } catch {
     return false;
   }
+}
+
+function oauthRedirectHeaders(redirectUri) {
+  // The consent form posts only to this server. Browsers also apply form-action
+  // to every redirect in that navigation, so the validated OAuth callback
+  // origin must be present or ChatGPT/Claude cannot receive the code. Keeping
+  // the source to the exact registered origin preserves the restrictive CSP.
+  const callbackOrigin = new URL(redirectUri).origin;
+  return { 'content-security-policy': contentSecurityPolicy(["'self'", callbackOrigin]) };
 }
 
 function membership(userId, spaceId) {
@@ -345,7 +354,7 @@ async function route(req, res) {
     const requestedInput = (url.searchParams.get('scope') || 'profile spaces.read materials.read').split(/\s+/).filter((scope) => SCOPES.has(scope));
     const requested = requestedInput.length > 0 ? requestedInput : ['materials.read'];
     const hidden = [...url.searchParams].map(([key, value]) => `<input type="hidden" name="${escapeHtml(key)}" value="${escapeHtml(value)}">`).join('');
-    return html(res, 200, page('Autorizar', `<h1>Conectar ${escapeHtml(client.client_name)}</h1><div class="card"><p>La aplicación podrá:</p><ul>${requested.map((scope) => `<li>${escapeHtml(scope)}</li>`).join('')}</ul><p class="muted">Solo tendrá acceso a los espacios asignados a ${escapeHtml(current.user.email)}.</p><form method="post" action="/oauth/authorize">${hidden}<input type="hidden" name="csrf" value="${current.session.csrf}"><button>Autorizar</button></form></div>`));
+    return html(res, 200, page('Autorizar', `<h1>Conectar ${escapeHtml(client.client_name)}</h1><div class="card"><p>La aplicación podrá:</p><ul>${requested.map((scope) => `<li>${escapeHtml(scope)}</li>`).join('')}</ul><p class="muted">Solo tendrá acceso a los espacios asignados a ${escapeHtml(current.user.email)}.</p><form method="post" action="/oauth/authorize">${hidden}<input type="hidden" name="csrf" value="${current.session.csrf}"><button>Autorizar</button></form></div>`), oauthRedirectHeaders(redirectUri));
   }
 
   if (url.pathname === '/oauth/authorize' && req.method === 'POST') {
@@ -360,7 +369,7 @@ async function route(req, res) {
     store.state.oauthCodes.push({ hash: digest(raw), userId: current.user.id, clientId: client.client_id, redirectUri: values.redirect_uri, codeChallenge: values.code_challenge, scopes, resource: mcpResource(), expiresAt: new Date(Date.now() + 5 * 60_000).toISOString() });
     store.save();
     const target = new URL(values.redirect_uri); target.searchParams.set('code', raw); if (values.state) target.searchParams.set('state', values.state);
-    return redirect(res, target.toString());
+    return redirect(res, target.toString(), oauthRedirectHeaders(values.redirect_uri));
   }
 
   if (url.pathname === '/oauth/token' && req.method === 'POST') {

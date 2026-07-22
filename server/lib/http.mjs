@@ -44,8 +44,12 @@ export async function jsonBody(req, limit) {
   }
 }
 
+export function contentSecurityPolicy(formActionSources = ["'self'"]) {
+  return `default-src 'none'; style-src 'unsafe-inline'; form-action ${formActionSources.join(' ')}; frame-ancestors 'none'; base-uri 'none'`;
+}
+
 const SECURITY_HEADERS = {
-  'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
+  'content-security-policy': contentSecurityPolicy(),
   'permissions-policy': 'camera=(), microphone=(), geolocation=(), payment=()',
   'referrer-policy': 'no-referrer',
   'strict-transport-security': 'max-age=31536000; includeSubDomains',
