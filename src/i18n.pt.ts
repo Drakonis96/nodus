@@ -6,10 +6,12 @@
  */
 import { PROTECT_TRANSLATIONS } from './i18n.protect';
 import { AI_OCR_TRANSLATIONS } from './i18n.aiOcr';
+import { TOOLKIT_APPS_TRANSLATIONS } from './i18n.toolkitApps';
 
 export const PT: Record<string, string> = {
   ...AI_OCR_TRANSLATIONS.pt,
   ...PROTECT_TRANSLATIONS.pt,
+  ...TOOLKIT_APPS_TRANSLATIONS.pt,
   'Mover documento a la papelera': 'Mover documento para o lixo',
   'Mover documentos a la papelera': 'Mover documentos para o lixo',
   '«{name}» dejará de aparecer. Podrás recuperarlo desde la administración de datos.': '«{name}» deixará de aparecer. Poderá recuperá-lo na gestão de dados.',

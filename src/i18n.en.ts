@@ -1,5 +1,6 @@
 import { PROTECT_TRANSLATIONS } from './i18n.protect';
 import { AI_OCR_TRANSLATIONS } from './i18n.aiOcr';
+import { TOOLKIT_APPS_TRANSLATIONS } from './i18n.toolkitApps';
 
 /**
  * English translations keyed by the Spanish source string (see {@link ../i18n}).
@@ -9,6 +10,7 @@ import { AI_OCR_TRANSLATIONS } from './i18n.aiOcr';
 export const EN: Record<string, string> = {
   ...AI_OCR_TRANSLATIONS.en,
   ...PROTECT_TRANSLATIONS.en,
+  ...TOOLKIT_APPS_TRANSLATIONS.en,
   'Mover documento a la papelera': 'Move document to trash',
   'Mover documentos a la papelera': 'Move documents to trash',
   '«{name}» dejará de aparecer. Podrás recuperarlo desde la administración de datos.': '“{name}” will no longer appear. You can recover it from data management.',

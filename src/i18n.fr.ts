@@ -6,10 +6,12 @@
  */
 import { PROTECT_TRANSLATIONS } from './i18n.protect';
 import { AI_OCR_TRANSLATIONS } from './i18n.aiOcr';
+import { TOOLKIT_APPS_TRANSLATIONS } from './i18n.toolkitApps';
 
 export const FR: Record<string, string> = {
   ...AI_OCR_TRANSLATIONS.fr,
   ...PROTECT_TRANSLATIONS.fr,
+  ...TOOLKIT_APPS_TRANSLATIONS.fr,
   'Mover documento a la papelera': 'Mettre le document à la corbeille',
   'Mover documentos a la papelera': 'Mettre les documents à la corbeille',
   '«{name}» dejará de aparecer. Podrás recuperarlo desde la administración de datos.': '« {name} » ne sera plus affiché. Vous pourrez le récupérer depuis la gestion des données.',

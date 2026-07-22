@@ -14,6 +14,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { _electron as electron } from 'playwright-core';
+import { WebSocket } from 'ws';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
@@ -769,11 +770,11 @@ try {
   // checks and are never forced through an overlay.
   await page.evaluate(() => window.nodus.updateSettings({ mascotEnabled: false }));
   await nodiFigure.waitFor({ state: 'detached', timeout: 5_000 });
-  // The hub's promise is four cards that read as one set, so the sizes are
+  // The hub's promise is a single catalogue whose cards read as one set, so the sizes are
   // measured on the real rendered shell rather than trusted from the classes.
   await page.locator('[data-tour="toolkit"]').click();
   await page.getByTestId('toolkit-home').waitFor({ timeout: 30_000 });
-  const toolCards = ['toolkit-card-convert', 'toolkit-card-protect', 'toolkit-card-presenter', 'toolkit-card-aiocr'];
+  const toolCards = ['toolkit-card-apps', 'toolkit-card-convert', 'toolkit-card-protect', 'toolkit-card-presenter', 'toolkit-card-aiocr'];
   const cardBoxes = [];
   for (const testId of toolCards) {
     const box = await page.getByTestId(testId).boundingBox();
@@ -785,7 +786,7 @@ try {
     1,
     `every toolkit card has the same dimensions: ${cardBoxes.map((b) => `${b.testId} ${Math.round(b.width)}x${Math.round(b.height)}`).join(', ')}`
   );
-  assert.equal(new Set(cardBoxes.map((b) => Math.round(b.y))).size, 2, 'the cards form two aligned rows');
+  assert.equal(new Set(cardBoxes.map((b) => Math.round(b.y))).size, 3, 'the cards form three aligned rows');
   // Each card's icon tile is square and its glyph sits dead centre in it.
   for (const testId of toolCards) {
     const centring = await page.getByTestId(testId).evaluate((card) => {
@@ -804,6 +805,202 @@ try {
     assert.equal(centring.square, true, `${testId} icon tile is square`);
     assert.ok(centring.dx <= 0.5 && centring.dy <= 0.5, `${testId} icon is centred (dx ${centring.dx}, dy ${centring.dy})`);
   }
+  // Nodus Apps opens its beginner-facing catalogue and executes both curated
+  // multilingual apps in the real sandbox before exercising app management.
+  assert.equal(await page.getByTestId('toolkit-card-apps').isDisabled(), false, 'Nodus Apps opens');
+  await page.getByTestId('toolkit-card-apps').click();
+  await page.getByTestId('toolkit-apps-catalog').waitFor({ timeout: 10_000 });
+  assert.equal(await page.locator('[data-testid^="toolkit-app-card-"]').count(), 3, 'the three curated bundled apps are included');
+  const appsSearch = page.getByTestId('toolkit-app-search');
+  await appsSearch.fill('ruleta');
+  assert.equal(await page.locator('[data-testid^="toolkit-app-card-"]').count(), 1, 'catalogue search covers the roulette title and tags');
+  await appsSearch.fill('evidencias');
+  assert.equal(await page.locator('[data-testid^="toolkit-app-card-"]').count(), 0, 'discarded example apps are no longer included');
+  await appsSearch.fill('');
+
+  await page.getByTestId('toolkit-app-card-included-miniapp-topic-distributor').click();
+  await page.getByTestId('toolkit-app-runtime').waitFor();
+  const distributorFrame = page.frameLocator('[data-testid="toolkit-app-iframe"]');
+  await distributorFrame.getByRole('heading', { name: 'Repartidor de temas' }).waitFor();
+  await page.getByTestId('toolkit-app-fullscreen-open').click();
+  await page.getByTestId('toolkit-app-fullscreen').waitFor();
+  await page.getByTestId('toolkit-app-fullscreen').locator('[data-testid="toolkit-app-iframe"]').waitFor();
+  await page.getByTestId('toolkit-app-fullscreen-close').click();
+  assert.equal(await page.getByTestId('toolkit-app-fullscreen').count(), 0, 'bundled apps can enter and leave the full-screen view');
+  assert.equal(await distributorFrame.getByRole('button', { name: 'Generar asignaciones' }).isDisabled(), true, 'assignments require enough active topics');
+  await distributorFrame.locator('#group-count').fill('4');
+  await distributorFrame.locator('#group-count').press('Tab');
+  for (const topic of ['Tema uno', 'Tema dos', 'Tema tres']) {
+    await distributorFrame.getByPlaceholder('Ej. Energías renovables').fill(topic);
+    await distributorFrame.getByRole('button', { name: 'Añadir', exact: true }).click();
+  }
+  await distributorFrame.getByPlaceholder('Ej. Tema de recuperación').fill('Tema excepcional');
+  await distributorFrame.getByRole('button', { name: 'Añadir excepcional', exact: true }).click();
+  await distributorFrame.getByText('Hay 3 temas activos para 4 grupos. Añade o activa 1 más.', { exact: true }).waitFor();
+  await distributorFrame.getByRole('checkbox', { name: 'Activar Tema excepcional' }).check();
+  await distributorFrame.getByText('Se repartirán 4 temas únicos entre 4 grupos.', { exact: true }).waitFor();
+  await distributorFrame.getByRole('button', { name: 'Generar asignaciones' }).click();
+  assert.equal(await distributorFrame.locator('.assignment').count(), 4, 'one assignment is generated for every group');
+  assert.equal(new Set(await distributorFrame.locator('.assignment strong').allTextContents()).size, 4, 'all assigned topics are unique');
+
+  await page.getByRole('button', { name: 'Todas las apps', exact: true }).click();
+  await page.getByTestId('toolkit-app-card-included-miniapp-topic-distributor').click();
+  await distributorFrame.getByRole('heading', { name: 'Asignaciones' }).waitFor();
+  assert.equal(await distributorFrame.locator('.assignment').count(), 4, 'the topic setup and assignments persist after reopening');
+  await distributorFrame.getByRole('button', { name: 'Rebarajar' }).click();
+  assert.equal(new Set(await distributorFrame.locator('.assignment strong').allTextContents()).size, 4, 'reshuffling keeps assignments unique');
+  await distributorFrame.getByRole('button', { name: 'Nueva configuración' }).click();
+  const resetDialog = distributorFrame.getByRole('dialog', { name: '¿Empezar una configuración nueva?' });
+  await resetDialog.waitFor();
+  await resetDialog.getByRole('button', { name: 'Empezar de nuevo' }).click();
+  await distributorFrame.getByText('Hay 0 temas activos para 4 grupos. Añade o activa 4 más.', { exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Todas las apps', exact: true }).click();
+
+  await page.getByTestId('toolkit-app-card-included-miniapp-brainstorm').click();
+  await page.getByTestId('toolkit-app-runtime').waitFor();
+  const brainstormFrame = page.frameLocator('[data-testid="toolkit-app-iframe"]');
+  await brainstormFrame.getByRole('heading', { name: 'Lluvia de ideas' }).waitFor();
+  await brainstormFrame.getByRole('button', { name: 'Crear la primera sesión' }).first().click();
+  await brainstormFrame.getByLabel('Título de la sesión').fill('Ideas para el campus');
+  await brainstormFrame.getByLabel('Pregunta para el grupo').fill('¿Qué cambio haría el campus más sostenible?');
+  await brainstormFrame.getByRole('button', { name: 'Crear sesión', exact: true }).click();
+  await brainstormFrame.getByRole('heading', { name: 'Ideas para el campus' }).waitFor();
+  await brainstormFrame.getByRole('button', { name: 'Editar sesión' }).click();
+  await brainstormFrame.getByLabel('Título de la sesión').fill('Campus sostenible');
+  await brainstormFrame.getByRole('button', { name: 'Guardar cambios' }).click();
+  await brainstormFrame.getByRole('heading', { name: 'Campus sostenible' }).waitFor();
+  await brainstormFrame.getByRole('button', { name: 'Eliminar sesión' }).click();
+  const brainstormDelete = brainstormFrame.getByRole('dialog', { name: '¿Eliminar esta sesión?' });
+  await brainstormDelete.waitFor();
+  await brainstormDelete.getByRole('button', { name: 'Cancelar' }).click();
+  assert.equal(await brainstormDelete.count(), 0, 'brainstorm session deletion always requires a confirmation modal');
+
+  await page.getByRole('button', { name: 'Compartir por QR', exact: true }).click();
+  await page.getByTestId('toolkit-app-session-start').click();
+  await page.getByTestId('toolkit-app-session-live').waitFor({ timeout: 10_000 });
+  await brainstormFrame.getByText('La sesión está conectada. Las nuevas ideas aparecerán sin recargar.', { exact: true }).waitFor();
+  const brainstormSessionInfo = await page.evaluate(() => window.nodus.getToolkitAppSessionInfo());
+  assert.ok(brainstormSessionInfo?.url, 'the brainstorm exposes a real participant link and QR session');
+  assert.equal(new URL(brainstormSessionInfo.url).search, '', 'the participant link never embeds the access code');
+  const brainstormJoinHtml = await fetch(brainstormSessionInfo.url).then((response) => response.text());
+  assert.match(brainstormJoinHtml, /Introduce el código/, 'opening the link requires the visible six-digit access code');
+  const invalidBrainstormPin = brainstormSessionInfo.pin === '000000' ? '999999' : '000000';
+  const brainstormMetaUrl = new URL('/api/meta', brainstormSessionInfo.url);
+  brainstormMetaUrl.searchParams.set('pin', invalidBrainstormPin);
+  assert.equal((await fetch(brainstormMetaUrl)).status, 403, 'a participant cannot bypass the access code gate');
+  brainstormMetaUrl.searchParams.set('pin', brainstormSessionInfo.pin);
+  assert.equal((await fetch(brainstormMetaUrl)).status, 200, 'the displayed access code unlocks the participant experience');
+  const participantSocket = await new Promise((resolve, reject) => {
+    const shareUrl = new URL(brainstormSessionInfo.url);
+    const socket = new WebSocket(`ws://${shareUrl.host}/socket?pin=${encodeURIComponent(brainstormSessionInfo.pin)}`);
+    const timeout = setTimeout(() => { socket.close(); reject(new Error('brainstorm participant did not receive the live question')); }, 10_000);
+    const finish = (messages) => {
+      const config = messages.find((message) => message?.channel === 'brainstorm:config' && message.payload?.accepting);
+      if (!config) return false;
+      clearTimeout(timeout);
+      resolve({ socket, sessionId: config.payload.sessionId });
+      return true;
+    };
+    socket.on('open', () => socket.send(JSON.stringify({ type: 'join', name: '' })));
+    socket.on('message', (raw) => {
+      const message = JSON.parse(raw.toString());
+      if (message.kind === 'ready' && finish(message.history ?? [])) return;
+      if (message.kind === 'app-message') finish([message.message]);
+    });
+    socket.on('error', reject);
+  });
+  await page.getByRole('button', { name: 'Usar app', exact: true }).click();
+  await brainstormFrame.getByRole('heading', { name: 'Campus sostenible' }).waitFor();
+  participantSocket.socket.send(JSON.stringify({
+    type: 'app-message',
+    channel: 'brainstorm:idea',
+    payload: { sessionId: participantSocket.sessionId, text: 'Instalar fuentes de agua y más aparcabicis', clientId: 'e2e-student-idea' },
+  }));
+  await brainstormFrame.getByText('Instalar fuentes de agua y más aparcabicis', { exact: true }).waitFor({ timeout: 10_000 });
+  assert.equal(await brainstormFrame.locator('.idea-card').count(), 1, 'student ideas appear automatically while the host keeps the main app tab visible');
+  participantSocket.socket.close();
+  await page.getByRole('button', { name: 'Compartir por QR', exact: true }).click();
+  await page.getByRole('button', { name: 'Cerrar sesión', exact: true }).click();
+  await page.getByRole('button', { name: 'Usar app', exact: true }).click();
+  await brainstormFrame.getByRole('heading', { name: 'Campus sostenible' }).waitFor();
+  await brainstormFrame.getByText('Instalar fuentes de agua y más aparcabicis', { exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Todas las apps', exact: true }).click();
+
+  await page.evaluate(() => window.nodus.updateSettings({ uiLanguage: 'en' }));
+  await page.getByText('Topic distributor', { exact: true }).waitFor();
+  await page.getByTestId('toolkit-app-card-included-miniapp-topic-distributor').click();
+  await distributorFrame.getByRole('heading', { name: 'Topic distributor' }).waitFor();
+  await distributorFrame.getByText('There are 0 active topics for 4 groups. Add or enable 4 more.', { exact: true }).waitFor();
+  await page.evaluate(() => window.nodus.updateSettings({ uiLanguage: 'es' }));
+  await distributorFrame.getByRole('heading', { name: 'Repartidor de temas' }).waitFor();
+  await page.getByRole('button', { name: 'Todas las apps', exact: true }).click();
+
+  await page.getByTestId('toolkit-app-card-included-miniapp-wheel').click();
+  await page.getByTestId('toolkit-app-runtime').waitFor();
+  const wheelFrame = page.frameLocator('[data-testid="toolkit-app-iframe"]');
+  assert.equal(await wheelFrame.getByRole('button', { name: 'Girar la ruleta' }).isDisabled(), true, 'the wheel requires at least two options');
+  await wheelFrame.getByLabel('Nueva opción').fill('Opción alfa');
+  await wheelFrame.getByRole('button', { name: 'Añadir', exact: true }).click();
+  await wheelFrame.getByLabel('Nueva opción').fill('Opción beta');
+  await wheelFrame.getByRole('button', { name: 'Añadir', exact: true }).click();
+  await wheelFrame.locator('#options-list').getByText('Opción alfa', { exact: true }).waitFor();
+  await wheelFrame.locator('#options-list').getByText('Opción beta', { exact: true }).waitFor();
+  assert.equal(await wheelFrame.getByRole('button', { name: 'Girar la ruleta' }).isDisabled(), false, 'two custom options activate the wheel');
+  await wheelFrame.getByRole('button', { name: 'Girar la ruleta' }).click();
+  await page.waitForTimeout(4_000);
+  const wheelResult = await wheelFrame.locator('#result').textContent();
+  assert.ok(wheelResult === 'Opción alfa' || wheelResult === 'Opción beta', `the wheel chooses one real option, got ${wheelResult}`);
+  assert.equal(await wheelFrame.locator('.history-item').count(), 1, 'the completed spin is recorded in history');
+
+  await page.getByRole('button', { name: 'Todas las apps', exact: true }).click();
+  await page.getByTestId('toolkit-apps-catalog').waitFor();
+  await page.getByTestId('toolkit-app-card-included-miniapp-wheel').click();
+  await page.getByTestId('toolkit-app-runtime').waitFor();
+  await wheelFrame.locator('#options-list').getByText('Opción alfa', { exact: true }).waitFor();
+  await wheelFrame.locator('#options-list').getByText('Opción beta', { exact: true }).waitFor();
+  assert.equal(await wheelFrame.locator('.history-item').count(), 1, 'options and history persist after reopening the roulette');
+
+  await page.getByRole('button', { name: 'Crear una copia', exact: true }).click();
+  await page.getByTestId('toolkit-app-fullscreen-open').click();
+  await page.getByTestId('toolkit-app-fullscreen').waitFor();
+  assert.equal(await page.getByTestId('toolkit-app-fullscreen').getAttribute('role'), 'dialog', 'personal apps open in an accessible full-window view');
+  await page.getByTestId('toolkit-app-fullscreen').locator('[data-testid="toolkit-app-iframe"]').waitFor();
+  await page.getByTestId('toolkit-app-fullscreen-close').click();
+  assert.equal(await page.getByTestId('toolkit-app-fullscreen').count(), 0, 'full-screen view closes without leaving the app');
+  assert.equal(await page.getByTestId('toolkit-app-download').isVisible(), true, 'the complete app package can be downloaded');
+  await page.getByTestId('toolkit-app-delete').click();
+  const deleteAppDialog = page.getByRole('dialog', { name: 'Eliminar app' });
+  await deleteAppDialog.waitFor();
+  await deleteAppDialog.getByRole('button', { name: 'Eliminar app', exact: true }).click();
+  await page.getByTestId('toolkit-apps-catalog').waitFor();
+  assert.equal(await page.locator('[data-testid^="toolkit-app-card-"]').count(), 3, 'deleting a personal copy restores the three curated apps');
+
+  await page.getByTestId('toolkit-app-card-included-miniapp-wheel').click();
+  await page.getByTestId('toolkit-app-improve').click();
+  await page.getByTestId('toolkit-app-studio').waitFor();
+  await page.getByTestId('toolkit-app-instruction').fill('Añade pesos opcionales manteniendo la ruleta fácil de entender.');
+  assert.equal(await page.getByTestId('toolkit-app-generate').isDisabled(), false, 'the included roulette can be revised with the configured AI model');
+  await page.getByRole('button', { name: 'Volver', exact: true }).click();
+  await page.getByRole('button', { name: 'Todas las apps', exact: true }).click();
+  await page.getByTestId('toolkit-apps-catalog').waitFor();
+  await page.getByTestId('toolkit-app-create').click();
+  await page.getByTestId('toolkit-app-studio').waitFor();
+  await page.getByText('La app se ejecuta aislada', { exact: false }).waitFor();
+  await page.getByTestId('toolkit-app-instruction').fill('Una herramienta para comparar dos argumentos académicos, sus evidencias y sus supuestos.');
+  assert.equal(await page.getByTestId('toolkit-app-generate').isDisabled(), false, 'generation is ready when the profile has a configured model');
+  assert.match(await page.getByTestId('toolkit-app-studio').textContent(), /No necesitas saber programar/, 'the studio keeps the creation flow beginner-facing');
+  console.log('[e2e] Nodus Apps: multilingual bundled tools, live brainstorm, staged AI flow, package download, fullscreen and delete modals');
+  if (process.env.NODUS_E2E_APPS_ONLY === '1') {
+    assert.deepEqual(pageErrors, [], `renderer errors: ${pageErrors.map((error) => error.message).join(' | ')}`);
+    await closeElectronApp(app); app = null;
+    await rm(userData, { recursive: true, force: true });
+    console.log('[e2e] focused Nodus Apps smoke passed');
+    process.exit(0);
+  }
+  await page.getByRole('button', { name: 'Volver', exact: true }).click();
+  await page.getByTestId('toolkit-apps-catalog').waitFor();
+  await page.getByRole('button', { name: 'Nodus Toolkit', exact: true }).click();
+  await page.getByTestId('toolkit-home').waitFor();
   // AI OCR is a working tool: it opens on its (empty) library and returns.
   assert.equal(await page.getByTestId('toolkit-card-aiocr').isDisabled(), false, 'OCR Workspace opens');
   await page.getByTestId('toolkit-card-aiocr').click();

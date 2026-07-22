@@ -11,6 +11,7 @@ import { ToolkitConvertView } from './ToolkitConvertView';
 import { ToolkitProtectView } from './ToolkitProtectView';
 import { ToolkitPresenterView } from './ToolkitPresenterView';
 import { ToolkitAiOcrView } from './ToolkitAiOcrView';
+import { ToolkitAppsView } from './ToolkitAppsView';
 
 interface ToolCardProps {
   testid: string;
@@ -71,10 +72,12 @@ export function ToolkitView({
 }) {
   return (
     <div className="h-full overflow-y-auto px-6 py-6 max-md:px-4">
-      {/* Las cuatro herramientas tienen página propia; cualquier otra página
+      {/* Las herramientas tienen página propia; cualquier otra página
           cae en el catálogo en lugar de dejar el panel en blanco. */}
       {page === 'convert' ? (
         <ToolkitConvertView onBack={() => onNavigate('home')} />
+      ) : page === 'apps' ? (
+        <ToolkitAppsView onBack={() => onNavigate('home')} settings={settings} />
       ) : page === 'protect' ? (
         <ToolkitProtectView onBack={() => onNavigate('home')} />
       ) : page === 'presenter' ? (

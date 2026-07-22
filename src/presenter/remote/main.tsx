@@ -25,13 +25,11 @@ import { noteParagraphs } from '../deck';
 import { loadMobilePdf } from './mobilePdf';
 import '../../index.css';
 
-const PIN = new URLSearchParams(location.search).get('pin') ?? '';
-
-function apiUrl(p: string): string {
-  return `${p}${p.includes('?') ? '&' : '?'}pin=${encodeURIComponent(PIN)}`;
+function apiUrl(p: string, pin: string): string {
+  return `${p}${p.includes('?') ? '&' : '?'}pin=${encodeURIComponent(pin)}`;
 }
 
-function RemoteApp() {
+function RemoteApp({ pin, onInvalidPin }: { pin: string; onInvalidPin: () => void }) {
   const [ui, setUi] = useState<PresenterRuntimeState>(() => initialPresenterState());
   const [connected, setConnected] = useState(false);
   const [everConnected, setEverConnected] = useState(false);
@@ -85,8 +83,8 @@ function RemoteApp() {
     loadedPdfId.current = pdfId;
     try {
       const [doc, pres] = await Promise.all([
-        loadMobilePdf(apiUrl(`/api/pdf/${encodeURIComponent(pdfId)}`)),
-        fetch(apiUrl(`/api/presentation/${encodeURIComponent(pdfId)}`)).then((r) => (r.ok ? r.json() : null)),
+        loadMobilePdf(apiUrl(`/api/pdf/${encodeURIComponent(pdfId)}`, pin)),
+        fetch(apiUrl(`/api/presentation/${encodeURIComponent(pdfId)}`, pin)).then((r) => (r.ok ? r.json() : null)),
       ]);
       const prev = pdfDocRef.current;
       pdfDocRef.current = doc;
@@ -98,7 +96,7 @@ function RemoteApp() {
       console.error('Mobile deck load failed:', err);
       loadedPdfId.current = null;
     }
-  }, [renderDisplayed]);
+  }, [pin, renderDisplayed]);
 
   // Apply an action to local state + overlays. `fromLocal` also sends it upstream.
   const apply = useCallback(
@@ -136,7 +134,7 @@ function RemoteApp() {
     let retry: ReturnType<typeof setTimeout> | null = null;
     const connect = () => {
       const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const ws = new WebSocket(`${proto}//${location.host}/?pin=${encodeURIComponent(PIN)}`);
+      const ws = new WebSocket(`${proto}//${location.host}/?pin=${encodeURIComponent(pin)}`);
       wsRef.current = ws;
       ws.onopen = () => {
         setConnected(true);
@@ -158,8 +156,13 @@ function RemoteApp() {
           applyRef.current(msg.action, false);
         }
       };
-      ws.onclose = () => {
+      ws.onclose = (event) => {
         setConnected(false);
+        if (event.code === 4001) {
+          closed = true;
+          onInvalidPin();
+          return;
+        }
         if (!closed) retry = setTimeout(connect, 2000);
       };
       ws.onerror = () => ws.close();
@@ -171,7 +174,7 @@ function RemoteApp() {
       wsRef.current?.close();
       void pdfDocRef.current?.destroy();
     };
-  }, [loadDeck]);
+  }, [loadDeck, onInvalidPin, pin]);
 
   // Set up renderer + tool overlay whenever the preview UI is (re)mounted. A momentary
   // WS drop unmounts the whole remote screen (screen !== 'remote') and remounts a FRESH
@@ -335,13 +338,13 @@ function RemoteApp() {
   // Pull the current system volume once a presentation is live.
   useEffect(() => {
     if (!ui.presenting) return;
-    void fetch(apiUrl('/api/volume'))
+    void fetch(apiUrl('/api/volume', pin))
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (d && typeof d.volume === 'number') setVolume(d.volume);
       })
       .catch(() => {});
-  }, [ui.presenting]);
+  }, [pin, ui.presenting]);
 
   const paras = useMemo(() => noteParagraphs(notes[String(displayedSlide)]), [notes, displayedSlide]);
   const screen = !connected ? (everConnected ? 'reconnecting' : 'connecting') : ui.presenting ? 'remote' : 'waiting';
@@ -447,7 +450,7 @@ function RemoteApp() {
               onChange={(e) => {
                 const v = parseInt(e.target.value, 10);
                 setVolume(v);
-                void fetch(apiUrl(`/api/volume?set=${v}`)).catch(() => {});
+                void fetch(apiUrl(`/api/volume?set=${v}`, pin)).catch(() => {});
               }}
               className="min-w-0 flex-1 accent-amber-400"
             />
@@ -547,6 +550,53 @@ function RemoteApp() {
   );
 }
 
+function PresenterRemoteRoot() {
+  const [pin, setPin] = useState('');
+  const [draft, setDraft] = useState('');
+  const [invalid, setInvalid] = useState(false);
+
+  if (pin) {
+    return <RemoteApp pin={pin} onInvalidPin={() => { setPin(''); setDraft(''); setInvalid(true); }} />;
+  }
+
+  return (
+    <main className="fixed inset-0 grid place-items-center bg-neutral-950 p-5 text-neutral-100" data-testid="presenter-pin-gate">
+      <form
+        className="w-full max-w-sm rounded-3xl border border-white/10 bg-neutral-900 p-7 shadow-2xl"
+        onSubmit={(event) => {
+          event.preventDefault();
+          const next = draft.replace(/\D/g, '').slice(0, 6);
+          if (next.length !== 6) { setInvalid(true); return; }
+          setInvalid(false);
+          setPin(next);
+        }}
+      >
+        <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-amber-400 text-neutral-950 shadow-lg shadow-amber-400/20">
+          <Icon name="presentation" size={25} />
+        </span>
+        <h1 className="mt-5 text-center text-xl font-semibold">PDF Presenter</h1>
+        <p className="mt-2 text-center text-sm leading-relaxed text-neutral-400">{t('Introduce el PIN que aparece en Nodus.')}</p>
+        <label htmlFor="presenter-pin" className="mt-6 block text-xs font-medium text-neutral-300">{t('PIN')}</label>
+        <input
+          id="presenter-pin"
+          autoFocus
+          required
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          pattern="[0-9]{6}"
+          maxLength={6}
+          value={draft}
+          onChange={(event) => { setDraft(event.target.value.replace(/\D/g, '').slice(0, 6)); setInvalid(false); }}
+          placeholder="000000"
+          className="mt-2 h-14 w-full rounded-xl border border-white/15 bg-neutral-950 px-4 text-center font-mono text-2xl tracking-[0.3em] text-white outline-none focus:border-amber-400 focus:ring-4 focus:ring-amber-400/10"
+        />
+        {invalid && <p role="alert" className="mt-2 text-center text-xs text-rose-400">{t('Código incorrecto.')}</p>}
+        <button type="submit" className="mt-4 h-12 w-full rounded-xl bg-amber-400 font-semibold text-neutral-950 active:bg-amber-300">{t('Conectar')}</button>
+      </form>
+    </main>
+  );
+}
+
 function formatTimer(sec: number): string {
   const p = (n: number) => String(n).padStart(2, '0');
   return `${p(Math.floor(sec / 3600))}:${p(Math.floor((sec % 3600) / 60))}:${p(sec % 60)}`;
@@ -569,4 +619,4 @@ function buildRemoteThumb(pageNum: number, onClick: () => void) {
 }
 
 const el = document.getElementById('presenter-root');
-if (el) createRoot(el).render(<RemoteApp />);
+if (el) createRoot(el).render(<PresenterRemoteRoot />);
