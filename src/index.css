@@ -2477,8 +2477,30 @@ select.input optgroup {
 .whats-new-confetti { --confetti-left: 10%; --confetti-delay: 0s; --confetti-color: #2dd4bf; position: absolute; z-index: 1; top: -12px; left: var(--confetti-left); width: 5px; height: 10px; border-radius: 2px; background: var(--confetti-color); opacity: 0; animation: whats-new-confetti 2.8s var(--confetti-delay) ease-in infinite; }
 @keyframes whats-new-confetti { 0% { opacity: 0; transform: translateY(-8px) rotate(0); } 12% { opacity: .9; } 100% { opacity: 0; transform: translateY(245px) rotate(480deg); } }
 .whats-new-scroll { display: grid; min-height: 0; flex: 1; grid-auto-rows: max-content; align-content: start; gap: 13px; overflow-y: auto; padding: 22px 30px 24px; background: var(--wn-surface); }
-.whats-new-section-title { display: flex; align-items: center; gap: 12px; color: var(--wn-muted); font-size: 10px; font-weight: 750; letter-spacing: .14em; text-transform: uppercase; }
+.whats-new-section-header { position: relative; z-index: 5; display: flex; align-items: center; gap: 14px; }
+.whats-new-section-title { display: flex; min-width: 0; flex: 1; align-items: center; gap: 12px; color: var(--wn-muted); font-size: 10px; font-weight: 750; letter-spacing: .14em; text-transform: uppercase; }
 .whats-new-section-title i { height: 1px; flex: 1; background: var(--wn-border); }
+.whats-new-version-picker { position: relative; flex: 0 0 auto; }
+.whats-new-version-trigger { display: flex; min-width: 172px; align-items: center; gap: 7px; border: 1px solid var(--wn-border); border-radius: 10px; padding: 7px 9px; color: var(--wn-muted); background: var(--wn-card); box-shadow: 0 7px 20px rgb(0 0 0 / .08); font-size: 10px; font-weight: 700; }
+.whats-new-version-trigger:hover, .whats-new-version-trigger[aria-expanded='true'] { border-color: rgb(129 140 248 / .55); color: var(--wn-text); }
+.whats-new-version-trigger > span { text-transform: uppercase; letter-spacing: .09em; }
+.whats-new-version-trigger b { margin-left: auto; color: #818cf8; font-size: 11px; letter-spacing: .02em; }
+.dark .whats-new-version-trigger b { color: #a5b4fc; }
+.whats-new-version-menu { position: absolute; top: calc(100% + 7px); right: 0; z-index: 12; width: 270px; max-height: min(330px, 52vh); overflow-y: auto; border: 1px solid var(--wn-border); border-radius: 13px; padding: 7px; color: var(--wn-text); background: var(--wn-surface); box-shadow: 0 24px 60px rgb(0 0 0 / .42); }
+.light .whats-new-version-menu { box-shadow: 0 22px 50px rgb(15 23 42 / .2); }
+.whats-new-version-major + .whats-new-version-major { margin-top: 6px; border-top: 1px solid var(--wn-border); padding-top: 7px; }
+.whats-new-version-major-label { padding: 5px 8px; color: var(--wn-text); font-size: 10px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+.whats-new-version-branch { position: relative; margin-left: 8px; padding-left: 13px; }
+.whats-new-version-branch::before { content: ''; position: absolute; top: 0; bottom: 8px; left: 2px; width: 1px; background: var(--wn-border); }
+.whats-new-version-branch-label { padding: 5px 7px 3px; color: var(--wn-muted); font-size: 9px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
+.whats-new-version-option { position: relative; display: grid; width: 100%; grid-template-columns: 1fr auto 16px; align-items: center; gap: 8px; border-radius: 8px; padding: 7px 7px 7px 12px; color: var(--wn-text); text-align: left; }
+.whats-new-version-option::before { content: ''; position: absolute; top: 50%; left: -11px; width: 9px; height: 1px; background: var(--wn-border); }
+.whats-new-version-option:hover { background: rgb(129 140 248 / .1); }
+.whats-new-version-option[aria-selected='true'] { color: #c7d2fe; background: rgb(99 102 241 / .16); }
+.light .whats-new-version-option[aria-selected='true'] { color: #4338ca; }
+.whats-new-version-option span { font-size: 11px; font-weight: 760; }
+.whats-new-version-option time { color: var(--wn-muted); font-size: 9px; font-variant-numeric: tabular-nums; }
+.whats-new-version-option svg { color: #818cf8; }
 .whats-new-release-card { position: relative; overflow: hidden; border: 1px solid var(--wn-border); border-radius: 17px; padding: 5px 18px; background: var(--wn-card); box-shadow: 0 12px 30px rgb(0 0 0 / .08); }
 .whats-new-release-card::before { content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 3px; background: linear-gradient(#5eead4, #818cf8); }
 .whats-new-release-version { padding: 11px 0 3px; color: #818cf8; font-size: 10px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
@@ -2508,7 +2530,7 @@ select.input optgroup {
 .whats-new-footer > button:last-child { justify-self: end; }
 .whats-new-footer .whats-new-footer-support { justify-self: center; margin-left: 0; color: white; background: #0070ba; box-shadow: 0 9px 22px rgb(0 112 186 / .2); }
 .whats-new-footer .whats-new-footer-support:hover { background: #005ea6; }
-@media (max-width: 680px) { .whats-new-backdrop { padding: 12px; } .whats-new-cinema { max-height: 92vh; border-radius: 20px; } .whats-new-hero { min-height: 205px; grid-template-columns: 1fr 145px; padding: 25px 20px; } .whats-new-hero h2 { font-size: 31px; } .whats-new-hero-copy > p { font-size: 11px; } .whats-new-nodi svg { height: 150px !important; } .whats-new-scroll { padding: 18px; } .whats-new-support { align-items: flex-start; flex-wrap: wrap; } }
+@media (max-width: 680px) { .whats-new-backdrop { padding: 12px; } .whats-new-cinema { max-height: 92vh; border-radius: 20px; } .whats-new-hero { min-height: 205px; grid-template-columns: 1fr 145px; padding: 25px 20px; } .whats-new-hero h2 { font-size: 31px; } .whats-new-hero-copy > p { font-size: 11px; } .whats-new-nodi svg { height: 150px !important; } .whats-new-scroll { padding: 18px; } .whats-new-section-header { align-items: stretch; flex-direction: column; gap: 9px; } .whats-new-version-trigger { width: 100%; } .whats-new-version-menu { right: auto; left: 0; width: min(100%, 320px); } .whats-new-support { align-items: flex-start; flex-wrap: wrap; } }
 @media (prefers-reduced-motion: reduce) { .whats-new-aurora, .whats-new-confetti { animation: none; } }
 
 /* Roadmap — a quieter sibling of the cinematic What's New modal. The in-progress

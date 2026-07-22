@@ -1,13 +1,14 @@
 import { motion } from 'framer-motion';
-import { useEffect, useState, type CSSProperties } from 'react';
-import { releaseNotesForMajor, type ReleaseNoteScope } from '@shared/releaseNotes';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { releaseNotesForMajor, releaseNotesSince, type ReleaseNote, type ReleaseNoteScope } from '@shared/releaseNotes';
 import type { AppLanguage } from '@shared/types';
 import { Icon } from './ui';
 import { t } from '../i18n';
 import { NodiAvatar } from './nodi/NodiAvatar';
 
-// Shown once after the app updates, with the complete release history for the
-// current major version. "Last seen" lives in localStorage (a pure renderer
+// Shown once after the app updates, initially focused on the latest release.
+// Older releases remain available through the hierarchical version picker.
+// "Last seen" lives in localStorage (a pure renderer
 // concern — no DB migration), and is advanced to the current version when the
 // user dismisses the modal, so it never reappears for the same version.
 
@@ -69,6 +70,132 @@ function writeLastSeen(version: string): void {
   }
 }
 
+interface VersionBranch {
+  version: string;
+  notes: ReleaseNote[];
+}
+
+interface VersionMajor {
+  version: string;
+  branches: VersionBranch[];
+}
+
+/** Build a major -> minor -> release hierarchy while preserving newest-first order. */
+function buildVersionHierarchy(notes: ReleaseNote[]): VersionMajor[] {
+  const majors = new Map<string, Map<string, ReleaseNote[]>>();
+  for (const note of notes) {
+    const [major = '0', minor = '0'] = note.version.split('.');
+    let branches = majors.get(major);
+    if (!branches) {
+      branches = new Map();
+      majors.set(major, branches);
+    }
+    const branch = `${major}.${minor}`;
+    branches.set(branch, [...(branches.get(branch) ?? []), note]);
+  }
+
+  return [...majors].map(([version, branches]) => ({
+    version,
+    branches: [...branches].map(([branchVersion, branchNotes]) => ({
+      version: branchVersion,
+      notes: branchNotes,
+    })),
+  }));
+}
+
+function VersionPicker({
+  notes,
+  value,
+  onChange,
+}: {
+  notes: ReleaseNote[];
+  value: string;
+  onChange: (version: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const hierarchy = useMemo(() => buildVersionHierarchy(notes), [notes]);
+
+  useEffect(() => {
+    if (!open) return;
+    const dismiss = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', dismiss);
+    document.addEventListener('keydown', escape);
+    return () => {
+      document.removeEventListener('mousedown', dismiss);
+      document.removeEventListener('keydown', escape);
+    };
+  }, [open]);
+
+  return (
+    <div ref={rootRef} className="whats-new-version-picker">
+      <button
+        type="button"
+        className="whats-new-version-trigger"
+        data-testid="whats-new-version-trigger"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen((currentOpen) => !currentOpen)}
+      >
+        <span>{t('Versiones')}</span>
+        <b>v{value}</b>
+        <Icon name="chevronDown" size={13} />
+      </button>
+
+      {open && (
+        <div
+          className="whats-new-version-menu"
+          data-testid="whats-new-version-menu"
+          role="listbox"
+          aria-label={t('Versiones')}
+        >
+          {hierarchy.map((major) => (
+            <div key={major.version} className="whats-new-version-major">
+              <div className="whats-new-version-major-label">Nodus {major.version}.x</div>
+              {major.branches.map((branch) => (
+                <div
+                  key={branch.version}
+                  className="whats-new-version-branch"
+                  role="group"
+                  aria-label={`Nodus ${major.version}.x · v${branch.version}.x`}
+                >
+                  <div className="whats-new-version-branch-label">v{branch.version}.x</div>
+                  {branch.notes.map((note) => {
+                    const selected = note.version === value;
+                    return (
+                      <button
+                        type="button"
+                        key={note.version}
+                        className="whats-new-version-option"
+                        data-testid={`whats-new-version-${note.version}`}
+                        role="option"
+                        aria-selected={selected}
+                        onClick={() => {
+                          onChange(note.version);
+                          setOpen(false);
+                        }}
+                      >
+                        <span>v{note.version}</span>
+                        <time dateTime={note.date}>{note.date}</time>
+                        {selected && <Icon name="check" size={13} />}
+                      </button>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function hasPendingWhatsNew(): boolean {
   const current = __APP_VERSION__;
   const lastSeen = readLastSeen();
@@ -85,20 +212,23 @@ export function WhatsNewModal({
   showSeenReleaseNotes?: boolean;
 }) {
   const current = __APP_VERSION__;
-  // Compute once on mount: each update shows the complete current-major history.
+  // Compute once on mount. The full history feeds the picker, but only its newest
+  // release is selected and rendered initially.
   const [notes] = useState(() => {
-    if (showSeenReleaseNotes) return releaseNotesForMajor(current);
+    if (showSeenReleaseNotes) return releaseNotesSince(null, current);
     const lastSeen = readLastSeen();
     if (lastSeen === current) return [];
-    return releaseNotesForMajor(current);
+    return releaseNotesSince(null, current);
   });
+  const [selectedVersion, setSelectedVersion] = useState(() => notes[0]?.version ?? '');
   const [open, setOpen] = useState(notes.length > 0);
+  const selectedNote = notes.find((note) => note.version === selectedVersion) ?? notes[0];
 
   useEffect(() => {
     if (notes.length === 0) onSettled?.();
   }, [notes.length, onSettled]);
 
-  if (!open || notes.length === 0) return null;
+  if (!open || notes.length === 0 || !selectedNote) return null;
 
   const close = () => {
     writeLastSeen(current);
@@ -136,7 +266,10 @@ export function WhatsNewModal({
             <div className="whats-new-kicker"><Icon name="star" size={14} /> {t('Novedades')}</div>
             <h2>{t('Nodus acaba de mejorar')}</h2>
             <p>{t('Hemos preparado nuevas funciones y mejoras para que sigas construyendo conocimiento con menos fricción.')}</p>
-            <div className="whats-new-version"><span>{t('Nueva versión')}</span><b>v{current}</b></div>
+            <div className="whats-new-version">
+              <span>{selectedNote.version === current ? t('Nueva versión') : t('Versiones')}</span>
+              <b>v{selectedNote.version}</b>
+            </div>
           </div>
           <motion.div className="whats-new-nodi" initial={{ opacity: 0, scale: .7, rotate: -8 }} animate={{ opacity: 1, scale: 1, rotate: 0 }} transition={{ delay: .18, duration: .5, type: 'spring', stiffness: 170 }}>
             <div className="whats-new-nodi-glow" />
@@ -146,36 +279,37 @@ export function WhatsNewModal({
         </header>
 
         <div className="whats-new-scroll">
-          <div className="whats-new-section-title"><span>{t('Lo más destacado')}</span><i /></div>
-          {notes.map((note) => (
-            <section key={note.version} className="whats-new-release-card">
-              <div className="whats-new-release-version">v{note.version}</div>
-              <ul>
-                {groupHighlightsByScope(note.highlights).map((h, i) => {
-                  const scope = h.scope;
-                  const scopeMeta = RELEASE_SCOPE_META[scope];
-                  const scopeLabel = t(scopeMeta.label);
-                  const tooltipId = `whats-new-scope-label-${note.version.replaceAll('.', '-')}-${i}`;
-                  return (
-                    <li key={i}>
-                      <span
-                        className={`whats-new-scope whats-new-scope-${scope}`}
-                        data-testid={`whats-new-scope-${scope}`}
-                        style={{ '--wn-scope-color': scopeMeta.color } as CSSProperties}
-                        tabIndex={0}
-                        aria-label={scopeLabel}
-                        aria-describedby={tooltipId}
-                      >
-                        <Icon name={scopeMeta.icon} size={13} />
-                        <span id={tooltipId} role="tooltip" className="whats-new-scope-tooltip">{scopeLabel}</span>
-                      </span>
-                      <span>{h[lang]}</span>
-                    </li>
-                  );
-                })}
-              </ul>
-            </section>
-          ))}
+          <div className="whats-new-section-header">
+            <div className="whats-new-section-title"><span>{t('Lo más destacado')}</span><i /></div>
+            <VersionPicker notes={notes} value={selectedNote.version} onChange={setSelectedVersion} />
+          </div>
+          <section key={selectedNote.version} className="whats-new-release-card" data-testid="whats-new-selected-release">
+            <div className="whats-new-release-version">v{selectedNote.version}</div>
+            <ul>
+              {groupHighlightsByScope(selectedNote.highlights).map((h, i) => {
+                const scope = h.scope;
+                const scopeMeta = RELEASE_SCOPE_META[scope];
+                const scopeLabel = t(scopeMeta.label);
+                const tooltipId = `whats-new-scope-label-${selectedNote.version.replaceAll('.', '-')}-${i}`;
+                return (
+                  <li key={i}>
+                    <span
+                      className={`whats-new-scope whats-new-scope-${scope}`}
+                      data-testid={`whats-new-scope-${scope}`}
+                      style={{ '--wn-scope-color': scopeMeta.color } as CSSProperties}
+                      tabIndex={0}
+                      aria-label={scopeLabel}
+                      aria-describedby={tooltipId}
+                    >
+                      <Icon name={scopeMeta.icon} size={13} />
+                      <span id={tooltipId} role="tooltip" className="whats-new-scope-tooltip">{scopeLabel}</span>
+                    </span>
+                    <span>{h[lang]}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
 
           <aside
             className="whats-new-support"

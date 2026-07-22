@@ -554,8 +554,23 @@ try {
   assert.equal(latestChangesButtonBox.width, checkUpdatesButtonBox.width, 'Latest changes and Check for updates have the same width');
   assert.equal(latestChangesButtonBox.height, checkUpdatesButtonBox.height, 'Latest changes and Check for updates have the same height');
   await page.getByTestId('open-latest-changes').click();
-  await page.getByTestId('whats-new-cinematic-modal').waitFor();
-  assert.equal(await page.getByTestId('whats-new-cinematic-modal').count(), 1, 'Latest changes reopens the release modal even after the current version was seen');
+  const whatsNewModal = page.getByTestId('whats-new-cinematic-modal');
+  const selectedRelease = page.getByTestId('whats-new-selected-release');
+  await whatsNewModal.waitFor();
+  assert.equal(await whatsNewModal.count(), 1, 'Latest changes reopens the release modal even after the current version was seen');
+  assert.equal(await selectedRelease.count(), 1, 'the release modal renders exactly one version at a time');
+  assert.equal(await selectedRelease.getByText(`v${appVersion}`, { exact: true }).count(), 1, 'the latest installed release is selected by default');
+  assert.equal(await selectedRelease.getByText('v2.5.3', { exact: true }).count(), 0, 'an older release is not rendered before it is selected');
+
+  await page.getByTestId('whats-new-version-trigger').click();
+  const versionMenu = page.getByTestId('whats-new-version-menu');
+  await versionMenu.waitFor();
+  assert.equal(await versionMenu.getByText('Nodus 2.x', { exact: true }).count(), 1, 'the version dropdown groups releases by major version');
+  assert.equal(await versionMenu.getByText('v2.5.x', { exact: true }).count(), 1, 'the version dropdown groups releases by minor branch');
+  await page.getByTestId('whats-new-version-2.5.3').click();
+  await versionMenu.waitFor({ state: 'detached' });
+  assert.equal(await selectedRelease.getByText('v2.5.3', { exact: true }).count(), 1, 'selecting a historical version replaces the rendered release');
+
   const generalReleaseScope = page.getByTestId('whats-new-scope-general').first();
   await page.waitForTimeout(550);
   await generalReleaseScope.hover();
