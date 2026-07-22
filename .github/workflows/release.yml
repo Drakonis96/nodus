@@ -62,8 +62,9 @@ jobs:
       HAS_MACOS_SIGNING: ${{ secrets.MACOS_CERTIFICATE != '' }}
     strategy:
       fail-fast: false
-      # electron-builder creates the GitHub Release as part of publishing. Running
-      # both OS jobs at once can race on release creation for the same tag.
+      # electron-builder creates a shared draft GitHub Release. Running the OS jobs
+      # at once can race on creation for the same tag; the verification job below
+      # promotes the draft only after every installer and updater manifest exists.
       max-parallel: 1
       matrix:
         include:
@@ -131,9 +132,9 @@ jobs:
     needs: release
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
     steps:
-      - name: Verify stable installer assets
+      - name: Verify stable release assets
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -142,10 +143,18 @@ jobs:
             Nodus-mac-arm64.dmg \
             Nodus-win-x64.exe \
             Nodus-linux-amd64.deb \
-            Nodus-linux-x86_64.AppImage
+            Nodus-linux-x86_64.AppImage \
+            latest-mac.yml \
+            latest.yml \
+            latest-linux.yml
           do
             if ! grep -Fxq "$asset" <<< "$assets"; then
               echo "::error::Missing release asset: $asset"
               exit 1
             fi
           done
+
+      - name: Publish completed release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false --latest

@@ -158,7 +158,7 @@
         "provider": "github",
         "owner": "drakonis96",
         "repo": "nodus",
-        "releaseType": "release"
+        "releaseType": "draft"
       }
     ],
     "beforePack": "build/beforePack.cjs",
