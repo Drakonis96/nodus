@@ -1,5 +1,9 @@
 /** Italian history, indexed by release and highlight order. */
 export const RELEASE_NOTES_IT: Record<string, string[]> = {
+  "2.5.4": [
+    "PDF Presenter ora importa direttamente presentazioni PowerPoint, OpenDocument e Keynote oltre ai PDF. Nodus le converte localmente tramite PowerPoint, Keynote o LibreOffice installati, conserva le note del relatore quando il formato lo consente e non modifica il file originale.",
+    "Quando chiudi la finestra principale su macOS senza uscire da Nodus e poi riapri l'app, vengono ripristinati correttamente sia la finestra sia il compagno Nodi sempre in primo piano, se era attivato."
+  ],
   "2.5.3": [
     "PDF Presenter è molto più solido: gli strumenti di annotazione rispondono in modo affidabile, supportano scorciatoie e ridimensionamento in tempo reale, mentre la modalità presentatore funziona meglio con uno o più schermi e dal telecomando mobile. Puoi inoltre importare ed esportare le note del relatore in TXT e ridimensionare liberamente i video di YouTube.",
     "OCR Workspace ora separa «Nuovo OCR» e «Libreria», consente di cercare per titolo o contenuto trascritto e può elaborare più pagine in parallelo in base al provider. Rielaborando una pagina o un documento puoi scegliere un altro modello e vedere meglio l'avanzamento; i modelli locali continuano a lavorare una pagina alla volta per maggiore stabilità.",

@@ -24,9 +24,9 @@ try {
 
   const { RELEASE_NOTES, releaseNotesForMajor } = await import(pathToFileURL(bundlePath).href);
   const currentRelease = RELEASE_NOTES[0];
-  assert.equal(currentRelease?.version, '2.5.3');
+  assert.equal(currentRelease?.version, '2.5.4');
   assert.equal(currentRelease?.date, '2026-07-22');
-  assert.equal(currentRelease?.highlights.length, 12);
+  assert.equal(currentRelease?.highlights.length, 2);
   assert.ok(currentRelease?.highlights.every((highlight) => highlight.it.length > 0));
   const currentMajorNotes = releaseNotesForMajor('2.3.8');
 

@@ -1,5 +1,24 @@
 # Changelog
 
+## 2.5.4 — 2026-07-22
+
+### Added
+
+- **Office presentation imports.** PDF Presenter can now import PowerPoint,
+  OpenDocument Presentation and Keynote files in addition to PDFs. Nodus converts
+  them locally through an installed PowerPoint, Keynote or LibreOffice app,
+  preserves compatible speaker notes and leaves the original file untouched.
+
+### Changed
+
+- GitHub releases remain as drafts until the macOS, Windows and Linux installers
+  and their updater manifests have all been uploaded and verified.
+
+### Fixed
+
+- Closing the main window on macOS and reopening Nodus now restores both the app
+  window and the enabled always-on-top Nodi companion.
+
 ## 2.5.3 — 2026-07-22
 
 ### Added

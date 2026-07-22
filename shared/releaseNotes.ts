@@ -37,6 +37,30 @@ interface RawReleaseNote extends Omit<ReleaseNote, 'highlights'> { highlights: R
 
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
   {
+    version: '2.5.4',
+    date: '2026-07-22',
+    highlights: [
+      {
+        scope: 'toolkit',
+        es: 'PDF Presenter ya importa directamente presentaciones de PowerPoint, OpenDocument y Keynote además de PDF. Nodus las convierte localmente mediante PowerPoint, Keynote o LibreOffice instalados, conserva las notas del ponente cuando el formato lo permite y no modifica el archivo original.',
+        en: 'PDF Presenter now imports PowerPoint, OpenDocument and Keynote presentations directly in addition to PDFs. Nodus converts them locally through an installed PowerPoint, Keynote or LibreOffice app, preserves speaker notes when the format supports them, and leaves the original file untouched.',
+        fr: 'PDF Presenter importe désormais directement les présentations PowerPoint, OpenDocument et Keynote en plus des PDF. Nodus les convertit localement à l’aide de PowerPoint, Keynote ou LibreOffice installé, conserve les notes de l’orateur lorsque le format le permet et ne modifie pas le fichier original.',
+        de: 'PDF Presenter importiert jetzt neben PDFs auch PowerPoint-, OpenDocument- und Keynote-Präsentationen direkt. Nodus konvertiert sie lokal mit einer installierten PowerPoint-, Keynote- oder LibreOffice-Anwendung, übernimmt Sprechernotizen, sofern das Format sie unterstützt, und verändert die Originaldatei nicht.',
+        pt: 'O PDF Presenter passa a importar diretamente apresentações PowerPoint, OpenDocument e Keynote, além de PDF. O Nodus converte-as localmente através do PowerPoint, Keynote ou LibreOffice instalado, preserva as notas do orador quando o formato o permite e não altera o ficheiro original.',
+        'pt-BR': 'O PDF Presenter agora importa diretamente apresentações do PowerPoint, OpenDocument e Keynote, além de PDF. O Nodus faz a conversão localmente pelo PowerPoint, Keynote ou LibreOffice instalado, preserva as notas do apresentador quando o formato permite e não altera o arquivo original.',
+      },
+      {
+        scope: 'nodi',
+        es: 'Si cierras la ventana principal en macOS sin salir de Nodus y después vuelves a abrir la app, ahora se restauran correctamente tanto la ventana como el compañero Nodi siempre visible, si lo tenías activado.',
+        en: 'If you close the main window on macOS without quitting Nodus and then reopen the app, both the window and the always-on-top Nodi companion are now restored correctly when enabled.',
+        fr: 'Si vous fermez la fenêtre principale sur macOS sans quitter Nodus, puis rouvrez l’application, la fenêtre et le compagnon Nodi toujours visible sont désormais correctement restaurés lorsqu’il est activé.',
+        de: 'Wenn du unter macOS das Hauptfenster schließt, ohne Nodus zu beenden, und die App danach erneut öffnest, werden jetzt sowohl das Fenster als auch der stets sichtbare Nodi-Begleiter korrekt wiederhergestellt, sofern er aktiviert war.',
+        pt: 'Se fechar a janela principal no macOS sem sair do Nodus e depois voltar a abrir a aplicação, tanto a janela como o companheiro Nodi sempre visível passam a ser restaurados corretamente quando estão ativados.',
+        'pt-BR': 'Se você fechar a janela principal no macOS sem sair do Nodus e depois abrir o app novamente, tanto a janela quanto o companheiro Nodi sempre visível passam a ser restaurados corretamente quando estão ativados.',
+      },
+    ],
+  },
+  {
     version: '2.5.3',
     date: '2026-07-22',
     highlights: [
