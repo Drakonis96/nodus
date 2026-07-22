@@ -999,7 +999,7 @@ try {
   }
   await page.getByRole('button', { name: 'Volver', exact: true }).click();
   await page.getByTestId('toolkit-apps-catalog').waitFor();
-  await page.getByRole('button', { name: 'Nodus Toolkit', exact: true }).click();
+  await page.getByTestId('toolkit-apps-page').getByRole('button', { name: 'Nodus Toolkit', exact: true }).click();
   await page.getByTestId('toolkit-home').waitFor();
   // AI OCR is a working tool: it opens on its (empty) library and returns.
   assert.equal(await page.getByTestId('toolkit-card-aiocr').isDisabled(), false, 'OCR Workspace opens');
