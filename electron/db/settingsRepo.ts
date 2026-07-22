@@ -232,9 +232,9 @@ export function getSettings(): AppSettings {
     merged.defaultModel = null;
     writeRaw('app', JSON.stringify(merged));
   }
-  // App-wide preferences (theme, language) are shared across every vault: overlay the
-  // global store, seeding it once from this vault's value so existing users keep their
-  // current theme/language when the first new vault is created.
+  // App-wide preferences (theme, language and favorite models) are shared across every
+  // vault: overlay the global store, seeding it once from this vault's value so existing
+  // users keep their preferences when the first new vault is created.
   const globalPrefs = recoverV23SharedModelPrefs() as ReturnType<typeof readGlobalPrefs>;
   const seed: Record<string, unknown> = {};
   for (const key of GLOBAL_PREF_KEYS) {
@@ -306,14 +306,14 @@ export function updateSettings(patch: Partial<AppSettings>): AppSettings {
     patch = { ...patch, studyAiPrivacyMode: patch.studyAiLocalOnly ? 'local' : 'hybrid' };
   }
   const current = getSettings();
-  // Shared keys (theme/language + the AI model configuration) go to the global store;
+  // Shared keys (theme/language/favorites + the AI model configuration) go to the global store;
   // everything else stays per-vault. Model keys are also kept in the per-vault blob as a
   // fallback, so switching vaults never loses a value.
   const { global, local } = splitGlobalPatch(patch);
   if (Object.keys(global).length) writeGlobalPrefs(global);
   // providerKeys is derived from the secret store, never persisted.
   const { providerKeys: _ignore, lockedProviderKeys: _ignoreLocked, ...rest } = { ...current, ...local };
-  // Never persist the theme/language keys into the per-vault blob (they'd shadow the
+  // Never persist the app-wide keys into the per-vault blob (they'd shadow the
   // shared store and drift), so keep them exclusively in the global prefs file.
   for (const key of GLOBAL_PREF_KEYS) delete (rest as Record<string, unknown>)[key];
   writeRaw('app', JSON.stringify(rest));
