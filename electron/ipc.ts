@@ -181,6 +181,13 @@ import {
 } from './toolkit/aiOcr';
 import type { AiOcrExportFormat, OcrOptions } from '@shared/aiOcrTypes';
 import type { ToolkitJobRequest } from '@shared/toolkitTypes';
+import type { TranslateJobRequest } from '@shared/toolkitTranslateTypes';
+import {
+  runTranslateJob,
+  suggestedTextFilename,
+  type TranslateSignal,
+} from './toolkit/translate';
+import { listTranslateHistory, removeTranslateHistory } from './toolkit/translate/history';
 import * as presenterLibrary from './toolkit/presenter/library';
 import { extractPptxNotes } from './toolkit/presenter/pptxNotes';
 import {
@@ -3609,6 +3616,48 @@ export function registerIpc(
   });
   h('toolkit:showInFolder', async (_e, filePath: string) => {
     shell.showItemInFolder(filePath);
+  });
+
+  // ── Nodus Translate ─────────────────────────────────────────────────────────
+  const translateSignals = new Map<string, TranslateSignal>();
+  h('translate:job:run', async (e, jobId: string, request: TranslateJobRequest) => {
+    const signal: TranslateSignal = { cancelled: false };
+    translateSignals.set(jobId, signal);
+    try {
+      const result = await runTranslateJob(jobId, request, {
+        signal,
+        onProgress: (progress) => e.sender.send('translate:job:event', jobId, progress),
+      });
+      if (request.openFolderOnDone && !result.cancelled && result.outputs[0]?.outputPath) {
+        shell.showItemInFolder(result.outputs[0].outputPath);
+      }
+      return result;
+    } finally {
+      translateSignals.delete(jobId);
+    }
+  });
+  h('translate:job:cancel', async (_e, jobId: string) => {
+    const signal = translateSignals.get(jobId);
+    if (signal) signal.cancelled = true;
+  });
+  h('translate:text:save', async (e, text: string, targetLanguage: string, extension: 'txt' | 'md' | 'html' = 'txt') => {
+    const win = BrowserWindow.fromWebContents(e.sender);
+    const picked = await dialog.showSaveDialog(win ?? undefined!, {
+      title: 'Guardar traducción',
+      defaultPath: suggestedTextFilename(targetLanguage, extension),
+      filters: [{ name: extension.toUpperCase(), extensions: [extension] }],
+    });
+    if (picked.canceled || !picked.filePath) return { canceled: true };
+    fs.writeFileSync(picked.filePath, text, 'utf8');
+    return { canceled: false, path: picked.filePath };
+  });
+  h('translate:history:list', async () => listTranslateHistory());
+  h('translate:history:remove', async (_e, id: string, deleteOutput = false) => {
+    const entry = listTranslateHistory().find((candidate) => candidate.id === id);
+    if (deleteOutput && entry?.outputPath && fs.existsSync(entry.outputPath)) {
+      await shell.trashItem(entry.outputPath);
+    }
+    return removeTranslateHistory(id);
   });
 
   // ── Nodus AI OCR (OCR Workspace) ────────────────────────────────────────────

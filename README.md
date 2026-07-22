@@ -75,7 +75,7 @@ Teaching tools cover private student rosters, gradebooks, reusable rubrics and e
 
 ## Nodus Toolkit
 
-The Toolkit provides cross-vault, local-first document utilities. **Nodus Convert** converts and processes documents, PDFs, images and text. **Nodus Protect** combines PDFs and images, permanently redacts or blurs sensitive areas, adds watermarks and a legal footer, creates fully rasterised PNG/PDF/ZIP results and can issue or verify IDPS v1 traceable copies. PDF Presenter and OCR Workspace remain marked as upcoming.
+The Toolkit provides cross-vault document utilities. **Nodus Convert** converts and processes documents, PDFs, images and text. **Nodus Protect** combines PDFs and images, permanently redacts or blurs sensitive areas, adds watermarks and a legal footer, creates fully rasterised PNG/PDF/ZIP results and can issue or verify IDPS v1 traceable copies. **Nodus Translate** translates pasted text, files and Zotero attachments with a chosen AI model; it preserves DOCX/EPUB structure and includes a rasterised PDF facsimile mode that retains page geometry, backgrounds and images while replacing visible text. PDF Presenter and OCR Workspace are also available.
 
 Protect can read files selected from disk or compatible sources in the active vault and can save each result back to disk, share it through the operating system or store it in the vault’s Protected Copies library. Its document processing is entirely local: it does not send protected documents to AI providers or any external service. This statement applies specifically to Nodus Protect; other optional Nodus features can use network providers when the user configures and invokes them.
 

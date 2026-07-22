@@ -22,10 +22,10 @@ test('the 2.4.0 update queues a one-off toolkit guide behind release notes', asy
   assert.ok(app.indexOf('<ToolkitBetaUpdateTour') < app.indexOf('<StartupUpdateModal'));
 });
 
-test('the guide covers all four tools, extraction choices, performance and subscriptions', async () => {
+test('the guide covers all five tools, extraction choices, performance and subscriptions', async () => {
   const guide = await read('src/components/ToolkitBetaGuide.tsx');
   const navigation = await read('src/navigation.ts');
-  for (const tool of ['Nodus Convert', 'Nodus Protect', 'PDF Presenter', 'OCR Workspace']) assert.ok(navigation.includes(tool));
+  for (const tool of ['Nodus Convert', 'Nodus Protect', 'Nodus Translate', 'PDF Presenter', 'OCR Workspace']) assert.ok(navigation.includes(tool));
   for (const expected of [
     'Gemma 4 E2B Q4',
     '20 ejecuciones correctas de 20',
@@ -44,7 +44,8 @@ test('the guide covers all four tools, extraction choices, performance and subsc
     assert.match(guide, new RegExp(asset.replace('.', '\\.')));
     assert.match(await read(`src/assets/brands/${asset}`), /<svg/);
   }
-  assert.match(guide, /\.\.\.\[0, 1, 2, 3\]\.map/);
+  assert.match(guide, /\.\.\.BETA_TOOLS\.map/, 'the versioned guide cannot index newer catalogue entries');
+  assert.match(guide, /BETA · \{index \+ 1\} \/ \{BETA_TOOLS\.length\}/);
   assert.match(guide, /data-testid="toolkit-beta-update-tour"/);
   assert.match(guide, /data-testid="toolkit-beta-tour-complete"/);
   assert.match(guide, /disabled=\{itemIndex > index\}/);

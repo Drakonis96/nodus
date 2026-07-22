@@ -41,6 +41,21 @@ export type {
   AiOcrExportResult,
 } from './aiOcrTypes';
 export type {
+  TranslateInputKind,
+  TranslatePdfMode,
+  TranslateOutputFormat,
+  TranslateMarkupKind,
+  TranslateZoteroSource,
+  TranslateJobRequest,
+  TranslateJobStage,
+  TranslateJobProgress,
+  TranslateOutputResult,
+  TranslateJobResult,
+  TranslateHistoryEntry,
+  TranslateSegment,
+  TranslateSegmentResult,
+} from './toolkitTranslateTypes';
+export type {
   ProtectInputExtension,
   ProtectSourceKind,
   ProtectSourceRef,
@@ -88,6 +103,7 @@ import type {
   ToolkitAppSessionInfo,
   ToolkitAppSessionSnapshot,
 } from './toolkitApps';
+import type { TranslateHistoryEntry, TranslateJobRequest, TranslateJobProgress, TranslateJobResult } from './toolkitTranslateTypes';
 import type { AiOcrCreateRequest, AiOcrExportFormat, AiOcrExportResult, OcrDoc, OcrDocSummary, OcrDocProgress, OcrOptions } from './aiOcrTypes';
 import type {
   Presentation,
@@ -6301,6 +6317,17 @@ export interface NodusApi {
   pickToolkitOutputDir(): Promise<string | null>;
   /** Reveal a produced file in the OS file manager. */
   revealToolkitOutput(filePath: string): Promise<void>;
+
+  // Nodus Translate — AI translation of pasted text, local files and Zotero
+  // attachments. Like Convert, the renderer re-attaches to progress after navigation.
+  runTranslateJob(
+    request: TranslateJobRequest,
+    handlers: { onProgress: (progress: TranslateJobProgress) => void },
+  ): Promise<TranslateJobResult>;
+  cancelTranslateJob(jobId: string): Promise<void>;
+  saveTranslatedText(text: string, targetLanguage: string, extension?: 'txt' | 'md' | 'html'): Promise<{ canceled: boolean; path?: string }>;
+  listTranslateHistory(): Promise<TranslateHistoryEntry[]>;
+  removeTranslateHistory(id: string, deleteOutput?: boolean): Promise<TranslateHistoryEntry[]>;
 
   // Nodus AI OCR (OCR Workspace) — a persistent, per-document OCR library backed by
   // vision models. Processing runs in main and survives navigation; progress is pushed

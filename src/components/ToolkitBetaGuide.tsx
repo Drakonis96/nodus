@@ -9,7 +9,7 @@ import claudeLogo from '../assets/brands/claude.svg';
 import { Icon } from './ui';
 import { NodiAvatar } from './nodi/NodiAvatar';
 
-// This guide belongs to the 2.4.0 release, so its four-tool snapshot must not
+// This guide belongs to the 2.4.0 release, so its five-tool snapshot must not
 // change when newer Toolkit entries (such as Nodus Apps) are added later.
 const BETA_TOOLS = TOOLKIT_TOOLS.filter((tool) => tool.page !== 'apps');
 
@@ -25,11 +25,11 @@ const COPY = {
   es: {
     beta: 'NUEVO · BETA',
     title: 'Nuevas herramientas, mejores decisiones',
-    summary: 'Nodus Toolkit incorpora cuatro herramientas en beta y una guía práctica para elegir bien el modelo de extracción.',
+    summary: 'Nodus Toolkit incorpora cinco herramientas en beta y una guía práctica para elegir bien el modelo de extracción.',
     introTitle: 'Nodus Toolkit ya está aquí',
-    introSummary: 'Cuatro espacios de trabajo para preparar, proteger y presentar documentos sin salir de Nodus.',
-    introBody: 'Las cuatro herramientas están disponibles en beta. El procesamiento es local salvo las funciones que indiquen expresamente que usan un proveedor de IA.',
-    toolSummaries: ['Documentos, PDF, imágenes y texto', 'Copias seguras y trazables', 'PDF como presentación', 'OCR asistido para casos difíciles'],
+    introSummary: 'Cinco espacios de trabajo para preparar, proteger, traducir y presentar documentos sin salir de Nodus.',
+    introBody: 'Las cinco herramientas están disponibles en beta. El procesamiento es local salvo las funciones que indiquen expresamente que usan un proveedor de IA.',
+    toolSummaries: ['Documentos, PDF, imágenes y texto', 'Copias seguras y trazables', 'Traducción de texto y documentos', 'PDF como presentación', 'OCR asistido para casos difíciles'],
     originalFiles: 'Los archivos originales no se modifican. Nodus crea siempre una copia o un resultado nuevo.',
     extractionTitle: 'Extracción: menos razonamiento, más precisión',
     extractionSummary: 'Para extraer ideas conviene un modelo directo, disciplinado y fiable con datos estructurados.',
@@ -63,11 +63,11 @@ const COPY = {
   en: {
     beta: 'NEW · BETA',
     title: 'New tools, better model choices',
-    summary: 'Nodus Toolkit adds four beta tools and practical guidance for choosing an idea-extraction model.',
+    summary: 'Nodus Toolkit adds five beta tools and practical guidance for choosing an idea-extraction model.',
     introTitle: 'Nodus Toolkit is here',
-    introSummary: 'Four workspaces to prepare, protect and present documents without leaving Nodus.',
-    introBody: 'All four tools are available in beta. Processing is local unless a feature explicitly says it uses an AI provider.',
-    toolSummaries: ['Documents, PDFs, images and text', 'Safe, traceable copies', 'Present a PDF', 'Assisted OCR for difficult scans'],
+    introSummary: 'Five workspaces to prepare, protect, translate and present documents without leaving Nodus.',
+    introBody: 'All five tools are available in beta. Processing is local unless a feature explicitly says it uses an AI provider.',
+    toolSummaries: ['Documents, PDFs, images and text', 'Safe, traceable copies', 'Translate text and documents', 'Present a PDF', 'Assisted OCR for difficult scans'],
     originalFiles: 'Original files are never modified. Nodus always creates a copy or a new output.',
     extractionTitle: 'Extraction: less reasoning, more precision',
     extractionSummary: 'Idea extraction benefits from a direct model that reliably returns structured data.',
@@ -152,19 +152,21 @@ function toolStep(index: number, language: GuideLanguage): TourStep {
   const details = language === 'es' ? [
     <>Convierte documentos, PDF e imágenes de uno en uno o en lote. Incluye utilidades de PDF, OCR ligero, compresión, cambio de formato y operaciones de texto.</>,
     <>Oculta o desenfoca datos, añade marcas de agua y pies legales, rasteriza copias y crea o verifica marcas trazables. Todo el procesamiento del documento es local.</>,
+    <>Traduce texto pegado, documentos del disco o adjuntos de Zotero con el modelo que elijas. Conserva la estructura de DOCX y EPUB y ofrece un modo facsímil para mantener la apariencia de los PDF.</>,
     <>Convierte un PDF en una presentación con vista del público y del presentador, notas, miniaturas, puntero, dibujo y anotaciones en directo.</>,
     <>Reconstruye escaneados difíciles página a página con ayuda de un modelo visual. Permite revisar el resultado y guardarlo en Markdown o incorporarlo a una bóveda.</>,
   ] : [
     <>Convert documents, PDFs and images one at a time or in batches, with PDF utilities, light OCR, compression, format changes and text operations.</>,
     <>Redact or blur data, add watermarks and legal footers, rasterise copies, and create or verify traceable marks. Document processing remains local.</>,
+    <>Translate pasted text, documents from disk or Zotero attachments with the model you choose. DOCX and EPUB structure is retained, and facsimile mode preserves the visual appearance of PDFs.</>,
     <>Turn a PDF into a presentation with audience and presenter views, notes, thumbnails, a pointer, drawing and live annotations.</>,
     <>Reconstruct difficult scans page by page with a vision model, review the output, and save it as Markdown or add it to a vault.</>,
   ];
   return {
     icon: tool.icon,
     title: tool.name,
-    summary: language === 'es' ? 'Una de las cuatro herramientas disponibles en la beta de Nodus Toolkit.' : 'One of the four tools available in the Nodus Toolkit beta.',
-    content: <div className="toolkit-guide-tool-focus"><span><Icon name={tool.icon} size={34} /></span><p>{details[index]}</p><div><Icon name="sparkles" size={14} /> BETA · {index + 1} / 4</div></div>,
+    summary: language === 'es' ? 'Una de las cinco herramientas disponibles en la beta de Nodus Toolkit.' : 'One of the five tools available in the Nodus Toolkit beta.',
+    content: <div className="toolkit-guide-tool-focus"><span><Icon name={tool.icon} size={34} /></span><p>{details[index]}</p><div><Icon name="sparkles" size={14} /> BETA · {index + 1} / {BETA_TOOLS.length}</div></div>,
   };
 }
 
@@ -192,7 +194,7 @@ export function ToolkitBetaUpdateTour({
   const c = toolkitBetaGuideCopy(uiLanguage);
   const steps = useMemo<TourStep[]>(() => [
     { icon: 'tools', title: c.introTitle, summary: c.introSummary, content: <ToolkitOverviewPanel language={uiLanguage} /> },
-    ...[0, 1, 2, 3].map((toolIndex) => toolStep(toolIndex, uiLanguage)),
+    ...BETA_TOOLS.map((_, toolIndex) => toolStep(toolIndex, uiLanguage)),
     { icon: 'bulb', title: c.extractionTitle, summary: c.extractionSummary, content: <IdeaExtractionPanel language={uiLanguage} /> },
     { icon: 'clock', title: c.performanceTitle, summary: c.performanceSummary, content: <LocalPerformancePanel language={uiLanguage} /> },
     { icon: 'chartBar', title: c.remoteTitle, summary: c.remoteSummary, content: <RemoteModelsPanel language={uiLanguage} /> },
