@@ -55,6 +55,7 @@ const SETTINGS_TABS: { id: SettingsTabId; label: string; icon: string; keywords:
 const ABOUT_ACTION_BUTTON_CLASS = 'btn btn-ghost w-full shrink-0 justify-center border border-neutral-300 dark:border-neutral-700 sm:w-56';
 const ABOUT_CARD_CLASS = 'rounded-xl border border-neutral-200 bg-neutral-50 p-5 dark:border-neutral-800 dark:bg-neutral-900/50';
 const NODUS_REPOSITORY_URL = 'https://github.com/Drakonis96/nodus';
+const NODUS_SERVER_GUIDE_URL = `${NODUS_REPOSITORY_URL}/blob/main/server/README.md`;
 const NODUS_PRIVACY_URL = `${NODUS_REPOSITORY_URL}/blob/main/PRIVACY.md`;
 const NODUS_LICENSE_URL = `${NODUS_REPOSITORY_URL}/blob/main/LICENSE`;
 const NODUS_SECURITY_REPORT_URL = `${NODUS_REPOSITORY_URL}/security/advisories/new`;
@@ -140,6 +141,7 @@ export function Settings({
   const [nodusServerPairCode, setNodusServerPairCode] = useState('');
   const [nodusServerBusy, setNodusServerBusy] = useState(false);
   const [nodusServerMessage, setNodusServerMessage] = useState<string | null>(null);
+  const [nodusServerGuideOpen, setNodusServerGuideOpen] = useState(false);
   const [copilotStatus, setCopilotStatus] = useState<CopilotServerStatus>({ running: false, port: null, addinUrl: null, certReady: false, error: null });
   const [copilotBusy, setCopilotBusy] = useState(false);
   const [copilotInstallBusy, setCopilotInstallBusy] = useState(false);
@@ -1152,6 +1154,12 @@ export function Settings({
           <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-300">
             {t('Versión experimental recomendada solo para testers. Guarda copias de seguridad y reporta cualquier error desde el botón superior.')}
           </p>
+          <button
+            className="btn btn-ghost w-full justify-center border border-indigo-300 text-indigo-700 dark:border-indigo-800 dark:text-indigo-300 sm:w-auto"
+            onClick={() => setNodusServerGuideOpen(true)}
+          >
+            <Icon name="graduation" /> {t('Guía de instalación paso a paso')}
+          </button>
           <div
             data-testid="nodus-server-settings-card"
             className="rounded-xl border border-indigo-200 bg-indigo-50 p-4 dark:border-indigo-900/70 dark:bg-indigo-950/20"
@@ -1977,6 +1985,12 @@ export function Settings({
           onClose={() => setMcpHelpOpen(false)}
         />
       )}
+      {nodusServerGuideOpen && (
+        <NodusServerGuideModal
+          onOpenGuide={() => void window.nodus.openExternal(NODUS_SERVER_GUIDE_URL)}
+          onClose={() => setNodusServerGuideOpen(false)}
+        />
+      )}
       {backupResult && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-6" onClick={() => setBackupResult(null)}>
           <div className="card w-full max-w-lg p-5" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
@@ -2093,6 +2107,61 @@ export function Settings({
           onClose={() => setOpenLegalDoc(null)}
         />
       )}
+    </div>
+  );
+}
+
+const NODUS_SERVER_GUIDE_STEPS = [
+  ['1. Prepara el equipo', 'Instala Docker Desktop en Windows o macOS, o Docker Engine en Linux. También puedes usar un VPS y administrar el Stack desde Portainer. El equipo debe permanecer encendido.'],
+  ['2. Elige una dirección', 'Crea un dominio o subdominio para Nodus. Haz que su DNS apunte a la IP pública del servidor; si la IP cambia, configura DDNS. Caddy obtiene HTTPS, pero no crea el registro DNS.'],
+  ['3. Despliega el Stack', 'En Portainer abre Stacks, crea uno nuevo, pega el Stack oficial y define NODUS_DOMAIN y un NODUS_SETUP_TOKEN aleatorio de al menos 16 caracteres. Después pulsa Deploy the stack.'],
+  ['4. Publica HTTPS de forma segura', 'Si no tienes proxy, el Stack con Caddy utiliza los puertos 80 y 443. Si ya usas Caddy o Nginx, despliega solo Nodus Server y dirige el proxy a 127.0.0.1:7443 o nodus-server:7443. Cloudflare Tunnel también puede apuntar a ese destino. Nunca expongas 7443 directamente a Internet.'],
+  ['5. Completa la configuración web', 'Abre https://tu-dominio/setup, introduce el token de instalación y crea la cuenta administradora. Después borra NODUS_SETUP_TOKEN del Stack y vuelve a desplegarlo. La contraseña se cambia desde Mi cuenta.'],
+  ['6. Crea usuarios y espacios', 'En la administración web crea un espacio, crea las cuentas lectoras y concede a cada persona únicamente los espacios que debe consultar. El administrador puede restablecer contraseñas temporales.'],
+  ['7. Conecta este vault', 'En el servidor genera un código para Nodus. Aquí, en Ajustes → Servidor, escribe la dirección HTTPS y ese código de un solo uso. Nodus enviará una copia filtrada y la mantendrá actualizada mientras la aplicación esté abierta.'],
+  ['8. Conecta ChatGPT o Claude', 'Añade https://tu-dominio/mcp como servidor MCP remoto. El cliente abrirá OAuth: cada persona inicia sesión, autoriza la lectura y solo puede consultar los espacios que tenga asignados.'],
+  ['9. Mantén el servidor', 'Actualiza periódicamente la imagen main, conserva copias del volumen nodus_data y prueba su restauración. Las contraseñas, tokens, archivos PDF, rutas locales y la base SQLite original no se publican desde el vault.'],
+] as const;
+
+function NodusServerGuideModal({ onOpenGuide, onClose }: { onOpenGuide: () => void; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-3 sm:p-6" onClick={onClose}>
+      <div
+        className="card flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="nodus-server-guide-title"
+        data-testid="nodus-server-guide-modal"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-start gap-3 border-b border-neutral-200 p-5 dark:border-neutral-800">
+          <div className="min-w-0 flex-1">
+            <h2 id="nodus-server-guide-title" className="text-lg font-semibold">{t('Cómo instalar y conectar Nodus Server')}</h2>
+            <p className="mt-1 text-sm text-neutral-500">{t('Sigue estos pasos en orden. No necesitas abrir puertos en el ordenador donde utilizas Nodus Desktop.')}</p>
+          </div>
+          <button className="btn btn-ghost shrink-0" onClick={onClose} aria-label={t('Cerrar')} title={t('Cerrar')}>
+            <Icon name="x" />
+          </button>
+        </div>
+        <div className="overflow-y-auto p-5">
+          <ol className="space-y-3">
+            {NODUS_SERVER_GUIDE_STEPS.map(([title, description]) => (
+              <li key={title} className="rounded-xl border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-800 dark:bg-neutral-950/50">
+                <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{t(title)}</h3>
+                <p className="mt-1 text-sm leading-6 text-neutral-600 dark:text-neutral-400">{t(description)}</p>
+              </li>
+            ))}
+          </ol>
+          <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm leading-6 text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-300">
+            <strong>{t('Regla de seguridad')}:</strong>{' '}
+            {t('Solo el reverse proxy o el túnel debe ser público y siempre con HTTPS. No guardes el token de instalación después del primer arranque ni compartas contraseñas por mensajes sin cifrar.')}
+          </div>
+        </div>
+        <div className="flex flex-col-reverse gap-2 border-t border-neutral-200 p-4 dark:border-neutral-800 sm:flex-row sm:justify-end">
+          <button className="btn btn-ghost" onClick={onClose}>{t('Cerrar')}</button>
+          <button className="btn btn-primary" onClick={onOpenGuide}><Icon name="external" /> {t('Abrir guía completa')}</button>
+        </div>
+      </div>
     </div>
   );
 }

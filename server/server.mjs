@@ -219,7 +219,16 @@ function setupPage(error = '') {
 }
 
 function loginPage(next = '/', error = '') {
-  return page('Entrar', `<h1>Entrar en Nodus Server</h1>${error ? `<p class="warn">${escapeHtml(error)}</p>` : ''}<form class="card" method="post" action="/login"><input type="hidden" name="next" value="${escapeHtml(next)}"><label>Correo</label><input name="email" type="email" required><label>Contraseña</label><input name="password" type="password" required><button>Entrar</button></form>`);
+  return page('Entrar', `<h1>Entrar en Nodus Server</h1>${error ? `<p class="warn">${escapeHtml(error)}</p>` : ''}<form class="card" method="post" action="/login"><input type="hidden" name="next" value="${escapeHtml(next)}"><label>Correo</label><input name="email" type="email" autocomplete="username" required><label>Contraseña</label><input name="password" type="password" autocomplete="current-password" required><button>Entrar</button></form>`);
+}
+
+function accountPage(current, notice = '', error = '') {
+  const adminLink = current.user.role === 'admin' ? '<a href="/">Administración</a> · ' : '';
+  return page('Mi cuenta', `<div style="display:flex;gap:16px;align-items:center"><h1 style="flex:1">Mi cuenta</h1><form method="post" action="/logout"><input type="hidden" name="csrf" value="${current.session.csrf}"><button class="secondary">Salir</button></form></div><p>${adminLink}<span class="muted">${escapeHtml(current.user.email)}</span></p>${notice ? `<p class="ok">${escapeHtml(notice)}</p>` : ''}${error ? `<p class="warn">${escapeHtml(error)}</p>` : ''}<form class="card" method="post" action="/account/password"><h2>Cambiar contraseña</h2><p class="muted">Debe tener al menos 12 caracteres. Al cambiarla, se cerrarán tus otras sesiones y se revocarán las conexiones OAuth de ChatGPT y Claude.</p><input type="hidden" name="csrf" value="${current.session.csrf}"><label>Contraseña actual</label><input name="currentPassword" type="password" autocomplete="current-password" required><label>Nueva contraseña</label><input name="newPassword" type="password" autocomplete="new-password" minlength="12" required><label>Repite la nueva contraseña</label><input name="confirmPassword" type="password" autocomplete="new-password" minlength="12" required><button>Cambiar contraseña</button></form>`);
+}
+
+function resetPasswordPage(current, user, error = '') {
+  return page('Restablecer contraseña', `<h1>Restablecer contraseña</h1><p><a href="/">← Volver a la administración</a></p>${error ? `<p class="warn">${escapeHtml(error)}</p>` : ''}<form class="card" method="post" action="/admin/users/password"><h2>${escapeHtml(user.email)}</h2><p class="muted">La cuenta se cerrará en todos sus dispositivos y tendrá que volver a conectar ChatGPT o Claude.</p><input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="userId" value="${user.id}"><label>Nueva contraseña temporal</label><input name="newPassword" type="password" autocomplete="new-password" minlength="12" required><label>Repite la nueva contraseña</label><input name="confirmPassword" type="password" autocomplete="new-password" minlength="12" required><button>Restablecer contraseña</button></form>`);
 }
 
 function dashboard(current, notice = '') {
@@ -232,13 +241,14 @@ function dashboard(current, notice = '') {
       return `<div>${escapeHtml(space?.name || entry.spaceId)} · ${escapeHtml(entry.role)} ${remove}</div>`;
     }).join('') || '—';
     const grant = user.role === 'admin' || !spaceOptions ? '' : `<form method="post" action="/admin/access/grant"><input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="userId" value="${user.id}"><select name="spaceId">${spaceOptions}</select><button class="secondary">Dar acceso lector</button></form>`;
-    return `<tr><td>${escapeHtml(user.email)}</td><td>${escapeHtml(user.role)}</td><td>${access}</td><td>${grant}</td></tr>`;
+    const reset = user.role === 'member' ? `<p><a href="/admin/users/password?userId=${encodeURIComponent(user.id)}">Restablecer contraseña</a></p>` : '<p><a href="/account">Cambiar mi contraseña</a></p>';
+    return `<tr><td>${escapeHtml(user.email)}</td><td>${escapeHtml(user.role)}</td><td>${access}</td><td>${grant}${reset}</td></tr>`;
   }).join('');
   const devices = store.state.deviceTokens.map((device) => {
     const space = store.state.spaces.find((entry) => entry.id === device.spaceId);
     return `<tr><td>${escapeHtml(device.deviceName)}</td><td>${escapeHtml(space?.name || device.spaceId)}</td><td>${escapeHtml(device.lastUsedAt || 'Nunca')}</td><td><form method="post" action="/admin/devices/revoke"><input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="tokenHash" value="${device.hash}"><button class="secondary">Revocar</button></form></td></tr>`;
   }).join('');
-  return page('Administración', `<div style="display:flex;gap:16px;align-items:center"><h1 style="flex:1">${escapeHtml(store.state.settings.name)}</h1><form method="post" action="/logout"><input type="hidden" name="csrf" value="${current.session.csrf}"><button class="secondary">Salir</button></form></div><p class="muted">URL MCP: <code>${escapeHtml(mcpResource())}</code></p>${notice ? `<p class="ok">${escapeHtml(notice)}</p>` : ''}<div class="grid"><form class="card" method="post" action="/admin/spaces"><h2>Nuevo espacio</h2><input type="hidden" name="csrf" value="${current.session.csrf}"><label>Nombre</label><input name="name" required><label>Descripción</label><input name="description"><button>Crear espacio</button></form><form class="card" method="post" action="/admin/users"><h2>Nuevo usuario</h2><input type="hidden" name="csrf" value="${current.session.csrf}"><label>Correo</label><input name="email" type="email" required><label>Contraseña temporal</label><input name="password" type="password" minlength="12" required><label>Espacio</label><select name="spaceId">${spaceOptions}</select><button>Crear usuario lector</button></form></div><div class="card"><h2>Espacios</h2><table><tr><th>Nombre</th><th>ID</th><th>Última publicación</th><th></th></tr>${spaces || '<tr><td colspan="4">Todavía no hay espacios.</td></tr>'}</table></div><div class="card"><h2>Usuarios y acceso</h2><p class="muted">La versión actual publica herramientas MCP de consulta. No expone calificaciones ni escritura remota.</p><table><tr><th>Correo</th><th>Cuenta</th><th>Acceso</th><th>Añadir</th></tr>${users}</table></div><div class="card"><h2>Dispositivos publicadores</h2><table><tr><th>Dispositivo</th><th>Espacio</th><th>Último uso</th><th></th></tr>${devices || '<tr><td colspan="4">No hay dispositivos emparejados.</td></tr>'}</table></div>`);
+  return page('Administración', `<div style="display:flex;gap:16px;align-items:center"><h1 style="flex:1">${escapeHtml(store.state.settings.name)}</h1><a href="/account">Mi cuenta</a><form method="post" action="/logout"><input type="hidden" name="csrf" value="${current.session.csrf}"><button class="secondary">Salir</button></form></div><p class="muted">URL MCP: <code>${escapeHtml(mcpResource())}</code></p>${notice ? `<p class="ok">${escapeHtml(notice)}</p>` : ''}<div class="grid"><form class="card" method="post" action="/admin/spaces"><h2>Nuevo espacio</h2><input type="hidden" name="csrf" value="${current.session.csrf}"><label>Nombre</label><input name="name" required><label>Descripción</label><input name="description"><button>Crear espacio</button></form><form class="card" method="post" action="/admin/users"><h2>Nuevo usuario</h2><input type="hidden" name="csrf" value="${current.session.csrf}"><label>Correo</label><input name="email" type="email" required><label>Contraseña temporal</label><input name="password" type="password" autocomplete="new-password" minlength="12" required><label>Espacio</label><select name="spaceId">${spaceOptions}</select><button>Crear usuario lector</button></form></div><div class="card"><h2>Espacios</h2><table><tr><th>Nombre</th><th>ID</th><th>Última publicación</th><th></th></tr>${spaces || '<tr><td colspan="4">Todavía no hay espacios.</td></tr>'}</table></div><div class="card"><h2>Usuarios y acceso</h2><p class="muted">La versión actual publica herramientas MCP de consulta. No expone calificaciones ni escritura remota.</p><table><tr><th>Correo</th><th>Cuenta</th><th>Acceso</th><th>Acciones</th></tr>${users}</table></div><div class="card"><h2>Dispositivos publicadores</h2><table><tr><th>Dispositivo</th><th>Espacio</th><th>Último uso</th><th></th></tr>${devices || '<tr><td colspan="4">No hay dispositivos emparejados.</td></tr>'}</table></div>`);
 }
 
 async function route(req, res) {
@@ -270,7 +280,49 @@ async function route(req, res) {
     if (!user) return html(res, 401, loginPage(values.next || '/', 'Correo o contraseña incorrectos.'));
     const raw = store.createSession(user.id);
     const next = String(values.next || '/');
-    return redirect(res, next.startsWith('/') && !next.startsWith('//') ? next : '/', { 'set-cookie': `nodus_session=${encodeURIComponent(raw)}; Path=/; HttpOnly; SameSite=Lax${publicUrl().startsWith('https://') ? '; Secure' : ''}` });
+    const safeNext = next.startsWith('/') && !next.startsWith('//') ? next : '/';
+    const destination = safeNext === '/' && user.role !== 'admin' ? '/account' : safeNext;
+    return redirect(res, destination, { 'set-cookie': `nodus_session=${encodeURIComponent(raw)}; Path=/; HttpOnly; SameSite=Lax${publicUrl().startsWith('https://') ? '; Secure' : ''}` });
+  }
+
+  if (url.pathname === '/account' && req.method === 'GET') {
+    const current = requireSession(req, res); if (!current) return;
+    return html(res, 200, accountPage(current, url.searchParams.get('notice') || ''));
+  }
+  if (url.pathname === '/account/password' && req.method === 'POST') {
+    const current = requireSession(req, res); if (!current) return;
+    if (!rateLimit(req, res, 'password-change', 10, 15 * 60_000)) return;
+    const values = await form(req);
+    if (!checkCsrf(current, values.csrf)) return html(res, 403, page('Error', '<h1>La sesión ha caducado.</h1>'));
+    if (values.newPassword !== values.confirmPassword) return html(res, 400, accountPage(current, '', 'Las contraseñas nuevas no coinciden.'));
+    try {
+      store.changePassword(current.user.id, values.currentPassword, values.newPassword, current.session.hash);
+      return redirect(res, '/account?notice=' + encodeURIComponent('Contraseña actualizada. Tus otras sesiones y conexiones OAuth se han cerrado.'));
+    } catch (error) {
+      return html(res, 400, accountPage(current, '', error instanceof Error ? error.message : String(error)));
+    }
+  }
+
+  if (url.pathname === '/admin/users/password' && req.method === 'GET') {
+    const current = requireSession(req, res, true); if (!current) return;
+    const user = store.state.users.find((entry) => entry.id === url.searchParams.get('userId') && entry.role === 'member');
+    if (!user) return html(res, 404, page('Error', '<h1>Cuenta lectora no encontrada.</h1>'));
+    return html(res, 200, resetPasswordPage(current, user));
+  }
+  if (url.pathname === '/admin/users/password' && req.method === 'POST') {
+    const current = requireSession(req, res, true); if (!current) return;
+    if (!rateLimit(req, res, 'password-reset', 20, 15 * 60_000)) return;
+    const values = await form(req);
+    if (!checkCsrf(current, values.csrf)) return html(res, 403, page('Error', '<h1>La sesión ha caducado.</h1>'));
+    const user = store.state.users.find((entry) => entry.id === values.userId && entry.role === 'member');
+    if (!user) return html(res, 404, page('Error', '<h1>Cuenta lectora no encontrada.</h1>'));
+    if (values.newPassword !== values.confirmPassword) return html(res, 400, resetPasswordPage(current, user, 'Las contraseñas nuevas no coinciden.'));
+    try {
+      store.resetPassword(user.id, values.newPassword);
+      return redirect(res, '/?notice=' + encodeURIComponent(`Contraseña restablecida para ${user.email}.`));
+    } catch (error) {
+      return html(res, 400, resetPasswordPage(current, user, error instanceof Error ? error.message : String(error)));
+    }
   }
 
   if (url.pathname === '/oauth/register' && req.method === 'POST') {
@@ -377,7 +429,8 @@ async function route(req, res) {
   }
 
   if (url.pathname === '/') {
-    const current = requireSession(req, res, true); if (!current) return;
+    const current = requireSession(req, res); if (!current) return;
+    if (current.user.role !== 'admin') return redirect(res, '/account');
     return html(res, 200, dashboard(current, url.searchParams.get('notice') || ''));
   }
   if (url.pathname === '/logout' && req.method === 'POST') {

@@ -124,9 +124,10 @@ Por defecto se publican referencias y conocimiento académico derivado. PDF, cre
 ## Dar acceso a estudiantes o investigadores
 
 1. Desde la administración web crea una cuenta lectora con contraseña temporal y asígnala a un espacio.
-2. Puedes conceder a esa cuenta acceso lector a otros espacios o revocarlo en cualquier momento.
-3. La persona añade `https://tu-dominio/mcp` como conector MCP personalizado en ChatGPT o Claude.
-4. El cliente abre la pantalla OAuth de Nodus Server. La persona inicia sesión y autoriza el permiso de lectura.
+2. La persona inicia sesión y abre **Mi cuenta** para cambiar esa contraseña. Se cerrarán sus demás sesiones y se revocarán sus conexiones OAuth anteriores.
+3. Puedes conceder a esa cuenta acceso lector a otros espacios, revocarlo o restablecer su contraseña temporal desde la tabla de usuarios. Un restablecimiento administrativo cierra todas las sesiones y conexiones OAuth de esa cuenta.
+4. La persona añade `https://tu-dominio/mcp` como conector MCP personalizado en ChatGPT o Claude.
+5. El cliente abre la pantalla OAuth de Nodus Server. La persona inicia sesión y autoriza el permiso de lectura.
 
 Cada token está vinculado a esa persona y a esta URL MCP. Las herramientas comprueban la membresía del espacio en cada llamada. La versión actual es deliberadamente de solo lectura; las ediciones remotas no se mezclan con el vault local ni pueden sobrescribirlo.
 
@@ -135,6 +136,7 @@ Cada token está vinculado a esa persona y a esta URL MCP. Las herramientas comp
 - No expongas 7443 a Internet ni uses el servidor sin HTTPS.
 - Mantén Docker, Caddy/Nginx y la imagen de Nodus actualizados.
 - Usa contraseñas únicas; el servidor exige al menos 12 caracteres y limita intentos de login y emparejamiento.
+- Cambia tu propia contraseña desde **Mi cuenta**. El administrador solo puede restablecer contraseñas de cuentas lectoras; no puede ver las contraseñas existentes.
 - Revoca desde la web cualquier dispositivo perdido. Desconectar el vault en Desktop detiene los envíos, pero el administrador debe eliminar la publicación retenida cuando corresponda.
 - Haz copias periódicas del volumen `nodus_data` y prueba su restauración. El estado y las publicaciones están bajo `/data` dentro del contenedor.
 - La copia de seguridad debe protegerse como los materiales que contiene. Para datos institucionales, documenta alojamiento, conservación, accesos, encargados y transferencias conforme a tu política y al RGPD.

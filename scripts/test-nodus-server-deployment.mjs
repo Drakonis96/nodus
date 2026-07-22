@@ -36,3 +36,16 @@ test('the image is non-root, health-checked and visibly experimental', () => {
   assert.match(dockerfile, /app\.nodus\.stability="experimental"/);
   assert.match(read('server/README.md'), /Experimental e inestable/);
 });
+
+test('desktop settings include a beginner-friendly server deployment guide', () => {
+  const settings = read('src/views/Settings.tsx');
+  const translations = read('src/i18n.server.ts');
+  assert.match(settings, /data-testid="nodus-server-guide-modal"/);
+  assert.match(settings, /NODUS_SETUP_TOKEN/);
+  assert.match(settings, /Caddy o Nginx/);
+  assert.match(settings, /Cloudflare Tunnel/);
+  assert.match(settings, /Nunca expongas 7443 directamente a Internet/);
+  assert.match(settings, /ChatGPT o Claude/);
+  assert.match(translations, /Step-by-step installation guide/);
+  assert.match(read('server/README.md'), /Mi cuenta/);
+});
