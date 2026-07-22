@@ -1404,6 +1404,21 @@ export const FR: Record<string, string> = {
   'Último paso: añade Nodus en ChatGPT': 'Dernière étape : ajoutez Nodus dans ChatGPT',
   'Abre la configuración de ChatGPT, crea una app, elige «Tunnel» como conexión y selecciona el túnel que acabas de configurar.':
     'Ouvrez les paramètres de ChatGPT, créez une app, choisissez « Tunnel » comme connexion et sélectionnez le tunnel que vous venez de configurer.',
+  'Activa el modo desarrollador si es necesario': 'Activez le mode développeur si nécessaire',
+  'En ChatGPT, ve a Configuración → Seguridad e inicio de sesión y activa Modo desarrollador. Si ya está activo, continúa con el siguiente paso.':
+    'Dans ChatGPT, accédez à Paramètres → Sécurité et connexion et activez le mode développeur. S’il est déjà activé, passez à l’étape suivante.',
+  'Abre el configurador de complementos': 'Ouvrez le configurateur de plugins',
+  'En la configuración de ChatGPT, abre Complementos, pulsa Añadir complemento e introduce un nombre, por ejemplo «Nodus».':
+    'Dans les paramètres de ChatGPT, ouvrez Plugins, sélectionnez Ajouter un plugin et saisissez un nom, par exemple « Nodus ».',
+  'Selecciona el túnel de Nodus': 'Sélectionnez le tunnel Nodus',
+  'Cuando ChatGPT solicite la conexión, elige Túnel y selecciona el túnel que acabas de configurar; no introduzcas la URL local.':
+    'Lorsque ChatGPT demande la connexion, choisissez Tunnel et sélectionnez le tunnel que vous venez de configurer ; ne saisissez pas l’URL locale.',
+  'Configura la autenticación': 'Configurez l’authentification',
+  'En Autenticación, selecciona Sin autenticación. No pegues aquí la clave de ejecución de OpenAI ni el token MCP local.':
+    'Dans Authentification, choisissez Aucune authentification. Ne collez ici ni la clé d’exécution OpenAI ni le jeton MCP local.',
+  'Confirma y termina': 'Confirmez et terminez',
+  'Marca Entiendo y quiero continuar y guarda el complemento. Nodus estará disponible en los chats donde actives el complemento.':
+    'Cochez Je comprends et je souhaite continuer, puis enregistrez le plugin. Nodus sera disponible dans les chats où vous activez le plugin.',
   'Abrir configuración de ChatGPT': 'Ouvrir les paramètres de ChatGPT',
   'Abrir diagnóstico': 'Ouvrir le diagnostic',
   'Desconectar': 'Déconnecter',
