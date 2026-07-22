@@ -5631,6 +5631,7 @@ export interface NodusApi {
   listIdeasPage(request: IdeaPageRequest): Promise<IdeaPage>;
   listIdeaConnections(globalId: string): Promise<IdeaConnection[]>;
   getIdeaDetail(globalId: string): Promise<IdeaDetail | null>;
+  deleteIdea(globalId: string): Promise<void>;
   getEdgeDetail(edgeId: string): Promise<EdgeDetail | null>;
   /** Every direct idea↔idea edge touching an idea (its connections). */
   getIdeaEdges(globalId: string): Promise<EdgeDetail[]>;
@@ -5685,7 +5686,7 @@ export interface NodusApi {
   addStudyPlacement(documentId: string, input: StudyPlacementInput): Promise<StudyPlacement>;
   setPrimaryStudyPlacement(documentId: string, input: StudyPlacementInput): Promise<StudyPlacement>;
   removeStudyPlacement(id: string): Promise<void>;
-  setStudyLifecycle(kind: StudyEntityKind, id: string, action: StudyLifecycleAction): Promise<void>;
+  setStudyLifecycle(kind: StudyEntityKind, id: string, action: StudyLifecycleAction, options?: { purgeLinkedKnowledge?: boolean }): Promise<void>;
   /** The copy keeps the original's academic year; re-file it by editing the copy. */
   duplicateStudyTree(kind: StudyEntityKind, id: string): Promise<StudyCourse | StudySubject | StudyTopic | StudyFolder | StudyDocument>;
   createStudyTag(input: CreateStudyTagInput): Promise<StudyTag>;
@@ -5751,7 +5752,7 @@ export interface NodusApi {
   deleteStudyMaterialAnnotation(id: string): Promise<void>;
   exportAnnotatedStudyMaterial(id: string): Promise<{ path: string } | null>;
   createStudyNoteFromMaterial(materialId: string, annotationId?: string | null, title?: string): Promise<{ documentId: string }>;
-  setStudyMaterialLifecycle(id: string, action: 'archive' | 'restore' | 'trash' | 'recover' | 'delete'): Promise<void>;
+  setStudyMaterialLifecycle(id: string, action: 'archive' | 'restore' | 'trash' | 'recover' | 'delete', options?: { purgeLinkedKnowledge?: boolean }): Promise<void>;
   listStudyRecordings(options?: StudyRecordingListOptions): Promise<StudyRecordingSummary[]>;
   getStudyRecording(id: string): Promise<StudyRecordingDetail>;
   getStudyRecordingContent(id: string): Promise<StudyRecordingContent>;
@@ -5857,6 +5858,7 @@ export interface NodusApi {
   onStudySearchProgress(cb: (progress: StudySearchProgress) => void): () => void;
   listStudyIdeas(subjectId: string, query?: string): Promise<StudyIdeaSummary[]>;
   getStudyIdeaDetail(id: string): Promise<StudyIdeaDetail | null>;
+  deleteStudyIdea(id: string): Promise<void>;
   getStudyKnowledgeGraph(subjectId: string): Promise<StudyKnowledgeGraph>;
   listStudyKnowledgeJobs(subjectId?: string): Promise<StudyKnowledgeJob[]>;
   getStudyKnowledgeProgress(): Promise<StudyKnowledgeProgress>;

@@ -63,6 +63,11 @@ export function getStudyIdeaDetail(id: string): StudyIdeaDetail | null {
   return { ...summary(row), evidence, connections };
 }
 
+/** Delete one canonical study idea and every dependent vector/evidence/edge. */
+export function deleteStudyIdea(id: string): boolean {
+  return getDb().prepare('DELETE FROM study_ideas WHERE id=?').run(id).changes > 0;
+}
+
 function connection(row: Row): StudyIdeaConnection {
   return {
     id: String(row.id), subjectId: String(row.subject_id), fromId: String(row.from_id), toId: String(row.to_id),

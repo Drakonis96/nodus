@@ -126,7 +126,9 @@ export function mergeStudyKnowledgeExtractions(parts: StudyKnowledgeExtraction[]
 
 function sourceData(kind: StudyKnowledgeSourceKind, id: string): SourceData | null {
   if (kind === 'material') {
-    const material = getStudyMaterial(id); const text = [material.visualDescription, material.extractedText].filter(Boolean).join('\n\n').trim();
+    const material = getStudyMaterial(id);
+    if (material.deletedAt || material.archivedAt) return null;
+    const text = [material.visualDescription, material.extractedText].filter(Boolean).join('\n\n').trim();
     return { kind, id, title: material.title, text, hash: crypto.createHash('sha256').update(text).digest('hex') };
   }
   const row = getDb().prepare('SELECT title,content_markdown FROM study_docs WHERE id=? AND deleted_at IS NULL AND archived_at IS NULL').get(id) as { title: string; content_markdown: string } | undefined;
@@ -173,6 +175,10 @@ async function analyzeSource(source: SourceData, force: boolean, externalConsent
     const merged = mergeStudyKnowledgeExtractions(parts); const embeddingTexts = merged.ideas.map((idea) => `${idea.type}\n${idea.label}\n${idea.statement}`);
     const vectors = await embedMany(embeddingTexts); const config = currentEmbeddingConfig();
     for (const subjectId of pendingSubjects) {
+      // The source can be deleted while an external model is still answering.
+      // Re-check scope immediately before writing so a late response can never
+      // resurrect ideas the user just chose to purge.
+      if (!sourceSubjectIds(source.kind, source.id).includes(subjectId)) continue;
       setStudyKnowledgeJob({ subjectId, sourceKind: source.kind, sourceId: source.id, status: 'relating', phase: 'relating', sourceHash: source.hash }); emit();
       replaceStudySourceKnowledge({ subjectId, sourceKind: source.kind, sourceId: source.id, sourceTitle: source.title, sourceHash: source.hash,
         ideas: merged.ideas, relations: merged.relations, embeddings: vectors, embeddingProvider: config.provider, embeddingModel: config.model });

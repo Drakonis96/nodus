@@ -4,6 +4,17 @@ import { AI_OCR_TRANSLATIONS } from './i18n.aiOcr';
 /** Complete static Italian interface table; coverage prohibits runtime fallbacks. */
 export const IT: Record<string, string> = {
   ...AI_OCR_TRANSLATIONS.it,
+  'Mover documento a la papelera': 'Sposta il documento nel cestino',
+  'Mover documentos a la papelera': 'Sposta i documenti nel cestino',
+  '«{name}» dejará de aparecer. Podrás recuperarlo desde la administración de datos.': '«{name}» non sarà più visibile. Potrai recuperarlo dalla gestione dei dati.',
+  'Los {n} documentos seleccionados dejarán de aparecer. Podrás recuperarlos desde la administración de datos.': 'I {n} documenti selezionati non saranno più visibili. Potrai recuperarli dalla gestione dei dati.',
+  '¿Eliminar también las ideas vinculadas?': 'Eliminare anche le idee collegate?',
+  'Se eliminarán las ideas que solo proceden de estos documentos, junto con sus embeddings, evidencia y conexiones. Las ideas compartidas con otras fuentes se conservarán.': 'Le idee provenienti solo da questi documenti verranno eliminate insieme a embedding, prove e connessioni. Le idee condivise con altre fonti verranno conservate.',
+  'Eliminar ideas y embeddings': 'Elimina idee ed embedding',
+  'Conservar ideas': 'Conserva idee',
+  'Cancelar operación': 'Annulla operazione',
+  'Eliminar idea': 'Elimina idea',
+  'Se eliminará «{name}» junto con su embedding, evidencia y conexiones. Esta acción no se puede deshacer.': '«{name}» verrà eliminata insieme al relativo embedding, alle prove e alle connessioni. Questa azione non può essere annullata.',
   "No se pudo traducir este mensaje.": "Questo messaggio non può essere tradotto.",
   "Analizando fragmento {current}/{total} con IA… ({seconds}s)": "Analisi del pezzo {current}/{total} con l'intelligenza artificiale… ({seconds}s)",
   "Analizando fragmento {current}/{total} con IA…": "Analisi del pezzo {current}/{total} con l'intelligenza artificiale…",

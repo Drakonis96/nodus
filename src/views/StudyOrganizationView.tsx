@@ -5,6 +5,7 @@ import type { StudyAcademicYear, StudyExportFormat, StudyExportScope, StudyMater
 import { STUDY_DOCUMENT_KINDS } from '@shared/studyOrg';
 import { Icon, Spinner } from '../components/ui';
 import { ConfirmModal } from '../components/ConfirmModal';
+import { LinkedKnowledgeDeleteFlow, type LinkedKnowledgeDeleteStep } from '../components/LinkedKnowledgeDeleteFlow';
 import { IconEmojiPicker } from '../components/IconEmojiPicker';
 import { StudyGeneratedQuestionsTable, StudyTestGeneratorDialog, type StudyTestScope } from '../components/StudyTestGenerator';
 import {
@@ -29,6 +30,7 @@ const KIND_LABEL: Record<StudyDocumentKind, string> = {
 
 type StudyCreateKind = 'course' | 'subject' | 'topic' | 'folder' | 'document';
 type StudyOrganizationSort = 'manual' | 'year-desc' | 'year-asc' | 'created-desc' | 'created-asc' | 'updated-desc' | 'name-asc' | 'name-desc';
+type StudySourceDelete = { kind: 'document' | 'material'; id: string; title: string };
 
 interface StudyCreateDraft {
   kind: StudyCreateKind;
@@ -460,9 +462,8 @@ export function StudyOrganizationView({
   const [editingDocumentMetadata, setEditingDocumentMetadata] = useState<StudyDocument | null>(null);
   const [locatingItem, setLocatingItem] = useState<{ item: StudyBrowserItem; mode: 'move' | 'duplicate' } | null>(null);
   const [deletingItem, setDeletingItem] = useState<StudyBrowserItem | null>(null);
-  const [deletingDocument, setDeletingDocument] = useState<StudyDocument | null>(null);
+  const [pendingSourceDelete, setPendingSourceDelete] = useState<{ sources: StudySourceDelete[]; step: LinkedKnowledgeDeleteStep } | null>(null);
   const [renamingMaterial, setRenamingMaterial] = useState<StudyMaterialSummary | null>(null);
-  const [deletingMaterial, setDeletingMaterial] = useState<StudyMaterialSummary | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const [assessmentGenerator, setAssessmentGenerator] = useState<'test' | 'exam' | 'flashcards' | null>(null);
   const [generatedQuestions, setGeneratedQuestions] = useState<StudyQuestion[]>([]);
@@ -477,6 +478,34 @@ export function StudyOrganizationView({
     setMaterials(nextMaterials);
     setEditing((current) => current ? next.documents.find((document) => document.id === current.id) ?? null : null);
   }, []);
+
+  const requestSourceDelete = (sources: StudySourceDelete[]) => {
+    if (sources.length) setPendingSourceDelete({ sources, step: 'sources' });
+  };
+  const deletePendingSources = async (purgeLinkedKnowledge: boolean) => {
+    if (!pendingSourceDelete) return;
+    const sources = pendingSourceDelete.sources;
+    setPendingSourceDelete(null);
+    for (const source of sources) {
+      if (source.kind === 'document') {
+        await window.nodus.setStudyLifecycle('document', source.id, 'trash', { purgeLinkedKnowledge });
+      } else {
+        await window.nodus.setStudyMaterialLifecycle(source.id, 'trash', { purgeLinkedKnowledge });
+      }
+    }
+    const deletedDocumentIds = new Set(sources.filter((source) => source.kind === 'document').map((source) => source.id));
+    if (deletedDocumentIds.size) {
+      const remaining = openDocumentIds.filter((id) => !deletedDocumentIds.has(id));
+      setOpenDocumentIds(remaining);
+      if (editing && deletedDocumentIds.has(editing.id)) {
+        const next = workspace?.documents.find((document) => document.id === remaining.at(-1)) ?? null;
+        setEditing(next);
+        onTargetChange(next ? { kind: 'document', id: next.id } : null);
+      }
+    }
+    announceStudyWorkspaceChanged();
+    await reload();
+  };
 
   useEffect(() => {
     void reload();
@@ -857,7 +886,7 @@ export function StudyOrganizationView({
 
   if (editing) {
     return (
-      <Suspense fallback={<div className="flex h-full items-center justify-center"><Spinner label={t('Cargando editor…')} /></div>}>
+      <><Suspense fallback={<div className="flex h-full items-center justify-center"><Spinner label={t('Cargando editor…')} /></div>}>
       <StudyEditor
         documents={openDocuments.length ? openDocuments : [editing]}
         tags={workspace.tags}
@@ -907,14 +936,7 @@ export function StudyOrganizationView({
           await reload();
         }}
         onTrash={async () => {
-          await window.nodus.setStudyLifecycle('document', editing.id, 'trash');
-          const remaining = openDocumentIds.filter((candidate) => candidate !== editing.id);
-          setOpenDocumentIds(remaining);
-          const next = workspace.documents.find((document) => document.id === remaining.at(-1));
-          setEditing(next ?? null);
-          onTargetChange(next ? { kind: 'document', id: next.id } : null);
-          announceStudyWorkspaceChanged();
-          await reload();
+          requestSourceDelete([{ kind: 'document', id: editing.id, title: editing.title }]);
         }}
         onOpenLinkedDocument={(id) => {
           const document = workspace.documents.find((candidate) => candidate.id === id);
@@ -922,7 +944,7 @@ export function StudyOrganizationView({
         }}
         onOpenRecording={onOpenRecording}
       />
-      </Suspense>
+      </Suspense>{pendingSourceDelete && <LinkedKnowledgeDeleteFlow items={pendingSourceDelete.sources} step={pendingSourceDelete.step} onContinue={() => setPendingSourceDelete((current) => current ? { ...current, step: 'knowledge' } : current)} onChoose={(purge) => void deletePendingSources(purge)} onCancel={() => setPendingSourceDelete(null)} />}</>
     );
   }
 
@@ -1004,8 +1026,8 @@ export function StudyOrganizationView({
         {showDocuments && <section className="flex min-w-0 flex-col px-5 pb-5" data-testid="study-documents-section">
           <div className="mb-3 flex items-center justify-between gap-3"><h2 className="text-sm font-semibold text-neutral-300">{t('Apuntes y materiales')}</h2><span className="text-xs text-neutral-600">{documents.length + scopedMaterials.length}</span></div>
           <div className="flex-1 content-start overflow-y-auto">
-            {documents.length > 0 && <StudyDocumentCollection documents={documents} layout={browserLayout} onOpen={openDocument} onEdit={setEditingDocumentMetadata} onDelete={setDeletingDocument} />}
-            {scopedMaterials.length > 0 && <StudyMaterialCollection materials={scopedMaterials} layout={browserLayout} onOpen={(material) => onOpenMaterial(material.id)} onRename={setRenamingMaterial} onDelete={setDeletingMaterial} />}
+            {documents.length > 0 && <StudyDocumentCollection documents={documents} layout={browserLayout} onOpen={openDocument} onEdit={setEditingDocumentMetadata} onDelete={(document) => requestSourceDelete([{ kind: 'document', id: document.id, title: document.title }])} />}
+            {scopedMaterials.length > 0 && <StudyMaterialCollection materials={scopedMaterials} layout={browserLayout} onOpen={(material) => onOpenMaterial(material.id)} onRename={setRenamingMaterial} onDelete={(material) => requestSourceDelete([{ kind: 'material', id: material.id, title: material.title }])} />}
             {documents.length === 0 && scopedMaterials.length === 0 && (
               <div className="col-span-full rounded-xl border border-dashed border-neutral-800 px-6 py-12 text-center text-sm text-neutral-500">
                 <Icon name="book" size={24} className="mb-3 text-neutral-700" /><p>{t('No hay materiales en esta selección.')}</p>
@@ -1031,8 +1053,7 @@ export function StudyOrganizationView({
       {editingDocumentMetadata && <StudyCreateDialog initial={{ kind: 'topic', id: editingDocumentMetadata.id, name: editingDocumentMetadata.title, description: editingDocumentMetadata.description, icon: editingDocumentMetadata.icon || 'notebook', emoji: editingDocumentMetadata.emoji, imageData: editingDocumentMetadata.imageData, year: editingDocumentMetadata.year, color: editingDocumentMetadata.color, position: editingDocumentMetadata.position, createdAt: editingDocumentMetadata.createdAt, updatedAt: editingDocumentMetadata.updatedAt, courseId: null, subjectId: null, topicId: null, folderId: null, academicYearId: null, academicYearIds: [null], meta: '' }} draft={{ kind: 'document', courseId: '', subjectId: '', folderId: '', parentId: '' }} workspace={workspace} onCancel={() => setEditingDocumentMetadata(null)} onSubmit={async (values) => { await window.nodus.updateStudyEntity('document', editingDocumentMetadata.id, { title: values.name, description: values.description || null, color: values.color || null, icon: values.icon || null, emoji: values.emoji || null, imageData: values.imageData || null, year: values.year }); setEditingDocumentMetadata(null); await refreshAfterOrganizationChange(); }} />}
       {locatingItem && workspace && <StudyEntityLocationDialog item={locatingItem.item} mode={locatingItem.mode} workspace={workspace} onCancel={() => setLocatingItem(null)} onSave={async (destination) => { let entityId = locatingItem.item.id; if (locatingItem.mode === 'duplicate') entityId = (await window.nodus.duplicateStudyTree(locatingItem.item.kind, locatingItem.item.id)).id; if (locatingItem.item.kind !== 'course') await window.nodus.moveStudyEntity(locatingItem.item.kind, entityId, destination); setLocatingItem(null); await refreshAfterOrganizationChange(); }} />}
       {deletingItem && <ConfirmModal title={t('Eliminar elemento')} message={t('«{name}» y todo su contenido se moverán a la papelera.').replace('{name}', deletingItem.name)} confirmLabel={t('Mover a la papelera')} danger onCancel={() => setDeletingItem(null)} onConfirm={() => void window.nodus.setStudyLifecycle(deletingItem.kind, deletingItem.id, 'trash').then(async () => { setDeletingItem(null); await refreshAfterOrganizationChange(); })} />}
-      {deletingDocument && <ConfirmModal title={t('Eliminar elemento')} message={t('«{name}» y todo su contenido se moverán a la papelera.').replace('{name}', deletingDocument.title)} confirmLabel={t('Mover a la papelera')} danger onCancel={() => setDeletingDocument(null)} onConfirm={() => void window.nodus.setStudyLifecycle('document', deletingDocument.id, 'trash').then(async () => { setDeletingDocument(null); await refreshAfterOrganizationChange(); })} />}
-      {deletingMaterial && <ConfirmModal title={t('Mover material a la papelera')} message={t('El material «{name}» dejará de aparecer en la biblioteca. Podrás recuperarlo desde la administración de datos.').replace('{name}', deletingMaterial.title)} confirmLabel={t('Mover a la papelera')} danger onCancel={() => setDeletingMaterial(null)} onConfirm={() => void window.nodus.setStudyMaterialLifecycle(deletingMaterial.id, 'trash').then(async () => { setDeletingMaterial(null); announceStudyWorkspaceChanged(); await reload(); })} />}
+      {pendingSourceDelete && <LinkedKnowledgeDeleteFlow items={pendingSourceDelete.sources} step={pendingSourceDelete.step} onContinue={() => setPendingSourceDelete((current) => current ? { ...current, step: 'knowledge' } : current)} onChoose={(purge) => void deletePendingSources(purge)} onCancel={() => setPendingSourceDelete(null)} />}
       {renamingMaterial && <StudyMaterialRenameDialog material={renamingMaterial} onCancel={() => setRenamingMaterial(null)} onSave={async (title) => { await window.nodus.updateStudyMaterial(renamingMaterial.id, { title }); setRenamingMaterial(null); announceStudyWorkspaceChanged(); await reload(); }} />}
       {zoteroMaterialImportOpen && <ZoteroMaterialImportModal placement={placementForTarget() ?? {}} onClose={() => setZoteroMaterialImportOpen(false)} onImported={async () => { announceStudyWorkspaceChanged(); await reload(); }} />}
     </div>

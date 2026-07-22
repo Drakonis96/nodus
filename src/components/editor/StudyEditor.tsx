@@ -606,7 +606,7 @@ export function StudyEditor({
         <button className="btn btn-ghost h-8 w-8 p-0" onClick={() => window.print()} title={t('Vista previa de impresión')} aria-label={t('Vista previa de impresión')}><Icon name="external" size={13} /></button>
         <button className="btn btn-ghost h-8 w-8 p-0" onClick={() => void onDuplicate()} title={t('Duplicar')} aria-label={t('Duplicar')}><Icon name="copy" size={13} /></button>
         <button className="btn btn-ghost h-8 w-8 p-0 text-red-400" onClick={() => {
-          if (window.confirm(t('¿Mover este material a la papelera?'))) void onTrash();
+          void onTrash();
         }} title={t('Mover a la papelera')} aria-label={t('Mover a la papelera')}><Icon name="trash" size={13} /></button>
         <span className="ml-auto py-1 text-[10px] text-neutral-600">{stats.words} {t('palabras')} · {stats.readingMinutes} min</span>
       </div>

@@ -196,6 +196,33 @@ test('study actions use renderer dialogs and the sidebar has no onboarding space
   assert.doesNotMatch(sidebar, /study-sidebar-organization" className="[^"]*flex-1/);
 });
 
+test('study and teaching sources share two-step linked-knowledge deletion', async () => {
+  const [materials, organization, flow, ideas, preload, ipc, types] = await Promise.all([
+    read('src/views/StudyMaterialsView.tsx'),
+    read('src/views/StudyOrganizationView.tsx'),
+    read('src/components/LinkedKnowledgeDeleteFlow.tsx'),
+    read('src/views/IdeasView.tsx'),
+    read('electron/preload.ts'),
+    read('electron/ipc.ts'),
+    read('shared/types.ts'),
+  ]);
+  assert.match(materials, /selectedSources/);
+  assert.match(materials, /study-library-delete-selected/);
+  assert.match(materials, /<LinkedKnowledgeDeleteFlow/);
+  assert.match(organization, /<LinkedKnowledgeDeleteFlow/);
+  assert.match(flow, /step === 'sources'/);
+  assert.match(flow, /Eliminar ideas y embeddings/);
+  assert.match(flow, /Conservar ideas/);
+  assert.match(materials, /purgeLinkedKnowledge/);
+  assert.match(organization, /purgeLinkedKnowledge/);
+  assert.match(ideas, /Eliminar idea/);
+  assert.match(preload, /deleteStudyIdea/);
+  assert.match(preload, /deleteIdea/);
+  assert.match(ipc, /study:knowledge:idea:delete/);
+  assert.match(ipc, /ideas:delete/);
+  assert.match(types, /purgeLinkedKnowledge\?: boolean/);
+});
+
 test('study metadata uses one searchable icon and emoji catalogue', async () => {
   const [view, picker, ui] = await Promise.all([
     read('src/views/StudyOrganizationView.tsx'),

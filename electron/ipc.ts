@@ -2250,6 +2250,7 @@ export function registerIpc(
   h('ideas:listPage', async (_e, request) => ideas.listIdeasPage(request));
   h('ideas:connections', async (_e, globalId: string) => ideas.listIdeaConnections(globalId));
   h('graph:ideaDetail', async (_e, globalId: string) => ideas.getIdeaDetail(globalId));
+  h('ideas:delete', async (_e, globalId: string) => ideas.deleteIdea(globalId));
   h('graph:edgeDetail', async (_e, edgeId: string) => ideas.getEdgeDetail(edgeId));
   h('graph:ideaEdges', async (_e, globalId: string) => ideas.getIdeaEdges(globalId));
   h('graph:edgeFeedback:set', async (_e, fromId: string, toId: string, type: string, verdict: 'rejected' | 'confirmed' | null, note?: string) =>
@@ -2317,9 +2318,16 @@ export function registerIpc(
     const result = studyOrg.removeStudyPlacement(id); if (row) { studyKnowledgeRepo.syncStudyKnowledgeSourceScopes('document', row.document_id); queueStudyKnowledgeSources('document', [row.document_id]); studySearch.queueStudySearchIndexRefresh(); }
     return result;
   });
-  h('study:lifecycle:set', async (_e, kind: StudyEntityKind, id: string, action: StudyLifecycleAction) => {
+  h('study:lifecycle:set', async (_e, kind: StudyEntityKind, id: string, action: StudyLifecycleAction, options?: { purgeLinkedKnowledge?: boolean }) => {
+    const destructive = action === 'trash';
+    const purgeLinkedKnowledge = destructive && options?.purgeLinkedKnowledge !== false;
+    if (kind === 'document' && purgeLinkedKnowledge) studyKnowledgeRepo.purgeStudyKnowledgeSource('document', id);
     const result = studyOrg.setStudyLifecycle(kind, id, action);
-    if (kind === 'document') { studyKnowledgeRepo.syncStudyKnowledgeSourceScopes('document', id); if (action === 'restore' || action === 'recover') queueStudyKnowledgeSources('document', [id]); studySearch.queueStudySearchIndexRefresh(); }
+    if (kind === 'document') {
+      if (!destructive || purgeLinkedKnowledge) studyKnowledgeRepo.syncStudyKnowledgeSourceScopes('document', id);
+      if (action === 'restore' || action === 'recover') queueStudyKnowledgeSources('document', [id]);
+      studySearch.queueStudySearchIndexRefresh();
+    }
     else {
       const materialIds = (getDb().prepare('SELECT id FROM study_materials WHERE deleted_at IS NULL').all() as Array<{ id: string }>).map((row) => row.id);
       const documentIds = (getDb().prepare('SELECT id FROM study_docs WHERE deleted_at IS NULL').all() as Array<{ id: string }>).map((row) => row.id);
@@ -2583,10 +2591,13 @@ export function registerIpc(
   h('study:materials:note:create', async (_e, materialId: string, annotationId?: string | null, title?: string) => {
     const result = studyMaterials.createStudyNoteFromMaterial(materialId, annotationId, title); queueStudyKnowledgeSources('document', [result.documentId]); studySearch.queueStudySearchIndexRefresh(); return result;
   });
-  h('study:materials:lifecycle', async (_e, id: string, action: 'archive' | 'restore' | 'trash' | 'recover' | 'delete') => {
-    if (action === 'delete') studyKnowledgeRepo.purgeStudyKnowledgeSource('material', id);
+  h('study:materials:lifecycle', async (_e, id: string, action: 'archive' | 'restore' | 'trash' | 'recover' | 'delete', options?: { purgeLinkedKnowledge?: boolean }) => {
+    const destructive = action === 'trash' || action === 'delete';
+    const purgeLinkedKnowledge = destructive && options?.purgeLinkedKnowledge !== false;
+    if (purgeLinkedKnowledge) studyKnowledgeRepo.purgeStudyKnowledgeSource('material', id);
     const result = studyMaterials.setStudyMaterialLifecycle(id, action);
-    if (action !== 'delete') { studyKnowledgeRepo.syncStudyKnowledgeSourceScopes('material', id); if (action === 'restore' || action === 'recover') queueStudyKnowledgeSources('material', [id]); }
+    if (action !== 'delete' && (!destructive || purgeLinkedKnowledge)) studyKnowledgeRepo.syncStudyKnowledgeSourceScopes('material', id);
+    if (action === 'restore' || action === 'recover') queueStudyKnowledgeSources('material', [id]);
     studySearch.queueStudySearchIndexRefresh(); return result;
   });
   h('study:recordings:list', async (_e, options?: StudyRecordingListOptions) => studyRecordings.listStudyRecordings(options));
@@ -2812,6 +2823,7 @@ export function registerIpc(
   h('study:search:history:clear', async () => studySearch.clearStudySearchHistory());
   h('study:knowledge:ideas', async (_e, subjectId: string, query?: string) => studyKnowledgeRepo.listStudyIdeas(subjectId, query));
   h('study:knowledge:idea', async (_e, id: string) => studyKnowledgeRepo.getStudyIdeaDetail(id));
+  h('study:knowledge:idea:delete', async (_e, id: string) => studyKnowledgeRepo.deleteStudyIdea(id));
   h('study:knowledge:graph', async (_e, subjectId: string) => studyKnowledgeRepo.getStudyKnowledgeGraph(subjectId));
   h('study:knowledge:jobs', async (_e, subjectId?: string) => studyKnowledgeRepo.listStudyKnowledgeJobs(subjectId));
   h('study:knowledge:progress', async () => getStudyKnowledgeProgress());

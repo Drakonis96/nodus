@@ -52,13 +52,15 @@ try {
       global_id TEXT, nodus_id TEXT, role TEXT, development TEXT, confidence REAL,
       PRIMARY KEY (global_id, nodus_id)
     );
-    CREATE TABLE notes (id TEXT PRIMARY KEY, source_json TEXT);
+    CREATE TABLE notes (id TEXT PRIMARY KEY, source_json TEXT, updated_at TEXT);
     CREATE TABLE edges (id TEXT PRIMARY KEY, from_id TEXT, to_id TEXT, type TEXT, basis TEXT, confidence REAL, source_work TEXT);
     CREATE TABLE edge_traces (edge_id TEXT PRIMARY KEY);
     CREATE TABLE evidence (id TEXT PRIMARY KEY, nodus_id TEXT, global_id TEXT);
     CREATE TABLE idea_theme_links (theme_id TEXT, nodus_id TEXT, global_id TEXT, confidence REAL);
-    CREATE TABLE gaps (id TEXT PRIMARY KEY, nodus_id TEXT);
-    CREATE TABLE external_refs (id TEXT PRIMARY KEY, nodus_id TEXT);
+    CREATE TABLE gaps (id TEXT PRIMARY KEY, nodus_id TEXT, related_idea TEXT);
+    CREATE TABLE external_refs (id TEXT PRIMARY KEY, nodus_id TEXT, from_idea TEXT);
+    CREATE TABLE project_chapter_idea_relations (target_kind TEXT, target_id TEXT);
+    CREATE TABLE db_relations (target_kind TEXT, target_id TEXT, target_vault_id TEXT);
     CREATE TABLE work_authors (author_id TEXT, nodus_id TEXT);
     CREATE TABLE work_idea_synthesis (nodus_id TEXT PRIMARY KEY);
     CREATE TABLE edge_feedback (
@@ -122,9 +124,39 @@ try {
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM edge_traces').get().n, 0, 'dangling trace cleaned with it');
 
   const manual = repo.createIdea({ type: 'claim', label: 'Manual', statement: 'del usuario', embedding: null });
-  db.prepare('INSERT INTO notes VALUES (?, ?)').run('n1', JSON.stringify({ note: 'manual-idea', ref: manual.global_id }));
+  db.prepare('INSERT INTO notes VALUES (?, ?, ?)').run('n1', JSON.stringify({ note: 'manual-idea', ref: manual.global_id }), daysAgo(1));
   db.prepare('UPDATE ideas SET orphaned_at = ? WHERE global_id = ?').run(daysAgo(400), manual.global_id);
   assert.equal(repo.pruneDormantIdeas(30), 0, 'manual ideas are never pruned');
+
+  // ── 6. Explicit deletion is complete, but preserves user-authored note text ─
+  db.prepare("INSERT INTO edges VALUES ('e-manual', ?, ?, 'supports', 'manual', 1, NULL)").run(manual.global_id, originalId);
+  db.prepare("INSERT INTO edge_traces VALUES ('e-manual')").run();
+  db.prepare("INSERT INTO edge_feedback VALUES (?, ?, 'supports', 'confirmed', '', ?)").run(manual.global_id, originalId, daysAgo(1));
+  db.prepare("INSERT INTO idea_occurrences VALUES (?, 'w3', 'principal', '', 1)").run(manual.global_id);
+  db.prepare("INSERT INTO evidence VALUES ('ev-manual', 'w3', ?)").run(manual.global_id);
+  db.prepare("INSERT INTO idea_theme_links VALUES ('theme', 'w3', ?, 1)").run(manual.global_id);
+  db.prepare("INSERT INTO gaps VALUES ('gap-manual', 'w3', ?)").run(manual.global_id);
+  db.prepare("INSERT INTO external_refs VALUES ('ref-manual', 'w3', ?)").run(manual.global_id);
+  db.prepare("INSERT INTO project_chapter_idea_relations VALUES ('idea', ?)").run(manual.global_id);
+  db.prepare("INSERT INTO db_relations VALUES ('idea', ?, NULL)").run(manual.global_id);
+  assert.equal(repo.deleteIdea(manual.global_id), true, 'an academic idea can be explicitly deleted');
+  assert.equal(db.prepare('SELECT 1 FROM ideas WHERE global_id=?').get(manual.global_id), undefined, 'the canonical idea and embedding row are gone');
+  assert.equal(db.prepare('SELECT source_json FROM notes WHERE id=?').get('n1').source_json, null, 'the note remains but its deleted-idea provenance is detached');
+  const referenceChecks = [
+    ['edges', 'from_id=? OR to_id=?', [manual.global_id, manual.global_id]],
+    ['edge_traces', 'edge_id=?', ['e-manual']],
+    ['edge_feedback', 'from_id=? OR to_id=?', [manual.global_id, manual.global_id]],
+    ['idea_occurrences', 'global_id=?', [manual.global_id]],
+    ['evidence', 'global_id=?', [manual.global_id]],
+    ['idea_theme_links', 'global_id=?', [manual.global_id]],
+    ['gaps', 'related_idea=?', [manual.global_id]],
+    ['external_refs', 'from_idea=?', [manual.global_id]],
+    ['project_chapter_idea_relations', 'target_kind=\'idea\' AND target_id=?', [manual.global_id]],
+    ['db_relations', 'target_kind=\'idea\' AND target_id=?', [manual.global_id]],
+  ];
+  for (const [table, where, parameters] of referenceChecks) {
+    assert.equal(db.prepare(`SELECT COUNT(*) n FROM ${table} WHERE ${where}`).get(...parameters).n, 0, `${table} no longer references the deleted idea`);
+  }
 
   db.close();
   console.log('idea identity (dormancy + revival) test passed');

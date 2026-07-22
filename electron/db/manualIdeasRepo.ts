@@ -86,19 +86,7 @@ export function saveManualIdea(p: ManualIdeaPayload): void {
 
 /** Purge a manual idea and everything indexed for it. Called when its note is deleted. */
 export function deleteManualIdea(globalId: string): void {
-  const db = getDb();
-  const tx = db.transaction(() => {
-    db.prepare('DELETE FROM evidence WHERE global_id = ?').run(globalId);
-    db.prepare('DELETE FROM idea_occurrences WHERE global_id = ?').run(globalId);
-    db.prepare('DELETE FROM idea_theme_links WHERE global_id = ?').run(globalId);
-    db.prepare('DELETE FROM edge_traces WHERE edge_id IN (SELECT id FROM edges WHERE from_id = ? OR to_id = ?)').run(
-      globalId,
-      globalId
-    );
-    db.prepare('DELETE FROM edges WHERE from_id = ? OR to_id = ?').run(globalId, globalId);
-    db.prepare('DELETE FROM ideas WHERE global_id = ?').run(globalId);
-  });
-  tx();
+  ideas.deleteIdea(globalId);
 }
 
 export async function autoIndexManualIdea(input: {

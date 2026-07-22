@@ -14,13 +14,13 @@ import type {
 } from '@shared/types';
 import { parseStudyMaterialMarkers, studyMaterialLocationLabel } from '@shared/studyMaterials';
 import { Icon, Spinner } from '../components/ui';
-import { ConfirmModal } from '../components/ConfirmModal';
+import { LinkedKnowledgeDeleteFlow, type LinkedKnowledgeDeleteStep } from '../components/LinkedKnowledgeDeleteFlow';
 import { TextInputModal } from '../components/TextInputModal';
 import { ChipSelectCell } from '../components/dbGrid';
 import { announceStudyWorkspaceChanged, STUDY_WORKSPACE_CHANGED } from '../components/StudySidebar';
 import { Markdown } from '../components/Markdown';
 import { ZoteroMaterialImportModal } from '../components/ZoteroMaterialImportModal';
-import { t } from '../i18n';
+import { t, tx } from '../i18n';
 
 const PdfViewer = lazy(() => import('../components/materials/PdfViewer').then((module) => ({ default: module.PdfViewer })));
 const EpubViewer = lazy(() => import('../components/materials/EpubViewer').then((module) => ({ default: module.EpubViewer })));
@@ -40,6 +40,9 @@ const INDEX_LABEL: Record<StudyMaterialSummary['indexStatus'], string> = {
 };
 
 type MaterialPlacementDimension = 'course' | 'subject' | 'folder' | 'topic';
+type StudyLibraryDeleteSource = { kind: 'document' | 'material'; id: string; title: string };
+
+const studyLibrarySourceKey = (source: Pick<StudyLibraryDeleteSource, 'kind' | 'id'>) => `${source.kind}:${source.id}`;
 
 function indexStatusClass(status: StudyMaterialSummary['indexStatus']): string {
   if (status === 'indexed') return 'text-emerald-600 dark:text-emerald-400';
@@ -91,9 +94,10 @@ export function StudyMaterialsView({ onOpenDocument, initialMaterialId }: { onOp
   const [subjectId, setSubjectId] = useState('');
   const [topicId, setTopicId] = useState('');
   const [selected, setSelected] = useState<string | null>(null);
+  const [selectedSources, setSelectedSources] = useState<Set<string>>(() => new Set());
   const [editing, setEditing] = useState<StudyMaterialSummary | null>(null);
   const [locating, setLocating] = useState<{ material: StudyMaterialSummary; mode: 'move' | 'duplicate' } | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState<StudyMaterialSummary | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<{ sources: StudyLibraryDeleteSource[]; step: LinkedKnowledgeDeleteStep } | null>(null);
   const [message, setMessage] = useState('');
   const [dragActive, setDragActive] = useState(false);
   const [importDialogPaths, setImportDialogPaths] = useState<string[] | null>(null);
@@ -130,6 +134,52 @@ export function StudyMaterialsView({ onOpenDocument, initialMaterialId }: { onOp
       return !needle || `${document.title} ${document.description ?? ''} ${document.contentMarkdown}`.toLocaleLowerCase().includes(needle);
     }).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }, [workspace, query, readState, previewKind, courseId, subjectId, topicId]);
+  const visibleSourceKeys = useMemo(() => new Set([
+    ...notes.map((document) => studyLibrarySourceKey({ kind: 'document', id: document.id })),
+    ...materials.map((material) => studyLibrarySourceKey({ kind: 'material', id: material.id })),
+  ]), [notes, materials]);
+  useEffect(() => {
+    setSelectedSources((current) => {
+      const next = new Set([...current].filter((key) => visibleSourceKeys.has(key)));
+      return next.size === current.size ? current : next;
+    });
+  }, [visibleSourceKeys]);
+
+  const toggleSource = (source: Pick<StudyLibraryDeleteSource, 'kind' | 'id'>) => {
+    const key = studyLibrarySourceKey(source);
+    setSelectedSources((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
+  const requestDelete = (sources: StudyLibraryDeleteSource[]) => {
+    if (sources.length) setPendingDelete({ sources, step: 'sources' });
+  };
+  const requestSelectedDelete = () => requestDelete([
+    ...notes.filter((document) => selectedSources.has(studyLibrarySourceKey({ kind: 'document', id: document.id }))).map((document) => ({ kind: 'document' as const, id: document.id, title: document.title })),
+    ...materials.filter((material) => selectedSources.has(studyLibrarySourceKey({ kind: 'material', id: material.id }))).map((material) => ({ kind: 'material' as const, id: material.id, title: material.title })),
+  ]);
+  const deletePendingSources = async (purgeLinkedKnowledge: boolean) => {
+    if (!pendingDelete) return;
+    const sources = pendingDelete.sources;
+    setPendingDelete(null);
+    for (const source of sources) {
+      if (source.kind === 'document') {
+        await window.nodus.setStudyLifecycle('document', source.id, 'trash', { purgeLinkedKnowledge });
+      } else {
+        await window.nodus.setStudyMaterialLifecycle(source.id, 'trash', { purgeLinkedKnowledge });
+      }
+    }
+    if (selected && sources.some((source) => source.kind === 'material' && source.id === selected)) setSelected(null);
+    setSelectedSources((current) => {
+      const next = new Set(current);
+      sources.forEach((source) => next.delete(studyLibrarySourceKey(source)));
+      return next;
+    });
+    announceStudyWorkspaceChanged();
+    await load();
+  };
   const finishImport = async (results: Awaited<ReturnType<typeof window.nodus.importStudyMaterials>>) => {
     if (!results.length) {
       setMessage(t('No se encontraron materiales compatibles.'));
@@ -235,40 +285,46 @@ export function StudyMaterialsView({ onOpenDocument, initialMaterialId }: { onOp
         <select className="input h-8 text-xs" value={subjectId} onChange={(event) => { setSubjectId(event.target.value); setTopicId(''); }}><option value="">{t('Todas las asignaturas')}</option>{subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select>
         <select className="input h-8 text-xs" value={topicId} onChange={(event) => setTopicId(event.target.value)}><option value="">{t('Todos los temas')}</option>{topics.map((topic) => <option key={topic.id} value={topic.id}>{topic.name}</option>)}</select>
       </div>
+      {selectedSources.size > 0 && <div className="mt-3 flex items-center gap-2 rounded-xl border border-red-900/40 bg-red-950/20 px-3 py-2"><span className="text-xs text-neutral-300">{tx('{n} seleccionados', { n: selectedSources.size })}</span><button className="btn btn-ghost ml-auto h-7 text-xs" onClick={() => setSelectedSources(new Set())}>{t('Quitar selección')}</button><button data-testid="study-library-delete-selected" className="btn h-7 bg-red-600 px-3 text-xs text-white hover:bg-red-500" onClick={requestSelectedDelete}><Icon name="trash" size={12} />{t('Eliminar selección')}</button></div>}
       {message && <p className="mt-2 text-xs text-amber-300">{message}</p>}
     </header>
     <main className="relative min-h-0 flex-1 overflow-auto">
       {dragActive && <div className="pointer-events-none absolute inset-3 z-[60] grid place-items-center rounded-2xl border-2 border-dashed border-teal-500 bg-teal-50/95 text-center shadow-2xl dark:bg-teal-950/90" data-testid="study-material-dropzone"><div><Icon name="upload" size={32} className="mx-auto mb-3 text-teal-600 dark:text-teal-300" /><p className="font-semibold text-teal-900 dark:text-teal-100">{t('Suelta los materiales para prepararlos')}</p><p className="mt-1 text-xs text-teal-700 dark:text-teal-300">{t('Se abrirá el formulario para completar sus metadatos y ubicaciones.')}</p></div></div>}
       {materials.length === 0 && notes.length === 0 && <div className="grid h-full place-items-center text-center"><div><span className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-2xl bg-teal-950 text-teal-400"><Icon name="book" size={28} /></span><h2 className="text-base font-semibold text-neutral-300">{t('Tu biblioteca de materiales está vacía')}</h2><p className="mt-1 max-w-md text-sm text-neutral-600">{t('Añade PDF, Word, Markdown, presentaciones, EPUB, imágenes o audio. Los archivos se guardan dentro del vault.')}</p><button className="btn btn-primary mt-4" onClick={() => setImportDialogPaths([])}><Icon name="upload" size={13} /> {t('Añadir primer material')}</button></div></div>}
-      {notes.length > 0 && <section className="border-b border-neutral-800" data-testid="study-material-notes-section"><div className="sticky left-0 flex items-center gap-2 border-b border-neutral-800 bg-neutral-900/40 px-4 py-2"><Icon name="notebook" size={13} className="text-indigo-300" /><h2 className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{t('Apuntes')}</h2><span className="text-[10px] text-neutral-600">{notes.length}</span></div><StudyNotesTable notes={notes} placements={workspace?.placements ?? []} workspace={workspace} onOpen={onOpenDocument} /></section>}
+      {notes.length > 0 && <section className="border-b border-neutral-800" data-testid="study-material-notes-section"><div className="sticky left-0 flex items-center gap-2 border-b border-neutral-800 bg-neutral-900/40 px-4 py-2"><Icon name="notebook" size={13} className="text-indigo-300" /><h2 className="text-xs font-semibold uppercase tracking-wide text-neutral-400">{t('Apuntes')}</h2><span className="text-[10px] text-neutral-600">{notes.length}</span></div><StudyNotesTable notes={notes} placements={workspace?.placements ?? []} workspace={workspace} selected={selectedSources} onToggle={toggleSource} onOpen={onOpenDocument} onDelete={(document) => requestDelete([{ kind: 'document', id: document.id, title: document.title }])} /></section>}
       {materials.length === 0 ? null : <MaterialTable
         materials={materials}
         workspace={workspace}
+        selected={selectedSources}
+        onToggle={toggleSource}
         onOpen={(material) => { if (material.origin === 'zotero_link') void window.nodus.openStudyMaterialInZotero(material.id); else setSelected(material.id); }}
         onFavorite={async (material) => { await window.nodus.updateStudyMaterial(material.id, { favorite: !material.favorite }); await load(); }}
         onReadState={async (material, next) => { await window.nodus.updateStudyMaterial(material.id, { readState: next }); await load(); }}
         onPlacementsChange={updatePlacementDimension}
         onEdit={setEditing}
         onLocate={(material, mode) => setLocating({ material, mode })}
-        onDelete={setConfirmDelete}
+        onDelete={(material) => requestDelete([{ kind: 'material', id: material.id, title: material.title }])}
         reindexingId={reindexingId}
         onReindex={async (material) => { setReindexingId(material.id); try { await window.nodus.reindexStudyMaterial(material.id); await load(); } finally { setReindexingId(null); } }}
       />}
     </main>
-    {selected && <MaterialViewer materialId={selected} workspace={workspace} onClose={() => setSelected(null)} onChanged={load} onOpenDocument={onOpenDocument} />}
+    {selected && <MaterialViewer materialId={selected} workspace={workspace} onClose={() => setSelected(null)} onChanged={load} onOpenDocument={onOpenDocument} onRequestDelete={(material) => requestDelete([{ kind: 'material', id: material.id, title: material.title }])} />}
     {editing && <MaterialMetadataDialog material={editing} onCancel={() => setEditing(null)} onSave={async (patch) => { await window.nodus.updateStudyMaterial(editing.id, patch); setEditing(null); await load(); }} />}
     {locating && workspace && <MaterialLocationDialog material={locating.material} mode={locating.mode} workspace={workspace} onCancel={() => setLocating(null)} onSave={async (input) => { if (locating.mode === 'move') await window.nodus.setPrimaryStudyMaterialPlacement(locating.material.id, input); else await window.nodus.addStudyMaterialPlacement(locating.material.id, input); setLocating(null); await load(); }} />}
-    {confirmDelete && <ConfirmModal title={t('Mover material a la papelera')} message={t('El material «{name}» dejará de aparecer en la biblioteca. Podrás recuperarlo desde la administración de datos.').replace('{name}', confirmDelete.title)} confirmLabel={t('Mover a la papelera')} danger onConfirm={() => void window.nodus.setStudyMaterialLifecycle(confirmDelete.id, 'trash').then(async () => { setConfirmDelete(null); await load(); })} onCancel={() => setConfirmDelete(null)} />}
+    {pendingDelete && <LinkedKnowledgeDeleteFlow items={pendingDelete.sources} step={pendingDelete.step} onContinue={() => setPendingDelete((current) => current ? { ...current, step: 'knowledge' } : current)} onChoose={(purge) => void deletePendingSources(purge)} onCancel={() => setPendingDelete(null)} />}
     {importDialogPaths && workspace && <MaterialImportDialog initialPaths={importDialogPaths} initialPlacement={{ courseId: courseId || null, subjectId: subjectId || null, topicId: topicId || null }} workspace={workspace} onCancel={() => setImportDialogPaths(null)} onSave={async (draft) => { await commitMaterialImport(draft); setImportDialogPaths(null); }} />}
     {zoteroImportOpen && <ZoteroMaterialImportModal placement={{ courseId: courseId || null, subjectId: subjectId || null, topicId: topicId || null }} onClose={() => setZoteroImportOpen(false)} onImported={async (result) => finishImport([result])} />}
   </div>;
 }
 
-function StudyNotesTable({ notes, placements, workspace, onOpen }: {
+function StudyNotesTable({ notes, placements, workspace, selected, onToggle, onOpen, onDelete }: {
   notes: StudyDocument[];
   placements: StudyPlacement[];
   workspace: StudyWorkspace | null;
+  selected: Set<string>;
+  onToggle: (source: Pick<StudyLibraryDeleteSource, 'kind' | 'id'>) => void;
   onOpen: (id: string) => void;
+  onDelete: (document: StudyDocument) => void;
 }) {
   const locationNames = (documentId: string, dimension: 'course' | 'subject' | 'folder' | 'topic') => {
     if (!workspace) return '—';
@@ -278,9 +334,10 @@ function StudyNotesTable({ notes, placements, workspace, onOpen }: {
     const names = ids.map((id) => entities.find((entity) => entity.id === id)?.name).filter(Boolean);
     return names.length ? names.join(', ') : '—';
   };
+  const allSelected = notes.every((document) => selected.has(studyLibrarySourceKey({ kind: 'document', id: document.id })));
   return <table className="w-full min-w-[980px] border-collapse text-xs" data-testid="study-material-notes-table">
-    <thead className="bg-neutral-950/95"><tr className="border-b border-neutral-800 text-neutral-500"><th className="w-[320px] px-4 py-2 text-center font-medium">{t('Apunte')}</th><th className="px-3 py-2 text-center font-medium">{t('Curso')}</th><th className="px-3 py-2 text-center font-medium">{t('Asignatura')}</th><th className="px-3 py-2 text-center font-medium">{t('Carpeta')}</th><th className="px-3 py-2 text-center font-medium">{t('Tema')}</th><th className="w-[110px] px-3 py-2 text-center font-medium">{t('Formato')}</th><th className="w-[90px] px-3 py-2 text-center font-medium">{t('Acciones')}</th></tr></thead>
-    <tbody>{notes.map((document) => <tr key={document.id} data-testid={`study-material-note-${document.id}`} className="cursor-pointer border-b border-neutral-800/60 hover:bg-neutral-900/40" onClick={() => onOpen(document.id)}><td className="px-4 py-2.5"><div className="flex max-w-[310px] items-center gap-2"><span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-indigo-600/15 text-indigo-300">{document.emoji ? <span>{document.emoji}</span> : <Icon name={document.icon || 'notebook'} size={15} />}</span><span className="min-w-0"><span className="block truncate font-medium text-neutral-200">{document.title}</span><span className="block truncate text-[10px] text-neutral-600">{document.description || t('Apunte creado en Nodus')}</span></span></div></td>{(['course', 'subject', 'folder', 'topic'] as const).map((dimension) => <td key={dimension} className="max-w-[180px] truncate px-3 py-2.5 text-neutral-500">{locationNames(document.id, dimension)}</td>)}<td className="px-3 py-2.5 text-neutral-500">{t('Apunte')}</td><td className="px-3 py-2.5 text-right"><button className="btn btn-ghost h-7 px-2" title={t('Abrir apunte')} onClick={(event) => { event.stopPropagation(); onOpen(document.id); }}><Icon name="external" size={12} /></button></td></tr>)}</tbody>
+    <thead className="bg-neutral-950/95"><tr className="border-b border-neutral-800 text-neutral-500"><th className="w-10 px-3 py-2 text-center"><input type="checkbox" aria-label={t('Seleccionar todos')} checked={allSelected} onChange={() => notes.forEach((document) => { const isSelected = selected.has(studyLibrarySourceKey({ kind: 'document', id: document.id })); if (isSelected === allSelected) onToggle({ kind: 'document', id: document.id }); })} /></th><th className="w-[320px] px-4 py-2 text-center font-medium">{t('Apunte')}</th><th className="px-3 py-2 text-center font-medium">{t('Curso')}</th><th className="px-3 py-2 text-center font-medium">{t('Asignatura')}</th><th className="px-3 py-2 text-center font-medium">{t('Carpeta')}</th><th className="px-3 py-2 text-center font-medium">{t('Tema')}</th><th className="w-[110px] px-3 py-2 text-center font-medium">{t('Formato')}</th><th className="w-[90px] px-3 py-2 text-center font-medium">{t('Acciones')}</th></tr></thead>
+    <tbody>{notes.map((document) => <tr key={document.id} data-testid={`study-material-note-${document.id}`} className="cursor-pointer border-b border-neutral-800/60 hover:bg-neutral-900/40" onClick={() => onOpen(document.id)}><td className="px-3 py-2.5"><input type="checkbox" aria-label={document.title} checked={selected.has(studyLibrarySourceKey({ kind: 'document', id: document.id }))} onClick={(event) => event.stopPropagation()} onChange={() => onToggle({ kind: 'document', id: document.id })} /></td><td className="px-4 py-2.5"><div className="flex max-w-[310px] items-center gap-2"><span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-indigo-600/15 text-indigo-300">{document.emoji ? <span>{document.emoji}</span> : <Icon name={document.icon || 'notebook'} size={15} />}</span><span className="min-w-0"><span className="block truncate font-medium text-neutral-200">{document.title}</span><span className="block truncate text-[10px] text-neutral-600">{document.description || t('Apunte creado en Nodus')}</span></span></div></td>{(['course', 'subject', 'folder', 'topic'] as const).map((dimension) => <td key={dimension} className="max-w-[180px] truncate px-3 py-2.5 text-neutral-500">{locationNames(document.id, dimension)}</td>)}<td className="px-3 py-2.5 text-neutral-500">{t('Apunte')}</td><td className="px-3 py-2.5 text-right"><div className="flex justify-end"><button className="btn btn-ghost h-7 px-2" title={t('Abrir apunte')} onClick={(event) => { event.stopPropagation(); onOpen(document.id); }}><Icon name="external" size={12} /></button><button className="btn btn-ghost h-7 px-2 text-red-400" title={t('Mover a la papelera')} onClick={(event) => { event.stopPropagation(); onDelete(document); }}><Icon name="trash" size={12} /></button></div></td></tr>)}</tbody>
   </table>;
 }
 
@@ -353,6 +410,8 @@ function MaterialImportDialog({ initialPaths, initialPlacement, workspace, onSav
 function MaterialTable({
   materials,
   workspace,
+  selected,
+  onToggle,
   onOpen,
   onFavorite,
   onReadState,
@@ -365,6 +424,8 @@ function MaterialTable({
 }: {
   materials: StudyMaterialSummary[];
   workspace: StudyWorkspace | null;
+  selected: Set<string>;
+  onToggle: (source: Pick<StudyLibraryDeleteSource, 'kind' | 'id'>) => void;
   onOpen: (material: StudyMaterialSummary) => void;
   onFavorite: (material: StudyMaterialSummary) => Promise<void>;
   onReadState: (material: StudyMaterialSummary, state: StudyMaterialReadState) => Promise<void>;
@@ -388,9 +449,11 @@ function MaterialTable({
       material.placements.map((placement) => placement[field]).filter((id): id is string => Boolean(id)),
     )];
   };
+  const allSelected = materials.every((material) => selected.has(studyLibrarySourceKey({ kind: 'material', id: material.id })));
   return <table className="w-full min-w-[1180px] border-collapse text-xs" data-testid="study-material-table">
     <thead className="sticky top-0 z-10 bg-neutral-950/95 backdrop-blur">
       <tr className="border-b border-neutral-800 text-neutral-500">
+        <th className="w-10 px-3 py-2 text-center"><input type="checkbox" aria-label={t('Seleccionar todos')} checked={allSelected} onChange={() => materials.forEach((material) => { const isSelected = selected.has(studyLibrarySourceKey({ kind: 'material', id: material.id })); if (isSelected === allSelected) onToggle({ kind: 'material', id: material.id }); })} /></th>
         <th className="w-[300px] px-4 py-2 text-center font-medium">{t('Material')}</th>
         <th className="w-[135px] px-3 py-2 text-center font-medium">{t('Curso')}</th>
         <th className="w-[150px] px-3 py-2 text-center font-medium">{t('Asignatura')}</th>
@@ -404,6 +467,7 @@ function MaterialTable({
     </thead>
     <tbody>
       {materials.map((material) => <tr key={material.id} data-testid="study-material-row" className="border-b border-neutral-800/60 hover:bg-neutral-900/40">
+        <td className="px-3 py-2.5"><input type="checkbox" aria-label={material.title} checked={selected.has(studyLibrarySourceKey({ kind: 'material', id: material.id }))} onChange={() => onToggle({ kind: 'material', id: material.id })} /></td>
         <td className="px-4 py-2.5"><button className="flex max-w-[290px] items-center gap-2 text-left" onClick={() => onOpen(material)}><span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-indigo-600/15 text-indigo-300"><Icon name={material.origin === 'zotero_link' ? 'external' : materialIcon(material.previewKind)} size={15} /></span><span className="min-w-0"><span className="block truncate font-medium text-neutral-200">{material.title}</span><span className="block truncate text-[10px] text-neutral-600">{material.origin === 'zotero_link' ? t('Enlace de Zotero') : material.fileName}</span><span className={`block truncate text-[10px] ${indexStatusClass(material.indexStatus)}`} title={material.indexError ?? undefined}>{material.origin === 'zotero_link' ? t('Se abre en Zotero') : t(INDEX_LABEL[material.indexStatus])}{material.embeddingModel ? ` · ${material.embeddingModel}` : ''}</span></span></button></td>
         {(['course', 'subject', 'folder', 'topic'] as const).map((dimension) => <td key={dimension} className="study-material-state-cell px-1 py-1"><div className="h-8"><ChipSelectCell values={placementIds(material, dimension)} options={locationOptions[dimension]} multi onChange={(ids) => void onPlacementsChange(material, dimension, ids)} placeholder={t('Seleccionar')} /></div></td>)}
         <td className="study-material-state-cell px-1 py-1"><div className="h-8"><ChipSelectCell values={[material.readState]} options={readOptions} multi={false} onChange={(values) => { const next = values[0] as StudyMaterialReadState | undefined; if (next) void onReadState(material, next); }} /></div></td>
@@ -461,7 +525,7 @@ function MaterialLocationDialog({ material, mode, workspace, onSave, onCancel }:
   </form></div>, document.body);
 }
 
-function MaterialViewer({ materialId, workspace, onClose, onChanged, onOpenDocument }: { materialId: string; workspace: StudyWorkspace | null; onClose: () => void; onChanged: () => Promise<void>; onOpenDocument: (id: string) => void }) {
+function MaterialViewer({ materialId, workspace, onClose, onChanged, onOpenDocument, onRequestDelete }: { materialId: string; workspace: StudyWorkspace | null; onClose: () => void; onChanged: () => Promise<void>; onOpenDocument: (id: string) => void; onRequestDelete: (material: StudyMaterialDetail) => void }) {
   const [material, setMaterial] = useState<StudyMaterialDetail | null>(null);
   const [content, setContent] = useState<StudyMaterialContent | null>(null);
   const [tab, setTab] = useState<'preview' | 'text' | 'details' | 'versions'>('preview');
@@ -521,7 +585,7 @@ function MaterialViewer({ materialId, workspace, onClose, onChanged, onOpenDocum
     <main className="relative min-h-0 flex-1 overflow-hidden">
       {tab === 'preview' && <Preview material={material} content={content} objectUrl={objectUrl} onAnnotation={createAnnotation} onUpdateAnnotation={updateAnnotation} onDeleteAnnotation={async (id) => { await window.nodus.deleteStudyMaterialAnnotation(id); await changed(); }} onCreateNote={createNote} onSelectText={captureTextSelection} />}
       {tab === 'text' && <div className="h-full overflow-y-auto p-6" onMouseUp={captureTextSelection}><pre className="mx-auto max-w-5xl whitespace-pre-wrap font-sans text-sm leading-7 text-neutral-300">{material.extractedText || t('Este formato no tiene texto extraído todavía.')}</pre>{material.extractedText && <p className="fixed bottom-5 left-1/2 -translate-x-1/2 rounded-full border border-neutral-700 bg-neutral-950/95 px-4 py-2 text-[10px] text-neutral-500 shadow-xl">{t('Selecciona un fragmento para anotarlo o convertirlo en apunte.')}</p>}</div>}
-      {tab === 'details' && <div className="h-full overflow-y-auto p-6"><div className="mx-auto max-w-3xl space-y-4"><div className="grid gap-3 sm:grid-cols-2"><label className="text-xs text-neutral-500">{t('Título')}<input className="input mt-1 w-full" value={editingTitle} onChange={(event) => setEditingTitle(event.target.value)} /></label><label className="text-xs text-neutral-500">{t('Etiquetas separadas por comas')}<input className="input mt-1 w-full" value={tags} onChange={(event) => setTags(event.target.value)} /></label></div><label className="block text-xs text-neutral-500">{t('Descripción')}<textarea className="input mt-1 min-h-20 w-full" value={description} onChange={(event) => setDescription(event.target.value)} /></label>{material.previewKind === 'image' && <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4 text-xs dark:border-neutral-800 dark:bg-neutral-900/40"><p className="font-medium text-neutral-700 dark:text-neutral-300">{t('Descripción visual generada por IA')}</p><p className="mt-2 whitespace-pre-wrap leading-6 text-neutral-600 dark:text-neutral-400">{material.visualDescription || t('Todavía no hay una descripción visual disponible.')}</p>{material.visualAnalysisModel && <p className="mt-2 text-[10px] text-neutral-500">{material.visualAnalysisProvider} · {material.visualAnalysisModel}</p>}</div>}<label className="block text-xs text-neutral-500">{t('Referencia bibliográfica')}<textarea className="input mt-1 min-h-20 w-full" value={citation} onChange={(event) => setCitation(event.target.value)} placeholder={t('Autor (año). Título…')} /></label><div className="rounded-xl border border-neutral-800 p-4 text-xs text-neutral-500"><p>{material.fileName} · {material.mimeType} · {formatBytes(material.sizeBytes)}</p><p className="mt-1">SHA-256: <code className="text-neutral-600">{material.contentHash}</code></p><p className="mt-1">{material.extractedChars.toLocaleString()} {t('caracteres indexables')} · {material.pageCount ? `${material.pageCount} ${t('páginas')}` : material.metadata.slideCount ? `${material.metadata.slideCount} ${t('diapositivas')}` : material.durationSeconds ? `${material.durationSeconds}s` : t('sin paginación')}</p><p className={`mt-2 ${indexStatusClass(material.indexStatus)}`}>{t(INDEX_LABEL[material.indexStatus])}{material.embeddingModel ? ` · ${material.embeddingProvider}/${material.embeddingModel} · ${material.embeddingDim ?? 0}d` : ''}</p>{material.indexError && <p className="mt-1 text-red-500">{material.indexError}</p>}{material.metadata.extractionNote && <p className="mt-2 text-amber-400">{String(material.metadata.extractionNote)}</p>}</div><div className="flex flex-wrap justify-end gap-2"><button className="btn btn-ghost" onClick={() => setCommentDialog({})}>{t('Añadir comentario general')}</button><button className="btn btn-ghost" onClick={() => void window.nodus.replaceStudyMaterialFile(material.id, true).then(async (updated) => { if (updated) await changed(); })}>{t('Sustituir fichero')}</button><button className="btn btn-ghost text-red-400" onClick={() => { if (window.confirm(t('¿Mover este material a la papelera?'))) void window.nodus.setStudyMaterialLifecycle(material.id, 'trash').then(async () => { await onChanged(); onClose(); }); }}>{t('Papelera')}</button><button className="btn btn-primary" onClick={() => void saveDetails()}>{t('Guardar detalles')}</button></div>{message && <p className="text-right text-xs text-teal-300">{message}</p>}</div></div>}
+      {tab === 'details' && <div className="h-full overflow-y-auto p-6"><div className="mx-auto max-w-3xl space-y-4"><div className="grid gap-3 sm:grid-cols-2"><label className="text-xs text-neutral-500">{t('Título')}<input className="input mt-1 w-full" value={editingTitle} onChange={(event) => setEditingTitle(event.target.value)} /></label><label className="text-xs text-neutral-500">{t('Etiquetas separadas por comas')}<input className="input mt-1 w-full" value={tags} onChange={(event) => setTags(event.target.value)} /></label></div><label className="block text-xs text-neutral-500">{t('Descripción')}<textarea className="input mt-1 min-h-20 w-full" value={description} onChange={(event) => setDescription(event.target.value)} /></label>{material.previewKind === 'image' && <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4 text-xs dark:border-neutral-800 dark:bg-neutral-900/40"><p className="font-medium text-neutral-700 dark:text-neutral-300">{t('Descripción visual generada por IA')}</p><p className="mt-2 whitespace-pre-wrap leading-6 text-neutral-600 dark:text-neutral-400">{material.visualDescription || t('Todavía no hay una descripción visual disponible.')}</p>{material.visualAnalysisModel && <p className="mt-2 text-[10px] text-neutral-500">{material.visualAnalysisProvider} · {material.visualAnalysisModel}</p>}</div>}<label className="block text-xs text-neutral-500">{t('Referencia bibliográfica')}<textarea className="input mt-1 min-h-20 w-full" value={citation} onChange={(event) => setCitation(event.target.value)} placeholder={t('Autor (año). Título…')} /></label><div className="rounded-xl border border-neutral-800 p-4 text-xs text-neutral-500"><p>{material.fileName} · {material.mimeType} · {formatBytes(material.sizeBytes)}</p><p className="mt-1">SHA-256: <code className="text-neutral-600">{material.contentHash}</code></p><p className="mt-1">{material.extractedChars.toLocaleString()} {t('caracteres indexables')} · {material.pageCount ? `${material.pageCount} ${t('páginas')}` : material.metadata.slideCount ? `${material.metadata.slideCount} ${t('diapositivas')}` : material.durationSeconds ? `${material.durationSeconds}s` : t('sin paginación')}</p><p className={`mt-2 ${indexStatusClass(material.indexStatus)}`}>{t(INDEX_LABEL[material.indexStatus])}{material.embeddingModel ? ` · ${material.embeddingProvider}/${material.embeddingModel} · ${material.embeddingDim ?? 0}d` : ''}</p>{material.indexError && <p className="mt-1 text-red-500">{material.indexError}</p>}{material.metadata.extractionNote && <p className="mt-2 text-amber-400">{String(material.metadata.extractionNote)}</p>}</div><div className="flex flex-wrap justify-end gap-2"><button className="btn btn-ghost" onClick={() => setCommentDialog({})}>{t('Añadir comentario general')}</button><button className="btn btn-ghost" onClick={() => void window.nodus.replaceStudyMaterialFile(material.id, true).then(async (updated) => { if (updated) await changed(); })}>{t('Sustituir fichero')}</button><button className="btn btn-ghost text-red-400" onClick={() => onRequestDelete(material)}>{t('Papelera')}</button><button className="btn btn-primary" onClick={() => void saveDetails()}>{t('Guardar detalles')}</button></div>{message && <p className="text-right text-xs text-teal-300">{message}</p>}</div></div>}
       {tab === 'versions' && <div className="h-full overflow-y-auto p-6"><div className="mx-auto max-w-3xl"><h3 className="mb-3 text-sm font-semibold text-neutral-200">{t('Historial del fichero')}</h3>{material.versions.length === 0 ? <p className="text-sm text-neutral-600">{t('Las versiones anteriores aparecerán al sustituir el fichero.')}</p> : material.versions.map((version) => <div key={version.id} className="mb-2 flex items-center gap-3 rounded-xl border border-neutral-800 p-3"><Icon name="archive" className="text-teal-500" /><div className="min-w-0 flex-1"><p className="truncate text-xs text-neutral-300">v{version.versionNo} · {version.fileName}</p><p className="text-[10px] text-neutral-600">{formatBytes(version.sizeBytes)} · {new Date(version.createdAt).toLocaleString()} · {version.contentHash.slice(0, 12)}</p></div><button className="btn btn-ghost text-xs" onClick={() => { if (window.confirm(t('¿Restaurar esta versión del fichero?'))) void window.nodus.restoreStudyMaterialVersion(material.id, version.id).then(changed); }}>{t('Restaurar')}</button></div>)}</div></div>}
     </main>
     {commentDialog && <TextInputModal testId="study-material-comment-dialog" title={commentDialog.selectedText ? t('Anotar fragmento') : t('Comentario del material')} label={t('Nota')} multiline onCancel={() => setCommentDialog(null)} onSubmit={async (note) => { const annotation = await window.nodus.createStudyMaterialAnnotation(material.id, { selectedText: commentDialog.selectedText, from: commentDialog.from, to: commentDialog.to, note }); setCommentDialog(null); await changed(); if (commentDialog.selectedText && window.confirm(t('¿Crear también un apunte enlazado desde este fragmento?'))) await createNote(annotation.id); }} />}

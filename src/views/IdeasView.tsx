@@ -10,8 +10,9 @@ import {
 } from '../components/NodeDetailPanel';
 import { VirtualList } from '../components/VirtualList';
 import { SaveToNotesModal } from '../components/SaveToNotesModal';
+import { ConfirmModal } from '../components/ConfirmModal';
 import { buildIdeaNote } from '../notes';
-import { useDataRefresh, useScanComplete } from '../hooks';
+import { notifyDataChanged, useDataRefresh, useScanComplete } from '../hooks';
 import {
   ASSISTANT_CONTEXTS,
   type PendingAssistantNavigationTarget,
@@ -56,6 +57,8 @@ export function IdeasView({
   const [detailLoading, setDetailLoading] = useState(false);
   const [savingIdeaToNotes, setSavingIdeaToNotes] = useState(false);
   const [savingIdea, setSavingIdea] = useState(false);
+  const [deletingIdea, setDeletingIdea] = useState(false);
+  const [confirmDeleteIdea, setConfirmDeleteIdea] = useState(false);
   const [detailWidth, setDetailWidth] = useState(() =>
     loadNumber(IDEAS_DETAIL_WIDTH_KEY, IDEAS_DETAIL_DEFAULT_WIDTH, DETAIL_MIN_WIDTH, DETAIL_MAX_WIDTH)
   );
@@ -163,6 +166,22 @@ export function IdeasView({
   useEffect(() => dataSource.subscribe?.(() => reload(true)), [dataSource, reload]);
 
   const selectedNode = selectedId ? ideas.find((idea) => idea.id === selectedId) : null;
+
+  const deleteSelectedIdea = async () => {
+    if (!selectedId || deletingIdea) return;
+    setDeletingIdea(true);
+    try {
+      await dataSource.deleteIdea(selectedId);
+      setConfirmDeleteIdea(false);
+      setSelectedId(null);
+      setDetail(null);
+      setConnections([]);
+      notifyDataChanged();
+      reload(true);
+    } finally {
+      setDeletingIdea(false);
+    }
+  };
 
   return (
     <div className="h-full flex min-h-0 bg-white text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100" data-testid={testId}>
@@ -347,6 +366,13 @@ export function IdeasView({
                   >
                     <Icon name="notebook" size={13} /> {t(savingIdea ? 'Guardando…' : 'Guardar en notas')}
                   </button>
+                  <button
+                    className="btn btn-ghost border border-red-900/70 text-xs text-red-400 gap-1.5"
+                    disabled={deletingIdea}
+                    onClick={() => setConfirmDeleteIdea(true)}
+                  >
+                    <Icon name="trash" size={13} /> {t('Eliminar idea')}
+                  </button>
                 </div>
               </div>
 
@@ -406,6 +432,16 @@ export function IdeasView({
           kind="idea"
           source={{ origin: 'idea', ref: detail.idea.global_id }}
           onClose={() => setSavingIdeaToNotes(false)}
+        />
+      )}
+      {confirmDeleteIdea && detail && (
+        <ConfirmModal
+          title={t('Eliminar idea')}
+          message={tx('Se eliminará «{name}» junto con su embedding, evidencia y conexiones. Esta acción no se puede deshacer.', { name: detail.idea.label })}
+          confirmLabel={t('Eliminar idea')}
+          danger
+          onCancel={() => setConfirmDeleteIdea(false)}
+          onConfirm={() => void deleteSelectedIdea()}
         />
       )}
     </div>
