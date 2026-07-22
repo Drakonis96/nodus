@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 // Nodus Toolkit — the Herramientas section (hub + per-tool pages). These checks
 // cover the wiring that no e2e step can see cheaply: that the view is registered
 // in the canonical nav tables, that it stays universal across vault types, and
-// that the hub's four cards keep the structure the design requires (identical
+// that the hub's cards keep the structure the design requires (identical
 // shape, centred icons, honest state badges). The real rendering is asserted by
 // the toolkit steps in scripts/e2e-smoke.mjs.
 
@@ -60,7 +60,7 @@ test('every sidebar icon stays unique so a collapsed sidebar keeps sections apar
 
 test('the toolkit icons exist in the shared catalogue', async () => {
   const ui = await read('src/components/ui.tsx');
-  for (const icon of ['tools', 'swap', 'shield', 'scanText', 'presentation', 'chevronLeft']) {
+  for (const icon of ['tools', 'swap', 'shield', 'scanText', 'presentation', 'languages', 'chevronLeft']) {
     assert.match(ui, new RegExp(`\\n\\s{2}${icon}: '`), `${icon} is defined in ICON_PATHS`);
   }
 });
@@ -85,7 +85,7 @@ test('the toolkit shows in every vault type, including databases and study', () 
   assert.deepEqual(tools.items.map((n) => n.id), ['toolkit']);
 });
 
-test('the hub renders five tools and Protect is in development', async () => {
+test('the hub renders every built tool including Nodus Translate', async () => {
   const view = await read('src/views/ToolkitView.tsx');
   assert.ok(view.includes('data-testid="toolkit-home"'), 'the hub is addressable');
   // The cards receive their testid as a prop; ToolCard is what stamps it onto the DOM.
@@ -96,17 +96,17 @@ test('the hub renders five tools and Protect is in development', async () => {
   // set of tools from each other.
   assert.deepEqual(
     navigation.TOOLKIT_TOOLS.map((tool) => `toolkit-card-${tool.testid}`),
-    ['toolkit-card-apps', 'toolkit-card-convert', 'toolkit-card-protect', 'toolkit-card-presenter', 'toolkit-card-aiocr']
+    ['toolkit-card-apps', 'toolkit-card-convert', 'toolkit-card-protect', 'toolkit-card-translate', 'toolkit-card-presenter', 'toolkit-card-aiocr']
   );
   assert.deepEqual(
     navigation.TOOLKIT_TOOLS.map((tool) => tool.name),
-    ['Nodus Apps', 'Nodus Convert', 'Nodus Protect', 'PDF Presenter', 'OCR Workspace'],
+    ['Nodus Apps', 'Nodus Convert', 'Nodus Protect', 'Nodus Translate', 'PDF Presenter', 'OCR Workspace'],
     'brand names stay untranslated'
   );
   assert.match(view, /name=\{tool\.name\}/, 'the card shows the brand name verbatim, never through t()');
   assert.match(view, /description=\{t\(tool\.description\)\}/, 'only the description is translated');
 
-  // All five tools are built and openable; none is coming soon.
+  // Every tool is built and openable; none is coming soon.
   assert.deepEqual(
     navigation.TOOLKIT_TOOLS.filter((tool) => tool.state === 'soon').map((tool) => tool.page),
     [],
@@ -114,7 +114,7 @@ test('the hub renders five tools and Protect is in development', async () => {
   );
   assert.deepEqual(
     navigation.TOOLKIT_TOOLS.filter((tool) => tool.state === 'wip').map((tool) => tool.page),
-    ['apps', 'convert', 'protect', 'presenter', 'ocr'],
+    ['apps', 'convert', 'protect', 'translate', 'presenter', 'ocr'],
     'every tool uses the in-development badge'
   );
   assert.match(view, /const disabled = state === 'soon'/);
@@ -123,13 +123,38 @@ test('the hub renders five tools and Protect is in development', async () => {
   assert.match(view, /<ToolkitAppsView onBack=/, 'Nodus Apps renders the functional catalogue');
   assert.match(view, /<ToolkitConvertView onBack=/, 'Nodus Convert renders the functional converter');
   assert.match(view, /<ToolkitProtectView onBack=/, 'Nodus Protect renders the functional protection flow');
+  assert.match(view, /<ToolkitTranslateView onBack=/, 'Nodus Translate renders the functional translation workspace');
   assert.match(view, /<ToolkitPresenterView onBack=/, 'PDF Presenter renders the functional library');
   assert.match(view, /<ToolkitAiOcrView onBack=/, 'OCR Workspace renders the functional library');
   // Any page other than the built ones falls back to the catalogue rather than
   // rendering an empty pane.
   assert.match(view, /page === 'protect'/, 'Protect has its own routed workspace');
+  assert.match(view, /page === 'translate'/, 'Translate has its own routed workspace');
   assert.match(view, /page === 'presenter'/, 'PDF Presenter has its own routed workspace');
   assert.match(view, /page === 'ocr'/, 'OCR Workspace has its own routed workspace');
+});
+
+test('Translate exposes balanced text panes, resilient Zotero controls and persistent history', async () => {
+  const [view, preload, ipc, history, shared] = await Promise.all([
+    read('src/views/ToolkitTranslateView.tsx'),
+    read('electron/preload.ts'),
+    read('electron/ipc.ts'),
+    read('electron/toolkit/translate/history.ts'),
+    read('shared/toolkitTranslateTypes.ts'),
+  ]);
+  assert.match(view, /translate-source-text[^>]+w-full/, 'the source textarea fills its grid column');
+  assert.match(view, /grid gap-6 lg:grid-cols-2/, 'source and result use balanced columns with a visible gutter');
+  assert.match(view, /\['history', 'Historial', 'clock'\]/, 'history is a first-class fourth section');
+  assert.match(view, /input input-with-leading-icon w-full/, 'Zotero search reserves space for its icon');
+  assert.match(view, /translate-zotero-reconnect/, 'a failed Zotero connection can be retried explicitly');
+  assert.match(view, /disposed = true/, 'stale Zotero searches cannot overwrite a newer result');
+  for (const marker of ['listTranslateHistory', 'removeTranslateHistory']) {
+    assert.ok(preload.includes(marker), `preload exposes ${marker}`);
+    assert.ok(view.includes(marker), `renderer uses ${marker}`);
+  }
+  assert.match(ipc, /shell\.trashItem/, 'deleting a generated document uses the recoverable OS Trash');
+  assert.match(history, /history\.json/, 'history is persisted below userData');
+  assert.match(shared, /interface TranslateHistoryEntry/, 'history has a shared typed contract');
 });
 
 test('Protect exposes the complete local workflow and the secure preload boundary', async () => {
@@ -196,7 +221,7 @@ test('the toolkit nests one sidebar button per tool under its section', async ()
 
 test('the hub cards share one shape: equal size, centred icons, pinned badges', async () => {
   const view = await read('src/views/ToolkitView.tsx');
-  // One ToolCard component renders all five, so they cannot drift apart.
+  // One ToolCard component renders every card, so they cannot drift apart.
   assert.equal((view.match(/<ToolCard\b/g) ?? []).length, 1, 'a single ToolCard renders the whole catalogue');
   assert.match(view, /grid gap-4 sm:grid-cols-2/, 'the cards use a two-column grid when space permits');
   assert.match(view, /className=\{`flex h-full flex-col/, 'each card fills its grid cell');

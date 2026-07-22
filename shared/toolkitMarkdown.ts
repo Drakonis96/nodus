@@ -105,12 +105,13 @@ export function markdownToHtml(markdown: string): string {
     }
 
     if (/^\s*\d+\.\s+/.test(line)) {
+      const start = Number(line.match(/^\s*(\d+)\./)?.[1] ?? '1');
       const items: string[] = [];
       while (i < lines.length && /^\s*\d+\.\s+/.test(lines[i])) {
         items.push(`<li>${renderInline(lines[i].replace(/^\s*\d+\.\s+/, ''))}</li>`);
         i++;
       }
-      out.push(`<ol>${items.join('')}</ol>`);
+      out.push(`<ol${start === 1 ? '' : ` start="${start}"`}>${items.join('')}</ol>`);
       continue;
     }
 

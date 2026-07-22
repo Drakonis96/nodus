@@ -6,6 +6,8 @@ import { TOOLKIT_APPS_TRANSLATIONS } from './i18n.toolkitApps';
 export const IT: Record<string, string> = {
   ...AI_OCR_TRANSLATIONS.it,
   ...TOOLKIT_APPS_TRANSLATIONS.it,
+  'Traduce texto, documentos y adjuntos de Zotero con el modelo que elijas, incluido un modo PDF facsímil.': 'Traduci testo, documenti e allegati Zotero con il modello che preferisci, inclusa una modalità facsimile PDF.',
+  'Traducir texto, documentos y adjuntos de Zotero con el modelo elegido, conservando la estructura de DOCX y EPUB y la apariencia de los PDF mediante un modo facsímil.': 'Tradurre testo, documenti e allegati Zotero con il modello scelto, mantenendo la struttura di DOCX ed EPUB e l’aspetto dei PDF tramite la modalità facsimile.',
   'Mover documento a la papelera': 'Sposta il documento nel cestino',
   'Mover documentos a la papelera': 'Sposta i documenti nel cestino',
   '«{name}» dejará de aparecer. Podrás recuperarlo desde la administración de datos.': '«{name}» non sarà più visibile. Potrai recuperarlo dalla gestione dei dati.',

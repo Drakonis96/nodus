@@ -1206,6 +1206,25 @@ const api: NodusApi = {
   pickToolkitOutputDir: () => ipcRenderer.invoke('toolkit:pickOutputDir'),
   revealToolkitOutput: (filePath) => ipcRenderer.invoke('toolkit:showInFolder', filePath).then(() => undefined),
 
+  // Nodus Translate. A per-run id keeps simultaneous/late events isolated in the
+  // renderer and gives cancellation an unambiguous main-process target.
+  runTranslateJob: async (request, handlers) => {
+    const jobId = `translate-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const onEvent = (_e: unknown, id: string, progress: Parameters<typeof handlers.onProgress>[0]) => {
+      if (id === jobId) handlers.onProgress(progress);
+    };
+    ipcRenderer.on('translate:job:event', onEvent);
+    try {
+      return await ipcRenderer.invoke('translate:job:run', jobId, request);
+    } finally {
+      ipcRenderer.removeListener('translate:job:event', onEvent);
+    }
+  },
+  cancelTranslateJob: (jobId) => ipcRenderer.invoke('translate:job:cancel', jobId).then(() => undefined),
+  saveTranslatedText: (text, targetLanguage, extension) => ipcRenderer.invoke('translate:text:save', text, targetLanguage, extension),
+  listTranslateHistory: () => ipcRenderer.invoke('translate:history:list'),
+  removeTranslateHistory: (id, deleteOutput) => ipcRenderer.invoke('translate:history:remove', id, deleteOutput),
+
   // Nodus AI OCR (OCR Workspace). Progress is pushed on 'aiOcr:event' (docId + snapshot).
   createOcrDocs: (input) => ipcRenderer.invoke('aiOcr:create', input),
   listOcrDocs: () => ipcRenderer.invoke('aiOcr:list'),

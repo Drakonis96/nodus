@@ -7,14 +7,17 @@
 // Requires a build (dist/ + dist-electron/); run via `npm run test:e2e`.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { once } from 'node:events';
 import { existsSync } from 'node:fs';
 import { chmod, mkdir, mkdtemp, rm, readFile, readdir, writeFile } from 'node:fs/promises';
+import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { _electron as electron } from 'playwright-core';
 import { WebSocket } from 'ws';
+import { buildTextPdf } from './toolkit-fixtures.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
@@ -36,6 +39,44 @@ if (!existsSync(path.join(repoRoot, 'dist-electron/main.js')) || !existsSync(pat
   console.log('[e2e] no build found — running npm run build first…');
   execFileSync('npm', ['run', 'build'], { cwd: repoRoot, stdio: 'inherit' });
 }
+
+const zoteroApiServer = createServer((request, response) => {
+  const pathname = new URL(request.url || '/', 'http://127.0.0.1').pathname;
+  response.setHeader('Content-Type', 'application/json');
+  response.setHeader('Last-Modified-Version', '7');
+  if (pathname.endsWith('/groups')) {
+    response.end('[]');
+    return;
+  }
+  if (pathname.endsWith('/items/top')) {
+    response.setHeader('Total-Results', '1');
+    response.end(JSON.stringify([{ key: 'ITEM1', version: 7, data: {
+      key: 'ITEM1', version: 7, itemType: 'journalArticle', title: 'Smoke Research Paper',
+      date: '2025', creators: [{ creatorType: 'author', firstName: 'Ada', lastName: 'Lovelace' }],
+      tags: [], collections: [],
+    } }]));
+    return;
+  }
+  if (pathname.endsWith('/items/ITEM1/children')) {
+    response.end(JSON.stringify([{ key: 'ATT1', version: 7, data: {
+      key: 'ATT1', version: 7, itemType: 'attachment', parentItem: 'ITEM1', title: 'Full text PDF',
+      contentType: 'application/pdf', linkMode: 'imported_file', filename: 'smoke-paper.pdf',
+    } }]));
+    return;
+  }
+  if (pathname.endsWith('/items')) {
+    response.setHeader('Total-Results', '1');
+    response.end(JSON.stringify([{ key: 'ITEM1', version: 7, data: { key: 'ITEM1', itemType: 'journalArticle', title: 'Smoke Research Paper' } }]));
+    return;
+  }
+  response.statusCode = 404;
+  response.end('{"error":"not found"}');
+});
+zoteroApiServer.listen(0, '127.0.0.1');
+await once(zoteroApiServer, 'listening');
+const zoteroAddress = zoteroApiServer.address();
+assert.ok(zoteroAddress && typeof zoteroAddress !== 'string');
+const zoteroApiBase = `http://127.0.0.1:${zoteroAddress.port}/api`;
 
 const userData = await mkdtemp(path.join(os.tmpdir(), 'nodus-e2e-'));
 const fakeWhisperPath = path.join(userData, 'fake-whisper-cli.mjs');
@@ -92,6 +133,8 @@ try {
     NODUS_E2E_UPDATE_STATUS: 'not-available',
     NODUS_E2E_DISABLE_STUDY_BACKGROUND_AI: '1',
     NODUS_E2E_FORCE_STUDY_AI_FAILURE: '1',
+    NODUS_E2E_TRANSLATE_FAKE: '1',
+    NODUS_ZOTERO_API_BASE: zoteroApiBase,
   };
   delete childEnv.ELECTRON_RUN_AS_NODE;
   const packagedExecutable = process.env.NODUS_E2E_EXECUTABLE;
@@ -110,7 +153,10 @@ try {
   const page = await app.firstWindow();
   page.setDefaultTimeout(30_000);
   const pageErrors = [];
-  page.on('pageerror', (err) => pageErrors.push(err));
+  page.on('pageerror', (err) => {
+    pageErrors.push(err);
+    process.stderr.write(`[e2e][pageerror] ${err?.stack ?? err}\n`);
+  });
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => {
     const root = document.getElementById('root');
@@ -774,7 +820,7 @@ try {
   // measured on the real rendered shell rather than trusted from the classes.
   await page.locator('[data-tour="toolkit"]').click();
   await page.getByTestId('toolkit-home').waitFor({ timeout: 30_000 });
-  const toolCards = ['toolkit-card-apps', 'toolkit-card-convert', 'toolkit-card-protect', 'toolkit-card-presenter', 'toolkit-card-aiocr'];
+  const toolCards = ['toolkit-card-apps', 'toolkit-card-convert', 'toolkit-card-protect', 'toolkit-card-translate', 'toolkit-card-presenter', 'toolkit-card-aiocr'];
   const cardBoxes = [];
   for (const testId of toolCards) {
     const box = await page.getByTestId(testId).boundingBox();
@@ -1007,6 +1053,73 @@ try {
   await page.getByTestId('aiocr-home').waitFor({ timeout: 10_000 });
   await page.getByTestId('toolkit-aiocr-back').click();
   await page.getByTestId('toolkit-home').waitFor();
+  // Nodus Translate: run a pasted-text translation through the real renderer →
+  // preload → IPC → segment protocol path. The E2E-only model is deterministic and
+  // offline, so this never needs a personal provider key.
+  const e2eTranslateModel = { provider: 'lmstudio', model: 'nodus-e2e-translate' };
+  await page.evaluate((model) => window.nodus.updateSettings({ synthesisModel: model, favorites: [model] }), e2eTranslateModel);
+  await page.getByTestId('toolkit-card-translate').click();
+  await page.getByTestId('translate-home').waitFor({ timeout: 10_000 });
+  const translatePaneLayout = await page.evaluate(() => {
+    const source = document.querySelector('[data-testid="translate-source-text"]')?.getBoundingClientRect();
+    const result = document.querySelector('[data-testid="translate-result-text"]')?.getBoundingClientRect();
+    return source && result ? { sourceWidth: source.width, resultWidth: result.width, gap: result.left - source.right } : null;
+  });
+  assert.ok(translatePaneLayout, 'both translation panes are rendered');
+  assert.ok(Math.abs(translatePaneLayout.sourceWidth - translatePaneLayout.resultWidth) <= 2, `source and result panes have equal widths (${translatePaneLayout.sourceWidth}/${translatePaneLayout.resultWidth})`);
+  assert.ok(translatePaneLayout.gap >= 20, `translation panes keep a visible gutter (${translatePaneLayout.gap}px)`);
+
+  // The Zotero tab talks to a deterministic local-API fixture through real IPC.
+  // It verifies reconnection, the library select, search-result freshness and icon spacing.
+  await page.getByTestId('translate-tab-zotero').click();
+  await page.getByTestId('translate-zotero-library').waitFor({ state: 'visible' });
+  await waitForCondition('Zotero library connected in Translate', () => page.getByTestId('translate-zotero-library').isEnabled());
+  assert.equal(await page.getByTestId('translate-zotero-library').inputValue(), 'user:0');
+  const zoteroSearchSpacing = await page.getByTestId('translate-zotero-search').evaluate((input) => {
+    const icon = input.parentElement?.querySelector('svg')?.getBoundingClientRect();
+    const field = input.getBoundingClientRect();
+    return { paddingLeft: parseFloat(getComputedStyle(input).paddingLeft), iconRight: icon ? icon.right - field.left : 0 };
+  });
+  assert.ok(zoteroSearchSpacing.paddingLeft > zoteroSearchSpacing.iconRight, `Zotero placeholder starts after its icon (${zoteroSearchSpacing.paddingLeft}px > ${zoteroSearchSpacing.iconRight}px)`);
+  await page.getByTestId('translate-zotero-search').fill('Smoke Research');
+  await page.getByTestId('translate-zotero-results').getByText('Smoke Research Paper', { exact: true }).waitFor();
+  await page.getByTestId('translate-zotero-results').getByText('Smoke Research Paper', { exact: true }).click();
+  await page.getByText('smoke-paper.pdf', { exact: true }).waitFor();
+  await page.getByTestId('translate-tab-text').click();
+  await page.getByTestId('translate-source-text').fill('# Titulo Principal\n\nEste es un documento de prueba.');
+  await page.getByTestId('translate-run').click();
+  await page.getByTestId('translate-result-text').getByText('Main Title', { exact: false }).waitFor({ timeout: 20_000 });
+  assert.match(await page.getByTestId('translate-result-text').innerText(), /This is a test document\./, 'pasted text crosses the complete translation stack');
+  await page.getByTestId('translate-tab-history').click();
+  await page.getByTestId('translate-history').getByText('Texto pegado', { exact: true }).waitFor();
+  assert.ok((await page.evaluate(() => window.nodus.listTranslateHistory())).some((entry) => entry.inputKind === 'text' && entry.translatedText?.includes('Main Title')), 'pasted translation is persisted in history');
+
+  // Facsimile mode gets its own real PDF round-trip: three source pages enter IPC,
+  // translated page rasters come out with the same geometry and no source text layer.
+  const translateDir = await mkdtemp(path.join(os.tmpdir(), 'nodus-e2e-translate-'));
+  const translateSourcePdf = await buildTextPdf(translateDir, 'translate-facsimile.pdf');
+  const facsimileResult = await page.evaluate(async ({ input, outDir, model }) => window.nodus.runTranslateJob({
+    inputKind: 'files', inputPaths: [input], targetLanguage: 'en', model,
+    outputFormat: 'pdf', pdfMode: 'facsimile', translateImageText: false,
+    outputDir: outDir, openFolderOnDone: false,
+  }, { onProgress: () => {} }), { input: translateSourcePdf, outDir: translateDir, model: e2eTranslateModel });
+  assert.equal(facsimileResult.cancelled, false);
+  assert.equal(facsimileResult.outputs.length, 1, 'facsimile job emits one translated PDF');
+  assert.equal(facsimileResult.outputs[0].pageCount, 3, 'facsimile reports the original page count');
+  const translatedFacsimilePath = facsimileResult.outputs[0].outputPath;
+  assert.ok(existsSync(translatedFacsimilePath), 'facsimile output exists');
+  const facsimilePdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+  const facsimileDoc = await facsimilePdfjs.getDocument({ data: new Uint8Array(await readFile(translatedFacsimilePath)), isEvalSupported: false }).promise;
+  assert.equal(facsimileDoc.numPages, 3);
+  const facsimileViewport = (await facsimileDoc.getPage(1)).getViewport({ scale: 1 });
+  assert.ok(Math.abs(facsimileViewport.width - 595) < 1 && Math.abs(facsimileViewport.height - 842) < 1, 'facsimile retains A4 page geometry');
+  assert.equal((await (await facsimileDoc.getPage(1)).getTextContent()).items.length, 0, 'source-language text is not leaked behind the facsimile');
+  const persistedFacsimile = (await page.evaluate(() => window.nodus.listTranslateHistory())).find((entry) => entry.outputPath === translatedFacsimilePath);
+  assert.ok(persistedFacsimile?.outputExists, 'facsimile output is visible in persistent history');
+  assert.equal(persistedFacsimile.pdfMode, 'facsimile');
+  await rm(translateDir, { recursive: true, force: true });
+  await page.getByTestId('toolkit-translate-back').click();
+  await page.getByTestId('toolkit-home').waitFor();
   // PDF Presenter is a working tool: it opens on its (empty) library and returns.
   assert.equal(await page.getByTestId('toolkit-card-presenter').isDisabled(), false, 'PDF Presenter opens');
   await page.getByTestId('toolkit-card-presenter').click();
@@ -1137,12 +1250,12 @@ try {
   await page.getByTestId('protect-home').waitFor();
   await page.getByTestId('toolkit-protect-back').click();
   await page.getByTestId('toolkit-home').waitFor({ timeout: 10_000 });
-  console.log('[e2e] toolkit: hub geometry, Convert regression, and full Protect redact → trace → vault → verify round-trip');
+  console.log('[e2e] toolkit: hub geometry, Convert regression, Translate text + PDF facsimile, and full Protect redact → trace → vault → verify round-trip');
   if (process.env.NODUS_E2E_TOOLKIT_ONLY === '1') {
     assert.deepEqual(pageErrors, [], `renderer errors: ${pageErrors.map((error) => error.message).join(' | ')}`);
     await closeElectronApp(app); app = null;
     await rm(userData, { recursive: true, force: true });
-    console.log('[e2e] focused Toolkit + Nodus Protect smoke passed');
+    console.log('[e2e] focused Toolkit + Nodus Translate + Nodus Protect smoke passed');
     process.exit(0);
   }
 
@@ -2454,6 +2567,7 @@ try {
 } finally {
   if (app) await closeElectronApp(app);
   await rm(userData, { recursive: true, force: true });
+  await new Promise((resolve) => zoteroApiServer.close(resolve));
 }
 
 /** First .sqlite file under the profile dir (vault registry decides the layout). */

@@ -11,6 +11,8 @@ export const EN: Record<string, string> = {
   ...AI_OCR_TRANSLATIONS.en,
   ...PROTECT_TRANSLATIONS.en,
   ...TOOLKIT_APPS_TRANSLATIONS.en,
+  'Traduce texto, documentos y adjuntos de Zotero con el modelo que elijas, incluido un modo PDF facsímil.': 'Translate text, documents and Zotero attachments with the model you choose, including a PDF facsimile mode.',
+  'Traducir texto, documentos y adjuntos de Zotero con el modelo elegido, conservando la estructura de DOCX y EPUB y la apariencia de los PDF mediante un modo facsímil.': 'Translate text, documents and Zotero attachments with the chosen model, retaining DOCX and EPUB structure and the appearance of PDFs through facsimile mode.',
   'Mover documento a la papelera': 'Move document to trash',
   'Mover documentos a la papelera': 'Move documents to trash',
   '«{name}» dejará de aparecer. Podrás recuperarlo desde la administración de datos.': '“{name}” will no longer appear. You can recover it from data management.',
