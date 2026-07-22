@@ -1414,6 +1414,21 @@ export const EN: Record<string, string> = {
   'Último paso: añade Nodus en ChatGPT': 'Final step: add Nodus in ChatGPT',
   'Abre la configuración de ChatGPT, crea una app, elige «Tunnel» como conexión y selecciona el túnel que acabas de configurar.':
     'Open ChatGPT settings, create an app, choose “Tunnel” as the connection, and select the tunnel you just configured.',
+  'Activa el modo desarrollador si es necesario': 'Enable Developer mode if needed',
+  'En ChatGPT, ve a Configuración → Seguridad e inicio de sesión y activa Modo desarrollador. Si ya está activo, continúa con el siguiente paso.':
+    'In ChatGPT, go to Settings → Security and login and enable Developer mode. If it is already enabled, continue to the next step.',
+  'Abre el configurador de complementos': 'Open the plugin configurator',
+  'En la configuración de ChatGPT, abre Complementos, pulsa Añadir complemento e introduce un nombre, por ejemplo «Nodus».':
+    'In ChatGPT settings, open Plugins, select Add plugin, and enter a name such as “Nodus”.',
+  'Selecciona el túnel de Nodus': 'Select the Nodus tunnel',
+  'Cuando ChatGPT solicite la conexión, elige Túnel y selecciona el túnel que acabas de configurar; no introduzcas la URL local.':
+    'When ChatGPT asks for the connection, choose Tunnel and select the tunnel you just configured; do not enter the local URL.',
+  'Configura la autenticación': 'Configure authentication',
+  'En Autenticación, selecciona Sin autenticación. No pegues aquí la clave de ejecución de OpenAI ni el token MCP local.':
+    'Under Authentication, choose No authentication. Do not paste the OpenAI runtime key or local MCP token here.',
+  'Confirma y termina': 'Confirm and finish',
+  'Marca Entiendo y quiero continuar y guarda el complemento. Nodus estará disponible en los chats donde actives el complemento.':
+    'Select I understand and want to continue and save the plugin. Nodus will be available in chats where you enable the plugin.',
   'Abrir configuración de ChatGPT': 'Open ChatGPT settings',
   'Abrir diagnóstico': 'Open diagnostics',
   'Desconectar': 'Disconnect',

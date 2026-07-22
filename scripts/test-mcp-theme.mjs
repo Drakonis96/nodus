@@ -4,6 +4,24 @@ import test from 'node:test';
 
 const modal = await readFile(new URL('../src/components/McpConnectionModal.tsx', import.meta.url), 'utf8');
 const settings = await readFile(new URL('../src/views/Settings.tsx', import.meta.url), 'utf8');
+const localeFiles = ['i18n.en.ts', 'i18n.fr.ts', 'i18n.de.ts', 'i18n.pt.ts', 'i18n.pt-BR.ts', 'i18n.it.ts'];
+const localeSources = await Promise.all(localeFiles.map(async (file) => ({
+  file,
+  source: await readFile(new URL(`../src/${file}`, import.meta.url), 'utf8'),
+})));
+
+const chatGptTutorialKeys = [
+  'Activa el modo desarrollador si es necesario',
+  'En ChatGPT, ve a Configuración → Seguridad e inicio de sesión y activa Modo desarrollador. Si ya está activo, continúa con el siguiente paso.',
+  'Abre el configurador de complementos',
+  'En la configuración de ChatGPT, abre Complementos, pulsa Añadir complemento e introduce un nombre, por ejemplo «Nodus».',
+  'Selecciona el túnel de Nodus',
+  'Cuando ChatGPT solicite la conexión, elige Túnel y selecciona el túnel que acabas de configurar; no introduzcas la URL local.',
+  'Configura la autenticación',
+  'En Autenticación, selecciona Sin autenticación. No pegues aquí la clave de ejecución de OpenAI ni el token MCP local.',
+  'Confirma y termina',
+  'Marca Entiendo y quiero continuar y guarda el complemento. Nodus estará disponible en los chats donde actives el complemento.',
+];
 
 const settingsStart = settings.indexOf('data-testid="mcp-settings-card"');
 const settingsEnd = settings.indexOf('</Section>', settingsStart);
@@ -49,6 +67,18 @@ test('the complete MCP connection modal avoids dark-only semantic palettes', () 
     'border-indigo-200',
     'dark:border-indigo-900/70',
   ]) assert.ok(modal.includes(token), `McpConnectionModal is missing ${token}`);
+});
+
+test('the connected ChatGPT tutorial is complete and translated in every supported non-Spanish locale', () => {
+  for (const number of ['1', '2', '3', '4', '5']) {
+    assert.ok(modal.includes(`<Step number="${number}"`), `ChatGPT tutorial is missing step ${number}`);
+  }
+  for (const key of chatGptTutorialKeys) {
+    assert.ok(modal.includes(`t('${key}')`), `McpConnectionModal is missing tutorial copy: ${key}`);
+    for (const { file, source } of localeSources) {
+      assert.ok(source.includes(key), `${file} is missing the ChatGPT tutorial translation for: ${key}`);
+    }
+  }
 });
 
 test('the MCP Settings card and server status support light and dark themes', () => {

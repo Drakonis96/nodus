@@ -176,9 +176,21 @@ export function McpConnectionModal({
 
             {isConnected ? (
               <div className="space-y-4">
-                <Step number="1" title={t('Último paso: añade Nodus en ChatGPT')}>
-                  <p>{t('Abre la configuración de ChatGPT, crea una app, elige «Tunnel» como conexión y selecciona el túnel que acabas de configurar.')}</p>
+                <Step number="1" title={t('Activa el modo desarrollador si es necesario')}>
+                  <p>{t('En ChatGPT, ve a Configuración → Seguridad e inicio de sesión y activa Modo desarrollador. Si ya está activo, continúa con el siguiente paso.')}</p>
+                </Step>
+                <Step number="2" title={t('Abre el configurador de complementos')}>
+                  <p>{t('En la configuración de ChatGPT, abre Complementos, pulsa Añadir complemento e introduce un nombre, por ejemplo «Nodus».')}</p>
                   <button className="btn btn-primary mt-3" onClick={() => void window.nodus.openExternal(CHATGPT_PLUGINS_URL)}><Icon name="external" />{t('Abrir configuración de ChatGPT')}</button>
+                </Step>
+                <Step number="3" title={t('Selecciona el túnel de Nodus')}>
+                  <p>{t('Cuando ChatGPT solicite la conexión, elige Túnel y selecciona el túnel que acabas de configurar; no introduzcas la URL local.')}</p>
+                </Step>
+                <Step number="4" title={t('Configura la autenticación')}>
+                  <p>{t('En Autenticación, selecciona Sin autenticación. No pegues aquí la clave de ejecución de OpenAI ni el token MCP local.')}</p>
+                </Step>
+                <Step number="5" title={t('Confirma y termina')}>
+                  <p>{t('Marca Entiendo y quiero continuar y guarda el complemento. Nodus estará disponible en los chats donde actives el complemento.')}</p>
                 </Step>
                 <div className="flex flex-wrap gap-2">
                   {tunnel.uiUrl && <button className="btn btn-ghost border border-neutral-300 dark:border-neutral-700" onClick={() => void window.nodus.openExternal(tunnel.uiUrl!)}><Icon name="settings" />{t('Abrir diagnóstico')}</button>}

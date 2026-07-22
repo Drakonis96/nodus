@@ -1389,6 +1389,21 @@ export const PT: Record<string, string> = {
   'Último paso: añade Nodus en ChatGPT': 'Último passo: adicione o Nodus ao ChatGPT',
   'Abre la configuración de ChatGPT, crea una app, elige «Tunnel» como conexión y selecciona el túnel que acabas de configurar.':
     'Abra as definições do ChatGPT, crie uma app, escolha «Tunnel» como ligação e selecione o túnel que acabou de configurar.',
+  'Activa el modo desarrollador si es necesario': 'Ative o modo de programador se necessário',
+  'En ChatGPT, ve a Configuración → Seguridad e inicio de sesión y activa Modo desarrollador. Si ya está activo, continúa con el siguiente paso.':
+    'No ChatGPT, aceda a Definições → Segurança e início de sessão e ative o Modo de programador. Se já estiver ativo, avance para o passo seguinte.',
+  'Abre el configurador de complementos': 'Abra o configurador de plugins',
+  'En la configuración de ChatGPT, abre Complementos, pulsa Añadir complemento e introduce un nombre, por ejemplo «Nodus».':
+    'Nas definições do ChatGPT, abra Plugins, selecione Adicionar plugin e introduza um nome, por exemplo «Nodus».',
+  'Selecciona el túnel de Nodus': 'Selecione o túnel do Nodus',
+  'Cuando ChatGPT solicite la conexión, elige Túnel y selecciona el túnel que acabas de configurar; no introduzcas la URL local.':
+    'Quando o ChatGPT pedir a ligação, escolha Túnel e selecione o túnel que acabou de configurar; não introduza o URL local.',
+  'Configura la autenticación': 'Configure a autenticação',
+  'En Autenticación, selecciona Sin autenticación. No pegues aquí la clave de ejecución de OpenAI ni el token MCP local.':
+    'Em Autenticação, selecione Sem autenticação. Não cole aqui a chave de execução da OpenAI nem o token MCP local.',
+  'Confirma y termina': 'Confirme e conclua',
+  'Marca Entiendo y quiero continuar y guarda el complemento. Nodus estará disponible en los chats donde actives el complemento.':
+    'Selecione Compreendo e quero continuar e guarde o plugin. O Nodus ficará disponível nos chats em que ativar o plugin.',
   'Abrir configuración de ChatGPT': 'Abrir definições do ChatGPT',
   'Abrir diagnóstico': 'Abrir diagnóstico',
   'Desconectar': 'Desligar',

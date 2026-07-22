@@ -9,6 +9,7 @@ import AdmZip from 'adm-zip';
 import type { McpTunnelConnectInput, McpTunnelErrorCode, McpTunnelStatus } from '@shared/types';
 import {
   classifyMcpTunnelFailure,
+  isIgnorableLocalMcpOAuthDoctorFailure,
   isValidMcpTunnelId,
   mcpTunnelAssetName,
 } from '@shared/mcpTunnel';
@@ -325,10 +326,10 @@ async function runDoctor(executable: string, env: NodeJS.ProcessEnv, secrets: st
     const child = spawn(executable, ['doctor', '--json', '--explain'], {
       cwd: path.dirname(executable), env, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
     });
-    let output = '';
-    const append = (chunk: Buffer) => { output = `${output}${chunk.toString('utf8')}`.slice(-32_000); };
-    child.stdout.on('data', append);
-    child.stderr.on('data', append);
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', (chunk: Buffer) => { stdout = `${stdout}${chunk.toString('utf8')}`.slice(-32_000); });
+    child.stderr.on('data', (chunk: Buffer) => { stderr = `${stderr}${chunk.toString('utf8')}`.slice(-32_000); });
     const timer = setTimeout(() => {
       child.kill('SIGKILL');
       reject(new Error('El diagnóstico del túnel agotó el tiempo de espera.'));
@@ -337,7 +338,11 @@ async function runDoctor(executable: string, env: NodeJS.ProcessEnv, secrets: st
     child.once('exit', (code, signal) => {
       clearTimeout(timer);
       if (code === 0) resolve();
-      else reject(new Error(sanitizeDiagnostic(output || `doctor exited with ${code ?? signal ?? 'unknown'}`, secrets)));
+      else if (env.MCP_SERVER_URL && isIgnorableLocalMcpOAuthDoctorFailure(stdout, env.MCP_SERVER_URL)) resolve();
+      else {
+        const output = [stdout, stderr].filter(Boolean).join('\n');
+        reject(new Error(sanitizeDiagnostic(output || `doctor exited with ${code ?? signal ?? 'unknown'}`, secrets)));
+      }
     });
   });
 }

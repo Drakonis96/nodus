@@ -43,9 +43,36 @@ test('operator failures become stable, user-facing categories', () => {
   assert.equal(helpers.classifyMcpTunnelFailure('403 forbidden: Tunnels Read + Use permission required'), 'permission_denied');
   assert.equal(helpers.classifyMcpTunnelFailure('403 permission denied by the OpenAI Platform'), 'permission_denied');
   assert.equal(helpers.classifyMcpTunnelFailure('tunnel not found (404)'), 'tunnel_not_found');
+  assert.equal(helpers.classifyMcpTunnelFailure('HTTP 404 from http://127.0.0.1:4319/.well-known/oauth-protected-resource/mcp'), 'local_server');
   assert.equal(helpers.classifyMcpTunnelFailure('MCP probe to 127.0.0.1 refused'), 'local_server');
   assert.equal(helpers.classifyMcpTunnelFailure('TLS certificate error contacting proxy'), 'network');
   assert.equal(helpers.classifyMcpTunnelFailure('SHA-256 checksum mismatch'), 'integrity_failed');
+});
+
+test('the expected local OAuth metadata-only doctor failure does not block static Bearer auth', () => {
+  const serverUrl = 'http://127.0.0.1:4319/mcp';
+  const report = {
+    result: 'fail',
+    failed_checks: ['oauth_metadata'],
+    checks: [
+      { id: 'mcp_target', status: 'PASS', summary: serverUrl },
+      { id: 'mcp_server_reachable', status: 'PASS', summary: `HTTP 401 from ${serverUrl}` },
+      {
+        id: 'oauth_metadata',
+        status: 'FAIL',
+        summary: 'HTTP 404 from http://127.0.0.1:4319/.well-known/oauth-protected-resource/mcp',
+        evidence: ['http://127.0.0.1:4319/.well-known/oauth-protected-resource/mcp', 'HTTP 404'],
+      },
+    ],
+  };
+  assert.equal(helpers.isIgnorableLocalMcpOAuthDoctorFailure(JSON.stringify(report), serverUrl), true);
+
+  report.failed_checks.push('health_listener');
+  assert.equal(helpers.isIgnorableLocalMcpOAuthDoctorFailure(JSON.stringify(report), serverUrl), false);
+  report.failed_checks.pop();
+  report.checks[2].evidence[1] = 'HTTP 500';
+  assert.equal(helpers.isIgnorableLocalMcpOAuthDoctorFailure(JSON.stringify(report), serverUrl), false);
+  assert.equal(helpers.isIgnorableLocalMcpOAuthDoctorFailure(JSON.stringify(report).replaceAll('127.0.0.1', 'mcp.example.com'), 'http://mcp.example.com/mcp'), false);
 });
 
 test('the integration keeps both credentials out of argv and renderer status', async () => {
