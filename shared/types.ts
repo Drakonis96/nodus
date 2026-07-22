@@ -64,7 +64,13 @@ export type {
 import type { VaultType } from './vaultTypes';
 import type { ToolkitJobRequest, ToolkitJobProgress, ToolkitJobResult } from './toolkitTypes';
 import type { AiOcrCreateRequest, AiOcrExportFormat, AiOcrExportResult, OcrDoc, OcrDocSummary, OcrDocProgress, OcrOptions } from './aiOcrTypes';
-import type { Presentation, PresenterLibrary, PptxNotes } from './presenterTypes';
+import type {
+  Presentation,
+  PresenterImportResult,
+  PresenterImportSelection,
+  PresenterLibrary,
+  PptxNotes,
+} from './presenterTypes';
 import type { PresenterAction, PresenterRuntimeState } from './presenterState';
 import type {
   ProtectArtifact,
@@ -6311,8 +6317,10 @@ export interface NodusApi {
   // read/written whole; PDF bytes stream over IPC for pdfjs (offline).
   getPresenterLibrary(): Promise<PresenterLibrary>;
   savePresenterLibrary(lib: PresenterLibrary): Promise<void>;
-  /** Open a picker and copy the chosen PDF into the library; null when cancelled. */
-  importPresenterPdf(): Promise<Presentation | null>;
+  /** Pick a PDF or externally-authored presentation; null when cancelled. */
+  pickPresenterImport(): Promise<PresenterImportSelection | null>;
+  /** Import a selected PDF, or convert a selected presentation locally first. */
+  importPresenterFile(token: string): Promise<PresenterImportResult>;
   /** Raw PDF bytes for a presentation, or null if its copy is missing. */
   getPresenterPdfData(id: string): Promise<Uint8Array | null>;
   deletePresenterPresentation(id: string): Promise<void>;

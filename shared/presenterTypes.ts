@@ -23,12 +23,12 @@ export interface PresenterVideo {
   h: number;
 }
 
-/** One imported PDF and everything the user has attached to it. */
+/** One imported deck, stored internally as PDF, and everything attached to it. */
 export interface Presentation {
   id: string;
   /** Display name (defaults to the file name without extension; user-editable). */
   name: string;
-  /** Original file name, kept for reference. */
+  /** Original file name (PDF or source presentation), kept for reference. */
   fileName: string;
   /** ISO timestamp of import. */
   createdAt: string;
@@ -63,6 +63,41 @@ export interface PptxNotes {
   /** Slide count in the deck, validated against the PDF page count on import. */
   totalSlides: number;
 }
+
+/** File types accepted by the presenter import picker. Every non-PDF format is
+ * converted locally to the presenter's internal PDF representation. */
+export type PresenterImportFormat =
+  | 'pdf'
+  | 'pptx'
+  | 'ppt'
+  | 'pptm'
+  | 'ppsx'
+  | 'pps'
+  | 'odp'
+  | 'key';
+
+/** A file explicitly chosen by the user. The path is returned only after the
+ * native picker succeeds, then sent back to Electron if the user confirms. */
+export interface PresenterImportSelection {
+  /** Opaque, short-lived handle; the renderer never receives the local path. */
+  token: string;
+  fileName: string;
+  format: PresenterImportFormat;
+  needsConversion: boolean;
+}
+
+export type PresenterConverter = 'libreoffice' | 'powerpoint' | 'keynote';
+export type PresenterImportErrorCode = 'invalid-file' | 'unsupported-format' | 'no-converter' | 'conversion-failed';
+
+export type PresenterImportResult =
+  | {
+      ok: true;
+      presentation: Presentation;
+      converted: boolean;
+      converter?: PresenterConverter;
+      importedNotes: number;
+    }
+  | { ok: false; code: PresenterImportErrorCode };
 
 export type PresenterSortMode = 'recent-added' | 'recent-opened' | 'name-asc' | 'name-desc';
 

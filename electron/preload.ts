@@ -1230,7 +1230,8 @@ const api: NodusApi = {
   // fetched over IPC (offline; no file:// or CDN) for pdfjs to render.
   getPresenterLibrary: () => ipcRenderer.invoke('presenter:library:get'),
   savePresenterLibrary: (lib) => ipcRenderer.invoke('presenter:library:save', lib).then(() => undefined),
-  importPresenterPdf: () => ipcRenderer.invoke('presenter:import:pdf'),
+  pickPresenterImport: () => ipcRenderer.invoke('presenter:import:pick'),
+  importPresenterFile: (token) => ipcRenderer.invoke('presenter:import:file', token),
   getPresenterPdfData: (id) => ipcRenderer.invoke('presenter:pdf:getData', id),
   deletePresenterPresentation: (id) => ipcRenderer.invoke('presenter:delete', id).then(() => undefined),
   importPresenterPptxNotes: () => ipcRenderer.invoke('presenter:import:pptxNotes'),

@@ -183,6 +183,13 @@ import type { AiOcrExportFormat, OcrOptions } from '@shared/aiOcrTypes';
 import type { ToolkitJobRequest } from '@shared/toolkitTypes';
 import * as presenterLibrary from './toolkit/presenter/library';
 import { extractPptxNotes } from './toolkit/presenter/pptxNotes';
+import {
+  canExtractOpenXmlNotes,
+  convertPresentationToPdf,
+  PRESENTER_IMPORT_EXTENSIONS,
+  PresentationConversionError,
+  presenterImportFormat,
+} from './toolkit/presenter/conversion';
 import * as presenterWindows from './toolkit/presenter/windows';
 import { getSystemVolume, setSystemVolume, openCastPicker } from './toolkit/presenter/systemAudio';
 import { normalizeLibrary, type PresenterLibrary } from '@shared/presenterTypes';
@@ -3637,19 +3644,89 @@ export function registerIpc(
   // active vault, under userData/toolkit/presenter. The pure model + reducers
   // live in @shared/presenterTypes; the filesystem side in toolkit/presenter.
   const presenterDir = () => path.join(app.getPath('userData'), 'toolkit', 'presenter');
+  const pendingPresenterImports = new Map<string, { path: string; pickedAt: number }>();
   h('presenter:library:get', async () => presenterLibrary.readLibrary(presenterDir()));
   h('presenter:library:save', async (_e, lib: PresenterLibrary) => {
     presenterLibrary.writeLibrary(presenterDir(), normalizeLibrary(lib));
   });
-  h('presenter:import:pdf', async (e) => {
+  h('presenter:import:pick', async (e) => {
     const win = BrowserWindow.fromWebContents(e.sender);
     const picked = await showImportOpenDialog(win ?? undefined!, {
-      title: 'Importar PDF',
+      title: 'Importar PDF o presentación',
       properties: ['openFile'],
-      filters: [{ name: 'PDF', extensions: ['pdf'] }],
+      filters: [
+        { name: 'PDF y presentaciones', extensions: [...PRESENTER_IMPORT_EXTENSIONS] },
+        { name: 'PDF', extensions: ['pdf'] },
+        { name: 'Presentaciones', extensions: PRESENTER_IMPORT_EXTENSIONS.filter((ext) => ext !== 'pdf') },
+      ],
     });
     if (picked.canceled || picked.filePaths.length === 0) return null;
-    return presenterLibrary.importPdf(presenterDir(), picked.filePaths[0]);
+    const selectedPath = picked.filePaths[0];
+    const format = presenterImportFormat(selectedPath);
+    if (!format) return null;
+    const now = Date.now();
+    for (const [token, pending] of pendingPresenterImports) {
+      if (now - pending.pickedAt > 10 * 60_000) pendingPresenterImports.delete(token);
+    }
+    const token = crypto.randomUUID();
+    pendingPresenterImports.set(token, { path: selectedPath, pickedAt: now });
+    return {
+      token,
+      fileName: path.basename(selectedPath),
+      format,
+      needsConversion: format !== 'pdf',
+    };
+  });
+  h('presenter:import:file', async (_e, token: string) => {
+    const pending = typeof token === 'string' ? pendingPresenterImports.get(token) : undefined;
+    if (pending) pendingPresenterImports.delete(token); // one use, success or failure
+    const selectedPath = pending?.path;
+    if (!selectedPath || Date.now() - pending.pickedAt > 10 * 60_000 || !fs.existsSync(selectedPath)) {
+      return { ok: false, code: 'invalid-file' } as const;
+    }
+    const format = presenterImportFormat(selectedPath);
+    if (!format) return { ok: false, code: 'unsupported-format' } as const;
+    if (format === 'pdf') {
+      try {
+        const presentation = presenterLibrary.importPdf(presenterDir(), selectedPath);
+        return { ok: true, presentation, converted: false, importedNotes: 0 } as const;
+      } catch (error) {
+        console.error('[presenter] PDF import failed:', error);
+        return { ok: false, code: 'invalid-file' } as const;
+      }
+    }
+
+    try {
+      const converted = await convertPresentationToPdf(selectedPath);
+      try {
+        let notes: Record<string, string> = {};
+        if (canExtractOpenXmlNotes(format)) {
+          try {
+            notes = extractPptxNotes(fs.readFileSync(selectedPath)).notes;
+          } catch (error) {
+            // Notes are an enhancement; a valid visual conversion must still import.
+            console.warn('[presenter] Could not extract PowerPoint notes:', error);
+          }
+        }
+        const presentation = presenterLibrary.importPdf(presenterDir(), converted.pdfPath, new Date(), {
+          originalFileName: path.basename(selectedPath),
+          notes,
+        });
+        return {
+          ok: true,
+          presentation,
+          converted: true,
+          converter: converted.converter,
+          importedNotes: Object.keys(notes).length,
+        } as const;
+      } finally {
+        converted.cleanup();
+      }
+    } catch (error) {
+      console.error('[presenter] Presentation conversion failed:', error);
+      const code = error instanceof PresentationConversionError ? error.code : 'conversion-failed';
+      return { ok: false, code } as const;
+    }
   });
   h('presenter:pdf:getData', async (_e, id: string) => {
     const bytes = presenterLibrary.readPdfBytes(presenterDir(), id);

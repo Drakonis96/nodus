@@ -181,6 +181,7 @@
       ],
       "extendInfo": {
         "NSMicrophoneUsageDescription": "Nodus usa el micrófono únicamente cuando inicias un dictado o una grabación de estudio.",
+        "NSAppleEventsUsageDescription": "Nodus puede usar una aplicación de presentaciones instalada únicamente para convertir a PDF el archivo que elijas importar.",
         "NSDockTilePlugIn": "NodusDockTile.docktileplugin"
       },
       "target": [

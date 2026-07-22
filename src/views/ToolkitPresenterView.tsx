@@ -1,4 +1,5 @@
-// PDF Presenter — the library workspace (F0). Imports PDFs into a global Toolkit
+// PDF Presenter — the library workspace (F0). Imports PDFs and converts externally
+// authored presentations to the same internal PDF representation in a global Toolkit
 // shelf and lets you organise them into folders, search, sort, rename, move and
 // delete, with a lazy thumbnail grid for the selected deck. Presenting, notes and
 // the mobile remote arrive in later phases; the model + reducers are pure
@@ -7,6 +8,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { Icon } from '../components/ui';
+import { confirm } from '../components/feedback';
 import { t, tx } from '../i18n';
 import {
   addFolder,
@@ -165,11 +167,42 @@ export function ToolkitPresenterView({ onBack }: { onBack: () => void }) {
     [library, commit],
   );
 
-  const importPdf = useCallback(async () => {
+  const importPresentation = useCallback(async () => {
+    const selection = await window.nodus.pickPresenterImport();
+    if (!selection) return;
+
+    if (selection.needsConversion) {
+      const proceed = await confirm({
+        title: t('Convertir presentación a PDF'),
+        message: t('Para ofrecer una presentación fluida y estable, Nodus convertirá este archivo a PDF antes de importarlo. Las animaciones, transiciones y otros elementos interactivos no se conservarán. El archivo original no se modificará. ¿Quieres continuar?'),
+        confirmLabel: t('Convertir e importar'),
+      });
+      if (!proceed) return;
+    }
+
     setImporting(true);
     try {
-      const created = await window.nodus.importPresenterPdf();
-      if (!created) return;
+      const result = await window.nodus.importPresenterFile(selection.token);
+      if (!result.ok) {
+        if (result.code === 'no-converter') {
+          setNotice({
+            title: t('No hay una aplicación compatible'),
+            body: t('Nodus no encontró PowerPoint, Keynote ni LibreOffice en este equipo. Instala LibreOffice o exporta la presentación a PDF desde la aplicación con la que la creaste.'),
+          });
+        } else if (result.code === 'unsupported-format') {
+          setNotice({
+            title: t('Formato no compatible'),
+            body: t('Selecciona un archivo PDF, PowerPoint, OpenDocument Presentation o Keynote compatible.'),
+          });
+        } else {
+          setNotice({
+            title: t('No se pudo importar la presentación'),
+            body: t('Nodus no pudo convertir este archivo. Prueba a abrirlo en la aplicación con la que lo creaste y expórtalo a PDF.'),
+          });
+        }
+        return;
+      }
+      const created = result.presentation;
       const fresh = await window.nodus.getPresenterLibrary();
       const next = currentFolder ? moveToFolder(fresh, created.id, currentFolder) : fresh;
       commit(next);
@@ -295,13 +328,13 @@ export function ToolkitPresenterView({ onBack }: { onBack: () => void }) {
       <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
-          onClick={importPdf}
+          onClick={importPresentation}
           disabled={importing}
           data-testid="presenter-import"
           className="btn btn-accent h-9 min-h-9 gap-1.5 px-3 text-sm"
         >
           <Icon name={importing ? 'refresh' : 'plus'} size={16} className={`shrink-0 ${importing ? 'animate-spin' : ''}`} />
-          {t('Importar PDF')}
+          {importing ? t('Importando…') : t('Importar PDF o presentación')}
         </button>
         <div className="relative min-w-40 flex-1">
           <Icon
@@ -386,7 +419,7 @@ export function ToolkitPresenterView({ onBack }: { onBack: () => void }) {
                 {search ? t('Sin resultados') : t('Aún no hay presentaciones')}
               </p>
               <p className="text-xs text-neutral-400">
-                {search ? t('Prueba con otra búsqueda') : t('Importa un PDF para empezar')}
+                {search ? t('Prueba con otra búsqueda') : t('Importa un PDF o una presentación para empezar')}
               </p>
             </div>
           ) : (
@@ -515,7 +548,7 @@ export function ToolkitPresenterView({ onBack }: { onBack: () => void }) {
               </span>
               <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300">{t('Selecciona una presentación')}</p>
               <p className="max-w-xs text-xs text-neutral-400">
-                {t('Elige una presentación de la lista para ver sus diapositivas, o importa un PDF nuevo.')}
+                {t('Elige una presentación de la lista para ver sus diapositivas, o importa un PDF o una presentación nueva.')}
               </p>
             </div>
           )}
