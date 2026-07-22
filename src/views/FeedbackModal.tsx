@@ -1,3 +1,4 @@
+import { motion } from 'framer-motion';
 import { useEffect, useMemo, useState } from 'react';
 import type { AppInfo } from '@shared/types';
 import { Icon } from '../components/ui';
@@ -133,66 +134,83 @@ export function FeedbackModal({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-4" onMouseDown={onClose}>
-      <section
+    <motion.div
+      className="roadmap-backdrop feedback-backdrop"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.24 }}
+      onMouseDown={onClose}
+    >
+      <motion.section
         role="dialog"
         aria-modal="true"
         aria-label={t('Enviar propuesta a GitHub')}
-        className="flex max-h-[88vh] w-full max-w-xl flex-col overflow-hidden rounded-xl border border-neutral-300 bg-white shadow-2xl dark:border-neutral-700 dark:bg-neutral-950"
-        onMouseDown={(e) => e.stopPropagation()}
+        className="roadmap-cinema feedback-cinema"
+        data-testid="feedback-cinematic-modal"
+        initial={{ opacity: 0, y: 28, scale: 0.96 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.46, ease: [0.2, 0.8, 0.2, 1] }}
+        onMouseDown={(event) => event.stopPropagation()}
       >
-        <header className="flex items-center gap-3 border-b border-neutral-200 px-5 py-4 dark:border-neutral-800">
-          <Icon name="gitPr" className="text-indigo-500 dark:text-indigo-300" />
-          <div className="min-w-0 flex-1">
-            <h2 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">{t('Enviar propuesta a GitHub')}</h2>
-            <p className="text-xs text-neutral-500">
-              {t('Genera un reporte preformateado y ábrelo en GitHub para publicarlo.')}
-            </p>
-          </div>
-          <button className="btn btn-ghost p-1.5" onClick={onClose} title={t('Cerrar')}>
-            <Icon name="x" />
+        <header className="roadmap-hero feedback-hero">
+          <div className="roadmap-aurora" aria-hidden="true" />
+          <div className="roadmap-stars" aria-hidden="true" />
+          <button className="roadmap-close" onClick={onClose} aria-label={t('Cerrar')}>
+            <Icon name="x" size={16} />
           </button>
+          <div className="roadmap-hero-copy">
+            <div className="roadmap-kicker"><Icon name="gitPr" size={14} /> {t('Sugerir / Reportar')}</div>
+            <h2>{t('Enviar propuesta a GitHub')}</h2>
+            <p>{t('Genera un reporte preformateado y ábrelo en GitHub para publicarlo.')}</p>
+          </div>
+          <div className="roadmap-hero-route feedback-hero-route" aria-hidden="true">
+            <span><Icon name="gitPr" size={44} /></span>
+            <i /><i /><i />
+          </div>
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+        <div className="roadmap-scroll feedback-scroll">
           {kind === null ? (
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="feedback-kind-grid">
               <button
-                className="group flex flex-col items-start gap-2 rounded-xl border border-neutral-200 p-4 text-left transition-colors hover:border-indigo-400 hover:bg-indigo-50 dark:border-neutral-800 dark:hover:border-indigo-500/60 dark:hover:bg-indigo-950/30"
+                className="feedback-kind-card"
+                data-kind="feature"
                 onClick={() => setKind('feature')}
               >
-                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-100 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-300">
+                <span className="feedback-kind-icon">
                   <Icon name="bulb" size={18} />
                 </span>
-                <span className="font-semibold text-neutral-900 dark:text-neutral-100">{t('Nueva función')}</span>
-                <span className="text-xs text-neutral-500">{t('Propón una mejora o una función que te gustaría ver en Nodus.')}</span>
+                <span className="feedback-kind-title">{t('Nueva función')} <Icon name="chevronRight" size={14} /></span>
+                <span className="feedback-kind-description">{t('Propón una mejora o una función que te gustaría ver en Nodus.')}</span>
               </button>
               <button
-                className="group flex flex-col items-start gap-2 rounded-xl border border-neutral-200 p-4 text-left transition-colors hover:border-red-400 hover:bg-red-50 dark:border-neutral-800 dark:hover:border-red-500/60 dark:hover:bg-red-950/30"
+                className="feedback-kind-card"
+                data-kind="bug"
                 onClick={() => setKind('bug')}
               >
-                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-red-100 text-red-600 dark:bg-red-950/60 dark:text-red-300">
+                <span className="feedback-kind-icon">
                   <Icon name="bug" size={18} />
                 </span>
-                <span className="font-semibold text-neutral-900 dark:text-neutral-100">{t('Reporte de error')}</span>
-                <span className="text-xs text-neutral-500">{t('Cuéntanos qué falla, con los pasos para reproducirlo.')}</span>
+                <span className="feedback-kind-title">{t('Reporte de error')} <Icon name="chevronRight" size={14} /></span>
+                <span className="feedback-kind-description">{t('Cuéntanos qué falla, con los pasos para reproducirlo.')}</span>
               </button>
               <button
-                className="group flex flex-col items-start gap-2 rounded-xl border border-neutral-200 p-4 text-left transition-colors hover:border-teal-400 hover:bg-teal-50 dark:border-neutral-800 dark:hover:border-teal-500/60 dark:hover:bg-teal-950/30"
+                className="feedback-kind-card"
+                data-kind="vault"
                 onClick={() => setKind('vault')}
                 data-testid="feedback-new-vault-type"
               >
-                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-teal-100 text-teal-700 dark:bg-teal-950/60 dark:text-teal-300">
+                <span className="feedback-kind-icon">
                   <Icon name="archive" size={18} />
                 </span>
-                <span className="font-semibold text-neutral-900 dark:text-neutral-100">{t('Nuevo tipo de vault')}</span>
-                <span className="text-xs text-neutral-500">{t('Propón un espacio especializado y cómo colaborarías para hacerlo viable.')}</span>
+                <span className="feedback-kind-title">{t('Nuevo tipo de vault')} <Icon name="chevronRight" size={14} /></span>
+                <span className="feedback-kind-description">{t('Propón un espacio especializado y cómo colaborarías para hacerlo viable.')}</span>
               </button>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="feedback-form" data-kind={kind}>
               <button
-                className="inline-flex items-center gap-1.5 text-xs font-medium text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
+                className="feedback-back"
                 onClick={() => setKind(null)}
               >
                 <Icon name="chevronLeft" size={14} /> {t('Cambiar tipo')}
@@ -200,41 +218,41 @@ export function FeedbackModal({ onClose }: { onClose: () => void }) {
 
               {kind === 'vault' ? (
                 <>
-                  <div className="rounded-lg border border-teal-200 bg-teal-50 px-3 py-2 text-xs text-teal-900 dark:border-teal-800/70 dark:bg-teal-950/30 dark:text-teal-200">
+                  <div className="feedback-note feedback-note-teal">
                     <div className="flex items-start gap-2"><Icon name="users" size={14} className="mt-0.5" /><span>{t('Un vault especializado puede requerir arquitectura nueva. Se priorizará cuando haya colaboración activa, conocimiento del área y personas dispuestas a probarlo.')}</span></div>
                   </div>
                   <FieldLabel>{t('Rama de conocimiento o área')}</FieldLabel>
-                  <div className="flex flex-wrap gap-1.5">
-                    {VAULT_AREA_SUGGESTIONS.map((area) => <button key={area} type="button" className="rounded-full border border-neutral-300 px-2 py-1 text-[10px] text-neutral-600 hover:border-teal-500 hover:text-teal-700 dark:border-neutral-700 dark:text-neutral-400 dark:hover:text-teal-300" onClick={() => setTitle(t(area))}>{t(area)}</button>)}
+                  <div className="feedback-suggestions">
+                    {VAULT_AREA_SUGGESTIONS.map((area) => <button key={area} type="button" onClick={() => setTitle(t(area))}>{t(area)}</button>)}
                   </div>
-                  <input autoFocus className="input w-full" value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t('Ej.: ciencias de la salud, periodismo, ingeniería…')} />
+                  <input autoFocus className="input feedback-input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t('Ej.: ciencias de la salud, periodismo, ingeniería…')} />
 
                   <FieldLabel>{t('¿Cuál es tu relación con esta área?')}</FieldLabel>
-                  <select className="input w-full" value={expertise} onChange={(event) => setExpertise(event.target.value as Expertise)}>
+                  <select className="input feedback-input" value={expertise} onChange={(event) => setExpertise(event.target.value as Expertise)}>
                     <option value="">{t('Selecciona una opción')}</option>
                     <option value="specialist">{t('Soy especialista o profesional del área')}</option>
                     <option value="experienced">{t('Tengo experiencia práctica o académica')}</option>
                     <option value="interested">{t('No soy especialista, pero conozco la necesidad')}</option>
                   </select>
-                  <label className="flex items-start gap-2 rounded-lg border border-neutral-200 px-3 py-2 text-xs text-neutral-600 dark:border-neutral-800 dark:text-neutral-400">
-                    <input type="checkbox" className="mt-0.5" checked={activeTester} onChange={(event) => setActiveTester(event.target.checked)} />
+                  <label className="feedback-checkbox">
+                    <input type="checkbox" checked={activeTester} onChange={(event) => setActiveTester(event.target.checked)} />
                     <span>{t('Puedo probar activamente este vault, enviar feedback y ayudar a pulir errores.')}</span>
                   </label>
 
                   <FieldLabel>{t('Características que debería incluir')}</FieldLabel>
-                  <textarea className="input min-h-[75px] w-full resize-y" value={summary} onChange={(e) => setSummary(e.target.value)} placeholder={t('Funciones y flujos imprescindibles para trabajar en esta área.')}/>
+                  <textarea className="input feedback-input min-h-[75px] resize-y" value={summary} onChange={(e) => setSummary(e.target.value)} placeholder={t('Funciones y flujos imprescindibles para trabajar en esta área.')}/>
                   <FieldLabel>{t('Organización y estructura del vault')}</FieldLabel>
-                  <textarea className="input min-h-[70px] w-full resize-y" value={detail} onChange={(e) => setDetail(e.target.value)} placeholder={t('Secciones, jerarquías, tipos de contenido y forma de navegar.')}/>
+                  <textarea className="input feedback-input min-h-[70px] resize-y" value={detail} onChange={(e) => setDetail(e.target.value)} placeholder={t('Secciones, jerarquías, tipos de contenido y forma de navegar.')}/>
                   <FieldLabel>{t('Beneficios y casos de uso')}</FieldLabel>
-                  <textarea className="input min-h-[65px] w-full resize-y" value={extra} onChange={(e) => setExtra(e.target.value)} placeholder={t('¿A quién ayudaría y qué trabajo mejoraría?')}/>
+                  <textarea className="input feedback-input min-h-[65px] resize-y" value={extra} onChange={(e) => setExtra(e.target.value)} placeholder={t('¿A quién ayudaría y qué trabajo mejoraría?')}/>
 
                   <FieldLabel>{t('¿Trataría datos personales o sensibles?')}</FieldLabel>
-                  <select className="input w-full" value={personalData} onChange={(event) => setPersonalData(event.target.value as typeof personalData)}>
+                  <select className="input feedback-input" value={personalData} onChange={(event) => setPersonalData(event.target.value as typeof personalData)}>
                     <option value="unknown">{t('No estoy seguro')}</option>
                     <option value="yes">{t('Sí')}</option>
                     <option value="no">{t('No')}</option>
                   </select>
-                  <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-800/70 dark:bg-amber-950/30 dark:text-amber-200">
+                  <div className="feedback-note feedback-note-amber">
                     <Icon name="lock" size={14} className="mt-0.5" />
                     <span>{t('En vaults con datos personales, la IA se limitará inicialmente a modelos locales del usuario. También se valorará sustituir datos identificativos por placeholders que la IA no verá.')}</span>
                   </div>
@@ -242,18 +260,18 @@ export function FeedbackModal({ onClose }: { onClose: () => void }) {
               ) : (
                 <>
                   <FieldLabel>{t('Título')}</FieldLabel>
-                  <input autoFocus className="input w-full" value={title} onChange={(e) => setTitle(e.target.value)} placeholder={kind === 'feature' ? t('Resumen breve de la función') : t('Resumen breve del error')} />
+                  <input autoFocus className="input feedback-input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder={kind === 'feature' ? t('Resumen breve de la función') : t('Resumen breve del error')} />
                   <FieldLabel>{kind === 'feature' ? t('Descripción de la función') : t('Descripción del error')}</FieldLabel>
-                  <textarea className="input min-h-[90px] w-full resize-y" value={summary} onChange={(e) => setSummary(e.target.value)} placeholder={kind === 'feature' ? t('¿Qué debería hacer Nodus?') : t('¿Qué ocurre exactamente?')} />
+                  <textarea className="input feedback-input min-h-[90px] resize-y" value={summary} onChange={(e) => setSummary(e.target.value)} placeholder={kind === 'feature' ? t('¿Qué debería hacer Nodus?') : t('¿Qué ocurre exactamente?')} />
                   <FieldLabel>{kind === 'feature' ? t('¿Qué problema resuelve?') : t('Pasos para reproducir')}</FieldLabel>
-                  <textarea className="input min-h-[70px] w-full resize-y" value={detail} onChange={(e) => setDetail(e.target.value)} placeholder={kind === 'feature' ? t('Contexto o motivación (opcional)') : t('1. … 2. … 3. …')} />
+                  <textarea className="input feedback-input min-h-[70px] resize-y" value={detail} onChange={(e) => setDetail(e.target.value)} placeholder={kind === 'feature' ? t('Contexto o motivación (opcional)') : t('1. … 2. … 3. …')} />
                   <FieldLabel>{kind === 'feature' ? t('Notas adicionales') : t('Comportamiento esperado')}</FieldLabel>
-                  <textarea className="input min-h-[60px] w-full resize-y" value={extra} onChange={(e) => setExtra(e.target.value)} placeholder={kind === 'feature' ? t('Cualquier otra cosa (opcional)') : t('¿Qué esperabas que ocurriera?')} />
+                  <textarea className="input feedback-input min-h-[60px] resize-y" value={extra} onChange={(e) => setExtra(e.target.value)} placeholder={kind === 'feature' ? t('Cualquier otra cosa (opcional)') : t('¿Qué esperabas que ocurriera?')} />
                 </>
               )}
 
-              <div className="rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs text-neutral-500 dark:border-neutral-800 dark:bg-neutral-900/50">
-                <div className="mb-1 flex items-center gap-1.5 font-medium text-neutral-600 dark:text-neutral-400">
+              <div className="feedback-system-info">
+                <div>
                   <Icon name="info" size={13} /> {t('Se adjuntará automáticamente')}
                 </div>
                 {appInfo ? (
@@ -268,19 +286,22 @@ export function FeedbackModal({ onClose }: { onClose: () => void }) {
           )}
         </div>
 
-        {kind !== null && (
-          <footer className="flex items-center justify-between gap-3 border-t border-neutral-200 px-5 py-3 dark:border-neutral-800">
-            <span className="text-xs text-neutral-500">{t('Se abrirá GitHub para que revises y publiques.')}</span>
-            <button className="btn btn-primary gap-1.5" onClick={send} disabled={!canSend}>
+        <footer className="roadmap-footer feedback-footer">
+          <span>{kind === null ? <><Icon name="network" size={13} /> NODUS</> : t('Se abrirá GitHub para que revises y publiques.')}</span>
+          <span><Icon name="gitPr" size={13} /> GITHUB · ISSUES</span>
+          {kind !== null ? (
+            <button onClick={send} disabled={!canSend}>
               <Icon name="external" size={15} /> {t('Enviar a GitHub')}
             </button>
-          </footer>
-        )}
-      </section>
-    </div>
+          ) : (
+            <button onClick={onClose}>{t('Cerrar')} <Icon name="check" size={14} /></button>
+          )}
+        </footer>
+      </motion.section>
+    </motion.div>
   );
 }
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
-  return <label className="block text-xs font-medium text-neutral-600 dark:text-neutral-400">{children}</label>;
+  return <label className="feedback-field-label">{children}</label>;
 }
