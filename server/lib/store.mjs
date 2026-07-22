@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash, randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
+import { normalizeServerLanguage } from './i18n.mjs';
 
 export function token(bytes = 32) {
   return randomBytes(bytes).toString('base64url');
@@ -23,7 +24,7 @@ export function verifyPassword(password, salt, expected) {
 function initialState() {
   return {
     version: 1,
-    settings: { name: 'Nodus Server', publicUrl: '' },
+    settings: { name: 'Nodus Server', publicUrl: '', language: 'en' },
     users: [],
     spaces: [],
     memberships: [],
@@ -50,9 +51,11 @@ export class Store {
     if (!fs.existsSync(this.stateFile)) return initialState();
     try {
       const parsed = JSON.parse(fs.readFileSync(this.stateFile, 'utf8'));
-      return { ...initialState(), ...parsed, settings: { ...initialState().settings, ...(parsed.settings ?? {}) } };
+      const settings = { ...initialState().settings, ...(parsed.settings ?? {}) };
+      settings.language = normalizeServerLanguage(settings.language);
+      return { ...initialState(), ...parsed, settings };
     } catch (error) {
-      throw new Error(`No se pudo leer ${this.stateFile}: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(`Could not read ${this.stateFile}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -74,9 +77,9 @@ export class Store {
 
   createUser(email, password, role = 'member') {
     const normalized = String(email).trim().toLowerCase();
-    if (!normalized || !normalized.includes('@')) throw new Error('Introduce un correo válido.');
-    if (String(password).length < 12) throw new Error('La contraseña debe tener al menos 12 caracteres.');
-    if (this.state.users.some((user) => user.email === normalized)) throw new Error('Ya existe una cuenta con ese correo.');
+    if (!normalized || !normalized.includes('@')) throw new Error('Enter a valid email address.');
+    if (String(password).length < 12) throw new Error('The password must contain at least 12 characters.');
+    if (this.state.users.some((user) => user.email === normalized)) throw new Error('An account already exists for that email address.');
     const protectedPassword = hashPassword(password);
     const user = { id: randomUUID(), email: normalized, role, ...protectedPassword, createdAt: new Date().toISOString() };
     this.state.users.push(user);
@@ -91,8 +94,8 @@ export class Store {
 
   replacePassword(userId, password, exceptSessionHash = null) {
     const user = this.state.users.find((entry) => entry.id === userId);
-    if (!user) throw new Error('La cuenta no existe.');
-    if (String(password).length < 12) throw new Error('La contraseña debe tener al menos 12 caracteres.');
+    if (!user) throw new Error('The account does not exist.');
+    if (String(password).length < 12) throw new Error('The password must contain at least 12 characters.');
     Object.assign(user, hashPassword(String(password)), { passwordChangedAt: new Date().toISOString() });
 
     // A password change is also a credential-recovery event: stale browser and
@@ -113,8 +116,8 @@ export class Store {
 
   changePassword(userId, currentPassword, newPassword, currentSessionHash) {
     const user = this.state.users.find((entry) => entry.id === userId);
-    if (!user || !verifyPassword(String(currentPassword), user.salt, user.hash)) throw new Error('La contraseña actual no es correcta.');
-    if (verifyPassword(String(newPassword), user.salt, user.hash)) throw new Error('La contraseña nueva debe ser diferente de la actual.');
+    if (!user || !verifyPassword(String(currentPassword), user.salt, user.hash)) throw new Error('The current password is incorrect.');
+    if (verifyPassword(String(newPassword), user.salt, user.hash)) throw new Error('The new password must be different from the current password.');
     return this.replacePassword(userId, newPassword, currentSessionHash);
   }
 

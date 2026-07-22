@@ -132,6 +132,7 @@ export function Settings({
     url: null,
     spaceId: null,
     spaceName: null,
+    language: 'en',
     lastSyncAt: null,
     lastError: null,
     lastBytes: null,
@@ -339,7 +340,9 @@ export function Settings({
       setNodusServerStatus(next);
       setNodusServerMessage(next.lastError || `${t('Conectado a')} ${result.serverName} · ${result.spaceName}`);
     } catch (error) {
-      setNodusServerMessage(error instanceof Error ? error.message : String(error));
+      const message = error instanceof Error ? error.message : String(error);
+      setNodusServerStatus((current) => ({ ...current, phase: 'error', lastError: message }));
+      setNodusServerMessage(message);
     } finally {
       setNodusServerBusy(false);
     }
@@ -352,6 +355,23 @@ export function Settings({
       const next = await window.nodus.syncNodusServerNow();
       setNodusServerStatus(next);
       setNodusServerMessage(next.lastError || t('Vault publicado correctamente.'));
+    } finally {
+      setNodusServerBusy(false);
+    }
+  };
+
+  const changeNodusServerLanguage = async (language: AppSettings['nodusServerLanguage']) => {
+    setNodusServerBusy(true);
+    setNodusServerMessage(null);
+    try {
+      const next = await window.nodus.setNodusServerLanguage(language);
+      setNodusServerStatus(next);
+      await onChange();
+      setNodusServerMessage(t('Idioma del servidor actualizado.'));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setNodusServerStatus((current) => ({ ...current, phase: 'error', lastError: message }));
+      setNodusServerMessage(message);
     } finally {
       setNodusServerBusy(false);
     }
@@ -1253,6 +1273,26 @@ export function Settings({
                   </div>
                 </div>
               </div>
+
+              <Row
+                label={t('Idioma de la interfaz del servidor')}
+                hint={t('Cambia la administración web y las pantallas de acceso para todos los usuarios. El idioma inicial es inglés.')}
+              >
+                <select
+                  className="input w-full sm:w-64"
+                  value={nodusServerStatus.language}
+                  disabled={nodusServerBusy}
+                  onChange={(event) => void changeNodusServerLanguage(event.target.value as AppSettings['nodusServerLanguage'])}
+                >
+                  <option value="en">English</option>
+                  <option value="es">Español</option>
+                  <option value="fr">Français</option>
+                  <option value="de">Deutsch</option>
+                  <option value="pt">Português (Portugal)</option>
+                  <option value="pt-BR">Português (Brasil)</option>
+                  <option value="it">Italiano</option>
+                </select>
+              </Row>
 
               <div className="flex items-center justify-between gap-4">
                 <div>

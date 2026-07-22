@@ -329,6 +329,7 @@ const api: NodusApi = {
   forgetMcpTunnel: () => ipcRenderer.invoke('mcp:tunnel:forget'),
   getNodusServerStatus: () => ipcRenderer.invoke('nodusServer:status'),
   pairNodusServer: (url, code) => ipcRenderer.invoke('nodusServer:pair', url, code),
+  setNodusServerLanguage: (language) => ipcRenderer.invoke('nodusServer:setLanguage', language),
   syncNodusServerNow: () => ipcRenderer.invoke('nodusServer:syncNow'),
   disconnectNodusServer: () => ipcRenderer.invoke('nodusServer:disconnect'),
   getCopilotStatus: () => ipcRenderer.invoke('copilot:status'),

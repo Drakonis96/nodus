@@ -1527,6 +1527,8 @@ export interface AppSettings {
   /** Remote space selected during one-time pairing. */
   nodusServerSpaceId: string;
   nodusServerSpaceName: string;
+  /** Language used by the paired Nodus Server web interface. English is the server default. */
+  nodusServerLanguage: AppLanguage;
   /** Include user-authored notes, projects and study/teaching tables in the publication. */
   nodusServerIncludeUserContent: boolean;
   /** Include citable extracted passages. Off by default because full text may be licensed. */
@@ -2311,6 +2313,7 @@ export interface NodusServerSyncStatus {
   url: string | null;
   spaceId: string | null;
   spaceName: string | null;
+  language: AppLanguage;
   lastSyncAt: string | null;
   lastError: string | null;
   lastBytes: number | null;
@@ -2323,6 +2326,7 @@ export interface NodusServerPairResult {
   serverName: string;
   spaceId: string;
   spaceName: string;
+  language: AppLanguage;
 }
 
 export type McpTunnelPhase =
@@ -5533,6 +5537,7 @@ export interface NodusApi {
   forgetMcpTunnel(): Promise<McpTunnelStatus>;
   getNodusServerStatus(): Promise<NodusServerSyncStatus>;
   pairNodusServer(url: string, code: string): Promise<NodusServerPairResult>;
+  setNodusServerLanguage(language: AppLanguage): Promise<NodusServerSyncStatus>;
   syncNodusServerNow(): Promise<NodusServerSyncStatus>;
   disconnectNodusServer(): Promise<NodusServerSyncStatus>;
   getCopilotStatus(): Promise<CopilotServerStatus>;

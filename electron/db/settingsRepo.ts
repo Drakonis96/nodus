@@ -150,6 +150,7 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys' | 'lockedProviderKeys'> = {
   nodusServerUrl: '',
   nodusServerSpaceId: '',
   nodusServerSpaceName: '',
+  nodusServerLanguage: 'en',
   nodusServerIncludeUserContent: false,
   nodusServerIncludePassages: false,
   nodusServerAutoSync: true,

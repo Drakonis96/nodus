@@ -1,12 +1,34 @@
 import assert from 'node:assert/strict';
 import { createHash, randomBytes } from 'node:crypto';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { gzipSync } from 'node:zlib';
 import test from 'node:test';
+import { missingServerTranslations } from '../server/lib/i18n.mjs';
+import { Store } from '../server/lib/store.mjs';
+
+test('Nodus Server web translations cover every supported app language', () => {
+  assert.deepEqual(missingServerTranslations(), {
+    en: [], es: [], fr: [], de: [], pt: [], 'pt-BR': [], it: [],
+  });
+});
+
+test('existing server state without a language migrates to English', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'nodus-server-language-test-'));
+  try {
+    await writeFile(path.join(root, 'state.json'), JSON.stringify({ version: 1, settings: { name: 'Legacy server', publicUrl: '' } }));
+    const store = new Store(root);
+    assert.equal(store.state.settings.language, 'en');
+    store.state.settings.language = 'it';
+    store.save();
+    assert.equal(new Store(root).state.settings.language, 'it');
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
 
 async function freePort() {
   const probe = createServer();
@@ -140,6 +162,12 @@ test('Nodus Server pairs a desktop publisher and protects read-only MCP with OAu
   try {
     await waitForHealth(origin, child, logs);
 
+    const initialSetupResponse = await fetch(`${origin}/setup`);
+    assert.equal(initialSetupResponse.status, 200);
+    const initialSetupHtml = await initialSetupResponse.text();
+    assert.match(initialSetupHtml, /<html lang="en">/);
+    assert.match(initialSetupHtml, /<h1>Set up Nodus Server<\/h1>/);
+
     const setup = await postForm(`${origin}/setup`, {
       setupToken,
       name: 'Nodus Test',
@@ -188,6 +216,43 @@ test('Nodus Server pairs a desktop publisher and protects read-only MCP with OAu
     const paired = await pairedResponse.json();
     assert.equal(paired.space.id, sharedSpaceId);
     assert.ok(paired.accessToken);
+    assert.equal(paired.server.language, 'en');
+
+    const anonymousLanguageChange = await fetch(`${origin}/api/v1/settings/language`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ language: 'es' }),
+    });
+    assert.equal(anonymousLanguageChange.status, 401, 'server language changes require a paired device token');
+
+    const unsupportedLanguage = await fetch(`${origin}/api/v1/settings/language`, {
+      method: 'PUT',
+      headers: { authorization: `Bearer ${paired.accessToken}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ language: 'tr' }),
+    });
+    assert.equal(unsupportedLanguage.status, 400);
+
+    for (const [language, heading] of [
+      ['es', 'Entrar en Nodus Server'],
+      ['fr', 'Se connecter à Nodus Server'],
+      ['de', 'Bei Nodus Server anmelden'],
+      ['pt', 'Iniciar sessão no Nodus Server'],
+      ['pt-BR', 'Iniciar sessão no Nodus Server'],
+      ['it', 'Accedi a Nodus Server'],
+      ['en', 'Sign in to Nodus Server'],
+    ]) {
+      const changed = await fetch(`${origin}/api/v1/settings/language`, {
+        method: 'PUT',
+        headers: { authorization: `Bearer ${paired.accessToken}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ language }),
+      });
+      assert.equal(changed.status, 200);
+      assert.equal((await changed.json()).language, language);
+      const loginPageResponse = await fetch(`${origin}/login`);
+      const loginPageHtml = await loginPageResponse.text();
+      assert.match(loginPageHtml, new RegExp(`<html lang="${language}">`));
+      assert.ok(loginPageHtml.includes(`<h1>${heading}</h1>`));
+    }
 
     const reusedPairing = await fetch(`${origin}/api/v1/pair`, {
       method: 'POST',
@@ -329,7 +394,7 @@ test('Nodus Server pairs a desktop publisher and protects read-only MCP with OAu
       confirmPassword: 'student-password-updated',
     }, { headers: { cookie: readerCookie } });
     assert.equal(wrongCurrentPassword.status, 400);
-    assert.match(await wrongCurrentPassword.text(), /contraseña actual no es correcta/i);
+    assert.match(await wrongCurrentPassword.text(), /current password is incorrect/i);
 
     const changedPassword = await postForm(`${origin}/account/password`, {
       csrf: accountCsrf,

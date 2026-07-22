@@ -3,7 +3,8 @@ import { gzipSync } from 'node:zlib';
 import { getSettings, updateSettings } from '../db/settingsRepo';
 import { getActiveVault } from '../vaults/vaultRegistry';
 import { clearNodusServerToken, getNodusServerToken, hasNodusServerToken, setNodusServerToken } from '../secrets/secretStore';
-import type { NodusServerPairResult, NodusServerSyncStatus } from '@shared/types';
+import type { AppLanguage, NodusServerPairResult, NodusServerSyncStatus } from '@shared/types';
+import { normalizeUiLanguage } from '@shared/uiLanguage';
 import { buildServerSnapshot, lightweightVaultRevision } from './serverSnapshot';
 
 const CHECK_INTERVAL_MS = 30_000;
@@ -23,6 +24,7 @@ function emptyStatus(): NodusServerSyncStatus {
   return {
     configured: false, enabled: false, autoSync: false, phase: 'disconnected',
     url: null, spaceId: null, spaceName: null, lastSyncAt: null, lastError: null,
+    language: 'en',
     lastBytes: null, transport: 'outbound-https',
   };
 }
@@ -49,6 +51,7 @@ function refreshConfiguredStatus(): void {
     url: settings.nodusServerUrl || null,
     spaceId: settings.nodusServerSpaceId || null,
     spaceName: settings.nodusServerSpaceName || null,
+    language: settings.nodusServerLanguage,
     ...(configured ? {} : { lastSyncAt: null, lastError: null, lastBytes: null }),
   };
 }
@@ -73,23 +76,45 @@ export async function pairNodusServer(urlValue: string, code: string): Promise<N
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ code: cleanCode, deviceName: `Nodus Desktop · ${os.hostname()}` }),
     });
-    const result = await response.json().catch(() => ({})) as { accessToken?: string; error?: string; space?: { id: string; name: string }; server?: { name: string; publicUrl: string } };
+    const result = await response.json().catch(() => ({})) as { accessToken?: string; error?: string; space?: { id: string; name: string }; server?: { name: string; publicUrl: string; language?: AppLanguage } };
     if (!response.ok || !result.accessToken || !result.space) throw new Error(result.error || `El servidor respondió con HTTP ${response.status}.`);
     const pairedUrl = normalizeUrl(result.server?.publicUrl || url);
     setNodusServerToken(result.accessToken);
-    updateSettings({ nodusServerUrl: pairedUrl, nodusServerSpaceId: result.space.id, nodusServerSpaceName: result.space.name, nodusServerEnabled: true });
+    const language = normalizeUiLanguage(result.server?.language ?? 'en');
+    updateSettings({ nodusServerUrl: pairedUrl, nodusServerSpaceId: result.space.id, nodusServerSpaceName: result.space.name, nodusServerLanguage: language, nodusServerEnabled: true });
     observedRevision = null; dirtySince = Date.now();
-    status = { ...emptyStatus(), configured: true, enabled: true, autoSync: getSettings().nodusServerAutoSync, phase: 'idle', url: pairedUrl, spaceId: result.space.id, spaceName: result.space.name };
+    status = { ...emptyStatus(), configured: true, enabled: true, autoSync: getSettings().nodusServerAutoSync, phase: 'idle', url: pairedUrl, spaceId: result.space.id, spaceName: result.space.name, language };
     startNodusServerSync();
     // The one explicit full publication happens immediately. Subsequent automatic
     // work is debounced and revision-gated by the lightweight timer below.
     await syncNodusServerNow();
-    return { ok: true, serverName: result.server?.name || 'Nodus Server', spaceId: result.space.id, spaceName: result.space.name };
+    return { ok: true, serverName: result.server?.name || 'Nodus Server', spaceId: result.space.id, spaceName: result.space.name, language };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     status = { ...status, phase: 'error', lastError: message };
     throw error;
   }
+}
+
+export async function setNodusServerLanguage(languageValue: AppLanguage): Promise<NodusServerSyncStatus> {
+  const settings = getSettings();
+  const accessToken = getNodusServerToken();
+  if (!settings.nodusServerUrl || !settings.nodusServerSpaceId || !accessToken) {
+    throw new Error('Conecta este vault a Nodus Server antes de cambiar su idioma.');
+  }
+  const language = normalizeUiLanguage(languageValue);
+  const response = await fetchWithTimeout(`${normalizeUrl(settings.nodusServerUrl)}/api/v1/settings/language`, {
+    method: 'PUT',
+    headers: { authorization: `Bearer ${accessToken}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ language }),
+  });
+  const result = await response.json().catch(() => ({})) as { language?: AppLanguage; error?: string };
+  if (!response.ok || !result.language) throw new Error(result.error || `El servidor respondió con HTTP ${response.status}.`);
+  const accepted = normalizeUiLanguage(result.language);
+  updateSettings({ nodusServerLanguage: accepted });
+  status = { ...status, language: accepted, lastError: null };
+  refreshConfiguredStatus();
+  return { ...status };
 }
 
 export async function syncNodusServerNow(): Promise<NodusServerSyncStatus> {

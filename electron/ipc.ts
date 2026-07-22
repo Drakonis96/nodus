@@ -321,6 +321,7 @@ import {
   getNodusServerStatus,
   pairNodusServer,
   restartNodusServerSync,
+  setNodusServerLanguage,
   startNodusServerSync,
   stopNodusServerSync,
   syncNodusServerNow,
@@ -1849,6 +1850,7 @@ export function registerIpc(
   h('mcp:tunnel:forget', async () => forgetMcpTunnel());
   h('nodusServer:status', async () => getNodusServerStatus());
   h('nodusServer:pair', async (_e, url: string, code: string) => pairNodusServer(url, code));
+  h('nodusServer:setLanguage', async (_e, language: AppLanguage) => setNodusServerLanguage(language));
   h('nodusServer:syncNow', async () => syncNodusServerNow());
   h('nodusServer:disconnect', async () => disconnectNodusServer());
   h('copilot:status', async () => getCopilotStatus());
