@@ -247,6 +247,34 @@ export function getIdeaSummary(globalId: string): Idea | null {
   return { ...row, embedding: null };
 }
 
+/**
+ * Permanently delete one corpus idea. Unlike a rescan purge, this is an explicit
+ * user action, so the stable identity and embedding are intentionally removed as
+ * well as every direct derived reference. User-authored note text is preserved;
+ * only its now-invalid manual-idea provenance is detached.
+ */
+export function deleteIdea(globalId: string): boolean {
+  const db = getDb();
+  let deleted = false;
+  db.transaction(() => {
+    if (!db.prepare('SELECT 1 FROM ideas WHERE global_id=?').get(globalId)) return;
+    db.prepare('DELETE FROM gaps WHERE related_idea=?').run(globalId);
+    db.prepare('DELETE FROM external_refs WHERE from_idea=?').run(globalId);
+    db.prepare("DELETE FROM project_chapter_idea_relations WHERE target_kind='idea' AND target_id=?").run(globalId);
+    db.prepare("DELETE FROM db_relations WHERE target_kind='idea' AND target_id=? AND target_vault_id IS NULL").run(globalId);
+    db.prepare('UPDATE notes SET source_json=NULL, updated_at=? WHERE json_valid(source_json) AND json_extract(source_json, \'$.note\')=\'manual-idea\' AND json_extract(source_json, \'$.ref\')=?')
+      .run(new Date().toISOString(), globalId);
+    db.prepare('DELETE FROM edge_feedback WHERE from_id=? OR to_id=?').run(globalId, globalId);
+    db.prepare('DELETE FROM edge_traces WHERE edge_id IN (SELECT id FROM edges WHERE from_id=? OR to_id=?)').run(globalId, globalId);
+    db.prepare('DELETE FROM edges WHERE from_id=? OR to_id=?').run(globalId, globalId);
+    db.prepare('DELETE FROM evidence WHERE global_id=?').run(globalId);
+    db.prepare('DELETE FROM idea_occurrences WHERE global_id=?').run(globalId);
+    db.prepare('DELETE FROM idea_theme_links WHERE global_id=?').run(globalId);
+    deleted = db.prepare('DELETE FROM ideas WHERE global_id=?').run(globalId).changes > 0;
+  })();
+  return deleted;
+}
+
 /** All ideas with a current-model embedding. Kept for small in-memory consumers. */
 export function ideasWithEmbeddings(): { global_id: string; type: IdeaType; label: string; statement: string; embedding: number[] }[] {
   const db = getDb();

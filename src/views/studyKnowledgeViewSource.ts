@@ -245,6 +245,7 @@ export function createStudyKnowledgeViewSource(subjectId: string, openEvidence?:
     getGraph: () => graphData(subjectId),
     getGraphOverview: () => graphData(subjectId),
     getGraphTheme: () => graphData(subjectId),
+    deleteIdea: (id) => window.nodus.deleteStudyIdea(id),
     subscribe: (refresh) => window.nodus.onStudyKnowledgeChanged(refresh),
     openEvidence,
     saveIdea: async (idea) => {

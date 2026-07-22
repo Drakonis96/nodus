@@ -26,6 +26,7 @@ export interface KnowledgeViewSource {
   getGraph(lens: 'ideas' | 'authors'): Promise<GraphData>;
   getGraphOverview(): Promise<GraphData>;
   getGraphTheme(theme: string, cap?: number): Promise<GraphData>;
+  deleteIdea(id: string): Promise<void>;
   subscribe?(refresh: () => void): () => void;
   openEvidence?(sourceRef: string, location: string | null): void;
   saveIdea?(detail: IdeaDetail): Promise<void>;
@@ -49,4 +50,5 @@ export const academicKnowledgeViewSource: KnowledgeViewSource = {
   getGraph: (lens) => window.nodus.getGraph(lens),
   getGraphOverview: () => window.nodus.getGraphOverview(),
   getGraphTheme: (theme, cap) => window.nodus.getGraphTheme(theme, cap),
+  deleteIdea: (id) => window.nodus.deleteIdea(id),
 };

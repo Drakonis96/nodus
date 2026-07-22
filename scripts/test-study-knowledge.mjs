@@ -60,6 +60,12 @@ try {
   knowledge.connectStudySourceIdeasSemantically(subjectA.id, 'material', second.material.id);
   assert.ok(knowledge.getStudyKnowledgeGraph(subjectA.id).edges.length >= 1, 'semantic neighbours inside one subject are connected');
   assert.equal(knowledge.getStudyKnowledgeGraph(subjectB.id).edges.length, 0, 'relations never cross subjects');
+  const secondIdea = knowledge.listStudyIdeas(subjectA.id).find((idea) => idea.label === 'Equilibrio institucional');
+  assert.ok(secondIdea, 'the second source produced its canonical idea');
+  assert.equal(knowledge.deleteStudyIdea(secondIdea.id), true, 'an idea can be deleted explicitly');
+  assert.equal(knowledge.getStudyIdeaDetail(secondIdea.id), null, 'deleting an idea removes its detail and embedding row');
+  assert.equal(knowledge.getStudyKnowledgeGraph(subjectA.id).nodes.some((node) => node.id === secondIdea.id), false, 'the deleted idea leaves the graph');
+  assert.equal(knowledge.getStudyKnowledgeGraph(subjectA.id).edges.some((edge) => edge.source === secondIdea.id || edge.target === secondIdea.id), false, 'dependent graph connections are deleted with the idea');
 
   const merged = ai.mergeStudyKnowledgeExtractions([extraction, { ideas: [{ ...extraction.ideas[0], key: 'duplicate', statement: 'Una formulación más extensa sobre la separación de poderes.' }], relations: [] }]);
   assert.equal(merged.ideas.length, 1, 'duplicate labels from separate chunks are merged');
@@ -105,6 +111,16 @@ try {
   const assessmentContext = await ai.retrieveStudyKnowledgeContext(subjectA.id, 'limitación del poder', [`material:${imported.material.id}`]);
   assert.equal(assessmentContext.ideas.length, 1, 'assessment retrieval respects explicit source selection');
   assert.match(assessmentContext.outline, /Separación de poderes/);
+
+  const sourcePath3 = path.join(root, 'tema-3.txt'); fs.writeFileSync(sourcePath3, 'La separación de poderes limita la concentración política.');
+  const third = await materials.importStudyMaterialFile(sourcePath3, { courseId: course.id, subjectId: subjectA.id });
+  knowledge.replaceStudySourceKnowledge({ subjectId: subjectA.id, sourceKind: 'material', sourceId: third.material.id,
+    sourceTitle: 'Tema 3', sourceHash: 'hash-3', ideas: extraction.ideas, relations: [], embeddings: [[1, 0, 0]], embeddingProvider: 'test', embeddingModel: 'test' });
+  const sharedIdeaId = knowledge.listStudyIdeas(subjectA.id).find((idea) => idea.label === 'Separación de poderes').id;
+  knowledge.purgeStudyKnowledgeSource('material', imported.material.id);
+  assert.ok(knowledge.getStudyIdeaDetail(sharedIdeaId), 'purging one source preserves an idea that is still supported by another source');
+  knowledge.purgeStudyKnowledgeSource('material', third.material.id);
+  assert.equal(knowledge.getStudyIdeaDetail(sharedIdeaId), null, 'purging the last source deletes the idea, embedding, evidence, and connections');
 
   const [searchSource, questionSource, ideasView, graphView, ideasEngine, graphEngine, adapter] = await Promise.all([
     readFile(path.join(repoRoot, 'electron/ai/studySearch.ts'), 'utf8'), readFile(path.join(repoRoot, 'electron/ai/studyQuestions.ts'), 'utf8'),
