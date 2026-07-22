@@ -1,9 +1,22 @@
 /** Italian history, indexed by release and highlight order. */
 export const RELEASE_NOTES_IT: Record<string, string[]> = {
+  "2.5.3": [
+    "PDF Presenter è molto più solido: gli strumenti di annotazione rispondono in modo affidabile, supportano scorciatoie e ridimensionamento in tempo reale, mentre la modalità presentatore funziona meglio con uno o più schermi e dal telecomando mobile. Puoi inoltre importare ed esportare le note del relatore in TXT e ridimensionare liberamente i video di YouTube.",
+    "OCR Workspace ora separa «Nuovo OCR» e «Libreria», consente di cercare per titolo o contenuto trascritto e può elaborare più pagine in parallelo in base al provider. Rielaborando una pagina o un documento puoi scegliere un altro modello e vedere meglio l'avanzamento; i modelli locali continuano a lavorare una pagina alla volta per maggiore stabilità.",
+    "Nodus Protect uniforma le dimensioni dei controlli e migliora la modifica visiva: la barra nera si regola con un cursore, mentre il suo spessore e la dimensione e intensità della sfocatura si aggiornano immediatamente nell'anteprima.",
+    "Le Impostazioni hanno ora una sezione dedicata ad «Aggiornamenti e novità». Privacy, GDPR e Licenze si aprono direttamente in Nodus con contenuti localizzati e un collegamento al documento canonico, invece di mostrare Markdown esterno in un'altra lingua.",
+    "Le impostazioni IA distinguono più chiaramente la selezione dei modelli dai servizi locali e vocali, allineano i selettori avanzati e migliorano il contrasto dell'avviso sulla privacy della Docenza. I tuoi modelli preferiti diventano una preferenza globale e restano disponibili quando cambi deposito.",
+    "Studio offre ora un flusso di eliminazione sicuro e coerente: seleziona più appunti o materiali, spostali nel cestino e decidi se rimuovere anche idee, embedding, prove e connessioni. Le idee condivise con altre fonti vengono conservate, i processi IA non possono più ricreare contenuti eliminati e le singole idee si possono cancellare dalla loro scheda.",
+    "Le intestazioni delle tabelle dei materiali e degli appunti condivisi sono ora centrate e allineate, rendendo più leggibili gli elenchi larghi.",
+    "ChatGPT può ora collegarsi a Nodus tramite il tunnel MCP sicuro di OpenAI. Una procedura guidata installa e verifica il client ufficiale, protegge le credenziali, spiega autorizzazioni ed errori con passaggi concreti e si connette senza aprire porte né pubblicare la tua libreria; l'interfaccia è inoltre completamente leggibile nel tema chiaro.",
+    "Database aggiunge colonne di confronto che calcolano il valore maggioritario esatto tra più proprietà, per riga o per l'intera colonna. Le colonne di testo e immagine IA possono usare un proprio modello e i processi lunghi conservano l'avanzamento quando cambi vista, con errori e tentativi più chiari.",
+    "I messaggi della chat di Nodi ora possono essere selezionati come testo. Ogni risposta ha un pulsante per copiarla e dall'intestazione puoi copiare l'intera conversazione.",
+    "La narrazione locale con Kokoro include ora voci in spagnolo di Spagna e dell'America Latina, con normalizzazione e pronuncia adattate affinché date, numeri e testo suonino naturali senza lasciare il dispositivo.",
+    "Il deposito Docenza mostra chiaramente il suo stato BETA e lo stato vuoto del registro dei voti torna a offrire l'azione corretta per creare il primo registro."
+  ],
   "2.5.2": [
     "Importare file è più diretto: il selettore di sistema si apre subito, senza finestre intermedie. L'avviso prima di registrare con il microfono — dove avvertire le persone che potrebbero essere registrate conta davvero — ora ti permette di accettarlo una volta, accettarlo e non mostrarlo più su questo dispositivo, oppure rifiutarlo.",
-    "Corretto un errore per cui cambiare deposito poteva fallire con «table … already exists». I database creati da una versione precedente con una numerazione delle migrazioni diversa si riparano da soli — conservando i tuoi dati — invece di impedire l'apertura.",
-    "ChatGPT può ora usare Nodus tramite il tunnel MCP sicuro di OpenAI. Una procedura guidata installa e verifica il client ufficiale, protegge le credenziali e spiega ogni passaggio senza aprire porte né pubblicare la tua libreria."
+    "Corretto un errore per cui cambiare deposito poteva fallire con «table … already exists». I database creati da una versione precedente con una numerazione delle migrazioni diversa si riparano da soli — conservando i tuoi dati — invece di impedire l'apertura."
   ],
   "2.5.0": [
     "Novità in Strumenti: OCR Workspace trascrive PDF scansionati e immagini con qualsiasi modello dotato di visione — locale o nel cloud — e mantiene una libreria di OCR per documento. Ricostruisce un Markdown pulito, lascia intatto l'originale ed esporta il risultato.",

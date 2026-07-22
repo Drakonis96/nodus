@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.5.2 — 2026-07-21
+## 2.5.3 — 2026-07-22
 
 ### Added
 
@@ -11,6 +11,40 @@
   reconnects automatically without exposing the local MCP listener.
 - Runtime credentials stay outside renderer state and process arguments, and
   users can disconnect temporarily or forget the saved connection entirely.
+- **Database comparison properties.** Compare two or more source columns and
+  write their unique exact majority value per row or across the whole table.
+- **Per-column AI models.** Text and image AI properties can override the global
+  model, while their long-running cell and column jobs retain progress across
+  navigation and report failures cleanly.
+- **Spanish Kokoro voices.** Local narration supports Spain and Latin American
+  voices with Spanish-aware normalisation and phonemisation.
+- **Presenter notes as TXT.** Speaker notes can be exported to a stable,
+  slide-numbered text format and imported again after validation.
+
+### Changed
+
+- **Toolkit polish.** PDF Presenter has reliable live annotation tools,
+  shortcuts, resizable overlays, a more robust phone remote and better
+  single-display behaviour. OCR Workspace adds new/library tabs, content search,
+  provider-aware concurrency, model selection when reprocessing and clearer
+  progress. Nodus Protect gets consistent controls and live slider previews.
+- **Safer Study deletion.** Notes and materials support multi-selection and a
+  two-step choice to retain or purge their derived ideas, embeddings, evidence
+  and connections. Shared ideas remain intact, late AI work cannot resurrect
+  deleted content, and individual ideas can be deleted from their detail view.
+- **Clearer Settings.** Legal documents open in localised in-app modals, updates
+  have their own section, model selection is separated from local/audio services,
+  and favourite models are shared across vaults.
+- Nodi chat text is selectable, with controls to copy one answer or the complete
+  conversation.
+- Shared Study material-table headers are centred and aligned.
+- The Teaching vault now carries a BETA badge.
+
+### Fixed
+
+- The Teaching gradebook empty state once again creates the first gradebook.
+- The ChatGPT MCP connector is readable in light theme and its guided setup gives
+  more precise permission, installation and recovery instructions.
 
 ### Notes
 
