@@ -63,6 +63,7 @@ const granularKeys = [
   'gradingModel', 'flashcardModel',
 ];
 
+const primary = registry.getActiveVault();
 let db = database.getDb();
 const broken = {
   embeddingProvider: 'openai',
@@ -131,6 +132,19 @@ const secondarySettings = settingsRepo.getSettings();
 assert.equal(secondarySettings.embeddingProvider, 'openai', 'each vault recovers against its own independent index');
 assert.equal(secondarySettings.embeddingModel, 'text-embedding-3-small');
 assert.deepEqual(secondarySettings.codexReasoningEfforts, { 'gpt-test': 'xhigh' }, 'Codex reasoning preferences are shared across vaults');
+
+const favoritesPinnedInSecondary = [gemini, integrated];
+settingsRepo.updateSettings({ favorites: favoritesPinnedInSecondary });
+database.closeDb();
+registry.setActiveVault(primary.id);
+db = database.getDb();
+assert.deepEqual(settingsRepo.getSettings().favorites, favoritesPinnedInSecondary, 'models pinned in one vault appear in every other vault');
+
+settingsRepo.updateSettings({ favorites: [integrated] });
+database.closeDb();
+registry.setActiveVault(secondary.id);
+db = database.getDb();
+assert.deepEqual(settingsRepo.getSettings().favorites, [integrated], 'unpinning a shared model updates every vault too');
 
 database.closeDb();
 console.log('2.3 model preference recovery tests passed');

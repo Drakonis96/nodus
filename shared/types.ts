@@ -1266,8 +1266,9 @@ export interface AppSettings {
   // Connection settings for local providers (Ollama, LM Studio). The base URL is
   // user-editable; an optional access token, when set, is stored like an API key.
   localProviders: Record<LocalProvider, LocalProviderConfig>;
-  // Favorite models the user pinned. Workload and feature selectors below are
-  // deliberately independent: changing one must never retarget another flow.
+  // Favorite models the user pinned. This list is app-wide and shared across vaults.
+  // Workload and feature selectors below remain deliberately independent: changing
+  // one must never retarget another flow.
   favorites: ModelRef[];
   /** @deprecated Legacy global selector, retained only for one-time migration. */
   defaultModel: ModelRef | null;

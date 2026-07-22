@@ -1464,7 +1464,7 @@ export function Settings({
       )}
 
       {visibleSettingsSection('models', 'Modelos de IA', 'basico avanzado modelo general extraccion sintesis tutor resumen fusion embeddings transcripcion voz imagen') && (<>
-          <Section title={t('Modelos de IA')}>
+          <Section title={t('Selección de modelos')}>
             <p className="mb-2 text-xs leading-5 text-neutral-600 dark:text-neutral-400">
               {t('Solo puede haber un modo de configuración activo. Cambiar de modo modifica qué selección de modelos utiliza Nodus, no solo la vista de este formulario.')}
             </p>
@@ -1499,11 +1499,6 @@ export function Settings({
                 onEmbeddingChange={(provider, model) => setPendingEmbeddingChange({ provider, model })}
               />
             </Row>
-            <LocalAiModelsSettings
-              settings={settings}
-              patch={patch}
-            />
-            <SttSettings settings={settings} patch={patch} />
             {activeVault?.type === 'estudio' && <Row
               label={t('Procesamiento de materiales nuevos con IA')}
               hint={t('Controla si Nodus crea automáticamente conceptos, citas y relaciones para el mapa de Ideas y el grafo de estudio.')}
@@ -1524,17 +1519,17 @@ export function Settings({
                 <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('Ajustes avanzados comunes')}</h3>
                 {/* The four selectors below drive the scan pipeline: one run covers a
                     whole corpus, so a subscription plan's quota is the real limit. */}
-                <Row label={t('Extracción de temas, ideas y evidencias')}><ModelPicker allowEmpty={false} settings={settings} value={settings.extractionModel} onChange={(extractionModel) => void patch({ extractionModel })} emptyLabel="Seleccionar modelo" requireExtraction /></Row>
+                <Row label={t('Extracción de temas, ideas y evidencias')}><ModelPicker className="w-full" allowEmpty={false} settings={settings} value={settings.extractionModel} onChange={(extractionModel) => void patch({ extractionModel })} emptyLabel="Seleccionar modelo" requireExtraction /></Row>
                 <ExtractionCapabilityNotice model={settings.extractionModel} />
                 <SubscriptionQuotaNotice model={settings.extractionModel} />
-                <Row label={t('Visión y OCR de imágenes')}><ModelPicker allowEmpty={false} settings={settings} value={settings.visionModel} onChange={(visionModel) => void patch({ visionModel })} emptyLabel="Seleccionar modelo" /></Row>
+                <Row label={t('Visión y OCR de imágenes')}><ModelPicker className="w-full" allowEmpty={false} settings={settings} value={settings.visionModel} onChange={(visionModel) => void patch({ visionModel })} emptyLabel="Seleccionar modelo" /></Row>
                 <SubscriptionQuotaNotice model={settings.visionModel} />
-                <Row label={t('Resúmenes de obras')}><ModelPicker allowEmpty={false} settings={settings} value={settings.summaryModel} onChange={(summaryModel) => void patch({ summaryModel })} emptyLabel="Seleccionar modelo" /></Row>
+                <Row label={t('Resúmenes de obras')}><ModelPicker className="w-full" allowEmpty={false} settings={settings} value={settings.summaryModel} onChange={(summaryModel) => void patch({ summaryModel })} emptyLabel="Seleccionar modelo" /></Row>
                 <SubscriptionQuotaNotice model={settings.summaryModel} />
-                <Row label={t('Fusión y deduplicación')}><ModelPicker allowEmpty={false} settings={settings} value={settings.fusionModel} onChange={(fusionModel) => void patch({ fusionModel })} emptyLabel="Seleccionar modelo" requireExtraction /></Row>
+                <Row label={t('Fusión y deduplicación')}><ModelPicker className="w-full" allowEmpty={false} settings={settings} value={settings.fusionModel} onChange={(fusionModel) => void patch({ fusionModel })} emptyLabel="Seleccionar modelo" requireExtraction /></Row>
                 <ExtractionCapabilityNotice model={settings.fusionModel} />
                 <SubscriptionQuotaNotice model={settings.fusionModel} />
-                <Row label={t('Asistente Nodi')}><ModelPicker allowEmpty={false} settings={settings} value={settings.nodiModel} onChange={(nodiModel) => void patch({ nodiModel })} emptyLabel="Seleccionar modelo" /></Row>
+                <Row label={t('Asistente Nodi')}><ModelPicker className="w-full" allowEmpty={false} settings={settings} value={settings.nodiModel} onChange={(nodiModel) => void patch({ nodiModel })} emptyLabel="Seleccionar modelo" /></Row>
               </div>
               <VaultModelOverrides settings={settings} vaultType={activeVault?.type ?? 'academic'} vaultName={activeVault?.name ?? t('Vault actual')} patch={patch} />
             </>}
@@ -1587,7 +1582,7 @@ export function Settings({
               label={t('IA y datos del alumnado')}
               hint={t('La IA de Nodus no recibe listados, notas ni respuestas del alumnado y no puede calificar, perfilar ni evaluar estudiantes. Solo puede generar o estructurar contenido docente que no contenga datos del alumnado.')}
             >
-              <span data-testid="settings-no-ai-student-evaluation" className="inline-flex items-center gap-1.5 rounded-full border border-emerald-800/60 bg-emerald-950/30 px-2.5 py-1 text-xs font-medium text-emerald-300">
+              <span data-testid="settings-no-ai-student-evaluation" className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 dark:border-emerald-800/60 dark:bg-emerald-950/30 dark:text-emerald-300">
                 <Icon name="shield" size={12} /> {t('Bloqueado por diseño')}
               </span>
             </Row>
@@ -1626,6 +1621,11 @@ export function Settings({
               />
             </Row>
           </Section>
+          <LocalAiModelsSettings
+            settings={settings}
+            patch={patch}
+          />
+          <SttSettings settings={settings} patch={patch} />
           <ImageGenerationSettings settings={settings} onChange={onChange} />
           <AudioGenerationSettings settings={settings} onChange={onChange} />
       </>)}

@@ -152,6 +152,7 @@ export const FR: Record<string, string> = {
   'Abrir origen en Zotero': 'Ouvrir la source dans Zotero',
   'Solo puede haber un modo de configuración activo. Cambiar de modo modifica qué selección de modelos utiliza Nodus, no solo la vista de este formulario.':
     'Un seul mode de configuration peut être actif. Changer de mode modifie la sélection de modèles utilisée par Nodus, pas seulement l\'affichage de ce formulaire.',
+  'Selección de modelos': 'Sélection des modèles',
   'Configuración básica': 'Configuration de base',
   'Configuración avanzada': 'Configuration avancée',
   '¿Cambiar a la configuración básica?': 'Passer à la configuration de base ?',

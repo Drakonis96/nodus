@@ -521,9 +521,15 @@ try {
   await page.getByRole('button', { name: 'Modelos IA', exact: true }).click();
   await page.getByText('Generación de imágenes', { exact: true }).waitFor({ timeout: 30_000 });
   assert.equal(await page.getByText('gemini-3.1-flash-lite-image', { exact: false }).count() > 0, true, 'image settings render selected verified model');
-  const advancedPickerHeights = await page.locator('[data-testid="common-model-overrides"] select').evaluateAll((selects) => selects.map((select) => select.getBoundingClientRect().height));
-  assert.ok(advancedPickerHeights.length >= 5, 'advanced model settings render a common selector for every task, including Nodi');
+  const advancedPickerBoxes = await page.locator('[data-testid="common-model-overrides"] select').evaluateAll((selects) => selects.map((select) => {
+    const box = select.getBoundingClientRect();
+    return { width: box.width, height: box.height };
+  }));
+  assert.ok(advancedPickerBoxes.length >= 5, 'advanced model settings render a common selector for every task, including Nodi');
+  const advancedPickerHeights = advancedPickerBoxes.map((box) => box.height);
+  const advancedPickerWidths = advancedPickerBoxes.map((box) => box.width);
   assert.ok(Math.max(...advancedPickerHeights) - Math.min(...advancedPickerHeights) <= 1, 'the Nodi model selector has the same height as adjacent advanced selectors');
+  assert.ok(Math.max(...advancedPickerWidths) - Math.min(...advancedPickerWidths) <= 1, 'all common advanced model selectors have the same width');
   console.log('[e2e] image provider settings rendered');
   await page.getByRole('button', { name: 'Acerca de Nodus', exact: true }).click();
   await page.getByTestId('about-privacy').waitFor();

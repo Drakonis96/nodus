@@ -7,10 +7,11 @@ import type { AppSettings } from '@shared/types';
 // families live here, both persisted in a single JSON in userData so that creating
 // or switching vaults never resets them:
 //
-//  • GLOBAL_PREF_KEYS   — theme/interface preferences and the recovery policy. Always
-//                         present, so the first vault read seeds them unconditionally.
-//  • SHARED_MODEL_KEYS  — the AI model configuration (favorites, every workload
-//                         selector, local-provider base URLs and the image model).
+//  • GLOBAL_PREF_KEYS   — theme/interface preferences, model favorites and the
+//                         recovery policy. Always present, so the first vault read
+//                         seeds them unconditionally.
+//  • SHARED_MODEL_KEYS  — the AI model configuration (every workload selector,
+//                         local-provider base URLs and the image model).
 //                         API keys are already shared across vaults, so the models
 //                         chosen for them should travel too. These are seeded only
 //                         from a vault that has actually configured them (see
@@ -29,6 +30,7 @@ export const GLOBAL_PREF_KEYS = [
   'highContrast',
   'reduceMotion',
   'readingFocusMode',
+  'favorites',
   'mascotEnabled',
   'mascotAlwaysOnTop',
   'mascotVaultCostumes',
@@ -55,7 +57,6 @@ export const GLOBAL_PREF_KEYS = [
 export type GlobalPrefKey = (typeof GLOBAL_PREF_KEYS)[number];
 
 export const SHARED_MODEL_KEYS = [
-  'favorites',
   'codexReasoningEfforts',
   'localProviders',
   'providerFreeTier',
