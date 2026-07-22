@@ -2591,7 +2591,55 @@ select.input optgroup {
 .roadmap-footer > span:nth-child(2) { justify-self: center; }
 .roadmap-footer button { display: inline-flex; align-items: center; justify-self: end; gap: 7px; border-radius: 10px; padding: 9px 14px; color: #07151a; background: linear-gradient(135deg, color-mix(in srgb, var(--vault-accent, #6366f1) 72%, white), color-mix(in srgb, var(--vault-accent, #6366f1) 38%, white)); font-size: 11px; font-weight: 800; box-shadow: 0 10px 25px color-mix(in srgb, var(--vault-accent, #6366f1) 20%, transparent); }
 .roadmap-footer button:hover { transform: translateY(-1px); filter: brightness(1.04); }
+
+/* GitHub proposals share the roadmap's cinematic shell, motion and hero. These
+   rules carry that visual language through the interactive cards and form. */
+.feedback-hero-route > span { transform: rotate(6deg); }
+.feedback-scroll { display: block; }
+.feedback-kind-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.feedback-kind-card { --feedback-kind: #818cf8; position: relative; display: flex; min-height: 178px; flex-direction: column; align-items: flex-start; overflow: hidden; border: 1px solid var(--rm-border); border-radius: 17px; padding: 17px; text-align: left; background: var(--rm-card); box-shadow: 0 10px 28px rgb(0 0 0 / .07); transition: border-color .18s ease, background .18s ease, box-shadow .18s ease, transform .18s ease; }
+.feedback-kind-card::after { content: ''; position: absolute; right: -35px; bottom: -55px; width: 115px; height: 115px; pointer-events: none; border-radius: 50%; background: var(--feedback-kind); filter: blur(34px); opacity: .08; transition: opacity .18s ease; }
+.feedback-kind-card[data-kind='bug'] { --feedback-kind: #f87171; }
+.feedback-kind-card[data-kind='vault'] { --feedback-kind: #2dd4bf; }
+.feedback-kind-card:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--feedback-kind) 55%, var(--rm-border)); background: color-mix(in srgb, var(--feedback-kind) 7%, var(--rm-card)); box-shadow: 0 16px 36px color-mix(in srgb, var(--feedback-kind) 10%, transparent); }
+.feedback-kind-card:hover::after { opacity: .18; }
+.feedback-kind-icon { position: relative; z-index: 1; display: grid; width: 40px; height: 40px; place-items: center; border: 1px solid color-mix(in srgb, var(--feedback-kind) 38%, transparent); border-radius: 12px; color: color-mix(in srgb, var(--feedback-kind) 72%, white); background: color-mix(in srgb, var(--feedback-kind) 13%, transparent); box-shadow: 0 8px 22px color-mix(in srgb, var(--feedback-kind) 12%, transparent); }
+.light .feedback-kind-icon { color: color-mix(in srgb, var(--feedback-kind) 78%, black); }
+.feedback-kind-title { position: relative; z-index: 1; display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 8px; margin-top: 14px; color: var(--rm-text); font-size: 14px; font-weight: 720; }
+.feedback-kind-title svg { flex: 0 0 auto; color: var(--feedback-kind); opacity: .65; transition: transform .18s ease, opacity .18s ease; }
+.feedback-kind-card:hover .feedback-kind-title svg { transform: translateX(2px); opacity: 1; }
+.feedback-kind-description { position: relative; z-index: 1; margin-top: 6px; color: var(--rm-muted); font-size: 11px; line-height: 1.55; }
+.feedback-form { --feedback-kind: #818cf8; display: grid; gap: 10px; }
+.feedback-form[data-kind='bug'] { --feedback-kind: #f87171; }
+.feedback-form[data-kind='vault'] { --feedback-kind: #2dd4bf; }
+.feedback-back { display: inline-flex; width: fit-content; align-items: center; gap: 6px; margin-bottom: 2px; border: 1px solid var(--rm-border); border-radius: 999px; padding: 6px 9px; color: var(--rm-muted); background: var(--rm-card); font-size: 10px; font-weight: 750; }
+.feedback-back:hover { border-color: color-mix(in srgb, var(--feedback-kind) 45%, var(--rm-border)); color: var(--rm-text); }
+.feedback-field-label { display: block; margin-top: 3px; color: var(--rm-muted); font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.feedback-input.input { width: 100%; border-color: var(--rm-border); border-radius: 11px; padding: 9px 11px; color: var(--rm-text); background-color: rgb(2 6 23 / .24); font-size: 12px; line-height: 1.45; }
+.feedback-input.input::placeholder { color: color-mix(in srgb, var(--rm-muted) 72%, transparent); }
+.feedback-input.input:focus { border-color: color-mix(in srgb, var(--feedback-kind) 70%, white); box-shadow: 0 0 0 3px color-mix(in srgb, var(--feedback-kind) 12%, transparent); }
+.light .feedback-input.input { border-color: var(--rm-border); color: var(--rm-text); background-color: #fff; }
+.light .feedback-input.input:focus { border-color: color-mix(in srgb, var(--feedback-kind) 75%, black); }
+.feedback-suggestions { display: flex; flex-wrap: wrap; gap: 6px; }
+.feedback-suggestions button { border: 1px solid var(--rm-border); border-radius: 999px; padding: 5px 8px; color: var(--rm-muted); background: rgb(255 255 255 / .025); font-size: 9px; font-weight: 700; }
+.feedback-suggestions button:hover { border-color: color-mix(in srgb, var(--feedback-kind) 58%, var(--rm-border)); color: color-mix(in srgb, var(--feedback-kind) 55%, white); background: color-mix(in srgb, var(--feedback-kind) 9%, transparent); }
+.light .feedback-suggestions button { background: #f8fafc; }
+.light .feedback-suggestions button:hover { color: color-mix(in srgb, var(--feedback-kind) 78%, black); }
+.feedback-checkbox { display: flex; align-items: flex-start; gap: 9px; border: 1px solid var(--rm-border); border-radius: 11px; padding: 10px 11px; color: var(--rm-muted); background: var(--rm-card); font-size: 11px; line-height: 1.5; }
+.feedback-checkbox input { flex: 0 0 auto; margin-top: 2px; accent-color: var(--feedback-kind); }
+.feedback-note { display: flex; align-items: flex-start; gap: 8px; border: 1px solid var(--rm-border); border-radius: 12px; padding: 10px 11px; font-size: 11px; line-height: 1.55; }
+.feedback-note > svg { flex: 0 0 auto; }
+.feedback-note-teal { border-color: rgb(45 212 191 / .25); color: #99f6e4; background: linear-gradient(105deg, rgb(45 212 191 / .09), var(--rm-card)); }
+.feedback-note-amber { border-color: rgb(245 158 11 / .25); color: #fde68a; background: linear-gradient(105deg, rgb(245 158 11 / .09), var(--rm-card)); }
+.light .feedback-note-teal { color: #115e59; }
+.light .feedback-note-amber { color: #92400e; }
+.feedback-system-info { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 3px; border: 1px solid var(--rm-border); border-radius: 12px; padding: 10px 11px; color: var(--rm-muted); background: var(--rm-card); font-size: 10px; line-height: 1.45; }
+.feedback-system-info > div { display: flex; flex: 0 0 auto; align-items: center; gap: 6px; color: var(--rm-text); font-weight: 700; }
+.feedback-system-info > span { text-align: right; }
+.feedback-footer > span:first-child { max-width: 250px; line-height: 1.4; }
+.feedback-footer button:disabled, .feedback-footer button:disabled:hover { cursor: not-allowed; transform: none; filter: grayscale(.45); opacity: .42; }
 @media (max-width: 680px) { .roadmap-backdrop { padding: 12px; } .roadmap-cinema { max-height: 93vh; border-radius: 20px; } .roadmap-hero { min-height: 190px; grid-template-columns: 1fr 105px; padding: 25px 20px; } .roadmap-hero h2 { font-size: 31px; } .roadmap-hero-copy > p { font-size: 11px; } .roadmap-hero-route { width: 90px; height: 90px; } .roadmap-hero-route > span { width: 58px; height: 58px; border-radius: 18px; } .roadmap-hero-route svg { width: 31px; height: 31px; } .roadmap-legend { align-items: flex-start; flex-wrap: wrap; } .roadmap-legend-title { width: 100%; flex-basis: 100%; } .roadmap-scroll { padding: 18px; } .roadmap-footer > span:nth-child(2) { display: none; } .roadmap-footer { grid-template-columns: 1fr auto; } }
+@media (max-width: 520px) { .feedback-kind-grid { grid-template-columns: 1fr; } .feedback-kind-card { min-height: 142px; } .feedback-system-info { align-items: flex-start; flex-direction: column; gap: 5px; } .feedback-system-info > span { text-align: left; } .feedback-footer > span:first-child { display: none; } .feedback-footer { grid-template-columns: 1fr; } }
 @media (max-width: 450px) { .roadmap-hero { grid-template-columns: 1fr; } .roadmap-hero-route { display: none; } .roadmap-card-heading { align-items: flex-start; } .roadmap-status-label { margin-top: 1px; } }
 @media (prefers-reduced-motion: reduce) { .roadmap-aurora { animation: none; } }
 

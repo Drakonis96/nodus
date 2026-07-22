@@ -21,6 +21,10 @@ test('feedback offers a structured new-vault collaboration request', async () =>
   assert.match(feedback, /modelos locales del usuario/);
   assert.match(feedback, /placeholders que la IA no verá/);
   assert.match(feedback, /\[Vault type\]/);
+  assert.match(feedback, /data-testid="feedback-cinematic-modal"/);
+  assert.match(feedback, /className="roadmap-backdrop feedback-backdrop"/);
+  assert.match(feedback, /className="roadmap-hero feedback-hero"/);
+  assert.match(feedback, /initial=\{\{ opacity: 0, y: 28, scale: 0\.96 \}\}/);
 });
 
 test('roadmap follows the requested sequence and is opened from the header', async () => {
