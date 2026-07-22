@@ -69,10 +69,19 @@ async function oauthLogin(origin, client, cookie) {
   });
   const consentResponse = await fetch(`${origin}/oauth/authorize?${params}`, { headers: { cookie } });
   assert.equal(consentResponse.status, 200);
+  const callbackOrigin = new URL(client.redirect_uris[0]).origin;
+  assert.ok(
+    (consentResponse.headers.get('content-security-policy') || '').includes(`form-action 'self' ${callbackOrigin};`),
+    'the consent CSP must allow only the validated OAuth callback origin after its same-origin POST',
+  );
   const consent = await consentResponse.text();
   const csrf = hidden(consent, 'csrf');
   const authorization = await postForm(`${origin}/oauth/authorize`, { ...Object.fromEntries(params), csrf }, { headers: { cookie } });
   assert.equal(authorization.status, 303);
+  assert.ok(
+    (authorization.headers.get('content-security-policy') || '').includes(`form-action 'self' ${callbackOrigin};`),
+    'the authorization redirect must retain the callback-compatible CSP',
+  );
   const callback = new URL(authorization.headers.get('location'));
   assert.equal(callback.searchParams.get('state'), state);
   const code = callback.searchParams.get('code');
@@ -239,6 +248,19 @@ test('Nodus Server pairs a desktop publisher and protects read-only MCP with OAu
     });
     assert.equal(registered.status, 201);
     const client = await registered.json();
+
+    for (const redirectUri of [
+      'http://client.example/callback',
+      'https://user:password@client.example/callback',
+      'https://client.example/callback#fragment',
+    ]) {
+      const rejectedRegistration = await fetch(`${origin}/oauth/register`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ client_name: 'Untrusted callback test', redirect_uris: [redirectUri] }),
+      });
+      assert.equal(rejectedRegistration.status, 400, `unsafe OAuth redirect must be rejected: ${redirectUri}`);
+    }
 
     const readerLogin = await postForm(`${origin}/login`, {
       email: 'student@example.test',
