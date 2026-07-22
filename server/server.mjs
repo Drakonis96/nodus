@@ -6,6 +6,7 @@ import { gunzipSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { Store, digest, token } from './lib/store.mjs';
 import { body, contentSecurityPolicy, cookies, escapeHtml, form, html, json, jsonBody, redirect } from './lib/http.mjs';
+import { normalizeServerLanguage, serverTranslator } from './lib/i18n.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = process.env.NODUS_DATA_DIR || path.join(ROOT, 'data');
@@ -19,11 +20,19 @@ const rateBuckets = new Map();
 const SCOPES = new Set(['profile', 'spaces.read', 'materials.read']);
 const MCP_PROTOCOLS = new Set(['2025-11-25', '2025-06-18', '2025-03-26']);
 
+function language() {
+  return normalizeServerLanguage(store.state.settings.language);
+}
+
+function tr(key, variables) {
+  return serverTranslator(language())(key, variables);
+}
+
 function normalizePublicUrl(value) {
   const parsed = new URL(String(value));
   const local = ['localhost', '127.0.0.1', '::1'].includes(parsed.hostname);
-  if (parsed.protocol !== 'https:' && !(local && parsed.protocol === 'http:')) throw new Error('La URL pública debe utilizar HTTPS.');
-  if (parsed.username || parsed.password || parsed.search || parsed.hash || (parsed.pathname !== '/' && parsed.pathname !== '')) throw new Error('La URL pública debe ser solo el dominio o subdominio, sin ruta ni credenciales.');
+  if (parsed.protocol !== 'https:' && !(local && parsed.protocol === 'http:')) throw new Error('The public URL must use HTTPS.');
+  if (parsed.username || parsed.password || parsed.search || parsed.hash || (parsed.pathname !== '/' && parsed.pathname !== '')) throw new Error('The public URL must contain only the domain or subdomain, without a path or credentials.');
   return parsed.origin;
 }
 
@@ -36,7 +45,7 @@ function mcpResource() {
 }
 
 function page(title, content) {
-  return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title)} · Nodus Server</title><style>
+  return `<!doctype html><html lang="${escapeHtml(language())}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title)} · Nodus Server</title><style>
   :root{font-family:Inter,ui-sans-serif,system-ui,sans-serif;color:#e5e7eb;background:#09090b}body{max-width:920px;margin:0 auto;padding:40px 20px}a{color:#a5b4fc}h1,h2{color:#fff}.card{background:#18181b;border:1px solid #303038;border-radius:14px;padding:20px;margin:16px 0}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}label{display:block;margin:12px 0 5px;color:#d4d4d8}input,select{box-sizing:border-box;width:100%;padding:10px;border-radius:8px;border:1px solid #3f3f46;background:#09090b;color:#fff}button{margin-top:14px;border:0;border-radius:8px;padding:10px 14px;background:#4f46e5;color:white;font-weight:600;cursor:pointer}.secondary{background:#27272a}.muted{color:#a1a1aa;font-size:.9rem}.ok{color:#6ee7b7}.warn{color:#fbbf24}code{background:#27272a;padding:2px 5px;border-radius:5px;word-break:break-all}table{width:100%;border-collapse:collapse}th,td{text-align:left;border-bottom:1px solid #303038;padding:9px 5px}</style></head><body>${content}</body></html>`;
 }
 
@@ -124,7 +133,7 @@ function oauthAccess(req, neededScope = 'materials.read') {
 
 function oauthChallenge(res, scope = 'materials.read') {
   const metadata = `${publicUrl()}/.well-known/oauth-protected-resource`;
-  json(res, 401, { error: 'unauthorized', error_description: 'Inicia sesión en Nodus para continuar.' }, {
+  json(res, 401, { error: 'unauthorized', error_description: 'Sign in to Nodus to continue.' }, {
     'www-authenticate': `Bearer resource_metadata="${metadata}", scope="${scope}"`,
   });
 }
@@ -168,9 +177,9 @@ function callTool(auth, name, args) {
   if (name === 'nodus_list_spaces') return toolResult({ spaces: userSpaces(auth.user.id).map(({ id, name, description, updatedAt }) => ({ id, name, description, updatedAt })) });
   const spaceId = typeof args?.spaceId === 'string' ? args.spaceId : '';
   const space = store.state.spaces.find((entry) => entry.id === spaceId);
-  if (!space || !membership(auth.user.id, spaceId)) return toolResult({ error: 'No tienes acceso a ese espacio.' }, true);
+  if (!space || !membership(auth.user.id, spaceId)) return toolResult({ error: 'You do not have access to that space.' }, true);
   const snapshot = readSnapshot(spaceId);
-  if (!snapshot) return toolResult({ error: 'Este espacio todavía no ha recibido una publicación.' }, true);
+  if (!snapshot) return toolResult({ error: 'This space has not received a publication yet.' }, true);
   if (name === 'nodus_get_space_summary') {
     return toolResult({ space: { id: space.id, name: space.name, description: space.description, updatedAt: space.updatedAt }, vault: snapshot.vault, generatedAt: snapshot.generatedAt, counts: Object.fromEntries(Object.entries(snapshot.tables ?? {}).map(([key, value]) => [key, Array.isArray(value) ? value.length : 0])) });
   }
@@ -194,16 +203,16 @@ function callTool(auth, name, args) {
   }
   if (name === 'nodus_get_work') {
     const work = rows(snapshot, 'works').find((entry) => String(entry.nodus_id ?? entry.id) === String(args.id));
-    return work ? toolResult({ work }) : toolResult({ error: 'Obra no encontrada.' }, true);
+    return work ? toolResult({ work }) : toolResult({ error: 'Work not found.' }, true);
   }
   if (name === 'nodus_get_idea') {
     const idea = rows(snapshot, 'ideas').find((entry) => String(entry.global_id ?? entry.id) === String(args.id));
-    if (!idea) return toolResult({ error: 'Idea no encontrada.' }, true);
+    if (!idea) return toolResult({ error: 'Idea not found.' }, true);
     const id = String(idea.global_id ?? idea.id);
     const relations = rows(snapshot, 'edges').filter((entry) => String(entry.from_id) === id || String(entry.to_id) === id);
     return toolResult({ idea, relations });
   }
-  return toolResult({ error: 'Herramienta desconocida.' }, true);
+  return toolResult({ error: 'Unknown tool.' }, true);
 }
 
 async function handleMcp(req, res) {
@@ -224,45 +233,45 @@ async function handleMcp(req, res) {
 }
 
 function setupPage(error = '') {
-  return page('Configuración inicial', `<h1>Configurar Nodus Server</h1><p class="muted">Haz esta configuración antes de publicar el servidor en Internet.</p>${error ? `<p class="warn">${escapeHtml(error)}</p>` : ''}<form class="card" method="post" action="/setup"><label>Código de instalación</label><input name="setupToken" type="password" required><label>Nombre del servidor</label><input name="name" value="Nodus Server" required><label>URL pública</label><input name="publicUrl" placeholder="https://nodus.ejemplo.es" required><label>Correo del administrador</label><input name="email" type="email" required><label>Contraseña del administrador</label><input name="password" type="password" minlength="12" required><button>Crear servidor</button></form>`);
+  return page(tr('setupTitle'), `<h1>${tr('setupHeading')}</h1><p class="muted">${tr('setupIntro')}</p>${error ? `<p class="warn">${escapeHtml(error)}</p>` : ''}<form class="card" method="post" action="/setup"><label>${tr('setupToken')}</label><input name="setupToken" type="password" required><label>${tr('serverName')}</label><input name="name" value="Nodus Server" required><label>${tr('publicUrl')}</label><input name="publicUrl" placeholder="https://nodus.example.com" required><label>${tr('adminEmail')}</label><input name="email" type="email" required><label>${tr('adminPassword')}</label><input name="password" type="password" minlength="12" required><button>${tr('createServer')}</button></form>`);
 }
 
 function loginPage(next = '/', error = '') {
-  return page('Entrar', `<h1>Entrar en Nodus Server</h1>${error ? `<p class="warn">${escapeHtml(error)}</p>` : ''}<form class="card" method="post" action="/login"><input type="hidden" name="next" value="${escapeHtml(next)}"><label>Correo</label><input name="email" type="email" autocomplete="username" required><label>Contraseña</label><input name="password" type="password" autocomplete="current-password" required><button>Entrar</button></form>`);
+  return page(tr('loginTitle'), `<h1>${tr('loginHeading')}</h1>${error ? `<p class="warn">${escapeHtml(error)}</p>` : ''}<form class="card" method="post" action="/login"><input type="hidden" name="next" value="${escapeHtml(next)}"><label>${tr('email')}</label><input name="email" type="email" autocomplete="username" required><label>${tr('password')}</label><input name="password" type="password" autocomplete="current-password" required><button>${tr('signIn')}</button></form>`);
 }
 
 function accountPage(current, notice = '', error = '') {
-  const adminLink = current.user.role === 'admin' ? '<a href="/">Administración</a> · ' : '';
-  return page('Mi cuenta', `<div style="display:flex;gap:16px;align-items:center"><h1 style="flex:1">Mi cuenta</h1><form method="post" action="/logout"><input type="hidden" name="csrf" value="${current.session.csrf}"><button class="secondary">Salir</button></form></div><p>${adminLink}<span class="muted">${escapeHtml(current.user.email)}</span></p>${notice ? `<p class="ok">${escapeHtml(notice)}</p>` : ''}${error ? `<p class="warn">${escapeHtml(error)}</p>` : ''}<form class="card" method="post" action="/account/password"><h2>Cambiar contraseña</h2><p class="muted">Debe tener al menos 12 caracteres. Al cambiarla, se cerrarán tus otras sesiones y se revocarán las conexiones OAuth de ChatGPT y Claude.</p><input type="hidden" name="csrf" value="${current.session.csrf}"><label>Contraseña actual</label><input name="currentPassword" type="password" autocomplete="current-password" required><label>Nueva contraseña</label><input name="newPassword" type="password" autocomplete="new-password" minlength="12" required><label>Repite la nueva contraseña</label><input name="confirmPassword" type="password" autocomplete="new-password" minlength="12" required><button>Cambiar contraseña</button></form>`);
+  const adminLink = current.user.role === 'admin' ? `<a href="/">${tr('administration')}</a> · ` : '';
+  return page(tr('accountTitle'), `<div style="display:flex;gap:16px;align-items:center"><h1 style="flex:1">${tr('accountTitle')}</h1><form method="post" action="/logout"><input type="hidden" name="csrf" value="${current.session.csrf}"><button class="secondary">${tr('signOut')}</button></form></div><p>${adminLink}<span class="muted">${escapeHtml(current.user.email)}</span></p>${notice ? `<p class="ok">${escapeHtml(notice)}</p>` : ''}${error ? `<p class="warn">${escapeHtml(error)}</p>` : ''}<form class="card" method="post" action="/account/password"><h2>${tr('changePassword')}</h2><p class="muted">${tr('passwordHelp')}</p><input type="hidden" name="csrf" value="${current.session.csrf}"><label>${tr('currentPassword')}</label><input name="currentPassword" type="password" autocomplete="current-password" required><label>${tr('newPassword')}</label><input name="newPassword" type="password" autocomplete="new-password" minlength="12" required><label>${tr('repeatPassword')}</label><input name="confirmPassword" type="password" autocomplete="new-password" minlength="12" required><button>${tr('changePassword')}</button></form>`);
 }
 
 function resetPasswordPage(current, user, error = '') {
-  return page('Restablecer contraseña', `<h1>Restablecer contraseña</h1><p><a href="/">← Volver a la administración</a></p>${error ? `<p class="warn">${escapeHtml(error)}</p>` : ''}<form class="card" method="post" action="/admin/users/password"><h2>${escapeHtml(user.email)}</h2><p class="muted">La cuenta se cerrará en todos sus dispositivos y tendrá que volver a conectar ChatGPT o Claude.</p><input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="userId" value="${user.id}"><label>Nueva contraseña temporal</label><input name="newPassword" type="password" autocomplete="new-password" minlength="12" required><label>Repite la nueva contraseña</label><input name="confirmPassword" type="password" autocomplete="new-password" minlength="12" required><button>Restablecer contraseña</button></form>`);
+  return page(tr('resetPassword'), `<h1>${tr('resetPassword')}</h1><p><a href="/">${tr('backAdmin')}</a></p>${error ? `<p class="warn">${escapeHtml(error)}</p>` : ''}<form class="card" method="post" action="/admin/users/password"><h2>${escapeHtml(user.email)}</h2><p class="muted">${tr('resetHelp')}</p><input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="userId" value="${user.id}"><label>${tr('temporaryPassword')}</label><input name="newPassword" type="password" autocomplete="new-password" minlength="12" required><label>${tr('repeatPassword')}</label><input name="confirmPassword" type="password" autocomplete="new-password" minlength="12" required><button>${tr('resetPassword')}</button></form>`);
 }
 
 function dashboard(current, notice = '') {
-  const spaces = store.state.spaces.map((space) => `<tr><td>${escapeHtml(space.name)}</td><td><code>${space.id}</code></td><td>${escapeHtml(space.updatedAt || 'Sin publicar')}</td><td><form method="post" action="/admin/pairing"><input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="spaceId" value="${space.id}"><button class="secondary">Crear código para Nodus</button></form>${space.updatedAt ? `<form method="post" action="/admin/spaces/clear-request"><input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="spaceId" value="${space.id}"><button class="secondary">Borrar publicación</button></form>` : ''}</td></tr>`).join('');
+  const spaces = store.state.spaces.map((space) => `<tr><td>${escapeHtml(space.name)}</td><td><code>${space.id}</code></td><td>${escapeHtml(space.updatedAt || tr('unpublished'))}</td><td><form method="post" action="/admin/pairing"><input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="spaceId" value="${space.id}"><button class="secondary">${tr('createPairing')}</button></form>${space.updatedAt ? `<form method="post" action="/admin/spaces/clear-request"><input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="spaceId" value="${space.id}"><button class="secondary">${tr('deletePublication')}</button></form>` : ''}</td></tr>`).join('');
   const spaceOptions = store.state.spaces.map((space) => `<option value="${space.id}">${escapeHtml(space.name)}</option>`).join('');
   const users = store.state.users.map((user) => {
     const access = store.state.memberships.filter((entry) => entry.userId === user.id).map((entry) => {
       const space = store.state.spaces.find((candidate) => candidate.id === entry.spaceId);
-      const remove = entry.role === 'owner' ? '' : `<form method="post" action="/admin/access/revoke" style="display:inline"><input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="userId" value="${user.id}"><input type="hidden" name="spaceId" value="${entry.spaceId}"><button class="secondary" title="Revocar acceso">×</button></form>`;
+      const remove = entry.role === 'owner' ? '' : `<form method="post" action="/admin/access/revoke" style="display:inline"><input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="userId" value="${user.id}"><input type="hidden" name="spaceId" value="${entry.spaceId}"><button class="secondary" title="${tr('revokeAccess')}">×</button></form>`;
       return `<div>${escapeHtml(space?.name || entry.spaceId)} · ${escapeHtml(entry.role)} ${remove}</div>`;
     }).join('') || '—';
-    const grant = user.role === 'admin' || !spaceOptions ? '' : `<form method="post" action="/admin/access/grant"><input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="userId" value="${user.id}"><select name="spaceId">${spaceOptions}</select><button class="secondary">Dar acceso lector</button></form>`;
-    const reset = user.role === 'member' ? `<p><a href="/admin/users/password?userId=${encodeURIComponent(user.id)}">Restablecer contraseña</a></p>` : '<p><a href="/account">Cambiar mi contraseña</a></p>';
+    const grant = user.role === 'admin' || !spaceOptions ? '' : `<form method="post" action="/admin/access/grant"><input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="userId" value="${user.id}"><select name="spaceId">${spaceOptions}</select><button class="secondary">${tr('grantReader')}</button></form>`;
+    const reset = user.role === 'member' ? `<p><a href="/admin/users/password?userId=${encodeURIComponent(user.id)}">${tr('resetPassword')}</a></p>` : `<p><a href="/account">${tr('changeMyPassword')}</a></p>`;
     return `<tr><td>${escapeHtml(user.email)}</td><td>${escapeHtml(user.role)}</td><td>${access}</td><td>${grant}${reset}</td></tr>`;
   }).join('');
   const devices = store.state.deviceTokens.map((device) => {
     const space = store.state.spaces.find((entry) => entry.id === device.spaceId);
-    return `<tr><td>${escapeHtml(device.deviceName)}</td><td>${escapeHtml(space?.name || device.spaceId)}</td><td>${escapeHtml(device.lastUsedAt || 'Nunca')}</td><td><form method="post" action="/admin/devices/revoke"><input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="tokenHash" value="${device.hash}"><button class="secondary">Revocar</button></form></td></tr>`;
+    return `<tr><td>${escapeHtml(device.deviceName)}</td><td>${escapeHtml(space?.name || device.spaceId)}</td><td>${escapeHtml(device.lastUsedAt || tr('never'))}</td><td><form method="post" action="/admin/devices/revoke"><input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="tokenHash" value="${device.hash}"><button class="secondary">${tr('revokeAccess')}</button></form></td></tr>`;
   }).join('');
-  return page('Administración', `<div style="display:flex;gap:16px;align-items:center"><h1 style="flex:1">${escapeHtml(store.state.settings.name)}</h1><a href="/account">Mi cuenta</a><form method="post" action="/logout"><input type="hidden" name="csrf" value="${current.session.csrf}"><button class="secondary">Salir</button></form></div><p class="muted">URL MCP: <code>${escapeHtml(mcpResource())}</code></p>${notice ? `<p class="ok">${escapeHtml(notice)}</p>` : ''}<div class="grid"><form class="card" method="post" action="/admin/spaces"><h2>Nuevo espacio</h2><input type="hidden" name="csrf" value="${current.session.csrf}"><label>Nombre</label><input name="name" required><label>Descripción</label><input name="description"><button>Crear espacio</button></form><form class="card" method="post" action="/admin/users"><h2>Nuevo usuario</h2><input type="hidden" name="csrf" value="${current.session.csrf}"><label>Correo</label><input name="email" type="email" required><label>Contraseña temporal</label><input name="password" type="password" autocomplete="new-password" minlength="12" required><label>Espacio</label><select name="spaceId">${spaceOptions}</select><button>Crear usuario lector</button></form></div><div class="card"><h2>Espacios</h2><table><tr><th>Nombre</th><th>ID</th><th>Última publicación</th><th></th></tr>${spaces || '<tr><td colspan="4">Todavía no hay espacios.</td></tr>'}</table></div><div class="card"><h2>Usuarios y acceso</h2><p class="muted">La versión actual publica herramientas MCP de consulta. No expone calificaciones ni escritura remota.</p><table><tr><th>Correo</th><th>Cuenta</th><th>Acceso</th><th>Acciones</th></tr>${users}</table></div><div class="card"><h2>Dispositivos publicadores</h2><table><tr><th>Dispositivo</th><th>Espacio</th><th>Último uso</th><th></th></tr>${devices || '<tr><td colspan="4">No hay dispositivos emparejados.</td></tr>'}</table></div>`);
+  return page(tr('administration'), `<div style="display:flex;gap:16px;align-items:center"><h1 style="flex:1">${escapeHtml(store.state.settings.name)}</h1><a href="/account">${tr('accountTitle')}</a><form method="post" action="/logout"><input type="hidden" name="csrf" value="${current.session.csrf}"><button class="secondary">${tr('signOut')}</button></form></div><p class="muted">${tr('mcpUrl')}: <code>${escapeHtml(mcpResource())}</code></p>${notice ? `<p class="ok">${escapeHtml(notice)}</p>` : ''}<div class="grid"><form class="card" method="post" action="/admin/spaces"><h2>${tr('newSpace')}</h2><input type="hidden" name="csrf" value="${current.session.csrf}"><label>${tr('name')}</label><input name="name" required><label>${tr('description')}</label><input name="description"><button>${tr('createSpace')}</button></form><form class="card" method="post" action="/admin/users"><h2>${tr('newUser')}</h2><input type="hidden" name="csrf" value="${current.session.csrf}"><label>${tr('email')}</label><input name="email" type="email" required><label>${tr('temporaryPasswordLabel')}</label><input name="password" type="password" autocomplete="new-password" minlength="12" required><label>${tr('space')}</label><select name="spaceId">${spaceOptions}</select><button>${tr('createReader')}</button></form></div><div class="card"><h2>${tr('spaces')}</h2><table><tr><th>${tr('name')}</th><th>ID</th><th>${tr('lastPublication')}</th><th></th></tr>${spaces || `<tr><td colspan="4">${tr('noSpaces')}</td></tr>`}</table></div><div class="card"><h2>${tr('usersAccess')}</h2><p class="muted">${tr('mcpReadOnly')}</p><table><tr><th>${tr('email')}</th><th>${tr('account')}</th><th>${tr('access')}</th><th>${tr('actions')}</th></tr>${users}</table></div><div class="card"><h2>${tr('publisherDevices')}</h2><table><tr><th>${tr('device')}</th><th>${tr('space')}</th><th>${tr('lastUsed')}</th><th></th></tr>${devices || `<tr><td colspan="4">${tr('noDevices')}</td></tr>`}</table></div>`);
 }
 
 async function route(req, res) {
   const url = new URL(req.url || '/', publicUrl());
-  if (url.pathname === '/healthz') return json(res, 200, { ok: true, service: 'nodus-server', version: '0.1.0' });
+  if (url.pathname === '/healthz') return json(res, 200, { ok: true, service: 'nodus-server', version: '0.1.0', language: language() });
   if (url.pathname === '/.well-known/oauth-protected-resource' || url.pathname === '/.well-known/oauth-protected-resource/mcp') return json(res, 200, { resource: mcpResource(), authorization_servers: [publicUrl()], scopes_supported: [...SCOPES], resource_documentation: `${publicUrl()}/` });
   if (url.pathname === '/.well-known/oauth-authorization-server' || url.pathname === '/.well-known/openid-configuration') return json(res, 200, { issuer: publicUrl(), authorization_endpoint: `${publicUrl()}/oauth/authorize`, token_endpoint: `${publicUrl()}/oauth/token`, registration_endpoint: `${publicUrl()}/oauth/register`, code_challenge_methods_supported: ['S256'], token_endpoint_auth_methods_supported: ['none'], response_types_supported: ['code'], grant_types_supported: ['authorization_code', 'refresh_token'], scopes_supported: [...SCOPES] });
   if (url.pathname === '/mcp') return handleMcp(req, res);
@@ -273,8 +282,8 @@ async function route(req, res) {
     if (!rateLimit(req, res, 'setup', 10, 15 * 60_000)) return;
     const values = await form(req);
     try {
-      if (!SETUP_TOKEN || SETUP_TOKEN.length < 16 || values.setupToken !== SETUP_TOKEN) throw new Error('El código de instalación no es válido.');
-      store.state.settings = { name: String(values.name).trim(), publicUrl: normalizePublicUrl(values.publicUrl) };
+      if (!SETUP_TOKEN || SETUP_TOKEN.length < 16 || values.setupToken !== SETUP_TOKEN) throw new Error('The setup token is invalid.');
+      store.state.settings = { ...store.state.settings, name: String(values.name).trim(), publicUrl: normalizePublicUrl(values.publicUrl), language: 'en' };
       const user = store.createUser(values.email, values.password, 'admin');
       const raw = store.createSession(user.id);
       return redirect(res, '/', { 'set-cookie': `nodus_session=${encodeURIComponent(raw)}; Path=/; HttpOnly; SameSite=Lax${publicUrl().startsWith('https://') ? '; Secure' : ''}` });
@@ -286,7 +295,7 @@ async function route(req, res) {
     if (!rateLimit(req, res, 'login', 12, 15 * 60_000)) return;
     const values = await form(req);
     const user = store.authenticate(values.email, values.password);
-    if (!user) return html(res, 401, loginPage(values.next || '/', 'Correo o contraseña incorrectos.'));
+    if (!user) return html(res, 401, loginPage(values.next || '/', tr('invalidLogin')));
     const raw = store.createSession(user.id);
     const next = String(values.next || '/');
     const safeNext = next.startsWith('/') && !next.startsWith('//') ? next : '/';
@@ -302,11 +311,11 @@ async function route(req, res) {
     const current = requireSession(req, res); if (!current) return;
     if (!rateLimit(req, res, 'password-change', 10, 15 * 60_000)) return;
     const values = await form(req);
-    if (!checkCsrf(current, values.csrf)) return html(res, 403, page('Error', '<h1>La sesión ha caducado.</h1>'));
-    if (values.newPassword !== values.confirmPassword) return html(res, 400, accountPage(current, '', 'Las contraseñas nuevas no coinciden.'));
+    if (!checkCsrf(current, values.csrf)) return html(res, 403, page(tr('error'), `<h1>${tr('sessionExpired')}</h1>`));
+    if (values.newPassword !== values.confirmPassword) return html(res, 400, accountPage(current, '', 'The new passwords do not match.'));
     try {
       store.changePassword(current.user.id, values.currentPassword, values.newPassword, current.session.hash);
-      return redirect(res, '/account?notice=' + encodeURIComponent('Contraseña actualizada. Tus otras sesiones y conexiones OAuth se han cerrado.'));
+      return redirect(res, '/account?notice=' + encodeURIComponent('Password updated. Your other sessions and OAuth connections have been signed out.'));
     } catch (error) {
       return html(res, 400, accountPage(current, '', error instanceof Error ? error.message : String(error)));
     }
@@ -315,20 +324,20 @@ async function route(req, res) {
   if (url.pathname === '/admin/users/password' && req.method === 'GET') {
     const current = requireSession(req, res, true); if (!current) return;
     const user = store.state.users.find((entry) => entry.id === url.searchParams.get('userId') && entry.role === 'member');
-    if (!user) return html(res, 404, page('Error', '<h1>Cuenta lectora no encontrada.</h1>'));
+    if (!user) return html(res, 404, page(tr('error'), `<h1>${tr('readerNotFound')}</h1>`));
     return html(res, 200, resetPasswordPage(current, user));
   }
   if (url.pathname === '/admin/users/password' && req.method === 'POST') {
     const current = requireSession(req, res, true); if (!current) return;
     if (!rateLimit(req, res, 'password-reset', 20, 15 * 60_000)) return;
     const values = await form(req);
-    if (!checkCsrf(current, values.csrf)) return html(res, 403, page('Error', '<h1>La sesión ha caducado.</h1>'));
+    if (!checkCsrf(current, values.csrf)) return html(res, 403, page(tr('error'), `<h1>${tr('sessionExpired')}</h1>`));
     const user = store.state.users.find((entry) => entry.id === values.userId && entry.role === 'member');
-    if (!user) return html(res, 404, page('Error', '<h1>Cuenta lectora no encontrada.</h1>'));
-    if (values.newPassword !== values.confirmPassword) return html(res, 400, resetPasswordPage(current, user, 'Las contraseñas nuevas no coinciden.'));
+    if (!user) return html(res, 404, page(tr('error'), `<h1>${tr('readerNotFound')}</h1>`));
+    if (values.newPassword !== values.confirmPassword) return html(res, 400, resetPasswordPage(current, user, 'The new passwords do not match.'));
     try {
       store.resetPassword(user.id, values.newPassword);
-      return redirect(res, '/?notice=' + encodeURIComponent(`Contraseña restablecida para ${user.email}.`));
+      return redirect(res, '/?notice=' + encodeURIComponent(`Password reset for ${user.email}.`));
     } catch (error) {
       return html(res, 400, resetPasswordPage(current, user, error instanceof Error ? error.message : String(error)));
     }
@@ -350,19 +359,19 @@ async function route(req, res) {
     const client = store.state.oauthClients.find((entry) => entry.client_id === url.searchParams.get('client_id'));
     const redirectUri = url.searchParams.get('redirect_uri') || '';
     const resource = url.searchParams.get('resource') || mcpResource();
-    if (!client || !client.redirect_uris.includes(redirectUri) || resource !== mcpResource() || url.searchParams.get('response_type') !== 'code' || url.searchParams.get('code_challenge_method') !== 'S256') return html(res, 400, page('OAuth', '<h1>Solicitud OAuth no válida</h1>'));
+    if (!client || !client.redirect_uris.includes(redirectUri) || resource !== mcpResource() || url.searchParams.get('response_type') !== 'code' || url.searchParams.get('code_challenge_method') !== 'S256') return html(res, 400, page('OAuth', `<h1>${tr('invalidOauth')}</h1>`));
     const requestedInput = (url.searchParams.get('scope') || 'profile spaces.read materials.read').split(/\s+/).filter((scope) => SCOPES.has(scope));
     const requested = requestedInput.length > 0 ? requestedInput : ['materials.read'];
     const hidden = [...url.searchParams].map(([key, value]) => `<input type="hidden" name="${escapeHtml(key)}" value="${escapeHtml(value)}">`).join('');
-    return html(res, 200, page('Autorizar', `<h1>Conectar ${escapeHtml(client.client_name)}</h1><div class="card"><p>La aplicación podrá:</p><ul>${requested.map((scope) => `<li>${escapeHtml(scope)}</li>`).join('')}</ul><p class="muted">Solo tendrá acceso a los espacios asignados a ${escapeHtml(current.user.email)}.</p><form method="post" action="/oauth/authorize">${hidden}<input type="hidden" name="csrf" value="${current.session.csrf}"><button>Autorizar</button></form></div>`), oauthRedirectHeaders(redirectUri));
+    return html(res, 200, page(tr('authorize'), `<h1>${tr('connectClient', { name: escapeHtml(client.client_name) })}</h1><div class="card"><p>${tr('appCan')}</p><ul>${requested.map((scope) => `<li>${escapeHtml(scope)}</li>`).join('')}</ul><p class="muted">${tr('assignedOnly', { email: escapeHtml(current.user.email) })}</p><form method="post" action="/oauth/authorize">${hidden}<input type="hidden" name="csrf" value="${current.session.csrf}"><button>${tr('authorize')}</button></form></div>`), oauthRedirectHeaders(redirectUri));
   }
 
   if (url.pathname === '/oauth/authorize' && req.method === 'POST') {
     const current = requireSession(req, res); if (!current) return;
     const values = await form(req);
-    if (!checkCsrf(current, values.csrf)) return html(res, 403, page('Error', '<h1>La sesión ha caducado.</h1>'));
+    if (!checkCsrf(current, values.csrf)) return html(res, 403, page(tr('error'), `<h1>${tr('sessionExpired')}</h1>`));
     const client = store.state.oauthClients.find((entry) => entry.client_id === values.client_id);
-    if (!client || !client.redirect_uris.includes(values.redirect_uri) || values.code_challenge_method !== 'S256' || String(values.resource || mcpResource()) !== mcpResource()) return html(res, 400, page('OAuth', '<h1>Solicitud OAuth no válida.</h1>'));
+    if (!client || !client.redirect_uris.includes(values.redirect_uri) || values.code_challenge_method !== 'S256' || String(values.resource || mcpResource()) !== mcpResource()) return html(res, 400, page('OAuth', `<h1>${tr('invalidOauth')}</h1>`));
     const scopeInput = String(values.scope || 'profile spaces.read materials.read').split(/\s+/).filter((scope) => SCOPES.has(scope));
     const scopes = scopeInput.length > 0 ? scopeInput : ['materials.read'];
     const raw = token(24);
@@ -408,29 +417,43 @@ async function route(req, res) {
     const input = await jsonBody(req);
     store.cleanup();
     const pairing = store.state.pairingCodes.find((entry) => entry.hash === digest(String(input.code || '').toUpperCase()));
-    if (!pairing) return json(res, 401, { error: 'Código inválido o caducado.' });
+    if (!pairing) return json(res, 401, { error: 'Invalid or expired pairing code.' });
     pairing.usedAt = new Date().toISOString();
     const raw = token();
     store.state.deviceTokens.push({ hash: digest(raw), userId: pairing.userId, spaceId: pairing.spaceId, deviceName: String(input.deviceName || 'Nodus Desktop').slice(0, 120), createdAt: new Date().toISOString(), lastUsedAt: null });
     store.save();
     const space = store.state.spaces.find((entry) => entry.id === pairing.spaceId);
-    return json(res, 200, { accessToken: raw, space: { id: space.id, name: space.name }, server: { name: store.state.settings.name, publicUrl: publicUrl() } });
+    return json(res, 200, { accessToken: raw, space: { id: space.id, name: space.name }, server: { name: store.state.settings.name, publicUrl: publicUrl(), language: language() } });
+  }
+
+  if (url.pathname === '/api/v1/settings/language' && req.method === 'PUT') {
+    const raw = bearer(req);
+    const device = store.state.deviceTokens.find((entry) => entry.hash === digest(raw));
+    if (!device || !membership(device.userId, device.spaceId)) return json(res, 401, { error: 'Invalid or revoked device token.' });
+    const input = await jsonBody(req);
+    if (typeof input.language !== 'string' || normalizeServerLanguage(input.language) !== input.language) {
+      return json(res, 400, { error: 'Unsupported server language.' });
+    }
+    store.state.settings.language = input.language;
+    device.lastUsedAt = new Date().toISOString();
+    store.save();
+    return json(res, 200, { language: language() });
   }
 
   const snapshotMatch = url.pathname.match(/^\/api\/v1\/spaces\/([^/]+)\/snapshot$/);
   if (snapshotMatch && req.method === 'PUT') {
     const raw = bearer(req);
     const device = store.state.deviceTokens.find((entry) => entry.hash === digest(raw) && entry.spaceId === snapshotMatch[1]);
-    if (!device) return json(res, 401, { error: 'Token de dispositivo no válido.' });
+    if (!device) return json(res, 401, { error: 'Invalid device token.' });
     const space = store.state.spaces.find((entry) => entry.id === device.spaceId);
-    if (!space || !membership(device.userId, space.id)) return json(res, 403, { error: 'Sin permiso para publicar este espacio.' });
-    if (req.headers['content-encoding'] !== 'gzip') return json(res, 415, { error: 'La publicación debe enviarse comprimida con gzip.' });
+    if (!space || !membership(device.userId, space.id)) return json(res, 403, { error: 'You do not have permission to publish this space.' });
+    if (req.headers['content-encoding'] !== 'gzip') return json(res, 415, { error: 'The publication must be gzip-compressed.' });
     const revision = String(req.headers['x-nodus-revision'] || '');
     if (revision && revision === space.revision) return json(res, 200, { ok: true, unchanged: true, updatedAt: space.updatedAt });
     const bytes = await body(req, MAX_SNAPSHOT_BYTES);
     let snapshot;
-    try { snapshot = JSON.parse(gunzipSync(bytes, { maxOutputLength: MAX_SNAPSHOT_BYTES }).toString('utf8')); } catch { return json(res, 400, { error: 'La publicación comprimida no es válida o supera el tamaño permitido.' }); }
-    if (snapshot?.format !== 'nodus.server-snapshot' || snapshot?.formatVersion !== 1) return json(res, 400, { error: 'Formato de publicación no compatible.' });
+    try { snapshot = JSON.parse(gunzipSync(bytes, { maxOutputLength: MAX_SNAPSHOT_BYTES }).toString('utf8')); } catch { return json(res, 400, { error: 'The compressed publication is invalid or exceeds the size limit.' }); }
+    if (snapshot?.format !== 'nodus.server-snapshot' || snapshot?.formatVersion !== 1) return json(res, 400, { error: 'Unsupported publication format.' });
     store.writeSnapshot(space.id, bytes); snapshotCache.delete(space.id);
     space.updatedAt = new Date().toISOString(); space.revision = revision || snapshot.revision || ''; space.vault = snapshot.vault; space.bytes = bytes.length;
     device.lastUsedAt = space.updatedAt; store.save();
@@ -444,76 +467,76 @@ async function route(req, res) {
   }
   if (url.pathname === '/logout' && req.method === 'POST') {
     const current = requireSession(req, res); if (!current) return;
-    const values = await form(req); if (!checkCsrf(current, values.csrf)) return html(res, 403, page('Error', '<h1>Sesión caducada.</h1>'));
+    const values = await form(req); if (!checkCsrf(current, values.csrf)) return html(res, 403, page(tr('error'), `<h1>${tr('sessionExpired')}</h1>`));
     store.state.sessions = store.state.sessions.filter((entry) => entry.hash !== current.session.hash); store.save();
     return redirect(res, '/login', { 'set-cookie': 'nodus_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0' });
   }
   if (url.pathname === '/admin/spaces' && req.method === 'POST') {
     const current = requireSession(req, res, true); if (!current) return;
-    const values = await form(req); if (!checkCsrf(current, values.csrf)) return html(res, 403, page('Error', '<h1>Sesión caducada.</h1>'));
+    const values = await form(req); if (!checkCsrf(current, values.csrf)) return html(res, 403, page(tr('error'), `<h1>${tr('sessionExpired')}</h1>`));
     const space = { id: randomUUID(), name: String(values.name || '').trim(), description: String(values.description || '').trim(), createdAt: new Date().toISOString(), updatedAt: null, revision: '', bytes: 0 };
-    if (!space.name) return html(res, 400, dashboard(current, 'El espacio necesita un nombre.'));
+    if (!space.name) return html(res, 400, dashboard(current, 'The space needs a name.'));
     store.state.spaces.push(space); store.state.memberships.push({ userId: current.user.id, spaceId: space.id, role: 'owner' }); store.save();
-    return redirect(res, '/?notice=' + encodeURIComponent('Espacio creado.'));
+    return redirect(res, '/?notice=' + encodeURIComponent('Space created.'));
   }
   if (url.pathname === '/admin/spaces/clear-request' && req.method === 'POST') {
     const current = requireSession(req, res, true); if (!current) return;
-    const values = await form(req); if (!checkCsrf(current, values.csrf)) return html(res, 403, page('Error', '<h1>Sesión caducada.</h1>'));
+    const values = await form(req); if (!checkCsrf(current, values.csrf)) return html(res, 403, page(tr('error'), `<h1>${tr('sessionExpired')}</h1>`));
     const space = store.state.spaces.find((entry) => entry.id === values.spaceId);
-    if (!space) return html(res, 404, page('Error', '<h1>Espacio no encontrado.</h1>'));
-    return html(res, 200, page('Borrar publicación', `<h1>Borrar publicación</h1><div class="card"><p>Se eliminará del servidor la copia publicada de <strong>${escapeHtml(space.name)}</strong>. El vault local no se modifica.</p><form method="post" action="/admin/spaces/clear"><input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="spaceId" value="${space.id}"><button>Borrar definitivamente</button></form><p><a href="/">Cancelar</a></p></div>`));
+    if (!space) return html(res, 404, page(tr('error'), `<h1>${tr('spaceNotFound')}</h1>`));
+    return html(res, 200, page(tr('deletePublication'), `<h1>${tr('deletePublicationHeading')}</h1><div class="card"><p>${tr('deletePublicationHelp', { name: `<strong>${escapeHtml(space.name)}</strong>` })}</p><form method="post" action="/admin/spaces/clear"><input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="spaceId" value="${space.id}"><button>${tr('deletePermanently')}</button></form><p><a href="/">${tr('cancel')}</a></p></div>`));
   }
   if (url.pathname === '/admin/spaces/clear' && req.method === 'POST') {
     const current = requireSession(req, res, true); if (!current) return;
-    const values = await form(req); if (!checkCsrf(current, values.csrf)) return html(res, 403, page('Error', '<h1>Sesión caducada.</h1>'));
+    const values = await form(req); if (!checkCsrf(current, values.csrf)) return html(res, 403, page(tr('error'), `<h1>${tr('sessionExpired')}</h1>`));
     const space = store.state.spaces.find((entry) => entry.id === values.spaceId);
-    if (!space) return html(res, 404, page('Error', '<h1>Espacio no encontrado.</h1>'));
+    if (!space) return html(res, 404, page(tr('error'), `<h1>${tr('spaceNotFound')}</h1>`));
     store.removeSnapshot(space.id); snapshotCache.delete(space.id);
     // Deleting a publication also revokes its publishers so an open desktop app
     // cannot silently recreate data the administrator has just removed.
     store.state.deviceTokens = store.state.deviceTokens.filter((entry) => entry.spaceId !== space.id);
     store.state.pairingCodes = store.state.pairingCodes.filter((entry) => entry.spaceId !== space.id);
     space.updatedAt = null; space.revision = ''; space.vault = null; space.bytes = 0; store.save();
-    return redirect(res, '/?notice=' + encodeURIComponent('Publicación eliminada del servidor.'));
+    return redirect(res, '/?notice=' + encodeURIComponent('Publication deleted from the server.'));
   }
   if (url.pathname === '/admin/users' && req.method === 'POST') {
     const current = requireSession(req, res, true); if (!current) return;
-    const values = await form(req); if (!checkCsrf(current, values.csrf)) return html(res, 403, page('Error', '<h1>Sesión caducada.</h1>'));
-    try { const user = store.createUser(values.email, values.password, 'member'); if (values.spaceId) { store.state.memberships.push({ userId: user.id, spaceId: values.spaceId, role: 'reader' }); store.save(); } return redirect(res, '/?notice=' + encodeURIComponent('Usuario creado.')); }
+    const values = await form(req); if (!checkCsrf(current, values.csrf)) return html(res, 403, page(tr('error'), `<h1>${tr('sessionExpired')}</h1>`));
+    try { const user = store.createUser(values.email, values.password, 'member'); if (values.spaceId) { store.state.memberships.push({ userId: user.id, spaceId: values.spaceId, role: 'reader' }); store.save(); } return redirect(res, '/?notice=' + encodeURIComponent('User created.')); }
     catch (error) { return html(res, 400, dashboard(current, error instanceof Error ? error.message : String(error))); }
   }
   if (url.pathname === '/admin/access/grant' && req.method === 'POST') {
     const current = requireSession(req, res, true); if (!current) return;
-    const values = await form(req); if (!checkCsrf(current, values.csrf)) return html(res, 403, page('Error', '<h1>Sesión caducada.</h1>'));
+    const values = await form(req); if (!checkCsrf(current, values.csrf)) return html(res, 403, page(tr('error'), `<h1>${tr('sessionExpired')}</h1>`));
     const user = store.state.users.find((entry) => entry.id === values.userId);
     const space = store.state.spaces.find((entry) => entry.id === values.spaceId);
-    if (!user || !space) return html(res, 400, dashboard(current, 'Usuario o espacio no válido.'));
+    if (!user || !space) return html(res, 400, dashboard(current, 'Invalid user or space.'));
     if (!membership(user.id, space.id)) { store.state.memberships.push({ userId: user.id, spaceId: space.id, role: 'reader' }); store.save(); }
-    return redirect(res, '/?notice=' + encodeURIComponent('Acceso lector concedido.'));
+    return redirect(res, '/?notice=' + encodeURIComponent('Read access granted.'));
   }
   if (url.pathname === '/admin/access/revoke' && req.method === 'POST') {
     const current = requireSession(req, res, true); if (!current) return;
-    const values = await form(req); if (!checkCsrf(current, values.csrf)) return html(res, 403, page('Error', '<h1>Sesión caducada.</h1>'));
+    const values = await form(req); if (!checkCsrf(current, values.csrf)) return html(res, 403, page(tr('error'), `<h1>${tr('sessionExpired')}</h1>`));
     const entry = membership(values.userId, values.spaceId);
-    if (!entry || entry.role === 'owner') return html(res, 400, dashboard(current, 'Ese acceso no puede revocarse desde aquí.'));
+    if (!entry || entry.role === 'owner') return html(res, 400, dashboard(current, 'That access cannot be revoked here.'));
     store.state.memberships = store.state.memberships.filter((candidate) => candidate !== entry);
     store.state.deviceTokens = store.state.deviceTokens.filter((device) => device.userId !== values.userId || device.spaceId !== values.spaceId);
     store.save();
-    return redirect(res, '/?notice=' + encodeURIComponent('Acceso revocado.'));
+    return redirect(res, '/?notice=' + encodeURIComponent('Access revoked.'));
   }
   if (url.pathname === '/admin/devices/revoke' && req.method === 'POST') {
     const current = requireSession(req, res, true); if (!current) return;
-    const values = await form(req); if (!checkCsrf(current, values.csrf)) return html(res, 403, page('Error', '<h1>Sesión caducada.</h1>'));
+    const values = await form(req); if (!checkCsrf(current, values.csrf)) return html(res, 403, page(tr('error'), `<h1>${tr('sessionExpired')}</h1>`));
     store.state.deviceTokens = store.state.deviceTokens.filter((entry) => entry.hash !== values.tokenHash); store.save();
-    return redirect(res, '/?notice=' + encodeURIComponent('Dispositivo revocado.'));
+    return redirect(res, '/?notice=' + encodeURIComponent('Device revoked.'));
   }
   if (url.pathname === '/admin/pairing' && req.method === 'POST') {
     const current = requireSession(req, res, true); if (!current) return;
-    const values = await form(req); if (!checkCsrf(current, values.csrf)) return html(res, 403, page('Error', '<h1>Sesión caducada.</h1>'));
-    if (!membership(current.user.id, values.spaceId)) return html(res, 403, page('Error', '<h1>Sin acceso al espacio.</h1>'));
+    const values = await form(req); if (!checkCsrf(current, values.csrf)) return html(res, 403, page(tr('error'), `<h1>${tr('sessionExpired')}</h1>`));
+    if (!membership(current.user.id, values.spaceId)) return html(res, 403, page(tr('error'), '<h1>No access to that space.</h1>'));
     const raw = `${token(4).slice(0, 4)}-${token(4).slice(0, 4)}`.toUpperCase();
     store.state.pairingCodes.push({ hash: digest(raw), userId: current.user.id, spaceId: values.spaceId, expiresAt: new Date(Date.now() + 15 * 60_000).toISOString(), usedAt: null }); store.save();
-    return html(res, 200, page('Código de conexión', `<h1>Conectar Nodus Desktop</h1><div class="card"><p>Introduce este código en Ajustes → Servidor:</p><h2><code>${raw}</code></h2><p class="muted">Caduca en 15 minutos y solo puede utilizarse una vez.</p><p><a href="/">Volver</a></p></div>`));
+    return html(res, 200, page(tr('createPairing'), `<h1>${tr('connectDesktop')}</h1><div class="card"><p>${tr('pairingHelp')}</p><h2><code>${raw}</code></h2><p class="muted">${tr('pairingExpiry')}</p><p><a href="/">${tr('back')}</a></p></div>`));
   }
   return json(res, 404, { error: 'not_found' });
 }
@@ -521,7 +544,7 @@ async function route(req, res) {
 const server = http.createServer((req, res) => {
   Promise.resolve(route(req, res)).catch((error) => {
     console.error('[server]', error);
-    if (!res.headersSent) json(res, Number(error?.statusCode) || 500, { error: Number(error?.statusCode) ? error.message : 'Error interno del servidor.' });
+    if (!res.headersSent) json(res, Number(error?.statusCode) || 500, { error: Number(error?.statusCode) ? error.message : tr('internalError') });
     else res.end();
   });
 });
