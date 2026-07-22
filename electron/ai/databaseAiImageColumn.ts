@@ -27,7 +27,7 @@ export interface AiImageDeps {
   generate?: (prompt: string, model: AiImageModelRef | null) => Promise<{ image: Buffer; mimeType: string }>;
 }
 
-const IMAGE_PROVIDERS = new Set<ImageProvider>(['google', 'openai', 'openrouter']);
+const IMAGE_PROVIDERS = new Set<ImageProvider>(['google', 'openai', 'openrouter', 'nodus']);
 
 function configuredImageModel(value: unknown): AiImageModelRef | null {
   if (!value || typeof value !== 'object') return null;

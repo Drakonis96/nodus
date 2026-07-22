@@ -404,6 +404,12 @@ import {
   getNodusLocalAiStatus,
   installNodusLocalRuntime,
 } from './ai/nodusLocalAi';
+import {
+  deleteNodusLocalImageModel,
+  downloadNodusLocalImageModel,
+  getNodusLocalImageStatus,
+  installNodusLocalImageRuntime,
+} from './ai/nodusLocalImages';
 import { improveStudyText } from './ai/studyImprove';
 import * as studySearch from './ai/studySearch';
 import * as studyAssistant from './ai/studyAssistant';
@@ -1872,6 +1878,16 @@ export function registerIpc(
       if (!event.sender.isDestroyed()) event.sender.send('ai:nodusLocal:progress', requestId, fraction);
     }));
   h('ai:nodusLocal:deleteModel', async (_event, model: string) => deleteNodusLocalModel(model));
+  h('ai:nodusLocalImage:status', async () => getNodusLocalImageStatus());
+  h('ai:nodusLocalImage:installRuntime', async (event, requestId: string) =>
+    installNodusLocalImageRuntime((fraction) => {
+      if (!event.sender.isDestroyed()) event.sender.send('ai:nodusLocalImage:progress', requestId, fraction);
+    }));
+  h('ai:nodusLocalImage:downloadModel', async (event, requestId: string, model: string) =>
+    downloadNodusLocalImageModel(model, (fraction) => {
+      if (!event.sender.isDestroyed()) event.sender.send('ai:nodusLocalImage:progress', requestId, fraction);
+    }));
+  h('ai:nodusLocalImage:deleteModel', async (_event, model: string) => deleteNodusLocalImageModel(model));
   h('images:get', async (_e, entityKind: DecorativeImageEntityKind, entityId: string) =>
     getDecorativeImage(entityKind, entityId)
   );

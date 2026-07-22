@@ -98,6 +98,7 @@ import type {
   WhisperCppStatus,
 } from './sttModels';
 import type { NodusLocalAiStatus } from './localAiModels';
+import type { NodusImageQuality, NodusLocalImageStatus } from './localImageModels';
 import type {
   StudyImproveRequest,
   StudyImproveResult,
@@ -858,7 +859,7 @@ export type AiProvider =
  *  They need no API key (an optional token is supported for secured instances). */
 export type LocalProvider = Extract<AiProvider, 'ollama' | 'lmstudio'>;
 export type EmbeddingProvider = Extract<AiProvider, 'openai' | 'openrouter' | 'gemini' | 'ollama' | 'lmstudio' | 'nodus'>;
-export type ImageProvider = 'google' | 'openai' | 'openrouter';
+export type ImageProvider = 'google' | 'openai' | 'openrouter' | 'nodus';
 
 /** User-editable connection settings for a local provider. The base URL includes
  *  scheme, host and port (e.g. "http://localhost:11434"); no trailing "/v1". */
@@ -1355,6 +1356,8 @@ export interface AppSettings {
   /** Provider/model used only for optional decorative image generation. */
   imageProvider: ImageProvider;
   imageModel: string;
+  /** Resolution preset for the native FLUX.2 pipeline; remote providers keep their own fixed settings. */
+  imageQuality: NodusImageQuality;
   imageStyle: DecorativeImageStyle;
   /** Audio narration backend: 'piper' / 'kokoro' (local WASM) or 'hume' (cloud, BYO key). */
   audioProvider: AudioProvider;
@@ -5495,6 +5498,10 @@ export interface NodusApi {
   installNodusLocalRuntime(onProgress?: (fraction: number) => void): Promise<NodusLocalAiStatus>;
   downloadNodusLocalModel(model: string, onProgress?: (fraction: number) => void): Promise<NodusLocalAiStatus>;
   deleteNodusLocalModel(model: string): Promise<NodusLocalAiStatus>;
+  getNodusLocalImageStatus(): Promise<NodusLocalImageStatus>;
+  installNodusLocalImageRuntime(onProgress?: (fraction: number) => void): Promise<NodusLocalImageStatus>;
+  downloadNodusLocalImageModel(model: string, onProgress?: (fraction: number) => void): Promise<NodusLocalImageStatus>;
+  deleteNodusLocalImageModel(model: string): Promise<NodusLocalImageStatus>;
   /** Ping a local provider (Ollama / LM Studio) to verify its base URL is reachable. */
   testLocalProvider(provider: LocalProvider): Promise<LocalProviderTestResult>;
   getDecorativeImage(entityKind: DecorativeImageEntityKind, entityId: string): Promise<DecorativeImage | null>;

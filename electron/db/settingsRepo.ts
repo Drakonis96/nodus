@@ -4,6 +4,7 @@ import { DEFAULT_EMBEDDING_MODELS, DEFAULT_LOCAL_BASE_URLS, normalizeEmbeddingPr
 import { NODI_ORB_DEFAULT_COLOR } from '@shared/nodiOrb';
 import { lockedApiKeyProviders, providerKeyMap } from '../secrets/secretStore';
 import { GRANULAR_MODEL_KEYS, migrateModelSettings } from '@shared/modelSettings';
+import { DEFAULT_NODUS_IMAGE_QUALITY, isNodusImageQuality } from '@shared/localImageModels';
 import { recoverV23SharedModelPrefs, recoverV23VaultEmbeddingSelection } from './modelPrefsRecovery';
 import {
   GLOBAL_PREF_KEYS,
@@ -82,6 +83,7 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys' | 'lockedProviderKeys'> = {
   sttWhisperCppExecutable: '',
   imageProvider: 'google',
   imageModel: 'gemini-3.1-flash-lite-image',
+  imageQuality: DEFAULT_NODUS_IMAGE_QUALITY,
   imageStyle: 'antique_book',
   audioProvider: 'piper',
   audioVoice: '',
@@ -208,6 +210,7 @@ export function getSettings(): AppSettings {
     .filter((value): value is string => typeof value === 'string' && value.trim().length > 0))].slice(0, 4);
   // Pre-2.3 builds called the Transformers.js worker simply "local".
   if ((parsed as { sttProvider?: string }).sttProvider === 'local') merged.sttProvider = 'transformers';
+  if (!isNodusImageQuality(merged.imageQuality)) merged.imageQuality = DEFAULT_NODUS_IMAGE_QUALITY;
   if (parsed.studyAiPrivacyMode === undefined && parsed.studyAiLocalOnly) merged.studyAiPrivacyMode = 'local';
   merged.studyAiLocalOnly = merged.studyAiPrivacyMode === 'local';
   if (!['ask', 'always', 'never'].includes(merged.studyKnowledgeAutoProcess)) merged.studyKnowledgeAutoProcess = 'ask';

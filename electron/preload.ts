@@ -392,6 +392,22 @@ const api: NodusApi = {
     finally { ipcRenderer.removeListener('ai:nodusLocal:progress', listener); }
   },
   deleteNodusLocalModel: (model) => ipcRenderer.invoke('ai:nodusLocal:deleteModel', model),
+  getNodusLocalImageStatus: () => ipcRenderer.invoke('ai:nodusLocalImage:status'),
+  installNodusLocalImageRuntime: async (onProgress) => {
+    const requestId = `nodus-local-image-runtime-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const listener = (_event: unknown, id: string, fraction: number) => { if (id === requestId) onProgress?.(fraction); };
+    ipcRenderer.on('ai:nodusLocalImage:progress', listener);
+    try { return await ipcRenderer.invoke('ai:nodusLocalImage:installRuntime', requestId); }
+    finally { ipcRenderer.removeListener('ai:nodusLocalImage:progress', listener); }
+  },
+  downloadNodusLocalImageModel: async (model, onProgress) => {
+    const requestId = `nodus-local-image-model-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const listener = (_event: unknown, id: string, fraction: number) => { if (id === requestId) onProgress?.(fraction); };
+    ipcRenderer.on('ai:nodusLocalImage:progress', listener);
+    try { return await ipcRenderer.invoke('ai:nodusLocalImage:downloadModel', requestId, model); }
+    finally { ipcRenderer.removeListener('ai:nodusLocalImage:progress', listener); }
+  },
+  deleteNodusLocalImageModel: (model) => ipcRenderer.invoke('ai:nodusLocalImage:deleteModel', model),
   getDecorativeImage: (entityKind, entityId) => ipcRenderer.invoke('images:get', entityKind, entityId),
   getDecorativeImageDataUrl: (entityKind, entityId, thumbnail) =>
     ipcRenderer.invoke('images:data', entityKind, entityId, thumbnail),

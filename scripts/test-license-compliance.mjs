@@ -54,5 +54,8 @@ test('licenses are visible in About and before local model downloads', () => {
   assert.match(read('shared/localAiModels.ts'), /LFM Open License 1\.0/);
   assert.match(read('src/lib/audio/piper.ts'), /CC BY-NC-SA 4\.0 · no comercial/);
   assert.match(read('src/components/LocalAiModelsSettings.tsx'), /llama\.cpp · MIT/);
+  assert.match(read('src/components/LocalImageModelSettings.tsx'), /stable-diffusion\.cpp · MIT/);
+  assert.match(read('src/components/LocalImageModelSettings.tsx'), /Apache 2\.0/);
+  assert.match(read('THIRD_PARTY_NOTICES.md'), /FLUX\.2 \[klein\] 4B Q4/);
   assert.match(read('THIRD_PARTY_NOTICES.md'), /eSpeak NG/);
 });

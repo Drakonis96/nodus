@@ -73,6 +73,12 @@ The local model installer downloads the unmodified `llama.cpp` release b10002
 directly from its GitHub release. llama.cpp is MIT licensed and its source is:
 https://github.com/ggml-org/llama.cpp/tree/b10002
 
+The local image model installer downloads the unmodified `stable-diffusion.cpp`
+release `master-782-b290693` directly from its GitHub release. The runtime and
+its bundled ggml component are MIT licensed; license texts are included in the
+downloaded archive and the corresponding source is:
+https://github.com/leejet/stable-diffusion.cpp/tree/b290693
+
 Piper speech downloads `@diffusionstudio/piper-wasm` 1.0.0 from jsDelivr when
 the user first invokes it. That runtime incorporates eSpeak NG, licensed under
 GPL-3.0-or-later. Nodus is MIT/GPL-compatible open-source software and imposes
@@ -87,6 +93,18 @@ no additional restriction on that component. The GPL text is included in
 Model weights are not included in the Nodus installer. When the user requests
 one, Nodus downloads it directly from its named upstream repository. The model
 picker displays its source and license before download.
+
+The optional native image pipeline downloads FLUX.2 [klein] 4B Q4 weights, its
+Qwen3 4B Q4 text encoder and the FLUX.2 VAE. These components are Apache-2.0;
+Nodus also downloads the upstream license texts next to the weights. This
+integration intentionally uses the 4B model. The similarly named 9B model is
+subject to the separate FLUX Non-Commercial License and is not downloaded by
+Nodus. Sources:
+
+- https://huggingface.co/leejet/FLUX.2-klein-4B-GGUF
+- https://huggingface.co/black-forest-labs/FLUX.2-klein-4B
+- https://huggingface.co/unsloth/Qwen3-4B-GGUF
+- https://huggingface.co/Qwen/Qwen3-4B
 
 Nodus is a free, non-commercial open-source application. Some optional Piper
 voice datasets, including HFC Female and Ryan, are marked CC BY-NC-SA 4.0 and
