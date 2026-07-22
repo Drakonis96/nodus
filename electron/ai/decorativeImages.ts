@@ -14,6 +14,7 @@ import { vaultTypeImagePrompt } from '@shared/vaultTypes';
 import { getActiveVault } from '../vaults/vaultRegistry';
 import { completeText } from './aiClient';
 import { getSettings } from '../db/settingsRepo';
+import { generateNodusLocalImage } from './nodusLocalImages';
 import { getApiKey } from '../secrets/secretStore';
 import { setPersonPortrait } from '../db/entitiesRepo';
 import {
@@ -123,6 +124,7 @@ async function visualContextFor(source: ImageSource): Promise<string> {
 }
 
 function providerKey(provider: ImageProvider): string | null {
+  if (provider === 'nodus') return null;
   if (provider === 'google') return getApiKey('gemini');
   return getApiKey(provider);
 }
@@ -191,6 +193,7 @@ function generateOpenRouter(model: string, prompt: string, key: string): Promise
 }
 
 export async function callImageProvider(provider: ImageProvider, model: string, prompt: string): Promise<GeneratedImageBytes> {
+  if (provider === 'nodus') return generateNodusLocalImage(model, prompt, getSettings().imageQuality);
   const key = providerKey(provider);
   if (!key) throw new Error(`Falta la clave de ${provider === 'google' ? 'Google' : provider === 'openai' ? 'OpenAI' : 'OpenRouter'}.`);
   switch (provider) {

@@ -392,6 +392,7 @@ try {
       immersionModel: chat,
       imageProvider: 'google',
       imageModel: 'gemini-3.1-flash-lite-image',
+      imageQuality: 'balanced',
       imageStyle: 'antique_book',
     }), { model: smokeModel, chat: chatModel });
   assert.deepEqual(independent.chatModel, chatModel, 'chat model persists independently');
@@ -586,6 +587,13 @@ try {
     assert.equal(installedRuntime.status.runtime.ready, true, 'Nodus downloads and extracts a working llama.cpp runtime');
     assert.ok(installedRuntime.progress.some((fraction) => fraction >= 1), 'local runtime installation reports completion progress');
   }
+  await page.getByTestId('nodus-local-image-models').waitFor({ timeout: 30_000 });
+  const localImageStatus = await page.evaluate(() => window.nodus.getNodusLocalImageStatus());
+  assert.equal(localImageStatus.model.id, 'flux-2-klein-4b-q4', 'native FLUX.2 image model is available over the real preload bridge');
+  await page.getByTestId('image-generation-model-list').getByText('FLUX.2 Klein 4B Q4', { exact: true }).waitFor({ timeout: 30_000 });
+  assert.equal(await page.getByText('FLUX.2 Klein 4B Q4', { exact: true }).count(), 2, 'native model appears in its download section and the shared image selector');
+  assert.deepEqual(await page.getByTestId('nodus-image-quality').locator('option').evaluateAll((options) => options.map((option) => option.value)), ['draft', 'balanced', 'high'], 'native image quality exposes all three resolution presets');
+  assert.equal(await page.getByText('Licencia: esta integración usa FLUX.2 Klein 4B bajo Apache 2.0. La variante 9B tiene términos no comerciales diferentes y no se descarga.', { exact: true }).count(), 1, 'the 4B license distinction is visible before download');
   await page.getByTestId('stt-settings').waitFor({ timeout: 30_000 });
   assert.deepEqual(await page.getByTestId('stt-provider').locator('option').evaluateAll((options) => options.map((option) => option.value)), ['transformers', 'whisper_cpp', 'openai'], 'Settings owns all STT engines');
   const whisperCppStatus = await page.evaluate(() => window.nodus.getWhisperCppStatus());

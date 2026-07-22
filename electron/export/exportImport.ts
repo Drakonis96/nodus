@@ -92,7 +92,7 @@ interface BackupInventory {
     | 'argumentMapModel' | 'authorModel' | 'studyModel' | 'tutorModel' | 'hypothesisModel'
     | 'improveModel' | 'questionGenModel' | 'gradingModel' | 'flashcardModel' | 'transcriptionModel' | 'sttProvider'
     | 'sttTransformersModel' | 'sttWhisperCppModel' | 'sttWhisperCppExecutable'
-    | 'imageProvider' | 'imageModel' | 'imageStyle' | 'audioProvider' | 'audioVoice' | 'audioSpeed'
+    | 'imageProvider' | 'imageModel' | 'imageQuality' | 'imageStyle' | 'audioProvider' | 'audioVoice' | 'audioSpeed'
   >;
   apiKeyProviders: AiProvider[];
 }
@@ -919,7 +919,7 @@ function modelSettings(
     | 'argumentMapModel' | 'authorModel' | 'studyModel' | 'tutorModel' | 'hypothesisModel'
     | 'improveModel' | 'questionGenModel' | 'gradingModel' | 'flashcardModel' | 'transcriptionModel' | 'sttProvider'
     | 'sttTransformersModel' | 'sttWhisperCppModel' | 'sttWhisperCppExecutable'
-    | 'imageProvider' | 'imageModel' | 'imageStyle' | 'audioProvider' | 'audioVoice' | 'audioSpeed'
+    | 'imageProvider' | 'imageModel' | 'imageQuality' | 'imageStyle' | 'audioProvider' | 'audioVoice' | 'audioSpeed'
   >
 ): BackupInventory['modelSettings'] {
   return {
@@ -955,6 +955,7 @@ function modelSettings(
     sttWhisperCppExecutable: settings.sttWhisperCppExecutable,
     imageProvider: settings.imageProvider,
     imageModel: settings.imageModel,
+    imageQuality: settings.imageQuality,
     imageStyle: settings.imageStyle,
     audioProvider: settings.audioProvider,
     audioVoice: settings.audioVoice,

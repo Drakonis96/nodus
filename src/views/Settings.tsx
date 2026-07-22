@@ -26,6 +26,7 @@ import { NodiStylePicker } from '../components/nodi/NodiStylePicker';
 import { vaultTypeLabel } from '../components/VaultSwitcher';
 import { SttSettings } from '../components/SttSettings';
 import { LocalAiModelsSettings } from '../components/LocalAiModelsSettings';
+import { LocalImageModelSettings } from '../components/LocalImageModelSettings';
 import { McpConnectionModal } from '../components/McpConnectionModal';
 import { NAV_GROUPS, orderedNav } from '../navigation';
 import { t, tx } from '../i18n';
@@ -1626,6 +1627,7 @@ export function Settings({
             patch={patch}
           />
           <SttSettings settings={settings} patch={patch} />
+          <LocalImageModelSettings settings={settings} patch={patch} />
           <ImageGenerationSettings settings={settings} onChange={onChange} />
           <AudioGenerationSettings settings={settings} onChange={onChange} />
       </>)}

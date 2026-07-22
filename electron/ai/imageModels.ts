@@ -1,8 +1,20 @@
 import type { ImageModelInfo } from '@shared/types';
+import { NODUS_LOCAL_IMAGE_MODEL } from '@shared/localImageModels';
 
 const GOOGLE_SOURCE = 'https://ai.google.dev/gemini-api/docs/pricing';
 const OPENAI_SOURCE = 'https://developers.openai.com/api/docs/guides/image-generation';
 const OPENROUTER_SOURCE = 'https://openrouter.ai/models?output_modalities=image&order=pricing-low-to-high';
+
+const NODUS_LOCAL_MODELS: ImageModelInfo[] = [{
+  provider: 'nodus',
+  id: NODUS_LOCAL_IMAGE_MODEL.id,
+  name: NODUS_LOCAL_IMAGE_MODEL.label,
+  inputPriceUsdPerMillion: null,
+  outputPriceUsdPerMillion: null,
+  imagePriceUsd: 0,
+  imagePriceLabel: 'Local · sin coste por uso',
+  sourceUrl: NODUS_LOCAL_IMAGE_MODEL.sourceUrl,
+}];
 
 const GOOGLE_MODELS: ImageModelInfo[] = [
   {
@@ -158,7 +170,7 @@ async function openRouterModels(): Promise<ImageModelInfo[]> {
 
 export async function listImageModels(): Promise<ImageModelInfo[]> {
   const openrouter = await openRouterModels().catch(() => []);
-  return [...GOOGLE_MODELS, ...OPENAI_MODELS, ...openrouter].sort(
+  return [...NODUS_LOCAL_MODELS, ...GOOGLE_MODELS, ...OPENAI_MODELS, ...openrouter].sort(
     (a, b) => a.provider.localeCompare(b.provider) || a.name.localeCompare(b.name)
   );
 }

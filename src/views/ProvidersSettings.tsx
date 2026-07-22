@@ -528,6 +528,7 @@ const IMAGE_PROVIDER_LABELS: Record<ImageModelInfo['provider'], string> = {
   google: 'Google',
   openai: 'OpenAI',
   openrouter: 'OpenRouter',
+  nodus: 'Nodus local',
 };
 
 export function ImageGenerationSettings({ settings, onChange }: { settings: AppSettings; onChange: () => Promise<unknown> }) {
@@ -653,8 +654,8 @@ export function ImageGenerationSettings({ settings, onChange }: { settings: AppS
                     <div className="mt-1 truncate font-mono text-[10px] text-neutral-500 dark:text-neutral-600" title={model.id}>{IMAGE_PROVIDER_LABELS[model.provider]} · {model.id}</div>
                   </div>
                 </div>
-                <PriceCell label={t('Entrada')} value={money(model.inputPriceUsdPerMillion)} />
-                <PriceCell label={t('Salida')} value={money(model.outputPriceUsdPerMillion)} />
+                <PriceCell label={t('Entrada')} value={model.provider === 'nodus' ? t('Local') : money(model.inputPriceUsdPerMillion)} />
+                <PriceCell label={t('Salida')} value={model.provider === 'nodus' ? t('Local') : money(model.outputPriceUsdPerMillion)} />
                 <PriceCell label={t('Imagen')} value={model.imagePriceLabel ?? t('No disponible')} />
               </button>
             );

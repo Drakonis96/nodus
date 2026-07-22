@@ -22,6 +22,7 @@
     "verify:api-key-recovery-macos": "node scripts/verify-api-key-recovery-macos.mjs",
     "verify:toolkit-heic": "node scripts/verify-toolkit-heic.mjs",
     "verify:aiocr": "node scripts/verify-aiocr.mjs",
+    "verify:local-image": "node scripts/verify-local-image-generation.mjs",
     "licenses:generate": "node scripts/generate-third-party-licenses.mjs",
     "licenses:verify": "npm run licenses:generate && node scripts/verify-license-compliance.mjs",
     "privacy:verify": "node --test scripts/test-privacy-compliance.mjs",

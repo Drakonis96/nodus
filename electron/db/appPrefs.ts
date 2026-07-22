@@ -73,6 +73,7 @@ export const SHARED_MODEL_KEYS = [
   'sttWhisperCppExecutable',
   'imageProvider',
   'imageModel',
+  'imageQuality',
   'imageStyle',
   'audioProvider',
   'audioVoice',
