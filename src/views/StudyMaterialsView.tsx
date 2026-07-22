@@ -279,7 +279,7 @@ function StudyNotesTable({ notes, placements, workspace, onOpen }: {
     return names.length ? names.join(', ') : '—';
   };
   return <table className="w-full min-w-[980px] border-collapse text-xs" data-testid="study-material-notes-table">
-    <thead className="bg-neutral-950/95"><tr className="border-b border-neutral-800 text-left text-neutral-500"><th className="w-[320px] px-4 py-2 font-medium">{t('Apunte')}</th><th className="px-3 py-2 font-medium">{t('Curso')}</th><th className="px-3 py-2 font-medium">{t('Asignatura')}</th><th className="px-3 py-2 font-medium">{t('Carpeta')}</th><th className="px-3 py-2 font-medium">{t('Tema')}</th><th className="w-[110px] px-3 py-2 font-medium">{t('Formato')}</th><th className="w-[90px] px-3 py-2 text-right font-medium">{t('Acciones')}</th></tr></thead>
+    <thead className="bg-neutral-950/95"><tr className="border-b border-neutral-800 text-neutral-500"><th className="w-[320px] px-4 py-2 text-center font-medium">{t('Apunte')}</th><th className="px-3 py-2 text-center font-medium">{t('Curso')}</th><th className="px-3 py-2 text-center font-medium">{t('Asignatura')}</th><th className="px-3 py-2 text-center font-medium">{t('Carpeta')}</th><th className="px-3 py-2 text-center font-medium">{t('Tema')}</th><th className="w-[110px] px-3 py-2 text-center font-medium">{t('Formato')}</th><th className="w-[90px] px-3 py-2 text-center font-medium">{t('Acciones')}</th></tr></thead>
     <tbody>{notes.map((document) => <tr key={document.id} data-testid={`study-material-note-${document.id}`} className="cursor-pointer border-b border-neutral-800/60 hover:bg-neutral-900/40" onClick={() => onOpen(document.id)}><td className="px-4 py-2.5"><div className="flex max-w-[310px] items-center gap-2"><span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-indigo-600/15 text-indigo-300">{document.emoji ? <span>{document.emoji}</span> : <Icon name={document.icon || 'notebook'} size={15} />}</span><span className="min-w-0"><span className="block truncate font-medium text-neutral-200">{document.title}</span><span className="block truncate text-[10px] text-neutral-600">{document.description || t('Apunte creado en Nodus')}</span></span></div></td>{(['course', 'subject', 'folder', 'topic'] as const).map((dimension) => <td key={dimension} className="max-w-[180px] truncate px-3 py-2.5 text-neutral-500">{locationNames(document.id, dimension)}</td>)}<td className="px-3 py-2.5 text-neutral-500">{t('Apunte')}</td><td className="px-3 py-2.5 text-right"><button className="btn btn-ghost h-7 px-2" title={t('Abrir apunte')} onClick={(event) => { event.stopPropagation(); onOpen(document.id); }}><Icon name="external" size={12} /></button></td></tr>)}</tbody>
   </table>;
 }
@@ -390,16 +390,16 @@ function MaterialTable({
   };
   return <table className="w-full min-w-[1180px] border-collapse text-xs" data-testid="study-material-table">
     <thead className="sticky top-0 z-10 bg-neutral-950/95 backdrop-blur">
-      <tr className="border-b border-neutral-800 text-left text-neutral-500">
-        <th className="w-[300px] px-4 py-2 font-medium">{t('Material')}</th>
-        <th className="w-[135px] px-3 py-2 font-medium">{t('Curso')}</th>
-        <th className="w-[150px] px-3 py-2 font-medium">{t('Asignatura')}</th>
-        <th className="w-[145px] px-3 py-2 font-medium">{t('Carpeta')}</th>
-        <th className="w-[145px] px-3 py-2 font-medium">{t('Tema')}</th>
-        <th className="w-[115px] px-3 py-2 font-medium">{t('Estado')}</th>
-        <th className="w-[90px] px-3 py-2 font-medium">{t('Formato')}</th>
-        <th className="w-[90px] px-3 py-2 font-medium">{t('Tamaño')}</th>
-        <th className="w-[260px] px-3 py-2 text-right font-medium">{t('Acciones')}</th>
+      <tr className="border-b border-neutral-800 text-neutral-500">
+        <th className="w-[300px] px-4 py-2 text-center font-medium">{t('Material')}</th>
+        <th className="w-[135px] px-3 py-2 text-center font-medium">{t('Curso')}</th>
+        <th className="w-[150px] px-3 py-2 text-center font-medium">{t('Asignatura')}</th>
+        <th className="w-[145px] px-3 py-2 text-center font-medium">{t('Carpeta')}</th>
+        <th className="w-[145px] px-3 py-2 text-center font-medium">{t('Tema')}</th>
+        <th className="w-[115px] px-3 py-2 text-center font-medium">{t('Estado')}</th>
+        <th className="w-[90px] px-3 py-2 text-center font-medium">{t('Formato')}</th>
+        <th className="w-[90px] px-3 py-2 text-center font-medium">{t('Tamaño')}</th>
+        <th className="w-[260px] px-3 py-2 text-center font-medium">{t('Acciones')}</th>
       </tr>
     </thead>
     <tbody>
