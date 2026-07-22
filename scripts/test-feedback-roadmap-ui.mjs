@@ -59,7 +59,7 @@ test('roadmap follows the requested sequence and is opened from the header', asy
   assert.match(roadmapSource, /Nodus Toolkit, PDF Presenter y OCR Workspace figuran como implementados/, 'current Toolkit availability is documented');
   for (const description of [
     'Handy local-first tools for file conversion and document processing, built into Nodus.',
-    'Present PDFs with presenter view, mobile remote control, speaker notes, and live annotation tools.',
+    'Present PDFs and externally authored presentations with presenter view, mobile remote control, speaker notes, and live annotation tools.',
     'AI-powered OCR for scanned PDFs and images, with page-by-page review, text cleanup, reprocessing, and direct integration with your Nodus vaults.',
   ]) {
     assert.ok(english.includes(description), `English roadmap copy is preserved: ${description}`);
