@@ -246,7 +246,15 @@ test('Nodus Server pairs a desktop publisher and protects read-only MCP with OAu
       next: '/',
     });
     assert.equal(readerLogin.status, 303);
+    assert.equal(readerLogin.headers.get('location'), '/account', 'reader accounts land on their account page');
     const readerCookie = cookieFrom(readerLogin);
+    const secondReaderLogin = await postForm(`${origin}/login`, {
+      email: 'student@example.test',
+      password: 'student-password-strong',
+      next: '/account',
+    });
+    assert.equal(secondReaderLogin.status, 303);
+    const secondReaderCookie = cookieFrom(secondReaderLogin);
     const tokens = await oauthLogin(origin, client, readerCookie);
 
     const initialized = await mcp(origin, tokens.access_token, 'initialize', {
@@ -278,7 +286,8 @@ test('Nodus Server pairs a desktop publisher and protects read-only MCP with OAu
       resource: `${origin}/mcp`,
     });
     assert.equal(refreshed.status, 200);
-    assert.ok((await refreshed.json()).refresh_token);
+    const refreshedTokens = await refreshed.json();
+    assert.ok(refreshedTokens.refresh_token);
     const replayedRefresh = await postForm(`${origin}/oauth/token`, {
       grant_type: 'refresh_token',
       client_id: client.client_id,
@@ -286,6 +295,82 @@ test('Nodus Server pairs a desktop publisher and protects read-only MCP with OAu
       resource: `${origin}/mcp`,
     });
     assert.equal(replayedRefresh.status, 400, 'refresh tokens rotate and cannot be replayed');
+
+    const accountResponse = await fetch(`${origin}/account`, { headers: { cookie: readerCookie } });
+    assert.equal(accountResponse.status, 200);
+    const account = await accountResponse.text();
+    const accountCsrf = hidden(account, 'csrf');
+    const wrongCurrentPassword = await postForm(`${origin}/account/password`, {
+      csrf: accountCsrf,
+      currentPassword: 'incorrect-password',
+      newPassword: 'student-password-updated',
+      confirmPassword: 'student-password-updated',
+    }, { headers: { cookie: readerCookie } });
+    assert.equal(wrongCurrentPassword.status, 400);
+    assert.match(await wrongCurrentPassword.text(), /contraseña actual no es correcta/i);
+
+    const changedPassword = await postForm(`${origin}/account/password`, {
+      csrf: accountCsrf,
+      currentPassword: 'student-password-strong',
+      newPassword: 'student-password-updated',
+      confirmPassword: 'student-password-updated',
+    }, { headers: { cookie: readerCookie } });
+    assert.equal(changedPassword.status, 303);
+    assert.match(changedPassword.headers.get('location') || '', /^\/account\?notice=/);
+
+    const currentSessionStillWorks = await fetch(`${origin}/account`, { headers: { cookie: readerCookie }, redirect: 'manual' });
+    assert.equal(currentSessionStillWorks.status, 200, 'the session changing its own password remains valid');
+    const secondSessionRevoked = await fetch(`${origin}/account`, { headers: { cookie: secondReaderCookie }, redirect: 'manual' });
+    assert.equal(secondSessionRevoked.status, 303);
+    assert.match(secondSessionRevoked.headers.get('location') || '', /^\/login/);
+
+    const oldPasswordRejected = await postForm(`${origin}/login`, {
+      email: 'student@example.test', password: 'student-password-strong', next: '/account',
+    });
+    assert.equal(oldPasswordRejected.status, 401);
+    const updatedPasswordAccepted = await postForm(`${origin}/login`, {
+      email: 'student@example.test', password: 'student-password-updated', next: '/account',
+    });
+    assert.equal(updatedPasswordAccepted.status, 303);
+    const updatedReaderCookie = cookieFrom(updatedPasswordAccepted);
+
+    for (const accessToken of [tokens.access_token, refreshedTokens.access_token]) {
+      const revokedAccess = await fetch(`${origin}/mcp`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${accessToken}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 5, method: 'tools/list' }),
+      });
+      assert.equal(revokedAccess.status, 401, 'password changes revoke OAuth access tokens');
+    }
+    const revokedRefresh = await postForm(`${origin}/oauth/token`, {
+      grant_type: 'refresh_token',
+      client_id: client.client_id,
+      refresh_token: refreshedTokens.refresh_token,
+      resource: `${origin}/mcp`,
+    });
+    assert.equal(revokedRefresh.status, 400, 'password changes revoke OAuth refresh tokens');
+
+    dashboardResponse = await fetch(`${origin}/`, { headers: { cookie: adminCookie } });
+    dashboard = await dashboardResponse.text();
+    const readerId = dashboard.match(/\/admin\/users\/password\?userId=([0-9a-f-]{36})/)?.[1];
+    assert.ok(readerId, 'the administrator can open a reader password reset');
+    const resetPageResponse = await fetch(`${origin}/admin/users/password?userId=${readerId}`, { headers: { cookie: adminCookie } });
+    assert.equal(resetPageResponse.status, 200);
+    const resetPage = await resetPageResponse.text();
+    const resetCsrf = hidden(resetPage, 'csrf');
+    const resetPassword = await postForm(`${origin}/admin/users/password`, {
+      csrf: resetCsrf,
+      userId: readerId,
+      newPassword: 'temporary-password-reset',
+      confirmPassword: 'temporary-password-reset',
+    }, { headers: { cookie: adminCookie } });
+    assert.equal(resetPassword.status, 303);
+    const resetSessionRevoked = await fetch(`${origin}/account`, { headers: { cookie: updatedReaderCookie }, redirect: 'manual' });
+    assert.equal(resetSessionRevoked.status, 303, 'an administrator reset revokes every reader session');
+    const resetPasswordAccepted = await postForm(`${origin}/login`, {
+      email: 'student@example.test', password: 'temporary-password-reset', next: '/account',
+    });
+    assert.equal(resetPasswordAccepted.status, 303);
   } finally {
     child.kill('SIGTERM');
     await Promise.race([

@@ -89,6 +89,39 @@ export class Store {
     return user && verifyPassword(String(password), user.salt, user.hash) ? user : null;
   }
 
+  replacePassword(userId, password, exceptSessionHash = null) {
+    const user = this.state.users.find((entry) => entry.id === userId);
+    if (!user) throw new Error('La cuenta no existe.');
+    if (String(password).length < 12) throw new Error('La contraseña debe tener al menos 12 caracteres.');
+    Object.assign(user, hashPassword(String(password)), { passwordChangedAt: new Date().toISOString() });
+
+    // A password change is also a credential-recovery event: stale browser and
+    // OAuth credentials must stop working immediately. The session performing a
+    // self-service change may remain signed in, but receives a new CSRF secret.
+    this.state.sessions = this.state.sessions.filter((entry) => entry.userId !== userId || entry.hash === exceptSessionHash);
+    const currentSession = exceptSessionHash
+      ? this.state.sessions.find((entry) => entry.hash === exceptSessionHash && entry.userId === userId)
+      : null;
+    if (currentSession) currentSession.csrf = token(18);
+    this.state.oauthCodes = this.state.oauthCodes.filter((entry) => entry.userId !== userId);
+    this.state.accessTokens = this.state.accessTokens.filter((entry) => entry.userId !== userId);
+    this.state.refreshTokens = this.state.refreshTokens.filter((entry) => entry.userId !== userId);
+    this.state.pairingCodes = this.state.pairingCodes.filter((entry) => entry.userId !== userId);
+    this.save();
+    return user;
+  }
+
+  changePassword(userId, currentPassword, newPassword, currentSessionHash) {
+    const user = this.state.users.find((entry) => entry.id === userId);
+    if (!user || !verifyPassword(String(currentPassword), user.salt, user.hash)) throw new Error('La contraseña actual no es correcta.');
+    if (verifyPassword(String(newPassword), user.salt, user.hash)) throw new Error('La contraseña nueva debe ser diferente de la actual.');
+    return this.replacePassword(userId, newPassword, currentSessionHash);
+  }
+
+  resetPassword(userId, newPassword) {
+    return this.replacePassword(userId, newPassword);
+  }
+
   createSession(userId) {
     const raw = token();
     this.state.sessions.push({ hash: digest(raw), userId, csrf: token(18), expiresAt: new Date(Date.now() + 12 * 3600_000).toISOString() });
