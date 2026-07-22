@@ -19,6 +19,33 @@ const snapshotCache = new Map();
 const rateBuckets = new Map();
 const SCOPES = new Set(['profile', 'spaces.read', 'materials.read']);
 const MCP_PROTOCOLS = new Set(['2025-11-25', '2025-06-18', '2025-03-26']);
+const AUTH_BODY_BYTES = 32 * 1024;
+const MAX_RATE_BUCKETS = 20_000;
+
+function environmentCredential(name) {
+  const direct = process.env[name] || '';
+  const file = process.env[`${name}_FILE`] || '';
+  if (direct && file) throw new Error(`${name} and ${name}_FILE cannot be used together.`);
+  if (!file) return direct;
+  try {
+    return fs.readFileSync(file, 'utf8').replace(/\r?\n$/, '');
+  } catch {
+    throw new Error(`Could not read the credential file configured by ${name}_FILE.`);
+  }
+}
+
+function syncEnvironmentAdmin() {
+  const email = environmentCredential('NODUS_ADMIN_EMAIL').trim();
+  const password = environmentCredential('NODUS_ADMIN_PASSWORD');
+  if (!email && !password) return false;
+  if (!email || !password) throw new Error('NODUS_ADMIN_EMAIL and NODUS_ADMIN_PASSWORD must be configured together.');
+  const result = store.syncAdminCredentials(email, password);
+  const changes = [result.created && 'created', result.emailChanged && 'email updated', result.passwordChanged && 'password rotated'].filter(Boolean);
+  console.log(`[nodus-server] environment administrator synchronized${changes.length ? ` (${changes.join(', ')})` : ''}`);
+  return true;
+}
+
+const ENVIRONMENT_ADMIN_CONFIGURED = syncEnvironmentAdmin();
 
 function language() {
   return normalizeServerLanguage(store.state.settings.language);
@@ -62,10 +89,14 @@ function requireSession(req, res, admin = false) {
   return current;
 }
 
-function checkCsrf(current, value) {
+function safeEqual(value, expected) {
   const actual = Buffer.from(String(value ?? ''));
-  const wanted = Buffer.from(current.session.csrf);
+  const wanted = Buffer.from(String(expected ?? ''));
   return actual.length === wanted.length && timingSafeEqual(actual, wanted);
+}
+
+function checkCsrf(current, value) {
+  return safeEqual(value, current.session.csrf);
 }
 
 function bearer(req) {
@@ -80,21 +111,26 @@ function clientIp(req) {
   return forwarded.at(-1) || req.socket.remoteAddress || 'unknown';
 }
 
-function rateLimit(req, res, key, limit, windowMs) {
+function rateLimit(req, res, key, limit, windowMs, identity = clientIp(req)) {
   const now = Date.now();
-  const bucketKey = `${key}:${clientIp(req)}`;
+  const bucketKey = `${key}:${identity}`;
   let bucket = rateBuckets.get(bucketKey);
   if (!bucket || bucket.resetAt <= now) bucket = { count: 0, resetAt: now + windowMs };
   bucket.count += 1;
   rateBuckets.set(bucketKey, bucket);
-  if (rateBuckets.size > 10_000) {
+  if (rateBuckets.size > MAX_RATE_BUCKETS) {
     for (const [candidate, value] of rateBuckets) if (value.resetAt <= now) rateBuckets.delete(candidate);
+    while (rateBuckets.size > MAX_RATE_BUCKETS) rateBuckets.delete(rateBuckets.keys().next().value);
   }
   if (bucket.count <= limit) return true;
-  json(res, 429, { error: 'rate_limited', error_description: 'Demasiados intentos. Espera unos minutos.' }, {
+  json(res, 429, { error: 'rate_limited', error_description: 'Too many attempts. Wait a few minutes and try again.' }, {
     'retry-after': String(Math.max(1, Math.ceil((bucket.resetAt - now) / 1000))),
   });
   return false;
+}
+
+function clearRateLimit(key, identity) {
+  rateBuckets.delete(`${key}:${identity}`);
 }
 
 function validRedirectUri(value) {
@@ -233,11 +269,11 @@ async function handleMcp(req, res) {
 }
 
 function setupPage(error = '') {
-  return page(tr('setupTitle'), `<h1>${tr('setupHeading')}</h1><p class="muted">${tr('setupIntro')}</p>${error ? `<p class="warn">${escapeHtml(error)}</p>` : ''}<form class="card" method="post" action="/setup"><label>${tr('setupToken')}</label><input name="setupToken" type="password" required><label>${tr('serverName')}</label><input name="name" value="Nodus Server" required><label>${tr('publicUrl')}</label><input name="publicUrl" placeholder="https://nodus.example.com" required><label>${tr('adminEmail')}</label><input name="email" type="email" required><label>${tr('adminPassword')}</label><input name="password" type="password" minlength="12" required><button>${tr('createServer')}</button></form>`);
+  return page(tr('setupTitle'), `<h1>${tr('setupHeading')}</h1><p class="muted">${tr('setupIntro')}</p>${error ? `<p class="warn">${escapeHtml(error)}</p>` : ''}<form class="card" method="post" action="/setup"><label>${tr('setupToken')}</label><input name="setupToken" type="password" maxlength="1024" required><label>${tr('serverName')}</label><input name="name" value="Nodus Server" maxlength="120" required><label>${tr('publicUrl')}</label><input name="publicUrl" placeholder="https://nodus.example.com" maxlength="2048" required><label>${tr('adminEmail')}</label><input name="email" type="email" maxlength="320" required><label>${tr('adminPassword')}</label><input name="password" type="password" minlength="12" maxlength="1024" required><button>${tr('createServer')}</button></form>`);
 }
 
 function loginPage(next = '/', error = '') {
-  return page(tr('loginTitle'), `<h1>${tr('loginHeading')}</h1>${error ? `<p class="warn">${escapeHtml(error)}</p>` : ''}<form class="card" method="post" action="/login"><input type="hidden" name="next" value="${escapeHtml(next)}"><label>${tr('email')}</label><input name="email" type="email" autocomplete="username" required><label>${tr('password')}</label><input name="password" type="password" autocomplete="current-password" required><button>${tr('signIn')}</button></form>`);
+  return page(tr('loginTitle'), `<h1>${tr('loginHeading')}</h1>${error ? `<p class="warn">${escapeHtml(error)}</p>` : ''}<form class="card" method="post" action="/login"><input type="hidden" name="next" value="${escapeHtml(next)}"><label>${tr('email')}</label><input name="email" type="email" autocomplete="username" maxlength="320" required><label>${tr('password')}</label><input name="password" type="password" autocomplete="current-password" maxlength="1024" required><button>${tr('signIn')}</button></form>`);
 }
 
 function accountPage(current, notice = '', error = '') {
@@ -279,10 +315,11 @@ async function route(req, res) {
   if (store.state.users.length === 0) {
     if (url.pathname !== '/setup') return redirect(res, '/setup');
     if (req.method === 'GET') return html(res, 200, setupPage());
-    if (!rateLimit(req, res, 'setup', 10, 15 * 60_000)) return;
-    const values = await form(req);
+    if (!rateLimit(req, res, 'setup-global', 60, 60 * 60_000, 'all')) return;
+    if (!rateLimit(req, res, 'setup-ip', 10, 15 * 60_000)) return;
+    const values = await form(req, AUTH_BODY_BYTES);
     try {
-      if (!SETUP_TOKEN || SETUP_TOKEN.length < 16 || values.setupToken !== SETUP_TOKEN) throw new Error('The setup token is invalid.');
+      if (!SETUP_TOKEN || SETUP_TOKEN.length < 16 || !safeEqual(values.setupToken, SETUP_TOKEN)) throw new Error('The setup token is invalid.');
       store.state.settings = { ...store.state.settings, name: String(values.name).trim(), publicUrl: normalizePublicUrl(values.publicUrl), language: 'en' };
       const user = store.createUser(values.email, values.password, 'admin');
       const raw = store.createSession(user.id);
@@ -290,12 +327,18 @@ async function route(req, res) {
     } catch (error) { return html(res, 400, setupPage(error instanceof Error ? error.message : String(error))); }
   }
 
+  if (url.pathname === '/setup') return redirect(res, '/login');
+
   if (url.pathname === '/login') {
     if (req.method === 'GET') return html(res, 200, loginPage(url.searchParams.get('next') || '/'));
-    if (!rateLimit(req, res, 'login', 12, 15 * 60_000)) return;
-    const values = await form(req);
+    if (!rateLimit(req, res, 'login-global', 240, 5 * 60_000, 'all')) return;
+    if (!rateLimit(req, res, 'login-ip', 60, 15 * 60_000)) return;
+    const values = await form(req, AUTH_BODY_BYTES);
+    const accountIdentity = digest(String(values.email || '').trim().toLowerCase());
+    if (!rateLimit(req, res, 'login-account', 10, 10 * 60_000, accountIdentity)) return;
     const user = store.authenticate(values.email, values.password);
     if (!user) return html(res, 401, loginPage(values.next || '/', tr('invalidLogin')));
+    clearRateLimit('login-account', accountIdentity);
     const raw = store.createSession(user.id);
     const next = String(values.next || '/');
     const safeNext = next.startsWith('/') && !next.startsWith('//') ? next : '/';
@@ -310,7 +353,7 @@ async function route(req, res) {
   if (url.pathname === '/account/password' && req.method === 'POST') {
     const current = requireSession(req, res); if (!current) return;
     if (!rateLimit(req, res, 'password-change', 10, 15 * 60_000)) return;
-    const values = await form(req);
+    const values = await form(req, AUTH_BODY_BYTES);
     if (!checkCsrf(current, values.csrf)) return html(res, 403, page(tr('error'), `<h1>${tr('sessionExpired')}</h1>`));
     if (values.newPassword !== values.confirmPassword) return html(res, 400, accountPage(current, '', 'The new passwords do not match.'));
     try {
@@ -330,7 +373,7 @@ async function route(req, res) {
   if (url.pathname === '/admin/users/password' && req.method === 'POST') {
     const current = requireSession(req, res, true); if (!current) return;
     if (!rateLimit(req, res, 'password-reset', 20, 15 * 60_000)) return;
-    const values = await form(req);
+    const values = await form(req, AUTH_BODY_BYTES);
     if (!checkCsrf(current, values.csrf)) return html(res, 403, page(tr('error'), `<h1>${tr('sessionExpired')}</h1>`));
     const user = store.state.users.find((entry) => entry.id === values.userId && entry.role === 'member');
     if (!user) return html(res, 404, page(tr('error'), `<h1>${tr('readerNotFound')}</h1>`));
@@ -344,8 +387,10 @@ async function route(req, res) {
   }
 
   if (url.pathname === '/oauth/register' && req.method === 'POST') {
+    if (!rateLimit(req, res, 'oauth-register-global', 300, 60 * 60_000, 'all')) return;
     if (!rateLimit(req, res, 'oauth-register', 30, 60 * 60_000)) return;
-    const input = await jsonBody(req);
+    if (store.state.oauthClients.length >= 10_000) return json(res, 503, { error: 'registration_capacity_reached' });
+    const input = await jsonBody(req, 64 * 1024);
     const redirects = Array.isArray(input.redirect_uris) ? [...new Set(input.redirect_uris.filter((value) => typeof value === 'string' && validRedirectUri(value)))].slice(0, 10) : [];
     if (redirects.length === 0) return json(res, 400, { error: 'invalid_redirect_uri' });
     const client = { client_id: `client_${token(18)}`, client_name: String(input.client_name || 'MCP client').slice(0, 120), redirect_uris: redirects, createdAt: new Date().toISOString() };
@@ -368,7 +413,7 @@ async function route(req, res) {
 
   if (url.pathname === '/oauth/authorize' && req.method === 'POST') {
     const current = requireSession(req, res); if (!current) return;
-    const values = await form(req);
+    const values = await form(req, 64 * 1024);
     if (!checkCsrf(current, values.csrf)) return html(res, 403, page(tr('error'), `<h1>${tr('sessionExpired')}</h1>`));
     const client = store.state.oauthClients.find((entry) => entry.client_id === values.client_id);
     if (!client || !client.redirect_uris.includes(values.redirect_uri) || values.code_challenge_method !== 'S256' || String(values.resource || mcpResource()) !== mcpResource()) return html(res, 400, page('OAuth', `<h1>${tr('invalidOauth')}</h1>`));
@@ -382,8 +427,9 @@ async function route(req, res) {
   }
 
   if (url.pathname === '/oauth/token' && req.method === 'POST') {
+    if (!rateLimit(req, res, 'oauth-token-global', 1_000, 60_000, 'all')) return;
     if (!rateLimit(req, res, 'oauth-token', 120, 60_000)) return;
-    const values = await form(req);
+    const values = await form(req, AUTH_BODY_BYTES);
     if (values.grant_type === 'authorization_code') {
       store.cleanup();
       const index = store.state.oauthCodes.findIndex((entry) => entry.hash === digest(values.code));
@@ -413,8 +459,9 @@ async function route(req, res) {
   }
 
   if (url.pathname === '/api/v1/pair' && req.method === 'POST') {
+    if (!rateLimit(req, res, 'pair-global', 300, 15 * 60_000, 'all')) return;
     if (!rateLimit(req, res, 'pair', 30, 15 * 60_000)) return;
-    const input = await jsonBody(req);
+    const input = await jsonBody(req, AUTH_BODY_BYTES);
     store.cleanup();
     const pairing = store.state.pairingCodes.find((entry) => entry.hash === digest(String(input.code || '').toUpperCase()));
     if (!pairing) return json(res, 401, { error: 'Invalid or expired pairing code.' });
@@ -430,7 +477,7 @@ async function route(req, res) {
     const raw = bearer(req);
     const device = store.state.deviceTokens.find((entry) => entry.hash === digest(raw));
     if (!device || !membership(device.userId, device.spaceId)) return json(res, 401, { error: 'Invalid or revoked device token.' });
-    const input = await jsonBody(req);
+    const input = await jsonBody(req, 4 * 1024);
     if (typeof input.language !== 'string' || normalizeServerLanguage(input.language) !== input.language) {
       return json(res, 400, { error: 'Unsupported server language.' });
     }
@@ -467,13 +514,13 @@ async function route(req, res) {
   }
   if (url.pathname === '/logout' && req.method === 'POST') {
     const current = requireSession(req, res); if (!current) return;
-    const values = await form(req); if (!checkCsrf(current, values.csrf)) return html(res, 403, page(tr('error'), `<h1>${tr('sessionExpired')}</h1>`));
+    const values = await form(req, AUTH_BODY_BYTES); if (!checkCsrf(current, values.csrf)) return html(res, 403, page(tr('error'), `<h1>${tr('sessionExpired')}</h1>`));
     store.state.sessions = store.state.sessions.filter((entry) => entry.hash !== current.session.hash); store.save();
     return redirect(res, '/login', { 'set-cookie': 'nodus_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0' });
   }
   if (url.pathname === '/admin/spaces' && req.method === 'POST') {
     const current = requireSession(req, res, true); if (!current) return;
-    const values = await form(req); if (!checkCsrf(current, values.csrf)) return html(res, 403, page(tr('error'), `<h1>${tr('sessionExpired')}</h1>`));
+    const values = await form(req, AUTH_BODY_BYTES); if (!checkCsrf(current, values.csrf)) return html(res, 403, page(tr('error'), `<h1>${tr('sessionExpired')}</h1>`));
     const space = { id: randomUUID(), name: String(values.name || '').trim(), description: String(values.description || '').trim(), createdAt: new Date().toISOString(), updatedAt: null, revision: '', bytes: 0 };
     if (!space.name) return html(res, 400, dashboard(current, 'The space needs a name.'));
     store.state.spaces.push(space); store.state.memberships.push({ userId: current.user.id, spaceId: space.id, role: 'owner' }); store.save();
@@ -481,14 +528,14 @@ async function route(req, res) {
   }
   if (url.pathname === '/admin/spaces/clear-request' && req.method === 'POST') {
     const current = requireSession(req, res, true); if (!current) return;
-    const values = await form(req); if (!checkCsrf(current, values.csrf)) return html(res, 403, page(tr('error'), `<h1>${tr('sessionExpired')}</h1>`));
+    const values = await form(req, AUTH_BODY_BYTES); if (!checkCsrf(current, values.csrf)) return html(res, 403, page(tr('error'), `<h1>${tr('sessionExpired')}</h1>`));
     const space = store.state.spaces.find((entry) => entry.id === values.spaceId);
     if (!space) return html(res, 404, page(tr('error'), `<h1>${tr('spaceNotFound')}</h1>`));
     return html(res, 200, page(tr('deletePublication'), `<h1>${tr('deletePublicationHeading')}</h1><div class="card"><p>${tr('deletePublicationHelp', { name: `<strong>${escapeHtml(space.name)}</strong>` })}</p><form method="post" action="/admin/spaces/clear"><input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="spaceId" value="${space.id}"><button>${tr('deletePermanently')}</button></form><p><a href="/">${tr('cancel')}</a></p></div>`));
   }
   if (url.pathname === '/admin/spaces/clear' && req.method === 'POST') {
     const current = requireSession(req, res, true); if (!current) return;
-    const values = await form(req); if (!checkCsrf(current, values.csrf)) return html(res, 403, page(tr('error'), `<h1>${tr('sessionExpired')}</h1>`));
+    const values = await form(req, AUTH_BODY_BYTES); if (!checkCsrf(current, values.csrf)) return html(res, 403, page(tr('error'), `<h1>${tr('sessionExpired')}</h1>`));
     const space = store.state.spaces.find((entry) => entry.id === values.spaceId);
     if (!space) return html(res, 404, page(tr('error'), `<h1>${tr('spaceNotFound')}</h1>`));
     store.removeSnapshot(space.id); snapshotCache.delete(space.id);
@@ -501,13 +548,13 @@ async function route(req, res) {
   }
   if (url.pathname === '/admin/users' && req.method === 'POST') {
     const current = requireSession(req, res, true); if (!current) return;
-    const values = await form(req); if (!checkCsrf(current, values.csrf)) return html(res, 403, page(tr('error'), `<h1>${tr('sessionExpired')}</h1>`));
+    const values = await form(req, AUTH_BODY_BYTES); if (!checkCsrf(current, values.csrf)) return html(res, 403, page(tr('error'), `<h1>${tr('sessionExpired')}</h1>`));
     try { const user = store.createUser(values.email, values.password, 'member'); if (values.spaceId) { store.state.memberships.push({ userId: user.id, spaceId: values.spaceId, role: 'reader' }); store.save(); } return redirect(res, '/?notice=' + encodeURIComponent('User created.')); }
     catch (error) { return html(res, 400, dashboard(current, error instanceof Error ? error.message : String(error))); }
   }
   if (url.pathname === '/admin/access/grant' && req.method === 'POST') {
     const current = requireSession(req, res, true); if (!current) return;
-    const values = await form(req); if (!checkCsrf(current, values.csrf)) return html(res, 403, page(tr('error'), `<h1>${tr('sessionExpired')}</h1>`));
+    const values = await form(req, AUTH_BODY_BYTES); if (!checkCsrf(current, values.csrf)) return html(res, 403, page(tr('error'), `<h1>${tr('sessionExpired')}</h1>`));
     const user = store.state.users.find((entry) => entry.id === values.userId);
     const space = store.state.spaces.find((entry) => entry.id === values.spaceId);
     if (!user || !space) return html(res, 400, dashboard(current, 'Invalid user or space.'));
@@ -516,7 +563,7 @@ async function route(req, res) {
   }
   if (url.pathname === '/admin/access/revoke' && req.method === 'POST') {
     const current = requireSession(req, res, true); if (!current) return;
-    const values = await form(req); if (!checkCsrf(current, values.csrf)) return html(res, 403, page(tr('error'), `<h1>${tr('sessionExpired')}</h1>`));
+    const values = await form(req, AUTH_BODY_BYTES); if (!checkCsrf(current, values.csrf)) return html(res, 403, page(tr('error'), `<h1>${tr('sessionExpired')}</h1>`));
     const entry = membership(values.userId, values.spaceId);
     if (!entry || entry.role === 'owner') return html(res, 400, dashboard(current, 'That access cannot be revoked here.'));
     store.state.memberships = store.state.memberships.filter((candidate) => candidate !== entry);
@@ -526,13 +573,13 @@ async function route(req, res) {
   }
   if (url.pathname === '/admin/devices/revoke' && req.method === 'POST') {
     const current = requireSession(req, res, true); if (!current) return;
-    const values = await form(req); if (!checkCsrf(current, values.csrf)) return html(res, 403, page(tr('error'), `<h1>${tr('sessionExpired')}</h1>`));
+    const values = await form(req, AUTH_BODY_BYTES); if (!checkCsrf(current, values.csrf)) return html(res, 403, page(tr('error'), `<h1>${tr('sessionExpired')}</h1>`));
     store.state.deviceTokens = store.state.deviceTokens.filter((entry) => entry.hash !== values.tokenHash); store.save();
     return redirect(res, '/?notice=' + encodeURIComponent('Device revoked.'));
   }
   if (url.pathname === '/admin/pairing' && req.method === 'POST') {
     const current = requireSession(req, res, true); if (!current) return;
-    const values = await form(req); if (!checkCsrf(current, values.csrf)) return html(res, 403, page(tr('error'), `<h1>${tr('sessionExpired')}</h1>`));
+    const values = await form(req, AUTH_BODY_BYTES); if (!checkCsrf(current, values.csrf)) return html(res, 403, page(tr('error'), `<h1>${tr('sessionExpired')}</h1>`));
     if (!membership(current.user.id, values.spaceId)) return html(res, 403, page(tr('error'), '<h1>No access to that space.</h1>'));
     const raw = `${token(4).slice(0, 4)}-${token(4).slice(0, 4)}`.toUpperCase();
     store.state.pairingCodes.push({ hash: digest(raw), userId: current.user.id, spaceId: values.spaceId, expiresAt: new Date(Date.now() + 15 * 60_000).toISOString(), usedAt: null }); store.save();
@@ -551,8 +598,10 @@ const server = http.createServer((req, res) => {
 
 server.requestTimeout = 5 * 60_000;
 server.headersTimeout = 65_000;
+server.maxHeadersCount = 100;
+server.maxRequestsPerSocket = 1_000;
 server.listen(PORT, HOST, () => {
   console.log(`[nodus-server] listening on http://${HOST}:${PORT}`);
   console.log(`[nodus-server] public URL: ${publicUrl()}`);
-  if (store.state.users.length === 0 && (!SETUP_TOKEN || SETUP_TOKEN.length < 16)) console.warn('[nodus-server] NODUS_SETUP_TOKEN must contain at least 16 characters before setup can complete.');
+  if (!ENVIRONMENT_ADMIN_CONFIGURED && store.state.users.length === 0 && (!SETUP_TOKEN || SETUP_TOKEN.length < 16)) console.warn('[nodus-server] Configure NODUS_ADMIN_EMAIL + NODUS_ADMIN_PASSWORD, or provide a temporary NODUS_SETUP_TOKEN with at least 16 characters.');
 });

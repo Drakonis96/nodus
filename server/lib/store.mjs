@@ -21,6 +21,21 @@ export function verifyPassword(password, salt, expected) {
   return actual.length === wanted.length && timingSafeEqual(actual, wanted);
 }
 
+const DUMMY_PASSWORD = hashPassword('nodus-invalid-login-password', 'nodus-dummy-auth-salt');
+
+function normalizedEmail(value) {
+  const email = String(value).trim().toLowerCase();
+  if (!email || email.length > 320 || !email.includes('@')) throw new Error('Enter a valid email address.');
+  return email;
+}
+
+function validatePassword(value) {
+  const password = String(value);
+  if (password.length < 12) throw new Error('The password must contain at least 12 characters.');
+  if (password.length > 1024) throw new Error('The password is too long.');
+  return password;
+}
+
 function initialState() {
   return {
     version: 1,
@@ -76,11 +91,10 @@ export class Store {
   }
 
   createUser(email, password, role = 'member') {
-    const normalized = String(email).trim().toLowerCase();
-    if (!normalized || !normalized.includes('@')) throw new Error('Enter a valid email address.');
-    if (String(password).length < 12) throw new Error('The password must contain at least 12 characters.');
+    const normalized = normalizedEmail(email);
+    const cleanPassword = validatePassword(password);
     if (this.state.users.some((user) => user.email === normalized)) throw new Error('An account already exists for that email address.');
-    const protectedPassword = hashPassword(password);
+    const protectedPassword = hashPassword(cleanPassword);
     const user = { id: randomUUID(), email: normalized, role, ...protectedPassword, createdAt: new Date().toISOString() };
     this.state.users.push(user);
     this.save();
@@ -89,14 +103,37 @@ export class Store {
 
   authenticate(email, password) {
     const user = this.state.users.find((entry) => entry.email === String(email).trim().toLowerCase());
-    return user && verifyPassword(String(password), user.salt, user.hash) ? user : null;
+    // Always perform the same expensive password verification. Returning early for
+    // an unknown email makes account discovery possible through response timing.
+    const protectedPassword = user ?? DUMMY_PASSWORD;
+    const valid = verifyPassword(String(password).slice(0, 1024), protectedPassword.salt, protectedPassword.hash);
+    return user && valid ? user : null;
+  }
+
+  syncAdminCredentials(email, password) {
+    const normalized = normalizedEmail(email);
+    const cleanPassword = validatePassword(password);
+    let admin = this.state.users.find((entry) => entry.role === 'admin');
+    if (!admin) {
+      admin = this.createUser(normalized, cleanPassword, 'admin');
+      return { created: true, emailChanged: false, passwordChanged: false };
+    }
+    if (this.state.users.some((entry) => entry.id !== admin.id && entry.email === normalized)) {
+      throw new Error('The configured administrator email already belongs to another account.');
+    }
+    const emailChanged = admin.email !== normalized;
+    const passwordChanged = !verifyPassword(cleanPassword, admin.salt, admin.hash);
+    if (emailChanged) admin.email = normalized;
+    if (passwordChanged) this.replacePassword(admin.id, cleanPassword);
+    else if (emailChanged) this.save();
+    return { created: false, emailChanged, passwordChanged };
   }
 
   replacePassword(userId, password, exceptSessionHash = null) {
     const user = this.state.users.find((entry) => entry.id === userId);
     if (!user) throw new Error('The account does not exist.');
-    if (String(password).length < 12) throw new Error('The password must contain at least 12 characters.');
-    Object.assign(user, hashPassword(String(password)), { passwordChangedAt: new Date().toISOString() });
+    const cleanPassword = validatePassword(password);
+    Object.assign(user, hashPassword(cleanPassword), { passwordChangedAt: new Date().toISOString() });
 
     // A password change is also a credential-recovery event: stale browser and
     // OAuth credentials must stop working immediately. The session performing a
@@ -127,6 +164,10 @@ export class Store {
 
   createSession(userId) {
     const raw = token();
+    this.cleanup();
+    const existing = this.state.sessions.filter((entry) => entry.userId === userId).sort((a, b) => Date.parse(b.expiresAt) - Date.parse(a.expiresAt));
+    const retained = new Set(existing.slice(0, 19));
+    this.state.sessions = this.state.sessions.filter((entry) => entry.userId !== userId || retained.has(entry));
     this.state.sessions.push({ hash: digest(raw), userId, csrf: token(18), expiresAt: new Date(Date.now() + 12 * 3600_000).toISOString() });
     this.save();
     return raw;

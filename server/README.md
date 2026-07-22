@@ -13,7 +13,7 @@ Nodus Server permite compartir una proyección de un vault con estudiantes o inv
 - Un dominio o subdominio apuntando a la IP pública del servidor, por ejemplo `nodus.universidad.es`.
 - Los puertos 80 y 443 accesibles si vas a usar el Caddy incluido.
 
-La instalación tiene dos partes: un comando de Docker en terminal y un asistente de configuración en el navegador. La gestión diaria de espacios, usuarios, permisos y dispositivos se hace por web.
+La instalación recomendada define la cuenta administradora como variables del Stack y abre directamente la página de login. Como alternativa, puede utilizarse un token temporal y el asistente `/setup`. La gestión diaria de espacios, usuarios, permisos y dispositivos se hace por web.
 
 ## Prueba desde Portainer
 
@@ -28,7 +28,12 @@ una etiqueta `main-<sha>` para poder fijar o restaurar una prueba concreta. Defi
 estas variables en el Stack:
 
 - `NODUS_DOMAIN`: dominio sin `https://`, por ejemplo `nodus.ejemplo.es`.
-- `NODUS_SETUP_TOKEN`: valor aleatorio temporal de al menos 16 caracteres.
+- `NODUS_ADMIN_EMAIL`: correo de la cuenta administradora.
+- `NODUS_ADMIN_PASSWORD`: contraseña única y larga, de al menos 12 caracteres.
+
+Estas dos variables deben definirse juntas. En el primer arranque crean la cuenta; en despliegues posteriores actualizan el correo o rotan la contraseña si cambias sus valores. La contraseña nunca se escribe en `state.json`: solo se conserva su hash. Mientras mantengas estas variables, sus valores son la fuente autoritativa y volverán a aplicarse en cada reinicio.
+
+Como alternativa, deja ambas vacías y define `NODUS_SETUP_TOKEN` con un valor aleatorio temporal de al menos 16 caracteres. En ese caso completarás `/setup` manualmente y deberás borrar el token después.
 
 El workflow termina cerrando la sesión de GHCR y leyendo el manifiesto como usuario
 anónimo. Así falla si el paquete no es público o si falta `amd64` o `arm64`; una
@@ -42,7 +47,7 @@ proxy y configura como destino HTTP `nodus-server:7443`.
 
 1. Descarga esta carpeta `server` y abre una terminal dentro de ella.
 2. Copia `.env.example` como `.env`.
-3. Edita `.env`: cambia `NODUS_DOMAIN` y `NODUS_PUBLIC_URL` por tu dominio y sustituye `NODUS_SETUP_TOKEN` por una cadena aleatoria de al menos 16 caracteres. Puedes generar una con `openssl rand -hex 32`.
+3. Edita `.env`: cambia `NODUS_DOMAIN` y `NODUS_PUBLIC_URL`, introduce `NODUS_ADMIN_EMAIL` y genera una contraseña única para `NODUS_ADMIN_PASSWORD` (por ejemplo, con `openssl rand -base64 32`). Protege el archivo `.env` y no lo subas a Git.
 4. Ejecuta:
 
 ```sh
@@ -50,8 +55,8 @@ docker compose --profile proxy pull
 docker compose --profile proxy up -d
 ```
 
-5. Abre `https://tu-dominio/setup`, introduce el mismo código de instalación y crea la cuenta administradora.
-6. Tras completar el asistente, elimina el valor de `NODUS_SETUP_TOKEN` de `.env` y ejecuta `docker compose --profile proxy up -d` una vez más.
+5. Abre `https://tu-dominio`: Nodus te enviará directamente al login y podrás entrar con esas credenciales.
+6. Para rotarlas, cambia las dos variables y vuelve a desplegar el contenedor. Se cerrarán las sesiones y conexiones OAuth anteriores si cambia la contraseña.
 
 Caddy obtiene y renueva automáticamente el certificado HTTPS. Los datos quedan en el volumen Docker `nodus_data`; recrear o actualizar el contenedor no los borra.
 
@@ -111,6 +116,12 @@ Si tu Caddy/Nginx también está dentro de Docker, conecta ambos proyectos a una
 
 Si cambias el dominio, actualiza `NODUS_DOMAIN`, `NODUS_PUBLIC_URL`, el DNS y el proxy; después ejecuta de nuevo `docker compose up -d`. No uses una IP pública con HTTP. Nodus Desktop rechaza HTTP salvo para pruebas en `localhost`.
 
+## Credenciales por entorno y Docker secrets
+
+La opción sencilla para Portainer y Compose es `NODUS_ADMIN_EMAIL` + `NODUS_ADMIN_PASSWORD`. Quien tenga permisos para inspeccionar o editar el contenedor podrá ver sus variables, por lo que el acceso a Docker/Portainer debe limitarse a administradores.
+
+Si tu plataforma admite secretos montados como archivos, puedes usar `NODUS_ADMIN_EMAIL_FILE` y `NODUS_ADMIN_PASSWORD_FILE` en lugar de los valores directos. No configures simultáneamente una variable directa y su variante `_FILE`. Nodus lee el archivo al arrancar y nunca registra el contenido.
+
 ## Conectar un vault de Nodus Desktop
 
 1. Entra como administrador en `https://tu-dominio`.
@@ -135,7 +146,10 @@ Cada token está vinculado a esa persona y a esta URL MCP. Las herramientas comp
 
 - No expongas 7443 a Internet ni uses el servidor sin HTTPS.
 - Mantén Docker, Caddy/Nginx y la imagen de Nodus actualizados.
-- Usa contraseñas únicas; el servidor exige al menos 12 caracteres y limita intentos de login y emparejamiento.
+- Usa contraseñas únicas; el servidor exige entre 12 y 1024 caracteres.
+- El login limita intentos simultáneamente por IP, por cuenta (mediante un identificador hash que no revela el correo) y en todo el servidor. Las cuentas inexistentes ejecutan la misma verificación criptográfica que las existentes para evitar su enumeración por tiempos de respuesta.
+- `/setup`, el emparejamiento, el registro OAuth y el intercambio de tokens tienen límites propios y límites globales. Los cuerpos de autenticación están acotados, las sesiones activas por cuenta se limitan y los registros internos de rate limiting no pueden crecer sin límite.
+- Caddy o Nginx debe conservar la IP real del cliente mediante `X-Forwarded-For`; no coloques otro proxy no confiable directamente delante del puerto interno.
 - Cambia tu propia contraseña desde **Mi cuenta**. El administrador solo puede restablecer contraseñas de cuentas lectoras; no puede ver las contraseñas existentes.
 - Revoca desde la web cualquier dispositivo perdido. Desconectar el vault en Desktop detiene los envíos, pero el administrador debe eliminar la publicación retenida cuando corresponda.
 - Haz copias periódicas del volumen `nodus_data` y prueba su restauración. El estado y las publicaciones están bajo `/data` dentro del contenedor.

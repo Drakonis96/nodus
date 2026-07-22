@@ -22,7 +22,7 @@ export async function body(req, limit = 2 * 1024 * 1024) {
     const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
     size += bytes.length;
     if (size > limit) {
-      const error = new Error('La petición supera el tamaño permitido.');
+      const error = new Error('The request exceeds the allowed size.');
       error.statusCode = 413;
       throw error;
     }
@@ -38,7 +38,7 @@ export async function form(req, limit) {
 export async function jsonBody(req, limit) {
   const raw = (await body(req, limit)).toString('utf8');
   try { return raw ? JSON.parse(raw) : {}; } catch {
-    const error = new Error('JSON no válido.');
+    const error = new Error('Invalid JSON.');
     error.statusCode = 400;
     throw error;
   }
