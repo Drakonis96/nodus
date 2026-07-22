@@ -5,7 +5,9 @@ services:
     restart: unless-stopped
     environment:
       NODUS_PUBLIC_URL: https://${NODUS_DOMAIN}
-      NODUS_SETUP_TOKEN: ${NODUS_SETUP_TOKEN}
+      NODUS_ADMIN_EMAIL: ${NODUS_ADMIN_EMAIL:-}
+      NODUS_ADMIN_PASSWORD: ${NODUS_ADMIN_PASSWORD:-}
+      NODUS_SETUP_TOKEN: ${NODUS_SETUP_TOKEN:-}
     volumes:
       - nodus_data:/data
     expose:

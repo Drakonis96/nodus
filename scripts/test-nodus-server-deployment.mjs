@@ -13,6 +13,8 @@ test('production and Portainer compose pull the experimental image built from ma
     assert.match(source, /image:\s+ghcr\.io\/drakonis96\/nodus-server:main/);
     assert.match(source, /pull_policy:\s+always/);
     assert.doesNotMatch(source, /^\s*build:/m);
+    assert.match(source, /NODUS_ADMIN_EMAIL/);
+    assert.match(source, /NODUS_ADMIN_PASSWORD/);
   }
 });
 
@@ -42,6 +44,8 @@ test('desktop settings include a beginner-friendly server deployment guide', () 
   const translations = read('src/i18n.server.ts');
   assert.match(settings, /data-testid="nodus-server-guide-modal"/);
   assert.match(settings, /NODUS_SETUP_TOKEN/);
+  assert.match(settings, /NODUS_ADMIN_EMAIL/);
+  assert.match(settings, /NODUS_ADMIN_PASSWORD/);
   assert.match(settings, /Caddy o Nginx/);
   assert.match(settings, /Cloudflare Tunnel/);
   assert.match(settings, /Nunca expongas 7443 directamente a Internet/);

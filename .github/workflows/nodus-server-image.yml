@@ -50,10 +50,12 @@ jobs:
           docker run -d --name nodus-server-ci \
             -p 127.0.0.1:17443:7443 \
             -e NODUS_PUBLIC_URL=http://localhost:17443 \
-            -e NODUS_SETUP_TOKEN=ci-only-setup-token-123456 \
+            -e NODUS_ADMIN_EMAIL=ci-admin@example.test \
+            -e NODUS_ADMIN_PASSWORD=ci-only-admin-password-123456 \
             nodus-server:ci
           for _ in {1..30}; do
             if curl --fail --silent http://127.0.0.1:17443/healthz | grep --quiet '"ok":true'; then
+              curl --silent --head http://127.0.0.1:17443/ | grep --ignore-case --quiet '^location: /login'
               docker rm -f nodus-server-ci >/dev/null
               exit 0
             fi

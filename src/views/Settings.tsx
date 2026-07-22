@@ -2154,13 +2154,13 @@ export function Settings({
 const NODUS_SERVER_GUIDE_STEPS = [
   ['1. Prepara el equipo', 'Instala Docker Desktop en Windows o macOS, o Docker Engine en Linux. También puedes usar un VPS y administrar el Stack desde Portainer. El equipo debe permanecer encendido.'],
   ['2. Elige una dirección', 'Crea un dominio o subdominio para Nodus. Haz que su DNS apunte a la IP pública del servidor; si la IP cambia, configura DDNS. Caddy obtiene HTTPS, pero no crea el registro DNS.'],
-  ['3. Despliega el Stack', 'En Portainer abre Stacks, crea uno nuevo, pega el Stack oficial y define NODUS_DOMAIN y un NODUS_SETUP_TOKEN aleatorio de al menos 16 caracteres. Después pulsa Deploy the stack.'],
+  ['3. Despliega el Stack', 'En Portainer abre Stacks, crea uno nuevo y pega el Stack oficial. Define NODUS_DOMAIN, NODUS_ADMIN_EMAIL y una NODUS_ADMIN_PASSWORD única de al menos 12 caracteres. Las dos credenciales deben configurarse juntas.'],
   ['4. Publica HTTPS de forma segura', 'Si no tienes proxy, el Stack con Caddy utiliza los puertos 80 y 443. Si ya usas Caddy o Nginx, despliega solo Nodus Server y dirige el proxy a 127.0.0.1:7443 o nodus-server:7443. Cloudflare Tunnel también puede apuntar a ese destino. Nunca expongas 7443 directamente a Internet.'],
-  ['5. Completa la configuración web', 'Abre https://tu-dominio/setup, introduce el token de instalación y crea la cuenta administradora. Después borra NODUS_SETUP_TOKEN del Stack y vuelve a desplegarlo. La contraseña se cambia desde Mi cuenta.'],
+  ['5. Inicia sesión', 'Abre https://tu-dominio: el servidor habrá creado o actualizado la cuenta y mostrará directamente el login. Para rotar las credenciales, cambia las variables y vuelve a desplegar. Como alternativa puedes dejar ambas vacías y utilizar /setup con un NODUS_SETUP_TOKEN temporal.'],
   ['6. Crea usuarios y espacios', 'En la administración web crea un espacio, crea las cuentas lectoras y concede a cada persona únicamente los espacios que debe consultar. El administrador puede restablecer contraseñas temporales.'],
   ['7. Conecta este vault', 'En el servidor genera un código para Nodus. Aquí, en Ajustes → Servidor, escribe la dirección HTTPS y ese código de un solo uso. Nodus enviará una copia filtrada y la mantendrá actualizada mientras la aplicación esté abierta.'],
   ['8. Conecta ChatGPT o Claude', 'Añade https://tu-dominio/mcp como servidor MCP remoto. El cliente abrirá OAuth: cada persona inicia sesión, autoriza la lectura y solo puede consultar los espacios que tenga asignados.'],
-  ['9. Mantén el servidor', 'Actualiza periódicamente la imagen main, conserva copias del volumen nodus_data y prueba su restauración. Las contraseñas, tokens, archivos PDF, rutas locales y la base SQLite original no se publican desde el vault.'],
+  ['9. Mantén el servidor', 'Actualiza periódicamente la imagen main, limita el acceso administrativo a Docker o Portainer, protege las variables de entorno y conserva copias probadas del volumen nodus_data. Las credenciales y la base SQLite original no se publican desde el vault.'],
 ] as const;
 
 function NodusServerGuideModal({ onOpenGuide, onClose }: { onOpenGuide: () => void; onClose: () => void }) {
@@ -2194,7 +2194,7 @@ function NodusServerGuideModal({ onOpenGuide, onClose }: { onOpenGuide: () => vo
           </ol>
           <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm leading-6 text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-300">
             <strong>{t('Regla de seguridad')}:</strong>{' '}
-            {t('Solo el reverse proxy o el túnel debe ser público y siempre con HTTPS. No guardes el token de instalación después del primer arranque ni compartas contraseñas por mensajes sin cifrar.')}
+            {t('Solo el reverse proxy o el túnel debe ser público y siempre con HTTPS. Restringe el acceso a Docker o Portainer, protege las variables de credenciales y no compartas contraseñas por mensajes sin cifrar.')}
           </div>
         </div>
         <div className="flex flex-col-reverse gap-2 border-t border-neutral-200 p-4 dark:border-neutral-800 sm:flex-row sm:justify-end">

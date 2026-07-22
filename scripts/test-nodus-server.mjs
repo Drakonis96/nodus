@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash, randomBytes } from 'node:crypto';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
@@ -30,6 +30,18 @@ test('existing server state without a language migrates to English', async () =>
   }
 });
 
+test('active browser sessions are bounded per account', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'nodus-server-session-limit-test-'));
+  try {
+    const store = new Store(root);
+    const user = store.createUser('session-admin@example.test', 'session-limit-password-strong', 'admin');
+    for (let index = 0; index < 25; index += 1) store.createSession(user.id);
+    assert.equal(store.state.sessions.filter((session) => session.userId === user.id).length, 20);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 async function freePort() {
   const probe = createServer();
   await new Promise((resolve, reject) => probe.listen(0, '127.0.0.1', resolve).once('error', reject));
@@ -52,6 +64,24 @@ async function waitForHealth(origin, child, logs) {
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
   throw new Error(`Nodus Server did not become healthy.\n${logs.join('')}`);
+}
+
+function serverEnvironment(overrides = {}) {
+  const env = { ...process.env };
+  for (const name of [
+    'NODUS_ADMIN_EMAIL', 'NODUS_ADMIN_PASSWORD', 'NODUS_ADMIN_EMAIL_FILE', 'NODUS_ADMIN_PASSWORD_FILE',
+    'NODUS_SETUP_TOKEN', 'NODUS_PUBLIC_URL', 'NODUS_DATA_DIR', 'NODUS_HOST', 'NODUS_PORT',
+  ]) delete env[name];
+  return { ...env, ...overrides };
+}
+
+async function stopServer(child) {
+  if (child.exitCode !== null) return;
+  child.kill('SIGTERM');
+  await Promise.race([
+    new Promise((resolve) => child.once('exit', resolve)),
+    new Promise((resolve) => setTimeout(resolve, 2_000)),
+  ]);
 }
 
 function cookieFrom(response) {
@@ -138,6 +168,122 @@ async function mcp(origin, accessToken, method, params, id = 1) {
   return response.json();
 }
 
+test('environment credentials skip setup, rotate the admin, and rate-limit distributed login attacks', { timeout: 30_000 }, async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'nodus-server-env-admin-test-'));
+  const port = await freePort();
+  const origin = `http://localhost:${port}`;
+  const logs = [];
+  let child;
+  const start = async (credentials) => {
+    child = spawn(process.execPath, ['server/server.mjs'], {
+      cwd: path.resolve('.'),
+      env: serverEnvironment({
+        NODUS_DATA_DIR: root,
+        NODUS_HOST: '127.0.0.1',
+        NODUS_PORT: String(port),
+        NODUS_PUBLIC_URL: origin,
+        ...credentials,
+      }),
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    child.stdout.on('data', (chunk) => logs.push(chunk.toString()));
+    child.stderr.on('data', (chunk) => logs.push(chunk.toString()));
+    await waitForHealth(origin, child, logs);
+  };
+
+  try {
+    const emailFile = path.join(root, 'admin-email');
+    const passwordFile = path.join(root, 'admin-password');
+    await writeFile(emailFile, 'first-admin@example.test\n');
+    await writeFile(passwordFile, 'first-admin-password-strong\n');
+    await start({ NODUS_ADMIN_EMAIL_FILE: emailFile, NODUS_ADMIN_PASSWORD_FILE: passwordFile });
+    const rootResponse = await fetch(`${origin}/`, { redirect: 'manual' });
+    assert.equal(rootResponse.status, 303);
+    assert.match(rootResponse.headers.get('location') || '', /^\/login/);
+    const oldSetup = await fetch(`${origin}/setup`, { redirect: 'manual' });
+    assert.equal(oldSetup.status, 303);
+    assert.equal(oldSetup.headers.get('location'), '/login');
+
+    const initialLogin = await postForm(`${origin}/login`, {
+      email: 'first-admin@example.test', password: 'first-admin-password-strong', next: '/',
+    });
+    assert.equal(initialLogin.status, 303);
+    const initialCookie = cookieFrom(initialLogin);
+    await stopServer(child);
+
+    await start({
+      NODUS_ADMIN_EMAIL: 'rotated-admin@example.test',
+      NODUS_ADMIN_PASSWORD: 'rotated-admin-password-strong',
+    });
+    const staleSession = await fetch(`${origin}/account`, { headers: { cookie: initialCookie }, redirect: 'manual' });
+    assert.equal(staleSession.status, 303, 'rotating the environment password revokes old sessions');
+    const oldCredentials = await postForm(`${origin}/login`, {
+      email: 'first-admin@example.test', password: 'first-admin-password-strong', next: '/',
+    });
+    assert.equal(oldCredentials.status, 401);
+    const rotatedCredentials = await postForm(`${origin}/login`, {
+      email: 'rotated-admin@example.test', password: 'rotated-admin-password-strong', next: '/',
+    });
+    assert.equal(rotatedCredentials.status, 303);
+
+    const state = JSON.parse(await readFile(path.join(root, 'state.json'), 'utf8'));
+    assert.equal(state.users.filter((user) => user.role === 'admin').length, 1);
+    assert.equal(state.users[0].email, 'rotated-admin@example.test');
+    const serializedState = JSON.stringify(state);
+    assert.ok(!serializedState.includes('first-admin-password-strong'));
+    assert.ok(!serializedState.includes('rotated-admin-password-strong'));
+
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const rejected = await postForm(`${origin}/login`, {
+        email: 'rotated-admin@example.test', password: `wrong-password-${attempt}`, next: '/',
+      }, { headers: { 'x-forwarded-for': `198.51.100.${attempt + 1}` } });
+      assert.equal(rejected.status, 401);
+    }
+    const accountLimited = await postForm(`${origin}/login`, {
+      email: 'rotated-admin@example.test', password: 'another-wrong-password', next: '/',
+    }, { headers: { 'x-forwarded-for': '203.0.113.20' } });
+    assert.equal(accountLimited.status, 429, 'the account bucket must stop a distributed brute-force attempt');
+    assert.ok(Number(accountLimited.headers.get('retry-after')) > 0);
+
+    const oversized = await fetch(`${origin}/login`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded', 'x-forwarded-for': '203.0.113.50' },
+      body: `email=other%40example.test&password=${'x'.repeat(40_000)}`,
+      redirect: 'manual',
+    });
+    assert.equal(oversized.status, 413);
+    assert.ok(!logs.join('').includes('rotated-admin-password-strong'), 'credentials must never be logged');
+  } finally {
+    if (child) await stopServer(child);
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('partial environment administrator configuration fails closed', { timeout: 10_000 }, async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'nodus-server-partial-env-test-'));
+  const child = spawn(process.execPath, ['server/server.mjs'], {
+    cwd: path.resolve('.'),
+    env: serverEnvironment({
+      NODUS_DATA_DIR: root,
+      NODUS_HOST: '127.0.0.1',
+      NODUS_PORT: String(await freePort()),
+      NODUS_ADMIN_EMAIL: 'partial-admin@example.test',
+    }),
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  const logs = [];
+  child.stdout.on('data', (chunk) => logs.push(chunk.toString()));
+  child.stderr.on('data', (chunk) => logs.push(chunk.toString()));
+  try {
+    const exitCode = await new Promise((resolve) => child.once('exit', resolve));
+    assert.notEqual(exitCode, 0);
+    assert.match(logs.join(''), /must be configured together/);
+    assert.ok(!logs.join('').includes('partial-admin@example.test'));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test('Nodus Server pairs a desktop publisher and protects read-only MCP with OAuth + space ACLs', { timeout: 20_000 }, async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), 'nodus-server-test-'));
   const port = await freePort();
@@ -146,14 +292,13 @@ test('Nodus Server pairs a desktop publisher and protects read-only MCP with OAu
   const logs = [];
   const child = spawn(process.execPath, ['server/server.mjs'], {
     cwd: path.resolve('.'),
-    env: {
-      ...process.env,
+    env: serverEnvironment({
       NODUS_DATA_DIR: root,
       NODUS_HOST: '127.0.0.1',
       NODUS_PORT: String(port),
       NODUS_PUBLIC_URL: origin,
       NODUS_SETUP_TOKEN: setupToken,
-    },
+    }),
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   child.stdout.on('data', (chunk) => logs.push(chunk.toString()));
@@ -459,11 +604,7 @@ test('Nodus Server pairs a desktop publisher and protects read-only MCP with OAu
     });
     assert.equal(resetPasswordAccepted.status, 303);
   } finally {
-    child.kill('SIGTERM');
-    await Promise.race([
-      new Promise((resolve) => child.once('exit', resolve)),
-      new Promise((resolve) => setTimeout(resolve, 2_000)),
-    ]);
+    await stopServer(child);
     await rm(root, { recursive: true, force: true });
   }
 });
