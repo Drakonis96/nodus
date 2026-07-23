@@ -349,6 +349,20 @@ test('#10: message-action buttons live-render via the real fake-DOM path', () =>
   assert.ok(src.includes('nsIClipboardHelper'), 'copy uses the clipboard helper XPCOM');
 });
 
+test('composer: Enter sends and Alt+Enter keeps the textarea newline', () => {
+  const src = readSource('zotero-plugin/content/sidebar.js');
+  assert.match(
+    src,
+    /e\.key === "Enter" && !e\.altKey\)\s*\{\s*e\.preventDefault\(\);/,
+    'plain Enter is intercepted for sending while Alt+Enter keeps its default newline',
+  );
+  assert.doesNotMatch(
+    src,
+    /e\.key === "Enter" && \(e\.metaKey \|\| e\.ctrlKey\)/,
+    'sending no longer requires Ctrl/Command',
+  );
+});
+
 // ─────────────────────────────────────────── auto-highlighter engine (pure)
 test('highlighter: parsePassages extracts {text,level} robustly', () => {
   const { NodusHighlighter: H } = loadModule('highlighter.js');

@@ -1034,7 +1034,7 @@ function wire() {
   $("#nd-prompt-save").addEventListener("click", savePrompt);
   $("#nd-prompt-cancel").addEventListener("click", closePromptModal);
   $("#nd-prompt-modal").addEventListener("click", (e) => { if (e.target === $("#nd-prompt-modal")) closePromptModal(); });
-  $("#nd-input").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); const v = $("#nd-input").value; $("#nd-input").value = ""; send(v); } });
+  $("#nd-input").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.altKey) { e.preventDefault(); const v = $("#nd-input").value; $("#nd-input").value = ""; send(v); } });
   // dismiss the prompt menu on outside click
   document.addEventListener("click", (e) => { const menu = $("#nd-prompt-menu"); if (!menu || menu.hidden) return; if (!menu.contains(e.target) && !(e.target.closest && e.target.closest("#nd-prompt-btn"))) togglePromptMenu(false); });
   $("#nd-model-btn").addEventListener("click", (e) => { e.stopPropagation(); toggleModelMenu(); });
