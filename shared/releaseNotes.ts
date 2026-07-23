@@ -152,7 +152,33 @@ const RELEASE_2_6_HIGHLIGHTS: RawReleaseHighlight[] = [
   },
 ];
 
+const RELEASE_2_6_2_HIGHLIGHTS: RawReleaseHighlight[] = [
+  {
+    scope: 'plugin',
+    es: 'El complemento de Zotero divide la indexación en un índice rápido —extrae y fragmenta el texto casi al instante— y uno completo que calcula embeddings en segundo plano sin bloquear el asistente. El OCR es ahora bajo demanda en lugar de ejecutarse siempre, y al leer un único documento se usa todo el texto en contexto directamente, igualando la velocidad de otras herramientas de lectura.',
+    en: 'The Zotero add-on now splits indexing into a Quick index —extracts and chunks text almost instantly— and a Full index that computes embeddings in the background without blocking the assistant. OCR is now on-demand instead of always running, and when reading a single document, full text is used in context directly, matching the speed of other reading tools.',
+    fr: "L'extension Zotero divise désormais l'indexation en un index rapide —extrait et segmente le texte presque instantanément— et un index complet qui calcule les embeddings en arrière-plan sans bloquer l'assistant. L'OCR est désormais à la demande au lieu de s'exécuter en permanence, et lors de la lecture d'un seul document, tout le texte est utilisé en contexte directement, égalant la vitesse des autres outils de lecture.",
+    de: 'Das Zotero-Add-on teilt die Indexierung jetzt in einen schnellen Index —extrahiert und segmentiert Text fast sofort— und einen vollständigen Index, der Embeddings im Hintergrund berechnet, ohne den Assistenten zu blockieren. OCR läuft jetzt nur bei Bedarf statt immer, und beim Lesen eines einzelnen Dokuments wird der gesamte Text direkt im Kontext verwendet — genauso schnell wie andere Lesewerkzeuge.',
+    pt: 'O complemento do Zotero divide agora a indexação num índice rápido —extrai e fragmenta o texto quase de imediato— e num índice completo que calcula embeddings em segundo plano sem bloquear o assistente. O OCR é agora a pedido em vez de ser executado sempre, e ao ler um único documento todo o texto é usado em contexto diretamente, igualando a velocidade de outras ferramentas de leitura.',
+    'pt-BR': 'O complemento do Zotero agora divide a indexação em um índice rápido —extrai e fragmenta o texto quase na hora— e um índice completo que calcula embeddings em segundo plano sem bloquear o assistente. O OCR agora é sob demanda em vez de sempre ativo, e ao ler um único documento todo o texto é usado em contexto diretamente, igualando a velocidade de outras ferramentas de leitura.',
+  },
+  {
+    scope: 'plugin',
+    es: 'La búsqueda semántica es más eficiente: se evitan llamadas extra al modelo cuando hay pocos resultados, la reparación de citas es configurable y las rondas de búsqueda agente se pueden ajustar (1 por defecto). El OCR se procesa en paralelo y los embeddings locales usan WebGPU cuando está disponible, con respaldo en Wasm.',
+    en: 'Semantic search is more efficient: extra model calls are skipped when there are few results, citation repair is configurable, and agentic search rounds are adjustable (1 by default). OCR processes in parallel and local embeddings use WebGPU when available, falling back to Wasm.',
+    fr: "La recherche sémantique est plus efficace : les appels supplémentaires au modèle sont évités quand il y a peu de résultats, la réparation des citations est configurable et les tours de recherche agent sont réglables (1 par défaut). L'OCR est traité en parallèle et les embeddings locaux utilisent WebGPU quand il est disponible, avec repli sur Wasm.",
+    de: 'Die semantische Suche ist effizienter: Zusätzliche Modellaufrufe entfallen bei wenigen Ergebnissen, die Zitatreparatur ist konfigurierbar und die agentenbasierten Suchrunden sind einstellbar (standardmäßig 1). OCR wird parallel verarbeitet und lokale Embeddings nutzen WebGPU, wenn verfügbar, mit Wasm als Fallback.',
+    pt: 'A pesquisa semântica é mais eficiente: evitam-se chamadas extra ao modelo quando há poucos resultados, a reparação de citações é configurável e as rondas de pesquisa agente são ajustáveis (1 por defeito). O OCR é processado em paralelo e os embeddings locais usam WebGPU quando disponível, com recurso a Wasm como alternativa.',
+    'pt-BR': 'A busca semântica é mais eficiente: chamadas extras ao modelo são evitadas quando há poucos resultados, a reparação de citações é configurável e as rodadas de busca agente são ajustáveis (1 por padrão). O OCR processa em paralelo e os embeddings locais usam WebGPU quando disponível, com fallback para Wasm.',
+  },
+];
+
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
+  {
+    version: '2.6.2',
+    date: '2026-07-23',
+    highlights: RELEASE_2_6_2_HIGHLIGHTS,
+  },
   {
     version: '2.6.1',
     date: '2026-07-23',

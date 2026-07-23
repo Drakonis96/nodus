@@ -15,8 +15,14 @@ const RELEASE_2_6_IT: string[] = [
   "Nuova guida di benvenuto sui flussi connessi: spiega chiaramente quando usare il server MCP locale, quando usare il nuovo Nodus Server, come lavorare dentro Zotero e cosa offre il Toolkit completo."
 ];
 
+export const RELEASE_2_6_2_IT: string[] = [
+  "Il componente aggiuntivo Zotero ora divide l'indicizzazione in un indice rapido —estrae e suddivide il testo quasi subito— e uno completo che calcola gli embedding in background senza bloccare l'assistente. L'OCR è ora su richiesta invece di essere sempre attivo, e quando si legge un singolo documento l'intero testo viene usato direttamente nel contesto, eguagliando la velocità di altri strumenti di lettura.",
+  "La ricerca semantica è più efficiente: le chiamate extra al modello vengono evitate quando ci sono pochi risultati, la riparazione delle citazioni è configurabile e i round di ricerca agentica sono regolabili (1 per impostazione predefinita). L'OCR viene elaborato in parallelo e gli embedding locali usano WebGPU quando disponibile, con fallback a Wasm.",
+];
+
 /** Italian history, indexed by release and highlight order. */
 export const RELEASE_NOTES_IT: Record<string, string[]> = {
+  "2.6.2": RELEASE_2_6_2_IT,
   "2.6.1": RELEASE_2_6_IT,
   "2.6.0": RELEASE_2_6_IT,
   "2.5.4": [

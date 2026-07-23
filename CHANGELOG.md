@@ -1,5 +1,23 @@
 # Changelog
 
+## 2.6.2 — 2026-07-23
+
+### Changed
+
+- **Zotero plugin indexing overhaul.** The single index action is now split into
+  a Quick index (text extraction and chunking, ready almost instantly) and a Full
+  index that progressively computes embeddings in the background, keeping the
+  composer responsive. OCR is now on-demand instead of always running during
+  indexing, and when reading a single document whose text fits the context
+  window, full-text-in-context is used directly, matching the speed of competing
+  single-document reading tools.
+- **Smarter Zotero retrieval.** Query-time LLM round-trips are reduced: the
+  rerank call is skipped when there are few candidates, citation repair is
+  configurable (off/auto/always), and agentic search rounds are now configurable
+  (default 1, was hardcoded 2). OCR processing is parallelised up to 3 vision
+  LLM calls at once, and the local embeddings worker prefers WebGPU with a Wasm
+  fallback when WebGPU is unavailable.
+
 ## 2.6.1 — 2026-07-23
 
 ### Fixed

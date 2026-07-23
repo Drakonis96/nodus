@@ -9,7 +9,7 @@ authors:
     orcid: "https://orcid.org/0000-0002-1150-1930"
   - name: "Nodus contributors"
 type: software
-version: "2.6.1"
+version: "2.6.2"
 date-released: "2026-07-23"
 license: MIT
 repository-code: "https://github.com/Drakonis96/nodus"
