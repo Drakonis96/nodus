@@ -1,8 +1,8 @@
 {
   "manifest_version": 2,
   "name": "Nodus for Zotero",
-  "version": "0.0.16",
-  "description": "Nodus research assistant integrated into Zotero. Proof-of-concept: adds a toolbar button.",
+  "version": "0.1.0",
+  "description": "Evidence-grounded research assistant for Zotero with full-text semantic retrieval, audited citations, OCR and visual document understanding.",
   "author": "Nodus",
   "applications": {
     "zotero": {

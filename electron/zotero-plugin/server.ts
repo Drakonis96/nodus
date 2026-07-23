@@ -23,8 +23,9 @@ import { getWorkByZoteroKey, getWorkByDoi, getWorkByAliasKey } from '../db/works
 import { searchCopilotIdeas, searchCopilotPassages } from '../ai/liveRelations';
 import { completeTextStream } from '../ai/aiClient';
 import { getActiveVault } from '../vaults/vaultRegistry';
+import type { VisionImagePart } from '@shared/imageAnalysis';
 
-const MAX_REQUEST_BYTES = 4 * 1024 * 1024; // documents can be large
+const MAX_REQUEST_BYTES = 20 * 1024 * 1024; // full text plus several bounded page images
 
 let httpServer: Server | null = null;
 let status: ZoteroPluginServerStatus = { running: false, port: null, url: null, error: null };
@@ -144,6 +145,7 @@ function featuredModels(): { models: ModelRef[]; default: ModelRef | null } {
 
 const CITE_INSTRUCTIONS = [
   'CITATION RULES — cite sources inline using these exact tokens (the reader turns them into clickable chips):',
+  '• Retrieved or complete Zotero evidence: [[e:PASSAGE_ID]]. Use only ids present in ZOTERO EVIDENCE and put citations immediately after supported sentences.',
   '• A page of the OPEN DOCUMENT: [[p:N]] where N is the page label/number. Only cite pages that appear in the provided document text or passages.',
   '• A Nodus idea: [[idea:GLOBAL_ID]] using an id from the "NODUS IDEAS" list below.',
   '• A Nodus research gap: [[gap:GAP_ID]] using an id from the "NODUS GAPS" list below.',
@@ -229,6 +231,7 @@ function buildPrompt(body: Record<string, unknown>, ctx: ChatContext): { system:
   const context = (body.context && typeof body.context === 'object' ? body.context : {}) as Record<string, unknown>;
   const itemTitle = typeof context.title === 'string' ? context.title : ctx.work?.title ?? '';
   const documentText = typeof context.documentText === 'string' ? context.documentText : '';
+  const evidenceText = typeof context.evidenceText === 'string' ? context.evidenceText : '';
   const selection = typeof context.selection === 'string' ? context.selection : '';
   const extraContext = typeof context.extraContext === 'string' ? context.extraContext : '';
 
@@ -237,12 +240,18 @@ function buildPrompt(body: Record<string, unknown>, ctx: ChatContext): { system:
     .filter((m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
     .map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
     .join('\n\n');
+  const lastUser = [...messages].reverse().find((m) => m?.role === 'user')?.content ?? '';
+  const normalizedLast = lastUser.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const spanishSignals = (normalizedLast.match(/\b(que|como|segun|documento|pagina|explica|describe|distingue|cita|evidencia)\b/g) ?? []).length;
+  const englishSignals = (normalizedLast.match(/\b(what|how|according|document|page|explain|describe|distinguish|cite|evidence)\b/g) ?? []).length;
+  const outputLanguage = spanishSignals >= 2 && spanishSignals > englishSignals ? 'Spanish' : 'English';
 
   const agentInstructions = typeof context.agentInstructions === 'string' ? context.agentInstructions : '';
   const system = [
     'You are Nodus, an academic research assistant embedded in Zotero. You help the user understand the open document and how it connects to their Nodus library.',
     'Be precise and concise. Ground every claim in the provided context.',
     CITE_INSTRUCTIONS,
+    `OUTPUT LANGUAGE (highest priority): answer entirely in ${outputLanguage}. Do not switch because sources or images use another language.`,
     ...(agentInstructions ? [agentInstructions] : []),
   ].join('\n\n');
 
@@ -252,6 +261,7 @@ function buildPrompt(body: Record<string, unknown>, ctx: ChatContext): { system:
   if (ctx.ideasBlock) parts.push(ctx.ideasBlock);
   if (ctx.gapsBlock) parts.push(ctx.gapsBlock);
   if (selection) parts.push(`USER SELECTION (the user highlighted this — treat it as the focus and quote/cite it):\n"""\n${selection}\n"""`);
+  if (evidenceText) parts.push(`ZOTERO EVIDENCE (authoritative passages with exact citable ids):\n${evidenceText.slice(0, 1_000_000)}`);
   // The plugin already head/tail-samples long documents to DOC_CHAR_LIMIT; keep a
   // generous ceiling here so we don't re-truncate away the sampled conclusion.
   if (documentText) parts.push(`DOCUMENT TEXT (page markers like "=== page N ===" indicate pages you may cite with [[p:N]]):\n"""\n${documentText.slice(0, 200_000)}\n"""`);
@@ -260,6 +270,22 @@ function buildPrompt(body: Record<string, unknown>, ctx: ChatContext): { system:
   parts.push('Answer the last user message.');
 
   return { system, user: parts.join('\n\n') };
+}
+
+function parseVisionImages(value: unknown): VisionImagePart[] {
+  if (!Array.isArray(value)) return [];
+  const out: VisionImagePart[] = [];
+  for (const raw of value.slice(0, 6)) {
+    if (!raw || typeof raw !== 'object') continue;
+    const item = raw as Record<string, unknown>;
+    if (typeof item.dataUrl === 'string') {
+      const match = /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=\s]+)$/i.exec(item.dataUrl);
+      if (match) out.push({ mediaType: match[1].toLowerCase(), base64: match[2].replace(/\s+/g, '') });
+    } else if (typeof item.mimeType === 'string' && typeof item.data === 'string' && /^image\/(?:png|jpeg|webp)$/i.test(item.mimeType)) {
+      out.push({ mediaType: item.mimeType.toLowerCase(), base64: item.data.replace(/\s+/g, '') });
+    }
+  }
+  return out;
 }
 
 // ------------------------------------------------------------- request router
@@ -365,6 +391,21 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, port: nu
 
     if (urlPath === '/api/z/chat/stream' && req.method === 'POST') {
       await handleChatStream(req, res);
+      return;
+    }
+
+    if (urlPath === '/api/z/vision' && req.method === 'POST') {
+      await handleVision(req, res);
+      return;
+    }
+
+    if (urlPath === '/api/z/rerank' && req.method === 'POST') {
+      await handleRerank(req, res);
+      return;
+    }
+
+    if (urlPath === '/api/z/citation-repair' && req.method === 'POST') {
+      await handleCitationRepair(req, res);
       return;
     }
 
@@ -539,6 +580,7 @@ async function handleChatStream(req: IncomingMessage, res: ServerResponse): Prom
   const ctx = await buildChatContext(body, lastUserText);
   const { system, user } = buildPrompt(body, ctx);
   const model = toModelRef(body.model);
+  const images = parseVisionImages(body.images);
   // Honor the plugin's reasoning/thinking selector; 'default' preserves the
   // server's historical 'off'.
   const context = (body.context && typeof body.context === 'object' ? body.context : {}) as Record<string, unknown>;
@@ -567,7 +609,7 @@ async function handleChatStream(req: IncomingMessage, res: ServerResponse): Prom
   res.on('close', () => controller.abort());
   try {
     await completeTextStream(
-      { system, user, reasoning },
+      { system, user, reasoning, images },
       (delta, kind) => {
         if (kind === 'reasoning') return;
         write({ type: 'delta', text: delta });
@@ -580,6 +622,101 @@ async function handleChatStream(req: IncomingMessage, res: ServerResponse): Prom
     write({ type: 'error', error: error instanceof Error ? error.message : String(error) });
   }
   try { res.end(); } catch { /* client gone */ }
+}
+
+async function handleVision(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const body = await readJsonBody(req);
+  const model = toModelRef(body.model);
+  const system = typeof body.system === 'string' ? body.system.slice(0, 20_000) : 'Extract visible document content faithfully.';
+  const user = typeof body.prompt === 'string' ? body.prompt.slice(0, 30_000) : 'Describe and transcribe this document page.';
+  const images = parseVisionImages(body.images);
+  if (!images.length) {
+    sendJson(res, 400, { error: 'No valid page image supplied.' });
+    return;
+  }
+  let text = '';
+  const controller = new AbortController();
+  res.on('close', () => controller.abort());
+  try {
+    await completeTextStream(
+      { system, user, images, reasoning: 'off', plainContext: true, skipStudentPseudonyms: true },
+      (delta, kind) => { if (kind !== 'reasoning') text += delta; },
+      model,
+      controller.signal,
+    );
+    sendJson(res, 200, { text });
+  } catch (error) {
+    sendJson(res, 500, { error: error instanceof Error ? error.message : String(error) });
+  }
+}
+
+async function handleRerank(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const body = await readJsonBody(req);
+  const model = toModelRef(body.model);
+  const query = typeof body.query === 'string' ? body.query.slice(0, 10_000) : '';
+  const candidates = Array.isArray(body.candidates) ? body.candidates.slice(0, 36) : [];
+  const rows = candidates
+    .map((raw) => {
+      const c = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {};
+      const id = typeof c.id === 'string' ? c.id : '';
+      const title = typeof c.title === 'string' ? c.title : '';
+      const page = typeof c.pageLabel === 'string' ? c.pageLabel : String(c.pageLabel ?? '');
+      const text = typeof c.text === 'string' ? c.text.replace(/\s+/g, ' ').slice(0, 650) : '';
+      return id ? `${id} | ${title} | page ${page} | ${text}` : '';
+    })
+    .filter(Boolean);
+  const allowed = new Set(candidates.map((raw) => raw && typeof raw === 'object' ? String((raw as Record<string, unknown>).id ?? '') : '').filter(Boolean));
+  let output = '';
+  await completeTextStream(
+    {
+      system: 'Rerank academic evidence across languages. Prefer passages that directly answer the question over related passages or bibliography entries. Return ONLY a JSON array of up to 10 exact ids, best first. Never invent ids.',
+      user: `QUESTION:\n${query}\n\nCANDIDATES:\n${rows.join('\n')}`,
+      reasoning: 'off',
+      plainContext: true,
+      skipStudentPseudonyms: true,
+      maxTokens: 1200,
+    },
+    (delta, kind) => { if (kind !== 'reasoning') output += delta; },
+    model,
+  );
+  let ids: string[] = [];
+  const start = output.indexOf('['), end = output.lastIndexOf(']');
+  if (start >= 0 && end > start) {
+    try {
+      const parsed = JSON.parse(output.slice(start, end + 1));
+      if (Array.isArray(parsed)) ids = parsed.map(String).filter((id) => allowed.has(id));
+    } catch { /* malformed model result falls back client-side */ }
+  }
+  sendJson(res, 200, { ids });
+}
+
+async function handleCitationRepair(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const body = await readJsonBody(req);
+  const model = toModelRef(body.model);
+  const answer = typeof body.answer === 'string' ? body.answer.slice(0, 100_000) : '';
+  const evidence = Array.isArray(body.evidence) ? body.evidence.slice(0, 20) : [];
+  const catalogue = evidence.map((raw) => {
+    const e = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {};
+    const id = typeof e.id === 'string' ? e.id : '';
+    const title = typeof e.title === 'string' ? e.title : '';
+    const page = String(e.pageLabel ?? '');
+    const text = typeof e.text === 'string' ? e.text.slice(0, 3000) : '';
+    return id ? `[[e:${id}]] ${title} · page ${page}\n"""${text}"""` : '';
+  }).filter(Boolean).join('\n\n');
+  let text = '';
+  await completeTextStream(
+    {
+      system: 'Repair citations in the supplied academic answer. Preserve its language, meaning and structure. Add exact [[e:ID]] tokens immediately after every supported factual sentence. Never invent ids. Replace an unsupported claim only with a statement that supplied evidence is insufficient. Return only the complete repaired answer.',
+      user: `ANSWER TO REPAIR:\n${answer}\n\nEVIDENCE CATALOGUE:\n${catalogue}`,
+      reasoning: 'off',
+      plainContext: true,
+      skipStudentPseudonyms: true,
+      maxTokens: 3000,
+    },
+    (delta, kind) => { if (kind !== 'reasoning') text += delta; },
+    model,
+  );
+  sendJson(res, 200, { text: text.trim() || answer });
 }
 
 // ---------------------------------------------------------------- lifecycle

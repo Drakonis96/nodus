@@ -16,7 +16,7 @@
   // snake_case identifiers, file names and URLs in academic/code text and must
   // not be mangled into italics.
   const INLINE = [
-    { type: "cite", re: /\[\[(p|idea|zotero|gap):([^\]|]+?)(?:\|([^\]]+?))?\]\]/ },
+    { type: "cite", re: /\[\[(e|p|idea|zotero|gap):([^\]|]+?)(?:\|([^\]]+?))?\]\]/ },
     { type: "code", re: /`([^`]+)`/ },
     { type: "strong", re: /\*\*([\s\S]+?)\*\*/ },
     { type: "em", re: /\*(?!\s)([\s\S]+?)(?<!\s)\*/ },

@@ -13,6 +13,8 @@ const NM = window.NodusMarkdown;
 const NU = window.NodusUtil;
 const NH = window.NodusHighlighter;
 const NI = window.NodusIcons;
+const NE = window.NodusEvidence;
+const NV = window.NodusMultimodal;
 const ico = (name, size) => (NI ? NI.svg(name, { size: size || 16 }) : "");
 
 // Full-document context cap (~50k tokens): big enough for most modern models,
@@ -33,6 +35,10 @@ const I18N = {
     "mode.hint.standalone": "Works without Nodus, using your own provider API keys. Nodus-only features are off.",
     "settings.context": "Context", "settings.useIdeas": "Use Nodus ideas when available",
     "settings.useFulltext": "Send document text", "settings.useCorpus": "Search my Nodus library for related passages",
+    "evidence.idle": "Evidence index idle", "evidence.index": "Index", "evidence.indexTitle": "Index selected documents and OCR text-poor PDF pages",
+    "evidence.vision": "Vision", "evidence.visionTitle": "Analyze and attach the current rendered PDF page",
+    "evidence.auto": "Auto: full text when small, retrieval when large", "evidence.retrieval": "Semantic retrieval", "evidence.full": "Complete text",
+    "evidence.embedding": "Embedding model",
     "settings.standaloneNote": "Nodus-only features are unavailable in Standalone mode.",
     "settings.language": "Language", "settings.connection": "Nodus connection", "settings.test": "Test connection",
     "settings.token": "token", "settings.manualHint": "Leave empty to auto-detect from Nodus.",
@@ -114,6 +120,10 @@ const I18N = {
     "mode.hint.standalone": "Funciona sin Nodus, con tus propias API keys. Las funciones exclusivas de Nodus quedan desactivadas.",
     "settings.context": "Contexto", "settings.useIdeas": "Usar ideas de Nodus cuando existan",
     "settings.useFulltext": "Enviar texto del documento", "settings.useCorpus": "Buscar pasajes relacionados en mi biblioteca Nodus",
+    "evidence.idle": "Índice de evidencia inactivo", "evidence.index": "Indexar", "evidence.indexTitle": "Indexar los documentos seleccionados y aplicar OCR a las páginas PDF sin texto",
+    "evidence.vision": "Visión", "evidence.visionTitle": "Analizar y adjuntar la página PDF renderizada actual",
+    "evidence.auto": "Auto: texto completo si es pequeño; recuperación si es grande", "evidence.retrieval": "Búsqueda semántica", "evidence.full": "Texto completo",
+    "evidence.embedding": "Modelo de embeddings",
     "settings.standaloneNote": "Las funciones exclusivas de Nodus no están disponibles en modo Autónomo.",
     "settings.language": "Idioma", "settings.connection": "Conexión con Nodus", "settings.test": "Probar conexión",
     "settings.token": "token", "settings.manualHint": "Déjalo vacío para detectarlo automáticamente desde Nodus.",
@@ -196,6 +206,7 @@ const state = {
   agentEnabled: false, agentAuto: false, selectionDraft: null,
   items: [], maxTokens: 8192, reasoning: "default", notifierID: null, pollTimer: null,
   hlColors: { high: "#ff6666", medium: "#ffd400" }, lastHighlightKeys: [],
+  indexes: [], evidence: new Map(), retrieval: null, visuals: [], contextStrategy: "auto",
 };
 
 const t = (k) => (I18N[state.lang] && I18N[state.lang][k]) || I18N.en[k] || k;
@@ -297,6 +308,8 @@ function renderModelDropdown() {
     it.addEventListener("click", () => {
       state.model = { provider: m.provider, model: m.model };
       NS.setModel(state.mode, state.model);
+      const embeddingInput = $("#nd-embedding-model");
+      if (embeddingInput) embeddingInput.value = NS.getEmbeddingModel(m.provider);
       closeModelMenu(); renderModelDropdown(); updateSendEnabled();
     });
     list.appendChild(it); shown++;
@@ -388,6 +401,311 @@ async function getDocumentText() {
   return "";
 }
 
+function setIndexStatus(text, tone) {
+  const box = $("#nd-index-status");
+  if (!box) return;
+  box.textContent = text;
+  box.className = tone ? "nd-index-status nd-index-status--" + tone : "nd-index-status";
+}
+async function selectedAttachments() {
+  const cur = getCurrentItem();
+  const out = [];
+  if (cur.attachment) out.push(cur.attachment);
+  else if (cur.item && cur.item.getBestAttachment) {
+    try { const a = await cur.item.getBestAttachment(); if (a) out.push(a); } catch (e) {}
+  }
+  if (!cur.reader) {
+    try {
+      const w = Zotero.getMainWindow();
+      const zp = (w && w.ZoteroPane) || Zotero.getActiveZoteroPane();
+      for (let item of (zp && zp.getSelectedItems ? zp.getSelectedItems() : [])) {
+        let att = null;
+        if (item.isAttachment && item.isAttachment()) att = item;
+        else if (item.getBestAttachment) { try { att = await item.getBestAttachment(); } catch (e) {} }
+        if (att && !out.some((x) => x.id === att.id)) out.push(att);
+      }
+    } catch (e) {}
+  }
+  return out;
+}
+function embeddingRef() {
+  const candidates = [];
+  if (state.model) candidates.push(state.model.provider);
+  candidates.push("openrouter", "openai", "gemini", "ollama", "lmstudio");
+  for (const provider of [...new Set(candidates)]) {
+    const p = NP.byId(provider);
+    if (!p || p.subscription || provider === "anthropic") continue;
+    if (!p.needsKey || NS.getKey(provider)) return { provider, model: NS.getEmbeddingModel(provider) };
+  }
+  return null;
+}
+async function ensureEmbeddings(indexes, signal) {
+  const ref = embeddingRef();
+  if (!ref) return { model: null, embedded: 0 };
+  let embedded = 0;
+  for (const index of indexes) {
+    const missing = (index.chunks || []).filter((c) => !Array.isArray(c.embedding) || c.embeddingModel !== ref.model);
+    for (let i = 0; i < missing.length; i += 32) {
+      const batch = missing.slice(i, i + 32);
+      setIndexStatus("Embedding " + Math.min(i + batch.length, missing.length) + "/" + missing.length + " · " + (index.title || index.attachmentKey), "busy");
+      const vectors = await NP.embed(ref, batch.map((c) => c.text), {
+        key: NS.getKey(ref.provider), localBase: NS.getLocalBase(ref.provider),
+      }, signal);
+      batch.forEach((chunk, j) => { chunk.embedding = vectors[j]; chunk.embeddingModel = ref.model; embedded++; });
+    }
+    index.embeddingModel = ref.model;
+    index.updatedAt = Date.now();
+    await NS.saveEvidenceIndex(index);
+  }
+  return { model: ref, embedded };
+}
+function parseRankedIds(value, allowed) {
+  const text = String(value || "").replace(/```(?:json)?/gi, "").replace(/```/g, "");
+  const a = text.indexOf("["), b = text.lastIndexOf("]");
+  if (a < 0 || b <= a) return [];
+  try {
+    const parsed = JSON.parse(text.slice(a, b + 1));
+    const ids = Array.isArray(parsed) ? parsed : (parsed && Array.isArray(parsed.ids) ? parsed.ids : []);
+    return ids.map(String).filter((id) => allowed.has(id));
+  } catch (e) { return []; }
+}
+async function rerankEvidence(query, result, indexes, signal) {
+  if (!result || !Array.isArray(result.candidates) || !result.candidates.length) return result && result.hits ? result.hits : [];
+  const candidates = result.candidates.slice(0, 36);
+  const allowed = new Set(candidates.map((c) => c.id));
+  const catalogue = candidates.map((c) =>
+    `${c.id} | ${c.title || c.itemKey} | page ${c.pageLabel} | ${String(c.text || "").replace(/\s+/g, " ").slice(0, 650)}`
+  ).join("\n");
+  const system = [
+    "You rerank academic evidence passages for a user question.",
+    "Understand the question across languages. Rank passages that directly answer it above merely related passages or bibliography entries.",
+    "Return ONLY a JSON array of up to 10 exact passage ids, best first. Do not invent ids.",
+  ].join("\n");
+  const prompt = `QUESTION:\n${query}\n\nCANDIDATES:\n${catalogue}`;
+  let acc = "";
+  try {
+    if (state.mode === "connected") {
+      const response = await apiJson("/api/z/rerank", {
+        method: "POST", body: JSON.stringify({ model: state.model, query, candidates }),
+        signal,
+      });
+      acc = JSON.stringify(response.ids || []);
+    } else {
+      await NP.chatStream(state.model, {
+        system,
+        key: NS.getKey(state.model.provider),
+        localBase: NS.getLocalBase(state.model.provider),
+        maxTokens: 1200,
+        reasoning: "off",
+        messages: [{ role: "user", content: prompt }],
+      }, (delta) => { acc += delta; }, signal);
+    }
+    const ids = parseRankedIds(acc, allowed);
+    const required = indexes.length > 1
+      ? indexes.map((index) => index.chunks && index.chunks[0] && index.chunks[0].id).filter((id) => id && allowed.has(id))
+      : [];
+    const fallbackIds = ids.length ? ids : (result.hits || []).map((hit) => hit.id);
+    const seeds = NE.diversifyCandidates(candidates, [...required, ...fallbackIds], { topK: 8, maxPerSource: indexes.length > 1 ? 4 : 8 });
+    return NE.expandWithNeighbors(indexes, seeds, { topK: 12, maxPerSource: indexes.length > 1 ? 5 : 12 });
+  } catch (e) {
+    try { Zotero.logError(e); } catch (x) {}
+    return result.hits;
+  }
+}
+async function repairEvidenceAnswer(answer, evidence, signal) {
+  const hits = [...(evidence instanceof Map ? evidence.values() : evidence || [])];
+  if (!hits.length || !String(answer || "").trim()) return String(answer || "");
+  const system = [
+    "You repair evidence citations in an academic answer.",
+    "Return the complete answer in the same language and preserve its meaning and structure.",
+    "For every factual claim, add one or more exact [[e:ID]] tokens from the catalogue immediately after the supported sentence.",
+    "Never invent or alter an id. If no passage supports a claim, replace only that claim with an explicit statement that the supplied evidence is insufficient.",
+    "Return only the repaired answer, with no commentary or code fence.",
+  ].join("\n");
+  const prompt = `ANSWER TO REPAIR:\n${answer}\n\n${NE.evidencePrompt(hits)}`;
+  let acc = "";
+  try {
+    if (state.mode === "connected") {
+      const response = await apiJson("/api/z/citation-repair", {
+        method: "POST", body: JSON.stringify({ model: state.model, answer, evidence: hits }),
+        signal,
+      });
+      return String(response.text || answer);
+    }
+    await NP.chatStream(state.model, {
+      system,
+      key: NS.getKey(state.model.provider),
+      localBase: NS.getLocalBase(state.model.provider),
+      maxTokens: Math.min(state.maxTokens, 3000),
+      reasoning: "off",
+      messages: [{ role: "user", content: prompt }],
+    }, (delta) => { acc += delta; }, signal);
+    return acc.trim() || answer;
+  } catch (e) {
+    try { Zotero.logError(e); } catch (x) {}
+    return answer;
+  }
+}
+function auditValidatedAnswer(value) {
+  const checked = NE.validateCitations(value, { evidence: state.evidence });
+  const audit = NE.auditClaims(checked.text, state.evidence);
+  audit.invalidCitations = checked.invalid;
+  if (checked.invalid.length) {
+    audit.claims.push({
+      text: state.lang === "es"
+        ? "Cita rechazada porque el modelo inventó o alteró el identificador de evidencia."
+        : "Citation rejected because the model invented or altered the evidence id.",
+      citationIds: checked.invalid.map((c) => c.id),
+      status: "missing", support: 0, evidence: [],
+    });
+    audit.missing += checked.invalid.length;
+    audit.total += checked.invalid.length;
+    audit.coverage = audit.total ? audit.covered / audit.total : 0;
+  }
+  return { text: checked.text, audit };
+}
+async function buildSelectedIndexes(force, signal) {
+  if (!NE) return [];
+  const attachments = await selectedAttachments();
+  if (!attachments.length) return [];
+  if (attachments.length > 1) {
+    state.item = null;
+    state.items = attachments.map((att) => {
+      let item = null;
+      try { item = att.parentItem || att; } catch (e) { item = att; }
+      const info = { key: item && item.key ? item.key : att.key };
+      try { info.title = item.getDisplayTitle ? item.getDisplayTitle() : item.getField("title"); } catch (e) { info.title = att.key; }
+      try { info.year = item.getField("date") ? String(item.getField("date")).slice(0, 4) : ""; } catch (e) {}
+      try { info.creators = item.getField("firstCreator") || ""; } catch (e) {}
+      try { info.abstract = item.getField("abstractNote") || ""; } catch (e) {}
+      return info;
+    });
+    const box = $("#nd-item");
+    if (box) {
+      box.innerHTML = "";
+      box.appendChild(el("div", "nd-item-title", tf("item.multi", { n: state.items.length })));
+      box.appendChild(el("div", "nd-muted", state.items.map((i) => i.title || i.key).join(" · ")));
+    }
+  }
+  const indexes = [];
+  for (let i = 0; i < attachments.length; i++) {
+    setIndexStatus("Indexing " + (i + 1) + "/" + attachments.length, "busy");
+    const result = await NE.ensureIndex(attachments[i], NS, { force: !!force });
+    indexes.push(result.index);
+  }
+  state.indexes = indexes;
+  setIndexStatus(indexes.length + " source" + (indexes.length === 1 ? "" : "s") + " · " + indexes.reduce((n, x) => n + x.chunks.length, 0) + " passages", "ok");
+  return indexes;
+}
+async function prepareEvidence(query, signal) {
+  state.evidence = new Map(); state.retrieval = null;
+  const ctx = NS.getContext();
+  if (!ctx.useFulltext || !NE) return { text: "", hits: [], method: "off", truncated: false };
+  await refreshItem(true);
+  const indexes = await buildSelectedIndexes(false, signal);
+  if (!indexes.length) return { text: "", hits: [], method: "empty", truncated: false };
+  const totalChars = indexes.reduce((n, x) => n + (x.totalChars || 0), 0);
+  const strategy = ctx.strategy === "auto" ? (totalChars <= 120000 && indexes.length <= 3 ? "full" : "retrieval") : ctx.strategy;
+  if (strategy === "full") {
+    const full = NE.fullEvidencePrompt(indexes, 750000);
+    state.evidence = NE.evidenceMap(full.hits);
+    state.retrieval = { method: "full", hits: full.hits, totalChars, truncated: full.truncated };
+    setIndexStatus("Complete text · " + full.hits.length + " citable passages", full.truncated ? "warn" : "ok");
+    return { ...full, method: "full" };
+  }
+  let queryEmbedding = null;
+  try {
+    const semantic = await ensureEmbeddings(indexes, signal);
+    if (semantic.model) {
+      const vectors = await NP.embed(semantic.model, [query], {
+        key: NS.getKey(semantic.model.provider), localBase: NS.getLocalBase(semantic.model.provider),
+      }, signal);
+      queryEmbedding = vectors[0];
+    }
+  } catch (e) {
+    try { Zotero.logError(e); } catch (x) {}
+    setIndexStatus("Semantic unavailable · lexical fallback", "warn");
+  }
+  const result = NE.hybridSearch(indexes, query, queryEmbedding);
+  result.hits = await rerankEvidence(query, result, indexes, signal);
+  result.method += "+rerank";
+  state.evidence = NE.evidenceMap(result.hits);
+  state.retrieval = result;
+  setIndexStatus((result.method.startsWith("hybrid") ? "Semantic + lexical + rerank" : "Lexical + rerank") + " · " + result.hits.length + " passages", "ok");
+  return { text: NE.evidencePrompt(result.hits), hits: result.hits, method: result.method, truncated: false };
+}
+async function runVisualExtraction(image, page) {
+  const prompt = NV.visualPrompt(page.pageLabel, page.text);
+  if (state.mode === "connected") {
+    const res = await apiJson("/api/z/vision", {
+      method: "POST",
+      body: JSON.stringify({ model: state.model, system: NV.VISUAL_SYSTEM, prompt, images: [image] }),
+    });
+    return NV.cleanVisualExtraction(res.text || "");
+  }
+  let acc = "";
+  await NP.chatStream(state.model, {
+    system: NV.VISUAL_SYSTEM,
+    key: NS.getKey(state.model.provider),
+    localBase: NS.getLocalBase(state.model.provider),
+    maxTokens: Math.min(state.maxTokens, 4096),
+    reasoning: "off",
+    messages: [{ role: "user", content: prompt }],
+    images: [image],
+  }, (delta) => { acc += delta; }, state.abort ? state.abort.signal : undefined);
+  return NV.cleanVisualExtraction(acc);
+}
+async function analyzeCurrentPage() {
+  if (state.busy || !NV || !NE || !currentModel()) return;
+  const cur = getCurrentItem();
+  if (!cur.reader || !cur.attachment) { showToast(state.lang === "es" ? "Abre un PDF en el lector primero." : "Open a PDF in the reader first."); return; }
+  state.busy = true; state.abort = new AbortController(); updateSendEnabled();
+  try {
+    setIndexStatus("Capturing rendered page…", "busy");
+    const ensured = await NE.ensureIndex(cur.attachment, NS);
+    const pageIndex = NV.currentPageIndex(cur.reader);
+    const image = await NV.capturePage(cur.reader, pageIndex);
+    const page = ensured.index.pages.find((p) => p.pageIndex === pageIndex);
+    if (!page) throw new Error("page-not-indexed");
+    setIndexStatus("Reading figures, tables, formulas and OCR…", "busy");
+    const visualText = await runVisualExtraction(image, page);
+    if (!visualText) throw new Error("no-visual-content");
+    NE.addVisualText(ensured.index, pageIndex, visualText);
+    await NS.saveEvidenceIndex(ensured.index);
+    state.indexes = [ensured.index];
+    state.visuals = [{ ...image, label: "Rendered document page " + page.pageLabel }];
+    setIndexStatus("Page " + page.pageLabel + " visual evidence indexed", "ok");
+    showToast(state.lang === "es" ? "Página visual indexada y adjunta a la próxima pregunta." : "Visual page indexed and attached to the next question.");
+  } catch (e) {
+    setIndexStatus("Vision failed: " + (e.message || e), "warn");
+  } finally {
+    state.busy = false; state.abort = null; updateSendEnabled();
+  }
+}
+async function analyzeMissingOcr(indexes) {
+  if (!NV || !NE) return 0;
+  const cur = getCurrentItem();
+  if (!cur.reader || !cur.attachment) return 0;
+  const index = (indexes || []).find((x) => x.attachmentKey === cur.attachment.key);
+  if (!index) return 0;
+  const pages = (index.pages || []).filter((page) => page.needsOcr);
+  let completed = 0;
+  for (let i = 0; i < pages.length; i++) {
+    if (state.abort && state.abort.signal.aborted) break;
+    const page = pages[i];
+    setIndexStatus("OCR page " + (i + 1) + "/" + pages.length + " · rendered fallback", "busy");
+    try {
+      const image = await NV.capturePage(cur.reader, page.pageIndex);
+      const visualText = await runVisualExtraction(image, page);
+      if (!visualText) continue;
+      NE.addVisualText(index, page.pageIndex, visualText);
+      await NS.saveEvidenceIndex(index);
+      completed++;
+    } catch (e) { try { Zotero.logError(e); } catch (x) {} }
+  }
+  return completed;
+}
+
 // ─────────────────────────────────────────── messages + citations
 const messagesEl = () => $("#nd-messages");
 // `index` is the message's position in state.conv.messages; when given, a small
@@ -433,8 +751,12 @@ function rerenderConversation() {
   messagesEl().innerHTML = "";
   if (!state.conv || !state.conv.messages.length) { const h = el("div", "nd-hint"); h.textContent = t("chat.hint"); messagesEl().appendChild(h); return; }
   state.conv.messages.forEach((m, i) => {
+    if (m.role === "assistant" && Array.isArray(m.evidence)) state.evidence = NE ? NE.evidenceMap(m.evidence) : new Map();
     const b = addMessage(m.role, m.content, i);
-    if (m.role === "assistant") { b.setAttribute("data-raw", m.content); renderRich(b, m.content); }
+    if (m.role === "assistant") {
+      b.setAttribute("data-raw", m.content); renderRich(b, m.content);
+      if (m.audit) renderEvidenceAudit(b, m.audit, m.evidence || []);
+    }
   });
 }
 // Reload the user message into the composer and drop it + everything after, so
@@ -468,7 +790,7 @@ function addDocNote(info) {
 }
 function renderCitations(bodyEl, text) {
   bodyEl.textContent = "";
-  const re = /\[\[(p|idea|zotero|gap):([^\]|]+)(?:\|([^\]]+))?\]\]/g;
+  const re = /\[\[(e|p|idea|zotero|gap):([^\]|]+)(?:\|([^\]]+))?\]\]/g;
   let last = 0, m;
   while ((m = re.exec(text)) !== null) { if (m.index > last) bodyEl.appendChild(document.createTextNode(text.slice(last, m.index))); bodyEl.appendChild(makeCite(m[1], m[2].trim(), m[3])); last = re.lastIndex; }
   if (last < text.length) bodyEl.appendChild(document.createTextNode(text.slice(last)));
@@ -482,11 +804,53 @@ function renderRich(bodyEl, text) {
 }
 function makeCite(kind, id, label) {
   const chip = el("a", "nd-cite");
-  if (kind === "p") { chip.textContent = "p. " + id; chip.onclick = () => goToPage(id); }
+  if (kind === "e") {
+    const hit = state.evidence && state.evidence.get(id);
+    chip.textContent = hit ? ((hit.title || "source").slice(0, 24) + " · p. " + hit.pageLabel) : (label || "evidence");
+    if (!hit) chip.classList.add("nd-cite--invalid");
+    chip.onclick = () => hit && goToEvidence(hit);
+    chip.title = hit ? hit.text : "Evidence unavailable";
+  }
+  else if (kind === "p") { chip.textContent = "p. " + id; chip.onclick = () => goToPage(id); }
   else if (kind === "idea") { chip.textContent = "▸ " + (label || state.ideaLabels[id] || "idea"); chip.onclick = () => openInNodus("idea", id); }
   else if (kind === "gap") { chip.textContent = "◇ " + (label || "gap"); chip.onclick = () => openInNodus("gap", id); }
   else if (kind === "zotero") { chip.textContent = "↗ " + (label || "source"); chip.onclick = () => selectInZotero(id); }
   return chip;
+}
+function goToEvidence(hit) {
+  if (!hit) return;
+  const reader = activeReader();
+  const cur = getCurrentItem();
+  if (reader && cur.attachment && cur.attachment.key === hit.attachmentKey) {
+    try { reader.navigate({ pageIndex: Number(hit.pageIndex) || 0 }); return; } catch (e) {}
+  }
+  const page = encodeURIComponent(hit.pageLabel || String((Number(hit.pageIndex) || 0) + 1));
+  try { Zotero.launchURL("zotero://open-pdf/library/items/" + hit.attachmentKey + "?page=" + page); } catch (e) {}
+}
+function renderEvidenceAudit(bodyEl, audit, evidence) {
+  if (!audit) return;
+  const wrap = bodyEl.parentNode;
+  const card = el("details", "nd-audit");
+  const summary = el("summary", "nd-audit-summary");
+  const pct = Math.round((Number(audit.coverage) || 0) * 100);
+  const rejected = Array.isArray(audit.invalidCitations) ? audit.invalidCitations.length : 0;
+  summary.textContent = "Evidence audit · " + pct + "% · " + audit.covered + " supported · " + audit.weak + " weak · " + audit.missing + " uncited" + (rejected ? " · " + rejected + " rejected citation" + (rejected === 1 ? "" : "s") : "");
+  card.appendChild(summary);
+  const refs = NE ? NE.evidenceMap(evidence || []) : new Map();
+  for (const claim of audit.claims || []) {
+    const row = el("div", "nd-audit-claim nd-audit-claim--" + claim.status);
+    row.appendChild(el("div", "nd-audit-status", claim.status === "covered" ? "✓ supported" : claim.status === "weak" ? "△ weak match" : "○ missing citation"));
+    row.appendChild(el("div", "nd-audit-text", claim.text));
+    for (const id of claim.citationIds || []) {
+      const hit = refs.get(id);
+      if (!hit) continue;
+      const passage = el("button", "nd-audit-passage", (hit.title || "source") + " · p. " + hit.pageLabel + " — " + String(hit.text || "").slice(0, 240));
+      passage.onclick = () => goToEvidence(hit);
+      row.appendChild(passage);
+    }
+    card.appendChild(row);
+  }
+  wrap.appendChild(card);
 }
 function goToPage(pageLabel) {
   const n = parseInt(String(pageLabel).replace(/[^0-9]/g, ""), 10);
@@ -621,13 +985,19 @@ async function generateAssistant() {
   bodyEl.innerHTML = TYPING_HTML; // animated dots until the first token streams in
   let acc = "";
   try {
-    // Sample the open document ONCE (both modes share it) and warn if the work is
-    // too long to send whole, instead of silently truncating.
-    let docInfo = { text: "", truncated: false };
+    let docInfo = { text: "", hits: [], method: "off", truncated: false };
     if (NS.getContext().useFulltext) {
-      const raw = await getDocumentText();
-      docInfo = NU ? NU.sampleDocText(raw, DOC_CHAR_LIMIT) : { text: raw, truncated: false };
-      if (docInfo.truncated) addDocNote(docInfo);
+      const lastUser = [...state.conv.messages].reverse().find((m) => m.role === "user");
+      try {
+        docInfo = await prepareEvidence(lastUser ? lastUser.content : "", state.abort.signal);
+      } catch (e) {
+        try { Zotero.logError(e); } catch (x) {}
+        const raw = await getDocumentText();
+        const sampled = NU ? NU.sampleDocText(raw, DOC_CHAR_LIMIT) : { text: raw, truncated: false };
+        docInfo = { ...sampled, hits: [], method: "legacy" };
+        setIndexStatus("Index unavailable · plain text fallback", "warn");
+        if (docInfo.truncated) addDocNote(docInfo);
+      }
     }
     try {
       if (state.mode === "connected") acc = await sendConnected(bodyEl, state.abort.signal, docInfo);
@@ -645,11 +1015,32 @@ async function generateAssistant() {
       const parsed = NA.parseActions(acc);
       if (parsed.actions.length) { display = parsed.clean || acc; actions = parsed.actions; }
     }
+    let audit = null;
+    if (NE && state.evidence && state.evidence.size) {
+      let reviewed = auditValidatedAnswer(display);
+      if (reviewed.audit.invalidCitations.length || reviewed.audit.missing || reviewed.audit.weak) {
+        const repaired = await repairEvidenceAnswer(reviewed.text, state.evidence, state.abort.signal);
+        const second = auditValidatedAnswer(repaired);
+        second.audit.repairAttempted = true;
+        // Never let a repair make coverage worse or replace a substantive
+        // answer with a provider response that stopped midway.
+        const enoughText = repaired.trim().length >= Math.min(80, Math.max(35, reviewed.text.trim().length * 0.45));
+        if (enoughText && second.audit.coverage >= reviewed.audit.coverage && !second.audit.invalidCitations.length) reviewed = second;
+      }
+      display = reviewed.text; audit = reviewed.audit;
+    }
     if (!display) bodyEl.textContent = ""; // clear the dots if nothing came back
     bodyEl.setAttribute("data-raw", display);
     renderRich(bodyEl, display);
+    if (audit) renderEvidenceAudit(bodyEl, audit, [...state.evidence.values()]);
     if (actions) renderActionCards(bodyEl, actions);
-    const aidx = state.conv.messages.push({ role: "assistant", content: display }) - 1;
+    const storedEvidence = state.evidence ? [...state.evidence.values()].map((h) => ({
+      id: h.id, libraryID: h.libraryID, itemKey: h.itemKey, attachmentKey: h.attachmentKey,
+      title: h.title, pageIndex: h.pageIndex, pageLabel: h.pageLabel, section: h.section,
+      start: h.start, end: h.end, text: h.text, score: h.score, retrieval: h.retrieval,
+    })) : [];
+    const storedAudit = audit && NS.compactAudit ? NS.compactAudit(audit) : audit;
+    const aidx = state.conv.messages.push({ role: "assistant", content: display, evidence: storedEvidence, audit: storedAudit }) - 1;
     attachMessageActions(bodyEl.parentNode, "assistant", aidx, display);
     await persistConv();
   } catch (e) {
@@ -668,7 +1059,8 @@ async function sendConnected(bodyEl, signal, docInfo) {
     messages: state.conv.messages.map((m) => ({ role: m.role, content: m.content })),
     context: { zoteroKey: state.item ? state.item.key : "", doi: state.item ? state.item.doi : "", title: state.item ? state.item.title : "", selection: state.selection || "", useIdeas: ctx.useIdeas, useCorpus: ctx.useCorpus, agentInstructions: state.agentEnabled && NA ? NA.SYSTEM : "", extraContext, reasoning: state.reasoning },
   };
-  if (docInfo && docInfo.text) payload.context.documentText = docInfo.text;
+  if (docInfo && docInfo.text) payload.context.evidenceText = docInfo.text;
+  if (state.visuals.length) payload.images = state.visuals.slice(0, NV ? NV.MAX_IMAGES : 6);
   const res = await api("/api/z/chat/stream", { method: "POST", body: JSON.stringify(payload), signal });
   if (!res.ok || !res.body) throw new Error("HTTP " + res.status);
   let acc = ""; const reader = res.body.getReader(); const dec = new TextDecoder(); let buf = "";
@@ -684,6 +1076,7 @@ async function sendConnected(bodyEl, signal, docInfo) {
       messagesEl().scrollTop = messagesEl().scrollHeight;
     }
   }
+  state.visuals = [];
   return acc;
 }
 
@@ -693,19 +1086,32 @@ async function sendStandalone(bodyEl, signal, docInfo) {
   const itemsSummary = NU ? NU.buildItemsSummary(state.items) : "";
   if (itemsSummary) parts.push(itemsSummary);
   if (state.selection) parts.push('The user highlighted this passage (focus on it):\n"""\n' + state.selection + '\n"""');
-  if (docInfo && docInfo.text) parts.push('Document text:\n"""\n' + docInfo.text + '\n"""');
+  if (docInfo && docInfo.text) parts.push(docInfo.text);
   // Pin the reply language: some models (e.g. deepseek) otherwise drift to their
   // training language even for an English/Spanish question.
-  const lang = state.lang === "es" ? "Spanish" : "English";
-  let system = "You are a research assistant embedded in Zotero. Answer about the open document, grounded in the provided text. Be concise. Always answer in " + lang + " unless the user's last message is clearly in another language, in which case match that language.\n\n" + parts.join("\n\n");
+  const lastUser = [...state.conv.messages].reverse().find((m) => m.role === "user");
+  const lang = NU && NU.detectLanguage ? NU.detectLanguage(lastUser && lastUser.content, state.lang) : (state.lang === "es" ? "Spanish" : "English");
+  let system = "You are a research assistant embedded in Zotero. Answer about the open documents, grounded only in the supplied evidence. Cite every factual claim inline with the exact [[e:ID]] token for its supporting passage. Never invent, alter or reuse an evidence id for a claim it does not support. Put citations immediately after the sentence. If evidence is insufficient, say so. Be concise.\n\nOUTPUT LANGUAGE (highest priority): answer entirely in " + lang + ". Do not switch language because the source or an attached image uses another language.\n\n" + parts.join("\n\n");
   if (state.agentEnabled && NA) system += "\n\n" + NA.SYSTEM;
   const key = NS.getKey(state.model.provider);
   const localBase = NS.getLocalBase(state.model.provider);
   let acc = "";
-  await NP.chatStream(state.model, {
-    system, key, localBase, maxTokens: state.maxTokens, reasoning: state.reasoning,
-    messages: state.conv.messages.map((m) => ({ role: m.role, content: m.content })),
+  const messages = state.conv.messages.map((m) => ({ role: m.role, content: m.content }));
+  const images = state.visuals.slice(0, NV ? NV.MAX_IMAGES : 6);
+  let meta = await NP.chatStream(state.model, {
+    system, key, localBase, maxTokens: state.maxTokens, reasoning: state.reasoning, messages, images,
   }, (delta) => { acc += delta; bodyEl.textContent = acc; messagesEl().scrollTop = messagesEl().scrollHeight; }, signal);
+  if (NP.isProbablyTruncated && NP.isProbablyTruncated(acc, meta && meta.finishReason) && !signal.aborted) {
+    acc = "";
+    meta = await NP.chatStream(state.model, {
+      system: system + "\n\nRELIABILITY RETRY: Return the complete answer and finish every sentence.",
+      key, localBase, maxTokens: state.maxTokens, reasoning: state.reasoning, messages, images,
+    }, (delta) => { acc += delta; bodyEl.textContent = acc; messagesEl().scrollTop = messagesEl().scrollHeight; }, signal);
+  }
+  if (NP.isProbablyTruncated && NP.isProbablyTruncated(acc, meta && meta.finishReason)) {
+    throw new Error("The provider returned an incomplete response after retrying.");
+  }
+  state.visuals = [];
   return acc;
 }
 
@@ -1061,8 +1467,25 @@ function wire() {
   $("#nd-history-search").addEventListener("input", (e) => renderHistory(e.target.value));
   $("#nd-history-clear").addEventListener("click", async () => { if (await showConfirm(t("modal.delAll"))) { state.conversations = []; await NS.saveConversations([]); startNewConversation(); renderHistory(""); } });
   $("#nd-ctx-fulltext").addEventListener("change", saveContext);
+  $("#nd-ctx-strategy").addEventListener("change", saveContext);
+  $("#nd-embedding-model").addEventListener("change", (e) => {
+    NS.setEmbeddingModel(state.model ? state.model.provider : "openrouter", e.target.value);
+  });
   $("#nd-ctx-ideas").addEventListener("change", saveContext);
   $("#nd-ctx-corpus").addEventListener("change", saveContext);
+  $("#nd-index-btn").addEventListener("click", async () => {
+    if (state.busy) return;
+    state.busy = true; state.abort = new AbortController(); updateSendEnabled();
+    try {
+      await refreshItem(true);
+      const indexes = await buildSelectedIndexes(true, state.abort.signal);
+      const ocrPages = await analyzeMissingOcr(indexes);
+      await ensureEmbeddings(indexes, state.abort.signal);
+      setIndexStatus(indexes.length + " source" + (indexes.length === 1 ? "" : "s") + " fully indexed" + (ocrPages ? " · " + ocrPages + " OCR pages" : ""), "ok");
+    } catch (e) { setIndexStatus("Index failed: " + (e.message || e), "warn"); }
+    finally { state.busy = false; state.abort = null; updateSendEnabled(); }
+  });
+  $("#nd-visual-btn").addEventListener("click", () => analyzeCurrentPage());
   $("#nd-test").addEventListener("click", () => { NS.setManual($("#nd-port").value, $("#nd-token").value.trim()); connect().then(loadModelsForMode); });
   window.addEventListener("message", (e) => {
     if (!e.data || e.data.type !== "nodus-selection") return;
@@ -1085,7 +1508,15 @@ function wire() {
   // Notifier below, so this can be slow.
   state.pollTimer = setInterval(() => scheduleRefresh(false), 2000);
 }
-function saveContext() { NS.setContext({ useFulltext: $("#nd-ctx-fulltext").checked, useIdeas: $("#nd-ctx-ideas").checked, useCorpus: $("#nd-ctx-corpus").checked }); }
+function saveContext() {
+  state.contextStrategy = $("#nd-ctx-strategy").value;
+  NS.setContext({
+    useFulltext: $("#nd-ctx-fulltext").checked,
+    useIdeas: $("#nd-ctx-ideas").checked,
+    useCorpus: $("#nd-ctx-corpus").checked,
+    strategy: state.contextStrategy,
+  });
+}
 function saveHlColors() { state.hlColors = { high: $("#nd-hl-high").value || "#ff6666", medium: $("#nd-hl-medium").value || "#ffd400" }; NS.setHlColors(state.hlColors); }
 
 // Coalesced refresh so a burst of Notifier events (e.g. during sync) triggers a
@@ -1122,12 +1553,14 @@ async function boot() {
   state.reasoning = NS.getReasoning();
   state.hlColors = NS.getHlColors();
   const ctx = NS.getContext();
+  state.contextStrategy = ctx.strategy;
   wire();
   $("#nd-lang").value = state.lang;
   $("#nd-maxtokens").value = state.maxTokens;
   $("#nd-hl-high").value = state.hlColors.high; $("#nd-hl-medium").value = state.hlColors.medium;
   const m = NS.getManual(); $("#nd-port").value = m.port || ""; $("#nd-token").value = m.token || "";
   $("#nd-ctx-fulltext").checked = ctx.useFulltext; $("#nd-ctx-ideas").checked = ctx.useIdeas; $("#nd-ctx-corpus").checked = ctx.useCorpus;
+  $("#nd-ctx-strategy").value = ctx.strategy;
   state.agentEnabled = NS.getAgent(); state.agentAuto = NS.getAgentAuto();
   $("#nd-agent").checked = state.agentEnabled; $("#nd-agent-auto").checked = state.agentAuto;
   $("#nd-agent-btn").classList.toggle("nd-iconbtn--active", state.agentEnabled);
@@ -1138,6 +1571,7 @@ async function boot() {
   startNewConversation();
   await connect();
   await loadModelsForMode();
+  $("#nd-embedding-model").value = NS.getEmbeddingModel(state.model ? state.model.provider : "openrouter");
   await refreshItem(true);
 }
 boot().catch((e) => { try { Zotero.logError(e); } catch (x) {} });

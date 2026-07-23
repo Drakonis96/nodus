@@ -31,6 +31,8 @@ Download the installer for your computer and open it. There is no server to conf
 
 The standalone Zotero plugin is available from the same release as [nodus-zotero.xpi](https://github.com/Drakonis96/nodus/releases/latest/download/nodus-zotero.xpi). In Zotero, open **Tools → Add-ons**, choose **Install Add-on From File**, and select the downloaded file.
 
+The plugin indexes the complete text of selected PDF, EPUB and HTML attachments, combines semantic and lexical retrieval across documents, and attaches exact passage/page citations to its answers. Its evidence audit flags uncited or weakly supported claims. For PDFs, **Vision** reads the rendered page—including scanned text, figures, tables, formulas and diagrams—and merges the extraction into the searchable index; **Index** applies the same OCR fallback to text-poor pages.
+
 The [latest release page](https://github.com/Drakonis96/nodus/releases/latest) always contains the newest available installers and release notes.
 
 ## Share a vault with Nodus Server

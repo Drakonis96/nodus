@@ -99,6 +99,82 @@
     return { reasoning_effort: level };
   }
 
+  function imageParts(images) {
+    const out = [];
+    for (const image of images || []) {
+      if (!image) continue;
+      if (typeof image === "string" && /^data:image\//i.test(image)) out.push({ url: image, label: "" });
+      else if (image.dataUrl && /^data:image\//i.test(image.dataUrl)) out.push({ url: image.dataUrl, label: String(image.label || "") });
+      else if (image.mimeType && image.data) out.push({ url: "data:" + image.mimeType + ";base64," + image.data, label: String(image.label || "") });
+    }
+    return out.slice(0, 6);
+  }
+  function withOpenAiImages(messages, images) {
+    const normalized = (messages || []).map((m) => ({ role: m.role, content: m.content }));
+    const visuals = imageParts(images);
+    if (!visuals.length) return normalized;
+    let i = normalized.length - 1;
+    while (i >= 0 && normalized[i].role !== "user") i--;
+    if (i < 0) { normalized.push({ role: "user", content: "" }); i = normalized.length - 1; }
+    const original = normalized[i].content;
+    const content = [{ type: "text", text: typeof original === "string" ? original : JSON.stringify(original || "") }];
+    for (const visual of visuals) {
+      if (visual.label) content.push({ type: "text", text: visual.label });
+      content.push({ type: "image_url", image_url: { url: visual.url, detail: "high" } });
+    }
+    normalized[i] = { ...normalized[i], content };
+    return normalized;
+  }
+  function withAnthropicImages(messages, images) {
+    const normalized = (messages || []).map((m) => ({ role: m.role, content: m.content }));
+    const visuals = imageParts(images);
+    if (!visuals.length) return normalized;
+    let i = normalized.length - 1;
+    while (i >= 0 && normalized[i].role !== "user") i--;
+    if (i < 0) { normalized.push({ role: "user", content: "" }); i = normalized.length - 1; }
+    const original = normalized[i].content;
+    const content = [{ type: "text", text: typeof original === "string" ? original : JSON.stringify(original || "") }];
+    for (const visual of visuals) {
+      const match = /^data:(image\/(?:png|jpeg|webp));base64,(.+)$/i.exec(visual.url);
+      if (!match) continue;
+      if (visual.label) content.push({ type: "text", text: visual.label });
+      content.push({ type: "image", source: { type: "base64", media_type: match[1].toLowerCase(), data: match[2] } });
+    }
+    normalized[i] = { ...normalized[i], content };
+    return normalized;
+  }
+
+  function embeddingBase(provider, localBase) {
+    return chatBase(provider, localBase);
+  }
+  async function embed(modelRef, inputs, opts, signal) {
+    opts = opts || {};
+    const provider = modelRef && modelRef.provider;
+    const model = modelRef && modelRef.model;
+    const p = byId(provider);
+    if (!p) throw new Error("Unknown provider " + provider);
+    if (p.subscription || provider === "anthropic") throw new Error(p.label + " does not expose compatible embeddings.");
+    const values = (Array.isArray(inputs) ? inputs : [inputs]).map((v) => String(v || ""));
+    if (!values.length) return [];
+    const base = embeddingBase(provider, opts.localBase);
+    const headers = { "Content-Type": "application/json" };
+    if (opts.key) headers.Authorization = "Bearer " + opts.key;
+    if (provider === "openrouter") {
+      headers["HTTP-Referer"] = "https://github.com/Drakonis96/nodus";
+      headers["X-Title"] = "Nodus for Zotero";
+    }
+    const res = await fetch(base + "/embeddings", {
+      method: "POST", headers,
+      body: JSON.stringify({ model, input: values, encoding_format: "float" }),
+      signal,
+    });
+    if (!res.ok) throw new Error(p.label + " embeddings HTTP " + res.status + " " + (await res.text()).slice(0, 200));
+    const json = await res.json();
+    const rows = Array.isArray(json && json.data) ? json.data.slice().sort((a, b) => Number(a.index) - Number(b.index)) : [];
+    if (rows.length !== values.length || rows.some((r) => !Array.isArray(r.embedding))) throw new Error("Invalid embeddings response");
+    return rows.map((r) => r.embedding.map(Number));
+  }
+
   // Pure body builder for the Anthropic Messages API (unit-tested). `max_tokens`
   // is required by the API and was hardcoded to 4096, truncating long answers;
   // it is now configurable via opts.maxTokens. When reasoning is low/medium/high
@@ -114,6 +190,14 @@
     return body;
   }
 
+  function isProbablyTruncated(text, finishReason) {
+    const value = String(text || "").trim();
+    if (["length", "content_filter", "error"].includes(String(finishReason || "").toLowerCase())) return true;
+    if (!value || value.length > 240) return false;
+    if (/[.!?。！？…)\]}'"»”’]$/.test(value)) return false;
+    return value.length >= 20 && value.split(/\s+/).length >= 4;
+  }
+
   // messages: [{role:'user'|'assistant', content}]  system: string
   async function chatStream(modelRef, opts, onDelta, signal) {
     const provider = modelRef.provider;
@@ -124,11 +208,12 @@
     const key = (opts && opts.key) || "";
     const system = (opts && opts.system) || "";
     const messages = (opts && opts.messages) || [];
+    const images = (opts && opts.images) || [];
     const maxTokens = opts && opts.maxTokens;
     const reasoning = (opts && opts.reasoning) || "default";
 
     if (provider === "anthropic") {
-      return anthropicStream(key, model, system, messages, maxTokens, reasoning, onDelta, signal);
+      return anthropicStream(key, model, system, withAnthropicImages(messages, images), maxTokens, reasoning, onDelta, signal);
     }
     // OpenAI-compatible (incl. gemini openai-compat, local servers)
     const base = chatBase(provider, opts && opts.localBase);
@@ -136,17 +221,23 @@
     const headers = { "Content-Type": "application/json" };
     if (key) headers.Authorization = "Bearer " + key;
     if (provider === "openrouter") { headers["HTTP-Referer"] = "https://github.com/Drakonis96/nodus"; headers["X-Title"] = "Nodus for Zotero"; }
-    const body = { model, stream: true, messages: system ? [{ role: "system", content: system }, ...messages] : messages };
+    const visualMessages = withOpenAiImages(messages, images);
+    const body = { model, stream: true, messages: system ? [{ role: "system", content: system }, ...visualMessages] : visualMessages };
     // Only cap when the user configured a limit: omitting it lets the model use
     // its own (usually larger) default instead of an arbitrary ceiling.
     if (maxTokens) body.max_tokens = clampMaxTokens(maxTokens);
     Object.assign(body, reasoningBody(provider, reasoning));
     const res = await fetch(url, { method: "POST", headers, body: JSON.stringify(body), signal });
     if (!res.ok || !res.body) throw new Error(p.label + " chat HTTP " + res.status + (res.ok ? "" : " " + (await res.text()).slice(0, 200)));
+    let finishReason = "";
     await readSSE(res.body, (json) => {
+      if (json && json.error) throw new Error(p.label + " stream error: " + String(json.error.message || json.error.code || "unknown"));
       const delta = json && json.choices && json.choices[0] && json.choices[0].delta;
       if (delta && typeof delta.content === "string") onDelta(delta.content);
+      const reason = json && json.choices && json.choices[0] && json.choices[0].finish_reason;
+      if (reason) finishReason = String(reason);
     });
+    return { finishReason };
   }
 
   async function anthropicStream(key, model, system, messages, maxTokens, reasoning, onDelta, signal) {
@@ -160,9 +251,13 @@
       signal,
     });
     if (!res.ok || !res.body) throw new Error("Anthropic chat HTTP " + res.status + " " + (res.ok ? "" : (await res.text()).slice(0, 200)));
+    let finishReason = "";
     await readSSE(res.body, (json) => {
+      if (json && json.type === "error") throw new Error("Anthropic stream error: " + String(json.error && json.error.message || "unknown"));
       if (json && json.type === "content_block_delta" && json.delta && typeof json.delta.text === "string") onDelta(json.delta.text);
+      if (json && json.type === "message_delta" && json.delta && json.delta.stop_reason) finishReason = String(json.delta.stop_reason);
     });
+    return { finishReason };
   }
 
   // Reads a text/event-stream, calling onJson for each `data: {json}` (ignores [DONE]).
@@ -170,22 +265,30 @@
     const reader = stream.getReader();
     const dec = new TextDecoder();
     let buf = "";
+    const processLine = (raw) => {
+      const line = String(raw || "").replace(/\r$/, "").trim();
+      if (!line.startsWith("data:")) return;
+      const payload = line.slice(5).trim();
+      if (!payload || payload === "[DONE]") return;
+      let json; try { json = JSON.parse(payload); } catch (e) { return; }
+      onJson(json);
+    };
     for (;;) {
       const { done, value } = await reader.read();
       if (done) break;
       buf += dec.decode(value, { stream: true });
       let idx;
       while ((idx = buf.indexOf("\n")) >= 0) {
-        let line = buf.slice(0, idx); buf = buf.slice(idx + 1);
-        line = line.replace(/\r$/, "").trim();
-        if (!line.startsWith("data:")) continue;
-        const payload = line.slice(5).trim();
-        if (!payload || payload === "[DONE]") continue;
-        let json; try { json = JSON.parse(payload); } catch (e) { continue; }
-        onJson(json);
+        processLine(buf.slice(0, idx)); buf = buf.slice(idx + 1);
       }
     }
+    buf += dec.decode();
+    if (buf.trim()) processLine(buf);
   }
 
-  window.NodusProviders = { PROVIDERS, byId, chatBase, listModels, chatStream, buildAnthropicBody, clampMaxTokens, DEFAULT_MAX_TOKENS, reasoningBody, REASONING_LEVELS };
+  window.NodusProviders = {
+    PROVIDERS, byId, chatBase, listModels, chatStream, embed,
+    buildAnthropicBody, withOpenAiImages, withAnthropicImages, imageParts,
+    clampMaxTokens, DEFAULT_MAX_TOKENS, reasoningBody, REASONING_LEVELS, isProbablyTruncated,
+  };
 })();

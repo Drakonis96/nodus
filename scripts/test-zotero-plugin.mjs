@@ -141,6 +141,14 @@ test('markdown: citations become chips via citeFn, body is escaped (no XSS)', ()
   assert.ok(!elementTags(container).includes('SCRIPT'), 'no live <script> element injected');
 });
 
+test('markdown: evidence citations become chips', () => {
+  const { NodusMarkdown } = loadModule('markdown.js');
+  const spans = NodusMarkdown.parseInline('Claim [[e:ev_abc|source p. 2]].');
+  const cite = spans.find((s) => s.type === 'cite');
+  assert.equal(cite.kind, 'e');
+  assert.equal(cite.id, 'ev_abc');
+});
+
 // ─────────────────────────────────────────── #2 long-document sampling
 test('util: sampleDocText keeps short docs whole', () => {
   const { NodusUtil } = loadModule('util.js');
@@ -161,6 +169,155 @@ test('util: sampleDocText keeps head AND tail of long docs', () => {
   assert.ok(r.sentChars <= 200 + 60, 'roughly within budget');
   assert.equal(r.totalChars, big.length);
   assert.ok(r.ratio > 0 && r.ratio < 1);
+});
+
+// ─────────────────────────────────────────── evidence retrieval
+test('evidence: page-aware chunking preserves exact passages and stable ids', () => {
+  const { NodusEvidence: E } = loadModule('evidence.js');
+  const text = 'INTRODUCTION\n' + 'First page evidence. '.repeat(80) + '\fRESULTS\n' + 'Second page finding. '.repeat(80);
+  const idx = E.buildIndex({ libraryID: 1, itemKey: 'PARENT', attachmentKey: 'ATT', title: 'Paper', pageLabels: ['i', '7'] }, text, { targetChars: 500, minChars: 150, overlapChars: 50 });
+  assert.equal(idx.pages.length, 2);
+  assert.ok(idx.chunks.length >= 4);
+  assert.ok(idx.chunks.some((c) => c.pageLabel === '7' && c.section === 'RESULTS'));
+  for (const chunk of idx.chunks) {
+    const page = idx.pages[chunk.pageIndex];
+    const combined = [page.text, page.visualText].filter(Boolean).join('\n\n[VISUAL/OCR]\n');
+    assert.equal(combined.slice(chunk.start, chunk.end), chunk.text);
+    assert.match(chunk.id, /^ev_/);
+  }
+  const idx2 = E.buildIndex({ libraryID: 1, itemKey: 'PARENT', attachmentKey: 'ATT', title: 'Paper', pageLabels: ['i', '7'] }, text, { targetChars: 500, minChars: 150, overlapChars: 50 });
+  assert.deepEqual([...idx.chunks.map((c) => c.id)], [...idx2.chunks.map((c) => c.id)]);
+});
+
+test('evidence: hybrid retrieval uses semantics, limits sources and produces citable catalogue', () => {
+  const { NodusEvidence: E } = loadModule('evidence.js');
+  const a = E.buildIndex({ libraryID: 1, itemKey: 'A', attachmentKey: 'AA', title: 'Alpha' }, 'Cats sleep in warm windows. '.repeat(80), { targetChars: 300, minChars: 100, overlapChars: 40 });
+  const b = E.buildIndex({ libraryID: 1, itemKey: 'B', attachmentKey: 'BB', title: 'Beta' }, 'Quantum entanglement links distant particles. '.repeat(80), { targetChars: 300, minChars: 100, overlapChars: 40 });
+  a.chunks.forEach((c) => { c.embedding = [1, 0]; });
+  b.chunks.forEach((c) => { c.embedding = [0, 1]; });
+  const result = E.hybridSearch([a, b], 'nonlocal physics', [0, 1], { topK: 5, maxPerSource: 3 });
+  assert.equal(result.method, 'hybrid');
+  assert.equal(result.hits[0].attachmentKey, 'BB');
+  assert.ok(result.hits.filter((h) => h.attachmentKey === 'BB').length <= 3);
+  const prompt = E.evidencePrompt(result.hits);
+  assert.ok(prompt.includes(`[[e:${result.hits[0].id}]]`));
+  assert.ok(prompt.includes('EXACT PASSAGE'));
+});
+
+test('evidence: full text remains citable and citation validation rejects invented ids', () => {
+  const { NodusEvidence: E } = loadModule('evidence.js');
+  const idx = E.buildIndex({ libraryID: 1, itemKey: 'A', attachmentKey: 'AA', title: 'Alpha' }, 'A supported factual sentence with enough detail. '.repeat(30), { targetChars: 300, minChars: 100, overlapChars: 40 });
+  const full = E.fullEvidencePrompt([idx], 100000);
+  assert.equal(full.hits.length, idx.chunks.length);
+  assert.ok(full.text.includes(`[[e:${idx.chunks[0].id}]]`));
+  const checked = E.validateCitations(`Supported [[e:${idx.chunks[0].id}]]. Invented [[e:nope]]. Legacy [[p:2]].`, { evidence: E.evidenceMap(full.hits) });
+  assert.equal(checked.invalid.length, 1);
+  assert.ok(!checked.text.includes('[[e:nope]]'));
+  assert.ok(checked.text.includes('[[p:2]]'), 'unspecified legacy citation kinds remain untouched');
+});
+
+test('evidence: malformed evidence brackets are normalized only for allowed ids', () => {
+  const { NodusEvidence: E } = loadModule('evidence.js');
+  const evidence = E.evidenceMap([{ id: 'first' }, { id: 'second' }]);
+  const checked = E.validateCitations('Supported [[e:first], [e:second]]. Invented [e:nope].', { evidence });
+  assert.equal(checked.text, 'Supported [[e:first]], [[e:second]]. Invented.');
+  assert.equal(checked.valid.length, 2);
+  assert.equal(checked.invalid.length, 1);
+});
+
+test('evidence: claim audit distinguishes supported, weak and uncited statements', () => {
+  const { NodusEvidence: E } = loadModule('evidence.js');
+  const evidence = [{ id: 'one', text: 'The trial enrolled 240 adult participants and reduced blood pressure significantly.' }];
+  const answer = 'The trial enrolled 240 adult participants and reduced blood pressure significantly [[e:one]].\n\nThe moon is made entirely of polished copper according to this investigation [[e:one]].\n\nA separate long factual assertion appears here without any supporting source citation.';
+  const audit = E.auditClaims(answer, evidence);
+  assert.equal(audit.covered, 1);
+  assert.equal(audit.weak, 1);
+  assert.equal(audit.missing, 1);
+});
+
+test('evidence: claim audit supports faithful English-to-Spanish citations and ignores lead-ins', () => {
+  const { NodusEvidence: E } = loadModule('evidence.js');
+  const evidence = [{
+    id: 'computer',
+    text: 'A computer is a machine that can be programmed to automatically carry out sequences of arithmetic or logical operations.',
+  }];
+  const answer = 'Aquí tienes una comparación de las fuentes:\\n'
+    + '- Un ordenador es una máquina programada para llevar a cabo automáticamente secuencias de operaciones aritméticas o lógicas [[e:computer]].';
+  const audit = E.auditClaims(answer, evidence);
+  assert.equal(audit.total, 1);
+  assert.equal(audit.covered, 1);
+  assert.equal(audit.coverage, 1);
+});
+
+test('store: conversation audits are compacted without persisting embeddings', () => {
+  const { NodusStore: S } = loadModule('store.js');
+  const conversations = [{
+    id: 'conversation',
+    messages: [{
+      role: 'assistant',
+      content: 'Supported answer.',
+      audit: {
+        total: 1, covered: 1, weak: 0, missing: 0, coverage: 1,
+        invalidCitations: [{ id: 'bad', token: '[[e:bad]]', embedding: [9, 9] }],
+        claims: [{
+          text: 'Supported answer.', citationIds: ['good'], status: 'covered', support: 0.91,
+          evidence: [{ id: 'good', embedding: [0.1, 0.2], text: 'Exact passage' }],
+        }],
+      },
+    }],
+  }];
+  const compact = S.compactConversations(conversations);
+  assert.equal(compact[0].messages[0].audit.claims[0].support, 0.91);
+  assert.equal(compact[0].messages[0].audit.claims[0].evidence, undefined);
+  assert.equal(compact[0].messages[0].audit.invalidCitations[0].embedding, undefined);
+  assert.ok(!JSON.stringify(compact).includes('embedding'));
+});
+
+test('evidence: visual extraction is merged into the correct page and re-chunked', () => {
+  const { NodusEvidence: E } = loadModule('evidence.js');
+  const idx = E.buildIndex({ libraryID: 1, itemKey: 'A', attachmentKey: 'AA', title: 'Alpha', totalPages: 2 }, 'Text page\f');
+  E.addVisualText(idx, 1, '[TABLE] Group | Mean\\nA | 42');
+  assert.ok(idx.pages[1].visualText.includes('Mean'));
+  assert.equal(idx.pages[1].needsOcr, false);
+  assert.ok(idx.chunks.some((c) => c.pageIndex === 1 && c.text.includes('[TABLE]')));
+});
+
+test('multimodal: validates images and detects figures, tables, formulas, diagrams and OCR pages', () => {
+  const { NodusMultimodal: V } = loadModule('multimodal.js');
+  const data = 'data:image/png;base64,aGVsbG8=';
+  assert.equal(V.isImageDataUrl(data), true);
+  assert.deepEqual({ ...V.dataUrlToImagePart(data) }, { mimeType: 'image/png', data: 'aGVsbG8=' });
+  const signals = V.visualSignals('Figure 2 and Table 4 show α = 0.5 in the architecture diagram');
+  assert.deepEqual({ ...signals }, { figure: true, table: true, formula: true, diagram: true });
+  assert.equal(V.needsVisualAnalysis({ needsOcr: true, text: '' }), true);
+  assert.ok(V.cleanVisualExtraction('```text\n[OCR] EMPTY\n[TABLE] A | B\n```').includes('[TABLE]'));
+});
+
+test('providers: multimodal body builders and embedding response ordering', async () => {
+  const calls = [];
+  const fakeFetch = async (url, init) => {
+    calls.push({ url, init });
+    return { ok: true, json: async () => ({ data: [{ index: 1, embedding: [0, 1] }, { index: 0, embedding: [1, 0] }] }) };
+  };
+  const { NodusProviders: P } = loadModule('providers.js', { fetch: fakeFetch });
+  const image = { dataUrl: 'data:image/jpeg;base64,YQ==', label: 'page' };
+  const openai = P.withOpenAiImages([{ role: 'user', content: 'inspect' }], [image]);
+  assert.ok(Array.isArray(openai[0].content));
+  assert.equal(openai[0].content.at(-1).type, 'image_url');
+  const anthropic = P.withAnthropicImages([{ role: 'user', content: 'inspect' }], [image]);
+  assert.equal(anthropic[0].content.at(-1).type, 'image');
+  const vectors = await P.embed({ provider: 'openrouter', model: 'openai/text-embedding-3-small' }, ['a', 'b'], { key: 'secret' });
+  assert.deepEqual([...vectors[0]], [1, 0]);
+  assert.ok(calls[0].url.endsWith('/embeddings'));
+  assert.equal(JSON.parse(calls[0].init.body).input.length, 2);
+});
+
+test('providers: detects short unfinished streams without flagging complete replies', () => {
+  const { NodusProviders: P } = loadModule('providers.js');
+  assert.equal(P.isProbablyTruncated('Un ordenador es una máquina program', 'stop'), true);
+  assert.equal(P.isProbablyTruncated('Un ordenador es una máquina programable.', 'stop'), false);
+  assert.equal(P.isProbablyTruncated('A complete but long answer. '.repeat(20), 'stop'), false);
+  assert.equal(P.isProbablyTruncated('Complete.', 'length'), true);
 });
 
 // ─────────────────────────────────────────── #4 save chat as note
@@ -186,6 +343,13 @@ test('util: buildItemsSummary only fires for 2+ items', () => {
   assert.ok(s.includes('SELECTED DOCUMENTS'));
   assert.ok(s.includes('1. Paper A') && s.includes('2. Paper B'));
   assert.ok(s.includes('Smith') && s.includes('(2020)'));
+});
+
+test('util: reply language follows the last user message, not the source language', () => {
+  const { NodusUtil } = loadModule('util.js');
+  assert.equal(NodusUtil.detectLanguage('Describe la figura de la página y cita la evidencia.', 'en'), 'Spanish');
+  assert.equal(NodusUtil.detectLanguage('Describe the figure on the page and cite the evidence.', 'es'), 'English');
+  assert.equal(NodusUtil.detectLanguage('OK', 'es'), 'Spanish');
 });
 
 // ─────────────────────────────────────────── #3 agent tools
