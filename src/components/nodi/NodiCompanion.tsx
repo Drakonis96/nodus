@@ -159,14 +159,12 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
   const [noteTitle, setNoteTitle] = useState('');
   const [noteDraft, setNoteDraft] = useState('');
   const [noteDirty, setNoteDirty] = useState(false);
-  const [noteSaving, setNoteSaving] = useState(false);
   const [noteSearch, setNoteSearch] = useState('');
   const [notePreview, setNotePreview] = useState(false);
   const [deleteNoteTarget, setDeleteNoteTarget] = useState<NodiNote | null>(null);
   const noteEditorRef = useRef<HTMLTextAreaElement | null>(null);
   const noteSessionRef = useRef(0);
   const noteSaveChainRef = useRef<Promise<void>>(Promise.resolve());
-  const noteSavesInFlightRef = useRef(0);
   // Mirror the in-flight note so the leave-editor flush reads live values without a
   // stale closure (a lesson from the study-vault useMemo bug: closures over editor
   // state go stale between renders).
@@ -241,8 +239,6 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
   useEffect(() => { if (panel === 'notes') refreshNotes(); }, [panel, refreshNotes]);
 
   const persistNote = useCallback((session: number, id: string | null, title: string, draft: string) => {
-    noteSavesInFlightRef.current += 1;
-    setNoteSaving(true);
     const task = noteSaveChainRef.current.then(async () => {
       // A second autosave may have been queued before the first one assigned its id.
       // Reuse the live id for the same editor session instead of creating duplicates.
@@ -264,9 +260,6 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
           noteRef.current = { ...current, dirty: true };
           setNoteDirty(true);
         }
-      } finally {
-        noteSavesInFlightRef.current -= 1;
-        if (noteSavesInFlightRef.current === 0) setNoteSaving(false);
       }
     });
     noteSaveChainRef.current = task.then(() => undefined, () => undefined);
@@ -1089,11 +1082,7 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
                   )}
                 </div>
                 <div className="nodi-note-foot">
-                  {activeNoteId && (
-                    <button className="nodi-note-remove" onClick={() => { const note = notes.find((n) => n.id === activeNoteId); if (note) setDeleteNoteTarget(note); }} title={t('Borrar nota')} aria-label={t('Borrar nota')}><Icon name="trash" size={13} /></button>
-                  )}
-                  <span className="nodi-note-state">{noteSaving ? t('Guardando…') : noteDirty ? t('Sin guardar') : activeNoteId ? t('Guardado automáticamente') : ''}</span>
-                  <span className="grow" />
+                  <span className="nodi-note-state">{t('Guardado automático')}</span>
                 </div>
               </>
             )}

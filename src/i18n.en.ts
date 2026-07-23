@@ -5253,7 +5253,7 @@ export const EN: Record<string, string> = {
   'en blanco': 'blank',
   'Cargando simulacro…': 'Loading mock exam…',
   'Simulacro escrito': 'Written mock exam',
-  'Guardado automáticamente': 'Saved automatically',
+  'Guardado automático': 'Saved automatically',
   'Autoguardado activo': 'Autosave active',
   'Entregar examen': 'Submit exam',
   'Marcar para revisar': 'Flag for review',
