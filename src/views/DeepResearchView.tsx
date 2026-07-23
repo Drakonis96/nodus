@@ -22,7 +22,7 @@ import { ModelPicker } from '../components/ModelPicker';
 import { confirm } from '../components/feedback';
 import { SourceCitationModal, type CitationTarget } from '../components/SourceCitationModal';
 import { SaveToNotesModal } from '../components/SaveToNotesModal';
-import { TranslationPanel } from '../components/TranslationModal';
+import { TranslationModal } from '../components/TranslationModal';
 import { Markdown } from '../components/Markdown';
 import { DraftActionBar, DraftResultMain, SupportMatrix } from './writingShared';
 import { DecorativeImageCard } from '../components/DecorativeImageCard';
@@ -121,7 +121,7 @@ export function DeepResearchView({
   const [showMatrix, setShowMatrix] = useState(false);
   const [citation, setCitation] = useState<CitationTarget>(null);
   const [savingToNotes, setSavingToNotes] = useState(false);
-  const [showTranslations, setShowTranslations] = useState(true);
+  const [translationOpen, setTranslationOpen] = useState(false);
   const [appliedTranslation, setAppliedTranslation] = useState<ContentTranslation | null>(null);
   const [exporting, setExporting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -203,14 +203,14 @@ export function DeepResearchView({
     setShowMatrix(false);
     setError(null);
     setMessage(null);
-    setShowTranslations(true);
+    setTranslationOpen(false);
     setAppliedTranslation(null);
   };
 
   const backToGallery = () => {
     setMode('gallery');
     setOpenDraft(null);
-    setShowTranslations(false);
+    setTranslationOpen(false);
     setAppliedTranslation(null);
     void refreshSavedDrafts();
   };
@@ -280,7 +280,7 @@ export function DeepResearchView({
     setError(null);
     setMessage(null);
     try {
-      const result = await window.nodus.exportWritingWorkshopDraft({ draft: openDraft.draft, format });
+      const result = await window.nodus.exportWritingWorkshopDraft({ draft: openDraft.draft, format, entityId: openDraft.id });
       if (result) setMessage(`${t('Exportado')}: ${result.path}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -330,13 +330,11 @@ export function DeepResearchView({
           message={message}
           error={error}
           appliedTranslation={appliedTranslation}
-          showTranslations={showTranslations}
           onToggleMatrix={() => setShowMatrix((v) => !v)}
           onBack={backToGallery}
           onCopy={() => void copyDraft()}
           onSaveToNotes={() => setSavingToNotes(true)}
-          onTranslate={() => setShowTranslations((value) => !value)}
-          onApplyTranslation={setAppliedTranslation}
+          onTranslate={() => setTranslationOpen(true)}
           onExport={(format) => void exportDraft(format)}
           onCitation={setCitation}
           onImageChange={onImageChange}
@@ -344,6 +342,18 @@ export function DeepResearchView({
           onOpenStudyMaterial={onOpenStudyMaterial}
           onOpenStudyRecording={onOpenStudyRecording}
         />
+        {translationOpen && (
+          <TranslationModal
+            entityKind="deep_research"
+            entityId={openDraft.id}
+            sourceTitle={openDraft.draft.title}
+            sourceMarkdown={`# ${openDraft.draft.title}\n\n${openDraft.draft.abstract ? `${openDraft.draft.abstract}\n\n` : ''}${openDraft.draft.draftMarkdown}`}
+            model={openDraft.model}
+            activeTranslationId={appliedTranslation?.id ?? null}
+            onApply={setAppliedTranslation}
+            onClose={() => setTranslationOpen(false)}
+          />
+        )}
         {citation && (
           <SourceCitationModal
             target={citation}
@@ -801,13 +811,11 @@ function ReaderView({
   message,
   error,
   appliedTranslation,
-  showTranslations,
   onToggleMatrix,
   onBack,
   onCopy,
   onSaveToNotes,
   onTranslate,
-  onApplyTranslation,
   onExport,
   onCitation,
   onImageChange,
@@ -822,13 +830,11 @@ function ReaderView({
   message: string | null;
   error: string | null;
   appliedTranslation: ContentTranslation | null;
-  showTranslations: boolean;
   onToggleMatrix: () => void;
   onBack: () => void;
   onCopy: () => void;
   onSaveToNotes: () => void;
   onTranslate: () => void;
-  onApplyTranslation: (translation: ContentTranslation | null) => void;
   onExport: (format: 'markdown' | 'pdf') => void;
   onCitation: (target: CitationTarget) => void;
   onImageChange: (image: DecorativeImage) => void;
@@ -901,7 +907,6 @@ function ReaderView({
               onStudyMaterial={onOpenStudyMaterial}
               onStudyRecording={onOpenStudyRecording}
             />}
-            {showTranslations && <TranslationPanel entityKind="deep_research" entityId={saved.id} sourceTitle={saved.draft.title} sourceMarkdown={`# ${saved.draft.title}\n\n${saved.draft.abstract ? `${saved.draft.abstract}\n\n` : ''}${saved.draft.draftMarkdown}`} model={saved.model} activeTranslationId={appliedTranslation?.id ?? null} onApply={onApplyTranslation} />}
           </div>
         </main>
         {showMatrix && (

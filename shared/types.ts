@@ -4407,6 +4407,8 @@ export interface WritingWorkshopExportRequest {
   draft: WritingWorkshopDraft;
   /** Output format. Defaults to `'markdown'` when omitted. */
   format?: WritingWorkshopExportFormat;
+  /** Saved Deep Research id, used only to include its ready decorative image in PDF exports. */
+  entityId?: string;
 }
 
 /** A locally saved workshop draft, including the exact prompt and selected evidence. */
@@ -6101,6 +6103,7 @@ export interface NodusApi {
   restartImmersionSession(id: string): Promise<ImmersionSession | null>;
   setImmersionProgress(id: string, progress: ImmersionProgress): Promise<void>;
   answerImmersionQuestion(request: ImmersionAnswerRequest): Promise<ImmersionAnswerResult>;
+  exportImmersionSessionPdf(id: string): Promise<{ path: string } | null>;
   deleteImmersionSession(id: string): Promise<void>;
   // main-theme management ("temas principales")
   listManagedThemes(): Promise<ManagedTheme[]>;
