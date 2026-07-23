@@ -10,6 +10,12 @@ exports.default = async function beforePack(context) {
   });
   console.log('[beforePack] Generated and verified third-party legal bundle');
 
+  execFileSync(process.execPath, [path.join(root, 'scripts', 'build-zotero-xpi.mjs')], {
+    cwd: root,
+    stdio: 'inherit',
+  });
+  console.log('[beforePack] Built the canonical Zotero XPI');
+
   if (context.electronPlatformName !== 'darwin') return;
   const source = path.join(__dirname, 'docktile');
   const output = path.join(__dirname, 'NodusDockTile.docktileplugin');

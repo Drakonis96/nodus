@@ -4,6 +4,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import fs from 'node:fs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const tempDir = await mkdtemp(path.join(os.tmpdir(), 'nodus-release-notes-'));
@@ -24,10 +25,14 @@ try {
 
   const { RELEASE_NOTES, releaseNotesForMajor } = await import(pathToFileURL(bundlePath).href);
   const currentRelease = RELEASE_NOTES[0];
-  assert.equal(currentRelease?.version, '2.5.4');
-  assert.equal(currentRelease?.date, '2026-07-22');
-  assert.equal(currentRelease?.highlights.length, 2);
+  assert.equal(currentRelease?.version, '2.6.0');
+  assert.equal(currentRelease?.date, '2026-07-23');
+  assert.equal(currentRelease?.highlights.length, 3);
   assert.ok(currentRelease?.highlights.every((highlight) => highlight.it.length > 0));
+  const whatsNew = fs.readFileSync(path.join(root, 'src/components/WhatsNewModal.tsx'), 'utf8');
+  assert.match(whatsNew, /function ZoteroReleaseIcon/);
+  assert.match(whatsNew, /M16 18H48L16 46H48/);
+  assert.match(whatsNew, /scope === 'plugin'/);
   const currentMajorNotes = releaseNotesForMajor('2.3.8');
 
   assert.equal(currentMajorNotes[0]?.version, '2.3.8');

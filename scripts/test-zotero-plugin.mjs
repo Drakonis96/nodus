@@ -273,6 +273,198 @@ test('store: conversation audits are compacted without persisting embeddings', (
   assert.ok(!JSON.stringify(compact).includes('embedding'));
 });
 
+test('store: evidence cache separates compressed metadata from Float32 vectors', () => {
+  const { NodusStore: S } = loadModule('store.js');
+  const index = {
+    libraryID: 1,
+    attachmentKey: 'ATT',
+    chunks: [
+      { id: 'a', text: 'alpha', embedding: [0.1, -0.2, 0.3] },
+      { id: 'b', text: 'beta', embedding: null },
+      { id: 'c', text: 'gamma', embedding: [1, 0, -1] },
+    ],
+  };
+  const packed = S.detachEmbeddings(index);
+  assert.equal(packed.index.cache.vectorFormat, 'float32-le');
+  assert.equal(packed.index.cache.vectorCount, 6);
+  assert.equal(packed.bytes.byteLength, 6 * 4);
+  assert.ok(packed.index.chunks.every((chunk) => chunk.embedding === null), 'JSON carries no vector arrays');
+  const restored = S.attachEmbeddings(JSON.parse(JSON.stringify(packed.index)), packed.bytes);
+  assert.equal(restored.chunks[1].embedding, null);
+  assert.equal(restored.chunks[0].embedding.length, 3);
+  assert.ok(Math.abs(restored.chunks[0].embedding[0] - 0.1) < 1e-6);
+  assert.ok(Math.abs(restored.chunks[2].embedding[2] + 1) < 1e-6);
+});
+
+test('evidence: layout extraction removes repeated margins, orders columns and retains exact coordinates', () => {
+  const { NodusEvidence: E } = loadModule('evidence.js');
+  const item = (str, x, y, width = 90) => ({ str, x, y, width, height: 10 });
+  const pages = Array.from({ length: 4 }, (_, pageIndex) => ({
+    pageIndex,
+    pageLabel: String(pageIndex + 1),
+    width: 600,
+    height: 800,
+    items: [
+      item(`Journal header ${pageIndex + 1}`, 50, 10, 500),
+      item(`multi${String.fromCharCode(97 + pageIndex)}-`, 50, 100), item(`lingual evidence ${String.fromCharCode(97 + pageIndex)}`, 50, 120, 130), item(`left conclusion ${String.fromCharCode(97 + pageIndex)}.`, 50, 140, 130),
+      item(`left detail one ${String.fromCharCode(97 + pageIndex)}`, 50, 160, 130), item(`left detail two ${String.fromCharCode(97 + pageIndex)}`, 50, 180, 130), item(`left detail three ${String.fromCharCode(97 + pageIndex)}.`, 50, 200, 130),
+      item(`right first ${String.fromCharCode(97 + pageIndex)}`, 330, 100), item(`right second ${String.fromCharCode(97 + pageIndex)}`, 330, 120), item(`right third ${String.fromCharCode(97 + pageIndex)}.`, 330, 140),
+      item(`right detail one ${String.fromCharCode(97 + pageIndex)}`, 330, 160), item(`right detail two ${String.fromCharCode(97 + pageIndex)}`, 330, 180), item(`right detail three ${String.fromCharCode(97 + pageIndex)}.`, 330, 200),
+      item(`Page ${pageIndex + 1}`, 250, 780, 100),
+    ],
+  }));
+  const structured = E.structureLayoutPages(pages, { pageLabels: ['i', 'ii', '1', '2'] });
+  assert.equal(structured.length, 4);
+  assert.ok(structured.every((page) => !page.text.includes('Journal header') && !page.text.includes('Page ')));
+  assert.ok(structured[0].text.indexOf('left conclusion') < structured[0].text.indexOf('right first'));
+  assert.ok(structured[0].text.includes('multialingual evidence a'), 'line-end hyphen reconstructed');
+  assert.equal(structured[2].pageLabel, '1');
+  assert.ok(structured[0].spans.length >= 6);
+  for (const span of structured[0].spans) {
+    assert.equal(structured[0].text.slice(span.start, span.end), span.text);
+    assert.equal(span.rect.length, 4);
+  }
+});
+
+test('evidence: a sparse figure caption is not mistaken for a second prose column', () => {
+  const { NodusEvidence: E } = loadModule('evidence.js');
+  const item = (str, x, y, width = 110) => ({ str, x, y, width, height: 10 });
+  const page = E.structureLayoutPage({
+    pageIndex: 0,
+    pageLabel: '26',
+    width: 600,
+    height: 800,
+    items: [
+      item('Main prose starts here', 253, 80, 299),
+      item('and continues through the', 253, 100, 299),
+      item('important network account.', 253, 120, 299),
+      item('A second paragraph remains', 253, 140, 299),
+      item('part of the dominant prose', 253, 160, 299),
+      item('before the wide section.', 253, 180, 299),
+      item('Figure showing routes', 35, 120, 200),
+      item('on the Internet', 35, 140, 120),
+      item('Full-width continuation below the floating figure.', 35, 250, 520),
+    ],
+  });
+  assert.ok(page.text.indexOf('Main prose starts here') < page.text.indexOf('Figure showing routes'));
+  assert.ok(page.text.indexOf('Figure showing routes') < page.text.indexOf('Full-width continuation'));
+});
+
+test('evidence: a new heading starts its own paragraph and carries into the next page', () => {
+  const { NodusEvidence: E } = loadModule('evidence.js');
+  const item = (str, x, y, width = 480) => ({ str, x, y, width, height: 10 });
+  const pages = E.structureLayoutPages([
+    {
+      pageIndex: 0, pageLabel: '25', width: 600, height: 800,
+      items: [
+        item('The prior discussion ends here.[143]', 50, 100),
+        item('Networking and the Internet', 50, 140, 220),
+      ],
+    },
+    {
+      pageIndex: 1, pageLabel: '26', width: 600, height: 800,
+      items: [item('Computers have coordinated information across locations since the 1950s.', 50, 100)],
+    },
+  ], {});
+  assert.ok(pages[0].text.includes('\n\nNetworking and the Internet'));
+  assert.equal(pages[0].headings.at(-1).title, 'Networking and the Internet');
+  assert.equal(pages[0].inheritedSection, '');
+  assert.equal(pages[1].inheritedSection, 'Networking and the Internet');
+  const index = E.buildIndex(
+    { libraryID: 1, itemKey: 'A', attachmentKey: 'AA', title: 'Computer', layoutPages: [
+      {
+        pageIndex: 0, pageLabel: '25', width: 600, height: 800,
+        items: [
+          item('The prior discussion ends here.[143]', 50, 100),
+          item('Networking and the Internet', 50, 140, 220),
+        ],
+      },
+      {
+        pageIndex: 1, pageLabel: '26', width: 600, height: 800,
+        items: [item('Computers have coordinated information across locations since the 1950s.', 50, 100)],
+      },
+    ] },
+    '',
+    { targetChars: 500, minChars: 80, overlapChars: 20 },
+  );
+  assert.equal(index.chunks.find((chunk) => chunk.pageIndex === 1).section, 'Networking and the Internet');
+});
+
+test('evidence: reference entries do not replace the References section or dominate ordinary retrieval', () => {
+  const { NodusEvidence: E } = loadModule('evidence.js');
+  assert.equal(E.looksLikeHeading('References'), true);
+  assert.equal(E.looksLikeHeading('37. Smith, Jane (2024). "Computer Networks" (https://example.test)'), false);
+  assert.equal(E.looksLikeHeading('Software-'), false);
+  assert.equal(E.looksLikeHeading('3. System Architecture'), true);
+  const index = E.buildIndex(
+    { libraryID: 1, itemKey: 'A', attachmentKey: 'AA', title: 'Computer', totalPages: 3 },
+    'Networking and the Internet\nComputers exchange information over linked networks.\fReferences\n37. Smith, Jane (2024). Computer Networks and the Internet.\f18. Leonardo Torres. Memoria sobre las máquinas algébricas',
+    { targetChars: 180, minChars: 80, overlapChars: 20 },
+  );
+  assert.equal(index.pages[2].inheritedSection, 'References');
+  assert.ok(index.chunks.filter((chunk) => chunk.pageIndex === 2).every((chunk) => chunk.section === 'References'));
+  assert.equal(
+    E.detectHeadings('118. Example reference\nConcise Guide for the New User\nPublisher Name', 'References').length,
+    0,
+  );
+  const dims = 4;
+  index.chunks.forEach((chunk) => {
+    chunk.embedding = chunk.section === 'References' ? [1, 0, 0, 0] : [0.92, 0.2, 0, 0];
+  });
+  const result = E.hybridSearch([index], 'computer networks and internet', [1, 0, 0, 0], { topK: 2, candidateK: 4 });
+  assert.notEqual(result.hits[0].section, 'References');
+  assert.ok(result.candidates.every((hit) => hit.section !== 'References'));
+  const citePages = E.hybridSearch([index], 'explica computer networks y cita páginas exactas', [1, 0, 0, 0], { topK: 2, candidateK: 4 });
+  assert.ok(citePages.hits.every((hit) => hit.section !== 'References'));
+  assert.ok(citePages.candidates.every((hit) => hit.section !== 'References'));
+  const bibliography = E.hybridSearch([index], 'bibliography reference for computer networks', [1, 0, 0, 0], { topK: 2, candidateK: 4 });
+  assert.ok(bibliography.hits.some((hit) => hit.section === 'References'));
+  assert.equal(dims, index.chunks[0].embedding.length);
+});
+
+test('evidence: section-neighbor expansion crosses a page boundary without pulling unrelated sections', () => {
+  const { NodusEvidence: E } = loadModule('evidence.js');
+  const index = {
+    libraryID: 1, attachmentKey: 'A', signature: 'sig',
+    chunks: [
+      { id: 'p1', libraryID: 1, attachmentKey: 'A', pageIndex: 0, chunkIndex: 0, section: 'Networking', text: 'ARPANET history' },
+      { id: 'p2a', libraryID: 1, attachmentKey: 'A', pageIndex: 1, chunkIndex: 0, section: 'Networking', text: 'Standards groups ANSI IETF' },
+      { id: 'p2b', libraryID: 1, attachmentKey: 'A', pageIndex: 1, chunkIndex: 1, section: 'Notes', text: 'Unrelated notes' },
+      { id: 'p3', libraryID: 1, attachmentKey: 'A', pageIndex: 2, chunkIndex: 0, section: 'References', text: 'Bibliography' },
+    ],
+  };
+  const expanded = E.expandWithNeighbors([index], [index.chunks[0]], { topK: 5, maxPerSource: 5 });
+  assert.ok(expanded.some((hit) => hit.id === 'p2a' && hit.retrieval === 'section-neighbor'));
+  assert.ok(!expanded.some((hit) => hit.id === 'p2b' || hit.id === 'p3'));
+});
+
+test('evidence: bounded page reads and iterative result merging never invent sources', () => {
+  const { NodusEvidence: E } = loadModule('evidence.js');
+  const a = E.buildIndex({ libraryID: 1, itemKey: 'A', attachmentKey: 'AA', title: 'Alpha', pageLabels: ['1', '2', '3'] }, 'first page\fsecond target page\fthird page');
+  const b = E.buildIndex({ libraryID: 1, itemKey: 'B', attachmentKey: 'BB', title: 'Beta' }, 'other source');
+  const pageHits = E.pageRequestHits([a, b], [
+    { source: 'AA', from: 2, to: 99 },
+    { source: 'INVENTED', from: 1, to: 4 },
+  ], { maxPagesPerRequest: 1, maxHits: 8 });
+  assert.ok(pageHits.length > 0);
+  assert.ok(pageHits.every((hit) => hit.attachmentKey === 'AA' && hit.pageLabel === '2'));
+  const base = { method: 'lexical', hits: [{ ...a.chunks[0], score: 0.2 }], candidates: [{ ...a.chunks[0], score: 0.2 }] };
+  const expanded = { method: 'hybrid', hits: [{ ...a.chunks[0], score: 0.8 }, { ...b.chunks[0], score: 0.7 }], candidates: [{ ...b.chunks[0], score: 0.7 }] };
+  const merged = E.mergeRetrievalResults([base, expanded], pageHits);
+  assert.equal(merged.method, 'hybrid');
+  assert.equal(merged.hits.filter((hit) => hit.id === a.chunks[0].id).length, 1, 'deduplicates repeated hits');
+  assert.ok(merged.candidates.some((hit) => hit.attachmentKey === 'BB'));
+});
+
+test('evidence: complete-text mode obeys a token budget', () => {
+  const { NodusEvidence: E } = loadModule('evidence.js');
+  const idx = E.buildIndex({ libraryID: 1, itemKey: 'A', attachmentKey: 'AA', title: 'Alpha' }, 'Evidence sentence with several words. '.repeat(300), { targetChars: 260, minChars: 100, overlapChars: 30 });
+  const bounded = E.fullEvidencePrompt([idx], { maxChars: 100000, maxTokens: 250 });
+  assert.equal(bounded.truncated, true);
+  assert.ok(bounded.tokens <= 250);
+  assert.ok(bounded.hits.length < idx.chunks.length);
+});
+
 test('evidence: visual extraction is merged into the correct page and re-chunked', () => {
   const { NodusEvidence: E } = loadModule('evidence.js');
   const idx = E.buildIndex({ libraryID: 1, itemKey: 'A', attachmentKey: 'AA', title: 'Alpha', totalPages: 2 }, 'Text page\f');
@@ -291,6 +483,81 @@ test('multimodal: validates images and detects figures, tables, formulas, diagra
   assert.deepEqual({ ...signals }, { figure: true, table: true, formula: true, diagram: true });
   assert.equal(V.needsVisualAnalysis({ needsOcr: true, text: '' }), true);
   assert.ok(V.cleanVisualExtraction('```text\n[OCR] EMPTY\n[TABLE] A | B\n```').includes('[TABLE]'));
+});
+
+test('multimodal: resolves the Zotero 9 PDFView iframe and extracts positioned text', async () => {
+  const { NodusMultimodal: V } = loadModule('multimodal.js');
+  const pdfViewer = { currentPageNumber: 3 };
+  const pdfDocument = {
+    numPages: 1,
+    async getPage(pageNumber) {
+      assert.equal(pageNumber, 1);
+      return {
+        getViewport: () => ({ width: 612, height: 792 }),
+        getTextContent: async () => ({
+          items: [{ str: 'Positioned evidence', width: 96, height: 12, transform: [12, 0, 0, 12, 54, 700] }],
+        }),
+      };
+    },
+  };
+  const iframe = { PDFViewerApplication: { pdfDocument, pdfViewer } };
+  const reader = { _internalReader: { _primaryView: { _pdfView: { _iframeWindow: iframe } } } };
+  const internals = V.readerInternals(reader);
+  assert.equal(internals.iframe, iframe);
+  assert.equal(internals.viewer, pdfViewer);
+  assert.equal(V.currentPageIndex(reader), 2);
+  const pages = await V.extractDocumentLayout(reader);
+  assert.equal(pages.length, 1);
+  assert.equal(pages[0].items[0].str, 'Positioned evidence');
+  assert.deepEqual(
+    { x: pages[0].items[0].x, y: pages[0].items[0].y, width: pages[0].items[0].width },
+    { x: 54, y: 80, width: 96 },
+  );
+});
+
+test('multimodal: unwraps PDF.js page and text objects returned across the Zotero iframe boundary', async () => {
+  const cloned = [];
+  const { NodusMultimodal: V } = loadModule('multimodal.js', {
+    Components: {
+      utils: {
+        cloneInto(value, target) {
+          cloned.push({ value, target });
+          return { ...value, cloned: true };
+        },
+      },
+    },
+  });
+  const rawContent = {
+    items: [{ wrappedJSObject: { str: 'Cross-compartment evidence', width: 120, height: 10, transform: [10, 0, 0, 10, 40, 740] } }],
+  };
+  const rawPage = {
+    getViewport: (options) => {
+      assert.equal(options.cloned, true);
+      return { wrappedJSObject: { width: 600, height: 800 } };
+    },
+    getTextContent: async () => ({ wrappedJSObject: rawContent }),
+  };
+  const pdfDocument = {
+    numPages: 1,
+    getPage: async () => ({ wrappedJSObject: rawPage }),
+  };
+  const iframe = {
+    wrappedJSObject: {
+      PDFViewerApplication: {
+        wrappedJSObject: {
+          pdfDocument: { wrappedJSObject: pdfDocument },
+          pdfViewer: {},
+        },
+      },
+    },
+  };
+  const reader = { _internalReader: { _primaryView: { _iframeWindow: iframe } } };
+  const pages = await V.extractDocumentLayout(reader);
+  assert.equal(pages[0].items.length, 1);
+  assert.equal(pages[0].items[0].str, 'Cross-compartment evidence');
+  assert.equal(pages[0].items[0].y, 50);
+  assert.equal(cloned.length, 1);
+  assert.equal(cloned[0].target, iframe);
 });
 
 test('providers: multimodal body builders and embedding response ordering', async () => {
@@ -438,6 +705,42 @@ test('#reasoning: sidebar + server wire the selector through', () => {
   assert.ok(store.includes('getReasoning') && store.includes('setReasoning'), 'store persists reasoning');
   const server = readSource('electron/zotero-plugin/server.ts');
   assert.ok(/reasoning/.test(server) && server.includes('ReasoningEffort'), 'connected server honors reasoning');
+});
+
+test('local retrieval: E5 is pinned, isolated in a worker and requires no embedding setting or API', () => {
+  const worker = readSource('scripts/zotero-local-embedding-worker.mjs');
+  const bridge = readSource('zotero-plugin/content/local-embeddings.js');
+  const sidebar = readSource('zotero-plugin/content/sidebar.js');
+  const html = readSource('zotero-plugin/content/sidebar.html');
+  assert.ok(worker.includes("Xenova/multilingual-e5-small"));
+  assert.match(worker, /MODEL_REVISION = '[0-9a-f]{40}'/);
+  assert.ok(worker.includes("MODEL_DTYPE = 'q8'"));
+  assert.ok(worker.includes("device: 'wasm'") && worker.includes("pooling: 'mean'") && worker.includes('normalize: true'));
+  assert.ok(worker.includes("'query'") && worker.includes("'passage'"), 'E5 query/passage prefixes are distinct');
+  assert.match(worker, /env\.useBrowserCache = false/);
+  assert.match(worker, /env\.useCustomCache = true/);
+  assert.ok(worker.includes('createIndexedDbCache') && worker.includes("indexedDB.open(CACHE_DB, 1)"));
+  assert.ok(bridge.includes('ChromeWorker') && bridge.includes('embedQueries'));
+  assert.ok(sidebar.includes('NL.embedPassages') && sidebar.includes('NL.embedQuery'));
+  assert.ok(!sidebar.includes('NP.embed('), 'retrieval no longer calls a provider embedding API');
+  assert.ok(!html.includes('nd-embedding-model'), 'embedding configuration was removed');
+});
+
+test('agentic retrieval: both modes use a validated two-round planner', () => {
+  const sidebar = readSource('zotero-plugin/content/sidebar.js');
+  const server = readSource('electron/zotero-plugin/server.ts');
+  assert.match(sidebar, /for \(let round = 1; round <= 2; round\+\+\)/);
+  assert.ok(sidebar.includes('/api/z/retrieval-plan'));
+  assert.ok(sidebar.includes('pageRequestHits') && sidebar.includes('mergeRetrievalResults'));
+  assert.ok(sidebar.includes('every named entity, requested sub-question'));
+  assert.ok(server.includes("urlPath === '/api/z/retrieval-plan'"));
+  assert.ok(server.includes('safeRetrievalPlan'));
+  assert.ok(server.includes('every named entity, requested sub-question'));
+  assert.match(server, /\.slice\(0, 3\)/, 'query expansion is bounded');
+  assert.match(server, /\.slice\(0, 4\)/, 'page requests are bounded');
+  assert.ok(sidebar.includes('do not add tangential facts'));
+  assert.ok(sidebar.includes('never infer causation'));
+  assert.ok(server.includes('omit tangential neighboring facts'));
 });
 
 // ─────────────────────────────────────────── extra edge coverage (#8)
@@ -607,16 +910,26 @@ test('#9: build-zotero-xpi produces a valid xpi + updates.json', () => {
   assert.ok(names.includes('manifest.json'), 'manifest.json at zip ROOT (Zotero rejects it otherwise)');
   for (const need of [
     'content/sidebar.js',
+    'content/local-embeddings.js',
+    'content/runtime/local-embedding-worker.js',
+    'content/runtime/ort-wasm-simd-threaded.jsep.mjs',
+    'content/runtime/ort-wasm-simd-threaded.jsep.wasm',
     'content/markdown.js',
     'content/util.js',
     'content/highlighter.js',
     'content/icons.js',
     'bootstrap.js',
+    'icons/nodus.svg',
     'locale/en-US/nodus.ftl',
     'locale/es-ES/nodus.ftl',
   ]) {
     assert.ok(names.includes(need), `xpi contains ${need}`);
   }
+  assert.equal(manifest.version, '2.6.0');
+  assert.equal(manifest.icons['64'], 'icons/nodus.svg');
+  assert.match(zip.readAsText('icons/nodus.svg'), /M18 48V16L46 48V16/, 'Zotero keeps the normal Nodus N');
+  assert.ok(!names.includes('icons/zotero-z.svg'), 'the rotated release-note mark is not shipped as Zotero UI');
+  assert.ok(zip.getEntry('content/runtime/ort-wasm-simd-threaded.jsep.wasm').header.size > 20_000_000, 'full ONNX WASM runtime is packaged');
 
   const updates = JSON.parse(readSource('dist-zotero/updates.json'));
   const entry = updates.addons[manifest.applications.zotero.id].updates[0];
@@ -624,6 +937,22 @@ test('#9: build-zotero-xpi produces a valid xpi + updates.json', () => {
   assert.ok(entry.update_link.endsWith(r.xpiName), 'update_link points at the built xpi');
   assert.match(entry.update_hash, /^sha256:[0-9a-f]{64}$/);
   assert.equal(entry.applications.zotero.strict_min_version, manifest.applications.zotero.strict_min_version);
+});
+
+test('#9: desktop installer copies the canonical release XPI', () => {
+  const install = readSource('electron/zotero-plugin/install.ts');
+  const beforePack = readSource('build/beforePack.cjs');
+  const pkg = JSON.parse(readSource('package.json'));
+  assert.match(install, /dist-zotero.*PLUGIN_XPI_NAME/s);
+  assert.match(install, /fs\.copyFile\(packagedXpiPath\(\), destXpi\)/);
+  assert.match(install, /ort-wasm-simd-threaded\.jsep\.wasm/);
+  assert.match(install, /icons\/nodus\.svg/);
+  assert.doesNotMatch(install, /addLocalFolder/);
+  assert.match(beforePack, /build-zotero-xpi\.mjs/);
+  assert.ok(pkg.build.extraResources.some((entry) => (
+    entry.from === 'dist-zotero/nodus-zotero.xpi'
+    && entry.to === 'zotero/nodus-zotero.xpi'
+  )));
 });
 
 test('#9: stable release blocks publication until the Zotero assets exist', () => {

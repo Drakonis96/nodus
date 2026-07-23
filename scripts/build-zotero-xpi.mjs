@@ -13,14 +13,17 @@
 //   updates.json       — served at manifest.update_url; points Zotero at the
 //                        tagged .xpi with a sha256 integrity hash.
 import { createHash } from 'node:crypto';
-import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import AdmZip from 'adm-zip';
+import { buildSync } from 'esbuild';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const pluginDir = path.join(repoRoot, 'zotero-plugin');
 const outDir = path.join(repoRoot, 'dist-zotero');
+const workerEntry = path.join(repoRoot, 'scripts', 'zotero-local-embedding-worker.mjs');
 
 function parseBase() {
   const arg = process.argv.find((a) => a.startsWith('--base='));
@@ -52,17 +55,49 @@ export function buildXpi() {
   const version = manifest.version;
   if (!id || !version) throw new Error('manifest.json missing applications.zotero.id or version');
 
-  const files = collectFiles(pluginDir);
-  if (!files.some((f) => f.relPath === 'manifest.json')) throw new Error('manifest.json not found at plugin root');
-
-  const zip = new AdmZip();
-  for (const f of files) {
-    zip.addFile(f.relPath, readFileSync(f.abs)); // relPath keeps manifest.json at zip root
-  }
-  mkdirSync(outDir, { recursive: true });
+  const staging = mkdtempSync(path.join(os.tmpdir(), 'nodus-zotero-xpi-'));
+  let files;
   const xpiName = 'nodus-zotero.xpi';
   const xpiPath = path.join(outDir, xpiName);
-  zip.writeZip(xpiPath);
+  try {
+    cpSync(pluginDir, staging, { recursive: true });
+    const runtimeDir = path.join(staging, 'content', 'runtime');
+    mkdirSync(runtimeDir, { recursive: true });
+    buildSync({
+      entryPoints: [workerEntry],
+      outfile: path.join(runtimeDir, 'local-embedding-worker.js'),
+      bundle: true,
+      minify: true,
+      sourcemap: false,
+      platform: 'browser',
+      format: 'iife',
+      target: ['firefox128'],
+      define: { 'process.env.NODE_ENV': '"production"' },
+      logLevel: 'warning',
+    });
+    for (const name of ['ort-wasm-simd-threaded.jsep.mjs', 'ort-wasm-simd-threaded.jsep.wasm']) {
+      cpSync(path.join(repoRoot, 'node_modules', '@huggingface', 'transformers', 'dist', name), path.join(runtimeDir, name));
+    }
+
+    files = collectFiles(staging);
+    if (!files.some((f) => f.relPath === 'manifest.json')) throw new Error('manifest.json not found at plugin root');
+    for (const required of [
+      'content/local-embeddings.js',
+      'content/runtime/local-embedding-worker.js',
+      'content/runtime/ort-wasm-simd-threaded.jsep.mjs',
+      'content/runtime/ort-wasm-simd-threaded.jsep.wasm',
+      'icons/nodus.svg',
+    ]) {
+      if (!files.some((file) => file.relPath === required)) throw new Error(`missing local embedding runtime: ${required}`);
+    }
+
+    const zip = new AdmZip();
+    for (const file of files) zip.addFile(file.relPath, readFileSync(file.abs));
+    mkdirSync(outDir, { recursive: true });
+    zip.writeZip(xpiPath);
+  } finally {
+    rmSync(staging, { recursive: true, force: true });
+  }
 
   const buf = readFileSync(xpiPath);
   const sha256 = createHash('sha256').update(buf).digest('hex');

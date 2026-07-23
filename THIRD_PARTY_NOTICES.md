@@ -31,6 +31,24 @@ The offline gazetteer in Nodus is derived from the GeoNames `cities15000`,
 GeoNames data is provided "as is" and without endorsement. A complete copy of
 CC BY 4.0 is included in `legal/generated/CC-BY-4.0.txt`.
 
+## Multilingual E5 small model — MIT
+
+Nodus for Zotero downloads and runs the quantized ONNX weights from
+`Xenova/multilingual-e5-small`, pinned to revision
+`761b726dd34fb83930e26aab4e9ac3899aa1fa78`. That repository is an ONNX
+conversion of `intfloat/multilingual-e5-small`; the base model is licensed
+under the MIT License.
+
+- Model: https://huggingface.co/Xenova/multilingual-e5-small
+- Base model and license: https://huggingface.co/intfloat/multilingual-e5-small
+
+## Transformers.js — Apache License 2.0
+
+Nodus bundles Transformers.js 3.8.1 to run the local Zotero embedding model.
+Transformers.js is copyright Hugging Face and contributors and is licensed
+under the Apache License 2.0. Its license text is included in the generated
+third-party license bundle.
+
 ## ONNX Runtime — MIT
 
 Nodus uses ONNX Runtime 1.18.0, 1.21.0 and the development build identified by

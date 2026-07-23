@@ -15,6 +15,7 @@ const NH = window.NodusHighlighter;
 const NI = window.NodusIcons;
 const NE = window.NodusEvidence;
 const NV = window.NodusMultimodal;
+const NL = window.NodusLocalEmbeddings;
 const ico = (name, size) => (NI ? NI.svg(name, { size: size || 16 }) : "");
 
 // Full-document context cap (~50k tokens): big enough for most modern models,
@@ -38,7 +39,9 @@ const I18N = {
     "evidence.idle": "Evidence index idle", "evidence.index": "Index", "evidence.indexTitle": "Index selected documents and OCR text-poor PDF pages",
     "evidence.vision": "Vision", "evidence.visionTitle": "Analyze and attach the current rendered PDF page",
     "evidence.auto": "Auto: full text when small, retrieval when large", "evidence.retrieval": "Semantic retrieval", "evidence.full": "Complete text",
-    "evidence.embedding": "Embedding model",
+    "evidence.localEmbedding": "Local semantic model: multilingual E5 small (INT8). Runs on this device; no embedding API key required.",
+    "evidence.modelDownload": "Preparing the local semantic model · {pct}%",
+    "evidence.agentSearch": "Expanding evidence · round {round}",
     "settings.standaloneNote": "Nodus-only features are unavailable in Standalone mode.",
     "settings.language": "Language", "settings.connection": "Nodus connection", "settings.test": "Test connection",
     "settings.token": "token", "settings.manualHint": "Leave empty to auto-detect from Nodus.",
@@ -123,7 +126,9 @@ const I18N = {
     "evidence.idle": "Índice de evidencia inactivo", "evidence.index": "Indexar", "evidence.indexTitle": "Indexar los documentos seleccionados y aplicar OCR a las páginas PDF sin texto",
     "evidence.vision": "Visión", "evidence.visionTitle": "Analizar y adjuntar la página PDF renderizada actual",
     "evidence.auto": "Auto: texto completo si es pequeño; recuperación si es grande", "evidence.retrieval": "Búsqueda semántica", "evidence.full": "Texto completo",
-    "evidence.embedding": "Modelo de embeddings",
+    "evidence.localEmbedding": "Modelo semántico local: multilingual E5 small (INT8). Se ejecuta en este dispositivo; no requiere API key de embeddings.",
+    "evidence.modelDownload": "Preparando el modelo semántico local · {pct}%",
+    "evidence.agentSearch": "Ampliando evidencia · ronda {round}",
     "settings.standaloneNote": "Las funciones exclusivas de Nodus no están disponibles en modo Autónomo.",
     "settings.language": "Idioma", "settings.connection": "Conexión con Nodus", "settings.test": "Probar conexión",
     "settings.token": "token", "settings.manualHint": "Déjalo vacío para detectarlo automáticamente desde Nodus.",
@@ -308,8 +313,6 @@ function renderModelDropdown() {
     it.addEventListener("click", () => {
       state.model = { provider: m.provider, model: m.model };
       NS.setModel(state.mode, state.model);
-      const embeddingInput = $("#nd-embedding-model");
-      if (embeddingInput) embeddingInput.value = NS.getEmbeddingModel(m.provider);
       closeModelMenu(); renderModelDropdown(); updateSendEnabled();
     });
     list.appendChild(it); shown++;
@@ -428,36 +431,42 @@ async function selectedAttachments() {
   }
   return out;
 }
-function embeddingRef() {
-  const candidates = [];
-  if (state.model) candidates.push(state.model.provider);
-  candidates.push("openrouter", "openai", "gemini", "ollama", "lmstudio");
-  for (const provider of [...new Set(candidates)]) {
-    const p = NP.byId(provider);
-    if (!p || p.subscription || provider === "anthropic") continue;
-    if (!p.needsKey || NS.getKey(provider)) return { provider, model: NS.getEmbeddingModel(provider) };
-  }
-  return null;
-}
 async function ensureEmbeddings(indexes, signal) {
-  const ref = embeddingRef();
-  if (!ref) return { model: null, embedded: 0 };
+  if (!NL) throw new Error("local-embeddings-unavailable");
+  const model = NL.MODEL;
   let embedded = 0;
-  for (const index of indexes) {
-    const missing = (index.chunks || []).filter((c) => !Array.isArray(c.embedding) || c.embeddingModel !== ref.model);
-    for (let i = 0; i < missing.length; i += 32) {
-      const batch = missing.slice(i, i + 32);
+  const stopProgress = NL.onProgress((progress) => {
+    if (!progress || progress.status !== "progress") return;
+    const pct = Math.max(0, Math.min(100, Math.round(Number(progress.progress) || 0)));
+    setIndexStatus(tf("evidence.modelDownload", { pct }), "busy");
+  });
+  try {
+    for (const index of indexes) {
+      const missing = (index.chunks || []).filter((c) =>
+        !Array.isArray(c.embedding)
+        || c.embedding.length !== model.dimensions
+        || c.embeddingModel !== model.fingerprint
+      );
+      for (let i = 0; i < missing.length; i += 24) {
+        const batch = missing.slice(i, i + 24);
       setIndexStatus("Embedding " + Math.min(i + batch.length, missing.length) + "/" + missing.length + " · " + (index.title || index.attachmentKey), "busy");
-      const vectors = await NP.embed(ref, batch.map((c) => c.text), {
-        key: NS.getKey(ref.provider), localBase: NS.getLocalBase(ref.provider),
-      }, signal);
-      batch.forEach((chunk, j) => { chunk.embedding = vectors[j]; chunk.embeddingModel = ref.model; embedded++; });
+        const vectors = await NL.embedPassages(batch.map((chunk) =>
+          [index.title, chunk.section, chunk.text].filter(Boolean).join("\n")
+        ), { signal });
+        batch.forEach((chunk, j) => {
+          chunk.embedding = vectors[j];
+          chunk.embeddingModel = model.fingerprint;
+          embedded++;
+        });
+      }
+      index.embeddingModel = model.fingerprint;
+      index.updatedAt = Date.now();
+      await NS.saveEvidenceIndex(index);
     }
-    index.embeddingModel = ref.model;
-    index.updatedAt = Date.now();
-    await NS.saveEvidenceIndex(index);
+  } finally {
+    stopProgress();
   }
-  return { model: ref, embedded };
+  return { model, embedded };
 }
 function parseRankedIds(value, allowed) {
   const text = String(value || "").replace(/```(?:json)?/gi, "").replace(/```/g, "");
@@ -512,14 +521,94 @@ async function rerankEvidence(query, result, indexes, signal) {
     return result.hits;
   }
 }
+function parseRetrievalPlan(value, indexes) {
+  const text = String(value || "").replace(/```(?:json)?/gi, "").replace(/```/g, "");
+  const start = text.indexOf("{"), end = text.lastIndexOf("}");
+  if (start < 0 || end <= start) return { sufficient: true, queries: [], pages: [], missing: [] };
+  try {
+    const parsed = JSON.parse(text.slice(start, end + 1));
+    const sourcePages = new Map((indexes || []).map((index) => [
+      String(index.attachmentKey || ""),
+      Math.max(1, Number(index.totalPages) || (index.pages || []).length || 1),
+    ]));
+    const queries = [...new Set((Array.isArray(parsed.queries) ? parsed.queries : [])
+      .map((query) => String(query || "").replace(/\s+/g, " ").trim())
+      .filter((query) => query.length >= 2 && query.length <= 500))].slice(0, 3);
+    const pages = [];
+    for (const raw of (Array.isArray(parsed.pages) ? parsed.pages : []).slice(0, 4)) {
+      if (!raw || typeof raw !== "object") continue;
+      const source = String(raw.source || "");
+      const maxPage = sourcePages.get(source);
+      if (!maxPage) continue;
+      const from = Math.max(1, Math.min(maxPage, Math.floor(Number(raw.from) || 1)));
+      const to = Math.max(from, Math.min(maxPage, Math.floor(Number(raw.to) || from)));
+      pages.push({ source, from, to: Math.min(to, from + 5) });
+    }
+    return {
+      sufficient: parsed.sufficient !== false,
+      queries,
+      pages,
+      missing: (Array.isArray(parsed.missing) ? parsed.missing : []).map(String).slice(0, 4),
+    };
+  } catch (e) {
+    return { sufficient: true, queries: [], pages: [], missing: [] };
+  }
+}
+async function planEvidenceSearch(query, indexes, hits, round, signal) {
+  const sources = (indexes || []).map((index) => ({
+    source: index.attachmentKey,
+    title: index.title || index.itemKey,
+    pages: Number(index.totalPages) || (index.pages || []).length,
+  }));
+  const current = (hits || []).slice(0, 12).map((hit) => ({
+    id: hit.id,
+    source: hit.attachmentKey,
+    page: hit.pageLabel,
+    section: hit.section || "",
+    text: String(hit.text || "").replace(/\s+/g, " ").slice(0, 700),
+  }));
+  const system = [
+    "You are a bounded retrieval planner for academic documents.",
+    "Judge whether the current passages are enough to answer the question accurately.",
+    "Sufficient means every named entity, requested sub-question, comparison, relation, standard, and page/section constraint is directly covered. If any requested facet is absent from currentEvidence, mark sufficient false and search for it; never treat 'the supplied evidence does not mention it' as a complete answer while more source pages remain.",
+    "If not, propose at most 3 focused multilingual semantic queries and at most 4 short page ranges from the supplied sources.",
+    'Return ONLY JSON: {"sufficient":boolean,"queries":["..."],"pages":[{"source":"exact source id","from":1,"to":2}],"missing":["brief evidence gap"]}.',
+    "Use only exact source ids. Do not answer the question.",
+  ].join("\n");
+  const payload = { question: query, round, sources, currentEvidence: current };
+  let output = "";
+  try {
+    if (state.mode === "connected") {
+      const response = await apiJson("/api/z/retrieval-plan", {
+        method: "POST",
+        body: JSON.stringify({ model: state.model, ...payload }),
+        signal,
+      });
+      return parseRetrievalPlan(JSON.stringify(response), indexes);
+    }
+    await NP.chatStream(state.model, {
+      system,
+      key: NS.getKey(state.model.provider),
+      localBase: NS.getLocalBase(state.model.provider),
+      maxTokens: 900,
+      reasoning: "off",
+      messages: [{ role: "user", content: JSON.stringify(payload) }],
+    }, (delta) => { output += delta; }, signal);
+    return parseRetrievalPlan(output, indexes);
+  } catch (e) {
+    try { Zotero.logError(e); } catch (x) {}
+    return { sufficient: true, queries: [], pages: [], missing: [] };
+  }
+}
 async function repairEvidenceAnswer(answer, evidence, signal) {
   const hits = [...(evidence instanceof Map ? evidence.values() : evidence || [])];
   if (!hits.length || !String(answer || "").trim()) return String(answer || "");
   const system = [
     "You repair evidence citations in an academic answer.",
-    "Return the complete answer in the same language and preserve its meaning and structure.",
+    "Return the complete answer in the same language, focused only on the user's requested facets.",
+    "Remove tangential claims. If the catalogue directly covers a requested named entity, list, standard or relation, use that evidence instead of saying it is absent.",
     "For every factual claim, add one or more exact [[e:ID]] tokens from the catalogue immediately after the supported sentence.",
-    "Never invent or alter an id. If no passage supports a claim, replace only that claim with an explicit statement that the supplied evidence is insufficient.",
+    "A cited passage must directly entail the claim: never infer causation or a relationship merely because two facts are nearby. Never invent or alter an id. If no passage supports a claim, remove it or replace it with an explicit statement that the supplied evidence is insufficient.",
     "Return only the repaired answer, with no commentary or code fence.",
   ].join("\n");
   const prompt = `ANSWER TO REPAIR:\n${answer}\n\n${NE.evidencePrompt(hits)}`;
@@ -568,6 +657,7 @@ async function buildSelectedIndexes(force, signal) {
   if (!NE) return [];
   const attachments = await selectedAttachments();
   if (!attachments.length) return [];
+  const current = getCurrentItem();
   if (attachments.length > 1) {
     state.item = null;
     state.items = attachments.map((att) => {
@@ -590,12 +680,31 @@ async function buildSelectedIndexes(force, signal) {
   const indexes = [];
   for (let i = 0; i < attachments.length; i++) {
     setIndexStatus("Indexing " + (i + 1) + "/" + attachments.length, "busy");
-    const result = await NE.ensureIndex(attachments[i], NS, { force: !!force });
+    const attachment = attachments[i];
+    const canReadLayout = NV
+      && current.reader
+      && current.attachment
+      && Number(current.attachment.id) === Number(attachment.id)
+      && typeof NV.extractDocumentLayout === "function";
+    const result = await NE.ensureIndex(attachment, NS, {
+      force: !!force,
+      layoutExtractor: canReadLayout
+        ? () => NV.extractDocumentLayout(current.reader, {
+          signal,
+          onProgress: (done, total) => setIndexStatus("Reading layout " + done + "/" + total, "busy"),
+        })
+        : null,
+    });
     indexes.push(result.index);
   }
   state.indexes = indexes;
   setIndexStatus(indexes.length + " source" + (indexes.length === 1 ? "" : "s") + " · " + indexes.reduce((n, x) => n + x.chunks.length, 0) + " passages", "ok");
   return indexes;
+}
+function availableContextTokens() {
+  const raw = state.model && Number(state.model.contextLength || state.model.context_length);
+  const windowTokens = Number.isFinite(raw) && raw >= 8192 ? raw : 32768;
+  return Math.max(4000, Math.min(48000, windowTokens - Math.max(2048, state.maxTokens) - 4000));
 }
 async function prepareEvidence(query, signal) {
   state.evidence = new Map(); state.retrieval = null;
@@ -605,33 +714,58 @@ async function prepareEvidence(query, signal) {
   const indexes = await buildSelectedIndexes(false, signal);
   if (!indexes.length) return { text: "", hits: [], method: "empty", truncated: false };
   const totalChars = indexes.reduce((n, x) => n + (x.totalChars || 0), 0);
-  const strategy = ctx.strategy === "auto" ? (totalChars <= 120000 && indexes.length <= 3 ? "full" : "retrieval") : ctx.strategy;
+  const totalTokens = indexes.reduce((n, index) =>
+    n + (Number(index.estimatedTokens) || (index.chunks || []).reduce((sum, chunk) => sum + (Number(chunk.estimatedTokens) || NE.estimateTokens(chunk.text)), 0))
+  , 0);
+  const tokenBudget = availableContextTokens();
+  const strategy = ctx.strategy === "auto" ? (totalTokens <= tokenBudget && indexes.length <= 3 ? "full" : "retrieval") : ctx.strategy;
   if (strategy === "full") {
-    const full = NE.fullEvidencePrompt(indexes, 750000);
+    const full = NE.fullEvidencePrompt(indexes, { maxChars: tokenBudget * 5, maxTokens: tokenBudget });
     state.evidence = NE.evidenceMap(full.hits);
-    state.retrieval = { method: "full", hits: full.hits, totalChars, truncated: full.truncated };
+    state.retrieval = { method: "full", hits: full.hits, totalChars, totalTokens, truncated: full.truncated };
     setIndexStatus("Complete text · " + full.hits.length + " citable passages", full.truncated ? "warn" : "ok");
     return { ...full, method: "full" };
   }
   let queryEmbedding = null;
   try {
-    const semantic = await ensureEmbeddings(indexes, signal);
-    if (semantic.model) {
-      const vectors = await NP.embed(semantic.model, [query], {
-        key: NS.getKey(semantic.model.provider), localBase: NS.getLocalBase(semantic.model.provider),
-      }, signal);
-      queryEmbedding = vectors[0];
-    }
+    await ensureEmbeddings(indexes, signal);
+    queryEmbedding = await NL.embedQuery(query, { signal });
   } catch (e) {
     try { Zotero.logError(e); } catch (x) {}
     setIndexStatus("Semantic unavailable · lexical fallback", "warn");
   }
-  const result = NE.hybridSearch(indexes, query, queryEmbedding);
+  let result = NE.hybridSearch(indexes, query, queryEmbedding);
   result.hits = await rerankEvidence(query, result, indexes, signal);
-  result.method += "+rerank";
+  let rounds = 0;
+  const searched = new Set([NE.fold(query)]);
+  for (let round = 1; round <= 2; round++) {
+    setIndexStatus(tf("evidence.agentSearch", { round }), "busy");
+    const plan = await planEvidenceSearch(query, indexes, result.hits, round, signal);
+    if (plan.sufficient) break;
+    const queries = plan.queries.filter((value) => {
+      const key = NE.fold(value);
+      if (!key || searched.has(key)) return false;
+      searched.add(key);
+      return true;
+    });
+    if (!queries.length && !plan.pages.length) break;
+    let vectors = [];
+    if (queries.length && NL) {
+      try { vectors = await NL.embedQueries(queries, { signal }); }
+      catch (e) { try { Zotero.logError(e); } catch (x) {} }
+    }
+    const expansions = queries.map((value, i) => NE.hybridSearch(indexes, value, vectors[i] || null, { topK: 12, candidateK: 48 }));
+    const pageHits = NE.pageRequestHits(indexes, plan.pages, { maxHits: 24 });
+    result = NE.mergeRetrievalResults([result, ...expansions], pageHits, { topK: 16, candidateK: 56 });
+    result.hits = await rerankEvidence(query, result, indexes, signal);
+    rounds++;
+  }
+  result.method += (rounds ? "+agentic" + rounds : "") + "+rerank";
+  result.rounds = rounds;
+  result.totalTokens = totalTokens;
   state.evidence = NE.evidenceMap(result.hits);
   state.retrieval = result;
-  setIndexStatus((result.method.startsWith("hybrid") ? "Semantic + lexical + rerank" : "Lexical + rerank") + " · " + result.hits.length + " passages", "ok");
+  setIndexStatus((result.method.startsWith("hybrid") ? "Local semantic + lexical" : "Lexical") + (rounds ? " + agentic " + rounds : "") + " + rerank · " + result.hits.length + " passages", "ok");
   return { text: NE.evidencePrompt(result.hits), hits: result.hits, method: result.method, truncated: false };
 }
 async function runVisualExtraction(image, page) {
@@ -1091,7 +1225,7 @@ async function sendStandalone(bodyEl, signal, docInfo) {
   // training language even for an English/Spanish question.
   const lastUser = [...state.conv.messages].reverse().find((m) => m.role === "user");
   const lang = NU && NU.detectLanguage ? NU.detectLanguage(lastUser && lastUser.content, state.lang) : (state.lang === "es" ? "Spanish" : "English");
-  let system = "You are a research assistant embedded in Zotero. Answer about the open documents, grounded only in the supplied evidence. Cite every factual claim inline with the exact [[e:ID]] token for its supporting passage. Never invent, alter or reuse an evidence id for a claim it does not support. Put citations immediately after the sentence. If evidence is insufficient, say so. Be concise.\n\nOUTPUT LANGUAGE (highest priority): answer entirely in " + lang + ". Do not switch language because the source or an attached image uses another language.\n\n" + parts.join("\n\n");
+  let system = "You are a research assistant embedded in Zotero. Answer about the open documents, grounded only in the supplied evidence. Address every requested facet that the evidence covers, especially explicit named entities, lists and standards. Stay focused on the question: do not add tangential facts merely because they occur in neighboring passages. A claimed relation must be directly supported; never infer causation from co-location. Cite every factual claim inline with the exact [[e:ID]] token for its supporting passage. Never invent, alter or reuse an evidence id for a claim it does not support. Put citations immediately after the sentence. If evidence is insufficient, say so. Be concise.\n\nOUTPUT LANGUAGE (highest priority): answer entirely in " + lang + ". Do not switch language because the source or an attached image uses another language.\n\n" + parts.join("\n\n");
   if (state.agentEnabled && NA) system += "\n\n" + NA.SYSTEM;
   const key = NS.getKey(state.model.provider);
   const localBase = NS.getLocalBase(state.model.provider);
@@ -1468,9 +1602,6 @@ function wire() {
   $("#nd-history-clear").addEventListener("click", async () => { if (await showConfirm(t("modal.delAll"))) { state.conversations = []; await NS.saveConversations([]); startNewConversation(); renderHistory(""); } });
   $("#nd-ctx-fulltext").addEventListener("change", saveContext);
   $("#nd-ctx-strategy").addEventListener("change", saveContext);
-  $("#nd-embedding-model").addEventListener("change", (e) => {
-    NS.setEmbeddingModel(state.model ? state.model.provider : "openrouter", e.target.value);
-  });
   $("#nd-ctx-ideas").addEventListener("change", saveContext);
   $("#nd-ctx-corpus").addEventListener("change", saveContext);
   $("#nd-index-btn").addEventListener("click", async () => {
@@ -1571,7 +1702,6 @@ async function boot() {
   startNewConversation();
   await connect();
   await loadModelsForMode();
-  $("#nd-embedding-model").value = NS.getEmbeddingModel(state.model ? state.model.provider : "openrouter");
   await refreshItem(true);
 }
 boot().catch((e) => { try { Zotero.logError(e); } catch (x) {} });

@@ -16,6 +16,7 @@ test('packaging generates and exposes the legal bundle', () => {
       ['THIRD_PARTY_NOTICES.md', 'legal/THIRD_PARTY_NOTICES.md'],
       ['PRIVACY.md', 'legal/PRIVACY.md'],
       ['legal', 'legal'],
+      ['dist-zotero/nodus-zotero.xpi', 'zotero/nodus-zotero.xpi'],
     ],
   );
   for (const unpacked of ['node_modules/libheif-js/**/*', 'node_modules/@img/sharp-libvips-*/**/*']) {
@@ -25,7 +26,7 @@ test('packaging generates and exposes the legal bundle', () => {
 
 test('special notices cover data, native runtimes and LGPL replacement', () => {
   const notices = read('THIRD_PARTY_NOTICES.md');
-  for (const marker of ['GeoNames', 'CC BY 4.0', 'ONNX Runtime', 'libheif-js', 'sharp-libvips', 'IDprotector']) {
+  for (const marker of ['GeoNames', 'CC BY 4.0', 'Multilingual E5 small', 'Transformers.js 3.8.1', 'ONNX Runtime', 'libheif-js', 'sharp-libvips', 'IDprotector']) {
     assert.match(notices, new RegExp(marker));
   }
   const lgpl = read('legal/LGPL_COMPLIANCE.md');

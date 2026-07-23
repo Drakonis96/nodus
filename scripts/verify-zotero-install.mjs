@@ -1,6 +1,7 @@
 // Headless verification of the "Install/update in Zotero" flow. Runs the real
 // install module under Electron-as-Node (electron stubbed; app.getAppPath →
-// repo root so it zips zotero-plugin/). It WILL close + reopen a running Zotero.
+// repo root so it copies the canonical dist-zotero XPI). It WILL close +
+// reopen a running Zotero.
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';

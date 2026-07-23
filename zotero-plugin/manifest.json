@@ -1,9 +1,16 @@
 {
   "manifest_version": 2,
   "name": "Nodus for Zotero",
-  "version": "0.1.0",
+  "version": "2.6.0",
   "description": "Evidence-grounded research assistant for Zotero with full-text semantic retrieval, audited citations, OCR and visual document understanding.",
   "author": "Nodus",
+  "icons": {
+    "16": "icons/nodus.svg",
+    "32": "icons/nodus.svg",
+    "48": "icons/nodus.svg",
+    "64": "icons/nodus.svg",
+    "96": "icons/nodus.svg"
+  },
   "applications": {
     "zotero": {
       "id": "nodus-zotero@nodus.app",

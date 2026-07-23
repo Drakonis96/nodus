@@ -17,16 +17,26 @@ context so scanned text, figures, tables, equations and diagrams can be read.
 2. Split every logical page/section into overlapping, sentence-aligned chunks.
    Each chunk stores an immutable evidence id, attachment/item keys, title,
    page index/label, section, offsets and exact text.
-3. Persist indexes per attachment in the Zotero profile. Invalidate them when
-   the attachment modification time, size or text signature changes.
-4. Create embeddings in batches when the selected provider supports them.
-   Combine cosine similarity with BM25-style lexical scoring. If embeddings
-   are unavailable, lexical retrieval remains functional and the chat model
-   continues to provide explicit lexical retrieval with a visible status.
-5. Diversify results across documents and include neighbouring chunks when
+3. Reconstruct open PDFs from Zotero's PDF.js reader layout: order columns,
+   rebuild paragraphs, dehyphenate line endings, remove repeated headers and
+   footers, and retain page-coordinate spans for exact navigation/highlights.
+4. Persist cache metadata in a profile-local SQLite database, compressed page
+   and chunk data in gzip JSON, and embeddings in compact Float32 sidecars.
+   Invalidate them when the attachment modification time, size or text
+   signature changes.
+5. Create multilingual embeddings locally in a dedicated worker using pinned
+   `Xenova/multilingual-e5-small` INT8 weights. The model is automatic, cached
+   by Zotero after its first download and never needs an embedding provider or
+   API key. Combine cosine similarity with BM25-style lexical scoring.
+   Lexical retrieval remains available if the local runtime cannot start.
+6. Diversify results across documents and include neighbouring chunks when
    needed. Small source sets can use complete-text mode; large source sets use
    retrieval while retaining on-demand access to every indexed chunk.
-6. Give the model an explicit evidence catalogue and require
+7. For long documents, let a bounded retrieval planner run at most two
+   expansion rounds. It may issue up to three focused semantic queries and
+   inspect up to four short ranges from known source ids; every request is
+   validated and merged with the existing evidence before reranking.
+8. Give the model an explicit evidence catalogue and require
    `[[e:EVIDENCE_ID]]` citations.
 
 ## Citation contract and audit
@@ -63,7 +73,7 @@ context so scanned text, figures, tables, equations and diagrams can be read.
 ## Product controls
 
 - Context strategy: Auto, semantic retrieval or complete text.
-- Embedding model setting with provider-aware defaults.
+- Automatic local multilingual semantic model with download progress.
 - Index selected/open sources, rebuild stale indexes and show progress.
 - Attach current page, index visual page and OCR text-poor pages.
 - Clear indication of active sources, indexed chunks, visual attachments and
@@ -76,7 +86,7 @@ context so scanned text, figures, tables, equations and diagrams can be read.
   ranking, source diversity, citation allow-listing, claim coverage and visual
   feature parsing.
 - Provider tests for embeddings and multimodal request bodies.
-- Packaging tests for every new module.
+- Packaging tests for the worker, pinned model metadata, WASM runtime and icon.
 - Connected-server tests for evidence catalogues and images.
 - Syntax, lint, typecheck, build and the complete repository test suite.
 - Live Zotero 9 install/update smoke test:

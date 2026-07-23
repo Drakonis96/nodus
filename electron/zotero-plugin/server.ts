@@ -249,7 +249,7 @@ function buildPrompt(body: Record<string, unknown>, ctx: ChatContext): { system:
   const agentInstructions = typeof context.agentInstructions === 'string' ? context.agentInstructions : '';
   const system = [
     'You are Nodus, an academic research assistant embedded in Zotero. You help the user understand the open document and how it connects to their Nodus library.',
-    'Be precise and concise. Ground every claim in the provided context.',
+    'Be precise and concise. Ground every claim in the provided context. Address every requested facet that the evidence covers, especially explicit named entities, lists and standards. Stay focused on the question and omit tangential neighboring facts. A claimed relation must be directly supported; never infer causation from co-location.',
     CITE_INSTRUCTIONS,
     `OUTPUT LANGUAGE (highest priority): answer entirely in ${outputLanguage}. Do not switch because sources or images use another language.`,
     ...(agentInstructions ? [agentInstructions] : []),
@@ -401,6 +401,11 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, port: nu
 
     if (urlPath === '/api/z/rerank' && req.method === 'POST') {
       await handleRerank(req, res);
+      return;
+    }
+
+    if (urlPath === '/api/z/retrieval-plan' && req.method === 'POST') {
+      await handleRetrievalPlan(req, res);
       return;
     }
 
@@ -690,6 +695,100 @@ async function handleRerank(req: IncomingMessage, res: ServerResponse): Promise<
   sendJson(res, 200, { ids });
 }
 
+interface RetrievalPlan {
+  sufficient: boolean;
+  queries: string[];
+  pages: { source: string; from: number; to: number }[];
+  missing: string[];
+}
+
+function safeRetrievalPlan(output: string, sources: Map<string, number>): RetrievalPlan {
+  const fallback: RetrievalPlan = { sufficient: true, queries: [], pages: [], missing: [] };
+  const clean = output.replace(/```(?:json)?/gi, '').replace(/```/g, '');
+  const start = clean.indexOf('{');
+  const end = clean.lastIndexOf('}');
+  if (start < 0 || end <= start) return fallback;
+  try {
+    const parsed = JSON.parse(clean.slice(start, end + 1)) as Record<string, unknown>;
+    const queries = [...new Set((Array.isArray(parsed.queries) ? parsed.queries : [])
+      .map((value) => String(value ?? '').replace(/\s+/g, ' ').trim())
+      .filter((value) => value.length >= 2 && value.length <= 500))].slice(0, 3);
+    const pages: RetrievalPlan['pages'] = [];
+    for (const value of (Array.isArray(parsed.pages) ? parsed.pages : []).slice(0, 4)) {
+      if (!value || typeof value !== 'object') continue;
+      const raw = value as Record<string, unknown>;
+      const source = String(raw.source ?? '');
+      const maxPage = sources.get(source);
+      if (!maxPage) continue;
+      const from = Math.max(1, Math.min(maxPage, Math.floor(Number(raw.from) || 1)));
+      const requestedTo = Math.max(from, Math.floor(Number(raw.to) || from));
+      pages.push({ source, from, to: Math.min(maxPage, from + 5, requestedTo) });
+    }
+    return {
+      sufficient: parsed.sufficient !== false,
+      queries,
+      pages,
+      missing: (Array.isArray(parsed.missing) ? parsed.missing : []).map(String).slice(0, 4),
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+async function handleRetrievalPlan(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const body = await readJsonBody(req);
+  const model = toModelRef(body.model);
+  const question = typeof body.question === 'string' ? body.question.slice(0, 10_000) : '';
+  const round = Math.max(1, Math.min(2, Math.floor(Number(body.round) || 1)));
+  const sources = new Map<string, number>();
+  const sourceRows = (Array.isArray(body.sources) ? body.sources : []).slice(0, 12).map((value) => {
+    const raw = value && typeof value === 'object' ? value as Record<string, unknown> : {};
+    const source = typeof raw.source === 'string' ? raw.source.slice(0, 120) : '';
+    const title = typeof raw.title === 'string' ? raw.title.slice(0, 500) : '';
+    const pages = Math.max(1, Math.min(100_000, Math.floor(Number(raw.pages) || 1)));
+    if (source) sources.set(source, pages);
+    return source ? { source, title, pages } : null;
+  }).filter(Boolean);
+  const currentEvidence = (Array.isArray(body.currentEvidence) ? body.currentEvidence : []).slice(0, 12).map((value) => {
+    const raw = value && typeof value === 'object' ? value as Record<string, unknown> : {};
+    return {
+      id: String(raw.id ?? '').slice(0, 160),
+      source: String(raw.source ?? '').slice(0, 120),
+      page: String(raw.page ?? '').slice(0, 40),
+      section: String(raw.section ?? '').slice(0, 300),
+      text: String(raw.text ?? '').replace(/\s+/g, ' ').slice(0, 700),
+    };
+  });
+  if (!question || !sources.size) {
+    sendJson(res, 200, { sufficient: true, queries: [], pages: [], missing: [] });
+    return;
+  }
+  let output = '';
+  const controller = new AbortController();
+  res.on('close', () => controller.abort());
+  await completeTextStream(
+    {
+      system: [
+        'You are a bounded retrieval planner for academic documents.',
+        'Judge whether the current passages are sufficient to answer the question accurately.',
+        "Sufficient means every named entity, requested sub-question, comparison, relation, standard, and page/section constraint is directly covered. If any requested facet is absent from currentEvidence, mark sufficient false and search for it; never treat 'the supplied evidence does not mention it' as a complete answer while more source pages remain.",
+        'If evidence is incomplete, propose at most 3 focused multilingual semantic queries and at most 4 short page ranges from the supplied sources.',
+        'Return ONLY JSON: {"sufficient":boolean,"queries":["..."],"pages":[{"source":"exact source id","from":1,"to":2}],"missing":["brief evidence gap"]}.',
+        'Use only exact source ids. Do not answer the question.',
+      ].join('\n'),
+      user: JSON.stringify({ question, round, sources: sourceRows, currentEvidence }),
+      reasoning: 'off',
+      plainContext: true,
+      skipStudentPseudonyms: true,
+      maxTokens: 900,
+    },
+    (delta, kind) => { if (kind !== 'reasoning') output += delta; },
+    model,
+    controller.signal,
+  );
+  sendJson(res, 200, safeRetrievalPlan(output, sources));
+}
+
 async function handleCitationRepair(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const body = await readJsonBody(req);
   const model = toModelRef(body.model);
@@ -706,7 +805,7 @@ async function handleCitationRepair(req: IncomingMessage, res: ServerResponse): 
   let text = '';
   await completeTextStream(
     {
-      system: 'Repair citations in the supplied academic answer. Preserve its language, meaning and structure. Add exact [[e:ID]] tokens immediately after every supported factual sentence. Never invent ids. Replace an unsupported claim only with a statement that supplied evidence is insufficient. Return only the complete repaired answer.',
+      system: "Repair the supplied academic answer in the same language, focused only on the user's requested facets. Remove tangential claims. If the evidence catalogue directly covers a requested named entity, list, standard or relation, use it instead of saying it is absent. Add exact [[e:ID]] tokens immediately after every supported factual sentence. A cited passage must directly entail the claim; never infer causation from co-location. Never invent ids. Remove an unsupported claim or replace it with a statement that supplied evidence is insufficient. Return only the complete answer.",
       user: `ANSWER TO REPAIR:\n${answer}\n\nEVIDENCE CATALOGUE:\n${catalogue}`,
       reasoning: 'off',
       plainContext: true,

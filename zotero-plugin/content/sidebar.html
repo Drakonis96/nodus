@@ -84,7 +84,7 @@
           <option value="retrieval" data-i18n="evidence.retrieval">Semantic retrieval</option>
           <option value="full" data-i18n="evidence.full">Complete text</option>
         </select>
-        <input id="nd-embedding-model" type="text" data-i18n-ph="evidence.embedding" placeholder="Embedding model" />
+        <div id="nd-local-embedding" class="nd-muted" data-i18n="evidence.localEmbedding">Local semantic model: multilingual E5 small (INT8). Runs on this device; no embedding API key required.</div>
         <label class="nd-check" data-nodus-only><input type="checkbox" id="nd-ctx-ideas" /> <span data-i18n="settings.useIdeas">Use Nodus ideas when available</span></label>
         <label class="nd-check" data-nodus-only><input type="checkbox" id="nd-ctx-corpus" /> <span data-i18n="settings.useCorpus">Search my Nodus library for related passages</span></label>
         <div class="nd-muted" data-nodus-only-hint hidden data-i18n="settings.standaloneNote">Nodus-only features are unavailable in Standalone mode.</div>
@@ -162,6 +162,7 @@
   <script src="chrome://nodus/content/icons.js"></script>
   <script src="chrome://nodus/content/providers.js"></script>
   <script src="chrome://nodus/content/store.js"></script>
+  <script src="chrome://nodus/content/local-embeddings.js"></script>
   <script src="chrome://nodus/content/evidence.js"></script>
   <script src="chrome://nodus/content/multimodal.js"></script>
   <script src="chrome://nodus/content/agent.js"></script>

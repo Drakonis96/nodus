@@ -45,13 +45,31 @@
     return Object.values(signals).some(Boolean);
   }
 
+  function unwrap(value) {
+    try { return value && value.wrappedJSObject ? value.wrappedJSObject : value; }
+    catch (e) { return value; }
+  }
+  function cloneForCompartment(value, target) {
+    try {
+      if (typeof Components !== "undefined" && Components.utils && typeof Components.utils.cloneInto === "function") {
+        return Components.utils.cloneInto(value, target);
+      }
+    } catch (e) {}
+    return value;
+  }
   function readerInternals(reader) {
     try {
-      const primary = reader && reader._internalReader && reader._internalReader._primaryView;
-      const iframe = primary && primary._iframeWindow;
-      const app = iframe && iframe.PDFViewerApplication;
-      const viewer = app && app.pdfViewer;
-      return { primary, iframe, app, viewer };
+      const internal = reader && reader._internalReader;
+      const primary = internal && internal._primaryView;
+      // Zotero 9 keeps PDF.js on the PDFView owned by PrimaryView. Older
+      // releases exposed the iframe directly on PrimaryView, so retain that
+      // path as a compatibility fallback.
+      const pdfView = primary && (primary._pdfView || primary);
+      const rawIframe = (pdfView && pdfView._iframeWindow) || (primary && primary._iframeWindow);
+      const iframe = unwrap(rawIframe);
+      const app = unwrap(iframe && iframe.PDFViewerApplication);
+      const viewer = unwrap(app && app.pdfViewer);
+      return { internal, primary, pdfView, rawIframe, iframe, app, viewer };
     } catch (e) { return {}; }
   }
   function currentPageIndex(reader) {
@@ -62,6 +80,64 @@
       if (loc && Number.isFinite(Number(loc.pageIndex))) return Number(loc.pageIndex);
     } catch (e) {}
     return 0;
+  }
+  function layoutItem(item, pageHeight) {
+    const transform = Array.isArray(item && item.transform) ? item.transform : [];
+    const x = Number(transform[4]) || 0;
+    const rawY = Number(transform[5]) || 0;
+    const height = Math.max(
+      1,
+      Math.abs(Number(item && item.height) || 0),
+      Math.hypot(Number(transform[2]) || 0, Number(transform[3]) || 0),
+    );
+    return {
+      str: String(item && item.str || ""),
+      x,
+      y: Math.max(0, Number(pageHeight) - rawY - height),
+      width: Math.max(0, Number(item && item.width) || 0),
+      height,
+      dir: String(item && item.dir || ""),
+      fontName: String(item && item.fontName || ""),
+    };
+  }
+  async function extractDocumentLayout(reader, opts) {
+    opts = opts || {};
+    const { app, rawIframe, iframe } = readerInternals(reader);
+    const pdf = unwrap(app && app.pdfDocument);
+    if (!pdf || !Number(pdf.numPages)) throw new Error("pdf-document-unavailable");
+    const pages = [];
+    for (let i = 0; i < Number(pdf.numPages); i++) {
+      if (opts.signal && opts.signal.aborted) throw new DOMException("Aborted", "AbortError");
+      if (typeof opts.onProgress === "function") opts.onProgress(i, Number(pdf.numPages));
+      // PDF.js lives in a resource:// iframe. Values returned across that
+      // compartment are Xray wrappers in chrome://nodus and must be unwrapped
+      // before their prototype methods (getViewport/getTextContent) are visible.
+      const page = unwrap(await pdf.getPage(i + 1));
+      if (!page || typeof page.getViewport !== "function" || typeof page.getTextContent !== "function") {
+        throw new Error("pdf-page-api-unavailable");
+      }
+      // Firefox rejects a chrome-compartment object passed to a function from
+      // the PDF iframe. Clone the only structured argument into that iframe.
+      const viewportOptions = cloneForCompartment({ scale: 1 }, rawIframe || iframe);
+      const viewport = unwrap(page.getViewport(viewportOptions));
+      const content = unwrap(await page.getTextContent());
+      pages.push({
+        pageIndex: i,
+        pageLabel: String(i + 1),
+        width: Number(viewport.width) || 0,
+        height: Number(viewport.height) || 0,
+        // Array.prototype.map on the unwrapped PDF.js array would create the
+        // result in the iframe's realm. Array.from materializes a Nodus-owned
+        // array so later structure/cache code never receives privileged Xrays.
+        items: Array.from(content && content.items ? content.items : [], unwrap)
+          .filter((item) => item && typeof item.str === "string")
+          .map((item) => layoutItem(item, viewport.height)),
+      });
+      // Let the reader paint/respond between pages on long monographs.
+      if (i % 4 === 3) await wait(0);
+    }
+    if (typeof opts.onProgress === "function") opts.onProgress(Number(pdf.numPages), Number(pdf.numPages));
+    return pages;
   }
   function wait(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
   async function renderedCanvas(reader, pageIndex) {
@@ -135,7 +211,7 @@
   window.NodusMultimodal = {
     MAX_IMAGE_DIM, MAX_IMAGES, VISUAL_SYSTEM,
     isImageDataUrl, dataUrlToImagePart, visualSignals, needsVisualAnalysis,
-    readerInternals, currentPageIndex, renderedCanvas, copyCanvas, capturePage,
+    unwrap, cloneForCompartment, readerInternals, currentPageIndex, layoutItem, extractDocumentLayout, renderedCanvas, copyCanvas, capturePage,
     selectionCrop, visualPrompt, cleanVisualExtraction,
   };
 })();
