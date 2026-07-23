@@ -279,6 +279,16 @@ test('Nodi drags in absolute screen space and closes through an animated context
     assert.match(figureCss, new RegExp(animation));
   }
   assert.match(companionCss, /\.nodi-context-menu/);
+  assert.match(
+    companionCss,
+    /\.nodi-theme-light \.nodi-context-menu button:hover,[\s\S]*?\.nodi-theme-light \.nodi-context-menu button:focus-visible\s*\{[^}]*color:\s*#9f1239/s,
+    'the selected close-mascot action keeps readable text in the light theme',
+  );
+  assert.match(
+    companionCss,
+    /\.nodi-theme-light \.nodi-context-icon\s*\{[^}]*color:\s*#be123c/s,
+    'the close-mascot icon keeps sufficient contrast in the light theme',
+  );
   assert.match(companionCss, /\.nodi-anchor\.open-right/);
   assert.match(companionCss, /\.nodi-anchor\.open-down/);
   assert.match(companionCss, /\.nodi-figure\s*\{[^}]*z-index:\s*1/s);
