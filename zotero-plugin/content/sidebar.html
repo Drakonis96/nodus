@@ -14,6 +14,7 @@
       <button id="nd-close" class="nd-iconbtn nd-close" title="Close" aria-label="Close" data-i18n-title="close">✕</button>
     </header>
 
+    <div id="nd-body">
     <nav id="nd-tabs">
       <button class="nd-tab nd-tab--active" data-tab="chat" data-i18n="tab.chat">Chat</button>
       <button class="nd-tab" data-tab="providers" data-i18n="tab.providers">Providers</button>
@@ -25,8 +26,22 @@
       <div id="nd-chatbar">
         <button id="nd-new" class="nd-iconbtn" data-i18n-title="chat.new" title="New conversation">＋</button>
         <button id="nd-history-btn" class="nd-iconbtn" data-i18n-title="chat.history" title="Conversations">🕑</button>
+        <button id="nd-save-note" class="nd-iconbtn" data-i18n-title="chat.saveNote" title="Save chat as note">📝</button>
+        <button id="nd-highlight-btn" class="nd-iconbtn" data-i18n-title="hl.btn" title="Auto-highlight document">🖍️</button>
         <button id="nd-agent-btn" class="nd-iconbtn" data-i18n-title="agent.mode" title="Agent mode">🛠</button>
-        <select id="nd-model" title="Model"></select>
+        <div id="nd-model-dd" class="nd-dd">
+          <button id="nd-model-btn" class="nd-dd-btn" title="Model"><span id="nd-model-label">—</span></button>
+          <div id="nd-model-menu" class="nd-dd-menu" hidden>
+            <div class="nd-dd-search"><input id="nd-model-search" data-i18n-ph="model.search" placeholder="Search models…" /></div>
+            <div id="nd-model-list" class="nd-dd-list"></div>
+          </div>
+        </div>
+        <div id="nd-think-dd" class="nd-dd nd-dd--think">
+          <button id="nd-reasoning-btn" class="nd-iconbtn nd-think-btn" data-i18n-title="reasoning.title" title="Thinking"><span class="nd-think-ico" aria-hidden="true"></span><span id="nd-think-lvl" class="nd-think-lvl"></span></button>
+          <div id="nd-think-menu" class="nd-dd-menu nd-dd-menu--think" hidden>
+            <div id="nd-think-list" class="nd-dd-list"></div>
+          </div>
+        </div>
       </div>
       <div id="nd-item"></div>
       <div id="nd-selection" hidden></div>
@@ -70,6 +85,19 @@
         <div class="nd-muted" data-i18n="agent.hint">Each action asks for permission unless auto-approve is on.</div>
       </div>
       <div class="nd-field">
+        <label data-i18n="hl.title">Auto-highlight colors</label>
+        <div class="nd-row nd-hl-colors">
+          <label class="nd-hl-color"><input type="color" id="nd-hl-high" value="#ff6666" /> <span data-i18n="hl.high">Very important</span></label>
+          <label class="nd-hl-color"><input type="color" id="nd-hl-medium" value="#ffd400" /> <span data-i18n="hl.medium">Important</span></label>
+        </div>
+        <div class="nd-muted" data-i18n="hl.hint">Open the PDF in Zotero's reader, then use the 🖍️ button to highlight the most important passages.</div>
+      </div>
+      <div class="nd-field">
+        <label data-i18n="settings.maxTokens">Max response length</label>
+        <input id="nd-maxtokens" type="number" min="256" step="256" placeholder="8192" />
+        <div class="nd-muted" data-i18n="settings.maxTokensHint">Maximum tokens the model may generate per reply. Higher = longer answers.</div>
+      </div>
+      <div class="nd-field">
         <label data-i18n="settings.language">Language</label>
         <select id="nd-lang"><option value="en">English</option><option value="es">Español</option></select>
       </div>
@@ -94,6 +122,20 @@
       <div id="nd-history-list"></div>
       <button id="nd-history-clear" class="nd-danger" data-i18n="history.clearAll">Delete all conversations</button>
     </div>
+    </div><!-- /#nd-body -->
+
+    <!-- ADD PROMPT MODAL -->
+    <div id="nd-prompt-modal" class="nd-modal" hidden>
+      <div class="nd-modal-box">
+        <div class="nd-modal-title" data-i18n="prompt.newTitle">New prompt</div>
+        <input id="nd-prompt-title" class="nd-modal-input" data-i18n-ph="prompt.titlePh" placeholder="Title" />
+        <textarea id="nd-prompt-text" class="nd-modal-input" rows="4" data-i18n-ph="prompt.textPh" placeholder="Prompt text…"></textarea>
+        <div class="nd-modal-actions">
+          <button id="nd-prompt-cancel" class="nd-btn-ghost" data-i18n="modal.cancel">Cancel</button>
+          <button id="nd-prompt-save" class="nd-btn-primary" data-i18n="modal.save">Save</button>
+        </div>
+      </div>
+    </div>
 
     <!-- CONFIRM MODAL -->
     <div id="nd-modal" class="nd-modal" hidden>
@@ -106,9 +148,13 @@
       </div>
     </div>
   </div>
+  <script src="chrome://nodus/content/icons.js"></script>
   <script src="chrome://nodus/content/providers.js"></script>
   <script src="chrome://nodus/content/store.js"></script>
   <script src="chrome://nodus/content/agent.js"></script>
+  <script src="chrome://nodus/content/util.js"></script>
+  <script src="chrome://nodus/content/markdown.js"></script>
+  <script src="chrome://nodus/content/highlighter.js"></script>
   <script src="chrome://nodus/content/sidebar.js"></script>
 </body>
 </html>

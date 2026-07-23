@@ -22,6 +22,14 @@
   function setLang(l) { S("lang", l); }
   function getModel(mode) { return PJSON("model." + mode, null); }
   function setModel(mode, ref) { SJSON("model." + mode, ref); }
+  function getMaxTokens() { const n = Number(P("maxTokens", 0)); return Number.isFinite(n) && n > 0 ? n : 8192; }
+  function setMaxTokens(v) { const n = Number(v); S("maxTokens", Number.isFinite(n) && n > 0 ? Math.floor(n) : 8192); }
+  const REASONING = ["default", "off", "low", "medium", "high"];
+  function getReasoning() { const v = P("reasoning", "default"); return REASONING.includes(v) ? v : "default"; }
+  function setReasoning(v) { S("reasoning", REASONING.includes(v) ? v : "default"); }
+  // Auto-highlight colors: high = MUY IMPORTANTE, medium = IMPORTANTE.
+  function getHlColors() { const c = PJSON("hlColors", null); return { high: (c && c.high) || "#ff6666", medium: (c && c.medium) || "#ffd400" }; }
+  function setHlColors(c) { SJSON("hlColors", { high: (c && c.high) || "#ff6666", medium: (c && c.medium) || "#ffd400" }); }
   function getContext() {
     return { useIdeas: P("ctx.ideas", "1") !== "0", useCorpus: P("ctx.corpus", "1") !== "0", useFulltext: P("ctx.fulltext", "1") !== "0" };
   }
@@ -42,6 +50,16 @@
     setPinned(arr);
     return arr;
   }
+
+  // ---- custom prompts (user-defined templates for the ✦ menu) ----
+  function getCustomPrompts() { const a = PJSON("customPrompts", []); return Array.isArray(a) ? a : []; }
+  function setCustomPrompts(arr) { SJSON("customPrompts", Array.isArray(arr) ? arr : []); }
+  function addCustomPrompt(title, prompt) {
+    const a = getCustomPrompts();
+    a.push({ id: "up_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6), title: String(title || "").trim(), prompt: String(prompt || "").trim() });
+    setCustomPrompts(a); return a;
+  }
+  function removeCustomPrompt(id) { setCustomPrompts(getCustomPrompts().filter((p) => p.id !== id)); }
 
   // ---- agent mode ----
   function getAgent() { return P("agent", "0") === "1"; }
@@ -68,8 +86,9 @@
   function newId() { return "c_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8); }
 
   window.NodusStore = {
-    getMode, setMode, getLang, setLang, getModel, setModel, getContext, setContext,
+    getMode, setMode, getLang, setLang, getModel, setModel, getMaxTokens, setMaxTokens, getReasoning, setReasoning, getHlColors, setHlColors, getContext, setContext,
     getKey, setKey, getLocalBase, setLocalBase, getPinned, setPinned, isPinned, togglePinned,
+    getCustomPrompts, setCustomPrompts, addCustomPrompt, removeCustomPrompt,
     getAgent, setAgent, getAgentAuto, setAgentAuto,
     getManual, setManual, loadConversations, saveConversations, newId,
   };

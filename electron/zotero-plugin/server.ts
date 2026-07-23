@@ -15,7 +15,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { app, BrowserWindow, shell } from 'electron';
-import type { ModelRef, Work, ZoteroPluginServerStatus } from '@shared/types';
+import type { ModelRef, ReasoningEffort, Work, ZoteroPluginServerStatus } from '@shared/types';
 import { getSettings, updateSettings } from '../db/settingsRepo';
 import { getDb } from '../db/database';
 import { embeddedIdeaCount, getIdeasByWork, getIdeaDetail } from '../db/ideasRepo';
@@ -230,6 +230,7 @@ function buildPrompt(body: Record<string, unknown>, ctx: ChatContext): { system:
   const itemTitle = typeof context.title === 'string' ? context.title : ctx.work?.title ?? '';
   const documentText = typeof context.documentText === 'string' ? context.documentText : '';
   const selection = typeof context.selection === 'string' ? context.selection : '';
+  const extraContext = typeof context.extraContext === 'string' ? context.extraContext : '';
 
   const messages = Array.isArray(body.messages) ? (body.messages as { role?: string; content?: string }[]) : [];
   const history = messages
@@ -247,10 +248,13 @@ function buildPrompt(body: Record<string, unknown>, ctx: ChatContext): { system:
 
   const parts: string[] = [];
   if (itemTitle) parts.push(`OPEN DOCUMENT: ${itemTitle}`);
+  if (extraContext) parts.push(extraContext);
   if (ctx.ideasBlock) parts.push(ctx.ideasBlock);
   if (ctx.gapsBlock) parts.push(ctx.gapsBlock);
   if (selection) parts.push(`USER SELECTION (the user highlighted this — treat it as the focus and quote/cite it):\n"""\n${selection}\n"""`);
-  if (documentText) parts.push(`DOCUMENT TEXT (page markers like "=== page N ===" indicate pages you may cite with [[p:N]]):\n"""\n${documentText.slice(0, 60_000)}\n"""`);
+  // The plugin already head/tail-samples long documents to DOC_CHAR_LIMIT; keep a
+  // generous ceiling here so we don't re-truncate away the sampled conclusion.
+  if (documentText) parts.push(`DOCUMENT TEXT (page markers like "=== page N ===" indicate pages you may cite with [[p:N]]):\n"""\n${documentText.slice(0, 200_000)}\n"""`);
   if (ctx.passagesBlock) parts.push(ctx.passagesBlock);
   parts.push(`CONVERSATION SO FAR:\n${history}`);
   parts.push('Answer the last user message.');
@@ -364,6 +368,16 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, port: nu
       return;
     }
 
+    if (urlPath === '/api/z/highlight' && req.method === 'POST') {
+      await handleHighlight(req, res);
+      return;
+    }
+
+    if (urlPath === '/api/z/translate' && req.method === 'POST') {
+      await handleTranslate(req, res);
+      return;
+    }
+
     sendJson(res, 404, { error: 'Ruta no encontrada.' });
   } catch (error) {
     if (res.headersSent) {
@@ -435,6 +449,87 @@ async function openInNodus(body: Record<string, unknown>): Promise<{ ok: boolean
   return { ok: true };
 }
 
+const HIGHLIGHT_SYSTEM =
+  "You pick the most important passages of a document to highlight for a student. " +
+  "Read the DOCUMENT TEXT and choose the passages that matter most, as EXACT verbatim quotes copied from the text — do NOT paraphrase, keep the exact wording so they can be located in the PDF. " +
+  "Assign each a level: 'high' for the few MOST important (core thesis, key definitions, critical findings/conclusions) and 'medium' for important supporting points. " +
+  "Prefer a single sentence or short clause per passage (never a whole paragraph). Return between 8 and 25 passages. " +
+  'Respond with ONLY a JSON array and nothing else: [{"text":"exact quote","level":"high|medium"}].';
+
+/** Parse a model reply into [{text, level}] highlight passages. */
+function parseHighlightPassages(text: string): { text: string; level: 'high' | 'medium' }[] {
+  const s = text.replace(/```(?:json)?/gi, '');
+  const a = s.indexOf('['), b = s.lastIndexOf(']');
+  if (a < 0 || b <= a) return [];
+  let arr: unknown;
+  try { arr = JSON.parse(s.slice(a, b + 1)); } catch { return []; }
+  if (!Array.isArray(arr)) return [];
+  const out: { text: string; level: 'high' | 'medium' }[] = [];
+  for (const it of arr) {
+    const quote = typeof it === 'string' ? it : (it && typeof it === 'object' ? (it as Record<string, unknown>).text : null);
+    if (typeof quote !== 'string' || !quote.trim()) continue;
+    const raw = String((it && typeof it === 'object' && ((it as Record<string, unknown>).level || (it as Record<string, unknown>).importance)) || 'medium').toLowerCase();
+    out.push({ text: quote.trim(), level: /(high|very|muy|crit|red|rojo|1)/.test(raw) ? 'high' : 'medium' });
+  }
+  return out;
+}
+
+async function handleHighlight(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const body = await readJsonBody(req);
+  const documentText = typeof body.documentText === 'string' ? body.documentText.slice(0, 300_000) : '';
+  const model = toModelRef(body.model);
+  const reasoningRaw = typeof body.reasoning === 'string' ? body.reasoning : 'default';
+  const reasoning: ReasoningEffort = (['off', 'low', 'medium', 'high'] as const).includes(reasoningRaw as ReasoningEffort)
+    ? (reasoningRaw as ReasoningEffort)
+    : 'off';
+  if (!documentText) {
+    sendJson(res, 200, { passages: [] });
+    return;
+  }
+  let acc = '';
+  const controller = new AbortController();
+  res.on('close', () => controller.abort());
+  try {
+    await completeTextStream(
+      { system: HIGHLIGHT_SYSTEM, user: `DOCUMENT TEXT:\n"""\n${documentText}\n"""\n\nReturn the JSON array of the most important passages to highlight.`, reasoning },
+      (delta, kind) => { if (kind !== 'reasoning') acc += delta; },
+      model,
+      controller.signal,
+    );
+  } catch (error) {
+    sendJson(res, 500, { error: error instanceof Error ? error.message : String(error), passages: [] });
+    return;
+  }
+  sendJson(res, 200, { passages: parseHighlightPassages(acc) });
+}
+
+async function handleTranslate(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const body = await readJsonBody(req);
+  const text = typeof body.text === 'string' ? body.text.slice(0, 20_000) : '';
+  const language = typeof body.language === 'string' ? body.language.slice(0, 60) : 'English';
+  const model = toModelRef(body.model);
+  res.writeHead(200, { 'Content-Type': 'application/x-ndjson; charset=utf-8', 'Cache-Control': 'no-store', Connection: 'keep-alive' });
+  const write = (obj: unknown) => { try { if (!res.writableEnded && !res.destroyed) res.write(JSON.stringify(obj) + '\n'); } catch { /* client gone */ } };
+  const controller = new AbortController();
+  res.on('close', () => controller.abort());
+  try {
+    await completeTextStream(
+      {
+        system: `Translate the text the user provides into ${language}. Output ONLY the translation — no explanations, no notes, no quotation marks. Preserve meaning and tone.`,
+        user: text,
+        reasoning: 'off',
+      },
+      (delta, kind) => { if (kind !== 'reasoning') write({ type: 'delta', text: delta }); },
+      model,
+      controller.signal,
+    );
+    write({ type: 'done' });
+  } catch (error) {
+    write({ type: 'error', error: error instanceof Error ? error.message : String(error) });
+  }
+  try { res.end(); } catch { /* client gone */ }
+}
+
 async function handleChatStream(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const body = await readJsonBody(req);
   const messages = Array.isArray(body.messages) ? (body.messages as { role?: string; content?: string }[]) : [];
@@ -444,6 +539,15 @@ async function handleChatStream(req: IncomingMessage, res: ServerResponse): Prom
   const ctx = await buildChatContext(body, lastUserText);
   const { system, user } = buildPrompt(body, ctx);
   const model = toModelRef(body.model);
+  // Honor the plugin's reasoning/thinking selector; 'default' preserves the
+  // server's historical 'off'.
+  const context = (body.context && typeof body.context === 'object' ? body.context : {}) as Record<string, unknown>;
+  const reasoningRaw = typeof context.reasoning === 'string' ? context.reasoning : 'default';
+  const reasoning: ReasoningEffort = (['off', 'low', 'medium', 'high'] as const).includes(
+    reasoningRaw as ReasoningEffort,
+  )
+    ? (reasoningRaw as ReasoningEffort)
+    : 'off';
 
   res.writeHead(200, {
     'Content-Type': 'application/x-ndjson; charset=utf-8',
@@ -463,7 +567,7 @@ async function handleChatStream(req: IncomingMessage, res: ServerResponse): Prom
   res.on('close', () => controller.abort());
   try {
     await completeTextStream(
-      { system, user, reasoning: 'off' },
+      { system, user, reasoning },
       (delta, kind) => {
         if (kind === 'reasoning') return;
         write({ type: 'delta', text: delta });

@@ -26,6 +26,7 @@
     "licenses:generate": "node scripts/generate-third-party-licenses.mjs",
     "licenses:verify": "npm run licenses:generate && node scripts/verify-license-compliance.mjs",
     "privacy:verify": "node --test scripts/test-privacy-compliance.mjs",
+    "zotero:xpi": "node scripts/build-zotero-xpi.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p electron/tsconfig.json",
     "lint": "eslint . --ext .ts,.tsx",
     "icons": "node scripts/generate-icons.mjs",

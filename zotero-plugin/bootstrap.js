@@ -167,6 +167,12 @@ function addLibraryButton(window) {
   btn.setAttribute("tooltiptext", "Nodus");
   btn.classList.add("zotero-tb-button");
   btn.style.setProperty("list-style-image", 'url("' + Nodus.rootURI + 'icons/nodus.svg")');
+  // Only WIDEN the button so it isn't a tall/narrow vertical rectangle. Do NOT
+  // set height — the native class already sizes it to the toolbar row and
+  // centres it vertically; forcing a height overflowed the items bar.
+  btn.style.minWidth = "24px";
+  // Breathing room so it doesn't sit flush against the search bar.
+  btn.style.marginInlineStart = "6px";
   btn.addEventListener("command", () => toggleSidebar(window));
   const ref = doc.getElementById(LIB_INSERT_BEFORE);
   if (ref && ref.parentNode === toolbar) toolbar.insertBefore(btn, ref);
@@ -202,28 +208,155 @@ function registerReaderToolbarButton() {
 
 // -------------------------------------------------- reader selection → chat
 
+// Reader text-selection popup i18n + the small inline icons it uses.
+const POPUP_I18N = {
+  en: { cite: "Cite", explain: "Explain", translate: "Translate", searchLang: "Search language…", pickModel: "Pick a model in Nodus first.", noResp: "(no response)" },
+  es: { cite: "Citar", explain: "Explicar", translate: "Traducir", searchLang: "Buscar idioma…", pickModel: "Elige un modelo en Nodus primero.", noResp: "(sin respuesta)" },
+};
+const POPUP_ICO = {
+  quote: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h3a1 1 0 0 1 1 1v1a2 2 0 0 1-2 2h-1a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1h1a4 4 0 0 0 4-4V5a2 2 0 0 0-2-2z"/><path d="M5 3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h3a1 1 0 0 1 1 1v1a2 2 0 0 1-2 2H6a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1h1a4 4 0 0 0 4-4V5a2 2 0 0 0-2-2z"/></svg>',
+  book: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>',
+  lang: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></svg>',
+};
+const POPUP_LANGS = ["English", "Spanish", "French", "German", "Italian", "Portuguese", "Dutch", "Catalan", "Galician", "Basque", "Russian", "Ukrainian", "Polish", "Czech", "Greek", "Turkish", "Arabic", "Hebrew", "Persian", "Hindi", "Bengali", "Urdu", "Chinese (Simplified)", "Chinese (Traditional)", "Japanese", "Korean", "Vietnamese", "Thai", "Indonesian", "Malay", "Filipino", "Swedish", "Norwegian", "Danish", "Finnish", "Icelandic", "Romanian", "Hungarian", "Bulgarian", "Croatian", "Serbian", "Slovak", "Slovenian", "Latin", "Swahili"];
+
+var _popupMods = null;
+function popupModules() {
+  if (_popupMods) return _popupMods;
+  const mw = Zotero.getMainWindow();
+  const scope = { window: {}, ChromeUtils: ChromeUtils, Components: Components, Services: Services, fetch: mw.fetch.bind(mw), TextDecoder: mw.TextDecoder, AbortController: mw.AbortController };
+  Services.scriptloader.loadSubScript("chrome://nodus/content/providers.js", scope);
+  Services.scriptloader.loadSubScript("chrome://nodus/content/store.js", scope);
+  _popupMods = { NP: scope.window.NodusProviders, NS: scope.window.NodusStore };
+  return _popupMods;
+}
+
+async function translateInPopup(text, langName, resultEl, L) {
+  try {
+    const { NS, NP } = popupModules();
+    const mode = NS.getMode();
+    const model = NS.getModel(mode);
+    if (!model) { resultEl.textContent = L.pickModel; return; }
+    const system = "Translate the text the user provides into " + langName + ". Output ONLY the translation — no explanations, no notes, no quotation marks. Preserve meaning and tone.";
+    resultEl.textContent = "";
+    let acc = "";
+    const onDelta = (d) => { acc += d; resultEl.textContent = acc; resultEl.scrollTop = resultEl.scrollHeight; };
+    if (mode === "standalone") {
+      const key = NS.getKey(model.provider);
+      const localBase = NS.getLocalBase(model.provider);
+      await NP.chatStream(model, { system, key, localBase, messages: [{ role: "user", content: text }] }, onDelta, undefined);
+    } else {
+      await translateViaServer(model, langName, text, onDelta);
+    }
+    if (!acc) resultEl.textContent = L.noResp;
+  } catch (e) { resultEl.textContent = "⚠ " + (e && e.message ? e.message : e); }
+}
+
+// Connected mode: stream a translation from the Nodus local server.
+async function translateViaServer(model, langName, text, onDelta) {
+  const mw = Zotero.getMainWindow();
+  const dir = Services.dirsvc.get("Home", Components.interfaces.nsIFile);
+  const f = dir.clone(); f.append(".nodus"); f.append("zotero-bridge.json");
+  const cfg = JSON.parse(await Zotero.File.getContentsAsync(f.path));
+  const res = await mw.fetch("http://127.0.0.1:" + cfg.port + "/api/z/translate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: "Bearer " + cfg.token },
+    body: JSON.stringify({ model, text, language: langName }),
+  });
+  if (!res.ok || !res.body) throw new Error("HTTP " + res.status);
+  const reader = res.body.getReader(); const dec = new mw.TextDecoder(); let buf = "";
+  for (;;) {
+    const r = await reader.read(); if (r.done) break;
+    buf += dec.decode(r.value, { stream: true }); let idx;
+    while ((idx = buf.indexOf("\n")) >= 0) {
+      const line = buf.slice(0, idx).trim(); buf = buf.slice(idx + 1); if (!line) continue;
+      let o; try { o = JSON.parse(line); } catch (e) { continue; }
+      if (o.type === "delta") onDelta(o.text);
+    }
+  }
+}
+
+function buildTranslateUI(doc, area, text, L) {
+  area.style.display = "flex"; area.textContent = "";
+  const input = doc.createElement("input");
+  input.placeholder = L.searchLang;
+  input.style.cssText = "width:100%;box-sizing:border-box;padding:5px 7px;border:1px solid rgba(124,58,237,.3);border-radius:6px;font-size:11px;outline:none;";
+  const list = doc.createElement("div");
+  list.style.cssText = "width:100%;box-sizing:border-box;max-height:132px;overflow-y:auto;border:1px solid rgba(0,0,0,.12);border-radius:6px;";
+  const result = doc.createElement("div");
+  result.style.cssText = "display:none;box-sizing:border-box;width:100%;font-size:12px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;max-height:190px;overflow-y:auto;padding:6px 8px;border-radius:6px;background:rgba(124,58,237,.07);color:#1f2430;";
+  const render = (filter) => {
+    list.textContent = "";
+    const q = (filter || "").toLowerCase();
+    for (const name of POPUP_LANGS) {
+      if (q && name.toLowerCase().indexOf(q) < 0) continue;
+      const it = doc.createElement("div");
+      it.textContent = name;
+      it.style.cssText = "box-sizing:border-box;width:100%;padding:5px 9px;cursor:pointer;font-size:11px;color:#1f2430;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;";
+      it.addEventListener("mouseenter", () => { it.style.background = "rgba(124,58,237,.1)"; });
+      it.addEventListener("mouseleave", () => { it.style.background = ""; });
+      it.addEventListener("click", () => {
+        input.style.display = "none"; list.style.display = "none";
+        result.style.display = "block"; result.textContent = "…";
+        translateInPopup(text, name, result, L);
+      });
+      list.appendChild(it);
+    }
+  };
+  input.addEventListener("input", () => render(input.value));
+  render("");
+  area.appendChild(input); area.appendChild(list); area.appendChild(result);
+  try { input.focus(); } catch (e) {}
+}
+
 function registerSelectionPopup() {
   Nodus.selectionListener = (event) => {
     try {
       const doc = event.doc;
       const params = event.params || {};
       const text = (params.annotation && params.annotation.text) || params.text || "";
-      const btn = doc.createElement("button");
-      btn.textContent = "Nodus";
-      btn.title = "Ask Nodus about the selection";
-      btn.style.cssText =
-        "display:inline-flex;align-items:center;gap:4px;padding:4px 8px;margin:0 2px;" +
-        "border:none;border-radius:6px;cursor:pointer;background:#7c3aed;color:#fff;font-size:12px;";
-      btn.addEventListener("click", () => {
-        const win = Zotero.getMainWindow();
-        toggleSidebar(win, true);
-        // Send the full annotation draft (position/pageLabel/sortIndex) so the
-        // agent can create a real highlight from this selection, not just the text.
-        let draft = null;
-        try { draft = params.annotation ? JSON.parse(JSON.stringify(params.annotation)) : null; } catch (e) {}
+      let draft = null;
+      try { draft = params.annotation ? JSON.parse(JSON.stringify(params.annotation)) : null; } catch (e) {}
+      let lang = "en";
+      try { lang = Zotero.Prefs.get("nodus.lang") === "es" ? "es" : "en"; } catch (e) {}
+      const L = POPUP_I18N[lang];
+
+      const wrap = doc.createElement("div");
+      wrap.style.cssText = "display:flex;flex-direction:column;gap:6px;padding:5px 4px;width:238px;max-width:238px;box-sizing:border-box;";
+      const head = doc.createElement("div");
+      head.style.cssText = "display:flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:#7c3aed;";
+      head.innerHTML = MARK_SVG + "<span>Nodus</span>";
+      wrap.appendChild(head);
+
+      const row = doc.createElement("div");
+      row.style.cssText = "display:flex;gap:5px;";
+      const mkBtn = (label, iconSvg) => {
+        const b = doc.createElement("button");
+        b.style.cssText = "flex:1;display:inline-flex;align-items:center;justify-content:center;gap:4px;padding:5px 6px;border:1px solid rgba(124,58,237,.35);border-radius:6px;background:#fff;color:#7c3aed;font-size:11px;font-weight:600;cursor:pointer;";
+        b.innerHTML = iconSvg + "<span>" + label + "</span>";
+        return b;
+      };
+      const citeBtn = mkBtn(L.cite, POPUP_ICO.quote);
+      const explainBtn = mkBtn(L.explain, POPUP_ICO.book);
+      const translateBtn = mkBtn(L.translate, POPUP_ICO.lang);
+      row.appendChild(citeBtn); row.appendChild(explainBtn); row.appendChild(translateBtn);
+      wrap.appendChild(row);
+
+      const trArea = doc.createElement("div");
+      trArea.style.cssText = "display:none;flex-direction:column;gap:4px;";
+      wrap.appendChild(trArea);
+
+      citeBtn.addEventListener("click", () => {
+        const win = Zotero.getMainWindow(); toggleSidebar(win, true);
         sendToSidebar(win, { type: "nodus-selection", text: String(text || ""), draft: draft });
       });
-      event.append(btn);
+      explainBtn.addEventListener("click", () => {
+        const win = Zotero.getMainWindow(); toggleSidebar(win, true);
+        sendToSidebar(win, { type: "nodus-selection", text: String(text || ""), draft: draft, action: "explain" });
+      });
+      translateBtn.addEventListener("click", () => { buildTranslateUI(doc, trArea, String(text || ""), L); });
+
+      event.append(wrap);
     } catch (e) { Zotero.logError(e); }
   };
   Zotero.Reader.registerEventListener("renderTextSelectionPopup", Nodus.selectionListener, PLUGIN_ID);
