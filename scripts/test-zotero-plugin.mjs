@@ -417,11 +417,26 @@ test('#9: build-zotero-xpi produces a valid xpi + updates.json', () => {
   const r = buildXpi();
   const manifest = JSON.parse(readSource('zotero-plugin/manifest.json'));
   assert.equal(r.version, manifest.version);
+  assert.equal(r.xpiName, 'nodus-zotero.xpi', 'release asset name stays stable across versions');
+  assert.equal(
+    manifest.applications.zotero.update_url,
+    'https://github.com/Drakonis96/nodus/releases/latest/download/updates.json',
+    'installed plugins always poll the latest Nodus release',
+  );
 
   const zip = new AdmZip(r.xpiPath);
   const names = zip.getEntries().map((e) => e.entryName);
   assert.ok(names.includes('manifest.json'), 'manifest.json at zip ROOT (Zotero rejects it otherwise)');
-  for (const need of ['content/sidebar.js', 'content/markdown.js', 'content/util.js', 'content/highlighter.js', 'content/icons.js', 'bootstrap.js']) {
+  for (const need of [
+    'content/sidebar.js',
+    'content/markdown.js',
+    'content/util.js',
+    'content/highlighter.js',
+    'content/icons.js',
+    'bootstrap.js',
+    'locale/en-US/nodus.ftl',
+    'locale/es-ES/nodus.ftl',
+  ]) {
     assert.ok(names.includes(need), `xpi contains ${need}`);
   }
 
@@ -431,4 +446,21 @@ test('#9: build-zotero-xpi produces a valid xpi + updates.json', () => {
   assert.ok(entry.update_link.endsWith(r.xpiName), 'update_link points at the built xpi');
   assert.match(entry.update_hash, /^sha256:[0-9a-f]{64}$/);
   assert.equal(entry.applications.zotero.strict_min_version, manifest.applications.zotero.strict_min_version);
+});
+
+test('#9: stable release blocks publication until the Zotero assets exist', () => {
+  const workflow = readSource('.github/workflows/release.yml');
+  const pluginJob = workflow.slice(
+    workflow.indexOf('  build-zotero-plugin:'),
+    workflow.indexOf('  verify-release-assets:'),
+  );
+  const verificationJob = workflow.slice(workflow.indexOf('  verify-release-assets:'));
+
+  assert.match(pluginJob, /needs: release/, 'plugin build waits for the draft app release');
+  assert.match(pluginJob, /npm run zotero:xpi/, 'release builds the XPI');
+  assert.match(pluginJob, /dist-zotero\/nodus-zotero\.xpi/, 'release uploads the fixed-name XPI');
+  assert.match(pluginJob, /dist-zotero\/updates\.json/, 'release uploads the Zotero update manifest');
+  assert.match(verificationJob, /- build-zotero-plugin/, 'publication waits for the plugin job');
+  assert.match(verificationJob, /nodus-zotero\.xpi/, 'publication verifies the XPI asset');
+  assert.match(verificationJob, /updates\.json/, 'publication verifies the update manifest asset');
 });

@@ -124,10 +124,11 @@ function pluginSourceDir(): string {
 function buildXpi(destXpi: string): void {
   const zip = new AdmZip();
   const src = pluginSourceDir();
-  zip.addLocalFile(path.join(src, 'manifest.json'));
-  zip.addLocalFile(path.join(src, 'bootstrap.js'));
-  zip.addLocalFolder(path.join(src, 'icons'), 'icons');
-  zip.addLocalFolder(path.join(src, 'content'), 'content');
+  // Package the complete plugin tree so the in-app installer and the release
+  // builder cannot silently diverge when a new locale or asset directory lands.
+  zip.addLocalFolder(src, '', (filename) => (
+    !filename.split('/').some((part) => part.startsWith('.') || part === 'Thumbs.db')
+  ));
   zip.writeZip(destXpi);
 }
 
@@ -159,7 +160,7 @@ export async function getZoteroInstallInfo(): Promise<ZoteroInstallInfo> {
 /** Save the packaged .xpi to a user-chosen location for manual install. */
 export async function exportZoteroPluginXpi(): Promise<ZoteroExportResult> {
   try {
-    const defaultPath = path.join(app.getPath('downloads'), 'nodus-for-zotero.xpi');
+    const defaultPath = path.join(app.getPath('downloads'), 'nodus-zotero.xpi');
     const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0] ?? null;
     const opts = { defaultPath, filters: [{ name: 'Zotero plugin', extensions: ['xpi'] }] };
     const result = win ? await dialog.showSaveDialog(win, opts) : await dialog.showSaveDialog(opts);
