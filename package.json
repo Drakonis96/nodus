@@ -39,6 +39,7 @@
     "dist:linux": "npm run build && electron-builder --linux",
     "verify:exam-generation": "node scripts/verify-exam-generation.mjs",
     "verify:exam-pdf": "node scripts/verify-exam-pdf.mjs",
+    "verify:professional-pdf": "node scripts/verify-professional-report-pdf.mjs",
     "verify:rubric-generation": "node scripts/verify-rubric-generation.mjs",
     "capture:docs": "npm run build && electron-rebuild -f -w better-sqlite3 && node scripts/capture-doc-screenshots.mjs"
   },

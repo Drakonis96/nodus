@@ -899,6 +899,7 @@ const api: NodusApi = {
   restartImmersionSession: (id) => ipcRenderer.invoke('immersion:restart', id),
   setImmersionProgress: (id, progress) => ipcRenderer.invoke('immersion:progress:set', id, progress).then(() => undefined),
   answerImmersionQuestion: (request) => ipcRenderer.invoke('immersion:answer', request),
+  exportImmersionSessionPdf: (id) => ipcRenderer.invoke('immersion:exportPdf', id),
   deleteImmersionSession: (id) => ipcRenderer.invoke('immersion:delete', id).then(() => undefined),
 
   listManagedThemes: () => ipcRenderer.invoke('themes:listManaged'),

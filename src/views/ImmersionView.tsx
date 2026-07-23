@@ -35,8 +35,8 @@ import { ModelPicker } from '../components/ModelPicker';
 import { Markdown, type MarkdownCitation } from '../components/Markdown';
 import { SourceCitationModal, type CitationTarget } from '../components/SourceCitationModal';
 import { SaveToNotesModal } from '../components/SaveToNotesModal';
-import { TranslationPanel } from '../components/TranslationModal';
-import { confirm } from '../components/feedback';
+import { TranslationModal } from '../components/TranslationModal';
+import { confirm, toast } from '../components/feedback';
 import { SigmaGraph } from './graph/SigmaGraph';
 import { GraphErrorBoundary } from './graph/GraphErrorBoundary';
 import { GRAPH_NODE_TYPES, EDGE_TYPE_COLORS, type GraphFilters } from './graph/model';
@@ -1223,8 +1223,9 @@ function ImmersionPlayer({
   onSaveToNotes: () => void;
 }) {
   const steps = useMemo(() => playerSteps(session), [session]);
-  const [showTranslations, setShowTranslations] = useState(true);
+  const [translationOpen, setTranslationOpen] = useState(false);
   const [appliedTranslation, setAppliedTranslation] = useState<ContentTranslation | null>(null);
+  const [exportingPdf, setExportingPdf] = useState(false);
   // Honest total study time from the actual route, not the requested budget:
   // a deep route can hold far more stations than a single afternoon.
   const totalMinutes = useMemo(() => steps.reduce((acc, s) => acc + stepMeta(s, session).minutes, 0), [steps, session]);
@@ -1232,6 +1233,18 @@ function ImmersionPlayer({
   const current = Math.min(progress.currentStep, steps.length - 1);
   const [direction, setDirection] = useState(1);
   const mainRef = useRef<HTMLDivElement | null>(null);
+
+  const exportPdf = async () => {
+    setExportingPdf(true);
+    try {
+      const result = await window.nodus.exportImmersionSessionPdf(session.id);
+      if (result) toast(tx('Exportado a {path}', { path: result.path }));
+    } catch (cause) {
+      toast(cause instanceof Error ? cause.message : String(cause), { tone: 'error' });
+    } finally {
+      setExportingPdf(false);
+    }
+  };
 
   const persist = useCallback(
     (next: ImmersionProgress) => {
@@ -1392,7 +1405,11 @@ function ImmersionPlayer({
           </div>
         </div>
         <div className="flex-1" />
-        <button className={`btn btn-ghost gap-1.5 text-xs border ${showTranslations ? 'border-indigo-600 text-indigo-300' : 'border-neutral-700'}`} onClick={() => setShowTranslations((value) => !value)}>
+        <button className="btn btn-ghost gap-1.5 border border-neutral-700 text-xs" disabled={exportingPdf} onClick={() => void exportPdf()}>
+          <Icon name={exportingPdf ? 'sync' : 'download'} size={13} className={exportingPdf ? 'animate-spin' : ''} />
+          {exportingPdf ? t('Exportando…') : `${t('Exportar')} PDF`}
+        </button>
+        <button className="btn btn-ghost gap-1.5 border border-neutral-700 text-xs" onClick={() => setTranslationOpen(true)}>
           <Icon name="languages" size={13} /> {t('Traducir')}
         </button>
         <button className="btn btn-ghost gap-1.5 text-xs border border-neutral-700" onClick={onSaveToNotes}>
@@ -1484,7 +1501,6 @@ function ImmersionPlayer({
                 {step.kind === 'exam' && (
                   <ExamStep session={session} onAnswered={onAnswered} onFinish={finish} onSaveToNotes={onSaveToNotes} onExit={onExit} />
                 )}</>}
-                {showTranslations && <TranslationPanel entityKind="immersion" entityId={session.id} sourceTitle={session.plan.title} sourceMarkdown={sessionMarkdown(session)} model={session.model} activeTranslationId={appliedTranslation?.id ?? null} onApply={setAppliedTranslation} />}
               </div>
               <ContextRail step={step} session={session} onCitation={onCitation} />
             </motion.div>
@@ -1511,6 +1527,18 @@ function ImmersionPlayer({
         )}
       </footer>
       <FindInPage targetRef={mainRef} />
+      {translationOpen && (
+        <TranslationModal
+          entityKind="immersion"
+          entityId={session.id}
+          sourceTitle={session.plan.title}
+          sourceMarkdown={sessionMarkdown(session)}
+          model={session.model}
+          activeTranslationId={appliedTranslation?.id ?? null}
+          onApply={setAppliedTranslation}
+          onClose={() => setTranslationOpen(false)}
+        />
+      )}
     </div>
   );
 }
