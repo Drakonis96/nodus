@@ -5024,7 +5024,7 @@ export const DE: Record<string, string> = {
   'en blanco': 'leer',
   'Cargando simulacro…': 'Probeprüfung wird geladen…',
   'Simulacro escrito': 'Schriftliche Probeprüfung',
-  'Guardado automáticamente': 'Automatisch gespeichert',
+  'Guardado automático': 'Automatisch gespeichert',
   'Autoguardado activo': 'Automatisches Speichern aktiv',
   'Entregar examen': 'Prüfung abgeben',
   'Marcar para revisar': 'Zur Überprüfung markieren',

@@ -147,7 +147,7 @@ try {
   const afterBold = await ta.inputValue();
   assert.ok(afterBold.includes('**leche**'), `bold did not wrap selection: ${afterBold}`);
   log('bold formatting applied:', JSON.stringify(afterBold));
-  await page.waitForFunction(() => document.querySelector('.nodi-note-state')?.textContent === 'Guardado automáticamente');
+  await page.waitForFunction(() => document.querySelector('.nodi-note-state')?.textContent === 'Guardado automático');
   log('note autosaved');
 
   // ── Back to list: the note shows with derived title + snippet ───────────────
@@ -164,7 +164,7 @@ try {
   await page.locator('.nodi-notes-panel .nodi-panel-head button[title="Nueva nota"]').click();
   await page.locator('.nodi-note-title-input').fill('Ideas para el proyecto');
   await ta.fill('Probar el modo oscuro con un título manual');
-  await page.waitForFunction(() => document.querySelector('.nodi-note-state')?.textContent === 'Guardado automáticamente');
+  await page.waitForFunction(() => document.querySelector('.nodi-note-state')?.textContent === 'Guardado automático');
   await page.locator('.nodi-notes-panel .nodi-panel-head button[title="Volver"]').click();
   assert.equal(await page.locator('.nodi-note-row').count(), 2, 'expected 2 notes');
 
@@ -188,7 +188,9 @@ try {
 
   // ── Delete with confirmation ────────────────────────────────────────────────
   await page.locator('.nodi-notes-panel .nodi-panel-head button[title="Editar"]').click(); // leave preview
-  await page.locator('.nodi-note-remove').click();
+  assert.equal(await page.locator('.nodi-note-remove').count(), 0, 'delete should not be available inside the editor');
+  await page.locator('.nodi-notes-panel .nodi-panel-head button[title="Volver"]').click();
+  await page.locator('.nodi-note-row', { hasText: 'Lista de la' }).locator('.nodi-note-delete').click();
   await page.locator('.nodi-confirm-dialog').waitFor();
   await page.screenshot({ path: `${shots}/notes-4-confirm-dark.png` });
   await page.locator('.nodi-confirm-dialog button.danger').click();
@@ -250,6 +252,22 @@ try {
   await chatPanel.locator('.nodi-panel-head button[title="Cerrar"]').click();
   log('notifications + chat share the light theme:', JSON.stringify(lightChatTheme));
 
+  // The destructive context action needs its own light-theme selection colors;
+  // inheriting the dark-theme pale pink makes the title disappear on hover.
+  await figure.click({ button: 'right' });
+  const closeMascotItem = page.getByRole('menuitem', { name: /Cerrar mascota/ });
+  await closeMascotItem.waitFor();
+  await closeMascotItem.hover();
+  const lightContextStyles = await closeMascotItem.evaluate((button) => ({
+    title: getComputedStyle(button.querySelector('b')).color,
+    icon: getComputedStyle(button.querySelector('.nodi-context-icon')).color,
+  }));
+  assert.equal(lightContextStyles.title, 'rgb(159, 18, 57)', 'selected close-mascot title must remain readable');
+  assert.equal(lightContextStyles.icon, 'rgb(190, 18, 60)', 'close-mascot icon must remain readable');
+  await page.screenshot({ path: `${shots}/notes-7-context-menu-light.png` });
+  await page.mouse.click(20, 20);
+  log('light context-menu contrast verified:', JSON.stringify(lightContextStyles));
+
   // ── Always-on-top overlay ─────────────────────────────────────────────────
   // The same persisted note must be reachable from Nodi's independent desktop
   // window, where the extra "Open Nodus" action brings the radial count to five.
@@ -288,7 +306,7 @@ try {
   await overlay.locator('[data-nodi-action="notes"]').click();
   await overlay.locator('.nodi-notes-panel').waitFor();
   assert.equal(await overlay.locator('.nodi-note-row').count(), 1, 'saved note should be shared with the overlay');
-  await overlay.screenshot({ path: `${shots}/notes-7-overlay-light.png` });
+  await overlay.screenshot({ path: `${shots}/notes-8-overlay-light.png` });
   log('always-on-top overlay verified ->', overlayMetrics.gaps.map((gap) => gap.toFixed(1)).join(', '));
 
   log('ALL CHECKS PASSED. Shots in', shots);

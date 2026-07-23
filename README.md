@@ -103,6 +103,10 @@ Nodi is the friendly guide that lives inside Nodus. It helps new users understan
 
 Nodus is useful for individual work today and is designed with universities, research groups, teaching teams and learning communities in mind.
 
+## Cite Nodus
+
+If Nodus contributes substantially to research that leads to a publication, please cite the version you used. The repository provides machine-readable citation metadata in [`CITATION.cff`](CITATION.cff), which GitHub can render in APA and BibTeX formats.
+
 ## Roadmap
 
 Nodus is growing through new vaults rather than adding every possible tool to one menu.

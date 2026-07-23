@@ -11,6 +11,9 @@
     "dev": "vite",
     "build": "npm run typecheck && vite build",
     "test": "node --test scripts/test-*.mjs",
+    "citation:sync": "node scripts/sync-citation.mjs",
+    "citation:check": "node scripts/sync-citation.mjs --check",
+    "version": "npm run citation:sync && git add CITATION.cff",
     "test:e2e": "node scripts/e2e-smoke.mjs",
     "verify:nodi-overlay": "npm run build && node scripts/verify-nodi-overlay.mjs",
     "verify:study-whisper": "node scripts/verify-study-whisper.mjs",
@@ -37,6 +40,7 @@
     "dist:linux": "npm run build && electron-builder --linux",
     "verify:exam-generation": "node scripts/verify-exam-generation.mjs",
     "verify:exam-pdf": "node scripts/verify-exam-pdf.mjs",
+    "verify:professional-pdf": "node scripts/verify-professional-report-pdf.mjs",
     "verify:rubric-generation": "node scripts/verify-rubric-generation.mjs",
     "capture:docs": "npm run build && electron-rebuild -f -w better-sqlite3 && node scripts/capture-doc-screenshots.mjs"
   },

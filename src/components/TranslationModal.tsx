@@ -6,14 +6,60 @@ import {
   type ModelRef,
   type TranslationEntityKind,
 } from '@shared/types';
-import { Icon } from './ui';
+import { Icon, ModalBackdrop } from './ui';
 import { confirm } from './feedback';
 import { t, tx } from '../i18n';
 
-/** Inline translation manager. Jobs are persisted by the main process before the
- * first AI call, so this list survives navigation away from the reader. Selecting
- * a ready translation asks the parent reader to render it in its normal layout. */
-export function TranslationPanel({
+/**
+ * Translation manager presented next to the action that opens it instead of at
+ * the end of a potentially very long document. Jobs are persisted by the main
+ * process before the first AI call, so closing the dialog never interrupts them.
+ */
+export function TranslationModal({
+  onClose,
+  ...panelProps
+}: {
+  entityKind: TranslationEntityKind;
+  entityId: string;
+  sourceTitle: string;
+  sourceMarkdown: string;
+  model: ModelRef | null;
+  activeTranslationId: string | null;
+  onApply: (translation: ContentTranslation | null) => void;
+  onClose: () => void;
+}) {
+  return (
+    <ModalBackdrop onClose={onClose}>
+      <section
+        className="card-modal flex max-h-[86vh] w-full max-w-2xl flex-col overflow-hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="translation-modal-title"
+        data-testid="translation-modal"
+      >
+        <header className="flex items-center gap-2 border-b border-neutral-200 px-5 py-3 dark:border-neutral-800">
+          <Icon name="languages" className="text-indigo-500 dark:text-indigo-300" />
+          <h2 id="translation-modal-title" className="text-sm font-semibold">{t('Traducciones')}</h2>
+          <div className="flex-1" />
+          <button className="btn btn-ghost !p-2" onClick={onClose} aria-label={t('Cerrar')} title={t('Cerrar')}>
+            <Icon name="x" size={15} />
+          </button>
+        </header>
+        <div className="min-h-0 overflow-y-auto p-5">
+          <TranslationPanel
+            {...panelProps}
+            onApply={(translation) => {
+              panelProps.onApply(translation);
+              onClose();
+            }}
+          />
+        </div>
+      </section>
+    </ModalBackdrop>
+  );
+}
+
+function TranslationPanel({
   entityKind,
   entityId,
   sourceTitle,
@@ -74,14 +120,14 @@ export function TranslationPanel({
   };
 
   const remove = async (summary: ContentTranslationSummary) => {
-    const ok = await confirm({ title: t('Eliminar traducción'), message: tx('¿Eliminar la traducción a {lang}? Esta acción no se puede deshacer.', { lang: summary.languageLabel }), confirmLabel: t('Eliminar'), danger: true });
+    const ok = await confirm({ title: t('Eliminar traducción'), message: tx('¿Eliminar la traducción a {lang}? Esta acción no se puede deshacer.', { lang: summary.languageLabel }), confirmLabel: t('Eliminar'), danger: true, zIndex: 140 });
     if (!ok) return;
     await window.nodus.deleteContentTranslation(summary.id);
     if (activeTranslationId === summary.id) onApply(null);
     await refresh();
   };
 
-  return <section className="mt-8 rounded-xl border border-neutral-200 bg-neutral-50/70 p-4 dark:border-neutral-800 dark:bg-neutral-900/30" data-testid="translation-panel">
+  return <section className="rounded-xl border border-neutral-200 bg-neutral-50/70 p-4 dark:border-neutral-800 dark:bg-neutral-900/30" data-testid="translation-panel">
     <div className="flex flex-wrap items-end gap-2">
       <div className="min-w-48 flex-1"><label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-neutral-500">{t('Idioma')}</label><select className="input w-full text-sm" value={language} onChange={(event) => setLanguage(event.target.value)}>{TRANSLATION_LANGUAGES.map((item) => <option key={item.code} value={item.code}>{item.nativeName} — {item.name}</option>)}</select></div>
       <button className="btn btn-primary gap-1.5" disabled={starting.includes(language) || list.some((item) => item.language === language && item.status === 'generating')} onClick={() => generate(language)}><Icon name={starting.includes(language) ? 'sync' : 'languages'} className={starting.includes(language) ? 'animate-spin' : ''} size={15} />{starting.includes(language) ? t('Traduciendo…') : t('Generar traducción')}</button>

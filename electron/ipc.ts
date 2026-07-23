@@ -493,6 +493,7 @@ import * as workSummaries from './db/workSummariesRepo';
 import * as projects from './db/projectsRepo';
 import { closeDb, getDb, withVaultDatabase } from './db/database';
 import { exportWritingWorkshopDraft } from './export/writingWorkshopExport';
+import { exportImmersionSessionPdf } from './export/immersionExport';
 import { generateProjectSuggestions } from './ai/projectInsertion';
 import { exportProject, exportProjectChapter } from './export/projectExport';
 import {
@@ -3074,6 +3075,11 @@ export function registerIpc(
     immersionRepo.setImmersionProgress(id, progress)
   );
   h('immersion:answer', async (_e, request: ImmersionAnswerRequest) => evaluateImmersionAnswer(request));
+  h('immersion:exportPdf', async (_e, id: string) => {
+    const session = immersionRepo.getImmersionSession(id);
+    if (!session) throw new Error('La inmersión ya no existe.');
+    return exportImmersionSessionPdf(session);
+  });
   h('immersion:delete', async (_e, id: string) => {
     invalidateDecorativeImageGeneration('immersion', id);
     translationsRepo.deleteEntityTranslations('immersion', id);

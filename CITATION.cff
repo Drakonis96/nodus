@@ -1,0 +1,22 @@
+cff-version: "1.2.0"
+message: "If Nodus contributes substantially to research that leads to a publication, please cite the software using these metadata."
+title: "Nodus"
+abstract: "A local-first desktop workspace that brings sources, notes, data, ideas, and learning materials together for research, teaching, and study."
+authors:
+  - family-names: "Pérez Burgueño"
+    given-names: "Jorge"
+    alias: "drakonis96"
+    orcid: "https://orcid.org/0000-0002-1150-1930"
+  - name: "Nodus contributors"
+type: software
+version: "2.5.4"
+date-released: "2026-07-22"
+license: MIT
+repository-code: "https://github.com/Drakonis96/nodus"
+url: "https://drakonis96.github.io/nodus/"
+keywords:
+  - "research software"
+  - "knowledge management"
+  - "academic writing"
+  - "teaching"
+  - "study"
