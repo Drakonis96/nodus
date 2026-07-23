@@ -89,6 +89,14 @@ The Toolkit provides cross-vault document utilities. **Nodus Convert** converts 
 
 Protect can read files selected from disk or compatible sources in the active vault and can save each result back to disk, share it through the operating system or store it in the vault’s Protected Copies library. Its document processing is entirely local: it does not send protected documents to AI providers or any external service. This statement applies specifically to Nodus Protect; other optional Nodus features can use network providers when the user configures and invokes them.
 
+![Nodus Toolkit demo showing Convert, Protect, Translate and OCR Workspace](docs/screenshots/readme-toolkit-demo.png)
+
+## Zotero plugin
+
+The standalone Zotero plugin brings Nodus search into your reference manager. It indexes the complete text of selected PDF, EPUB and HTML attachments, combines semantic and lexical retrieval across documents, and attaches exact passage and page citations to its answers. Multilingual semantic search runs locally through a quantised E5 model—no embedding API key or per-query embedding cost is required—and the compressed text index plus vectors remain in the Zotero profile. Long PDFs are reconstructed by page, column and paragraph, with repeated margins removed and source coordinates retained. A bounded two-round retriever can reformulate searches and inspect specific page ranges before answering. Its evidence audit flags uncited or weakly supported claims. For PDFs, Vision reads the rendered page—including scanned text, figures, tables, formulas and diagrams—and merges the extraction into the searchable index; Index applies the same OCR fallback to text-poor pages.
+
+![Zotero plugin demo showing indexed search results with citations](docs/screenshots/readme-zotero-plugin-demo.png)
+
 ## Meet Nodi
 
 Nodi is the friendly guide that lives inside Nodus. It helps new users understand a vault, points out useful next steps and keeps notifications easy to follow without taking over the workspace.
