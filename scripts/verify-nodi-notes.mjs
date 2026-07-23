@@ -252,6 +252,22 @@ try {
   await chatPanel.locator('.nodi-panel-head button[title="Cerrar"]').click();
   log('notifications + chat share the light theme:', JSON.stringify(lightChatTheme));
 
+  // The destructive context action needs its own light-theme selection colors;
+  // inheriting the dark-theme pale pink makes the title disappear on hover.
+  await figure.click({ button: 'right' });
+  const closeMascotItem = page.getByRole('menuitem', { name: /Cerrar mascota/ });
+  await closeMascotItem.waitFor();
+  await closeMascotItem.hover();
+  const lightContextStyles = await closeMascotItem.evaluate((button) => ({
+    title: getComputedStyle(button.querySelector('b')).color,
+    icon: getComputedStyle(button.querySelector('.nodi-context-icon')).color,
+  }));
+  assert.equal(lightContextStyles.title, 'rgb(159, 18, 57)', 'selected close-mascot title must remain readable');
+  assert.equal(lightContextStyles.icon, 'rgb(190, 18, 60)', 'close-mascot icon must remain readable');
+  await page.screenshot({ path: `${shots}/notes-7-context-menu-light.png` });
+  await page.mouse.click(20, 20);
+  log('light context-menu contrast verified:', JSON.stringify(lightContextStyles));
+
   // ── Always-on-top overlay ─────────────────────────────────────────────────
   // The same persisted note must be reachable from Nodi's independent desktop
   // window, where the extra "Open Nodus" action brings the radial count to five.
@@ -290,7 +306,7 @@ try {
   await overlay.locator('[data-nodi-action="notes"]').click();
   await overlay.locator('.nodi-notes-panel').waitFor();
   assert.equal(await overlay.locator('.nodi-note-row').count(), 1, 'saved note should be shared with the overlay');
-  await overlay.screenshot({ path: `${shots}/notes-7-overlay-light.png` });
+  await overlay.screenshot({ path: `${shots}/notes-8-overlay-light.png` });
   log('always-on-top overlay verified ->', overlayMetrics.gaps.map((gap) => gap.toFixed(1)).join(', '));
 
   log('ALL CHECKS PASSED. Shots in', shots);
