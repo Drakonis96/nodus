@@ -240,14 +240,14 @@ try {
     const settings = await window.nodus.getSettings();
     return settings.uiLanguage === 'fr' && settings.promptLanguage === 'fr';
   }));
-  assert.equal(await page.locator('.tutorial-progress button').count(), 17, 'essential guide exposes thirteen core chapters plus four Toolkit beta chapters');
+  assert.equal(await page.locator('.tutorial-progress button').count(), 19, 'essential guide exposes thirteen core chapters plus three model-guidance and three connected-workflow chapters');
   await page.locator('.tutorial-topbar button').click();
   // The skip dialog follows the (now French) UI language, proving the French table
   // is actually wired into a real render.
   await page.getByText('Passer le guide essentiel ?', { exact: true }).waitFor();
   await page.getByRole('button', { name: 'Passer quand même', exact: true }).click();
   await page.getByTestId('basics-tutorial').waitFor({ state: 'detached' });
-  assert.equal((await page.evaluate(() => window.nodus.getSettings())).basicsTutorialVersion, 4, 'confirmed skip records the current tutorial version globally');
+  assert.equal((await page.evaluate(() => window.nodus.getSettings())).basicsTutorialVersion, 5, 'confirmed skip records the current tutorial version globally');
 
   // Finish setup, then walk every translated language on the real shell. These labels
   // reach the DOM from navigation.ts through t(), so they prove each table is wired
@@ -274,6 +274,32 @@ try {
     assert.equal(await page.evaluate(() => document.documentElement.lang), language, `the document language follows the UI language (${language})`);
   }
   console.log(`[e2e] ${Object.keys(SIDEBAR_BY_LANGUAGE).length} translated UIs render on the real shell (sidebar + document lang)`);
+
+  // Existing users (tutorial v4) receive the new three-part connected-workflows
+  // summary immediately after release notes. This profile is throwaway, so the
+  // seen key exercised here never touches the developer's real Nodus profile.
+  await page.evaluate(async () => {
+    localStorage.removeItem('nodus.lastSeenVersion');
+    localStorage.removeItem('nodus.platformHighlightsSeen.2026-07');
+    await window.nodus.updateSettings({ uiLanguage: 'es', promptLanguage: 'es', basicsTutorialVersion: 4 });
+  });
+  await page.reload();
+  const whatsNewForExistingUser = page.getByTestId('whats-new-cinematic-modal');
+  await whatsNewForExistingUser.waitFor();
+  await whatsNewForExistingUser.getByRole('button', { name: 'Explorar las novedades', exact: true }).click();
+  const platformTour = page.getByTestId('platform-highlights-update-tour');
+  await platformTour.waitFor();
+  assert.equal(await platformTour.locator('.toolkit-guide-progress button').count(), 3, 'existing-user summary has three ordered chapters');
+  await platformTour.getByRole('heading', { name: 'MCP local y Nodus Server', exact: true }).waitFor();
+  await platformTour.getByRole('button', { name: 'Siguiente', exact: true }).click();
+  await platformTour.getByRole('heading', { name: 'Nodus para Zotero', exact: true }).waitFor();
+  assert.equal(await platformTour.locator('img[alt="Zotero"]').count(), 1, 'the Zotero chapter renders the official Zotero mark');
+  await platformTour.getByRole('button', { name: 'Siguiente', exact: true }).click();
+  await platformTour.getByRole('heading', { name: 'El Toolkit completo', exact: true }).waitFor();
+  await platformTour.getByTestId('platform-highlights-tour-complete').click();
+  await platformTour.waitFor({ state: 'detached' });
+  assert.equal(await page.evaluate(() => localStorage.getItem('nodus.platformHighlightsSeen.2026-07')), '1', 'the summary is marked seen only after its final action');
+  console.log('[e2e] release notes hand off to the translated three-part connected-workflows summary');
 
   // Back to Spanish for the rest of the suite, which asserts on Spanish copy. The
   // reload above already consumed the once-per-session startup update check, so reset
@@ -424,7 +450,7 @@ try {
   const independent = await page.evaluate(({ model, chat }) =>
     window.nodus.updateSettings({
       onboardingComplete: true,
-      basicsTutorialVersion: 4,
+      basicsTutorialVersion: 5,
       recoverySetupVersion: 1,
       tourComplete: true,
       advancedTourComplete: true,
@@ -1528,7 +1554,7 @@ try {
     const created = await window.nodus.createVault({ name: 'Study smoke', type: 'estudio' });
     const switched = await window.nodus.switchVault(created.vault.id);
     if (!switched.ok) throw new Error(switched.message);
-    await window.nodus.updateSettings({ onboardingComplete: true, basicsTutorialVersion: 4, recoverySetupVersion: 1, tourComplete: true, advancedTourComplete: true, studyTourComplete: true, theme: 'light' });
+    await window.nodus.updateSettings({ onboardingComplete: true, basicsTutorialVersion: 5, recoverySetupVersion: 1, tourComplete: true, advancedTourComplete: true, studyTourComplete: true, theme: 'light' });
   });
   await page.reload();
   await page.getByRole('button', { name: 'Cursos y asignaturas', exact: true }).first().click();

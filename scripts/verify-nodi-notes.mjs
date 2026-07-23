@@ -34,7 +34,7 @@ try {
   const applyTheme = async (theme) => {
     await page.evaluate((t) => window.nodus.updateSettings({
       onboardingComplete: true, recoverySetupVersion: 1, tourComplete: true, advancedTourComplete: true,
-      basicsTutorialVersion: 4, uiLanguage: 'es', mascotEnabled: true, mascotAlwaysOnTop: false,
+      basicsTutorialVersion: 5, uiLanguage: 'es', mascotEnabled: true, mascotAlwaysOnTop: false,
       mascotStyle: 'classic', reduceMotion: true, theme: t,
     }), theme);
   };

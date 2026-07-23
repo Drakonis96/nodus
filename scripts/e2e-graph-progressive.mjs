@@ -73,7 +73,7 @@ try {
     localStorage.setItem('nodus.lastSeenVersion', '9999.0.0');
     await window.nodus.updateSettings({
       onboardingComplete: true,
-      basicsTutorialVersion: 4,
+      basicsTutorialVersion: 5,
       recoverySetupVersion: 1,
       tourComplete: true,
       advancedTourComplete: true,
