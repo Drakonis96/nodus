@@ -35,39 +35,133 @@ export interface ReleaseNote {
 
 interface RawReleaseNote extends Omit<ReleaseNote, 'highlights'> { highlights: RawReleaseHighlight[] }
 
+// v2.6.0 shipped with only three Zotero highlights, silently dropping every other
+// change merged since 2.5.4 (Nodus Apps, Nodus Translate, local image generation,
+// professional PDF exports, the experimental Nodus Server, and the rest of the
+// Zotero add-on work). v2.6.1 republishes the complete list and backfills it onto
+// the 2.6.0 entry too, so the version picker's history stays accurate. Both
+// versions intentionally share this exact array — do not fork it.
+const RELEASE_2_6_HIGHLIGHTS: RawReleaseHighlight[] = [
+  {
+    scope: 'plugin',
+    es: 'Nodus para Zotero incorpora búsqueda semántica multilingüe completamente local con E5 small cuantizado. El modelo se descarga una sola vez, se ejecuta en el dispositivo y elimina la configuración y el coste de una API de embeddings; los índices persisten comprimidos junto a sus vectores en el perfil de Zotero.',
+    en: 'Nodus for Zotero now includes fully local multilingual semantic search with a quantised E5 small model. The model downloads once, runs on-device, and removes embedding API setup and cost; compressed indexes and their vectors persist in the Zotero profile.',
+    fr: 'Nodus pour Zotero intègre désormais une recherche sémantique multilingue entièrement locale avec un modèle E5 small quantifié. Le modèle n’est téléchargé qu’une fois, s’exécute sur l’appareil et supprime la configuration et le coût d’une API d’embeddings ; les index compressés et leurs vecteurs sont conservés dans le profil Zotero.',
+    de: 'Nodus für Zotero bietet jetzt eine vollständig lokale, mehrsprachige semantische Suche mit einem quantisierten E5-small-Modell. Das Modell wird einmal heruntergeladen, läuft auf dem Gerät und macht Einrichtung und Kosten einer Embedding-API überflüssig; komprimierte Indizes und ihre Vektoren bleiben im Zotero-Profil erhalten.',
+    pt: 'O Nodus para Zotero inclui agora pesquisa semântica multilingue totalmente local com um modelo E5 small quantizado. O modelo é descarregado uma única vez, executa-se no dispositivo e elimina a configuração e o custo de uma API de embeddings; os índices comprimidos e os respetivos vetores ficam guardados no perfil do Zotero.',
+    'pt-BR': 'O Nodus para Zotero agora inclui busca semântica multilíngue totalmente local com um modelo E5 small quantizado. O modelo é baixado uma única vez, roda no dispositivo e elimina a configuração e o custo de uma API de embeddings; os índices compactados e seus vetores ficam salvos no perfil do Zotero.',
+  },
+  {
+    scope: 'plugin',
+    es: 'Los PDF largos se reconstruyen por páginas, columnas y párrafos, eliminando encabezados y pies repetidos y conservando coordenadas para citas y resaltados exactos. Un recuperador acotado puede reformular la búsqueda, inspeccionar rangos de páginas y ampliar la evidencia en dos rondas antes de responder, con OCR y análisis visual cuando hacen falta.',
+    en: 'Long PDFs are reconstructed by page, column and paragraph, removing repeated headers and footers while retaining coordinates for exact citations and highlights. A bounded retriever can reformulate searches, inspect page ranges and expand evidence for two rounds before answering, with OCR and visual analysis when needed.',
+    fr: 'Les PDF longs sont reconstruits par page, colonne et paragraphe, avec suppression des en-têtes et pieds de page répétés et conservation des coordonnées pour des citations et surlignages exacts. Un moteur de récupération limité peut reformuler les recherches, inspecter des plages de pages et enrichir les preuves pendant deux tours avant de répondre, avec OCR et analyse visuelle si nécessaire.',
+    de: 'Lange PDFs werden nach Seiten, Spalten und Absätzen rekonstruiert; wiederkehrende Kopf- und Fußzeilen werden entfernt, Koordinaten für genaue Zitate und Markierungen bleiben erhalten. Eine begrenzte Suche kann Anfragen neu formulieren, Seitenbereiche prüfen und die Evidenz in zwei Runden erweitern, bevor sie antwortet – bei Bedarf mit OCR und visueller Analyse.',
+    pt: 'Os PDF longos são reconstruídos por página, coluna e parágrafo, removendo cabeçalhos e rodapés repetidos e preservando coordenadas para citações e destaques exatos. Um recuperador limitado pode reformular pesquisas, inspecionar intervalos de páginas e ampliar a evidência em duas rondas antes de responder, com OCR e análise visual quando necessário.',
+    'pt-BR': 'PDFs longos são reconstruídos por página, coluna e parágrafo, removendo cabeçalhos e rodapés repetidos e preservando coordenadas para citações e destaques exatos. Um recuperador limitado pode reformular buscas, inspecionar intervalos de páginas e ampliar as evidências por duas rodadas antes de responder, com OCR e análise visual quando necessário.',
+  },
+  {
+    scope: 'plugin',
+    es: 'En el modal de Novedades, la N conectada de Nodus gira para formar una Z e identifica de un vistazo las mejoras del complemento. Dentro de Zotero, el complemento conserva la N normal de Nodus.',
+    en: 'In the What’s New modal, Nodus’s connected N rotates into a Z to identify add-on improvements at a glance. Inside Zotero, the add-on keeps the normal Nodus N.',
+    fr: 'Dans la fenêtre Nouveautés, le N connecté de Nodus pivote pour former un Z et identifier d’un coup d’œil les améliorations de l’extension. Dans Zotero, l’extension conserve le N normal de Nodus.',
+    de: 'Im Neuigkeiten-Dialog dreht sich das verbundene N von Nodus zu einem Z, damit Verbesserungen des Add-ons sofort erkennbar sind. In Zotero selbst behält das Add-on das normale N von Nodus.',
+    pt: 'No modal Novidades, o N ligado do Nodus roda para formar um Z e identificar de imediato as melhorias do complemento. Dentro do Zotero, o complemento mantém o N normal do Nodus.',
+    'pt-BR': 'No modal Novidades, o N conectado do Nodus gira para formar um Z e identificar de imediato as melhorias do complemento. Dentro do Zotero, o complemento mantém o N normal do Nodus.',
+  },
+  {
+    scope: 'toolkit',
+    es: 'Herramientas estrena Nodus Apps: crea con IA miniaplicaciones completas y funcionales —juegos, calculadoras, planificadores, encuestas— con un catálogo inicial ya incluido. Cada app se puede compartir en directo con un código QR o un PIN para que otras personas participen desde su móvil.',
+    en: 'Tools introduces Nodus Apps: use AI to build complete, working mini apps — games, calculators, planners, polls — with an initial catalogue ready to use. Each app can be shared live with a QR code or PIN so others can join in from their phone.',
+    fr: 'Outils inaugure Nodus Apps : créez avec l’IA des mini-applications complètes et fonctionnelles — jeux, calculatrices, planificateurs, sondages — avec un catalogue initial déjà inclus. Chaque application peut être partagée en direct via un code QR ou un code PIN pour que d’autres personnes participent depuis leur téléphone.',
+    de: 'Werkzeuge führt Nodus Apps ein: Erstelle mit KI vollständige, funktionsfähige Mini-Apps – Spiele, Rechner, Planer, Umfragen – mit einem bereits enthaltenen Startkatalog. Jede App lässt sich live per QR-Code oder PIN teilen, damit andere vom Smartphone aus teilnehmen können.',
+    pt: 'Ferramentas estreia o Nodus Apps: crie com IA miniaplicações completas e funcionais — jogos, calculadoras, planeadores, sondagens — com um catálogo inicial já incluído. Cada aplicação pode ser partilhada ao vivo através de um código QR ou de um PIN para que outras pessoas participem a partir do telemóvel.',
+    'pt-BR': 'Ferramentas estreia o Nodus Apps: crie com IA miniaplicativos completos e funcionais — jogos, calculadoras, planejadores, enquetes — com um catálogo inicial já incluído. Cada app pode ser compartilhado ao vivo com um código QR ou um PIN para que outras pessoas participem pelo celular.',
+  },
+  {
+    scope: 'toolkit',
+    es: 'Nueva herramienta Nodus Translate: traduce texto pegado, archivos y adjuntos de Zotero con el modelo de IA que elijas. Conserva la estructura de DOCX y EPUB, e incluye un modo facsímil para PDF que mantiene el diseño, las imágenes y la geometría de página mientras sustituye el texto visible.',
+    en: 'New Nodus Translate tool: translate pasted text, files and Zotero attachments with the AI model of your choice. It preserves DOCX and EPUB structure, and includes a PDF facsimile mode that keeps the layout, images and page geometry while replacing the visible text.',
+    fr: 'Nouvel outil Nodus Translate : traduisez du texte collé, des fichiers et des pièces jointes Zotero avec le modèle d’IA de votre choix. Il conserve la structure des DOCX et EPUB, et inclut un mode fac-similé pour les PDF qui préserve la mise en page, les images et la géométrie des pages tout en remplaçant le texte visible.',
+    de: 'Neues Werkzeug Nodus Translate: Übersetze eingefügten Text, Dateien und Zotero-Anhänge mit dem KI-Modell deiner Wahl. Es bewahrt die Struktur von DOCX und EPUB und bietet einen PDF-Faksimile-Modus, der Layout, Bilder und Seitengeometrie beibehält, während der sichtbare Text ersetzt wird.',
+    pt: 'Nova ferramenta Nodus Translate: traduza texto colado, ficheiros e anexos do Zotero com o modelo de IA que escolher. Conserva a estrutura de DOCX e EPUB, e inclui um modo fac-símile para PDF que mantém o design, as imagens e a geometria da página enquanto substitui o texto visível.',
+    'pt-BR': 'Nova ferramenta Nodus Translate: traduza texto colado, arquivos e anexos do Zotero com o modelo de IA que você escolher. Ela preserva a estrutura de DOCX e EPUB, e inclui um modo fac-símile para PDF que mantém o layout, as imagens e a geometria da página enquanto substitui o texto visível.',
+  },
+  {
+    scope: 'general',
+    es: 'Generación de imágenes local con FLUX.2 Klein: descarga opcional de un modelo bajo licencia Apache-2.0 que crea imágenes en tu propio equipo, sin API, sin coste por uso y sin enviar tus prompts a terceros.',
+    en: 'Local image generation with FLUX.2 Klein: an optional, Apache-2.0-licensed model download that creates images right on your own machine, with no API, no per-use cost and no prompts sent to third parties.',
+    fr: 'Génération d’images locale avec FLUX.2 Klein : un modèle téléchargeable en option, sous licence Apache 2.0, qui crée des images directement sur votre propre ordinateur, sans API, sans coût à l’usage et sans envoi de vos prompts à des tiers.',
+    de: 'Lokale Bildgenerierung mit FLUX.2 Klein: ein optional herunterladbares, Apache-2.0-lizenziertes Modell, das Bilder direkt auf deinem eigenen Gerät erzeugt – ohne API, ohne Kosten pro Nutzung und ohne Weitergabe deiner Prompts an Dritte.',
+    pt: 'Geração de imagens local com o FLUX.2 Klein: transferência opcional de um modelo com licença Apache-2.0 que cria imagens no seu próprio equipamento, sem API, sem custo por utilização e sem enviar os seus prompts a terceiros.',
+    'pt-BR': 'Geração de imagens local com o FLUX.2 Klein: download opcional de um modelo com licença Apache-2.0 que cria imagens no seu próprio computador, sem API, sem custo por uso e sem enviar seus prompts a terceiros.',
+  },
+  {
+    scope: 'general',
+    es: 'Deep Research, Inmersión y el Taller de escritura exportan ahora informes en PDF con un diseño profesional: portada, tabla de contenidos navegable, métricas destacadas y secciones numeradas.',
+    en: 'Deep Research, Immersion and the Writing Workshop now export reports as professionally designed PDFs, with a cover page, a navigable table of contents, highlighted metrics and numbered sections.',
+    fr: 'Deep Research, Immersion et l’Atelier d’écriture exportent désormais des rapports en PDF au design professionnel : page de couverture, table des matières navigable, indicateurs mis en avant et sections numérotées.',
+    de: 'Deep Research, Immersion und die Schreibwerkstatt exportieren Berichte jetzt als professionell gestaltete PDFs mit Deckblatt, navigierbarem Inhaltsverzeichnis, hervorgehobenen Kennzahlen und nummerierten Abschnitten.',
+    pt: 'O Deep Research, a Imersão e a Oficina de escrita passam a exportar relatórios em PDF com um design profissional: capa, índice navegável, métricas em destaque e secções numeradas.',
+    'pt-BR': 'O Deep Research, a Imersão e a Oficina de escrita agora exportam relatórios em PDF com um design profissional: capa, sumário navegável, métricas em destaque e seções numeradas.',
+  },
+  {
+    scope: 'mcp',
+    es: 'Nodus Server, experimental: comparte una copia filtrada y de solo lectura de una bóveda con un grupo de trabajo o clase, con acceso remoto desde ChatGPT o Claude mediante un túnel MCP protegido por OAuth. Se despliega en tu propio Docker, exige una contraseña de administración segura y solo recibe tráfico HTTPS saliente de Nodus Desktop.',
+    en: 'Experimental Nodus Server: share a filtered, read-only copy of a vault with a class or working group, with remote access from ChatGPT or Claude through an OAuth-protected MCP tunnel. It runs on your own Docker host, requires a secure admin password, and only accepts outbound HTTPS traffic from Nodus Desktop.',
+    fr: 'Nodus Server, expérimental : partagez une copie filtrée et en lecture seule d’un espace avec un groupe de travail ou une classe, avec un accès distant depuis ChatGPT ou Claude via un tunnel MCP protégé par OAuth. Il se déploie sur votre propre Docker, exige un mot de passe d’administration sécurisé et ne reçoit que du trafic HTTPS sortant de Nodus Desktop.',
+    de: 'Experimenteller Nodus Server: Teile eine gefilterte, schreibgeschützte Kopie eines Arbeitsbereichs mit einer Klasse oder Arbeitsgruppe, mit Fernzugriff von ChatGPT oder Claude über einen OAuth-geschützten MCP-Tunnel. Er läuft auf deinem eigenen Docker-Host, verlangt ein sicheres Administratorpasswort und akzeptiert nur ausgehenden HTTPS-Verkehr von Nodus Desktop.',
+    pt: 'Nodus Server, experimental: partilhe uma cópia filtrada e só de leitura de um espaço com uma turma ou grupo de trabalho, com acesso remoto a partir do ChatGPT ou do Claude através de um túnel MCP protegido por OAuth. É implementado no seu próprio Docker, exige uma palavra-passe de administração segura e só recebe tráfego HTTPS de saída do Nodus Desktop.',
+    'pt-BR': 'Nodus Server, experimental: compartilhe uma cópia filtrada e somente leitura de um espaço com uma turma ou grupo de trabalho, com acesso remoto a partir do ChatGPT ou do Claude por um túnel MCP protegido por OAuth. Ele roda no seu próprio Docker, exige uma senha de administração segura e só recebe tráfego HTTPS de saída do Nodus Desktop.',
+  },
+  {
+    scope: 'plugin',
+    es: 'El asistente de Nodus para Zotero se vuelve mucho más completo: aparece también en el lector emergente, responde sobre el documento abierto o varios elementos seleccionados, puede resaltar automáticamente los pasajes más relevantes y guardar la conversación como una nota de Zotero.',
+    en: 'The Nodus for Zotero assistant becomes far more capable: it also appears in the reader popup, answers about the open document or several selected items, can automatically highlight the most relevant passages, and saves the conversation as a Zotero note.',
+    fr: 'L’assistant Nodus pour Zotero devient beaucoup plus complet : il apparaît aussi dans la fenêtre du lecteur, répond sur le document ouvert ou plusieurs éléments sélectionnés, peut surligner automatiquement les passages les plus pertinents et enregistrer la conversation comme note Zotero.',
+    de: 'Der Nodus-Assistent für Zotero wird deutlich leistungsfähiger: Er erscheint jetzt auch im Reader-Popup, beantwortet Fragen zum geöffneten Dokument oder mehreren ausgewählten Elementen, kann die relevantesten Passagen automatisch markieren und die Unterhaltung als Zotero-Notiz speichern.',
+    pt: 'O assistente do Nodus para o Zotero torna-se muito mais completo: aparece também na janela do leitor, responde sobre o documento aberto ou vários itens selecionados, pode destacar automaticamente as passagens mais relevantes e guardar a conversa como nota do Zotero.',
+    'pt-BR': 'O assistente do Nodus para o Zotero fica muito mais completo: ele também aparece no pop-up do leitor, responde sobre o documento aberto ou vários itens selecionados, pode destacar automaticamente as passagens mais relevantes e salvar a conversa como uma nota do Zotero.',
+  },
+  {
+    scope: 'plugin',
+    es: 'Nuevo modo agente en Nodus para Zotero: propone crear notas, resaltados, etiquetas o cambios de campos a partir de la conversación, y pide tu confirmación antes de aplicar cada acción.',
+    en: 'New agent mode in Nodus for Zotero: it proposes creating notes, highlights, tags or field changes from the conversation, and asks for your confirmation before applying each action.',
+    fr: 'Nouveau mode agent dans Nodus pour Zotero : il propose de créer des notes, des surlignages, des étiquettes ou des modifications de champs à partir de la conversation, et demande votre confirmation avant d’appliquer chaque action.',
+    de: 'Neuer Agentenmodus in Nodus für Zotero: Er schlägt aus der Unterhaltung heraus Notizen, Markierungen, Schlagwörter oder Feldänderungen vor und fragt vor jeder Aktion um deine Bestätigung.',
+    pt: 'Novo modo agente no Nodus para o Zotero: propõe criar notas, destaques, etiquetas ou alterações de campos a partir da conversa, e pede a sua confirmação antes de aplicar cada ação.',
+    'pt-BR': 'Novo modo agente no Nodus para o Zotero: ele propõe criar notas, destaques, etiquetas ou alterações de campos a partir da conversa, e pede sua confirmação antes de aplicar cada ação.',
+  },
+  {
+    scope: 'plugin',
+    es: 'El complemento Nodus para Zotero se instala y se actualiza directamente desde Ajustes, y también se publica como archivo .xpi en cada versión de Nodus para quien prefiera instalarlo manualmente en Zotero.',
+    en: 'The Nodus for Zotero add-on can now be installed and updated straight from Settings, and is also published as an .xpi file with every Nodus release for anyone who prefers to install it manually in Zotero.',
+    fr: 'L’extension Nodus pour Zotero s’installe et se met à jour directement depuis les Paramètres, et est aussi publiée sous forme de fichier .xpi à chaque version de Nodus pour celles et ceux qui préfèrent l’installer manuellement dans Zotero.',
+    de: 'Das Add-on Nodus für Zotero lässt sich jetzt direkt aus den Einstellungen installieren und aktualisieren und wird außerdem bei jeder Nodus-Version als .xpi-Datei veröffentlicht, für alle, die es lieber manuell in Zotero installieren möchten.',
+    pt: 'O complemento Nodus para o Zotero instala-se e atualiza-se diretamente a partir das Definições, e é também publicado como ficheiro .xpi em cada versão do Nodus para quem preferir instalá-lo manualmente no Zotero.',
+    'pt-BR': 'O complemento Nodus para o Zotero agora se instala e se atualiza diretamente pelas Configurações, e também é publicado como arquivo .xpi em cada versão do Nodus para quem preferir instalá-lo manualmente no Zotero.',
+  },
+  {
+    scope: 'general',
+    es: 'Nueva guía de bienvenida sobre flujos conectados: explica con claridad cuándo usar el servidor MCP local, cuándo el nuevo Nodus Server, cómo trabajar dentro de Zotero y qué ofrece el Toolkit completo.',
+    en: 'New connected-workflows onboarding guide: it clearly explains when to use the local MCP server, when to use the new Nodus Server, how to work inside Zotero, and what the complete Toolkit offers.',
+    fr: 'Nouveau guide d’accueil sur les flux connectés : il explique clairement quand utiliser le serveur MCP local, quand utiliser le nouveau Nodus Server, comment travailler dans Zotero et ce que propose le Toolkit complet.',
+    de: 'Neuer Einführungsguide zu verbundenen Arbeitsabläufen: Er erklärt klar, wann der lokale MCP-Server und wann der neue Nodus Server genutzt werden sollte, wie man in Zotero arbeitet und was das vollständige Toolkit bietet.',
+    pt: 'Novo guia de boas-vindas sobre fluxos ligados: explica com clareza quando usar o servidor MCP local, quando usar o novo Nodus Server, como trabalhar dentro do Zotero e o que oferece o Toolkit completo.',
+    'pt-BR': 'Novo guia de boas-vindas sobre fluxos conectados: explica com clareza quando usar o servidor MCP local, quando usar o novo Nodus Server, como trabalhar dentro do Zotero e o que o Toolkit completo oferece.',
+  },
+];
+
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
+  {
+    version: '2.6.1',
+    date: '2026-07-23',
+    highlights: RELEASE_2_6_HIGHLIGHTS,
+  },
   {
     version: '2.6.0',
     date: '2026-07-23',
-    highlights: [
-      {
-        scope: 'plugin',
-        es: 'Nodus para Zotero incorpora búsqueda semántica multilingüe completamente local con E5 small cuantizado. El modelo se descarga una sola vez, se ejecuta en el dispositivo y elimina la configuración y el coste de una API de embeddings; los índices persisten comprimidos junto a sus vectores en el perfil de Zotero.',
-        en: 'Nodus for Zotero now includes fully local multilingual semantic search with a quantised E5 small model. The model downloads once, runs on-device, and removes embedding API setup and cost; compressed indexes and their vectors persist in the Zotero profile.',
-        fr: 'Nodus pour Zotero intègre désormais une recherche sémantique multilingue entièrement locale avec un modèle E5 small quantifié. Le modèle n’est téléchargé qu’une fois, s’exécute sur l’appareil et supprime la configuration et le coût d’une API d’embeddings ; les index compressés et leurs vecteurs sont conservés dans le profil Zotero.',
-        de: 'Nodus für Zotero bietet jetzt eine vollständig lokale, mehrsprachige semantische Suche mit einem quantisierten E5-small-Modell. Das Modell wird einmal heruntergeladen, läuft auf dem Gerät und macht Einrichtung und Kosten einer Embedding-API überflüssig; komprimierte Indizes und ihre Vektoren bleiben im Zotero-Profil erhalten.',
-        pt: 'O Nodus para Zotero inclui agora pesquisa semântica multilingue totalmente local com um modelo E5 small quantizado. O modelo é descarregado uma única vez, executa-se no dispositivo e elimina a configuração e o custo de uma API de embeddings; os índices comprimidos e os respetivos vetores ficam guardados no perfil do Zotero.',
-        'pt-BR': 'O Nodus para Zotero agora inclui busca semântica multilíngue totalmente local com um modelo E5 small quantizado. O modelo é baixado uma única vez, roda no dispositivo e elimina a configuração e o custo de uma API de embeddings; os índices compactados e seus vetores ficam salvos no perfil do Zotero.',
-      },
-      {
-        scope: 'plugin',
-        es: 'Los PDF largos se reconstruyen por páginas, columnas y párrafos, eliminando encabezados y pies repetidos y conservando coordenadas para citas y resaltados exactos. Un recuperador acotado puede reformular la búsqueda, inspeccionar rangos de páginas y ampliar la evidencia en dos rondas antes de responder, con OCR y análisis visual cuando hacen falta.',
-        en: 'Long PDFs are reconstructed by page, column and paragraph, removing repeated headers and footers while retaining coordinates for exact citations and highlights. A bounded retriever can reformulate searches, inspect page ranges and expand evidence for two rounds before answering, with OCR and visual analysis when needed.',
-        fr: 'Les PDF longs sont reconstruits par page, colonne et paragraphe, avec suppression des en-têtes et pieds de page répétés et conservation des coordonnées pour des citations et surlignages exacts. Un moteur de récupération limité peut reformuler les recherches, inspecter des plages de pages et enrichir les preuves pendant deux tours avant de répondre, avec OCR et analyse visuelle si nécessaire.',
-        de: 'Lange PDFs werden nach Seiten, Spalten und Absätzen rekonstruiert; wiederkehrende Kopf- und Fußzeilen werden entfernt, Koordinaten für genaue Zitate und Markierungen bleiben erhalten. Eine begrenzte Suche kann Anfragen neu formulieren, Seitenbereiche prüfen und die Evidenz in zwei Runden erweitern, bevor sie antwortet – bei Bedarf mit OCR und visueller Analyse.',
-        pt: 'Os PDF longos são reconstruídos por página, coluna e parágrafo, removendo cabeçalhos e rodapés repetidos e preservando coordenadas para citações e destaques exatos. Um recuperador limitado pode reformular pesquisas, inspecionar intervalos de páginas e ampliar a evidência em duas rondas antes de responder, com OCR e análise visual quando necessário.',
-        'pt-BR': 'PDFs longos são reconstruídos por página, coluna e parágrafo, removendo cabeçalhos e rodapés repetidos e preservando coordenadas para citações e destaques exatos. Um recuperador limitado pode reformular buscas, inspecionar intervalos de páginas e ampliar as evidências por duas rodadas antes de responder, com OCR e análise visual quando necessário.',
-      },
-      {
-        scope: 'plugin',
-        es: 'En el modal de Novedades, la N conectada de Nodus gira para formar una Z e identifica de un vistazo las mejoras del complemento. Dentro de Zotero, el complemento conserva la N normal de Nodus.',
-        en: 'In the What’s New modal, Nodus’s connected N rotates into a Z to identify add-on improvements at a glance. Inside Zotero, the add-on keeps the normal Nodus N.',
-        fr: 'Dans la fenêtre Nouveautés, le N connecté de Nodus pivote pour former un Z et identifier d’un coup d’œil les améliorations de l’extension. Dans Zotero, l’extension conserve le N normal de Nodus.',
-        de: 'Im Neuigkeiten-Dialog dreht sich das verbundene N von Nodus zu einem Z, damit Verbesserungen des Add-ons sofort erkennbar sind. In Zotero selbst behält das Add-on das normale N von Nodus.',
-        pt: 'No modal Novidades, o N ligado do Nodus roda para formar um Z e identificar de imediato as melhorias do complemento. Dentro do Zotero, o complemento mantém o N normal do Nodus.',
-        'pt-BR': 'No modal Novidades, o N conectado do Nodus gira para formar um Z e identificar de imediato as melhorias do complemento. Dentro do Zotero, o complemento mantém o N normal do Nodus.',
-      },
-    ],
+    highlights: RELEASE_2_6_HIGHLIGHTS,
   },
   {
     version: '2.5.4',

@@ -1,10 +1,24 @@
+// v2.6.0 and v2.6.1 intentionally share this exact Italian list — see the note
+// next to RELEASE_2_6_HIGHLIGHTS in releaseNotes.ts.
+const RELEASE_2_6_IT: string[] = [
+  "Nodus per Zotero include ora una ricerca semantica multilingue completamente locale con un modello E5 small quantizzato. Il modello viene scaricato una sola volta, funziona sul dispositivo ed elimina la configurazione e il costo di un'API di embedding; gli indici compressi e i relativi vettori restano nel profilo Zotero.",
+  "I PDF lunghi vengono ricostruiti per pagina, colonna e paragrafo, rimuovendo intestazioni e piè di pagina ripetuti e conservando le coordinate per citazioni ed evidenziazioni esatte. Un recuperatore limitato può riformulare le ricerche, ispezionare intervalli di pagine ed estendere le prove per due turni prima di rispondere, con OCR e analisi visiva quando necessari.",
+  "Nel modale Novità, la N collegata di Nodus ruota formando una Z per identificare a colpo d'occhio i miglioramenti del componente aggiuntivo. Dentro Zotero, il componente aggiuntivo mantiene la normale N di Nodus.",
+  "Strumenti inaugura Nodus Apps: crea con l'IA mini applicazioni complete e funzionanti — giochi, calcolatrici, pianificatori, sondaggi — con un catalogo iniziale già incluso. Ogni app può essere condivisa dal vivo con un codice QR o un PIN, così altre persone possono partecipare dal proprio telefono.",
+  "Nuovo strumento Nodus Translate: traduci testo incollato, file e allegati di Zotero con il modello IA che preferisci. Conserva la struttura di DOCX ed EPUB e include una modalità facsimile per i PDF che mantiene il layout, le immagini e la geometria della pagina sostituendo il testo visibile.",
+  "Generazione di immagini locale con FLUX.2 Klein: un modello scaricabile facoltativamente, con licenza Apache 2.0, che crea immagini direttamente sul tuo dispositivo, senza API, senza costi per utilizzo e senza inviare i tuoi prompt a terzi.",
+  "Deep Research, Immersione e il Laboratorio di scrittura ora esportano report in PDF con un design professionale: copertina, indice navigabile, metriche in evidenza e sezioni numerate.",
+  "Nodus Server, sperimentale: condividi una copia filtrata e di sola lettura di un deposito con una classe o un gruppo di lavoro, con accesso remoto da ChatGPT o Claude tramite un tunnel MCP protetto da OAuth. Viene eseguito sul tuo Docker, richiede una password di amministrazione sicura e riceve solo traffico HTTPS in uscita da Nodus Desktop.",
+  "L'assistente di Nodus per Zotero diventa molto più completo: appare anche nel popup del lettore, risponde sul documento aperto o su più elementi selezionati, può evidenziare automaticamente i passaggi più rilevanti e salvare la conversazione come nota di Zotero.",
+  "Nuova modalità agente in Nodus per Zotero: propone di creare note, evidenziazioni, etichette o modifiche ai campi a partire dalla conversazione, chiedendo conferma prima di applicare ogni azione.",
+  "Il componente aggiuntivo Nodus per Zotero si installa e si aggiorna direttamente dalle Impostazioni, ed è anche pubblicato come file .xpi a ogni versione di Nodus per chi preferisce installarlo manualmente in Zotero.",
+  "Nuova guida di benvenuto sui flussi connessi: spiega chiaramente quando usare il server MCP locale, quando usare il nuovo Nodus Server, come lavorare dentro Zotero e cosa offre il Toolkit completo."
+];
+
 /** Italian history, indexed by release and highlight order. */
 export const RELEASE_NOTES_IT: Record<string, string[]> = {
-  "2.6.0": [
-    "Nodus per Zotero include ora una ricerca semantica multilingue completamente locale con un modello E5 small quantizzato. Il modello viene scaricato una sola volta, funziona sul dispositivo ed elimina la configurazione e il costo di un'API di embedding; gli indici compressi e i relativi vettori restano nel profilo Zotero.",
-    "I PDF lunghi vengono ricostruiti per pagina, colonna e paragrafo, rimuovendo intestazioni e piè di pagina ripetuti e conservando le coordinate per citazioni ed evidenziazioni esatte. Un recuperatore limitato può riformulare le ricerche, ispezionare intervalli di pagine ed estendere le prove per due turni prima di rispondere, con OCR e analisi visiva quando necessari.",
-    "Nel modale Novità, la N collegata di Nodus ruota formando una Z per identificare a colpo d'occhio i miglioramenti del componente aggiuntivo. Dentro Zotero, il componente aggiuntivo mantiene la normale N di Nodus."
-  ],
+  "2.6.1": RELEASE_2_6_IT,
+  "2.6.0": RELEASE_2_6_IT,
   "2.5.4": [
     "PDF Presenter ora importa direttamente presentazioni PowerPoint, OpenDocument e Keynote oltre ai PDF. Nodus le converte localmente tramite PowerPoint, Keynote o LibreOffice installati, conserva le note del relatore quando il formato lo consente e non modifica il file originale.",
     "Quando chiudi la finestra principale su macOS senza uscire da Nodus e poi riapri l'app, vengono ripristinati correttamente sia la finestra sia il compagno Nodi sempre in primo piano, se era attivato."
