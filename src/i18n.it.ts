@@ -4512,7 +4512,7 @@ export const IT: Record<string, string> = {
   "en blanco": "vuoto",
   "Cargando simulacro…": "Caricamento esame simulato…",
   "Simulacro escrito": "Esame simulato scritto",
-  "Guardado automáticamente": "Salvato automaticamente",
+  "Guardado automático": "Salvato automaticamente",
   "Autoguardado activo": "Salvataggio automatico attivo",
   "Entregar examen": "Invia esame",
   "Marcar para revisar": "Contrassegna per la revisione",

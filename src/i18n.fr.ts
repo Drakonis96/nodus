@@ -5017,7 +5017,7 @@ export const FR: Record<string, string> = {
   'en blanco': 'vierge',
   'Cargando simulacro…': 'Chargement de l\'examen blanc…',
   'Simulacro escrito': 'Examen blanc écrit',
-  'Guardado automáticamente': 'Enregistré automatiquement',
+  'Guardado automático': 'Enregistré automatiquement',
   'Autoguardado activo': 'Enregistrement automatique actif',
   'Entregar examen': 'Rendre l\'examen',
   'Marcar para revisar': 'Marquer à revoir',

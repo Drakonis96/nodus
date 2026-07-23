@@ -732,22 +732,8 @@
 .nodi-note-preview .md pre code { padding: 0; background: transparent; color: #dce3ed; }
 .nodi-note-preview .md a { color: #8ec5ff; text-decoration: underline; text-underline-offset: 2px; }
 
-.nodi-note-foot { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; padding: 8px; border-top: 0.5px solid rgba(255, 255, 255, 0.08); }
-.nodi-note-remove {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  border: 1px solid rgba(239, 68, 68, 0.28);
-  border-radius: 9px;
-  background: rgba(127, 29, 29, 0.22);
-  color: #f0a3a3;
-  cursor: pointer;
-}
-.nodi-note-remove:hover { background: rgba(153, 27, 27, 0.4); color: #fecaca; }
-.nodi-note-state { font-size: 10px; color: #7a8598; }
+.nodi-note-foot { display: flex; align-items: center; justify-content: center; flex: 0 0 auto; padding: 8px; border-top: 0.5px solid rgba(255, 255, 255, 0.08); }
+.nodi-note-state { font-size: 10px; color: #7a8598; text-align: center; }
 
 .nodi-notes-list,
 .nodi-note-textarea,
@@ -959,8 +945,6 @@
 .nodi-theme-light .nodi-notes-panel .nodi-note-preview .md a { color: var(--nodi-vault-accent, #6366f1); }
 .nodi-theme-light .nodi-notes-panel .nodi-note-foot { border-top-color: rgba(15, 23, 42, 0.08); }
 .nodi-theme-light .nodi-notes-panel .nodi-note-state { color: #94a3b8; }
-.nodi-theme-light .nodi-notes-panel .nodi-note-remove { border-color: rgba(239, 68, 68, 0.28); background: rgba(239, 68, 68, 0.08); color: #dc2626; }
-.nodi-theme-light .nodi-notes-panel .nodi-note-remove:hover { background: rgba(239, 68, 68, 0.16); color: #b91c1c; }
 .nodi-theme-light .nodi-notes-panel .nodi-notes-list,
 .nodi-theme-light .nodi-notes-panel .nodi-note-textarea,
 .nodi-theme-light .nodi-notes-panel .nodi-note-preview { scrollbar-color: #cbd5e1 #eef2f7; }

@@ -4976,7 +4976,7 @@ export const PT: Record<string, string> = {
   'en blanco': 'em branco',
   'Cargando simulacro…': 'A carregar o exame branco…',
   'Simulacro escrito': 'Exame branco escrito',
-  'Guardado automáticamente': 'Guardado automaticamente',
+  'Guardado automático': 'Guardado automaticamente',
   'Autoguardado activo': 'Guardado automático ativo',
   'Entregar examen': 'Entregar exame',
   'Marcar para revisar': 'Marcar para rever',

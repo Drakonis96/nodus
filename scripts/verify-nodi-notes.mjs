@@ -147,7 +147,7 @@ try {
   const afterBold = await ta.inputValue();
   assert.ok(afterBold.includes('**leche**'), `bold did not wrap selection: ${afterBold}`);
   log('bold formatting applied:', JSON.stringify(afterBold));
-  await page.waitForFunction(() => document.querySelector('.nodi-note-state')?.textContent === 'Guardado automáticamente');
+  await page.waitForFunction(() => document.querySelector('.nodi-note-state')?.textContent === 'Guardado automático');
   log('note autosaved');
 
   // ── Back to list: the note shows with derived title + snippet ───────────────
@@ -164,7 +164,7 @@ try {
   await page.locator('.nodi-notes-panel .nodi-panel-head button[title="Nueva nota"]').click();
   await page.locator('.nodi-note-title-input').fill('Ideas para el proyecto');
   await ta.fill('Probar el modo oscuro con un título manual');
-  await page.waitForFunction(() => document.querySelector('.nodi-note-state')?.textContent === 'Guardado automáticamente');
+  await page.waitForFunction(() => document.querySelector('.nodi-note-state')?.textContent === 'Guardado automático');
   await page.locator('.nodi-notes-panel .nodi-panel-head button[title="Volver"]').click();
   assert.equal(await page.locator('.nodi-note-row').count(), 2, 'expected 2 notes');
 
@@ -188,7 +188,9 @@ try {
 
   // ── Delete with confirmation ────────────────────────────────────────────────
   await page.locator('.nodi-notes-panel .nodi-panel-head button[title="Editar"]').click(); // leave preview
-  await page.locator('.nodi-note-remove').click();
+  assert.equal(await page.locator('.nodi-note-remove').count(), 0, 'delete should not be available inside the editor');
+  await page.locator('.nodi-notes-panel .nodi-panel-head button[title="Volver"]').click();
+  await page.locator('.nodi-note-row', { hasText: 'Lista de la' }).locator('.nodi-note-delete').click();
   await page.locator('.nodi-confirm-dialog').waitFor();
   await page.screenshot({ path: `${shots}/notes-4-confirm-dark.png` });
   await page.locator('.nodi-confirm-dialog button.danger').click();

@@ -68,8 +68,11 @@ try {
   assert.match(component, /noteSaveChainRef/, 'overlapping autosaves are serialized');
   assert.match(component, /deriveNodiNoteTitle\(noteDraft\)/, 'the editor previews the shared fallback title');
   assert.match(component, /className="nodi-note-title-input"/, 'users can assign an explicit title');
-  assert.match(component, /t\('Guardado automáticamente'\)/, 'the footer communicates autosave');
+  assert.match(component, /t\('Guardado automático'\)/, 'the footer communicates autosave');
   assert.doesNotMatch(component, /className="nodi-note-save"/, 'the editor no longer requires a manual save action');
+  assert.doesNotMatch(component, /className="nodi-note-remove"/, 'delete is not available inside the editor');
+  assert.match(component, /className="nodi-note-delete"/, 'delete remains available in the notes list');
+  assert.match(css, /\.nodi-note-foot\s*\{[^}]*justify-content:\s*center/s, 'the autosave footer is horizontally centered');
   assert.match(css, /\.nodi-notes-list\s*\{[^}]*padding:\s*6px 10px/s, 'the list keeps a small lateral margin');
   assert.match(css, /\.nodi-note-row\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\) 30px/s, 'each note reserves a fixed column for its delete action');
   assert.match(css, /\.nodi-note-open\s*\{[^}]*overflow:\s*hidden/s, 'note text is clipped before the delete action');

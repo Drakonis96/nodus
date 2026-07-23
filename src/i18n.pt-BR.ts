@@ -4983,7 +4983,7 @@ export const PT_BR: Record<string, string> = {
   'en blanco': 'em branco',
   'Cargando simulacro…': 'Carregando simulado…',
   'Simulacro escrito': 'Simulado escrito',
-  'Guardado automáticamente': 'Salvo automaticamente',
+  'Guardado automático': 'Salvo automaticamente',
   'Autoguardado activo': 'Salvamento automático ativo',
   'Entregar examen': 'Entregar exame',
   'Marcar para revisar': 'Marcar para revisar',
