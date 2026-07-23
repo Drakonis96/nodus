@@ -18,6 +18,7 @@
 
   let worker = null;
   let seq = 0;
+  let lastBackend = null;
   const pending = new Map();
   const progressListeners = new Set();
 
@@ -31,6 +32,10 @@
         for (const listener of progressListeners) {
           try { listener(message.progress || {}); } catch (e) {}
         }
+        return;
+      }
+      if (message.type === "backend") {
+        lastBackend = String(message.backend || "") || null;
         return;
       }
       const job = pending.get(String(message.id || ""));
@@ -92,7 +97,12 @@
     return vectors && vectors[0] ? vectors[0] : [];
   }
   async function warmup(opts) {
-    return request("warmup", null, opts && opts.signal);
+    const result = await request("warmup", null, opts && opts.signal);
+    if (result && result.backend) lastBackend = result.backend;
+    return result;
+  }
+  function getBackend() {
+    return lastBackend;
   }
   function reset() {
     if (worker) { try { worker.terminate(); } catch (e) {} }
@@ -111,6 +121,7 @@
     embedQuery,
     warmup,
     onProgress,
+    getBackend,
     reset,
   };
 })();

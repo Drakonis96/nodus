@@ -46,9 +46,11 @@
       <div id="nd-item"></div>
       <div id="nd-evidencebar" class="nd-evidencebar">
         <span id="nd-index-status" data-i18n="evidence.idle">Evidence index idle</span>
-        <button id="nd-index-btn" class="nd-btn-ghost" data-i18n="evidence.index" data-i18n-title="evidence.indexTitle" title="Index selected documents">Index</button>
+        <button id="nd-index-quick-btn" class="nd-btn-ghost" data-i18n="evidence.indexQuick" data-i18n-title="evidence.indexQuickTitle" title="Quick index (text only)">Quick index</button>
+        <button id="nd-index-full-btn" class="nd-btn-ghost" data-i18n="evidence.indexFull" data-i18n-title="evidence.indexFullTitle" title="Full index (OCR + embeddings)">Full index</button>
         <button id="nd-visual-btn" class="nd-btn-ghost" data-i18n="evidence.vision" data-i18n-title="evidence.visionTitle" title="Analyze current page image">Vision</button>
       </div>
+      <div id="nd-embed-progress" class="nd-embed-progress" hidden><div id="nd-embed-progress-bar" class="nd-embed-progress-bar"></div></div>
       <div id="nd-selection" hidden></div>
       <div id="nd-messages"></div>
       <div id="nd-prompt-menu" class="nd-menu" hidden></div>
@@ -85,6 +87,12 @@
           <option value="full" data-i18n="evidence.full">Complete text</option>
         </select>
         <div id="nd-local-embedding" class="nd-muted" data-i18n="evidence.localEmbedding">Local semantic model: multilingual E5 small (INT8). Runs on this device; no embedding API key required.</div>
+        <label data-i18n="settings.ocrMode">Visual OCR for text-poor pages</label>
+        <select id="nd-ctx-ocr">
+          <option value="off" data-i18n="evidence.ocrOff">Off (fastest indexing)</option>
+          <option value="ondemand" data-i18n="evidence.ocrOnDemand">On demand (only pages you ask about)</option>
+          <option value="always" data-i18n="evidence.ocrAlways">Always (full index button)</option>
+        </select>
         <label class="nd-check" data-nodus-only><input type="checkbox" id="nd-ctx-ideas" /> <span data-i18n="settings.useIdeas">Use Nodus ideas when available</span></label>
         <label class="nd-check" data-nodus-only><input type="checkbox" id="nd-ctx-corpus" /> <span data-i18n="settings.useCorpus">Search my Nodus library for related passages</span></label>
         <div class="nd-muted" data-nodus-only-hint hidden data-i18n="settings.standaloneNote">Nodus-only features are unavailable in Standalone mode.</div>
