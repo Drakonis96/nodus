@@ -62,5 +62,15 @@
     return "SELECTED DOCUMENTS (the user selected " + list.length + " items — you may compare, relate and reference them):\n" + lines.join("\n");
   }
 
-  window.NodusUtil = { sampleDocText, conversationToHtml, buildItemsSummary };
+  function detectLanguage(text, fallback) {
+    const s = String(text || "").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    const count = (words) => words.reduce((n, word) => n + ((s.match(new RegExp("\\b" + word + "\\b", "g")) || []).length), 0);
+    const spanish = count(["que", "como", "segun", "documento", "pagina", "explica", "describe", "distingue", "cita", "evidencia", "vertientes", "etica"]);
+    const english = count(["what", "how", "according", "document", "page", "explain", "describe", "distinguish", "cite", "evidence"]);
+    if (spanish >= 2 && spanish > english) return "Spanish";
+    if (english >= 2 && english > spanish) return "English";
+    return fallback === "es" ? "Spanish" : "English";
+  }
+
+  window.NodusUtil = { sampleDocText, conversationToHtml, buildItemsSummary, detectLanguage };
 })();

@@ -44,6 +44,11 @@
         </div>
       </div>
       <div id="nd-item"></div>
+      <div id="nd-evidencebar" class="nd-evidencebar">
+        <span id="nd-index-status" data-i18n="evidence.idle">Evidence index idle</span>
+        <button id="nd-index-btn" class="nd-btn-ghost" data-i18n="evidence.index" data-i18n-title="evidence.indexTitle" title="Index selected documents">Index</button>
+        <button id="nd-visual-btn" class="nd-btn-ghost" data-i18n="evidence.vision" data-i18n-title="evidence.visionTitle" title="Analyze current page image">Vision</button>
+      </div>
       <div id="nd-selection" hidden></div>
       <div id="nd-messages"></div>
       <div id="nd-prompt-menu" class="nd-menu" hidden></div>
@@ -74,6 +79,12 @@
       <div class="nd-field">
         <label data-i18n="settings.context">Context</label>
         <label class="nd-check"><input type="checkbox" id="nd-ctx-fulltext" /> <span data-i18n="settings.useFulltext">Send document text</span></label>
+        <select id="nd-ctx-strategy">
+          <option value="auto" data-i18n="evidence.auto">Auto: full text when small, retrieval when large</option>
+          <option value="retrieval" data-i18n="evidence.retrieval">Semantic retrieval</option>
+          <option value="full" data-i18n="evidence.full">Complete text</option>
+        </select>
+        <input id="nd-embedding-model" type="text" data-i18n-ph="evidence.embedding" placeholder="Embedding model" />
         <label class="nd-check" data-nodus-only><input type="checkbox" id="nd-ctx-ideas" /> <span data-i18n="settings.useIdeas">Use Nodus ideas when available</span></label>
         <label class="nd-check" data-nodus-only><input type="checkbox" id="nd-ctx-corpus" /> <span data-i18n="settings.useCorpus">Search my Nodus library for related passages</span></label>
         <div class="nd-muted" data-nodus-only-hint hidden data-i18n="settings.standaloneNote">Nodus-only features are unavailable in Standalone mode.</div>
@@ -151,6 +162,8 @@
   <script src="chrome://nodus/content/icons.js"></script>
   <script src="chrome://nodus/content/providers.js"></script>
   <script src="chrome://nodus/content/store.js"></script>
+  <script src="chrome://nodus/content/evidence.js"></script>
+  <script src="chrome://nodus/content/multimodal.js"></script>
   <script src="chrome://nodus/content/agent.js"></script>
   <script src="chrome://nodus/content/util.js"></script>
   <script src="chrome://nodus/content/markdown.js"></script>
