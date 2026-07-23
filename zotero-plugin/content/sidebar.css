@@ -42,6 +42,7 @@ body {
 .nd-conn--on { background: rgba(16,185,129,0.15); color: #059669; }
 .nd-conn--off { background: rgba(239,68,68,0.15); color: #dc2626; }
 
+#nd-body { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
 #nd-tabs { display: flex; border-bottom: 1px solid var(--nd-border); }
 .nd-tab {
   flex: 1; padding: 8px 10px; background: transparent; border: none; cursor: pointer;
@@ -63,6 +64,21 @@ body {
 
 #nd-toolrow { display: flex; gap: 6px; }
 #nd-model { flex: 1; min-width: 0; padding: 5px 6px; border-radius: 6px; border: 1px solid var(--nd-border); background: var(--nd-bg); color: var(--nd-fg); }
+
+/* Searchable model dropdown. */
+.nd-dd { position: relative; flex: 1; min-width: 0; }
+.nd-dd-btn { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 4px; padding: 5px 8px; border-radius: 6px; border: 1px solid var(--nd-border); background: var(--nd-bg); color: var(--nd-fg); font: inherit; font-size: 12px; cursor: pointer; }
+.nd-dd-btn #nd-model-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nd-dd-menu { position: absolute; z-index: 40; top: calc(100% + 4px); left: 0; right: 0; min-width: 220px; background: var(--nd-bg); border: 1px solid var(--nd-border); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.18); overflow: hidden; }
+.nd-dd-search { padding: 6px; border-bottom: 1px solid var(--nd-border); }
+.nd-dd-search input { width: 100%; box-sizing: border-box; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--nd-border); background: var(--nd-bg); color: var(--nd-fg); font: inherit; font-size: 12px; }
+.nd-dd-list { max-height: 240px; overflow: auto; }
+.nd-dd-item { display: flex; align-items: baseline; gap: 8px; padding: 6px 10px; cursor: pointer; font-size: 12px; }
+.nd-dd-item:hover { background: var(--nd-accent-soft); }
+.nd-dd-item--sel { background: var(--nd-accent-soft); }
+.nd-dd-model { color: var(--nd-fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nd-dd-prov { color: var(--nd-muted); font-size: 10px; margin-left: auto; flex: 0 0 auto; }
+.nd-dd-empty { padding: 10px; color: var(--nd-muted); font-size: 11px; text-align: center; }
 
 #nd-prompts { display: flex; flex-wrap: wrap; gap: 6px; }
 .nd-chip {
@@ -106,6 +122,15 @@ body {
 .nd-menu-item:hover { background: var(--nd-accent-soft); }
 .nd-menu-item .nd-menu-title { font-weight: 600; }
 .nd-menu-item .nd-menu-sub { font-size: 10px; color: var(--nd-muted); margin-top: 1px; }
+/* Custom user prompts: title/preview on the left, delete button on the right. */
+.nd-menu-item--custom { display: flex; align-items: center; gap: 6px; }
+.nd-menu-item--custom .nd-menu-txt { flex: 1; min-width: 0; }
+.nd-menu-item--custom .nd-menu-sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nd-menu-del { flex: 0 0 auto; border: none; background: transparent; color: var(--nd-muted); cursor: pointer; padding: 4px; border-radius: 6px; display: inline-flex; align-items: center; }
+.nd-menu-del:hover { color: #dc2626; background: rgba(239,68,68,0.1); }
+.nd-menu-add { display: flex; align-items: center; gap: 5px; color: var(--nd-accent); font-weight: 600; border-bottom: 1px solid var(--nd-border); margin-bottom: 2px; border-radius: 7px 7px 0 0; }
+.nd-modal-input { width: 100%; box-sizing: border-box; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--nd-border); background: var(--nd-bg); color: var(--nd-fg); font: inherit; font-size: 13px; }
+textarea.nd-modal-input { resize: vertical; min-height: 64px; }
 
 .nd-field { display: flex; flex-direction: column; gap: 6px; }
 .nd-field > label:first-child { font-weight: 600; font-size: 12px; }
@@ -173,6 +198,17 @@ body {
 .nd-modal { position: absolute; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 10; padding: 16px; }
 .nd-modal-box { background: var(--nd-bg); border: 1px solid var(--nd-border); border-radius: 12px; padding: 16px; max-width: 320px; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 8px 30px rgba(0,0,0,0.3); }
 .nd-modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.nd-modal-title { font-weight: 700; font-size: 14px; }
+/* Same box metrics as .nd-btn-ghost so paired modal buttons match in shape/size. */
+.nd-btn-primary { padding: 5px 12px; border: 1px solid var(--nd-accent); border-radius: 6px; background: var(--nd-accent); color: #fff; cursor: pointer; font-weight: 600; }
+
+/* Thinking control (chat bar button + modal dropdown). */
+.nd-think-btn { width: auto; min-width: 24px; gap: 3px; padding: 0 6px; }
+.nd-think-ico { display: inline-flex; align-items: center; }
+.nd-think-ico svg { width: 15px; height: 15px; }
+.nd-think-lvl { font-size: 10px; font-weight: 600; color: var(--nd-muted); }
+.nd-dd--think { flex: 0 0 auto; }
+.nd-dd-menu--think { left: auto; right: 0; min-width: 140px; }
 #nodus-app { position: relative; }
 
 /* agent mode */
@@ -184,3 +220,61 @@ body {
 .nd-action-status { margin-top: 6px; font-size: 11px; }
 .nd-action-ok { color: #059669; font-weight: 600; }
 .nd-action-err { color: #dc2626; }
+
+/* Markdown-rendered assistant messages: block layout instead of pre-wrapped
+ * text, so headings/lists/quotes/code read like formatted prose. */
+.nd-body.nd-md { white-space: normal; }
+.nd-md > :first-child { margin-top: 0; }
+.nd-md > :last-child { margin-bottom: 0; }
+.nd-md-p { margin: 0 0 8px; line-height: 1.5; }
+.nd-md-h { margin: 12px 0 6px; line-height: 1.3; font-weight: 700; }
+h1.nd-md-h { font-size: 16px; } h2.nd-md-h { font-size: 15px; } h3.nd-md-h { font-size: 13.5px; }
+h4.nd-md-h, h5.nd-md-h, h6.nd-md-h { font-size: 12.5px; }
+.nd-md-list { margin: 0 0 8px; padding-left: 20px; }
+.nd-md-list li { margin: 2px 0; line-height: 1.45; }
+.nd-md-quote { margin: 0 0 8px; padding: 4px 10px; border-left: 3px solid var(--nd-accent-line); color: var(--nd-muted); background: var(--nd-accent-soft); border-radius: 0 6px 6px 0; }
+.nd-md-code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.92em; padding: 1px 4px; border-radius: 4px; background: var(--nd-accent-soft); }
+.nd-md-pre { margin: 0 0 8px; padding: 8px 10px; overflow: auto; border-radius: 8px; background: var(--nd-accent-soft); border: 1px solid var(--nd-border); }
+.nd-md-pre code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.92em; white-space: pre; }
+.nd-md-hr { border: none; border-top: 1px solid var(--nd-border); margin: 10px 0; }
+.nd-md-link { color: var(--nd-accent); text-decoration: underline; cursor: pointer; }
+
+/* Per-message actions (copy · edit/regenerate): dim, revealed on hover. */
+.nd-msg-actions { display: flex; gap: 4px; margin-top: 5px; opacity: 0; transition: opacity 0.12s; }
+.nd-msg:hover .nd-msg-actions { opacity: 0.75; }
+.nd-msg-actions:hover { opacity: 1; }
+/* Persistent action rows (e.g. Undo highlights) stay visible without hover. */
+.nd-msg-actions--persist, .nd-msg:hover .nd-msg-actions--persist { opacity: 1; }
+
+/* Streaming "typing" indicator — three dots bouncing in progression. */
+.nd-typing { display: inline-flex; gap: 5px; align-items: center; padding: 4px 2px; }
+.nd-typing-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--nd-accent); opacity: 0.35; animation: nd-typing 1.2s infinite ease-in-out; }
+.nd-typing-dot:nth-child(2) { animation-delay: 0.18s; }
+.nd-typing-dot:nth-child(3) { animation-delay: 0.36s; }
+@keyframes nd-typing { 0%, 60%, 100% { opacity: 0.3; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-4px); } }
+.nd-msg--user .nd-msg-actions { justify-content: flex-end; }
+.nd-msg-act { border: none; background: transparent; cursor: pointer; color: var(--nd-muted); font-size: 12px; line-height: 1; padding: 2px 5px; border-radius: 5px; }
+.nd-msg-act:hover { background: var(--nd-accent-soft); color: var(--nd-accent); }
+
+/* Provider key row + delete-key button. */
+.nd-prov-keyrow { display: flex; gap: 6px; align-items: center; }
+.nd-prov-keyrow input { flex: 1 1 auto; min-width: 0; }
+.nd-prov-del { flex: 0 0 auto; width: 30px; height: 30px; border: 1px solid var(--nd-border); border-radius: 6px; background: transparent; color: var(--nd-muted); cursor: pointer; }
+.nd-prov-del:hover { color: #dc2626; border-color: rgba(239,68,68,0.4); background: rgba(239,68,68,0.08); }
+
+/* Inline SVG icons. */
+.nd-ico { display: inline-block; vertical-align: middle; flex: 0 0 auto; }
+.nd-iconbtn, .nd-sendbtn, .nd-msg-act, .nd-star, .nd-conv-del, .nd-prov-del { display: inline-flex; align-items: center; justify-content: center; }
+.nd-msg-act { gap: 3px; }
+.nd-hl-undo { gap: 4px; padding: 2px 8px; }
+.nd-conv-del .nd-ico { vertical-align: -2px; }
+
+/* Auto-highlight color pickers + undo action. */
+.nd-hl-colors { gap: 14px; align-items: center; }
+.nd-hl-color { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer; }
+.nd-hl-color input[type="color"] { width: 26px; height: 22px; border: 1px solid var(--nd-border); border-radius: 5px; padding: 0; background: none; cursor: pointer; }
+.nd-hl-undo { border: 1px solid var(--nd-accent-line); color: var(--nd-accent); }
+
+/* Long-document truncation notice. */
+.nd-doc-note { font-size: 11px; padding: 6px 9px; border-radius: 8px; border: 1px solid rgba(245,158,11,0.4); background: rgba(245,158,11,0.12); color: #b45309; }
+@media (prefers-color-scheme: dark) { .nd-doc-note { color: #fbbf24; } }

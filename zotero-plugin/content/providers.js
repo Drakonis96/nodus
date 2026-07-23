@@ -72,6 +72,48 @@
     return (d.data || []).map((m) => m.id).filter(Boolean).sort();
   }
 
+  const DEFAULT_MAX_TOKENS = 8192;
+  function clampMaxTokens(v) {
+    const n = Number(v);
+    if (!Number.isFinite(n) || n <= 0) return DEFAULT_MAX_TOKENS;
+    return Math.min(200000, Math.max(256, Math.floor(n)));
+  }
+
+  // Reasoning/thinking control (per model, if it supports it). Levels:
+  //   'default' — send nothing, let the model/provider decide
+  //   'off'     — ask the model NOT to reason (faster/cheaper)
+  //   'low'|'medium'|'high' — reasoning effort
+  const REASONING_LEVELS = ["default", "off", "low", "medium", "high"];
+  const THINK_BUDGET = { low: 1024, medium: 4096, high: 8192 };
+
+  // Body fragment for OpenAI-compatible chat. OpenRouter exposes a unified
+  // `reasoning` object (verified against gemini/deepseek/mimo); other
+  // OpenAI-compatible endpoints use the standard `reasoning_effort`. 'off' has
+  // no portable "disable" on plain OpenAI-compat, so we simply don't request it.
+  function reasoningBody(provider, level) {
+    if (!level || level === "default") return {};
+    if (provider === "openrouter") {
+      return level === "off" ? { reasoning: { enabled: false } } : { reasoning: { effort: level } };
+    }
+    if (level === "off") return {};
+    return { reasoning_effort: level };
+  }
+
+  // Pure body builder for the Anthropic Messages API (unit-tested). `max_tokens`
+  // is required by the API and was hardcoded to 4096, truncating long answers;
+  // it is now configurable via opts.maxTokens. When reasoning is low/medium/high
+  // we enable extended thinking and make room for it above max_tokens (Anthropic
+  // counts thinking tokens toward max_tokens and requires max_tokens > budget).
+  function buildAnthropicBody(model, system, messages, maxTokens, reasoning) {
+    const body = { model, max_tokens: clampMaxTokens(maxTokens), stream: true, system: system || undefined, messages };
+    const budget = THINK_BUDGET[reasoning];
+    if (budget) {
+      body.thinking = { type: "enabled", budget_tokens: budget };
+      if (body.max_tokens <= budget) body.max_tokens = budget + clampMaxTokens(maxTokens);
+    }
+    return body;
+  }
+
   // messages: [{role:'user'|'assistant', content}]  system: string
   async function chatStream(modelRef, opts, onDelta, signal) {
     const provider = modelRef.provider;
@@ -82,9 +124,11 @@
     const key = (opts && opts.key) || "";
     const system = (opts && opts.system) || "";
     const messages = (opts && opts.messages) || [];
+    const maxTokens = opts && opts.maxTokens;
+    const reasoning = (opts && opts.reasoning) || "default";
 
     if (provider === "anthropic") {
-      return anthropicStream(key, model, system, messages, onDelta, signal);
+      return anthropicStream(key, model, system, messages, maxTokens, reasoning, onDelta, signal);
     }
     // OpenAI-compatible (incl. gemini openai-compat, local servers)
     const base = chatBase(provider, opts && opts.localBase);
@@ -93,6 +137,10 @@
     if (key) headers.Authorization = "Bearer " + key;
     if (provider === "openrouter") { headers["HTTP-Referer"] = "https://github.com/Drakonis96/nodus"; headers["X-Title"] = "Nodus for Zotero"; }
     const body = { model, stream: true, messages: system ? [{ role: "system", content: system }, ...messages] : messages };
+    // Only cap when the user configured a limit: omitting it lets the model use
+    // its own (usually larger) default instead of an arbitrary ceiling.
+    if (maxTokens) body.max_tokens = clampMaxTokens(maxTokens);
+    Object.assign(body, reasoningBody(provider, reasoning));
     const res = await fetch(url, { method: "POST", headers, body: JSON.stringify(body), signal });
     if (!res.ok || !res.body) throw new Error(p.label + " chat HTTP " + res.status + (res.ok ? "" : " " + (await res.text()).slice(0, 200)));
     await readSSE(res.body, (json) => {
@@ -101,14 +149,14 @@
     });
   }
 
-  async function anthropicStream(key, model, system, messages, onDelta, signal) {
+  async function anthropicStream(key, model, system, messages, maxTokens, reasoning, onDelta, signal) {
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
         "content-type": "application/json", "x-api-key": key,
         "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true",
       },
-      body: JSON.stringify({ model, max_tokens: 4096, stream: true, system: system || undefined, messages }),
+      body: JSON.stringify(buildAnthropicBody(model, system, messages, maxTokens, reasoning)),
       signal,
     });
     if (!res.ok || !res.body) throw new Error("Anthropic chat HTTP " + res.status + " " + (res.ok ? "" : (await res.text()).slice(0, 200)));
@@ -139,5 +187,5 @@
     }
   }
 
-  window.NodusProviders = { PROVIDERS, byId, chatBase, listModels, chatStream };
+  window.NodusProviders = { PROVIDERS, byId, chatBase, listModels, chatStream, buildAnthropicBody, clampMaxTokens, DEFAULT_MAX_TOKENS, reasoningBody, REASONING_LEVELS };
 })();

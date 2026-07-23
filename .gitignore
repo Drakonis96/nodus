@@ -2,6 +2,7 @@ node_modules/
 tmp/
 dist/
 dist-electron/
+dist-zotero/
 release/
 *.log
 .DS_Store

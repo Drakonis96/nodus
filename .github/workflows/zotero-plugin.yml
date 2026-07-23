@@ -1,0 +1,62 @@
+name: Zotero plugin
+
+# Packages zotero-plugin/ into an .xpi + updates.json and attaches both to a
+# GitHub Release. Isolated from the app Release workflow: it triggers ONLY on
+# `zotero-v*` tags (e.g. zotero-v0.0.9), so app `v*` releases are unaffected.
+#
+# update_link in the generated updates.json points at the assets uploaded to
+# THIS release, so the pair is self-consistent on GitHub. To enable in-Zotero
+# auto-update, point the manifest's `update_url` at this updates.json URL (or a
+# stable host that redirects to it).
+
+on:
+  push:
+    tags:
+      - 'zotero-v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-xpi:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify plugin (unit tests)
+        run: node --test scripts/test-zotero-plugin.mjs
+
+      - name: Build xpi + updates.json
+        env:
+          # Hosts update_link on this release's asset URL. On workflow_dispatch
+          # (no tag) this is a throwaway base; the upload step is skipped anyway.
+          ZOTERO_XPI_BASE: https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/
+        run: npm run zotero:xpi
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nodus-zotero-xpi
+          path: dist-zotero/*
+
+      - name: Publish to the release
+        if: startsWith(github.ref, 'refs/tags/zotero-v')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="$GITHUB_REF_NAME"
+          gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create "$tag" --repo "$GITHUB_REPOSITORY" \
+              --title "Nodus for Zotero $tag" \
+              --notes "Zotero plugin build $tag. Install the .xpi via Tools → Add-ons → Install Add-on From File."
+          gh release upload "$tag" dist-zotero/*.xpi dist-zotero/updates.json --repo "$GITHUB_REPOSITORY" --clobber
