@@ -1,7 +1,8 @@
 // One-click install/update of the "Nodus for Zotero" plugin into the user's
 // Zotero profile. Zotero ignores an .xpi merely dropped into extensions/ UNLESS
-// a full extension rescan is forced, so we: (Zotero closed) write the packaged
-// .xpi, force a rescan via prefs, clear the startup caches, and relaunch.
+// a full extension rescan is forced, so we: (Zotero closed) copy the same
+// prebuilt .xpi that ships on GitHub Releases, force a rescan via prefs, clear
+// the startup caches, and relaunch.
 // Verified against Zotero 9: a VALID .xpi (with update_url) is auto-registered
 // by the startup scan — no need to hand-edit extensions.json.
 import AdmZip from 'adm-zip';
@@ -15,6 +16,15 @@ import { app, dialog, BrowserWindow } from 'electron';
 
 const execFileAsync = promisify(execFile);
 const PLUGIN_ID = 'nodus-zotero@nodus.app';
+const PLUGIN_XPI_NAME = 'nodus-zotero.xpi';
+const REQUIRED_XPI_ENTRIES = [
+  'manifest.json',
+  'content/local-embeddings.js',
+  'content/runtime/local-embedding-worker.js',
+  'content/runtime/ort-wasm-simd-threaded.jsep.mjs',
+  'content/runtime/ort-wasm-simd-threaded.jsep.wasm',
+  'icons/nodus.svg',
+] as const;
 
 export interface ZoteroInstallInfo {
   profileFound: boolean;
@@ -113,23 +123,45 @@ async function launchZotero(): Promise<boolean> {
   }
 }
 
-function pluginSourceDir(): string {
-  // In production the plugin ships inside app.asar but is unpacked (asarUnpack)
-  // so adm-zip can read the real files; map the path accordingly.
-  const base = path.join(app.getAppPath(), 'zotero-plugin');
-  const marker = `${path.sep}app.asar${path.sep}`;
-  return base.includes(marker) ? base.replace(marker, `${path.sep}app.asar.unpacked${path.sep}`) : base;
+function packagedXpiCandidates(): string[] {
+  const candidates = [
+    path.join(process.resourcesPath || '', 'zotero', PLUGIN_XPI_NAME),
+    path.join(app.getAppPath(), 'dist-zotero', PLUGIN_XPI_NAME),
+  ];
+  return [...new Set(candidates.filter((candidate) => candidate && existsSync(candidate)))];
 }
 
-function buildXpi(destXpi: string): void {
-  const zip = new AdmZip();
-  const src = pluginSourceDir();
-  // Package the complete plugin tree so the in-app installer and the release
-  // builder cannot silently diverge when a new locale or asset directory lands.
-  zip.addLocalFolder(src, '', (filename) => (
-    !filename.split('/').some((part) => part.startsWith('.') || part === 'Thumbs.db')
-  ));
-  zip.writeZip(destXpi);
+function validatePackagedXpi(xpiPath: string): void {
+  const zip = new AdmZip(xpiPath);
+  const names = new Set(zip.getEntries().map((entry) => entry.entryName));
+  for (const required of REQUIRED_XPI_ENTRIES) {
+    if (!names.has(required)) throw new Error(`El XPI integrado no contiene ${required}.`);
+  }
+  const manifestEntry = zip.getEntry('manifest.json');
+  if (!manifestEntry) throw new Error('El XPI integrado no contiene manifest.json.');
+  const manifest = JSON.parse(manifestEntry.getData().toString('utf8')) as {
+    version?: string;
+    applications?: { zotero?: { id?: string } };
+  };
+  if (manifest.applications?.zotero?.id !== PLUGIN_ID) {
+    throw new Error('El XPI integrado tiene un identificador de plugin inesperado.');
+  }
+  if (!manifest.version) throw new Error('El XPI integrado no declara una versión.');
+}
+
+function packagedXpiPath(): string {
+  const candidate = packagedXpiCandidates()[0];
+  if (!candidate) {
+    throw new Error(
+      'No se encontró el XPI integrado de Nodus. En desarrollo, ejecuta "npm run zotero:xpi" antes de instalar.',
+    );
+  }
+  validatePackagedXpi(candidate);
+  return candidate;
+}
+
+async function copyPackagedXpi(destXpi: string): Promise<void> {
+  await fs.copyFile(packagedXpiPath(), destXpi);
 }
 
 async function ensurePrefs(profile: string): Promise<void> {
@@ -160,12 +192,12 @@ export async function getZoteroInstallInfo(): Promise<ZoteroInstallInfo> {
 /** Save the packaged .xpi to a user-chosen location for manual install. */
 export async function exportZoteroPluginXpi(): Promise<ZoteroExportResult> {
   try {
-    const defaultPath = path.join(app.getPath('downloads'), 'nodus-zotero.xpi');
+    const defaultPath = path.join(app.getPath('downloads'), PLUGIN_XPI_NAME);
     const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0] ?? null;
     const opts = { defaultPath, filters: [{ name: 'Zotero plugin', extensions: ['xpi'] }] };
     const result = win ? await dialog.showSaveDialog(win, opts) : await dialog.showSaveDialog(opts);
     if (result.canceled || !result.filePath) return { ok: false, path: null, canceled: true };
-    buildXpi(result.filePath);
+    await copyPackagedXpi(result.filePath);
     return { ok: true, path: result.filePath, canceled: false };
   } catch (error) {
     return { ok: false, path: null, canceled: false, message: error instanceof Error ? error.message : String(error) };
@@ -184,7 +216,7 @@ export async function installZoteroPlugin(): Promise<ZoteroInstallResult> {
     }
     const extDir = path.join(profile, 'extensions');
     await fs.mkdir(extDir, { recursive: true });
-    buildXpi(path.join(extDir, `${PLUGIN_ID}.xpi`));
+    await copyPackagedXpi(path.join(extDir, `${PLUGIN_ID}.xpi`));
     await ensurePrefs(profile);
     await fs.rm(path.join(profile, 'addonStartup.json.lz4'), { force: true }).catch(() => {});
     await fs.rm(path.join(profile, 'startupCache'), { recursive: true, force: true }).catch(() => {});

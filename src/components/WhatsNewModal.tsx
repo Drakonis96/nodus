@@ -31,6 +31,31 @@ const RELEASE_SCOPE_META: Record<ReleaseNoteScope, { icon: string; color: string
   languages: { icon: 'languages', color: '#db2777', label: 'Idiomas' },
 };
 
+/** The rotated N is exclusive to the What's New badge for Zotero-plugin news. */
+function ZoteroReleaseIcon({ size = 13 }: { size?: number }) {
+  return (
+    <svg
+      aria-hidden="true"
+      width={size}
+      height={size}
+      viewBox="0 0 64 64"
+      fill="none"
+    >
+      <path
+        d="M16 18H48L16 46H48"
+        stroke="currentColor"
+        strokeWidth="7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle cx="16" cy="18" r="5.5" fill="currentColor" />
+      <circle cx="48" cy="18" r="5.5" fill="currentColor" />
+      <circle cx="16" cy="46" r="5.5" fill="currentColor" />
+      <circle cx="48" cy="46" r="5.5" fill="currentColor" />
+    </svg>
+  );
+}
+
 // Present every release uniformly: cluster its highlights by scope and order the
 // clusters by how many changes each carries (most first), keeping a stable
 // first-appearance order for ties and preserving each cluster's internal order.
@@ -301,7 +326,9 @@ export function WhatsNewModal({
                       aria-label={scopeLabel}
                       aria-describedby={tooltipId}
                     >
-                      <Icon name={scopeMeta.icon} size={13} />
+                      {scope === 'plugin'
+                        ? <ZoteroReleaseIcon size={13} />
+                        : <Icon name={scopeMeta.icon} size={13} />}
                       <span id={tooltipId} role="tooltip" className="whats-new-scope-tooltip">{scopeLabel}</span>
                     </span>
                     <span>{h[lang]}</span>

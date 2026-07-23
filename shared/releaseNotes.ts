@@ -37,6 +37,39 @@ interface RawReleaseNote extends Omit<ReleaseNote, 'highlights'> { highlights: R
 
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
   {
+    version: '2.6.0',
+    date: '2026-07-23',
+    highlights: [
+      {
+        scope: 'plugin',
+        es: 'Nodus para Zotero incorpora búsqueda semántica multilingüe completamente local con E5 small cuantizado. El modelo se descarga una sola vez, se ejecuta en el dispositivo y elimina la configuración y el coste de una API de embeddings; los índices persisten comprimidos junto a sus vectores en el perfil de Zotero.',
+        en: 'Nodus for Zotero now includes fully local multilingual semantic search with a quantised E5 small model. The model downloads once, runs on-device, and removes embedding API setup and cost; compressed indexes and their vectors persist in the Zotero profile.',
+        fr: 'Nodus pour Zotero intègre désormais une recherche sémantique multilingue entièrement locale avec un modèle E5 small quantifié. Le modèle n’est téléchargé qu’une fois, s’exécute sur l’appareil et supprime la configuration et le coût d’une API d’embeddings ; les index compressés et leurs vecteurs sont conservés dans le profil Zotero.',
+        de: 'Nodus für Zotero bietet jetzt eine vollständig lokale, mehrsprachige semantische Suche mit einem quantisierten E5-small-Modell. Das Modell wird einmal heruntergeladen, läuft auf dem Gerät und macht Einrichtung und Kosten einer Embedding-API überflüssig; komprimierte Indizes und ihre Vektoren bleiben im Zotero-Profil erhalten.',
+        pt: 'O Nodus para Zotero inclui agora pesquisa semântica multilingue totalmente local com um modelo E5 small quantizado. O modelo é descarregado uma única vez, executa-se no dispositivo e elimina a configuração e o custo de uma API de embeddings; os índices comprimidos e os respetivos vetores ficam guardados no perfil do Zotero.',
+        'pt-BR': 'O Nodus para Zotero agora inclui busca semântica multilíngue totalmente local com um modelo E5 small quantizado. O modelo é baixado uma única vez, roda no dispositivo e elimina a configuração e o custo de uma API de embeddings; os índices compactados e seus vetores ficam salvos no perfil do Zotero.',
+      },
+      {
+        scope: 'plugin',
+        es: 'Los PDF largos se reconstruyen por páginas, columnas y párrafos, eliminando encabezados y pies repetidos y conservando coordenadas para citas y resaltados exactos. Un recuperador acotado puede reformular la búsqueda, inspeccionar rangos de páginas y ampliar la evidencia en dos rondas antes de responder, con OCR y análisis visual cuando hacen falta.',
+        en: 'Long PDFs are reconstructed by page, column and paragraph, removing repeated headers and footers while retaining coordinates for exact citations and highlights. A bounded retriever can reformulate searches, inspect page ranges and expand evidence for two rounds before answering, with OCR and visual analysis when needed.',
+        fr: 'Les PDF longs sont reconstruits par page, colonne et paragraphe, avec suppression des en-têtes et pieds de page répétés et conservation des coordonnées pour des citations et surlignages exacts. Un moteur de récupération limité peut reformuler les recherches, inspecter des plages de pages et enrichir les preuves pendant deux tours avant de répondre, avec OCR et analyse visuelle si nécessaire.',
+        de: 'Lange PDFs werden nach Seiten, Spalten und Absätzen rekonstruiert; wiederkehrende Kopf- und Fußzeilen werden entfernt, Koordinaten für genaue Zitate und Markierungen bleiben erhalten. Eine begrenzte Suche kann Anfragen neu formulieren, Seitenbereiche prüfen und die Evidenz in zwei Runden erweitern, bevor sie antwortet – bei Bedarf mit OCR und visueller Analyse.',
+        pt: 'Os PDF longos são reconstruídos por página, coluna e parágrafo, removendo cabeçalhos e rodapés repetidos e preservando coordenadas para citações e destaques exatos. Um recuperador limitado pode reformular pesquisas, inspecionar intervalos de páginas e ampliar a evidência em duas rondas antes de responder, com OCR e análise visual quando necessário.',
+        'pt-BR': 'PDFs longos são reconstruídos por página, coluna e parágrafo, removendo cabeçalhos e rodapés repetidos e preservando coordenadas para citações e destaques exatos. Um recuperador limitado pode reformular buscas, inspecionar intervalos de páginas e ampliar as evidências por duas rodadas antes de responder, com OCR e análise visual quando necessário.',
+      },
+      {
+        scope: 'plugin',
+        es: 'En el modal de Novedades, la N conectada de Nodus gira para formar una Z e identifica de un vistazo las mejoras del complemento. Dentro de Zotero, el complemento conserva la N normal de Nodus.',
+        en: 'In the What’s New modal, Nodus’s connected N rotates into a Z to identify add-on improvements at a glance. Inside Zotero, the add-on keeps the normal Nodus N.',
+        fr: 'Dans la fenêtre Nouveautés, le N connecté de Nodus pivote pour former un Z et identifier d’un coup d’œil les améliorations de l’extension. Dans Zotero, l’extension conserve le N normal de Nodus.',
+        de: 'Im Neuigkeiten-Dialog dreht sich das verbundene N von Nodus zu einem Z, damit Verbesserungen des Add-ons sofort erkennbar sind. In Zotero selbst behält das Add-on das normale N von Nodus.',
+        pt: 'No modal Novidades, o N ligado do Nodus roda para formar um Z e identificar de imediato as melhorias do complemento. Dentro do Zotero, o complemento mantém o N normal do Nodus.',
+        'pt-BR': 'No modal Novidades, o N conectado do Nodus gira para formar um Z e identificar de imediato as melhorias do complemento. Dentro do Zotero, o complemento mantém o N normal do Nodus.',
+      },
+    ],
+  },
+  {
     version: '2.5.4',
     date: '2026-07-22',
     highlights: [

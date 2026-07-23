@@ -1,5 +1,10 @@
 /** Italian history, indexed by release and highlight order. */
 export const RELEASE_NOTES_IT: Record<string, string[]> = {
+  "2.6.0": [
+    "Nodus per Zotero include ora una ricerca semantica multilingue completamente locale con un modello E5 small quantizzato. Il modello viene scaricato una sola volta, funziona sul dispositivo ed elimina la configurazione e il costo di un'API di embedding; gli indici compressi e i relativi vettori restano nel profilo Zotero.",
+    "I PDF lunghi vengono ricostruiti per pagina, colonna e paragrafo, rimuovendo intestazioni e piè di pagina ripetuti e conservando le coordinate per citazioni ed evidenziazioni esatte. Un recuperatore limitato può riformulare le ricerche, ispezionare intervalli di pagine ed estendere le prove per due turni prima di rispondere, con OCR e analisi visiva quando necessari.",
+    "Nel modale Novità, la N collegata di Nodus ruota formando una Z per identificare a colpo d'occhio i miglioramenti del componente aggiuntivo. Dentro Zotero, il componente aggiuntivo mantiene la normale N di Nodus."
+  ],
   "2.5.4": [
     "PDF Presenter ora importa direttamente presentazioni PowerPoint, OpenDocument e Keynote oltre ai PDF. Nodus le converte localmente tramite PowerPoint, Keynote o LibreOffice installati, conserva le note del relatore quando il formato lo consente e non modifica il file originale.",
     "Quando chiudi la finestra principale su macOS senza uscire da Nodus e poi riapri l'app, vengono ripristinati correttamente sia la finestra sia il compagno Nodi sempre in primo piano, se era attivato."

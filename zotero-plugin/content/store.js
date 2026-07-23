@@ -43,14 +43,6 @@
     S("ctx.ideas", c.useIdeas ? "1" : "0"); S("ctx.corpus", c.useCorpus ? "1" : "0"); S("ctx.fulltext", c.useFulltext ? "1" : "0");
     S("ctx.strategy", ["auto", "retrieval", "full"].includes(c.strategy) ? c.strategy : "auto");
   }
-  function defaultEmbeddingModel(provider) {
-    if (provider === "gemini") return "gemini-embedding-001";
-    if (provider === "ollama" || provider === "lmstudio") return "nomic-embed-text";
-    return provider === "openrouter" ? "openai/text-embedding-3-small" : "text-embedding-3-small";
-  }
-  function getEmbeddingModel(provider) { return P("embedding." + provider, defaultEmbeddingModel(provider)); }
-  function setEmbeddingModel(provider, model) { S("embedding." + provider, String(model || defaultEmbeddingModel(provider)).trim()); }
-
   // ---- providers ----
   function getKey(provider) { return P("key." + provider, "") || ""; }
   function setKey(provider, v) { S("key." + provider, v || ""); }
@@ -136,38 +128,210 @@
   async function saveConversations(list) {
     try { await IOUtils.writeUTF8(convPath(), JSON.stringify(compactConversations(list))); } catch (e) { try { Zotero.logError(e); } catch (x) {} }
   }
-  function indexDir() {
+  const EVIDENCE_CACHE_VERSION = 1;
+  let evidenceDbPromise = null;
+
+  function legacyIndexDir() {
     const dir = Services.dirsvc.get("ProfD", Components.interfaces.nsIFile).path;
     return PathUtils.join(dir, "nodus-zotero-indexes");
   }
-  function indexPath(libraryID, attachmentKey) {
+  function legacyIndexPath(libraryID, attachmentKey) {
     const safe = String(libraryID) + "-" + String(attachmentKey || "").replace(/[^A-Za-z0-9_-]/g, "_");
-    return PathUtils.join(indexDir(), safe + ".json");
+    return PathUtils.join(legacyIndexDir(), safe + ".json");
+  }
+  function evidenceDir() {
+    const dir = Services.dirsvc.get("ProfD", Components.interfaces.nsIFile).path;
+    return PathUtils.join(dir, "nodus-zotero-evidence");
+  }
+  function evidenceDbPath() {
+    return PathUtils.join(evidenceDir(), "nodus-evidence.sqlite");
+  }
+  function evidenceStem(libraryID, attachmentKey) {
+    return String(libraryID) + "-" + String(attachmentKey || "").replace(/[^A-Za-z0-9_-]/g, "_");
+  }
+  function evidenceDataPath(libraryID, attachmentKey) {
+    return PathUtils.join(evidenceDir(), evidenceStem(libraryID, attachmentKey) + ".json.gz");
+  }
+  function evidenceVectorPath(libraryID, attachmentKey) {
+    return PathUtils.join(evidenceDir(), evidenceStem(libraryID, attachmentKey) + ".f32");
+  }
+  async function gzipText(value) {
+    const bytes = new TextEncoder().encode(String(value || ""));
+    if (typeof CompressionStream === "undefined") throw new Error("gzip-unavailable");
+    const stream = new Blob([bytes]).stream().pipeThrough(new CompressionStream("gzip"));
+    return new Uint8Array(await new Response(stream).arrayBuffer());
+  }
+  async function gunzipText(bytes) {
+    if (typeof DecompressionStream === "undefined") throw new Error("gunzip-unavailable");
+    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"));
+    return new TextDecoder().decode(await new Response(stream).arrayBuffer());
+  }
+  function detachEmbeddings(index) {
+    const copy = { ...(index || {}) };
+    const chunks = [];
+    let totalFloats = 0;
+    for (const source of Array.isArray(index && index.chunks) ? index.chunks : []) {
+      const chunk = { ...source };
+      const vector = Array.isArray(source.embedding) ? source.embedding : null;
+      if (vector && vector.length) {
+        chunk.embeddingOffset = totalFloats;
+        chunk.embeddingLength = vector.length;
+        totalFloats += vector.length;
+      } else {
+        delete chunk.embeddingOffset;
+        delete chunk.embeddingLength;
+      }
+      chunk.embedding = null;
+      chunks.push(chunk);
+    }
+    copy.chunks = chunks;
+    const vectors = new Float32Array(totalFloats);
+    let cursor = 0;
+    for (const source of Array.isArray(index && index.chunks) ? index.chunks : []) {
+      if (!Array.isArray(source.embedding) || !source.embedding.length) continue;
+      vectors.set(source.embedding.map(Number), cursor);
+      cursor += source.embedding.length;
+    }
+    copy.cache = {
+      schema: EVIDENCE_CACHE_VERSION,
+      vectorFormat: "float32-le",
+      vectorCount: totalFloats,
+    };
+    return { index: copy, bytes: new Uint8Array(vectors.buffer) };
+  }
+  function attachEmbeddings(index, bytes) {
+    const copy = index || {};
+    const source = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes || 0);
+    const raw = source.byteLength ? new Uint8Array(source).buffer : new ArrayBuffer(0);
+    const vectors = new Float32Array(raw);
+    for (const chunk of Array.isArray(copy.chunks) ? copy.chunks : []) {
+      const offset = Number(chunk.embeddingOffset);
+      const length = Number(chunk.embeddingLength);
+      if (Number.isInteger(offset) && Number.isInteger(length) && offset >= 0 && length > 0 && offset + length <= vectors.length) {
+        chunk.embedding = Array.from(vectors.subarray(offset, offset + length));
+      } else {
+        chunk.embedding = null;
+      }
+    }
+    return copy;
+  }
+  async function evidenceDb() {
+    if (evidenceDbPromise) return evidenceDbPromise;
+    evidenceDbPromise = (async () => {
+      await IOUtils.makeDirectory(evidenceDir(), { ignoreExisting: true });
+      const db = new Zotero.DBConnection(evidenceDbPath());
+      await db.queryAsync(
+        "CREATE TABLE IF NOT EXISTS evidence_indexes (" +
+        "library_id INTEGER NOT NULL, attachment_key TEXT NOT NULL, item_key TEXT NOT NULL, " +
+        "signature TEXT NOT NULL, index_version INTEGER NOT NULL, embedding_model TEXT, " +
+        "total_pages INTEGER NOT NULL, total_chars INTEGER NOT NULL, data_path TEXT NOT NULL, " +
+        "vector_path TEXT NOT NULL, updated_at INTEGER NOT NULL, " +
+        "PRIMARY KEY (library_id, attachment_key))"
+      );
+      await db.queryAsync("CREATE INDEX IF NOT EXISTS evidence_indexes_updated ON evidence_indexes(updated_at)");
+      return db;
+    })().catch((error) => {
+      evidenceDbPromise = null;
+      throw error;
+    });
+    return evidenceDbPromise;
   }
   async function loadEvidenceIndex(libraryID, attachmentKey) {
-    try { return JSON.parse(await IOUtils.readUTF8(indexPath(libraryID, attachmentKey))); } catch (e) { return null; }
+    let dataPath = evidenceDataPath(libraryID, attachmentKey);
+    let vectorPath = evidenceVectorPath(libraryID, attachmentKey);
+    try {
+      const db = await evidenceDb();
+      const row = await db.rowQueryAsync(
+        "SELECT data_path, vector_path FROM evidence_indexes WHERE library_id=? AND attachment_key=?",
+        [Number(libraryID), String(attachmentKey || "")]
+      );
+      if (row) {
+        dataPath = String(row.data_path);
+        vectorPath = String(row.vector_path);
+      }
+    } catch (e) { try { Zotero.logError(e); } catch (x) {} }
+    // The sidecars remain independently recoverable if SQLite metadata was
+    // interrupted after the atomic file move.
+    try {
+      const packed = await IOUtils.read(dataPath);
+      const vectors = await IOUtils.read(vectorPath);
+      return attachEmbeddings(JSON.parse(await gunzipText(packed)), vectors);
+    } catch (e) {}
+    // One-way lazy migration from the v0.1 JSON cache.  The old file is left in
+    // place until the new cache has been written successfully.
+    try {
+      const legacy = JSON.parse(await IOUtils.readUTF8(legacyIndexPath(libraryID, attachmentKey)));
+      if (legacy) await saveEvidenceIndex(legacy);
+      return legacy;
+    } catch (e) { return null; }
   }
   async function saveEvidenceIndex(index) {
     try {
-      await IOUtils.makeDirectory(indexDir(), { ignoreExisting: true });
-      const target = indexPath(index.libraryID, index.attachmentKey);
-      const tmp = target + ".tmp";
-      await IOUtils.writeUTF8(tmp, JSON.stringify(index));
-      await IOUtils.move(tmp, target, { noOverwrite: false });
+      await IOUtils.makeDirectory(evidenceDir(), { ignoreExisting: true });
+      const target = evidenceDataPath(index.libraryID, index.attachmentKey);
+      const vectorsTarget = evidenceVectorPath(index.libraryID, index.attachmentKey);
+      const packed = detachEmbeddings(index);
+      const dataBytes = await gzipText(JSON.stringify(packed.index));
+      const dataTmp = target + ".tmp";
+      const vectorsTmp = vectorsTarget + ".tmp";
+      await IOUtils.write(dataTmp, dataBytes);
+      await IOUtils.write(vectorsTmp, packed.bytes);
+      await IOUtils.move(dataTmp, target, { noOverwrite: false });
+      await IOUtils.move(vectorsTmp, vectorsTarget, { noOverwrite: false });
+      const db = await evidenceDb();
+      await db.queryAsync(
+        "INSERT INTO evidence_indexes " +
+        "(library_id, attachment_key, item_key, signature, index_version, embedding_model, total_pages, total_chars, data_path, vector_path, updated_at) " +
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) " +
+        "ON CONFLICT(library_id, attachment_key) DO UPDATE SET " +
+        "item_key=excluded.item_key, signature=excluded.signature, index_version=excluded.index_version, " +
+        "embedding_model=excluded.embedding_model, total_pages=excluded.total_pages, total_chars=excluded.total_chars, " +
+        "data_path=excluded.data_path, vector_path=excluded.vector_path, updated_at=excluded.updated_at",
+        [
+          Number(index.libraryID), String(index.attachmentKey || ""), String(index.itemKey || ""),
+          String(index.signature || ""), Number(index.version) || 0, String(index.embeddingModel || ""),
+          Number(index.totalPages) || 0, Number(index.totalChars) || 0,
+          target, vectorsTarget, Number(index.updatedAt) || Date.now(),
+        ]
+      );
       return target;
     } catch (e) { try { Zotero.logError(e); } catch (x) {} return null; }
   }
   async function deleteEvidenceIndex(libraryID, attachmentKey) {
-    try { await IOUtils.remove(indexPath(libraryID, attachmentKey), { ignoreAbsent: true }); return true; } catch (e) { return false; }
+    try {
+      await IOUtils.remove(evidenceDataPath(libraryID, attachmentKey), { ignoreAbsent: true });
+      await IOUtils.remove(evidenceVectorPath(libraryID, attachmentKey), { ignoreAbsent: true });
+      const db = await evidenceDb();
+      await db.queryAsync("DELETE FROM evidence_indexes WHERE library_id=? AND attachment_key=?", [Number(libraryID), String(attachmentKey || "")]);
+      return true;
+    } catch (e) { return false; }
+  }
+  async function evidenceCacheStats() {
+    try {
+      const db = await evidenceDb();
+      const row = await db.rowQueryAsync(
+        "SELECT COUNT(*) AS documents, COALESCE(SUM(total_pages),0) AS pages, COALESCE(SUM(total_chars),0) AS chars FROM evidence_indexes"
+      );
+      return {
+        path: evidenceDir(),
+        database: evidenceDbPath(),
+        documents: Number(row && row.documents) || 0,
+        pages: Number(row && row.pages) || 0,
+        chars: Number(row && row.chars) || 0,
+      };
+    } catch (e) {
+      return { path: evidenceDir(), database: evidenceDbPath(), documents: 0, pages: 0, chars: 0 };
+    }
   }
   function newId() { return "c_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8); }
 
   window.NodusStore = {
     getMode, setMode, getLang, setLang, getModel, setModel, getMaxTokens, setMaxTokens, getReasoning, setReasoning, getHlColors, setHlColors, getContext, setContext,
-    defaultEmbeddingModel, getEmbeddingModel, setEmbeddingModel,
     getKey, setKey, getLocalBase, setLocalBase, getPinned, setPinned, isPinned, togglePinned,
     getCustomPrompts, setCustomPrompts, addCustomPrompt, removeCustomPrompt,
     getAgent, setAgent, getAgentAuto, setAgentAuto,
-    getManual, setManual, loadConversations, saveConversations, compactAudit, compactConversations, loadEvidenceIndex, saveEvidenceIndex, deleteEvidenceIndex, newId,
+    getManual, setManual, loadConversations, saveConversations, compactAudit, compactConversations,
+    EVIDENCE_CACHE_VERSION, gzipText, gunzipText, detachEmbeddings, attachEmbeddings,
+    loadEvidenceIndex, saveEvidenceIndex, deleteEvidenceIndex, evidenceCacheStats, newId,
   };
 })();

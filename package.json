@@ -1,6 +1,6 @@
 {
   "name": "nodus",
-  "version": "2.5.4",
+  "version": "2.6.0",
   "description": "Local-first desktop app that turns a Zotero library into a navigable graph of ideas and authors.",
   "author": "Nodus",
   "license": "MIT",
@@ -118,6 +118,7 @@
     "autoprefixer": "^10.4.20",
     "electron": "^33.2.0",
     "electron-builder": "^25.1.8",
+    "esbuild": "^0.21.5",
     "eslint": "^8.57.1",
     "playwright-core": "^1.61.1",
     "postcss": "^8.4.49",
@@ -150,6 +151,10 @@
       {
         "from": "legal",
         "to": "legal"
+      },
+      {
+        "from": "dist-zotero/nodus-zotero.xpi",
+        "to": "zotero/nodus-zotero.xpi"
       }
     ],
     "files": [
