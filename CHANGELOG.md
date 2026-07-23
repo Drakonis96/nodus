@@ -1,5 +1,53 @@
 # Changelog
 
+## 2.6.1 — 2026-07-23
+
+### Fixed
+
+- The in-app What's New modal for 2.6.0 only surfaced three Zotero-plugin
+  highlights, silently dropping every other user-facing change shipped since
+  2.5.4. The 2.6.0 and 2.6.1 entries now list the complete set — Nodus Apps,
+  Nodus Translate, local FLUX.2 Klein image generation, professional PDF
+  exports, the experimental Nodus Server, and the rest of the Zotero add-on
+  work — translated into every supported language, so the fix reaches users
+  regardless of which version they're updating from.
+
+## 2.6.0 — 2026-07-23
+
+### Added
+
+- **Local semantic search for Zotero.** Nodus for Zotero adds fully local
+  multilingual semantic search with a quantised E5 small model: no embedding
+  API setup or cost, compressed indexes and vectors persisted in the Zotero
+  profile.
+- **Long PDF reconstruction and retrieval.** Long PDFs are reconstructed by
+  page, column and paragraph with deduplicated headers/footers and
+  coordinate-preserving citations/highlights; a bounded two-round retriever
+  reformulates searches, inspects page ranges and expands evidence, with OCR
+  and visual analysis fallback.
+- **Nodus Apps.** A new Toolkit mini-app studio: build AI-generated sandboxed
+  web apps and share sessions live via QR code or PIN.
+- **Nodus Translate.** Translate pasted text, files and Zotero attachments
+  with a chosen AI model, preserving DOCX/EPUB structure, plus a rasterized
+  PDF facsimile mode.
+- **Nodus Server (experimental).** Self-hosted, Docker-based server for
+  sharing a filtered, read-only vault view with a group, reachable remotely
+  from ChatGPT/Claude via an OAuth-protected MCP tunnel.
+- **Professional PDF exports.** Deep Research, Immersion and Writing Workshop
+  now export PDFs with a cover page, table of contents, structured sections
+  and metrics.
+- **Zotero add-on install/update from Settings.** Nodus for Zotero can be
+  installed and updated from Settings, and is also published as a
+  `nodus-zotero.xpi` file with every release.
+- **Richer Zotero assistant.** In-context chat in the reader popup, an
+  auto-highlighter for relevant passages, and the ability to save
+  conversations as Zotero notes.
+- **Zotero agent mode.** Proposes notes, highlights, tags or field edits from
+  the conversation, requesting per-action confirmation by default.
+- **Connected workflows guide.** A new onboarding guide explains when to use
+  the local MCP server, Nodus Server, the Zotero plugin, or the full
+  Toolkit.
+
 ## 2.5.4 — 2026-07-22
 
 ### Added
