@@ -4,14 +4,14 @@
 //
 //   node scripts/build-zotero-xpi.mjs [--base <url>]
 //
-// --base (or env ZOTERO_XPI_BASE) is the public directory where BOTH the .xpi
-// and updates.json will be hosted; it must match the host in manifest.json's
-// `update_url`. Default: https://nodus.app/zotero/ (the current update_url host).
+// --base (or env ZOTERO_XPI_BASE) is the public directory where the .xpi will
+// be hosted. Releases override it with their immutable tag URL; local builds
+// default to the stable latest-release URL used for direct downloads.
 //
 // Outputs to dist-zotero/:
-//   nodus-zotero-<version>.xpi   — the packaged add-on (manifest.json at root)
-//   updates.json                 — served at manifest.update_url; points Zotero
-//                                  at the .xpi with a sha256 integrity hash.
+//   nodus-zotero.xpi   — fixed-name packaged add-on (manifest.json at root)
+//   updates.json       — served at manifest.update_url; points Zotero at the
+//                        tagged .xpi with a sha256 integrity hash.
 import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -27,7 +27,7 @@ function parseBase() {
   if (arg) return arg.slice('--base='.length);
   const i = process.argv.indexOf('--base');
   if (i >= 0 && process.argv[i + 1]) return process.argv[i + 1];
-  return process.env.ZOTERO_XPI_BASE || 'https://nodus.app/zotero/';
+  return process.env.ZOTERO_XPI_BASE || 'https://github.com/Drakonis96/nodus/releases/latest/download/';
 }
 
 // Files to include: the whole plugin tree, minus junk. manifest.json lands at
@@ -60,7 +60,7 @@ export function buildXpi() {
     zip.addFile(f.relPath, readFileSync(f.abs)); // relPath keeps manifest.json at zip root
   }
   mkdirSync(outDir, { recursive: true });
-  const xpiName = `nodus-zotero-${version}.xpi`;
+  const xpiName = 'nodus-zotero.xpi';
   const xpiPath = path.join(outDir, xpiName);
   zip.writeZip(xpiPath);
 
@@ -99,8 +99,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   console.log(`  sha256: ${r.sha256}`);
   console.log(`✔ Wrote updates.json → ${r.updatesPath}`);
   console.log('');
-  console.log('Publish BOTH files to the directory that backs the manifest update_url:');
+  console.log('Publish the XPI at the update_link base and updates.json at the manifest update_url:');
   console.log(`  update_url in manifest : ${r.updateUrl || '(none)'}`);
-  console.log(`  upload xpi + updates to: ${r.base}`);
+  console.log(`  XPI update_link base   : ${r.base}`);
   console.log('Zotero polls updates.json and offers the new version to installed users.');
 }

@@ -1,7 +1,7 @@
 name: Release
 
-# Builds the macOS .dmg, Windows .exe (NSIS) and Linux .deb/.AppImage and attaches
-# them to the GitHub Release for the pushed tag. Native modules (better-sqlite3,
+# Builds the desktop installers and the fixed-name Zotero .xpi, then attaches all
+# of them to the GitHub Release for the pushed tag. Native modules (better-sqlite3,
 # @napi-rs/canvas) are compiled on each OS runner — this is why each installer must
 # be built on its own OS. Linux ships deb + AppImage only: snap/flatpak need extra
 # tooling (snapcraft, flatpak-builder + runtimes) that a bare ubuntu runner lacks.
@@ -130,9 +130,51 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npx electron-builder ${{ matrix.platform }} --publish always
 
-  verify-release-assets:
+  build-zotero-plugin:
+    # The plugin is part of every stable app release. Waiting for the installer
+    # matrix guarantees electron-builder has already created the shared draft
+    # release before this job uploads its two assets.
     if: startsWith(github.ref, 'refs/tags/v')
     needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify plugin
+        run: node --test scripts/test-zotero-plugin.mjs
+
+      - name: Build fixed-name XPI and update manifest
+        env:
+          # Pin the update payload to this immutable tag. Installed plugins find
+          # updates.json through the stable /releases/latest/download URL.
+          ZOTERO_XPI_BASE: https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/
+        run: npm run zotero:xpi
+
+      - name: Upload plugin assets to the draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "$GITHUB_REF_NAME" \
+            dist-zotero/nodus-zotero.xpi \
+            dist-zotero/updates.json \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber
+
+  verify-release-assets:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs:
+      - release
+      - build-zotero-plugin
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -149,7 +191,9 @@ jobs:
             Nodus-linux-x86_64.AppImage \
             latest-mac.yml \
             latest.yml \
-            latest-linux.yml
+            latest-linux.yml \
+            nodus-zotero.xpi \
+            updates.json
           do
             if ! grep -Fxq "$asset" <<< "$assets"; then
               echo "::error::Missing release asset: $asset"
