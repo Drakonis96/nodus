@@ -37,11 +37,16 @@ const I18N = {
     "settings.context": "Context", "settings.useIdeas": "Use Nodus ideas when available",
     "settings.useFulltext": "Send document text", "settings.useCorpus": "Search my Nodus library for related passages",
     "evidence.idle": "Evidence index idle", "evidence.index": "Index", "evidence.indexTitle": "Index selected documents and OCR text-poor PDF pages",
+    "evidence.indexQuick": "Quick index", "evidence.indexQuickTitle": "Extract and chunk text only (no OCR, no embeddings) — fastest",
+    "evidence.indexFull": "Full index", "evidence.indexFullTitle": "Extract text, run OCR on text-poor pages (if enabled) and compute embeddings",
     "evidence.vision": "Vision", "evidence.visionTitle": "Analyze and attach the current rendered PDF page",
     "evidence.auto": "Auto: full text when small, retrieval when large", "evidence.retrieval": "Semantic retrieval", "evidence.full": "Complete text",
     "evidence.localEmbedding": "Local semantic model: multilingual E5 small (INT8). Runs on this device; no embedding API key required.",
     "evidence.modelDownload": "Preparing the local semantic model · {pct}%",
+    "evidence.embeddingBg": "Embedding in background · {pct}%",
     "evidence.agentSearch": "Expanding evidence · round {round}",
+    "evidence.ocrOff": "Off (fastest indexing)", "evidence.ocrOnDemand": "On demand (only pages you ask about)", "evidence.ocrAlways": "Always (full index button)",
+    "settings.ocrMode": "Visual OCR for text-poor pages",
     "settings.standaloneNote": "Nodus-only features are unavailable in Standalone mode.",
     "settings.language": "Language", "settings.connection": "Nodus connection", "settings.test": "Test connection",
     "settings.token": "token", "settings.manualHint": "Leave empty to auto-detect from Nodus.",
@@ -124,11 +129,16 @@ const I18N = {
     "settings.context": "Contexto", "settings.useIdeas": "Usar ideas de Nodus cuando existan",
     "settings.useFulltext": "Enviar texto del documento", "settings.useCorpus": "Buscar pasajes relacionados en mi biblioteca Nodus",
     "evidence.idle": "Índice de evidencia inactivo", "evidence.index": "Indexar", "evidence.indexTitle": "Indexar los documentos seleccionados y aplicar OCR a las páginas PDF sin texto",
+    "evidence.indexQuick": "Indexado rápido", "evidence.indexQuickTitle": "Extraer y trocear el texto solamente (sin OCR ni embeddings) — lo más rápido",
+    "evidence.indexFull": "Indexado completo", "evidence.indexFullTitle": "Extraer texto, aplicar OCR a páginas sin texto (si está activado) y calcular embeddings",
     "evidence.vision": "Visión", "evidence.visionTitle": "Analizar y adjuntar la página PDF renderizada actual",
     "evidence.auto": "Auto: texto completo si es pequeño; recuperación si es grande", "evidence.retrieval": "Búsqueda semántica", "evidence.full": "Texto completo",
     "evidence.localEmbedding": "Modelo semántico local: multilingual E5 small (INT8). Se ejecuta en este dispositivo; no requiere API key de embeddings.",
     "evidence.modelDownload": "Preparando el modelo semántico local · {pct}%",
+    "evidence.embeddingBg": "Calculando embeddings en segundo plano · {pct}%",
     "evidence.agentSearch": "Ampliando evidencia · ronda {round}",
+    "evidence.ocrOff": "Desactivado (indexado más rápido)", "evidence.ocrOnDemand": "Bajo demanda (solo páginas por las que preguntes)", "evidence.ocrAlways": "Siempre (botón de indexado completo)",
+    "settings.ocrMode": "OCR visual para páginas sin texto",
     "settings.standaloneNote": "Las funciones exclusivas de Nodus no están disponibles en modo Autónomo.",
     "settings.language": "Idioma", "settings.connection": "Conexión con Nodus", "settings.test": "Probar conexión",
     "settings.token": "token", "settings.manualHint": "Déjalo vacío para detectarlo automáticamente desde Nodus.",
@@ -431,25 +441,37 @@ async function selectedAttachments() {
   }
   return out;
 }
-async function ensureEmbeddings(indexes, signal) {
+// opts.onProgress(done, total) reports overall chunk progress across every
+// index passed in; opts.onStatus(text) reports a human-readable line. Both
+// default to the shared setIndexStatus line so the foreground ("Full index")
+// path behaves exactly as before. embedIndexesBackground() overrides them to
+// drive the non-blocking progress bar instead.
+async function ensureEmbeddings(indexes, signal, opts) {
+  opts = opts || {};
+  const onStatus = opts.onStatus || ((text) => setIndexStatus(text, "busy"));
+  const onProgress = opts.onProgress || (() => {});
   if (!NL) throw new Error("local-embeddings-unavailable");
   const model = NL.MODEL;
   let embedded = 0;
   const stopProgress = NL.onProgress((progress) => {
     if (!progress || progress.status !== "progress") return;
     const pct = Math.max(0, Math.min(100, Math.round(Number(progress.progress) || 0)));
-    setIndexStatus(tf("evidence.modelDownload", { pct }), "busy");
+    onStatus(tf("evidence.modelDownload", { pct }));
   });
   try {
-    for (const index of indexes) {
-      const missing = (index.chunks || []).filter((c) =>
-        !Array.isArray(c.embedding)
-        || c.embedding.length !== model.dimensions
-        || c.embeddingModel !== model.fingerprint
-      );
+    const missingByIndex = indexes.map((index) => (index.chunks || []).filter((c) =>
+      !Array.isArray(c.embedding)
+      || c.embedding.length !== model.dimensions
+      || c.embeddingModel !== model.fingerprint
+    ));
+    const totalMissing = missingByIndex.reduce((n, arr) => n + arr.length, 0);
+    let doneSoFar = 0;
+    for (let idxPos = 0; idxPos < indexes.length; idxPos++) {
+      const index = indexes[idxPos];
+      const missing = missingByIndex[idxPos];
       for (let i = 0; i < missing.length; i += 24) {
         const batch = missing.slice(i, i + 24);
-      setIndexStatus("Embedding " + Math.min(i + batch.length, missing.length) + "/" + missing.length + " · " + (index.title || index.attachmentKey), "busy");
+        onStatus("Embedding " + Math.min(i + batch.length, missing.length) + "/" + missing.length + " · " + (index.title || index.attachmentKey));
         const vectors = await NL.embedPassages(batch.map((chunk) =>
           [index.title, chunk.section, chunk.text].filter(Boolean).join("\n")
         ), { signal });
@@ -458,6 +480,8 @@ async function ensureEmbeddings(indexes, signal) {
           chunk.embeddingModel = model.fingerprint;
           embedded++;
         });
+        doneSoFar += batch.length;
+        onProgress(doneSoFar, totalMissing);
       }
       index.embeddingModel = model.fingerprint;
       index.updatedAt = Date.now();
@@ -467,6 +491,31 @@ async function ensureEmbeddings(indexes, signal) {
     stopProgress();
   }
   return { model, embedded };
+}
+// Only one embedding pass runs at a time (foreground or background) so two
+// concurrent callers never race writing the same chunks/index file.
+function showEmbedProgress(pct) {
+  const wrap = $("#nd-embed-progress"), bar = $("#nd-embed-progress-bar");
+  if (!wrap || !bar) return;
+  if (pct == null) { wrap.hidden = true; bar.style.width = "0%"; return; }
+  wrap.hidden = false; bar.style.width = Math.max(0, Math.min(100, pct)) + "%";
+}
+async function ensureEmbeddingsSerialized(indexes, signal, opts) {
+  if (state.embedPromise) { try { await state.embedPromise; } catch (e) {} }
+  const job = ensureEmbeddings(indexes, signal, opts);
+  state.embedPromise = job;
+  try { return await job; } finally { if (state.embedPromise === job) state.embedPromise = null; }
+}
+// Fire-and-forget: computes embeddings without blocking the composer, driving
+// the thin progress bar under the evidence bar instead of the shared status
+// line (which stays free for whatever the user is doing meanwhile).
+function embedIndexesBackground(indexes) {
+  if (!NL || !indexes || !indexes.length) return;
+  showEmbedProgress(0);
+  ensureEmbeddingsSerialized(indexes, undefined, {
+    onStatus: () => {},
+    onProgress: (done, total) => showEmbedProgress(total ? Math.round((done / total) * 100) : 100),
+  }).catch((e) => { try { Zotero.logError(e); } catch (x) {} }).finally(() => showEmbedProgress(null));
 }
 function parseRankedIds(value, allowed) {
   const text = String(value || "").replace(/```(?:json)?/gi, "").replace(/```/g, "");
@@ -478,9 +527,19 @@ function parseRankedIds(value, allowed) {
     return ids.map(String).filter((id) => allowed.has(id));
   } catch (e) { return []; }
 }
+function diversifyExpand(candidates, seedIds, indexes) {
+  const seeds = NE.diversifyCandidates(candidates, seedIds, { topK: 8, maxPerSource: indexes.length > 1 ? 4 : 8 });
+  return NE.expandWithNeighbors(indexes, seeds, { topK: 12, maxPerSource: indexes.length > 1 ? 5 : 12 });
+}
 async function rerankEvidence(query, result, indexes, signal) {
   if (!result || !Array.isArray(result.candidates) || !result.candidates.length) return result && result.hits ? result.hits : [];
   const candidates = result.candidates.slice(0, 36);
+  // A handful of candidates rarely benefits from a whole extra LLM round-trip:
+  // the lexical/semantic blend from hybridSearch already ranks them well, so
+  // skip the network call entirely and just diversify/expand what we have.
+  if (candidates.length <= 8) {
+    return diversifyExpand(candidates, (result.hits || []).map((hit) => hit.id), indexes);
+  }
   const allowed = new Set(candidates.map((c) => c.id));
   const catalogue = candidates.map((c) =>
     `${c.id} | ${c.title || c.itemKey} | page ${c.pageLabel} | ${String(c.text || "").replace(/\s+/g, " ").slice(0, 650)}`
@@ -514,8 +573,7 @@ async function rerankEvidence(query, result, indexes, signal) {
       ? indexes.map((index) => index.chunks && index.chunks[0] && index.chunks[0].id).filter((id) => id && allowed.has(id))
       : [];
     const fallbackIds = ids.length ? ids : (result.hits || []).map((hit) => hit.id);
-    const seeds = NE.diversifyCandidates(candidates, [...required, ...fallbackIds], { topK: 8, maxPerSource: indexes.length > 1 ? 4 : 8 });
-    return NE.expandWithNeighbors(indexes, seeds, { topK: 12, maxPerSource: indexes.length > 1 ? 5 : 12 });
+    return diversifyExpand(candidates, [...required, ...fallbackIds], indexes);
   } catch (e) {
     try { Zotero.logError(e); } catch (x) {}
     return result.hits;
@@ -717,8 +775,12 @@ async function prepareEvidence(query, signal) {
   const totalTokens = indexes.reduce((n, index) =>
     n + (Number(index.estimatedTokens) || (index.chunks || []).reduce((sum, chunk) => sum + (Number(chunk.estimatedTokens) || NE.estimateTokens(chunk.text)), 0))
   , 0);
-  const tokenBudget = availableContextTokens();
-  const strategy = ctx.strategy === "auto" ? (totalTokens <= tokenBudget && indexes.length <= 3 ? "full" : "retrieval") : ctx.strategy;
+  const tokenBudget = Math.min(availableContextTokens(), ctx.fullTextThreshold);
+  // A single open document that fits the context window is exactly the
+  // "Reading Assistant" case: no retrieval/embeddings needed, just hand the
+  // whole thing to the model — always, regardless of the configured strategy.
+  const singleDocFits = indexes.length === 1 && totalTokens <= tokenBudget;
+  const strategy = singleDocFits ? "full" : (ctx.strategy === "auto" ? (totalTokens <= tokenBudget && indexes.length <= 5 ? "full" : "retrieval") : ctx.strategy);
   if (strategy === "full") {
     const full = NE.fullEvidencePrompt(indexes, { maxChars: tokenBudget * 5, maxTokens: tokenBudget });
     state.evidence = NE.evidenceMap(full.hits);
@@ -728,7 +790,7 @@ async function prepareEvidence(query, signal) {
   }
   let queryEmbedding = null;
   try {
-    await ensureEmbeddings(indexes, signal);
+    await ensureEmbeddingsSerialized(indexes, signal);
     queryEmbedding = await NL.embedQuery(query, { signal });
   } catch (e) {
     try { Zotero.logError(e); } catch (x) {}
@@ -736,9 +798,16 @@ async function prepareEvidence(query, signal) {
   }
   let result = NE.hybridSearch(indexes, query, queryEmbedding);
   result.hits = await rerankEvidence(query, result, indexes, signal);
+  if (ctx.ocr === "ondemand" && NV) {
+    const ocrCount = await ocrHitsOnDemand(result.hits, indexes, signal);
+    if (ocrCount) {
+      result = NE.hybridSearch(indexes, query, queryEmbedding);
+      result.hits = await rerankEvidence(query, result, indexes, signal);
+    }
+  }
   let rounds = 0;
   const searched = new Set([NE.fold(query)]);
-  for (let round = 1; round <= 2; round++) {
+  for (let round = 1; round <= ctx.agenticRounds; round++) {
     setIndexStatus(tf("evidence.agentSearch", { round }), "busy");
     const plan = await planEvidenceSearch(query, indexes, result.hits, round, signal);
     if (plan.sufficient) break;
@@ -824,11 +893,50 @@ async function analyzeMissingOcr(indexes) {
   if (!index) return 0;
   const pages = (index.pages || []).filter((page) => page.needsOcr);
   let completed = 0;
+  // capturePage drives the single shared PDF reader (navigate → render →
+  // restore), so captures must stay sequential. The vision LLM call per page
+  // is the slow part, so pipeline up to 3 of those concurrently.
+  const CONCURRENCY = 3;
+  let inFlight = [];
   for (let i = 0; i < pages.length; i++) {
     if (state.abort && state.abort.signal.aborted) break;
     const page = pages[i];
     setIndexStatus("OCR page " + (i + 1) + "/" + pages.length + " · rendered fallback", "busy");
+    const image = await NV.capturePage(cur.reader, page.pageIndex);
+    inFlight.push(runVisualExtraction(image, page)
+      .then((visualText) => { if (visualText) { NE.addVisualText(index, page.pageIndex, visualText); completed++; } })
+      .catch((e) => { try { Zotero.logError(e); } catch (x) {} }));
+    if (inFlight.length >= CONCURRENCY) { await Promise.all(inFlight); inFlight = []; await NS.saveEvidenceIndex(index); }
+  }
+  if (inFlight.length) { await Promise.all(inFlight); await NS.saveEvidenceIndex(index); }
+  return completed;
+}
+// Targeted OCR for ctx.ocr === "ondemand": only runs vision on the handful of
+// retrieved pages that actually need it for THIS question, instead of the
+// whole document up front (which is what the "Full index" button does).
+async function ocrHitsOnDemand(hits, indexes, signal) {
+  if (!NV || !NE) return 0;
+  const cur = getCurrentItem();
+  if (!cur.reader || !cur.attachment) return 0;
+  const index = (indexes || []).find((x) => x.attachmentKey === cur.attachment.key);
+  if (!index) return 0;
+  const pagesByIndex = new Map((index.pages || []).map((p) => [p.pageIndex, p]));
+  const seen = new Set();
+  const targets = [];
+  for (const hit of hits || []) {
+    if (hit.attachmentKey !== index.attachmentKey) continue;
+    const page = pagesByIndex.get(hit.pageIndex);
+    if (!page || !page.needsOcr || seen.has(page.pageIndex)) continue;
+    seen.add(page.pageIndex);
+    targets.push(page);
+    if (targets.length >= 4) break;
+  }
+  if (!targets.length) return 0;
+  let completed = 0;
+  for (const page of targets) {
+    if (signal && signal.aborted) break;
     try {
+      setIndexStatus("OCR p. " + page.pageLabel + " (on demand)…", "busy");
       const image = await NV.capturePage(cur.reader, page.pageIndex);
       const visualText = await runVisualExtraction(image, page);
       if (!visualText) continue;
@@ -1152,7 +1260,13 @@ async function generateAssistant() {
     let audit = null;
     if (NE && state.evidence && state.evidence.size) {
       let reviewed = auditValidatedAnswer(display);
-      if (reviewed.audit.invalidCitations.length || reviewed.audit.missing || reviewed.audit.weak) {
+      const ctx = NS.getContext();
+      const needsRepair = ctx.repair === "off" ? false
+        : ctx.repair === "always" ? (reviewed.audit.invalidCitations.length || reviewed.audit.missing || reviewed.audit.weak)
+        // "auto": only pay for a repair round-trip when citations are outright
+        // invalid or coverage is clearly weak — small nits aren't worth it.
+        : (reviewed.audit.invalidCitations.length > 0 || reviewed.audit.coverage < 0.5);
+      if (needsRepair) {
         const repaired = await repairEvidenceAnswer(reviewed.text, state.evidence, state.abort.signal);
         const second = auditValidatedAnswer(repaired);
         second.audit.repairAttempted = true;
@@ -1602,15 +1716,35 @@ function wire() {
   $("#nd-history-clear").addEventListener("click", async () => { if (await showConfirm(t("modal.delAll"))) { state.conversations = []; await NS.saveConversations([]); startNewConversation(); renderHistory(""); } });
   $("#nd-ctx-fulltext").addEventListener("change", saveContext);
   $("#nd-ctx-strategy").addEventListener("change", saveContext);
+  $("#nd-ctx-ocr").addEventListener("change", saveContext);
   $("#nd-ctx-ideas").addEventListener("change", saveContext);
   $("#nd-ctx-corpus").addEventListener("change", saveContext);
-  $("#nd-index-btn").addEventListener("click", async () => {
+  // Quick index: extraction + chunking only (no OCR, no embeddings) — fast,
+  // enough to answer with lexical/agentic retrieval right away. Embeddings then
+  // compute in the background (non-blocking) so semantic search improves
+  // without making the user wait.
+  $("#nd-index-quick-btn").addEventListener("click", async () => {
     if (state.busy) return;
     state.busy = true; state.abort = new AbortController(); updateSendEnabled();
     try {
       await refreshItem(true);
       const indexes = await buildSelectedIndexes(true, state.abort.signal);
-      const ocrPages = await analyzeMissingOcr(indexes);
+      setIndexStatus(indexes.length + " source" + (indexes.length === 1 ? "" : "s") + " · text extracted · embeddings running in background", "ok");
+      embedIndexesBackground(indexes);
+    } catch (e) { setIndexStatus("Index failed: " + (e.message || e), "warn"); }
+    finally { state.busy = false; state.abort = null; updateSendEnabled(); }
+  });
+  // Full index: extraction + chunking + (optional) OCR of text-poor pages +
+  // embeddings, all done up front. Blocking on purpose — the user explicitly
+  // asked for a complete, ready-to-query index.
+  $("#nd-index-full-btn").addEventListener("click", async () => {
+    if (state.busy) return;
+    state.busy = true; state.abort = new AbortController(); updateSendEnabled();
+    try {
+      await refreshItem(true);
+      const indexes = await buildSelectedIndexes(true, state.abort.signal);
+      const ctx = NS.getContext();
+      const ocrPages = ctx.ocr === "always" ? await analyzeMissingOcr(indexes) : 0;
       await ensureEmbeddings(indexes, state.abort.signal);
       setIndexStatus(indexes.length + " source" + (indexes.length === 1 ? "" : "s") + " fully indexed" + (ocrPages ? " · " + ocrPages + " OCR pages" : ""), "ok");
     } catch (e) { setIndexStatus("Index failed: " + (e.message || e), "warn"); }
@@ -1641,11 +1775,14 @@ function wire() {
 }
 function saveContext() {
   state.contextStrategy = $("#nd-ctx-strategy").value;
+  const prev = NS.getContext();
   NS.setContext({
+    ...prev,
     useFulltext: $("#nd-ctx-fulltext").checked,
     useIdeas: $("#nd-ctx-ideas").checked,
     useCorpus: $("#nd-ctx-corpus").checked,
     strategy: state.contextStrategy,
+    ocr: $("#nd-ctx-ocr").value,
   });
 }
 function saveHlColors() { state.hlColors = { high: $("#nd-hl-high").value || "#ff6666", medium: $("#nd-hl-medium").value || "#ffd400" }; NS.setHlColors(state.hlColors); }
@@ -1692,6 +1829,17 @@ async function boot() {
   const m = NS.getManual(); $("#nd-port").value = m.port || ""; $("#nd-token").value = m.token || "";
   $("#nd-ctx-fulltext").checked = ctx.useFulltext; $("#nd-ctx-ideas").checked = ctx.useIdeas; $("#nd-ctx-corpus").checked = ctx.useCorpus;
   $("#nd-ctx-strategy").value = ctx.strategy;
+  $("#nd-ctx-ocr").value = ctx.ocr;
+  // Pre-warm the local embedding model in the background so the first
+  // "Quick index" background embedding pass (or the first semantic query)
+  // doesn't pay the model-load cost. Non-blocking, best-effort.
+  if (NL && NL.warmup) {
+    NL.warmup().then(() => {
+      const hint = $("#nd-local-embedding");
+      const backend = NL.getBackend && NL.getBackend();
+      if (hint && backend) hint.setAttribute("data-backend", backend);
+    }).catch(() => {});
+  }
   state.agentEnabled = NS.getAgent(); state.agentAuto = NS.getAgentAuto();
   $("#nd-agent").checked = state.agentEnabled; $("#nd-agent-auto").checked = state.agentAuto;
   $("#nd-agent-btn").classList.toggle("nd-iconbtn--active", state.agentEnabled);

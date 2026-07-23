@@ -32,6 +32,7 @@ env.backends.onnx.wasm.numThreads = Math.max(
 );
 
 let extractorPromise = null;
+let backendUsed = null;
 
 function createIndexedDbCache() {
   let dbPromise = null;
@@ -124,17 +125,44 @@ function progressCallback(progress) {
 
 async function extractor() {
   if (!extractorPromise) {
-    extractorPromise = pipeline('feature-extraction', MODEL_ID, {
-      revision: MODEL_REVISION,
-      dtype: MODEL_DTYPE,
-      device: 'wasm',
-      progress_callback: progressCallback,
-    }).catch((error) => {
+    extractorPromise = createExtractor().catch((error) => {
       extractorPromise = null;
       throw error;
     });
   }
   return extractorPromise;
+}
+
+// WebGPU is much faster than WASM for this model when it's actually available
+// and stable, but Zotero runs on Firefox's engine where WebGPU support in
+// ChromeWorkers varies by platform/version. Probe for navigator.gpu first and
+// fall back to WASM on any failure so indexing never hard-fails because of it.
+async function createExtractor() {
+  const canTryWebgpu = typeof navigator !== 'undefined' && !!navigator.gpu;
+  if (canTryWebgpu) {
+    try {
+      const model = await pipeline('feature-extraction', MODEL_ID, {
+        revision: MODEL_REVISION,
+        dtype: MODEL_DTYPE,
+        device: 'webgpu',
+        progress_callback: progressCallback,
+      });
+      backendUsed = 'webgpu';
+      globalThis.postMessage({ type: 'backend', backend: backendUsed });
+      return model;
+    } catch (error) {
+      // Fall through to WASM below.
+    }
+  }
+  const model = await pipeline('feature-extraction', MODEL_ID, {
+    revision: MODEL_REVISION,
+    dtype: MODEL_DTYPE,
+    device: 'wasm',
+    progress_callback: progressCallback,
+  });
+  backendUsed = 'wasm';
+  globalThis.postMessage({ type: 'backend', backend: backendUsed });
+  return model;
 }
 
 function prefix(role, value) {
@@ -175,13 +203,14 @@ globalThis.addEventListener('message', async (event) => {
           dtype: MODEL_DTYPE,
           dimensions: MODEL_DIMENSIONS,
           fingerprint: MODEL_FINGERPRINT,
+          backend: backendUsed,
         },
       });
       return;
     }
     if (message.type === 'warmup') {
       await extractor();
-      globalThis.postMessage({ type: 'result', id, result: { ready: true } });
+      globalThis.postMessage({ type: 'result', id, result: { ready: true, backend: backendUsed } });
       return;
     }
     if (message.type !== 'embed') throw new Error('unknown-local-embedding-message');

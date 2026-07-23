@@ -729,7 +729,9 @@ test('local retrieval: E5 is pinned, isolated in a worker and requires no embedd
 test('agentic retrieval: both modes use a validated two-round planner', () => {
   const sidebar = readSource('zotero-plugin/content/sidebar.js');
   const server = readSource('electron/zotero-plugin/server.ts');
-  assert.match(sidebar, /for \(let round = 1; round <= 2; round\+\+\)/);
+  assert.match(sidebar, /for \(let round = 1; round <= ctx\.agenticRounds; round\+\+\)/);
+  const store = readSource('zotero-plugin/content/store.js');
+  assert.ok(store.includes('agenticRounds') && /Math\.max\(0, Math\.min\(2,/.test(store), 'agentic rounds are capped at 2, configurable via settings');
   assert.ok(sidebar.includes('/api/z/retrieval-plan'));
   assert.ok(sidebar.includes('pageRequestHits') && sidebar.includes('mergeRetrievalResults'));
   assert.ok(sidebar.includes('every named entity, requested sub-question'));

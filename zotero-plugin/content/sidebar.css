@@ -286,6 +286,8 @@ h4.nd-md-h, h5.nd-md-h, h6.nd-md-h { font-size: 12.5px; }
 .nd-index-status--ok { color:#16803c !important; }
 .nd-index-status--warn { color:#b45309 !important; }
 .nd-evidencebar button { padding:3px 7px; font-size:11px; }
+.nd-embed-progress { height:3px; background:var(--nd-border); overflow:hidden; }
+.nd-embed-progress-bar { height:100%; width:0%; background:var(--nd-accent); transition:width .25s ease; }
 .nd-audit { margin:7px 10px 3px; border:1px solid var(--nd-border); border-radius:7px; background:rgba(124,58,237,.035); font-size:11px; }
 .nd-audit-summary { cursor:pointer; padding:7px 9px; font-weight:600; }
 .nd-audit-claim { padding:7px 9px; border-top:1px solid var(--nd-border); }

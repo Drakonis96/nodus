@@ -32,16 +32,30 @@
   function setHlColors(c) { SJSON("hlColors", { high: (c && c.high) || "#ff6666", medium: (c && c.medium) || "#ffd400" }); }
   function getContext() {
     const strategy = P("ctx.strategy", "auto");
+    const ocr = P("ctx.ocr", "off");
+    const repair = P("ctx.repair", "auto");
+    const rounds = Number(P("ctx.agenticRounds", 1));
+    const threshold = Number(P("ctx.fullTextThreshold", 48000));
     return {
       useIdeas: P("ctx.ideas", "1") !== "0",
       useCorpus: P("ctx.corpus", "1") !== "0",
       useFulltext: P("ctx.fulltext", "1") !== "0",
       strategy: ["auto", "retrieval", "full"].includes(strategy) ? strategy : "auto",
+      ocr: ["off", "ondemand", "always"].includes(ocr) ? ocr : "off",
+      repair: ["auto", "off", "always"].includes(repair) ? repair : "auto",
+      agenticRounds: Number.isFinite(rounds) ? Math.max(0, Math.min(2, Math.floor(rounds))) : 1,
+      fullTextThreshold: Number.isFinite(threshold) && threshold > 0 ? threshold : 48000,
     };
   }
   function setContext(c) {
     S("ctx.ideas", c.useIdeas ? "1" : "0"); S("ctx.corpus", c.useCorpus ? "1" : "0"); S("ctx.fulltext", c.useFulltext ? "1" : "0");
     S("ctx.strategy", ["auto", "retrieval", "full"].includes(c.strategy) ? c.strategy : "auto");
+    S("ctx.ocr", ["off", "ondemand", "always"].includes(c.ocr) ? c.ocr : "off");
+    S("ctx.repair", ["auto", "off", "always"].includes(c.repair) ? c.repair : "auto");
+    const rounds = Number(c.agenticRounds);
+    S("ctx.agenticRounds", String(Number.isFinite(rounds) ? Math.max(0, Math.min(2, Math.floor(rounds))) : 1));
+    const threshold = Number(c.fullTextThreshold);
+    S("ctx.fullTextThreshold", String(Number.isFinite(threshold) && threshold > 0 ? threshold : 48000));
   }
   // ---- providers ----
   function getKey(provider) { return P("key." + provider, "") || ""; }
