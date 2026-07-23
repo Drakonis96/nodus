@@ -32,7 +32,7 @@ try {
   await page.waitForFunction(() => !!document.getElementById('root')?.children.length, { timeout: 30_000 });
   await page.evaluate(() => window.nodus.updateSettings({
     onboardingComplete: true, recoverySetupVersion: 1, tourComplete: true, advancedTourComplete: true,
-    basicsTutorialVersion: 4, uiLanguage: 'es', mascotEnabled: true, mascotAlwaysOnTop: true,
+    basicsTutorialVersion: 5, uiLanguage: 'es', mascotEnabled: true, mascotAlwaysOnTop: true,
     mascotStyle: 'orb', reduceMotion: false,
   }));
   await page.reload();

@@ -42,7 +42,7 @@ try {
   // A user who has already been through the cinematic tutorial, and so was never asked.
   await page.evaluate(() => window.nodus.updateSettings({
     onboardingComplete: true, recoverySetupVersion: 1, tourComplete: true, advancedTourComplete: true,
-    basicsTutorialVersion: 4, uiLanguage: 'es', mascotEnabled: true, mascotAlwaysOnTop: false,
+    basicsTutorialVersion: 5, uiLanguage: 'es', mascotEnabled: true, mascotAlwaysOnTop: false,
     reduceMotion: false, mascotStyle: 'classic', mascotStyleChosen: false, mascotOrbColorMode: 'auto',
   }));
   await page.evaluate(() => sessionStorage.clear());

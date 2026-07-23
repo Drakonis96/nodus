@@ -27,7 +27,7 @@ try {
   await page.waitForFunction(() => Boolean(document.getElementById('root')?.children.length));
   await page.evaluate(() => window.nodus.updateSettings({
     uiLanguage: 'es', promptLanguage: 'es', onboardingComplete: true,
-    basicsTutorialVersion: 4, recoverySetupVersion: 1, tourComplete: true,
+    basicsTutorialVersion: 5, recoverySetupVersion: 1, tourComplete: true,
     advancedTourComplete: true, mascotEnabled: false,
   }));
   await page.reload();

@@ -16,8 +16,8 @@ test('the 2.4.0 update queues a one-off toolkit guide behind release notes', asy
   assert.match(guide, /previousTutorialVersion >= TOOLKIT_BETA_GUIDE_TUTORIAL_VERSION/);
   assert.match(app, /<ToolkitBetaUpdateTour/);
   assert.match(app, /previousTutorialVersion=\{settings\.basicsTutorialVersion\}/);
-  assert.match(app, /whatsNewSettled && !toolkitBetaTourSettled/);
-  assert.match(app, /whatsNewSettled && toolkitBetaTourSettled/);
+  assert.match(app, /whatsNewSettled && platformHighlightsSettled && !toolkitBetaTourSettled/);
+  assert.match(app, /whatsNewSettled && platformHighlightsSettled && toolkitBetaTourSettled/);
   assert.ok(app.indexOf('<WhatsNewModal') < app.indexOf('<ToolkitBetaUpdateTour'));
   assert.ok(app.indexOf('<ToolkitBetaUpdateTour') < app.indexOf('<StartupUpdateModal'));
 });

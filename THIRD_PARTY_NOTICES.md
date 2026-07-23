@@ -67,6 +67,16 @@ Nodus is independently licensed. OpenAI, ChatGPT, Codex, GitHub and Copilot are
 trademarks of their respective owners. Inclusion does not imply affiliation,
 certification or endorsement.
 
+## Zotero mark
+
+The Zotero “Z” shown in the in-app tutorial is the official symbolic icon from
+the Zotero source distribution:
+https://github.com/zotero/zotero/blob/main/app/linux/icons/symbolic.svg
+
+Zotero is developed by the Corporation for Digital Scholarship. Zotero and its
+logo are trademarks of the Corporation for Digital Scholarship. Nodus is an
+independent project and is not affiliated with or endorsed by Zotero.
+
 ## Engines downloaded at runtime
 
 The local model installer downloads the unmodified `llama.cpp` release b10002

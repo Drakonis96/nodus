@@ -11,13 +11,15 @@ import {
   IdeaExtractionPanel,
   LocalPerformancePanel,
   SubscriptionAccessPanel,
-  ToolkitOverviewPanel,
-  TOOLKIT_BETA_GUIDE_TUTORIAL_VERSION,
   toolkitBetaGuideCopy,
 } from '../components/ToolkitBetaGuide';
+import {
+  PLATFORM_HIGHLIGHTS_TUTORIAL_VERSION,
+  platformHighlightSlides,
+} from '../components/PlatformHighlightsGuide';
 import { t } from '../i18n';
 
-export const BASICS_TUTORIAL_VERSION = TOOLKIT_BETA_GUIDE_TUTORIAL_VERSION;
+export const BASICS_TUTORIAL_VERSION = PLATFORM_HIGHLIGHTS_TUTORIAL_VERSION;
 
 type Slide = {
   eyebrow: string;
@@ -52,16 +54,13 @@ function Tip({ children, warning = false }: { children: ReactNode; warning?: boo
   return <div className={`tutorial-tip ${warning ? 'tutorial-tip-warning' : ''}`}><Icon name={warning ? 'alert' : 'bulb'} size={16} /><div>{children}</div></div>;
 }
 
-/** Material introduced in 2.4.0. It is shared with the one-off update tour so a
- * fresh installation and an upgraded installation receive the same guidance. */
-function ToolkitBetaSlides(language: TutorialLanguage): Slide[] {
+/** Model guidance introduced with the Toolkit beta. The current Toolkit overview
+ * now lives in PlatformHighlightsGuide so this deck never describes a stale
+ * five-tool snapshot to new users. */
+function ModelGuidanceSlides(language: TutorialLanguage): Slide[] {
   const c = toolkitBetaGuideCopy(language);
   const es = language === 'es';
   return [
-    {
-      eyebrow: es ? 'Nodus Toolkit · Beta' : 'Nodus Toolkit · Beta', title: c.introTitle, icon: 'tools', nodi: 'discovering', summary: c.introSummary,
-      content: <ToolkitOverviewPanel language={language} />,
-    },
     {
       eyebrow: es ? 'Extracción de ideas' : 'Idea extraction', title: c.extractionTitle, icon: 'bulb', nodi: 'thinking', summary: c.extractionSummary,
       content: <IdeaExtractionPanel language={language} />,
@@ -124,6 +123,7 @@ function SpanishSlides(): Slide[] {
       summary: 'Muchos servicios cobran según la cantidad de texto que reciben y generan. Las tareas cortas suelen costar muy poco.',
       content: <><p>Para extracción recomendamos <b>Gemini 2.5 Flash-Lite</b>, <b>Gemini 3.1 Flash-Lite</b>, <b>DeepSeek V4 Flash</b> y <b>MiMo 2.5</b>: modelos pequeños y económicos que encajan bien con llamadas breves y estructuradas.</p><p>Nodus solicita el razonamiento desactivado por defecto durante la extracción. Así se reduce el tiempo, el texto innecesario y el riesgo de recibir una respuesta fuera del formato esperado.</p><Tip warning>Los nombres, los precios y los catálogos cambian. Revisa la página del proveedor antes de añadir saldo y fija un presupuesto que te resulte cómodo.</Tip><div className="tutorial-links"><ExternalLink href="https://ai.google.dev/gemini-api/docs/pricing">Precios de Gemini</ExternalLink><ExternalLink href="https://api-docs.deepseek.com/quick_start/pricing">Precios de DeepSeek</ExternalLink><ExternalLink href="https://platform.xiaomimimo.com/">Plataforma MiMo</ExternalLink></div></>,
     },
+    ...ModelGuidanceSlides('es'),
     {
       eyebrow: 'Concepto 3', title: 'Encontrar ideas relacionadas', icon: 'network', nodi: 'connecting',
       summary: 'Nodus puede encontrar textos con un significado parecido aunque utilicen palabras diferentes.',
@@ -144,7 +144,7 @@ function SpanishSlides(): Slide[] {
       summary: 'Nodus puede convertir grabaciones en texto y leer tus documentos en voz alta.',
       content: <><div className="tutorial-three-columns"><div><Icon name="microphone" /><b>Pasar audio a texto</b><span>Convierte clases, entrevistas y notas de voz en texto que puedes revisar y editar.</span></div><div><Icon name="play" /><b>Escuchar documentos</b><span>Lee apuntes y documentos en voz alta con opciones que funcionan en tu equipo.</span></div><div><Icon name="settings" /><b>Elegir y descargar</b><span>Puedes gestionar las voces y los modelos de transcripción desde Ajustes.</span></div></div><Tip>Revisa siempre el texto obtenido. El ruido, los nombres propios, los acentos y el vocabulario especializado pueden causar errores.</Tip></>,
     },
-    ...ToolkitBetaSlides('es'),
+    ...platformHighlightSlides('es'),
     {
       eyebrow: 'Una forma segura de empezar', title: 'Tu primera configuración', icon: 'check', nodi: 'celebrating',
       summary: 'Empieza con pocos materiales, comprueba los resultados y amplía tu espacio cuando lo necesites.',
@@ -167,11 +167,12 @@ function EnglishSlides(): Slide[] {
     { eyebrow: 'Remote AI', title: 'What is an API key?', icon: 'key', nodi: 'discovering', summary: 'A secret credential that lets Nodus request work from a provider on your behalf.', content: <><ol className="tutorial-steps"><li>Create an account with the provider.</li><li>Open its API keys page and generate a key.</li><li>Paste it into <b>Settings → Providers</b>, test it and select a model.</li></ol><Tip warning><b>Never share or publish an API key.</b> Usage, limits and billing can be attached to it. Nodus uses the operating system's secure storage when available.</Tip><div className="tutorial-links"><ExternalLink href="https://openrouter.ai/settings/keys">OpenRouter keys</ExternalLink><ExternalLink href="https://console.groq.com/keys">Groq keys</ExternalLink><ExternalLink href="https://cloud.cerebras.ai/">Cerebras keys</ExternalLink><ExternalLink href="https://aistudio.google.com/app/apikey">Gemini keys</ExternalLink><ExternalLink href="https://platform.openai.com/api-keys">OpenAI keys</ExternalLink></div></> },
     { eyebrow: 'Start for free', title: 'Free options and their limits', icon: 'star', nodi: 'waving', summary: '“Free” means a limited allowance, not unlimited capacity or guaranteed availability.', content: <><ul className="tutorial-list"><li><b>OpenRouter:</b> choose a <code>:free</code> model or <code>openrouter/free</code>; limits are low and availability can change.</li><li><b>Groq:</b> its Free Plan exposes selected models with per-model request and token limits.</li><li><b>Cerebras:</b> its free tier has request and token limits that vary by model.</li><li><b>Gemini:</b> has a free tier for selected models; limits and data terms differ from paid use.</li></ul><div className="tutorial-links"><ExternalLink href="https://openrouter.ai/docs/faq#what-free-tier-options-exist">OpenRouter free tier</ExternalLink><ExternalLink href="https://console.groq.com/docs/rate-limits">Groq limits</ExternalLink><ExternalLink href="https://inference-docs.cerebras.ai/support/rate-limits">Cerebras limits</ExternalLink></div></> },
     { eyebrow: 'Controlled cost', title: 'Affordable remote models', icon: 'chartBar', nodi: 'thinking', summary: 'Small, fast models are a good fit for short, structured extraction calls.', content: <><p>For extraction we recommend <b>Gemini 2.5 Flash-Lite</b>, <b>Gemini 3.1 Flash-Lite</b>, <b>DeepSeek V4 Flash</b> and <b>MiMo 2.5</b>.</p><p>Nodus requests reasoning off by default during extraction. This reduces latency, unnecessary output and the risk of receiving a response outside the required format.</p><Tip warning>Model names, prices and catalogues change. Check the provider before adding credit and set a budget.</Tip><div className="tutorial-links"><ExternalLink href="https://ai.google.dev/gemini-api/docs/pricing">Gemini pricing</ExternalLink><ExternalLink href="https://api-docs.deepseek.com/quick_start/pricing">DeepSeek pricing</ExternalLink><ExternalLink href="https://platform.xiaomimimo.com/">MiMo platform</ExternalLink></div></> },
+    ...ModelGuidanceSlides('en'),
     { eyebrow: 'Concept 3', title: 'Embeddings: the semantic index', icon: 'network', nodi: 'connecting', summary: 'An embedding is a numerical fingerprint of a text fragment’s meaning.', content: <><p>Nodus splits material into passages and converts each one to a vector. It converts a search or question too, then retrieves semantically close passages even when they use different words. This powers discovery, connections and corpus-grounded answers.</p><p><b>RAG</b> stands for <b>retrieval-augmented generation</b>. It retrieves relevant information first, then gives it to a generative model as context for its answer. This makes large collections practical to query without sending the whole corpus every time and helps ground answers in specific sources.</p><p>In Nodus, embeddings retrieve the passages and ideas in your vault that are closest to the question. Chat, research and writing features that work with your sources can add that selection to the chosen model’s context and, where appropriate, preserve references so you can verify them. RAG reduces unsupported answers, but cannot eliminate them: always check the sources.</p><Tip warning><b>An index is only comparable with itself.</b> If you change the embedding provider or model, old vectors are unusable and all material must be reindexed. Nodus warns you before the change.</Tip></> },
     { eyebrow: 'Choosing embeddings', title: 'Local, remote and multilingual', icon: 'languages', nodi: 'discovering', summary: 'For mixed-language material, choose a multilingual embedding model—the standard term.', content: <><p>Integrated <b>BGE-M3 Q8_0</b>, <b>GTE Multilingual Base INT8</b> and <b>Multilingual E5 Small INT8</b> have no per-use fee and keep text local; downloading and initial indexing can take time.</p><p>Through an API you can use OpenAI's <b>text-embedding-3-small</b> or <b>text-embedding-3-large</b>. Their OpenRouter slugs are <code>openai/text-embedding-3-small</code> and <code>openai/text-embedding-3-large</code>.</p><Tip>Test retrieval with your own languages, field and document types before indexing a large library.</Tip><div className="tutorial-links"><ExternalLink href="https://developers.openai.com/api/docs/models/text-embedding-3-small">OpenAI embeddings</ExternalLink><ExternalLink href="https://openrouter.ai/docs/api/reference/embeddings">OpenRouter embeddings</ExternalLink></div></> },
     { eyebrow: 'AI images', title: 'Create and understand images', icon: 'image', nodi: 'discovering', summary: 'Some models can inspect an image, while others can create a new one from a description.', content: <><div className="tutorial-three-columns"><div><Icon name="image" /><b>Understand an image</b><span>Add a photograph, chart, or scanned page and ask for a description or analysis.</span></div><div><Icon name="wand" /><b>Create an image</b><span>Nodus can generate illustrations and other visual resources when you connect a compatible service.</span></div><div><Icon name="alert" /><b>Review the result</b><span>A generated image can contain incorrect details. Check it before using it in your work.</span></div></div><Tip>Understanding and creating images are different tasks. A model that accepts images may not generate new ones. Image generation commonly uses an external service and may have a cost.</Tip></> },
     { eyebrow: 'Integrated audio', title: 'Transcribe and listen', icon: 'microphone', nodi: 'waving', summary: 'Local speech models are fully integrated: download, select and use.', content: <><div className="tutorial-three-columns"><div><Icon name="microphone" /><b>Speech-to-text</b><span>Turns lectures, interviews or voice notes into text with Transformers.js or whisper.cpp.</span></div><div><Icon name="play" /><b>Text-to-speech</b><span>Reads notes and documents aloud using local engines available in Settings.</span></div><div><Icon name="settings" /><b>Management</b><span>Download a model, select it and remove unused files from Settings.</span></div></div><Tip>Always review transcripts: proper names, noise, accents and specialist vocabulary can cause errors.</Tip></> },
-    ...ToolkitBetaSlides('en'),
+    ...platformHighlightSlides('en'),
     { eyebrow: 'A safe first setup', title: 'Your first configuration', icon: 'check', nodi: 'celebrating', summary: 'Start small, verify results, and expand only when you need to.', content: <><ol className="tutorial-steps"><li>Create the right vault and import a few materials.</li><li>Try a local model or a free key for generative AI.</li><li>Choose one embedding model before indexing at scale.</li><li>Check that answers cite or rely on your material.</li><li>Back up your data and review every remote provider's data policy.</li></ol><p className="tutorial-thanks">Thank you for using Nodus. Nodi and this guide remain available under <b>Settings → Tutorials → Help</b>.</p></> },
     { eyebrow: 'Your companion', title: 'Meet Nodi', icon: 'star', nodi: 'celebrating', summary: 'Nodi brings chat, notifications and help together in a companion you can customize or disable.', content: <><div className="tutorial-three-columns"><div><Icon name="chat" /><b>Ask and chat</b><span>It can answer using the documentation, current view, active vault or all your vaults as context.</span></div><div><Icon name="bell" /><b>Useful updates</b><span>It shows notifications about relevant processes and tasks without interrupting your work.</span></div><div><Icon name="settings" /><b>Make it yours</b><span>Choose its chat model, keep it above other apps, and enable or remove vault-specific accessories.</span></div></div><Tip>Nodi is optional. Open <b>Settings → Interface → Nodi mascot</b> to hide it completely or change any of its options.</Tip><p className="tutorial-thanks">You are ready. Click Nodi whenever you want to chat, check notifications or open help.</p></> },
   ];
@@ -333,7 +334,13 @@ const COMPACT_SLIDES: Record<Exclude<TutorialLanguage, 'es' | 'en'>, CompactSlid
 function CompactSlides(language: Exclude<TutorialLanguage, 'es' | 'en'>): Slide[] {
   const states: NodiState[] = ['waving', 'discovering', 'connecting', 'thinking', 'idle', 'loading', 'sleeping', 'connecting', 'discovering', 'thinking', 'waving', 'idle', 'celebrating'];
   const base = COMPACT_SLIDES[language].map((slide, index) => ({ ...slide, nodi: states[index], content: <><p>{slide.body}</p>{slide.tip && <Tip warning={index === 4 || index === 6 || index === 7 || index === 9}>{slide.tip}</Tip>}</> }));
-  return [...base.slice(0, -2), ...ToolkitBetaSlides(language), ...base.slice(-2)];
+  return [
+    ...base.slice(0, 7),
+    ...ModelGuidanceSlides(language),
+    ...base.slice(7, -2),
+    ...platformHighlightSlides(language),
+    ...base.slice(-2),
+  ];
 }
 
 export function BasicsTutorial({ language, onLanguageChosen, onNodiStyleChosen, onComplete }: { language: AppLanguage; onLanguageChosen: (language: TutorialLanguage) => void | Promise<void>; onNodiStyleChosen: (style: NodiStyle) => void | Promise<void>; onComplete: () => void | Promise<void> }) {

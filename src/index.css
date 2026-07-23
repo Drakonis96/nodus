@@ -2754,13 +2754,39 @@ select.input optgroup {
 .toolkit-guide-tool-focus p { max-width: 610px; color: var(--tg-text); font-size: 14px; line-height: 1.7; }
 .toolkit-guide-tool-focus > div { display: inline-flex; align-items: center; gap: 7px; border-radius: 999px; padding: 6px 10px; color: #b45309; background: rgb(245 158 11 / .1); font-size: 9px; font-weight: 850; letter-spacing: .1em; }
 .dark .toolkit-guide-tool-focus > div { color: #fcd34d; }
+.platform-guide-hero { background: radial-gradient(circle at 82% 34%, rgb(204 41 54 / .2), transparent 30%), radial-gradient(circle at 18% 5%, rgb(45 212 191 / .23), transparent 36%), linear-gradient(124deg, #111827, #101524 54%, #160d12); }
+.platform-guide-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+.platform-guide-pair > div { display: flex; min-width: 0; align-items: flex-start; gap: 11px; border: 1px solid var(--tg-border, rgb(255 255 255 / .1)); border-radius: 14px; padding: 13px; background: var(--tg-card, rgb(0 0 0 / .14)); }
+.platform-guide-pair > div > span { display: grid; width: 38px; height: 38px; flex: 0 0 auto; place-items: center; border-radius: 11px; color: #5eead4; background: rgb(20 184 166 / .12); }
+.platform-guide-pair > div:last-child > span { color: #a5b4fc; background: rgb(99 102 241 / .13); }
+.platform-guide-pair > div > div { display: grid; gap: 4px; }
+.platform-guide-pair b { color: var(--tg-text, #f5f5f4); font-size: 12px; }
+.platform-guide-pair small { color: var(--tg-muted, #a8a29e); font-size: 10.5px; line-height: 1.5; }
+.platform-guide-notice { display: flex; align-items: flex-start; gap: 10px; border: 1px solid rgb(45 212 191 / .24); border-radius: 13px; padding: 11px 13px; color: #0f766e; background: rgb(20 184 166 / .08); }
+.dark .platform-guide-notice, .tutorial-cinema .platform-guide-notice { color: #ccfbf1; }
+.platform-guide-notice > svg { flex: 0 0 auto; margin-top: 2px; color: #14b8a6; }
+.platform-guide-zotero { display: grid; grid-template-columns: 64px minmax(0, 1fr); align-items: center; gap: 14px; border: 1px solid rgb(204 41 54 / .26); border-radius: 16px; padding: 14px; background: linear-gradient(120deg, rgb(204 41 54 / .1), var(--tg-card, rgb(0 0 0 / .14))); }
+.platform-guide-zotero-brand { display: grid; width: 58px; height: 58px; place-items: center; border-radius: 15px; background: #fff; box-shadow: 0 9px 28px rgb(0 0 0 / .2); }
+.platform-guide-zotero-brand img { display: block; width: 36px; height: 36px; }
+.platform-guide-zotero > div { display: grid; gap: 4px; }
+.platform-guide-zotero b { color: var(--tg-text, #f5f5f4); font-size: 14px; }
+.platform-guide-zotero p { color: var(--tg-muted, #a8a29e); font-size: 11px; line-height: 1.55; }
+.platform-guide-feature-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.platform-guide-feature-list.compact { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.platform-guide-feature-list > div { display: flex; align-items: flex-start; gap: 7px; border: 1px solid var(--tg-border, rgb(255 255 255 / .1)); border-radius: 11px; padding: 10px; color: var(--tg-muted, #a8a29e); background: var(--tg-card, rgb(0 0 0 / .14)); font-size: 10px; line-height: 1.45; }
+.platform-guide-feature-list svg { flex: 0 0 auto; margin-top: 1px; color: #34d399; }
+.platform-guide-tool-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.platform-guide-tool-grid > div { display: flex; min-width: 0; align-items: center; gap: 8px; border: 1px solid var(--tg-border, rgb(255 255 255 / .1)); border-radius: 12px; padding: 9px 10px; background: var(--tg-card, rgb(0 0 0 / .14)); }
+.platform-guide-tool-grid span { display: grid; width: 30px; height: 30px; flex: 0 0 auto; place-items: center; border-radius: 9px; color: #fbbf24; background: rgb(245 158 11 / .12); }
+.platform-guide-tool-grid b { overflow: hidden; color: var(--tg-text, #f5f5f4); font-size: 10.5px; text-overflow: ellipsis; white-space: nowrap; }
+.platform-guide-trademark { color: var(--tg-muted, #78716c); font-size: 8.5px; text-align: center; }
 @media (min-width: 900px) { .tutorial-content .toolkit-guide-tools { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 .toolkit-guide-footer { display: flex; min-height: 63px; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: 10px; border-top: 1px solid var(--tg-border); padding: 12px 24px; background: var(--tg-surface); }
 .toolkit-guide-footer button { display: inline-flex; min-height: 38px; align-items: center; justify-content: center; gap: 7px; border: 1px solid var(--tg-border); border-radius: 10px; padding: 9px 14px; color: var(--tg-text); background: var(--tg-card); font-size: 11px; font-weight: 800; }
 .toolkit-guide-footer button:disabled { cursor: default; opacity: .32; }
 .toolkit-guide-footer button.primary { border: 0; color: #07151a; background: linear-gradient(135deg, #fcd34d, #5eead4); box-shadow: 0 10px 25px rgb(45 212 191 / .14); }
 .toolkit-guide-footer button:not(:disabled):hover { transform: translateY(-1px); filter: brightness(1.04); }
-@media (max-width: 660px) { .toolkit-guide-backdrop { padding: 10px; } .toolkit-guide-cinema { max-height: 95vh; border-radius: 20px; } .toolkit-guide-hero { min-height: 170px; grid-template-columns: 1fr 120px; padding: 24px 20px; } .toolkit-guide-nodi svg { height: 130px !important; } .toolkit-guide-stage { padding: 19px; } .toolkit-guide-tools, .toolkit-guide-models, .toolkit-guide-remote-models, .toolkit-guide-subscriptions { grid-template-columns: 1fr; } .toolkit-guide-subscription { grid-template-columns: 38px minmax(0, 1fr); } .toolkit-guide-subscription em { display: none; } }
+@media (max-width: 660px) { .toolkit-guide-backdrop { padding: 10px; } .toolkit-guide-cinema { max-height: 95vh; border-radius: 20px; } .toolkit-guide-hero { min-height: 170px; grid-template-columns: 1fr 120px; padding: 24px 20px; } .toolkit-guide-nodi svg { height: 130px !important; } .toolkit-guide-stage { padding: 19px; } .toolkit-guide-tools, .toolkit-guide-models, .toolkit-guide-remote-models, .toolkit-guide-subscriptions, .platform-guide-pair, .platform-guide-feature-list, .platform-guide-feature-list.compact, .platform-guide-tool-grid { grid-template-columns: 1fr; } .toolkit-guide-subscription { grid-template-columns: 38px minmax(0, 1fr); } .toolkit-guide-subscription em { display: none; } }
 @media (prefers-reduced-motion: reduce) { .toolkit-guide-aurora { animation: none; } }
 
 /* Cinematic, app-wide essentials tutorial. It deliberately owns the full viewport so
