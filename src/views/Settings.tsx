@@ -6,7 +6,8 @@ import type {
   McpServerStatus,
   McpTunnelStatus,
   ModelInfo,
-  NodusServerSyncStatus,
+  NodusServerConnection,
+  NodusServerOverview,
   ZoteroPluginServerStatus,
   RecoveryHealth,
   StudyDataOverview,
@@ -125,18 +126,9 @@ export function Settings({
   const [autoBackupRunning, setAutoBackupRunning] = useState(false);
   const [mcpStatus, setMcpStatus] = useState<McpServerStatus>({ running: false, port: null, url: null, error: null });
   const [mcpTunnelStatus, setMcpTunnelStatus] = useState<McpTunnelStatus | null>(null);
-  const [nodusServerStatus, setNodusServerStatus] = useState<NodusServerSyncStatus>({
-    configured: false,
-    enabled: false,
-    autoSync: false,
-    phase: 'disconnected',
-    url: null,
-    spaceId: null,
-    spaceName: null,
-    language: 'en',
-    lastSyncAt: null,
-    lastError: null,
-    lastBytes: null,
+  const [nodusServerOverview, setNodusServerOverview] = useState<NodusServerOverview>({
+    connections: [],
+    activeVault: { id: '', name: '', type: 'academic', connected: false },
     transport: 'outbound-https',
   });
   const [nodusServerUrlInput, setNodusServerUrlInput] = useState(settings.nodusServerUrl);
@@ -198,8 +190,8 @@ export function Settings({
   useEffect(() => {
     let active = true;
     const refresh = async () => {
-      const next = await window.nodus.getNodusServerStatus();
-      if (active) setNodusServerStatus(next);
+      const next = await window.nodus.getNodusServerOverview();
+      if (active) setNodusServerOverview(next);
     };
     void refresh();
     const interval = window.setInterval(() => void refresh(), 3000);
@@ -353,59 +345,57 @@ export function Settings({
       const result = await window.nodus.pairNodusServer(nodusServerUrlInput, nodusServerPairCode);
       setNodusServerPairCode('');
       await onChange();
-      const next = await window.nodus.getNodusServerStatus();
-      setNodusServerStatus(next);
-      setNodusServerMessage(next.lastError || `${t('Conectado a')} ${result.serverName} · ${result.spaceName}`);
+      setNodusServerOverview(await window.nodus.getNodusServerOverview());
+      setNodusServerMessage(`${t('Conectado a')} ${result.serverName} · ${result.spaceName}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      setNodusServerStatus((current) => ({ ...current, phase: 'error', lastError: message }));
       setNodusServerMessage(message);
     } finally {
       setNodusServerBusy(false);
     }
   };
 
-  const syncWithNodusServer = async () => {
+  const syncNodusServerVault = async (vaultId: string) => {
     setNodusServerBusy(true);
     setNodusServerMessage(null);
     try {
-      const next = await window.nodus.syncNodusServerNow();
-      setNodusServerStatus(next);
-      setNodusServerMessage(next.lastError || t('Vault publicado correctamente.'));
+      const next = await window.nodus.syncNodusServerVaultNow(vaultId);
+      setNodusServerOverview(next);
+      const conn = next.connections.find((c) => c.vaultId === vaultId);
+      setNodusServerMessage(conn?.lastError || t('Vault publicado correctamente.'));
     } finally {
       setNodusServerBusy(false);
     }
   };
 
-  const changeNodusServerLanguage = async (language: AppSettings['nodusServerLanguage']) => {
+  const changeNodusServerLanguage = async (vaultId: string, language: AppSettings['nodusServerLanguage']) => {
     setNodusServerBusy(true);
     setNodusServerMessage(null);
     try {
-      const next = await window.nodus.setNodusServerLanguage(language);
-      setNodusServerStatus(next);
+      const next = await window.nodus.setNodusServerLanguage(language, vaultId);
+      setNodusServerOverview(next);
       await onChange();
       setNodusServerMessage(t('Idioma del servidor actualizado.'));
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      setNodusServerStatus((current) => ({ ...current, phase: 'error', lastError: message }));
       setNodusServerMessage(message);
     } finally {
       setNodusServerBusy(false);
     }
   };
 
-  const disconnectFromNodusServer = async () => {
+  const disconnectNodusServerVault = async (vaultId: string, vaultName: string) => {
     const accepted = await confirm({
       title: t('Desconectar Nodus Server'),
-      message: t('Nodus dejará de publicar este vault. La última copia seguirá en el servidor hasta que su administrador la elimine.'),
+      message: `${vaultName} · ${t('Nodus dejará de publicar este vault. La última copia seguirá en el servidor hasta que su administrador la elimine.')}`,
       confirmLabel: t('Desconectar'),
       danger: true,
     });
     if (!accepted) return;
     setNodusServerBusy(true);
     try {
-      const next = await window.nodus.disconnectNodusServer();
-      setNodusServerStatus(next);
+      const next = await window.nodus.disconnectNodusServerVault(vaultId);
+      setNodusServerOverview(next);
       setNodusServerMessage(t('Servidor desconectado.'));
       await onChange();
     } finally {
@@ -1203,8 +1193,8 @@ export function Settings({
             className="rounded-xl border border-indigo-200 bg-indigo-50 p-4 dark:border-indigo-900/70 dark:bg-indigo-950/20"
           >
             <div className="flex items-start gap-3">
-              <span className={`mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full ${nodusServerStatus.phase === 'ok' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300' : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300'}`}>
-                <Icon name={nodusServerStatus.phase === 'ok' ? 'check' : 'globe'} />
+              <span className={`mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full ${nodusServerOverview.connections.some((c) => c.phase === 'ok') ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300' : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300'}`}>
+                <Icon name={nodusServerOverview.connections.some((c) => c.phase === 'ok') ? 'check' : 'globe'} />
               </span>
               <div>
                 <h3 className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
@@ -1217,10 +1207,139 @@ export function Settings({
             </div>
           </div>
 
-          {!nodusServerStatus.configured ? (
+          <div className="rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-3 text-xs leading-5 text-neutral-600 dark:border-neutral-800 dark:bg-neutral-950/50 dark:text-neutral-400">
+            <strong className="text-neutral-800 dark:text-neutral-200">{t('Cómo funciona')}:</strong>
+            <ul className="mt-1.5 list-disc space-y-1 pl-4">
+              <li>{t('Cada vault se conecta por separado y sigue publicándose en segundo plano aunque estés trabajando en otro vault.')}</li>
+              <li>{t('Tu ordenador es quien publica: mantenlo encendido y con Nodus abierto para enviar las novedades.')}</li>
+              <li>{t('El servidor Docker sirve la última copia a ChatGPT o Claude aunque tu ordenador esté apagado.')}</li>
+            </ul>
+          </div>
+
+          {nodusServerOverview.connections.length > 0 && (
+            <div className="space-y-3">
+              <h3 className="text-sm font-medium">{t('Vaults conectados')}</h3>
+              {nodusServerOverview.connections.map((conn: NodusServerConnection) => (
+                <div key={conn.vaultId} className="rounded-xl border border-neutral-200 p-4 dark:border-neutral-800">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${conn.phase === 'ok' ? 'bg-emerald-500' : conn.phase === 'error' ? 'bg-red-500' : conn.phase === 'syncing' ? 'bg-indigo-500' : 'bg-neutral-400'}`} />
+                        <h4 className="text-sm font-medium">{conn.vaultName}</h4>
+                        {conn.isActiveVault && (
+                          <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300">{t('Vault actual')}</span>
+                        )}
+                        {!conn.enabled && (
+                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">{t('En pausa')}</span>
+                        )}
+                      </div>
+                      <p className="mt-1 text-xs text-neutral-500">{conn.spaceName || t('Espacio compartido')}</p>
+                      <p className="mt-0.5 break-all text-xs text-neutral-500">{conn.url}</p>
+                      <p className="mt-0.5 text-xs text-neutral-500">
+                        {conn.phase === 'syncing'
+                          ? t('Publicando cambios…')
+                          : conn.phase === 'error'
+                            ? `${t('Error')}: ${conn.lastError}`
+                            : conn.lastSyncAt
+                              ? `${t('Última publicación')}: ${new Date(conn.lastSyncAt).toLocaleString()}${conn.lastBytes != null ? ` · ${Math.max(1, Math.round(conn.lastBytes / 1024))} KiB` : ''}`
+                              : t('Pendiente de la primera publicación.')}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        className="btn btn-primary"
+                        disabled={nodusServerBusy || !conn.enabled}
+                        onClick={() => void syncNodusServerVault(conn.vaultId)}
+                      >
+                        <Icon name="sync" className={conn.phase === 'syncing' ? 'animate-spin' : ''} />
+                        {t('Publicar ahora')}
+                      </button>
+                      {conn.url && (
+                        <button className="btn btn-ghost border border-neutral-300 dark:border-neutral-700" onClick={() => void window.nodus.openExternal(conn.url)}>
+                          <Icon name="external" /> {t('Administrar')}
+                        </button>
+                      )}
+                      <button className="btn btn-ghost border border-red-300 text-red-700 dark:border-red-900 dark:text-red-300" disabled={nodusServerBusy} onClick={() => void disconnectNodusServerVault(conn.vaultId, conn.vaultName)}>
+                        <Icon name="x" /> {t('Desconectar')}
+                      </button>
+                    </div>
+                  </div>
+
+                  {conn.isActiveVault ? (
+                    <div className="mt-4 space-y-4 border-t border-neutral-200 pt-4 dark:border-neutral-800">
+                      <Row
+                        label={t('Idioma de la interfaz del servidor')}
+                        hint={t('Cambia la administración web y las pantallas de acceso para todos los usuarios. El idioma inicial es inglés.')}
+                      >
+                        <select
+                          className="input w-full sm:w-64"
+                          value={conn.language}
+                          disabled={nodusServerBusy}
+                          onChange={(event) => void changeNodusServerLanguage(conn.vaultId, event.target.value as AppSettings['nodusServerLanguage'])}
+                        >
+                          <option value="en">English</option>
+                          <option value="es">Español</option>
+                          <option value="fr">Français</option>
+                          <option value="de">Deutsch</option>
+                          <option value="pt">Português (Portugal)</option>
+                          <option value="pt-BR">Português (Brasil)</option>
+                          <option value="it">Italiano</option>
+                        </select>
+                      </Row>
+
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <label className="text-sm text-neutral-700 dark:text-neutral-300">{t('Publicar este vault')}</label>
+                          <p className="mt-0.5 text-xs text-neutral-500">{t('Detiene o reanuda los envíos sin borrar la configuración.')}</p>
+                        </div>
+                        <input type="checkbox" checked={settings.nodusServerEnabled} onChange={(event) => void patch({ nodusServerEnabled: event.target.checked })} />
+                      </div>
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <label className="text-sm text-neutral-700 dark:text-neutral-300">{t('Mantener actualizado en segundo plano')}</label>
+                          <p className="mt-0.5 text-xs text-neutral-500">{t('Comprueba un contador ligero cada 30 segundos y solo publica tras cambios y un minuto de reposo.')}</p>
+                        </div>
+                        <input type="checkbox" checked={settings.nodusServerAutoSync} onChange={(event) => void patch({ nodusServerAutoSync: event.target.checked })} />
+                      </div>
+
+                      <div className="border-t border-neutral-200 pt-4 dark:border-neutral-800">
+                        <h3 className="text-sm font-medium">{t('Qué se publica')}</h3>
+                        <p className="mt-1 text-xs text-neutral-500">
+                          {t('Siempre: referencias, autores, temas, ideas, evidencias, conexiones y preguntas. Nunca: archivos PDF, claves API, contraseñas, rutas locales, embeddings, listas de alumnos, grupos, calificaciones, resultados de evaluación ni la base SQLite original.')}
+                        </p>
+                      </div>
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <label className="text-sm text-neutral-700 dark:text-neutral-300">{t('Incluir contenido creado por mí')}</label>
+                          <p className="mt-0.5 text-xs text-neutral-500">{t('Incluye notas, proyectos, borradores y contenido de docencia o estudio.')}</p>
+                        </div>
+                        <input type="checkbox" checked={settings.nodusServerIncludeUserContent} onChange={(event) => void patch({ nodusServerIncludeUserContent: event.target.checked })} />
+                      </div>
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <label className="text-sm text-neutral-700 dark:text-neutral-300">{t('Incluir pasajes extraídos')}</label>
+                          <p className="mt-0.5 text-xs text-amber-700 dark:text-amber-400">{t('Puede incluir texto protegido por derechos de autor. Actívalo solo si tienes permiso para compartirlo.')}</p>
+                        </div>
+                        <input type="checkbox" checked={settings.nodusServerIncludePassages} onChange={(event) => void patch({ nodusServerIncludePassages: event.target.checked })} />
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="mt-3 border-t border-neutral-200 pt-3 text-xs text-neutral-500 dark:border-neutral-800">
+                      {t('Cámbiate a este vault para editar su idioma y qué se publica.')}
+                    </p>
+                  )}
+                </div>
+              ))}
+              <p className="text-xs text-neutral-500">
+                {t('Los estudiantes e investigadores inician sesión por OAuth desde ChatGPT o Claude; solo ven los espacios que el administrador les haya asignado.')}
+              </p>
+            </div>
+          )}
+
+          {!nodusServerOverview.activeVault.connected && (
             <div className="space-y-4 rounded-xl border border-neutral-200 p-4 dark:border-neutral-800">
               <div>
-                <h3 className="text-sm font-medium">{t('Conectar este vault')}</h3>
+                <h3 className="text-sm font-medium">{nodusServerOverview.connections.length > 0 ? t('Conectar también este vault') : t('Conectar este vault')}</h3>
                 <p className="mt-1 text-xs text-neutral-500">
                   {t('Entra en la administración web del servidor, crea un espacio y genera un código de conexión de un solo uso.')}
                 </p>
@@ -1256,111 +1375,10 @@ export function Settings({
                 {nodusServerBusy ? t('Conectando…') : t('Conectar vault')}
               </button>
             </div>
-          ) : (
-            <>
-              <div className="rounded-xl border border-neutral-200 p-4 dark:border-neutral-800">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <h3 className="text-sm font-medium">{nodusServerStatus.spaceName || t('Espacio compartido')}</h3>
-                    <p className="mt-1 break-all text-xs text-neutral-500">{nodusServerStatus.url}</p>
-                    <p className="mt-1 text-xs text-neutral-500">
-                      {nodusServerStatus.phase === 'syncing'
-                        ? t('Publicando cambios…')
-                        : nodusServerStatus.phase === 'error'
-                          ? `${t('Error')}: ${nodusServerStatus.lastError}`
-                          : nodusServerStatus.lastSyncAt
-                            ? `${t('Última publicación')}: ${new Date(nodusServerStatus.lastSyncAt).toLocaleString()}`
-                            : t('Pendiente de la primera publicación.')}
-                      {nodusServerStatus.lastBytes != null ? ` · ${Math.max(1, Math.round(nodusServerStatus.lastBytes / 1024))} KiB` : ''}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      className="btn btn-primary"
-                      disabled={nodusServerBusy || !settings.nodusServerEnabled}
-                      onClick={() => void syncWithNodusServer()}
-                    >
-                      <Icon name="sync" className={nodusServerStatus.phase === 'syncing' ? 'animate-spin' : ''} />
-                      {t('Publicar ahora')}
-                    </button>
-                    {nodusServerStatus.url && (
-                      <button className="btn btn-ghost border border-neutral-300 dark:border-neutral-700" onClick={() => void window.nodus.openExternal(nodusServerStatus.url!)}>
-                        <Icon name="external" /> {t('Administrar')}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <Row
-                label={t('Idioma de la interfaz del servidor')}
-                hint={t('Cambia la administración web y las pantallas de acceso para todos los usuarios. El idioma inicial es inglés.')}
-              >
-                <select
-                  className="input w-full sm:w-64"
-                  value={nodusServerStatus.language}
-                  disabled={nodusServerBusy}
-                  onChange={(event) => void changeNodusServerLanguage(event.target.value as AppSettings['nodusServerLanguage'])}
-                >
-                  <option value="en">English</option>
-                  <option value="es">Español</option>
-                  <option value="fr">Français</option>
-                  <option value="de">Deutsch</option>
-                  <option value="pt">Português (Portugal)</option>
-                  <option value="pt-BR">Português (Brasil)</option>
-                  <option value="it">Italiano</option>
-                </select>
-              </Row>
-
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <label className="text-sm text-neutral-700 dark:text-neutral-300">{t('Publicar este vault')}</label>
-                  <p className="mt-0.5 text-xs text-neutral-500">{t('Detiene o reanuda los envíos sin borrar la configuración.')}</p>
-                </div>
-                <input type="checkbox" checked={settings.nodusServerEnabled} onChange={(event) => void patch({ nodusServerEnabled: event.target.checked })} />
-              </div>
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <label className="text-sm text-neutral-700 dark:text-neutral-300">{t('Mantener actualizado en segundo plano')}</label>
-                  <p className="mt-0.5 text-xs text-neutral-500">{t('Comprueba un contador ligero cada 30 segundos y solo publica tras cambios y un minuto de reposo.')}</p>
-                </div>
-                <input type="checkbox" checked={settings.nodusServerAutoSync} onChange={(event) => void patch({ nodusServerAutoSync: event.target.checked })} />
-              </div>
-
-              <div className="border-t border-neutral-200 pt-4 dark:border-neutral-800">
-                <h3 className="text-sm font-medium">{t('Qué se publica')}</h3>
-                <p className="mt-1 text-xs text-neutral-500">
-                  {t('Siempre: referencias, autores, temas, ideas, evidencias, conexiones y preguntas. Nunca: archivos PDF, claves API, contraseñas, rutas locales, embeddings, listas de alumnos, grupos, calificaciones, resultados de evaluación ni la base SQLite original.')}
-                </p>
-              </div>
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <label className="text-sm text-neutral-700 dark:text-neutral-300">{t('Incluir contenido creado por mí')}</label>
-                  <p className="mt-0.5 text-xs text-neutral-500">{t('Incluye notas, proyectos, borradores y contenido de docencia o estudio.')}</p>
-                </div>
-                <input type="checkbox" checked={settings.nodusServerIncludeUserContent} onChange={(event) => void patch({ nodusServerIncludeUserContent: event.target.checked })} />
-              </div>
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <label className="text-sm text-neutral-700 dark:text-neutral-300">{t('Incluir pasajes extraídos')}</label>
-                  <p className="mt-0.5 text-xs text-amber-700 dark:text-amber-400">{t('Puede incluir texto protegido por derechos de autor. Actívalo solo si tienes permiso para compartirlo.')}</p>
-                </div>
-                <input type="checkbox" checked={settings.nodusServerIncludePassages} onChange={(event) => void patch({ nodusServerIncludePassages: event.target.checked })} />
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2 border-t border-neutral-200 pt-4 dark:border-neutral-800">
-                <button className="btn btn-ghost border border-red-300 text-red-700 dark:border-red-900 dark:text-red-300" disabled={nodusServerBusy} onClick={() => void disconnectFromNodusServer()}>
-                  <Icon name="x" /> {t('Desconectar')}
-                </button>
-                <p className="text-xs text-neutral-500">
-                  {t('Los estudiantes e investigadores inician sesión por OAuth desde ChatGPT o Claude; solo ven los espacios que el administrador les haya asignado.')}
-                </p>
-              </div>
-            </>
           )}
 
           {nodusServerMessage && (
-            <p className={`text-xs ${nodusServerStatus.phase === 'error' ? 'text-red-600 dark:text-red-400' : 'text-emerald-700 dark:text-emerald-400'}`}>
+            <p className={`text-xs ${nodusServerOverview.connections.some((c) => c.phase === 'error') ? 'text-red-600 dark:text-red-400' : 'text-emerald-700 dark:text-emerald-400'}`}>
               {nodusServerMessage}
             </p>
           )}

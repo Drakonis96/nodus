@@ -2335,6 +2335,40 @@ export interface NodusServerPairResult {
   language: AppLanguage;
 }
 
+/**
+ * One vault's live connection to Nodus Server. A pairing belongs to the vault that
+ * created it and keeps publishing in the background regardless of which vault is
+ * currently open, so the desktop tracks and surfaces every connection at once — never
+ * only the active vault's. Never includes the device token.
+ */
+export interface NodusServerConnection {
+  vaultId: string;
+  vaultName: string;
+  vaultType: VaultType;
+  /** True when this connection's vault is the one currently open in the app. */
+  isActiveVault: boolean;
+  url: string;
+  spaceId: string;
+  spaceName: string;
+  language: AppLanguage;
+  /** The "Publish this vault" switch: paused connections keep their config but stop uploading. */
+  enabled: boolean;
+  autoSync: boolean;
+  includeUserContent: boolean;
+  includePassages: boolean;
+  phase: NodusServerSyncPhase;
+  lastSyncAt: string | null;
+  lastError: string | null;
+  lastBytes: number | null;
+}
+
+/** Every Nodus Server connection across all vaults, plus what the active vault can pair. */
+export interface NodusServerOverview {
+  connections: NodusServerConnection[];
+  activeVault: { id: string; name: string; type: VaultType; connected: boolean };
+  transport: 'outbound-https';
+}
+
 export type McpTunnelPhase =
   | 'not_configured'
   | 'stopped'
@@ -5574,11 +5608,12 @@ export interface NodusApi {
   connectMcpTunnel(input: McpTunnelConnectInput): Promise<McpTunnelStatus>;
   disconnectMcpTunnel(): Promise<McpTunnelStatus>;
   forgetMcpTunnel(): Promise<McpTunnelStatus>;
-  getNodusServerStatus(): Promise<NodusServerSyncStatus>;
+  getNodusServerOverview(): Promise<NodusServerOverview>;
+  /** Pairs the currently open vault to a server space using a single-use code. */
   pairNodusServer(url: string, code: string): Promise<NodusServerPairResult>;
-  setNodusServerLanguage(language: AppLanguage): Promise<NodusServerSyncStatus>;
-  syncNodusServerNow(): Promise<NodusServerSyncStatus>;
-  disconnectNodusServer(): Promise<NodusServerSyncStatus>;
+  setNodusServerLanguage(language: AppLanguage, vaultId?: string): Promise<NodusServerOverview>;
+  syncNodusServerVaultNow(vaultId: string): Promise<NodusServerOverview>;
+  disconnectNodusServerVault(vaultId: string): Promise<NodusServerOverview>;
   getCopilotStatus(): Promise<CopilotServerStatus>;
   regenerateCopilotToken(): Promise<string>;
   /** Runtime state of the opt-in local server for the Nodus-for-Zotero plugin. */

@@ -41,6 +41,8 @@ try {
   `);
   fs.writeFileSync(vaultStub, `
     export const activeVaultDir = () => ${JSON.stringify(vaultDir)};
+    export const getActiveVault = () => ({ id: 'vault-a', path: ${JSON.stringify(path.join(vaultDir, 'nodus.sqlite'))} });
+    export const vaultDir = (id) => (id === 'vault-a' ? ${JSON.stringify(vaultDir)} : null);
     export const listVaults = () => [{ id: 'vault-a', path: ${JSON.stringify(path.join(vaultDir, 'nodus.sqlite'))} }];
   `);
   fs.writeFileSync(entry, `

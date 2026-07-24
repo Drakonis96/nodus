@@ -325,14 +325,14 @@ import { aggregateGaps, aggregateGapsPage, contradictionCount, getGapDetail } fr
 import { getSyncLog } from './db/syncRepo';
 import { fullSync, ingestZoteroItem, startRealtimeSync, stopRealtimeSync } from './sync/syncService';
 import {
-  disconnectNodusServer,
-  getNodusServerStatus,
+  disconnectNodusServerVault,
+  getNodusServerOverview,
   pairNodusServer,
   restartNodusServerSync,
   setNodusServerLanguage,
   startNodusServerSync,
   stopNodusServerSync,
-  syncNodusServerNow,
+  syncNodusServerVaultNow,
 } from './serverSync/serverSyncService';
 import { scanQueue } from './pipeline/scanQueue';
 import { buildIdeaGraph, buildIdeaGraphOverview, buildIdeaThemeGraph, buildAuthorGraph, getContradictions, getDebates, buildReadingPath } from './graph/graphService';
@@ -1869,11 +1869,11 @@ export function registerIpc(
   h('mcp:tunnel:connect', async (_e, input) => connectMcpTunnel(input));
   h('mcp:tunnel:disconnect', async () => disconnectMcpTunnel());
   h('mcp:tunnel:forget', async () => forgetMcpTunnel());
-  h('nodusServer:status', async () => getNodusServerStatus());
+  h('nodusServer:overview', async () => getNodusServerOverview());
   h('nodusServer:pair', async (_e, url: string, code: string) => pairNodusServer(url, code));
-  h('nodusServer:setLanguage', async (_e, language: AppLanguage) => setNodusServerLanguage(language));
-  h('nodusServer:syncNow', async () => syncNodusServerNow());
-  h('nodusServer:disconnect', async () => disconnectNodusServer());
+  h('nodusServer:setLanguage', async (_e, language: AppLanguage, vaultId?: string) => setNodusServerLanguage(language, vaultId));
+  h('nodusServer:syncVaultNow', async (_e, vaultId: string) => syncNodusServerVaultNow(vaultId));
+  h('nodusServer:disconnectVault', async (_e, vaultId: string) => disconnectNodusServerVault(vaultId));
   h('copilot:status', async () => getCopilotStatus());
   h('copilot:regenerateToken', async () => regenerateCopilotToken());
   h('copilot:ensureCert', async () => {
