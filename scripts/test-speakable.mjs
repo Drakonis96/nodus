@@ -92,6 +92,32 @@ try {
     assert.deepEqual(segs.map((s) => s.index), [0, 1, 2], 'indices are contiguous');
   }
 
+  // ── Deep Research: the abstract is never narrated twice ─────────────────────
+  // assembleMarkdown() embeds the abstract as a "## Resumen" section inside
+  // draftMarkdown; it is also the intro segment. It must be spoken exactly once.
+  {
+    const abstract = 'Este resumen sintetiza el análisis del turismo como propaganda.';
+    const draft = {
+      title: 'Informe',
+      abstract,
+      draftMarkdown: `## Resumen\n\n${abstract}\n\n## Contexto\n\nCuerpo del contexto.`,
+    };
+    const segs = deepResearchSegments(draft);
+    const withAbstract = segs.filter((s) => s.text.includes('Este resumen sintetiza'));
+    assert.equal(withAbstract.length, 1, 'abstract narrated exactly once');
+    assert.deepEqual(segs.map((s) => s.label), ['Resumen', 'Contexto'], 'no duplicate Resumen section');
+    assert.deepEqual(segs.map((s) => s.index), [0, 1], 'indices contiguous after skipping the duplicate');
+  }
+
+  // ── An unpunctuated tail is not dropped when splitting a long block ──────────
+  {
+    const head = 'Frase completa de relleno con suficientes palabras. '.repeat(60); // > 2600 chars
+    const tail = 'cola final sin punto con varias palabras que no deben perderse';
+    const parts = splitForNarration(head + tail);
+    assert.ok(parts.length > 1, 'long text splits into multiple chunks');
+    assert.ok(parts.join(' ').includes(tail), 'the whole unpunctuated tail survives (not just its last word)');
+  }
+
   // ── Immersion: panorama + one segment per station, takeaways included ────────
   {
     const plan = {

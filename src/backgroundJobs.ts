@@ -1,4 +1,7 @@
 import type {
+  AudioEntityKind,
+  AudioProvider,
+  AudioSegmentRequest,
   DeepResearchProgress,
   DeepResearchReport,
   DeepResearchRequest,
@@ -463,4 +466,90 @@ function drainDeepQueue(): void {
     notifyDeepQueue();
     drainDeepQueue();
   }
+}
+
+// ── Audio narration generation ───────────────────────────────────────────────
+//
+// Synthesising a whole report or immersion runs one segment at a time in the
+// renderer (Piper/Kokoro in a worker; Hume over IPC). The loop lives here, at
+// module scope, so it keeps running while the user navigates away from the panel
+// that started it — and the progress bar reappears, mid-run, when they return.
+// The panel used to own the loop, so leaving the view unmounted it, cancelled the
+// synthesis, and discarded the progress.
+
+export interface AudioGenerationRequest {
+  entityKind: AudioEntityKind;
+  entityId: string;
+  provider: AudioProvider;
+  voiceId: string;
+  language: string;
+  segmentRequest: AudioSegmentRequest;
+  /** Localised strings the module-scope loop cannot resolve through i18n itself. */
+  labels: { preparing: string; noText: string };
+}
+
+export interface AudioGenerationProgress {
+  done: number;
+  total: number;
+  label: string;
+}
+
+export interface AudioGenerationResult {
+  count: number;
+  cancelled: boolean;
+}
+
+export type AudioGenerationJob = BackgroundJob<AudioGenerationRequest, AudioGenerationProgress, AudioGenerationResult>;
+
+export function audioGenerationJobKey(kind: AudioEntityKind, id: string): string {
+  return `audio:generate:${kind}:${id}`;
+}
+
+// Keys whose in-flight generation the user has asked to cancel. Checked between
+// segments; cleared when the loop observes it (so a later run starts clean).
+const audioCancellations = new Set<string>();
+
+export function cancelAudioGeneration(kind: AudioEntityKind, id: string): void {
+  audioCancellations.add(audioGenerationJobKey(kind, id));
+}
+
+/** The synthesis backend, injected by the caller so this module stays free of the
+ *  heavy WASM/onnx audio engines (and can be bundled and unit-tested on its own). */
+export type SegmentSynthesizer = (provider: AudioProvider, voiceId: string, text: string) => Promise<Uint8Array>;
+
+export function startAudioGeneration(request: AudioGenerationRequest, synthesize: SegmentSynthesizer): AudioGenerationJob {
+  const key = audioGenerationJobKey(request.entityKind, request.entityId);
+  const existing = getBackgroundJob<AudioGenerationRequest, AudioGenerationProgress, AudioGenerationResult>(key);
+  if (existing?.status === 'running') return existing;
+  audioCancellations.delete(key);
+
+  return startBackgroundJob<AudioGenerationRequest, AudioGenerationProgress, AudioGenerationResult>(key, request, async (req, onProgress) => {
+    const segments = await window.nodus.getAudioSegments(req.entityKind, req.entityId, req.segmentRequest);
+    if (!segments.length) throw new Error(req.labels.noText);
+
+    await window.nodus.clearAudioClips(req.entityKind, req.entityId);
+    onProgress({ done: 0, total: segments.length, label: req.labels.preparing });
+
+    let done = 0;
+    let cancelled = false;
+    for (const segment of segments) {
+      if (audioCancellations.has(key)) { cancelled = true; break; }
+      onProgress({ done, total: segments.length, label: segment.label });
+      const bytes = await synthesize(req.provider, req.voiceId, segment.text);
+      if (audioCancellations.has(key)) { cancelled = true; break; }
+      await window.nodus.saveAudioClip(req.entityKind, req.entityId, {
+        segmentIndex: segment.index,
+        segmentLabel: segment.label,
+        provider: req.provider,
+        voice: req.voiceId,
+        language: req.language,
+        bytes,
+      });
+      done += 1;
+      onProgress({ done, total: segments.length, label: segment.label });
+    }
+
+    audioCancellations.delete(key);
+    return { count: done, cancelled };
+  });
 }
