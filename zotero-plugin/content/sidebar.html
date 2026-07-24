@@ -120,6 +120,11 @@
         <label data-i18n="settings.language">Language</label>
         <select id="nd-lang"><option value="en">English</option><option value="es">Español</option></select>
       </div>
+      <div class="nd-field">
+        <label data-i18n="update.title">Updates</label>
+        <label class="nd-check"><input type="checkbox" id="nd-autoupdate" /> <span data-i18n="update.autoDesc">Keep the plugin up to date automatically</span></label>
+        <div class="nd-muted" data-i18n="update.hint">Nodus installs each new plugin release automatically when Zotero checks for add-on updates. Updates are downloaded from GitHub and verified before installing.</div>
+      </div>
       <div class="nd-field" data-nodus-only>
         <label data-i18n="settings.connection">Nodus connection</label>
         <div id="nd-conn-detail" class="nd-muted"></div>
@@ -170,6 +175,7 @@
   <script src="chrome://nodus/content/icons.js"></script>
   <script src="chrome://nodus/content/providers.js"></script>
   <script src="chrome://nodus/content/store.js"></script>
+  <script src="chrome://nodus/content/updater.js"></script>
   <script src="chrome://nodus/content/local-embeddings.js"></script>
   <script src="chrome://nodus/content/evidence.js"></script>
   <script src="chrome://nodus/content/multimodal.js"></script>

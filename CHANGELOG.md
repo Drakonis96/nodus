@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- **Zotero plugin self-updates.** The Nodus for Zotero add-on now keeps itself
+  current: it registers with Zotero's own add-on updater and installs each new
+  plugin release automatically from the latest GitHub Release (downloaded and
+  sha256-verified by Zotero, applied on the next restart). This is on by default
+  and can be turned off under Settings → Updates; turning it off asks for
+  confirmation first. Plugin bumped to 2.7.0.
+
 ## 2.6.2 — 2026-07-23
 
 ### Changed

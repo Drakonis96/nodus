@@ -16,6 +16,7 @@ const NI = window.NodusIcons;
 const NE = window.NodusEvidence;
 const NV = window.NodusMultimodal;
 const NL = window.NodusLocalEmbeddings;
+const NUP = window.NodusUpdater;
 const ico = (name, size) => (NI ? NI.svg(name, { size: size || 16 }) : "");
 
 // Full-document context cap (~50k tokens): big enough for most modern models,
@@ -118,6 +119,11 @@ const I18N = {
     "providers.linkedMsg": "Providers are only used in Standalone mode. In Link mode, models come from Nodus — add or pin models in the Nodus app.",
     "agent.on": "Agent mode ON — Nodus can now propose actions on your Zotero (create notes, highlight, tag). It asks permission each time you chat.",
     "agent.off": "Agent mode off.",
+    "update.title": "Updates", "update.autoDesc": "Keep the plugin up to date automatically",
+    "update.hint": "Nodus installs each new plugin release automatically when Zotero checks for add-on updates. Updates are downloaded from GitHub and verified before installing.",
+    "update.disable": "Turn off",
+    "update.disableConfirm": "Turn off automatic updates? You'll then have to update the Nodus plugin manually to get new features and fixes.",
+    "update.on": "Automatic updates on.", "update.off": "Automatic updates off.",
   },
   es: {
     "tab.chat": "Chat", "tab.providers": "Proveedores", "tab.settings": "Ajustes",
@@ -210,6 +216,11 @@ const I18N = {
     "providers.linkedMsg": "Los proveedores solo se usan en modo Autónomo. En modo Link, los modelos vienen de Nodus — añade o fija modelos en la app de Nodus.",
     "agent.on": "Modo agente ACTIVADO — Nodus podrá proponer acciones sobre tu Zotero (crear notas, subrayar, etiquetar). Pedirá permiso cada vez que chatees.",
     "agent.off": "Modo agente desactivado.",
+    "update.title": "Actualizaciones", "update.autoDesc": "Mantener el plugin actualizado automáticamente",
+    "update.hint": "Nodus instala cada nueva versión del plugin automáticamente cuando Zotero busca actualizaciones de complementos. Las actualizaciones se descargan de GitHub y se verifican antes de instalarse.",
+    "update.disable": "Desactivar",
+    "update.disableConfirm": "¿Desactivar las actualizaciones automáticas? Tendrás que actualizar el plugin de Nodus manualmente para recibir nuevas funciones y correcciones.",
+    "update.on": "Actualizaciones automáticas activadas.", "update.off": "Actualizaciones automáticas desactivadas.",
   },
 };
 
@@ -218,7 +229,7 @@ const state = {
   modelsConnected: [], model: null,
   item: null, attachmentKey: null, selection: "", ideaLabels: {},
   conversations: [], conv: null, busy: false, lastItemKey: null, abort: null,
-  agentEnabled: false, agentAuto: false, selectionDraft: null,
+  agentEnabled: false, agentAuto: false, autoUpdate: true, selectionDraft: null,
   items: [], maxTokens: 8192, reasoning: "default", notifierID: null, pollTimer: null,
   hlColors: { high: "#ff6666", medium: "#ffd400" }, lastHighlightKeys: [],
   indexes: [], evidence: new Map(), retrieval: null, visuals: [], contextStrategy: "auto",
@@ -1876,6 +1887,15 @@ function wire() {
     if (e.target.checked) { const ok = await showConfirm(t("agent.autoConfirm"), t("agent.enable")); if (!ok) { e.target.checked = false; return; } }
     state.agentAuto = e.target.checked; NS.setAgentAuto(state.agentAuto);
   });
+  // Self-update toggle. Turning it OFF is the guarded action: confirm first, and
+  // revert the checkbox if the user cancels. Enabling also triggers an immediate
+  // update check via Zotero's AddonManager.
+  $("#nd-autoupdate").addEventListener("change", async (e) => {
+    if (!e.target.checked) { const ok = await showConfirm(t("update.disableConfirm"), t("update.disable")); if (!ok) { e.target.checked = true; return; } }
+    state.autoUpdate = e.target.checked; NS.setAutoUpdate(state.autoUpdate);
+    if (NUP && NUP.configure) NUP.configure(state.autoUpdate);
+    showToast(t(state.autoUpdate ? "update.on" : "update.off"));
+  });
   registerNotifier();
   // Fallback poll ONLY for library list-selection, which Zotero exposes no
   // public event for. Tab switches and item edits arrive instantly via the
@@ -1949,6 +1969,8 @@ async function boot() {
       if (hint && backend) hint.setAttribute("data-backend", backend);
     }).catch(() => {});
   }
+  state.autoUpdate = NS.getAutoUpdate();
+  $("#nd-autoupdate").checked = state.autoUpdate;
   state.agentEnabled = NS.getAgent(); state.agentAuto = NS.getAgentAuto();
   $("#nd-agent").checked = state.agentEnabled; $("#nd-agent-auto").checked = state.agentAuto;
   $("#nd-agent-btn").classList.toggle("nd-iconbtn--active", state.agentEnabled);
