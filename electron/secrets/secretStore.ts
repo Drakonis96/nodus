@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { AiProvider } from '@shared/types';
 import { AI_PROVIDERS, SECRET_PROVIDERS as PROVIDERS } from '@shared/providers';
-import { activeVaultDir, listVaults } from '../vaults/vaultRegistry';
+import { activeVaultDir, getActiveVault, listVaults, vaultDir } from '../vaults/vaultRegistry';
 
 // AI API keys are stored per provider, encrypted-at-rest via Electron safeStorage,
 // never in the renderer and never in plaintext on disk. Keys never cross IPC to the UI.
@@ -371,36 +371,74 @@ export function clearMcpTunnelApiKey(): void {
 // server URL/space id it must never enter settings JSON, backups, sync packages or the
 // renderer. This is intentionally unrelated to the localhost MCP bearer token.
 
-function nodusServerTokenFile(): string {
-  return path.join(activeVaultDir(), 'nodus_server_token.bin');
+// The device token lives beside its vault, not beside the active one: a vault stays
+// paired and keeps publishing in the background even while a different vault is open,
+// so every accessor is keyed by vaultId. The active-vault wrappers below just resolve
+// the current vault and delegate here.
+function nodusServerTokenFileForDir(dir: string): string {
+  return path.join(dir, 'nodus_server_token.bin');
+}
+
+function activeVaultIdOrNull(): string | null {
+  try { return getActiveVault().id; } catch { return null; }
 }
 
 // If the OS keychain is unavailable, keep the publisher credential only for the
-// lifetime of this process. Persisting a reversible base64 token would turn a
+// lifetime of this process, per vault. Persisting a reversible base64 token would turn a
 // local file read into remote publishing access. The user can pair again after
 // restarting once a supported keychain is available.
-let transientNodusServerToken: string | null = null;
+const transientNodusServerTokens = new Map<string, string>();
 
-export function setNodusServerToken(value: string): void {
+export function setNodusServerTokenFor(vaultId: string, value: string): void {
   const clean = value.trim();
   if (!clean) {
-    clearNodusServerToken();
+    clearNodusServerTokenFor(vaultId);
     return;
   }
-  const file = nodusServerTokenFile();
+  const dir = vaultDir(vaultId);
+  if (!dir) return;
+  const file = nodusServerTokenFileForDir(dir);
   if (!safeStorage.isEncryptionAvailable()) {
-    transientNodusServerToken = clean;
+    transientNodusServerTokens.set(vaultId, clean);
     if (fs.existsSync(file)) fs.unlinkSync(file);
     return;
   }
   fs.mkdirSync(path.dirname(file), { recursive: true });
   writeSecretAtomically(file, safeStorage.encryptString(clean));
-  transientNodusServerToken = null;
+  transientNodusServerTokens.delete(vaultId);
+}
+
+export function getNodusServerTokenFor(vaultId: string): string | null {
+  const transient = transientNodusServerTokens.get(vaultId);
+  if (transient !== undefined) return transient;
+  const dir = vaultDir(vaultId);
+  if (!dir) return null;
+  try { return readKeyFile(nodusServerTokenFileForDir(dir)); } catch { return null; }
+}
+
+export function hasNodusServerTokenFor(vaultId: string): boolean {
+  return getNodusServerTokenFor(vaultId) !== null;
+}
+
+export function clearNodusServerTokenFor(vaultId: string): void {
+  transientNodusServerTokens.delete(vaultId);
+  const dir = vaultDir(vaultId);
+  if (!dir) return;
+  try {
+    const file = nodusServerTokenFileForDir(dir);
+    if (fs.existsSync(file)) fs.unlinkSync(file);
+  } catch { /* the vault directory is gone */ }
+}
+
+// Active-vault convenience wrappers. Pairing always targets the currently open vault.
+export function setNodusServerToken(value: string): void {
+  const id = activeVaultIdOrNull();
+  if (id) setNodusServerTokenFor(id, value);
 }
 
 export function getNodusServerToken(): string | null {
-  if (transientNodusServerToken !== null) return transientNodusServerToken;
-  try { return readKeyFile(nodusServerTokenFile()); } catch { return null; }
+  const id = activeVaultIdOrNull();
+  return id ? getNodusServerTokenFor(id) : null;
 }
 
 export function hasNodusServerToken(): boolean {
@@ -408,11 +446,8 @@ export function hasNodusServerToken(): boolean {
 }
 
 export function clearNodusServerToken(): void {
-  transientNodusServerToken = null;
-  try {
-    const file = nodusServerTokenFile();
-    if (fs.existsSync(file)) fs.unlinkSync(file);
-  } catch { /* no active vault yet */ }
+  const id = activeVaultIdOrNull();
+  if (id) clearNodusServerTokenFor(id);
 }
 
 export function setBackupRecoveryKey(recoveryKey: string): void {
