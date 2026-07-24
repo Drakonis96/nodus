@@ -83,6 +83,10 @@
   }
   function removeCustomPrompt(id) { setCustomPrompts(getCustomPrompts().filter((p) => p.id !== id)); }
 
+  // ---- self-update (default ON; the plugin keeps itself current via Zotero) ----
+  function getAutoUpdate() { return P("autoUpdate", "1") !== "0"; }
+  function setAutoUpdate(v) { S("autoUpdate", v ? "1" : "0"); }
+
   // ---- agent mode ----
   function getAgent() { return P("agent", "0") === "1"; }
   function setAgent(v) { S("agent", v ? "1" : "0"); }
@@ -343,6 +347,7 @@
     getMode, setMode, getLang, setLang, getModel, setModel, getMaxTokens, setMaxTokens, getReasoning, setReasoning, getHlColors, setHlColors, getContext, setContext,
     getKey, setKey, getLocalBase, setLocalBase, getPinned, setPinned, isPinned, togglePinned,
     getCustomPrompts, setCustomPrompts, addCustomPrompt, removeCustomPrompt,
+    getAutoUpdate, setAutoUpdate,
     getAgent, setAgent, getAgentAuto, setAgentAuto,
     getManual, setManual, loadConversations, saveConversations, compactAudit, compactConversations,
     EVIDENCE_CACHE_VERSION, gzipText, gunzipText, detachEmbeddings, attachEmbeddings,

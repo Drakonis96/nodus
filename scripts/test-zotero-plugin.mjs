@@ -795,6 +795,37 @@ test('#reasoning: sidebar + server wire the selector through', () => {
   assert.ok(/reasoning/.test(server) && server.includes('ReasoningEffort'), 'connected server honors reasoning');
 });
 
+test('self-update: default-on preference, AddonManager wiring and a guarded disable toggle', () => {
+  // Store defaults ON and round-trips the preference.
+  const { NodusStore: S } = loadModule('store.js');
+  assert.equal(S.getAutoUpdate(), true, 'auto-update defaults to enabled');
+  assert.equal(typeof S.setAutoUpdate, 'function', 'store exposes setAutoUpdate');
+
+  // updater.js drives Zotero's own AddonManager (per-add-on background updates +
+  // an immediate check), rather than reinventing download/verify.
+  const updater = readSource('zotero-plugin/content/updater.js');
+  assert.ok(updater.includes('AddonManager.sys.mjs'), 'imports the AddonManager');
+  assert.ok(updater.includes('applyBackgroundUpdates'), 'sets per-add-on auto-update');
+  assert.ok(updater.includes('AUTOUPDATE_ENABLE') && updater.includes('AUTOUPDATE_DISABLE'), 'enables/disables explicitly');
+  assert.ok(updater.includes('findUpdates'), 'can check for an update immediately');
+  assert.ok(updater.includes('window.NodusUpdater'), 'exposes NodusUpdater');
+
+  // bootstrap applies the preference at startup, defaulting to enabled.
+  const bootstrap = readSource('zotero-plugin/bootstrap.js');
+  assert.ok(bootstrap.includes('configureAutoUpdate'), 'startup configures auto-update');
+  assert.ok(/nodus\.autoUpdate/.test(bootstrap), 'reads the auto-update preference');
+  assert.ok(/updater\.js/.test(bootstrap), 'startup loads the shared updater module');
+
+  // sidebar exposes the toggle, confirms before turning it OFF, and reverts on cancel.
+  const sidebar = readSource('zotero-plugin/content/sidebar.js');
+  const html = readSource('zotero-plugin/content/sidebar.html');
+  assert.ok(html.includes('id="nd-autoupdate"'), 'settings expose the toggle');
+  assert.ok(html.includes('chrome://nodus/content/updater.js'), 'sidebar loads the updater');
+  assert.ok(sidebar.includes('NS.setAutoUpdate'), 'persists the choice');
+  assert.ok(/showConfirm\(t\("update\.disableConfirm"\)/.test(sidebar), 'disabling asks for confirmation');
+  assert.ok(/e\.target\.checked = true;\s*return;/.test(sidebar), 'cancelling reverts the toggle to on');
+});
+
 test('local retrieval: E5 is pinned, isolated in a worker and requires no embedding setting or API', () => {
   const worker = readSource('scripts/zotero-local-embedding-worker.mjs');
   const bridge = readSource('zotero-plugin/content/local-embeddings.js');
@@ -1000,6 +1031,7 @@ test('#9: build-zotero-xpi produces a valid xpi + updates.json', () => {
   assert.ok(names.includes('manifest.json'), 'manifest.json at zip ROOT (Zotero rejects it otherwise)');
   for (const need of [
     'content/sidebar.js',
+    'content/updater.js',
     'content/local-embeddings.js',
     'content/runtime/local-embedding-worker.js',
     'content/runtime/ort-wasm-simd-threaded.jsep.mjs',
@@ -1015,7 +1047,7 @@ test('#9: build-zotero-xpi produces a valid xpi + updates.json', () => {
   ]) {
     assert.ok(names.includes(need), `xpi contains ${need}`);
   }
-  assert.equal(manifest.version, '2.6.0');
+  assert.equal(manifest.version, '2.7.0');
   assert.equal(manifest.icons['64'], 'icons/nodus.svg');
   assert.match(zip.readAsText('icons/nodus.svg'), /M18 48V16L46 48V16/, 'Zotero keeps the normal Nodus N');
   assert.ok(!names.includes('icons/zotero-z.svg'), 'the rotated release-note mark is not shipped as Zotero UI');

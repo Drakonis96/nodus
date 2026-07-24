@@ -50,7 +50,24 @@ async function startup({ id, version, rootURI, resourceURI }) {
   registerReaderToolbarButton();
   registerSelectionPopup();
   eachMainWindow((w) => { injectSidebar(w); addLibraryButton(w); });
+  configureAutoUpdate();
   log("startup complete v" + version);
+}
+
+// Self-update: on by default. Reads the user's preference (Settings toggle) and
+// tells Zotero's AddonManager whether to keep this add-on current, checking for
+// a new release immediately when enabled. Shares content/updater.js with the
+// sidebar so both apply the same behaviour.
+function autoUpdateEnabled() {
+  try { return Zotero.Prefs.get("nodus.autoUpdate") !== "0"; } catch (e) { return true; }
+}
+function configureAutoUpdate() {
+  try {
+    const scope = { window: {}, ChromeUtils: ChromeUtils };
+    Services.scriptloader.loadSubScript("chrome://nodus/content/updater.js", scope);
+    const NU = scope.window.NodusUpdater;
+    if (NU && NU.configure) NU.configure(autoUpdateEnabled());
+  } catch (e) { log("auto-update config failed: " + (e && e.message ? e.message : e)); }
 }
 
 function onMainWindowLoad({ window }) {
