@@ -20,8 +20,17 @@ export const RELEASE_2_6_2_IT: string[] = [
   "La ricerca semantica è più efficiente: le chiamate extra al modello vengono evitate quando ci sono pochi risultati, la riparazione delle citazioni è configurabile e i round di ricerca agentica sono regolabili (1 per impostazione predefinita). L'OCR viene elaborato in parallelo e gli embedding locali usano WebGPU quando disponibile, con fallback a Wasm.",
 ];
 
+export const RELEASE_2_6_3_IT: string[] = [
+  "Il componente aggiuntivo Nodus per Zotero si mantiene aggiornato da solo: si registra nel gestore di aggiornamenti di Zotero e installa ogni nuova versione automaticamente dall'ultima pubblicazione su GitHub, verificata da Zotero e applicata al riavvio. È attivo per impostazione predefinita e può essere disattivato nelle Impostazioni, che chiedono prima conferma.",
+  "L'assistente di Nodus per Zotero risponde con precisione sui PDF lunghi: una mappa del documento gli fornisce dati reali sulle pagine —totale, pagina corrente, prima e ultima— così da non inventarli, e le domande su «pagina corrente», «ultima pagina» o «pagina N» recuperano quelle pagine esatte. Inoltre la prima risposta non attende più l'indicizzazione dell'intero documento: si calcolano solo gli embedding indispensabili e il resto prosegue in background.",
+  "Nodus Server mantiene pubblicati in background tutti i depositi collegati, non solo quello aperto: cambiando deposito gli altri continuano a sincronizzarsi e a essere serviti, senza diventare obsoleti. Le Impostazioni mostrano ora tutte le tue connessioni con il relativo stato e puoi sincronizzare o disconnettere ciascuna separatamente.",
+  "La generazione audio è più affidabile: la narrazione prosegue anche se esci dalla vista e recupera il suo avanzamento al ritorno, il riassunto di un report di Deep Research non viene più letto due volte e i segmenti lunghi non si interrompono più a metà parola. Anche la trascrizione con Whisper locale ora termina in background invece di essere annullata quando cambi schermata.",
+  "I report PDF di Deep Research adottano un design più curato: copertina pulita con il marchio Nodus, riassunto esecutivo centrato, numerazione automatica delle sezioni e una matrice di tracciabilità compatta in forma di tabella.",
+];
+
 /** Italian history, indexed by release and highlight order. */
 export const RELEASE_NOTES_IT: Record<string, string[]> = {
+  "2.6.3": RELEASE_2_6_3_IT,
   "2.6.2": RELEASE_2_6_2_IT,
   "2.6.1": RELEASE_2_6_IT,
   "2.6.0": RELEASE_2_6_IT,
