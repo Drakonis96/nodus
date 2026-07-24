@@ -53,6 +53,16 @@ try {
   });
   const aiProgressListeners = new Set();
   const comparisonProgressListeners = new Set();
+  const audioSegments = [
+    { index: 0, label: 'Resumen', text: 'Uno.' },
+    { index: 1, label: 'Contexto', text: 'Dos.' },
+    { index: 2, label: 'Análisis', text: 'Tres.' },
+  ];
+  const savedAudioClips = [];
+  let audioCleared = 0;
+  let synthCalls = 0;
+  let releaseSynth;
+  let synthGate = new Promise((resolve) => { releaseSynth = resolve; });
   const fakeSession = { id: 'imm-1', topic: 'Tema recuperable' };
   const fakeReport = {
     draft: { title: 'Informe recuperable', brief: { kind: 'deep_research' } },
@@ -115,6 +125,12 @@ try {
         for (const listener of comparisonProgressListeners) listener({ databaseId, columnId, done: 4, total: 8 });
         await Promise.resolve();
         return { done: 8 };
+      },
+      getAudioSegments: async () => audioSegments,
+      clearAudioClips: async () => { audioCleared += 1; savedAudioClips.length = 0; },
+      saveAudioClip: async (kind, id, input) => {
+        savedAudioClips.push({ kind, id, index: input.segmentIndex });
+        return { id: `clip-${input.segmentIndex}` };
       },
     },
   };
@@ -244,6 +260,58 @@ try {
   await waitFor(() => jobs.getBackgroundJob(comparisonKey)?.status === 'completed', 'comparison column completion');
   assert.deepEqual(jobs.getBackgroundJob(comparisonKey).progress, { done: 4, total: 8 });
   assert.equal(comparisonColumnCalls, 1);
+
+  // ── Audio narration survives leaving the view (the progress bar reappears) ──
+  // The synthesis loop runs in the store, not the panel. Leaving only unsubscribes;
+  // it must not stop the loop, and a remounted panel picks progress up mid-run.
+  const fakeSynth = async () => {
+    synthCalls += 1;
+    await synthGate;
+    return new Uint8Array([82, 73, 70, 70]);
+  };
+  const audioRequest = {
+    entityKind: 'deep_research',
+    entityId: 'report-1',
+    provider: 'kokoro',
+    voiceId: 'ef_dora',
+    language: 'es',
+    segmentRequest: { mode: 'full' },
+    labels: { preparing: 'Preparando…', noText: 'No hay texto narrable en este contenido.' },
+  };
+  const audioKey = jobs.audioGenerationJobKey('deep_research', 'report-1');
+  let audioBeforeUnmount = null;
+  const unsubscribeAudio = jobs.subscribeBackgroundJob(audioKey, (job) => { audioBeforeUnmount = job; });
+  const audioJob = jobs.startAudioGeneration(audioRequest, fakeSynth);
+  const duplicateAudio = jobs.startAudioGeneration(audioRequest, fakeSynth);
+  assert.equal(duplicateAudio.id, audioJob.id, 'a second "Generar audio" click reuses the running job');
+  await waitFor(() => jobs.getBackgroundJob(audioKey)?.progress?.label === 'Resumen', 'audio progress before unmount');
+  assert.equal(jobs.getBackgroundJob(audioKey).progress.total, 3, 'progress reports the segment total');
+  assert.equal(audioCleared, 1, 'existing clips are cleared once at the start');
+  unsubscribeAudio();
+  assert.equal(audioBeforeUnmount?.status, 'running', 'the mounted panel saw the running state');
+  releaseSynth();
+  await waitFor(() => jobs.getBackgroundJob(audioKey)?.status === 'completed', 'audio completion after unmount');
+  assert.equal(synthCalls, 3, 'every segment is synthesised even though the view was left');
+  assert.equal(savedAudioClips.length, 3, 'every clip is saved');
+  assert.deepEqual(jobs.getBackgroundJob(audioKey).result, { count: 3, cancelled: false });
+  let recoveredAudio = null;
+  const unsubscribeRecoveredAudio = jobs.subscribeBackgroundJob(audioKey, (job) => { recoveredAudio = job; });
+  assert.equal(recoveredAudio.status, 'completed', 'a remounted panel receives the retained job (bar reappears)');
+  unsubscribeRecoveredAudio();
+  jobs.clearBackgroundJob(audioKey, jobs.getBackgroundJob(audioKey).id);
+
+  // ── Cancelling mid-run stops the loop and reports it ────────────────────────
+  synthGate = new Promise((resolve) => { releaseSynth = resolve; });
+  const cancelKey = jobs.audioGenerationJobKey('immersion', 'imm-cancel');
+  const synthCallsBefore = synthCalls;
+  jobs.startAudioGeneration({ ...audioRequest, entityKind: 'immersion', entityId: 'imm-cancel' }, fakeSynth);
+  await waitFor(() => synthCalls === synthCallsBefore + 1, 'first segment synthesis started');
+  jobs.cancelAudioGeneration('immersion', 'imm-cancel');
+  releaseSynth();
+  await waitFor(() => jobs.getBackgroundJob(cancelKey)?.status === 'completed', 'cancelled audio settles');
+  const cancelledResult = jobs.getBackgroundJob(cancelKey).result;
+  assert.equal(cancelledResult.cancelled, true, 'cancellation is reported');
+  assert.ok(cancelledResult.count < 3, 'cancelling stops before every segment is synthesised');
 
   console.log('background generation jobs test passed');
 } finally {

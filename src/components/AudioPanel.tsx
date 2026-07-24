@@ -11,6 +11,16 @@ import type {
 } from '@shared/types';
 import { findVoice, getEngine } from '../lib/audio';
 import { synthesizeSegment } from '../lib/audio/synth';
+import {
+  audioGenerationJobKey,
+  cancelAudioGeneration,
+  clearBackgroundJob,
+  startAudioGeneration,
+  subscribeBackgroundJob,
+  type AudioGenerationProgress,
+  type AudioGenerationRequest,
+  type AudioGenerationResult,
+} from '../backgroundJobs';
 import { useAudioPlayer, type PlayerTrack } from './AudioPlayer';
 import { t, tx } from '../i18n';
 
@@ -60,8 +70,6 @@ export function AudioPanel({
   const [playlist, setPlaylist] = useState<StudyAudioPlaylistItem[]>([]);
   const [dictionaryDraft, setDictionaryDraft] = useState({ written: '', spoken: '' });
   const [showStudyTools, setShowStudyTools] = useState(false);
-  const cancelRef = useRef(false);
-  const clipsDoneRef = useRef(0);
   const mounted = useRef(true);
 
   const generating = run != null;
@@ -115,8 +123,31 @@ export function AudioPanel({
     void checkVoice();
     return () => {
       mounted.current = false;
-      cancelRef.current = true;
     };
+    // eslint-disable-next-line
+  }, [entityKind, entityId]);
+
+  // The synthesis loop runs in the module-scope job store, so it survives leaving
+  // this view. Subscribe to its progress: on remount the bar picks up mid-run, and
+  // clips are reflected as they are saved. Leaving simply unsubscribes — it never
+  // cancels the work.
+  useEffect(() => {
+    const key = audioGenerationJobKey(entityKind, entityId);
+    return subscribeBackgroundJob<AudioGenerationRequest, AudioGenerationProgress, AudioGenerationResult>(key, (job) => {
+      if (!mounted.current) return;
+      if (job?.status === 'running') {
+        setRun(job.progress ?? { done: 0, total: 0, label: t('Preparando…') });
+        if (job.progress) void refreshClips();
+        return;
+      }
+      setRun(null);
+      if (!job) return;
+      if (job.status === 'failed' && job.error) setError(job.error);
+      void refreshClips();
+      void refreshStudyMeta();
+      // Drop the finished snapshot so a later remount does not resurrect it.
+      clearBackgroundJob(key, job.id);
+    });
     // eslint-disable-next-line
   }, [entityKind, entityId]);
 
@@ -142,53 +173,23 @@ export function AudioPanel({
     // Local voices carry static metadata; cloud (Hume) voices are dynamic, so the
     // language is best-effort and defaults to empty.
     const language = findVoice(chosen.provider, chosen.voiceId)?.language ?? '';
-    let segments;
-    try {
-      segments = await window.nodus.getAudioSegments(entityKind, entityId, segmentRequest);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-      return;
-    }
-    if (!segments.length) {
-      setError(t('No hay texto narrable en este contenido.'));
-      return;
-    }
-
-    cancelRef.current = false;
     player.stop();
-    await window.nodus.clearAudioClips(entityKind, entityId);
-    setClips([]);
-    setRun({ done: 0, total: segments.length, label: t('Preparando…') });
-
-    try {
-      for (const segment of segments) {
-        if (cancelRef.current) break;
-        setRun({ done: clipsDoneRef.current, total: segments.length, label: segment.label });
-        const bytes = await synthesizeSegment(chosen.provider, chosen.voiceId, segment.text);
-        if (cancelRef.current) break;
-        const clip = await window.nodus.saveAudioClip(entityKind, entityId, {
-          segmentIndex: segment.index,
-          segmentLabel: segment.label,
-          provider: chosen.provider,
-          voice: chosen.voiceId,
-          language,
-          bytes,
-        });
-        clipsDoneRef.current += 1;
-        if (mounted.current) setClips((prev) => [...prev, clip]);
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      clipsDoneRef.current = 0;
-      if (mounted.current) setRun(null);
-      await refreshClips();
-      await refreshStudyMeta();
-    }
+    // Hand the loop to the module-scope job store; the subscription above drives
+    // the progress bar and clip list. Segment fetching, clip clearing and errors
+    // (including "no narratable text") are reported through the job.
+    startAudioGeneration({
+      entityKind,
+      entityId,
+      provider: chosen.provider,
+      voiceId: chosen.voiceId,
+      language,
+      segmentRequest,
+      labels: { preparing: t('Preparando…'), noText: t('No hay texto narrable en este contenido.') },
+    }, synthesizeSegment);
   };
 
   const cancel = () => {
-    cancelRef.current = true;
+    cancelAudioGeneration(entityKind, entityId);
   };
 
   const playFrom = (clip: AudioClip) => {

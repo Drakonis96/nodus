@@ -124,7 +124,11 @@ const SEGMENT_SPLIT_CHARS = 2600;
 export function splitForNarration(text: string, limit = SEGMENT_SPLIT_CHARS): string[] {
   const clean = text.trim();
   if (clean.length <= limit) return clean ? [clean] : [];
-  const sentences = clean.match(/[^.!?]+[.!?]+(?:["')\]]+)?|\S+$/g) ?? [clean];
+  // Match whole sentences (text up to a terminator), plus a final alternative for
+  // a trailing clause with no terminator. That last alternative is a *run* of
+  // non-terminator chars — not `\S+$`, which only kept the last word and silently
+  // dropped the rest of an unpunctuated tail (a source of cut-off narration).
+  const sentences = clean.match(/[^.!?]+[.!?]+(?:["')\]]+)?|[^.!?]+$/g) ?? [clean];
   const chunks: string[] = [];
   let current = '';
   for (const s of sentences) {
@@ -161,6 +165,10 @@ export function deepResearchSegments(draft: DeepResearchDraftLike): AudioSegment
   for (const section of splitMarkdownSections(draft.draftMarkdown ?? '')) {
     const body = markdownToSpeech(section.body);
     if (!body) continue;
+    // The assembled report embeds the abstract as its own heading section (see
+    // assembleMarkdown), and it is already narrated as the intro segment above.
+    // Skip that duplicate so the summary is not synthesised — and heard — twice.
+    if (abstract && body === abstract) continue;
     const parts = splitForNarration([section.heading ? `${section.heading}.` : '', body].filter(Boolean).join('\n\n'));
     parts.forEach((part, i) => {
       segments.push({

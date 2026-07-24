@@ -226,7 +226,11 @@ export function StudyRecordingsView({ onOpenDocument, initialRecordingId, initia
     if (recorderRef.current && recorderRef.current.state !== 'inactive') recorderRef.current.stop();
     streamRef.current?.getTracks().forEach((track) => track.stop());
     void contextRef.current?.close();
-    cancelLocalWhisper();
+    // Deliberately NOT cancelling local Whisper here: leaving the view must not
+    // kill an in-flight transcription. The worker keeps going and saveStudyTranscript
+    // persists the result (and resets the recording status) from its own promise
+    // chain, matching how the cloud / whisper_cpp providers already survive
+    // navigation. The explicit Cancel button still stops it on purpose.
   }, []);
 
   const subjects = useMemo(() => workspace?.subjects.filter((subject) => !courseId || subject.courseId === courseId) ?? [], [workspace, courseId]);

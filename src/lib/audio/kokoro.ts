@@ -2,6 +2,7 @@ import type { KokoroTTS } from 'kokoro-js';
 import type { AudioEngine, AudioVoice } from './types';
 import { phonemizeKokoroSpanish } from './kokoroSpanishPhonemizer';
 import { isKokoroSpanishVoice } from './kokoroSpanishText';
+import { chunkForKokoro, concatAudio } from './kokoroChunk';
 import { encodeWavPcm16 } from './wav';
 
 // Kokoro provider: one shared 82M model (StyleTTS2) powers many high-quality
@@ -105,23 +106,36 @@ export const kokoroEngine: AudioEngine = {
 
   async synthesize(text, voiceId) {
     const model = await loadModel();
-    let audio;
-    if (isKokoroSpanishVoice(voiceId)) {
-      // kokoro-js 1.2.1 ships the official Spanish voice embeddings but its
-      // high-level generate() rejects them and phonemizes every non-US voice as
-      // English. Follow Kokoro/Misaki instead: eSpeak NG `es` -> Kokoro tokens ->
-      // generate_from_ids(), whose runtime accepts the published voice id.
-      const phonemes = await phonemizeKokoroSpanish(text);
-      const { input_ids } = model.tokenizer(phonemes, { truncation: true });
-      const options = { voice: voiceId, speed: 1 } as unknown as Parameters<KokoroTTS['generate_from_ids']>[1];
-      audio = await model.generate_from_ids(input_ids, options);
-    } else {
-      // kokoro-js types `voice` as a literal union; curated ids arrive as strings.
-      const options = { voice: voiceId, speed: 1 } as unknown as Parameters<KokoroTTS['generate']>[1];
-      audio = await model.generate(text, options);
+    const spanish = isKokoroSpanishVoice(voiceId);
+    // Split into sentence-sized pieces first: the tokenizer truncates past ~509
+    // tokens, so a whole segment (up to ~2600 chars) would otherwise be cut off
+    // mid-word. Each piece is synthesised separately and the audio is joined back.
+    const pieces = chunkForKokoro(text);
+    if (pieces.length === 0) return encodeWavPcm16(new Float32Array(0), 24000);
+
+    const parts: Float32Array[] = [];
+    let sampleRate = 24000;
+    for (const piece of pieces) {
+      let audio;
+      if (spanish) {
+        // kokoro-js 1.2.1 ships the official Spanish voice embeddings but its
+        // high-level generate() rejects them and phonemizes every non-US voice as
+        // English. Follow Kokoro/Misaki instead: eSpeak NG `es` -> Kokoro tokens ->
+        // generate_from_ids(), whose runtime accepts the published voice id.
+        const phonemes = await phonemizeKokoroSpanish(piece);
+        const { input_ids } = model.tokenizer(phonemes, { truncation: true });
+        const options = { voice: voiceId, speed: 1 } as unknown as Parameters<KokoroTTS['generate_from_ids']>[1];
+        audio = await model.generate_from_ids(input_ids, options);
+      } else {
+        // kokoro-js types `voice` as a literal union; curated ids arrive as strings.
+        const options = { voice: voiceId, speed: 1 } as unknown as Parameters<KokoroTTS['generate']>[1];
+        audio = await model.generate(piece, options);
+      }
+      parts.push(audio.audio as Float32Array);
+      sampleRate = audio.sampling_rate;
     }
     // RawAudio.toBlob() writes 32-bit float WAV, which Chromium's <audio> cannot
-    // play; re-encode the raw samples as 16-bit PCM WAV instead.
-    return encodeWavPcm16(audio.audio as Float32Array, audio.sampling_rate);
+    // play; re-encode the joined raw samples as 16-bit PCM WAV instead.
+    return encodeWavPcm16(concatAudio(parts, sampleRate), sampleRate);
   },
 };
