@@ -511,11 +511,66 @@ async function ensureEmbeddingsSerialized(indexes, signal, opts) {
 // line (which stays free for whatever the user is doing meanwhile).
 function embedIndexesBackground(indexes) {
   if (!NL || !indexes || !indexes.length) return;
+  // Nothing left to do — don't flash an empty progress bar.
+  const model = NL.MODEL;
+  const remaining = indexes.reduce((n, index) => n + (index.chunks || []).filter((c) =>
+    !Array.isArray(c.embedding) || c.embedding.length !== model.dimensions || c.embeddingModel !== model.fingerprint
+  ).length, 0);
+  if (!remaining) return;
   showEmbedProgress(0);
   ensureEmbeddingsSerialized(indexes, undefined, {
     onStatus: () => {},
     onProgress: (done, total) => showEmbedProgress(total ? Math.round((done / total) * 100) : 100),
   }).catch((e) => { try { Zotero.logError(e); } catch (x) {} }).finally(() => showEmbedProgress(null));
+}
+// Query-time BOUNDED embedding. Embedding every chunk of a several-hundred-page
+// book up front is what makes the first answer hang for minutes. Instead embed
+// only the BM25 candidate chunks (+ any positional page chunks) for THIS
+// question, plus the query itself. The vectors land on the in-memory chunk
+// objects and get persisted later by the background full pass, so the answer
+// never waits on the whole document. Returns the query embedding (or null).
+async function embedCandidatesInline(indexes, query, extraHits, signal) {
+  if (!NL || !NE || !indexes || !indexes.length) return null;
+  const model = NL.MODEL;
+  const wanted = new Set(NE.candidateChunkIdsForQuery(indexes, query, { limit: 96 }));
+  for (const h of extraHits || []) if (h && h.id) wanted.add(h.id);
+  const missing = [];
+  for (const index of indexes) {
+    for (const chunk of index.chunks || []) {
+      if (!wanted.has(chunk.id)) continue;
+      if (Array.isArray(chunk.embedding) && chunk.embedding.length === model.dimensions && chunk.embeddingModel === model.fingerprint) continue;
+      missing.push({ index, chunk });
+    }
+  }
+  for (let i = 0; i < missing.length; i += 24) {
+    if (signal && signal.aborted) throw new DOMException("Aborted", "AbortError");
+    const batch = missing.slice(i, i + 24);
+    const vectors = await NL.embedPassages(batch.map(({ index, chunk }) =>
+      [index.title, chunk.section, chunk.text].filter(Boolean).join("\n")
+    ), { signal });
+    batch.forEach(({ chunk }, j) => { chunk.embedding = vectors[j]; chunk.embeddingModel = model.fingerprint; });
+  }
+  return NL.embedQuery(query, { signal });
+}
+// fromLabel/toLabel of the pages actually present in `hits`, per source — used
+// to tell the model honestly which pages a truncated full-text body covers.
+function coverageFromHits(indexes, hits) {
+  const byKey = new Map();
+  for (const h of hits || []) {
+    const key = String(h.attachmentKey || "");
+    const span = byKey.get(key) || { min: Infinity, max: -Infinity };
+    span.min = Math.min(span.min, Number(h.pageIndex));
+    span.max = Math.max(span.max, Number(h.pageIndex));
+    byKey.set(key, span);
+  }
+  const coverage = {};
+  for (const index of indexes || []) {
+    const key = String(index.attachmentKey || "");
+    const span = byKey.get(key);
+    if (!span || !Number.isFinite(span.min)) continue;
+    coverage[key] = { fromLabel: NE.pageLabelForIndex(index, span.min), toLabel: NE.pageLabelForIndex(index, span.max) };
+  }
+  return coverage;
 }
 function parseRankedIds(value, allowed) {
   const text = String(value || "").replace(/```(?:json)?/gi, "").replace(/```/g, "");
@@ -776,22 +831,64 @@ async function prepareEvidence(query, signal) {
     n + (Number(index.estimatedTokens) || (index.chunks || []).reduce((sum, chunk) => sum + (Number(chunk.estimatedTokens) || NE.estimateTokens(chunk.text)), 0))
   , 0);
   const tokenBudget = Math.min(availableContextTokens(), ctx.fullTextThreshold);
+
+  // Reader position + the index it points at, so page-aware questions ("this
+  // page", "the last page", "page 213") resolve against the open document.
+  const cur = getCurrentItem();
+  let currentRef = null;
+  let targetIndex = (cur && cur.attachment) ? indexes.find((x) => x.attachmentKey === cur.attachment.key) : null;
+  if (!targetIndex && indexes.length === 1) targetIndex = indexes[0];
+  if (cur && cur.reader && cur.attachment && NV) {
+    try { currentRef = { attachmentKey: cur.attachment.key, pageIndex: NV.currentPageIndex(cur.reader) }; } catch (e) {}
+  }
+  const intents = NE.classifyPositionalQuery(query);
+  const positionalHits = (intents.positional && targetIndex)
+    ? NE.positionalPageHits(targetIndex, intents, { currentPageIndex: currentRef ? currentRef.pageIndex : null, maxHits: 20 })
+    : [];
+  // Users most often ask about the page they are reading. Always embed that
+  // page's neighborhood so such a question is answerable from the FIRST query,
+  // even when it is cross-lingual (BM25 can't bridge languages, so the reading
+  // page might otherwise miss the bounded candidate set until the background
+  // pass catches up).
+  let readingWindowHits = [];
+  if (currentRef && targetIndex) {
+    const idx = Number(currentRef.pageIndex);
+    readingWindowHits = (targetIndex.chunks || []).filter((c) => Math.abs(Number(c.pageIndex) - idx) <= 2);
+  }
+  const mapPrompt = (coverage) => NE.documentMapPrompt(
+    NE.buildDocumentMap(indexes, { current: currentRef, coverage: coverage || {} }),
+    { lang: state.lang }
+  );
+
   // A single open document that fits the context window is exactly the
   // "Reading Assistant" case: no retrieval/embeddings needed, just hand the
   // whole thing to the model — always, regardless of the configured strategy.
   const singleDocFits = indexes.length === 1 && totalTokens <= tokenBudget;
   const strategy = singleDocFits ? "full" : (ctx.strategy === "auto" ? (totalTokens <= tokenBudget && indexes.length <= 5 ? "full" : "retrieval") : ctx.strategy);
   if (strategy === "full") {
-    const full = NE.fullEvidencePrompt(indexes, { maxChars: tokenBudget * 5, maxTokens: tokenBudget });
-    state.evidence = NE.evidenceMap(full.hits);
-    state.retrieval = { method: "full", hits: full.hits, totalChars, totalTokens, truncated: full.truncated };
-    setIndexStatus("Complete text · " + full.hits.length + " citable passages", full.truncated ? "warn" : "ok");
-    return { ...full, method: "full" };
+    // Reserve part of the budget so the pages the user is most likely to ask
+    // about (current/first/last/explicit) are never the ones truncation drops.
+    const reserve = positionalHits.length ? Math.min(Math.round(tokenBudget * 0.35), 6000) : 0;
+    const full = NE.fullEvidencePrompt(indexes, { maxChars: (tokenBudget - reserve) * 5, maxTokens: tokenBudget - reserve });
+    const includedIds = new Set(full.hits.map((h) => h.id));
+    const extraPositional = positionalHits.filter((h) => !includedIds.has(h.id));
+    const hits = full.hits.concat(extraPositional);
+    state.evidence = NE.evidenceMap(hits);
+    const coverage = full.truncated ? coverageFromHits(indexes, full.hits) : {};
+    const bodyParts = [full.text];
+    if (extraPositional.length) {
+      bodyParts.push((state.lang === "es" ? "PÁGINAS SOLICITADAS (texto completo):\n" : "REQUESTED PAGES (full text):\n") + NE.evidencePrompt(extraPositional));
+    }
+    const text = [mapPrompt(coverage), bodyParts.join("\n\n")].filter(Boolean).join("\n\n");
+    state.retrieval = { method: "full", hits, totalChars, totalTokens, truncated: full.truncated };
+    setIndexStatus("Complete text · " + hits.length + " citable passages", full.truncated ? "warn" : "ok");
+    return { text, hits, method: "full", truncated: full.truncated };
   }
   let queryEmbedding = null;
   try {
-    await ensureEmbeddingsSerialized(indexes, signal);
-    queryEmbedding = await NL.embedQuery(query, { signal });
+    // Bounded, non-blocking: embed only this query's candidate chunks, not the
+    // whole book. The rest are embedded in the background (see end of function).
+    queryEmbedding = await embedCandidatesInline(indexes, query, positionalHits.concat(readingWindowHits), signal);
   } catch (e) {
     try { Zotero.logError(e); } catch (x) {}
     setIndexStatus("Semantic unavailable · lexical fallback", "warn");
@@ -832,10 +929,22 @@ async function prepareEvidence(query, signal) {
   result.method += (rounds ? "+agentic" + rounds : "") + "+rerank";
   result.rounds = rounds;
   result.totalTokens = totalTokens;
+  // A semantic search has no anchor for "the last page" or "page 213"; splice
+  // those exact-page passages in (deduped, at the front) so positional
+  // questions always answer from real content, not a nearby guess.
+  if (positionalHits.length) {
+    const existing = new Set(result.hits.map((h) => h.id));
+    const extra = positionalHits.filter((h) => !existing.has(h.id));
+    if (extra.length) result.hits = extra.concat(result.hits);
+  }
   state.evidence = NE.evidenceMap(result.hits);
   state.retrieval = result;
   setIndexStatus((result.method.startsWith("hybrid") ? "Local semantic + lexical" : "Lexical") + (rounds ? " + agentic " + rounds : "") + " + rerank · " + result.hits.length + " passages", "ok");
-  return { text: NE.evidencePrompt(result.hits), hits: result.hits, method: result.method, truncated: false };
+  // Non-blocking: finish embedding the whole document so later queries get full
+  // semantic recall and the vectors reach disk. Never awaited — the answer for
+  // THIS question is already built from the bounded candidate set above.
+  embedIndexesBackground(indexes);
+  return { text: [mapPrompt({}), NE.evidencePrompt(result.hits)].filter(Boolean).join("\n\n"), hits: result.hits, method: result.method, truncated: false };
 }
 async function runVisualExtraction(image, page) {
   const prompt = NV.visualPrompt(page.pageLabel, page.text);
@@ -1339,7 +1448,7 @@ async function sendStandalone(bodyEl, signal, docInfo) {
   // training language even for an English/Spanish question.
   const lastUser = [...state.conv.messages].reverse().find((m) => m.role === "user");
   const lang = NU && NU.detectLanguage ? NU.detectLanguage(lastUser && lastUser.content, state.lang) : (state.lang === "es" ? "Spanish" : "English");
-  let system = "You are a research assistant embedded in Zotero. Answer about the open documents, grounded only in the supplied evidence. Address every requested facet that the evidence covers, especially explicit named entities, lists and standards. Stay focused on the question: do not add tangential facts merely because they occur in neighboring passages. A claimed relation must be directly supported; never infer causation from co-location. Cite every factual claim inline with the exact [[e:ID]] token for its supporting passage. Never invent, alter or reuse an evidence id for a claim it does not support. Put citations immediately after the sentence. If evidence is insufficient, say so. Be concise.\n\nOUTPUT LANGUAGE (highest priority): answer entirely in " + lang + ". Do not switch language because the source or an attached image uses another language.\n\n" + parts.join("\n\n");
+  let system = "You are a research assistant embedded in Zotero. Answer about the open documents, grounded only in the supplied evidence. Address every requested facet that the evidence covers, especially explicit named entities, lists and standards. Stay focused on the question: do not add tangential facts merely because they occur in neighboring passages. A claimed relation must be directly supported; never infer causation from co-location. Cite every factual claim inline with the exact [[e:ID]] token for its supporting passage. Never invent, alter or reuse an evidence id for a claim it does not support. Put citations immediately after the sentence. If evidence is insufficient, say so. Be concise.\n\nDOCUMENT STRUCTURE: When a DOCUMENT MAP is present, it is the single source of truth for the document's page count, its length, the current page, and the first/last page. Answer any such question from the map alone. The EVIDENCE passages are a partial selection; NEVER infer the document's length or which page is last from the page numbers that appear in the evidence, and never say the document ends where the evidence happens to end.\n\nOUTPUT LANGUAGE (highest priority): answer entirely in " + lang + ". Do not switch language because the source or an attached image uses another language.\n\n" + parts.join("\n\n");
   if (state.agentEnabled && NA) system += "\n\n" + NA.SYSTEM;
   const key = NS.getKey(state.model.provider);
   const localBase = NS.getLocalBase(state.model.provider);
