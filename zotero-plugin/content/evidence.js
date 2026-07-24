@@ -923,6 +923,171 @@
     return { text: parts.join("\n"), hits: included, chars: used, tokens, truncated };
   }
 
+  // ─────────────────────────────────────── document-structure awareness
+  // A long PDF's answer quality collapses when the model has to guess the
+  // document's length or the reader's position. These helpers give the model
+  // authoritative structural facts (total pages, current page, first/last page
+  // labels) and let positional questions ("the last page", "page 213", "this
+  // page") fetch the exact page deterministically instead of relying on a
+  // semantic search that has no anchor for "the last page".
+
+  // Map a 0-based pageIndex to the human page label the reader shows.
+  function pageLabelForIndex(index, pageIndex) {
+    const pages = (index && index.pages) || [];
+    const want = Number(pageIndex);
+    for (const p of pages) if (Number(p.pageIndex) === want) {
+      const label = p.pageLabel == null ? "" : String(p.pageLabel);
+      return label || String(want + 1);
+    }
+    return String(want + 1);
+  }
+  // Resolve a page number the user typed (usually the printed label) to the
+  // matching 0-based pageIndex — matching labels first, then falling back to
+  // treating the number as a physical position.
+  function resolvePageIndex(index, requested) {
+    const n = Math.floor(Number(requested));
+    if (!Number.isFinite(n)) return -1;
+    const pages = (index && index.pages) || [];
+    for (const p of pages) if (Number(p.pageLabel) === n) return Number(p.pageIndex);
+    for (const p of pages) if (Number(p.pageIndex) + 1 === n) return Number(p.pageIndex);
+    return -1;
+  }
+  // opts.current = { attachmentKey, pageIndex }; opts.coverage[attachmentKey] =
+  // { fromLabel, toLabel } marks the page span actually present in the evidence
+  // text (used to warn honestly about truncation in full-text mode).
+  function buildDocumentMap(indexes, opts) {
+    opts = opts || {};
+    const current = opts.current || null;
+    const coverage = opts.coverage || {};
+    const sources = [];
+    for (const index of indexes || []) {
+      const pages = Array.isArray(index.pages) ? index.pages : [];
+      const total = Number(index.totalPages) || pages.length || 0;
+      const firstLabel = pages.length ? pageLabelForIndex(index, pages[0].pageIndex) : "1";
+      const lastLabel = pages.length ? pageLabelForIndex(index, pages[pages.length - 1].pageIndex) : String(total);
+      const src = {
+        attachmentKey: String(index.attachmentKey || ""),
+        title: String(index.title || index.itemKey || index.attachmentKey || "document"),
+        totalPages: total,
+        firstLabel,
+        lastLabel,
+        // Labels differ from physical numbering (roman front-matter, offset
+        // print pages, etc.) — worth telling the model so it quotes the label.
+        labelsDiffer: firstLabel !== "1" || (total > 0 && lastLabel !== String(total)),
+      };
+      if (current && String(current.attachmentKey || "") === src.attachmentKey && current.pageIndex != null && Number(current.pageIndex) >= 0) {
+        src.currentPageIndex = Number(current.pageIndex);
+        src.currentLabel = pageLabelForIndex(index, Number(current.pageIndex));
+      }
+      if (coverage[src.attachmentKey]) src.coverage = coverage[src.attachmentKey];
+      sources.push(src);
+    }
+    return { sources };
+  }
+  function documentMapPrompt(map, opts) {
+    opts = opts || {};
+    const es = opts.lang === "es";
+    const sources = (map && map.sources) || [];
+    if (!sources.length) return "";
+    const lines = [];
+    lines.push(es
+      ? "MAPA DEL DOCUMENTO — datos estructurales AUTORITATIVOS. Úsalo como ÚNICA fuente para responder cualquier pregunta sobre el número de páginas, la extensión, la página actual o «la última/primera página». NUNCA deduzcas esos datos de los pasajes de EVIDENCIA de más abajo: son una selección parcial y sus números de página NO indican la longitud del documento. El mapa NO es una fuente citable: no lo cites nunca ni inventes un token [[e:...]] a partir de él."
+      : "DOCUMENT MAP — AUTHORITATIVE structural facts. Use this as the ONLY source for any question about the page count, length, the current page, or \"the last/first page\". NEVER infer those from the EVIDENCE passages below: they are a partial selection and their page numbers do NOT indicate the document's length. The map is NOT a citable source: never cite it and never fabricate an [[e:...]] token from it.");
+    for (const s of sources) {
+      const bits = ["\"" + s.title + "\"", es ? s.totalPages + " páginas" : s.totalPages + " pages"];
+      if (s.labelsDiffer) bits.push(es ? "etiquetas de página «" + s.firstLabel + "»–«" + s.lastLabel + "»" : "page labels \"" + s.firstLabel + "\"–\"" + s.lastLabel + "\"");
+      let line = "• " + bits.join(" · ") + ".";
+      if (s.currentLabel != null) line += es ? " El lector está abierto ahora en la página " + s.currentLabel + "." : " The reader is currently open at page " + s.currentLabel + ".";
+      if (s.coverage) line += es
+        ? " NOTA: los pasajes de abajo de este documento solo cubren las páginas " + s.coverage.fromLabel + "–" + s.coverage.toLabel + "; el contenido posterior NO está incluido en este mensaje. Para leer una página concreta, pregunta por su número."
+        : " NOTE: the passages below from this document cover only pages " + s.coverage.fromLabel + "–" + s.coverage.toLabel + "; later content is NOT included in this message. To read a specific page, ask for its number.";
+      lines.push(line);
+    }
+    return lines.join("\n");
+  }
+  // Detect questions that address a document POSITION rather than content, so
+  // the exact page(s) can be fetched deterministically.
+  function classifyPositionalQuery(query) {
+    const q = " " + String(query || "").toLowerCase().replace(/\s+/g, " ") + " ";
+    const out = { positional: false, current: false, first: false, last: false, length: false, pages: [], ranges: [] };
+    const mark = (flag) => { out[flag] = true; out.positional = true; };
+    if (/(p[áa]gina actual|esta p[áa]gina|en esta p[áa]gina|la p[áa]gina en la que estoy|en qu[ée] p[áa]gina estoy|d[óo]nde estoy|current page|this page|the page i(?:'m| am) on|what page am i)/.test(q)) mark("current");
+    if (/([úu]ltima p[áa]gina|p[áa]gina final|[úu]ltima hoja|el final del (?:libro|documento|texto|pdf)|al final del (?:libro|documento|texto)|last page|final page|the end of the (?:book|document|text|pdf))/.test(q)) mark("last");
+    if (/(primera p[áa]gina|p[áa]gina inicial|el (?:principio|comienzo|inicio) del (?:libro|documento|texto|pdf)|portada|first page|the (?:start|beginning) of the (?:book|document|text|pdf)|cover page)/.test(q)) mark("first");
+    if (/(cu[áa]nt[ao]s p[áa]ginas|n[úu]mero de p[áa]ginas|de cu[áa]ntas p[áa]ginas|how many pages|how long is|page count|number of pages|qu[ée] extensi[óo]n)/.test(q)) { out.length = true; out.positional = true; }
+    const rangeRe = /(?:pp?\.?|p[áa]ginas?|pages?)\s*(\d{1,4})\s*(?:[-–—]|a|to|hasta|y|and)\s*(\d{1,4})/g;
+    let m;
+    while ((m = rangeRe.exec(q)) !== null) { out.ranges.push({ from: Number(m[1]), to: Number(m[2]) }); out.positional = true; }
+    const pageRe = /(?:p[áa]gina|page)\s*(?:n[uú]mero\s*|no\.?\s*|#\s*)?(\d{1,4})|\bp\.?\s*(\d{1,4})\b|\bpp\.?\s*(\d{1,4})\b/g;
+    while ((m = pageRe.exec(q)) !== null) { out.pages.push(Number(m[1] || m[2] || m[3])); out.positional = true; }
+    return out;
+  }
+  // Deterministically return the chunks that belong to the requested pages of a
+  // single index (the one open in the reader). Whole pages are returned so the
+  // model sees the entire page, not a similarity-ranked fragment of it.
+  function positionalPageHits(index, intents, opts) {
+    opts = opts || {};
+    if (!index || !intents || !intents.positional) return [];
+    const pages = Array.isArray(index.pages) ? index.pages : [];
+    const total = Number(index.totalPages) || pages.length || 0;
+    if (!total) return [];
+    const wantIdx = new Set(); // 0-based pageIndexes
+    const addIdx = (i) => { if (Number.isFinite(i) && i >= 0 && i < total) wantIdx.add(i); };
+    if (intents.first) addIdx(0);
+    if (intents.last) { addIdx(total - 1); if (total > 1) addIdx(total - 2); }
+    if (intents.current && Number.isFinite(Number(opts.currentPageIndex))) addIdx(Number(opts.currentPageIndex));
+    for (const n of intents.pages || []) addIdx(resolvePageIndex(index, n));
+    for (const r of intents.ranges || []) {
+      const from = resolvePageIndex(index, r.from);
+      const to = resolvePageIndex(index, r.to);
+      if (from < 0) continue;
+      const end = to < 0 ? from : to;
+      for (let i = from; i <= Math.min(end, from + 8); i++) addIdx(i);
+    }
+    if (!wantIdx.size) return [];
+    const maxHits = Number(opts.maxHits) || 20;
+    const out = [];
+    for (const chunk of index.chunks || []) {
+      if (!wantIdx.has(Number(chunk.pageIndex))) continue;
+      out.push({ ...chunk, score: 1, retrieval: "position", indexSignature: index.signature });
+      if (out.length >= maxHits) break;
+    }
+    out.sort((a, b) => a.pageIndex - b.pageIndex || a.chunkIndex - b.chunkIndex);
+    return out;
+  }
+  // Bound how many chunks a single query must embed on a large document: rank by
+  // BM25 (needs no embeddings) and keep the top ids, plus each source's opening
+  // chunks so a purely conceptual question still has anchor points. Everything
+  // else is embedded lazily in the background for later queries.
+  function candidateChunkIdsForQuery(indexes, query, opts) {
+    opts = opts || {};
+    const limit = Number(opts.limit) > 0 ? Number(opts.limit) : 96;
+    const starters = Number.isFinite(opts.startersPerSource) ? opts.startersPerSource : 6;
+    const chunks = flattenIndexes(indexes);
+    if (!chunks.length) return [];
+    const scores = bm25Scores(chunks, query);
+    const ranked = chunks
+      .map((c, i) => ({ id: c.id, score: scores[i] }))
+      .sort((a, b) => b.score - a.score);
+    const ids = new Set();
+    for (const r of ranked) {
+      if (ids.size >= limit) break;
+      if (r.score > 0) ids.add(r.id);
+    }
+    const bySource = new Map();
+    for (const c of chunks) {
+      const key = c.libraryID + ":" + c.attachmentKey;
+      if (!bySource.has(key)) bySource.set(key, []);
+      bySource.get(key).push(c);
+    }
+    const hardCap = limit + starters * Math.max(1, bySource.size);
+    for (const arr of bySource.values()) {
+      arr.sort((a, b) => Number(a.pageIndex) - Number(b.pageIndex) || Number(a.chunkIndex) - Number(b.chunkIndex));
+      for (const c of arr.slice(0, starters)) { if (ids.size >= hardCap) break; ids.add(c.id); }
+    }
+    return [...ids];
+  }
+
   const CITE_RE = /\[\[(e|p|idea|zotero|gap):([^\]|]+?)(?:\|([^\]]+?))?\]\]/g;
   function allowSet(value) {
     if (value == null) return null;
@@ -1141,6 +1306,8 @@
     splitLogicalPages, chunkPage, buildIndex, addVisualText,
     bm25Scores, cosine, hybridSearch, expandWithNeighbors, diversifyCandidates, flattenIndexes,
     mergeRetrievalResults, pageRequestHits,
+    pageLabelForIndex, resolvePageIndex, buildDocumentMap, documentMapPrompt,
+    classifyPositionalQuery, positionalPageHits, candidateChunkIdsForQuery,
     evidenceMap, evidencePrompt, fullTextPrompt, fullEvidencePrompt,
     validateCitations, citationIds, splitClaims, auditTokens, supportScore, auditClaims,
     attachmentSignature, extractAttachment, ensureIndex,

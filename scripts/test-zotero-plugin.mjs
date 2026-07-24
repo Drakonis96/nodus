@@ -465,6 +465,94 @@ test('evidence: complete-text mode obeys a token budget', () => {
   assert.ok(bounded.hits.length < idx.chunks.length);
 });
 
+// A several-hundred-page monograph: one sentence per page, form-feed
+// separated, so a known token appears on exactly one known page.
+function makeBook(E, pages, opts = {}) {
+  const text = Array.from({ length: pages }, (_, i) => `This is page ${i + 1}. It discusses topic marker ${i + 1} in detail with enough words to chunk.`).join('\f');
+  return E.buildIndex({ libraryID: 1, itemKey: 'BOOK', attachmentKey: 'BK', title: opts.title || 'Big Monograph', totalPages: pages, pageLabels: opts.pageLabels }, text, { targetChars: 400, minChars: 120, overlapChars: 40 });
+}
+
+test('evidence: document map reports true length + current/first/last, never guessed from evidence', () => {
+  const { NodusEvidence: E } = loadModule('evidence.js');
+  const book = makeBook(E, 600);
+  const map = E.buildDocumentMap([book], { current: { attachmentKey: 'BK', pageIndex: 43 } });
+  const src = map.sources[0];
+  assert.equal(src.totalPages, 600);
+  assert.equal(src.firstLabel, '1');
+  assert.equal(src.lastLabel, '600');
+  assert.equal(src.currentLabel, '44'); // pageIndex 43 → human page 44
+  const en = E.documentMapPrompt(map, { lang: 'en' });
+  assert.ok(/600 pages/.test(en));
+  assert.ok(/currently open at page 44/.test(en));
+  assert.ok(/AUTHORITATIVE/.test(en) && /NEVER infer/.test(en));
+  assert.ok(/NOT a citable source/i.test(en), 'map declares itself non-citable');
+  const es = E.documentMapPrompt(map, { lang: 'es' });
+  assert.ok(/600 páginas/.test(es) && /página 44/.test(es) && /NUNCA/.test(es));
+});
+
+test('evidence: document map surfaces roman-numeral front matter as differing labels', () => {
+  const { NodusEvidence: E } = loadModule('evidence.js');
+  const labels = ['i', 'ii', 'iii', '1', '2'];
+  const book = makeBook(E, 5, { pageLabels: labels });
+  const map = E.buildDocumentMap([book], { current: { attachmentKey: 'BK', pageIndex: 0 } });
+  const src = map.sources[0];
+  assert.equal(src.firstLabel, 'i');
+  assert.equal(src.currentLabel, 'i');
+  assert.equal(src.labelsDiffer, true);
+  assert.ok(/page labels "i"/.test(E.documentMapPrompt(map, { lang: 'en' })));
+});
+
+test('evidence: positional query classifier detects current/last/first/explicit pages in ES + EN', () => {
+  const { NodusEvidence: E } = loadModule('evidence.js');
+  assert.equal(E.classifyPositionalQuery('¿en qué página estoy?').current, true);
+  assert.equal(E.classifyPositionalQuery('what page am I on right now').current, true);
+  assert.equal(E.classifyPositionalQuery('¿qué dice la última página?').last, true);
+  assert.equal(E.classifyPositionalQuery('summarize the last page').last, true);
+  assert.equal(E.classifyPositionalQuery('resume la primera página').first, true);
+  assert.equal(E.classifyPositionalQuery('¿cuántas páginas tiene el libro?').length, true);
+  assert.deepEqual([...E.classifyPositionalQuery('explica la página 213').pages], [213]);
+  assert.deepEqual(Array.from(E.classifyPositionalQuery('compara las páginas 10 a 12').ranges, (r) => ({ from: r.from, to: r.to })), [{ from: 10, to: 12 }]);
+  // A content question must NOT be treated as positional.
+  const plain = E.classifyPositionalQuery('what is the main argument about tourism?');
+  assert.equal(plain.positional, false);
+});
+
+test('evidence: positional page hits fetch the exact page content deterministically', () => {
+  const { NodusEvidence: E } = loadModule('evidence.js');
+  const book = makeBook(E, 600);
+  const last = E.positionalPageHits(book, E.classifyPositionalQuery('¿qué dice la última página?'), {});
+  assert.ok(last.length > 0);
+  assert.ok(last.every((h) => h.pageIndex >= 598)); // last page (599) + its neighbor
+  assert.ok(last.some((h) => h.text.includes('page 600')));
+  const explicit = E.positionalPageHits(book, E.classifyPositionalQuery('resume la página 213'), {});
+  assert.ok(explicit.length > 0 && explicit.every((h) => h.pageIndex === 212));
+  assert.ok(explicit.some((h) => h.text.includes('page 213')));
+  const current = E.positionalPageHits(book, E.classifyPositionalQuery('what is on this page'), { currentPageIndex: 43 });
+  assert.ok(current.length > 0 && current.every((h) => h.pageIndex === 43));
+  assert.ok(current.some((h) => h.text.includes('page 44')));
+});
+
+test('evidence: explicit page number matches the printed LABEL, not just the physical index', () => {
+  const { NodusEvidence: E } = loadModule('evidence.js');
+  // Physical page 4 (index 3) is printed "1"; a reader asking for "page 1" means the label.
+  const book = makeBook(E, 5, { pageLabels: ['i', 'ii', 'iii', '1', '2'] });
+  const hits = E.positionalPageHits(book, E.classifyPositionalQuery('página 1'), {});
+  assert.ok(hits.length > 0 && hits.every((h) => h.pageIndex === 3));
+});
+
+test('evidence: candidate selection bounds embedding cost far below the whole book', () => {
+  const { NodusEvidence: E } = loadModule('evidence.js');
+  const book = makeBook(E, 600);
+  assert.ok(book.chunks.length >= 400, 'a 600-page book chunks into hundreds of passages');
+  const ids = E.candidateChunkIdsForQuery([book], 'topic marker 317', { limit: 96 });
+  // Bounded: never the whole book, and small relative to it.
+  assert.ok(ids.length <= 96 + 6 + 8, `candidates ${ids.length} stay bounded`);
+  assert.ok(ids.length < book.chunks.length / 3, 'far fewer than the whole document');
+  // The lexically-relevant page for the query is among the candidates.
+  const target = book.chunks.find((c) => c.text.includes('marker 317'));
+  assert.ok(ids.includes(target.id), 'the on-topic chunk is selected for embedding');
+});
+
 test('evidence: visual extraction is merged into the correct page and re-chunked', () => {
   const { NodusEvidence: E } = loadModule('evidence.js');
   const idx = E.buildIndex({ libraryID: 1, itemKey: 'A', attachmentKey: 'AA', title: 'Alpha', totalPages: 2 }, 'Text page\f');
