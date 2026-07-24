@@ -173,7 +173,60 @@ const RELEASE_2_6_2_HIGHLIGHTS: RawReleaseHighlight[] = [
   },
 ];
 
+const RELEASE_2_6_3_HIGHLIGHTS: RawReleaseHighlight[] = [
+  {
+    scope: 'plugin',
+    es: 'El complemento Nodus para Zotero se mantiene actualizado por sí solo: se registra en el actualizador de complementos del propio Zotero e instala cada nueva versión automáticamente desde la última publicación de GitHub, verificada por Zotero y aplicada al reiniciar. Viene activado y puedes desactivarlo en Ajustes, que primero te pide confirmación.',
+    en: 'The Nodus for Zotero add-on now keeps itself up to date: it registers with Zotero’s own add-on updater and installs each new release automatically from the latest GitHub Release, verified by Zotero and applied on restart. It is on by default and can be turned off in Settings, which asks for confirmation first.',
+    fr: 'L’extension Nodus pour Zotero se maintient à jour toute seule : elle s’enregistre auprès du gestionnaire de mises à jour de Zotero et installe chaque nouvelle version automatiquement depuis la dernière publication GitHub, vérifiée par Zotero et appliquée au redémarrage. Activée par défaut, elle peut être désactivée dans les Paramètres, qui demandent d’abord confirmation.',
+    de: 'Das Add-on Nodus für Zotero hält sich jetzt selbst aktuell: Es registriert sich beim Add-on-Updater von Zotero und installiert jede neue Version automatisch aus dem neuesten GitHub-Release, von Zotero geprüft und beim Neustart angewendet. Standardmäßig aktiviert, lässt es sich in den Einstellungen abschalten, die zuvor um Bestätigung bitten.',
+    pt: 'O complemento Nodus para o Zotero mantém-se atualizado sozinho: regista-se no atualizador de complementos do próprio Zotero e instala cada nova versão automaticamente a partir da última publicação do GitHub, verificada pelo Zotero e aplicada ao reiniciar. Vem ativado e pode ser desativado nas Definições, que pedem confirmação primeiro.',
+    'pt-BR': 'O complemento Nodus para o Zotero se mantém atualizado sozinho: ele se registra no atualizador de complementos do próprio Zotero e instala cada nova versão automaticamente a partir da última publicação do GitHub, verificada pelo Zotero e aplicada ao reiniciar. Vem ativado e pode ser desativado nas Configurações, que pedem confirmação primeiro.',
+  },
+  {
+    scope: 'plugin',
+    es: 'El asistente de Nodus para Zotero responde con precisión sobre PDF largos: un mapa del documento le aporta datos reales de páginas —total, página actual, primera y última— para no inventarlos, y las preguntas por «página actual», «última página» o «página N» recuperan esas páginas exactas. Además, la primera respuesta ya no espera a indexar todo el documento: se calculan solo los embeddings imprescindibles y el resto continúa en segundo plano.',
+    en: 'The Nodus for Zotero assistant answers accurately about long PDFs: a document map gives it real page facts —total, current, first and last— so it no longer guesses them, and questions about the “current page”, “last page” or “page N” fetch those exact pages. The first answer also no longer waits for the whole document to be indexed: only the essential embeddings are computed and the rest continues in the background.',
+    fr: 'L’assistant Nodus pour Zotero répond avec précision sur les PDF longs : une carte du document lui fournit des données de pages réelles —total, page actuelle, première et dernière— pour ne pas les inventer, et les questions sur la « page actuelle », la « dernière page » ou la « page N » récupèrent ces pages exactes. La première réponse n’attend plus l’indexation de tout le document : seuls les embeddings indispensables sont calculés et le reste se poursuit en arrière-plan.',
+    de: 'Der Nodus-Assistent für Zotero beantwortet Fragen zu langen PDFs präzise: Eine Dokumentkarte liefert ihm echte Seitendaten – Gesamtzahl, aktuelle, erste und letzte Seite –, sodass er sie nicht mehr errät, und Fragen nach „aktueller Seite“, „letzter Seite“ oder „Seite N“ rufen genau diese Seiten ab. Die erste Antwort wartet außerdem nicht mehr auf die Indexierung des gesamten Dokuments: Nur die nötigen Embeddings werden berechnet, der Rest läuft im Hintergrund weiter.',
+    pt: 'O assistente do Nodus para o Zotero responde com precisão sobre PDF longos: um mapa do documento dá-lhe dados reais de páginas —total, página atual, primeira e última— para não os inventar, e as perguntas por «página atual», «última página» ou «página N» recuperam essas páginas exatas. A primeira resposta já não espera pela indexação de todo o documento: calculam-se apenas os embeddings indispensáveis e o resto continua em segundo plano.',
+    'pt-BR': 'O assistente do Nodus para o Zotero responde com precisão sobre PDFs longos: um mapa do documento dá a ele dados reais de páginas —total, página atual, primeira e última— para não inventá-los, e as perguntas por “página atual”, “última página” ou “página N” recuperam essas páginas exatas. A primeira resposta também não espera mais pela indexação de todo o documento: apenas os embeddings essenciais são calculados e o restante continua em segundo plano.',
+  },
+  {
+    scope: 'mcp',
+    es: 'Nodus Server mantiene publicadas en segundo plano todas las bóvedas conectadas, no solo la que tengas abierta: al cambiar de bóveda las demás siguen sincronizándose y sirviéndose, sin quedarse obsoletas. Ajustes muestra ahora todas tus conexiones con su estado y puedes sincronizar o desconectar cada una por separado.',
+    en: 'Nodus Server now keeps every connected vault published in the background, not just the one you have open: switching vaults no longer leaves the others stale, since they keep syncing and serving. Settings now lists all your connections with their status, and you can sync or disconnect each one individually.',
+    fr: 'Nodus Server garde désormais publiés en arrière-plan tous les espaces connectés, pas seulement celui qui est ouvert : changer d’espace ne laisse plus les autres obsolètes, car ils continuent à se synchroniser et à être servis. Les Paramètres affichent maintenant toutes vos connexions avec leur statut, et vous pouvez synchroniser ou déconnecter chacune séparément.',
+    de: 'Nodus Server hält jetzt alle verbundenen Arbeitsbereiche im Hintergrund veröffentlicht, nicht nur den geöffneten: Ein Wechsel des Arbeitsbereichs lässt die anderen nicht mehr veralten, da sie weiter synchronisiert und bereitgestellt werden. Die Einstellungen listen nun alle Verbindungen mit ihrem Status auf, und du kannst jede einzeln synchronisieren oder trennen.',
+    pt: 'O Nodus Server mantém publicados em segundo plano todos os espaços ligados, não apenas o que tem aberto: ao mudar de espaço os restantes continuam a sincronizar e a ser servidos, sem ficarem desatualizados. As Definições mostram agora todas as suas ligações com o respetivo estado e pode sincronizar ou desligar cada uma separadamente.',
+    'pt-BR': 'O Nodus Server agora mantém publicados em segundo plano todos os espaços conectados, não só o que você tem aberto: ao trocar de espaço os demais continuam sincronizando e sendo servidos, sem ficarem desatualizados. As Configurações agora mostram todas as suas conexões com o respectivo status, e você pode sincronizar ou desconectar cada uma separadamente.',
+  },
+  {
+    scope: 'general',
+    es: 'La generación de audio es más fiable: la narración continúa aunque salgas de la vista y recupera su progreso al volver, el resumen de un informe de Deep Research ya no se lee dos veces y los fragmentos largos dejan de cortarse a mitad de palabra. La transcripción con Whisper local también termina en segundo plano en lugar de cancelarse al cambiar de pantalla.',
+    en: 'Audio generation is more reliable: narration keeps going even if you leave the view and restores its progress when you return, a Deep Research report summary is no longer read twice, and long segments no longer cut off mid-word. Local Whisper transcription now also finishes in the background instead of being cancelled when you switch screens.',
+    fr: 'La génération audio est plus fiable : la narration se poursuit même si vous quittez la vue et retrouve sa progression au retour, le résumé d’un rapport Deep Research n’est plus lu deux fois et les longs segments ne se coupent plus au milieu d’un mot. La transcription avec Whisper local se termine désormais en arrière-plan au lieu d’être annulée lorsque vous changez d’écran.',
+    de: 'Die Audioerzeugung ist zuverlässiger: Die Erzählung läuft weiter, auch wenn du die Ansicht verlässt, und stellt beim Zurückkehren ihren Fortschritt wieder her; die Zusammenfassung eines Deep-Research-Berichts wird nicht mehr doppelt vorgelesen und lange Abschnitte brechen nicht mehr mitten im Wort ab. Auch die lokale Whisper-Transkription wird jetzt im Hintergrund fertiggestellt, statt beim Bildschirmwechsel abgebrochen zu werden.',
+    pt: 'A geração de áudio é mais fiável: a narração continua mesmo que saia da vista e recupera o seu progresso ao voltar, o resumo de um relatório de Deep Research já não é lido duas vezes e os fragmentos longos deixam de ser cortados a meio de uma palavra. A transcrição com Whisper local também termina em segundo plano em vez de ser cancelada ao mudar de ecrã.',
+    'pt-BR': 'A geração de áudio é mais confiável: a narração continua mesmo que você saia da tela e recupera seu progresso ao voltar, o resumo de um relatório de Deep Research não é mais lido duas vezes e os trechos longos deixam de ser cortados no meio de uma palavra. A transcrição com Whisper local também termina em segundo plano em vez de ser cancelada ao trocar de tela.',
+  },
+  {
+    scope: 'general',
+    es: 'Los informes PDF de Deep Research estrenan un diseño más cuidado: portada limpia con la marca de Nodus, resumen ejecutivo centrado, numeración automática de secciones y una matriz de trazabilidad compacta en forma de tabla.',
+    en: 'Deep Research PDF reports get a more polished design: a clean cover page with the Nodus brand mark, a centred executive summary, automatic section numbering and a compact, table-based traceability matrix.',
+    fr: 'Les rapports PDF de Deep Research adoptent un design plus soigné : page de couverture épurée avec la marque Nodus, résumé exécutif centré, numérotation automatique des sections et une matrice de traçabilité compacte sous forme de tableau.',
+    de: 'Die PDF-Berichte von Deep Research erhalten ein feineres Design: eine aufgeräumte Titelseite mit der Nodus-Bildmarke, eine zentrierte Zusammenfassung, automatische Abschnittsnummerierung und eine kompakte, tabellenbasierte Nachverfolgbarkeitsmatrix.',
+    pt: 'Os relatórios PDF do Deep Research estreiam um design mais cuidado: capa limpa com a marca do Nodus, resumo executivo centrado, numeração automática de secções e uma matriz de rastreabilidade compacta em forma de tabela.',
+    'pt-BR': 'Os relatórios PDF do Deep Research estreiam um design mais caprichado: capa limpa com a marca do Nodus, resumo executivo centralizado, numeração automática de seções e uma matriz de rastreabilidade compacta em forma de tabela.',
+  },
+];
+
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
+  {
+    version: '2.6.3',
+    date: '2026-07-24',
+    highlights: RELEASE_2_6_3_HIGHLIGHTS,
+  },
   {
     version: '2.6.2',
     date: '2026-07-23',

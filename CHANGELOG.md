@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2.6.3 — 2026-07-24
 
 ### Added
 
@@ -10,6 +10,38 @@
   sha256-verified by Zotero, applied on the next restart). This is on by default
   and can be turned off under Settings → Updates; turning it off asks for
   confirmation first. Plugin bumped to 2.7.0.
+
+### Changed
+
+- **Nodus Server publishes every connected vault.** A server pairing is stored
+  per vault, but the desktop only published the active one, so a shared vault
+  silently went stale after switching away. Every connected vault is now tracked
+  and published in the background regardless of which is open, Settings lists all
+  connections with their status, and each can be synced or disconnected
+  individually.
+- **Refined Deep Research PDF report design.** The exported report now uses the
+  stylized Nodus brand mark in the header, a clean title-page cover, a centered
+  executive summary, automatic section numbering (01–04) and a compact
+  table-based traceability matrix; the standalone research outline section was
+  removed.
+
+### Fixed
+
+- **Page-aware answers for long Zotero PDFs.** A document map now injects
+  authoritative structural facts (total pages, current reader page, first/last
+  labels and honest truncation coverage) ahead of the evidence, so page and
+  length questions are answered from the map instead of guessed. Positional
+  retrieval fetches "current/last/first page" and "page N" deterministically,
+  embedding is bounded and non-blocking (only BM25 candidates plus the current
+  page embed up front, the rest continues in the background), and full-text mode
+  marks truncation honestly while always including the requested pages.
+- **Audio narration lifecycle and local Whisper cancellation.** Audio synthesis
+  now lives in the global background-jobs store, so generation survives leaving
+  the view and the panel restores its progress on return. A Deep Research report
+  no longer narrates its abstract twice, Kokoro input is chunked on sentence
+  boundaries so long segments are no longer truncated mid-word, and the local
+  Whisper worker is no longer terminated on view unmount so an in-flight
+  transcription finishes and persists in the background.
 
 ## 2.6.2 — 2026-07-23
 
