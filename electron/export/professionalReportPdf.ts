@@ -1,4 +1,4 @@
-import { PDFDocument, StandardFonts, rgb, type PDFPage } from 'pdf-lib';
+import { PDFDocument, StandardFonts, LineCapStyle, rgb, type PDFPage } from 'pdf-lib';
 import { escapeHtml, markdownToHtml } from '@shared/toolkitMarkdown';
 import { htmlToPdfBytes } from './htmlToPdf';
 
@@ -301,6 +301,15 @@ export function renderProfessionalReportHtml(input: ProfessionalReportInput): st
     .section-heading h2 { margin: 0; color: var(--accent-dark); font: 700 20pt/1.15 Arial, sans-serif; letter-spacing: -.02em; }
     .section-lead { max-width: 145mm; margin-top: 2mm; color: var(--muted); font-size: 9.5pt; line-height: 1.48; }
     .section-body { margin-left: 17mm; }
+    .report-section.exec-summary .section-heading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 2.5mm;
+    }
+    .report-section.exec-summary .section-body { margin-left: 0; }
+    .report-section.exec-summary .abstract-box { max-width: 150mm; margin: 0 auto; }
     .prose { color: #262d3d; }
     .prose p { text-align: justify; text-indent: 1.35em; hyphens: auto; orphans: 3; widows: 3; }
     .prose h1, .prose h2, .prose h3, .prose h4 {
@@ -370,6 +379,31 @@ export function renderProfessionalReportHtml(input: ProfessionalReportInput): st
     .evidence-card dl { display: grid; grid-template-columns: 21mm 1fr; gap: 1mm 3mm; margin: 0; font-size: 8.3pt; }
     .evidence-card dt { color: var(--muted); font: 700 6.8pt/1.35 Arial, sans-serif; letter-spacing: .06em; text-transform: uppercase; }
     .evidence-card dd { margin: 0; }
+    .evidence-table { width: 100%; margin: 0; border-collapse: collapse; table-layout: fixed; font: 8pt/1.42 Arial, sans-serif; }
+    .evidence-table th {
+      padding: 2.2mm 2.4mm;
+      border-bottom: .35mm solid color-mix(in srgb, var(--accent) 30%, #d9deea);
+      background: var(--accent-soft);
+      color: var(--accent-dark);
+      text-align: left;
+      font: 700 6.6pt/1.25 Arial, sans-serif;
+      letter-spacing: .07em;
+      text-transform: uppercase;
+    }
+    .evidence-table td { padding: 2.3mm 2.4mm; border-bottom: .25mm solid var(--line); vertical-align: top; overflow-wrap: anywhere; }
+    .evidence-table tr { break-inside: avoid; }
+    .evidence-table .claim { color: var(--ink); font-weight: 700; }
+    .evidence-table .role-tag {
+      display: inline-block;
+      padding: .5mm 1.7mm;
+      border-radius: 99px;
+      background: var(--accent-soft);
+      color: var(--accent-dark);
+      font: 700 5.7pt/1.3 Arial, sans-serif;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      overflow-wrap: break-word;
+    }
     .term-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3mm; }
     .term-card { padding: 3.5mm; border: .25mm solid var(--line); border-radius: 2mm; break-inside: avoid; }
     .term-card h3 { margin: 0 0 1mm; color: var(--accent-dark); font: 700 9.5pt/1.3 Arial, sans-serif; }
@@ -444,17 +478,22 @@ function fitText(value: string, font: Awaited<ReturnType<PDFDocument['embedFont'
   return `${clipped.trim()}...`;
 }
 
+// The Nodus brand mark: the same stylized "N" as the app icon — bold strokes
+// with round caps and prominent nodes at each vertex, drawn taller than wide
+// (28×32 in the source SVG) so it reads as the logo rather than a bare letter.
 function drawNodusMark(page: PDFPage, centerX: number, y: number, accent: ReturnType<typeof rgb>): void {
-  const left = centerX - 6.7;
-  const right = centerX + 6.7;
-  const bottom = y - 4.8;
-  const top = y + 4.8;
-  const line = { thickness: 1.55, color: accent, opacity: 0.95 };
-  page.drawLine({ start: { x: left, y: bottom }, end: { x: left, y: top }, ...line });
-  page.drawLine({ start: { x: left, y: top }, end: { x: right, y: bottom }, ...line });
-  page.drawLine({ start: { x: right, y: bottom }, end: { x: right, y: top }, ...line });
+  const halfW = 4.9;
+  const halfH = 5.8;
+  const left = centerX - halfW;
+  const right = centerX + halfW;
+  const bottom = y - halfH;
+  const top = y + halfH;
+  const stroke = { thickness: 2.4, color: accent, lineCap: LineCapStyle.Round };
+  page.drawLine({ start: { x: left, y: bottom }, end: { x: left, y: top }, ...stroke });
+  page.drawLine({ start: { x: left, y: top }, end: { x: right, y: bottom }, ...stroke });
+  page.drawLine({ start: { x: right, y: bottom }, end: { x: right, y: top }, ...stroke });
   for (const [x, cy] of [[left, bottom], [left, top], [right, bottom], [right, top]] as const) {
-    page.drawCircle({ x, y: cy, size: 1.7, color: accent });
+    page.drawCircle({ x, y: cy, size: 2.5, color: accent });
   }
 }
 
@@ -479,6 +518,8 @@ async function stampProfessionalPdf(bytes: Buffer, input: ProfessionalReportInpu
     const margin = 56.7;
     const centerX = width / 2;
     const headerY = height - 25;
+    // The cover is a clean title page: no header/footer rules framing the image.
+    if (index === 0) return;
     page.drawLine({ start: { x: margin, y: height - 39 }, end: { x: centerX - 16, y: height - 39 }, thickness: 0.45, color: line });
     page.drawLine({ start: { x: centerX + 16, y: height - 39 }, end: { x: width - margin, y: height - 39 }, thickness: 0.45, color: line });
     drawNodusMark(page, centerX, headerY, accent);

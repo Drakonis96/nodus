@@ -41,6 +41,8 @@ interface DeepReportLabels {
   imageAi: string;
   imageCustom: string;
   claims: string;
+  role: string;
+  claim: string;
   source: string;
   evidence: string;
   notes: string;
@@ -68,6 +70,8 @@ const DEEP_LABELS: Record<PromptLanguage, DeepReportLabels> = {
     imageAi: 'Imagen de portada generada por IA en Nodus.',
     imageCustom: 'Imagen de portada aportada por el usuario.',
     claims: 'Afirmaciones clave',
+    role: 'Rol',
+    claim: 'Afirmación',
     source: 'Fuente',
     evidence: 'Evidencia',
     notes: 'Notas',
@@ -93,6 +97,8 @@ const DEEP_LABELS: Record<PromptLanguage, DeepReportLabels> = {
     imageAi: 'Cover image generated with AI in Nodus.',
     imageCustom: 'Cover image provided by the user.',
     claims: 'Key claims',
+    role: 'Role',
+    claim: 'Claim',
     source: 'Source',
     evidence: 'Evidence',
     notes: 'Notes',
@@ -103,7 +109,7 @@ const DEEP_LABELS: Record<PromptLanguage, DeepReportLabels> = {
     report: 'Rapport', reportEyebrow: 'Analyse', recommendations: 'Prochaines étapes', recommendationsEyebrow: 'Recommandations',
     traceability: 'Matrice de traçabilité', traceabilityEyebrow: 'Preuves et liens', sections: 'sections', sources: 'sources', words: 'mots',
     imageAi: 'Image de couverture générée par IA dans Nodus.', imageCustom: 'Image de couverture fournie par l’utilisateur.',
-    claims: 'Affirmations clés', source: 'Source', evidence: 'Preuve', notes: 'Notes',
+    claims: 'Affirmations clés', role: 'Rôle', claim: 'Affirmation', source: 'Source', evidence: 'Preuve', notes: 'Notes',
   },
   tr: {
     kind: 'Profesyonel rapor · Deep Research', contents: 'İçindekiler', generated: 'Oluşturulma', objective: 'Amaç',
@@ -111,7 +117,7 @@ const DEEP_LABELS: Record<PromptLanguage, DeepReportLabels> = {
     report: 'Rapor', reportEyebrow: 'Analiz', recommendations: 'Sonraki adımlar', recommendationsEyebrow: 'Öneriler',
     traceability: 'İzlenebilirlik matrisi', traceabilityEyebrow: 'Kanıt ve bağlantılar', sections: 'bölüm', sources: 'kaynak', words: 'kelime',
     imageAi: 'Kapak görseli Nodus’ta yapay zekâ ile oluşturuldu.', imageCustom: 'Kapak görseli kullanıcı tarafından sağlandı.',
-    claims: 'Temel iddialar', source: 'Kaynak', evidence: 'Kanıt', notes: 'Notlar',
+    claims: 'Temel iddialar', role: 'Rol', claim: 'İddia', source: 'Kaynak', evidence: 'Kanıt', notes: 'Notlar',
   },
   de: {
     kind: 'Professioneller Bericht · Deep Research', contents: 'Inhalt', generated: 'Erstellt', objective: 'Ziel',
@@ -119,7 +125,7 @@ const DEEP_LABELS: Record<PromptLanguage, DeepReportLabels> = {
     report: 'Bericht', reportEyebrow: 'Analyse', recommendations: 'Nächste Schritte', recommendationsEyebrow: 'Empfehlungen',
     traceability: 'Nachweismatrix', traceabilityEyebrow: 'Evidenz und Links', sections: 'Abschnitte', sources: 'Quellen', words: 'Wörter',
     imageAi: 'Titelbild mit KI in Nodus generiert.', imageCustom: 'Titelbild vom Benutzer bereitgestellt.',
-    claims: 'Kernaussagen', source: 'Quelle', evidence: 'Evidenz', notes: 'Notizen',
+    claims: 'Kernaussagen', role: 'Rolle', claim: 'Aussage', source: 'Quelle', evidence: 'Evidenz', notes: 'Notizen',
   },
   pt: {
     kind: 'Relatório profissional · Deep Research', contents: 'Conteúdo', generated: 'Gerado', objective: 'Objetivo',
@@ -127,7 +133,7 @@ const DEEP_LABELS: Record<PromptLanguage, DeepReportLabels> = {
     report: 'Relatório', reportEyebrow: 'Análise', recommendations: 'Próximos passos', recommendationsEyebrow: 'Recomendações',
     traceability: 'Matriz de rastreabilidade', traceabilityEyebrow: 'Evidência e ligações', sections: 'secções', sources: 'fontes', words: 'palavras',
     imageAi: 'Imagem de capa gerada por IA no Nodus.', imageCustom: 'Imagem de capa fornecida pelo utilizador.',
-    claims: 'Afirmações-chave', source: 'Fonte', evidence: 'Evidência', notes: 'Notas',
+    claims: 'Afirmações-chave', role: 'Papel', claim: 'Afirmação', source: 'Fonte', evidence: 'Evidência', notes: 'Notas',
   },
   'pt-BR': {
     kind: 'Relatório profissional · Deep Research', contents: 'Conteúdo', generated: 'Gerado', objective: 'Objetivo',
@@ -135,7 +141,7 @@ const DEEP_LABELS: Record<PromptLanguage, DeepReportLabels> = {
     report: 'Relatório', reportEyebrow: 'Análise', recommendations: 'Próximos passos', recommendationsEyebrow: 'Recomendações',
     traceability: 'Matriz de rastreabilidade', traceabilityEyebrow: 'Evidências e links', sections: 'seções', sources: 'fontes', words: 'palavras',
     imageAi: 'Imagem de capa gerada por IA no Nodus.', imageCustom: 'Imagem de capa fornecida pelo usuário.',
-    claims: 'Afirmações-chave', source: 'Fonte', evidence: 'Evidência', notes: 'Notas',
+    claims: 'Afirmações-chave', role: 'Papel', claim: 'Afirmação', source: 'Fonte', evidence: 'Evidência', notes: 'Notas',
   },
 };
 
@@ -213,34 +219,29 @@ function stripLeadingAbstract(markdown: string, abstract: string): string {
   return lines.slice(next).join('\n').trim();
 }
 
-function outlineHtml(draft: WritingWorkshopDraft, labels: DeepReportLabels): string {
-  return `<ol class="outline-list">${draft.outline.map((section) => {
-    const claims = section.keyClaims.length
-      ? `<div class="muted" style="margin-top:2mm;font:700 6.8pt Arial,sans-serif;text-transform:uppercase;letter-spacing:.07em">${labels.claims}</div><ul class="claim-list">${section.keyClaims.map((claim) => `<li>${escapeCellHtml(claim)}</li>`).join('')}</ul>`
-      : '';
-    const sources = section.sources.length
-      ? `<div class="source-pills">${section.sources.map((source) => `<span>${escapeCellHtml(source)}</span>`).join('')}</div>`
-      : '';
-    return `<li><h3>${escapeCellHtml(section.title)}</h3>${section.purpose ? `<p>${escapeCellHtml(section.purpose)}</p>` : ''}${claims}${sources}</li>`;
-  }).join('')}</ol>`;
-}
-
 function matrixHtml(rows: WritingWorkshopMatrixRow[], labels: DeepReportLabels): string {
   if (!rows.length) return '';
-  return `<div class="evidence-grid">${rows.map((row) => {
+  const head = `<colgroup><col style="width:20mm" /><col /><col style="width:26mm" /><col /><col style="width:26mm" /></colgroup>
+    <thead><tr>
+      <th>${escapeCellHtml(labels.role)}</th>
+      <th>${escapeCellHtml(labels.claim)}</th>
+      <th>${escapeCellHtml(labels.source)}</th>
+      <th>${escapeCellHtml(labels.evidence)}</th>
+      <th>${escapeCellHtml(labels.notes)}</th>
+    </tr></thead>`;
+  const body = rows.map((row) => {
     const source = row.citation
       ? reportLink(row.citation, row.sourceLabel || labels.source)
       : escapeCellHtml(row.sourceLabel || labels.source);
-    return `<article class="evidence-card">
-      <span>${escapeCellHtml(row.role)}</span>
-      <h3>${escapeCellHtml(row.claim)}</h3>
-      <dl>
-        <dt>${escapeCellHtml(labels.source)}</dt><dd>${source}</dd>
-        <dt>${escapeCellHtml(labels.evidence)}</dt><dd>${escapeCellHtml(row.evidence)}</dd>
-        ${row.notes ? `<dt>${escapeCellHtml(labels.notes)}</dt><dd>${escapeCellHtml(row.notes)}</dd>` : ''}
-      </dl>
-    </article>`;
-  }).join('')}</div>`;
+    return `<tr>
+      <td><span class="role-tag">${escapeCellHtml(row.role)}</span></td>
+      <td class="claim">${escapeCellHtml(row.claim)}</td>
+      <td>${source}</td>
+      <td>${escapeCellHtml(row.evidence)}</td>
+      <td>${row.notes ? escapeCellHtml(row.notes) : '—'}</td>
+    </tr>`;
+  }).join('');
+  return `<table class="evidence-table">${head}<tbody>${body}</tbody></table>`;
 }
 
 function escapeCellHtml(value: string): string {
@@ -270,17 +271,9 @@ export function buildDeepResearchPdfInput(
       title: labels.summary,
       eyebrow: labels.summaryEyebrow,
       html: `<div class="abstract-box prose">${abstract.html}</div>`,
+      className: 'exec-summary',
     },
   ];
-  if (draft.outline.length) {
-    sections.push({
-      id: 'research-outline',
-      number: String(sections.length + 1).padStart(2, '0'),
-      title: labels.outline,
-      eyebrow: labels.outlineEyebrow,
-      html: outlineHtml(draft, labels),
-    });
-  }
   sections.push({
     id: 'research-report',
     number: String(sections.length + 1).padStart(2, '0'),
