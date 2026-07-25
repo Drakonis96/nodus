@@ -40,10 +40,23 @@ complemento y una pequeña API JSON **en el mismo origen HTTPS local**
 2. **Activa** el toggle "Activar copiloto para Word". Verás `Activo:
    https://localhost:4320/addin/taskpane.html`.
 3. Pulsa **Instalar/actualizar en Word**. Nodus copia un manifiesto con el puerto
-   actual al catálogo local de Word, actualiza su versión para que Office no
-   reutilice una cinta antigua y limpia entradas cacheadas de Nodus en Wef.
-   Reinicia Word si el complemento ya estaba cargado. En Word verás una pestaña
-   propia **Nodus** con el botón **Nodus Copilot**.
+   actual al catálogo local de Word (`…/com.microsoft.Word/Data/Documents/wef` en
+   macOS) y actualiza su versión, que es la vía admitida para que Office recoja un
+   manifiesto cambiado. **Nodus no toca la caché de complementos de Office**:
+   borrar archivos sueltos de ella está documentado como algo que puede dejar de
+   cargar *todos* los complementos.
+4. Cierra Word del todo (`Cmd+Q`) y vuelve a abrirlo — Word solo lee ese catálogo
+   al arrancar. El complemento aparece en **Inicio → Complementos**; al abrirlo la
+   primera vez añade su pestaña propia **Nodus** con el botón **Nodus Copilot**.
+
+> **Si no aparece en la lista de complementos**: no es el manifiesto. Office para
+> Mac arrastra desde la versión 16.100 una regresión de complementos web, y hay un
+> fallo abierto ([office-js#6597](https://github.com/OfficeDev/office-js/issues/6597))
+> que afecta **solo a cuentas de trabajo/estudios**: el catálogo se queda vacío y
+> no registra ningún complemento, ni de carpeta local ni de la tienda. Se
+> reconoce en que tampoco aparecen los complementos de tienda que sí tenías. El
+> vaciado completo de caché que documenta Microsoft no lo resuelve; probar con
+> una cuenta personal sí distingue el caso.
 
 ## Uso diario
 - Abre Nodus (con el copiloto activado) y Word. En la pestaña **Nodus**, abre el

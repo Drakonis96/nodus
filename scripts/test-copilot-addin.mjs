@@ -23,7 +23,8 @@ const root = await mkdtemp(path.join(os.tmpdir(), 'nodus-copilot-addin-test-'));
 installRuntimeHooks(root);
 
 try {
-  const { renderManifest, purgeCachedCopilotAddin } = require(path.join(repoRoot, 'electron/copilot/install.ts'));
+  const installModule = require(path.join(repoRoot, 'electron/copilot/install.ts'));
+  const { renderManifest, installCopilotAddin } = installModule;
   const template = fs.readFileSync(path.join(repoRoot, 'word-addin/manifest.xml'), 'utf8');
   const rendered = renderManifest(template, 4455, '0.7.20-beta.1');
 
@@ -33,18 +34,59 @@ try {
   assert.match(rendered, /<Label resid="Nodus\.Tab\.Label" \/>/);
   assert.doesNotMatch(rendered, /<OfficeTab id="TabHome">/);
 
-  const cache = path.join(root, 'Wef');
-  fs.mkdirSync(path.join(cache, 'Manifests'), { recursive: true });
-  fs.mkdirSync(path.join(cache, 'Other'), { recursive: true });
-  fs.writeFileSync(path.join(cache, 'Manifests', 'old-nodus'), '<Id>E4352919-FFEC-4F77-8268-975BB4217FAD</Id>');
-  fs.writeFileSync(path.join(cache, 'Other', 'old-label'), 'Nodus Copiloto');
-  fs.writeFileSync(path.join(cache, 'Other', 'keep'), 'Claude in Microsoft Office');
+  // Office's add-in cache must survive an install untouched. Deleting individual
+  // files from it is documented to make ALL add-ins stop loading, and it did:
+  // it left Word unable to register any sideloaded add-in until the whole cache
+  // was cleared. https://learn.microsoft.com/office/dev/add-ins/testing/clear-cache
+  assert.equal(
+    typeof installModule.purgeCachedCopilotAddin,
+    'undefined',
+    'the per-file Office cache purge must not come back'
+  );
 
-  const removed = await purgeCachedCopilotAddin(cache);
-  assert.equal(removed, 2);
-  assert.equal(fs.existsSync(path.join(cache, 'Manifests', 'old-nodus')), false);
-  assert.equal(fs.existsSync(path.join(cache, 'Other', 'old-label')), false);
-  assert.equal(fs.existsSync(path.join(cache, 'Other', 'keep')), true);
+  // Only macOS and Windows have a Word sideload catalog; elsewhere install bails out early.
+  if (process.platform === 'darwin' || process.platform === 'win32') {
+    const fakeHome = path.join(root, 'home');
+    const cache =
+      process.platform === 'darwin'
+        ? path.join(
+            fakeHome,
+            'Library/Containers/com.microsoft.Word/Data/Library/Application Support/Microsoft/Office/16.0/Wef'
+          )
+        : path.join(fakeHome, 'AppData/Local/Microsoft/Office/16.0/Wef');
+    const manifestDir =
+      process.platform === 'darwin'
+        ? path.join(fakeHome, 'Library/Containers/com.microsoft.Word/Data/Documents/wef')
+        : cache;
+    fs.mkdirSync(path.join(cache, 'Manifests'), { recursive: true });
+    fs.writeFileSync(path.join(cache, 'Manifests', 'cached-nodus'), '<Id>E4352919-FFEC-4F77-8268-975BB4217FAD</Id>');
+    fs.writeFileSync(path.join(cache, 'Word.RibbonCache.es-ES'), 'Nodus Copilot\nClaude in Microsoft Office');
+
+    // install.ts calls os.homedir() at call time, so patching the shared CJS
+    // module object redirects it. The ESM namespace object is read-only.
+    const osModule = require('node:os');
+    const originalHomedir = osModule.homedir;
+    const originalLocalAppData = process.env.LOCALAPPDATA;
+    osModule.homedir = () => fakeHome;
+    process.env.LOCALAPPDATA = path.join(fakeHome, 'AppData/Local');
+    let result;
+    try {
+      result = await installCopilotAddin(repoRoot, '0.7.20');
+    } finally {
+      osModule.homedir = originalHomedir;
+      if (originalLocalAppData === undefined) delete process.env.LOCALAPPDATA;
+      else process.env.LOCALAPPDATA = originalLocalAppData;
+    }
+
+    assert.equal(result.ok, true, result.message);
+    assert.equal(fs.existsSync(path.join(manifestDir, 'nodus-copilot.manifest.xml')), true);
+    assert.equal(fs.existsSync(path.join(cache, 'Manifests', 'cached-nodus')), true, 'install must not touch the Office cache');
+    assert.equal(
+      fs.existsSync(path.join(cache, 'Word.RibbonCache.es-ES')),
+      true,
+      'install must not delete the shared ribbon cache'
+    );
+  }
   console.log('copilot add-in manifest/cache test passed');
 } finally {
   await rm(root, { recursive: true, force: true });
