@@ -958,17 +958,24 @@ export function registerIpc(
   });
   h('nodi:viewContext:set', async (_e, context) => setNodiViewContext(context));
   h('nodi:viewContext:get', async () => getNodiViewContext());
+  // The overlay's mouse hit-test transition. Asynchronous on purpose: the flag is
+  // applied when the main process next reaches its event loop, which is exactly
+  // when a `sendSync` would have been serviced too — the synchronous form only
+  // added a stall of Nodi's own renderer while heavy work held the loop.
+  ipcMain.on('nodi:setMouseIgnore:async', (e, ignore: boolean) => {
+    const win = BrowserWindow.fromWebContents(e.sender);
+    win?.setIgnoreMouseEvents(Boolean(ignore), { forward: true });
+  });
+  h('nodi:overlayPlacement:get', async () => getMascotWindowPlacement());
+  // Retained for compatibility with older preload bundles.
   ipcMain.on('nodi:setMouseIgnoreSync', (e, ignore: boolean) => {
     const win = BrowserWindow.fromWebContents(e.sender);
     win?.setIgnoreMouseEvents(Boolean(ignore), { forward: true });
-    // sendSync is intentional here: a forwarded mousemove must make Nodi interactive
-    // before a following physical mouse-down can pass through to the app underneath.
     e.returnValue = true;
   });
   ipcMain.on('nodi:getOverlayPlacementSync', (e) => {
     e.returnValue = getMascotWindowPlacement();
   });
-  // Retained for compatibility with older preload bundles.
   h('nodi:setMouseIgnore', async (e, ignore: boolean) => {
     const win = BrowserWindow.fromWebContents(e.sender);
     win?.setIgnoreMouseEvents(Boolean(ignore), { forward: true });

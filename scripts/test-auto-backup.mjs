@@ -5,6 +5,7 @@
 // Electron-as-Node so better-sqlite3 matches the app ABI.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { randomFillSync } from 'node:crypto';
 import { mkdtemp, rm, writeFile, readdir, mkdir } from 'node:fs/promises';
 import Module, { createRequire } from 'node:module';
 import os from 'node:os';
@@ -206,6 +207,53 @@ try {
     crypto.decryptBackupPayload(manualZip.getEntry('backup.bin').getData(), manualRecoveryKey, manualManifest.cipher)
   );
   assert.ok(manualPayload.getEntry('api-keys.json'), 'manual export still carries keys');
+
+  // ── The archive must be built WITHOUT parking the main-process event loop ─────
+  // Automatic backups run unattended every 30 minutes on the same single thread
+  // that serves every IPC handler, so a synchronous deflate took the whole app
+  // with it — including the Nodi overlay, which pings the main process on every
+  // mouse hit-test transition and froze mid-animation for the entire pass.
+  //
+  // Metering which primitive gets used, rather than timing the call, keeps this
+  // deterministic under the parallel runner: deflateRawSync and scryptSync burn
+  // the event loop, their streaming/callback counterparts run on libuv's
+  // threadpool. The probe is a ~32 MB incompressible auxiliary file
+  // (nodi-notes.json is read from userData, which the stub points at `root`).
+  const filler = Buffer.alloc(32 * 1024 * 1024);
+  for (let offset = 0; offset < filler.length; offset += 65536) randomFillSync(filler, offset, 65536);
+  await writeFile(path.join(root, 'nodi-notes.json'), filler);
+
+  const zlib = require('node:zlib');
+  const nodeCrypto = require('node:crypto');
+  const meter = { deflateSync: 0, deflateStream: 0, scryptSync: 0, scryptAsync: 0 };
+  const original = {
+    deflateRawSync: zlib.deflateRawSync,
+    createDeflateRaw: zlib.createDeflateRaw,
+    scryptSync: nodeCrypto.scryptSync,
+    scrypt: nodeCrypto.scrypt,
+  };
+  // node:zlib exports are non-writable, so swap them through defineProperty.
+  const swap = (host, name, value) => Object.defineProperty(host, name, { value, configurable: true, writable: true });
+  swap(zlib, 'deflateRawSync', (...a) => { meter.deflateSync += 1; return original.deflateRawSync(...a); });
+  swap(zlib, 'createDeflateRaw', (...a) => { meter.deflateStream += 1; return original.createDeflateRaw(...a); });
+  swap(nodeCrypto, 'scryptSync', (...a) => { meter.scryptSync += 1; return original.scryptSync(...a); });
+  swap(nodeCrypto, 'scrypt', (...a) => { meter.scryptAsync += 1; return original.scrypt(...a); });
+  let archive;
+  try {
+    archive = await exportImport.createBackupArchive({ password: 'clave-manual-larga', appVersion: 'x' });
+  } finally {
+    for (const [name, value] of Object.entries(original)) swap(name.startsWith('scrypt') ? nodeCrypto : zlib, name, value);
+  }
+  assert.ok(archive.length > 32 * 1024 * 1024, 'the probe payload really made it into the archive');
+  assert.ok(meter.deflateStream > 0, 'the archive is deflated through zlib’s asynchronous API');
+  assert.equal(meter.deflateSync, 0, 'no entry may be deflated with deflateRawSync on the main thread');
+  assert.ok(meter.scryptAsync > 0, 'the backup key is derived on libuv’s threadpool');
+  assert.equal(meter.scryptSync, 0, 'scryptSync must not run on the main thread while writing a backup');
+  assert.equal(
+    exportImport.verifyBackupArchive(archive, 'clave-manual-larga').ok,
+    true,
+    'an archive built off the event loop is still decryptable',
+  );
 
   // ── verifyBackupArchive: the gate that must hold before retention deletes ──────
   // Retention only runs when this returns ok, so a false positive here is what would

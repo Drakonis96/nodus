@@ -190,6 +190,13 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
       ? window.nodus.nodiGetOverlayPlacement()
       : { x: 16, y: 16, horizontal: 'left', vertical: 'up' }
   ));
+  // The initial placement comes from the load URL, which is stale after a
+  // renderer reload (the window may have been dragged since). Reconcile with the
+  // main process once, asynchronously, so this never blocks the first frame.
+  useEffect(() => {
+    if (!isOverlay) return;
+    void window.nodus.nodiRefreshOverlayPlacement().then(setOverlayPlacement).catch(() => {});
+  }, [isOverlay]);
   const [dragging, setDragging] = useState(false);
   const [greet, setGreet] = useState(false);
   const draggingRef = useRef(false);

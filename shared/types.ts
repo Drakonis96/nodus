@@ -5331,7 +5331,10 @@ export interface NodusApi {
   nodiOpenSettings(): Promise<void>;
   onNodiNavigate(cb: (view: 'settings') => void): () => void;
   nodiSetMouseIgnore(ignore: boolean): Promise<void>;
+  /** Synchronous, but IPC-free: read from the URL the mascot window was loaded with. */
   nodiGetOverlayPlacement(): NodiOverlayPlacement;
+  /** Authoritative placement from the main process, for after a reload. */
+  nodiRefreshOverlayPlacement(): Promise<NodiOverlayPlacement>;
   nodiSetExpanded(expanded: boolean): Promise<NodiOverlayPlacement>;
   onNodiDismiss(cb: () => void): () => void;
   nodiOpenMainWindow(): Promise<void>;

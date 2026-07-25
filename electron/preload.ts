@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type {
   NodusApi,
+  NodiOverlayPlacement,
   QueueProgress,
   UpdateProgressEvent,
   ReprocessProgress,
@@ -20,6 +21,37 @@ let activeNodiChatRequestId: string | null = null;
 let activeStudyImproveRequestId: string | null = null;
 let activeStudyAssistantRequestId: string | null = null;
 let activeStudySttRequestId: string | null = null;
+
+const DEFAULT_OVERLAY_PLACEMENT: NodiOverlayPlacement = { x: 16, y: 16, horizontal: 'left', vertical: 'up' };
+
+/**
+ * The mascot window's placement for the overlay's first frame, read from the
+ * page URL rather than fetched over IPC.
+ *
+ * mascotWindow.ts positions the native window *before* it loads mascot.html, so
+ * the value is already known at load time; carrying it in the URL keeps the
+ * first frame correct without a synchronous round-trip into a main process that
+ * may be busy with a backup or a scan.
+ */
+function readInitialOverlayPlacement(): NodiOverlayPlacement {
+  try {
+    // The preload shares the renderer's frame, so `location` is there at runtime;
+    // this tsconfig deliberately omits the DOM lib, hence the narrow cast.
+    const search = (globalThis as unknown as { location?: { search?: string } }).location?.search ?? '';
+    const raw = new URLSearchParams(search).get('placement');
+    if (!raw) return DEFAULT_OVERLAY_PLACEMENT;
+    const parsed = JSON.parse(raw) as Partial<NodiOverlayPlacement>;
+    if (typeof parsed?.x !== 'number' || typeof parsed?.y !== 'number') return DEFAULT_OVERLAY_PLACEMENT;
+    return {
+      x: parsed.x,
+      y: parsed.y,
+      horizontal: parsed.horizontal === 'right' ? 'right' : 'left',
+      vertical: parsed.vertical === 'down' ? 'down' : 'up',
+    };
+  } catch {
+    return DEFAULT_OVERLAY_PLACEMENT;
+  }
+}
 
 // Minimal, typed surface exposed to the renderer. No Node, no direct IPC names leak.
 const api: NodusApi = {
@@ -64,10 +96,20 @@ const api: NodusApi = {
   setNodiViewContext: (context) => ipcRenderer.invoke('nodi:viewContext:set', context).then(() => undefined),
   getNodiViewContext: () => ipcRenderer.invoke('nodi:viewContext:get'),
   setNodiTutorialVisible: (visible) => ipcRenderer.invoke('nodi:tutorialVisible', visible).then(() => undefined),
+  // Deliberately fire-and-forget. `sendSync` was used here to make the hit-test
+  // transition land before a following physical mouse-down, but it cannot buy
+  // that: the main process handles either message at the same point in its event
+  // loop. All the synchronous form added was a full stall of the overlay
+  // renderer — so while the main process was busy (auto backup, a scan, an
+  // import) Nodi froze mid-animation the moment the pointer crossed it.
   nodiSetMouseIgnore: async (ignore) => {
-    ipcRenderer.sendSync('nodi:setMouseIgnoreSync', ignore);
+    ipcRenderer.send('nodi:setMouseIgnore:async', ignore);
   },
-  nodiGetOverlayPlacement: () => ipcRenderer.sendSync('nodi:getOverlayPlacementSync'),
+  // The main process places the window before it loads mascot.html and passes
+  // the result in the URL, so the very first frame draws Nodi in the right spot
+  // with no IPC at all. `nodi:overlayPlacement:get` refreshes it afterwards.
+  nodiGetOverlayPlacement: () => readInitialOverlayPlacement(),
+  nodiRefreshOverlayPlacement: () => ipcRenderer.invoke('nodi:overlayPlacement:get'),
   nodiSetExpanded: (expanded) => ipcRenderer.invoke('nodi:setExpanded', expanded),
   onNodiDismiss: (cb) => {
     const listener = () => cb();

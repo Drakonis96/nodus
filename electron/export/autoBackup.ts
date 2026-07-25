@@ -204,14 +204,17 @@ export async function runAutoBackupNow(appVersion: string): Promise<AutoBackupRe
     const hostname = os.hostname();
     const target = path.join(folder, backupFileName(hostname, new Date()));
     // Write via temp + rename so cloud clients never sync a half-written file.
+    // The archive is the whole library, so both the write and the verification
+    // re-read go through the promise API: *Sync would park the single
+    // main-process event loop for as long as the transfer takes.
     const tmp = `${target}.tmp`;
-    fs.writeFileSync(tmp, archive);
-    fs.renameSync(tmp, target);
+    await fs.promises.writeFile(tmp, archive);
+    await fs.promises.rename(tmp, target);
 
     // Prove the snapshot is recoverable BEFORE retention deletes older ones. Re-read
     // from disk rather than trusting the in-memory buffer, so a truncated or corrupted
     // write is caught here instead of on the day it is needed.
-    const verification = verifyBackupArchive(fs.readFileSync(target), password);
+    const verification = verifyBackupArchive(await fs.promises.readFile(target), password);
     if (!verification.ok) {
       fs.rmSync(target, { force: true });
       return finish({

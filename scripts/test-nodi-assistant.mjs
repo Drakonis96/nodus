@@ -191,13 +191,45 @@ test('floating Nodi dismisses every open surface on an outside click or window b
   assert.match(mascot, /width: EXPANDED_WIDTH/, 'opening controls must not resize a visible transparent NSPanel');
   assert.match(mascot, /applyClosedMousePassthrough/, 'closed transparent regions pass clicks to the app underneath');
   assert.match(component, /addEventListener\('mousemove'/, 'forwarded movement performs transparent-region hit testing');
-  assert.match(ipc, /nodi:setMouseIgnoreSync/);
-  assert.match(ipc, /e\.returnValue = true/, 'the native hit target changes before a following physical mouse-down');
-  assert.match(preload, /sendSync\('nodi:setMouseIgnoreSync'/);
+  assert.match(ipc, /ipcMain\.on\('nodi:setMouseIgnore:async'/);
+  assert.match(ipc, /nodi:setMouseIgnore:async'[\s\S]{0,220}setIgnoreMouseEvents/, 'the async channel still applies the native hit target');
+  assert.match(preload, /ipcRenderer\.send\('nodi:setMouseIgnore:async'/);
   assert.match(component, /nodiGetOverlayPlacement\(\)/, 'the first renderer frame uses the native placement rather than a provisional anchor');
-  assert.match(preload, /sendSync\('nodi:getOverlayPlacementSync'/);
+  // Nodi's own renderer must never wait on the main process: sendSync stalls this
+  // window for as long as a backup, scan or import holds the main event loop, which
+  // is exactly the freeze it was meant to prevent. The hit-test flag lands at the
+  // same point in the loop either way, and the first frame's placement now travels
+  // in the URL mascot.html is loaded with.
+  assert.doesNotMatch(preload, /sendSync\('nodi:/, 'the Nodi overlay bridge must not block on synchronous IPC');
+  assert.match(preload, /new URLSearchParams\(search\)\.get\('placement'\)/);
+  assert.match(mascot, /searchParams\.set\('placement'/, 'the dev-server overlay URL carries the placement');
+  assert.match(mascot, /loadFile\([^)]*mascot\.html'\), \{ query \}\)/, 'the packaged overlay URL carries the placement');
   assert.match(preload, /onNodiDismiss/);
   assert.match(types, /onNodiDismiss\(cb: \(\) => void\)/);
+});
+
+test('Nodi’s scrollable panels overflow instead of crushing their rows', async () => {
+  const css = await read('src/components/nodi/companion.css');
+  // A column flexbox with a definite height distributes any shortfall to its
+  // children, so rows left at the default flex-shrink:1 are compressed to fit:
+  // the list stops scrolling and every row's own `overflow: hidden` slices its
+  // text in half. That is what turned the quick-notes panel into shredded lines
+  // once the user had more notes than fit on screen.
+  const rule = (selector) => {
+    const at = css.indexOf(`${selector} {`) >= 0 ? css.indexOf(`${selector} {`) : css.indexOf(`${selector} `);
+    assert.ok(at >= 0, `${selector} is missing from companion.css`);
+    return css.slice(at, css.indexOf('}', at) + 1);
+  };
+  for (const [scroller, row] of [['.nodi-notes-list', '.nodi-note-row'], ['.nodi-chat-msgs', '.nodi-msg']]) {
+    const scrollerRule = rule(scroller);
+    assert.match(scrollerRule, /flex-direction:\s*column/, `${scroller} is a column flexbox`);
+    assert.match(scrollerRule, /overflow-y:\s*auto/, `${scroller} scrolls`);
+    assert.match(
+      rule(row),
+      /flex:\s*0\s+0\s+auto|flex-shrink:\s*0/,
+      `${row} must not shrink, or ${scroller} squashes its rows instead of scrolling`,
+    );
+  }
 });
 
 test('floating Nodi restores mouse passthrough after its radial buttons finish collapsing', async () => {

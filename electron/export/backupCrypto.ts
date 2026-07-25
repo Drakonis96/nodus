@@ -1,4 +1,4 @@
-import { createCipheriv, createDecipheriv, createHash, randomBytes, scryptSync } from 'node:crypto';
+import { createCipheriv, createDecipheriv, createHash, randomBytes, scrypt, scryptSync } from 'node:crypto';
 
 const PASSWORD_BYTES = 24;
 const SALT_BYTES = 16;
@@ -58,6 +58,27 @@ function deriveKey(password: string, salt: Buffer): Buffer {
   });
 }
 
+/**
+ * scrypt on libuv's threadpool instead of the main thread. Same parameters and
+ * same key as {@link deriveKey}; only the scheduling differs. Used by the write
+ * path, which runs unattended every 30 minutes and must not stall the app.
+ */
+function deriveKeyAsync(password: string, salt: Buffer): Promise<Buffer> {
+  const clean = cleanPassword(password);
+  if (clean.length < MIN_BACKUP_PASSWORD_LENGTH) {
+    return Promise.reject(new Error('La contraseña de la copia de seguridad no es válida.'));
+  }
+  return new Promise((resolve, reject) => {
+    scrypt(
+      clean,
+      salt,
+      KEY_BYTES,
+      { cost: SCRYPT_N, blockSize: SCRYPT_R, parallelization: SCRYPT_P, maxmem: SCRYPT_MAXMEM },
+      (err, key) => (err ? reject(err) : resolve(key as Buffer))
+    );
+  });
+}
+
 export type KdfDescriptor = BackupCipherMetadata['kdf'];
 
 /**
@@ -114,8 +135,20 @@ export function decryptWithKey(sealed: Buffer, key: Buffer): Buffer {
 
 export function encryptBackupPayload(plaintext: Buffer, password: string): { ciphertext: Buffer; metadata: BackupCipherMetadata } {
   const salt = randomBytes(SALT_BYTES);
+  return sealPayload(plaintext, deriveKey(password, salt), salt);
+}
+
+/** {@link encryptBackupPayload} with the key derivation moved off the event loop. */
+export async function encryptBackupPayloadAsync(
+  plaintext: Buffer,
+  password: string
+): Promise<{ ciphertext: Buffer; metadata: BackupCipherMetadata }> {
+  const salt = randomBytes(SALT_BYTES);
+  return sealPayload(plaintext, await deriveKeyAsync(password, salt), salt);
+}
+
+function sealPayload(plaintext: Buffer, key: Buffer, salt: Buffer): { ciphertext: Buffer; metadata: BackupCipherMetadata } {
   const iv = randomBytes(IV_BYTES);
-  const key = deriveKey(password, salt);
   const cipher = createCipheriv('aes-256-gcm', key, iv);
   const ciphertext = Buffer.concat([cipher.update(plaintext), cipher.final()]);
   const authTag = cipher.getAuthTag();
