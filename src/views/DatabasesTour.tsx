@@ -58,6 +58,7 @@ export function DatabasesTour({ onClose, onNavigate }: { onClose: () => void; on
     <TourOverlay
       steps={STEPS}
       label="Tutorial de bases de datos"
+      vaultType="databases"
       onClose={onClose}
       onNavigate={(v) => onNavigate(v as View)}
     />

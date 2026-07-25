@@ -92,6 +92,7 @@ export type {
 
 // Type-only import (erased at compile time) — keeps the no-runtime-import rule intact.
 import type { VaultType } from './vaultTypes';
+import type { TutorialVideo } from './tutorialVideos';
 import type { ToolkitJobRequest, ToolkitJobProgress, ToolkitJobResult } from './toolkitTypes';
 import type {
   ToolkitAppGenerationRequest,
@@ -1476,6 +1477,13 @@ export interface AppSettings {
   onboardingComplete: boolean;
   /** App-wide version of the introductory AI/vault tutorial already completed. */
   basicsTutorialVersion: number;
+  /**
+   * Ids of the video tutorials already opened (`TutorialVideoId` values from
+   * shared/tutorialVideos.ts, kept as plain strings so types.ts stays at the root of
+   * the import graph). App-wide, like the tutorial version above: a video watched in
+   * one vault stays watched in every other.
+   */
+  tutorialVideosWatched: string[];
   // First-run usage tour (distinct from the setup onboarding above).
   tourComplete: boolean;
   // Advanced research-workflow walkthrough. Opt-in (never auto-shown): defaults
@@ -6362,6 +6370,12 @@ export interface NodusApi {
   runBackupNow(): Promise<AutoBackupResult>;
   /** Write a plaintext recovery kit (master password + independent recovery key) to a user-chosen file. */
   saveBackupRecoveryKit(): Promise<{ ok: boolean; message: string }>;
+  /**
+   * The video tutorials to show: this build's list plus any published since, fetched
+   * and validated in the main process. Falls back to the built-in list, so it is safe
+   * to render whatever comes back.
+   */
+  getTutorialCatalogue(): Promise<TutorialVideo[]>;
   /** Inspect whether recovery onboarding is required for this installation. */
   getRecoveryStatus(): Promise<RecoveryStatus>;
   /** Pick and inspect an empty folder or an existing Nodus recovery root. */

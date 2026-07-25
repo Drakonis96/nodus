@@ -120,6 +120,7 @@ export function TeachingTour({ onClose, onNavigate }: { onClose: () => void; onN
     <TourOverlay
       steps={STEPS}
       label="Tutorial de docencia"
+      vaultType="docencia"
       accent={VAULT_TYPE_COLORS.docencia}
       onClose={onClose}
       onNavigate={(view) => onNavigate(view as View)}

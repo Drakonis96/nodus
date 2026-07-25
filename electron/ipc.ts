@@ -347,6 +347,7 @@ import {
   inspectRecoveryFolder,
   restoreRecoverySnapshot,
 } from './recovery/recoveryManager';
+import { getTutorialCatalogue } from './tutorialCatalogue';
 import { buildSyncPackage, mergeSyncPackage } from './export/syncPackage';
 import { clearSuperseded, countSuperseded, listSuperseded, restoreSuperseded } from './db/syncSupersededRepo';
 import { clearSyncPassphrase, getSyncPassphrase, hasSyncPassphrase, setSyncPassphrase } from './secrets/secretStore';
@@ -3504,6 +3505,8 @@ export function registerIpc(
     );
     return { ok: true, message: filePath };
   });
+  // Never rejects: the built-in list is always a complete answer (see tutorialCatalogue).
+  h('tutorials:catalogue', async () => getTutorialCatalogue());
   h('recovery:status', async () => getRecoveryStatus());
   h('recovery:chooseFolder', async (_e, mode: 'create' | 'restore', language: AppLanguage = 'es') => {
     const titles: Record<AppLanguage, string> = {

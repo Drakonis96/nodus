@@ -26,6 +26,7 @@ import { confirm } from '../components/feedback';
 import { Icon, PROVIDER_LABELS } from '../components/ui';
 import { ModelPicker, SubscriptionQuotaNotice, ExtractionCapabilityNotice } from '../components/ModelPicker';
 import { NodiStylePicker } from '../components/nodi/NodiStylePicker';
+import { TutorialVideoGrid } from '../components/TutorialVideos';
 import { vaultTypeLabel } from '../components/VaultSwitcher';
 import { SttSettings } from '../components/SttSettings';
 import { LocalAiModelsSettings } from '../components/LocalAiModelsSettings';
@@ -789,7 +790,11 @@ export function Settings({
 
       {visibleSettingsSection('system', 'Ayuda', 'tutorial uso avanzado') && (
           <Section title={t('Ayuda')}>
-            <div className="flex items-center justify-between gap-4">
+            {/* The videos come first: for most people they are the fastest way in. Their
+                copy comes from shared/tutorialVideos.ts rather than t() because that
+                table covers the tutorial's twelve languages, not the interface's seven. */}
+            <TutorialVideoGrid language={settings.uiLanguage} variant="panel" />
+            <div className="border-t border-neutral-800 pt-4 flex items-center justify-between gap-4">
               <div>
                 <label className="text-sm text-neutral-300">{t('Guía esencial de Nodus e IA')}</label>
                 <p className="text-xs text-neutral-500 mt-0.5">{t('Bóvedas, modelos locales, API keys, costes, embeddings y voz explicados desde cero.')}</p>

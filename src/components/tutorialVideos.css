@@ -1,0 +1,236 @@
+/* The video tutorials: the "how do you want to learn?" choice, the card grid and the
+   in-app player. Two hosts, two skins: `cinema` on the tutorial's dark stage and
+   `panel` inside a Settings card, which also has to survive light mode. */
+
+/* ── how do you prefer to learn? ────────────────────────────────────────────────── */
+.tutorial-mode-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .9rem;
+  margin-top: 1.5rem;
+}
+
+.tutorial-mode-option {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .5rem;
+  padding: 1.5rem 1.1rem 1.3rem;
+  border: 1px solid rgba(255, 255, 255, .16);
+  border-radius: 1.1rem;
+  background: rgba(255, 255, 255, .04);
+  color: inherit;
+  text-align: center;
+  cursor: pointer;
+  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+}
+.tutorial-mode-option:hover,
+.tutorial-mode-option:focus-visible {
+  transform: translateY(-3px);
+  border-color: rgba(255, 255, 255, .5);
+  background: rgba(255, 255, 255, .07);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, .3);
+  outline: none;
+}
+.tutorial-mode-option.recommended {
+  border-color: rgba(45, 212, 191, .45);
+  background: rgba(13, 148, 136, .12);
+}
+.tutorial-mode-option.recommended:hover,
+.tutorial-mode-option.recommended:focus-visible {
+  border-color: rgba(94, 234, 212, .85);
+  background: rgba(13, 148, 136, .2);
+}
+.tutorial-mode-icon {
+  display: grid;
+  place-items: center;
+  width: 3.25rem;
+  height: 3.25rem;
+  border-radius: 50%;
+  color: #5eead4;
+  background: rgba(45, 212, 191, .14);
+}
+.tutorial-mode-option b { font-size: .98rem; font-weight: 650; }
+.tutorial-mode-body { color: #a3a3a3; font-size: .8rem; line-height: 1.4; }
+.tutorial-mode-badge {
+  position: absolute;
+  top: .7rem;
+  right: .7rem;
+  border-radius: 999px;
+  padding: .18rem .5rem;
+  color: #042f2e;
+  background: #5eead4;
+  font-size: .62rem;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+/* ── the grid ───────────────────────────────────────────────────────────────────── */
+.tutorial-videos { display: flex; min-height: 0; flex-direction: column; gap: 1rem; }
+.tutorial-videos-heading h2 { color: #fff; font-size: clamp(1.3rem, 3vw, 1.9rem); font-weight: 650; }
+.tutorial-videos-heading p { margin-top: .3rem; color: #a3a3a3; font-size: .87rem; }
+
+.tutorial-video-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: .9rem;
+}
+
+.tutorial-video-card {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, .13);
+  border-radius: 1.1rem;
+  background: rgba(255, 255, 255, .04);
+  transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+.tutorial-video-card:hover { transform: translateY(-3px); border-color: rgba(255, 255, 255, .34); box-shadow: 0 16px 38px rgba(0, 0, 0, .32); }
+
+.tutorial-video-poster {
+  position: relative;
+  display: grid;
+  height: 122px;
+  place-items: center;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+.tutorial-video-poster::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(2, 6, 23, .05), rgba(2, 6, 23, .45));
+}
+.tutorial-video-poster-icon { position: relative; z-index: 1; color: rgba(255, 255, 255, .92); }
+.tutorial-video-order {
+  position: absolute;
+  top: .6rem;
+  left: .7rem;
+  z-index: 1;
+  color: rgba(255, 255, 255, .82);
+  font-size: .64rem;
+  font-weight: 800;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+.tutorial-video-play {
+  position: absolute;
+  right: .7rem;
+  bottom: .6rem;
+  z-index: 1;
+  display: grid;
+  width: 2.1rem;
+  height: 2.1rem;
+  place-items: center;
+  border-radius: 50%;
+  color: #0f172a;
+  background: rgba(255, 255, 255, .92);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .35);
+  transition: transform 160ms ease;
+}
+.tutorial-video-poster:hover .tutorial-video-play,
+.tutorial-video-poster:focus-visible .tutorial-video-play { transform: scale(1.12); }
+.tutorial-video-watched {
+  position: absolute;
+  top: .55rem;
+  right: .6rem;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: .25rem;
+  border-radius: 999px;
+  padding: .18rem .48rem;
+  color: #042f2e;
+  background: rgba(94, 234, 212, .95);
+  font-size: .64rem;
+  font-weight: 800;
+}
+
+.tutorial-video-body { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: .35rem; padding: .85rem .95rem 1rem; }
+.tutorial-video-body h3 { color: #f5f5f4; font-size: .95rem; font-weight: 650; line-height: 1.25; }
+.tutorial-video-body p { flex: 1; color: #a3a3a3; font-size: .78rem; line-height: 1.45; }
+.tutorial-video-card-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin-top: .45rem; }
+.tutorial-video-card-actions .tutorial-video-unwatch { font-size: .7rem; }
+
+.tutorial-videos-footer { display: grid; gap: .3rem; }
+.tutorial-videos-more { display: flex; align-items: center; gap: .4rem; color: #5eead4; font-size: .8rem; font-weight: 600; }
+.tutorial-videos-hosting, .tutorial-video-hosting { color: #78716c; font-size: .72rem; line-height: 1.45; }
+
+/* Inside the cinematic guide the grid owns the stage and scrolls on its own. As a
+   `flex-direction: column` scroller it would SQUASH its rows instead of scrolling
+   them, so every child is pinned at its natural height. */
+.tutorial-videos-cinema {
+  position: relative;
+  z-index: 1;
+  min-height: 0;
+  flex: 1;
+  /* `safe` so a grid taller than the stage scrolls from its top instead of having its
+     first row clipped above the scroll origin. */
+  justify-content: safe center;
+  overflow-y: auto;
+  width: min(1080px, calc(100% - 64px));
+  margin: 0 auto;
+  padding: 1.5rem 0;
+}
+.tutorial-videos-cinema > * { flex: 0 0 auto; }
+
+/* The choice screen centres everything, including the promise of more tutorials. */
+.tutorial-language-card .tutorial-videos-more { justify-content: center; margin-top: 1.1rem; }
+
+/* ── the player ─────────────────────────────────────────────────────────────────── */
+.tutorial-video-player {
+  display: flex;
+  width: min(1080px, 100%);
+  max-height: 90vh;
+  flex-direction: column;
+  gap: .6rem;
+  overflow: hidden;
+  padding: .9rem 1rem 1rem;
+  border: 1px solid rgba(148, 163, 184, .25);
+  border-radius: 1.25rem;
+  color: #e7e5e4;
+  background: #090d16;
+  box-shadow: 0 40px 120px rgba(0, 0, 0, .58);
+}
+.tutorial-video-player-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem; }
+.tutorial-video-player-bar > div:first-child { display: grid; min-width: 0; gap: .1rem; }
+.tutorial-video-player-bar span { color: #5eead4; font-size: .64rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+.tutorial-video-player-bar b { font-size: .95rem; font-weight: 650; }
+.tutorial-video-player-actions { display: flex; gap: .35rem; }
+.tutorial-video-frame {
+  position: relative;
+  overflow: hidden;
+  border-radius: .9rem;
+  background: #000;
+  aspect-ratio: 16 / 9;
+  /* The frame keeps its 16:9 ratio but must never push the dialog past the viewport. */
+  max-height: calc(90vh - 9rem);
+  margin-inline: auto;
+  width: 100%;
+}
+.tutorial-video-frame iframe { display: block; width: 100%; height: 100%; border: 0; }
+
+/* ── light mode (the Settings panel and the player) ─────────────────────────────── */
+.light .tutorial-videos-panel .tutorial-video-card { border-color: rgba(15, 23, 42, .14); background: rgba(15, 23, 42, .03); }
+.light .tutorial-videos-panel .tutorial-video-card:hover { border-color: rgba(15, 23, 42, .34); box-shadow: 0 16px 38px rgba(15, 23, 42, .14); }
+.light .tutorial-videos-panel .tutorial-video-body h3 { color: #172033; }
+.light .tutorial-videos-panel .tutorial-video-body p { color: #64748b; }
+.light .tutorial-videos-panel .tutorial-videos-heading h2 { color: #172033; }
+.light .tutorial-videos-panel .tutorial-videos-heading p { color: #64748b; }
+.light .tutorial-videos-panel .tutorial-videos-more { color: #0f766e; }
+.light .tutorial-videos-panel .tutorial-videos-hosting { color: #64748b; }
+.light .tutorial-video-player { border-color: rgba(30, 41, 59, .2); color: #172033; background: #f8fafc; box-shadow: 0 35px 100px rgba(15, 23, 42, .28); }
+.light .tutorial-video-player-bar span { color: #0f766e; }
+.light .tutorial-video-hosting { color: #64748b; }
+.light .tutorial-mode-option { border-color: rgba(15, 23, 42, .14); background: rgba(15, 23, 42, .03); }
+.light .tutorial-mode-body { color: #64748b; }
+
+@media (max-width: 720px) {
+  .tutorial-mode-grid { grid-template-columns: 1fr; }
+  .tutorial-videos-cinema { width: calc(100% - 32px); }
+  .tutorial-video-player { border-radius: 1rem; padding: .7rem .75rem .8rem; }
+}

@@ -26,6 +26,7 @@ import { restorePersistedDockIcon } from './dockIcon';
 import { stopAllWhisperCpp } from './stt/whisperCpp';
 import { recoverLegacyApiKeys } from './secrets/legacySecretRecovery';
 import type { UpdateCheckResponse, UpdateProgressEvent } from '@shared/types';
+import { TUTORIAL_VIDEO_EMBED_ORIGIN } from '@shared/tutorialVideos';
 import { killChatGptSubscriptionServer } from './ai/codexSubscription';
 import { stopGitHubCopilotSubscription } from './ai/githubCopilotSubscription';
 import { installProcessSafetyNet } from './util/processSafety';
@@ -475,6 +476,18 @@ app.whenReady().then(() => {
     .replace(/\s+/g, ' ')
     .trim();
   session.defaultSession.setUserAgent(cleanUa);
+  // Same embeds, second obstacle: a packaged renderer is served from file://, so the
+  // frame request carries no http(s) referer and YouTube answers with its "error 153 —
+  // video player configuration error" card instead of the video. Only in packaged
+  // builds; from the dev server it works, which is exactly how this ships broken.
+  // Naming Nodus's own site as the embedding page is enough, and it is where these
+  // tutorials are published. Scoped to the one host Nodus ever frames.
+  session.defaultSession.webRequest.onBeforeSendHeaders(
+    { urls: [`${TUTORIAL_VIDEO_EMBED_ORIGIN}/*`] },
+    (details, callback) => {
+      callback({ requestHeaders: { ...details.requestHeaders, Referer: 'https://drakonis96.github.io/nodus/' } });
+    },
+  );
   // Nodus Toolkit OCR caches its Tesseract language traineddata here (the one
   // opt-in network call), so downloads persist across sessions in userData.
   if (!process.env.NODUS_TESSDATA_CACHE) {

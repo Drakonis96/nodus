@@ -84,5 +84,12 @@ const STEPS: TourStep[] = [
 ];
 
 export function Tour({ onClose, onNavigate }: { onClose: () => void; onNavigate: (v: ViewId) => void }) {
-  return <TourOverlay steps={STEPS} onClose={onClose} onNavigate={(v) => onNavigate(v as ViewId)} />;
+  return (
+    <TourOverlay
+      steps={STEPS}
+      vaultType="academic"
+      onClose={onClose}
+      onNavigate={(v) => onNavigate(v as ViewId)}
+    />
+  );
 }

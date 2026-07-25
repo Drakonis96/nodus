@@ -17,6 +17,8 @@ import {
   PLATFORM_HIGHLIGHTS_TUTORIAL_VERSION,
   platformHighlightSlides,
 } from '../components/PlatformHighlightsGuide';
+import { TutorialVideoGrid } from '../components/TutorialVideos';
+import { tutorialVideoCopy } from '@shared/tutorialVideos';
 import { t } from '../i18n';
 
 export const BASICS_TUTORIAL_VERSION = PLATFORM_HIGHLIGHTS_TUTORIAL_VERSION;
@@ -348,6 +350,9 @@ export function BasicsTutorial({ language, onLanguageChosen, onNodiStyleChosen, 
   // Which Nodi guides the rest of the tutorial is the user's first real choice, so the
   // deck that follows is already staged by the companion they picked.
   const [styleChosen, setStyleChosen] = useState(false);
+  // Third and last gate: watch the tutorials or read the deck. Not persisted — either
+  // path completes the guide, and both stay reachable from Settings → Tutorials.
+  const [learnMode, setLearnMode] = useState<'video' | 'text' | null>(null);
   const activeLanguage = tutorialLanguage ?? language;
   const slides = useMemo(() => activeLanguage === 'es' ? SpanishSlides() : activeLanguage === 'en' ? EnglishSlides() : CompactSlides(activeLanguage), [activeLanguage]);
   const [index, setIndex] = useState(0);
@@ -377,7 +382,7 @@ export function BasicsTutorial({ language, onLanguageChosen, onNodiStyleChosen, 
   }, []);
 
   useEffect(() => {
-    if (!tutorialLanguage || !styleChosen) return;
+    if (!tutorialLanguage || !styleChosen || learnMode !== 'text') return;
     const onKey = (event: KeyboardEvent) => {
       if (confirmSkip) return;
       if (event.key === 'ArrowRight' || event.key === 'Enter') setIndex((value) => Math.min(slides.length - 1, value + 1));
@@ -386,7 +391,12 @@ export function BasicsTutorial({ language, onLanguageChosen, onNodiStyleChosen, 
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [confirmSkip, slides.length, styleChosen, tutorialLanguage]);
+  }, [confirmSkip, learnMode, slides.length, styleChosen, tutorialLanguage]);
+
+  const videoCopy = tutorialVideoCopy(activeLanguage);
+  // Skipping is offered from every screen that follows the two mandatory choices, so
+  // the dialog is built once and rendered by each of them.
+  const skipDialog = confirmSkip && <ConfirmModal zIndex={220} title={t('¿Saltar la guía esencial?')} message={t('Esta guía explica los espacios de trabajo, los modelos que funcionan en tu equipo, los servicios externos y las búsquedas por significado.')} cancelLabel={t('Continuar tutorial')} confirmLabel={t('Saltar de todos modos')} danger onCancel={() => setConfirmSkip(false)} onConfirm={() => void onComplete()} />;
 
   if (!tutorialLanguage) return <div className="tutorial-cinema tutorial-language-screen" data-testid="basics-tutorial-language" role="dialog" aria-modal="true" aria-labelledby="tutorial-language-title"><div className="tutorial-aurora" aria-hidden="true" /><main className="tutorial-language-card"><NodiAvatar state="waving" height={190} /><p className="tutorial-eyebrow tutorial-language-brand"><Icon name="languages" size={15} /> NODUS</p><h1 id="tutorial-language-title">Choose the language for the tutorial</h1><div className="tutorial-language-grid">{TUTORIAL_LANGUAGES.map(({ code, label, flag }) => <button key={code} data-testid={`tutorial-language-${code}`} className="tutorial-language-option" style={{ '--tutorial-flag': flag } as React.CSSProperties} onClick={() => { setTutorialLanguage(code); setIndex(0); void onLanguageChosen(code); }}>{label}</button>)}</div></main></div>;
 
@@ -403,6 +413,48 @@ export function BasicsTutorial({ language, onLanguageChosen, onNodiStyleChosen, 
         onPick={(style) => { setStyleChosen(true); setIndex(0); void onNodiStyleChosen(style); }}
       />
     </main>
+  </div>;
+
+  // Third screen: watch the tutorials or read the deck. The video path is recommended
+  // because it is the same ground covered faster; the deck stays the offline path and
+  // one click away from here.
+  if (!learnMode) return <div className="tutorial-cinema tutorial-language-screen" data-testid="basics-tutorial-mode" role="dialog" aria-modal="true" aria-labelledby="tutorial-mode-title">
+    <div className="tutorial-aurora" aria-hidden="true" />
+    <main className="tutorial-language-card">
+      <p className="tutorial-eyebrow tutorial-language-brand"><Icon name="graduation" size={15} /> NODUS</p>
+      <h1 id="tutorial-mode-title">{videoCopy.chooseTitle}</h1>
+      <p>{videoCopy.chooseLede}</p>
+      <div className="tutorial-mode-grid">
+        <button type="button" className="tutorial-mode-option recommended" data-testid="tutorial-mode-video" onClick={() => setLearnMode('video')}>
+          <span className="tutorial-mode-badge">{videoCopy.videoOption.badge}</span>
+          <span className="tutorial-mode-icon"><Icon name="play" size={22} /></span>
+          <b>{videoCopy.videoOption.title}</b>
+          <span className="tutorial-mode-body">{videoCopy.videoOption.body}</span>
+        </button>
+        <button type="button" className="tutorial-mode-option" data-testid="tutorial-mode-text" onClick={() => setLearnMode('text')}>
+          <span className="tutorial-mode-icon"><Icon name="book" size={22} /></span>
+          <b>{videoCopy.textOption.title}</b>
+          <span className="tutorial-mode-body">{videoCopy.textOption.body}</span>
+        </button>
+      </div>
+      <p className="tutorial-videos-more"><Icon name="sparkles" size={13} />{videoCopy.more}</p>
+    </main>
+    {skipDialog}
+  </div>;
+
+  // The video path: the same cinema chrome, with the catalogue as a grid.
+  if (learnMode === 'video') return <div className="tutorial-cinema" data-testid="basics-tutorial-videos" role="dialog" aria-modal="true" aria-label={videoCopy.gridTitle}>
+    <div className="tutorial-aurora" aria-hidden="true" />
+    <header className="tutorial-topbar"><span>NODUS · {ui.guide}</span><button onClick={() => setConfirmSkip(true)}>{ui.skip}</button></header>
+    <TutorialVideoGrid language={activeLanguage} variant="cinema" />
+    <footer className="tutorial-footer">
+      {/* No `ui.pace` hint here: the arrow keys belong to the deck, not to the grid. */}
+      <button className="btn btn-ghost" data-testid="tutorial-mode-switch-text" onClick={() => { setIndex(0); setLearnMode('text'); }}>
+        <Icon name="book" />{videoCopy.textOption.title}
+      </button>
+      <button className="btn btn-primary" data-testid="basics-tutorial-complete" onClick={() => void onComplete()}>{ui.finish}<Icon name="check" /></button>
+    </footer>
+    {skipDialog}
   </div>;
 
   const motionProfiles = [
@@ -428,6 +480,6 @@ export function BasicsTutorial({ language, onLanguageChosen, onNodiStyleChosen, 
       </AnimatePresence>
     </main>
     <footer className="tutorial-footer"><button className="btn btn-ghost" disabled={index === 0} onClick={() => setIndex((value) => Math.max(0, value - 1))}><Icon name="arrowLeft" />{ui.back}</button><span>{ui.pace}</span>{last ? <button data-testid="basics-tutorial-complete" className="btn btn-primary" onClick={() => void onComplete()}>{ui.finish}<Icon name="check" /></button> : <button className="btn btn-primary" onClick={() => setIndex((value) => value + 1)}>{ui.next}<Icon name="chevronRight" /></button>}</footer>
-    {confirmSkip && <ConfirmModal zIndex={220} title={t('¿Saltar la guía esencial?')} message={t('Esta guía explica los espacios de trabajo, los modelos que funcionan en tu equipo, los servicios externos y las búsquedas por significado.')} cancelLabel={t('Continuar tutorial')} confirmLabel={t('Saltar de todos modos')} danger onCancel={() => setConfirmSkip(false)} onConfirm={() => void onComplete()} />}
+    {skipDialog}
   </div>;
 }
