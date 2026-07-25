@@ -73,9 +73,11 @@ export function RelationsSection({
         </div>
         <button
           className={PERSON_DOSSIER_ADD_BUTTON_CLASS}
+          title={t('Añadir')}
+          aria-label={t('Añadir relación')}
           onClick={() => setAdding(true)}
         >
-          <Icon name="plus" size={11} /> {t('Añadir relación')}
+          <Icon name="plus" size={14} />
         </button>
       </div>
 

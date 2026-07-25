@@ -22,7 +22,7 @@ import { MarkdownNotesEditor } from './MarkdownNotesEditor';
 import { RelationsSection } from './RelationsSection';
 import { PersonPlacesSection } from './PersonPlacesSection';
 import { KinshipEditor } from './KinshipEditor';
-import { PERSON_DOSSIER_ADD_BUTTON_CLASS, PERSON_DOSSIER_SECTION_CLASS } from './personDossierLayout';
+import { PERSON_DOSSIER_ACTION_BUTTON_CLASS, PERSON_DOSSIER_ADD_BUTTON_CLASS, PERSON_DOSSIER_SECTION_CLASS } from './personDossierLayout';
 import { confirm } from './feedback';
 import { useDismissableLayer } from '../hooks';
 import { t, tx } from '../i18n';
@@ -192,7 +192,7 @@ export function PersonDossier({
         <div className="mb-2 flex items-center gap-2">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('Biografía')}</h3>
           <button
-            className={`${PERSON_DOSSIER_ADD_BUTTON_CLASS} ml-auto`}
+            className={`${PERSON_DOSSIER_ACTION_BUTTON_CLASS} ml-auto`}
             disabled={bioBusy}
             onClick={() => void generateBio()}
           >
@@ -566,8 +566,8 @@ function NameVariantsEditor({ person, onChanged }: { person: Person; onChanged: 
     <section className={PERSON_DOSSIER_SECTION_CLASS} data-testid="person-dossier-name-variants">
       <div className="mb-2 flex items-center gap-2">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('Variantes del nombre')}</h3>
-        <button className={`${PERSON_DOSSIER_ADD_BUTTON_CLASS} ml-auto`} onClick={() => { setValue(''); setModalOpen(true); }}>
-          <Icon name="plus" size={11} /> {t('Añadir variante')}
+        <button className={`${PERSON_DOSSIER_ADD_BUTTON_CLASS} ml-auto`} title={t('Añadir')} aria-label={t('Añadir variante')} onClick={() => { setValue(''); setModalOpen(true); }}>
+          <Icon name="plus" size={14} />
         </button>
       </div>
       {person.names.length > 0 ? (
@@ -639,8 +639,8 @@ function EventsEditor({
         <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
           {t('Eventos de su vida')} <span className="text-neutral-600">({events.length})</span>
         </h3>
-        <button className={`${PERSON_DOSSIER_ADD_BUTTON_CLASS} ml-auto`} onClick={() => setAdding(true)}>
-          <Icon name="plus" size={11} /> {t('Añadir evento')}
+        <button className={`${PERSON_DOSSIER_ADD_BUTTON_CLASS} ml-auto`} title={t('Añadir')} aria-label={t('Añadir evento')} onClick={() => setAdding(true)}>
+          <Icon name="plus" size={14} />
         </button>
       </div>
 
