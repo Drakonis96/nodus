@@ -62,9 +62,11 @@ export function PersonPlacesSection({ personId }: { personId: string }) {
         </h3>
         <button
           className={`${PERSON_DOSSIER_ADD_BUTTON_CLASS} ml-auto`}
+          title={t('Añadir')}
+          aria-label={t('Añadir lugar')}
           onClick={() => setAdding(true)}
         >
-          <Icon name="plus" size={11} /> {t('Añadir lugar')}
+          <Icon name="plus" size={14} />
         </button>
       </div>
 

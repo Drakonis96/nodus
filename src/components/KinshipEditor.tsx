@@ -150,8 +150,8 @@ export function KinshipEditor({ person, persons, onChanged, compact = false }: {
             {t('Padres, hijos, hermanos y parejas vinculados a esta persona.')}
           </p>
         </div>
-        <button className={PERSON_DOSSIER_ADD_BUTTON_CLASS} onClick={openNew}>
-          <Icon name="plus" size={11} /> {t('Añadir relación')}
+        <button className={PERSON_DOSSIER_ADD_BUTTON_CLASS} title={t('Añadir')} aria-label={t('Añadir relación')} onClick={openNew}>
+          <Icon name="plus" size={14} />
         </button>
       </div>
 

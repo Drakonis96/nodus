@@ -31,16 +31,31 @@ test('every person dossier area uses the shared section block', () => {
 });
 
 test('all dossier add actions share exactly one size contract', () => {
-  assert.match(layout, /PERSON_DOSSIER_ADD_BUTTON_CLASS[\s\S]*h-auto min-h-9 min-w-44/);
-  assert.match(layout, /whitespace-normal/);
-  assert.match(layout, /px-4 py-2 text-center/);
+  assert.match(layout, /PERSON_DOSSIER_ADD_BUTTON_CLASS[\s\S]*h-8 w-8 shrink-0/);
+  assert.match(layout, /PERSON_DOSSIER_ACTION_BUTTON_CLASS[\s\S]*h-auto min-h-9 min-w-44/);
   assert.match(dossier, /PERSON_DOSSIER_ADD_BUTTON_CLASS/);
-  assert.match(dossier, /Biografía'[\s\S]{0,240}PERSON_DOSSIER_ADD_BUTTON_CLASS/);
+  assert.match(dossier, /Biografía'[\s\S]{0,240}PERSON_DOSSIER_ACTION_BUTTON_CLASS/);
   assert.match(kinship, /PERSON_DOSSIER_ADD_BUTTON_CLASS/);
   assert.match(social, /PERSON_DOSSIER_ADD_BUTTON_CLASS/);
   assert.match(places, /PERSON_DOSSIER_ADD_BUTTON_CLASS/);
   assert.doesNotMatch(dossier, /Añadir variante'[\s\S]{0,180}h-6/);
   assert.doesNotMatch(dossier, /Añadir evento'[\s\S]{0,180}h-6/);
+});
+
+test('icon-only add buttons keep their label in the tooltip and for screen readers', () => {
+  for (const [source, label] of [
+    [kinship, 'Añadir relación'],
+    [social, 'Añadir relación'],
+    [places, 'Añadir lugar'],
+    [dossier, 'Añadir variante'],
+    [dossier, 'Añadir evento'],
+  ]) {
+    assert.match(source, new RegExp(`title=\\{t\\('Añadir'\\)\\}[\\s\\S]{0,40}aria-label=\\{t\\('${label}'\\)\\}`));
+  }
+  // The wording must not sit inside the button any more: that is what stacked vertically.
+  for (const source of [kinship, social, places, dossier]) {
+    assert.doesNotMatch(source, /<Icon name="plus"[^>]*\/>\s*\{t\('Añadir/);
+  }
 });
 
 test('portrait actions keep side padding and grow for translated labels', () => {
