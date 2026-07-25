@@ -121,14 +121,14 @@ function applyThemeClasses(theme: import('@shared/types').ThemeMode): boolean {
 }
 
 /** Header action rendered as an icon that reveals its label on hover/focus, so the
- *  top bar's action rail stays a clean row of icons. Pass `showLabel` to keep the
- *  text pinned open (e.g. the primary action, or an alert that must be noticed). */
+ *  top bar's action rail stays a clean row of icons. Every action shares the same
+ *  ghost styling so none stands out; pass `showLabel` to keep the text pinned open
+ *  (e.g. an action in progress, or an alert that must be noticed). */
 function HeaderAction({
   icon,
   label,
   onClick,
   title,
-  primary = false,
   tone = '',
   spinning = false,
   showLabel = false,
@@ -141,7 +141,6 @@ function HeaderAction({
   label: string;
   onClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
   title?: string;
-  primary?: boolean;
   tone?: string;
   spinning?: boolean;
   showLabel?: boolean;
@@ -158,7 +157,7 @@ function HeaderAction({
       disabled={disabled}
       title={title ?? label}
       aria-label={label}
-      className={`header-action group btn ${primary ? 'btn-primary' : 'btn-ghost'} h-9 min-h-9 justify-center px-2.5 py-0 leading-none ${tone}`}
+      className={`header-action group btn btn-ghost h-9 min-h-9 justify-center px-2.5 py-0 leading-none ${tone}`}
     >
       <Icon name={icon} className={`shrink-0 ${spinning ? 'animate-spin' : ''}`} />
       <span
@@ -1023,7 +1022,6 @@ export function App() {
               dataTour="sync"
               icon="refresh"
               label={syncing ? t('Actualizando…') : t('Actualizar')}
-              primary
               spinning={syncing}
               showLabel={syncing}
               disabled={syncing}
