@@ -71,6 +71,7 @@ export function GenealogyTour({ onClose, onNavigate }: { onClose: () => void; on
     <TourOverlay
       steps={STEPS}
       label="Tutorial de genealogía"
+      vaultType="genealogy"
       onClose={onClose}
       onNavigate={(v) => onNavigate(v as View)}
     />

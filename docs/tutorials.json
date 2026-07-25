@@ -1,0 +1,8 @@
+{
+  "$comment": "Published video tutorials, read by Nodus when a user opens a tutorial grid (see shared/tutorialVideos.ts). Adding an entry here reaches installed copies without a release. Rules the app enforces on this file: `id` is a lowercase slug, `youtubeId` must be exactly 11 YouTube-id characters, `order` sets the position, `icon` must be one of the allowed names (play, network, archive, sparkles, graduation, layers, tree, table, chartBar, microphone, image, tools, star), `vaultType` may name a vault so its tour offers the video, and `copy` carries the title/description per language (es, en, fr, tr, de, it, pt, pt-BR, zh, ja, ru, uk). A new entry with no usable copy is dropped; a built-in id may omit copy and keep the translations compiled into the app. Malformed entries are ignored one by one, and this file can never hide a tutorial the app already ships.",
+  "videos": [
+    { "id": "essentials", "youtubeId": "QqSY1_DeDRM", "order": 1, "icon": "network" },
+    { "id": "academic", "youtubeId": "Z-5CpJBVV_I", "order": 2, "icon": "archive", "vaultType": "academic" },
+    { "id": "nodi", "youtubeId": "5OTe5CtefME", "order": 3, "icon": "sparkles" }
+  ]
+}

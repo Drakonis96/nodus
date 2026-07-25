@@ -1,5 +1,9 @@
 import { useEffect, useLayoutEffect, useState } from 'react';
-import { t } from '../i18n';
+import type { VaultType } from '@shared/types';
+import { tutorialVideoCopy, tutorialVideoForVault, type TutorialVideo } from '@shared/tutorialVideos';
+import { TutorialVideoPlayer } from '../components/TutorialVideos';
+import { Icon } from '../components/ui';
+import { getActiveLang, t } from '../i18n';
 
 export interface TourStep {
   /** A `data-tour="…"` value to spotlight. Omit for a centered, target-less step. */
@@ -29,11 +33,21 @@ export function TourOverlay({
   steps,
   label = 'Tutorial',
   accent = DEFAULT_ACCENT,
+  vaultType,
   onClose,
   onNavigate,
 }: {
   steps: TourStep[];
   label?: string;
+  /**
+   * The vault this tour teaches. If a video covers it, the opening step offers it as the
+   * recommended third option next to the in-app walkthrough and "not now"; watching it
+   * counts as having taken the tour, which is why the player closing also closes the
+   * tour (Settings can replay either at any time). The video is looked up in the
+   * published catalogue, so a vault gains the option the day its video ships — no
+   * release required, and no change to this component.
+   */
+  vaultType?: VaultType;
   /**
    * Spotlight colour. The eyebrow and the progress dots are Tailwind `indigo-*`
    * utilities, which the per-vault `.<type>` blocks in index.css already remap; the
@@ -45,6 +59,8 @@ export function TourOverlay({
   onNavigate: (view: string) => void;
 }) {
   const [i, setI] = useState(0);
+  const [watchingVideo, setWatchingVideo] = useState(false);
+  const [video, setVideo] = useState<TutorialVideo | undefined>(() => tutorialVideoForVault(vaultType));
   const [rect, setRect] = useState<Rect | null>(null);
   // The card node lives in state rather than a ref so the first measurement happens as
   // soon as it mounts; a plain ref is still null on the pass that positions it.
@@ -58,6 +74,17 @@ export function TourOverlay({
   useEffect(() => {
     if (step.view) onNavigate(step.view);
   }, [i, step.view, onNavigate]);
+
+  // A video published after this build still reaches the opening step.
+  useEffect(() => {
+    if (!vaultType) return;
+    let cancelled = false;
+    void window.nodus.getTutorialCatalogue().then((catalogue) => {
+      if (cancelled || !Array.isArray(catalogue)) return;
+      setVideo(tutorialVideoForVault(vaultType, catalogue));
+    }).catch(() => { /* keep whatever this build knows */ });
+    return () => { cancelled = true; };
+  }, [vaultType]);
 
   /**
    * Measure the target, RETRYING until it appears.
@@ -110,6 +137,9 @@ export function TourOverlay({
   }, [card, i]);
 
   useEffect(() => {
+    // While the video plays, the keyboard belongs to the player: Escape has to leave
+    // fullscreen or close it, not dismiss the tour underneath.
+    if (watchingVideo) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
       else if (e.key === 'ArrowRight' || e.key === 'Enter') setI((n) => Math.min(steps.length - 1, n + 1));
@@ -117,7 +147,7 @@ export function TourOverlay({
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose, steps.length]);
+  }, [onClose, steps.length, watchingVideo]);
 
   const pad = 6;
   const spotlight: Rect | null = rect
@@ -174,7 +204,11 @@ export function TourOverlay({
         <h3 className="font-semibold text-base mb-1">{t(step.title)}</h3>
         <p className="text-neutral-300 leading-relaxed">{t(step.body)}</p>
 
-        <div className="flex items-center justify-between mt-4">
+        {/* The opening step offers up to three ways in, and the card is only 360px wide:
+            side by side they overflowed it and each label broke into three lines. They
+            are stacked full-width instead — which is also the shape every other vault
+            gets the day its own video is published. Later steps keep the compact row. */}
+        <div className={`mt-4 ${isFirst ? 'flex flex-col gap-3' : 'flex items-center justify-between'}`}>
           <div className="flex gap-1">
             {steps.map((_, n) => (
               <span
@@ -183,7 +217,7 @@ export function TourOverlay({
               />
             ))}
           </div>
-          <div className="flex gap-2">
+          <div className={isFirst ? 'flex flex-col gap-2' : 'flex gap-2'}>
             {!isFirst && (
               <button className="btn btn-ghost" onClick={() => setI((n) => Math.max(0, n - 1))}>
                 {t('Atrás')}
@@ -191,11 +225,20 @@ export function TourOverlay({
             )}
             {isFirst ? (
               <>
-                <button className="btn btn-ghost" onClick={onClose}>
-                  {t('Ahora no')}
-                </button>
-                <button className="btn btn-primary" onClick={() => setI(1)}>
+                {video && (
+                  <button className="btn btn-primary w-full" data-testid="tour-watch-video" onClick={() => setWatchingVideo(true)}>
+                    <Icon name="play" size={14} />
+                    {tutorialVideoCopy(getActiveLang()).tourVideo}
+                  </button>
+                )}
+                <button
+                  className={`w-full ${video ? 'btn btn-ghost border border-neutral-700' : 'btn btn-primary'}`}
+                  onClick={() => setI(1)}
+                >
                   {t('Sí, enséñame')}
+                </button>
+                <button className="btn btn-ghost w-full" onClick={onClose}>
+                  {t('Ahora no')}
                 </button>
               </>
             ) : isLast ? (
@@ -210,6 +253,14 @@ export function TourOverlay({
           </div>
         </div>
       </div>
+
+      {watchingVideo && video && (
+        <TutorialVideoPlayer
+          video={video}
+          language={getActiveLang()}
+          onClose={() => { setWatchingVideo(false); onClose(); }}
+        />
+      )}
     </div>
   );
 }

@@ -1174,6 +1174,7 @@ const api: NodusApi = {
   chooseBackupFolder: () => ipcRenderer.invoke('backup:chooseFolder'),
   runBackupNow: () => ipcRenderer.invoke('backup:runNow'),
   saveBackupRecoveryKit: () => ipcRenderer.invoke('backup:saveRecoveryKit'),
+  getTutorialCatalogue: () => ipcRenderer.invoke('tutorials:catalogue'),
   getRecoveryStatus: () => ipcRenderer.invoke('recovery:status'),
   chooseRecoveryFolder: (mode, language) => ipcRenderer.invoke('recovery:chooseFolder', mode, language),
   initializeRecoveryFolder: (folder, password, language) => ipcRenderer.invoke('recovery:initialize', folder, password, language),

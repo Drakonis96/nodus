@@ -157,6 +157,10 @@ try {
     pageErrors.push(err);
     process.stderr.write(`[e2e][pageerror] ${err?.stack ?? err}\n`);
   });
+  // Kept so the tutorial walk can prove the CSP actually admits the video embed: a
+  // blocked frame never attaches, it only logs "Refused to frame …".
+  const consoleMessages = [];
+  page.on('console', (message) => { consoleMessages.push(message.text()); });
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => {
     const root = document.getElementById('root');
@@ -233,6 +237,41 @@ try {
     const settings = await window.nodus.getSettings();
     return settings.mascotStyle === 'classic' && settings.mascotStyleChosen === true;
   }));
+  // Third screen: watch the tutorials or read the deck. Walk the video path first —
+  // including the player, whose embed the CSP has to admit — then come back to the
+  // written guide, which is the offline path the rest of this walk relies on.
+  await page.getByTestId('basics-tutorial-mode').waitFor({ timeout: 30_000 });
+  await page.getByText('Comment préférez-vous apprendre ?', { exact: true }).waitFor();
+  await page.getByTestId('tutorial-mode-video').click();
+  await page.getByTestId('basics-tutorial-videos').waitFor({ timeout: 30_000 });
+  assert.equal(await page.locator('.tutorial-video-card').count(), 3, 'the video mode lists the three published tutorials');
+  assert.match(
+    await page.getByTestId('tutorial-videos-more').innerText(),
+    /D’autres tutoriels arrivent bientôt/,
+    'the promise of more tutorials is translated, not left in Spanish'
+  );
+  await page.getByTestId('tutorial-video-play-essentials').click();
+  const videoPlayer = page.getByTestId('tutorial-video-player');
+  await videoPlayer.waitFor({ timeout: 30_000 });
+  const embedSrc = (await videoPlayer.locator('iframe').getAttribute('src')) ?? '';
+  assert.match(embedSrc, /^https:\/\/www\.youtube-nocookie\.com\/embed\/QqSY1_DeDRM\?/, 'the player embeds the no-cookie host');
+  assert.match(embedSrc, /hl=fr/, 'the embed follows the language chosen for the tutorial');
+  assert.equal(await videoPlayer.locator('iframe[allowfullscreen]').count(), 1, 'the embedded player can go fullscreen');
+  await waitForCondition('vídeo marcado como visto', () => page.evaluate(async () => {
+    const settings = await window.nodus.getSettings();
+    return Array.isArray(settings.tutorialVideosWatched) && settings.tutorialVideosWatched.includes('essentials');
+  }));
+  await page.getByTestId('tutorial-video-close').click();
+  await videoPlayer.waitFor({ state: 'detached' });
+  assert.equal(
+    await page.getByTestId('tutorial-video-card-essentials').getAttribute('data-watched'),
+    'true',
+    'the card reflects the watched flag once the player closes'
+  );
+  const framingRefusals = consoleMessages.filter((text) => /Refused to frame/i.test(text));
+  assert.deepEqual(framingRefusals, [], `the CSP admits the tutorial embed: ${framingRefusals.join(' | ')}`);
+  await page.getByTestId('tutorial-mode-switch-text').click();
+
   await page.getByTestId('basics-tutorial').waitFor({ timeout: 30_000 });
   // French now has a full UI translation, so choosing it keeps the French interface
   // instead of borrowing the English one.
