@@ -175,10 +175,17 @@ function createMascotWindow(): BrowserWindow {
     if (!tutorialVisible) win.showInactive();
   });
 
+  // positionBottomRight() above already placed the window, so the placement is
+  // known before the page loads. Carrying it in the URL lets the overlay draw
+  // its first frame in the right spot without a synchronous IPC round-trip —
+  // that call used to stall Nodi's renderer whenever the main process was busy.
+  const query = { placement: JSON.stringify(placement) };
   if (VITE_DEV_SERVER_URL) {
-    void win.loadURL(new URL('mascot.html', VITE_DEV_SERVER_URL).toString());
+    const devUrl = new URL('mascot.html', VITE_DEV_SERVER_URL);
+    devUrl.searchParams.set('placement', query.placement);
+    void win.loadURL(devUrl.toString());
   } else {
-    void win.loadFile(path.join(RENDERER_DIST, 'mascot.html'));
+    void win.loadFile(path.join(RENDERER_DIST, 'mascot.html'), { query });
   }
 
   win.on('closed', () => {

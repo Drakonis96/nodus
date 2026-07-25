@@ -340,7 +340,10 @@
 .nodi-chat-msgs,
 .nodi-msg,
 .nodi-msg .md { -webkit-user-select: text; user-select: text; }
-.nodi-msg { position: relative; font-size: 13px; line-height: 1.5; padding: 7px 32px 7px 10px; border-radius: 12px; max-width: 86%; white-space: pre-wrap; word-break: break-word; }
+/* flex: 0 0 auto for the same reason as .nodi-note-row: without it a long
+ * conversation is compressed into the panel instead of scrolling, and the
+ * bubbles overlap each other. */
+.nodi-msg { position: relative; flex: 0 0 auto; font-size: 13px; line-height: 1.5; padding: 7px 32px 7px 10px; border-radius: 12px; max-width: 86%; white-space: pre-wrap; word-break: break-word; }
 .nodi-msg.user { align-self: flex-end; background: #24406b; color: #eaf1ff; border-bottom-right-radius: 4px; }
 .nodi-msg.assistant { align-self: flex-start; background: #1a2130; color: #e7ebf2; border-bottom-left-radius: 4px; white-space: normal; }
 .nodi-msg-copy {
@@ -623,6 +626,11 @@
   grid-template-columns: minmax(0, 1fr) 30px;
   align-items: stretch;
   gap: 3px;
+  /* The list is a column flexbox with a definite height, so a row left at the
+   * default flex-shrink:1 is squashed to fit instead of overflowing — the list
+   * never scrolls and every row's `overflow: hidden` slices its own text in
+   * half. Rows keep their natural height; the list scrolls. */
+  flex: 0 0 auto;
   overflow: hidden;
   border-radius: 9px;
   background: transparent;

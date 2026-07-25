@@ -1,5 +1,6 @@
 import os from 'node:os';
-import { gzipSync } from 'node:zlib';
+import { gzip } from 'node:zlib';
+import { promisify } from 'node:util';
 import Database from 'better-sqlite3';
 import { getDb, withVaultDatabase } from '../db/database';
 import { getActiveVault, getVault, listVaults } from '../vaults/vaultRegistry';
@@ -28,6 +29,8 @@ import { buildServerSnapshot, lightweightVaultRevision } from './serverSnapshot'
 // active one on change and refreshes the rest once per run. Connections are surfaced
 // together so Settings shows them from any vault instead of pretending the current
 // vault is "unconfigured".
+
+const gzipAsync = promisify(gzip);
 
 const CHECK_INTERVAL_MS = 30_000;
 const QUIET_PERIOD_MS = 60_000;
@@ -260,7 +263,10 @@ async function publishVault(vaultId: string): Promise<void> {
       return;
     }
     // Level 1 deliberately trades a little bandwidth for very low desktop CPU usage.
-    const compressed = gzipSync(snapshot.buffer, { level: 1 });
+    // Compressing asynchronously puts even that on libuv's threadpool: this runs on
+    // a 30 s timer, and the main process is the single thread every window's IPC
+    // goes through — including the Nodi overlay's.
+    const compressed = await gzipAsync(snapshot.buffer, { level: 1 });
     const response = await fetchWithTimeout(
       `${normalizeUrl(config.url)}/api/v1/spaces/${encodeURIComponent(config.spaceId)}/snapshot`,
       {
