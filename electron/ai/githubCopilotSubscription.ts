@@ -4,16 +4,16 @@ import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-type CopilotModelInfo = import('@github/copilot-sdk').ModelInfo;
-let CopilotClient: typeof import('@github/copilot-sdk').CopilotClient;
+import type { CopilotClient, ModelInfo as CopilotModelInfo } from '@github/copilot-sdk';
+let CopilotClientCtor: typeof import('@github/copilot-sdk').CopilotClient;
 let RuntimeConnection: typeof import('@github/copilot-sdk').RuntimeConnection;
 try {
   const req = createRequire(__filename);
   const sdk = req('@github/copilot-sdk');
-  CopilotClient = sdk.CopilotClient;
+  CopilotClientCtor = sdk.CopilotClient;
   RuntimeConnection = sdk.RuntimeConnection;
 } catch {
-  CopilotClient = class {} as any;
+  CopilotClientCtor = class {} as any;
   RuntimeConnection = { forStdio: () => ({}) } as any;
 }
 import { ProviderRuntimeError } from './providerErrors';
@@ -124,7 +124,7 @@ function sanitizedEnv(): Record<string, string> {
 function getClient(): CopilotClient {
   if (client) return client;
   const home = copilotHome();
-  client = new CopilotClient({
+  client = new CopilotClientCtor({
     connection: RuntimeConnection.forStdio({ path: resolveGitHubCopilotBinaryPath(), env: sanitizedEnv() }),
     mode: 'empty',
     baseDirectory: home,
