@@ -216,6 +216,35 @@ export const TREE_KINSHIP_ROLE_LABEL_PT_BR: Record<TreeKinshipRole, string> = {
   unrelated: 'Sem parentesco registrado',
 };
 
+export const TREE_KINSHIP_ROLE_LABEL_TR: Record<TreeKinshipRole, string> = {
+  focus: 'Odak kişi', father: 'Baba', mother: 'Anne', parent: 'Ebeveyn',
+  grandfather: 'Dede', grandmother: 'Büyükanne', grandparent: 'Dede/Büyükanne',
+  paternal_grandfather: 'Dede (Baba tarafı)', paternal_grandmother: 'Babaanne', paternal_grandparent: 'Dede/Babaanne',
+  maternal_grandfather: 'Dede (Anne tarafı)', maternal_grandmother: 'Anneanne', maternal_grandparent: 'Dede/Anneanne',
+  great_grandfather: 'Büyük dede', great_grandmother: 'Büyük büyükanne', great_grandparent: 'Büyük dede/büyükanne',
+  great_great_grandfather: 'Büyük büyük dede', great_great_grandmother: 'Büyük büyük büyükanne', great_great_grandparent: 'Büyük büyük dede/büyükanne',
+  paternal_ancestor: 'Baba tarafı ata', maternal_ancestor: 'Anne tarafı ata', ancestor: 'Ata',
+  brother: 'Erkek kardeş', sister: 'Kız kardeş', sibling: 'Kardeş', husband: 'Koca', wife: 'Eş (Kadın)', spouse: 'Eş',
+  son: 'Oğul', daughter: 'Kız çocuk', child: 'Çocuk', grandson: 'Erkek torun', granddaughter: 'Kız torun', grandchild: 'Torun',
+  great_grandson: 'Erkek torun çocuğu', great_granddaughter: 'Kız torun çocuğu', great_grandchild: 'Torun çocuğu',
+  great_great_grandson: 'Büyük erkek torun çocuğu', great_great_granddaughter: 'Büyük kız torun çocuğu', great_great_grandchild: 'Büyük torun çocuğu',
+  paternal_uncle: 'Amca', paternal_aunt: 'Hala', maternal_uncle: 'Dayı', maternal_aunt: 'Teyze', uncle_aunt: 'Amca/Hala/Dayı/Teyze',
+  paternal_granduncle: 'Büyük amca (Baba tarafı)', paternal_grandaunt: 'Büyük hala', maternal_granduncle: 'Büyük dayı', maternal_grandaunt: 'Büyük teyze', granduncle_aunt: 'Büyük amca/hala/dayı/teyze',
+  great_granduncle: 'Büyük büyük amca/dayı', great_grandaunt: 'Büyük büyük hala/teyze', great_granduncle_aunt: 'Büyük büyük amca/hala/dayı/teyze',
+  nephew: 'Erkek yeğen', niece: 'Kız yeğen', nibling: 'Yeğen',
+  grandnephew: 'Erkek yeğen çocuğu', grandniece: 'Kız yeğen çocuğu', grandnibling: 'Yeğen çocuğu',
+  great_grandnephew: 'Erkek yeğen torunu', great_grandniece: 'Kız yeğen torunu', great_grandnibling: 'Yeğen torunu',
+  male_cousin: 'Erkek kuzen', female_cousin: 'Kız kuzen', cousin: 'Kuzen',
+  father_in_law: 'Kayınpeder', mother_in_law: 'Kayınvalide', parent_in_law: 'Kayınpeder/Kayınvalide',
+  son_in_law: 'Damat', daughter_in_law: 'Gelin', child_in_law: 'Damat/Gelin',
+  brother_in_law: 'Kayınbirader / Enişte', sister_in_law: 'Baldız / Yenge / Görümce', sibling_in_law: 'Kayınbirader/Baldız/Görümce/Enişte/Yenge',
+  stepfather: 'Üvey baba', stepmother: 'Üvey anne', stepparent: 'Üvey ebeveyn',
+  stepson: 'Üvey oğul', stepdaughter: 'Üvey kız çocuk', stepchild: 'Üvey çocuk',
+  co_parent: 'Ortak ebeveyn',
+  descendant: 'Soydan gelen', relative_by_marriage: 'Hısım (Evlilik yoluyla akraba)', connected_relative: 'Aile bağlantısı',
+  unrelated: 'Kayıtlı akrabalık yok',
+};
+
 /** Every role table by language, for {@link treeKinshipLabel}. */
 export const TREE_KINSHIP_ROLE_LABELS: Record<AppLanguage, Record<TreeKinshipRole, string>> = {
   es: TREE_KINSHIP_ROLE_LABEL_ES,
@@ -225,6 +254,7 @@ export const TREE_KINSHIP_ROLE_LABELS: Record<AppLanguage, Record<TreeKinshipRol
   pt: TREE_KINSHIP_ROLE_LABEL_PT,
   'pt-BR': TREE_KINSHIP_ROLE_LABEL_PT_BR,
   it: TREE_KINSHIP_ROLE_LABEL_IT as Record<TreeKinshipRole, string>,
+  tr: TREE_KINSHIP_ROLE_LABEL_TR,
 };
 
 /** The languages kinship labels exist in; derived so it cannot drift from the tables. */
@@ -245,6 +275,7 @@ const SPOUSE_WORD: Record<AppLanguage, readonly [string, string, string]> = {
   pt: ['Marido', 'Esposa', 'Cônjuge'],
   'pt-BR': ['Marido', 'Esposa', 'Cônjuge'],
   it: ['Marito', 'Moglie', 'Coniuge'],
+  tr: ['Koca', 'Eş', 'Eş'],
 };
 
 const SPOUSE_OF: Record<AppLanguage, (spouse: string, relation: string) => string> = {
@@ -255,6 +286,7 @@ const SPOUSE_OF: Record<AppLanguage, (spouse: string, relation: string) => strin
   pt: (spouse, relation) => `${spouse} de ${relation}`,
   'pt-BR': (spouse, relation) => `${spouse} de ${relation}`,
   it: (spouse, relation) => `${spouse} di ${relation}`,
+  tr: (spouse, relation) => `${relation} adlı yakınınızın ${spouse.toLowerCase()}ı`,
 };
 
 /** "<relation> of their spouse" — the noun is fixed, so the possessive can agree. */
@@ -266,6 +298,7 @@ const OF_SPOUSE: Record<AppLanguage, (base: string) => string> = {
   pt: (base) => `${base} do seu cônjuge`,
   'pt-BR': (base) => `${base} do seu cônjuge`,
   it: (base) => `${base} del coniuge`,
+  tr: (base) => `Eşinizin ${base.toLowerCase()}ı`,
 };
 
 const CONNECTION_LABEL: Record<AppLanguage, string> = {
@@ -276,6 +309,7 @@ const CONNECTION_LABEL: Record<AppLanguage, string> = {
   pt: 'Ligação familiar',
   'pt-BR': 'Conexão familiar',
   it: 'Legame familiare',
+  tr: 'Aile bağlantısı',
 };
 
 export interface TreeKinshipContext {

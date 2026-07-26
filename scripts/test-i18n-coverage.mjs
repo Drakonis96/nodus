@@ -49,6 +49,7 @@ const TRANSLATIONS = [
   { name: 'European Portuguese', file: 'src/i18n.pt.ts', export: 'PT' },
   { name: 'Brazilian Portuguese', file: 'src/i18n.pt-BR.ts', export: 'PT_BR' },
   { name: 'Italian', file: 'src/i18n.it.ts', export: 'IT' },
+  { name: 'Turkish', file: 'src/i18n.tr.ts', export: 'TR' },
 ].map((entry) => ({ ...entry, table: loadModule(entry.file)[entry.export] }));
 
 const EN = TRANSLATIONS[0].table;

@@ -583,6 +583,7 @@ export function Settings({
                 <option value="pt">Português (Portugal)</option>
                 <option value="pt-BR">Português (Brasil)</option>
                 <option value="it">Italiano</option>
+                <option value="tr">Türkçe</option>
               </select>
             </Row>
             <Row label={t('Idioma de los prompts (idioma de las ideas generadas)')}>
@@ -1289,6 +1290,7 @@ export function Settings({
                           <option value="pt">Português (Portugal)</option>
                           <option value="pt-BR">Português (Brasil)</option>
                           <option value="it">Italiano</option>
+                          <option value="tr">Türkçe</option>
                         </select>
                       </Row>
 
