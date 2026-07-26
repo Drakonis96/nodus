@@ -242,6 +242,36 @@ const PRIVACY: Record<AppLanguage, LegalDocContent> = {
     ],
     canonicalLabel: 'Leggi l’informativa sulla privacy completa su GitHub',
   },
+  tr: {
+    title: 'Gizlilik ve veri kontrolü',
+    intro:
+      'Nodus öncelikle cihazınızda çalışır: hesap gerektirmez, reklam, telemetri veya uzaktan analitik içermez ve kasa içeriğinizi alan kendi arka sunucusunu çalıştırmaz.',
+    sections: [
+      {
+        heading: 'Cihazınızda neler kalır',
+        bullets: [
+          'Veritabanları, dosyalar, kayıtlar, deşifreler, notlar, dosyalar ve sonuçlar cihazınızda saklanır.',
+          'Bir dosya seçmek veya bir kayıt başlatmak onu asla yayınlamaz veya Nodus’a yüklemez.',
+        ],
+      },
+      {
+        heading: 'Veriler cihazdan ne zaman ayrılır',
+        bullets: [
+          'Yalnızca açıkça etkinleştirdiğiniz isteğe bağlı özellikler üçüncü taraflarla iletişim kurar: seçtiğiniz bir bulut yapay zeka sağlayıcısı, Zotero, Unpaywall, GitHub (güncelleme kontrolleri) veya Hugging Face (model indirmeleri).',
+          'OpenAI Secure MCP Tunnel aracılığıyla ChatGPT bağlarsanız, OpenAI araç isteklerini ve sonuçlarını alır; Nodus sunucusu bu cihazla sınırlı kalır.',
+          'İsteğe bağlı kendi sunucunuzda barındırılan Nodus Sunucusunu bağlarsanız, kasanın filtrelenmiş bir kopyası HTTPS üzerinden yayınlanır; PDF’leri, kimlik bilgilerini, yolları, gömmeleri, öğrenci listelerini ve notları hariç tutar.',
+          'Her harici hizmet kullanılmadan önce tanımlanır.',
+        ],
+      },
+      {
+        heading: 'Öğrenciler ve öğretim verileri',
+        bullets: [
+          'Yapay zeka asla öğrenci listelerini, notlarını veya yanıtlarını almaz ve öğrencileri notlandıramaz, profilleyemez veya değerlendiremez.',
+        ],
+      },
+    ],
+    canonicalLabel: 'Gizlilik politikasının tamamını GitHub’da okuyun',
+  },
 };
 
 const GDPR: Record<AppLanguage, LegalDocContent> = {
@@ -406,6 +436,29 @@ const GDPR: Record<AppLanguage, LegalDocContent> = {
     ],
     canonicalLabel: 'Aprire la lista di implementazione GDPR su GitHub',
   },
+  tr: {
+    title: 'Nodus KVKK / GDPR uyumluluğunu nasıl destekler',
+    intro:
+      'Tasarım; veri minimizasyonu, varsayılan olarak gizlilik ve kayıttan hemen önce bildirimler uygular. Bu, uyumluluğu kolaylaştırır ancak bir sertifikasyon değildir: veri sorumlusu hukuki sebebi, saklama süresini, erişimi ve sağlayıcıları belirler.',
+    sections: [
+      {
+        heading: 'Tarımsal tasarımla gizlilik',
+        bullets: [
+          'Yerel işleme, isteğe bağlı harici bağlantılardan açıkça ayrılır.',
+          'Kayıt gibi hassas eylemlerden hemen önce kısa bildirimler görünür.',
+        ],
+      },
+      {
+        heading: 'Sorumluluğunuzda kalan hususlar',
+        bullets: [
+          'Her bir amacı, hukuki sebebi, saklama süresini ve alıcıyı belgelemek.',
+          'İlgili kişilere eksiksiz aydınlatma bildirimini sunmak.',
+          'Kuruluşunuz için dağıtım kontrol listesini tamamlamak.',
+        ],
+      },
+    ],
+    canonicalLabel: 'GDPR / KVKK dağıtım kontrol listesini GitHub’da açın',
+  },
 };
 
 const LICENSES: Record<AppLanguage, LegalDocContent> = {
@@ -555,6 +608,27 @@ const LICENSES: Record<AppLanguage, LegalDocContent> = {
       },
     ],
     canonicalLabel: 'Visualizza gli avvisi di terze parti su GitHub',
+  },
+  tr: {
+    title: 'Lisanslar ve atıflar',
+    intro:
+      'Nodus, MIT Lisansı altında yayınlanmıştır. Her bir üçüncü taraf bileşeni, modeli, sesi veya veri seti için gerekli lisanslar, atıflar ve bildirimler her sürümle birlikte gelir.',
+    sections: [
+      {
+        heading: 'Açık kaynak',
+        bullets: [
+          'Nodus’un kaynak kodu, geçmişi ve yasal belgeleri açık ve denetlenebilirdir.',
+        ],
+      },
+      {
+        heading: 'Üçüncü taraf bildirimleri',
+        bullets: [
+          'Paketlenen her uygulama; MIT lisansını, üretim bağımlılıklarının tam dökümünü ve gerekli bildirimleri (ONNX Runtime, sharp/libvips, Electron, Chromium, GPL/LGPL ve Creative Commons metinleri) içeren yasal bir dizin barındırır.',
+          'LGPL bileşenlerini yeniden derleme veya değiştirme talimatları dahildir.',
+        ],
+      },
+    ],
+    canonicalLabel: 'Üçüncü taraf bildirimlerini GitHub’da görüntüleyin',
   },
 };
 

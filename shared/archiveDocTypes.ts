@@ -1265,6 +1265,7 @@ function expand(row: RawDocType): ArchiveDocTypeDef {
       pt: DOC_TYPE_LABEL_PT[id] ?? labelEn,
       'pt-BR': DOC_TYPE_LABEL_PT_BR[id] ?? labelEn,
       it: DOC_TYPE_LABEL_IT[id] ?? labelEn,
+      tr: labelEn,
     },
     category,
     fields,

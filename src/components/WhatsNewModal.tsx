@@ -331,7 +331,7 @@ export function WhatsNewModal({
                         : <Icon name={scopeMeta.icon} size={13} />}
                       <span id={tooltipId} role="tooltip" className="whats-new-scope-tooltip">{scopeLabel}</span>
                     </span>
-                    <span>{h[lang]}</span>
+                    <span>{h[lang] ?? h.en}</span>
                   </li>
                 );
               })}

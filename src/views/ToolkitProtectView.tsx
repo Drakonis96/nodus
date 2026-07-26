@@ -38,7 +38,7 @@ type Destination = 'disk' | 'vault' | 'share';
 let verifyPayloadCache: ProtectFilePayload | null = null;
 
 const SUFFIX: Record<AppLanguage, string> = {
-  es: 'protegido', en: 'protected', fr: 'protege', de: 'geschuetzt', pt: 'protegido', 'pt-BR': 'protegido', it: 'protetto',
+  es: 'protegido', en: 'protected', fr: 'protege', de: 'geschuetzt', pt: 'protegido', 'pt-BR': 'protegido', it: 'protetto', tr: 'korumali',
 };
 
 function copy(): ProtectComposeCopy {

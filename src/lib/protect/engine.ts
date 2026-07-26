@@ -87,10 +87,11 @@ const EU_REGULATION_URLS: Record<AppLanguage, string> = {
   pt: 'https://eur-lex.europa.eu/eli/reg/2016/679/oj/por',
   'pt-BR': 'https://eur-lex.europa.eu/eli/reg/2016/679/oj/por',
   it: 'https://eur-lex.europa.eu/eli/reg/2016/679/oj/ita',
+  tr: 'https://eur-lex.europa.eu/eli/reg/2016/679/oj/eng',
 };
 
 const DEFAULT_AUTHORITY: Record<AppLanguage, string> = {
-  es: 'ES', en: 'IE', fr: 'FR', de: 'DE', pt: 'PT', 'pt-BR': 'PT', it: 'IT',
+  es: 'ES', en: 'IE', fr: 'FR', de: 'DE', pt: 'PT', 'pt-BR': 'PT', it: 'IT', tr: 'IE',
 };
 
 export function defaultProtectAuthority(language: AppLanguage): string {

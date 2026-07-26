@@ -744,22 +744,22 @@ export function deriveTreeKinship(input: TreeKinshipInput): Map<string, TreeKins
     parent: {
       es: ['padre', 'madre', 'progenitor/a'], en: ['father', 'mother', 'parent'], fr: ['père', 'mère', 'parent'],
       de: ['Vater', 'Mutter', 'Elternteil'], pt: ['pai', 'mãe', 'progenitor/a'], 'pt-BR': ['pai', 'mãe', 'genitor/a'],
-      it: ['padre', 'madre', 'genitore'],
+      it: ['padre', 'madre', 'genitore'], tr: ['baba', 'anne', 'ebeveyn'],
     },
     child: {
       es: ['hijo', 'hija', 'hijo/a'], en: ['son', 'daughter', 'child'], fr: ['fils', 'fille', 'enfant'],
       de: ['Sohn', 'Tochter', 'Kind'], pt: ['filho', 'filha', 'filho/a'], 'pt-BR': ['filho', 'filha', 'filho/a'],
-      it: ['figlio', 'figlia', 'figlio/a'],
+      it: ['figlio', 'figlia', 'figlio/a'], tr: ['oğul', 'kız', 'çocuk'],
     },
     spouse: {
       es: ['esposo', 'esposa', 'cónyuge'], en: ['husband', 'wife', 'spouse'], fr: ['époux', 'épouse', 'conjoint'],
       de: ['Ehemann', 'Ehefrau', 'Ehepartner'], pt: ['marido', 'esposa', 'cônjuge'], 'pt-BR': ['marido', 'esposa', 'cônjuge'],
-      it: ['marito', 'moglie', 'coniuge'],
+      it: ['marito', 'moglie', 'coniuge'], tr: ['koca', 'eş', 'eş'],
     },
     sibling: {
       es: ['hermano', 'hermana', 'hermano/a'], en: ['brother', 'sister', 'sibling'], fr: ['frère', 'sœur', 'frère/sœur'],
       de: ['Bruder', 'Schwester', 'Geschwister'], pt: ['irmão', 'irmã', 'irmão/ã'], 'pt-BR': ['irmão', 'irmã', 'irmão/ã'],
-      it: ['fratello', 'sorella', 'fratello/sorella'],
+      it: ['fratello', 'sorella', 'fratello/sorella'], tr: ['erkek kardeş', 'kız kardeş', 'kardeş'],
     },
   };
   const stepFor = (sex: string | undefined, kind: keyof typeof STEP_WORDS): ConnectionStep => {

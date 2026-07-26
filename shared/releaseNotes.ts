@@ -24,7 +24,7 @@ interface RawReleaseHighlight {
   scope: ReleaseNoteScope;
 }
 
-export interface ReleaseHighlight extends RawReleaseHighlight { it: string }
+export interface ReleaseHighlight extends RawReleaseHighlight { it: string; tr?: string }
 
 export interface ReleaseNote {
   version: string;
