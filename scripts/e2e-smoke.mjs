@@ -320,6 +320,11 @@ try {
   await page.evaluate(async () => {
     localStorage.removeItem('nodus.lastSeenVersion');
     localStorage.removeItem('nodus.platformHighlightsSeen.2026-07');
+    // Walking the tutorial above marked the videos announcement seen, exactly as it
+    // does for a real first run. Clear it here so the announcement this existing user
+    // never got is exercised too — it must be cleared BEFORE the render, since
+    // eligibility is read once, when the modal mounts.
+    localStorage.removeItem('nodus.tutorialVideosAnnouncementSeen.2026-07');
     await window.nodus.updateSettings({ uiLanguage: 'es', promptLanguage: 'es', basicsTutorialVersion: 4 });
   });
   await page.reload();
@@ -339,6 +344,18 @@ try {
   await platformTour.waitFor({ state: 'detached' });
   assert.equal(await page.evaluate(() => localStorage.getItem('nodus.platformHighlightsSeen.2026-07')), '1', 'the summary is marked seen only after its final action');
   console.log('[e2e] release notes hand off to the translated three-part connected-workflows summary');
+
+  // …and behind that, the videos announcement: the one modal that embeds the catalogue
+  // instead of describing it, for users who completed the guide when it was text-only.
+  const videosTour = page.getByTestId('tutorial-videos-update-tour');
+  await videosTour.waitFor();
+  await videosTour.getByRole('heading', { name: 'Tutoriales en vídeo', exact: true }).waitFor();
+  assert.equal(await videosTour.locator('.tutorial-video-card').count(), 3, 'the announcement embeds the published catalogue');
+  assert.equal(await videosTour.locator('iframe').count(), 0, 'nothing is framed until a card is opened');
+  await videosTour.getByTestId('tutorial-videos-tour-complete').click();
+  await videosTour.waitFor({ state: 'detached' });
+  assert.equal(await page.evaluate(() => localStorage.getItem('nodus.tutorialVideosAnnouncementSeen.2026-07')), '1', 'the announcement is marked seen only when dismissed');
+  console.log('[e2e] the video tutorials announcement shows the catalogue in-modal, once');
 
   // Back to Spanish for the rest of the suite, which asserts on Spanish copy. The
   // reload above already consumed the once-per-session startup update check, so reset
