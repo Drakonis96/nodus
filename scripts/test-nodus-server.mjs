@@ -12,7 +12,7 @@ import { Store } from '../server/lib/store.mjs';
 
 test('Nodus Server web translations cover every supported app language', () => {
   assert.deepEqual(missingServerTranslations(), {
-    en: [], es: [], fr: [], de: [], pt: [], 'pt-BR': [], it: [],
+    en: [], es: [], fr: [], de: [], pt: [], 'pt-BR': [], it: [], tr: [],
   });
 });
 
@@ -373,7 +373,7 @@ test('Nodus Server pairs a desktop publisher and protects read-only MCP with OAu
     const unsupportedLanguage = await fetch(`${origin}/api/v1/settings/language`, {
       method: 'PUT',
       headers: { authorization: `Bearer ${paired.accessToken}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ language: 'tr' }),
+      body: JSON.stringify({ language: 'nl' }),
     });
     assert.equal(unsupportedLanguage.status, 400);
 
@@ -384,6 +384,7 @@ test('Nodus Server pairs a desktop publisher and protects read-only MCP with OAu
       ['pt', 'Iniciar sessão no Nodus Server'],
       ['pt-BR', 'Iniciar sessão no Nodus Server'],
       ['it', 'Accedi a Nodus Server'],
+      ['tr', 'Nodus Server’da oturum aç'],
       ['en', 'Sign in to Nodus Server'],
     ]) {
       const changed = await fetch(`${origin}/api/v1/settings/language`, {

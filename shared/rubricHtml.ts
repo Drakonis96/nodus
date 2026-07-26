@@ -36,6 +36,8 @@ const LABELS: Record<string, { criterion: string; weight: string; score: string;
   de: { criterion: 'Kriterium', weight: 'Gewichtung', score: 'Punkte', total: 'Gesamtpunktzahl', max: 'Maximum' },
   pt: { criterion: 'Critério', weight: 'Peso', score: 'Pontuação', total: 'Pontuação total', max: 'máximo' },
   'pt-BR': { criterion: 'Critério', weight: 'Peso', score: 'Pontuação', total: 'Pontuação total', max: 'máximo' },
+  it: { criterion: 'Criterio', weight: 'Peso', score: 'Punteggio', total: 'Punteggio totale', max: 'massimo' },
+  tr: { criterion: 'Ölçüt', weight: 'Ağırlık', score: 'Puan', total: 'Toplam puan', max: 'en fazla' },
 };
 
 export function rubricDocumentLabels(language: string) {

@@ -100,7 +100,7 @@ export function seedWelcomeNotification(language: AppLanguage): void {
   addNotification({
     title: uiText(language, {
       es: '¡Hola! Soy Nodi', en: 'Hi! I’m Nodi', fr: 'Bonjour ! Je suis Nodi', de: 'Hallo! Ich bin Nodi',
-      pt: 'Olá! Sou o Nodi', 'pt-BR': 'Olá! Eu sou o Nodi',
+      pt: 'Olá! Sou o Nodi', 'pt-BR': 'Olá! Eu sou o Nodi', it: 'Ciao! Sono Nodi', tr: 'Merhaba! Ben Nodi',
     }),
     body: uiText(language, {
       es: 'Tu nodo acompañante. Haz clic en mí para abrir el chat, tus notificaciones y la ayuda.',
@@ -109,6 +109,8 @@ export function seedWelcomeNotification(language: AppLanguage): void {
       de: 'Dein Begleitknoten. Klicke auf mich, um Chat, Benachrichtigungen und Hilfe zu öffnen.',
       pt: 'O teu nodo companheiro. Clica em mim para abrir o chat, as notificações e a ajuda.',
       'pt-BR': 'Seu nodo companheiro. Clique em mim para abrir o chat, as notificações e a ajuda.',
+      it: 'Il tuo nodo compagno. Fai clic su di me per aprire la chat, le notifiche e la guida.',
+      tr: 'Size eşlik eden düğümüm. Sohbeti, bildirimleri ve yardımı açmak için bana tıklayın.',
     }),
     kind: 'success',
   });

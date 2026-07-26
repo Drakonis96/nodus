@@ -37,7 +37,7 @@ function participantLanguage(value: string | null): AppLanguage {
   const normalized = (value ?? '').trim().toLowerCase();
   if (normalized === 'pt-br' || normalized.startsWith('pt-br-')) return 'pt-BR';
   const base = normalized.split('-')[0];
-  return base === 'es' || base === 'en' || base === 'fr' || base === 'de' || base === 'pt' || base === 'it' ? base : 'en';
+  return base === 'es' || base === 'en' || base === 'fr' || base === 'de' || base === 'pt' || base === 'it' || base === 'tr' ? base : 'en';
 }
 
 function lanIp(): string {

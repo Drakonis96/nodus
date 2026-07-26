@@ -84,6 +84,11 @@ test('every bundled app contains complete copy for every Nodus interface languag
   }
 });
 
+test('shared app sessions preserve the participant browser language', async () => {
+  const server = await readFile(path.join(repoRoot, 'electron/toolkit/apps/server.ts'), 'utf8');
+  assert.match(server, /base === 'tr'/, 'Turkish browsers must not receive the English mini-app copy');
+});
+
 test('builds the executable document with a deny-by-default CSP and private bridge', () => {
   const documentText = runtime.buildToolkitAppDocument(minimal, { token: 'a'.repeat(32), language: 'en', storage: true, session: { available: false, role: 'host', participant: null } });
   assert.match(documentText, /default-src 'none'/);

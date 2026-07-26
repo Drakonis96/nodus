@@ -49,6 +49,8 @@ const LANGUAGE_NAMES: Record<ExamLanguage, string> = {
   de: 'alemán',
   pt: 'portugués de Portugal',
   'pt-BR': 'portugués de Brasil',
+  it: 'italiano',
+  tr: 'turco',
 };
 
 /** The JSON contract the model must satisfy, per question type. */

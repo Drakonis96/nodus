@@ -350,6 +350,9 @@ test('non-Spanish translations prefer English and preserve unknown dynamic value
   assert.equal(resolveTranslation('pt', 'Already readable', { en: {} }), 'Already readable');
   setActiveLang('unknown-locale');
   assert.equal(getActiveLang(), 'en', 'an unknown locale must normalize to English');
+  setActiveLang('tr');
+  assert.equal(getActiveLang(), 'tr', 'Turkish must survive runtime locale normalization');
+  assert.equal(resolveTranslation('tr', 'Idioma'), 'Dil', 'Turkish must use its own table at runtime');
 
   const { treeKinshipLabel } = loadModule('shared/treeKinship.ts');
   const generatedOnlyInSpanish = { role: 'father', branch: 'paternal', tone: 0, depth: 1, labels: { es: 'Solo español' } };
@@ -449,7 +452,7 @@ test('the two Portuguese variants are really different', () => {
 
 // The languages that in-data labels must also carry. Spanish and English are the
 // source pair every table already had.
-const IN_DATA_LANGUAGES = ['fr', 'de', 'pt', 'pt-BR', 'it'];
+const IN_DATA_LANGUAGES = ['fr', 'de', 'pt', 'pt-BR', 'it', 'tr'];
 
 test('in-data labels are translated alongside the i18n table', () => {
   // These labels ship inside shared/ data rather than the i18n table, so the
@@ -461,7 +464,7 @@ test('in-data labels are translated alongside the i18n table', () => {
   // Assert against the source maps, not the expanded `labels`: those are
   // `DOC_TYPE_LABEL_XX[id] ?? labelEn`, so a missing id would silently look fine.
   // A label equal to the English one is legitimate ("Illustration", "Notes").
-  const docTypeMaps = { fr: docTypes.DOC_TYPE_LABEL_FR, de: docTypes.DOC_TYPE_LABEL_DE, pt: docTypes.DOC_TYPE_LABEL_PT, 'pt-BR': docTypes.DOC_TYPE_LABEL_PT_BR, it: docTypes.DOC_TYPE_LABEL_IT };
+  const docTypeMaps = { fr: docTypes.DOC_TYPE_LABEL_FR, de: docTypes.DOC_TYPE_LABEL_DE, pt: docTypes.DOC_TYPE_LABEL_PT, 'pt-BR': docTypes.DOC_TYPE_LABEL_PT_BR, it: docTypes.DOC_TYPE_LABEL_IT, tr: docTypes.DOC_TYPE_LABEL_TR };
   for (const language of IN_DATA_LANGUAGES) {
     const map = docTypeMaps[language];
     assert.ok(map, `no doc-type label map for ${language}`);
@@ -486,11 +489,16 @@ test('in-data labels are translated alongside the i18n table', () => {
   }
 
   const { RELEASE_NOTES } = loadModule('shared/releaseNotes.ts');
+  const { RELEASE_NOTES_TR } = loadModule('shared/releaseNotes.tr.ts');
   const highlights = RELEASE_NOTES.flatMap((note) => note.highlights.map((h) => [note.version, h]));
   for (const language of IN_DATA_LANGUAGES) {
     const missing = highlights.filter(([, h]) => !h[language]?.trim()).map(([version]) => version);
     assert.deepEqual(missing, [], `these release notes have no ${language} highlight`);
   }
+  const missingTurkishSources = RELEASE_NOTES.flatMap((note) =>
+    note.highlights.flatMap((_, index) => RELEASE_NOTES_TR[note.version]?.[index]?.trim() ? [] : [`${note.version}#${index}`])
+  );
+  assert.deepEqual(missingTurkishSources, [], 'Turkish release notes must not silently fall back to English');
 });
 
 test('keys reached indirectly and through ternaries are collected', () => {

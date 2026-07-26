@@ -2,7 +2,7 @@ import type { AppLanguage } from './types';
 
 export type UiTranslations = Partial<Record<AppLanguage, string>> & { en: string };
 
-const UI_LANGUAGES = new Set<AppLanguage>(['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it']);
+const UI_LANGUAGES = new Set<AppLanguage>(['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr']);
 
 /** Runtime locale validation. Unknown or future locales must never fall back to Spanish. */
 export function normalizeUiLanguage(language: unknown): AppLanguage {
@@ -45,6 +45,7 @@ export function localizeRuntimeError(message: string, language: unknown): string
     pt: 'Não foi possível concluir a operação.',
     'pt-BR': 'Não foi possível concluir a operação.',
     it: 'Non è stato possibile completare l’operazione.',
+    tr: 'İşlem tamamlanamadı.',
   });
 }
 

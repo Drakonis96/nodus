@@ -37,6 +37,8 @@ const LANGUAGE_LABELS: Record<ExamLanguage, string> = {
   de: 'Deutsch',
   pt: 'Português',
   'pt-BR': 'Português (Brasil)',
+  it: 'Italiano',
+  tr: 'Türkçe',
 };
 
 /** Small labelled field so every panel keeps identical label/really-input rhythm. */
