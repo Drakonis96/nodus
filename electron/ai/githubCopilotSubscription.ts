@@ -4,7 +4,18 @@ import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { CopilotClient, RuntimeConnection, type ModelInfo as CopilotModelInfo } from '@github/copilot-sdk';
+type CopilotModelInfo = import('@github/copilot-sdk').ModelInfo;
+let CopilotClient: typeof import('@github/copilot-sdk').CopilotClient;
+let RuntimeConnection: typeof import('@github/copilot-sdk').RuntimeConnection;
+try {
+  const req = createRequire(__filename);
+  const sdk = req('@github/copilot-sdk');
+  CopilotClient = sdk.CopilotClient;
+  RuntimeConnection = sdk.RuntimeConnection;
+} catch {
+  CopilotClient = class {} as any;
+  RuntimeConnection = { forStdio: () => ({}) } as any;
+}
 import { ProviderRuntimeError } from './providerErrors';
 import type {
   GitHubCopilotSessionUsage,
