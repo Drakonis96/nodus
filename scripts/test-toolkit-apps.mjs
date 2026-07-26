@@ -73,7 +73,7 @@ test('accepts real mini-app bundles and every included app', () => {
 });
 
 test('every bundled app contains complete copy for every Nodus interface language', () => {
-  assert.deepEqual(catalogue.INCLUDED_APP_LANGUAGES, ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it']);
+  assert.deepEqual(catalogue.INCLUDED_APP_LANGUAGES, ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr']);
   for (const [name, copy] of [['roulette', catalogue.ROULETTE_COPY], ['topic distributor', catalogue.TOPIC_DISTRIBUTOR_COPY], ['brainstorm', catalogue.BRAINSTORM_COPY]]) {
     const expected = Object.keys(copy.es).sort();
     assert.ok(expected.length > 30, `${name} should translate its complete interface`);

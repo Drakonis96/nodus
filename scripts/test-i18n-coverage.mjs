@@ -359,7 +359,7 @@ test('non-Spanish translations prefer English and preserve unknown dynamic value
 test('legacy Spanish Electron errors cannot leak into a non-Spanish interface', () => {
   const { localizeIpcPayload, localizeRuntimeError, uiText } = loadModule('shared/uiLanguage.ts');
   const spanish = 'No se puede cambiar de bóveda mientras hay un análisis activo.';
-  for (const language of ['en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'unknown']) {
+  for (const language of ['en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'unknown']) {
     const localized = localizeRuntimeError(spanish, language);
     assert.notEqual(localized, spanish, `${language} leaked the Spanish runtime error`);
   }
@@ -373,7 +373,7 @@ test('legacy Spanish Electron errors cannot leak into a non-Spanish interface', 
 
 test('issue #12 queue payloads translate at runtime', () => {
   const runtime = loadModule('src/i18n.ts');
-  for (const language of ['en', 'fr', 'de', 'pt', 'pt-BR', 'it']) {
+  for (const language of ['en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr']) {
     runtime.setActiveLang(language);
     assert.notEqual(runtime.tr('Descubrir relaciones semánticas'), 'Descubrir relaciones semánticas');
     assert.notEqual(runtime.tr('Analizando fragmento 2/5 con IA… (8s)'), 'Analizando fragmento 2/5 con IA… (8s)');
