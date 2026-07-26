@@ -25,6 +25,7 @@ import { TeachingTour } from './views/TeachingTour';
 import { BASICS_TUTORIAL_VERSION, BasicsTutorial } from './views/BasicsTutorial';
 import { preferencesForTutorialLanguage } from '@shared/tutorialPreferences';
 import { hasPendingWhatsNew, WhatsNewModal } from './components/WhatsNewModal';
+import { markTutorialVideosAnnouncementSeen, TutorialVideosUpdateTour } from './components/TutorialVideosGuide';
 import { PlatformHighlightsUpdateTour } from './components/PlatformHighlightsGuide';
 import { ToolkitBetaUpdateTour } from './components/ToolkitBetaGuide';
 import { StartupUpdateModal } from './components/StartupUpdateModal';
@@ -188,6 +189,9 @@ export function App() {
   // The 2.4.0 toolkit/model guide queues directly behind release notes. Its own
   // versioned guard settles immediately for new installs and for users who saw it.
   const [toolkitBetaTourSettled, setToolkitBetaTourSettled] = useState(false);
+  // Users who completed the essential guide before the video tutorials existed were
+  // never asked "video or text", so the catalogue is announced to them once, here.
+  const [tutorialVideosSettled, setTutorialVideosSettled] = useState(false);
   // Set once the startup update check is done with the screen, so the one-time Nodi
   // choice can queue up behind it instead of fighting it for the foreground.
   const [updateSettled, setUpdateSettled] = useState(false);
@@ -856,6 +860,9 @@ export function App() {
           await reloadSettings();
         }}
         onComplete={async () => {
+          // The guide itself asks video or text, so whoever finishes it has already met
+          // the catalogue: the announcement for older installs must not follow them out.
+          markTutorialVideosAnnouncementSeen();
           await window.nodus.updateSettings({ basicsTutorialVersion: BASICS_TUTORIAL_VERSION });
           await reloadSettings();
         }}
@@ -1673,7 +1680,15 @@ export function App() {
         />
       )}
 
-      {whatsNewSettled && platformHighlightsSettled && toolkitBetaTourSettled && !manualWhatsNewOpen && <StartupUpdateModal onSettled={() => setUpdateSettled(true)} />}
+      {whatsNewSettled && platformHighlightsSettled && toolkitBetaTourSettled && !tutorialVideosSettled && !manualWhatsNewOpen && (
+        <TutorialVideosUpdateTour
+          uiLanguage={settings.uiLanguage}
+          previousTutorialVersion={settings.basicsTutorialVersion}
+          onSettled={() => setTutorialVideosSettled(true)}
+        />
+      )}
+
+      {whatsNewSettled && platformHighlightsSettled && toolkitBetaTourSettled && tutorialVideosSettled && !manualWhatsNewOpen && <StartupUpdateModal onSettled={() => setUpdateSettled(true)} />}
 
       {/* Users who already saw the cinematic tutorial were never offered the choice of
           Nodi, so it is made here instead — once, behind the update check. New users

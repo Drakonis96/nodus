@@ -14,7 +14,9 @@ const [modal, app, main, styles, translations] = await Promise.all([
 ]);
 
 test('the app performs one visible update check per launch after the update guides settle', () => {
-  assert.match(app, /whatsNewSettled && platformHighlightsSettled && toolkitBetaTourSettled && !manualWhatsNewOpen && <StartupUpdateModal[\s\S]*?\/>/);
+  // Every one-time guide — release notes, the two update tours and the video tutorials
+  // announcement — must have settled before the update check takes the foreground.
+  assert.match(app, /whatsNewSettled && platformHighlightsSettled && toolkitBetaTourSettled && tutorialVideosSettled && !manualWhatsNewOpen && <StartupUpdateModal[\s\S]*?\/>/);
   assert.match(app, /<WhatsNewModal[\s\S]*onSettled=\{\(\) => setWhatsNewSettled\(true\)\}/);
   // The one-time Nodi choice queues behind this modal, so a launch that never shows it
   // must still settle or that modal would wait forever.

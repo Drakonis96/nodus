@@ -214,6 +214,38 @@
 }
 .tutorial-video-frame iframe { display: block; width: 100%; height: 100%; border: 0; }
 
+/* ── the "now on video too" announcement ────────────────────────────────────────── */
+/* The grid sits inside the update-tour card (840px wide), so its cards are narrower
+   than in Settings; everything else is inherited from the `panel` skin, including its
+   light-mode remaps, because this card follows the theme. */
+.tutorial-videos-guide .tutorial-video-grid { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.tutorial-videos-guide .tutorial-video-poster { height: 104px; }
+/* The tour's stage styles every h3 inside it as a 34px headline, which lands on the
+   cards' own titles too — they have the same specificity and index.css wins on order. */
+.tutorial-videos-guide .tutorial-video-body h3 { margin-top: 0; font-size: .88rem; font-weight: 650; line-height: 1.3; letter-spacing: 0; }
+
+.tutorial-videos-guide-where { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; }
+.tutorial-videos-guide-where > div {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: .6rem;
+  border: 1px solid var(--tg-border, rgba(255, 255, 255, .11));
+  border-radius: .85rem;
+  padding: .7rem .8rem;
+  background: var(--tg-card, rgba(255, 255, 255, .055));
+}
+.tutorial-videos-guide-where > div > svg { flex: 0 0 auto; margin-top: .1rem; color: #14b8a6; }
+.tutorial-videos-guide-where b { display: block; color: var(--tg-text, #f1f5f9); font-size: .78rem; font-weight: 700; }
+.tutorial-videos-guide-where small { color: var(--tg-muted, #a3acba); font-size: .72rem; line-height: 1.45; }
+
+.tutorial-videos-guide-footer span { min-width: 0; color: var(--tg-muted, #a3acba); font-size: .69rem; line-height: 1.4; }
+
+@media (max-width: 660px) {
+  .tutorial-videos-guide-where { grid-template-columns: 1fr; }
+  .tutorial-videos-guide-footer span { display: none; }
+}
+
 /* ── light mode (the Settings panel and the player) ─────────────────────────────── */
 .light .tutorial-videos-panel .tutorial-video-card { border-color: rgba(15, 23, 42, .14); background: rgba(15, 23, 42, .03); }
 .light .tutorial-videos-panel .tutorial-video-card:hover { border-color: rgba(15, 23, 42, .34); box-shadow: 0 16px 38px rgba(15, 23, 42, .14); }

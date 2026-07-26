@@ -173,6 +173,52 @@ test('Settings leads its tutorials section with the grid', async () => {
   assert.match(css, /\.light \.tutorial-video-player/);
 });
 
+test('the videos are announced once to installs that predate them', async () => {
+  const [guide, app] = await Promise.all([
+    read('src/components/TutorialVideosGuide.tsx'),
+    read('src/App.tsx'),
+  ]);
+  // The announcement shows the videos rather than describing them: the same grid and
+  // the same in-app player, in the update tours' cinematic chrome.
+  assert.match(guide, /className="toolkit-guide-cinema tutorial-videos-guide"/);
+  assert.match(guide, /data-testid="tutorial-videos-update-tour"/);
+  assert.match(guide, /<TutorialVideoGrid language=\{uiLanguage\} variant="panel" showHeading=\{false\} \/>/);
+  // Shown once, and only to someone who finished the guide back when it was text-only.
+  assert.match(guide, /if \(previousTutorialVersion <= 0\) return false;/);
+  assert.match(guide, /localStorage\.getItem\(SEEN_KEY\) !== '1'/);
+  // Marked seen on dismissal, never merely on mount.
+  assert.match(guide, /const finish = \(\) => \{\s*\/\/[^\n]*\n\s*\/\/[^\n]*\n\s*markTutorialVideosAnnouncementSeen\(\);/);
+
+  // Completing the cinematic guide answers the same question, so it settles the
+  // announcement too — a fresh install must never be told about a choice it just made.
+  assert.match(app, /markTutorialVideosAnnouncementSeen\(\);\s*\n\s*await window\.nodus\.updateSettings\(\{ basicsTutorialVersion: BASICS_TUTORIAL_VERSION \}\)/);
+  // It queues behind the other one-time tours and ahead of the update check, so two
+  // modals never fight for the foreground.
+  const order = ['<WhatsNewModal', '<PlatformHighlightsUpdateTour', '<ToolkitBetaUpdateTour', '<TutorialVideosUpdateTour', '<StartupUpdateModal'].map((tag) => app.indexOf(tag));
+  assert.deepEqual(order, [...order].sort((a, b) => a - b), 'the videos announcement sits between the toolkit tour and the update check');
+  assert.match(app, /toolkitBetaTourSettled && tutorialVideosSettled && !manualWhatsNewOpen && <StartupUpdateModal/);
+});
+
+test('the announcement speaks every interface language', async () => {
+  const [guide, types] = await Promise.all([
+    read('src/components/TutorialVideosGuide.tsx'),
+    read('shared/types.ts'),
+  ]);
+  // Read the languages from the type itself, so an eighth UI language fails here.
+  const declared = types.match(/export type AppLanguage = ([^;]+);/)[1]
+    .split('|').map((code) => code.trim().replace(/'/g, ''));
+  assert.equal(declared.length, 7);
+  const table = guide.slice(guide.indexOf('const COPY: Record<AppLanguage, AnnouncementCopy>'), guide.indexOf('export function markTutorialVideosAnnouncementSeen'));
+  for (const code of declared) {
+    assert.match(table, new RegExp(`\\n  '?${code}'?: \\{`), `${code} has no announcement copy`);
+  }
+  // Seven distinct summaries: a table that quietly reused one language would pass every
+  // per-key check above.
+  const summaries = [...table.matchAll(/\n    summary: '(.+)',/g)].map((match) => match[1]);
+  assert.equal(summaries.length, 7);
+  assert.equal(new Set(summaries).size, 7, 'one of the languages falls back to another');
+});
+
 test('a vault tour with a video offers three ways in', async () => {
   const [engine, tour] = await Promise.all([read('src/views/tourEngine.tsx'), read('src/views/Tour.tsx')]);
   assert.match(engine, /vaultType\?: VaultType/);
