@@ -68,3 +68,9 @@ scripts/.cache/
 
 # Local verification screenshots (scripts/verify-*-ui.mjs)
 .tmp-shots/
+
+# Tutorial video pipeline output (frames, audio, renders — never committed)
+.tutorial-out/
+
+# Local Nodus Server state (admin hashes, device tokens) — never committed
+server/data/

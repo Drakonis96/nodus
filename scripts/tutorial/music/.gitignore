@@ -1,0 +1,5 @@
+# El audio no se versiona: ver README.md
+*.mp3
+*.m4a
+*.wav
+*.aac
