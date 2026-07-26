@@ -2,6 +2,7 @@ import { PROTECT_TRANSLATIONS } from './i18n.protect';
 import { AI_OCR_TRANSLATIONS } from './i18n.aiOcr';
 import { TOOLKIT_APPS_TRANSLATIONS } from './i18n.toolkitApps';
 import { SERVER_TRANSLATIONS } from './i18n.server';
+import { TRANSLATE_TRANSLATIONS } from './i18n.translate';
 
 /** Complete static Turkish interface table; coverage prohibits runtime fallbacks. */
 export const TR: Record<string, string> = {
@@ -9,6 +10,7 @@ export const TR: Record<string, string> = {
   ...PROTECT_TRANSLATIONS.tr,
   ...TOOLKIT_APPS_TRANSLATIONS.tr,
   ...SERVER_TRANSLATIONS.tr,
+  ...TRANSLATE_TRANSLATIONS.tr,
   "Nuevo OCR": "Yeni OCR",
   "Biblioteca": "Kütüphane",
   "Reprocesar página {n}": "{n} sayfasını yeniden işle",
@@ -306,7 +308,7 @@ export const TR: Record<string, string> = {
   "Crea preguntas, recupera la respuesta de memoria y separa lo dominado de lo que debes revisar.": "Sorular oluşturun, cevabı hafızanızdan hatırlayın ve uzmanlaştığınız şeyleri gözden geçirmeniz gerekenlerden ayırın.",
   "Pulso de comprensión": "Anlamanın nabzı",
   "Lanza una pregunta por QR y observa la confianza y las dudas del grupo sin identificar al alumnado.": "QR aracılığıyla soru sorun ve öğrencileri tanımlamadan grubun kendine olan güvenini ve şüphelerini gözlemleyin.",
-  "Paso {current} de {total}": "{total}'den {current} adımına geçin",
+  "Paso {current} de {total}": "Adım {current} / {total}",
   "Entendiendo tu idea": "Fikrinizi anlamak",
   "Construyendo la app": "Uygulamayı oluşturma",
   "Revisando la coherencia visual": "Görsel tutarlılığın kontrol edilmesi",
@@ -319,7 +321,7 @@ export const TR: Record<string, string> = {
   "Pantalla completa": "Tam ekran",
   "{name} a pantalla completa": "{name} tam ekran",
   "Vista a pantalla completa": "Tam ekran görünümü",
-  "Ruleta de opciones": "Seçenekler rulet",
+  "Ruleta de opciones": "Seçenek çarkı",
   "Añade tus alternativas, gira la ruleta y deja que el azar elija una por ti.": "Alternatiflerinizi ekleyin, çarkı çevirin ve şansa sizin için bir seçim yapın.",
   "Repartidor de temas": "Konu dağıtıcısı",
   "Reparte temas únicos entre grupos e incluye temas excepcionales solo cuando los necesites.": "Benzersiz konuları gruplar arasında dağıtın ve istisnai konuları yalnızca ihtiyaç duyduğunuzda dahil edin.",

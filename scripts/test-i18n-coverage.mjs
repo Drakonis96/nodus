@@ -272,7 +272,11 @@ function collectTranslatableStrings() {
     if (!val || NOT_KEYS.has(val) || !/[a-zA-Z]/.test(val)) return;
     if (!found.has(val)) found.set(val, path.relative(repoRoot, file));
   };
-  const unescape = (s) => s.replace(/\\'/g, "'").replace(/\\"/g, '"').replace(/\\`/g, '`');
+  const unescape = (s) => s
+    .replace(/\\n/g, '\n')
+    .replace(/\\'/g, "'")
+    .replace(/\\"/g, '"')
+    .replace(/\\`/g, '`');
 
   for (const f of walk(path.join(repoRoot, 'src'))) {
     // Bundled mini-apps run in their own iframe and use a private seven-language

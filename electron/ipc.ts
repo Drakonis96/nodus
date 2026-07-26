@@ -211,6 +211,7 @@ import type { ProtectArtifact, ProtectListSourcesRequest, ProtectSourceRef } fro
 import { PROTECT_INPUT_EXTENSIONS } from '@shared/protectTypes';
 import * as protect from './protect/protectService';
 import { localizeIpcPayload, localizeRuntimeError } from '@shared/uiLanguage';
+import { toolkitDialogText, type ToolkitDialogKey } from './toolkit/dialogI18n';
 import {
   connectMcpTunnel,
   disconnectMcpTunnel,
@@ -761,6 +762,7 @@ export function registerIpc(
       throw new Error(localized);
     }
   });
+  const toolkitCopy = (key: ToolkitDialogKey): string => toolkitDialogText(key, getSettings().uiLanguage);
 
   // In-flight research-chat streams, keyed by requestId, so the renderer's Stop
   // button (`research:chatStream:cancel`) can abort the provider mid-answer.
@@ -3667,12 +3669,12 @@ export function registerIpc(
     // "Todos los archivos" stays reachable even when a compatible-extension list is
     // given: the checksum operation accepts any file at all, so a hard filter would
     // make it unusable from the picker (drag-and-drop would be the only way in).
-    const allFiles = { name: 'Todos los archivos', extensions: ['*'] };
+    const allFiles = { name: toolkitCopy('allFiles'), extensions: ['*'] };
     const filters = extensions.length
-      ? [{ name: 'Archivos compatibles', extensions }, allFiles]
+      ? [{ name: toolkitCopy('compatibleFiles'), extensions }, allFiles]
       : [allFiles];
     const picked = await showImportOpenDialog(win ?? undefined!, {
-      title: 'Añadir archivos',
+      title: toolkitCopy('addFiles'),
       properties: ['openFile', 'multiSelections'],
       filters,
     });
@@ -3681,7 +3683,7 @@ export function registerIpc(
   h('toolkit:pickOutputDir', async (e) => {
     const win = BrowserWindow.fromWebContents(e.sender);
     const picked = await showImportOpenDialog(win ?? undefined!, {
-      title: 'Carpeta de salida',
+      title: toolkitCopy('outputFolder'),
       properties: ['openDirectory', 'createDirectory'],
     });
     return picked.canceled || picked.filePaths.length === 0 ? null : picked.filePaths[0];
@@ -3715,7 +3717,7 @@ export function registerIpc(
   h('translate:text:save', async (e, text: string, targetLanguage: string, extension: 'txt' | 'md' | 'html' = 'txt') => {
     const win = BrowserWindow.fromWebContents(e.sender);
     const picked = await dialog.showSaveDialog(win ?? undefined!, {
-      title: 'Guardar traducción',
+      title: toolkitCopy('saveTranslation'),
       defaultPath: suggestedTextFilename(targetLanguage, extension),
       filters: [{ name: extension.toUpperCase(), extensions: [extension] }],
     });
@@ -3755,7 +3757,7 @@ export function registerIpc(
   h('aiOcr:export', async (e, id: string, format: AiOcrExportFormat) => {
     const { filename, data } = await buildOcrExport(id, format);
     const win = BrowserWindow.fromWebContents(e.sender);
-    const picked = await dialog.showSaveDialog(win ?? undefined!, { title: 'Exportar transcripción', defaultPath: filename });
+    const picked = await dialog.showSaveDialog(win ?? undefined!, { title: toolkitCopy('exportTranscript'), defaultPath: filename });
     if (picked.canceled || !picked.filePath) return { canceled: true };
     fs.writeFileSync(picked.filePath, data);
     return { canceled: false, path: picked.filePath };
@@ -3763,7 +3765,7 @@ export function registerIpc(
   h('aiOcr:exportZip', async (e, ids: string[], format: AiOcrExportFormat) => {
     const { filename, data } = await buildOcrExportZip(ids, format);
     const win = BrowserWindow.fromWebContents(e.sender);
-    const picked = await dialog.showSaveDialog(win ?? undefined!, { title: 'Exportar transcripciones', defaultPath: filename });
+    const picked = await dialog.showSaveDialog(win ?? undefined!, { title: toolkitCopy('exportTranscripts'), defaultPath: filename });
     if (picked.canceled || !picked.filePath) return { canceled: true };
     fs.writeFileSync(picked.filePath, data);
     return { canceled: false, path: picked.filePath };
@@ -3771,11 +3773,11 @@ export function registerIpc(
   h('aiOcr:pickFiles', async (e) => {
     const win = BrowserWindow.fromWebContents(e.sender);
     const picked = await showImportOpenDialog(win ?? undefined!, {
-      title: 'Añadir PDF o imágenes para OCR',
+      title: toolkitCopy('addOcrFiles'),
       properties: ['openFile', 'multiSelections'],
       filters: [
-        { name: 'PDF e imágenes', extensions: ['pdf', 'png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'tif', 'tiff'] },
-        { name: 'Todos los archivos', extensions: ['*'] },
+        { name: toolkitCopy('pdfAndImages'), extensions: ['pdf', 'png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'tif', 'tiff'] },
+        { name: toolkitCopy('allFiles'), extensions: ['*'] },
       ],
     });
     return picked.canceled ? [] : picked.filePaths;
@@ -3794,12 +3796,12 @@ export function registerIpc(
   h('presenter:import:pick', async (e) => {
     const win = BrowserWindow.fromWebContents(e.sender);
     const picked = await showImportOpenDialog(win ?? undefined!, {
-      title: 'Importar PDF o presentación',
+      title: toolkitCopy('importPresentation'),
       properties: ['openFile'],
       filters: [
-        { name: 'PDF y presentaciones', extensions: [...PRESENTER_IMPORT_EXTENSIONS] },
+        { name: toolkitCopy('pdfAndPresentations'), extensions: [...PRESENTER_IMPORT_EXTENSIONS] },
         { name: 'PDF', extensions: ['pdf'] },
-        { name: 'Presentaciones', extensions: PRESENTER_IMPORT_EXTENSIONS.filter((ext) => ext !== 'pdf') },
+        { name: toolkitCopy('presentations'), extensions: PRESENTER_IMPORT_EXTENSIONS.filter((ext) => ext !== 'pdf') },
       ],
     });
     if (picked.canceled || picked.filePaths.length === 0) return null;
@@ -3880,7 +3882,7 @@ export function registerIpc(
   h('presenter:import:pptxNotes', async (e) => {
     const win = BrowserWindow.fromWebContents(e.sender);
     const picked = await showImportOpenDialog(win ?? undefined!, {
-      title: 'Importar notas desde PowerPoint',
+      title: toolkitCopy('importPowerPointNotes'),
       properties: ['openFile'],
       filters: [{ name: 'PowerPoint', extensions: ['pptx'] }],
     });
@@ -3896,9 +3898,9 @@ export function registerIpc(
       .join('')
       .trim() || 'presentation';
     const picked = await dialog.showSaveDialog(win ?? undefined!, {
-      title: 'Exportar notas del presentador',
+      title: toolkitCopy('exportPresenterNotes'),
       defaultPath: `${safeName} - notas.txt`,
-      filters: [{ name: 'Texto', extensions: ['txt'] }],
+      filters: [{ name: toolkitCopy('text'), extensions: ['txt'] }],
     });
     if (picked.canceled || !picked.filePath) return false;
     fs.writeFileSync(
@@ -3911,9 +3913,9 @@ export function registerIpc(
   h('presenter:import:txtNotes', async (e) => {
     const win = BrowserWindow.fromWebContents(e.sender);
     const picked = await showImportOpenDialog(win ?? undefined!, {
-      title: 'Importar notas desde TXT',
+      title: toolkitCopy('importTxtNotes'),
       properties: ['openFile'],
-      filters: [{ name: 'Texto', extensions: ['txt'] }],
+      filters: [{ name: toolkitCopy('text'), extensions: ['txt'] }],
     });
     if (picked.canceled || picked.filePaths.length === 0) return null;
     return parsePresenterNotesTxt(fs.readFileSync(picked.filePaths[0], 'utf-8'));
@@ -3926,12 +3928,12 @@ export function registerIpc(
     if (!isToolkitAppManifest(manifest)) throw new Error('La app no es válida y no se puede descargar.');
     const win = BrowserWindow.fromWebContents(e.sender);
     const picked = await dialog.showSaveDialog(win ?? undefined!, {
-      title: 'Descargar paquete de la app',
-      defaultPath: toolkitAppPackageFileName(manifest),
-      filters: [{ name: 'Paquete ZIP', extensions: ['zip'] }],
+      title: toolkitCopy('downloadAppPackage'),
+      defaultPath: toolkitAppPackageFileName(manifest, getSettings().uiLanguage),
+      filters: [{ name: toolkitCopy('zipPackage'), extensions: ['zip'] }],
     });
     if (picked.canceled || !picked.filePath) return null;
-    fs.writeFileSync(picked.filePath, buildToolkitAppPackage(manifest));
+    fs.writeFileSync(picked.filePath, buildToolkitAppPackage(manifest, getSettings().uiLanguage));
     return picked.filePath;
   });
   h('toolkitApps:session:start', async (e, manifest: ToolkitAppManifest) => {
@@ -3976,9 +3978,9 @@ export function registerIpc(
   h('protect:pickFiles', async (e, multiple = true) => {
     const win = BrowserWindow.fromWebContents(e.sender);
     const picked = await showImportOpenDialog(win ?? undefined!, {
-      title: 'Seleccionar documentos para Nodus Protect',
+      title: toolkitCopy('selectProtectDocuments'),
       properties: multiple ? ['openFile', 'multiSelections'] : ['openFile'],
-      filters: [{ name: 'PDF e imágenes compatibles', extensions: [...PROTECT_INPUT_EXTENSIONS] }],
+      filters: [{ name: toolkitCopy('compatiblePdfAndImages'), extensions: [...PROTECT_INPUT_EXTENSIONS] }],
     });
     return picked.canceled ? [] : protect.registerProtectDiskSources(picked.filePaths);
   });
@@ -3994,7 +3996,7 @@ export function registerIpc(
     const win = BrowserWindow.fromWebContents(e.sender);
     const ext = artifact.format;
     const picked = await dialog.showSaveDialog(win ?? undefined!, {
-      title: 'Guardar copia protegida',
+      title: toolkitCopy('saveProtectedCopy'),
       defaultPath: path.basename(artifact.fileName),
       filters: [{ name: ext.toUpperCase(), extensions: [ext] }],
     });
@@ -4008,7 +4010,7 @@ export function registerIpc(
     if (!result.fallbackRequired) return result;
     const ext = artifact.format;
     const picked = await dialog.showSaveDialog(win ?? undefined!, {
-      title: 'Guardar para compartir', defaultPath: path.basename(artifact.fileName),
+      title: toolkitCopy('saveForSharing'), defaultPath: path.basename(artifact.fileName),
       filters: [{ name: ext.toUpperCase(), extensions: [ext] }],
     });
     if (picked.canceled || !picked.filePath) return { shared: false, canceled: true, fallbackRequired: true, message: result.message };
@@ -4025,7 +4027,7 @@ export function registerIpc(
     const win = BrowserWindow.fromWebContents(e.sender);
     const ext = artifact.format;
     const picked = await dialog.showSaveDialog(win ?? undefined!, {
-      title: 'Descargar copia protegida', defaultPath: artifact.fileName,
+      title: toolkitCopy('downloadProtectedCopy'), defaultPath: artifact.fileName,
       filters: [{ name: ext.toUpperCase(), extensions: [ext] }],
     });
     if (picked.canceled || !picked.filePath) return { canceled: true, path: null };

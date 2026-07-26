@@ -866,7 +866,7 @@ export const PROTECT_TRANSLATIONS = {
     "Verificar copia": "Kopyayı doğrula",
     "Verificar otro archivo": "Başka bir dosyayı doğrula",
     "Verificar una copia trazable": "İzlenebilir bir kopyayı doğrula",
-    "Versión": "Süm",
+    "Versión": "Sürüm",
     "Volver a Nodus Protect": "Nodus Protect'e Dön",
     "Vuelve a seleccionar el archivo.": "Dosyayı tekrar seçin.",
     "Válido únicamente a efectos de identificación en el trámite indicado. No constituye firma, autorización contractual ni consentimiento para usos distintos.": "Yalnızca belirtilen işlemdeki kimlik tespiti amacıyla geçerlidir. İmza, sözleşmesel yetki veya farklı kullanımlar için rıza teşkil etmez.",

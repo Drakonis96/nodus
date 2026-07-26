@@ -607,7 +607,7 @@ export function ToolkitConvertView({ onBack }: { onBack: () => void }) {
                     {/* Why a file failed, instead of a bare red pill the user cannot
                         act on. tr() because the message comes from the main process. */}
                     {fp?.error && (
-                      <span className="truncate text-xs text-rose-600 dark:text-rose-400" title={fp.error}>
+                      <span className="truncate text-xs text-rose-600 dark:text-rose-400" title={tr(fp.error)}>
                         {tr(fp.error)}
                       </span>
                     )}

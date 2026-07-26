@@ -9,7 +9,7 @@ import type {
 } from '@shared/types';
 import { Icon, Spinner } from '../components/ui';
 import { ConfirmModal } from '../components/ConfirmModal';
-import { getActiveLang, t, tx } from '../i18n';
+import { getActiveLang, t, tr, tx } from '../i18n';
 import {
   PROTECT_AUTHORITIES,
   buildProtectArtifact,
@@ -85,7 +85,7 @@ function protectErrorText(error: unknown): string {
     case 'Formato no compatible.': return t('Formato no compatible.');
     case 'Web Crypto no está disponible.': return t('Web Crypto no está disponible.');
     case 'No se pudo codificar la imagen.': return t('No se pudo codificar la imagen.');
-    default: return raw;
+    default: return tr(raw);
   }
 }
 

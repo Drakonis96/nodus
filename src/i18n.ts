@@ -132,6 +132,34 @@ const RUNTIME_PATTERNS: RuntimePattern[] = [
     pattern: /^Reintentando \((\d+)\/(\d+)\)…$/,
     render: (m) => tx('Reintentando ({current}/{total})…', { current: m[1], total: m[2] }),
   },
+  {
+    pattern: /^Traduciendo (\d+) de (\d+) fragmentos…$/,
+    render: (m) => tx('Traduciendo {done} de {total} fragmentos…', { done: m[1], total: m[2] }),
+  },
+  {
+    pattern: /^(.+): analizando…$/,
+    render: (m) => tx('{name}: analizando…', { name: m[1] }),
+  },
+  {
+    pattern: /^(.+): reconstruyendo…$/,
+    render: (m) => tx('{name}: reconstruyendo…', { name: m[1] }),
+  },
+  {
+    pattern: /^(.+): traduciendo…$/,
+    render: (m) => tx('{name}: traduciendo…', { name: m[1] }),
+  },
+  {
+    pattern: /^(.+): guardando…$/,
+    render: (m) => tx('{name}: guardando…', { name: m[1] }),
+  },
+  {
+    pattern: /^Revisa las páginas (.+): el texto necesitó un ajuste tipográfico intenso\.$/,
+    render: (m) => tx('Revisa las páginas {pages}: el texto necesitó un ajuste tipográfico intenso.', { pages: m[1] }),
+  },
+  {
+    pattern: /^(.+?): (.+)$/,
+    render: (m) => tx('{name}: {warning}', { name: m[1], warning: tr(m[2]) }),
+  },
 ];
 
 /** Translate prose received at runtime from Electron while preserving user data. */

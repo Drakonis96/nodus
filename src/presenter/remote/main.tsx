@@ -9,7 +9,8 @@ import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { Icon } from '../../components/ui';
-import { t } from '../../i18n';
+import { setActiveLang, t } from '../../i18n';
+import { normalizeBrowserUiLanguage } from '@shared/uiLanguage';
 import {
   initialPresenterState,
   presenterReducer,
@@ -619,4 +620,7 @@ function buildRemoteThumb(pageNum: number, onClick: () => void) {
 }
 
 const el = document.getElementById('presenter-root');
-if (el) createRoot(el).render(<PresenterRemoteRoot />);
+if (el) {
+  setActiveLang(normalizeBrowserUiLanguage(navigator.language));
+  createRoot(el).render(<PresenterRemoteRoot />);
+}

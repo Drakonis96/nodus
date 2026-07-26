@@ -24,7 +24,7 @@ import { OCR_CONCURRENCY_OPTIONS } from '@shared/aiOcrTypes';
 import { Icon, Spinner, modelLabel } from '../components/ui';
 import { ModelPicker, SubscriptionQuotaNotice } from '../components/ModelPicker';
 import { ConfirmModal } from '../components/ConfirmModal';
-import { t, tx } from '../i18n';
+import { errorText, t, tr, tx } from '../i18n';
 
 type Notice = { kind: 'ok' | 'error' | 'info'; text: string } | null;
 
@@ -57,7 +57,7 @@ function pageBadge(page: OcrPageState): { label: string; style: string } | null 
 }
 
 function ocrErrorText(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  return errorText(error);
 }
 
 function BackButton({ testid, label, onClick }: { testid: string; label: string; onClick: () => void }) {
@@ -295,7 +295,7 @@ function DocReview({ docId, settings, onBack }: { docId: string; settings: AppSe
               {(badge || (page?.status === 'error' && page.lastError)) && (
                 <div className="flex items-center gap-2">
                   {badge && <span className={`shrink-0 rounded-md px-2 py-0.5 text-xs ${badge.style}`}>{badge.label}</span>}
-                  {page?.status === 'error' && page.lastError && <span className="min-w-0 truncate text-xs text-red-600 dark:text-red-300">{page.lastError}</span>}
+                  {page?.status === 'error' && page.lastError && <span className="min-w-0 truncate text-xs text-red-600 dark:text-red-300">{tr(page.lastError)}</span>}
                 </div>
               )}
               <textarea
@@ -339,7 +339,7 @@ export function ToolkitAiOcrView({ onBack, settings }: { onBack: () => void; set
   // Options.
   const [model, setModel] = useState<ModelRef | null>(null);
   const [mode, setMode] = useState<OcrProcessingMode>('ocr');
-  const [targetLanguage, setTargetLanguage] = useState('inglés');
+  const [targetLanguage, setTargetLanguage] = useState(() => t('inglés'));
   const [customPrompt, setCustomPrompt] = useState('');
   const [removeReferences, setRemoveReferences] = useState(true);
   const [simpleText, setSimpleText] = useState(false);

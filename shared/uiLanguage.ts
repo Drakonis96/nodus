@@ -11,6 +11,18 @@ export function normalizeUiLanguage(language: unknown): AppLanguage {
     : 'en';
 }
 
+/** Resolve a browser locale such as `fr-FR` or `pt-BR` to a supported UI language. */
+export function normalizeBrowserUiLanguage(language: unknown): AppLanguage {
+  if (typeof language !== 'string') return 'en';
+  const normalized = language.trim().toLowerCase();
+  if (normalized === 'pt-br' || normalized.startsWith('pt-br-')) return 'pt-BR';
+  const base = normalized.split('-')[0];
+  return base === 'es' || base === 'en' || base === 'fr' || base === 'de'
+    || base === 'pt' || base === 'it' || base === 'tr'
+    ? base
+    : 'en';
+}
+
 /** Pick UI copy with a single, explicit fallback: English. */
 export function uiText(language: unknown, translations: UiTranslations): string {
   const normalized = normalizeUiLanguage(language);
