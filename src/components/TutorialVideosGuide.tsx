@@ -146,6 +146,21 @@ const COPY: Record<AppLanguage, AnnouncementCopy> = {
     hint: 'Você pode voltar aos vídeos quando quiser em Configurações → Tutoriais.',
     finish: 'Entendi',
   },
+  tr: {
+    badge: 'YENİ · VİDEO DERSLER',
+    title: 'Rehberler artık video olarak da mevcut',
+    summary: 'Yazılı temel rehberi incelediniz. Aynı içerikler artık Nodus içinde video formatında da erişilebilir.',
+    eyebrow: 'Doğrudan buradan izleyin',
+    heading: 'Video rehberler',
+    lede: 'Uygulamadan ayrılmadan; duraklatma, altyazı ve tam ekran desteğiyle izleyin. Her biri açıldığı anda izlendi olarak işaretlenir.',
+    settingsTitle: 'Her zaman elinizin altında',
+    settingsBody: 'Ayarlar → Rehberler sekmesi tüm kataloğu ve yazılı rehberi bir arada sunar.',
+    toursTitle: 'Rehberli turlarda da mevcut',
+    toursBody: 'Bir kasanın videosu varsa, rehberli turu bunu üçüncü bir yol olarak sunar.',
+    offline: 'Yazılı rehber hiçbir yere gitmiyor: uygulama içinde kalır ve çevrimdışı çalışır.',
+    hint: 'Ayarlar → Rehberler menüsünden istediğiniz zaman videolara dönebilirsiniz.',
+    finish: 'Anlaşıldı',
+  },
 };
 
 /**

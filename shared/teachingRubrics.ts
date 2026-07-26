@@ -20,7 +20,7 @@
  * (export) and the AI generator all share it, and it is unit-tested on its own.
  */
 
-export const RUBRIC_LANGUAGES = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR'] as const;
+export const RUBRIC_LANGUAGES = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr'] as const;
 export type RubricLanguage = (typeof RUBRIC_LANGUAGES)[number];
 
 export function normalizeRubricLanguage(value: unknown): RubricLanguage {
@@ -110,6 +110,8 @@ export const RUBRIC_LEVEL_PRESETS: RubricLevelPreset[] = [
       de: ['Ausgezeichnet', 'Gut', 'Angemessen', 'Verbesserungsbedürftig'],
       pt: ['Excelente', 'Bom', 'Adequado', 'A melhorar'],
       'pt-BR': ['Excelente', 'Bom', 'Adequado', 'A melhorar'],
+      it: ['Eccellente', 'Buono', 'Adeguato', 'Da migliorare'],
+      tr: ['Mükemmel', 'İyi', 'Yeterli', 'Geliştirilmeli'],
     },
   },
   {
@@ -125,6 +127,8 @@ export const RUBRIC_LEVEL_PRESETS: RubricLevelPreset[] = [
       de: ['Experte', 'Fortgeschritten', 'Lernend', 'Anfänger'],
       pt: ['Especialista', 'Avançado', 'Aprendiz', 'Iniciante'],
       'pt-BR': ['Especialista', 'Avançado', 'Aprendiz', 'Iniciante'],
+      it: ['Esperto', 'Avanzato', 'Apprendista', 'Principiante'],
+      tr: ['Uzman', 'İleri düzey', 'Öğrenen', 'Acemi'],
     },
   },
   {
@@ -137,6 +141,8 @@ export const RUBRIC_LEVEL_PRESETS: RubricLevelPreset[] = [
       de: ['Übertrifft Erwartungen', 'Erfüllt Erwartungen', 'Annähernd', 'Darunter'],
       pt: ['Supera o esperado', 'Cumpre o esperado', 'Aproxima-se', 'Abaixo'],
       'pt-BR': ['Supera o esperado', 'Atende ao esperado', 'Aproxima-se', 'Abaixo'],
+      it: ['Supera le aspettative', 'Soddisfa le aspettative', 'Si avvicina', 'Sotto le aspettative'],
+      tr: ['Beklentileri aşıyor', 'Beklentileri karşılıyor', 'Yaklaşıyor', 'Beklentilerin altında'],
     },
   },
   {
@@ -149,6 +155,8 @@ export const RUBRIC_LEVEL_PRESETS: RubricLevelPreset[] = [
       de: ['Vorbildlich', 'Kompetent', 'In Entwicklung', 'Anfänglich'],
       pt: ['Exemplar', 'Competente', 'Em desenvolvimento', 'Inicial'],
       'pt-BR': ['Exemplar', 'Competente', 'Em desenvolvimento', 'Inicial'],
+      it: ['Esemplare', 'Competente', 'In sviluppo', 'Iniziale'],
+      tr: ['Örnek düzey', 'Yetkin', 'Gelişiyor', 'Başlangıç'],
     },
   },
   {
@@ -162,6 +170,8 @@ export const RUBRIC_LEVEL_PRESETS: RubricLevelPreset[] = [
       de: ['Erreicht', 'In Entwicklung', 'Nicht erreicht'],
       pt: ['Conseguido', 'Em progresso', 'Não conseguido'],
       'pt-BR': ['Alcançado', 'Em progresso', 'Não alcançado'],
+      it: ['Raggiunto', 'In corso', 'Non raggiunto'],
+      tr: ['Başarıldı', 'Devam ediyor', 'Başarılmadı'],
     },
   },
   {
@@ -175,6 +185,8 @@ export const RUBRIC_LEVEL_PRESETS: RubricLevelPreset[] = [
       de: ['Sehr gut', 'Gut', 'Befriedigend', 'Ausreichend', 'Ungenügend'],
       pt: ['Excelente', 'Muito bom', 'Bom', 'Suficiente', 'Insuficiente'],
       'pt-BR': ['Excelente', 'Muito bom', 'Bom', 'Suficiente', 'Insuficiente'],
+      it: ['Eccellente', 'Molto buono', 'Buono', 'Sufficiente', 'Insufficiente'],
+      tr: ['Üstün', 'Çok iyi', 'İyi', 'Yeterli', 'Yetersiz'],
     },
   },
   {
@@ -187,6 +199,8 @@ export const RUBRIC_LEVEL_PRESETS: RubricLevelPreset[] = [
       de: ['Übertrifft Erwartungen', 'Erwartetes Kriterium', 'Verbesserung nötig'],
       pt: ['Supera o esperado', 'Critério esperado', 'Precisa melhorar'],
       'pt-BR': ['Supera o esperado', 'Critério esperado', 'Precisa melhorar'],
+      it: ['Supera le aspettative', 'Criterio atteso', 'Da migliorare'],
+      tr: ['Beklentileri aşıyor', 'Beklenen ölçüt', 'Geliştirilmeli'],
     },
   },
 ];

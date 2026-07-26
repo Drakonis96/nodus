@@ -7,6 +7,7 @@
 // of phones share one state. The LAN server runs only while presenting.
 import path from 'node:path';
 import { app, BrowserWindow, screen, powerSaveBlocker } from 'electron';
+import { getSettings } from '../../db/settingsRepo';
 import QRCode from 'qrcode';
 import {
   beginPresentation,
@@ -76,7 +77,12 @@ function createAudienceWindow(pdfId: string, startSlide: number, fullscreen = tr
   const { audience } = pickDisplays();
   const win = new BrowserWindow(baseWindowOptions(audience, fullscreen));
   audienceWindow = win;
-  loadEntry(win, 'presenterAudience.html', { pdfId, startSlide: String(startSlide), role: 'audience' });
+  loadEntry(win, 'presenterAudience.html', {
+    pdfId,
+    startSlide: String(startSlide),
+    role: 'audience',
+    language: getSettings().uiLanguage,
+  });
   win.on('closed', () => {
     if (audienceWindow === win) audienceWindow = null;
     // The audience is the presentation — closing it ends everything.
@@ -88,7 +94,12 @@ function createPresenterWindow(pdfId: string, startSlide: number): void {
   const { presenter } = pickDisplays();
   const win = new BrowserWindow(baseWindowOptions(presenter));
   presenterWindow = win;
-  loadEntry(win, 'presenterView.html', { pdfId, startSlide: String(startSlide), role: 'presenter' });
+  loadEntry(win, 'presenterView.html', {
+    pdfId,
+    startSlide: String(startSlide),
+    role: 'presenter',
+    language: getSettings().uiLanguage,
+  });
   win.on('closed', () => {
     if (presenterWindow === win) presenterWindow = null;
   });

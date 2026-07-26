@@ -304,6 +304,7 @@ test('the exam language follows the interface until the teacher picks one', () =
   // Unlocked: whatever the interface currently is.
   assert.equal(model.effectiveExamLanguage(free, 'en'), 'en');
   assert.equal(model.effectiveExamLanguage(free, 'fr'), 'fr');
+  assert.equal(model.effectiveExamLanguage(free, 'tr'), 'tr');
   assert.equal(model.effectiveExamLanguage(free, 'nonsense'), 'es', 'an unknown interface locale falls back');
   // Locked: the teacher's choice wins no matter what the interface says.
   const locked = { language: 'de', languageLocked: true };

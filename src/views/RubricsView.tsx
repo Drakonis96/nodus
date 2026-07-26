@@ -25,7 +25,7 @@ import { ConfirmModal } from '../components/ConfirmModal';
 import { t, errorText, getActiveLang } from '../i18n';
 
 const LANGUAGE_LABELS: Record<RubricLanguage, string> = {
-  es: 'Español', en: 'English', fr: 'Français', de: 'Deutsch', pt: 'Português', 'pt-BR': 'Português (Brasil)',
+  es: 'Español', en: 'English', fr: 'Français', de: 'Deutsch', pt: 'Português', 'pt-BR': 'Português (Brasil)', it: 'Italiano', tr: 'Türkçe',
 };
 
 export function RubricsView() {

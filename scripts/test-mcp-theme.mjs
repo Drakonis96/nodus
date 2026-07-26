@@ -4,7 +4,7 @@ import test from 'node:test';
 
 const modal = await readFile(new URL('../src/components/McpConnectionModal.tsx', import.meta.url), 'utf8');
 const settings = await readFile(new URL('../src/views/Settings.tsx', import.meta.url), 'utf8');
-const localeFiles = ['i18n.en.ts', 'i18n.fr.ts', 'i18n.de.ts', 'i18n.pt.ts', 'i18n.pt-BR.ts', 'i18n.it.ts'];
+const localeFiles = ['i18n.en.ts', 'i18n.fr.ts', 'i18n.de.ts', 'i18n.pt.ts', 'i18n.pt-BR.ts', 'i18n.it.ts', 'i18n.tr.ts'];
 const localeSources = await Promise.all(localeFiles.map(async (file) => ({
   file,
   source: await readFile(new URL(`../src/${file}`, import.meta.url), 'utf8'),

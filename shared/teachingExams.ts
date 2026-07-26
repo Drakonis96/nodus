@@ -32,7 +32,7 @@ export const EXAM_QUESTION_TYPES = [
 export type ExamQuestionType = (typeof EXAM_QUESTION_TYPES)[number];
 
 /** The document's own language, independent from the interface language. */
-export const EXAM_LANGUAGES = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR'] as const;
+export const EXAM_LANGUAGES = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr'] as const;
 export type ExamLanguage = (typeof EXAM_LANGUAGES)[number];
 
 export interface ExamQuestionTypeDef {
@@ -479,6 +479,8 @@ const DOCUMENT_LABELS: Record<ExamLanguage, ExamDocumentLabels> = {
   de: { studentName: 'Name und Nachname', studentId: 'Matrikelnummer', group: 'Gruppe', date: 'Datum', grade: 'Note', points: 'Punkte', point: 'Punkt', duration: 'Dauer', minutes: 'Minuten', instructions: 'Hinweise', question: 'Aufgabe', total: 'Gesamt', answerKey: 'Lösungsschlüssel', trueLabel: 'Wahr', falseLabel: 'Falsch', columnA: 'Spalte A', columnB: 'Spalte B' },
   pt: { studentName: 'Nome e apelidos', studentId: 'Nº de estudante', group: 'Turma', date: 'Data', grade: 'Classificação', points: 'pontos', point: 'ponto', duration: 'Duração', minutes: 'minutos', instructions: 'Instruções', question: 'Pergunta', total: 'Total', answerKey: 'Soluções', trueLabel: 'Verdadeiro', falseLabel: 'Falso', columnA: 'Coluna A', columnB: 'Coluna B' },
   'pt-BR': { studentName: 'Nome e sobrenome', studentId: 'Matrícula', group: 'Turma', date: 'Data', grade: 'Nota', points: 'pontos', point: 'ponto', duration: 'Duração', minutes: 'minutos', instructions: 'Instruções', question: 'Questão', total: 'Total', answerKey: 'Gabarito', trueLabel: 'Verdadeiro', falseLabel: 'Falso', columnA: 'Coluna A', columnB: 'Coluna B' },
+  it: { studentName: 'Nome e cognome', studentId: 'Numero di matricola', group: 'Gruppo', date: 'Data', grade: 'Voto', points: 'punti', point: 'punto', duration: 'Durata', minutes: 'minuti', instructions: 'Istruzioni', question: 'Domanda', total: 'Totale', answerKey: 'Soluzioni', trueLabel: 'Vero', falseLabel: 'Falso', columnA: 'Colonna A', columnB: 'Colonna B' },
+  tr: { studentName: 'Adı ve soyadı', studentId: 'Öğrenci numarası', group: 'Grup', date: 'Tarih', grade: 'Not', points: 'puan', point: 'puan', duration: 'Süre', minutes: 'dakika', instructions: 'Talimatlar', question: 'Soru', total: 'Toplam', answerKey: 'Cevap anahtarı', trueLabel: 'Doğru', falseLabel: 'Yanlış', columnA: 'A sütunu', columnB: 'B sütunu' },
 };
 
 export function normalizeExamLanguage(value: unknown): ExamLanguage {

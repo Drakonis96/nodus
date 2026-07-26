@@ -42,6 +42,8 @@ const LANGUAGE_NAMES: Record<RubricLanguage, string> = {
   de: 'alemán',
   pt: 'portugués de Portugal',
   'pt-BR': 'portugués de Brasil',
+  it: 'italiano',
+  tr: 'turco',
 };
 
 /** The rules that separate a usable descriptor from a vague one. */

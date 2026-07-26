@@ -3,6 +3,8 @@
 // window (@shared/presenterState). Local input is applied AND relayed to main;
 // actions relayed back from the presenter are applied without re-broadcasting.
 import { createRoot } from 'react-dom/client';
+import { setActiveLang } from '../i18n';
+import { normalizeUiLanguage } from '@shared/uiLanguage';
 import type React from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { beginPresentation, presenterReducer, type PresenterAction, type PresenterRuntimeState, type ToolName } from '@shared/presenterState';
@@ -260,4 +262,7 @@ function AudienceApp() {
 }
 
 const el = document.getElementById('presenter-root');
-if (el) createRoot(el).render(<AudienceApp />);
+if (el) {
+  setActiveLang(normalizeUiLanguage(new URLSearchParams(window.location.search).get('language')));
+  createRoot(el).render(<AudienceApp />);
+}

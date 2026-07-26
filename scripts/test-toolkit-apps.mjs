@@ -73,7 +73,7 @@ test('accepts real mini-app bundles and every included app', () => {
 });
 
 test('every bundled app contains complete copy for every Nodus interface language', () => {
-  assert.deepEqual(catalogue.INCLUDED_APP_LANGUAGES, ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it']);
+  assert.deepEqual(catalogue.INCLUDED_APP_LANGUAGES, ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr']);
   for (const [name, copy] of [['roulette', catalogue.ROULETTE_COPY], ['topic distributor', catalogue.TOPIC_DISTRIBUTOR_COPY], ['brainstorm', catalogue.BRAINSTORM_COPY]]) {
     const expected = Object.keys(copy.es).sort();
     assert.ok(expected.length > 30, `${name} should translate its complete interface`);
@@ -81,6 +81,16 @@ test('every bundled app contains complete copy for every Nodus interface languag
       assert.deepEqual(Object.keys(copy[language]).sort(), expected, `${name} ${language} copy keys`);
       assert.ok(Object.values(copy[language]).every((value) => typeof value === 'string' && value.trim()), `${name} ${language} has no blank copy`);
     }
+  }
+});
+
+test('shared app sessions preserve the participant browser language', async () => {
+  const server = await readFile(path.join(repoRoot, 'electron/toolkit/apps/server.ts'), 'utf8');
+  assert.match(server, /normalizeBrowserUiLanguage/);
+  assert.match(server, /client\.language = participantLanguage\(typeof message\.language === 'string'/);
+  assert.match(server, /language:\s*__locale/);
+  for (const language of catalogue.INCLUDED_APP_LANGUAGES) {
+    assert.match(server, new RegExp(`(?:^|\\s|['"])${language.replace('-', '\\-')}(?:['"])?\\s*:`), `participant shell includes ${language}`);
   }
 });
 
@@ -187,6 +197,17 @@ test('downloads a complete offline package with runnable and editable files', ()
   assert.match(zip.readAsText('README.md'), /Abre `index\.html`/);
   assert.equal(JSON.parse(zip.readAsText('nodus-app.json')).title, minimal.title);
   assert.equal(appExport.toolkitAppPackageFileName(minimal), 'Contador-amable.zip');
+
+  const turkishZip = new (require('adm-zip'))(appExport.buildToolkitAppPackage(minimal, 'tr'));
+  assert.match(turkishZip.readAsText('index.html'), /<html lang="tr">/);
+  assert.match(turkishZip.readAsText('index.html'), /locale:"tr"/);
+  assert.match(turkishZip.readAsText('README.md'), /## Uygulamayı açın/);
+  assert.match(turkishZip.readAsText('README.md'), /## Paket içeriği/);
+
+  const includedTurkishZip = new (require('adm-zip'))(appExport.buildToolkitAppPackage(catalogue.INCLUDED_TOOLKIT_APPS[0].manifest, 'tr'));
+  assert.match(includedTurkishZip.readAsText('index.html'), /<title>Seçenek çarkı<\/title>/);
+  assert.match(includedTurkishZip.readAsText('README.md'), /^# Seçenek çarkı/m);
+  assert.notEqual(appExport.toolkitAppPackageFileName(catalogue.INCLUDED_TOOLKIT_APPS[0].manifest, 'tr'), 'Ruleta-de-opciones.zip');
 });
 
 test('revision prompts carry a validated complete app and request a replacement bundle', () => {
@@ -210,7 +231,8 @@ test('session/storage payloads accept bounded JSON and reject hostile or deep va
 test('shared Nodus Apps links omit the PIN and present an explicit access gate', async () => {
   const serverSource = await readFile(path.join(repoRoot, 'electron/toolkit/apps/server.ts'), 'utf8');
   assert.match(serverSource, /function renderAccess/);
-  assert.match(serverSource, /Introduce el código/);
+  assert.match(serverSource, /PARTICIPANT_COPY/);
+  assert.match(serverSource, /tx\('enterCode'\)/);
   assert.match(serverSource, /const url = `http:\/\/\$\{ip\}:\$\{port\}\/join`/);
   assert.doesNotMatch(serverSource, /\/join\?pin=/);
   assert.match(serverSource, /ws\.close\(4001, 'Invalid PIN'\)/);

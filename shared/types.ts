@@ -1083,7 +1083,7 @@ export type DeepContextMode = 'standard' | 'long';
 /** Languages Nodus can speak. `uiLanguage` localizes the interface; `promptLanguage`
  *  is injected into the AI prompts and so determines the language of generated content
  *  (ideas, themes, tutor narrative, drafts, assistant answers). */
-export type AppLanguage = 'es' | 'en' | 'fr' | 'de' | 'pt' | 'pt-BR' | 'it';
+export type AppLanguage = 'es' | 'en' | 'fr' | 'de' | 'pt' | 'pt-BR' | 'it' | 'tr';
 /** Single source of truth for the prompt languages: the union below is derived from
  *  it, and runtime validators (the MCP tool schemas) enumerate it instead of
  *  re-spelling the list — which is how `tr` once ended up accepted everywhere except

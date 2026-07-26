@@ -8,7 +8,8 @@ import type React from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { Icon } from '../components/ui';
-import { t } from '../i18n';
+import { setActiveLang, t } from '../i18n';
+import { normalizeUiLanguage } from '@shared/uiLanguage';
 import { beginPresentation, presenterReducer, type PresenterAction, type PresenterRuntimeState, type ToolName } from '@shared/presenterState';
 import { FittedSlideRenderer } from '../lib/presenter/renderSlide';
 import { createThumbSession, type ThumbSession } from '../lib/presenter/thumbSession';
@@ -513,4 +514,7 @@ function buildCarouselItem(pageNum: number, onClick: () => void) {
 }
 
 const el = document.getElementById('presenter-root');
-if (el) createRoot(el).render(<PresenterViewApp />);
+if (el) {
+  setActiveLang(normalizeUiLanguage(new URLSearchParams(window.location.search).get('language')));
+  createRoot(el).render(<PresenterViewApp />);
+}

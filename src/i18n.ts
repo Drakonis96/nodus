@@ -5,6 +5,7 @@ import { DE } from './i18n.de';
 import { PT } from './i18n.pt';
 import { PT_BR } from './i18n.pt-BR';
 import { IT } from './i18n.it';
+import { TR } from './i18n.tr';
 import { looksLikeSpanishUiText, normalizeUiLanguage } from '@shared/uiLanguage';
 
 /**
@@ -32,6 +33,7 @@ const TABLES: Record<Exclude<AppLanguage, 'es'>, Record<string, string>> = {
   pt: PT,
   'pt-BR': PT_BR,
   it: IT,
+  tr: TR,
 };
 
 let activeLang: AppLanguage = 'es';
@@ -129,6 +131,34 @@ const RUNTIME_PATTERNS: RuntimePattern[] = [
   {
     pattern: /^Reintentando \((\d+)\/(\d+)\)…$/,
     render: (m) => tx('Reintentando ({current}/{total})…', { current: m[1], total: m[2] }),
+  },
+  {
+    pattern: /^Traduciendo (\d+) de (\d+) fragmentos…$/,
+    render: (m) => tx('Traduciendo {done} de {total} fragmentos…', { done: m[1], total: m[2] }),
+  },
+  {
+    pattern: /^(.+): analizando…$/,
+    render: (m) => tx('{name}: analizando…', { name: m[1] }),
+  },
+  {
+    pattern: /^(.+): reconstruyendo…$/,
+    render: (m) => tx('{name}: reconstruyendo…', { name: m[1] }),
+  },
+  {
+    pattern: /^(.+): traduciendo…$/,
+    render: (m) => tx('{name}: traduciendo…', { name: m[1] }),
+  },
+  {
+    pattern: /^(.+): guardando…$/,
+    render: (m) => tx('{name}: guardando…', { name: m[1] }),
+  },
+  {
+    pattern: /^Revisa las páginas (.+): el texto necesitó un ajuste tipográfico intenso\.$/,
+    render: (m) => tx('Revisa las páginas {pages}: el texto necesitó un ajuste tipográfico intenso.', { pages: m[1] }),
+  },
+  {
+    pattern: /^(.+?): (.+)$/,
+    render: (m) => tx('{name}: {warning}', { name: m[1], warning: tr(m[2]) }),
   },
 ];
 

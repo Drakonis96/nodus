@@ -2,12 +2,24 @@ import type { AppLanguage } from './types';
 
 export type UiTranslations = Partial<Record<AppLanguage, string>> & { en: string };
 
-const UI_LANGUAGES = new Set<AppLanguage>(['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it']);
+const UI_LANGUAGES = new Set<AppLanguage>(['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr']);
 
 /** Runtime locale validation. Unknown or future locales must never fall back to Spanish. */
 export function normalizeUiLanguage(language: unknown): AppLanguage {
   return typeof language === 'string' && UI_LANGUAGES.has(language as AppLanguage)
     ? (language as AppLanguage)
+    : 'en';
+}
+
+/** Resolve a browser locale such as `fr-FR` or `pt-BR` to a supported UI language. */
+export function normalizeBrowserUiLanguage(language: unknown): AppLanguage {
+  if (typeof language !== 'string') return 'en';
+  const normalized = language.trim().toLowerCase();
+  if (normalized === 'pt-br' || normalized.startsWith('pt-br-')) return 'pt-BR';
+  const base = normalized.split('-')[0];
+  return base === 'es' || base === 'en' || base === 'fr' || base === 'de'
+    || base === 'pt' || base === 'it' || base === 'tr'
+    ? base
     : 'en';
 }
 
@@ -45,6 +57,7 @@ export function localizeRuntimeError(message: string, language: unknown): string
     pt: 'Não foi possível concluir a operação.',
     'pt-BR': 'Não foi possível concluir a operação.',
     it: 'Non è stato possibile completare l’operazione.',
+    tr: 'İşlem tamamlanamadı.',
   });
 }
 

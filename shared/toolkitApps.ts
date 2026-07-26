@@ -196,7 +196,7 @@ Do not output this checklist or analysis. Output only the corrected final JSON.
 </implementation_checklist>
 
 <nodus_api>
-The read-only window.nodus.locale property contains the active Nodus interface language: "es", "en", "fr", "de", "pt", "pt-BR" or "it". Use it only when the user requests a multilingual app.
+The read-only window.nodus.locale property contains the active Nodus interface language: "es", "en", "fr", "de", "pt", "pt-BR", "it" or "tr". Use it only when the user requests a multilingual app.
 
 When capabilities.storage is true, persist app-owned JSON data with:
   await window.nodus.storage.get(key)
