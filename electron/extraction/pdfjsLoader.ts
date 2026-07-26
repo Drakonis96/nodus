@@ -27,7 +27,7 @@ export async function openPdf(filePath: string): Promise<any> {
   // Without it, PDFs using Helvetica/Times can expose a valid text layer while
   // rendering blank glyphs in the Node canvas used by facsimile translation.
   const standardFontDataUrl = pathToFileURL(path.join(pdfjsRoot, 'standard_fonts') + path.sep).href;
-  const task = pdfjs.getDocument({ data, useSystemFonts: true, standardFontDataUrl, isEvalSupported: false, disableFontFace: false });
+  const task = pdfjs.getDocument({ data, useSystemFonts: true, standardFontDataUrl, isEvalSupported: false, disableFontFace: true });
   return task.promise;
 }
 
