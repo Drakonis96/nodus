@@ -28,8 +28,17 @@ export const RELEASE_2_6_3_IT: string[] = [
   "I report PDF di Deep Research adottano un design più curato: copertina pulita con il marchio Nodus, riassunto esecutivo centrato, numerazione automatica delle sezioni e una matrice di tracciabilità compatta in forma di tabella.",
 ];
 
+export const RELEASE_2_7_0_IT: string[] = [
+  "I tutorial di Nodus si possono ora guardare in video senza uscire dall'applicazione. Al primo avvio ti viene chiesto come preferisci imparare —guardare i tutorial o leggere la guida— e Impostazioni → Tutorial apre la stessa griglia, con lettore integrato, contrassegno «visto» condiviso tra i depositi e la guida scritta sempre a un clic come percorso offline. Anche i tour guidati di ogni deposito propongono il loro video, e il catalogo si aggiorna da solo ogni volta che ne pubblichiamo uno nuovo.",
+  "I backup automatici non bloccano più l'applicazione. L'archivio viene ora compresso e cifrato senza bloccare il processo principale, così una libreria grande smette di scattare ogni mezz'ora; la sincronizzazione con Nodus Server fa lo stesso con la propria compressione. Il formato dei backup non cambia e quelli esistenti si ripristinano esattamente come prima.",
+  "Nodi torna a rispondere all'istante e le sue liste si comportano bene. Le note rapide e la chat ora scorrono invece di schiacciare le righe e tagliare il testo a metà, e la mascotte non resta più congelata mentre il processo principale è occupato.",
+  "Due ritocchi di interfaccia: il pulsante Aggiorna dell'intestazione non è più riempito con il colore d'accento e si uniforma al resto della barra, e nella scheda della persona i pulsanti di aggiunta (relazioni, luoghi, varianti del nome ed eventi di vita) si riducono a un'icona con descrizione al passaggio del mouse, così titolo e descrizione di ogni sezione tornano a stare su una riga.",
+  "L'installazione del copilota di Word non tocca più la cache dei componenti aggiuntivi di Office. Prima venivano cancellati singoli file da quella cache —cosa che Microsoft sconsiglia— e ciò poteva impedire il caricamento di tutti i componenti aggiuntivi di Word; ora basta reinstallare dalle Impostazioni e riaprire Word. Il manuale del componente aggiuntivo descrive la vera procedura di installazione e come distinguerla da un guasto proprio di Office.",
+];
+
 /** Italian history, indexed by release and highlight order. */
 export const RELEASE_NOTES_IT: Record<string, string[]> = {
+  "2.7.0": RELEASE_2_7_0_IT,
   "2.6.3": RELEASE_2_6_3_IT,
   "2.6.2": RELEASE_2_6_2_IT,
   "2.6.1": RELEASE_2_6_IT,
