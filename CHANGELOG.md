@@ -1,5 +1,62 @@
 # Changelog
 
+## 2.7.0 — 2026-07-26
+
+### Added
+
+- **Video tutorials, in-app.** First run now asks a third question — watch the
+  tutorials or read the written guide — and the video path renders the published
+  catalogue as a grid inside the same cinematic chrome, with an in-app player
+  (pause, seek, captions, speed, fullscreen). Watched flags are global, so a
+  video watched in one vault stays watched in the others. Settings → Tutorials
+  leads with the same grid above its replay buttons, and a vault tour whose
+  ground a video covers opens with three ways in (watch, walk the app, not now).
+  The catalogue is fetched from `docs/tutorials.json` in the main process,
+  validated entry by entry and cached in `userData`; the three built-in
+  tutorials are always a complete fallback. The written deck remains the offline
+  path. Existing installs, which were never asked the question, get a one-time
+  announcement modal that embeds the same grid.
+
+### Changed
+
+- **The header sync button matches the rest of the rail.** The Zotero sync
+  action was the only header icon rendered with `btn-primary`, permanently
+  filled with the vault accent colour. It is now `btn-ghost` like its
+  neighbours, keeping its spinner and pinned label while syncing.
+- **Person dossier add buttons are icon-only.** The `+` actions for family and
+  social relations, places, name variants and life events claimed at least 176px
+  of the section header and wrapped their own label, squeezing the title and
+  description into a one-word-per-line strip. They are now 32×32 icons with the
+  wording in a tooltip and a specific `aria-label` per action; the biography
+  action, whose label carries state, keeps the wide style.
+
+### Fixed
+
+- **Automatic backups no longer freeze the app.** `createBackupArchive` ran
+  unattended every 30 minutes and was fully synchronous: on a 220 MB payload
+  `AdmZip.toBuffer()` alone blocked the main process for 3.65 s (0.28 s now,
+  async zlib), plus synchronous `scryptSync` and `readFileSync`/`writeFileSync`.
+  Linear in library size, so a 1–2 GB library meant 20–45 s of freeze per
+  backup. Hashing and entry addition now yield, and `serverSyncService` gzips
+  asynchronously for the same reason. The archive format is unchanged.
+- **Nodi stays responsive and its lists scroll.** The mascot preload used
+  `ipcRenderer.sendSync` for the mouse hit-test — fired on every transition —
+  which parked the overlay renderer until the main process was free without ever
+  buying the ordering it was written for; the hit test is now fire-and-forget and
+  the first frame's placement travels in the URL. Separately, `.nodi-note-row`
+  and `.nodi-msg` were left at the default `flex-shrink: 1`, so quick notes and
+  chat compressed their rows (33px instead of 60px) and clipped their own text
+  instead of scrolling; `flex: 0 0 auto` restores natural heights.
+- **The Word add-in installer no longer deletes files from the Office cache.**
+  `installCopilotAddin` walked Office's Wef cache and unlinked anything matching
+  `nodus` or the add-in GUID, including `Word.RibbonCache.<locale>`, the index
+  shared by every installed add-in — which Microsoft documents as a way to make
+  all add-ins stop loading. Bumping the manifest `<Version>` is the sanctioned
+  way to make Office pick up a changed manifest, and it is now the only thing
+  the installer does. `word-addin/README.md` documents the real install flow and
+  a troubleshooting note for the unrelated Office-side failure on Word for Mac
+  16.109 with work accounts.
+
 ## 2.6.3 — 2026-07-24
 
 ### Added

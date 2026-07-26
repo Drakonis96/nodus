@@ -221,7 +221,60 @@ const RELEASE_2_6_3_HIGHLIGHTS: RawReleaseHighlight[] = [
   },
 ];
 
+const RELEASE_2_7_0_HIGHLIGHTS: RawReleaseHighlight[] = [
+  {
+    scope: 'general',
+    es: 'Los tutoriales de Nodus ya se pueden ver en vídeo sin salir de la aplicación. El primer arranque te pregunta cómo prefieres aprender —ver los tutoriales o leer la guía— y Ajustes → Tutoriales abre la misma parrilla, con reproductor integrado, marca de «visto» compartida entre bóvedas y la guía escrita siempre a un clic como camino sin conexión. Los recorridos guiados de cada bóveda ofrecen también su vídeo, y el catálogo se actualiza solo cuando publicamos uno nuevo.',
+    en: 'Nodus tutorials can now be watched as video without leaving the app. First run asks how you prefer to learn — watch the tutorials or read the guide — and Settings → Tutorials opens the same grid, with a built-in player, a watched flag shared across vaults and the written guide always one click away as the offline path. Each vault’s guided tour offers its video too, and the catalogue refreshes on its own whenever we publish a new one.',
+    fr: 'Les tutoriels de Nodus peuvent désormais être regardés en vidéo sans quitter l’application. Le premier lancement vous demande comment vous préférez apprendre — regarder les tutoriels ou lire le guide — et Paramètres → Tutoriels ouvre la même grille, avec lecteur intégré, marque « vu » partagée entre les espaces et le guide écrit toujours à un clic comme voie hors ligne. Les visites guidées de chaque espace proposent aussi leur vidéo, et le catalogue se met à jour tout seul dès que nous en publions un nouveau.',
+    de: 'Die Nodus-Tutorials lassen sich jetzt als Video ansehen, ohne die App zu verlassen. Beim ersten Start wirst du gefragt, wie du lieber lernst – Tutorials ansehen oder die Anleitung lesen –, und Einstellungen → Tutorials öffnet dieselbe Übersicht, mit eingebautem Player, einer über alle Arbeitsbereiche geteilten „Gesehen“-Markierung und der schriftlichen Anleitung stets einen Klick entfernt als Offline-Weg. Auch die geführten Touren jedes Arbeitsbereichs bieten ihr Video an, und der Katalog aktualisiert sich von selbst, sobald wir ein neues veröffentlichen.',
+    pt: 'Os tutoriais do Nodus já podem ser vistos em vídeo sem sair da aplicação. O primeiro arranque pergunta como prefere aprender — ver os tutoriais ou ler o guia — e Definições → Tutoriais abre a mesma grelha, com reprodutor integrado, marca de «visto» partilhada entre espaços e o guia escrito sempre a um clique como caminho sem ligação. As visitas guiadas de cada espaço oferecem também o seu vídeo, e o catálogo atualiza-se sozinho sempre que publicamos um novo.',
+    'pt-BR': 'Os tutoriais do Nodus já podem ser assistidos em vídeo sem sair do aplicativo. A primeira execução pergunta como você prefere aprender — assistir aos tutoriais ou ler o guia — e Configurações → Tutoriais abre a mesma grade, com player integrado, marca de “assistido” compartilhada entre espaços e o guia escrito sempre a um clique como caminho offline. Os tours guiados de cada espaço também oferecem seu vídeo, e o catálogo se atualiza sozinho sempre que publicamos um novo.',
+  },
+  {
+    scope: 'general',
+    es: 'Las copias de seguridad automáticas ya no congelan la aplicación. El archivo se comprime y cifra sin bloquear el proceso principal, de modo que una biblioteca grande deja de dar tirones cada media hora; la sincronización con Nodus Server hace lo mismo con su comprimido. El formato de las copias no cambia y las existentes se restauran igual.',
+    en: 'Automatic backups no longer freeze the app. The archive is now compressed and encrypted without blocking the main process, so a large library stops stuttering every half hour; Nodus Server sync does the same with its own compression. The backup format is unchanged and existing backups restore exactly as before.',
+    fr: 'Les sauvegardes automatiques ne figent plus l’application. L’archive est désormais compressée et chiffrée sans bloquer le processus principal, de sorte qu’une grande bibliothèque cesse de saccader toutes les demi-heures ; la synchronisation avec Nodus Server fait de même avec sa compression. Le format des sauvegardes ne change pas et les sauvegardes existantes se restaurent comme avant.',
+    de: 'Automatische Sicherungen frieren die App nicht mehr ein. Das Archiv wird jetzt komprimiert und verschlüsselt, ohne den Hauptprozess zu blockieren, sodass eine große Bibliothek nicht mehr alle halbe Stunde stockt; die Synchronisierung mit Nodus Server macht dasselbe mit ihrer Komprimierung. Das Sicherungsformat bleibt unverändert und vorhandene Sicherungen lassen sich genauso wiederherstellen.',
+    pt: 'As cópias de segurança automáticas já não congelam a aplicação. O arquivo passa a ser comprimido e cifrado sem bloquear o processo principal, pelo que uma biblioteca grande deixa de dar solavancos a cada meia hora; a sincronização com o Nodus Server faz o mesmo com a sua compressão. O formato das cópias não muda e as existentes restauram-se tal como antes.',
+    'pt-BR': 'Os backups automáticos não travam mais o aplicativo. O arquivo passa a ser compactado e criptografado sem bloquear o processo principal, então uma biblioteca grande deixa de engasgar a cada meia hora; a sincronização com o Nodus Server faz o mesmo com sua compactação. O formato dos backups não muda e os existentes são restaurados igual.',
+  },
+  {
+    scope: 'nodi',
+    es: 'Nodi vuelve a responder al instante y sus listas se comportan. Las notas rápidas y el chat ya hacen scroll en lugar de aplastar sus filas y cortar el texto por la mitad, y la mascota deja de quedarse congelada mientras el proceso principal está ocupado.',
+    en: 'Nodi is instantly responsive again and its lists behave. Quick notes and chat now scroll instead of squashing their rows and clipping the text through the middle, and the mascot no longer freezes while the main process is busy.',
+    fr: 'Nodi répond de nouveau instantanément et ses listes se tiennent. Les notes rapides et le chat défilent désormais au lieu d’écraser leurs lignes et de couper le texte en son milieu, et la mascotte ne se fige plus pendant que le processus principal est occupé.',
+    de: 'Nodi reagiert wieder sofort und seine Listen benehmen sich. Schnellnotizen und Chat scrollen jetzt, statt ihre Zeilen zu stauchen und den Text mittendurch abzuschneiden, und das Maskottchen friert nicht mehr ein, während der Hauptprozess beschäftigt ist.',
+    pt: 'O Nodi volta a responder num instante e as suas listas comportam-se. As notas rápidas e o chat já fazem deslocamento em vez de esmagar as linhas e cortar o texto a meio, e a mascote deixa de ficar congelada enquanto o processo principal está ocupado.',
+    'pt-BR': 'O Nodi volta a responder na hora e suas listas se comportam. As notas rápidas e o chat agora rolam em vez de esmagar as linhas e cortar o texto pela metade, e o mascote deixa de ficar congelado enquanto o processo principal está ocupado.',
+  },
+  {
+    scope: 'general',
+    es: 'Dos retoques de interfaz: el botón Actualizar del encabezado deja de ir resaltado en color y se iguala al resto de la barra, y en la ficha de persona los botones de añadir (relaciones, lugares, variantes del nombre y hechos vitales) se recogen en un icono con su descripción al pasar el ratón, así que el título y la descripción de cada sección vuelven a caber en una línea.',
+    en: 'Two interface touch-ups: the header’s Sync button is no longer filled with the accent colour and now matches the rest of the rail, and in the person dossier the add buttons (relations, places, name variants and life events) collapse to an icon with a tooltip, so each section’s title and description fit on one line again.',
+    fr: 'Deux retouches d’interface : le bouton Actualiser de l’en-tête n’est plus rempli de la couleur d’accent et s’aligne sur le reste de la barre, et dans la fiche de personne les boutons d’ajout (relations, lieux, variantes du nom et événements de vie) se réduisent à une icône avec une infobulle, de sorte que le titre et la description de chaque section tiennent de nouveau sur une ligne.',
+    de: 'Zwei Feinschliffe an der Oberfläche: Die Schaltfläche „Aktualisieren“ in der Kopfzeile ist nicht mehr in der Akzentfarbe gefüllt und passt sich dem Rest der Leiste an, und im Personendossier schrumpfen die Hinzufügen-Schaltflächen (Beziehungen, Orte, Namensvarianten und Lebensereignisse) auf ein Symbol mit Kurzinfo, sodass Titel und Beschreibung jedes Abschnitts wieder in eine Zeile passen.',
+    pt: 'Dois retoques de interface: o botão Atualizar do cabeçalho deixa de estar preenchido com a cor de destaque e iguala-se ao resto da barra, e na ficha de pessoa os botões de adicionar (relações, lugares, variantes do nome e factos de vida) recolhem-se num ícone com descrição ao passar o rato, pelo que o título e a descrição de cada secção voltam a caber numa linha.',
+    'pt-BR': 'Dois retoques de interface: o botão Atualizar do cabeçalho deixa de ficar preenchido com a cor de destaque e se iguala ao resto da barra, e na ficha de pessoa os botões de adicionar (relações, lugares, variantes do nome e fatos da vida) se recolhem em um ícone com dica ao passar o mouse, então o título e a descrição de cada seção voltam a caber em uma linha.',
+  },
+  {
+    scope: 'plugin',
+    es: 'Instalar el copiloto de Word ya no toca la caché de complementos de Office. Antes se borraban archivos sueltos de esa caché —algo que Microsoft desaconseja— y podía dejar sin cargar todos los complementos de Word; ahora basta con reinstalar desde Ajustes y abrir Word de nuevo. El manual del complemento explica el proceso real de instalación y cómo distinguirlo de un fallo propio de Office.',
+    en: 'Installing the Word copilot no longer touches Office’s add-in cache. It used to delete individual files from that cache — which Microsoft advises against — and could leave every Word add-in failing to load; reinstalling from Settings and reopening Word is now enough. The add-in manual documents the real install flow and how to tell it apart from an Office-side failure.',
+    fr: 'L’installation du copilote Word ne touche plus au cache des compléments d’Office. Auparavant, des fichiers isolés de ce cache étaient supprimés — ce que Microsoft déconseille — au risque d’empêcher le chargement de tous les compléments Word ; il suffit désormais de réinstaller depuis les Paramètres et de rouvrir Word. Le manuel du complément décrit la véritable procédure d’installation et comment la distinguer d’une panne propre à Office.',
+    de: 'Die Installation des Word-Copiloten rührt den Add-in-Cache von Office nicht mehr an. Zuvor wurden einzelne Dateien aus diesem Cache gelöscht – wovon Microsoft abrät – und dadurch konnten sämtliche Word-Add-ins nicht mehr laden; jetzt genügt es, aus den Einstellungen neu zu installieren und Word erneut zu öffnen. Das Add-in-Handbuch beschreibt den tatsächlichen Installationsablauf und wie er sich von einem Office-eigenen Fehler unterscheiden lässt.',
+    pt: 'Instalar o copiloto do Word já não mexe na cache de suplementos do Office. Antes eram apagados ficheiros soltos dessa cache — algo que a Microsoft desaconselha — e podia deixar todos os suplementos do Word sem carregar; agora basta reinstalar a partir das Definições e abrir o Word de novo. O manual do suplemento explica o processo real de instalação e como distingui-lo de uma falha do próprio Office.',
+    'pt-BR': 'Instalar o copiloto do Word não mexe mais no cache de suplementos do Office. Antes eram apagados arquivos avulsos desse cache — algo que a Microsoft desaconselha — e isso podia deixar todos os suplementos do Word sem carregar; agora basta reinstalar pelas Configurações e abrir o Word de novo. O manual do suplemento explica o processo real de instalação e como distingui-lo de uma falha do próprio Office.',
+  },
+];
+
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
+  {
+    version: '2.7.0',
+    date: '2026-07-26',
+    highlights: RELEASE_2_7_0_HIGHLIGHTS,
+  },
   {
     version: '2.6.3',
     date: '2026-07-24',
