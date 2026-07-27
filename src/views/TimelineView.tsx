@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { HistoricalEvent, HistoricalEventType, Person, RecordEvidence } from '@shared/types';
+import type { CharacterEvent, HistoricalEvent, HistoricalEventType, Person, RecordEvidence } from '@shared/types';
+import { CHARACTER_EVENT_TYPES, CHARACTER_EVENT_TYPE_LABEL } from '@shared/characterLabels';
 import { Icon } from '../components/ui';
 import { PersonDossierModal } from '../components/PersonDossierModal';
+import { WorldCalendarModal } from '../components/WorldCalendarModal';
 import { PersonPortrait } from '../components/PersonPortrait';
 import { SearchableMultiSelect } from '../components/PersonMultiSelect';
 import { t } from '../i18n';
@@ -31,19 +33,33 @@ const ROLE_LABEL: Record<string, string> = {
   other: 'otro',
 };
 
-export function TimelineView() {
-  const [events, setEvents] = useState<HistoricalEvent[]>([]);
+/**
+ * The timeline of a records vault, reused by worldbuilding.
+ *
+ * `worldbuilding` changes two things and nothing else: the events are fetched in
+ * IN-WORLD year order (an invented calendar leaves `date_sort` NULL, so the default query
+ * would return insertion order while looking chronological), and the event-type
+ * vocabulary and the year column come from the fiction side.
+ */
+export function TimelineView({ worldbuilding = false }: { worldbuilding?: boolean } = {}) {
+  const [events, setEvents] = useState<(HistoricalEvent | CharacterEvent)[]>([]);
   const [persons, setPersons] = useState<Person[]>([]);
   const [selectedPersonIds, setSelectedPersonIds] = useState<string[]>([]);
   const [selectedTypes, setSelectedTypes] = useState<HistoricalEventType[]>([]);
-  const [selectedEvent, setSelectedEvent] = useState<HistoricalEvent | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<HistoricalEvent | CharacterEvent | null>(null);
+  const [editingCalendar, setEditingCalendar] = useState(false);
+  const typeOptions = worldbuilding ? CHARACTER_EVENT_TYPES : EVENT_TYPES;
+  const typeLabel = worldbuilding ? CHARACTER_EVENT_TYPE_LABEL : EVENT_TYPE_LABEL;
   const [dossierId, setDossierId] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
-    const [eventList, personList] = await Promise.all([window.nodus.listEvents({}), window.nodus.listPersons()]);
+    const [eventList, personList] = await Promise.all([
+      worldbuilding ? window.nodus.listWorldEvents() : window.nodus.listEvents({}),
+      window.nodus.listPersons(),
+    ]);
     setEvents(eventList);
     setPersons(personList);
-  }, []);
+  }, [worldbuilding]);
 
   useEffect(() => {
     void reload();
@@ -74,7 +90,7 @@ export function TimelineView() {
             testId="timeline-person-filter"
           />
           <SearchableMultiSelect
-            options={EVENT_TYPES.map((type) => ({ id: type, label: t(EVENT_TYPE_LABEL[type]) }))}
+            options={typeOptions.map((type) => ({ id: type, label: t(typeLabel[type] ?? type) }))}
             selectedIds={selectedTypes}
             onChange={(ids) => setSelectedTypes(ids as HistoricalEventType[])}
             placeholder={t('Todos los tipos')}
@@ -98,6 +114,8 @@ export function TimelineView() {
                 personById={personById}
                 onOpenEvent={() => setSelectedEvent(event)}
                 onOpenPerson={setDossierId}
+                worldbuilding={worldbuilding}
+                typeLabel={typeLabel}
               />
             ))}
           </ol>
@@ -110,6 +128,27 @@ export function TimelineView() {
           personById={personById}
           onClose={() => setSelectedEvent(null)}
           onOpenPerson={setDossierId}
+          worldbuilding={worldbuilding}
+          typeLabel={typeLabel}
+        />
+      )}
+      {worldbuilding && (
+        <button
+          className="btn btn-ghost fixed bottom-6 right-6 z-10 gap-1.5 border border-neutral-700 text-xs shadow-lg"
+          title={t('Definir las eras y los meses de tu mundo')}
+          onClick={() => setEditingCalendar(true)}
+        >
+          <Icon name="calendar" size={13} /> {t('Calendario del mundo')}
+        </button>
+      )}
+      {editingCalendar && (
+        <WorldCalendarModal
+          onClose={() => setEditingCalendar(false)}
+          onSaved={() => {
+            setEditingCalendar(false);
+            // Saving recomputed every absolute day, so the order on screen is stale.
+            void reload();
+          }}
         />
       )}
       {dossierId && <PersonDossierModal personId={dossierId} onClose={() => setDossierId(null)} onChanged={reload} />}
@@ -122,11 +161,15 @@ function TimelineEventCard({
   personById,
   onOpenEvent,
   onOpenPerson,
+  worldbuilding = false,
+  typeLabel = EVENT_TYPE_LABEL,
 }: {
-  event: HistoricalEvent;
+  event: HistoricalEvent | CharacterEvent;
   personById: Map<string, Person>;
   onOpenEvent: () => void;
   onOpenPerson: (personId: string) => void;
+  worldbuilding?: boolean;
+  typeLabel?: Record<string, string>;
 }) {
   return (
     <li className="relative ml-6" data-testid="timeline-event-card">
@@ -134,10 +177,12 @@ function TimelineEventCard({
       <article className="timeline-event-surface overflow-hidden rounded-xl border border-neutral-800 shadow-sm transition hover:border-amber-800/60 hover:shadow-amber-950/20">
         <button className="group flex w-full items-start gap-4 p-4 text-left" onClick={onOpenEvent} aria-label={t('Ver detalles del evento')}>
           <time className="timeline-date-chip min-w-[6.5rem] rounded-lg border border-amber-800/40 bg-amber-950/20 px-2.5 py-2 text-center text-xs font-semibold text-amber-300">
-            {event.date || t('sin fecha')}
+            {worldbuilding && 'worldYear' in event && event.worldYear != null
+              ? `${event.worldYear}${event.date ? ` · ${event.date}` : ''}`
+              : event.date || t('sin fecha')}
           </time>
           <span className="min-w-0 flex-1">
-            <span className="block text-sm font-semibold text-neutral-100">{t(EVENT_TYPE_LABEL[event.type] ?? event.type)}</span>
+            <span className="block text-sm font-semibold text-neutral-100">{t(typeLabel[event.type] ?? event.type)}</span>
             {event.label && <span className="mt-0.5 block text-sm text-neutral-300">{event.label}</span>}
             {event.placeName && <span className="mt-1 flex items-center gap-1 text-xs text-neutral-500"><Icon name="map" size={12} /> {event.placeName}</span>}
             {event.notes && <span className="mt-2 line-clamp-2 block text-xs leading-5 text-neutral-500">{event.notes}</span>}
@@ -177,16 +222,23 @@ function EventDetail({
   personById,
   onClose,
   onOpenPerson,
+  worldbuilding = false,
+  typeLabel = EVENT_TYPE_LABEL,
 }: {
-  event: HistoricalEvent;
+  event: HistoricalEvent | CharacterEvent;
   personById: Map<string, Person>;
+  worldbuilding?: boolean;
+  typeLabel?: Record<string, string>;
   onClose: () => void;
   onOpenPerson: (personId: string) => void;
 }) {
   const [evidence, setEvidence] = useState<RecordEvidence[]>([]);
   useEffect(() => {
+    // A worldbuilding vault has no record evidence at all — the author is the source —
+    // so the query is skipped rather than run to return nothing.
+    if (worldbuilding) return;
     void window.nodus.listRecordEvidence('event', event.eventId).then(setEvidence);
-  }, [event.eventId]);
+  }, [event.eventId, worldbuilding]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6" onMouseDown={(mouseEvent) => { if (mouseEvent.target === mouseEvent.currentTarget) onClose(); }}>
@@ -194,9 +246,12 @@ function EventDetail({
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h2 className="text-lg font-semibold">{t(EVENT_TYPE_LABEL[event.type] ?? event.type)}</h2>
+              <h2 className="text-lg font-semibold">{t(typeLabel[event.type] ?? event.type)}</h2>
               <p className="text-sm text-neutral-400">
-                {event.date || t('sin fecha')}{event.placeName ? ` · ${event.placeName}` : ''}
+                {worldbuilding && 'worldYear' in event && event.worldYear != null
+                  ? `${event.worldYear}${event.date ? ` · ${event.date}` : ''}`
+                  : event.date || t('sin fecha')}
+                {event.placeName ? ` · ${event.placeName}` : ''}
               </p>
             </div>
             <button className="btn btn-ghost h-8 w-8 shrink-0 p-0" onClick={onClose} aria-label={t('Cerrar')} title={t('Cerrar')}>

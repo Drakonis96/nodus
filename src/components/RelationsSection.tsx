@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import type { Person, SocialContact, SocialRelation } from '@shared/types';
+import type { Person, SocialContact, SocialRelation, SocialRelationValence } from '@shared/types';
+import { SOCIAL_VALENCES, SOCIAL_VALENCE_LABEL } from '@shared/characterLabels';
 import { Icon } from './ui';
 import { MarkdownNotesEditor } from './MarkdownNotesEditor';
 import { ContactDossier } from './ContactDossier';
@@ -20,9 +21,15 @@ import { PERSON_DOSSIER_ADD_BUTTON_CLASS, PERSON_DOSSIER_SECTION_CLASS } from '.
 export function RelationsSection({
   personId,
   onNavigate,
+  showValence = false,
 }: {
   personId: string;
   onNavigate?: (personId: string) => void;
+  /**
+   * Worldbuilding only: show and edit the bond's valence (ally / rival / lover / …).
+   * A genealogy relation has a documented role, not a felt one, so it stays off there.
+   */
+  showValence?: boolean;
 }) {
   const [outgoing, setOutgoing] = useState<SocialRelation[]>([]);
   const [incoming, setIncoming] = useState<SocialRelation[]>([]);
@@ -95,6 +102,11 @@ export function RelationsSection({
                 <span className="shrink-0 rounded-full bg-neutral-800 px-2 py-0.5 text-[10px] uppercase text-neutral-400">
                   {t(r.role)}
                 </span>
+                {showValence && r.valence && (
+                  <span className="shrink-0 rounded-full bg-indigo-600/20 px-2 py-0.5 text-[10px] uppercase text-indigo-300">
+                    {t(SOCIAL_VALENCE_LABEL[r.valence])}
+                  </span>
+                )}
                 {r.targetKind === 'contact' && (
                   <span className="shrink-0 text-[10px] text-neutral-600">{t('contacto')}</span>
                 )}
@@ -182,19 +194,28 @@ function EditRelationModal({
   relation,
   onSaved,
   onCancel,
+  showValence = false,
 }: {
   relation: SocialRelation;
   onSaved: () => Promise<void>;
   onCancel: () => void;
+  showValence?: boolean;
 }) {
   const [role, setRole] = useState(relation.role);
   const [notes, setNotes] = useState(relation.notes ?? '');
+  const [valence, setValence] = useState<SocialRelationValence | ''>(relation.valence ?? '');
   const [saving, setSaving] = useState(false);
 
   const save = async () => {
     setSaving(true);
     try {
-      await window.nodus.updateSocialRelation(relation.relationId, { role: role.trim() || relation.role, notes: notes || null });
+      await window.nodus.updateSocialRelation(relation.relationId, {
+        role: role.trim() || relation.role,
+        notes: notes || null,
+        // Only sent when the surface offers it, so a genealogy edit never writes the
+        // column at all.
+        ...(showValence ? { valence: valence || null } : {}),
+      });
       await onSaved();
     } finally {
       setSaving(false);
@@ -216,6 +237,26 @@ function EditRelationModal({
             <span className="text-xs font-medium text-neutral-400">{t('Tipo de relación')}</span>
             <input className="input h-9 w-full text-sm" value={role} onChange={(event) => setRole(event.target.value)} placeholder={t('Rol (amigo, patrón, socio…)')} />
           </label>
+          {showValence && (
+            <label className="block space-y-1">
+              <span className="text-xs font-medium text-neutral-400">{t('Cómo la vive')}</span>
+              <select
+                className="input h-9 w-full text-sm"
+                value={valence}
+                onChange={(event) => setValence(event.target.value as SocialRelationValence | '')}
+              >
+                <option value="">{t('Sin especificar')}</option>
+                {SOCIAL_VALENCES.map((entry) => (
+                  <option key={entry} value={entry}>
+                    {t(SOCIAL_VALENCE_LABEL[entry])}
+                  </option>
+                ))}
+              </select>
+              <span className="block text-[10px] leading-4 text-neutral-600">
+                {t('Solo desde su lado: la otra persona puede vivir la misma relación de forma muy distinta.')}
+              </span>
+            </label>
+          )}
           <MarkdownNotesEditor value={notes} onSave={async (next) => setNotes(next)} placeholder={t('Notas sobre esta relación, en Markdown…')} rows={3} />
           <div className="flex justify-end gap-2 border-t border-neutral-800 pt-3">
             <button className="btn btn-ghost border border-neutral-700 px-3 text-xs" onClick={onCancel} disabled={saving}>{t('Cancelar')}</button>
