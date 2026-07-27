@@ -66,8 +66,9 @@ complemento y una pequeña API JSON **en el mismo origen HTTPS local**
   **Ideas / Pasajes** cambias a la búsqueda semántica sobre el **texto completo**:
   cada pasaje trae su cita y un botón **Insertar cita** (lo pega entre comillas con
   el autor-año).
-- Abre **Detalles** para ver fuentes y conexiones; **Abrir en Nodus** enfoca la
-  idea en el grafo; **Insertar con IA** añade una paráfrasis citada al texto.
+- Abre **Detalles** para ver fuentes y conexiones; **Abrir en Nodus** abre el
+  desarrollo completo de la idea en la sección **Ideas**; **Insertar con IA**
+  añade una paráfrasis citada al texto.
 - Con texto seleccionado, la fila **Selección** ofrece **Reescribir** (sustituye la
   selección), **Ampliar** (continúa el texto) y **Rebatir** (redacta un
   contraargumento citado a partir de las ideas que la contradicen o matizan).

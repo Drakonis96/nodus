@@ -23,6 +23,8 @@ const root = await mkdtemp(path.join(os.tmpdir(), 'nodus-copilot-addin-test-'));
 installRuntimeHooks(root);
 
 try {
+  const { updateSettings } = require(path.join(repoRoot, 'electron/db/settingsRepo.ts'));
+  updateSettings({ uiLanguage: 'en' });
   const installModule = require(path.join(repoRoot, 'electron/copilot/install.ts'));
   const { renderManifest, installCopilotAddin } = installModule;
   const template = fs.readFileSync(path.join(repoRoot, 'word-addin/manifest.xml'), 'utf8');
@@ -33,6 +35,31 @@ try {
   assert.match(rendered, /<CustomTab id="Nodus\.Tab">/);
   assert.match(rendered, /<Label resid="Nodus\.Tab\.Label" \/>/);
   assert.doesNotMatch(rendered, /<OfficeTab id="TabHome">/);
+  assert.match(rendered, /<DefaultLocale>en-US<\/DefaultLocale>/);
+  assert.match(rendered, /DefaultValue="Open the pane to see how your text relates to your library\."/);
+  assert.match(rendered, /<bt:Override Locale="es-ES" Value="Abre el panel/);
+
+  // English is also the safe pre-initialization language in the task pane. The
+  // runtime switches it to Spanish when Nodus injects lang=es, but an English
+  // pane must never fall back to a Spanish string when a key is missing.
+  const taskpaneHtml = fs.readFileSync(path.join(repoRoot, 'word-addin/taskpane.html'), 'utf8');
+  const taskpaneJs = fs.readFileSync(path.join(repoRoot, 'word-addin/taskpane.js'), 'utf8');
+  assert.match(taskpaneHtml, /<html lang="en">/);
+  assert.match(taskpaneHtml, />Analyze paragraph</);
+  assert.doesNotMatch(taskpaneHtml, /Conectando|Buscar ideas|Analizar párrafo|Selección|Insertar en|Nota al pie|Pasajes/);
+  assert.match(taskpaneJs, /table\[key\] !== undefined \? table\[key\] : STR\.en\[key\]/);
+
+  // The Word bridge opens the full idea detail in Ideas, not the graph. The
+  // nonce makes a second click on the same idea retrigger the selection.
+  const appSource = fs.readFileSync(path.join(repoRoot, 'src/App.tsx'), 'utf8');
+  const ideasSource = fs.readFileSync(path.join(repoRoot, 'src/views/IdeasView.tsx'), 'utf8');
+  const serverSource = fs.readFileSync(path.join(repoRoot, 'electron/copilot/server.ts'), 'utf8');
+  assert.match(serverSource, /destination: 'ideas'/);
+  assert.match(
+    appSource,
+    /if \(target\.destination === 'ideas'\) \{\s*setIdeaTarget\(\{ ideaId: target\.ideaId, nonce: Date\.now\(\) \}\);\s*setView\('ideas'\);/s
+  );
+  assert.match(ideasSource, /if \(target\) setSelectedId\(target\.ideaId\)/);
 
   // Office's add-in cache must survive an install untouched. Deleting individual
   // files from it is documented to make ALL add-ins stop loading, and it did:
@@ -79,6 +106,7 @@ try {
     }
 
     assert.equal(result.ok, true, result.message);
+    assert.match(result.message, /installed\/updated for Word/);
     assert.equal(fs.existsSync(path.join(manifestDir, 'nodus-copilot.manifest.xml')), true);
     assert.equal(fs.existsSync(path.join(cache, 'Manifests', 'cached-nodus')), true, 'install must not touch the Office cache');
     assert.equal(

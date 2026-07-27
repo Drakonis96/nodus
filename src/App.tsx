@@ -41,6 +41,7 @@ import { setActiveVaultQueryScope } from './vaultQueryCache';
 import type {
   PendingAssistantNavigationTarget,
   PendingGraphNavigationTarget,
+  PendingIdeaNavigationTarget,
   PendingLibraryNavigationTarget,
   View,
 } from './navigation';
@@ -249,6 +250,7 @@ export function App() {
     []
   );
   const [graphTarget, setGraphTarget] = useState<PendingGraphNavigationTarget & { nonce: number } | null>(null);
+  const [ideaTarget, setIdeaTarget] = useState<PendingIdeaNavigationTarget & { nonce: number } | null>(null);
   const [libraryTarget, setLibraryTarget] = useState<PendingLibraryNavigationTarget & { nonce: number } | null>(null);
   const [assistantTarget, setAssistantTarget] = useState<PendingAssistantNavigationTarget & { nonce: number } | null>(null);
   // A note the user opened from global search; the nonce re-triggers even if the
@@ -739,6 +741,11 @@ export function App() {
   useEffect(() => {
     if (!window.nodus?.onCopilotOpenIdea) return undefined;
     return window.nodus.onCopilotOpenIdea((target) => {
+      if (target.destination === 'ideas') {
+        setIdeaTarget({ ideaId: target.ideaId, nonce: Date.now() });
+        setView('ideas');
+        return;
+      }
       navigate('graph', {
         preset: 'overview',
         nodeId: target.ideaId,
@@ -776,6 +783,7 @@ export function App() {
     setCollectionsOpen(false);
     setResearchOpen(false);
     setGraphTarget(null);
+    setIdeaTarget(null);
     setStudyGraphTarget(null);
     setStudyChatTarget(null);
     setAssistantTarget(null);
@@ -1381,7 +1389,7 @@ export function App() {
           )}
           {view === 'graph' && <GraphView settings={settings} onSettingsChange={reloadSettings} target={graphTarget} />}
           {view === 'argument' && <ArgumentMapView settings={settings} />}
-          {view === 'ideas' && <IdeasView vaultId={activeVault?.id ?? null} onOpenGraph={(target) => navigate('graph', target)} onOpenAssistant={openAssistant} />}
+          {view === 'ideas' && <IdeasView vaultId={activeVault?.id ?? null} target={ideaTarget} onOpenGraph={(target) => navigate('graph', target)} onOpenAssistant={openAssistant} />}
           {view === 'authors' && <AuthorsView vaultId={activeVault?.id ?? null} settings={settings} onOpenGraph={(target) => navigate('graph', target)} />}
           {view === 'persons' && <PersonasView initialPersonId={personsTarget} />}
           {view === 'timeline' && <TimelineView />}

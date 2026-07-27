@@ -82,6 +82,8 @@
       searchingPassages: 'Buscando pasajes…',
       noPassages: 'Sin pasajes para esa búsqueda.',
       passagesNotIndexed: 'No hay texto completo indexado. Indexa la biblioteca en Nodus.',
+      quoteOpen: '«',
+      quoteClose: '»',
       relation: { supports: 'apoya', contradicts: 'contradice', refines: 'matiza', extends: 'amplía', related: 'relacionada' },
       kind: { idea: 'idea', note: 'nota', passage: 'pasaje', work: 'obra' },
     },
@@ -144,13 +146,16 @@
       searchingPassages: 'Searching passages…',
       noPassages: 'No passages match that search.',
       passagesNotIndexed: 'No full text indexed. Index your library in Nodus.',
+      quoteOpen: '“',
+      quoteClose: '”',
       relation: { supports: 'supports', contradicts: 'contradicts', refines: 'refines', extends: 'extends', related: 'related' },
       kind: { idea: 'idea', note: 'note', passage: 'passage', work: 'work' },
     },
   };
 
   function T(key) {
-    return STR[LANG][key] !== undefined ? STR[LANG][key] : STR.es[key];
+    var table = STR[LANG] || STR.en;
+    return table[key] !== undefined ? table[key] : STR.en[key];
   }
 
   var RELATION_LABEL = T('relation');
@@ -633,7 +638,7 @@
     btn.disabled = true;
     btn.textContent = T('inserting');
     var body = (passage.text || passage.snippet || '').trim();
-    var quote = '«' + body + '»';
+    var quote = T('quoteOpen') + body + T('quoteClose');
     if (passage.authorYear) quote += ' (' + passage.authorYear + ')';
     insertAtCursor(quote, { asFootnote: insertTarget === 'footnote' })
       .then(function () { setStatus(T('quoteInserted'), 'ok'); })

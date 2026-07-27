@@ -8,9 +8,11 @@
   <Id>E4352919-FFEC-4F77-8268-975BB4217FAD</Id>
   <Version>2.4.0</Version>
   <ProviderName>Nodus</ProviderName>
-  <DefaultLocale>es-ES</DefaultLocale>
+  <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="Nodus Copilot" />
-  <Description DefaultValue="Muestra cómo el párrafo que escribes se relaciona con tu biblioteca de Nodus, permite explorar ideas y conexiones, y te ayuda a insertar ideas citadas." />
+  <Description DefaultValue="Shows how the paragraph you are writing relates to your Nodus library, lets you explore ideas and connections, and helps you insert cited ideas.">
+    <Override Locale="es-ES" Value="Muestra cómo el párrafo que escribes se relaciona con tu biblioteca de Nodus, permite explorar ideas y conexiones, y te ayuda a insertar ideas citadas." />
+  </Description>
   <IconUrl DefaultValue="https://localhost:4320/addin/assets/icon-32.png" />
   <HighResolutionIconUrl DefaultValue="https://localhost:4320/addin/assets/icon-80.png" />
   <SupportUrl DefaultValue="https://localhost:4320/addin/taskpane.html" />
@@ -82,8 +84,12 @@
         <bt:String id="Nodus.Taskpane.Label" DefaultValue="Nodus Copilot" />
       </bt:ShortStrings>
       <bt:LongStrings>
-        <bt:String id="GetStarted.Description" DefaultValue="Abre el panel para ver cómo tu texto se relaciona con tu biblioteca." />
-        <bt:String id="Nodus.Taskpane.Tooltip" DefaultValue="Relaciona el párrafo actual con tu biblioteca de Nodus e inserta ideas citadas." />
+        <bt:String id="GetStarted.Description" DefaultValue="Open the pane to see how your text relates to your library.">
+          <bt:Override Locale="es-ES" Value="Abre el panel para ver cómo tu texto se relaciona con tu biblioteca." />
+        </bt:String>
+        <bt:String id="Nodus.Taskpane.Tooltip" DefaultValue="Relate the current paragraph to your Nodus library and insert cited ideas.">
+          <bt:Override Locale="es-ES" Value="Relaciona el párrafo actual con tu biblioteca de Nodus e inserta ideas citadas." />
+        </bt:String>
       </bt:LongStrings>
     </Resources>
   </VersionOverrides>
