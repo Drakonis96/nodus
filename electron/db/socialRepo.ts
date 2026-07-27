@@ -100,6 +100,8 @@ interface RelationRow {
   target_id: string;
   role: string;
   notes: string | null;
+  valence: string | null;
+  since_event_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -119,6 +121,10 @@ function rowToRelation(row: RelationRow): SocialRelation {
     targetName: resolveTargetName(row.target_kind, row.target_id),
     role: row.role,
     notes: row.notes,
+    // v92, worldbuilding only: the colour of the bond and the moment it took that
+    // shape. A genealogy relation leaves both NULL and reads as before.
+    valence: (row.valence as SocialRelation['valence']) ?? null,
+    sinceEventId: row.since_event_id ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -129,10 +135,22 @@ export function createSocialRelation(input: SocialRelationInput): SocialRelation
   const ts = now();
   getDb()
     .prepare(
-      `INSERT INTO social_relations (relation_id, person_id, target_kind, target_id, role, notes, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO social_relations
+        (relation_id, person_id, target_kind, target_id, role, notes, valence, since_event_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
-    .run(id, input.personId, input.targetKind, input.targetId, input.role.trim() || 'conocido', input.notes ?? null, ts, ts);
+    .run(
+      id,
+      input.personId,
+      input.targetKind,
+      input.targetId,
+      input.role.trim() || 'conocido',
+      input.notes ?? null,
+      input.valence ?? null,
+      input.sinceEventId ?? null,
+      ts,
+      ts
+    );
   return getSocialRelation(id)!;
 }
 
@@ -141,15 +159,19 @@ export function getSocialRelation(relationId: string): SocialRelation | null {
   return row ? rowToRelation(row) : null;
 }
 
-/** Only role/notes are mutable; a wrong target is deleted and recreated instead. */
+/** Only role/notes/valence are mutable; a wrong target is deleted and recreated instead. */
 export function updateSocialRelation(relationId: string, patch: Partial<SocialRelationInput>): SocialRelation | null {
   const existing = getDb().prepare('SELECT * FROM social_relations WHERE relation_id = ?').get(relationId) as RelationRow | undefined;
   if (!existing) return null;
   const role = patch.role !== undefined ? patch.role.trim() || existing.role : existing.role;
   const notes = patch.notes !== undefined ? patch.notes : existing.notes;
+  const valence = patch.valence !== undefined ? patch.valence ?? null : existing.valence;
+  const sinceEventId = patch.sinceEventId !== undefined ? patch.sinceEventId ?? null : existing.since_event_id;
   getDb()
-    .prepare('UPDATE social_relations SET role = ?, notes = ?, updated_at = ? WHERE relation_id = ?')
-    .run(role, notes, now(), relationId);
+    .prepare(
+      'UPDATE social_relations SET role = ?, notes = ?, valence = ?, since_event_id = ?, updated_at = ? WHERE relation_id = ?'
+    )
+    .run(role, notes, valence, sinceEventId, now(), relationId);
   return getSocialRelation(relationId);
 }
 

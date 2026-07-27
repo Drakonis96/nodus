@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 90;
+export const SCHEMA_VERSION = 96;
 
 export const migrations: Migration[] = [
   {
@@ -3122,6 +3122,398 @@ export const migrations: Migration[] = [
       );
       CREATE INDEX idx_protect_copies_updated ON protect_copies(deleted_at, updated_at DESC);
       CREATE INDEX idx_protect_copies_sha256 ON protect_copies(sha256);
+    `,
+  },
+  {
+    version: 91,
+    up: /* sql */ `
+      -- Worldbuilding characters. A character IS a person row — that is what lets it
+      -- inherit life events, kinship, social relations, places and the portrait — so
+      -- this table is a 1:1 SUPERPOSITION holding only what makes no sense outside a
+      -- made-up world. A genealogy vault never has rows here, and none of its own
+      -- surfaces (GEDCOM, dedupe, evidence) learn a new column.
+      CREATE TABLE character_profiles (
+        person_id        TEXT PRIMARY KEY REFERENCES persons(person_id) ON DELETE CASCADE,
+
+        -- Identity, replacing persons.sex ('male'|'female'|'unknown'), which describes
+        -- neither a god, nor a dragon, nor a sentient sword. persons.sex stays
+        -- 'unknown' in a worldbuilding vault and is never surfaced.
+        species          TEXT,
+        gender           TEXT,
+        pronouns         TEXT,
+
+        -- Narrative state instead of a bare birth/death pair.
+        -- unknown | alive | dead | missing | undead | immortal | unborn
+        life_status      TEXT NOT NULL DEFAULT 'unknown',
+
+        -- protagonist | antagonist | secondary | tertiary | cameo
+        narrative_role   TEXT,
+        -- A palette token (never a raw hex) so the card grid restyles with the theme.
+        accent           TEXT,
+
+        -- The biographical description, split in three so the image prompt is not fed
+        -- the personality and the backstory as noise.
+        appearance       TEXT,
+        personality      TEXT,
+        backstory        TEXT,
+
+        -- The canonical appearance prompt, re-injected into EVERY image generation.
+        -- It is the only thing that makes a character resemble itself across images.
+        visual_seed      TEXT,
+
+        -- In-world year. The readable date stays in persons.birth_date / death_date
+        -- exactly as the author typed it ("13 de Lluvia, 1204 T.E."); these integers
+        -- (negative allowed) are the ONLY thing that orders anything, because
+        -- parseHistoricalDate rejects every year outside 1..3000 and silently yields a
+        -- null sort key for an invented calendar.
+        birth_year_sort  INTEGER,
+        death_year_sort  INTEGER,
+
+        created_at       TEXT NOT NULL,
+        updated_at       TEXT NOT NULL
+      );
+      CREATE INDEX idx_character_profiles_birth ON character_profiles(birth_year_sort);
+
+      -- An event's position in an invented calendar. A side table rather than a column
+      -- on "events" so this migration stays CREATE-only (and therefore replayable by
+      -- the backfill path) and so the genealogy ontology gains nothing it never uses.
+      CREATE TABLE event_world_dates (
+        event_id    TEXT PRIMARY KEY REFERENCES events(event_id) ON DELETE CASCADE,
+        world_year  INTEGER,
+        -- Tie-break within the same year (season, day, chapter) without forcing the
+        -- author to invent a whole calendar first.
+        world_order INTEGER NOT NULL DEFAULT 0
+      );
+      CREATE INDEX idx_event_world_dates_year ON event_world_dates(world_year, world_order);
+    `,
+  },
+  {
+    version: 92,
+    up: /* sql */ `
+      -- Second round of the worldbuilding character sheet: an image gallery, the
+      -- narrative arc, the character's voice, their abilities, secret aliases, and
+      -- valence on social relations.
+      --
+      -- NOT create-only (it adds columns), so it is never replayed by the backfill path.
+
+      -- Many images per character, each keeping the prompt that produced it so a
+      -- generation is reproducible and can be iterated instead of re-guessed. The bytes
+      -- live in the vault like every other irreplaceable authored asset.
+      --
+      -- The AVATAR is deliberately NOT a flag here: person_portraits stays the single
+      -- source of truth for it (everything from the card grid to the kinship tree reads
+      -- that table, and the non-destructive framing belongs to it), so "use as avatar"
+      -- copies the bytes across. One duplicated blob beats two competing answers to
+      -- "which image is this character".
+      CREATE TABLE character_images (
+        image_id    TEXT PRIMARY KEY,
+        person_id   TEXT NOT NULL REFERENCES persons(person_id) ON DELETE CASCADE,
+        -- portrait | full_body | expression | age | outfit | other
+        kind        TEXT NOT NULL DEFAULT 'portrait',
+        label       TEXT,
+        mime_type   TEXT NOT NULL DEFAULT 'image/jpeg',
+        bytes       INTEGER NOT NULL DEFAULT 0,
+        blob        BLOB,
+        prompt      TEXT,
+        provider    TEXT,
+        model       TEXT,
+        style       TEXT,
+        generated   INTEGER NOT NULL DEFAULT 0,
+        sort_order  INTEGER NOT NULL DEFAULT 0,
+        created_at  TEXT NOT NULL,
+        updated_at  TEXT NOT NULL
+      );
+      CREATE INDEX idx_character_images_person ON character_images(person_id, sort_order);
+
+      -- Abilities with a COST and a LIMIT. Both columns exist because a power with
+      -- neither is a plot solvent: the limit is what makes it dramatic.
+      CREATE TABLE character_abilities (
+        ability_id  TEXT PRIMARY KEY,
+        person_id   TEXT NOT NULL REFERENCES persons(person_id) ON DELETE CASCADE,
+        name        TEXT NOT NULL,
+        description TEXT,
+        cost        TEXT,
+        limits      TEXT,
+        sort_order  INTEGER NOT NULL DEFAULT 0,
+        created_at  TEXT NOT NULL,
+        updated_at  TEXT NOT NULL
+      );
+      CREATE INDEX idx_character_abilities_person ON character_abilities(person_id, sort_order);
+
+      -- The classic story-structure arc, and how the character sounds. Columns on the
+      -- overlay rather than a table: they are exactly one optional value each, and the
+      -- sheet always reads them together with the rest of the profile.
+      ALTER TABLE character_profiles ADD COLUMN arc_want TEXT;
+      ALTER TABLE character_profiles ADD COLUMN arc_need TEXT;
+      ALTER TABLE character_profiles ADD COLUMN arc_flaw TEXT;
+      ALTER TABLE character_profiles ADD COLUMN arc_lie TEXT;
+      ALTER TABLE character_profiles ADD COLUMN arc_wound TEXT;
+      ALTER TABLE character_profiles ADD COLUMN voice_register TEXT;
+      ALTER TABLE character_profiles ADD COLUMN voice_tics TEXT;
+      ALTER TABLE character_profiles ADD COLUMN voice_sample TEXT;
+
+      -- A biography the AI was allowed to PROPOSE from, rather than one written strictly
+      -- from canon. Kept separate from persons.biography so a proposal can never be
+      -- mistaken for something the author accepted.
+      ALTER TABLE character_profiles ADD COLUMN biography_proposed TEXT;
+      ALTER TABLE character_profiles ADD COLUMN biography_proposed_at TEXT;
+
+      -- A name can be a secret: who knows it is a plot device, not decoration.
+      ALTER TABLE person_names ADD COLUMN secret INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE person_names ADD COLUMN known_by TEXT;
+
+      -- Relations are already DIRECTIONAL, which is what lets A love B while B despises
+      -- A. What was missing is the colour of the bond and the moment it changed.
+      ALTER TABLE social_relations ADD COLUMN valence TEXT;
+      ALTER TABLE social_relations ADD COLUMN since_event_id TEXT REFERENCES events(event_id) ON DELETE SET NULL;
+    `,
+  },
+  {
+    version: 93,
+    up: /* sql */ `
+      -- The world's own calendar: eras and months the author invents.
+      --
+      -- ONE calendar per vault, because one vault is one world — the same reasoning that
+      -- makes a genealogy vault hold one family. That is what lets these be plain tables
+      -- with no owner column.
+      --
+      -- Entirely OPTIONAL. Without a calendar the integer year in event_world_dates keeps
+      -- ordering everything exactly as before; defining one buys exact ordering WITHIN a
+      -- year and a real date picker instead of free text. A writer should not have to
+      -- invent twelve month names before they can write their first character.
+      CREATE TABLE world_calendar (
+        -- Single row, enforced rather than assumed: a second calendar would silently make
+        -- half the timeline sort against the wrong month lengths.
+        id         INTEGER PRIMARY KEY CHECK (id = 1),
+        name       TEXT,
+        notes      TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      -- An era names a stretch of years and says where its year 1 falls on the absolute
+      -- scale, so "1204 T.E." and "340 de la Larga Noche" can be compared at all.
+      CREATE TABLE world_calendar_eras (
+        era_id           TEXT PRIMARY KEY,
+        name             TEXT NOT NULL,
+        abbreviation     TEXT,
+        -- The absolute year this era's year 1 corresponds to.
+        start_year       INTEGER NOT NULL DEFAULT 0,
+        -- Eras that count DOWN towards their end, the way BC does.
+        counts_backwards INTEGER NOT NULL DEFAULT 0,
+        sort_order       INTEGER NOT NULL DEFAULT 0,
+        created_at       TEXT NOT NULL,
+        updated_at       TEXT NOT NULL
+      );
+      CREATE INDEX idx_world_eras_order ON world_calendar_eras(sort_order);
+
+      -- Months in order, each with its own length. No leap rules: a leap year is a
+      -- real-calendar accident of astronomy, and modelling it would complicate every
+      -- absolute-day computation for something almost no invented calendar needs.
+      CREATE TABLE world_calendar_months (
+        month_id   TEXT PRIMARY KEY,
+        name       TEXT NOT NULL,
+        days       INTEGER NOT NULL DEFAULT 30,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_world_months_order ON world_calendar_months(sort_order);
+
+      -- The structured half of an event's date. The readable string stays in events.date
+      -- exactly as the author typed it; these are what ordering uses.
+      --
+      -- world_day is DERIVED (era + year + month + day → an absolute day number). It is
+      -- stored rather than computed on read so the timeline can ORDER BY it, which means
+      -- every calendar edit has to recompute it — see recomputeWorldDays().
+      ALTER TABLE event_world_dates ADD COLUMN era_id TEXT;
+      ALTER TABLE event_world_dates ADD COLUMN month_index INTEGER;
+      ALTER TABLE event_world_dates ADD COLUMN day INTEGER;
+      ALTER TABLE event_world_dates ADD COLUMN world_day INTEGER;
+      CREATE INDEX idx_event_world_dates_day ON event_world_dates(world_day);
+    `,
+  },
+  {
+    version: 94,
+    up: /* sql */ `
+      -- Collections: one image table for every world entity, and one table for the groups
+      -- a character can belong to.
+
+      -- character_images generalised. Places, factions and cultures all want a gallery
+      -- with the same shape, and two tables for one concept is exactly the "two sources of
+      -- truth" problem the avatar rule was written to avoid. Done NOW, while the gallery
+      -- holds a handful of rows: in three sections this would be a real data migration.
+      --
+      -- entity_id is polymorphic and therefore has NO foreign key, which means the
+      -- ON DELETE CASCADE that character_images relied on is GONE. Every delete path has
+      -- to remove its own images explicitly — see deleteCharacter().
+      CREATE TABLE world_images (
+        image_id    TEXT PRIMARY KEY,
+        -- character | place | group | scene
+        entity_kind TEXT NOT NULL,
+        entity_id   TEXT NOT NULL,
+        kind        TEXT NOT NULL DEFAULT 'portrait',
+        label       TEXT,
+        mime_type   TEXT NOT NULL DEFAULT 'image/jpeg',
+        bytes       INTEGER NOT NULL DEFAULT 0,
+        blob        BLOB,
+        prompt      TEXT,
+        provider    TEXT,
+        model       TEXT,
+        style       TEXT,
+        generated   INTEGER NOT NULL DEFAULT 0,
+        sort_order  INTEGER NOT NULL DEFAULT 0,
+        created_at  TEXT NOT NULL,
+        updated_at  TEXT NOT NULL
+      );
+      CREATE INDEX idx_world_images_entity ON world_images(entity_kind, entity_id, sort_order);
+
+      INSERT INTO world_images
+        (image_id, entity_kind, entity_id, kind, label, mime_type, bytes, blob, prompt,
+         provider, model, style, generated, sort_order, created_at, updated_at)
+      SELECT image_id, 'character', person_id, kind, label, mime_type, bytes, blob, prompt,
+             provider, model, style, generated, sort_order, created_at, updated_at
+        FROM character_images;
+      DROP TABLE character_images;
+
+      -- Factions, cultures, religions, houses and orders are ONE entity with a kind, not
+      -- five tables. They share every field — name, description, image, members, period —
+      -- so the sections are filtered views of this one collection, and adding "Religiones"
+      -- later costs a vocabulary entry and a sidebar row.
+      CREATE TABLE world_groups (
+        group_id      TEXT PRIMARY KEY,
+        -- faction | culture | religion | house | order | species | language
+        kind          TEXT NOT NULL DEFAULT 'faction',
+        name          TEXT NOT NULL,
+        summary       TEXT,
+        description   TEXT,
+        -- Same role as a character's: the anchor that keeps generated images of one
+        -- faction's emblem or one culture's dress looking like each other.
+        visual_seed   TEXT,
+        accent        TEXT,
+        -- active | extinct | dormant
+        status        TEXT,
+        parent_id     TEXT REFERENCES world_groups(group_id) ON DELETE SET NULL,
+        seat_place_id TEXT REFERENCES places(place_id) ON DELETE SET NULL,
+        founded_year  INTEGER,
+        ended_year    INTEGER,
+        notes         TEXT,
+        created_at    TEXT NOT NULL,
+        updated_at    TEXT NOT NULL
+      );
+      CREATE INDEX idx_world_groups_kind ON world_groups(kind, name);
+
+      -- Who belongs to what, with a rank and a period in world days. A character can hold
+      -- several ranks in the same group over time, so the period is part of the identity.
+      CREATE TABLE character_affiliations (
+        affiliation_id TEXT PRIMARY KEY,
+        person_id      TEXT NOT NULL REFERENCES persons(person_id) ON DELETE CASCADE,
+        group_id       TEXT NOT NULL REFERENCES world_groups(group_id) ON DELETE CASCADE,
+        rank           TEXT,
+        from_world_day INTEGER,
+        to_world_day   INTEGER,
+        notes          TEXT,
+        created_at     TEXT NOT NULL,
+        updated_at     TEXT NOT NULL
+      );
+      CREATE INDEX idx_affiliations_person ON character_affiliations(person_id);
+      CREATE INDEX idx_affiliations_group ON character_affiliations(group_id);
+    `,
+  },
+  {
+    version: 95,
+    up: /* sql */ `
+      -- The fiction half of a place, exactly as character_profiles is the fiction half of
+      -- a person. The places table is SHARED with genealogy — which writes real
+      -- municipalities with gazetteer ids — so the invented fields live in an overlay
+      -- as columns nobody there will ever fill.
+      --
+      -- The hierarchy and the classifier need no schema at all: parent_id and kind have
+      -- existed on the places table since migration 33.
+      CREATE TABLE place_profiles (
+        place_id    TEXT PRIMARY KEY REFERENCES places(place_id) ON DELETE CASCADE,
+        -- Split for the same reason the character description is: the image prompt is
+        -- built from the appearance alone, and feeding it the history paints a mood
+        -- instead of a place.
+        appearance  TEXT,
+        atmosphere  TEXT,
+        history     TEXT,
+        -- The anchor that keeps successive images of one city looking like one city.
+        visual_seed TEXT,
+        accent      TEXT,
+        created_at  TEXT NOT NULL,
+        updated_at  TEXT NOT NULL
+      );
+    `,
+  },
+  {
+    version: 96,
+    up: /* sql */ `
+      -- Secrets, and who knows them. A plot device with a state, not a note.
+      --
+      -- The point is not storing the secret: it is being able to ask "who could possibly
+      -- have said this out loud in chapter nine". So the KNOWERS carry the moment they
+      -- learned it, and the secret itself carries whether it is still kept.
+      CREATE TABLE world_secrets (
+        secret_id          TEXT PRIMARY KEY,
+        title              TEXT NOT NULL,
+        content            TEXT,
+        -- Whose secret it is. SET NULL rather than cascade: a secret usually outlives the
+        -- character it belonged to, which is frequently the whole point of it.
+        owner_person_id    TEXT REFERENCES persons(person_id) ON DELETE SET NULL,
+        -- kept | revealed
+        status             TEXT NOT NULL DEFAULT 'kept',
+        revealed_world_day INTEGER,
+        notes              TEXT,
+        created_at         TEXT NOT NULL,
+        updated_at         TEXT NOT NULL
+      );
+      CREATE INDEX idx_world_secrets_owner ON world_secrets(owner_person_id);
+
+      CREATE TABLE secret_knowers (
+        id              TEXT PRIMARY KEY,
+        secret_id       TEXT NOT NULL REFERENCES world_secrets(secret_id) ON DELETE CASCADE,
+        person_id       TEXT NOT NULL REFERENCES persons(person_id) ON DELETE CASCADE,
+        -- When they learned it, on the world scale. Null = they always knew.
+        since_world_day INTEGER,
+        how             TEXT,
+        created_at      TEXT NOT NULL,
+        UNIQUE (secret_id, person_id)
+      );
+      CREATE INDEX idx_secret_knowers_person ON secret_knowers(person_id);
+
+      -- Scenes: the unit a writer actually works in.
+      --
+      -- TWO orders, deliberately, because they are not the same thing and conflating them
+      -- is what makes a flashback impossible to file. world_day is WHEN it happens in the
+      -- world; narrative_order is WHERE it sits in the telling. A prologue set three
+      -- centuries earlier is first in the narrative and near-last in the chronology, and
+      -- both facts have to survive.
+      CREATE TABLE world_scenes (
+        scene_id        TEXT PRIMARY KEY,
+        title           TEXT NOT NULL,
+        summary         TEXT,
+        place_id        TEXT REFERENCES places(place_id) ON DELETE SET NULL,
+        world_year      INTEGER,
+        world_day       INTEGER,
+        -- outline | draft | written
+        status          TEXT NOT NULL DEFAULT 'outline',
+        narrative_order INTEGER NOT NULL DEFAULT 0,
+        notes           TEXT,
+        created_at      TEXT NOT NULL,
+        updated_at      TEXT NOT NULL
+      );
+      CREATE INDEX idx_world_scenes_order ON world_scenes(narrative_order);
+      CREATE INDEX idx_world_scenes_day ON world_scenes(world_year, world_day);
+
+      CREATE TABLE scene_characters (
+        id        TEXT PRIMARY KEY,
+        scene_id  TEXT NOT NULL REFERENCES world_scenes(scene_id) ON DELETE CASCADE,
+        person_id TEXT NOT NULL REFERENCES persons(person_id) ON DELETE CASCADE,
+        role      TEXT,
+        UNIQUE (scene_id, person_id)
+      );
+      CREATE INDEX idx_scene_characters_person ON scene_characters(person_id);
     `,
   },
 ];

@@ -70,6 +70,31 @@ const SYNC_GROUPS: { key: SyncGroupKey; prefix?: string; tables?: string[] }[] =
       'social_relations',
     ],
   },
+  // A worldbuilding character's own layer. The person row it hangs off travels in the
+  // group above (both vault types share that ontology); these two are the fiction-only
+  // half, and they are authored by hand and irreplaceable, so they must travel too.
+  {
+    key: 'worldbuilding',
+    tables: [
+      'character_profiles',
+      'event_world_dates',
+      'character_abilities',
+      // v94: one gallery table for every world entity, replacing character_images.
+      'world_images',
+      'world_groups',
+      'character_affiliations',
+      'place_profiles',
+      'world_secrets',
+      'secret_knowers',
+      'world_scenes',
+      'scene_characters',
+      // The world's calendar. Its `world_day` values are derived, but they travel with the
+      // eras and months that produced them, so a merged package stays self-consistent.
+      'world_calendar',
+      'world_calendar_eras',
+      'world_calendar_months',
+    ],
+  },
   {
     key: 'research',
     tables: [

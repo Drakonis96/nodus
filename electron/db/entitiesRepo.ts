@@ -61,11 +61,13 @@ const PERSON_SELECT = `SELECT p.*, pp.focus_x AS pf_focus_x, pp.focus_y AS pf_fo
   FROM persons p LEFT JOIN person_portraits pp ON pp.person_id = p.person_id`;
 
 function personNames(personId: string): PersonName[] {
+  // `secret` / `known_by` (schema v92) only ever carry a value in a worldbuilding vault;
+  // in a genealogy one they stay 0/NULL and the flags simply read as false.
   return (
     getDb()
-      .prepare('SELECT name, kind FROM person_names WHERE person_id = ? ORDER BY name')
-      .all(personId) as { name: string; kind: string | null }[]
-  ).map((r) => ({ name: r.name, kind: r.kind }));
+      .prepare('SELECT name, kind, secret, known_by FROM person_names WHERE person_id = ? ORDER BY name')
+      .all(personId) as { name: string; kind: string | null; secret: number | null; known_by: string | null }[]
+  ).map((r) => ({ name: r.name, kind: r.kind, secret: !!r.secret, knownBy: r.known_by ?? null }));
 }
 
 function rowToPerson(row: PersonRow): Person {
@@ -351,6 +353,23 @@ export function updatePlace(placeId: string, patch: Partial<PlaceInput>): Place 
     .prepare('UPDATE places SET name = ?, kind = ?, latitude = ?, longitude = ?, notes = ?, updated_at = ? WHERE place_id = ?')
     .run(name, kind, latitude, longitude, notes, now(), placeId);
   return getPlace(placeId);
+}
+
+/**
+ * Delete a place row.
+ *
+ * Children are DETACHED, not deleted: `places.parent_id` is ON DELETE SET NULL, so
+ * removing a country leaves its cities as roots rather than taking them with it. Events
+ * that happened there keep existing with no place (`events.place_id` is also SET NULL) —
+ * a fact does not stop being a fact because its location was removed.
+ */
+export function deletePlaceRow(placeId: string): void {
+  const db = getDb();
+  const tx = db.transaction(() => {
+    db.prepare('DELETE FROM record_evidence WHERE target_kind = ? AND target_id = ?').run('place', placeId);
+    db.prepare('DELETE FROM places WHERE place_id = ?').run(placeId);
+  });
+  tx();
 }
 
 /** Find a place by exact name (case-insensitive), or create it. Used by extraction to de-dupe. */
