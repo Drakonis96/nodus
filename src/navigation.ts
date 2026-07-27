@@ -1,6 +1,6 @@
 import type { CorpusHealthBucketId, ResearchContextSelection } from '@shared/types';
 
-export type View = 'home' | 'search' | 'library' | 'graph' | 'argument' | 'ideas' | 'authors' | 'persons' | 'timeline' | 'tree' | 'relations' | 'map' | 'archive' | 'databases' | 'dbSearch' | 'dbAnalysis' | 'dbChat' | 'studyCourses' | 'studySchedule' | 'studyCalendar' | 'studySearch' | 'studyLibrary' | 'studyRecordings' | 'studyChat' | 'studyIdeas' | 'studyGraph' | 'studyQuestions' | 'studyReview' | 'studyDeepResearch' | 'teachingGroups' | 'teachingGrades' | 'teachingExams' | 'teachingRubrics' | 'immersion' | 'gaps' | 'debate' | 'research' | 'hypothesis' | 'reading' | 'writing' | 'deepResearch' | 'projects' | 'notes' | 'toolkit' | 'settings';
+export type View = 'home' | 'search' | 'library' | 'graph' | 'argument' | 'ideas' | 'authors' | 'persons' | 'characters' | 'places' | 'factions' | 'cultures' | 'scenes' | 'timeline' | 'tree' | 'relations' | 'map' | 'archive' | 'databases' | 'dbSearch' | 'dbAnalysis' | 'dbChat' | 'studyCourses' | 'studySchedule' | 'studyCalendar' | 'studySearch' | 'studyLibrary' | 'studyRecordings' | 'studyChat' | 'studyIdeas' | 'studyGraph' | 'studyQuestions' | 'studyReview' | 'studyDeepResearch' | 'teachingGroups' | 'teachingGrades' | 'teachingExams' | 'teachingRubrics' | 'immersion' | 'gaps' | 'debate' | 'research' | 'hypothesis' | 'reading' | 'writing' | 'deepResearch' | 'projects' | 'notes' | 'toolkit' | 'settings';
 
 export type GraphPresetId = 'overview' | 'contradictions' | 'gaps' | 'reading' | 'unread' | 'authors';
 
@@ -50,6 +50,13 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'relations', label: 'Relaciones sociales', icon: 'network', group: 'explore' },
   { id: 'map', label: 'Mapa', icon: 'map', group: 'explore' },
   { id: 'archive', label: 'Archivo', icon: 'archive', group: 'explore' },
+  // Worldbuilding mode — shown only for the 'worldbuilding' vault type. It shares the
+  // 'users' icon with Personas and Grupos, which never coexist with it in one vault.
+  { id: 'characters', label: 'Personajes', icon: 'users', group: 'explore' },
+  { id: 'places', label: 'Lugares', icon: 'map', group: 'explore' },
+  { id: 'factions', label: 'Facciones', icon: 'network', group: 'explore' },
+  { id: 'cultures', label: 'Culturas', icon: 'languages', group: 'explore' },
+  { id: 'scenes', label: 'Escenas', icon: 'image', group: 'create' },
   // Databases mode — shown only for the 'databases' vault type (see VAULT_TYPE_SCOPED_VIEWS).
   // The database list itself is rendered dynamically in the sidebar; these two are the
   // fixed Analysis and Chat sections. The table workspace ('databases' view) is reached

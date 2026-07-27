@@ -1448,6 +1448,150 @@ body {
 .docencia .hover\:bg-indigo-600\/20:hover { background-color: rgba(234, 88, 12, 0.20); }
 .docencia .ring-indigo-500 { --tw-ring-color: #f97316; }
 
+/* Worldbuilding vault → violet (#7c3aed) accent instead of the indigo default. Same
+   remap strategy as .docencia / .databases, with one addition it needs and they do
+   not: the character sheet is built out of the person-dossier components, which reach
+   for the `dark:` indigo variants far more than the study surfaces do. A plain
+   `.worldbuilding .text-indigo-300` never wins against `dark:text-indigo-300`, so the
+   dark variants are remapped explicitly below under `.worldbuilding.dark`. */
+.worldbuilding { --tw-ring-color: rgba(124, 58, 237, 0.48); }
+.worldbuilding .btn-primary { background-color: #7c3aed; }
+.worldbuilding .btn-primary:hover { background-color: #6d28d9; }
+.worldbuilding .text-indigo-100 { color: #ede9fe; }
+.worldbuilding .text-indigo-200 { color: #ddd6fe; }
+.worldbuilding .text-indigo-300 { color: #c4b5fd; }
+.worldbuilding .text-indigo-400 { color: #a78bfa; }
+.worldbuilding .text-indigo-500 { color: #8b5cf6; }
+.worldbuilding .text-indigo-600 { color: #7c3aed; }
+.worldbuilding .text-indigo-700 { color: #6d28d9; }
+.worldbuilding .text-indigo-900 { color: #4c1d95; }
+.worldbuilding .hover\:text-indigo-300:hover { color: #c4b5fd; }
+.worldbuilding .hover\:text-indigo-400:hover { color: #a78bfa; }
+.worldbuilding .hover\:text-indigo-700:hover { color: #6d28d9; }
+.worldbuilding .bg-indigo-400 { background-color: #a78bfa; }
+.worldbuilding .bg-indigo-500 { background-color: #8b5cf6; }
+.worldbuilding .bg-indigo-600 { background-color: #7c3aed; }
+.worldbuilding .hover\:bg-indigo-500:hover { background-color: #8b5cf6; }
+.worldbuilding .bg-indigo-50 { background-color: #f5f3ff; }
+.worldbuilding .bg-indigo-100 { background-color: #ede9fe; }
+.worldbuilding .bg-indigo-900 { background-color: #4c1d95; }
+.worldbuilding .bg-indigo-950 { background-color: #2e1065; }
+.worldbuilding .bg-indigo-500\/15 { background-color: rgba(139, 92, 246, 0.15); }
+.worldbuilding .bg-indigo-600\/10 { background-color: rgba(124, 58, 237, 0.1); }
+.worldbuilding .bg-indigo-600\/15 { background-color: rgba(124, 58, 237, 0.15); }
+.worldbuilding .bg-indigo-600\/20 { background-color: rgba(124, 58, 237, 0.2); }
+.worldbuilding .bg-indigo-600\/30 { background-color: rgba(124, 58, 237, 0.3); }
+.worldbuilding .bg-indigo-900\/20 { background-color: rgba(76, 29, 149, 0.2); }
+.worldbuilding .bg-indigo-900\/30 { background-color: rgba(76, 29, 149, 0.3); }
+.worldbuilding .bg-indigo-900\/40 { background-color: rgba(76, 29, 149, 0.4); }
+.worldbuilding .bg-indigo-900\/50 { background-color: rgba(76, 29, 149, 0.5); }
+.worldbuilding .bg-indigo-950\/10 { background-color: rgba(46, 16, 101, 0.1); }
+.worldbuilding .bg-indigo-950\/15 { background-color: rgba(46, 16, 101, 0.15); }
+.worldbuilding .bg-indigo-950\/20 { background-color: rgba(46, 16, 101, 0.2); }
+.worldbuilding .bg-indigo-950\/25 { background-color: rgba(46, 16, 101, 0.25); }
+.worldbuilding .bg-indigo-950\/30 { background-color: rgba(46, 16, 101, 0.3); }
+.worldbuilding .bg-indigo-950\/40 { background-color: rgba(46, 16, 101, 0.4); }
+.worldbuilding .bg-indigo-950\/60 { background-color: rgba(46, 16, 101, 0.6); }
+.worldbuilding .border-indigo-200 { border-color: #ddd6fe; }
+.worldbuilding .border-indigo-400 { border-color: #a78bfa; }
+.worldbuilding .border-indigo-500 { border-color: #8b5cf6; }
+.worldbuilding .border-indigo-600 { border-color: #7c3aed; }
+.worldbuilding .border-indigo-700 { border-color: #6d28d9; }
+.worldbuilding .border-indigo-800 { border-color: #5b21b6; }
+.worldbuilding .border-indigo-900 { border-color: #4c1d95; }
+.worldbuilding .border-indigo-600\/40 { border-color: rgba(124, 58, 237, 0.4); }
+.worldbuilding .border-indigo-600\/70 { border-color: rgba(124, 58, 237, 0.7); }
+.worldbuilding .border-indigo-700\/50 { border-color: rgba(109, 40, 217, 0.5); }
+.worldbuilding .border-indigo-700\/60 { border-color: rgba(109, 40, 217, 0.6); }
+.worldbuilding .border-indigo-700\/70 { border-color: rgba(109, 40, 217, 0.7); }
+.worldbuilding .border-indigo-800\/40 { border-color: rgba(91, 33, 182, 0.4); }
+.worldbuilding .border-indigo-800\/60 { border-color: rgba(91, 33, 182, 0.6); }
+.worldbuilding .border-indigo-800\/70 { border-color: rgba(91, 33, 182, 0.7); }
+.worldbuilding .border-indigo-900\/50 { border-color: rgba(76, 29, 149, 0.5); }
+.worldbuilding .border-indigo-900\/60 { border-color: rgba(76, 29, 149, 0.6); }
+.worldbuilding .border-indigo-900\/70 { border-color: rgba(76, 29, 149, 0.7); }
+.worldbuilding .ring-indigo-500 { --tw-ring-color: #8b5cf6; }
+.worldbuilding .ring-indigo-500\/40 { --tw-ring-color: rgba(139, 92, 246, 0.4); }
+.worldbuilding .ring-indigo-600\/40 { --tw-ring-color: rgba(124, 58, 237, 0.4); }
+.worldbuilding .hover\:border-indigo-700\/60:hover { border-color: rgba(109, 40, 217, 0.6); }
+.worldbuilding .hover\:bg-indigo-600\/20:hover { background-color: rgba(124, 58, 237, 0.2); }
+.worldbuilding .hover\:bg-indigo-700:hover { background-color: #6d28d9; }
+
+/* The `dark:` variants. The root carries .worldbuilding and .dark together, so these
+   need the compound selector to outrank Tailwind's own `.dark .dark\:…` rule. */
+.worldbuilding.dark .dark\:text-indigo-100 { color: #ede9fe; }
+.worldbuilding.dark .dark\:text-indigo-200 { color: #ddd6fe; }
+.worldbuilding.dark .dark\:text-indigo-200\/75 { color: rgba(221, 214, 254, 0.75); }
+.worldbuilding.dark .dark\:text-indigo-300 { color: #c4b5fd; }
+.worldbuilding.dark .dark\:text-indigo-300\/80 { color: rgba(196, 181, 253, 0.8); }
+.worldbuilding.dark .dark\:text-indigo-300\/90 { color: rgba(196, 181, 253, 0.9); }
+.worldbuilding.dark .dark\:text-indigo-400 { color: #a78bfa; }
+.worldbuilding.dark .dark\:hover\:text-indigo-200:hover { color: #ddd6fe; }
+.worldbuilding.dark .dark\:hover\:text-indigo-300:hover { color: #c4b5fd; }
+.worldbuilding.dark .dark\:bg-indigo-400 { background-color: #a78bfa; }
+.worldbuilding.dark .dark\:bg-indigo-500\/15 { background-color: rgba(139, 92, 246, 0.15); }
+.worldbuilding.dark .dark\:bg-indigo-600\/10 { background-color: rgba(124, 58, 237, 0.1); }
+.worldbuilding.dark .dark\:bg-indigo-600\/15 { background-color: rgba(124, 58, 237, 0.15); }
+.worldbuilding.dark .dark\:bg-indigo-900\/20 { background-color: rgba(76, 29, 149, 0.2); }
+.worldbuilding.dark .dark\:bg-indigo-900\/30 { background-color: rgba(76, 29, 149, 0.3); }
+.worldbuilding.dark .dark\:bg-indigo-900\/40 { background-color: rgba(76, 29, 149, 0.4); }
+.worldbuilding.dark .dark\:bg-indigo-950 { background-color: #2e1065; }
+.worldbuilding.dark .dark\:bg-indigo-950\/10 { background-color: rgba(46, 16, 101, 0.1); }
+.worldbuilding.dark .dark\:bg-indigo-950\/15 { background-color: rgba(46, 16, 101, 0.15); }
+.worldbuilding.dark .dark\:bg-indigo-950\/20 { background-color: rgba(46, 16, 101, 0.2); }
+.worldbuilding.dark .dark\:bg-indigo-950\/25 { background-color: rgba(46, 16, 101, 0.25); }
+.worldbuilding.dark .dark\:bg-indigo-950\/30 { background-color: rgba(46, 16, 101, 0.3); }
+.worldbuilding.dark .dark\:bg-indigo-950\/40 { background-color: rgba(46, 16, 101, 0.4); }
+.worldbuilding.dark .dark\:bg-indigo-950\/60 { background-color: rgba(46, 16, 101, 0.6); }
+.worldbuilding.dark .dark\:hover\:bg-indigo-600:hover { background-color: #7c3aed; }
+.worldbuilding.dark .dark\:border-indigo-400 { border-color: #a78bfa; }
+.worldbuilding.dark .dark\:border-indigo-600 { border-color: #7c3aed; }
+.worldbuilding.dark .dark\:border-indigo-600\/40 { border-color: rgba(124, 58, 237, 0.4); }
+.worldbuilding.dark .dark\:border-indigo-600\/70 { border-color: rgba(124, 58, 237, 0.7); }
+.worldbuilding.dark .dark\:border-indigo-700 { border-color: #6d28d9; }
+.worldbuilding.dark .dark\:border-indigo-700\/50 { border-color: rgba(109, 40, 217, 0.5); }
+.worldbuilding.dark .dark\:border-indigo-700\/60 { border-color: rgba(109, 40, 217, 0.6); }
+.worldbuilding.dark .dark\:border-indigo-700\/70 { border-color: rgba(109, 40, 217, 0.7); }
+.worldbuilding.dark .dark\:border-indigo-800 { border-color: #5b21b6; }
+.worldbuilding.dark .dark\:border-indigo-800\/40 { border-color: rgba(91, 33, 182, 0.4); }
+.worldbuilding.dark .dark\:border-indigo-800\/60 { border-color: rgba(91, 33, 182, 0.6); }
+.worldbuilding.dark .dark\:border-indigo-800\/70 { border-color: rgba(91, 33, 182, 0.7); }
+.worldbuilding.dark .dark\:border-indigo-900 { border-color: #4c1d95; }
+.worldbuilding.dark .dark\:border-indigo-900\/50 { border-color: rgba(76, 29, 149, 0.5); }
+.worldbuilding.dark .dark\:border-indigo-900\/60 { border-color: rgba(76, 29, 149, 0.6); }
+.worldbuilding.dark .dark\:border-indigo-900\/70 { border-color: rgba(76, 29, 149, 0.7); }
+.worldbuilding.dark .dark\:hover\:border-indigo-600:hover { border-color: #7c3aed; }
+.worldbuilding.dark .dark\:ring-indigo-950 { --tw-ring-color: #2e1065; }
+
+/* Light mode: the deep 900/950 fills would be near-black panels, so they collapse to
+   the pale end of the violet scale, exactly as .light.docencia does for orange. */
+.light.worldbuilding .bg-indigo-950,
+.light.worldbuilding .bg-indigo-950\/10,
+.light.worldbuilding .bg-indigo-950\/15,
+.light.worldbuilding .bg-indigo-950\/20,
+.light.worldbuilding .bg-indigo-950\/25,
+.light.worldbuilding .bg-indigo-950\/30,
+.light.worldbuilding .bg-indigo-950\/40,
+.light.worldbuilding .bg-indigo-950\/60 { background-color: #ede9fe; }
+.light.worldbuilding .bg-indigo-900,
+.light.worldbuilding .bg-indigo-900\/20,
+.light.worldbuilding .bg-indigo-900\/30,
+.light.worldbuilding .bg-indigo-900\/40,
+.light.worldbuilding .bg-indigo-900\/50 { background-color: #ddd6fe; }
+.light.worldbuilding .bg-indigo-600\/10 { background-color: rgba(124, 58, 237, 0.08); }
+.light.worldbuilding .bg-indigo-600\/15 { background-color: rgba(124, 58, 237, 0.1); }
+.light.worldbuilding .bg-indigo-600\/20 { background-color: rgba(124, 58, 237, 0.14); }
+.light.worldbuilding .hover\:bg-indigo-600\/20:hover { background-color: rgba(124, 58, 237, 0.18); }
+.light.worldbuilding .text-indigo-100,
+.light.worldbuilding .text-indigo-200 { color: #4c1d95; }
+.light.worldbuilding .text-indigo-300 { color: #6d28d9; }
+.light.worldbuilding .text-indigo-400 { color: #7c3aed; }
+.light.worldbuilding .border-indigo-700,
+.light.worldbuilding .border-indigo-700\/50,
+.light.worldbuilding .border-indigo-700\/60 { border-color: rgba(124, 58, 237, 0.45); }
+.light.worldbuilding .border-indigo-800\/40,
+.light.worldbuilding .border-indigo-800\/60 { border-color: rgba(124, 58, 237, 0.3); }
+
 .light.docencia .bg-indigo-950,
 .light.docencia .bg-indigo-950\/20,
 .light.docencia .bg-indigo-950\/25,

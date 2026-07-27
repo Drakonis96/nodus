@@ -13,7 +13,7 @@ import { VaultSwitcher, vaultTypeIcon, vaultTypeLabel } from './components/Vault
 import { DatabasesSidebarExplore } from './components/DatabasesSidebarExplore';
 import { StudySidebar, type StudyNavigationTarget } from './components/StudySidebar';
 import { TeachingSidebar } from './components/TeachingSidebar';
-import { PreviewVaultSidebar } from './components/PreviewVaultSidebar';
+import { WorldbuildingSidebar } from './components/WorldbuildingSidebar';
 import { FeedbackHost } from './components/feedback';
 import { PrivacyRequestHost } from './privacyNotices';
 import { Tour } from './views/Tour';
@@ -54,6 +54,7 @@ import nodusLogoGold from './assets/nodus-logo-gold.svg';
 import nodusLogoCrimson from './assets/nodus-logo-crimson.svg';
 import nodusLogoTeal from './assets/nodus-logo-teal.svg';
 import nodusLogoOrange from './assets/nodus-logo-orange.svg';
+import nodusLogoViolet from './assets/nodus-logo-violet.svg';
 import { buildDockIconDataUrl, dockColorForVaultType } from './dockIcon';
 
 const DatabasesView = lazy(() => import('./views/DatabasesView').then((module) => ({ default: module.DatabasesView })));
@@ -63,6 +64,12 @@ const DatabasesChatView = lazy(() => import('./views/DatabasesChatView').then((m
 const DatabasesSearchView = lazy(() => import('./views/DatabasesSearchView').then((module) => ({ default: module.DatabasesSearchView })));
 const StudyHome = lazy(() => import('./views/StudyHome').then((module) => ({ default: module.StudyHome })));
 const TeachingHome = lazy(() => import('./views/TeachingHome').then((module) => ({ default: module.TeachingHome })));
+const WorldbuildingHome = lazy(() => import('./views/WorldbuildingHome').then((module) => ({ default: module.WorldbuildingHome })));
+const ScenesView = lazy(() => import('./views/ScenesView').then((module) => ({ default: module.ScenesView })));
+const FactionsView = lazy(() => import('./views/GroupsView').then((module) => ({ default: module.FactionsView })));
+const CulturesView = lazy(() => import('./views/GroupsView').then((module) => ({ default: module.CulturesView })));
+const PlacesView = lazy(() => import('./views/PlacesView').then((module) => ({ default: module.PlacesView })));
+const CharactersView = lazy(() => import('./views/CharactersView').then((module) => ({ default: module.CharactersView })));
 const TeachingGroupsView = lazy(() => import('./views/TeachingGroupsView').then((module) => ({ default: module.TeachingGroupsView })));
 const TeachingGradesView = lazy(() => import('./views/TeachingGradesView').then((module) => ({ default: module.TeachingGradesView })));
 const RubricsView = lazy(() => import('./views/RubricsView').then((module) => ({ default: module.RubricsView })));
@@ -391,6 +398,12 @@ export function App() {
   useEffect(() => {
     document.documentElement.classList.toggle('docencia', isDocencia);
   }, [isDocencia]);
+  // Worldbuilding vaults wear a violet accent and render their own sidebar; the
+  // character section is built on the shared person ontology.
+  const isWorldbuilding = activeVault?.type === 'worldbuilding';
+  useEffect(() => {
+    document.documentElement.classList.toggle('worldbuilding', isWorldbuilding);
+  }, [isWorldbuilding]);
 
   // Accessibility preferences are applied at the document root so dialogs,
   // floating panels and every vault inherit them consistently.
@@ -815,14 +828,14 @@ export function App() {
     if (isEstudio) {
       actions.unshift({ id: 'act:reading-focus', label: settings?.readingFocusMode ? t('Salir del modo lectura') : t('Entrar en modo lectura'), section: t('Acciones'), icon: 'book', keywords: 'lectura enfoque focus estudio', run: () => void window.nodus.updateSettings({ readingFocusMode: !settings?.readingFocusMode }).then(reloadSettings) });
     }
-    if (!isGenealogy && !isDatabases && !isEstudio && !isDocencia) {
+    if (!isGenealogy && !isDatabases && !isEstudio && !isDocencia && !isWorldbuilding) {
       actions.unshift(
         { id: 'act:sync', label: t('Actualizar (sincronizar Zotero)'), section: t('Acciones'), icon: 'sync', keywords: 'sync sincronizar', run: () => void onSync() },
         { id: 'act:collections', label: t('Colecciones'), section: t('Acciones'), icon: 'folder', keywords: 'collections zotero', run: () => setCollectionsOpen(true) },
       );
     }
     return [...navCommands, ...actions];
-  }, [settings?.uiLanguage, settings?.reduceMotion, settings?.readingFocusMode, activeVault?.type, isGenealogy, isDatabases, isEstudio, isDocencia, isDark, onSync, openAssistant, reloadSettings]);
+  }, [settings?.uiLanguage, settings?.reduceMotion, settings?.readingFocusMode, activeVault?.type, isGenealogy, isDatabases, isEstudio, isDocencia, isWorldbuilding, isDark, onSync, openAssistant, reloadSettings]);
 
   if (loadError) {
     return (
@@ -926,8 +939,8 @@ export function App() {
         >
           <img
             data-testid="nodus-logo"
-            data-vault-logo={isGenealogy ? 'genealogy' : isDatabases ? 'databases' : isEstudio ? 'estudio' : isDocencia ? 'docencia' : 'academic'}
-            src={isGenealogy ? nodusLogoGold : isDatabases ? nodusLogoCrimson : isEstudio ? nodusLogoTeal : isDocencia ? nodusLogoOrange : nodusLogo}
+            data-vault-logo={isGenealogy ? 'genealogy' : isDatabases ? 'databases' : isEstudio ? 'estudio' : isDocencia ? 'docencia' : isWorldbuilding ? 'worldbuilding' : 'academic'}
+            src={isGenealogy ? nodusLogoGold : isDatabases ? nodusLogoCrimson : isEstudio ? nodusLogoTeal : isDocencia ? nodusLogoOrange : isWorldbuilding ? nodusLogoViolet : nodusLogo}
             alt=""
             className="h-7 w-7"
           />
@@ -1010,7 +1023,7 @@ export function App() {
           {/* Colecciones y Actualizar dependen de Zotero → solo en bóvedas
               académicas; genealogía, bases de datos, estudio y docencia no
               sincronizan con Zotero. */}
-          {!isGenealogy && !isDatabases && !isEstudio && !isDocencia && (
+          {!isGenealogy && !isDatabases && !isEstudio && !isDocencia && !isWorldbuilding && (
             <HeaderAction
               dataTour="collections"
               icon="folder"
@@ -1024,7 +1037,7 @@ export function App() {
             title={t('Enviar una propuesta o reporte a GitHub')}
             onClick={() => setFeedbackOpen(true)}
           />
-          {!isGenealogy && !isDatabases && !isEstudio && !isDocencia && (
+          {!isGenealogy && !isDatabases && !isEstudio && !isDocencia && !isWorldbuilding && (
             <HeaderAction
               dataTour="sync"
               icon="refresh"
@@ -1177,8 +1190,17 @@ export function App() {
                   </div>
                 );
               };
-              if (isPreviewVault && activeVault) {
-                return <PreviewVaultSidebar type={activeVault.type} />;
+              if (isWorldbuilding) {
+                return (
+                  <>
+                    {navButton(homeItem)}
+                    <WorldbuildingSidebar activeView={view} onNavigate={(targetView) => setView(targetView)} />
+                    {/* Only the tools group: Explorar/Analizar/Crear are already covered
+                        by WorldbuildingSidebar, so rendering them would duplicate. */}
+                    {navGroups.filter((group) => group.id === 'tools').map((group) => renderGroup(group))}
+                    <div className="mt-2 flex flex-col gap-1">{navButton(settingsItem)}</div>
+                  </>
+                );
               }
               if (isDatabases) {
                 // A databases vault keeps the same Explorar · Analizar · Escribir
@@ -1348,10 +1370,8 @@ export function App() {
               onLoadDemo={loadTeachingDemo}
             />
           )}
-          {view === 'home' && isPreviewVault && activeVault && (
-            <div className="grid h-full place-items-center bg-neutral-50 p-8 text-center dark:bg-neutral-950" data-testid={`preview-vault-home-${activeVault.type}`}><div className="max-w-md"><Icon name={vaultTypeIcon(activeVault.type)} size={34} className="mx-auto mb-4 text-violet-500" /><span className="rounded border border-violet-500/50 bg-violet-500/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-violet-600 dark:text-violet-300">PREVIEW</span><h1 className="mt-4 text-xl font-semibold">{vaultTypeLabel(activeVault.type)}</h1><p className="mt-2 text-sm leading-6 text-neutral-500">{t('Este vault muestra la estructura prevista. Sus secciones todavía no permiten realizar acciones.')}</p></div></div>
-          )}
-          {view === 'home' && !isGenealogy && !isDatabases && !isEstudio && !isDocencia && !isPreviewVault && (
+          {view === 'home' && isWorldbuilding && <WorldbuildingHome onNavigate={setView} />}
+          {view === 'home' && !isGenealogy && !isDatabases && !isEstudio && !isDocencia && !isWorldbuilding && !isPreviewVault && (
             <HomeView
               vaultId={activeVault?.id ?? null}
               settings={settings}
@@ -1384,7 +1404,12 @@ export function App() {
           {view === 'ideas' && <IdeasView vaultId={activeVault?.id ?? null} onOpenGraph={(target) => navigate('graph', target)} onOpenAssistant={openAssistant} />}
           {view === 'authors' && <AuthorsView vaultId={activeVault?.id ?? null} settings={settings} onOpenGraph={(target) => navigate('graph', target)} />}
           {view === 'persons' && <PersonasView initialPersonId={personsTarget} />}
-          {view === 'timeline' && <TimelineView />}
+          {view === 'characters' && <CharactersView />}
+          {view === 'places' && <PlacesView />}
+          {view === 'factions' && <FactionsView />}
+          {view === 'cultures' && <CulturesView />}
+          {view === 'scenes' && <ScenesView />}
+          {view === 'timeline' && <TimelineView worldbuilding={isWorldbuilding} />}
           {view === 'tree' && <TreeView settings={settings} onSettingsChange={reloadSettings} />}
           {view === 'relations' && <RelationsView onOpenPersons={() => setView('persons')} />}
           {view === 'map' && <MapView />}
@@ -1559,7 +1584,7 @@ export function App() {
       {roadmapTopic && <RoadmapFeedbackModal topic={roadmapTopic} onClose={() => setRoadmapTopic(null)} />}
       {roadmapOpen && <RoadmapModal onClose={() => setRoadmapOpen(false)} />}
 
-      {!isPreviewVault && settings.onboardingComplete && settings.basicsTutorialVersion > 0 && !settings.tourComplete && !isGenealogy && !isDatabases && !isEstudio && !isDocencia && (
+      {!isPreviewVault && settings.onboardingComplete && settings.basicsTutorialVersion > 0 && !settings.tourComplete && !isGenealogy && !isDatabases && !isEstudio && !isDocencia && !isWorldbuilding && (
         <Tour
           onNavigate={setView}
           onClose={async () => {
