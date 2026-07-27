@@ -4683,7 +4683,6 @@ export const FR: Record<string, string> = {
   'Selecciona un estilo o crea uno personalizado.': 'Sélectionnez un style ou créez-en un personnalisé.',
   'Icono o emoji': 'Icône ou emoji',
   'Seleccionar icono o emoji': 'Sélectionner une icône ou un emoji',
-  'Emoji seleccionado': 'Emoji sélectionné',
   'Busca y elige un icono de Nodus o un emoji.': 'Recherchez et choisissez une icône Nodus ou un emoji.',
   'Buscar iconos…': 'Rechercher des icônes…',
   'No se encontraron iconos.': 'Aucune icône trouvée.',
