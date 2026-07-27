@@ -10,6 +10,7 @@ export type TeachingView =
   | 'studyLibrary'
   | 'studyRecordings'
   | 'studyQuestions'
+  | 'studyDeepResearch'
   | 'teachingGroups'
   | 'teachingGrades'
   | 'teachingExams'
@@ -41,12 +42,12 @@ export const TEACHING_GROUPS: TeachingGroup[] = [
   ] },
   { label: 'Crear', items: [
     { label: 'Guía docente / Programación', icon: 'book', topic: 'guiaDocente' },
-    { label: 'Unidades didácticas', icon: 'layers', topic: 'unidadesDidacticas' },
+    { label: 'Unidades didácticas', icon: 'layers', view: 'studyDeepResearch' },
     { label: 'Situaciones de aprendizaje', icon: 'bulb', topic: 'situacionesAprendizaje' },
     { label: 'Adaptaciones', icon: 'users', topic: 'adaptaciones' },
     { label: 'Notas', icon: 'notebook', topic: 'notas' },
     { label: 'Proyectos de innovación', icon: 'flask', topic: 'proyectosInnovacion' },
-  ], hint: 'En diseño. Ábrelas para contar qué necesitas.' },
+  ] },
 ];
 
 export function TeachingSidebar({

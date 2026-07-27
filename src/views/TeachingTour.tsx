@@ -111,7 +111,7 @@ const STEPS: TourStep[] = [
   },
   {
     title: 'Lo que todavía está en diseño',
-    body: 'Las secciones del grupo «Crear» —guía docente, unidades didácticas, situaciones de aprendizaje, adaptaciones— aún no existen: ábrelas para contarme qué necesitas antes de que se construyan. Puedes repetir este tutorial desde Ajustes.',
+    body: 'En «Crear», Unidades didácticas ya permite generar una planificación para el docente o apuntes para el alumnado a partir de tus materiales. Las demás secciones punteadas siguen abiertas a tus sugerencias. Puedes repetir este tutorial desde Ajustes.',
   },
 ];
 

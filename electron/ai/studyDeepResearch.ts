@@ -9,6 +9,10 @@ import type {
   WritingWorkshopSection,
 } from '@shared/types';
 import type { StudySearchIndexEntry, StudySearchKind } from '@shared/studySearch';
+import {
+  normalizeStudyDeepResearchAudience,
+  STUDY_DEEP_RESEARCH_AUDIENCE_PROMPTS,
+} from '@shared/studyDeepResearchAudience';
 import { completeJson, completeText } from './aiClient';
 import { retrieveStudyAssistantEntries } from './studySearch';
 
@@ -206,17 +210,24 @@ export async function generateStudyDeepResearchReport(
 ): Promise<DeepResearchReport> {
   const language = request.language ?? 'es';
   const prompts = STUDY_DEEP_RESEARCH_PROMPTS[language];
+  const audience = normalizeStudyDeepResearchAudience(request.audience);
+  const audiencePrompts = STUDY_DEEP_RESEARCH_AUDIENCE_PROMPTS[language][audience];
   onProgress?.({ phase: 'snapshot', message: 'Recuperando apuntes, materiales y transcripciones relevantes…' });
   const retrieved = await retrieveStudyAssistantEntries(request.objective, { kinds: ['material', 'document', 'transcript'] }, [], 48);
   const sources = buildSources(retrieved);
   if (!sources.length) throw new Error('No hay contenido indexado suficiente en los materiales de estudio para generar el informe.');
   const pages = targetPages(request, sources.length);
   const count = sectionCount(request, pages);
-  onProgress?.({ phase: 'planning', message: `Diseñando una explicación didáctica en ${count} secciones…` });
+  onProgress?.({
+    phase: 'planning',
+    message: audience === 'teacher'
+      ? `Diseñando una planificación docente en ${count} secciones…`
+      : `Preparando apuntes para el alumnado en ${count} secciones…`,
+  });
   const sourcePayload = sources.map(({ id, kind, title, subtitle, location, text }) => ({ id, kind, title, subtitle, location, extract: text }));
   const plan = await completeJson<StudyPlan>({
-    system: prompts.plan,
-    user: JSON.stringify({ objective: request.objective, language, sectionCount: count, sources: sourcePayload }, null, 2),
+    system: `${prompts.plan}\n\n${audiencePrompts.plan}`,
+    user: JSON.stringify({ objective: request.objective, audience, language, sectionCount: count, sources: sourcePayload }, null, 2),
     temperature: 0.18,
     maxTokens: 4_000,
   }, isPlan, model);
@@ -244,9 +255,10 @@ export async function generateStudyDeepResearchReport(
     sectionSources.forEach((source) => usedSourceIds.add(source.id));
     onProgress?.({ phase: 'section', message: `Explicando: ${section.title}`, sectionIndex: index + 1, sectionTotal: sections.length, sectionTitle: section.title });
     const raw = await completeText({
-      system: prompts.write,
+      system: `${prompts.write}\n\n${audiencePrompts.write}`,
       user: JSON.stringify({
         objective: request.objective,
+        audience,
         language,
         targetWords: Math.max(850, Math.min(1_650, Math.round((pages.max * 450) / sections.length))),
         section: { title: section.title, purpose: section.purpose, keyClaims: section.keyClaims },
@@ -262,8 +274,8 @@ export async function generateStudyDeepResearchReport(
 
   onProgress?.({ phase: 'assembling', message: 'Preparando síntesis, fuentes y actividades de comprensión…' });
   const final = await completeJson<StudyFinal>({
-    system: prompts.finalize,
-    user: JSON.stringify({ objective: request.objective, language, provisionalTitle: plan.title, sectionTitles: sections.map((section) => section.title), sourcesUsed: [...usedSourceIds] }, null, 2),
+    system: `${prompts.finalize}\n\n${audiencePrompts.finalize}`,
+    user: JSON.stringify({ objective: request.objective, audience, language, provisionalTitle: plan.title, sectionTitles: sections.map((section) => section.title), sourcesUsed: [...usedSourceIds] }, null, 2),
     temperature: 0.18,
     maxTokens: 1_800,
   }, isFinal, model).catch((): StudyFinal => ({}));
@@ -286,7 +298,7 @@ export async function generateStudyDeepResearchReport(
   const words = body.split(/\s+/).filter(Boolean).length;
   const draft: WritingWorkshopDraft = {
     generatedAt: new Date().toISOString(),
-    brief: { kind: 'deep_research', objective: request.objective, audience: request.audience, tone: 'academic', language },
+    brief: { kind: 'deep_research', objective: request.objective, audience, tone: 'academic', language },
     selection: { ideaIds: [], themeIds: [], gapIds: [], contradictionIds: [], workIds: [], passageIds: [], tutorRouteIds: [] },
     title: final.title?.trim() || plan.title?.trim() || request.objective,
     abstract: final.abstract?.trim() || plan.abstract?.trim() || '',

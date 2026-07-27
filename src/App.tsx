@@ -1521,6 +1521,7 @@ export function App() {
           {view === 'studyDeepResearch' && <DeepResearchView
             settings={settings}
             isStudy
+            isTeaching={isDocencia}
             onOpenGraph={(target) => navigate('graph', target)}
             onOpenStudyDocument={(id) => { setStudyTarget({ kind: 'document', id }); setView('studyCourses'); }}
             onOpenStudyMaterial={(id) => { setStudyMaterialTarget(id); setView('studyLibrary'); }}

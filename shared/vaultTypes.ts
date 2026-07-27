@@ -306,8 +306,8 @@ export const VAULT_TYPE_SCOPED_VIEWS: Record<string, VaultType[]> = {
   // They must never leak into research/records/database vaults. The teaching
   // ('docencia') mode reuses the shared organisation surfaces — courses & subjects,
   // schedule, calendar, materials and recordings — so those five are scoped to both.
-  // The study-only surfaces (search, chat, ideas, graph, question bank, review,
-  // deep research) stay exclusive to 'estudio'.
+  // Search, chat, ideas, graph and review stay exclusive to 'estudio'. The question
+  // bank and pedagogical Deep Research are also used by the teaching workspace.
   studyCourses: ['estudio', 'docencia'],
   studySchedule: ['estudio', 'docencia'],
   studyCalendar: ['estudio', 'docencia'],
@@ -320,7 +320,7 @@ export const VAULT_TYPE_SCOPED_VIEWS: Record<string, VaultType[]> = {
   // The question bank is shared with teaching (its Evaluación section).
   studyQuestions: ['estudio', 'docencia'],
   studyReview: ['estudio'],
-  studyDeepResearch: ['estudio'],
+  studyDeepResearch: ['estudio', 'docencia'],
   // Student rosters, the exam paper builder and rubrics belong to teaching only.
   teachingGroups: ['docencia'],
   teachingGrades: ['docencia'],

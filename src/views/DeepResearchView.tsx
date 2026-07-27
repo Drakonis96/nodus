@@ -15,6 +15,7 @@ import type {
   DecorativeImageStyle,
   ContentTranslation,
 } from '@shared/types';
+import type { StudyDeepResearchAudience } from '@shared/studyDeepResearchAudience';
 import { DECORATIVE_IMAGE_STYLES } from '@shared/imageStyles';
 import type { PendingGraphNavigationTarget } from '../navigation';
 import { Icon, modelLabel } from '../components/ui';
@@ -73,6 +74,7 @@ export function DeepResearchView({
   settings,
   isGenealogy = false,
   isStudy = false,
+  isTeaching = false,
   onOpenGraph,
   onOpenStudyDocument,
   onOpenStudyMaterial,
@@ -81,6 +83,7 @@ export function DeepResearchView({
   settings: AppSettings;
   isGenealogy?: boolean;
   isStudy?: boolean;
+  isTeaching?: boolean;
   onOpenGraph: (target: PendingGraphNavigationTarget) => void;
   onOpenStudyDocument?: (id: string) => void;
   onOpenStudyMaterial?: (id: string) => void;
@@ -95,6 +98,7 @@ export function DeepResearchView({
   const [selectedModel, setSelectedModel] = useFeatureModel(settings, 'deepResearchModel');
   const [deepTarget, setDeepTarget] = useState<DeepResearchTargetLength>('adaptive');
   const [deepSectionLimit, setDeepSectionLimit] = useState<DeepResearchSectionLimit>('auto');
+  const [audience, setAudience] = useState<StudyDeepResearchAudience>(isTeaching ? 'teacher' : 'students');
   const [includeImage, setIncludeImage] = useState(false);
   const [imageStyle, setImageStyle] = useState<DecorativeImageStyle>(settings.imageStyle);
   const [focusPersonId, setFocusPersonId] = useState<string | null>(null);
@@ -185,6 +189,7 @@ export function DeepResearchView({
       language,
       targetLength: deepTarget,
       sectionLimit: deepSectionLimit,
+      ...(isStudy ? { audience } : {}),
       model: selectedModel,
       decorativeImage: { enabled: includeImage, style: imageStyle },
       ...(isGenealogy ? { focusPersonId } : {}),
@@ -219,6 +224,9 @@ export function DeepResearchView({
     setObjective(saved.brief.objective);
     if (saved.brief.language) setLanguage(saved.brief.language as PromptLanguage);
     if (saved.model) setSelectedModel(saved.model);
+    if (isStudy && (saved.brief.audience === 'teacher' || saved.brief.audience === 'students')) {
+      setAudience(saved.brief.audience);
+    }
     setFocusPersonId(null);
     setComposerOpen(true);
   };
@@ -389,7 +397,9 @@ export function DeepResearchView({
             {isGenealogy
               ? t('Tu biblioteca de informes de historia familiar, generados en cola y citando tus documentos y fuentes.')
               : isStudy
-                ? t('Informes didácticos basados en tus materiales, apuntes y transcripciones indexados.')
+                ? isTeaching
+                  ? t('Diseña unidades para el docente o apuntes para entregar al alumnado, siempre desde tus fuentes.')
+                  : t('Informes didácticos basados en tus materiales, apuntes y transcripciones indexados.')
                 : t('Tu biblioteca de informes académicos, generados en cola y citando todo el corpus.')}
           </p>
         </div>
@@ -546,7 +556,9 @@ export function DeepResearchView({
           settings={settings}
           isGenealogy={isGenealogy}
           isStudy={isStudy}
+          isTeaching={isTeaching}
           objective={objective}
+          audience={audience}
           language={language}
           model={selectedModel}
           target={deepTarget}
@@ -558,6 +570,7 @@ export function DeepResearchView({
           persons={personsList}
           focusPersonId={focusPersonId}
           onObjective={setObjective}
+          onAudience={setAudience}
           onLanguage={setLanguage}
           onModel={setSelectedModel}
           onTarget={setDeepTarget}
@@ -928,7 +941,9 @@ function ComposerModal({
   settings,
   isGenealogy = false,
   isStudy = false,
+  isTeaching = false,
   objective,
+  audience,
   language,
   model,
   target,
@@ -940,6 +955,7 @@ function ComposerModal({
   persons = [],
   focusPersonId = null,
   onObjective,
+  onAudience,
   onLanguage,
   onModel,
   onTarget,
@@ -953,7 +969,9 @@ function ComposerModal({
   settings: AppSettings;
   isGenealogy?: boolean;
   isStudy?: boolean;
+  isTeaching?: boolean;
   objective: string;
+  audience: StudyDeepResearchAudience;
   language: PromptLanguage;
   model: AppSettings['deepResearchModel'];
   target: DeepResearchTargetLength;
@@ -965,6 +983,7 @@ function ComposerModal({
   persons?: Person[];
   focusPersonId?: string | null;
   onObjective: (v: string) => void;
+  onAudience: (v: StudyDeepResearchAudience) => void;
   onLanguage: (v: PromptLanguage) => void;
   onModel: (m: AppSettings['deepResearchModel']) => void;
   onTarget: (v: DeepResearchTargetLength) => void;
@@ -1000,7 +1019,9 @@ function ComposerModal({
               {isGenealogy
                 ? t('El informe reconstruye la historia familiar a partir de tus documentos y fuentes, citándolos.')
                 : isStudy
-                  ? t('El informe enseña el tema paso a paso usando y citando tus materiales de estudio.')
+                  ? isTeaching
+                    ? t('Elige si necesitas una planificación para impartir la lección o apuntes listos para entregar.')
+                    : t('Elige si necesitas apuntes para aprender o una planificación para enseñar el tema.')
                   : t('El informe desarrolla tu idea por completo, citando todo el corpus.')}
             </p>
           </div>
@@ -1019,10 +1040,33 @@ function ComposerModal({
               isGenealogy
                 ? t('Escribe el tema o la pregunta (p. ej. «Historia de la familia» o «La migración a la ciudad»). El informe la desarrollará citando tus documentos y fuentes.')
                 : isStudy
-                  ? t('Escribe el tema o pregunta que quieres comprender. El informe explicará los conceptos difíciles, ejemplos y conexiones usando tus materiales.')
+                  ? audience === 'teacher'
+                    ? t('Escribe el tema o la lección que quieres preparar. El informe diseñará objetivos, secuencia, actividades y evaluación usando tus materiales.')
+                    : t('Escribe el tema de los apuntes. El informe lo explicará paso a paso con ejemplos y autoevaluación usando tus materiales.')
                   : t('Escribe la idea o pregunta de investigación. El informe la desarrollará por completo, citando todas las obras del corpus.')
             }
           />
+          {isStudy && (
+            <label className="block">
+              <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-neutral-500">
+                {t('Público objetivo y producto')}
+              </span>
+              <select
+                data-testid="deep-research-audience"
+                className="input w-full text-sm"
+                value={audience}
+                onChange={(event) => onAudience(event.target.value as StudyDeepResearchAudience)}
+              >
+                <option value="teacher">{t('Docente · planificación de la lección')}</option>
+                <option value="students">{t('Alumnado · apuntes para entregar')}</option>
+              </select>
+              <span className="mt-1 block text-[11px] text-neutral-500" data-testid="deep-research-audience-help">
+                {audience === 'teacher'
+                  ? t('Generará objetivos, secuencia, actividades, comprobaciones de comprensión y evaluación para el docente.')
+                  : t('Generará explicaciones, definiciones, ejemplos, síntesis y autoevaluación dirigidos al alumnado.')}
+              </span>
+            </label>
+          )}
           {isGenealogy && (
             <div>
               <select
