@@ -1585,6 +1585,9 @@ export interface AppSettings {
   /** User-selected colours for the two primary ancestor branches. */
   treePaternalColor: string;
   treeMaternalColor: string;
+  /** Whether each focus-relative ancestor branch is visible in the genealogy tree. */
+  treePaternalBranchVisible: boolean;
+  treeMaternalBranchVisible: boolean;
   // ── Recovery and automatic encrypted backups ──────────────────────────────
   /** Version of the global recovery-folder onboarding contract completed here. */
   recoverySetupVersion: number;
