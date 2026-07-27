@@ -99,6 +99,34 @@ test('no production bridge can send student work to AI for grading, feedback or 
   assert.doesNotMatch(immersion, /respuesta_del_estudiante|EVALUA LA RESPUESTA|open → AI|heuristic fallback/i);
 });
 
+test('teaching AI modules cannot reach the student roster', async () => {
+  // The shipped boundary is that the AI never receives roster data at all — stronger
+  // than receiving it pseudonymised. It holds because electron/ai and the roster are
+  // physically disjoint, so that disjointness is what has to be enforced. Today this
+  // passes trivially; it fails the day someone imports the roster into a prompt.
+  // Comments are stripped first: studentPrivacyContext.ts documents this very rule
+  // and would otherwise flag itself.
+  const stripComments = (source) => source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+  for (const file of await sourceFiles('electron/ai')) {
+    const code = stripComments(await readFile(file, 'utf8'));
+    const relative = path.relative(repoRoot, file);
+    assert.doesNotMatch(code, /teachingGroupsRepo/, `${relative}: teaching AI must not import the roster repo`);
+    assert.doesNotMatch(code, /teaching_students/, `${relative}: teaching AI must not read the roster table`);
+  }
+
+  // The dormancy note is load-bearing documentation: without it the next reader sees
+  // an unused pseudonymisation layer and concludes the guarantee is active.
+  const context = await read('electron/ai/studentPrivacyContext.ts');
+  assert.match(context, /THIS LAYER IS DORMANT/);
+  assert.match(context, /never receives roster data at all/);
+
+  // What actually protects the one roster-adjacent model path (the MCP gradebook).
+  const grid = await read('shared/assessment/grid.ts');
+  assert.match(grid, /export function anonymousGrid/);
+  assert.match(grid, /new Set<string>\(\[GRID_COL\.givenNames, GRID_COL\.surnames\]\)/);
+  assert.match(await read('electron/mcp/tools.ts'), /anonymousGrid\(/);
+});
+
 test('remote vault publication excludes credentials, files and student administration tables', async () => {
   const [snapshot, secretStore, backup, settings] = await Promise.all([
     read('electron/serverSync/serverSnapshot.ts'),

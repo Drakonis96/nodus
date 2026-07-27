@@ -450,7 +450,7 @@ export function Settings({
     visibleSettingsSection('integrations', 'Copiloto de escritura LibreOffice', 'libreoffice copilot macro python install instalacion instalando'),
     visibleSettingsSection('integrations', 'Nodus para Zotero', 'zotero plugin sidebar chat servidor puerto token pagina citas conexiones'),
     visibleSettingsSection('data', 'Backup / copia de seguridad', 'datos demo exportar importar copia backup cifrada contraseña'),
-    visibleSettingsSection('models', 'Modelos de IA', 'basico avanzado modelo general extraccion sintesis tutor resumen fusion embeddings transcripcion voz imagen'),
+    visibleSettingsSection('models', 'Modelos de IA', 'basico avanzado modelo general extraccion sintesis tutor resumen fusion embeddings transcripcion voz imagen alumnado identificador identificadores cuaderno notas actas boletines'),
     visibleSettingsSection('extraction', 'Extracción de texto PDFs grandes', 'pdf texto zotero ocr tesseract paginas idiomas'),
     visibleSettingsSection('data', 'Zona de peligro', 'reinicializar grafo borrar ideas temas conexiones autores huecos'),
     visibleSettingsSection('about', 'Acerca de Nodus', 'proyecto independiente codigo abierto open source gratuito privacidad privacy rgpd gdpr datos alumnado licencia'),
@@ -1882,7 +1882,7 @@ export function Settings({
           </Section>
       )}
 
-      {visibleSettingsSection('models', 'Modelos de IA', 'basico avanzado modelo general extraccion sintesis tutor resumen fusion embeddings transcripcion voz imagen') && (<>
+      {visibleSettingsSection('models', 'Modelos de IA', 'basico avanzado modelo general extraccion sintesis tutor resumen fusion embeddings transcripcion voz imagen alumnado identificador identificadores cuaderno notas actas boletines') && (<>
           <Section title={t('Selección de modelos')}>
             <p className="mb-2 text-xs leading-5 text-neutral-600 dark:text-neutral-400">
               {t('Solo puede haber un modo de configuración activo. Cambiar de modo modifica qué selección de modelos utiliza Nodus, no solo la vista de este formulario.')}
@@ -2007,6 +2007,20 @@ export function Settings({
                 <Icon name="shield" size={12} /> {t('Bloqueado por diseño')}
               </span>
             </Row>
+            {/* Display-only, and the hint has to say so: it sits next to the badge
+                above and must not be read as softening it. Nothing here changes what
+                the AI receives, because the AI never receives the roster. */}
+            {activeVault?.type === 'docencia' && <Row
+              label={t('Identificadores del alumnado')}
+              hint={t('Muestra una columna de identificadores (STU_XXXX) junto a los nombres en el cuaderno de notas y en las actas y boletines que exportes. No cambia lo que recibe la IA: la IA nunca recibe listados de alumnado.')}
+            >
+              <input
+                data-testid="settings-student-identifiers"
+                type="checkbox"
+                checked={settings.studentPseudonymsEnabled}
+                onChange={(e) => void patch({ studentPseudonymsEnabled: e.target.checked })}
+              />
+            </Row>}
             <Row
               label={t('OpenRouter: priorizar velocidad')}
               hint={t('Enruta hacia el proveedor más rápido disponible. Puede aumentar ligeramente el coste.')}

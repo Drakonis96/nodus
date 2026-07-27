@@ -31,6 +31,32 @@
  * Pick the mechanism whose failure is safe. `CallOpts.skipStudentPseudonyms` exists
  * as a typed escape hatch so that a future caller opts out loudly rather than by
  * quietly restructuring a scope.
+ *
+ * THIS LAYER IS DORMANT. DO NOT CITE IT AS AN ACTIVE GUARANTEE
+ * -----------------------------------------------------------
+ * `withStudentPseudonyms` has no production caller, and that is the design, not an
+ * oversight. Nodus settled on a STRONGER boundary than "the AI receives roster data
+ * pseudonymised": the AI never receives roster data at all. No module in this
+ * directory imports `teachingGroupsRepo` or touches `teaching_students`, and the four
+ * teaching AI entry points (assessment-plan import, rubric fill, rubric generation,
+ * exam questions) read plans, rubrics and the study corpus — never the roster. See
+ * the note at the top of `assessmentImport.ts` for the same reasoning stated at a
+ * call site.
+ *
+ * So `currentPrivacyScope()` returns null on every real call today, and
+ * `anonymizeCallOpts` (aiClient.ts) early-returns. What actually protects the one
+ * roster-adjacent model path — the MCP gradebook tool — is `anonymousGrid`
+ * (shared/assessment/grid.ts), which drops the name columns BY CONSTRUCTION before
+ * anything is serialised. That is the first line of defence; this file is the second,
+ * kept live and tested so that a future feature which genuinely needs roster text has
+ * a correct mechanism to reach for instead of inventing one under deadline.
+ *
+ * Consequences for anyone reading this file:
+ *   · Do not describe Nodus as "pseudonymising student names for the AI" in code
+ *     comments, docs or UI copy. It does not, because it does not send them.
+ *   · `scripts/test-privacy-compliance.mjs` enforces the import boundary above and
+ *     asserts this note still exists. If you wire a roster into an AI prompt, that
+ *     test fails, and opening a scope here is then part of the fix — not all of it.
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
 import {
@@ -83,6 +109,9 @@ export function currentPrivacyScope(): ActivePrivacyScope | null {
  * Line appended to the external-send consent dialog. It is the only honest place to
  * state what the layer does NOT cover, because it is the moment the user authorises
  * the send.
+ *
+ * Feeds `runStudyAiTask`'s `externalDetail` (studyAiPolicy.ts). Unused pending a first
+ * caller that opens a scope — see the dormancy note in the module header.
  */
 export function privacyConsentDetail(privacy: ActivePrivacyScope | null): string | undefined {
   if (!privacy) return undefined;
