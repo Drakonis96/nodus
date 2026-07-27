@@ -53,10 +53,17 @@
     border-bottom: 1px solid transparent; transition: border-color 0.3s;
   }
   .nav.scrolled { border-color: var(--border); }
-  .nav .logo { display: flex; align-items: center; gap: 9px; font-weight: 800; font-size: 17px; color: var(--text); }
-  .nav .logo img { width: 26px; height: 26px; }
-  .nav .links { margin-left: auto; display: flex; gap: 18px; align-items: center; font-size: 14px; font-weight: 500; }
-  .nav .links > a { color: var(--text-2); }
+  .nav .logo {
+    display: flex; flex: 0 0 auto; align-items: center; gap: 9px;
+    font-weight: 800; font-size: 17px; color: var(--text); white-space: nowrap;
+  }
+  .nav .logo img { width: 26px; height: 26px; flex: 0 0 auto; }
+  .nav .links {
+    min-width: 0; margin-left: auto; display: flex; gap: 18px;
+    align-items: center; font-size: 14px; font-weight: 500;
+  }
+  .nav .links > * { flex: 0 0 auto; min-width: 0; }
+  .nav .links > a { color: var(--text-2); white-space: nowrap; }
   .nav .links > a:hover { color: var(--text); }
   .btn {
     display: inline-flex; align-items: center; gap: 8px; padding: 11px 22px; border-radius: 12px;
@@ -70,24 +77,25 @@
   }
   .btn.primary, .nav .links a.btn.primary { color: #fff !important; font-weight: 700; }
   .btn.primary:hover { box-shadow: 0 10px 32px rgba(124,58,237,0.5); }
-  .nav .btn { padding: 8px 16px; font-size: 13.5px; }
+  .nav .btn { padding: 8px 16px; font-size: 13.5px; white-space: nowrap; overflow: hidden; }
   .gh-badge {
-    display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px; border-radius: 12px;
+    display: inline-flex; flex: 0 0 auto; align-items: center; gap: 8px; padding: 7px 14px; border-radius: 12px;
     border: 1px solid var(--border); background: var(--card); color: var(--text) !important;
-    font-size: 13px; font-weight: 600; transition: all 0.2s;
+    font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; transition: all 0.2s;
   }
   .gh-badge:hover { border-color: rgba(167,139,250,0.5); }
-  .gh-badge svg { width: 16px; height: 16px; fill: currentColor; }
+  .gh-badge svg { width: 16px; height: 16px; flex: 0 0 auto; fill: currentColor; }
   .gh-badge .stars { display: inline-flex; align-items: center; gap: 4px; padding-left: 10px; border-left: 1px solid var(--border); color: var(--amber); }
   .gh-badge .stars svg { width: 13px; height: 13px; fill: var(--amber); }
   .release-downloads {
-    position: relative; display: inline-flex; min-width: 104px; align-items: center; justify-content: center; gap: 5px;
+    position: relative; display: inline-flex; flex: 0 0 auto; min-width: 104px; align-items: center; justify-content: center; gap: 5px;
     padding: 7px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--card);
-    color: var(--text-2) !important; font-size: 13px; font-weight: 600; transition: all 0.2s;
+    color: var(--text-2) !important; font-size: 13px; font-weight: 600; white-space: nowrap; transition: all 0.2s;
   }
   .release-downloads:hover, .release-downloads:focus-visible { border-color: rgba(167,139,250,0.5); color: var(--text) !important; }
   .release-downloads:focus-visible { outline: 2px solid var(--violet-2); outline-offset: 2px; }
-  .release-downloads > svg { width: 15px; height: 15px; flex: 0 0 auto; }
+  .release-downloads > svg, .release-downloads > span:not(.download-tooltip) { flex: 0 0 auto; }
+  .release-downloads > svg { width: 15px; height: 15px; }
   .release-downloads[data-state="loading"] .download-value { opacity: 0.55; }
   .release-downloads[data-state="error"] { opacity: 0.72; }
   .download-tooltip {
@@ -97,17 +105,18 @@
     opacity: 0; pointer-events: none; transform: translateY(-3px); transition: opacity 0.15s, transform 0.15s;
   }
   .release-downloads:hover .download-tooltip, .release-downloads:focus-visible .download-tooltip { opacity: 1; transform: translateY(0); }
-  .lang-picker { position: relative; }
+  .lang-picker { position: relative; flex: 0 0 auto; }
   .lang-trigger {
-    display: inline-flex; align-items: center; gap: 8px; min-width: 146px; height: 36px; padding: 0 10px;
+    display: inline-flex; align-items: center; gap: 8px; width: 146px; min-width: 146px; height: 36px; padding: 0 10px;
     border: 1px solid var(--border); border-radius: 11px; background: rgba(255,255,255,.045); color: var(--text);
-    font: 600 12.5px/1 var(--sans); cursor: pointer; transition: border-color .2s, background .2s, box-shadow .2s;
+    font: 600 12.5px/1 var(--sans); white-space: nowrap; overflow: hidden; cursor: pointer;
+    transition: border-color .2s, background .2s, box-shadow .2s;
   }
   .lang-trigger:hover, .lang-trigger[aria-expanded="true"] { border-color: rgba(167,139,250,.52); background: rgba(139,92,246,.1); }
   .lang-trigger:focus-visible { outline: 3px solid rgba(139,92,246,.25); outline-offset: 2px; }
-  .lang-flag { font-size: 17px; line-height: 1; filter: saturate(.92); }
-  .lang-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .lang-chevron { width: 14px; height: 14px; margin-left: auto; color: var(--text-2); transition: transform .2s; }
+  .lang-flag { flex: 0 0 auto; font-size: 17px; line-height: 1; filter: saturate(.92); }
+  .lang-name { min-width: 0; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lang-chevron { width: 14px; height: 14px; flex: 0 0 auto; margin-left: auto; color: var(--text-2); transition: transform .2s; }
   .lang-trigger[aria-expanded="true"] .lang-chevron { transform: rotate(180deg); }
   .lang-menu {
     position: absolute; z-index: 70; top: calc(100% + 9px); right: 0; width: 242px; max-height: min(430px, calc(100vh - 84px)); overflow-y: auto;
@@ -176,7 +185,7 @@
 
   /* ---------- sections ---------- */
   section { position: relative; padding: 110px 24px; }
-  #vaults, #toolkit { scroll-margin-top: 64px; }
+  #vaults, #toolkit, #tutorials { scroll-margin-top: 64px; }
   .wrap { max-width: 1080px; margin: 0 auto; }
   .kicker {
     display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700;
@@ -529,6 +538,117 @@
   .feat h3 { font-size: 14.5px; margin: 12px 0 5px; }
   .feat p { font-size: 12.8px; color: var(--text-2); margin: 0; }
 
+  /* tutorials */
+  .tutorials-section {
+    border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+    background: radial-gradient(900px 520px at 50% 0%, rgba(34,211,238,.08), transparent 70%), var(--bg);
+  }
+  .tutorials-head { display: grid; grid-template-columns: minmax(0,.9fr) minmax(320px,1.1fr); gap: 48px; align-items: end; }
+  .tutorials-head .title { max-width: 620px; }
+  .tutorials-head .lead { justify-self: end; }
+  .tutorial-tools { display: grid; grid-template-columns: minmax(250px,1fr) auto; gap: 18px; align-items: center; margin-top: 38px; }
+  .tutorial-search-wrap { position: relative; }
+  .tutorial-search-wrap > svg {
+    position: absolute; left: 16px; top: 50%; width: 18px; height: 18px;
+    transform: translateY(-50%); color: var(--text-2); pointer-events: none;
+  }
+  .tutorial-search {
+    width: 100%; min-height: 46px; padding: 12px 48px 12px 46px; border-radius: 14px;
+    border: 1px solid var(--border); background: rgba(8,7,13,.78); color: var(--text);
+    font: 500 13.5px/1.3 var(--sans); outline: none; box-shadow: 0 12px 34px rgba(0,0,0,.2);
+  }
+  .tutorial-search:focus { border-color: rgba(34,211,238,.55); box-shadow: 0 0 0 3px rgba(34,211,238,.1); }
+  .tutorial-search::placeholder { color: #77718d; }
+  .tutorial-search-clear {
+    position: absolute; right: 7px; top: 50%; transform: translateY(-50%);
+    width: 34px; height: 34px; border: 0; border-radius: 9px; background: transparent;
+    color: var(--text-2); cursor: pointer; font: 500 18px/1 var(--sans);
+  }
+  .tutorial-search-clear:hover { color: var(--text); background: rgba(255,255,255,.06); }
+  .tutorial-search-clear[hidden] { display: none; }
+  .tutorial-tabs { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+  .tutorial-tab {
+    min-height: 38px; padding: 8px 15px; border: 1px solid var(--border); border-radius: 999px;
+    background: rgba(255,255,255,.025); color: var(--text-2); cursor: pointer;
+    font: 700 12px/1 var(--sans); transition: color .18s, border-color .18s, background .18s, transform .18s;
+  }
+  .tutorial-tab:hover { color: var(--text); border-color: rgba(34,211,238,.4); transform: translateY(-1px); }
+  .tutorial-tab[aria-pressed="true"] { color: #cffafe; border-color: rgba(34,211,238,.55); background: rgba(8,145,178,.2); }
+  .tutorial-tab:focus-visible, .tutorial-card:focus-visible, .tutorial-modal button:focus-visible, .tutorial-modal a:focus-visible {
+    outline: 3px solid rgba(34,211,238,.32); outline-offset: 3px;
+  }
+  .tutorial-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px,1fr)); gap: 18px; margin-top: 24px; }
+  .tutorial-card {
+    position: relative; overflow: hidden; padding: 0; border: 1px solid var(--border); border-radius: 18px;
+    background: linear-gradient(160deg, rgba(19,17,32,.96), rgba(10,9,16,.98)); color: var(--text);
+    font: inherit; text-align: left; cursor: pointer; box-shadow: 0 18px 44px rgba(0,0,0,.24);
+    transition: transform .22s, border-color .22s, box-shadow .22s;
+  }
+  .tutorial-card:hover { transform: translateY(-4px); border-color: rgba(34,211,238,.45); box-shadow: 0 24px 58px rgba(0,0,0,.36); }
+  .tutorial-card[hidden] { display: none; }
+  .tutorial-thumb { position: relative; overflow: hidden; aspect-ratio: 16/9; background: #11101a; }
+  .tutorial-thumb::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 40%, rgba(4,3,8,.5)); pointer-events: none; }
+  .tutorial-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; transition: transform .35s ease; }
+  .tutorial-card:hover .tutorial-thumb img { transform: scale(1.035); }
+  .tutorial-play {
+    position: absolute; z-index: 2; left: 50%; top: 50%; transform: translate(-50%,-50%);
+    display: grid; width: 50px; height: 50px; place-items: center; border-radius: 50%;
+    color: #fff; background: rgba(124,58,237,.94); box-shadow: 0 12px 34px rgba(0,0,0,.45), 0 0 0 7px rgba(255,255,255,.1);
+    transition: transform .22s, background .22s;
+  }
+  .tutorial-card:hover .tutorial-play { transform: translate(-50%,-50%) scale(1.08); background: #8b5cf6; }
+  .tutorial-play svg { width: 19px; height: 19px; margin-left: 2px; }
+  .tutorial-card-copy { display: grid; gap: 8px; padding: 16px 17px 18px; }
+  .tutorial-card-copy small { color: var(--cyan); font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+  .tutorial-card-copy h3 { min-height: 44px; margin: 0; font-size: 15px; line-height: 1.42; }
+  .tutorial-empty {
+    margin-top: 24px; padding: 32px; border: 1px dashed var(--border); border-radius: 16px;
+    color: var(--text-2); text-align: center; font-size: 13.5px;
+  }
+  .tutorial-empty[hidden] { display: none; }
+  .tutorial-modal {
+    position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 24px;
+    background: rgba(3,2,7,.84); backdrop-filter: blur(10px); animation: tutorial-fade-in .2s ease-out;
+  }
+  .tutorial-modal[hidden] { display: none; }
+  @keyframes tutorial-fade-in { from { opacity: 0; } }
+  .tutorial-dialog {
+    width: min(980px,100%); max-height: calc(100vh - 48px); overflow: auto;
+    border: 1px solid rgba(167,139,250,.28); border-radius: 22px; background: #11101a;
+    box-shadow: 0 34px 100px rgba(0,0,0,.72); animation: modalIn .24s cubic-bezier(.2,.9,.3,1);
+  }
+  .tutorial-dialog-head { display: flex; align-items: center; gap: 20px; padding: 18px 20px; border-bottom: 1px solid var(--border); }
+  .tutorial-dialog-head h3 { flex: 1; margin: 0; font: 700 clamp(17px,2vw,22px)/1.3 var(--serif); }
+  .tutorial-modal-close {
+    display: grid; flex: 0 0 auto; width: 38px; height: 38px; place-items: center;
+    border: 1px solid var(--border); border-radius: 11px; background: var(--card); color: var(--text-2);
+    cursor: pointer; font: 400 22px/1 var(--sans);
+  }
+  .tutorial-modal-close:hover { color: var(--text); border-color: rgba(167,139,250,.45); }
+  .tutorial-player { aspect-ratio: 16/9; background: #000; }
+  .tutorial-player iframe { display: block; width: 100%; height: 100%; border: 0; }
+  .tutorial-dialog-actions { display: flex; justify-content: flex-end; gap: 10px; padding: 15px 20px 18px; border-top: 1px solid var(--border); }
+  .tutorial-dialog-actions .btn { padding: 9px 15px; font-size: 12.5px; }
+  body.tutorial-open { overflow: hidden; }
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
+    clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+  }
+  @media (max-width: 760px) {
+    .tutorials-head { grid-template-columns: 1fr; gap: 12px; }
+    .tutorials-head .lead { justify-self: start; }
+    .tutorial-tools { grid-template-columns: 1fr; }
+    .tutorial-tabs { justify-content: flex-start; }
+    .tutorial-modal { padding: 12px; }
+    .tutorial-dialog { max-height: calc(100vh - 24px); border-radius: 16px; }
+  }
+  @media (max-width: 520px) {
+    .tutorial-grid { grid-template-columns: 1fr; }
+    .tutorial-dialog-head { padding: 14px; }
+    .tutorial-dialog-actions { flex-direction: column; padding: 14px; }
+    .tutorial-dialog-actions .btn { justify-content: center; }
+  }
+
   /* FAQ */
   .faq-section {
     border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
@@ -641,20 +761,32 @@
   .dl-close:hover { color: var(--text); }
   .dl-all { display: block; margin-top: 14px; font-size: 12.5px; }
 
+  @media (max-width: 1320px) {
+    .nav { gap: 16px; padding-right: 16px; padding-left: 16px; }
+    .nav .links { gap: 10px; font-size: 13px; }
+    .nav .btn { padding-right: 13px; padding-left: 13px; }
+  }
+  @media (max-width: 1180px) {
+    .nav .links a.nav-secondary { display: none; }
+  }
+  @media (max-width: 980px) {
+    .nav .links a.hideS, .gh-badge .lbl, .release-downloads .download-word { display: none; }
+    .release-downloads { min-width: 58px; padding-right: 10px; padding-left: 10px; }
+  }
   @media (max-width: 820px) {
     .shot { grid-template-columns: 1fr; gap: 18px; }
     .shot .shot-txt { order: 0 !important; }
     .story .step { margin-left: 10px; padding-left: 30px; grid-template-columns: 1fr; }
     .story .step .num { left: -26px; width: 48px; height: 48px; font-size: 16px; top: 40px; }
     .story .step h3, .story .step p, .story .step .views { grid-column: 1; }
-    .nav .links a.hideS, .gh-badge .lbl, .release-downloads .download-word { display: none; }
-    .release-downloads { min-width: 58px; padding-right: 10px; padding-left: 10px; }
+  }
+  @media (max-width: 760px) {
+    .nav .links a.btn.primary { display: none; }
   }
   @media (max-width: 620px) {
     .nav { padding: 12px 16px; gap: 12px; }
     .nav .links { gap: 12px; }
-    .nav .links a.btn.primary { display: none; }
-    .lang-trigger { min-width: 0; width: 46px; padding: 0; justify-content: center; }
+    .lang-trigger { min-width: 46px; width: 46px; padding: 0; justify-content: center; }
     .lang-trigger .lang-name, .lang-trigger .lang-chevron { display: none; }
     .lang-menu { position: fixed; top: 65px; right: 12px; width: min(250px, calc(100vw - 24px)); }
     .faq-item summary { align-items: flex-start; flex-direction: column; gap: 4px; padding-left: 16px; }
@@ -664,6 +796,7 @@
     .nav { padding: 10px; gap: 8px; }
     .nav .logo { gap: 0; font-size: 0; }
     .nav .links { gap: 8px; }
+    .nav #faq-nav-link { display: none; }
     .gh-badge { padding-right: 10px; padding-left: 10px; }
   }
 
@@ -865,9 +998,10 @@
   <a class="logo" href="#"><img src="assets/nodus-logo.svg" alt=""/> Nodus</a>
   <div class="links">
     <a href="#vaults" class="hideS" data-i18n="nav.vaults">Vaults</a>
-    <a href="#story" class="hideS" data-i18n="nav.how">How it works</a>
-    <a href="#views" class="hideS" data-i18n="nav.views">Views</a>
-    <a href="#contrib" class="hideS" data-i18n="nav.contrib">Contribute</a>
+    <a href="#story" class="hideS nav-secondary" data-i18n="nav.how">How it works</a>
+    <a href="#views" class="hideS nav-secondary" data-i18n="nav.views">Views</a>
+    <a href="#tutorials" class="hideS" data-i18n="nav.tutorials">Tutorials</a>
+    <a href="#contrib" class="hideS nav-secondary" data-i18n="nav.contrib">Contribute</a>
     <a href="#faq" class="hideS" id="faq-nav-link">FAQ</a>
     <div class="lang-picker" id="lang-picker">
       <button class="lang-trigger" id="lang-trigger" type="button" aria-haspopup="listbox" aria-expanded="false" aria-controls="lang-menu" aria-label="Choose language">
@@ -1509,6 +1643,76 @@
   </div>
 </section>
 
+<!-- ---------- video tutorials ---------- -->
+<section class="tutorials-section" id="tutorials">
+  <div class="wrap">
+    <div class="tutorials-head">
+      <div>
+        <span class="kicker" data-i18n="tutorials.kicker">Video tutorials</span>
+        <h2 class="title" data-i18n="tutorials.title">Learn Nodus, step by step.</h2>
+      </div>
+      <p class="lead" data-i18n="tutorials.lead">Short guided videos for setting up each vault, discovering key features and connecting Nodus to the tools you already use.</p>
+    </div>
+    <div class="tutorial-tools">
+      <div class="tutorial-search-wrap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.4-3.4"/></svg>
+        <input class="tutorial-search" id="tutorial-search" type="search" autocomplete="off" aria-controls="tutorial-grid"
+          placeholder="Search tutorials…" aria-label="Search tutorials"
+          data-i18n-placeholder="tutorials.search" data-i18n-aria-label="tutorials.searchLabel"/>
+        <button class="tutorial-search-clear" id="tutorial-search-clear" type="button" aria-label="Clear search" data-i18n-aria-label="tutorials.clear" hidden>×</button>
+      </div>
+      <div class="tutorial-tabs" id="tutorial-tabs" role="toolbar" aria-label="Tutorial categories" data-i18n-aria-label="tutorials.tabsLabel">
+        <button class="tutorial-tab" type="button" data-tutorial-category="vaults" aria-pressed="true" data-i18n="tutorials.tab.vaults">Vaults</button>
+        <button class="tutorial-tab" type="button" data-tutorial-category="features" aria-pressed="false" data-i18n="tutorials.tab.features">Features</button>
+        <button class="tutorial-tab" type="button" data-tutorial-category="integrations" aria-pressed="false" data-i18n="tutorials.tab.integrations">Integrations</button>
+      </div>
+    </div>
+    <div class="tutorial-grid" id="tutorial-grid">
+      <button class="tutorial-card" type="button" data-category="vaults" data-video-id="QqSY1_DeDRM" data-youtube-url="https://youtu.be/QqSY1_DeDRM">
+        <span class="tutorial-thumb"><img src="https://i.ytimg.com/vi/QqSY1_DeDRM/hqdefault.jpg" alt="" loading="lazy"/><span class="tutorial-play"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7-11-7Z"/></svg></span></span>
+        <span class="tutorial-card-copy"><small data-i18n="tutorials.tab.vaults">Vaults</small><h3 data-i18n="tutorials.video.vaultsIntro">Nodus Vaults | Introduction and first steps</h3></span>
+        <span class="sr-only" data-i18n="tutorials.play">Play tutorial</span>
+      </button>
+      <button class="tutorial-card" type="button" data-category="vaults" data-video-id="Z-5CpJBVV_I" data-youtube-url="https://youtu.be/Z-5CpJBVV_I">
+        <span class="tutorial-thumb"><img src="https://i.ytimg.com/vi/Z-5CpJBVV_I/hqdefault.jpg" alt="" loading="lazy"/><span class="tutorial-play"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7-11-7Z"/></svg></span></span>
+        <span class="tutorial-card-copy"><small data-i18n="tutorials.tab.vaults">Vaults</small><h3 data-i18n="tutorials.video.academic">Nodus Vaults | Academic research</h3></span>
+        <span class="sr-only" data-i18n="tutorials.play">Play tutorial</span>
+      </button>
+      <button class="tutorial-card" type="button" data-category="vaults" data-video-id="UPz7bqN5znE" data-youtube-url="https://youtu.be/UPz7bqN5znE">
+        <span class="tutorial-thumb"><img src="https://i.ytimg.com/vi/UPz7bqN5znE/hqdefault.jpg" alt="" loading="lazy"/><span class="tutorial-play"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7-11-7Z"/></svg></span></span>
+        <span class="tutorial-card-copy"><small data-i18n="tutorials.tab.vaults">Vaults</small><h3 data-i18n="tutorials.video.genealogy">Nodus Vaults | Genealogy</h3></span>
+        <span class="sr-only" data-i18n="tutorials.play">Play tutorial</span>
+      </button>
+      <button class="tutorial-card" type="button" data-category="vaults" data-video-id="4ooNmZVx0dA" data-youtube-url="https://youtu.be/4ooNmZVx0dA">
+        <span class="tutorial-thumb"><img src="https://i.ytimg.com/vi/4ooNmZVx0dA/hqdefault.jpg" alt="" loading="lazy"/><span class="tutorial-play"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7-11-7Z"/></svg></span></span>
+        <span class="tutorial-card-copy"><small data-i18n="tutorials.tab.vaults">Vaults</small><h3 data-i18n="tutorials.video.databases">Nodus Vaults | Databases</h3></span>
+        <span class="sr-only" data-i18n="tutorials.play">Play tutorial</span>
+      </button>
+      <button class="tutorial-card" type="button" data-category="features" data-video-id="5OTe5CtefME" data-youtube-url="https://youtu.be/5OTe5CtefME">
+        <span class="tutorial-thumb"><img src="https://i.ytimg.com/vi/5OTe5CtefME/hqdefault.jpg" alt="" loading="lazy"/><span class="tutorial-play"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7-11-7Z"/></svg></span></span>
+        <span class="tutorial-card-copy"><small data-i18n="tutorials.tab.features">Features</small><h3 data-i18n="tutorials.video.nodi">Nodus Features | Meet Nodi</h3></span>
+        <span class="sr-only" data-i18n="tutorials.play">Play tutorial</span>
+      </button>
+      <button class="tutorial-card" type="button" data-category="features" data-video-id="-xhDw_Y0vpA" data-youtube-url="https://youtu.be/-xhDw_Y0vpA">
+        <span class="tutorial-thumb"><img src="https://i.ytimg.com/vi/-xhDw_Y0vpA/hqdefault.jpg" alt="" loading="lazy"/><span class="tutorial-play"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7-11-7Z"/></svg></span></span>
+        <span class="tutorial-card-copy"><small data-i18n="tutorials.tab.features">Features</small><h3 data-i18n="tutorials.video.toolkit">Nodus Features | Nodus Toolkit</h3></span>
+        <span class="sr-only" data-i18n="tutorials.play">Play tutorial</span>
+      </button>
+      <button class="tutorial-card" type="button" data-category="integrations" data-video-id="lMWW8JJrl2c" data-youtube-url="https://youtu.be/lMWW8JJrl2c">
+        <span class="tutorial-thumb"><img src="https://i.ytimg.com/vi/lMWW8JJrl2c/hqdefault.jpg" alt="" loading="lazy"/><span class="tutorial-play"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7-11-7Z"/></svg></span></span>
+        <span class="tutorial-card-copy"><small data-i18n="tutorials.tab.integrations">Integrations</small><h3 data-i18n="tutorials.video.zotero">Nodus Integrations | Zotero</h3></span>
+        <span class="sr-only" data-i18n="tutorials.play">Play tutorial</span>
+      </button>
+      <button class="tutorial-card" type="button" data-category="integrations" data-video-id="qa2xPiOmV2c" data-youtube-url="https://youtu.be/qa2xPiOmV2c">
+        <span class="tutorial-thumb"><img src="https://i.ytimg.com/vi/qa2xPiOmV2c/hqdefault.jpg" alt="" loading="lazy"/><span class="tutorial-play"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7-11-7Z"/></svg></span></span>
+        <span class="tutorial-card-copy"><small data-i18n="tutorials.tab.integrations">Integrations</small><h3 data-i18n="tutorials.video.mcp">Nodus Integrations | MCP and Server</h3></span>
+        <span class="sr-only" data-i18n="tutorials.play">Play tutorial</span>
+      </button>
+    </div>
+    <div class="tutorial-empty" id="tutorial-empty" hidden data-i18n="tutorials.empty">No tutorials match that search in this category.</div>
+  </div>
+</section>
+
 <!-- ---------- privacy band ---------- -->
 <section class="band">
   <div class="wrap">
@@ -1609,6 +1813,31 @@
   <p style="margin-top:12px;opacity:0.7" data-i18n="footer.tag">Nodus, a free, open-source, local-first research workspace. Audio samples generated with the app's local Kokoro voices.</p>
 </footer>
 
+<!-- ---------- tutorial modal ---------- -->
+<div class="tutorial-modal" id="tutorial-modal" hidden>
+  <div class="tutorial-dialog" role="dialog" aria-modal="true" aria-labelledby="tutorial-modal-title">
+    <div class="tutorial-dialog-head">
+      <h3 id="tutorial-modal-title"></h3>
+      <button class="tutorial-modal-close" id="tutorial-modal-close" type="button" aria-label="Close tutorial" data-i18n-aria-label="tutorials.close">×</button>
+    </div>
+    <div class="tutorial-player" id="tutorial-player">
+      <iframe id="tutorial-frame" title="Nodus tutorial" data-i18n-title="tutorials.frameTitle"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+        referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+    </div>
+    <div class="tutorial-dialog-actions">
+      <button class="btn" id="tutorial-fullscreen" type="button">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/></svg>
+        <span data-i18n="tutorials.fullscreen">Full screen</span>
+      </button>
+      <a class="btn primary" id="tutorial-youtube" href="https://www.youtube.com/" target="_blank" rel="noopener">
+        <svg class="ic" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2 31 31 0 0 0 0 12a31 31 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1A31 31 0 0 0 24 12a31 31 0 0 0-.5-5.8ZM9.6 15.6V8.4L15.8 12l-6.2 3.6Z"/></svg>
+        <span data-i18n="tutorials.youtube">Watch on YouTube</span>
+      </a>
+    </div>
+  </div>
+</div>
+
 <!-- ---------- download modal ---------- -->
 <div class="dl-overlay" id="dl-overlay" onclick="if(event.target===this)closeDl()">
   <div class="dl-modal">
@@ -1635,7 +1864,8 @@
   </div>
 </div>
 
-<script src="faq.js?v=20260718-languages"></script>
+<script src="i18n-complete.js?v=20260727-tutorials"></script>
+<script src="faq.js?v=20260727-full-coverage"></script>
 <script>
 // ---------- nav shadow ----------
 const nav = document.getElementById('nav');
@@ -3123,8 +3353,18 @@ I18N['pt-BR'] = Object.assign(regionalisePortuguese(I18N.pt, [
   [/teus/g, 'seus'], [/tuas/g, 'suas'], [/teu/g, 'seu'], [/tua/g, 'sua'],
 ]), PT_BR);
 
+Object.entries(window.NODUS_LANDING_I18N || {}).forEach(([language, translations]) => {
+  I18N[language] = Object.assign(I18N[language] || {}, translations);
+});
+
 const _orig = new Map();
 document.querySelectorAll('[data-i18n]').forEach((el) => _orig.set(el, el.innerHTML));
+const _origPlaceholders = new Map();
+document.querySelectorAll('[data-i18n-placeholder]').forEach((el) => _origPlaceholders.set(el, el.getAttribute('placeholder') || ''));
+const _origAriaLabels = new Map();
+document.querySelectorAll('[data-i18n-aria-label]').forEach((el) => _origAriaLabels.set(el, el.getAttribute('aria-label') || ''));
+const _origTitles = new Map();
+document.querySelectorAll('[data-i18n-title]').forEach((el) => _origTitles.set(el, el.getAttribute('title') || ''));
 const _vigOrig = [];
 document.querySelectorAll('.shot-txt').forEach((el, i) => {
   _vigOrig[i] = {
@@ -3150,6 +3390,18 @@ function setLang(lang) {
     const k = el.getAttribute('data-i18n');
     el.innerHTML = (dict[k] != null) ? dict[k] : _orig.get(el);
   });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
+    const k = el.getAttribute('data-i18n-placeholder');
+    el.setAttribute('placeholder', dict[k] != null ? dict[k] : _origPlaceholders.get(el));
+  });
+  document.querySelectorAll('[data-i18n-aria-label]').forEach((el) => {
+    const k = el.getAttribute('data-i18n-aria-label');
+    el.setAttribute('aria-label', dict[k] != null ? dict[k] : _origAriaLabels.get(el));
+  });
+  document.querySelectorAll('[data-i18n-title]').forEach((el) => {
+    const k = el.getAttribute('data-i18n-title');
+    el.setAttribute('title', dict[k] != null ? dict[k] : _origTitles.get(el));
+  });
   document.querySelectorAll('.shot-txt').forEach((el, i) => {
     const base = VIG[i]; if (!base) return;
     const h3 = el.querySelector('h3'), p = el.querySelector('p'), tr = el.querySelector('.try');
@@ -3170,6 +3422,7 @@ function setLang(lang) {
   const flag = document.getElementById('lang-current-flag'); if (flag) flag.textContent = choice.f;
   const name = document.getElementById('lang-current-name'); if (name) name.textContent = choice.n;
   document.querySelectorAll('.lang-option').forEach((option) => option.setAttribute('aria-selected', String(option.dataset.lang === lang)));
+  document.dispatchEvent(new CustomEvent('nodus:languagechange', { detail: { lang } }));
 }
 (function () {
   const picker = document.getElementById('lang-picker');
@@ -3231,6 +3484,112 @@ function setLang(lang) {
   } catch (e) {}
   if (!LANGS.some((item) => item.c === lang)) lang = browserLanguage(lang);
   setLang(lang);
+})();
+
+// ---------- Tutorials: filters + modal YouTube player ----------
+(function () {
+  const grid = document.getElementById('tutorial-grid');
+  const tabs = document.getElementById('tutorial-tabs');
+  const search = document.getElementById('tutorial-search');
+  const clear = document.getElementById('tutorial-search-clear');
+  const empty = document.getElementById('tutorial-empty');
+  const modal = document.getElementById('tutorial-modal');
+  const dialog = modal?.querySelector('.tutorial-dialog');
+  const frame = document.getElementById('tutorial-frame');
+  const player = document.getElementById('tutorial-player');
+  const modalTitle = document.getElementById('tutorial-modal-title');
+  const close = document.getElementById('tutorial-modal-close');
+  const fullscreen = document.getElementById('tutorial-fullscreen');
+  const youtube = document.getElementById('tutorial-youtube');
+  if (!grid || !tabs || !search || !clear || !empty || !modal || !dialog || !frame || !player || !modalTitle || !close || !fullscreen || !youtube) return;
+
+  const cards = [...grid.querySelectorAll('.tutorial-card')];
+  const categoryTabs = [...tabs.querySelectorAll('[data-tutorial-category]')];
+  let activeCategory = 'vaults';
+  let activeCard = null;
+  let returnFocus = null;
+
+  function normalized(value) {
+    return value.toLocaleLowerCase(document.documentElement.lang || 'en')
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+  }
+
+  function applyTutorialFilter() {
+    const query = normalized(search.value);
+    let shown = 0;
+    cards.forEach((card) => {
+      const matchesCategory = card.dataset.category === activeCategory;
+      const matchesSearch = !query || normalized(card.textContent || '').includes(query);
+      const visible = matchesCategory && matchesSearch;
+      card.hidden = !visible;
+      if (visible) shown += 1;
+    });
+    empty.hidden = shown !== 0;
+    clear.hidden = !search.value;
+  }
+
+  function selectCategory(tab) {
+    activeCategory = tab.dataset.tutorialCategory;
+    categoryTabs.forEach((candidate) => candidate.setAttribute('aria-pressed', String(candidate === tab)));
+    applyTutorialFilter();
+  }
+
+  function syncOpenTutorialTitle() {
+    if (!activeCard) return;
+    const title = activeCard.querySelector('h3')?.textContent.trim() || 'Nodus tutorial';
+    modalTitle.textContent = title;
+    frame.title = title;
+  }
+
+  function openTutorial(card) {
+    activeCard = card;
+    returnFocus = card;
+    syncOpenTutorialTitle();
+    frame.src = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(card.dataset.videoId)}?autoplay=1&rel=0`;
+    youtube.href = card.dataset.youtubeUrl;
+    modal.hidden = false;
+    document.body.classList.add('tutorial-open');
+    close.focus();
+  }
+
+  function closeTutorial() {
+    if (modal.hidden) return;
+    modal.hidden = true;
+    frame.src = '';
+    document.body.classList.remove('tutorial-open');
+    activeCard = null;
+    if (returnFocus?.isConnected) returnFocus.focus();
+    returnFocus = null;
+  }
+
+  search.addEventListener('input', applyTutorialFilter);
+  clear.addEventListener('click', () => {
+    search.value = '';
+    search.focus();
+    applyTutorialFilter();
+  });
+  categoryTabs.forEach((tab) => tab.addEventListener('click', () => selectCategory(tab)));
+  cards.forEach((card) => card.addEventListener('click', () => openTutorial(card)));
+  close.addEventListener('click', closeTutorial);
+  modal.addEventListener('click', (event) => { if (event.target === modal) closeTutorial(); });
+  fullscreen.addEventListener('click', () => {
+    const request = player.requestFullscreen || player.webkitRequestFullscreen;
+    if (request) request.call(player);
+  });
+  document.addEventListener('keydown', (event) => {
+    if (modal.hidden) return;
+    if (event.key === 'Escape') { event.preventDefault(); closeTutorial(); return; }
+    if (event.key !== 'Tab') return;
+    const focusable = [...dialog.querySelectorAll('button:not([disabled]),a[href],iframe')].filter((el) => !el.hidden);
+    const first = focusable[0], last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+  });
+  document.addEventListener('nodus:languagechange', () => {
+    applyTutorialFilter();
+    syncOpenTutorialTitle();
+  });
+  applyTutorialFilter();
 })();
 
 // ---------- Contributing: humans-only contributor list ----------
