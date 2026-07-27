@@ -85,6 +85,9 @@ try {
     ['courses/subjects', 'study_courses', "id LIKE 'demo-teaching-%'"], ['notes', 'study_docs', "id LIKE 'demo-teaching-%'"],
     ['materials', 'study_materials', "id LIKE 'demo-teaching-%'"], ['recordings', 'study_recordings', "id LIKE 'demo-teaching-%'"],
     ['transcripts', 'study_transcripts', "id LIKE 'demo-teaching-%'"], ['question bank', 'study_questions', "id LIKE 'demo-teaching-%'"],
+    ['ideas/graph', 'study_ideas', "id LIKE 'demo-teaching-%'"], ['idea edges', 'study_idea_edges', "id LIKE 'demo-teaching-%'"],
+    ['idea evidence', 'study_idea_evidence', "occurrence_id LIKE 'demo-teaching-%'"],
+    ['unit design', 'writing_saved_drafts', "id LIKE 'demo-teaching-%'"],
     ['schedule', 'study_schedule_periods', "id LIKE 'demo-teaching-%'"], ['calendar', 'study_calendar_events', "id LIKE 'demo-teaching-%'"],
     ['groups', 'teaching_groups', "id LIKE 'demo-teaching-%'"], ['students', 'teaching_students', "id LIKE 'demo-teaching-%'"],
     ['rubrics', 'teaching_rubrics', "id LIKE 'demo-teaching-%'"], ['exams', 'teaching_exams', "id LIKE 'demo-teaching-%'"],
@@ -94,9 +97,13 @@ try {
     ['grades', 'teaching_grade_entries', "id LIKE 'demo-teaching-%'"],
     ['rubric marks', 'teaching_rubric_evaluations', "id LIKE 'demo-teaching-%'"],
   ]) assert.ok(count(table, where) > 0, `teaching ${label} is populated`);
+  assert.ok(studyChat.listStudyAssistantConversations().some((item) => item.id === 'demo-teaching-chat-commentary'), 'teaching chat is populated');
   teaching.clearTeachingDemoData();
   assert.equal(count('study_courses', "id LIKE 'demo-teaching-%'"), 0);
   assert.equal(count('teaching_groups', "id LIKE 'demo-teaching-%'"), 0);
+  assert.equal(count('study_ideas', "id LIKE 'demo-teaching-%'"), 0);
+  assert.equal(count('writing_saved_drafts', "id LIKE 'demo-teaching-%'"), 0);
+  assert.equal(studyChat.listStudyAssistantConversations(true).filter((item) => item.id.startsWith('demo-teaching-')).length, 0);
   assert.deepEqual(db.pragma('foreign_key_check'), []);
   closeDb();
   console.log('Cross-vault demo coverage tests passed!');

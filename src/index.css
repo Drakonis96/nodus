@@ -1447,6 +1447,13 @@ body {
 .docencia .hover\:border-indigo-700\/60:hover { border-color: rgba(194, 65, 12, 0.6); }
 .docencia .hover\:bg-indigo-600\/20:hover { background-color: rgba(234, 88, 12, 0.20); }
 .docencia .ring-indigo-500 { --tw-ring-color: #f97316; }
+/* Reached only through the Analizar group: the Ideas list's drag handle and open-card
+   ring, and the graph's backbone slider. They live in the shared IdeasView/GraphView,
+   which teaching renders over its own subject scope. */
+.docencia .accent-indigo-400 { accent-color: #fb923c; }
+.docencia .bg-indigo-500\/25 { background-color: rgba(249, 115, 22, 0.25); }
+.docencia .hover\:bg-indigo-500\/25:hover { background-color: rgba(249, 115, 22, 0.25); }
+.docencia .ring-indigo-500\/40 { --tw-ring-color: rgba(249, 115, 22, 0.4); }
 
 .light.docencia .bg-indigo-950,
 .light.docencia .bg-indigo-950\/20,
@@ -1495,6 +1502,8 @@ body {
 .docencia .hover\:bg-teal-50\/60:hover { background-color: rgba(255, 247, 237, 0.6); }
 .docencia .border-teal-200 { border-color: #fed7aa; }
 .docencia .border-teal-500 { border-color: #f97316; }
+/* The chat's starter cards and manual-source checkboxes (Analizar group). */
+.docencia .hover\:border-teal-400:hover { border-color: #fb923c; }
 .docencia .hover\:border-teal-500:hover { border-color: #f97316; }
 .docencia .hover\:border-teal-600:hover { border-color: #ea580c; }
 .docencia .hover\:border-teal-800:hover { border-color: #9a3412; }
@@ -1514,6 +1523,7 @@ body {
 .docencia.dark .dark\:hover\:bg-teal-950:hover { background-color: #431407; }
 .docencia.dark .dark\:hover\:bg-teal-950\/20:hover { background-color: rgba(67, 20, 7, 0.2); }
 .docencia.dark .dark\:border-teal-800\/60 { border-color: rgba(154, 52, 18, 0.6); }
+.docencia.dark .dark\:border-teal-900 { border-color: #7c2d12; }
 .docencia.dark .dark\:border-teal-900\/50 { border-color: rgba(124, 45, 18, 0.5); }
 .docencia.dark .dark\:hover\:border-teal-700:hover { border-color: #c2410c; }
 

@@ -82,6 +82,24 @@ try {
     const person = entities.createPerson({ displayName: `Dato ${name}` });
     extraVaults.push({ vault, person });
   }
+  // The teaching vault's Analizar group (chat, ideas, graph) writes to two different
+  // places: the study_idea_* tables inside the DB and a JSON history file beside it.
+  // Only the first travels for free with the snapshot, so both are seeded here and
+  // asserted after the restore — a backup that silently drops the chat history would
+  // otherwise look complete.
+  const teachingVault = extraVaults.find((item) => item.vault.type === 'docencia').vault;
+  const teachingDir = path.dirname(teachingVault.path);
+  switchTo(teachingVault.id);
+  const teachingDemo = require(path.join(repoRoot, 'electron/db/teachingDemoData.ts'));
+  const studyChat = require(path.join(repoRoot, 'electron/ai/studyAssistant.ts'));
+  assert.equal(teachingDemo.seedTeachingDemoData(), true, 'teaching sample workspace seeded');
+  const teachingIdeaCount = Number(getDb().prepare("SELECT COUNT(*) AS n FROM study_ideas WHERE id LIKE 'demo-teaching-%'").get().n);
+  assert.ok(teachingIdeaCount > 0, 'the teaching vault has ideas before the backup');
+  assert.ok(
+    studyChat.listStudyAssistantConversations().some((item) => item.id === 'demo-teaching-chat-commentary'),
+    'the teaching vault has a chat conversation before the backup'
+  );
+
   const studyVault = extraVaults.find((item) => item.vault.type === 'estudio').vault;
   const studyDir = path.dirname(studyVault.path);
   fs.writeFileSync(path.join(studyDir, 'study-chat-history.json'), JSON.stringify([{ text: 'historial estudio' }]));
@@ -113,6 +131,10 @@ try {
     switchTo(item.vault.id);
     entities.deletePerson(item.person.personId);
   }
+  switchTo(teachingVault.id);
+  teachingDemo.clearTeachingDemoData();
+  assert.equal(Number(getDb().prepare("SELECT COUNT(*) AS n FROM study_ideas WHERE id LIKE 'demo-teaching-%'").get().n), 0, 'teaching ideas wiped');
+  assert.equal(studyChat.listStudyAssistantConversations().length, 0, 'teaching chat history wiped');
   fs.rmSync(path.join(studyDir, 'study-chat-history.json'), { force: true });
   fs.rmSync(path.join(studyDir, 'audio'), { recursive: true, force: true });
   fs.rmSync(path.join(root, 'nodi-notes.json'), { force: true });
@@ -147,6 +169,21 @@ try {
     switchTo(item.vault.id);
     assert.ok(entities.getPerson(item.person.personId), `${item.vault.type} vault data restored`);
   }
+  switchTo(teachingVault.id);
+  assert.equal(
+    Number(getDb().prepare("SELECT COUNT(*) AS n FROM study_ideas WHERE id LIKE 'demo-teaching-%'").get().n),
+    teachingIdeaCount,
+    'teaching ideas restored from the backup'
+  );
+  assert.ok(
+    Number(getDb().prepare("SELECT COUNT(*) AS n FROM study_idea_edges WHERE id LIKE 'demo-teaching-%'").get().n) > 0,
+    'teaching idea graph edges restored from the backup'
+  );
+  assert.ok(
+    studyChat.listStudyAssistantConversations().some((item) => item.id === 'demo-teaching-chat-commentary'),
+    'teaching chat history restored from the backup'
+  );
+  assert.match(fs.readFileSync(path.join(teachingDir, 'study-chat-history.json'), 'utf8'), /demo-teaching-chat-commentary/, 'the teaching chat file is inside the archive');
   assert.match(fs.readFileSync(path.join(studyDir, 'study-chat-history.json'), 'utf8'), /historial estudio/, 'study history restored');
   assert.equal(fs.readFileSync(path.join(studyDir, 'audio', 'lesson.wav'), 'utf8'), 'STUDY-AUDIO', 'study generated audio restored');
   assert.match(fs.readFileSync(path.join(root, 'nodi-notes.json'), 'utf8'), /No perder esto/, 'Nodi quick notes restored');

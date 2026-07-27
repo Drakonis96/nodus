@@ -62,6 +62,18 @@ const STEPS: TourStep[] = [
     body: 'Graba una sesión o importa audio, transcríbelo y enlaza fragmentos con tus materiales. Útil para recuperar lo que se dijo en clase al preparar la evaluación.',
   },
   {
+    target: 'nav-studyChat',
+    view: 'studyChat',
+    title: 'Pregunta a tus materiales',
+    body: 'El chat responde solo con lo que hay en el ámbito que elijas —materiales, apuntes y transcripciones— y cada respuesta enlaza con la fuente que la sostiene, así que puedes comprobarla antes de llevarla a clase.',
+  },
+  {
+    target: 'nav-studyIdeas',
+    view: 'studyIdeas',
+    title: 'Ideas y grafo por asignatura',
+    body: 'Nodus extrae los conceptos de cada material y los relaciona entre sí, una red por asignatura para que no se mezclen materias distintas. De aquí saldrán las unidades, las situaciones de aprendizaje y los demás materiales que se generen.',
+  },
+  {
     target: 'nav-studyQuestions',
     view: 'studyQuestions',
     title: 'Banco de preguntas',
@@ -110,8 +122,14 @@ const STEPS: TourStep[] = [
     body: 'Lo que se guarda es un valor y un estado —evaluado, no entregado, sin evaluar o exento—, y cada estado reparte los pesos de otra forma. La nota numérica o el término cualitativo se derivan de ahí según las reglas que tú configuras.',
   },
   {
+    target: 'nav-teachingUnits',
+    view: 'teachingUnits',
+    title: 'Diseño de unidades',
+    body: 'Escribe el tema y Nodus redacta la unidad completa con tus materiales, citando cada uno. Puedes dejar que la IA proponga las partes o fijarlas tú: cuántas son, cómo se titulan y en qué debe centrarse cada una.',
+  },
+  {
     title: 'Lo que todavía está en diseño',
-    body: 'Las secciones del grupo «Crear» —guía docente, unidades didácticas, situaciones de aprendizaje, adaptaciones— aún no existen: ábrelas para contarme qué necesitas antes de que se construyan. Puedes repetir este tutorial desde Ajustes.',
+    body: 'El resto de secciones del grupo «Crear» —guía docente, situaciones de aprendizaje, adaptaciones— aún no existen: ábrelas para contarme qué necesitas antes de que se construyan. Puedes repetir este tutorial desde Ajustes.',
   },
 ];
 

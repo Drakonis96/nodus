@@ -7,7 +7,6 @@ const REPO = 'Drakonis96/nodus';
 
 export type RoadmapTopicKey =
   | 'guiaDocente'
-  | 'unidadesDidacticas'
   | 'situacionesAprendizaje'
   | 'adaptaciones'
   | 'notas'
@@ -37,11 +36,6 @@ export const ROADMAP_THREADS: Record<RoadmapTopicKey, RoadmapThread> = {
     issue: 68,
     label: 'Guía docente / Programación',
     blurb: 'Redactar y mantener la programación didáctica del curso, conectada con los materiales, las unidades y los criterios que ya usas para calificar.',
-  },
-  unidadesDidacticas: {
-    issue: 69,
-    label: 'Unidades didácticas',
-    blurb: 'La pieza intermedia entre la programación anual y el día a día: temporalización, actividades, recursos y criterios que alimentan el cuaderno de notas.',
   },
   situacionesAprendizaje: {
     issue: 70,

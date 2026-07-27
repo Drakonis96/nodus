@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   AppSettings,
+  DeepResearchOutlineSection,
   DeepResearchProgress,
   DeepResearchSectionLimit,
   DeepResearchTargetLength,
@@ -61,6 +62,151 @@ const DEEP_SECTION_OPTIONS: { value: DeepResearchSectionLimit; label: string }[]
 
 type SortKey = 'recent' | 'oldest' | 'title';
 
+/**
+ * One surface, four readers. The machinery is identical — queue, gallery, reader,
+ * citations, audio, export — but the artefact is not: an academic report, a family
+ * history, a study report and a teaching unit are different things, and calling all
+ * four "informe" is what made the teaching section read as somebody else's feature.
+ * Only the wording lives here; every variant runs the same code path.
+ */
+type DeepResearchVariant = 'academic' | 'genealogy' | 'study' | 'unit';
+
+interface DeepResearchCopy {
+  heading: string;
+  subtitle: string;
+  newAction: string;
+  composerSubtitle: string;
+  objectivePlaceholder: string;
+  missingObjective: string;
+  queuedToast: string;
+  deleteTitle: string;
+  deleteMessage: string;
+  deletedToast: string;
+  searchPlaceholder: string;
+  loading: string;
+  noMatch: string;
+  empty: string;
+  tutorial: { icon: string; title: string; body: string }[];
+}
+
+const REPORT_TUTORIAL = [
+  {
+    icon: 'edit',
+    title: '1. Plantea la idea',
+    body: 'Pulsa «Nuevo informe» y escribe la pregunta o idea. El informe la convierte en un texto de varias páginas, no en una respuesta corta.',
+  },
+  {
+    icon: 'layers',
+    title: '2. Encola los que quieras',
+    body: 'Añade varios informes a la cola: se generan en cadena, uno tras otro, mientras sigues trabajando.',
+  },
+  {
+    icon: 'compass',
+    title: '3. Cobertura del corpus',
+    body: 'Nodus recorre todo el corpus indexado, planifica las secciones y redacta guiado por la cobertura, citando cada obra sin que tengas que seleccionarla.',
+  },
+  {
+    icon: 'book',
+    title: '4. Lee a pantalla completa',
+    body: 'Abre cualquier informe de la galería para leerlo a pantalla completa, revisar sus citas y exportarlo a Markdown o PDF.',
+  },
+];
+
+const DEEP_RESEARCH_COPY: Record<DeepResearchVariant, DeepResearchCopy> = {
+  academic: {
+    heading: 'Deep Research',
+    subtitle: 'Tu biblioteca de informes académicos, generados en cola y citando todo el corpus.',
+    newAction: 'Nuevo informe',
+    composerSubtitle: 'El informe desarrolla tu idea por completo, citando todo el corpus.',
+    objectivePlaceholder: 'Escribe la idea o pregunta de investigación. El informe la desarrollará por completo, citando todas las obras del corpus.',
+    missingObjective: 'Escribe la idea de investigación antes de generar el informe.',
+    queuedToast: 'Informe añadido a la cola. Se generará en segundo plano.',
+    deleteTitle: 'Eliminar informe',
+    deleteMessage: '¿Eliminar este informe guardado? Esta acción no se puede deshacer.',
+    deletedToast: 'Informe eliminado.',
+    searchPlaceholder: 'Buscar entre tus informes…',
+    loading: 'Cargando informes…',
+    noMatch: 'Ningún informe coincide con tu búsqueda.',
+    empty: 'Aún no hay informes. Crea el primero y quedará aquí, listo para leerse a pantalla completa.',
+    tutorial: REPORT_TUTORIAL,
+  },
+  genealogy: {
+    heading: 'Deep Research',
+    subtitle: 'Tu biblioteca de informes de historia familiar, generados en cola y citando tus documentos y fuentes.',
+    newAction: 'Nuevo informe',
+    composerSubtitle: 'El informe reconstruye la historia familiar a partir de tus documentos y fuentes, citándolos.',
+    objectivePlaceholder: 'Escribe el tema o la pregunta (p. ej. «Historia de la familia» o «La migración a la ciudad»). El informe la desarrollará citando tus documentos y fuentes.',
+    missingObjective: 'Escribe la idea de investigación antes de generar el informe.',
+    queuedToast: 'Informe añadido a la cola. Se generará en segundo plano.',
+    deleteTitle: 'Eliminar informe',
+    deleteMessage: '¿Eliminar este informe guardado? Esta acción no se puede deshacer.',
+    deletedToast: 'Informe eliminado.',
+    searchPlaceholder: 'Buscar entre tus informes…',
+    loading: 'Cargando informes…',
+    noMatch: 'Ningún informe coincide con tu búsqueda.',
+    empty: 'Aún no hay informes. Crea el primero y quedará aquí, listo para leerse a pantalla completa.',
+    tutorial: REPORT_TUTORIAL,
+  },
+  study: {
+    heading: 'Deep Research',
+    subtitle: 'Informes didácticos basados en tus materiales, apuntes y transcripciones indexados.',
+    newAction: 'Nuevo informe',
+    composerSubtitle: 'El informe enseña el tema paso a paso usando y citando tus materiales de estudio.',
+    objectivePlaceholder: 'Escribe el tema o pregunta que quieres comprender. El informe explicará los conceptos difíciles, ejemplos y conexiones usando tus materiales.',
+    missingObjective: 'Escribe la idea de investigación antes de generar el informe.',
+    queuedToast: 'Informe añadido a la cola. Se generará en segundo plano.',
+    deleteTitle: 'Eliminar informe',
+    deleteMessage: '¿Eliminar este informe guardado? Esta acción no se puede deshacer.',
+    deletedToast: 'Informe eliminado.',
+    searchPlaceholder: 'Buscar entre tus informes…',
+    loading: 'Cargando informes…',
+    noMatch: 'Ningún informe coincide con tu búsqueda.',
+    empty: 'Aún no hay informes. Crea el primero y quedará aquí, listo para leerse a pantalla completa.',
+    tutorial: REPORT_TUTORIAL,
+  },
+  unit: {
+    heading: 'Diseño de unidades',
+    subtitle: 'Tus unidades didácticas, escritas a partir de los materiales de clase y de las ideas extraídas de ellos.',
+    newAction: 'Nueva unidad',
+    composerSubtitle: 'La unidad se escribe con tus materiales de clase y cita cada uno de ellos.',
+    objectivePlaceholder: 'Escribe el tema de la unidad y, si quieres, para qué grupo o nivel. La unidad se desarrollará con tus materiales, citándolos.',
+    missingObjective: 'Escribe el tema de la unidad antes de generarla.',
+    queuedToast: 'Unidad añadida a la cola. Se generará en segundo plano.',
+    deleteTitle: 'Eliminar unidad',
+    deleteMessage: '¿Eliminar esta unidad guardada? Esta acción no se puede deshacer.',
+    deletedToast: 'Unidad eliminada.',
+    searchPlaceholder: 'Buscar entre tus unidades…',
+    loading: 'Cargando unidades…',
+    noMatch: 'Ninguna unidad coincide con tu búsqueda.',
+    empty: 'Aún no hay unidades. Crea la primera y quedará aquí, lista para leerse a pantalla completa.',
+    tutorial: [
+      {
+        icon: 'edit',
+        title: '1. Plantea el tema',
+        body: 'Pulsa «Nueva unidad» y escribe el tema. Nodus lo convierte en una unidad de varias páginas escrita para dar clase, no en una respuesta corta.',
+      },
+      {
+        icon: 'list',
+        title: '2. Decide la estructura',
+        body: 'Deja que la IA proponga las partes o fíjalas tú: eliges cuántas son, les pones título y, si quieres, indicas en qué debe centrarse cada una.',
+      },
+      {
+        icon: 'compass',
+        title: '3. Tus materiales y tus ideas',
+        body: 'Nodus recorre los materiales indexados y la red de ideas extraída de ellos, y redacta citando cada material sin que tengas que seleccionarlo.',
+      },
+      {
+        icon: 'book',
+        title: '4. Lee a pantalla completa',
+        body: 'Abre cualquier unidad de la galería para leerla a pantalla completa, revisar sus citas y exportarla a Markdown o PDF.',
+      },
+    ],
+  },
+};
+
+/** Section counts offered when the teacher fixes the structure. */
+const UNIT_SECTION_COUNTS = [2, 3, 4, 5, 6, 7, 8];
+
 function formatDate(iso: string): string {
   try {
     return new Date(iso).toLocaleDateString(getActiveLang(), { year: 'numeric', month: 'short', day: 'numeric' });
@@ -73,6 +219,7 @@ export function DeepResearchView({
   settings,
   isGenealogy = false,
   isStudy = false,
+  isTeaching = false,
   onOpenGraph,
   onOpenStudyDocument,
   onOpenStudyMaterial,
@@ -81,11 +228,15 @@ export function DeepResearchView({
   settings: AppSettings;
   isGenealogy?: boolean;
   isStudy?: boolean;
+  /** Teaching vaults: Unit design — same surface, plus the teacher-defined structure. */
+  isTeaching?: boolean;
   onOpenGraph: (target: PendingGraphNavigationTarget) => void;
   onOpenStudyDocument?: (id: string) => void;
   onOpenStudyMaterial?: (id: string) => void;
   onOpenStudyRecording?: (id: string, timestamp?: number | null) => void;
 }) {
+  const variant: DeepResearchVariant = isTeaching ? 'unit' : isGenealogy ? 'genealogy' : isStudy ? 'study' : 'academic';
+  const copy = DEEP_RESEARCH_COPY[variant];
   const [mode, setMode] = useState<'gallery' | 'reader'>('gallery');
 
   // Composer (new report) state.
@@ -99,6 +250,13 @@ export function DeepResearchView({
   const [imageStyle, setImageStyle] = useState<DecorativeImageStyle>(settings.imageStyle);
   const [focusPersonId, setFocusPersonId] = useState<string | null>(null);
   const [personsList, setPersonsList] = useState<Person[]>([]);
+  // Unit design: who decides the structure, and the teacher's slots when it is them.
+  // Blank slots are kept — the count is the teacher's decision even when the titles
+  // are not (see DeepResearchOutlineSection).
+  const [structureMode, setStructureMode] = useState<'ai' | 'manual'>('ai');
+  const [unitOutline, setUnitOutline] = useState<DeepResearchOutlineSection[]>(
+    () => Array.from({ length: 4 }, () => ({ title: '', focus: '' }))
+  );
 
   // Data.
   const [savedDrafts, setSavedDrafts] = useState<WritingWorkshopSavedDraft[]>([]);
@@ -177,9 +335,10 @@ export function DeepResearchView({
 
   const submitComposer = () => {
     if (!objective.trim()) {
-      setError(t('Escribe la idea de investigación antes de generar el informe.'));
+      setError(t(copy.missingObjective));
       return;
     }
+    const outline = isTeaching && structureMode === 'manual' ? unitOutline : null;
     enqueueDeepResearch({
       objective: objective.trim(),
       language,
@@ -189,12 +348,16 @@ export function DeepResearchView({
       decorativeImage: { enabled: includeImage, style: imageStyle },
       ...(isGenealogy ? { focusPersonId } : {}),
       ...(isStudy ? { studyMode: true } : {}),
+      ...(isTeaching ? { unitMode: true } : {}),
+      // Trimmed here rather than in the editor so a slot the teacher is still typing
+      // into never loses its whitespace mid-keystroke.
+      ...(outline ? { outline: outline.map((slot) => ({ title: slot.title.trim(), focus: slot.focus?.trim() || undefined })) } : {}),
     });
     setComposerOpen(false);
     setObjective('');
     setFocusPersonId(null);
     setError(null);
-    setMessage(t('Informe añadido a la cola. Se generará en segundo plano.'));
+    setMessage(t(copy.queuedToast));
   };
 
   const openReader = (saved: WritingWorkshopSavedDraft) => {
@@ -225,8 +388,8 @@ export function DeepResearchView({
 
   const deleteDraft = async (saved: WritingWorkshopSavedDraft) => {
     const ok = await confirm({
-      title: t('Eliminar informe'),
-      message: t('¿Eliminar este informe guardado? Esta acción no se puede deshacer.'),
+      title: t(copy.deleteTitle),
+      message: t(copy.deleteMessage),
       confirmLabel: t('Eliminar'),
       danger: true,
     });
@@ -235,7 +398,7 @@ export function DeepResearchView({
       await window.nodus.deleteWritingWorkshopDraft(saved.id);
       setSavedDrafts((current) => current.filter((item) => item.id !== saved.id));
       if (openDraft?.id === saved.id) backToGallery();
-      setMessage(t('Informe eliminado.'));
+      setMessage(t(copy.deletedToast));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -383,15 +546,9 @@ export function DeepResearchView({
       <header className="flex flex-wrap items-center gap-3 border-b border-neutral-800 px-4 py-3">
         <div className="min-w-0">
           <h1 className="flex items-center gap-2 text-xl font-semibold">
-            <Icon name="compass" className="text-indigo-300" /> {t('Deep Research')}
+            <Icon name="compass" className="text-indigo-300" /> {t(copy.heading)}
           </h1>
-          <p className="mt-0.5 text-xs text-neutral-500">
-            {isGenealogy
-              ? t('Tu biblioteca de informes de historia familiar, generados en cola y citando tus documentos y fuentes.')
-              : isStudy
-                ? t('Informes didácticos basados en tus materiales, apuntes y transcripciones indexados.')
-                : t('Tu biblioteca de informes académicos, generados en cola y citando todo el corpus.')}
-          </p>
+          <p className="mt-0.5 text-xs text-neutral-500">{t(copy.subtitle)}</p>
         </div>
 
         <div className="flex-1" />
@@ -399,11 +556,11 @@ export function DeepResearchView({
           <Icon name="help" /> {showTutorial ? t('Ocultar tutorial') : t('Tutorial')}
         </button>
         <button className="btn btn-primary gap-1.5" onClick={() => setComposerOpen(true)}>
-          <Icon name="plus" /> {t('Nuevo informe')}
+          <Icon name="plus" /> {t(copy.newAction)}
         </button>
       </header>
 
-      {showTutorial && <DeepResearchTutorial />}
+      {showTutorial && <DeepResearchTutorial steps={copy.tutorial} />}
 
       {(message || error) && (
         <div className={`px-4 py-2 text-sm border-b ${error ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-200' : 'border-neutral-200 text-neutral-500 dark:border-neutral-800 dark:text-neutral-400'}`}>
@@ -429,7 +586,7 @@ export function DeepResearchView({
             className="input input-with-leading-icon w-full !py-1.5 text-sm"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder={t('Buscar entre tus informes…')}
+            placeholder={t(copy.searchPlaceholder)}
           />
         </div>
         <select className="input !py-1.5 text-xs" value={sortKey} onChange={(e) => setSortKey(e.target.value as SortKey)}>
@@ -495,14 +652,14 @@ export function DeepResearchView({
             <Icon name="compass" size={28} className="text-neutral-600" />
             <div className="max-w-md text-sm text-neutral-500">
               {loadingSavedDrafts
-                ? t('Cargando informes…')
+                ? t(copy.loading)
                 : search.trim()
-                  ? t('Ningún informe coincide con tu búsqueda.')
-                  : t('Aún no hay informes. Crea el primero y quedará aquí, listo para leerse a pantalla completa.')}
+                  ? t(copy.noMatch)
+                  : t(copy.empty)}
             </div>
             {!search.trim() && !loadingSavedDrafts && (
               <button className="btn btn-primary gap-1.5" onClick={() => setComposerOpen(true)}>
-                <Icon name="plus" /> {t('Nuevo informe')}
+                <Icon name="plus" /> {t(copy.newAction)}
               </button>
             )}
           </div>
@@ -545,7 +702,12 @@ export function DeepResearchView({
         <ComposerModal
           settings={settings}
           isGenealogy={isGenealogy}
-          isStudy={isStudy}
+          isTeaching={isTeaching}
+          copy={copy}
+          structureMode={structureMode}
+          unitOutline={unitOutline}
+          onStructureMode={setStructureMode}
+          onUnitOutline={setUnitOutline}
           objective={objective}
           language={language}
           model={selectedModel}
@@ -927,7 +1089,12 @@ function ReaderView({
 function ComposerModal({
   settings,
   isGenealogy = false,
-  isStudy = false,
+  isTeaching = false,
+  copy,
+  structureMode,
+  unitOutline,
+  onStructureMode,
+  onUnitOutline,
   objective,
   language,
   model,
@@ -952,7 +1119,12 @@ function ComposerModal({
 }: {
   settings: AppSettings;
   isGenealogy?: boolean;
-  isStudy?: boolean;
+  isTeaching?: boolean;
+  copy: DeepResearchCopy;
+  structureMode: 'ai' | 'manual';
+  unitOutline: DeepResearchOutlineSection[];
+  onStructureMode: (v: 'ai' | 'manual') => void;
+  onUnitOutline: (v: DeepResearchOutlineSection[]) => void;
   objective: string;
   language: PromptLanguage;
   model: AppSettings['deepResearchModel'];
@@ -988,21 +1160,15 @@ function ComposerModal({
       <section
         role="dialog"
         aria-modal="true"
-        aria-label={t('Nuevo informe')}
+        aria-label={t(copy.newAction)}
         className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-neutral-700 bg-white shadow-2xl dark:bg-neutral-950"
         onMouseDown={(event) => event.stopPropagation()}
       >
         <header className="flex items-center gap-3 border-b border-neutral-200 px-5 py-4 dark:border-neutral-800">
           <Icon name="compass" className="text-indigo-500 dark:text-indigo-300" />
           <div className="min-w-0 flex-1">
-            <h2 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">{t('Nuevo informe')}</h2>
-            <p className="text-xs text-neutral-500">
-              {isGenealogy
-                ? t('El informe reconstruye la historia familiar a partir de tus documentos y fuentes, citándolos.')
-                : isStudy
-                  ? t('El informe enseña el tema paso a paso usando y citando tus materiales de estudio.')
-                  : t('El informe desarrolla tu idea por completo, citando todo el corpus.')}
-            </p>
+            <h2 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">{t(copy.newAction)}</h2>
+            <p className="text-xs text-neutral-500">{t(copy.composerSubtitle)}</p>
           </div>
           <button className="btn btn-ghost px-2" onClick={onClose} aria-label={t('Cerrar')}>
             <Icon name="x" />
@@ -1015,13 +1181,7 @@ function ComposerModal({
             value={objective}
             autoFocus
             onChange={(e) => onObjective(e.target.value)}
-            placeholder={
-              isGenealogy
-                ? t('Escribe el tema o la pregunta (p. ej. «Historia de la familia» o «La migración a la ciudad»). El informe la desarrollará citando tus documentos y fuentes.')
-                : isStudy
-                  ? t('Escribe el tema o pregunta que quieres comprender. El informe explicará los conceptos difíciles, ejemplos y conexiones usando tus materiales.')
-                  : t('Escribe la idea o pregunta de investigación. El informe la desarrollará por completo, citando todas las obras del corpus.')
-            }
+            placeholder={t(copy.objectivePlaceholder)}
           />
           {isGenealogy && (
             <div>
@@ -1043,21 +1203,34 @@ function ComposerModal({
               </p>
             </div>
           )}
+          {isTeaching && (
+            <UnitStructureEditor
+              mode={structureMode}
+              outline={unitOutline}
+              onMode={onStructureMode}
+              onOutline={onUnitOutline}
+            />
+          )}
           <div className="grid grid-cols-2 gap-2 max-sm:grid-cols-1">
             <select className="input text-sm" value={target} onChange={(e) => onTarget(e.target.value as DeepResearchTargetLength)}>
               {Object.entries(DEEP_TARGET_LABELS).map(([id, label]) => (
                 <option key={id} value={id}>{t(label)}</option>
               ))}
             </select>
-            <select
-              className="input text-sm"
-              value={String(sectionLimit)}
-              onChange={(e) => onSectionLimit(e.target.value === 'auto' ? 'auto' : (Number(e.target.value) as DeepResearchSectionLimit))}
-            >
-              {DEEP_SECTION_OPTIONS.map((option) => (
-                <option key={String(option.value)} value={String(option.value)}>{t(option.label)}</option>
-              ))}
-            </select>
+            {/* Superseded once the teacher fixes the structure: the outline already says
+                how many parts there are, and offering a second, contradictory answer is
+                how a form starts lying to the person filling it in. */}
+            {!(isTeaching && structureMode === 'manual') && (
+              <select
+                className="input text-sm"
+                value={String(sectionLimit)}
+                onChange={(e) => onSectionLimit(e.target.value === 'auto' ? 'auto' : (Number(e.target.value) as DeepResearchSectionLimit))}
+              >
+                {DEEP_SECTION_OPTIONS.map((option) => (
+                  <option key={String(option.value)} value={String(option.value)}>{t(option.label)}</option>
+                ))}
+              </select>
+            )}
             <select className="input text-sm" value={language} onChange={(e) => onLanguage(e.target.value as PromptLanguage)}>
               <option value="es">Español</option>
               <option value="en">English</option>
@@ -1107,33 +1280,113 @@ function ComposerModal({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Unit structure — who decides the parts of a teaching unit
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * The one thing Unit design adds to Deep Research: the teacher can hand the generator
+ * a structure instead of receiving one. The slot list IS the contract — its length is
+ * the number of parts and its order is their order — so changing the count grows or
+ * trims the list rather than storing a separate number that could disagree with it.
+ */
+function UnitStructureEditor({
+  mode,
+  outline,
+  onMode,
+  onOutline,
+}: {
+  mode: 'ai' | 'manual';
+  outline: DeepResearchOutlineSection[];
+  onMode: (v: 'ai' | 'manual') => void;
+  onOutline: (v: DeepResearchOutlineSection[]) => void;
+}) {
+  const setCount = (count: number) => {
+    // Grow by appending blanks, shrink from the end: the teacher's typing in the parts
+    // they keep must survive a change of mind about how many there are.
+    onOutline(Array.from({ length: count }, (_unused, index) => outline[index] ?? { title: '', focus: '' }));
+  };
+  const patch = (index: number, change: Partial<DeepResearchOutlineSection>) => {
+    onOutline(outline.map((slot, at) => (at === index ? { ...slot, ...change } : slot)));
+  };
+
+  return (
+    <section className="rounded-lg border border-neutral-200 p-3 dark:border-neutral-800" data-testid="unit-structure">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs font-medium text-neutral-600 dark:text-neutral-300">{t('Estructura de la unidad')}</span>
+        <div className="ml-auto flex overflow-hidden rounded-lg border border-neutral-300 dark:border-neutral-700">
+          {(['ai', 'manual'] as const).map((option) => (
+            <button
+              key={option}
+              type="button"
+              data-testid={`unit-structure-${option}`}
+              aria-pressed={mode === option}
+              className={`px-2.5 py-1 text-xs ${mode === option ? 'bg-indigo-600 text-white' : 'text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-900'}`}
+              onClick={() => onMode(option)}
+            >
+              {t(option === 'ai' ? 'La decide la IA' : 'La defino yo')}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {mode === 'ai' ? (
+        <p className="mt-2 text-[11px] leading-5 text-neutral-500">
+          {t('La IA agrupa los materiales y propone las partes de la unidad y su orden.')}
+        </p>
+      ) : (
+        <div className="mt-3 space-y-2">
+          <label className="flex items-center gap-2 text-[11px] text-neutral-500">
+            {t('Número de partes')}
+            <select
+              className="input !py-1 text-xs"
+              data-testid="unit-structure-count"
+              value={outline.length}
+              onChange={(event) => setCount(Number(event.target.value))}
+            >
+              {UNIT_SECTION_COUNTS.map((count) => <option key={count} value={count}>{count}</option>)}
+            </select>
+          </label>
+          {outline.map((slot, index) => (
+            <div key={index} className="rounded-md border border-neutral-200 p-2 dark:border-neutral-800">
+              <div className="flex items-center gap-2">
+                <span className="shrink-0 text-[11px] font-medium text-neutral-500">{index + 1}</span>
+                <input
+                  className="input w-full !py-1 text-xs"
+                  data-testid={`unit-section-title-${index}`}
+                  value={slot.title}
+                  onChange={(event) => patch(index, { title: event.target.value })}
+                  placeholder={t('Título de la parte (opcional)')}
+                />
+              </div>
+              <input
+                className="input mt-1.5 w-full !py-1 text-xs"
+                data-testid={`unit-section-focus-${index}`}
+                value={slot.focus ?? ''}
+                onChange={(event) => patch(index, { focus: event.target.value })}
+                placeholder={t('En qué debe centrarse (opcional)')}
+              />
+            </div>
+          ))}
+          <p className="text-[11px] leading-5 text-neutral-500">
+            {t('Se generarán exactamente estas partes, en este orden. Las que dejes sin título las nombra la IA.')}
+          </p>
+        </div>
+      )}
+    </section>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Tutorial
 // ─────────────────────────────────────────────────────────────────────────────
 
-function DeepResearchTutorial() {
+function DeepResearchTutorial({ steps }: { steps: { icon: string; title: string; body: string }[] }) {
   return (
     <section className="border-b border-neutral-800 bg-white/95 px-4 py-3 dark:bg-neutral-950/80">
       <div className="grid grid-cols-4 gap-3 max-2xl:grid-cols-2 max-md:grid-cols-1">
-        <TutorialStep
-          icon="edit"
-          title={t('1. Plantea la idea')}
-          body={t('Pulsa «Nuevo informe» y escribe la pregunta o idea. El informe la convierte en un texto de varias páginas, no en una respuesta corta.')}
-        />
-        <TutorialStep
-          icon="layers"
-          title={t('2. Encola los que quieras')}
-          body={t('Añade varios informes a la cola: se generan en cadena, uno tras otro, mientras sigues trabajando.')}
-        />
-        <TutorialStep
-          icon="compass"
-          title={t('3. Cobertura del corpus')}
-          body={t('Nodus recorre todo el corpus indexado, planifica las secciones y redacta guiado por la cobertura, citando cada obra sin que tengas que seleccionarla.')}
-        />
-        <TutorialStep
-          icon="book"
-          title={t('4. Lee a pantalla completa')}
-          body={t('Abre cualquier informe de la galería para leerlo a pantalla completa, revisar sus citas y exportarlo a Markdown o PDF.')}
-        />
+        {steps.map((step) => (
+          <TutorialStep key={step.title} icon={step.icon} title={t(step.title)} body={t(step.body)} />
+        ))}
       </div>
     </section>
   );

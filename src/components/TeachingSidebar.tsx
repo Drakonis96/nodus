@@ -9,11 +9,15 @@ export type TeachingView =
   | 'studyCalendar'
   | 'studyLibrary'
   | 'studyRecordings'
+  | 'studyChat'
+  | 'studyIdeas'
+  | 'studyGraph'
   | 'studyQuestions'
   | 'teachingGroups'
   | 'teachingGrades'
   | 'teachingExams'
-  | 'teachingRubrics';
+  | 'teachingRubrics'
+  | 'teachingUnits';
 
 interface TeachingItem { label: string; icon: string; view?: TeachingView; topic?: RoadmapTopicKey }
 interface TeachingGroup { label: string; items: TeachingItem[]; hint?: string }
@@ -33,6 +37,15 @@ export const TEACHING_GROUPS: TeachingGroup[] = [
     { label: 'Materiales', icon: 'book', view: 'studyLibrary' },
     { label: 'Grabaciones', icon: 'microphone', view: 'studyRecordings' },
   ] },
+  // The same three surfaces the study vault exposes, over the teaching vault's own
+  // materials. They keep the plain names here — in a teacher's workspace there is no
+  // other chat, no other idea map — while the shared nav table still calls them
+  // "de estudio" for the study vault (see navItemLabel in navigation.ts).
+  { label: 'Analizar', items: [
+    { label: 'Chat', icon: 'chat', view: 'studyChat' },
+    { label: 'Ideas', icon: 'bulb', view: 'studyIdeas' },
+    { label: 'Grafo', icon: 'layers', view: 'studyGraph' },
+  ] },
   { label: 'Evaluación', items: [
     { label: 'Banco de preguntas', icon: 'help', view: 'studyQuestions' },
     { label: 'Rúbricas', icon: 'table', view: 'teachingRubrics' },
@@ -41,7 +54,7 @@ export const TEACHING_GROUPS: TeachingGroup[] = [
   ] },
   { label: 'Crear', items: [
     { label: 'Guía docente / Programación', icon: 'book', topic: 'guiaDocente' },
-    { label: 'Unidades didácticas', icon: 'layers', topic: 'unidadesDidacticas' },
+    { label: 'Diseño de unidades', icon: 'compass', view: 'teachingUnits' },
     { label: 'Situaciones de aprendizaje', icon: 'bulb', topic: 'situacionesAprendizaje' },
     { label: 'Adaptaciones', icon: 'users', topic: 'adaptaciones' },
     { label: 'Notas', icon: 'notebook', topic: 'notas' },

@@ -1421,6 +1421,7 @@ export function App() {
           {view === 'studyRecordings' && <StudyRecordingsView initialRecordingId={studyRecordingTarget?.id} initialTimestamp={studyRecordingTarget?.timestamp} onOpenDocument={(id) => { setStudyTarget({ kind: 'document', id }); setView('studyCourses'); }} />}
           {view === 'studyChat' && <StudyChatView
             settings={settings}
+            variant={isDocencia ? 'teaching' : 'study'}
             initialPrompt={studyChatTarget?.prompt}
             onOpenDocument={(id) => { setStudyTarget({ kind: 'document', id }); setView('studyCourses'); }}
             onOpenMaterial={(id) => { setStudyMaterialTarget(id); setView('studyLibrary'); }}
@@ -1450,6 +1451,17 @@ export function App() {
           {view === 'teachingGrades' && <TeachingGradesView onOpenOrganization={() => setView('studyCourses')} />}
           {view === 'teachingRubrics' && <RubricsView />}
           {view === 'studyReview' && <StudyReviewView />}
+          {/* Unit design: the same Deep Research surface over the teaching corpus, with
+              a structure the teacher may fix section by section. */}
+          {view === 'teachingUnits' && <DeepResearchView
+            settings={settings}
+            isStudy
+            isTeaching
+            onOpenGraph={(target) => { setStudyGraphTarget({ ...target, nonce: Date.now() }); setView('studyGraph'); }}
+            onOpenStudyDocument={(id) => { setStudyTarget({ kind: 'document', id }); setView('studyCourses'); }}
+            onOpenStudyMaterial={(id) => { setStudyMaterialTarget(id); setView('studyLibrary'); }}
+            onOpenStudyRecording={(id, timestamp) => { setStudyRecordingTarget({ id, timestamp }); setView('studyRecordings'); }}
+          />}
           {view === 'studyDeepResearch' && <DeepResearchView
             settings={settings}
             isStudy

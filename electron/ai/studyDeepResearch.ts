@@ -1,4 +1,5 @@
 import type {
+  DeepResearchOutlineSection,
   DeepResearchProgress,
   DeepResearchReport,
   DeepResearchRequest,
@@ -9,8 +10,22 @@ import type {
   WritingWorkshopSection,
 } from '@shared/types';
 import type { StudySearchIndexEntry, StudySearchKind } from '@shared/studySearch';
+import { listStudyIdeasForSources } from '../db/studyKnowledgeRepo';
 import { completeJson, completeText } from './aiClient';
 import { retrieveStudyAssistantEntries } from './studySearch';
+
+/** Hard ceiling on a teacher-authored outline; the composer offers far fewer. */
+export const MAX_UNIT_SECTIONS = 12;
+
+/**
+ * Appended to the planner prompt when the teacher fixed the structure. The code
+ * enforces the shape regardless — this only stops the model wasting a turn proposing
+ * a different one, and gets the source assignment aligned with the given titles.
+ */
+const FIXED_OUTLINE_RULE = 'ESTRUCTURA FIJADA POR EL DOCENTE: el campo "fixedSections" define exactamente las partes de la unidad, su número y su orden. Devuelve EXACTAMENTE esas partes, con los mismos id y en el mismo orden. No añadas, elimines ni reordenes ninguna. Cuando una parte trae "title", cópialo literalmente; cuando viene vacío, ponle tú un título. Cuando trae "focus", es una instrucción del docente sobre qué debe tratar esa parte: respétala al asignarle propósito, afirmaciones clave y fuentes.';
+
+/** Appended to the writer prompt for a part the teacher gave an explicit steer for. */
+const SECTION_FOCUS_RULE = 'El campo "teacherFocus" es una instrucción del docente sobre lo que esta parte debe tratar. Es vinculante: organiza la parte en torno a ella y no la sustituyas por otro enfoque, aunque las fuentes sugieran uno más amplio.';
 
 interface StudyResearchSource {
   id: string;
@@ -30,6 +45,8 @@ interface StudyPlanSection {
   purpose?: string;
   keyClaims?: string[];
   sourceIds?: string[];
+  /** Unit design only: extracted ideas the planner tied to this part. */
+  ideaIds?: string[];
 }
 
 interface StudyPlan {
@@ -116,6 +133,74 @@ export const STUDY_DEEP_RESEARCH_PROMPTS: Record<PromptLanguage, StudyPromptPack
   },
 };
 
+/**
+ * Unit design (teaching vaults). Same machinery as the study report — one local corpus,
+ * one citation contract — but the reader is the TEACHER, not the learner: the output is
+ * a unit to teach from, so every section has to land as classroom material (what is
+ * taught, in what order, with which activity and which evidence) rather than as an
+ * explanation addressed to a student. The extracted idea network is handed to the model
+ * on top of the sources, because a unit is sequenced by concept dependencies and those
+ * are exactly what the graph already knows.
+ */
+export const TEACHING_UNIT_PROMPTS: Record<PromptLanguage, StudyPromptPack> = {
+  es: {
+    plan: 'Eres un docente experto que diseña una unidad didáctica a partir exclusivamente de los materiales locales y de la red de ideas ya extraída de ellos. Secuencia las partes según las dependencias entre conceptos: lo que hay que entender antes va antes. Cada parte debe poder darse en clase: qué se enseña, con qué materiales y cómo se comprueba. No inventes información, materiales ni identificadores. Devuelve solo JSON con {"title":"...","abstract":"...","sections":[{"id":"s1","title":"...","purpose":"...","keyClaims":["..."],"sourceIds":["S1"],"ideaIds":["..."]}]}.',
+    write: 'Eres un docente experto que redacta una parte de una unidad didáctica usando solo los materiales proporcionados. Escribes PARA EL DOCENTE que va a dar la clase: expón el contenido con precisión, indica el orden en que conviene presentarlo, señala los prerrequisitos, los errores frecuentes del alumnado y en qué conviene detenerse, y propón al menos una actividad de aula y una forma de comprobar la comprensión, ambas apoyadas en los materiales. No inventes datos. Cita cada afirmación sustantiva copiando exactamente uno de los enlaces permitidos. Escribe prosa continua en Markdown, con un único encabezado ## y sin microsecciones.',
+    finalize: 'Cierras una unidad didáctica fundamentada en materiales locales. Devuelve solo JSON con {"title":"...","abstract":"...","limitations":["..."],"nextSteps":["..."]}. El resumen debe decir qué aprenderá el alumnado y cómo se articula la unidad; las limitaciones deben señalar con honestidad qué no cubren los materiales disponibles; los siguientes pasos deben proponer evaluación, refuerzo o ampliación concretos.',
+    fallbackSection: (index) => `Parte ${index} de la unidad`,
+    references: 'Materiales de la unidad',
+    limitations: 'Limitaciones y ajustes',
+  },
+  en: {
+    plan: 'You are an expert teacher designing a teaching unit exclusively from the supplied local materials and the idea network already extracted from them. Sequence the parts by concept dependency: what must be understood first comes first. Every part must be teachable: what is taught, with which materials, and how it is checked. Do not invent information, materials or identifiers. Return JSON only as {"title":"...","abstract":"...","sections":[{"id":"s1","title":"...","purpose":"...","keyClaims":["..."],"sourceIds":["S1"],"ideaIds":["..."]}]}.',
+    write: 'You are an expert teacher writing one part of a teaching unit using only the supplied materials. You write FOR THE TEACHER who will run the lesson: set out the content precisely, say in what order to present it, name the prerequisites, the misconceptions students usually bring and where to slow down, and propose at least one classroom activity and one way to check understanding, both grounded in the materials. Do not invent facts. Cite every substantive claim by copying exactly one allowed link. Write continuous Markdown prose with one ## heading and no micro-sections.',
+    finalize: 'Conclude a teaching unit grounded in local materials. Return JSON only as {"title":"...","abstract":"...","limitations":["..."],"nextSteps":["..."]}. The abstract must say what the students will learn and how the unit holds together; the limitations must state honestly what the available materials do not cover; the next steps must propose concrete assessment, reinforcement or extension.',
+    fallbackSection: (index) => `Unit part ${index}`,
+    references: 'Unit materials',
+    limitations: 'Limitations and adjustments',
+  },
+  fr: {
+    plan: 'Tu es un enseignant expert qui conçoit une unité didactique exclusivement à partir des supports locaux fournis et du réseau d’idées déjà extrait de ceux-ci. Ordonne les parties selon les dépendances entre concepts: ce qu’il faut comprendre d’abord vient d’abord. Chaque partie doit pouvoir être enseignée: ce qui est enseigné, avec quels supports et comment on le vérifie. N’invente ni information, ni support, ni identifiant. Renvoie uniquement le JSON {"title":"...","abstract":"...","sections":[{"id":"s1","title":"...","purpose":"...","keyClaims":["..."],"sourceIds":["S1"],"ideaIds":["..."]}]}.',
+    write: 'Tu es un enseignant expert qui rédige une partie d’une unité didactique en utilisant uniquement les supports fournis. Tu écris POUR L’ENSEIGNANT qui fera cours: expose le contenu avec précision, indique dans quel ordre le présenter, nomme les prérequis, les erreurs fréquentes des élèves et les points sur lesquels s’attarder, et propose au moins une activité de classe et un moyen de vérifier la compréhension, l’un et l’autre appuyés sur les supports. N’invente aucun fait. Cite chaque affirmation substantielle en copiant exactement un lien autorisé. Écris une prose Markdown continue avec un seul titre ## et sans micro-sections.',
+    finalize: 'Conclus une unité didactique fondée sur des supports locaux. Renvoie uniquement le JSON {"title":"...","abstract":"...","limitations":["..."],"nextSteps":["..."]}. Le résumé doit dire ce que les élèves apprendront et comment l’unité s’articule; les limites doivent indiquer honnêtement ce que les supports ne couvrent pas; les étapes suivantes doivent proposer une évaluation, un renforcement ou un approfondissement concrets.',
+    fallbackSection: (index) => `Partie ${index} de l’unité`,
+    references: 'Supports de l’unité',
+    limitations: 'Limites et ajustements',
+  },
+  tr: {
+    plan: 'Yalnızca sağlanan yerel materyallerden ve bunlardan çıkarılmış fikir ağından bir öğretim ünitesi tasarlayan uzman bir öğretmensin. Bölümleri kavram bağımlılıklarına göre sırala: önce anlaşılması gereken önce gelir. Her bölüm derste işlenebilir olmalı: ne öğretilir, hangi materyalle ve nasıl ölçülür. Bilgi, materyal veya kimlik uydurma. Yalnızca şu biçimde JSON döndür: {"title":"...","abstract":"...","sections":[{"id":"s1","title":"...","purpose":"...","keyClaims":["..."],"sourceIds":["S1"],"ideaIds":["..."]}]}.',
+    write: 'Yalnızca sağlanan materyalleri kullanarak bir öğretim ünitesinin tek bölümünü yazan uzman bir öğretmensin. DERSİ İŞLEYECEK ÖĞRETMEN İÇİN yazıyorsun: içeriği tam olarak ortaya koy, hangi sırayla sunulacağını belirt, ön koşulları, öğrencilerin sıkça getirdiği yanılgıları ve nerede yavaşlanacağını adlandır; materyallere dayalı en az bir sınıf etkinliği ve anlamayı ölçmenin bir yolunu öner. Bilgi uydurma. Her önemli iddiayı izin verilen bağlantılardan birini aynen kopyalayarak kaynaklandır. Tek bir ## başlığı olan, mikro bölümler içermeyen kesintisiz Markdown düzyazısı yaz.',
+    finalize: 'Yerel materyallere dayalı bir öğretim ünitesini tamamla. Yalnızca {"title":"...","abstract":"...","limitations":["..."],"nextSteps":["..."]} biçiminde JSON döndür. Özet öğrencilerin ne öğreneceğini ve ünitenin nasıl kurulduğunu söylemeli; sınırlılıklar mevcut materyallerin neyi kapsamadığını dürüstçe belirtmeli; sonraki adımlar somut ölçme, pekiştirme veya derinleştirme önermelidir.',
+    fallbackSection: (index) => `Ünitenin ${index}. bölümü`,
+    references: 'Ünite materyalleri',
+    limitations: 'Sınırlılıklar ve düzenlemeler',
+  },
+  de: {
+    plan: 'Du bist eine erfahrene Lehrkraft, die eine Unterrichtseinheit ausschließlich aus den bereitgestellten lokalen Materialien und dem bereits daraus extrahierten Ideennetz entwirft. Ordne die Teile nach den Abhängigkeiten zwischen den Konzepten: Was zuerst verstanden werden muss, kommt zuerst. Jeder Teil muss unterrichtbar sein: was gelehrt wird, mit welchem Material und wie es überprüft wird. Erfinde keine Informationen, Materialien oder Kennungen. Gib ausschließlich JSON zurück im Format {"title":"...","abstract":"...","sections":[{"id":"s1","title":"...","purpose":"...","keyClaims":["..."],"sourceIds":["S1"],"ideaIds":["..."]}]}.',
+    write: 'Du bist eine erfahrene Lehrkraft, die einen Teil einer Unterrichtseinheit ausschließlich anhand der bereitgestellten Materialien verfasst. Du schreibst FÜR DIE LEHRKRAFT, die den Unterricht hält: stelle den Inhalt präzise dar, gib an, in welcher Reihenfolge er zu präsentieren ist, benenne die Voraussetzungen, die üblichen Fehlvorstellungen der Lernenden und die Stellen, an denen man verweilen sollte, und schlage mindestens eine Unterrichtsaktivität und eine Möglichkeit zur Überprüfung des Verständnisses vor, beide auf die Materialien gestützt. Erfinde keine Fakten. Belege jede inhaltliche Aussage, indem du genau einen zulässigen Link exakt kopierst. Schreibe fortlaufende Markdown-Prosa mit einer einzigen ##-Überschrift und ohne Mikroabschnitte.',
+    finalize: 'Schließe eine auf lokalen Materialien beruhende Unterrichtseinheit ab. Gib ausschließlich JSON zurück im Format {"title":"...","abstract":"...","limitations":["..."],"nextSteps":["..."]}. Die Zusammenfassung muss sagen, was die Lernenden lernen werden und wie die Einheit aufgebaut ist; die Einschränkungen müssen ehrlich benennen, was die vorhandenen Materialien nicht abdecken; die nächsten Schritte müssen konkrete Leistungsüberprüfung, Festigung oder Vertiefung vorschlagen.',
+    fallbackSection: (index) => `Teil ${index} der Einheit`,
+    references: 'Materialien der Einheit',
+    limitations: 'Einschränkungen und Anpassungen',
+  },
+  pt: {
+    plan: 'És um docente especialista que concebe uma unidade didática exclusivamente a partir dos materiais locais fornecidos e da rede de ideias já extraída deles. Sequencia as partes segundo as dependências entre conceitos: o que tem de ser compreendido primeiro vem primeiro. Cada parte tem de poder ser dada em aula: o que se ensina, com que materiais e como se verifica. Não inventes informação, materiais nem identificadores. Devolve apenas JSON no formato {"title":"...","abstract":"...","sections":[{"id":"s1","title":"...","purpose":"...","keyClaims":["..."],"sourceIds":["S1"],"ideaIds":["..."]}]}.',
+    write: 'És um docente especialista que redige uma parte de uma unidade didática utilizando apenas os materiais fornecidos. Escreves PARA O DOCENTE que vai dar a aula: expõe o conteúdo com precisão, indica por que ordem convém apresentá-lo, nomeia os pré-requisitos, os erros frequentes dos alunos e onde convém demorar-se, e propõe pelo menos uma atividade de aula e uma forma de verificar a compreensão, ambas apoiadas nos materiais. Não inventes factos. Cita cada afirmação substancial copiando exatamente uma das ligações permitidas. Escreve prosa Markdown contínua, com um único título ## e sem micro-secções.',
+    finalize: 'Conclui uma unidade didática fundamentada em materiais locais. Devolve apenas JSON no formato {"title":"...","abstract":"...","limitations":["..."],"nextSteps":["..."]}. O resumo deve dizer o que os alunos vão aprender e como a unidade se articula; as limitações devem indicar honestamente o que os materiais disponíveis não cobrem; os passos seguintes devem propor avaliação, reforço ou ampliação concretos.',
+    fallbackSection: (index) => `Parte ${index} da unidade`,
+    references: 'Materiais da unidade',
+    limitations: 'Limitações e ajustes',
+  },
+  'pt-BR': {
+    plan: 'Você é um docente especialista que projeta uma unidade didática exclusivamente a partir dos materiais locais fornecidos e da rede de ideias já extraída deles. Sequencie as partes segundo as dependências entre conceitos: o que precisa ser compreendido antes vem antes. Cada parte precisa ser aplicável em aula: o que se ensina, com quais materiais e como se verifica. Não invente informações, materiais nem identificadores. Retorne apenas JSON no formato {"title":"...","abstract":"...","sections":[{"id":"s1","title":"...","purpose":"...","keyClaims":["..."],"sourceIds":["S1"],"ideaIds":["..."]}]}.',
+    write: 'Você é um docente especialista que escreve uma parte de uma unidade didática usando apenas os materiais fornecidos. Você escreve PARA O DOCENTE que vai dar a aula: apresente o conteúdo com precisão, indique em que ordem convém apresentá-lo, nomeie os pré-requisitos, os erros frequentes dos alunos e onde convém se deter, e proponha ao menos uma atividade de sala e uma forma de verificar a compreensão, ambas apoiadas nos materiais. Não invente fatos. Cite cada afirmação substancial copiando exatamente um dos links permitidos. Escreva prosa em Markdown contínua, com um único título ## e sem microsseções.',
+    finalize: 'Conclua uma unidade didática fundamentada em materiais locais. Retorne apenas JSON no formato {"title":"...","abstract":"...","limitations":["..."],"nextSteps":["..."]}. O resumo deve dizer o que os alunos vão aprender e como a unidade se articula; as limitações devem indicar honestamente o que os materiais disponíveis não cobrem; os próximos passos devem propor avaliação, reforço ou ampliação concretos.',
+    fallbackSection: (index) => `Parte ${index} da unidade`,
+    references: 'Materiais da unidade',
+    limitations: 'Limitações e ajustes',
+  },
+};
+
 function isPlan(value: unknown): value is StudyPlan {
   return Boolean(value && typeof value === 'object' && Array.isArray((value as StudyPlan).sections));
 }
@@ -180,9 +265,80 @@ function targetPages(request: DeepResearchRequest, sourceCount: number): { min: 
   return { min: 5, max };
 }
 
+/**
+ * The teacher's outline, cleaned. Blank slots survive on purpose — the teacher chose
+ * how many parts the unit has, and only named the ones they had an opinion about.
+ * Returns an empty array when there is nothing to honour, which is the signal the
+ * model designs the structure itself.
+ */
+export function normalizeUnitOutline(raw: DeepResearchOutlineSection[] | undefined): DeepResearchOutlineSection[] {
+  if (!Array.isArray(raw)) return [];
+  const slots = raw.slice(0, MAX_UNIT_SECTIONS).map((slot) => ({
+    title: typeof slot?.title === 'string' ? slot.title.trim().slice(0, 160) : '',
+    focus: typeof slot?.focus === 'string' ? slot.focus.trim().slice(0, 600) : '',
+  }));
+  return slots.length ? slots : [];
+}
+
 function sectionCount(request: DeepResearchRequest, pages: { min: number; max: number }): number {
+  // A fixed outline wins over every heuristic: the teacher asked for exactly this many
+  // parts, and quietly rounding it up to the three-section floor would deliver a unit
+  // that does not match the structure they typed.
+  const outline = normalizeUnitOutline(request.outline);
+  if (outline.length) return outline.length;
   const natural = Math.max(3, Math.min(7, Math.round(((pages.min + pages.max) / 2) / 2.5)));
   return typeof request.sectionLimit === 'number' ? Math.max(3, Math.min(natural, Math.round(request.sectionLimit))) : natural;
+}
+
+export interface ResolvedStudySection {
+  id: string;
+  title: string;
+  purpose: string;
+  /** The teacher's steer for this part. Empty unless they typed one. */
+  focus: string;
+  keyClaims: string[];
+  sourceIds: string[];
+  ideaIds: string[];
+}
+
+/**
+ * Turn whatever the planner returned into exactly `count` writable sections.
+ *
+ * Kept pure and exported so the contract that matters — a teacher-authored outline is
+ * reproduced slot for slot, whatever the model answers — is testable without a model.
+ * The planner is treated as a suggestion for everything except length and given titles.
+ */
+export function resolveStudySections(input: {
+  planned: StudyPlanSection[];
+  outline?: DeepResearchOutlineSection[];
+  count: number;
+  fallbackTitle: (index: number) => string;
+  validSourceIds: Set<string>;
+  validIdeaIds?: Set<string>;
+  fallbackSourceIds: string[][];
+}): ResolvedStudySection[] {
+  const outline = normalizeUnitOutline(input.outline);
+  const count = outline.length || Math.max(1, input.count);
+  const ideaIdsAllowed = input.validIdeaIds ?? new Set<string>();
+  const strings = (value: unknown, allowed?: Set<string>, limit = 8): string[] =>
+    Array.isArray(value)
+      ? value.filter((item): item is string => typeof item === 'string' && (!allowed || allowed.has(item))).slice(0, limit)
+      : [];
+
+  return Array.from({ length: count }, (_unused, index) => {
+    const planned = input.planned[index] ?? {};
+    const slot = outline[index];
+    const sourceIds = strings(planned.sourceIds, input.validSourceIds, 12);
+    return {
+      id: planned.id?.trim() || `s${index + 1}`,
+      title: slot?.title || planned.title?.trim() || input.fallbackTitle(index + 1),
+      purpose: planned.purpose?.trim() || '',
+      focus: slot?.focus ?? '',
+      keyClaims: strings(planned.keyClaims),
+      sourceIds: sourceIds.length ? sourceIds : (input.fallbackSourceIds[index] ?? []),
+      ideaIds: strings(planned.ideaIds, ideaIdsAllowed, 12),
+    };
+  });
 }
 
 function normalizeSectionMarkdown(raw: string, title: string, sources: StudyResearchSource[]): string {
@@ -205,35 +361,71 @@ export async function generateStudyDeepResearchReport(
   onProgress?: (progress: DeepResearchProgress) => void,
 ): Promise<DeepResearchReport> {
   const language = request.language ?? 'es';
-  const prompts = STUDY_DEEP_RESEARCH_PROMPTS[language];
-  onProgress?.({ phase: 'snapshot', message: 'Recuperando apuntes, materiales y transcripciones relevantes…' });
+  const unitMode = Boolean(request.unitMode);
+  const prompts = unitMode ? TEACHING_UNIT_PROMPTS[language] : STUDY_DEEP_RESEARCH_PROMPTS[language];
+  onProgress?.({ phase: 'snapshot', message: unitMode ? 'Recuperando materiales, apuntes y transcripciones de clase…' : 'Recuperando apuntes, materiales y transcripciones relevantes…' });
   const retrieved = await retrieveStudyAssistantEntries(request.objective, { kinds: ['material', 'document', 'transcript'] }, [], 48);
   const sources = buildSources(retrieved);
-  if (!sources.length) throw new Error('No hay contenido indexado suficiente en los materiales de estudio para generar el informe.');
+  if (!sources.length) {
+    throw new Error(unitMode
+      ? 'No hay contenido indexado suficiente en los materiales de clase para diseñar la unidad.'
+      : 'No hay contenido indexado suficiente en los materiales de estudio para generar el informe.');
+  }
+  // A unit is sequenced by concept dependencies, and those already exist as the idea
+  // network extracted from these very sources. Only in unit mode: the study report is
+  // a text-first explanation and its prompts were tuned without a graph.
+  const knowledge = unitMode
+    ? listStudyIdeasForSources(sources.map((source) => `${source.kind}:${source.sourceId}`))
+    : { ideas: [], connections: [] };
+  const ideaLabels = new Map(knowledge.ideas.map((idea) => [idea.id, idea.label]));
+  const ideaPayload = knowledge.ideas.map((idea) => ({ id: idea.id, type: idea.type, label: idea.label, statement: idea.statement }));
+  const relationPayload = knowledge.connections
+    .map((edge) => ({ from: ideaLabels.get(edge.fromId), to: ideaLabels.get(edge.toId), type: edge.type, basis: edge.basis }))
+    .filter((edge) => edge.from && edge.to);
   const pages = targetPages(request, sources.length);
+  const requestedOutline = normalizeUnitOutline(request.outline);
   const count = sectionCount(request, pages);
-  onProgress?.({ phase: 'planning', message: `Diseñando una explicación didáctica en ${count} secciones…` });
+  onProgress?.({
+    phase: 'planning',
+    message: requestedOutline.length
+      ? `Ajustando el esquema indicado (${count} partes) a los materiales…`
+      : unitMode
+        ? `Diseñando la unidad en ${count} partes…`
+        : `Diseñando una explicación didáctica en ${count} secciones…`,
+  });
   const sourcePayload = sources.map(({ id, kind, title, subtitle, location, text }) => ({ id, kind, title, subtitle, location, extract: text }));
   const plan = await completeJson<StudyPlan>({
-    system: prompts.plan,
-    user: JSON.stringify({ objective: request.objective, language, sectionCount: count, sources: sourcePayload }, null, 2),
+    system: requestedOutline.length ? `${prompts.plan}\n${FIXED_OUTLINE_RULE}` : prompts.plan,
+    user: JSON.stringify({
+      objective: request.objective,
+      language,
+      sectionCount: count,
+      ...(requestedOutline.length
+        ? { fixedSections: requestedOutline.map((slot, index) => ({ id: `s${index + 1}`, position: index + 1, title: slot.title || null, focus: slot.focus || null })) }
+        : {}),
+      ...(ideaPayload.length ? { extractedIdeas: ideaPayload, ideaRelations: relationPayload } : {}),
+      sources: sourcePayload,
+    }, null, 2),
     temperature: 0.18,
     maxTokens: 4_000,
   }, isPlan, model);
-  const validIds = new Set(sources.map((source) => source.id));
-  const fallbackChunks = Array.from({ length: count }, (_, index) => sources.filter((_source, sourceIndex) => sourceIndex % count === index).map((source) => source.id));
-  const sections = (plan.sections ?? []).slice(0, count).map((section, index) => ({
-    id: section.id || `s${index + 1}`,
-    title: section.title?.trim() || prompts.fallbackSection(index + 1),
-    purpose: section.purpose?.trim() || '',
-    keyClaims: Array.isArray(section.keyClaims) ? section.keyClaims.filter((value): value is string => typeof value === 'string').slice(0, 8) : [],
-    sourceIds: Array.isArray(section.sourceIds) ? section.sourceIds.filter((id): id is string => typeof id === 'string' && validIds.has(id)) : [],
-  }));
-  while (sections.length < count) {
-    const index = sections.length;
-    sections.push({ id: `s${index + 1}`, title: prompts.fallbackSection(index + 1), purpose: '', keyClaims: [], sourceIds: fallbackChunks[index] ?? [] });
-  }
-  sections.forEach((section, index) => { if (!section.sourceIds.length) section.sourceIds = fallbackChunks[index] ?? sources.slice(0, 3).map((source) => source.id); });
+  // Round-robin share-out, used for any section the planner left without sources. With
+  // fewer sources than sections a slice comes out empty, so those fall back to the top
+  // three rather than being written with nothing to cite.
+  const topSourceIds = sources.slice(0, 3).map((source) => source.id);
+  const fallbackSourceIds = Array.from({ length: count }, (_unused, index) => {
+    const share = sources.filter((_source, sourceIndex) => sourceIndex % count === index).map((source) => source.id);
+    return share.length ? share : topSourceIds;
+  });
+  const sections = resolveStudySections({
+    planned: plan.sections ?? [],
+    outline: request.outline,
+    count,
+    fallbackTitle: prompts.fallbackSection,
+    validSourceIds: new Set(sources.map((source) => source.id)),
+    validIdeaIds: new Set(knowledge.ideas.map((idea) => idea.id)),
+    fallbackSourceIds,
+  });
 
   const written: string[] = [];
   const outline: WritingWorkshopSection[] = [];
@@ -242,14 +434,32 @@ export async function generateStudyDeepResearchReport(
     const section = sections[index];
     const sectionSources = section.sourceIds.map((id) => sources.find((source) => source.id === id)).filter((source): source is StudyResearchSource => Boolean(source));
     sectionSources.forEach((source) => usedSourceIds.add(source.id));
-    onProgress?.({ phase: 'section', message: `Explicando: ${section.title}`, sectionIndex: index + 1, sectionTotal: sections.length, sectionTitle: section.title });
+    // Ideas the planner tied to this part; if it tied none, the strongest few, so a
+    // section is never written blind to the concept network the rest of the unit uses.
+    const sectionIdeas = (section.ideaIds.length
+      ? knowledge.ideas.filter((idea) => section.ideaIds.includes(idea.id))
+      : knowledge.ideas.slice(0, 8)
+    ).map((idea) => ({ type: idea.type, label: idea.label, statement: idea.statement }));
+    onProgress?.({
+      phase: 'section',
+      message: `${unitMode ? 'Redactando' : 'Explicando'}: ${section.title}`,
+      sectionIndex: index + 1,
+      sectionTotal: sections.length,
+      sectionTitle: section.title,
+    });
     const raw = await completeText({
-      system: prompts.write,
+      system: section.focus ? `${prompts.write}\n${SECTION_FOCUS_RULE}` : prompts.write,
       user: JSON.stringify({
         objective: request.objective,
         language,
         targetWords: Math.max(850, Math.min(1_650, Math.round((pages.max * 450) / sections.length))),
-        section: { title: section.title, purpose: section.purpose, keyClaims: section.keyClaims },
+        section: {
+          title: section.title,
+          purpose: section.purpose,
+          keyClaims: section.keyClaims,
+          ...(section.focus ? { teacherFocus: section.focus } : {}),
+        },
+        ...(sectionIdeas.length ? { extractedIdeas: sectionIdeas } : {}),
         allowedSources: sectionSources.map((source) => ({ id: source.id, exactCitation: source.token, title: source.title, location: source.location, extract: source.text })),
         previousSections: written.map((markdown) => markdown.replace(/^##[^\n]+/, '').slice(0, 900)),
       }, null, 2),
@@ -257,10 +467,21 @@ export async function generateStudyDeepResearchReport(
       maxTokens: 5_200,
     }, model);
     written.push(normalizeSectionMarkdown(raw, section.title, sectionSources));
-    outline.push({ id: section.id, title: section.title, purpose: section.purpose, keyClaims: section.keyClaims, sources: sectionSources.map((source) => source.token) });
+    outline.push({
+      id: section.id,
+      title: section.title,
+      // The teacher's steer is kept in the saved outline: it is why the part reads the
+      // way it does, and the reader shows it beside the section.
+      purpose: [section.focus, section.purpose].filter(Boolean).join(' · '),
+      keyClaims: section.keyClaims,
+      sources: sectionSources.map((source) => source.token),
+    });
   }
 
-  onProgress?.({ phase: 'assembling', message: 'Preparando síntesis, fuentes y actividades de comprensión…' });
+  onProgress?.({
+    phase: 'assembling',
+    message: unitMode ? 'Preparando síntesis, materiales y propuestas de evaluación…' : 'Preparando síntesis, fuentes y actividades de comprensión…',
+  });
   const final = await completeJson<StudyFinal>({
     system: prompts.finalize,
     user: JSON.stringify({ objective: request.objective, language, provisionalTitle: plan.title, sectionTitles: sections.map((section) => section.title), sourcesUsed: [...usedSourceIds] }, null, 2),
@@ -284,10 +505,14 @@ export async function generateStudyDeepResearchReport(
     notes: source.kind,
   }));
   const words = body.split(/\s+/).filter(Boolean).length;
+  // Which extracted ideas actually shaped the unit. Recorded on the draft so the next
+  // surfaces built on top of a unit (activities, adaptations) can start from the same
+  // concepts instead of re-deriving them from the prose.
+  const usedIdeaIds = [...new Set(sections.flatMap((section) => section.ideaIds))];
   const draft: WritingWorkshopDraft = {
     generatedAt: new Date().toISOString(),
     brief: { kind: 'deep_research', objective: request.objective, audience: request.audience, tone: 'academic', language },
-    selection: { ideaIds: [], themeIds: [], gapIds: [], contradictionIds: [], workIds: [], passageIds: [], tutorRouteIds: [] },
+    selection: { ideaIds: usedIdeaIds, themeIds: [], gapIds: [], contradictionIds: [], workIds: [], passageIds: [], tutorRouteIds: [] },
     title: final.title?.trim() || plan.title?.trim() || request.objective,
     abstract: final.abstract?.trim() || plan.abstract?.trim() || '',
     outline,
@@ -296,9 +521,25 @@ export async function generateStudyDeepResearchReport(
     bibliography: references,
     nextSteps,
     limitations,
-    stats: { selectedIdeas: 0, selectedThemes: 0, selectedGaps: 0, selectedContradictions: 0, selectedWorks: usedSourceIds.size, selectedPassages: 0, selectedTutorRoutes: 0, contextChars: sources.reduce((sum, source) => sum + source.text.length, 0), truncated: retrieved.length >= 48 },
+    stats: { selectedIdeas: usedIdeaIds.length, selectedThemes: 0, selectedGaps: 0, selectedContradictions: 0, selectedWorks: usedSourceIds.size, selectedPassages: 0, selectedTutorRoutes: 0, contextChars: sources.reduce((sum, source) => sum + source.text.length, 0), truncated: retrieved.length >= 48 },
   };
-  const meta = { sections: sections.length, words, pages: Math.max(1, Math.ceil(words / 450)), ideasCovered: 0, ideasConsidered: 0, worksCited: usedSourceIds.size, targetPages: pages, stoppedReason: retrieved.length >= 48 ? 'El contexto se acotó a los fragmentos más relevantes del índice de estudio.' : null };
-  onProgress?.({ phase: 'done', message: `Informe de estudio listo: ${sections.length} secciones · ${usedSourceIds.size} fuentes`, wordsSoFar: words, pagesSoFar: meta.pages });
+  const meta = {
+    sections: sections.length,
+    words,
+    pages: Math.max(1, Math.ceil(words / 450)),
+    ideasCovered: usedIdeaIds.length,
+    ideasConsidered: knowledge.ideas.length,
+    worksCited: usedSourceIds.size,
+    targetPages: pages,
+    stoppedReason: retrieved.length >= 48 ? 'El contexto se acotó a los fragmentos más relevantes del índice de estudio.' : null,
+  };
+  onProgress?.({
+    phase: 'done',
+    message: unitMode
+      ? `Unidad lista: ${sections.length} partes · ${usedSourceIds.size} materiales`
+      : `Informe de estudio listo: ${sections.length} secciones · ${usedSourceIds.size} fuentes`,
+    wordsSoFar: words,
+    pagesSoFar: meta.pages,
+  });
   return { draft, meta };
 }
