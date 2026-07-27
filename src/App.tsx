@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { AppSettings, CorpusHealthBucketId, DatabaseSummary, RecoveryStatus, SyncLogEntry, VaultSummary } from '@shared/types';
 import { Onboarding } from './views/Onboarding';
 import { HomeView, GenealogyHome, DatabasesHome } from './views/HomeView';
@@ -13,6 +13,7 @@ import { VaultSwitcher, vaultTypeIcon, vaultTypeLabel } from './components/Vault
 import { DatabasesSidebarExplore } from './components/DatabasesSidebarExplore';
 import { StudySidebar, type StudyNavigationTarget } from './components/StudySidebar';
 import { TeachingSidebar } from './components/TeachingSidebar';
+import { WorldMapsView } from './views/WorldMapsView';
 import { WorldbuildingSidebar } from './components/WorldbuildingSidebar';
 import { FeedbackHost } from './components/feedback';
 import { PrivacyRequestHost } from './privacyNotices';
@@ -23,6 +24,7 @@ import { DatabasesTour } from './views/DatabasesTour';
 import { StudyTour } from './views/StudyTour';
 import { TeachingTour } from './views/TeachingTour';
 import { BASICS_TUTORIAL_VERSION, BasicsTutorial } from './views/BasicsTutorial';
+import { FIRST_VAULT_VERSION, FirstVaultSetup } from './views/FirstVaultSetup';
 import { preferencesForTutorialLanguage } from '@shared/tutorialPreferences';
 import { hasPendingWhatsNew, WhatsNewModal } from './components/WhatsNewModal';
 import { markTutorialVideosAnnouncementSeen, TutorialVideosUpdateTour } from './components/TutorialVideosGuide';
@@ -202,6 +204,13 @@ export function App() {
   // Set once the startup update check is done with the screen, so the one-time Nodi
   // choice can queue up behind it instead of fighting it for the foreground.
   const [updateSettled, setUpdateSettled] = useState(false);
+  // Whether this RUN began before the essential guide had ever been completed — i.e.
+  // whether the person at the keyboard is meeting Nodus for the first time. Captured
+  // from the first settings read and never recomputed, because both flags the
+  // first-vault chooser depends on flip while the app is running: reading them live
+  // would shut the chooser the instant the guide set `basicsTutorialVersion`.
+  const newInstallRef = useRef<boolean | null>(null);
+  const [newInstall, setNewInstall] = useState(false);
   useEffect(() => setActiveVaultQueryScope(activeVault?.id ?? null), [activeVault?.id]);
   // Resolved light/dark (accounts for 'system'); drives the macOS dock icon.
   const [isDark, setIsDark] = useState<boolean>(() =>
@@ -496,6 +505,20 @@ export function App() {
   useEffect(() => {
     void reloadSettings();
   }, [reloadSettings]);
+
+  // Decide once, from the first settings this run sees, whether this is a first meeting.
+  // The same pass stamps `firstVaultVersion` on any install that already completed the
+  // guide: without it, an existing user who replays the guide from Settings and then
+  // restarts would look brand new and have their vault renamed under them.
+  useEffect(() => {
+    if (!settings || newInstallRef.current !== null) return;
+    const fresh = settings.basicsTutorialVersion === 0;
+    newInstallRef.current = fresh;
+    setNewInstall(fresh);
+    if (!fresh && settings.firstVaultVersion === 0) {
+      void window.nodus.updateSettings({ firstVaultVersion: FIRST_VAULT_VERSION });
+    }
+  }, [settings]);
 
   useEffect(() => window.nodus?.onApiKeysRecovered(() => { void reloadSettings(); }), [reloadSettings]);
   // Settings may also change outside this React tree (notably from the floating
@@ -878,6 +901,23 @@ export function App() {
           markTutorialVideosAnnouncementSeen();
           await window.nodus.updateSettings({ basicsTutorialVersion: BASICS_TUTORIAL_VERSION });
           await reloadSettings();
+        }}
+      />
+    );
+  }
+
+  // Straight out of the guide, and before anything else asks for a decision: name the
+  // vault and pick its mode. Nodus used to skip this and hand over an academic vault
+  // called «Principal», which is why the mode felt like something that had happened to
+  // the user rather than something they chose. Only a run that STARTED before the guide
+  // was ever completed gets here (see `newInstall`), so no existing vault is ever
+  // renamed underneath its owner.
+  if (!isPreviewVault && newInstall && settings.firstVaultVersion === 0 && activeVault) {
+    return (
+      <FirstVaultSetup
+        vault={activeVault}
+        onComplete={async () => {
+          await Promise.all([reloadSettings(), reloadVaults()]);
         }}
       />
     );
@@ -1412,7 +1452,10 @@ export function App() {
           {view === 'timeline' && <TimelineView worldbuilding={isWorldbuilding} />}
           {view === 'tree' && <TreeView settings={settings} onSettingsChange={reloadSettings} />}
           {view === 'relations' && <RelationsView onOpenPersons={() => setView('persons')} />}
-          {view === 'map' && <MapView />}
+          {/* The genealogy map projects lat/lon onto OpenStreetMap tiles, so in an
+              invented world — whose places have no gazetteer coordinates — it renders an
+              empty planet every time. Worldbuilding gets its own section instead. */}
+          {view === 'map' && (isWorldbuilding ? <WorldMapsView /> : <MapView />)}
           {view === 'archive' && <ArchiveView onOpenLibrary={() => setView('library')} isGenealogy={isGenealogy} />}
           {view === 'databases' && (
             <DatabasesView

@@ -72,7 +72,9 @@ test('shipped and preview vaults are selectable; announced future vaults remain 
 });
 
 test('the vault picker derives selectable modes from the canonical registry', async () => {
-  const picker = await readFile(path.join(repoRoot, 'src/components/VaultSwitcher.tsx'), 'utf8');
+  // One picker, shared by the switcher's creation modal and the first-run chooser.
+  const picker = await readFile(path.join(repoRoot, 'src/components/vaultTypeUi.tsx'), 'utf8');
+  const switcher = await readFile(path.join(repoRoot, 'src/components/VaultSwitcher.tsx'), 'utf8');
   assert.match(picker, /VAULT_TYPES\.filter\(\(type\) => type\.available\)/);
   assert.match(picker, /const CREATE_VAULT_TYPES: VaultType\[\] = \[\s*'academic', 'primary_sources', 'testimonios',\s*'databases', 'docencia', 'estudio',\s*'genealogy', 'worldbuilding',\s*\]/s);
   assert.doesNotMatch(picker, /COMING_SOON_VAULT_TYPES[^\n]*estudio/);
@@ -90,8 +92,8 @@ test('the vault picker derives selectable modes from the canonical registry', as
   assert.match(picker, /className="pointer-events-none fixed z-\[90\]/);
   assert.match(picker, /window\.innerWidth - width - 8/);
   assert.match(picker, /window\.innerHeight - 8/);
-  assert.match(picker, /className=\{`card-modal max-h-\[90vh\]/, 'vault creation and management dialogs use an opaque surface');
-  assert.doesNotMatch(picker, /className=\{`card max-h-\[90vh\]/, 'translucent cards must not be used as modal panels');
+  assert.match(switcher, /className=\{`card-modal max-h-\[90vh\]/, 'vault creation and management dialogs use an opaque surface');
+  assert.doesNotMatch(switcher, /className=\{`card max-h-\[90vh\]/, 'translucent cards must not be used as modal panels');
 });
 
 test('the worldbuilding sidebar keeps its full announced shape, with only the built sections live', async () => {

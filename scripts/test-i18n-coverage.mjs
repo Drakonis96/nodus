@@ -151,6 +151,17 @@ const INDIRECT_KEY_SOURCES = [
   // t(v.label) in the ficha's "Hechos en conflicto" section.
   { file: 'shared/conflictDetection.ts', pattern: /\bcollect\([^,]+,[^,]+,\s*(["'])((?:\\.|(?!\1).)*?)\1/g },
   { file: 'shared/conflictDetection.ts', pattern: /^\s{2}\w+:\s*(["'])((?:\\.|(?!\1).)*?)\1,$/gm },
+  // Geometry names, rendered as t(GEOMETRY_LABEL[marker.geometryKind]) in the marker
+  // sheet. Dynamic, so none of them would be collected.
+  { file: 'src/components/world/mapMarkers.tsx', pattern: /^ {2}(?:point|circle|polygon|path): (["'])((?:\\.|(?!\1).)*?)\1,$/gm },
+  // Cartographic style names, rendered as t(style.label) in the generation panel.
+  { file: 'shared/mapPrompt.ts', pattern: /\blabel: (["'])((?:\\.|(?!\1).)*?)\1/g },
+  // Distance-unit labels, rendered as t(UNIT_LABEL[unit]) by the scale bar, the ruler and
+  // the calibration panel. Every one of them is dynamic, so none would be collected.
+  { file: 'src/components/world/mapTools.tsx', pattern: /^ {2}(?:km|mi|m|ft|league|custom): (["'])((?:\\.|(?!\1).)*?)\1,$/gm },
+  // Map kind names, rendered as t(kind.label) in the map cards, the side panel and the
+  // creation modal. They never appear literally inside a t() call.
+  { file: 'src/views/WorldMapsView.tsx', pattern: /\blabel:\s*(["'])((?:\\.|(?!\1).)*?)\1/g },
   // Worldbuilding character vocabularies (life status, narrative role, event kinds),
   // rendered as t(CHARACTER_*_LABEL[x]) in the grid, the sheet and the AI prompts. The
   // two-space-indent form deliberately skips the `{ id: 'violet', hex: '#7c3aed' }`

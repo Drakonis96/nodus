@@ -605,6 +605,53 @@ import {
   listWorldPlaces,
   updateWorldPlace,
 } from './db/worldPlacesRepo';
+import {
+  childMaps,
+  createWorldMap,
+  deleteWorldMap,
+  getMapImageBlob,
+  getMapThumbnail,
+  getWorldMap,
+  growMapCanvas,
+  listWorldMaps,
+  mapAncestry,
+  worldMapCoverage,
+  placeMapAppearances,
+  saveMapImage,
+  updateWorldMap,
+} from './db/worldMapsRepo';
+import {
+  circleToPolygon,
+  createMapLayer,
+  createMapMarker,
+  createTravelMode,
+  deleteMapLayer,
+  deleteMapMarker,
+  deleteTravelMode,
+  ensureTravelModes,
+  listMapLayers,
+  listMapMarkers,
+  listTravelModes,
+  updateMapLayer,
+  updateMapMarker,
+  updateTravelMode,
+} from './db/mapMarkersRepo';
+import { readMapImageFile } from './maps/mapImageStore';
+import { listPresences } from './db/worldPresenceRepo';
+import {
+  expandMapCanvas,
+  generateMapImage,
+  suggestMapMarkers,
+  zoomIntoRegion,
+  type MapGenerationRequest,
+} from './maps/mapGeneration';
+import type { CanvasGrowth } from '@shared/worldMapGeometry';
+import type {
+  MapLayerInput,
+  MapMarkerInput,
+  MapTravelModeInput,
+  WorldMapInput,
+} from '@shared/types';
 import type { WorldDate } from '@shared/worldCalendar';
 import {
   getEventWorldDateFull,
@@ -1411,6 +1458,71 @@ export function registerIpc(
     kind: CharacterImageKind,
     style?: DecorativeImageStyle
   ) => generateWorldEntityImage(entityKind, entityId, kind, style ?? DEFAULT_DECORATIVE_IMAGE_STYLE));
+  // ── Maps of an invented world ──────────────────────────────────────────────
+  // The image blob is fetched on its own (`maps:imageBlob`) rather than inlined with the
+  // map: a base map is megabytes, and listing them would push every byte of every map
+  // through the bridge just to draw a row of thumbnails.
+  h('maps:list', async () => listWorldMaps());
+  h('maps:get', async (_e, mapId: string) => getWorldMap(mapId));
+  h('maps:create', async (_e, input: WorldMapInput) => createWorldMap(input));
+  h('maps:update', async (_e, mapId: string, patch: Partial<WorldMapInput>) => updateWorldMap(mapId, patch));
+  h('maps:delete', async (_e, mapId: string) => {
+    deleteWorldMap(mapId);
+  });
+  h('maps:children', async (_e, mapId: string) => childMaps(mapId));
+  h('maps:ancestry', async (_e, mapId: string) => mapAncestry(mapId));
+  h('maps:placeAppearances', async (_e, placeId: string) => placeMapAppearances(placeId));
+  h('maps:coverage', async () => worldMapCoverage());
+  h('maps:imageBlob', async (_e, imageId: string) => getMapImageBlob(imageId));
+  h('maps:thumbnail', async (_e, mapId: string) => getMapThumbnail(mapId));
+  h('maps:importImage', async (_e, mapId: string) => {
+    const win = getWindow();
+    const picked = await showImportOpenDialog(win ?? undefined!, {
+      title: 'Elegir la imagen del mapa',
+      properties: ['openFile'],
+      filters: [{ name: 'Imágenes', extensions: ['png', 'jpg', 'jpeg', 'webp', 'bmp', 'tif', 'tiff'] }],
+    });
+    if (picked.canceled || picked.filePaths.length === 0) return null;
+    const prepared = await readMapImageFile(picked.filePaths[0]);
+    saveMapImage({ mapId, role: 'base', ...prepared, generated: false });
+    return getWorldMap(mapId);
+  });
+  h('maps:growCanvas', async (_e, mapId: string, growth: CanvasGrowth) => growMapCanvas(mapId, growth));
+  // Generation. `zoom` with `cropOnly` needs no provider at all: it is the exact,
+  // instant, offline half of "ampliación" and the one offered first.
+  h('maps:generateImage', async (_e, request: MapGenerationRequest) => generateMapImage(request));
+  h('maps:zoomRegion', async (_e, request: MapGenerationRequest) => zoomIntoRegion(request));
+  h('maps:expandCanvas', async (_e, request: MapGenerationRequest) => expandMapCanvas(request));
+  h('maps:suggestMarkers', async (_e, mapId: string) => suggestMapMarkers(mapId));
+
+  h('maps:listMarkers', async (_e, mapId: string) => listMapMarkers(mapId));
+  h('maps:createMarker', async (_e, input: MapMarkerInput) => createMapMarker(input));
+  h('maps:updateMarker', async (_e, markerId: string, patch: Partial<MapMarkerInput>) => updateMapMarker(markerId, patch));
+  h('maps:deleteMarker', async (_e, markerId: string) => {
+    deleteMapMarker(markerId);
+  });
+  h('maps:circleToPolygon', async (_e, markerId: string, aspect: number, vertices?: number) =>
+    circleToPolygon(markerId, aspect, vertices)
+  );
+
+  h('maps:listLayers', async (_e, mapId: string) => listMapLayers(mapId));
+  h('maps:createLayer', async (_e, mapId: string, input: MapLayerInput) => createMapLayer(mapId, input));
+  h('maps:updateLayer', async (_e, layerId: string, patch: Partial<MapLayerInput>) => updateMapLayer(layerId, patch));
+  h('maps:deleteLayer', async (_e, layerId: string) => {
+    deleteMapLayer(layerId);
+  });
+
+  // Where every character is, from scenes + events + residences. One call: the renderer
+  // builds the tracks itself with the pure engine, so the playhead never round-trips.
+  h('maps:presences', async () => listPresences());
+  h('maps:listTravelModes', async () => listTravelModes());
+  h('maps:ensureTravelModes', async () => ensureTravelModes());
+  h('maps:createTravelMode', async (_e, input: MapTravelModeInput) => createTravelMode(input));
+  h('maps:updateTravelMode', async (_e, modeId: string, patch: Partial<MapTravelModeInput>) => updateTravelMode(modeId, patch));
+  h('maps:deleteTravelMode', async (_e, modeId: string) => {
+    deleteTravelMode(modeId);
+  });
+
   // The world's calendar. Saving it recomputes every derived absolute day, because a
   // month that gained a day moves every date after it.
   h('world:getCalendar', async () => getWorldCalendar());

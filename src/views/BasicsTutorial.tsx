@@ -17,8 +17,8 @@ import {
   PLATFORM_HIGHLIGHTS_TUTORIAL_VERSION,
   platformHighlightSlides,
 } from '../components/PlatformHighlightsGuide';
-import { TutorialVideoGrid } from '../components/TutorialVideos';
-import { tutorialVideoCopy } from '@shared/tutorialVideos';
+import { TutorialVideoFeature } from '../components/TutorialVideos';
+import { TUTORIAL_INTRO_VIDEO_ID, TUTORIAL_VIDEOS, tutorialVideo, tutorialVideoCopy } from '@shared/tutorialVideos';
 import { t } from '../i18n';
 
 export const BASICS_TUTORIAL_VERSION = PLATFORM_HIGHLIGHTS_TUTORIAL_VERSION;
@@ -394,6 +394,11 @@ export function BasicsTutorial({ language, onLanguageChosen, onNodiStyleChosen, 
   }, [confirmSkip, learnMode, slides.length, styleChosen, tutorialLanguage]);
 
   const videoCopy = tutorialVideoCopy(activeLanguage);
+  // Compiled in rather than fetched: the one video a fresh install is shown must be on
+  // screen even if the published catalogue is unreachable. The fallback is defensive —
+  // `TUTORIAL_INTRO_VIDEO_ID` names a built-in — but a crash here would be the first
+  // thing a new user ever saw.
+  const introVideo = tutorialVideo(TUTORIAL_INTRO_VIDEO_ID) ?? TUTORIAL_VIDEOS[0];
   // Skipping is offered from every screen that follows the two mandatory choices, so
   // the dialog is built once and rendered by each of them.
   const skipDialog = confirmSkip && <ConfirmModal zIndex={220} title={t('¿Saltar la guía esencial?')} message={t('Esta guía explica los espacios de trabajo, los modelos que funcionan en tu equipo, los servicios externos y las búsquedas por significado.')} cancelLabel={t('Continuar tutorial')} confirmLabel={t('Saltar de todos modos')} danger onCancel={() => setConfirmSkip(false)} onConfirm={() => void onComplete()} />;
@@ -442,11 +447,12 @@ export function BasicsTutorial({ language, onLanguageChosen, onNodiStyleChosen, 
     {skipDialog}
   </div>;
 
-  // The video path: the same cinema chrome, with the catalogue as a grid.
-  if (learnMode === 'video') return <div className="tutorial-cinema" data-testid="basics-tutorial-videos" role="dialog" aria-modal="true" aria-label={videoCopy.gridTitle}>
+  // The video path: the same cinema chrome, with the INTRODUCTION alone on the stage.
+  // The rest of the catalogue is deliberately not shown here — see TutorialVideoFeature.
+  if (learnMode === 'video') return <div className="tutorial-cinema" data-testid="basics-tutorial-videos" role="dialog" aria-modal="true" aria-label={videoCopy.startHere}>
     <div className="tutorial-aurora" aria-hidden="true" />
     <header className="tutorial-topbar"><span>NODUS · {ui.guide}</span><button onClick={() => setConfirmSkip(true)}>{ui.skip}</button></header>
-    <TutorialVideoGrid language={activeLanguage} variant="cinema" />
+    <TutorialVideoFeature video={introVideo} language={activeLanguage} />
     <footer className="tutorial-footer">
       {/* No `ui.pace` hint here: the arrow keys belong to the deck, not to the grid. */}
       <button className="btn btn-ghost" data-testid="tutorial-mode-switch-text" onClick={() => { setIndex(0); setLearnMode('text'); }}>

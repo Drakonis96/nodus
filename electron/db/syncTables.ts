@@ -90,6 +90,13 @@ const SYNC_GROUPS: { key: SyncGroupKey; prefix?: string; tables?: string[] }[] =
       'scene_characters',
       // The world's calendar. Its `world_day` values are derived, but they travel with the
       // eras and months that produced them, so a merged package stays self-consistent.
+      // Maps. The image blobs travel with them: a map without its picture is an empty
+      // frame full of correctly-placed pins, which is worse than no map at all.
+      'world_maps',
+      'map_images',
+      'map_layers',
+      'map_markers',
+      'map_travel_modes',
       'world_calendar',
       'world_calendar_eras',
       'world_calendar_months',

@@ -29,22 +29,85 @@ test.after(() => rm(outDir, { recursive: true, force: true }));
 
 // ── the catalogue ───────────────────────────────────────────────────────────────
 
-test('the three published tutorials keep their ids, order and vault mapping', () => {
+test('the published tutorials keep their ids, shelves and vault mapping', () => {
   assert.deepEqual(
-    catalogue.TUTORIAL_VIDEOS.map((video) => [video.id, video.youtubeId, video.order]),
+    catalogue.TUTORIAL_VIDEOS.map((video) => [video.id, video.youtubeId, video.order, video.category]),
     [
-      ['essentials', 'QqSY1_DeDRM', 1],
-      ['academic', 'Z-5CpJBVV_I', 2],
-      ['nodi', '5OTe5CtefME', 3],
+      ['essentials', 'QqSY1_DeDRM', 1, 'introduction'],
+      ['academic', 'Z-5CpJBVV_I', 2, 'vaults'],
+      ['genealogy', 'UPz7bqN5znE', 3, 'vaults'],
+      ['databases', '4ooNmZVx0dA', 4, 'vaults'],
+      ['teaching', '5LsojBiM348', 5, 'vaults'],
+      ['nodi', '5OTe5CtefME', 6, 'features'],
+      ['toolkit', '-xhDw_Y0vpA', 7, 'features'],
+      ['word', 'GFVOJ0JNPMw', 8, 'integrations'],
+      ['zotero', 'lMWW8JJrl2c', 9, 'integrations'],
+      ['mcp', 'qa2xPiOmV2c', 10, 'integrations'],
     ]
   );
-  // Only the academic tour can currently be replaced by a video; the other vault tours
-  // must keep their two-option opening step until their own video exists.
-  assert.equal(catalogue.tutorialVideoForVault('academic').id, 'academic');
-  for (const type of ['estudio', 'genealogy', 'databases', 'docencia', 'primary_sources']) {
+  // Exactly one tutorial is an `introduction`: the first-run guide shows that one alone,
+  // so a second would silently make the guide pick between them.
+  assert.deepEqual(catalogue.TUTORIAL_VIDEOS.filter((v) => v.category === 'introduction').map((v) => v.id), ['essentials']);
+  assert.equal(catalogue.TUTORIAL_INTRO_VIDEO_ID, 'essentials');
+  assert.equal(catalogue.tutorialVideo(catalogue.TUTORIAL_INTRO_VIDEO_ID).youtubeId, 'QqSY1_DeDRM');
+
+  // Four vault tours can now be replaced by a video; the rest must keep their
+  // two-option opening step until their own video exists.
+  for (const [type, id] of [['academic', 'academic'], ['genealogy', 'genealogy'], ['databases', 'databases'], ['docencia', 'teaching']]) {
+    assert.equal(catalogue.tutorialVideoForVault(type).id, id, `${type} is covered by the ${id} video`);
+  }
+  for (const type of ['estudio', 'primary_sources', 'worldbuilding', 'testimonios']) {
     assert.equal(catalogue.tutorialVideoForVault(type), undefined, `${type} has no video yet`);
   }
   assert.equal(catalogue.tutorialVideoForVault(undefined), undefined);
+  // Every video that names a vault sits on the vaults shelf, and vice versa: the tabs
+  // and the tours would otherwise disagree about what a "vault tutorial" is.
+  for (const video of catalogue.TUTORIAL_VIDEOS) {
+    assert.equal(Boolean(video.vaultType), video.category === 'vaults', `${video.id} disagrees about its shelf`);
+  }
+});
+
+test('the shelves are ordered vaults → features → integrations, behind the introduction', () => {
+  assert.deepEqual(catalogue.TUTORIAL_CATEGORIES, ['introduction', 'vaults', 'features', 'integrations']);
+  const shelves = catalogue.tutorialVideoShelves(catalogue.TUTORIAL_VIDEOS, { language: 'en' });
+  assert.deepEqual(shelves.map((shelf) => shelf.category), ['introduction', 'vaults', 'features', 'integrations']);
+  assert.deepEqual(shelves.map((shelf) => shelf.videos.map((video) => video.id)), [
+    ['essentials'],
+    ['academic', 'genealogy', 'databases', 'teaching'],
+    ['nodi', 'toolkit'],
+    ['word', 'zotero', 'mcp'],
+  ]);
+  // A tab narrows to one shelf; the empty ones are dropped rather than left as headings
+  // with nothing under them.
+  const vaults = catalogue.tutorialVideoShelves(catalogue.TUTORIAL_VIDEOS, { language: 'en', category: 'vaults' });
+  assert.deepEqual(vaults.map((shelf) => shelf.category), ['vaults']);
+  // No filter at all is the default state, and it hides nothing.
+  assert.equal(
+    catalogue.tutorialVideoShelves(catalogue.TUTORIAL_VIDEOS).flatMap((shelf) => shelf.videos).length,
+    catalogue.TUTORIAL_VIDEOS.length,
+  );
+});
+
+test('search reads titles, descriptions and shelf names, accents and all', () => {
+  const find = (query, language = 'es') => catalogue
+    .tutorialVideoShelves(catalogue.TUTORIAL_VIDEOS, { language, query })
+    .flatMap((shelf) => shelf.videos.map((video) => video.id));
+  assert.deepEqual(find('zotero'), ['zotero']);
+  // Accent- and case-insensitive: a Spanish reader typing on a US layout still finds it.
+  assert.deepEqual(find('genealogia'), ['genealogy']);
+  assert.deepEqual(find('GENEALOGÍA'), ['genealogy']);
+  // Words may arrive in any order, and the shelf name is searchable too.
+  assert.deepEqual(find('integraciones word'), ['word']);
+  assert.deepEqual(find('word integraciones'), ['word']);
+  // The description counts: "rúbricas" appears only in the teaching video's body.
+  assert.deepEqual(find('rubricas'), ['teaching']);
+  // English copy for an English reader, and no cross-language false positives.
+  assert.deepEqual(find('gradebook', 'en'), ['teaching']);
+  assert.deepEqual(find('cuaderno de notas', 'en'), []);
+  // An empty or whitespace query is not a filter.
+  assert.equal(find('  ').length, catalogue.TUTORIAL_VIDEOS.length);
+  // Nothing matched is an empty list, never an exception.
+  assert.deepEqual(find('qwertyuiop'), []);
 });
 
 test('embeds go to the no-cookie host, in the tutorial language', () => {
@@ -68,23 +131,56 @@ test('every language the cinematic guide offers has full video copy', async () =
   const spanish = catalogue.tutorialVideoCopy('es');
   for (const code of codes) {
     const copy = catalogue.tutorialVideoCopy(code);
-    for (const key of ['tutorialWord', 'chooseTitle', 'chooseLede', 'gridTitle', 'gridLede', 'more', 'watched', 'markUnwatched', 'openExternal', 'hosting', 'close', 'play', 'tourVideo']) {
+    for (const key of ['chooseTitle', 'chooseLede', 'gridTitle', 'gridLede', 'more', 'watched', 'markUnwatched', 'openExternal', 'hosting', 'close', 'play', 'tourVideo', 'allCategories', 'searchPlaceholder', 'searchLabel', 'noMatches', 'startHere', 'startHereLede']) {
       assert.ok(typeof copy[key] === 'string' && copy[key].trim().length > 0, `${code}.${key} is missing`);
     }
-    for (const option of ['videoOption', 'textOption']) {
+    for (const option of ['videoOption', 'textOption', 'whereVaults', 'whereSettings']) {
       assert.ok(copy[option].title.trim().length > 0, `${code}.${option}.title is missing`);
       assert.ok(copy[option].body.trim().length > 0, `${code}.${option}.body is missing`);
     }
     assert.ok(copy.videoOption.badge.trim().length > 0, `${code} does not mark the recommended option`);
-    for (const id of ['essentials', 'academic', 'nodi']) {
-      assert.ok(copy.videos[id].title.trim().length > 0, `${code}.videos.${id}.title is missing`);
-      assert.ok(copy.videos[id].body.trim().length > 0, `${code}.videos.${id}.body is missing`);
+    // The shelves are headings, tabs AND search terms, so a missing one is invisible
+    // until someone types in that language.
+    for (const shelf of catalogue.TUTORIAL_CATEGORIES) {
+      assert.ok(copy.categories[shelf]?.trim().length > 0, `${code}.categories.${shelf} is missing`);
+    }
+    for (const video of catalogue.TUTORIAL_VIDEOS) {
+      assert.ok(copy.videos[video.id]?.title.trim().length > 0, `${code}.videos.${video.id}.title is missing`);
+      assert.ok(copy.videos[video.id]?.body.trim().length > 0, `${code}.videos.${video.id}.body is missing`);
     }
     if (code === 'es') continue;
     // A table that merely falls back to Spanish would satisfy every check above.
     assert.notEqual(copy.more, spanish.more, `${code} falls back to the Spanish "more on the way"`);
     assert.notEqual(copy.videos.essentials.title, spanish.videos.essentials.title, `${code} falls back to Spanish video titles`);
+    assert.notEqual(copy.whereSettings.body, spanish.whereSettings.body, `${code} falls back to the Spanish "all the tutorials are in Settings"`);
   }
+});
+
+test('every language names all four shelves, and names them apart', () => {
+  for (const code of catalogue.TUTORIAL_COPY_LANGUAGES) {
+    const names = catalogue.TUTORIAL_CATEGORIES.map((shelf) => catalogue.tutorialVideoCopy(code).categories[shelf]);
+    assert.equal(new Set(names).size, 4, `${code} reuses a shelf name, so two tabs read the same`);
+  }
+});
+
+test('the copy tells the reader where the rest of the tutorials are', () => {
+  // The promise the first-run screen makes: each vault's video at creation, and ALL of
+  // them in Settings. Both halves have to survive a translation pass.
+  const en = catalogue.tutorialVideoCopy('en');
+  assert.match(en.whereSettings.body, /Settings/);
+  for (const shelf of ['Introduction', 'Vaults', 'Features', 'Integrations']) {
+    assert.match(en.whereSettings.body, new RegExp(shelf), `the English copy does not name ${shelf}`);
+  }
+  assert.match(en.whereVaults.body, /create/i);
+  const es = catalogue.tutorialVideoCopy('es');
+  assert.match(es.whereSettings.body, /Ajustes/);
+  for (const shelf of ['Introducción', 'Bóvedas', 'Funciones', 'Integraciones']) {
+    assert.match(es.whereSettings.body, new RegExp(shelf), `the Spanish copy does not name ${shelf}`);
+  }
+  // The section really is called "Ayuda"/"Help": pointing at a tab that does not exist
+  // is worse than saying nothing.
+  assert.match(es.chooseLede, /Ajustes → Ayuda/);
+  assert.match(en.chooseLede, /Settings → Help/);
 });
 
 test('"more tutorials on the way" is promised in every language', () => {
@@ -152,7 +248,6 @@ test('the cinematic guide offers video or text, and both complete it', async () 
   assert.match(tutorial, /data-testid="tutorial-mode-text"/);
   assert.match(tutorial, /tutorial-mode-option recommended/, 'the video path is the recommended one');
   assert.match(tutorial, /data-testid="basics-tutorial-videos"/);
-  assert.match(tutorial, /<TutorialVideoGrid language=\{activeLanguage\} variant="cinema" \/>/);
   // Skippable from the video screen, and completable from it too.
   assert.match(tutorial, /data-testid="tutorial-mode-switch-text"/);
   const videoScreen = tutorial.slice(tutorial.indexOf('basics-tutorial-videos'));
@@ -162,14 +257,50 @@ test('the cinematic guide offers video or text, and both complete it', async () 
   assert.match(tutorial, /if \(!tutorialLanguage \|\| !styleChosen \|\| learnMode !== 'text'\) return;/);
 });
 
-test('Settings leads its tutorials section with the grid', async () => {
-  const settings = await read('src/views/Settings.tsx');
-  assert.match(settings, /<TutorialVideoGrid language=\{settings\.uiLanguage\} variant="panel" \/>/);
+test('the first-run video screen shows the introduction ALONE', async () => {
+  const [tutorial, component] = await Promise.all([
+    read('src/views/BasicsTutorial.tsx'),
+    read('src/components/TutorialVideos.tsx'),
+  ]);
+  // One tutorial, large — not the catalogue. A brand-new install has no vault yet, so
+  // the vault videos would be cards about places the reader cannot go.
+  assert.match(tutorial, /<TutorialVideoFeature video=\{introVideo\} language=\{activeLanguage\} \/>/);
+  assert.doesNotMatch(tutorial, /<TutorialVideoGrid/, 'the guide must not fall back to the full grid');
+  assert.match(tutorial, /tutorialVideo\(TUTORIAL_INTRO_VIDEO_ID\) \?\? TUTORIAL_VIDEOS\[0\]/, 'the intro video is compiled in, not fetched');
+  // …and the screen SAYS where the others are, rather than leaving the reader to find out.
+  assert.match(component, /data-testid="tutorial-video-where"/);
+  assert.match(component, /copy\.whereVaults\.title/);
+  assert.match(component, /copy\.whereSettings\.title/);
+  assert.match(component, /copy\.startHere/);
+});
+
+test('Settings holds the whole catalogue, with tabs and a search box', async () => {
+  const [settings, component] = await Promise.all([
+    read('src/views/Settings.tsx'),
+    read('src/components/TutorialVideos.tsx'),
+  ]);
+  assert.match(settings, /<TutorialVideoGrid language=\{settings\.uiLanguage\} variant="panel" showFilters \/>/);
   const gridAt = settings.indexOf('<TutorialVideoGrid');
   const replayAt = settings.indexOf('basics-tutorial-replay');
   assert.ok(gridAt > 0 && gridAt < replayAt, 'the videos come before the replay buttons');
+
+  // Tabs filter, they do not hide: "All" is the initial state and every shelf present in
+  // the catalogue gets a tab.
+  assert.match(component, /const \[category, setCategory\] = useState<TutorialCategory \| null>\(null\)/);
+  assert.match(component, /const \[query, setQuery\] = useState\(''\)/);
+  assert.match(component, /data-testid="tutorial-videos-tab-all"/);
+  assert.match(component, /data-testid=\{`tutorial-videos-tab-\$\{shelf\}`\}/);
+  assert.match(component, /data-testid="tutorial-videos-search"/);
+  // Clicking the active tab clears the filter, so a tab is never a dead end.
+  assert.match(component, /setCategory\(\(current\) => \(current === shelf \? null : shelf\)\)/);
+  // Filters only apply where they are rendered; every other host still shows everything.
+  assert.match(component, /category: showFilters \? category : null, query: showFilters \? query : ''/);
+  assert.match(component, /data-testid="tutorial-videos-empty"/, 'an empty search says so');
+
   const css = await read('src/components/tutorialVideos.css');
   assert.match(css, /\.light \.tutorial-videos-panel \.tutorial-video-card/, 'the Settings grid is remapped for light mode');
+  assert.match(css, /\.light \.tutorial-videos-panel \.tutorial-videos-tabs button\.active/, 'and so are the new tabs');
+  assert.match(css, /\.light \.tutorial-videos-panel \.tutorial-videos-search input/);
   assert.match(css, /\.light \.tutorial-video-player/);
 });
 
@@ -240,14 +371,26 @@ test('a vault tour with a video offers three ways in', async () => {
   assert.match(engine, /if \(watchingVideo\) return;/);
   assert.match(tour, /vaultType="academic"/);
   // Every vault tour declares its type, so each gains the option the day its own video
-  // is published — without a release and without touching the engine.
+  // is published — without a release and without touching the engine. Four of them now
+  // have one, which is what makes "you'll see each vault's tutorial when you create it"
+  // a true statement rather than a promise.
   for (const [file, type] of [
     ['src/views/StudyTour.tsx', 'estudio'],
     ['src/views/GenealogyTour.tsx', 'genealogy'],
     ['src/views/DatabasesTour.tsx', 'databases'],
     ['src/views/TeachingTour.tsx', 'docencia'],
-  ]) assert.match(await read(file), new RegExp(`vaultType="${type}"`), `${file} declares its vault type`);
+  ]) {
+    assert.match(await read(file), new RegExp(`vaultType="${type}"`), `${file} declares its vault type`);
+  }
+  for (const type of ['academic', 'genealogy', 'databases', 'docencia']) {
+    assert.ok(catalogue.tutorialVideoForVault(type), `the ${type} tour has a video to offer`);
+  }
   assert.match(engine, /tutorialVideoForVault\(vaultType, catalogue\)/);
+  // The player's badge is the shelf, not "Tutorial 3": the published titles stopped
+  // being numbered, and a catalogue that grows would renumber itself.
+  const grid = await read('src/components/TutorialVideos.tsx');
+  assert.doesNotMatch(grid, /tutorialWord/);
+  assert.match(grid, /copy\.categories\[video\.category\]/);
 });
 
 // ── the catalogue: untrusted input from the network ─────────────────────────────
@@ -255,24 +398,54 @@ test('a vault tour with a video offers three ways in', async () => {
 test('the published catalogue can add tutorials and update copy', () => {
   const { videos, rejected } = catalogue.parseTutorialCatalogue({
     videos: [
-      { id: 'essentials', youtubeId: 'QqSY1_DeDRM', order: 1, icon: 'network' },
+      { id: 'essentials', youtubeId: 'QqSY1_DeDRM', order: 1, category: 'introduction', icon: 'network' },
       {
-        id: 'teaching', youtubeId: 'abcdefghijk', order: 4, icon: 'graduation', vaultType: 'docencia',
-        copy: { es: { title: 'La bóveda de docencia', body: 'Cursos, horarios y clases.' }, en: { title: 'The teaching vault', body: 'Courses, timetables and classes.' } },
+        id: 'study', youtubeId: 'abcdefghijk', order: 6, category: 'vaults', icon: 'graduation', vaultType: 'estudio',
+        copy: { es: { title: 'La bóveda de estudio', body: 'Asignaturas, apuntes y repaso.' }, en: { title: 'The study vault', body: 'Subjects, notes and revision.' } },
       },
     ],
   });
   assert.equal(rejected, 0);
   assert.equal(videos.length, 2);
   const merged = catalogue.mergeTutorialCatalogue(videos);
-  assert.deepEqual(merged.map((video) => video.id), ['essentials', 'academic', 'nodi', 'teaching']);
+  // The new entry lands on its shelf, after the vault videos this build already ships —
+  // never at the end of the whole list.
+  assert.deepEqual(merged.map((video) => video.id), [
+    'essentials',
+    'academic', 'genealogy', 'databases', 'teaching', 'study',
+    'nodi', 'toolkit',
+    'word', 'zotero', 'mcp',
+  ]);
   // A new vault video reaches that vault's tour with no code change.
-  assert.equal(catalogue.tutorialVideoForVault('docencia', merged).youtubeId, 'abcdefghijk');
+  assert.equal(catalogue.tutorialVideoForVault('estudio', merged).youtubeId, 'abcdefghijk');
   // Its own copy is used, in the reader's language, falling back to English.
-  assert.equal(catalogue.videoCopyFor(merged[3], 'es').title, 'La bóveda de docencia');
-  assert.equal(catalogue.videoCopyFor(merged[3], 'ja').title, 'The teaching vault');
+  const study = merged.find((video) => video.id === 'study');
+  assert.equal(catalogue.videoCopyFor(study, 'es').title, 'La bóveda de estudio');
+  assert.equal(catalogue.videoCopyFor(study, 'ja').title, 'The study vault');
+  // …and it is searchable and filterable like the compiled-in ones.
+  const shelves = catalogue.tutorialVideoShelves(merged, { language: 'es', category: 'vaults', query: 'apuntes' });
+  assert.deepEqual(shelves.map((shelf) => shelf.videos.map((video) => video.id)), [['study']]);
   // Built-in videos keep the compiled translations.
   assert.equal(catalogue.videoCopyFor(merged[0], 'ja').title, catalogue.tutorialVideoCopy('ja').videos.essentials.title);
+});
+
+test('an entry that forgets its shelf still lands on one', () => {
+  const { videos } = catalogue.parseTutorialCatalogue({
+    videos: [
+      // Naming a vault is the strongest signal there is.
+      { id: 'sources', youtubeId: 'QqSY1_DeDRM', order: 1, vaultType: 'primary_sources', copy: { en: { title: 'Sources', body: 'x' } } },
+      // Anything else is a feature until a later file says otherwise.
+      { id: 'whatever', youtubeId: 'QqSY1_DeDRM', order: 2, copy: { en: { title: 'Whatever', body: 'x' } } },
+      // A built-in keeps its own shelf rather than being demoted.
+      { id: 'essentials', youtubeId: 'QqSY1_DeDRM', order: 3 },
+      // Junk in `category` is junk, not a new shelf.
+      { id: 'bogus', youtubeId: 'QqSY1_DeDRM', order: 4, category: 'javascript:alert(1)', copy: { en: { title: 'Bogus', body: 'x' } } },
+    ],
+  });
+  assert.deepEqual(
+    videos.map((video) => [video.id, video.category]),
+    [['sources', 'vaults'], ['whatever', 'features'], ['essentials', 'introduction'], ['bogus', 'features']],
+  );
 });
 
 test('the catalogue cannot smuggle in anything the app would render blindly', () => {
@@ -308,11 +481,11 @@ test('the catalogue cannot smuggle in anything the app would render blindly', ()
 });
 
 test('a broken catalogue can never hide a tutorial the app already ships', () => {
-  // Half-written file, wrong ids, empty list: the built-in three survive all of it.
+  // Half-written file, wrong ids, empty list: the built-in ten survive all of it.
   for (const remote of [[], catalogue.parseTutorialCatalogue({ videos: [{ id: 'x' }] }).videos]) {
     assert.deepEqual(
       catalogue.mergeTutorialCatalogue(remote).map((video) => video.id),
-      ['essentials', 'academic', 'nodi']
+      catalogue.TUTORIAL_VIDEOS.map((video) => video.id)
     );
   }
 });
@@ -322,8 +495,8 @@ test('the published file matches what this build ships', async () => {
   const { videos, rejected } = catalogue.parseTutorialCatalogue(published);
   assert.equal(rejected, 0, 'every entry in docs/tutorials.json passes the app\'s own validation');
   assert.deepEqual(
-    videos.map((video) => [video.id, video.youtubeId, video.order]),
-    catalogue.TUTORIAL_VIDEOS.map((video) => [video.id, video.youtubeId, video.order]),
+    videos.map((video) => [video.id, video.youtubeId, video.order, video.category, video.vaultType ?? null]),
+    catalogue.TUTORIAL_VIDEOS.map((video) => [video.id, video.youtubeId, video.order, video.category, video.vaultType ?? null]),
     'docs/tutorials.json and the built-in list agree'
   );
   assert.equal(catalogue.TUTORIAL_CATALOGUE_URL, 'https://drakonis96.github.io/nodus/tutorials.json');

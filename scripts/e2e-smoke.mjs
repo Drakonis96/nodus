@@ -244,12 +244,21 @@ try {
   await page.getByText('Comment préférez-vous apprendre ?', { exact: true }).waitFor();
   await page.getByTestId('tutorial-mode-video').click();
   await page.getByTestId('basics-tutorial-videos').waitFor({ timeout: 30_000 });
-  assert.equal(await page.locator('.tutorial-video-card').count(), 3, 'the video mode lists the three published tutorials');
-  assert.match(
-    await page.getByTestId('tutorial-videos-more').innerText(),
-    /D’autres tutoriels arrivent bientôt/,
-    'the promise of more tutorials is translated, not left in Spanish'
-  );
+  // ONE tutorial, not the catalogue. A brand-new install has no vault yet, so the vault
+  // videos would be cards about places the reader cannot go; they are deferred and said
+  // out loud instead (below).
+  await page.getByTestId('tutorial-video-feature').waitFor({ timeout: 30_000 });
+  assert.equal(await page.locator('.tutorial-video-card').count(), 0, 'the first-run screen is not the grid');
+  assert.equal(await page.locator('.tutorial-video-feature-card').count(), 1, 'exactly one tutorial is offered');
+  // …and the screen SAYS where the others are: each vault's on creation, all of them in
+  // Settings. That promise is the whole point of showing only one here.
+  const whereText = await page.getByTestId('tutorial-video-where').innerText();
+  assert.match(whereText, /coffre/i, 'it names the vaults, in the language chosen');
+  assert.match(whereText, /Réglages/, 'and points at Settings for the full catalogue');
+  for (const shelf of ['Introduction', 'Coffres', 'Fonctions', 'Intégrations']) {
+    assert.ok(whereText.includes(shelf), `the four shelves are named: missing ${shelf}`);
+  }
+
   await page.getByTestId('tutorial-video-play-essentials').click();
   const videoPlayer = page.getByTestId('tutorial-video-player');
   await videoPlayer.waitFor({ timeout: 30_000 });
@@ -257,6 +266,12 @@ try {
   assert.match(embedSrc, /^https:\/\/www\.youtube-nocookie\.com\/embed\/QqSY1_DeDRM\?/, 'the player embeds the no-cookie host');
   assert.match(embedSrc, /hl=fr/, 'the embed follows the language chosen for the tutorial');
   assert.equal(await videoPlayer.locator('iframe[allowfullscreen]').count(), 1, 'the embedded player can go fullscreen');
+  // The badge is the shelf, not "Tutorial 1": the published titles stopped being numbered.
+  // innerText comes back upper-cased: the bar is styled `text-transform: uppercase`.
+  assert.equal(
+    (await videoPlayer.locator('.tutorial-video-player-bar span').innerText()).toLowerCase(),
+    'introduction',
+  );
   await waitForCondition('vídeo marcado como visto', () => page.evaluate(async () => {
     const settings = await window.nodus.getSettings();
     return Array.isArray(settings.tutorialVideosWatched) && settings.tutorialVideosWatched.includes('essentials');
@@ -264,9 +279,9 @@ try {
   await page.getByTestId('tutorial-video-close').click();
   await videoPlayer.waitFor({ state: 'detached' });
   assert.equal(
-    await page.getByTestId('tutorial-video-card-essentials').getAttribute('data-watched'),
-    'true',
-    'the card reflects the watched flag once the player closes'
+    await page.locator('.tutorial-video-feature-card .tutorial-video-watched').count(),
+    1,
+    'the featured card reflects the watched flag once the player closes'
   );
   const framingRefusals = consoleMessages.filter((text) => /Refused to frame/i.test(text));
   assert.deepEqual(framingRefusals, [], `the CSP admits the tutorial embed: ${framingRefusals.join(' | ')}`);
@@ -350,7 +365,11 @@ try {
   const videosTour = page.getByTestId('tutorial-videos-update-tour');
   await videosTour.waitFor();
   await videosTour.getByRole('heading', { name: 'Tutoriales en vídeo', exact: true }).waitFor();
-  assert.equal(await videosTour.locator('.tutorial-video-card').count(), 3, 'the announcement embeds the published catalogue');
+  // The WHOLE catalogue, arranged on its shelves — the announcement's claim is that it
+  // shows the tutorials rather than describing them. Asserted by shape, not by a count
+  // that has to be edited every time a tutorial is published.
+  assert.ok(await videosTour.locator('.tutorial-video-card').count() >= 4, 'the announcement embeds the published catalogue');
+  assert.equal(await videosTour.locator('.tutorial-videos-shelf-title').count(), 4, 'introduction, vaults, features, integrations');
   assert.equal(await videosTour.locator('iframe').count(), 0, 'nothing is framed until a card is opened');
   await videosTour.getByTestId('tutorial-videos-tour-complete').click();
   await videosTour.waitFor({ state: 'detached' });
@@ -2758,6 +2777,266 @@ try {
   await page.getByTestId('character-dossier-appearances').waitFor({ timeout: 30_000 });
   assert.match(await page.getByTestId('character-dossier-appearances').innerText(), /La caída de Vael/);
   console.log('[e2e] worldbuilding places, factions, cultures and scenes work through the shared workspace');
+
+  // ── Maps ───────────────────────────────────────────────────────────────────
+  // The one worldbuilding section whose core is a live Leaflet canvas, so this is the
+  // only place the coordinate maths can be checked against real mouse gestures. Two
+  // things in particular are only provable here: that a click lands where it looks like
+  // it lands, and that dragging a vertex actually SAVES — a bug that moved the shape on
+  // screen, reported exactly once, and wrote nothing.
+  const mapImagePath = path.join(userData, 'e2e-map.png');
+  const mapPngBytes = await page.evaluate(async () => {
+    // A 2000x1000 plate, so the aspect ratio is not 1 and a mistake in the y axis or in
+    // the aspect correction cannot hide.
+    const canvas = document.createElement('canvas');
+    canvas.width = 2000;
+    canvas.height = 1000;
+    const context = canvas.getContext('2d');
+    context.fillStyle = '#e8dcc0';
+    context.fillRect(0, 0, 2000, 1000);
+    context.fillStyle = '#7f1d1d';
+    context.fillRect(0, 0, 40, 40);
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+    return [...new Uint8Array(await blob.arrayBuffer())];
+  });
+  await writeFile(mapImagePath, Buffer.from(mapPngBytes));
+  await app.evaluate(({ dialog }, filePath) => {
+    dialog.showOpenDialog = async (_window, options) => {
+      const actual = options ?? _window;
+      if (actual?.title === 'Elegir la imagen del mapa') return { canceled: false, filePaths: [filePath] };
+      return { canceled: true, filePaths: [] };
+    };
+  }, mapImagePath);
+
+  await page.getByTestId('worldbuilding-sidebar').getByRole('button', { name: 'Mapa', exact: true }).click();
+  await page.getByTestId('world-maps-view').waitFor({ timeout: 30_000 });
+  await page.getByTestId('world-map-create').click();
+  await page.getByTestId('world-map-create-name').fill('El Norte');
+  await page.getByTestId('world-map-create-confirm').click();
+  await page.getByTestId('world-map-workbench').waitFor({ timeout: 30_000 });
+
+  // Upload: stored at its native size, NOT through the 1280px decorative pipeline.
+  await page.getByTestId('world-map-import-image').click();
+  await waitForCondition('el mapa guarda su imagen a tamaño nativo', () => page.evaluate(async () => {
+    const [map] = await window.nodus.listWorldMaps();
+    return map?.widthPx === 2000 && map?.heightPx === 1000;
+  }));
+  await page.locator('.world-map-image').first().waitFor({ timeout: 30_000 });
+
+  /**
+   * Measure an element with `getBoundingClientRect` inside the page, NOT with Playwright's
+   * `boundingBox()`.
+   *
+   * Measured here: `boundingBox()` intermittently reports `width: 0` for Leaflet's image
+   * overlay and for its SVG handles — the first call was right and the next returned zero.
+   * Every click then lands at `box.x`, i.e. the left edge, and the whole walk silently
+   * measures the same point over and over. `getBoundingClientRect` returns the real box
+   * every time.
+   */
+  const measure = (selector, index) => page.evaluate(([sel, i]) => {
+    const element = document.querySelectorAll(sel)[i];
+    if (!element) return null;
+    const box = element.getBoundingClientRect();
+    return { x: box.left, y: box.top, width: box.width, height: box.height };
+  }, [selector, index]);
+  const rectOf = async (selector, index = 0) => {
+    let rect = null;
+    // Leaflet appends the overlay <img> before the blob has loaded and before it sizes it,
+    // so the element EXISTS with a zero-width box for a moment. Clicking against that box
+    // puts every click on the left edge and the walk silently measures the same point over
+    // and over — which is exactly what happened while writing this.
+    await waitForCondition(`${selector}[${index}] tiene tamaño`, async () => {
+      rect = await measure(selector, index);
+      return !!rect && rect.width > 0 && rect.height > 0;
+    });
+    return rect;
+  };
+  const centreOf = async (selector, index = 0) => {
+    const rect = await rectOf(selector, index);
+    return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+  };
+  /** Screen coordinates of a normalized point on the map image. */
+  const mapPoint = async (nx, ny) => {
+    const box = await rectOf('.world-map-image');
+    return { x: box.x + nx * box.width, y: box.y + ny * box.height };
+  };
+  const clickMap = async (nx, ny) => {
+    const at = await mapPoint(nx, ny);
+    await page.mouse.click(at.x, at.y);
+  };
+
+  // Uncalibrated: the bar says so rather than showing a fabricated distance.
+  await page.getByTestId('map-no-scale').waitFor({ timeout: 30_000 });
+
+  // Calibrate by drawing a segment across the full width and calling it 400 km.
+  await page.getByTestId('map-calibrate').click();
+  await page.getByTestId('map-calibration-panel').waitFor({ timeout: 30_000 });
+  // React owns this element's class attribute and Leaflet writes its own classes onto the
+  // same element, so a className that varies with the tool wipes them — and with
+  // `.leaflet-container` gone, Leaflet's `img { max-width: none !important }` goes too and
+  // Tailwind's preflight collapses the map image to zero width. The map broke the instant
+  // any tool was picked; this is the assertion that catches it coming back.
+  assert.equal(
+    await page.evaluate(() => document.querySelector('[data-testid="world-map-canvas"]').classList.contains('leaflet-container')),
+    true,
+    'picking a tool must not strip Leaflet\'s classes from its container',
+  );
+  await clickMap(0.02, 0.5);
+  await clickMap(0.98, 0.5);
+  // 0.96 of the width called 384 km implies a map exactly 400 km across. The point of
+  // calibrating on an inset segment rather than edge to edge is that this is what an
+  // author actually does: they trace the scale bar printed on their own map.
+  await page.getByTestId('map-calibration-distance').fill('384');
+  await page.getByTestId('map-calibration-save').click();
+  await waitForCondition('la calibración se guarda como DOS puntos separados', () => page.evaluate(async () => {
+    const [map] = await window.nodus.listWorldMaps();
+    // A separation is part of the claim: two identical endpoints store fine and leave the
+    // map uncalibrated, which is exactly the failure this walk exists to catch.
+    return map?.scaleDistance === 384 && map?.scaleUnit === 'km'
+      && map?.scaleX0 != null && map?.scaleX1 != null && Math.abs(map.scaleX1 - map.scaleX0) > 0.5;
+  }));
+  // The click landed where it looked like it landed: a 0.02→0.98 segment called 384 km
+  // implies a map 400 km wide, which is what the summary must say. A click that missed by
+  // more than a pixel or two moves this number, so it is the real proof that the
+  // normalized coordinate the app stored is the point the mouse was over.
+  // The DB write and the React re-render are two separate events, so wait for the panel
+  // rather than reading it the instant the row lands.
+  // `textContent`, not `innerText`: the panel scrolls, and innerText only returns what is
+  // currently laid out — the heading came back alone while the sentence under it existed.
+  let scaleSummary = '';
+  await waitForCondition('el panel muestra la anchura implícita', async () => {
+    scaleSummary = (await page.getByTestId('map-scale-summary').textContent()) ?? '';
+    return /km/.test(scaleSummary);
+  });
+  assert.match(scaleSummary, /39[89] km|40[0-2] km/, `the implied width is ~400 km, got: ${scaleSummary}`);
+  assert.equal(await page.getByTestId('map-no-scale').count(), 0, 'the bar stops saying "sin escala"');
+
+  // Pin a place, and check the click position round-trips through the stored coordinates.
+  await page.getByTestId('world-map-tool-pin').click();
+  await clickMap(0.25, 0.25);
+  await page.getByTestId('map-marker-sheet').waitFor({ timeout: 30_000 });
+  const pinned = await page.evaluate(async () => {
+    const [map] = await window.nodus.listWorldMaps();
+    const [marker] = await window.nodus.listMapMarkers(map.mapId);
+    return { x: marker.x, y: marker.y };
+  });
+  assert.ok(Math.abs(pinned.x - 0.25) < 0.02, `pin x lands where it was clicked: ${pinned.x}`);
+  assert.ok(Math.abs(pinned.y - 0.25) < 0.02, `pin y lands where it was clicked: ${pinned.y}`);
+  await page.getByTestId('map-marker-place').selectOption({ label: 'Vael' });
+  await waitForCondition('la chincheta queda vinculada al lugar', () => page.evaluate(async () => {
+    const [map] = await window.nodus.listWorldMaps();
+    const [marker] = await window.nodus.listMapMarkers(map.mapId);
+    return marker.placeName === 'Vael';
+  }));
+
+  // The ladder: point → circle → editable shape, keeping the place through both steps.
+  await page.getByTestId('map-marker-to-circle').click();
+  // Give it a radius that is actually visible before converting. The seeded circle is a
+  // few kilometres across, which at this zoom is ~25 px — smaller than the vertex and
+  // midpoint handles, so every handle sits on top of its neighbours and a click cannot
+  // pick one. (That is a real limitation of editing a tiny shape zoomed out; the author's
+  // answer is to zoom in, and this walk's answer is to make the shape big.)
+  await page.getByTestId('map-marker-radius').fill('60');
+  await page.getByTestId('map-marker-radius').blur();
+  await waitForCondition('el círculo toma el radio escrito en km', () => page.evaluate(async () => {
+    const [map] = await window.nodus.listWorldMaps();
+    const [marker] = await window.nodus.listMapMarkers(map.mapId);
+    return marker.radius != null && Math.abs(marker.radius - 0.15) < 0.01;
+  }));
+  await page.getByTestId('map-marker-to-polygon').click();
+  await waitForCondition('el círculo se convierte en forma conservando su lugar', () => page.evaluate(async () => {
+    const [map] = await window.nodus.listWorldMaps();
+    const [marker] = await window.nodus.listMapMarkers(map.mapId);
+    return marker.geometryKind === 'polygon' && (marker.points?.length ?? 0) >= 3 && marker.placeName === 'Vael';
+  }));
+
+  const vertexCount = () => page.locator('.world-map-vertex').count();
+  const storedPoints = () => page.evaluate(async () => {
+    const [map] = await window.nodus.listWorldMaps();
+    const [marker] = await window.nodus.listMapMarkers(map.mapId);
+    return marker.points;
+  });
+  await page.locator('.world-map-vertex').first().waitFor({ timeout: 30_000 });
+  const seededVertices = await vertexCount();
+  assert.ok(seededVertices >= 3, `the outline is seeded around the circle: ${seededVertices}`);
+
+  // DRAG a vertex — the gesture no synthetic event could reproduce faithfully.
+  //
+  // Note what this does NOT prove: the stale-ref bug (the shape moved on screen, the
+  // gesture committed once, and the ORIGINAL outline was written back) does not reproduce
+  // here, because Playwright's stepped drag leaves enough time between the last mousemove
+  // and the mouseup for React to flush. That invariant is pinned in
+  // scripts/test-world-map-markers-ui.mjs instead. What this proves is the other half:
+  // that a real drag reaches Leaflet, passes the threshold, and saves.
+  const before = await storedPoints();
+  const handleAt = await centreOf('.world-map-vertex');
+  const target = await mapPoint(0.72, 0.18);
+  await page.mouse.move(handleAt.x, handleAt.y);
+  await page.mouse.down();
+  // Several steps, so Leaflet sees real mousemoves and the 4px drag threshold is passed.
+  await page.mouse.move(target.x, target.y, { steps: 12 });
+  await page.mouse.up();
+  let afterDrag = before;
+  await waitForCondition('arrastrar un vértice GUARDA la forma movida', async () => {
+    afterDrag = await storedPoints();
+    // A drag MOVES one vertex: same count, different position. A changed count means the
+    // gesture grabbed a midpoint handle instead, which is a different bug.
+    if (afterDrag.length !== before.length) return false;
+    return afterDrag.some((point, index) =>
+      Math.abs(point.x - before[index].x) > 0.02 || Math.abs(point.y - before[index].y) > 0.02);
+  });
+  assert.equal(afterDrag.length, before.length, `a drag moves a vertex, it does not add or remove one: ${before.length} → ${afterDrag.length}`);
+
+  // ADD one by dragging a midpoint, and REMOVE one with Alt+click. Both are single
+  // gestures whose only proof is the vertex count changing in the database.
+  const midAt = await centreOf('.world-map-midpoint');
+  await page.mouse.move(midAt.x, midAt.y);
+  await page.mouse.down();
+  await page.mouse.move(midAt.x + 30, midAt.y + 20, { steps: 6 });
+  await page.mouse.up();
+  await waitForCondition('arrastrar un punto intermedio añade un vértice', async () =>
+    (await storedPoints()).length === afterDrag.length + 1);
+
+  const beforeDelete = (await storedPoints()).length;
+  // Pick a vertex whose centre is actually HIT-TESTABLE as a vertex. Handles and midpoints
+  // are drawn a few pixels apart, so a blind index can land on a midpoint and the gesture
+  // does nothing — a flake, and the reason the midpoint handler now ignores Alt too.
+  let victimAt = null;
+  for (let index = 0; index < (await page.locator('.world-map-vertex').count()); index += 1) {
+    const at = await centreOf('.world-map-vertex', index);
+    const onTop = await page.evaluate(([x, y]) => {
+      const element = document.elementFromPoint(x, y);
+      return element ? element.getAttribute('class') ?? '' : '';
+    }, [at.x, at.y]);
+    if (onTop.includes('world-map-vertex')) { victimAt = at; break; }
+  }
+  assert.ok(victimAt, 'at least one vertex handle is reachable by the mouse');
+  await page.keyboard.down('Alt');
+  await page.mouse.click(victimAt.x, victimAt.y);
+  await page.keyboard.up('Alt');
+  await waitForCondition('Alt+clic elimina un vértice', async () => (await storedPoints()).length === beforeDelete - 1);
+
+  // Measuring, with the travel modes seeded on first use.
+  await page.getByTestId('world-map-tool-measure').click();
+  await page.getByTestId('map-ruler-panel').waitFor({ timeout: 30_000 });
+  await clickMap(0.1, 0.5);
+  await clickMap(0.6, 0.5);
+  const rulerText = await page.getByTestId('map-ruler-panel').innerText();
+  // Half the width of a ~400 km map, measured along the equator of the image.
+  assert.match(rulerText, /19[0-9] km|20[0-9] km/, `the ruler measures the ground, not the pixels: ${rulerText}`);
+  assert.match(rulerText, /A caballo/, 'and answers in days of travel, which is why a writer opens it');
+  await page.getByTestId('world-map-tool-measure').click();
+
+  // The reports read the whole cast when none is selected, and stay quiet about what they
+  // cannot know rather than inventing a warning.
+  await page.getByTestId('map-reports-panel').waitFor({ timeout: 30_000 });
+  // textContent again: the side panel scrolls, so innerText only returns the part that
+  // happens to be laid out.
+  const reports = (await page.getByTestId('map-reports-panel').textContent()) ?? '';
+  assert.match(reports, /Viajes imposibles/);
+  assert.match(reports, /Encuentros posibles/);
+  console.log('[e2e] worldbuilding maps: upload, calibration, pins, vertex editing and measuring work on the real canvas');
+
 
   // Hand the empty study-demo vault back to the genealogy checks below.
   await page.evaluate(async (id) => {

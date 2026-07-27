@@ -1,8 +1,15 @@
 {
-  "$comment": "Published video tutorials, read by Nodus when a user opens a tutorial grid (see shared/tutorialVideos.ts). Adding an entry here reaches installed copies without a release. Rules the app enforces on this file: `id` is a lowercase slug, `youtubeId` must be exactly 11 YouTube-id characters, `order` sets the position, `icon` must be one of the allowed names (play, network, archive, sparkles, graduation, layers, tree, table, chartBar, microphone, image, tools, star), `vaultType` may name a vault so its tour offers the video, and `copy` carries the title/description per language (es, en, fr, tr, de, it, pt, pt-BR, zh, ja, ru, uk). A new entry with no usable copy is dropped; a built-in id may omit copy and keep the translations compiled into the app. Malformed entries are ignored one by one, and this file can never hide a tutorial the app already ships.",
+  "$comment": "Published video tutorials, read by Nodus when a user opens a tutorial grid (see shared/tutorialVideos.ts). Adding an entry here reaches installed copies without a release. Rules the app enforces on this file: `id` is a lowercase slug, `youtubeId` must be exactly 11 YouTube-id characters, `order` sets the position within its shelf, `category` is one of introduction/vaults/features/integrations (a missing one falls back to the built-in entry, or to vaults when `vaultType` is named and to features otherwise), `icon` must be one of the allowed names (play, network, archive, sparkles, graduation, layers, tree, table, chartBar, microphone, image, tools, star, file, book, plug, puzzle, globe, link), `vaultType` may name a vault so its tour offers the video, and `copy` carries the title/description per language (es, en, fr, tr, de, it, pt, pt-BR, zh, ja, ru, uk). A new entry with no usable copy is dropped; a built-in id may omit copy and keep the translations compiled into the app. Malformed entries are ignored one by one, and this file can never hide a tutorial the app already ships.",
   "videos": [
-    { "id": "essentials", "youtubeId": "QqSY1_DeDRM", "order": 1, "icon": "network" },
-    { "id": "academic", "youtubeId": "Z-5CpJBVV_I", "order": 2, "icon": "archive", "vaultType": "academic" },
-    { "id": "nodi", "youtubeId": "5OTe5CtefME", "order": 3, "icon": "sparkles" }
+    { "id": "essentials", "youtubeId": "QqSY1_DeDRM", "order": 1, "category": "introduction", "icon": "network" },
+    { "id": "academic", "youtubeId": "Z-5CpJBVV_I", "order": 2, "category": "vaults", "icon": "archive", "vaultType": "academic" },
+    { "id": "genealogy", "youtubeId": "UPz7bqN5znE", "order": 3, "category": "vaults", "icon": "tree", "vaultType": "genealogy" },
+    { "id": "databases", "youtubeId": "4ooNmZVx0dA", "order": 4, "category": "vaults", "icon": "table", "vaultType": "databases" },
+    { "id": "teaching", "youtubeId": "5LsojBiM348", "order": 5, "category": "vaults", "icon": "graduation", "vaultType": "docencia" },
+    { "id": "nodi", "youtubeId": "5OTe5CtefME", "order": 6, "category": "features", "icon": "sparkles" },
+    { "id": "toolkit", "youtubeId": "-xhDw_Y0vpA", "order": 7, "category": "features", "icon": "tools" },
+    { "id": "word", "youtubeId": "GFVOJ0JNPMw", "order": 8, "category": "integrations", "icon": "file" },
+    { "id": "zotero", "youtubeId": "lMWW8JJrl2c", "order": 9, "category": "integrations", "icon": "book" },
+    { "id": "mcp", "youtubeId": "qa2xPiOmV2c", "order": 10, "category": "integrations", "icon": "plug" }
   ]
 }

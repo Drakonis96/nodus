@@ -124,6 +124,7 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys' | 'lockedProviderKeys'> = {
   unpaywallEmail: '',
   onboardingComplete: false,
   basicsTutorialVersion: 0,
+  firstVaultVersion: 0,
   tutorialVideosWatched: [],
   tourComplete: false,
   advancedTourComplete: true,

@@ -1480,6 +1480,12 @@ export interface AppSettings {
   /** App-wide version of the introductory AI/vault tutorial already completed. */
   basicsTutorialVersion: number;
   /**
+   * App-wide version of the first-vault chooser already completed — the cinematic
+   * screen that follows the guide and asks the newcomer to name their first vault and
+   * pick its mode. Zero means it has never been answered on this install.
+   */
+  firstVaultVersion: number;
+  /**
    * Ids of the video tutorials already opened (`TutorialVideoId` values from
    * shared/tutorialVideos.ts, kept as plain strings so types.ts stays at the root of
    * the import graph). App-wide, like the tutorial version above: a video watched in
@@ -2230,6 +2236,235 @@ export interface SceneAppearance {
   personId: string;
   personName: string;
   role: string | null;
+}
+
+// ── Maps of an invented world (schema v97) ───────────────────────────────────
+//
+// A MAP IS A CANVAS, NOT A PLACE: the relation to `Place` is many-to-many. Every
+// coordinate below is normalized 0..1 against the base image, never a pixel; the
+// arithmetic lives in shared/worldMapGeometry.ts and is the only correct way to
+// transform any of it.
+
+export type WorldMapKind =
+  | 'world' | 'continent' | 'region' | 'city' | 'town' | 'building'
+  | 'interior' | 'dungeon' | 'battle' | 'route' | 'schematic' | 'other';
+
+export type MapGeometryKind = 'point' | 'circle' | 'polygon' | 'path';
+export type MapLayerKind = 'political' | 'physical' | 'routes' | 'climate' | 'culture' | 'battle' | 'labels' | 'custom';
+export type MapImageRole = 'base' | 'previous' | 'reference';
+
+export interface WorldMap {
+  mapId: string;
+  name: string;
+  kind: WorldMapKind;
+  /** The place this map IS of, when it is of one. */
+  placeId: string | null;
+  placeName: string | null;
+  parentMapId: string | null;
+  /** Where this map falls inside its parent, in the PARENT's normalized coordinates. */
+  parentX0: number | null;
+  parentY0: number | null;
+  parentX1: number | null;
+  parentY1: number | null;
+  imageId: string | null;
+  widthPx: number;
+  heightPx: number;
+  /** The calibration segment: two points, never a length. See worldMapGeometry.ts. */
+  scaleX0: number | null;
+  scaleY0: number | null;
+  scaleX1: number | null;
+  scaleY1: number | null;
+  scaleDistance: number | null;
+  scaleUnit: MapDistanceUnitName | null;
+  projection: 'flat' | 'globe';
+  planetRadius: number | null;
+  planetRadiusUnit: MapDistanceUnitName | null;
+  fromWorldDay: number | null;
+  toWorldDay: number | null;
+  visualSeed: string | null;
+  style: string | null;
+  /** True when the image model was asked to write the place names itself. */
+  modelLabels: boolean;
+  notes: string | null;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Kept as a plain string union rather than importing `MapDistanceUnit` from
+ * worldMapGeometry: types.ts sits at the root of the import graph and nothing here may
+ * depend on a module that depends on it. The two are pinned together by a test.
+ */
+export type MapDistanceUnitName = 'km' | 'mi' | 'm' | 'ft' | 'league' | 'custom';
+
+export interface WorldMapInput {
+  name: string;
+  kind?: WorldMapKind;
+  placeId?: string | null;
+  parentMapId?: string | null;
+  parentX0?: number | null;
+  parentY0?: number | null;
+  parentX1?: number | null;
+  parentY1?: number | null;
+  projection?: 'flat' | 'globe';
+  planetRadius?: number | null;
+  planetRadiusUnit?: MapDistanceUnitName | null;
+  scaleX0?: number | null;
+  scaleY0?: number | null;
+  scaleX1?: number | null;
+  scaleY1?: number | null;
+  scaleDistance?: number | null;
+  scaleUnit?: MapDistanceUnitName | null;
+  fromWorldDay?: number | null;
+  toWorldDay?: number | null;
+  visualSeed?: string | null;
+  style?: string | null;
+  modelLabels?: boolean;
+  notes?: string | null;
+  sortOrder?: number;
+}
+
+export interface MapImageMeta {
+  imageId: string;
+  mapId: string;
+  role: MapImageRole;
+  mimeType: string;
+  width: number;
+  height: number;
+  bytes: number;
+  prompt: string | null;
+  provider: string | null;
+  model: string | null;
+  style: string | null;
+  generated: boolean;
+  createdAt: string;
+}
+
+export interface MapLayer {
+  layerId: string;
+  mapId: string;
+  name: string;
+  kind: MapLayerKind;
+  color: string | null;
+  opacity: number;
+  visible: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MapLayerInput {
+  name: string;
+  kind?: MapLayerKind;
+  color?: string | null;
+  opacity?: number;
+  visible?: boolean;
+  sortOrder?: number;
+}
+
+export interface MapMarker {
+  markerId: string;
+  mapId: string;
+  layerId: string | null;
+  placeId: string | null;
+  /** Resolved from the place, so a card can be drawn without a second query. */
+  placeName: string | null;
+  placeKind: string | null;
+  childMapId: string | null;
+  /** Override; null means "use the place name". */
+  label: string | null;
+  geometryKind: MapGeometryKind;
+  x: number;
+  y: number;
+  /** Circles only, normalized against the X axis. */
+  radius: number | null;
+  /** polygon/path vertices, already parsed. */
+  points: { x: number; y: number }[] | null;
+  icon: string | null;
+  color: string | null;
+  fromWorldDay: number | null;
+  toWorldDay: number | null;
+  notes: string | null;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MapMarkerInput {
+  mapId: string;
+  layerId?: string | null;
+  placeId?: string | null;
+  childMapId?: string | null;
+  label?: string | null;
+  geometryKind?: MapGeometryKind;
+  x: number;
+  y: number;
+  radius?: number | null;
+  points?: { x: number; y: number }[] | null;
+  icon?: string | null;
+  color?: string | null;
+  fromWorldDay?: number | null;
+  toWorldDay?: number | null;
+  notes?: string | null;
+  sortOrder?: number;
+}
+
+export interface MapTravelMode {
+  modeId: string;
+  name: string;
+  distancePerDay: number;
+  unit: MapDistanceUnitName;
+  icon: string | null;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MapTravelModeInput {
+  name: string;
+  distancePerDay: number;
+  unit?: MapDistanceUnitName;
+  icon?: string | null;
+  sortOrder?: number;
+}
+
+export type MapGenerationMode = 'create' | 'zoom' | 'expand' | 'restyle' | 'variant';
+
+export interface MapGenerationRequestPayload {
+  mapId: string;
+  mode: MapGenerationMode;
+  style?: string;
+  extra?: string | null;
+  region?: { x0: number; y0: number; x1: number; y1: number };
+  childName?: string;
+  edge?: 'north' | 'south' | 'east' | 'west';
+  fraction?: number;
+  /** `zoom` only: crop with no model at all — exact, instant and offline. */
+  cropOnly?: boolean;
+}
+
+export interface MapGenerationResultPayload {
+  map: WorldMap;
+  degraded: boolean;
+  notice: string | null;
+}
+
+export interface SuggestedMapMarker {
+  name: string;
+  kind: string | null;
+  x: number;
+  y: number;
+}
+
+/** Where a place is shown, for the "En los mapas" section of a place sheet. */
+export interface PlaceMapAppearance {
+  mapId: string;
+  mapName: string;
+  mapKind: WorldMapKind;
+  markerId: string;
+  x: number;
+  y: number;
 }
 
 /** Factions, cultures, religions, houses and orders: one entity, several kinds. */
@@ -5875,6 +6110,73 @@ export interface NodusApi {
     personId: string,
     options?: { includeSecrets?: boolean; includeNotes?: boolean }
   ): Promise<string | null>;
+  // ── Maps of an invented world ─────────────────────────────────────────────
+  // The image bytes are NEVER inlined with a map: a base map is megabytes, and listing
+  // them would push every byte of every map through the bridge to draw a row of cards.
+  listWorldMaps(): Promise<WorldMap[]>;
+  getWorldMap(mapId: string): Promise<WorldMap | null>;
+  createWorldMap(input: WorldMapInput): Promise<WorldMap>;
+  updateWorldMap(mapId: string, patch: Partial<WorldMapInput>): Promise<WorldMap | null>;
+  deleteWorldMap(mapId: string): Promise<void>;
+  childMaps(mapId: string): Promise<WorldMap[]>;
+  /** The chain up to the root, nearest first — the breadcrumb. */
+  mapAncestry(mapId: string): Promise<WorldMap[]>;
+  /** Every map a place is drawn on, for the place sheet. */
+  placeMapAppearances(placeId: string): Promise<PlaceMapAppearance[]>;
+  /**
+   * What every map can show, in one call. Map-following asks "which map draws this
+   * place?" on every tick of the playhead; loading it per map would be a query per map
+   * per tick.
+   */
+  mapCoverage(): Promise<import('./worldPresence').MapFocusCandidate[]>;
+  getMapImageBlob(imageId: string): Promise<{ blob: Uint8Array; mime: string } | null>;
+  getMapThumbnail(mapId: string): Promise<{ blob: Uint8Array; mime: string } | null>;
+  /** Pick a file and make it the map's base image. Null when cancelled. */
+  importMapImage(mapId: string): Promise<WorldMap | null>;
+  /**
+   * Grow the canvas and move EVERY coordinate the map holds. The only correct way to
+   * resize a map — see growMapCanvas in worldMapsRepo.
+   */
+  growMapCanvas(mapId: string, growth: { x0: number; y0: number; x1: number; y1: number }): Promise<WorldMap | null>;
+
+  /**
+   * Generate or regenerate a map's image. `degraded` is true when the provider could not
+   * take a reference image and prose was used instead — the interface MUST say so rather
+   * than quietly producing something that does not match.
+   */
+  generateMapImage(request: MapGenerationRequestPayload): Promise<MapGenerationResultPayload>;
+  /** Enlarge a region into a new child map, reprojecting the markers inside it. */
+  zoomMapRegion(request: MapGenerationRequestPayload): Promise<MapGenerationResultPayload>;
+  /** Grow the canvas by one edge, moving every coordinate with it. */
+  expandMapCanvas(request: MapGenerationRequestPayload): Promise<MapGenerationResultPayload>;
+  /** Look at the map and propose pins. Every suggestion is accepted one at a time. */
+  suggestMapMarkers(mapId: string): Promise<SuggestedMapMarker[]>;
+
+  listMapMarkers(mapId: string): Promise<MapMarker[]>;
+  createMapMarker(input: MapMarkerInput): Promise<MapMarker>;
+  updateMapMarker(markerId: string, patch: Partial<MapMarkerInput>): Promise<MapMarker | null>;
+  deleteMapMarker(markerId: string): Promise<void>;
+  /** Seed an editable outline around an existing circle. `aspect` is widthPx/heightPx. */
+  circleToPolygon(markerId: string, aspect: number, vertices?: number): Promise<MapMarker | null>;
+
+  listMapLayers(mapId: string): Promise<MapLayer[]>;
+  createMapLayer(mapId: string, input: MapLayerInput): Promise<MapLayer>;
+  updateMapLayer(layerId: string, patch: Partial<MapLayerInput>): Promise<MapLayer | null>;
+  deleteMapLayer(layerId: string): Promise<void>;
+
+  /**
+   * Every recorded presence: scenes, events and residences, unioned. The renderer builds
+   * the tracks with the pure engine in shared/worldPresence.ts, so scrubbing the playhead
+   * never touches the database.
+   */
+  listWorldPresences(): Promise<import('./worldPresence').Presence[]>;
+  listTravelModes(): Promise<MapTravelMode[]>;
+  /** Seeds the four default paces the first time the travel panel is opened. */
+  ensureTravelModes(): Promise<MapTravelMode[]>;
+  createTravelMode(input: MapTravelModeInput): Promise<MapTravelMode>;
+  updateTravelMode(modeId: string, patch: Partial<MapTravelModeInput>): Promise<MapTravelMode | null>;
+  deleteTravelMode(modeId: string): Promise<void>;
+
   /** The world's calendar. Empty eras+months means the author has not defined one. */
   getWorldCalendar(): Promise<WorldCalendar>;
   /** Replaces the whole calendar and recomputes every derived absolute day. */

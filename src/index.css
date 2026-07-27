@@ -973,6 +973,16 @@ body {
   margin-top: 1.5rem;
 }
 
+/* The first-vault chooser reuses the guide's card, but carries the same three-column
+   mode grid as the switcher's creation modal — 680px squeezes it to two. The card is
+   also the only one of these that can outgrow a short window, so it scrolls itself. */
+.first-vault-card {
+  width: min(760px, 100%);
+  max-height: calc(100vh - 4rem);
+  overflow-y: auto;
+}
+.first-vault-form { margin-top: 1.4rem; }
+
 .tutorial-language-option {
   display: grid;
   width: 100%;
@@ -1183,6 +1193,117 @@ body {
 }
 .pm-dark .leaflet-control-attribution a {
   color: #818cf8;
+}
+
+/* ── The invented-world map viewer ───────────────────────────────────────────────
+   The genealogy map inverts OpenStreetMap's tiles for dark mode (`.pm-dark
+   .leaflet-tile` above). An AUTHORED map must never be touched by that: inverting a
+   hand-painted or AI-generated map turns parchment into a photographic negative.
+
+   `.leaflet-tile` does not match an `imageOverlay` today, so this rule is not fixing a
+   bug — it is making the exemption EXPLICIT, so the next person who widens the dark-mode
+   filter to `.leaflet-container img` has already been overruled. Pinned by
+   scripts/test-world-maps-ui.mjs. */
+.world-map-image,
+.leaflet-container .world-map-image {
+  filter: none !important;
+  image-rendering: auto;
+}
+
+/* Pins and their labels. The marker itself is a zero-size divIcon, so both children are
+   positioned relative to the exact anchor point rather than to an icon box — a pin whose
+   dot sits half a box away from where the author clicked is the commonest Leaflet bug. */
+.world-map-pin { background: transparent; border: 0; }
+.world-map-pin-dot {
+  position: absolute;
+  left: -6px;
+  top: -6px;
+  width: 12px;
+  height: 12px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: var(--pin, #818cf8);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .6);
+}
+.world-map-pin-dot[data-selected='true'] { width: 16px; height: 16px; left: -8px; top: -8px; box-shadow: 0 0 0 3px rgba(251, 191, 36, .55); }
+.world-map-pin-label {
+  position: absolute;
+  left: 10px;
+  top: -8px;
+  white-space: nowrap;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .9), 0 0 4px rgba(0, 0, 0, .7);
+  pointer-events: none;
+}
+/* A character on the map. Bigger and brighter than a place pin, because they are what
+   the reader is following; faint before their first recorded appearance, and ringed while
+   travelling so a stop and a road are told apart at a glance. */
+.world-map-cast { background: transparent; border: 0; }
+.world-map-cast-dot {
+  position: absolute;
+  left: -7px;
+  top: -7px;
+  width: 14px;
+  height: 14px;
+  border: 2px solid #0a0a0b;
+  border-radius: 50%;
+  background: var(--cast, #f59e0b);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, .35), 0 2px 6px rgba(0, 0, 0, .7);
+}
+.world-map-cast-dot[data-faint='true'] { opacity: .38; }
+.world-map-cast-dot[data-travelling='true'] { box-shadow: 0 0 0 3px color-mix(in srgb, var(--cast) 55%, transparent), 0 2px 6px rgba(0, 0, 0, .7); }
+.world-map-cast-label {
+  position: absolute;
+  left: 12px;
+  top: -8px;
+  white-space: nowrap;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .95), 0 0 5px rgba(0, 0, 0, .8);
+  pointer-events: none;
+}
+
+/* A scene badge: how many scenes happen here. Deliberately unlike a place pin — a
+   novelist filtering to an act wants to see their story, not more geography. */
+.world-map-scene { background: transparent; border: 0; }
+.world-map-scene-badge {
+  position: absolute;
+  left: 4px;
+  top: -18px;
+  display: grid;
+  min-width: 16px;
+  height: 16px;
+  place-items: center;
+  padding: 0 4px;
+  border-radius: 999px;
+  color: #1c1917;
+  background: #fbbf24;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .6);
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.world-map-vertex, .world-map-midpoint { cursor: grab; }
+.world-map-vertex:active { cursor: grabbing; }
+
+/* The drawing cursor lives here, NOT on the Leaflet container: React owns that element's
+   class attribute and would wipe Leaflet's own classes every time a tool is toggled. */
+.world-map-stage[data-drawing='true'] .leaflet-container,
+.world-map-stage[data-drawing='true'] .leaflet-container .leaflet-interactive {
+  cursor: crosshair;
+}
+
+/* The void around the map. Darker than the genealogy basemap so an authored map reads as
+   a plate lying on a table rather than as a window onto a sea. */
+.world-map-stage .leaflet-container {
+  background: #0a0a0b;
+}
+.light .world-map-stage .leaflet-container {
+  background: #e7e5e4;
 }
 
 .btn {

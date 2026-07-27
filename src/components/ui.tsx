@@ -55,6 +55,13 @@ export const EDGE_LABELS: Record<EdgeType, string> = {
 // Kept inline so buttons with long text labels read at a glance, without a dep.
 const ICON_PATHS: Record<string, string> = {
   home: '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9 21v-7h6v7"/>',
+  building: '<rect x="4" y="3" width="16" height="18" rx="1.5"/><path d="M8 7h2"/><path d="M14 7h2"/><path d="M8 11h2"/><path d="M14 11h2"/><path d="M10 21v-5h4v5"/>',
+  flag: '<path d="M5 21V4"/><path d="M5 4h11l-2 3.5L16 11H5"/>',
+  ruler: '<path d="M3 15 15 3l6 6L9 21z"/><path d="m7 11 2 2"/><path d="m10 8 2 2"/><path d="m13 5 2 2"/>',
+  mapPin: '<path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11Z"/><circle cx="12" cy="10" r="2.6"/>',
+  scissors: '<circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><path d="M8.1 7.7 20 18"/><path d="M8.1 16.3 20 6"/>',
+  truck: '<path d="M3 6h11v10H3z"/><path d="M14 9h4l3 3v4h-7z"/><circle cx="7" cy="18" r="1.6"/><circle cx="17.5" cy="18" r="1.6"/>',
+  anchor: '<circle cx="12" cy="5" r="2.5"/><path d="M12 7.5V21"/><path d="M8 11H5a7 7 0 0 0 14 0h-3"/>',
   languages: '<path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/>',
   refresh: '<path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>',
   undo: '<path d="M9 14 4 9l5-5"/><path d="M4 9h9a7 7 0 0 1 7 7v4"/>',

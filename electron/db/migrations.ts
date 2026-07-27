@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 96;
+export const SCHEMA_VERSION = 97;
 
 export const migrations: Migration[] = [
   {
@@ -3514,6 +3514,167 @@ export const migrations: Migration[] = [
         UNIQUE (scene_id, person_id)
       );
       CREATE INDEX idx_scene_characters_person ON scene_characters(person_id);
+    `,
+  },
+  {
+    version: 97,
+    up: /* sql */ `
+      -- Maps of an invented world.
+      --
+      -- A MAP IS A CANVAS, NOT A PLACE. The relation to "places" is many-to-many: a city
+      -- is a pin on the continent map, on the kingdom map and on the trade-routes map,
+      -- AND has a map of its own holding its districts. Modelling a map as a property of
+      -- a place would make the second half of that sentence impossible.
+      --
+      -- Every coordinate in these tables is NORMALIZED 0..1 against the base image, never
+      -- a pixel. The image will be regenerated in another style, re-uploaded at a higher
+      -- resolution and extended by an edge; in pixels each of those gestures scatters
+      -- every pin the author placed. See shared/worldMapGeometry.ts, which owns the
+      -- arithmetic and is the only correct way to transform any of it.
+      CREATE TABLE world_maps (
+        map_id        TEXT PRIMARY KEY,
+        name          TEXT NOT NULL,
+        -- world | continent | region | city | town | building | interior | dungeon
+        -- | battle | route | schematic | other
+        kind          TEXT NOT NULL DEFAULT 'region',
+        -- "This map IS the map OF this place". SET NULL rather than cascade: deleting the
+        -- place must not take the map with it, which may still be worth keeping as a plate.
+        place_id      TEXT REFERENCES places(place_id) ON DELETE SET NULL,
+
+        parent_map_id TEXT REFERENCES world_maps(map_id) ON DELETE SET NULL,
+        -- Where this map falls inside its parent, in the PARENT's normalized coordinates.
+        parent_x0 REAL, parent_y0 REAL, parent_x1 REAL, parent_y1 REAL,
+
+        image_id      TEXT,
+        width_px      INTEGER NOT NULL DEFAULT 0,
+        height_px     INTEGER NOT NULL DEFAULT 0,
+
+        -- The calibration segment. Stored as TWO POINTS, not a length, so it survives a
+        -- regeneration at another resolution (still the same two points of the drawing)
+        -- and survives an outpaint (it transforms with everything else).
+        scale_x0 REAL, scale_y0 REAL, scale_x1 REAL, scale_y1 REAL,
+        scale_distance REAL,
+        scale_unit     TEXT,
+
+        -- flat | globe. "globe" reads the image as equirectangular over a planet of the
+        -- given radius and measures by great circle, because a world map measured flat
+        -- gives nonsense near the poles.
+        projection     TEXT NOT NULL DEFAULT 'flat',
+        planet_radius  REAL,
+        planet_radius_unit TEXT,
+
+        -- A map can be of an epoch: "the Empire in year 300".
+        from_world_day INTEGER,
+        to_world_day   INTEGER,
+
+        -- The anchor that keeps every map of one world looking like one atlas, exactly as
+        -- character_profiles.visual_seed keeps a character looking like themselves.
+        visual_seed    TEXT,
+        style          TEXT,
+        -- 0 = Nodus draws the labels (the default); 1 = the image model is asked to write
+        -- them. Image models write illegible or misspelled text and a map is mostly text,
+        -- so drawing them ourselves is what keeps the names correct, searchable,
+        -- translatable and able to follow a renamed place.
+        model_labels   INTEGER NOT NULL DEFAULT 0,
+        notes          TEXT,
+        sort_order     INTEGER NOT NULL DEFAULT 0,
+        created_at     TEXT NOT NULL,
+        updated_at     TEXT NOT NULL
+      );
+      CREATE INDEX idx_world_maps_place  ON world_maps(place_id);
+      CREATE INDEX idx_world_maps_parent ON world_maps(parent_map_id);
+
+      -- Its own table and NOT world_images: a map needs its native resolution, and the
+      -- gallery path downsizes to 1280 px, which would turn every map into a blurred
+      -- thumbnail. This also keeps the previous version around so a regeneration can be
+      -- undone, which a gallery has no concept of.
+      CREATE TABLE map_images (
+        image_id   TEXT PRIMARY KEY,
+        map_id     TEXT NOT NULL REFERENCES world_maps(map_id) ON DELETE CASCADE,
+        -- base | previous | reference
+        role       TEXT NOT NULL DEFAULT 'base',
+        mime_type  TEXT NOT NULL DEFAULT 'image/webp',
+        width      INTEGER NOT NULL DEFAULT 0,
+        height     INTEGER NOT NULL DEFAULT 0,
+        bytes      INTEGER NOT NULL DEFAULT 0,
+        blob       BLOB,
+        thumbnail  BLOB,
+        prompt     TEXT,
+        provider   TEXT,
+        model      TEXT,
+        style      TEXT,
+        generated  INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_map_images_map ON map_images(map_id, role);
+
+      CREATE TABLE map_layers (
+        layer_id   TEXT PRIMARY KEY,
+        map_id     TEXT NOT NULL REFERENCES world_maps(map_id) ON DELETE CASCADE,
+        name       TEXT NOT NULL,
+        -- political | physical | routes | climate | culture | battle | labels | custom
+        kind       TEXT NOT NULL DEFAULT 'custom',
+        color      TEXT,
+        opacity    REAL NOT NULL DEFAULT 1,
+        visible    INTEGER NOT NULL DEFAULT 1,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_map_layers_map ON map_layers(map_id, sort_order);
+
+      -- A pin, a circle of influence, a traced outline or a route. One geometry column
+      -- rather than four tables, because they are one thing to the author: the shape
+      -- grows out of the pin as they refine it (point → circle → polygon).
+      CREATE TABLE map_markers (
+        marker_id     TEXT PRIMARY KEY,
+        map_id        TEXT NOT NULL REFERENCES world_maps(map_id) ON DELETE CASCADE,
+        layer_id      TEXT REFERENCES map_layers(layer_id) ON DELETE SET NULL,
+
+        -- The link to the world. NULL = decorative, or not assigned yet.
+        place_id      TEXT REFERENCES places(place_id) ON DELETE SET NULL,
+        -- Double-clicking descends here. Usually the map of the same place.
+        child_map_id  TEXT REFERENCES world_maps(map_id) ON DELETE SET NULL,
+        label         TEXT,
+
+        -- point | circle | polygon | path
+        geometry_kind TEXT NOT NULL DEFAULT 'point',
+        x REAL NOT NULL,
+        y REAL NOT NULL,
+        -- Circles only, normalized against the X axis: one number cannot describe an
+        -- ellipse, so the X axis is picked and every conversion goes through it.
+        radius REAL,
+        -- polygon/path: JSON [[x, y], ...].
+        points TEXT,
+
+        icon  TEXT,
+        color TEXT,
+        -- Temporal validity. Not only for pins: a polygon with a period IS a border, so
+        -- moving the playhead expands an empire and burns a forest with the same machinery
+        -- that moves the characters.
+        from_world_day INTEGER,
+        to_world_day   INTEGER,
+
+        notes      TEXT,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_map_markers_map   ON map_markers(map_id, sort_order);
+      CREATE INDEX idx_map_markers_place ON map_markers(place_id);
+
+      -- How fast things move in this world. Belongs to the vault, not to a map: a horse
+      -- does not change pace between the continent map and the city map.
+      CREATE TABLE map_travel_modes (
+        mode_id    TEXT PRIMARY KEY,
+        name       TEXT NOT NULL,
+        distance_per_day REAL NOT NULL,
+        unit       TEXT NOT NULL DEFAULT 'km',
+        icon       TEXT,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
     `,
   },
 ];

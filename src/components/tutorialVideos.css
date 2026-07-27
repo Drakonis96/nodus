@@ -72,10 +72,76 @@
 .tutorial-videos-heading h2 { color: #fff; font-size: clamp(1.3rem, 3vw, 1.9rem); font-weight: 650; }
 .tutorial-videos-heading p { margin-top: .3rem; color: #a3a3a3; font-size: .87rem; }
 
+/* `auto-fill`, NOT `auto-fit`: the catalogue is arranged in shelves now, and a shelf
+   with one video would have its single card stretched across the whole panel — a
+   poster three times the size of every other one. `auto-fill` keeps the empty tracks,
+   so a card is the same width whatever shelf it sits on. */
 .tutorial-video-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: .9rem;
+}
+
+/* ── shelves, tabs and search ───────────────────────────────────────────────────── */
+.tutorial-videos-shelf { display: grid; gap: .55rem; }
+.tutorial-videos-shelf-title {
+  color: #a8a29e;
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+}
+
+.tutorial-videos-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .6rem; }
+.tutorial-videos-tabs { display: flex; min-width: 0; flex-wrap: wrap; gap: .3rem; }
+.tutorial-videos-tabs button {
+  border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: 999px;
+  padding: .3rem .75rem;
+  color: #a3a3a3;
+  background: transparent;
+  font-size: .76rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 140ms ease, border-color 140ms ease, background 140ms ease;
+}
+.tutorial-videos-tabs button:hover { color: #e7e5e4; border-color: rgba(255, 255, 255, .3); }
+.tutorial-videos-tabs button.active { color: #042f2e; border-color: transparent; background: #5eead4; }
+
+.tutorial-videos-search {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 190px;
+  max-width: 300px;
+  align-items: center;
+  gap: .4rem;
+  border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: 999px;
+  padding: .3rem .75rem;
+  color: #78716c;
+}
+.tutorial-videos-search:focus-within { border-color: rgba(94, 234, 212, .6); color: #5eead4; }
+.tutorial-videos-search input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  padding: 0;
+  color: #e7e5e4;
+  background: transparent;
+  font-size: .8rem;
+  outline: none;
+}
+.tutorial-videos-search input::placeholder { color: #78716c; }
+/* WebKit's own clear button is a grey glyph that disappears on this background. */
+.tutorial-videos-search input::-webkit-search-cancel-button { filter: invert(.6); cursor: pointer; }
+
+.tutorial-videos-empty {
+  border: 1px dashed rgba(255, 255, 255, .16);
+  border-radius: .9rem;
+  padding: 1.4rem 1rem;
+  color: #a3a3a3;
+  font-size: .84rem;
+  text-align: center;
 }
 
 .tutorial-video-card {
@@ -181,6 +247,46 @@
 /* The choice screen centres everything, including the promise of more tutorials. */
 .tutorial-language-card .tutorial-videos-more { justify-content: center; margin-top: 1.1rem; }
 
+/* ── the first-run screen: one tutorial, large ──────────────────────────────────── */
+.tutorial-video-feature { width: min(760px, calc(100% - 64px)); gap: 1.2rem; text-align: left; }
+.tutorial-video-feature .tutorial-videos-heading { text-align: center; }
+.tutorial-video-feature-card {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(94, 234, 212, .3);
+  border-radius: 1.2rem;
+  background: rgba(255, 255, 255, .04);
+  box-shadow: 0 22px 60px rgba(0, 0, 0, .34);
+}
+.tutorial-video-feature-poster { height: 230px; width: 100%; }
+.tutorial-video-feature-card .tutorial-video-body { gap: .45rem; padding: 1.1rem 1.25rem 1.3rem; }
+.tutorial-video-feature-card .tutorial-video-body h3 { font-size: 1.15rem; }
+.tutorial-video-feature-card .tutorial-video-body p { font-size: .87rem; }
+
+/* Where the OTHER tutorials are met. Said here rather than shown: a fresh install has
+   no vault yet, so nine more cards would be nine places the reader cannot go. */
+.tutorial-video-where { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .7rem; }
+.tutorial-video-where > div {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: .65rem;
+  border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: .95rem;
+  padding: .8rem .9rem;
+  background: rgba(255, 255, 255, .04);
+}
+.tutorial-video-where > div > svg { flex: 0 0 auto; margin-top: .1rem; color: #5eead4; }
+.tutorial-video-where b { display: block; color: #f5f5f4; font-size: .82rem; font-weight: 700; }
+.tutorial-video-where small { display: block; margin-top: .18rem; color: #a3a3a3; font-size: .75rem; line-height: 1.45; }
+
+@media (max-width: 760px) {
+  .tutorial-video-where { grid-template-columns: 1fr; }
+  .tutorial-video-feature-poster { height: 170px; }
+}
+
 /* ── the player ─────────────────────────────────────────────────────────────────── */
 .tutorial-video-player {
   display: flex;
@@ -218,11 +324,13 @@
 /* The grid sits inside the update-tour card (840px wide), so its cards are narrower
    than in Settings; everything else is inherited from the `panel` skin, including its
    light-mode remaps, because this card follows the theme. */
-.tutorial-videos-guide .tutorial-video-grid { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.tutorial-videos-guide .tutorial-video-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
 .tutorial-videos-guide .tutorial-video-poster { height: 104px; }
 /* The tour's stage styles every h3 inside it as a 34px headline, which lands on the
-   cards' own titles too — they have the same specificity and index.css wins on order. */
+   cards' own titles too — they have the same specificity and index.css wins on order.
+   The shelf headings are h3 as well, and would blow the card apart without this. */
 .tutorial-videos-guide .tutorial-video-body h3 { margin-top: 0; font-size: .88rem; font-weight: 650; line-height: 1.3; letter-spacing: 0; }
+.tutorial-videos-guide .tutorial-videos-shelf-title { margin-top: 0; font-size: .66rem; font-weight: 800; line-height: 1.3; letter-spacing: .13em; }
 
 .tutorial-videos-guide-where { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; }
 .tutorial-videos-guide-where > div {
@@ -255,6 +363,16 @@
 .light .tutorial-videos-panel .tutorial-videos-heading p { color: #64748b; }
 .light .tutorial-videos-panel .tutorial-videos-more { color: #0f766e; }
 .light .tutorial-videos-panel .tutorial-videos-hosting { color: #64748b; }
+.light .tutorial-videos-panel .tutorial-videos-shelf-title { color: #64748b; }
+.light .tutorial-videos-panel .tutorial-videos-tabs button { border-color: rgba(15, 23, 42, .16); color: #64748b; }
+.light .tutorial-videos-panel .tutorial-videos-tabs button:hover { border-color: rgba(15, 23, 42, .34); color: #172033; }
+.light .tutorial-videos-panel .tutorial-videos-tabs button.active { border-color: transparent; color: #f0fdfa; background: #0f766e; }
+.light .tutorial-videos-panel .tutorial-videos-search { border-color: rgba(15, 23, 42, .16); color: #64748b; }
+.light .tutorial-videos-panel .tutorial-videos-search:focus-within { border-color: rgba(13, 148, 136, .6); color: #0f766e; }
+.light .tutorial-videos-panel .tutorial-videos-search input { color: #172033; }
+.light .tutorial-videos-panel .tutorial-videos-search input::placeholder { color: #94a3b8; }
+.light .tutorial-videos-panel .tutorial-videos-search input::-webkit-search-cancel-button { filter: none; }
+.light .tutorial-videos-panel .tutorial-videos-empty { border-color: rgba(15, 23, 42, .18); color: #64748b; }
 .light .tutorial-video-player { border-color: rgba(30, 41, 59, .2); color: #172033; background: #f8fafc; box-shadow: 0 35px 100px rgba(15, 23, 42, .28); }
 .light .tutorial-video-player-bar span { color: #0f766e; }
 .light .tutorial-video-hosting { color: #64748b; }

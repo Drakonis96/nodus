@@ -39,6 +39,7 @@ export const GLOBAL_PREF_KEYS = [
   'mascotOrbColorMode',
   'mascotOrbColor',
   'basicsTutorialVersion',
+  'firstVaultVersion',
   'tutorialVideosWatched',
   'recoverySetupVersion',
   'backupVaultIds',

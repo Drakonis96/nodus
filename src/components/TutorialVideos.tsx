@@ -1,11 +1,14 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { TutorialLanguage } from '@shared/tutorialPreferences';
 import {
+  TUTORIAL_CATEGORIES,
   TUTORIAL_VIDEOS,
   tutorialVideoCopy,
+  tutorialVideoShelves,
   videoCopyFor,
   youtubeEmbedUrl,
   youtubeWatchUrl,
+  type TutorialCategory,
   type TutorialVideo,
 } from '@shared/tutorialVideos';
 import { Icon, ModalBackdrop } from './ui';
@@ -97,7 +100,7 @@ export function TutorialVideoPlayer({
       <div className="tutorial-video-player" data-testid="tutorial-video-player" role="dialog" aria-modal="true" aria-label={meta.title}>
         <header className="tutorial-video-player-bar">
           <div>
-            <span>{copy.tutorialWord} {video.order}</span>
+            <span>{copy.categories[video.category]}</span>
             <b>{meta.title}</b>
           </div>
           <div className="tutorial-video-player-actions">
@@ -148,7 +151,9 @@ function TutorialVideoCard({
         aria-label={`${copy.play}: ${meta.title}`}
         data-testid={`tutorial-video-play-${video.id}`}
       >
-        <span className="tutorial-video-order">{copy.tutorialWord} {video.order}</span>
+        {/* The shelf, not a number: the published titles stopped being numbered, and a
+            catalogue that grows by category would renumber itself every time. */}
+        <span className="tutorial-video-order">{copy.categories[video.category]}</span>
         <Icon name={video.icon} size={34} className="tutorial-video-poster-icon" />
         <span className="tutorial-video-play" aria-hidden="true"><Icon name="play" size={18} /></span>
         {watched && <span className="tutorial-video-watched"><Icon name="check" size={12} />{copy.watched}</span>}
@@ -170,11 +175,103 @@ function TutorialVideoCard({
   );
 }
 
+/**
+ * The first-run screen: ONE tutorial, large, and a plain statement of where the rest
+ * are met.
+ *
+ * A brand-new user has no vault yet, so the vault tutorials would be nine cards about
+ * places they cannot go — the introduction is the only one that applies on day one.
+ * The others are not hidden, they are deferred and *said out loud*: each vault's video
+ * is offered by its own tour the first time that vault is opened, and Settings → Help
+ * holds all four shelves with search and filters.
+ */
+export function TutorialVideoFeature({
+  video,
+  language,
+}: {
+  video: TutorialVideo;
+  language: TutorialLanguage;
+}) {
+  const copy = tutorialVideoCopy(language);
+  const meta = videoCopyFor(video, language);
+  const [watched, setWatched] = useState<string[]>([]);
+  const [playing, setPlaying] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void window.nodus.getSettings().then((settings) => {
+      if (cancelled) return;
+      setWatched(Array.isArray(settings.tutorialVideosWatched) ? settings.tutorialVideosWatched : []);
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  return (
+    <div className="tutorial-videos tutorial-videos-cinema tutorial-video-feature" data-testid="tutorial-video-feature">
+      <header className="tutorial-videos-heading">
+        <h2>{copy.startHere}</h2>
+        <p>{copy.startHereLede}</p>
+      </header>
+      <article className="tutorial-video-feature-card">
+        <button
+          className="tutorial-video-poster tutorial-video-feature-poster"
+          style={posterStyle(video)}
+          onClick={() => setPlaying(true)}
+          aria-label={`${copy.play}: ${meta.title}`}
+          data-testid={`tutorial-video-play-${video.id}`}
+        >
+          <span className="tutorial-video-order">{copy.categories[video.category]}</span>
+          <Icon name={video.icon} size={46} className="tutorial-video-poster-icon" />
+          <span className="tutorial-video-play" aria-hidden="true"><Icon name="play" size={22} /></span>
+          {watched.includes(video.id) && <span className="tutorial-video-watched"><Icon name="check" size={12} />{copy.watched}</span>}
+        </button>
+        <div className="tutorial-video-body">
+          <h3>{meta.title}</h3>
+          <p>{meta.body}</p>
+          <div className="tutorial-video-card-actions">
+            <button className="btn btn-primary" onClick={() => setPlaying(true)}><Icon name="play" size={14} />{copy.play}</button>
+            <button className="btn btn-ghost" title={copy.openExternal} aria-label={copy.openExternal} onClick={() => void window.nodus.openExternal(youtubeWatchUrl(video))}>
+              <Icon name="external" size={14} />
+            </button>
+          </div>
+        </div>
+      </article>
+      <div className="tutorial-video-where" data-testid="tutorial-video-where">
+        <div>
+          <Icon name="layers" size={18} />
+          <div><b>{copy.whereVaults.title}</b><small>{copy.whereVaults.body}</small></div>
+        </div>
+        <div>
+          <Icon name="settings" size={18} />
+          <div><b>{copy.whereSettings.title}</b><small>{copy.whereSettings.body}</small></div>
+        </div>
+      </div>
+      <p className="tutorial-videos-hosting">{copy.hosting}</p>
+      {playing && (
+        <TutorialVideoPlayer
+          video={video}
+          language={language}
+          onClose={(next) => { setPlaying(false); if (next) setWatched(next); }}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * The published catalogue, plus the watched flags and the player.
+ *
+ * The list arrives from the main process, so the built-in one paints first and offline.
+ * `showFilters` adds the Settings toolbar: one tab per shelf and a search box. Both are
+ * additive — nothing is hidden until the reader asks for it, which is why the default
+ * state is "All" with an empty query.
+ */
 export function TutorialVideoGrid({
   language,
   variant = 'cinema',
   videos,
   showHeading = true,
+  showFilters = false,
 }: {
   language: TutorialLanguage;
   /** `cinema` sits on the tutorial's dark stage; `panel` on a Settings card. */
@@ -182,10 +279,14 @@ export function TutorialVideoGrid({
   /** Render exactly these instead of the published catalogue. */
   videos?: readonly TutorialVideo[];
   showHeading?: boolean;
+  /** Category tabs and a search box above the shelves. */
+  showFilters?: boolean;
 }) {
   const copy = tutorialVideoCopy(language);
   const [watched, setWatched] = useState<string[]>([]);
   const [playing, setPlaying] = useState<TutorialVideo | null>(null);
+  const [category, setCategory] = useState<TutorialCategory | null>(null);
+  const [query, setQuery] = useState('');
   // Starts as this build's list, so the grid paints immediately and offline; the main
   // process then answers with anything published since. `videos` overrides both when a
   // caller wants a specific subset.
@@ -216,6 +317,17 @@ export function TutorialVideoGrid({
     if (next) setWatched(next);
   }, []);
 
+  const shelves = useMemo(
+    () => tutorialVideoShelves(shown, { language, category: showFilters ? category : null, query: showFilters ? query : '' }),
+    [shown, language, category, query, showFilters],
+  );
+  // A tab whose shelf is empty in the current catalogue would be a dead end; the ones
+  // filtered out by the *search* stay, so clearing a query is always one click away.
+  const tabs = useMemo(
+    () => TUTORIAL_CATEGORIES.filter((shelf) => shown.some((video) => video.category === shelf)),
+    [shown],
+  );
+
   return (
     <div className={`tutorial-videos tutorial-videos-${variant}`} data-testid="tutorial-video-grid">
       {showHeading && (
@@ -224,18 +336,67 @@ export function TutorialVideoGrid({
           <p>{copy.gridLede}</p>
         </header>
       )}
-      <div className="tutorial-video-grid">
-        {shown.map((video) => (
-          <TutorialVideoCard
-            key={video.id}
-            video={video}
-            language={language}
-            watched={watched.includes(video.id)}
-            onPlay={() => setPlaying(video)}
-            onUnwatch={() => void unmarkWatched(video.id).then(setWatched)}
-          />
-        ))}
-      </div>
+      {showFilters && (
+        <div className="tutorial-videos-toolbar" data-testid="tutorial-videos-toolbar">
+          <div className="tutorial-videos-tabs" role="tablist" aria-label={copy.gridTitle}>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={category === null}
+              className={category === null ? 'active' : ''}
+              data-testid="tutorial-videos-tab-all"
+              onClick={() => setCategory(null)}
+            >
+              {copy.allCategories}
+            </button>
+            {tabs.map((shelf) => (
+              <button
+                key={shelf}
+                type="button"
+                role="tab"
+                aria-selected={category === shelf}
+                className={category === shelf ? 'active' : ''}
+                data-testid={`tutorial-videos-tab-${shelf}`}
+                // Clicking the active tab clears the filter, so a tab is never a trap.
+                onClick={() => setCategory((current) => (current === shelf ? null : shelf))}
+              >
+                {copy.categories[shelf]}
+              </button>
+            ))}
+          </div>
+          <div className="tutorial-videos-search">
+            <Icon name="search" size={14} />
+            <input
+              type="search"
+              value={query}
+              placeholder={copy.searchPlaceholder}
+              aria-label={copy.searchLabel}
+              data-testid="tutorial-videos-search"
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </div>
+        </div>
+      )}
+      {shelves.map((shelf) => (
+        <section key={shelf.category} className="tutorial-videos-shelf" data-testid={`tutorial-videos-shelf-${shelf.category}`}>
+          {/* The heading is the shelf name even when a tab already says it: the tabs are
+              optional and the grid is read top to bottom without them. */}
+          <h3 className="tutorial-videos-shelf-title">{copy.categories[shelf.category]}</h3>
+          <div className="tutorial-video-grid">
+            {shelf.videos.map((video) => (
+              <TutorialVideoCard
+                key={video.id}
+                video={video}
+                language={language}
+                watched={watched.includes(video.id)}
+                onPlay={() => setPlaying(video)}
+                onUnwatch={() => void unmarkWatched(video.id).then(setWatched)}
+              />
+            ))}
+          </div>
+        </section>
+      ))}
+      {shelves.length === 0 && <p className="tutorial-videos-empty" data-testid="tutorial-videos-empty">{copy.noMatches}</p>}
       <footer className="tutorial-videos-footer">
         <p className="tutorial-videos-more" data-testid="tutorial-videos-more"><Icon name="sparkles" size={13} />{copy.more}</p>
         <p className="tutorial-videos-hosting">{copy.hosting} {copy.catalogueNote}</p>

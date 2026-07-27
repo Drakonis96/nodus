@@ -793,8 +793,11 @@ export function Settings({
           <Section title={t('Ayuda')}>
             {/* The videos come first: for most people they are the fastest way in. Their
                 copy comes from shared/tutorialVideos.ts rather than t() because that
-                table covers the tutorial's twelve languages, not the interface's seven. */}
-            <TutorialVideoGrid language={settings.uiLanguage} variant="panel" />
+                table covers the tutorial's twelve languages, not the interface's seven.
+                This is the one place that holds the WHOLE catalogue — the first-run guide
+                shows only the introduction and each vault's tour offers its own video —
+                so it is also the only one with the tabs and the search box. */}
+            <TutorialVideoGrid language={settings.uiLanguage} variant="panel" showFilters />
             <div className="border-t border-neutral-800 pt-4 flex items-center justify-between gap-4">
               <div>
                 <label className="text-sm text-neutral-300">{t('Guía esencial de Nodus e IA')}</label>

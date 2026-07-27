@@ -5,7 +5,8 @@ import { readFile } from 'node:fs/promises';
 const read = (file) => readFile(new URL(`../${file}`, import.meta.url), 'utf8');
 
 test('worldbuilding and teaching use their own visible vault icons', async () => {
-  const [picker, app, ui, dock] = await Promise.all([
+  const [picker, switcher, app, ui, dock] = await Promise.all([
+    read('src/components/vaultTypeUi.tsx'),
     read('src/components/VaultSwitcher.tsx'),
     read('src/App.tsx'),
     read('src/components/ui.tsx'),
@@ -14,7 +15,7 @@ test('worldbuilding and teaching use their own visible vault icons', async () =>
   assert.match(picker, /case 'worldbuilding': return 'globe'/);
   assert.match(picker, /case 'docencia': return 'presentation'/);
   assert.match(picker, /new-vault-type-icon-/);
-  assert.match(picker, /vault-type-icon-/);
+  assert.match(switcher, /vault-type-icon-/);
   assert.match(app, /vaultTypeIcon\(activeVault\.type\)/);
   assert.match(ui, /globe:/);
   assert.match(ui, /presentation:/);
@@ -23,6 +24,67 @@ test('worldbuilding and teaching use their own visible vault icons', async () =>
   assert.match(vaultTypes, /worldbuilding: '#7c3aed'/);
   assert.match(vaultTypes, /docencia: '#ea580c'/);
   assert.match(dock, /vaultTypeColor\(type\)/);
+});
+
+test('the guide hands over to the first-vault chooser, not to an academic vault', async () => {
+  const [app, screen, registry] = await Promise.all([
+    read('src/App.tsx'),
+    read('src/views/FirstVaultSetup.tsx'),
+    read('electron/vaults/vaultRegistry.ts'),
+  ]);
+  // It comes straight after the guide and before anything else asks for a decision.
+  const guideAt = app.indexOf('if (!isPreviewVault && settings.basicsTutorialVersion === 0)');
+  const chooserAt = app.indexOf('<FirstVaultSetup');
+  const recoveryAt = app.indexOf('<RecoverySetupWizard');
+  const onboardingAt = app.indexOf('<Onboarding');
+  assert.ok(guideAt > 0 && chooserAt > guideAt, 'the chooser follows the guide');
+  assert.ok(chooserAt < recoveryAt && chooserAt < onboardingAt, 'and precedes recovery setup and the model wizard');
+  assert.match(app, /!isPreviewVault && newInstall && settings\.firstVaultVersion === 0 && activeVault/);
+
+  // It RENAMES the vault the registry always materialises rather than creating a second
+  // one — `defaultVaultRecord` is re-added whenever it is missing, so a create here
+  // would strand an empty «Principal» on every new install.
+  assert.match(registry, /function defaultVaultRecord\(\): VaultRecord/);
+  assert.match(registry, /vaults\.unshift\(defaultVaultRecord\(\)\)/);
+  assert.match(screen, /window\.nodus\.renameVault\(vault\.id, trimmed\)/);
+  assert.match(screen, /window\.nodus\.setVaultType\(vault\.id, type\)/);
+  assert.doesNotMatch(screen, /createVault/, 'the install already has a vault');
+  // The flag is written LAST, so a failed rename leaves the screen retryable instead of
+  // marking it answered with the vault half-configured.
+  const renameAt = screen.indexOf('renameVault(vault.id');
+  const flagAt = screen.indexOf('firstVaultVersion: FIRST_VAULT_VERSION');
+  assert.ok(renameAt > 0 && flagAt > renameAt);
+  // Never a dead end: the name is pre-filled and Enter submits.
+  assert.match(screen, /useState\(\(\) => t\('Mi bóveda'\)\)/);
+  assert.match(screen, /event\.key === 'Enter'/);
+  assert.match(screen, /data-testid="first-vault-create"/);
+  // Cinematic chrome, like the guide it follows.
+  assert.match(screen, /className="tutorial-cinema tutorial-language-screen"/);
+  assert.match(screen, /<NodiAvatar/);
+});
+
+test('the first-vault chooser can only ever meet a genuinely new install', async () => {
+  const [app, prefs, defaults, types] = await Promise.all([
+    read('src/App.tsx'),
+    read('electron/db/appPrefs.ts'),
+    read('electron/db/settingsRepo.ts'),
+    read('shared/types.ts'),
+  ]);
+  // The gate is captured from the FIRST settings read of the run. Both flags it depends
+  // on flip while the app is running — the guide sets basicsTutorialVersion, then the
+  // chooser sets firstVaultVersion — so a live read would close the chooser the instant
+  // it opened, and would show it to installs that predate it.
+  assert.match(app, /const newInstallRef = useRef<boolean \| null>\(null\)/);
+  assert.match(app, /if \(!settings \|\| newInstallRef\.current !== null\) return;/);
+  assert.match(app, /const fresh = settings\.basicsTutorialVersion === 0;/);
+  // …and an install that already completed the guide is stamped, so replaying the guide
+  // from Settings and restarting can never make it look new.
+  assert.match(app, /if \(!fresh && settings\.firstVaultVersion === 0\) \{\s*\n\s*void window\.nodus\.updateSettings\(\{ firstVaultVersion: FIRST_VAULT_VERSION \}\);/);
+  // App-wide, like the tutorial version it sits next to: answering it in one vault must
+  // not leave another vault asking again.
+  assert.match(types, /firstVaultVersion: number;/);
+  assert.match(defaults, /firstVaultVersion: 0,/);
+  assert.match(prefs, /'firstVaultVersion',/);
 });
 
 test('preview vaults bypass setup and every automatic tutorial', async () => {
@@ -69,6 +131,31 @@ test('discarding a new onboarding vault switches away before deleting it', async
   const deleteAt = cancelFlow.indexOf('deleteVault(discardedVaultId, true)');
   assert.ok(switchAt >= 0 && deleteAt > switchAt, 'the active vault must be switched before it can be deleted');
   assert.match(cancelFlow, /if \(!switched\.ok\) throw new Error\(switched\.message\)/);
+});
+
+test('both vault creation screens offer the SAME modes, from one picker', async () => {
+  const [shared, switcher, first] = await Promise.all([
+    read('src/components/vaultTypeUi.tsx'),
+    read('src/components/VaultSwitcher.tsx'),
+    read('src/views/FirstVaultSetup.tsx'),
+  ]);
+  // Which modes exist, which are "Pronto", which carry a BETA/PREVIEW tag and what each
+  // promises are decided once. Two copies of this grid is exactly how the first-run
+  // chooser would end up offering a type the switcher had already retired.
+  assert.match(shared, /export function VaultTypePicker\(/);
+  for (const file of [switcher, first]) {
+    assert.match(file, /<VaultTypePicker value=/, 'renders the shared picker');
+    assert.doesNotMatch(file, /CREATE_VAULT_TYPES\.map/, 'must not re-implement the grid');
+    assert.doesNotMatch(file, /vaultTypeDescription\(tp\)/);
+  }
+  // The vocabulary moved wholesale: nothing may be left behind to drift.
+  for (const symbol of ['vaultTypeLabel', 'vaultTypeIcon', 'vaultTypeDescription', 'vaultTypePhase', 'CREATE_VAULT_TYPES']) {
+    assert.match(shared, new RegExp(`export (?:function|const) ${symbol}\\b`), `${symbol} lives in vaultTypeUi`);
+    assert.doesNotMatch(switcher, new RegExp(`^(?:export )?function ${symbol}\\(`, 'm'), `${symbol} must not be redefined in the switcher`);
+  }
+  // The header and Settings have imported these from VaultSwitcher since before the
+  // split, so it re-exports them rather than breaking those call sites.
+  assert.match(switcher, /export \{ vaultTypeIcon, vaultTypeLabel \} from '\.\/vaultTypeUi'/);
 });
 
 test('the create-vault modal shows an inline accessible name error', async () => {
