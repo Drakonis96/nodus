@@ -92,6 +92,8 @@ export type {
 
 // Type-only import (erased at compile time) — keeps the no-runtime-import rule intact.
 import type { VaultType } from './vaultTypes';
+import type { InterviewTurn } from './characterInterview';
+import type { WorldCalendar, WorldDate } from './worldCalendar';
 import type { TutorialVideo } from './tutorialVideos';
 import type { ToolkitJobRequest, ToolkitJobProgress, ToolkitJobResult } from './toolkitTypes';
 import type {
@@ -1774,6 +1776,14 @@ export interface VaultDuplicateResult {
 
 export type PersonSex = 'male' | 'female' | 'unknown';
 
+/**
+ * Event kinds stored in `events.type`. The first block is the records/genealogy
+ * vocabulary; the second is the worldbuilding one. They share the column and this
+ * union but never the same picker — each surface enumerates its own subset
+ * (EVENT_TYPE_OPTIONS in the person dossier, CHARACTER_EVENT_TYPES in the character
+ * one), and every consumer of this union is an explicit allow-list rather than an
+ * exhaustive switch, so neither vocabulary ever leaks into the other's UI.
+ */
 export type HistoricalEventType =
   | 'birth'
   | 'baptism'
@@ -1784,7 +1794,19 @@ export type HistoricalEventType =
   | 'residence'
   | 'migration'
   | 'occupation'
-  | 'other';
+  | 'other'
+  // Worldbuilding
+  | 'first_appearance'
+  | 'oath'
+  | 'betrayal'
+  | 'battle'
+  | 'journey'
+  | 'ascension'
+  | 'exile'
+  | 'transformation'
+  | 'bond'
+  | 'loss'
+  | 'revelation';
 
 export type ParticipantRole =
   | 'principal'
@@ -1861,9 +1883,28 @@ export interface SocialRelation {
   role: string;
   /** Markdown, about the connection itself (distinct from the contact's own notes). */
   notes: string | null;
+  /**
+   * Worldbuilding only: the colour of the bond. The relation is already DIRECTIONAL, so
+   * A can be 'lover' towards B while B is 'nemesis' towards A — the asymmetry that
+   * fiction needs and a genealogy role never expresses.
+   */
+  valence?: SocialRelationValence | null;
+  /** The event from which the bond took this shape; null when it always has. */
+  sinceEventId?: string | null;
   createdAt: string;
   updatedAt: string;
 }
+
+/** How a directed social bond feels from the source's side. */
+export type SocialRelationValence =
+  | 'ally'
+  | 'rival'
+  | 'lover'
+  | 'mentor'
+  | 'student'
+  | 'nemesis'
+  | 'kin'
+  | 'neutral';
 
 export interface SocialRelationInput {
   personId: string;
@@ -1871,6 +1912,8 @@ export interface SocialRelationInput {
   targetId: string;
   role: string;
   notes?: string | null;
+  valence?: SocialRelationValence | null;
+  sinceEventId?: string | null;
 }
 
 /** One node in the social-relations graph: a tree person or a standalone contact. */
@@ -1952,6 +1995,13 @@ export interface MatchCandidatePair {
 export interface PersonName {
   name: string;
   kind: string | null;
+  /**
+   * Worldbuilding only: this name is a secret. Genealogy never sets it — a historical
+   * record either says a name or it does not.
+   */
+  secret?: boolean;
+  /** Who inside the story knows this name. Free text; only meaningful when `secret`. */
+  knownBy?: string | null;
 }
 
 /** Non-destructive framing of a person's portrait; the original bytes are untouched. */
@@ -1994,6 +2044,359 @@ export interface PersonInput {
   deathDate?: string | null;
   notes?: string | null;
   names?: PersonName[];
+}
+
+// ── Worldbuilding characters ─────────────────────────────────────────────────
+// A character is a `Person` row plus the `character_profiles` overlay (schema v91).
+// Reusing the person row is what gives characters life events, kinship, social
+// relations, places and the portrait for free; the overlay carries everything that
+// only means something inside an invented world.
+
+export type CharacterLifeStatus =
+  | 'unknown'
+  | 'alive'
+  | 'dead'
+  | 'missing'
+  | 'undead'
+  | 'immortal'
+  | 'unborn';
+
+export type CharacterNarrativeRole = 'protagonist' | 'antagonist' | 'secondary' | 'tertiary' | 'cameo';
+
+/** The classic story-structure arc. Every field optional: it is a prompt, not a form. */
+export interface CharacterArc {
+  want: string | null;
+  need: string | null;
+  flaw: string | null;
+  /** The lie they believe about themselves or the world. */
+  lie: string | null;
+  /** The wound the lie came from. */
+  wound: string | null;
+}
+
+/** How a character sounds — reused when the AI writes their dialogue or speaks them. */
+export interface CharacterVoice {
+  register: string | null;
+  /** Verbal tics, catchphrases, things they never say. */
+  tics: string | null;
+  /** A two- or three-line sample of them talking. */
+  sample: string | null;
+}
+
+export type CharacterImageKind = 'portrait' | 'full_body' | 'expression' | 'age' | 'outfit' | 'other';
+
+/** What a `world_images` row hangs off. Polymorphic, so nothing cascades from it. */
+export type WorldImageEntityKind = 'character' | 'place' | 'group' | 'scene';
+
+/**
+ * How a character's biography is written. `faithful` retells only what the sheet says;
+ * `propose` may fill gaps but must mark what it invented, and its output is quarantined
+ * in CharacterProfile.biographyProposed until the author accepts it.
+ */
+export type CharacterBiographyMode = 'faithful' | 'propose';
+
+export interface CharacterImage {
+  imageId: string;
+  personId: string;
+  kind: CharacterImageKind;
+  label: string | null;
+  mimeType: string;
+  bytes: number;
+  /** The prompt that produced it, so a generation can be iterated, not re-guessed. */
+  prompt: string | null;
+  provider: string | null;
+  model: string | null;
+  style: string | null;
+  generated: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CharacterAbility {
+  abilityId: string;
+  personId: string;
+  name: string;
+  description: string | null;
+  /** What using it costs. */
+  cost: string | null;
+  /** What it cannot do. Without this a power is a plot solvent. */
+  limits: string | null;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** The fiction half of a place: an overlay on `places`, like CharacterProfile on persons. */
+export interface PlaceProfile {
+  placeId: string;
+  appearance: string | null;
+  atmosphere: string | null;
+  history: string | null;
+  visualSeed: string | null;
+  accent: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** A place seen from a worldbuilding vault: the shared row plus its overlay. */
+export interface WorldPlace extends Place {
+  profile: PlaceProfile;
+}
+
+export interface WorldPlaceInput {
+  name: string;
+  kind?: string | null;
+  parentId?: string | null;
+  notes?: string | null;
+  appearance?: string | null;
+  atmosphere?: string | null;
+  history?: string | null;
+  visualSeed?: string | null;
+  accent?: string | null;
+}
+
+// ── Secrets and scenes (schema v96) ──────────────────────────────────────────
+
+export type WorldSecretStatus = 'kept' | 'revealed';
+
+export interface WorldSecret {
+  secretId: string;
+  title: string;
+  content: string | null;
+  ownerPersonId: string | null;
+  ownerName: string | null;
+  status: WorldSecretStatus;
+  /** When it got out, on the world scale. */
+  revealedWorldDay: number | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WorldSecretInput {
+  title: string;
+  content?: string | null;
+  ownerPersonId?: string | null;
+  status?: WorldSecretStatus;
+  revealedWorldDay?: number | null;
+  notes?: string | null;
+}
+
+export interface SecretKnower {
+  id: string;
+  secretId: string;
+  personId: string;
+  personName: string;
+  /** When they learned it; null means they always knew. */
+  sinceWorldDay: number | null;
+  how: string | null;
+}
+
+export type WorldSceneStatus = 'outline' | 'draft' | 'written';
+
+export interface WorldScene {
+  sceneId: string;
+  title: string;
+  summary: string | null;
+  placeId: string | null;
+  placeName: string | null;
+  /** WHEN it happens in the world. */
+  worldYear: number | null;
+  worldDay: number | null;
+  status: WorldSceneStatus;
+  /** WHERE it sits in the telling. Not the same as when it happens — see a prologue. */
+  narrativeOrder: number;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WorldSceneInput {
+  title: string;
+  summary?: string | null;
+  placeId?: string | null;
+  worldYear?: number | null;
+  worldDay?: number | null;
+  status?: WorldSceneStatus;
+  narrativeOrder?: number;
+  notes?: string | null;
+}
+
+export interface SceneAppearance {
+  id: string;
+  sceneId: string;
+  sceneTitle: string;
+  personId: string;
+  personName: string;
+  role: string | null;
+}
+
+/** Factions, cultures, religions, houses and orders: one entity, several kinds. */
+export type WorldGroupKind = 'faction' | 'culture' | 'religion' | 'house' | 'order' | 'species' | 'language';
+export type WorldGroupStatus = 'active' | 'extinct' | 'dormant';
+
+export interface WorldGroup {
+  groupId: string;
+  kind: WorldGroupKind;
+  name: string;
+  summary: string | null;
+  description: string | null;
+  /** Same role as a character's: keeps generated images of one group looking alike. */
+  visualSeed: string | null;
+  accent: string | null;
+  status: WorldGroupStatus | null;
+  parentId: string | null;
+  /** Where it is seated, if anywhere — a `places` row. */
+  seatPlaceId: string | null;
+  foundedYear: number | null;
+  endedYear: number | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WorldGroupInput {
+  kind?: WorldGroupKind;
+  name: string;
+  summary?: string | null;
+  description?: string | null;
+  visualSeed?: string | null;
+  accent?: string | null;
+  status?: WorldGroupStatus | null;
+  parentId?: string | null;
+  seatPlaceId?: string | null;
+  foundedYear?: number | null;
+  endedYear?: number | null;
+  notes?: string | null;
+}
+
+/** A character's membership of a group, with a rank and a period in world days. */
+export interface CharacterAffiliation {
+  affiliationId: string;
+  personId: string;
+  groupId: string;
+  groupName: string;
+  groupKind: WorldGroupKind;
+  /** Resolved for the group sheet's member list, which has no other way to name them. */
+  personName: string;
+  rank: string | null;
+  fromWorldDay: number | null;
+  toWorldDay: number | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CharacterAffiliationInput {
+  personId: string;
+  groupId: string;
+  rank?: string | null;
+  fromWorldDay?: number | null;
+  toWorldDay?: number | null;
+  notes?: string | null;
+}
+
+export interface CharacterAbilityInput {
+  name: string;
+  description?: string | null;
+  cost?: string | null;
+  limits?: string | null;
+  sortOrder?: number;
+}
+
+export interface CharacterProfile {
+  personId: string;
+  species: string | null;
+  gender: string | null;
+  /** Written verbatim by the author and passed verbatim to the AI. */
+  pronouns: string | null;
+  lifeStatus: CharacterLifeStatus;
+  narrativeRole: CharacterNarrativeRole | null;
+  /** A palette token from CHARACTER_ACCENTS, never a raw hex. */
+  accent: string | null;
+  appearance: string | null;
+  personality: string | null;
+  backstory: string | null;
+  /** Canonical appearance prompt re-injected into every image generation. */
+  visualSeed: string | null;
+  /** In-world year; the readable date lives in Person.birthDate / deathDate. */
+  birthYearSort: number | null;
+  deathYearSort: number | null;
+  arc: CharacterArc;
+  voice: CharacterVoice;
+  /**
+   * A biography the AI was allowed to PROPOSE beyond the sheet. Held apart from
+   * Person.biography so a proposal is never mistaken for accepted canon: accepting it
+   * is what moves it across.
+   */
+  biographyProposed: string | null;
+  biographyProposedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** A character: the shared person row joined to its worldbuilding overlay. */
+export interface Character extends Person {
+  profile: CharacterProfile;
+  /** Names of the factions/houses/orders they belong to — what the grid facets by. */
+  factions?: string[];
+  /** Names of the cultures/species/languages they belong to. */
+  cultures?: string[];
+}
+
+export interface CharacterInput {
+  displayName: string;
+  species?: string | null;
+  gender?: string | null;
+  pronouns?: string | null;
+  lifeStatus?: CharacterLifeStatus;
+  narrativeRole?: CharacterNarrativeRole | null;
+  accent?: string | null;
+  appearance?: string | null;
+  personality?: string | null;
+  backstory?: string | null;
+  visualSeed?: string | null;
+  /** Free text, exactly as the author writes it in their own calendar. */
+  birthDate?: string | null;
+  deathDate?: string | null;
+  birthYearSort?: number | null;
+  deathYearSort?: number | null;
+  arc?: Partial<CharacterArc>;
+  voice?: Partial<CharacterVoice>;
+  notes?: string | null;
+  names?: PersonName[];
+}
+
+export interface CharacterFilter {
+  search?: string;
+  role?: CharacterNarrativeRole;
+  status?: CharacterLifeStatus;
+}
+
+export interface CharacterCounts {
+  total: number;
+  byRole: Record<string, number>;
+  byStatus: Record<string, number>;
+}
+
+/**
+ * A life event seen from a character sheet: the shared historical event plus its
+ * position in the world's own calendar. A wrapper rather than two more fields on
+ * HistoricalEvent, so the genealogy timeline never grows a column it cannot use.
+ */
+export interface CharacterEvent extends HistoricalEvent {
+  /** In-world year (may be negative); null when the author has not placed it yet. */
+  worldYear: number | null;
+  /** Tie-break within the same year. */
+  worldOrder: number;
+  /** Structured date against the world's calendar (v93); all null without one. */
+  eraId: string | null;
+  /** 0-based index into the calendar's months. */
+  monthIndex: number | null;
+  day: number | null;
+  /** Derived absolute day; orders events WITHIN a year. */
+  worldDay: number | null;
 }
 
 export interface Place {
@@ -2733,6 +3136,7 @@ export type SyncGroupKey =
   | 'study'
   | 'teaching'
   | 'genealogy'
+  | 'worldbuilding'
   | 'research'
   | 'chats'
   | 'content';
@@ -5397,6 +5801,134 @@ export interface NodusApi {
   deleteEvent(id: string): Promise<void>;
   addParticipant(eventId: string, personId: string, role: ParticipantRole): Promise<void>;
   removeParticipant(eventId: string, personId: string, role: ParticipantRole): Promise<void>;
+  // Worldbuilding characters. Everything a character shares with a person — portrait,
+  // aliases, events, kinship, social relations — goes through the bridges above; only
+  // the overlay and the in-world calendar have their own calls.
+  listCharacters(filter?: CharacterFilter): Promise<Character[]>;
+  getCharacter(personId: string): Promise<Character | null>;
+  createCharacter(input: CharacterInput): Promise<Character>;
+  updateCharacter(personId: string, patch: Partial<CharacterInput>): Promise<Character | null>;
+  deleteCharacter(personId: string): Promise<void>;
+  listCharacterEvents(personId: string): Promise<CharacterEvent[]>;
+  setCharacterEventWorldDate(eventId: string, worldYear: number | null, worldOrder?: number): Promise<void>;
+  characterCounts(): Promise<CharacterCounts>;
+  /** Every event in the vault ordered by the in-world year — the worldbuilding timeline. */
+  listWorldEvents(): Promise<CharacterEvent[]>;
+  listWorldPlaces(): Promise<WorldPlace[]>;
+  getWorldPlace(placeId: string): Promise<WorldPlace | null>;
+  createWorldPlace(input: WorldPlaceInput): Promise<WorldPlace>;
+  /** A reparent that would close a loop is refused; the parent stays as it was. */
+  updateWorldPlace(placeId: string, patch: Partial<WorldPlaceInput>): Promise<WorldPlace | null>;
+  deleteWorldPlace(placeId: string): Promise<void>;
+  /** Characters recorded at this place, from `person_places`. */
+  placeInhabitants(placeId: string): Promise<{ personId: string; displayName: string; role: string | null }[]>;
+  /** Factions, cultures and the rest: one collection, filtered by kind. */
+  listWorldGroups(kind?: WorldGroupKind): Promise<WorldGroup[]>;
+  getWorldGroup(groupId: string): Promise<WorldGroup | null>;
+  createWorldGroup(input: WorldGroupInput): Promise<WorldGroup>;
+  updateWorldGroup(groupId: string, patch: Partial<WorldGroupInput>): Promise<WorldGroup | null>;
+  deleteWorldGroup(groupId: string): Promise<void>;
+  listAffiliationsForCharacter(personId: string): Promise<CharacterAffiliation[]>;
+  listAffiliationsForGroup(groupId: string): Promise<CharacterAffiliation[]>;
+  addAffiliation(input: CharacterAffiliationInput): Promise<CharacterAffiliation>;
+  updateAffiliation(id: string, patch: Partial<CharacterAffiliationInput>): Promise<CharacterAffiliation | null>;
+  deleteAffiliation(id: string): Promise<void>;
+  listSecrets(): Promise<WorldSecret[]>;
+  secretsForCharacter(personId: string): Promise<{ owned: WorldSecret[]; known: WorldSecret[] }>;
+  createSecret(input: WorldSecretInput): Promise<WorldSecret>;
+  updateSecret(secretId: string, patch: Partial<WorldSecretInput>): Promise<WorldSecret | null>;
+  deleteSecret(secretId: string): Promise<void>;
+  listKnowers(secretId: string): Promise<SecretKnower[]>;
+  addKnower(input: { secretId: string; personId: string; sinceWorldDay?: number | null; how?: string | null }): Promise<SecretKnower[]>;
+  removeKnower(id: string): Promise<void>;
+  /** Scenes in narrative order (the manuscript's) or chronological (the world's). */
+  listScenes(order?: 'narrative' | 'chronological'): Promise<WorldScene[]>;
+  createScene(input: WorldSceneInput): Promise<WorldScene>;
+  updateScene(sceneId: string, patch: Partial<WorldSceneInput>): Promise<WorldScene | null>;
+  deleteScene(sceneId: string): Promise<void>;
+  listSceneCharacters(sceneId: string): Promise<SceneAppearance[]>;
+  /** The scenes a character appears in, in narrative order. */
+  appearancesOfCharacter(personId: string): Promise<SceneAppearance[]>;
+  addSceneCharacter(sceneId: string, personId: string, role?: string | null): Promise<SceneAppearance[]>;
+  removeSceneCharacter(id: string): Promise<void>;
+  /** The generic gallery, shared by characters, places, groups and scenes. */
+  listWorldImages(entityKind: WorldImageEntityKind, entityId: string): Promise<CharacterImage[]>;
+  getWorldImageBlob(imageId: string): Promise<{ blob: Uint8Array; mime: string } | null>;
+  deleteWorldImage(imageId: string): Promise<void>;
+  addWorldImageFromFile(
+    entityKind: WorldImageEntityKind,
+    entityId: string,
+    kind?: CharacterImageKind
+  ): Promise<CharacterImage[]>;
+  generateWorldImage(
+    entityKind: WorldImageEntityKind,
+    entityId: string,
+    kind: CharacterImageKind,
+    style?: DecorativeImageStyle
+  ): Promise<CharacterImage>;
+  /**
+   * Write the sheet to a Markdown file the author chooses. Secret aliases and private
+   * notes are OMITTED unless explicitly asked for: exporting means sharing. Returns the
+   * saved path, or null if the dialog was cancelled.
+   */
+  exportCharacterSheet(
+    personId: string,
+    options?: { includeSecrets?: boolean; includeNotes?: boolean }
+  ): Promise<string | null>;
+  /** The world's calendar. Empty eras+months means the author has not defined one. */
+  getWorldCalendar(): Promise<WorldCalendar>;
+  /** Replaces the whole calendar and recomputes every derived absolute day. */
+  saveWorldCalendar(input: {
+    name?: string | null;
+    notes?: string | null;
+    eras?: { eraId?: string; name: string; abbreviation?: string | null; startYear: number; countsBackwards?: boolean }[];
+    months?: { monthId?: string; name: string; days: number }[];
+  }): Promise<WorldCalendar>;
+  getEventWorldDate(eventId: string): Promise<(WorldDate & { worldDay: number | null }) | null>;
+  setEventWorldDate(eventId: string, date: WorldDate, worldOrder?: number): Promise<void>;
+  generateCharacterBiography(
+    personId: string,
+    mode?: CharacterBiographyMode
+  ): Promise<{ biography: string | null; noMaterial: boolean; proposal: boolean }>;
+  /**
+   * Ask a character a question and get their in-voice answer. The exchange is NOT
+   * persisted: pass the history back on each turn.
+   */
+  interviewCharacter(personId: string, question: string, history?: InterviewTurn[]): Promise<string>;
+  /** Promote the AI proposal to canon. Null when there was nothing to accept. */
+  acceptProposedBiography(personId: string): Promise<Character | null>;
+  discardProposedBiography(personId: string): Promise<Character | null>;
+  generateCharacterPortrait(
+    personId: string,
+    style?: DecorativeImageStyle,
+    extra?: string | null
+  ): Promise<Character | null>;
+  /** The gallery WITHOUT the bytes; fetch those one at a time with getCharacterImageBlob. */
+  listCharacterImages(personId: string): Promise<CharacterImage[]>;
+  getCharacterImageBlob(imageId: string): Promise<{ blob: Uint8Array; mime: string } | null>;
+  addCharacterImageFromFile(personId: string, kind?: CharacterImageKind): Promise<CharacterImage[]>;
+  generateCharacterImage(
+    personId: string,
+    kind: CharacterImageKind,
+    style?: DecorativeImageStyle,
+    extra?: string | null
+  ): Promise<CharacterImage>;
+  updateCharacterImage(imageId: string, patch: { kind?: CharacterImageKind; label?: string | null }): Promise<void>;
+  deleteCharacterImage(imageId: string): Promise<void>;
+  setCharacterAvatarFromImage(imageId: string): Promise<void>;
+  listCharacterAbilities(personId: string): Promise<CharacterAbility[]>;
+  addCharacterAbility(personId: string, input: CharacterAbilityInput): Promise<CharacterAbility>;
+  updateCharacterAbility(abilityId: string, patch: Partial<CharacterAbilityInput>): Promise<CharacterAbility | null>;
+  deleteCharacterAbility(abilityId: string): Promise<void>;
+  /** Add or update an alias, including whether it is a secret and who knows it. */
+  setCharacterName(
+    personId: string,
+    name: string,
+    kind: string | null,
+    secret?: boolean,
+    knownBy?: string | null
+  ): Promise<Character | null>;
+  deleteCharacterName(personId: string, name: string): Promise<Character | null>;
   addRecordEvidence(input: RecordEvidenceInput): Promise<RecordEvidence>;
   listRecordEvidence(targetKind: RecordEvidenceTargetKind, targetId: string): Promise<RecordEvidence[]>;
   deleteRecordEvidence(id: string): Promise<void>;

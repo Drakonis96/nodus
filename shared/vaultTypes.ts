@@ -171,8 +171,31 @@ Este vault es un gestor de bases de datos estructuradas (tablas con columnas tip
   {
     id: 'worldbuilding',
     available: true,
-    defaultHiddenViews: [],
-    promptPack: '',
+    // A worldbuilding vault renders its own sidebar (WorldbuildingSidebar) plus the
+    // tools group, so the research/authoring universals are hidden by default the way
+    // the study and teaching modes hide them. `notes` stays visible: the sidebar's
+    // "Crear" group points at the real Notes view rather than a placeholder.
+    defaultHiddenViews: [
+      'search',
+      'library',
+      'graph',
+      'argument',
+      'ideas',
+      'authors',
+      'immersion',
+      'gaps',
+      'debate',
+      'research',
+      'hypothesis',
+      'reading',
+      'deepResearch',
+      'writing',
+      'projects',
+    ],
+    promptPack: `
+
+═══ CONTEXTO DEL VAULT — MODO WORLDBUILDING ═══
+Este vault construye un mundo de ficción. A diferencia de un corpus documental, aquí el AUTOR ES LA FUENTE DE VERDAD: lo que consta en las fichas es canon y no se contradice ni se "corrige". No introduzcas hechos, nombres, lugares ni parentescos que no estén en el material aportado, y cuando propongas algo, dilo explícitamente en vez de presentarlo como establecido. Respeta literalmente los nombres, epítetos y pronombres tal como el autor los escribe: no los traduzcas, normalices ni sustituyas. Ten en cuenta que los personajes pueden no ser humanos y que el calendario, la geografía y las reglas del mundo son inventados: no los ajustes a la historia real ni a un calendario terrestre.`,
   },
   {
     id: 'docencia',
@@ -228,8 +251,17 @@ export function vaultTypeColor(value: unknown): string {
   return VAULT_TYPE_COLORS[normalizeVaultType(value)];
 }
 
-/** Selectable shells whose product sections are visible but intentionally inert. */
-export const PREVIEW_VAULT_TYPES: VaultType[] = ['worldbuilding'];
+/**
+ * Selectable shells whose product sections are visible but intentionally inert.
+ *
+ * Empty since worldbuilding graduated into a real workspace (its Personajes section
+ * ships; the rest of its sidebar is inert inside WorldbuildingSidebar instead). The
+ * mechanism is kept because it is how a type gets announced before it is built — but
+ * note that the renderer no longer carries a generic preview shell: putting a type
+ * back in this list means writing its sidebar and its Inicio placeholder too, since
+ * `isViewAllowedForVaultType` will then allow nothing but 'home'.
+ */
+export const PREVIEW_VAULT_TYPES: VaultType[] = [];
 
 export function isPreviewVaultType(value: unknown): boolean {
   return PREVIEW_VAULT_TYPES.includes(normalizeVaultType(value));
@@ -245,19 +277,31 @@ export function isPreviewVaultType(value: unknown): boolean {
  */
 export const VAULT_TYPE_SCOPED_VIEWS: Record<string, VaultType[]> = {
   persons: ['primary_sources', 'genealogy'],
-  timeline: ['primary_sources', 'genealogy'],
+  // The timeline, the map and the kinship tree work on `persons`, `events` and
+  // `relationships`, which a worldbuilding vault fills with characters — so they are
+  // reused rather than rebuilt. The timeline orders by the in-world year there (see
+  // TimelineView); the other two need no date at all.
+  timeline: ['primary_sources', 'genealogy', 'worldbuilding'],
   archive: ['primary_sources', 'genealogy'],
-  map: ['primary_sources', 'genealogy'],
-  tree: ['genealogy'],
+  map: ['primary_sources', 'genealogy', 'worldbuilding'],
+  tree: ['genealogy', 'worldbuilding'],
   // The social-relations graph is independent from the kinship tree but needs the
   // same Person entities, so it's available wherever persons/timeline/archive are.
-  relations: ['primary_sources', 'genealogy'],
+  relations: ['primary_sources', 'genealogy', 'worldbuilding'],
   // Databases mode: the table workspace and its Analysis + Chat sections only exist
   // in a 'databases' vault.
   databases: ['databases'],
   dbSearch: ['databases'],
   dbAnalysis: ['databases'],
   dbChat: ['databases'],
+  // Worldbuilding mode: characters are the first section to ship. Their storage is the
+  // shared person ontology plus the `character_profiles` overlay, but the view itself is
+  // its own (a card grid, not the genealogy list + dossier split).
+  characters: ['worldbuilding'],
+  places: ['worldbuilding'],
+  factions: ['worldbuilding'],
+  cultures: ['worldbuilding'],
+  scenes: ['worldbuilding'],
   // Study mode owns its academic organisation, materials and question bank.
   // They must never leak into research/records/database vaults. The teaching
   // ('docencia') mode reuses the shared organisation surfaces — courses & subjects,
