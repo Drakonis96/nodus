@@ -80,6 +80,12 @@ import type {
   VaultSwitchResult,
   VaultType,
   PersonInput,
+  CharacterInput,
+  CharacterFilter,
+  CharacterImage,
+  CharacterImageKind,
+  CharacterAbilityInput,
+  CharacterAffiliationInput,
   PlaceInput,
   GazetteerPlace,
   PersonPlaceInput,
@@ -282,6 +288,9 @@ import { listImageModels } from './ai/imageModels';
 import {
   applyDecorativeImageOption,
   deleteDecorativeImage,
+  generateCharacterGalleryImage,
+  generateCharacterPortrait,
+  generateWorldEntityImage,
   generatePersonPortraitFromDescription,
   interruptDecorativeImageGenerations,
   invalidateDecorativeImageGeneration,
@@ -541,6 +550,96 @@ import {
   deleteRecordEvidence,
   recordCounts,
 } from './db/entitiesRepo';
+import { DEFAULT_DECORATIVE_IMAGE_STYLE } from '@shared/imageStyles';
+import { generateCharacterBiography } from './ai/characterBiography';
+import { composeCharacterSheetMarkdown } from '@shared/characterSheetExport';
+import type { WorldPlaceInput } from '@shared/types';
+import type {
+  WorldGroupInput,
+  WorldGroupKind,
+  WorldImageEntityKind,
+  WorldSceneInput,
+  WorldSecretInput,
+} from '@shared/types';
+import {
+  addKnower,
+  addSceneCharacter,
+  appearancesOfCharacter,
+  createScene,
+  createSecret,
+  deleteScene,
+  deleteSecret,
+  listKnowers,
+  listSceneCharacters,
+  listScenes,
+  listSecrets,
+  removeKnower,
+  removeSceneCharacter,
+  secretsForCharacter,
+  updateScene,
+  updateSecret,
+} from './db/worldStoryRepo';
+import {
+  addAffiliation,
+  createWorldGroup,
+  deleteAffiliation,
+  deleteWorldGroup,
+  getWorldGroup,
+  listAffiliationsForCharacter,
+  listAffiliationsForGroup,
+  listWorldGroups,
+  updateAffiliation,
+  updateWorldGroup,
+} from './db/worldGroupsRepo';
+import {
+  addWorldImage,
+  deleteWorldImage,
+  getWorldImageBlob,
+  listWorldImages,
+} from './db/worldImagesRepo';
+import {
+  createWorldPlace,
+  deleteWorldPlace,
+  getWorldPlace,
+  inhabitantsOfPlace,
+  listWorldPlaces,
+  updateWorldPlace,
+} from './db/worldPlacesRepo';
+import type { WorldDate } from '@shared/worldCalendar';
+import {
+  getEventWorldDateFull,
+  getWorldCalendar,
+  saveWorldCalendar,
+  setEventWorldDateFull,
+  type WorldCalendarInput,
+} from './db/worldCalendarRepo';
+import { interviewCharacter } from './ai/characterInterview';
+import type { InterviewTurn } from '@shared/characterInterview';
+import {
+  acceptProposedBiography,
+  addCharacterAbility,
+  addCharacterImage,
+  characterCounts,
+  createCharacter,
+  deleteCharacter,
+  deleteCharacterAbility,
+  deleteCharacterImage,
+  deleteCharacterName,
+  getCharacter,
+  getCharacterImageBlob,
+  listCharacterAbilities,
+  listCharacterEvents,
+  listCharacterImages,
+  listCharacters,
+  listWorldEvents,
+  setCharacterAvatarFromImage,
+  setCharacterName,
+  setEventWorldDate,
+  setProposedBiography,
+  updateCharacter,
+  updateCharacterAbility,
+  updateCharacterImage,
+} from './db/charactersRepo';
 import {
   createFolder,
   listFolders,
@@ -1182,6 +1281,289 @@ export function registerIpc(
   );
   h('entities:deleteEvidence', async (_e, id: string) => {
     deleteRecordEvidence(id);
+  });
+  // Worldbuilding characters. A character is a person row plus its overlay, so the
+  // portrait, kinship, relations and event handlers above are reused as they are;
+  // only the overlay and the in-world calendar need their own channels.
+  h('characters:list', async (_e, filter?: CharacterFilter) => listCharacters(filter ?? {}));
+  h('characters:get', async (_e, personId: string) => getCharacter(personId));
+  h('characters:create', async (_e, input: CharacterInput) => createCharacter(input));
+  h('characters:update', async (_e, personId: string, patch: Partial<CharacterInput>) =>
+    updateCharacter(personId, patch)
+  );
+  h('characters:delete', async (_e, personId: string) => {
+    deleteCharacter(personId);
+  });
+  h('characters:listEvents', async (_e, personId: string) => listCharacterEvents(personId));
+  h('characters:setEventWorldDate', async (_e, eventId: string, worldYear: number | null, worldOrder?: number) => {
+    setEventWorldDate(eventId, worldYear, worldOrder ?? 0);
+  });
+  h('characters:counts', async () => characterCounts());
+  h('characters:listWorldEvents', async () => listWorldEvents());
+  // Places, from a worldbuilding vault: the shared row plus its fiction overlay.
+  h('places:listWorld', async () => listWorldPlaces());
+  h('places:getWorld', async (_e, placeId: string) => getWorldPlace(placeId));
+  h('places:createWorld', async (_e, input: WorldPlaceInput) => createWorldPlace(input));
+  h('places:updateWorld', async (_e, placeId: string, patch: Partial<WorldPlaceInput>) =>
+    updateWorldPlace(placeId, patch)
+  );
+  h('places:deleteWorld', async (_e, placeId: string) => {
+    deleteWorldPlace(placeId);
+  });
+  // Which characters are recorded at a place, and what happened there. Both come from
+  // tables genealogy already populates (person_places, events.place_id).
+  h('places:inhabitants', async (_e, placeId: string) => inhabitantsOfPlace(placeId));
+  // Groups: factions, cultures, religions, houses and orders — one collection, filtered.
+  // Secrets and scenes.
+  h('story:listSecrets', async () => listSecrets());
+  h('story:secretsForCharacter', async (_e, personId: string) => secretsForCharacter(personId));
+  h('story:createSecret', async (_e, input: WorldSecretInput) => createSecret(input));
+  h('story:updateSecret', async (_e, id: string, patch: Partial<WorldSecretInput>) => updateSecret(id, patch));
+  h('story:deleteSecret', async (_e, id: string) => {
+    deleteSecret(id);
+  });
+  h('story:listKnowers', async (_e, secretId: string) => listKnowers(secretId));
+  h('story:addKnower', async (_e, input: { secretId: string; personId: string; sinceWorldDay?: number | null; how?: string | null }) =>
+    addKnower(input)
+  );
+  h('story:removeKnower', async (_e, id: string) => {
+    removeKnower(id);
+  });
+  h('story:listScenes', async (_e, order?: 'narrative' | 'chronological') => listScenes(order ?? 'narrative'));
+  h('story:createScene', async (_e, input: WorldSceneInput) => createScene(input));
+  h('story:updateScene', async (_e, id: string, patch: Partial<WorldSceneInput>) => updateScene(id, patch));
+  h('story:deleteScene', async (_e, id: string) => {
+    deleteScene(id);
+  });
+  h('story:listSceneCharacters', async (_e, sceneId: string) => listSceneCharacters(sceneId));
+  h('story:appearances', async (_e, personId: string) => appearancesOfCharacter(personId));
+  h('story:addSceneCharacter', async (_e, sceneId: string, personId: string, role?: string | null) =>
+    addSceneCharacter(sceneId, personId, role ?? null)
+  );
+  h('story:removeSceneCharacter', async (_e, id: string) => {
+    removeSceneCharacter(id);
+  });
+  h('groups:list', async (_e, kind?: WorldGroupKind) => listWorldGroups(kind));
+  h('groups:get', async (_e, groupId: string) => getWorldGroup(groupId));
+  h('groups:create', async (_e, input: WorldGroupInput) => createWorldGroup(input));
+  h('groups:update', async (_e, groupId: string, patch: Partial<WorldGroupInput>) =>
+    updateWorldGroup(groupId, patch)
+  );
+  h('groups:delete', async (_e, groupId: string) => {
+    deleteWorldGroup(groupId);
+  });
+  h('groups:listAffiliationsForCharacter', async (_e, personId: string) =>
+    listAffiliationsForCharacter(personId)
+  );
+  h('groups:listAffiliationsForGroup', async (_e, groupId: string) => listAffiliationsForGroup(groupId));
+  h('groups:addAffiliation', async (_e, input: CharacterAffiliationInput) => addAffiliation(input));
+  h('groups:updateAffiliation', async (_e, id: string, patch: Partial<CharacterAffiliationInput>) =>
+    updateAffiliation(id, patch)
+  );
+  h('groups:deleteAffiliation', async (_e, id: string) => {
+    deleteAffiliation(id);
+  });
+  // Generic gallery, shared by characters, places, groups and scenes.
+  h('world:listImages', async (_e, entityKind: WorldImageEntityKind, entityId: string) =>
+    listWorldImages(entityKind, entityId)
+  );
+  h('world:getImageBlob', async (_e, imageId: string) => getWorldImageBlob(imageId));
+  h('world:deleteImage', async (_e, imageId: string) => {
+    deleteWorldImage(imageId);
+  });
+  h('world:addImageFromFile', async (
+    _e,
+    entityKind: WorldImageEntityKind,
+    entityId: string,
+    kind?: CharacterImageKind
+  ) => {
+    const win = getWindow();
+    const picked = await showImportOpenDialog(win ?? undefined!, {
+      title: 'Añadir imagen',
+      properties: ['openFile', 'multiSelections'],
+      filters: [{ name: 'Imágenes', extensions: ['png', 'jpg', 'jpeg', 'webp', 'bmp', 'tif', 'tiff'] }],
+    });
+    if (picked.canceled || picked.filePaths.length === 0) return [];
+    return picked.filePaths.map((filePath) => {
+      const bytes = fs.readFileSync(filePath);
+      const ext = path.extname(filePath).toLowerCase();
+      const mime =
+        ext === '.png' ? 'image/png'
+        : ext === '.webp' ? 'image/webp'
+        : ext === '.bmp' ? 'image/bmp'
+        : ext === '.tif' || ext === '.tiff' ? 'image/tiff'
+        : 'image/jpeg';
+      return addWorldImage({
+        entityKind,
+        entityId,
+        blob: bytes,
+        mimeType: mime,
+        kind: kind ?? 'other',
+        label: path.basename(filePath, ext),
+        generated: false,
+      });
+    });
+  });
+  h('world:generateImage', async (
+    _e,
+    entityKind: WorldImageEntityKind,
+    entityId: string,
+    kind: CharacterImageKind,
+    style?: DecorativeImageStyle
+  ) => generateWorldEntityImage(entityKind, entityId, kind, style ?? DEFAULT_DECORATIVE_IMAGE_STYLE));
+  // The world's calendar. Saving it recomputes every derived absolute day, because a
+  // month that gained a day moves every date after it.
+  h('world:getCalendar', async () => getWorldCalendar());
+  h('world:saveCalendar', async (_e, input: WorldCalendarInput) => saveWorldCalendar(input));
+  h('world:getEventDate', async (_e, eventId: string) => getEventWorldDateFull(eventId));
+  h('world:setEventDate', async (_e, eventId: string, date: WorldDate, worldOrder?: number) => {
+    setEventWorldDateFull(eventId, date, worldOrder ?? 0);
+  });
+  h('characters:exportSheet', async (
+    _e,
+    personId: string,
+    options?: { includeSecrets?: boolean; includeNotes?: boolean }
+  ) => {
+    const character = getCharacter(personId);
+    if (!character) throw new Error('Personaje no encontrado.');
+    const kin = kinOf(personId);
+    const markdown = composeCharacterSheetMarkdown(
+      {
+        displayName: character.displayName,
+        names: character.names,
+        species: character.profile.species,
+        gender: character.profile.gender,
+        pronouns: character.profile.pronouns,
+        lifeStatus: character.profile.lifeStatus,
+        narrativeRole: character.profile.narrativeRole,
+        birthDate: character.birthDate,
+        deathDate: character.deathDate,
+        birthYear: character.profile.birthYearSort,
+        deathYear: character.profile.deathYearSort,
+        appearance: character.profile.appearance,
+        personality: character.profile.personality,
+        backstory: character.profile.backstory,
+        biography: character.biography,
+        arc: character.profile.arc,
+        voice: character.profile.voice,
+        abilities: listCharacterAbilities(personId),
+        events: listCharacterEvents(personId),
+        kin: {
+          parents: kin.parents.map((person) => person.displayName),
+          spouses: kin.spouses.map((person) => person.displayName),
+          children: kin.children.map((person) => person.displayName),
+          siblings: kin.siblings.map((person) => person.displayName),
+        },
+        relations: listSocialRelationsForPerson(personId).map((relation) => ({
+          role: relation.role,
+          target: relation.targetName,
+        })),
+        notes: character.notes,
+      },
+      options ?? {}
+    );
+    const win = getWindow();
+    const safeName = character.displayName.replace(/[^\p{L}\p{N} _-]/gu, '').trim() || 'personaje';
+    const picked = await dialog.showSaveDialog(win ?? undefined!, {
+      title: 'Exportar ficha del personaje',
+      defaultPath: `${safeName}.md`,
+      filters: [{ name: 'Markdown', extensions: ['md'] }],
+    });
+    if (picked.canceled || !picked.filePath) return null;
+    fs.writeFileSync(picked.filePath, markdown, 'utf8');
+    return picked.filePath;
+  });
+  h('characters:generateBiography', async (_e, personId: string, mode?: 'faithful' | 'propose') =>
+    generateCharacterBiography(personId, mode ?? 'faithful')
+  );
+  h('characters:interview', async (_e, personId: string, question: string, history?: InterviewTurn[]) =>
+    interviewCharacter(personId, question, history ?? [])
+  );
+  h('characters:acceptProposedBiography', async (_e, personId: string) => acceptProposedBiography(personId));
+  h('characters:discardProposedBiography', async (_e, personId: string) => {
+    setProposedBiography(personId, null);
+    return getCharacter(personId);
+  });
+  // Image gallery. The bytes never travel with the list — only on demand, per image.
+  h('characters:listImages', async (_e, personId: string) => listCharacterImages(personId));
+  h('characters:getImageBlob', async (_e, imageId: string) => getCharacterImageBlob(imageId));
+  h('characters:addImageFromFile', async (_e, personId: string, kind?: CharacterImageKind) => {
+    const win = getWindow();
+    const picked = await showImportOpenDialog(win ?? undefined!, {
+      title: 'Añadir imagen del personaje',
+      properties: ['openFile', 'multiSelections'],
+      filters: [{ name: 'Imágenes', extensions: ['png', 'jpg', 'jpeg', 'webp', 'bmp', 'tif', 'tiff'] }],
+    });
+    if (picked.canceled || picked.filePaths.length === 0) return [];
+    const added: CharacterImage[] = [];
+    for (const filePath of picked.filePaths) {
+      const bytes = fs.readFileSync(filePath);
+      const ext = path.extname(filePath).toLowerCase();
+      const mime =
+        ext === '.png' ? 'image/png'
+        : ext === '.webp' ? 'image/webp'
+        : ext === '.bmp' ? 'image/bmp'
+        : ext === '.tif' || ext === '.tiff' ? 'image/tiff'
+        : 'image/jpeg';
+      added.push(
+        addCharacterImage({
+          personId,
+          blob: bytes,
+          mimeType: mime,
+          kind: kind ?? 'portrait',
+          label: path.basename(filePath, ext),
+          generated: false,
+        })
+      );
+    }
+    return added;
+  });
+  h('characters:generateImage', async (
+    _e,
+    personId: string,
+    kind: CharacterImageKind,
+    style?: DecorativeImageStyle,
+    extra?: string | null
+  ) => generateCharacterGalleryImage(personId, kind, style ?? DEFAULT_DECORATIVE_IMAGE_STYLE, extra ?? null));
+  h('characters:updateImage', async (_e, imageId: string, patch: { kind?: CharacterImageKind; label?: string | null }) => {
+    updateCharacterImage(imageId, patch);
+  });
+  h('characters:deleteImage', async (_e, imageId: string) => {
+    deleteCharacterImage(imageId);
+  });
+  h('characters:setAvatarFromImage', async (_e, imageId: string) => {
+    setCharacterAvatarFromImage(imageId);
+  });
+  // Abilities
+  h('characters:listAbilities', async (_e, personId: string) => listCharacterAbilities(personId));
+  h('characters:addAbility', async (_e, personId: string, input: CharacterAbilityInput) =>
+    addCharacterAbility(personId, input)
+  );
+  h('characters:updateAbility', async (_e, abilityId: string, patch: Partial<CharacterAbilityInput>) =>
+    updateCharacterAbility(abilityId, patch)
+  );
+  h('characters:deleteAbility', async (_e, abilityId: string) => {
+    deleteCharacterAbility(abilityId);
+  });
+  // Aliases, with the secret flag genealogy's addPersonName knows nothing about.
+  h('characters:setName', async (
+    _e,
+    personId: string,
+    name: string,
+    kind: string | null,
+    secret?: boolean,
+    knownBy?: string | null
+  ) => {
+    setCharacterName(personId, name, kind, secret ?? false, knownBy ?? null);
+    return getCharacter(personId);
+  });
+  h('characters:deleteName', async (_e, personId: string, name: string) => {
+    deleteCharacterName(personId, name);
+    return getCharacter(personId);
+  });
+  h('characters:generatePortrait', async (_e, personId: string, style?: DecorativeImageStyle, extra?: string | null) => {
+    await generateCharacterPortrait(personId, style ?? DEFAULT_DECORATIVE_IMAGE_STYLE, extra ?? null);
+    return getCharacter(personId);
   });
   // kinship (genealogy)
   h('entities:addRelationship', async (

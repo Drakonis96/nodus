@@ -1,6 +1,9 @@
 import { nativeImage } from 'electron';
 import { GoogleGenAI } from '@google/genai';
 import type {
+  CharacterImage,
+  CharacterImageKind,
+  WorldImageEntityKind,
   DecorativeImage,
   DecorativeImageActionRequest,
   DecorativeImageEntityKind,
@@ -10,7 +13,11 @@ import type {
   ModelRef,
 } from '@shared/types';
 import { buildDecorativeImagePrompt, DEFAULT_DECORATIVE_IMAGE_STYLE } from '@shared/imageStyles';
+import { buildCharacterPortraitPrompt, hasCharacterImageMaterial } from '@shared/characterImagePrompt';
 import { vaultTypeImagePrompt } from '@shared/vaultTypes';
+import { addCharacterImage, getCharacter } from '../db/charactersRepo';
+import { addWorldImage } from '../db/worldImagesRepo';
+import { getWorldPlace } from '../db/worldPlacesRepo';
 import { getActiveVault } from '../vaults/vaultRegistry';
 import { completeText } from './aiClient';
 import { getSettings } from '../db/settingsRepo';
@@ -411,6 +418,127 @@ function buildReferencePortraitPrompt(description: string): string {
     'Head-and-shoulders composition, calm neutral expression, plain muted backdrop, restrained sepia and warm heritage tones.',
     'A single person only. No text, no words, no letters, no caption, no signature, no border and no decorative frame.',
   ].join(' ');
+}
+
+/**
+ * Generate a worldbuilding character's portrait from their sheet.
+ *
+ * Separate from `generatePersonPortraitFromDescription` on purpose: that one is a
+ * reluctant last resort for genealogy and hardcodes a "clearly not a photograph,
+ * sepia heritage tones" instruction, which is exactly wrong for a made-up world. Here
+ * the author picks the style, and the character's visual seed leads the prompt so
+ * successive generations keep the same face.
+ */
+export async function generateCharacterPortrait(
+  personId: string,
+  style: DecorativeImageStyle = DEFAULT_DECORATIVE_IMAGE_STYLE,
+  extra?: string | null
+): Promise<void> {
+  const character = getCharacter(personId);
+  if (!character) throw new Error('Personaje no encontrado.');
+  const sources = {
+    visualSeed: character.profile.visualSeed,
+    appearance: character.profile.appearance,
+    extra: extra ?? null,
+  };
+  if (!hasCharacterImageMaterial(sources)) {
+    throw new Error('Escribe la apariencia del personaje (o una semilla visual) antes de generar el retrato.');
+  }
+  const settings = getSettings();
+  if (!settings.imageProvider || !settings.imageModel) {
+    throw new Error('Configura un proveedor y modelo de imagen en Ajustes → Proveedores.');
+  }
+  const prompt = buildCharacterPortraitPrompt(style, sources);
+  const generated = await callImageProvider(settings.imageProvider, settings.imageModel, prompt);
+  const optimized = await optimizedJpegs(generated);
+  // focusY sits above centre because a portrait crop should hold the face, not the chest.
+  setPersonPortrait(personId, optimized.image, 'image/jpeg', { focusX: 0.5, focusY: 0.42, scale: 1 }, true);
+}
+
+/**
+ * Generate one image INTO a character's gallery, keeping the prompt, provider, model and
+ * style beside the bytes so the author can iterate on a result instead of re-guessing
+ * what produced it. The avatar is untouched: promoting an image is a separate, explicit
+ * action.
+ */
+export async function generateCharacterGalleryImage(
+  personId: string,
+  kind: CharacterImageKind,
+  style: DecorativeImageStyle = DEFAULT_DECORATIVE_IMAGE_STYLE,
+  extra?: string | null
+): Promise<CharacterImage> {
+  const character = getCharacter(personId);
+  if (!character) throw new Error('Personaje no encontrado.');
+  const sources = {
+    visualSeed: character.profile.visualSeed,
+    appearance: character.profile.appearance,
+    extra: extra ?? null,
+  };
+  if (!hasCharacterImageMaterial(sources)) {
+    throw new Error('Escribe la apariencia del personaje (o una semilla visual) antes de generar imágenes.');
+  }
+  const settings = getSettings();
+  if (!settings.imageProvider || !settings.imageModel) {
+    throw new Error('Configura un proveedor y modelo de imagen en Ajustes → Proveedores.');
+  }
+  const prompt = buildCharacterPortraitPrompt(style, sources, kind);
+  const generated = await callImageProvider(settings.imageProvider, settings.imageModel, prompt);
+  const optimized = await optimizedJpegs(generated);
+  return addCharacterImage({
+    personId,
+    blob: optimized.image,
+    mimeType: 'image/jpeg',
+    kind,
+    prompt,
+    provider: settings.imageProvider,
+    model: settings.imageModel,
+    style,
+    generated: true,
+  });
+}
+
+/**
+ * Generate an image into ANY world entity's gallery.
+ *
+ * The appearance and the visual seed are read from whichever overlay the entity has —
+ * characters and places carry the same two fields for the same reason, so one function
+ * serves both instead of one per section.
+ */
+export async function generateWorldEntityImage(
+  entityKind: WorldImageEntityKind,
+  entityId: string,
+  kind: CharacterImageKind,
+  style: DecorativeImageStyle = DEFAULT_DECORATIVE_IMAGE_STYLE
+): Promise<CharacterImage> {
+  if (entityKind === 'character') return generateCharacterGalleryImage(entityId, kind, style);
+  const place = entityKind === 'place' ? getWorldPlace(entityId) : null;
+  const sources = {
+    visualSeed: place?.profile.visualSeed ?? null,
+    appearance: place?.profile.appearance ?? null,
+    extra: null,
+  };
+  if (!hasCharacterImageMaterial(sources)) {
+    throw new Error('Escribe la apariencia (o una semilla visual) antes de generar imágenes.');
+  }
+  const settings = getSettings();
+  if (!settings.imageProvider || !settings.imageModel) {
+    throw new Error('Configura un proveedor y modelo de imagen en Ajustes → Proveedores.');
+  }
+  const prompt = buildCharacterPortraitPrompt(style, sources, kind);
+  const generated = await callImageProvider(settings.imageProvider, settings.imageModel, prompt);
+  const optimized = await optimizedJpegs(generated);
+  return addWorldImage({
+    entityKind,
+    entityId,
+    blob: optimized.image,
+    mimeType: 'image/jpeg',
+    kind,
+    prompt,
+    provider: settings.imageProvider,
+    model: settings.imageModel,
+    style,
+    generated: true,
+  });
 }
 
 /** End process-local tasks before a vault switch/reset or app shutdown. */
