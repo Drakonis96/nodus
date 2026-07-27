@@ -6644,4 +6644,12 @@ export const DE: Record<string, string> = {
   'Unidad eliminada.': 'Einheit gelöscht.',
   '¿Eliminar esta unidad guardada? Esta acción no se puede deshacer.': 'Diese gespeicherte Einheit löschen? Dieser Vorgang kann nicht rückgängig gemacht werden.',
   'Escribe el tema y Nodus redacta la unidad completa con tus materiales, citando cada uno. Puedes dejar que la IA proponga las partes o fijarlas tú: cuántas son, cómo se titulan y en qué debe centrarse cada una.': 'Schreibe das Thema und Nodus verfasst die ganze Einheit aus deinen Materialien und zitiert jedes davon. Du kannst die KI die Teile vorschlagen lassen oder sie selbst festlegen: wie viele es sind, wie sie heißen und worauf sich jeder konzentrieren soll.',
+  'Diseña unidades para el docente o apuntes para entregar al alumnado, siempre desde tus fuentes.': 'Erstelle Unterrichtseinheiten für Lehrkräfte oder Lernunterlagen für Schülerinnen und Schüler, stets auf Grundlage deiner Quellen.',
+  'Elige si necesitas una planificación para impartir la lección o apuntes listos para entregar.': 'Wähle zwischen einer Unterrichtsplanung und direkt ausgabefertigen Lernunterlagen.',
+  'Escribe el tema de los apuntes. El contenido lo explicará paso a paso con ejemplos y autoevaluación usando tus materiales.': 'Gib das Thema der Lernunterlagen ein. Der Inhalt erklärt es anhand deiner Materialien Schritt für Schritt mit Beispielen und Selbstkontrolle.',
+  'Público objetivo y producto': 'Zielgruppe und Ergebnis',
+  'Docente · planificación de la lección': 'Lehrkraft · Unterrichtsplanung',
+  'Alumnado · apuntes para entregar': 'Lernende · ausgabefertige Unterlagen',
+  'Generará objetivos, secuencia, actividades, comprobaciones de comprensión y evaluación para el docente.': 'Erstellt Lernziele, Ablauf, Aktivitäten, Verständnisprüfungen und Bewertung für die Lehrkraft.',
+  'Generará explicaciones, definiciones, ejemplos, síntesis y autoevaluación dirigidos al alumnado.': 'Erstellt Erklärungen, Definitionen, Beispiele, Zusammenfassungen und Selbstkontrollen für Lernende.',
 };

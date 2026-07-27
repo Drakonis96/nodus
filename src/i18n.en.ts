@@ -6871,4 +6871,12 @@ export const EN: Record<string, string> = {
   'Unidad eliminada.': 'Unit deleted.',
   '¿Eliminar esta unidad guardada? Esta acción no se puede deshacer.': 'Delete this saved unit? This action cannot be undone.',
   'Escribe el tema y Nodus redacta la unidad completa con tus materiales, citando cada uno. Puedes dejar que la IA proponga las partes o fijarlas tú: cuántas son, cómo se titulan y en qué debe centrarse cada una.': 'Write the topic and Nodus drafts the whole unit from your materials, citing each one. You can let the AI propose the parts or fix them yourself: how many there are, what they are called and what each one should concentrate on.',
+  'Diseña unidades para el docente o apuntes para entregar al alumnado, siempre desde tus fuentes.': 'Design teacher-facing units or student handouts, always grounded in your sources.',
+  'Elige si necesitas una planificación para impartir la lección o apuntes listos para entregar.': 'Choose whether you need a plan for teaching the lesson or notes that are ready to share.',
+  'Escribe el tema de los apuntes. El contenido lo explicará paso a paso con ejemplos y autoevaluación usando tus materiales.': 'Enter the topic for the notes. The content will explain it step by step with examples and self-assessment drawn from your materials.',
+  'Público objetivo y producto': 'Target audience and output',
+  'Docente · planificación de la lección': 'Teacher · lesson plan',
+  'Alumnado · apuntes para entregar': 'Students · ready-to-share notes',
+  'Generará objetivos, secuencia, actividades, comprobaciones de comprensión y evaluación para el docente.': 'It will generate objectives, sequence, activities, checks for understanding, and assessment for the teacher.',
+  'Generará explicaciones, definiciones, ejemplos, síntesis y autoevaluación dirigidos al alumnado.': 'It will generate student-facing explanations, definitions, examples, summaries, and self-assessment.',
 };

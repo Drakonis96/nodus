@@ -10,9 +10,15 @@ import type {
   WritingWorkshopSection,
 } from '@shared/types';
 import type { StudySearchIndexEntry, StudySearchKind } from '@shared/studySearch';
+import {
+  normalizeStudyDeepResearchAudience,
+  type StudyDeepResearchAudience,
+} from '@shared/studyDeepResearchAudience';
 import { listStudyIdeasForSources } from '../db/studyKnowledgeRepo';
 import { completeJson, completeText } from './aiClient';
 import { retrieveStudyAssistantEntries } from './studySearch';
+
+export { normalizeStudyDeepResearchAudience };
 
 /** Hard ceiling on a teacher-authored outline; the composer offers far fewer. */
 export const MAX_UNIT_SECTIONS = 12;
@@ -201,6 +207,21 @@ export const TEACHING_UNIT_PROMPTS: Record<PromptLanguage, StudyPromptPack> = {
   },
 };
 
+/**
+ * A teaching unit can now produce either a teacher-facing plan or student-facing
+ * notes. Both prompt packs are already native in every supported output language;
+ * choosing here avoids mixing contradictory teacher and learner instructions.
+ */
+export function studyDeepResearchPromptPack(
+  language: PromptLanguage,
+  audience: StudyDeepResearchAudience,
+  unitMode: boolean,
+): StudyPromptPack {
+  return unitMode && audience === 'teacher'
+    ? TEACHING_UNIT_PROMPTS[language]
+    : STUDY_DEEP_RESEARCH_PROMPTS[language];
+}
+
 function isPlan(value: unknown): value is StudyPlan {
   return Boolean(value && typeof value === 'object' && Array.isArray((value as StudyPlan).sections));
 }
@@ -362,7 +383,14 @@ export async function generateStudyDeepResearchReport(
 ): Promise<DeepResearchReport> {
   const language = request.language ?? 'es';
   const unitMode = Boolean(request.unitMode);
-  const prompts = unitMode ? TEACHING_UNIT_PROMPTS[language] : STUDY_DEEP_RESEARCH_PROMPTS[language];
+  // Existing study reports remain student-facing, while existing teaching-unit jobs
+  // retain their historical teacher-plan behaviour.
+  const audience = normalizeStudyDeepResearchAudience(
+    request.audience,
+    unitMode ? 'teacher' : 'students',
+  );
+  const teacherPlan = unitMode && audience === 'teacher';
+  const prompts = studyDeepResearchPromptPack(language, audience, unitMode);
   onProgress?.({ phase: 'snapshot', message: unitMode ? 'Recuperando materiales, apuntes y transcripciones de clase…' : 'Recuperando apuntes, materiales y transcripciones relevantes…' });
   const retrieved = await retrieveStudyAssistantEntries(request.objective, { kinds: ['material', 'document', 'transcript'] }, [], 48);
   const sources = buildSources(retrieved);
@@ -389,15 +417,18 @@ export async function generateStudyDeepResearchReport(
     phase: 'planning',
     message: requestedOutline.length
       ? `Ajustando el esquema indicado (${count} partes) a los materiales…`
-      : unitMode
+      : teacherPlan
         ? `Diseñando la unidad en ${count} partes…`
-        : `Diseñando una explicación didáctica en ${count} secciones…`,
+        : unitMode
+          ? `Preparando apuntes para el alumnado en ${count} partes…`
+          : `Diseñando una explicación didáctica en ${count} secciones…`,
   });
   const sourcePayload = sources.map(({ id, kind, title, subtitle, location, text }) => ({ id, kind, title, subtitle, location, extract: text }));
   const plan = await completeJson<StudyPlan>({
     system: requestedOutline.length ? `${prompts.plan}\n${FIXED_OUTLINE_RULE}` : prompts.plan,
     user: JSON.stringify({
       objective: request.objective,
+      audience,
       language,
       sectionCount: count,
       ...(requestedOutline.length
@@ -442,7 +473,7 @@ export async function generateStudyDeepResearchReport(
     ).map((idea) => ({ type: idea.type, label: idea.label, statement: idea.statement }));
     onProgress?.({
       phase: 'section',
-      message: `${unitMode ? 'Redactando' : 'Explicando'}: ${section.title}`,
+      message: `${teacherPlan ? 'Redactando' : 'Explicando'}: ${section.title}`,
       sectionIndex: index + 1,
       sectionTotal: sections.length,
       sectionTitle: section.title,
@@ -451,6 +482,7 @@ export async function generateStudyDeepResearchReport(
       system: section.focus ? `${prompts.write}\n${SECTION_FOCUS_RULE}` : prompts.write,
       user: JSON.stringify({
         objective: request.objective,
+        audience,
         language,
         targetWords: Math.max(850, Math.min(1_650, Math.round((pages.max * 450) / sections.length))),
         section: {
@@ -480,11 +512,15 @@ export async function generateStudyDeepResearchReport(
 
   onProgress?.({
     phase: 'assembling',
-    message: unitMode ? 'Preparando síntesis, materiales y propuestas de evaluación…' : 'Preparando síntesis, fuentes y actividades de comprensión…',
+    message: teacherPlan
+      ? 'Preparando síntesis, materiales y propuestas de evaluación…'
+      : unitMode
+        ? 'Preparando síntesis, fuentes y actividades de autoevaluación…'
+        : 'Preparando síntesis, fuentes y actividades de comprensión…',
   });
   const final = await completeJson<StudyFinal>({
     system: prompts.finalize,
-    user: JSON.stringify({ objective: request.objective, language, provisionalTitle: plan.title, sectionTitles: sections.map((section) => section.title), sourcesUsed: [...usedSourceIds] }, null, 2),
+    user: JSON.stringify({ objective: request.objective, audience, language, provisionalTitle: plan.title, sectionTitles: sections.map((section) => section.title), sourcesUsed: [...usedSourceIds] }, null, 2),
     temperature: 0.18,
     maxTokens: 1_800,
   }, isFinal, model).catch((): StudyFinal => ({}));
@@ -511,7 +547,7 @@ export async function generateStudyDeepResearchReport(
   const usedIdeaIds = [...new Set(sections.flatMap((section) => section.ideaIds))];
   const draft: WritingWorkshopDraft = {
     generatedAt: new Date().toISOString(),
-    brief: { kind: 'deep_research', objective: request.objective, audience: request.audience, tone: 'academic', language },
+    brief: { kind: 'deep_research', objective: request.objective, audience, tone: 'academic', language },
     selection: { ideaIds: usedIdeaIds, themeIds: [], gapIds: [], contradictionIds: [], workIds: [], passageIds: [], tutorRouteIds: [] },
     title: final.title?.trim() || plan.title?.trim() || request.objective,
     abstract: final.abstract?.trim() || plan.abstract?.trim() || '',
@@ -535,8 +571,10 @@ export async function generateStudyDeepResearchReport(
   };
   onProgress?.({
     phase: 'done',
-    message: unitMode
+    message: teacherPlan
       ? `Unidad lista: ${sections.length} partes · ${usedSourceIds.size} materiales`
+      : unitMode
+        ? `Apuntes listos: ${sections.length} partes · ${usedSourceIds.size} materiales`
       : `Informe de estudio listo: ${sections.length} secciones · ${usedSourceIds.size} fuentes`,
     wordsSoFar: words,
     pagesSoFar: meta.pages,

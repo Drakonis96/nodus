@@ -6586,4 +6586,12 @@ export const PT: Record<string, string> = {
   'Unidad eliminada.': 'Unidade eliminada.',
   '¿Eliminar esta unidad guardada? Esta acción no se puede deshacer.': 'Eliminar esta unidade guardada? Esta ação não pode ser anulada.',
   'Escribe el tema y Nodus redacta la unidad completa con tus materiales, citando cada uno. Puedes dejar que la IA proponga las partes o fijarlas tú: cuántas son, cómo se titulan y en qué debe centrarse cada una.': 'Escreve o tema e o Nodus redige a unidade completa a partir dos teus materiais, citando cada um. Podes deixar a IA propor as partes ou fixá-las tu: quantas são, como se intitulam e em que se deve centrar cada uma.',
+  'Diseña unidades para el docente o apuntes para entregar al alumnado, siempre desde tus fuentes.': 'Concebe unidades para o docente ou apontamentos para entregar aos alunos, sempre a partir das tuas fontes.',
+  'Elige si necesitas una planificación para impartir la lección o apuntes listos para entregar.': 'Escolhe entre um plano para dar a aula e apontamentos prontos a entregar.',
+  'Escribe el tema de los apuntes. El contenido lo explicará paso a paso con ejemplos y autoevaluación usando tus materiales.': 'Escreve o tema dos apontamentos. O conteúdo explica-o passo a passo com exemplos e autoavaliação a partir dos teus materiais.',
+  'Público objetivo y producto': 'Público-alvo e resultado',
+  'Docente · planificación de la lección': 'Docente · plano da aula',
+  'Alumnado · apuntes para entregar': 'Alunos · apontamentos prontos a entregar',
+  'Generará objetivos, secuencia, actividades, comprobaciones de comprensión y evaluación para el docente.': 'Irá gerar objetivos, sequência, atividades, verificações da compreensão e avaliação para o docente.',
+  'Generará explicaciones, definiciones, ejemplos, síntesis y autoevaluación dirigidos al alumnado.': 'Irá gerar explicações, definições, exemplos, sínteses e autoavaliação dirigidos aos alunos.',
 };
