@@ -24,9 +24,12 @@ try {
   const { SCHEMA_VERSION, migrations } = require(path.join(root, 'electron/db/migrations.ts'));
   const copies = require(path.join(root, 'electron/db/protectCopiesRepo.ts'));
   const db = getDb();
-  assert.equal(SCHEMA_VERSION, 90);
-  assert.equal(Math.max(...migrations.map((migration) => migration.version)), 90);
-  assert.equal(db.pragma('user_version', { simple: true }), 90);
+  // The three must agree, and the DB must be at least at the migration that introduced
+  // protect_copies (90). Pinning the exact latest version made every later migration
+  // fail here, which says nothing about Protect.
+  assert.equal(Math.max(...migrations.map((migration) => migration.version)), SCHEMA_VERSION);
+  assert.equal(db.pragma('user_version', { simple: true }), SCHEMA_VERSION);
+  assert.ok(SCHEMA_VERSION >= 90, 'protect_copies arrived at v90');
   const columns = db.prepare('PRAGMA table_info(protect_copies)').all().map((column) => column.name);
   assert.deepEqual(columns, ['id', 'file_name', 'mime_type', 'bytes', 'sha256', 'blob', 'source_kind', 'source_label', 'created_at', 'updated_at', 'deleted_at']);
   assert.equal(columns.includes('path'), false, 'disk paths are never persisted');

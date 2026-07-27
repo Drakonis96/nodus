@@ -2509,6 +2509,256 @@ try {
   await page.getByTestId('teaching-demo-offer').waitFor({ timeout: 30_000 });
   console.log('[e2e] teaching sample workspace + orange-accented guided tutorial work through the real UI');
 
+  // ── Worldbuilding: the Personajes section, through the real UI ──────────────
+  // Worldbuilding graduated from an inert preview shell, so this proves the graduation
+  // actually happened: its own sidebar renders, only the built sections are clickable,
+  // and a character can be created, described and given life events end to end.
+  await page.evaluate(async () => {
+    const created = await window.nodus.createVault({ name: 'Worldbuilding smoke', type: 'worldbuilding' });
+    const switched = await window.nodus.switchVault(created.vault.id);
+    if (!switched.ok) throw new Error(switched.message);
+    await window.nodus.updateSettings({ onboardingComplete: true, tourComplete: true, advancedTourComplete: true });
+  });
+  await page.reload();
+
+  // Its own sidebar, not the academic one — and the announced-but-unbuilt sections stay
+  // inert rather than disappearing.
+  const worldSidebar = page.getByTestId('worldbuilding-sidebar');
+  await worldSidebar.waitFor({ timeout: 30_000 });
+  assert.equal(await worldSidebar.getByRole('button', { name: 'Enciclopedia', exact: true }).isDisabled(), true,
+    'a section that is not built yet must not be clickable');
+  assert.equal(await worldSidebar.getByRole('button', { name: 'Personajes', exact: true }).isDisabled(), false);
+  assert.equal(await page.getByTestId('nodus-logo').getAttribute('data-vault-logo'), 'worldbuilding');
+  // The violet accent comes from a CSS class remap that only applies when the root
+  // carries `.worldbuilding`; a missing toggle would silently leave the app indigo.
+  assert.equal(await page.evaluate(() => document.documentElement.classList.contains('worldbuilding')), true);
+
+  await worldSidebar.getByRole('button', { name: 'Personajes', exact: true }).click();
+  await page.getByTestId('characters-grid').waitFor({ timeout: 30_000 });
+  await page.getByRole('button', { name: 'Crear el primero', exact: true }).click();
+  await page.getByPlaceholder('Nombre', { exact: true }).fill('Kaelen Vor');
+  await page.getByPlaceholder('Epíteto o título (opcional)').fill('El Cuervo de Vael');
+  await page.getByPlaceholder('Especie', { exact: true }).fill('Semielfo');
+  await page.getByPlaceholder('Pronombres', { exact: true }).fill('elle/le');
+  await page.getByRole('button', { name: 'Crear personaje', exact: true }).click();
+
+  // Saving opens the sheet. The epithet and the pronouns must survive verbatim — a
+  // pronoun the app "tidies up" is the one error that makes a generated biography
+  // unusable.
+  await page.getByTestId('character-dossier-description').waitFor({ timeout: 30_000 });
+  // Selecting does not REPLACE the collection any more: it shrinks to a left rail beside
+  // the sheet, so both are on screen at once. Without this the workspace could silently
+  // fall back to the old replace behaviour and every other assertion would still pass.
+  assert.ok(
+    await page.getByTestId('characters-grid').isVisible(),
+    'the collection stays visible as a rail while the sheet is open'
+  );
+  const railBox = await page.getByTestId('characters-grid').boundingBox();
+  const sheetBox = await page.getByTestId('character-dossier-description').boundingBox();
+  assert.ok(
+    railBox && sheetBox && railBox.x + railBox.width <= sheetBox.x + 1,
+    'the rail sits to the LEFT of the sheet rather than on top of it'
+  );
+  await page.getByText('El Cuervo de Vael', { exact: true }).first().waitFor({ timeout: 30_000 });
+  assert.match(await page.getByTestId('character-dossier-aliases').innerText(), /Epíteto o título/);
+  await waitForCondition('el personaje conserva especie y pronombres literales', () => page.evaluate(async () => {
+    const [character] = await window.nodus.listCharacters();
+    return character?.profile.species === 'Semielfo' && character?.profile.pronouns === 'elle/le';
+  }));
+
+  // The description autosaves on blur, and the appearance is what unlocks portrait
+  // generation (the button stays disabled until there is something to draw).
+  await page.getByPlaceholder('Rasgos, complexión, ropa, marcas distintivas…')
+    .fill('Alto y enjuto, cicatriz sobre el ojo izquierdo, capa gris raída.');
+  await page.getByTestId('character-dossier-biography').click();
+  await waitForCondition('la apariencia se guarda al salir del campo', () => page.evaluate(async () => {
+    const [character] = await window.nodus.listCharacters();
+    return (character?.profile.appearance ?? '').startsWith('Alto y enjuto');
+  }));
+
+  // Two events in an invented calendar, entered out of order. The dates are unparseable
+  // by the Earth-calendar parser on purpose: if the list ever fell back to `date_sort`
+  // it would come out in insertion order and nothing would say so.
+  const addWorldEvent = async (kind, date, year) => {
+    await page.getByTestId('character-dossier-events').getByLabel('Añadir hecho').click();
+    await page.getByLabel('Tipo de hecho').selectOption({ label: kind });
+    await page.getByLabel('Fecha en tu calendario').fill(date);
+    await page.getByLabel('Año del mundo', { exact: true }).fill(String(year));
+    await page.getByRole('button', { name: 'Guardar hecho', exact: true }).click();
+    await page.getByRole('button', { name: 'Guardar hecho', exact: true }).waitFor({ state: 'detached', timeout: 30_000 });
+  };
+  await addWorldEvent('Exilio', 'Otoño de 1229 T.E.', 1229);
+  await addWorldEvent('Juramento', 'Primavera de 1221 T.E.', 1221);
+  await waitForCondition('los hechos se ordenan por el año del mundo, no por el de inserción', async () => {
+    const rows = await page.getByTestId('character-dossier-events').locator('li').allInnerTexts();
+    return rows.length === 2 && /1221/.test(rows[0]) && /1229/.test(rows[1]);
+  });
+  assert.equal(
+    await page.evaluate(async () => {
+      const [character] = await window.nodus.listCharacters();
+      const events = await window.nodus.listCharacterEvents(character.personId);
+      // The readable date is kept exactly as typed; only the integer orders.
+      return events.map((event) => `${event.worldYear}:${event.date}`).join('|');
+    }),
+    '1221:Primavera de 1221 T.E.|1229:Otoño de 1229 T.E.',
+    'the invented dates survive verbatim and the world year drives the order',
+  );
+
+  // The coherence check fires on a real contradiction and stays silent otherwise. It is
+  // rendered ONLY when it has something to say, so its absence beforehand is the control.
+  assert.equal(await page.getByTestId('character-dossier-checks').count(), 0, 'a clean sheet shows no warnings');
+  // Written straight through the IPC bridge, so the renderer's copy has to be refreshed
+  // by a reload — otherwise the sheet keeps rendering the character it already had.
+  await page.evaluate(async () => {
+    const [character] = await window.nodus.listCharacters();
+    // Dies in 1225, but the exile above happens in 1229.
+    await window.nodus.updateCharacter(character.personId, { deathYearSort: 1225, lifeStatus: 'dead' });
+  });
+  const openFirstCharacter = async () => {
+    await page.getByTestId('worldbuilding-sidebar').getByRole('button', { name: 'Personajes', exact: true }).click();
+    await page.getByTestId('characters-grid').waitFor({ timeout: 30_000 });
+    await page.getByTestId('character-card').first().click();
+    await page.getByTestId('character-dossier-description').waitFor({ timeout: 30_000 });
+  };
+  await page.reload();
+  await openFirstCharacter();
+  const checks = page.getByTestId('character-dossier-checks');
+  await checks.waitFor({ timeout: 30_000 });
+  assert.match(await checks.innerText(), /después de morir/, 'an event after death is reported');
+  await page.evaluate(async () => {
+    const [character] = await window.nodus.listCharacters();
+    await window.nodus.updateCharacter(character.personId, { deathYearSort: null, lifeStatus: 'alive' });
+  });
+  await page.reload();
+  await openFirstCharacter();
+  assert.equal(
+    await page.getByTestId('character-dossier-checks').count(),
+    0,
+    'and the warning disappears once the contradiction is gone'
+  );
+
+  // Arc and voice patch one field at a time. Two saves in a row must not wipe each other —
+  // the bug a wholesale object patch would produce, and one the UI would never show.
+  await page.getByTestId('character-dossier-arc').getByRole('button', { name: 'Arco', exact: true }).click();
+  await page.getByPlaceholder('El objetivo que persigue y que mueve la trama.').fill('Recuperar el nombre de su casa');
+  await page.getByPlaceholder('Lo que le impide conseguirlo.').fill('No sabe pedir ayuda');
+  await page.getByTestId('character-dossier-abilities').click();
+  await waitForCondition('el arco guarda cada campo sin pisar los demás', () => page.evaluate(async () => {
+    const [character] = await window.nodus.listCharacters();
+    return (
+      character?.profile.arc.want === 'Recuperar el nombre de su casa' &&
+      character?.profile.arc.flaw === 'No sabe pedir ayuda'
+    );
+  }));
+
+  // An ability records a cost AND a limit; the sheet says so when the limit is missing.
+  await page.getByTestId('character-dossier-abilities').getByLabel('Añadir habilidad').click();
+  await page.getByPlaceholder('Nombre de la habilidad').fill('Voz de mando');
+  await page.getByPlaceholder('Qué le cuesta usarla').fill('Pierde la voz un día entero');
+  await page.getByRole('button', { name: 'Guardar', exact: true }).click();
+  await waitForCondition('la habilidad queda guardada con su coste', () => page.evaluate(async () => {
+    const [character] = await window.nodus.listCharacters();
+    const abilities = await window.nodus.listCharacterAbilities(character.personId);
+    return abilities.length === 1 && abilities[0].cost === 'Pierde la voz un día entero';
+  }));
+  assert.match(
+    await page.getByTestId('character-dossier-abilities').innerText(),
+    /Sin límite definido/,
+    'a power with no limit is called out rather than accepted quietly'
+  );
+
+  // A secret alias is stored as secret and kept OFF the card grid.
+  await page.getByTestId('character-dossier-aliases').getByLabel('Añadir alias').click();
+  // Deliberately sorts BEFORE "El Cuervo de Vael": person_names comes back ordered by
+  // name, so a secret that sorted later would pass this check by luck of the alphabet
+  // rather than because it is filtered out.
+  await page.getByPlaceholder('El nombre…').fill('Ala Rota');
+  await page.getByLabel('Tipo de nombre').selectOption({ label: 'Epíteto o título' });
+  await page.getByLabel('Es un secreto').check();
+  await page.getByPlaceholder('Quién lo conoce (p. ej. «solo su hermana y el archivero»)').fill('Solo el archivero');
+  await page.getByRole('button', { name: 'Guardar', exact: true }).click();
+  await waitForCondition('el alias queda marcado como secreto', () => page.evaluate(async () => {
+    const [character] = await window.nodus.listCharacters();
+    const secret = character.names.find((entry) => entry.name === 'Ala Rota');
+    return secret?.secret === true && secret?.knownBy === 'Solo el archivero';
+  }));
+
+  // Back to the grid: the card carries the character, and Inicio counts them.
+  await page.getByRole('button', { name: 'Volver a los personajes', exact: true }).click();
+  await page.getByTestId('character-card').first().waitFor({ timeout: 30_000 });
+  const cardText = await page.getByTestId('character-card').first().innerText();
+  assert.match(cardText, /Kaelen Vor/);
+  assert.match(cardText, /El Cuervo de Vael/, 'the public epithet labels the card');
+  assert.doesNotMatch(cardText, /Ala Rota/, 'a secret epithet must never be printed on the public card');
+  await page.getByRole('button', { name: 'Inicio', exact: true }).click();
+  await page.getByText('Personajes recientes', { exact: true }).waitFor({ timeout: 30_000 });
+  console.log('[e2e] worldbuilding characters: own sidebar, card grid, sheet, and world-calendar ordering ok');
+
+  // ── The other four collections, through the shared workspace ───────────────
+  // Characters proved the workspace works; these prove each descriptor is wired to the
+  // right data. Kept deliberately thin — the repo tests cover the rules, this covers that
+  // the section exists, creates, and shows what it created.
+  const openSection = async (label, testid) => {
+    await page.getByTestId('worldbuilding-sidebar').getByRole('button', { name: label, exact: true }).click();
+    await page.getByTestId(testid).waitFor({ timeout: 30_000 });
+  };
+
+  // Places: a tree, and the containment-scale warning that only fires on a real slip.
+  await openSection('Lugares', 'places-grid');
+  await page.getByRole('button', { name: 'Crear el primero', exact: true }).click();
+  await page.getByPlaceholder('Nombre del lugar').fill('Vael');
+  await page.getByRole('button', { name: 'Crear lugar', exact: true }).click();
+  await page.getByTestId('place-sheet-basics').waitFor({ timeout: 30_000 });
+  await page.getByLabel('Tipo de lugar').first().selectOption('city');
+  await waitForCondition('el lugar guarda su tipo', () => page.evaluate(async () => {
+    const [place] = await window.nodus.listWorldPlaces();
+    return place?.kind === 'city';
+  }));
+  // A continent inside a city: the one case the scale check exists for.
+  await page.evaluate(async () => {
+    const city = (await window.nodus.listWorldPlaces())[0];
+    const inner = await window.nodus.createWorldPlace({ name: 'Un continente entero', kind: 'continent' });
+    await window.nodus.updateWorldPlace(inner.placeId, { parentId: city.placeId });
+  });
+  await page.reload();
+  await openSection('Lugares', 'places-grid');
+  await page.getByRole('button', { name: 'Un continente entero', exact: true }).click();
+  await page.getByTestId('place-scale-warning').waitFor({ timeout: 30_000 });
+  assert.match(await page.getByTestId('place-scale-warning').innerText(), /Continente/);
+
+  // Factions and cultures: two sections over ONE table. Creating in one must not show up
+  // in the other — the split by kind is the whole design.
+  await openSection('Facciones', 'factions-grid');
+  await page.getByRole('button', { name: 'Crear el primero', exact: true }).click();
+  await page.getByPlaceholder('Nombre', { exact: true }).fill('Los Cuervos');
+  await page.getByRole('button', { name: 'Crear', exact: true }).click();
+  await page.getByTestId('group-sheet-basics').waitFor({ timeout: 30_000 });
+  await openSection('Culturas', 'cultures-grid');
+  assert.equal(
+    await page.getByTestId('group-card').count(),
+    0,
+    'a faction must not appear under Culturas: the two sections filter one table by kind'
+  );
+
+  // Scenes, and the appearance that shows up back on the character sheet.
+  await openSection('Escenas', 'scenes-grid');
+  await page.getByRole('button', { name: 'Crear el primero', exact: true }).click();
+  await page.getByPlaceholder('Título de la escena').fill('La caída de Vael');
+  await page.getByRole('button', { name: 'Crear escena', exact: true }).click();
+  await page.getByTestId('scene-sheet-cast').waitFor({ timeout: 30_000 });
+  await page.getByTestId('scene-sheet-cast').locator('select').selectOption({ label: 'Kaelen Vor' });
+  await page.getByTestId('scene-sheet-cast').getByRole('button', { name: 'Añadir', exact: true }).click();
+  await waitForCondition('el personaje queda en el reparto', () => page.evaluate(async () => {
+    const [scene] = await window.nodus.listScenes();
+    return (await window.nodus.listSceneCharacters(scene.sceneId)).length === 1;
+  }));
+  // The appearance is what closes the loop: it has to be visible from the character too.
+  await openSection('Personajes', 'characters-grid');
+  await page.getByTestId('character-card').first().click();
+  await page.getByTestId('character-dossier-appearances').waitFor({ timeout: 30_000 });
+  assert.match(await page.getByTestId('character-dossier-appearances').innerText(), /La caída de Vael/);
+  console.log('[e2e] worldbuilding places, factions, cultures and scenes work through the shared workspace');
+
   // Hand the empty study-demo vault back to the genealogy checks below.
   await page.evaluate(async (id) => {
     const switched = await window.nodus.switchVault(id);

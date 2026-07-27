@@ -151,6 +151,45 @@ const INDIRECT_KEY_SOURCES = [
   // t(v.label) in the ficha's "Hechos en conflicto" section.
   { file: 'shared/conflictDetection.ts', pattern: /\bcollect\([^,]+,[^,]+,\s*(["'])((?:\\.|(?!\1).)*?)\1/g },
   { file: 'shared/conflictDetection.ts', pattern: /^\s{2}\w+:\s*(["'])((?:\\.|(?!\1).)*?)\1,$/gm },
+  // Worldbuilding character vocabularies (life status, narrative role, event kinds),
+  // rendered as t(CHARACTER_*_LABEL[x]) in the grid, the sheet and the AI prompts. The
+  // two-space-indent form deliberately skips the `{ id: 'violet', hex: '#7c3aed' }`
+  // one-liners in the alias-kind and accent arrays, whose tokens are not keys; their
+  // `label:` values are collected by the pattern after it.
+  { file: 'shared/characterLabels.ts', pattern: /^\s{2}\w+:\s*(["'])((?:\\.|(?!\1).)*?)\1,$/gm },
+  { file: 'shared/characterLabels.ts', pattern: /\blabel:\s*(["'])((?:\\.|(?!\1).)*?)\1/g },
+  // Arc / voice field prompts, rendered as t(field.label) / t(field.hint) in the sheet.
+  { file: 'shared/characterLabels.ts', pattern: /\bhint:\s*(["'])((?:\\.|(?!\1).)*?)\1/g },
+  // Archetype template names and descriptions, rendered as t(entry.label) /
+  // t(characterTemplate(id).description) in the creation modal.
+  { file: 'shared/characterTemplates.ts', pattern: /\b(?:label|description):\s*(["'])((?:\\.|(?!\1).)*?)\1/g },
+  // Coherence-check messages, surfaced through t()/tx() in the sheet's Revisar section.
+  { file: 'shared/characterChecks.ts', pattern: /\bmessage:\s*(["'])((?:\\.|(?!\1).)*?)\1/g },
+  // World section descriptors: the workspace renders t(section.title), t(section.createLabel)
+  // and so on, so these literals never appear inside a t() call. Without this the strings
+  // pass only because they happened to be direct t() calls before the refactor.
+  {
+    file: 'src/views/ScenesView.tsx',
+    pattern: /\b(?:title|searchPlaceholder|createLabel|emptyLabel|noMatchLabel|label):\s*(["'])((?:\\.|(?!\1).)*?)\1/g,
+  },
+  // Scene status labels, rendered as t(SCENE_STATUS_LABEL[x]).
+  { file: 'src/views/ScenesView.tsx', pattern: /^  (?:outline|draft|written):\s*(["'])((?:\\.|(?!\1).)*?)\1,$/gm },
+  {
+    file: 'src/views/GroupsView.tsx',
+    pattern: /\b(?:title|search|create|empty|noMatch|label):\s*(["'])((?:\\.|(?!\1).)*?)\1/g,
+  },
+  {
+    file: 'src/views/PlacesView.tsx',
+    pattern: /\b(?:title|searchPlaceholder|createLabel|emptyLabel|noMatchLabel|label):\s*(["'])((?:\\.|(?!\1).)*?)\1/g,
+  },
+  // Place kinds and their picker groups, rendered as t(kind.label) / t(group.group).
+  { file: 'shared/placeKinds.ts', pattern: /\b(?:label|group):\s*(["'])((?:\\.|(?!\1).)*?)\1/g },
+  // The scale warning, surfaced through tx(warning.message, …) in the place sheet.
+  { file: 'shared/placeKinds.ts', pattern: /\bmessage:\s*(["'])((?:\\.|(?!\1).)*?)\1/g },
+  {
+    file: 'src/views/CharactersView.tsx',
+    pattern: /\b(?:title|searchPlaceholder|createLabel|emptyLabel|noMatchLabel|label):\s*(["'])((?:\\.|(?!\1).)*?)\1/g,
+  },
 ];
 
 // Literals that sit inside a t() call but are not keys: they index a label map

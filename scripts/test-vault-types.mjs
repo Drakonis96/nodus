@@ -53,16 +53,17 @@ test('shipped and preview vaults are selectable; announced future vaults remain 
   assert.equal(vt.getVaultTypeDef('genealogy').available, true);
   assert.equal(vt.getVaultTypeDef('estudio').available, true);
   assert.equal(vt.getVaultTypeDef('databases').available, true);
-  // docencia (teaching) graduated from a preview shell into a real workspace.
-  assert.equal(vt.getVaultTypeDef('docencia').available, true);
-  assert.equal(vt.isPreviewVaultType('docencia'), false);
-  assert.equal(vt.isViewAllowedForVaultType('settings', 'docencia'), true);
-  for (const preview of ['worldbuilding']) {
-    assert.equal(vt.getVaultTypeDef(preview).available, true, `${preview} preview is selectable`);
-    assert.equal(vt.isPreviewVaultType(preview), true);
-    assert.equal(vt.isViewAllowedForVaultType('home', preview), true);
-    assert.equal(vt.isViewAllowedForVaultType('settings', preview), false);
+  // docencia (teaching) and worldbuilding both graduated from a preview shell into
+  // real workspaces, so no type is a preview any more. The mechanism stays — it is how
+  // a type gets announced before it exists — but the list is empty, and putting a type
+  // back into it means writing its sidebar and Inicio too (see PREVIEW_VAULT_TYPES).
+  for (const graduated of ['docencia', 'worldbuilding']) {
+    assert.equal(vt.getVaultTypeDef(graduated).available, true);
+    assert.equal(vt.isPreviewVaultType(graduated), false);
+    assert.equal(vt.isViewAllowedForVaultType('home', graduated), true);
+    assert.equal(vt.isViewAllowedForVaultType('settings', graduated), true);
   }
+  assert.deepEqual(vt.PREVIEW_VAULT_TYPES, []);
   for (const gated of ['primary_sources', 'testimonios']) {
     assert.equal(vt.getVaultTypeDef(gated).available, false, `${gated} not selectable this release`);
   }
@@ -93,19 +94,75 @@ test('the vault picker derives selectable modes from the canonical registry', as
   assert.doesNotMatch(picker, /className=\{`card max-h-\[90vh\]/, 'translucent cards must not be used as modal panels');
 });
 
-test('the worldbuilding preview exposes its complete inert bilingual sidebar', async () => {
+test('the worldbuilding sidebar keeps its full announced shape, with only the built sections live', async () => {
   const [sidebar, app, english] = await Promise.all([
-    readFile(path.join(repoRoot, 'src/components/PreviewVaultSidebar.tsx'), 'utf8'),
+    readFile(path.join(repoRoot, 'src/components/WorldbuildingSidebar.tsx'), 'utf8'),
     readFile(path.join(repoRoot, 'src/App.tsx'), 'utf8'),
     readFile(path.join(repoRoot, 'src/i18n.en.ts'), 'utf8'),
   ]);
-  for (const label of ['Enciclopedia', 'Personajes', 'Lugares', 'Facciones', 'Culturas', 'Cronología', 'Chat del mundo', 'Grafo del mundo', 'Reglas del mundo', 'Conflictos', 'Arcos narrativos', 'Consistencia', 'Preguntas abiertas', 'Escenas', 'Tramas', 'Manuscritos']) {
-    assert.match(sidebar, new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `${label} appears in preview sidebar`);
+  // The whole promised structure stays visible while it is built one section at a time.
+  for (const label of ['Enciclopedia', 'Personajes', 'Lugares', 'Facciones', 'Culturas', 'Cronología', 'Chat del mundo', 'Grafo del mundo', 'Reglas del mundo', 'Conflictos', 'Arcos narrativos', 'Consistencia', 'Preguntas abiertas', 'Notas', 'Escenas', 'Tramas', 'Manuscritos']) {
+    assert.match(sidebar, new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `${label} appears in the worldbuilding sidebar`);
   }
-  assert.match(sidebar, /disabled aria-disabled="true"/);
-  assert.match(app, /<PreviewVaultSidebar type=\{activeVault\.type\}/);
-  assert.match(app, /preview-vault-home-/);
+  // Ten sections are wired up; the rest must stay inert. Personajes and Lugares are
+  // this vault's own views; Cronología, Mapa, Relaciones and Dinastías are the records
+  // views reused over the shared ontology; Notas is universal.
+  assert.match(sidebar, /disabled\s+aria-disabled="true"/);
+  assert.deepEqual(
+    [...sidebar.matchAll(/\bview: '(\w+)'/g)].map((m) => m[1]).sort(),
+    ['characters', 'cultures', 'factions', 'map', 'notes', 'places', 'relations', 'scenes', 'timeline', 'tree']
+  );
+  // Every wired view must actually be allowed for the vault type, or the sidebar offers a
+  // button that navigates to a section the scoping then refuses to render.
+  for (const view of ['characters', 'cultures', 'factions', 'map', 'notes', 'places', 'relations', 'scenes', 'timeline', 'tree']) {
+    assert.equal(
+      vt.isViewAllowedForVaultType(view, 'worldbuilding'),
+      true,
+      `${view} is wired in the sidebar and must be allowed for worldbuilding`
+    );
+  }
+  assert.match(app, /<WorldbuildingSidebar activeView=\{view\} onNavigate=/);
+  // Its own Inicio, and the generic academic home must not also render for it.
+  assert.match(app, /view === 'home' && isWorldbuilding && <WorldbuildingHome/);
+  assert.match(app, /view === 'home' &&[^\n]*!isWorldbuilding[^\n]*&& \(/);
   assert.match(english, /'World chat'/);
+});
+
+test('the characters section belongs to worldbuilding alone', () => {
+  assert.deepEqual(vt.VAULT_TYPE_SCOPED_VIEWS.characters, ['worldbuilding']);
+  assert.deepEqual(vt.VAULT_TYPE_SCOPED_VIEWS.places, ['worldbuilding'], 'Lugares is worldbuilding-only');
+  // Factions and cultures are two filtered views of ONE collection (world_groups), but
+  // each still needs its own scoped view id.
+  assert.deepEqual(vt.VAULT_TYPE_SCOPED_VIEWS.factions, ['worldbuilding']);
+  assert.deepEqual(vt.VAULT_TYPE_SCOPED_VIEWS.cultures, ['worldbuilding']);
+  assert.deepEqual(vt.VAULT_TYPE_SCOPED_VIEWS.scenes, ['worldbuilding']);
+  // Genealogy keeps its own Personas and its own Mapa; the fiction places view must not
+  // appear there, and vice versa.
+  assert.equal(vt.isViewAllowedForVaultType('places', 'genealogy'), false);
+  assert.equal(vt.isViewAllowedForVaultType('characters', 'worldbuilding'), true);
+  for (const other of ['academic', 'genealogy', 'estudio', 'databases', 'docencia']) {
+    assert.equal(vt.isViewAllowedForVaultType('characters', other), false, `characters must not leak into ${other}`);
+  }
+  // And genealogy's Personas must not leak the other way.
+  assert.equal(vt.isViewAllowedForVaultType('persons', 'worldbuilding'), false);
+  // The worldbuilding sidebar renders its own groups, so the research/authoring
+  // universals are hidden by default — but Notes stays, because the sidebar links it.
+  const hidden = vt.defaultHiddenViewsForType('worldbuilding');
+  assert.ok(hidden.includes('library'), 'the Zotero library is hidden by default');
+  assert.ok(hidden.includes('writing'), 'the writing workshop is hidden by default');
+  assert.ok(!hidden.includes('notes'), 'Notes stays available: the sidebar points at it');
+  assert.ok(!hidden.includes('characters'), 'the characters section is never hidden by default');
+});
+
+test('the worldbuilding prompt pack makes the author the source of truth', () => {
+  const pack = vt.vaultTypePromptPack('worldbuilding');
+  assert.match(pack, /WORLDBUILDING/);
+  assert.match(pack, /AUTOR ES LA FUENTE DE VERDAD/);
+  // The three instructions whose absence produced unusable output in the other vaults:
+  // no invention, verbatim pronouns, and hands off an invented calendar.
+  assert.match(pack, /No introduzcas hechos/);
+  assert.match(pack, /pronombres/);
+  assert.match(pack, /calendario/);
 });
 
 test('the header vault action uses a stable localized label', async () => {
