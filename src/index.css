@@ -2857,11 +2857,17 @@ select.input optgroup {
 
 /* Family-tree branch controls and relationship legend. */
 .tree-branch-colors { border-left: 1px solid #3f3f46; padding-left: 10px; }
-.tree-branch-color-control { display: inline-flex; height: 32px; align-items: center; gap: 6px; border: 1px solid #3f3f46; border-radius: 8px; padding: 0 8px 0 5px; color: #a1a1aa; background: rgb(24 24 27 / .65); font-size: 11px; font-weight: 650; cursor: pointer; }
+.tree-branch-color-control { display: inline-flex; width: 108px; height: 32px; align-items: center; gap: 6px; border: 1px solid #3f3f46; border-radius: 8px; padding: 0 4px 0 5px; color: #a1a1aa; background: rgb(24 24 27 / .65); font-size: 11px; font-weight: 650; transition: border-color 150ms ease, background-color 150ms ease, color 150ms ease; }
 .tree-branch-color-control:hover { border-color: #71717a; color: #e4e4e7; }
+.tree-branch-color-control.is-hidden { color: #71717a; background: rgb(9 9 11 / .65); }
 .tree-branch-color-control input[type='color'] { width: 22px; height: 22px; overflow: hidden; border: 0; border-radius: 6px; padding: 0; background: transparent; cursor: pointer; }
+.tree-branch-color-control.is-hidden input[type='color'] { opacity: .45; filter: grayscale(.65); }
 .tree-branch-color-control input[type='color']::-webkit-color-swatch-wrapper { padding: 0; }
 .tree-branch-color-control input[type='color']::-webkit-color-swatch { border: 1px solid rgb(255 255 255 / .35); border-radius: 5px; }
+.tree-branch-color-label { min-width: 0; flex: 1; }
+.tree-branch-visibility-toggle { display: inline-flex; width: 24px; height: 24px; flex: 0 0 24px; align-items: center; justify-content: center; border-radius: 6px; color: inherit; }
+.tree-branch-visibility-toggle:hover { background: rgb(63 63 70 / .8); color: #fafafa; }
+.tree-branch-visibility-toggle:focus-visible { outline: 2px solid #d4a017; outline-offset: 1px; }
 .tree-line-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; color: #71717a; font-size: 10px; }
 .tree-line-legend > span { display: inline-flex; align-items: center; gap: 6px; }
 .tree-line-sample { display: inline-block; width: 24px; height: 0; border-top: 2px solid #64748b; }
@@ -2871,6 +2877,8 @@ select.input optgroup {
 .light .tree-branch-colors { border-left-color: #d4d4d8; }
 .light .tree-branch-color-control { border-color: #d4d4d8; color: #52525b; background: rgb(255 255 255 / .8); }
 .light .tree-branch-color-control:hover { border-color: #a1a1aa; color: #18181b; }
+.light .tree-branch-color-control.is-hidden { color: #71717a; background: rgb(244 244 245 / .9); }
+.light .tree-branch-visibility-toggle:hover { background: #e4e4e7; color: #18181b; }
 .light .tree-line-legend { color: #52525b; }
 
 /* Searchable multi-person picker used by genealogy relationship forms. */

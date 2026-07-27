@@ -65,6 +65,8 @@ export function TreeView({
   const orientation = settings?.treeOrientation ?? 'ancestors_top';
   const paternalColor = settings?.treePaternalColor ?? '#2563eb';
   const maternalColor = settings?.treeMaternalColor ?? '#dc2626';
+  const paternalBranchVisible = settings?.treePaternalBranchVisible ?? true;
+  const maternalBranchVisible = settings?.treeMaternalBranchVisible ?? true;
 
   const reload = useCallback(async () => {
     const [ps, rs] = await Promise.all([window.nodus.listPersons(), window.nodus.allRelationships()]);
@@ -101,27 +103,49 @@ export function TreeView({
   const branchByPerson = useMemo(() => Object.fromEntries(
     [...kinship].map(([personId, context]) => [personId, context.branch])
   ), [kinship]);
+  const visiblePersonIds = useMemo(() => new Set(treePersons.flatMap((person) => {
+    const branch = kinship.get(person.id)?.branch ?? 'neutral';
+    if (branch === 'paternal' && !paternalBranchVisible) return [];
+    if (branch === 'maternal' && !maternalBranchVisible) return [];
+    return [person.id];
+  })), [kinship, maternalBranchVisible, paternalBranchVisible, treePersons]);
+  const visibleTreePersons = useMemo(
+    () => treePersons.filter((person) => visiblePersonIds.has(person.id)),
+    [treePersons, visiblePersonIds]
+  );
+  const visibleParentEdges = useMemo(
+    () => parentEdges.filter((edge) => visiblePersonIds.has(edge.parent) && visiblePersonIds.has(edge.child)),
+    [parentEdges, visiblePersonIds]
+  );
+  const visibleSpouseEdges = useMemo(
+    () => spouseEdges.filter((edge) => visiblePersonIds.has(edge.a) && visiblePersonIds.has(edge.b)),
+    [spouseEdges, visiblePersonIds]
+  );
+  const visibleSiblingEdges = useMemo(
+    () => siblingEdges.filter((edge) => visiblePersonIds.has(edge.a) && visiblePersonIds.has(edge.b)),
+    [siblingEdges, visiblePersonIds]
+  );
 
   const layout: TreeLayoutResult = useMemo(
     () =>
       computeTreeLayout({
         focusId,
-        persons: treePersons,
-        parentEdges,
-        spouseEdges,
-        siblingEdges,
+        persons: visibleTreePersons,
+        parentEdges: visibleParentEdges,
+        spouseEdges: visibleSpouseEdges,
+        siblingEdges: visibleSiblingEdges,
         nodeWidth: NODE_W,
         nodeHeight: NODE_H,
         vGap: 52,
         orientation,
         branchByPerson,
       }),
-    [branchByPerson, focusId, orientation, parentEdges, siblingEdges, spouseEdges, treePersons]
+    [branchByPerson, focusId, orientation, visibleParentEdges, visibleSiblingEdges, visibleSpouseEdges, visibleTreePersons]
   );
 
   const pos = useMemo(() => new Map(layout.nodes.map((n) => [n.personId, n])), [layout]);
-  const families = useMemo(() => buildTreeFamilies(parentEdges, layout.nodes), [layout.nodes, parentEdges]);
-  const focusDescendantLineIds = useMemo(() => treeDescendantLineIds(focusId, parentEdges), [focusId, parentEdges]);
+  const families = useMemo(() => buildTreeFamilies(visibleParentEdges, layout.nodes), [layout.nodes, visibleParentEdges]);
+  const focusDescendantLineIds = useMemo(() => treeDescendantLineIds(focusId, visibleParentEdges), [focusId, visibleParentEdges]);
   const searchActive = searchQuery.trim().length > 0;
   const searchMatches = useMemo(() => new Set(layout.nodes.flatMap((node) => {
     const person = personById.get(node.personId);
@@ -136,7 +160,7 @@ export function TreeView({
     }
     return pairs;
   }, [families]);
-  const spousePairSet = useMemo(() => new Set(spouseEdges.map((edge) => pairKey(edge.a, edge.b))), [spouseEdges]);
+  const spousePairSet = useMemo(() => new Set(visibleSpouseEdges.map((edge) => pairKey(edge.a, edge.b))), [visibleSpouseEdges]);
   const branchColorFor = (personId: string): string => {
     const context = kinship.get(personId);
     if (!context || context.branch === 'neutral') return light ? '#64748b' : '#94a3b8';
@@ -281,26 +305,50 @@ export function TreeView({
           {orientation === 'ancestors_top' ? t('Ascendientes arriba') : t('Ascendientes abajo')}
         </button>
         <div className="tree-branch-colors flex items-center gap-2" data-testid="tree-branch-color-controls">
-          <label className="tree-branch-color-control" title={t('Color de la rama paterna')}>
+          <div className={`tree-branch-color-control ${paternalBranchVisible ? '' : 'is-hidden'}`}>
             <input
               type="color"
               value={paternalColor}
               aria-label={t('Color de la rama paterna')}
+              title={t('Color de la rama paterna')}
               data-testid="tree-paternal-color"
               onChange={(event) => void window.nodus.updateSettings({ treePaternalColor: event.target.value }).then(() => onSettingsChange?.())}
             />
-            <span>{t('Paterna')}</span>
-          </label>
-          <label className="tree-branch-color-control" title={t('Color de la rama materna')}>
+            <span className="tree-branch-color-label">{t('Paterna')}</span>
+            <button
+              type="button"
+              className="tree-branch-visibility-toggle"
+              aria-pressed={paternalBranchVisible}
+              aria-label={t(paternalBranchVisible ? 'Ocultar rama paterna' : 'Mostrar rama paterna')}
+              title={t(paternalBranchVisible ? 'Ocultar rama paterna' : 'Mostrar rama paterna')}
+              data-testid="tree-paternal-visibility"
+              onClick={() => void window.nodus.updateSettings({ treePaternalBranchVisible: !paternalBranchVisible }).then(() => onSettingsChange?.())}
+            >
+              <Icon name={paternalBranchVisible ? 'eye' : 'eyeOff'} size={14} />
+            </button>
+          </div>
+          <div className={`tree-branch-color-control ${maternalBranchVisible ? '' : 'is-hidden'}`}>
             <input
               type="color"
               value={maternalColor}
               aria-label={t('Color de la rama materna')}
+              title={t('Color de la rama materna')}
               data-testid="tree-maternal-color"
               onChange={(event) => void window.nodus.updateSettings({ treeMaternalColor: event.target.value }).then(() => onSettingsChange?.())}
             />
-            <span>{t('Materna')}</span>
-          </label>
+            <span className="tree-branch-color-label">{t('Materna')}</span>
+            <button
+              type="button"
+              className="tree-branch-visibility-toggle"
+              aria-pressed={maternalBranchVisible}
+              aria-label={t(maternalBranchVisible ? 'Ocultar rama materna' : 'Mostrar rama materna')}
+              title={t(maternalBranchVisible ? 'Ocultar rama materna' : 'Mostrar rama materna')}
+              data-testid="tree-maternal-visibility"
+              onClick={() => void window.nodus.updateSettings({ treeMaternalBranchVisible: !maternalBranchVisible }).then(() => onSettingsChange?.())}
+            >
+              <Icon name={maternalBranchVisible ? 'eye' : 'eyeOff'} size={14} />
+            </button>
+          </div>
         </div>
         <div className="ml-auto flex items-center gap-1">
           <button className="btn btn-ghost px-2 py-1" onClick={() => setZoom((z) => Math.max(0.4, z - 0.15))}>
