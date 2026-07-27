@@ -247,9 +247,31 @@ export async function ensureNodusCert(
  * office-addin-dev-certs setup (dev machines); otherwise generates and trusts
  * the Nodus CA. Safe to call repeatedly — it also renews a near-expiry leaf.
  */
-export async function ensureCopilotCert(): Promise<{ ok: boolean; message: string }> {
-  if (loadOfficeCert()) return { ok: true, message: 'Certificado localhost listo.' };
-  return ensureNodusCert();
+export async function ensureCopilotCert(language: unknown = 'es'): Promise<{ ok: boolean; message: string }> {
+  const result = loadOfficeCert()
+    ? { ok: true, message: 'Certificado localhost listo.' }
+    : await ensureNodusCert();
+  if (language === 'es') return result;
+  if (result.message === 'Certificado localhost listo.') {
+    return { ...result, message: 'The localhost certificate is ready.' };
+  }
+  if (result.message === 'Word de escritorio solo existe en macOS y Windows; no hay CA que confiar aquí.') {
+    return {
+      ...result,
+      message: 'Desktop Word is only available on macOS and Windows; there is no certificate authority to trust here.',
+    };
+  }
+  if (result.message === 'Certificado localhost generado y confiado para este usuario.') {
+    return { ...result, message: 'The localhost certificate was generated and trusted for this user.' };
+  }
+  const trustFailure = /^No se pudo confiar la CA local: (.+)\. Acepta el diálogo del sistema y reintenta\.$/.exec(result.message);
+  if (trustFailure) {
+    return {
+      ...result,
+      message: `The local certificate authority could not be trusted: ${trustFailure[1]}. Accept the system prompt and try again.`,
+    };
+  }
+  return { ...result, message: 'The localhost certificate could not be prepared.' };
 }
 
 /** Silently re-issue a near-expiry leaf at server start (no trust prompt needed).

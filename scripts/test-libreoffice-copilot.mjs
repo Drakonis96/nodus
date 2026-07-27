@@ -25,9 +25,24 @@ installRuntimeHooks(root);
 
 try {
   const { updateSettings } = require(path.join(repoRoot, 'electron/db/settingsRepo.ts'));
-  updateSettings({ copilotToken: 'test-token', copilotEnabled: true, copilotPort: 4320 });
+  updateSettings({ copilotToken: 'test-token', copilotEnabled: true, copilotPort: 4320, uiLanguage: 'en' });
 
   const server = require(path.join(repoRoot, 'electron/copilot/server.ts'));
+
+  // API errors shown by the pane follow the Nodus UI language.
+  {
+    const englishRes = mockResponse();
+    await server.handleRequest(mockRequest('POST', '/api/idea', authHeaders(), {}), englishRes, 4320);
+    assert.equal(englishRes.statusCode, 400);
+    assert.equal(JSON.parse(englishRes.getBody()).error, 'Missing ideaId.');
+
+    updateSettings({ uiLanguage: 'es' });
+    const spanishRes = mockResponse();
+    await server.handleRequest(mockRequest('POST', '/api/idea', authHeaders(), {}), spanishRes, 4320);
+    assert.equal(spanishRes.statusCode, 400);
+    assert.equal(JSON.parse(spanishRes.getBody()).error, 'Falta ideaId.');
+    updateSettings({ uiLanguage: 'en' });
+  }
 
   // Editor state round-trip: update-text → state.
   {

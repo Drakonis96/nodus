@@ -488,7 +488,7 @@ async function openInNodus(body: Record<string, unknown>): Promise<{ ok: boolean
   // Reuse the copilot idea-open channel for ideas (already handled by the UI);
   // other kinds focus the window and send a generic open event.
   if (kind === 'idea' && id) {
-    win.webContents.send('copilot:openIdea', { ideaId: id, label: '' });
+    win.webContents.send('copilot:openIdea', { ideaId: id, label: '', destination: 'graph' });
   } else {
     win.webContents.send('zoteroPlugin:open', { kind, id });
   }

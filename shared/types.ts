@@ -2477,6 +2477,8 @@ export interface CopilotInstallResult {
 export interface CopilotOpenIdeaTarget {
   ideaId: string;
   label: string | null;
+  /** Word opens full development in Ideas; legacy callers keep the graph destination. */
+  destination?: 'ideas' | 'graph';
 }
 
 /** One typed relation between the edited paragraph and a library entity (Word copilot). */

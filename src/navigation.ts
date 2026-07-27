@@ -270,9 +270,16 @@ export interface LibraryNavigationTarget {
   healthBucket?: CorpusHealthBucketId;
 }
 
+/** Navigation into Ideas that opens the complete detail panel for one idea. */
+export interface IdeaNavigationTarget {
+  nonce: number;
+  ideaId: string;
+}
+
 export type PendingGraphNavigationTarget = Omit<GraphNavigationTarget, 'nonce'>;
 export type PendingAssistantNavigationTarget = Omit<AssistantNavigationTarget, 'nonce'>;
 export type PendingLibraryNavigationTarget = Omit<LibraryNavigationTarget, 'nonce'>;
+export type PendingIdeaNavigationTarget = Omit<IdeaNavigationTarget, 'nonce'>;
 
 export const ASSISTANT_CONTEXTS: Record<'idea' | 'gap' | 'contradiction' | 'reading', ResearchContextSelection> = {
   idea: {

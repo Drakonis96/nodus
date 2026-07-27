@@ -10,6 +10,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { app, BrowserWindow, shell } from 'electron';
 import type { CopilotServerStatus } from '@shared/types';
+import { localizeRuntimeError } from '@shared/uiLanguage';
 import { getSettings, updateSettings } from '../db/settingsRepo';
 import { loadCopilotCert, loadCopilotCa, certReady, copilotStateDir, renewLeafIfNeeded } from './certs';
 import {
@@ -56,6 +57,26 @@ function addinUrl(port: number): string {
   return `https://localhost:${port}/addin/taskpane.html`;
 }
 
+function copilotLanguage(): 'es' | 'en' {
+  return getSettings().uiLanguage === 'es' ? 'es' : 'en';
+}
+
+function copilotText(es: string, en: string): string {
+  return copilotLanguage() === 'es' ? es : en;
+}
+
+function copilotError(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  if (copilotLanguage() === 'es') return message;
+  const translated: Record<string, string> = {
+    'No se encontró la idea en Nodus.': 'The idea could not be found in Nodus.',
+    'La IA no devolvió texto insertable.': 'The AI did not return any text that could be inserted.',
+    'Selecciona (o sitúate en) un fragmento con algo más de texto para trabajarlo.':
+      'Select (or place the cursor in) a passage with a little more text to work with.',
+  };
+  return translated[message] ?? localizeRuntimeError(message, 'en');
+}
+
 /**
  * Connection info for external bridges that cannot receive the token via an
  * injected page (the LibreOffice macro). Written next to the copilot certs —
@@ -78,9 +99,12 @@ export async function writeCopilotBridgeFile(port: number, dir: string = copilot
 
 function describeError(error: unknown): string {
   if (error && typeof error === 'object' && 'code' in error && (error as { code?: string }).code === 'EADDRINUSE') {
-    return 'El puerto del copiloto ya está en uso. Elige otro puerto o cierra la app que lo usa.';
+    return copilotText(
+      'El puerto del copiloto ya está en uso. Elige otro puerto o cierra la app que lo usa.',
+      'The copilot port is already in use. Choose another port or close the app using it.'
+    );
   }
-  return error instanceof Error ? error.message : String(error);
+  return copilotError(error);
 }
 
 function ensureToken(): string {
@@ -122,7 +146,9 @@ async function readJsonBody(req: IncomingMessage): Promise<unknown> {
   for await (const chunk of req) {
     const data = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
     size += data.length;
-    if (size > MAX_REQUEST_BYTES) throw new Error('La solicitud supera el tamaño máximo.');
+    if (size > MAX_REQUEST_BYTES) {
+      throw new Error(copilotText('La solicitud supera el tamaño máximo.', 'The request exceeds the maximum size.'));
+    }
     chunks.push(data);
   }
   const raw = Buffer.concat(chunks).toString('utf8').trim();
@@ -170,7 +196,7 @@ async function serveAddin(req: IncomingMessage, res: ServerResponse, urlPath: st
     res.end(body);
   } catch {
     res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
-    res.end('No encontrado');
+    res.end(copilotText('No encontrado', 'Not found'));
   }
 }
 
@@ -201,14 +227,16 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse, p
   }
 
   if (!urlPath.startsWith('/api/')) {
-    sendJson(res, 404, { error: 'No encontrado' });
+    sendJson(res, 404, { error: copilotText('No encontrado', 'Not found') });
     return;
   }
 
   const token = getSettings().copilotToken;
   if (!token || !hasValidToken(req, token)) {
     res.setHeader('WWW-Authenticate', 'Bearer realm="Nodus Copilot"');
-    sendJson(res, 401, { error: 'Se requiere un bearer token válido.' });
+    sendJson(res, 401, {
+      error: copilotText('Se requiere un bearer token válido.', 'A valid bearer token is required.'),
+    });
     return;
   }
 
@@ -245,12 +273,12 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse, p
     if (urlPath === '/api/idea' && req.method === 'POST') {
       const body = (await readJsonBody(req)) as { ideaId?: string };
       if (!body.ideaId) {
-        sendJson(res, 400, { error: 'Falta ideaId.' });
+        sendJson(res, 400, { error: copilotText('Falta ideaId.', 'Missing ideaId.') });
         return;
       }
       const idea = getCopilotIdeaDetail(body.ideaId);
       if (!idea) {
-        sendJson(res, 404, { error: 'Idea no encontrada.' });
+        sendJson(res, 404, { error: copilotText('Idea no encontrada.', 'Idea not found.') });
         return;
       }
       sendJson(res, 200, { idea });
@@ -259,7 +287,7 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse, p
     if (urlPath === '/api/insert' && req.method === 'POST') {
       const body = (await readJsonBody(req)) as { ideaId?: string; paragraphText?: string; selectionText?: string };
       if (!body.ideaId) {
-        sendJson(res, 400, { error: 'Falta ideaId.' });
+        sendJson(res, 400, { error: copilotText('Falta ideaId.', 'Missing ideaId.') });
         return;
       }
       const insertion = await composeCopilotIdeaInsertion({
@@ -273,12 +301,12 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse, p
     if (urlPath === '/api/nodus/open' && req.method === 'POST') {
       const body = (await readJsonBody(req)) as { ideaId?: string };
       if (!body.ideaId) {
-        sendJson(res, 400, { error: 'Falta ideaId.' });
+        sendJson(res, 400, { error: copilotText('Falta ideaId.', 'Missing ideaId.') });
         return;
       }
       const idea = getCopilotIdeaDetail(body.ideaId);
       if (!idea) {
-        sendJson(res, 404, { error: 'Idea no encontrada.' });
+        sendJson(res, 404, { error: copilotText('Idea no encontrada.', 'Idea not found.') });
         return;
       }
       const win = getMainWindow?.() ?? null;
@@ -286,7 +314,11 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse, p
         if (win.isMinimized()) win.restore();
         win.show();
         win.focus();
-        win.webContents.send('copilot:openIdea', { ideaId: idea.idea.globalId, label: idea.idea.label });
+        win.webContents.send('copilot:openIdea', {
+          ideaId: idea.idea.globalId,
+          label: idea.idea.label,
+          destination: 'ideas',
+        });
       }
       sendJson(res, 200, { ok: Boolean(win) });
       return;
@@ -294,7 +326,7 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse, p
     if (urlPath === '/api/zotero/select' && req.method === 'POST') {
       const body = (await readJsonBody(req)) as { zoteroKey?: string };
       if (!body.zoteroKey) {
-        sendJson(res, 400, { error: 'Falta zoteroKey.' });
+        sendJson(res, 400, { error: copilotText('Falta zoteroKey.', 'Missing zoteroKey.') });
         return;
       }
       await shell.openExternal(`zotero://select/library/items/${encodeURIComponent(body.zoteroKey)}`);
@@ -359,10 +391,10 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse, p
       });
       return;
     }
-    sendJson(res, 404, { error: 'Ruta no encontrada.' });
+    sendJson(res, 404, { error: copilotText('Ruta no encontrada.', 'Route not found.') });
   } catch (error) {
     if (res.headersSent) return;
-    sendJson(res, 500, { error: error instanceof Error ? error.message : String(error) });
+    sendJson(res, 500, { error: copilotError(error) });
   }
 }
 
@@ -382,7 +414,10 @@ async function start(): Promise<void> {
       port: null,
       addinUrl: null,
       certReady: false,
-      error: 'Falta el certificado localhost. Genera el certificado del copiloto en Ajustes.',
+      error: copilotText(
+        'Falta el certificado localhost. Genera el certificado del copiloto en Ajustes.',
+        'The localhost certificate is missing. Generate the copilot certificate in Settings.'
+      ),
     };
     return;
   }
@@ -396,7 +431,11 @@ async function start(): Promise<void> {
       handleRequest(req, res, port).catch((error) => {
         console.warn('[copilot] request failed', error);
         try {
-          if (!res.headersSent) sendJson(res, 500, { error: 'Error interno del copiloto.' });
+          if (!res.headersSent) {
+            sendJson(res, 500, {
+              error: copilotText('Error interno del copiloto.', 'Internal copilot error.'),
+            });
+          }
         } catch {
           /* client already gone */
         }
