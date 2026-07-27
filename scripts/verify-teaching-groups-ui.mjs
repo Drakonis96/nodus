@@ -109,6 +109,23 @@ try {
   await page.reload();
   await page.waitForFunction(() => !!document.getElementById('root')?.children.length);
 
+  // ── Unit design chooses its reader before deciding the structure ────────────
+  const unitsButton = page.getByTestId('teaching-sidebar').getByRole('button', { name: 'Diseño de unidades', exact: true });
+  assert.equal(await unitsButton.count(), 1, 'the teaching sidebar exposes Unit design');
+  await unitsButton.click();
+  await page.getByRole('heading', { name: 'Diseño de unidades', exact: true }).waitFor();
+  await page.getByText('Diseña unidades para el docente o apuntes para entregar al alumnado, siempre desde tus fuentes.', { exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Nueva unidad', exact: true }).first().click();
+  const audienceSelect = page.getByTestId('deep-research-audience');
+  await audienceSelect.waitFor();
+  assert.equal(await audienceSelect.inputValue(), 'teacher', 'Unit design defaults to the teacher lesson-plan product');
+  assert.match(await page.getByTestId('deep-research-audience-help').innerText(), /objetivos, secuencia, actividades/i);
+  await audienceSelect.selectOption('students');
+  assert.equal(await audienceSelect.inputValue(), 'students', 'student handouts can be selected');
+  assert.match(await page.getByTestId('deep-research-audience-help').innerText(), /explicaciones, definiciones, ejemplos/i);
+  await page.getByRole('button', { name: 'Cancelar', exact: true }).click();
+  console.log('[ui] Unit design chooses between a teacher plan and student-ready notes');
+
   // ── The menu entry is live, not "coming soon" ───────────────────────────────
   const groupsButton = page.getByRole('button', { name: 'Grupos', exact: true }).first();
   assert.equal(await groupsButton.isDisabled(), false, 'Grupos is no longer a disabled placeholder');

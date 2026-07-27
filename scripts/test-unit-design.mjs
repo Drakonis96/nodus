@@ -40,7 +40,15 @@ await build({
   }],
   logLevel: 'silent',
 });
-const { normalizeUnitOutline, resolveStudySections, TEACHING_UNIT_PROMPTS, MAX_UNIT_SECTIONS } =
+const {
+  normalizeStudyDeepResearchAudience,
+  normalizeUnitOutline,
+  resolveStudySections,
+  studyDeepResearchPromptPack,
+  STUDY_DEEP_RESEARCH_PROMPTS,
+  TEACHING_UNIT_PROMPTS,
+  MAX_UNIT_SECTIONS,
+} =
   await import(pathToFileURL(outfile).href);
 
 const fallbackTitle = (index) => `Parte ${index}`;
@@ -150,5 +158,27 @@ test('every supported language has a complete teaching-unit prompt pack', () => 
     // The unit is written for the teacher to teach from; a pack that slipped back into
     // the study wording would silently turn it into a report addressed to the student.
     assert.match(pack.plan, /\{"title"/, `${language} planner does not state its JSON shape`);
+  }
+});
+
+test('teaching units preserve their teacher default and accept student handouts', () => {
+  assert.equal(normalizeStudyDeepResearchAudience(undefined, 'teacher'), 'teacher');
+  assert.equal(normalizeStudyDeepResearchAudience('teacher', 'students'), 'teacher');
+  assert.equal(normalizeStudyDeepResearchAudience('students', 'teacher'), 'students');
+  assert.equal(normalizeStudyDeepResearchAudience('unknown', 'students'), 'students');
+});
+
+test('the audience selects a native teacher plan or student notes in every language', () => {
+  for (const language of Object.keys(TEACHING_UNIT_PROMPTS)) {
+    assert.equal(
+      studyDeepResearchPromptPack(language, 'teacher', true),
+      TEACHING_UNIT_PROMPTS[language],
+      `${language} teacher output uses the lesson-plan contract`,
+    );
+    assert.equal(
+      studyDeepResearchPromptPack(language, 'students', true),
+      STUDY_DEEP_RESEARCH_PROMPTS[language],
+      `${language} student output uses the learner-facing notes contract`,
+    );
   }
 });

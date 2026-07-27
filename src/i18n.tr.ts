@@ -6401,4 +6401,12 @@ export const TR: Record<string, string> = {
   "Unidad eliminada.": "Ünite silindi.",
   "¿Eliminar esta unidad guardada? Esta acción no se puede deshacer.": "Kaydedilmiş bu ünite silinsin mi? Bu işlem geri alınamaz.",
   "Escribe el tema y Nodus redacta la unidad completa con tus materiales, citando cada uno. Puedes dejar que la IA proponga las partes o fijarlas tú: cuántas son, cómo se titulan y en qué debe centrarse cada una.": "Konuyu yaz; Nodus üniteyi materyallerinden baştan sona yazar ve her birine atıf yapar. Bölümleri yapay zekâya önerttirebilir ya da kendin belirleyebilirsin: kaç tane olacağı, nasıl adlandırılacağı ve her birinin neye odaklanacağı.",
+  "Diseña unidades para el docente o apuntes para entregar al alumnado, siempre desde tus fuentes.": "Her zaman kaynaklarına dayanarak öğretmen için üniteler veya öğrencilere verilecek ders notları hazırla.",
+  "Elige si necesitas una planificación para impartir la lección o apuntes listos para entregar.": "Dersi uygulamak için bir plan ile paylaşılmaya hazır ders notları arasında seçim yap.",
+  "Escribe el tema de los apuntes. El contenido lo explicará paso a paso con ejemplos y autoevaluación usando tus materiales.": "Ders notlarının konusunu yaz. İçerik, materyallerini kullanarak örnekler ve öz değerlendirmeyle adım adım açıklayacak.",
+  "Público objetivo y producto": "Hedef kitle ve çıktı",
+  "Docente · planificación de la lección": "Öğretmen · ders planı",
+  "Alumnado · apuntes para entregar": "Öğrenciler · paylaşılmaya hazır notlar",
+  "Generará objetivos, secuencia, actividades, comprobaciones de comprensión y evaluación para el docente.": "Öğretmen için hedefler, sıralama, etkinlikler, anlama kontrolleri ve değerlendirme oluşturur.",
+  "Generará explicaciones, definiciones, ejemplos, síntesis y autoevaluación dirigidos al alumnado.": "Öğrencilere yönelik açıklamalar, tanımlar, örnekler, özetler ve öz değerlendirme oluşturur.",
 };

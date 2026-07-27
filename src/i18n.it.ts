@@ -6054,4 +6054,12 @@ export const IT: Record<string, string> = {
   "Unidad eliminada.": "Unità eliminata.",
   "¿Eliminar esta unidad guardada? Esta acción no se puede deshacer.": "Eliminare questa unità salvata? Questa azione non può essere annullata.",
   "Escribe el tema y Nodus redacta la unidad completa con tus materiales, citando cada uno. Puedes dejar que la IA proponga las partes o fijarlas tú: cuántas son, cómo se titulan y en qué debe centrarse cada una.": "Scrivi il tema e Nodus redige l’intera unità a partire dai tuoi materiali, citandoli uno per uno. Puoi lasciare che l’IA proponga le parti oppure fissarle tu: quante sono, come si intitolano e su che cosa deve concentrarsi ciascuna.",
+  "Diseña unidades para el docente o apuntes para entregar al alumnado, siempre desde tus fuentes.": "Progetta unità per il docente o dispense da consegnare agli studenti, sempre a partire dalle tue fonti.",
+  "Elige si necesitas una planificación para impartir la lección o apuntes listos para entregar.": "Scegli fra un piano per svolgere la lezione e dispense pronte da consegnare.",
+  "Escribe el tema de los apuntes. El contenido lo explicará paso a paso con ejemplos y autoevaluación usando tus materiales.": "Scrivi l’argomento delle dispense. Il contenuto lo spiegherà passo dopo passo con esempi e autovalutazione a partire dai tuoi materiali.",
+  "Público objetivo y producto": "Destinatari e risultato",
+  "Docente · planificación de la lección": "Docente · piano della lezione",
+  "Alumnado · apuntes para entregar": "Studenti · dispense pronte da consegnare",
+  "Generará objetivos, secuencia, actividades, comprobaciones de comprensión y evaluación para el docente.": "Genererà obiettivi, sequenza, attività, verifiche della comprensione e valutazione per il docente.",
+  "Generará explicaciones, definiciones, ejemplos, síntesis y autoevaluación dirigidos al alumnado.": "Genererà spiegazioni, definizioni, esempi, sintesi e autovalutazione rivolti agli studenti.",
 };

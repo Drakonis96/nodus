@@ -6594,4 +6594,12 @@ export const PT_BR: Record<string, string> = {
   'Unidad eliminada.': 'Unidade excluída.',
   '¿Eliminar esta unidad guardada? Esta acción no se puede deshacer.': 'Excluir esta unidade salva? Esta ação não pode ser desfeita.',
   'Escribe el tema y Nodus redacta la unidad completa con tus materiales, citando cada uno. Puedes dejar que la IA proponga las partes o fijarlas tú: cuántas son, cómo se titulan y en qué debe centrarse cada una.': 'Escreva o tema e o Nodus redige a unidade completa a partir dos seus materiais, citando cada um. Você pode deixar a IA propor as partes ou defini-las: quantas são, como se chamam e no que cada uma deve se concentrar.',
+  'Diseña unidades para el docente o apuntes para entregar al alumnado, siempre desde tus fuentes.': 'Crie unidades para o docente ou material para entregar aos estudantes, sempre a partir das suas fontes.',
+  'Elige si necesitas una planificación para impartir la lección o apuntes listos para entregar.': 'Escolha entre um planejamento para ministrar a aula e material pronto para entregar.',
+  'Escribe el tema de los apuntes. El contenido lo explicará paso a paso con ejemplos y autoevaluación usando tus materiales.': 'Escreva o tema do material. O conteúdo explicará passo a passo com exemplos e autoavaliação a partir dos seus materiais.',
+  'Público objetivo y producto': 'Público-alvo e resultado',
+  'Docente · planificación de la lección': 'Docente · planejamento da aula',
+  'Alumnado · apuntes para entregar': 'Estudantes · material pronto para entregar',
+  'Generará objetivos, secuencia, actividades, comprobaciones de comprensión y evaluación para el docente.': 'Vai gerar objetivos, sequência, atividades, verificações de compreensão e avaliação para o docente.',
+  'Generará explicaciones, definiciones, ejemplos, síntesis y autoevaluación dirigidos al alumnado.': 'Vai gerar explicações, definições, exemplos, sínteses e autoavaliação dirigidos aos estudantes.',
 };

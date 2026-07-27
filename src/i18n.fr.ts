@@ -6635,4 +6635,12 @@ export const FR: Record<string, string> = {
   'Unidad eliminada.': 'Unité supprimée.',
   '¿Eliminar esta unidad guardada? Esta acción no se puede deshacer.': 'Supprimer cette unité enregistrée? Cette action est irréversible.',
   'Escribe el tema y Nodus redacta la unidad completa con tus materiales, citando cada uno. Puedes dejar que la IA proponga las partes o fijarlas tú: cuántas son, cómo se titulan y en qué debe centrarse cada una.': 'Écris le sujet et Nodus rédige l’unité complète à partir de tes supports, en citant chacun d’eux. Tu peux laisser l’IA proposer les parties ou les fixer toi-même: combien il y en a, comment elles s’intitulent et sur quoi chacune doit se concentrer.',
+  'Diseña unidades para el docente o apuntes para entregar al alumnado, siempre desde tus fuentes.': 'Conçois des unités pour l’enseignant ou des notes à distribuer aux élèves, toujours à partir de tes sources.',
+  'Elige si necesitas una planificación para impartir la lección o apuntes listos para entregar.': 'Choisis entre un plan pour donner le cours et des notes prêtes à distribuer.',
+  'Escribe el tema de los apuntes. El contenido lo explicará paso a paso con ejemplos y autoevaluación usando tus materiales.': 'Écris le sujet des notes. Le contenu l’expliquera pas à pas avec des exemples et une autoévaluation à partir de tes supports.',
+  'Público objetivo y producto': 'Public cible et livrable',
+  'Docente · planificación de la lección': 'Enseignant · plan de cours',
+  'Alumnado · apuntes para entregar': 'Élèves · notes prêtes à distribuer',
+  'Generará objetivos, secuencia, actividades, comprobaciones de comprensión y evaluación para el docente.': 'Cela générera des objectifs, une progression, des activités, des vérifications de compréhension et une évaluation pour l’enseignant.',
+  'Generará explicaciones, definiciones, ejemplos, síntesis y autoevaluación dirigidos al alumnado.': 'Cela générera pour les élèves des explications, définitions, exemples, synthèses et activités d’autoévaluation.',
 };

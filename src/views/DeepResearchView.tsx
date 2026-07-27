@@ -16,6 +16,7 @@ import type {
   DecorativeImageStyle,
   ContentTranslation,
 } from '@shared/types';
+import type { StudyDeepResearchAudience } from '@shared/studyDeepResearchAudience';
 import { DECORATIVE_IMAGE_STYLES } from '@shared/imageStyles';
 import type { PendingGraphNavigationTarget } from '../navigation';
 import { Icon, modelLabel } from '../components/ui';
@@ -166,9 +167,9 @@ const DEEP_RESEARCH_COPY: Record<DeepResearchVariant, DeepResearchCopy> = {
   },
   unit: {
     heading: 'Diseño de unidades',
-    subtitle: 'Tus unidades didácticas, escritas a partir de los materiales de clase y de las ideas extraídas de ellos.',
+    subtitle: 'Diseña unidades para el docente o apuntes para entregar al alumnado, siempre desde tus fuentes.',
     newAction: 'Nueva unidad',
-    composerSubtitle: 'La unidad se escribe con tus materiales de clase y cita cada uno de ellos.',
+    composerSubtitle: 'Elige si necesitas una planificación para impartir la lección o apuntes listos para entregar.',
     objectivePlaceholder: 'Escribe el tema de la unidad y, si quieres, para qué grupo o nivel. La unidad se desarrollará con tus materiales, citándolos.',
     missingObjective: 'Escribe el tema de la unidad antes de generarla.',
     queuedToast: 'Unidad añadida a la cola. Se generará en segundo plano.',
@@ -246,6 +247,7 @@ export function DeepResearchView({
   const [selectedModel, setSelectedModel] = useFeatureModel(settings, 'deepResearchModel');
   const [deepTarget, setDeepTarget] = useState<DeepResearchTargetLength>('adaptive');
   const [deepSectionLimit, setDeepSectionLimit] = useState<DeepResearchSectionLimit>('auto');
+  const [audience, setAudience] = useState<StudyDeepResearchAudience>(isTeaching ? 'teacher' : 'students');
   const [includeImage, setIncludeImage] = useState(false);
   const [imageStyle, setImageStyle] = useState<DecorativeImageStyle>(settings.imageStyle);
   const [focusPersonId, setFocusPersonId] = useState<string | null>(null);
@@ -344,6 +346,7 @@ export function DeepResearchView({
       language,
       targetLength: deepTarget,
       sectionLimit: deepSectionLimit,
+      ...(isStudy ? { audience } : {}),
       model: selectedModel,
       decorativeImage: { enabled: includeImage, style: imageStyle },
       ...(isGenealogy ? { focusPersonId } : {}),
@@ -382,6 +385,9 @@ export function DeepResearchView({
     setObjective(saved.brief.objective);
     if (saved.brief.language) setLanguage(saved.brief.language as PromptLanguage);
     if (saved.model) setSelectedModel(saved.model);
+    if (isTeaching && (saved.brief.audience === 'teacher' || saved.brief.audience === 'students')) {
+      setAudience(saved.brief.audience);
+    }
     setFocusPersonId(null);
     setComposerOpen(true);
   };
@@ -709,6 +715,7 @@ export function DeepResearchView({
           onStructureMode={setStructureMode}
           onUnitOutline={setUnitOutline}
           objective={objective}
+          audience={audience}
           language={language}
           model={selectedModel}
           target={deepTarget}
@@ -720,6 +727,7 @@ export function DeepResearchView({
           persons={personsList}
           focusPersonId={focusPersonId}
           onObjective={setObjective}
+          onAudience={setAudience}
           onLanguage={setLanguage}
           onModel={setSelectedModel}
           onTarget={setDeepTarget}
@@ -1096,6 +1104,7 @@ function ComposerModal({
   onStructureMode,
   onUnitOutline,
   objective,
+  audience,
   language,
   model,
   target,
@@ -1107,6 +1116,7 @@ function ComposerModal({
   persons = [],
   focusPersonId = null,
   onObjective,
+  onAudience,
   onLanguage,
   onModel,
   onTarget,
@@ -1126,6 +1136,7 @@ function ComposerModal({
   onStructureMode: (v: 'ai' | 'manual') => void;
   onUnitOutline: (v: DeepResearchOutlineSection[]) => void;
   objective: string;
+  audience: StudyDeepResearchAudience;
   language: PromptLanguage;
   model: AppSettings['deepResearchModel'];
   target: DeepResearchTargetLength;
@@ -1137,6 +1148,7 @@ function ComposerModal({
   persons?: Person[];
   focusPersonId?: string | null;
   onObjective: (v: string) => void;
+  onAudience: (v: StudyDeepResearchAudience) => void;
   onLanguage: (v: PromptLanguage) => void;
   onModel: (m: AppSettings['deepResearchModel']) => void;
   onTarget: (v: DeepResearchTargetLength) => void;
@@ -1181,8 +1193,31 @@ function ComposerModal({
             value={objective}
             autoFocus
             onChange={(e) => onObjective(e.target.value)}
-            placeholder={t(copy.objectivePlaceholder)}
+            placeholder={isTeaching && audience === 'students'
+              ? t('Escribe el tema de los apuntes. El contenido lo explicará paso a paso con ejemplos y autoevaluación usando tus materiales.')
+              : t(copy.objectivePlaceholder)}
           />
+          {isTeaching && (
+            <label className="block">
+              <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-neutral-500">
+                {t('Público objetivo y producto')}
+              </span>
+              <select
+                data-testid="deep-research-audience"
+                className="input w-full text-sm"
+                value={audience}
+                onChange={(event) => onAudience(event.target.value as StudyDeepResearchAudience)}
+              >
+                <option value="teacher">{t('Docente · planificación de la lección')}</option>
+                <option value="students">{t('Alumnado · apuntes para entregar')}</option>
+              </select>
+              <span className="mt-1 block text-[11px] text-neutral-500" data-testid="deep-research-audience-help">
+                {audience === 'teacher'
+                  ? t('Generará objetivos, secuencia, actividades, comprobaciones de comprensión y evaluación para el docente.')
+                  : t('Generará explicaciones, definiciones, ejemplos, síntesis y autoevaluación dirigidos al alumnado.')}
+              </span>
+            </label>
+          )}
           {isGenealogy && (
             <div>
               <select
