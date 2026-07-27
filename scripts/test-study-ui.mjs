@@ -397,10 +397,15 @@ test('study timetable exposes editable weekdays, periods and subject styling', a
 });
 
 test('student calendar exposes month, week and year views with durable event actions', async () => {
-  const [view, navigation, app, sidebar, types, preload, ipc, reminders] = await Promise.all([
-    read('src/views/StudyCalendarView.tsx'), read('src/navigation.ts'), read('src/App.tsx'), read('src/components/StudySidebar.tsx'), read('shared/types.ts'), read('electron/preload.ts'), read('electron/ipc.ts'), read('electron/studyCalendarReminders.ts'),
+  const [view, layout, navigation, app, sidebar, types, preload, ipc, reminders] = await Promise.all([
+    read('src/views/StudyCalendarView.tsx'), read('src/views/studyCalendarLayout.ts'), read('src/navigation.ts'), read('src/App.tsx'), read('src/components/StudySidebar.tsx'), read('shared/types.ts'), read('electron/preload.ts'), read('electron/ipc.ts'), read('electron/studyCalendarReminders.ts'),
   ]);
   for (const marker of ['study-calendar-view', 'study-calendar-month-grid', 'study-calendar-week-grid', 'study-calendar-year-grid', 'study-calendar-editor', 'study-calendar-reminder']) assert.match(view, new RegExp(marker));
+  for (const marker of ['study-calendar-event-bar', 'study-calendar-month-event-layer', 'study-calendar-week-event-layer']) assert.match(view, new RegExp(marker));
+  assert.match(view, /layoutCalendarWeek\(events, week\[0\], \{ maxLanes: 4 \}\)/);
+  assert.match(view, /eventsByCoveredDay\(events\)/);
+  assert.match(layout, /continuesBefore: candidate\.range\.start < weekStart/);
+  assert.match(layout, /continuesAfter: candidate\.range\.end > weekEnd/);
   assert.match(view, /<ConfirmModal/);
   assert.match(view, /data-testid="study-calendar-event-detail"/);
   assert.match(view, /data-testid="study-calendar-event-actions"/);
