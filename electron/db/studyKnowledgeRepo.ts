@@ -231,6 +231,34 @@ export function listStudyIdeaVectors(subjectId: string, sourceKeys: string[] = [
   return rows.map((row) => ({ ...summary(row), embedding: row.embedding ? decodeEmbedding(row.embedding as Buffer) : null }));
 }
 
+/**
+ * The extracted idea network behind a set of sources, across subjects.
+ *
+ * Unit design retrieves its sources by relevance to the teacher's objective and then
+ * asks what was already extracted FROM those exact sources, so the ideas inherit the
+ * retrieval's scope instead of needing a subject picker of their own. Subject isolation
+ * still holds in practice — the relevant sources of one objective belong to one
+ * subject — but it is a consequence here, not a filter, which is why the edge lookup
+ * is keyed on the idea ids rather than on a subject.
+ */
+export function listStudyIdeasForSources(sourceKeys: string[]): { ideas: StudyIdeaSummary[]; connections: StudyIdeaConnection[] } {
+  const selected = sourceKeys.filter((key) => /^(?:material|document):/.test(key));
+  if (!selected.length) return { ideas: [], connections: [] };
+  const ideas = (getDb().prepare(`${SUMMARY_SQL}
+    WHERE EXISTS (SELECT 1 FROM study_idea_occurrences selected WHERE selected.idea_id=i.id AND
+      (selected.source_kind || ':' || selected.source_id) IN (${selected.map(() => '?').join(',')}))
+    GROUP BY i.id ORDER BY source_count DESC, connection_count DESC, i.label LIMIT 60`).all(...selected) as Row[]).map(summary);
+  if (!ideas.length) return { ideas, connections: [] };
+  const ids = ideas.map((idea) => idea.id);
+  const placeholders = ids.map(() => '?').join(',');
+  // Both endpoints must be in the set: an edge to an idea the writer never sees is a
+  // dangling reference the model would be tempted to invent a meaning for.
+  const connections = (getDb().prepare(`SELECT * FROM study_idea_edges
+    WHERE from_id IN (${placeholders}) AND to_id IN (${placeholders})
+    ORDER BY confidence DESC LIMIT 80`).all(...ids, ...ids) as Row[]).map(connection);
+  return { ideas, connections };
+}
+
 export function listStudyConnectionsForIdeas(subjectId: string, ideaIds: string[]): StudyIdeaConnection[] {
   if (!ideaIds.length) return [];
   const placeholders = ideaIds.map(() => '?').join(',');

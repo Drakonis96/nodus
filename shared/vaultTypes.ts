@@ -262,17 +262,21 @@ export const VAULT_TYPE_SCOPED_VIEWS: Record<string, VaultType[]> = {
   // They must never leak into research/records/database vaults. The teaching
   // ('docencia') mode reuses the shared organisation surfaces — courses & subjects,
   // schedule, calendar, materials and recordings — so those five are scoped to both.
-  // The study-only surfaces (search, chat, ideas, graph, question bank, review,
-  // deep research) stay exclusive to 'estudio'.
+  // The remaining study-only surfaces (search, review, deep research) stay exclusive
+  // to 'estudio'.
   studyCourses: ['estudio', 'docencia'],
   studySchedule: ['estudio', 'docencia'],
   studyCalendar: ['estudio', 'docencia'],
   studySearch: ['estudio'],
   studyLibrary: ['estudio', 'docencia'],
   studyRecordings: ['estudio', 'docencia'],
-  studyChat: ['estudio'],
-  studyIdeas: ['estudio'],
-  studyGraph: ['estudio'],
+  // Chat, Ideas and the idea graph read the same study_* corpus (materials, notes and
+  // transcripts) scoped by subject, so they work unchanged over a teaching vault: they
+  // are teaching's Analizar group, and the ideas they extract are what the planned
+  // "Crear" surfaces will build their materials from.
+  studyChat: ['estudio', 'docencia'],
+  studyIdeas: ['estudio', 'docencia'],
+  studyGraph: ['estudio', 'docencia'],
   // The question bank is shared with teaching (its Evaluación section).
   studyQuestions: ['estudio', 'docencia'],
   studyReview: ['estudio'],
@@ -282,6 +286,9 @@ export const VAULT_TYPE_SCOPED_VIEWS: Record<string, VaultType[]> = {
   teachingGrades: ['docencia'],
   teachingExams: ['docencia'],
   teachingRubrics: ['docencia'],
+  // Unit design: Deep Research over the teaching corpus, with a structure the teacher
+  // may fix. Teaching-only — it writes a class unit, not an academic report.
+  teachingUnits: ['docencia'],
 };
 
 const BY_ID = new Map<VaultType, VaultTypeDef>(VAULT_TYPES.map((def) => [def.id, def]));

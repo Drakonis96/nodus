@@ -1,6 +1,7 @@
 import type { CorpusHealthBucketId, ResearchContextSelection } from '@shared/types';
+import { type VaultType, normalizeVaultType } from '@shared/vaultTypes';
 
-export type View = 'home' | 'search' | 'library' | 'graph' | 'argument' | 'ideas' | 'authors' | 'persons' | 'timeline' | 'tree' | 'relations' | 'map' | 'archive' | 'databases' | 'dbSearch' | 'dbAnalysis' | 'dbChat' | 'studyCourses' | 'studySchedule' | 'studyCalendar' | 'studySearch' | 'studyLibrary' | 'studyRecordings' | 'studyChat' | 'studyIdeas' | 'studyGraph' | 'studyQuestions' | 'studyReview' | 'studyDeepResearch' | 'teachingGroups' | 'teachingGrades' | 'teachingExams' | 'teachingRubrics' | 'immersion' | 'gaps' | 'debate' | 'research' | 'hypothesis' | 'reading' | 'writing' | 'deepResearch' | 'projects' | 'notes' | 'toolkit' | 'settings';
+export type View = 'home' | 'search' | 'library' | 'graph' | 'argument' | 'ideas' | 'authors' | 'persons' | 'timeline' | 'tree' | 'relations' | 'map' | 'archive' | 'databases' | 'dbSearch' | 'dbAnalysis' | 'dbChat' | 'studyCourses' | 'studySchedule' | 'studyCalendar' | 'studySearch' | 'studyLibrary' | 'studyRecordings' | 'studyChat' | 'studyIdeas' | 'studyGraph' | 'studyQuestions' | 'studyReview' | 'studyDeepResearch' | 'teachingGroups' | 'teachingGrades' | 'teachingExams' | 'teachingRubrics' | 'teachingUnits' | 'immersion' | 'gaps' | 'debate' | 'research' | 'hypothesis' | 'reading' | 'writing' | 'deepResearch' | 'projects' | 'notes' | 'toolkit' | 'settings';
 
 export type GraphPresetId = 'overview' | 'contradictions' | 'gaps' | 'reading' | 'unread' | 'authors';
 
@@ -75,6 +76,7 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'teachingGrades', label: 'Calificaciones', icon: 'chartBar', group: 'analyze' },
   { id: 'teachingExams', label: 'Exámenes', icon: 'notebook', group: 'analyze' },
   { id: 'teachingRubrics', label: 'Rúbricas', icon: 'table', group: 'analyze' },
+  { id: 'teachingUnits', label: 'Diseño de unidades', icon: 'compass', group: 'create' },
   // Analizar — superficies derivadas del grafo y síntesis.
   { id: 'immersion', label: 'Inmersión', icon: 'target', group: 'analyze' },
   { id: 'gaps', label: 'Huecos', icon: 'gap', group: 'analyze' },
@@ -176,6 +178,26 @@ export const TOOLKIT_TOOLS: ToolkitToolDef[] = [
     testid: 'aiocr',
   },
 ];
+
+/**
+ * Sections whose name changes with the vault type. A view reused by two modes carries
+ * the name of the mode it was written for, and that name reads wrong in the other one:
+ * a teacher's workspace has no "chat de estudio", just a chat. Only the label moves —
+ * the view id, its icon and its group stay shared — and the override matches what the
+ * teaching sidebar prints, so Settings and the sidebar can never disagree.
+ */
+const VAULT_TYPE_LABELS: Partial<Record<VaultType, Partial<Record<View, string>>>> = {
+  docencia: {
+    studyChat: 'Chat',
+    studyIdeas: 'Ideas',
+    studyGraph: 'Grafo',
+  },
+};
+
+/** The label to render for a section in a vault of this type (a t() key, as always). */
+export function navItemLabel(item: NavItem, vaultType: string | undefined): string {
+  return VAULT_TYPE_LABELS[normalizeVaultType(vaultType)]?.[item.id] ?? item.label;
+}
 
 /**
  * Resolve the sidebar items for a user-defined order. Home is pinned first and

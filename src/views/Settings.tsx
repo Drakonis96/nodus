@@ -32,7 +32,7 @@ import { SttSettings } from '../components/SttSettings';
 import { LocalAiModelsSettings } from '../components/LocalAiModelsSettings';
 import { LocalImageModelSettings } from '../components/LocalImageModelSettings';
 import { McpConnectionModal } from '../components/McpConnectionModal';
-import { NAV_GROUPS, orderedNav } from '../navigation';
+import { NAV_GROUPS, navItemLabel, orderedNav } from '../navigation';
 import { t, tx } from '../i18n';
 import { updateStatusMessage } from '../updateStatus';
 import { DEFAULT_EMBEDDING_MODELS, EMBEDDING_PROVIDERS } from '@shared/providers';
@@ -1918,9 +1918,11 @@ export function Settings({
                 onEmbeddingChange={(provider, model) => setPendingEmbeddingChange({ provider, model })}
               />
             </Row>
-            {activeVault?.type === 'estudio' && <Row
+            {/* Study and teaching share the extraction pipeline: it is what fills the
+                Ideas map and the graph in both, so both need the switch. */}
+            {(activeVault?.type === 'estudio' || activeVault?.type === 'docencia') && <Row
               label={t('Procesamiento de materiales nuevos con IA')}
-              hint={t('Controla si Nodus crea automáticamente conceptos, citas y relaciones para el mapa de Ideas y el grafo de estudio.')}
+              hint={t('Controla si Nodus crea automáticamente conceptos, citas y relaciones para el mapa de Ideas y el grafo.')}
             >
               <select
                 data-testid="study-knowledge-auto-process"
@@ -2444,7 +2446,7 @@ function SidebarOrderEditor({
                     hidden.has(item.id) ? 'text-neutral-600 line-through' : 'text-neutral-200'
                   }`}
                 >
-                  {t(item.label)}
+                  {t(navItemLabel(item, vaultType))}
                 </span>
                 <button
                   className={`p-1 rounded hover:bg-neutral-800 ${
