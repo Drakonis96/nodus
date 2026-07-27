@@ -6505,6 +6505,8 @@ export const PT: Record<string, string> = {
   "IA y datos del alumnado": "IA e dados dos alunos",
   "La IA de Nodus no recibe listados, notas ni respuestas del alumnado y no puede calificar, perfilar ni evaluar estudiantes. Solo puede generar o estructurar contenido docente que no contenga datos del alumnado.": "A IA do Nodus não recebe listas, notas ou respostas dos alunos e não pode classificar, criar perfis nem avaliar estudantes. Só pode gerar ou estruturar conteúdo docente sem dados dos alunos.",
   "Bloqueado por diseño": "Bloqueado por conceção",
+  "Identificadores del alumnado": "Identificadores dos alunos",
+  "Muestra una columna de identificadores (STU_XXXX) junto a los nombres en el cuaderno de notas y en las actas y boletines que exportes. No cambia lo que recibe la IA: la IA nunca recibe listados de alumnado.": "Mostra uma coluna de identificadores (STU_XXXX) junto aos nomes na pauta de notas e nas atas e boletins que exportar. Não altera o que a IA recebe: a IA nunca recebe listas de alunos.",
   "Identificador {code} copiado. Úsalo para minimizar nombres en notas y exportaciones.": "Identificador {code} copiado. Usa-o para minimizar nomes em notas e exportações.",
   "La IA no accede a este listado, a las notas ni a las respuestas del alumnado.": "A IA não acede a esta lista, às notas nem às respostas dos alunos.",
   "Nodus no expone ninguna función de IA para calificar, perfilar o evaluar estudiantes. Los identificadores permiten minimizar nombres en usos locales y exportaciones.": "O Nodus não disponibiliza qualquer função de IA para classificar, criar perfis ou avaliar estudantes. Os identificadores permitem minimizar nomes em utilizações locais e exportações.",

@@ -6563,6 +6563,8 @@ export const DE: Record<string, string> = {
   "IA y datos del alumnado": "KI und Daten von Lernenden",
   "La IA de Nodus no recibe listados, notas ni respuestas del alumnado y no puede calificar, perfilar ni evaluar estudiantes. Solo puede generar o estructurar contenido docente que no contenga datos del alumnado.": "Die KI von Nodus erhält keine Listen, Noten oder Antworten von Lernenden und kann Lernende weder benoten, profilieren noch bewerten. Sie kann nur Lehrinhalte ohne Daten von Lernenden erzeugen oder strukturieren.",
   "Bloqueado por diseño": "Durch das Design gesperrt",
+  "Identificadores del alumnado": "Kennungen der Schülerinnen und Schüler",
+  "Muestra una columna de identificadores (STU_XXXX) junto a los nombres en el cuaderno de notas y en las actas y boletines que exportes. No cambia lo que recibe la IA: la IA nunca recibe listados de alumnado.": "Zeigt im Notenbuch sowie in den exportierten Notenlisten und Zeugnissen eine Kennungsspalte (STU_XXXX) neben den Namen an. Ändert nicht, was die KI erhält: Die KI erhält niemals Schülerlisten.",
   "Identificador {code} copiado. Úsalo para minimizar nombres en notas y exportaciones.": "Kennung {code} kopiert. Verwenden Sie sie, um Namen in Notizen und Exporten zu minimieren.",
   "La IA no accede a este listado, a las notas ni a las respuestas del alumnado.": "Die KI hat keinen Zugriff auf diese Liste, Noten oder Antworten von Lernenden.",
   "Nodus no expone ninguna función de IA para calificar, perfilar o evaluar estudiantes. Los identificadores permiten minimizar nombres en usos locales y exportaciones.": "Nodus stellt keine KI-Funktion zur Benotung, Profilerstellung oder Bewertung von Lernenden bereit. Kennungen helfen, Namen bei lokaler Nutzung und in Exporten zu minimieren.",
