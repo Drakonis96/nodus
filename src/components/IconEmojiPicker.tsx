@@ -50,11 +50,10 @@ export function IconEmojiPicker({ icon, emoji, onChange }: {
   const chooseEmoji = (value: string) => { onChange({ icon, emoji: value }); setOpen(false); };
 
   return <>
-    <button data-testid="study-create-icon-emoji" type="button" className="input mt-1 flex w-full items-center gap-2 text-left hover:border-teal-500" onClick={() => { setQuery(''); setOpen(true); }}>
+    <button data-testid="study-create-icon-emoji" type="button" className="input mt-1 flex w-full items-center justify-between text-left hover:border-teal-500" aria-label={t('Seleccionar icono o emoji')} onClick={() => { setQuery(''); setOpen(true); }}>
       <span className="grid h-5 w-5 shrink-0 place-items-center rounded bg-indigo-950/30 text-sm text-indigo-300">
         {emoji || <Icon name={icon} size={14} />}
       </span>
-      <span className="min-w-0 flex-1 truncate">{emoji ? t('Emoji seleccionado') : icon || t('Seleccionar icono o emoji')}</span>
       <Icon name="chevronDown" size={13} className="text-neutral-500" />
     </button>
     {open && createPortal(

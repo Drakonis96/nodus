@@ -4557,7 +4557,6 @@ export const TR: Record<string, string> = {
   "Selecciona un estilo o crea uno personalizado.": "Bir stil seçin veya özel bir stil oluşturun.",
   "Icono o emoji": "Simge veya emoji",
   "Seleccionar icono o emoji": "Simge veya emojiyi seçin",
-  "Emoji seleccionado": "Seçilen emoji",
   "Busca y elige un icono de Nodus o un emoji.": "Bir Nodus simgesi veya emojisi bulun ve seçin.",
   "Buscar iconos…": "Simgeleri arayın…",
   "No se encontraron iconos.": "Hiçbir simge bulunamadı.",

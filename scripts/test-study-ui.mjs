@@ -234,7 +234,8 @@ test('study metadata uses one searchable icon and emoji catalogue', async () => 
   assert.match(picker, /data-testid="study-icon-search"/);
   assert.match(picker, /ICON_NAMES\.filter/);
   assert.match(picker, /EMOJI_SEARCH_GROUPS/);
-  assert.match(picker, /emoji \? t\('Emoji seleccionado'\)/);
+  assert.match(picker, /aria-label=\{t\('Seleccionar icono o emoji'\)\}/);
+  assert.doesNotMatch(picker, /Emoji seleccionado/);
   assert.doesNotMatch(picker, /\{emoji \|\| icon \|\| t\('Seleccionar icono o emoji'\)\}/);
   assert.match(ui, /export const ICON_NAMES/);
   assert.match(view, /className="sr-only" type="file"/);
