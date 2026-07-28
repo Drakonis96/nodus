@@ -29,6 +29,7 @@ import {
   findPlaceholders,
   inferApplyMode,
   mergeQuestionFeed,
+  nextBlockedScene,
   planApply,
   rankQuestionFeed,
   type FeedScene,
@@ -683,6 +684,17 @@ export function sceneQuestionLoad(sceneId: string): SceneQuestionLoad {
     (item) => item.status === 'open' && item.anchor && leansOn.has(`${item.anchor.kind}:${item.anchor.id}`)
   );
   return { count: items.length, blocking: items.filter((item) => item.blocking).length, items };
+}
+
+/**
+ * The next unwritten scene that leans on an anchor.
+ *
+ * Exported for the model prompt, which wants it without paying for the whole feed: the feed
+ * scans every piece of prose in the world for holes, and «what is this blocking» needs only
+ * the scenes and what they lean on.
+ */
+export function blockedSceneFor(anchor: { kind: string; id: string } | null) {
+  return nextBlockedScene(anchor, feedScenes());
 }
 
 /** The prose of an entry, so the sheet can show the field an answer would write into. */

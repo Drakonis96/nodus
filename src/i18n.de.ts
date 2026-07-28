@@ -7478,4 +7478,9 @@ export const DE: Record<string, string> = {
   "y {count} más": "und {count} weitere",
   "{count} opciones": "{count} Optionen",
   "¿La magia deja marca visible?": "Hinterlässt Magie eine sichtbare Spur?",
+  "El modelo no ha devuelto ninguna respuesta que pueda usar.": "Das Modell hat keine brauchbare Antwort geliefert.",
+  "Escribe primero qué es lo que no has decidido: «???» a secas no da para responder.": "Schreib erst auf, was du nicht entschieden hast: ein blankes „???“ gibt nichts zu beantworten her.",
+  "Proponer respuestas": "Antworten vorschlagen",
+  "Solo el enunciado. El precio y los límites los escribes tú: cada uno responde a una pregunta distinta.": "Nur der Wortlaut. Den Preis und die Grenzen schreibst du: jedes davon beantwortet eine andere Frage.",
+  "Todavía no hay de dónde escribirla: dime sobre qué rige, empieza una línea o márcala en una escena.": "Es gibt noch nichts, woraus sich das schreiben ließe: sag mir, worüber sie gilt, fang eine Zeile an, oder markiere sie in einer Szene.",
 };

@@ -6888,4 +6888,9 @@ export const IT: Record<string, string> = {
   "y {count} más": "e altre {count}",
   "{count} opciones": "{count} opzioni",
   "¿La magia deja marca visible?": "La magia lascia un segno visibile?",
+  "El modelo no ha devuelto ninguna respuesta que pueda usar.": "Il modello non ha restituito nessuna risposta utilizzabile.",
+  "Escribe primero qué es lo que no has decidido: «???» a secas no da para responder.": "Scrivi prima che cosa non hai deciso: un «???» da solo non dà niente a cui rispondere.",
+  "Proponer respuestas": "Proponi risposte",
+  "Solo el enunciado. El precio y los límites los escribes tú: cada uno responde a una pregunta distinta.": "Solo l'enunciato. Il prezzo e i limiti li scrivi tu: ognuno risponde a una domanda diversa.",
+  "Todavía no hay de dónde escribirla: dime sobre qué rige, empieza una línea o márcala en una escena.": "Non c'è ancora da dove scriverla: dimmi su cosa vige, comincia una riga, o segnala in una scena.",
 };

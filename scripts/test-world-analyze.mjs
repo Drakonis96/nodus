@@ -1416,3 +1416,172 @@ test('the undo is offered only while the field still says what was written', () 
   assert.equal(questions.canUndo(option({ replacedText: 'x' }), 'Hija del carcelero'), false, 'never applied');
   assert.equal(questions.canUndo({ ...applied, replacedText: null }, 'Hija del carcelero'), false);
 });
+
+// ── The two model calls ──────────────────────────────────────────────────────
+//
+// The IA does not calculate anything in this layer: it drafts one sentence and proposes
+// three answers, both under a button and both in quarantine. What is worth testing without
+// a provider is exactly that — what the model is TOLD, and what is read back out of it.
+
+const ruleContext = load('shared/worldRuleContext.ts');
+const questionContext = load('shared/worldQuestionContext.ts');
+
+function ruleSources(over = {}) {
+  return {
+    title: 'La sangre paga la sangre',
+    hardness: 'Tiene un precio',
+    hardnessHint: 'Puede pasar, pero cuesta algo.',
+    scope: 'Todo el mundo',
+    statement: null,
+    cost: null,
+    limits: null,
+    exceptions: [],
+    tests: [],
+    mentions: [],
+    calendar: null,
+    ...over,
+  };
+}
+
+function questionSources(over = {}) {
+  return {
+    question: '¿De quién es hija Kaelen?',
+    anchorTitle: 'Kaelen Vor',
+    anchorKind: 'Personaje',
+    fieldLabel: 'Trasfondo',
+    evidence: 'Nació en ??? y creció lejos.',
+    anchorProse: [],
+    existing: [],
+    neighbours: [],
+    blockedScene: null,
+    ...over,
+  };
+}
+
+test('a bare title is not enough to draft a law from', () => {
+  // The blank page is what the button is for, but a title in a vault that has never used
+  // the law yields a sentence that would fit any fantasy novel — and an author deletes
+  // that once and never presses it again. One more signal, all of them a click away.
+  assert.equal(ruleContext.hasWorldRuleMaterial(ruleSources()), false);
+  assert.equal(ruleContext.hasWorldRuleMaterial(ruleSources({ statement: 'Algo' })), true);
+  assert.equal(ruleContext.hasWorldRuleMaterial(ruleSources({ exceptions: ['Salvo los Cuervos'] })), true);
+  assert.equal(
+    ruleContext.hasWorldRuleMaterial(ruleSources({ tests: [{ mark: 'la rompe', sceneTitle: 'El vado', text: null, subjectName: null, paid: null }] })),
+    true
+  );
+  assert.equal(ruleContext.hasWorldRuleMaterial(ruleSources({ title: '   ', statement: 'Algo' })), false);
+});
+
+test('the law prompt asks for the statement and NOTHING else', () => {
+  // The price and the limits are separate fields because each diagnostic asks a different
+  // question of each; a model that filled all three would invent two answers to buy one.
+  assert.match(ruleContext.WORLD_RULE_SYSTEM, /SOLO el enunciado/);
+  assert.match(ruleContext.WORLD_RULE_SYSTEM, /son otros campos de la ficha y NO se escriben aquí/);
+  assert.match(ruleContext.WORLD_RULE_SYSTEM, /No introduzcas nombres propios/);
+});
+
+test('what the author already wrote is a draft to improve, never a text to replace', () => {
+  const composed = ruleContext.composeWorldRuleContext(
+    ruleSources({ statement: 'La sangre derramada se cobra en sangre.', cost: 'Un año de vida' })
+  );
+  assert.match(composed, /ENUNCIADO ACTUAL \(mejóralo, no lo tires\): La sangre derramada/);
+  // The other two fields are context, not a target. Saying so is what keeps the accepted
+  // proposal from swallowing three fields into one.
+  assert.match(composed, /LO QUE CUESTA ROMPERLA \(otro campo; no lo repitas\)/);
+});
+
+test('the law prompt carries how the story actually tests it, price included', () => {
+  const composed = ruleContext.composeWorldRuleContext(
+    ruleSources({
+      tests: [
+        { mark: 'la rompe', sceneTitle: 'El vado', text: 'Mata sin pagar', subjectName: 'Kaelen', paid: false },
+        { mark: 'la obedece', sceneTitle: 'El juicio', text: null, subjectName: null, paid: null },
+      ],
+    })
+  );
+  assert.match(composed, /El vado — Kaelen: la rompe: Mata sin pagar \[el precio NO está en la página\]/);
+  assert.match(composed, /El juicio — la obedece$/m, 'no invented subject, no invented price');
+});
+
+test('a world with no calendar is not handed an empty one', () => {
+  assert.doesNotMatch(ruleContext.composeWorldRuleContext(ruleSources()), /CALENDARIO/);
+  assert.match(
+    ruleContext.composeWorldRuleContext(ruleSources({ calendar: { eras: ['Tercera Era'] } })),
+    /CALENDARIO DE ESTE MUNDO \(no uses ningún otro\) — eras: Tercera Era/
+  );
+});
+
+test('«???» on its own is not a question anybody can answer', () => {
+  // The common degenerate case: a field containing nothing but the mark becomes a question
+  // whose whole text IS the mark, and answering that produces generic fantasy.
+  assert.equal(questionContext.hasWorldQuestionMaterial(questionSources({ question: '???' })), false);
+  assert.equal(
+    questionContext.hasWorldQuestionMaterial(
+      questionSources({ question: '???', anchorProse: [{ field: 'Trasfondo', text: 'Creció en el vado.' }] })
+    ),
+    true,
+    'the sheet it hangs off can carry it instead'
+  );
+  assert.equal(questionContext.hasWorldQuestionMaterial(questionSources()), true);
+});
+
+test('the options prompt asks for three genuinely different answers, in the author’s voice', () => {
+  assert.match(questionContext.WORLD_QUESTION_OPTIONS_SYSTEM, /EXACTAMENTE TRES/);
+  assert.match(questionContext.WORLD_QUESTION_OPTIONS_SYSTEM, /tres variantes de la misma idea no son una decisión/);
+  // Each answer is written verbatim into somebody's sheet, so it has to read like theirs.
+  assert.match(questionContext.WORLD_QUESTION_OPTIONS_SYSTEM, /se escribirá tal cual en la ficha/);
+});
+
+test('the question context carries the sheet, the hole and what is already written', () => {
+  const composed = questionContext.composeWorldQuestionContext(
+    questionSources({
+      anchorProse: [{ field: 'Trasfondo', text: 'Creció lejos del vado.' }],
+      existing: ['Hija del carcelero'],
+      neighbours: [{ title: 'Los Cuervos', kind: 'Facción', summary: 'Los espías de la corte' }],
+      blockedScene: 'El juicio',
+    })
+  );
+  assert.match(composed, /SOBRE: Kaelen Vor \(Personaje\) — se escribirá en «Trasfondo»/);
+  assert.match(composed, /LA FRASE DONDE ESTÁ EL HUECO: Nació en \?\?\? y creció lejos\./);
+  assert.match(composed, /BLOQUEA LA ESCENA: El juicio/);
+  assert.match(composed, /LO QUE LA FICHA YA DICE[\s\S]*Trasfondo: Creció lejos del vado\./);
+  assert.match(composed, /YA HA ESCRITO COMO RESPUESTA \(no lo repitas\)[\s\S]*Hija del carcelero/);
+});
+
+test('the parser survives everything a warm model does around its answer', () => {
+  const parsed = questionContext.parseQuestionOptions(
+    [
+      'Claro, aquí van tres posibilidades:',
+      '',
+      '1. **OPCIÓN:** Hija del carcelero de Vael.',
+      '   IMPLICA: los Cuervos la reconocerían al verla.',
+      '- OPCION 2: Hija de nadie; la crió el gremio.',
+      '  **Implicaciones:** nadie puede reclamarla,',
+      '  y el juicio pierde su testigo.',
+      'OPCIÓN 3 — Hija de la propia jueza.',
+      '',
+      'Espero que te sirvan.',
+    ].join('\n')
+  );
+  assert.deepEqual(parsed, [
+    { text: 'Hija del carcelero de Vael.', implications: 'los Cuervos la reconocerían al verla.' },
+    {
+      text: 'Hija de nadie; la crió el gremio.',
+      implications: 'nadie puede reclamarla, y el juicio pierde su testigo.',
+    },
+    // An answer with no implications is KEPT: the answer is the part that reaches the
+    // world, and dropping it would be the parser deciding it knows better.
+    { text: 'Hija de la propia jueza.', implications: null },
+  ]);
+});
+
+test('the parser never returns more than three, and never invents one', () => {
+  const many = questionContext.parseQuestionOptions(
+    ['OPCIÓN: A', 'OPCIÓN: B', 'OPCIÓN: C', 'OPCIÓN: D'].join('\n')
+  );
+  assert.deepEqual(many.map((option) => option.text), ['A', 'B', 'C']);
+  // An IMPLICA with nothing above it belongs to nothing.
+  assert.deepEqual(questionContext.parseQuestionOptions('IMPLICA: algo suelto'), []);
+  assert.deepEqual(questionContext.parseQuestionOptions('Aquí no hay ninguna opción.'), []);
+  assert.deepEqual(questionContext.parseQuestionOptions('OPCIÓN:   '), []);
+});

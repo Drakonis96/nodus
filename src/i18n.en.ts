@@ -7705,4 +7705,9 @@ export const EN: Record<string, string> = {
   "y {count} más": "and {count} more",
   "{count} opciones": "{count} options",
   "¿La magia deja marca visible?": "Does magic leave a visible mark?",
+  "El modelo no ha devuelto ninguna respuesta que pueda usar.": "The model returned no answer I can use.",
+  "Escribe primero qué es lo que no has decidido: «???» a secas no da para responder.": "Write down what you have not decided first: a bare “???” gives nothing to answer.",
+  "Proponer respuestas": "Propose answers",
+  "Solo el enunciado. El precio y los límites los escribes tú: cada uno responde a una pregunta distinta.": "The statement only. The price and the limits are yours to write: each one answers a different question.",
+  "Todavía no hay de dónde escribirla: dime sobre qué rige, empieza una línea o márcala en una escena.": "There is nothing to write it from yet: tell me what it governs, start a line, or mark it in a scene.",
 };

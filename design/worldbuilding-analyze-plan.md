@@ -1,9 +1,9 @@
 # Worldbuilding — el grupo «Analizar» (migración 99)
 
-> **Estado: A0–A8 implementados y verificados** (2026-07-28). `SCHEMA_VERSION = 99`,
-> 1142/1142 tests, lint 0 errores, typecheck, `npm run build` y `npm run test:e2e` en verde.
-> **Quedan A9 y A10**, especificados abajo con el detalle suficiente para retomarlos sin
-> volver a diseñar nada.
+> **Estado: A0–A9 implementados y verificados** (2026-07-28). `SCHEMA_VERSION = 99`,
+> 1152/1152 tests, lint 0 errores, typecheck, `npm run build` y `npm run test:e2e` en verde.
+> **Queda A10**, especificado abajo con el detalle suficiente para retomarlo sin volver a
+> diseñar nada.
 >
 > Plan producido por un workflow de 12 agentes (5 diseños + 5 críticas «desde la mesa de un
 > novelista» + síntesis). Este documento es el resumen ejecutable; la enciclopedia (v98) va
@@ -40,6 +40,7 @@ elemento y bajo botón, en cuarentena (§A9).
 | **A4** | **La vista de Continuidad**: `src/views/ContinuityView.tsx`, silencios enlatados, excepciones aceptadas, estado vacío con recuentos reales. «Consistencia» → **«Continuidad»**. |
 | **A5** | **Conflictos**: `src/views/ConflictsView.tsx` (tablero primero), `CharacterThreadsSection`, lealtades cruzadas, `conflict` como 7.ª `WorldEntryKind`, `checkThreads` en Continuidad. |
 | **A6** | **Arcos**: `src/views/ArcsView.tsx`, carriles SVG de solo lectura, tira de densidad, tramos inertes, orden de cierre, hoja de hitos. Se retiró «Tramas». |
+| **A9** | **Los dos usos de IA**: `shared/worldRuleContext.ts` + `electron/ai/worldRules.ts` (redactar el enunciado de una ley) y `shared/worldQuestionContext.ts` + `electron/ai/worldQuestionOptions.ts` (proponer tres respuestas). Nada más: la IA sigue sin calcular nada. |
 | **A8** | **Preguntas abiertas**: `shared/worldQuestions.ts`, `electron/db/worldQuestionsRepo.ts`, `QuestionsView`, la captura desde cualquier campo de prosa (`questionCapture.tsx` + `anchorOf` en el shell) y la franja `SceneQuestionBand` en la escena. |
 | **A7** | **Reglas**: `shared/worldRules.ts`, `electron/db/worldRulesRepo.ts`, `RulesView`, `RulesInPlay` en la escena, `rule` como 8.ª `WorldEntryKind`, «convertir en ley», `checkRules` en Continuidad. |
 
@@ -139,7 +140,7 @@ Más la banda «esta escena depende de N decisiones abiertas» en la ficha de es
 
 ---
 
-## 4. A9 — Los dos usos de IA
+## 4. A9 — Los dos usos de IA — **HECHA**
 
 Ambos **por elemento, bajo botón y en cuarentena**. Copiar el patrón de
 `electron/ai/worldArticleDraft.ts`, que ya funciona: prompt puro en `shared/`, llamada en
@@ -161,6 +162,27 @@ bandeja, `generateArcDraft` en modo propose, `reviewWorldProse`, `world_ai_findi
 `material_hash` y su caducidad. Su entrada real es `world_scenes.summary`, que es NULLABLE y
 en un vault real está vacío la mayor parte del tiempo. **No se paga un modelo por lo que
 contesta un JOIN.**
+
+### Lo que cambió al construirla
+
+- **Dos líneas etiquetadas (`OPCIÓN:` / `IMPLICA:`), no JSON.** `completeJson` escala
+  BAJANDO la temperatura hasta que el modelo obedece, y esta es la llamada más caliente de
+  la app (0.9): pagaría tres turnos para quedarse con la más sosa de las tres. Además, de
+  los modelos locales que un escritor corre de verdad, la mayoría envuelve su JSON en prosa.
+  Dos prefijos sobreviven a un preámbulo, a una lista numerada, a la negrita de Markdown y a
+  una despedida. El parser está en `shared/`, y **solo continúa una línea si va indentada**:
+  sin ese guard, el «espero que te sirvan» del modelo acaba dentro de la ficha de alguien.
+- **`hasWorldRuleMaterial` exige el título MÁS una señal** (un ámbito con nombre, una línea
+  empezada, una excepción, una escena que la pone a prueba, un texto que la menciona). Un
+  título a secas produce una frase que valdría para cualquier novela, y eso se borra una vez
+  y no se vuelve a pulsar el botón. El aviso dice cuál de las cinco falta.
+- **`blockedSceneFor(anchor)`** se exporta desde `worldQuestionsRepo` para que el prompt
+  sepa qué escena está bloqueando **sin pagar el escaneo de toda la prosa del vault** que
+  hace el feed.
+- **No hay paso de «aceptar» en las opciones**, y no es un olvido: una opción es una
+  escritura pendiente, así que elegirla y pulsar el botón que nombra lo que va a escribir ya
+  es el consentimiento. El único «Aceptar» del grupo es el de la ley, porque ahí el modelo
+  sí escribe en un campo.
 
 ---
 

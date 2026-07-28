@@ -7235,4 +7235,9 @@ export const TR: Record<string, string> = {
   "y {count} más": "ve {count} tane daha",
   "{count} opciones": "{count} seçenek",
   "¿La magia deja marca visible?": "Büyü görünür bir iz bırakır mı?",
+  "El modelo no ha devuelto ninguna respuesta que pueda usar.": "Model kullanabileceğim bir cevap döndürmedi.",
+  "Escribe primero qué es lo que no has decidido: «???» a secas no da para responder.": "Önce neye karar vermediğini yaz: tek başına bir «???» cevaplanacak bir şey vermiyor.",
+  "Proponer respuestas": "Cevap öner",
+  "Solo el enunciado. El precio y los límites los escribes tú: cada uno responde a una pregunta distinta.": "Yalnızca ifade. Bedeli ve sınırları sen yazarsın: her biri başka bir soruya cevap verir.",
+  "Todavía no hay de dónde escribirla: dime sobre qué rige, empieza una línea o márcala en una escena.": "Bunu yazacak bir şey henüz yok: neyin üzerinde geçerli olduğunu söyle, bir satır başlat ya da bir sahnede işaretle.",
 };

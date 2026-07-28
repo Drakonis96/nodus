@@ -616,6 +616,8 @@ import {
   listWorldImages,
 } from './db/worldImagesRepo';
 import { draftWorldArticle } from './ai/worldArticleDraft';
+import { draftWorldRule } from './ai/worldRules';
+import { proposeQuestionOptions } from './ai/worldQuestionOptions';
 import { analyzeMissingEntries } from './ai/worldMissingEntries';
 import { exportWorldBible } from './export/worldBibleExport';
 import {
@@ -1707,6 +1709,9 @@ export function registerIpc(
     deleteWorldRule(ruleId);
   });
   h('rules:inPlay', async (_e, sceneId: string) => rulesInPlay(sceneId));
+  // The first of the two model calls this layer keeps: a first sentence to disagree with,
+  // written into `proposed_text` and never into `statement`. Accepting is a separate call.
+  h('rules:draft', async (_e, ruleId: string) => draftWorldRule(ruleId));
   h('rules:acceptDraft', async (_e, ruleId: string) => acceptRuleProposedText(ruleId));
   h('rules:rejectDraft', async (_e, ruleId: string) => {
     setRuleProposedText(ruleId, null);
@@ -1736,6 +1741,10 @@ export function registerIpc(
     questionAnchorText(kind, id, field)
   );
   h('questions:forScene', async (_e, sceneId: string) => sceneQuestionLoad(sceneId));
+  // The second: three answers, stored as options with `origin='ai'`. There is no accept
+  // step because choosing one IS the accept step — an option is not canon until it is
+  // applied, so the quarantine here is structural.
+  h('questions:propose', async (_e, questionId: string) => proposeQuestionOptions(questionId));
 
   // The one mechanical fix: re-derive every scene's world day from the chain.
   h('scenes:recomputeDays', async () => recomputeSceneDays());

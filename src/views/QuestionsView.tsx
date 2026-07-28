@@ -13,7 +13,7 @@ import type { View } from '../navigation';
 import type { WorldSectionDef } from '../components/world/WorldWorkspace';
 import { WorldWorkspace } from '../components/world/WorldWorkspace';
 import { Icon } from '../components/ui';
-import { confirm } from '../components/feedback';
+import { confirm, toast } from '../components/feedback';
 import { PERSON_DOSSIER_SECTION_CLASS } from '../components/personDossierLayout';
 import { notifyDataChanged } from '../hooks';
 import { t, tx } from '../i18n';
@@ -224,6 +224,7 @@ function QuestionSheet({
   const [draft, setDraft] = useState(item.question);
   const [adding, setAdding] = useState('');
   const [busy, setBusy] = useState(false);
+  const [proposing, setProposing] = useState(false);
   const [undoable, setUndoable] = useState<Record<string, boolean>>({});
   const [holes, setHoles] = useState<{ title: string; field: string; evidence: string }[]>([]);
 
@@ -279,6 +280,33 @@ function QuestionSheet({
       notifyDataChanged();
     } finally {
       setBusy(false);
+    }
+  };
+
+  /**
+   * Three answers from the model, stored as options like the author's own.
+   *
+   * There is no «accept» here, and that is the design rather than an omission: an option is
+   * a PENDING WRITE, so choosing one and pressing the button that names what it will write
+   * is already the moment of consent. Nothing the model says reaches the world before that.
+   */
+  const propose = async () => {
+    setProposing(true);
+    try {
+      const questionId = await ensure();
+      const result = await window.nodus.proposeQuestionOptions(questionId);
+      if (result.noMaterial) {
+        toast(t('Escribe primero qué es lo que no has decidido: «???» a secas no da para responder.'));
+        return;
+      }
+      if (result.options.length === 0) {
+        toast(t('El modelo no ha devuelto ninguna respuesta que pueda usar.'));
+        return;
+      }
+      await onChanged();
+      notifyDataChanged();
+    } finally {
+      setProposing(false);
     }
   };
 
@@ -481,6 +509,16 @@ function QuestionSheet({
           >
             {t('Añadir')}
           </button>
+          {item.status !== 'answered' && (
+            <button
+              className="btn btn-ghost h-8 shrink-0 gap-1 border border-neutral-700 px-2 text-xs"
+              data-testid="question-propose"
+              disabled={busy || proposing}
+              onClick={() => void propose()}
+            >
+              <Icon name="sparkles" size={13} /> {proposing ? t('Pensando…') : t('Proponer respuestas')}
+            </button>
+          )}
         </div>
       </section>
 

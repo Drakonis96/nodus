@@ -23,7 +23,7 @@ import { WorldWorkspace } from '../components/world/WorldWorkspace';
 import { NewRuleModal } from '../components/world/NewRuleModal';
 import { AutoSavingField } from '../components/AutoSavingField';
 import { Icon } from '../components/ui';
-import { confirm } from '../components/feedback';
+import { confirm, toast } from '../components/feedback';
 import { PERSON_DOSSIER_SECTION_CLASS } from '../components/personDossierLayout';
 import { notifyDataChanged } from '../hooks';
 import { t, tx } from '../i18n';
@@ -183,6 +183,7 @@ function RuleSheet({
   const [exceptions, setExceptions] = useState<WorldRule[]>([]);
   const [groups, setGroups] = useState<WorldGroup[]>([]);
   const [places, setPlaces] = useState<WorldPlace[]>([]);
+  const [drafting, setDrafting] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -211,6 +212,25 @@ function RuleSheet({
     notifyDataChanged();
   };
 
+  /**
+   * The one model call this screen makes, and it attacks the blank page rather than
+   * judging anything: the draft lands in `proposedText`, beside the author's own sentence,
+   * and becomes the law only when they say so.
+   */
+  const draft = async () => {
+    setDrafting(true);
+    try {
+      const result = await window.nodus.draftWorldRule(rule.ruleId);
+      if (result.noMaterial) {
+        toast(t('Todavía no hay de dónde escribirla: dime sobre qué rige, empieza una línea o márcala en una escena.'));
+        return;
+      }
+      await onChanged();
+    } finally {
+      setDrafting(false);
+    }
+  };
+
   const remove = async () => {
     const ok = await confirm({
       title: t('Eliminar la regla'),
@@ -237,13 +257,25 @@ function RuleSheet({
             {[t(RULE_HARDNESS_LABEL[rule.hardness]), t(RULE_STATUS_LABEL[rule.status])].join(' · ')}
           </p>
         </div>
-        <button
-          className="btn btn-ghost h-8 w-8 shrink-0 p-0 text-red-300 hover:text-red-200"
-          title={t('Eliminar')}
-          onClick={() => void remove()}
-        >
-          <Icon name="trash" size={15} />
-        </button>
+        <div className="flex shrink-0 gap-1">
+          {!rule.proposedText && (
+            <button
+              className="btn btn-ghost h-8 gap-1 border border-neutral-700 px-2 text-xs"
+              data-testid="rule-draft"
+              disabled={drafting}
+              onClick={() => void draft()}
+            >
+              <Icon name="sparkles" size={13} /> {drafting ? t('Escribiendo…') : t('Redactar')}
+            </button>
+          )}
+          <button
+            className="btn btn-ghost h-8 w-8 p-0 text-red-300 hover:text-red-200"
+            title={t('Eliminar')}
+            onClick={() => void remove()}
+          >
+            <Icon name="trash" size={15} />
+          </button>
+        </div>
       </div>
 
       {/* The AI draft, quarantined exactly as an article's is. */}
@@ -253,6 +285,9 @@ function RuleSheet({
             <Icon name="sparkles" size={13} /> {t('Propuesta de la IA')}
           </h3>
           <p className="whitespace-pre-wrap text-sm text-neutral-300">{rule.proposedText}</p>
+          <p className="mt-1 text-[10px] leading-4 text-neutral-600">
+            {t('Solo el enunciado. El precio y los límites los escribes tú: cada uno responde a una pregunta distinta.')}
+          </p>
           <div className="mt-3 flex gap-2">
             <button
               className="btn btn-primary px-3 text-xs"

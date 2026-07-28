@@ -2723,6 +2723,20 @@ export interface WorldQuestionFeedItem {
   updatedAt: string | null;
 }
 
+/** The drafted statement of a law, quarantined in `world_rules.proposed_text`. */
+export interface WorldRuleDraftResult {
+  text: string | null;
+  /** True when the law is too bare to draft from — not an error. */
+  noMaterial: boolean;
+}
+
+/** Answers a model proposed. They are stored as options and are NOT canon: an option
+ *  becomes part of the world only when the author chooses it and applies it. */
+export interface WorldQuestionOptionsResult {
+  options: WorldQuestionOption[];
+  noMaterial: boolean;
+}
+
 /** What a scene is waiting on, for the band on its sheet. */
 export interface SceneQuestionLoad {
   count: number;
@@ -6707,6 +6721,8 @@ export interface NodusApi {
   deleteWorldRule(ruleId: string): Promise<void>;
   /** The laws a scene puts in play, prepopulated from its links, its place and its cast. */
   rulesInPlay(sceneId: string): Promise<WorldRule[]>;
+  /** A first sentence to disagree with, quarantined in `proposed_text`. */
+  draftWorldRule(ruleId: string): Promise<WorldRuleDraftResult>;
   acceptRuleDraft(ruleId: string): Promise<WorldRule>;
   rejectRuleDraft(ruleId: string): Promise<void>;
   // ── The decisions not taken yet ───────────────────────────────────────────
@@ -6740,6 +6756,8 @@ export interface NodusApi {
   ): Promise<{ kind: string; id: string; title: string; field: string; evidence: string }[]>;
   questionAnchorText(kind: string, id: string, field: string): Promise<string | null>;
   questionsForScene(sceneId: string): Promise<SceneQuestionLoad>;
+  /** Three answers, stored as options. They are not canon until one is chosen and applied. */
+  proposeQuestionOptions(questionId: string): Promise<WorldQuestionOptionsResult>;
   // ── Maps of an invented world ─────────────────────────────────────────────
   // The image bytes are NEVER inlined with a map: a base map is megabytes, and listing
   // them would push every byte of every map through the bridge to draw a row of cards.

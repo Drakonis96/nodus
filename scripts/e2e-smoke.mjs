@@ -3008,6 +3008,9 @@ try {
     await page.getByPlaceholder('Qué es siempre verdad en este mundo').fill('La sangre paga la sangre');
     await page.getByTestId('new-rule-modal').getByRole('button', { name: 'Crear', exact: true }).click();
     await page.getByTestId('rule-sheet').waitFor({ timeout: 15_000 });
+    // The one model call this screen makes sits under a button, and the button exists only
+    // while there is no proposal to judge — accepting is always a separate act.
+    await page.getByTestId('rule-draft').waitFor({ timeout: 15_000 });
 
     // Put it to the test from the SCENE, which is the only place a writer will do it.
     await openSection('Escenas', 'scenes-grid');
@@ -3106,6 +3109,24 @@ try {
       const kaelen = (await window.nodus.listCharacters()).find((c) => c.displayName === 'Kaelen Vor');
       return kaelen?.profile.backstory === 'Nació en ??? y creció lejos del vado.';
     }));
+
+    // Proposing answers is under a button too, beside the author's own. There is no accept
+    // step: an option is a pending write, so choosing one IS the consent.
+    await page.getByTestId('question-propose').waitFor({ timeout: 15_000 });
+
+    // Both model calls refuse BEFORE they need a provider when there is nothing to work
+    // from — a bare law, a question whose whole text is «???». Without that guard the
+    // author's first click on either button is a provider error.
+    const guarded = await page.evaluate(async () => {
+      const bare = await window.nodus.createWorldRule({ title: 'Una ley sin nada detrás' });
+      const drafted = await window.nodus.draftWorldRule(bare.ruleId);
+      const hollow = await window.nodus.ensureQuestion({ question: '???', origin: 'author' });
+      const proposed = await window.nodus.proposeQuestionOptions(hollow.questionId);
+      await window.nodus.deleteWorldRule(bare.ruleId);
+      await window.nodus.deleteWorldQuestion(hollow.questionId);
+      return { rule: drafted.noMaterial, question: proposed.noMaterial };
+    });
+    assert.deepEqual(guarded, { rule: true, question: true }, 'no material is an answer, not an error');
 
     // And the scene the author is about to write says what it is waiting on, which is the
     // whole point of the section: they never come here to feed it.
