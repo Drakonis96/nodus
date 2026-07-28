@@ -28,3 +28,14 @@ test('manuscript workbench buttons grow with wrapped or translated labels', asyn
   assert.doesNotMatch(workbench, /className="btn btn-ghost h-7 flex-1/);
   assert.match(workbench, /min-w-0 rounded-xl border border-neutral-200/);
 });
+
+test('the manuscript textarea edits a clean projection and serializes links on save', async () => {
+  const manuscript = await readFile(path.join(repoRoot, 'src/views/ManuscriptView.tsx'), 'utf8');
+
+  assert.match(manuscript, /const editor = toManuscriptEditor\(text\.text\)/);
+  assert.match(manuscript, /setDraft\(editor\.text\)/);
+  assert.match(manuscript, /setDraftLinks\(editor\.links\)/);
+  assert.match(manuscript, /saveSceneText\(sceneId, fromManuscriptEditor\(text, editorLinks\)\)/);
+  assert.match(manuscript, /rebaseManuscriptEditorLinks\(draft, next, current\)/);
+  assert.match(manuscript, /replaceCandidate: \(entry, range\) =>/);
+});

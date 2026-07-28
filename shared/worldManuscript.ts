@@ -287,6 +287,137 @@ export interface CompileChapter {
 
 const RESOLVED_LINK_RE = /\[([^\]\n]*)\]\(nodus:\/\/world\/[a-z]+\/[^)\s]+\)/g;
 const PENDING_LINK_RE = /\[\[([^\][\n]+)\]\]/g;
+const EDITOR_LINK_RE = /\[([^\]\n]*)\]\((nodus:\/\/world\/[a-z]+\/[^)\s]+)\)|\[\[([^\][\n]+)\]\]/g;
+
+/**
+ * A world link's invisible position inside the manuscript textarea.
+ *
+ * Textarea selections and JavaScript strings both use UTF-16 offsets, so these positions
+ * remain exact even when the prose contains emoji or non-Latin scripts.
+ */
+export interface ManuscriptEditorLink {
+  start: number;
+  end: number;
+  /** A resolved world URL, or null while a typed `[[name]]` is still pending. */
+  href: string | null;
+}
+
+/**
+ * Project stored manuscript Markdown into the clean prose shown to the author.
+ *
+ * Internal URLs are storage, not prose. Their ranges travel separately so the textarea can
+ * show only the labels without sacrificing backlinks, rename stability or pending links.
+ */
+export function toManuscriptEditor(markdown: string | null | undefined): {
+  text: string;
+  links: ManuscriptEditorLink[];
+} {
+  const source = markdown ?? '';
+  const links: ManuscriptEditorLink[] = [];
+  let text = '';
+  let cursor = 0;
+
+  for (const match of source.matchAll(EDITOR_LINK_RE)) {
+    const index = match.index ?? 0;
+    const label = match[1] ?? match[3] ?? '';
+    text += source.slice(cursor, index);
+    const start = text.length;
+    text += label;
+    links.push({ start, end: text.length, href: match[2] ?? null });
+    cursor = index + match[0].length;
+  }
+  text += source.slice(cursor);
+  return { text, links };
+}
+
+/**
+ * Keep invisible link ranges aligned after one textarea edit.
+ *
+ * An edit wholly before a link shifts it, and one wholly after leaves it alone. Touching
+ * the visible label deliberately drops that link: preserving an old target behind a name
+ * the author changed would create a convincing but false backlink.
+ */
+export function rebaseManuscriptEditorLinks(
+  previousText: string,
+  nextText: string,
+  links: ManuscriptEditorLink[],
+): ManuscriptEditorLink[] {
+  if (previousText === nextText) return links;
+
+  const delta = nextText.length - previousText.length;
+  const candidate = (preferSuffix: boolean): ManuscriptEditorLink[] => {
+    let prefix = 0;
+    let suffix = 0;
+
+    if (preferSuffix) {
+      while (
+        suffix < previousText.length
+        && suffix < nextText.length
+        && previousText[previousText.length - 1 - suffix] === nextText[nextText.length - 1 - suffix]
+      ) suffix += 1;
+      while (
+        prefix < previousText.length - suffix
+        && prefix < nextText.length - suffix
+        && previousText[prefix] === nextText[prefix]
+      ) prefix += 1;
+    } else {
+      while (
+        prefix < previousText.length
+        && prefix < nextText.length
+        && previousText[prefix] === nextText[prefix]
+      ) prefix += 1;
+      while (
+        suffix < previousText.length - prefix
+        && suffix < nextText.length - prefix
+        && previousText[previousText.length - 1 - suffix] === nextText[nextText.length - 1 - suffix]
+      ) suffix += 1;
+    }
+
+    const previousEnd = previousText.length - suffix;
+    return links.flatMap((link) => {
+      if (previousEnd <= link.start) {
+        return [{ ...link, start: link.start + delta, end: link.end + delta }];
+      }
+      if (prefix >= link.end) return [link];
+      return [];
+    });
+  };
+
+  const prefixAligned = candidate(false);
+  const suffixAligned = candidate(true);
+  const coveredCharacters = (items: ManuscriptEditorLink[]) =>
+    items.reduce((total, link) => total + link.end - link.start, 0);
+  return suffixAligned.length > prefixAligned.length
+    || (
+      suffixAligned.length === prefixAligned.length
+      && coveredCharacters(suffixAligned) > coveredCharacters(prefixAligned)
+    )
+    ? suffixAligned
+    : prefixAligned;
+}
+
+/** Rebuild the stored form immediately before saving the clean textarea value. */
+export function fromManuscriptEditor(text: string, links: ManuscriptEditorLink[]): string {
+  const ordered = [...links].sort((left, right) => left.start - right.start || left.end - right.end);
+  let markdown = '';
+  let cursor = 0;
+
+  for (const link of ordered) {
+    if (
+      link.start < cursor
+      || link.start < 0
+      || link.end <= link.start
+      || link.end > text.length
+      || (link.href !== null && !/^nodus:\/\/world\/[a-z]+\/[^)\s]+$/.test(link.href))
+    ) continue;
+    const label = text.slice(link.start, link.end).replace(/[[\]]/g, '');
+    if (!label) continue;
+    markdown += text.slice(cursor, link.start);
+    markdown += link.href ? `[${label}](${link.href})` : `[[${label}]]`;
+    cursor = link.end;
+  }
+  return markdown + text.slice(cursor);
+}
 
 /**
  * Quitar los enlaces del mundo, dejando lo que se lee.

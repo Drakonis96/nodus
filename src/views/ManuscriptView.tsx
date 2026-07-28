@@ -9,7 +9,13 @@ import type {
   WorldScene,
 } from '@shared/types';
 import type { SpineScene } from '@shared/worldManuscript';
-import { countWords } from '@shared/worldManuscript';
+import {
+  countWords,
+  fromManuscriptEditor,
+  rebaseManuscriptEditorLinks,
+  toManuscriptEditor,
+  type ManuscriptEditorLink,
+} from '@shared/worldManuscript';
 import type { View } from '../navigation';
 import { Icon } from '../components/ui';
 import { SceneThreadsPanel } from '../components/world/SceneThreadsPanel';
@@ -53,6 +59,7 @@ export function ManuscriptView({ onNavigate }: { onNavigate?: (view: View) => vo
   const [entries, setEntries] = useState<WorldEntry[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(() => localStorage.getItem(LAST_SCENE_KEY));
   const [draft, setDraft] = useState('');
+  const [draftLinks, setDraftLinks] = useState<ManuscriptEditorLink[]>([]);
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [cast, setCast] = useState<SceneAppearance[]>([]);
@@ -95,7 +102,9 @@ export function ManuscriptView({ onNavigate }: { onNavigate?: (view: View) => vo
     let active = true;
     void window.nodus.getSceneText(selectedId).then((text) => {
       if (!active) return;
-      setDraft(text.text ?? '');
+      const editor = toManuscriptEditor(text.text);
+      setDraft(editor.text);
+      setDraftLinks(editor.links);
       setLoadedFor(selectedId);
       localStorage.setItem(LAST_SCENE_KEY, selectedId);
     });
@@ -117,11 +126,11 @@ export function ManuscriptView({ onNavigate }: { onNavigate?: (view: View) => vo
    * saving the previous scene's text into the scene that has just been selected.
    */
   const commit = useCallback(
-    async (sceneId: string | null, text: string) => {
+    async (sceneId: string | null, text: string, editorLinks: ManuscriptEditorLink[]) => {
       if (!sceneId || loadedFor !== sceneId) return;
       setSaving(true);
       try {
-        await window.nodus.saveSceneText(sceneId, text);
+        await window.nodus.saveSceneText(sceneId, fromManuscriptEditor(text, editorLinks));
         await reloadSpine();
         notifyDataChanged();
       } finally {
@@ -133,7 +142,7 @@ export function ManuscriptView({ onNavigate }: { onNavigate?: (view: View) => vo
 
   const select = async (sceneId: string) => {
     if (sceneId === selectedId) return;
-    await commit(selectedId, draft);
+    await commit(selectedId, draft, draftLinks);
     setSelectedId(sceneId);
   };
 
@@ -143,7 +152,31 @@ export function ManuscriptView({ onNavigate }: { onNavigate?: (view: View) => vo
     if (next) void select(next.sceneId);
   };
 
-  const links = useWorldLinkAutocomplete({ entries, value: draft, onChange: setDraft, areaRef });
+  const changeDraft = (next: string) => {
+    setDraftLinks((current) => rebaseManuscriptEditorLinks(draft, next, current));
+    setDraft(next);
+  };
+
+  const links = useWorldLinkAutocomplete({
+    entries,
+    value: draft,
+    onChange: changeDraft,
+    areaRef,
+    replaceCandidate: (entry, range) => {
+      const label = entry.title.replace(/[[\]]/g, '');
+      const next = `${draft.slice(0, range.start)}${label}${draft.slice(range.end)}`;
+      setDraftLinks((current) => [
+        ...rebaseManuscriptEditorLinks(draft, next, current),
+        {
+          start: range.start,
+          end: range.start + label.length,
+          href: `nodus://world/${entry.kind}/${encodeURIComponent(entry.id)}`,
+        },
+      ]);
+      setDraft(next);
+      return range.start + label.length;
+    },
+  });
   const liveWords = countWords(draft);
 
   if (!spine) return <p className="p-6 text-sm text-neutral-500">{t('Cargando…')}</p>;
@@ -305,7 +338,7 @@ export function ManuscriptView({ onNavigate }: { onNavigate?: (view: View) => vo
               value={draft}
               placeholder={t('Escribe la escena. [[ enlaza con cualquier cosa del mundo.')}
               onChange={(event) => {
-                setDraft(event.target.value);
+                changeDraft(event.target.value);
                 links.sync(event.target.value, event.target.selectionStart);
                 syncTypewriter();
               }}
@@ -331,7 +364,7 @@ export function ManuscriptView({ onNavigate }: { onNavigate?: (view: View) => vo
                   step(-1);
                 }
               }}
-              onBlur={() => void commit(selectedId, draft)}
+              onBlur={() => void commit(selectedId, draft, draftLinks)}
             />
             {/* El foco, en la única forma que un textarea permite de verdad: no se puede
                 atenuar un párrafo suyo por separado, pero sí velar lo que queda lejos de la

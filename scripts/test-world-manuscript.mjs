@@ -50,6 +50,60 @@ test('a resolved link counts as its label, not as its URL', () => {
   assert.equal(ms.countWords('Kaelen Vor cruzó el vado.'), 5);
 });
 
+test('the editor hides internal URLs while preserving resolved and pending links', () => {
+  const stored = [
+    '# El último encendido',
+    '',
+    '[Aurel](nodus://world/character/demo-world-char-aurel) miró [[el Faro]].',
+  ].join('\n');
+  const editor = ms.toManuscriptEditor(stored);
+
+  assert.equal(editor.text, '# El último encendido\n\nAurel miró el Faro.');
+  assert.equal(editor.text.includes('nodus://'), false);
+  assert.equal(editor.text.includes('[Aurel]'), false);
+  assert.deepEqual(editor.links.map((link) => ({
+    label: editor.text.slice(link.start, link.end),
+    href: link.href,
+  })), [
+    { label: 'Aurel', href: 'nodus://world/character/demo-world-char-aurel' },
+    { label: 'el Faro', href: null },
+  ]);
+  assert.equal(ms.fromManuscriptEditor(editor.text, editor.links), stored);
+});
+
+test('plain manuscript edits move untouched links and unlink edited labels', () => {
+  const stored = '[Aurel](nodus://world/character/a) vio [Aurel](nodus://world/character/a2).';
+  const editor = ms.toManuscriptEditor(stored);
+
+  const prefixed = `Ayer, ${editor.text}`;
+  const shifted = ms.rebaseManuscriptEditorLinks(editor.text, prefixed, editor.links);
+  assert.deepEqual(shifted.map((link) => prefixed.slice(link.start, link.end)), ['Aurel', 'Aurel']);
+  assert.equal(
+    ms.fromManuscriptEditor(prefixed, shifted),
+    'Ayer, [Aurel](nodus://world/character/a) vio [Aurel](nodus://world/character/a2).',
+    'repeated labels keep their distinct positional targets',
+  );
+
+  const renamed = prefixed.replace('Aurel', 'Áurea');
+  const afterRename = ms.rebaseManuscriptEditorLinks(prefixed, renamed, shifted);
+  assert.equal(afterRename.length, 1, 'editing one visible label drops only its stale target');
+  assert.equal(
+    ms.fromManuscriptEditor(renamed, afterRename),
+    'Ayer, Áurea vio [Aurel](nodus://world/character/a2).',
+  );
+});
+
+test('external Markdown is not hidden or rewritten by the manuscript projection', () => {
+  const stored = 'Consulta [la guía](https://example.com) y `[[literal]]`.';
+  const editor = ms.toManuscriptEditor(stored);
+  assert.equal(editor.text, 'Consulta [la guía](https://example.com) y `literal`.');
+  assert.equal(
+    ms.fromManuscriptEditor(editor.text, editor.links),
+    stored,
+    'a pending world link still round-trips even when written inside inline code',
+  );
+});
+
 test('marks, code and images are not words', () => {
   assert.equal(ms.countWords('## Capítulo uno'), 2);
   assert.equal(ms.countWords('*Corrió.* **Cayó.**'), 2);

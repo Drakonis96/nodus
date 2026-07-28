@@ -22,11 +22,13 @@ export function useWorldLinkAutocomplete({
   value,
   onChange,
   areaRef,
+  replaceCandidate,
 }: {
   entries: WorldEntry[];
   value: string;
   onChange: (next: string) => void;
   areaRef: RefObject<HTMLTextAreaElement>;
+  replaceCandidate?: (entry: WorldEntry, range: { start: number; end: number }) => number;
 }) {
   /** Where the open `[[` starts, and what has been typed after it. */
   const [trigger, setTrigger] = useState<{ at: number; fragment: string } | null>(null);
@@ -56,12 +58,17 @@ export function useWorldLinkAutocomplete({
     if (!trigger) return;
     const area = areaRef.current;
     const caret = area?.selectionStart ?? value.length;
-    const link = formatWorldLink({ kind: entry.kind, id: entry.id }, entry.title);
-    onChange(`${value.slice(0, trigger.at)}${link}${value.slice(caret)}`);
+    let position: number;
+    if (replaceCandidate) {
+      position = replaceCandidate(entry, { start: trigger.at, end: caret });
+    } else {
+      const link = formatWorldLink({ kind: entry.kind, id: entry.id }, entry.title);
+      onChange(`${value.slice(0, trigger.at)}${link}${value.slice(caret)}`);
+      position = trigger.at + link.length;
+    }
     setTrigger(null);
     // The caret has to land after the link or the next word is typed inside it.
     requestAnimationFrame(() => {
-      const position = trigger.at + link.length;
       area?.focus();
       area?.setSelectionRange(position, position);
     });
