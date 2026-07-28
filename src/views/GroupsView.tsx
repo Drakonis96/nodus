@@ -65,15 +65,17 @@ function groupSection(
         data-testid="group-card"
         onClick={onOpen}
         title={item.name}
-        className="w-full rounded-lg border border-neutral-800 p-3 text-left transition-colors hover:border-indigo-700/60 hover:bg-indigo-950/20"
+        className={`w-full rounded-lg border border-neutral-300 bg-white text-left shadow-sm transition-colors hover:border-violet-400 hover:bg-violet-50 dark:border-neutral-800 dark:bg-neutral-950/25 dark:shadow-none dark:hover:border-violet-700/60 dark:hover:bg-violet-950/20 ${
+          compact ? 'h-20 p-2.5' : 'h-40 p-4'
+        }`}
       >
-        <span className="block truncate text-sm font-medium text-neutral-100">{item.name}</span>
+        <span className="block truncate text-sm font-medium text-neutral-900 dark:text-neutral-100">{item.name}</span>
         <span className="block truncate text-[11px] text-neutral-500">
           {t(WORLD_GROUP_KIND_LABEL[item.kind] ?? item.kind)}
           {item.status ? ` · ${t(WORLD_GROUP_STATUS_LABEL[item.status])}` : ''}
         </span>
         {!compact && item.summary && (
-          <span className="mt-1 line-clamp-2 block text-[11px] leading-4 text-neutral-600">{item.summary}</span>
+          <span className="mt-2 line-clamp-2 block text-[11px] leading-4 text-neutral-600 dark:text-neutral-500">{item.summary}</span>
         )}
       </button>
     ),
