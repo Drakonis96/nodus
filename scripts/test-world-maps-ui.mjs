@@ -81,13 +81,17 @@ test('deleting a map says what survives it', async () => {
 });
 
 test('cards use the thumbnail, never the full map', async () => {
-  const view = await read('src/views/WorldMapsView.tsx');
+  const [view, imageUrls] = await Promise.all([
+    read('src/views/WorldMapsView.tsx'),
+    read('src/lib/imageUrl.ts'),
+  ]);
   // A base map is megabytes. Drawing a grid of thirty from the full blobs would push
-  // hundreds of megabytes through the bridge to render postage stamps.
+  // hundreds of megabytes through the bridge to render postage stamps. The internal
+  // protocol also lets Chromium cache the thumbnail instead of rebuilding object URLs.
   const card = view.slice(view.indexOf('function MapCard'), view.indexOf('function MapWorkbench'));
-  assert.match(card, /getMapThumbnail\(map\.mapId\)/);
-  assert.doesNotMatch(card, /getMapImageBlob/);
-  assert.match(card, /revokeObjectURL/, 'and the object URL is released');
+  assert.match(card, /mapThumbnailUrl\(map\)/);
+  assert.doesNotMatch(card, /mapImageUrl|getMapImageBlob/);
+  assert.match(imageUrls, /nodusImageUrl\('map-thumbnail', map\.mapId, map\.imageId\)/);
 });
 
 test('every icon the maps section names exists', async () => {

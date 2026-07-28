@@ -189,7 +189,7 @@ function MapCard({ map, maps, onOpen }: { map: WorldMap; maps: WorldMap[]; onOpe
             <Icon name={kind.icon} size={28} className="text-neutral-600" />
           </div>
         )}
-        <span className="absolute left-2 top-2 rounded bg-neutral-950/80 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-neutral-300">
+        <span className="world-map-image-badge absolute left-2 top-2 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
           {t(kind.label)}
         </span>
       </div>
@@ -587,7 +587,7 @@ function MapWorkbench({
             />
           )}
           {followed.length > 0 && (
-            <div className="absolute inset-x-3 bottom-3 z-[500] flex flex-col gap-2 rounded-xl border border-neutral-800 bg-neutral-950/92 px-3 py-2 shadow-2xl" data-testid="map-timeline-dock">
+            <div className="world-map-timeline-dock absolute inset-x-3 bottom-3 z-[500] flex flex-col gap-2 rounded-xl border px-3 py-2 shadow-2xl" data-testid="map-timeline-dock">
               <CastStrip chips={castChips} onJump={onOpenMap} />
               <TimelineBar
                 tracks={followed}

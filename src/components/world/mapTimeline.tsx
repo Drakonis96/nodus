@@ -449,9 +449,8 @@ export function CastStrip({
           <button
             key={chip.personId}
             className={`flex max-w-[15rem] items-center gap-1.5 rounded-full border px-2 py-1 text-left text-xs transition-colors ${
-              away ? 'border-neutral-700 text-neutral-400 hover:border-neutral-500 hover:text-neutral-200' : 'border-transparent text-neutral-200'
+              away ? 'border-neutral-700 text-neutral-400 hover:border-neutral-500 hover:text-neutral-200' : 'world-map-cast-chip-current border-transparent text-neutral-200'
             }`}
-            style={away ? undefined : { backgroundColor: 'rgba(255,255,255,.06)' }}
             disabled={!away}
             title={away ? tx('Ir a {map}', { map: chip.elsewhereMapName ?? '' }) : undefined}
             onClick={() => chip.elsewhereMapId && onJump(chip.elsewhereMapId)}

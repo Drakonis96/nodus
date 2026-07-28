@@ -117,14 +117,14 @@ export function MapScaleBar({ map, leaflet, frame }: { map: WorldMap; leaflet: L
     <div className="pointer-events-none absolute bottom-3 left-3 z-[500] flex flex-col gap-1" data-testid="map-scale-bar">
       {bar ? (
         <>
-          <div className="h-2 border-x-2 border-b-2 border-neutral-200/90 shadow" style={{ width: Math.round(bar.pixels) }} />
-          <span className="text-[11px] font-medium tabular-nums text-neutral-200 drop-shadow">
+          <div className="world-map-scale-rule h-2 border-x-2 border-b-2 shadow" style={{ width: Math.round(bar.pixels) }} />
+          <span className="world-map-image-overlay-text text-[11px] font-medium tabular-nums">
             {formatDistance(bar.distance, (unit ?? 'km') as MapDistanceUnit, unitLabel(unit))}
           </span>
         </>
       ) : (
         // Never a fabricated number: an uncalibrated map says so, and says where to fix it.
-        <span className="rounded bg-neutral-950/70 px-2 py-1 text-[11px] text-neutral-400" data-testid="map-no-scale">
+        <span className="world-map-image-pill rounded px-2 py-1 text-[11px]" data-testid="map-no-scale">
           {t('Sin escala')}
         </span>
       )}

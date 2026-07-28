@@ -39,3 +39,29 @@ test('encyclopedia-specific surfaces do not rely on generic theme overrides', as
   assert.match(css, /\.light\.worldbuilding \.encyclopedia-letter-heading/);
   assert.match(css, /\[data-testid='entry-reader'\] \.md a/);
 });
+
+test('map image overlays keep contrast while map chrome follows the light theme', async () => {
+  const [view, canvas, tools, timeline, css] = await Promise.all([
+    read('src/views/WorldMapsView.tsx'),
+    read('src/components/world/WorldMapCanvas.tsx'),
+    read('src/components/world/mapTools.tsx'),
+    read('src/components/world/mapTimeline.tsx'),
+    read('src/index.css'),
+  ]);
+
+  assert.match(view, /world-map-image-badge/);
+  assert.doesNotMatch(view, /bg-neutral-950\/80[^"]*text-neutral-300/);
+  assert.match(canvas, /world-map-image-pill/);
+  assert.match(tools, /world-map-scale-rule/);
+  assert.match(tools, /world-map-image-overlay-text/);
+  assert.match(tools, /world-map-image-pill[^"]*" data-testid="map-no-scale"/);
+  assert.match(view, /world-map-timeline-dock/);
+  assert.match(timeline, /world-map-cast-chip-current/);
+  assert.doesNotMatch(timeline, /backgroundColor: 'rgba\(255,255,255,.06\)'/);
+
+  assert.match(css, /\.world-map-image-badge,\s*\n\.world-map-image-pill/);
+  assert.match(css, /background-color: rgba\(10, 10, 11, \.78\)/);
+  assert.match(css, /\.world-map-image-overlay-text[\s\S]{0,140}color: rgba\(255, 255, 255, \.95\)/);
+  assert.match(css, /\.light \.world-map-timeline-dock[\s\S]{0,140}background-color: rgba\(255, 255, 255, \.95\)/);
+  assert.match(css, /\.light \.world-map-cast-chip-current[\s\S]{0,80}background-color: #f3f4f6/);
+});

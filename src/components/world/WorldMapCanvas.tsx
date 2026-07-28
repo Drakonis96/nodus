@@ -182,7 +182,7 @@ export function WorldMapCanvas({ map, imageUrl, children, onClick, drawing = fal
       <div ref={containerRef} data-testid="world-map-canvas" className="h-full w-full rounded-xl" />
       {!imageUrl && !drawing && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <p className="rounded-lg bg-neutral-950/80 px-4 py-2 text-sm text-neutral-400">
+          <p className="world-map-image-pill rounded-lg px-4 py-2 text-sm">
             {t('Este mapa todavía no tiene imagen.')}
           </p>
         </div>

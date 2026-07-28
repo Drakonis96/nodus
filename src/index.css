@@ -1210,6 +1210,42 @@ body {
   image-rendering: auto;
 }
 
+/* Elements painted on top of an authored image must keep their own contrast. Generic
+   light-theme remaps are correct for UI surfaces, but would turn the text dark while
+   these translucent black overlays remain dark. */
+.world-map-image-badge,
+.world-map-image-pill {
+  border: 1px solid rgba(255, 255, 255, .14);
+  background-color: rgba(10, 10, 11, .78);
+  color: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .35);
+}
+.world-map-image-overlay-text {
+  color: rgba(255, 255, 255, .95);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, .95), 0 0 5px rgba(0, 0, 0, .7);
+}
+.world-map-scale-rule {
+  border-color: rgba(255, 255, 255, .92);
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .9));
+}
+
+/* The timeline is application chrome, not an image overlay: it follows the active
+   theme. Its current-character chip needs a real light fill rather than white at 6%. */
+.world-map-timeline-dock {
+  border-color: #262626;
+  background-color: rgba(10, 10, 11, .92);
+}
+.world-map-cast-chip-current {
+  background-color: rgba(255, 255, 255, .06);
+}
+.light .world-map-timeline-dock {
+  border-color: #d4d4d4;
+  background-color: rgba(255, 255, 255, .95);
+}
+.light .world-map-cast-chip-current {
+  background-color: #f3f4f6;
+}
+
 /* Pins and their labels. The marker itself is a zero-size divIcon, so both children are
    positioned relative to the exact anchor point rather than to an icon box — a pin whose
    dot sits half a box away from where the author clicked is the commonest Leaflet bug. */
