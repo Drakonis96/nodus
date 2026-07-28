@@ -7318,4 +7318,7 @@ export const TR: Record<string, string> = {
   "Eliminar tipo personalizado": "Özel türü sil",
   "El tipo desaparecerá del selector. Los hechos existentes conservarán su nombre.": "Tür seçiciden kaybolur. Mevcut olaylar adını korur.",
   "Los tipos incorporados no se pueden eliminar.": "Yerleşik türler silinemez.",
+  "Buscar o crear lugar…": "Yer ara veya oluştur…",
+  "Buscar lugar": "Yer ara",
+  "Los lugares nuevos se crean solo con el nombre para completarlos después.": "Yeni yerler daha sonra tamamlanmak üzere yalnızca adlarıyla oluşturulur.",
 };

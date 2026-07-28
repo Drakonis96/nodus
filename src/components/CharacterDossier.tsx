@@ -45,6 +45,7 @@ import {
 } from './personDossierLayout';
 import { confirm } from './feedback';
 import { EventTypePicker } from './EventTypePicker';
+import { ConfiguredPlacePicker, type PlaceSelection } from './ConfiguredPlacePicker';
 import { characterSubtitle } from '../views/CharactersView';
 import { t, tx } from '../i18n';
 
@@ -759,20 +760,16 @@ function CharacterEventForm({
 
   const calendarDefined = hasCalendar(calendar);
   const [worldOrder, setWorldOrder] = useState(String(event?.worldOrder ?? 0));
-  const [place, setPlace] = useState(event?.placeName ?? '');
+  const [place, setPlace] = useState<PlaceSelection | null>(
+    event?.placeId && event.placeName ? { placeId: event.placeId, name: event.placeName } : null
+  );
   const [notes, setNotes] = useState(event?.notes ?? '');
   const [saving, setSaving] = useState(false);
 
   const save = async () => {
     setSaving(true);
     try {
-      let placeId: string | null = event?.placeId ?? null;
-      const placeName = place.trim();
-      if (placeName) {
-        placeId = (await window.nodus.findOrCreatePlace(placeName)).placeId;
-      } else {
-        placeId = null;
-      }
+      const placeId = place?.placeId ?? null;
       const eventId = event
         ? (await window.nodus.updateEvent(event.eventId, {
             type,
@@ -956,12 +953,10 @@ function CharacterEventForm({
               />
             </label>
           </div>
-          <input
-            className="input h-9 w-full text-sm"
+          <ConfiguredPlacePicker
             value={place}
-            placeholder={t('Lugar')}
-            aria-label={t('Lugar')}
-            onChange={(changeEvent) => setPlace(changeEvent.target.value)}
+            onChange={setPlace}
+            disabled={saving}
           />
           <textarea
             className="input min-h-20 w-full resize-y text-sm"

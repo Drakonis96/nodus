@@ -7562,4 +7562,7 @@ export const DE: Record<string, string> = {
   "Eliminar tipo personalizado": "Benutzerdefinierten Typ löschen",
   "El tipo desaparecerá del selector. Los hechos existentes conservarán su nombre.": "Der Typ verschwindet aus der Auswahl. Bestehende Fakten behalten seinen Namen.",
   "Los tipos incorporados no se pueden eliminar.": "Integrierte Typen können nicht gelöscht werden.",
+  "Buscar o crear lugar…": "Ort suchen oder erstellen…",
+  "Buscar lugar": "Ort suchen",
+  "Los lugares nuevos se crean solo con el nombre para completarlos después.": "Neue Orte werden zunächst nur mit ihrem Namen erstellt und können später ergänzt werden.",
 };

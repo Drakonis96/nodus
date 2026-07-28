@@ -7789,4 +7789,7 @@ export const EN: Record<string, string> = {
   "Eliminar tipo personalizado": "Delete custom type",
   "El tipo desaparecerá del selector. Los hechos existentes conservarán su nombre.": "The type will disappear from the selector. Existing facts will keep its name.",
   "Los tipos incorporados no se pueden eliminar.": "Built-in types cannot be deleted.",
+  "Buscar o crear lugar…": "Search or create a place…",
+  "Buscar lugar": "Search place",
+  "Los lugares nuevos se crean solo con el nombre para completarlos después.": "New places are created with only a name so you can complete them later.",
 };

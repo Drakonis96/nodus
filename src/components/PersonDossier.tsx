@@ -29,6 +29,7 @@ import { useDismissableLayer } from '../hooks';
 import { t, tx } from '../i18n';
 import { eventTypeLabel } from '@shared/eventTypes';
 import { EventTypePicker } from './EventTypePicker';
+import { ConfiguredPlacePicker, type PlaceSelection } from './ConfiguredPlacePicker';
 
 const STRENGTH_STYLE: Record<string, string> = {
   alta: 'bg-emerald-900/40 text-emerald-300',
@@ -711,21 +712,16 @@ function EventForm({
 }) {
   const [type, setType] = useState<EventTypeValue>(event?.type ?? 'birth');
   const [date, setDate] = useState(event?.date ?? '');
-  const [place, setPlace] = useState(event?.placeName ?? '');
+  const [place, setPlace] = useState<PlaceSelection | null>(
+    event?.placeId && event.placeName ? { placeId: event.placeId, name: event.placeName } : null
+  );
   const [notes, setNotes] = useState(event?.notes ?? '');
   const [saving, setSaving] = useState(false);
 
   const save = async () => {
     setSaving(true);
     try {
-      let placeId: string | null = event?.placeId ?? null;
-      const placeName = place.trim();
-      if (placeName) {
-        const p = await window.nodus.findOrCreatePlace(placeName);
-        placeId = p.placeId;
-      } else {
-        placeId = null;
-      }
+      const placeId = place?.placeId ?? null;
       if (event) {
         await window.nodus.updateEvent(event.eventId, { type, date: date.trim() || null, placeId, notes: notes.trim() || null });
       } else {
@@ -765,7 +761,7 @@ function EventForm({
             />
             <input className="input h-9 text-sm" value={date} onChange={(changeEvent) => setDate(changeEvent.target.value)} placeholder={t('Fecha (puede ser incierta: «c. 1850»)')} />
           </div>
-          <input className="input h-9 w-full text-sm" value={place} onChange={(changeEvent) => setPlace(changeEvent.target.value)} placeholder={t('Lugar')} />
+          <ConfiguredPlacePicker value={place} onChange={setPlace} disabled={saving} />
           <textarea className="input min-h-20 w-full resize-y text-sm" value={notes} onChange={(changeEvent) => setNotes(changeEvent.target.value)} placeholder={t('Notas')} />
           <div className="flex justify-end gap-2 border-t border-neutral-800 pt-3">
             <button className="btn btn-ghost border border-neutral-700 px-3 text-xs" onClick={onCancel} disabled={saving}>{t('Cancelar')}</button>

@@ -6971,4 +6971,7 @@ export const IT: Record<string, string> = {
   "Eliminar tipo personalizado": "Elimina tipo personalizzato",
   "El tipo desaparecerá del selector. Los hechos existentes conservarán su nombre.": "Il tipo scomparirà dal selettore. I fatti esistenti manterranno il suo nome.",
   "Los tipos incorporados no se pueden eliminar.": "I tipi incorporati non possono essere eliminati.",
+  "Buscar o crear lugar…": "Cerca o crea un luogo…",
+  "Buscar lugar": "Cerca luogo",
+  "Los lugares nuevos se crean solo con el nombre para completarlos después.": "I nuovi luoghi vengono creati con il solo nome per essere completati in seguito.",
 };

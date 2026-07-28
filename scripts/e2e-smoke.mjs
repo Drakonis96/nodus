@@ -2604,17 +2604,28 @@ try {
   // Two events in an invented calendar, entered out of order. The dates are unparseable
   // by the Earth-calendar parser on purpose: if the list ever fell back to `date_sort`
   // it would come out in insertion order and nothing would say so.
-  const addWorldEvent = async (kind, date, year) => {
+  const addWorldEvent = async (kind, date, year, place = null) => {
     await page.getByTestId('character-dossier-events').getByLabel('Añadir hecho').click();
     await page.getByLabel('Tipo de hecho').click();
     await page.getByRole('option', { name: kind, exact: true }).getByRole('button').click();
     await page.getByLabel('Fecha en tu calendario').fill(date);
     await page.getByLabel('Año del mundo', { exact: true }).fill(String(year));
+    if (place) {
+      await page.getByLabel('Lugar', { exact: true }).click();
+      await page.getByLabel('Buscar lugar', { exact: true }).fill(place);
+      await page.getByRole('button', { name: `Añadir «${place}»`, exact: true }).click();
+    }
     await page.getByRole('button', { name: 'Guardar hecho', exact: true }).click();
     await page.getByRole('button', { name: 'Guardar hecho', exact: true }).waitFor({ state: 'detached', timeout: 30_000 });
   };
-  await addWorldEvent('Exilio', 'Otoño de 1229 T.E.', 1229);
+  await addWorldEvent('Exilio', 'Otoño de 1229 T.E.', 1229, 'Fortín de la Bruma');
   await addWorldEvent('Juramento', 'Primavera de 1221 T.E.', 1221);
+  await waitForCondition('el lugar provisional se crea con el nombre y queda vinculado al hecho', () => page.evaluate(async () => {
+    const places = await window.nodus.listWorldPlaces();
+    const events = await window.nodus.listWorldEvents();
+    return places.some((place) => place.name === 'Fortín de la Bruma')
+      && events.some((event) => event.placeName === 'Fortín de la Bruma');
+  }));
   await waitForCondition('los hechos se ordenan por el año del mundo, no por el de inserción', async () => {
     const rows = await page.getByTestId('character-dossier-events').locator('li').allInnerTexts();
     return rows.length === 2 && /1221/.test(rows[0]) && /1229/.test(rows[1]);

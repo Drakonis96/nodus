@@ -54,11 +54,14 @@ test('a dropdown remains usable in a viewport narrower than its normal width', (
 });
 
 test('worldbuilding dropdowns use the portaled collision-aware panel', async () => {
-  const [filters, timeline, popover, eventTypes] = await Promise.all([
+  const [filters, timeline, popover, eventTypes, placePicker, characterDossier, personDossier] = await Promise.all([
     readFile(path.join(repoRoot, 'src/components/world/WorldFilterBar.tsx'), 'utf8'),
     readFile(path.join(repoRoot, 'src/components/world/mapTimeline.tsx'), 'utf8'),
     readFile(path.join(repoRoot, 'src/components/world/ViewportPopover.tsx'), 'utf8'),
     readFile(path.join(repoRoot, 'src/components/EventTypePicker.tsx'), 'utf8'),
+    readFile(path.join(repoRoot, 'src/components/ConfiguredPlacePicker.tsx'), 'utf8'),
+    readFile(path.join(repoRoot, 'src/components/CharacterDossier.tsx'), 'utf8'),
+    readFile(path.join(repoRoot, 'src/components/PersonDossier.tsx'), 'utf8'),
   ]);
   assert.match(filters, /<ViewportPopover/);
   assert.doesNotMatch(filters, /absolute left-0 top-full/);
@@ -68,4 +71,10 @@ test('worldbuilding dropdowns use the portaled collision-aware panel', async () 
   assert.match(popover, /positionViewportPopover/);
   assert.match(eventTypes, /<ViewportPopover/);
   assert.doesNotMatch(eventTypes, /createPortal\(/);
+  assert.match(placePicker, /<ViewportPopover/);
+  assert.match(placePicker, /findOrCreatePlace\(query\.trim\(\)\)/);
+  assert.match(characterDossier, /<ConfiguredPlacePicker/);
+  assert.match(personDossier, /<ConfiguredPlacePicker/);
+  assert.doesNotMatch(characterDossier, /findOrCreatePlace/);
+  assert.doesNotMatch(personDossier, /findOrCreatePlace/);
 });
