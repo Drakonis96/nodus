@@ -246,7 +246,7 @@ export async function streamWorldChat(
   }
 
   const settings = getSettings();
-  const model = settings.chatModel ?? settings.synthesisModel ?? null;
+  const model = request.model ?? settings.chatModel ?? settings.synthesisModel ?? null;
   const raw = await completeTextStream(
     {
       system: WORLD_CHAT_SYSTEM,

@@ -728,6 +728,7 @@ import {
   saveMapImage,
   updateWorldMap,
 } from './db/worldMapsRepo';
+import * as worldChatHistory from './db/worldChatRepo';
 import {
   circleToPolygon,
   createMapLayer,
@@ -1261,6 +1262,25 @@ export function registerIpc(
       win.webContents.send('nodi:navigate', 'settings');
     }
   });
+  h('nodi:openWorldEntry', async (_e, kind: string, id: string) => {
+    const viewByKind: Record<string, string> = {
+      character: 'characters',
+      place: 'places',
+      group: 'factions',
+      scene: 'scenes',
+      article: 'encyclopedia',
+      map: 'map',
+      rule: 'rules',
+      conflict: 'conflicts',
+    };
+    const view = viewByKind[kind];
+    const win = getWindow();
+    if (!view || !win) return;
+    if (win.isMinimized()) win.restore();
+    win.show();
+    win.focus();
+    win.webContents.send('nodi:navigate', { view, kind, id });
+  });
   h('nodi:windowDrag:begin', async (e, screenX: number, screenY: number) => {
     const win = BrowserWindow.fromWebContents(e.sender);
     if (!win) return { x: 16, y: 16, horizontal: 'left', vertical: 'up' };
@@ -1781,6 +1801,22 @@ export function registerIpc(
   });
   h('worldChat:cancel', async (_e, requestId: string) => {
     chatAborters.get(requestId)?.abort();
+  });
+  h('worldChat:history:list', async () => worldChatHistory.listWorldChatConversations());
+  h('worldChat:history:get', async (_e, id: string) => worldChatHistory.getWorldChatConversation(id));
+  h('worldChat:history:create', async (_e, input: Parameters<typeof worldChatHistory.createWorldChatConversation>[0]) =>
+    worldChatHistory.createWorldChatConversation(input)
+  );
+  h('worldChat:history:save', async (
+    _e,
+    id: string,
+    messages: Parameters<typeof worldChatHistory.saveWorldChatConversation>[1],
+    selection: Parameters<typeof worldChatHistory.saveWorldChatConversation>[2],
+    focus: Parameters<typeof worldChatHistory.saveWorldChatConversation>[3],
+    model: Parameters<typeof worldChatHistory.saveWorldChatConversation>[4]
+  ) => worldChatHistory.saveWorldChatConversation(id, messages, selection, focus, model));
+  h('worldChat:history:delete', async (_e, id: string) => {
+    worldChatHistory.deleteWorldChatConversation(id);
   });
 
   // ── The manuscript ─────────────────────────────────────────────────────────

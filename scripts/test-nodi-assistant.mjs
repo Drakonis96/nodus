@@ -70,15 +70,14 @@ test('Nodi cites corpus sources like the research assistant, adapted to its own 
   assert.match(backend, /CHAT_CITATION_RULES/);
   assert.match(backend, /humanizeResearchCitations/);
   assert.match(backend, /function corpusCitationsEnabled/);
-  // Only the academic vault carries citable ids — the other types are excluded.
-  for (const excluded of ['genealogy', 'primary_sources', 'databases', 'estudio']) {
-    assert.match(backend, new RegExp(`active\\.type !== '${excluded}'`));
-  }
+  // Academic corpus citations and world-entry citations are separate, explicit contracts.
+  assert.match(backend, /return wantsVault && active\.type === 'academic'/);
+  assert.match(backend, /return wantsVault && active\.type === 'worldbuilding'/);
 
   // Frontend: answers open a Nodi-native source card, wired through the read-only IPC.
   assert.match(companion, /import \{ NodiCitationCard \}/);
   assert.match(companion, /citation && <NodiCitationCard/);
-  assert.match(companion, /onCitation=\{setCitation\}/);
+  assert.match(companion, /onCitation=\{citesCorpus \? setCitation : undefined\}/);
   for (const ipc of ['getIdeaDetail', 'getWork', 'getGapDetail', 'getEdgeDetail', 'getPassage', 'openInZotero']) {
     assert.match(card, new RegExp(ipc));
   }
@@ -119,8 +118,9 @@ test('Nodi chat keeps model selection inside settings and exposes deletable hist
   for (const tool of ['history', 'contexts', 'settings']) assert.match(component, new RegExp(`'${tool}'`));
   assert.doesNotMatch(component, /chatTool === 'model'/);
   assert.doesNotMatch(component, /setChatTool\(\(tool\) => tool === 'model'/);
-  // Assistant answers render clickable source citations (no longer verify={false}).
-  assert.match(component, /<Markdown content=\{m\.content\} onCitation=\{setCitation\}/);
+  // Assistant answers render the citation type appropriate to the active vault.
+  assert.match(component, /onCitation=\{citesCorpus \? setCitation : undefined\}/);
+  assert.match(component, /onWorldEntry=\{citesWorld/);
   assert.match(component, /listNodiConversations/);
   assert.match(component, /saveNodiConversation/);
   assert.match(component, /nodiOpenSettings/);
@@ -145,6 +145,27 @@ test('Nodi chat keeps model selection inside settings and exposes deletable hist
   assert.match(pickerCss, /position:\s*absolute/);
   assert.match(pickerCss, /font-family:\s*inherit/);
   assert.match(globalCss, /background-repeat: no-repeat/);
+});
+
+test('Nodi uses the bounded world model and opens validated worldbuilding references', async () => {
+  const [backend, companion, ipc, preload, types, app] = await Promise.all([
+    read('electron/ai/nodiChat.ts'),
+    read('src/components/nodi/NodiCompanion.tsx'),
+    read('electron/ipc.ts'),
+    read('electron/preload.ts'),
+    read('shared/types.ts'),
+    read('src/App.tsx'),
+  ]);
+  assert.match(backend, /buildWorldChatFacts\(\{ question \}\)/);
+  assert.match(backend, /composeWorldChatContext/);
+  assert.match(backend, /validateWorldCitations\(answer/);
+  assert.match(backend, /worldbuilding: 'construcción de mundos'/);
+  assert.match(companion, /NODI_WORLD_STARTERS/);
+  assert.match(companion, /vaultType === 'worldbuilding'/);
+  for (const source of [preload, types, companion]) assert.match(source, /nodiOpenWorldEntry/);
+  assert.match(ipc, /nodi:openWorldEntry/);
+  assert.match(ipc, /win\.webContents\.send\('nodi:navigate', \{ view, kind, id \}\)/);
+  assert.match(app, /setView\(target\.view\)/);
 });
 
 test('Nodi chat messages are selectable and expose a per-message copy action', async () => {

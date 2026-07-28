@@ -2795,6 +2795,7 @@ export interface WorldChatRequest {
   question: string;
   focusKeys?: string[];
   history?: DbChatTurn[];
+  model?: ModelRef | null;
 }
 
 export interface WorldChatResult {
@@ -2803,6 +2804,29 @@ export interface WorldChatResult {
   focus: { kind: string; id: string; title: string }[];
   /** True when the question named nothing this world contains — not an error. */
   noMaterial: boolean;
+}
+
+export interface WorldChatSelection {
+  /** Automatic resolves names in each question; manual always sends the chosen entries. */
+  scope: 'auto' | 'manual';
+  entryKeys: string[];
+  /** In automatic mode, keep using the last resolved focus for follow-up questions. */
+  keepFocus: boolean;
+}
+
+export interface WorldChatConversationSummary {
+  id: string;
+  title: string;
+  selection: WorldChatSelection;
+  focus: WorldChatResult['focus'];
+  model: ModelRef | null;
+  messageCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WorldChatConversation extends WorldChatConversationSummary {
+  messages: DbChatTurn[];
 }
 
 /** The drafted statement of a law, quarantined in `world_rules.proposed_text`. */
@@ -6548,6 +6572,14 @@ export interface NodiOverlayPlacement {
   vertical: 'up' | 'down';
 }
 
+export type NodiNavigationTarget =
+  | 'settings'
+  | {
+      view: 'characters' | 'places' | 'factions' | 'scenes' | 'encyclopedia' | 'map' | 'rules' | 'conflicts';
+      kind: string;
+      id: string;
+    };
+
 // ─────────────────────────────────────────────────────────────────────────────
 // IPC API surface exposed on window.nodus via the preload bridge.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -6576,7 +6608,8 @@ export interface NodusApi {
   getNodiViewContext(): Promise<NodiViewContext | null>;
   setNodiTutorialVisible(visible: boolean): Promise<void>;
   nodiOpenSettings(): Promise<void>;
-  onNodiNavigate(cb: (view: 'settings') => void): () => void;
+  nodiOpenWorldEntry(kind: string, id: string): Promise<void>;
+  onNodiNavigate(cb: (target: NodiNavigationTarget) => void): () => void;
   nodiSetMouseIgnore(ignore: boolean): Promise<void>;
   /** Synchronous, but IPC-free: read from the URL the mascot window was loaded with. */
   nodiGetOverlayPlacement(): NodiOverlayPlacement;
@@ -6848,6 +6881,21 @@ export interface NodusApi {
     handlers: { onDelta: (delta: string) => void }
   ): Promise<WorldChatResult>;
   cancelWorldChat(): Promise<void>;
+  listWorldChatConversations(): Promise<WorldChatConversationSummary[]>;
+  getWorldChatConversation(id: string): Promise<WorldChatConversation | null>;
+  createWorldChatConversation(input: {
+    title: string;
+    selection: WorldChatSelection;
+    model: ModelRef | null;
+  }): Promise<WorldChatConversation>;
+  saveWorldChatConversation(
+    id: string,
+    messages: DbChatTurn[],
+    selection: WorldChatSelection,
+    focus: WorldChatResult['focus'],
+    model: ModelRef | null
+  ): Promise<WorldChatConversation | null>;
+  deleteWorldChatConversation(id: string): Promise<void>;
   // ── The manuscript ────────────────────────────────────────────────────────
   // The spine carries not one word of prose: a novel is megabytes, and every screen that
   // shows a chapter title would otherwise load the whole book.

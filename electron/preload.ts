@@ -119,6 +119,7 @@ const api: NodusApi = {
   },
   nodiOpenMainWindow: () => ipcRenderer.invoke('nodi:openMainWindow'),
   nodiOpenSettings: () => ipcRenderer.invoke('nodi:openSettings'),
+  nodiOpenWorldEntry: (kind, id) => ipcRenderer.invoke('nodi:openWorldEntry', kind, id),
   onNodiNavigate: (cb) => {
     const listener = (_e: unknown, view: Parameters<typeof cb>[0]) => cb(view);
     ipcRenderer.on('nodi:navigate', listener);
@@ -315,6 +316,12 @@ const api: NodusApi = {
       ipcRenderer.removeListener('worldChat:delta', onDelta);
     }
   },
+  listWorldChatConversations: () => ipcRenderer.invoke('worldChat:history:list'),
+  getWorldChatConversation: (id) => ipcRenderer.invoke('worldChat:history:get', id),
+  createWorldChatConversation: (input) => ipcRenderer.invoke('worldChat:history:create', input),
+  saveWorldChatConversation: (id, messages, selection, focus, model) =>
+    ipcRenderer.invoke('worldChat:history:save', id, messages, selection, focus, model),
+  deleteWorldChatConversation: (id) => ipcRenderer.invoke('worldChat:history:delete', id).then(() => undefined),
   manuscriptSpine: () => ipcRenderer.invoke('manuscript:spine'),
   getSceneText: (sceneId) => ipcRenderer.invoke('manuscript:getText', sceneId),
   saveSceneText: (sceneId, text) => ipcRenderer.invoke('manuscript:saveText', sceneId, text),

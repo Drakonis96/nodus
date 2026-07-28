@@ -9,8 +9,10 @@ import { AI_OCR_TRANSLATIONS } from './i18n.aiOcr';
 import { TOOLKIT_APPS_TRANSLATIONS } from './i18n.toolkitApps';
 import { SERVER_TRANSLATIONS } from './i18n.server';
 import { TRANSLATE_TRANSLATIONS } from './i18n.translate';
+import { WORLD_CHAT_TRANSLATIONS } from './i18n.worldChat';
 
 export const FR: Record<string, string> = {
+  ...WORLD_CHAT_TRANSLATIONS.fr,
   "Lo que cuenta el mapa": "Ce que raconte la carte",
   "Ver dónde ocurren las escenas ({n})": "Voir où se passent les scènes ({n})",
   "Viajes imposibles": "Trajets impossibles",

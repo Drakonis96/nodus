@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 101;
+export const SCHEMA_VERSION = 102;
 
 export const migrations: Migration[] = [
   {
@@ -4316,7 +4316,26 @@ export const migrations: Migration[] = [
       created_at  TEXT NOT NULL
     );
     CREATE INDEX idx_world_scene_snapshots_scene ON world_scene_snapshots(scene_id, created_at DESC);
-  `,
+    `,
+  },
+  {
+    version: 102,
+    up: /* sql */ `
+      -- The world chat is authored working context: its questions, answers and explicit
+      -- focus must survive reopening the vault just like study and database chats.
+      CREATE TABLE world_chat_conversations (
+        id             TEXT PRIMARY KEY,
+        title          TEXT NOT NULL,
+        selection_json TEXT NOT NULL DEFAULT '{"scope":"auto","entryKeys":[],"keepFocus":false}',
+        focus_json     TEXT NOT NULL DEFAULT '[]',
+        messages_json  TEXT NOT NULL DEFAULT '[]',
+        model_json     TEXT,
+        created_at     TEXT NOT NULL,
+        updated_at     TEXT NOT NULL
+      );
+      CREATE INDEX idx_world_chat_conversations_updated
+        ON world_chat_conversations(updated_at DESC);
+    `,
   },
 ];
 

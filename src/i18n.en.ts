@@ -3,6 +3,7 @@ import { AI_OCR_TRANSLATIONS } from './i18n.aiOcr';
 import { TOOLKIT_APPS_TRANSLATIONS } from './i18n.toolkitApps';
 import { SERVER_TRANSLATIONS } from './i18n.server';
 import { TRANSLATE_TRANSLATIONS } from './i18n.translate';
+import { WORLD_CHAT_TRANSLATIONS } from './i18n.worldChat';
 
 /**
  * English translations keyed by the Spanish source string (see {@link ../i18n}).
@@ -10,6 +11,7 @@ import { TRANSLATE_TRANSLATIONS } from './i18n.translate';
  * every non-Spanish interface language.
  */
 export const EN: Record<string, string> = {
+  ...WORLD_CHAT_TRANSLATIONS.en,
   "Lo que cuenta el mapa": "What the map tells you",
   "Ver dónde ocurren las escenas ({n})": "See where the scenes happen ({n})",
   "Viajes imposibles": "Impossible journeys",

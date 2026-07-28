@@ -20,6 +20,8 @@ function roleForVault(type: VaultType | null): NodiRole {
       return 'study';
     case 'primary_sources':
       return 'study';
+    case 'worldbuilding':
+      return 'study';
     default:
       return 'academic';
   }
@@ -105,6 +107,11 @@ const NODI_CORPUS_STARTERS = [
   '¿Cuáles son las ideas más centrales del corpus y por qué?',
   'Resume las principales contradicciones y tensiones.',
   '¿Qué huecos de investigación debería priorizar?',
+];
+const NODI_WORLD_STARTERS = [
+  '¿Qué contradicciones hay ahora mismo en mi mundo?',
+  '¿Qué reglas afectan a la próxima escena?',
+  '¿Qué sabe cada personaje sobre el conflicto principal?',
 ];
 // Four overlay actions collapse over 340 ms with up to 90 ms of stagger.
 // Keep the roomy native window until every button has returned to its anchor.
@@ -664,12 +671,9 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
   const activeConversation = conversations.find((conversation) => conversation.id === activeConversationId) ?? null;
   // The academic idea-graph is the only vault whose retrieval carries citable ids, so its
   // corpus starters (and inline citations) only make sense there with a vault context on.
-  const citesCorpus =
-    (contexts.includes('vault') || contexts.includes('all_vaults')) &&
-    vaultType !== 'genealogy' &&
-    vaultType !== 'databases' &&
-    vaultType !== 'primary_sources' &&
-    vaultType !== 'estudio';
+  const hasVaultContext = contexts.includes('vault') || contexts.includes('all_vaults');
+  const citesCorpus = hasVaultContext && vaultType === 'academic';
+  const citesWorld = hasVaultContext && vaultType === 'worldbuilding';
 
   type Item = { id: string; label: string; icon: React.ReactNode; onClick: () => void; badge?: number };
   const items: Item[] = useMemo(() => {
@@ -933,7 +937,18 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
             )}
             <div className="nodi-chat-msgs" ref={msgsRef} style={{ flex: 1 }}>
               {messages.length === 0 && (
-                citesCorpus ? (
+                citesWorld ? (
+                  <div className="nodi-chat-welcome">
+                    <p className="nodi-empty">{t('Pregunta por personajes, lugares, escenas, reglas o conflictos de tu mundo.')}</p>
+                    <div className="nodi-starters">
+                      {NODI_WORLD_STARTERS.map((suggestion) => (
+                        <button key={suggestion} className="nodi-starter" disabled={streaming} onClick={() => void send(t(suggestion))}>
+                          {t(suggestion)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : citesCorpus ? (
                   <div className="nodi-chat-welcome">
                     <p className="nodi-empty">{t('Pregunta sobre ideas, autores, temas, contradicciones o documentos.')}</p>
                     <div className="nodi-starters">
@@ -960,7 +975,14 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
                     <Icon name={copiedMessageIndex === i ? 'check' : 'copy'} size={12} />
                   </button>
                   {m.content
-                    ? m.role === 'assistant' ? <Markdown content={m.content} onCitation={setCitation} /> : m.content
+                    ? m.role === 'assistant' ? (
+                      <Markdown
+                        content={m.content}
+                        verify={citesCorpus}
+                        onCitation={citesCorpus ? setCitation : undefined}
+                        onWorldEntry={citesWorld ? (kind, id) => void window.nodus.nodiOpenWorldEntry(kind, id) : undefined}
+                      />
+                    ) : m.content
                     : streaming && i === messages.length - 1 ? <span className="nodi-typing">{t('escribiendo…')}</span> : ''}
                 </div>
               ))}

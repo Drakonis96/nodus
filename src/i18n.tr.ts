@@ -3,9 +3,11 @@ import { AI_OCR_TRANSLATIONS } from './i18n.aiOcr';
 import { TOOLKIT_APPS_TRANSLATIONS } from './i18n.toolkitApps';
 import { SERVER_TRANSLATIONS } from './i18n.server';
 import { TRANSLATE_TRANSLATIONS } from './i18n.translate';
+import { WORLD_CHAT_TRANSLATIONS } from './i18n.worldChat';
 
 /** Complete static Turkish interface table; coverage prohibits runtime fallbacks. */
 export const TR: Record<string, string> = {
+  ...WORLD_CHAT_TRANSLATIONS.tr,
   "Lo que cuenta el mapa": "Haritanın anlattıkları",
   "Ver dónde ocurren las escenas ({n})": "Sahnelerin nerede geçtiğini gör ({n})",
   "Viajes imposibles": "İmkânsız yolculuklar",

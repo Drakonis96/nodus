@@ -130,6 +130,9 @@ const SYNC_GROUPS: { key: SyncGroupKey; prefix?: string; tables?: string[] }[] =
       // que el autor ya ha perdido una vez si viaja sin ellas.
       'world_manuscript_starts',
       'world_scene_snapshots',
+      // v102: conversation history and its explicit focus are author working context,
+      // not a regenerable model cache.
+      'world_chat_conversations',
     ],
   },
   {

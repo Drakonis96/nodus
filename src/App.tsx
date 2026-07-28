@@ -393,6 +393,8 @@ export function App() {
     if (target === 'settings') {
       localStorage.setItem('nodus.settingsTarget', 'nodi');
       setView('settings');
+    } else {
+      setView(target.view);
     }
   }), []);
 
@@ -819,10 +821,15 @@ export function App() {
         setView('settings');
         return;
       }
+      if (isWorldbuilding) {
+        setResearchOpen(false);
+        setView('worldChat');
+        return;
+      }
       setAssistantTarget(target ? { ...target, nonce: Date.now() } : null);
       setResearchOpen(true);
     },
-    [settings?.chatModel, settings?.synthesisModel]
+    [isWorldbuilding, settings?.chatModel, settings?.synthesisModel]
   );
 
   const openGraphFromAssistant = useCallback(
@@ -866,7 +873,7 @@ export function App() {
       run: () => setView(n.id),
     }));
     const actions: Command[] = [
-      { id: 'act:assistant', label: t('Asistente de investigación'), section: t('Acciones'), icon: 'chat', keywords: 'assistant chat', run: () => openAssistant() },
+      { id: 'act:assistant', label: t(isWorldbuilding ? 'Chat del mundo' : 'Asistente de investigación'), section: t('Acciones'), icon: 'chat', keywords: 'assistant chat', run: () => openAssistant() },
       { id: 'act:presenter', label: 'PDF Presenter', section: t('Acciones'), icon: 'presentation', keywords: 'presentar diapositivas slides pdf presenter proyector herramientas toolkit', run: () => { setToolkitPage('presenter'); setView('toolkit'); } },
       { id: 'act:feedback', label: t('Sugerir función o reportar error'), section: t('Acciones'), icon: 'gitPr', keywords: 'feedback github pr bug feature sugerencia error', run: () => setFeedbackOpen(true) },
       { id: 'act:roadmap', label: t('Roadmap'), section: t('Acciones'), icon: 'route', keywords: 'roadmap hoja ruta futuro próximos pasos', run: () => setRoadmapOpen(true) },
@@ -1075,7 +1082,7 @@ export function App() {
           <HeaderAction
             icon="chat"
             label={t('Asistente')}
-            title={(settings.chatModel ?? settings.synthesisModel) ? t('Abrir asistente de investigación') : t('Configura un modelo de IA')}
+            title={(settings.chatModel ?? settings.synthesisModel) ? t(isWorldbuilding ? 'Abrir chat del mundo' : 'Abrir asistente de investigación') : t('Configura un modelo de IA')}
             onClick={() => openAssistant()}
           />
           <HeaderAction
@@ -1488,7 +1495,7 @@ export function App() {
           {view === 'arcs' && <ArcsView onNavigate={setView} />}
           {view === 'rules' && <RulesView onNavigate={setView} />}
           {view === 'questions' && <QuestionsView onNavigate={setView} />}
-          {view === 'worldChat' && <WorldChatView onNavigate={setView} />}
+          {view === 'worldChat' && <WorldChatView settings={settings} onNavigate={setView} />}
           {view === 'manuscript' && <ManuscriptView onNavigate={setView} />}
           {view === 'characters' && <CharactersView />}
           {view === 'places' && <PlacesView />}
