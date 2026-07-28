@@ -3225,6 +3225,30 @@ try {
     // Kaelen fue añadido al reparto de la primera escena en el bloque de preguntas, así
     // que aquí NO debe haber aviso: el chequeo distingue nombrar de declarar.
     assert.equal(entered.uncast, false, 'somebody declared in the cast raises nothing');
+
+    // El estante: un libro es DÓNDE empieza un libro, igual que un capítulo, así que no
+    // añade un segundo eje de ordenación al del relato.
+    await page.getByTestId('manuscript-start-book').click();
+    await page.getByPlaceholder('Título del libro').fill('La marca de sangre');
+    await page.getByTestId('manuscript-book-pill').waitFor({ state: 'detached', timeout: 5_000 }).catch(() => {});
+    await page.getByRole('button', { name: 'Guardar', exact: true }).first().click();
+    await waitForCondition('el libro agrupa desde su escena', () => page.evaluate(async () => {
+      const spine = await window.nodus.manuscriptSpine();
+      return spine.books.some((book) => book.title === 'La marca de sangre');
+    }));
+
+    // Una reescritura que se come la escena la guarda sola, y restaurar guarda antes lo que
+    // hay: un deshacer que no se puede deshacer es una trampa.
+    const undone = await page.evaluate(async () => {
+      const [first] = await window.nodus.listScenes('narrative');
+      await window.nodus.saveSceneText(first.sceneId, Array.from({ length: 80 }, (_, i) => `p${i}`).join(' '));
+      await window.nodus.saveSceneText(first.sceneId, 'Dos palabras.');
+      const shots = await window.nodus.listSceneSnapshots(first.sceneId);
+      await window.nodus.restoreSceneSnapshot(shots[0].snapshotId);
+      const back = await window.nodus.getSceneText(first.sceneId);
+      return { reason: shots[0].reason, restored: back.wordCount, kept: (await window.nodus.listSceneSnapshots(first.sceneId)).length };
+    });
+    assert.deepEqual(undone, { reason: 'shrink', restored: 80, kept: 2 }, 'the save kept what the paste ate');
   }
 
   console.log('[e2e] worldbuilding open questions: a hole becomes a decision, answering rewrites the sheet, undo restores it');

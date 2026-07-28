@@ -126,6 +126,10 @@ const SYNC_GROUPS: { key: SyncGroupKey; prefix?: string; tables?: string[] }[] =
       'world_scene_text',
       'world_chapter_breaks',
       'world_word_days',
+      // v101: los libros son marcas como los capitulos, y las instantaneas son autoria
+      // que el autor ya ha perdido una vez si viaja sin ellas.
+      'world_manuscript_starts',
+      'world_scene_snapshots',
     ],
   },
   {

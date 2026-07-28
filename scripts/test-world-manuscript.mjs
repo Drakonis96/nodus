@@ -224,3 +224,90 @@ test('un capítulo entero sin nada que compilar no deja su título suelto', () =
   assert.doesNotMatch(out, /## Vacío/);
   assert.match(out, /## Lleno/);
 });
+
+// ── El estante: varios libros en un mundo ────────────────────────────────────
+
+test('un libro es DÓNDE empieza un libro, igual que un capítulo', () => {
+  // Una tabla de manuscritos con su propio orden más una pertenencia por escena serían un
+  // segundo eje de ordenación junto al del relato, y los dos discreparían el primer día que
+  // alguien moviera una escena.
+  const books = ms.groupIntoBooks([
+    scene('s1', { narrativeOrder: 0, wordCount: 10 }),
+    scene('s2', { narrativeOrder: 1, wordCount: 20, chapter: { title: 'Uno', epigraph: null } }),
+    scene('s3', {
+      narrativeOrder: 2,
+      wordCount: 5,
+      book: { title: 'Libro segundo', subtitle: 'El juicio', targetWords: 90000 },
+    }),
+    scene('s4', { narrativeOrder: 3, wordCount: 7 }),
+  ]);
+  assert.deepEqual(
+    books.map((book) => [book.title, book.scenes, book.wordCount]),
+    [
+      // Lo que va antes de la primera marca es el libro sin marcar: un manuscrito único no
+      // tiene que anunciarse para existir.
+      [null, 2, 30],
+      ['Libro segundo', 2, 12],
+    ]
+  );
+  assert.equal(books[1].targetWords, 90000);
+  // Y cada libro conserva sus capítulos.
+  assert.deepEqual(books[0].chapters.map((chapter) => chapter.title), [null, 'Uno']);
+  assert.equal(books[1].chapters.length, 1);
+});
+
+test('el estante se lee en orden de relato, llegue como llegue', () => {
+  const books = ms.groupIntoBooks([
+    scene('s3', { narrativeOrder: 2, book: { title: 'Dos', subtitle: null, targetWords: null } }),
+    scene('s1', { narrativeOrder: 0 }),
+    scene('s2', { narrativeOrder: 1 }),
+  ]);
+  assert.deepEqual(books.map((book) => book.title), [null, 'Dos']);
+  assert.deepEqual(books[0].chapters[0].scenes.map((s) => s.sceneId), ['s1', 's2']);
+});
+
+// ── Leer la escena contra lo que dijiste que pasaría ─────────────────────────
+
+const review = load('shared/worldProseReview.ts');
+
+test('sin latidos declarados o sin prosa no hay nada que leer', () => {
+  const beats = [{ threadLabel: 'conflicto: El vado', mark: 'sube la presión', text: null }];
+  assert.equal(review.hasProseReviewMaterial({ sceneTitle: 'X', beats, prose: 'Algo escrito.' }), true);
+  assert.equal(review.hasProseReviewMaterial({ sceneTitle: 'X', beats: [], prose: 'Algo escrito.' }), false);
+  assert.equal(review.hasProseReviewMaterial({ sceneTitle: 'X', beats, prose: '   ' }), false);
+});
+
+test('el prompt prohíbe opinar sobre la prosa', () => {
+  // Si contestara «tu diálogo es plano» estaría opinando sobre una novela que no es suya.
+  assert.match(review.WORLD_PROSE_REVIEW_SYSTEM, /NO opinas sobre la prosa/);
+  assert.match(review.WORLD_PROSE_REVIEW_SYSTEM, /no la reescribes/);
+  // «Está» significa que un lector se enteraría leyendo SOLO este texto.
+  assert.match(review.WORLD_PROSE_REVIEW_SYSTEM, /leyendo SOLO este texto/);
+});
+
+test('la lectura vuelve en orden, y una línea sin sí/no se descarta entera', () => {
+  const verdicts = review.parseProseReview(
+    [
+      'Vamos allá:',
+      '1. **LATIDO:** sí — el juramento se rompe en la página 2.',
+      'LATIDO: no — de la deuda no se dice nada.',
+      'LATIDO: quizá, depende de cómo lo leas.',
+      'LATIDO 4 — Sí: se insinúa cuando cierra la puerta.',
+      'Un saludo.',
+    ].join('\n')
+  );
+  assert.deepEqual(verdicts, [
+    { present: true, note: 'el juramento se rompe en la página 2.' },
+    { present: false, note: 'de la deuda no se dice nada.' },
+    { present: true, note: 'se insinúa cuando cierra la puerta.' },
+  ]);
+});
+
+test('nunca rellena: un latido sin respuesta se queda sin leer', () => {
+  // Decirle al autor que algo está en la página cuando nadie lo ha comprobado es
+  // exactamente el error que esta comprobación existe para no cometer.
+  assert.deepEqual(review.parseProseReview('No he entendido la pregunta.'), []);
+  assert.deepEqual(review.parseProseReview(''), []);
+  const one = review.parseProseReview('LATIDO: sí');
+  assert.deepEqual(one, [{ present: true, note: null }]);
+});

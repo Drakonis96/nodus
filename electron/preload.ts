@@ -319,7 +319,13 @@ const api: NodusApi = {
   getSceneText: (sceneId) => ipcRenderer.invoke('manuscript:getText', sceneId),
   saveSceneText: (sceneId, text) => ipcRenderer.invoke('manuscript:saveText', sceneId, text),
   setChapterBreak: (sceneId, input) => ipcRenderer.invoke('manuscript:setChapter', sceneId, input).then(() => undefined),
+  setBookStart: (sceneId, input) => ipcRenderer.invoke('manuscript:setBook', sceneId, input).then(() => undefined),
+  listSceneSnapshots: (sceneId) => ipcRenderer.invoke('manuscript:snapshots', sceneId),
+  takeSceneSnapshot: (sceneId) => ipcRenderer.invoke('manuscript:snapshot', sceneId),
+  restoreSceneSnapshot: (snapshotId) => ipcRenderer.invoke('manuscript:restore', snapshotId),
+  getSnapshotText: (snapshotId) => ipcRenderer.invoke('manuscript:snapshotText', snapshotId),
   manuscriptProgress: () => ipcRenderer.invoke('manuscript:progress'),
+  reviewWorldProse: (sceneId) => ipcRenderer.invoke('manuscript:review', sceneId),
   exportManuscript: (options) => ipcRenderer.invoke('manuscript:export', options),
   cancelWorldChat: async () => {
     if (activeWorldChatRequestId) await ipcRenderer.invoke('worldChat:cancel', activeWorldChatRequestId);

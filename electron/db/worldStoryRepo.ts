@@ -15,6 +15,7 @@ import { v4 as uuid } from 'uuid';
 import { getDb } from './database';
 import { computeSceneDays, reorderScenes } from '@shared/worldSceneDays';
 import { deleteImagesFor } from './worldImagesRepo';
+import { deleteManuscriptFor } from './worldManuscriptRepo';
 import type {
   SceneDayLink,
   SceneAppearance,
@@ -300,11 +301,12 @@ export function deleteScene(sceneId: string): void {
     // No cascade reaches these: the beats and the day declaration are owned here.
     db.prepare('DELETE FROM world_beats WHERE scene_id = ?').run(sceneId);
     db.prepare('DELETE FROM world_scene_days WHERE scene_id = ?').run(sceneId);
-    // The prose and the chapter it opened are the scene's too. No cascade reaches them
-    // either: v100 declares no foreign keys, so that cutting a scene stays an editing
+    // The prose, the marks it carried and its snapshots are the scene's too. Delegated to
+    // ONE list rather than repeated here: v100 already cost a bug when the manuscript grew
+    // two more tables and this copy of the list did not know about them. No cascade reaches
+    // any of them — the layer declares no foreign keys, so cutting a scene stays an editing
     // decision instead of becoming a database error.
-    db.prepare('DELETE FROM world_scene_text WHERE scene_id = ?').run(sceneId);
-    db.prepare('DELETE FROM world_chapter_breaks WHERE scene_id = ?').run(sceneId);
+    deleteManuscriptFor(sceneId);
     db.prepare('DELETE FROM world_scenes WHERE scene_id = ?').run(sceneId);
   });
   remove();

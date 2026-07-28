@@ -624,10 +624,16 @@ import {
   getSceneText,
   manuscriptProgress,
   manuscriptSpine,
+  getSnapshotText,
+  listSceneSnapshots,
+  restoreSceneSnapshot,
   saveSceneText,
+  setBookStart,
+  takeSceneSnapshot,
   setChapterBreak,
 } from './db/worldManuscriptRepo';
 import { exportManuscript } from './export/manuscriptExport';
+import { reviewWorldProse } from './ai/worldProseReview';
 import { analyzeMissingEntries } from './ai/worldMissingEntries';
 import { exportWorldBible } from './export/worldBibleExport';
 import {
@@ -1785,7 +1791,21 @@ export function registerIpc(
   ) => {
     setChapterBreak(sceneId, input);
   });
+  h('manuscript:setBook', async (
+    _e,
+    sceneId: string,
+    input: { title?: string | null; subtitle?: string | null; targetWords?: number | null } | null
+  ) => {
+    setBookStart(sceneId, input);
+  });
+  h('manuscript:snapshots', async (_e, sceneId: string) => listSceneSnapshots(sceneId));
+  h('manuscript:snapshot', async (_e, sceneId: string) => takeSceneSnapshot(sceneId));
+  h('manuscript:restore', async (_e, snapshotId: string) => restoreSceneSnapshot(snapshotId));
+  h('manuscript:snapshotText', async (_e, snapshotId: string) => getSnapshotText(snapshotId));
   h('manuscript:progress', async () => manuscriptProgress());
+  // The third and last model call of this vault, and the narrowest: it reads, it does not
+  // write. A9 turned it down for lack of an input; the manuscript created one.
+  h('manuscript:review', async (_e, sceneId: string) => reviewWorldProse(sceneId));
   h('manuscript:export', async (
     _e,
     options: Parameters<typeof exportManuscript>[0]

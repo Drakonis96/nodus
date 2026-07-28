@@ -29,7 +29,14 @@ if (!process.argv.includes('--electron-manuscript-test')) {
 const root = await mkdtemp(path.join(os.tmpdir(), 'nodus-manuscript-test-'));
 installRuntimeHooks(root);
 
-const NEW_TABLES = ['world_scene_text', 'world_chapter_breaks', 'world_word_days'];
+const NEW_TABLES = [
+  'world_scene_text',
+  'world_chapter_breaks',
+  'world_word_days',
+  // v101
+  'world_manuscript_starts',
+  'world_scene_snapshots',
+];
 
 try {
   const { getDb } = require(path.join(repoRoot, 'electron/db/database.ts'));
@@ -37,18 +44,20 @@ try {
   const db = getDb();
 
   assert.equal(db.pragma('user_version', { simple: true }), SCHEMA_VERSION);
-  assert.ok(SCHEMA_VERSION >= 100, 'the manuscript arrived at v100');
+  assert.ok(SCHEMA_VERSION >= 101, 'the shelf and the snapshots arrived at v101');
 
   // ── 0. The migration keeps both of its repair paths ───────────────────────
   {
-    const m100 = migrations.find((m) => m.version === 100);
-    assert.ok(m100, 'migration 100 exists');
-    assert.ok(!m100.up.includes('`'), 'a backtick would silently terminate the template literal');
-    const bare = m100.up.replace(/--[^\n]*/g, ' ');
-    // ALTER is what would have been needed to put the prose on world_scenes — and it is
-    // exactly what disqualifies a migration from backfillMissingCreateOnly.
-    assert.doesNotMatch(bare, /\b(ALTER|DROP|INSERT|UPDATE|DELETE|REPLACE)\b/i, 'migration 100 is CREATE-only');
-    assert.doesNotMatch(bare, /REFERENCES/i, 'ownership is enforced by deleteScene, not by the schema');
+    for (const version of [100, 101]) {
+      const migration = migrations.find((m) => m.version === version);
+      assert.ok(migration, `migration ${version} exists`);
+      assert.ok(!migration.up.includes('`'), 'a backtick would silently terminate the template literal');
+      const bare = migration.up.replace(/--[^\n]*/g, ' ');
+      // ALTER is what would have been needed to put the prose on world_scenes — and it is
+      // exactly what disqualifies a migration from backfillMissingCreateOnly.
+      assert.doesNotMatch(bare, /\b(ALTER|DROP|INSERT|UPDATE|DELETE|REPLACE)\b/i, `migration ${version} is CREATE-only`);
+      assert.doesNotMatch(bare, /REFERENCES/i, 'ownership is enforced by deleteScene, not by the schema');
+    }
   }
 
   // ── 1. The tables and their content-derived keys ──────────────────────────
@@ -64,6 +73,7 @@ try {
   assert.deepEqual(keyOf('world_scene_text'), ['scene_id']);
   assert.deepEqual(keyOf('world_chapter_breaks'), ['scene_id']);
   assert.deepEqual(keyOf('world_word_days'), ['day']);
+  assert.deepEqual(keyOf('world_manuscript_starts'), ['scene_id'], 'a book is a mark on the scene that opens it');
 
   // ── 2. Everything travels, and its deletions travel too ───────────────────
   {
@@ -192,12 +202,46 @@ try {
       'declaring them in the cast settles it'
     );
 
+    // ── M7: el estante ──────────────────────────────────────────────────────
+    repo.setBookStart(two.sceneId, { title: 'Libro segundo', subtitle: null, targetWords: 90000 });
+    const shelf = repo.manuscriptSpine();
+    assert.deepEqual(shelf.books.map((book) => book.title), [null, 'Libro segundo']);
+    assert.equal(shelf.books[1].targetWords, 90000);
+    // Y el orden del relato sigue siendo UNO: el libro no añade eje, agrupa un tramo.
+    assert.deepEqual(
+      shelf.books.flatMap((book) => book.chapters.flatMap((chapter) => chapter.scenes.map((s) => s.narrativeOrder))),
+      [0, 1]
+    );
+    repo.setBookStart(two.sceneId, null);
+    assert.equal(repo.manuscriptSpine().books.length, 1, 'quitar la marca funde el tramo con el libro de arriba');
+
+    // ── M8: instantáneas ────────────────────────────────────────────────────
+    repo.saveSceneText(two.sceneId, Array.from({ length: 60 }, (_, i) => `palabra${i}`).join(' '));
+    assert.equal(repo.listSceneSnapshots(two.sceneId).length, 0, 'escribir no genera instantáneas');
+    // Un pegado que se come la escena la guarda solo: es el momento en que nadie se acuerda
+    // de pulsar nada.
+    repo.saveSceneText(two.sceneId, 'Cuatro palabras nada más.');
+    const auto = repo.listSceneSnapshots(two.sceneId);
+    assert.equal(auto.length, 1);
+    assert.equal(auto[0].reason, 'shrink');
+    assert.equal(auto[0].wordCount, 60);
+    assert.ok(!Object.prototype.hasOwnProperty.call(auto[0], 'text'), 'la lista no lleva el texto');
+
+    // Restaurar es una edición destructiva, así que guarda antes lo que hay: un deshacer
+    // que no se puede deshacer es una trampa.
+    repo.restoreSceneSnapshot(auto[0].snapshotId);
+    assert.match(repo.getSceneText(two.sceneId).text, /palabra0 palabra1/);
+    const afterRestore = repo.listSceneSnapshots(two.sceneId);
+    assert.equal(afterRestore.length, 2);
+    assert.equal(afterRestore[0].wordCount, 4, 'lo que había antes de restaurar');
+
     // Cutting a scene takes its prose and its chapter with it: no cascade reaches them.
     repo.setChapterBreak(two.sceneId, { title: 'Vuelve' });
     story.deleteScene(two.sceneId);
     assert.equal(db.prepare('SELECT COUNT(*) AS c FROM world_chapter_breaks').get().c, 0);
     story.deleteScene(one.sceneId);
     assert.equal(db.prepare('SELECT COUNT(*) AS c FROM world_scene_text').get().c, 0);
+    assert.equal(db.prepare('SELECT COUNT(*) AS c FROM world_scene_snapshots').get().c, 0, 'snapshots go too');
     // And it is an editing decision, not a database error: v100 declares no foreign keys.
     characters.deleteCharacter(kaelen.personId);
   }

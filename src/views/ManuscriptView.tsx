@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { ManuscriptProgress, ManuscriptSpine, SceneAppearance, WorldEntry, WorldScene } from '@shared/types';
+import type {
+  ManuscriptProgress,
+  ManuscriptSpine,
+  ProseReviewResult,
+  SceneAppearance,
+  SceneSnapshot,
+  WorldEntry,
+  WorldScene,
+} from '@shared/types';
 import type { SpineScene } from '@shared/worldManuscript';
 import { countWords } from '@shared/worldManuscript';
 import type { View } from '../navigation';
@@ -187,23 +195,42 @@ export function ManuscriptView({ onNavigate }: { onNavigate?: (view: View) => vo
         {/* La espina: tabla de contenidos y navegador a la vez. */}
         <div className="flex w-64 shrink-0 flex-col border-r border-neutral-800">
         <nav className="min-h-0 flex-1 overflow-y-auto p-2" data-testid="manuscript-spine">
-          {spine.chapters.map((chapter, index) => (
-            <section key={chapter.startSceneId ?? `head-${index}`} className="mb-3">
-              <h2 className="px-1 pb-1 text-[10px] font-semibold uppercase tracking-wider text-neutral-600">
-                {chapter.title || (chapter.startSceneId ? t('Capítulo sin título') : t('Sin capítulo'))}
-                <span className="ml-1 text-neutral-700">{chapter.wordCount.toLocaleString()}</span>
-              </h2>
-              <ul className="space-y-0.5">
-                {chapter.scenes.map((scene) => (
-                  <li key={scene.sceneId}>
-                    <SpineRow
-                      scene={scene}
-                      selected={scene.sceneId === selectedId}
-                      onOpen={() => void select(scene.sceneId)}
-                    />
-                  </li>
-                ))}
-              </ul>
+          {spine.books.map((book, bookIndex) => (
+            <section key={book.startSceneId ?? `shelf-${bookIndex}`} className="mb-4">
+              {/* El encabezado del libro sólo aparece cuando hay estante: un solo manuscrito
+                  sin marcar es el caso normal y no necesita anunciarse. */}
+              {(spine.books.length > 1 || book.startSceneId) && (
+                <h2 className="mb-1 border-b border-neutral-800 px-1 pb-1 text-[11px] font-semibold text-indigo-300">
+                  {book.title || t('Libro sin título')}
+                  <span className="ml-1 font-normal text-neutral-600">
+                    {book.targetWords
+                      ? tx('{words}/{target}', {
+                          words: book.wordCount.toLocaleString(),
+                          target: book.targetWords.toLocaleString(),
+                        })
+                      : book.wordCount.toLocaleString()}
+                  </span>
+                </h2>
+              )}
+              {book.chapters.map((chapter, index) => (
+                <section key={chapter.startSceneId ?? `head-${bookIndex}-${index}`} className="mb-3">
+                  <h3 className="px-1 pb-1 text-[10px] font-semibold uppercase tracking-wider text-neutral-600">
+                    {chapter.title || (chapter.startSceneId ? t('Capítulo sin título') : t('Sin capítulo'))}
+                    <span className="ml-1 text-neutral-700">{chapter.wordCount.toLocaleString()}</span>
+                  </h3>
+                  <ul className="space-y-0.5">
+                    {chapter.scenes.map((scene) => (
+                      <li key={scene.sceneId}>
+                        <SpineRow
+                          scene={scene}
+                          selected={scene.sceneId === selectedId}
+                          onOpen={() => void select(scene.sceneId)}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ))}
             </section>
           ))}
         </nav>
@@ -222,6 +249,11 @@ export function ManuscriptView({ onNavigate }: { onNavigate?: (view: View) => vo
               <ChapterControl
                 sceneId={selected.sceneId}
                 chapter={ordered.find((scene) => scene.sceneId === selected.sceneId)?.chapter ?? null}
+                onChanged={reloadSpine}
+              />
+              <BookControl
+                sceneId={selected.sceneId}
+                book={ordered.find((scene) => scene.sceneId === selected.sceneId)?.book ?? null}
                 onChanged={reloadSpine}
               />
               <span className="ml-auto flex shrink-0 gap-1">
@@ -294,6 +326,7 @@ export function ManuscriptView({ onNavigate }: { onNavigate?: (view: View) => vo
               <section className="rounded-xl border border-neutral-800 p-3">
                 <RulesInPlay scene={selected} onChanged={reloadSpine} />
               </section>
+              <SceneWorkbench sceneId={selected.sceneId} onRestored={reloadSpine} />
             </WorldAnchorProvider>
           </aside>
         )}
@@ -520,5 +553,224 @@ function CompileButton({ title }: { title: string }) {
         </div>
       )}
     </span>
+  );
+}
+
+/**
+ * «Aquí empieza un libro».
+ *
+ * La misma forma que el capítulo, y por la misma razón: **un libro es dónde empieza un
+ * libro**. Una tabla de manuscritos con su propio orden, más una fila de pertenencia por
+ * escena, serían un segundo eje de ordenación junto al del relato — del que ya cuelgan la
+ * cadena de días, los carriles de los arcos y la escena límite de las preguntas — y los dos
+ * discreparían el primer día que alguien moviera una escena. El precio es que los libros son
+ * tramos contiguos del orden, que es exactamente lo que es un estante.
+ */
+function BookControl({
+  sceneId,
+  book,
+  onChanged,
+}: {
+  sceneId: string;
+  book: { title: string | null; subtitle: string | null; targetWords: number | null } | null;
+  onChanged: () => Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [title, setTitle] = useState(book?.title ?? '');
+  const [subtitle, setSubtitle] = useState(book?.subtitle ?? '');
+  const [target, setTarget] = useState(book?.targetWords ? String(book.targetWords) : '');
+
+  useEffect(() => {
+    setTitle(book?.title ?? '');
+    setSubtitle(book?.subtitle ?? '');
+    setTarget(book?.targetWords ? String(book.targetWords) : '');
+  }, [book?.title, book?.subtitle, book?.targetWords, sceneId]);
+
+  const save = async () => {
+    await window.nodus.setBookStart(sceneId, {
+      title: title.trim() || null,
+      subtitle: subtitle.trim() || null,
+      targetWords: Number.parseInt(target, 10) || null,
+    });
+    setOpen(false);
+    await onChanged();
+  };
+
+  if (!book && !open) {
+    return (
+      <button
+        className="shrink-0 text-[10px] text-neutral-600 hover:text-indigo-300"
+        data-testid="manuscript-start-book"
+        onClick={() => setOpen(true)}
+      >
+        {t('Empieza libro aquí')}
+      </button>
+    );
+  }
+
+  return (
+    <span className="relative shrink-0">
+      <button
+        className="rounded bg-indigo-950/60 px-1.5 py-0.5 text-[10px] text-indigo-200 hover:bg-indigo-900/60"
+        data-testid="manuscript-book-pill"
+        onClick={() => setOpen((value) => !value)}
+      >
+        {book?.title || t('Libro sin título')}
+      </button>
+      {open && (
+        <div className="absolute right-0 top-6 z-30 w-72 rounded-lg border border-neutral-700 bg-neutral-900 p-2 shadow-xl">
+          <input
+            className="input h-8 w-full text-xs"
+            placeholder={t('Título del libro')}
+            aria-label={t('Título del libro')}
+            value={title}
+            autoFocus
+            onChange={(event) => setTitle(event.target.value)}
+            onKeyDown={(event) => event.key === 'Enter' && void save()}
+          />
+          <input
+            className="input mt-1 h-8 w-full text-xs"
+            placeholder={t('Subtítulo (opcional)')}
+            aria-label={t('Subtítulo (opcional)')}
+            value={subtitle}
+            onChange={(event) => setSubtitle(event.target.value)}
+          />
+          <input
+            className="input mt-1 h-8 w-full text-xs"
+            type="number"
+            placeholder={t('Palabras a las que aspira')}
+            aria-label={t('Palabras a las que aspira')}
+            value={target}
+            onChange={(event) => setTarget(event.target.value)}
+          />
+          <div className="mt-2 flex gap-2">
+            <button className="btn btn-primary h-7 flex-1 text-[11px]" onClick={() => void save()}>
+              {t('Guardar')}
+            </button>
+            {book && (
+              <button
+                className="btn btn-ghost h-7 border border-neutral-700 px-2 text-[11px] text-red-300"
+                onClick={async () => {
+                  await window.nodus.setBookStart(sceneId, null);
+                  setOpen(false);
+                  await onChanged();
+                }}
+              >
+                {t('Quitar')}
+              </button>
+            )}
+          </div>
+          <p className="mt-1 text-[9px] leading-3 text-neutral-600">
+            {t('El libro va de aquí a la siguiente marca. Para moverlo, mueve sus escenas.')}
+          </p>
+        </div>
+      )}
+    </span>
+  );
+}
+
+/**
+ * Lo que se puede hacer con una escena escrita: guardarla antes de destrozarla, y leerla
+ * contra lo que dijiste que tenía que pasar en ella.
+ *
+ * Las instantáneas no son control de cambios: son el botón que hace que reescribir un
+ * capítulo entero deje de dar miedo. Y la revisión **lee, no escribe** — de los latidos que
+ * el autor declaró, dice cuáles están en la página. Nada más.
+ */
+function SceneWorkbench({ sceneId, onRestored }: { sceneId: string; onRestored: () => Promise<void> }) {
+  const [snapshots, setSnapshots] = useState<SceneSnapshot[]>([]);
+  const [review, setReview] = useState<ProseReviewResult | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    setSnapshots(await window.nodus.listSceneSnapshots(sceneId));
+  }, [sceneId]);
+
+  useEffect(() => {
+    setReview(null);
+    void load();
+  }, [load]);
+
+  const check = async () => {
+    setBusy(true);
+    try {
+      const result = await window.nodus.reviewWorldProse(sceneId);
+      if (result.noMaterial) {
+        toast(t('Necesito las dos cosas: latidos declarados en la escena y algo escrito.'));
+        return;
+      }
+      setReview(result);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="rounded-xl border border-neutral-800 p-3" data-testid="manuscript-workbench">
+      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-neutral-500">{t('La escena escrita')}</h3>
+
+      <div className="flex gap-2">
+        <button
+          className="btn btn-ghost h-7 flex-1 border border-neutral-700 text-[11px]"
+          data-testid="manuscript-snapshot"
+          onClick={async () => {
+            setSnapshots(await window.nodus.takeSceneSnapshot(sceneId));
+            toast(t('Instantánea guardada.'));
+          }}
+        >
+          {t('Guardar instantánea')}
+        </button>
+        <button
+          className="btn btn-ghost h-7 flex-1 gap-1 border border-neutral-700 text-[11px]"
+          data-testid="manuscript-review"
+          disabled={busy}
+          onClick={() => void check()}
+        >
+          <Icon name="sparkles" size={12} /> {busy ? t('Leyendo…') : t('¿Está en la página?')}
+        </button>
+      </div>
+
+      {review && (
+        <ul className="mt-2 space-y-1" data-testid="manuscript-review-result">
+          {review.beats.map((beat) => (
+            <li key={`${beat.threadKind}:${beat.threadId}`} className="text-[11px] leading-4">
+              <span className={beat.present === false ? 'text-amber-400' : 'text-neutral-300'}>
+                {beat.present === null ? '·' : beat.present ? '✓' : '✗'} {beat.threadTitle} — {t(beat.mark)}
+              </span>
+              {beat.note && <span className="block pl-3 text-[10px] text-neutral-600">{beat.note}</span>}
+              {beat.present === null && (
+                <span className="block pl-3 text-[10px] text-neutral-600">{t('Sin respuesta: no lo doy por leído.')}</span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {snapshots.length > 0 && (
+        <ul className="mt-2 space-y-0.5 border-t border-neutral-800 pt-2">
+          {snapshots.slice(0, 5).map((snapshot) => (
+            <li key={snapshot.snapshotId} className="flex items-center gap-2 text-[10px] text-neutral-500">
+              <span className="min-w-0 flex-1 truncate">
+                {new Date(snapshot.createdAt).toLocaleString()} · {snapshot.wordCount}
+                {snapshot.reason === 'shrink' ? ` · ${t('antes de encoger')}` : ''}
+              </span>
+              <button
+                className="shrink-0 text-indigo-300 hover:text-indigo-200"
+                data-testid="manuscript-restore"
+                onClick={async () => {
+                  await window.nodus.restoreSceneSnapshot(snapshot.snapshotId);
+                  await load();
+                  await onRestored();
+                  notifyDataChanged();
+                  toast(t('Restaurada. Lo que había se ha guardado antes.'));
+                }}
+              >
+                {t('Restaurar')}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }

@@ -1,11 +1,9 @@
 # Worldbuilding — «Manuscritos» (migración 100)
 
-> **Estado: M0–M6 IMPLEMENTADAS Y VERIFICADAS** (2026-07-28). `SCHEMA_VERSION = 100`,
-> 1174/1174 tests, lint 0 errores, typecheck, `npm run build` y `npm run test:e2e` en verde.
-> Con esto **el vault de worldbuilding no tiene ni una sección inerte**.
->
-> Quedan M7 (varios manuscritos), M8 (instantáneas) y M9 (`reviewWorldProse`), diseñadas en
-> §7 y deliberadamente fuera de esta entrega.
+> **Estado: COMPLETO. M0–M9 implementadas y verificadas** (2026-07-28).
+> `SCHEMA_VERSION = 101`, 1180/1180 tests, lint 0 errores, typecheck, `npm run build` y
+> `npm run test:e2e` en verde. Con esto **el vault de worldbuilding no tiene ni una sección
+> inerte** y su sección de escritura está terminada.
 
 ---
 
@@ -286,16 +284,43 @@ sidebar navegan. Y `test-vault-types.mjs` pasa a dieciocho vistas cableadas.
 
 ---
 
-## 7. Después (diseñado, no ahora)
+## 7. M7, M8 y M9 — **HECHAS** (migración 101)
 
-- **M7 — Varios manuscritos por vault.** `world_manuscripts` + pertenencia de la escena, y
-  `narrative_order` pasa a ser **por manuscrito**. Toca la cadena de días, los carriles de los
-  arcos y `reorderScene`; es una fase entera, no un añadido.
-- **M8 — Instantáneas de escena.** Antes de una reescritura grande. Reutilizable del
-  versionado del editor de estudio.
-- **M9 — `reviewWorldProse`.** A9 rechazó la revisión con IA del texto **por falta de
-  entrada**: su fuente real era `world_scenes.summary`, que es NULLABLE y en un vault real
-  está vacío casi siempre. Esta sección crea esa entrada. Cuando exista prosa de verdad, la
-  pregunta que merece un modelo es una sola y muy acotada: *«de los latidos que declaraste
-  para esta escena, ¿cuáles no aparecen en lo que has escrito?»* — bajo botón, por escena, y
-  como aviso, nunca como reescritura.
+- **M7 — El estante.** El diseño de arriba —`world_manuscripts` + pertenencia de la escena +
+  `narrative_order` por manuscrito— **se descartó al construirlo**, y la razón es la misma
+  que ya había decidido los capítulos: sería un segundo eje de ordenación junto al del
+  relato, del que cuelgan la cadena de días, los carriles de los arcos y la escena límite de
+  las preguntas abiertas. **Un libro es DÓNDE empieza un libro**: `world_manuscript_starts`,
+  la misma forma que `world_chapter_breaks`. Cero cambios en el orden, cero migración de
+  datos, cero riesgo. El precio —los libros son tramos contiguos del orden— es exactamente
+  lo que es un estante. La cadena de días sigue siendo global a propósito: en una trilogía
+  de un mismo mundo el día 4120 es el día 4120, y un libro que abre otra era ancla su
+  primera escena.
+- **M8 — Instantáneas.** `world_scene_snapshots`, a mano y **automáticas cuando el texto se
+  reduce a menos de la mitad** — el momento en que nadie se acuerda de pulsar nada (un
+  pegado sobre el capítulo seleccionado). Restaurar guarda antes lo que hay, porque un
+  deshacer que no se puede deshacer es una trampa, y pasa por `saveSceneText`, así que un
+  capítulo restaurado no es de segunda: se le promocionan e indexan los enlaces igual.
+  Tope de 20 por escena, y sale la más vieja.
+- **M9 — `reviewWorldProse`.** La revisión que A9 rechazó por falta de entrada. Bajo botón,
+  por escena, temperatura 0.2: de los latidos que el autor declaró, cuáles están en la
+  página. **No opina sobre la prosa, no reescribe, no sugiere frases.** Un latido sin
+  respuesta vuelve como `present: null` — decirle al autor que algo está escrito cuando
+  nadie lo ha comprobado es justo el error que esta comprobación existe para no cometer.
+
+### Lo que enseñó construirlas
+
+- **`\b` es ASCII, y eso borra el español.** El parser daba por no leídos TODOS los «sí»:
+  detrás de `í` y delante de `:` no hay frontera de palabra para JS. La condición correcta es
+  «no le sigue otra letra», con `(?![\p{L}\p{N}])` y el flag `u`.
+- **Dos sitios que saben qué posee una escena es un sitio de más.** `deleteScene()` repetía
+  la lista de tablas del manuscrito, y al crecer con dos más de la v101 se quedó vieja: las
+  instantáneas sobrevivían al borrado de su escena. Ahora delega en `deleteManuscriptFor()`.
+- **Una marca ausente no es una marca nula.** `scene.book !== null` convierte un `undefined`
+  —de cualquier llamante que omita el campo— en «aquí empieza un libro»: cada escena abría
+  el suyo. Se comprueba con `Boolean(...)`.
+
+## 8. Después (diseñado, no ahora)
+
+- **`reviewWorldProse` en lote**, para leer un capítulo entero de una vez.
+- **Modo máquina de escribir** (foco en el párrafo, desplazamiento centrado).

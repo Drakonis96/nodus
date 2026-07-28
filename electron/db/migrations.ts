@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 100;
+export const SCHEMA_VERSION = 101;
 
 export const migrations: Migration[] = [
   {
@@ -4267,6 +4267,55 @@ export const migrations: Migration[] = [
       created_at   TEXT NOT NULL,
       updated_at   TEXT NOT NULL
     );
+  `,
+  },
+  {
+    version: 101,
+    up: /* sql */ `
+    -- Varios libros en un mundo, e instantaneas de una escena. Las dos cosas que le
+    -- faltaban al manuscrito, y ninguna de las dos necesita tocar el orden del relato.
+    --
+    -- CREATE-only y sin claves foraneas, por lo mismo que la 100: isCreateOnly() rechaza
+    -- ALTER y DELETE, y foreign_keys esta ON, asi que un REFERENCES sin accion abortaria
+    -- el borrado de la escena. La propiedad la impone deleteScene() en su transaccion.
+
+    -- UN LIBRO ES DONDE EMPIEZA UN LIBRO. Exactamente la misma forma que
+    -- world_chapter_breaks, y por exactamente la misma razon: una tabla de manuscritos con
+    -- su propio orden, mas una tabla de pertenencia de la escena, serian un SEGUNDO EJE DE
+    -- ORDENACION junto a narrative_order -- del que ya cuelgan la cadena de dias, los
+    -- carriles de los arcos y la escena limite de las preguntas abiertas -- y los dos
+    -- discreparian el primer dia que alguien moviera una escena.
+    --
+    -- El coste es que los libros son tramos CONTIGUOS del orden global, que es exactamente
+    -- lo que es un estante. Mover un libro es mover sus escenas, igual que un capitulo.
+    -- Y la cadena de dias sigue siendo global a proposito: en una trilogia de un mismo
+    -- mundo el dia 4120 es el dia 4120, y un libro que abre otra era ancla su primera
+    -- escena.
+    CREATE TABLE world_manuscript_starts (
+      scene_id     TEXT PRIMARY KEY,
+      title        TEXT,
+      subtitle     TEXT,
+      -- Palabras a las que aspira ESTE libro. Sin objetivo no hay barra de avance, y una
+      -- barra sobre el total del mundo no significa nada cuando hay tres libros.
+      target_words INTEGER,
+      created_at   TEXT NOT NULL,
+      updated_at   TEXT NOT NULL
+    );
+
+    -- Lo que la escena decia antes de una reescritura. Sin id de contenido: dos
+    -- instantaneas del mismo texto en dos momentos son dos instantaneas, y colapsarlas
+    -- perderia justo la que se quiere recuperar.
+    CREATE TABLE world_scene_snapshots (
+      snapshot_id TEXT PRIMARY KEY,
+      scene_id    TEXT NOT NULL,
+      text        TEXT,
+      word_count  INTEGER NOT NULL DEFAULT 0,
+      -- manual | shrink. La segunda la toma el propio guardado cuando el texto encoge de
+      -- golpe, que es cuando nadie se acuerda de pulsar nada.
+      reason      TEXT NOT NULL DEFAULT 'manual',
+      created_at  TEXT NOT NULL
+    );
+    CREATE INDEX idx_world_scene_snapshots_scene ON world_scene_snapshots(scene_id, created_at DESC);
   `,
   },
 ];

@@ -9,11 +9,25 @@
 // `narrative_order`, the dates are the day chain, what a scene must do is its beats — which
 // is why this file is as short as it is.
 
+import { v4 as uuid } from 'uuid';
 import { getDb } from './database';
 import { indexEntryLinks, promoteWorldLinks } from './worldEncyclopediaRepo';
 import { countWords, localDay, todayDelta, type SpineScene, type WordDay } from '@shared/worldManuscript';
-import { checkCast, groupIntoChapters, manuscriptTotals, type CastCheckScene } from '@shared/worldManuscript';
-import type { ManuscriptProgress, ManuscriptSpine, SceneText, WorldFinding, WorldSceneStatus } from '@shared/types';
+import {
+  checkCast,
+  groupIntoBooks,
+  groupIntoChapters,
+  manuscriptTotals,
+  type CastCheckScene,
+} from '@shared/worldManuscript';
+import type {
+  ManuscriptProgress,
+  ManuscriptSpine,
+  SceneSnapshot,
+  SceneText,
+  WorldFinding,
+  WorldSceneStatus,
+} from '@shared/types';
 
 function now(): string {
   return new Date().toISOString();
@@ -59,13 +73,22 @@ export function saveSceneText(sceneId: string, text: string | null): SceneText {
   if (!exists) throw new Error('Escena no encontrada.');
 
   const promoted = promoteWorldLinks(text, { kind: 'scene', id: sceneId }).text ?? text;
+  // Before an overwrite that eats the scene, keep what was there. The trigger is the one
+  // moment nobody remembers to press anything: a paste over a selected chapter, or an undo
+  // stack lost to a reload. Half is the line because a real edit rarely halves a scene and
+  // an accident almost always does.
+  const before = getSceneText(sceneId);
+  const after = countWords(promoted);
+  if (before.wordCount >= SHRINK_FLOOR && after < before.wordCount / 2) {
+    writeSnapshot(sceneId, before.text, before.wordCount, 'shrink');
+  }
   const ts = now();
   db.prepare(
     `INSERT INTO world_scene_text (scene_id, text, word_count, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?)
      ON CONFLICT(scene_id) DO UPDATE SET text = excluded.text, word_count = excluded.word_count,
        updated_at = excluded.updated_at`
-  ).run(sceneId, promoted, countWords(promoted), ts, ts);
+  ).run(sceneId, promoted, after, ts, ts);
 
   indexEntryLinks({ kind: 'scene', id: sceneId });
   recordWordDay();
@@ -77,6 +100,8 @@ export function deleteManuscriptFor(sceneId: string): void {
   const db = getDb();
   db.prepare('DELETE FROM world_scene_text WHERE scene_id = ?').run(sceneId);
   db.prepare('DELETE FROM world_chapter_breaks WHERE scene_id = ?').run(sceneId);
+  db.prepare('DELETE FROM world_manuscript_starts WHERE scene_id = ?').run(sceneId);
+  db.prepare('DELETE FROM world_scene_snapshots WHERE scene_id = ?').run(sceneId);
 }
 
 // ── Chapters ─────────────────────────────────────────────────────────────────
@@ -119,10 +144,12 @@ export function manuscriptSpine(): ManuscriptSpine {
     .prepare(
       `SELECT s.scene_id, s.title, s.narrative_order, s.status,
               COALESCE(t.word_count, 0) AS word_count,
-              b.scene_id AS break_id, b.title AS chapter_title, b.epigraph
+              b.scene_id AS break_id, b.title AS chapter_title, b.epigraph,
+              m.scene_id AS book_id, m.title AS book_title, m.subtitle, m.target_words
          FROM world_scenes s
          LEFT JOIN world_scene_text t ON t.scene_id = s.scene_id
          LEFT JOIN world_chapter_breaks b ON b.scene_id = s.scene_id
+         LEFT JOIN world_manuscript_starts m ON m.scene_id = s.scene_id
         ORDER BY s.narrative_order`
     )
     .all() as {
@@ -134,6 +161,10 @@ export function manuscriptSpine(): ManuscriptSpine {
     break_id: string | null;
     chapter_title: string | null;
     epigraph: string | null;
+    book_id: string | null;
+    book_title: string | null;
+    subtitle: string | null;
+    target_words: number | null;
   }[];
 
   const scenes: SpineScene[] = rows.map((row) => ({
@@ -145,10 +176,38 @@ export function manuscriptSpine(): ManuscriptSpine {
     // The BREAK's presence is what makes a chapter, so a break with an empty title is
     // still a chapter — an untitled one — and not the absence of a break.
     chapter: row.break_id ? { title: row.chapter_title, epigraph: row.epigraph } : null,
+    book: row.book_id
+      ? { title: row.book_title, subtitle: row.subtitle, targetWords: row.target_words }
+      : null,
   }));
 
   const chapters = groupIntoChapters(scenes);
-  return { chapters, totals: manuscriptTotals(chapters) };
+  return { books: groupIntoBooks(scenes), chapters, totals: manuscriptTotals(chapters) };
+}
+
+/**
+ * Mark (or unmark) a scene as the one that opens a book.
+ *
+ * The same shape as `setChapterBreak`, because it is the same idea one level up. Removing
+ * the mark merges the run into the book above it: a book is only ever the stretch between
+ * two marks.
+ */
+export function setBookStart(
+  sceneId: string,
+  input: { title?: string | null; subtitle?: string | null; targetWords?: number | null } | null
+): void {
+  const db = getDb();
+  if (!input) {
+    db.prepare('DELETE FROM world_manuscript_starts WHERE scene_id = ?').run(sceneId);
+    return;
+  }
+  const ts = now();
+  db.prepare(
+    `INSERT INTO world_manuscript_starts (scene_id, title, subtitle, target_words, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT(scene_id) DO UPDATE SET title = excluded.title, subtitle = excluded.subtitle,
+       target_words = excluded.target_words, updated_at = excluded.updated_at`
+  ).run(sceneId, input.title ?? null, input.subtitle ?? null, input.targetWords ?? null, ts, ts);
 }
 
 // ── The word diary ───────────────────────────────────────────────────────────
@@ -239,4 +298,78 @@ export function manuscriptFindings(): WorldFinding[] {
     scenes.set(row.scene_id, scene);
   }
   return checkCast([...scenes.values()]);
+}
+
+// ── Instantáneas ─────────────────────────────────────────────────────────────
+
+/** Below this a scene is a stub, and «half of it» is noise rather than a loss. */
+const SHRINK_FLOOR = 40;
+/** Per scene. A novel with unbounded snapshots is a novel that syncs several times over. */
+const MAX_SNAPSHOTS = 20;
+
+function writeSnapshot(sceneId: string, text: string | null, wordCount: number, reason: 'manual' | 'shrink'): void {
+  const db = getDb();
+  const run = db.transaction(() => {
+    db.prepare(
+      `INSERT INTO world_scene_snapshots (snapshot_id, scene_id, text, word_count, reason, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    ).run(`snp_${uuid()}`, sceneId, text, wordCount, reason, now());
+    // Oldest first out. A cap that dropped the newest would keep the useless half.
+    db.prepare(
+      `DELETE FROM world_scene_snapshots
+        WHERE snapshot_id IN (
+          SELECT snapshot_id FROM world_scene_snapshots WHERE scene_id = ?
+           ORDER BY created_at DESC, snapshot_id LIMIT -1 OFFSET ?
+        )`
+    ).run(sceneId, MAX_SNAPSHOTS);
+  });
+  run();
+}
+
+/** The list carries word counts and reasons — never the text. Same rule as the spine. */
+export function listSceneSnapshots(sceneId: string): SceneSnapshot[] {
+  return (
+    getDb()
+      .prepare(
+        `SELECT snapshot_id, scene_id, word_count, reason, created_at
+           FROM world_scene_snapshots WHERE scene_id = ? ORDER BY created_at DESC, snapshot_id DESC`
+      )
+      .all(sceneId) as { snapshot_id: string; scene_id: string; word_count: number; reason: string; created_at: string }[]
+  ).map((row) => ({
+    snapshotId: row.snapshot_id,
+    sceneId: row.scene_id,
+    wordCount: row.word_count,
+    reason: row.reason === 'shrink' ? 'shrink' : 'manual',
+    createdAt: row.created_at,
+  }));
+}
+
+export function takeSceneSnapshot(sceneId: string): SceneSnapshot[] {
+  const current = getSceneText(sceneId);
+  writeSnapshot(sceneId, current.text, current.wordCount, 'manual');
+  return listSceneSnapshots(sceneId);
+}
+
+/**
+ * Put a snapshot back — after keeping what is there now.
+ *
+ * Restoring is itself a destructive edit, and an undo you cannot undo is a trap. The
+ * restore goes through `saveSceneText`, so the links are re-promoted and re-indexed exactly
+ * as if the author had typed it: a restored chapter is not a second-class one.
+ */
+export function restoreSceneSnapshot(snapshotId: string): SceneText {
+  const row = getDb()
+    .prepare('SELECT scene_id, text, word_count FROM world_scene_snapshots WHERE snapshot_id = ?')
+    .get(snapshotId) as { scene_id: string; text: string | null; word_count: number } | undefined;
+  if (!row) throw new Error('Instantánea no encontrada.');
+  const current = getSceneText(row.scene_id);
+  writeSnapshot(row.scene_id, current.text, current.wordCount, 'manual');
+  return saveSceneText(row.scene_id, row.text);
+}
+
+export function getSnapshotText(snapshotId: string): string | null {
+  const row = getDb().prepare('SELECT text FROM world_scene_snapshots WHERE snapshot_id = ?').get(snapshotId) as
+    | { text: string | null }
+    | undefined;
+  return row?.text ?? null;
 }

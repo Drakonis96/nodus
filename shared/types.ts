@@ -2736,7 +2736,38 @@ export interface SceneText {
   updatedAt: string | null;
 }
 
+/**
+ * Which of a scene's declared beats are actually on the page.
+ *
+ * `present: null` means the model did not answer for that one — never a guess. Telling an
+ * author something is written when nobody checked is the failure this exists to avoid.
+ */
+export interface ProseReviewResult {
+  beats: {
+    threadKind: BeatThreadKind;
+    threadId: string;
+    threadTitle: string;
+    mark: string;
+    present: boolean | null;
+    note: string | null;
+  }[];
+  /** True when there are no declared beats, or nothing written yet — not an error. */
+  noMaterial: boolean;
+}
+
+/** What a scene said before a rewrite. The list never carries the text. */
+export interface SceneSnapshot {
+  snapshotId: string;
+  sceneId: string;
+  wordCount: number;
+  /** `shrink` was taken by the save itself, when the text suddenly halved. */
+  reason: 'manual' | 'shrink';
+  createdAt: string;
+}
+
 export interface ManuscriptSpine {
+  /** The shelf. One book is the normal case and comes back as a single untitled one. */
+  books: import('./worldManuscript').SpineBook[];
   chapters: import('./worldManuscript').SpineChapter[];
   totals: import('./worldManuscript').ManuscriptTotals;
 }
@@ -6814,7 +6845,18 @@ export interface NodusApi {
   getSceneText(sceneId: string): Promise<SceneText>;
   saveSceneText(sceneId: string, text: string | null): Promise<SceneText>;
   setChapterBreak(sceneId: string, input: { title?: string | null; epigraph?: string | null } | null): Promise<void>;
+  setBookStart(
+    sceneId: string,
+    input: { title?: string | null; subtitle?: string | null; targetWords?: number | null } | null
+  ): Promise<void>;
   manuscriptProgress(): Promise<ManuscriptProgress>;
+  listSceneSnapshots(sceneId: string): Promise<SceneSnapshot[]>;
+  takeSceneSnapshot(sceneId: string): Promise<SceneSnapshot[]>;
+  /** Puts it back — after keeping what is there now, because an undo you cannot undo is a trap. */
+  restoreSceneSnapshot(snapshotId: string): Promise<SceneText>;
+  getSnapshotText(snapshotId: string): Promise<string | null>;
+  /** Reads the scene against the beats the author declared for it. Never rewrites. */
+  reviewWorldProse(sceneId: string): Promise<ProseReviewResult>;
   /** One file you can send. The internal `nodus://` links are degraded to their label. */
   exportManuscript(
     options: import('./worldManuscript').ManuscriptCompileOptions & { format: 'md' | 'pdf' }

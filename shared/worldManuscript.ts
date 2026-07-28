@@ -60,6 +60,8 @@ export interface SpineScene {
   wordCount: number;
   /** Present when this scene OPENS a chapter — which is the only way a chapter exists. */
   chapter: { title: string | null; epigraph: string | null } | null;
+  /** Present when this scene opens a BOOK. Same idea, one level up. */
+  book: { title: string | null; subtitle: string | null; targetWords: number | null } | null;
 }
 
 export interface SpineChapter {
@@ -87,7 +89,9 @@ export function groupIntoChapters(scenes: SpineScene[]): SpineChapter[] {
   const ordered = [...scenes].sort((a, b) => a.narrativeOrder - b.narrativeOrder);
   const chapters: SpineChapter[] = [];
   for (const scene of ordered) {
-    const opens = scene.chapter !== null;
+    // `Boolean`, no `!== null`: un llamante que omita el campo pasaría `undefined` y cada
+    // escena abriría capítulo. La marca es lo que existe o no, no lo que es exactamente null.
+    const opens = Boolean(scene.chapter);
     if (opens || chapters.length === 0) {
       chapters.push({
         startSceneId: opens ? scene.sceneId : null,
@@ -102,6 +106,46 @@ export function groupIntoChapters(scenes: SpineScene[]): SpineChapter[] {
     current.wordCount += scene.wordCount;
   }
   return chapters;
+}
+
+export interface SpineBook {
+  /** The scene that opens it, or null for the run before the first book mark. */
+  startSceneId: string | null;
+  title: string | null;
+  subtitle: string | null;
+  targetWords: number | null;
+  chapters: SpineChapter[];
+  wordCount: number;
+  scenes: number;
+}
+
+/**
+ * The shelf: several books in one world.
+ *
+ * Built the same way chapters are, out of the same walk, because a book is the same idea
+ * one level up — **a book is where a book starts**. A table of manuscripts with its own
+ * order plus a membership row per scene would be a second ordering axis beside
+ * `narrative_order`, and the day chain, the arc lanes and the blocked-scene of an open
+ * question all hang off that one. The price is that books are CONTIGUOUS runs of the
+ * reading order, which is precisely what a shelf is.
+ */
+export function groupIntoBooks(scenes: SpineScene[]): SpineBook[] {
+  const ordered = [...scenes].sort((a, b) => a.narrativeOrder - b.narrativeOrder);
+  const runs: { start: SpineScene | null; scenes: SpineScene[] }[] = [];
+  for (const scene of ordered) {
+    const opens = Boolean(scene.book);
+    if (opens || runs.length === 0) runs.push({ start: opens ? scene : null, scenes: [] });
+    runs[runs.length - 1].scenes.push(scene);
+  }
+  return runs.map((run) => ({
+    startSceneId: run.start?.sceneId ?? null,
+    title: run.start?.book?.title ?? null,
+    subtitle: run.start?.book?.subtitle ?? null,
+    targetWords: run.start?.book?.targetWords ?? null,
+    chapters: groupIntoChapters(run.scenes),
+    wordCount: run.scenes.reduce((total, scene) => total + scene.wordCount, 0),
+    scenes: run.scenes.length,
+  }));
 }
 
 export interface ManuscriptTotals {
