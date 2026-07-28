@@ -243,6 +243,15 @@ export const PT: Record<string, string> = {
   'El modelo local seleccionado ya no está disponible.': 'O modelo local selecionado já não está disponível.',
   'Preparando el motor local…': 'A preparar o motor local…',
   'Descargando {model}…': 'A transferir {model}…',
+  'Descarga cancelada.': 'Transferência cancelada.',
+  'Descarga detenida. Los archivos temporales se han eliminado.': 'Transferência interrompida. Os ficheiros temporários foram eliminados.',
+  'Deteniendo…': 'A interromper…',
+  'Detener descarga': 'Interromper transferência',
+  'Configurar más tarde': 'Configurar mais tarde',
+  'Configurar IA más tarde': 'Configurar IA mais tarde',
+  'Podrás explorar este vault sin IA. Las funciones que analizan, generan contenido o usan búsqueda semántica no estarán disponibles hasta que configures los modelos en Ajustes → Modelos IA.':
+    'Poderá explorar este espaço sem IA. As funções que analisam, geram conteúdo ou usam pesquisa semântica permanecerão indisponíveis até configurar os modelos em Definições → Modelos de IA.',
+  'Explorar sin IA': 'Explorar sem IA',
   'Al crear la bóveda, el asistente te llevará a elegir su modelo de IA y su modelo de embeddings, con los modelos de tus proveedores ya cargados.':
     'Ao criar o espaço, o assistente vai levá-lo a escolher o modelo de IA e o modelo de embeddings, com os modelos dos seus fornecedores já carregados.',
   'En el siguiente paso elegirás el modelo de IA y el de embeddings. Nodus detecta tus claves y carga los modelos disponibles por ti.':

@@ -21,6 +21,7 @@ interface ActiveLocalAiDownload {
   progress: number;
   promise: Promise<NodusLocalAiStatus>;
   listeners: Set<(fraction: number) => void>;
+  controller: AbortController;
 }
 
 const activeDownloads = new Map<string, ActiveLocalAiDownload>();
@@ -180,17 +181,35 @@ function followDownload(
   return job.promise.finally(() => job.listeners.delete(onProgress));
 }
 
+function downloadCancelledError(): Error {
+  const error = new Error('Descarga cancelada.');
+  error.name = 'AbortError';
+  return error;
+}
+
+function throwIfDownloadCancelled(signal?: AbortSignal): void {
+  if (signal?.aborted) throw downloadCancelledError();
+}
+
 async function downloadFile(
   url: string,
   target: string,
   expectedBytes: number | undefined,
   expectedSha256: string | undefined,
-  onBytes: (bytes: number) => void
+  onBytes: (bytes: number) => void,
+  signal?: AbortSignal
 ): Promise<void> {
+  throwIfDownloadCancelled(signal);
   await fsp.mkdir(path.dirname(target), { recursive: true });
   const partial = `${target}.download`;
   await fsp.rm(partial, { force: true });
-  const response = await fetch(url, { redirect: 'follow' });
+  let response: Response;
+  try {
+    response = await fetch(url, { redirect: 'follow', signal });
+  } catch (error) {
+    if (signal?.aborted) throw downloadCancelledError();
+    throw error;
+  }
   if (!response.ok || !response.body) throw new Error(`Descarga HTTP ${response.status}: ${url}`);
   const file = fs.createWriteStream(partial, { flags: 'wx' });
   const hash = createHash('sha256');
@@ -210,8 +229,10 @@ async function downloadFile(
   } catch (error) {
     file.destroy();
     await fsp.rm(partial, { force: true });
+    if (signal?.aborted) throw downloadCancelledError();
     throw error;
   }
+  throwIfDownloadCancelled(signal);
   if (expectedBytes && received !== expectedBytes) {
     await fsp.rm(partial, { force: true });
     throw new Error(`Descarga incompleta: se esperaban ${expectedBytes} bytes y se recibieron ${received}.`);
@@ -224,13 +245,33 @@ async function downloadFile(
   await fsp.rename(partial, target);
 }
 
-function run(command: string, args: string[], cwd?: string): Promise<void> {
+function run(command: string, args: string[], cwd?: string, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(downloadCancelledError());
+      return;
+    }
     const child = spawn(command, args, { cwd, stdio: ['ignore', 'ignore', 'pipe'] });
     let stderr = '';
+    let settled = false;
+    const finish = (error?: Error) => {
+      if (settled) return;
+      settled = true;
+      signal?.removeEventListener('abort', abort);
+      if (error) reject(error);
+      else resolve();
+    };
+    const abort = () => {
+      if (child.exitCode == null) child.kill('SIGTERM');
+    };
+    signal?.addEventListener('abort', abort, { once: true });
     child.stderr?.on('data', (chunk) => { stderr = `${stderr}${String(chunk)}`.slice(-8_000); });
-    child.on('error', reject);
-    child.on('close', (code) => code === 0 ? resolve() : reject(new Error(stderr || `${command} terminó con código ${code}.`)));
+    child.on('error', (error) => finish(signal?.aborted ? downloadCancelledError() : error));
+    child.on('close', (code) => {
+      if (signal?.aborted) finish(downloadCancelledError());
+      else if (code === 0) finish();
+      else finish(new Error(stderr || `${command} terminó con código ${code}.`));
+    });
   });
 }
 
@@ -243,31 +284,39 @@ export async function installNodusLocalRuntime(onProgress?: (fraction: number) =
     progress: 0,
     promise: null as unknown as Promise<NodusLocalAiStatus>,
     listeners: new Set(),
+    controller: new AbortController(),
   };
   activeRuntimeDownload = job;
   job.promise = (async () => {
     const asset = runtimeAsset();
     const root = runtimeDirectory();
     const archive = path.join(rootDirectory(), `${asset.name}.download`);
-    await fsp.rm(root, { recursive: true, force: true });
-    await fsp.mkdir(rootDirectory(), { recursive: true });
-    let downloaded = 0;
-    await downloadFile(asset.url, archive, asset.bytes, asset.sha256, (bytes) => {
-      downloaded += bytes;
-      reportDownloadProgress(job, Math.min(0.9, (downloaded / asset.bytes) * 0.9));
-    });
-    await fsp.mkdir(root, { recursive: true });
-    if (asset.archive === 'zip') {
-      new AdmZip(archive).extractAllTo(root, true);
-    } else {
-      await run('tar', ['-xzf', archive, '-C', root]);
+    try {
+      await fsp.rm(root, { recursive: true, force: true });
+      await fsp.mkdir(rootDirectory(), { recursive: true });
+      let downloaded = 0;
+      await downloadFile(asset.url, archive, asset.bytes, asset.sha256, (bytes) => {
+        downloaded += bytes;
+        reportDownloadProgress(job, Math.min(0.9, (downloaded / asset.bytes) * 0.9));
+      }, job.controller.signal);
+      throwIfDownloadCancelled(job.controller.signal);
+      await fsp.mkdir(root, { recursive: true });
+      if (asset.archive === 'zip') {
+        new AdmZip(archive).extractAllTo(root, true);
+        throwIfDownloadCancelled(job.controller.signal);
+      } else {
+        await run('tar', ['-xzf', archive, '-C', root], undefined, job.controller.signal);
+      }
+      const executable = await llamaServerPath();
+      if (!executable) throw new Error('El runtime se descargó, pero no contiene llama-server.');
+      if (process.platform !== 'win32') await fsp.chmod(executable, 0o755);
+      reportDownloadProgress(job, 1);
+      return getNodusLocalAiStatus();
+    } finally {
+      await fsp.rm(archive, { force: true });
+      await fsp.rm(`${archive}.download`, { force: true });
+      if (job.controller.signal.aborted) await fsp.rm(root, { recursive: true, force: true });
     }
-    await fsp.rm(archive, { force: true });
-    const executable = await llamaServerPath();
-    if (!executable) throw new Error('El runtime se descargó, pero no contiene llama-server.');
-    if (process.platform !== 'win32') await fsp.chmod(executable, 0o755);
-    reportDownloadProgress(job, 1);
-    return getNodusLocalAiStatus();
   })().finally(() => {
     if (activeRuntimeDownload === job) activeRuntimeDownload = null;
   }).then(() => getNodusLocalAiStatus());
@@ -276,13 +325,15 @@ export async function installNodusLocalRuntime(onProgress?: (fraction: number) =
 
 async function downloadModelAssets(
   model: NodusLocalModelDefinition,
-  onProgress?: (fraction: number) => void
+  onProgress?: (fraction: number) => void,
+  signal?: AbortSignal
 ): Promise<NodusLocalAiStatus> {
   const directory = modelDirectory(model.id);
   const total = nodusLocalModelBytes(model);
   let completed = 0;
   await fsp.mkdir(directory, { recursive: true });
   for (const asset of model.assets) {
+    throwIfDownloadCancelled(signal);
     const target = path.join(directory, asset.file);
     const stat = await fsp.stat(target).catch(() => null);
     if (stat?.isFile() && stat.size === asset.bytes) {
@@ -294,9 +345,10 @@ async function downloadModelAssets(
     await downloadFile(asset.url, target, asset.bytes, asset.sha256, (bytes) => {
       current += bytes;
       onProgress?.(Math.min(0.999, (completed + current) / total));
-    });
+    }, signal);
     completed += asset.bytes;
   }
+  throwIfDownloadCancelled(signal);
   onProgress?.(1);
   return getNodusLocalAiStatus();
 }
@@ -313,18 +365,42 @@ export async function downloadNodusLocalModel(
     progress: 0,
     promise: null as unknown as Promise<NodusLocalAiStatus>,
     listeners: new Set(),
+    controller: new AbortController(),
   };
   activeDownloads.set(modelId, job);
   job.promise = (async () => {
     if (model.runtime === 'llama_cpp' && !(await llamaServerPath())) {
       await installNodusLocalRuntime((fraction) => reportDownloadProgress(job, fraction * 0.2));
-      return downloadModelAssets(model, (fraction) => reportDownloadProgress(job, 0.2 + fraction * 0.8));
+      throwIfDownloadCancelled(job.controller.signal);
+      return downloadModelAssets(model, (fraction) => reportDownloadProgress(job, 0.2 + fraction * 0.8), job.controller.signal);
     }
-    return downloadModelAssets(model, (fraction) => reportDownloadProgress(job, fraction));
+    return downloadModelAssets(model, (fraction) => reportDownloadProgress(job, fraction), job.controller.signal);
   })().finally(() => {
     if (activeDownloads.get(modelId) === job) activeDownloads.delete(modelId);
   }).then(() => getNodusLocalAiStatus());
   return followDownload(job, onProgress);
+}
+
+export async function cancelNodusLocalDownloads(): Promise<NodusLocalAiStatus> {
+  const modelJobs = [...activeDownloads.entries()];
+  const runtimeJob = activeRuntimeDownload;
+  for (const [, job] of modelJobs) job.controller.abort();
+  runtimeJob?.controller.abort();
+  await Promise.allSettled([
+    ...modelJobs.map(([, job]) => job.promise),
+    ...(runtimeJob ? [runtimeJob.promise] : []),
+  ]);
+  await Promise.all(modelJobs.map(([modelId]) => fsp.rm(modelDirectory(modelId), { recursive: true, force: true })));
+  if (runtimeJob) {
+    const asset = runtimeAsset();
+    const archive = path.join(rootDirectory(), `${asset.name}.download`);
+    await Promise.all([
+      fsp.rm(runtimeDirectory(), { recursive: true, force: true }),
+      fsp.rm(archive, { force: true }),
+      fsp.rm(`${archive}.download`, { force: true }),
+    ]);
+  }
+  return getNodusLocalAiStatus();
 }
 
 export async function deleteNodusLocalModel(modelId: string): Promise<NodusLocalAiStatus> {

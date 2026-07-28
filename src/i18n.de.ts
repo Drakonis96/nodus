@@ -243,6 +243,15 @@ export const DE: Record<string, string> = {
   'El modelo local seleccionado ya no está disponible.': 'Das ausgewählte lokale Modell ist nicht mehr verfügbar.',
   'Preparando el motor local…': 'Lokale Engine wird vorbereitet…',
   'Descargando {model}…': '{model} wird heruntergeladen…',
+  'Descarga cancelada.': 'Download abgebrochen.',
+  'Descarga detenida. Los archivos temporales se han eliminado.': 'Download gestoppt. Temporäre Dateien wurden gelöscht.',
+  'Deteniendo…': 'Wird gestoppt…',
+  'Detener descarga': 'Download stoppen',
+  'Configurar más tarde': 'Später konfigurieren',
+  'Configurar IA más tarde': 'KI später konfigurieren',
+  'Podrás explorar este vault sin IA. Las funciones que analizan, generan contenido o usan búsqueda semántica no estarán disponibles hasta que configures los modelos en Ajustes → Modelos IA.':
+    'Sie können diesen Arbeitsbereich ohne KI erkunden. Funktionen zum Analysieren, Erzeugen von Inhalten oder für die semantische Suche bleiben nicht verfügbar, bis Sie die Modelle unter Einstellungen → KI-Modelle konfigurieren.',
+  'Explorar sin IA': 'Ohne KI erkunden',
   'Al crear la bóveda, el asistente te llevará a elegir su modelo de IA y su modelo de embeddings, con los modelos de tus proveedores ya cargados.':
     'Nach dem Erstellen des Arbeitsbereichs führt Sie der Assistent zur Auswahl seines KI-Modells und seines Embeddings-Modells, wobei die Modelle Ihrer Anbieter bereits geladen sind.',
   'En el siguiente paso elegirás el modelo de IA y el de embeddings. Nodus detecta tus claves y carga los modelos disponibles por ti.':

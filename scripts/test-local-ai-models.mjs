@@ -36,13 +36,14 @@ try {
   assert.ok(catalog.NODUS_LOCAL_MODELS.every((model) => model.assets.every((asset) => asset.bytes > 0)), 'every asset has an expected byte size');
   assert.ok(catalog.NODUS_LOCAL_MODELS.every((model) => model.assets.filter((asset) => asset.bytes > 1_000_000).every((asset) => /^[a-f0-9]{64}$/.test(asset.sha256))), 'large assets are pinned by SHA-256');
 
-  const [manager, aiClient, ipc, preload, settings, ui, providers, studyPolicy] = await Promise.all([
+  const [manager, aiClient, ipc, preload, settings, ui, onboarding, providers, studyPolicy] = await Promise.all([
     readFile(path.join(root, 'electron/ai/nodusLocalAi.ts'), 'utf8'),
     readFile(path.join(root, 'electron/ai/aiClient.ts'), 'utf8'),
     readFile(path.join(root, 'electron/ipc.ts'), 'utf8'),
     readFile(path.join(root, 'electron/preload.ts'), 'utf8'),
     readFile(path.join(root, 'src/views/Settings.tsx'), 'utf8'),
     readFile(path.join(root, 'src/components/LocalAiModelsSettings.tsx'), 'utf8'),
+    readFile(path.join(root, 'src/views/Onboarding.tsx'), 'utf8'),
     readFile(path.join(root, 'shared/providers.ts'), 'utf8'),
     readFile(path.join(root, 'shared/studyAi.ts'), 'utf8'),
   ]);
@@ -57,11 +58,19 @@ try {
   assert.match(manager, /activeRuntimeDownload.*ActiveLocalAiDownload/s, 'runtime downloads persist in main-process state');
   assert.match(manager, /activeDownloads\.get\(model\.id\)/, 'model status reconnects to a main-process download job');
   assert.match(manager, /return followDownload\(running, onProgress\)/, 'duplicate requests follow the existing download');
+  assert.match(manager, /controller: AbortController/, 'every main-process transfer owns an abort controller');
+  assert.match(manager, /fetch\(url, \{ redirect: 'follow', signal \}\)/, 'cancelling aborts the network request itself');
+  assert.match(manager, /export async function cancelNodusLocalDownloads/, 'the main process exposes a real cancellation operation');
+  assert.match(manager, /Promise\.allSettled\(/, 'cancellation waits until active jobs have stopped');
+  assert.match(manager, /fsp\.rm\(modelDirectory\(modelId\), \{ recursive: true, force: true \}\)/, 'cancellation removes an incomplete model directory');
+  assert.match(manager, /fsp\.rm\(`\$\{archive\}\.download`/, 'cancellation removes runtime partials');
   assert.match(aiClient, /ensureNodusLocalServer\(model\.model, 'chat'\)/, 'chat completions start the managed local server');
   assert.match(aiClient, /embedWithNodusLocal/, 'embedding calls route to the integrated runtime');
   assert.match(ipc, /ai:nodusLocal:downloadModel/, 'main IPC exposes model downloads');
+  assert.match(ipc, /ai:nodusLocal:cancelDownloads/, 'main IPC exposes cancellation');
   assert.match(ipc, /if \(!event\.sender\.isDestroyed\(\)\) event\.sender\.send\('ai:nodusLocal:progress'/, 'progress cannot abort a download after its renderer is destroyed');
   assert.match(preload, /ai:nodusLocal:progress/, 'preload forwards download progress safely');
+  assert.match(preload, /cancelNodusLocalDownloads: \(\) => ipcRenderer\.invoke\('ai:nodusLocal:cancelDownloads'\)/, 'the renderer can request cancellation');
   assert.match(settings, /Cambiar modelo de embeddings/, 'embedding changes require an explicit compatibility confirmation');
   assert.match(ui, /ConfirmModal/, 'deleting a local model uses the styled confirmation modal');
   assert.match(ui, /no son compatibles y deberán regenerarse/, 'the permanent embedding compatibility reminder is visible');
@@ -73,6 +82,9 @@ try {
   assert.match(ui, /await window\.nodus\.downloadNodusLocalModel\(model\.id, setProgress\)/, 'one main-process request owns runtime preparation and model download');
   assert.doesNotMatch(ui, /await window\.nodus\.installNodusLocalRuntime\([\s\S]{0,300}await window\.nodus\.downloadNodusLocalModel/, 'the renderer does not split a model transfer into dependent stages');
   assert.match(ui, /nodus-local-download-progress/, 'rehydrated progress has a stable UI hook');
+  assert.match(onboarding, /data-testid="onboarding-stop-model-download"/, 'the setup wizard exposes a stop-download action');
+  assert.match(onboarding, /await window\.nodus\.cancelNodusLocalDownloads\(\)/, 'the stop action reaches the main-process transfer');
+  assert.match(onboarding, /Descarga detenida\. Los archivos temporales se han eliminado\./, 'the wizard confirms cleanup after cancellation');
   assert.match(ui, /exposeDownloadedChatModels/, 'downloaded local chat models are exposed to the shared dropdowns');
   assert.doesNotMatch(ui, /SettingsModelDot|selectedEmbedding|selectedGeneral|selectedVision/, 'the download catalog must not present models as active selections');
   assert.doesNotMatch(ui, /onSelectEmbedding|selectChat|Usar para embeddings|Usar como general|Usar para visión|Modelo general|Modelo de visión/, 'model assignment belongs exclusively to the shared dropdowns');

@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import type { AiProvider, AppSettings, ZoteroCollection, ModelRef, VaultSummary } from '@shared/types';
 import { normalizeEmbeddingModel, normalizeEmbeddingProvider } from '@shared/providers';
 import { getNodusLocalModel } from '@shared/localAiModels';
 import { Spinner, Icon } from '../components/ui';
+import { ConfirmModal } from '../components/ConfirmModal';
 import { OnboardingModelStep } from '../components/OnboardingModelStep';
 import { t, tx } from '../i18n';
 
@@ -42,6 +43,9 @@ export function Onboarding({
   const [finishing, setFinishing] = useState(false);
   const [downloadLabel, setDownloadLabel] = useState('');
   const [downloadProgress, setDownloadProgress] = useState(0);
+  const [downloadNotice, setDownloadNotice] = useState<string | null>(null);
+  const [cancellingDownload, setCancellingDownload] = useState(false);
+  const downloadCancellationRequested = useRef(false);
   const [finishError, setFinishError] = useState<string | null>(null);
   const [syncSummary, setSyncSummary] = useState<string | null>(null);
   const [syncedWorks, setSyncedWorks] = useState<number | null>(null);
@@ -49,6 +53,8 @@ export function Onboarding({
   const [confirmExit, setConfirmExit] = useState(false);
   const [exiting, setExiting] = useState(false);
   const [exitError, setExitError] = useState<string | null>(null);
+  const [confirmConfigureLater, setConfirmConfigureLater] = useState(false);
+  const [skippingAi, setSkippingAi] = useState(false);
 
   // The onboarding adapts to the active vault: only academic research starts with
   // Zotero. Genealogy, databases and study use a short intro → AI → done flow.
@@ -96,6 +102,9 @@ export function Onboarding({
   /** Built-in models are chosen here but only fetched now, so the wizard stays
    *  responsive while browsing and the download runs once the choice is final. */
   const downloadLocalModels = async (refs: (ModelRef | null)[]) => {
+    const ensureDownloadContinues = () => {
+      if (downloadCancellationRequested.current) throw new Error(t('Descarga cancelada.'));
+    };
     const definitions = [...new Set(refs.filter((ref) => ref?.provider === 'nodus').map((ref) => ref!.model))]
       .map((id) => {
         const definition = getNodusLocalModel(id);
@@ -103,6 +112,7 @@ export function Onboarding({
         return definition;
       });
     if (!definitions.length) return;
+    ensureDownloadContinues();
     const status = await window.nodus.getNodusLocalAiStatus();
     const needsRuntime = definitions.some((model) => model.runtime === 'llama_cpp') && !status.runtime.ready;
     const pending = definitions.filter((model) => !status.models.find((entry) => entry.id === model.id)?.downloaded);
@@ -111,17 +121,37 @@ export function Onboarding({
     let done = 0;
     const onProgress = (fraction: number) => setDownloadProgress((done + fraction) / total);
     if (needsRuntime) {
+      ensureDownloadContinues();
       setDownloadLabel(t('Preparando el motor local…'));
       await window.nodus.installNodusLocalRuntime(onProgress);
+      ensureDownloadContinues();
       done += 1;
     }
     for (const model of pending) {
+      ensureDownloadContinues();
       setDownloadLabel(tx('Descargando {model}…', { model: model.label }));
       await window.nodus.downloadNodusLocalModel(model.id, onProgress);
+      ensureDownloadContinues();
       done += 1;
     }
+    ensureDownloadContinues();
     setDownloadProgress(1);
     setDownloadLabel('');
+  };
+
+  const cancelLocalDownloads = async () => {
+    if (!finishing || cancellingDownload) return;
+    downloadCancellationRequested.current = true;
+    setCancellingDownload(true);
+    setDownloadNotice(null);
+    try {
+      await window.nodus.cancelNodusLocalDownloads();
+      setDownloadNotice(t('Descarga detenida. Los archivos temporales se han eliminado.'));
+    } catch (error) {
+      setModelError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setCancellingDownload(false);
+    }
   };
 
   const finish = async () => {
@@ -135,6 +165,8 @@ export function Onboarding({
     setSyncSummary(null);
     setSyncedWorks(null);
     setDownloadProgress(0);
+    setDownloadNotice(null);
+    downloadCancellationRequested.current = false;
     try {
       await downloadLocalModels([aiModel, embeddingModel]);
       const favorites = settings.favorites.some((model) => model.provider === aiModel.provider && model.model === aiModel.model)
@@ -160,10 +192,36 @@ export function Onboarding({
         setSyncedWorks(works.length);
       }
     } catch (e) {
-      setStep(doneStep);
-      setFinishError(e instanceof Error ? e.message : String(e));
+      if (downloadCancellationRequested.current) {
+        setDownloadLabel('');
+        setDownloadProgress(0);
+        setDownloadNotice(t('Descarga detenida. Los archivos temporales se han eliminado.'));
+      } else {
+        setStep(doneStep);
+        setFinishError(e instanceof Error ? e.message : String(e));
+      }
     } finally {
+      downloadCancellationRequested.current = false;
       setFinishing(false);
+    }
+  };
+
+  const configureAiLater = async () => {
+    if (skippingAi) return;
+    setConfirmConfigureLater(false);
+    setSkippingAi(true);
+    setModelError(null);
+    try {
+      await window.nodus.updateSettings({
+        ...(simple ? {} : { monitoredCollections: Array.from(selected), readTag, zoteroStoragePath: storagePath }),
+        onboardingComplete: true,
+      });
+      if (!simple) await window.nodus.syncNow().catch(() => undefined);
+      onDone('home');
+    } catch (error) {
+      setModelError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setSkippingAi(false);
     }
   };
 
@@ -313,14 +371,27 @@ export function Onboarding({
               embeddingModel={embeddingModel}
               onAiChange={(ref) => { setAiModel(ref); setModelError(null); }}
               onEmbeddingChange={(ref) => { setEmbeddingModel(ref); setModelError(null); }}
-              disabled={finishing}
+              disabled={finishing || skippingAi}
             />
             {modelError && <p role="alert" className="text-sm text-red-400">{modelError}</p>}
+            {downloadNotice && <p role="status" className="text-sm text-emerald-400">{downloadNotice}</p>}
             {finishing && downloadLabel && (
               <div className="rounded-lg border border-indigo-800/60 bg-indigo-950/25 p-3" data-testid="onboarding-model-download-progress">
                 <div className="flex items-center justify-between gap-3 text-xs text-indigo-200">
                   <span>{downloadLabel}</span>
-                  {downloadProgress > 0 && <span className="tabular-nums">{Math.round(downloadProgress * 100)}%</span>}
+                  <span className="flex shrink-0 items-center gap-2">
+                    {downloadProgress > 0 && <span className="tabular-nums">{Math.round(downloadProgress * 100)}%</span>}
+                    <button
+                      type="button"
+                      className="btn btn-ghost h-7 gap-1 px-2 text-[10px] text-indigo-100"
+                      data-testid="onboarding-stop-model-download"
+                      disabled={cancellingDownload}
+                      onClick={() => void cancelLocalDownloads()}
+                    >
+                      <Icon name="stop" size={11} />
+                      {cancellingDownload ? t('Deteniendo…') : t('Detener descarga')}
+                    </button>
+                  </span>
                 </div>
                 <div className="mt-2 h-1.5 overflow-hidden rounded bg-neutral-800">
                   <div className="h-full bg-indigo-500 transition-[width]" style={{ width: `${Math.max(3, downloadProgress * 100)}%` }} />
@@ -373,9 +444,19 @@ export function Onboarding({
               {t('Siguiente')}
             </button>
           ) : step === aiStep ? (
-            <button className="btn btn-primary" data-testid="onboarding-start" onClick={finish} disabled={finishing || !aiModel || !embeddingModel}>
-              {finishing ? t('Preparando...') : t('Empezar')}
-            </button>
+            <div className="flex gap-2">
+              <button
+                className="btn btn-ghost border border-neutral-700"
+                data-testid="onboarding-configure-ai-later"
+                onClick={() => setConfirmConfigureLater(true)}
+                disabled={finishing || skippingAi}
+              >
+                {skippingAi ? t('Guardando…') : t('Configurar más tarde')}
+              </button>
+              <button className="btn btn-primary" data-testid="onboarding-start" onClick={finish} disabled={finishing || skippingAi || !aiModel || !embeddingModel}>
+                {finishing ? t('Preparando...') : t('Empezar')}
+              </button>
+            </div>
           ) : (
             <div className="flex gap-2">
               {finishError && (
@@ -394,6 +475,15 @@ export function Onboarding({
             </div>
           )}
         </div>
+        {confirmConfigureLater && (
+          <ConfirmModal
+            title={t('Configurar IA más tarde')}
+            message={t('Podrás explorar este vault sin IA. Las funciones que analizan, generan contenido o usan búsqueda semántica no estarán disponibles hasta que configures los modelos en Ajustes → Modelos IA.')}
+            confirmLabel={t('Explorar sin IA')}
+            onConfirm={() => void configureAiLater()}
+            onCancel={() => setConfirmConfigureLater(false)}
+          />
+        )}
       </motion.div>
     </div>
   );

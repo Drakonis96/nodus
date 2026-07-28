@@ -440,6 +440,7 @@ import {
   installWhisperCpp, uninstallWhisperCpp,
 } from './stt/whisperCpp';
 import {
+  cancelNodusLocalDownloads,
   deleteNodusLocalModel,
   downloadNodusLocalModel,
   getNodusLocalAiStatus,
@@ -2730,6 +2731,7 @@ export function registerIpc(
     downloadNodusLocalModel(model, (fraction) => {
       if (!event.sender.isDestroyed()) event.sender.send('ai:nodusLocal:progress', requestId, fraction);
     }));
+  h('ai:nodusLocal:cancelDownloads', async () => cancelNodusLocalDownloads());
   h('ai:nodusLocal:deleteModel', async (_event, model: string) => deleteNodusLocalModel(model));
   h('ai:nodusLocalImage:status', async () => getNodusLocalImageStatus());
   h('ai:nodusLocalImage:installRuntime', async (event, requestId: string) =>

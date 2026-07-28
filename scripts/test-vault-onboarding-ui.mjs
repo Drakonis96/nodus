@@ -185,7 +185,7 @@ test('the create-vault modal asks for a name and a type, never for models', asyn
   }
 });
 
-test('the wizard discovers models by itself and requires one of each role', async () => {
+test('the wizard discovers both model roles but can be explicitly postponed', async () => {
   const [onboarding, step, select] = await Promise.all([
     read('src/views/Onboarding.tsx'),
     read('src/components/OnboardingModelStep.tsx'),
@@ -209,7 +209,15 @@ test('the wizard discovers models by itself and requires one of each role', asyn
   assert.match(onboarding, /embeddingProvider,/);
   assert.match(onboarding, /embeddingModel: normalizeEmbeddingModel\(embeddingProvider, embeddingModel\.model\)/);
   assert.match(onboarding, /await downloadLocalModels\(\[aiModel, embeddingModel\]\)/);
-  assert.match(onboarding, /disabled=\{finishing \|\| !aiModel \|\| !embeddingModel\}/);
+  assert.match(onboarding, /data-testid="onboarding-start"[\s\S]{0,180}disabled=\{finishing \|\| skippingAi \|\| !aiModel \|\| !embeddingModel\}/);
+  // Postponing is a distinct confirmed path: it completes onboarding without
+  // persisting either auto-selected model, so the vault can be explored first.
+  assert.match(onboarding, /data-testid="onboarding-configure-ai-later"/);
+  assert.match(onboarding, /title=\{t\('Configurar IA más tarde'\)\}/);
+  assert.match(onboarding, /confirmLabel=\{t\('Explorar sin IA'\)\}/);
+  assert.match(onboarding, /const configureAiLater = async \(\) => \{[\s\S]*onboardingComplete: true,[\s\S]*onDone\('home'\)/);
+  const postpone = onboarding.slice(onboarding.indexOf('const configureAiLater'), onboarding.indexOf('const steps'));
+  assert.doesNotMatch(postpone, /synthesisModel|embeddingProvider|embeddingModel/, 'postponing must not silently save the discovered models');
 });
 
 test('vault creation persists the complete model selection and keeps legacy callers compatible', async () => {

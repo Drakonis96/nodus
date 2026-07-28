@@ -655,6 +655,7 @@ const api: NodusApi = {
     try { return await ipcRenderer.invoke('ai:nodusLocal:downloadModel', requestId, model); }
     finally { ipcRenderer.removeListener('ai:nodusLocal:progress', listener); }
   },
+  cancelNodusLocalDownloads: () => ipcRenderer.invoke('ai:nodusLocal:cancelDownloads'),
   deleteNodusLocalModel: (model) => ipcRenderer.invoke('ai:nodusLocal:deleteModel', model),
   getNodusLocalImageStatus: () => ipcRenderer.invoke('ai:nodusLocalImage:status'),
   installNodusLocalImageRuntime: async (onProgress) => {

@@ -7262,6 +7262,7 @@ export interface NodusApi {
   getNodusLocalAiStatus(): Promise<NodusLocalAiStatus>;
   installNodusLocalRuntime(onProgress?: (fraction: number) => void): Promise<NodusLocalAiStatus>;
   downloadNodusLocalModel(model: string, onProgress?: (fraction: number) => void): Promise<NodusLocalAiStatus>;
+  cancelNodusLocalDownloads(): Promise<NodusLocalAiStatus>;
   deleteNodusLocalModel(model: string): Promise<NodusLocalAiStatus>;
   getNodusLocalImageStatus(): Promise<NodusLocalImageStatus>;
   installNodusLocalImageRuntime(onProgress?: (fraction: number) => void): Promise<NodusLocalImageStatus>;
