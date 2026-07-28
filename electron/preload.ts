@@ -17,6 +17,7 @@ import type { PresenterAction as PresenterControlAction } from '@shared/presente
 // stream runs at a time (the composer is disabled while sending).
 let activeChatRequestId: string | null = null;
 let activeDbChatRequestId: string | null = null;
+let activeWorldChatRequestId: string | null = null;
 let activeNodiChatRequestId: string | null = null;
 let activeStudyImproveRequestId: string | null = null;
 let activeStudyAssistantRequestId: string | null = null;
@@ -300,6 +301,23 @@ const api: NodusApi = {
   questionAnchorText: (kind, id, field) => ipcRenderer.invoke('questions:anchorText', kind, id, field),
   questionsForScene: (sceneId) => ipcRenderer.invoke('questions:forScene', sceneId),
   proposeQuestionOptions: (questionId) => ipcRenderer.invoke('questions:propose', questionId),
+  worldChatStream: async (request, handlers) => {
+    const requestId = `world-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const onDelta = (_e: unknown, id: string, delta: string) => {
+      if (id === requestId) handlers.onDelta(delta);
+    };
+    ipcRenderer.on('worldChat:delta', onDelta);
+    activeWorldChatRequestId = requestId;
+    try {
+      return await ipcRenderer.invoke('worldChat:stream', requestId, request);
+    } finally {
+      if (activeWorldChatRequestId === requestId) activeWorldChatRequestId = null;
+      ipcRenderer.removeListener('worldChat:delta', onDelta);
+    }
+  },
+  cancelWorldChat: async () => {
+    if (activeWorldChatRequestId) await ipcRenderer.invoke('worldChat:cancel', activeWorldChatRequestId);
+  },
   recomputeSceneDays: () => ipcRenderer.invoke('scenes:recomputeDays'),
   listWorldMaps: () => ipcRenderer.invoke('maps:list'),
   getWorldMap: (mapId) => ipcRenderer.invoke('maps:get', mapId),

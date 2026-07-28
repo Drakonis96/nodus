@@ -2723,6 +2723,22 @@ export interface WorldQuestionFeedItem {
   updatedAt: string | null;
 }
 
+/** A question for the world chat. `focusKeys` is the author's explicit choice; with none,
+ *  the repo resolves the focus from the names the question itself uses. */
+export interface WorldChatRequest {
+  question: string;
+  focusKeys?: string[];
+  history?: DbChatTurn[];
+}
+
+export interface WorldChatResult {
+  text: string;
+  /** What it actually answered about, so the screen can show (and correct) the focus. */
+  focus: { kind: string; id: string; title: string }[];
+  /** True when the question named nothing this world contains — not an error. */
+  noMaterial: boolean;
+}
+
 /** The drafted statement of a law, quarantined in `world_rules.proposed_text`. */
 export interface WorldRuleDraftResult {
   text: string | null;
@@ -6758,6 +6774,14 @@ export interface NodusApi {
   questionsForScene(sceneId: string): Promise<SceneQuestionLoad>;
   /** Three answers, stored as options. They are not canon until one is chosen and applied. */
   proposeQuestionOptions(questionId: string): Promise<WorldQuestionOptionsResult>;
+  // ── The world chat ────────────────────────────────────────────────────────
+  // Nodus calculates and the model writes: the answer is composed from facts this app
+  // computed, and every citation is validated against the entries that really exist.
+  worldChatStream(
+    request: WorldChatRequest,
+    handlers: { onDelta: (delta: string) => void }
+  ): Promise<WorldChatResult>;
+  cancelWorldChat(): Promise<void>;
   // ── Maps of an invented world ─────────────────────────────────────────────
   // The image bytes are NEVER inlined with a map: a base map is megabytes, and listing
   // them would push every byte of every map through the bridge to draw a row of cards.

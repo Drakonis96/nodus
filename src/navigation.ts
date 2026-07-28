@@ -1,6 +1,6 @@
 import type { CorpusHealthBucketId, ResearchContextSelection } from '@shared/types';
 
-export type View = 'home' | 'search' | 'library' | 'graph' | 'argument' | 'ideas' | 'authors' | 'persons' | 'encyclopedia' | 'continuity' | 'conflicts' | 'arcs' | 'rules' | 'questions' | 'characters' | 'places' | 'factions' | 'cultures' | 'scenes' | 'timeline' | 'tree' | 'relations' | 'map' | 'archive' | 'databases' | 'dbSearch' | 'dbAnalysis' | 'dbChat' | 'studyCourses' | 'studySchedule' | 'studyCalendar' | 'studySearch' | 'studyLibrary' | 'studyRecordings' | 'studyChat' | 'studyIdeas' | 'studyGraph' | 'studyQuestions' | 'studyReview' | 'studyDeepResearch' | 'teachingGroups' | 'teachingGrades' | 'teachingExams' | 'teachingRubrics' | 'immersion' | 'gaps' | 'debate' | 'research' | 'hypothesis' | 'reading' | 'writing' | 'deepResearch' | 'projects' | 'notes' | 'toolkit' | 'settings';
+export type View = 'home' | 'search' | 'library' | 'graph' | 'argument' | 'ideas' | 'authors' | 'persons' | 'encyclopedia' | 'continuity' | 'conflicts' | 'arcs' | 'rules' | 'questions' | 'worldChat' | 'characters' | 'places' | 'factions' | 'cultures' | 'scenes' | 'timeline' | 'tree' | 'relations' | 'map' | 'archive' | 'databases' | 'dbSearch' | 'dbAnalysis' | 'dbChat' | 'studyCourses' | 'studySchedule' | 'studyCalendar' | 'studySearch' | 'studyLibrary' | 'studyRecordings' | 'studyChat' | 'studyIdeas' | 'studyGraph' | 'studyQuestions' | 'studyReview' | 'studyDeepResearch' | 'teachingGroups' | 'teachingGrades' | 'teachingExams' | 'teachingRubrics' | 'immersion' | 'gaps' | 'debate' | 'research' | 'hypothesis' | 'reading' | 'writing' | 'deepResearch' | 'projects' | 'notes' | 'toolkit' | 'settings';
 
 export type GraphPresetId = 'overview' | 'contradictions' | 'gaps' | 'reading' | 'unread' | 'authors';
 
@@ -62,6 +62,7 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'arcs', label: 'Arcos narrativos', icon: 'route', group: 'analyze' },
   { id: 'continuity', label: 'Continuidad', icon: 'check', group: 'analyze' },
   { id: 'questions', label: 'Preguntas abiertas', icon: 'help', group: 'analyze' },
+  { id: 'worldChat', label: 'Chat del mundo', icon: 'chat', group: 'analyze' },
   { id: 'scenes', label: 'Escenas', icon: 'image', group: 'create' },
   // Databases mode — shown only for the 'databases' vault type (see VAULT_TYPE_SCOPED_VIEWS).
   // The database list itself is rendered dynamically in the sidebar; these two are the

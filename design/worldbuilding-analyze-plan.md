@@ -1,9 +1,10 @@
 # Worldbuilding — el grupo «Analizar» (migración 99)
 
-> **Estado: A0–A9 implementados y verificados** (2026-07-28). `SCHEMA_VERSION = 99`,
-> 1152/1152 tests, lint 0 errores, typecheck, `npm run build` y `npm run test:e2e` en verde.
-> **Queda A10**, especificado abajo con el detalle suficiente para retomarlo sin volver a
-> diseñar nada.
+> **Estado: el grupo «Analizar» está COMPLETO — A0–A10 implementados y verificados**
+> (2026-07-28). `SCHEMA_VERSION = 99`, 1160/1160 tests, lint 0 errores, typecheck,
+> `npm run build` y `npm run test:e2e` en verde. Lo único que A10 dejó deliberadamente
+> fuera es el historial de conversaciones: habría pedido una migración que el plan no
+> contempla, y el chat vive en la sesión.
 >
 > Plan producido por un workflow de 12 agentes (5 diseños + 5 críticas «desde la mesa de un
 > novelista» + síntesis). Este documento es el resumen ejecutable; la enciclopedia (v98) va
@@ -40,6 +41,7 @@ elemento y bajo botón, en cuarentena (§A9).
 | **A4** | **La vista de Continuidad**: `src/views/ContinuityView.tsx`, silencios enlatados, excepciones aceptadas, estado vacío con recuentos reales. «Consistencia» → **«Continuidad»**. |
 | **A5** | **Conflictos**: `src/views/ConflictsView.tsx` (tablero primero), `CharacterThreadsSection`, lealtades cruzadas, `conflict` como 7.ª `WorldEntryKind`, `checkThreads` en Continuidad. |
 | **A6** | **Arcos**: `src/views/ArcsView.tsx`, carriles SVG de solo lectura, tira de densidad, tramos inertes, orden de cierre, hoja de hitos. Se retiró «Tramas». |
+| **A10** | **Chat del mundo**: `shared/worldChatContext.ts` + `electron/ai/worldChat.ts` + `WorldChatView`. Nodus calcula las cinco lecturas y el modelo redacta; las citas se validan contra las entradas reales. |
 | **A9** | **Los dos usos de IA**: `shared/worldRuleContext.ts` + `electron/ai/worldRules.ts` (redactar el enunciado de una ley) y `shared/worldQuestionContext.ts` + `electron/ai/worldQuestionOptions.ts` (proponer tres respuestas). Nada más: la IA sigue sin calcular nada. |
 | **A8** | **Preguntas abiertas**: `shared/worldQuestions.ts`, `electron/db/worldQuestionsRepo.ts`, `QuestionsView`, la captura desde cualquier campo de prosa (`questionCapture.tsx` + `anchorOf` en el shell) y la franja `SceneQuestionBand` en la escena. |
 | **A7** | **Reglas**: `shared/worldRules.ts`, `electron/db/worldRulesRepo.ts`, `RulesView`, `RulesInPlay` en la escena, `rule` como 8.ª `WorldEntryKind`, «convertir en ley», `checkRules` en Continuidad. |
@@ -186,7 +188,7 @@ contesta un JOIN.**
 
 ---
 
-## 5. A10 — Chat del mundo
+## 5. A10 — Chat del mundo — **HECHO**
 
 Se diseña **sabiendo que las otras cinco existen**, y eso cambia lo que es: **el chat no
 razona sobre el mundo — Nodus calcula y el modelo redacta**. Mismo reparto que la analítica
@@ -239,6 +241,28 @@ tratamiento que un enlace rojo.
 No escribe canon (sus sugerencias se copian a mano o se convierten en `world_questions`), no
 ve el vault entero (solo los focos y sus hechos calculados, que es además la única forma de
 que quepa en el contexto).
+
+### Lo que cambió al construirlo
+
+- **Sin foco no se calcula NADA**, y esto lo cazó el e2e: `rulesReaching` con sujeto nulo
+  devuelve todas las leyes de ámbito mundial —alcanzan a todo el mundo por definición—, así
+  que una pregunta que no nombraba nada llegaba al modelo con el código legal del mundo
+  adjunto y respondía sobre él. Un chat que no puede decir de qué habla tiene que decir eso.
+- **El día se lee en `shared/`, no en el modelo** (`readWorldDay`): todo lo que va después
+  es aritmética SOBRE ese número, y un modelo que lee «el día 4 120» como 4 se equivoca con
+  seguridad en las cinco lecturas. Acepta el separador de millares español (espacio y punto).
+- **El foco más largo suprime al que contiene**: «Kaelen Vor» en la pregunta no es una
+  mención del personaje llamado «Vor», y dejar entrar a los dos llena el foco —y la ventana
+  del modelo— con una ficha que nadie ha pedido. Dos nombres de la MISMA longitud no se
+  suprimen: dos cosas pueden llamarse igual.
+- **Se le entrega el enlace ya escrito** («Kaelen Vor → `[Kaelen Vor](nodus://…)`»), en vez
+  de esperar que componga la URL. Y aun así `validateCitations` degrada a texto plano lo
+  que no exista: se conserva la frase y se retira la promesa.
+- **Tránsito y «antes de su primera aparición» se dicen en voz alta.** Aplanar una posición
+  a un nombre de lugar convertiría «iba de camino» en «estaba en Vael», que es exactamente
+  la respuesta confiada y falsa que todo este diseño existe para evitar.
+- **Sin historial de conversaciones**: habría necesitado tabla y migración, y el plan de
+  A10 no lo pide. El chat vive en la sesión.
 
 ---
 

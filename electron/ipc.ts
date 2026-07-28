@@ -559,6 +559,7 @@ import type {
   WorldRuleInput,
   WorldQuestionInput,
   WorldQuestionOptionInput,
+  WorldChatRequest,
   SceneDayLink,
   ThreadPartySide,
   WorldBeatInput,
@@ -618,6 +619,7 @@ import {
 import { draftWorldArticle } from './ai/worldArticleDraft';
 import { draftWorldRule } from './ai/worldRules';
 import { proposeQuestionOptions } from './ai/worldQuestionOptions';
+import { streamWorldChat } from './ai/worldChat';
 import { analyzeMissingEntries } from './ai/worldMissingEntries';
 import { exportWorldBible } from './export/worldBibleExport';
 import {
@@ -1745,6 +1747,24 @@ export function registerIpc(
   // step because choosing one IS the accept step — an option is not canon until it is
   // applied, so the quarantine here is structural.
   h('questions:propose', async (_e, questionId: string) => proposeQuestionOptions(questionId));
+
+  // ── The world chat ─────────────────────────────────────────────────────────
+  h('worldChat:stream', async (e, requestId: string, request: WorldChatRequest) => {
+    const controller = new AbortController();
+    chatAborters.set(requestId, controller);
+    try {
+      return await streamWorldChat(
+        request,
+        (delta) => e.sender.send('worldChat:delta', requestId, delta),
+        controller.signal
+      );
+    } finally {
+      chatAborters.delete(requestId);
+    }
+  });
+  h('worldChat:cancel', async (_e, requestId: string) => {
+    chatAborters.get(requestId)?.abort();
+  });
 
   // The one mechanical fix: re-derive every scene's world day from the chain.
   h('scenes:recomputeDays', async () => recomputeSceneDays());

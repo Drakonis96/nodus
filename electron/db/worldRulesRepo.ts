@@ -14,7 +14,7 @@ import { getDb } from './database';
 import { entryKey, normalizeTitle, pendingKey } from '@shared/worldEncyclopedia';
 import { indexEntryLinks, promoteWorldLinks } from './worldEncyclopediaRepo';
 import { listWorldBeats } from './worldThreadsRepo';
-import { checkRules, type RuleSubject } from '@shared/worldRules';
+import { checkRules, effectiveRules, toScope, type EffectiveRule, type RuleSubject } from '@shared/worldRules';
 import type { RuleHardness, RuleStatus, WorldFinding, WorldRule, WorldRuleInput } from '@shared/types';
 
 function now(): string {
@@ -234,6 +234,25 @@ function groupsAt(personId: string, worldDay: number | null): string[] {
       return true;
     })
     .map((row) => row.group_id);
+}
+
+/**
+ * The laws that reach somebody, somewhere, on a given day — and which exception bites each.
+ *
+ * Exported for the world chat, which must never ask a model «¿le alcanzaba esta ley?». That
+ * question is arithmetic over a scope tree, a membership window and a validity range, and a
+ * model gets it confidently wrong; this returns the answer as a fact instead.
+ */
+export function rulesReaching(
+  subject: { personId: string | null; placeId: string | null },
+  worldDay: number | null
+): EffectiveRule[] {
+  const groupIds = subject.personId ? groupsAt(subject.personId, worldDay) : [];
+  return effectiveRules(
+    listWorldRules().map(toScope),
+    { personId: subject.personId, groupIds, placePath: placePath(subject.placeId) },
+    worldDay
+  );
 }
 
 export function ruleFindings(): WorldFinding[] {

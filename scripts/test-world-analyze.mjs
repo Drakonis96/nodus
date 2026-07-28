@@ -1585,3 +1585,129 @@ test('the parser never returns more than three, and never invents one', () => {
   assert.deepEqual(questionContext.parseQuestionOptions('Aquí no hay ninguna opción.'), []);
   assert.deepEqual(questionContext.parseQuestionOptions('OPCIÓN:   '), []);
 });
+
+// ── The world chat ───────────────────────────────────────────────────────────
+//
+// The chat does not reason about the world: Nodus calculates and the model writes. So what
+// is worth testing here is the boundary — what the model is handed, and what is read back
+// out of it — and above all the citation validator, because a link that opens nothing turns
+// the whole answer into something the reader has to check by hand.
+
+const chat = load('shared/worldChatContext.ts');
+
+function chatFacts(over = {}) {
+  return {
+    question: '¿Podía Kaelen invocar la Marca?',
+    focus: [{ kind: 'character', id: 'prs_7', title: 'Kaelen Vor' }],
+    prose: [],
+    computed: {},
+    citable: [{ kind: 'character', id: 'prs_7', title: 'Kaelen Vor' }],
+    worldDay: null,
+    ...over,
+  };
+}
+
+test('the day the question names is read here, not left to the model', () => {
+  // Everything downstream is arithmetic ON that number — which laws were in force, who
+  // belonged to what, who knew — and a model that reads «el día 4 120» as 4 is
+  // confidently wrong about all of it.
+  assert.equal(chat.readWorldDay('¿Podía invocarla el día 4 120?'), 4120);
+  assert.equal(chat.readWorldDay('¿y el día 412?'), 412);
+  assert.equal(chat.readWorldDay('el día 1.204 de la Tercera Era'), 1204);
+  assert.equal(chat.readWorldDay('¿Podía invocarla?'), null);
+  assert.equal(chat.readWorldDay('el día del juicio'), null);
+});
+
+test('the focus is the longest name that really appears, folded', () => {
+  const entries = [
+    { key: 'character:prs_7', names: ['Kaelen Vor', 'El Cuervo'] },
+    { key: 'character:prs_8', names: ['Vor'] },
+    { key: 'place:plc_1', names: ['Vaël'] },
+    { key: 'group:grp_1', names: ['Los Cuervos'] },
+  ];
+  // «Vaël» in the world matches «Vael» in the question, and «Kaelen Vor» beats the
+  // character called «Vor» rather than both arriving.
+  assert.deepEqual(chat.matchFocus('¿Estaba Kaelen Vor en Vael?', entries), ['character:prs_7', 'place:plc_1']);
+  // A name inside a longer word is not a mention.
+  assert.deepEqual(chat.matchFocus('¿Es una costumbre vaelense?', entries), []);
+  assert.deepEqual(chat.matchFocus('¿Y los Cuervos?', entries), ['group:grp_1']);
+  assert.deepEqual(chat.matchFocus('¿Qué pasa aquí?', entries), []);
+});
+
+test('a question that names nothing of the world is not answered from nothing', () => {
+  assert.equal(chat.hasWorldChatMaterial(chatFacts()), false);
+  assert.equal(
+    chat.hasWorldChatMaterial(chatFacts({ prose: [{ ref: { kind: 'character', id: 'prs_7', title: 'K' }, field: 'Trasfondo', text: 'Algo' }] })),
+    true
+  );
+  assert.equal(
+    chat.hasWorldChatMaterial(chatFacts({ computed: { findings: [{ headline: 'Choca', severity: 'contradiction', subjects: ['K'] }] } })),
+    true
+  );
+  assert.equal(chat.hasWorldChatMaterial(chatFacts({ computed: { findings: [] } })), false);
+});
+
+test('the computed facts arrive marked as facts, and the prompt says they are not up for discussion', () => {
+  const composed = chat.composeWorldChatContext(
+    chatFacts({
+      worldDay: 4120,
+      computed: {
+        effectiveRules: [
+          { rule: 'La sangre paga la sangre', ruleId: 'rul_7', scope: 'Todo el mundo', overriddenBy: ['Salvo los Cuervos'] },
+        ],
+        presenceAt: [{ personName: 'Kaelen Vor', placeName: 'Vael', worldDay: 4120 }],
+        memberships: [{ personName: 'Kaelen Vor', groupName: 'Los Cuervos', fromWorldDay: 4000, toWorldDay: null }],
+        knowersAt: [{ secretTitle: 'La marca', people: ['Kaelen Vor'], worldDay: 4120 }],
+      },
+    })
+  );
+  assert.match(composed, /CALCULADO POR NODUS \(hechos; no los discutas ni los recalcules\)/);
+  assert.match(composed, /La sangre paga la sangre \(rige sobre Todo el mundo\) — pero la muerde: Salvo los Cuervos/);
+  assert.match(composed, /Kaelen Vor — Los Cuervos \(desde el día 4000\)/);
+  assert.match(composed, /DÍA DEL MUNDO: 4120/);
+  assert.match(chat.WORLD_CHAT_SYSTEM, /no los discutas, no los recalcules/);
+  assert.match(chat.WORLD_CHAT_SYSTEM, /Si el material no contiene la respuesta/);
+});
+
+test('with no day, the context says so instead of implying one', () => {
+  assert.match(chat.composeWorldChatContext(chatFacts()), /DÍA DEL MUNDO: sin concretar/);
+});
+
+test('the exact link to copy is handed over, one per citable thing', () => {
+  const composed = chat.composeWorldChatContext(
+    chatFacts({
+      citable: [
+        { kind: 'character', id: 'prs_7', title: 'Kaelen Vor' },
+        { kind: 'rule', id: 'rul_7', title: 'La sangre paga la sangre' },
+      ],
+    })
+  );
+  assert.match(composed, /- Kaelen Vor → \[Kaelen Vor\]\(nodus:\/\/world\/character\/prs_7\)/);
+  assert.match(composed, /- La sangre paga la sangre → \[La sangre paga la sangre\]\(nodus:\/\/world\/rule\/rul_7\)/);
+});
+
+test('a citation the model invented degrades to plain text, keeping the sentence', () => {
+  // The label survives because the sentence is usually right even when the id is not; only
+  // the promise that clicking it opens something is withdrawn.
+  const allowed = new Set(['character:prs_7']);
+  const validated = chat.validateCitations(
+    'Sí, [Kaelen Vor](nodus://world/character/prs_7) podía, pero [la Marca](nodus://world/rule/rul_99) no existe.',
+    allowed
+  );
+  assert.equal(validated, 'Sí, [Kaelen Vor](nodus://world/character/prs_7) podía, pero la Marca no existe.');
+  // An id that arrives percent-encoded is the same id.
+  assert.equal(
+    chat.validateCitations('[X](nodus://world/place/plc%201)', new Set(['place:plc 1'])),
+    '[X](nodus://world/place/plc%201)'
+  );
+  // Ordinary Markdown links are none of its business.
+  assert.equal(chat.validateCitations('[docs](https://example.com)', allowed), '[docs](https://example.com)');
+});
+
+test('a finding reaches the prompt as its Spanish sentence, variables and all', () => {
+  assert.equal(
+    chat.plainFindingText({ key: '«{rule}» se rompe {count} veces', vars: { rule: 'La sangre', count: '3' } }),
+    '«La sangre» se rompe 3 veces'
+  );
+  assert.equal(chat.plainFindingText({ key: 'Sin variables' }), 'Sin variables');
+});

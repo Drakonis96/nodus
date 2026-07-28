@@ -3149,7 +3149,24 @@ try {
 
   console.log('[e2e] worldbuilding rules: created, put to the test from the scene, unpaid price reaches Continuidad');
 
+  {
+    // The world chat. Nodus calculates and the model writes, so the half that can be proved
+    // without a provider is the half that matters most: it refuses to answer about a world
+    // it cannot anchor, instead of composing a plausible one.
+    await openSection('Chat del mundo', 'world-chat-view');
+    await page.getByTestId('world-chat-input').fill('¿Y ahora qué hago?');
+    await page.keyboard.press('Enter');
+    const refusal = page.getByTestId('world-chat-answer').first();
+    await refusal.waitFor({ timeout: 30_000 });
+    assert.match(
+      await refusal.innerText(),
+      /No he encontrado nada de tu mundo/,
+      'a question that names nothing is refused before a provider is ever needed'
+    );
+  }
+
   console.log('[e2e] worldbuilding open questions: a hole becomes a decision, answering rewrites the sheet, undo restores it');
+  console.log('[e2e] worldbuilding world chat: refuses to answer about a world it cannot anchor');
 
   console.log('[e2e] worldbuilding arcs: lanes drawn from the scene strip, sheet, milestone sheet');
 

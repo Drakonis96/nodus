@@ -106,17 +106,17 @@ test('the worldbuilding sidebar keeps its full announced shape, with only the bu
   for (const label of ['Enciclopedia', 'Personajes', 'Lugares', 'Facciones', 'Culturas', 'Cronología', 'Chat del mundo', 'Reglas del mundo', 'Conflictos', 'Arcos narrativos', 'Continuidad', 'Preguntas abiertas', 'Notas', 'Escenas', 'Manuscritos']) {
     assert.match(sidebar, new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `${label} appears in the worldbuilding sidebar`);
   }
-  // Sixteen sections are wired up; the rest must stay inert. Enciclopedia, Personajes and
+  // Seventeen sections are wired up; the rest must stay inert. Enciclopedia, Personajes and
   // Lugares are this vault's own views; Cronología, Mapa, Relaciones and Dinastías are the
   // records views reused over the shared ontology; Notas is universal.
   assert.match(sidebar, /disabled\s+aria-disabled="true"/);
   assert.deepEqual(
     [...sidebar.matchAll(/\bview: '(\w+)'/g)].map((m) => m[1]).sort(),
-    ['arcs', 'characters', 'conflicts', 'continuity', 'cultures', 'encyclopedia', 'factions', 'map', 'notes', 'places', 'questions', 'relations', 'rules', 'scenes', 'timeline', 'tree']
+    ['arcs', 'characters', 'conflicts', 'continuity', 'cultures', 'encyclopedia', 'factions', 'map', 'notes', 'places', 'questions', 'relations', 'rules', 'scenes', 'timeline', 'tree', 'worldChat']
   );
   // Every wired view must actually be allowed for the vault type, or the sidebar offers a
   // button that navigates to a section the scoping then refuses to render.
-  for (const view of ['arcs', 'characters', 'conflicts', 'continuity', 'cultures', 'encyclopedia', 'factions', 'map', 'notes', 'places', 'questions', 'relations', 'rules', 'scenes', 'timeline', 'tree']) {
+  for (const view of ['arcs', 'characters', 'conflicts', 'continuity', 'cultures', 'encyclopedia', 'factions', 'map', 'notes', 'places', 'questions', 'relations', 'rules', 'scenes', 'timeline', 'tree', 'worldChat']) {
     assert.equal(
       vt.isViewAllowedForVaultType(view, 'worldbuilding'),
       true,
