@@ -32,7 +32,7 @@ interface ImageRow {
   updated_at: string;
 }
 
-const IMAGE_KINDS = new Set<CharacterImageKind>(['portrait', 'full_body', 'expression', 'age', 'outfit', 'other']);
+const IMAGE_KINDS = new Set<CharacterImageKind>(['portrait', 'full_body', 'expression', 'age', 'outfit', 'emblem', 'other']);
 
 export function imageKind(value: string | null | undefined): CharacterImageKind {
   return value && IMAGE_KINDS.has(value as CharacterImageKind) ? (value as CharacterImageKind) : 'other';

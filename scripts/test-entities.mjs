@@ -165,7 +165,9 @@ try {
   assert.equal(repo.getPerson(juan.personId).portrait, null, 'no portrait initially');
   repo.setPersonPortrait(juan.personId, Buffer.from('JPEGDATA'), 'image/jpeg', { focusX: 0.4, focusY: 0.3, scale: 1.5 });
   const withPortrait = repo.getPerson(juan.personId);
-  assert.deepEqual(withPortrait.portrait, { focusX: 0.4, focusY: 0.3, scale: 1.5, generated: false }, 'focus surfaced without the blob');
+  const { updatedAt: portraitUpdatedAt, ...portraitMetadata } = withPortrait.portrait;
+  assert.match(portraitUpdatedAt, /^\d{4}-\d{2}-\d{2}T/, 'portrait exposes its cache revision');
+  assert.deepEqual(portraitMetadata, { focusX: 0.4, focusY: 0.3, scale: 1.5, generated: false }, 'focus surfaced without the blob');
   assert.equal(repo.getPersonPortrait(juan.personId).blob.toString(), 'JPEGDATA', 'blob fetched on demand');
   repo.updatePortraitFocus(juan.personId, { focusX: 0.6, focusY: 0.6, scale: 2 });
   assert.equal(repo.getPerson(juan.personId).portrait.scale, 2, 'focus updated');

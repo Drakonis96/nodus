@@ -138,6 +138,7 @@ export const CHARACTER_IMAGE_KINDS: CharacterImageKind[] = [
   'expression',
   'age',
   'outfit',
+  'emblem',
   'other',
 ];
 
@@ -147,6 +148,7 @@ export const CHARACTER_IMAGE_KIND_LABEL: Record<CharacterImageKind, string> = {
   expression: 'Expresión',
   age: 'A otra edad',
   outfit: 'Atuendo',
+  emblem: 'Emblema o blasón',
   other: 'Otra',
 };
 
@@ -201,10 +203,11 @@ export const WORLD_GROUP_KIND_LABEL: Record<string, string> = {
   language: 'Lengua',
 };
 
-/** Which kinds each section offers when creating. Factions and cultures are the two
- *  sections that ship; the rest are available as kinds inside them. */
-export const FACTION_KINDS = ['faction', 'house', 'order', 'religion'];
+/** Which kinds each section offers when creating. Houses are deliberately separate:
+ *  a dynasty is a lineage institution, not just another political faction. */
+export const FACTION_KINDS = ['faction', 'order', 'religion'];
 export const CULTURE_KINDS = ['culture', 'species', 'language'];
+export const DYNASTY_KINDS = ['house'];
 
 export const WORLD_GROUP_STATUS_LABEL: Record<string, string> = {
   active: 'Activa',

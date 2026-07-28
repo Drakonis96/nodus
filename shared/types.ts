@@ -2100,7 +2100,7 @@ export interface CharacterVoice {
   sample: string | null;
 }
 
-export type CharacterImageKind = 'portrait' | 'full_body' | 'expression' | 'age' | 'outfit' | 'other';
+export type CharacterImageKind = 'portrait' | 'full_body' | 'expression' | 'age' | 'outfit' | 'emblem' | 'other';
 
 /** What a `world_images` row hangs off. Polymorphic, so nothing cascades from it.
  *  The column carries no CHECK constraint, so a value outside this union writes happily

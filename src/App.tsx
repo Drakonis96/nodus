@@ -79,6 +79,7 @@ const WorldbuildingHome = lazy(() => import('./views/WorldbuildingHome').then((m
 const ScenesView = lazy(() => import('./views/ScenesView').then((module) => ({ default: module.ScenesView })));
 const FactionsView = lazy(() => import('./views/GroupsView').then((module) => ({ default: module.FactionsView })));
 const CulturesView = lazy(() => import('./views/GroupsView').then((module) => ({ default: module.CulturesView })));
+const DynastiesView = lazy(() => import('./views/GroupsView').then((module) => ({ default: module.DynastiesView })));
 const PlacesView = lazy(() => import('./views/PlacesView').then((module) => ({ default: module.PlacesView })));
 const CharactersView = lazy(() => import('./views/CharactersView').then((module) => ({ default: module.CharactersView })));
 const TeachingGroupsView = lazy(() => import('./views/TeachingGroupsView').then((module) => ({ default: module.TeachingGroupsView })));
@@ -1493,6 +1494,7 @@ export function App() {
           {view === 'places' && <PlacesView />}
           {view === 'factions' && <FactionsView />}
           {view === 'cultures' && <CulturesView />}
+          {view === 'dynasties' && <DynastiesView />}
           {view === 'scenes' && <ScenesView onNavigate={setView} />}
           {view === 'timeline' && <TimelineView worldbuilding={isWorldbuilding} />}
           {view === 'tree' && <TreeView settings={settings} onSettingsChange={reloadSettings} />}

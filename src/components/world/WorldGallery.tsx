@@ -26,6 +26,10 @@ export function WorldGallery({
   appearance,
   onAvatar,
   onImagesChange,
+  title = 'Galería',
+  kinds = CHARACTER_IMAGE_KINDS,
+  defaultKind,
+  generateLabel = 'Generar imagen',
 }: {
   entityKind: WorldImageEntityKind;
   entityId: string;
@@ -35,11 +39,20 @@ export function WorldGallery({
   onAvatar?: (imageId: string) => Promise<void>;
   /** Lets a sheet reuse the first ordered image as its cover without loading blobs twice. */
   onImagesChange?: (images: CharacterImage[]) => void;
+  /** A dynasty calls this "Blasón y galería"; other entities keep the generic label. */
+  title?: string;
+  /** Restrict the vocabulary when character-specific framings make no sense. */
+  kinds?: CharacterImageKind[];
+  defaultKind?: CharacterImageKind;
+  /** Lets specialised entities make the primary action explicit. */
+  generateLabel?: string;
 }) {
   const [images, setImages] = useState<CharacterImage[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [kind, setKind] = useState<CharacterImageKind>(entityKind === 'place' ? 'other' : 'portrait');
+  const [kind, setKind] = useState<CharacterImageKind>(
+    defaultKind ?? (entityKind === 'character' ? 'portrait' : entityKind === 'group' ? 'emblem' : 'other')
+  );
   const [style, setStyle] = useState<DecorativeImageStyle>('contemporary_editorial');
   const [viewingId, setViewingId] = useState<string | null>(null);
 
@@ -82,7 +95,7 @@ export function WorldGallery({
     <section className={PERSON_DOSSIER_SECTION_CLASS} data-testid={`${entityKind}-gallery`}>
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
-          {t('Galería')} <span className="text-neutral-600">({images.length})</span>
+          {t(title)} <span className="text-neutral-600">({images.length})</span>
         </h3>
         <div className="ml-auto flex flex-wrap items-center gap-1.5">
           <select
@@ -92,7 +105,7 @@ export function WorldGallery({
             disabled={busy}
             onChange={(event) => setKind(event.target.value as CharacterImageKind)}
           >
-            {CHARACTER_IMAGE_KINDS.map((entry) => (
+            {kinds.map((entry) => (
               <option key={entry} value={entry}>
                 {t(CHARACTER_IMAGE_KIND_LABEL[entry])}
               </option>
@@ -124,7 +137,7 @@ export function WorldGallery({
             title={canGenerate ? undefined : t('Escribe primero la apariencia en la sección Descripción.')}
             onClick={() => void act(() => window.nodus.generateWorldImage(entityKind, entityId, kind, style))}
           >
-            <Icon name="wand" size={12} /> {busy ? t('Generando…') : t('Generar imagen')}
+            <Icon name="wand" size={12} /> {busy ? t('Generando…') : t(generateLabel)}
           </button>
         </div>
       </div>

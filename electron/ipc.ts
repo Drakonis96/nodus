@@ -367,7 +367,7 @@ import { seedGenealogyDemoData } from './db/genealogyDemoData';
 import { seedDatabasesDemoData } from './db/databasesDemoData';
 import { seedStudyDemoData } from './db/studyDemoData';
 import { seedTeachingDemoData } from './db/teachingDemoData';
-import { seedWorldbuildingDemoData } from './db/worldbuildingDemoData';
+import { seedWorldbuildingDemoData, upgradeWorldbuildingDemoDynasties } from './db/worldbuildingDemoData';
 import { generateDemoPortraits, hasDemoPortraitKey } from './ai/genealogyDemoPortraits';
 import { exportNotes } from './export/notesExport';
 import { reorderNotesByAI } from './ai/notesOrder';
@@ -1110,6 +1110,7 @@ export function registerIpc(
     closeDb();
     setActiveVault(id);
     getDb();
+    upgradeWorldbuildingDemoDynasties();
     reconcileAuthorLayerOnce();
 
     const settings = getSettings();

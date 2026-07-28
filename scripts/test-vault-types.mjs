@@ -103,11 +103,11 @@ test('the worldbuilding sidebar keeps its full announced shape, with only the bu
     readFile(path.join(repoRoot, 'src/i18n.en.ts'), 'utf8'),
   ]);
   // The whole promised structure stays visible while it is built one section at a time.
-  for (const label of ['Enciclopedia', 'Personajes', 'Lugares', 'Facciones', 'Culturas', 'Cronología', 'Chat del mundo', 'Reglas del mundo', 'Conflictos', 'Arcos narrativos', 'Continuidad', 'Preguntas abiertas', 'Notas', 'Escenas', 'Manuscrito']) {
+  for (const label of ['Enciclopedia', 'Personajes', 'Lugares', 'Facciones', 'Culturas', 'Cronología', 'Familias', 'Dinastías', 'Chat del mundo', 'Reglas del mundo', 'Conflictos', 'Arcos narrativos', 'Continuidad', 'Preguntas abiertas', 'Notas', 'Escenas', 'Manuscrito']) {
     assert.match(sidebar, new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `${label} appears in the worldbuilding sidebar`);
   }
   // Every announced section is now wired up: nothing in this sidebar is inert. Enciclopedia, Personajes and
-  // Lugares are this vault's own views; Cronología, Mapa, Relaciones and Dinastías are the
+  // Lugares are this vault's own views; Cronología, Mapa, Relaciones and Familias are the
   // records views reused over the shared ontology; Notas is universal.
   // Every announced item now navigates. The inert branch stays in the component because it
   // is how the NEXT announced section gets shown before it is built (the teaching sidebar
@@ -120,11 +120,11 @@ test('the worldbuilding sidebar keeps its full announced shape, with only the bu
   );
   assert.deepEqual(
     [...sidebar.matchAll(/\bview: '(\w+)'/g)].map((m) => m[1]).sort(),
-    ['arcs', 'characters', 'conflicts', 'continuity', 'cultures', 'encyclopedia', 'factions', 'manuscript', 'map', 'notes', 'places', 'questions', 'relations', 'rules', 'scenes', 'timeline', 'tree', 'worldChat']
+    ['arcs', 'characters', 'conflicts', 'continuity', 'cultures', 'dynasties', 'encyclopedia', 'factions', 'manuscript', 'map', 'notes', 'places', 'questions', 'relations', 'rules', 'scenes', 'timeline', 'tree', 'worldChat']
   );
   // Every wired view must actually be allowed for the vault type, or the sidebar offers a
   // button that navigates to a section the scoping then refuses to render.
-  for (const view of ['arcs', 'characters', 'conflicts', 'continuity', 'cultures', 'encyclopedia', 'factions', 'manuscript', 'map', 'notes', 'places', 'questions', 'relations', 'rules', 'scenes', 'timeline', 'tree', 'worldChat']) {
+  for (const view of ['arcs', 'characters', 'conflicts', 'continuity', 'cultures', 'dynasties', 'encyclopedia', 'factions', 'manuscript', 'map', 'notes', 'places', 'questions', 'relations', 'rules', 'scenes', 'timeline', 'tree', 'worldChat']) {
     assert.equal(
       vt.isViewAllowedForVaultType(view, 'worldbuilding'),
       true,
@@ -167,6 +167,7 @@ test('the characters section belongs to worldbuilding alone', () => {
   // each still needs its own scoped view id.
   assert.deepEqual(vt.VAULT_TYPE_SCOPED_VIEWS.factions, ['worldbuilding']);
   assert.deepEqual(vt.VAULT_TYPE_SCOPED_VIEWS.cultures, ['worldbuilding']);
+  assert.deepEqual(vt.VAULT_TYPE_SCOPED_VIEWS.dynasties, ['worldbuilding']);
   assert.deepEqual(vt.VAULT_TYPE_SCOPED_VIEWS.scenes, ['worldbuilding']);
   // Genealogy keeps its own Personas and its own Mapa; the fiction places view must not
   // appear there, and vice versa.

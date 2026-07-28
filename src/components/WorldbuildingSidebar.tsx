@@ -2,7 +2,7 @@ import { Icon } from './ui';
 import { t } from '../i18n';
 
 /** Views the worldbuilding vault has already wired up. */
-export type WorldbuildingView = 'encyclopedia' | 'continuity' | 'conflicts' | 'arcs' | 'rules' | 'questions' | 'worldChat' | 'manuscript' | 'characters' | 'places' | 'factions' | 'cultures' | 'scenes' | 'timeline' | 'tree' | 'map' | 'relations' | 'notes';
+export type WorldbuildingView = 'encyclopedia' | 'continuity' | 'conflicts' | 'arcs' | 'rules' | 'questions' | 'worldChat' | 'manuscript' | 'characters' | 'places' | 'factions' | 'cultures' | 'dynasties' | 'scenes' | 'timeline' | 'tree' | 'map' | 'relations' | 'notes';
 
 interface WorldbuildingItem { label: string; icon: string; view?: WorldbuildingView }
 interface WorldbuildingGroup { label: string; items: WorldbuildingItem[] }
@@ -12,7 +12,7 @@ interface WorldbuildingGroup { label: string; items: WorldbuildingItem[] }
  * sections this vault has been announced with and are rendered disabled, so the shape
  * of the finished product stays visible while it is being built one section at a time.
  *
- * Cronología, Mapa, Relaciones and Dinastías are the records views reused as they are:
+ * Cronología, Mapa, Relaciones and Familias are the records views reused as they are:
  * they work on `persons`, `events` and `relationships`, which this vault fills with
  * characters. Only the timeline needed adapting — it orders by the in-world year, since
  * an invented calendar leaves the Earth sort key empty.
@@ -32,7 +32,8 @@ export const WORLDBUILDING_GROUPS: WorldbuildingGroup[] = [
     { label: 'Cronología', icon: 'clock', view: 'timeline' },
     { label: 'Mapa', icon: 'map', view: 'map' },
     { label: 'Relaciones', icon: 'network', view: 'relations' },
-    { label: 'Dinastías', icon: 'tree', view: 'tree' },
+    { label: 'Familias', icon: 'tree', view: 'tree' },
+    { label: 'Dinastías', icon: 'shield', view: 'dynasties' },
   ] },
   { label: 'Analizar', items: [
     { label: 'Chat del mundo', icon: 'chat', view: 'worldChat' },

@@ -14,7 +14,7 @@
  */
 
 import { imageStyleTemplate } from './imageStyles';
-import type { CharacterImageKind, DecorativeImageStyle } from './types';
+import type { CharacterImageKind, DecorativeImageStyle, WorldImageEntityKind } from './types';
 
 export interface CharacterImageSources {
   /** The canonical appearance prompt; the anchor of consistency. */
@@ -46,6 +46,7 @@ const FRAMING: Record<CharacterImageKind, string> = {
   expression: 'a single character, tight head-and-shoulders close-up centred on the face, plain backdrop',
   age: 'a single character shown at a different age, portrait framing from the chest up, plain backdrop',
   outfit: 'a single character, three-quarter view showing the full outfit in detail, plain backdrop',
+  emblem: 'a single centred heraldic emblem or coat of arms, strong readable silhouette, symmetrical composition, plain textured backdrop',
   other: 'a single character, plain uncluttered backdrop',
 };
 
@@ -61,6 +62,37 @@ export function buildCharacterPortraitPrompt(
     clean(sources.extra, 200),
     FRAMING[kind] ?? FRAMING.other,
     'no text, no words, no letters, no numbers, no caption, no signature, no watermark, no border',
+  ]
+    .filter(Boolean)
+    .join('. ')
+    .slice(0, 900);
+}
+
+/** The same visual-seed contract for places, groups, scenes and articles, without
+ * accidentally asking the model to draw "a single character" for an organisation. */
+export function buildWorldEntityImagePrompt(
+  style: DecorativeImageStyle,
+  sources: CharacterImageSources,
+  entityKind: Exclude<WorldImageEntityKind, 'character'>,
+  kind: CharacterImageKind = 'other'
+): string {
+  const subject =
+    entityKind === 'group' && kind === 'emblem'
+      ? FRAMING.emblem
+      : entityKind === 'group'
+        ? 'one coherent visual identity image for this organisation or people, centred composition'
+        : entityKind === 'place'
+          ? 'one establishing view of this fictional place, no people unless essential for scale'
+          : entityKind === 'scene'
+            ? 'one cinematic narrative moment from this fictional scene'
+            : 'one symbolic illustration of this fictional encyclopaedia subject';
+  return [
+    imageStyleTemplate(style).prompt,
+    clean(sources.visualSeed, 300),
+    clean(sources.appearance, 320),
+    clean(sources.extra, 200),
+    subject,
+    'no text, no words, no letters, no numbers, no caption, no signature, no watermark',
   ]
     .filter(Boolean)
     .join('. ')

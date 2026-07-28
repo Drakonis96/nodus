@@ -4,7 +4,7 @@
 // developed Worldbuilding surface reads from it: the encyclopedia resolves its links into
 // the cast, places and rules; scenes drive the manuscript, conflicts, arcs and continuity;
 // the calendar dates the timeline; map markers locate the same places; and the family and
-// social graphs reuse the same characters. No AI output is seeded or required.
+// social graphs reuse the same characters. No runtime AI call is required.
 //
 // Every owned id starts with `demo-world-`. Cleanup can therefore remove the corpus
 // surgically without touching anything the user creates while exploring it.
@@ -241,6 +241,8 @@ const GROUPS = [
   { id: `${PREFIX}group-vellum`, kind: 'faction', name: 'Archivo de Bajamar', status: 'active', parent: null, seat: `${PREFIX}place-archivo`, founded: 612, ended: null, accent: 'emerald', symbol: '▤', summary: text('Red de archiveros que rescata memoria del agua.', 'A network of archivists rescuing memory from the water.'), description: text('Sus llaves abren depósitos, máquinas y recuerdos atrapados en vidrio. Protege a [[Sena Mir]].', 'Its keys open stacks, machines and memories trapped in glass. It protects [[Sena Mir]].') },
   { id: `${PREFIX}group-sails`, kind: 'faction', name: 'Gremio de las Seis Velas', status: 'active', parent: null, seat: `${PREFIX}place-lumina`, founded: 655, ended: null, accent: 'sky', symbol: '⛵', summary: text('Liga de capitanes que monopoliza las rutas del Mar de Vidrio.', 'Captains’ league monopolising routes across the Glass Sea.'), description: text('Cada vela representa un rumbo seguro. La séptima ruta, borrada de sus cartas, lleva a la Ciudad Sepultada.', 'Each sail represents a safe bearing. The seventh route, erased from its charts, leads to the Buried City.') },
   { id: `${PREFIX}group-venn`, kind: 'house', name: 'Casa Venn', status: 'dormant', parent: null, seat: `${PREFIX}place-faro`, founded: 203, ended: 733, accent: 'amber', symbol: '✦', summary: text('Dinastía de fareros desplazada por la regencia.', 'A lighthouse dynasty displaced by the regency.'), description: text('Su legitimidad procede del pacto con el Faro y de mapas heredados que nadie más sabe leer.', 'Its legitimacy comes from the pact with the Lighthouse and inherited maps nobody else can read.') },
+  { id: `${PREFIX}group-sarn`, kind: 'house', name: 'Casa Sarn', status: 'active', parent: null, seat: `${PREFIX}place-lumina`, founded: 641, ended: null, accent: 'crimson', symbol: '◐', summary: text('Dinastía regente nacida de la administración de la catástrofe.', 'A regent dynasty born from the administration of catastrophe.'), description: text('Afirma que la continuidad del Estado legitima su corona provisional. Su blasón reúne el sol eclipsado, la puerta de hierro y seis brasas de luto.', 'It claims continuity of state legitimises its provisional crown. Its arms combine an eclipsed sun, the iron gate and six embers of mourning.') },
+  { id: `${PREFIX}group-mir`, kind: 'house', name: 'Casa Mir', status: 'active', parent: null, seat: `${PREFIX}place-archivo`, founded: 587, ended: null, accent: 'emerald', symbol: '⚿', summary: text('Linaje de archiveros y guardianes de llaves del Barrio Hundido.', 'A lineage of archivists and key-keepers from the Sunken Quarter.'), description: text('Nunca ostentó corona, pero custodia los registros capaces de reconocerla. Su blasón muestra una llave sobre un libro abierto y tres mareas oscuras.', 'It never wore a crown, but keeps the records able to recognise one. Its arms show a key over an open book and three dark tides.') },
   { id: `${PREFIX}group-tideborn`, kind: 'culture', name: 'Pueblos de la Marea', status: 'active', parent: null, seat: `${PREFIX}place-nacre`, founded: null, ended: null, accent: 'cyan', symbol: '≈', summary: text('Culturas costeras que cuentan el tiempo por mareas y nombres.', 'Coastal cultures that count time in tides and names.'), description: text('Comparten memoria oral, hospitalidad ritual y rechazo a las fronteras fijas sobre el mar.', 'They share oral memory, ritual hospitality and a rejection of fixed borders at sea.') },
   { id: `${PREFIX}group-veyari`, kind: 'species', name: 'Veyari', status: 'active', parent: `${PREFIX}group-tideborn`, seat: `${PREFIX}place-nacre`, founded: null, ended: null, accent: 'sky', symbol: '◈', summary: text('Pueblo anfibio adaptado a las corrientes de vidrio.', 'An amphibious people adapted to glass currents.'), description: text('Sus membranas perciben vibraciones y sus genealogías se cantan, no se escriben.', 'Their membranes sense vibration and their genealogies are sung rather than written.') },
   { id: `${PREFIX}group-tidecant`, kind: 'language', name: 'Habla de Marea', status: 'active', parent: `${PREFIX}group-tideborn`, seat: null, founded: null, ended: null, accent: 'violet', symbol: '≋', summary: text('Lengua tonal cuyo sentido cambia con el ritmo de respiración.', 'A tonal language whose meaning changes with breathing rhythm.'), description: text('Puede pronunciarse bajo el agua y conserva tiempos verbales para recuerdos heredados.', 'It can be spoken underwater and preserves verb tenses for inherited memories.') },
@@ -305,7 +307,9 @@ const LORE_ASSET_BY_ID: Record<string, string> = {
   [`${PREFIX}group-tideborn`]: 'lore-tide-culture.webp',
   [`${PREFIX}group-tidecant`]: 'lore-tide-culture.webp',
   [`${PREFIX}group-vellum`]: 'lore-archive.webp',
-  [`${PREFIX}group-venn`]: 'lore-lighthouse.webp',
+  [`${PREFIX}group-venn`]: 'dynasty-venn.webp',
+  [`${PREFIX}group-sarn`]: 'dynasty-sarn.webp',
+  [`${PREFIX}group-mir`]: 'dynasty-mir.webp',
   [`${PREFIX}group-veyari`]: 'lore-tide-culture.webp',
   [`${PREFIX}scene-prologue`]: 'lore-lighthouse.webp',
   [`${PREFIX}scene-arrival`]: 'lore-letter.webp',
@@ -342,11 +346,12 @@ function demoImageAsset(entityKind: string, entityId: string): string {
 
 function demoImage(entityKind: string, entityId: string, title: string, order = 0): void {
   const bytes = demoAsset(demoImageAsset(entityKind, entityId));
+  const group = entityKind === 'group' ? GROUPS.find((entry) => entry.id === entityId) : null;
   insert('world_images', {
     image_id: `${PREFIX}image-${entityKind}-${entityId.slice(PREFIX.length)}-${order}`,
     entity_kind: entityKind,
     entity_id: entityId,
-    kind: order === 0 ? 'portrait' : 'other',
+    kind: group?.kind === 'house' ? 'emblem' : order === 0 ? 'portrait' : 'other',
     label: title,
     mime_type: 'image/webp',
     bytes: bytes.length,
@@ -370,6 +375,86 @@ function hasWorldbuildingData(): boolean {
     'persons', 'places', 'world_groups', 'world_scenes', 'world_maps', 'world_articles',
     'world_rules', 'world_threads', 'world_questions', 'world_secrets', 'world_calendar', 'notes',
   ].some((table) => count(table) > 0);
+}
+
+/**
+ * Add newly shipped demo-only material without asking authors to erase and reseed a demo
+ * they may already have annotated. A normal world is ignored: the Venn demo id is the
+ * opt-in marker, and every insert remains namespaced under `demo-world-`.
+ */
+export function upgradeWorldbuildingDemoDynasties(): boolean {
+  if (getActiveVault().type !== 'worldbuilding') return false;
+  const db = getDb();
+  const hasDemo = db.prepare('SELECT 1 FROM world_groups WHERE group_id = ?').get(`${PREFIX}group-venn`);
+  if (!hasDemo) return false;
+  const L = locale();
+  const houses = GROUPS.filter((group) => group.kind === 'house');
+  const affiliations = [
+    [`${PREFIX}aff-aurel-venn`, `${PREFIX}char-aurel`, `${PREFIX}group-venn`, L === 'es' ? 'maestro del Faro' : 'Lighthouse master', null, 131950],
+    [`${PREFIX}aff-maelor-sarn`, `${PREFIX}char-maelor`, `${PREFIX}group-sarn`, L === 'es' ? 'cabeza de casa' : 'head of house', null, null],
+    [`${PREFIX}aff-tarek-sarn`, `${PREFIX}char-tarek`, `${PREFIX}group-sarn`, L === 'es' ? 'heredero adoptivo' : 'adoptive heir', null, null],
+    [`${PREFIX}aff-sena-mir`, `${PREFIX}char-sena`, `${PREFIX}group-mir`, L === 'es' ? 'última llave' : 'last key', null, null],
+  ] as const;
+
+  db.transaction(() => {
+    for (const group of houses) {
+      db.prepare(
+        `INSERT OR IGNORE INTO world_groups
+          (group_id, kind, name, summary, description, visual_seed, accent, status, parent_id,
+           seat_place_id, founded_year, ended_year, notes, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(
+        group.id,
+        group.kind,
+        group.name,
+        group.summary[L],
+        resolveDemoLinks(group.description[L]),
+        `${group.name}, heraldic emblem, maritime fantasy`,
+        group.accent,
+        group.status,
+        group.parent,
+        group.seat,
+        group.founded,
+        group.ended,
+        L === 'es' ? 'Dinastía de demostración con blasón, sede y miembros editables.' : 'Demo dynasty with editable arms, seat and members.',
+        AT,
+        AT
+      );
+
+      const bytes = demoAsset(demoImageAsset('group', group.id));
+      const imageId = `${PREFIX}image-group-${group.id.slice(PREFIX.length)}-0`;
+      db.prepare(
+        `INSERT INTO world_images
+          (image_id, entity_kind, entity_id, kind, label, mime_type, bytes, blob, prompt,
+           provider, model, style, generated, sort_order, created_at, updated_at)
+         VALUES (?, 'group', ?, 'emblem', ?, 'image/webp', ?, ?, ?, 'openai',
+                 'codex-imagegen', 'painterly fantasy heraldry', 1, 0, ?, ?)
+         ON CONFLICT(image_id) DO UPDATE SET
+           kind = 'emblem', label = excluded.label, mime_type = excluded.mime_type,
+           bytes = excluded.bytes, blob = excluded.blob, prompt = excluded.prompt,
+           provider = excluded.provider, model = excluded.model, style = excluded.style,
+           generated = 1, updated_at = excluded.updated_at`
+      ).run(
+        imageId,
+        group.id,
+        group.name,
+        bytes.length,
+        bytes,
+        `Heraldic coat of arms for ${group.name}; no text or watermark.`,
+        AT,
+        AT
+      );
+    }
+
+    for (const [affiliationId, personId, groupId, rank, fromWorldDay, toWorldDay] of affiliations) {
+      db.prepare(
+        `INSERT OR IGNORE INTO character_affiliations
+          (affiliation_id, person_id, group_id, rank, from_world_day, to_world_day, notes, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?)`
+      ).run(affiliationId, personId, groupId, rank, fromWorldDay, toWorldDay, AT, AT);
+    }
+  })();
+  return true;
 }
 
 export function seedWorldbuildingDemoData(): boolean {
@@ -555,6 +640,10 @@ export function seedWorldbuildingDemoData(): boolean {
     [
       [`${PREFIX}aff-ilyra-venn`, `${PREFIX}char-ilyra`, `${PREFIX}group-venn`, L === 'es' ? 'heredera' : 'heir', null, null],
       [`${PREFIX}aff-nara-venn`, `${PREFIX}char-nara`, `${PREFIX}group-venn`, L === 'es' ? 'primogénita' : 'firstborn', 131000, 133300],
+      [`${PREFIX}aff-aurel-venn`, `${PREFIX}char-aurel`, `${PREFIX}group-venn`, L === 'es' ? 'maestro del Faro' : 'Lighthouse master', null, 131950],
+      [`${PREFIX}aff-maelor-sarn`, `${PREFIX}char-maelor`, `${PREFIX}group-sarn`, L === 'es' ? 'cabeza de casa' : 'head of house', null, null],
+      [`${PREFIX}aff-tarek-sarn`, `${PREFIX}char-tarek`, `${PREFIX}group-sarn`, L === 'es' ? 'heredero adoptivo' : 'adoptive heir', null, null],
+      [`${PREFIX}aff-sena-mir`, `${PREFIX}char-sena`, `${PREFIX}group-mir`, L === 'es' ? 'última llave' : 'last key', null, null],
       [`${PREFIX}aff-maelor-council`, `${PREFIX}char-maelor`, `${PREFIX}group-council`, L === 'es' ? 'regente' : 'regent', 131950, null],
       [`${PREFIX}aff-tarek-guard`, `${PREFIX}char-tarek`, `${PREFIX}group-guard`, L === 'es' ? 'comandante' : 'commander', 132900, null],
       [`${PREFIX}aff-odran-guard`, `${PREFIX}char-odran`, `${PREFIX}group-guard`, L === 'es' ? 'guardián' : 'guardian', 126000, 133100],

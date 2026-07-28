@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import type { CharacterAffiliation, WorldGroup, WorldGroupKind } from '@shared/types';
+import type { CharacterAffiliation, CharacterImage, WorldGroup, WorldGroupKind, WorldPlace } from '@shared/types';
 import {
   CULTURE_KINDS,
+  DYNASTY_KINDS,
   FACTION_KINDS,
   WORLD_GROUP_KIND_LABEL,
   WORLD_GROUP_STATUSES,
@@ -17,18 +18,20 @@ import { confirm } from '../components/feedback';
 import { PERSON_DOSSIER_SECTION_CLASS } from '../components/personDossierLayout';
 import { ContinuityBadge } from '../components/world/ContinuityBadge';
 import { t, tx } from '../i18n';
+import { worldImageUrl } from '../lib/imageUrl';
 
 /**
- * Factions and cultures.
+ * Factions, cultures and dynasties.
  *
  * They are ONE collection with a `kind` (schema v94), so this file builds both sections
  * from the same descriptor: the only differences are which kinds each offers and what it
  * is called. Adding "Religiones" as its own section later would cost a nav row.
  */
 function groupSection(
-  id: 'factions' | 'cultures',
+  id: 'factions' | 'cultures' | 'dynasties',
   kinds: string[],
-  labels: { title: string; create: string; search: string; empty: string; noMatch: string; icon: string }
+  labels: { title: string; create: string; search: string; empty: string; noMatch: string; icon: string },
+  dynasty = false
 ): WorldSectionDef<WorldGroup> {
   return {
     id,
@@ -60,7 +63,9 @@ function groupSection(
     ],
     facetValues: (group) => ({ kind: group.kind, status: group.status }),
     searchText: (group) => [group.name, group.summary ?? ''],
-    Card: ({ item, compact, onOpen }) => (
+    Card: ({ item, compact, onOpen }) => dynasty ? (
+      <DynastyCard item={item} compact={compact} onOpen={onOpen} />
+    ) : (
       <button
         data-testid="group-card"
         onClick={onOpen}
@@ -80,7 +85,7 @@ function groupSection(
       </button>
     ),
     Sheet: ({ item, onChanged, onBack }) => (
-      <GroupSheet group={item} kinds={kinds} onChanged={onChanged} onBack={onBack} />
+      <GroupSheet group={item} kinds={kinds} dynasty={dynasty} onChanged={onChanged} onBack={onBack} />
     ),
   };
 }
@@ -102,6 +107,15 @@ const CULTURES = groupSection('cultures', CULTURE_KINDS, {
   empty: 'Todavía no hay culturas en este mundo.',
   noMatch: 'Ninguna cultura coincide con el filtro.',
 });
+
+const DYNASTIES = groupSection('dynasties', DYNASTY_KINDS, {
+  icon: 'shield',
+  title: 'Dinastías',
+  create: 'Nueva dinastía',
+  search: 'Buscar dinastías…',
+  empty: 'Todavía no hay dinastías en este mundo.',
+  noMatch: 'Ninguna dinastía coincide con el filtro.',
+}, true);
 
 export function FactionsView() {
   const section = useMemo(() => FACTIONS, []);
@@ -127,22 +141,89 @@ export function CulturesView() {
   );
 }
 
+export function DynastiesView() {
+  const section = useMemo(() => DYNASTIES, []);
+  return (
+    <WorldWorkspace
+      section={section}
+      createModal={(close, created) => (
+        <NewGroupModal kinds={DYNASTY_KINDS} title="Nueva dinastía" onClose={close} onCreated={created} />
+      )}
+    />
+  );
+}
+
+function DynastyCard({ item, compact, onOpen }: { item: WorldGroup; compact: boolean; onOpen: () => void }) {
+  const [emblem, setEmblem] = useState<CharacterImage | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void window.nodus.listWorldImages('group', item.groupId).then((images) => {
+      if (!cancelled) setEmblem(images.find((image) => image.kind === 'emblem') ?? images[0] ?? null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [item.groupId, item.updatedAt]);
+
+  return (
+    <button
+      data-testid="dynasty-card"
+      onClick={onOpen}
+      title={item.name}
+      className={`group w-full overflow-hidden rounded-xl border border-neutral-300 bg-white text-left shadow-sm transition-colors hover:border-amber-500 dark:border-neutral-800 dark:bg-neutral-950/25 dark:shadow-none dark:hover:border-amber-600 ${
+        compact ? 'flex h-20' : 'h-60'
+      }`}
+    >
+      <div className={compact ? 'h-full w-20 shrink-0 bg-neutral-100 dark:bg-neutral-900' : 'h-40 w-full bg-neutral-100 dark:bg-neutral-900'}>
+        {emblem ? (
+          <img src={worldImageUrl(emblem)} alt="" draggable={false} className="h-full w-full object-cover transition-transform group-hover:scale-[1.02]" />
+        ) : (
+          <div className="grid h-full place-items-center">
+            <Icon name="shield" size={compact ? 22 : 34} className="text-neutral-400 dark:text-neutral-600" />
+          </div>
+        )}
+      </div>
+      <div className={compact ? 'min-w-0 flex-1 p-3' : 'min-w-0 p-3'}>
+        <span className="block truncate text-sm font-semibold text-neutral-900 dark:text-neutral-100">{item.name}</span>
+        <span className="block truncate text-[11px] text-neutral-500">
+          {item.status ? t(WORLD_GROUP_STATUS_LABEL[item.status]) : t('Dinastía')}
+          {item.foundedYear != null ? ` · ${item.foundedYear}` : ''}
+        </span>
+        {!compact && item.summary && <span className="mt-1 line-clamp-1 block text-[11px] text-neutral-600 dark:text-neutral-400">{item.summary}</span>}
+      </div>
+    </button>
+  );
+}
+
 function GroupSheet({
   group,
   kinds,
+  dynasty,
   onChanged,
   onBack,
 }: {
   group: WorldGroup;
   kinds: string[];
+  dynasty: boolean;
   onChanged: () => Promise<void>;
   onBack: () => void;
 }) {
   const [members, setMembers] = useState<CharacterAffiliation[]>([]);
+  const [groups, setGroups] = useState<WorldGroup[]>([]);
+  const [places, setPlaces] = useState<WorldPlace[]>([]);
 
   useEffect(() => {
-    void window.nodus.listAffiliationsForGroup(group.groupId).then(setMembers);
-  }, [group.groupId, group.updatedAt]);
+    void Promise.all([
+      window.nodus.listAffiliationsForGroup(group.groupId),
+      dynasty ? window.nodus.listWorldGroups('house') : Promise.resolve([]),
+      dynasty ? window.nodus.listWorldPlaces() : Promise.resolve([]),
+    ]).then(([nextMembers, nextGroups, nextPlaces]) => {
+      setMembers(nextMembers);
+      setGroups(nextGroups);
+      setPlaces(nextPlaces);
+    });
+  }, [dynasty, group.groupId, group.updatedAt]);
 
   const save = async (patch: Parameters<typeof window.nodus.updateWorldGroup>[1]) => {
     await window.nodus.updateWorldGroup(group.groupId, patch);
@@ -189,6 +270,10 @@ function GroupSheet({
         entityId={group.groupId}
         visualSeed={group.visualSeed}
         appearance={group.description}
+        title={dynasty ? 'Blasón y galería' : 'Galería'}
+        kinds={['emblem', 'other']}
+        defaultKind="emblem"
+        generateLabel={dynasty ? 'Generar blasón' : 'Generar imagen'}
       />
 
       <ContinuityBadge entity={{ kind: 'group', id: group.groupId }} />
@@ -226,6 +311,59 @@ function GroupSheet({
           </label>
         </div>
       </section>
+
+      {dynasty && (
+        <section className={PERSON_DOSSIER_SECTION_CLASS} data-testid="dynasty-sheet-lineage">
+          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('Linaje y dominio')}</h3>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="block">
+              <span className="mb-1 block text-[10px] uppercase tracking-wide text-neutral-500">{t('Casa de origen')}</span>
+              <select className="input h-9 w-full text-sm" value={group.parentId ?? ''} onChange={(event) => void save({ parentId: event.target.value || null })}>
+                <option value="">{t('Sin casa de origen')}</option>
+                {groups.filter((entry) => entry.groupId !== group.groupId).map((entry) => (
+                  <option key={entry.groupId} value={entry.groupId}>{entry.name}</option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[10px] uppercase tracking-wide text-neutral-500">{t('Sede')}</span>
+              <select className="input h-9 w-full text-sm" value={group.seatPlaceId ?? ''} onChange={(event) => void save({ seatPlaceId: event.target.value || null })}>
+                <option value="">{t('Sin sede')}</option>
+                {places.map((place) => <option key={place.placeId} value={place.placeId}>{place.name}</option>)}
+              </select>
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[10px] uppercase tracking-wide text-neutral-500">{t('Fundación')}</span>
+              <input
+                key={`founded-${group.updatedAt}`}
+                type="number"
+                className="input h-9 w-full text-sm"
+                defaultValue={group.foundedYear ?? ''}
+                onBlur={(event) => void save({ foundedYear: event.target.value ? Number(event.target.value) : null })}
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[10px] uppercase tracking-wide text-neutral-500">{t('Extinción')}</span>
+              <input
+                key={`ended-${group.updatedAt}`}
+                type="number"
+                className="input h-9 w-full text-sm"
+                defaultValue={group.endedYear ?? ''}
+                onBlur={(event) => void save({ endedYear: event.target.value ? Number(event.target.value) : null })}
+              />
+            </label>
+          </div>
+          <div className="mt-3">
+            <AutoSavingField
+              label={t('Notas dinásticas')}
+              hint={t('Sucesión, ramas, reclamaciones, lemas y legitimidad.')}
+              value={group.notes}
+              placeholder={t('Herederos, ramas cadetes, disputas sucesorias…')}
+              onSave={(next) => save({ notes: next || null })}
+            />
+          </div>
+        </section>
+      )}
 
       <section className={PERSON_DOSSIER_SECTION_CLASS} data-testid="group-sheet-description">
         <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('Descripción')}</h3>
@@ -411,7 +549,7 @@ export function CharacterAffiliationsSection({ personId }: { personId: string })
       </div>
 
       {groups.length === 0 ? (
-        <p className="text-sm text-neutral-500">{t('Crea antes una facción o una cultura.')}</p>
+        <p className="text-sm text-neutral-500">{t('Crea antes una facción, una cultura o una dinastía.')}</p>
       ) : affiliations.length === 0 && !adding ? (
         <p className="text-sm text-neutral-500">{t('No pertenece a nada por ahora.')}</p>
       ) : null}

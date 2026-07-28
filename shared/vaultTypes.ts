@@ -318,6 +318,7 @@ export const VAULT_TYPE_SCOPED_VIEWS: Record<string, VaultType[]> = {
   places: ['worldbuilding'],
   factions: ['worldbuilding'],
   cultures: ['worldbuilding'],
+  dynasties: ['worldbuilding'],
   scenes: ['worldbuilding'],
   // Study mode owns its academic organisation, materials and question bank.
   // They must never leak into research/records/database vaults. The teaching

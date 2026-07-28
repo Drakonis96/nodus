@@ -49,7 +49,7 @@ try {
   const demoAssetDir = path.join(repoRoot, 'electron/assets/worldbuilding-demo');
   const demoAssetFiles = fs.readdirSync(demoAssetDir).filter((file) => file.endsWith('.webp'));
   const demoAssetBytes = demoAssetFiles.reduce((total, file) => total + fs.statSync(path.join(demoAssetDir, file)).size, 0);
-  assert.equal(demoAssetFiles.length, 42, 'worldbuilding ships every generated demo illustration');
+  assert.equal(demoAssetFiles.length, 45, 'worldbuilding ships every generated demo illustration');
   assert.ok(demoAssetBytes < 1.25 * 1024 * 1024, 'the complete worldbuilding artwork bundle stays compact');
   for (const file of demoAssetFiles) {
     const header = fs.readFileSync(path.join(demoAssetDir, file)).subarray(0, 12);
@@ -133,6 +133,29 @@ try {
       ('demo-world-scene-prologue', 'anchor', 0, 0, '2026-01-01', '2026-01-01')
   `).run();
   assert.equal(worldbuilding.seedWorldbuildingDemoData(), true);
+
+  // Existing demo vaults must gain the new dynasty section without being reset.
+  db.prepare(`
+    DELETE FROM world_images
+    WHERE entity_kind = 'group'
+      AND entity_id IN ('demo-world-group-sarn', 'demo-world-group-mir')
+  `).run();
+  db.prepare(`
+    UPDATE world_images SET kind = 'portrait'
+    WHERE entity_kind = 'group' AND entity_id = 'demo-world-group-venn'
+  `).run();
+  db.prepare(`
+    DELETE FROM world_groups
+    WHERE group_id IN ('demo-world-group-sarn', 'demo-world-group-mir')
+  `).run();
+  assert.equal(worldbuilding.upgradeWorldbuildingDemoDynasties(), true, 'an existing demo receives the dynasty expansion');
+  assert.equal(count('world_groups', "group_id LIKE 'demo-world-group-%' AND kind = 'house'"), 3);
+  assert.equal(count('world_images', "entity_id LIKE 'demo-world-group-%' AND kind = 'emblem'"), 3);
+  assert.equal(count('character_affiliations', "affiliation_id IN ('demo-world-aff-maelor-sarn','demo-world-aff-tarek-sarn','demo-world-aff-sena-mir')"), 3);
+  assert.equal(worldbuilding.upgradeWorldbuildingDemoDynasties(), true, 'the dynasty upgrade is idempotent');
+  assert.equal(count('world_groups', "group_id LIKE 'demo-world-group-%' AND kind = 'house'"), 3);
+  assert.equal(count('world_images', "entity_id LIKE 'demo-world-group-%' AND kind = 'emblem'"), 3);
+
   for (const [label, table, where] of [
     ['characters', 'persons', "person_id LIKE 'demo-world-%'"],
     ['character profiles', 'character_profiles', "person_id LIKE 'demo-world-%'"],
@@ -181,14 +204,16 @@ try {
   ]) assert.ok(count(table, where) > 0, `worldbuilding ${label} is populated`);
   assert.equal(count('persons', "person_id LIKE 'demo-world-char-%'"), 10, 'worldbuilding demo has a substantial cast');
   assert.equal(count('places', "place_id LIKE 'demo-world-place-%'"), 12, 'worldbuilding demo has a substantial geography');
-  assert.equal(count('world_groups', "group_id LIKE 'demo-world-group-%'"), 9, 'worldbuilding demo covers organizations and cultures');
+  assert.equal(count('world_groups', "group_id LIKE 'demo-world-group-%'"), 11, 'worldbuilding demo covers organizations, cultures and dynasties');
+  assert.equal(count('world_groups', "group_id LIKE 'demo-world-group-%' AND kind = 'house'"), 3, 'worldbuilding demo has several distinct dynasties');
   assert.equal(count('world_scenes', "scene_id LIKE 'demo-world-scene-%'"), 9, 'worldbuilding demo covers the story sequence');
   assert.equal(count('world_maps', "map_id LIKE 'demo-world-map-%'"), 4, 'worldbuilding demo covers map scopes');
   assert.equal(count('world_articles', "article_id LIKE 'demo-world-article-%'"), 14, 'worldbuilding demo has a substantial encyclopedia');
   assert.equal(count('world_threads', "thread_id LIKE 'demo-world-%'"), 7, 'worldbuilding demo covers conflicts and arcs');
   assert.equal(count('world_rules', "rule_id LIKE 'demo-world-rule-%'"), 7, 'worldbuilding demo covers rule states and scopes');
   assert.equal(count('person_portraits', "person_id LIKE 'demo-world-%' AND mime = 'image/webp' AND generated = 1"), 10, 'every demo character has generated WebP cover art');
-  assert.equal(count('world_images', "image_id LIKE 'demo-world-%' AND mime_type = 'image/webp' AND generated = 1"), 54, 'every visual world entity has generated WebP gallery art');
+  assert.equal(count('world_images', "image_id LIKE 'demo-world-%' AND mime_type = 'image/webp' AND generated = 1"), 56, 'every visual world entity has generated WebP gallery art');
+  assert.equal(count('world_images', "entity_id LIKE 'demo-world-group-%' AND kind = 'emblem' AND mime_type = 'image/webp'"), 3, 'each demo dynasty has a compressed coat of arms');
   assert.equal(count('map_images', "image_id LIKE 'demo-world-%' AND mime_type = 'image/webp' AND generated = 1"), 6, 'all map image roles use generated WebP artwork');
   const seededArtworkBytes = Number(db.prepare(`
     SELECT
@@ -206,7 +231,7 @@ try {
   assert.equal(characters.listWorldEvents().length, 8);
   assert.equal(places.listWorldPlaces().length, 12);
   assert.ok(places.inhabitantsOfPlace('demo-world-place-faro').length > 0);
-  assert.equal(groups.listWorldGroups().length, 9);
+  assert.equal(groups.listWorldGroups().length, 11);
   assert.deepEqual(new Set(groups.listWorldGroups().map((group) => group.kind)), new Set(['faction', 'order', 'house', 'religion', 'culture', 'species', 'language']));
   assert.ok(groups.listAffiliationsForCharacter('demo-world-char-ilyra').length > 0);
   assert.equal(story.listScenes('narrative').length, 9);

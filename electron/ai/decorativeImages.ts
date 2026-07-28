@@ -13,11 +13,12 @@ import type {
   ModelRef,
 } from '@shared/types';
 import { buildDecorativeImagePrompt, DEFAULT_DECORATIVE_IMAGE_STYLE } from '@shared/imageStyles';
-import { buildCharacterPortraitPrompt, hasCharacterImageMaterial } from '@shared/characterImagePrompt';
+import { buildCharacterPortraitPrompt, buildWorldEntityImagePrompt, hasCharacterImageMaterial } from '@shared/characterImagePrompt';
 import { vaultTypeImagePrompt } from '@shared/vaultTypes';
 import { addCharacterImage, getCharacter } from '../db/charactersRepo';
 import { addWorldImage } from '../db/worldImagesRepo';
 import { getWorldPlace } from '../db/worldPlacesRepo';
+import { getWorldGroup } from '../db/worldGroupsRepo';
 import { getActiveVault } from '../vaults/vaultRegistry';
 import { completeText } from './aiClient';
 import { getSettings } from '../db/settingsRepo';
@@ -512,9 +513,10 @@ export async function generateWorldEntityImage(
 ): Promise<CharacterImage> {
   if (entityKind === 'character') return generateCharacterGalleryImage(entityId, kind, style);
   const place = entityKind === 'place' ? getWorldPlace(entityId) : null;
+  const group = entityKind === 'group' ? getWorldGroup(entityId) : null;
   const sources = {
-    visualSeed: place?.profile.visualSeed ?? null,
-    appearance: place?.profile.appearance ?? null,
+    visualSeed: place?.profile.visualSeed ?? group?.visualSeed ?? null,
+    appearance: place?.profile.appearance ?? group?.description ?? null,
     extra: null,
   };
   if (!hasCharacterImageMaterial(sources)) {
@@ -524,7 +526,7 @@ export async function generateWorldEntityImage(
   if (!settings.imageProvider || !settings.imageModel) {
     throw new Error('Configura un proveedor y modelo de imagen en Ajustes → Proveedores.');
   }
-  const prompt = buildCharacterPortraitPrompt(style, sources, kind);
+  const prompt = buildWorldEntityImagePrompt(style, sources, entityKind, kind);
   const generated = await callImageProvider(settings.imageProvider, settings.imageModel, prompt);
   const optimized = await optimizedJpegs(generated);
   return addWorldImage({
