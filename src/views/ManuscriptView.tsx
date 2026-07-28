@@ -18,6 +18,7 @@ import { RulesInPlay } from '../components/world/RulesInPlay';
 import { ContinuityBadge } from '../components/world/ContinuityBadge';
 import { WorldAnchorProvider } from '../components/world/questionCapture';
 import { useWorldLinkAutocomplete, WorldLinkCandidates } from '../components/world/worldLinkAutocomplete';
+import { TYPEWRITER_BAND, useTypewriter } from '../components/world/useTypewriter';
 import { notifyDataChanged } from '../hooks';
 import { toast } from '../components/feedback';
 import { t, tx } from '../i18n';
@@ -57,7 +58,9 @@ export function ManuscriptView({ onNavigate }: { onNavigate?: (view: View) => vo
   const [cast, setCast] = useState<SceneAppearance[]>([]);
   const [railOpen, setRailOpen] = useState(() => localStorage.getItem('nodus.manuscript.rail') !== '0');
   const [progress, setProgress] = useState<ManuscriptProgress | null>(null);
+  const [typewriter, setTypewriter] = useState(() => localStorage.getItem('nodus.manuscript.typewriter') === '1');
   const areaRef = useRef<HTMLTextAreaElement>(null);
+  const { sync: syncTypewriter, paddingBottom } = useTypewriter({ areaRef, enabled: typewriter });
 
   const reloadSpine = useCallback(async () => {
     const [next, allScenes, today] = await Promise.all([
@@ -175,6 +178,19 @@ export function ManuscriptView({ onNavigate }: { onNavigate?: (view: View) => vo
         </div>
         <span className="ml-auto flex items-center gap-2">
           {saving && <span className="text-[10px] text-neutral-500">{t('Guardando…')}</span>}
+          <button
+            className={`btn h-8 gap-1.5 border border-neutral-700 px-2 text-xs ${typewriter ? 'btn-secondary' : 'btn-ghost'}`}
+            data-testid="manuscript-typewriter"
+            title={t('La línea que escribes se queda a la altura de los ojos. Esc para salir.')}
+            onClick={() =>
+              setTypewriter((on) => {
+                localStorage.setItem('nodus.manuscript.typewriter', on ? '0' : '1');
+                return !on;
+              })
+            }
+          >
+            <Icon name="edit" size={13} /> {t('Máquina de escribir')}
+          </button>
           <CompileButton title={t('Manuscrito')} />
           <button
             className={`btn h-8 gap-1.5 border border-neutral-700 px-2 text-xs ${railOpen ? 'btn-secondary' : 'btn-ghost'}`}
@@ -192,7 +208,9 @@ export function ManuscriptView({ onNavigate }: { onNavigate?: (view: View) => vo
       </div>
 
       <div className="flex min-h-0 flex-1">
-        {/* La espina: tabla de contenidos y navegador a la vez. */}
+        {/* La espina: tabla de contenidos y navegador a la vez. Fuera en modo máquina de
+            escribir: lo que hace el modo es quitar de la vista todo lo que no es la frase. */}
+        {!typewriter && (
         <div className="flex w-64 shrink-0 flex-col border-r border-neutral-800">
         <nav className="min-h-0 flex-1 overflow-y-auto p-2" data-testid="manuscript-spine">
           {spine.books.map((book, bookIndex) => (
@@ -236,6 +254,7 @@ export function ManuscriptView({ onNavigate }: { onNavigate?: (view: View) => vo
         </nav>
         {progress && <Progress spine={spine} progress={progress} />}
         </div>
+        )}
 
         {/* El texto. Medida cómoda y serifa: no es decoración, es la diferencia entre
             escribir aquí y no hacerlo. */}
@@ -280,18 +299,31 @@ export function ManuscriptView({ onNavigate }: { onNavigate?: (view: View) => vo
             <textarea
               ref={areaRef}
               data-testid="manuscript-editor"
+              data-typewriter={typewriter ? 'true' : undefined}
               className="mx-auto block w-full max-w-[65ch] resize-none border-0 bg-transparent font-serif text-[15px] leading-8 text-neutral-100 outline-none placeholder:text-neutral-700"
-              style={{ minHeight: '100%' }}
+              style={{ minHeight: '100%', paddingBottom }}
               value={draft}
               placeholder={t('Escribe la escena. [[ enlaza con cualquier cosa del mundo.')}
               onChange={(event) => {
                 setDraft(event.target.value);
                 links.sync(event.target.value, event.target.selectionStart);
+                syncTypewriter();
               }}
-              onClick={(event) => links.sync(draft, event.currentTarget.selectionStart)}
+              onClick={(event) => {
+                links.sync(draft, event.currentTarget.selectionStart);
+                syncTypewriter();
+              }}
+              // Después de que el cursor se haya movido, no antes: en keydown la selección
+              // sigue donde estaba y la línea se colocaría con una pulsación de retraso.
+              onKeyUp={syncTypewriter}
+              onSelect={syncTypewriter}
               onKeyDown={(event) => {
                 if (links.handleKeyDown(event)) return;
-                if ((event.metaKey || event.ctrlKey) && event.key === 'ArrowDown') {
+                if (typewriter && event.key === 'Escape') {
+                  event.preventDefault();
+                  setTypewriter(false);
+                  localStorage.setItem('nodus.manuscript.typewriter', '0');
+                } else if ((event.metaKey || event.ctrlKey) && event.key === 'ArrowDown') {
                   event.preventDefault();
                   step(1);
                 } else if ((event.metaKey || event.ctrlKey) && event.key === 'ArrowUp') {
@@ -301,6 +333,19 @@ export function ManuscriptView({ onNavigate }: { onNavigate?: (view: View) => vo
               }}
               onBlur={() => void commit(selectedId, draft)}
             />
+            {/* El foco, en la única forma que un textarea permite de verdad: no se puede
+                atenuar un párrafo suyo por separado, pero sí velar lo que queda lejos de la
+                banda donde vive la línea que se escribe. */}
+            {typewriter && (
+              <div
+                aria-hidden
+                data-testid="manuscript-focus-veil"
+                className="pointer-events-none absolute inset-0"
+                style={{
+                  background: `linear-gradient(to bottom, rgba(10,10,10,0.75) 0%, rgba(10,10,10,0) ${TYPEWRITER_BAND * 100 - 12}%, rgba(10,10,10,0) ${TYPEWRITER_BAND * 100 + 12}%, rgba(10,10,10,0.75) 100%)`,
+                }}
+              />
+            )}
             <WorldLinkCandidates
               candidates={links.candidates}
               highlight={links.highlight}
@@ -312,7 +357,7 @@ export function ManuscriptView({ onNavigate }: { onNavigate?: (view: View) => vo
 
         {/* Lo que esta escena tiene que hacer. Los mismos componentes de «Analizar»: una
             segunda versión suya sería una segunda respuesta a la misma pregunta. */}
-        {railOpen && selected && (
+        {railOpen && !typewriter && selected && (
           <aside className="w-80 shrink-0 space-y-3 overflow-y-auto border-l border-neutral-800 p-3" data-testid="manuscript-rail">
             <WorldAnchorProvider anchor={{ kind: 'scene', id: selected.sceneId, title: selected.title }}>
               <SceneQuestionBand

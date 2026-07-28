@@ -320,7 +320,36 @@ sidebar navegan. Y `test-vault-types.mjs` pasa a dieciocho vistas cableadas.
   —de cualquier llamante que omita el campo— en «aquí empieza un libro»: cada escena abría
   el suyo. Se comprueba con `Boolean(...)`.
 
-## 8. Después (diseñado, no ahora)
+## 8. Modo máquina de escribir — **HECHO**
+
+La línea que se escribe se queda a la altura de los ojos (banda al 42 %, ligeramente por
+encima del centro: centrado exacto deja media pantalla de texto ya escrito ocupando el sitio
+de lo que viene). Fuera la espina y el margen derecho; `Esc` devuelve la pantalla entera.
+
+Tres cosas que decidieron la implementación:
+
+- **Un `<textarea>` no sabe decir en qué píxel está su cursor.** Da `selectionStart`, un
+  índice en la cadena, y nada más. La única forma de averiguarlo es pintar el mismo texto
+  hasta el cursor en un `div` invisible con EXACTAMENTE los mismos estilos que deciden dónde
+  se parte una línea, pegarle una marca y preguntarle a la marca. La lista de estilos es el
+  punto débil: si el espejo difiere en una sola, el texto se parte por otro sitio y el error
+  **crece línea a línea** — a mitad de un capítulo la medición apunta a otro párrafo. Un
+  editor `contenteditable` daría la posición exacta con `Range.getClientRects()`, pero
+  costaría el autocompletado de `[[` (vive de `selectionStart`), la pila de deshacer nativa y
+  el IME; no se paga eso por colocar una línea.
+- **Sin relleno inferior el modo se muere justo donde siempre está el autor.** Al final de lo
+  escrito no hay nada debajo que empujar, así que la última línea no puede subir a la banda y
+  el efecto desaparece precisamente mientras se escribe. El modo añade
+  `viewportHeight * (1 - band)` de relleno.
+- **Sin zona muerta el texto TIEMBLA bajo las manos**: cada pulsación corrige uno o dos
+  píxeles. Cuatro píxeles de tolerancia y se acabó.
+
+Y una limitación asumida: **no se atenúan los párrafos uno a uno**, porque un `<textarea>` no
+puede dar estilo a partes de su propio texto y un editor falso encima sería otro producto. Lo
+que sí es honesto —y hace el mismo trabajo— es velar lo que queda lejos de la banda con un
+degradado, que además no cuesta ni un cálculo por pulsación porque la línea siempre está en
+el mismo sitio.
+
+## 9. Después (no diseñado a fondo)
 
 - **`reviewWorldProse` en lote**, para leer un capítulo entero de una vez.
-- **Modo máquina de escribir** (foco en el párrafo, desplazamiento centrado).

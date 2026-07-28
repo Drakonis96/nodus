@@ -7295,4 +7295,6 @@ export const TR: Record<string, string> = {
   "antes de encoger": "küçülmeden önce",
   "{words}/{target}": "{words}/{target}",
   "¿Está en la página?": "Sayfada var mı?",
+  "La línea que escribes se queda a la altura de los ojos. Esc para salir.": "Yazdığın satır göz hizasında kalır. Çıkmak için Esc.",
+  "Máquina de escribir": "Daktilo",
 };

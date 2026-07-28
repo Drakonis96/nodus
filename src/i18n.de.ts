@@ -7538,4 +7538,6 @@ export const DE: Record<string, string> = {
   "antes de encoger": "vor dem Schrumpfen",
   "{words}/{target}": "{words}/{target}",
   "¿Está en la página?": "Steht es auf der Seite?",
+  "La línea que escribes se queda a la altura de los ojos. Esc para salir.": "Die Zeile, die du schreibst, bleibt auf Augenhöhe. Esc zum Verlassen.",
+  "Máquina de escribir": "Schreibmaschine",
 };

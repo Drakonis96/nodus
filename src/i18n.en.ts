@@ -7765,4 +7765,6 @@ export const EN: Record<string, string> = {
   "antes de encoger": "before it shrank",
   "{words}/{target}": "{words}/{target}",
   "¿Está en la página?": "Is it on the page?",
+  "La línea que escribes se queda a la altura de los ojos. Esc para salir.": "The line you are writing stays at eye level. Esc to leave.",
+  "Máquina de escribir": "Typewriter",
 };

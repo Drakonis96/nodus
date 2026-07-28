@@ -3249,6 +3249,28 @@ try {
       return { reason: shots[0].reason, restored: back.wordCount, kept: (await window.nodus.listSceneSnapshots(first.sceneId)).length };
     });
     assert.deepEqual(undone, { reason: 'shrink', restored: 80, kept: 2 }, 'the save kept what the paste ate');
+
+    // Modo máquina de escribir: la línea que se escribe se queda a la altura de los ojos.
+    // Lo que se comprueba aquí es el mecanismo que lo hace posible al final del documento,
+    // que es donde siempre está el autor: el relleno inferior. Sin él la última línea no
+    // puede llegar a la banda porque no hay nada debajo que empujar.
+    await editor.fill(Array.from({ length: 200 }, (_, i) => `Línea ${i} del capítulo.`).join('\n'));
+    const flat = await editor.evaluate((el) => ({ scrollHeight: el.scrollHeight, clientHeight: el.clientHeight }));
+    await page.getByTestId('manuscript-typewriter').click();
+    await waitForCondition('el relleno deja llegar a la última línea', () =>
+      editor.evaluate(
+        (el, previous) => el.scrollHeight > previous.scrollHeight + previous.clientHeight * 0.4,
+        flat
+      )
+    );
+    // Y el modo quita de la vista todo lo que no es la frase.
+    await page.getByTestId('manuscript-spine').waitFor({ state: 'detached', timeout: 10_000 });
+    await page.getByTestId('manuscript-focus-veil').waitFor({ timeout: 10_000 });
+
+    // Esc devuelve la pantalla entera, sin tener que buscar el botón.
+    await editor.click();
+    await page.keyboard.press('Escape');
+    await page.getByTestId('manuscript-spine').waitFor({ timeout: 10_000 });
   }
 
   console.log('[e2e] worldbuilding open questions: a hole becomes a decision, answering rewrites the sheet, undo restores it');

@@ -311,3 +311,59 @@ test('nunca rellena: un latido sin respuesta se queda sin leer', () => {
   const one = review.parseProseReview('LATIDO: sí');
   assert.deepEqual(one, [{ present: true, note: null }]);
 });
+
+// ── Máquina de escribir ──────────────────────────────────────────────────────
+
+const tw = load('shared/typewriter.ts');
+
+function typing(over = {}) {
+  return {
+    caretTop: 1000,
+    caretHeight: 32,
+    viewportHeight: 600,
+    band: 0.5,
+    currentScrollTop: 0,
+    scrollHeight: 5000,
+    ...over,
+  };
+}
+
+test('la línea del cursor sube hasta la banda, no hasta el borde', () => {
+  // 1000 + 16 - 300 = 716: el texto se desplaza para dejar la línea en el centro.
+  assert.equal(tw.typewriterScrollTop(typing()), 716);
+  // Con la banda más arriba hay que desplazar más.
+  assert.equal(tw.typewriterScrollTop(typing({ band: 0.25 })), 866);
+});
+
+test('la zona muerta evita que el texto tiemble bajo las manos', () => {
+  // Sin ella cada pulsación corrige uno o dos píxeles y el texto vibra mientras se escribe,
+  // que es exactamente lo contrario de lo que este modo persigue.
+  assert.equal(tw.typewriterScrollTop(typing({ currentScrollTop: 714 })), 714);
+  assert.equal(tw.typewriterScrollTop(typing({ currentScrollTop: 700 })), 716);
+});
+
+test('al principio del documento no se desplaza a negativo', () => {
+  assert.equal(tw.typewriterScrollTop(typing({ caretTop: 0, currentScrollTop: 0 })), 0);
+});
+
+test('el relleno inferior es lo que deja llegar a la última línea', () => {
+  // Sin él las últimas líneas no pueden alcanzar la banda —no hay nada debajo que empujar—
+  // y el efecto se muere justo donde siempre está el autor: al final de lo escrito.
+  assert.equal(tw.typewriterPadding(600, 0.5), 300);
+  assert.equal(tw.typewriterPadding(600, 0.42), 348);
+  // Con el relleno, el tope permite dejar la última línea en la banda.
+  const atEnd = typing({ caretTop: 4900, scrollHeight: 5000 + tw.typewriterPadding(600, 0.5) });
+  assert.equal(tw.typewriterScrollTop(atEnd), 4616);
+  // Y sin él, el tope se queda corto: la línea acaba por debajo de la banda.
+  assert.equal(tw.typewriterScrollTop(typing({ caretTop: 4900 })), 4400);
+});
+
+test('el espejo copia todo lo que decide dónde se parte una línea', () => {
+  // Si difiere en una sola, el texto se parte por otro sitio y el error crece línea a
+  // línea: a mitad de un capítulo la medición apunta a un párrafo distinto.
+  for (const property of ['width', 'boxSizing', 'fontFamily', 'fontSize', 'lineHeight', 'letterSpacing', 'paddingLeft', 'paddingRight', 'whiteSpace', 'wordBreak']) {
+    assert.ok(tw.MIRRORED_STYLES.includes(property), `${property} viaja al espejo`);
+  }
+  // La altura NO: el espejo tiene que ser tan alto como su contenido, que es la medida.
+  assert.ok(!tw.MIRRORED_STYLES.includes('height'));
+});
