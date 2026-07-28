@@ -65,3 +65,38 @@ test('map image overlays keep contrast while map chrome follows the light theme'
   assert.match(css, /\.light \.world-map-timeline-dock[\s\S]{0,140}background-color: rgba\(255, 255, 255, \.95\)/);
   assert.match(css, /\.light \.world-map-cast-chip-current[\s\S]{0,80}background-color: #f3f4f6/);
 });
+
+test('world analysis sections and their shared controls declare light and dark palettes', async () => {
+  const files = [
+    'src/views/WorldChatView.tsx',
+    'src/views/RulesView.tsx',
+    'src/views/ConflictsView.tsx',
+    'src/views/ArcsView.tsx',
+    'src/views/ContinuityView.tsx',
+    'src/views/QuestionsView.tsx',
+  ];
+  const sources = await Promise.all(files.map(read));
+  const unscopedDarkToken =
+    /(?:^|[\s'"`])(?:bg-neutral-(?:900|950)(?:\/\d+)?|border-neutral-(?:700|800|900)(?:\/\d+)?|text-neutral-(?:100|200)|text-(?:indigo|red|amber)-300|bg-(?:indigo|red|amber|emerald)-950\/\d+)/m;
+
+  for (let index = 0; index < files.length; index += 1) {
+    assert.match(sources[index], /dark:/, `${files[index]} defines dark-mode counterparts`);
+    assert.doesNotMatch(sources[index], unscopedDarkToken, `${files[index]} has no unscoped dark-only utility`);
+  }
+
+  const [workspace, filters, dossier, fields, ruleModal] = await Promise.all([
+    read('src/components/world/WorldWorkspace.tsx'),
+    read('src/components/world/WorldFilterBar.tsx'),
+    read('src/components/personDossierLayout.ts'),
+    read('src/components/AutoSavingField.tsx'),
+    read('src/components/world/NewRuleModal.tsx'),
+  ]);
+
+  assert.match(workspace, /border-neutral-200[^"'`]*dark:border-neutral-800/);
+  assert.match(workspace, /bg-indigo-100 text-indigo-900[^"'`]*dark:bg-violet-950\/30 dark:text-indigo-100/);
+  assert.match(filters, /bg-white[^"'`]*dark:bg-neutral-950/);
+  assert.match(filters, /bg-indigo-100 text-indigo-800[^"'`]*dark:border-indigo-600/);
+  assert.match(dossier, /bg-neutral-50[^'"]*dark:bg-neutral-900\/40/);
+  assert.match(fields, /text-indigo-700[^"'`]*dark:text-indigo-300/);
+  assert.match(ruleModal, /bg-indigo-50[^"'`]*dark:bg-indigo-950\/20/);
+});

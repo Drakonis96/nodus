@@ -137,19 +137,19 @@ export function WorldWorkspace<T>({
       className={`min-h-0 flex-1 overflow-y-auto ${split ? 'p-2' : 'p-4'}`}
     >
       {loading ? (
-        <p className="py-12 text-center text-sm text-neutral-500">{t('Cargando…')}</p>
+        <p className="py-12 text-center text-sm text-neutral-600 dark:text-neutral-500">{t('Cargando…')}</p>
       ) : visible.length === 0 ? (
         <div className={split ? 'py-8 text-center' : 'py-16 text-center'}>
-          {!split && <Icon name={section.icon} size={32} className="mx-auto mb-3 text-neutral-700" />}
+          {!split && <Icon name={section.icon} size={32} className="mx-auto mb-3 text-neutral-400 dark:text-neutral-700" />}
           {filtering || !section.EmptyState ? (
-            <p className="text-sm text-neutral-500">{filtering ? t(section.noMatchLabel) : t(section.emptyLabel)}</p>
+            <p className="text-sm text-neutral-600 dark:text-neutral-500">{filtering ? t(section.noMatchLabel) : t(section.emptyLabel)}</p>
           ) : (
             <section.EmptyState />
           )}
           {!split &&
             (filtering ? (
               <button
-                className="btn btn-ghost mt-3 border border-neutral-700 text-xs"
+                className="btn btn-ghost mt-3 border border-neutral-300 text-xs dark:border-neutral-700"
                 onClick={() => setFilter(EMPTY_WORLD_FILTER)}
               >
                 {t('Quitar los filtros')}
@@ -187,13 +187,13 @@ export function WorldWorkspace<T>({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="shrink-0 space-y-2 border-b border-neutral-800 p-4">
+      <div className="shrink-0 space-y-2 border-b border-neutral-200 p-4 dark:border-neutral-800">
         <div className="flex items-center gap-2">
-          <Icon name={section.icon} size={20} className="text-indigo-300" />
+          <Icon name={section.icon} size={20} className="text-indigo-700 dark:text-indigo-300" />
           <h1 className="text-lg font-semibold">{t(section.title)}</h1>
           {/* Never present a filtered count as the total: that is the quickest way to make
               someone believe half their world has vanished. */}
-          <span className="text-xs text-neutral-500">
+          <span className="text-xs text-neutral-600 dark:text-neutral-500">
             {filtering ? tx('{shown} de {total}', { shown: String(visible.length), total: String(items.length) }) : items.length}
           </span>
           <span className="ml-auto flex items-center gap-2">
@@ -221,7 +221,7 @@ export function WorldWorkspace<T>({
 
       {split && selected ? (
         <div className="flex min-h-0 flex-1">
-          <div className="flex w-72 shrink-0 flex-col border-r border-neutral-800">{collection}</div>
+          <div className="flex w-72 shrink-0 flex-col border-r border-neutral-200 dark:border-neutral-800">{collection}</div>
           <div className="min-h-0 flex-1 overflow-y-auto">
             <WorldAnchorProvider anchor={section.anchorOf?.(selected) ?? null}>
               <section.Sheet
@@ -297,7 +297,7 @@ function WorldAlphaIndex<T>({
             <button
               key={letter}
               onClick={() => document.getElementById(headingId(letter))?.scrollIntoView({ block: 'start' })}
-              className="rounded px-1.5 py-0.5 text-[11px] font-medium text-neutral-500 hover:bg-neutral-800 hover:text-indigo-300"
+              className="rounded px-1.5 py-0.5 text-[11px] font-medium text-neutral-600 hover:bg-neutral-100 hover:text-indigo-700 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-indigo-300"
             >
               {letter}
             </button>
@@ -308,7 +308,7 @@ function WorldAlphaIndex<T>({
         <section key={letter}>
           <h3
             id={headingId(letter)}
-            className={`sticky top-0 z-10 mb-1 bg-neutral-950/95 py-1 text-xs font-semibold uppercase tracking-wider text-neutral-500 backdrop-blur ${
+            className={`sticky top-0 z-10 mb-1 bg-white/95 py-1 text-xs font-semibold uppercase tracking-wider text-neutral-600 backdrop-blur dark:bg-neutral-950/95 dark:text-neutral-500 ${
               section.id === 'encyclopedia' ? 'encyclopedia-letter-heading' : ''
             }`}
           >
@@ -368,12 +368,12 @@ function WorldTree<T>({
             <>
               <span
                 aria-hidden="true"
-                className="pointer-events-none absolute -left-2 top-0 h-4 w-2 rounded-bl-sm border-b border-l border-neutral-700/80"
+                className="pointer-events-none absolute -left-2 top-0 h-4 w-2 rounded-bl-sm border-b border-l border-neutral-300 dark:border-neutral-700/80"
               />
               {index < entries.length - 1 && (
                 <span
                   aria-hidden="true"
-                  className="pointer-events-none absolute -left-2 bottom-0 top-4 border-l border-neutral-700/80"
+                  className="pointer-events-none absolute -left-2 bottom-0 top-4 border-l border-neutral-300 dark:border-neutral-700/80"
                 />
               )}
             </>
@@ -381,14 +381,16 @@ function WorldTree<T>({
           <button
             onClick={() => onOpen(id)}
             className={`flex w-full items-center gap-1.5 rounded px-2 py-1.5 text-left text-sm ${
-              id === selectedId ? 'bg-indigo-600/20 text-indigo-100' : 'text-neutral-300 hover:bg-neutral-800/60'
+              id === selectedId
+                ? 'bg-indigo-100 text-indigo-900 dark:bg-violet-950/30 dark:text-indigo-100'
+                : 'text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800/60'
             }`}
           >
             {depth > 0 && (
               <span
                 aria-hidden="true"
                 className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-                  id === selectedId ? 'bg-indigo-300' : 'bg-neutral-600'
+                  id === selectedId ? 'bg-indigo-500 dark:bg-indigo-300' : 'bg-neutral-400 dark:bg-neutral-600'
                 }`}
               />
             )}

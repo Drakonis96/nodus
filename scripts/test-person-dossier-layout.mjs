@@ -27,7 +27,10 @@ test('every person dossier area uses the shared section block', () => {
   assert.match(kinship, /data-testid="person-dossier-family-relations"/);
   assert.match(social, /data-testid="person-dossier-social-relations"/);
   assert.match(places, /data-testid="person-dossier-places"/);
-  assert.match(layout, /PERSON_DOSSIER_SECTION_CLASS = 'rounded-md border border-neutral-800 bg-neutral-900\/40 p-3'/);
+  assert.match(
+    layout,
+    /PERSON_DOSSIER_SECTION_CLASS =\s*'rounded-md border border-neutral-200 bg-neutral-50 p-3 dark:border-neutral-800 dark:bg-neutral-900\/40'/,
+  );
 });
 
 test('all dossier add actions share exactly one size contract', () => {

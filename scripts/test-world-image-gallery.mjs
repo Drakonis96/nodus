@@ -10,7 +10,7 @@ const read = (file) => readFile(path.join(repoRoot, file), 'utf8');
 test('the places tree draws explicit hierarchy connectors', async () => {
   const workspace = await read('src/components/world/WorldWorkspace.tsx');
   assert.match(workspace, /data-testid=\{`\$\{section\.id\}-tree`\}/);
-  assert.match(workspace, /border-b border-l border-neutral-700\/80/);
+  assert.match(workspace, /border-b border-l border-neutral-300 dark:border-neutral-700\/80/);
   assert.match(workspace, /children\.has\(id\) && <ul className="ml-3 pl-2">/);
 });
 

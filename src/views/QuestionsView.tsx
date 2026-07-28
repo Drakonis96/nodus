@@ -119,7 +119,7 @@ function questionsSection(
     EmptyState: settled ? NothingDecided : undefined,
     HeaderActions: () => (
       <button
-        className="btn btn-ghost h-9 gap-1.5 border border-neutral-700 px-2 text-xs"
+        className="btn btn-ghost h-9 gap-1.5 border border-neutral-300 dark:border-neutral-700 px-2 text-xs"
         data-testid="questions-settled-toggle"
         onClick={onToggleSettled}
       >
@@ -150,13 +150,13 @@ export function QuestionsView({ onNavigate }: { onNavigate?: (view: View) => voi
 }
 
 function NothingDecided() {
-  return <p className="text-sm text-neutral-500">{t('Todavía no has decidido nada aquí.')}</p>;
+  return <p className="text-sm text-neutral-600 dark:text-neutral-500">{t('Todavía no has decidido nada aquí.')}</p>;
 }
 
 const URGENCY_TONE: Record<string, string> = {
-  blocking: 'text-red-400',
-  soon: 'text-amber-400',
-  later: 'text-neutral-600',
+  blocking: 'text-red-600 dark:text-red-400',
+  soon: 'text-amber-700 dark:text-amber-400',
+  later: 'text-neutral-500 dark:text-neutral-600',
 };
 
 function QuestionRow({
@@ -174,7 +174,7 @@ function QuestionRow({
       data-urgency={item.urgency}
       data-origin={item.origin}
       onClick={onOpen}
-      className="flex w-full items-start gap-2 rounded-lg border border-neutral-800 px-2 py-1.5 text-left transition-colors hover:border-indigo-700/60 hover:bg-indigo-950/20"
+      className="flex w-full items-start gap-2 rounded-lg border border-neutral-200 dark:border-neutral-800 px-2 py-1.5 text-left transition-colors hover:border-indigo-400 dark:hover:border-violet-700/60 hover:bg-indigo-50 dark:hover:bg-indigo-950/20"
     >
       <Icon
         name={item.blocking ? 'alert' : item.origin === 'placeholder' ? 'edit' : 'help'}
@@ -182,9 +182,9 @@ function QuestionRow({
         className={`mt-0.5 shrink-0 ${URGENCY_TONE[item.urgency]}`}
       />
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm text-neutral-100">{item.question}</span>
+        <span className="block truncate text-sm text-neutral-900 dark:text-neutral-100">{item.question}</span>
         {!compact && (
-          <span className="mt-0.5 block truncate text-[11px] text-neutral-600">
+          <span className="mt-0.5 block truncate text-[11px] text-neutral-500 dark:text-neutral-600">
             {[
               item.anchor ? `${item.anchor.title}${item.anchorField ? ` → ${fieldLabel(item.anchorField)}` : ''}` : null,
               item.blockedScene ? tx('bloquea «{scene}»', { scene: item.blockedScene.title }) : null,
@@ -195,7 +195,7 @@ function QuestionRow({
           </span>
         )}
       </span>
-      {item.status === 'answered' && <Icon name="check" size={12} className="mt-0.5 shrink-0 text-emerald-500" />}
+      {item.status === 'answered' && <Icon name="check" size={12} className="mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-500" />}
     </button>
   );
 }
@@ -327,7 +327,7 @@ function QuestionSheet({
     <div className="space-y-5 p-6" data-testid="question-sheet">
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
-          <button className="mb-2 flex items-center gap-1 text-xs text-neutral-400 hover:text-neutral-200" onClick={onBack}>
+          <button className="mb-2 flex items-center gap-1 text-xs text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200" onClick={onBack}>
             <Icon name="chevronLeft" size={13} /> {t('Volver')}
           </button>
           <textarea
@@ -342,7 +342,7 @@ function QuestionSheet({
               void run((questionId) => window.nodus.updateWorldQuestion(questionId, { question: draft.trim() }));
             }}
           />
-          <p className="mt-1 text-xs text-neutral-500">
+          <p className="mt-1 text-xs text-neutral-600 dark:text-neutral-500">
             {[
               t(WORLD_QUESTION_ORIGIN_LABEL[item.origin]),
               item.status === 'open'
@@ -353,7 +353,7 @@ function QuestionSheet({
         </div>
         {item.questionId && (
           <button
-            className="btn btn-ghost h-8 w-8 shrink-0 p-0 text-red-300 hover:text-red-200"
+            className="btn btn-ghost h-8 w-8 shrink-0 p-0 text-red-600 dark:text-red-300 hover:text-red-700 dark:hover:text-red-200"
             title={t('Eliminar')}
             onClick={() => void remove()}
           >
@@ -366,13 +366,13 @@ function QuestionSheet({
           which of their own holes this is. */}
       {item.evidence && (
         <section className={PERSON_DOSSIER_SECTION_CLASS} data-testid="question-evidence">
-          <h3 className="mb-1 text-xs font-semibold uppercase tracking-wider text-neutral-500">
+          <h3 className="mb-1 text-xs font-semibold uppercase tracking-wider text-neutral-600 dark:text-neutral-500">
             {t('Dónde está el hueco')}
           </h3>
-          <p className="whitespace-pre-wrap text-xs leading-5 text-neutral-400">{item.evidence}</p>
+          <p className="whitespace-pre-wrap text-xs leading-5 text-neutral-600 dark:text-neutral-400">{item.evidence}</p>
           {item.anchor && (
             <button
-              className="mt-2 flex items-center gap-1 text-[11px] text-indigo-300 hover:text-indigo-200"
+              className="mt-2 flex items-center gap-1 text-[11px] text-indigo-700 dark:text-indigo-300 hover:text-indigo-700 dark:hover:text-indigo-200"
               disabled={!SECTION_OF_KIND[item.anchor.kind]}
               onClick={() => onNavigate?.(SECTION_OF_KIND[item.anchor!.kind])}
             >
@@ -387,7 +387,7 @@ function QuestionSheet({
       {/* What hangs off it, and what it holds up. The only two numbers on this screen the
           author cannot work out from what is in front of them. */}
       <section className={PERSON_DOSSIER_SECTION_CLASS} data-testid="question-leverage">
-        <p className="text-xs leading-5 text-neutral-400">
+        <p className="text-xs leading-5 text-neutral-600 dark:text-neutral-400">
           {item.leverage > 0
             ? tx('Lo que decidas aquí toca {count} textos que ya mencionan «{title}».', {
                 count: String(item.leverage),
@@ -396,14 +396,14 @@ function QuestionSheet({
             : t('Todavía no hay nada más en el mundo que dependa de esto.')}
         </p>
         {item.blockedScene && (
-          <p className="mt-1 text-xs text-amber-400" data-testid="question-blocked-scene">
+          <p className="mt-1 text-xs text-amber-700 dark:text-amber-400" data-testid="question-blocked-scene">
             {tx('No puedes escribir «{scene}» sin decidirlo (escena {order} del relato).', {
               scene: item.blockedScene.title,
               order: String(item.blockedScene.narrativeOrder + 1),
             })}
           </p>
         )}
-        <label className="mt-2 flex items-center gap-2 text-xs text-neutral-300">
+        <label className="mt-2 flex items-center gap-2 text-xs text-neutral-700 dark:text-neutral-300">
           <input
             type="checkbox"
             data-testid="question-blocking"
@@ -420,11 +420,11 @@ function QuestionSheet({
       </section>
 
       <section data-testid="question-options">
-        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-neutral-500">
+        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-neutral-600 dark:text-neutral-500">
           {item.status === 'answered' ? t('Lo que decidiste, y lo que descartaste') : t('Las salidas')}
         </h3>
         {item.options.length === 0 ? (
-          <p className="mb-2 text-[11px] leading-4 text-neutral-600">
+          <p className="mb-2 text-[11px] leading-4 text-neutral-500 dark:text-neutral-600">
             {t('Escribe dos o tres respuestas posibles. Elegir una la escribe donde toca.')}
           </p>
         ) : (
@@ -511,7 +511,7 @@ function QuestionSheet({
           </button>
           {item.status !== 'answered' && (
             <button
-              className="btn btn-ghost h-8 shrink-0 gap-1 border border-neutral-700 px-2 text-xs"
+              className="btn btn-ghost h-8 shrink-0 gap-1 border border-neutral-300 dark:border-neutral-700 px-2 text-xs"
               data-testid="question-propose"
               disabled={busy || proposing}
               onClick={() => void propose()}
@@ -526,14 +526,14 @@ function QuestionSheet({
           once rarely fills every hole it opened. */}
       {holes.length > 0 && (
         <section className={PERSON_DOSSIER_SECTION_CLASS} data-testid="question-remaining-holes">
-          <h3 className="mb-1 text-xs font-semibold uppercase tracking-wider text-neutral-500">
+          <h3 className="mb-1 text-xs font-semibold uppercase tracking-wider text-neutral-600 dark:text-neutral-500">
             {t('Sigue habiendo hueco en')}
           </h3>
           <ul className="space-y-0.5">
             {holes.map((hole) => (
-              <li key={`${hole.title}:${hole.field}`} className="truncate text-[11px] text-neutral-500">
+              <li key={`${hole.title}:${hole.field}`} className="truncate text-[11px] text-neutral-600 dark:text-neutral-500">
                 · {hole.title} → {fieldLabel(hole.field)}
-                <span className="text-neutral-600"> · {hole.evidence}</span>
+                <span className="text-neutral-500 dark:text-neutral-600"> · {hole.evidence}</span>
               </li>
             ))}
           </ul>
@@ -542,7 +542,7 @@ function QuestionSheet({
 
       {item.status !== 'answered' && (
         <button
-          className="btn btn-ghost w-full border border-neutral-700 text-xs"
+          className="btn btn-ghost w-full border border-neutral-300 dark:border-neutral-700 text-xs"
           data-testid="question-park"
           disabled={busy}
           onClick={() => {
@@ -554,7 +554,7 @@ function QuestionSheet({
         </button>
       )}
       {item.status === 'parked' && (
-        <p className="text-[10px] leading-4 text-neutral-600">
+        <p className="text-[10px] leading-4 text-neutral-500 dark:text-neutral-600">
           {t('Aparcada. Si venía de un hueco en tu prosa, seguirá aparcada aunque reescribas la frase.')}
         </p>
       )}
@@ -604,20 +604,20 @@ function OptionCard({
       data-testid="question-option"
       data-chosen={chosen ? 'true' : undefined}
       className={`flex h-full flex-col gap-2 rounded-lg border p-2 ${
-        chosen ? 'border-emerald-700/70 bg-emerald-950/10' : 'border-neutral-800'
+        chosen ? 'border-emerald-300 dark:border-emerald-700/70 bg-emerald-50 dark:bg-emerald-950/10' : 'border-neutral-200 dark:border-neutral-800'
       }`}
     >
-      <p className="min-h-0 flex-1 whitespace-pre-wrap text-xs leading-5 text-neutral-200">{option.text}</p>
+      <p className="min-h-0 flex-1 whitespace-pre-wrap text-xs leading-5 text-neutral-800 dark:text-neutral-200">{option.text}</p>
       {option.implications && (
-        <p className="text-[10px] leading-4 text-neutral-500">{option.implications}</p>
+        <p className="text-[10px] leading-4 text-neutral-600 dark:text-neutral-500">{option.implications}</p>
       )}
       {option.origin === 'ai' && (
-        <span className="text-[9px] uppercase tracking-wide text-amber-500">{t('Propuesta de la IA')}</span>
+        <span className="text-[9px] uppercase tracking-wide text-amber-700 dark:text-amber-500">{t('Propuesta de la IA')}</span>
       )}
 
       {option.appliedAt && canUndo ? (
         <button
-          className="btn btn-ghost border border-neutral-700 px-2 text-[11px]"
+          className="btn btn-ghost border border-neutral-300 dark:border-neutral-700 px-2 text-[11px]"
           data-testid="question-option-undo"
           disabled={busy}
           onClick={() => void onUndo()}
@@ -625,7 +625,7 @@ function OptionCard({
           {t('Deshacer')}
         </button>
       ) : option.appliedAt ? (
-        <span className="text-[10px] leading-4 text-neutral-600">
+        <span className="text-[10px] leading-4 text-neutral-500 dark:text-neutral-600">
           {t('Aplicada. El texto ha cambiado desde entonces, así que ya no se puede deshacer sola.')}
         </span>
       ) : (
@@ -641,7 +641,7 @@ function OptionCard({
           </button>
           {option.applyMode !== 'none' && (
             <button
-              className="text-[10px] text-neutral-500 hover:text-neutral-300"
+              className="text-[10px] text-neutral-600 dark:text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-300"
               disabled={busy}
               onClick={() => void onApply('none')}
             >
@@ -649,7 +649,7 @@ function OptionCard({
             </button>
           )}
           <button
-            className="text-[10px] text-neutral-600 hover:text-red-300"
+            className="text-[10px] text-neutral-500 hover:text-red-600 dark:text-neutral-600 dark:hover:text-red-300"
             disabled={busy}
             onClick={() => void onDelete()}
           >
@@ -688,14 +688,14 @@ function NewQuestionModal({ onClose, onCreated }: { onClose: () => void; onCreat
       <section className="card-modal w-full max-w-lg p-5" role="dialog" aria-modal="true" aria-labelledby="new-question-title">
         <div className="mb-4 flex items-start gap-3">
           <div className="min-w-0 flex-1">
-            <h3 id="new-question-title" className="text-base font-semibold text-neutral-100">
+            <h3 id="new-question-title" className="text-base font-semibold text-neutral-900 dark:text-neutral-100">
               {t('Nueva pregunta')}
             </h3>
-            <p className="mt-1 text-xs text-neutral-500">
+            <p className="mt-1 text-xs text-neutral-600 dark:text-neutral-500">
               {t('Lo que todavía no has decidido de tu mundo. Desde una ficha se captura sola, con su sitio ya puesto.')}
             </p>
           </div>
-          <button className="btn btn-ghost h-8 w-8 shrink-0 p-0 text-neutral-400" aria-label={t('Cerrar')} disabled={saving} onClick={onClose}>
+          <button className="btn btn-ghost h-8 w-8 shrink-0 p-0 text-neutral-600 dark:text-neutral-400" aria-label={t('Cerrar')} disabled={saving} onClick={onClose}>
             <Icon name="x" size={15} />
           </button>
         </div>
@@ -707,13 +707,13 @@ function NewQuestionModal({ onClose, onCreated }: { onClose: () => void; onCreat
           autoFocus
           onChange={(event) => setQuestion(event.target.value)}
         />
-        <p className="mt-2 text-[10px] leading-4 text-neutral-600">
+        <p className="mt-2 text-[10px] leading-4 text-neutral-500 dark:text-neutral-600">
           {tx('También aparecen aquí solos los huecos que dejas al escribir: {tokens}.', {
             tokens: WORLD_PLACEHOLDER_TOKENS.join('  '),
           })}
         </p>
-        <div className="mt-4 flex justify-end gap-2 border-t border-neutral-800 pt-3">
-          <button className="btn btn-ghost border border-neutral-700 px-3 text-xs" onClick={onClose} disabled={saving}>
+        <div className="mt-4 flex justify-end gap-2 border-t border-neutral-200 dark:border-neutral-800 pt-3">
+          <button className="btn btn-ghost border border-neutral-300 dark:border-neutral-700 px-3 text-xs" onClick={onClose} disabled={saving}>
             {t('Cancelar')}
           </button>
           <button className="btn btn-primary min-w-32" disabled={saving || !question.trim()} onClick={() => void save()}>

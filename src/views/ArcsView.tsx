@@ -104,19 +104,19 @@ export function ArcsView({ onNavigate }: { onNavigate?: (view: View) => void }) 
   const inert = useMemo(() => (data ? findInertScenes(data.scenes, data.beats) : []), [data]);
   const closing = useMemo(() => closingOrder(plotted), [plotted]);
 
-  if (!data) return <p className="p-6 text-sm text-neutral-500">{t('Cargando…')}</p>;
+  if (!data) return <p className="p-6 text-sm text-neutral-600 dark:text-neutral-500">{t('Cargando…')}</p>;
 
   const open = plotted.find((entry) => entry.thread.threadId === selected) ?? null;
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="shrink-0 space-y-2 border-b border-neutral-800 p-4">
+      <div className="shrink-0 space-y-2 border-b border-neutral-200 dark:border-neutral-800 p-4">
         <div className="flex items-center gap-2">
-          <Icon name="route" size={20} className="text-indigo-300" />
+          <Icon name="route" size={20} className="text-indigo-700 dark:text-indigo-300" />
           <h1 className="text-lg font-semibold">{t('Arcos narrativos')}</h1>
-          <span className="text-xs text-neutral-500">{plotted.length}</span>
+          <span className="text-xs text-neutral-600 dark:text-neutral-500">{plotted.length}</span>
           <button
-            className="btn btn-ghost ml-auto h-9 gap-1.5 border border-neutral-700 px-2 text-xs"
+            className="btn btn-ghost ml-auto h-9 gap-1.5 border border-neutral-300 dark:border-neutral-700 px-2 text-xs"
             data-testid="arcs-copy-sheet"
             onClick={async () => {
               await navigator.clipboard.writeText(milestoneSheet(plotted, sceneCount));
@@ -174,16 +174,16 @@ export function ArcsView({ onNavigate }: { onNavigate?: (view: View) => void }) 
 function EmptyArcs({ hasThreads, onNavigate }: { hasThreads: boolean; onNavigate?: (view: View) => void }) {
   return (
     <div className="py-12 text-center">
-      <Icon name="route" size={32} className="mx-auto mb-3 text-neutral-700" />
-      <p className="text-sm text-neutral-500">
+      <Icon name="route" size={32} className="mx-auto mb-3 text-neutral-400 dark:text-neutral-700" />
+      <p className="text-sm text-neutral-600 dark:text-neutral-500">
         {hasThreads ? t('Ningún arco coincide con el filtro.') : t('Todavía no hay arcos.')}
       </p>
       {!hasThreads && (
         <>
-          <p className="mx-auto mt-1 max-w-md text-xs leading-5 text-neutral-600">
+          <p className="mx-auto mt-1 max-w-md text-xs leading-5 text-neutral-500 dark:text-neutral-600">
             {t('Un arco se crea desde la escena en la que algo cambia, y sus hitos se marcan ahí mismo. Aquí verás cómo se reparten por el relato.')}
           </p>
-          <button className="btn btn-ghost mt-3 border border-neutral-700 text-xs" onClick={() => onNavigate?.('scenes')}>
+          <button className="btn btn-ghost mt-3 border border-neutral-300 dark:border-neutral-700 text-xs" onClick={() => onNavigate?.('scenes')}>
             {t('Ir a Escenas')}
           </button>
         </>
@@ -291,18 +291,18 @@ function Density({ bars, sceneCount }: { bars: number[]; sceneCount: number }) {
   const peak = Math.max(1, ...bars);
   return (
     <section className="mt-3" data-testid="arcs-density">
-      <h3 className="mb-1 text-[10px] uppercase tracking-wider text-neutral-600">{t('Dónde se concentra')}</h3>
+      <h3 className="mb-1 text-[10px] uppercase tracking-wider text-neutral-500 dark:text-neutral-600">{t('Dónde se concentra')}</h3>
       <div className="flex h-10 items-end gap-0.5">
         {bars.map((value, index) => (
           <span
             key={index}
-            className="flex-1 rounded-sm bg-indigo-800/70"
+            className="flex-1 rounded-sm bg-indigo-500 dark:bg-indigo-800/70"
             style={{ height: `${Math.max(2, (value / peak) * 100)}%` }}
             title={tx('{count} hitos', { count: String(value) })}
           />
         ))}
       </div>
-      <p className="mt-0.5 text-[10px] text-neutral-600">
+      <p className="mt-0.5 text-[10px] text-neutral-500 dark:text-neutral-600">
         {tx('A lo largo de {count} escenas, en orden de relato.', { count: String(sceneCount) })}
       </p>
     </section>
@@ -331,13 +331,13 @@ function ArcSheet({
   return (
     <section className={`${PERSON_DOSSIER_SECTION_CLASS} mt-4`} data-testid="arc-sheet">
       <div className="mb-2 flex items-baseline gap-2">
-        <h3 className="text-sm font-semibold text-neutral-100">{plotted.thread.title}</h3>
+        <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{plotted.thread.title}</h3>
         {subject && (
-          <span className="text-[11px] text-neutral-500">
+          <span className="text-[11px] text-neutral-600 dark:text-neutral-500">
             {subject.partyName} · {t(PARTY_SIDE_LABEL[subject.side])}
           </span>
         )}
-        <span className="ml-auto text-[11px] text-neutral-600">
+        <span className="ml-auto text-[11px] text-neutral-500 dark:text-neutral-600">
           {plotted.last !== null
             ? tx('cierra en la escena {scene} de {total}', {
                 scene: String(plotted.last + 1),
@@ -351,10 +351,10 @@ function ArcSheet({
         <dl className="mb-2 grid grid-cols-[auto,1fr] gap-x-3 gap-y-0.5 text-[11px]">
           {(['want', 'need'] as const).map((id) => (
             <div key={id} className="contents">
-              <dt className="text-neutral-600">
+              <dt className="text-neutral-500 dark:text-neutral-600">
                 {t(CHARACTER_ARC_FIELDS.find((field) => field.id === id)?.label ?? id)}
               </dt>
-              <dd className="text-neutral-300">{fields[id] ?? '—'}</dd>
+              <dd className="text-neutral-700 dark:text-neutral-300">{fields[id] ?? '—'}</dd>
             </div>
           ))}
         </dl>
@@ -363,17 +363,17 @@ function ArcSheet({
       <ul className="space-y-0.5">
         {plotted.beats.map((beat) => (
           <li key={beat.sceneId} className="flex items-baseline gap-2 text-[11px]">
-            <span className="w-12 shrink-0 text-neutral-600">{beat.position + 1}</span>
-            <span className="shrink-0 rounded bg-neutral-800 px-1 text-[10px] text-neutral-400">
+            <span className="w-12 shrink-0 text-neutral-500 dark:text-neutral-600">{beat.position + 1}</span>
+            <span className="shrink-0 rounded bg-neutral-200 dark:bg-neutral-800 px-1 text-[10px] text-neutral-600 dark:text-neutral-400">
               {t(BEAT_MARK_LABEL[beat.mark])}
             </span>
-            <span className="min-w-0 flex-1 truncate text-neutral-300">
+            <span className="min-w-0 flex-1 truncate text-neutral-700 dark:text-neutral-300">
               {beat.text ?? beat.sceneTitle}
             </span>
           </li>
         ))}
         {plotted.beats.length === 0 && (
-          <li className="text-[11px] text-neutral-600">{t('Ninguna escena lo mueve todavía.')}</li>
+          <li className="text-[11px] text-neutral-500 dark:text-neutral-600">{t('Ninguna escena lo mueve todavía.')}</li>
         )}
       </ul>
     </section>
@@ -393,13 +393,13 @@ function InertScenes({
   const worst = runs.filter((run) => run.scenes.length >= 2).slice(0, 4);
   if (worst.length === 0) return null;
   return (
-    <section className="mt-4 rounded-lg border border-amber-900/50 bg-amber-950/10 p-3" data-testid="arcs-inert">
-      <h3 className="mb-1 text-xs font-semibold uppercase tracking-wider text-amber-400">
+    <section className="mt-4 rounded-lg border border-amber-300 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/10 p-3" data-testid="arcs-inert">
+      <h3 className="mb-1 text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400">
         {t('Tramos que no mueven nada')}
       </h3>
       <ul className="space-y-0.5">
         {worst.map((run) => (
-          <li key={run.from} className="text-[11px] text-neutral-300">
+          <li key={run.from} className="text-[11px] text-neutral-700 dark:text-neutral-300">
             ·{' '}
             {tx('{count} escenas seguidas, de la {from} a la {to} de {total}', {
               count: String(run.scenes.length),
@@ -407,12 +407,12 @@ function InertScenes({
               to: String(run.to + 1),
               total: String(sceneCount),
             })}
-            <span className="ml-1 text-neutral-600">{run.scenes.map((scene) => scene.title).join(' · ')}</span>
+            <span className="ml-1 text-neutral-500 dark:text-neutral-600">{run.scenes.map((scene) => scene.title).join(' · ')}</span>
           </li>
         ))}
       </ul>
       <button
-        className="btn btn-ghost mt-2 border border-neutral-700 px-2 text-[11px]"
+        className="btn btn-ghost mt-2 border border-neutral-300 dark:border-neutral-700 px-2 text-[11px]"
         onClick={() => onNavigate?.('scenes')}
       >
         {t('Ir a Escenas')}
@@ -432,14 +432,14 @@ function ClosingOrder({
   if (closing.length < 2) return null;
   return (
     <section className={`${PERSON_DOSSIER_SECTION_CLASS} mt-4`} data-testid="arcs-closing">
-      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-neutral-500">
+      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-neutral-600 dark:text-neutral-500">
         {t('El orden en que cierran')}
       </h3>
       <ol className="space-y-0.5">
         {closing.map((entry) => (
           <li key={entry.thread.threadId} className="flex items-baseline gap-2 text-[11px]">
-            <span className="min-w-0 flex-1 truncate text-neutral-300">{entry.thread.title}</span>
-            <span className="shrink-0 text-neutral-600">
+            <span className="min-w-0 flex-1 truncate text-neutral-700 dark:text-neutral-300">{entry.thread.title}</span>
+            <span className="shrink-0 text-neutral-500 dark:text-neutral-600">
               {entry.last === null
                 ? t('sin cerrar')
                 : tx('escena {scene} de {total}', { scene: String(entry.last + 1), total: String(sceneCount) })}

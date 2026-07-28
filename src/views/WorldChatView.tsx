@@ -108,16 +108,16 @@ export function WorldChatView({ onNavigate }: { onNavigate?: (view: View) => voi
 
   return (
     <div className="flex h-full min-h-0 flex-col" data-testid="world-chat-view">
-      <div className="flex flex-wrap items-center gap-2 border-b border-neutral-800 p-4">
-        <Icon name="chat" size={20} className="text-indigo-300" />
+      <div className="flex flex-wrap items-center gap-2 border-b border-neutral-200 dark:border-neutral-800 p-4">
+        <Icon name="chat" size={20} className="text-indigo-700 dark:text-indigo-300" />
         <div className="min-w-0">
           <h1 className="truncate text-lg font-semibold">{t('Chat del mundo')}</h1>
-          <p className="text-[10px] text-neutral-500">
+          <p className="text-[10px] text-neutral-600 dark:text-neutral-500">
             {t('Nodus calcula y el modelo redacta: responde con lo que hay en tus fichas, y cita.')}
           </p>
         </div>
         <button
-          className="btn btn-ghost ml-auto h-8 gap-1.5 border border-neutral-700 px-2 text-xs"
+          className="btn btn-ghost ml-auto h-8 gap-1.5 border border-neutral-300 dark:border-neutral-700 px-2 text-xs"
           data-testid="world-chat-new"
           onClick={() => {
             setMessages([]);
@@ -132,19 +132,19 @@ export function WorldChatView({ onNavigate }: { onNavigate?: (view: View) => voi
       {/* What it actually looked at. A chat that answers about a world without saying which
           half of it it read is a chat you have to double-check. */}
       {focus.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5 border-b border-neutral-800 px-4 py-2" data-testid="world-chat-focus">
-          <span className="text-[10px] uppercase tracking-wide text-neutral-600">{t('Ha mirado')}</span>
+        <div className="flex flex-wrap items-center gap-1.5 border-b border-neutral-200 dark:border-neutral-800 px-4 py-2" data-testid="world-chat-focus">
+          <span className="text-[10px] uppercase tracking-wide text-neutral-500 dark:text-neutral-600">{t('Ha mirado')}</span>
           {focus.map((ref) => (
             <button
               key={`${ref.kind}:${ref.id}`}
-              className="rounded-full bg-neutral-800 px-2.5 py-0.5 text-[11px] text-neutral-300 hover:bg-neutral-700"
+              className="rounded-full bg-neutral-200 dark:bg-neutral-800 px-2.5 py-0.5 text-[11px] text-neutral-700 dark:text-neutral-300 hover:bg-neutral-300 dark:hover:bg-neutral-700"
               disabled={!SECTION_OF_KIND[ref.kind]}
               onClick={() => SECTION_OF_KIND[ref.kind] && onNavigate?.(SECTION_OF_KIND[ref.kind])}
             >
               {ref.title}
             </button>
           ))}
-          <label className="ml-auto flex items-center gap-1.5 text-[11px] text-neutral-400">
+          <label className="ml-auto flex items-center gap-1.5 text-[11px] text-neutral-600 dark:text-neutral-400">
             <input type="checkbox" checked={pinned} onChange={(event) => setPinned(event.target.checked)} />
             {t('Seguir con esto')}
           </label>
@@ -154,15 +154,15 @@ export function WorldChatView({ onNavigate }: { onNavigate?: (view: View) => voi
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto p-4">
         {messages.length === 0 && !streaming && (
           <div className="mx-auto mt-10 max-w-xl text-center">
-            <Icon name="chat" size={32} className="mx-auto mb-2 text-neutral-700" />
-            <p className="mb-4 text-sm text-neutral-400">
+            <Icon name="chat" size={32} className="mx-auto mb-2 text-neutral-400 dark:text-neutral-700" />
+            <p className="mb-4 text-sm text-neutral-600 dark:text-neutral-400">
               {t('Pregúntale a tu mundo. Nombra en la pregunta lo que quieras que mire.')}
             </p>
             <div className="flex flex-col gap-2">
               {STARTERS.map((starter) => (
                 <button
                   key={starter}
-                  className="rounded-lg border border-neutral-800 px-3 py-2 text-left text-sm hover:border-indigo-600/70 hover:bg-neutral-900"
+                  className="rounded-lg border border-neutral-200 dark:border-neutral-800 px-3 py-2 text-left text-sm hover:border-indigo-400 dark:hover:border-violet-600/70 hover:bg-neutral-100 dark:hover:bg-neutral-900"
                   onClick={() => void send(t(starter))}
                 >
                   {t(starter)}
@@ -182,22 +182,22 @@ export function WorldChatView({ onNavigate }: { onNavigate?: (view: View) => voi
               <div
                 key={index}
                 data-testid="world-chat-answer"
-                className="self-start max-w-[95%] rounded-2xl border border-neutral-800 bg-neutral-900 px-3.5 py-2"
+                className="self-start max-w-[95%] rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-neutral-100 dark:bg-neutral-900 px-3.5 py-2"
               >
                 {answer(message.content)}
               </div>
             )
           )}
           {streaming && (
-            <div className="self-start max-w-[95%] rounded-2xl border border-neutral-800 bg-neutral-900 px-3.5 py-2">
+            <div className="self-start max-w-[95%] rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-neutral-100 dark:bg-neutral-900 px-3.5 py-2">
               {answer(streaming)}
             </div>
           )}
-          {busy && !streaming && <div className="self-start text-xs text-neutral-500">{t('Pensando…')}</div>}
+          {busy && !streaming && <div className="self-start text-xs text-neutral-600 dark:text-neutral-500">{t('Pensando…')}</div>}
         </div>
       </div>
 
-      <div className="border-t border-neutral-800 p-3">
+      <div className="border-t border-neutral-200 dark:border-neutral-800 p-3">
         <div className="mx-auto flex max-w-3xl gap-2">
           <input
             className="input flex-1"
@@ -211,7 +211,7 @@ export function WorldChatView({ onNavigate }: { onNavigate?: (view: View) => voi
             }}
           />
           {busy ? (
-            <button className="btn btn-ghost border border-neutral-700" onClick={() => void window.nodus.cancelWorldChat()}>
+            <button className="btn btn-ghost border border-neutral-300 dark:border-neutral-700" onClick={() => void window.nodus.cancelWorldChat()}>
               <Icon name="stop" /> {t('Detener')}
             </button>
           ) : (
@@ -220,7 +220,7 @@ export function WorldChatView({ onNavigate }: { onNavigate?: (view: View) => voi
             </button>
           )}
         </div>
-        <p className="mx-auto mt-1.5 max-w-3xl text-[10px] leading-4 text-neutral-600">
+        <p className="mx-auto mt-1.5 max-w-3xl text-[10px] leading-4 text-neutral-500 dark:text-neutral-600">
           {t('No escribe nada en tu mundo: lo que te proponga, lo copias tú o lo conviertes en pregunta abierta.')}
         </p>
       </div>

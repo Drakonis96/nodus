@@ -77,9 +77,9 @@ export function AutoSavingField({
         <span className="sr-only">{label}</span>
       ) : (
         <span className="mb-1 flex items-baseline gap-2">
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">{label}</span>
-          {hint && <span className="text-[10px] text-neutral-600">{hint}</span>}
-          {saving && <span className="ml-auto text-[10px] text-neutral-500">{t('Guardando…')}</span>}
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-neutral-600 dark:text-neutral-400">{label}</span>
+          {hint && <span className="text-[10px] text-neutral-500 dark:text-neutral-600">{hint}</span>}
+          {saving && <span className="ml-auto text-[10px] text-neutral-600 dark:text-neutral-500">{t('Guardando…')}</span>}
         </span>
       )}
       <textarea
@@ -109,7 +109,7 @@ export function AutoSavingField({
         <button
           type="button"
           data-testid="capture-question"
-          className="mt-1 flex items-center gap-1 text-[10px] text-indigo-300 hover:text-indigo-200"
+          className="mt-1 flex items-center gap-1 text-[10px] text-indigo-700 hover:text-indigo-800 dark:text-indigo-300 dark:hover:text-indigo-200"
           title={t('Alt+Q')}
           onMouseDown={(event) => event.preventDefault()}
           onClick={() => void captureSelection()}

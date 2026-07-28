@@ -126,7 +126,7 @@ export function RulesView({ onNavigate }: { onNavigate?: (view: View) => void })
     };
   }, []);
 
-  if (!ready) return <p className="p-6 text-sm text-neutral-500">{t('Cargando…')}</p>;
+  if (!ready) return <p className="p-6 text-sm text-neutral-600 dark:text-neutral-500">{t('Cargando…')}</p>;
 
   return (
     <WorldWorkspace
@@ -143,23 +143,23 @@ function RuleRow({ item, compact, onOpen }: { item: WorldRule; compact: boolean;
       data-testid="rule-row"
       data-health={health}
       onClick={onOpen}
-      className="w-full rounded-lg border border-neutral-800 p-2 text-left transition-colors hover:border-indigo-700/60 hover:bg-indigo-950/20"
+      className="w-full rounded-lg border border-neutral-200 dark:border-neutral-800 p-2 text-left transition-colors hover:border-indigo-400 dark:hover:border-violet-700/60 hover:bg-indigo-50 dark:hover:bg-indigo-950/20"
     >
       <span className="flex items-baseline gap-2">
-        <span className="min-w-0 flex-1 truncate text-sm text-neutral-100">{item.title}</span>
+        <span className="min-w-0 flex-1 truncate text-sm text-neutral-900 dark:text-neutral-100">{item.title}</span>
         {item.parentRuleId && (
-          <span className="shrink-0 rounded bg-neutral-800 px-1 text-[9px] uppercase tracking-wide text-neutral-500">
+          <span className="shrink-0 rounded bg-neutral-200 dark:bg-neutral-800 px-1 text-[9px] uppercase tracking-wide text-neutral-600 dark:text-neutral-500">
             {t('Excepción')}
           </span>
         )}
-        <span className="shrink-0 text-[10px] text-neutral-600">{t(RULE_HARDNESS_LABEL[item.hardness])}</span>
+        <span className="shrink-0 text-[10px] text-neutral-500 dark:text-neutral-600">{t(RULE_HARDNESS_LABEL[item.hardness])}</span>
       </span>
       {!compact && item.statement && (
-        <span className="mt-0.5 line-clamp-1 block text-[11px] text-neutral-500">{item.statement}</span>
+        <span className="mt-0.5 line-clamp-1 block text-[11px] text-neutral-600 dark:text-neutral-500">{item.statement}</span>
       )}
       {!compact && health !== 'working' && (
         <span
-          className={`mt-0.5 block text-[10px] ${health === 'unpaid' ? 'text-amber-500' : 'text-neutral-600'}`}
+          className={`mt-0.5 block text-[10px] ${health === 'unpaid' ? 'text-amber-700 dark:text-amber-500' : 'text-neutral-500 dark:text-neutral-600'}`}
         >
           {t(RULE_HEALTH_LABEL[health])}
         </span>
@@ -249,18 +249,18 @@ function RuleSheet({
     <div className="space-y-5 p-6" data-testid="rule-sheet">
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
-          <button className="mb-2 flex items-center gap-1 text-xs text-neutral-400 hover:text-neutral-200" onClick={onBack}>
+          <button className="mb-2 flex items-center gap-1 text-xs text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200" onClick={onBack}>
             <Icon name="chevronLeft" size={13} /> {t('Volver')}
           </button>
           <h2 className="text-xl font-semibold">{rule.title}</h2>
-          <p className="text-sm text-neutral-400">
+          <p className="text-sm text-neutral-600 dark:text-neutral-400">
             {[t(RULE_HARDNESS_LABEL[rule.hardness]), t(RULE_STATUS_LABEL[rule.status])].join(' · ')}
           </p>
         </div>
         <div className="flex shrink-0 gap-1">
           {!rule.proposedText && (
             <button
-              className="btn btn-ghost h-8 gap-1 border border-neutral-700 px-2 text-xs"
+              className="btn btn-ghost h-8 gap-1 border border-neutral-300 dark:border-neutral-700 px-2 text-xs"
               data-testid="rule-draft"
               disabled={drafting}
               onClick={() => void draft()}
@@ -269,7 +269,7 @@ function RuleSheet({
             </button>
           )}
           <button
-            className="btn btn-ghost h-8 w-8 p-0 text-red-300 hover:text-red-200"
+            className="btn btn-ghost h-8 w-8 p-0 text-red-600 dark:text-red-300 hover:text-red-700 dark:hover:text-red-200"
             title={t('Eliminar')}
             onClick={() => void remove()}
           >
@@ -280,12 +280,12 @@ function RuleSheet({
 
       {/* The AI draft, quarantined exactly as an article's is. */}
       {rule.proposedText && (
-        <section className="rounded-xl border border-amber-800/60 bg-amber-950/10 p-4" data-testid="rule-proposal">
-          <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-amber-400">
+        <section className="rounded-xl border border-amber-300 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-950/10 p-4" data-testid="rule-proposal">
+          <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400">
             <Icon name="sparkles" size={13} /> {t('Propuesta de la IA')}
           </h3>
-          <p className="whitespace-pre-wrap text-sm text-neutral-300">{rule.proposedText}</p>
-          <p className="mt-1 text-[10px] leading-4 text-neutral-600">
+          <p className="whitespace-pre-wrap text-sm text-neutral-700 dark:text-neutral-300">{rule.proposedText}</p>
+          <p className="mt-1 text-[10px] leading-4 text-neutral-500 dark:text-neutral-600">
             {t('Solo el enunciado. El precio y los límites los escribes tú: cada uno responde a una pregunta distinta.')}
           </p>
           <div className="mt-3 flex gap-2">
@@ -299,7 +299,7 @@ function RuleSheet({
               {t('Aceptar')}
             </button>
             <button
-              className="btn btn-ghost border border-neutral-700 px-3 text-xs"
+              className="btn btn-ghost border border-neutral-300 dark:border-neutral-700 px-3 text-xs"
               onClick={async () => {
                 await window.nodus.rejectRuleDraft(rule.ruleId);
                 await onChanged();
@@ -344,7 +344,7 @@ function RuleSheet({
       <section className={PERSON_DOSSIER_SECTION_CLASS} data-testid="rule-scope">
         <div className="grid gap-3 sm:grid-cols-3">
           <label className="block">
-            <span className="mb-1 block text-[10px] uppercase tracking-wide text-neutral-500">{t('Dureza')}</span>
+            <span className="mb-1 block text-[10px] uppercase tracking-wide text-neutral-600 dark:text-neutral-500">{t('Dureza')}</span>
             <select
               className="input h-9 w-full text-sm"
               value={rule.hardness}
@@ -358,7 +358,7 @@ function RuleSheet({
             </select>
           </label>
           <label className="block">
-            <span className="mb-1 block text-[10px] uppercase tracking-wide text-neutral-500">{t('Rige sobre')}</span>
+            <span className="mb-1 block text-[10px] uppercase tracking-wide text-neutral-600 dark:text-neutral-500">{t('Rige sobre')}</span>
             <select
               className="input h-9 w-full text-sm"
               value={rule.scopeKind}
@@ -374,7 +374,7 @@ function RuleSheet({
             </select>
           </label>
           <label className="block">
-            <span className="mb-1 block text-[10px] uppercase tracking-wide text-neutral-500">{t('Estado')}</span>
+            <span className="mb-1 block text-[10px] uppercase tracking-wide text-neutral-600 dark:text-neutral-500">{t('Estado')}</span>
             <select
               className="input h-9 w-full text-sm"
               value={rule.status}
@@ -390,7 +390,7 @@ function RuleSheet({
         </div>
         {rule.scopeKind !== 'world' && (
           <label className="mt-2 block">
-            <span className="mb-1 block text-[10px] uppercase tracking-wide text-neutral-500">
+            <span className="mb-1 block text-[10px] uppercase tracking-wide text-neutral-600 dark:text-neutral-500">
               {t(rule.scopeKind === 'group' ? 'Qué facción' : 'Qué lugar')}
             </span>
             <select
@@ -413,13 +413,13 @@ function RuleSheet({
             </select>
           </label>
         )}
-        <p className="mt-1 text-[10px] leading-4 text-neutral-600">{t(RULE_HARDNESS_HINT[rule.hardness])}</p>
+        <p className="mt-1 text-[10px] leading-4 text-neutral-500 dark:text-neutral-600">{t(RULE_HARDNESS_HINT[rule.hardness])}</p>
       </section>
 
       <section className={PERSON_DOSSIER_SECTION_CLASS} data-testid="rule-tests">
-        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-neutral-500">{t('Puesta a prueba')}</h3>
+        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-neutral-600 dark:text-neutral-500">{t('Puesta a prueba')}</h3>
         {beats.length === 0 ? (
-          <p className="text-[11px] leading-4 text-neutral-600">
+          <p className="text-[11px] leading-4 text-neutral-500 dark:text-neutral-600">
             {t('Ninguna escena la pone a prueba todavía. Se marca desde la ficha de la escena.')}
           </p>
         ) : (
@@ -429,15 +429,15 @@ function RuleSheet({
                 .sort((a, b) => a.narrativeOrder - b.narrativeOrder)
                 .map((beat) => (
                   <li key={beat.sceneId} className="flex items-baseline gap-2 text-xs">
-                    <span className="w-8 shrink-0 text-neutral-600">{beat.narrativeOrder + 1}</span>
-                    <span className="shrink-0 rounded bg-neutral-800 px-1 text-[10px] text-neutral-400">
+                    <span className="w-8 shrink-0 text-neutral-500 dark:text-neutral-600">{beat.narrativeOrder + 1}</span>
+                    <span className="shrink-0 rounded bg-neutral-200 dark:bg-neutral-800 px-1 text-[10px] text-neutral-600 dark:text-neutral-400">
                       {t(BEAT_MARK_LABEL[beat.mark])}
                     </span>
-                    <span className="min-w-0 flex-1 truncate text-neutral-200">{beat.sceneTitle}</span>
+                    <span className="min-w-0 flex-1 truncate text-neutral-800 dark:text-neutral-200">{beat.sceneTitle}</span>
                     {beat.mark === 'breaks' && (
                       <span
                         className={`shrink-0 text-[10px] ${
-                          beat.paid === false ? 'text-amber-500' : beat.paid ? 'text-neutral-600' : 'text-neutral-700'
+                          beat.paid === false ? 'text-amber-700 dark:text-amber-500' : beat.paid ? 'text-neutral-500 dark:text-neutral-600' : 'text-neutral-400 dark:text-neutral-700'
                         }`}
                       >
                         {beat.paid === false
@@ -452,7 +452,7 @@ function RuleSheet({
             </ul>
             {/* Three states, and only the explicit zero is a problem. */}
             {tally.unjudged > 0 && (
-              <p className="mt-1 text-[10px] text-neutral-600">
+              <p className="mt-1 text-[10px] text-neutral-500 dark:text-neutral-600">
                 {tx('{count} roturas sin juzgar: márcalas en la escena para saber si el precio está en la página.', {
                   count: String(tally.unjudged),
                 })}
@@ -464,10 +464,10 @@ function RuleSheet({
 
       {exceptions.length > 0 && (
         <section className={PERSON_DOSSIER_SECTION_CLASS} data-testid="rule-exceptions">
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-neutral-500">{t('Excepciones')}</h3>
+          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-neutral-600 dark:text-neutral-500">{t('Excepciones')}</h3>
           <ul className="space-y-0.5">
             {exceptions.map((exception) => (
-              <li key={exception.ruleId} className="truncate text-xs text-neutral-300">
+              <li key={exception.ruleId} className="truncate text-xs text-neutral-700 dark:text-neutral-300">
                 · {exception.title}
               </li>
             ))}
@@ -476,7 +476,7 @@ function RuleSheet({
       )}
 
       <button
-        className="btn btn-ghost w-full border border-neutral-700 text-xs"
+        className="btn btn-ghost w-full border border-neutral-300 dark:border-neutral-700 text-xs"
         onClick={() => onNavigate?.('scenes')}
       >
         {t('Ir a Escenas para ponerla a prueba')}

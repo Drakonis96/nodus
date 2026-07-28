@@ -54,9 +54,9 @@ export function NewRuleModal({
     >
       <section className="card-modal w-full max-w-lg p-5" role="dialog" aria-modal="true" data-testid="new-rule-modal">
         <div className="mb-4 flex items-start gap-3">
-          <h3 className="min-w-0 flex-1 text-base font-semibold text-neutral-100">{t('Nueva regla')}</h3>
+          <h3 className="min-w-0 flex-1 text-base font-semibold text-neutral-900 dark:text-neutral-100">{t('Nueva regla')}</h3>
           <button
-            className="btn btn-ghost h-8 w-8 shrink-0 p-0 text-neutral-400"
+            className="btn btn-ghost h-8 w-8 shrink-0 p-0 text-neutral-600 dark:text-neutral-400"
             aria-label={t('Cerrar')}
             disabled={saving}
             onClick={onClose}
@@ -76,13 +76,15 @@ export function NewRuleModal({
           />
 
           <div>
-            <span className="mb-1 block text-[10px] uppercase tracking-wide text-neutral-500">{t('Qué clase de ley')}</span>
+            <span className="mb-1 block text-[10px] uppercase tracking-wide text-neutral-600 dark:text-neutral-500">{t('Qué clase de ley')}</span>
             <div className="space-y-1">
               {RULE_HARDNESS.map((entry) => (
                 <label
                   key={entry}
                   className={`flex cursor-pointer items-start gap-2 rounded border p-2 text-xs ${
-                    hardness === entry ? 'border-indigo-600 bg-indigo-950/20' : 'border-neutral-800'
+                    hardness === entry
+                      ? 'border-indigo-400 bg-indigo-50 dark:border-indigo-600 dark:bg-indigo-950/20'
+                      : 'border-neutral-200 dark:border-neutral-800'
                   }`}
                 >
                   <input
@@ -92,8 +94,8 @@ export function NewRuleModal({
                     onChange={() => setHardness(entry)}
                   />
                   <span>
-                    <span className="block text-neutral-200">{t(RULE_HARDNESS_LABEL[entry])}</span>
-                    <span className="block text-[10px] text-neutral-600">{t(RULE_HARDNESS_HINT[entry])}</span>
+                    <span className="block text-neutral-800 dark:text-neutral-200">{t(RULE_HARDNESS_LABEL[entry])}</span>
+                    <span className="block text-[10px] text-neutral-500 dark:text-neutral-600">{t(RULE_HARDNESS_HINT[entry])}</span>
                   </span>
                 </label>
               ))}
@@ -102,14 +104,14 @@ export function NewRuleModal({
 
           {!title.trim() && (
             <div>
-              <span className="mb-1 block text-[10px] uppercase tracking-wide text-neutral-500">
+              <span className="mb-1 block text-[10px] uppercase tracking-wide text-neutral-600 dark:text-neutral-500">
                 {t('O empieza por una de estas')}
               </span>
               <div className="flex flex-wrap gap-1">
                 {RULE_SUGGESTIONS.map((suggestion) => (
                   <button
                     key={suggestion}
-                    className="rounded-full border border-neutral-700 px-2 py-0.5 text-[11px] text-neutral-400 hover:border-neutral-600 hover:text-neutral-200"
+                    className="rounded-full border border-neutral-300 px-2 py-0.5 text-[11px] text-neutral-600 hover:border-neutral-500 hover:text-neutral-900 dark:border-neutral-700 dark:text-neutral-400 dark:hover:border-neutral-600 dark:hover:text-neutral-200"
                     onClick={() => setTitle(t(suggestion))}
                   >
                     {t(suggestion)}
@@ -119,8 +121,8 @@ export function NewRuleModal({
             </div>
           )}
 
-          <div className="flex justify-end gap-2 border-t border-neutral-800 pt-3">
-            <button className="btn btn-ghost border border-neutral-700 px-3 text-xs" onClick={onClose} disabled={saving}>
+          <div className="flex justify-end gap-2 border-t border-neutral-200 pt-3 dark:border-neutral-800">
+            <button className="btn btn-ghost border border-neutral-300 px-3 text-xs dark:border-neutral-700" onClick={onClose} disabled={saving}>
               {t('Cancelar')}
             </button>
             <button className="btn btn-primary min-w-32" disabled={saving || !title.trim()} onClick={() => void save()}>
