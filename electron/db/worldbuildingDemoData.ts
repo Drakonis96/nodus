@@ -38,6 +38,7 @@ const PREFIX = 'demo-world-';
 const AT = '2026-07-28T12:00:00.000Z';
 const PREVIOUS_AT = '2026-07-21T12:00:00.000Z';
 const IMAGE_AT = '2026-07-28T21:00:00.000Z';
+const MATCHED_THUMBNAIL_AT = '2026-07-28T22:45:00.000Z';
 
 type DemoLocale = AppLanguage;
 type Localized = WorldbuildingDemoLocalized;
@@ -461,6 +462,65 @@ export function upgradeWorldbuildingDemoImageQuality(): boolean {
            updated_at = ?
          WHERE person_id = ? AND mime = 'image/webp'`
       ).run(demoAsset(`${base}.png`), demoAsset(`${base}.webp`), IMAGE_AT, personId);
+    }
+
+    // The first lossless-image upgrade shipped its PNG originals and WebP card images
+    // independently. Several pairs therefore depicted different characters: the grid
+    // loaded one asset and the dossier loaded another. Repair only rows whose original
+    // still equals the distributed PNG byte-for-byte. A portrait replaced by the author
+    // is not demo-owned anymore and must never have even its thumbnail rewritten.
+    const currentPortraits = db
+      .prepare(
+        `SELECT person_id, blob, thumbnail
+           FROM person_portraits
+          WHERE person_id LIKE ? AND mime = 'image/png'`
+      )
+      .all(`${PREFIX}char-%`) as Array<{
+        person_id: string;
+        blob: Buffer;
+        thumbnail: Buffer | null;
+      }>;
+    for (const portrait of currentPortraits) {
+      const base = `character-${portrait.person_id.slice(`${PREFIX}char-`.length)}`;
+      const shippedOriginal = demoAsset(`${base}.png`);
+      const shippedThumbnail = demoAsset(`${base}.webp`);
+      if (
+        portrait.blob.equals(shippedOriginal)
+        && !portrait.thumbnail?.equals(shippedThumbnail)
+      ) {
+        db.prepare(
+          `UPDATE person_portraits
+              SET thumbnail = ?, thumbnail_mime = 'image/webp', updated_at = ?
+            WHERE person_id = ? AND blob = ?`
+        ).run(shippedThumbnail, MATCHED_THUMBNAIL_AT, portrait.person_id, shippedOriginal);
+      }
+    }
+
+    // The character gallery repeats the portrait as its first image and uses the same
+    // thumbnail/original split, so keep that pair under the identical invariant.
+    const currentCharacterImages = db
+      .prepare(
+        `SELECT image_id, entity_id, blob, thumbnail
+           FROM world_images
+          WHERE image_id LIKE ? AND entity_kind = 'character' AND mime_type = 'image/png'`
+      )
+      .all(`${PREFIX}%`) as Array<{
+        image_id: string;
+        entity_id: string;
+        blob: Buffer;
+        thumbnail: Buffer | null;
+      }>;
+    for (const image of currentCharacterImages) {
+      const base = `character-${image.entity_id.slice(`${PREFIX}char-`.length)}`;
+      const shippedOriginal = demoAsset(`${base}.png`);
+      const shippedThumbnail = demoAsset(`${base}.webp`);
+      if (image.blob.equals(shippedOriginal) && !image.thumbnail?.equals(shippedThumbnail)) {
+        db.prepare(
+          `UPDATE world_images
+              SET thumbnail = ?, thumbnail_mime_type = 'image/webp', updated_at = ?
+            WHERE image_id = ? AND blob = ?`
+        ).run(shippedThumbnail, MATCHED_THUMBNAIL_AT, image.image_id, shippedOriginal);
+      }
     }
 
     const mapRows = [

@@ -6,6 +6,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { build } from 'esbuild';
 import { createCanvas, Image } from '@napi-rs/canvas';
+import sharp from 'sharp';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -78,6 +79,30 @@ test('every worldbuilding demo visual has a larger lossless original beside its 
       `${originalName} carries materially more source detail`,
     );
     assert.ok(fs.statSync(originalPath).size > fs.statSync(thumbnailPath).size, `${originalName} is not the compressed derivative`);
+  }
+});
+
+test('every character card thumbnail is derived from the same image its dossier opens', async () => {
+  const assetDir = path.join(root, 'electron/assets/worldbuilding-demo');
+  const originals = fs.readdirSync(assetDir).filter((file) => /^character-.*\.png$/.test(file)).sort();
+  assert.equal(originals.length, 10);
+
+  for (const originalName of originals) {
+    const originalPath = path.join(assetDir, originalName);
+    const thumbnailPath = originalPath.replace(/\.png$/, '.webp');
+    const [original, thumbnail] = await Promise.all([
+      sharp(originalPath).resize(90, 120, { fit: 'fill' }).removeAlpha().raw().toBuffer(),
+      sharp(thumbnailPath).resize(90, 120, { fit: 'fill' }).removeAlpha().raw().toBuffer(),
+    ]);
+    let absoluteError = 0;
+    for (let index = 0; index < original.length; index += 1) {
+      absoluteError += Math.abs(original[index] - thumbnail[index]);
+    }
+    const meanAbsoluteError = absoluteError / original.length;
+    assert.ok(
+      meanAbsoluteError < 8,
+      `${originalName} and its card thumbnail diverge (MAE ${meanAbsoluteError.toFixed(2)})`
+    );
   }
 });
 

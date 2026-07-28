@@ -145,6 +145,45 @@ try {
   `).run();
   assert.equal(worldbuilding.seedWorldbuildingDemoData(), true);
 
+  // Regression: older demo builds paired the lossless original with an independently
+  // produced thumbnail, so opening a character appeared to swap people. The upgrade
+  // repairs both the primary portrait and gallery copy, but leaves a user replacement
+  // alone because its original bytes no longer match the shipped asset.
+  const elanThumbnail = fs.readFileSync(path.join(demoAssetDir, 'character-elan.webp'));
+  const wrongThumbnail = fs.readFileSync(path.join(demoAssetDir, 'character-aurel.webp'));
+  db.prepare(
+    "UPDATE person_portraits SET thumbnail = ? WHERE person_id = 'demo-world-char-elan'"
+  ).run(wrongThumbnail);
+  db.prepare(
+    "UPDATE world_images SET thumbnail = ? WHERE image_id = 'demo-world-image-character-char-elan-0'"
+  ).run(wrongThumbnail);
+  const customOriginal = Buffer.from('author-owned-original');
+  const customThumbnail = Buffer.from('author-owned-thumbnail');
+  const veshPortrait = db.prepare(
+    "SELECT blob, thumbnail, mime, thumbnail_mime, updated_at FROM person_portraits WHERE person_id = 'demo-world-char-vesh'"
+  ).get();
+  db.prepare(
+    "UPDATE person_portraits SET blob = ?, thumbnail = ? WHERE person_id = 'demo-world-char-vesh'"
+  ).run(customOriginal, customThumbnail);
+  assert.equal(worldbuilding.upgradeWorldbuildingDemoImageQuality(), true);
+  assert.ok(
+    db.prepare("SELECT thumbnail FROM person_portraits WHERE person_id = 'demo-world-char-elan'").get().thumbnail.equals(elanThumbnail),
+    'legacy character card thumbnail is rebuilt from the matching original'
+  );
+  assert.ok(
+    db.prepare("SELECT thumbnail FROM world_images WHERE image_id = 'demo-world-image-character-char-elan-0'").get().thumbnail.equals(elanThumbnail),
+    'legacy gallery thumbnail is rebuilt from the matching original'
+  );
+  assert.ok(
+    db.prepare("SELECT thumbnail FROM person_portraits WHERE person_id = 'demo-world-char-vesh'").get().thumbnail.equals(customThumbnail),
+    'an author-owned replacement is not rewritten'
+  );
+  db.prepare(
+    `UPDATE person_portraits
+        SET blob = ?, thumbnail = ?, mime = ?, thumbnail_mime = ?, updated_at = ?
+      WHERE person_id = 'demo-world-char-vesh'`
+  ).run(veshPortrait.blob, veshPortrait.thumbnail, veshPortrait.mime, veshPortrait.thumbnail_mime, veshPortrait.updated_at);
+
   // Existing demo vaults must gain the new dynasty section without being reset.
   db.prepare(`
     DELETE FROM world_images
@@ -295,6 +334,22 @@ try {
       AS thumbnail_bytes
   `).get();
   assert.ok(Number(seededArtwork.original_bytes) > Number(seededArtwork.thumbnail_bytes) * 10, 'lists stay light without reducing the zoomable originals');
+  for (const personId of [
+    'aurel', 'cael', 'elan', 'ilyra', 'maelor', 'nara', 'odran', 'sena', 'tarek', 'vesh',
+  ].map((slug) => `demo-world-char-${slug}`)) {
+    const slug = personId.slice('demo-world-char-'.length);
+    const portrait = db.prepare(
+      'SELECT blob, thumbnail FROM person_portraits WHERE person_id = ?'
+    ).get(personId);
+    assert.ok(
+      portrait.blob.equals(fs.readFileSync(path.join(demoAssetDir, `character-${slug}.png`))),
+      `${slug} dossier uses its own original`
+    );
+    assert.ok(
+      portrait.thumbnail.equals(fs.readFileSync(path.join(demoAssetDir, `character-${slug}.webp`))),
+      `${slug} card uses the thumbnail derived from that original`
+    );
+  }
 
   // A populated table is not enough: every non-AI reader behind the eighteen
   // Worldbuilding sections must be able to interpret the same connected corpus.
