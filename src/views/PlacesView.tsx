@@ -1,16 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import type { WorldPlace } from '@shared/types';
+import type { CharacterImage, WorldPlace } from '@shared/types';
 import { checkPlaceScale, placeKind, placeKindGroups, suggestedChildKind, wouldCycle } from '@shared/placeKinds';
+import { CHARACTER_IMAGE_KIND_LABEL } from '@shared/characterLabels';
 import type { WorldSectionDef } from '../components/world/WorldWorkspace';
 import { WorldWorkspace } from '../components/world/WorldWorkspace';
 import { WorldGallery } from '../components/world/WorldGallery';
+import { ImageLightbox, type ImageLightboxItem } from '../components/ImageLightbox';
 import { AutoSavingField } from '../components/AutoSavingField';
 import { Icon } from '../components/ui';
 import { confirm } from '../components/feedback';
 import { PERSON_DOSSIER_SECTION_CLASS } from '../components/personDossierLayout';
 import { ContinuityBadge } from '../components/world/ContinuityBadge';
 import { t, tx } from '../i18n';
+import { worldImageUrl } from '../lib/imageUrl';
 
 /**
  * The places of a world.
@@ -72,6 +75,8 @@ function PlaceSheet({
 }) {
   const [places, setPlaces] = useState<WorldPlace[]>([]);
   const [inhabitants, setInhabitants] = useState<{ personId: string; displayName: string; role: string | null }[]>([]);
+  const [images, setImages] = useState<CharacterImage[]>([]);
+  const [viewingId, setViewingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     void window.nodus.listWorldPlaces().then(setPlaces);
@@ -85,6 +90,17 @@ function PlaceSheet({
   const parent = places.find((entry) => entry.placeId === place.parentId) ?? null;
   const scaleWarning = checkPlaceScale(place.kind, parent?.kind);
   const parentOf = (id: string) => places.find((entry) => entry.placeId === id)?.parentId ?? null;
+  const cover = images[0] ?? null;
+  const lightboxItems = useMemo<ImageLightboxItem[]>(
+    () => images.map((image) => ({
+      id: image.imageId,
+      src: worldImageUrl(image),
+      alt: image.label ? `${place.name} · ${image.label}` : place.name,
+      label: image.label ?? t(CHARACTER_IMAGE_KIND_LABEL[image.kind]),
+      meta: image.generated ? 'IA' : null,
+    })),
+    [images, place.name]
+  );
 
   const save = async (patch: Parameters<typeof window.nodus.updateWorldPlace>[1]) => {
     await window.nodus.updateWorldPlace(place.placeId, patch);
@@ -107,6 +123,28 @@ function PlaceSheet({
 
   return (
     <div className="space-y-5 p-6">
+      {cover && (
+        <button
+          type="button"
+          data-testid="place-cover"
+          className="group relative block aspect-[21/8] max-h-72 min-h-40 w-full overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900 text-left shadow-lg"
+          title={t('Ver detalles')}
+          aria-label={t('Ver detalles')}
+          onClick={() => setViewingId(cover.imageId)}
+        >
+          <img
+            src={worldImageUrl(cover)}
+            alt={place.name}
+            draggable={false}
+            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.015]"
+          />
+          <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" />
+          <span className="pointer-events-none absolute bottom-3 right-3 grid h-9 w-9 place-items-center rounded-full bg-black/65 text-white shadow ring-1 ring-white/15">
+            <Icon name="fit" size={16} />
+          </span>
+        </button>
+      )}
+
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
           <button className="mb-2 flex items-center gap-1 text-xs text-neutral-400 hover:text-neutral-200" onClick={onBack}>
@@ -142,7 +180,13 @@ function PlaceSheet({
         </p>
       )}
 
-      <WorldGallery entityKind="place" entityId={place.placeId} visualSeed={place.profile.visualSeed} appearance={place.profile.appearance} />
+      <WorldGallery
+        entityKind="place"
+        entityId={place.placeId}
+        visualSeed={place.profile.visualSeed}
+        appearance={place.profile.appearance}
+        onImagesChange={setImages}
+      />
 
       <ContinuityBadge entity={{ kind: 'place', id: place.placeId }} />
 
@@ -247,6 +291,14 @@ function PlaceSheet({
           </ul>
         )}
       </section>
+
+      {viewingId && (
+        <ImageLightbox
+          items={lightboxItems}
+          activeId={viewingId}
+          onClose={() => setViewingId(null)}
+        />
+      )}
     </div>
   );
 }

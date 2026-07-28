@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { CharacterImage, CharacterImageKind, DecorativeImageStyle, WorldImageEntityKind } from '@shared/types';
 import { CHARACTER_IMAGE_KINDS, CHARACTER_IMAGE_KIND_LABEL } from '@shared/characterLabels';
 import { DECORATIVE_IMAGE_STYLES } from '@shared/imageStyles';
@@ -7,6 +7,7 @@ import { confirm } from '../feedback';
 import { PERSON_DOSSIER_ACTION_BUTTON_CLASS, PERSON_DOSSIER_SECTION_CLASS } from '../personDossierLayout';
 import { t } from '../../i18n';
 import { worldImageUrl } from '../../lib/imageUrl';
+import { ImageLightbox, type ImageLightboxItem } from '../ImageLightbox';
 
 /**
  * The gallery of any world entity, at the top of its sheet.
@@ -24,6 +25,7 @@ export function WorldGallery({
   visualSeed,
   appearance,
   onAvatar,
+  onImagesChange,
 }: {
   entityKind: WorldImageEntityKind;
   entityId: string;
@@ -31,22 +33,37 @@ export function WorldGallery({
   appearance: string | null;
   /** Only characters have an avatar; without this the action is not offered. */
   onAvatar?: (imageId: string) => Promise<void>;
+  /** Lets a sheet reuse the first ordered image as its cover without loading blobs twice. */
+  onImagesChange?: (images: CharacterImage[]) => void;
 }) {
   const [images, setImages] = useState<CharacterImage[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [kind, setKind] = useState<CharacterImageKind>(entityKind === 'place' ? 'other' : 'portrait');
   const [style, setStyle] = useState<DecorativeImageStyle>('contemporary_editorial');
+  const [viewingId, setViewingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    setImages(await window.nodus.listWorldImages(entityKind, entityId));
-  }, [entityKind, entityId]);
+    const next = await window.nodus.listWorldImages(entityKind, entityId);
+    setImages(next);
+    onImagesChange?.(next);
+  }, [entityKind, entityId, onImagesChange]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
   const canGenerate = Boolean(appearance?.trim() || visualSeed?.trim());
+  const lightboxItems = useMemo<ImageLightboxItem[]>(
+    () => images.map((image) => ({
+      id: image.imageId,
+      src: worldImageUrl(image),
+      alt: image.label ?? t(CHARACTER_IMAGE_KIND_LABEL[image.kind]),
+      label: image.label ?? t(CHARACTER_IMAGE_KIND_LABEL[image.kind]),
+      meta: image.generated ? 'IA' : null,
+    })),
+    [images]
+  );
 
   const act = async (fn: () => Promise<unknown>) => {
     setBusy(true);
@@ -125,7 +142,18 @@ export function WorldGallery({
         <ul className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(7rem,1fr))]">
           {images.map((image) => (
             <li key={image.imageId} className="overflow-hidden rounded-md border border-neutral-800">
-              <WorldThumb image={image} />
+              <button
+                type="button"
+                className="group relative block w-full"
+                title={t('Ver detalles')}
+                aria-label={t('Ver detalles')}
+                onClick={() => setViewingId(image.imageId)}
+              >
+                <WorldThumb image={image} />
+                <span className="pointer-events-none absolute bottom-1.5 right-1.5 grid h-7 w-7 place-items-center rounded-full bg-black/65 text-white opacity-0 shadow transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+                  <Icon name="fit" size={13} />
+                </span>
+              </button>
               <div className="p-1.5">
                 <span className="block truncate text-[10px] uppercase tracking-wide text-neutral-500">
                   {t(CHARACTER_IMAGE_KIND_LABEL[image.kind])}
@@ -163,6 +191,13 @@ export function WorldGallery({
             </li>
           ))}
         </ul>
+      )}
+      {viewingId && (
+        <ImageLightbox
+          items={lightboxItems}
+          activeId={viewingId}
+          onClose={() => setViewingId(null)}
+        />
       )}
     </section>
   );

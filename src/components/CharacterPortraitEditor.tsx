@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Character, DecorativeImageStyle, PortraitFocus } from '@shared/types';
 import { DECORATIVE_IMAGE_STYLES } from '@shared/imageStyles';
+import { CHARACTER_IMAGE_KIND_LABEL } from '@shared/characterLabels';
 import { Icon } from './ui';
 import { CharacterPortrait } from './CharacterPortrait';
+import { ImageLightbox, type ImageLightboxItem } from './ImageLightbox';
 import { useDismissableLayer } from '../hooks';
 import { t } from '../i18n';
+import { personPortraitUrl, worldImageUrl } from '../lib/imageUrl';
 
 /**
  * A character's portrait: upload an image and frame it non-destructively, or generate
@@ -33,6 +36,7 @@ export function CharacterPortraitEditor({
   const [extra, setExtra] = useState('');
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [viewingItems, setViewingItems] = useState<ImageLightboxItem[] | null>(null);
   // The drag maths needs a pixel scale; the card is ~11rem wide at the default root size.
   const DRAG_SCALE = 176;
 
@@ -42,6 +46,29 @@ export function CharacterPortraitEditor({
 
   const hasPortrait = Boolean(character.portrait);
   const canGenerate = Boolean(character.profile.appearance?.trim() || character.profile.visualSeed?.trim());
+  const portraitId = `portrait:${character.personId}`;
+
+  const inspectPortrait = async () => {
+    const portraitUrl = personPortraitUrl(character);
+    if (!portraitUrl || adjusting) return;
+    const gallery = await window.nodus.listCharacterImages(character.personId);
+    setViewingItems([
+      {
+        id: portraitId,
+        src: portraitUrl,
+        alt: character.displayName,
+        label: t('Imagen del personaje'),
+        meta: character.portrait?.generated ? 'IA' : null,
+      },
+      ...gallery.map((image) => ({
+        id: image.imageId,
+        src: worldImageUrl(image),
+        alt: image.label ? `${character.displayName} · ${image.label}` : character.displayName,
+        label: image.label ?? t(CHARACTER_IMAGE_KIND_LABEL[image.kind]),
+        meta: image.generated ? 'IA' : null,
+      })),
+    ]);
+  };
 
   const upload = async () => {
     const updated = await window.nodus.setPersonPortraitFromFile(character.personId);
@@ -108,17 +135,36 @@ export function CharacterPortraitEditor({
   return (
     <div className="relative w-44 shrink-0" ref={editorRef}>
       <div
+        data-testid="character-portrait"
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
-        title={hasPortrait && adjusting ? t('Arrastra para encuadrar') : undefined}
-        style={{ cursor: hasPortrait && adjusting ? 'grab' : 'default', touchAction: 'none' }}
+        role={hasPortrait && !adjusting ? 'button' : undefined}
+        tabIndex={hasPortrait && !adjusting ? 0 : undefined}
+        aria-label={hasPortrait && !adjusting ? t('Ver detalles') : undefined}
+        onClick={() => {
+          if (hasPortrait && !adjusting) void inspectPortrait();
+        }}
+        onKeyDown={(event) => {
+          if (hasPortrait && !adjusting && (event.key === 'Enter' || event.key === ' ')) {
+            event.preventDefault();
+            void inspectPortrait();
+          }
+        }}
+        title={hasPortrait ? t(adjusting ? 'Arrastra para encuadrar' : 'Ver detalles') : undefined}
+        className={hasPortrait && !adjusting ? 'group relative outline-none ring-indigo-500 focus-visible:ring-2' : 'relative'}
+        style={{ cursor: hasPortrait ? (adjusting ? 'grab' : 'zoom-in') : 'default', touchAction: 'none' }}
       >
         <CharacterPortrait
           character={{ ...character, portrait: hasPortrait ? focus : null }}
           placeholderSize={110}
           className="rounded-md"
         />
+        {hasPortrait && !adjusting && (
+          <span className="pointer-events-none absolute bottom-2 right-2 grid h-7 w-7 place-items-center rounded-full bg-black/65 text-white opacity-0 shadow transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+            <Icon name="fit" size={13} />
+          </span>
+        )}
       </div>
 
       <div className="mt-2 space-y-1">
@@ -239,6 +285,13 @@ export function CharacterPortraitEditor({
             </button>
           </div>
         </div>
+      )}
+      {viewingItems && (
+        <ImageLightbox
+          items={viewingItems}
+          activeId={portraitId}
+          onClose={() => setViewingItems(null)}
+        />
       )}
     </div>
   );

@@ -7,7 +7,8 @@ import { Icon } from './ui';
 import { confirm } from './feedback';
 import { PERSON_DOSSIER_ACTION_BUTTON_CLASS, PERSON_DOSSIER_SECTION_CLASS } from './personDossierLayout';
 import { t, tx } from '../i18n';
-import { worldImageUrl } from '../lib/imageUrl';
+import { personPortraitUrl, worldImageUrl } from '../lib/imageUrl';
+import { ImageLightbox, type ImageLightboxItem } from './ImageLightbox';
 
 /**
  * Every image of a character, not just the avatar: the portrait, the full body, the
@@ -25,6 +26,7 @@ export function CharacterGallery({ character, onChanged }: { character: Characte
   const [style, setStyle] = useState<DecorativeImageStyle>('contemporary_editorial');
   const [extra, setExtra] = useState('');
   const [inspecting, setInspecting] = useState<CharacterImage | null>(null);
+  const [viewingId, setViewingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setImages(await window.nodus.listCharacterImages(character.personId));
@@ -35,6 +37,23 @@ export function CharacterGallery({ character, onChanged }: { character: Characte
   }, [load]);
 
   const canGenerate = Boolean(character.profile.appearance?.trim() || character.profile.visualSeed?.trim());
+  const portraitUrl = personPortraitUrl(character);
+  const lightboxItems: ImageLightboxItem[] = [
+    ...(portraitUrl ? [{
+      id: `portrait:${character.personId}`,
+      src: portraitUrl,
+      alt: character.displayName,
+      label: t('Imagen del personaje'),
+      meta: character.portrait?.generated ? 'IA' : null,
+    }] : []),
+    ...images.map((image) => ({
+      id: image.imageId,
+      src: worldImageUrl(image),
+      alt: image.label ? `${character.displayName} · ${image.label}` : character.displayName,
+      label: image.label ?? t(CHARACTER_IMAGE_KIND_LABEL[image.kind]),
+      meta: image.generated ? 'IA' : null,
+    })),
+  ];
 
   const act = async (fn: () => Promise<unknown>) => {
     setBusy(true);
@@ -150,11 +169,15 @@ export function CharacterGallery({ character, onChanged }: { character: Characte
           {images.map((image) => (
             <li key={image.imageId} className="overflow-hidden rounded-md border border-neutral-800">
               <button
-                className="block w-full"
+                className="group relative block w-full"
                 title={t('Ver detalles')}
-                onClick={() => setInspecting(image)}
+                aria-label={t('Ver detalles')}
+                onClick={() => setViewingId(image.imageId)}
               >
                 <GalleryThumb image={image} />
+                <span className="pointer-events-none absolute bottom-1.5 right-1.5 grid h-7 w-7 place-items-center rounded-full bg-black/65 text-white opacity-0 shadow transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+                  <Icon name="fit" size={13} />
+                </span>
               </button>
               <div className="p-1.5">
                 <span className="block truncate text-[10px] uppercase tracking-wide text-neutral-500">
@@ -163,6 +186,15 @@ export function CharacterGallery({ character, onChanged }: { character: Characte
                 </span>
                 {image.label && <span className="block truncate text-[11px] text-neutral-300">{image.label}</span>}
                 <div className="mt-1 flex gap-0.5">
+                  <button
+                    className="btn btn-ghost h-6 flex-1 justify-center p-0 text-[10px] text-neutral-400 hover:text-neutral-200"
+                    title={t('Ver detalles')}
+                    aria-label={t('Ver detalles')}
+                    disabled={busy}
+                    onClick={() => setInspecting(image)}
+                  >
+                    <Icon name="edit" size={11} />
+                  </button>
                   <button
                     className="btn btn-ghost h-6 flex-1 justify-center p-0 text-[10px] text-neutral-400 hover:text-neutral-200"
                     title={t('Usar como avatar')}
@@ -199,6 +231,13 @@ export function CharacterGallery({ character, onChanged }: { character: Characte
             setInspecting(null);
             await load();
           }}
+        />
+      )}
+      {viewingId && (
+        <ImageLightbox
+          items={lightboxItems}
+          activeId={viewingId}
+          onClose={() => setViewingId(null)}
         />
       )}
     </section>

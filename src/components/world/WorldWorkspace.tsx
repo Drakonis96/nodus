@@ -354,28 +354,51 @@ function WorldTree<T>({
     return map;
   }, [items, byId, section]);
 
-  const render = (parentId: string | null, depth: number, seen: Set<string>): React.ReactNode =>
-    (children.get(parentId) ?? []).map((item) => {
+  const render = (parentId: string | null, depth: number, seen: Set<string>): React.ReactNode => {
+    const entries = children.get(parentId) ?? [];
+    return entries.map((item, index) => {
       const id = section.idOf(item);
       // A cycle in the data would recurse forever; the write path rejects them, but the
       // renderer must not depend on that being true.
       if (seen.has(id)) return null;
       const nextSeen = new Set(seen).add(id);
       return (
-        <li key={id}>
+        <li key={id} className="relative">
+          {depth > 0 && (
+            <>
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute -left-2 top-0 h-4 w-2 rounded-bl-sm border-b border-l border-neutral-700/80"
+              />
+              {index < entries.length - 1 && (
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute -left-2 bottom-0 top-4 border-l border-neutral-700/80"
+                />
+              )}
+            </>
+          )}
           <button
             onClick={() => onOpen(id)}
-            style={{ paddingLeft: `${depth * 0.85 + 0.5}rem` }}
             className={`flex w-full items-center gap-1.5 rounded px-2 py-1.5 text-left text-sm ${
               id === selectedId ? 'bg-indigo-600/20 text-indigo-100' : 'text-neutral-300 hover:bg-neutral-800/60'
             }`}
           >
+            {depth > 0 && (
+              <span
+                aria-hidden="true"
+                className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                  id === selectedId ? 'bg-indigo-300' : 'bg-neutral-600'
+                }`}
+              />
+            )}
             <span className="min-w-0 flex-1 truncate">{section.labelOf?.(item) ?? id}</span>
           </button>
-          {children.has(id) && <ul>{render(id, depth + 1, nextSeen)}</ul>}
+          {children.has(id) && <ul className="ml-3 pl-2">{render(id, depth + 1, nextSeen)}</ul>}
         </li>
       );
     });
+  };
 
-  return <ul>{render(null, 0, new Set())}</ul>;
+  return <ul data-testid={`${section.id}-tree`} className="space-y-0.5">{render(null, 0, new Set())}</ul>;
 }
