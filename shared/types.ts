@@ -1504,6 +1504,8 @@ export interface AppSettings {
   // The active vault's type before the genealogy demo flipped it, so leaving the demo
   // restores it. Null when no genealogy demo is active. (KV setting, no migration.)
   demoPriorVaultType: VaultType | null;
+  /** Per-vault additions to the fact/event selectors. Built-in types are immutable. */
+  customEventTypes: Record<EventTypeVocabularyScope, CustomHistoricalEventType[]>;
   // Completion flag for the genealogy-specific guided tour (shown in the genealogy demo).
   genealogyTourComplete: boolean;
   // Completion flag for the databases-mode guided tour (shown once per databases vault).
@@ -1814,6 +1816,12 @@ export type HistoricalEventType =
   | 'bond'
   | 'loss'
   | 'revelation';
+
+/** User-defined event kinds carry their encoded label so facts stay readable after
+ * the vocabulary entry itself is removed. */
+export type CustomHistoricalEventType = `custom:${string}`;
+export type EventTypeValue = HistoricalEventType | CustomHistoricalEventType;
+export type EventTypeVocabularyScope = 'records' | 'worldbuilding';
 
 export type ParticipantRole =
   | 'principal'
@@ -3329,7 +3337,7 @@ export interface EventParticipant {
 
 export interface HistoricalEvent {
   eventId: string;
-  type: HistoricalEventType;
+  type: EventTypeValue;
   label: string | null;
   /** Human display form of the date. */
   date: string | null;
@@ -3342,7 +3350,7 @@ export interface HistoricalEvent {
 }
 
 export interface EventInput {
-  type: HistoricalEventType;
+  type: EventTypeValue;
   label?: string | null;
   date?: string | null;
   placeId?: string | null;
@@ -6620,7 +6628,7 @@ export interface NodusApi {
   mapPoints(personIds?: string[]): Promise<MapPlacePoint[]>;
   listEvents(opts?: {
     personId?: string;
-    type?: HistoricalEventType;
+    type?: EventTypeValue;
     from?: string;
     to?: string;
   }): Promise<HistoricalEvent[]>;

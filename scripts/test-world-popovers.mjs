@@ -54,10 +54,11 @@ test('a dropdown remains usable in a viewport narrower than its normal width', (
 });
 
 test('worldbuilding dropdowns use the portaled collision-aware panel', async () => {
-  const [filters, timeline, popover] = await Promise.all([
+  const [filters, timeline, popover, eventTypes] = await Promise.all([
     readFile(path.join(repoRoot, 'src/components/world/WorldFilterBar.tsx'), 'utf8'),
     readFile(path.join(repoRoot, 'src/components/world/mapTimeline.tsx'), 'utf8'),
     readFile(path.join(repoRoot, 'src/components/world/ViewportPopover.tsx'), 'utf8'),
+    readFile(path.join(repoRoot, 'src/components/EventTypePicker.tsx'), 'utf8'),
   ]);
   assert.match(filters, /<ViewportPopover/);
   assert.doesNotMatch(filters, /absolute left-0 top-full/);
@@ -65,4 +66,6 @@ test('worldbuilding dropdowns use the portaled collision-aware panel', async () 
   assert.doesNotMatch(timeline, /className="absolute z-\[50\]/);
   assert.match(popover, /createPortal\(/);
   assert.match(popover, /positionViewportPopover/);
+  assert.match(eventTypes, /<ViewportPopover/);
+  assert.doesNotMatch(eventTypes, /createPortal\(/);
 });

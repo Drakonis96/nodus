@@ -21,6 +21,7 @@ import {
   CHARACTER_ROLE_LABEL,
   CHARACTER_VOICE_FIELDS,
 } from './characterLabels';
+import { eventTypeLabel } from './eventTypes';
 import type { CharacterAbility, CharacterArc, CharacterEvent, CharacterVoice, PersonName } from './types';
 import type { CharacterLifeStatus, CharacterNarrativeRole } from './types';
 
@@ -135,7 +136,7 @@ export function composeCharacterSheetMarkdown(
     lines.push('## Hechos de su vida', '');
     for (const event of sheet.events) {
       const when = [event.worldYear != null ? String(event.worldYear) : '', event.date ?? ''].filter(Boolean).join(' · ');
-      const what = CHARACTER_EVENT_TYPE_LABEL[event.type] ?? event.type;
+      const what = eventTypeLabel(event.type, CHARACTER_EVENT_TYPE_LABEL);
       lines.push(`- ${when ? `**${when}** — ` : ''}${what}${event.placeName ? `, en ${event.placeName}` : ''}`);
     }
     lines.push('');

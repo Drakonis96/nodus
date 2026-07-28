@@ -5,6 +5,7 @@ import { NODI_ORB_DEFAULT_COLOR } from '@shared/nodiOrb';
 import { lockedApiKeyProviders, providerKeyMap } from '../secrets/secretStore';
 import { GRANULAR_MODEL_KEYS, migrateModelSettings } from '@shared/modelSettings';
 import { DEFAULT_NODUS_IMAGE_QUALITY, isNodusImageQuality } from '@shared/localImageModels';
+import { EMPTY_CUSTOM_EVENT_TYPES, sanitizeCustomEventTypes } from '@shared/eventTypes';
 import { recoverV23SharedModelPrefs, recoverV23VaultEmbeddingSelection } from './modelPrefsRecovery';
 import {
   GLOBAL_PREF_KEYS,
@@ -130,6 +131,7 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys' | 'lockedProviderKeys'> = {
   advancedTourComplete: true,
   demoMode: false,
   demoPriorVaultType: null,
+  customEventTypes: EMPTY_CUSTOM_EVENT_TYPES,
   genealogyTourComplete: false,
   databasesTourComplete: false,
   studyTourComplete: false,
@@ -221,6 +223,7 @@ export function getSettings(): AppSettings {
   merged.codexReasoningEfforts = sanitizeCodexReasoningEfforts(parsed.codexReasoningEfforts);
   merged.studyImproveToolbarStyleIds = [...new Set((Array.isArray(merged.studyImproveToolbarStyleIds) ? merged.studyImproveToolbarStyleIds : [])
     .filter((value): value is string => typeof value === 'string' && value.trim().length > 0))].slice(0, 4);
+  merged.customEventTypes = sanitizeCustomEventTypes(parsed.customEventTypes);
   // Pre-2.3 builds called the Transformers.js worker simply "local".
   if ((parsed as { sttProvider?: string }).sttProvider === 'local') merged.sttProvider = 'transformers';
   if (!isNodusImageQuality(merged.imageQuality)) merged.imageQuality = DEFAULT_NODUS_IMAGE_QUALITY;
@@ -309,6 +312,9 @@ export function getSettings(): AppSettings {
 }
 
 export function updateSettings(patch: Partial<AppSettings>): AppSettings {
+  if (patch.customEventTypes !== undefined) {
+    patch = { ...patch, customEventTypes: sanitizeCustomEventTypes(patch.customEventTypes) };
+  }
   if (patch.codexReasoningEfforts !== undefined) {
     patch = { ...patch, codexReasoningEfforts: sanitizeCodexReasoningEfforts(patch.codexReasoningEfforts) };
   }

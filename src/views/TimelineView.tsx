@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { CharacterEvent, HistoricalEvent, HistoricalEventType, Person, RecordEvidence } from '@shared/types';
+import type { CharacterEvent, EventTypeValue, HistoricalEvent, HistoricalEventType, Person, RecordEvidence } from '@shared/types';
 import { CHARACTER_EVENT_TYPES, CHARACTER_EVENT_TYPE_LABEL } from '@shared/characterLabels';
+import { eventTypeLabel } from '@shared/eventTypes';
 import { Icon } from '../components/ui';
 import { PersonDossierModal } from '../components/PersonDossierModal';
 import { WorldCalendarModal } from '../components/WorldCalendarModal';
@@ -45,20 +46,23 @@ export function TimelineView({ worldbuilding = false }: { worldbuilding?: boolea
   const [events, setEvents] = useState<(HistoricalEvent | CharacterEvent)[]>([]);
   const [persons, setPersons] = useState<Person[]>([]);
   const [selectedPersonIds, setSelectedPersonIds] = useState<string[]>([]);
-  const [selectedTypes, setSelectedTypes] = useState<HistoricalEventType[]>([]);
+  const [selectedTypes, setSelectedTypes] = useState<EventTypeValue[]>([]);
+  const [customTypes, setCustomTypes] = useState<EventTypeValue[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<HistoricalEvent | CharacterEvent | null>(null);
   const [editingCalendar, setEditingCalendar] = useState(false);
-  const typeOptions = worldbuilding ? CHARACTER_EVENT_TYPES : EVENT_TYPES;
+  const typeOptions: EventTypeValue[] = [...(worldbuilding ? CHARACTER_EVENT_TYPES : EVENT_TYPES), ...customTypes];
   const typeLabel = worldbuilding ? CHARACTER_EVENT_TYPE_LABEL : EVENT_TYPE_LABEL;
   const [dossierId, setDossierId] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
-    const [eventList, personList] = await Promise.all([
+    const [eventList, personList, settings] = await Promise.all([
       worldbuilding ? window.nodus.listWorldEvents() : window.nodus.listEvents({}),
       window.nodus.listPersons(),
+      window.nodus.getSettings(),
     ]);
     setEvents(eventList);
     setPersons(personList);
+    setCustomTypes(settings.customEventTypes[worldbuilding ? 'worldbuilding' : 'records']);
   }, [worldbuilding]);
 
   useEffect(() => {
@@ -90,9 +94,9 @@ export function TimelineView({ worldbuilding = false }: { worldbuilding?: boolea
             testId="timeline-person-filter"
           />
           <SearchableMultiSelect
-            options={typeOptions.map((type) => ({ id: type, label: t(typeLabel[type] ?? type) }))}
+            options={typeOptions.map((type) => ({ id: type, label: t(eventTypeLabel(type, typeLabel)) }))}
             selectedIds={selectedTypes}
-            onChange={(ids) => setSelectedTypes(ids as HistoricalEventType[])}
+            onChange={(ids) => setSelectedTypes(ids as EventTypeValue[])}
             placeholder={t('Todos los tipos')}
             searchPlaceholder={t('Buscar tipo de evento…')}
             testId="timeline-type-filter"
@@ -182,7 +186,7 @@ function TimelineEventCard({
               : event.date || t('sin fecha')}
           </time>
           <span className="min-w-0 flex-1">
-            <span className="block text-sm font-semibold text-neutral-100">{t(typeLabel[event.type] ?? event.type)}</span>
+            <span className="block text-sm font-semibold text-neutral-100">{t(eventTypeLabel(event.type, typeLabel))}</span>
             {event.label && <span className="mt-0.5 block text-sm text-neutral-300">{event.label}</span>}
             {event.placeName && <span className="mt-1 flex items-center gap-1 text-xs text-neutral-500"><Icon name="map" size={12} /> {event.placeName}</span>}
             {event.notes && <span className="mt-2 line-clamp-2 block text-xs leading-5 text-neutral-500">{event.notes}</span>}
@@ -246,7 +250,7 @@ function EventDetail({
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h2 className="text-lg font-semibold">{t(typeLabel[event.type] ?? event.type)}</h2>
+              <h2 className="text-lg font-semibold">{t(eventTypeLabel(event.type, typeLabel))}</h2>
               <p className="text-sm text-neutral-400">
                 {worldbuilding && 'worldYear' in event && event.worldYear != null
                   ? `${event.worldYear}${event.date ? ` · ${event.date}` : ''}`

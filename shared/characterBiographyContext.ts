@@ -12,7 +12,8 @@
  */
 
 import { CHARACTER_EVENT_TYPE_LABEL, CHARACTER_LIFE_STATUS_LABEL, CHARACTER_ROLE_LABEL } from './characterLabels';
-import type { CharacterBiographyMode, CharacterLifeStatus, CharacterNarrativeRole } from './types';
+import { eventTypeLabel } from './eventTypes';
+import type { CharacterBiographyMode, CharacterLifeStatus, CharacterNarrativeRole, EventTypeValue } from './types';
 
 export interface CharacterBiographySources {
   name: string;
@@ -32,7 +33,7 @@ export interface CharacterBiographySources {
   children: string[];
   siblings: string[];
   relations: { role: string; target: string }[];
-  events: { type: string; date: string | null; place: string | null; worldYear: number | null; notes: string | null }[];
+  events: { type: EventTypeValue; date: string | null; place: string | null; worldYear: number | null; notes: string | null }[];
   notes: string | null;
 }
 
@@ -116,7 +117,7 @@ export function composeCharacterBiographyContext(
   if (sources.events.length) {
     lines.push('Hechos de su vida, en orden:');
     for (const event of sources.events.slice(0, 40)) {
-      const parts = [CHARACTER_EVENT_TYPE_LABEL[event.type] ?? event.type];
+      const parts = [eventTypeLabel(event.type, CHARACTER_EVENT_TYPE_LABEL)];
       if (event.worldYear != null) parts.push(`año ${event.worldYear}`);
       if (event.date) parts.push(event.date);
       if (event.place) parts.push(`en ${event.place}`);

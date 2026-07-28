@@ -4,6 +4,7 @@ import type {
   ArchiveItem,
   DocumentLinkSuggestion,
   HistoricalEvent,
+  EventTypeValue,
   HistoricalEventType,
   Kin,
   KinSuggestion,
@@ -26,6 +27,8 @@ import { PERSON_DOSSIER_ACTION_BUTTON_CLASS, PERSON_DOSSIER_ADD_BUTTON_CLASS, PE
 import { confirm } from './feedback';
 import { useDismissableLayer } from '../hooks';
 import { t, tx } from '../i18n';
+import { eventTypeLabel } from '@shared/eventTypes';
+import { EventTypePicker } from './EventTypePicker';
 
 const STRENGTH_STYLE: Record<string, string> = {
   alta: 'bg-emerald-900/40 text-emerald-300',
@@ -661,7 +664,7 @@ function EventsEditor({
         <ul className="space-y-1.5">
           {events.map((e) => (
               <li key={e.eventId} className="flex items-center gap-2 rounded-md border border-neutral-800 px-3 py-2 text-sm">
-                <span className="font-medium text-neutral-200">{t(EVENT_TYPE_LABEL[e.type] ?? e.type)}</span>
+                <span className="font-medium text-neutral-200">{t(eventTypeLabel(e.type, EVENT_TYPE_LABEL))}</span>
                 {e.date ? <span className="text-neutral-400">· {e.date}</span> : null}
                 {e.placeName ? <span className="text-neutral-500">· {e.placeName}</span> : null}
                 <div className="ml-auto flex shrink-0 gap-0.5">
@@ -706,7 +709,7 @@ function EventForm({
   onSaved: () => Promise<void>;
   onCancel: () => void;
 }) {
-  const [type, setType] = useState<HistoricalEventType>(event?.type ?? 'birth');
+  const [type, setType] = useState<EventTypeValue>(event?.type ?? 'birth');
   const [date, setDate] = useState(event?.date ?? '');
   const [place, setPlace] = useState(event?.placeName ?? '');
   const [notes, setNotes] = useState(event?.notes ?? '');
@@ -752,13 +755,14 @@ function EventForm({
         </div>
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-2">
-            <select className="input h-9 text-sm" value={type} onChange={(changeEvent) => setType(changeEvent.target.value as HistoricalEventType)}>
-              {EVENT_TYPE_OPTIONS.map((eventType) => (
-                <option key={eventType} value={eventType}>
-                  {t(EVENT_TYPE_LABEL[eventType] ?? eventType)}
-                </option>
-              ))}
-            </select>
+            <EventTypePicker
+              value={type}
+              onChange={setType}
+              scope="records"
+              builtInTypes={EVENT_TYPE_OPTIONS}
+              builtInLabels={EVENT_TYPE_LABEL}
+              disabled={saving}
+            />
             <input className="input h-9 text-sm" value={date} onChange={(changeEvent) => setDate(changeEvent.target.value)} placeholder={t('Fecha (puede ser incierta: «c. 1850»)')} />
           </div>
           <input className="input h-9 w-full text-sm" value={place} onChange={(changeEvent) => setPlace(changeEvent.target.value)} placeholder={t('Lugar')} />

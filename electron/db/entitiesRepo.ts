@@ -12,7 +12,7 @@ import type {
   EventInput,
   EventParticipant,
   HistoricalEvent,
-  HistoricalEventType,
+  EventTypeValue,
   ParticipantRole,
   Person,
   PersonInput,
@@ -393,7 +393,7 @@ export function findOrCreatePlace(name: string, kind: string | null = null): Pla
 
 interface EventRow {
   event_id: string;
-  type: HistoricalEventType;
+  type: EventTypeValue;
   label: string | null;
   date: string | null;
   date_sort: string | null;
@@ -497,7 +497,7 @@ export function deleteEvent(eventId: string): void {
  * optional filters by participating person, event type, and a sort-key window.
  */
 export function listEvents(
-  opts: { personId?: string; type?: HistoricalEventType; from?: string; to?: string } = {}
+  opts: { personId?: string; type?: EventTypeValue; from?: string; to?: string } = {}
 ): HistoricalEvent[] {
   const where: string[] = [];
   const params: unknown[] = [];

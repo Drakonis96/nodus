@@ -189,7 +189,7 @@ export function globalSearch(query: string, limitPerKind = 8): GlobalSearchResul
     )
     .all(like, like, like, limitPerKind) as { event_id: string; type: string; label: string | null; date: string | null; place_name: string | null }[];
   for (const r of events) {
-    const title = r.label?.trim() || [EVENT_TYPE_LABEL[r.type] ?? r.type, r.date?.trim()].filter(Boolean).join(' · ');
+    const title = r.label?.trim() || [searchEventTypeLabel(r.type), r.date?.trim()].filter(Boolean).join(' · ');
     results.push({ kind: 'event', id: r.event_id, title, subtitle: r.place_name || null });
   }
 
@@ -226,6 +226,15 @@ const EVENT_TYPE_LABEL: Record<string, string> = {
   occupation: 'Ocupación',
   other: 'Evento',
 };
+
+function searchEventTypeLabel(type: string): string {
+  if (!type.startsWith('custom:')) return EVENT_TYPE_LABEL[type] ?? type;
+  try {
+    return decodeURIComponent(type.slice(7)) || type;
+  } catch {
+    return type;
+  }
+}
 
 function textValue(value: unknown): string | null {
   if (value == null) return null;

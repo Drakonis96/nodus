@@ -2606,7 +2606,8 @@ try {
   // it would come out in insertion order and nothing would say so.
   const addWorldEvent = async (kind, date, year) => {
     await page.getByTestId('character-dossier-events').getByLabel('Añadir hecho').click();
-    await page.getByLabel('Tipo de hecho').selectOption({ label: kind });
+    await page.getByLabel('Tipo de hecho').click();
+    await page.getByRole('option', { name: kind, exact: true }).getByRole('button').click();
     await page.getByLabel('Fecha en tu calendario').fill(date);
     await page.getByLabel('Año del mundo', { exact: true }).fill(String(year));
     await page.getByRole('button', { name: 'Guardar hecho', exact: true }).click();

@@ -7309,4 +7309,13 @@ export const TR: Record<string, string> = {
   "¿Está en la página?": "Sayfada var mı?",
   "La línea que escribes se queda a la altura de los ojos. Esc para salir.": "Yazdığın satır göz hizasında kalır. Çıkmak için Esc.",
   "Máquina de escribir": "Daktilo",
+  "Buscar o crear tipo de hecho…": "Olay türü ara veya oluştur…",
+  "Buscar tipo de hecho": "Olay türü ara",
+  "Añadir «{name}»": "“{name}” ekle",
+  "Eliminar «{name}»": "“{name}” sil",
+  "Eliminar tipo «{name}»": "“{name}” türünü sil",
+  "Eliminar tipo": "Türü sil",
+  "Eliminar tipo personalizado": "Özel türü sil",
+  "El tipo desaparecerá del selector. Los hechos existentes conservarán su nombre.": "Tür seçiciden kaybolur. Mevcut olaylar adını korur.",
+  "Los tipos incorporados no se pueden eliminar.": "Yerleşik türler silinemez.",
 };

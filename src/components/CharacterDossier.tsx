@@ -6,7 +6,7 @@ import type {
   CharacterEvent,
   CharacterLifeStatus,
   CharacterNarrativeRole,
-  HistoricalEventType,
+  EventTypeValue,
   Kin,
   Person,
 } from '@shared/types';
@@ -23,6 +23,7 @@ import {
   characterEpithet,
 } from '@shared/characterLabels';
 import { EMPTY_CALENDAR, formatWorldDate, hasCalendar, type WorldCalendar } from '@shared/worldCalendar';
+import { eventTypeLabel } from '@shared/eventTypes';
 import { Icon } from './ui';
 import { CharacterPortraitEditor } from './CharacterPortraitEditor';
 import { AutoSavingField } from './AutoSavingField';
@@ -43,6 +44,7 @@ import {
   PERSON_DOSSIER_SECTION_CLASS,
 } from './personDossierLayout';
 import { confirm } from './feedback';
+import { EventTypePicker } from './EventTypePicker';
 import { characterSubtitle } from '../views/CharactersView';
 import { t, tx } from '../i18n';
 
@@ -674,7 +676,7 @@ function EventsSection({
                 {event.worldYear ?? '—'}
               </span>
               <span className="font-medium text-neutral-200">
-                {t(CHARACTER_EVENT_TYPE_LABEL[event.type] ?? event.type)}
+                {t(eventTypeLabel(event.type, CHARACTER_EVENT_TYPE_LABEL))}
               </span>
               {event.date ? <span className="truncate text-neutral-400">· {event.date}</span> : null}
               {event.placeName ? <span className="truncate text-neutral-500">· {event.placeName}</span> : null}
@@ -734,7 +736,7 @@ function CharacterEventForm({
   onSaved: () => Promise<void>;
   onCancel: () => void;
 }) {
-  const [type, setType] = useState<HistoricalEventType>(event?.type ?? 'first_appearance');
+  const [type, setType] = useState<EventTypeValue>(event?.type ?? 'first_appearance');
   const [date, setDate] = useState(event?.date ?? '');
   const [worldYear, setWorldYear] = useState(event?.worldYear != null ? String(event.worldYear) : '');
   const [calendar, setCalendar] = useState<WorldCalendar>(EMPTY_CALENDAR);
@@ -849,18 +851,14 @@ function CharacterEventForm({
         </div>
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-2">
-            <select
-              className="input h-9 text-sm"
+            <EventTypePicker
               value={type}
-              aria-label={t('Tipo de hecho')}
-              onChange={(changeEvent) => setType(changeEvent.target.value as HistoricalEventType)}
-            >
-              {CHARACTER_EVENT_TYPES.map((entry) => (
-                <option key={entry} value={entry}>
-                  {t(CHARACTER_EVENT_TYPE_LABEL[entry] ?? entry)}
-                </option>
-              ))}
-            </select>
+              onChange={setType}
+              scope="worldbuilding"
+              builtInTypes={CHARACTER_EVENT_TYPES}
+              builtInLabels={CHARACTER_EVENT_TYPE_LABEL}
+              disabled={saving}
+            />
             <input
               className="input h-9 text-sm"
               value={date}

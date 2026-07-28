@@ -6962,4 +6962,13 @@ export const IT: Record<string, string> = {
   "¿Está en la página?": "È sulla pagina?",
   "La línea que escribes se queda a la altura de los ojos. Esc para salir.": "La riga che stai scrivendo resta all'altezza degli occhi. Esc per uscire.",
   "Máquina de escribir": "Macchina da scrivere",
+  "Buscar o crear tipo de hecho…": "Cerca o crea un tipo di fatto…",
+  "Buscar tipo de hecho": "Cerca tipo di fatto",
+  "Añadir «{name}»": "Aggiungi «{name}»",
+  "Eliminar «{name}»": "Elimina «{name}»",
+  "Eliminar tipo «{name}»": "Elimina tipo «{name}»",
+  "Eliminar tipo": "Elimina tipo",
+  "Eliminar tipo personalizado": "Elimina tipo personalizzato",
+  "El tipo desaparecerá del selector. Los hechos existentes conservarán su nombre.": "Il tipo scomparirà dal selettore. I fatti esistenti manterranno il suo nome.",
+  "Los tipos incorporados no se pueden eliminar.": "I tipi incorporati non possono essere eliminati.",
 };

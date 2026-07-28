@@ -91,7 +91,7 @@ import type {
   PersonPlaceInput,
   EventInput,
   ParticipantRole,
-  HistoricalEventType,
+  EventTypeValue,
   RecordEvidenceInput,
   RecordEvidenceTargetKind,
   RelationshipType,
@@ -1416,7 +1416,7 @@ export function registerIpc(
   h('places:mapPoints', async (_e, personIds?: string[]) => mapPoints(personIds));
   h('entities:listEvents', async (
     _e,
-    opts?: { personId?: string; type?: HistoricalEventType; from?: string; to?: string }
+    opts?: { personId?: string; type?: EventTypeValue; from?: string; to?: string }
   ) => listEvents(opts ?? {}));
   h('entities:getEvent', async (_e, id: string) => getEvent(id));
   h('entities:createEvent', async (_e, input: EventInput) => createEvent(input));
