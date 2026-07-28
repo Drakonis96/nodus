@@ -103,16 +103,24 @@ export function WorldbuildingHome({
           ))}
         </section>
 
-        <section className="rounded-xl border border-neutral-800 bg-neutral-900/40">
-          <div className="flex items-center justify-between border-b border-neutral-800 px-4 py-3">
-            <h2 className="text-sm font-semibold text-neutral-300">{t('Personajes recientes')}</h2>
-            <button className="text-xs text-indigo-400 hover:text-indigo-300" onClick={() => onNavigate('characters')}>
+        <section
+          data-testid="world-recent-characters"
+          className="rounded-xl border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900/40"
+        >
+          <div className="flex items-center justify-between border-b border-neutral-200 px-4 py-3 dark:border-neutral-800">
+            <h2 className="text-sm font-semibold text-neutral-900 dark:text-neutral-300">{t('Personajes recientes')}</h2>
+            <button
+              className="text-xs text-violet-700 hover:text-violet-900 dark:text-indigo-400 dark:hover:text-indigo-300"
+              onClick={() => onNavigate('characters')}
+            >
               {t('Ver todos')}
             </button>
           </div>
           {recent.length === 0 ? (
             <div className="px-4 py-8 text-center">
-              <p className="text-sm text-neutral-500">{t('Todavía no hay personajes en este mundo.')}</p>
+              <p className="text-sm text-neutral-600 dark:text-neutral-500">
+                {t('Todavía no hay personajes en este mundo.')}
+              </p>
               <button className="btn btn-primary mt-3 gap-1.5" onClick={() => onNavigate('characters')}>
                 <Icon name="plus" size={14} /> {t('Crear el primero')}
               </button>
@@ -122,16 +130,20 @@ export function WorldbuildingHome({
               {recent.map((character) => (
                 <li key={character.personId}>
                   <button
-                    className="w-full rounded-lg border border-neutral-800 p-2 text-left transition-colors hover:border-indigo-700/60 hover:bg-indigo-950/20"
+                    className="w-full rounded-lg border border-neutral-200 bg-white p-2 text-left transition-colors hover:border-violet-400 hover:bg-violet-50 dark:border-neutral-800 dark:bg-transparent dark:hover:border-violet-700/60 dark:hover:bg-violet-950/20"
                     onClick={() => onNavigate('characters')}
                   >
                     <CharacterPortrait character={character} className="mb-2 rounded-md" />
-                    <span className="block truncate text-sm text-neutral-200">{character.displayName}</span>
-                    <span className="block truncate text-[11px] text-neutral-500">
-                      {characterEpithet(character.names) ??
-                        (character.profile.narrativeRole
-                          ? t(CHARACTER_ROLE_LABEL[character.profile.narrativeRole])
-                          : t(CHARACTER_LIFE_STATUS_LABEL[character.profile.lifeStatus]))}
+                    <span className="block truncate text-sm text-neutral-900 dark:text-neutral-200">
+                      {character.displayName}
+                    </span>
+                    <span className="world-recent-character-label mt-1 inline-flex max-w-full rounded-full border border-neutral-200 bg-neutral-100 px-2 py-0.5 text-[10px] font-medium text-neutral-600 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">
+                      <span className="truncate">
+                        {characterEpithet(character.names) ??
+                          (character.profile.narrativeRole
+                            ? t(CHARACTER_ROLE_LABEL[character.profile.narrativeRole])
+                            : t(CHARACTER_LIFE_STATUS_LABEL[character.profile.lifeStatus]))}
+                      </span>
                     </span>
                   </button>
                 </li>

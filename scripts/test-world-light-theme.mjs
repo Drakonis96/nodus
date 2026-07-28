@@ -24,6 +24,23 @@ test('portrait overlays have an explicit light palette', async () => {
   assert.match(css, /color: #262626/);
 });
 
+test('recent character cards and labels declare explicit light and dark palettes', async () => {
+  const home = await read('src/views/WorldbuildingHome.tsx');
+  const recent = home.slice(
+    home.indexOf('data-testid="world-recent-characters"'),
+    home.indexOf('</section>', home.indexOf('data-testid="world-recent-characters"'))
+  );
+
+  assert.match(recent, /border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900\/40/);
+  assert.match(recent, /bg-white[^"'`]*hover:bg-violet-50[^"'`]*dark:bg-transparent/);
+  assert.match(recent, /text-neutral-900 dark:text-neutral-200/);
+  assert.match(recent, /world-recent-character-label/);
+  assert.match(
+    recent,
+    /bg-neutral-100[^"'`]*text-neutral-600[^"'`]*dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300/
+  );
+});
+
 test('encyclopedia-specific surfaces do not rely on generic theme overrides', async () => {
   const [view, workspace, css] = await Promise.all([
     read('src/views/EncyclopediaView.tsx'),
