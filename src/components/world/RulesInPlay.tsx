@@ -85,7 +85,7 @@ export function RulesInPlay({ scene, onChanged }: { scene: WorldScene; onChanged
 
   return (
     <section data-testid="rules-in-play">
-      <div className="mb-2 flex items-center gap-2">
+      <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-500">{t('Reglas en juego')}</h3>
         <span className="text-[10px] text-neutral-600">
           {judged.size === 0 ? t('Ninguna juzgada') : `${judged.size}/${rows.length}`}
@@ -95,30 +95,30 @@ export function RulesInPlay({ scene, onChanged }: { scene: WorldScene; onChanged
         {rows.map((rule) => {
           const beat = beatOf(rule.ruleId);
           return (
-            <li key={rule.ruleId} className="rounded border border-neutral-800 p-2" data-testid="rule-in-play-row">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="min-w-0 flex-1 truncate text-xs text-neutral-200">{rule.title}</span>
+            <li key={rule.ruleId} className="min-w-0 rounded border border-neutral-200 p-2 dark:border-neutral-800" data-testid="rule-in-play-row">
+              <div className="flex min-w-0 items-start justify-between gap-2">
+                <span className="min-w-0 flex-1 break-words text-xs text-neutral-800 dark:text-neutral-200">{rule.title}</span>
                 <span className="shrink-0 text-[10px] text-neutral-600">
                   {t(RULE_HARDNESS_LABEL[rule.hardness] ?? rule.hardness)}
                 </span>
-                <span className="flex shrink-0 gap-0.5">
-                  {marksFor('rule').map((entry) => (
-                    <button
-                      key={entry}
-                      onClick={() => void mark(rule, beat?.mark === entry ? null : entry)}
-                      className={`rounded px-1.5 py-0.5 text-[10px] ${
-                        beat?.mark === entry
-                          ? 'bg-indigo-600 text-white'
-                          : 'border border-neutral-700 text-neutral-400 hover:text-neutral-200'
-                      }`}
-                    >
-                      {t(BEAT_MARK_LABEL[entry])}
-                    </button>
-                  ))}
-                </span>
+              </div>
+              <div className="mt-2 grid w-full grid-cols-[repeat(auto-fit,minmax(6rem,1fr))] gap-1">
+                {marksFor('rule').map((entry) => (
+                  <button
+                    key={entry}
+                    onClick={() => void mark(rule, beat?.mark === entry ? null : entry)}
+                    className={`min-h-7 min-w-0 whitespace-normal break-words rounded px-2 py-1 text-[10px] leading-4 ${
+                      beat?.mark === entry
+                        ? 'bg-indigo-600 text-white'
+                        : 'border border-neutral-300 text-neutral-600 hover:text-neutral-900 dark:border-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200'
+                    }`}
+                  >
+                    {t(BEAT_MARK_LABEL[entry])}
+                  </button>
+                ))}
               </div>
               {beat?.mark === 'breaks' && (
-                <div className="mt-1 flex items-center gap-2">
+                <div className="mt-2 flex flex-wrap items-center gap-2">
                   <span className="text-[10px] text-neutral-600">{t('¿Está el precio en la página?')}</span>
                   {([true, false] as const).map((value) => (
                     <button
@@ -128,16 +128,16 @@ export function RulesInPlay({ scene, onChanged }: { scene: WorldScene; onChanged
                       className={`rounded px-1.5 py-0.5 text-[10px] ${
                         beat.paid === value
                           ? value
-                            ? 'bg-neutral-700 text-neutral-100'
-                            : 'bg-amber-800 text-amber-100'
-                          : 'border border-neutral-700 text-neutral-400 hover:text-neutral-200'
+                            ? 'bg-neutral-200 text-neutral-900 dark:bg-neutral-700 dark:text-neutral-100'
+                            : 'bg-amber-100 text-amber-800 dark:bg-amber-800 dark:text-amber-100'
+                          : 'border border-neutral-300 text-neutral-600 hover:text-neutral-900 dark:border-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200'
                       }`}
                     >
                       {value ? t('Sí') : t('No')}
                     </button>
                   ))}
                   {beat.paid == null && (
-                    <span className="flex items-center gap-1 text-[10px] text-neutral-700">
+                    <span className="flex items-center gap-1 text-[10px] text-neutral-500 dark:text-neutral-700">
                       <Icon name="info" size={10} /> {t('sin mirar')}
                     </span>
                   )}

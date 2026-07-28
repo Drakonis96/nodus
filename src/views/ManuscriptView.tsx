@@ -751,12 +751,12 @@ function SceneWorkbench({ sceneId, onRestored }: { sceneId: string; onRestored: 
   };
 
   return (
-    <section className="rounded-xl border border-neutral-800 p-3" data-testid="manuscript-workbench">
+    <section className="min-w-0 rounded-xl border border-neutral-200 p-3 dark:border-neutral-800" data-testid="manuscript-workbench">
       <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-neutral-500">{t('La escena escrita')}</h3>
 
-      <div className="flex gap-2">
+      <div className="grid w-full grid-cols-[repeat(auto-fit,minmax(7rem,1fr))] gap-2">
         <button
-          className="btn btn-ghost h-7 flex-1 border border-neutral-700 text-[11px]"
+          className="btn btn-ghost min-h-9 min-w-0 whitespace-normal break-words border border-neutral-300 px-2 py-1.5 text-center text-[11px] leading-4 dark:border-neutral-700"
           data-testid="manuscript-snapshot"
           onClick={async () => {
             setSnapshots(await window.nodus.takeSceneSnapshot(sceneId));
@@ -766,7 +766,7 @@ function SceneWorkbench({ sceneId, onRestored }: { sceneId: string; onRestored: 
           {t('Guardar instantánea')}
         </button>
         <button
-          className="btn btn-ghost h-7 flex-1 gap-1 border border-neutral-700 text-[11px]"
+          className="btn btn-ghost min-h-9 min-w-0 whitespace-normal break-words border border-neutral-300 px-2 py-1.5 text-center text-[11px] leading-4 dark:border-neutral-700"
           data-testid="manuscript-review"
           disabled={busy}
           onClick={() => void check()}
@@ -792,7 +792,7 @@ function SceneWorkbench({ sceneId, onRestored }: { sceneId: string; onRestored: 
       )}
 
       {snapshots.length > 0 && (
-        <ul className="mt-2 space-y-0.5 border-t border-neutral-800 pt-2">
+        <ul className="mt-2 space-y-0.5 border-t border-neutral-200 pt-2 dark:border-neutral-800">
           {snapshots.slice(0, 5).map((snapshot) => (
             <li key={snapshot.snapshotId} className="flex items-center gap-2 text-[10px] text-neutral-500">
               <span className="min-w-0 flex-1 truncate">
