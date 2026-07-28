@@ -151,14 +151,14 @@ function EntryRow({ item, compact, onOpen }: { item: WorldEntry; compact: boolea
       data-entry-kind={item.kind}
       onClick={onOpen}
       title={item.title}
-      className="flex w-full items-start gap-2 rounded-lg border border-transparent px-2 py-1.5 text-left transition-colors hover:border-indigo-700/60 hover:bg-indigo-950/20"
+      className="encyclopedia-entry-row flex w-full items-start gap-2 rounded-lg border border-transparent px-2 py-1.5 text-left transition-colors hover:border-indigo-700/60 hover:bg-indigo-950/20"
     >
       <Icon name={WORLD_ENTRY_KIND_ICON[item.kind]} size={14} className="mt-0.5 shrink-0 text-neutral-600" />
       <span className="min-w-0 flex-1">
         <span className="flex items-baseline gap-1.5">
           <span className="truncate text-sm text-neutral-100">{item.title}</span>
           {item.stub && (
-            <span className="shrink-0 rounded bg-neutral-800 px-1 text-[9px] uppercase tracking-wide text-neutral-500">
+            <span className="encyclopedia-stub-badge shrink-0 rounded bg-neutral-800 px-1 text-[9px] uppercase tracking-wide text-neutral-500">
               {t('Sin desarrollar')}
             </span>
           )}

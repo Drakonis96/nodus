@@ -1718,6 +1718,51 @@ body {
 .light.worldbuilding .border-indigo-800\/40,
 .light.worldbuilding .border-indigo-800\/60 { border-color: rgba(124, 58, 237, 0.3); }
 
+/* Image labels are overlays, not dark-mode surfaces. They need their own contract:
+   the generic `.light .text-neutral-*` remap otherwise turns a black portrait label's
+   text black as well. */
+.ai-image-badge {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background-color: rgba(0, 0, 0, 0.55);
+  color: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22);
+}
+.character-card-role-badge {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background-color: rgba(0, 0, 0, 0.65);
+  color: #f5f5f5;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.24);
+}
+.light .ai-image-badge,
+.light.worldbuilding .character-card-role-badge {
+  border-color: rgba(255, 255, 255, 0.8);
+  background-color: rgba(255, 255, 255, 0.84);
+  color: #262626;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.2);
+}
+
+/* The encyclopedia used to inherit its light palette indirectly from generic utility
+   overrides. These semantic rules keep its A–Z headers and state chips correct even
+   when their dark utility composition changes. */
+.light.worldbuilding .encyclopedia-entry-row:hover {
+  border-color: rgba(124, 58, 237, 0.4);
+  background-color: #f5f3ff;
+}
+.light.worldbuilding .encyclopedia-stub-badge {
+  background-color: #e5e7eb;
+  color: #525252;
+}
+.light.worldbuilding .encyclopedia-letter-heading {
+  background-color: rgba(248, 250, 252, 0.96);
+  color: #525252;
+}
+.light.worldbuilding [data-testid='entry-reader'] .md a {
+  color: #6d28d9;
+}
+.light.worldbuilding [data-testid='entry-reader'] .md a:hover {
+  color: #5b21b6;
+}
+
 .light.docencia .bg-indigo-950,
 .light.docencia .bg-indigo-950\/20,
 .light.docencia .bg-indigo-950\/25,

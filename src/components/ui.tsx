@@ -248,7 +248,7 @@ export function AiBadge({
   return (
     <span
       title={t('Generado con IA')}
-      className={`pointer-events-none absolute ${pos[corner]} z-10 inline-flex items-center rounded-full bg-black/55 font-medium uppercase tracking-wide text-white backdrop-blur-sm ${pad} ${className}`}
+      className={`ai-image-badge pointer-events-none absolute ${pos[corner]} z-10 inline-flex items-center rounded-full font-medium uppercase tracking-wide backdrop-blur-sm ${pad} ${className}`}
     >
       <Icon name="wand" size={size === 'sm' ? 9 : 11} />
       {t('IA')}

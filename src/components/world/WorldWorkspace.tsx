@@ -308,7 +308,9 @@ function WorldAlphaIndex<T>({
         <section key={letter}>
           <h3
             id={headingId(letter)}
-            className="sticky top-0 z-10 mb-1 bg-neutral-950/95 py-1 text-xs font-semibold uppercase tracking-wider text-neutral-500 backdrop-blur"
+            className={`sticky top-0 z-10 mb-1 bg-neutral-950/95 py-1 text-xs font-semibold uppercase tracking-wider text-neutral-500 backdrop-blur ${
+              section.id === 'encyclopedia' ? 'encyclopedia-letter-heading' : ''
+            }`}
           >
             {letter}
           </h3>

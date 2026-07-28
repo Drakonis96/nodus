@@ -104,7 +104,7 @@ function CharacterCard({ item, compact, onOpen }: { item: Character; compact: bo
           className={faded ? 'opacity-60' : ''}
         />
         {profile.narrativeRole && !compact && (
-          <span className="absolute right-1.5 top-1.5 rounded bg-black/65 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-neutral-200">
+          <span className="character-card-role-badge absolute right-1.5 top-1.5 rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide">
             {t(CHARACTER_ROLE_LABEL[profile.narrativeRole])}
           </span>
         )}
