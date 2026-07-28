@@ -1567,16 +1567,16 @@ export interface AppSettings {
   /** Bearer token for the Zotero-plugin API. Intentionally visible in Settings. */
   zoteroPluginToken: string;
   /**
-   * User-defined order of the sidebar sections, as view ids. Excludes 'home'
-   * (always pinned first) and 'settings' (always pinned last). Empty means the
-   * default order. Unknown/missing ids are reconciled against the canonical nav
-   * list at render time.
+   * User-defined order of the sidebar sections, as stable view/action ids. Excludes
+   * 'home' (always pinned first) and 'settings' (always pinned last). Empty means
+   * the default order. Unknown/missing ids are reconciled against the active vault's
+   * own navigation list at render time.
    */
   sidebarOrder: string[];
   /**
-   * View ids the user has hidden from the sidebar. 'home' and 'settings' can
-   * never be hidden. Hidden sections are simply not rendered in the sidebar nav;
-   * they can be shown again from Settings.
+   * Stable view/action ids the user has hidden from the sidebar. 'home' and
+   * 'settings' can never be hidden. Hidden sections are simply not rendered in
+   * the sidebar nav; they can be shown again from Settings.
    */
   sidebarHidden: string[];
   /**

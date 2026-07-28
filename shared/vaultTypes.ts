@@ -100,8 +100,8 @@ Este vault reconstruye historia familiar a partir de fuentes primarias (censos, 
   {
     id: 'estudio',
     available: true,
-    // The dedicated study surfaces replace the research and authoring workspace in
-    // this mode. Users can still opt universal sections back in from Settings.
+    // The dedicated study surfaces replace the research and authoring workspace.
+    // The renderer also enforces its strict allow-list in the sidebar configurator.
     defaultHiddenViews: [
       'search',
       'library',
@@ -144,7 +144,7 @@ Este vault trabaja con FUENTES PRIMARIAS y documentos de archivo (censos, padron
     // A structured-data workspace: a Notion-like manager of typed tables. None of the
     // argumentative/records surfaces apply — the sidebar shows the user's databases
     // (rendered dynamically) plus the fixed Analysis and Chat sections, and keeps
-    // Notes. Everything else is hidden by default (re-enableable for mixed corpora).
+    // Notes. Everything else is excluded by the dedicated navigation allow-list.
     // The records views (persons/timeline/tree/…) are already excluded by scoping.
     defaultHiddenViews: [
       'search',
@@ -178,8 +178,8 @@ Este vault es un gestor de bases de datos estructuradas (tablas con columnas tip
     id: 'worldbuilding',
     available: true,
     // A worldbuilding vault renders its own sidebar (WorldbuildingSidebar) plus the
-    // tools group, so the research/authoring universals are hidden by default the way
-    // the study and teaching modes hide them. `notes` stays visible: the sidebar's
+    // tools group, so the research/authoring universals are excluded the way the study
+    // and teaching modes exclude them. `notes` stays visible: the sidebar's
     // "Crear" group points at the real Notes view rather than a placeholder.
     defaultHiddenViews: [
       'search',
@@ -207,9 +207,8 @@ Este vault construye un mundo de ficción. A diferencia de un corpus documental,
     id: 'docencia',
     available: true,
     // Teaching reuses the study organisation surfaces (courses & subjects, schedule,
-    // calendar, materials, recordings). Like the study mode it hides the
-    // research/authoring universals, leaving a focused teaching workspace. The user
-    // can re-enable any universal section from Settings.
+    // calendar, materials, recordings). Like the study mode it excludes the
+    // research/authoring universals, leaving a focused teaching workspace.
     defaultHiddenViews: [
       'search',
       'library',

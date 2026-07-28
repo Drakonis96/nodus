@@ -55,7 +55,7 @@ import type {
   PendingLibraryNavigationTarget,
   View,
 } from './navigation';
-import { groupedNav, NAV_ITEMS, NAV_GROUPS, TOOLKIT_TOOLS } from './navigation';
+import { dedicatedVaultNavIds, groupedNav, NAV_ITEMS, NAV_GROUPS, TOOLKIT_TOOLS } from './navigation';
 import type { ToolkitPage } from './navigation';
 import { placeHeaderBadge, type HeaderBadgePlacement } from './headerLayout';
 import { effectiveSidebarHidden, isPreviewVaultType, isViewAllowedForVaultType, viewsDisallowedForType } from '@shared/vaultTypes';
@@ -319,19 +319,27 @@ export function App() {
   // Sidebar sections grouped for rendering (Explorar · Analizar · Escribir),
   // each group in the user's chosen order, minus any hidden sections. Home is
   // pinned first and Settings last, both outside every group and never hidden.
-  const navGroups = useMemo(() => {
-    const hidden = effectiveSidebarHidden(
+  const activeSidebarHidden = useMemo(
+    () => effectiveSidebarHidden(
       settings?.sidebarHidden ?? [],
       settings?.sidebarCustomized ?? false,
       activeVault?.type
-    );
+    ),
+    [settings?.sidebarHidden, settings?.sidebarCustomized, activeVault?.type],
+  );
+
+  const navGroups = useMemo(() => {
     // Views scoped to other vault types are removed outright (not user-toggleable here).
     const disallowed = viewsDisallowedForType(
       NAV_ITEMS.map((n) => n.id),
       activeVault?.type
     );
-    return groupedNav(settings?.sidebarOrder ?? [], [...hidden, ...disallowed]);
-  }, [settings?.sidebarOrder, settings?.sidebarHidden, settings?.sidebarCustomized, activeVault?.type]);
+    const dedicatedIds = dedicatedVaultNavIds(activeVault?.type);
+    const outsideDedicatedWorkspace = dedicatedIds
+      ? NAV_ITEMS.filter((item) => item.id !== 'home' && item.id !== 'settings' && !dedicatedIds.includes(item.id)).map((item) => item.id)
+      : [];
+    return groupedNav(settings?.sidebarOrder ?? [], [...activeSidebarHidden, ...disallowed, ...outsideDedicatedWorkspace]);
+  }, [settings?.sidebarOrder, activeSidebarHidden, activeVault?.type]);
 
   // If the active vault type doesn't allow the current view (e.g. switching from a
   // primary-source vault to an academic one while on Personas), fall back to Home.
@@ -1266,7 +1274,12 @@ export function App() {
                 return (
                   <>
                     {navButton(homeItem)}
-                    <WorldbuildingSidebar activeView={view} onNavigate={(targetView) => setView(targetView)} />
+                    <WorldbuildingSidebar
+                      activeView={view}
+                      onNavigate={(targetView) => setView(targetView)}
+                      sidebarOrder={settings?.sidebarOrder}
+                      sidebarHidden={activeSidebarHidden}
+                    />
                     {/* Only the tools group: Explorar/Analizar/Crear are already covered
                         by WorldbuildingSidebar, so rendering them would duplicate. */}
                     {navGroups.filter((group) => group.id === 'tools').map((group) => renderGroup(group))}
@@ -1320,6 +1333,8 @@ export function App() {
                     <StudySidebar
                       activeView={view}
                       onNavigate={(targetView) => { setStudyTarget(null); if (targetView !== 'studyLibrary') setStudyMaterialTarget(null); if (targetView !== 'studyRecordings') setStudyRecordingTarget(null); setStudyGraphTarget(null); setView(targetView); }}
+                      sidebarOrder={settings?.sidebarOrder}
+                      sidebarHidden={activeSidebarHidden}
                     />
                     {navGroups.filter((group) => group.id !== 'explore').map((group) => renderGroup(group))}
                     <div className="mt-2 flex flex-col gap-1">{navButton(settingsItem)}</div>
@@ -1334,6 +1349,8 @@ export function App() {
                       activeView={view}
                       onNavigate={(targetView) => { setStudyTarget(null); if (targetView !== 'studyLibrary') setStudyMaterialTarget(null); if (targetView !== 'studyRecordings') setStudyRecordingTarget(null); setStudyGraphTarget(null); setView(targetView); }}
                       onOpenRoadmap={setRoadmapTopic}
+                      sidebarOrder={settings?.sidebarOrder}
+                      sidebarHidden={activeSidebarHidden}
                     />
                     {/* Only the tools group: Explorar/Analizar/Escribir are already
                         covered by TeachingSidebar, so rendering them would duplicate. */}

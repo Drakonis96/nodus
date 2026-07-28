@@ -1,4 +1,5 @@
 import type { CorpusHealthBucketId, ResearchContextSelection } from '@shared/types';
+import { normalizeVaultType } from '@shared/vaultTypes';
 
 export type View = 'home' | 'search' | 'library' | 'graph' | 'argument' | 'ideas' | 'authors' | 'persons' | 'encyclopedia' | 'continuity' | 'conflicts' | 'arcs' | 'rules' | 'questions' | 'worldChat' | 'manuscript' | 'characters' | 'places' | 'factions' | 'cultures' | 'dynasties' | 'scenes' | 'timeline' | 'tree' | 'relations' | 'map' | 'archive' | 'databases' | 'dbSearch' | 'dbAnalysis' | 'dbChat' | 'studyCourses' | 'studySchedule' | 'studyCalendar' | 'studySearch' | 'studyLibrary' | 'studyRecordings' | 'studyChat' | 'studyIdeas' | 'studyGraph' | 'studyQuestions' | 'studyReview' | 'studyDeepResearch' | 'teachingGroups' | 'teachingGrades' | 'teachingExams' | 'teachingRubrics' | 'immersion' | 'gaps' | 'debate' | 'research' | 'hypothesis' | 'reading' | 'writing' | 'deepResearch' | 'projects' | 'notes' | 'toolkit' | 'settings';
 
@@ -218,6 +219,52 @@ export function orderedNav(sidebarOrder: string[]): NavItem[] {
 
 export interface NavGroup extends NavGroupDef {
   items: NavItem[];
+}
+
+/**
+ * Dedicated workspaces replace the generic research navigation instead of merely
+ * hiding it by default. Keep their fixed top-level view ids here so both the real
+ * sidebar and its Settings editor can exclude sections belonging to another mode.
+ * Docencia's roadmap-only buttons live in TeachingSidebar and are added by that
+ * component because they are not application Views.
+ */
+const DEDICATED_VAULT_NAV_IDS: Partial<Record<ReturnType<typeof normalizeVaultType>, View[]>> = {
+  estudio: [
+    'studyCourses', 'studySchedule', 'studyCalendar', 'studySearch', 'studyLibrary',
+    'studyRecordings', 'studyChat', 'studyIdeas', 'studyGraph', 'studyQuestions',
+    'studyReview', 'studyDeepResearch', 'toolkit',
+  ],
+  docencia: [
+    'studyCourses', 'teachingGroups', 'studySchedule', 'studyCalendar', 'studyLibrary',
+    'studyRecordings', 'studyQuestions', 'teachingRubrics', 'teachingExams',
+    'teachingGrades', 'studyDeepResearch', 'toolkit',
+  ],
+  databases: ['dbSearch', 'dbAnalysis', 'dbChat', 'notes', 'toolkit'],
+  worldbuilding: [
+    'encyclopedia', 'characters', 'places', 'factions', 'cultures', 'timeline', 'map',
+    'relations', 'tree', 'dynasties', 'worldChat', 'rules', 'conflicts', 'arcs',
+    'continuity', 'questions', 'notes', 'scenes', 'manuscript', 'toolkit',
+  ],
+};
+
+/** Strict top-level navigation allow-list for dedicated vault workspaces. */
+export function dedicatedVaultNavIds(vaultType: unknown): View[] | null {
+  const ids = DEDICATED_VAULT_NAV_IDS[normalizeVaultType(vaultType)];
+  return ids ? [...ids] : null;
+}
+
+/** Put a bounded set of sidebar items in the user's saved relative order. */
+export function orderSidebarItems<T extends { id: string }>(items: readonly T[], sidebarOrder: string[]): T[] {
+  const position = new Map(sidebarOrder.map((id, index) => [id, index]));
+  return items
+    .map((item, defaultIndex) => ({ item, defaultIndex, savedIndex: position.get(item.id) }))
+    .sort((a, b) => {
+      if (a.savedIndex !== undefined && b.savedIndex !== undefined) return a.savedIndex - b.savedIndex;
+      if (a.savedIndex !== undefined) return -1;
+      if (b.savedIndex !== undefined) return 1;
+      return a.defaultIndex - b.defaultIndex;
+    })
+    .map(({ item }) => item);
 }
 
 /**

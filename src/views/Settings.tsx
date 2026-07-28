@@ -32,7 +32,9 @@ import { SttSettings } from '../components/SttSettings';
 import { LocalAiModelsSettings } from '../components/LocalAiModelsSettings';
 import { LocalImageModelSettings } from '../components/LocalImageModelSettings';
 import { McpConnectionModal } from '../components/McpConnectionModal';
-import { NAV_GROUPS, orderedNav } from '../navigation';
+import { dedicatedVaultNavIds, NAV_GROUPS, orderSidebarItems, orderedNav } from '../navigation';
+import { teachingItemId, TEACHING_GROUPS } from '../components/TeachingSidebar';
+import { WORLDBUILDING_GROUPS } from '../components/WorldbuildingSidebar';
 import { t, tx } from '../i18n';
 import { updateStatusMessage } from '../updateStatus';
 import { DEFAULT_EMBEDDING_MODELS, EMBEDDING_PROVIDERS } from '@shared/providers';
@@ -2356,10 +2358,54 @@ function SidebarOrderEditor({
   onReorder: (ids: string[]) => void;
   onToggleHidden: (hidden: string[]) => void;
 }) {
-  const orderedAll = orderedNav(sidebarOrder).filter(
-    (n) => n.id !== 'home' && n.id !== 'settings' && isViewAllowedForVaultType(n.id, vaultType)
-  );
-  const groups = NAV_GROUPS.map((g) => ({ ...g, items: orderedAll.filter((n) => n.group === g.id) }));
+  type EditorItem = { id: string; label: string; icon: string; group: string };
+  type EditorGroup = { id: string; label: string; items: EditorItem[] };
+
+  const toolkit = orderedNav(sidebarOrder).find((item) => item.id === 'toolkit');
+  let groups: EditorGroup[];
+  if (vaultType === 'docencia') {
+    groups = TEACHING_GROUPS.map((group) => ({
+      id: group.id,
+      label: group.label,
+      items: orderSidebarItems(
+        group.items.map((item) => ({ ...item, id: teachingItemId(item) })),
+        sidebarOrder,
+      ).map((item) => ({ ...item, group: group.id })),
+    }));
+  } else if (vaultType === 'worldbuilding') {
+    groups = WORLDBUILDING_GROUPS.map((group) => ({
+      id: group.id,
+      label: group.label,
+      items: orderSidebarItems(
+        group.items.map((item) => ({ ...item, id: item.view })),
+        sidebarOrder,
+      ).map((item) => ({ ...item, group: group.id })),
+    }));
+  } else {
+    const dedicatedIds = dedicatedVaultNavIds(vaultType);
+    const dedicated = dedicatedIds ? new Set(dedicatedIds) : null;
+    const orderedAll = orderedNav(sidebarOrder).filter(
+      (item) => item.id !== 'home'
+        && item.id !== 'settings'
+        && isViewAllowedForVaultType(item.id, vaultType)
+        && (!dedicated || dedicated.has(item.id)),
+    );
+    groups = NAV_GROUPS.map((group) => ({
+      ...group,
+      items: orderedAll
+        .filter((item) => item.group === group.id)
+        .map((item) => ({ ...item, group: group.id })),
+    }));
+  }
+  if ((vaultType === 'docencia' || vaultType === 'worldbuilding') && toolkit) {
+    const tools = NAV_GROUPS.find((group) => group.id === 'tools')!;
+    groups.push({
+      ...tools,
+      items: [{ ...toolkit, group: tools.id }],
+    });
+  }
+  groups = groups.filter((group) => group.items.length > 0);
+  const orderedAll = groups.flatMap((group) => group.items);
   const hidden = new Set(sidebarHidden);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);

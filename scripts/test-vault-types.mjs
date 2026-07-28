@@ -131,7 +131,7 @@ test('the worldbuilding sidebar keeps its full announced shape, with only the bu
       `${view} is wired in the sidebar and must be allowed for worldbuilding`
     );
   }
-  assert.match(app, /<WorldbuildingSidebar activeView=\{view\} onNavigate=/);
+  assert.match(app, /<WorldbuildingSidebar[\s\S]*?activeView=\{view\}[\s\S]*?onNavigate=/);
   // Its own Inicio, and the generic academic home must not also render for it.
   assert.match(app, /view === 'home' && isWorldbuilding && \(\s*<WorldbuildingHome/);
   assert.match(app, /view === 'home' &&[^\n]*!isWorldbuilding[^\n]*&& \(/);
