@@ -7,9 +7,9 @@ import type { DecorativeImageStyle } from './types';
 import { imageStyleTemplate } from './imageStyles';
 
 const IMAGE_NOUN =
-  /\b(imagen|foto(?:graf[ií]a)?|retrato|selfie|dibujo|ilustraci[oó]n|picture|photo|image|portrait|selfie)\b/i;
+  /\b(imagen|foto(?:graf[ií]a)?|retrato|selfie|dibujo|ilustraci[oó]n|picture|photo|image|portrait|photograph|bild|foto|portr[aä]t|zeichnung|illustration|imagem|fotografia|retrato|desenho|illustra[cç][aã]o|immagine|fotografia|ritratto|disegno|illustrazione|g[oö]rsel|foto[gğ]raf|resm(?:i|ini)|portre|[cç]izim|ill[uü]strasyon)\b/i;
 const IMAGE_ACTION =
-  /\b(env[ií]a(?:r|me)?|manda(?:r|me)?|mu[eé]stra(?:me)?|mostrar(?:me)?|ens[eé][ñn]a(?:r|me)?|compart(?:e|ir)|genera(?:r)?|crea(?:r)?|haz|send|show|share|generate|create|draw)\b/i;
+  /\b(env[ií]a(?:r|me)?|manda(?:r|me)?|mu[eé]stra(?:me)?|mostrar(?:me)?|ens[eé][ñn]a(?:r|me)?|compart(?:e|ir)|genera(?:r)?|crea(?:r)?|haz|send|show|share|generate|create|draw|envoie|montre|partage|g[eé]n[eè]re|cr[eé]e|dessine|sende|zeig|teile|generiere|erstelle|zeichne|envia|envie|manda|mostra|partilha|gera|cria|desenha|invia|mandami|mostrami|condividi|genera|crea|disegna|g[oö]nder|g[oö]ster|payla[sş]|[uü]ret|olu[sş]tur|[cç]iz)\b/i;
 
 export function isCharacterImageRequest(text: string): boolean {
   const clean = text.replace(/[¿?¡!.,;:()[\]{}]/g, ' ').replace(/\s+/g, ' ').trim();

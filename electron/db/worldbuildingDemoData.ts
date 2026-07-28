@@ -20,6 +20,15 @@ import { countWords } from '@shared/worldManuscript';
 import { recomputeWorldDays } from './worldCalendarRepo';
 import { rebuildWorldLinks } from './worldEncyclopediaRepo';
 import { runContinuityUnfiltered, muteNotice } from './worldContinuityRepo';
+import type { AppLanguage } from '@shared/types';
+import {
+  worldbuildingDemoLocale,
+  worldbuildingDemoLocalized,
+  worldbuildingDemoText,
+  worldbuildingDemoVariants,
+  relocalizeWorldbuildingDemoText,
+  type WorldbuildingDemoLocalized,
+} from '@shared/worldbuildingDemoI18n';
 import {
   WORLD_DEMO_CHARACTER_NARRATIVE,
   WORLD_DEMO_SCENE_NARRATIVE,
@@ -30,16 +39,24 @@ const AT = '2026-07-28T12:00:00.000Z';
 const PREVIOUS_AT = '2026-07-21T12:00:00.000Z';
 const IMAGE_AT = '2026-07-28T21:00:00.000Z';
 
-type DemoLocale = 'es' | 'en';
-type Localized = { es: string; en: string };
+type DemoLocale = AppLanguage;
+type Localized = WorldbuildingDemoLocalized;
 type SqlValue = string | number | null | Buffer;
 
 function locale(): DemoLocale {
-  return getSettings().uiLanguage === 'es' ? 'es' : 'en';
+  return worldbuildingDemoLocale(getSettings().uiLanguage);
 }
 
 function text(es: string, en: string): Localized {
-  return { es, en };
+  return worldbuildingDemoLocalized(es, en);
+}
+
+function demoText(es: string, en: string): string {
+  return worldbuildingDemoText(locale(), es, en);
+}
+
+function demoLiteral(es: string): string {
+  return worldbuildingDemoText(locale(), es);
 }
 
 const DEMO_ASSET_DIR = path.join(app.getAppPath(), 'electron', 'assets', 'worldbuilding-demo');
@@ -69,7 +86,7 @@ const CHARACTERS = [
     appearance: text('Cartógrafa de cabello negro trenzado, ojos plateados y una prótesis de vidrio solar en la mano izquierda.', 'A black-haired cartographer with silver eyes and a solar-glass prosthetic left hand.'),
     personality: text('Observadora, obstinada y compasiva; convierte el miedo en preguntas concretas.', 'Observant, stubborn and compassionate; she turns fear into concrete questions.'),
     backstory: text('Hija de [[Aurel Venn]], sobrevivió al Hundimiento de [[Lúmina]]. Busca a su hermana [[Nara Venn]] y oculta que conoce el nombre verdadero del Faro. ???', 'Daughter of [[Aurel Venn]], she survived the Sinking of [[Lumina]]. She searches for her sister [[Nara Venn]] and hides that she knows the Lighthouse’s true name. ???'),
-    visual: 'young maritime cartographer, silver eyes, dark braid, brass coat, translucent glass left hand',
+    visual: text('joven cartógrafa marítima, ojos plateados, trenza oscura, abrigo de latón, mano izquierda de vidrio translúcido', 'young maritime cartographer, silver eyes, dark braid, brass coat, translucent glass left hand'),
     want: text('Encontrar a Nara antes de la próxima Marea Negra.', 'Find Nara before the next Black Tide.'),
     need: text('Aceptar que un mapa no puede controlar a las personas que ama.', 'Accept that a map cannot control the people she loves.'),
     flaw: text('Confunde preparación con control.', 'She mistakes preparation for control.'),
@@ -85,7 +102,7 @@ const CHARACTERS = [
     appearance: text('Navegante veyari de piel cobriza, membranas azuladas en los antebrazos y tatuajes de corriente.', 'A copper-skinned Veyari navigator with blue forearm membranes and current tattoos.'),
     personality: text('Irónico, paciente y ferozmente leal cuando decide confiar.', 'Wry, patient and fiercely loyal once he chooses to trust.'),
     backstory: text('Antiguo capitán del [[Gremio de las Seis Velas]], acusado de provocar el naufragio de la Aguja Norte.', 'Former captain of the [[Guild of Six Sails]], accused of causing the wreck of the North Needle.'),
-    visual: 'Veyari sailor, copper skin, blue fin-like arm membranes, indigo tattoos, weathered coat',
+    visual: text('marinero veyari, piel cobriza, membranas azules como aletas en los brazos, tatuajes índigo, abrigo desgastado', 'Veyari sailor, copper skin, blue fin-like arm membranes, indigo tattoos, weathered coat'),
     want: text('Limpiar su nombre y recuperar su nave.', 'Clear his name and recover his ship.'),
     need: text('Elegir una causa que no dependa de su reputación.', 'Choose a cause that does not depend on his reputation.'),
     flaw: text('Convierte toda intimidad en una broma.', 'He turns every intimacy into a joke.'),
@@ -101,7 +118,7 @@ const CHARACTERS = [
     appearance: text('Hombre alto de cabello blanco, uniforme carmesí y máscara ceremonial de obsidiana.', 'A tall white-haired man in a crimson uniform and ceremonial obsidian mask.'),
     personality: text('Cortés, disciplinado y convencido de que la crueldad preventiva es misericordia.', 'Courteous, disciplined and convinced that preventive cruelty is mercy.'),
     backstory: text('Tomó la regencia tras la desaparición de [[Nara Venn]] y convirtió el racionamiento de luz en instrumento político.', 'He took the regency after [[Nara Venn]] disappeared and turned light rationing into a political instrument.'),
-    visual: 'older regent, white hair, obsidian half mask, crimson military coat, solar sigil',
+    visual: text('regente mayor, cabello blanco, media máscara de obsidiana, abrigo militar carmesí, sigilo solar', 'older regent, white hair, obsidian half mask, crimson military coat, solar sigil'),
     want: text('Encender el Corazón de Vidrio bajo su control.', 'Ignite the Glass Heart under his control.'),
     need: text('Reconocer que el orden sin consentimiento es otra forma de ruina.', 'Recognise that order without consent is another form of ruin.'),
     flaw: text('No distingue obediencia de lealtad.', 'He cannot distinguish obedience from loyalty.'),
@@ -117,7 +134,7 @@ const CHARACTERS = [
     appearance: text('Astrónoma de pelo cobrizo, pecas luminosas y lentes con seis diafragmas.', 'A copper-haired astronomer with luminous freckles and six-aperture lenses.'),
     personality: text('Brillante, impaciente y capaz de guardar un secreto demasiado tiempo.', 'Brilliant, impatient and capable of keeping a secret for too long.'),
     backstory: text('Desapareció en el [[Observatorio de Orla]] después de demostrar que la Tercera Luna no era una luna.', 'She vanished at the [[Orla Observatory]] after proving that the Third Moon was not a moon.'),
-    visual: 'copper-haired astronomer, luminous freckles, many-lensed spectacles, amber observatory robes',
+    visual: text('astrónoma de cabello cobrizo, pecas luminosas, gafas de múltiples lentes, ropajes ámbar de observatorio', 'copper-haired astronomer, luminous freckles, many-lensed spectacles, amber observatory robes'),
     want: text('Impedir que el Corazón despierte.', 'Prevent the Heart from waking.'),
     need: text('Compartir la verdad antes de que deje de pertenecerle.', 'Share the truth before it stops belonging to her.'),
     flaw: text('Protege a los demás negándoles información.', 'She protects others by denying them information.'),
@@ -133,7 +150,7 @@ const CHARACTERS = [
     appearance: text('Aprendiz de archivo, piel oscura, pelo rapado y un enjambre de llaves mecánicas al cinturón.', 'A dark-skinned archive apprentice with a shaved head and a swarm of mechanical keys at their belt.'),
     personality: text('Curiose, valiente y pésime mintiendo.', 'Curious, brave and terrible at lying.'),
     backstory: text('Creció en el Barrio Hundido y puede oír los ecos atrapados en el vidrio antiguo.', 'Raised in the Sunken Quarter, they can hear echoes trapped in old glass.'),
-    visual: 'young archive apprentice, shaved head, green coat, brass keys, glowing glass fragments',
+    visual: text('joven aprendiz de archivo, cabeza rapada, abrigo verde, llaves de latón, fragmentos de vidrio brillante', 'young archive apprentice, shaved head, green coat, brass keys, glowing glass fragments'),
     want: text('Demostrar que el Barrio Hundido merece ser salvado.', 'Prove the Sunken Quarter deserves to be saved.'),
     need: text('Dejar de medir su valor por la utilidad que ofrece.', 'Stop measuring their worth by how useful they are.'),
     flaw: text('Se ofrece para todo hasta romperse.', 'They volunteer for everything until they break.'),
@@ -149,7 +166,7 @@ const CHARACTERS = [
     appearance: text('Guardián canoso con armadura azul ennegrecida y una cicatriz que le cruza la garganta.', 'A grey-haired guard in blackened blue armour with a scar across his throat.'),
     personality: text('Austero, protector y aferrado a juramentos incompatibles.', 'Austere, protective and bound to incompatible oaths.'),
     backstory: text('La ficha dice que murió defendiendo la Puerta de Sal, pero varios testigos lo sitúan después en el Faro.', 'His file says he died defending the Salt Gate, yet several witnesses place him at the Lighthouse later.'),
-    visual: 'grey veteran, blackened blue armour, throat scar, weathered lighthouse cloak',
+    visual: text('veterano canoso, armadura azul ennegrecida, cicatriz en la garganta, capa de farero desgastada', 'grey veteran, blackened blue armour, throat scar, weathered lighthouse cloak'),
     want: text('Cumplir su último juramento.', 'Fulfil his last oath.'),
     need: text('Aceptar que un juramento puede sobrevivir sin quien lo pronunció.', 'Accept that an oath can outlive the one who spoke it.'),
     flaw: text('Obedece la letra cuando teme decidir.', 'He obeys the letter when afraid to decide.'),
@@ -165,7 +182,7 @@ const CHARACTERS = [
     appearance: text('Maestro farero de barba rojiza y manos quemadas por el vidrio solar.', 'A red-bearded lighthouse master whose hands were burned by solar glass.'),
     personality: text('Generoso en público, reservado con su familia.', 'Generous in public, guarded with his family.'),
     backstory: text('Descubrió la deuda que alimenta el Faro y dejó sus mapas cifrados a Ilyra.', 'He discovered the debt feeding the Lighthouse and left his ciphered maps to Ilyra.'),
-    visual: 'older lighthouse keeper, red beard, burned hands, ochre coat, brass astrolabe',
+    visual: text('farero mayor, barba roja, manos quemadas, abrigo ocre, astrolabio de latón', 'older lighthouse keeper, red beard, burned hands, ochre coat, brass astrolabe'),
     want: text('Romper el ciclo de la Deuda de Eco.', 'Break the cycle of Echo Debt.'),
     need: text('Confiar el peligro a sus hijas.', 'Trust his daughters with the danger.'),
     flaw: text('Calla para proteger.', 'He protects through silence.'),
@@ -181,7 +198,7 @@ const CHARACTERS = [
     appearance: text('Sacerdotisa veyari de piel azul grisácea, ojos sin pupila y manto tejido con sal cristalizada.', 'A grey-blue Veyari priestess with pupil-less eyes and a cloak woven from crystallised salt.'),
     personality: text('Serena, inescrutable y más divertida de lo que permite su cargo.', 'Serene, inscrutable and more amused than her office permits.'),
     backstory: text('Recuerda mareas anteriores al calendario y asegura haber conocido al Faro cuando todavía caminaba.', 'She remembers tides older than the calendar and claims to have known the Lighthouse when it still walked.'),
-    visual: 'ancient Veyari priestess, grey blue skin, pupil-less eyes, crystalline salt cloak',
+    visual: text('antigua sacerdotisa veyari, piel azul grisácea, ojos sin pupilas, manto de sal cristalina', 'ancient Veyari priestess, grey blue skin, pupil-less eyes, crystalline salt cloak'),
     want: text('Devolver el Corazón al mar.', 'Return the Heart to the sea.'),
     need: text('Admitir que la memoria también deforma.', 'Admit that memory also distorts.'),
     flaw: text('Confunde antigüedad con autoridad.', 'She mistakes age for authority.'),
@@ -197,7 +214,7 @@ const CHARACTERS = [
     appearance: text('Joven oficial de pelo oscuro, capa roja y una prótesis auditiva de latón.', 'A young dark-haired officer in a red cloak with a brass hearing device.'),
     personality: text('Honorable, competitivo y atrapado entre afecto y apellido.', 'Honourable, competitive and trapped between affection and family name.'),
     backstory: text('Sobrino del Regente, amigo de infancia de Ilyra y comandante de la Puerta de Sal.', 'The Regent’s nephew, Ilyra’s childhood friend and commander of the Salt Gate.'),
-    visual: 'young officer, dark hair, red cloak, brass hearing device, salt gate insignia',
+    visual: text('joven oficial, cabello oscuro, capa roja, dispositivo auditivo de latón, insignia de la Puerta de Sal', 'young officer, dark hair, red cloak, brass hearing device, salt gate insignia'),
     want: text('Evitar una guerra civil sin traicionar a su familia.', 'Prevent civil war without betraying his family.'),
     need: text('Entender que la neutralidad también elige un bando.', 'Understand that neutrality also chooses a side.'),
     flaw: text('Pospone la decisión moral hasta que otros deciden por él.', 'He postpones moral choices until others choose for him.'),
@@ -213,7 +230,7 @@ const CHARACTERS = [
     appearance: text('Aún no ha nacido; existe en una profecía y en los planes de dos casas.', 'Not yet born; exists in a prophecy and in the plans of two houses.'),
     personality: text('Sin determinar.', 'Undetermined.'),
     backstory: text('El heredero anunciado por el Oráculo de Sal, cuyo parentesco real sigue en disputa.', 'The heir announced by the Salt Oracle, whose true parentage remains disputed.'),
-    visual: 'symbolic empty cradle beneath two moons, rose cloth, salt crystals',
+    visual: text('cuna vacía simbólica bajo dos lunas, tela rosa, cristales de sal', 'symbolic empty cradle beneath two moons, rose cloth, salt crystals'),
     want: text('Aún no tiene voluntad en el relato.', 'Has no agency in the story yet.'),
     need: text('Ser tratado como persona y no como solución dinástica.', 'Be treated as a person rather than a dynastic solution.'),
     flaw: text('Sin determinar.', 'Undetermined.'),
@@ -289,11 +306,18 @@ function link(kind: string, id: string, label: string): string {
 
 function resolveDemoLinks(value: string): string {
   const entries = [
-    ...CHARACTERS.map((item) => ({ kind: 'character', id: item.id, names: [item.name] })),
-    ...PLACES.map((item) => ({ kind: 'place', id: item.id, names: [item.name] })),
-    ...GROUPS.map((item) => ({ kind: 'group', id: item.id, names: [item.name] })),
-    ...SCENES.map((item) => ({ kind: 'scene', id: item.id, names: [item.title.es, item.title.en] })),
-    ...ARTICLES.map((item) => ({ kind: 'article', id: item.id, names: [item.title.es, item.title.en, ...item.aka.es.split('\n'), ...item.aka.en.split('\n')] })),
+    ...CHARACTERS.map((item) => ({ kind: 'character', id: item.id, names: worldbuildingDemoVariants(item.name) })),
+    ...PLACES.map((item) => ({ kind: 'place', id: item.id, names: worldbuildingDemoVariants(item.name) })),
+    ...GROUPS.map((item) => ({ kind: 'group', id: item.id, names: worldbuildingDemoVariants(item.name) })),
+    ...SCENES.map((item) => ({ kind: 'scene', id: item.id, names: Object.values(item.title) })),
+    ...ARTICLES.map((item) => ({
+      kind: 'article',
+      id: item.id,
+      names: [
+        ...Object.values(item.title),
+        ...Object.values(item.aka).flatMap((aliases) => aliases.split('\n')),
+      ],
+    })),
   ];
   let result = value;
   for (const entry of entries) {
@@ -368,10 +392,10 @@ function demoImage(entityKind: string, entityId: string, title: string, order = 
     blob: bytes,
     thumbnail,
     thumbnail_mime_type: 'image/webp',
-    prompt: 'The Ashen Tides demo artwork',
+    prompt: demoText('Ilustración del demo Las Mareas de Ceniza', 'The Ashen Tides demo artwork'),
     provider: 'openai',
     model: 'codex-imagegen',
-    style: 'painterly fantasy codex',
+    style: demoText('códice de fantasía pictórica', 'painterly fantasy codex'),
     generated: 1,
     sort_order: order,
     created_at: AT,
@@ -478,14 +502,15 @@ export function upgradeWorldbuildingDemoDynasties(): boolean {
   const L = locale();
   const houses = GROUPS.filter((group) => group.kind === 'house');
   const affiliations = [
-    [`${PREFIX}aff-aurel-venn`, `${PREFIX}char-aurel`, `${PREFIX}group-venn`, L === 'es' ? 'maestro del Faro' : 'Lighthouse master', null, 131950],
-    [`${PREFIX}aff-maelor-sarn`, `${PREFIX}char-maelor`, `${PREFIX}group-sarn`, L === 'es' ? 'cabeza de casa' : 'head of house', null, null],
-    [`${PREFIX}aff-tarek-sarn`, `${PREFIX}char-tarek`, `${PREFIX}group-sarn`, L === 'es' ? 'heredero adoptivo' : 'adoptive heir', null, null],
-    [`${PREFIX}aff-sena-mir`, `${PREFIX}char-sena`, `${PREFIX}group-mir`, L === 'es' ? 'última llave' : 'last key', null, null],
+    [`${PREFIX}aff-aurel-venn`, `${PREFIX}char-aurel`, `${PREFIX}group-venn`, demoText('maestro del Faro', 'Lighthouse master'), null, 131950],
+    [`${PREFIX}aff-maelor-sarn`, `${PREFIX}char-maelor`, `${PREFIX}group-sarn`, demoText('cabeza de casa', 'head of house'), null, null],
+    [`${PREFIX}aff-tarek-sarn`, `${PREFIX}char-tarek`, `${PREFIX}group-sarn`, demoText('heredero adoptivo', 'adoptive heir'), null, null],
+    [`${PREFIX}aff-sena-mir`, `${PREFIX}char-sena`, `${PREFIX}group-mir`, demoText('última llave', 'last key'), null, null],
   ] as const;
 
   db.transaction(() => {
     for (const group of houses) {
+      const groupName = demoLiteral(group.name);
       db.prepare(
         `INSERT OR IGNORE INTO world_groups
           (group_id, kind, name, summary, description, visual_seed, accent, status, parent_id,
@@ -494,17 +519,17 @@ export function upgradeWorldbuildingDemoDynasties(): boolean {
       ).run(
         group.id,
         group.kind,
-        group.name,
+        groupName,
         group.summary[L],
         resolveDemoLinks(group.description[L]),
-        `${group.name}, heraldic emblem, maritime fantasy`,
+        `${groupName}, ${demoText('emblema heráldico de fantasía marítima', 'heraldic emblem, maritime fantasy')}`,
         group.accent,
         group.status,
         group.parent,
         group.seat,
         group.founded,
         group.ended,
-        L === 'es' ? 'Dinastía de demostración con blasón, sede y miembros editables.' : 'Demo dynasty with editable arms, seat and members.',
+        demoText('Dinastía de demostración con blasón, sede y miembros editables.', 'Demo dynasty with editable arms, seat and members.'),
         AT,
         AT
       );
@@ -518,7 +543,7 @@ export function upgradeWorldbuildingDemoDynasties(): boolean {
            thumbnail, thumbnail_mime_type, prompt, provider, model, style, generated,
            sort_order, created_at, updated_at)
          VALUES (?, 'group', ?, 'emblem', ?, 'image/png', ?, ?, ?, 'image/webp', ?, 'openai',
-                 'codex-imagegen', 'painterly fantasy heraldry', 1, 0, ?, ?)
+                 'codex-imagegen', ?, 1, 0, ?, ?)
          ON CONFLICT(image_id) DO UPDATE SET
            kind = 'emblem', label = excluded.label, mime_type = excluded.mime_type,
            bytes = excluded.bytes, blob = excluded.blob, thumbnail = excluded.thumbnail,
@@ -528,11 +553,12 @@ export function upgradeWorldbuildingDemoDynasties(): boolean {
       ).run(
         imageId,
         group.id,
-        group.name,
+        groupName,
         bytes.length,
         bytes,
         thumbnail,
-        `Heraldic coat of arms for ${group.name}; no text or watermark.`,
+        `${demoText('Escudo heráldico sin texto ni marca de agua para', 'Heraldic coat of arms with no text or watermark for')} ${groupName}.`,
+        demoText('heráldica de fantasía pictórica', 'painterly fantasy heraldry'),
         AT,
         AT
       );
@@ -617,6 +643,169 @@ export function upgradeWorldbuildingDemoNarrativeDepth(): boolean {
   return true;
 }
 
+type DemoRelocalizationSpec = {
+  table: string;
+  ownerColumn: string;
+  columns: string[];
+};
+
+const DEMO_RELOCALIZATION_SPECS: DemoRelocalizationSpec[] = [
+  { table: 'world_calendar_eras', ownerColumn: 'era_id', columns: ['name', 'abbreviation'] },
+  { table: 'world_calendar_months', ownerColumn: 'month_id', columns: ['name'] },
+  { table: 'places', ownerColumn: 'place_id', columns: ['name', 'notes'] },
+  { table: 'place_profiles', ownerColumn: 'place_id', columns: ['appearance', 'atmosphere', 'history', 'visual_seed'] },
+  { table: 'persons', ownerColumn: 'person_id', columns: ['display_name', 'birth_date', 'death_date', 'notes', 'biography'] },
+  { table: 'person_names', ownerColumn: 'id', columns: ['name', 'kind', 'known_by'] },
+  {
+    table: 'character_profiles',
+    ownerColumn: 'person_id',
+    columns: [
+      'species', 'gender', 'pronouns', 'appearance', 'personality', 'backstory',
+      'visual_seed', 'arc_want', 'arc_need', 'arc_flaw', 'arc_lie', 'arc_wound',
+      'voice_register', 'voice_tics', 'voice_sample', 'biography_proposed',
+    ],
+  },
+  { table: 'character_abilities', ownerColumn: 'ability_id', columns: ['name', 'description', 'cost', 'limits'] },
+  { table: 'social_contacts', ownerColumn: 'contact_id', columns: ['display_name', 'notes'] },
+  { table: 'social_relations', ownerColumn: 'relation_id', columns: ['role', 'notes'] },
+  { table: 'world_groups', ownerColumn: 'group_id', columns: ['name', 'summary', 'description', 'visual_seed', 'notes'] },
+  { table: 'character_affiliations', ownerColumn: 'affiliation_id', columns: ['rank', 'notes'] },
+  { table: 'world_secrets', ownerColumn: 'secret_id', columns: ['title', 'content', 'notes'] },
+  { table: 'secret_knowers', ownerColumn: 'id', columns: ['how'] },
+  { table: 'events', ownerColumn: 'event_id', columns: ['label', 'date', 'notes'] },
+  { table: 'record_evidence', ownerColumn: 'id', columns: ['quote', 'location'] },
+  { table: 'person_places', ownerColumn: 'id', columns: ['label', 'date', 'notes'] },
+  { table: 'world_scenes', ownerColumn: 'scene_id', columns: ['title', 'summary', 'notes'] },
+  { table: 'scene_characters', ownerColumn: 'id', columns: ['role'] },
+  { table: 'world_maps', ownerColumn: 'map_id', columns: ['name', 'scale_unit', 'planet_radius_unit', 'visual_seed', 'style', 'notes'] },
+  { table: 'map_images', ownerColumn: 'image_id', columns: ['prompt', 'style'] },
+  { table: 'map_layers', ownerColumn: 'layer_id', columns: ['name'] },
+  { table: 'map_markers', ownerColumn: 'marker_id', columns: ['label', 'notes'] },
+  { table: 'map_travel_modes', ownerColumn: 'mode_id', columns: ['name', 'unit'] },
+  { table: 'world_articles', ownerColumn: 'article_id', columns: ['title', 'summary', 'body', 'body_proposed', 'aka', 'sort_title', 'notes'] },
+  { table: 'world_entry_proposals', ownerColumn: 'proposal_id', columns: ['term', 'rationale', 'suggested_summary'] },
+  { table: 'world_threads', ownerColumn: 'thread_id', columns: ['title', 'pitch', 'stakes', 'outcome'] },
+  { table: 'world_beats', ownerColumn: 'scene_id', columns: ['text'] },
+  { table: 'world_rules', ownerColumn: 'rule_id', columns: ['title', 'statement', 'cost', 'limits', 'proposed_text'] },
+  { table: 'world_questions', ownerColumn: 'question_id', columns: ['question'] },
+  { table: 'world_question_options', ownerColumn: 'option_id', columns: ['text', 'implications', 'replaced_text'] },
+  { table: 'world_scene_text', ownerColumn: 'scene_id', columns: ['text'] },
+  { table: 'world_scene_snapshots', ownerColumn: 'snapshot_id', columns: ['text'] },
+  { table: 'world_manuscript_starts', ownerColumn: 'scene_id', columns: ['title', 'subtitle'] },
+  { table: 'world_chapter_breaks', ownerColumn: 'scene_id', columns: ['title', 'epigraph'] },
+  { table: 'note_folders', ownerColumn: 'id', columns: ['name', 'summary'] },
+  { table: 'notes', ownerColumn: 'id', columns: ['title', 'content'] },
+  { table: 'world_images', ownerColumn: 'image_id', columns: ['label', 'prompt', 'style'] },
+];
+
+function relocalizeDemoTable(spec: DemoRelocalizationSpec, language: AppLanguage): number {
+  if (
+    !/^[a-z_][a-z0-9_]*$/.test(spec.table)
+    || !/^[a-z_][a-z0-9_]*$/.test(spec.ownerColumn)
+  ) {
+    throw new Error(`Unsafe demo relocalization target: ${spec.table}.${spec.ownerColumn}`);
+  }
+  const db = getDb();
+  const tableExists = db
+    .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?")
+    .get(spec.table);
+  if (!tableExists) return 0;
+  const available = new Set(
+    (db.prepare(`PRAGMA table_info(${spec.table})`).all() as Array<{ name: string }>)
+      .map((column) => column.name)
+  );
+  if (!available.has(spec.ownerColumn)) return 0;
+  const columns = spec.columns.filter(
+    (column) => /^[a-z_][a-z0-9_]*$/.test(column) && available.has(column)
+  );
+  if (!columns.length) return 0;
+
+  const rows = db
+    .prepare(
+      `SELECT rowid AS __rowid, ${columns.join(', ')}
+         FROM ${spec.table}
+        WHERE ${spec.ownerColumn} LIKE ?`
+    )
+    .all(`${PREFIX}%`) as Array<Record<string, unknown> & { __rowid: number }>;
+  let changes = 0;
+  for (const row of rows) {
+    const updates: Array<[string, string]> = [];
+    for (const column of columns) {
+      if (typeof row[column] !== 'string' || !row[column]) continue;
+      const translated = relocalizeWorldbuildingDemoText(row[column], language);
+      if (translated !== row[column]) updates.push([column, translated]);
+    }
+    if (!updates.length) continue;
+    db.prepare(
+      `UPDATE ${spec.table}
+          SET ${updates.map(([column]) => `${column} = ?`).join(', ')}
+        WHERE rowid = ?`
+    ).run(...updates.map(([, value]) => value), row.__rowid);
+    changes += updates.length;
+  }
+  return changes;
+}
+
+/**
+ * Keep an already-created demo in the language selected for the interface.
+ *
+ * Only values that exactly match one of the shipped demo translations are changed.
+ * Anything the author has touched is therefore left alone, even when it belongs to a
+ * demo-owned row.
+ */
+export function relocalizeWorldbuildingDemoData(language: unknown = getSettings().uiLanguage): boolean {
+  if (getActiveVault().type !== 'worldbuilding') return false;
+  const db = getDb();
+  const hasDemo = db.prepare('SELECT 1 FROM persons WHERE person_id = ?').get(`${PREFIX}char-ilyra`);
+  if (!hasDemo) return false;
+  const target = worldbuildingDemoLocale(language);
+  let changes = 0;
+
+  db.transaction(() => {
+    const calendar = db.prepare('SELECT name, notes FROM world_calendar WHERE id = 1').get() as
+      | { name: string | null; notes: string | null }
+      | undefined;
+    if (calendar) {
+      const name = calendar.name ? relocalizeWorldbuildingDemoText(calendar.name, target) : calendar.name;
+      const notes = calendar.notes ? relocalizeWorldbuildingDemoText(calendar.notes, target) : calendar.notes;
+      if (name !== calendar.name || notes !== calendar.notes) {
+        db.prepare('UPDATE world_calendar SET name = ?, notes = ? WHERE id = 1').run(name, notes);
+        changes += Number(name !== calendar.name) + Number(notes !== calendar.notes);
+      }
+    }
+
+    for (const spec of DEMO_RELOCALIZATION_SPECS) {
+      changes += relocalizeDemoTable(spec, target);
+    }
+
+    const sceneRows = db
+      .prepare('SELECT scene_id, text FROM world_scene_text WHERE scene_id LIKE ?')
+      .all(`${PREFIX}%`) as Array<{ scene_id: string; text: string | null }>;
+    for (const scene of sceneRows) {
+      db.prepare('UPDATE world_scene_text SET word_count = ? WHERE scene_id = ?')
+        .run(countWords(scene.text ?? ''), scene.scene_id);
+    }
+
+    for (const [table, idColumn, keyColumn, titleColumn] of [
+      ['world_articles', 'article_id', 'title_key', 'title'],
+      ['world_entry_proposals', 'proposal_id', 'term_key', 'term'],
+      ['world_threads', 'thread_id', 'title_key', 'title'],
+      ['world_rules', 'rule_id', 'title_key', 'title'],
+    ] as const) {
+      db.prepare(
+        `SELECT ${idColumn} AS id, ${titleColumn} AS title FROM ${table} WHERE ${idColumn} LIKE ?`
+      ).all(`${PREFIX}%`).forEach((row: unknown) => {
+        const { id, title } = row as { id: string; title: string };
+        db.prepare(`UPDATE ${table} SET ${keyColumn} = ? WHERE ${idColumn} = ?`)
+          .run(normalizeTitle(title), id);
+      });
+    }
+  })();
+
+  if (changes > 0) rebuildWorldLinks();
+  return changes > 0;
+}
+
 export function seedWorldbuildingDemoData(): boolean {
   if (getActiveVault().type !== 'worldbuilding' || hasWorldbuildingData()) return false;
 
@@ -638,20 +827,25 @@ export function seedWorldbuildingDemoData(): boolean {
     // month ordering and the fallback to year-only dates.
     insert('world_calendar', {
       id: 1,
-      name: L === 'es' ? 'Calendario de las Mareas' : 'Calendar of Tides',
-      notes: L === 'es' ? 'Seis meses de treinta días. D.F. significa Después del Faro.' : 'Six thirty-day months. A.L. means After the Lighthouse.',
+      name: demoText('Calendario de las Mareas', 'Calendar of Tides'),
+      notes: demoText('Seis meses de treinta días. D.F. significa Después del Faro.', 'Six thirty-day months. A.L. means After the Lighthouse.'),
       created_at: AT,
       updated_at: AT,
     });
     [
-      [`${PREFIX}era-before`, L === 'es' ? 'Antes del Faro' : 'Before the Lighthouse', L === 'es' ? 'A.F.' : 'B.L.', -1, 1, 0],
-      [`${PREFIX}era-after`, L === 'es' ? 'Después del Faro' : 'After the Lighthouse', L === 'es' ? 'D.F.' : 'A.L.', 0, 0, 1],
+      [`${PREFIX}era-before`, demoText('Antes del Faro', 'Before the Lighthouse'), demoText('A.F.', 'B.L.'), -1, 1, 0],
+      [`${PREFIX}era-after`, demoText('Después del Faro', 'After the Lighthouse'), demoText('D.F.', 'A.L.'), 0, 0, 1],
     ].forEach(([era_id, name, abbreviation, start_year, counts_backwards, sort_order]) =>
       insert('world_calendar_eras', { era_id, name, abbreviation, start_year, counts_backwards, sort_order, created_at: AT, updated_at: AT })
     );
-    const monthNames = L === 'es'
-      ? ['Brasa', 'Lluvia', 'Sal', 'Viento', 'Ceniza', 'Quietud']
-      : ['Ember', 'Rain', 'Salt', 'Wind', 'Ash', 'Stillness'];
+    const monthNames = [
+      demoText('Brasa', 'Ember'),
+      demoText('Lluvia', 'Rain'),
+      demoText('Sal', 'Salt'),
+      demoText('Viento', 'Wind'),
+      demoText('Ceniza', 'Ash'),
+      demoText('Quietud', 'Stillness'),
+    ];
     monthNames.forEach((name, index) =>
       insert('world_calendar_months', {
         month_id: `${PREFIX}month-${index + 1}`, name, days: 30, sort_order: index, created_at: AT, updated_at: AT,
@@ -660,10 +854,11 @@ export function seedWorldbuildingDemoData(): boolean {
 
     // Places and fiction overlays.
     for (const place of PLACES) {
+      const placeName = demoLiteral(place.name);
       insert('places', {
-        place_id: place.id, name: place.name, parent_id: place.parent, kind: place.kind,
+        place_id: place.id, name: placeName, parent_id: place.parent, kind: place.kind,
         latitude: null, longitude: null,
-        notes: L === 'es' ? `Entrada del atlas de demostración: ${place.name}.` : `Demo atlas entry: ${place.name}.`,
+        notes: demoText('Entrada del atlas de demostración.', 'Demo atlas entry.'),
         created_at: AT, updated_at: AT,
       });
       insert('place_profiles', {
@@ -671,12 +866,12 @@ export function seedWorldbuildingDemoData(): boolean {
         appearance: resolveDemoLinks(place.appearance[L]),
         atmosphere: resolveDemoLinks(place.atmosphere[L]),
         history: resolveDemoLinks(place.history[L]),
-        visual_seed: `${place.name}, illustrated maritime fantasy atlas, ${place.accent}`,
+        visual_seed: `${placeName}, ${demoText('atlas fantástico marítimo ilustrado', 'illustrated maritime fantasy atlas')}, ${place.accent}`,
         accent: place.accent,
         created_at: AT,
         updated_at: AT,
       });
-      demoImage('place', place.id, place.name);
+      demoImage('place', place.id, placeName);
     }
 
     // Characters: the reusable person row, full fiction profile, names, avatar and
@@ -684,13 +879,14 @@ export function seedWorldbuildingDemoData(): boolean {
     // populated; Elan deliberately demonstrates the unborn/unknown states.
     for (const [index, character] of CHARACTERS.entries()) {
       const depth = WORLD_DEMO_CHARACTER_NARRATIVE[character.id];
+      const characterName = demoLiteral(character.name);
       insert('persons', {
         person_id: character.id,
-        display_name: character.name,
+        display_name: characterName,
         sex: 'unknown',
-        birth_date: character.birth,
+        birth_date: demoLiteral(character.birth),
         birth_date_sort: null,
-        death_date: character.death,
+        death_date: character.death ? demoLiteral(character.death) : null,
         death_date_sort: null,
         notes: depth.notes[L],
         biography: character.biography[L],
@@ -699,19 +895,19 @@ export function seedWorldbuildingDemoData(): boolean {
         created_at: PREVIOUS_AT,
         updated_at: AT,
       });
-      insert('person_names', { id: `${PREFIX}name-${index}-main`, person_id: character.id, name: character.name, kind: null, secret: 0, known_by: null });
+      insert('person_names', { id: `${PREFIX}name-${index}-main`, person_id: character.id, name: characterName, kind: null, secret: 0, known_by: null });
       insert('character_profiles', {
         person_id: character.id,
-        species: character.species,
-        gender: character.gender,
-        pronouns: character.pronouns,
+        species: demoLiteral(character.species),
+        gender: character.gender ? demoLiteral(character.gender) : null,
+        pronouns: character.pronouns ? demoLiteral(character.pronouns) : null,
         life_status: character.life,
         narrative_role: character.role,
         accent: character.accent,
         appearance: resolveDemoLinks(character.appearance[L]),
         personality: resolveDemoLinks(depth.personality[L]),
         backstory: resolveDemoLinks(depth.backstory[L]),
-        visual_seed: character.visual,
+        visual_seed: character.visual[L],
         birth_year_sort: Number(character.birth.match(/\d{3}/)?.[0] ?? null) || null,
         death_year_sort: character.death ? Number(character.death.match(/\d{3}/)?.[0] ?? null) || null : null,
         arc_want: character.want[L],
@@ -735,14 +931,14 @@ export function seedWorldbuildingDemoData(): boolean {
         thumbnail: portraitThumbnail, thumbnail_mime: 'image/webp',
         focus_x: 0.5, focus_y: 0.42, scale: 1, generated: 1, updated_at: AT,
       });
-      demoImage('character', character.id, character.name);
+      demoImage('character', character.id, characterName);
     }
     [
-      [`${PREFIX}name-ilyra-epithet`, `${PREFIX}char-ilyra`, L === 'es' ? 'La Cartógrafa de Ceniza' : 'The Ash Cartographer', 'epithet', 0, null],
-      [`${PREFIX}name-ilyra-secret`, `${PREFIX}char-ilyra`, 'Asteriel', 'true_name', 1, L === 'es' ? 'Nara, Vesh y Sena' : 'Nara, Vesh and Sena'],
-      [`${PREFIX}name-cael-nick`, `${PREFIX}char-cael`, L === 'es' ? 'Séptima Vela' : 'Seventh Sail', 'nickname', 0, null],
-      [`${PREFIX}name-maelor-title`, `${PREFIX}char-maelor`, L === 'es' ? 'Custodio de la Continuidad' : 'Keeper of Continuity', 'epithet', 0, null],
-      [`${PREFIX}name-nara-alias`, `${PREFIX}char-nara`, L === 'es' ? 'Orla' : 'Rim', 'alias', 1, L === 'es' ? 'Ilyra' : 'Ilyra'],
+      [`${PREFIX}name-ilyra-epithet`, `${PREFIX}char-ilyra`, demoText('La Cartógrafa de Ceniza', 'The Ash Cartographer'), 'epithet', 0, null],
+      [`${PREFIX}name-ilyra-secret`, `${PREFIX}char-ilyra`, 'Asteriel', 'true_name', 1, demoText('Nara, Vesh y Sena', 'Nara, Vesh and Sena')],
+      [`${PREFIX}name-cael-nick`, `${PREFIX}char-cael`, demoText('Séptima Vela', 'Seventh Sail'), 'nickname', 0, null],
+      [`${PREFIX}name-maelor-title`, `${PREFIX}char-maelor`, demoText('Custodio de la Continuidad', 'Keeper of Continuity'), 'epithet', 0, null],
+      [`${PREFIX}name-nara-alias`, `${PREFIX}char-nara`, demoText('Orla', 'Rim'), 'alias', 1, demoText('Ilyra', 'Ilyra')],
     ].forEach(([id, person_id, name, kind, secret, known_by]) =>
       insert('person_names', { id, person_id, name, kind, secret, known_by })
     );
@@ -750,11 +946,11 @@ export function seedWorldbuildingDemoData(): boolean {
     // Abilities deliberately include costs and limits: this is the part that prevents a
     // magic system from looking complete while behaving like a plot solvent.
     [
-      [`${PREFIX}ability-ilyra-map`, `${PREFIX}char-ilyra`, L === 'es' ? 'Cartografía resonante' : 'Resonant cartography', L === 'es' ? 'Percibe rutas recorridas por la luz.' : 'Perceives routes travelled by light.', L === 'es' ? 'Pierde un recuerdo reciente por cada mapa leído.' : 'Loses one recent memory per map read.', L === 'es' ? 'Solo funciona sobre vidrio que haya visto el sol.' : 'Only works on glass that has seen sunlight.', 0],
-      [`${PREFIX}ability-ilyra-hand`, `${PREFIX}char-ilyra`, L === 'es' ? 'Mano prismática' : 'Prismatic hand', L === 'es' ? 'Refracta un haz en seis direcciones.' : 'Refracts one beam in six directions.', L === 'es' ? 'La prótesis se agrieta y causa dolor.' : 'The prosthesis cracks and causes pain.', L === 'es' ? 'No crea luz propia.' : 'It creates no light of its own.', 1],
-      [`${PREFIX}ability-cael-current`, `${PREFIX}char-cael`, L === 'es' ? 'Lectura de corrientes' : 'Current reading', L === 'es' ? 'Detecta fracturas y movimiento bajo el agua.' : 'Detects fractures and movement underwater.', L === 'es' ? 'La sobrecarga lo deja sordo a vibraciones.' : 'Overload leaves him deaf to vibration.', L === 'es' ? 'No atraviesa metal macizo.' : 'Cannot pass through solid metal.', 0],
-      [`${PREFIX}ability-sena-echo`, `${PREFIX}char-sena`, L === 'es' ? 'Escucha de ecos' : 'Echo listening', L === 'es' ? 'Oye memoria residual almacenada en vidrio.' : 'Hears residual memory stored in glass.', L === 'es' ? 'Confunde recuerdos ajenos con propios durante horas.' : 'Confuses others’ memories with their own for hours.', L === 'es' ? 'No distingue una memoria manipulada.' : 'Cannot distinguish an altered memory.', 0],
-      [`${PREFIX}ability-vesh-memory`, `${PREFIX}char-vesh`, L === 'es' ? 'Memoria de marea' : 'Tide memory', L === 'es' ? 'Comparte recuerdos heredados mediante canto.' : 'Shares inherited memories through song.', L === 'es' ? 'Quien escucha hereda también una emoción.' : 'The listener also inherits an emotion.', L === 'es' ? 'No puede transmitir nombres verdaderos.' : 'Cannot transmit true names.', 0],
+      [`${PREFIX}ability-ilyra-map`, `${PREFIX}char-ilyra`, demoText('Cartografía resonante', 'Resonant cartography'), demoText('Percibe rutas recorridas por la luz.', 'Perceives routes travelled by light.'), demoText('Pierde un recuerdo reciente por cada mapa leído.', 'Loses one recent memory per map read.'), demoText('Solo funciona sobre vidrio que haya visto el sol.', 'Only works on glass that has seen sunlight.'), 0],
+      [`${PREFIX}ability-ilyra-hand`, `${PREFIX}char-ilyra`, demoText('Mano prismática', 'Prismatic hand'), demoText('Refracta un haz en seis direcciones.', 'Refracts one beam in six directions.'), demoText('La prótesis se agrieta y causa dolor.', 'The prosthesis cracks and causes pain.'), demoText('No crea luz propia.', 'It creates no light of its own.'), 1],
+      [`${PREFIX}ability-cael-current`, `${PREFIX}char-cael`, demoText('Lectura de corrientes', 'Current reading'), demoText('Detecta fracturas y movimiento bajo el agua.', 'Detects fractures and movement underwater.'), demoText('La sobrecarga lo deja sordo a vibraciones.', 'Overload leaves him deaf to vibration.'), demoText('No atraviesa metal macizo.', 'Cannot pass through solid metal.'), 0],
+      [`${PREFIX}ability-sena-echo`, `${PREFIX}char-sena`, demoText('Escucha de ecos', 'Echo listening'), demoText('Oye memoria residual almacenada en vidrio.', 'Hears residual memory stored in glass.'), demoText('Confunde recuerdos ajenos con propios durante horas.', 'Confuses others’ memories with their own for hours.'), demoText('No distingue una memoria manipulada.', 'Cannot distinguish an altered memory.'), 0],
+      [`${PREFIX}ability-vesh-memory`, `${PREFIX}char-vesh`, demoText('Memoria de marea', 'Tide memory'), demoText('Comparte recuerdos heredados mediante canto.', 'Shares inherited memories through song.'), demoText('Quien escucha hereda también una emoción.', 'The listener also inherits an emotion.'), demoText('No puede transmitir nombres verdaderos.', 'Cannot transmit true names.'), 0],
     ].forEach(([ability_id, person_id, name, description, cost, limits, sort_order]) =>
       insert('character_abilities', { ability_id, person_id, name, description, cost, limits, sort_order, created_at: AT, updated_at: AT })
     );
@@ -770,19 +966,19 @@ export function seedWorldbuildingDemoData(): boolean {
       insert('relationships', { rel_id, from_person, to_person, type, provenance, subtype, notes: null, created_at: AT })
     );
     [
-      [`${PREFIX}contact-rhea`, 'Rhea Sol', L === 'es' ? 'Contrabandista de lentes y enlace en el puerto.' : 'Lens smuggler and harbour contact.'],
-      [`${PREFIX}contact-boros`, 'Boros el Calderero', L === 'es' ? 'Artesano que repara prótesis sin licencia.' : 'Craftsperson repairing prostheses without a licence.'],
-      [`${PREFIX}contact-oracle`, L === 'es' ? 'Oráculo de Sal' : 'Salt Oracle', L === 'es' ? 'Identidad desconocida; solo habla a través de conchas selladas.' : 'Unknown identity; speaks only through sealed shells.'],
+      [`${PREFIX}contact-rhea`, 'Rhea Sol', demoText('Contrabandista de lentes y enlace en el puerto.', 'Lens smuggler and harbour contact.')],
+      [`${PREFIX}contact-boros`, demoLiteral('Boros el Calderero'), demoText('Artesano que repara prótesis sin licencia.', 'Craftsperson repairing prostheses without a licence.')],
+      [`${PREFIX}contact-oracle`, demoText('Oráculo de Sal', 'Salt Oracle'), demoText('Identidad desconocida; solo habla a través de conchas selladas.', 'Unknown identity; speaks only through sealed shells.')],
     ].forEach(([contact_id, display_name, notes]) =>
       insert('social_contacts', { contact_id, display_name, notes, created_at: AT, updated_at: AT })
     );
     [
-      [`${PREFIX}social-ilyra-tarek`, `${PREFIX}char-ilyra`, 'person', `${PREFIX}char-tarek`, L === 'es' ? 'amistad rota' : 'broken friendship', L === 'es' ? 'Se criaron juntos en la Casa del Faro.' : 'They grew up together in the Lighthouse House.', 'mixed'],
-      [`${PREFIX}social-tarek-ilyra`, `${PREFIX}char-tarek`, 'person', `${PREFIX}char-ilyra`, L === 'es' ? 'protege en secreto' : 'secretly protects', L === 'es' ? 'Manipula órdenes para retrasar su captura.' : 'He alters orders to delay her capture.', 'positive'],
-      [`${PREFIX}social-cael-rhea`, `${PREFIX}char-cael`, 'contact', `${PREFIX}contact-rhea`, L === 'es' ? 'socia y acreedora' : 'partner and creditor', L === 'es' ? 'Rhea conserva la escritura de la nave de Cael.' : 'Rhea holds the deed to Cael’s ship.', 'mixed'],
-      [`${PREFIX}social-ilyra-boros`, `${PREFIX}char-ilyra`, 'contact', `${PREFIX}contact-boros`, L === 'es' ? 'artesano de confianza' : 'trusted craftsperson', L === 'es' ? 'Construyó la mano prismática a partir del mapa de Aurel.' : 'Built the prismatic hand from Aurel’s map.', 'positive'],
-      [`${PREFIX}social-maelor-oracle`, `${PREFIX}char-maelor`, 'contact', `${PREFIX}contact-oracle`, L === 'es' ? 'informante' : 'informant', L === 'es' ? 'Maelor recibe profecías incompletas y cree controlar la fuente.' : 'Maelor receives incomplete prophecies and believes he controls the source.', 'negative'],
-      [`${PREFIX}social-sena-vesh`, `${PREFIX}char-sena`, 'person', `${PREFIX}char-vesh`, L === 'es' ? 'mentora improbable' : 'unlikely mentor', L === 'es' ? 'Vesh enseña a Sena a separar memoria y emoción.' : 'Vesh teaches Sena to separate memory from emotion.', 'positive'],
+      [`${PREFIX}social-ilyra-tarek`, `${PREFIX}char-ilyra`, 'person', `${PREFIX}char-tarek`, demoText('amistad rota', 'broken friendship'), demoText('Se criaron juntos en la Casa del Faro.', 'They grew up together in the Lighthouse House.'), 'mixed'],
+      [`${PREFIX}social-tarek-ilyra`, `${PREFIX}char-tarek`, 'person', `${PREFIX}char-ilyra`, demoText('protege en secreto', 'secretly protects'), demoText('Manipula órdenes para retrasar su captura.', 'He alters orders to delay her capture.'), 'positive'],
+      [`${PREFIX}social-cael-rhea`, `${PREFIX}char-cael`, 'contact', `${PREFIX}contact-rhea`, demoText('socia y acreedora', 'partner and creditor'), demoText('Rhea conserva la escritura de la nave de Cael.', 'Rhea holds the deed to Cael’s ship.'), 'mixed'],
+      [`${PREFIX}social-ilyra-boros`, `${PREFIX}char-ilyra`, 'contact', `${PREFIX}contact-boros`, demoText('artesano de confianza', 'trusted craftsperson'), demoText('Construyó la mano prismática a partir del mapa de Aurel.', 'Built the prismatic hand from Aurel’s map.'), 'positive'],
+      [`${PREFIX}social-maelor-oracle`, `${PREFIX}char-maelor`, 'contact', `${PREFIX}contact-oracle`, demoText('informante', 'informant'), demoText('Maelor recibe profecías incompletas y cree controlar la fuente.', 'Maelor receives incomplete prophecies and believes he controls the source.'), 'negative'],
+      [`${PREFIX}social-sena-vesh`, `${PREFIX}char-sena`, 'person', `${PREFIX}char-vesh`, demoText('mentora improbable', 'unlikely mentor'), demoText('Vesh enseña a Sena a separar memoria y emoción.', 'Vesh teaches Sena to separate memory from emotion.'), 'positive'],
     ].forEach(([relation_id, person_id, target_kind, target_id, role, notes, valence]) =>
       insert('social_relations', { relation_id, person_id, target_kind, target_id, role, notes, valence, since_event_id: null, created_at: AT, updated_at: AT })
     );
@@ -790,33 +986,34 @@ export function seedWorldbuildingDemoData(): boolean {
     // Groups and affiliations. One deliberately inverted membership feeds a visible,
     // deterministic continuity finding.
     for (const group of GROUPS) {
+      const groupName = demoLiteral(group.name);
       insert('world_groups', {
-        group_id: group.id, kind: group.kind, name: group.name,
+        group_id: group.id, kind: group.kind, name: groupName,
         summary: group.summary[L], description: resolveDemoLinks(group.description[L]),
-        visual_seed: `${group.name}, heraldic emblem, maritime fantasy`,
+        visual_seed: `${groupName}, ${demoText('emblema heráldico de fantasía marítima', 'heraldic emblem, maritime fantasy')}`,
         accent: group.accent, status: group.status, parent_id: group.parent,
         seat_place_id: group.seat, founded_year: group.founded, ended_year: group.ended,
-        notes: L === 'es' ? 'Grupo de demostración con relaciones y miembros editables.' : 'Demo group with editable relationships and members.',
+        notes: demoText('Grupo de demostración con relaciones y miembros editables.', 'Demo group with editable relationships and members.'),
         created_at: AT, updated_at: AT,
       });
-      demoImage('group', group.id, group.name);
+      demoImage('group', group.id, groupName);
     }
     [
-      [`${PREFIX}aff-ilyra-venn`, `${PREFIX}char-ilyra`, `${PREFIX}group-venn`, L === 'es' ? 'heredera' : 'heir', null, null],
-      [`${PREFIX}aff-nara-venn`, `${PREFIX}char-nara`, `${PREFIX}group-venn`, L === 'es' ? 'primogénita' : 'firstborn', 131000, 133300],
-      [`${PREFIX}aff-aurel-venn`, `${PREFIX}char-aurel`, `${PREFIX}group-venn`, L === 'es' ? 'maestro del Faro' : 'Lighthouse master', null, 131950],
-      [`${PREFIX}aff-maelor-sarn`, `${PREFIX}char-maelor`, `${PREFIX}group-sarn`, L === 'es' ? 'cabeza de casa' : 'head of house', null, null],
-      [`${PREFIX}aff-tarek-sarn`, `${PREFIX}char-tarek`, `${PREFIX}group-sarn`, L === 'es' ? 'heredero adoptivo' : 'adoptive heir', null, null],
-      [`${PREFIX}aff-sena-mir`, `${PREFIX}char-sena`, `${PREFIX}group-mir`, L === 'es' ? 'última llave' : 'last key', null, null],
-      [`${PREFIX}aff-maelor-council`, `${PREFIX}char-maelor`, `${PREFIX}group-council`, L === 'es' ? 'regente' : 'regent', 131950, null],
-      [`${PREFIX}aff-tarek-guard`, `${PREFIX}char-tarek`, `${PREFIX}group-guard`, L === 'es' ? 'comandante' : 'commander', 132900, null],
-      [`${PREFIX}aff-odran-guard`, `${PREFIX}char-odran`, `${PREFIX}group-guard`, L === 'es' ? 'guardián' : 'guardian', 126000, 133100],
-      [`${PREFIX}aff-cael-sails`, `${PREFIX}char-cael`, `${PREFIX}group-sails`, L === 'es' ? 'capitán suspendido' : 'suspended captain', 132000, 133000],
-      [`${PREFIX}aff-sena-vellum`, `${PREFIX}char-sena`, `${PREFIX}group-vellum`, L === 'es' ? 'aprendiz' : 'apprentice', 133000, null],
-      [`${PREFIX}aff-cael-veyari`, `${PREFIX}char-cael`, `${PREFIX}group-veyari`, L === 'es' ? 'navegante' : 'navigator', null, null],
-      [`${PREFIX}aff-vesh-veyari`, `${PREFIX}char-vesh`, `${PREFIX}group-veyari`, L === 'es' ? 'guardiana de memoria' : 'memory keeper', null, null],
-      [`${PREFIX}aff-vesh-tide`, `${PREFIX}char-vesh`, `${PREFIX}group-tideborn`, L === 'es' ? 'hermana de marea' : 'tide sister', null, null],
-      [`${PREFIX}aff-nara-broken`, `${PREFIX}char-nara`, `${PREFIX}group-vellum`, L === 'es' ? 'investigadora invitada' : 'visiting researcher', 133500, 133400],
+      [`${PREFIX}aff-ilyra-venn`, `${PREFIX}char-ilyra`, `${PREFIX}group-venn`, demoText('heredera', 'heir'), null, null],
+      [`${PREFIX}aff-nara-venn`, `${PREFIX}char-nara`, `${PREFIX}group-venn`, demoText('primogénita', 'firstborn'), 131000, 133300],
+      [`${PREFIX}aff-aurel-venn`, `${PREFIX}char-aurel`, `${PREFIX}group-venn`, demoText('maestro del Faro', 'Lighthouse master'), null, 131950],
+      [`${PREFIX}aff-maelor-sarn`, `${PREFIX}char-maelor`, `${PREFIX}group-sarn`, demoText('cabeza de casa', 'head of house'), null, null],
+      [`${PREFIX}aff-tarek-sarn`, `${PREFIX}char-tarek`, `${PREFIX}group-sarn`, demoText('heredero adoptivo', 'adoptive heir'), null, null],
+      [`${PREFIX}aff-sena-mir`, `${PREFIX}char-sena`, `${PREFIX}group-mir`, demoText('última llave', 'last key'), null, null],
+      [`${PREFIX}aff-maelor-council`, `${PREFIX}char-maelor`, `${PREFIX}group-council`, demoText('regente', 'regent'), 131950, null],
+      [`${PREFIX}aff-tarek-guard`, `${PREFIX}char-tarek`, `${PREFIX}group-guard`, demoText('comandante', 'commander'), 132900, null],
+      [`${PREFIX}aff-odran-guard`, `${PREFIX}char-odran`, `${PREFIX}group-guard`, demoText('guardián', 'guardian'), 126000, 133100],
+      [`${PREFIX}aff-cael-sails`, `${PREFIX}char-cael`, `${PREFIX}group-sails`, demoText('capitán suspendido', 'suspended captain'), 132000, 133000],
+      [`${PREFIX}aff-sena-vellum`, `${PREFIX}char-sena`, `${PREFIX}group-vellum`, demoText('aprendiz', 'apprentice'), 133000, null],
+      [`${PREFIX}aff-cael-veyari`, `${PREFIX}char-cael`, `${PREFIX}group-veyari`, demoText('navegante', 'navigator'), null, null],
+      [`${PREFIX}aff-vesh-veyari`, `${PREFIX}char-vesh`, `${PREFIX}group-veyari`, demoText('guardiana de memoria', 'memory keeper'), null, null],
+      [`${PREFIX}aff-vesh-tide`, `${PREFIX}char-vesh`, `${PREFIX}group-tideborn`, demoText('hermana de marea', 'tide sister'), null, null],
+      [`${PREFIX}aff-nara-broken`, `${PREFIX}char-nara`, `${PREFIX}group-vellum`, demoText('investigadora invitada', 'visiting researcher'), 133500, 133400],
     ].forEach(([affiliation_id, person_id, group_id, rank, from_world_day, to_world_day]) =>
       insert('character_affiliations', {
         affiliation_id, person_id, group_id, rank, from_world_day, to_world_day,
@@ -826,34 +1023,34 @@ export function seedWorldbuildingDemoData(): boolean {
 
     // Secrets and knowledge windows.
     [
-      [`${PREFIX}secret-name`, L === 'es' ? 'El nombre verdadero del Faro' : 'The Lighthouse’s true name', L === 'es' ? 'Asteriel: un nombre capaz de detener el Flujo durante una marea.' : 'Asteriel: a name able to stop Flux for one tide.', `${PREFIX}char-nara`, 'kept', null],
-      [`${PREFIX}secret-heart`, L === 'es' ? 'El Corazón está vivo' : 'The Heart is alive', L === 'es' ? 'El Corazón de Vidrio es una ballena de brasa inmovilizada bajo Lúmina.' : 'The Glass Heart is an ember whale pinned beneath Lumina.', `${PREFIX}char-vesh`, 'revealed', 133452],
-      [`${PREFIX}secret-sinking`, L === 'es' ? 'Maelor ordenó cerrar las compuertas' : 'Maelor ordered the gates closed', L === 'es' ? 'La inundación del Barrio Hundido fue agravada para salvar la terraza alta.' : 'The Sunken Quarter’s flood was worsened to save the upper terrace.', `${PREFIX}char-maelor`, 'kept', null],
+      [`${PREFIX}secret-name`, demoText('El nombre verdadero del Faro', 'The Lighthouse’s true name'), demoText('Asteriel: un nombre capaz de detener el Flujo durante una marea.', 'Asteriel: a name able to stop Flux for one tide.'), `${PREFIX}char-nara`, 'kept', null],
+      [`${PREFIX}secret-heart`, demoText('El Corazón está vivo', 'The Heart is alive'), demoText('El Corazón de Vidrio es una ballena de brasa inmovilizada bajo Lúmina.', 'The Glass Heart is an ember whale pinned beneath Lumina.'), `${PREFIX}char-vesh`, 'revealed', 133452],
+      [`${PREFIX}secret-sinking`, demoText('Maelor ordenó cerrar las compuertas', 'Maelor ordered the gates closed'), demoText('La inundación del Barrio Hundido fue agravada para salvar la terraza alta.', 'The Sunken Quarter’s flood was worsened to save the upper terrace.'), `${PREFIX}char-maelor`, 'kept', null],
     ].forEach(([secret_id, title, content, owner_person_id, status, revealed_world_day]) =>
       insert('world_secrets', { secret_id, title, content, owner_person_id, status, revealed_world_day, notes: null, created_at: AT, updated_at: AT })
     );
     [
-      [`${PREFIX}knower-name-nara`, `${PREFIX}secret-name`, `${PREFIX}char-nara`, 133445, L === 'es' ? 'Lo encontró en los mapas de Aurel.' : 'Found it in Aurel’s maps.'],
-      [`${PREFIX}knower-name-ilyra`, `${PREFIX}secret-name`, `${PREFIX}char-ilyra`, 133440, L === 'es' ? 'Apareció grabado dentro de su prótesis.' : 'It appeared engraved inside her prosthesis.'],
-      [`${PREFIX}knower-name-vesh`, `${PREFIX}secret-name`, `${PREFIX}char-vesh`, null, L === 'es' ? 'Lo recuerda de una marea anterior.' : 'Remembers it from an earlier tide.'],
-      [`${PREFIX}knower-heart-vesh`, `${PREFIX}secret-heart`, `${PREFIX}char-vesh`, 120000, L === 'es' ? 'Memoria heredada.' : 'Inherited memory.'],
-      [`${PREFIX}knower-heart-sena`, `${PREFIX}secret-heart`, `${PREFIX}char-sena`, 133450, L === 'es' ? 'Lo oyó en el Archivo.' : 'Heard it in the Archive.'],
-      [`${PREFIX}knower-sinking-maelor`, `${PREFIX}secret-sinking`, `${PREFIX}char-maelor`, 131950, L === 'es' ? 'Dio la orden.' : 'Gave the order.'],
-      [`${PREFIX}knower-sinking-tarek`, `${PREFIX}secret-sinking`, `${PREFIX}char-tarek`, 133454, L === 'es' ? 'Encontró el registro de guardia.' : 'Found the guard log.'],
+      [`${PREFIX}knower-name-nara`, `${PREFIX}secret-name`, `${PREFIX}char-nara`, 133445, demoText('Lo encontró en los mapas de Aurel.', 'Found it in Aurel’s maps.')],
+      [`${PREFIX}knower-name-ilyra`, `${PREFIX}secret-name`, `${PREFIX}char-ilyra`, 133440, demoText('Apareció grabado dentro de su prótesis.', 'It appeared engraved inside her prosthesis.')],
+      [`${PREFIX}knower-name-vesh`, `${PREFIX}secret-name`, `${PREFIX}char-vesh`, null, demoText('Lo recuerda de una marea anterior.', 'Remembers it from an earlier tide.')],
+      [`${PREFIX}knower-heart-vesh`, `${PREFIX}secret-heart`, `${PREFIX}char-vesh`, 120000, demoText('Memoria heredada.', 'Inherited memory.')],
+      [`${PREFIX}knower-heart-sena`, `${PREFIX}secret-heart`, `${PREFIX}char-sena`, 133450, demoText('Lo oyó en el Archivo.', 'Heard it in the Archive.')],
+      [`${PREFIX}knower-sinking-maelor`, `${PREFIX}secret-sinking`, `${PREFIX}char-maelor`, 131950, demoText('Dio la orden.', 'Gave the order.')],
+      [`${PREFIX}knower-sinking-tarek`, `${PREFIX}secret-sinking`, `${PREFIX}char-tarek`, 133454, demoText('Encontró el registro de guardia.', 'Found the guard log.')],
     ].forEach(([id, secret_id, person_id, since_world_day, how]) =>
       insert('secret_knowers', { id, secret_id, person_id, since_world_day, how, created_at: AT })
     );
 
     // Events and places of residence feed the chronology and the presence engine.
     const events = [
-      [`${PREFIX}event-birth-ilyra`, 'birth', L === 'es' ? 'Nacimiento de Ilyra' : 'Birth of Ilyra', '719 D.F.', `${PREFIX}place-lumina`, 719, 0, 16, [[`${PREFIX}char-ilyra`, 'principal'], [`${PREFIX}char-aurel`, 'father']]],
-      [`${PREFIX}event-sinking`, 'loss', L === 'es' ? 'Hundimiento de Lúmina' : 'Sinking of Lumina', '30 de Ceniza, 733 D.F.', `${PREFIX}place-hundido`, 733, 4, 30, [[`${PREFIX}char-aurel`, 'principal'], [`${PREFIX}char-ilyra`, 'witness'], [`${PREFIX}char-maelor`, 'witness']]],
-      [`${PREFIX}event-oath-tarek`, 'oath', L === 'es' ? 'Juramento de Tarek' : 'Tarek’s oath', '1 de Brasa, 739 D.F.', `${PREFIX}place-sal`, 739, 0, 1, [[`${PREFIX}char-tarek`, 'principal'], [`${PREFIX}char-maelor`, 'witness']]],
-      [`${PREFIX}event-death-odran`, 'death', L === 'es' ? 'Muerte registrada de Odran' : 'Recorded death of Odran', '19 de Brasa, 740 D.F.', `${PREFIX}place-sal`, 740, 0, 19, [[`${PREFIX}char-odran`, 'principal'], [`${PREFIX}char-tarek`, 'witness']]],
-      [`${PREFIX}event-nara-missing`, 'loss', L === 'es' ? 'Desaparición de Nara' : 'Nara’s disappearance', '7 de Quietud, 741 D.F.', `${PREFIX}place-orla`, 741, 5, 7, [[`${PREFIX}char-nara`, 'principal']]],
-      [`${PREFIX}event-cael-exile`, 'exile', L === 'es' ? 'Expulsión de Cael del Gremio' : 'Cael expelled from the Guild', '22 de Viento, 741 D.F.', `${PREFIX}place-lumina`, 741, 3, 22, [[`${PREFIX}char-cael`, 'principal']]],
-      [`${PREFIX}event-odran-after`, 'first_appearance', L === 'es' ? 'Odran visto en el Faro' : 'Odran seen at the Lighthouse', '2 de Sal, 742 D.F.', `${PREFIX}place-faro`, 742, 2, 2, [[`${PREFIX}char-odran`, 'principal'], [`${PREFIX}char-sena`, 'witness']]],
-      [`${PREFIX}event-letter`, 'revelation', L === 'es' ? 'Regresa la carta de Nara' : 'Nara’s letter returns', '10 de Sal, 742 D.F.', `${PREFIX}place-lumina`, 742, 2, 10, [[`${PREFIX}char-ilyra`, 'principal'], [`${PREFIX}char-cael`, 'witness']]],
+      [`${PREFIX}event-birth-ilyra`, 'birth', demoText('Nacimiento de Ilyra', 'Birth of Ilyra'), demoLiteral('719 D.F.'), `${PREFIX}place-lumina`, 719, 0, 16, [[`${PREFIX}char-ilyra`, 'principal'], [`${PREFIX}char-aurel`, 'father']]],
+      [`${PREFIX}event-sinking`, 'loss', demoText('Hundimiento de Lúmina', 'Sinking of Lumina'), demoLiteral('30 de Ceniza, 733 D.F.'), `${PREFIX}place-hundido`, 733, 4, 30, [[`${PREFIX}char-aurel`, 'principal'], [`${PREFIX}char-ilyra`, 'witness'], [`${PREFIX}char-maelor`, 'witness']]],
+      [`${PREFIX}event-oath-tarek`, 'oath', demoText('Juramento de Tarek', 'Tarek’s oath'), demoLiteral('1 de Brasa, 739 D.F.'), `${PREFIX}place-sal`, 739, 0, 1, [[`${PREFIX}char-tarek`, 'principal'], [`${PREFIX}char-maelor`, 'witness']]],
+      [`${PREFIX}event-death-odran`, 'death', demoText('Muerte registrada de Odran', 'Recorded death of Odran'), demoLiteral('19 de Brasa, 740 D.F.'), `${PREFIX}place-sal`, 740, 0, 19, [[`${PREFIX}char-odran`, 'principal'], [`${PREFIX}char-tarek`, 'witness']]],
+      [`${PREFIX}event-nara-missing`, 'loss', demoText('Desaparición de Nara', 'Nara’s disappearance'), demoLiteral('7 de Quietud, 741 D.F.'), `${PREFIX}place-orla`, 741, 5, 7, [[`${PREFIX}char-nara`, 'principal']]],
+      [`${PREFIX}event-cael-exile`, 'exile', demoText('Expulsión de Cael del Gremio', 'Cael expelled from the Guild'), demoLiteral('22 de Viento, 741 D.F.'), `${PREFIX}place-lumina`, 741, 3, 22, [[`${PREFIX}char-cael`, 'principal']]],
+      [`${PREFIX}event-odran-after`, 'first_appearance', demoText('Odran visto en el Faro', 'Odran seen at the Lighthouse'), demoLiteral('2 de Sal, 742 D.F.'), `${PREFIX}place-faro`, 742, 2, 2, [[`${PREFIX}char-odran`, 'principal'], [`${PREFIX}char-sena`, 'witness']]],
+      [`${PREFIX}event-letter`, 'revelation', demoText('Regresa la carta de Nara', 'Nara’s letter returns'), demoLiteral('10 de Sal, 742 D.F.'), `${PREFIX}place-lumina`, 742, 2, 10, [[`${PREFIX}char-ilyra`, 'principal'], [`${PREFIX}char-cael`, 'witness']]],
     ] as const;
     for (const [event_id, type, label, date, place_id, year, month_index, day, participants] of events) {
       insert('events', { event_id, type, label, date, date_sort: null, date_end_sort: null, place_id, notes: null, created_at: AT, updated_at: AT });
@@ -863,18 +1060,22 @@ export function seedWorldbuildingDemoData(): boolean {
       );
       insert('record_evidence', {
         id: `${event_id}-evidence`, target_kind: 'event', target_id: event_id, nodus_id: null,
-        source_kind: 'work', quote: L === 'es' ? `Registro narrativo: ${label}.` : `Narrative record: ${label}.`,
-        location: L === 'es' ? 'Biblia del mundo demo' : 'Demo world bible', confidence: 1, created_at: AT,
+        source_kind: 'work', quote: `${demoText('Registro narrativo', 'Narrative record')}: ${label}.`,
+        location: demoText('Biblia del mundo demo', 'Demo world bible'), confidence: 1, created_at: AT,
       });
     }
     [
-      [`${PREFIX}residence-ilyra`, `${PREFIX}char-ilyra`, `${PREFIX}place-faro`, L === 'es' ? 'residencia' : 'residence', '719–733 D.F.'],
-      [`${PREFIX}residence-sena`, `${PREFIX}char-sena`, `${PREFIX}place-hundido`, L === 'es' ? 'residencia' : 'residence', '725–742 D.F.'],
-      [`${PREFIX}residence-cael`, `${PREFIX}char-cael`, `${PREFIX}place-nacre`, L === 'es' ? 'origen' : 'origin', '716 D.F.'],
-      [`${PREFIX}residence-maelor`, `${PREFIX}char-maelor`, `${PREFIX}place-lumina`, L === 'es' ? 'residencia' : 'residence', '688–742 D.F.'],
-      [`${PREFIX}residence-vesh`, `${PREFIX}char-vesh`, `${PREFIX}place-nacre`, L === 'es' ? 'santuario' : 'sanctuary', null],
+      [`${PREFIX}residence-ilyra`, `${PREFIX}char-ilyra`, `${PREFIX}place-faro`, demoText('residencia', 'residence'), '719–733 D.F.'],
+      [`${PREFIX}residence-sena`, `${PREFIX}char-sena`, `${PREFIX}place-hundido`, demoText('residencia', 'residence'), '725–742 D.F.'],
+      [`${PREFIX}residence-cael`, `${PREFIX}char-cael`, `${PREFIX}place-nacre`, demoText('origen', 'origin'), '716 D.F.'],
+      [`${PREFIX}residence-maelor`, `${PREFIX}char-maelor`, `${PREFIX}place-lumina`, demoText('residencia', 'residence'), '688–742 D.F.'],
+      [`${PREFIX}residence-vesh`, `${PREFIX}char-vesh`, `${PREFIX}place-nacre`, demoText('santuario', 'sanctuary'), null],
     ].forEach(([id, person_id, place_id, label, date]) =>
-      insert('person_places', { id, person_id, place_id, label, date, date_sort: null, notes: null, created_at: AT, updated_at: AT })
+      insert('person_places', {
+        id, person_id, place_id, label,
+        date: date ? demoLiteral(date) : null,
+        date_sort: null, notes: null, created_at: AT, updated_at: AT,
+      })
     );
 
     // Scenes, cast, relative day chain and a gallery image on every scene.
@@ -903,7 +1104,12 @@ export function seedWorldbuildingDemoData(): boolean {
         anchor_world_day: scene.anchor, created_at: AT, updated_at: AT,
       });
       (cast[scene.id] ?? []).forEach(([person_id, role], index) =>
-        insert('scene_characters', { id: `${scene.id}-cast-${index}`, scene_id: scene.id, person_id, role })
+        insert('scene_characters', {
+          id: `${scene.id}-cast-${index}`,
+          scene_id: scene.id,
+          person_id,
+          role: demoLiteral(role),
+        })
       );
       demoImage('scene', scene.id, scene.title[L]);
     }
@@ -912,10 +1118,10 @@ export function seedWorldbuildingDemoData(): boolean {
     // editor, and every marker geometry. Coordinates and periods are real inputs to the
     // coverage, focus and travel engines.
     const maps = [
-      { id: `${PREFIX}map-world`, name: L === 'es' ? 'Atlas de Elyndra' : 'Atlas of Elyndra', kind: 'world', place: `${PREFIX}place-elyndra`, parent: null, box: [null, null, null, null], projection: 'globe', radius: 4800, radiusUnit: 'km', scale: [0.12, 0.88, 0.32, 0.88, 1200, 'km'], order: 0, detail: false },
-      { id: `${PREFIX}map-orthea`, name: L === 'es' ? 'Reino de Orthea' : 'Kingdom of Orthea', kind: 'region', place: `${PREFIX}place-orthea`, parent: `${PREFIX}map-world`, box: [0.18, 0.25, 0.72, 0.78], projection: 'flat', radius: null, radiusUnit: null, scale: [0.08, 0.91, 0.28, 0.91, 300, 'km'], order: 1, detail: false },
-      { id: `${PREFIX}map-lumina`, name: L === 'es' ? 'Ciudad de Lúmina' : 'City of Lumina', kind: 'city', place: `${PREFIX}place-lumina`, parent: `${PREFIX}map-orthea`, box: [0.31, 0.27, 0.61, 0.58], projection: 'flat', radius: null, radiusUnit: null, scale: [0.08, 0.91, 0.28, 0.91, 4, 'km'], order: 2, detail: true },
-      { id: `${PREFIX}map-old`, name: L === 'es' ? 'Orthea antes del Hundimiento' : 'Orthea before the Sinking', kind: 'region', place: `${PREFIX}place-orthea`, parent: `${PREFIX}map-world`, box: [0.18, 0.25, 0.72, 0.78], projection: 'flat', radius: null, radiusUnit: null, scale: [0.08, 0.91, 0.28, 0.91, 300, 'km'], order: 3, detail: false },
+      { id: `${PREFIX}map-world`, name: demoText('Atlas de Elyndra', 'Atlas of Elyndra'), kind: 'world', place: `${PREFIX}place-elyndra`, parent: null, box: [null, null, null, null], projection: 'globe', radius: 4800, radiusUnit: 'km', scale: [0.12, 0.88, 0.32, 0.88, 1200, 'km'], order: 0, detail: false },
+      { id: `${PREFIX}map-orthea`, name: demoText('Reino de Orthea', 'Kingdom of Orthea'), kind: 'region', place: `${PREFIX}place-orthea`, parent: `${PREFIX}map-world`, box: [0.18, 0.25, 0.72, 0.78], projection: 'flat', radius: null, radiusUnit: null, scale: [0.08, 0.91, 0.28, 0.91, 300, 'km'], order: 1, detail: false },
+      { id: `${PREFIX}map-lumina`, name: demoText('Ciudad de Lúmina', 'City of Lumina'), kind: 'city', place: `${PREFIX}place-lumina`, parent: `${PREFIX}map-orthea`, box: [0.31, 0.27, 0.61, 0.58], projection: 'flat', radius: null, radiusUnit: null, scale: [0.08, 0.91, 0.28, 0.91, 4, 'km'], order: 2, detail: true },
+      { id: `${PREFIX}map-old`, name: demoText('Orthea antes del Hundimiento', 'Orthea before the Sinking'), kind: 'region', place: `${PREFIX}place-orthea`, parent: `${PREFIX}map-world`, box: [0.18, 0.25, 0.72, 0.78], projection: 'flat', radius: null, radiusUnit: null, scale: [0.08, 0.91, 0.28, 0.91, 300, 'km'], order: 3, detail: false },
     ] as const;
     for (const map of maps) {
       const imageId = `${PREFIX}map-image-${map.id.slice(PREFIX.length)}`;
@@ -928,9 +1134,9 @@ export function seedWorldbuildingDemoData(): boolean {
         projection: map.projection, planet_radius: map.radius, planet_radius_unit: map.radiusUnit,
         from_world_day: map.id === `${PREFIX}map-old` ? 0 : null,
         to_world_day: map.id === `${PREFIX}map-old` ? 131949 : null,
-        visual_seed: 'antique maritime fantasy atlas, glass coastlines, ink and gold',
-        style: 'illustrated parchment', model_labels: 0,
-        notes: L === 'es' ? 'Mapa ilustrado local de demostración con capas, escala y marcadores editables.' : 'Local illustrated demo map with editable layers, scale and markers.',
+        visual_seed: demoText('atlas antiguo de fantasía marítima, costas de vidrio, tinta y oro', 'antique maritime fantasy atlas, glass coastlines, ink and gold'),
+        style: demoText('pergamino ilustrado', 'illustrated parchment'), model_labels: 0,
+        notes: demoText('Mapa ilustrado local de demostración con capas, escala y marcadores editables.', 'Local illustrated demo map with editable layers, scale and markers.'),
         sort_order: map.order, created_at: AT, updated_at: AT,
       });
       const mapBase = `map-${map.id.slice(`${PREFIX}map-`.length)}`;
@@ -940,8 +1146,8 @@ export function seedWorldbuildingDemoData(): boolean {
         image_id: imageId, map_id: map.id, role: 'base', mime_type: 'image/png',
         width: 1254, height: 1254, bytes: bytes.length, blob: bytes, thumbnail,
         thumbnail_mime_type: 'image/webp',
-        prompt: 'The Ashen Tides cartographic demo artwork', provider: 'openai', model: 'codex-imagegen',
-        style: 'painted fantasy atlas', generated: 1, created_at: AT,
+        prompt: demoText('Ilustración cartográfica del demo Las Mareas de Ceniza', 'The Ashen Tides cartographic demo artwork'), provider: 'openai', model: 'codex-imagegen',
+        style: demoText('atlas de fantasía pintado', 'painted fantasy atlas'), generated: 1, created_at: AT,
       });
     }
     const previousMap = demoAsset('map-old.png');
@@ -950,8 +1156,8 @@ export function seedWorldbuildingDemoData(): boolean {
       image_id: `${PREFIX}map-image-previous`, map_id: `${PREFIX}map-orthea`, role: 'previous',
       mime_type: 'image/png', width: 1254, height: 1254, bytes: previousMap.length, blob: previousMap,
       thumbnail: previousMapThumbnail, thumbnail_mime_type: 'image/webp',
-      prompt: 'Orthea before the Sinking', provider: 'openai', model: 'codex-imagegen',
-      style: 'painted historical atlas', generated: 1, created_at: PREVIOUS_AT,
+      prompt: demoText('Orthea antes del Hundimiento', 'Orthea before the Sinking'), provider: 'openai', model: 'codex-imagegen',
+      style: demoText('atlas histórico pintado', 'painted historical atlas'), generated: 1, created_at: PREVIOUS_AT,
     });
     const referenceMap = demoAsset('place-lumina.png');
     const referenceMapThumbnail = demoAsset('place-lumina.webp');
@@ -959,18 +1165,18 @@ export function seedWorldbuildingDemoData(): boolean {
       image_id: `${PREFIX}map-image-reference`, map_id: `${PREFIX}map-lumina`, role: 'reference',
       mime_type: 'image/png', width: 760, height: 504, bytes: referenceMap.length, blob: referenceMap,
       thumbnail: referenceMapThumbnail, thumbnail_mime_type: 'image/webp',
-      prompt: 'Lumina coastal reference', provider: 'openai', model: 'codex-imagegen',
-      style: 'painterly environment concept', generated: 1, created_at: PREVIOUS_AT,
+      prompt: demoText('Referencia costera de Lúmina', 'Lumina coastal reference'), provider: 'openai', model: 'codex-imagegen',
+      style: demoText('concepto pictórico de entorno', 'painterly environment concept'), generated: 1, created_at: PREVIOUS_AT,
     });
     const layers = [
-      [`${PREFIX}layer-political`, `${PREFIX}map-orthea`, L === 'es' ? 'Fronteras actuales' : 'Current borders', 'political', '#eab308', 0.72, 1, 0],
-      [`${PREFIX}layer-physical`, `${PREFIX}map-orthea`, L === 'es' ? 'Relieve y corrientes' : 'Terrain and currents', 'physical', '#22c55e', 0.68, 1, 1],
-      [`${PREFIX}layer-routes`, `${PREFIX}map-orthea`, L === 'es' ? 'Rutas navegables' : 'Navigable routes', 'routes', '#38bdf8', 0.9, 1, 2],
-      [`${PREFIX}layer-climate`, `${PREFIX}map-world`, L === 'es' ? 'Mareas Negras' : 'Black Tides', 'climate', '#6366f1', 0.5, 1, 0],
-      [`${PREFIX}layer-culture`, `${PREFIX}map-orthea`, L === 'es' ? 'Pueblos de la Marea' : 'Tide Peoples', 'culture', '#a855f7', 0.55, 1, 3],
-      [`${PREFIX}layer-battle`, `${PREFIX}map-lumina`, L === 'es' ? 'Asedio previsto' : 'Planned siege', 'battle', '#ef4444', 0.75, 0, 0],
-      [`${PREFIX}layer-labels`, `${PREFIX}map-lumina`, L === 'es' ? 'Nombres y distritos' : 'Names and districts', 'labels', '#f8fafc', 1, 1, 1],
-      [`${PREFIX}layer-custom`, `${PREFIX}map-lumina`, L === 'es' ? 'Túneles del Archivo' : 'Archive tunnels', 'custom', '#10b981', 0.8, 1, 2],
+      [`${PREFIX}layer-political`, `${PREFIX}map-orthea`, demoText('Fronteras actuales', 'Current borders'), 'political', '#eab308', 0.72, 1, 0],
+      [`${PREFIX}layer-physical`, `${PREFIX}map-orthea`, demoText('Relieve y corrientes', 'Terrain and currents'), 'physical', '#22c55e', 0.68, 1, 1],
+      [`${PREFIX}layer-routes`, `${PREFIX}map-orthea`, demoText('Rutas navegables', 'Navigable routes'), 'routes', '#38bdf8', 0.9, 1, 2],
+      [`${PREFIX}layer-climate`, `${PREFIX}map-world`, demoText('Mareas Negras', 'Black Tides'), 'climate', '#6366f1', 0.5, 1, 0],
+      [`${PREFIX}layer-culture`, `${PREFIX}map-orthea`, demoText('Pueblos de la Marea', 'Tide Peoples'), 'culture', '#a855f7', 0.55, 1, 3],
+      [`${PREFIX}layer-battle`, `${PREFIX}map-lumina`, demoText('Asedio previsto', 'Planned siege'), 'battle', '#ef4444', 0.75, 0, 0],
+      [`${PREFIX}layer-labels`, `${PREFIX}map-lumina`, demoText('Nombres y distritos', 'Names and districts'), 'labels', '#f8fafc', 1, 1, 1],
+      [`${PREFIX}layer-custom`, `${PREFIX}map-lumina`, demoText('Túneles del Archivo', 'Archive tunnels'), 'custom', '#10b981', 0.8, 1, 2],
     ] as const;
     layers.forEach(([layer_id, map_id, name, kind, color, opacity, visible, sort_order]) =>
       insert('map_layers', { layer_id, map_id, name, kind, color, opacity, visible, sort_order, created_at: AT, updated_at: AT })
@@ -980,26 +1186,26 @@ export function seedWorldbuildingDemoData(): boolean {
       [`${PREFIX}marker-nacre`, `${PREFIX}map-orthea`, `${PREFIX}layer-physical`, `${PREFIX}place-nacre`, null, null, 'circle', .78, .72, .055, null, 'island', '#f472b6', null, null, 1],
       [`${PREFIX}marker-sal`, `${PREFIX}map-orthea`, `${PREFIX}layer-political`, `${PREFIX}place-sal`, null, null, 'point', .67, .25, null, null, 'fortress', '#eab308', null, null, 2],
       [`${PREFIX}marker-ceniza`, `${PREFIX}map-world`, `${PREFIX}layer-climate`, `${PREFIX}place-ceniza`, null, null, 'polygon', .58, .42, null, JSON.stringify([[.45,.34],[.71,.31],[.77,.53],[.52,.59]]), 'desert', '#a16207', null, null, 0],
-      [`${PREFIX}marker-route`, `${PREFIX}map-orthea`, `${PREFIX}layer-routes`, null, null, L === 'es' ? 'Séptima ruta' : 'Seventh route', 'path', .22, .31, null, JSON.stringify([[.22,.31],[.42,.46],[.61,.55],[.78,.72]]), 'route', '#38bdf8', 133000, null, 3],
-      [`${PREFIX}marker-council`, `${PREFIX}map-lumina`, `${PREFIX}layer-battle`, `${PREFIX}place-faro`, null, L === 'es' ? 'Cerco del Consejo' : 'Council cordon', 'circle', .48, .28, .18, null, 'battle', '#ef4444', 133454, 133455, 0],
+      [`${PREFIX}marker-route`, `${PREFIX}map-orthea`, `${PREFIX}layer-routes`, null, null, demoText('Séptima ruta', 'Seventh route'), 'path', .22, .31, null, JSON.stringify([[.22,.31],[.42,.46],[.61,.55],[.78,.72]]), 'route', '#38bdf8', 133000, null, 3],
+      [`${PREFIX}marker-council`, `${PREFIX}map-lumina`, `${PREFIX}layer-battle`, `${PREFIX}place-faro`, null, demoText('Cerco del Consejo', 'Council cordon'), 'circle', .48, .28, .18, null, 'battle', '#ef4444', 133454, 133455, 0],
       [`${PREFIX}marker-hundido`, `${PREFIX}map-lumina`, `${PREFIX}layer-labels`, `${PREFIX}place-hundido`, null, null, 'polygon', .42, .66, null, JSON.stringify([[.23,.53],[.61,.5],[.69,.84],[.29,.9]]), 'district', '#06b6d4', null, null, 1],
       [`${PREFIX}marker-archive`, `${PREFIX}map-lumina`, `${PREFIX}layer-custom`, `${PREFIX}place-archivo`, null, null, 'point', .46, .72, null, null, 'archive', '#10b981', null, null, 2],
       [`${PREFIX}marker-orla`, `${PREFIX}map-lumina`, `${PREFIX}layer-labels`, `${PREFIX}place-orla`, null, null, 'point', .78, .2, null, null, 'observatory', '#a78bfa', null, null, 3],
-      [`${PREFIX}marker-old-lumina`, `${PREFIX}map-old`, null, `${PREFIX}place-lumina`, null, L === 'es' ? 'Lúmina antes del Hundimiento' : 'Lumina before the Sinking', 'point', .24, .34, null, null, 'city', '#f8fafc', 0, 131949, 0],
+      [`${PREFIX}marker-old-lumina`, `${PREFIX}map-old`, null, `${PREFIX}place-lumina`, null, demoText('Lúmina antes del Hundimiento', 'Lumina before the Sinking'), 'point', .24, .34, null, null, 'city', '#f8fafc', 0, 131949, 0],
     ] as const;
     markers.forEach(([marker_id, map_id, layer_id, place_id, child_map_id, label, geometry_kind, x, y, radius, points, icon, color, from_world_day, to_world_day, sort_order]) =>
       insert('map_markers', {
         marker_id, map_id, layer_id, place_id, child_map_id, label, geometry_kind, x, y, radius, points,
         icon, color, from_world_day, to_world_day,
-        notes: L === 'es' ? 'Marcador de demostración editable.' : 'Editable demo marker.',
+        notes: demoText('Marcador de demostración editable.', 'Editable demo marker.'),
         sort_order, created_at: AT, updated_at: AT,
       })
     );
     [
-      [`${PREFIX}travel-foot`, L === 'es' ? 'A pie' : 'On foot', 28, 'km', 'walk', 0],
-      [`${PREFIX}travel-horse`, L === 'es' ? 'Caballo de sal' : 'Salt horse', 65, 'km', 'horse', 1],
-      [`${PREFIX}travel-sail`, L === 'es' ? 'Vela de corriente' : 'Current sail', 180, 'km', 'sail', 2],
-      [`${PREFIX}travel-whale`, L === 'es' ? 'Ballena de brasa' : 'Ember whale', 300, 'km', 'sparkles', 3],
+      [`${PREFIX}travel-foot`, demoText('A pie', 'On foot'), 28, 'km', 'walk', 0],
+      [`${PREFIX}travel-horse`, demoText('Caballo de sal', 'Salt horse'), 65, 'km', 'horse', 1],
+      [`${PREFIX}travel-sail`, demoText('Vela de corriente', 'Current sail'), 180, 'km', 'sail', 2],
+      [`${PREFIX}travel-whale`, demoText('Ballena de brasa', 'Ember whale'), 300, 'km', 'sparkles', 3],
     ].forEach(([mode_id, name, distance_per_day, unit, icon, sort_order]) =>
       insert('map_travel_modes', { mode_id, name, distance_per_day, unit, icon, sort_order, created_at: AT, updated_at: AT })
     );
@@ -1012,16 +1218,16 @@ export function seedWorldbuildingDemoData(): boolean {
         body: resolveDemoLinks(article.body[L]), body_proposed: null, body_proposed_at: null,
         aka: article.aka[L], origin: index === ARTICLES.length - 1 ? 'ai_proposal' : 'author',
         spoiler: article.id.endsWith('thirdmoon') ? 1 : 0, sort_title: null,
-        notes: L === 'es' ? 'Artículo de demostración conectado al resto del mundo.' : 'Demo article connected to the rest of the world.',
+        notes: demoText('Artículo de demostración conectado al resto del mundo.', 'Demo article connected to the rest of the world.'),
         created_at: PREVIOUS_AT, updated_at: AT,
       });
       demoImage('article', article.id, article.title[L]);
     }
     [
-      [`${PREFIX}proposal-buried`, L === 'es' ? 'Ciudad Sepultada' : 'Buried City', 'place', L === 'es' ? 'La menciona la Brújula de ceniza y no existe todavía como lugar.' : 'The Ash Compass mentions it, but it does not exist as a place yet.', 'unresolved_link', .98, 'pending', null],
-      [`${PREFIX}proposal-blacktide`, L === 'es' ? 'Marea Negra' : 'Black Tide', 'event', L === 'es' ? 'Aparece en varias fichas y merece una entrada propia.' : 'It appears in several sheets and deserves its own entry.', 'frequency', .79, 'pending', null],
-      [`${PREFIX}proposal-lighthouse`, L === 'es' ? 'Maestros del Faro' : 'Lighthouse Masters', 'organization', L === 'es' ? 'Propuesta ya aceptada, conservada para demostrar el historial.' : 'Accepted proposal retained to demonstrate history.', 'frequency', .91, 'accepted', `${PREFIX}article-keepers`],
-      [`${PREFIX}proposal-rumour`, L === 'es' ? 'Rey de la Espuma' : 'Foam King', 'other', L === 'es' ? 'Rumor descartado que no debe volver a proponerse.' : 'Dismissed rumour that must not be proposed again.', 'frequency', .42, 'dismissed', null],
+      [`${PREFIX}proposal-buried`, demoText('Ciudad Sepultada', 'Buried City'), 'place', demoText('La menciona la Brújula de ceniza y no existe todavía como lugar.', 'The Ash Compass mentions it, but it does not exist as a place yet.'), 'unresolved_link', .98, 'pending', null],
+      [`${PREFIX}proposal-blacktide`, demoText('Marea Negra', 'Black Tide'), 'event', demoText('Aparece en varias fichas y merece una entrada propia.', 'It appears in several sheets and deserves its own entry.'), 'frequency', .79, 'pending', null],
+      [`${PREFIX}proposal-lighthouse`, demoText('Maestros del Faro', 'Lighthouse Masters'), 'organization', demoText('Propuesta ya aceptada, conservada para demostrar el historial.', 'Accepted proposal retained to demonstrate history.'), 'frequency', .91, 'accepted', `${PREFIX}article-keepers`],
+      [`${PREFIX}proposal-rumour`, demoText('Rey de la Espuma', 'Foam King'), 'other', demoText('Rumor descartado que no debe volver a proponerse.', 'Dismissed rumour that must not be proposed again.'), 'frequency', .42, 'dismissed', null],
     ].forEach(([proposal_id, term, category, rationale, source, confidence, status, article_id]) =>
       insert('world_entry_proposals', {
         proposal_id, term, term_key: normalizeTitle(String(term)), category, rationale,
@@ -1034,13 +1240,13 @@ export function seedWorldbuildingDemoData(): boolean {
     // Conflicts and arcs share the same engine and scenes. The corpus includes every
     // status, scope, party side and beat vocabulary so both boards show meaningful lanes.
     const threads = [
-      [`${PREFIX}thread-succession`, 'conflict', L === 'es' ? 'La sucesión del Faro' : 'The Lighthouse succession', L === 'es' ? 'Ilyra reclama el derecho a decidir el destino del Faro frente al Consejo de Ceniza.' : 'Ilyra claims the right to decide the Lighthouse’s fate against the Ash Council.', L === 'es' ? 'La legitimidad de Orthea y quién controla la luz.' : 'Orthea’s legitimacy and who controls the light.', 'external', 'open', null],
-      [`${PREFIX}thread-blockade`, 'conflict', L === 'es' ? 'El bloqueo de las Seis Velas' : 'The Six Sails blockade', L === 'es' ? 'El Gremio cierra el puerto para exigir la liberación de Cael.' : 'The Guild closes the harbour to demand Cael’s release.', L === 'es' ? 'Alimentos, evacuación y apoyo popular.' : 'Food, evacuation and public support.', 'external', 'resolved', L === 'es' ? 'Tarek abre una ruta civil y el bloqueo se levanta.' : 'Tarek opens a civilian route and the blockade ends.'],
-      [`${PREFIX}thread-blacktide`, 'conflict', L === 'es' ? 'La próxima Marea Negra' : 'The coming Black Tide', L === 'es' ? 'Las placas del Mar de Vidrio convergen antes de lo previsto.' : 'The plates of the Glass Sea are converging ahead of schedule.', L === 'es' ? 'Toda la costa baja de Orthea.' : 'All of lowland Orthea.', 'background', 'open', null],
-      [`${PREFIX}thread-oldwar`, 'conflict', L === 'es' ? 'La guerra de los Tejedores' : 'The Weavers’ War', L === 'es' ? 'Conflicto histórico conservado como contexto.' : 'Historical conflict kept as context.', L === 'es' ? 'El control de los Telares Solares.' : 'Control of the Solar Looms.', 'external', 'archived', L === 'es' ? 'Los telares quedaron bajo custodia compartida.' : 'The looms entered shared custody.'],
-      [`${PREFIX}arc-ilyra`, 'arc', L === 'es' ? 'Ilyra aprende a soltar el mapa' : 'Ilyra learns to release the map', L === 'es' ? 'Del control absoluto a la confianza compartida.' : 'From absolute control to shared trust.', null, 'external', 'open', null],
-      [`${PREFIX}arc-tarek`, 'arc', L === 'es' ? 'Tarek elige un bando' : 'Tarek chooses a side', L === 'es' ? 'La neutralidad del comandante se vuelve complicidad y después decisión.' : 'The commander’s neutrality becomes complicity and then choice.', null, 'external', 'open', null],
-      [`${PREFIX}arc-sena`, 'arc', L === 'es' ? 'Sena reclama el Archivo' : 'Sena claims the Archive', L === 'es' ? 'De aprendiz útil a custodie de una memoria pública.' : 'From useful apprentice to keeper of a public memory.', null, 'external', 'resolved', L === 'es' ? 'Abre el Archivo de Bajamar a toda la ciudad.' : 'Opens the Low-Tide Archive to the whole city.'],
+      [`${PREFIX}thread-succession`, 'conflict', demoText('La sucesión del Faro', 'The Lighthouse succession'), demoText('Ilyra reclama el derecho a decidir el destino del Faro frente al Consejo de Ceniza.', 'Ilyra claims the right to decide the Lighthouse’s fate against the Ash Council.'), demoText('La legitimidad de Orthea y quién controla la luz.', 'Orthea’s legitimacy and who controls the light.'), 'external', 'open', null],
+      [`${PREFIX}thread-blockade`, 'conflict', demoText('El bloqueo de las Seis Velas', 'The Six Sails blockade'), demoText('El Gremio cierra el puerto para exigir la liberación de Cael.', 'The Guild closes the harbour to demand Cael’s release.'), demoText('Alimentos, evacuación y apoyo popular.', 'Food, evacuation and public support.'), 'external', 'resolved', demoText('Tarek abre una ruta civil y el bloqueo se levanta.', 'Tarek opens a civilian route and the blockade ends.')],
+      [`${PREFIX}thread-blacktide`, 'conflict', demoText('La próxima Marea Negra', 'The coming Black Tide'), demoText('Las placas del Mar de Vidrio convergen antes de lo previsto.', 'The plates of the Glass Sea are converging ahead of schedule.'), demoText('Toda la costa baja de Orthea.', 'All of lowland Orthea.'), 'background', 'open', null],
+      [`${PREFIX}thread-oldwar`, 'conflict', demoText('La guerra de los Tejedores', 'The Weavers’ War'), demoText('Conflicto histórico conservado como contexto.', 'Historical conflict kept as context.'), demoText('El control de los Telares Solares.', 'Control of the Solar Looms.'), 'external', 'archived', demoText('Los telares quedaron bajo custodia compartida.', 'The looms entered shared custody.')],
+      [`${PREFIX}arc-ilyra`, 'arc', demoText('Ilyra aprende a soltar el mapa', 'Ilyra learns to release the map'), demoText('Del control absoluto a la confianza compartida.', 'From absolute control to shared trust.'), null, 'external', 'open', null],
+      [`${PREFIX}arc-tarek`, 'arc', demoText('Tarek elige un bando', 'Tarek chooses a side'), demoText('La neutralidad del comandante se vuelve complicidad y después decisión.', 'The commander’s neutrality becomes complicity and then choice.'), null, 'external', 'open', null],
+      [`${PREFIX}arc-sena`, 'arc', demoText('Sena reclama el Archivo', 'Sena claims the Archive'), demoText('De aprendiz útil a custodie de una memoria pública.', 'From useful apprentice to keeper of a public memory.'), null, 'external', 'resolved', demoText('Abre el Archivo de Bajamar a toda la ciudad.', 'Opens the Low-Tide Archive to the whole city.')],
     ] as const;
     for (const [thread_id, kind, titleValue, pitch, stakes, scope, status, outcome] of threads) {
       insert('world_threads', {
@@ -1068,13 +1274,13 @@ export function seedWorldbuildingDemoData(): boolean {
     // Rules: physical/costly/social, a scoped rule, an exception, tentative and retired
     // states, plus a secret rule. All are normal author data; there are no AI proposals.
     const rules = [
-      [`${PREFIX}rule-shadow`, L === 'es' ? 'Toda luz deja sombra' : 'Every light casts a shadow', L === 'es' ? 'Usar el Flujo desplaza una cantidad equivalente de luz, calor o memoria.' : 'Using Flux displaces an equivalent amount of light, heat or memory.', L === 'es' ? 'La deuda aparece antes del siguiente amanecer.' : 'The debt appears before the next dawn.', L === 'es' ? 'La luz natural no cuenta hasta ser almacenada.' : 'Natural light does not count until stored.', 'physical', null, `${PREFIX}article-flux`, 'world', null, null, null, 'canon', null],
-      [`${PREFIX}rule-true-name`, L === 'es' ? 'Un nombre verdadero obliga una vez' : 'A true name compels once', L === 'es' ? 'Pronunciar el nombre verdadero de un ser de vidrio permite darle una sola orden.' : 'Speaking a glass being’s true name allows one command.', L === 'es' ? 'Quien lo pronuncia pierde para siempre ese nombre de su memoria.' : 'The speaker permanently loses that name from memory.', L === 'es' ? 'No funciona sobre una copia ni a través de una grabación.' : 'It does not work on a copy or through a recording.', 'costly', null, `${PREFIX}article-flux`, 'world', null, null, null, 'canon', `${PREFIX}secret-name`],
-      [`${PREFIX}rule-nara-exception`, L === 'es' ? 'La memoria heredada conserva el nombre' : 'Inherited memory preserves the name', L === 'es' ? 'Un nombre recibido por memoria de marea vuelve a quien lo entregó, no a quien lo pronuncia.' : 'A name received through tide memory returns to its giver, not its speaker.', L === 'es' ? 'La persona donante olvida una memoria adicional.' : 'The donor forgets one additional memory.', L === 'es' ? 'Solo los Veyari pueden transmitirlo.' : 'Only Veyari can transmit it.', 'costly', `${PREFIX}rule-true-name`, `${PREFIX}article-tidecant`, 'group', `${PREFIX}group-veyari`, null, null, 'canon', `${PREFIX}secret-name`],
-      [`${PREFIX}rule-gates`, L === 'es' ? 'Las puertas obedecen al sello' : 'The gates obey the seal', L === 'es' ? 'Las barreras solares de Lúmina solo se abren ante un sello registrado.' : 'Lumina’s solar barriers open only to a registered seal.', L === 'es' ? 'Forzar una barrera quema el sello utilizado.' : 'Forcing a barrier burns the seal used.', L === 'es' ? 'No alcanza a túneles anteriores al Hundimiento.' : 'Does not reach tunnels predating the Sinking.', 'social', null, `${PREFIX}article-looms`, 'place', `${PREFIX}place-lumina`, 131950, null, 'canon', null],
-      [`${PREFIX}rule-sanctuary`, L === 'es' ? 'Ningún arma en Isla Nácar' : 'No weapon on Nacre Island', L === 'es' ? 'Toda persona que pisa el santuario entrega sus armas a la marea.' : 'Everyone entering the sanctuary gives their weapons to the tide.', L === 'es' ? 'Romper el rito expulsa a la tripulación durante seis mareas.' : 'Breaking the rite exiles the crew for six tides.', L === 'es' ? 'Las herramientas y prótesis no se consideran armas salvo intención declarada.' : 'Tools and prostheses are not weapons unless declared as such.', 'social', null, `${PREFIX}article-firstlight`, 'place', `${PREFIX}place-nacre`, null, null, 'canon', null],
-      [`${PREFIX}rule-thirdmoon`, L === 'es' ? 'La Tercera Luna no proyecta sombra' : 'The Third Moon casts no shadow', L === 'es' ? 'Su luz no interactúa con materia ordinaria.' : 'Its light does not interact with ordinary matter.', null, L === 'es' ? 'La observación todavía no es concluyente.' : 'Observation is not yet conclusive.', 'physical', null, `${PREFIX}article-thirdmoon`, 'world', null, null, null, 'tentative', null],
-      [`${PREFIX}rule-oldtax`, L === 'es' ? 'Diezmo de lámpara' : 'Lamp tithe', L === 'es' ? 'Cada hogar entregaba una décima parte de su aceite al Faro.' : 'Every household gave one tenth of its oil to the Lighthouse.', L === 'es' ? 'Multa y pérdida temporal de luz.' : 'A fine and temporary loss of light.', L === 'es' ? 'Fue abolido después del Hundimiento.' : 'Abolished after the Sinking.', 'social', null, `${PREFIX}article-firstlight`, 'world', null, null, 131950, 'retired', null],
+      [`${PREFIX}rule-shadow`, demoText('Toda luz deja sombra', 'Every light casts a shadow'), demoText('Usar el Flujo desplaza una cantidad equivalente de luz, calor o memoria.', 'Using Flux displaces an equivalent amount of light, heat or memory.'), demoText('La deuda aparece antes del siguiente amanecer.', 'The debt appears before the next dawn.'), demoText('La luz natural no cuenta hasta ser almacenada.', 'Natural light does not count until stored.'), 'physical', null, `${PREFIX}article-flux`, 'world', null, null, null, 'canon', null],
+      [`${PREFIX}rule-true-name`, demoText('Un nombre verdadero obliga una vez', 'A true name compels once'), demoText('Pronunciar el nombre verdadero de un ser de vidrio permite darle una sola orden.', 'Speaking a glass being’s true name allows one command.'), demoText('Quien lo pronuncia pierde para siempre ese nombre de su memoria.', 'The speaker permanently loses that name from memory.'), demoText('No funciona sobre una copia ni a través de una grabación.', 'It does not work on a copy or through a recording.'), 'costly', null, `${PREFIX}article-flux`, 'world', null, null, null, 'canon', `${PREFIX}secret-name`],
+      [`${PREFIX}rule-nara-exception`, demoText('La memoria heredada conserva el nombre', 'Inherited memory preserves the name'), demoText('Un nombre recibido por memoria de marea vuelve a quien lo entregó, no a quien lo pronuncia.', 'A name received through tide memory returns to its giver, not its speaker.'), demoText('La persona donante olvida una memoria adicional.', 'The donor forgets one additional memory.'), demoText('Solo los Veyari pueden transmitirlo.', 'Only Veyari can transmit it.'), 'costly', `${PREFIX}rule-true-name`, `${PREFIX}article-tidecant`, 'group', `${PREFIX}group-veyari`, null, null, 'canon', `${PREFIX}secret-name`],
+      [`${PREFIX}rule-gates`, demoText('Las puertas obedecen al sello', 'The gates obey the seal'), demoText('Las barreras solares de Lúmina solo se abren ante un sello registrado.', 'Lumina’s solar barriers open only to a registered seal.'), demoText('Forzar una barrera quema el sello utilizado.', 'Forcing a barrier burns the seal used.'), demoText('No alcanza a túneles anteriores al Hundimiento.', 'Does not reach tunnels predating the Sinking.'), 'social', null, `${PREFIX}article-looms`, 'place', `${PREFIX}place-lumina`, 131950, null, 'canon', null],
+      [`${PREFIX}rule-sanctuary`, demoText('Ningún arma en Isla Nácar', 'No weapon on Nacre Island'), demoText('Toda persona que pisa el santuario entrega sus armas a la marea.', 'Everyone entering the sanctuary gives their weapons to the tide.'), demoText('Romper el rito expulsa a la tripulación durante seis mareas.', 'Breaking the rite exiles the crew for six tides.'), demoText('Las herramientas y prótesis no se consideran armas salvo intención declarada.', 'Tools and prostheses are not weapons unless declared as such.'), 'social', null, `${PREFIX}article-firstlight`, 'place', `${PREFIX}place-nacre`, null, null, 'canon', null],
+      [`${PREFIX}rule-thirdmoon`, demoText('La Tercera Luna no proyecta sombra', 'The Third Moon casts no shadow'), demoText('Su luz no interactúa con materia ordinaria.', 'Its light does not interact with ordinary matter.'), null, demoText('La observación todavía no es concluyente.', 'Observation is not yet conclusive.'), 'physical', null, `${PREFIX}article-thirdmoon`, 'world', null, null, null, 'tentative', null],
+      [`${PREFIX}rule-oldtax`, demoText('Diezmo de lámpara', 'Lamp tithe'), demoText('Cada hogar entregaba una décima parte de su aceite al Faro.', 'Every household gave one tenth of its oil to the Lighthouse.'), demoText('Multa y pérdida temporal de luz.', 'A fine and temporary loss of light.'), demoText('Fue abolido después del Hundimiento.', 'Abolished after the Sinking.'), 'social', null, `${PREFIX}article-firstlight`, 'world', null, null, 131950, 'retired', null],
     ] as const;
     for (const [rule_id, titleValue, statement, cost, limits, hardness, parent_rule_id, article_id, scope_kind, scope_id, from_world_day, to_world_day, status, secret_id] of rules) {
       insert('world_rules', {
@@ -1088,25 +1294,25 @@ export function seedWorldbuildingDemoData(): boolean {
 
     const beats = [
       ['conflict', `${PREFIX}thread-succession`, `${PREFIX}scene-arrival`, 'raise', null, 'character', `${PREFIX}char-ilyra`, null],
-      ['conflict', `${PREFIX}thread-succession`, `${PREFIX}scene-gate`, 'turn', L === 'es' ? 'Tarek deja pasar a Ilyra.' : 'Tarek lets Ilyra pass.', 'character', `${PREFIX}char-ilyra`, null],
+      ['conflict', `${PREFIX}thread-succession`, `${PREFIX}scene-gate`, 'turn', demoText('Tarek deja pasar a Ilyra.', 'Tarek lets Ilyra pass.'), 'character', `${PREFIX}char-ilyra`, null],
       ['conflict', `${PREFIX}thread-succession`, `${PREFIX}scene-coup`, 'raise', null, 'group', `${PREFIX}group-council`, null],
-      ['conflict', `${PREFIX}thread-succession`, `${PREFIX}scene-heart`, 'resolve', L === 'es' ? 'Ilyra rechaza gobernar sola.' : 'Ilyra refuses to rule alone.', 'character', `${PREFIX}char-ilyra`, null],
+      ['conflict', `${PREFIX}thread-succession`, `${PREFIX}scene-heart`, 'resolve', demoText('Ilyra rechaza gobernar sola.', 'Ilyra refuses to rule alone.'), 'character', `${PREFIX}char-ilyra`, null],
       ['conflict', `${PREFIX}thread-blockade`, `${PREFIX}scene-gate`, 'raise', null, 'group', `${PREFIX}group-sails`, null],
       ['conflict', `${PREFIX}thread-blockade`, `${PREFIX}scene-coup`, 'ease', null, 'character', `${PREFIX}char-tarek`, null],
       ['conflict', `${PREFIX}thread-blockade`, `${PREFIX}scene-heart`, 'resolve', null, 'group', `${PREFIX}group-sails`, null],
       ['conflict', `${PREFIX}thread-blacktide`, `${PREFIX}scene-island`, 'raise', null, null, null, null],
-      ['conflict', `${PREFIX}thread-blacktide`, `${PREFIX}scene-heart`, 'turn', L === 'es' ? 'El Corazón altera la dirección de la marea.' : 'The Heart changes the tide’s direction.', null, null, null],
-      ['arc', `${PREFIX}arc-ilyra`, `${PREFIX}scene-arrival`, 'step', L === 'es' ? 'Contrata a Cael pero oculta el mapa.' : 'Hires Cael but hides the map.', null, null, null],
-      ['arc', `${PREFIX}arc-ilyra`, `${PREFIX}scene-island`, 'turn', L === 'es' ? 'Comparte el nombre verdadero con Sena.' : 'Shares the true name with Sena.', null, null, null],
-      ['arc', `${PREFIX}arc-ilyra`, `${PREFIX}scene-heart`, 'turn', L === 'es' ? 'Entrega la decisión al grupo.' : 'Hands the decision to the group.', null, null, null],
-      ['arc', `${PREFIX}arc-tarek`, `${PREFIX}scene-gate`, 'turn', L === 'es' ? 'Falsifica la primera orden.' : 'Forges his first order.', null, null, null],
-      ['arc', `${PREFIX}arc-tarek`, `${PREFIX}scene-coup`, 'turn', L === 'es' ? 'Desobedece públicamente a Maelor.' : 'Publicly disobeys Maelor.', null, null, null],
-      ['arc', `${PREFIX}arc-sena`, `${PREFIX}scene-archive`, 'step', L === 'es' ? 'Abre un depósito sin permiso.' : 'Opens a stack without permission.', null, null, null],
-      ['arc', `${PREFIX}arc-sena`, `${PREFIX}scene-epilogue`, 'turn', L === 'es' ? 'Convierte el Archivo en institución pública.' : 'Turns the Archive into a public institution.', null, null, null],
-      ['rule', `${PREFIX}rule-shadow`, `${PREFIX}scene-archive`, 'establishes', L === 'es' ? 'El eco borra el recuerdo de una canción.' : 'The echo erases the memory of a song.', 'character', `${PREFIX}char-sena`, 1],
-      ['rule', `${PREFIX}rule-gates`, `${PREFIX}scene-gate`, 'breaks', L === 'es' ? 'Ilyra atraviesa la barrera con un sello falso.' : 'Ilyra crosses with a forged seal.', 'character', `${PREFIX}char-ilyra`, 0],
-      ['rule', `${PREFIX}rule-sanctuary`, `${PREFIX}scene-island`, 'bends', L === 'es' ? 'La mano prismática se acepta como herramienta.' : 'The prismatic hand is accepted as a tool.', 'character', `${PREFIX}char-ilyra`, 1],
-      ['rule', `${PREFIX}rule-true-name`, `${PREFIX}scene-heart`, 'breaks', L === 'es' ? 'Ilyra pronuncia Asteriel y todavía lo recuerda.' : 'Ilyra speaks Asteriel and still remembers it.', 'character', `${PREFIX}char-ilyra`, 0],
+      ['conflict', `${PREFIX}thread-blacktide`, `${PREFIX}scene-heart`, 'turn', demoText('El Corazón altera la dirección de la marea.', 'The Heart changes the tide’s direction.'), null, null, null],
+      ['arc', `${PREFIX}arc-ilyra`, `${PREFIX}scene-arrival`, 'step', demoText('Contrata a Cael pero oculta el mapa.', 'Hires Cael but hides the map.'), null, null, null],
+      ['arc', `${PREFIX}arc-ilyra`, `${PREFIX}scene-island`, 'turn', demoText('Comparte el nombre verdadero con Sena.', 'Shares the true name with Sena.'), null, null, null],
+      ['arc', `${PREFIX}arc-ilyra`, `${PREFIX}scene-heart`, 'turn', demoText('Entrega la decisión al grupo.', 'Hands the decision to the group.'), null, null, null],
+      ['arc', `${PREFIX}arc-tarek`, `${PREFIX}scene-gate`, 'turn', demoText('Falsifica la primera orden.', 'Forges his first order.'), null, null, null],
+      ['arc', `${PREFIX}arc-tarek`, `${PREFIX}scene-coup`, 'turn', demoText('Desobedece públicamente a Maelor.', 'Publicly disobeys Maelor.'), null, null, null],
+      ['arc', `${PREFIX}arc-sena`, `${PREFIX}scene-archive`, 'step', demoText('Abre un depósito sin permiso.', 'Opens a stack without permission.'), null, null, null],
+      ['arc', `${PREFIX}arc-sena`, `${PREFIX}scene-epilogue`, 'turn', demoText('Convierte el Archivo en institución pública.', 'Turns the Archive into a public institution.'), null, null, null],
+      ['rule', `${PREFIX}rule-shadow`, `${PREFIX}scene-archive`, 'establishes', demoText('El eco borra el recuerdo de una canción.', 'The echo erases the memory of a song.'), 'character', `${PREFIX}char-sena`, 1],
+      ['rule', `${PREFIX}rule-gates`, `${PREFIX}scene-gate`, 'breaks', demoText('Ilyra atraviesa la barrera con un sello falso.', 'Ilyra crosses with a forged seal.'), 'character', `${PREFIX}char-ilyra`, 0],
+      ['rule', `${PREFIX}rule-sanctuary`, `${PREFIX}scene-island`, 'bends', demoText('La mano prismática se acepta como herramienta.', 'The prismatic hand is accepted as a tool.'), 'character', `${PREFIX}char-ilyra`, 1],
+      ['rule', `${PREFIX}rule-true-name`, `${PREFIX}scene-heart`, 'breaks', demoText('Ilyra pronuncia Asteriel y todavía lo recuerda.', 'Ilyra speaks Asteriel and still remembers it.'), 'character', `${PREFIX}char-ilyra`, 0],
     ] as const;
     beats.forEach(([thread_kind, thread_id, scene_id, mark, beatText, subject_kind, subject_id, paid]) =>
       insert('world_beats', {
@@ -1119,10 +1325,10 @@ export function seedWorldbuildingDemoData(): boolean {
     // a parked decision and an already answered one. Options are authored demo material,
     // never AI output.
     [
-      [`${PREFIX}question-heart`, L === 'es' ? '¿Qué ocurre con Lúmina si el Corazón abandona la ciudad?' : 'What happens to Lumina if the Heart leaves the city?', 'scene', `${PREFIX}scene-heart`, 'summary', 'open', 'author', null, 1, null, null],
-      [`${PREFIX}question-nara`, L === 'es' ? '¿Por qué Nara envió la carta nueve meses después?' : 'Why did Nara send the letter nine months later?', 'character', `${PREFIX}char-nara`, 'backstory', 'open', 'author', null, 0, null, null],
-      [`${PREFIX}question-thirdmoon`, L === 'es' ? '¿La Tercera Luna es una puerta o una prisión?' : 'Is the Third Moon a door or a prison?', 'article', `${PREFIX}article-thirdmoon`, 'body', 'parked', 'author', null, 0, null, null],
-      [`${PREFIX}question-sails`, L === 'es' ? '¿Quién borró la séptima ruta?' : 'Who erased the seventh route?', 'group', `${PREFIX}group-sails`, 'description', 'answered', 'author', null, 0, `${PREFIX}option-sails-aurel`, AT],
+      [`${PREFIX}question-heart`, demoText('¿Qué ocurre con Lúmina si el Corazón abandona la ciudad?', 'What happens to Lumina if the Heart leaves the city?'), 'scene', `${PREFIX}scene-heart`, 'summary', 'open', 'author', null, 1, null, null],
+      [`${PREFIX}question-nara`, demoText('¿Por qué Nara envió la carta nueve meses después?', 'Why did Nara send the letter nine months later?'), 'character', `${PREFIX}char-nara`, 'backstory', 'open', 'author', null, 0, null, null],
+      [`${PREFIX}question-thirdmoon`, demoText('¿La Tercera Luna es una puerta o una prisión?', 'Is the Third Moon a door or a prison?'), 'article', `${PREFIX}article-thirdmoon`, 'body', 'parked', 'author', null, 0, null, null],
+      [`${PREFIX}question-sails`, demoText('¿Quién borró la séptima ruta?', 'Who erased the seventh route?'), 'group', `${PREFIX}group-sails`, 'description', 'answered', 'author', null, 0, `${PREFIX}option-sails-aurel`, AT],
     ].forEach(([question_id, question, anchor_kind, anchor_id, anchor_field, status, origin, origin_key, blocking, chosen_option_id, answered_at]) =>
       insert('world_questions', {
         question_id, question, anchor_kind, anchor_id, anchor_field, status, origin, origin_key,
@@ -1130,11 +1336,11 @@ export function seedWorldbuildingDemoData(): boolean {
       })
     );
     [
-      [`${PREFIX}option-heart-dark`, `${PREFIX}question-heart`, L === 'es' ? 'La terraza alta pierde luz durante un año, pero la ciudad sobrevive.' : 'The upper terrace loses light for a year, but the city survives.', L === 'es' ? 'Maelor pierde su argumento de emergencia.' : 'Maelor loses his emergency argument.', 'fill_field', null, null],
-      [`${PREFIX}option-heart-flood`, `${PREFIX}question-heart`, L === 'es' ? 'El mar recupera el Barrio Hundido y obliga a evacuar la costa.' : 'The sea reclaims the Sunken Quarter and forces a coastal evacuation.', L === 'es' ? 'El final necesita una ruta de evacuación preparada.' : 'The ending needs a prepared evacuation route.', 'fill_field', null, null],
-      [`${PREFIX}option-nara-memory`, `${PREFIX}question-nara`, L === 'es' ? 'La carta viajó dentro de una memoria de vidrio y solo tomó forma cuando Ilyra volvió.' : 'The letter travelled inside a glass memory and only took form when Ilyra returned.', L === 'es' ? 'Nara no controló el momento de entrega.' : 'Nara did not control the delivery time.', 'fill_field', null, null],
-      [`${PREFIX}option-nara-future`, `${PREFIX}question-nara`, L === 'es' ? 'Nara escribió desde una marea futura.' : 'Nara wrote from a future tide.', L === 'es' ? 'Introduce causalidad inversa y exige una regla nueva.' : 'Introduces reverse causality and requires a new rule.', 'fill_field', null, null],
-      [`${PREFIX}option-sails-aurel`, `${PREFIX}question-sails`, L === 'es' ? 'Aurel Venn la borró para impedir que el Consejo encontrara el Corazón.' : 'Aurel Venn erased it to stop the Council finding the Heart.', L === 'es' ? 'Cael fue acusado por una decisión de Aurel.' : 'Cael was blamed for Aurel’s decision.', 'none', AT, null],
+      [`${PREFIX}option-heart-dark`, `${PREFIX}question-heart`, demoText('La terraza alta pierde luz durante un año, pero la ciudad sobrevive.', 'The upper terrace loses light for a year, but the city survives.'), demoText('Maelor pierde su argumento de emergencia.', 'Maelor loses his emergency argument.'), 'fill_field', null, null],
+      [`${PREFIX}option-heart-flood`, `${PREFIX}question-heart`, demoText('El mar recupera el Barrio Hundido y obliga a evacuar la costa.', 'The sea reclaims the Sunken Quarter and forces a coastal evacuation.'), demoText('El final necesita una ruta de evacuación preparada.', 'The ending needs a prepared evacuation route.'), 'fill_field', null, null],
+      [`${PREFIX}option-nara-memory`, `${PREFIX}question-nara`, demoText('La carta viajó dentro de una memoria de vidrio y solo tomó forma cuando Ilyra volvió.', 'The letter travelled inside a glass memory and only took form when Ilyra returned.'), demoText('Nara no controló el momento de entrega.', 'Nara did not control the delivery time.'), 'fill_field', null, null],
+      [`${PREFIX}option-nara-future`, `${PREFIX}question-nara`, demoText('Nara escribió desde una marea futura.', 'Nara wrote from a future tide.'), demoText('Introduce causalidad inversa y exige una regla nueva.', 'Introduces reverse causality and requires a new rule.'), 'fill_field', null, null],
+      [`${PREFIX}option-sails-aurel`, `${PREFIX}question-sails`, demoText('Aurel Venn la borró para impedir que el Consejo encontrara el Corazón.', 'Aurel Venn erased it to stop the Council finding the Heart.'), demoText('Cael fue acusado por una decisión de Aurel.', 'Cael was blamed for Aurel’s decision.'), 'none', AT, null],
     ].forEach(([option_id, question_id, optionText, implications, apply_mode, applied_at, replaced_text]) =>
       insert('world_question_options', {
         option_id, question_id, text: optionText, implications, origin: 'author', apply_mode,
@@ -1145,37 +1351,7 @@ export function seedWorldbuildingDemoData(): boolean {
     // Manuscript: two books, four chapters, every scene with prose, a hand-made snapshot
     // and a word diary. The uncast Nara link in scene 2 intentionally exercises the
     // manuscript continuity check.
-    const manuscript = new Map<string, string>([
-      [`${PREFIX}scene-prologue`, L === 'es'
-        ? `# El último encendido\n\n${link('character', `${PREFIX}char-aurel`, 'Aurel')} apoyó las dos manos quemadas sobre la lente. Abajo, ${link('place', `${PREFIX}place-lumina`, 'Lúmina')} se hundía por terrazas, como una lámpara inclinada que derramara el aceite.\n\n—Toda costa es una decisión dibujada —dijo, y encendió el ${link('place', `${PREFIX}place-faro`, 'Faro')} una vez más.`
-        : `# The last lighting\n\n${link('character', `${PREFIX}char-aurel`, 'Aurel')} laid both burned hands on the lens. Below, ${link('place', `${PREFIX}place-lumina`, 'Lumina')} sank terrace by terrace, like a tilted lamp spilling its oil.\n\n“Every coast is a decision drawn,” he said, and lit the ${link('place', `${PREFIX}place-faro`, 'Lighthouse')} once more.`],
-      [`${PREFIX}scene-arrival`, L === 'es'
-        ? `La carta olía a fondo de mar. ${link('character', `${PREFIX}char-ilyra`, 'Ilyra')} reconoció la letra de ${link('character', `${PREFIX}char-nara`, 'Nara')} antes de leer la primera palabra.\n\n${link('character', `${PREFIX}char-cael`, 'Cael')} esperó en el umbral, dejando un charco salado sobre el mármol del Consejo.\n\n—Necesito una ruta —dijo Ilyra.\n\n—Necesitas una tripulación —corrigió él.`
-        : `The letter smelled of the seabed. ${link('character', `${PREFIX}char-ilyra`, 'Ilyra')} recognised ${link('character', `${PREFIX}char-nara`, 'Nara')}’s hand before reading the first word.\n\n${link('character', `${PREFIX}char-cael`, 'Cael')} waited at the threshold, leaving a salt puddle on the Council marble.\n\n“I need a route,” Ilyra said.\n\n“You need a crew,” he corrected.`],
-      [`${PREFIX}scene-archive`, L === 'es'
-        ? `${link('character', `${PREFIX}char-sena`, 'Sena')} introdujo la última llave. El depósito exhaló agua negra y una voz que llevaba nueve años esperando.\n\n—Si estás oyendo esto —dijo ${link('character', `${PREFIX}char-nara`, 'Nara')}, aunque su nombre no figuraba en el reparto del registro—, el Corazón ya sabe quién eres.\n\nLa mano de ${link('character', `${PREFIX}char-ilyra`, 'Ilyra')} se abrió sola. Bajo el cristal apareció una costa que ningún atlas conservaba.`
-        : `${link('character', `${PREFIX}char-sena`, 'Sena')} inserted the last key. The stack breathed black water and a voice that had waited nine years.\n\n“If you can hear this,” said ${link('character', `${PREFIX}char-nara`, 'Nara')}, though her name was absent from the recorded cast, “the Heart already knows who you are.”\n\n${link('character', `${PREFIX}char-ilyra`, 'Ilyra')}’s hand opened by itself. Beneath the glass appeared a coast no atlas preserved.`],
-      [`${PREFIX}scene-gate`, L === 'es'
-        ? `${link('character', `${PREFIX}char-tarek`, 'Tarek')} leyó la orden dos veces. El sello era perfecto; la firma, imposible.\n\nAl otro lado de la barrera, Ilyra no pidió ayuda. Esa fue la única razón por la que él decidió dársela.\n\nCuando el vidrio ardió, el sello falso se volvió ceniza. El precio de ${link('rule', `${PREFIX}rule-gates`, 'la ley de las puertas')} había quedado a la vista.`
-        : `${link('character', `${PREFIX}char-tarek`, 'Tarek')} read the order twice. The seal was perfect; the signature impossible.\n\nBeyond the barrier, Ilyra did not ask for help. That was the only reason he chose to give it.\n\nWhen the glass burned, the forged seal turned to ash. The cost of ${link('rule', `${PREFIX}rule-gates`, 'the gate law')} was visible.`],
-      [`${PREFIX}scene-island`, L === 'es'
-        ? `Nadie desembarcó armado en ${link('place', `${PREFIX}place-nacre`, 'Isla Nácar')}. La marea recogió espadas, pistolas y la pequeña navaja de Sena.\n\nSolo retuvo la mano de vidrio de Ilyra.\n\n—Herramienta —dictaminó ${link('character', `${PREFIX}char-vesh`, 'Vesh')}—, mientras no decida lo contrario.\n\nBajo la isla, algo enorme respondió con un canto.`
-        : `Nobody landed armed on ${link('place', `${PREFIX}place-nacre`, 'Nacre Island')}. The tide collected swords, pistols and Sena’s little knife.\n\nIt kept only Ilyra’s glass hand.\n\n“A tool,” ${link('character', `${PREFIX}char-vesh`, 'Vesh')} ruled, “until it decides otherwise.”\n\nBeneath the island, something enormous answered in song.`],
-      [`${PREFIX}scene-observatory`, L === 'es'
-        ? `Las seis cúpulas del ${link('place', `${PREFIX}place-orla`, 'Observatorio')} giraban en direcciones distintas. Sena superpuso los registros de Nara y descubrió una órbita que no rodeaba el mundo, sino el ${link('place', `${PREFIX}place-faro`, 'Faro')}.\n\nTarek encontró una séptima palanca detrás del sello del Regente.`
-        : `The ${link('place', `${PREFIX}place-orla`, 'Observatory')}’s six domes turned in different directions. Sena overlaid Nara’s records and found an orbit circling not the world but the ${link('place', `${PREFIX}place-faro`, 'Lighthouse')}.\n\nTarek found a seventh lever behind the Regent’s seal.`],
-      [`${PREFIX}scene-coup`, L === 'es'
-        ? `Las seis campanas sonaron a mediodía. El ${link('group', `${PREFIX}group-council`, 'Consejo')} nombró traidora a la Casa Venn y ordenó cerrar el puerto.\n\n${link('character', `${PREFIX}char-maelor`, 'Maelor')} esperó que Tarek repitiera la orden. Tarek se quitó la capa roja y la dejó sobre la mesa.`
-        : `Six bells rang at noon. The ${link('group', `${PREFIX}group-council`, 'Council')} named House Venn traitorous and ordered the harbour closed.\n\n${link('character', `${PREFIX}char-maelor`, 'Maelor')} waited for Tarek to repeat the order. Tarek removed his red cloak and left it on the table.`],
-      [`${PREFIX}scene-heart`, L === 'es'
-        ? `El Corazón no era una máquina. Abrió un ojo del tamaño de una plaza y toda la ciudad recordó la misma pérdida.\n\nIlyra pronunció **Asteriel**. El nombre atravesó el agua, alcanzó la criatura y volvió a ella intacto. La regla decía que debía olvidarlo.\n\n—No voy a decidir sola —dijo, y abrió el mapa para todos.`
-        : `The Heart was not a machine. It opened an eye the size of a square and the whole city remembered the same loss.\n\nIlyra spoke **Asteriel**. The name crossed the water, reached the creature and returned to her intact. The rule said she should forget it.\n\n“I will not decide alone,” she said, and opened the map to everyone.`],
-      [`${PREFIX}scene-epilogue`, L === 'es'
-        ? `El nuevo Archivo no tenía puerta principal. Sena había mandado abrir seis.\n\nEn la pared vacía dejó un espacio para el mapa que Ilyra aún no había regresado a dibujar. Mar adentro apareció una luz baja, móvil y paciente.`
-        : `The new Archive had no main door. Sena had ordered six opened.\n\nOn the empty wall they left a place for the map Ilyra had not yet returned to draw. Far out at sea, a low light appeared, moving and patient.`],
-    ]);
-    // The compact passages above remain useful as a readable synopsis beside the seed
-    // mechanics; the shipped demo uses the fully dramatised versions.
+    const manuscript = new Map<string, string>();
     for (const scene of SCENES) {
       manuscript.set(scene.id, WORLD_DEMO_SCENE_NARRATIVE[scene.id].manuscript[L]);
     }
@@ -1186,25 +1362,25 @@ export function seedWorldbuildingDemoData(): boolean {
       });
     }
     [
-      [`${PREFIX}scene-prologue`, L === 'es' ? 'Libro I · La costa rota' : 'Book I · The Broken Coast', L === 'es' ? 'Las Mareas de Ceniza' : 'The Ashen Tides', 48000],
-      [`${PREFIX}scene-coup`, L === 'es' ? 'Libro II · El corazón sumergido' : 'Book II · The Sunken Heart', L === 'es' ? 'Las Mareas de Ceniza' : 'The Ashen Tides', 52000],
+      [`${PREFIX}scene-prologue`, demoText('Libro I · La costa rota', 'Book I · The Broken Coast'), demoText('Las Mareas de Ceniza', 'The Ashen Tides'), 48000],
+      [`${PREFIX}scene-coup`, demoText('Libro II · El corazón sumergido', 'Book II · The Sunken Heart'), demoText('Las Mareas de Ceniza', 'The Ashen Tides'), 52000],
     ].forEach(([scene_id, titleValue, subtitle, target_words]) =>
       insert('world_manuscript_starts', { scene_id, title: titleValue, subtitle, target_words, created_at: AT, updated_at: AT })
     );
     [
-      [`${PREFIX}scene-prologue`, L === 'es' ? 'Prólogo' : 'Prologue', L === 'es' ? 'Toda costa es una decisión dibujada.' : 'Every coast is a decision drawn.'],
-      [`${PREFIX}scene-arrival`, L === 'es' ? 'I · Cartas y mapas' : 'I · Letters and maps', null],
-      [`${PREFIX}scene-island`, L === 'es' ? 'II · Lo que recuerda el mar' : 'II · What the sea remembers', null],
-      [`${PREFIX}scene-coup`, L === 'es' ? 'III · Las seis campanas' : 'III · The six bells', null],
-      [`${PREFIX}scene-heart`, L === 'es' ? 'IV · Asteriel' : 'IV · Asteriel', null],
-      [`${PREFIX}scene-epilogue`, L === 'es' ? 'Epílogo' : 'Epilogue', null],
+      [`${PREFIX}scene-prologue`, demoText('Prólogo', 'Prologue'), demoText('Toda costa es una decisión dibujada.', 'Every coast is a decision drawn.')],
+      [`${PREFIX}scene-arrival`, demoText('I · Cartas y mapas', 'I · Letters and maps'), null],
+      [`${PREFIX}scene-island`, demoText('II · Lo que recuerda el mar', 'II · What the sea remembers'), null],
+      [`${PREFIX}scene-coup`, demoText('III · Las seis campanas', 'III · The six bells'), null],
+      [`${PREFIX}scene-heart`, demoText('IV · Asteriel', 'IV · Asteriel'), null],
+      [`${PREFIX}scene-epilogue`, demoText('Epílogo', 'Epilogue'), null],
     ].forEach(([scene_id, titleValue, epigraph]) =>
       insert('world_chapter_breaks', { scene_id, title: titleValue, epigraph, created_at: AT, updated_at: AT })
     );
     const archiveText = manuscript.get(`${PREFIX}scene-archive`) ?? '';
     insert('world_scene_snapshots', {
       snapshot_id: `${PREFIX}snapshot-archive`, scene_id: `${PREFIX}scene-archive`,
-      text: `${archiveText}\n\n${L === 'es' ? 'Versión anterior: la voz se cortaba antes de nombrar el Corazón.' : 'Earlier version: the voice cut out before naming the Heart.'}`,
+      text: `${archiveText}\n\n${demoText('Versión anterior: la voz se cortaba antes de nombrar el Corazón.', 'Earlier version: the voice cut out before naming the Heart.')}`,
       word_count: countWords(archiveText) + 11, reason: 'manual', created_at: PREVIOUS_AT,
     });
     [
@@ -1218,25 +1394,25 @@ export function seedWorldbuildingDemoData(): boolean {
     // Notes are part of "Crear", not a separate academic corpus.
     insert('note_folders', {
       id: `${PREFIX}notes-root`, parent_id: null,
-      name: L === 'es' ? 'Las Mareas de Ceniza' : 'The Ashen Tides',
-      order_idx: 0, summary: L === 'es' ? 'Cuaderno de desarrollo del mundo demo.' : 'Development notebook for the demo world.',
+      name: demoText('Las Mareas de Ceniza', 'The Ashen Tides'),
+      order_idx: 0, summary: demoText('Cuaderno de desarrollo del mundo demo.', 'Development notebook for the demo world.'),
       created_at: AT, updated_at: AT,
     });
     insert('note_folders', {
       id: `${PREFIX}notes-revision`, parent_id: `${PREFIX}notes-root`,
-      name: L === 'es' ? 'Revisión' : 'Revision', order_idx: 0,
-      summary: L === 'es' ? 'Listas de trabajo y decisiones editoriales.' : 'Worklists and editorial decisions.',
+      name: demoText('Revisión', 'Revision'), order_idx: 0,
+      summary: demoText('Listas de trabajo y decisiones editoriales.', 'Worklists and editorial decisions.'),
       created_at: AT, updated_at: AT,
     });
     [
-      [`${PREFIX}note-premise`, `${PREFIX}notes-root`, L === 'es' ? 'Premisa y promesa' : 'Premise and promise', 0,
-        L === 'es' ? '# Premisa\n\nUna cartógrafa descubre que la fuente de energía de su ciudad es una criatura cautiva y que cada recuerdo usado como combustible borra otro.\n\n## Promesa al lector\n\n- Fantasía marítima\n- Misterio familiar\n- Política de recursos\n- Magia con coste verificable' : '# Premise\n\nA cartographer discovers that her city’s energy source is a captive creature and every memory used as fuel erases another.\n\n## Reader promise\n\n- Maritime fantasy\n- Family mystery\n- Resource politics\n- Magic with a verifiable cost'],
-      [`${PREFIX}note-symbols`, `${PREFIX}notes-root`, L === 'es' ? 'Motivos visuales' : 'Visual motifs', 1,
-        L === 'es' ? '## Motivos\n\n- Vidrio agrietado = memoria disputada\n- Seis = orden oficial\n- Siete = ruta borrada\n- Agua dentro de edificios = pasado que regresa\n\nVincular con [[Flujo de vidrio]] y [[La Tercera Luna]].' : '## Motifs\n\n- Cracked glass = disputed memory\n- Six = official order\n- Seven = erased route\n- Water inside buildings = the past returning\n\nLink to [[Glass flux]] and [[The Third Moon]].'],
-      [`${PREFIX}note-revision`, `${PREFIX}notes-revision`, L === 'es' ? 'Lista de revisión del acto I' : 'Act I revision list', 0,
-        L === 'es' ? '- [x] Presentar el coste del Flujo en el Archivo\n- [x] Dar a Tarek una decisión visible\n- [ ] Aclarar cómo llegó la carta\n- [ ] Sembrar antes la orquídea de sal' : '- [x] Introduce Flux’s cost in the Archive\n- [x] Give Tarek a visible choice\n- [ ] Clarify how the letter arrived\n- [ ] Seed the salt orchid earlier'],
-      [`${PREFIX}note-questions`, `${PREFIX}notes-revision`, L === 'es' ? 'Preguntas para lectores beta' : 'Beta reader questions', 1,
-        L === 'es' ? '1. ¿Se entiende por qué Ilyra necesita a Cael?\n2. ¿Maelor parece convencido de su propia lógica?\n3. ¿La revelación del Corazón cambia la lectura del prólogo?\n4. ¿Qué parte de Lúmina recuerdas sin mirar el mapa?' : '1. Is it clear why Ilyra needs Cael?\n2. Does Maelor seem convinced by his own logic?\n3. Does the Heart reveal change the prologue?\n4. Which part of Lumina do you remember without checking the map?'],
+      [`${PREFIX}note-premise`, `${PREFIX}notes-root`, demoText('Premisa y promesa', 'Premise and promise'), 0,
+        demoText('# Premisa\n\nUna cartógrafa descubre que la fuente de energía de su ciudad es una criatura cautiva y que cada recuerdo usado como combustible borra otro.\n\n## Promesa al lector\n\n- Fantasía marítima\n- Misterio familiar\n- Política de recursos\n- Magia con coste verificable', '# Premise\n\nA cartographer discovers that her city’s energy source is a captive creature and every memory used as fuel erases another.\n\n## Reader promise\n\n- Maritime fantasy\n- Family mystery\n- Resource politics\n- Magic with a verifiable cost')],
+      [`${PREFIX}note-symbols`, `${PREFIX}notes-root`, demoText('Motivos visuales', 'Visual motifs'), 1,
+        demoText('## Motivos\n\n- Vidrio agrietado = memoria disputada\n- Seis = orden oficial\n- Siete = ruta borrada\n- Agua dentro de edificios = pasado que regresa\n\nVincular con [[Flujo de vidrio]] y [[La Tercera Luna]].', '## Motifs\n\n- Cracked glass = disputed memory\n- Six = official order\n- Seven = erased route\n- Water inside buildings = the past returning\n\nLink to [[Glass flux]] and [[The Third Moon]].')],
+      [`${PREFIX}note-revision`, `${PREFIX}notes-revision`, demoText('Lista de revisión del acto I', 'Act I revision list'), 0,
+        demoText('- [x] Presentar el coste del Flujo en el Archivo\n- [x] Dar a Tarek una decisión visible\n- [ ] Aclarar cómo llegó la carta\n- [ ] Sembrar antes la orquídea de sal', '- [x] Introduce Flux’s cost in the Archive\n- [x] Give Tarek a visible choice\n- [ ] Clarify how the letter arrived\n- [ ] Seed the salt orchid earlier')],
+      [`${PREFIX}note-questions`, `${PREFIX}notes-revision`, demoText('Preguntas para lectores beta', 'Beta reader questions'), 1,
+        demoText('1. ¿Se entiende por qué Ilyra necesita a Cael?\n2. ¿Maelor parece convencido de su propia lógica?\n3. ¿La revelación del Corazón cambia la lectura del prólogo?\n4. ¿Qué parte de Lúmina recuerdas sin mirar el mapa?', '1. Is it clear why Ilyra needs Cael?\n2. Does Maelor seem convinced by his own logic?\n3. Does the Heart reveal change the prologue?\n4. Which part of Lumina do you remember without checking the map?')],
     ].forEach(([id, folder_id, titleValue, order_idx, content]) =>
       insert('notes', { id, folder_id, title: titleValue, kind: 'markdown', content, source_json: null, order_idx, created_at: AT, updated_at: AT })
     );
@@ -1261,7 +1437,7 @@ export function seedWorldbuildingDemoData(): boolean {
       subjects: muted.subjects,
       headline: muted.headline.key,
       reasonCode: 'deliberate',
-      reason: `${PREFIX}${locale() === 'es' ? 'ejemplo: flashback deliberado para mostrar las excepciones.' : 'example: deliberate flashback demonstrating exceptions.'}`,
+      reason: `${PREFIX}${demoText('ejemplo: flashback deliberado para mostrar las excepciones.', 'example: deliberate flashback demonstrating exceptions.')}`,
     });
   }
   return true;

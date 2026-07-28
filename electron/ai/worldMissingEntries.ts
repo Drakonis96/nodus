@@ -17,6 +17,7 @@ import {
 } from '@shared/worldMissingEntries';
 import { isArticleCategory } from '@shared/worldEncyclopedia';
 import type { WorldEntryProposal } from '@shared/types';
+import { withWorldPromptLanguage } from '@shared/worldPromptLanguage';
 
 /** Beyond this the prompt stops being a shortlist and starts being the whole vocabulary. */
 const MAX_CANDIDATES = 40;
@@ -57,7 +58,7 @@ async function judge(candidates: EntryCandidate[]) {
   try {
     const text = await completeText(
       {
-        system: MISSING_ENTRIES_SYSTEM,
+        system: withWorldPromptLanguage(MISSING_ENTRIES_SYSTEM, settings.uiLanguage),
         user: composeMissingEntriesContext(candidates),
         temperature: 0.2,
         maxTokens: 1200,

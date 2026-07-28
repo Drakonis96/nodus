@@ -184,6 +184,34 @@ const INDIRECT_KEY_SOURCES = [
     pattern: /\b(?:title|searchPlaceholder|createLabel|emptyLabel|noMatchLabel|label):\s*(["'])((?:\\.|(?!\1).)*?)\1/g,
   },
   {
+    file: 'src/views/CharactersView.tsx',
+    pattern: /\b(?:title|searchPlaceholder|createLabel|emptyLabel|noMatchLabel|label):\s*(["'])((?:\\.|(?!\1).)*?)\1/g,
+  },
+  {
+    file: 'src/views/PlacesView.tsx',
+    pattern: /\b(?:title|searchPlaceholder|createLabel|emptyLabel|noMatchLabel|label):\s*(["'])((?:\\.|(?!\1).)*?)\1/g,
+  },
+  {
+    file: 'src/views/GroupsView.tsx',
+    pattern: /\b(?:title|create|search|empty|noMatch|label|generateLabel):\s*(["'])((?:\\.|(?!\1).)*?)\1/g,
+  },
+  {
+    file: 'src/views/WorldbuildingHome.tsx',
+    pattern: /\b(?:label|hint):\s*(["'])((?:\\.|(?!\1).)*?)\1/g,
+  },
+  {
+    file: 'src/views/WorldChatView.tsx',
+    pattern: /^ {2}(?:character|place|group|scene|article):\s*(["'])([A-ZÁÉÍÓÚÑ](?:\\.|(?!\1).)*?)\1,?$/gm,
+  },
+  {
+    file: 'src/components/WorldbuildingSidebar.tsx',
+    pattern: /\blabel:\s*(["'])((?:\\.|(?!\1).)*?)\1/g,
+  },
+  {
+    file: 'src/components/world/WorldGallery.tsx',
+    pattern: /\b(?:title|generateLabel)\s*=\s*(["'])((?:\\.|(?!\1).)*?)\1/g,
+  },
+  {
     file: 'src/views/EncyclopediaView.tsx',
     pattern: /\b(?:title|searchPlaceholder|createLabel|emptyLabel|noMatchLabel|label):\s*(["'])((?:\\.|(?!\1).)*?)\1/g,
   },

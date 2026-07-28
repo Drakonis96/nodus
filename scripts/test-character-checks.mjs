@@ -270,6 +270,12 @@ test('character chat invokes images only for an explicit request and builds a sa
     '¿Puedes mostrarme una foto de tu habitación?',
     'Haz un retrato de cómo ibas vestido aquella noche',
     'Send me a picture of the old gate',
+    'Envoie-moi une image du vieux port',
+    'Zeig mir ein Bild vom alten Tor',
+    'Envia-me uma imagem do porto antigo',
+    'Envie uma imagem do porto antigo',
+    'Mandami una foto del vecchio porto',
+    'Bana eski limanın bir resmini gönder',
   ]) {
     assert.equal(characterChat.isCharacterImageRequest(request), true, request);
   }

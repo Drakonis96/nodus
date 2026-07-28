@@ -29,6 +29,7 @@ import {
 } from '@shared/worldArticleContext';
 import { ARTICLE_CATEGORY_LABEL, WORLD_ENTRY_KIND_LABEL, entryKey } from '@shared/worldEncyclopedia';
 import type { WorldArticleDraftMode, WorldArticleDraftResult } from '@shared/types';
+import { withWorldPromptLanguage } from '@shared/worldPromptLanguage';
 
 /** How many neighbours are worth sending. Beyond this the context stops being a
  *  neighbourhood and starts being the whole world, which is both expensive and vaguer. */
@@ -85,7 +86,10 @@ export async function draftWorldArticle(
   const model = settings.synthesisModel ?? settings.extractionModel ?? null;
   const text = await completeText(
     {
-      system: mode === 'expand' ? WORLD_ARTICLE_EXPAND_SYSTEM : WORLD_ARTICLE_SYSTEM,
+      system: withWorldPromptLanguage(
+        mode === 'expand' ? WORLD_ARTICLE_EXPAND_SYSTEM : WORLD_ARTICLE_SYSTEM,
+        settings.uiLanguage
+      ),
       user: composeWorldArticleContext(sources),
       // As warm as the character biography: this is prose about an invented thing, not a
       // cautious reading of records.

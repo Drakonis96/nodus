@@ -20,6 +20,7 @@ import {
   parseProseReview,
   type ProseReviewSources,
 } from '@shared/worldProseReview';
+import { withWorldPromptLanguage } from '@shared/worldPromptLanguage';
 import { BEAT_MARK_LABEL, THREAD_KIND_LABEL } from '@shared/worldThreads';
 import type { BeatThreadKind } from '@shared/types';
 import { stripWorldLinks } from '@shared/worldManuscript';
@@ -56,7 +57,7 @@ export async function reviewWorldProse(sceneId: string): Promise<ProseReviewResu
   const model = settings.synthesisModel ?? settings.extractionModel ?? null;
   const completion = await completeText(
     {
-      system: WORLD_PROSE_REVIEW_SYSTEM,
+      system: withWorldPromptLanguage(WORLD_PROSE_REVIEW_SYSTEM, settings.uiLanguage),
       user: composeProseReviewContext(sources),
       // Cold. This is a reading, not a piece of writing: everything true in the answer is
       // already on the page.

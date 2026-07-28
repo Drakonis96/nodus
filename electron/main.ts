@@ -36,6 +36,7 @@ import {
   upgradeWorldbuildingDemoDynasties,
   upgradeWorldbuildingDemoImageQuality,
   upgradeWorldbuildingDemoNarrativeDepth,
+  relocalizeWorldbuildingDemoData,
 } from './db/worldbuildingDemoData';
 
 // Before anything else: a stray rejection from any of the fire-and-forget
@@ -504,6 +505,7 @@ app.whenReady().then(() => {
   upgradeWorldbuildingDemoDynasties();
   upgradeWorldbuildingDemoImageQuality();
   upgradeWorldbuildingDemoNarrativeDepth();
+  relocalizeWorldbuildingDemoData();
   registerImageProtocol();
   reconcileAuthorLayerOnce(); // one-time: collapse duplicate author nodes onto Zotero identity
   // Maintenance: drop ideas that have sat dormant (no occurrences) for >30 days.

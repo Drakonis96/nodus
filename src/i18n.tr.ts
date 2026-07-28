@@ -4,9 +4,11 @@ import { TOOLKIT_APPS_TRANSLATIONS } from './i18n.toolkitApps';
 import { SERVER_TRANSLATIONS } from './i18n.server';
 import { TRANSLATE_TRANSLATIONS } from './i18n.translate';
 import { WORLD_CHAT_TRANSLATIONS } from './i18n.worldChat';
+import { WORLDBUILDING_TRANSLATIONS } from './i18n.worldbuilding';
 
 /** Complete static Turkish interface table; coverage prohibits runtime fallbacks. */
 export const TR: Record<string, string> = {
+  ...WORLDBUILDING_TRANSLATIONS.tr,
   ...WORLD_CHAT_TRANSLATIONS.tr,
   "Lo que cuenta el mapa": "Haritanın anlattıkları",
   "Ver dónde ocurren las escenas ({n})": "Sahnelerin nerede geçtiğini gör ({n})",

@@ -27,6 +27,7 @@ try {
   const study = require(path.join(repoRoot, 'electron/db/studyDemoData.ts'));
   const teaching = require(path.join(repoRoot, 'electron/db/teachingDemoData.ts'));
   const worldbuilding = require(path.join(repoRoot, 'electron/db/worldbuildingDemoData.ts'));
+  const demoI18n = require(path.join(repoRoot, 'shared/worldbuildingDemoI18n.ts'));
   const vaults = require(path.join(repoRoot, 'electron/vaults/vaultRegistry.ts'));
   const studyChat = require(path.join(repoRoot, 'electron/ai/studyAssistant.ts'));
   const characters = require(path.join(repoRoot, 'electron/db/charactersRepo.ts'));
@@ -342,6 +343,37 @@ try {
   assert.ok(presence.listPresences().length > 20);
   assert.ok(continuity.continuitySummary().facts > 0);
   assert.ok(continuity.runContinuityUnfiltered().length > continuity.runContinuity().length, 'the demo includes a real muted continuity exception');
+
+  // Changing the interface language updates untouched demo-owned content in place,
+  // including a database that was seeded by an older session. Exact author edits must
+  // survive the same pass.
+  db.prepare("UPDATE world_groups SET notes = 'Nota personal del autor.' WHERE group_id = 'demo-world-group-venn'").run();
+  for (const language of ['fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'en', 'es']) {
+    assert.equal(worldbuilding.relocalizeWorldbuildingDemoData(language), true, `demo changes to ${language}`);
+    assert.equal(
+      db.prepare('SELECT name FROM world_calendar WHERE id = 1').get().name,
+      demoI18n.worldbuildingDemoText(language, 'Calendario de las Mareas')
+    );
+    assert.equal(
+      db.prepare("SELECT name FROM places WHERE place_id = 'demo-world-place-lumina'").get().name,
+      demoI18n.worldbuildingDemoText(language, 'Lúmina')
+    );
+    assert.equal(
+      db.prepare("SELECT role FROM scene_characters WHERE id = 'demo-world-scene-prologue-cast-0'").get().role,
+      demoI18n.worldbuildingDemoText(language, 'punto de vista')
+    );
+    assert.equal(
+      db.prepare("SELECT notes FROM world_groups WHERE group_id = 'demo-world-group-venn'").get().notes,
+      'Nota personal del autor.',
+      `relocalization to ${language} preserves edited demo fields`
+    );
+  }
+  assert.equal(db.prepare('SELECT name FROM world_calendar WHERE id = 1').get().name, 'Calendario de las Mareas');
+  assert.equal(
+    db.prepare("SELECT notes FROM world_groups WHERE group_id = 'demo-world-group-venn'").get().notes,
+    'Nota personal del autor.'
+  );
+
   assert.equal(worldbuilding.seedWorldbuildingDemoData(), false, 'worldbuilding demo cannot be seeded twice');
   academic.clearDemoData();
   assert.equal(count('persons', "person_id LIKE 'demo-world-%'"), 0);

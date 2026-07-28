@@ -4,9 +4,11 @@ import { TOOLKIT_APPS_TRANSLATIONS } from './i18n.toolkitApps';
 import { SERVER_TRANSLATIONS } from './i18n.server';
 import { TRANSLATE_TRANSLATIONS } from './i18n.translate';
 import { WORLD_CHAT_TRANSLATIONS } from './i18n.worldChat';
+import { WORLDBUILDING_TRANSLATIONS } from './i18n.worldbuilding';
 
 /** Complete static Italian interface table; coverage prohibits runtime fallbacks. */
 export const IT: Record<string, string> = {
+  ...WORLDBUILDING_TRANSLATIONS.it,
   ...WORLD_CHAT_TRANSLATIONS.it,
   "Lo que cuenta el mapa": "Cosa racconta la mappa",
   "Ver dónde ocurren las escenas ({n})": "Vedi dove accadono le scene ({n})",

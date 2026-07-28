@@ -6,9 +6,11 @@ import type {
   WorldChatConversationSummary,
   WorldChatResult,
   WorldChatSelection,
+  WorldArticleCategory,
   WorldEntry,
 } from '@shared/types';
 import type { View } from '../navigation';
+import { ARTICLE_CATEGORY_LABEL } from '@shared/worldEncyclopedia';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { Markdown } from '../components/Markdown';
 import { ModelPicker } from '../components/ModelPicker';
@@ -331,7 +333,7 @@ export function WorldChatView({ settings, onNavigate }: {
                 {filteredEntries.map((entry) => (
                   <label key={entry.key} className="flex cursor-pointer gap-2 rounded-lg border border-neutral-200 p-2 text-xs hover:border-violet-400 dark:border-neutral-800 dark:hover:border-violet-800">
                     <input type="checkbox" checked={selection.entryKeys.includes(entry.key)} onChange={(event) => setSelection((current) => ({ ...current, entryKeys: event.target.checked ? [...current.entryKeys, entry.key] : current.entryKeys.filter((key) => key !== entry.key) }))} />
-                    <span className="min-w-0"><span className="block truncate font-medium">{entry.title}</span><span className="block truncate text-[9px] text-neutral-500">{t(KIND_LABEL[entry.kind] ?? entry.kind)}{entry.category ? ` · ${entry.category}` : ''}</span></span>
+                    <span className="min-w-0"><span className="block truncate font-medium">{entry.title}</span><span className="block truncate text-[9px] text-neutral-500">{t(KIND_LABEL[entry.kind] ?? entry.kind)}{entry.category ? ` · ${t(ARTICLE_CATEGORY_LABEL[entry.category as WorldArticleCategory] ?? entry.category)}` : ''}</span></span>
                   </label>
                 ))}
               </div>

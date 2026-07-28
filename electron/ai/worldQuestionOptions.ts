@@ -21,6 +21,7 @@ import {
   parseQuestionOptions,
   type WorldQuestionSources,
 } from '@shared/worldQuestionContext';
+import { withWorldPromptLanguage } from '@shared/worldPromptLanguage';
 import { findPlaceholders } from '@shared/worldQuestions';
 import { WORLD_ENTRY_KIND_LABEL, WORLD_LINK_FIELD_LABEL, entryKey } from '@shared/worldEncyclopedia';
 import type { WorldEntryKind, WorldQuestionOptionsResult } from '@shared/types';
@@ -90,7 +91,7 @@ export async function proposeQuestionOptions(questionId: string): Promise<WorldQ
   const model = settings.synthesisModel ?? settings.extractionModel ?? null;
   const completion = await completeText(
     {
-      system: WORLD_QUESTION_OPTIONS_SYSTEM,
+      system: withWorldPromptLanguage(WORLD_QUESTION_OPTIONS_SYSTEM, settings.uiLanguage),
       user: composeWorldQuestionContext(sources),
       // The warmest call in the app, and deliberately so: three answers that differ only
       // in wording are not a decision, and a cold model writes exactly those.

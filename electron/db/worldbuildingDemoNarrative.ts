@@ -4,12 +4,14 @@
 // newly created demos receive it immediately, while existing demos can be upgraded
 // without rebuilding the vault or touching author-created rows.
 
-export type WorldbuildingDemoLocale = 'es' | 'en';
-type Localized = Record<WorldbuildingDemoLocale, string>;
+import type { AppLanguage } from '@shared/types';
+import {
+  worldbuildingDemoLocalized as localized,
+  type WorldbuildingDemoLocalized,
+} from '@shared/worldbuildingDemoI18n';
 
-function localized(es: string, en: string): Localized {
-  return { es, en };
-}
+export type WorldbuildingDemoLocale = AppLanguage;
+type Localized = WorldbuildingDemoLocalized;
 
 export interface DemoCharacterNarrative {
   personality: Localized;
@@ -444,4 +446,3 @@ export const WORLD_DEMO_SCENE_NARRATIVE: Record<string, DemoSceneNarrative> = {
     ),
   },
 };
-

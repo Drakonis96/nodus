@@ -31,6 +31,7 @@ import {
   type WorldChatFacts,
   type WorldChatRef,
 } from '@shared/worldChatContext';
+import { withWorldPromptLanguage } from '@shared/worldPromptLanguage';
 import { findingsFor } from '@shared/worldFindings';
 import { BEAT_MARK_LABEL } from '@shared/worldThreads';
 import { RULE_SCOPE_LABEL } from '@shared/worldRules';
@@ -249,7 +250,7 @@ export async function streamWorldChat(
   const model = request.model ?? settings.chatModel ?? settings.synthesisModel ?? null;
   const raw = await completeTextStream(
     {
-      system: WORLD_CHAT_SYSTEM,
+      system: withWorldPromptLanguage(WORLD_CHAT_SYSTEM, settings.uiLanguage),
       user: composeWorldChatContext(facts),
       plainContext: true,
       // Cool. Everything true in the answer is already in the material; the model's job is

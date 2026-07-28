@@ -26,6 +26,7 @@ import {
   type WorldRuleSources,
   type WorldRuleTest,
 } from '@shared/worldRuleContext';
+import { withWorldPromptLanguage } from '@shared/worldPromptLanguage';
 import { RULE_HARDNESS_HINT, RULE_HARDNESS_LABEL, RULE_SCOPE_LABEL } from '@shared/worldRules';
 import { BEAT_MARK_LABEL } from '@shared/worldThreads';
 import { WORLD_ENTRY_KIND_LABEL, entryKey } from '@shared/worldEncyclopedia';
@@ -95,7 +96,7 @@ export async function draftWorldRule(ruleId: string): Promise<WorldRuleDraftResu
   const model = settings.synthesisModel ?? settings.extractionModel ?? null;
   const completion = await completeText(
     {
-      system: WORLD_RULE_SYSTEM,
+      system: withWorldPromptLanguage(WORLD_RULE_SYSTEM, settings.uiLanguage),
       user: composeWorldRuleContext(sources),
       // Warm: this is a sentence about an invented world, not a cautious reading of
       // records. Cold, the model returns the title back as a sentence.

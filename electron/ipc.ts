@@ -373,6 +373,7 @@ import {
   upgradeWorldbuildingDemoDynasties,
   upgradeWorldbuildingDemoImageQuality,
   upgradeWorldbuildingDemoNarrativeDepth,
+  relocalizeWorldbuildingDemoData,
 } from './db/worldbuildingDemoData';
 import { generateDemoPortraits, hasDemoPortraitKey } from './ai/genealogyDemoPortraits';
 import { exportNotes } from './export/notesExport';
@@ -1146,6 +1147,7 @@ export function registerIpc(
     upgradeWorldbuildingDemoDynasties();
     upgradeWorldbuildingDemoImageQuality();
     upgradeWorldbuildingDemoNarrativeDepth();
+    relocalizeWorldbuildingDemoData();
     reconcileAuthorLayerOnce();
 
     const settings = getSettings();
@@ -1168,7 +1170,11 @@ export function registerIpc(
   // settings + secrets
   h('settings:get', async () => getSettings());
   h('settings:update', async (_e, patch: Partial<AppSettings>) => {
+    const previous = getSettings();
     const next = updateSettings(patch);
+    if (patch.uiLanguage !== undefined && next.uiLanguage !== previous.uiLanguage) {
+      relocalizeWorldbuildingDemoData(next.uiLanguage);
+    }
     if (patch.syncMode) {
       if (next.syncMode === 'realtime') startRealtimeSync();
       else stopRealtimeSync();

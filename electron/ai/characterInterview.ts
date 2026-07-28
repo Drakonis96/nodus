@@ -13,6 +13,7 @@ import { listSocialRelationsForPerson } from '../db/socialRepo';
 import { appearancesOfCharacter, listScenes } from '../db/worldStoryRepo';
 import { getSettings } from '../db/settingsRepo';
 import { CHARACTER_NAME_KIND_LABEL } from '@shared/characterLabels';
+import { withWorldPromptLanguage } from '@shared/worldPromptLanguage';
 import {
   characterInterviewSystem,
   composeInterviewPrompt,
@@ -96,7 +97,7 @@ export async function interviewCharacter(
   const model = settings.chatModel ?? settings.synthesisModel ?? settings.extractionModel ?? null;
   const reply = await completeText(
     {
-      system: characterInterviewSystem(sources),
+      system: withWorldPromptLanguage(characterInterviewSystem(sources), settings.uiLanguage),
       user: composeInterviewPrompt(history, trimmed),
       // High: this is performance, not extraction. A cold temperature makes every
       // character sound like the same polite narrator.
