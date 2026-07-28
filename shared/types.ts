@@ -7388,6 +7388,11 @@ export interface NodusApi {
   /** Restore the image that preceded the last regeneration or upload. */
   revertDecorativeImage(entityKind: DecorativeImageEntityKind, entityId: string): Promise<DecorativeImage>;
   deleteDecorativeImage(entityKind: DecorativeImageEntityKind, entityId: string): Promise<DecorativeImage>;
+  /** Save the untouched source behind an internal image URL. Thumbnail routes are rejected. */
+  downloadOriginalImage(
+    source: string,
+    label?: string | null
+  ): Promise<{ canceled: boolean; path: string | null }>;
   onDecorativeImageChanged(cb: (image: DecorativeImage) => void): () => void;
 
   // audio / text-to-speech (synthesis runs in the renderer; main persists WAVs)

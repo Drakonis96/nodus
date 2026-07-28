@@ -13,7 +13,7 @@ import {
   type MapFocusCandidate,
 } from '@shared/worldPresence';
 import { Icon } from '../components/ui';
-import { confirm } from '../components/feedback';
+import { confirm, toast } from '../components/feedback';
 import { WorldMapCanvas, useMapImageUrl } from '../components/world/WorldMapCanvas';
 import { MarkerLayer, MarkerSheet, VertexEditor } from '../components/world/mapMarkers';
 import { GeneratePanel, SuggestMarkersPanel } from '../components/world/mapGenerate';
@@ -240,6 +240,7 @@ function MapWorkbench({
 }) {
   const [ancestry, setAncestry] = useState<WorldMap[]>([]);
   const [busy, setBusy] = useState(false);
+  const [downloadBusy, setDownloadBusy] = useState(false);
   const [tool, setTool] = useState<MapTool>('none');
   const [segment, setSegment] = useState<PendingSegment | null>(null);
   const [travelModes, setTravelModes] = useState<MapTravelMode[]>([]);
@@ -464,6 +465,18 @@ function MapWorkbench({
     }
   };
 
+  const downloadOriginal = async () => {
+    if (!imageUrl || downloadBusy) return;
+    setDownloadBusy(true);
+    try {
+      await window.nodus.downloadOriginalImage(imageUrl, map.name);
+    } catch (error) {
+      toast(error instanceof Error ? error.message : String(error), { tone: 'error' });
+    } finally {
+      setDownloadBusy(false);
+    }
+  };
+
   const remove = async () => {
     const ok = await confirm({
       title: t('¿Eliminar este mapa?'),
@@ -517,6 +530,16 @@ function MapWorkbench({
           <button className="btn btn-ghost h-8 gap-1.5 border border-neutral-700 px-2 text-sm" onClick={() => void importImage()} disabled={busy} data-testid="world-map-import-image">
             <Icon name={busy ? 'sync' : 'image'} size={14} className={busy ? 'animate-spin' : ''} />
             {map.imageId ? t('Cambiar imagen') : t('Subir imagen')}
+          </button>
+          <button
+            className="btn btn-ghost grid h-8 w-8 place-items-center border border-neutral-700 p-0"
+            onClick={() => void downloadOriginal()}
+            disabled={!imageUrl || downloadBusy}
+            aria-label={t('Descargar')}
+            title={t('Descargar')}
+            data-testid="world-map-download-original"
+          >
+            <Icon name={downloadBusy ? 'sync' : 'download'} size={14} className={downloadBusy ? 'animate-spin' : ''} />
           </button>
           <button className="btn btn-ghost h-8 gap-1.5 px-2 text-sm text-red-300" onClick={() => void remove()} data-testid="world-map-delete">
             <Icon name="trash" size={14} />

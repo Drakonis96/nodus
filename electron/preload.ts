@@ -700,6 +700,7 @@ const api: NodusApi = {
     ipcRenderer.invoke('images:upload', entityKind, entityId, bytes, mimeType, style),
   revertDecorativeImage: (entityKind, entityId) => ipcRenderer.invoke('images:revert', entityKind, entityId),
   deleteDecorativeImage: (entityKind, entityId) => ipcRenderer.invoke('images:delete', entityKind, entityId),
+  downloadOriginalImage: (source, label) => ipcRenderer.invoke('images:downloadOriginal', source, label),
   onDecorativeImageChanged: (cb) => {
     const listener = (_e: unknown, image: import('@shared/types').DecorativeImage) => cb(image);
     ipcRenderer.on('images:changed', listener);

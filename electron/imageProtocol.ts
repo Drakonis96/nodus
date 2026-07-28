@@ -25,6 +25,7 @@ export function registerImageSchemePrivileges(): void {
 }
 
 type ImagePayload = { blob: Buffer; mime: string } | null;
+const ORIGINAL_IMAGE_ROUTES = new Set(['portrait', 'world', 'map', 'character-chat']);
 
 function safeImageMime(mime: string): string {
   return /^image\/[a-z0-9.+-]+$/i.test(mime) ? mime : 'application/octet-stream';
@@ -56,6 +57,24 @@ function payloadFor(host: string, id: string): ImagePayload {
     return payload ? { blob: payload.blob, mime: payload.mimeType } : null;
   }
   return null;
+}
+
+/**
+ * Resolve only full-resolution internal image URLs.
+ *
+ * Thumbnail routes and external schemes are deliberately rejected: downloads must
+ * always use the untouched source and this must never become a general file reader.
+ */
+export function originalImagePayloadFromUrl(source: string): ImagePayload {
+  try {
+    const url = new URL(source);
+    if (url.protocol !== `${NODUS_IMAGE_SCHEME}:` || !ORIGINAL_IMAGE_ROUTES.has(url.hostname)) return null;
+    const id = decodeURIComponent(url.pathname.replace(/^\/+/, ''));
+    if (!id || id.length > 512) return null;
+    return payloadFor(url.hostname, id);
+  } catch {
+    return null;
+  }
 }
 
 /**

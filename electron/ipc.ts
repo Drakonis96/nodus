@@ -4,6 +4,7 @@ import os from 'node:os';
 import crypto from 'node:crypto';
 import AdmZip from 'adm-zip';
 import { ipcMain, shell, BrowserWindow, dialog, app } from 'electron';
+import { originalImagePayloadFromUrl } from './imageProtocol';
 import {
   openPrivacyPolicy,
   showImportOpenDialog,
@@ -1006,6 +1007,30 @@ const CSV_PREVIEW_ROWS = 50;
 /** Guards against a mis-picked folder (a home directory) walking the whole disk. */
 const BULK_WALK_MAX_DEPTH = 8;
 const BULK_WALK_MAX_FILES = 50_000;
+
+function extensionForOriginalImage(mime: string): string {
+  switch (mime.toLowerCase()) {
+    case 'image/png': return 'png';
+    case 'image/webp': return 'webp';
+    case 'image/gif': return 'gif';
+    case 'image/bmp': return 'bmp';
+    case 'image/tiff': return 'tiff';
+    case 'image/svg+xml': return 'svg';
+    case 'image/avif': return 'avif';
+    default: return 'jpg';
+  }
+}
+
+function originalImageFileName(label: string | null | undefined, mime: string): string {
+  const base =
+    (label ?? '')
+      .replace(/\.[a-z0-9]{2,5}$/i, '')
+      .replace(/[^\p{L}\p{N} _-]/gu, '')
+      .trim()
+      .slice(0, 120)
+    || 'imagen';
+  return `${base}.${extensionForOriginalImage(mime)}`;
+}
 
 /** Register every IPC channel backing the window.nodus API. */
 export function registerIpc(
@@ -2842,6 +2867,21 @@ export function registerIpc(
   h('images:delete', async (_e, entityKind: DecorativeImageEntityKind, entityId: string) =>
     deleteDecorativeImage(entityKind, entityId)
   );
+  h('images:downloadOriginal', async (_e, source: string, label?: string | null) => {
+    const image = originalImagePayloadFromUrl(source);
+    if (!image) throw new Error('No se encontró la imagen original.');
+    const picked = await dialog.showSaveDialog(getWindow() ?? undefined!, {
+      title: 'Descargar imagen original',
+      defaultPath: originalImageFileName(label, image.mime),
+      filters: [{
+        name: 'Imagen original',
+        extensions: [extensionForOriginalImage(image.mime)],
+      }],
+    });
+    if (picked.canceled || !picked.filePath) return { canceled: true, path: null };
+    fs.writeFileSync(picked.filePath, image.blob);
+    return { canceled: false, path: picked.filePath };
+  });
 
   // audio / text-to-speech. Synthesis runs in the renderer (Piper via WebAssembly);
   // the main process supplies the speakable segments and persists the resulting WAVs.

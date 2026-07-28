@@ -29,12 +29,18 @@ export function ImageLightbox({
 }) {
   const available = useMemo(() => items.filter((item) => Boolean(item.src)), [items]);
   const [currentId, setCurrentId] = useState(activeId);
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
   const currentIndex = Math.max(0, available.findIndex((item) => item.id === currentId));
   const current = available[currentIndex] ?? null;
 
   useEffect(() => {
     setCurrentId(activeId);
   }, [activeId]);
+
+  useEffect(() => {
+    setDownloadError(null);
+  }, [currentId]);
 
   useEffect(() => {
     if (available.length === 0) {
@@ -58,6 +64,19 @@ export function ImageLightbox({
     if (available.length < 2) return;
     const next = (currentIndex + delta + available.length) % available.length;
     setCurrentId(available[next].id);
+  };
+
+  const downloadOriginal = async () => {
+    if (!current || downloading) return;
+    setDownloading(true);
+    setDownloadError(null);
+    try {
+      await window.nodus.downloadOriginalImage(current.src, current.label || current.alt);
+    } catch (error) {
+      setDownloadError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setDownloading(false);
+    }
   };
 
   useEffect(() => {
@@ -91,6 +110,17 @@ export function ImageLightbox({
         <span className="text-xs tabular-nums text-neutral-400">
           {currentIndex + 1} / {available.length}
         </span>
+        <button
+          type="button"
+          className="grid h-9 w-9 place-items-center rounded-full text-neutral-300 hover:bg-white/10 hover:text-white disabled:opacity-50"
+          aria-label={t('Descargar')}
+          title={t('Descargar')}
+          disabled={downloading}
+          onClick={() => void downloadOriginal()}
+          data-testid="image-lightbox-download"
+        >
+          <Icon name={downloading ? 'sync' : 'download'} size={17} className={downloading ? 'animate-spin' : ''} />
+        </button>
         <button
           autoFocus
           type="button"
@@ -135,6 +165,11 @@ export function ImageLightbox({
       </div>
 
       <footer className="shrink-0 border-t border-white/10 bg-black/80 px-4 py-3">
+        {downloadError && (
+          <p className="mx-auto mb-2 max-w-4xl text-center text-xs text-red-300" role="alert">
+            {downloadError}
+          </p>
+        )}
         {(current.label || current.meta) && (
           <div className="mx-auto mb-2 max-w-4xl text-center">
             {current.label && <p className="truncate text-sm text-neutral-100">{current.label}</p>}
