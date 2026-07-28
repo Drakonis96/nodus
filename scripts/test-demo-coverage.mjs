@@ -155,6 +155,29 @@ try {
   assert.equal(worldbuilding.upgradeWorldbuildingDemoDynasties(), true, 'the dynasty upgrade is idempotent');
   assert.equal(count('world_groups', "group_id LIKE 'demo-world-group-%' AND kind = 'house'"), 3);
   assert.equal(count('world_images', "entity_id LIKE 'demo-world-group-%' AND kind = 'emblem'"), 3);
+  // Opening an old manuscript/profile in the renderer may have autosaved it under a
+  // current timestamp without actually deepening the seed text. The content threshold,
+  // not the original timestamp, must decide whether it still needs the upgrade.
+  db.prepare(`
+    UPDATE character_profiles
+       SET voice_sample = 'Muestra antigua.', updated_at = '2026-07-28T17:00:00.000Z'
+     WHERE person_id = 'demo-world-char-nara'
+  `).run();
+  db.prepare(`
+    UPDATE world_scene_text
+       SET text = 'Pasaje antiguo.', word_count = 2, updated_at = '2026-07-28T17:00:00.000Z'
+     WHERE scene_id = 'demo-world-scene-prologue'
+  `).run();
+  assert.equal(worldbuilding.upgradeWorldbuildingDemoNarrativeDepth(), true, 'existing demos receive deeper characters and scenes');
+  assert.ok(
+    Number(db.prepare("SELECT LENGTH(voice_sample) AS n FROM character_profiles WHERE person_id = 'demo-world-char-nara'").get().n) >= 170,
+    'a shallow character autosave is deepened'
+  );
+  assert.ok(
+    Number(db.prepare("SELECT word_count AS n FROM world_scene_text WHERE scene_id = 'demo-world-scene-prologue'").get().n) >= 120,
+    'a shallow manuscript autosave is deepened'
+  );
+  assert.equal(worldbuilding.upgradeWorldbuildingDemoNarrativeDepth(), true, 'the narrative upgrade is idempotent');
 
   for (const [label, table, where] of [
     ['characters', 'persons', "person_id LIKE 'demo-world-%'"],
@@ -207,6 +230,40 @@ try {
   assert.equal(count('world_groups', "group_id LIKE 'demo-world-group-%'"), 11, 'worldbuilding demo covers organizations, cultures and dynasties');
   assert.equal(count('world_groups', "group_id LIKE 'demo-world-group-%' AND kind = 'house'"), 3, 'worldbuilding demo has several distinct dynasties');
   assert.equal(count('world_scenes', "scene_id LIKE 'demo-world-scene-%'"), 9, 'worldbuilding demo covers the story sequence');
+  const characterDepth = db.prepare(`
+    SELECT
+      MIN(LENGTH(p.notes)) AS min_notes,
+      MIN(LENGTH(cp.personality)) AS min_personality,
+      MIN(LENGTH(cp.backstory)) AS min_backstory,
+      MIN(LENGTH(cp.voice_register)) AS min_register,
+      MIN(LENGTH(cp.voice_tics)) AS min_tics,
+      MIN(LENGTH(cp.voice_sample)) AS min_sample,
+      SUM(CASE WHEN cp.voice_register IS NULL OR cp.voice_tics IS NULL OR cp.voice_sample IS NULL THEN 1 ELSE 0 END) AS missing_voice
+    FROM persons p
+    JOIN character_profiles cp ON cp.person_id = p.person_id
+    WHERE p.person_id LIKE 'demo-world-char-%'
+  `).get();
+  assert.ok(Number(characterDepth.min_notes) >= 500, 'every demo character has a substantial performance guide');
+  assert.ok(Number(characterDepth.min_personality) >= 240, 'every demo character has developed personality');
+  assert.ok(Number(characterDepth.min_backstory) >= 280, 'every demo character has developed backstory');
+  assert.ok(Number(characterDepth.min_register) >= 130, 'every demo character has a concrete speech register');
+  assert.ok(Number(characterDepth.min_tics) >= 120, 'every demo character has repeatable speech habits');
+  assert.ok(Number(characterDepth.min_sample) >= 170, 'every demo character has several voice examples');
+  assert.equal(Number(characterDepth.missing_voice), 0, 'even the unborn character has a bounded interview voice');
+  const sceneDepth = db.prepare(`
+    SELECT
+      MIN(LENGTH(s.summary)) AS min_summary,
+      MIN(LENGTH(s.notes)) AS min_notes,
+      MIN(t.word_count) AS min_words,
+      SUM(t.word_count) AS total_words
+    FROM world_scenes s
+    JOIN world_scene_text t ON t.scene_id = s.scene_id
+    WHERE s.scene_id LIKE 'demo-world-scene-%'
+  `).get();
+  assert.ok(Number(sceneDepth.min_summary) >= 350, 'every demo scene has objective, conflict, turn and consequence');
+  assert.ok(Number(sceneDepth.min_notes) >= 220, 'every demo scene has actionable author notes');
+  assert.ok(Number(sceneDepth.min_words) >= 120, 'every demo scene is fully dramatised');
+  assert.ok(Number(sceneDepth.total_words) >= 1650, 'the demo manuscript is substantial enough to exercise story flows');
   assert.equal(count('world_maps', "map_id LIKE 'demo-world-map-%'"), 4, 'worldbuilding demo covers map scopes');
   assert.equal(count('world_articles', "article_id LIKE 'demo-world-article-%'"), 14, 'worldbuilding demo has a substantial encyclopedia');
   assert.equal(count('world_threads', "thread_id LIKE 'demo-world-%'"), 7, 'worldbuilding demo covers conflicts and arcs');

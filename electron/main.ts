@@ -32,7 +32,10 @@ import { stopGitHubCopilotSubscription } from './ai/githubCopilotSubscription';
 import { installProcessSafetyNet } from './util/processSafety';
 import { restoreAppWindows } from './windowLifecycle';
 import { registerImageProtocol, registerImageSchemePrivileges } from './imageProtocol';
-import { upgradeWorldbuildingDemoDynasties } from './db/worldbuildingDemoData';
+import {
+  upgradeWorldbuildingDemoDynasties,
+  upgradeWorldbuildingDemoNarrativeDepth,
+} from './db/worldbuildingDemoData';
 
 // Before anything else: a stray rejection from any of the fire-and-forget
 // timers below would otherwise terminate the process under Node's default.
@@ -498,6 +501,7 @@ app.whenReady().then(() => {
   }
   getDb(); // open + migrate before anything touches data
   upgradeWorldbuildingDemoDynasties();
+  upgradeWorldbuildingDemoNarrativeDepth();
   registerImageProtocol();
   reconcileAuthorLayerOnce(); // one-time: collapse duplicate author nodes onto Zotero identity
   // Maintenance: drop ideas that have sat dormant (no occurrences) for >30 days.

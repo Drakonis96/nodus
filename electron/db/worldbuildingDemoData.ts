@@ -20,6 +20,10 @@ import { countWords } from '@shared/worldManuscript';
 import { recomputeWorldDays } from './worldCalendarRepo';
 import { rebuildWorldLinks } from './worldEncyclopediaRepo';
 import { runContinuityUnfiltered, muteNotice } from './worldContinuityRepo';
+import {
+  WORLD_DEMO_CHARACTER_NARRATIVE,
+  WORLD_DEMO_SCENE_NARRATIVE,
+} from './worldbuildingDemoNarrative';
 
 const PREFIX = 'demo-world-';
 const AT = '2026-07-28T12:00:00.000Z';
@@ -457,6 +461,74 @@ export function upgradeWorldbuildingDemoDynasties(): boolean {
   return true;
 }
 
+/**
+ * Deepen demo-owned character dossiers and scenes in vaults created by earlier builds.
+ *
+ * Each field is upgraded only while it is still shallower than the new demo contract.
+ * This catches renderer autosaves (which legitimately change `updated_at` even when the
+ * old sample text is untouched) while preserving author edits that are already developed.
+ */
+export function upgradeWorldbuildingDemoNarrativeDepth(): boolean {
+  if (getActiveVault().type !== 'worldbuilding') return false;
+  const db = getDb();
+  const hasDemo = db.prepare('SELECT 1 FROM persons WHERE person_id = ?').get(`${PREFIX}char-ilyra`);
+  if (!hasDemo) return false;
+  const L = locale();
+  const upgradedAt = '2026-07-28T18:30:00.000Z';
+
+  db.transaction(() => {
+    for (const [personId, depth] of Object.entries(WORLD_DEMO_CHARACTER_NARRATIVE)) {
+      db.prepare(
+        `UPDATE persons
+            SET notes = ?, updated_at = ?
+          WHERE person_id = ? AND COALESCE(LENGTH(notes), 0) < 500`
+      ).run(depth.notes[L], upgradedAt, personId);
+      db.prepare(
+        `UPDATE character_profiles
+            SET personality = CASE WHEN COALESCE(LENGTH(personality), 0) < 240 THEN ? ELSE personality END,
+                backstory = CASE WHEN COALESCE(LENGTH(backstory), 0) < 280 THEN ? ELSE backstory END,
+                voice_register = CASE WHEN COALESCE(LENGTH(voice_register), 0) < 130 THEN ? ELSE voice_register END,
+                voice_tics = CASE WHEN COALESCE(LENGTH(voice_tics), 0) < 120 THEN ? ELSE voice_tics END,
+                voice_sample = CASE WHEN COALESCE(LENGTH(voice_sample), 0) < 170 THEN ? ELSE voice_sample END,
+                updated_at = ?
+          WHERE person_id = ?
+            AND (COALESCE(LENGTH(personality), 0) < 240
+              OR COALESCE(LENGTH(backstory), 0) < 280
+              OR COALESCE(LENGTH(voice_register), 0) < 130
+              OR COALESCE(LENGTH(voice_tics), 0) < 120
+              OR COALESCE(LENGTH(voice_sample), 0) < 170)`
+      ).run(
+        resolveDemoLinks(depth.personality[L]),
+        resolveDemoLinks(depth.backstory[L]),
+        depth.voice.register[L],
+        depth.voice.tics[L],
+        depth.voice.sample[L],
+        upgradedAt,
+        personId
+      );
+    }
+
+    for (const [sceneId, depth] of Object.entries(WORLD_DEMO_SCENE_NARRATIVE)) {
+      db.prepare(
+        `UPDATE world_scenes
+            SET summary = CASE WHEN COALESCE(LENGTH(summary), 0) < 350 THEN ? ELSE summary END,
+                notes = CASE WHEN COALESCE(LENGTH(notes), 0) < 220 THEN ? ELSE notes END,
+                updated_at = ?
+          WHERE scene_id = ?
+            AND (COALESCE(LENGTH(summary), 0) < 350 OR COALESCE(LENGTH(notes), 0) < 220)`
+      ).run(resolveDemoLinks(depth.summary[L]), depth.notes[L], upgradedAt, sceneId);
+      const prose = depth.manuscript[L];
+      db.prepare(
+        `UPDATE world_scene_text
+            SET text = ?, word_count = ?, updated_at = ?
+          WHERE scene_id = ? AND word_count < 120`
+      ).run(prose, countWords(prose), upgradedAt, sceneId);
+    }
+  })();
+
+  return true;
+}
+
 export function seedWorldbuildingDemoData(): boolean {
   if (getActiveVault().type !== 'worldbuilding' || hasWorldbuildingData()) return false;
 
@@ -523,6 +595,7 @@ export function seedWorldbuildingDemoData(): boolean {
     // gallery. All profile prompts have meaningful values so every dossier panel opens
     // populated; Elan deliberately demonstrates the unborn/unknown states.
     for (const [index, character] of CHARACTERS.entries()) {
+      const depth = WORLD_DEMO_CHARACTER_NARRATIVE[character.id];
       insert('persons', {
         person_id: character.id,
         display_name: character.name,
@@ -531,7 +604,7 @@ export function seedWorldbuildingDemoData(): boolean {
         birth_date_sort: null,
         death_date: character.death,
         death_date_sort: null,
-        notes: L === 'es' ? 'Personaje del mundo de demostración Las Mareas de Ceniza.' : 'Character from The Ashen Tides demo world.',
+        notes: depth.notes[L],
         biography: character.biography[L],
         biography_at: AT,
         frame_style: index % 3 === 0 ? 'brass' : null,
@@ -548,8 +621,8 @@ export function seedWorldbuildingDemoData(): boolean {
         narrative_role: character.role,
         accent: character.accent,
         appearance: resolveDemoLinks(character.appearance[L]),
-        personality: resolveDemoLinks(character.personality[L]),
-        backstory: resolveDemoLinks(character.backstory[L]),
+        personality: resolveDemoLinks(depth.personality[L]),
+        backstory: resolveDemoLinks(depth.backstory[L]),
         visual_seed: character.visual,
         birth_year_sort: Number(character.birth.match(/\d{3}/)?.[0] ?? null) || null,
         death_year_sort: character.death ? Number(character.death.match(/\d{3}/)?.[0] ?? null) || null : null,
@@ -558,9 +631,9 @@ export function seedWorldbuildingDemoData(): boolean {
         arc_flaw: character.flaw[L],
         arc_lie: character.lie[L],
         arc_wound: character.wound[L],
-        voice_register: character.voice[0],
-        voice_tics: character.voice[1],
-        voice_sample: character.voice[2],
+        voice_register: depth.voice.register[L],
+        voice_tics: depth.voice.tics[L],
+        voice_sample: depth.voice.sample[L],
         biography_proposed: null,
         biography_proposed_at: null,
         created_at: PREVIOUS_AT,
@@ -726,11 +799,12 @@ export function seedWorldbuildingDemoData(): boolean {
       [`${PREFIX}scene-epilogue`]: [[`${PREFIX}char-sena`, 'punto de vista'], [`${PREFIX}char-elan`, 'presagio']],
     };
     for (const scene of SCENES) {
+      const depth = WORLD_DEMO_SCENE_NARRATIVE[scene.id];
       insert('world_scenes', {
-        scene_id: scene.id, title: scene.title[L], summary: resolveDemoLinks(scene.summary[L]),
+        scene_id: scene.id, title: scene.title[L], summary: resolveDemoLinks(depth.summary[L]),
         place_id: scene.place, world_year: scene.year, world_day: scene.day, status: scene.status,
         narrative_order: scene.order,
-        notes: L === 'es' ? 'Escena de demostración: reparto, día, hilos, reglas, preguntas y manuscrito están conectados.' : 'Demo scene: cast, day, threads, rules, questions and manuscript are connected.',
+        notes: depth.notes[L],
         created_at: AT, updated_at: AT,
       });
       insert('world_scene_days', {
@@ -1002,6 +1076,11 @@ export function seedWorldbuildingDemoData(): boolean {
         ? `El nuevo Archivo no tenía puerta principal. Sena había mandado abrir seis.\n\nEn la pared vacía dejó un espacio para el mapa que Ilyra aún no había regresado a dibujar. Mar adentro apareció una luz baja, móvil y paciente.`
         : `The new Archive had no main door. Sena had ordered six opened.\n\nOn the empty wall they left a place for the map Ilyra had not yet returned to draw. Far out at sea, a low light appeared, moving and patient.`],
     ]);
+    // The compact passages above remain useful as a readable synopsis beside the seed
+    // mechanics; the shipped demo uses the fully dramatised versions.
+    for (const scene of SCENES) {
+      manuscript.set(scene.id, WORLD_DEMO_SCENE_NARRATIVE[scene.id].manuscript[L]);
+    }
     for (const scene of SCENES) {
       const prose = manuscript.get(scene.id) ?? '';
       insert('world_scene_text', {

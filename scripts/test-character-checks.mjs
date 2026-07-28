@@ -225,6 +225,12 @@ test('the interview prompt keeps the character in voice and ignorant of what is 
     voiceSample: '—No me hagas repetirlo.',
     abilities: [{ name: 'Voz de mando', cost: 'Pierde la voz un día', limits: 'Solo si ya le temen' }],
     arc: { want: 'El trono', need: 'Que alguien le crea', flaw: 'No pide ayuda', lie: 'Está solo', wound: 'Lo abandonaron' },
+    scenes: [{
+      title: 'La puerta sitiada',
+      role: 'punto de vista',
+      summary: 'Kaelen desobedece la orden y deja escapar a la cocinera.',
+      notes: 'Elige a una persona por encima del rango.',
+    }],
   });
   assert.match(system, /primera persona/);
   assert.match(system, /NO te lo inventes/);
@@ -233,6 +239,10 @@ test('the interview prompt keeps the character in voice and ignorant of what is 
   assert.match(system, /No me hagas repetirlo/);
   assert.match(system, /Voz de mando/);
   assert.match(system, /El trono/);
+  assert.match(system, /Escenas que has vivido/);
+  assert.match(system, /La puerta sitiada/);
+  assert.match(system, /punto de vista/);
+  assert.match(system, /desobedece la orden/);
   // The NEED is withheld on purpose: a character who can state what they actually need
   // has finished their arc, and the interview stops being useful.
   assert.doesNotMatch(system, /Que alguien le crea/);

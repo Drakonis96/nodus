@@ -10,6 +10,7 @@ import { completeText } from './aiClient';
 import { getCharacter, listCharacterAbilities, listCharacterEvents } from '../db/charactersRepo';
 import { kinOf } from '../db/relationshipsRepo';
 import { listSocialRelationsForPerson } from '../db/socialRepo';
+import { appearancesOfCharacter, listScenes } from '../db/worldStoryRepo';
 import { getSettings } from '../db/settingsRepo';
 import { CHARACTER_NAME_KIND_LABEL } from '@shared/characterLabels';
 import {
@@ -33,6 +34,20 @@ export async function interviewCharacter(
   const events = listCharacterEvents(personId);
   const relations = listSocialRelationsForPerson(personId);
   const abilities = listCharacterAbilities(personId);
+  const scenesById = new Map(listScenes('narrative').map((scene) => [scene.sceneId, scene]));
+  const scenes = appearancesOfCharacter(personId)
+    .map((appearance) => {
+      const scene = scenesById.get(appearance.sceneId);
+      return scene
+        ? {
+            title: scene.title,
+            role: appearance.role,
+            summary: scene.summary,
+            notes: scene.notes,
+          }
+        : null;
+    })
+    .filter((scene): scene is NonNullable<typeof scene> => scene !== null);
 
   const sources: CharacterInterviewSources = {
     name: character.displayName,
@@ -54,7 +69,11 @@ export async function interviewCharacter(
     spouses: kin.spouses.map((person) => person.displayName),
     children: kin.children.map((person) => person.displayName),
     siblings: kin.siblings.map((person) => person.displayName),
-    relations: relations.map((relation) => ({ role: relation.role, target: relation.targetName })),
+    relations: relations.map((relation) => ({
+      role: relation.role,
+      target: relation.targetName,
+      notes: relation.notes,
+    })),
     events: events.map((event) => ({
       type: event.type,
       date: event.date,
@@ -68,6 +87,7 @@ export async function interviewCharacter(
     voiceSample: character.profile.voice.sample,
     abilities: abilities.map((ability) => ({ name: ability.name, cost: ability.cost, limits: ability.limits })),
     arc: character.profile.arc,
+    scenes,
   };
 
   const settings = getSettings();

@@ -24,6 +24,7 @@ export interface CharacterInterviewSources extends CharacterBiographySources {
   voiceSample: string | null;
   abilities: { name: string; cost: string | null; limits: string | null }[];
   arc: { want: string | null; need: string | null; flaw: string | null; lie: string | null; wound: string | null };
+  scenes: { title: string; role: string | null; summary: string | null; notes: string | null }[];
 }
 
 export function characterInterviewSystem(sources: CharacterInterviewSources): string {
@@ -72,6 +73,19 @@ export function characterInterviewSystem(sources: CharacterInterviewSources): st
         .filter(Boolean)
         .join('; ');
       lines.push(`- ${ability.name}${detail ? ` (${detail})` : ''}`);
+    }
+  }
+
+  if (sources.scenes.length) {
+    lines.push(
+      '',
+      'Escenas que has vivido en el relato (puedes recordarlas, pero no sabes lo que ocurre en escenas donde no apareces):'
+    );
+    for (const scene of sources.scenes.slice(0, 20)) {
+      const role = scene.role ? `; tu función en la escena: ${scene.role}` : '';
+      const summary = scene.summary?.replace(/\s+/g, ' ').trim().slice(0, 600);
+      const notes = scene.notes?.replace(/\s+/g, ' ').trim().slice(0, 400);
+      lines.push(`- ${scene.title}${role}.${summary ? ` ${summary}` : ''}${notes ? ` Claves del autor: ${notes}` : ''}`);
     }
   }
 

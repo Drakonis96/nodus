@@ -32,7 +32,7 @@ export interface CharacterBiographySources {
   spouses: string[];
   children: string[];
   siblings: string[];
-  relations: { role: string; target: string }[];
+  relations: { role: string; target: string; notes?: string | null }[];
   events: { type: EventTypeValue; date: string | null; place: string | null; worldYear: number | null; notes: string | null }[];
   notes: string | null;
 }
@@ -110,7 +110,8 @@ export function composeCharacterBiographyContext(
   if (sources.relations.length) {
     lines.push('Vínculos:');
     for (const relation of sources.relations.slice(0, 20)) {
-      lines.push(`- ${relation.role}: ${relation.target}`);
+      const detail = relation.notes?.replace(/\s+/g, ' ').trim().slice(0, 180);
+      lines.push(`- ${relation.role}: ${relation.target}${detail ? `. ${detail}` : ''}`);
     }
   }
 
