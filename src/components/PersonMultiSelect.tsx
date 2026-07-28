@@ -21,6 +21,7 @@ export function SearchableMultiSelect({
   placeholder,
   searchPlaceholder = t('Buscar familiar…'),
   maxSelected,
+  placement = 'auto',
   testId,
 }: {
   options: SearchableMultiSelectOption[];
@@ -29,6 +30,7 @@ export function SearchableMultiSelect({
   placeholder: string;
   searchPlaceholder?: string;
   maxSelected?: number;
+  placement?: 'auto' | 'above' | 'below';
   testId?: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -49,17 +51,21 @@ export function SearchableMultiSelect({
     const rect = rootRef.current.getBoundingClientRect();
     const width = Math.max(240, rect.width);
     const estimatedHeight = 310;
-    const openAbove = window.innerHeight - rect.bottom < estimatedHeight && rect.top > window.innerHeight - rect.bottom;
-    const top = openAbove ? Math.max(8, rect.top - estimatedHeight - 4) : rect.bottom + 4;
-    const availableHeight = openAbove ? rect.top - top - 4 : window.innerHeight - top - 8;
+    const roomBelow = window.innerHeight - rect.bottom;
+    const openAbove = placement === 'above'
+      || (placement === 'auto' && roomBelow < estimatedHeight && rect.top > roomBelow);
+    const openBelow = placement === 'below' || !openAbove;
+    const availableHeight = openAbove ? rect.top - 12 : window.innerHeight - rect.bottom - 12;
     return {
       position: 'fixed',
       left: Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)),
-      top,
+      ...(openBelow
+        ? { top: rect.bottom + 4 }
+        : { bottom: window.innerHeight - rect.top + 4 }),
       width,
       maxHeight: Math.max(96, availableHeight),
     };
-  }, []);
+  }, [placement]);
 
   const updatePopoverPosition = useCallback(() => {
     const nextStyle = calculatePopoverStyle();
@@ -114,14 +120,20 @@ export function SearchableMultiSelect({
         aria-expanded={open}
         onClick={togglePopover}
       >
-        <span className={`min-w-0 flex-1 truncate ${selected.length === 0 ? 'text-neutral-500' : 'text-neutral-200'}`}>
+        <span className={`min-w-0 flex-1 truncate ${selected.length === 0 ? 'text-neutral-500' : 'text-neutral-800 dark:text-neutral-200'}`}>
           {selected.length === 0 ? placeholder : selected.map((option) => option.label).join(', ')}
         </span>
-        {selected.length > 1 && <span className="shrink-0 rounded-full bg-indigo-600/20 px-1.5 text-[10px] text-indigo-300">{selected.length}</span>}
+        {selected.length > 1 && <span className="shrink-0 rounded-full bg-indigo-100 px-1.5 text-[10px] text-indigo-700 dark:bg-neutral-800 dark:text-indigo-300">{selected.length}</span>}
         <Icon name="chevronDown" size={13} className="shrink-0 text-neutral-500" />
       </button>
       {open && createPortal(
-        <div ref={popoverRef} style={popoverStyle} className="person-multi-select-popover fixed z-[120] flex flex-col rounded-md border border-neutral-800 bg-neutral-950 p-2 shadow-2xl">
+        <div
+          ref={popoverRef}
+          style={popoverStyle}
+          className="person-multi-select-popover fixed z-[120] flex flex-col rounded-md border border-neutral-200 bg-white p-2 shadow-2xl dark:border-neutral-800 dark:bg-neutral-950"
+          data-testid={testId ? `${testId}-popover` : undefined}
+          data-placement={placement}
+        >
           <div className="relative mb-1.5">
             <Icon name="search" size={13} className="pointer-events-none absolute left-2 top-2 text-neutral-500" />
             <input
@@ -145,16 +157,16 @@ export function SearchableMultiSelect({
                   key={option.id}
                   role="option"
                   aria-selected={checked}
-                  className={`flex items-center gap-2 rounded px-2 py-1.5 text-xs ${disabled ? 'cursor-not-allowed opacity-40' : 'cursor-pointer hover:bg-neutral-900'}`}
+                  className={`flex items-center gap-2 rounded px-2 py-1.5 text-xs ${disabled ? 'cursor-not-allowed opacity-40' : 'cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-900'}`}
                 >
                   <input type="checkbox" checked={checked} disabled={disabled} onChange={() => toggle(option.id)} />
-                  <span className="min-w-0 flex-1 truncate text-neutral-200">{option.label}</span>
+                  <span className="min-w-0 flex-1 truncate text-neutral-800 dark:text-neutral-200">{option.label}</span>
                   {option.description && <span className="shrink-0 text-[10px] text-neutral-600">{option.description}</span>}
                 </label>
               );
             })}
           </div>
-          <div className="mt-1.5 flex items-center justify-between gap-2 border-t border-neutral-800 pt-1.5">
+          <div className="mt-1.5 flex items-center justify-between gap-2 border-t border-neutral-200 pt-1.5 dark:border-neutral-800">
             <span className="text-[10px] text-neutral-600">
               {maxSelected != null ? t('{count} de {max} seleccionados').replace('{count}', String(selectedIds.length)).replace('{max}', String(maxSelected)) : t('{count} seleccionados').replace('{count}', String(selectedIds.length))}
             </span>
@@ -173,6 +185,7 @@ export function PersonMultiSelect(props: {
   onChange: (ids: string[]) => void;
   placeholder: string;
   maxSelected?: number;
+  placement?: 'auto' | 'above' | 'below';
   testId?: string;
 }) {
   const options = useMemo<SearchableMultiSelectOption[]>(() => props.persons.map((person) => ({

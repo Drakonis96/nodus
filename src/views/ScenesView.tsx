@@ -5,6 +5,7 @@ import type { View } from '../navigation';
 import type { WorldSectionDef } from '../components/world/WorldWorkspace';
 import { WorldWorkspace } from '../components/world/WorldWorkspace';
 import { AutoSavingField } from '../components/AutoSavingField';
+import { SearchableMultiSelect } from '../components/PersonMultiSelect';
 import { Icon } from '../components/ui';
 import { confirm } from '../components/feedback';
 import { PERSON_DOSSIER_SECTION_CLASS } from '../components/personDossierLayout';
@@ -108,12 +109,22 @@ function SceneSheet({
   const [cast, setCast] = useState<SceneAppearance[]>([]);
   const [places, setPlaces] = useState<WorldPlace[]>([]);
   const [people, setPeople] = useState<{ personId: string; displayName: string }[]>([]);
-  const [adding, setAdding] = useState('');
+  const [addingIds, setAddingIds] = useState<string[]>([]);
+  const [addingCharacters, setAddingCharacters] = useState(false);
 
   const load = useCallback(async () => {
-    setCast(await window.nodus.listSceneCharacters(scene.sceneId));
-    setPlaces(await window.nodus.listWorldPlaces());
-    setPeople((await window.nodus.listCharacters()).map((c) => ({ personId: c.personId, displayName: c.displayName })));
+    const [nextCast, nextPlaces, nextPeople] = await Promise.all([
+      window.nodus.listSceneCharacters(scene.sceneId),
+      window.nodus.listWorldPlaces(),
+      window.nodus.listCharacters(),
+    ]);
+    setCast(nextCast);
+    setPlaces(nextPlaces);
+    setPeople(nextPeople.map((character) => ({ personId: character.personId, displayName: character.displayName })));
+    setAddingIds((current) => current.filter(
+      (personId) => nextPeople.some((character) => character.personId === personId)
+        && !nextCast.some((entry) => entry.personId === personId),
+    ));
   }, [scene.sceneId]);
 
   useEffect(() => {
@@ -123,6 +134,19 @@ function SceneSheet({
   const save = async (patch: Parameters<typeof window.nodus.updateScene>[1]) => {
     await window.nodus.updateScene(scene.sceneId, patch);
     await onChanged();
+  };
+
+  const addSelectedCharacters = async () => {
+    if (addingIds.length === 0 || addingCharacters) return;
+    setAddingCharacters(true);
+    try {
+      for (const personId of addingIds) {
+        await window.nodus.addSceneCharacter(scene.sceneId, personId);
+      }
+      await load();
+    } finally {
+      setAddingCharacters(false);
+    }
   };
 
   const remove = async () => {
@@ -263,30 +287,25 @@ function SceneSheet({
         {people.length === 0 ? (
           <p className="text-sm text-neutral-500">{t('Crea antes algún personaje.')}</p>
         ) : (
-          <div className="mb-2 flex gap-2">
-            <select
-              className="input h-8 min-w-40 flex-1 text-xs"
-              value={adding}
-              aria-label={t('Añadir personaje a la escena')}
-              onChange={(event) => setAdding(event.target.value)}
-            >
-              <option value="">{t('Elegir…')}</option>
-              {people
-                .filter((person) => !cast.some((entry) => entry.personId === person.personId))
-                .map((person) => (
-                  <option key={person.personId} value={person.personId}>
-                    {person.displayName}
-                  </option>
-                ))}
-            </select>
+          <div className="mb-2 flex items-start gap-2">
+            <div className="min-w-40 flex-1 text-xs" aria-label={t('Añadir personaje a la escena')}>
+              <SearchableMultiSelect
+                options={people
+                  .filter((person) => !cast.some((entry) => entry.personId === person.personId))
+                  .map((person) => ({ id: person.personId, label: person.displayName }))}
+                selectedIds={addingIds}
+                onChange={setAddingIds}
+                placeholder={t('Elegir…')}
+                searchPlaceholder={t('Buscar personaje…')}
+                placement="above"
+                testId="scene-cast-picker"
+              />
+            </div>
             <button
               className="btn btn-primary h-8 text-xs"
-              disabled={!adding}
-              onClick={async () => {
-                await window.nodus.addSceneCharacter(scene.sceneId, adding);
-                setAdding('');
-                await load();
-              }}
+              disabled={addingIds.length === 0 || addingCharacters}
+              aria-busy={addingCharacters}
+              onClick={() => void addSelectedCharacters()}
             >
               {t('Añadir')}
             </button>

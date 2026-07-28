@@ -2788,7 +2788,9 @@ try {
   await page.getByPlaceholder('Título de la escena').fill('La caída de Vael');
   await page.getByRole('button', { name: 'Crear escena', exact: true }).click();
   await page.getByTestId('scene-sheet-cast').waitFor({ timeout: 30_000 });
-  await page.getByTestId('scene-sheet-cast').locator('select').selectOption({ label: 'Kaelen Vor' });
+  await page.getByTestId('scene-cast-picker').click();
+  await page.getByTestId('scene-cast-picker-search').fill('Kaelen Vor');
+  await page.getByTestId('scene-cast-picker-popover').getByText('Kaelen Vor', { exact: true }).click();
   await page.getByTestId('scene-sheet-cast').getByRole('button', { name: 'Añadir', exact: true }).click();
   await waitForCondition('el personaje queda en el reparto', () => page.evaluate(async () => {
     const [scene] = await window.nodus.listScenes();
