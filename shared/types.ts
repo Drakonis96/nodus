@@ -7990,6 +7990,8 @@ export interface NodusApi {
   /** Seed a teaching vault with a class, a rubric, an exam and a published gradebook.
    *  Returns false outside a `docencia` vault, or when the demo is already loaded. */
   seedTeachingDemoData(): Promise<boolean>;
+  /** Seed an empty worldbuilding vault with the complete local-only Ashen Tides world. */
+  seedWorldbuildingDemoData(): Promise<boolean>;
   /** Generate daguerreotype portraits for the demo people (cheap Gemini model). */
   generateDemoPortraits(): Promise<{ generated: number; skipped: number }>;
   /** Progress of demo portrait generation. Returns an unsubscribe function. */

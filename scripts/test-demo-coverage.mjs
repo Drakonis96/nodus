@@ -26,8 +26,23 @@ try {
   const databases = require(path.join(repoRoot, 'electron/db/databasesDemoData.ts'));
   const study = require(path.join(repoRoot, 'electron/db/studyDemoData.ts'));
   const teaching = require(path.join(repoRoot, 'electron/db/teachingDemoData.ts'));
+  const worldbuilding = require(path.join(repoRoot, 'electron/db/worldbuildingDemoData.ts'));
   const vaults = require(path.join(repoRoot, 'electron/vaults/vaultRegistry.ts'));
   const studyChat = require(path.join(repoRoot, 'electron/ai/studyAssistant.ts'));
+  const characters = require(path.join(repoRoot, 'electron/db/charactersRepo.ts'));
+  const places = require(path.join(repoRoot, 'electron/db/worldPlacesRepo.ts'));
+  const groups = require(path.join(repoRoot, 'electron/db/worldGroupsRepo.ts'));
+  const story = require(path.join(repoRoot, 'electron/db/worldStoryRepo.ts'));
+  const maps = require(path.join(repoRoot, 'electron/db/worldMapsRepo.ts'));
+  const mapMarkers = require(path.join(repoRoot, 'electron/db/mapMarkersRepo.ts'));
+  const calendar = require(path.join(repoRoot, 'electron/db/worldCalendarRepo.ts'));
+  const encyclopedia = require(path.join(repoRoot, 'electron/db/worldEncyclopediaRepo.ts'));
+  const threads = require(path.join(repoRoot, 'electron/db/worldThreadsRepo.ts'));
+  const rules = require(path.join(repoRoot, 'electron/db/worldRulesRepo.ts'));
+  const questions = require(path.join(repoRoot, 'electron/db/worldQuestionsRepo.ts'));
+  const manuscript = require(path.join(repoRoot, 'electron/db/worldManuscriptRepo.ts'));
+  const presence = require(path.join(repoRoot, 'electron/db/worldPresenceRepo.ts'));
+  const continuity = require(path.join(repoRoot, 'electron/db/worldContinuityRepo.ts'));
   const { getDb, closeDb } = require(path.join(repoRoot, 'electron/db/database.ts'));
   const db = getDb();
   const count = (table, where = '1=1') => Number(db.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE ${where}`).get().n);
@@ -97,6 +112,132 @@ try {
   teaching.clearTeachingDemoData();
   assert.equal(count('study_courses', "id LIKE 'demo-teaching-%'"), 0);
   assert.equal(count('teaching_groups', "id LIKE 'demo-teaching-%'"), 0);
+
+  vaults.setVaultType(vaults.getActiveVault().id, 'worldbuilding');
+  assert.equal(worldbuilding.seedWorldbuildingDemoData(), true);
+  for (const [label, table, where] of [
+    ['characters', 'persons', "person_id LIKE 'demo-world-%'"],
+    ['character profiles', 'character_profiles', "person_id LIKE 'demo-world-%'"],
+    ['primary portraits', 'person_portraits', "person_id LIKE 'demo-world-%'"],
+    ['gallery images', 'world_images', "image_id LIKE 'demo-world-%'"],
+    ['places', 'places', "place_id LIKE 'demo-world-%'"],
+    ['place profiles', 'place_profiles', "place_id LIKE 'demo-world-%'"],
+    ['factions and cultures', 'world_groups', "group_id LIKE 'demo-world-%'"],
+    ['affiliations', 'character_affiliations', "affiliation_id LIKE 'demo-world-%'"],
+    ['relationships and dynasty', 'relationships', "rel_id LIKE 'demo-world-%'"],
+    ['social contacts', 'social_contacts', "contact_id LIKE 'demo-world-%'"],
+    ['social relations', 'social_relations', "relation_id LIKE 'demo-world-%'"],
+    ['timeline', 'events', "event_id LIKE 'demo-world-%'"],
+    ['event participants', 'event_participants', "event_id LIKE 'demo-world-%'"],
+    ['event evidence', 'record_evidence', "id LIKE 'demo-world-%'"],
+    ['presence map', 'person_places', "id LIKE 'demo-world-%'"],
+    ['calendar eras', 'world_calendar_eras', "era_id LIKE 'demo-world-%'"],
+    ['calendar months', 'world_calendar_months', "month_id LIKE 'demo-world-%'"],
+    ['secrets', 'world_secrets', "secret_id LIKE 'demo-world-%'"],
+    ['secret knowledge', 'secret_knowers', "id LIKE 'demo-world-%'"],
+    ['scenes', 'world_scenes', "scene_id LIKE 'demo-world-%'"],
+    ['scene cast', 'scene_characters', "id LIKE 'demo-world-%'"],
+    ['scene chronology', 'world_scene_days', "scene_id LIKE 'demo-world-%'"],
+    ['maps', 'world_maps', "map_id LIKE 'demo-world-%'"],
+    ['map canvases', 'map_images', "image_id LIKE 'demo-world-%'"],
+    ['map layers', 'map_layers', "layer_id LIKE 'demo-world-%'"],
+    ['map markers', 'map_markers', "marker_id LIKE 'demo-world-%'"],
+    ['travel modes', 'map_travel_modes', "mode_id LIKE 'demo-world-%'"],
+    ['encyclopedia articles', 'world_articles', "article_id LIKE 'demo-world-%'"],
+    ['encyclopedia links', 'world_links', "source_id LIKE 'demo-world-%'"],
+    ['entry proposals', 'world_entry_proposals', "proposal_id LIKE 'demo-world-%'"],
+    ['conflicts and arcs', 'world_threads', "thread_id LIKE 'demo-world-%'"],
+    ['thread parties', 'thread_parties', "party_id LIKE 'demo-world-%'"],
+    ['beats', 'world_beats', "thread_id LIKE 'demo-world-%'"],
+    ['rules', 'world_rules', "rule_id LIKE 'demo-world-%'"],
+    ['questions', 'world_questions', "question_id LIKE 'demo-world-%'"],
+    ['question options', 'world_question_options', "option_id LIKE 'demo-world-%'"],
+    ['continuity mute workflow', 'world_notice_mutes', "reason LIKE 'demo-world-%'"],
+    ['manuscript prose', 'world_scene_text', "scene_id LIKE 'demo-world-%'"],
+    ['chapters', 'world_chapter_breaks', "scene_id LIKE 'demo-world-%'"],
+    ['books', 'world_manuscript_starts', "scene_id LIKE 'demo-world-%'"],
+    ['manuscript snapshots', 'world_scene_snapshots', "snapshot_id LIKE 'demo-world-%'"],
+    ['writing diary', 'world_word_days', "day IN ('2000-01-01','2000-01-02','2000-01-03')"],
+    ['notes', 'notes', "id LIKE 'demo-world-%'"],
+    ['note folders', 'note_folders', "id LIKE 'demo-world-%'"],
+  ]) assert.ok(count(table, where) > 0, `worldbuilding ${label} is populated`);
+  assert.equal(count('persons', "person_id LIKE 'demo-world-char-%'"), 10, 'worldbuilding demo has a substantial cast');
+  assert.equal(count('places', "place_id LIKE 'demo-world-place-%'"), 12, 'worldbuilding demo has a substantial geography');
+  assert.equal(count('world_groups', "group_id LIKE 'demo-world-group-%'"), 9, 'worldbuilding demo covers organizations and cultures');
+  assert.equal(count('world_scenes', "scene_id LIKE 'demo-world-scene-%'"), 9, 'worldbuilding demo covers the story sequence');
+  assert.equal(count('world_maps', "map_id LIKE 'demo-world-map-%'"), 4, 'worldbuilding demo covers map scopes');
+  assert.equal(count('world_articles', "article_id LIKE 'demo-world-article-%'"), 14, 'worldbuilding demo has a substantial encyclopedia');
+  assert.equal(count('world_threads', "thread_id LIKE 'demo-world-%'"), 7, 'worldbuilding demo covers conflicts and arcs');
+  assert.equal(count('world_rules', "rule_id LIKE 'demo-world-rule-%'"), 7, 'worldbuilding demo covers rule states and scopes');
+
+  // A populated table is not enough: every non-AI reader behind the eighteen
+  // Worldbuilding sections must be able to interpret the same connected corpus.
+  assert.equal(characters.listCharacters().length, 10);
+  assert.equal(characters.characterCounts().total, 10);
+  assert.equal(characters.listWorldEvents().length, 8);
+  assert.equal(places.listWorldPlaces().length, 12);
+  assert.ok(places.inhabitantsOfPlace('demo-world-place-faro').length > 0);
+  assert.equal(groups.listWorldGroups().length, 9);
+  assert.deepEqual(new Set(groups.listWorldGroups().map((group) => group.kind)), new Set(['faction', 'order', 'house', 'religion', 'culture', 'species', 'language']));
+  assert.ok(groups.listAffiliationsForCharacter('demo-world-char-ilyra').length > 0);
+  assert.equal(story.listScenes('narrative').length, 9);
+  assert.equal(story.listScenes('chronological').length, 9);
+  assert.equal(story.listSecrets().length, 3);
+  assert.ok(story.listKnowers('demo-world-secret-name').length > 0);
+  assert.equal(story.listSceneDayLinks().length, 9);
+  assert.equal(maps.listWorldMaps().length, 4);
+  assert.equal(maps.childMaps('demo-world-map-world').length, 2);
+  assert.ok(maps.getMapThumbnail('demo-world-map-orthea')?.blob.length > 0);
+  assert.ok(maps.worldMapCoverage().some((item) => item.markerPlaceIds.length > 0));
+  assert.ok(mapMarkers.listMapLayers('demo-world-map-orthea').length >= 4);
+  assert.ok(mapMarkers.listMapMarkers('demo-world-map-orthea').length >= 4);
+  assert.equal(mapMarkers.listTravelModes().length, 4);
+  assert.equal(calendar.getWorldCalendar().eras.length, 2);
+  assert.equal(calendar.getWorldCalendar().months.length, 6);
+  assert.equal(encyclopedia.listWorldArticles().length, 14);
+  assert.ok(encyclopedia.listWorldEntries().length >= 50);
+  assert.ok(encyclopedia.worldBacklinks({ kind: 'character', id: 'demo-world-char-ilyra' }).length > 0);
+  assert.ok(encyclopedia.worldUnresolvedLinks().some((link) => link.label.includes('Ciudad Sepultada') || link.label.includes('Buried City')));
+  assert.ok(encyclopedia.searchWorldBodies('Corazón').length > 0 || encyclopedia.searchWorldBodies('Heart').length > 0);
+  assert.equal(threads.listWorldThreads('conflict').length, 4);
+  assert.equal(threads.listWorldThreads('arc').length, 3);
+  assert.equal(threads.threadBoardData().cast.length, 10);
+  assert.ok(threads.listWorldBeats().length >= 20);
+  assert.equal(rules.listWorldRules().length, 7);
+  assert.ok(rules.rulesInPlay('demo-world-scene-archive').length > 0);
+  assert.equal(questions.listWorldQuestions().length, 4);
+  assert.ok(questions.questionFeed(true).length >= 4);
+  assert.ok(questions.sceneQuestionLoad('demo-world-scene-arrival').count > 0);
+  const spine = manuscript.manuscriptSpine();
+  assert.equal(spine.books.length, 2);
+  assert.equal(spine.totals.scenes, 9);
+  assert.ok(spine.totals.words > 0);
+  assert.equal(manuscript.listSceneSnapshots('demo-world-scene-archive').length, 1);
+  assert.equal(manuscript.listWordDays().length, 3);
+  assert.ok(presence.listPresences().length > 20);
+  assert.ok(continuity.continuitySummary().facts > 0);
+  assert.ok(continuity.runContinuityUnfiltered().length > continuity.runContinuity().length, 'the demo includes a real muted continuity exception');
+  assert.equal(worldbuilding.seedWorldbuildingDemoData(), false, 'worldbuilding demo cannot be seeded twice');
+  academic.clearDemoData();
+  assert.equal(count('persons', "person_id LIKE 'demo-world-%'"), 0);
+  assert.equal(count('world_maps', "map_id LIKE 'demo-world-%'"), 0);
+  assert.equal(count('world_articles', "article_id LIKE 'demo-world-%'"), 0);
+  assert.equal(count('world_calendar'), 0);
+
+  // An author may begin with geography or with the calendar. Neither path is "empty",
+  // and the offer must never invite a demo that the seeder would then refuse.
+  db.prepare(
+    "INSERT INTO places (place_id,name,created_at,updated_at) VALUES ('real-place-only','Real place','2026-01-01','2026-01-01')"
+  ).run();
+  assert.equal(academic.hasAnyData(), true);
+  assert.equal(worldbuilding.seedWorldbuildingDemoData(), false);
+  db.prepare("DELETE FROM places WHERE place_id = 'real-place-only'").run();
+  db.prepare(
+    "INSERT INTO world_calendar (id,name,created_at,updated_at) VALUES (1,'Real calendar','2026-01-01','2026-01-01')"
+  ).run();
+  assert.equal(academic.hasAnyData(), true);
+  assert.equal(worldbuilding.seedWorldbuildingDemoData(), false);
+  db.prepare('DELETE FROM world_calendar WHERE id = 1').run();
   assert.deepEqual(db.pragma('foreign_key_check'), []);
   closeDb();
   console.log('Cross-vault demo coverage tests passed!');

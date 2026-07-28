@@ -367,6 +367,7 @@ import { seedGenealogyDemoData } from './db/genealogyDemoData';
 import { seedDatabasesDemoData } from './db/databasesDemoData';
 import { seedStudyDemoData } from './db/studyDemoData';
 import { seedTeachingDemoData } from './db/teachingDemoData';
+import { seedWorldbuildingDemoData } from './db/worldbuildingDemoData';
 import { generateDemoPortraits, hasDemoPortraitKey } from './ai/genealogyDemoPortraits';
 import { exportNotes } from './export/notesExport';
 import { reorderNotesByAI } from './ai/notesOrder';
@@ -4405,6 +4406,9 @@ export function registerIpc(
   // Teaching demo, likewise local-only. Unlike genealogy and databases it never
   // converts the active vault: it is refused outside a `docencia` vault instead.
   h('data:seedTeachingDemo', async () => seedTeachingDemoData());
+  // Worldbuilding demo is a complete, local-only fictional world. It is refused
+  // outside an empty worldbuilding vault and never invokes an AI provider.
+  h('data:seedWorldbuildingDemo', async () => seedWorldbuildingDemoData());
 
   h('updates:check', async () => checkForUpdates());
   h('updates:install', async () => installUpdate());

@@ -667,6 +667,21 @@ export function App() {
     }
   }, [reloadSettings, refreshHasData]);
 
+  const loadWorldbuildingDemo = useCallback(async () => {
+    setDemoBusy(true);
+    try {
+      const seeded = await window.nodus.seedWorldbuildingDemoData();
+      if (seeded) {
+        await reloadSettings();
+        await refreshHasData();
+        notifyDataChanged();
+        setView('home');
+      }
+    } finally {
+      setDemoBusy(false);
+    }
+  }, [reloadSettings, refreshHasData]);
+
   // Cancel the onboarding wizard. If it is running for a freshly-created (non-main)
   // vault, discard that vault and fall back to another one; for the first-run main
   // vault there is nothing to discard, so just skip the wizard.
@@ -1423,7 +1438,14 @@ export function App() {
               onLoadDemo={loadTeachingDemo}
             />
           )}
-          {view === 'home' && isWorldbuilding && <WorldbuildingHome onNavigate={setView} />}
+          {view === 'home' && isWorldbuilding && (
+            <WorldbuildingHome
+              onNavigate={setView}
+              showDemoOffer={hasData === false && !settings.demoMode}
+              demoBusy={demoBusy}
+              onLoadDemo={loadWorldbuildingDemo}
+            />
+          )}
           {view === 'home' && !isGenealogy && !isDatabases && !isEstudio && !isDocencia && !isWorldbuilding && !isPreviewVault && (
             <HomeView
               vaultId={activeVault?.id ?? null}

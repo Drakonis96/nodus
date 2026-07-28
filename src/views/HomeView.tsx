@@ -820,7 +820,7 @@ export function HomeIntroCard({
 
 /**
  * The "load sample data" card for a vault's Home. Each vault only offers ITS OWN demo
- * (academic / genealogy / databases / study) — a genealogy home never offers the academic demo,
+ * (academic / genealogy / databases / study / teaching / worldbuilding) — a genealogy home never offers the academic demo,
  * etc. `variant` picks which one; the matching onLoad… handler seeds it.
  */
 export function DemoOfferCard({
@@ -831,14 +831,16 @@ export function DemoOfferCard({
   onLoadDatabasesDemo,
   onLoadStudyDemo,
   onLoadTeachingDemo,
+  onLoadWorldbuildingDemo,
 }: {
-  variant?: 'academic' | 'genealogy' | 'databases' | 'study' | 'teaching';
+  variant?: 'academic' | 'genealogy' | 'databases' | 'study' | 'teaching' | 'worldbuilding';
   demoBusy: boolean;
   onLoadDemo?: () => Promise<void>;
   onLoadGenealogyDemo?: () => Promise<void>;
   onLoadDatabasesDemo?: () => Promise<void>;
   onLoadStudyDemo?: () => void | Promise<void>;
   onLoadTeachingDemo?: () => void | Promise<void>;
+  onLoadWorldbuildingDemo?: () => void | Promise<void>;
 }) {
   const card =
     variant === 'genealogy'
@@ -873,6 +875,14 @@ export function DemoOfferCard({
                 label: t('Cargar demo de docencia'),
                 onClick: onLoadTeachingDemo ?? (async () => {}),
               }
+            : variant === 'worldbuilding'
+              ? {
+                  title: t('Explora un mundo narrativo completo'),
+                  desc: t('Carga Las Mareas de Ceniza: personajes, lugares, facciones, culturas, calendario, mapas, relaciones, dinastías, escenas, enciclopedia, reglas, conflictos, arcos, continuidad, preguntas, notas y manuscrito, todo enlazado y sin necesitar IA.'),
+                  icon: 'globe',
+                  label: t('Cargar demo de worldbuilding'),
+                  onClick: onLoadWorldbuildingDemo ?? (async () => {}),
+                }
         : {
             title: t('Explora una investigación de ejemplo'),
             desc: t('Seis obras sobre la ciencia del aprendizaje con grafo, notas, mapa de investigación, inmersión, borradores, informe profundo y proyecto guardado; sin conectar Zotero ni configurar IA.'),

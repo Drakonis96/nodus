@@ -4,6 +4,7 @@ import { clearGenealogyDemoData } from './genealogyDemoData';
 import { clearDatabasesDemoData } from './databasesDemoData';
 import { clearStudyDemoData } from './studyDemoData';
 import { clearTeachingDemoData } from './teachingDemoData';
+import { clearWorldbuildingDemoData } from './worldbuildingDemoData';
 
 // A self-consistent corpus on the science of learning. It exists so a
 // first-time user can see every static view (graph, ideas, debates, gaps, notes,
@@ -702,6 +703,18 @@ export function hasAnyData(): boolean {
     count('persons') > 0 ||
     count('archive_items') > 0 ||
     count('events') > 0 ||
+    // Worldbuilding content. These top-level tables cover worlds that start from
+    // geography, lore, structure or a calendar instead of from a character/note.
+    count('places') > 0 ||
+    count('world_groups') > 0 ||
+    count('world_secrets') > 0 ||
+    count('world_scenes') > 0 ||
+    count('world_maps') > 0 ||
+    count('world_articles') > 0 ||
+    count('world_threads') > 0 ||
+    count('world_rules') > 0 ||
+    count('world_questions') > 0 ||
+    count('world_calendar') > 0 ||
     // Databases-mode content.
     count('db_databases') > 0 ||
     // Study-vault content is first-class data too; without these checks an
@@ -872,6 +885,7 @@ export function clearDemoData(): void {
   clearDatabasesDemoData();
   clearStudyDemoData();
   clearTeachingDemoData();
+  clearWorldbuildingDemoData();
   const db = getDb();
   const tx = db.transaction(() => {
     db.exec(`

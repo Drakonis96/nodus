@@ -5,19 +5,28 @@ import type { View } from '../navigation';
 import { Icon } from '../components/ui';
 import { CharacterPortrait } from '../components/CharacterPortrait';
 import { useDataRefresh } from '../hooks';
-import { HomeIntroCard } from './HomeView';
+import { DemoOfferCard, HomeIntroCard } from './HomeView';
 import { t, tx } from '../i18n';
 
 /**
  * Landing page for the worldbuilding vault: the size of the world, a way into it, and the
- * last people the author touched. It says plainly which sections are still being built
- * instead of showing them as buttons that do nothing.
+ * last people the author touched.
  *
  * The cast leads because that is what a writer opens the app to work on. The encyclopedia
  * sits beside it as the count of everything else, since it is the one place where a world
  * can be seen whole.
  */
-export function WorldbuildingHome({ onNavigate }: { onNavigate: (view: View) => void }) {
+export function WorldbuildingHome({
+  onNavigate,
+  showDemoOffer,
+  demoBusy,
+  onLoadDemo,
+}: {
+  onNavigate: (view: View) => void;
+  showDemoOffer: boolean;
+  demoBusy: boolean;
+  onLoadDemo: () => Promise<void>;
+}) {
   const [counts, setCounts] = useState<CharacterCounts | null>(null);
   const [recent, setRecent] = useState<Character[]>([]);
   const [entries, setEntries] = useState<{ total: number; stubs: number } | null>(null);
@@ -51,6 +60,14 @@ export function WorldbuildingHome({ onNavigate }: { onNavigate: (view: View) => 
           description={t('Construye un mundo de ficción pieza a pieza: personajes, lugares, facciones, culturas, escenas y mapas. La enciclopedia los reúne todos en un solo índice y te deja escribir el resto del mundo —la magia, una religión, una lengua— enlazándolo con [[dobles corchetes]].')}
           icon="globe"
         />
+
+        {showDemoOffer && (
+          <DemoOfferCard
+            variant="worldbuilding"
+            demoBusy={demoBusy}
+            onLoadWorldbuildingDemo={onLoadDemo}
+          />
+        )}
 
         <section className="grid gap-3 sm:grid-cols-4">
           {[
@@ -121,18 +138,6 @@ export function WorldbuildingHome({ onNavigate }: { onNavigate: (view: View) => 
               ))}
             </ul>
           )}
-        </section>
-
-        <section className="rounded-xl border border-dashed border-neutral-800 bg-neutral-900/20 p-4">
-          <h2 className="mb-1 flex items-center gap-1.5 text-sm font-semibold text-neutral-300">
-            <Icon name="tools" size={14} /> {t('En construcción')}
-          </h2>
-          <p className="text-xs leading-5 text-neutral-500">
-            {tx(
-              'Las demás secciones del menú ({sections}) aparecen atenuadas porque todavía no están construidas. Se irán activando una a una.',
-              { sections: t('preguntas abiertas, chat del mundo y manuscritos') }
-            )}
-          </p>
         </section>
       </div>
     </div>

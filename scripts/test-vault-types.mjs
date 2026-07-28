@@ -133,12 +133,31 @@ test('the worldbuilding sidebar keeps its full announced shape, with only the bu
   }
   assert.match(app, /<WorldbuildingSidebar activeView=\{view\} onNavigate=/);
   // Its own Inicio, and the generic academic home must not also render for it.
-  assert.match(app, /view === 'home' && isWorldbuilding && <WorldbuildingHome/);
+  assert.match(app, /view === 'home' && isWorldbuilding && \(\s*<WorldbuildingHome/);
   assert.match(app, /view === 'home' &&[^\n]*!isWorldbuilding[^\n]*&& \(/);
   assert.match(english, /'World chat'/);
   // The world graph was dropped: the encyclopedia's A–Z plus its backlinks answer what a
   // node-and-edge picture of a fictional world was ever going to answer.
   assert.doesNotMatch(sidebar, /Grafo del mundo/);
+});
+
+test('an empty worldbuilding home offers the complete local demo through the typed IPC bridge', async () => {
+  const [app, home, offer, ipc, preload, types] = await Promise.all([
+    readFile(path.join(repoRoot, 'src/App.tsx'), 'utf8'),
+    readFile(path.join(repoRoot, 'src/views/WorldbuildingHome.tsx'), 'utf8'),
+    readFile(path.join(repoRoot, 'src/views/HomeView.tsx'), 'utf8'),
+    readFile(path.join(repoRoot, 'electron/ipc.ts'), 'utf8'),
+    readFile(path.join(repoRoot, 'electron/preload.ts'), 'utf8'),
+    readFile(path.join(repoRoot, 'shared/types.ts'), 'utf8'),
+  ]);
+  assert.match(app, /const loadWorldbuildingDemo = useCallback/);
+  assert.match(app, /showDemoOffer=\{hasData === false && !settings\.demoMode\}/);
+  assert.match(home, /<DemoOfferCard\s+variant="worldbuilding"/s);
+  assert.match(offer, /variant\?:[^;]*'worldbuilding'/);
+  assert.match(offer, /Cargar demo de worldbuilding/);
+  assert.match(ipc, /data:seedWorldbuildingDemo/);
+  assert.match(preload, /seedWorldbuildingDemoData: \(\) => ipcRenderer\.invoke\('data:seedWorldbuildingDemo'\)/);
+  assert.match(types, /seedWorldbuildingDemoData\(\): Promise<boolean>/);
 });
 
 test('the characters section belongs to worldbuilding alone', () => {
