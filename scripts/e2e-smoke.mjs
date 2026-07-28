@@ -2546,7 +2546,7 @@ try {
   await worldSidebar.waitFor({ timeout: 30_000 });
   // Pick a section that is STILL inert. This assertion has to move each time one of the
   // announced sections graduates, and its failure means exactly that — not a regression.
-  assert.equal(await worldSidebar.getByRole('button', { name: 'Preguntas abiertas', exact: true }).isDisabled(), true,
+  assert.equal(await worldSidebar.getByRole('button', { name: 'Manuscritos', exact: true }).isDisabled(), true,
     'a section that is not built yet must not be clickable');
   assert.equal(await worldSidebar.getByRole('button', { name: 'Personajes', exact: true }).isDisabled(), false);
   assert.equal(await page.getByTestId('nodus-logo').getAttribute('data-vault-logo'), 'worldbuilding');
@@ -3046,7 +3046,89 @@ try {
     assert.equal(isEntry, true);
   }
 
+  {
+    // Preguntas abiertas. The section is small; what has to work is the round trip that
+    // makes it worth having: a hole left mid-sentence turns into a decision, answering it
+    // rewrites the author's own sheet, and the undo puts back exactly what was there.
+    await openSection('Personajes', 'characters-grid');
+    await page.getByText('Kaelen Vor', { exact: true }).first().click();
+    await page.getByTestId('character-dossier-description').waitFor({ timeout: 30_000 });
+
+    // A hole left while writing. Nothing is stored for it — the scan finds it every time.
+    const backstory = page.getByPlaceholder('Origen, historia previa, cómo llega al punto en que empieza el relato…');
+    await backstory.fill('Nació en ??? y creció lejos del vado.');
+    await page.getByTestId('character-dossier-biography').click();
+    await waitForCondition('el trasfondo se guarda al salir del campo', () => page.evaluate(async () => {
+      const kaelen = (await window.nodus.listCharacters()).find((c) => c.displayName === 'Kaelen Vor');
+      return (kaelen?.profile.backstory ?? '').includes('???');
+    }));
+
+    // Capturing from the prose itself: select, one click, and the anchor and the field
+    // come from where the caret already was. This is the affordance the whole section
+    // depends on, so it is exercised through the real textarea selection.
+    const personality = page.getByPlaceholder('Carácter, motivaciones, miedos, forma de hablar…');
+    await personality.fill('Jura por una diosa que quizá no exista.');
+    // Selected the way a person does it: the affordance appears from the field's own
+    // selection events, so a programmatic `select()` would prove nothing about the UI.
+    await personality.click();
+    await page.keyboard.press('ControlOrMeta+A');
+    await page.getByTestId('capture-question').first().click();
+    await waitForCondition('la captura guarda el ancla y el campo', () => page.evaluate(async () => {
+      const stored = await window.nodus.listWorldQuestions();
+      const captured = stored.find((question) => question.anchorField === 'personality');
+      return Boolean(captured && captured.origin === 'author' && captured.anchorKind === 'character');
+    }));
+
+    await openSection('Preguntas abiertas', 'questions-grid');
+    const hole = page.locator('[data-testid="question-row"][data-origin="placeholder"]').first();
+    await hole.waitFor({ timeout: 30_000 });
+    assert.match(await hole.innerText(), /Nació en \?\?\?/, 'the evidence is the line verbatim');
+    await hole.click();
+    await page.getByTestId('question-sheet').waitFor({ timeout: 15_000 });
+
+    // The write is NAMED before it happens. A button that edits a paragraph of somebody's
+    // novel without saying where is the one thing this section must never do.
+    await page.getByTestId('question-new-option').fill('la casa del carcelero');
+    await page.getByRole('button', { name: 'Añadir', exact: true }).click();
+    const apply = page.getByTestId('question-option-apply').first();
+    await apply.waitFor({ timeout: 15_000 });
+    assert.match(await apply.innerText(), /Kaelen Vor.*Trasfondo/, 'the button says what it will write');
+    await apply.click();
+
+    // The hole is REPLACED in the character's own sheet, not appended under it.
+    await waitForCondition('la respuesta se escribe en el trasfondo', () => page.evaluate(async () => {
+      const kaelen = (await window.nodus.listCharacters()).find((c) => c.displayName === 'Kaelen Vor');
+      return kaelen?.profile.backstory === 'Nació en la casa del carcelero y creció lejos del vado.';
+    }));
+
+    await page.getByTestId('question-option-undo').first().click();
+    await waitForCondition('deshacer devuelve exactamente lo que había', () => page.evaluate(async () => {
+      const kaelen = (await window.nodus.listCharacters()).find((c) => c.displayName === 'Kaelen Vor');
+      return kaelen?.profile.backstory === 'Nació en ??? y creció lejos del vado.';
+    }));
+
+    // And the scene the author is about to write says what it is waiting on, which is the
+    // whole point of the section: they never come here to feed it.
+    await page.evaluate(async () => {
+      const kaelen = (await window.nodus.listCharacters()).find((c) => c.displayName === 'Kaelen Vor');
+      const [first] = await window.nodus.listScenes('narrative');
+      const cast = await window.nodus.listSceneCharacters(first.sceneId);
+      if (!cast.some((entry) => entry.personId === kaelen.personId)) {
+        await window.nodus.addSceneCharacter(first.sceneId, kaelen.personId);
+      }
+      await window.nodus.updateScene(first.sceneId, { status: 'outline' });
+    });
+    await openSection('Escenas', 'scenes-grid');
+    await page.getByTestId('scene-card').first().click();
+    const band = page.getByTestId('scene-question-band');
+    await band.waitFor({ timeout: 30_000 });
+    // Case-insensitive: the heading is uppercased by CSS and innerText reports it rendered.
+    assert.match(await band.innerText(), /2 decisiones abiertas/i);
+  }
+
   console.log('[e2e] worldbuilding rules: created, put to the test from the scene, unpaid price reaches Continuidad');
+
+  console.log('[e2e] worldbuilding open questions: a hole becomes a decision, answering rewrites the sheet, undo restores it');
 
   console.log('[e2e] worldbuilding arcs: lanes drawn from the scene strip, sheet, milestone sheet');
 

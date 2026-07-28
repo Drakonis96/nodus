@@ -274,6 +274,7 @@ function DescriptionSection({ character, onChanged }: { character: Character; on
           hint={t('Lo que se ve. Es lo único que alimenta la generación de imágenes.')}
           value={character.profile.appearance}
           placeholder={t('Rasgos, complexión, ropa, marcas distintivas…')}
+          field="appearance"
           onSave={(next) => saveField({ appearance: next || null })}
         />
         <AutoSavingField
@@ -281,6 +282,7 @@ function DescriptionSection({ character, onChanged }: { character: Character; on
           hint={t('Cómo es y cómo habla.')}
           value={character.profile.personality}
           placeholder={t('Carácter, motivaciones, miedos, forma de hablar…')}
+          field="personality"
           onSave={(next) => saveField({ personality: next || null })}
         />
         <AutoSavingField
@@ -288,6 +290,7 @@ function DescriptionSection({ character, onChanged }: { character: Character; on
           hint={t('De dónde viene y qué le ha pasado.')}
           value={character.profile.backstory}
           placeholder={t('Origen, historia previa, cómo llega al punto en que empieza el relato…')}
+          field="backstory"
           onSave={(next) => saveField({ backstory: next || null })}
         />
       </div>

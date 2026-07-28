@@ -1,8 +1,8 @@
 # Worldbuilding — el grupo «Analizar» (migración 99)
 
-> **Estado: A0–A7 implementados y verificados** (2026-07-28). `SCHEMA_VERSION = 99`,
-> 1128/1128 tests, lint 0 errores, typecheck, `npm run build` y `npm run test:e2e` en verde.
-> **Quedan A8, A9 y A10**, especificados abajo con el detalle suficiente para retomarlos sin
+> **Estado: A0–A8 implementados y verificados** (2026-07-28). `SCHEMA_VERSION = 99`,
+> 1142/1142 tests, lint 0 errores, typecheck, `npm run build` y `npm run test:e2e` en verde.
+> **Quedan A9 y A10**, especificados abajo con el detalle suficiente para retomarlos sin
 > volver a diseñar nada.
 >
 > Plan producido por un workflow de 12 agentes (5 diseños + 5 críticas «desde la mesa de un
@@ -40,14 +40,16 @@ elemento y bajo botón, en cuarentena (§A9).
 | **A4** | **La vista de Continuidad**: `src/views/ContinuityView.tsx`, silencios enlatados, excepciones aceptadas, estado vacío con recuentos reales. «Consistencia» → **«Continuidad»**. |
 | **A5** | **Conflictos**: `src/views/ConflictsView.tsx` (tablero primero), `CharacterThreadsSection`, lealtades cruzadas, `conflict` como 7.ª `WorldEntryKind`, `checkThreads` en Continuidad. |
 | **A6** | **Arcos**: `src/views/ArcsView.tsx`, carriles SVG de solo lectura, tira de densidad, tramos inertes, orden de cierre, hoja de hitos. Se retiró «Tramas». |
+| **A8** | **Preguntas abiertas**: `shared/worldQuestions.ts`, `electron/db/worldQuestionsRepo.ts`, `QuestionsView`, la captura desde cualquier campo de prosa (`questionCapture.tsx` + `anchorOf` en el shell) y la franja `SceneQuestionBand` en la escena. |
 | **A7** | **Reglas**: `shared/worldRules.ts`, `electron/db/worldRulesRepo.ts`, `RulesView`, `RulesInPlay` en la escena, `rule` como 8.ª `WorldEntryKind`, «convertir en ley», `checkRules` en Continuidad. |
 
 ---
 
-## 3. A8 — Preguntas abiertas (mínima, a propósito)
+## 3. A8 — Preguntas abiertas (mínima, a propósito) — **HECHA**
 
-Las tablas **ya existen** (`world_questions`, `world_question_options`, migración 99). Falta
-todo lo demás.
+Las tablas ya existían (`world_questions`, `world_question_options`, migración 99); esta
+fase construyó todo lo demás **sin tocar el esquema**. Lo que sigue es el diseño tal como se
+implementó, más las desviaciones al final de la sección.
 
 ### Alcance recortado
 
@@ -114,6 +116,26 @@ Más la banda «esta escena depende de N decisiones abiertas» en la ficha de es
   respuesta de primera clase: hay decisiones que se toman y simplemente se recuerdan.
 - El estado `parked` absorbe lo que el diseño llamaba `dismissed`: eran dos estados negativos
   indistinguibles en la práctica.
+
+### Lo que cambió al construirla
+
+- **`planApply` recibe la pregunta entera**, no solo `(option, anchor, anchorField)`: el
+  título del artículo que crea sale de la pregunta (`questionTitle`), y el ancla no lo sabe.
+- **Una decisión respondida NO desaparece de la lista**. La primera versión la borraba de la
+  pantalla en el mismo clic: sin confirmación de lo que se había escrito y sin el «Deshacer»
+  justo en el momento en que alguien lo quiere. Ahora se queda hasta que el autor sale de la
+  sección (un `Set` de ids en la vista, no un estado en la base de datos).
+- **`emptyLabel` no puede ser un ternario.** El colector de i18n lee el literal que sigue a
+  `emptyLabel:`, así que la otra lectura dice lo suyo desde `EmptyState`, que llama a `t()`.
+- **La captura viaja por contexto** (`WorldAnchorProvider` en `WorldWorkspace`, alimentado
+  por un `anchorOf?` nuevo en el descriptor de sección) en vez de por props: son ~20 campos
+  en seis fichas, y el que se olvidaría es el que se añada el año que viene.
+- **`stillSaying` se resolvió como `remainingHoles(optionId)`**: la marca se lee del
+  `replaced_text` de la propia opción, así que ninguna columna tiene que recordarla y sigue
+  funcionando después de que el hueco que rellenó haya desaparecido.
+- **Los perfiles se escriben con upsert.** `character_profiles` y `place_profiles` cuelgan de
+  su padre por LEFT JOIN en todas partes: un `UPDATE` contra una ficha sin fila diría que ha
+  escrito un párrafo y no habría escrito nada.
 
 ---
 

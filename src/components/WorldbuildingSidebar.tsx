@@ -2,7 +2,7 @@ import { Icon } from './ui';
 import { t } from '../i18n';
 
 /** Views the worldbuilding vault has already wired up. */
-export type WorldbuildingView = 'encyclopedia' | 'continuity' | 'conflicts' | 'arcs' | 'rules' | 'characters' | 'places' | 'factions' | 'cultures' | 'scenes' | 'timeline' | 'tree' | 'map' | 'relations' | 'notes';
+export type WorldbuildingView = 'encyclopedia' | 'continuity' | 'conflicts' | 'arcs' | 'rules' | 'questions' | 'characters' | 'places' | 'factions' | 'cultures' | 'scenes' | 'timeline' | 'tree' | 'map' | 'relations' | 'notes';
 
 interface WorldbuildingItem { label: string; icon: string; view?: WorldbuildingView }
 interface WorldbuildingGroup { label: string; items: WorldbuildingItem[] }
@@ -40,7 +40,7 @@ export const WORLDBUILDING_GROUPS: WorldbuildingGroup[] = [
     { label: 'Conflictos', icon: 'scale', view: 'conflicts' },
     { label: 'Arcos narrativos', icon: 'route', view: 'arcs' },
     { label: 'Continuidad', icon: 'check', view: 'continuity' },
-    { label: 'Preguntas abiertas', icon: 'help' },
+    { label: 'Preguntas abiertas', icon: 'help', view: 'questions' },
   ] },
   { label: 'Crear', items: [
     { label: 'Notas', icon: 'notebook', view: 'notes' },

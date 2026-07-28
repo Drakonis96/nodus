@@ -10,6 +10,7 @@ import {
 import { alphaBucket } from '@shared/worldEncyclopedia';
 import { Icon } from '../ui';
 import { WorldFilterBar } from './WorldFilterBar';
+import { WorldAnchorProvider, type WorldAnchor } from './questionCapture';
 import { useDataRefresh } from '../../hooks';
 import { t, tx } from '../../i18n';
 
@@ -58,6 +59,10 @@ export interface WorldSectionDef<T> {
   /** Replaces the generic "nothing here yet" text. Continuity uses it to say what it
    *  actually checked, which is the only reason to reopen a screen that found nothing. */
   EmptyState?: React.ComponentType;
+  /** How this item is addressed by the encyclopedia. Declaring it is what lets every prose
+   *  field of the sheet offer «convertir en pregunta abierta» with its anchor and its field
+   *  already filled in — one line per section instead of one prop per field. */
+  anchorOf?: (item: T) => WorldAnchor | null;
 }
 
 /**
@@ -218,13 +223,15 @@ export function WorldWorkspace<T>({
         <div className="flex min-h-0 flex-1">
           <div className="flex w-72 shrink-0 flex-col border-r border-neutral-800">{collection}</div>
           <div className="min-h-0 flex-1 overflow-y-auto">
-            <section.Sheet
-              key={section.idOf(selected)}
-              item={selected}
-              onChanged={reload}
-              onBack={() => setSelectedId(null)}
-              onSelect={setSelectedId}
-            />
+            <WorldAnchorProvider anchor={section.anchorOf?.(selected) ?? null}>
+              <section.Sheet
+                key={section.idOf(selected)}
+                item={selected}
+                onChanged={reload}
+                onBack={() => setSelectedId(null)}
+                onSelect={setSelectedId}
+              />
+            </WorldAnchorProvider>
           </div>
         </div>
       ) : (

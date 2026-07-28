@@ -20,6 +20,7 @@ import { ContinuityView } from './views/ContinuityView';
 import { ConflictsView } from './views/ConflictsView';
 import { ArcsView } from './views/ArcsView';
 import { RulesView } from './views/RulesView';
+import { QuestionsView } from './views/QuestionsView';
 import { WorldbuildingSidebar } from './components/WorldbuildingSidebar';
 import { FeedbackHost } from './components/feedback';
 import { PrivacyRequestHost } from './privacyNotices';
@@ -1461,11 +1462,12 @@ export function App() {
           {view === 'conflicts' && <ConflictsView onNavigate={setView} />}
           {view === 'arcs' && <ArcsView onNavigate={setView} />}
           {view === 'rules' && <RulesView onNavigate={setView} />}
+          {view === 'questions' && <QuestionsView onNavigate={setView} />}
           {view === 'characters' && <CharactersView />}
           {view === 'places' && <PlacesView />}
           {view === 'factions' && <FactionsView />}
           {view === 'cultures' && <CulturesView />}
-          {view === 'scenes' && <ScenesView />}
+          {view === 'scenes' && <ScenesView onNavigate={setView} />}
           {view === 'timeline' && <TimelineView worldbuilding={isWorldbuilding} />}
           {view === 'tree' && <TreeView settings={settings} onSettingsChange={reloadSettings} />}
           {view === 'relations' && <RelationsView onOpenPersons={() => setView('persons')} />}

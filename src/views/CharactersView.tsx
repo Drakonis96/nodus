@@ -36,6 +36,7 @@ const CHARACTERS_SECTION: WorldSectionDef<Character> = {
   presentation: 'grid',
   load: () => window.nodus.listCharacters(),
   idOf: (character) => character.personId,
+  anchorOf: (character) => ({ kind: 'character', id: character.personId, title: character.displayName }),
   facets: [
     {
       id: 'role',

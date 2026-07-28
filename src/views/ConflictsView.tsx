@@ -70,6 +70,10 @@ function conflictsSection(onNavigate?: (view: View) => void): WorldSectionDef<Wo
     presentation: 'list',
     load: async () => (await window.nodus.listWorldThreads('conflict')),
     idOf: (thread) => thread.threadId,
+    // Only a conflict is an entry of the world: an arc is spoiler by nature and is not
+    // indexed, so a question captured on one would have nowhere to point.
+    anchorOf: (thread) =>
+      thread.kind === 'conflict' ? { kind: 'conflict', id: thread.threadId, title: thread.title } : null,
     labelOf: (thread) => thread.title,
     facets: [
       {
@@ -379,6 +383,7 @@ function ConflictSheet({
           hint={t('Quién quiere qué contra quién. Puedes enlazar con [[dobles corchetes]].')}
           value={thread.pitch}
           placeholder={t('El paso del vado, y quién cobra por cruzarlo…')}
+          field="pitch"
           onSave={(value) => save({ pitch: value })}
           rows={3}
         />
@@ -387,6 +392,7 @@ function ConflictSheet({
           hint={t('Lo que está en juego si esto se pierde.')}
           value={thread.stakes}
           placeholder={t('Si cae el vado, el norte queda aislado…')}
+          field="stakes"
           onSave={(value) => save({ stakes: value })}
           rows={2}
         />
@@ -410,6 +416,7 @@ function ConflictSheet({
             label={t('Cómo acaba')}
             value={thread.outcome}
             placeholder={t('En tus palabras…')}
+            field="outcome"
             onSave={(value) => save({ outcome: value })}
             rows={2}
           />

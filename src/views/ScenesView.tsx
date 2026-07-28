@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { SceneAppearance, WorldPlace, WorldScene, WorldSceneStatus, WorldSecret } from '@shared/types';
+import type { View } from '../navigation';
 import type { WorldSectionDef } from '../components/world/WorldWorkspace';
 import { WorldWorkspace } from '../components/world/WorldWorkspace';
 import { AutoSavingField } from '../components/AutoSavingField';
@@ -9,6 +10,7 @@ import { confirm } from '../components/feedback';
 import { PERSON_DOSSIER_SECTION_CLASS } from '../components/personDossierLayout';
 import { SceneDayChain } from '../components/world/SceneDayChain';
 import { SceneThreadsPanel } from '../components/world/SceneThreadsPanel';
+import { SceneQuestionBand } from '../components/world/SceneQuestionBand';
 import { RulesInPlay } from '../components/world/RulesInPlay';
 import { ContinuityBadge } from '../components/world/ContinuityBadge';
 import { t, tx } from '../i18n';
@@ -40,6 +42,7 @@ const SCENES_SECTION: WorldSectionDef<WorldScene> = {
   presentation: 'list',
   load: () => window.nodus.listScenes('narrative'),
   idOf: (scene) => scene.sceneId,
+  anchorOf: (scene) => ({ kind: 'scene', id: scene.sceneId, title: scene.title }),
   facets: [
     {
       id: 'status',
@@ -73,8 +76,16 @@ const SCENES_SECTION: WorldSectionDef<WorldScene> = {
   Sheet: ({ item, onChanged, onBack }) => <SceneSheet scene={item} onChanged={onChanged} onBack={onBack} />,
 };
 
-export function ScenesView() {
-  const section = useMemo(() => SCENES_SECTION, []);
+export function ScenesView({ onNavigate }: { onNavigate?: (view: View) => void } = {}) {
+  const section = useMemo<WorldSectionDef<WorldScene>>(
+    () => ({
+      ...SCENES_SECTION,
+      Sheet: ({ item, onChanged, onBack }) => (
+        <SceneSheet scene={item} onChanged={onChanged} onBack={onBack} onNavigate={onNavigate} />
+      ),
+    }),
+    [onNavigate]
+  );
   return (
     <WorldWorkspace
       section={section}
@@ -87,10 +98,12 @@ function SceneSheet({
   scene,
   onChanged,
   onBack,
+  onNavigate,
 }: {
   scene: WorldScene;
   onChanged: () => Promise<void>;
   onBack: () => void;
+  onNavigate?: (view: View) => void;
 }) {
   const [cast, setCast] = useState<SceneAppearance[]>([]);
   const [places, setPlaces] = useState<WorldPlace[]>([]);
@@ -205,11 +218,17 @@ function SceneSheet({
           hint={t('Lo que ocurre en la escena, en tus palabras.')}
           value={scene.summary}
           placeholder={t('Quién quiere qué, quién se lo impide y cómo acaba…')}
+          field="summary"
           onSave={(next) => save({ summary: next || null })}
         />
       </section>
 
       <ContinuityBadge entity={{ kind: 'scene', id: scene.sceneId }} />
+
+      {/* Before the threads and the laws, because it is the only one that can stop the
+          writing outright: the rest describe what the scene does, this one says what it
+          cannot do yet. */}
+      <SceneQuestionBand sceneId={scene.sceneId} onOpenQuestions={onNavigate ? () => onNavigate('questions') : undefined} />
 
       {/* Placed right after the cast, and before it on purpose in the reading order of
           the work: you decide who is in the room, and then what it costs them. */}

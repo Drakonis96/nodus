@@ -30,6 +30,7 @@ const PLACES_SECTION: WorldSectionDef<WorldPlace> = {
   presentation: 'tree',
   load: () => window.nodus.listWorldPlaces(),
   idOf: (place) => place.placeId,
+  anchorOf: (place) => ({ kind: 'place', id: place.placeId, title: place.name }),
   parentOf: (place) => place.parentId,
   labelOf: (place) => place.name,
   facets: [
@@ -197,6 +198,7 @@ function PlaceSheet({
             hint={t('Lo que se ve. Es lo único que alimenta la generación de imágenes.')}
             value={place.profile.appearance}
             placeholder={t('Arquitectura, materiales, colores, cómo se llega…')}
+            field="appearance"
             onSave={(next) => save({ appearance: next || null })}
           />
           <AutoSavingField
@@ -204,6 +206,7 @@ function PlaceSheet({
             hint={t('Cómo se siente estar ahí.')}
             value={place.profile.atmosphere}
             placeholder={t('Ruidos, olores, quién anda por la calle, qué se teme…')}
+            field="atmosphere"
             onSave={(next) => save({ atmosphere: next || null })}
           />
           <AutoSavingField
@@ -211,6 +214,7 @@ function PlaceSheet({
             hint={t('Qué ha pasado aquí antes del relato.')}
             value={place.profile.history}
             placeholder={t('Fundación, guerras, quién lo gobernó…')}
+            field="history"
             onSave={(next) => save({ history: next || null })}
           />
           <AutoSavingField

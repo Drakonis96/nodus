@@ -282,6 +282,7 @@ function RuleSheet({
           hint={t('Qué pasa siempre, o qué no puede pasar nunca. Puedes enlazar con [[dobles corchetes]].')}
           value={rule.statement}
           placeholder={t('La sangre paga la sangre…')}
+          field="statement"
           onSave={(value) => save({ statement: value })}
           rows={3}
         />
@@ -290,6 +291,7 @@ function RuleSheet({
           hint={t('Todo lo que revisa esta sección pregunta una sola cosa: si ese precio está alguna vez en la página.')}
           value={rule.cost}
           placeholder={t('Se paga con un año de vida…')}
+          field="cost"
           onSave={(value) => save({ cost: value })}
           rows={2}
         />
@@ -298,6 +300,7 @@ function RuleSheet({
           hint={t('Sin esto, un sistema de magia es un disolvente de tramas.')}
           value={rule.limits}
           placeholder={t('No funciona sobre los muertos…')}
+          field="limits"
           onSave={(value) => save({ limits: value })}
           rows={2}
         />

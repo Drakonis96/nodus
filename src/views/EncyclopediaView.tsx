@@ -58,6 +58,7 @@ function encyclopediaSection(onNavigate?: (view: View) => void): WorldSectionDef
     presentation: 'index',
     load: () => window.nodus.listWorldEntries(),
     idOf: (entry) => entry.key,
+    anchorOf: (entry) => ({ kind: entry.kind, id: entry.id, title: entry.title }),
     labelOf: (entry) => entry.title,
     facets: [
       {

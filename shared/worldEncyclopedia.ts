@@ -374,8 +374,10 @@ function mapProse(text: string, fn: (segment: string) => string): string {
     .join('');
 }
 
-function proseSegments(text: string): string[] {
-  return text.split(CODE_SEGMENT_RE).filter((_, index) => index % 2 === 0);
+/** The prose halves of a Markdown body, code removed. Shared with the placeholder scan:
+ *  a `???` inside a fence is being shown, not left to decide. */
+export function proseSegments(text: string): string[] {
+  return (text ?? '').split(CODE_SEGMENT_RE).filter((_, index) => index % 2 === 0);
 }
 
 function safeDecode(value: string): string {

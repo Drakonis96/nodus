@@ -316,6 +316,109 @@ try {
     characters.deleteCharacter(kaelen.personId);
   }
 
+  // ── 8. Open questions: the only writes this layer makes into a sheet ──────
+  {
+    const repo = require(path.join(repoRoot, 'electron/db/worldQuestionsRepo.ts'));
+    const story = require(path.join(repoRoot, 'electron/db/worldStoryRepo.ts'));
+    const characters = require(path.join(repoRoot, 'electron/db/charactersRepo.ts'));
+
+    const kaelen = characters.createCharacter({
+      displayName: 'Kaelen Vor',
+      backstory: 'Nació en ??? y creció lejos del vado.',
+    });
+    const scene = story.createScene({ title: 'El juicio' });
+    story.addSceneCharacter(scene.sceneId, kaelen.personId);
+
+    // The hole is DERIVED, not stored. Nothing was written when the character was.
+    assert.equal(db.prepare('SELECT COUNT(*) AS c FROM world_questions').get().c, 0);
+    const feed = repo.questionFeed();
+    const hole = feed.find((item) => item.originKey === `ph:character:${kaelen.personId}:backstory`);
+    assert.ok(hole, 'the hole in the backstory shows up on its own');
+    assert.equal(hole.questionId, null, 'and it has no row until somebody touches it');
+    assert.equal(hole.evidence, 'Nació en ??? y creció lejos del vado.');
+    assert.equal(hole.blockedScene?.sceneId, scene.sceneId, 'the unwritten scene it appears in blocks on it');
+
+    // Touching it materialises exactly one row, however many times it is touched.
+    const stored = repo.ensureQuestion({
+      question: hole.question,
+      originKey: hole.originKey,
+      origin: 'placeholder',
+      anchorKind: 'character',
+      anchorId: kaelen.personId,
+      anchorField: 'backstory',
+    });
+    const again = repo.ensureQuestion({ question: 'otra redacción', originKey: hole.originKey });
+    assert.equal(again.questionId, stored.questionId, 'the origin key de-duplicates by hand');
+    assert.equal(db.prepare('SELECT COUNT(*) AS c FROM world_questions').get().c, 1);
+
+    // Answering REPLACES the hole in the character's own sheet.
+    const option = repo.setQuestionOption({ questionId: stored.questionId, text: 'la casa del carcelero' });
+    assert.equal(option.applyMode, 'fill_field', 'the destination is inferred from the anchor');
+    repo.applyQuestionOption(option.optionId);
+    const backstoryOf = () =>
+      db.prepare('SELECT backstory FROM character_profiles WHERE person_id = ?').get(kaelen.personId).backstory;
+    assert.equal(backstoryOf(), 'Nació en la casa del carcelero y creció lejos del vado.');
+    assert.equal(repo.getWorldQuestion(stored.questionId).status, 'answered');
+    assert.equal(repo.canUndoOption(option.optionId), true);
+
+    // And the undo puts back exactly what was there.
+    repo.undoQuestionOption(option.optionId);
+    assert.equal(backstoryOf(), 'Nació en ??? y creció lejos del vado.');
+    assert.equal(repo.getWorldQuestion(stored.questionId).status, 'open');
+    assert.equal(repo.canUndoOption(option.optionId), false, 'nothing is applied any more');
+
+    // Rewritten afterwards, the offer disappears rather than the prose.
+    repo.applyQuestionOption(option.optionId);
+    characters.updateCharacter(kaelen.personId, { backstory: 'Nació donde nadie mira.' });
+    assert.equal(repo.canUndoOption(option.optionId), false);
+    repo.undoQuestionOption(option.optionId);
+    assert.equal(backstoryOf(), 'Nació donde nadie mira.', 'a refused undo writes nothing at all');
+
+    // A question with no anchor writes an article instead, and its links are indexed.
+    const worldWide = repo.ensureQuestion({ question: '¿La magia deja marca visible?', origin: 'author' });
+    const articleOption = repo.setQuestionOption({
+      questionId: worldWide.questionId,
+      text: 'Sí: una quemadura que no cura, y [[Kaelen Vor]] la lleva.',
+    });
+    assert.equal(articleOption.applyMode, 'create_article');
+    repo.applyQuestionOption(articleOption.optionId);
+    const article = db
+      .prepare('SELECT article_id, summary FROM world_articles WHERE title = ?')
+      .get('La magia deja marca visible');
+    assert.ok(article, 'the article is created from the question, not from a form');
+    assert.match(article.summary, /nodus:\/\/world\/character\//, 'its `[[…]]` became a real link');
+
+    // A profile row that does not exist yet must be CREATED, not silently missed: the
+    // profile tables hang off their parent by a LEFT JOIN everywhere they are read.
+    db.prepare('DELETE FROM character_profiles WHERE person_id = ?').run(kaelen.personId);
+    const orphan = repo.ensureQuestion({
+      question: '¿Cómo es de cerca?',
+      origin: 'author',
+      anchorKind: 'character',
+      anchorId: kaelen.personId,
+      anchorField: 'appearance',
+    });
+    const look = repo.setQuestionOption({ questionId: orphan.questionId, text: 'Alto y enjuto.' });
+    repo.applyQuestionOption(look.optionId);
+    assert.equal(
+      db.prepare('SELECT appearance FROM character_profiles WHERE person_id = ?').get(kaelen.personId).appearance,
+      'Alto y enjuto.'
+    );
+
+    // Deleting the anchor keeps the author's sentence and drops the pending write.
+    characters.deleteCharacter(kaelen.personId);
+    const orphaned = repo.getWorldQuestion(orphan.questionId);
+    assert.equal(orphaned.question, '¿Cómo es de cerca?');
+    assert.equal(orphaned.anchorTitle, null, 'no title means the sheet is gone');
+    assert.ok(repo.questionFeed(true).every((item) => item.questionId !== orphan.questionId || item.anchor === null));
+
+    story.deleteScene(scene.sceneId);
+    for (const row of db.prepare('SELECT question_id FROM world_questions').all()) {
+      repo.deleteWorldQuestion(row.question_id);
+    }
+    assert.equal(db.prepare('SELECT COUNT(*) AS c FROM world_question_options').get().c, 0, 'options go with it');
+  }
+
   console.log('Analyze layer database test passed!');
 } finally {
   await rm(root, { recursive: true, force: true });

@@ -2620,6 +2620,116 @@ export interface WorldRuleInput {
   secretId?: string | null;
 }
 
+/** `parked` means "stop showing me this until something changes" and absorbs what the
+ *  design called `dismissed`: two negative states nobody could tell apart in practice. */
+export type WorldQuestionStatus = 'open' | 'answered' | 'parked';
+
+/** Two derivations and no more. The other five belong to the sections that own those facts
+ *  and arrive here through a button on each of them, never through a second scan. */
+export type WorldQuestionOrigin = 'author' | 'placeholder';
+
+/** What answering WRITES. Inferred from where the question was captured, never chosen in a
+ *  form. `none` is a first-class answer: decisions get taken and simply remembered. */
+export type WorldApplyMode = 'none' | 'fill_field' | 'create_article';
+
+export type WorldQuestionUrgency = 'blocking' | 'soon' | 'later';
+
+/**
+ * One competing answer. A row rather than a bullet in a JSON column because each one is
+ * chosen, applied and undone separately — and above all because an option is A PENDING
+ * WRITE, and a write needs a destination.
+ */
+export interface WorldQuestionOption {
+  optionId: string;
+  questionId: string;
+  text: string;
+  /** What it drags along with it. Written by the model beside the option; as an empty box
+   *  it gets filled in on the first two questions and never again. */
+  implications: string | null;
+  /** An option is not canon until it is chosen AND applied, so the quarantine here is
+   *  structural rather than a second column. */
+  origin: 'author' | 'ai';
+  applyMode: WorldApplyMode;
+  appliedAt: string | null;
+  /** What the field said BEFORE. This is the undo, and without it nobody presses a button
+   *  that overwrites a paragraph of their own prose. */
+  replacedText: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WorldQuestion {
+  questionId: string;
+  question: string;
+  /** Polymorphic over six tables and therefore without a foreign key. NULL is legitimate
+   *  and common: "magic leaves a visible mark" belongs to the world, not to a sheet. */
+  anchorKind: string | null;
+  anchorId: string | null;
+  /** Joined for display and for the facet; not a column. */
+  anchorTitle: string | null;
+  anchorField: string | null;
+  status: WorldQuestionStatus;
+  origin: WorldQuestionOrigin;
+  originKey: string | null;
+  /** A switch, not a priority scale: a scale is a field edited once and never again. */
+  blocking: boolean;
+  chosenOptionId: string | null;
+  answeredAt: string | null;
+  options: WorldQuestionOption[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WorldQuestionInput {
+  question?: string;
+  anchorKind?: string | null;
+  anchorId?: string | null;
+  anchorField?: string | null;
+  status?: WorldQuestionStatus;
+  origin?: WorldQuestionOrigin;
+  originKey?: string | null;
+  blocking?: boolean;
+}
+
+export interface WorldQuestionOptionInput {
+  optionId?: string;
+  questionId: string;
+  text?: string;
+  implications?: string | null;
+  origin?: 'author' | 'ai';
+  applyMode?: WorldApplyMode;
+}
+
+/** A question as the screen reads it: the stored row (or a hole that has no row yet), plus
+ *  the two things only the whole vault can answer — what leans on it and what it blocks. */
+export interface WorldQuestionFeedItem {
+  /** null while it is only derived: nothing has been stored for this hole yet. */
+  questionId: string | null;
+  originKey: string | null;
+  question: string;
+  origin: WorldQuestionOrigin;
+  status: WorldQuestionStatus;
+  anchor: { kind: string; id: string; title: string } | null;
+  anchorField: string | null;
+  blocking: boolean;
+  /** The line the hole sits in, verbatim. */
+  evidence: string | null;
+  options: WorldQuestionOption[];
+  chosenOptionId: string | null;
+  /** How many bodies mention the anchor. */
+  leverage: number;
+  blockedScene: { sceneId: string; title: string; narrativeOrder: number } | null;
+  urgency: WorldQuestionUrgency;
+  updatedAt: string | null;
+}
+
+/** What a scene is waiting on, for the band on its sheet. */
+export interface SceneQuestionLoad {
+  count: number;
+  blocking: number;
+  items: WorldQuestionFeedItem[];
+}
+
 export interface WorldFindingText {
   key: string;
   vars?: Record<string, string>;
@@ -6599,6 +6709,37 @@ export interface NodusApi {
   rulesInPlay(sceneId: string): Promise<WorldRule[]>;
   acceptRuleDraft(ruleId: string): Promise<WorldRule>;
   rejectRuleDraft(ruleId: string): Promise<void>;
+  // ── The decisions not taken yet ───────────────────────────────────────────
+  // One read for the whole screen: the stored rows and the holes still sitting in the
+  // author's prose arrive already merged and ranked, so nothing in the renderer has to
+  // know which half a row came from.
+  questionFeed(includeSettled?: boolean): Promise<WorldQuestionFeedItem[]>;
+  listWorldQuestions(): Promise<WorldQuestion[]>;
+  getWorldQuestion(questionId: string): Promise<WorldQuestion | null>;
+  /** Store a derived hole so it can be parked, answered or edited. Idempotent by origin key. */
+  ensureQuestion(input: {
+    question: string;
+    originKey?: string | null;
+    origin?: WorldQuestionOrigin;
+    anchorKind?: string | null;
+    anchorId?: string | null;
+    anchorField?: string | null;
+  }): Promise<WorldQuestion>;
+  updateWorldQuestion(questionId: string, patch: WorldQuestionInput): Promise<WorldQuestion>;
+  deleteWorldQuestion(questionId: string): Promise<void>;
+  setQuestionOption(input: WorldQuestionOptionInput): Promise<WorldQuestionOption>;
+  deleteQuestionOption(optionId: string): Promise<void>;
+  /** Answer, performing the option's pending write. */
+  applyQuestionOption(optionId: string): Promise<WorldQuestion>;
+  undoQuestionOption(optionId: string): Promise<WorldQuestion>;
+  /** Whether the field still contains what was written, which is the only safe undo. */
+  canUndoQuestionOption(optionId: string): Promise<boolean>;
+  /** The same mark still sitting in other sheets, after one hole has been filled. */
+  questionRemainingHoles(
+    optionId: string
+  ): Promise<{ kind: string; id: string; title: string; field: string; evidence: string }[]>;
+  questionAnchorText(kind: string, id: string, field: string): Promise<string | null>;
+  questionsForScene(sceneId: string): Promise<SceneQuestionLoad>;
   // ── Maps of an invented world ─────────────────────────────────────────────
   // The image bytes are NEVER inlined with a map: a base map is megabytes, and listing
   // them would push every byte of every map through the bridge to draw a row of cards.

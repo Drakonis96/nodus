@@ -43,6 +43,7 @@ function groupSection(
     // keeps the facet counts honest.
     load: async () => (await window.nodus.listWorldGroups()).filter((group) => kinds.includes(group.kind)),
     idOf: (group) => group.groupId,
+    anchorOf: (group) => ({ kind: 'group', id: group.groupId, title: group.name }),
     facets: [
       {
         id: 'kind',
@@ -233,6 +234,7 @@ function GroupSheet({
             value={group.summary}
             placeholder={t('p. ej. «los espías de la corte, que ya no responden ante nadie»')}
             rows={2}
+            field="summary"
             onSave={(next) => save({ summary: next || null })}
           />
           <AutoSavingField
@@ -240,6 +242,7 @@ function GroupSheet({
             hint={t('Lo que se ve: emblemas, colores, vestimenta, arquitectura.')}
             value={group.description}
             placeholder={t('Símbolos, atuendo, cómo se reconoce a los suyos…')}
+            field="description"
             onSave={(next) => save({ description: next || null })}
           />
           <AutoSavingField

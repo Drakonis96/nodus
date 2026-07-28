@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { WorldEntry } from '@shared/types';
 import { formatWorldLink, rankEntryCandidates } from '@shared/worldEncyclopedia';
+import { useQuestionCapture } from './questionCapture';
 import { Markdown } from '../Markdown';
 import { Icon } from '../ui';
 import { WORLD_ENTRY_KIND_ICON } from '../../views/EncyclopediaView';
@@ -33,7 +34,11 @@ export function WorldEntryEditor({
   /** Where the open `[[` starts, and what has been typed after it. */
   const [trigger, setTrigger] = useState<{ at: number; fragment: string } | null>(null);
   const [highlight, setHighlight] = useState(0);
+  /** The words the author has selected right now — what «convertir en pregunta abierta»
+   *  would capture, anchored to this article and its body. */
+  const [selection, setSelection] = useState('');
   const areaRef = useRef<HTMLTextAreaElement>(null);
+  const { anchor, capture } = useQuestionCapture();
 
   useEffect(() => {
     setDraft(value);
@@ -62,6 +67,12 @@ export function WorldEntryEditor({
     // after `[[` is still being typed.
     if (/[\]\n]/.test(fragment)) return setTrigger(null);
     setTrigger({ at: open, fragment });
+  };
+
+  const syncSelection = () => {
+    const area = areaRef.current;
+    if (!area) return;
+    setSelection(area.value.slice(area.selectionStart, area.selectionEnd).trim());
   };
 
   const choose = (entry: WorldEntry) => {
@@ -106,6 +117,19 @@ export function WorldEntryEditor({
           ))}
         </div>
         <span className="text-[11px] text-neutral-600">{t('Escribe [[ para enlazar con cualquier cosa del mundo')}</span>
+        {anchor && selection && (
+          <button
+            data-testid="capture-question"
+            className="text-[11px] text-indigo-300 hover:text-indigo-200"
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={async () => {
+              await capture(selection, 'body');
+              setSelection('');
+            }}
+          >
+            {t('Convertir en pregunta abierta')}
+          </button>
+        )}
         <div className="ml-auto flex gap-2">
           <button className="btn btn-ghost border border-neutral-700 px-3 text-xs" onClick={onCancel} disabled={saving}>
             {t('Cancelar')}
@@ -132,7 +156,12 @@ export function WorldEntryEditor({
               setDraft(event.target.value);
               syncTrigger(event.target.value, event.target.selectionStart);
             }}
-            onClick={(event) => syncTrigger(draft, event.currentTarget.selectionStart)}
+            onClick={(event) => {
+              syncTrigger(draft, event.currentTarget.selectionStart);
+              syncSelection();
+            }}
+            onSelect={syncSelection}
+            onMouseUp={syncSelection}
             onKeyDown={(event) => {
               if (!trigger || candidates.length === 0) return;
               if (event.key === 'ArrowDown') {

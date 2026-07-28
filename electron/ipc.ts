@@ -557,6 +557,8 @@ import type { WorldPlaceInput } from '@shared/types';
 import type {
   BeatThreadKind,
   WorldRuleInput,
+  WorldQuestionInput,
+  WorldQuestionOptionInput,
   SceneDayLink,
   ThreadPartySide,
   WorldBeatInput,
@@ -626,6 +628,22 @@ import {
   setRuleProposedText,
   updateWorldRule,
 } from './db/worldRulesRepo';
+import {
+  applyQuestionOption,
+  canUndoOption,
+  deleteQuestionOption,
+  deleteWorldQuestion,
+  ensureQuestion,
+  getWorldQuestion,
+  listWorldQuestions,
+  questionAnchorText,
+  questionFeed,
+  remainingHoles,
+  sceneQuestionLoad,
+  setQuestionOption,
+  undoQuestionOption,
+  updateWorldQuestion,
+} from './db/worldQuestionsRepo';
 import {
   continuitySummary,
   listNoticeMutes,
@@ -1693,6 +1711,32 @@ export function registerIpc(
   h('rules:rejectDraft', async (_e, ruleId: string) => {
     setRuleProposedText(ruleId, null);
   });
+  // ── Open questions ─────────────────────────────────────────────────────────
+  // `feed` is the screen's only read: stored rows and the holes still in the prose arrive
+  // as one ranked list, so the renderer never has to know which half a row came from.
+  h('questions:feed', async (_e, includeSettled?: boolean) => questionFeed(includeSettled === true));
+  h('questions:list', async () => listWorldQuestions());
+  h('questions:get', async (_e, questionId: string) => getWorldQuestion(questionId));
+  h('questions:ensure', async (_e, input: Parameters<typeof ensureQuestion>[0]) => ensureQuestion(input));
+  h('questions:update', async (_e, questionId: string, patch: WorldQuestionInput) =>
+    updateWorldQuestion(questionId, patch)
+  );
+  h('questions:delete', async (_e, questionId: string) => {
+    deleteWorldQuestion(questionId);
+  });
+  h('questions:setOption', async (_e, input: WorldQuestionOptionInput) => setQuestionOption(input));
+  h('questions:deleteOption', async (_e, optionId: string) => {
+    deleteQuestionOption(optionId);
+  });
+  h('questions:apply', async (_e, optionId: string) => applyQuestionOption(optionId));
+  h('questions:undo', async (_e, optionId: string) => undoQuestionOption(optionId));
+  h('questions:canUndo', async (_e, optionId: string) => canUndoOption(optionId));
+  h('questions:remainingHoles', async (_e, optionId: string) => remainingHoles(optionId));
+  h('questions:anchorText', async (_e, kind: string, id: string, field: string) =>
+    questionAnchorText(kind, id, field)
+  );
+  h('questions:forScene', async (_e, sceneId: string) => sceneQuestionLoad(sceneId));
+
   // The one mechanical fix: re-derive every scene's world day from the chain.
   h('scenes:recomputeDays', async () => recomputeSceneDays());
   h('characters:exportSheet', async (

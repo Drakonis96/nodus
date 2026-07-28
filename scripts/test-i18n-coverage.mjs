@@ -209,6 +209,15 @@ const INDIRECT_KEY_SOURCES = [
     file: 'src/views/ContinuityView.tsx',
     pattern: /\b(?:title|searchPlaceholder|createLabel|emptyLabel|noMatchLabel|label):\s*(["'])((?:\\.|(?!\1).)*?)\1/g,
   },
+  {
+    file: 'src/views/QuestionsView.tsx',
+    pattern: /\b(?:title|searchPlaceholder|createLabel|emptyLabel|noMatchLabel|label):\s*(["'])((?:\\.|(?!\1).)*?)\1/g,
+  },
+  // The open-question vocabularies: status, origin, what answering will write, and how
+  // urgent it is — every one of them rendered as t(MAP[x]) and invisible otherwise. The
+  // `\w+:` form deliberately skips WORLD_PLACEHOLDER_TOKENS, whose entries ('???', 'TBD')
+  // are marks the author types, not text to translate.
+  { file: 'shared/worldQuestions.ts', pattern: /^  \w+:\s*(["'])((?:\\.|(?!\1).)*?)\1,$/gm },
   // The severity labels, rendered as t(SEVERITY_LABEL[x]).
   { file: 'src/views/ContinuityView.tsx', pattern: /^  (?:contradiction|warning|gap):\s*(["'])((?:\\.|(?!\1).)*?)\1,$/gm },
   // The encyclopedia's vocabularies: entry kinds, article categories and the field a link
