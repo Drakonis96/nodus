@@ -16,11 +16,21 @@ test('faction, culture and dynasty cards stay readable in the narrow detail rail
   assert.match(groups, /src=\{worldImageThumbnailUrl\(image\)\}/);
   assert.match(groups, /compactPresentation: 'list'/);
   assert.match(workspace, /split && section\.compactPresentation === 'list'/);
-  assert.match(groups, /compact \? 'h-24 flex-row' : 'h-64 flex-col'/);
-  assert.match(groups, /compact \? 'line-clamp-2 leading-5' : 'truncate'/);
+  assert.match(groups, /compact \? 'h-24 flex-row' : 'h-72 flex-col'/);
+  assert.match(groups, /compact \? 'px-3 py-2\.5' : 'px-4 py-3\.5'/);
+  assert.match(groups, /line-clamp-2 block max-w-full break-words pr-0\.5/);
   assert.match(groups, /'h-36 w-full shrink-0/);
   assert.match(groups, /line-clamp-2/);
   assert.doesNotMatch(groups, /compact \? 'h-20 flex-row'/);
+});
+
+test('long group names reserve a right gutter in factions, cultures and dynasties', async () => {
+  const groups = await readFile(path.join(repoRoot, 'src/views/GroupsView.tsx'), 'utf8');
+  assert.match(groups, /function GroupCard\(/, 'all three sections share one card');
+  assert.match(groups, /min-h-0 min-w-0 flex-1 overflow-hidden/);
+  assert.match(groups, /px-4 py-3\.5/, 'full cards keep sixteen pixels on both sides');
+  assert.match(groups, /line-clamp-2 block max-w-full break-words pr-0\.5/);
+  assert.doesNotMatch(groups, /compact \? 'line-clamp-2 leading-5' : 'truncate'/);
 });
 
 test('group cards declare light and dark surfaces and hover states independently', async () => {

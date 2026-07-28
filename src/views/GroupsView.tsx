@@ -185,7 +185,7 @@ function GroupCard({
         dynasty
           ? 'hover:border-amber-500 hover:bg-amber-50 dark:hover:border-amber-600 dark:hover:bg-amber-950/15'
           : 'hover:border-violet-400 hover:bg-violet-50 dark:hover:border-violet-700/60 dark:hover:bg-violet-950/20'
-      } ${compact ? 'h-24 flex-row' : 'h-64 flex-col'}`}
+      } ${compact ? 'h-24 flex-row' : 'h-72 flex-col'}`}
     >
       <div
         className={
@@ -207,11 +207,13 @@ function GroupCard({
           </div>
         )}
       </div>
-      <div className="min-h-0 min-w-0 flex-1 p-3">
+      <div
+        className={`min-h-0 min-w-0 flex-1 overflow-hidden ${
+          compact ? 'px-3 py-2.5' : 'px-4 py-3.5'
+        }`}
+      >
         <span
-          className={`block text-sm font-semibold text-neutral-900 dark:text-neutral-100 ${
-            compact ? 'line-clamp-2 leading-5' : 'truncate'
-          }`}
+          className="line-clamp-2 block max-w-full break-words pr-0.5 text-sm font-semibold leading-5 text-neutral-900 dark:text-neutral-100"
         >
           {item.name}
         </span>
