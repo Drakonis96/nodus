@@ -6,10 +6,15 @@ import { fileURLToPath } from 'node:url';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-test('faction and culture cards have one fixed size per workspace mode', async () => {
+test('faction, culture and dynasty cards share thumbnails and one fixed size per workspace mode', async () => {
   const groups = await readFile(path.join(repoRoot, 'src/views/GroupsView.tsx'), 'utf8');
-  assert.match(groups, /compact \? 'h-20 p-2\.5' : 'h-40 p-4'/);
+  assert.match(groups, /<GroupCard item=\{item\} compact=\{compact\} dynasty=\{dynasty\}/);
+  assert.match(groups, /listWorldImages\('group', item\.groupId\)/);
+  assert.match(groups, /src=\{worldImageThumbnailUrl\(image\)\}/);
+  assert.match(groups, /compact \? 'h-20 flex-row' : 'h-64 flex-col'/);
+  assert.match(groups, /'h-36 w-full shrink-0/);
   assert.match(groups, /line-clamp-2/);
+  assert.doesNotMatch(groups, /compact \? 'flex h-20' : 'h-60'/);
 });
 
 test('group cards declare light and dark surfaces and hover states independently', async () => {

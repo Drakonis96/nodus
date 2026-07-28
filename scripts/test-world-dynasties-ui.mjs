@@ -30,7 +30,7 @@ test('dynasties are house groups with emblem cards and a complete editable sheet
   assert.match(labels, /export const FACTION_KINDS = \['faction', 'order', 'religion'\]/);
   assert.match(labels, /export const DYNASTY_KINDS = \['house'\]/);
   assert.match(groups, /const DYNASTIES = groupSection\('dynasties', DYNASTY_KINDS/);
-  assert.match(groups, /data-testid="dynasty-card"/);
+  assert.match(groups, /data-testid=\{dynasty \? 'dynasty-card' : 'group-card'\}/);
   assert.match(groups, /images\.find\(\(image\) => image\.kind === 'emblem'\)/);
   assert.match(groups, /title=\{dynasty \? 'Blasón y galería' : 'Galería'\}/);
   assert.match(groups, /generateLabel=\{dynasty \? 'Generar blasón' : 'Generar imagen'\}/);

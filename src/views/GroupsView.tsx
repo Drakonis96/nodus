@@ -65,26 +65,8 @@ function groupSection(
     ],
     facetValues: (group) => ({ kind: group.kind, status: group.status }),
     searchText: (group) => [group.name, group.summary ?? ''],
-    Card: ({ item, compact, onOpen }) => dynasty ? (
-      <DynastyCard item={item} compact={compact} onOpen={onOpen} />
-    ) : (
-      <button
-        data-testid="group-card"
-        onClick={onOpen}
-        title={item.name}
-        className={`w-full rounded-lg border border-neutral-300 bg-white text-left shadow-sm transition-colors hover:border-violet-400 hover:bg-violet-50 dark:border-neutral-800 dark:bg-neutral-950/25 dark:shadow-none dark:hover:border-violet-700/60 dark:hover:bg-violet-950/20 ${
-          compact ? 'h-20 p-2.5' : 'h-40 p-4'
-        }`}
-      >
-        <span className="block truncate text-sm font-medium text-neutral-900 dark:text-neutral-100">{item.name}</span>
-        <span className="block truncate text-[11px] text-neutral-500">
-          {t(WORLD_GROUP_KIND_LABEL[item.kind] ?? item.kind)}
-          {item.status ? ` · ${t(WORLD_GROUP_STATUS_LABEL[item.status])}` : ''}
-        </span>
-        {!compact && item.summary && (
-          <span className="mt-2 line-clamp-2 block text-[11px] leading-4 text-neutral-600 dark:text-neutral-500">{item.summary}</span>
-        )}
-      </button>
+    Card: ({ item, compact, onOpen }) => (
+      <GroupCard item={item} compact={compact} dynasty={dynasty} onOpen={onOpen} />
     ),
     Sheet: ({ item, onChanged, onBack }) => (
       <GroupSheet group={item} kinds={kinds} dynasty={dynasty} onChanged={onChanged} onBack={onBack} />
@@ -155,44 +137,83 @@ export function DynastiesView() {
   );
 }
 
-function DynastyCard({ item, compact, onOpen }: { item: WorldGroup; compact: boolean; onOpen: () => void }) {
-  const [emblem, setEmblem] = useState<CharacterImage | null>(null);
+function GroupCard({
+  item,
+  compact,
+  dynasty,
+  onOpen,
+}: {
+  item: WorldGroup;
+  compact: boolean;
+  dynasty: boolean;
+  onOpen: () => void;
+}) {
+  const [image, setImage] = useState<CharacterImage | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     void window.nodus.listWorldImages('group', item.groupId).then((images) => {
-      if (!cancelled) setEmblem(images.find((image) => image.kind === 'emblem') ?? images[0] ?? null);
+      if (!cancelled) {
+        setImage(dynasty ? images.find((image) => image.kind === 'emblem') ?? images[0] ?? null : images[0] ?? null);
+      }
     });
     return () => {
       cancelled = true;
     };
-  }, [item.groupId, item.updatedAt]);
+  }, [dynasty, item.groupId, item.updatedAt]);
+
+  const metadata = dynasty
+    ? [
+        item.status ? t(WORLD_GROUP_STATUS_LABEL[item.status]) : t('Dinastía'),
+        item.foundedYear != null ? String(item.foundedYear) : null,
+      ]
+    : [
+        t(WORLD_GROUP_KIND_LABEL[item.kind] ?? item.kind),
+        item.status ? t(WORLD_GROUP_STATUS_LABEL[item.status]) : null,
+      ];
+  const fallbackIcon = dynasty ? 'shield' : CULTURE_KINDS.includes(item.kind) ? 'languages' : 'network';
 
   return (
     <button
-      data-testid="dynasty-card"
+      data-testid={dynasty ? 'dynasty-card' : 'group-card'}
       onClick={onOpen}
       title={item.name}
-      className={`group w-full overflow-hidden rounded-xl border border-neutral-300 bg-white text-left shadow-sm transition-colors hover:border-amber-500 dark:border-neutral-800 dark:bg-neutral-950/25 dark:shadow-none dark:hover:border-amber-600 ${
-        compact ? 'flex h-20' : 'h-60'
-      }`}
+      className={`group flex w-full overflow-hidden rounded-xl border border-neutral-300 bg-white text-left shadow-sm transition-colors dark:border-neutral-800 dark:bg-neutral-950/25 dark:shadow-none ${
+        dynasty
+          ? 'hover:border-amber-500 hover:bg-amber-50 dark:hover:border-amber-600 dark:hover:bg-amber-950/15'
+          : 'hover:border-violet-400 hover:bg-violet-50 dark:hover:border-violet-700/60 dark:hover:bg-violet-950/20'
+      } ${compact ? 'h-20 flex-row' : 'h-64 flex-col'}`}
     >
-      <div className={compact ? 'h-full w-20 shrink-0 bg-neutral-100 dark:bg-neutral-900' : 'h-40 w-full bg-neutral-100 dark:bg-neutral-900'}>
-        {emblem ? (
-          <img src={worldImageThumbnailUrl(emblem)} alt="" draggable={false} className="h-full w-full object-cover transition-transform group-hover:scale-[1.02]" />
+      <div
+        className={
+          compact
+            ? 'h-full w-20 shrink-0 bg-neutral-100 dark:bg-neutral-900'
+            : 'h-36 w-full shrink-0 bg-neutral-100 dark:bg-neutral-900'
+        }
+      >
+        {image ? (
+          <img
+            src={worldImageThumbnailUrl(image)}
+            alt=""
+            draggable={false}
+            className="h-full w-full object-cover transition-transform group-hover:scale-[1.02]"
+          />
         ) : (
           <div className="grid h-full place-items-center">
-            <Icon name="shield" size={compact ? 22 : 34} className="text-neutral-400 dark:text-neutral-600" />
+            <Icon name={fallbackIcon} size={compact ? 22 : 34} className="text-neutral-400 dark:text-neutral-600" />
           </div>
         )}
       </div>
-      <div className={compact ? 'min-w-0 flex-1 p-3' : 'min-w-0 p-3'}>
+      <div className="min-h-0 min-w-0 flex-1 p-3">
         <span className="block truncate text-sm font-semibold text-neutral-900 dark:text-neutral-100">{item.name}</span>
         <span className="block truncate text-[11px] text-neutral-500">
-          {item.status ? t(WORLD_GROUP_STATUS_LABEL[item.status]) : t('Dinastía')}
-          {item.foundedYear != null ? ` · ${item.foundedYear}` : ''}
+          {metadata.filter(Boolean).join(' · ')}
         </span>
-        {!compact && item.summary && <span className="mt-1 line-clamp-1 block text-[11px] text-neutral-600 dark:text-neutral-400">{item.summary}</span>}
+        {!compact && item.summary && (
+          <span className="mt-1.5 line-clamp-2 block text-[11px] leading-4 text-neutral-600 dark:text-neutral-400">
+            {item.summary}
+          </span>
+        )}
       </div>
     </button>
   );
