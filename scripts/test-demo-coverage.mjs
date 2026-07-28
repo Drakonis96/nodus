@@ -124,6 +124,14 @@ try {
   assert.equal(count('teaching_groups', "id LIKE 'demo-teaching-%'"), 0);
 
   vaults.setVaultType(vaults.getActiveVault().id, 'worldbuilding');
+  // Regression fixture: older builds left this row behind when exiting the demo,
+  // making the next click fail with a primary-key collision.
+  db.prepare(`
+    INSERT INTO world_scene_days
+      (scene_id, mode, offset_days, anchor_world_day, created_at, updated_at)
+    VALUES
+      ('demo-world-scene-prologue', 'anchor', 0, 0, '2026-01-01', '2026-01-01')
+  `).run();
   assert.equal(worldbuilding.seedWorldbuildingDemoData(), true);
   for (const [label, table, where] of [
     ['characters', 'persons', "person_id LIKE 'demo-world-%'"],
@@ -241,6 +249,7 @@ try {
   assert.equal(worldbuilding.seedWorldbuildingDemoData(), false, 'worldbuilding demo cannot be seeded twice');
   academic.clearDemoData();
   assert.equal(count('persons', "person_id LIKE 'demo-world-%'"), 0);
+  assert.equal(count('world_scene_days', "scene_id LIKE 'demo-world-%'"), 0, 'worldbuilding cleanup removes scene chronology');
   assert.equal(count('world_maps', "map_id LIKE 'demo-world-%'"), 0);
   assert.equal(count('world_articles', "article_id LIKE 'demo-world-%'"), 0);
   assert.equal(count('world_calendar'), 0);

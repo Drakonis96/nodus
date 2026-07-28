@@ -377,6 +377,17 @@ export function seedWorldbuildingDemoData(): boolean {
 
   const L = locale();
   const db = getDb();
+  // Builds before 2.7.0 forgot this child table when leaving the demo. Recover those
+  // vaults here so the next click can seed normally instead of colliding with nine
+  // orphaned scene chronology rows.
+  db.prepare(
+    `DELETE FROM world_scene_days
+      WHERE scene_id LIKE 'demo-world-%'
+        AND NOT EXISTS (
+          SELECT 1 FROM world_scenes
+           WHERE world_scenes.scene_id = world_scene_days.scene_id
+        )`
+  ).run();
   const tx = db.transaction(() => {
     // Calendar: two eras and six distinct months exercise exact dates, backwards eras,
     // month ordering and the fallback to year-only dates.
@@ -1016,6 +1027,7 @@ export function clearWorldbuildingDemoData(): void {
 
     // Scene and map children before their owners.
     db.prepare("DELETE FROM scene_characters WHERE scene_id LIKE 'demo-world-%' OR person_id LIKE 'demo-world-%'").run();
+    db.prepare("DELETE FROM world_scene_days WHERE scene_id LIKE 'demo-world-%'").run();
     db.prepare("DELETE FROM world_images WHERE image_id LIKE 'demo-world-%' OR entity_id LIKE 'demo-world-%'").run();
     db.prepare("DELETE FROM map_markers WHERE marker_id LIKE 'demo-world-%' OR map_id LIKE 'demo-world-%'").run();
     db.prepare("DELETE FROM map_layers WHERE layer_id LIKE 'demo-world-%' OR map_id LIKE 'demo-world-%'").run();
