@@ -60,7 +60,7 @@ test('the shared storage pipeline preserves exact source bytes and derives only 
 test('every worldbuilding demo visual has a larger lossless original beside its thumbnail', async () => {
   const assetDir = path.join(root, 'electron/assets/worldbuilding-demo');
   const originals = fs.readdirSync(assetDir).filter((file) => file.endsWith('.png')).sort();
-  assert.equal(originals.length, 45);
+  assert.equal(originals.length, 55);
 
   for (const originalName of originals) {
     const thumbnailName = originalName.replace(/\.png$/, '.webp');
@@ -84,7 +84,9 @@ test('every worldbuilding demo visual has a larger lossless original beside its 
 
 test('every character card thumbnail is derived from the same image its dossier opens', async () => {
   const assetDir = path.join(root, 'electron/assets/worldbuilding-demo');
-  const originals = fs.readdirSync(assetDir).filter((file) => /^character-.*\.png$/.test(file)).sort();
+  const originals = fs.readdirSync(assetDir)
+    .filter((file) => /^character-[a-z]+\.png$/.test(file))
+    .sort();
   assert.equal(originals.length, 10);
 
   for (const originalName of originals) {
@@ -102,6 +104,38 @@ test('every character card thumbnail is derived from the same image its dossier 
     assert.ok(
       meanAbsoluteError < 8,
       `${originalName} and its card thumbnail diverge (MAE ${meanAbsoluteError.toFixed(2)})`
+    );
+  }
+});
+
+test('every character gallery thumbnail is derived from its own high-resolution scene', async () => {
+  const assetDir = path.join(root, 'electron/assets/worldbuilding-demo');
+  const originals = fs.readdirSync(assetDir)
+    .filter((file) => /^character-[a-z]+-gallery\.png$/.test(file))
+    .sort();
+  assert.equal(originals.length, 10);
+
+  for (const originalName of originals) {
+    const originalPath = path.join(assetDir, originalName);
+    const thumbnailPath = originalPath.replace(/\.png$/, '.webp');
+    const metadata = await sharp(originalPath).metadata();
+    assert.deepEqual(
+      [metadata.width, metadata.height],
+      [1448, 1086],
+      `${originalName} keeps the generated source resolution`
+    );
+    const [original, thumbnail] = await Promise.all([
+      sharp(originalPath).resize(160, 120, { fit: 'fill' }).removeAlpha().raw().toBuffer(),
+      sharp(thumbnailPath).resize(160, 120, { fit: 'fill' }).removeAlpha().raw().toBuffer(),
+    ]);
+    let absoluteError = 0;
+    for (let index = 0; index < original.length; index += 1) {
+      absoluteError += Math.abs(original[index] - thumbnail[index]);
+    }
+    const meanAbsoluteError = absoluteError / original.length;
+    assert.ok(
+      meanAbsoluteError < 8,
+      `${originalName} and its gallery thumbnail diverge (MAE ${meanAbsoluteError.toFixed(2)})`
     );
   }
 });

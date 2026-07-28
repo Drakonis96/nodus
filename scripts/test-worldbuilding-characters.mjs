@@ -267,6 +267,11 @@ try {
   assert.equal(entities.getPersonPortrait(arcSubject.personId), null, 'no avatar yet');
   repo.setCharacterAvatarFromImage(shot.imageId);
   assert.deepEqual(entities.getPersonPortrait(arcSubject.personId).blob, png, 'the avatar got the bytes');
+  assert.equal(
+    repo.listCharacterImages(arcSubject.personId).length,
+    0,
+    'exact avatar copies are omitted from the gallery even if legacy rows still exist'
+  );
   repo.deleteCharacterImage(shot.imageId);
   const avatarAfterDelete = entities.getPersonPortrait(arcSubject.personId);
   // Asserted as a presence check first: a pointer-based avatar would leave this null and

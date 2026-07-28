@@ -539,7 +539,20 @@ function hydrateEvents(rows: WorldDateRow[]): CharacterEvent[] {
 // shared with places, groups and scenes.
 
 export function listCharacterImages(personId: string): CharacterImage[] {
-  return listWorldImages('character', personId);
+  const duplicateRows = getDb()
+    .prepare(
+      `SELECT wi.image_id
+         FROM world_images wi
+         JOIN person_portraits pp
+           ON pp.person_id = wi.entity_id
+          AND pp.blob = wi.blob
+        WHERE wi.entity_kind = 'character'
+          AND wi.entity_id = ?`
+    )
+    .all(personId) as Array<{ image_id: string }>;
+  if (duplicateRows.length === 0) return listWorldImages('character', personId);
+  const duplicates = new Set(duplicateRows.map((row) => row.image_id));
+  return listWorldImages('character', personId).filter((image) => !duplicates.has(image.imageId));
 }
 
 export function getCharacterImageBlob(imageId: string): { blob: Buffer; mime: string } | null {

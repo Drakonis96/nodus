@@ -51,8 +51,8 @@ try {
   const demoAssetFiles = fs.readdirSync(demoAssetDir);
   const originalAssets = demoAssetFiles.filter((file) => file.endsWith('.png'));
   const thumbnailAssets = demoAssetFiles.filter((file) => file.endsWith('.webp'));
-  assert.equal(originalAssets.length, 45, 'worldbuilding ships every full-resolution demo original');
-  assert.equal(thumbnailAssets.length, 45, 'every original has an independent compact thumbnail');
+  assert.equal(originalAssets.length, 55, 'worldbuilding ships every full-resolution demo original');
+  assert.equal(thumbnailAssets.length, 55, 'every original has an independent compact thumbnail');
   assert.deepEqual(
     originalAssets.map((file) => file.replace(/\.png$/, '')).sort(),
     thumbnailAssets.map((file) => file.replace(/\.webp$/, '')).sort(),
@@ -159,17 +159,20 @@ try {
   );
 
   // Regression: older demo builds paired the lossless original with an independently
-  // produced thumbnail, so opening a character appeared to swap people. The upgrade
-  // repairs both the primary portrait and gallery copy, but leaves a user replacement
-  // alone because its original bytes no longer match the shipped asset.
+  // produced thumbnail, and also copied the avatar itself into the gallery. The upgrade
+  // repairs the portrait pair and replaces only that demo-owned duplicate with a real
+  // secondary scene, while preserving author-owned replacements.
   const elanThumbnail = fs.readFileSync(path.join(demoAssetDir, 'character-elan.webp'));
+  const elanOriginal = fs.readFileSync(path.join(demoAssetDir, 'character-elan.png'));
+  const elanGalleryOriginal = fs.readFileSync(path.join(demoAssetDir, 'character-elan-gallery.png'));
+  const elanGalleryThumbnail = fs.readFileSync(path.join(demoAssetDir, 'character-elan-gallery.webp'));
   const wrongThumbnail = fs.readFileSync(path.join(demoAssetDir, 'character-aurel.webp'));
   db.prepare(
     "UPDATE person_portraits SET thumbnail = ? WHERE person_id = 'demo-world-char-elan'"
   ).run(wrongThumbnail);
   db.prepare(
-    "UPDATE world_images SET thumbnail = ? WHERE image_id = 'demo-world-image-character-char-elan-0'"
-  ).run(wrongThumbnail);
+    "UPDATE world_images SET bytes = ?, blob = ?, thumbnail = ? WHERE image_id = 'demo-world-image-character-char-elan-0'"
+  ).run(elanOriginal.length, elanOriginal, wrongThumbnail);
   const customOriginal = Buffer.from('author-owned-original');
   const customThumbnail = Buffer.from('author-owned-thumbnail');
   const veshPortrait = db.prepare(
@@ -192,8 +195,12 @@ try {
     'legacy character card thumbnail is rebuilt from the matching original'
   );
   assert.ok(
-    db.prepare("SELECT thumbnail FROM world_images WHERE image_id = 'demo-world-image-character-char-elan-0'").get().thumbnail.equals(elanThumbnail),
-    'legacy gallery thumbnail is rebuilt from the matching original'
+    db.prepare("SELECT blob FROM world_images WHERE image_id = 'demo-world-image-character-char-elan-0'").get().blob.equals(elanGalleryOriginal),
+    'legacy avatar copy is replaced by a distinct secondary gallery original'
+  );
+  assert.ok(
+    db.prepare("SELECT thumbnail FROM world_images WHERE image_id = 'demo-world-image-character-char-elan-0'").get().thumbnail.equals(elanGalleryThumbnail),
+    'legacy gallery thumbnail is rebuilt from that secondary original'
   );
   assert.ok(
     db.prepare("SELECT thumbnail FROM person_portraits WHERE person_id = 'demo-world-char-vesh'").get().thumbnail.equals(customThumbnail),
@@ -378,6 +385,19 @@ try {
       portrait.thumbnail.equals(fs.readFileSync(path.join(demoAssetDir, `character-${slug}.webp`))),
       `${slug} card uses the thumbnail derived from that original`
     );
+    const gallery = db.prepare(
+      "SELECT blob, thumbnail FROM world_images WHERE entity_kind = 'character' AND entity_id = ?"
+    ).get(personId);
+    assert.ok(
+      gallery.blob.equals(fs.readFileSync(path.join(demoAssetDir, `character-${slug}-gallery.png`))),
+      `${slug} gallery opens its own high-resolution scene`
+    );
+    assert.ok(
+      gallery.thumbnail.equals(fs.readFileSync(path.join(demoAssetDir, `character-${slug}-gallery.webp`))),
+      `${slug} gallery card is derived from that same scene`
+    );
+    assert.ok(!gallery.blob.equals(portrait.blob), `${slug} does not repeat its avatar in the gallery`);
+    assert.equal(characters.listCharacterImages(personId).length, 1, `${slug} exposes one distinct gallery scene`);
   }
 
   // A populated table is not enough: every non-AI reader behind the eighteen

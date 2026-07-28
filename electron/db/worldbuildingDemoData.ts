@@ -40,6 +40,7 @@ const PREVIOUS_AT = '2026-07-21T12:00:00.000Z';
 const IMAGE_AT = '2026-07-28T21:00:00.000Z';
 const MATCHED_THUMBNAIL_AT = '2026-07-28T22:45:00.000Z';
 const DISTINCT_GROUP_ART_AT = '2026-07-28T23:15:00.000Z';
+const DISTINCT_CHARACTER_GALLERY_AT = '2026-07-28T23:45:00.000Z';
 
 type DemoLocale = AppLanguage;
 type Localized = WorldbuildingDemoLocalized;
@@ -369,7 +370,9 @@ const LORE_ASSET_BY_ID: Record<string, string> = {
 
 function demoImageAsset(entityKind: string, entityId: string, thumbnail = false): string {
   let fileName: string;
-  if (entityKind === 'character') fileName = `character-${entityId.slice(`${PREFIX}char-`.length)}.webp`;
+  if (entityKind === 'character') {
+    fileName = `character-${entityId.slice(`${PREFIX}char-`.length)}-gallery.webp`;
+  }
   else if (entityKind === 'place') fileName = `place-${entityId.slice(`${PREFIX}place-`.length)}.webp`;
   else {
     const mapped = LORE_ASSET_BY_ID[entityId];
@@ -387,7 +390,7 @@ function demoImage(entityKind: string, entityId: string, title: string, order = 
     image_id: `${PREFIX}image-${entityKind}-${entityId.slice(PREFIX.length)}-${order}`,
     entity_kind: entityKind,
     entity_id: entityId,
-    kind: group?.kind === 'house' ? 'emblem' : order === 0 ? 'portrait' : 'other',
+    kind: group?.kind === 'house' ? 'emblem' : entityKind === 'character' ? 'full_body' : order === 0 ? 'portrait' : 'other',
     label: title,
     mime_type: 'image/png',
     bytes: bytes.length,
@@ -497,8 +500,9 @@ export function upgradeWorldbuildingDemoImageQuality(): boolean {
       }
     }
 
-    // The character gallery repeats the portrait as its first image and uses the same
-    // thumbnail/original split, so keep that pair under the identical invariant.
+    // Early demo builds inserted the primary portrait again as the sole gallery image.
+    // Replace only that deterministic, still-demo-owned copy with a genuine secondary
+    // scene. The card derivative is always shipped beside that exact scene original.
     const currentCharacterImages = db
       .prepare(
         `SELECT image_id, entity_id, blob, thumbnail
@@ -510,18 +514,27 @@ export function upgradeWorldbuildingDemoImageQuality(): boolean {
         entity_id: string;
         blob: Buffer;
         thumbnail: Buffer | null;
-      }>;
+    }>;
     for (const image of currentCharacterImages) {
       const base = `character-${image.entity_id.slice(`${PREFIX}char-`.length)}`;
-      const shippedOriginal = demoAsset(`${base}.png`);
-      const shippedThumbnail = demoAsset(`${base}.webp`);
-      if (image.blob.equals(shippedOriginal) && !image.thumbnail?.equals(shippedThumbnail)) {
-        db.prepare(
-          `UPDATE world_images
-              SET thumbnail = ?, thumbnail_mime_type = 'image/webp', updated_at = ?
-            WHERE image_id = ? AND blob = ?`
-        ).run(shippedThumbnail, MATCHED_THUMBNAIL_AT, image.image_id, shippedOriginal);
-      }
+      const legacyPortrait = demoAsset(`${base}.png`);
+      const expectedOriginal = demoAsset(`${base}-gallery.png`);
+      const expectedThumbnail = demoAsset(`${base}-gallery.webp`);
+      if (!image.blob.equals(legacyPortrait) && !image.blob.equals(expectedOriginal)) continue;
+      if (image.blob.equals(expectedOriginal) && image.thumbnail?.equals(expectedThumbnail)) continue;
+      db.prepare(
+        `UPDATE world_images
+            SET kind = 'full_body', bytes = ?, blob = ?, thumbnail = ?,
+                thumbnail_mime_type = 'image/webp', updated_at = ?
+          WHERE image_id = ? AND blob = ?`
+      ).run(
+        expectedOriginal.length,
+        expectedOriginal,
+        expectedThumbnail,
+        DISTINCT_CHARACTER_GALLERY_AT,
+        image.image_id,
+        image.blob
+      );
     }
 
     // Early demo data reused one cultural illustration for every culture, and one
