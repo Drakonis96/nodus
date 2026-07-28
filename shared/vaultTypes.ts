@@ -298,6 +298,13 @@ export const VAULT_TYPE_SCOPED_VIEWS: Record<string, VaultType[]> = {
   // shared person ontology plus the `character_profiles` overlay, but the view itself is
   // its own (a card grid, not the genealogy list + dossier split).
   characters: ['worldbuilding'],
+  // The encyclopedia is an index over every other worldbuilding section, so it exists
+  // only where those sections do.
+  encyclopedia: ['worldbuilding'],
+  continuity: ['worldbuilding'],
+  conflicts: ['worldbuilding'],
+  arcs: ['worldbuilding'],
+  rules: ['worldbuilding'],
   places: ['worldbuilding'],
   factions: ['worldbuilding'],
   cultures: ['worldbuilding'],

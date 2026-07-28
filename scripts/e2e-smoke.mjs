@@ -2544,7 +2544,9 @@ try {
   // inert rather than disappearing.
   const worldSidebar = page.getByTestId('worldbuilding-sidebar');
   await worldSidebar.waitFor({ timeout: 30_000 });
-  assert.equal(await worldSidebar.getByRole('button', { name: 'Enciclopedia', exact: true }).isDisabled(), true,
+  // Pick a section that is STILL inert. This assertion has to move each time one of the
+  // announced sections graduates, and its failure means exactly that — not a regression.
+  assert.equal(await worldSidebar.getByRole('button', { name: 'Preguntas abiertas', exact: true }).isDisabled(), true,
     'a section that is not built yet must not be clickable');
   assert.equal(await worldSidebar.getByRole('button', { name: 'Personajes', exact: true }).isDisabled(), false);
   assert.equal(await page.getByTestId('nodus-logo').getAttribute('data-vault-logo'), 'worldbuilding');
@@ -2625,7 +2627,11 @@ try {
 
   // The coherence check fires on a real contradiction and stays silent otherwise. It is
   // rendered ONLY when it has something to say, so its absence beforehand is the control.
-  assert.equal(await page.getByTestId('character-dossier-checks').count(), 0, 'a clean sheet shows no warnings');
+  //
+  // It now arrives through the CONTINUITY BADGE rather than through the character sheet's
+  // own warnings block: the same finding, in one wording, for every kind of entity. Two
+  // renderings of one problem taught a writer that the app did not know what it thought.
+  assert.equal(await page.getByTestId('continuity-badge').count(), 0, 'a clean sheet shows no warnings');
   // Written straight through the IPC bridge, so the renderer's copy has to be refreshed
   // by a reload — otherwise the sheet keeps rendering the character it already had.
   await page.evaluate(async () => {
@@ -2641,9 +2647,10 @@ try {
   };
   await page.reload();
   await openFirstCharacter();
-  const checks = page.getByTestId('character-dossier-checks');
+  const checks = page.getByTestId('continuity-badge');
   await checks.waitFor({ timeout: 30_000 });
-  assert.match(await checks.innerText(), /después de morir/, 'an event after death is reported');
+  await checks.getByRole('button').first().click();
+  assert.match(await checks.textContent(), /después de morir/, 'an event after death is reported');
   await page.evaluate(async () => {
     const [character] = await window.nodus.listCharacters();
     await window.nodus.updateCharacter(character.personId, { deathYearSort: null, lifeStatus: 'alive' });
@@ -2651,7 +2658,7 @@ try {
   await page.reload();
   await openFirstCharacter();
   assert.equal(
-    await page.getByTestId('character-dossier-checks').count(),
+    await page.getByTestId('continuity-badge').count(),
     0,
     'and the warning disappears once the contradiction is gone'
   );
@@ -2776,7 +2783,408 @@ try {
   await page.getByTestId('character-card').first().click();
   await page.getByTestId('character-dossier-appearances').waitFor({ timeout: 30_000 });
   assert.match(await page.getByTestId('character-dossier-appearances').innerText(), /La caída de Vael/);
+  {
+    // The strip that fills three sections. It is the only place a writer is willing to say
+    // "in this scene, this moves like so", so it has to work from inside the scene sheet
+    // with no trip to another screen.
+    // Back to the scene: the previous block navigated to Personajes to check the
+    // appearance from the other side.
+    await openSection('Escenas', 'scenes-grid');
+    await page.getByTestId('scene-card').first().click();
+    await page.getByTestId('scene-threads').waitFor({ timeout: 15_000 });
+    await page.getByTestId('scene-threads').getByRole('button', { name: '+ Conflicto', exact: true }).click();
+    await page.getByPlaceholder('Quién quiere qué contra quién').fill('La guerra por el vado');
+    await page.getByTestId('scene-threads').getByRole('button', { name: 'Crear', exact: true }).click();
+    const row = page.getByTestId('scene-thread-row').first();
+    await row.waitFor({ timeout: 15_000 });
+    assert.match(await row.textContent(), /La guerra por el vado/);
+
+    // Creating it records a beat, so the scene already counts towards the conflict.
+    const beats = await page.evaluate(async () => (await window.nodus.listWorldBeats()).length);
+    assert.equal(beats, 1, 'a thread created from a scene starts moved by that scene');
+
+    // The mark is a set, not a list: pressing another one replaces it.
+    await row.getByRole('button', { name: 'Gira', exact: true }).click();
+    await page.waitForFunction(
+      async () => (await window.nodus.listWorldBeats())[0]?.mark === 'turn',
+      undefined,
+      { timeout: 15_000 }
+    );
+
+    // And the day chain writes the canonical world day from a relation, not a number.
+    await page.getByTestId('scene-day-chain').waitFor({ timeout: 15_000 });
+  }
+
+  {
+    // Continuity, as a badge on the sheet the writer is already looking at — built before
+    // the section in the menu on purpose. Two scenes, one character, the same world day.
+    const secondScene = await page.evaluate(async () => {
+      const [first] = await window.nodus.listScenes('narrative');
+      const places = await window.nodus.listWorldPlaces();
+      const characters = await window.nodus.listCharacters();
+      const other = await window.nodus.createScene({ title: 'En otra parte' });
+      // A DIFFERENT place, so the two scenes really do contradict each other.
+      const elsewhere = await window.nodus.createWorldPlace({ name: 'Ninguna parte', kind: 'city' });
+      await window.nodus.updateScene(other.sceneId, { placeId: elsewhere.placeId });
+      await window.nodus.updateScene(first.sceneId, { placeId: places[0].placeId });
+      await window.nodus.addSceneCharacter(other.sceneId, characters[0].personId);
+      await window.nodus.setSceneDayLink(first.sceneId, { mode: 'anchor', offsetDays: 0, anchorWorldDay: 412 });
+      await window.nodus.setSceneDayLink(other.sceneId, { mode: 'same', offsetDays: 0, anchorWorldDay: null });
+      return other.sceneId;
+    });
+
+    const found = await page.evaluate(async () => {
+      const all = await window.nodus.runWorldContinuity();
+      return all.filter((finding) => finding.checkId === 'presence.bilocation').length;
+    });
+    assert.equal(found, 1, 'two places on one day is a contradiction');
+
+    // The badge has to reach the writer where they already are: the character sheet.
+    await openSection('Personajes', 'characters-grid');
+    await page.getByTestId('character-card').first().click();
+    const badge = page.getByTestId('continuity-badge');
+    await badge.waitFor({ timeout: 20_000 });
+    assert.match(await badge.textContent(), /contradicciones/);
+
+    // The section itself. It is a READING of the world: no create button, and the only
+    // thing it writes is the silence.
+    await openSection('Continuidad', 'continuity-grid');
+    const row = page.getByTestId('continuity-row').filter({ hasText: 'a la vez' }).first();
+    await row.waitFor({ timeout: 20_000 });
+    assert.equal(
+      await page.getByRole('button', { name: 'Crear el primero', exact: true }).count(),
+      0,
+      'a reading of the world has nothing to create'
+    );
+    await row.click();
+    const sheet = page.getByTestId('continuity-sheet');
+    await sheet.waitFor({ timeout: 15_000 });
+    // "Why I say so" is not politeness: a warning whose reasoning cannot be followed is a
+    // warning the writer learns to skip.
+    assert.match(await sheet.textContent(), /Alguien está en dos lugares distintos/);
+
+    // Silence it with a canned reason, and check the silence sticks.
+    await sheet.getByTestId('mute-double').click();
+    await page.waitForFunction(
+      async () => !(await window.nodus.runWorldContinuity()).some((f) => f.checkId === 'presence.bilocation'),
+      undefined,
+      { timeout: 20_000 }
+    );
+    assert.equal(
+      await page.evaluate(async () =>
+        (await window.nodus.runWorldContinuityUnfiltered()).some((f) => f.checkId === 'presence.bilocation')
+      ),
+      true,
+      'but the exceptions screen can still see it'
+    );
+
+    // THE POINT OF A NUMBERLESS FINGERPRINT: moving the date must not resurrect it.
+    await page.evaluate(async () => {
+      const [first] = await window.nodus.listScenes('narrative');
+      await window.nodus.setSceneDayLink(first.sceneId, { mode: 'anchor', offsetDays: 0, anchorWorldDay: 999 });
+    });
+    assert.equal(
+      await page.evaluate(async () =>
+        (await window.nodus.runWorldContinuity()).some((f) => f.checkId === 'presence.bilocation')
+      ),
+      false,
+      'changing the day must not bring back an exception the author already judged'
+    );
+
+    // And it is listed, readable, under the exceptions the author accepted.
+    await page.getByTestId('continuity-exceptions').click();
+    const modal = page.getByTestId('exceptions-modal');
+    await modal.waitFor({ timeout: 15_000 });
+    assert.match(await modal.textContent(), /Tiene un doble/, 'the reason is shown, not the fingerprint');
+    await modal.getByRole('button', { name: 'Volver a avisarme', exact: true }).click();
+    await page.waitForFunction(
+      async () => (await window.nodus.listNoticeMutes()).length === 0,
+      undefined,
+      { timeout: 15_000 }
+    );
+    // Close it: a `fixed inset-0` backdrop left open swallows every later click in the
+    // run, and the failure then points at whatever came next rather than at this.
+    await modal.getByRole('button', { name: 'Cerrar', exact: true }).click();
+    await modal.waitFor({ state: 'detached', timeout: 15_000 });
+
+    await page.evaluate(async (sceneId) => window.nodus.deleteScene(sceneId), secondScene);
+  }
+
+  {
+    // Conflicts. The board is the product: it is the one thing a writer cannot do in their
+    // head past fifteen characters, so the section opens on it and not on a list.
+    //
+    // Somebody ON STAGE and wanting nothing has to exist, or the diagnosis the board is
+    // built for has nothing to point at and the assertion below proves nothing.
+    await page.evaluate(async () => {
+      const walkOn = await window.nodus.createCharacter({ displayName: 'Bruma la Callada' });
+      const [scene] = await window.nodus.listScenes('narrative');
+      await window.nodus.addSceneCharacter(scene.sceneId, walkOn.personId);
+    });
+    await openSection('Conflictos', 'conflicts-board');
+    const board = page.getByTestId('conflicts-board');
+    await board.waitFor({ timeout: 20_000 });
+    assert.match(await board.textContent(), /La guerra por el vado/, 'the conflict created from a scene is a column');
+
+    // The diagnosis the board exists for: page time with nothing at stake, at the top.
+    const firstRow = page.getByTestId('conflicts-board-row').first();
+    assert.equal(await firstRow.getAttribute('data-stakes'), '0', 'whoever wants nothing comes first');
+    assert.match(await firstRow.textContent(), /Bruma la Callada/);
+    assert.match(
+      await page.getByTestId('conflicts-gaps').textContent(),
+      /Bruma la Callada/,
+      'and the diagnosis names them under the board'
+    );
+
+    // The list tab is infrastructure around it, and the sheet writes prose, never beats.
+    await page.getByTestId('conflicts-tab-list').click();
+    await page.getByTestId('conflict-row').first().click();
+    const sheet = page.getByTestId('conflict-sheet');
+    await sheet.waitFor({ timeout: 15_000 });
+    await page.getByPlaceholder('El paso del vado, y quién cobra por cruzarlo…').fill('Lo disputan [[Kaelen Vor]] y los suyos.');
+    await page.getByTestId('conflict-beats').click();
+    await waitForCondition('el pitch del conflicto se guarda y enlaza', () => page.evaluate(async () => {
+      const [thread] = await window.nodus.listWorldThreads('conflict');
+      return /nodus:\/\/world\/character\//.test(thread?.pitch ?? '');
+    }));
+
+    // A conflict is an encyclopedia entry: `[[la guerra…]]` has to resolve, and the
+    // character it names has to know it is mentioned.
+    const mentioned = await page.evaluate(async () => {
+      const [thread] = await window.nodus.listWorldThreads('conflict');
+      const entries = await window.nodus.listWorldEntries();
+      const entry = entries.find((item) => item.kind === 'conflict' && item.id === thread.threadId);
+      // By NAME, not by position: the cast is ordered by display name, so `[0]` is
+      // whoever sorts first — which is not the character the pitch mentions.
+      const characters = await window.nodus.listCharacters();
+      const kaelen = characters.find((character) => character.displayName === 'Kaelen Vor');
+      const backlinks = await window.nodus.worldBacklinks({ kind: 'character', id: kaelen.personId });
+      return { hasEntry: Boolean(entry), fromConflict: backlinks.some((link) => link.source.kind === 'conflict') };
+    });
+    assert.deepEqual(mentioned, { hasEntry: true, fromConflict: true });
+  }
+
+  {
+    // Arcs. The whole section is a READING of what the scene strip already writes, so the
+    // test writes through that strip and then checks the lane.
+    await openSection('Escenas', 'scenes-grid');
+    await page.getByTestId('scene-card').first().click();
+    const strip = page.getByTestId('scene-threads');
+    await strip.waitFor({ timeout: 15_000 });
+    await strip.getByRole('button', { name: '+ Arco', exact: true }).click();
+    await page.getByPlaceholder('Qué cambia, y en quién').fill('El deshielo de Kaelen');
+    await strip.getByRole('button', { name: 'Crear', exact: true }).click();
+    await waitForCondition('el arco queda creado con su primer hito', () => page.evaluate(async () => {
+      const arcs = await window.nodus.listWorldThreads('arc');
+      const beats = await window.nodus.listWorldBeats();
+      return arcs.length === 1 && beats.some((beat) => beat.threadKind === 'arc');
+    }));
+
+    await openSection('Arcos narrativos', 'arcs-lanes');
+    const lane = page.getByTestId('arc-lane').first();
+    await lane.waitFor({ timeout: 20_000 });
+    assert.match(await lane.textContent(), /El deshielo/);
+    // The lane has to have real width: an SVG drawn before the container is measured is
+    // the classic way this kind of view ships invisible.
+    const box = await lane.boundingBox();
+    assert.ok(box && box.width > 100, 'the lane is actually drawn, not collapsed');
+
+    // Selecting it opens the read-only sheet, which mirrors the character's own arc fields.
+    await lane.click();
+    await page.getByTestId('arc-sheet').waitFor({ timeout: 15_000 });
+
+    // And the milestone sheet copies as plain text in scene positions.
+    await page.getByTestId('arcs-copy-sheet').click();
+    const copied = await page.evaluate(async () => navigator.clipboard.readText());
+    assert.match(copied, /El deshielo de Kaelen/);
+    assert.doesNotMatch(copied, /%/, 'positions, never percentages');
+  }
+
+  {
+    // Rules. A law exists so that breaking it costs something, and the whole section turns
+    // on ONE question asked in the scene: is that price on the page?
+    await openSection('Reglas del mundo', 'rules-grid');
+    await page.getByRole('button', { name: 'Nueva regla', exact: true }).click();
+    await page.getByPlaceholder('Qué es siempre verdad en este mundo').fill('La sangre paga la sangre');
+    await page.getByTestId('new-rule-modal').getByRole('button', { name: 'Crear', exact: true }).click();
+    await page.getByTestId('rule-sheet').waitFor({ timeout: 15_000 });
+
+    // Put it to the test from the SCENE, which is the only place a writer will do it.
+    await openSection('Escenas', 'scenes-grid');
+    await page.getByTestId('scene-card').first().click();
+    const inPlay = page.getByTestId('rules-in-play');
+    await inPlay.waitFor({ timeout: 15_000 });
+    assert.match(await inPlay.textContent(), /La sangre paga la sangre/, 'a world-wide law is in play by default');
+    await inPlay.getByRole('button', { name: 'Se rompe', exact: true }).click();
+
+    // Three states. Marked but not judged must NOT accuse.
+    await waitForCondition('la rotura queda sin juzgar', () => page.evaluate(async () => {
+      const beats = await window.nodus.listWorldBeats();
+      const broken = beats.find((beat) => beat.threadKind === 'rule');
+      return broken?.mark === 'breaks' && broken.paid === null;
+    }));
+    assert.equal(
+      await page.evaluate(async () =>
+        (await window.nodus.runWorldContinuity()).some((f) => f.checkId === 'rule.unpaid')
+      ),
+      false,
+      'a break nobody has judged is not an accusation'
+    );
+
+    // Saying the price is NOT on the page is what turns it into a warning.
+    await inPlay.getByTestId('rule-paid-no').click();
+    await waitForCondition('el aviso de precio impagado aparece', () => page.evaluate(async () =>
+      (await window.nodus.runWorldContinuity()).some((f) => f.checkId === 'rule.unpaid')
+    ));
+
+    // And the law is an encyclopedia entry, so it can be cited from anywhere.
+    const isEntry = await page.evaluate(async () => {
+      const [rule] = await window.nodus.listWorldRules();
+      const entries = await window.nodus.listWorldEntries();
+      return entries.some((entry) => entry.kind === 'rule' && entry.id === rule.ruleId);
+    });
+    assert.equal(isEntry, true);
+  }
+
+  console.log('[e2e] worldbuilding rules: created, put to the test from the scene, unpaid price reaches Continuidad');
+
+  console.log('[e2e] worldbuilding arcs: lanes drawn from the scene strip, sheet, milestone sheet');
+
+  console.log('[e2e] worldbuilding conflicts: board, stake gaps, sheet prose indexed as an encyclopedia entry');
+
+  console.log('[e2e] worldbuilding continuity: badge on the sheet, section, canned silence that survives a date change');
+
   console.log('[e2e] worldbuilding places, factions, cultures and scenes work through the shared workspace');
+
+  // ── The encyclopedia ───────────────────────────────────────────────────────
+  // The one section that is an index over all the others, so it is also the only one
+  // whose correctness depends on the rest of the vault already existing. Four things are
+  // provable only here: that a character created in another section shows up as a
+  // read-only projection, that `[[` writes a real link, that the backlink appears on the
+  // other side, and that creating an entry from a red link repairs the body that was
+  // waiting for it.
+  await worldSidebar.getByRole('button', { name: 'Enciclopedia', exact: true }).click();
+  await page.getByTestId('encyclopedia-grid').waitFor({ timeout: 30_000 });
+
+  {
+    // Kaelen was created in the Personajes block above, and the places/factions/scenes
+    // block after it added more: the index is a read, so they are all here already.
+    const kaelen = page.getByTestId('encyclopedia-entry').filter({ hasText: 'Kaelen Vor' }).first();
+    await kaelen.waitFor({ timeout: 15_000 });
+    await kaelen.click();
+    await page.getByTestId('entry-reader').waitFor({ timeout: 15_000 });
+    assert.equal(
+      await page.getByTestId('entry-edit').count(),
+      0,
+      'a projected entry is read in the encyclopedia and edited in its own section'
+    );
+    assert.equal(await page.getByTestId('entry-full-sheet').count(), 1, 'and it offers the way there');
+  }
+
+  // A native article: the lore that hangs off no entity, which had nowhere to live before.
+  await page.getByRole('button', { name: 'Nuevo artículo', exact: true }).click();
+  await page.getByPlaceholder('Título de la entrada').fill('Magia de sangre');
+  await page.getByRole('button', { name: 'Crear', exact: true }).click();
+  await page.getByTestId('entry-reader').waitFor({ timeout: 15_000 });
+  await page.getByTestId('entry-edit').click();
+  await page.getByTestId('entry-editor').waitFor({ timeout: 15_000 });
+
+  {
+    // Typing `[[` must offer the whole world, not just the articles.
+    const area = page.getByPlaceholder('Escribe la entrada…');
+    await area.fill('La practican [[Kaelen');
+    await page.getByTestId('entry-link-autocomplete').waitFor({ timeout: 15_000 });
+    await page.getByTestId('entry-link-autocomplete').getByRole('button').first().click();
+    const afterPick = await area.inputValue();
+    assert.match(
+      afterPick,
+      /\[Kaelen Vor\]\(nodus:\/\/world\/character\//,
+      'picking from the autocomplete writes the resolved form, which is what survives a rename'
+    );
+    // And a name typed straight through is promoted on save, so the author never has to
+    // learn that there are two link forms.
+    await area.fill(`${afterPick} y también [[Vael]], guardadas por [[Los Sin Nombre]].`);
+    await page.getByTestId('entry-editor-save').click();
+    // What the save must produce is an OUTGOING link rendered as a clickable world link.
+    // (Backlinks belong to the other side — they are checked on Kaelen, below.)
+    await page
+      .getByTestId('entry-reader')
+      .getByRole('button', { name: 'Kaelen Vor', exact: true })
+      .first()
+      .waitFor({ timeout: 15_000 });
+  }
+
+  {
+    // The other side of the link: Kaelen now knows he is mentioned.
+    const kaelen = page.getByTestId('encyclopedia-entry').filter({ hasText: 'Kaelen Vor' }).first();
+    await kaelen.click();
+    const backlinks = page.getByTestId('entry-backlinks');
+    await backlinks.waitFor({ timeout: 15_000 });
+    // textContent, not innerText: a panel that has scrolled only lays out part of itself.
+    assert.match(await backlinks.textContent(), /Magia de sangre/, 'the backlink names the article');
+  }
+
+  {
+    // What the world names but never defines. The deterministic half of this analysis
+    // needs no AI provider — and there is none configured here — so a model failure must
+    // degrade to the unresolved links rather than take the feature down.
+    await page.getByTestId('analyze-missing').click();
+    const panel = page.getByTestId('missing-entries');
+    await panel.getByText('Los enlazaste y no existen', { exact: true }).waitFor({ timeout: 30_000 });
+    assert.match(
+      await panel.textContent(),
+      /Los Sin Nombre/,
+      'an unresolved [[link]] is a fact the author already stated, so it is always offered'
+    );
+  }
+
+  {
+    // The red link. `Los Sin Nombre` was never defined, so it stayed as [[…]] and is
+    // rendered as an invitation; following it creates the entry and repairs the body.
+    await page.getByTestId('encyclopedia-entry').filter({ hasText: 'Magia de sangre' }).first().click();
+    await page.getByTestId('entry-reader').waitFor({ timeout: 15_000 });
+    await page.getByRole('button', { name: 'Los Sin Nombre', exact: true }).first().click();
+    await page.getByTestId('create-from-link').click();
+    await page.getByTestId('create-from-link').waitFor({ state: 'detached', timeout: 15_000 });
+    const resolved = await page.evaluate(async () => (await window.nodus.worldUnresolvedLinks()).length);
+    assert.equal(resolved, 0, 'creating the entry linked every mention that was waiting for it');
+  }
+
+  {
+    // The second tier of the search: a word that lives only inside a character's
+    // appearance, deep in a paragraph no index row carries. `cicatriz` appears in
+    // Kaelen's description, written in the Personajes block above, and nowhere in any
+    // title or summary — so a hit proves the full-text path really ran.
+    await page.getByPlaceholder('Buscar en todo el mundo…').fill('cicatriz');
+    const footer = page.getByTestId('encyclopedia-fulltext');
+    await footer.waitFor({ timeout: 15_000 });
+    await footer.getByRole('button').first().click();
+    const hit = page.getByTestId('encyclopedia-fulltext').getByRole('button').first();
+    await hit.waitFor({ timeout: 20_000 });
+    assert.match(
+      await page.getByTestId('encyclopedia-fulltext').textContent(),
+      /Kaelen Vor/,
+      'the full-text search reaches prose that no index row carries'
+    );
+    await page.getByPlaceholder('Buscar en todo el mundo…').fill('');
+  }
+
+  {
+    // The world bible. The export itself ends in a native save dialog, which cannot be
+    // driven from here, so what this proves is the screen: that the three switches an
+    // author could regret are OFF when the modal opens.
+    await page.getByTestId('export-world-bible').click();
+    const modal = page.getByTestId('world-bible-modal');
+    await modal.waitFor({ timeout: 15_000 });
+    const checked = await modal.locator('input[type="checkbox"]').evaluateAll((boxes) =>
+      boxes.map((box) => box.checked)
+    );
+    assert.deepEqual(checked, [false, false, false], 'spoilers, private notes and AI drafts are opt-in');
+    await modal.getByRole('button', { name: 'Cancelar', exact: true }).click();
+    await modal.waitFor({ state: 'detached', timeout: 15_000 });
+  }
+
+  console.log('[e2e] worldbuilding encyclopedia: projections, [[links]], backlinks, red links and full-text search ok');
 
   // ── Maps ───────────────────────────────────────────────────────────────────
   // The one worldbuilding section whose core is a live Leaflet canvas, so this is the

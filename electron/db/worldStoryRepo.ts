@@ -13,8 +13,10 @@
 
 import { v4 as uuid } from 'uuid';
 import { getDb } from './database';
+import { computeSceneDays, reorderScenes } from '@shared/worldSceneDays';
 import { deleteImagesFor } from './worldImagesRepo';
 import type {
+  SceneDayLink,
   SceneAppearance,
   SecretKnower,
   WorldScene,
@@ -295,9 +297,14 @@ export function deleteScene(sceneId: string): void {
   const db = getDb();
   const remove = db.transaction(() => {
     deleteImagesFor('scene', sceneId);
+    // No cascade reaches these: the beats and the day declaration are owned here.
+    db.prepare('DELETE FROM world_beats WHERE scene_id = ?').run(sceneId);
+    db.prepare('DELETE FROM world_scene_days WHERE scene_id = ?').run(sceneId);
     db.prepare('DELETE FROM world_scenes WHERE scene_id = ?').run(sceneId);
   });
   remove();
+  // The chain is positional, so cutting a scene re-dates everything after it.
+  recomputeSceneDays();
 }
 
 /** Who appears in a scene. */
@@ -366,4 +373,93 @@ export function addSceneCharacter(sceneId: string, personId: string, role: strin
 
 export function removeSceneCharacter(id: string): void {
   getDb().prepare('DELETE FROM scene_characters WHERE id = ?').run(id);
+}
+
+// ── The chain of days ────────────────────────────────────────────────────────
+
+/**
+ * Every scene's day declaration.
+ *
+ * A scene with no row is not undated: it inherits the DDL default (offset 0, i.e. the same
+ * day as the one before it), which is what makes one anchor at the head of an act enough
+ * to date everything that follows.
+ */
+export function listSceneDayLinks(): SceneDayLink[] {
+  return (
+    getDb().prepare('SELECT * FROM world_scene_days').all() as {
+      scene_id: string;
+      mode: string;
+      offset_days: number;
+      anchor_world_day: number | null;
+    }[]
+  ).map((row) => ({
+    sceneId: row.scene_id,
+    mode: row.mode === 'anchor' ? 'anchor' : row.mode === 'same' ? 'same' : 'offset',
+    offsetDays: row.offset_days,
+    anchorWorldDay: row.anchor_world_day,
+  }));
+}
+
+export function setSceneDayLink(sceneId: string, link: Omit<SceneDayLink, 'sceneId'>): number {
+  const db = getDb();
+  const ts = now();
+  db.prepare(
+    `INSERT INTO world_scene_days (scene_id, mode, offset_days, anchor_world_day, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT(scene_id) DO UPDATE SET mode = excluded.mode, offset_days = excluded.offset_days,
+       anchor_world_day = excluded.anchor_world_day, updated_at = excluded.updated_at`
+  ).run(sceneId, link.mode, link.offsetDays, link.anchorWorldDay, ts, ts);
+  return recomputeSceneDays();
+}
+
+export function clearSceneDayLink(sceneId: string): number {
+  getDb().prepare('DELETE FROM world_scene_days WHERE scene_id = ?').run(sceneId);
+  return recomputeSceneDays();
+}
+
+/**
+ * Write `world_scenes.world_day` for the whole manuscript from the chain.
+ *
+ * `world_day` stays the canonical value — everything that compares two moments reads it,
+ * and SQLite has to be able to ORDER BY it — so this must run after ANY edit to the chain
+ * or to the narrative order. A chain edited without recomputing leaves the world ordered
+ * and WRONG, silently, which is the same trap `recomputeWorldDays()` documents for events.
+ */
+export function recomputeSceneDays(): number {
+  const db = getDb();
+  const scenes = db.prepare('SELECT scene_id, narrative_order FROM world_scenes').all() as {
+    scene_id: string;
+    narrative_order: number;
+  }[];
+  if (scenes.length === 0) return 0;
+  const links = new Map(listSceneDayLinks().map((link) => [link.sceneId, link]));
+  const days = computeSceneDays(
+    scenes.map((scene) => ({ sceneId: scene.scene_id, narrativeOrder: scene.narrative_order })),
+    links
+  );
+  const write = db.transaction(() => {
+    const update = db.prepare('UPDATE world_scenes SET world_day = ? WHERE scene_id = ?');
+    for (const [sceneId, day] of days) update.run(day, sceneId);
+  });
+  write();
+  return days.size;
+}
+
+/** Move a scene in the narrative order and renumber the rest, then re-date everything. */
+export function reorderScene(sceneId: string, toIndex: number): number {
+  const db = getDb();
+  const scenes = (
+    db.prepare('SELECT scene_id, narrative_order FROM world_scenes').all() as {
+      scene_id: string;
+      narrative_order: number;
+    }[]
+  ).map((row) => ({ sceneId: row.scene_id, narrativeOrder: row.narrative_order }));
+  const next = reorderScenes(scenes, sceneId, toIndex);
+  const ts = now();
+  const write = db.transaction(() => {
+    const update = db.prepare('UPDATE world_scenes SET narrative_order = ?, updated_at = ? WHERE scene_id = ?');
+    for (const entry of next) update.run(entry.narrativeOrder, ts, entry.sceneId);
+  });
+  write();
+  return recomputeSceneDays();
 }

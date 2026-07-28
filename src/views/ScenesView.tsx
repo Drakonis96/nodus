@@ -7,6 +7,10 @@ import { AutoSavingField } from '../components/AutoSavingField';
 import { Icon } from '../components/ui';
 import { confirm } from '../components/feedback';
 import { PERSON_DOSSIER_SECTION_CLASS } from '../components/personDossierLayout';
+import { SceneDayChain } from '../components/world/SceneDayChain';
+import { SceneThreadsPanel } from '../components/world/SceneThreadsPanel';
+import { RulesInPlay } from '../components/world/RulesInPlay';
+import { ContinuityBadge } from '../components/world/ContinuityBadge';
 import { t, tx } from '../i18n';
 
 const SCENE_STATUS_LABEL: Record<WorldSceneStatus, string> = {
@@ -185,6 +189,9 @@ function SceneSheet({
             />
           </label>
         </div>
+        <div className="mt-3">
+          <SceneDayChain scene={scene} onChanged={onChanged} />
+        </div>
         {/* The two orders are independent on purpose; saying so here is cheaper than
             letting an author discover it by filing a prologue wrong. */}
         <p className="mt-2 text-[10px] leading-4 text-neutral-600">
@@ -200,6 +207,18 @@ function SceneSheet({
           placeholder={t('Quién quiere qué, quién se lo impide y cómo acaba…')}
           onSave={(next) => save({ summary: next || null })}
         />
+      </section>
+
+      <ContinuityBadge entity={{ kind: 'scene', id: scene.sceneId }} />
+
+      {/* Placed right after the cast, and before it on purpose in the reading order of
+          the work: you decide who is in the room, and then what it costs them. */}
+      <section className={PERSON_DOSSIER_SECTION_CLASS}>
+        <SceneThreadsPanel scene={scene} cast={cast} onChanged={onChanged} />
+      </section>
+
+      <section className={PERSON_DOSSIER_SECTION_CLASS}>
+        <RulesInPlay scene={scene} onChanged={onChanged} />
       </section>
 
       <section className={PERSON_DOSSIER_SECTION_CLASS} data-testid="scene-sheet-cast">

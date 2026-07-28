@@ -26,6 +26,7 @@ import {
   updatePerson,
 } from './entitiesRepo';
 import { listAffiliationsForCharacter } from './worldGroupsRepo';
+import { deletePartiesForEntity } from './worldThreadsRepo';
 import {
   addWorldImage,
   deleteImagesFor,
@@ -397,6 +398,7 @@ export function deleteCharacter(personId: string): void {
   const db = getDb();
   const remove = db.transaction(() => {
     deleteImagesFor('character', personId);
+    deletePartiesForEntity('character', personId);
     deletePerson(personId);
   });
   remove();

@@ -555,6 +555,17 @@ import { generateCharacterBiography } from './ai/characterBiography';
 import { composeCharacterSheetMarkdown } from '@shared/characterSheetExport';
 import type { WorldPlaceInput } from '@shared/types';
 import type {
+  BeatThreadKind,
+  WorldRuleInput,
+  SceneDayLink,
+  ThreadPartySide,
+  WorldBeatInput,
+  WorldThreadInput,
+  WorldThreadKind,
+  WorldArticleDraftMode,
+  WorldArticleInput,
+  WorldBibleOptions,
+  WorldEntryRef,
   WorldGroupInput,
   WorldGroupKind,
   WorldImageEntityKind,
@@ -578,6 +589,11 @@ import {
   secretsForCharacter,
   updateScene,
   updateSecret,
+  listSceneDayLinks,
+  recomputeSceneDays,
+  setSceneDayLink,
+  clearSceneDayLink,
+  reorderScene,
 } from './db/worldStoryRepo';
 import {
   addAffiliation,
@@ -597,6 +613,60 @@ import {
   getWorldImageBlob,
   listWorldImages,
 } from './db/worldImagesRepo';
+import { draftWorldArticle } from './ai/worldArticleDraft';
+import { analyzeMissingEntries } from './ai/worldMissingEntries';
+import { exportWorldBible } from './export/worldBibleExport';
+import {
+  acceptRuleProposedText,
+  createWorldRule,
+  deleteWorldRule,
+  getWorldRule,
+  listWorldRules,
+  rulesInPlay,
+  setRuleProposedText,
+  updateWorldRule,
+} from './db/worldRulesRepo';
+import {
+  continuitySummary,
+  listNoticeMutes,
+  muteNotice,
+  runContinuity,
+  runContinuityUnfiltered,
+  unmuteNotice,
+} from './db/worldContinuityRepo';
+import {
+  beatsForScene,
+  createWorldThread,
+  deleteWorldBeat,
+  deleteWorldThread,
+  getWorldThread,
+  listWorldBeats,
+  listWorldThreads,
+  setThreadParties,
+  setWorldBeat,
+  threadBoardData,
+  threadSceneContext,
+  threadsForParty,
+  updateWorldThread,
+} from './db/worldThreadsRepo';
+import {
+  acceptArticleProposedBody,
+  acceptEntryProposal,
+  createWorldArticle,
+  deleteWorldArticle,
+  dismissEntryProposal,
+  listEntryProposals,
+  getWorldEntry,
+  indexEntryLinks,
+  listWorldEntries,
+  rebuildWorldLinks,
+  resolveWorldLink,
+  searchWorldBodies,
+  setArticleProposedBody,
+  updateWorldArticle,
+  worldBacklinks,
+  worldUnresolvedLinks,
+} from './db/worldEncyclopediaRepo';
 import {
   createWorldPlace,
   deleteWorldPlace,
@@ -1531,6 +1601,100 @@ export function registerIpc(
   h('world:setEventDate', async (_e, eventId: string, date: WorldDate, worldOrder?: number) => {
     setEventWorldDateFull(eventId, date, worldOrder ?? 0);
   });
+
+  // ── The encyclopedia ───────────────────────────────────────────────────────
+  h('encyclopedia:list', async () => listWorldEntries());
+  h('encyclopedia:get', async (_e, ref: WorldEntryRef) => getWorldEntry(ref));
+  h('encyclopedia:searchBodies', async (_e, query: string) => searchWorldBodies(query));
+  h('encyclopedia:createArticle', async (_e, input: WorldArticleInput) => createWorldArticle(input));
+  h('encyclopedia:updateArticle', async (_e, articleId: string, patch: WorldArticleInput) =>
+    updateWorldArticle(articleId, patch)
+  );
+  h('encyclopedia:deleteArticle', async (_e, articleId: string) => {
+    deleteWorldArticle(articleId);
+  });
+  h('encyclopedia:backlinks', async (_e, ref: WorldEntryRef) => worldBacklinks(ref));
+  h('encyclopedia:unresolved', async () => worldUnresolvedLinks());
+  h('encyclopedia:resolveLink', async (_e, text: string, target: WorldEntryRef) => resolveWorldLink(text, target));
+  h('encyclopedia:rebuildLinks', async () => rebuildWorldLinks());
+  // Re-index a sheet that is not an article after it is edited elsewhere, so a link
+  // written in a character's backstory shows up in the encyclopedia without a full rebuild.
+  h('encyclopedia:indexEntry', async (_e, ref: WorldEntryRef) => indexEntryLinks(ref));
+  h('encyclopedia:draft', async (_e, articleId: string, mode: WorldArticleDraftMode) =>
+    draftWorldArticle(articleId, mode)
+  );
+  h('encyclopedia:acceptDraft', async (_e, articleId: string) => acceptArticleProposedBody(articleId));
+  h('encyclopedia:rejectDraft', async (_e, articleId: string) => {
+    setArticleProposedBody(articleId, null);
+  });
+  h('encyclopedia:analyzeMissing', async () => analyzeMissingEntries());
+  h('encyclopedia:listProposals', async (_e, status?: 'pending' | 'accepted' | 'dismissed') =>
+    listEntryProposals(status)
+  );
+  h('encyclopedia:acceptProposal', async (_e, proposalId: string) => acceptEntryProposal(proposalId));
+  h('encyclopedia:dismissProposal', async (_e, proposalId: string) => {
+    dismissEntryProposal(proposalId);
+  });
+  h('encyclopedia:exportBible', async (_e, options: WorldBibleOptions) => exportWorldBible(options));
+
+  // ── The chain of days ──────────────────────────────────────────────────────
+  h('scenes:dayLinks', async () => listSceneDayLinks());
+  h('scenes:setDayLink', async (_e, sceneId: string, link: Omit<SceneDayLink, 'sceneId'>) =>
+    setSceneDayLink(sceneId, link)
+  );
+  h('scenes:clearDayLink', async (_e, sceneId: string) => clearSceneDayLink(sceneId));
+  h('scenes:reorder', async (_e, sceneId: string, toIndex: number) => reorderScene(sceneId, toIndex));
+
+  // ── Threads and beats ──────────────────────────────────────────────────────
+  h('threads:list', async (_e, kind?: WorldThreadKind) => listWorldThreads(kind));
+  h('threads:get', async (_e, threadId: string) => getWorldThread(threadId));
+  h('threads:create', async (_e, input: WorldThreadInput) => createWorldThread(input));
+  h('threads:update', async (_e, threadId: string, patch: WorldThreadInput) => updateWorldThread(threadId, patch));
+  h('threads:delete', async (_e, threadId: string) => {
+    deleteWorldThread(threadId);
+  });
+  h('threads:setParties', async (
+    _e,
+    threadId: string,
+    parties: { partyKind: 'character' | 'group'; partyId: string; side: ThreadPartySide }[]
+  ) => setThreadParties(threadId, parties));
+  h('threads:forParty', async (_e, partyKind: 'character' | 'group', partyId: string) =>
+    threadsForParty(partyKind, partyId)
+  );
+  h('threads:beats', async () => listWorldBeats());
+  h('threads:board', async () => threadBoardData());
+  h('threads:sceneContext', async () => threadSceneContext());
+  h('threads:beatsForScene', async (_e, sceneId: string) => beatsForScene(sceneId));
+  h('threads:setBeat', async (_e, input: WorldBeatInput) => {
+    setWorldBeat(input);
+  });
+  h('threads:deleteBeat', async (_e, threadKind: BeatThreadKind, threadId: string, sceneId: string) => {
+    deleteWorldBeat(threadKind, threadId, sceneId);
+  });
+
+  // ── Continuity ─────────────────────────────────────────────────────────────
+  h('continuity:run', async () => runContinuity());
+  h('continuity:runAll', async () => runContinuityUnfiltered());
+  h('continuity:mutes', async () => listNoticeMutes());
+  h('continuity:mute', async (_e, input: Parameters<typeof muteNotice>[0]) => muteNotice(input));
+  h('continuity:unmute', async (_e, fingerprint: string) => unmuteNotice(fingerprint));
+  h('continuity:summary', async () => continuitySummary());
+
+  // ── Rules ──────────────────────────────────────────────────────────────────
+  h('rules:list', async () => listWorldRules());
+  h('rules:get', async (_e, ruleId: string) => getWorldRule(ruleId));
+  h('rules:create', async (_e, input: WorldRuleInput) => createWorldRule(input));
+  h('rules:update', async (_e, ruleId: string, patch: WorldRuleInput) => updateWorldRule(ruleId, patch));
+  h('rules:delete', async (_e, ruleId: string) => {
+    deleteWorldRule(ruleId);
+  });
+  h('rules:inPlay', async (_e, sceneId: string) => rulesInPlay(sceneId));
+  h('rules:acceptDraft', async (_e, ruleId: string) => acceptRuleProposedText(ruleId));
+  h('rules:rejectDraft', async (_e, ruleId: string) => {
+    setRuleProposedText(ruleId, null);
+  });
+  // The one mechanical fix: re-derive every scene's world day from the chain.
+  h('scenes:recomputeDays', async () => recomputeSceneDays());
   h('characters:exportSheet', async (
     _e,
     personId: string,

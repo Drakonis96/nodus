@@ -14,6 +14,12 @@ import { DatabasesSidebarExplore } from './components/DatabasesSidebarExplore';
 import { StudySidebar, type StudyNavigationTarget } from './components/StudySidebar';
 import { TeachingSidebar } from './components/TeachingSidebar';
 import { WorldMapsView } from './views/WorldMapsView';
+import { EncyclopediaView } from './views/EncyclopediaView';
+import { CONTINUITY_VIEWS, ContinuityProvider } from './components/world/ContinuityBadge';
+import { ContinuityView } from './views/ContinuityView';
+import { ConflictsView } from './views/ConflictsView';
+import { ArcsView } from './views/ArcsView';
+import { RulesView } from './views/RulesView';
 import { WorldbuildingSidebar } from './components/WorldbuildingSidebar';
 import { FeedbackHost } from './components/feedback';
 import { PrivacyRequestHost } from './privacyNotices';
@@ -1332,6 +1338,10 @@ export function App() {
         )}
 
         {/* Main view */}
+        {/* One continuity snapshot for the whole worldbuilding vault. Every sheet's badge
+            filters the same array with `findingsFor()`, so a contradiction costs one set of
+            queries rather than one per open sheet. */}
+        <ContinuityProvider enabled={isWorldbuilding} revision={CONTINUITY_VIEWS.has(view) ? view : undefined}>
         <main className="flex flex-1 min-w-0 flex-col overflow-hidden" data-nodi-view={view}>
           {/* A backup system that fails quietly is worse than none: until now the only
               trace of a broken schedule was a grey line inside a collapsed Settings
@@ -1444,6 +1454,13 @@ export function App() {
           {view === 'ideas' && <IdeasView vaultId={activeVault?.id ?? null} onOpenGraph={(target) => navigate('graph', target)} onOpenAssistant={openAssistant} />}
           {view === 'authors' && <AuthorsView vaultId={activeVault?.id ?? null} settings={settings} onOpenGraph={(target) => navigate('graph', target)} />}
           {view === 'persons' && <PersonasView initialPersonId={personsTarget} />}
+          {/* `setView` is passed straight through: it is referentially stable, and the
+              encyclopedia's section descriptor depends on it. */}
+          {view === 'encyclopedia' && <EncyclopediaView onNavigate={setView} />}
+          {view === 'continuity' && <ContinuityView onNavigate={setView} />}
+          {view === 'conflicts' && <ConflictsView onNavigate={setView} />}
+          {view === 'arcs' && <ArcsView onNavigate={setView} />}
+          {view === 'rules' && <RulesView onNavigate={setView} />}
           {view === 'characters' && <CharactersView />}
           {view === 'places' && <PlacesView />}
           {view === 'factions' && <FactionsView />}
@@ -1594,6 +1611,7 @@ export function App() {
           </Suspense>
           </div>
         </main>
+        </ContinuityProvider>
       </div>
 
       <div data-tour="queue">

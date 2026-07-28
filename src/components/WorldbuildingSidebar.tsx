@@ -2,7 +2,7 @@ import { Icon } from './ui';
 import { t } from '../i18n';
 
 /** Views the worldbuilding vault has already wired up. */
-export type WorldbuildingView = 'characters' | 'places' | 'factions' | 'cultures' | 'scenes' | 'timeline' | 'tree' | 'map' | 'relations' | 'notes';
+export type WorldbuildingView = 'encyclopedia' | 'continuity' | 'conflicts' | 'arcs' | 'rules' | 'characters' | 'places' | 'factions' | 'cultures' | 'scenes' | 'timeline' | 'tree' | 'map' | 'relations' | 'notes';
 
 interface WorldbuildingItem { label: string; icon: string; view?: WorldbuildingView }
 interface WorldbuildingGroup { label: string; items: WorldbuildingItem[] }
@@ -24,7 +24,7 @@ interface WorldbuildingGroup { label: string; items: WorldbuildingItem[] }
  */
 export const WORLDBUILDING_GROUPS: WorldbuildingGroup[] = [
   { label: 'Explorar', items: [
-    { label: 'Enciclopedia', icon: 'book' },
+    { label: 'Enciclopedia', icon: 'book', view: 'encyclopedia' },
     { label: 'Personajes', icon: 'users', view: 'characters' },
     { label: 'Lugares', icon: 'map', view: 'places' },
     { label: 'Facciones', icon: 'network', view: 'factions' },
@@ -36,17 +36,15 @@ export const WORLDBUILDING_GROUPS: WorldbuildingGroup[] = [
   ] },
   { label: 'Analizar', items: [
     { label: 'Chat del mundo', icon: 'chat' },
-    { label: 'Grafo del mundo', icon: 'layers' },
-    { label: 'Reglas del mundo', icon: 'lock' },
-    { label: 'Conflictos', icon: 'scale' },
-    { label: 'Arcos narrativos', icon: 'route' },
-    { label: 'Consistencia', icon: 'check' },
+    { label: 'Reglas del mundo', icon: 'lock', view: 'rules' },
+    { label: 'Conflictos', icon: 'scale', view: 'conflicts' },
+    { label: 'Arcos narrativos', icon: 'route', view: 'arcs' },
+    { label: 'Continuidad', icon: 'check', view: 'continuity' },
     { label: 'Preguntas abiertas', icon: 'help' },
   ] },
   { label: 'Crear', items: [
     { label: 'Notas', icon: 'notebook', view: 'notes' },
     { label: 'Escenas', icon: 'image', view: 'scenes' },
-    { label: 'Tramas', icon: 'route' },
     { label: 'Manuscritos', icon: 'edit' },
   ] },
 ];

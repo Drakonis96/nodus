@@ -33,11 +33,14 @@ export function Markdown({
   onStudyMaterial,
   onStudyRecording,
   onStudyEvidence,
+  onWorldEntry,
   verify = true,
 }: {
   content: string;
   className?: string;
   onCitation?: (citation: MarkdownCitation) => void;
+  /** `nodus://world/<kind>/<id>`. `kind` is `new` when the entry does not exist yet. */
+  onWorldEntry?: (kind: string, id: string) => void;
   onStudyDocument?: (documentId: string) => void;
   onStudyMaterial?: (materialId: string) => void;
   onStudyRecording?: (recordingId: string, timestamp?: number | null) => void;
@@ -110,6 +113,32 @@ export function Markdown({
               const params = new URLSearchParams(studyRecording[2] ?? '');
               const timestamp = params.get('t');
               return <button className="text-teal-400 underline decoration-teal-700 underline-offset-2 hover:text-teal-300" onClick={() => onStudyRecording(decodeURIComponent(studyRecording[1]), timestamp == null ? null : Number(timestamp))}>{children}</button>;
+            }
+            // Encyclopedia links. Deliberately NOT routed through `parseCitation`: a
+            // citation pill fetches a preview of an ACADEMIC source over IPC, which a
+            // world entry has no answer for. The reserved kind `new` is a link the author
+            // wrote as [[…]] and nobody has defined — rendered dashed so it reads as an
+            // invitation rather than as a broken link.
+            const worldEntry = href?.match(/^nodus:\/\/world\/([a-z]+)\/(.+)$/);
+            if (worldEntry && onWorldEntry) {
+              const kind = worldEntry[1];
+              const id = decodeURIComponent(worldEntry[2]);
+              return kind === 'new' ? (
+                <button
+                  className="border-b border-dashed border-amber-700/80 text-amber-400 hover:text-amber-300"
+                  title={t('Esta entrada todavía no existe')}
+                  onClick={() => onWorldEntry(kind, id)}
+                >
+                  {children}
+                </button>
+              ) : (
+                <button
+                  className="text-indigo-400 underline decoration-indigo-700 underline-offset-2 hover:text-indigo-300"
+                  onClick={() => onWorldEntry(kind, id)}
+                >
+                  {children}
+                </button>
+              );
             }
             const citation = parseCitation(href);
             if (citation && onCitation) {

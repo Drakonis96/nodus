@@ -183,6 +183,49 @@ const INDIRECT_KEY_SOURCES = [
     file: 'src/views/ScenesView.tsx',
     pattern: /\b(?:title|searchPlaceholder|createLabel|emptyLabel|noMatchLabel|label):\s*(["'])((?:\\.|(?!\1).)*?)\1/g,
   },
+  {
+    file: 'src/views/EncyclopediaView.tsx',
+    pattern: /\b(?:title|searchPlaceholder|createLabel|emptyLabel|noMatchLabel|label):\s*(["'])((?:\\.|(?!\1).)*?)\1/g,
+  },
+  {
+    file: 'src/views/RulesView.tsx',
+    pattern: /\b(?:title|searchPlaceholder|createLabel|emptyLabel|noMatchLabel|label):\s*(["'])((?:\\.|(?!\1).)*?)\1/g,
+  },
+  // The rule vocabularies and the suggestion titles, all rendered through t(MAP[x]).
+  { file: 'shared/worldRules.ts', pattern: /^  \w+:\s*(["'])((?:\\.|(?!\1).)*?)\1,$/gm },
+  // Bare array elements (the suggestion titles). TWO capture groups, like every other
+  // pattern here: the collector reads the quote from group 1 and the string from group 2,
+  // and a one-group pattern makes it read `undefined`.
+  { file: 'shared/worldRules.ts', pattern: /^  (["'])((?:\\.|(?!\1).)*?)\1,$/gm },
+  {
+    file: 'src/views/ArcsView.tsx',
+    pattern: /\b(?:title|searchPlaceholder|createLabel|emptyLabel|noMatchLabel|label):\s*(["'])((?:\\.|(?!\1).)*?)\1/g,
+  },
+  {
+    file: 'src/views/ConflictsView.tsx',
+    pattern: /\b(?:title|searchPlaceholder|createLabel|emptyLabel|noMatchLabel|label):\s*(["'])((?:\\.|(?!\1).)*?)\1/g,
+  },
+  {
+    file: 'src/views/ContinuityView.tsx',
+    pattern: /\b(?:title|searchPlaceholder|createLabel|emptyLabel|noMatchLabel|label):\s*(["'])((?:\\.|(?!\1).)*?)\1/g,
+  },
+  // The severity labels, rendered as t(SEVERITY_LABEL[x]).
+  { file: 'src/views/ContinuityView.tsx', pattern: /^  (?:contradiction|warning|gap):\s*(["'])((?:\\.|(?!\1).)*?)\1,$/gm },
+  // The encyclopedia's vocabularies: entry kinds, article categories and the field a link
+  // was written in, all rendered as t(MAP[x]).
+  { file: 'shared/worldEncyclopedia.ts', pattern: /^  \w+:\s*(["'])((?:\\.|(?!\1).)*?)\1,$/gm },
+  // The scene-day chain: the mode labels, plus the KEYS describeSceneDay() returns. Those
+  // keys are handed to t()/tx() through a variable, so nothing else can see them.
+  { file: 'shared/worldSceneDays.ts', pattern: /^  \w+:\s*(["'])((?:\\.|(?!\1).)*?)\1,$/gm },
+  { file: 'shared/worldSceneDays.ts', pattern: /\bkey:\s*(["'])((?:\\.|(?!\1).)*?)\1/g },
+  // Threads and beats: the four-word vocabularies, all rendered as t(MAP[x]).
+  { file: 'shared/worldThreads.ts', pattern: /^  \w+:\s*(["'])((?:\\.|(?!\1).)*?)\1,$/gm },
+  // Continuity: the family and mute-reason labels, and every finding headline. A finding's
+  // text is a KEY plus vars precisely so it can be collected here; a finished sentence
+  // would stay Spanish in the other six languages.
+  { file: 'shared/worldFindings.ts', pattern: /^  \w+:\s*(["'])((?:\\.|(?!\1).)*?)\1,$/gm },
+  { file: 'shared/worldContinuity.ts', pattern: /\bkey:\s*(["'])((?:\\.|(?!\1).)*?)\1/g },
+  { file: 'shared/worldContinuity.ts', pattern: /\b(?:label|explains):\s*(["'])((?:\\.|(?!\1).)*?)\1/g },
   // Scene status labels, rendered as t(SCENE_STATUS_LABEL[x]).
   { file: 'src/views/ScenesView.tsx', pattern: /^  (?:outline|draft|written):\s*(["'])((?:\\.|(?!\1).)*?)\1,$/gm },
   {

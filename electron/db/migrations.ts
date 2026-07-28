@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 97;
+export const SCHEMA_VERSION = 99;
 
 export const migrations: Migration[] = [
   {
@@ -3676,6 +3676,538 @@ export const migrations: Migration[] = [
         updated_at TEXT NOT NULL
       );
     `,
+  },
+  {
+    version: 98,
+    up: /* sql */ `
+      -- The encyclopedia of an invented world.
+      --
+      -- THERE IS NO INDEX TABLE HERE, AND THAT IS THE POINT. A character, a place, a
+      -- faction, a scene and a map are already rows somewhere; projecting them into an
+      -- A-Z index is a read, not a copy. A materialised index would be a second answer to
+      -- "what is this thing called", and the two would disagree the first time somebody
+      -- renamed a character. Same reasoning as shared/worldPresence.ts, which refused a
+      -- fourth positions table because the vault already answered the question three
+      -- times. What this migration adds is the half the world does NOT already hold: the
+      -- articles for lore that hangs off no entity, and the link graph between everything.
+      --
+      -- NO STATEMENT HERE USES A CASCADING FOREIGN KEY, DELIBERATELY. isCreateOnly() below
+      -- strips comments and then rejects any body containing the word DELETE -- which the
+      -- clause "ON DELETE CASCADE" contains. A migration written that way loses BOTH
+      -- repair paths: backfillMissingCreateOnly() will not restore its tables, and a
+      -- database migrated under a differently-numbered build dies with "table already
+      -- exists" instead of being replayed. Ownership is enforced by the repo's delete
+      -- transactions instead, exactly as world_images already does for the polymorphic
+      -- gallery.
+
+      -- Lore that is not an entity: a magic system, a religion, a language, a species, an
+      -- artifact, a technology, a concept. Everything else in the encyclopedia is a
+      -- projection of a row that lives in its own section; only these are native.
+      CREATE TABLE world_articles (
+        article_id    TEXT PRIMARY KEY,
+        title         TEXT NOT NULL,
+        -- The normalised title: accents folded, lowercased, whitespace collapsed. Written
+        -- by shared/worldEncyclopedia.ts and NEVER by SQLite, whose LOWER() is ASCII-only
+        -- and would file "Vael" and "Vael" with a diaeresis as two different things in a
+        -- genre where half the proper nouns carry one.
+        title_key     TEXT NOT NULL,
+        -- magic | religion | language | creature | species | artifact | technology
+        -- | concept | event | organization | flora | fauna | custom | other
+        category      TEXT NOT NULL DEFAULT 'other',
+        -- The one line under the title in the index. Deliberately separate from the body:
+        -- an index that shows the body's first sentence shows a different sentence every
+        -- time the author edits the opening.
+        summary       TEXT,
+        -- Markdown. A resolved link is an ordinary Markdown link to nodus://world/...;
+        -- an unresolved one stays as the [[Name]] the author typed. Both forms are owned
+        -- by shared/worldEncyclopedia.ts, which is the only correct parser.
+        body          TEXT,
+        -- The model's draft, kept apart from the body exactly as
+        -- character_profiles.biography_proposed is kept apart from persons.biography. A
+        -- proposal that silently became canon would be indistinguishable from something
+        -- the author wrote -- and here it would be the WHOLE entry, not one field.
+        body_proposed    TEXT,
+        body_proposed_at TEXT,
+        -- Other names this entry answers to, one per line. The link resolver and the
+        -- search match them. A character takes theirs from person_names; an article has
+        -- no ontology row to hang them on and a second table for four words is not worth it.
+        aka           TEXT,
+        -- author | ai_proposal. An entry accepted from the missing-entries analysis is
+        -- still the author's, but they should be able to see which ones they never wrote.
+        origin        TEXT NOT NULL DEFAULT 'author',
+        -- Left out of the exported world bible unless the author asks for it: exporting
+        -- is handing the file to somebody else.
+        spoiler       INTEGER NOT NULL DEFAULT 0,
+        -- "Vor, Kaelen", for when the alphabetical position is not the title.
+        sort_title    TEXT,
+        notes         TEXT,
+        created_at    TEXT NOT NULL,
+        updated_at    TEXT NOT NULL
+      );
+      -- NOT unique. Two entries sharing a name is a real editorial situation, and a UNIQUE
+      -- constraint would turn it into a FAILED SYNC MERGE the moment the other machine's
+      -- copy arrives. The repo warns on create; the resolver breaks ties by created_at.
+      CREATE INDEX idx_world_articles_title_key ON world_articles(title_key);
+      CREATE INDEX idx_world_articles_category  ON world_articles(category, title);
+
+      -- The link graph. Derived from the bodies, and rebuildable from them -- but STORED,
+      -- because it cannot be recomputed on demand: five of the six entry kinds have no
+      -- body column at all (a character's "body" is composed from a dozen sheet fields at
+      -- read time), so answering "who mentions Kaelen" by scanning would mean composing
+      -- every sheet in the world on every page view.
+      --
+      -- THE PRIMARY KEY IS CONTENT-DERIVED, NOT A UUID, AND THAT IS LOAD-BEARING. Every
+      -- synced table gets AFTER DELETE / AFTER INSERT tombstone triggers (see
+      -- electron/db/tombstones.ts). Re-indexing a body clears this source's rows and
+      -- re-inserts them; with random ids that would leave one permanent tombstone per link
+      -- on every single save, syncing forever. With this key an unchanged link re-inserts
+      -- under the same key, and the INSERT trigger clears the tombstone the DELETE trigger
+      -- just wrote.
+      --
+      -- A (source, field, target) triple is a SET, not a list: a second mention of the
+      -- same target bumps occurrences rather than adding a row, so inserting a paragraph
+      -- renumbers nothing.
+      --
+      -- NO FOREIGN KEYS, on either end: both are polymorphic across six tables, exactly
+      -- like world_images. Removing an entity therefore does NOT remove the links pointing
+      -- at it -- and must not. The correct behaviour is that they DEGRADE to unresolved
+      -- and show up as red links, so the author sees what they just orphaned.
+      CREATE TABLE world_links (
+        -- article | character | place | group | scene | map
+        source_kind  TEXT NOT NULL,
+        source_id    TEXT NOT NULL,
+        -- Which text the link was written in: body, notes, backstory, history, summary...
+        -- Kept so "mentioned in" can say WHERE, and so re-indexing one field does not wipe
+        -- the links found in another.
+        source_field TEXT NOT NULL,
+        -- "kind:id" once resolved; "?:<normalised text>" while the author has written a
+        -- [[...]] nobody has defined yet. One column rather than two nullable ones,
+        -- because every query here is "the rows pointing at X" and a half-NULL compound
+        -- key indexes badly.
+        target_key   TEXT NOT NULL,
+        -- The words the author actually wrote. Rendered verbatim: the link belongs to the
+        -- prose, so renaming Kaelen Vor must never rewrite a sentence that called him
+        -- "the Crow".
+        label        TEXT,
+        occurrences  INTEGER NOT NULL DEFAULT 1,
+        created_at   TEXT NOT NULL,
+        updated_at   TEXT NOT NULL,
+        PRIMARY KEY (source_kind, source_id, source_field, target_key)
+      );
+      CREATE INDEX idx_world_links_target ON world_links(target_key);
+      CREATE INDEX idx_world_links_source ON world_links(source_kind, source_id);
+
+      -- What the world talks about but has never defined. Quarantined in its own table
+      -- rather than written into world_articles as empty stubs: an index full of blank
+      -- entries the author never asked for is worse than no analysis at all.
+      CREATE TABLE world_entry_proposals (
+        proposal_id  TEXT PRIMARY KEY,
+        term         TEXT NOT NULL,
+        -- Normalised, so a second run does not propose "Los Sin Nombre" beside "los sin
+        -- nombre", and so a dismissal sticks across runs.
+        term_key     TEXT NOT NULL,
+        category     TEXT,
+        rationale    TEXT,
+        suggested_summary TEXT,
+        -- JSON array of { key, title, snippet }. The author has to SEE where the term
+        -- appears to judge it, and re-finding the mentions means re-scanning the world.
+        evidence     TEXT,
+        -- unresolved_link | frequency. An unresolved [[...]] is a FACT the author already
+        -- stated; an n-gram is a guess. The UI must never present the second with the
+        -- confidence of the first.
+        source       TEXT NOT NULL DEFAULT 'frequency',
+        confidence   REAL,
+        -- pending | accepted | dismissed. Dismissed rows are KEPT, so the next run does
+        -- not propose again what the author already turned down.
+        status       TEXT NOT NULL DEFAULT 'pending',
+        article_id   TEXT,
+        created_at   TEXT NOT NULL,
+        updated_at   TEXT NOT NULL
+      );
+      CREATE INDEX idx_world_entry_proposals_status ON world_entry_proposals(status, confidence DESC);
+      CREATE INDEX idx_world_entry_proposals_term   ON world_entry_proposals(term_key);
+    `,
+  },
+  {
+    version: 99,
+    up: /* sql */ `
+    -- Las cinco secciones de "Analizar" comparten un esqueleto, porque las cinco son
+    -- lecturas de UNA sola afirmacion que el vault no podia guardar: "en esta escena,
+    -- esto se mueve asi". Una regla puesta a prueba, un conflicto que avanza y un arco
+    -- que gira son la misma fila con distinto vocabulario, y la prueba de ello es que las
+    -- tres se rellenan desde el mismo sitio: la ficha de la escena que el autor tiene
+    -- abierta. Tres tablas separadas habrian obligado a tres paneles en esa ficha, tres
+    -- repos, tres modulos puros y tres respuestas distintas a "que pasa en la escena 41".
+    --
+    -- NINGUNA SENTENCIA DE ESTE CUERPO LLEVA CLAUSULA DE BORRADO EN CASCADA, A PROPOSITO:
+    -- isCreateOnly() quita los comentarios y despues rechaza cualquier cuerpo que
+    -- contenga esa palabra, y una migracion asi pierde LOS DOS caminos de reparacion
+    -- (backfillMissingCreateOnly, y la reejecucion en una base migrada con otra
+    -- numeracion). La propiedad la imponen las transacciones del repo, igual que ya hacen
+    -- world_images y la enciclopedia.
+    --
+    -- Y NO HAY NINGUNA CLAVE FORANEA HACIA world_scenes NI HACIA persons, que es una
+    -- decision distinta y mas importante: el pragma foreign_keys esta ON, asi que un
+    -- REFERENCES sin accion declarada usa NO ACTION y ABORTA el borrado del padre. Una
+    -- decision de oficio ("corta esta escena") se convertiria en un error de base de
+    -- datos. El comportamiento correcto es el que world_links ya establecio: la fila
+    -- degrada, y el repo la limpia en su propia transaccion.
+
+    -- ---------------------------------------------------------------------------
+    -- 1. La cadena de dias. Propiedad de Escenas, precondicion de todo lo demas.
+    -- ---------------------------------------------------------------------------
+    -- world_scenes.world_day es NULLABLE y en un vault real esta vacio: un novelista
+    -- escribe treinta escenas antes de saber si la boda es el dia 412 o el 415. Sin ese
+    -- entero, tres de las seis familias de Continuidad (presencia, viaje, secreto) no
+    -- disparan JAMAS, y la seccion se abre vacia prometiendo que comprueba el mundo.
+    --
+    -- La solucion no es pedir el numero: es pedir la RELACION con la escena anterior, que
+    -- es como piensa quien escribe. Un ancla explicita al principio de cada acto y una
+    -- cadena de "mismo dia" / "+3 dias" produce world_day para todo el manuscrito con
+    -- cuatro clics. Esta tabla guarda la DECLARACION; world_day sigue siendo el dato
+    -- canonico y lo escribe recomputeSceneDays() en el repo.
+    CREATE TABLE world_scene_days (
+      scene_id      TEXT PRIMARY KEY,
+      -- anchor | same | offset. 'anchor' fija un dia absoluto; los otros dos se leen
+      -- respecto de la escena inmediatamente anterior en ORDEN DE RELATO.
+      mode          TEXT NOT NULL DEFAULT 'offset',
+      offset_days   INTEGER NOT NULL DEFAULT 0,
+      -- Solo con mode='anchor'. Dia absoluto en la escala de shared/worldCalendar.ts.
+      anchor_world_day INTEGER,
+      created_at    TEXT NOT NULL,
+      updated_at    TEXT NOT NULL
+    );
+
+    -- ---------------------------------------------------------------------------
+    -- 2. Los hilos: conflictos y arcos, en una tabla.  [UNIFICACION 1]
+    -- ---------------------------------------------------------------------------
+    -- Un conflicto es un hilo cuyas partes se oponen; un arco es un hilo con un solo
+    -- sujeto. Las dos criticas del proyecto llegaron al mismo sitio por caminos
+    -- distintos: la de Conflictos exigio decidir "Tramas" antes del DDL, y la de Arcos
+    -- senalo que un arco con subject_kind='plot' ES una trama. La respuesta es que
+    -- "Tramas" no existe, y que estas dos secciones son dos caras de una maquina.
+    --
+    -- LO QUE NO SE UNIFICA, Y POR QUE: world_rules se queda aparte. Una regla no tiene
+    -- partes ni sujeto; tiene ambito, vigencia, precio, limite y madre. Meterla aqui
+    -- habria dejado siete columnas nulas en todos los conflictos y cinco en todos los
+    -- arcos, que es la forma que tiene una unificacion de ser una mentira.
+    CREATE TABLE world_threads (
+      thread_id   TEXT PRIMARY KEY,
+      -- conflict | arc
+      kind        TEXT NOT NULL DEFAULT 'conflict',
+      title       TEXT NOT NULL,
+      -- Normalizado por shared/worldEncyclopedia.normalizeTitle() y NUNCA por SQLite,
+      -- cuyo LOWER() es solo ASCII. NO es unico, por la misma razon que world_articles
+      -- no lo es: una colision de nombre es una situacion editorial, y un UNIQUE la
+      -- convierte en una fusion de sincronizacion fallida en cuanto llega la copia de
+      -- la otra maquina.
+      title_key   TEXT NOT NULL,
+      -- Una caja de prosa, no dos. El diseno pedia "want" y "object" por separado y eso
+      -- es distincion de manual de guion, no de mesa de trabajo: quien teclea "La guerra
+      -- por el vado" ya ha dicho el objeto. Admite enlaces [[...]], que world_links
+      -- indexa como cualquier otro cuerpo -- de ahi salen "Disputado en:" en la ficha
+      -- del lugar y el retroenlace del artefacto, sin un par polimorfico (kind, id).
+      pitch       TEXT,
+      -- Que se pierde si esto se pierde. Solo para conflictos.
+      stakes      TEXT,
+      -- external | background. 'background' es la presion que no es plan de nadie -- el
+      -- invierno, la peste, la deuda: puede no tener parte opuesta y nunca cuenta como
+      -- algo en juego de un personaje. Por defecto y NO se pregunta al crear.
+      scope       TEXT NOT NULL DEFAULT 'external',
+      -- open | resolved | archived. Tres valores, no cinco: 'latente' y 'escalando' se
+      -- derivan de los latidos (si no hay ninguno / si hay mas subidas que bajadas), y
+      -- un desplegable al que nadie vuelve dira "en marcha" hasta que se borre el vault.
+      status      TEXT NOT NULL DEFAULT 'open',
+      -- Como acaba, en palabras del autor. La pantalla no lo muestra hasta status
+      -- 'resolved': un campo permanentemente gris es un reproche permanente.
+      outcome     TEXT,
+      -- author | ai. Procedencia permanente. En la v1 solo se escribe 'author'.
+      origin      TEXT NOT NULL DEFAULT 'author',
+      created_at  TEXT NOT NULL,
+      updated_at  TEXT NOT NULL
+    );
+    CREATE INDEX idx_world_threads_kind      ON world_threads(kind, status, title);
+    CREATE INDEX idx_world_threads_title_key ON world_threads(title_key);
+
+    -- Quien esta en un hilo.  [UNIFICACION 1b]
+    -- Muchos a muchos porque una guerra de tres bandos es lo normal y un par de columnas
+    -- party_a/party_b obligaria al autor a mentir en el primer conflicto interesante.
+    -- Polimorfica porque una parte es tan a menudo una casa como una persona -- y por eso
+    -- mismo, como world_images y world_links, sin clave foranea.
+    CREATE TABLE thread_parties (
+      thread_id  TEXT NOT NULL,
+      -- character | group
+      party_kind TEXT NOT NULL,
+      party_id   TEXT NOT NULL,
+      -- subject | wants | opposes | caught.
+      -- 'subject' es como un ARCO declara de quien es: un arco es un hilo con una sola
+      -- parte, y eso es exactamente lo que hace que las dos secciones compartan tabla.
+      -- 'caught' es el que nadie pide y todos necesitan: el nino, la ciudad, el rehen --
+      -- presente, perdiendo pase lo que pase, en ningun bando.
+      side       TEXT NOT NULL DEFAULT 'wants',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      -- CLAVE DERIVADA DEL CONTENIDO, Y ES LOAD-BEARING. El editor de partes reescribe
+      -- este conjunto vaciando e insertando; cada tabla sincronizada recibe disparadores
+      -- de lapida AFTER DELETE / AFTER INSERT (electron/db/tombstones.ts), asi que con
+      -- ids aleatorios cada guardado dejaria una lapida permanente por parte, para
+      -- siempre. Con esta clave una parte sin cambios se reinserta identica y el
+      -- disparador de INSERT limpia la lapida que el otro acaba de escribir.
+      --
+      -- "side" NO forma parte de la clave: una entidad en los dos bandos del mismo
+      -- conflicto es una contradiccion, y que la clave la rechace es una virtud.
+      PRIMARY KEY (thread_id, party_kind, party_id)
+    );
+    CREATE INDEX idx_thread_parties_party ON thread_parties(party_kind, party_id);
+
+    -- ---------------------------------------------------------------------------
+    -- 3. Los latidos. EL CORAZON DEL PROYECTO.  [UNIFICACION 2]
+    -- ---------------------------------------------------------------------------
+    -- "En esta escena, esto se mueve asi". Una fila es, a la vez:
+    --   * la prueba de una regla   (thread_kind='rule',     mark: obeys|bends|breaks|establishes)
+    --   * el latido de un conflicto(thread_kind='conflict', mark: raise|turn|ease|resolve)
+    --   * el hito de un arco       (thread_kind='arc',      mark: step|turn)
+    -- Los tres disenos pedian su propia tabla (rule_uses, conflict_scenes,
+    -- world_arc_beats) con las mismas cinco columnas y semantica identica: un ancla a
+    -- escena, un vocabulario de cuatro palabras, una nota, un sujeto opcional. Y los tres
+    -- reconocian, en su propia critica, que la tabla NO se llena desde su seccion sino
+    -- desde la ficha de la escena. Una sola tabla significa UN panel en esa ficha en vez
+    -- de tres, y significa que "estas nueve escenas no mueven nada" -- el mejor
+    -- diagnostico de los quince propuestos -- es un LEFT JOIN en vez de una union.
+    --
+    -- LO QUE NO SE DERIVA Y NUNCA SE DERIVARA es el juicio: world_links ya sabe que
+    -- escenas mencionan [[Marca de sangre]], y scene_characters ya sabe quien estaba en
+    -- la sala. Que la ley se rompa ahi, y que el precio no este en la pagina, solo lo
+    -- puede decir quien escribe. Ese juicio es el producto entero.
+    CREATE TABLE world_beats (
+      -- rule | conflict | arc
+      thread_kind  TEXT NOT NULL,
+      -- world_rules.rule_id o world_threads.thread_id. Polimorfica, sin clave foranea.
+      thread_id    TEXT NOT NULL,
+      -- NOT NULL A PROPOSITO. El diseno de Arcos preveia hitos "sin anclar" en un canalon
+      -- lateral con arrastre; eso obligaba a una clave uuid, a un orden autoral paralelo
+      -- (beat_order) y a un diagnostico de "hito en la escena equivocada" que solo existe
+      -- porque uno de los dos ordenes se queda rancio. Un plan sin escena es una pregunta
+      -- abierta o una nota, no un hito. SIN clave foranea: cortar una escena no puede
+      -- fallar ni borrar el juicio en silencio; deleteScene() limpia estas filas en su
+      -- propia transaccion.
+      scene_id     TEXT NOT NULL,
+      -- El vocabulario, por tipo de hilo. Cuatro palabras que el autor elige sin pensar,
+      -- nunca un numero de 0 a 10: una cifra que se inventa de nuevo cada vez no mide
+      -- nada y no se puede comparar a lo largo de un manuscrito.
+      mark         TEXT NOT NULL DEFAULT 'step',
+      -- Que cambia, en una frase. Es el hito de un arco; en regla y conflicto, la nota.
+      -- La UI solo la pide cuando mark='turn': un giro es lo unico que necesita
+      -- explicacion, "sube" se explica solo.
+      text         TEXT,
+      -- A FAVOR DE QUIEN.  [UNIFICACION 2b]
+      -- "Sube" es ambiguo: sube para quien. Para un conflicto es la parte que gana
+      -- terreno; para una regla, quien la rompio; para un arco, null (el sujeto es el del
+      -- hilo). Tres preguntas distintas de tres disenos, un solo par polimorfico.
+      subject_kind TEXT,
+      subject_id   TEXT,
+      -- SOLO REGLAS: 1 = el precio esta en la pagina, 0 = no esta, NULL = el autor no lo
+      -- ha mirado. NULL Y 0 TIENEN QUE SEGUIR SIENDO DISTINGUIBLES, y solo el 0 explicito
+      -- genera aviso: el diseno original contaba NULL como impago, y como NULL es el
+      -- estado de toda fila recien creada, la seccion habria gritado desde el minuto uno
+      -- sobre reglas que el autor todavia no habia mirado. Es literalmente el fallo que
+      -- la cabecera de shared/characterChecks.ts documenta.
+      paid         INTEGER,
+      created_at   TEXT NOT NULL,
+      updated_at   TEXT NOT NULL,
+      -- Clave derivada del contenido por la razon de las lapidas, y ademas porque un
+      -- hilo o mueve una escena o no la mueve: es un conjunto, no una lista.
+      PRIMARY KEY (thread_kind, thread_id, scene_id)
+    );
+    CREATE INDEX idx_world_beats_scene   ON world_beats(scene_id);
+    CREATE INDEX idx_world_beats_thread  ON world_beats(thread_kind, thread_id);
+    CREATE INDEX idx_world_beats_subject ON world_beats(subject_kind, subject_id);
+
+    -- ---------------------------------------------------------------------------
+    -- 4. Las leyes duras del mundo.
+    -- ---------------------------------------------------------------------------
+    -- Lo unico obligatorio es el titulo. Una seccion que exige quince campos antes de
+    -- ser util es una seccion abandonada en dos semanas.
+    CREATE TABLE world_rules (
+      rule_id       TEXT PRIMARY KEY,
+      title         TEXT NOT NULL,
+      title_key     TEXT NOT NULL,
+      -- El texto completo, en Markdown y con [[...]] como cualquier otra prosa del vault,
+      -- para que "a que facciones obliga" se conteste desde world_links sin tabla puente.
+      statement     TEXT,
+      -- Que cuesta romperla. Aparte del enunciado porque toda la capa de diagnostico le
+      -- hace una sola pregunta: este precio, esta alguna vez en la pagina.
+      cost          TEXT,
+      -- Hasta donde NO llega. Sin esto un sistema de magia es un disolvente de tramas,
+      -- que es la misma razon por la que character_abilities lleva "limits".
+      limits        TEXT,
+      -- physical | costly | social. El contrato con el lector, y el UNICO campo que
+      -- cambia lo que significa una infraccion: romper una fisica es un error de
+      -- continuidad, romper una con precio sin pagarlo es una trampa, romper una social
+      -- es una trama. Tres valores porque un escritor elige uno honestamente; con diez
+      -- elige al azar.
+      hardness      TEXT NOT NULL DEFAULT 'costly',
+      -- Una excepcion es una REGLA MAS ESTRECHA colgada de su madre, asi que hereda
+      -- ambito, vigencia, precio, secreto y sus propias pruebas -- y puede tener su
+      -- propia excepcion, que es exactamente como se comportan las leyes de una religion.
+      -- Sin clausula de borrado: el repo reapadrina las huerfanas al abuelo dentro de su
+      -- transaccion, porque tirar en silencio la mitad mejor escrita de la seccion no.
+      parent_rule_id TEXT,
+      -- El diseno pedia un "domain" de ocho valores que es, literalmente,
+      -- world_articles.category otra vez (magic, religion, language, technology...). En
+      -- su lugar, la regla es HIJA de un articulo: se crea desde el con "convertir en
+      -- ley" y hereda su categoria. Sin esto el autor acaba con "Magia de sangre" y "La
+      -- sangre paga la sangre" como dos entradas hermanas de la enciclopedia.
+      article_id    TEXT,
+      -- world | group | place. 'species' y 'character' eran casos raros que la prosa ya
+      -- resuelve. Polimorfico y por tanto sin clave foranea: una faccion borrada deja un
+      -- ambito colgante que los chequeos reportan como "ambito roto", que es el
+      -- comportamiento correcto -- el autor necesita ver lo que acaba de dejar huerfano.
+      scope_kind    TEXT NOT NULL DEFAULT 'world',
+      scope_id      TEXT,
+      -- Cuando rige, en la escala de dias absolutos del calendario inventado. Nulos los
+      -- dos = siempre ha regido. Detras de un "esta ley no siempre existio" en la ficha:
+      -- la columna existe, el formulario no la pide.
+      from_world_day INTEGER,
+      to_world_day   INTEGER,
+      -- canon | tentative | retired. 'tentative' no es decoracion: los chequeos callan
+      -- sobre una regla a la que el autor no se ha comprometido, y una seccion que grita
+      -- sobre borradores es una seccion cuyos avisos se ignoran en bloque.
+      status        TEXT NOT NULL DEFAULT 'canon',
+      -- El secreto que esta regla (casi siempre una excepcion) es. Quien lo sabe y desde
+      -- cuando es secret_knowers: NO hay rule_knowers, porque esa pregunta ya se contesto
+      -- una vez y contestarla dos garantiza dos respuestas distintas.
+      secret_id     TEXT,
+      -- El borrador del modelo, en cuarentena igual que world_articles.body_proposed.
+      -- Aceptarlo es una accion aparte y explicita: una propuesta que se volviera canon
+      -- en silencio seria indistinguible de lo que escribio el autor, y aqui seria UNA LEY.
+      proposed_text TEXT,
+      proposed_at   TEXT,
+      created_at    TEXT NOT NULL,
+      updated_at    TEXT NOT NULL
+    );
+    CREATE INDEX idx_world_rules_parent    ON world_rules(parent_rule_id);
+    CREATE INDEX idx_world_rules_scope     ON world_rules(scope_kind, scope_id);
+    CREATE INDEX idx_world_rules_title_key ON world_rules(title_key);
+
+    -- ---------------------------------------------------------------------------
+    -- 5. Las decisiones sin tomar.
+    -- ---------------------------------------------------------------------------
+    -- Un libro de cuentas, no una bandeja de tareas. De las siete reglas de derivacion
+    -- que el diseno proponia, SEIS pertenecian a otra seccion (enlaces rojos a la
+    -- Enciclopedia, huecos de arco a Arcos, contradicciones a Continuidad, escenas sin
+    -- fecha a Escenas, revelaciones a Secretos), y un panel de los huecos ajenos es la
+    -- categoria exacta de herramienta que se abandona en la semana tres. Quedan dos
+    -- origenes: lo que el autor teclea, y los marcadores que ya escribio el mismo.
+    CREATE TABLE world_questions (
+      question_id  TEXT PRIMARY KEY,
+      question     TEXT NOT NULL,
+      -- Que espera la respuesta. Polimorfico sobre seis tablas y por tanto sin clave
+      -- foranea. NULL es legitimo y comun: "la magia deja marca visible" es del mundo.
+      anchor_kind  TEXT,
+      anchor_id    TEXT,
+      -- En que campo de la ficha va la respuesta. Se DERIVA de donde se capturo la
+      -- pregunta; jamas se pregunta al autor, que es lo que convertiria la captura en un
+      -- formulario de tres widgets.
+      anchor_field TEXT,
+      -- open | answered | parked. 'parked' significa "no me lo vuelvas a ensenar hasta
+      -- que algo cambie" y absorbe lo que el diseno llamaba 'dismissed': eran dos estados
+      -- negativos indistinguibles en la practica.
+      status       TEXT NOT NULL DEFAULT 'open',
+      -- author | placeholder
+      origin       TEXT NOT NULL DEFAULT 'author',
+      -- Derivada del contenido para los marcadores, p.ej. 'ph:character:prs_7:backstory'.
+      -- Es lo que hace que aparcar una pregunta derivada se pegue entre recalculos. NO es
+      -- unica: un duplicado llegando de otra maquina no puede ser una fusion fallida.
+      origin_key   TEXT,
+      -- "No puedo seguir sin esto". Un interruptor, no una escala de prioridad: una
+      -- escala es un campo que el autor edita una vez y nunca mas.
+      blocking     INTEGER NOT NULL DEFAULT 0,
+      chosen_option_id TEXT,
+      answered_at  TEXT,
+      created_at   TEXT NOT NULL,
+      updated_at   TEXT NOT NULL
+    );
+    CREATE INDEX idx_world_questions_status ON world_questions(status, updated_at DESC);
+    CREATE INDEX idx_world_questions_anchor ON world_questions(anchor_kind, anchor_id);
+    CREATE INDEX idx_world_questions_origin ON world_questions(origin_key);
+
+    -- Las respuestas en competencia. Tabla aparte y no una columna JSON porque cada una
+    -- se elige, se aplica y se deshace por separado -- y sobre todo porque una opcion es
+    -- UNA ESCRITURA PENDIENTE, y una escritura necesita destino, no una vineta.
+    CREATE TABLE world_question_options (
+      option_id    TEXT PRIMARY KEY,
+      -- Sin clave foranea: el fusionador de sincronizacion recorre las tablas de una en
+      -- una, asi que una opcion puede llegar antes que su pregunta; una referencia
+      -- estricta rechazaria la fila y el mundo perderia la respuesta en vez del orden.
+      question_id  TEXT NOT NULL,
+      text         TEXT NOT NULL,
+      -- "Lo que arrastra". Lo escribe la IA junto a la opcion; como caja vacia se rellena
+      -- en las dos primeras preguntas y en ninguna mas.
+      implications TEXT,
+      -- author | ai. Una opcion no es canon hasta que se elige y se aplica, asi que la
+      -- cuarentena aqui es ESTRUCTURAL y no una segunda columna.
+      origin       TEXT NOT NULL DEFAULT 'author',
+      -- none | fill_field | create_article. El destino se infiere del ancla de la
+      -- pregunta; nunca se elige en un formulario. 'none' es una respuesta de primera
+      -- clase: hay decisiones que se toman y simplemente se recuerdan.
+      apply_mode   TEXT NOT NULL DEFAULT 'none',
+      applied_at   TEXT,
+      -- Lo que el campo decia ANTES. Es el deshacer. Sin el nadie pulsa un boton que
+      -- sobrescribe un parrafo de su propia prosa, y un boton que nadie pulsa devuelve la
+      -- seccion a ser una lista de tareas.
+      replaced_text TEXT,
+      created_at   TEXT NOT NULL,
+      updated_at   TEXT NOT NULL
+    );
+    CREATE INDEX idx_world_question_options_q ON world_question_options(question_id);
+
+    -- ---------------------------------------------------------------------------
+    -- 6. El silencio, para las cinco secciones.  [UNIFICACION 3]
+    -- ---------------------------------------------------------------------------
+    -- NO HAY TABLA DE HALLAZGOS. Un hallazgo es una funcion pura del vault y se recalcula
+    -- entero al abrir la pantalla: una fila guardada seria una segunda verdad que
+    -- sobrevive a su propia correccion. Lo unico que persiste es lo que el autor ha
+    -- decidido callar -- y eso lo pedian CUATRO disenos por separado: los silencios de
+    -- Continuidad, el conflict_hints_dismissed que la critica de Conflictos reclamo para
+    -- que los candidatos JOIN no murieran de ruido, los avisos de regla ya juzgados, y la
+    -- supresion de una pregunta derivada. Es un solo libro, y por tanto una sola pantalla
+    -- donde revisar lo que has mandado callar.
+    CREATE TABLE world_notice_mutes (
+      -- LA CLAVE ES DERIVADA DEL CONTENIDO Y ES LO QUE HACE QUE EL SILENCIO FUNCIONE.
+      -- Formato: "<check_id>|<kind:id[#campo]>,<kind:id>..." con los sujetos ORDENADOS.
+      --   1. Idempotente entre pasadas: el mismo silencio sobrescribe su propia fila en
+      --      vez de acumular filas y lapidas.
+      --   2. Converge al sincronizar: callar lo mismo en dos maquinas da UNA fila.
+      --   3. NO CONTIENE LAS CIFRAS. Si la huella incluyera el dia 412, cambiar la fecha
+      --      a 411 haria reaparecer la excepcion ya juzgada; y peor, una contradiccion
+      --      DISTINTA entre los mismos dos hechos quedaria tapada por el silencio viejo.
+      --      Los sujetos son la identidad del problema; las cifras son su sintoma.
+      fingerprint  TEXT PRIMARY KEY,
+      check_id     TEXT NOT NULL,
+      -- finding | check. 'check' apaga la comprobacion entera para este mundo. Es una
+      -- FILA y no un ajuste porque tiene que viajar con el mundo.
+      scope        TEXT NOT NULL DEFAULT 'finding',
+      -- JSON [{kind,id,title,field?}]. Copiado, no referenciado: la pantalla de
+      -- excepciones tiene que poder listarlas sin recorrer el mundo, y un sujeto que ya
+      -- no existe debe seguir leyendose.
+      subjects     TEXT NOT NULL DEFAULT '[]',
+      -- El mensaje tal y como se leia al callarlo. Sin esto, la lista seis meses despues
+      -- es una lista de huellas ilegibles.
+      headline     TEXT,
+      -- double | told | deliberate | unknown. Enlatado porque el gesto real del escritor
+      -- es "quitalo de mi vista" a las 23:40, y una caja de texto libre se queda vacia el
+      -- 90 % de las veces. Ademas son accionables: 'told' es material de articulo para la
+      -- Enciclopedia y excepcion de una regla para Reglas; 'unknown' crea una pregunta
+      -- abierta en vez de un silencio, que es lo que impide que esta lista se convierta
+      -- en un cementerio de decisiones aplazadas.
+      reason_code  TEXT NOT NULL DEFAULT 'deliberate',
+      reason       TEXT,
+      created_at   TEXT NOT NULL,
+      updated_at   TEXT NOT NULL
+    );
+    CREATE INDEX idx_world_notice_mutes_check ON world_notice_mutes(check_id);
+  `,
   },
 ];
 

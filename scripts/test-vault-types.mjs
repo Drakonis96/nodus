@@ -103,20 +103,20 @@ test('the worldbuilding sidebar keeps its full announced shape, with only the bu
     readFile(path.join(repoRoot, 'src/i18n.en.ts'), 'utf8'),
   ]);
   // The whole promised structure stays visible while it is built one section at a time.
-  for (const label of ['Enciclopedia', 'Personajes', 'Lugares', 'Facciones', 'Culturas', 'Cronología', 'Chat del mundo', 'Grafo del mundo', 'Reglas del mundo', 'Conflictos', 'Arcos narrativos', 'Consistencia', 'Preguntas abiertas', 'Notas', 'Escenas', 'Tramas', 'Manuscritos']) {
+  for (const label of ['Enciclopedia', 'Personajes', 'Lugares', 'Facciones', 'Culturas', 'Cronología', 'Chat del mundo', 'Reglas del mundo', 'Conflictos', 'Arcos narrativos', 'Continuidad', 'Preguntas abiertas', 'Notas', 'Escenas', 'Manuscritos']) {
     assert.match(sidebar, new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `${label} appears in the worldbuilding sidebar`);
   }
-  // Ten sections are wired up; the rest must stay inert. Personajes and Lugares are
-  // this vault's own views; Cronología, Mapa, Relaciones and Dinastías are the records
-  // views reused over the shared ontology; Notas is universal.
+  // Fifteen sections are wired up; the rest must stay inert. Enciclopedia, Personajes and
+  // Lugares are this vault's own views; Cronología, Mapa, Relaciones and Dinastías are the
+  // records views reused over the shared ontology; Notas is universal.
   assert.match(sidebar, /disabled\s+aria-disabled="true"/);
   assert.deepEqual(
     [...sidebar.matchAll(/\bview: '(\w+)'/g)].map((m) => m[1]).sort(),
-    ['characters', 'cultures', 'factions', 'map', 'notes', 'places', 'relations', 'scenes', 'timeline', 'tree']
+    ['arcs', 'characters', 'conflicts', 'continuity', 'cultures', 'encyclopedia', 'factions', 'map', 'notes', 'places', 'relations', 'rules', 'scenes', 'timeline', 'tree']
   );
   // Every wired view must actually be allowed for the vault type, or the sidebar offers a
   // button that navigates to a section the scoping then refuses to render.
-  for (const view of ['characters', 'cultures', 'factions', 'map', 'notes', 'places', 'relations', 'scenes', 'timeline', 'tree']) {
+  for (const view of ['arcs', 'characters', 'conflicts', 'continuity', 'cultures', 'encyclopedia', 'factions', 'map', 'notes', 'places', 'relations', 'rules', 'scenes', 'timeline', 'tree']) {
     assert.equal(
       vt.isViewAllowedForVaultType(view, 'worldbuilding'),
       true,
@@ -128,6 +128,9 @@ test('the worldbuilding sidebar keeps its full announced shape, with only the bu
   assert.match(app, /view === 'home' && isWorldbuilding && <WorldbuildingHome/);
   assert.match(app, /view === 'home' &&[^\n]*!isWorldbuilding[^\n]*&& \(/);
   assert.match(english, /'World chat'/);
+  // The world graph was dropped: the encyclopedia's A–Z plus its backlinks answer what a
+  // node-and-edge picture of a fictional world was ever going to answer.
+  assert.doesNotMatch(sidebar, /Grafo del mundo/);
 });
 
 test('the characters section belongs to worldbuilding alone', () => {

@@ -29,6 +29,8 @@ import { AutoSavingField } from './AutoSavingField';
 import { CharacterGallery } from './CharacterGallery';
 import { CharacterAbilitiesSection, CharacterArcSection, CharacterVoiceSection } from './CharacterCraftSections';
 import { CharacterChecksSection } from './CharacterChecksSection';
+import { ContinuityBadge } from './world/ContinuityBadge';
+import { CharacterThreadsSection } from '../views/ConflictsView';
 import { CharacterAffiliationsSection } from '../views/GroupsView';
 import { CharacterAppearancesSection, CharacterSecretsSection } from '../views/ScenesView';
 import { CharacterInterviewModal } from './CharacterInterviewModal';
@@ -176,7 +178,9 @@ export function CharacterDossier({
         />
       )}
 
-      <CharacterChecksSection character={character} events={events} />
+      <ContinuityBadge entity={{ kind: 'character', id: character.personId }} />
+      <CharacterThreadsSection personId={character.personId} />
+      <CharacterChecksSection character={character} />
 
       <DescriptionSection character={character} onChanged={onChanged} />
 

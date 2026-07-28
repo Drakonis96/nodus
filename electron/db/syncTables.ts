@@ -100,6 +100,26 @@ const SYNC_GROUPS: { key: SyncGroupKey; prefix?: string; tables?: string[] }[] =
       'world_calendar',
       'world_calendar_eras',
       'world_calendar_months',
+      // The encyclopedia. `world_links` is derived from the bodies, but it travels anyway:
+      // there is no cheap way to recompute it on arrival for the five entry kinds that
+      // have no body column, so mergeSyncPackage reconciles it with rebuildWorldLinks()
+      // once the bodies it describes have been merged.
+      'world_articles',
+      'world_links',
+      'world_entry_proposals',
+      // Analizar (v99). `world_beats` is irreplaceable authorship, not a derivative: the
+      // mention comes from `world_links`, but "the law breaks here and nobody pays" is
+      // something only the writer can say. The keys of `world_beats`, `thread_parties`
+      // and `world_notice_mutes` are content-derived precisely so that rewriting them
+      // leaves no tombstone on every save.
+      'world_scene_days',
+      'world_threads',
+      'thread_parties',
+      'world_beats',
+      'world_rules',
+      'world_questions',
+      'world_question_options',
+      'world_notice_mutes',
     ],
   },
   {

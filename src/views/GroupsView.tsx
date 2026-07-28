@@ -15,6 +15,7 @@ import { AutoSavingField } from '../components/AutoSavingField';
 import { Icon } from '../components/ui';
 import { confirm } from '../components/feedback';
 import { PERSON_DOSSIER_SECTION_CLASS } from '../components/personDossierLayout';
+import { ContinuityBadge } from '../components/world/ContinuityBadge';
 import { t, tx } from '../i18n';
 
 /**
@@ -186,6 +187,8 @@ function GroupSheet({
         visualSeed={group.visualSeed}
         appearance={group.description}
       />
+
+      <ContinuityBadge entity={{ kind: 'group', id: group.groupId }} />
 
       <section className={PERSON_DOSSIER_SECTION_CLASS} data-testid="group-sheet-basics">
         <div className="grid grid-cols-2 gap-2">

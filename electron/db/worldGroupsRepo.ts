@@ -11,6 +11,7 @@
 
 import { v4 as uuid } from 'uuid';
 import { getDb } from './database';
+import { deletePartiesForEntity } from './worldThreadsRepo';
 import type {
   CharacterAffiliation,
   CharacterAffiliationInput,
@@ -171,6 +172,7 @@ export function deleteWorldGroup(groupId: string): void {
   const db = getDb();
   const remove = db.transaction(() => {
     db.prepare("DELETE FROM world_images WHERE entity_kind = 'group' AND entity_id = ?").run(groupId);
+    deletePartiesForEntity('group', groupId);
     db.prepare('DELETE FROM world_groups WHERE group_id = ?').run(groupId);
   });
   remove();

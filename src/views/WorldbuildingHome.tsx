@@ -9,36 +9,33 @@ import { HomeIntroCard } from './HomeView';
 import { t, tx } from '../i18n';
 
 /**
- * Landing page for the worldbuilding vault. Characters are the only section built so
- * far, so this is deliberately a character-first home rather than a grid of doors to
- * places that do not exist yet: the count, a way in, and the last people the author
- * touched. It says plainly which sections are still being built instead of showing
- * them as buttons that do nothing.
+ * Landing page for the worldbuilding vault: the size of the world, a way into it, and the
+ * last people the author touched. It says plainly which sections are still being built
+ * instead of showing them as buttons that do nothing.
+ *
+ * The cast leads because that is what a writer opens the app to work on. The encyclopedia
+ * sits beside it as the count of everything else, since it is the one place where a world
+ * can be seen whole.
  */
 export function WorldbuildingHome({ onNavigate }: { onNavigate: (view: View) => void }) {
   const [counts, setCounts] = useState<CharacterCounts | null>(null);
   const [recent, setRecent] = useState<Character[]>([]);
+  const [entries, setEntries] = useState<{ total: number; stubs: number } | null>(null);
 
   const reload = useCallback(async () => {
-    const [nextCounts, characters] = await Promise.all([
+    const [nextCounts, characters, worldEntries] = await Promise.all([
       window.nodus.characterCounts(),
       window.nodus.listCharacters(),
+      window.nodus.listWorldEntries(),
     ]);
     setCounts(nextCounts);
     setRecent([...characters].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 6));
+    setEntries({ total: worldEntries.length, stubs: worldEntries.filter((entry) => entry.stub).length });
   }, []);
 
   useEffect(() => {
-    let active = true;
-    void Promise.all([window.nodus.characterCounts(), window.nodus.listCharacters()]).then(([nextCounts, characters]) => {
-      if (!active) return;
-      setCounts(nextCounts);
-      setRecent([...characters].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 6));
-    });
-    return () => {
-      active = false;
-    };
-  }, []);
+    void reload();
+  }, [reload]);
   useDataRefresh(reload);
 
   const total = counts?.total ?? 0;
@@ -51,27 +48,39 @@ export function WorldbuildingHome({ onNavigate }: { onNavigate: (view: View) => 
         <HomeIntroCard
           eyebrow={t('Vault de worldbuilding')}
           title={t('Tu mundo')}
-          description={t('Construye un mundo de ficción pieza a pieza. Empieza por los personajes: sus nombres y alias, los hechos de su vida, sus vínculos y su descripción, con retratos y biografías que puedes generar cuando te sirvan.')}
+          description={t('Construye un mundo de ficción pieza a pieza: personajes, lugares, facciones, culturas, escenas y mapas. La enciclopedia los reúne todos en un solo índice y te deja escribir el resto del mundo —la magia, una religión, una lengua— enlazándolo con [[dobles corchetes]].')}
           icon="globe"
         />
 
-        <section className="grid gap-3 sm:grid-cols-3">
+        <section className="grid gap-3 sm:grid-cols-4">
           {[
-            { label: 'Personajes', value: total, icon: 'users' },
-            { label: 'Protagonistas', value: protagonists, icon: 'target' },
-            { label: 'Con vida', value: alive, icon: 'sparkles' },
+            { label: 'Personajes', value: total, icon: 'users', view: 'characters' as View },
+            { label: 'Protagonistas', value: protagonists, icon: 'target', view: 'characters' as View },
+            { label: 'Con vida', value: alive, icon: 'sparkles', view: 'characters' as View },
+            // Everything the world holds, in one number — and, more usefully, how much of
+            // it has been named but never written.
+            {
+              label: 'En la enciclopedia',
+              value: entries?.total ?? 0,
+              icon: 'book',
+              view: 'encyclopedia' as View,
+              hint: entries && entries.stubs > 0 ? tx('{count} sin desarrollar', { count: String(entries.stubs) }) : null,
+            },
           ].map((metric) => (
             <button
               key={metric.label}
-              onClick={() => onNavigate('characters')}
+              onClick={() => onNavigate(metric.view)}
               className="flex items-center gap-3 rounded-xl border border-neutral-800 bg-neutral-900/40 p-4 text-left hover:border-indigo-700/60"
             >
               <span className="rounded-lg bg-indigo-600/15 p-2 text-indigo-300">
                 <Icon name={metric.icon} />
               </span>
-              <span>
+              <span className="min-w-0">
                 <span className="block text-xl font-semibold text-neutral-100">{metric.value}</span>
-                <span className="text-xs text-neutral-500">{t(metric.label)}</span>
+                <span className="block truncate text-xs text-neutral-500">{t(metric.label)}</span>
+                {'hint' in metric && metric.hint && (
+                  <span className="block truncate text-[10px] text-neutral-600">{metric.hint}</span>
+                )}
               </span>
             </button>
           ))}
@@ -121,7 +130,7 @@ export function WorldbuildingHome({ onNavigate }: { onNavigate: (view: View) => 
           <p className="text-xs leading-5 text-neutral-500">
             {tx(
               'Las demás secciones del menú ({sections}) aparecen atenuadas porque todavía no están construidas. Se irán activando una a una.',
-              { sections: t('enciclopedia, lugares, facciones, culturas, cronología, mapa, relaciones, escenas y manuscritos') }
+              { sections: t('preguntas abiertas, chat del mundo y manuscritos') }
             )}
           </p>
         </section>

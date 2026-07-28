@@ -9,6 +9,7 @@ import { AutoSavingField } from '../components/AutoSavingField';
 import { Icon } from '../components/ui';
 import { confirm } from '../components/feedback';
 import { PERSON_DOSSIER_SECTION_CLASS } from '../components/personDossierLayout';
+import { ContinuityBadge } from '../components/world/ContinuityBadge';
 import { t, tx } from '../i18n';
 
 /**
@@ -141,6 +142,8 @@ function PlaceSheet({
       )}
 
       <WorldGallery entityKind="place" entityId={place.placeId} visualSeed={place.profile.visualSeed} appearance={place.profile.appearance} />
+
+      <ContinuityBadge entity={{ kind: 'place', id: place.placeId }} />
 
       <section className={PERSON_DOSSIER_SECTION_CLASS} data-testid="place-sheet-basics">
         <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('Clasificación')}</h3>

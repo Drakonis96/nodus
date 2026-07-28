@@ -7,15 +7,17 @@ import {
   type WorldFacetDef,
   type WorldFilterState,
 } from '@shared/worldFilters';
+import { alphaBucket } from '@shared/worldEncyclopedia';
 import { Icon } from '../ui';
 import { WorldFilterBar } from './WorldFilterBar';
+import { useDataRefresh } from '../../hooks';
 import { t, tx } from '../../i18n';
 
 /**
  * How a section presents its collection. The data decides, not taste: a cast is browsed
  * by face, a set of places by containment, a run of scenes by narrative order.
  */
-export type WorldPresentation = 'grid' | 'tree' | 'list';
+export type WorldPresentation = 'grid' | 'tree' | 'list' | 'index';
 
 export interface WorldSectionDef<T> {
   /** Also the testid prefix: `${id}-grid` is the scroll container. */
@@ -23,7 +25,9 @@ export interface WorldSectionDef<T> {
   icon: string;
   title: string;
   searchPlaceholder: string;
-  createLabel: string;
+  /** Only for a section you can add to. Continuity is a reading of the world, not a
+   *  collection you append to, so it has neither this nor a create modal. */
+  createLabel?: string;
   /** Shown when the vault has none of these at all. */
   emptyLabel: string;
   /** Shown when the filters hid everything. */
@@ -39,7 +43,21 @@ export interface WorldSectionDef<T> {
   facetValues: (item: T) => FacetValues;
   searchText: (item: T) => string[];
   Card: React.ComponentType<{ item: T; compact: boolean; onOpen: () => void }>;
-  Sheet: React.ComponentType<{ item: T; onChanged: () => Promise<void>; onBack: () => void }>;
+  /** `onSelect` opens another item of the same collection — what an internal link needs. */
+  Sheet: React.ComponentType<{
+    item: T;
+    onChanged: () => Promise<void>;
+    onBack: () => void;
+    onSelect: (id: string) => void;
+  }>;
+  /** Rendered under the collection. The encyclopedia offers its full-text search here, so
+   *  the instant, client-side search above stays free of an IPC round-trip per keystroke. */
+  Footer?: React.ComponentType<{ filter: WorldFilterState; onOpen: (id: string) => void }>;
+  /** Rendered in the header, left of the create button — section-wide actions. */
+  HeaderActions?: React.ComponentType;
+  /** Replaces the generic "nothing here yet" text. Continuity uses it to say what it
+   *  actually checked, which is the only reason to reopen a screen that found nothing. */
+  EmptyState?: React.ComponentType;
 }
 
 /**
@@ -79,6 +97,9 @@ export function WorldWorkspace<T>({
   useEffect(() => {
     void reload();
   }, [reload]);
+  // A cross-cutting change (accepting a proposal, a sync merge) refreshes the collection
+  // in place, keeping the filters and the open item — remounting would close the sheet.
+  useDataRefresh(reload);
 
   const visible = useMemo(
     () => applyWorldFilter(items, filter, { facets: section.facetValues, searchText: section.searchText }),
@@ -92,6 +113,9 @@ export function WorldWorkspace<T>({
 
   // An item that was open and then filtered out (renamed, restatused) would leave the
   // sheet showing a stale copy, so the selection is dropped when it stops existing.
+  // Note the list: `items`, not `visible`. A filter narrowing the collection must NOT
+  // close what is open — in a reading pane, typing in the search box while reading an
+  // entry would otherwise slam the page shut mid-paragraph.
   useEffect(() => {
     if (selectedId && !loading && !items.some((item) => section.idOf(item) === selectedId)) {
       setSelectedId(null);
@@ -112,7 +136,11 @@ export function WorldWorkspace<T>({
       ) : visible.length === 0 ? (
         <div className={split ? 'py-8 text-center' : 'py-16 text-center'}>
           {!split && <Icon name={section.icon} size={32} className="mx-auto mb-3 text-neutral-700" />}
-          <p className="text-sm text-neutral-500">{filtering ? t(section.noMatchLabel) : t(section.emptyLabel)}</p>
+          {filtering || !section.EmptyState ? (
+            <p className="text-sm text-neutral-500">{filtering ? t(section.noMatchLabel) : t(section.emptyLabel)}</p>
+          ) : (
+            <section.EmptyState />
+          )}
           {!split &&
             (filtering ? (
               <button
@@ -122,13 +150,17 @@ export function WorldWorkspace<T>({
                 {t('Quitar los filtros')}
               </button>
             ) : (
-              <button className="btn btn-primary mt-3 gap-1.5" onClick={() => setAdding(true)}>
-                <Icon name="plus" size={14} /> {t('Crear el primero')}
-              </button>
+              createModal && (
+                <button className="btn btn-primary mt-3 gap-1.5" onClick={() => setAdding(true)}>
+                  <Icon name="plus" size={14} /> {t('Crear el primero')}
+                </button>
+              )
             ))}
         </div>
       ) : section.presentation === 'tree' ? (
         <WorldTree section={section} items={visible} selectedId={selectedId} onOpen={setSelectedId} />
+      ) : section.presentation === 'index' ? (
+        <WorldAlphaIndex section={section} items={visible} selectedId={selectedId} onOpen={setSelectedId} split={split} />
       ) : (
         <ul
           className={
@@ -144,6 +176,7 @@ export function WorldWorkspace<T>({
           ))}
         </ul>
       )}
+      {section.Footer && !loading && <section.Footer filter={filter} onOpen={setSelectedId} />}
     </div>
   );
 
@@ -158,9 +191,17 @@ export function WorldWorkspace<T>({
           <span className="text-xs text-neutral-500">
             {filtering ? tx('{shown} de {total}', { shown: String(visible.length), total: String(items.length) }) : items.length}
           </span>
-          <button className="btn btn-primary ml-auto h-9 gap-1.5" onClick={() => setAdding(true)}>
-            <Icon name="plus" /> {t(section.createLabel)}
-          </button>
+          <span className="ml-auto flex items-center gap-2">
+            {section.HeaderActions && <section.HeaderActions />}
+          </span>
+          {/* The create button exists only where creating is a thing. The four collections
+              pass a modal and are unchanged; Continuity passes none and simply has no
+              button, rather than one that opens an empty form. */}
+          {createModal && (
+            <button className="btn btn-primary h-9 gap-1.5" onClick={() => setAdding(true)}>
+              <Icon name="plus" /> {t(section.createLabel ?? 'Crear')}
+            </button>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <input
@@ -182,6 +223,7 @@ export function WorldWorkspace<T>({
               item={selected}
               onChanged={reload}
               onBack={() => setSelectedId(null)}
+              onSelect={setSelectedId}
             />
           </div>
         </div>
@@ -202,6 +244,76 @@ export function WorldWorkspace<T>({
             onCreated?.(id);
           }
         )}
+    </div>
+  );
+}
+
+/**
+ * The alphabetical presentation, for a collection you READ rather than browse.
+ *
+ * It renders the section's own `Card` like the grid does — an index row is just a card
+ * shaped like a line — so a section gets the A–Z for the cost of a `presentation` value
+ * and nothing else. What it adds is the two things a grid cannot give you: a sticky letter
+ * as you scroll, and a jump strip that only offers the letters this world actually uses.
+ */
+function WorldAlphaIndex<T>({
+  section,
+  items,
+  selectedId,
+  onOpen,
+  split,
+}: {
+  section: WorldSectionDef<T>;
+  items: T[];
+  selectedId: string | null;
+  onOpen: (id: string) => void;
+  split: boolean;
+}) {
+  const buckets = useMemo(() => {
+    const map = new Map<string, T[]>();
+    for (const item of items) {
+      const letter = alphaBucket(section.labelOf?.(item) ?? '');
+      map.set(letter, [...(map.get(letter) ?? []), item]);
+    }
+    // `#` last: digits and symbols are the tail of an index, not its head, however they
+    // happen to sort in ASCII.
+    return [...map.entries()].sort(([a], [b]) => (a === '#' ? 1 : b === '#' ? -1 : a.localeCompare(b)));
+  }, [items, section]);
+
+  const headingId = (letter: string) => `${section.id}-letter-${letter === '#' ? 'sym' : letter}`;
+
+  return (
+    <div>
+      {!split && buckets.length > 1 && (
+        <div className="mb-3 flex flex-wrap gap-0.5">
+          {buckets.map(([letter]) => (
+            <button
+              key={letter}
+              onClick={() => document.getElementById(headingId(letter))?.scrollIntoView({ block: 'start' })}
+              className="rounded px-1.5 py-0.5 text-[11px] font-medium text-neutral-500 hover:bg-neutral-800 hover:text-indigo-300"
+            >
+              {letter}
+            </button>
+          ))}
+        </div>
+      )}
+      {buckets.map(([letter, entries]) => (
+        <section key={letter}>
+          <h3
+            id={headingId(letter)}
+            className="sticky top-0 z-10 mb-1 bg-neutral-950/95 py-1 text-xs font-semibold uppercase tracking-wider text-neutral-500 backdrop-blur"
+          >
+            {letter}
+          </h3>
+          <ul className="mb-3 space-y-1">
+            {entries.map((item) => (
+              <li key={section.idOf(item)} data-selected={section.idOf(item) === selectedId ? 'true' : undefined}>
+                <section.Card item={item} compact={split} onOpen={() => onOpen(section.idOf(item))} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
     </div>
   );
 }

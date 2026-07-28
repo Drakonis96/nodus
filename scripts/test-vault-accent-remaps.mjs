@@ -22,12 +22,12 @@ import { fileURLToPath } from 'node:url';
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const css = fs.readFileSync(path.join(repoRoot, 'src', 'index.css'), 'utf8');
 
-const VAULTS = ['genealogy', 'estudio', 'docencia', 'databases'];
+const VAULTS = ['genealogy', 'estudio', 'docencia', 'databases', 'worldbuilding'];
 const unescape = (s) => s.replace(/\\/g, '');
 
 /** Base remaps: `.docencia .bg-indigo-600 { … }` → key `docencia|bg-indigo-600`. */
 const baseRemaps = new Set();
-for (const m of css.matchAll(/^\.(genealogy|estudio|docencia|databases) \.([^\s{]+?)(?::hover)?\s*\{/gm)) {
+for (const m of css.matchAll(/^\.(genealogy|estudio|docencia|databases|worldbuilding) \.([^\s{]+?)(?::hover)?\s*\{/gm)) {
   baseRemaps.add(`${m[1]}|${unescape(m[2])}`);
 }
 

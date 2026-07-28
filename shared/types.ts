@@ -94,6 +94,7 @@ export type {
 import type { VaultType } from './vaultTypes';
 import type { InterviewTurn } from './characterInterview';
 import type { WorldCalendar, WorldDate } from './worldCalendar';
+import type { BoardCastMember } from './worldThreads';
 import type { TutorialVideo } from './tutorialVideos';
 import type { ToolkitJobRequest, ToolkitJobProgress, ToolkitJobResult } from './toolkitTypes';
 import type {
@@ -2091,8 +2092,10 @@ export interface CharacterVoice {
 
 export type CharacterImageKind = 'portrait' | 'full_body' | 'expression' | 'age' | 'outfit' | 'other';
 
-/** What a `world_images` row hangs off. Polymorphic, so nothing cascades from it. */
-export type WorldImageEntityKind = 'character' | 'place' | 'group' | 'scene';
+/** What a `world_images` row hangs off. Polymorphic, so nothing cascades from it.
+ *  The column carries no CHECK constraint, so a value outside this union writes happily
+ *  and the gallery then returns nothing without erroring: this type is the only guard. */
+export type WorldImageEntityKind = 'character' | 'place' | 'group' | 'scene' | 'article';
 
 /**
  * How a character's biography is written. `faithful` retells only what the sheet says;
@@ -2465,6 +2468,399 @@ export interface PlaceMapAppearance {
   markerId: string;
   x: number;
   y: number;
+}
+
+// ── "Analizar": rules, conflicts, arcs, continuity and open questions (v99) ──
+//
+// Five sections over one skeleton, because all five are readings of a single statement
+// the vault could not hold before: "in this scene, this moves like so". A rule put to the
+// test, a conflict that advances and an arc that turns are the same row with different
+// vocabulary — which is why they are filled in from one place, the sheet of the scene the
+// author already has open, and not from five screens nobody visits.
+
+/** How a scene's day is declared: relative to the previous one, or pinned. */
+export type SceneDayMode = 'anchor' | 'same' | 'offset';
+
+export interface SceneDayLink {
+  sceneId: string;
+  mode: SceneDayMode;
+  offsetDays: number;
+  anchorWorldDay: number | null;
+}
+
+/** A conflict is a thread whose parties oppose; an arc is a thread with one subject. */
+export type WorldThreadKind = 'conflict' | 'arc';
+export type WorldThreadStatus = 'open' | 'resolved' | 'archived';
+/** `background` is pressure that is nobody's plan — the winter, the plague, the debt. */
+export type WorldThreadScope = 'external' | 'background';
+/** `caught` is the one nobody asks for and every story needs: the child, the hostage. */
+export type ThreadPartySide = 'subject' | 'wants' | 'opposes' | 'caught';
+
+export interface ThreadParty {
+  threadId: string;
+  partyKind: 'character' | 'group';
+  partyId: string;
+  partyName: string;
+  side: ThreadPartySide;
+}
+
+export interface WorldThread {
+  threadId: string;
+  kind: WorldThreadKind;
+  title: string;
+  titleKey: string;
+  /** One box of prose, not two: whoever types "The war for the ford" has said the object. */
+  pitch: string | null;
+  /** What is lost if this is lost. Conflicts only. */
+  stakes: string | null;
+  scope: WorldThreadScope;
+  status: WorldThreadStatus;
+  outcome: string | null;
+  origin: 'author' | 'ai';
+  parties: ThreadParty[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WorldThreadInput {
+  kind?: WorldThreadKind;
+  title?: string;
+  pitch?: string | null;
+  stakes?: string | null;
+  scope?: WorldThreadScope;
+  status?: WorldThreadStatus;
+  outcome?: string | null;
+}
+
+/** What a beat hangs off. `rule` points at `world_rules`, the rest at `world_threads`. */
+export type BeatThreadKind = 'rule' | 'conflict' | 'arc';
+
+/**
+ * The four-word vocabularies. Four words an author picks without thinking, never a 0–10
+ * number: a figure re-invented on each scene measures nothing across a manuscript.
+ */
+export type RuleMark = 'obeys' | 'bends' | 'breaks' | 'establishes';
+export type ConflictMark = 'raise' | 'turn' | 'ease' | 'resolve';
+export type ArcMark = 'step' | 'turn';
+export type BeatMark = RuleMark | ConflictMark | ArcMark;
+
+export interface WorldBeat {
+  threadKind: BeatThreadKind;
+  threadId: string;
+  threadTitle: string;
+  sceneId: string;
+  sceneTitle: string;
+  narrativeOrder: number;
+  mark: BeatMark;
+  /** What changes, in one sentence. Only asked for when the mark is a turn. */
+  text: string | null;
+  /** In whose favour. For a rule, who broke it; for an arc, null. */
+  subjectKind: 'character' | 'group' | null;
+  subjectId: string | null;
+  subjectName: string | null;
+  /** Rules only. 1 = the price is on the page, 0 = it is not, null = not looked at yet. */
+  paid: boolean | null;
+}
+
+export interface WorldBeatInput {
+  threadKind: BeatThreadKind;
+  threadId: string;
+  sceneId: string;
+  mark: BeatMark;
+  text?: string | null;
+  subjectKind?: 'character' | 'group' | null;
+  subjectId?: string | null;
+  paid?: boolean | null;
+}
+
+/** The contract with the reader, and the only field that changes what a breach means. */
+export type RuleHardness = 'physical' | 'costly' | 'social';
+export type RuleStatus = 'canon' | 'tentative' | 'retired';
+
+export interface WorldRule {
+  ruleId: string;
+  title: string;
+  titleKey: string;
+  statement: string | null;
+  /** What breaking it costs. Apart from the statement because the whole diagnostic layer
+   *  asks it one question: is this price ever on the page. */
+  cost: string | null;
+  /** How far it does NOT reach. Without this a magic system dissolves every plot. */
+  limits: string | null;
+  hardness: RuleHardness;
+  /** An exception is a NARROWER RULE hanging off its mother, inheriting scope and price. */
+  parentRuleId: string | null;
+  /** The encyclopedia article this rule was made from. */
+  articleId: string | null;
+  scopeKind: 'world' | 'group' | 'place';
+  scopeId: string | null;
+  fromWorldDay: number | null;
+  toWorldDay: number | null;
+  status: RuleStatus;
+  secretId: string | null;
+  proposedText: string | null;
+  proposedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WorldRuleInput {
+  title?: string;
+  statement?: string | null;
+  cost?: string | null;
+  limits?: string | null;
+  hardness?: RuleHardness;
+  parentRuleId?: string | null;
+  articleId?: string | null;
+  scopeKind?: 'world' | 'group' | 'place';
+  scopeId?: string | null;
+  fromWorldDay?: number | null;
+  toWorldDay?: number | null;
+  status?: RuleStatus;
+  secretId?: string | null;
+}
+
+export interface WorldFindingText {
+  key: string;
+  vars?: Record<string, string>;
+}
+
+/** A contradiction, recomputed whole on every open. There is NO findings table: a stored
+ *  finding is a second truth that outlives its own correction. */
+export interface WorldFinding {
+  /** Stable across runs and machines — it is half the mute fingerprint. */
+  checkId: string;
+  /** Which check produced it, for the filter and the label. */
+  family: string;
+  severity: 'contradiction' | 'warning' | 'gap';
+  /** An i18n KEY plus its variables, never a finished sentence: a headline built by
+   *  interpolation is invisible to the i18n collector and would stay in Spanish in the
+   *  other six languages. The renderer calls tx(key, vars). */
+  headline: WorldFindingText;
+  detail: WorldFindingText | null;
+  subjects: { kind: string; id: string; title: string; field?: string }[];
+  fingerprint: string;
+}
+
+export type MuteReasonCode = 'double' | 'told' | 'deliberate' | 'unknown';
+
+export interface WorldNoticeMute {
+  fingerprint: string;
+  checkId: string;
+  scope: 'finding' | 'check';
+  subjects: { kind: string; id: string; title: string; field?: string }[];
+  headline: string | null;
+  reasonCode: MuteReasonCode;
+  reason: string | null;
+  createdAt: string;
+}
+
+export type QuestionStatus = 'open' | 'answered' | 'parked';
+
+export interface WorldQuestionOption {
+  optionId: string;
+  questionId: string;
+  text: string;
+  /** What it drags along with it. */
+  implications: string | null;
+  origin: 'author' | 'ai';
+  applyMode: 'none' | 'fill_field' | 'create_article';
+  appliedAt: string | null;
+  /** What the field said BEFORE. This is the undo. */
+  replacedText: string | null;
+}
+
+export interface WorldQuestion {
+  questionId: string;
+  question: string;
+  anchorKind: string | null;
+  anchorId: string | null;
+  anchorTitle: string | null;
+  /** Which field of the sheet the answer goes in. Derived from where it was captured. */
+  anchorField: string | null;
+  status: QuestionStatus;
+  origin: 'author' | 'placeholder';
+  originKey: string | null;
+  /** "I cannot go on without this". A switch, not a priority scale. */
+  blocking: boolean;
+  chosenOptionId: string | null;
+  options: WorldQuestionOption[];
+  answeredAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WorldQuestionInput {
+  question?: string;
+  anchorKind?: string | null;
+  anchorId?: string | null;
+  anchorField?: string | null;
+  status?: QuestionStatus;
+  blocking?: boolean;
+}
+
+// ── The encyclopedia (schema v98) ────────────────────────────────────────────
+//
+// One index over the whole world. `article` is native and editable; every other kind is
+// a READ-TIME PROJECTION of a row that lives in its own section, which is why there is no
+// index table: a second copy of a character's name would disagree with the first the day
+// somebody renamed them. See shared/worldEncyclopedia.ts for the keys and the link syntax.
+
+export type WorldEntryKind = 'article' | 'character' | 'place' | 'group' | 'scene' | 'map' | 'conflict' | 'rule';
+
+/** A kind-qualified address. Ids are unique per table, never across the world, so nothing
+ *  anywhere may key an entry by its id alone. */
+export interface WorldEntryRef {
+  kind: WorldEntryKind;
+  id: string;
+}
+
+/** `${kind}:${id}`. The React key, the link target, the export anchor and
+ *  `world_links.target_key` are all this same string — see `entryKey()`. */
+export type WorldEntryKey = string;
+
+/** What lore that hangs off no entity is filed under. */
+export type WorldArticleCategory =
+  | 'magic' | 'religion' | 'language' | 'creature' | 'species' | 'artifact'
+  | 'technology' | 'concept' | 'event' | 'organization' | 'flora' | 'fauna'
+  | 'custom' | 'other';
+
+/** One row of the A–Z index. Deliberately without a body: the index loads whole. */
+export interface WorldEntry {
+  kind: WorldEntryKind;
+  id: string;
+  key: WorldEntryKey;
+  title: string;
+  /** Accent-folded, lowercased title — the link resolver's and the A–Z rail's key. */
+  titleKey: string;
+  /** Other names it answers to: `person_names` for a character, `aka` for an article. */
+  aliases: string[];
+  summary: string | null;
+  /** The taxonomy chip, from the underlying row's own kind column. */
+  category: string | null;
+  /** Only an article. A projection is browsed here and edited in its own section. */
+  editable: boolean;
+  /** True when there is nothing written yet — the writer's real question. */
+  stub: boolean;
+  spoiler: boolean;
+  updatedAt: string;
+}
+
+/** One edge of the link graph, in either direction. */
+export interface WorldEntryLink {
+  source: WorldEntryRef;
+  sourceTitle: string;
+  /** Which text it was written in: body, notes, backstory, history… */
+  sourceField: string;
+  /** null when the author wrote a `[[…]]` nobody has defined yet. */
+  target: WorldEntryRef | null;
+  targetTitle: string | null;
+  /** The normalised text of an unresolved link; null once it resolves. */
+  pendingText: string | null;
+  /** The words the author actually wrote. Rendered verbatim — never rewritten by a
+   *  rename, because the link belongs to the prose. */
+  label: string | null;
+  occurrences: number;
+}
+
+export interface WorldEntryDetail {
+  entry: WorldEntry;
+  /** Markdown. For a projection this is COMPOSED from the sheet at read time and never
+   *  stored: there is no second copy of a character's backstory. */
+  body: string;
+  /** The infobox. */
+  facts: { label: string; value: string }[];
+  links: WorldEntryLink[];
+  /** "Mentioned in" — prose references, as opposed to `related`. */
+  backlinks: WorldEntryLink[];
+  /** What the ontology already knows: affiliations, appearances, kin, containment. */
+  related: { ref: WorldEntryRef; title: string; relation: string }[];
+  /** Articles only: the quarantined AI draft, if there is one. */
+  proposedBody: string | null;
+  proposedAt: string | null;
+}
+
+/** The native row. */
+export interface WorldArticle {
+  articleId: string;
+  title: string;
+  titleKey: string;
+  category: WorldArticleCategory;
+  summary: string | null;
+  body: string | null;
+  proposedBody: string | null;
+  proposedAt: string | null;
+  aka: string | null;
+  origin: 'author' | 'ai_proposal';
+  spoiler: boolean;
+  sortTitle: string | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WorldArticleInput {
+  title?: string;
+  category?: WorldArticleCategory;
+  summary?: string | null;
+  body?: string | null;
+  aka?: string | null;
+  spoiler?: boolean;
+  sortTitle?: string | null;
+  notes?: string | null;
+}
+
+/** A full-text hit from the on-demand search (the index search is client-side). */
+export interface WorldBodyHit {
+  key: WorldEntryKey;
+  kind: WorldEntryKind;
+  id: string;
+  title: string;
+  /** Which text matched, already localised for display. */
+  field: string;
+  snippet: string;
+}
+
+/** Something the world talks about but has never defined. */
+export interface WorldEntryProposal {
+  proposalId: string;
+  term: string;
+  termKey: string;
+  category: WorldArticleCategory | null;
+  rationale: string | null;
+  suggestedSummary: string | null;
+  evidence: { key: WorldEntryKey; title: string; snippet: string }[];
+  /** An unresolved `[[…]]` is a fact the author already stated; an n-gram is a guess. */
+  source: 'unresolved_link' | 'frequency';
+  confidence: number | null;
+  status: 'pending' | 'accepted' | 'dismissed';
+  articleId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** How an article draft is written — the same two modes, and the same quarantine, as a
+ *  character biography, except that BOTH modes are quarantined here: a biography is one
+ *  field of a sheet the author is looking at, an article body is the whole entry. */
+export type WorldArticleDraftMode = 'draft' | 'expand';
+
+export interface WorldArticleDraftResult {
+  body: string | null;
+  /** True when the article is too empty to write from — not an error. */
+  noMaterial: boolean;
+}
+
+export interface WorldBibleOptions {
+  format: 'md' | 'pdf';
+  kinds?: WorldEntryKind[];
+  categories?: string[];
+  entryKeys?: WorldEntryKey[];
+  order: 'alpha' | 'category';
+  includeSpoilers: boolean;
+  includeNotes: boolean;
+  /** A draft nobody accepted is not canon. */
+  includeProposals: boolean;
+  title: string;
 }
 
 /** Factions, cultures, religions, houses and orders: one entity, several kinds. */
@@ -6110,6 +6506,99 @@ export interface NodusApi {
     personId: string,
     options?: { includeSecrets?: boolean; includeNotes?: boolean }
   ): Promise<string | null>;
+  // ── The encyclopedia ──────────────────────────────────────────────────────
+  // The index is loaded WHOLE and searched in the renderer, like every other world
+  // collection: it keeps the facet counts honest and the `[[` autocomplete free of an
+  // IPC round-trip per keystroke. Bodies are never in it — those come one at a time.
+  listWorldEntries(): Promise<WorldEntry[]>;
+  getWorldEntry(ref: WorldEntryRef): Promise<WorldEntryDetail | null>;
+  searchWorldBodies(query: string): Promise<WorldBodyHit[]>;
+  createWorldArticle(input: WorldArticleInput): Promise<WorldArticle>;
+  updateWorldArticle(articleId: string, patch: WorldArticleInput): Promise<WorldArticle>;
+  deleteWorldArticle(articleId: string): Promise<void>;
+  worldBacklinks(ref: WorldEntryRef): Promise<WorldEntryLink[]>;
+  worldUnresolvedLinks(): Promise<WorldEntryLink[]>;
+  /** Point every pending `[[text]]` at a real entry; resolves to how many were repaired. */
+  resolveWorldLink(text: string, target: WorldEntryRef): Promise<number>;
+  rebuildWorldLinks(): Promise<number>;
+  indexWorldEntry(ref: WorldEntryRef): Promise<number>;
+  /** Writes to `body_proposed`, NEVER to the body: accepting is a separate, explicit act. */
+  draftWorldArticle(articleId: string, mode: WorldArticleDraftMode): Promise<WorldArticleDraftResult>;
+  acceptWorldArticleDraft(articleId: string): Promise<WorldArticle>;
+  rejectWorldArticleDraft(articleId: string): Promise<void>;
+  /** Half deterministic: works, and is worth running, with no AI provider configured. */
+  analyzeMissingEntries(): Promise<WorldEntryProposal[]>;
+  listEntryProposals(status?: 'pending' | 'accepted' | 'dismissed'): Promise<WorldEntryProposal[]>;
+  acceptEntryProposal(proposalId: string): Promise<WorldArticle>;
+  dismissEntryProposal(proposalId: string): Promise<void>;
+  exportWorldBible(options: WorldBibleOptions): Promise<{ path: string } | null>;
+  // ── The chain of days ─────────────────────────────────────────────────────
+  // Every one of these recomputes `world_scenes.world_day` for the WHOLE manuscript and
+  // resolves to how many scenes were dated: a chain edited without recomputing leaves the
+  // world ordered and wrong, in silence.
+  listSceneDayLinks(): Promise<SceneDayLink[]>;
+  setSceneDayLink(sceneId: string, link: Omit<SceneDayLink, 'sceneId'>): Promise<number>;
+  clearSceneDayLink(sceneId: string): Promise<number>;
+  reorderScene(sceneId: string, toIndex: number): Promise<number>;
+  // ── Threads and beats ─────────────────────────────────────────────────────
+  // The beats are loaded WHOLE: every diagnostic they feed ("these nine scenes move
+  // nothing", "this thread was declared and forgotten") is a whole-manuscript question,
+  // and paying for them one scene at a time is how a structural view becomes unopenable.
+  listWorldThreads(kind?: WorldThreadKind): Promise<WorldThread[]>;
+  getWorldThread(threadId: string): Promise<WorldThread | null>;
+  createWorldThread(input: WorldThreadInput): Promise<WorldThread>;
+  updateWorldThread(threadId: string, patch: WorldThreadInput): Promise<WorldThread>;
+  deleteWorldThread(threadId: string): Promise<void>;
+  setThreadParties(
+    threadId: string,
+    parties: { partyKind: 'character' | 'group'; partyId: string; side: ThreadPartySide }[]
+  ): Promise<WorldThread>;
+  threadsForParty(partyKind: 'character' | 'group', partyId: string): Promise<WorldThread[]>;
+  listWorldBeats(): Promise<WorldBeat[]>;
+  /** The cast × conflicts board, in four queries. The arc fields travel READ-ONLY. */
+  threadBoardData(): Promise<{
+    cast: BoardCastMember[];
+    threads: WorldThread[];
+    affiliations: { personId: string; personName: string; groupId: string; groupName: string }[];
+  }>;
+  threadSceneContext(): Promise<{
+    scenes: { sceneId: string; title: string; narrativeOrder: number }[];
+    sceneCast: { sceneId: string; personId: string; personName: string }[];
+    membership: { groupId: string; personId: string }[];
+  }>;
+  beatsForScene(sceneId: string): Promise<WorldBeat[]>;
+  setWorldBeat(input: WorldBeatInput): Promise<void>;
+  deleteWorldBeat(threadKind: BeatThreadKind, threadId: string, sceneId: string): Promise<void>;
+  // ── Continuity ────────────────────────────────────────────────────────────
+  // Recomputed WHOLE on every call; there is no findings table. The badge on a sheet and
+  // the section list are the same array, filtered with `findingsFor()` in the renderer.
+  runWorldContinuity(): Promise<WorldFinding[]>;
+  /** Including what has been silenced — for the exceptions screen. */
+  runWorldContinuityUnfiltered(): Promise<WorldFinding[]>;
+  listNoticeMutes(): Promise<WorldNoticeMute[]>;
+  muteNotice(input: {
+    fingerprint: string;
+    checkId: string;
+    scope?: 'finding' | 'check';
+    subjects: WorldNoticeMute['subjects'];
+    headline: string | null;
+    reasonCode: MuteReasonCode;
+    reason?: string | null;
+  }): Promise<WorldNoticeMute[]>;
+  unmuteNotice(fingerprint: string): Promise<WorldNoticeMute[]>;
+  /** Real counts from the same snapshot the checks ran over — for the empty state. */
+  continuitySummary(): Promise<{ families: number; facts: number; checks: number }>;
+  recomputeSceneDays(): Promise<number>;
+  // ── The hard laws ─────────────────────────────────────────────────────────
+  listWorldRules(): Promise<WorldRule[]>;
+  getWorldRule(ruleId: string): Promise<WorldRule | null>;
+  createWorldRule(input: WorldRuleInput): Promise<WorldRule>;
+  updateWorldRule(ruleId: string, patch: WorldRuleInput): Promise<WorldRule>;
+  deleteWorldRule(ruleId: string): Promise<void>;
+  /** The laws a scene puts in play, prepopulated from its links, its place and its cast. */
+  rulesInPlay(sceneId: string): Promise<WorldRule[]>;
+  acceptRuleDraft(ruleId: string): Promise<WorldRule>;
+  rejectRuleDraft(ruleId: string): Promise<void>;
   // ── Maps of an invented world ─────────────────────────────────────────────
   // The image bytes are NEVER inlined with a map: a base map is megabytes, and listing
   // them would push every byte of every map through the bridge to draw a row of cards.
