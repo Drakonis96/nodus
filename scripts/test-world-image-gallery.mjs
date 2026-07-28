@@ -22,6 +22,15 @@ test('place sheets reuse their ordered gallery cover as a horizontal header', as
   assert.match(places, /<ImageLightbox/);
 });
 
+test('faction and culture sheets reuse their ordered gallery cover as a horizontal header', async () => {
+  const groups = await read('src/views/GroupsView.tsx');
+  assert.match(groups, /const cover = !dynasty \? images\[0\] \?\? null : null/);
+  assert.match(groups, /data-testid="group-cover"/);
+  assert.match(groups, /aspect-\[21\/8\]/);
+  assert.match(groups, /onImagesChange=\{setImages\}/);
+  assert.match(groups, /<ImageLightbox/);
+});
+
 test('the shared lightbox supports keyboard and thumbnail gallery navigation', async () => {
   const viewer = await read('src/components/ImageLightbox.tsx');
   assert.match(viewer, /event\.key === 'ArrowLeft'/);

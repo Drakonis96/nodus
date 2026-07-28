@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { CharacterAffiliation, CharacterImage, WorldGroup, WorldGroupKind, WorldPlace } from '@shared/types';
 import {
+  CHARACTER_IMAGE_KIND_LABEL,
   CULTURE_KINDS,
   DYNASTY_KINDS,
   FACTION_KINDS,
@@ -12,13 +13,14 @@ import {
 import type { WorldSectionDef } from '../components/world/WorldWorkspace';
 import { WorldWorkspace } from '../components/world/WorldWorkspace';
 import { WorldGallery } from '../components/world/WorldGallery';
+import { ImageLightbox, type ImageLightboxItem } from '../components/ImageLightbox';
 import { AutoSavingField } from '../components/AutoSavingField';
 import { Icon } from '../components/ui';
 import { confirm } from '../components/feedback';
 import { PERSON_DOSSIER_SECTION_CLASS } from '../components/personDossierLayout';
 import { ContinuityBadge } from '../components/world/ContinuityBadge';
 import { t, tx } from '../i18n';
-import { worldImageThumbnailUrl } from '../lib/imageUrl';
+import { worldImageThumbnailUrl, worldImageUrl } from '../lib/imageUrl';
 
 /**
  * Factions, cultures and dynasties.
@@ -212,6 +214,8 @@ function GroupSheet({
   const [members, setMembers] = useState<CharacterAffiliation[]>([]);
   const [groups, setGroups] = useState<WorldGroup[]>([]);
   const [places, setPlaces] = useState<WorldPlace[]>([]);
+  const [images, setImages] = useState<CharacterImage[]>([]);
+  const [viewingId, setViewingId] = useState<string | null>(null);
 
   useEffect(() => {
     void Promise.all([
@@ -230,6 +234,18 @@ function GroupSheet({
     await onChanged();
   };
 
+  const cover = !dynasty ? images[0] ?? null : null;
+  const lightboxItems = useMemo<ImageLightboxItem[]>(
+    () => images.map((image) => ({
+      id: image.imageId,
+      src: worldImageUrl(image),
+      alt: image.label ? `${group.name} · ${image.label}` : group.name,
+      label: image.label ?? t(CHARACTER_IMAGE_KIND_LABEL[image.kind]),
+      meta: image.generated ? 'IA' : null,
+    })),
+    [group.name, images]
+  );
+
   const remove = async () => {
     const ok = await confirm({
       title: t('Eliminar grupo'),
@@ -245,6 +261,28 @@ function GroupSheet({
 
   return (
     <div className="space-y-5 p-6">
+      {cover && (
+        <button
+          type="button"
+          data-testid="group-cover"
+          className="group relative block aspect-[21/8] max-h-72 min-h-40 w-full overflow-hidden rounded-xl border border-neutral-300 bg-neutral-100 text-left shadow-lg dark:border-neutral-800 dark:bg-neutral-900"
+          title={t('Ver detalles')}
+          aria-label={t('Ver detalles')}
+          onClick={() => setViewingId(cover.imageId)}
+        >
+          <img
+            src={worldImageUrl(cover)}
+            alt={group.name}
+            draggable={false}
+            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.015]"
+          />
+          <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" />
+          <span className="pointer-events-none absolute bottom-3 right-3 grid h-9 w-9 place-items-center rounded-full bg-black/65 text-white shadow ring-1 ring-white/15">
+            <Icon name="fit" size={16} />
+          </span>
+        </button>
+      )}
+
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
           <button className="mb-2 flex items-center gap-1 text-xs text-neutral-400 hover:text-neutral-200" onClick={onBack}>
@@ -274,6 +312,7 @@ function GroupSheet({
         kinds={['emblem', 'other']}
         defaultKind="emblem"
         generateLabel={dynasty ? 'Generar blasón' : 'Generar imagen'}
+        onImagesChange={setImages}
       />
 
       <ContinuityBadge entity={{ kind: 'group', id: group.groupId }} />
@@ -416,6 +455,14 @@ function GroupSheet({
           </ul>
         )}
       </section>
+
+      {viewingId && (
+        <ImageLightbox
+          items={lightboxItems}
+          activeId={viewingId}
+          onClose={() => setViewingId(null)}
+        />
+      )}
     </div>
   );
 }
