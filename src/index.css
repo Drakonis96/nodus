@@ -2169,6 +2169,28 @@ textarea.input-autosize {
   field-sizing: content;
 }
 
+/* Typewriter focus follows the paper, not merely the feature. Dark mode keeps the
+   cinematic vignette; on a white manuscript the same black veil looks like a disabled
+   screen, so light mode fades distant lines gently into the page instead. */
+.manuscript-focus-veil {
+  background: linear-gradient(
+    to bottom,
+    rgb(10 10 10 / .75) 0%,
+    rgb(10 10 10 / 0) var(--typewriter-focus-start),
+    rgb(10 10 10 / 0) var(--typewriter-focus-end),
+    rgb(10 10 10 / .75) 100%
+  );
+}
+.light .manuscript-focus-veil {
+  background: linear-gradient(
+    to bottom,
+    rgb(248 250 252 / .72) 0%,
+    rgb(248 250 252 / 0) var(--typewriter-focus-start),
+    rgb(248 250 252 / 0) var(--typewriter-focus-end),
+    rgb(248 250 252 / .72) 100%
+  );
+}
+
 /* Selects: drop the OS-native control and give every `<select class="input">` the
    app's own dark styling with a custom chevron, so dropdowns look the same across
    the whole app (academic and genealogy) instead of falling back to system chrome. */

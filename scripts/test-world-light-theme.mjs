@@ -117,3 +117,24 @@ test('world analysis sections and their shared controls declare light and dark p
   assert.match(fields, /text-indigo-700[^"'`]*dark:text-indigo-300/);
   assert.match(ruleModal, /bg-indigo-50[^"'`]*dark:bg-indigo-950\/20/);
 });
+
+test('typewriter focus fades into paper in light mode instead of darkening the manuscript', async () => {
+  const [manuscript, css] = await Promise.all([
+    read('src/views/ManuscriptView.tsx'),
+    read('src/index.css'),
+  ]);
+
+  assert.match(manuscript, /manuscript-focus-veil/);
+  assert.match(manuscript, /--typewriter-focus-start/);
+  assert.doesNotMatch(manuscript, /background: `linear-gradient\(to bottom, rgba\(10,10,10,0\.75\)/);
+  assert.match(css, /\.manuscript-focus-veil \{/);
+  assert.match(css, /\.light \.manuscript-focus-veil \{/);
+  assert.match(css, /rgb\(10 10 10 \/ \.75\)/, 'dark mode keeps its vignette');
+  assert.match(css, /rgb\(248 250 252 \/ \.72\)/, 'light mode fades into the paper colour');
+  const lightRule = css.slice(css.indexOf('.light .manuscript-focus-veil {'));
+  assert.doesNotMatch(
+    lightRule.slice(0, lightRule.indexOf('}\n') + 2),
+    /rgb\(10 10 10/,
+    'the light veil contains no black overlay'
+  );
+});

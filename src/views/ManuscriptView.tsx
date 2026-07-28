@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import type {
   ManuscriptProgress,
   ManuscriptSpine,
@@ -373,10 +373,11 @@ export function ManuscriptView({ onNavigate }: { onNavigate?: (view: View) => vo
               <div
                 aria-hidden
                 data-testid="manuscript-focus-veil"
-                className="pointer-events-none absolute inset-0"
+                className="manuscript-focus-veil pointer-events-none absolute inset-0"
                 style={{
-                  background: `linear-gradient(to bottom, rgba(10,10,10,0.75) 0%, rgba(10,10,10,0) ${TYPEWRITER_BAND * 100 - 12}%, rgba(10,10,10,0) ${TYPEWRITER_BAND * 100 + 12}%, rgba(10,10,10,0.75) 100%)`,
-                }}
+                  '--typewriter-focus-start': `${TYPEWRITER_BAND * 100 - 12}%`,
+                  '--typewriter-focus-end': `${TYPEWRITER_BAND * 100 + 12}%`,
+                } as CSSProperties}
               />
             )}
             <WorldLinkCandidates
