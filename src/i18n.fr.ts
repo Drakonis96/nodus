@@ -1178,6 +1178,7 @@ export const FR: Record<string, string> = {
   'Bóveda renombrada.': 'Espace renommé.',
   'Bóveda duplicada.': 'Espace dupliqué.',
   'Testimonios': 'Témoignages',
+  'Prosopografía': 'Prosopographie',
   'Worldbuilding': 'Worldbuilding',
   'Docencia': 'Enseignement',
   'Investigación, análisis y escritura.': 'Recherche, analyse et rédaction.',

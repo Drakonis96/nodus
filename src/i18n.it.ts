@@ -1093,6 +1093,7 @@ export const IT: Record<string, string> = {
   "Bóveda renombrada.": "Vault rinominato.",
   "Bóveda duplicada.": "Deposito duplicato.",
   "Testimonios": "Testimonianze",
+  "Prosopografía": "Prosopografia",
   "Worldbuilding": "Costruzione del mondo",
   "Docencia": "Insegnamento",
   "Investigación, análisis y escritura.": "Ricerca, analisi e scrittura.",

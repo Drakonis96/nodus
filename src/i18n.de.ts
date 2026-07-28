@@ -1179,6 +1179,7 @@ export const DE: Record<string, string> = {
   'Bóveda renombrada.': 'Arbeitsbereich umbenannt.',
   'Bóveda duplicada.': 'Arbeitsbereich dupliziert.',
   'Testimonios': 'Zeugnisse',
+  'Prosopografía': 'Prosopografie',
   'Worldbuilding': 'Worldbuilding',
   'Docencia': 'Lehre',
   'Investigación, análisis y escritura.': 'Forschung, Analyse und Schreiben.',

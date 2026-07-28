@@ -64,11 +64,10 @@ test('shipped and preview vaults are selectable; announced future vaults remain 
     assert.equal(vt.isViewAllowedForVaultType('settings', graduated), true);
   }
   assert.deepEqual(vt.PREVIEW_VAULT_TYPES, []);
-  for (const gated of ['primary_sources', 'testimonios']) {
+  for (const gated of ['primary_sources', 'testimonios', 'prosopography']) {
     assert.equal(vt.getVaultTypeDef(gated).available, false, `${gated} not selectable this release`);
   }
-  // Order shown in the picker: shipped types first, then the coming-soon ones.
-  assert.deepEqual(vt.VAULT_TYPES.map((d) => d.id), ['academic', 'genealogy', 'estudio', 'primary_sources', 'databases', 'testimonios', 'worldbuilding', 'docencia']);
+  assert.deepEqual(vt.VAULT_TYPES.map((d) => d.id), ['academic', 'genealogy', 'prosopography', 'estudio', 'primary_sources', 'databases', 'testimonios', 'worldbuilding', 'docencia']);
 });
 
 test('the vault picker derives selectable modes from the canonical registry', async () => {
@@ -76,8 +75,9 @@ test('the vault picker derives selectable modes from the canonical registry', as
   const picker = await readFile(path.join(repoRoot, 'src/components/vaultTypeUi.tsx'), 'utf8');
   const switcher = await readFile(path.join(repoRoot, 'src/components/VaultSwitcher.tsx'), 'utf8');
   assert.match(picker, /VAULT_TYPES\.filter\(\(type\) => type\.available\)/);
-  assert.match(picker, /const CREATE_VAULT_TYPES: VaultType\[\] = \[\s*'academic', 'primary_sources', 'testimonios',\s*'databases', 'docencia', 'estudio',\s*'genealogy', 'worldbuilding',\s*\]/s);
+  assert.match(picker, /const CREATE_VAULT_TYPES: VaultType\[\] = \[\s*'academic', 'primary_sources', 'testimonios',\s*'databases', 'docencia', 'estudio',\s*'genealogy', 'prosopography', 'worldbuilding',\s*\]/s);
   assert.doesNotMatch(picker, /COMING_SOON_VAULT_TYPES[^\n]*estudio/);
+  assert.match(picker, /type === 'worldbuilding'\) return 'alpha'/);
   assert.match(picker, /type === 'estudio' \|\| type === 'genealogy' \|\| type === 'databases' \|\| type === 'docencia'\) return 'beta'/);
   assert.doesNotMatch(picker, /type === '(?:estudio|genealogy)'\) return '(?:pre-alpha|alpha)'/);
   assert.match(picker, /data-testid="vault-phase-notice"/);

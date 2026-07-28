@@ -1481,6 +1481,7 @@ export const TR: Record<string, string> = {
   "Bóveda renombrada.": "Kasa yeniden adlandırıldı.",
   "Bóveda duplicada.": "Yinelenen kasa.",
   "Testimonios": "Görüşler",
+  "Prosopografía": "Prosopografi",
   "Worldbuilding": "Dünya inşası",
   "Docencia": "Öğretim",
   "Investigación, análisis y escritura.": "Araştırma, analiz ve yazma.",

@@ -25,7 +25,7 @@ export const COMING_SOON_VAULT_TYPES: VaultType[] = VAULT_TYPES.filter((type) =>
 export const CREATE_VAULT_TYPES: VaultType[] = [
   'academic', 'primary_sources', 'testimonios',
   'databases', 'docencia', 'estudio',
-  'genealogy', 'worldbuilding',
+  'genealogy', 'prosopography', 'worldbuilding',
 ];
 export const isComingSoonVaultType = (type: VaultType) => COMING_SOON_VAULT_TYPES.includes(type);
 export const VAULT_TYPE_COLOR = VAULT_TYPE_COLORS;
@@ -41,6 +41,8 @@ export function vaultTypeLabel(type: VaultType): string {
       return t('Fuentes primarias');
     case 'genealogy':
       return t('Genealogía');
+    case 'prosopography':
+      return t('Prosopografía');
     case 'databases':
       return t('Bases de datos');
     case 'testimonios':
@@ -61,6 +63,7 @@ export function vaultTypeIcon(type: VaultType): string {
     case 'estudio': return 'graduation';
     case 'primary_sources': return 'archive';
     case 'genealogy': return 'tree';
+    case 'prosopography': return 'users';
     case 'databases': return 'table';
     case 'testimonios': return 'microphone';
     case 'worldbuilding': return 'globe';
@@ -71,6 +74,7 @@ export function vaultTypeIcon(type: VaultType): string {
 }
 
 export function vaultTypePhase(type: VaultType): VaultPhase | null {
+  if (type === 'worldbuilding') return 'alpha';
   if (type === 'estudio' || type === 'genealogy' || type === 'databases' || type === 'docencia') return 'beta';
   return null;
 }
@@ -79,6 +83,7 @@ export function vaultTypeDescription(type: VaultType): string {
   switch (type) {
     case 'academic': return t('Investigación, análisis y escritura.');
     case 'genealogy': return t('Historia familiar y archivos.');
+    case 'prosopography': return t('Personas, relaciones, identidades y evidencias biográficas para investigación histórica.');
     case 'estudio': return t('Aprendizaje y materiales de estudio.');
     case 'databases': return t('Tablas, datos y análisis.');
     case 'primary_sources': return t('Archivos y fuentes históricas.');

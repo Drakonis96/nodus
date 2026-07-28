@@ -1184,6 +1184,7 @@ export const EN: Record<string, string> = {
   'Bóveda renombrada.': 'Vault renamed.',
   'Bóveda duplicada.': 'Vault duplicated.',
   Testimonios: 'Testimonies',
+  Prosopografía: 'Prosopography',
   Worldbuilding: 'Worldbuilding',
   Docencia: 'Teaching',
   'Investigación, análisis y escritura.': 'Research, analysis, and writing.',

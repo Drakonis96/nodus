@@ -20,6 +20,7 @@ export type VaultType =
   | 'estudio'
   | 'primary_sources'
   | 'genealogy'
+  | 'prosopography'
   | 'databases'
   | 'testimonios'
   | 'worldbuilding'
@@ -48,10 +49,9 @@ export interface VaultTypeDef {
 }
 
 /**
- * Canonical registry. Order here is the order shown in the picker: the two shipped
- * types first (`academic`, `genealogy`), then the announced-but-not-yet-shipped ones
- * in the order they were promised publicly. `academic` stays first and is the
- * default for every pre-existing vault.
+ * Canonical registry. `academic` stays first and is the default for every
+ * pre-existing vault. The creation grid has its own product order in
+ * `src/components/vaultTypeUi.tsx`.
  */
 export const VAULT_TYPES: VaultTypeDef[] = [
   {
@@ -88,6 +88,12 @@ export const VAULT_TYPES: VaultTypeDef[] = [
 
 ═══ CONTEXTO DEL VAULT — MODO GENEALOGÍA ═══
 Este vault reconstruye historia familiar a partir de fuentes primarias (censos, padrones, partidas de bautismo/matrimonio/defunción, actas, correspondencia). Tu tarea es ayudar a IDENTIFICAR personas, reconstruir su biografía y trazar vínculos de parentesco y su rastro a través del corpus. Trata la identidad y el parentesco como HIPÓTESIS que se prueban con evidencia, siguiendo el estándar de prueba genealógico: nunca afirmes que dos registros son la misma persona, ni un vínculo de parentesco, sin apoyo documental; cita la evidencia y su localización, y señala cuando un dato es incierto o contradictorio. Copia los nombres y fechas tal como constan en época; no modernices ortografías ni normalices fechas inciertas. Cuando falte un dato, dilo y sugiere qué fuente podría aportarlo.`,
+  },
+  {
+    id: 'prosopography',
+    available: false,
+    defaultHiddenViews: [],
+    promptPack: '',
   },
   // Study mode ships as a first-class local workspace. primary_sources remains
   // declared but gated until its own product surface is complete.
@@ -240,6 +246,7 @@ export const VAULT_TYPE_COLORS: Record<VaultType, string> = {
   estudio: '#0f766e',
   primary_sources: '#6366f1',
   genealogy: '#ca8a04',
+  prosopography: '#475569',
   databases: '#b30333',
   testimonios: '#0891b2',
   worldbuilding: '#7c3aed',

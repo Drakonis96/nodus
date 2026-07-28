@@ -20,6 +20,7 @@ const RELEASE_SCOPE_META: Record<ReleaseNoteScope, { icon: string; color: string
   estudio: { icon: 'graduation', color: '#0f766e', label: 'Estudio' },
   primary_sources: { icon: 'archive', color: '#6366f1', label: 'Fuentes primarias' },
   genealogy: { icon: 'tree', color: '#ca8a04', label: 'Genealogía' },
+  prosopography: { icon: 'users', color: '#475569', label: 'Prosopografía' },
   databases: { icon: 'table', color: '#b30333', label: 'Bases de datos' },
   testimonios: { icon: 'microphone', color: '#0891b2', label: 'Testimonios' },
   worldbuilding: { icon: 'globe', color: '#7c3aed', label: 'Worldbuilding' },
