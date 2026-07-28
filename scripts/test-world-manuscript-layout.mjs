@@ -16,6 +16,18 @@ test('rules in play reflow their states without crossing a narrow manuscript rai
   assert.doesNotMatch(rules, /flex shrink-0 gap-0\.5/);
 });
 
+test('scene threads give titles, beat text and parties their own readable rows', async () => {
+  const threads = await readFile(path.join(repoRoot, 'src/components/world/SceneThreadsPanel.tsx'), 'utf8');
+
+  assert.match(threads, /min-w-0 flex-1 break-words text-xs font-medium leading-5/);
+  assert.doesNotMatch(threads, /flex-1 truncate text-xs/);
+  assert.match(threads, /grid-cols-\[repeat\(auto-fit,minmax\(4rem,1fr\)\)\]/);
+  assert.match(threads, /data-testid="scene-thread-marks"/);
+  assert.match(threads, /<textarea[\s\S]*?Qué cambia, en una frase/);
+  assert.match(threads, /thread\.parties\.map[\s\S]*?break-words text-\[10px\] leading-4/);
+  assert.match(threads, /grid grid-cols-2 gap-1\.5/);
+});
+
 test('manuscript workbench buttons grow with wrapped or translated labels', async () => {
   const manuscript = await readFile(path.join(repoRoot, 'src/views/ManuscriptView.tsx'), 'utf8');
   const workbench = manuscript.slice(
