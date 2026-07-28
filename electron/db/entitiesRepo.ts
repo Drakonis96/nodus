@@ -52,12 +52,13 @@ interface PersonRow {
   pf_focus_y: number | null;
   pf_scale: number | null;
   pf_generated: number | null;
+  pf_updated_at: string | null;
   created_at: string;
   updated_at: string;
 }
 
 const PERSON_SELECT = `SELECT p.*, pp.focus_x AS pf_focus_x, pp.focus_y AS pf_focus_y, pp.scale AS pf_scale,
-    pp.generated AS pf_generated
+    pp.generated AS pf_generated, pp.updated_at AS pf_updated_at
   FROM persons p LEFT JOIN person_portraits pp ON pp.person_id = p.person_id`;
 
 function personNames(personId: string): PersonName[] {
@@ -82,7 +83,13 @@ function rowToPerson(row: PersonRow): Person {
     names: personNames(row.person_id),
     portrait:
       row.pf_focus_x != null
-        ? { focusX: row.pf_focus_x, focusY: row.pf_focus_y ?? 0.5, scale: row.pf_scale ?? 1, generated: !!row.pf_generated }
+        ? {
+            focusX: row.pf_focus_x,
+            focusY: row.pf_focus_y ?? 0.5,
+            scale: row.pf_scale ?? 1,
+            generated: !!row.pf_generated,
+            updatedAt: row.pf_updated_at ?? undefined,
+          }
         : null,
     frameStyle: row.frame_style ?? null,
     biography: row.biography ?? null,

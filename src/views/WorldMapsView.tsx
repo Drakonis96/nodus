@@ -40,6 +40,7 @@ import {
   type PendingSegment,
 } from '../components/world/mapTools';
 import { t, tx } from '../i18n';
+import { mapThumbnailUrl } from '../lib/imageUrl';
 
 /**
  * Maps of an invented world.
@@ -170,23 +171,9 @@ function EmptyMaps({ onCreate }: { onCreate: () => void }) {
 
 /** Card thumbnails come from `map_images.thumbnail`, never from the full base image. */
 function MapCard({ map, maps, onOpen }: { map: WorldMap; maps: WorldMap[]; onOpen: () => void }) {
-  const [url, setUrl] = useState<string | null>(null);
+  const url = mapThumbnailUrl(map);
   const kind = mapKindDef(map.kind);
   const parent = map.parentMapId ? maps.find((entry) => entry.mapId === map.parentMapId) : null;
-
-  useEffect(() => {
-    let objectUrl: string | null = null;
-    let cancelled = false;
-    void window.nodus.getMapThumbnail(map.mapId).then((payload) => {
-      if (cancelled || !payload) return;
-      objectUrl = URL.createObjectURL(new Blob([new Uint8Array(payload.blob)], { type: payload.mime }));
-      setUrl(objectUrl);
-    });
-    return () => {
-      cancelled = true;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [map.mapId, map.imageId]);
 
   return (
     <button

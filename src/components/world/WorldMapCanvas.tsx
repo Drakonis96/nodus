@@ -4,6 +4,7 @@ import 'leaflet/dist/leaflet.css';
 import type { WorldMap } from '@shared/types';
 import { canvasFrame, type CanvasFrame, type NormPoint } from '@shared/worldMapGeometry';
 import { t } from '../../i18n';
+import { mapImageUrl } from '../../lib/imageUrl';
 
 /**
  * The viewer for an INVENTED map.
@@ -26,25 +27,7 @@ import { t } from '../../i18n';
 export type { NormPoint };
 
 export function useMapImageUrl(map: WorldMap | null): string | null {
-  const [url, setUrl] = useState<string | null>(null);
-  useEffect(() => {
-    if (!map?.imageId) {
-      setUrl(null);
-      return;
-    }
-    let objectUrl: string | null = null;
-    let cancelled = false;
-    void window.nodus.getMapImageBlob(map.imageId).then((payload) => {
-      if (cancelled || !payload) return;
-      objectUrl = URL.createObjectURL(new Blob([new Uint8Array(payload.blob)], { type: payload.mime }));
-      setUrl(objectUrl);
-    });
-    return () => {
-      cancelled = true;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [map?.imageId]);
-  return url;
+  return map?.imageId ? mapImageUrl(map.imageId) : null;
 }
 
 /**
@@ -60,7 +43,7 @@ export function mapFrame(map: Pick<WorldMap, 'widthPx' | 'heightPx'>): MapFrame 
 
 export interface WorldMapCanvasProps {
   map: WorldMap;
-  /** Object URL of the base image; null while it loads or when there is none. */
+  /** Internal protocol URL of the base image; null when there is none. */
   imageUrl: string | null;
   /** Rendered into the map's overlay pane. Receives the live Leaflet map and the frame. */
   children?: (context: { leaflet: L.Map; frame: MapFrame }) => React.ReactNode;

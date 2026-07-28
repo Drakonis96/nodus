@@ -6,6 +6,7 @@ import { Icon } from '../ui';
 import { confirm } from '../feedback';
 import { PERSON_DOSSIER_ACTION_BUTTON_CLASS, PERSON_DOSSIER_SECTION_CLASS } from '../personDossierLayout';
 import { t } from '../../i18n';
+import { worldImageUrl } from '../../lib/imageUrl';
 
 /**
  * The gallery of any world entity, at the top of its sheet.
@@ -167,28 +168,22 @@ export function WorldGallery({
   );
 }
 
-/** One thumbnail. The object URL is revoked on unmount, or the renderer leaks per open. */
+/** One thumbnail, served directly through Chromium's cached internal image protocol. */
 function WorldThumb({ image }: { image: CharacterImage }) {
-  const [url, setUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    let objectUrl: string | null = null;
-    let cancelled = false;
-    void window.nodus.getWorldImageBlob(image.imageId).then((payload) => {
-      if (cancelled || !payload) return;
-      objectUrl = URL.createObjectURL(new Blob([new Uint8Array(payload.blob)], { type: payload.mime }));
-      setUrl(objectUrl);
-    });
-    return () => {
-      cancelled = true;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [image.imageId, image.updatedAt]);
+  const url = worldImageUrl(image);
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  const failed = failedUrl === url;
 
   return (
     <div className="aspect-[4/3] w-full bg-neutral-800/40">
-      {url ? (
-        <img src={url} alt="" draggable={false} className="h-full w-full object-cover" />
+      {!failed ? (
+        <img
+          src={url}
+          alt=""
+          draggable={false}
+          className="h-full w-full object-cover"
+          onError={() => setFailedUrl(url)}
+        />
       ) : (
         <div className="grid h-full place-items-center">
           <Icon name="image" size={18} className="text-neutral-600" />

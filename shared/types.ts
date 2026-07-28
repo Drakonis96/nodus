@@ -2018,6 +2018,8 @@ export interface PortraitFocus {
   scale: number;
   /** True when the portrait is an AI-generated reference likeness, not a real photo. */
   generated?: boolean;
+  /** Revision of the stored bytes/framing, used to invalidate the native image cache. */
+  updatedAt?: string;
 }
 
 export interface Person {

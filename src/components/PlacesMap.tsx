@@ -6,6 +6,7 @@ import { useIsLightTheme } from '../hooks';
 import { t, tx } from '../i18n';
 import manPortrait from '../assets/man-portrait.webp';
 import womanPortrait from '../assets/woman-portrait.webp';
+import { personPortraitUrl } from '../lib/imageUrl';
 
 // A REAL, precise map: OpenStreetMap raster tiles (free, no key, © OpenStreetMap
 // contributors) via Leaflet, with pinpoint place markers (portrait + who/where),
@@ -80,7 +81,15 @@ export function PlacesMap({
   const lastFitRef = useRef<string>('');
   const fitPointsRef = useRef<MapPlacePoint[]>(fitPoints ?? points);
   const [personsById, setPersonsById] = useState<Map<string, Person>>(new Map());
-  const [portraitUrls, setPortraitUrls] = useState<Map<string, string>>(new Map());
+  const portraitUrls = useMemo(
+    () =>
+      new Map(
+        [...personsById.values()]
+          .map((person) => [person.personId, personPortraitUrl(person)] as const)
+          .filter((entry): entry is readonly [string, string] => Boolean(entry[1]))
+      ),
+    [personsById]
+  );
   fitPointsRef.current = fitPoints ?? points;
 
   const fitMapToCurrentPoints = useCallback((map: L.Map) => {
@@ -170,29 +179,6 @@ export function PlacesMap({
       cancelled = true;
     };
   }, []);
-
-  // Fetch real-photo blobs once per person that has one; keep object URLs.
-  useEffect(() => {
-    const need = new Set(points.filter((p) => p.hasPortrait).map((p) => p.personId));
-    let cancelled = false;
-    const created: string[] = [];
-    void (async () => {
-      const map = new Map<string, string>();
-      for (const id of need) {
-        const blob = await window.nodus.getPersonPortrait(id).catch(() => null);
-        if (!blob) continue;
-        const url = URL.createObjectURL(new Blob([new Uint8Array(blob.blob)], { type: blob.mime }));
-        created.push(url);
-        map.set(id, url);
-      }
-      if (!cancelled) setPortraitUrls(map);
-      else created.forEach((u) => URL.revokeObjectURL(u));
-    })();
-    return () => {
-      cancelled = true;
-      created.forEach((u) => URL.revokeObjectURL(u));
-    };
-  }, [points]);
 
   // Create the Leaflet map once.
   useEffect(() => {

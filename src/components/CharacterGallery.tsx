@@ -7,6 +7,7 @@ import { Icon } from './ui';
 import { confirm } from './feedback';
 import { PERSON_DOSSIER_ACTION_BUTTON_CLASS, PERSON_DOSSIER_SECTION_CLASS } from './personDossierLayout';
 import { t, tx } from '../i18n';
+import { worldImageUrl } from '../lib/imageUrl';
 
 /**
  * Every image of a character, not just the avatar: the portrait, the full body, the
@@ -204,31 +205,22 @@ export function CharacterGallery({ character, onChanged }: { character: Characte
   );
 }
 
-/**
- * One thumbnail. The bytes are fetched per image and the object URL revoked on unmount —
- * a gallery that leaked them would grow the renderer's memory every time the sheet opened.
- */
+/** One thumbnail, served directly through Chromium's cached internal image protocol. */
 function GalleryThumb({ image }: { image: CharacterImage }) {
-  const [url, setUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    let objectUrl: string | null = null;
-    let cancelled = false;
-    void window.nodus.getCharacterImageBlob(image.imageId).then((payload) => {
-      if (cancelled || !payload) return;
-      objectUrl = URL.createObjectURL(new Blob([new Uint8Array(payload.blob)], { type: payload.mime }));
-      setUrl(objectUrl);
-    });
-    return () => {
-      cancelled = true;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [image.imageId, image.updatedAt]);
+  const url = worldImageUrl(image);
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  const failed = failedUrl === url;
 
   return (
     <div className="aspect-[3/4] w-full bg-neutral-800/40">
-      {url ? (
-        <img src={url} alt="" draggable={false} className="h-full w-full object-cover" />
+      {!failed ? (
+        <img
+          src={url}
+          alt=""
+          draggable={false}
+          className="h-full w-full object-cover"
+          onError={() => setFailedUrl(url)}
+        />
       ) : (
         <div className="grid h-full place-items-center">
           <Icon name="image" size={18} className="text-neutral-600" />

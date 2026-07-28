@@ -31,6 +31,7 @@ import { killChatGptSubscriptionServer } from './ai/codexSubscription';
 import { stopGitHubCopilotSubscription } from './ai/githubCopilotSubscription';
 import { installProcessSafetyNet } from './util/processSafety';
 import { restoreAppWindows } from './windowLifecycle';
+import { registerImageProtocol, registerImageSchemePrivileges } from './imageProtocol';
 
 // Before anything else: a stray rejection from any of the fire-and-forget
 // timers below would otherwise terminate the process under Node's default.
@@ -43,6 +44,7 @@ const { autoUpdater } = require('electron-updater') as typeof import('electron-u
 // service from "nodus" to "Nodus". The normal process keeps the current name;
 // recovery explicitly requests either released credential from macOS Keychain.
 app.setName('Nodus');
+registerImageSchemePrivileges();
 
 if (process.platform === 'linux') {
   app.commandLine.appendSwitch('ozone-platform-hint', 'auto');
@@ -494,6 +496,7 @@ app.whenReady().then(() => {
     process.env.NODUS_TESSDATA_CACHE = path.join(app.getPath('userData'), 'tessdata');
   }
   getDb(); // open + migrate before anything touches data
+  registerImageProtocol();
   reconcileAuthorLayerOnce(); // one-time: collapse duplicate author nodes onto Zotero identity
   // Maintenance: drop ideas that have sat dormant (no occurrences) for >30 days.
   // Recent dormancy is kept — it lets fusion revive an idea with the same
