@@ -52,6 +52,7 @@ import { setActiveVaultQueryScope } from './vaultQueryCache';
 import type {
   PendingAssistantNavigationTarget,
   PendingGraphNavigationTarget,
+  PendingIdeaNavigationTarget,
   PendingLibraryNavigationTarget,
   View,
 } from './navigation';
@@ -275,6 +276,7 @@ export function App() {
     []
   );
   const [graphTarget, setGraphTarget] = useState<PendingGraphNavigationTarget & { nonce: number } | null>(null);
+  const [ideaTarget, setIdeaTarget] = useState<PendingIdeaNavigationTarget & { nonce: number } | null>(null);
   const [libraryTarget, setLibraryTarget] = useState<PendingLibraryNavigationTarget & { nonce: number } | null>(null);
   const [assistantTarget, setAssistantTarget] = useState<PendingAssistantNavigationTarget & { nonce: number } | null>(null);
   // A note the user opened from global search; the nonce re-triggers even if the
@@ -810,6 +812,11 @@ export function App() {
   useEffect(() => {
     if (!window.nodus?.onCopilotOpenIdea) return undefined;
     return window.nodus.onCopilotOpenIdea((target) => {
+      if (target.destination === 'ideas') {
+        setIdeaTarget({ ideaId: target.ideaId, nonce: Date.now() });
+        setView('ideas');
+        return;
+      }
       navigate('graph', {
         preset: 'overview',
         nodeId: target.ideaId,
@@ -852,6 +859,7 @@ export function App() {
     setCollectionsOpen(false);
     setResearchOpen(false);
     setGraphTarget(null);
+    setIdeaTarget(null);
     setStudyGraphTarget(null);
     setStudyChatTarget(null);
     setAssistantTarget(null);
@@ -1501,7 +1509,7 @@ export function App() {
           )}
           {view === 'graph' && <GraphView settings={settings} onSettingsChange={reloadSettings} target={graphTarget} />}
           {view === 'argument' && <ArgumentMapView settings={settings} />}
-          {view === 'ideas' && <IdeasView vaultId={activeVault?.id ?? null} onOpenGraph={(target) => navigate('graph', target)} onOpenAssistant={openAssistant} />}
+          {view === 'ideas' && <IdeasView vaultId={activeVault?.id ?? null} target={ideaTarget} onOpenGraph={(target) => navigate('graph', target)} onOpenAssistant={openAssistant} />}
           {view === 'authors' && <AuthorsView vaultId={activeVault?.id ?? null} settings={settings} onOpenGraph={(target) => navigate('graph', target)} />}
           {view === 'persons' && <PersonasView initialPersonId={personsTarget} />}
           {/* `setView` is passed straight through: it is referentially stable, and the
@@ -1560,6 +1568,7 @@ export function App() {
           {view === 'studyRecordings' && <StudyRecordingsView initialRecordingId={studyRecordingTarget?.id} initialTimestamp={studyRecordingTarget?.timestamp} onOpenDocument={(id) => { setStudyTarget({ kind: 'document', id }); setView('studyCourses'); }} />}
           {view === 'studyChat' && <StudyChatView
             settings={settings}
+            variant={isDocencia ? 'teaching' : 'study'}
             initialPrompt={studyChatTarget?.prompt}
             onOpenDocument={(id) => { setStudyTarget({ kind: 'document', id }); setView('studyCourses'); }}
             onOpenMaterial={(id) => { setStudyMaterialTarget(id); setView('studyLibrary'); }}
@@ -1589,6 +1598,17 @@ export function App() {
           {view === 'teachingGrades' && <TeachingGradesView onOpenOrganization={() => setView('studyCourses')} />}
           {view === 'teachingRubrics' && <RubricsView />}
           {view === 'studyReview' && <StudyReviewView />}
+          {/* Unit design: the same Deep Research surface over the teaching corpus, with
+              a structure the teacher may fix section by section. */}
+          {view === 'teachingUnits' && <DeepResearchView
+            settings={settings}
+            isStudy
+            isTeaching
+            onOpenGraph={(target) => { setStudyGraphTarget({ ...target, nonce: Date.now() }); setView('studyGraph'); }}
+            onOpenStudyDocument={(id) => { setStudyTarget({ kind: 'document', id }); setView('studyCourses'); }}
+            onOpenStudyMaterial={(id) => { setStudyMaterialTarget(id); setView('studyLibrary'); }}
+            onOpenStudyRecording={(id, timestamp) => { setStudyRecordingTarget({ id, timestamp }); setView('studyRecordings'); }}
+          />}
           {view === 'studyDeepResearch' && <DeepResearchView
             settings={settings}
             isStudy

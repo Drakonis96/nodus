@@ -46,7 +46,11 @@ test('dedicated vaults expose only their own fixed navigation', () => {
   assert.ok(!study.includes('characters'));
 
   assert.ok(teaching.includes('teachingGroups'));
-  assert.ok(!teaching.includes('studyChat'));
+  assert.ok(teaching.includes('studyChat'));
+  assert.ok(teaching.includes('studyIdeas'));
+  assert.ok(teaching.includes('studyGraph'));
+  assert.ok(teaching.includes('teachingUnits'));
+  assert.ok(!teaching.includes('studyDeepResearch'));
   assert.ok(!teaching.includes('persons'));
 
   assert.deepEqual(databases.filter((id) => id.startsWith('db')), ['dbSearch', 'dbAnalysis', 'dbChat']);
@@ -70,7 +74,7 @@ test('Docencia exposes every Crear item to the settings editor with stable ids',
     create.items.map((item) => item.label),
     [
       'Guía docente / Programación',
-      'Unidades didácticas',
+      'Diseño de unidades',
       'Situaciones de aprendizaje',
       'Adaptaciones',
       'Notas',

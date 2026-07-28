@@ -31,7 +31,9 @@ const EMPTY_STORE: StudyAssistantStore = { version: 1, conversations: [] };
 const MAX_HISTORY_MESSAGES = 12;
 const MAX_CONTEXT_CHARS = 52_000;
 const MAX_SOURCE_CHARS = 3_600;
-const DEMO_CONVERSATION_ID = 'demo-study-chat-membrane';
+/** One seeded conversation per demo vault; the id prefix is what `clear` matches on. */
+const DEMO_CONVERSATION_IDS = { study: 'demo-study-chat-membrane', teaching: 'demo-teaching-chat-commentary' } as const;
+type StudyChatDemoVariant = keyof typeof DEMO_CONVERSATION_IDS;
 
 const INSUFFICIENT_INFORMATION: Record<string, string> = {
   es: 'No hay información suficiente en las fuentes seleccionadas para responder con seguridad. Añade materiales, amplía el ámbito o selecciona otras fuentes.',
@@ -110,11 +112,48 @@ export function deleteStudyAssistantConversation(id: string): void {
   const store = readStore(); store.conversations = store.conversations.filter((conversation) => conversation.id !== id); writeStore(store);
 }
 
-/** Add one fully local conversation so the demo chat is useful before an AI key is configured. */
-export function seedStudyAssistantDemoConversation(): void {
-  const store = readStore();
-  if (store.conversations.some((conversation) => conversation.id === DEMO_CONVERSATION_ID)) return;
-  const timestamp = now();
+/**
+ * One fully local conversation per demo vault, so the chat is useful before an AI key
+ * is configured. The teaching variant exists because the study one cites a study-demo
+ * document: seeded into a teaching vault its citation would resolve to nothing, which
+ * is precisely the broken-evidence state the chat is built to avoid showing.
+ */
+function demoConversation(variant: StudyChatDemoVariant, timestamp: string): StudyAssistantConversation {
+  if (variant === 'teaching') {
+    const es = getSettings().uiLanguage === 'es';
+    const sourceKey = 'material:demo-teaching-material-guide';
+    const citation: StudyAssistantCitation = {
+      id: 'S1', sourceKey, indexId: 'demo-teaching-chat-evidence', kind: 'material', sourceId: 'demo-teaching-material-guide',
+      title: es ? 'Fuente · Informe fabril (1832)' : 'Source · Factory report (1832)',
+      subtitle: es ? 'Historia' : 'History',
+      quote: es
+        ? 'Los niños entran en la fábrica antes del amanecer y salen cuando ya ha oscurecido.'
+        : 'The children enter the mill before daybreak and leave when it is already dark.',
+      location: { materialId: 'demo-teaching-material-guide', from: 60, to: 150 },
+      scope: { courseId: 'demo-teaching-course', subjectId: 'demo-teaching-subject-history', folderId: 'demo-teaching-folder-unit3', topicId: 'demo-teaching-topic-sources' },
+    };
+    return {
+      id: DEMO_CONVERSATION_IDS.teaching,
+      title: es ? 'Preparar el comentario de la sesión 3' : 'Preparing the session 3 commentary',
+      createdAt: timestamp, updatedAt: timestamp, archived: false,
+      selection: { scope: 'subject', courseId: 'demo-teaching-course', subjectId: 'demo-teaching-subject-history', topicId: null, sourceKeys: [sourceKey] },
+      model: null, messageCount: 2, task: 'explain', level: 'standard', tone: 'clear', language: es ? 'es' : 'en', allowExternalKnowledge: false,
+      messages: [
+        {
+          id: 'demo-teaching-chat-user', role: 'user', createdAt: timestamp,
+          content: es
+            ? '¿Qué condiciones de trabajo describe la fuente y qué preguntas puedo plantear en clase?'
+            : 'Which working conditions does the source describe, and what can I ask the class?',
+        },
+        {
+          id: 'demo-teaching-chat-assistant', role: 'assistant', createdAt: timestamp, citations: [citation],
+          content: es
+            ? 'La fuente describe jornadas que empiezan antes del amanecer y terminan de noche, con polvo de algodón y ruido constante [S1](nodus://study/evidence/S1). En clase puedes partir de quién escribe y con qué intención antes de entrar en el contenido.'
+            : 'The source describes days that begin before dawn and end after dark, with cotton dust and constant noise [S1](nodus://study/evidence/S1). In class you can start from who is writing and to what end before moving on to the content.',
+        },
+      ],
+    };
+  }
   const sourceKey = 'document:demo-study-doc-cell';
   const citation: StudyAssistantCitation = {
     id: 'S1', sourceKey, indexId: 'demo-study-chat-evidence', kind: 'document', sourceId: 'demo-study-doc-cell',
@@ -123,8 +162,8 @@ export function seedStudyAssistantDemoConversation(): void {
     location: { documentId: 'demo-study-doc-cell', from: 190, to: 260 },
     scope: { courseId: 'demo-study-course-biology', subjectId: 'demo-study-subject-cell', folderId: 'demo-study-folder-cell', topicId: 'demo-study-topic-membrane' },
   };
-  const conversation: StudyAssistantConversation = {
-    id: DEMO_CONVERSATION_ID, title: 'Dudas sobre la membrana plasmática', createdAt: timestamp, updatedAt: timestamp,
+  return {
+    id: DEMO_CONVERSATION_IDS.study, title: 'Dudas sobre la membrana plasmática', createdAt: timestamp, updatedAt: timestamp,
     archived: false,
     selection: { scope: 'subject', courseId: 'demo-study-course-biology', subjectId: 'demo-study-subject-cell', topicId: null, sourceKeys: [sourceKey] },
     model: null, messageCount: 2, task: 'explain', level: 'standard', tone: 'guided', language: 'es', allowExternalKnowledge: false,
@@ -133,12 +172,19 @@ export function seedStudyAssistantDemoConversation(): void {
       { id: 'demo-study-chat-assistant', role: 'assistant', content: 'El transporte pasivo ocurre a favor del gradiente y no consume ATP. El transporte activo desplaza sustancias contra el gradiente y necesita energía [S1](nodus://study/evidence/S1).', createdAt: timestamp, citations: [citation] },
     ],
   };
-  store.conversations.unshift(conversation); writeStore(store);
 }
 
-export function clearStudyAssistantDemoConversation(): void {
+export function seedStudyAssistantDemoConversation(variant: StudyChatDemoVariant = 'study'): void {
   const store = readStore();
-  const next = store.conversations.filter((conversation) => conversation.id !== DEMO_CONVERSATION_ID);
+  const id = DEMO_CONVERSATION_IDS[variant];
+  if (store.conversations.some((conversation) => conversation.id === id)) return;
+  store.conversations.unshift(demoConversation(variant, now())); writeStore(store);
+}
+
+export function clearStudyAssistantDemoConversation(variant: StudyChatDemoVariant = 'study'): void {
+  const store = readStore();
+  const id = DEMO_CONVERSATION_IDS[variant];
+  const next = store.conversations.filter((conversation) => conversation.id !== id);
   if (next.length !== store.conversations.length) writeStore({ ...store, conversations: next });
 }
 

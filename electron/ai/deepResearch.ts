@@ -29,6 +29,12 @@ export async function generateDeepResearchReport(
 ): Promise<DeepResearchReport> {
   const settings = getSettings();
   const model = request.model ?? settings.deepResearchModel ?? settings.synthesisModel ?? null;
+  // Study and teaching share one pipeline over the local study_* corpus. Teaching adds
+  // the extracted idea network and the unit prompts, selected by `unitMode`; the vault
+  // type sets it for anything that reaches here without the flag (MCP, a stale queue).
+  if (request.unitMode || getActiveVault().type === 'docencia') {
+    return generateStudyDeepResearchReport({ ...request, unitMode: true }, model, onProgress);
+  }
   if (request.studyMode || getActiveVault().type === 'estudio') {
     return generateStudyDeepResearchReport(request, model, onProgress);
   }

@@ -32,7 +32,7 @@ import { SttSettings } from '../components/SttSettings';
 import { LocalAiModelsSettings } from '../components/LocalAiModelsSettings';
 import { LocalImageModelSettings } from '../components/LocalImageModelSettings';
 import { McpConnectionModal } from '../components/McpConnectionModal';
-import { dedicatedVaultNavIds, NAV_GROUPS, orderSidebarItems, orderedNav } from '../navigation';
+import { dedicatedVaultNavIds, NAV_GROUPS, navItemLabel, orderSidebarItems, orderedNav } from '../navigation';
 import { teachingItemId, TEACHING_GROUPS } from '../components/TeachingSidebar';
 import { WORLDBUILDING_GROUPS } from '../components/WorldbuildingSidebar';
 import { t, tx } from '../i18n';
@@ -2394,7 +2394,7 @@ function SidebarOrderEditor({
       ...group,
       items: orderedAll
         .filter((item) => item.group === group.id)
-        .map((item) => ({ ...item, group: group.id })),
+        .map((item) => ({ ...item, label: navItemLabel(item, vaultType), group: group.id })),
     }));
   }
   if ((vaultType === 'docencia' || vaultType === 'worldbuilding') && toolkit) {

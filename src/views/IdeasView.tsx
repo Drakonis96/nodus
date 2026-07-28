@@ -15,6 +15,7 @@ import { buildIdeaNote } from '../notes';
 import { notifyDataChanged, useDataRefresh, useScanComplete } from '../hooks';
 import {
   ASSISTANT_CONTEXTS,
+  type IdeaNavigationTarget,
   type PendingAssistantNavigationTarget,
   type PendingGraphNavigationTarget,
 } from '../navigation';
@@ -30,6 +31,7 @@ const IDEAS_DETAIL_DEFAULT_WIDTH = 420;
 
 export function IdeasView({
   vaultId,
+  target,
   onOpenGraph,
   onOpenAssistant,
   dataSource = academicKnowledgeViewSource,
@@ -37,6 +39,7 @@ export function IdeasView({
   testId,
 }: {
   vaultId: string | null;
+  target?: IdeaNavigationTarget | null;
   onOpenGraph: (target: PendingGraphNavigationTarget) => void;
   onOpenAssistant: (target?: PendingAssistantNavigationTarget) => void;
   dataSource?: KnowledgeViewSource;
@@ -62,6 +65,10 @@ export function IdeasView({
   const [detailWidth, setDetailWidth] = useState(() =>
     loadNumber(IDEAS_DETAIL_WIDTH_KEY, IDEAS_DETAIL_DEFAULT_WIDTH, DETAIL_MIN_WIDTH, DETAIL_MAX_WIDTH)
   );
+
+  useEffect(() => {
+    if (target) setSelectedId(target.ideaId);
+  }, [target]);
 
   const startResize = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {

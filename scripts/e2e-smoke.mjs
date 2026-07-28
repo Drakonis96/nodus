@@ -2523,6 +2523,54 @@ try {
   await page.waitForTimeout(300);
   await tourCard.getByRole('button', { name: /^Saltar/ }).click();
   await teachingTourLabel.waitFor({ state: 'detached', timeout: 30_000 });
+
+  // The Analizar group: the study chat/ideas/graph trio over the teaching corpus. The
+  // tour already proved the sidebar entries exist and the views mount; what it cannot
+  // see is whether they are wired to the teaching vault's own data. An Ideas view that
+  // silently renders an empty list looks identical to one whose subject scope resolved
+  // to nothing, so the seeded ideas are asserted on screen.
+  await page.getByTestId('teaching-sidebar').getByRole('button', { name: 'Ideas', exact: true }).click();
+  const teachingIdeas = page.getByTestId('study-ideas-view');
+  await teachingIdeas.waitFor({ timeout: 30_000 });
+  await teachingIdeas.getByText('Máquina de vapor', { exact: false }).first().waitFor({ timeout: 30_000 });
+  await page.getByTestId('teaching-sidebar').getByRole('button', { name: 'Chat', exact: true }).click();
+  const teachingChat = page.getByTestId('study-chat-view');
+  await teachingChat.waitFor({ timeout: 30_000 });
+  // The copy has to be the teacher's, not the learner's: same component, other voice.
+  await teachingChat.getByText('Pregunta a tus materiales de clase con citas verificables.').waitFor({ timeout: 30_000 });
+  await page.getByTestId('teaching-sidebar').getByRole('button', { name: 'Grafo', exact: true }).click();
+  await page.getByTestId('study-graph-view').waitFor({ timeout: 30_000 });
+  console.log('[e2e] teaching Analizar group (chat · ideas · graph) reads the teaching vault corpus');
+
+  // Unit design: Deep Research over the teaching corpus. The seeded unit proves the
+  // gallery reads the teaching vault, and the structure control is the one thing this
+  // surface has that Deep Research does not — it must be reachable, and switching to
+  // "I define it" must actually produce editable slots.
+  await page.getByTestId('teaching-sidebar').getByRole('button', { name: 'Diseño de unidades', exact: true }).click();
+  await page.getByRole('heading', { name: 'Diseño de unidades', exact: true }).waitFor({ timeout: 30_000 });
+  await page.getByText('Unidad 3 · La revolución industrial', { exact: false }).first().waitFor({ timeout: 30_000 });
+  await page.getByRole('button', { name: 'Nueva unidad', exact: true }).first().click();
+  const structure = page.getByTestId('unit-structure');
+  await structure.waitFor({ timeout: 30_000 });
+  await structure.getByTestId('unit-structure-manual').click();
+  await structure.getByTestId('unit-structure-count').selectOption('3');
+  await structure.getByTestId('unit-section-title-2').waitFor({ timeout: 30_000 });
+  assert.equal(
+    await structure.getByTestId('unit-section-title-3').count(),
+    0,
+    'the outline editor shows exactly the number of parts chosen',
+  );
+  await structure.getByTestId('unit-section-title-0').fill('Punto de partida');
+  await structure.getByTestId('unit-structure-count').selectOption('5');
+  assert.equal(
+    await structure.getByTestId('unit-section-title-0').inputValue(),
+    'Punto de partida',
+    'growing the outline keeps what the teacher already typed',
+  );
+  await page.getByRole('button', { name: 'Cancelar', exact: true }).click();
+  await page.getByTestId('teaching-sidebar').getByRole('button', { name: 'Cursos, asignaturas y grupos', exact: true }).click();
+  console.log('[e2e] teaching Unit design gallery + teacher-defined structure editor work through the real UI');
+
   await page.getByRole('button', { name: 'Salir del modo demo', exact: true }).click();
   await waitForCondition('datos de ejemplo de docencia eliminados', () => page.evaluate(async () => (await window.nodus.listTeachingGroups()).length === 0));
   await page.getByTestId('teaching-demo-offer').waitFor({ timeout: 30_000 });

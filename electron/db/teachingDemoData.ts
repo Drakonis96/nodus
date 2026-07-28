@@ -25,8 +25,10 @@ import { DEFAULT_ACADEMIC_YEAR_START_MONTH, defaultAcademicYearRange, formatAcad
 import { assessmentProfile } from '@shared/assessment/profiles';
 import { buildRubricLevels } from '@shared/teachingRubrics';
 import { generatePseudonymCode } from '@shared/studentPseudonyms';
+import { clearStudyAssistantDemoConversation, seedStudyAssistantDemoConversation } from '../ai/studyAssistant';
 import { getDb } from './database';
 import { getSettings, updateSettings } from './settingsRepo';
+import { normalizeStudyIdeaLabel } from './studyKnowledgeRepo';
 import { getActiveVault } from '../vaults/vaultRegistry';
 
 type DemoLocale = 'es' | 'en';
@@ -55,6 +57,12 @@ const ID = {
   transcript: 'demo-teaching-transcript',
   transcriptSegment: 'demo-teaching-transcript-segment',
   question: 'demo-teaching-question',
+  ideaSteam: 'demo-teaching-idea-steam',
+  ideaFactory: 'demo-teaching-idea-factory',
+  ideaChildLabour: 'demo-teaching-idea-child-labour',
+  ideaLabour: 'demo-teaching-idea-labour-movement',
+  ideaCriticism: 'demo-teaching-idea-source-criticism',
+  unit: 'demo-teaching-unit',
   scheduleFirst: 'demo-teaching-period-first',
   scheduleThird: 'demo-teaching-period-third',
   plan: 'demo-teaching-studyplan',
@@ -402,6 +410,197 @@ export function seedTeachingDemoData(): boolean {
         pick({ es: 'Innovación técnica y fábrica.', en: 'Technical innovation and the factory.' }),
         JSON.stringify({ from: 0, to: 40 }), 1, 0, createdAt, updatedAt);
 
+    // ── Ideas and graph ──────────────────────────────────────────────────────
+    // What the AI extraction would have produced from the unit's note and source, so
+    // the Analizar group opens on a real network instead of an empty canvas. Both
+    // surfaces read the same rows: Ideas lists them, the graph draws the edges. Only
+    // History carries ideas — Geography has no materials in this fixture, and an
+    // idea whose subject holds no source would be evidence pointing nowhere.
+    const insertIdea = db.prepare(`INSERT INTO study_ideas
+      (id,subject_id,type,label,normalized_label,statement,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)`);
+    const ideas: Array<{ id: string; type: string; label: Localized; statement: Localized }> = [
+      {
+        id: ID.ideaSteam, type: 'concept',
+        label: { es: 'Máquina de vapor', en: 'Steam engine' },
+        statement: {
+          es: 'La máquina de vapor libera a la fábrica de los cursos de agua y permite situarla junto a la mina o la ciudad.',
+          en: 'The steam engine frees the factory from watercourses and lets it sit next to the mine or the city.',
+        },
+      },
+      {
+        id: ID.ideaFactory, type: 'concept',
+        label: { es: 'Sistema fabril', en: 'Factory system' },
+        statement: {
+          es: 'La producción se concentra en la fábrica, con maquinaria, división del trabajo y un horario impuesto.',
+          en: 'Production concentrates in the factory, with machinery, division of labour and an imposed timetable.',
+        },
+      },
+      {
+        id: ID.ideaChildLabour, type: 'consequence',
+        label: { es: 'Trabajo infantil', en: 'Child labour' },
+        statement: {
+          es: 'Las jornadas descritas en los informes fabriles incluyen menores desde antes del amanecer hasta la noche.',
+          en: 'The working days described in the factory reports include children from before dawn until night.',
+        },
+      },
+      {
+        id: ID.ideaLabour, type: 'process',
+        label: { es: 'Movimiento obrero', en: 'Labour movement' },
+        statement: {
+          es: 'Las condiciones de la fábrica dan origen a formas de organización obrera y a las primeras leyes laborales.',
+          en: 'Factory conditions give rise to forms of worker organisation and to the first labour laws.',
+        },
+      },
+      {
+        id: ID.ideaCriticism, type: 'principle',
+        label: { es: 'Crítica de fuentes', en: 'Source criticism' },
+        statement: {
+          es: 'Antes de analizar el contenido hay que clasificar el documento: quién escribe, para quién, cuándo y con qué intención.',
+          en: 'Before analysing the content the document must be classified: who writes, for whom, when and to what end.',
+        },
+      },
+    ];
+    for (const idea of ideas) {
+      insertIdea.run(idea.id, ID.subjectHistory, idea.type, pick(idea.label), normalizeStudyIdeaLabel(pick(idea.label)), pick(idea.statement), createdAt, updatedAt);
+    }
+
+    const insertOccurrence = db.prepare(`INSERT INTO study_idea_occurrences
+      (id,idea_id,source_kind,source_id,source_title,source_hash,role,confidence,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)`);
+    const insertEvidence = db.prepare(`INSERT INTO study_idea_evidence
+      (id,occurrence_id,quote,location,position,created_at) VALUES (?,?,?,?,?,?)`);
+    const evidence: Array<{ ideaId: string; kind: 'document' | 'material'; sourceId: string; title: Localized; hash: string; quote: Localized }> = [
+      {
+        ideaId: ID.ideaSteam, kind: 'document', sourceId: ID.docPlan, hash: 'demo-teaching-doc-plan-v1',
+        title: { es: 'Unidad 3 · guion de sesiones', en: 'Unit 3 · session outline' },
+        quote: { es: 'Innovación técnica y fábrica.', en: 'Technical innovation and the factory.' },
+      },
+      {
+        ideaId: ID.ideaFactory, kind: 'document', sourceId: ID.docPlan, hash: 'demo-teaching-doc-plan-v1',
+        title: { es: 'Unidad 3 · guion de sesiones', en: 'Unit 3 · session outline' },
+        quote: { es: 'Punto de partida: la sociedad agraria.', en: 'Starting point: agrarian society.' },
+      },
+      {
+        ideaId: ID.ideaChildLabour, kind: 'material', sourceId: ID.material, hash: 'demo-teaching-material-v1',
+        title: { es: 'Fuente · Informe fabril (1832)', en: 'Source · Factory report (1832)' },
+        quote: {
+          es: 'Los niños entran en la fábrica antes del amanecer y salen cuando ya ha oscurecido.',
+          en: 'The children enter the mill before daybreak and leave when it is already dark.',
+        },
+      },
+      {
+        ideaId: ID.ideaLabour, kind: 'document', sourceId: ID.docPlan, hash: 'demo-teaching-doc-plan-v1',
+        title: { es: 'Unidad 3 · guion de sesiones', en: 'Unit 3 · session outline' },
+        quote: { es: 'Efectos sociales y movimiento obrero.', en: 'Social effects and the labour movement.' },
+      },
+      {
+        ideaId: ID.ideaCriticism, kind: 'document', sourceId: ID.docCommentary, hash: 'demo-teaching-doc-commentary-v1',
+        title: { es: 'Cómo comentar un texto histórico', en: 'How to comment on a historical text' },
+        quote: {
+          es: 'Clasificar el documento: naturaleza, autoría, destinatario y fecha.',
+          en: 'Classify the document: nature, authorship, audience and date.',
+        },
+      },
+    ];
+    for (const item of evidence) {
+      const occurrenceId = `${item.ideaId}-occurrence`;
+      insertOccurrence.run(occurrenceId, item.ideaId, item.kind, item.sourceId, pick(item.title), item.hash, 'principal', 0.93, createdAt, updatedAt);
+      insertEvidence.run(`${item.ideaId}-evidence`, occurrenceId, pick(item.quote), pick({ es: 'Material de demostración', en: 'Demo material' }), 0, createdAt);
+    }
+
+    const insertEdge = db.prepare(`INSERT INTO study_idea_edges
+      (id,subject_id,from_id,to_id,type,basis,confidence,source_kind,source_id,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)`);
+    const edges: Array<{ id: string; from: string; to: string; type: string; basis: Localized; confidence: number }> = [
+      {
+        id: 'demo-teaching-edge-steam-factory', from: ID.ideaSteam, to: ID.ideaFactory, type: 'causes', confidence: 0.94,
+        basis: { es: 'La energía de vapor hace posible concentrar la producción en la fábrica.', en: 'Steam power makes it possible to concentrate production in the factory.' },
+      },
+      {
+        id: 'demo-teaching-edge-factory-child', from: ID.ideaFactory, to: ID.ideaChildLabour, type: 'causes', confidence: 0.9,
+        basis: { es: 'El horario y la maquinaria de la fábrica explican las jornadas que describe el informe.', en: 'The factory timetable and machinery explain the working days the report describes.' },
+      },
+      {
+        id: 'demo-teaching-edge-child-labour', from: ID.ideaChildLabour, to: ID.ideaLabour, type: 'causes', confidence: 0.88,
+        basis: { es: 'Las condiciones denunciadas están en el origen de la organización obrera.', en: 'The conditions denounced lie behind the rise of worker organisation.' },
+      },
+      {
+        id: 'demo-teaching-edge-criticism-child', from: ID.ideaCriticism, to: ID.ideaChildLabour, type: 'applies', confidence: 0.82,
+        basis: { es: 'El método de comentario se aplica sobre este informe antes de dar por buenos sus datos.', en: 'The commentary method is applied to this report before its data are taken at face value.' },
+      },
+    ];
+    for (const edge of edges) {
+      insertEdge.run(edge.id, ID.subjectHistory, edge.from, edge.to, edge.type, pick(edge.basis), edge.confidence, 'document', ID.docPlan, createdAt, updatedAt);
+    }
+
+    // The jobs table is what the Ideas view reads to say a source is already analysed;
+    // without these rows the demo would offer to re-extract what is already there.
+    const insertKnowledgeJob = db.prepare(`INSERT INTO study_knowledge_jobs
+      (subject_id,source_kind,source_id,status,phase,source_hash,updated_at) VALUES (?,?,?,?,?,?,?)`);
+    insertKnowledgeJob.run(ID.subjectHistory, 'document', ID.docPlan, 'done', 'done', 'demo-teaching-doc-plan-v1', updatedAt);
+    insertKnowledgeJob.run(ID.subjectHistory, 'document', ID.docCommentary, 'done', 'done', 'demo-teaching-doc-commentary-v1', updatedAt);
+    insertKnowledgeJob.run(ID.subjectHistory, 'material', ID.material, 'done', 'done', 'demo-teaching-material-v1', updatedAt);
+
+    // ── Unit design ──────────────────────────────────────────────────────────
+    // A saved unit, so the gallery opens on something real. Written as a fixed-outline
+    // unit would come out: three parts in the order a teacher would fix, each citing a
+    // material through the same nodus:// links the generator emits, so the reader, the
+    // citation modal and the export all exercise real data.
+    const unitSections: Array<{ id: string; title: Localized; purpose: Localized; body: Localized; source: 'material' | 'doc' }> = [
+      {
+        id: 'u1',
+        title: { es: 'Punto de partida: la sociedad agraria', en: 'Starting point: agrarian society' },
+        purpose: { es: 'Situar el antes para que el cambio industrial se entienda como ruptura.', en: 'Establish the before so industrial change reads as a break.' },
+        body: {
+          es: 'Antes de hablar de fábricas conviene fijar el punto de partida: una sociedad en la que la mayoría vive del campo y el trabajo sigue el ritmo de las estaciones. El guion de la unidad abre precisamente ahí',
+          en: 'Before talking about factories it helps to fix the starting point: a society where most people live off the land and work follows the rhythm of the seasons. The unit outline opens exactly there',
+        },
+        source: 'doc',
+      },
+      {
+        id: 'u2',
+        title: { es: 'La fábrica y el trabajo infantil', en: 'The factory and child labour' },
+        purpose: { es: 'Trabajar la fuente de 1832 con el método de comentario ya visto.', en: 'Work the 1832 source with the commentary method already covered.' },
+        body: {
+          es: 'El informe parlamentario describe jornadas que empiezan antes del amanecer y terminan de noche, con polvo de algodón y un ruido que impide hablar',
+          en: 'The parliamentary report describes days that begin before dawn and end after dark, with cotton dust and noise that makes talking impossible',
+        },
+        source: 'material',
+      },
+      {
+        id: 'u3',
+        title: { es: 'Del malestar a la organización obrera', en: 'From grievance to worker organisation' },
+        purpose: { es: 'Cerrar la unidad enlazando las condiciones descritas con sus consecuencias.', en: 'Close the unit by linking the described conditions to their consequences.' },
+        body: {
+          es: 'La última sesión enlaza las condiciones descritas con las primeras formas de organización obrera y con la legislación que las siguió',
+          en: 'The last session links the conditions described with the first forms of worker organisation and the legislation that followed',
+        },
+        source: 'doc',
+      },
+    ];
+    const unitLink = (source: 'material' | 'doc'): string => (source === 'material'
+      ? `[${pick({ es: 'Fuente · Informe fabril (1832)', en: 'Source · Factory report (1832)' })}](nodus://study/material/${ID.material})`
+      : `[${pick({ es: 'Unidad 3 · guion de sesiones', en: 'Unit 3 · session outline' })}](nodus://study/doc/${ID.docPlan})`);
+    const unitTitle = pick({ es: 'Unidad 3 · La revolución industrial', en: 'Unit 3 · The industrial revolution' });
+    const unitBrief = { kind: 'deep_research', objective: pick({ es: 'Diseñar la unidad sobre la revolución industrial para 3.º ESO', en: 'Design the industrial revolution unit for Year 9' }), tone: 'academic', language: L };
+    const unitDraft = {
+      generatedAt: updatedAt,
+      brief: unitBrief,
+      selection: { ideaIds: [ID.ideaFactory, ID.ideaChildLabour], themeIds: [], gapIds: [], contradictionIds: [], workIds: [], passageIds: [], tutorRouteIds: [] },
+      title: unitTitle,
+      abstract: pick({
+        es: 'Tres partes que llevan al alumnado de la sociedad agraria al movimiento obrero pasando por el comentario de una fuente de 1832.',
+        en: 'Three parts taking students from agrarian society to the labour movement by way of a commentary on an 1832 source.',
+      }),
+      outline: unitSections.map((section) => ({ id: section.id, title: pick(section.title), purpose: pick(section.purpose), keyClaims: [], sources: [unitLink(section.source)] })),
+      draftMarkdown: unitSections.map((section) => `## ${pick(section.title)}\n\n${pick(section.body)} ${unitLink(section.source)}.`).join('\n\n'),
+      matrix: [],
+      bibliography: [pick({ es: 'Fuente · Informe fabril (1832)', en: 'Source · Factory report (1832)' })],
+      nextSteps: [pick({ es: 'Evaluar el comentario con la rúbrica de la unidad.', en: 'Mark the commentary with the unit rubric.' })],
+      limitations: [pick({ es: 'Los materiales disponibles no cubren el caso español.', en: 'The available materials do not cover the Spanish case.' })],
+      stats: { selectedIdeas: 2, selectedThemes: 0, selectedGaps: 0, selectedContradictions: 0, selectedWorks: 2, selectedPassages: 0, selectedTutorRoutes: 0, contextChars: 4_200, truncated: false },
+    };
+    db.prepare('INSERT INTO writing_saved_drafts (id,title,brief_json,selection_json,model_json,draft_json,created_at,updated_at) VALUES (?,?,?,?,NULL,?,?,?)')
+      .run(ID.unit, unitTitle, JSON.stringify(unitBrief), JSON.stringify(unitDraft.selection), JSON.stringify(unitDraft), createdAt, updatedAt);
+
     // ── Timetable and calendar ───────────────────────────────────────────────
     const insertPeriod = db.prepare('INSERT INTO study_schedule_periods (id,section,label,start_time,end_time,position,academic_year_id) VALUES (?,?,?,?,?,?,?)');
     insertPeriod.run(ID.scheduleFirst, 'morning', pick({ es: 'Primera hora', en: 'First period' }), '08:30', '09:25', 0, ID.academicYear);
@@ -594,6 +793,9 @@ export function seedTeachingDemoData(): boolean {
 
     updateSettings({ demoMode: true, docenciaTourComplete: false });
   })();
+  // Outside the transaction: the chat history is a file in the vault directory, not a
+  // table, so it cannot take part in the SQLite rollback.
+  seedStudyAssistantDemoConversation('teaching');
   return true;
 }
 
@@ -616,7 +818,13 @@ export function clearTeachingDemoData(): void {
       DELETE FROM study_schedule_periods WHERE id LIKE 'demo-teaching-%';
       DELETE FROM study_calendar_events WHERE id LIKE 'demo-teaching-%';
       DELETE FROM study_plans WHERE id LIKE 'demo-teaching-%';
+      DELETE FROM writing_saved_drafts WHERE id LIKE 'demo-teaching-%';
       DELETE FROM study_questions WHERE id LIKE 'demo-teaching-%';
+      DELETE FROM study_knowledge_jobs WHERE source_id LIKE 'demo-teaching-%';
+      DELETE FROM study_idea_edges WHERE id LIKE 'demo-teaching-%';
+      DELETE FROM study_idea_evidence WHERE occurrence_id LIKE 'demo-teaching-%';
+      DELETE FROM study_idea_occurrences WHERE id LIKE 'demo-teaching-%';
+      DELETE FROM study_ideas WHERE id LIKE 'demo-teaching-%';
       DELETE FROM study_transcript_segments WHERE id LIKE 'demo-teaching-%';
       DELETE FROM study_transcripts WHERE id LIKE 'demo-teaching-%';
       DELETE FROM study_recordings WHERE id LIKE 'demo-teaching-%';
@@ -631,4 +839,5 @@ export function clearTeachingDemoData(): void {
       DELETE FROM study_academic_years WHERE id LIKE 'demo-teaching-%';
     `);
   })();
+  clearStudyAssistantDemoConversation('teaching');
 }

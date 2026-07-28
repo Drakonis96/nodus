@@ -9,6 +9,10 @@ export interface CopilotInstallResult {
   manifestPath: string | null;
 }
 
+function installText(es: string, en: string): string {
+  return getSettings().uiLanguage === 'es' ? es : en;
+}
+
 function wordManifestDirectory(): string | null {
   if (process.platform === 'darwin') {
     return path.join(homedir(), 'Library', 'Containers', 'com.microsoft.Word', 'Data', 'Documents', 'wef');
@@ -55,7 +59,10 @@ export async function installCopilotAddin(appRoot: string, appVersion = '0.1.0')
     return {
       ok: false,
       manifestPath: null,
-      message: 'La instalación automática del complemento solo está preparada para Word de escritorio en macOS o Windows.',
+      message: installText(
+        'La instalación automática del complemento solo está preparada para Word de escritorio en macOS o Windows.',
+        'Automatic add-in installation is only available for desktop Word on macOS or Windows.'
+      ),
     };
   }
 
@@ -69,14 +76,19 @@ export async function installCopilotAddin(appRoot: string, appVersion = '0.1.0')
     return {
       ok: true,
       manifestPath: targetPath,
-      message:
+      message: installText(
         'Nodus Copilot instalado/actualizado para Word. Cierra Word del todo (Cmd+Q) y vuelve a abrirlo: el complemento aparece en Inicio → Complementos, y añade su pestaña “Nodus” al abrirlo por primera vez.',
+        'Nodus Copilot was installed/updated for Word. Quit Word completely (Cmd+Q) and reopen it: the add-in appears under Home → Add-ins and adds its “Nodus” tab when you open it for the first time.'
+      ),
     };
   } catch (error) {
     return {
       ok: false,
       manifestPath: null,
-      message: `No se pudo instalar el complemento: ${error instanceof Error ? error.message : String(error)}`,
+      message: installText(
+        `No se pudo instalar el complemento: ${error instanceof Error ? error.message : String(error)}`,
+        `The add-in could not be installed: ${error instanceof Error ? error.message : String(error)}`
+      ),
     };
   }
 }
@@ -102,7 +114,10 @@ export async function installLibreOfficeCopilot(appRoot: string): Promise<Copilo
     return {
       ok: false,
       manifestPath: null,
-      message: 'La instalación automática del macro de LibreOffice no está soportada en esta plataforma.',
+      message: installText(
+        'La instalación automática del macro de LibreOffice no está soportada en esta plataforma.',
+        'Automatic LibreOffice macro installation is not supported on this platform.'
+      ),
     };
   }
 
@@ -118,13 +133,19 @@ export async function installLibreOfficeCopilot(appRoot: string): Promise<Copilo
     return {
       ok: true,
       manifestPath: targetPath,
-      message: `Macro de LibreOffice instalado en: ${targetPath}. En LibreOffice Writer, ejecútalo desde Herramientas → Macros → Ejecutar macro → Mis macros → nodus_copilot → start_nodus_copilot.`,
+      message: installText(
+        `Macro de LibreOffice instalado en: ${targetPath}. En LibreOffice Writer, ejecútalo desde Herramientas → Macros → Ejecutar macro → Mis macros → nodus_copilot → start_nodus_copilot.`,
+        `LibreOffice macro installed at: ${targetPath}. In LibreOffice Writer, run it from Tools → Macros → Run Macro → My Macros → nodus_copilot → start_nodus_copilot.`
+      ),
     };
   } catch (error) {
     return {
       ok: false,
       manifestPath: null,
-      message: `No se pudo copiar el macro: ${error instanceof Error ? error.message : String(error)}`,
+      message: installText(
+        `No se pudo copiar el macro: ${error instanceof Error ? error.message : String(error)}`,
+        `The macro could not be copied: ${error instanceof Error ? error.message : String(error)}`
+      ),
     };
   }
 }

@@ -327,6 +327,7 @@
     [/acadêmic/gi, 'académic'], [/aplicativo/g, 'aplicação'], [/configurações/g, 'definições'],
     [/baixar/g, 'descarregar'], [/Baixe/g, 'Descarrega'], [/seções/g, 'secções'], [/pesquisa/g, 'investigação'],
   ]);
+  Object.assign(FAQ, window.NODUS_FAQ_I18N || {});
 
   function translateCompact(lang) {
     return COMPACT[lang].map((item, index) => ({ ...item, id: FAQ.en[index].id, cat: FAQ.en[index].cat }));

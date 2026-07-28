@@ -273,9 +273,9 @@ test('academic shows the full sidebar; estudio uses its dedicated learning works
   }
 });
 
-test('pedagogical Deep Research is shared by study and teaching only', () => {
+test('pedagogical Deep Research stays exclusive to study', () => {
   assert.equal(vt.isViewAllowedForVaultType('studyDeepResearch', 'estudio'), true);
-  assert.equal(vt.isViewAllowedForVaultType('studyDeepResearch', 'docencia'), true);
+  assert.equal(vt.isViewAllowedForVaultType('studyDeepResearch', 'docencia'), false);
   assert.equal(vt.isViewAllowedForVaultType('studyDeepResearch', 'academic'), false);
   assert.equal(vt.isViewAllowedForVaultType('studyDeepResearch', 'genealogy'), false);
 });
@@ -299,17 +299,22 @@ test('all dedicated study views are scoped to estudio', () => {
   }
 });
 
-test('teaching reuses the study organisation surfaces and hides the research universals', () => {
-  // The shared organisation + evaluation surfaces are allowed in BOTH estudio and
-  // docencia (courses, schedule, calendar, materials, recordings, and the question bank).
-  for (const view of ['studyCourses', 'studySchedule', 'studyCalendar', 'studyLibrary', 'studyRecordings', 'studyQuestions', 'studyDeepResearch']) {
+test('teaching reuses the study organisation and analysis surfaces but hides the research universals', () => {
+  for (const view of [
+    'studyCourses', 'studySchedule', 'studyCalendar', 'studyLibrary', 'studyRecordings',
+    'studyChat', 'studyIdeas', 'studyGraph', 'studyQuestions',
+  ]) {
     assert.equal(vt.isViewAllowedForVaultType(view, 'estudio'), true, `${view} allowed in estudio`);
     assert.equal(vt.isViewAllowedForVaultType(view, 'docencia'), true, `${view} allowed in docencia`);
   }
   // The study-only surfaces stay exclusive to estudio and never leak into teaching.
-  for (const view of ['studySearch', 'studyChat', 'studyIdeas', 'studyGraph', 'studyReview']) {
+  for (const view of ['studySearch', 'studyReview', 'studyDeepResearch']) {
     assert.equal(vt.isViewAllowedForVaultType(view, 'estudio'), true, `${view} allowed in estudio`);
     assert.equal(vt.isViewAllowedForVaultType(view, 'docencia'), false, `${view} hidden in docencia`);
+  }
+  assert.equal(vt.isViewAllowedForVaultType('teachingUnits', 'docencia'), true);
+  for (const other of ['academic', 'estudio', 'genealogy', 'databases']) {
+    assert.equal(vt.isViewAllowedForVaultType('teachingUnits', other), false, `teachingUnits hidden in ${other}`);
   }
   // Teaching hides the same research/authoring universals the study mode hides.
   const hidden = vt.defaultHiddenViewsForType('docencia');
@@ -331,6 +336,18 @@ test('the teaching sidebar keeps the Tools group and never duplicates its own se
   assert.ok(!/navGroups\.map/.test(body), 'the docencia branch must not render every nav group');
   // The Toolkit is a universal view, so it must not be hidden for teaching.
   assert.ok(!vt.defaultHiddenViewsForType('docencia').includes('toolkit'), 'toolkit must stay visible in teaching');
+});
+
+test('every section the teaching sidebar navigates to is allowed for docencia', async () => {
+  const sidebar = await readFile(path.join(repoRoot, 'src/components/TeachingSidebar.tsx'), 'utf8');
+  const views = [...sidebar.matchAll(/\bview:\s*'([A-Za-z]+)'/g)].map((match) => match[1]);
+  assert.ok(views.length >= 10);
+  for (const view of views) {
+    assert.equal(vt.isViewAllowedForVaultType(view, 'docencia'), true, `${view} is wired but not allowed`);
+  }
+  for (const view of ['studyChat', 'studyIdeas', 'studyGraph', 'teachingUnits']) {
+    assert.ok(views.includes(view), `${view} is reachable`);
+  }
 });
 
 test('defaultHiddenViewsForType returns a fresh copy (no shared mutation)', () => {

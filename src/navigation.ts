@@ -1,7 +1,7 @@
 import type { CorpusHealthBucketId, ResearchContextSelection } from '@shared/types';
-import { normalizeVaultType } from '@shared/vaultTypes';
+import { type VaultType, normalizeVaultType } from '@shared/vaultTypes';
 
-export type View = 'home' | 'search' | 'library' | 'graph' | 'argument' | 'ideas' | 'authors' | 'persons' | 'encyclopedia' | 'continuity' | 'conflicts' | 'arcs' | 'rules' | 'questions' | 'worldChat' | 'manuscript' | 'characters' | 'places' | 'factions' | 'cultures' | 'dynasties' | 'scenes' | 'timeline' | 'tree' | 'relations' | 'map' | 'archive' | 'databases' | 'dbSearch' | 'dbAnalysis' | 'dbChat' | 'studyCourses' | 'studySchedule' | 'studyCalendar' | 'studySearch' | 'studyLibrary' | 'studyRecordings' | 'studyChat' | 'studyIdeas' | 'studyGraph' | 'studyQuestions' | 'studyReview' | 'studyDeepResearch' | 'teachingGroups' | 'teachingGrades' | 'teachingExams' | 'teachingRubrics' | 'immersion' | 'gaps' | 'debate' | 'research' | 'hypothesis' | 'reading' | 'writing' | 'deepResearch' | 'projects' | 'notes' | 'toolkit' | 'settings';
+export type View = 'home' | 'search' | 'library' | 'graph' | 'argument' | 'ideas' | 'authors' | 'persons' | 'encyclopedia' | 'continuity' | 'conflicts' | 'arcs' | 'rules' | 'questions' | 'worldChat' | 'manuscript' | 'characters' | 'places' | 'factions' | 'cultures' | 'dynasties' | 'scenes' | 'timeline' | 'tree' | 'relations' | 'map' | 'archive' | 'databases' | 'dbSearch' | 'dbAnalysis' | 'dbChat' | 'studyCourses' | 'studySchedule' | 'studyCalendar' | 'studySearch' | 'studyLibrary' | 'studyRecordings' | 'studyChat' | 'studyIdeas' | 'studyGraph' | 'studyQuestions' | 'studyReview' | 'studyDeepResearch' | 'teachingGroups' | 'teachingGrades' | 'teachingExams' | 'teachingRubrics' | 'teachingUnits' | 'immersion' | 'gaps' | 'debate' | 'research' | 'hypothesis' | 'reading' | 'writing' | 'deepResearch' | 'projects' | 'notes' | 'toolkit' | 'settings';
 
 export type GraphPresetId = 'overview' | 'contradictions' | 'gaps' | 'reading' | 'unread' | 'authors';
 
@@ -92,6 +92,7 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'teachingGrades', label: 'Calificaciones', icon: 'chartBar', group: 'analyze' },
   { id: 'teachingExams', label: 'Exámenes', icon: 'notebook', group: 'analyze' },
   { id: 'teachingRubrics', label: 'Rúbricas', icon: 'table', group: 'analyze' },
+  { id: 'teachingUnits', label: 'Diseño de unidades', icon: 'compass', group: 'create' },
   // Analizar — superficies derivadas del grafo y síntesis.
   { id: 'immersion', label: 'Inmersión', icon: 'target', group: 'analyze' },
   { id: 'gaps', label: 'Huecos', icon: 'gap', group: 'analyze' },
@@ -194,6 +195,19 @@ export const TOOLKIT_TOOLS: ToolkitToolDef[] = [
   },
 ];
 
+const VAULT_TYPE_LABELS: Partial<Record<VaultType, Partial<Record<View, string>>>> = {
+  docencia: {
+    studyChat: 'Chat',
+    studyIdeas: 'Ideas',
+    studyGraph: 'Grafo',
+  },
+};
+
+/** The translated label key appropriate to the active vault mode. */
+export function navItemLabel(item: NavItem, vaultType: string | undefined): string {
+  return VAULT_TYPE_LABELS[normalizeVaultType(vaultType)]?.[item.id] ?? item.label;
+}
+
 /**
  * Resolve the sidebar items for a user-defined order. Home is pinned first and
  * Settings is pinned last; neither is ever part of the saved order. Any sections
@@ -236,8 +250,8 @@ const DEDICATED_VAULT_NAV_IDS: Partial<Record<ReturnType<typeof normalizeVaultTy
   ],
   docencia: [
     'studyCourses', 'teachingGroups', 'studySchedule', 'studyCalendar', 'studyLibrary',
-    'studyRecordings', 'studyQuestions', 'teachingRubrics', 'teachingExams',
-    'teachingGrades', 'studyDeepResearch', 'toolkit',
+    'studyRecordings', 'studyChat', 'studyIdeas', 'studyGraph', 'studyQuestions',
+    'teachingRubrics', 'teachingExams', 'teachingGrades', 'teachingUnits', 'toolkit',
   ],
   databases: ['dbSearch', 'dbAnalysis', 'dbChat', 'notes', 'toolkit'],
   worldbuilding: [
@@ -311,9 +325,16 @@ export interface LibraryNavigationTarget {
   healthBucket?: CorpusHealthBucketId;
 }
 
+/** Navigation into Ideas that opens the complete detail panel for one idea. */
+export interface IdeaNavigationTarget {
+  nonce: number;
+  ideaId: string;
+}
+
 export type PendingGraphNavigationTarget = Omit<GraphNavigationTarget, 'nonce'>;
 export type PendingAssistantNavigationTarget = Omit<AssistantNavigationTarget, 'nonce'>;
 export type PendingLibraryNavigationTarget = Omit<LibraryNavigationTarget, 'nonce'>;
+export type PendingIdeaNavigationTarget = Omit<IdeaNavigationTarget, 'nonce'>;
 
 export const ASSISTANT_CONTEXTS: Record<'idea' | 'gap' | 'contradiction' | 'reading', ResearchContextSelection> = {
   idea: {

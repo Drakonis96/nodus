@@ -67,9 +67,6 @@ try {
   // every click. Both have their own storage gate and both must be settled explicitly.
   await page.evaluate((v) => {
     localStorage.setItem('nodus.lastSeenVersion', v);
-    localStorage.setItem('nodus.platformHighlightsSeen.2026-07', '1');
-    localStorage.setItem('nodus.toolkitBetaGuideSeen.2.4.0', '1');
-    localStorage.setItem('nodus.tutorialVideosAnnouncementSeen.2026-07', '1');
     sessionStorage.setItem('nodus.startupUpdateChecked', '1');
   }, appVersion);
 
@@ -112,22 +109,21 @@ try {
   await page.reload();
   await page.waitForFunction(() => !!document.getElementById('root')?.children.length);
 
-  // ── Unit design is now a real source-backed tool with two explicit products ─
-  const unitsButton = page.getByRole('button', { name: 'Unidades didácticas', exact: true });
+  // ── Unit design chooses its reader before deciding the structure ────────────
+  const unitsButton = page.getByTestId('teaching-sidebar').getByRole('button', { name: 'Diseño de unidades', exact: true });
   assert.equal(await unitsButton.count(), 1, 'the teaching sidebar exposes Unit design');
   await unitsButton.click();
-  await page.getByRole('heading', { name: 'Deep Research', exact: true }).waitFor();
+  await page.getByRole('heading', { name: 'Diseño de unidades', exact: true }).waitFor();
   await page.getByText('Diseña unidades para el docente o apuntes para entregar al alumnado, siempre desde tus fuentes.', { exact: true }).waitFor();
-  await page.getByRole('button', { name: 'Nuevo informe', exact: true }).first().click();
+  await page.getByRole('button', { name: 'Nueva unidad', exact: true }).first().click();
   const audienceSelect = page.getByTestId('deep-research-audience');
   await audienceSelect.waitFor();
-  assert.equal(await audienceSelect.inputValue(), 'teacher', 'teaching defaults to the teacher lesson-plan product');
+  assert.equal(await audienceSelect.inputValue(), 'teacher', 'Unit design defaults to the teacher lesson-plan product');
   assert.match(await page.getByTestId('deep-research-audience-help').innerText(), /objetivos, secuencia, actividades/i);
   await audienceSelect.selectOption('students');
   assert.equal(await audienceSelect.inputValue(), 'students', 'student handouts can be selected');
   assert.match(await page.getByTestId('deep-research-audience-help').innerText(), /explicaciones, definiciones, ejemplos/i);
-  await page.screenshot({ path: path.join(shotDir, 'teaching-unit-audience-light-es.png') });
-  await page.getByRole('button', { name: 'Cerrar', exact: true }).click();
+  await page.getByRole('button', { name: 'Cancelar', exact: true }).click();
   console.log('[ui] Unit design chooses between a teacher plan and student-ready notes');
 
   // ── The menu entry is live, not "coming soon" ───────────────────────────────

@@ -323,26 +323,29 @@ export const VAULT_TYPE_SCOPED_VIEWS: Record<string, VaultType[]> = {
   // They must never leak into research/records/database vaults. The teaching
   // ('docencia') mode reuses the shared organisation surfaces — courses & subjects,
   // schedule, calendar, materials and recordings — so those five are scoped to both.
-  // Search, chat, ideas, graph and review stay exclusive to 'estudio'. The question
-  // bank and pedagogical Deep Research are also used by the teaching workspace.
+  // Search, review and pedagogical Deep Research stay exclusive to 'estudio'.
   studyCourses: ['estudio', 'docencia'],
   studySchedule: ['estudio', 'docencia'],
   studyCalendar: ['estudio', 'docencia'],
   studySearch: ['estudio'],
   studyLibrary: ['estudio', 'docencia'],
   studyRecordings: ['estudio', 'docencia'],
-  studyChat: ['estudio'],
-  studyIdeas: ['estudio'],
-  studyGraph: ['estudio'],
+  // Chat, Ideas and Graph read the shared study corpus and also power Docencia's
+  // Analizar group.
+  studyChat: ['estudio', 'docencia'],
+  studyIdeas: ['estudio', 'docencia'],
+  studyGraph: ['estudio', 'docencia'],
   // The question bank is shared with teaching (its Evaluación section).
   studyQuestions: ['estudio', 'docencia'],
   studyReview: ['estudio'],
-  studyDeepResearch: ['estudio', 'docencia'],
+  studyDeepResearch: ['estudio'],
   // Student rosters, the exam paper builder and rubrics belong to teaching only.
   teachingGroups: ['docencia'],
   teachingGrades: ['docencia'],
   teachingExams: ['docencia'],
   teachingRubrics: ['docencia'],
+  // Unit design is the teaching-specific Deep Research workflow.
+  teachingUnits: ['docencia'],
 };
 
 const BY_ID = new Map<VaultType, VaultTypeDef>(VAULT_TYPES.map((def) => [def.id, def]));

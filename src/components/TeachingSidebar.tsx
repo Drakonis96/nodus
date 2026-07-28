@@ -10,12 +10,15 @@ export type TeachingView =
   | 'studyCalendar'
   | 'studyLibrary'
   | 'studyRecordings'
+  | 'studyChat'
+  | 'studyIdeas'
+  | 'studyGraph'
   | 'studyQuestions'
-  | 'studyDeepResearch'
   | 'teachingGroups'
   | 'teachingGrades'
   | 'teachingExams'
-  | 'teachingRubrics';
+  | 'teachingRubrics'
+  | 'teachingUnits';
 
 export interface TeachingItem { label: string; icon: string; view?: TeachingView; topic?: RoadmapTopicKey }
 export interface TeachingGroup { id: string; label: string; items: TeachingItem[]; hint?: string }
@@ -39,6 +42,12 @@ export const TEACHING_GROUPS: TeachingGroup[] = [
     { label: 'Materiales', icon: 'book', view: 'studyLibrary' },
     { label: 'Grabaciones', icon: 'microphone', view: 'studyRecordings' },
   ] },
+  // Shared study-corpus readers, relabelled for a teacher's workspace.
+  { id: 'teaching-analyze', label: 'Analizar', items: [
+    { label: 'Chat', icon: 'chat', view: 'studyChat' },
+    { label: 'Ideas', icon: 'bulb', view: 'studyIdeas' },
+    { label: 'Grafo', icon: 'layers', view: 'studyGraph' },
+  ] },
   { id: 'teaching-assessment', label: 'Evaluación', items: [
     { label: 'Banco de preguntas', icon: 'help', view: 'studyQuestions' },
     { label: 'Rúbricas', icon: 'table', view: 'teachingRubrics' },
@@ -47,7 +56,7 @@ export const TEACHING_GROUPS: TeachingGroup[] = [
   ] },
   { id: 'teaching-create', label: 'Crear', items: [
     { label: 'Guía docente / Programación', icon: 'book', topic: 'guiaDocente' },
-    { label: 'Unidades didácticas', icon: 'layers', view: 'studyDeepResearch' },
+    { label: 'Diseño de unidades', icon: 'compass', view: 'teachingUnits' },
     { label: 'Situaciones de aprendizaje', icon: 'bulb', topic: 'situacionesAprendizaje' },
     { label: 'Adaptaciones', icon: 'users', topic: 'adaptaciones' },
     { label: 'Notas', icon: 'notebook', topic: 'notas' },

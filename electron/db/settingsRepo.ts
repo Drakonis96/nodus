@@ -172,6 +172,8 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys' | 'lockedProviderKeys'> = {
   treeOrientation: 'ancestors_top',
   treePaternalColor: '#2563eb',
   treeMaternalColor: '#dc2626',
+  treePaternalBranchVisible: true,
+  treeMaternalBranchVisible: true,
   recoverySetupVersion: 0,
   backupVaultIds: [],
   backupIncludePreferences: true,

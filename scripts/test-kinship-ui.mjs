@@ -65,6 +65,22 @@ test('paternal and maternal colours are the only user-selectable tree branch col
   assert.match(styles, /\.light \.tree-branch-color-control/);
 });
 
+test('paternal and maternal branches can be hidden independently and persist per vault', () => {
+  assert.match(tree, /data-testid="tree-paternal-visibility"/);
+  assert.match(tree, /data-testid="tree-maternal-visibility"/);
+  assert.match(tree, /treePaternalBranchVisible: !paternalBranchVisible/);
+  assert.match(tree, /treeMaternalBranchVisible: !maternalBranchVisible/);
+  assert.match(tree, /branch === 'paternal' && !paternalBranchVisible/);
+  assert.match(tree, /branch === 'maternal' && !maternalBranchVisible/);
+  assert.match(tree, /visibleParentEdges/);
+  assert.match(tree, /visibleSpouseEdges/);
+  assert.match(tree, /visibleSiblingEdges/);
+  assert.match(settings, /treePaternalBranchVisible: true/);
+  assert.match(settings, /treeMaternalBranchVisible: true/);
+  assert.match(styles, /\.tree-branch-color-control\.is-hidden/);
+  assert.match(styles, /\.light \.tree-branch-color-control\.is-hidden/);
+});
+
 test('the parental junction mixes configured colours and focus descendants use genealogy gold', () => {
   assert.match(tree, /mixBranchColors/);
   assert.match(tree, /treeDescendantLineIds/);

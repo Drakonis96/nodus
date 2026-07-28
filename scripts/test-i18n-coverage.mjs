@@ -125,6 +125,16 @@ const INDIRECT_KEY_SOURCES = [
     file: `src/views/${name}.tsx`,
     pattern: /(?:title|body):\s*(["'])((?:\\.|(?!\1).)*?)\1/g,
   })),
+  // The chat's copy table: one component serves the study and the teaching vault, and
+  // the strings that address the reader differ between them, so they reach t() as
+  // t(copy.x) / t(starter) instead of as literals. Two patterns: the named fields, and
+  // the starter prompts, which are bare entries of the `starters` array.
+  { file: 'src/views/StudyChatView.tsx', pattern: /\b(?:title|subtitle|historyEmpty|scopeNote):\s*(["'])((?:\\.|(?!\1).)*?)\1,$/gm },
+  { file: 'src/views/StudyChatView.tsx', pattern: /^\s{6}(["'])((?:\\.|(?!\1).)*?)\1,$/gm },
+  // Deep Research / Unit design: one component, four artefact names (report, family
+  // history, study report, teaching unit). Its copy table reaches t() as t(copy.x) and
+  // t(step.title) / t(step.body) for the tutorial cards.
+  { file: 'src/views/DeepResearchView.tsx', pattern: /\b(?:heading|subtitle|newAction|composerSubtitle|objectivePlaceholder|missingObjective|queuedToast|deleteTitle|deleteMessage|deletedToast|searchPlaceholder|loading|noMatch|empty|title|body):\s*(["'])((?:\\.|(?!\1).)*?)\1,?$/gm },
   // Why the CSV import suggested a column type, rendered as t(s.reason) in the import modal.
   { file: 'shared/databaseCsv.ts', pattern: /\bpick\([^,]+,\s*(["'])((?:\\.|(?!\1).)*?)\1/g },
   // Column type + rollup function names, rendered as t(columnTypeDef(x).label) / t(f.label).

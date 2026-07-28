@@ -1596,6 +1596,9 @@ export interface AppSettings {
   /** User-selected colours for the two primary ancestor branches. */
   treePaternalColor: string;
   treeMaternalColor: string;
+  /** Whether each focus-relative ancestor branch is visible in the genealogy tree. */
+  treePaternalBranchVisible: boolean;
+  treeMaternalBranchVisible: boolean;
   // ── Recovery and automatic encrypted backups ──────────────────────────────
   /** Version of the global recovery-folder onboarding contract completed here. */
   recoverySetupVersion: number;
@@ -3777,6 +3780,8 @@ export interface CopilotInstallResult {
 export interface CopilotOpenIdeaTarget {
   ideaId: string;
   label: string | null;
+  /** Word opens full development in Ideas; legacy callers keep the graph destination. */
+  destination?: 'ideas' | 'graph';
 }
 
 /** One typed relation between the edited paragraph and a library entity (Word copilot). */
@@ -5800,6 +5805,20 @@ export type DeepResearchTargetLength = 'adaptive' | 'concise' | 'standard' | 'ex
  */
 export type DeepResearchSectionLimit = 'auto' | number;
 
+/**
+ * One section of a teacher-authored outline (teaching vaults, Unit design).
+ *
+ * A blank `title` still reserves the slot: the teacher fixes HOW MANY parts the unit
+ * has and may name only the ones they care about, leaving the rest to the model. That
+ * is why the outline is a list of slots rather than a list of titles — dropping the
+ * untitled ones would silently change the length the teacher asked for.
+ */
+export interface DeepResearchOutlineSection {
+  title: string;
+  /** Optional steer: what this section must concentrate on. */
+  focus?: string;
+}
+
 export interface DeepResearchRequest {
   /** The research idea/question the whole report must develop. */
   objective: string;
@@ -5816,6 +5835,18 @@ export interface DeepResearchRequest {
   decorativeImage?: DecorativeImageOption;
   /** Study vaults: use the indexed learning corpus and the pedagogical report prompts. */
   studyMode?: boolean;
+  /**
+   * Teaching vaults (Unit design): same local corpus as `studyMode`, but written as a
+   * teaching unit for a class and enriched with the extracted idea network.
+   */
+  unitMode?: boolean;
+  /**
+   * Teacher-authored structure. When present the generated unit has EXACTLY these
+   * sections, in this order — the model may name the untitled ones but can neither add
+   * nor drop a part. Absent/empty means the model designs the structure itself, and
+   * `sectionLimit` applies as usual.
+   */
+  outline?: DeepResearchOutlineSection[];
   /**
    * Genealogy vaults only: centre the family-history report on this person — their
    * documents are guaranteed into the source pool and every section is written to

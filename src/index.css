@@ -1412,6 +1412,7 @@ body {
 .genealogy .border-indigo-900\/70 { border-color: rgba(120, 53, 15, 0.7); }
 .genealogy .hover\:border-indigo-700\/60:hover { border-color: rgba(161, 98, 7, 0.6); }
 .genealogy .ring-indigo-500 { --tw-ring-color: #d4a017; }
+.genealogy .ring-indigo-500\/40 { --tw-ring-color: rgba(212, 160, 23, 0.4); }
 .genealogy .ring-indigo-600\/40 { --tw-ring-color: rgba(202, 138, 4, 0.4); }
 
 /* Genealogy mode in the LIGHT theme. Like .light.databases: the .genealogy rules
@@ -1540,6 +1541,7 @@ body {
 .estudio .ring-indigo-600\/40 { --tw-ring-color: rgba(15, 118, 110, 0.4); }
 .estudio .hover\:border-indigo-700\/60:hover { border-color: rgba(15, 118, 110, 0.6); }
 .estudio .ring-indigo-500 { --tw-ring-color: #14b8a6; }
+.estudio .ring-indigo-500\/40 { --tw-ring-color: rgba(20, 184, 166, 0.4); }
 
 .light.estudio .bg-indigo-950,
 .light.estudio .bg-indigo-950\/20,
@@ -1608,6 +1610,13 @@ body {
 .docencia .hover\:border-indigo-700\/60:hover { border-color: rgba(194, 65, 12, 0.6); }
 .docencia .hover\:bg-indigo-600\/20:hover { background-color: rgba(234, 88, 12, 0.20); }
 .docencia .ring-indigo-500 { --tw-ring-color: #f97316; }
+/* Reached only through the Analizar group: the Ideas list's drag handle and open-card
+   ring, and the graph's backbone slider. They live in the shared IdeasView/GraphView,
+   which teaching renders over its own subject scope. */
+.docencia .accent-indigo-400 { accent-color: #fb923c; }
+.docencia .bg-indigo-500\/25 { background-color: rgba(249, 115, 22, 0.25); }
+.docencia .hover\:bg-indigo-500\/25:hover { background-color: rgba(249, 115, 22, 0.25); }
+.docencia .ring-indigo-500\/40 { --tw-ring-color: rgba(249, 115, 22, 0.4); }
 
 /* Worldbuilding vault → violet (#7c3aed) accent instead of the indigo default. Same
    remap strategy as .docencia / .databases, with one addition it needs and they do
@@ -1846,6 +1855,8 @@ body {
 .docencia .hover\:bg-teal-50\/60:hover { background-color: rgba(255, 247, 237, 0.6); }
 .docencia .border-teal-200 { border-color: #fed7aa; }
 .docencia .border-teal-500 { border-color: #f97316; }
+/* The chat's starter cards and manual-source checkboxes (Analizar group). */
+.docencia .hover\:border-teal-400:hover { border-color: #fb923c; }
 .docencia .hover\:border-teal-500:hover { border-color: #f97316; }
 .docencia .hover\:border-teal-600:hover { border-color: #ea580c; }
 .docencia .hover\:border-teal-800:hover { border-color: #9a3412; }
@@ -1865,6 +1876,7 @@ body {
 .docencia.dark .dark\:hover\:bg-teal-950:hover { background-color: #431407; }
 .docencia.dark .dark\:hover\:bg-teal-950\/20:hover { background-color: rgba(67, 20, 7, 0.2); }
 .docencia.dark .dark\:border-teal-800\/60 { border-color: rgba(154, 52, 18, 0.6); }
+.docencia.dark .dark\:border-teal-900 { border-color: #7c2d12; }
 .docencia.dark .dark\:border-teal-900\/50 { border-color: rgba(124, 45, 18, 0.5); }
 .docencia.dark .dark\:hover\:border-teal-700:hover { border-color: #c2410c; }
 
@@ -1921,6 +1933,7 @@ body {
 .databases .border-indigo-900\/70 { border-color: rgba(77, 1, 22, 0.7); }
 .databases .hover\:border-indigo-700\/60:hover { border-color: rgba(138, 2, 39, 0.6); }
 .databases .ring-indigo-500 { --tw-ring-color: #cc0a3a; }
+.databases .ring-indigo-500\/40 { --tw-ring-color: rgba(204, 10, 58, 0.4); }
 .databases .ring-indigo-600\/40 { --tw-ring-color: rgba(179, 3, 51, 0.4); }
 /* Hover states the grid uses: the column resize handle and the database card's border. Without
    these two the databases vault flashes indigo on hover in an otherwise crimson surface. */
@@ -3223,11 +3236,17 @@ select.input optgroup {
 
 /* Family-tree branch controls and relationship legend. */
 .tree-branch-colors { border-left: 1px solid #3f3f46; padding-left: 10px; }
-.tree-branch-color-control { display: inline-flex; height: 32px; align-items: center; gap: 6px; border: 1px solid #3f3f46; border-radius: 8px; padding: 0 8px 0 5px; color: #a1a1aa; background: rgb(24 24 27 / .65); font-size: 11px; font-weight: 650; cursor: pointer; }
+.tree-branch-color-control { display: inline-flex; width: 108px; height: 32px; align-items: center; gap: 6px; border: 1px solid #3f3f46; border-radius: 8px; padding: 0 4px 0 5px; color: #a1a1aa; background: rgb(24 24 27 / .65); font-size: 11px; font-weight: 650; transition: border-color 150ms ease, background-color 150ms ease, color 150ms ease; }
 .tree-branch-color-control:hover { border-color: #71717a; color: #e4e4e7; }
+.tree-branch-color-control.is-hidden { color: #71717a; background: rgb(9 9 11 / .65); }
 .tree-branch-color-control input[type='color'] { width: 22px; height: 22px; overflow: hidden; border: 0; border-radius: 6px; padding: 0; background: transparent; cursor: pointer; }
+.tree-branch-color-control.is-hidden input[type='color'] { opacity: .45; filter: grayscale(.65); }
 .tree-branch-color-control input[type='color']::-webkit-color-swatch-wrapper { padding: 0; }
 .tree-branch-color-control input[type='color']::-webkit-color-swatch { border: 1px solid rgb(255 255 255 / .35); border-radius: 5px; }
+.tree-branch-color-label { min-width: 0; flex: 1; }
+.tree-branch-visibility-toggle { display: inline-flex; width: 24px; height: 24px; flex: 0 0 24px; align-items: center; justify-content: center; border-radius: 6px; color: inherit; }
+.tree-branch-visibility-toggle:hover { background: rgb(63 63 70 / .8); color: #fafafa; }
+.tree-branch-visibility-toggle:focus-visible { outline: 2px solid #d4a017; outline-offset: 1px; }
 .tree-line-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; color: #71717a; font-size: 10px; }
 .tree-line-legend > span { display: inline-flex; align-items: center; gap: 6px; }
 .tree-line-sample { display: inline-block; width: 24px; height: 0; border-top: 2px solid #64748b; }
@@ -3237,6 +3256,8 @@ select.input optgroup {
 .light .tree-branch-colors { border-left-color: #d4d4d8; }
 .light .tree-branch-color-control { border-color: #d4d4d8; color: #52525b; background: rgb(255 255 255 / .8); }
 .light .tree-branch-color-control:hover { border-color: #a1a1aa; color: #18181b; }
+.light .tree-branch-color-control.is-hidden { color: #71717a; background: rgb(244 244 245 / .9); }
+.light .tree-branch-visibility-toggle:hover { background: #e4e4e7; color: #18181b; }
 .light .tree-line-legend { color: #52525b; }
 
 /* Searchable multi-person picker used by genealogy relationship forms. */
