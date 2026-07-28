@@ -8,6 +8,7 @@ import { ImageLightbox, type ImageLightboxItem } from './ImageLightbox';
 import { useDismissableLayer } from '../hooks';
 import { t } from '../i18n';
 import { personPortraitUrl, worldImageUrl } from '../lib/imageUrl';
+import { dragPortraitFocus } from '@shared/portraitFraming';
 
 /**
  * A character's portrait: upload an image and frame it non-destructively, or generate
@@ -29,7 +30,14 @@ export function CharacterPortraitEditor({
   const [focus, setFocus] = useState<PortraitFocus>(
     character.portrait ?? { focusX: 0.5, focusY: 0.42, scale: 1 }
   );
-  const dragging = useRef<{ x: number; y: number } | null>(null);
+  const focusRef = useRef(focus);
+  const dragging = useRef<{
+    pointerId: number;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null>(null);
   const [adjusting, setAdjusting] = useState(false);
   const [showGenerate, setShowGenerate] = useState(false);
   const [style, setStyle] = useState<DecorativeImageStyle>('contemporary_editorial');
@@ -37,11 +45,10 @@ export function CharacterPortraitEditor({
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [viewingItems, setViewingItems] = useState<ImageLightboxItem[] | null>(null);
-  // The drag maths needs a pixel scale; the card is ~11rem wide at the default root size.
-  const DRAG_SCALE = 176;
-
   useEffect(() => {
-    setFocus(character.portrait ?? { focusX: 0.5, focusY: 0.42, scale: 1 });
+    const next = character.portrait ?? { focusX: 0.5, focusY: 0.42, scale: 1 };
+    focusRef.current = next;
+    setFocus(next);
   }, [character.personId, character.portrait?.focusX, character.portrait?.focusY, character.portrait?.scale]);
 
   const hasPortrait = Boolean(character.portrait);
@@ -102,25 +109,44 @@ export function CharacterPortraitEditor({
 
   const onPointerDown = (event: React.PointerEvent) => {
     if (!hasPortrait || !adjusting) return;
-    dragging.current = { x: event.clientX, y: event.clientY };
-    (event.target as HTMLElement).setPointerCapture(event.pointerId);
+    event.preventDefault();
+    const frame =
+      event.currentTarget.firstElementChild instanceof HTMLElement
+        ? event.currentTarget.firstElementChild.getBoundingClientRect()
+        : event.currentTarget.getBoundingClientRect();
+    dragging.current = {
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      width: frame.width,
+      height: frame.height,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
   };
   const onPointerMove = (event: React.PointerEvent) => {
-    if (!dragging.current) return;
-    const dx = (event.clientX - dragging.current.x) / DRAG_SCALE;
-    const dy = (event.clientY - dragging.current.y) / DRAG_SCALE;
-    dragging.current = { x: event.clientX, y: event.clientY };
-    setFocus((current) => ({
-      ...current,
-      focusX: Math.min(1, Math.max(0, current.focusX - dx)),
-      focusY: Math.min(1, Math.max(0, current.focusY - dy)),
-    }));
+    const drag = dragging.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const next = dragPortraitFocus(
+      focusRef.current,
+      event.clientX - drag.x,
+      event.clientY - drag.y,
+      drag.width,
+      drag.height
+    );
+    drag.x = event.clientX;
+    drag.y = event.clientY;
+    focusRef.current = next;
+    setFocus(next);
   };
-  const onPointerUp = () => {
-    if (dragging.current) {
-      dragging.current = null;
-      void window.nodus.updatePortraitFocus(character.personId, focus);
+  const finishDrag = (event: React.PointerEvent) => {
+    if (!dragging.current || dragging.current.pointerId !== event.pointerId) return;
+    dragging.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
     }
+    // Never read `focus` here: pointer moves can be batched with pointerup, leaving the
+    // render closure one frame behind. The ref always contains the final visible crop.
+    void window.nodus.updatePortraitFocus(character.personId, focusRef.current);
   };
 
   const editorRef = useDismissableLayer<HTMLDivElement>({
@@ -138,7 +164,9 @@ export function CharacterPortraitEditor({
         data-testid="character-portrait"
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
+        onPointerUp={finishDrag}
+        onPointerCancel={finishDrag}
+        onLostPointerCapture={finishDrag}
         role={hasPortrait && !adjusting ? 'button' : undefined}
         tabIndex={hasPortrait && !adjusting ? 0 : undefined}
         aria-label={hasPortrait && !adjusting ? t('Ver detalles') : undefined}
@@ -220,6 +248,7 @@ export function CharacterPortraitEditor({
             value={focus.scale}
             onChange={(event) => {
               const next = { ...focus, scale: Number(event.target.value) };
+              focusRef.current = next;
               setFocus(next);
               void window.nodus.updatePortraitFocus(character.personId, next);
             }}

@@ -14,6 +14,7 @@ import type {
   PortraitFocus,
   RecordEvidence,
 } from '@shared/types';
+import { dragPortraitFocus } from '@shared/portraitFraming';
 import { detectPersonConflicts } from '@shared/conflictDetection';
 import { Icon } from './ui';
 import { PersonPortrait } from './PersonPortrait';
@@ -800,7 +801,14 @@ function KinRow({ label, people, onNavigate }: { label: string; people: Person[]
  */
 function PortraitEditor({ person, onChanged }: { person: Person; onChanged: () => Promise<void> }) {
   const [focus, setFocus] = useState<PortraitFocus>(person.portrait ?? { focusX: 0.5, focusY: 0.5, scale: 1 });
-  const dragging = useRef<{ x: number; y: number } | null>(null);
+  const focusRef = useRef(focus);
+  const dragging = useRef<{
+    pointerId: number;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null>(null);
   const [adjusting, setAdjusting] = useState(false);
   const [showGenerate, setShowGenerate] = useState(false);
   const [description, setDescription] = useState('');
@@ -809,7 +817,9 @@ function PortraitEditor({ person, onChanged }: { person: Person; onChanged: () =
   const SIZE = 96;
 
   useEffect(() => {
-    setFocus(person.portrait ?? { focusX: 0.5, focusY: 0.5, scale: 1 });
+    const next = person.portrait ?? { focusX: 0.5, focusY: 0.5, scale: 1 };
+    focusRef.current = next;
+    setFocus(next);
   }, [person.personId, person.portrait?.focusX, person.portrait?.focusY, person.portrait?.scale]);
 
   const upload = async () => {
@@ -843,21 +853,42 @@ function PortraitEditor({ person, onChanged }: { person: Person; onChanged: () =
 
   const onPointerDown = (e: React.PointerEvent) => {
     if (!person.portrait || !adjusting) return;
-    dragging.current = { x: e.clientX, y: e.clientY };
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    e.preventDefault();
+    const frame =
+      e.currentTarget.firstElementChild instanceof HTMLElement
+        ? e.currentTarget.firstElementChild.getBoundingClientRect()
+        : e.currentTarget.getBoundingClientRect();
+    dragging.current = {
+      pointerId: e.pointerId,
+      x: e.clientX,
+      y: e.clientY,
+      width: frame.width,
+      height: frame.height,
+    };
+    e.currentTarget.setPointerCapture(e.pointerId);
   };
   const onPointerMove = (e: React.PointerEvent) => {
-    if (!dragging.current) return;
-    const dx = (e.clientX - dragging.current.x) / SIZE;
-    const dy = (e.clientY - dragging.current.y) / SIZE;
-    dragging.current = { x: e.clientX, y: e.clientY };
-    setFocus((f) => ({ ...f, focusX: Math.min(1, Math.max(0, f.focusX - dx)), focusY: Math.min(1, Math.max(0, f.focusY - dy)) }));
+    const drag = dragging.current;
+    if (!drag || drag.pointerId !== e.pointerId) return;
+    const next = dragPortraitFocus(
+      focusRef.current,
+      e.clientX - drag.x,
+      e.clientY - drag.y,
+      drag.width,
+      drag.height
+    );
+    drag.x = e.clientX;
+    drag.y = e.clientY;
+    focusRef.current = next;
+    setFocus(next);
   };
-  const onPointerUp = () => {
-    if (dragging.current) {
-      dragging.current = null;
-      void window.nodus.updatePortraitFocus(person.personId, focus);
+  const finishDrag = (e: React.PointerEvent) => {
+    if (!dragging.current || dragging.current.pointerId !== e.pointerId) return;
+    dragging.current = null;
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
     }
+    void window.nodus.updatePortraitFocus(person.personId, focusRef.current);
   };
 
   const hasPortrait = !!person.portrait;
@@ -879,7 +910,9 @@ function PortraitEditor({ person, onChanged }: { person: Person; onChanged: () =
         className="flex justify-center"
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
+        onPointerUp={finishDrag}
+        onPointerCancel={finishDrag}
+        onLostPointerCapture={finishDrag}
         title={hasPortrait && adjusting ? t('Arrastra para encuadrar la cara') : undefined}
         style={{ cursor: hasPortrait && adjusting ? 'grab' : 'default', touchAction: 'none' }}
       >
@@ -936,6 +969,7 @@ function PortraitEditor({ person, onChanged }: { person: Person; onChanged: () =
             value={focus.scale}
             onChange={(e) => {
               const next = { ...focus, scale: Number(e.target.value) };
+              focusRef.current = next;
               setFocus(next);
               void window.nodus.updatePortraitFocus(person.personId, next);
             }}

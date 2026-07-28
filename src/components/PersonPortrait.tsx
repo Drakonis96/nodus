@@ -53,6 +53,11 @@ export function PersonPortrait({
             objectFit: 'cover',
             objectPosition: `${focus.focusX * 100}% ${focus.focusY * 100}%`,
             transform: `scale(${focus.scale})`,
+            // object-position only moves a cover image when its aspect ratio overflows
+            // the frame. Generated portraits often match the frame exactly, so zoom
+            // must originate at the focal point as well or dragging appears to do
+            // nothing.
+            transformOrigin: `${focus.focusX * 100}% ${focus.focusY * 100}%`,
           }}
         />
         {focus.generated && size >= 40 && <AiBadge size="sm" />}
