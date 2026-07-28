@@ -229,6 +229,9 @@ const INDIRECT_KEY_SOURCES = [
   { file: 'shared/worldSceneDays.ts', pattern: /\bkey:\s*(["'])((?:\\.|(?!\1).)*?)\1/g },
   // Threads and beats: the four-word vocabularies, all rendered as t(MAP[x]).
   { file: 'shared/worldThreads.ts', pattern: /^  \w+:\s*(["'])((?:\\.|(?!\1).)*?)\1,$/gm },
+  // The manuscript's own finding: its headline and detail are a KEY plus variables, handed
+  // to tx() through a variable, so nothing else can see them.
+  { file: 'shared/worldManuscript.ts', pattern: /\bkey:\s*(["'])((?:\\.|(?!\1).)*?)\1/g },
   // Continuity: the family and mute-reason labels, and every finding headline. A finding's
   // text is a KEY plus vars precisely so it can be collected here; a finished sentence
   // would stay Spanish in the other six languages.

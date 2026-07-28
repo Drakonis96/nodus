@@ -114,6 +114,13 @@ export const CONTINUITY_CHECKS: { id: string; family: FindingFamily; label: stri
     explains: 'Alguien aparece antes de la fecha de su nacimiento.',
   },
   {
+    id: 'manuscript.uncastMention',
+    family: 'manuscript',
+    label: 'Sale en el texto y no en el reparto',
+    explains:
+      'El manuscrito de la escena enlaza a alguien que no está en su reparto, así que ni la cronología ni los viajes lo tienen en cuenta.',
+  },
+  {
     id: 'travel.impossible',
     family: 'travel',
     label: 'Viaje imposible',

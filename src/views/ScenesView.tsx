@@ -147,9 +147,25 @@ function SceneSheet({
           </button>
           <h2 className="text-xl font-semibold">{scene.title}</h2>
         </div>
-        <button className="btn btn-ghost h-8 w-8 p-0 text-red-300 hover:text-red-200" title={t('Eliminar escena')} onClick={() => void remove()}>
-          <Icon name="trash" size={15} />
-        </button>
+        <div className="flex shrink-0 gap-1">
+          {/* Una sola puerta al mismo texto: la escena y el manuscrito son la misma fila,
+              así que esto navega en vez de abrir un segundo editor. */}
+          {onNavigate && (
+            <button
+              className="btn btn-ghost h-8 gap-1 border border-neutral-700 px-2 text-xs"
+              data-testid="scene-write"
+              onClick={() => {
+                localStorage.setItem('nodus.manuscript.scene', scene.sceneId);
+                onNavigate('manuscript');
+              }}
+            >
+              <Icon name="edit" size={13} /> {t('Escribir')}
+            </button>
+          )}
+          <button className="btn btn-ghost h-8 w-8 p-0 text-red-300 hover:text-red-200" title={t('Eliminar escena')} onClick={() => void remove()}>
+            <Icon name="trash" size={15} />
+          </button>
+        </div>
       </div>
 
       <section className={PERSON_DOSSIER_SECTION_CLASS} data-testid="scene-sheet-basics">

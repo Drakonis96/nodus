@@ -315,6 +315,12 @@ const api: NodusApi = {
       ipcRenderer.removeListener('worldChat:delta', onDelta);
     }
   },
+  manuscriptSpine: () => ipcRenderer.invoke('manuscript:spine'),
+  getSceneText: (sceneId) => ipcRenderer.invoke('manuscript:getText', sceneId),
+  saveSceneText: (sceneId, text) => ipcRenderer.invoke('manuscript:saveText', sceneId, text),
+  setChapterBreak: (sceneId, input) => ipcRenderer.invoke('manuscript:setChapter', sceneId, input).then(() => undefined),
+  manuscriptProgress: () => ipcRenderer.invoke('manuscript:progress'),
+  exportManuscript: (options) => ipcRenderer.invoke('manuscript:export', options),
   cancelWorldChat: async () => {
     if (activeWorldChatRequestId) await ipcRenderer.invoke('worldChat:cancel', activeWorldChatRequestId);
   },

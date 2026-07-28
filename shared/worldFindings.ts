@@ -31,7 +31,8 @@ export type FindingFamily =
   | 'containment'
   | 'calendar'
   | 'thread'
-  | 'rule';
+  | 'rule'
+  | 'manuscript';
 
 export interface FindingSubject {
   kind: string;
@@ -51,6 +52,7 @@ export const FINDING_FAMILY_LABEL: Record<FindingFamily, string> = {
   calendar: 'Calendario',
   thread: 'Conflictos y arcos',
   rule: 'Reglas',
+  manuscript: 'Manuscrito',
 };
 
 export const MUTE_REASON_LABEL: Record<string, string> = {

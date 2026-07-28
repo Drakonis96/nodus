@@ -85,6 +85,7 @@ export const WORLD_LINK_FIELD_LABEL: Record<string, string> = {
   statement: 'La regla',
   cost: 'Qué cuesta romperla',
   limits: 'Hasta dónde no llega',
+  text: 'Manuscrito',
 };
 
 export function isArticleCategory(value: unknown): value is WorldArticleCategory {

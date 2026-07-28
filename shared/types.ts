@@ -2723,6 +2723,31 @@ export interface WorldQuestionFeedItem {
   updatedAt: string | null;
 }
 
+// ── The manuscript (v100) ────────────────────────────────────────────────────
+//
+// Not a new document: the column the scene was missing. The prose of a scene, the chapter
+// it opens, and the word diary — everything else the section needs (the order, the dates,
+// what a scene must do) already exists elsewhere in the vault.
+
+export interface SceneText {
+  sceneId: string;
+  text: string | null;
+  wordCount: number;
+  updatedAt: string | null;
+}
+
+export interface ManuscriptSpine {
+  chapters: import('./worldManuscript').SpineChapter[];
+  totals: import('./worldManuscript').ManuscriptTotals;
+}
+
+export interface ManuscriptProgress {
+  words: number;
+  /** Written today, against the last day recorded. Negative on a day of cutting. */
+  today: number;
+  history: { day: string; totalWords: number }[];
+}
+
 /** A question for the world chat. `focusKeys` is the author's explicit choice; with none,
  *  the repo resolves the focus from the names the question itself uses. */
 export interface WorldChatRequest {
@@ -6782,6 +6807,18 @@ export interface NodusApi {
     handlers: { onDelta: (delta: string) => void }
   ): Promise<WorldChatResult>;
   cancelWorldChat(): Promise<void>;
+  // ── The manuscript ────────────────────────────────────────────────────────
+  // The spine carries not one word of prose: a novel is megabytes, and every screen that
+  // shows a chapter title would otherwise load the whole book.
+  manuscriptSpine(): Promise<ManuscriptSpine>;
+  getSceneText(sceneId: string): Promise<SceneText>;
+  saveSceneText(sceneId: string, text: string | null): Promise<SceneText>;
+  setChapterBreak(sceneId: string, input: { title?: string | null; epigraph?: string | null } | null): Promise<void>;
+  manuscriptProgress(): Promise<ManuscriptProgress>;
+  /** One file you can send. The internal `nodus://` links are degraded to their label. */
+  exportManuscript(
+    options: import('./worldManuscript').ManuscriptCompileOptions & { format: 'md' | 'pdf' }
+  ): Promise<{ path: string } | null>;
   // ── Maps of an invented world ─────────────────────────────────────────────
   // The image bytes are NEVER inlined with a map: a base map is megabytes, and listing
   // them would push every byte of every map through the bridge to draw a row of cards.

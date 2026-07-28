@@ -628,7 +628,12 @@ test('every check in the catalogue can actually fire', () => {
   // the world and opening empty.
   // Quote style is NOT assumed: esbuild rewrites single quotes to double on the way
   // through the bundler, and the first version of this test silently matched nothing.
-  const source = Object.values(continuity)
+  // The catalogue is shared: `manuscript.uncastMention` is produced by shared/worldManuscript,
+  // not by the continuity module, so the scan has to cover every module that contributes a
+  // check — otherwise graduating a check into its own file silently disarms this guard.
+  const manuscript = load('shared/worldManuscript.ts');
+  const source = [continuity, manuscript]
+    .flatMap((module) => Object.values(module))
     .filter((value) => typeof value === 'function')
     .map((fn) => fn.toString())
     .join('\n');

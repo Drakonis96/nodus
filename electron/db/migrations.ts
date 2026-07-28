@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 99;
+export const SCHEMA_VERSION = 100;
 
 export const migrations: Migration[] = [
   {
@@ -4207,6 +4207,66 @@ export const migrations: Migration[] = [
       updated_at   TEXT NOT NULL
     );
     CREATE INDEX idx_world_notice_mutes_check ON world_notice_mutes(check_id);
+  `,
+  },
+  {
+    version: 100,
+    up: /* sql */ `
+    -- El manuscrito. La tesis de la seccion en una linea: NO es un documento nuevo, es la
+    -- columna que le faltaba a la escena. Una novela son sus escenas en orden de relato, y
+    -- este vault ya sabe cuales son, en que orden van, que dia ocurren, quien sale, que se
+    -- mueve en cada una y que decisiones las bloquean. Lo unico que no sabia es que dice el
+    -- texto. Escribirlo en un documento aparte habria creado una segunda verdad sobre la
+    -- misma historia, que es el fallo que este vault lleva cinco secciones evitando.
+    --
+    -- NINGUNA SENTENCIA DE ESTE CUERPO ALTERA NADA, A PROPOSITO. isCreateOnly() quita los
+    -- comentarios y rechaza cualquier cuerpo con ALTER, DROP, INSERT, UPDATE, DELETE o
+    -- REPLACE, y una migracion asi pierde LOS DOS caminos de reparacion. Eso significa,
+    -- literalmente, que la prosa NO PUEDE ser una columna nueva de world_scenes: tiene que
+    -- ser una tabla con scene_id de clave. Y tampoco hay ninguna clave foranea, por lo de
+    -- siempre: foreign_keys esta ON, un REFERENCES sin accion declarada usa NO ACTION y
+    -- ABORTA el borrado del padre, asi que "corta esta escena" se convertiria en un error
+    -- de base de datos. La propiedad la impone deleteScene() en su transaccion.
+
+    -- La prosa de una escena. Tabla aparte tambien por una segunda razon, independiente de
+    -- la migracion y igual de decisiva: una novela de 120 000 palabras son unos 700 KB, y
+    -- listScenes() la arrastraria en CADA lectura -- la vista de escenas, el feed de
+    -- preguntas, los carriles de los arcos y la cadena de dias. Misma regla que ya siguen
+    -- los mapas con sus bytes: el cuerpo nunca viaja con la lista.
+    CREATE TABLE world_scene_text (
+      scene_id     TEXT PRIMARY KEY,
+      text         TEXT,
+      -- Desnormalizado a proposito: es lo unico que la espina, el objetivo y el contador
+      -- del dia necesitan, y calcularlo exigiria leer el texto entero de todas las escenas
+      -- para pintar una lista.
+      word_count   INTEGER NOT NULL DEFAULT 0,
+      created_at   TEXT NOT NULL,
+      updated_at   TEXT NOT NULL
+    );
+
+    -- Un capitulo es DONDE EMPIEZA un capitulo. No hay tabla de capitulos con su propio
+    -- orden, y no es pereza: seria un segundo eje de ordenacion junto a narrative_order, y
+    -- los dos discreparian el primer dia que alguien mueva una escena. De ese orden ya
+    -- cuelgan la cadena de dias y los carriles de los arcos, que exigen que sea denso y
+    -- total. Aqui el capitulo se mueve moviendo sus escenas, que es lo que un autor hace
+    -- de todas formas.
+    CREATE TABLE world_chapter_breaks (
+      scene_id   TEXT PRIMARY KEY,
+      title      TEXT,
+      epigraph   TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    -- Cuantas palabras habia al cerrar cada dia. El delta se calcula contra el dia anterior
+    -- y PUEDE SER NEGATIVO: un dia de podar es un dia de trabajo, y un contador que solo
+    -- sabe sumar convierte cortar en un castigo.
+    CREATE TABLE world_word_days (
+      day          TEXT PRIMARY KEY,
+      total_words  INTEGER NOT NULL,
+      created_at   TEXT NOT NULL,
+      updated_at   TEXT NOT NULL
+    );
   `,
   },
 ];

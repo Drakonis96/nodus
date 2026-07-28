@@ -120,6 +120,12 @@ const SYNC_GROUPS: { key: SyncGroupKey; prefix?: string; tables?: string[] }[] =
       'world_questions',
       'world_question_options',
       'world_notice_mutes',
+      // El manuscrito (v100). La prosa es autoria irreemplazable; el recuento de palabras
+      // viaja con ella porque se deriva de un texto que la lista no lee, y el diario de
+      // palabras es historia, no cache.
+      'world_scene_text',
+      'world_chapter_breaks',
+      'world_word_days',
     ],
   },
   {

@@ -22,6 +22,7 @@ import { ArcsView } from './views/ArcsView';
 import { RulesView } from './views/RulesView';
 import { QuestionsView } from './views/QuestionsView';
 import { WorldChatView } from './views/WorldChatView';
+import { ManuscriptView } from './views/ManuscriptView';
 import { WorldbuildingSidebar } from './components/WorldbuildingSidebar';
 import { FeedbackHost } from './components/feedback';
 import { PrivacyRequestHost } from './privacyNotices';
@@ -1465,6 +1466,7 @@ export function App() {
           {view === 'rules' && <RulesView onNavigate={setView} />}
           {view === 'questions' && <QuestionsView onNavigate={setView} />}
           {view === 'worldChat' && <WorldChatView onNavigate={setView} />}
+          {view === 'manuscript' && <ManuscriptView onNavigate={setView} />}
           {view === 'characters' && <CharactersView />}
           {view === 'places' && <PlacesView />}
           {view === 'factions' && <FactionsView />}

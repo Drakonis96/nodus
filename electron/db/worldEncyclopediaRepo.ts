@@ -431,6 +431,24 @@ export function entryProse(ref: WorldEntryRef): ProseField[] {
   return fields;
 }
 
+/**
+ * Everything the INDEXERS should see, which is the entry's prose plus its manuscript.
+ *
+ * A separate function on purpose, and the separation is load-bearing: `entryProse()` also
+ * feeds the reading pane and the **world bible export**, so handing the manuscript to it
+ * would turn "export my world bible" into "export my entire novel, with the encyclopedia
+ * stapled to the front". The links, the full-text search and the scan for holes want the
+ * novel; the two readers do not.
+ */
+export function entryIndexableProse(ref: WorldEntryRef): ProseField[] {
+  const blocks = entryProse(ref);
+  if (ref.kind !== 'scene') return blocks;
+  const row = getDb().prepare('SELECT text FROM world_scene_text WHERE scene_id = ?').get(ref.id) as
+    | { text: string | null }
+    | undefined;
+  return (row?.text ?? '').trim() ? [...blocks, { field: 'text', heading: null, text: row!.text as string }] : blocks;
+}
+
 /** The reading pane's Markdown. For a projection it is COMPOSED here and never stored:
  *  a second copy of a character's backstory would be a second thing to keep in step. */
 function composeBody(ref: WorldEntryRef): string {
@@ -717,7 +735,7 @@ export function indexEntryLinks(ref: WorldEntryRef): number {
   const run = db.transaction(() => {
     db.prepare('DELETE FROM world_links WHERE source_kind = ? AND source_id = ?').run(ref.kind, ref.id);
     let count = 0;
-    for (const block of entryProse(ref)) {
+    for (const block of entryIndexableProse(ref)) {
       for (const { link, occurrences } of parseWorldLinks(block.text)) {
         const target = link.status === 'resolved' ? entryKey(link.target) : pendingKey(link.text);
         const label = link.status === 'resolved' ? link.label : link.text;
@@ -1008,11 +1026,17 @@ function rowToProposal(row: ProposalRow): WorldEntryProposal {
   };
 }
 
-/** Every piece of prose in the world, for the candidate extractor. */
+/**
+ * Every piece of prose in the world, for the candidate extractor and the scan for holes.
+ *
+ * The MANUSCRIPT is included, which is the point of M4: a `???` left mid-chapter is a
+ * decision the author has not taken, and it should reach «Preguntas abiertas» without a
+ * line of code written for it.
+ */
 export function allWorldBodies(): { key: string; title: string; field: string; text: string }[] {
   const bodies: { key: string; title: string; field: string; text: string }[] = [];
   for (const entry of listWorldEntries()) {
-    for (const block of entryProse({ kind: entry.kind, id: entry.id })) {
+    for (const block of entryIndexableProse({ kind: entry.kind, id: entry.id })) {
       bodies.push({ key: entry.key, title: entry.title, field: block.field, text: block.text });
     }
   }
@@ -1246,10 +1270,18 @@ export function searchWorldBodies(query: string, limit = 200): WorldBodyHit[] {
       { field: 'notes', column: 'notes' },
     ]
   );
-  collect('scene', `SELECT scene_id AS id, title, summary, notes FROM world_scenes WHERE __WHERE__`, [
-    { field: 'summary', column: 'summary' },
-    { field: 'notes', column: 'notes' },
-  ]);
+  collect(
+    'scene',
+    `SELECT s.scene_id AS id, s.title, s.summary, s.notes, t.text
+       FROM world_scenes s LEFT JOIN world_scene_text t ON t.scene_id = s.scene_id WHERE __WHERE__`,
+    [
+      { field: 'summary', column: 's.summary' },
+      { field: 'notes', column: 's.notes' },
+      // The manuscript is searchable like anything else the author wrote. Last, because a
+      // hit in the summary describes the scene and a hit in the prose is inside it.
+      { field: 'text', column: 't.text' },
+    ]
+  );
   collect('map', `SELECT map_id AS id, name AS title, notes FROM world_maps WHERE __WHERE__`, [
     { field: 'notes', column: 'notes' },
   ]);

@@ -2544,10 +2544,14 @@ try {
   // inert rather than disappearing.
   const worldSidebar = page.getByTestId('worldbuilding-sidebar');
   await worldSidebar.waitFor({ timeout: 30_000 });
-  // Pick a section that is STILL inert. This assertion has to move each time one of the
-  // announced sections graduates, and its failure means exactly that — not a regression.
-  assert.equal(await worldSidebar.getByRole('button', { name: 'Manuscritos', exact: true }).isDisabled(), true,
-    'a section that is not built yet must not be clickable');
+  // Every announced section has now graduated, so the assertion that used to pick an inert
+  // one is replaced by its opposite: NOTHING in this sidebar is disabled. That is the
+  // end state this control was always counting towards.
+  assert.equal(
+    await worldSidebar.locator('button[disabled]').count(),
+    0,
+    'every announced worldbuilding section is built and navigable'
+  );
   assert.equal(await worldSidebar.getByRole('button', { name: 'Personajes', exact: true }).isDisabled(), false);
   assert.equal(await page.getByTestId('nodus-logo').getAttribute('data-vault-logo'), 'worldbuilding');
   // The violet accent comes from a CSS class remap that only applies when the root
@@ -3165,7 +3169,66 @@ try {
     );
   }
 
+  {
+    // El manuscrito: la columna que le faltaba a la escena. Se escribe desde la escena que
+    // el autor ya tiene abierta, se cuenta solo, y lo que escribe entra en el mundo — que
+    // es lo que separa esto de un procesador de textos.
+    await openSection('Escenas', 'scenes-grid');
+    await page.getByTestId('scene-card').first().click();
+    await page.getByTestId('scene-sheet-summary').waitFor({ timeout: 30_000 });
+    await page.getByTestId('scene-write').click();
+
+    const editor = page.getByTestId('manuscript-editor');
+    await editor.waitFor({ timeout: 30_000 });
+    // Una sola puerta al mismo texto: «Escribir» abre el manuscrito EN esa escena.
+    await editor.fill('Kaelen cruzó el vado antes del alba, con [[Kaelen Vor]] detrás.');
+    await page.getByTestId('manuscript-spine').click();
+    await waitForCondition('la prosa se guarda al salir del campo', () => page.evaluate(async () => {
+      const [first] = await window.nodus.listScenes('narrative');
+      const text = await window.nodus.getSceneText(first.sceneId);
+      return (text.text ?? '').includes('antes del alba') && text.wordCount > 0;
+    }));
+
+    // El recuento no cuenta la URL del enlace resuelto — el único número que nadie
+    // comprobaría a mano.
+    const counted = await page.evaluate(async () => {
+      const [first] = await window.nodus.listScenes('narrative');
+      const text = await window.nodus.getSceneText(first.sceneId);
+      return { words: text.wordCount, linked: (text.text ?? '').includes('nodus://world/character/') };
+    });
+    // Once: the label counts, the URL does not (it would be 12 with the URL in).
+    assert.deepEqual(counted, { words: 11, linked: true }, 'the link is resolved and its URL is not words');
+
+    // Un capítulo es DONDE empieza: se marca en la escena, no en una tabla con su orden.
+    await page.getByTestId('manuscript-start-chapter').click();
+    await page.getByPlaceholder('Título del capítulo').fill('Primera parte');
+    await page.getByRole('button', { name: 'Guardar', exact: true }).click();
+    await waitForCondition('el capítulo agrupa desde su escena', () => page.evaluate(async () => {
+      const spine = await window.nodus.manuscriptSpine();
+      return spine.chapters.some((chapter) => chapter.title === 'Primera parte');
+    }));
+    assert.match(await page.getByTestId('manuscript-progress').innerText(), /Hoy/);
+
+    // Y lo escrito ENTRA EN EL MUNDO: retroenlace en la ficha del personaje, y el aviso
+    // que sólo el manuscrito hace posible cuando no está en el reparto.
+    const entered = await page.evaluate(async () => {
+      const characters = await window.nodus.listCharacters();
+      const kaelen = characters.find((c) => c.displayName === 'Kaelen Vor');
+      const backlinks = await window.nodus.worldBacklinks({ kind: 'character', id: kaelen.personId });
+      const findings = await window.nodus.runWorldContinuity();
+      return {
+        fromManuscript: backlinks.some((link) => link.source.kind === 'scene' && link.sourceField === 'text'),
+        uncast: findings.some((finding) => finding.checkId === 'manuscript.uncastMention'),
+      };
+    });
+    assert.equal(entered.fromManuscript, true, 'the manuscript feeds the link graph like any other prose');
+    // Kaelen fue añadido al reparto de la primera escena en el bloque de preguntas, así
+    // que aquí NO debe haber aviso: el chequeo distingue nombrar de declarar.
+    assert.equal(entered.uncast, false, 'somebody declared in the cast raises nothing');
+  }
+
   console.log('[e2e] worldbuilding open questions: a hole becomes a decision, answering rewrites the sheet, undo restores it');
+  console.log('[e2e] worldbuilding manuscript: written from the scene, counted, chaptered, and part of the world');
   console.log('[e2e] worldbuilding world chat: refuses to answer about a world it cannot anchor');
 
   console.log('[e2e] worldbuilding arcs: lanes drawn from the scene strip, sheet, milestone sheet');

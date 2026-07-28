@@ -21,6 +21,7 @@ import { applyMutes, sortFindings } from '@shared/worldFindings';
 import { checkThreads } from '@shared/worldThreads';
 import { listWorldBeats, listWorldThreads } from './worldThreadsRepo';
 import { ruleFindings } from './worldRulesRepo';
+import { manuscriptFindings } from './worldManuscriptRepo';
 import type { MuteReasonCode, WorldFinding, WorldNoticeMute } from '@shared/types';
 
 function now(): string {
@@ -264,7 +265,12 @@ function threadFindings(): WorldFinding[] {
 function allFindings(): WorldFinding[] {
   const snapshot = buildWorldSnapshot();
   const distances = resolveDistances(travelPairsNeeded(snapshot));
-  return [...runWorldContinuity(snapshot, { distances }), ...threadFindings(), ...ruleFindings()];
+  return [
+    ...runWorldContinuity(snapshot, { distances }),
+    ...threadFindings(),
+    ...ruleFindings(),
+    ...manuscriptFindings(),
+  ];
 }
 
 export function runContinuity(): WorldFinding[] {

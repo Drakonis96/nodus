@@ -620,6 +620,14 @@ import { draftWorldArticle } from './ai/worldArticleDraft';
 import { draftWorldRule } from './ai/worldRules';
 import { proposeQuestionOptions } from './ai/worldQuestionOptions';
 import { streamWorldChat } from './ai/worldChat';
+import {
+  getSceneText,
+  manuscriptProgress,
+  manuscriptSpine,
+  saveSceneText,
+  setChapterBreak,
+} from './db/worldManuscriptRepo';
+import { exportManuscript } from './export/manuscriptExport';
 import { analyzeMissingEntries } from './ai/worldMissingEntries';
 import { exportWorldBible } from './export/worldBibleExport';
 import {
@@ -1765,6 +1773,23 @@ export function registerIpc(
   h('worldChat:cancel', async (_e, requestId: string) => {
     chatAborters.get(requestId)?.abort();
   });
+
+  // ── The manuscript ─────────────────────────────────────────────────────────
+  h('manuscript:spine', async () => manuscriptSpine());
+  h('manuscript:getText', async (_e, sceneId: string) => getSceneText(sceneId));
+  h('manuscript:saveText', async (_e, sceneId: string, text: string | null) => saveSceneText(sceneId, text));
+  h('manuscript:setChapter', async (
+    _e,
+    sceneId: string,
+    input: { title?: string | null; epigraph?: string | null } | null
+  ) => {
+    setChapterBreak(sceneId, input);
+  });
+  h('manuscript:progress', async () => manuscriptProgress());
+  h('manuscript:export', async (
+    _e,
+    options: Parameters<typeof exportManuscript>[0]
+  ) => exportManuscript(options));
 
   // The one mechanical fix: re-derive every scene's world day from the chain.
   h('scenes:recomputeDays', async () => recomputeSceneDays());

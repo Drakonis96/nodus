@@ -300,6 +300,11 @@ export function deleteScene(sceneId: string): void {
     // No cascade reaches these: the beats and the day declaration are owned here.
     db.prepare('DELETE FROM world_beats WHERE scene_id = ?').run(sceneId);
     db.prepare('DELETE FROM world_scene_days WHERE scene_id = ?').run(sceneId);
+    // The prose and the chapter it opened are the scene's too. No cascade reaches them
+    // either: v100 declares no foreign keys, so that cutting a scene stays an editing
+    // decision instead of becoming a database error.
+    db.prepare('DELETE FROM world_scene_text WHERE scene_id = ?').run(sceneId);
+    db.prepare('DELETE FROM world_chapter_breaks WHERE scene_id = ?').run(sceneId);
     db.prepare('DELETE FROM world_scenes WHERE scene_id = ?').run(sceneId);
   });
   remove();

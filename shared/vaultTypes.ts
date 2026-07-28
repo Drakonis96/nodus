@@ -307,6 +307,7 @@ export const VAULT_TYPE_SCOPED_VIEWS: Record<string, VaultType[]> = {
   rules: ['worldbuilding'],
   questions: ['worldbuilding'],
   worldChat: ['worldbuilding'],
+  manuscript: ['worldbuilding'],
   places: ['worldbuilding'],
   factions: ['worldbuilding'],
   cultures: ['worldbuilding'],
