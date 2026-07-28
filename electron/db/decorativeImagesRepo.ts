@@ -23,6 +23,7 @@ interface ImageRow {
   mime_type: string | null;
   image_blob: Buffer | null;
   thumbnail_blob: Buffer | null;
+  thumbnail_mime_type: string | null;
   error: string | null;
   source: DecorativeImageSource | null;
   prev_image_blob: Buffer | null;
@@ -62,7 +63,8 @@ function snapshotCurrentAsPrevious(entityKind: DecorativeImageEntityKind, entity
     .prepare(
       `UPDATE decorative_images SET
          prev_image_blob = image_blob, prev_thumbnail_blob = thumbnail_blob,
-         prev_mime_type = mime_type, prev_style = style,
+         prev_mime_type = mime_type, prev_thumbnail_mime_type = thumbnail_mime_type,
+         prev_style = style,
          prev_visual_context = visual_context, prev_prompt = prompt,
          prev_provider = provider, prev_model = model, prev_source = source
        WHERE entity_kind = ? AND entity_id = ? AND status = 'ready' AND image_blob IS NOT NULL`
@@ -100,8 +102,9 @@ export function getDecorativeImageData(
   thumbnail = false
 ): { bytes: Buffer; mimeType: string } | null {
   const column = thumbnail ? 'thumbnail_blob' : 'image_blob';
+  const mimeColumn = thumbnail ? 'thumbnail_mime_type' : 'mime_type';
   const row = getDb()
-    .prepare(`SELECT ${column} AS bytes, mime_type FROM decorative_images WHERE entity_kind = ? AND entity_id = ? AND status = 'ready'`)
+    .prepare(`SELECT ${column} AS bytes, ${mimeColumn} AS mime_type FROM decorative_images WHERE entity_kind = ? AND entity_id = ? AND status = 'ready'`)
     .get(entityKind, entityId) as { bytes: Buffer | null; mime_type: string | null } | undefined;
   return row?.bytes ? { bytes: row.bytes, mimeType: row.mime_type ?? 'image/jpeg' } : null;
 }
@@ -121,7 +124,8 @@ export function markDecorativeImageNotRequested(
          requested = 0, status = 'not_requested', style = excluded.style,
          provider = NULL, model = NULL, visual_context = NULL, prompt = NULL,
          asset_ref = NULL, mime_type = NULL, image_blob = NULL,
-         thumbnail_blob = NULL, error = NULL, updated_at = excluded.updated_at`
+         thumbnail_blob = NULL, thumbnail_mime_type = NULL,
+         error = NULL, updated_at = excluded.updated_at`
     )
     .run(entityKind, entityId, style, now, now);
   return getDecorativeImage(entityKind, entityId)!;
@@ -154,7 +158,8 @@ export function markDecorativeImagePending(input: {
          model = excluded.model, style = excluded.style,
          visual_context = excluded.visual_context, prompt = excluded.prompt,
          asset_ref = NULL, mime_type = NULL, image_blob = NULL,
-         thumbnail_blob = NULL, error = NULL, updated_at = excluded.updated_at`
+         thumbnail_blob = NULL, thumbnail_mime_type = NULL,
+         error = NULL, updated_at = excluded.updated_at`
     )
     .run(
       input.entityKind,
@@ -185,17 +190,29 @@ export function saveDecorativeImageReady(
   entityKind: DecorativeImageEntityKind,
   entityId: string,
   image: Buffer,
-  thumbnail: Buffer
+  mimeType: string,
+  thumbnail: Buffer,
+  thumbnailMimeType: string
 ): DecorativeImage {
   const now = new Date().toISOString();
   getDb()
     .prepare(
       `UPDATE decorative_images SET
-         status = 'ready', source = 'ai', asset_ref = ?, mime_type = 'image/jpeg',
-         image_blob = ?, thumbnail_blob = ?, error = NULL, updated_at = ?
+         status = 'ready', source = 'ai', asset_ref = ?, mime_type = ?,
+         image_blob = ?, thumbnail_blob = ?, thumbnail_mime_type = ?,
+         error = NULL, updated_at = ?
        WHERE entity_kind = ? AND entity_id = ?`
     )
-    .run(ASSET_REF(entityKind, entityId), image, thumbnail, now, entityKind, entityId);
+    .run(
+      ASSET_REF(entityKind, entityId),
+      mimeType,
+      image,
+      thumbnail,
+      thumbnailMimeType,
+      now,
+      entityKind,
+      entityId
+    );
   return getDecorativeImage(entityKind, entityId)!;
 }
 
@@ -205,7 +222,9 @@ export function saveCustomDecorativeImageReady(
   entityKind: DecorativeImageEntityKind,
   entityId: string,
   image: Buffer,
+  mimeType: string,
   thumbnail: Buffer,
+  thumbnailMimeType: string,
   style: DecorativeImageStyle = DEFAULT_DECORATIVE_IMAGE_STYLE
 ): DecorativeImage {
   const now = new Date().toISOString();
@@ -213,18 +232,31 @@ export function saveCustomDecorativeImageReady(
     snapshotCurrentAsPrevious(entityKind, entityId);
     getDb()
       .prepare(
-        `INSERT INTO decorative_images (
+         `INSERT INTO decorative_images (
            entity_kind, entity_id, requested, status, source, style,
-           asset_ref, mime_type, image_blob, thumbnail_blob, created_at, updated_at
-         ) VALUES (?, ?, 1, 'ready', 'custom', ?, ?, 'image/jpeg', ?, ?, ?, ?)
+           asset_ref, mime_type, image_blob, thumbnail_blob, thumbnail_mime_type,
+           created_at, updated_at
+         ) VALUES (?, ?, 1, 'ready', 'custom', ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(entity_kind, entity_id) DO UPDATE SET
            requested = 1, status = 'ready', source = 'custom',
-           asset_ref = excluded.asset_ref, mime_type = 'image/jpeg',
+           asset_ref = excluded.asset_ref, mime_type = excluded.mime_type,
            image_blob = excluded.image_blob, thumbnail_blob = excluded.thumbnail_blob,
+           thumbnail_mime_type = excluded.thumbnail_mime_type,
            provider = NULL, model = NULL, prompt = NULL, error = NULL,
            updated_at = excluded.updated_at`
       )
-      .run(entityKind, entityId, style, ASSET_REF(entityKind, entityId), image, thumbnail, now, now);
+      .run(
+        entityKind,
+        entityId,
+        style,
+        ASSET_REF(entityKind, entityId),
+        mimeType,
+        image,
+        thumbnail,
+        thumbnailMimeType,
+        now,
+        now
+      );
   });
   save();
   return getDecorativeImage(entityKind, entityId)!;
@@ -242,10 +274,12 @@ export function restorePreviousDecorativeImage(
          requested = 1, status = 'ready',
          image_blob = prev_image_blob, thumbnail_blob = prev_thumbnail_blob,
          mime_type = COALESCE(prev_mime_type, 'image/jpeg'), asset_ref = ?,
+         thumbnail_mime_type = COALESCE(prev_thumbnail_mime_type, 'image/jpeg'),
          style = COALESCE(prev_style, style), visual_context = prev_visual_context,
          prompt = prev_prompt, provider = prev_provider, model = prev_model,
          source = prev_source, error = NULL,
          prev_image_blob = NULL, prev_thumbnail_blob = NULL, prev_mime_type = NULL,
+         prev_thumbnail_mime_type = NULL,
          prev_style = NULL, prev_visual_context = NULL, prev_prompt = NULL,
          prev_provider = NULL, prev_model = NULL, prev_source = NULL,
          updated_at = ?
@@ -263,7 +297,8 @@ export function saveDecorativeImageFailure(
   getDb()
     .prepare(
       `UPDATE decorative_images SET status = 'failed', image_blob = NULL,
-       thumbnail_blob = NULL, asset_ref = NULL, mime_type = NULL, error = ?, updated_at = ?
+       thumbnail_blob = NULL, thumbnail_mime_type = NULL, asset_ref = NULL,
+       mime_type = NULL, error = ?, updated_at = ?
        WHERE entity_kind = ? AND entity_id = ?`
     )
     .run(error.slice(0, 1000), new Date().toISOString(), entityKind, entityId);

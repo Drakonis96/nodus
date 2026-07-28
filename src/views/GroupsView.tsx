@@ -18,7 +18,7 @@ import { confirm } from '../components/feedback';
 import { PERSON_DOSSIER_SECTION_CLASS } from '../components/personDossierLayout';
 import { ContinuityBadge } from '../components/world/ContinuityBadge';
 import { t, tx } from '../i18n';
-import { worldImageUrl } from '../lib/imageUrl';
+import { worldImageThumbnailUrl } from '../lib/imageUrl';
 
 /**
  * Factions, cultures and dynasties.
@@ -177,7 +177,7 @@ function DynastyCard({ item, compact, onOpen }: { item: WorldGroup; compact: boo
     >
       <div className={compact ? 'h-full w-20 shrink-0 bg-neutral-100 dark:bg-neutral-900' : 'h-40 w-full bg-neutral-100 dark:bg-neutral-900'}>
         {emblem ? (
-          <img src={worldImageUrl(emblem)} alt="" draggable={false} className="h-full w-full object-cover transition-transform group-hover:scale-[1.02]" />
+          <img src={worldImageThumbnailUrl(emblem)} alt="" draggable={false} className="h-full w-full object-cover transition-transform group-hover:scale-[1.02]" />
         ) : (
           <div className="grid h-full place-items-center">
             <Icon name="shield" size={compact ? 22 : 34} className="text-neutral-400 dark:text-neutral-600" />

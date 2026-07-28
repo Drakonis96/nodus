@@ -916,7 +916,12 @@ function PortraitEditor({ person, onChanged }: { person: Person; onChanged: () =
         title={hasPortrait && adjusting ? t('Arrastra para encuadrar la cara') : undefined}
         style={{ cursor: hasPortrait && adjusting ? 'grab' : 'default', touchAction: 'none' }}
       >
-        <PersonPortrait person={{ ...person, portrait: hasPortrait ? focus : null }} size={SIZE} rounded="md" />
+        <PersonPortrait
+          person={{ ...person, portrait: hasPortrait ? focus : null }}
+          size={SIZE}
+          rounded="md"
+          fullResolution
+        />
       </div>
 
       <div className="mt-2 space-y-1">

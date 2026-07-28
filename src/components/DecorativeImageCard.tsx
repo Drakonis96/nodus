@@ -5,41 +5,6 @@ import { AiBadge, Icon } from './ui';
 import { t } from '../i18n';
 import { DecorativeImageModal, type DecorativeImageQueueAction } from './DecorativeImageModal';
 
-/** Largest edge (px) kept when pre-shrinking an uploaded image in the renderer.
- *  The main process compresses again to its storage size; this only bounds the
- *  IPC payload so a huge original never has to cross the bridge in full. */
-const MAX_UPLOAD_EDGE = 1600;
-
-/** Downscale + re-encode a user-chosen file to a compact JPEG before upload. */
-async function compressImageForUpload(file: File): Promise<Uint8Array> {
-  const url = URL.createObjectURL(file);
-  try {
-    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-      const el = new Image();
-      el.onload = () => resolve(el);
-      el.onerror = () => reject(new Error(t('No se pudo leer el archivo de imagen.')));
-      el.src = url;
-    });
-    const longest = Math.max(img.naturalWidth, img.naturalHeight) || 1;
-    const scale = Math.min(1, MAX_UPLOAD_EDGE / longest);
-    const width = Math.max(1, Math.round(img.naturalWidth * scale));
-    const height = Math.max(1, Math.round(img.naturalHeight * scale));
-    const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error(t('No se pudo procesar la imagen.'));
-    ctx.fillStyle = '#ffffff'; // Flatten any transparency; storage is JPEG.
-    ctx.fillRect(0, 0, width, height);
-    ctx.drawImage(img, 0, 0, width, height);
-    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.85));
-    if (!blob) throw new Error(t('No se pudo comprimir la imagen.'));
-    return new Uint8Array(await blob.arrayBuffer());
-  } finally {
-    URL.revokeObjectURL(url);
-  }
-}
-
 /** A small pill button that opens the design modal without cluttering the view. */
 function DesignPill({ onClick, floating = false }: { onClick: () => void; floating?: boolean }) {
   return (
@@ -141,8 +106,14 @@ export function DecorativeImageCard({
     setBusy(true);
     setActionError(null);
     try {
-      const bytes = await compressImageForUpload(file);
-      const next = await window.nodus.uploadDecorativeImage(entityKind, entityId, bytes, current?.style ?? defaultStyle);
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const next = await window.nodus.uploadDecorativeImage(
+        entityKind,
+        entityId,
+        bytes,
+        file.type || 'application/octet-stream',
+        current?.style ?? defaultStyle
+      );
       setCurrent(next);
       setBusy(false);
       onChange?.(next);

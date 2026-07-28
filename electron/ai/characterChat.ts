@@ -8,7 +8,7 @@ import {
 } from '../db/characterChatRepo';
 import { getCharacter } from '../db/charactersRepo';
 import { getSettings } from '../db/settingsRepo';
-import { callImageProvider, optimizedJpegs } from './decorativeImages';
+import { callImageProvider, prepareGeneratedImage } from './decorativeImages';
 import { interviewCharacter } from './characterInterview';
 
 /**
@@ -52,14 +52,14 @@ export async function sendCharacterChatMessage(
         answer,
       });
       const generated = await callImageProvider(settings.imageProvider, settings.imageModel, prompt);
-      const optimized = await optimizedJpegs(generated);
-      // JPEG keeps roleplay chat images small and predictable regardless of provider.
+      const stored = prepareGeneratedImage(generated);
       attachCharacterChatImage({
         conversationId,
         messageId: characterMessage.id,
-        blob: optimized.image,
-        thumbnailBlob: optimized.thumbnail,
-        mimeType: 'image/jpeg',
+        blob: stored.image,
+        thumbnailBlob: stored.thumbnail,
+        thumbnailMimeType: stored.thumbnailMimeType,
+        mimeType: stored.mimeType,
         prompt,
         provider: settings.imageProvider,
         model: settings.imageModel,

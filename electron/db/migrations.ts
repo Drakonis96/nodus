@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 103;
+export const SCHEMA_VERSION = 104;
 
 export const migrations: Migration[] = [
   {
@@ -4381,6 +4381,25 @@ export const migrations: Migration[] = [
       );
       CREATE INDEX idx_character_chat_images_conversation
         ON character_chat_images(conversation_id);
+    `,
+  },
+  {
+    version: 104,
+    up: /* sql */ `
+      -- Full-resolution originals and compact derivatives have independent formats.
+      -- Keeping their MIME types separate lets every viewer use the untouched source
+      -- while lists decode only a small thumbnail.
+      ALTER TABLE person_portraits ADD COLUMN thumbnail BLOB;
+      ALTER TABLE person_portraits ADD COLUMN thumbnail_mime TEXT;
+
+      ALTER TABLE world_images ADD COLUMN thumbnail BLOB;
+      ALTER TABLE world_images ADD COLUMN thumbnail_mime_type TEXT;
+
+      ALTER TABLE decorative_images ADD COLUMN thumbnail_mime_type TEXT;
+      ALTER TABLE decorative_images ADD COLUMN prev_thumbnail_mime_type TEXT;
+
+      ALTER TABLE map_images ADD COLUMN thumbnail_mime_type TEXT;
+      ALTER TABLE character_chat_images ADD COLUMN thumbnail_mime_type TEXT;
     `,
   },
 ];

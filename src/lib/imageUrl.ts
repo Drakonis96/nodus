@@ -2,7 +2,9 @@ import type { CharacterChatImage, CharacterImage, Person, WorldMap } from '@shar
 
 type NodusImageRoute =
   | 'portrait'
+  | 'portrait-thumbnail'
   | 'world'
+  | 'world-thumbnail'
   | 'map'
   | 'map-thumbnail'
   | 'character-chat'
@@ -19,8 +21,19 @@ export function personPortraitUrl(person: Pick<Person, 'personId' | 'portrait' |
   return nodusImageUrl('portrait', person.personId, person.portrait.updatedAt ?? person.updatedAt);
 }
 
+export function personPortraitThumbnailUrl(
+  person: Pick<Person, 'personId' | 'portrait' | 'updatedAt'>
+): string | null {
+  if (!person.portrait) return null;
+  return nodusImageUrl('portrait-thumbnail', person.personId, person.portrait.updatedAt ?? person.updatedAt);
+}
+
 export function worldImageUrl(image: Pick<CharacterImage, 'imageId' | 'updatedAt'>): string {
   return nodusImageUrl('world', image.imageId, image.updatedAt);
+}
+
+export function worldImageThumbnailUrl(image: Pick<CharacterImage, 'imageId' | 'updatedAt'>): string {
+  return nodusImageUrl('world-thumbnail', image.imageId, image.updatedAt);
 }
 
 export function mapImageUrl(imageId: string): string {

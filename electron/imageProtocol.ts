@@ -1,7 +1,7 @@
 import { protocol } from 'electron';
-import { getPersonPortrait } from './db/entitiesRepo';
+import { getPersonPortrait, getPersonPortraitThumbnail } from './db/entitiesRepo';
 import { getMapImageBlob, getMapThumbnail } from './db/worldMapsRepo';
-import { getWorldImageBlob } from './db/worldImagesRepo';
+import { getWorldImageBlob, getWorldImageThumbnail } from './db/worldImagesRepo';
 import { getCharacterChatImageBlob, getCharacterChatImageThumbnail } from './db/characterChatRepo';
 
 export const NODUS_IMAGE_SCHEME = 'nodus-image';
@@ -42,7 +42,9 @@ function imageIdFromRequest(request: Request): string | null {
 
 function payloadFor(host: string, id: string): ImagePayload {
   if (host === 'portrait') return getPersonPortrait(id);
+  if (host === 'portrait-thumbnail') return getPersonPortraitThumbnail(id);
   if (host === 'world') return getWorldImageBlob(id);
+  if (host === 'world-thumbnail') return getWorldImageThumbnail(id);
   if (host === 'character-chat') return getCharacterChatImageBlob(id);
   if (host === 'character-chat-thumbnail') return getCharacterChatImageThumbnail(id);
   if (host === 'map') {

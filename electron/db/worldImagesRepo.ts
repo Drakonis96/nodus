@@ -10,6 +10,7 @@
 import { v4 as uuid } from 'uuid';
 import { getDb } from './database';
 import type { CharacterImage, CharacterImageKind, WorldImageEntityKind } from '@shared/types';
+import { prepareImageStorage } from '../imageStorage';
 
 function now(): string {
   return new Date().toISOString();
@@ -82,6 +83,20 @@ export function getWorldImageBlob(imageId: string): { blob: Buffer; mime: string
   return row?.blob ? { blob: row.blob, mime: row.mime_type } : null;
 }
 
+export function getWorldImageThumbnail(imageId: string): { blob: Buffer; mime: string } | null {
+  const row = getDb()
+    .prepare('SELECT thumbnail, thumbnail_mime_type, blob, mime_type FROM world_images WHERE image_id = ?')
+    .get(imageId) as
+    | { thumbnail: Buffer | null; thumbnail_mime_type: string | null; blob: Buffer | null; mime_type: string }
+    | undefined;
+  const blob = row?.thumbnail ?? row?.blob;
+  if (!row || !blob) return null;
+  return {
+    blob,
+    mime: row.thumbnail ? row.thumbnail_mime_type ?? 'image/jpeg' : row.mime_type,
+  };
+}
+
 export function addWorldImage(input: {
   entityKind: WorldImageEntityKind;
   entityId: string;
@@ -102,21 +117,24 @@ export function addWorldImage(input: {
     ((db
       .prepare('SELECT MAX(sort_order) AS m FROM world_images WHERE entity_kind = ? AND entity_id = ?')
       .get(input.entityKind, input.entityId) as { m: number | null }).m ?? -1) + 1;
-  const bytes = Buffer.from(input.blob);
+  const stored = prepareImageStorage(Buffer.from(input.blob), input.mimeType);
   db.prepare(
     `INSERT INTO world_images
-      (image_id, entity_kind, entity_id, kind, label, mime_type, bytes, blob, prompt, provider,
-       model, style, generated, sort_order, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      (image_id, entity_kind, entity_id, kind, label, mime_type, bytes, blob,
+       thumbnail, thumbnail_mime_type, prompt, provider, model, style, generated,
+       sort_order, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     id,
     input.entityKind,
     input.entityId,
     imageKind(input.kind),
     input.label?.trim() || null,
-    input.mimeType ?? 'image/jpeg',
-    bytes.length,
-    bytes,
+    stored.mimeType,
+    stored.image.length,
+    stored.image,
+    stored.thumbnail,
+    stored.thumbnailMimeType,
     input.prompt ?? null,
     input.provider ?? null,
     input.model ?? null,

@@ -187,6 +187,7 @@ export function CharacterPortraitEditor({
           character={{ ...character, portrait: hasPortrait ? focus : null }}
           placeholderSize={110}
           className="rounded-md"
+          fullResolution
         />
         {hasPortrait && !adjusting && (
           <span className="pointer-events-none absolute bottom-2 right-2 grid h-7 w-7 place-items-center rounded-full bg-black/65 text-white opacity-0 shadow transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">

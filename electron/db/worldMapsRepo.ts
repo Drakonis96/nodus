@@ -456,6 +456,7 @@ export interface StoredMapImage {
   height: number;
   blob: Buffer;
   thumbnail: Buffer | null;
+  thumbnailMimeType?: string | null;
   prompt?: string | null;
   provider?: string | null;
   model?: string | null;
@@ -479,9 +480,9 @@ export function saveMapImage(image: StoredMapImage): string {
     }
     db.prepare(
       `INSERT INTO map_images
-        (image_id, map_id, role, mime_type, width, height, bytes, blob, thumbnail, prompt,
-         provider, model, style, generated, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        (image_id, map_id, role, mime_type, width, height, bytes, blob, thumbnail,
+         thumbnail_mime_type, prompt, provider, model, style, generated, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       imageId,
       image.mapId,
@@ -492,6 +493,7 @@ export function saveMapImage(image: StoredMapImage): string {
       image.blob.length,
       image.blob,
       image.thumbnail ?? null,
+      image.thumbnailMimeType ?? null,
       image.prompt ?? null,
       image.provider ?? null,
       image.model ?? null,
@@ -517,8 +519,18 @@ export function getMapImageBlob(imageId: string): { mimeType: string; blob: Buff
 
 export function getMapThumbnail(mapId: string): { mimeType: string; blob: Buffer } | null {
   const row = getDb()
-    .prepare("SELECT mime_type, thumbnail, blob FROM map_images WHERE map_id = ? AND role = 'base' LIMIT 1")
-    .get(mapId) as { mime_type: string; thumbnail: Buffer | null; blob: Buffer | null } | undefined;
+    .prepare(
+      `SELECT mime_type, thumbnail, thumbnail_mime_type, blob
+         FROM map_images WHERE map_id = ? AND role = 'base' LIMIT 1`
+    )
+    .get(mapId) as
+    | { mime_type: string; thumbnail: Buffer | null; thumbnail_mime_type: string | null; blob: Buffer | null }
+    | undefined;
   const bytes = row?.thumbnail ?? row?.blob;
-  return bytes ? { mimeType: row!.mime_type, blob: bytes } : null;
+  return bytes
+    ? {
+        mimeType: row!.thumbnail ? row!.thumbnail_mime_type ?? 'image/jpeg' : row!.mime_type,
+        blob: bytes,
+      }
+    : null;
 }

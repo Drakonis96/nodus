@@ -38,7 +38,11 @@ try {
 
   // Attach data to both Juans to prove the merge is lossless.
   rel.addRelationship(juan1.personId, child.personId, 'parent');
-  ent.setPersonPortrait(juan1.personId, Buffer.from('IMG'), 'image/jpeg');
+  ent.setPersonPortrait(
+    juan1.personId,
+    Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64'),
+    'image/png'
+  );
   ent.createEvent({ type: 'census', date: '1875', participants: [{ personId: juan1.personId, role: 'principal' }] });
   ent.addRecordEvidence({ targetKind: 'person', targetId: juan1.personId, quote: 'censo 1875', location: 'p. 1' });
 

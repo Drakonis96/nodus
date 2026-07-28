@@ -147,6 +147,7 @@ export function attachCharacterChatImage(input: {
   messageId: string;
   blob: Buffer;
   thumbnailBlob?: Buffer | null;
+  thumbnailMimeType?: string | null;
   mimeType: string;
   prompt: string;
   provider: string;
@@ -164,8 +165,9 @@ export function attachCharacterChatImage(input: {
   db
     .prepare(
       `INSERT INTO character_chat_images
-       (image_id, conversation_id, message_id, mime_type, bytes, blob, thumbnail_blob, prompt, provider, model, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       (image_id, conversation_id, message_id, mime_type, bytes, blob, thumbnail_blob,
+        thumbnail_mime_type, prompt, provider, model, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       imageId,
@@ -175,6 +177,7 @@ export function attachCharacterChatImage(input: {
       input.blob.byteLength,
       input.blob,
       input.thumbnailBlob ?? null,
+      input.thumbnailMimeType ?? null,
       input.prompt,
       input.provider,
       input.model,
@@ -200,9 +203,17 @@ export function getCharacterChatImageBlob(imageId: string): { blob: Buffer; mime
 
 export function getCharacterChatImageThumbnail(imageId: string): { blob: Buffer; mime: string } | null {
   const row = getDb()
-    .prepare('SELECT COALESCE(thumbnail_blob, blob) AS blob FROM character_chat_images WHERE image_id = ?')
-    .get(imageId) as { blob: Buffer } | undefined;
-  return row ? { blob: row.blob, mime: 'image/jpeg' } : null;
+    .prepare(
+      `SELECT thumbnail_blob, thumbnail_mime_type, blob, mime_type
+         FROM character_chat_images WHERE image_id = ?`
+    )
+    .get(imageId) as
+    | { thumbnail_blob: Buffer | null; thumbnail_mime_type: string | null; blob: Buffer; mime_type: string }
+    | undefined;
+  if (!row) return null;
+  return row.thumbnail_blob
+    ? { blob: row.thumbnail_blob, mime: row.thumbnail_mime_type ?? 'image/jpeg' }
+    : { blob: row.blob, mime: row.mime_type };
 }
 
 function deleteConversationRows(id: string): void {

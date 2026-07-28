@@ -696,8 +696,8 @@ const api: NodusApi = {
   getDecorativeImageDataUrl: (entityKind, entityId, thumbnail) =>
     ipcRenderer.invoke('images:data', entityKind, entityId, thumbnail),
   queueDecorativeImage: (request) => ipcRenderer.invoke('images:queue', request),
-  uploadDecorativeImage: (entityKind, entityId, bytes, style) =>
-    ipcRenderer.invoke('images:upload', entityKind, entityId, bytes, style),
+  uploadDecorativeImage: (entityKind, entityId, bytes, mimeType, style) =>
+    ipcRenderer.invoke('images:upload', entityKind, entityId, bytes, mimeType, style),
   revertDecorativeImage: (entityKind, entityId) => ipcRenderer.invoke('images:revert', entityKind, entityId),
   deleteDecorativeImage: (entityKind, entityId) => ipcRenderer.invoke('images:delete', entityKind, entityId),
   onDecorativeImageChanged: (cb) => {

@@ -4,7 +4,7 @@ import { defaultPortraitKind } from '@shared/treePortraits';
 import { AiBadge, Icon } from './ui';
 import manPortrait from '../assets/man-portrait.webp';
 import womanPortrait from '../assets/woman-portrait.webp';
-import { personPortraitUrl } from '../lib/imageUrl';
+import { personPortraitThumbnailUrl, personPortraitUrl } from '../lib/imageUrl';
 
 const DEFAULT_SRC: Record<'man' | 'woman', string> = { man: manPortrait, woman: womanPortrait };
 
@@ -22,6 +22,7 @@ export function PersonPortrait({
   rounded = 'full',
   mirror = false,
   fill = false,
+  fullResolution = false,
 }: {
   person: Person;
   size?: number;
@@ -29,11 +30,13 @@ export function PersonPortrait({
   mirror?: boolean;
   /** Fill the parent container (100%×100%) instead of a fixed square. */
   fill?: boolean;
+  /** Use the untouched source, for editors and enlarged detail views. */
+  fullResolution?: boolean;
 }) {
   const box = fill ? { width: '100%', height: '100%' } : { width: size, height: size };
   const radius = rounded === 'full' ? '9999px' : rounded === 'md' ? '8px' : '0';
   const focus = person.portrait;
-  const candidateUrl = personPortraitUrl(person);
+  const candidateUrl = fullResolution ? personPortraitUrl(person) : personPortraitThumbnailUrl(person);
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
   const url = candidateUrl === failedUrl ? null : candidateUrl;
 

@@ -1,4 +1,3 @@
-import { nativeImage } from 'electron';
 import { GoogleGenAI } from '@google/genai';
 import type {
   CharacterImage,
@@ -25,6 +24,7 @@ import { getSettings } from '../db/settingsRepo';
 import { generateNodusLocalImage } from './nodusLocalImages';
 import { getApiKey } from '../secrets/secretStore';
 import { setPersonPortrait } from '../db/entitiesRepo';
+import { prepareImageStorage, type StoredImageAssets } from '../imageStorage';
 import {
   getDecorativeImage,
   markDecorativeImageNotRequested,
@@ -144,13 +144,13 @@ async function generateGoogle(model: string, prompt: string, key: string): Promi
       model,
       input: prompt,
       store: false,
-      response_format: { type: 'image', mime_type: 'image/jpeg', aspect_ratio: '16:9', image_size: '1K' },
+      response_format: { type: 'image', mime_type: 'image/png', aspect_ratio: '16:9', image_size: '1K' },
     },
     { timeout: IMAGE_TIMEOUT_MS, maxRetries: 0 }
   );
   const data = response.output_image?.data;
   if (!data) throw new Error('Google no devolvió datos de imagen.');
-  return { bytes: Buffer.from(data, 'base64'), mimeType: 'image/jpeg' };
+  return { bytes: Buffer.from(data, 'base64'), mimeType: 'image/png' };
 }
 
 async function postBase64Image(url: string, body: Record<string, unknown>, key: string): Promise<GeneratedImageBytes> {
@@ -185,9 +185,8 @@ function generateOpenAI(model: string, prompt: string, key: string): Promise<Gen
       prompt,
       n: 1,
       size: '1536x1024',
-      quality: 'low',
-      output_format: 'jpeg',
-      output_compression: 82,
+      quality: 'high',
+      output_format: 'png',
     },
     key
   );
@@ -214,39 +213,8 @@ export async function callImageProvider(provider: ImageProvider, model: string, 
   }
 }
 
-export async function optimizedJpegs(generated: GeneratedImageBytes): Promise<{ image: Buffer; thumbnail: Buffer }> {
-  const source = nativeImage.createFromBuffer(generated.bytes);
-  if (!source.isEmpty()) {
-    const size = source.getSize();
-    const fullWidth = Math.min(1280, size.width);
-    const image = source.resize({ width: fullWidth, quality: 'best' }).toJPEG(84);
-    const thumbnail = source.resize({ width: Math.min(360, size.width), quality: 'good' }).toJPEG(72);
-    return { image, thumbnail };
-  }
-
-  // OpenRouter can legitimately return WebP or SVG. Electron's nativeImage is
-  // intentionally conservative, so rasterize those documented image outputs
-  // through the already-bundled local canvas library before persistence.
-  try {
-    const { createCanvas, loadImage } = await import('@napi-rs/canvas');
-    const loaded = await loadImage(generated.bytes);
-    if (!loaded.width || !loaded.height) throw new Error('Tamaño de imagen no válido.');
-    const render = (width: number, quality: number): Buffer => {
-      const height = Math.max(1, Math.round(width * (loaded.height / loaded.width)));
-      const canvas = createCanvas(width, height);
-      const context = canvas.getContext('2d');
-      context.fillStyle = '#ffffff';
-      context.fillRect(0, 0, width, height);
-      context.drawImage(loaded, 0, 0, width, height);
-      return canvas.toBuffer('image/jpeg', quality);
-    };
-    return {
-      image: render(Math.min(1280, loaded.width), 84),
-      thumbnail: render(Math.min(360, loaded.width), 72),
-    };
-  } catch {
-    throw new Error(`El proveedor devolvió una imagen ${generated.mimeType || 'desconocida'} que no pudo procesarse.`);
-  }
+export function prepareGeneratedImage(generated: GeneratedImageBytes): StoredImageAssets {
+  return prepareImageStorage(generated.bytes, generated.mimeType);
 }
 
 async function runGeneration(
@@ -268,12 +236,21 @@ async function runGeneration(
     }
     if (active.get(key) !== token) return;
     const generated = await callImageProvider(pending.provider, pending.model, prompt);
-    const optimized = await optimizedJpegs(generated);
+    const stored = prepareGeneratedImage(generated);
     // A delete or a newer attempt invalidates this task. The provider call may
     // already have completed, but stale work must never restore or overwrite an
     // image the user removed/regenerated in the meantime.
     if (active.get(key) !== token) return;
-    onChanged?.(saveDecorativeImageReady(request.entityKind, request.entityId, optimized.image, optimized.thumbnail));
+    onChanged?.(
+      saveDecorativeImageReady(
+        request.entityKind,
+        request.entityId,
+        stored.image,
+        stored.mimeType,
+        stored.thumbnail,
+        stored.thumbnailMimeType
+      )
+    );
   } catch (error) {
     if (active.get(key) !== token) return;
     const message = error instanceof Error && error.name === 'AbortError'
@@ -354,24 +331,25 @@ export function deleteDecorativeImage(entityKind: DecorativeImageEntityKind, ent
   return removeDecorativeImage(entityKind, entityId);
 }
 
-/** Persist a user-supplied image. The renderer pre-shrinks it; here it goes
- *  through the same JPEG/thumbnail pipeline as generated images so storage stays
- *  small and consistent regardless of the original file. */
+/** Persist a user-supplied image byte-for-byte and derive a separate thumbnail. */
 export async function saveCustomDecorativeImage(
   entityKind: DecorativeImageEntityKind,
   entityId: string,
   bytes: Buffer,
+  mimeType?: string,
   style?: DecorativeImageStyle
 ): Promise<DecorativeImage> {
   // Any in-flight generation must not overwrite the image the user just chose.
   invalidateDecorativeImageGeneration(entityKind, entityId);
   if (!bytes.length) throw new Error('El archivo de imagen está vacío.');
-  const optimized = await optimizedJpegs({ bytes, mimeType: 'image/jpeg' });
+  const stored = prepareImageStorage(bytes, mimeType);
   return saveCustomDecorativeImageReady(
     entityKind,
     entityId,
-    optimized.image,
-    optimized.thumbnail,
+    stored.image,
+    stored.mimeType,
+    stored.thumbnail,
+    stored.thumbnailMimeType,
     style ?? getDecorativeImage(entityKind, entityId)?.style ?? getSettings().imageStyle
   );
 }
@@ -408,8 +386,7 @@ export async function generatePersonPortraitFromDescription(personId: string, de
   }
   const prompt = buildReferencePortraitPrompt(trimmed);
   const generated = await callImageProvider(settings.imageProvider, settings.imageModel, prompt);
-  const optimized = await optimizedJpegs(generated);
-  setPersonPortrait(personId, optimized.image, 'image/jpeg', { focusX: 0.5, focusY: 0.42, scale: 1 }, true);
+  setPersonPortrait(personId, generated.bytes, generated.mimeType, { focusX: 0.5, focusY: 0.42, scale: 1 }, true);
 }
 
 function buildReferencePortraitPrompt(description: string): string {
@@ -451,9 +428,8 @@ export async function generateCharacterPortrait(
   }
   const prompt = buildCharacterPortraitPrompt(style, sources);
   const generated = await callImageProvider(settings.imageProvider, settings.imageModel, prompt);
-  const optimized = await optimizedJpegs(generated);
   // focusY sits above centre because a portrait crop should hold the face, not the chest.
-  setPersonPortrait(personId, optimized.image, 'image/jpeg', { focusX: 0.5, focusY: 0.42, scale: 1 }, true);
+  setPersonPortrait(personId, generated.bytes, generated.mimeType, { focusX: 0.5, focusY: 0.42, scale: 1 }, true);
 }
 
 /**
@@ -484,11 +460,10 @@ export async function generateCharacterGalleryImage(
   }
   const prompt = buildCharacterPortraitPrompt(style, sources, kind);
   const generated = await callImageProvider(settings.imageProvider, settings.imageModel, prompt);
-  const optimized = await optimizedJpegs(generated);
   return addCharacterImage({
     personId,
-    blob: optimized.image,
-    mimeType: 'image/jpeg',
+    blob: generated.bytes,
+    mimeType: generated.mimeType,
     kind,
     prompt,
     provider: settings.imageProvider,
@@ -528,12 +503,11 @@ export async function generateWorldEntityImage(
   }
   const prompt = buildWorldEntityImagePrompt(style, sources, entityKind, kind);
   const generated = await callImageProvider(settings.imageProvider, settings.imageModel, prompt);
-  const optimized = await optimizedJpegs(generated);
   return addWorldImage({
     entityKind,
     entityId,
-    blob: optimized.image,
-    mimeType: 'image/jpeg',
+    blob: generated.bytes,
+    mimeType: generated.mimeType,
     kind,
     prompt,
     provider: settings.imageProvider,

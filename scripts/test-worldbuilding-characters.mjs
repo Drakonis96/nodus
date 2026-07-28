@@ -232,7 +232,10 @@ try {
   assert.equal(voicePatched.profile.arc.want, 'El trono', 'and the arc survives a voice edit');
 
   // ── 9. Image gallery: bytes out of the list, prompt kept, avatar copied ───
-  const png = Buffer.from('89504e470d0a1a0a', 'hex');
+  const png = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+    'base64'
+  );
   const shot = repo.addCharacterImage({
     personId: arcSubject.personId,
     blob: png,

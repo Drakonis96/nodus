@@ -7,7 +7,7 @@ import { Icon } from './ui';
 import { confirm } from './feedback';
 import { PERSON_DOSSIER_ACTION_BUTTON_CLASS, PERSON_DOSSIER_SECTION_CLASS } from './personDossierLayout';
 import { t, tx } from '../i18n';
-import { personPortraitUrl, worldImageUrl } from '../lib/imageUrl';
+import { personPortraitUrl, worldImageThumbnailUrl, worldImageUrl } from '../lib/imageUrl';
 import { ImageLightbox, type ImageLightboxItem } from './ImageLightbox';
 
 /**
@@ -246,7 +246,7 @@ export function CharacterGallery({ character, onChanged }: { character: Characte
 
 /** One thumbnail, served directly through Chromium's cached internal image protocol. */
 function GalleryThumb({ image }: { image: CharacterImage }) {
-  const url = worldImageUrl(image);
+  const url = worldImageThumbnailUrl(image);
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
   const failed = failedUrl === url;
 

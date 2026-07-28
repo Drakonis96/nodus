@@ -370,6 +370,7 @@ import { seedTeachingDemoData } from './db/teachingDemoData';
 import {
   seedWorldbuildingDemoData,
   upgradeWorldbuildingDemoDynasties,
+  upgradeWorldbuildingDemoImageQuality,
   upgradeWorldbuildingDemoNarrativeDepth,
 } from './db/worldbuildingDemoData';
 import { generateDemoPortraits, hasDemoPortraitKey } from './ai/genealogyDemoPortraits';
@@ -1118,6 +1119,7 @@ export function registerIpc(
     setActiveVault(id);
     getDb();
     upgradeWorldbuildingDemoDynasties();
+    upgradeWorldbuildingDemoImageQuality();
     upgradeWorldbuildingDemoNarrativeDepth();
     reconcileAuthorLayerOnce();
 
@@ -2820,8 +2822,15 @@ export function registerIpc(
       if (!e.sender.isDestroyed()) e.sender.send('images:changed', image);
     })
   );
-  h('images:upload', async (e, entityKind: DecorativeImageEntityKind, entityId: string, bytes: Uint8Array, style?: DecorativeImageStyle) => {
-    const image = await saveCustomDecorativeImage(entityKind, entityId, Buffer.from(bytes), style);
+  h('images:upload', async (
+    e,
+    entityKind: DecorativeImageEntityKind,
+    entityId: string,
+    bytes: Uint8Array,
+    mimeType?: string,
+    style?: DecorativeImageStyle
+  ) => {
+    const image = await saveCustomDecorativeImage(entityKind, entityId, Buffer.from(bytes), mimeType, style);
     if (!e.sender.isDestroyed()) e.sender.send('images:changed', image);
     return image;
   });

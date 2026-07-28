@@ -48,8 +48,8 @@ import { cropMapImage, extendMapCanvas, prepareMapImage } from './mapImageStore'
  *      pixels and the coordinates must agree exactly, which is why both are given the
  *      SAME `CanvasGrowth` object.
  *
- * Nothing here goes through `optimizedJpegs`: that caps at 1280 px, which is right for a
- * decorative header and catastrophic for the one image in Nodus a reader zooms into.
+ * Every provider or file original is preserved byte-for-byte. Lists receive an independent
+ * thumbnail; zoom, export and further map operations always use the full source.
  */
 
 const IMAGE_TIMEOUT_MS = 180_000;

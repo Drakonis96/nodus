@@ -190,16 +190,12 @@ try {
   const png = source.toBuffer('image/png');
 
   const prepared = await store.prepareMapImage(png);
-  assert.equal(prepared.mimeType, 'image/webp');
-  // Capped at 4096 on the long side — NOT at the 1280 the decorative pipeline uses, which
-  // is the whole reason this module exists.
-  assert.equal(prepared.width, store.MAX_MAP_DIMENSION, 'capped at the map limit');
-  assert.equal(prepared.height, store.MAX_MAP_DIMENSION / 2, 'and the aspect ratio held');
-  assert.ok(prepared.width > 1280, 'a map is not a decorative header');
+  assert.equal(prepared.mimeType, 'image/png');
+  assert.equal(prepared.width, 6000, 'the original map width is preserved');
+  assert.equal(prepared.height, 3000, 'the original map height is preserved');
+  assert.ok(prepared.blob.equals(png), 'map source bytes are preserved exactly');
   assert.ok(prepared.thumbnail && prepared.thumbnail.length < prepared.blob.length, 'the thumbnail is smaller');
-  // The quality scale on @napi-rs/canvas is 0–100. Encoded at 0.88 this image would be a
-  // few dozen KB of mush; at 88 it is hundreds. The floor catches the mistake.
-  assert.ok(prepared.blob.length > 200_000, `a 4096px map must not be mush (${prepared.blob.length} bytes)`);
+  assert.equal(prepared.thumbnailMimeType, 'image/jpeg');
 
   // A crop is the no-AI half of "ampliación": exact, instant, offline.
   const cropped = await store.cropMapImage(prepared.blob, { x0: 0.25, y0: 0, x1: 0.75, y1: 0.5 });

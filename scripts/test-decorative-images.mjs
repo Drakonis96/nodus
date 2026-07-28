@@ -49,8 +49,9 @@ try {
     assert.ok(!/\s{2,}/.test(prompt), 'visual context whitespace is compacted');
   }
 
-  const [service, ipc, jobs, migration, imageModels, card, imageModal, searchView, app, providersUi, modelListUi, audioSettingsUi] = await Promise.all([
+  const [service, imageStorage, ipc, jobs, migration, imageModels, card, imageModal, searchView, app, providersUi, modelListUi, audioSettingsUi] = await Promise.all([
     readFile(path.join(root, 'electron/ai/decorativeImages.ts'), 'utf8'),
+    readFile(path.join(root, 'electron/imageStorage.ts'), 'utf8'),
     readFile(path.join(root, 'electron/ipc.ts'), 'utf8'),
     readFile(path.join(root, 'src/backgroundJobs.ts'), 'utf8'),
     readFile(path.join(root, 'electron/db/migrations.ts'), 'utf8'),
@@ -88,7 +89,8 @@ try {
   assert.ok(service.includes("client.interactions.create"), 'Google uses the official Interactions API client');
   assert.ok(service.includes("https://api.openai.com/v1/images/generations"), 'OpenAI uses the official Images API');
   assert.ok(service.includes("https://openrouter.ai/api/v1/images"), 'OpenRouter uses the image endpoint');
-  assert.ok(service.includes('media_type') && service.includes("import('@napi-rs/canvas')"), 'documented OpenRouter raster and vector formats are normalized locally');
+  assert.ok(service.includes('media_type') && imageStorage.includes("from '@napi-rs/canvas'"), 'documented OpenRouter formats are decoded for their independent thumbnail');
+  assert.ok(service.includes("quality: 'high'") && service.includes("output_format: 'png'"), 'OpenAI requests a high-quality lossless source');
   assert.ok(imageModels.includes("gemini-3.1-flash-lite-image"), 'verified Google image model is present');
   assert.ok(imageModels.includes("architecture?.output_modalities?.includes('image')"), 'OpenRouter results require image output');
   assert.ok(imageModels.includes('imagePriceUsd: cheapest?.value ?? null'), 'unpublished image prices remain unavailable');
@@ -97,7 +99,7 @@ try {
   assert.ok(audioSettingsUi.includes('audio-engine-model-list') && audioSettingsUi.includes('audio-voice-list-'), 'audio models and voices use the shared settings list pattern');
   assert.ok(modelListUi.includes('dark:bg-neutral-950/20') && modelListUi.includes('bg-indigo-50'), 'the shared list defines explicit light and dark surfaces');
 
-  // Persistence includes every requested audit field plus optimized thumbnail.
+  // Persistence includes every requested audit field plus an independent thumbnail.
   for (const column of ['requested', 'status', 'provider', 'model', 'style', 'prompt', 'asset_ref', 'error', 'thumbnail_blob']) {
     assert.ok(migration.includes(column), `migration persists ${column}`);
   }
@@ -115,13 +117,15 @@ try {
   // Custom upload + revert-to-previous are reachable from the same design modal.
   assert.ok(imageModal.includes("t('Subir mi imagen')") && imageModal.includes('accept="image/*"'), 'the modal offers a user image upload');
   assert.ok(imageModal.includes('image?.hasPrevious') && imageModal.includes("t('Volver a la imagen anterior')"), 'the modal offers reverting to the previous image only when one exists');
-  assert.ok(card.includes('compressImageForUpload') && card.includes('canvas.toBlob'), 'uploads are pre-compressed in the renderer before crossing the bridge');
+  assert.ok(!card.includes('compressImageForUpload') && !card.includes('canvas.toBlob'), 'uploads are never recompressed in the renderer');
+  assert.ok(card.includes('file.arrayBuffer()') && card.includes('file.type'), 'the exact uploaded bytes and MIME cross the bridge');
   assert.ok(card.includes('uploadDecorativeImage') && card.includes('revertDecorativeImage'), 'the card wires upload and revert to the bridge');
-  assert.ok(service.includes('saveCustomDecorativeImage') && service.includes('optimizedJpegs({ bytes'), 'a custom upload runs through the shared JPEG/thumbnail pipeline');
+  assert.ok(service.includes('saveCustomDecorativeImage') && service.includes('prepareImageStorage(bytes, mimeType)'), 'a custom upload preserves its source and derives a thumbnail separately');
+  assert.ok(imageStorage.includes('image: Buffer.from(bytes)') && imageStorage.includes("thumbnailMimeType: 'image/jpeg'"), 'the shared pipeline keeps the original byte-for-byte');
   assert.ok(service.includes('export function revertDecorativeImage') && service.includes('invalidateDecorativeImageGeneration'), 'revert discards any in-flight generation');
   assert.ok(ipc.includes("h('images:upload'") && ipc.includes("h('images:revert'"), 'upload and revert are exposed over IPC');
   assert.ok(ipc.includes("e.sender.send('images:changed', image)"), 'upload/revert broadcast so other mounted cards stay in sync');
-  for (const column of ['source', 'prev_image_blob', 'prev_thumbnail_blob', 'prev_style', 'prev_source']) {
+  for (const column of ['source', 'prev_image_blob', 'prev_thumbnail_blob', 'thumbnail_mime_type', 'prev_thumbnail_mime_type', 'prev_style', 'prev_source']) {
     assert.ok(migration.includes(column), `migration persists ${column}`);
   }
 
@@ -164,8 +168,8 @@ try {
       status TEXT NOT NULL DEFAULT 'not_requested',
       provider TEXT, model TEXT, style TEXT NOT NULL DEFAULT 'antique_book',
       visual_context TEXT, prompt TEXT, asset_ref TEXT, mime_type TEXT,
-      image_blob BLOB, thumbnail_blob BLOB, error TEXT, source TEXT,
-      prev_image_blob BLOB, prev_thumbnail_blob BLOB, prev_mime_type TEXT,
+      image_blob BLOB, thumbnail_blob BLOB, thumbnail_mime_type TEXT, error TEXT, source TEXT,
+      prev_image_blob BLOB, prev_thumbnail_blob BLOB, prev_mime_type TEXT, prev_thumbnail_mime_type TEXT,
       prev_style TEXT, prev_visual_context TEXT, prev_prompt TEXT,
       prev_provider TEXT, prev_model TEXT, prev_source TEXT,
       created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
@@ -179,14 +183,14 @@ try {
   const bytesOf = () => repo.getDecorativeImageData(K, ID)?.bytes.toString('utf8') ?? null;
 
   pend('antique_book', false, false);
-  let img = repo.saveDecorativeImageReady(K, ID, Buffer.from('A-full'), Buffer.from('A-thumb'));
+  let img = repo.saveDecorativeImageReady(K, ID, Buffer.from('A-full'), 'image/png', Buffer.from('A-thumb'), 'image/jpeg');
   assert.equal(img.status, 'ready'); assert.equal(img.source, 'ai'); assert.equal(img.hasPrevious, false);
   assert.equal(bytesOf(), 'A-full');
 
   pend('watercolor');
   assert.equal(repo.getDecorativeImage(K, ID).status, 'pending');
   assert.equal(repo.getDecorativeImage(K, ID).hasPrevious, true, 'pending regeneration snapshots the prior image');
-  img = repo.saveDecorativeImageReady(K, ID, Buffer.from('B-full'), Buffer.from('B-thumb'));
+  img = repo.saveDecorativeImageReady(K, ID, Buffer.from('B-full'), 'image/png', Buffer.from('B-thumb'), 'image/jpeg');
   assert.equal(img.hasPrevious, true, 'the snapshot survives the new image becoming ready');
   assert.equal(bytesOf(), 'B-full');
 
@@ -200,9 +204,9 @@ try {
   assert.equal(repo.getDecorativeImage(K, ID).hasPrevious, true, 'a failure keeps the snapshot');
   pend('antique_book', false, true);
   assert.equal(repo.getDecorativeImage(K, ID).hasPrevious, true, 'a retry after failure preserves the previous image');
-  repo.saveDecorativeImageReady(K, ID, Buffer.from('C-full'), Buffer.from('C-thumb'));
+  repo.saveDecorativeImageReady(K, ID, Buffer.from('C-full'), 'image/png', Buffer.from('C-thumb'), 'image/jpeg');
 
-  img = repo.saveCustomDecorativeImageReady(K, ID, Buffer.from('U-full'), Buffer.from('U-thumb'), 'watercolor');
+  img = repo.saveCustomDecorativeImageReady(K, ID, Buffer.from('U-full'), 'image/png', Buffer.from('U-thumb'), 'image/jpeg', 'watercolor');
   assert.equal(img.source, 'custom'); assert.equal(img.status, 'ready'); assert.equal(img.hasPrevious, true);
   assert.equal(bytesOf(), 'U-full');
   img = repo.restorePreviousDecorativeImage(K, ID);

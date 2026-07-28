@@ -7377,11 +7377,12 @@ export interface NodusApi {
   getDecorativeImage(entityKind: DecorativeImageEntityKind, entityId: string): Promise<DecorativeImage | null>;
   getDecorativeImageDataUrl(entityKind: DecorativeImageEntityKind, entityId: string, thumbnail?: boolean): Promise<string | null>;
   queueDecorativeImage(request: DecorativeImageActionRequest): Promise<DecorativeImage>;
-  /** Store a user-supplied image (already lightly pre-compressed) as the decorative image. */
+  /** Store a user-supplied image without altering its source bytes. */
   uploadDecorativeImage(
     entityKind: DecorativeImageEntityKind,
     entityId: string,
     bytes: Uint8Array,
+    mimeType: string,
     style?: DecorativeImageStyle
   ): Promise<DecorativeImage>;
   /** Restore the image that preceded the last regeneration or upload. */

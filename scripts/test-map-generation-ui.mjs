@@ -90,13 +90,14 @@ test('an outpaint drives the pixels and the coordinates from the SAME growth', a
   assert.ok(coordsAt > 0 && coordsAt < imageAt, 'coordinates before the image');
 });
 
-test('map images never go through the 1280px decorative pipeline', async () => {
-  // The comment naming it is fine; an import or a call is not.
+test('map images preserve the provider or file original and derive only a thumbnail', async () => {
   assert.doesNotMatch(source, /import \{[^}]*optimizedJpegs/);
   assert.doesNotMatch(source, /optimizedJpegs\(/);
   assert.match(source, /prepareMapImage\(/);
   const store = await read('electron/maps/mapImageStore.ts');
-  assert.match(store, /MAX_MAP_DIMENSION = 4096/);
+  assert.match(store, /prepareImageStorage\(bytes, mimeType\)/);
+  assert.match(store, /blob: stored\.image/);
+  assert.doesNotMatch(store, /MAX_MAP_DIMENSION|resize\(/);
 });
 
 test('regenerating keeps the previous image, but only one', async () => {

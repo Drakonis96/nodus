@@ -4,7 +4,6 @@
 // oval frames. Best-effort and background: no key or a failed call simply leaves the
 // default silhouette. The provider call is injectable so the flow is testable offline.
 
-import { nativeImage } from 'electron';
 import { GoogleGenAI } from '@google/genai';
 import { getApiKey } from '../secrets/secretStore';
 import { getDb } from '../db/database';
@@ -47,20 +46,12 @@ async function googlePortraitGenerator(prompt: string): Promise<Buffer | null> {
       model: DEMO_PORTRAIT_MODEL,
       input: prompt,
       store: false,
-      response_format: { type: 'image', mime_type: 'image/jpeg', aspect_ratio: '1:1', image_size: '1K' },
+      response_format: { type: 'image', mime_type: 'image/png', aspect_ratio: '1:1', image_size: '1K' },
     },
     { timeout: PORTRAIT_TIMEOUT_MS, maxRetries: 0 }
   );
   const data = response.output_image?.data;
   return data ? Buffer.from(data, 'base64') : null;
-}
-
-/** Down-size to a light square-ish JPEG; the portrait frame crops via the focal point. */
-function toStoredJpeg(bytes: Buffer): Buffer {
-  const image = nativeImage.createFromBuffer(bytes);
-  if (image.isEmpty()) return bytes;
-  const width = Math.min(512, image.getSize().width || 512);
-  return image.resize({ width, quality: 'best' }).toJPEG(85);
 }
 
 export function hasDemoPortraitKey(): boolean {
@@ -95,7 +86,7 @@ export async function generateDemoPortraits(opts: {
     try {
       const bytes = await generate(buildDaguerreotypePrompt(targets[i]));
       if (bytes && bytes.length) {
-        setPersonPortrait(targets[i].personId, toStoredJpeg(bytes), 'image/jpeg', { focusX: 0.5, focusY: 0.42, scale: 1 });
+        setPersonPortrait(targets[i].personId, bytes, 'image/png', { focusX: 0.5, focusY: 0.42, scale: 1 });
         generated++;
       } else {
         skipped++;

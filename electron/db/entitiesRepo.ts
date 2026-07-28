@@ -26,6 +26,7 @@ import type {
   RecordEvidenceTargetKind,
   RecordSourceKind,
 } from '@shared/types';
+import { prepareImageStorage } from '../imageStorage';
 
 function now(): string {
   return new Date().toISOString();
@@ -225,15 +226,31 @@ export function setPersonPortrait(
   focus: PortraitFocus = { focusX: 0.5, focusY: 0.5, scale: 1 },
   generated = false
 ): void {
+  const stored = prepareImageStorage(Buffer.from(blob), mime);
   getDb()
     .prepare(
-      `INSERT INTO person_portraits (person_id, blob, mime, focus_x, focus_y, scale, generated, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO person_portraits (
+         person_id, blob, mime, thumbnail, thumbnail_mime,
+         focus_x, focus_y, scale, generated, updated_at
+       )
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(person_id) DO UPDATE SET blob = excluded.blob, mime = excluded.mime,
+         thumbnail = excluded.thumbnail, thumbnail_mime = excluded.thumbnail_mime,
          focus_x = excluded.focus_x, focus_y = excluded.focus_y, scale = excluded.scale,
          generated = excluded.generated, updated_at = excluded.updated_at`
     )
-    .run(personId, Buffer.from(blob), mime, focus.focusX, focus.focusY, focus.scale, generated ? 1 : 0, now());
+    .run(
+      personId,
+      stored.image,
+      stored.mimeType,
+      stored.thumbnail,
+      stored.thumbnailMimeType,
+      focus.focusX,
+      focus.focusY,
+      focus.scale,
+      generated ? 1 : 0,
+      now()
+    );
 }
 
 export function updatePortraitFocus(personId: string, focus: PortraitFocus): void {
@@ -247,6 +264,18 @@ export function getPersonPortrait(personId: string): { blob: Buffer; mime: strin
     | { blob: Buffer; mime: string }
     | undefined;
   return row ? { blob: row.blob, mime: row.mime } : null;
+}
+
+export function getPersonPortraitThumbnail(personId: string): { blob: Buffer; mime: string } | null {
+  const row = getDb()
+    .prepare('SELECT thumbnail, thumbnail_mime, blob, mime FROM person_portraits WHERE person_id = ?')
+    .get(personId) as
+    | { thumbnail: Buffer | null; thumbnail_mime: string | null; blob: Buffer; mime: string }
+    | undefined;
+  if (!row) return null;
+  return row.thumbnail
+    ? { blob: row.thumbnail, mime: row.thumbnail_mime ?? 'image/jpeg' }
+    : { blob: row.blob, mime: row.mime };
 }
 
 export function clearPersonPortrait(personId: string): void {

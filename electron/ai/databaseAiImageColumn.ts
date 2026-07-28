@@ -29,6 +29,13 @@ export interface AiImageDeps {
 
 const IMAGE_PROVIDERS = new Set<ImageProvider>(['google', 'openai', 'openrouter', 'nodus']);
 
+function extensionForImageMime(mimeType: string): string {
+  if (mimeType === 'image/png') return 'png';
+  if (mimeType === 'image/webp') return 'webp';
+  if (mimeType === 'image/gif') return 'gif';
+  return 'jpg';
+}
+
 function configuredImageModel(value: unknown): AiImageModelRef | null {
   if (!value || typeof value !== 'object') return null;
   const candidate = value as Partial<AiImageModelRef>;
@@ -58,11 +65,12 @@ export async function runAiImageCell(rowId: string, columnId: string, deps: AiIm
   // An AI-image cell holds a single current image: replace whatever was there.
   for (const prev of listAttachments(rowId, columnId)) deleteAttachment(prev.id);
 
+  const resolvedMimeType = mimeType || 'image/jpeg';
   return addAttachment({
     rowId,
     columnId,
-    fileName: `${(col.name || 'imagen').replace(/[^\p{L}\p{N}._-]+/gu, '_').slice(0, 40)}.jpg`,
-    mimeType: mimeType || 'image/jpeg',
+    fileName: `${(col.name || 'imagen').replace(/[^\p{L}\p{N}._-]+/gu, '_').slice(0, 40)}.${extensionForImageMime(resolvedMimeType)}`,
+    mimeType: resolvedMimeType,
     bytes: image.length,
     blob: image,
     aiGenerated: true,
@@ -78,10 +86,9 @@ async function realGenerate(prompt: string, columnModel: AiImageModelRef | null)
   if (!provider || !model) {
     throw new Error('Configura un proveedor y modelo de imagen en Ajustes → Proveedores.');
   }
-  const { callImageProvider, optimizedJpegs } = await import('./decorativeImages');
+  const { callImageProvider } = await import('./decorativeImages');
   const generated = await callImageProvider(provider, model, prompt);
-  const optimized = await optimizedJpegs(generated);
-  return { image: optimized.image, mimeType: 'image/jpeg' };
+  return { image: generated.bytes, mimeType: generated.mimeType };
 }
 
 /** Generate AI images for every row of an ai_image column, reporting progress. */

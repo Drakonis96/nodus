@@ -34,6 +34,7 @@ import { restoreAppWindows } from './windowLifecycle';
 import { registerImageProtocol, registerImageSchemePrivileges } from './imageProtocol';
 import {
   upgradeWorldbuildingDemoDynasties,
+  upgradeWorldbuildingDemoImageQuality,
   upgradeWorldbuildingDemoNarrativeDepth,
 } from './db/worldbuildingDemoData';
 
@@ -501,6 +502,7 @@ app.whenReady().then(() => {
   }
   getDb(); // open + migrate before anything touches data
   upgradeWorldbuildingDemoDynasties();
+  upgradeWorldbuildingDemoImageQuality();
   upgradeWorldbuildingDemoNarrativeDepth();
   registerImageProtocol();
   reconcileAuthorLayerOnce(); // one-time: collapse duplicate author nodes onto Zotero identity

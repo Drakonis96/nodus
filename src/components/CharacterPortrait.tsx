@@ -19,10 +19,13 @@ export function CharacterPortrait({
   character,
   className = '',
   placeholderSize = 96,
+  fullResolution = false,
 }: {
   character: Character;
   className?: string;
   placeholderSize?: number;
+  /** Only detail editors should decode the original; cards use the independent thumbnail. */
+  fullResolution?: boolean;
 }) {
   const accent = characterAccentHex(character.profile.accent);
   return (
@@ -30,7 +33,13 @@ export function CharacterPortrait({
       className={`relative aspect-[3/4] w-full overflow-hidden bg-neutral-800/40 ${className}`}
       style={accent ? { boxShadow: `inset 0 2px 0 0 ${accent}` } : undefined}
     >
-      <PersonPortrait person={character} size={placeholderSize} rounded="none" fill />
+      <PersonPortrait
+        person={character}
+        size={placeholderSize}
+        rounded="none"
+        fill
+        fullResolution={fullResolution}
+      />
     </div>
   );
 }

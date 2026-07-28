@@ -47,11 +47,21 @@ try {
   const db = getDb();
   const count = (table, where = '1=1') => Number(db.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE ${where}`).get().n);
   const demoAssetDir = path.join(repoRoot, 'electron/assets/worldbuilding-demo');
-  const demoAssetFiles = fs.readdirSync(demoAssetDir).filter((file) => file.endsWith('.webp'));
-  const demoAssetBytes = demoAssetFiles.reduce((total, file) => total + fs.statSync(path.join(demoAssetDir, file)).size, 0);
-  assert.equal(demoAssetFiles.length, 45, 'worldbuilding ships every generated demo illustration');
-  assert.ok(demoAssetBytes < 1.25 * 1024 * 1024, 'the complete worldbuilding artwork bundle stays compact');
-  for (const file of demoAssetFiles) {
+  const demoAssetFiles = fs.readdirSync(demoAssetDir);
+  const originalAssets = demoAssetFiles.filter((file) => file.endsWith('.png'));
+  const thumbnailAssets = demoAssetFiles.filter((file) => file.endsWith('.webp'));
+  assert.equal(originalAssets.length, 45, 'worldbuilding ships every full-resolution demo original');
+  assert.equal(thumbnailAssets.length, 45, 'every original has an independent compact thumbnail');
+  assert.deepEqual(
+    originalAssets.map((file) => file.replace(/\.png$/, '')).sort(),
+    thumbnailAssets.map((file) => file.replace(/\.webp$/, '')).sort(),
+    'originals and thumbnails match one-to-one',
+  );
+  for (const file of originalAssets) {
+    const header = fs.readFileSync(path.join(demoAssetDir, file)).subarray(0, 8);
+    assert.ok(header.equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])), `${file} is a lossless PNG`);
+  }
+  for (const file of thumbnailAssets) {
     const header = fs.readFileSync(path.join(demoAssetDir, file)).subarray(0, 12);
     assert.equal(header.subarray(0, 4).toString(), 'RIFF', `${file} is a RIFF WebP`);
     assert.equal(header.subarray(8, 12).toString(), 'WEBP', `${file} is a RIFF WebP`);
@@ -268,18 +278,22 @@ try {
   assert.equal(count('world_articles', "article_id LIKE 'demo-world-article-%'"), 14, 'worldbuilding demo has a substantial encyclopedia');
   assert.equal(count('world_threads', "thread_id LIKE 'demo-world-%'"), 7, 'worldbuilding demo covers conflicts and arcs');
   assert.equal(count('world_rules', "rule_id LIKE 'demo-world-rule-%'"), 7, 'worldbuilding demo covers rule states and scopes');
-  assert.equal(count('person_portraits', "person_id LIKE 'demo-world-%' AND mime = 'image/webp' AND generated = 1"), 10, 'every demo character has generated WebP cover art');
-  assert.equal(count('world_images', "image_id LIKE 'demo-world-%' AND mime_type = 'image/webp' AND generated = 1"), 56, 'every visual world entity has generated WebP gallery art');
-  assert.equal(count('world_images', "entity_id LIKE 'demo-world-group-%' AND kind = 'emblem' AND mime_type = 'image/webp'"), 3, 'each demo dynasty has a compressed coat of arms');
-  assert.equal(count('map_images', "image_id LIKE 'demo-world-%' AND mime_type = 'image/webp' AND generated = 1"), 6, 'all map image roles use generated WebP artwork');
-  const seededArtworkBytes = Number(db.prepare(`
+  assert.equal(count('person_portraits', "person_id LIKE 'demo-world-%' AND mime = 'image/png' AND thumbnail_mime = 'image/webp' AND generated = 1"), 10, 'every demo character has a lossless original and separate thumbnail');
+  assert.equal(count('world_images', "image_id LIKE 'demo-world-%' AND mime_type = 'image/png' AND thumbnail_mime_type = 'image/webp' AND generated = 1"), 56, 'every visual world entity has a lossless gallery original and separate thumbnail');
+  assert.equal(count('world_images', "entity_id LIKE 'demo-world-group-%' AND kind = 'emblem' AND mime_type = 'image/png'"), 3, 'each demo dynasty has a lossless coat of arms');
+  assert.equal(count('map_images', "image_id LIKE 'demo-world-%' AND mime_type = 'image/png' AND thumbnail_mime_type = 'image/webp' AND generated = 1"), 6, 'all map roles preserve lossless artwork');
+  const seededArtwork = db.prepare(`
     SELECT
       (SELECT COALESCE(SUM(LENGTH(blob)), 0) FROM person_portraits WHERE person_id LIKE 'demo-world-%') +
       (SELECT COALESCE(SUM(LENGTH(blob)), 0) FROM world_images WHERE image_id LIKE 'demo-world-%') +
       (SELECT COALESCE(SUM(LENGTH(blob)), 0) FROM map_images WHERE image_id LIKE 'demo-world-%')
-      AS bytes
-  `).get().bytes);
-  assert.ok(seededArtworkBytes < 4 * 1024 * 1024, 'the seeded visual corpus remains lightweight');
+      AS original_bytes,
+      (SELECT COALESCE(SUM(LENGTH(thumbnail)), 0) FROM person_portraits WHERE person_id LIKE 'demo-world-%') +
+      (SELECT COALESCE(SUM(LENGTH(thumbnail)), 0) FROM world_images WHERE image_id LIKE 'demo-world-%') +
+      (SELECT COALESCE(SUM(LENGTH(thumbnail)), 0) FROM map_images WHERE image_id LIKE 'demo-world-%')
+      AS thumbnail_bytes
+  `).get();
+  assert.ok(Number(seededArtwork.original_bytes) > Number(seededArtwork.thumbnail_bytes) * 10, 'lists stay light without reducing the zoomable originals');
 
   // A populated table is not enough: every non-AI reader behind the eighteen
   // Worldbuilding sections must be able to interpret the same connected corpus.

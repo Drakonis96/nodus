@@ -28,6 +28,7 @@ import {
 const PREFIX = 'demo-world-';
 const AT = '2026-07-28T12:00:00.000Z';
 const PREVIOUS_AT = '2026-07-21T12:00:00.000Z';
+const IMAGE_AT = '2026-07-28T21:00:00.000Z';
 
 type DemoLocale = 'es' | 'en';
 type Localized = { es: string; en: string };
@@ -340,16 +341,21 @@ const LORE_ASSET_BY_ID: Record<string, string> = {
   [`${PREFIX}article-thirdmoon`]: 'lore-third-moon.webp',
 };
 
-function demoImageAsset(entityKind: string, entityId: string): string {
-  if (entityKind === 'character') return `character-${entityId.slice(`${PREFIX}char-`.length)}.webp`;
-  if (entityKind === 'place') return `place-${entityId.slice(`${PREFIX}place-`.length)}.webp`;
-  const fileName = LORE_ASSET_BY_ID[entityId];
-  if (!fileName) throw new Error(`Missing demo image asset for ${entityKind}:${entityId}`);
-  return fileName;
+function demoImageAsset(entityKind: string, entityId: string, thumbnail = false): string {
+  let fileName: string;
+  if (entityKind === 'character') fileName = `character-${entityId.slice(`${PREFIX}char-`.length)}.webp`;
+  else if (entityKind === 'place') fileName = `place-${entityId.slice(`${PREFIX}place-`.length)}.webp`;
+  else {
+    const mapped = LORE_ASSET_BY_ID[entityId];
+    if (!mapped) throw new Error(`Missing demo image asset for ${entityKind}:${entityId}`);
+    fileName = mapped;
+  }
+  return thumbnail ? fileName : fileName.replace(/\.webp$/, '.png');
 }
 
 function demoImage(entityKind: string, entityId: string, title: string, order = 0): void {
   const bytes = demoAsset(demoImageAsset(entityKind, entityId));
+  const thumbnail = demoAsset(demoImageAsset(entityKind, entityId, true));
   const group = entityKind === 'group' ? GROUPS.find((entry) => entry.id === entityId) : null;
   insert('world_images', {
     image_id: `${PREFIX}image-${entityKind}-${entityId.slice(PREFIX.length)}-${order}`,
@@ -357,9 +363,11 @@ function demoImage(entityKind: string, entityId: string, title: string, order = 
     entity_id: entityId,
     kind: group?.kind === 'house' ? 'emblem' : order === 0 ? 'portrait' : 'other',
     label: title,
-    mime_type: 'image/webp',
+    mime_type: 'image/png',
     bytes: bytes.length,
     blob: bytes,
+    thumbnail,
+    thumbnail_mime_type: 'image/webp',
     prompt: 'The Ashen Tides demo artwork',
     provider: 'openai',
     model: 'codex-imagegen',
@@ -379,6 +387,82 @@ function hasWorldbuildingData(): boolean {
     'persons', 'places', 'world_groups', 'world_scenes', 'world_maps', 'world_articles',
     'world_rules', 'world_threads', 'world_questions', 'world_secrets', 'world_calendar', 'notes',
   ].some((table) => count(table) > 0);
+}
+
+/**
+ * Replace the first demo's small contact-sheet crops with full source PNGs.
+ *
+ * Only legacy WebP rows are touched. Once upgraded, subsequent launches are a no-op and
+ * any image the author has replaced with another format remains theirs.
+ */
+export function upgradeWorldbuildingDemoImageQuality(): boolean {
+  if (
+    getActiveVault().type !== 'worldbuilding'
+    || !getSettings().demoMode
+    || !hasWorldbuildingData()
+  ) {
+    return false;
+  }
+  const db = getDb();
+  db.transaction(() => {
+    const images = db
+      .prepare(
+        `SELECT image_id, entity_kind, entity_id
+           FROM world_images
+          WHERE image_id LIKE ? AND mime_type = 'image/webp'`
+      )
+      .all(`${PREFIX}%`) as Array<{ image_id: string; entity_kind: string; entity_id: string }>;
+    for (const image of images) {
+      const full = demoAsset(demoImageAsset(image.entity_kind, image.entity_id));
+      const thumbnail = demoAsset(demoImageAsset(image.entity_kind, image.entity_id, true));
+      db.prepare(
+        `UPDATE world_images SET
+           mime_type = 'image/png', bytes = ?, blob = ?,
+           thumbnail = ?, thumbnail_mime_type = 'image/webp', updated_at = ?
+         WHERE image_id = ? AND mime_type = 'image/webp'`
+      ).run(full.length, full, thumbnail, IMAGE_AT, image.image_id);
+    }
+
+    const portraits = db
+      .prepare(
+        `SELECT person_id FROM person_portraits
+          WHERE person_id LIKE ? AND mime = 'image/webp'`
+      )
+      .all(`${PREFIX}char-%`) as Array<{ person_id: string }>;
+    for (const { person_id: personId } of portraits) {
+      const base = `character-${personId.slice(`${PREFIX}char-`.length)}`;
+      db.prepare(
+        `UPDATE person_portraits SET
+           blob = ?, mime = 'image/png', thumbnail = ?, thumbnail_mime = 'image/webp',
+           updated_at = ?
+         WHERE person_id = ? AND mime = 'image/webp'`
+      ).run(demoAsset(`${base}.png`), demoAsset(`${base}.webp`), IMAGE_AT, personId);
+    }
+
+    const mapRows = [
+      [`${PREFIX}map-image-map-world`, `${PREFIX}map-world`, 'map-world', 1254, 1254],
+      [`${PREFIX}map-image-map-orthea`, `${PREFIX}map-orthea`, 'map-orthea', 1254, 1254],
+      [`${PREFIX}map-image-map-lumina`, `${PREFIX}map-lumina`, 'map-lumina', 1254, 1254],
+      [`${PREFIX}map-image-map-old`, `${PREFIX}map-old`, 'map-old', 1254, 1254],
+      [`${PREFIX}map-image-previous`, `${PREFIX}map-orthea`, 'map-old', 1254, 1254],
+      [`${PREFIX}map-image-reference`, `${PREFIX}map-lumina`, 'place-lumina', 760, 504],
+    ] as const;
+    for (const [imageId, mapId, base, width, height] of mapRows) {
+      const full = demoAsset(`${base}.png`);
+      db.prepare(
+        `UPDATE map_images SET
+           mime_type = 'image/png', width = ?, height = ?, bytes = ?, blob = ?,
+           thumbnail = ?, thumbnail_mime_type = 'image/webp'
+         WHERE image_id = ? AND mime_type = 'image/webp'`
+      ).run(width, height, full.length, full, demoAsset(`${base}.webp`), imageId);
+      if (imageId === `${PREFIX}map-image-${mapId.slice(PREFIX.length)}`) {
+        db.prepare(
+          'UPDATE world_maps SET width_px = ?, height_px = ?, updated_at = ? WHERE map_id = ?'
+        ).run(width, height, IMAGE_AT, mapId);
+      }
+    }
+  })();
+  return true;
 }
 
 /**
@@ -426,16 +510,19 @@ export function upgradeWorldbuildingDemoDynasties(): boolean {
       );
 
       const bytes = demoAsset(demoImageAsset('group', group.id));
+      const thumbnail = demoAsset(demoImageAsset('group', group.id, true));
       const imageId = `${PREFIX}image-group-${group.id.slice(PREFIX.length)}-0`;
       db.prepare(
         `INSERT INTO world_images
-          (image_id, entity_kind, entity_id, kind, label, mime_type, bytes, blob, prompt,
-           provider, model, style, generated, sort_order, created_at, updated_at)
-         VALUES (?, 'group', ?, 'emblem', ?, 'image/webp', ?, ?, ?, 'openai',
+          (image_id, entity_kind, entity_id, kind, label, mime_type, bytes, blob,
+           thumbnail, thumbnail_mime_type, prompt, provider, model, style, generated,
+           sort_order, created_at, updated_at)
+         VALUES (?, 'group', ?, 'emblem', ?, 'image/png', ?, ?, ?, 'image/webp', ?, 'openai',
                  'codex-imagegen', 'painterly fantasy heraldry', 1, 0, ?, ?)
          ON CONFLICT(image_id) DO UPDATE SET
            kind = 'emblem', label = excluded.label, mime_type = excluded.mime_type,
-           bytes = excluded.bytes, blob = excluded.blob, prompt = excluded.prompt,
+           bytes = excluded.bytes, blob = excluded.blob, thumbnail = excluded.thumbnail,
+           thumbnail_mime_type = excluded.thumbnail_mime_type, prompt = excluded.prompt,
            provider = excluded.provider, model = excluded.model, style = excluded.style,
            generated = 1, updated_at = excluded.updated_at`
       ).run(
@@ -444,6 +531,7 @@ export function upgradeWorldbuildingDemoDynasties(): boolean {
         group.name,
         bytes.length,
         bytes,
+        thumbnail,
         `Heraldic coat of arms for ${group.name}; no text or watermark.`,
         AT,
         AT
@@ -639,9 +727,12 @@ export function seedWorldbuildingDemoData(): boolean {
         created_at: PREVIOUS_AT,
         updated_at: AT,
       });
-      const portrait = demoAsset(`character-${character.id.slice(`${PREFIX}char-`.length)}.webp`);
+      const portraitBase = `character-${character.id.slice(`${PREFIX}char-`.length)}`;
+      const portrait = demoAsset(`${portraitBase}.png`);
+      const portraitThumbnail = demoAsset(`${portraitBase}.webp`);
       insert('person_portraits', {
-        person_id: character.id, blob: portrait, mime: 'image/webp',
+        person_id: character.id, blob: portrait, mime: 'image/png',
+        thumbnail: portraitThumbnail, thumbnail_mime: 'image/webp',
         focus_x: 0.5, focus_y: 0.42, scale: 1, generated: 1, updated_at: AT,
       });
       demoImage('character', character.id, character.name);
@@ -831,7 +922,7 @@ export function seedWorldbuildingDemoData(): boolean {
       insert('world_maps', {
         map_id: map.id, name: map.name, kind: map.kind, place_id: map.place, parent_map_id: map.parent,
         parent_x0: map.box[0], parent_y0: map.box[1], parent_x1: map.box[2], parent_y1: map.box[3],
-        image_id: imageId, width_px: 768, height_px: 768,
+        image_id: imageId, width_px: 1254, height_px: 1254,
         scale_x0: map.scale[0], scale_y0: map.scale[1], scale_x1: map.scale[2], scale_y1: map.scale[3],
         scale_distance: map.scale[4], scale_unit: map.scale[5],
         projection: map.projection, planet_radius: map.radius, planet_radius_unit: map.radiusUnit,
@@ -842,26 +933,33 @@ export function seedWorldbuildingDemoData(): boolean {
         notes: L === 'es' ? 'Mapa ilustrado local de demostración con capas, escala y marcadores editables.' : 'Local illustrated demo map with editable layers, scale and markers.',
         sort_order: map.order, created_at: AT, updated_at: AT,
       });
-      const bytes = demoAsset(`map-${map.id.slice(`${PREFIX}map-`.length)}.webp`);
+      const mapBase = `map-${map.id.slice(`${PREFIX}map-`.length)}`;
+      const bytes = demoAsset(`${mapBase}.png`);
+      const thumbnail = demoAsset(`${mapBase}.webp`);
       insert('map_images', {
-        image_id: imageId, map_id: map.id, role: 'base', mime_type: 'image/webp',
-        width: 768, height: 768, bytes: bytes.length, blob: bytes, thumbnail: bytes,
+        image_id: imageId, map_id: map.id, role: 'base', mime_type: 'image/png',
+        width: 1254, height: 1254, bytes: bytes.length, blob: bytes, thumbnail,
+        thumbnail_mime_type: 'image/webp',
         prompt: 'The Ashen Tides cartographic demo artwork', provider: 'openai', model: 'codex-imagegen',
         style: 'painted fantasy atlas', generated: 1, created_at: AT,
       });
     }
-    const previousMap = demoAsset('map-old.webp');
+    const previousMap = demoAsset('map-old.png');
+    const previousMapThumbnail = demoAsset('map-old.webp');
     insert('map_images', {
       image_id: `${PREFIX}map-image-previous`, map_id: `${PREFIX}map-orthea`, role: 'previous',
-      mime_type: 'image/webp', width: 768, height: 768, bytes: previousMap.length, blob: previousMap,
-      thumbnail: previousMap, prompt: 'Orthea before the Sinking', provider: 'openai', model: 'codex-imagegen',
+      mime_type: 'image/png', width: 1254, height: 1254, bytes: previousMap.length, blob: previousMap,
+      thumbnail: previousMapThumbnail, thumbnail_mime_type: 'image/webp',
+      prompt: 'Orthea before the Sinking', provider: 'openai', model: 'codex-imagegen',
       style: 'painted historical atlas', generated: 1, created_at: PREVIOUS_AT,
     });
-    const referenceMap = demoAsset('place-lumina.webp');
+    const referenceMap = demoAsset('place-lumina.png');
+    const referenceMapThumbnail = demoAsset('place-lumina.webp');
     insert('map_images', {
       image_id: `${PREFIX}map-image-reference`, map_id: `${PREFIX}map-lumina`, role: 'reference',
-      mime_type: 'image/webp', width: 480, height: 320, bytes: referenceMap.length, blob: referenceMap,
-      thumbnail: referenceMap, prompt: 'Lumina coastal reference', provider: 'openai', model: 'codex-imagegen',
+      mime_type: 'image/png', width: 760, height: 504, bytes: referenceMap.length, blob: referenceMap,
+      thumbnail: referenceMapThumbnail, thumbnail_mime_type: 'image/webp',
+      prompt: 'Lumina coastal reference', provider: 'openai', model: 'codex-imagegen',
       style: 'painterly environment concept', generated: 1, created_at: PREVIOUS_AT,
     });
     const layers = [
