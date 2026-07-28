@@ -9,6 +9,9 @@
 // Every owned id starts with `demo-world-`. Cleanup can therefore remove the corpus
 // surgically without touching anything the user creates while exploring it.
 
+import { app } from 'electron';
+import fs from 'node:fs';
+import path from 'node:path';
 import { getDb } from './database';
 import { getSettings, updateSettings } from './settingsRepo';
 import { getActiveVault } from '../vaults/vaultRegistry';
@@ -34,83 +37,15 @@ function text(es: string, en: string): Localized {
   return { es, en };
 }
 
-function xml(value: string): string {
-  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
+const DEMO_ASSET_DIR = path.join(app.getAppPath(), 'electron', 'assets', 'worldbuilding-demo');
+const ASSET_CACHE = new Map<string, Buffer>();
 
-function initials(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? '')
-    .join('');
-}
-
-function portraitSvg(name: string, primary: string, secondary: string): Buffer {
-  const safe = xml(name);
-  return Buffer.from(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="480" height="640" viewBox="0 0 480 640">
-      <defs>
-        <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stop-color="${primary}"/><stop offset="1" stop-color="${secondary}"/>
-        </linearGradient>
-        <radialGradient id="halo"><stop stop-color="#fff" stop-opacity=".28"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
-      </defs>
-      <rect width="480" height="640" fill="url(#bg)"/>
-      <circle cx="240" cy="210" r="180" fill="url(#halo)"/>
-      <path d="M126 520c18-108 68-166 114-166s96 58 114 166" fill="#111827" fill-opacity=".82"/>
-      <circle cx="240" cy="246" r="92" fill="#f1d4b5"/>
-      <path d="M148 244c4-110 55-150 104-150 60 0 94 52 81 154-25-31-57-52-94-54-34-2-64 15-91 50z" fill="#202436"/>
-      <circle cx="209" cy="246" r="7" fill="#25232a"/><circle cx="272" cy="246" r="7" fill="#25232a"/>
-      <path d="M214 290q26 18 52 0" fill="none" stroke="#8b5e52" stroke-width="5" stroke-linecap="round"/>
-      <circle cx="394" cy="84" r="45" fill="#fff" fill-opacity=".13"/>
-      <text x="394" y="98" text-anchor="middle" font-family="serif" font-size="38" fill="#fff">${xml(initials(name))}</text>
-      <rect x="28" y="558" width="424" height="54" rx="12" fill="#09090b" fill-opacity=".72"/>
-      <text x="240" y="592" text-anchor="middle" font-family="serif" font-size="23" fill="#f8fafc">${safe}</text>
-    </svg>`,
-    'utf8'
-  );
-}
-
-function cardSvg(title: string, primary: string, secondary: string, symbol: string): Buffer {
-  return Buffer.from(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="960" height="640" viewBox="0 0 960 640">
-      <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="${primary}"/><stop offset="1" stop-color="${secondary}"/></linearGradient></defs>
-      <rect width="960" height="640" fill="url(#g)"/>
-      <path d="M0 470Q160 380 320 470T640 455T960 470V640H0Z" fill="#09090b" fill-opacity=".42"/>
-      <circle cx="480" cy="264" r="150" fill="#fff" fill-opacity=".08" stroke="#fff" stroke-opacity=".2" stroke-width="3"/>
-      <text x="480" y="318" text-anchor="middle" font-family="serif" font-size="142" fill="#fff" fill-opacity=".88">${xml(symbol)}</text>
-      <rect x="90" y="510" width="780" height="76" rx="18" fill="#09090b" fill-opacity=".72"/>
-      <text x="480" y="558" text-anchor="middle" font-family="serif" font-size="31" fill="#f8fafc">${xml(title)}</text>
-    </svg>`,
-    'utf8'
-  );
-}
-
-function mapSvg(name: string, detail = false): Buffer {
-  const coast = detail
-    ? 'M84 89C181 43 268 83 305 159c42 86 155 34 232 79 71 42 27 125 106 173 61 36 141 4 211 61l-18 107H76Z'
-    : 'M44 168C139 48 278 84 343 145c84 79 135-21 238 37 83 47 81 142 188 137 65-3 112 44 151 116l-35 144H61Z';
-  return Buffer.from(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="800" viewBox="0 0 1280 800">
-      <defs>
-        <radialGradient id="sea"><stop stop-color="#244b63"/><stop offset="1" stop-color="#102c3f"/></radialGradient>
-        <linearGradient id="land" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#c0a36a"/><stop offset=".52" stop-color="#71805e"/><stop offset="1" stop-color="#4c594b"/></linearGradient>
-        <filter id="paper"><feTurbulence baseFrequency=".8" numOctaves="2" result="n"/><feBlend in="SourceGraphic" in2="n" mode="soft-light"/></filter>
-      </defs>
-      <rect width="1280" height="800" fill="url(#sea)"/>
-      <g transform="translate(130 60)" filter="url(#paper)">
-        <path d="${coast}" fill="url(#land)" stroke="#e7d5aa" stroke-width="7"/>
-        <path d="M230 150q55 95 5 195t75 176M580 220q-45 70 18 135t-12 152" fill="none" stroke="#9fd4dc" stroke-width="8" opacity=".8"/>
-        <path d="M95 430Q270 315 440 425T790 380" fill="none" stroke="#d8c496" stroke-width="5" stroke-dasharray="13 11"/>
-        <path d="M420 214l42-64 39 71 45-82 48 87" fill="none" stroke="#eee1c5" stroke-width="12" opacity=".66"/>
-      </g>
-      <g fill="#f5e7c6" font-family="serif"><text x="640" y="62" text-anchor="middle" font-size="31">${xml(name)}</text><text x="1110" y="742" font-size="20">N ↑</text></g>
-      <path d="M1125 682l20-48 20 48-20-12z" fill="#f5e7c6"/>
-    </svg>`,
-    'utf8'
-  );
+function demoAsset(fileName: string): Buffer {
+  const cached = ASSET_CACHE.get(fileName);
+  if (cached) return cached;
+  const bytes = fs.readFileSync(path.join(DEMO_ASSET_DIR, fileName));
+  ASSET_CACHE.set(fileName, bytes);
+  return bytes;
 }
 
 function insert(table: string, row: Record<string, SqlValue>): void {
@@ -362,22 +297,65 @@ function resolveDemoLinks(value: string): string {
   return result;
 }
 
-function demoImage(entityKind: string, entityId: string, title: string, primary: string, symbol: string, order = 0): void {
-  const bytes = cardSvg(title, primary, '#111827', symbol);
+const LORE_ASSET_BY_ID: Record<string, string> = {
+  [`${PREFIX}group-council`]: 'lore-council.webp',
+  [`${PREFIX}group-firstlight`]: 'lore-lighthouse.webp',
+  [`${PREFIX}group-guard`]: 'lore-gate.webp',
+  [`${PREFIX}group-sails`]: 'lore-sails.webp',
+  [`${PREFIX}group-tideborn`]: 'lore-tide-culture.webp',
+  [`${PREFIX}group-tidecant`]: 'lore-tide-culture.webp',
+  [`${PREFIX}group-vellum`]: 'lore-archive.webp',
+  [`${PREFIX}group-venn`]: 'lore-lighthouse.webp',
+  [`${PREFIX}group-veyari`]: 'lore-tide-culture.webp',
+  [`${PREFIX}scene-prologue`]: 'lore-lighthouse.webp',
+  [`${PREFIX}scene-arrival`]: 'lore-letter.webp',
+  [`${PREFIX}scene-archive`]: 'lore-archive.webp',
+  [`${PREFIX}scene-gate`]: 'lore-gate.webp',
+  [`${PREFIX}scene-island`]: 'lore-tide-culture.webp',
+  [`${PREFIX}scene-observatory`]: 'lore-third-moon.webp',
+  [`${PREFIX}scene-coup`]: 'lore-coup.webp',
+  [`${PREFIX}scene-heart`]: 'lore-shared-map.webp',
+  [`${PREFIX}scene-epilogue`]: 'lore-epilogue.webp',
+  [`${PREFIX}article-flux`]: 'lore-heart.webp',
+  [`${PREFIX}article-firstlight`]: 'lore-lighthouse.webp',
+  [`${PREFIX}article-tidecant`]: 'lore-tide-culture.webp',
+  [`${PREFIX}article-whale`]: 'lore-black-tide.webp',
+  [`${PREFIX}article-veyari`]: 'lore-tide-culture.webp',
+  [`${PREFIX}article-compass`]: 'lore-compass.webp',
+  [`${PREFIX}article-looms`]: 'lore-weavers.webp',
+  [`${PREFIX}article-debt`]: 'lore-heart.webp',
+  [`${PREFIX}article-sinking`]: 'lore-black-tide.webp',
+  [`${PREFIX}article-keepers`]: 'lore-lighthouse.webp',
+  [`${PREFIX}article-orchid`]: 'lore-orchid.webp',
+  [`${PREFIX}article-fox`]: 'lore-tide-culture.webp',
+  [`${PREFIX}article-feast`]: 'lore-sails.webp',
+  [`${PREFIX}article-thirdmoon`]: 'lore-third-moon.webp',
+};
+
+function demoImageAsset(entityKind: string, entityId: string): string {
+  if (entityKind === 'character') return `character-${entityId.slice(`${PREFIX}char-`.length)}.webp`;
+  if (entityKind === 'place') return `place-${entityId.slice(`${PREFIX}place-`.length)}.webp`;
+  const fileName = LORE_ASSET_BY_ID[entityId];
+  if (!fileName) throw new Error(`Missing demo image asset for ${entityKind}:${entityId}`);
+  return fileName;
+}
+
+function demoImage(entityKind: string, entityId: string, title: string, order = 0): void {
+  const bytes = demoAsset(demoImageAsset(entityKind, entityId));
   insert('world_images', {
     image_id: `${PREFIX}image-${entityKind}-${entityId.slice(PREFIX.length)}-${order}`,
     entity_kind: entityKind,
     entity_id: entityId,
     kind: order === 0 ? 'portrait' : 'other',
     label: title,
-    mime_type: 'image/svg+xml',
+    mime_type: 'image/webp',
     bytes: bytes.length,
     blob: bytes,
-    prompt: null,
-    provider: null,
-    model: null,
-    style: 'demo-vector',
-    generated: 0,
+    prompt: 'The Ashen Tides demo artwork',
+    provider: 'openai',
+    model: 'codex-imagegen',
+    style: 'painterly fantasy codex',
+    generated: 1,
     sort_order: order,
     created_at: AT,
     updated_at: AT,
@@ -442,7 +420,7 @@ export function seedWorldbuildingDemoData(): boolean {
         created_at: AT,
         updated_at: AT,
       });
-      demoImage('place', place.id, place.name, place.accent === 'crimson' ? '#9f1239' : '#075985', place.symbol);
+      demoImage('place', place.id, place.name);
     }
 
     // Characters: the reusable person row, full fiction profile, names, avatar and
@@ -492,12 +470,12 @@ export function seedWorldbuildingDemoData(): boolean {
         created_at: PREVIOUS_AT,
         updated_at: AT,
       });
-      const portrait = portraitSvg(character.name, character.colors[0], character.colors[1]);
+      const portrait = demoAsset(`character-${character.id.slice(`${PREFIX}char-`.length)}.webp`);
       insert('person_portraits', {
-        person_id: character.id, blob: portrait, mime: 'image/svg+xml',
-        focus_x: 0.5, focus_y: 0.42, scale: 1, generated: 0, updated_at: AT,
+        person_id: character.id, blob: portrait, mime: 'image/webp',
+        focus_x: 0.5, focus_y: 0.42, scale: 1, generated: 1, updated_at: AT,
       });
-      demoImage('character', character.id, character.name, character.colors[0], initials(character.name));
+      demoImage('character', character.id, character.name);
     }
     [
       [`${PREFIX}name-ilyra-epithet`, `${PREFIX}char-ilyra`, L === 'es' ? 'La Cartógrafa de Ceniza' : 'The Ash Cartographer', 'epithet', 0, null],
@@ -561,7 +539,7 @@ export function seedWorldbuildingDemoData(): boolean {
         notes: L === 'es' ? 'Grupo de demostración con relaciones y miembros editables.' : 'Demo group with editable relationships and members.',
         created_at: AT, updated_at: AT,
       });
-      demoImage('group', group.id, group.name, group.accent === 'crimson' ? '#9f1239' : '#155e75', group.symbol);
+      demoImage('group', group.id, group.name);
     }
     [
       [`${PREFIX}aff-ilyra-venn`, `${PREFIX}char-ilyra`, `${PREFIX}group-venn`, L === 'es' ? 'heredera' : 'heir', null, null],
@@ -662,7 +640,7 @@ export function seedWorldbuildingDemoData(): boolean {
       (cast[scene.id] ?? []).forEach(([person_id, role], index) =>
         insert('scene_characters', { id: `${scene.id}-cast-${index}`, scene_id: scene.id, person_id, role })
       );
-      demoImage('scene', scene.id, scene.title[L], scene.order % 2 === 0 ? '#4338ca' : '#0f766e', '◫');
+      demoImage('scene', scene.id, scene.title[L]);
     }
 
     // Atlas: multiple maps, previous/reference images, every layer kind needed by the
@@ -679,7 +657,7 @@ export function seedWorldbuildingDemoData(): boolean {
       insert('world_maps', {
         map_id: map.id, name: map.name, kind: map.kind, place_id: map.place, parent_map_id: map.parent,
         parent_x0: map.box[0], parent_y0: map.box[1], parent_x1: map.box[2], parent_y1: map.box[3],
-        image_id: imageId, width_px: 1280, height_px: 800,
+        image_id: imageId, width_px: 768, height_px: 768,
         scale_x0: map.scale[0], scale_y0: map.scale[1], scale_x1: map.scale[2], scale_y1: map.scale[3],
         scale_distance: map.scale[4], scale_unit: map.scale[5],
         projection: map.projection, planet_radius: map.radius, planet_radius_unit: map.radiusUnit,
@@ -687,29 +665,30 @@ export function seedWorldbuildingDemoData(): boolean {
         to_world_day: map.id === `${PREFIX}map-old` ? 131949 : null,
         visual_seed: 'antique maritime fantasy atlas, glass coastlines, ink and gold',
         style: 'illustrated parchment', model_labels: 0,
-        notes: L === 'es' ? 'Mapa vectorial local de demostración con capas, escala y marcadores editables.' : 'Local vector demo map with editable layers, scale and markers.',
+        notes: L === 'es' ? 'Mapa ilustrado local de demostración con capas, escala y marcadores editables.' : 'Local illustrated demo map with editable layers, scale and markers.',
         sort_order: map.order, created_at: AT, updated_at: AT,
       });
-      const bytes = mapSvg(map.name, map.detail);
+      const bytes = demoAsset(`map-${map.id.slice(`${PREFIX}map-`.length)}.webp`);
       insert('map_images', {
-        image_id: imageId, map_id: map.id, role: 'base', mime_type: 'image/svg+xml',
-        width: 1280, height: 800, bytes: bytes.length, blob: bytes, thumbnail: bytes,
-        prompt: null, provider: null, model: null, style: 'demo-vector', generated: 0, created_at: AT,
+        image_id: imageId, map_id: map.id, role: 'base', mime_type: 'image/webp',
+        width: 768, height: 768, bytes: bytes.length, blob: bytes, thumbnail: bytes,
+        prompt: 'The Ashen Tides cartographic demo artwork', provider: 'openai', model: 'codex-imagegen',
+        style: 'painted fantasy atlas', generated: 1, created_at: AT,
       });
     }
-    const previousMap = mapSvg(L === 'es' ? 'Borrador anterior de Orthea' : 'Previous Orthea draft');
+    const previousMap = demoAsset('map-old.webp');
     insert('map_images', {
       image_id: `${PREFIX}map-image-previous`, map_id: `${PREFIX}map-orthea`, role: 'previous',
-      mime_type: 'image/svg+xml', width: 1280, height: 800, bytes: previousMap.length, blob: previousMap,
-      thumbnail: previousMap, prompt: null, provider: null, model: null, style: 'demo-vector',
-      generated: 0, created_at: PREVIOUS_AT,
+      mime_type: 'image/webp', width: 768, height: 768, bytes: previousMap.length, blob: previousMap,
+      thumbnail: previousMap, prompt: 'Orthea before the Sinking', provider: 'openai', model: 'codex-imagegen',
+      style: 'painted historical atlas', generated: 1, created_at: PREVIOUS_AT,
     });
-    const referenceMap = mapSvg(L === 'es' ? 'Referencia costera' : 'Coastal reference', true);
+    const referenceMap = demoAsset('place-lumina.webp');
     insert('map_images', {
       image_id: `${PREFIX}map-image-reference`, map_id: `${PREFIX}map-lumina`, role: 'reference',
-      mime_type: 'image/svg+xml', width: 1280, height: 800, bytes: referenceMap.length, blob: referenceMap,
-      thumbnail: referenceMap, prompt: null, provider: null, model: null, style: 'demo-vector',
-      generated: 0, created_at: PREVIOUS_AT,
+      mime_type: 'image/webp', width: 480, height: 320, bytes: referenceMap.length, blob: referenceMap,
+      thumbnail: referenceMap, prompt: 'Lumina coastal reference', provider: 'openai', model: 'codex-imagegen',
+      style: 'painterly environment concept', generated: 1, created_at: PREVIOUS_AT,
     });
     const layers = [
       [`${PREFIX}layer-political`, `${PREFIX}map-orthea`, L === 'es' ? 'Fronteras actuales' : 'Current borders', 'political', '#eab308', 0.72, 1, 0],
@@ -764,7 +743,7 @@ export function seedWorldbuildingDemoData(): boolean {
         notes: L === 'es' ? 'Artículo de demostración conectado al resto del mundo.' : 'Demo article connected to the rest of the world.',
         created_at: PREVIOUS_AT, updated_at: AT,
       });
-      demoImage('article', article.id, article.title[L], index % 2 === 0 ? '#6d28d9' : '#0f766e', '✧');
+      demoImage('article', article.id, article.title[L]);
     }
     [
       [`${PREFIX}proposal-buried`, L === 'es' ? 'Ciudad Sepultada' : 'Buried City', 'place', L === 'es' ? 'La menciona la Brújula de ceniza y no existe todavía como lugar.' : 'The Ash Compass mentions it, but it does not exist as a place yet.', 'unresolved_link', .98, 'pending', null],

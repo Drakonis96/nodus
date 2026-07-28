@@ -231,6 +231,9 @@ try {
     // que no se puede deshacer es una trampa.
     repo.restoreSceneSnapshot(auto[0].snapshotId);
     assert.match(repo.getSceneText(two.sceneId).text, /palabra0 palabra1/);
+    // ISO timestamps only resolve to milliseconds. Force the collision that happens under
+    // load so insertion order, never a random UUID, decides which undo is the newest.
+    db.prepare("UPDATE world_scene_snapshots SET created_at = '2026-07-28T12:00:00.000Z' WHERE scene_id = ?").run(two.sceneId);
     const afterRestore = repo.listSceneSnapshots(two.sceneId);
     assert.equal(afterRestore.length, 2);
     assert.equal(afterRestore[0].wordCount, 4, 'lo que había antes de restaurar');

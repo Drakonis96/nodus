@@ -319,7 +319,7 @@ function writeSnapshot(sceneId: string, text: string | null, wordCount: number, 
       `DELETE FROM world_scene_snapshots
         WHERE snapshot_id IN (
           SELECT snapshot_id FROM world_scene_snapshots WHERE scene_id = ?
-           ORDER BY created_at DESC, snapshot_id LIMIT -1 OFFSET ?
+           ORDER BY created_at DESC, rowid DESC LIMIT -1 OFFSET ?
         )`
     ).run(sceneId, MAX_SNAPSHOTS);
   });
@@ -332,7 +332,7 @@ export function listSceneSnapshots(sceneId: string): SceneSnapshot[] {
     getDb()
       .prepare(
         `SELECT snapshot_id, scene_id, word_count, reason, created_at
-           FROM world_scene_snapshots WHERE scene_id = ? ORDER BY created_at DESC, snapshot_id DESC`
+           FROM world_scene_snapshots WHERE scene_id = ? ORDER BY created_at DESC, rowid DESC`
       )
       .all(sceneId) as { snapshot_id: string; scene_id: string; word_count: number; reason: string; created_at: string }[]
   ).map((row) => ({
