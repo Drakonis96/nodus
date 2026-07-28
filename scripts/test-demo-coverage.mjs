@@ -145,6 +145,19 @@ try {
   `).run();
   assert.equal(worldbuilding.seedWorldbuildingDemoData(), true);
 
+  const distinctGroupIds = [
+    'council', 'firstlight', 'guard', 'sails', 'vellum',
+    'tideborn', 'tidecant', 'veyari',
+  ].map((slug) => `demo-world-group-${slug}`);
+  const seededGroupArt = distinctGroupIds.map((groupId) => db.prepare(
+    "SELECT thumbnail FROM world_images WHERE entity_kind = 'group' AND entity_id = ?"
+  ).get(groupId).thumbnail.toString('base64'));
+  assert.equal(
+    new Set(seededGroupArt).size,
+    seededGroupArt.length,
+    'every demo faction and culture has distinct card artwork'
+  );
+
   // Regression: older demo builds paired the lossless original with an independently
   // produced thumbnail, so opening a character appeared to swap people. The upgrade
   // repairs both the primary portrait and gallery copy, but leaves a user replacement
@@ -165,6 +178,14 @@ try {
   db.prepare(
     "UPDATE person_portraits SET blob = ?, thumbnail = ? WHERE person_id = 'demo-world-char-vesh'"
   ).run(customOriginal, customThumbnail);
+  // Early demos also reused one illustration for every culture. Simulate that shipped
+  // state so the startup reconciliation proves it fixes an existing vault as well.
+  const tideArt = db.prepare(
+    "SELECT blob, thumbnail FROM world_images WHERE entity_id = 'demo-world-group-tideborn'"
+  ).get();
+  db.prepare(
+    "UPDATE world_images SET blob = ?, thumbnail = ? WHERE entity_id = 'demo-world-group-tidecant'"
+  ).run(tideArt.blob, tideArt.thumbnail);
   assert.equal(worldbuilding.upgradeWorldbuildingDemoImageQuality(), true);
   assert.ok(
     db.prepare("SELECT thumbnail FROM person_portraits WHERE person_id = 'demo-world-char-elan'").get().thumbnail.equals(elanThumbnail),
@@ -177,6 +198,14 @@ try {
   assert.ok(
     db.prepare("SELECT thumbnail FROM person_portraits WHERE person_id = 'demo-world-char-vesh'").get().thumbnail.equals(customThumbnail),
     'an author-owned replacement is not rewritten'
+  );
+  const repairedCultureArt = ['tideborn', 'tidecant', 'veyari'].map((slug) => db.prepare(
+    'SELECT thumbnail FROM world_images WHERE entity_id = ?'
+  ).get(`demo-world-group-${slug}`).thumbnail.toString('base64'));
+  assert.equal(
+    new Set(repairedCultureArt).size,
+    repairedCultureArt.length,
+    'legacy demos regain distinct culture artwork'
   );
   db.prepare(
     `UPDATE person_portraits

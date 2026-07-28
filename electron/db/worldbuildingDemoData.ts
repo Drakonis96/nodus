@@ -39,6 +39,7 @@ const AT = '2026-07-28T12:00:00.000Z';
 const PREVIOUS_AT = '2026-07-21T12:00:00.000Z';
 const IMAGE_AT = '2026-07-28T21:00:00.000Z';
 const MATCHED_THUMBNAIL_AT = '2026-07-28T22:45:00.000Z';
+const DISTINCT_GROUP_ART_AT = '2026-07-28T23:15:00.000Z';
 
 type DemoLocale = AppLanguage;
 type Localized = WorldbuildingDemoLocalized;
@@ -334,8 +335,8 @@ const LORE_ASSET_BY_ID: Record<string, string> = {
   [`${PREFIX}group-firstlight`]: 'lore-lighthouse.webp',
   [`${PREFIX}group-guard`]: 'lore-gate.webp',
   [`${PREFIX}group-sails`]: 'lore-sails.webp',
-  [`${PREFIX}group-tideborn`]: 'lore-tide-culture.webp',
-  [`${PREFIX}group-tidecant`]: 'lore-tide-culture.webp',
+  [`${PREFIX}group-tideborn`]: 'place-nacre.webp',
+  [`${PREFIX}group-tidecant`]: 'lore-letter.webp',
   [`${PREFIX}group-vellum`]: 'lore-archive.webp',
   [`${PREFIX}group-venn`]: 'dynasty-venn.webp',
   [`${PREFIX}group-sarn`]: 'dynasty-sarn.webp',
@@ -521,6 +522,46 @@ export function upgradeWorldbuildingDemoImageQuality(): boolean {
             WHERE image_id = ? AND blob = ?`
         ).run(shippedThumbnail, MATCHED_THUMBNAIL_AT, image.image_id, shippedOriginal);
       }
+    }
+
+    // Early demo data reused one cultural illustration for every culture, and one
+    // intermediate build did the same for faction cards. Reconcile deterministic demo
+    // rows with their entity-specific artwork. A row is still demo-owned only while its
+    // bytes equal one of the shipped group assets; imported author artwork is preserved.
+    const demoOwnedGroupBlobs = [
+      ...new Set(GROUPS.map((group) => demoImageAsset('group', group.id))),
+    ].map((fileName) => demoAsset(fileName));
+    const currentGroupImages = db
+      .prepare(
+        `SELECT image_id, entity_id, blob, thumbnail
+           FROM world_images
+          WHERE image_id LIKE ? AND entity_kind = 'group' AND mime_type = 'image/png'`
+      )
+      .all(`${PREFIX}image-group-%`) as Array<{
+        image_id: string;
+        entity_id: string;
+        blob: Buffer;
+        thumbnail: Buffer | null;
+      }>;
+    for (const image of currentGroupImages) {
+      if (!GROUPS.some((group) => group.id === image.entity_id)) continue;
+      if (!demoOwnedGroupBlobs.some((blob) => image.blob.equals(blob))) continue;
+      const expectedOriginal = demoAsset(demoImageAsset('group', image.entity_id));
+      const expectedThumbnail = demoAsset(demoImageAsset('group', image.entity_id, true));
+      if (image.blob.equals(expectedOriginal) && image.thumbnail?.equals(expectedThumbnail)) continue;
+      db.prepare(
+        `UPDATE world_images
+            SET bytes = ?, blob = ?, thumbnail = ?, thumbnail_mime_type = 'image/webp',
+                updated_at = ?
+          WHERE image_id = ? AND blob = ?`
+      ).run(
+        expectedOriginal.length,
+        expectedOriginal,
+        expectedThumbnail,
+        DISTINCT_GROUP_ART_AT,
+        image.image_id,
+        image.blob
+      );
     }
 
     const mapRows = [

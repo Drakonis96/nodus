@@ -6,15 +6,21 @@ import { fileURLToPath } from 'node:url';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-test('faction, culture and dynasty cards share thumbnails and one fixed size per workspace mode', async () => {
-  const groups = await readFile(path.join(repoRoot, 'src/views/GroupsView.tsx'), 'utf8');
+test('faction, culture and dynasty cards stay readable in the narrow detail rail', async () => {
+  const [groups, workspace] = await Promise.all([
+    readFile(path.join(repoRoot, 'src/views/GroupsView.tsx'), 'utf8'),
+    readFile(path.join(repoRoot, 'src/components/world/WorldWorkspace.tsx'), 'utf8'),
+  ]);
   assert.match(groups, /<GroupCard item=\{item\} compact=\{compact\} dynasty=\{dynasty\}/);
   assert.match(groups, /listWorldImages\('group', item\.groupId\)/);
   assert.match(groups, /src=\{worldImageThumbnailUrl\(image\)\}/);
-  assert.match(groups, /compact \? 'h-20 flex-row' : 'h-64 flex-col'/);
+  assert.match(groups, /compactPresentation: 'list'/);
+  assert.match(workspace, /split && section\.compactPresentation === 'list'/);
+  assert.match(groups, /compact \? 'h-24 flex-row' : 'h-64 flex-col'/);
+  assert.match(groups, /compact \? 'line-clamp-2 leading-5' : 'truncate'/);
   assert.match(groups, /'h-36 w-full shrink-0/);
   assert.match(groups, /line-clamp-2/);
-  assert.doesNotMatch(groups, /compact \? 'flex h-20' : 'h-60'/);
+  assert.doesNotMatch(groups, /compact \? 'h-20 flex-row'/);
 });
 
 test('group cards declare light and dark surfaces and hover states independently', async () => {

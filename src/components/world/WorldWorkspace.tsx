@@ -34,6 +34,10 @@ export interface WorldSectionDef<T> {
   /** Shown when the filters hid everything. */
   noMatchLabel: string;
   presentation: WorldPresentation;
+  /** A grid can become a reading rail when an item opens. Cards that turn horizontal in
+   *  that rail need the whole row; squeezing two of them into 288 px makes their labels
+   *  unreadable. */
+  compactPresentation?: 'grid' | 'list';
   load: () => Promise<T[]>;
   idOf: (item: T) => string;
   /** Tree only: which item this one hangs from. */
@@ -171,6 +175,8 @@ export function WorldWorkspace<T>({
           className={
             section.presentation === 'list'
               ? 'space-y-1.5'
+              : split && section.compactPresentation === 'list'
+                ? 'space-y-2'
               : `grid gap-3 ${split ? '[grid-template-columns:repeat(auto-fill,minmax(7rem,1fr))]' : '[grid-template-columns:repeat(auto-fill,minmax(11rem,1fr))]'}`
           }
         >

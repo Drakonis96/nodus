@@ -44,6 +44,7 @@ function groupSection(
     emptyLabel: labels.empty,
     noMatchLabel: labels.noMatch,
     presentation: 'grid',
+    compactPresentation: 'list',
     // Loading everything and filtering here keeps ONE query behind both sections and
     // keeps the facet counts honest.
     load: async () => (await window.nodus.listWorldGroups()).filter((group) => kinds.includes(group.kind)),
@@ -152,6 +153,8 @@ function GroupCard({
 
   useEffect(() => {
     let cancelled = false;
+    // Never leave the previous group's cover visible while a reused card waits for IPC.
+    setImage(null);
     void window.nodus.listWorldImages('group', item.groupId).then((images) => {
       if (!cancelled) {
         setImage(dynasty ? images.find((image) => image.kind === 'emblem') ?? images[0] ?? null : images[0] ?? null);
@@ -182,12 +185,12 @@ function GroupCard({
         dynasty
           ? 'hover:border-amber-500 hover:bg-amber-50 dark:hover:border-amber-600 dark:hover:bg-amber-950/15'
           : 'hover:border-violet-400 hover:bg-violet-50 dark:hover:border-violet-700/60 dark:hover:bg-violet-950/20'
-      } ${compact ? 'h-20 flex-row' : 'h-64 flex-col'}`}
+      } ${compact ? 'h-24 flex-row' : 'h-64 flex-col'}`}
     >
       <div
         className={
           compact
-            ? 'h-full w-20 shrink-0 bg-neutral-100 dark:bg-neutral-900'
+            ? 'h-full w-24 shrink-0 bg-neutral-100 dark:bg-neutral-900'
             : 'h-36 w-full shrink-0 bg-neutral-100 dark:bg-neutral-900'
         }
       >
@@ -205,8 +208,14 @@ function GroupCard({
         )}
       </div>
       <div className="min-h-0 min-w-0 flex-1 p-3">
-        <span className="block truncate text-sm font-semibold text-neutral-900 dark:text-neutral-100">{item.name}</span>
-        <span className="block truncate text-[11px] text-neutral-500">
+        <span
+          className={`block text-sm font-semibold text-neutral-900 dark:text-neutral-100 ${
+            compact ? 'line-clamp-2 leading-5' : 'truncate'
+          }`}
+        >
+          {item.name}
+        </span>
+        <span className={`block text-[11px] leading-4 text-neutral-500 ${compact ? 'mt-1 line-clamp-2' : 'truncate'}`}>
           {metadata.filter(Boolean).join(' · ')}
         </span>
         {!compact && item.summary && (
