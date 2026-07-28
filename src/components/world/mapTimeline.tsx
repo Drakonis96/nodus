@@ -11,6 +11,7 @@ import {
 } from '@shared/worldPresence';
 import { Icon } from '../ui';
 import { t, tx } from '../../i18n';
+import { ViewportPopover } from './ViewportPopover';
 
 /**
  * The map's own timeline: a playhead over world days, and the characters moving under it.
@@ -345,6 +346,7 @@ export function CastPicker({
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const anchorRef = useRef<HTMLDivElement>(null);
   const shown = query.trim()
     ? tracks.filter((track) => track.personName.toLowerCase().includes(query.trim().toLowerCase()))
     : tracks;
@@ -356,7 +358,7 @@ export function CastPicker({
       : tx('{n} seleccionados', { n: selected.size });
 
   return (
-    <div className="relative" data-testid="map-cast-picker">
+    <div className="relative" ref={anchorRef} data-testid="map-cast-picker">
       <button
         className={`btn h-8 gap-1.5 px-2 text-sm ${selected.size > 0 ? 'btn-primary' : 'btn-ghost border border-neutral-700'}`}
         onClick={() => setOpen((value) => !value)}
@@ -365,10 +367,14 @@ export function CastPicker({
         <Icon name="users" size={14} /> <span className="max-w-[10rem] truncate">{label}</span>
         <Icon name="chevronDown" size={12} />
       </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-[40]" onClick={() => setOpen(false)} />
-          <div className="absolute z-[50] mt-1 w-60 rounded-md border border-neutral-800 bg-neutral-950 p-2 shadow-xl" data-testid="map-cast-dropdown">
+      <ViewportPopover
+        anchorRef={anchorRef}
+        open={open}
+        onDismiss={() => setOpen(false)}
+        backdrop
+        className="rounded-md border border-neutral-800 bg-neutral-950 p-2 shadow-xl"
+        testId="map-cast-dropdown"
+      >
             <input
               className="input mb-1.5 h-8 w-full text-sm"
               placeholder={t('Buscar personaje…')}
@@ -399,9 +405,7 @@ export function CastPicker({
               ))}
               {shown.length === 0 && <p className="px-2 py-2 text-center text-xs text-neutral-600">{t('Sin coincidencias')}</p>}
             </div>
-          </div>
-        </>
-      )}
+      </ViewportPopover>
     </div>
   );
 }

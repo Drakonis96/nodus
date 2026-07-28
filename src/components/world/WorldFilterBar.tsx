@@ -13,6 +13,7 @@ import {
 import { Icon } from '../ui';
 import { useDismissableLayer } from '../../hooks';
 import { t, tx } from '../../i18n';
+import { ViewportPopover } from './ViewportPopover';
 
 /**
  * The facet bar shared by every worldbuilding collection: one chip per dimension, each a
@@ -98,6 +99,7 @@ function FacetChip({
     open,
     onDismiss: () => setOpen(false),
     group: 'world-facet',
+    closeOnOutsideClick: false,
   });
 
   if (options.length === 0) return null;
@@ -120,8 +122,14 @@ function FacetChip({
         {active && <span className="rounded-full bg-indigo-500/40 px-1.5">{selected.length}</span>}
         <Icon name={open ? 'chevronDown' : 'chevronRight'} size={10} className="opacity-60" />
       </button>
-      {open && (
-        <div className="absolute left-0 top-full z-30 mt-1 w-60 rounded-md border border-neutral-800 bg-neutral-950 p-2 shadow-xl">
+      <ViewportPopover
+        anchorRef={ref}
+        open={open}
+        onDismiss={() => setOpen(false)}
+        closeOnEscape={false}
+        className="rounded-md border border-neutral-800 bg-neutral-950 p-2 shadow-xl"
+        testId={`world-facet-${facet.id}-dropdown`}
+      >
           {options.length > 8 && (
             <input
               className="input mb-1.5 h-7 w-full text-xs"
@@ -149,8 +157,7 @@ function FacetChip({
               {tx('Quitar «{facet}»', { facet: t(facet.label) })}
             </button>
           )}
-        </div>
-      )}
+      </ViewportPopover>
     </div>
   );
 }
