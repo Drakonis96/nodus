@@ -133,6 +133,12 @@ const SYNC_GROUPS: { key: SyncGroupKey; prefix?: string; tables?: string[] }[] =
       // v102: conversation history and its explicit focus are author working context,
       // not a regenerable model cache.
       'world_chat_conversations',
+      // v103: character roleplay chats and their generated binary attachments. Images
+      // follow messages so an imported package never presents an attachment without its
+      // answer, even though deletion remains explicit rather than FK-driven.
+      'character_chat_conversations',
+      'character_chat_messages',
+      'character_chat_images',
     ],
   },
   {

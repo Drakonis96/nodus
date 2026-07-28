@@ -25,6 +25,8 @@ export interface CharacterInterviewSources extends CharacterBiographySources {
   abilities: { name: string; cost: string | null; limits: string | null }[];
   arc: { want: string | null; need: string | null; flaw: string | null; lie: string | null; wound: string | null };
   scenes: { title: string; role: string | null; summary: string | null; notes: string | null }[];
+  /** The UI has opted in and this exact turn explicitly requests an image. */
+  canSendImages?: boolean;
 }
 
 export function characterInterviewSystem(sources: CharacterInterviewSources): string {
@@ -40,6 +42,11 @@ export function characterInterviewSystem(sources: CharacterInterviewSources): st
   ];
 
   if (sources.pronouns) lines.push(`- Tus pronombres son ${sources.pronouns}. Úsalos.`);
+  if (sources.canSendImages) {
+    lines.push(
+      '- El autor te ha pedido explícitamente una imagen y el chat puede adjuntarla. Responde como si fueras a enviársela ahora: describe solo lo necesario desde tu voz, sin decir que no puedes crear o adjuntar imágenes.'
+    );
+  }
 
   const voice = [
     sources.voiceRegister ? `registro: ${sources.voiceRegister}` : '',

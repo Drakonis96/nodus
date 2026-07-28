@@ -1,6 +1,12 @@
-import type { CharacterImage, Person, WorldMap } from '@shared/types';
+import type { CharacterChatImage, CharacterImage, Person, WorldMap } from '@shared/types';
 
-type NodusImageRoute = 'portrait' | 'world' | 'map' | 'map-thumbnail';
+type NodusImageRoute =
+  | 'portrait'
+  | 'world'
+  | 'map'
+  | 'map-thumbnail'
+  | 'character-chat'
+  | 'character-chat-thumbnail';
 
 function nodusImageUrl(route: NodusImageRoute, id: string, revision?: string | null): string {
   const version = revision ? `?v=${encodeURIComponent(revision)}` : '';
@@ -24,4 +30,12 @@ export function mapImageUrl(imageId: string): string {
 export function mapThumbnailUrl(map: Pick<WorldMap, 'mapId' | 'imageId'>): string | null {
   if (!map.imageId) return null;
   return nodusImageUrl('map-thumbnail', map.mapId, map.imageId);
+}
+
+export function characterChatImageUrl(image: Pick<CharacterChatImage, 'imageId' | 'createdAt'>): string {
+  return nodusImageUrl('character-chat', image.imageId, image.createdAt);
+}
+
+export function characterChatThumbnailUrl(image: Pick<CharacterChatImage, 'imageId' | 'createdAt'>): string {
+  return nodusImageUrl('character-chat-thumbnail', image.imageId, image.createdAt);
 }

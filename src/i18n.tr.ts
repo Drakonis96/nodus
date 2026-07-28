@@ -6710,6 +6710,8 @@ export const TR: Record<string, string> = {
   'Entrevistar a {name}': '{name} ile röportaj',
   'Hablar con el personaje en su propia voz': 'Karakterle kendi sesiyle konuş',
   'Responde en su voz y solo sabe lo que hay en su ficha. Nada de esta conversación se guarda.': 'Kendi sesiyle yanıtlar ve yalnızca künyesinde olanı bilir. Bu konuşmadan hiçbir şey kaydedilmez.',
+  'Responde en su propia voz; las conversaciones se guardan en esta bóveda.': 'Kendi sesiyle yanıtlar; konuşmalar bu kasada saklanır.',
+  'Se eliminará «{title}» junto con todos sus mensajes e imágenes. Esta acción no se puede deshacer.': '“{title}” tüm mesajları ve görselleriyle birlikte silinecek. Bu işlem geri alınamaz.',
   'Pregúntale algo.': 'Ona bir şey sor.',
   'Rellena antes su descripción: sin ficha no tiene nada que contestar.': 'Önce betimlemesini doldur: künye yoksa yanıtlayacak bir şeyi de yok.',
   'Tu pregunta…': 'Sorun…',

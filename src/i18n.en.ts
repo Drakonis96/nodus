@@ -7181,6 +7181,8 @@ export const EN: Record<string, string> = {
   'Entrevistar a {name}': 'Interview {name}',
   'Hablar con el personaje en su propia voz': 'Talk to the character in their own voice',
   'Responde en su voz y solo sabe lo que hay en su ficha. Nada de esta conversación se guarda.': 'They answer in their own voice and only know what is on their sheet. None of this conversation is saved.',
+  'Responde en su propia voz; las conversaciones se guardan en esta bóveda.': 'They answer in their own voice; conversations are saved in this vault.',
+  'Se eliminará «{title}» junto con todos sus mensajes e imágenes. Esta acción no se puede deshacer.': '“{title}” will be deleted along with all its messages and images. This action cannot be undone.',
   'Pregúntale algo.': 'Ask them something.',
   'Rellena antes su descripción: sin ficha no tiene nada que contestar.': 'Fill in their description first: with no sheet there is nothing to answer from.',
   'Tu pregunta…': 'Your question…',

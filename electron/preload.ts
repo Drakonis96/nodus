@@ -378,6 +378,18 @@ const api: NodusApi = {
   generateCharacterBiography: (personId, mode) => ipcRenderer.invoke('characters:generateBiography', personId, mode),
   interviewCharacter: (personId, question, history) =>
     ipcRenderer.invoke('characters:interview', personId, question, history),
+  listCharacterChatConversations: (personId) =>
+    ipcRenderer.invoke('characters:listChatConversations', personId),
+  getCharacterChatConversation: (id) =>
+    ipcRenderer.invoke('characters:getChatConversation', id),
+  createCharacterChatConversation: (input) =>
+    ipcRenderer.invoke('characters:createChatConversation', input),
+  setCharacterChatImagesEnabled: (id, enabled) =>
+    ipcRenderer.invoke('characters:setChatImagesEnabled', id, enabled),
+  sendCharacterChatMessage: (id, question) =>
+    ipcRenderer.invoke('characters:sendChatMessage', id, question),
+  deleteCharacterChatConversation: (id) =>
+    ipcRenderer.invoke('characters:deleteChatConversation', id).then(() => undefined),
   acceptProposedBiography: (personId) => ipcRenderer.invoke('characters:acceptProposedBiography', personId),
   discardProposedBiography: (personId) => ipcRenderer.invoke('characters:discardProposedBiography', personId),
   generateCharacterPortrait: (personId, style, extra) =>

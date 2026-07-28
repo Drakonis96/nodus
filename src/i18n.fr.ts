@@ -6945,6 +6945,8 @@ export const FR: Record<string, string> = {
   'Entrevistar a {name}': 'Interviewer {name}',
   'Hablar con el personaje en su propia voz': 'Parler au personnage dans sa propre voix',
   'Responde en su voz y solo sabe lo que hay en su ficha. Nada de esta conversación se guarda.': 'Il répond dans sa propre voix et ne sait que ce qui est sur sa fiche. Rien de cette conversation n’est enregistré.',
+  'Responde en su propia voz; las conversaciones se guardan en esta bóveda.': 'Le personnage répond avec sa propre voix ; les conversations sont enregistrées dans ce coffre.',
+  'Se eliminará «{title}» junto con todos sus mensajes e imágenes. Esta acción no se puede deshacer.': '« {title} » sera supprimée avec tous ses messages et images. Cette action est irréversible.',
   'Pregúntale algo.': 'Posez-lui une question.',
   'Rellena antes su descripción: sin ficha no tiene nada que contestar.': 'Renseignez d’abord sa description : sans fiche, il n’a rien à répondre.',
   'Tu pregunta…': 'Votre question…',

@@ -32,6 +32,7 @@ function load(file) {
 
 const checks = load('shared/characterChecks.ts');
 const interview = load('shared/characterInterview.ts');
+const characterChat = load('shared/characterChat.ts');
 const biography = load('shared/characterBiographyContext.ts');
 
 test.after(() => rm(outDir, { recursive: true, force: true }));
@@ -261,6 +262,52 @@ test('the interview prompt keeps only the recent turns and ends on the character
   assert.match(prompt, /turno 19/);
   assert.match(prompt, /Autor: ¿De qué te arrepientes\?/);
   assert.ok(prompt.trimEnd().endsWith('Tú:'), 'the prompt must hand the turn to the character');
+});
+
+test('character chat invokes images only for an explicit request and builds a safe prompt', () => {
+  for (const request of [
+    'Envíame una imagen del puerto al amanecer',
+    '¿Puedes mostrarme una foto de tu habitación?',
+    'Haz un retrato de cómo ibas vestido aquella noche',
+    'Send me a picture of the old gate',
+  ]) {
+    assert.equal(characterChat.isCharacterImageRequest(request), true, request);
+  }
+  for (const ordinary of [
+    '¿Cómo imaginas el puerto?',
+    'Muéstrame cómo ocurrió la batalla',
+    'Háblame de tu retrato moral',
+    '¿Qué opinas de aquella fotografía?',
+  ]) {
+    assert.equal(characterChat.isCharacterImageRequest(ordinary), false, ordinary);
+  }
+
+  const prompt = characterChat.buildCharacterChatImagePrompt({
+    style: 'cinematic',
+    name: 'Kaelen Vor',
+    visualSeed: 'pelo negro recogido y ojos ámbar',
+    appearance: 'capa gris y cicatriz vertical',
+    request: 'Envíame una imagen en las murallas bajo la lluvia',
+    answer: 'Así me viste la guardia aquella noche.',
+  });
+  assert.match(prompt, /pelo negro recogido/);
+  assert.match(prompt, /murallas bajo la lluvia/);
+  assert.match(prompt, /no text/);
+});
+
+test('the interview knows when this turn can carry an image without breaking character', () => {
+  const system = interview.characterInterviewSystem({
+    ...sheet,
+    voiceRegister: null,
+    voiceTics: null,
+    voiceSample: null,
+    abilities: [],
+    arc: { want: null, need: null, flaw: null, lie: null, wound: null },
+    scenes: [],
+    canSendImages: true,
+  });
+  assert.match(system, /puede adjuntarla/);
+  assert.match(system, /sin decir que no puedes crear o adjuntar imágenes/);
 });
 
 // ── The world calendar ───────────────────────────────────────────────────────

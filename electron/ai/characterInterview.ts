@@ -23,7 +23,8 @@ import {
 export async function interviewCharacter(
   personId: string,
   question: string,
-  history: InterviewTurn[] = []
+  history: InterviewTurn[] = [],
+  options: { canSendImages?: boolean } = {}
 ): Promise<string> {
   const trimmed = question.trim();
   if (!trimmed) throw new Error('Escribe una pregunta.');
@@ -88,6 +89,7 @@ export async function interviewCharacter(
     abilities: abilities.map((ability) => ({ name: ability.name, cost: ability.cost, limits: ability.limits })),
     arc: character.profile.arc,
     scenes,
+    canSendImages: options.canSendImages === true,
   };
 
   const settings = getSettings();

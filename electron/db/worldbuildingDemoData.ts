@@ -1178,6 +1178,13 @@ export function clearWorldbuildingDemoData(): void {
 
   const tx = db.transaction(() => {
     // Unowned or polymorphic rows first.
+    db.prepare(
+      "DELETE FROM character_chat_images WHERE conversation_id IN (SELECT id FROM character_chat_conversations WHERE person_id LIKE 'demo-world-%')"
+    ).run();
+    db.prepare(
+      "DELETE FROM character_chat_messages WHERE conversation_id IN (SELECT id FROM character_chat_conversations WHERE person_id LIKE 'demo-world-%')"
+    ).run();
+    db.prepare("DELETE FROM character_chat_conversations WHERE person_id LIKE 'demo-world-%'").run();
     db.prepare("DELETE FROM world_notice_mutes WHERE reason LIKE 'demo-world-%'").run();
     db.prepare("DELETE FROM world_links WHERE source_id LIKE 'demo-world-%' OR target_key LIKE '%:demo-world-%'").run();
     db.prepare("DELETE FROM world_entry_proposals WHERE proposal_id LIKE 'demo-world-%'").run();

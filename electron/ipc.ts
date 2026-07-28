@@ -733,6 +733,7 @@ import {
   updateWorldMap,
 } from './db/worldMapsRepo';
 import * as worldChatHistory from './db/worldChatRepo';
+import * as characterChatHistory from './db/characterChatRepo';
 import {
   circleToPolygon,
   createMapLayer,
@@ -774,6 +775,7 @@ import {
   type WorldCalendarInput,
 } from './db/worldCalendarRepo';
 import { interviewCharacter } from './ai/characterInterview';
+import { sendCharacterChatMessage } from './ai/characterChat';
 import type { InterviewTurn } from '@shared/characterInterview';
 import {
   acceptProposedBiography,
@@ -1917,6 +1919,26 @@ export function registerIpc(
   h('characters:interview', async (_e, personId: string, question: string, history?: InterviewTurn[]) =>
     interviewCharacter(personId, question, history ?? [])
   );
+  h('characters:listChatConversations', async (_e, personId: string) =>
+    characterChatHistory.listCharacterChatConversations(personId)
+  );
+  h('characters:getChatConversation', async (_e, id: string) =>
+    characterChatHistory.getCharacterChatConversation(id)
+  );
+  h(
+    'characters:createChatConversation',
+    async (_e, input: { personId: string; title: string; imageEnabled?: boolean }) =>
+      characterChatHistory.createCharacterChatConversation(input)
+  );
+  h('characters:setChatImagesEnabled', async (_e, id: string, enabled: boolean) =>
+    characterChatHistory.setCharacterChatImagesEnabled(id, enabled)
+  );
+  h('characters:sendChatMessage', async (_e, id: string, question: string) =>
+    sendCharacterChatMessage(id, question)
+  );
+  h('characters:deleteChatConversation', async (_e, id: string) => {
+    characterChatHistory.deleteCharacterChatConversation(id);
+  });
   h('characters:acceptProposedBiography', async (_e, personId: string) => acceptProposedBiography(personId));
   h('characters:discardProposedBiography', async (_e, personId: string) => {
     setProposedBiography(personId, null);

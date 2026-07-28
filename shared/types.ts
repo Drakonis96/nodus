@@ -2132,6 +2132,45 @@ export interface CharacterImage {
   updatedAt: string;
 }
 
+export interface CharacterChatImage {
+  imageId: string;
+  mimeType: string;
+  bytes: number;
+  prompt: string | null;
+  provider: string | null;
+  model: string | null;
+  createdAt: string;
+}
+
+export interface CharacterChatMessage {
+  id: string;
+  role: 'author' | 'character';
+  content: string;
+  image: CharacterChatImage | null;
+  createdAt: string;
+}
+
+export interface CharacterChatConversationSummary {
+  id: string;
+  personId: string;
+  title: string;
+  imageEnabled: boolean;
+  messageCount: number;
+  imageCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CharacterChatConversation extends CharacterChatConversationSummary {
+  messages: CharacterChatMessage[];
+}
+
+export interface CharacterChatSendResult {
+  conversation: CharacterChatConversation;
+  /** Text still succeeds when the optional image provider fails. */
+  imageError: string | null;
+}
+
 export interface CharacterAbility {
   abilityId: string;
   personId: string;
@@ -7001,11 +7040,18 @@ export interface NodusApi {
     personId: string,
     mode?: CharacterBiographyMode
   ): Promise<{ biography: string | null; noMaterial: boolean; proposal: boolean }>;
-  /**
-   * Ask a character a question and get their in-voice answer. The exchange is NOT
-   * persisted: pass the history back on each turn.
-   */
+  /** Low-level in-voice completion retained for internal and compatibility callers. */
   interviewCharacter(personId: string, question: string, history?: InterviewTurn[]): Promise<string>;
+  listCharacterChatConversations(personId: string): Promise<CharacterChatConversationSummary[]>;
+  getCharacterChatConversation(id: string): Promise<CharacterChatConversation | null>;
+  createCharacterChatConversation(input: {
+    personId: string;
+    title: string;
+    imageEnabled?: boolean;
+  }): Promise<CharacterChatConversation>;
+  setCharacterChatImagesEnabled(id: string, enabled: boolean): Promise<CharacterChatConversation | null>;
+  sendCharacterChatMessage(id: string, question: string): Promise<CharacterChatSendResult>;
+  deleteCharacterChatConversation(id: string): Promise<void>;
   /** Promote the AI proposal to canon. Null when there was nothing to accept. */
   acceptProposedBiography(personId: string): Promise<Character | null>;
   discardProposedBiography(personId: string): Promise<Character | null>;

@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 102;
+export const SCHEMA_VERSION = 103;
 
 export const migrations: Migration[] = [
   {
@@ -4335,6 +4335,52 @@ export const migrations: Migration[] = [
       );
       CREATE INDEX idx_world_chat_conversations_updated
         ON world_chat_conversations(updated_at DESC);
+    `,
+  },
+  {
+    version: 103,
+    up: /* sql */ `
+      -- Character conversations are normalised because generated images are binary
+      -- children of one precise answer. This makes deleting a conversation (including
+      -- every linked image) an explicit, testable transaction instead of JSON surgery.
+      CREATE TABLE character_chat_conversations (
+        id            TEXT PRIMARY KEY,
+        person_id     TEXT NOT NULL,
+        title         TEXT NOT NULL,
+        image_enabled INTEGER NOT NULL DEFAULT 0,
+        created_at    TEXT NOT NULL,
+        updated_at    TEXT NOT NULL
+      );
+      CREATE INDEX idx_character_chat_conversations_person
+        ON character_chat_conversations(person_id, updated_at DESC);
+
+      CREATE TABLE character_chat_messages (
+        id              TEXT PRIMARY KEY,
+        conversation_id TEXT NOT NULL,
+        seq             INTEGER NOT NULL,
+        role            TEXT NOT NULL CHECK (role IN ('author', 'character')),
+        content         TEXT NOT NULL,
+        created_at      TEXT NOT NULL,
+        UNIQUE(conversation_id, seq)
+      );
+      CREATE INDEX idx_character_chat_messages_conversation
+        ON character_chat_messages(conversation_id, seq);
+
+      CREATE TABLE character_chat_images (
+        image_id        TEXT PRIMARY KEY,
+        conversation_id TEXT NOT NULL,
+        message_id      TEXT NOT NULL UNIQUE,
+        mime_type       TEXT NOT NULL,
+        bytes           INTEGER NOT NULL,
+        blob            BLOB NOT NULL,
+        thumbnail_blob  BLOB,
+        prompt          TEXT,
+        provider        TEXT,
+        model           TEXT,
+        created_at      TEXT NOT NULL
+      );
+      CREATE INDEX idx_character_chat_images_conversation
+        ON character_chat_images(conversation_id);
     `,
   },
 ];

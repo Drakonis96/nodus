@@ -653,6 +653,85 @@ try {
     old.close();
   }
 
+  // ── 18. Character chat sessions own their messages and images ────────────
+  {
+    const chats = require(path.join(repoRoot, 'electron/db/characterChatRepo.ts'));
+    const speaker = repo.createCharacter({ displayName: 'Iria de Sal' });
+    const first = chats.createCharacterChatConversation({
+      personId: speaker.personId,
+      title: 'La noche del faro',
+      imageEnabled: true,
+    });
+    assert.equal(first.imageEnabled, true);
+    assert.equal(first.messageCount, 0);
+
+    const author = chats.appendCharacterChatMessage(first.id, 'author', '¿Qué viste?');
+    const answer = chats.appendCharacterChatMessage(first.id, 'character', 'Vi arder el horizonte.');
+    chats.attachCharacterChatImage({
+      conversationId: first.id,
+      messageId: answer.id,
+      blob: Buffer.from('chat-image-full'),
+      thumbnailBlob: Buffer.from('chat-image-thumb'),
+      mimeType: 'image/jpeg',
+      prompt: 'horizon on fire, no text',
+      provider: 'openai',
+      model: 'image-test',
+    });
+
+    const loaded = chats.getCharacterChatConversation(first.id);
+    assert.equal(loaded.messageCount, 2);
+    assert.equal(loaded.imageCount, 1);
+    assert.deepEqual(loaded.messages.map((message) => message.id), [author.id, answer.id]);
+    assert.equal(loaded.messages[1].image.provider, 'openai');
+    assert.deepEqual(
+      chats.getCharacterChatImageBlob(loaded.messages[1].image.imageId).blob,
+      Buffer.from('chat-image-full'),
+      'the protocol getter returns the linked full-size bytes'
+    );
+    assert.deepEqual(
+      chats.getCharacterChatImageThumbnail(loaded.messages[1].image.imageId).blob,
+      Buffer.from('chat-image-thumb'),
+      'the chat stream can load the small thumbnail without transferring the full image'
+    );
+    assert.equal(chats.listCharacterChatConversations(speaker.personId)[0].title, 'La noche del faro');
+
+    chats.deleteCharacterChatConversation(first.id);
+    assert.equal(chats.getCharacterChatConversation(first.id), null);
+    assert.equal(
+      getDb().prepare('SELECT COUNT(*) AS c FROM character_chat_messages WHERE conversation_id = ?').get(first.id).c,
+      0,
+      'deleting one conversation deletes every message'
+    );
+    assert.equal(
+      getDb().prepare('SELECT COUNT(*) AS c FROM character_chat_images WHERE conversation_id = ?').get(first.id).c,
+      0,
+      'deleting one conversation deletes every linked image'
+    );
+
+    const second = chats.createCharacterChatConversation({
+      personId: speaker.personId,
+      title: 'Otra noche',
+      imageEnabled: false,
+    });
+    const secondAnswer = chats.appendCharacterChatMessage(second.id, 'character', 'No mires atrás.');
+    chats.attachCharacterChatImage({
+      conversationId: second.id,
+      messageId: secondAnswer.id,
+      blob: Buffer.from('owned-image'),
+      mimeType: 'image/jpeg',
+      prompt: 'a closed door',
+      provider: 'google',
+      model: 'image-test',
+    });
+    repo.deleteCharacter(speaker.personId);
+    assert.equal(chats.getCharacterChatConversation(second.id), null, 'deleting the character deletes its chats');
+    assert.equal(
+      getDb().prepare('SELECT COUNT(*) AS c FROM character_chat_images WHERE conversation_id = ?').get(second.id).c,
+      0,
+      'and no invisible image blobs are leaked'
+    );
+  }
+
   console.log('Worldbuilding characters repository test passed!');
 } finally {
   await rm(root, { recursive: true, force: true });
