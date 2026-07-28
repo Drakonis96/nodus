@@ -882,13 +882,20 @@ function PortraitEditor({ person, onChanged }: { person: Person; onChanged: () =
     focusRef.current = next;
     setFocus(next);
   };
+  const persistFocus = async (next: PortraitFocus = focusRef.current) => {
+    await window.nodus.updatePortraitFocus(person.personId, next);
+    // Lists and modal hosts retain their person object between selections. Pull the
+    // stored framing back into that object now, rather than showing the old crop when
+    // this dossier is reopened in the same session.
+    await onChanged();
+  };
   const finishDrag = (e: React.PointerEvent) => {
     if (!dragging.current || dragging.current.pointerId !== e.pointerId) return;
     dragging.current = null;
     if (e.currentTarget.hasPointerCapture(e.pointerId)) {
       e.currentTarget.releasePointerCapture(e.pointerId);
     }
-    void window.nodus.updatePortraitFocus(person.personId, focusRef.current);
+    void persistFocus();
   };
 
   const hasPortrait = !!person.portrait;
@@ -973,11 +980,14 @@ function PortraitEditor({ person, onChanged }: { person: Person; onChanged: () =
             step={0.05}
             value={focus.scale}
             onChange={(e) => {
-              const next = { ...focus, scale: Number(e.target.value) };
+              const next = { ...focusRef.current, scale: Number(e.target.value) };
               focusRef.current = next;
               setFocus(next);
-              void window.nodus.updatePortraitFocus(person.personId, next);
             }}
+            onPointerUp={() => void persistFocus()}
+            onPointerCancel={() => void persistFocus()}
+            onKeyUp={() => void persistFocus()}
+            onBlur={() => void persistFocus()}
             className="w-full"
           />
           <p className="mt-1 text-[10px] leading-3 text-neutral-600">{t('Arrastra el retrato para encuadrar la cara y usa el zoom.')}</p>

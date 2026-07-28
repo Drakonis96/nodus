@@ -138,6 +138,13 @@ export function CharacterPortraitEditor({
     focusRef.current = next;
     setFocus(next);
   };
+  const persistFocus = async (next: PortraitFocus = focusRef.current) => {
+    await window.nodus.updatePortraitFocus(character.personId, next);
+    // The workspace keeps the selected character inside its collection. Refresh it
+    // after the write so leaving and reopening the sheet cannot resurrect the stale
+    // framing that was loaded before this edit.
+    await onChanged();
+  };
   const finishDrag = (event: React.PointerEvent) => {
     if (!dragging.current || dragging.current.pointerId !== event.pointerId) return;
     dragging.current = null;
@@ -146,7 +153,7 @@ export function CharacterPortraitEditor({
     }
     // Never read `focus` here: pointer moves can be batched with pointerup, leaving the
     // render closure one frame behind. The ref always contains the final visible crop.
-    void window.nodus.updatePortraitFocus(character.personId, focusRef.current);
+    void persistFocus();
   };
 
   const editorRef = useDismissableLayer<HTMLDivElement>({
@@ -248,11 +255,14 @@ export function CharacterPortraitEditor({
             step={0.05}
             value={focus.scale}
             onChange={(event) => {
-              const next = { ...focus, scale: Number(event.target.value) };
+              const next = { ...focusRef.current, scale: Number(event.target.value) };
               focusRef.current = next;
               setFocus(next);
-              void window.nodus.updatePortraitFocus(character.personId, next);
             }}
+            onPointerUp={() => void persistFocus()}
+            onPointerCancel={() => void persistFocus()}
+            onKeyUp={() => void persistFocus()}
+            onBlur={() => void persistFocus()}
             className="w-full"
           />
           <p className="mt-1 text-[10px] leading-3 text-neutral-600">

@@ -37,7 +37,7 @@ test('portrait drag cannot expose space outside the stored focal range', () => {
   assert.equal(framing.dragPortraitFocus(initial, 10, 10, 0, 0).focusX, 0);
 });
 
-test('genealogy and worldbuilding editors capture the frame and persist the latest drag', async () => {
+test('genealogy and worldbuilding editors capture, persist and reload the latest frame', async () => {
   const [personEditor, characterEditor, portrait] = await Promise.all([
     readFile(path.join(root, 'src/components/PersonDossier.tsx'), 'utf8'),
     readFile(path.join(root, 'src/components/CharacterPortraitEditor.tsx'), 'utf8'),
@@ -51,6 +51,14 @@ test('genealogy and worldbuilding editors capture the frame and persist the late
     assert.match(source, /focusRef\.current/);
     assert.match(source, /onPointerCancel=\{finishDrag\}/);
     assert.match(source, /onLostPointerCapture=\{finishDrag\}/);
+    assert.match(
+      source,
+      /const persistFocus = async[\s\S]*?await window\.nodus\.updatePortraitFocus\([\s\S]*?await onChanged\(\)/,
+      'the persisted frame replaces the stale person or character held by the parent collection'
+    );
+    assert.match(source, /onPointerUp=\{\(\) => void persistFocus\(\)\}/);
+    assert.match(source, /onKeyUp=\{\(\) => void persistFocus\(\)\}/);
+    assert.match(source, /onBlur=\{\(\) => void persistFocus\(\)\}/);
   }
   assert.match(portrait, /transformOrigin: `\$\{focus\.focusX \* 100\}% \$\{focus\.focusY \* 100\}%`/);
 });
