@@ -2795,18 +2795,23 @@ try {
 
   // Places: a tree, and the containment-scale warning that only fires on a real slip.
   await openSection('Lugares', 'places-grid');
-  await page.getByRole('button', { name: 'Crear el primero', exact: true }).click();
+  // The character event above deliberately created a provisional place, so this
+  // collection is no longer empty. Prove that hand-off first, then use the normal
+  // toolbar action instead of waiting for an empty-state button that cannot exist.
+  await page.getByRole('button', { name: 'Fortín de la Bruma', exact: true }).waitFor({ timeout: 30_000 });
+  await page.getByRole('button', { name: 'Nuevo lugar', exact: true }).click();
   await page.getByPlaceholder('Nombre del lugar').fill('Vael');
   await page.getByRole('button', { name: 'Crear lugar', exact: true }).click();
   await page.getByTestId('place-sheet-basics').waitFor({ timeout: 30_000 });
   await page.getByLabel('Tipo de lugar').first().selectOption('city');
   await waitForCondition('el lugar guarda su tipo', () => page.evaluate(async () => {
-    const [place] = await window.nodus.listWorldPlaces();
-    return place?.kind === 'city';
+    const places = await window.nodus.listWorldPlaces();
+    return places.find((place) => place.name === 'Vael')?.kind === 'city';
   }));
   // A continent inside a city: the one case the scale check exists for.
   await page.evaluate(async () => {
-    const city = (await window.nodus.listWorldPlaces())[0];
+    const city = (await window.nodus.listWorldPlaces()).find((place) => place.name === 'Vael');
+    if (!city) throw new Error('Vael was not persisted');
     const inner = await window.nodus.createWorldPlace({ name: 'Un continente entero', kind: 'continent' });
     await window.nodus.updateWorldPlace(inner.placeId, { parentId: city.placeId });
   });
