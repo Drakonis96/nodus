@@ -5,6 +5,7 @@ import { clearDatabasesDemoData } from './databasesDemoData';
 import { clearStudyDemoData } from './studyDemoData';
 import { clearTeachingDemoData } from './teachingDemoData';
 import { clearWorldbuildingDemoData } from './worldbuildingDemoData';
+import { clearPrimarySourcesDemoData } from './primarySourcesDemoData';
 import { clearTestimonyDemoData } from './testimonyDemoData';
 
 // A self-consistent corpus on the science of learning. It exists so a
@@ -880,6 +881,12 @@ export function seedDemoData(): boolean {
  * Guarded by the flag, so it never touches a real library even if called twice.
  */
 export function clearDemoData(): void {
+  // Primary Sources must go first. The older genealogy cleanup deliberately removes
+  // every `demo-%` archive item, but a Primary Sources corpus has RESTRICT-linked
+  // master/access file families that need their own leaf-first teardown. Letting the
+  // generic archive delete run first makes the real "Salir del modo demo" IPC path
+  // fail even though the dedicated cleanup succeeds in isolation.
+  clearPrimarySourcesDemoData();
   // The genealogy + databases demos live in separate tables and also restore the
   // vault type (whichever the demo flipped away from).
   clearGenealogyDemoData();

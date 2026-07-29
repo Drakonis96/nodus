@@ -317,7 +317,7 @@ export function deletionImpact(id: string): TestimonyDeletionImpact | null {
       id
     ),
     noteLinks: one(
-      `SELECT COUNT(*) AS n FROM note_links WHERE (target_kind = 'testimony_interview' AND target_id = ?)
+      `SELECT COUNT(*) AS n FROM testimony_note_links WHERE (target_kind = 'testimony_interview' AND target_id = ?)
         OR (target_kind = 'testimony_annotation' AND target_id IN (SELECT id FROM testimony_annotations WHERE interview_id = ?))`,
       id,
       id
@@ -371,13 +371,13 @@ export function purgeInterview(id: string): void {
       const marks = annotationIds.map(() => '?').join(',');
       db.prepare(`DELETE FROM testimony_annotation_codes WHERE annotation_id IN (${marks})`).run(...annotationIds);
       db.prepare(`DELETE FROM testimony_contrast_items WHERE annotation_id IN (${marks})`).run(...annotationIds);
-      db.prepare(`DELETE FROM note_links WHERE target_kind = 'testimony_annotation' AND target_id IN (${marks})`).run(...annotationIds);
+      db.prepare(`DELETE FROM testimony_note_links WHERE target_kind = 'testimony_annotation' AND target_id IN (${marks})`).run(...annotationIds);
       db.prepare(`DELETE FROM testimony_annotations WHERE id IN (${marks})`).run(...annotationIds);
     }
     db.prepare('DELETE FROM testimony_sessions WHERE interview_id = ?').run(id);
     db.prepare('DELETE FROM testimony_agreements WHERE interview_id = ?').run(id);
     db.prepare('DELETE FROM testimony_interview_participants WHERE interview_id = ?').run(id);
-    db.prepare("DELETE FROM note_links WHERE target_kind = 'testimony_interview' AND target_id = ?").run(id);
+    db.prepare("DELETE FROM testimony_note_links WHERE target_kind = 'testimony_interview' AND target_id = ?").run(id);
     db.prepare('DELETE FROM testimony_interviews WHERE id = ?').run(id);
   });
   tx();
@@ -768,7 +768,7 @@ export function deleteSession(id: string): void {
           const aMarks = annIds.map(() => '?').join(',');
           db.prepare(`DELETE FROM testimony_annotation_codes WHERE annotation_id IN (${aMarks})`).run(...annIds);
           db.prepare(`DELETE FROM testimony_contrast_items WHERE annotation_id IN (${aMarks})`).run(...annIds);
-          db.prepare(`DELETE FROM note_links WHERE target_kind = 'testimony_annotation' AND target_id IN (${aMarks})`).run(...annIds);
+          db.prepare(`DELETE FROM testimony_note_links WHERE target_kind = 'testimony_annotation' AND target_id IN (${aMarks})`).run(...annIds);
           db.prepare(`DELETE FROM testimony_annotations WHERE id IN (${aMarks})`).run(...annIds);
         }
         db.prepare(`DELETE FROM testimony_transcripts WHERE id IN (${tMarks})`).run(...transcriptIds);

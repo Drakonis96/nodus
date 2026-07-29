@@ -6,6 +6,7 @@ import type {
   StudyRecordingSummary,
   StudyRecordingStatus,
   StudyTranscriptKind,
+  StudyWhisperChunk,
   StudyWorkspace,
 } from '@shared/types';
 import {
@@ -128,6 +129,7 @@ export function StudyRecordingsView({ onOpenDocument, initialRecordingId, initia
   const [activeTranscriptKind, setActiveTranscriptKind] = useState<StudyTranscriptKind>('literal');
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
+  const [diarizing, setDiarizing] = useState(false);
   const [noteTranscriptId, setNoteTranscriptId] = useState<string | null>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -202,7 +204,7 @@ export function StudyRecordingsView({ onOpenDocument, initialRecordingId, initia
       const [content, settings] = await Promise.all([window.nodus.getStudyRecordingContent(selected.id), window.nodus.getSettings()]);
       const blob = new Blob([content.bytes.slice().buffer as ArrayBuffer], { type: content.mimeType });
       let text = ''; const provider = settings.sttProvider; let model = '';
-      let chunks: Array<{ text: string; timestamp: [number | null, number | null] | null }> = [];
+      let chunks: StudyWhisperChunk[] = [];
       if (provider === 'transformers') {
         model = settings.sttTransformersModel;
         if (!isLocalWhisperModelReady(model)) throw new Error(t('Descarga el modelo ONNX seleccionado desde Ajustes antes de transcribir.'));
@@ -273,6 +275,22 @@ export function StudyRecordingsView({ onOpenDocument, initialRecordingId, initia
       await open(selected.id); setActiveTranscriptKind(kind);
     } catch (cause) { setProcessError(cause instanceof Error ? cause.message : String(cause)); }
     finally { setBusy(false); }
+  };
+
+  const diarize = async () => {
+    if (!selected) return;
+    const literal = latestTranscript('literal');
+    if (!literal) return;
+    setBusy(true); setDiarizing(true); setProcessError(''); setProcessPartial('');
+    try {
+      await window.nodus.diarizeStudyRecording({ recordingId: selected.id, transcriptId: literal.id });
+      await open(selected.id);
+      setActiveTranscriptKind('literal');
+    } catch (cause) {
+      setProcessError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setDiarizing(false); setBusy(false);
+    }
   };
 
   const jumpTo = (seconds: number) => {
@@ -358,6 +376,7 @@ export function StudyRecordingsView({ onOpenDocument, initialRecordingId, initia
                   <div className="flex flex-wrap items-center gap-1 border-b border-neutral-200 p-2 dark:border-neutral-800">{(['literal', 'corrected', 'notes'] as const).filter((kind) => latestTranscript(kind)).map((kind) => <button key={kind} className={`rounded-md px-3 py-1.5 text-xs ${activeTranscriptKind === kind ? 'bg-teal-700 text-white' : 'text-neutral-600 hover:bg-neutral-100 dark:text-neutral-500 dark:hover:bg-neutral-800'}`} onClick={() => setActiveTranscriptKind(kind)}>{t(TRANSCRIPT_LABELS[kind])}</button>)}
                     {!latestTranscript('corrected') && latestTranscript('literal') && <button data-testid="study-recording-generate-corrected" className="btn btn-ghost h-7 px-2 text-xs" disabled={busy} onClick={() => void generateDerivedTranscript('corrected')}><Icon name="wand" size={12} />{t('Generar versión corregida')}</button>}
                     {!latestTranscript('notes') && latestTranscript('literal') && <button data-testid="study-recording-generate-notes" className="btn btn-ghost h-7 px-2 text-xs" disabled={busy} onClick={() => void generateDerivedTranscript('notes')}><Icon name="notebook" size={12} />{t('Generar apuntes')}</button>}
+                    {latestTranscript('literal') && <button data-testid="study-recording-diarize" className="btn btn-ghost h-7 px-2 text-xs" disabled={busy || !selected.sizeBytes} title={t('La diarización usa Gemini Flash Lite para distinguir voces y conserva literalmente el texto.')} onClick={() => void diarize()}><Icon name="users" size={12} />{diarizing ? t('Analizando voces…') : t('Detectar hablantes')}</button>}
                     <button className="btn btn-ghost ml-auto h-7 px-2 text-xs" disabled={!latestTranscript(activeTranscriptKind)} onClick={() => void saveTranscript()}><Icon name="save" size={12} />{t('Guardar edición')}</button>
                     <button className="btn btn-ghost h-7 px-2 text-xs" disabled={!latestTranscript(activeTranscriptKind)} onClick={() => { const transcript = latestTranscript(activeTranscriptKind); if (transcript) setNoteTranscriptId(transcript.id); }}><Icon name="notebook" size={12} />{t('Crear apunte')}</button>
                     <button className="btn btn-ghost h-7 px-2 text-xs text-red-400" disabled={!latestTranscript(activeTranscriptKind)} onClick={() => { const transcript = latestTranscript(activeTranscriptKind); if (transcript) void window.nodus.deleteStudyTranscript(transcript.id).then(() => open(selected.id)); }}><Icon name="trash" size={12} /></button>

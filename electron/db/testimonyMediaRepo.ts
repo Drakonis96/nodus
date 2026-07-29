@@ -306,7 +306,7 @@ export function deleteMedia(id: string): void {
         const aMarks = annIds.map(() => '?').join(',');
         db.prepare(`DELETE FROM testimony_annotation_codes WHERE annotation_id IN (${aMarks})`).run(...annIds);
         db.prepare(`DELETE FROM testimony_contrast_items WHERE annotation_id IN (${aMarks})`).run(...annIds);
-        db.prepare(`DELETE FROM note_links WHERE target_kind = 'testimony_annotation' AND target_id IN (${aMarks})`).run(...annIds);
+        db.prepare(`DELETE FROM testimony_note_links WHERE target_kind = 'testimony_annotation' AND target_id IN (${aMarks})`).run(...annIds);
         db.prepare(`DELETE FROM testimony_annotations WHERE id IN (${aMarks})`).run(...annIds);
       }
       db.prepare(`DELETE FROM testimony_transcripts WHERE id IN (${marks})`).run(...transcriptIds);
@@ -498,7 +498,7 @@ export function deleteTranscript(id: string): void {
       const marks = annIds.map(() => '?').join(',');
       db.prepare(`DELETE FROM testimony_annotation_codes WHERE annotation_id IN (${marks})`).run(...annIds);
       db.prepare(`DELETE FROM testimony_contrast_items WHERE annotation_id IN (${marks})`).run(...annIds);
-      db.prepare(`DELETE FROM note_links WHERE target_kind = 'testimony_annotation' AND target_id IN (${marks})`).run(...annIds);
+      db.prepare(`DELETE FROM testimony_note_links WHERE target_kind = 'testimony_annotation' AND target_id IN (${marks})`).run(...annIds);
       db.prepare(`DELETE FROM testimony_annotations WHERE id IN (${marks})`).run(...annIds);
     }
     db.prepare('DELETE FROM testimony_transcript_segments WHERE transcript_id = ?').run(id);

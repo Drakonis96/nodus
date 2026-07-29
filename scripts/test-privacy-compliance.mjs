@@ -64,13 +64,13 @@ test('the policy states the real local and controller boundaries without an inva
   const policy = await read('PRIVACY.md');
   const normalized = policy.replace(/\s+/g, ' ');
   for (const marker of [
-    'no incorpora publicidad, telemetría, analítica remota',
-    'no usa IA para puntuar, calificar, clasificar, perfilar ni evaluar',
-    'no crea por sí solo una base jurídica',
-    'no elimina obligaciones legales imperativas',
-    'artículos 13 y 14 del RGPD',
-    'artículo 28 RGPD',
-    'evaluación de impacto',
+    'does not incorporate advertising, telemetry, remote analytics',
+    'does not use AI to rate, grade, rank, profile, or evaluate',
+    'does not in itself create a legal basis',
+    'does not eliminate mandatory legal obligations',
+    'Articles 13 and 14 of the GDPR',
+    'Article 28 GDPR',
+    'impact assessment',
     'https://eur-lex.europa.eu/eli/reg/2016/679/oj',
     'https://www.aepd.es/',
   ]) assert.match(normalized, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'));

@@ -2405,6 +2405,203 @@ try {
   await page.keyboard.press('Escape');
   console.log('[e2e] accessibility controls + keyboard command palette apply globally');
 
+  // A first-time primary-sources researcher must be able to go from an empty vault
+  // to a reversible learning corpus, complete the six-step evidence-first tour, and
+  // reach every derived view without using a repository helper or a hidden route.
+  await page.evaluate(async () => {
+    const created = await window.nodus.createVault({ name: 'Primary sources demo smoke', type: 'primary_sources' });
+    const switched = await window.nodus.switchVault(created.vault.id);
+    if (!switched.ok) throw new Error(switched.message);
+    await window.nodus.updateSettings({
+      onboardingComplete: true,
+      basicsTutorialVersion: 5,
+      tourComplete: true,
+      advancedTourComplete: true,
+      primarySourcesTourComplete: true,
+    });
+  });
+  await page.reload();
+  await page.getByTestId('primary-sources-home').waitFor({ timeout: 30_000 });
+  await page.getByTestId('primary-sources-demo-offer').waitFor({ timeout: 30_000 });
+  await page.getByRole('button', { name: 'Cargar corpus de aprendizaje', exact: true }).click();
+  await waitForCondition('corpus de aprendizaje de fuentes primarias cargado', () => page.evaluate(async () => {
+    const workspace = await window.nodus.getPrimarySourcesWorkspace('', 0, 200);
+    const settings = await window.nodus.getSettings();
+    return workspace.page.total === 10
+      && workspace.repositories.length === 1
+      && workspace.sessions.length === 1
+      && settings.demoMode === true
+      && settings.primarySourcesTourComplete === true;
+  }));
+  assert.equal(await page.getByTestId('tour-card').count(), 0, 'cargar la demo no reinicia ni abre el recorrido');
+
+  // The walkthrough remains independently replayable. Relaunch it explicitly here so
+  // this E2E still validates the invitation and all six spotlighted steps.
+  await page.evaluate(async () => {
+    await window.nodus.updateSettings({ primarySourcesTourComplete: false });
+  });
+  await page.reload();
+
+  const primarySourcesTour = page.getByTestId('tour-card');
+  await primarySourcesTour.getByText('Recorrido de fuentes primarias · 1/6', { exact: true }).waitFor({ timeout: 30_000 });
+  await page.getByTestId('primary-sources-home').waitFor({ timeout: 30_000 });
+  assert.equal(await page.getByTestId('tour-spotlight').count(), 0, 'la invitación inicial no apunta ni navega antes del consentimiento');
+  const unavailablePrimarySourcesVideo = primarySourcesTour.getByRole('button', {
+    name: 'Ver el tutorial en vídeo (Próximamente)',
+    exact: true,
+  });
+  await unavailablePrimarySourcesVideo.waitFor({ timeout: 30_000 });
+  assert.equal(await unavailablePrimarySourcesVideo.isDisabled(), true, 'el vídeo futuro permanece visible pero deshabilitado');
+  await primarySourcesTour.getByRole('button', { name: 'Sí, enséñame', exact: true }).click();
+
+  const primarySourcesTourSteps = [
+    { number: 1, target: 'nav-archive', action: 'Siguiente' },
+    { number: 2, target: 'primary-sources-import', action: 'Siguiente' },
+    { number: 3, target: 'primary-sources-provenance-tree', action: 'Siguiente' },
+    { number: 4, target: 'primary-sources-view-modes', action: 'Siguiente' },
+    { number: 5, target: 'nav-persons', action: 'Siguiente' },
+    { number: 6, target: 'nav-notes', action: 'Empezar' },
+  ];
+  for (const step of primarySourcesTourSteps) {
+    await primarySourcesTour.getByText(`Recorrido de fuentes primarias · ${step.number}/6`, { exact: true }).waitFor({ timeout: 30_000 });
+    const target = page.locator(`[data-tour="${step.target}"]`);
+    await target.waitFor({ state: 'visible', timeout: 30_000 });
+    // The spotlight deliberately animates between anchors. The step copy updates at
+    // the start of that 200 ms transition, so measuring immediately can observe the
+    // rectangle halfway between the previous and current targets on a busy runner.
+    await page.waitForFunction((targetName) => {
+      const anchor = document.querySelector(`[data-tour="${targetName}"]`);
+      const focus = document.querySelector('[data-testid="tour-spotlight"]');
+      if (!(anchor instanceof HTMLElement) || !(focus instanceof HTMLElement)) return false;
+      const targetRect = anchor.getBoundingClientRect();
+      const focusRect = focus.getBoundingClientRect();
+      return focusRect.left <= targetRect.left
+        && focusRect.top <= targetRect.top
+        && focusRect.right >= targetRect.right
+        && focusRect.bottom >= targetRect.bottom;
+    }, step.target, { timeout: 5_000 });
+    const [targetBox, spotlightBox] = await Promise.all([
+      target.boundingBox(),
+      page.getByTestId('tour-spotlight').boundingBox(),
+    ]);
+    assert.ok(targetBox && spotlightBox, `el paso ${step.number}/6 conserva un ancla y un foco visibles`);
+    assert.ok(
+      spotlightBox.x <= targetBox.x
+        && spotlightBox.y <= targetBox.y
+        && spotlightBox.x + spotlightBox.width >= targetBox.x + targetBox.width
+        && spotlightBox.y + spotlightBox.height >= targetBox.y + targetBox.height,
+      `el foco del paso ${step.number}/6 encuadra su destino`
+    );
+    await primarySourcesTour.getByRole('button', { name: step.action, exact: true }).click();
+  }
+  await primarySourcesTour.waitFor({ state: 'detached', timeout: 30_000 });
+  await waitForCondition('recorrido de fuentes primarias completado', () => page.evaluate(async () => (await window.nodus.getSettings()).primarySourcesTourComplete === true));
+
+  await page.getByTestId('primary-sources-nav-archive').click();
+  await page.getByTestId('primary-sources-archive').waitFor({ timeout: 30_000 });
+
+  // Archive organisation actions must look and behave like real buttons. Exercise
+  // every vocabulary through the renderer and preload bridge, including the
+  // disabled, enabled, persisted, refreshed, and cleared-field states.
+  await page.getByTestId('primary-sources-organize-open').click();
+  const organizeButtons = {
+    repository: page.getByTestId('primary-sources-create-repository'),
+    session: page.getByTestId('primary-sources-create-session'),
+    collection: page.getByTestId('primary-sources-create-collection'),
+    template: page.getByTestId('primary-sources-create-template'),
+  };
+  for (const button of Object.values(organizeButtons)) {
+    assert.equal(await button.isDisabled(), true, 'empty organisation actions begin disabled');
+  }
+  const disabledOrganizeStyle = await organizeButtons.repository.evaluate((button) => {
+    const style = getComputedStyle(button);
+    return { backgroundColor: style.backgroundColor, borderStyle: style.borderStyle };
+  });
+  assert.notEqual(disabledOrganizeStyle.backgroundColor, 'rgba(0, 0, 0, 0)', 'disabled organisation actions retain a visible button surface');
+  assert.notEqual(disabledOrganizeStyle.borderStyle, 'none', 'disabled organisation actions retain a visible border');
+
+  await page.getByTestId('primary-sources-repository-name').fill('Repositorio de prueba E2E');
+  await page.getByTestId('primary-sources-repository-short-name').fill('RPE');
+  assert.equal(await organizeButtons.repository.isEnabled(), true);
+  const enabledOrganizeBackground = await organizeButtons.repository.evaluate((button) => getComputedStyle(button).backgroundColor);
+  assert.notEqual(enabledOrganizeBackground, disabledOrganizeStyle.backgroundColor, 'enabled organisation actions use the primary visual state');
+  await organizeButtons.repository.click();
+  await waitForCondition('repositorio creado desde Organizar', () => page.evaluate(async () => {
+    const workspace = await window.nodus.getPrimarySourcesWorkspace('', 0, 200);
+    return workspace.repositories.some((entry) => entry.name === 'Repositorio de prueba E2E' && entry.shortName === 'RPE');
+  }));
+  assert.equal(await page.getByTestId('primary-sources-repository-name').inputValue(), '');
+  assert.equal(await organizeButtons.repository.isDisabled(), true);
+
+  await page.getByTestId('primary-sources-session-title').fill('Consulta de prueba E2E');
+  await page.getByTestId('primary-sources-session-repository').selectOption({ label: 'Repositorio de prueba E2E' });
+  await organizeButtons.session.click();
+  await waitForCondition('sesión creada desde Organizar', () => page.evaluate(async () => {
+    const workspace = await window.nodus.getPrimarySourcesWorkspace('', 0, 200);
+    const repository = workspace.repositories.find((entry) => entry.name === 'Repositorio de prueba E2E');
+    return workspace.sessions.some((entry) => entry.title === 'Consulta de prueba E2E' && entry.repositoryId === repository?.repositoryId);
+  }));
+  assert.equal(await page.getByTestId('primary-sources-session-title').inputValue(), '');
+  assert.equal(await organizeButtons.session.isDisabled(), true);
+
+  await page.getByTestId('primary-sources-collection-name').fill('Colección de prueba E2E');
+  await organizeButtons.collection.click();
+  await waitForCondition('colección creada desde Organizar', () => page.evaluate(async () => {
+    const workspace = await window.nodus.getPrimarySourcesWorkspace('', 0, 200);
+    return workspace.collections.some((entry) => entry.name === 'Colección de prueba E2E');
+  }));
+  assert.equal(await page.getByTestId('primary-sources-collection-name').inputValue(), '');
+  assert.equal(await organizeButtons.collection.isDisabled(), true);
+
+  await page.getByTestId('primary-sources-template-name').fill('Plantilla de prueba E2E');
+  await organizeButtons.template.click();
+  await waitForCondition('plantilla creada desde Organizar', () => page.evaluate(async () => {
+    const workspace = await window.nodus.getPrimarySourcesWorkspace('', 0, 200);
+    return workspace.templates.some((entry) => entry.name === 'Plantilla de prueba E2E' && entry.builtin === false);
+  }));
+  assert.equal(await page.getByTestId('primary-sources-template-name').inputValue(), '');
+  assert.equal(await organizeButtons.template.isDisabled(), true);
+  await page.getByRole('button', { name: 'Listo', exact: true }).click();
+
+  await page.getByTestId('primary-sources-nav-persons').click();
+  await page.getByTestId('primary-sources-persons-view').waitFor({ timeout: 30_000 });
+  await page.getByTestId('primary-sources-nav-timeline').click();
+  await page.getByRole('heading', { name: 'Cronología documental', exact: true }).waitFor({ timeout: 30_000 });
+  await page.getByTestId('primary-sources-nav-map').click();
+  await page.getByRole('button', { name: 'Tabla accesible', exact: true }).click();
+  await page.getByTestId('primary-sources-map-table').waitFor({ timeout: 30_000 });
+  await page.getByTestId('primary-sources-nav-relations').click();
+  await page.getByRole('button', { name: 'Tabla accesible', exact: true }).click();
+  await page.getByTestId('primary-sources-relations-table').waitFor({ timeout: 30_000 });
+  await page.getByTestId('primary-sources-nav-search').click();
+  await page.getByTestId('primary-sources-search-input').fill('San Martín');
+  await page.getByTestId('primary-sources-search-result').first().waitFor({ timeout: 30_000 });
+  await page.getByTestId('primary-sources-nav-notes').click();
+  await page.getByTestId('primary-sources-notes').waitFor({ timeout: 30_000 });
+
+  // Primary Sources reuses the universal Toolkit catalogue. Its old dedicated
+  // governance console must not hide the tools available in every other vault.
+  for (const tool of ['apps', 'convert', 'protect', 'translate', 'presenter', 'aiocr']) {
+    await page.getByTestId(`nav-toolkit-${tool}`).waitFor({ state: 'visible', timeout: 30_000 });
+  }
+  await page.getByTestId('nav-toolkit-convert').click();
+  await page.getByTestId('toolkit-convert-page').waitFor({ timeout: 30_000 });
+  assert.equal(await page.getByTestId('primary-sources-toolkit').count(), 0, 'the retired primary-source Toolkit console is absent');
+  await page.getByTestId('toolkit-back').click();
+  await page.getByTestId('toolkit-home').waitFor({ timeout: 30_000 });
+  for (const tool of ['apps', 'convert', 'protect', 'translate', 'presenter', 'aiocr']) {
+    await page.getByTestId(`toolkit-card-${tool}`).waitFor({ state: 'visible', timeout: 30_000 });
+  }
+
+  await page.getByRole('button', { name: 'Salir del modo demo', exact: true }).click();
+  await waitForCondition('corpus de aprendizaje de fuentes primarias eliminado', () => page.evaluate(async () => {
+    const workspace = await window.nodus.getPrimarySourcesWorkspace('', 0, 200);
+    const settings = await window.nodus.getSettings();
+    return workspace.page.total === 0 && settings.demoMode === false;
+  }));
+  await page.getByTestId('primary-sources-demo-offer').waitFor({ timeout: 30_000 });
+  console.log('[e2e] primary-sources first-run corpus, tour, derived views, universal Toolkit, search, and cleanup work through the real UI');
+
   // A second, empty study vault exercises the real sample-data offer and the
   // reversible cleanup path without touching the study records created above.
   await page.evaluate(async () => {
@@ -2444,7 +2641,7 @@ try {
   assert.equal(demoFixture.ecologyIdeas.length, 3);
   const studyTourLabel = page.getByText(/^Tutorial de estudio/);
   await studyTourLabel.waitFor({ timeout: 30_000 });
-  await page.getByRole('button', { name: /^Saltar/ }).click();
+  await page.getByRole('button', { name: 'Cerrar tutorial', exact: true }).click();
   await studyTourLabel.waitFor({ state: 'detached', timeout: 30_000 });
   await page.getByRole('button', { name: 'Salir del modo demo', exact: true }).click();
   await waitForCondition('datos de ejemplo de estudio eliminados', () => page.evaluate(async () => (await window.nodus.getStudyWorkspace()).courses.length === 0));
@@ -2521,7 +2718,7 @@ try {
     if (win) win.setBounds({ width: 1440, height: 900 });
   }).catch(() => {});
   await page.waitForTimeout(300);
-  await tourCard.getByRole('button', { name: /^Saltar/ }).click();
+  await tourCard.getByRole('button', { name: 'Cerrar tutorial', exact: true }).click();
   await teachingTourLabel.waitFor({ state: 'detached', timeout: 30_000 });
 
   // The Analizar group: the study chat/ideas/graph trio over the teaching corpus. The
@@ -3700,24 +3897,29 @@ try {
   await page.mouse.up();
   await waitForCondition('arrastrar un punto intermedio añade un vértice', async () =>
     (await storedPoints()).length === afterDrag.length + 1);
+  // The IPC write can finish before React has replaced Leaflet's old layer group. Wait
+  // for the handles too, or the next gesture can land on a detached vertex on a slow CI
+  // runner even though the database already contains the inserted point.
+  await waitForCondition('la capa editable refleja el vértice añadido', async () =>
+    (await vertexCount()) === afterDrag.length + 1);
 
   const beforeDelete = (await storedPoints()).length;
   // Pick a vertex whose centre is actually HIT-TESTABLE as a vertex. Handles and midpoints
   // are drawn a few pixels apart, so a blind index can land on a midpoint and the gesture
   // does nothing — a flake, and the reason the midpoint handler now ignores Alt too.
-  let victimAt = null;
+  let victimIndex = null;
   for (let index = 0; index < (await page.locator('.world-map-vertex').count()); index += 1) {
     const at = await centreOf('.world-map-vertex', index);
     const onTop = await page.evaluate(([x, y]) => {
       const element = document.elementFromPoint(x, y);
       return element ? element.getAttribute('class') ?? '' : '';
     }, [at.x, at.y]);
-    if (onTop.includes('world-map-vertex')) { victimAt = at; break; }
+    if (onTop.includes('world-map-vertex')) { victimIndex = index; break; }
   }
-  assert.ok(victimAt, 'at least one vertex handle is reachable by the mouse');
-  await page.keyboard.down('Alt');
-  await page.mouse.click(victimAt.x, victimAt.y);
-  await page.keyboard.up('Alt');
+  assert.notEqual(victimIndex, null, 'at least one vertex handle is reachable by the mouse');
+  // Let Playwright hold Alt for the complete native pointer gesture. Splitting keyboard
+  // and mouse commands can lose the modifier when Electron processes a focus transition.
+  await page.locator('.world-map-vertex').nth(victimIndex).click({ modifiers: ['Alt'] });
   await waitForCondition('Alt+clic elimina un vértice', async () => (await storedPoints()).length === beforeDelete - 1);
 
   // Measuring, with the travel modes seeded on first use.

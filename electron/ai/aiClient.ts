@@ -4,6 +4,7 @@ import {
   openAiCompatBase,
   supportsJsonMode,
   reasoningBody,
+  samplingTemperatureBody,
   openRouterRoutingBody,
   OPENROUTER_HEADERS,
   isLocalProvider,
@@ -308,7 +309,7 @@ export async function localModelContextWindow(model: ModelRef): Promise<number |
 function optionalBody(model: ModelRef, jsonMode: boolean, reasoning: ReasoningEffort): Record<string, unknown> {
   return {
     ...(jsonMode && supportsJsonMode(model.provider) ? { response_format: { type: 'json_object' as const } } : {}),
-    ...reasoningBody(model.provider, reasoning),
+    ...reasoningBody(model.provider, reasoning, model.model),
     // Groq's reasoning models (gpt-oss/qwen3) reason at medium by default, which slows scans and
     // burns tokens. reasoningBody can't send it (no model id), so minimise it here. Groq rejects
     // reasoning_effort:'none' — 'low' is its floor; non-reasoning models 400 and the caller strips it.
@@ -595,7 +596,7 @@ async function rawComplete(
   });
   const baseBody = {
     model: model.model,
-    temperature: opts.temperature ?? 0.15,
+    ...samplingTemperatureBody(model.provider, model.model, opts.temperature ?? 0.15),
     ...completionTokensBody(model, maxTokens),
     messages: [
       { role: 'system' as const, content: opts.system },
@@ -1017,7 +1018,7 @@ async function rawCompleteStream(
   });
   const baseBody = {
     model: model.model,
-    temperature: opts.temperature ?? 0.15,
+    ...samplingTemperatureBody(model.provider, model.model, opts.temperature ?? 0.15),
     ...completionTokensBody(model, maxTokens),
     stream: true as const,
     messages: [
@@ -1074,7 +1075,25 @@ function embeddingConfig(): { provider: EmbeddingProvider; modelId: string } {
 }
 
 async function requestEmbeddings(provider: EmbeddingProvider, key: string, modelId: string, input: string | string[]): Promise<number[][]> {
-  if (provider === 'nodus') return embedWithNodusLocal(modelId, input);
+  const validate = (vectors: number[][]): number[][] => {
+    const dimension = vectors[0]?.length ?? 0;
+    for (const vector of vectors) {
+      if (
+        !Array.isArray(vector) ||
+        vector.length === 0 ||
+        vector.length !== dimension ||
+        !vector.every(Number.isFinite) ||
+        !vector.some((value) => value !== 0)
+      ) {
+        throw new AiError(
+          `El modelo de embeddings ${modelId} devolvió vectores vacíos, inválidos o con dimensiones incompatibles.`,
+          false
+        );
+      }
+    }
+    return vectors;
+  };
+  if (provider === 'nodus') return validate(await embedWithNodusLocal(modelId, input));
   const baseURL = openAiCompatBase(provider) ?? undefined;
   const OpenAI = (await import('openai')).default;
   const client = new OpenAI({
@@ -1089,9 +1108,9 @@ async function requestEmbeddings(provider: EmbeddingProvider, key: string, model
         : undefined,
   });
   const res = await client.embeddings.create({ model: modelId, input });
-  return [...res.data]
+  return validate([...res.data]
     .sort((a, b) => (a.index ?? 0) - (b.index ?? 0))
-    .map((d) => d.embedding);
+    .map((d) => d.embedding));
 }
 
 /**

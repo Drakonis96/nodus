@@ -345,7 +345,7 @@ export function deleteAnnotation(id: string): void {
   const tx = db.transaction(() => {
     db.prepare('DELETE FROM testimony_annotation_codes WHERE annotation_id = ?').run(id);
     db.prepare('DELETE FROM testimony_contrast_items WHERE annotation_id = ?').run(id);
-    db.prepare("DELETE FROM note_links WHERE target_kind = 'testimony_annotation' AND target_id = ?").run(id);
+    db.prepare("DELETE FROM testimony_note_links WHERE target_kind = 'testimony_annotation' AND target_id = ?").run(id);
     db.prepare('DELETE FROM testimony_annotations WHERE id = ?').run(id);
   });
   tx();

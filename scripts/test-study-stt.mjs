@@ -25,6 +25,13 @@ try {
   assert.equal(stt.whisperLanguageName('fr-FR'), 'french');
   assert.equal(stt.whisperLanguageName('auto'), undefined);
   assert.ok(stt.WHISPER_CPP_MODELS.some((model) => model.id === 'large-v3-turbo-q5_0'), 'whisper.cpp catalog exposes an official multilingual turbo model');
+  assert.deepEqual(stt.OPENAI_STUDY_STT_MODELS.map((model) => model.id), [
+    'gpt-4o-mini-transcribe', 'gpt-4o-transcribe', 'gpt-4o-transcribe-diarize',
+  ], 'the external picker contains audio-transcription models only');
+  assert.equal(stt.isOpenAiStudySttModel('gpt-4o-transcribe-diarize'), true);
+  assert.equal(stt.isOpenAiStudySttModel('gpt-4o'), false, 'OpenAI chat models are rejected by the STT contract');
+  assert.equal(stt.isOpenAiStudySttModel('gemini-3.5-flash-lite'), false, 'models from another provider are rejected');
+  assert.equal(stt.isOpenAiDiarizationModel('gpt-4o-transcribe-diarize'), true);
 
   assert.deepEqual(stt.transformStudyDictation('borrar la última frase'), { text: '', action: 'delete_last_sentence' });
   assert.deepEqual(stt.transformStudyDictation('deshacer'), { text: '', action: 'undo' });
@@ -43,7 +50,18 @@ try {
   assert.equal(stt.buildStudySttPrompt(['Nodus', '  Husserl ', 'Nodus']), 'Vocabulario del curso: Nodus, Husserl.');
   assert.equal(stt.buildStudySttPrompt([]), '');
 
-  const [pkg, worker, backend, cppBackend, ipc, preload, editor, settingsUi, recordingsUi, progressUi, html] = await Promise.all([
+  const recordingsOutfile = path.join(tmp, 'studyRecordings.mjs');
+  await build({ entryPoints: [path.join(root, 'shared/studyRecordings.ts')], outfile: recordingsOutfile, bundle: true, format: 'esm', platform: 'node', logLevel: 'silent' });
+  const recordings = await import(pathToFileURL(recordingsOutfile).href);
+  assert.deepEqual(recordings.normalizeStudyTranscriptSegments([
+    { text: 'Pregunta inicial.', timestamp: [0, 2.5], speaker: 'A' },
+    { text: 'Respuesta.', timestamp: [2.5, 5], speaker: 'B' },
+  ], 'Pregunta inicial. Respuesta.', 5).map(({ text, speaker, tStart, tEnd }) => ({ text, speaker, tStart, tEnd })), [
+    { text: 'Pregunta inicial.', speaker: 'A', tStart: 0, tEnd: 2.5 },
+    { text: 'Respuesta.', speaker: 'B', tStart: 2.5, tEnd: 5 },
+  ], 'diarized speakers and timestamps survive transcript normalization');
+
+  const [pkg, worker, backend, cppBackend, ipc, preload, editor, settingsUi, recordingsUi, progressUi, dossierUi, settingsRepo, html] = await Promise.all([
     readFile(path.join(root, 'package.json'), 'utf8'),
     readFile(path.join(root, 'src/lib/stt/stt.worker.ts'), 'utf8'),
     readFile(path.join(root, 'electron/ai/studyTranscription.ts'), 'utf8'),
@@ -54,6 +72,8 @@ try {
     readFile(path.join(root, 'src/components/SttSettings.tsx'), 'utf8'),
     readFile(path.join(root, 'src/views/StudyRecordingsView.tsx'), 'utf8'),
     readFile(path.join(root, 'src/components/media/TranscriptionProgress.tsx'), 'utf8'),
+    readFile(path.join(root, 'src/views/PrimarySourceDossierView.tsx'), 'utf8'),
+    readFile(path.join(root, 'electron/db/settingsRepo.ts'), 'utf8'),
     readFile(path.join(root, 'index.html'), 'utf8'),
   ]);
   assert.match(pkg, /"@huggingface\/transformers"/, 'transformers is a direct runtime dependency');
@@ -61,8 +81,15 @@ try {
   assert.match(worker, /device: 'wasm'/, 'local Whisper explicitly runs on WASM');
   assert.match(worker, /automatic-speech-recognition/, 'worker owns ASR inference');
   assert.match(worker, /WhisperTextStreamer/, 'ONNX transcription streams partial text from the worker');
-  assert.match(backend, /gpt-4o-transcribe/, 'official OpenAI transcription model is the fallback');
+  assert.equal(stt.DEFAULT_OPENAI_TRANSCRIPTION_MODEL, 'gpt-4o-transcribe', 'official OpenAI transcription model is the fallback');
   assert.match(backend, /audio\.transcriptions\.create/, 'external audio uses the transcription endpoint');
+  assert.match(backend, /response_format: diarization \? 'diarized_json' : 'json'/, 'speaker detection requests the diarized response contract');
+  assert.match(backend, /chunking_strategy: diarization \? 'auto'/, 'diarization enables server VAD chunking');
+  assert.match(backend, /speaker:/, 'speaker labels are mapped into Nodus transcript chunks');
+  assert.match(settingsUi, /OPENAI_STUDY_STT_MODELS/, 'Settings uses a dedicated STT catalog instead of generic favorites');
+  assert.doesNotMatch(settingsUi, /<ModelPicker/, 'the OpenAI STT selector cannot offer chat models');
+  assert.match(settingsRepo, /sanitizeTranscriptionModel/, 'stale incompatible transcription selections are repaired');
+  assert.match(dossierUi, /segment\.speakerLabel/, 'Primary Sources exposes preserved diarization labels');
   assert.match(cppBackend, /spawn\(executable/, 'whisper.cpp runs in a child process outside the UI thread');
   assert.match(cppBackend, /print-progress/, 'whisper.cpp exposes incremental progress');
   assert.match(cppBackend, /onPartial/, 'whisper.cpp streams completed segments');

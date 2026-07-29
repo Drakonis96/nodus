@@ -469,8 +469,10 @@ export function createEvent(input: EventInput): HistoricalEvent {
   const parsed = parseHistoricalDate(input.date);
   const tx = db.transaction(() => {
     db.prepare(
-      `INSERT INTO events (event_id, type, label, date, date_sort, date_end_sort, place_id, notes, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO events (
+        event_id, type, label, date, date_sort, date_end_sort, date_certainty,
+        place_id, notes, created_at, updated_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       id,
       input.type,
@@ -478,6 +480,7 @@ export function createEvent(input: EventInput): HistoricalEvent {
       input.date ?? null,
       parsed.sortKey,
       parsed.endSortKey,
+      parsed.qualifier,
       input.placeId ?? null,
       input.notes ?? null,
       ts,
@@ -500,10 +503,14 @@ export function updateEvent(eventId: string, patch: Partial<EventInput>): Histor
   const parsed = parseHistoricalDate(date);
   getDb()
     .prepare(
-      `UPDATE events SET type = ?, label = ?, date = ?, date_sort = ?, date_end_sort = ?, place_id = ?, notes = ?, updated_at = ?
+      `UPDATE events SET type=?, label=?, date=?, date_sort=?, date_end_sort=?,
+       date_certainty=?, place_id=?, notes=?, updated_at=?
        WHERE event_id = ?`
     )
-    .run(type, label, date, parsed.sortKey, parsed.endSortKey, placeId, notes, now(), eventId);
+    .run(
+      type, label, date, parsed.sortKey, parsed.endSortKey, parsed.qualifier,
+      placeId, notes, now(), eventId
+    );
   return getEvent(eventId);
 }
 
@@ -583,6 +590,14 @@ interface EvidenceRow {
   quote: string | null;
   location: string | null;
   confidence: number | null;
+  excerpt_id: string | null;
+  evidence_role: RecordEvidence['evidenceRole'];
+  certainty: number | null;
+  review_status: RecordEvidence['reviewStatus'];
+  source_version_id: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string | null;
 }
 
 function rowToEvidence(row: EvidenceRow): RecordEvidence {
@@ -595,6 +610,14 @@ function rowToEvidence(row: EvidenceRow): RecordEvidence {
     quote: row.quote,
     location: row.location,
     confidence: row.confidence,
+    excerptId: row.excerpt_id,
+    evidenceRole: row.evidence_role,
+    certainty: row.certainty,
+    reviewStatus: row.review_status,
+    sourceVersionId: row.source_version_id,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at ?? row.created_at,
   };
 }
 
@@ -602,8 +625,11 @@ export function addRecordEvidence(input: RecordEvidenceInput): RecordEvidence {
   const id = newId('rev');
   getDb()
     .prepare(
-      `INSERT INTO record_evidence (id, target_kind, target_id, nodus_id, source_kind, quote, location, confidence, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO record_evidence (
+        id, target_kind, target_id, nodus_id, source_kind, quote, location, confidence,
+        excerpt_id, evidence_role, certainty, review_status, source_version_id,
+        created_by, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       id,
@@ -614,6 +640,13 @@ export function addRecordEvidence(input: RecordEvidenceInput): RecordEvidence {
       input.quote ?? null,
       input.location ?? null,
       input.confidence ?? null,
+      input.excerptId ?? null,
+      input.evidenceRole ?? 'supports',
+      input.certainty ?? input.confidence ?? null,
+      input.reviewStatus ?? 'unreviewed',
+      input.sourceVersionId ?? null,
+      input.createdBy ?? null,
+      now(),
       now()
     );
   const row = getDb().prepare('SELECT * FROM record_evidence WHERE id = ?').get(id) as EvidenceRow;

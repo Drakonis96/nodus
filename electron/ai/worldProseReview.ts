@@ -1,7 +1,7 @@
 // Read the scene and say which of its declared beats are actually on the page.
 //
-// The third and last model call of the worldbuilding vault, and the one A9 turned down for
-// lack of an input: back then its source was `world_scenes.summary`, which is NULLABLE and
+// A narrow, read-only worldbuilding model call. An earlier design lacked a reliable input:
+// its source was `world_scenes.summary`, which is nullable and
 // empty most of the time in a real vault. The manuscript created the input.
 //
 // It never rewrites and never judges the prose. The beats are the author's own statement of

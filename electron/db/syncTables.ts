@@ -23,12 +23,12 @@ const SYNC_GROUPS: { key: SyncGroupKey; prefix?: string; tables?: string[] }[] =
   // Deletions travel as their own records, and are applied before any row is merged so
   // a tombstone can stop a resurrection rather than undo it afterwards.
   { key: 'tombstones', tables: ['sync_tombstones'] },
-  // `note_links` viaja con las notas y no con lo que enlaza: la tabla esta hecha para
+  // `testimony_note_links` viaja con las notas y no con lo que enlaza: la tabla esta hecha para
   // tolerar un destino ausente (la nota conserva su texto y muestra el enlace roto), asi
   // que un enlace que llega a una maquina sin la entrevista de destino degrada bien. Lo
   // contrario -- una nota que llega sin sus enlaces -- perderia trabajo del investigador
   // en silencio.
-  { key: 'notes', tables: ['note_folders', 'notes', 'note_links'] },
+  { key: 'notes', tables: ['note_folders', 'notes', 'note_links', 'testimony_note_links'] },
   {
     key: 'writing',
     tables: [
@@ -51,6 +51,7 @@ const SYNC_GROUPS: { key: SyncGroupKey; prefix?: string; tables?: string[] }[] =
   { key: 'protect', tables: ['protect_copies'] },
   { key: 'study', prefix: 'study_' },
   { key: 'teaching', prefix: 'teaching_' },
+  { key: 'prosopography', prefix: 'prosop_' },
   {
     key: 'genealogy',
     tables: [
@@ -69,6 +70,38 @@ const SYNC_GROUPS: { key: SyncGroupKey; prefix?: string; tables?: string[] }[] =
       'archive_item_folders',
       'archive_item_persons',
       'archive_item_tags',
+      // Primary Sources is an additive archival layer over archive_items. Every table
+      // below contains user-authored description, evidence, preservation history or
+      // review decisions and therefore travels with the compatible legacy record.
+      'archive_repositories',
+      'archive_description_units',
+      'archive_item_units',
+      'archive_capture_sessions',
+      'archive_item_profiles',
+      'archive_item_files',
+      'archive_text_versions',
+      'archive_text_segments',
+      'archive_excerpts',
+      'archive_entity_proposals',
+      'archive_proposal_decisions',
+      'archive_source_analyses',
+      'archive_place_mentions',
+      'archive_place_resolution_decisions',
+      'archive_person_mentions',
+      'entity_resolutions',
+      'note_links',
+      'testimony_note_links',
+      'primary_source_note_profiles',
+      'primary_source_note_link_snapshots',
+      'primary_source_policies',
+      'primary_source_citation_settings',
+      'primary_source_operation_runs',
+      'primary_source_export_manifests',
+      'primary_source_restore_reports',
+      'archive_integrity_checks',
+      'archive_exports',
+      'archive_description_templates',
+      'archive_audit_log',
       'kinship_suggestions',
       'kinship_suggestion_evidence',
       'social_contacts',
@@ -173,6 +206,8 @@ const NOT_SYNCED_TABLES = new Set([
   'ideas', 'idea_occurrences', 'idea_theme_links', 'themes', 'edges', 'edge_traces', 'gaps',
   'passages', 'collections', 'zotero_tags', 'external_refs', 'extraction_cache', 'scan_checkpoints',
   'sync_log', 'settings',
+  // Explicitly local, opt-in and content-free beta performance observations.
+  'primary_source_local_metrics',
   // Deliberately machine-local: it is THIS computer's record of what its own merges
   // discarded. Shipping it would let one machine's audit trail overwrite the other's,
   // and restoring an entry there would write a row that never lost anything here.

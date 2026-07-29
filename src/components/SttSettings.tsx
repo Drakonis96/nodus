@@ -1,10 +1,16 @@
 import { useEffect, useState } from 'react';
 import type { AppSettings, WhisperCppStatus } from '@shared/types';
-import { STUDY_STT_MODELS, WHISPER_CPP_MODELS } from '@shared/sttModels';
+import {
+  DEFAULT_OPENAI_TRANSCRIPTION_MODEL,
+  OPENAI_STUDY_STT_MODELS,
+  STUDY_STT_MODELS,
+  WHISPER_CPP_MODELS,
+  isOpenAiDiarizationModel,
+  isOpenAiStudySttModel,
+} from '@shared/sttModels';
 import { ensureLocalWhisperModel, isLocalWhisperModelReady, removeLocalWhisperModel } from '../lib/stt/localWhisper';
 import { t } from '../i18n';
 import { Icon } from './ui';
-import { ModelPicker } from './ModelPicker';
 import { SettingsModelDot, SettingsModelList, settingsModelRowClass } from './SettingsModelList';
 
 export function SttSettings({ settings, patch }: {
@@ -107,7 +113,21 @@ export function SttSettings({ settings, patch }: {
         })}</SettingsModelList>
       </div>}
 
-      {settings.sttProvider === 'openai' && <div className="mt-4 max-w-xl"><label className="text-xs text-neutral-500">{t('Modelo externo')}<ModelPicker compact settings={settings} value={settings.transcriptionModel} onChange={(transcriptionModel) => void patch({ transcriptionModel })} emptyLabel="gpt-4o-transcribe (predeterminado)" /></label><p className="mt-2 text-[10px] text-neutral-600">{t('Esta opción envía el audio a OpenAI. Los dos motores anteriores funcionan localmente.')}</p></div>}
+      {settings.sttProvider === 'openai' && <div className="mt-4 max-w-xl">
+        <label className="text-xs text-neutral-500">{t('Modelo externo')}
+          <select
+            className="input mt-1 w-full text-xs"
+            value={settings.transcriptionModel?.provider === 'openai' && isOpenAiStudySttModel(settings.transcriptionModel.model)
+              ? settings.transcriptionModel.model
+              : DEFAULT_OPENAI_TRANSCRIPTION_MODEL}
+            onChange={(event) => void patch({ transcriptionModel: { provider: 'openai', model: event.target.value } })}
+          >
+            {OPENAI_STUDY_STT_MODELS.map((model) => <option key={model.id} value={model.id}>{model.label}</option>)}
+          </select>
+        </label>
+        <p className="mt-2 text-[10px] text-neutral-600">{t('Esta opción envía el audio a OpenAI. Los dos motores anteriores funcionan localmente.')}</p>
+        {isOpenAiDiarizationModel(settings.transcriptionModel?.model ?? DEFAULT_OPENAI_TRANSCRIPTION_MODEL) && <p className="mt-2 rounded-lg border border-teal-200 bg-teal-50 px-3 py-2 text-[10px] text-teal-800 dark:border-teal-900/60 dark:bg-teal-950/25 dark:text-teal-300">{t('La diarización detecta cambios de hablante y etiqueta cada segmento automáticamente. Revisa siempre las etiquetas antes de usar la transcripción.')}</p>}
+      </div>}
 
       {busy && <div className="mt-3 h-1.5 overflow-hidden rounded bg-neutral-200 dark:bg-neutral-800"><div className="h-full bg-indigo-500 transition-all" style={{ width: `${Math.max(3, progress * 100)}%` }} /></div>}
       {error && <p className="mt-3 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-900/50 dark:bg-red-950/20 dark:text-red-300">{error}</p>}

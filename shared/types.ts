@@ -1,5 +1,61 @@
 // Shared domain types used by both the Electron main process and the React renderer.
 // Keep this file free of any runtime imports from either side.
+import type {
+  ProsopCriterionInput,
+  ProsopMethodologyVersion,
+  ProsopPopulationCriterion,
+  ProsopPopulationWorkspace,
+  ProsopQuestionnaireDraftInput,
+  ProsopQuestionnaireVersion,
+  ProsopStudy,
+  ProsopStudyInput,
+  ProsopVariableRevision,
+  ProsopVariableRevisionInput,
+  ProsopVocabulary,
+  ProsopVocabularyTerm,
+  ProsopSource,
+  ProsopSourceInput,
+  ProsopSourceSegment,
+  ProsopSourceSegmentInput,
+  ProsopSourcesWorkspace,
+  ProsopCaptureTemplate,
+  ProsopCaptureBatch,
+  ProsopCaptureRow,
+  ProsopFactoidDossier,
+  ProsopFactoidInput,
+  ProsopMissingValue,
+  ProsopMissingValueInput,
+  ProsopObservationsWorkspace,
+  ProsopResolution,
+  ProsopResolutionInput,
+  ProsopAuthorityId,
+  ProsopIdentityHypothesis,
+  ProsopIdentityHypothesisInput,
+  ProsopIdentityWorkspace,
+  ProsopNameAttestation,
+  ProsopNameAttestationInput,
+  ProsopOrganization,
+  ProsopPersonProfile,
+  ProsopCohort,
+  ProsopCohortInput,
+  ProsopMembershipInput,
+  ProsopMembershipWorkspace,
+  ProsopPopulationMembership,
+  ProsopAnalysisDefinitionRecord,
+  ProsopAnalysisRunRecord,
+  ProsopAnalysisWorkspace,
+  ProsopProjectionDefinition,
+  ProsopNetworkEdge,
+  ProsopNetworkEdgeInput,
+  ProsopNetworkLayer,
+  ProsopNetworkLayerInput,
+  ProsopNetworksWorkspace,
+  ProsopNoteLink,
+  ProsopProposal,
+  ProsopSearchHit,
+  ProsopInvariantIssue,
+} from './prosopography';
+import type { ProsopIpifDocument } from './prosopographyInterchange';
 
 // Testimonios (historia oral). Las REGLAS del dominio — transiciones, normalización de
 // códigos, remapeo de citas, la puerta de acceso — viven en './testimonies' y
@@ -228,6 +284,8 @@ import type {
 import type {
   StudyAudioMarker,
   StudyAudioMarkerInput,
+  StudyDiarizationRequest,
+  StudyDiarizationResult,
   StudyRecordingContent,
   StudyRecordingCreateInput,
   StudyRecordingDetail,
@@ -379,6 +437,8 @@ export type {
 export type {
   StudyAudioMarker,
   StudyAudioMarkerInput,
+  StudyDiarizationRequest,
+  StudyDiarizationResult,
   StudyRecordingContent,
   StudyRecordingCreateInput,
   StudyRecordingDetail,
@@ -1571,6 +1631,13 @@ export interface AppSettings {
   studyTourComplete: boolean;
   // Completion flag for the teaching-vault guided tour.
   docenciaTourComplete: boolean;
+  // Completion flag for the six-step Primary Sources evidence workflow tour.
+  primarySourcesTourComplete: boolean;
+  /**
+   * Explicit opt-in for coarse, on-device Primary Sources performance metrics.
+   * These rows never leave the vault automatically and never contain content or ids.
+   */
+  primarySourcesLocalMetricsEnabled: boolean;
   // Large-PDF / extraction strategy
   preferZoteroFulltext: boolean;
   ocrEnabled: boolean;
@@ -1922,8 +1989,20 @@ export type ParticipantRole =
   | 'officiant'
   | 'other';
 
-export type RecordEvidenceTargetKind = 'person' | 'place' | 'event' | 'participant' | 'relationship';
+export type RecordEvidenceTargetKind =
+  | 'person'
+  | 'place'
+  | 'event'
+  | 'event_participant'
+  | 'social_relation'
+  | 'identity_resolution'
+  | 'archive_item'
+  /** Legacy names remain readable while callers migrate to the explicit names above. */
+  | 'participant'
+  | 'relationship';
 export type RecordSourceKind = 'work' | 'archive';
+export type RecordEvidenceRole = 'supports' | 'contradicts' | 'contextualizes' | 'mentions';
+export type RecordEvidenceReviewStatus = 'unreviewed' | 'in_review' | 'reviewed';
 
 // Kinship (genealogy layer, phase C)
 export type RelationshipType = 'parent' | 'spouse' | 'sibling';
@@ -1995,6 +2074,13 @@ export interface SocialRelation {
   valence?: SocialRelationValence | null;
   /** The event from which the bond took this shape; null when it always has. */
   sinceEventId?: string | null;
+  /** Evidence-first enrichment. Legacy rows use the schema defaults. */
+  status: 'proposal' | 'confirmed' | 'rejected';
+  certainty: number | null;
+  dateDisplay: string | null;
+  dateStartSort: string | null;
+  dateEndSort: string | null;
+  direction: 'directed' | 'undirected' | 'mutual';
   createdAt: string;
   updatedAt: string;
 }
@@ -2018,6 +2104,12 @@ export interface SocialRelationInput {
   notes?: string | null;
   valence?: SocialRelationValence | null;
   sinceEventId?: string | null;
+  status?: 'proposal' | 'confirmed' | 'rejected';
+  certainty?: number | null;
+  dateDisplay?: string | null;
+  dateStartSort?: string | null;
+  dateEndSort?: string | null;
+  direction?: 'directed' | 'undirected' | 'mutual';
 }
 
 /** One node in the social-relations graph: a tree person or a standalone contact. */
@@ -3519,6 +3611,14 @@ export interface RecordEvidence {
   quote: string | null;
   location: string | null;
   confidence: number | null;
+  excerptId: string | null;
+  evidenceRole: RecordEvidenceRole;
+  certainty: number | null;
+  reviewStatus: RecordEvidenceReviewStatus;
+  sourceVersionId: string | null;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface RecordEvidenceInput {
@@ -3529,6 +3629,12 @@ export interface RecordEvidenceInput {
   quote?: string | null;
   location?: string | null;
   confidence?: number | null;
+  excerptId?: string | null;
+  evidenceRole?: RecordEvidenceRole;
+  certainty?: number | null;
+  reviewStatus?: RecordEvidenceReviewStatus;
+  sourceVersionId?: string | null;
+  createdBy?: string | null;
 }
 
 // ── Evidence archive (phase B) ───────────────────────────────────────────────
@@ -4127,6 +4233,7 @@ export type SyncGroupKey =
   | 'study'
   | 'teaching'
   | 'genealogy'
+  | 'prosopography'
   | 'worldbuilding'
   | 'research'
   | 'chats'
@@ -7337,6 +7444,60 @@ export interface NodusApi {
   resetVault(id: string): Promise<VaultSummary>;
   reuseVaultAnalysis(nodusIds: string[]): Promise<VaultAnalysisReuseResult>;
   copyVaultApiKeys(sourceVaultId: string, targetVaultId: string): Promise<{ copiedProviders: AiProvider[] }>;
+  // Prosopography — methodology, population and questionnaire.
+  getProsopPopulationWorkspace(): Promise<ProsopPopulationWorkspace>;
+  updateProsopStudy(patch: ProsopStudyInput): Promise<ProsopStudy>;
+  createProsopMethodologyDraft(actor?: string): Promise<ProsopMethodologyVersion>;
+  replaceProsopCriteria(versionId: string, criteria: ProsopCriterionInput[]): Promise<ProsopPopulationCriterion[]>;
+  publishProsopMethodology(versionId: string, changeSummary: string, actor?: string): Promise<ProsopMethodologyVersion>;
+  createProsopQuestionnaireDraft(input: ProsopQuestionnaireDraftInput): Promise<ProsopQuestionnaireVersion>;
+  saveProsopVariableRevision(questionnaireVersionId: string, input: ProsopVariableRevisionInput): Promise<ProsopVariableRevision>;
+  deleteProsopVariableRevision(questionnaireVersionId: string, variableId: string): Promise<void>;
+  publishProsopQuestionnaire(questionnaireVersionId: string, changeSummary: string, actor?: string): Promise<ProsopQuestionnaireVersion>;
+  saveProsopVocabulary(input: Partial<ProsopVocabulary> & { name: string }): Promise<ProsopVocabulary>;
+  saveProsopVocabularyTerm(input: Partial<ProsopVocabularyTerm> & { vocabularyId: string; code: string; preferredLabel: string }): Promise<ProsopVocabularyTerm>;
+  getProsopSourcesWorkspace(): Promise<ProsopSourcesWorkspace>;
+  saveProsopSource(input: ProsopSourceInput): Promise<ProsopSource>;
+  deleteProsopSource(sourceId: string): Promise<void>;
+  saveProsopSourceSegment(input: ProsopSourceSegmentInput): Promise<ProsopSourceSegment>;
+  saveProsopCaptureTemplate(input: Partial<ProsopCaptureTemplate> & { name: string; sourceKind: string }): Promise<ProsopCaptureTemplate>;
+  importProsopDelimited(input: { sourceId?: string | null; templateId?: string | null; fileName: string; text: string; locatorColumn?: string | null; createdBy?: string }): Promise<ProsopCaptureBatch & { rows: ProsopCaptureRow[] }>;
+  reviewProsopCaptureRow(captureRowId: string, status: 'accepted' | 'rejected'): Promise<ProsopCaptureRow>;
+  getProsopObservationsWorkspace(): Promise<ProsopObservationsWorkspace>;
+  saveProsopFactoid(input: ProsopFactoidInput): Promise<ProsopFactoidDossier>;
+  reviewProsopFactoid(factoidId: string, status: 'reviewed' | 'rejected', reviewedBy?: string): Promise<ProsopFactoidDossier>;
+  saveProsopMissingValue(input: ProsopMissingValueInput): Promise<ProsopMissingValue>;
+  saveProsopResolution(input: ProsopResolutionInput): Promise<ProsopResolution>;
+  retireProsopResolution(resolutionId: string): Promise<void>;
+  getProsopIdentityWorkspace(): Promise<ProsopIdentityWorkspace>;
+  createProsopPerson(input: PersonInput & { preferredNameBasis?: string; privacyStatus?: ProsopPersonProfile['privacyStatus'] }): Promise<ProsopPersonProfile>;
+  saveProsopNameAttestation(input: ProsopNameAttestationInput): Promise<ProsopNameAttestation>;
+  searchProsopIdentityCandidates(literalName: string, limit?: number): Promise<Array<ProsopPersonProfile & { score: number; reasons: string[] }>>;
+  saveProsopIdentityHypothesis(input: ProsopIdentityHypothesisInput): Promise<ProsopIdentityHypothesis>;
+  decideProsopIdentityHypothesis(hypothesisId: string, status: 'accepted' | 'rejected', reviewedBy?: string): Promise<ProsopIdentityHypothesis>;
+  mergeProsopPersons(survivorId: string, absorbedId: string, rationale: string, actor?: string): Promise<string>;
+  reverseProsopPersonMerge(mergeId: string, actor?: string): Promise<void>;
+  saveProsopAuthorityId(input: Omit<ProsopAuthorityId,'authorityId'|'createdAt'|'status'> & { authorityId?: string }): Promise<ProsopAuthorityId>;
+  saveProsopOrganization(input: Partial<ProsopOrganization> & { preferredName: string }): Promise<ProsopOrganization>;
+  getProsopMembershipWorkspace(): Promise<ProsopMembershipWorkspace>;
+  saveProsopMembership(input: ProsopMembershipInput): Promise<ProsopPopulationMembership>;
+  saveProsopCohort(input: ProsopCohortInput): Promise<ProsopCohort>;
+  refreshProsopDynamicCohort(cohortId: string): Promise<ProsopCohort>;
+  getProsopAnalysisWorkspace(): Promise<ProsopAnalysisWorkspace>;
+  runProsopAnalysis(input: { analysisId?: string; title: string; analysisKind: ProsopAnalysisDefinitionRecord['analysisKind']; personIds?: string[]; variableIds: string[]; cohortIds?: string[]; createdBy?: string; policies?: ProsopProjectionDefinition['variablePolicies'] }): Promise<ProsopAnalysisRunRecord>;
+  getProsopNetworksWorkspace(): Promise<ProsopNetworksWorkspace>;
+  saveProsopNetworkLayer(input: ProsopNetworkLayerInput): Promise<ProsopNetworkLayer>;
+  saveProsopNetworkEdge(input: ProsopNetworkEdgeInput): Promise<ProsopNetworkEdge>;
+  deriveProsopCooccurrenceLayer(layerId: string): Promise<ProsopNetworkLayer>;
+  searchProsopography(query: string, kind?: ProsopSearchHit['kind']): Promise<ProsopSearchHit[]>;
+  listProsopProposals(): Promise<ProsopProposal[]>;
+  createProsopProposal(input: { proposalKind: string; sourceId?: string | null; sourceSegmentId?: string | null; captureRowId?: string | null; targetKind: string; targetId?: string | null; payload: import('./prosopography').JsonValue; confidence?: number | null; rationale: string; producerKind: 'ai' | 'rule' | 'import' | 'human'; producerId: string; questionnaireVersionId?: string | null }): Promise<ProsopProposal>;
+  decideProsopProposal(proposalId: string, status: 'accepted' | 'rejected', reviewedBy?: string, decisionNote?: string): Promise<ProsopProposal>;
+  saveProsopNoteLink(input: { linkId?: string; nodusId: string; targetKind: string; targetId: string; targetVaultId?: string | null; relationKind?: string }): Promise<ProsopNoteLink>;
+  exportProsopLongRows(): Promise<Array<Record<string, unknown>>>;
+  exportProsopIpif(): Promise<ProsopIpifDocument>;
+  auditProsopIntegrity(): Promise<{ ok: boolean; issues: ProsopInvariantIssue[]; checksum: string; syncCoverage: { included: Record<string,string[]>; excluded:string[]; unclassified:string[]; unmergeable:string[] } }>;
+  seedProsopDemo(): Promise<{ seeded: boolean; message: string }>;
   // records ontology (primary sources / genealogy)
   recordCounts(): Promise<RecordCounts>;
   listPersons(search?: string): Promise<Person[]>;
@@ -7845,6 +8006,197 @@ export interface NodusApi {
   /** Embed text-bearing archive items for semantic discovery (idempotent). */
   indexArchive(): Promise<{ indexed: number; skipped: number }>;
   archiveIndexStatus(): Promise<{ indexed: number; total: number }>;
+  // Primary Sources: canonical archival workspace over the compatible archive.
+  getPrimarySourcesWorkspace(
+    search?: string,
+    offset?: number,
+    limit?: number
+  ): Promise<import('./primarySourcesTypes').PrimarySourceArchiveWorkspace>;
+  getPrimarySourceDossier(itemId: string): Promise<import('./primarySourcesTypes').PrimarySourceDossier | null>;
+  choosePrimarySourceFiles(): Promise<string[]>;
+  ingestPrimarySources(
+    input: import('./primarySourcesTypes').PrimarySourceIngestInput
+  ): Promise<import('./primarySourcesTypes').PrimarySourceIngestSummary>;
+  createPrimarySourceUnit(
+    input: import('./primarySourcesTypes').PrimarySourceUnitCreateInput
+  ): Promise<import('./archiveTypes').ArchiveDescriptionUnit>;
+  createPrimarySourceRepository(
+    input: Pick<import('./archiveTypes').ArchiveRepository, 'name'> &
+      Partial<Omit<import('./archiveTypes').ArchiveRepository, 'repositoryId' | 'name' | 'createdAt' | 'updatedAt'>>
+  ): Promise<import('./archiveTypes').ArchiveRepository>;
+  createPrimarySourceCaptureSession(
+    input: Pick<import('./archiveTypes').ArchiveCaptureSession, 'title'> &
+      Partial<Omit<import('./archiveTypes').ArchiveCaptureSession, 'sessionId' | 'title' | 'createdAt' | 'updatedAt'>>
+  ): Promise<import('./archiveTypes').ArchiveCaptureSession>;
+  createPrimarySourceCollection(name: string, parentId?: string | null): Promise<ArchiveFolder>;
+  createPrimarySourceDescriptionTemplate(input: {
+    name: string;
+    documentType?: string | null;
+    defaultLevel?: import('./archiveTypes').ArchiveDescriptionUnit['level'];
+    unitDefaults?: Partial<import('./archiveTypes').ArchiveDescriptionUnit>;
+    profileDefaults?: Partial<import('./primarySourcesTypes').PrimarySourceItemProfile>;
+  }): Promise<import('./primarySourcesTypes').PrimarySourceDescriptionTemplate>;
+  updatePrimarySourceArchiveRecord(
+    itemId: string,
+    input: import('./primarySourcesTypes').PrimarySourceArchiveEditInput
+  ): Promise<import('./primarySourcesTypes').PrimarySourceArchiveRow>;
+  previewPrimarySourceBulkEdit(itemIds: string[]): Promise<import('./primarySourcesTypes').PrimarySourceBulkPreview>;
+  applyPrimarySourceBulkEdit(input: {
+    itemIds: string[];
+    patch: import('./primarySourcesTypes').PrimarySourceBulkPatch;
+    expectedRevisions: Record<string, string>;
+  }): Promise<import('./primarySourcesTypes').PrimarySourceArchiveRow[]>;
+  addPrimarySourceFiles(
+    input: import('./primarySourcesTypes').PrimarySourceFileImportInput
+  ): Promise<import('./primarySourcesTypes').PrimarySourceFileImportResult>;
+  updatePrimarySourceFileMetadata(
+    fileId: string,
+    patch: import('./primarySourcesTypes').PrimarySourceFileMetadataPatch
+  ): Promise<import('./primarySourcesTypes').PrimarySourceDossier>;
+  reorderPrimarySourceFileGroups(
+    itemId: string,
+    rootFileIds: string[]
+  ): Promise<import('./primarySourcesTypes').PrimarySourceDossier>;
+  verifyPrimarySourceFiles(itemId: string): Promise<import('./primarySourcesTypes').PrimarySourceDossier>;
+  regeneratePrimarySourceThumbnail(parentFileId: string): Promise<import('./primarySourcesTypes').PrimarySourceDossier>;
+  savePrimarySourceFile(fileId: string): Promise<string | null>;
+  openPrimarySourceFileExternal(fileId: string): Promise<boolean>;
+  createPrimarySourceTextVersion(
+    input: import('./primarySourcesTypes').PrimarySourceTextVersionCreateInput
+  ): Promise<import('./primarySourcesTypes').PrimarySourceDossier>;
+  setPrimarySourceTextReviewStatus(
+    textVersionId: string,
+    status: import('./archiveTypes').ArchiveTextStatus
+  ): Promise<import('./primarySourcesTypes').PrimarySourceDossier>;
+  createPrimarySourceExcerpt(
+    input: import('./primarySourcesTypes').PrimarySourceExcerptCreateInput
+  ): Promise<import('./primarySourcesTypes').PrimarySourceDossier>;
+  setPrimarySourceExcerptReviewStatus(
+    excerptId: string,
+    status: import('./archiveTypes').ArchiveReviewStatus
+  ): Promise<import('./primarySourcesTypes').PrimarySourceDossier>;
+  savePrimarySourceAnalysis(
+    itemId: string,
+    patch: Partial<Omit<
+      import('./primarySourcesTypes').PrimarySourceAnalysis,
+      'analysisId' | 'itemId' | 'createdAt' | 'updatedAt'
+    >>
+  ): Promise<import('./primarySourcesTypes').PrimarySourceDossier>;
+  extractPrimarySourceProposals(
+    input: import('./primarySourcesTypes').PrimarySourceProposalExtractionInput
+  ): Promise<{
+    result: import('./primarySourcesTypes').PrimarySourceProposalExtractionResult;
+    dossier: import('./primarySourcesTypes').PrimarySourceDossier;
+  }>;
+  acceptPrimarySourceProposal(
+    proposalId: string,
+    input: import('./primarySourcesTypes').PrimarySourceProposalAcceptanceInput
+  ): Promise<{
+    result: import('./primarySourcesTypes').PrimarySourceProposalAcceptanceResult;
+    dossier: import('./primarySourcesTypes').PrimarySourceDossier;
+  }>;
+  decidePrimarySourceProposal(
+    proposalId: string,
+    status: 'rejected' | 'deferred',
+    input: import('./primarySourcesTypes').PrimarySourceProposalDecisionInput
+  ): Promise<import('./primarySourcesTypes').PrimarySourceDossier>;
+  revertPrimarySourceEntityResolution(
+    itemId: string,
+    resolutionId: string
+  ): Promise<import('./primarySourcesTypes').PrimarySourceDossier>;
+  listPrimarySourcePersons(
+    search?: string,
+    filter?: import('./primarySourcesTypes').PrimarySourcePersonFilter
+  ): Promise<import('./primarySourcesTypes').PrimarySourcePersonSummary[]>;
+  getPrimarySourcePersonDossier(
+    personId: string
+  ): Promise<import('./primarySourcesTypes').PrimarySourcePersonDossier | null>;
+  addPrimarySourcePersonVariant(
+    personId: string,
+    name: string
+  ): Promise<import('./primarySourcesTypes').PrimarySourcePersonDossier>;
+  mergePrimarySourcePersons(input: {
+    sourcePersonId: string;
+    targetPersonId: string;
+    rationale?: string | null;
+  }): Promise<import('./primarySourcesTypes').PrimarySourcePersonDossier>;
+  revertPrimarySourcePersonMerge(
+    resolutionId: string
+  ): Promise<import('./primarySourcesTypes').PrimarySourcePersonDossier | null>;
+  getPrimarySourceTimelineWorkspace(
+  ): Promise<import('./primarySourcesTypes').PrimarySourceTimelineWorkspace>;
+  getPrimarySourceMapWorkspace(
+  ): Promise<import('./primarySourcesTypes').PrimarySourceMapWorkspace>;
+  resolvePrimarySourceToponym(
+    input: import('./primarySourcesTypes').PrimarySourceToponymResolutionInput
+  ): Promise<import('./primarySourcesTypes').PrimarySourceMapWorkspace>;
+  revertPrimarySourceToponymResolution(
+    resolutionId: string
+  ): Promise<import('./primarySourcesTypes').PrimarySourceMapWorkspace>;
+  getPrimarySourceRelationsWorkspace(
+  ): Promise<import('./primarySourcesTypes').PrimarySourceRelationsWorkspace>;
+  searchPrimarySourceCorpus(
+    request: import('./primarySourcesTypes').PrimarySourceSearchRequest
+  ): Promise<import('./primarySourcesTypes').PrimarySourceSearchResponse>;
+  getPrimarySourceNoteWorkspace(
+  ): Promise<import('./primarySourcesTypes').PrimarySourceNoteWorkspace>;
+  createPrimarySourceNote(input: {
+    title: string;
+    content?: string;
+    noteType?: import('./primarySourcesTypes').PrimarySourceNoteType;
+    status?: import('./primarySourcesTypes').PrimarySourceNoteStatus;
+    collection?: string | null;
+    accessStatus?: import('./primarySourcesTypes').PrimarySourceAccessStatus;
+    sensitivity?: import('./primarySourcesTypes').PrimarySourceSensitivity;
+  }): Promise<import('./primarySourcesTypes').PrimarySourceResearchNote>;
+  updatePrimarySourceNoteProfile(
+    noteId: string,
+    patch: import('./primarySourcesTypes').PrimarySourceNoteProfilePatch
+  ): Promise<import('./primarySourcesTypes').PrimarySourceNoteProfile>;
+  addPrimarySourceNoteLink(
+    input: import('./primarySourcesTypes').PrimarySourceNoteLinkInput
+  ): Promise<import('./primarySourcesTypes').PrimarySourceResearchNoteLink>;
+  removePrimarySourceNoteLink(linkId: string): Promise<boolean>;
+  getPrimarySourceBacklinks(
+    targetKind: import('./primarySourcesTypes').PrimarySourceSearchTargetKind,
+    targetId: string
+  ): Promise<import('./primarySourcesTypes').PrimarySourceResearchNoteLink[]>;
+  insertPrimarySourceExcerptCitation(
+    input: import('./primarySourcesTypes').PrimarySourceNoteLinkInput
+  ): Promise<import('./primarySourcesTypes').PrimarySourceCitationInsertion>;
+  getPrimarySourceOperationalDashboard(
+  ): Promise<import('./primarySourcesTypes').PrimarySourceOperationalDashboard>;
+  getPrimarySourceGovernanceWorkspace(
+  ): Promise<import('./primarySourcesTypes').PrimarySourceGovernanceWorkspace>;
+  updatePrimarySourcePolicySettings(
+    patch: import('./primarySourcesTypes').PrimarySourcePolicySettingsPatch
+  ): Promise<import('./primarySourcesTypes').PrimarySourcePolicySettings>;
+  updatePrimarySourceCitationSettings(
+    patch: Partial<Omit<import('./primarySourcesTypes').PrimarySourceCitationSettings, 'updatedAt'>>
+  ): Promise<import('./primarySourcesTypes').PrimarySourceCitationSettings>;
+  getPrimarySourceLocalMetricSummary(
+  ): Promise<import('./primarySourcesTypes').PrimarySourceLocalMetricSummary>;
+  clearPrimarySourceLocalMetrics(): Promise<void>;
+  previewPrimarySourceToolkitOperation(
+    request: import('./primarySourcesTypes').PrimarySourceToolkitRequest
+  ): Promise<import('./primarySourcesTypes').PrimarySourceToolkitContextPreview>;
+  runPrimarySourceToolkitOperation(
+    request: import('./primarySourcesTypes').PrimarySourceToolkitRequest
+  ): Promise<import('./primarySourcesTypes').PrimarySourceToolkitResult>;
+  buildPrimarySourceCitation(
+    request: import('./primarySourcesTypes').PrimarySourceCitationBuildRequest
+  ): Promise<import('./primarySourcesTypes').PrimarySourceBuiltCitation>;
+  previewPrimarySourceExport(
+    request: import('./primarySourcesTypes').PrimarySourceExportRequest
+  ): Promise<import('./primarySourcesTypes').PrimarySourceExportPreview>;
+  exportPrimarySourceResearchPackage(
+    request: import('./primarySourcesTypes').PrimarySourceExportRequest
+  ): Promise<import('./primarySourcesTypes').PrimarySourceExportResult>;
+  validatePrimarySourceResearchPackage(
+  ): Promise<import('./primarySourcesTypes').PrimarySourcePackageValidation | null>;
+  restorePrimarySourceResearchPackage(
+    name?: string | null
+  ): Promise<import('./primarySourcesTypes').PrimarySourceRestoreReport | null>;
   // databases mode (Notion-like structured data)
   listDatabases(): Promise<DatabaseSummary[]>;
   searchDatabases(query: string, includeContent: boolean): Promise<DatabaseSearchHit[]>;
@@ -8392,6 +8744,7 @@ export interface NodusApi {
   deleteStudyAudioMarker(id: string): Promise<void>;
   saveStudyTranscript(recordingId: string, input: StudyTranscriptInput): Promise<StudyTranscript>;
   updateStudyTranscript(id: string, contentMarkdown: string, segments?: StudyTranscriptSegmentInput[]): Promise<StudyTranscript>;
+  diarizeStudyRecording(request: StudyDiarizationRequest): Promise<StudyDiarizationResult>;
   updateStudyTranscriptSegment(id: string, patch: Partial<StudyTranscriptSegmentInput>): Promise<StudyTranscriptSegment>;
   deleteStudyTranscript(id: string): Promise<void>;
   createStudyNoteFromTranscript(recordingId: string, transcriptId: string, placements?: StudyPlacementInput[]): Promise<{ documentId: string }>;
@@ -8754,6 +9107,8 @@ export interface NodusApi {
   hasAnyData(): Promise<boolean>;
   /** Seed the curated demo corpus. Returns false (no-op) if data already exists. */
   seedDemoData(): Promise<boolean>;
+  /** Seed the wholly fictional Primary Sources training corpus in an empty vault. */
+  seedPrimarySourcesDemoData(): Promise<boolean>;
   /** Remove every demo row and leave demo mode. */
   clearDemoData(): Promise<void>;
   /** Seed the genealogy demo (Serrano–Vidal family) and flip the vault to genealogy;

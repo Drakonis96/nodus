@@ -59,6 +59,59 @@ const api: NodusApi = {
   getSettings: () => ipcRenderer.invoke('settings:get'),
   updateSettings: (patch) => ipcRenderer.invoke('settings:update', patch),
   listVaults: () => ipcRenderer.invoke('vaults:list'),
+  getProsopPopulationWorkspace: () => ipcRenderer.invoke('prosop:population:workspace'),
+  updateProsopStudy: (patch) => ipcRenderer.invoke('prosop:study:update', patch),
+  createProsopMethodologyDraft: (actor) => ipcRenderer.invoke('prosop:methodology:createDraft', actor),
+  replaceProsopCriteria: (versionId, criteria) => ipcRenderer.invoke('prosop:methodology:replaceCriteria', versionId, criteria),
+  publishProsopMethodology: (versionId, changeSummary, actor) => ipcRenderer.invoke('prosop:methodology:publish', versionId, changeSummary, actor),
+  createProsopQuestionnaireDraft: (input) => ipcRenderer.invoke('prosop:questionnaire:createDraft', input),
+  saveProsopVariableRevision: (questionnaireVersionId, input) => ipcRenderer.invoke('prosop:questionnaire:saveVariable', questionnaireVersionId, input),
+  deleteProsopVariableRevision: (questionnaireVersionId, variableId) => ipcRenderer.invoke('prosop:questionnaire:deleteVariable', questionnaireVersionId, variableId).then(() => undefined),
+  publishProsopQuestionnaire: (questionnaireVersionId, changeSummary, actor) => ipcRenderer.invoke('prosop:questionnaire:publish', questionnaireVersionId, changeSummary, actor),
+  saveProsopVocabulary: (input) => ipcRenderer.invoke('prosop:vocabulary:save', input),
+  saveProsopVocabularyTerm: (input) => ipcRenderer.invoke('prosop:vocabulary:saveTerm', input),
+  getProsopSourcesWorkspace: () => ipcRenderer.invoke('prosop:sources:workspace'),
+  saveProsopSource: (input) => ipcRenderer.invoke('prosop:sources:save', input),
+  deleteProsopSource: (sourceId) => ipcRenderer.invoke('prosop:sources:delete', sourceId).then(() => undefined),
+  saveProsopSourceSegment: (input) => ipcRenderer.invoke('prosop:sources:saveSegment', input),
+  saveProsopCaptureTemplate: (input) => ipcRenderer.invoke('prosop:capture:saveTemplate', input),
+  importProsopDelimited: (input) => ipcRenderer.invoke('prosop:capture:importDelimited', input),
+  reviewProsopCaptureRow: (captureRowId, status) => ipcRenderer.invoke('prosop:capture:reviewRow', captureRowId, status),
+  getProsopObservationsWorkspace: () => ipcRenderer.invoke('prosop:observations:workspace'),
+  saveProsopFactoid: (input) => ipcRenderer.invoke('prosop:factoids:save', input),
+  reviewProsopFactoid: (factoidId, status, reviewedBy) => ipcRenderer.invoke('prosop:factoids:review', factoidId, status, reviewedBy),
+  saveProsopMissingValue: (input) => ipcRenderer.invoke('prosop:missing:save', input),
+  saveProsopResolution: (input) => ipcRenderer.invoke('prosop:resolutions:save', input),
+  retireProsopResolution: (resolutionId) => ipcRenderer.invoke('prosop:resolutions:retire', resolutionId).then(() => undefined),
+  getProsopIdentityWorkspace: () => ipcRenderer.invoke('prosop:identity:workspace'),
+  createProsopPerson: (input) => ipcRenderer.invoke('prosop:identity:createPerson', input),
+  saveProsopNameAttestation: (input) => ipcRenderer.invoke('prosop:identity:saveAttestation', input),
+  searchProsopIdentityCandidates: (literalName, limit) => ipcRenderer.invoke('prosop:identity:candidates', literalName, limit),
+  saveProsopIdentityHypothesis: (input) => ipcRenderer.invoke('prosop:identity:saveHypothesis', input),
+  decideProsopIdentityHypothesis: (hypothesisId, status, reviewedBy) => ipcRenderer.invoke('prosop:identity:decideHypothesis', hypothesisId, status, reviewedBy),
+  mergeProsopPersons: (survivorId, absorbedId, rationale, actor) => ipcRenderer.invoke('prosop:identity:merge', survivorId, absorbedId, rationale, actor),
+  reverseProsopPersonMerge: (mergeId, actor) => ipcRenderer.invoke('prosop:identity:reverseMerge', mergeId, actor).then(() => undefined),
+  saveProsopAuthorityId: (input) => ipcRenderer.invoke('prosop:identity:saveAuthority', input),
+  saveProsopOrganization: (input) => ipcRenderer.invoke('prosop:identity:saveOrganization', input),
+  getProsopMembershipWorkspace: () => ipcRenderer.invoke('prosop:membership:workspace'),
+  saveProsopMembership: (input) => ipcRenderer.invoke('prosop:membership:save', input),
+  saveProsopCohort: (input) => ipcRenderer.invoke('prosop:cohorts:save', input),
+  refreshProsopDynamicCohort: (cohortId) => ipcRenderer.invoke('prosop:cohorts:refresh', cohortId),
+  getProsopAnalysisWorkspace: () => ipcRenderer.invoke('prosop:analysis:workspace'),
+  runProsopAnalysis: (input) => ipcRenderer.invoke('prosop:analysis:run', input),
+  getProsopNetworksWorkspace: () => ipcRenderer.invoke('prosop:networks:workspace'),
+  saveProsopNetworkLayer: (input) => ipcRenderer.invoke('prosop:networks:saveLayer', input),
+  saveProsopNetworkEdge: (input) => ipcRenderer.invoke('prosop:networks:saveEdge', input),
+  deriveProsopCooccurrenceLayer: (layerId) => ipcRenderer.invoke('prosop:networks:deriveCooccurrence', layerId),
+  searchProsopography: (query, kind) => ipcRenderer.invoke('prosop:search', query, kind),
+  listProsopProposals: () => ipcRenderer.invoke('prosop:proposals:list'),
+  createProsopProposal: (input) => ipcRenderer.invoke('prosop:proposals:create', input),
+  decideProsopProposal: (proposalId, status, reviewedBy, decisionNote) => ipcRenderer.invoke('prosop:proposals:decide', proposalId, status, reviewedBy, decisionNote),
+  saveProsopNoteLink: (input) => ipcRenderer.invoke('prosop:notes:link', input),
+  exportProsopLongRows: () => ipcRenderer.invoke('prosop:export:long'),
+  exportProsopIpif: () => ipcRenderer.invoke('prosop:export:ipif'),
+  auditProsopIntegrity: () => ipcRenderer.invoke('prosop:integrity:audit'),
+  seedProsopDemo: () => ipcRenderer.invoke('prosop:demo:seed'),
   // Nodi companion: notifications
   listNotifications: () => ipcRenderer.invoke('nodi:notifications:list'),
   markNotificationsRead: () => ipcRenderer.invoke('nodi:notifications:markRead'),
@@ -483,6 +536,110 @@ const api: NodusApi = {
   suggestDocumentsForPerson: (personId) => ipcRenderer.invoke('archive:suggestDocumentsForPerson', personId),
   indexArchive: () => ipcRenderer.invoke('archive:index'),
   archiveIndexStatus: () => ipcRenderer.invoke('archive:indexStatus'),
+  getPrimarySourcesWorkspace: (search, offset, limit) =>
+    ipcRenderer.invoke('primarySources:workspace', search, offset, limit),
+  getPrimarySourceDossier: (itemId) => ipcRenderer.invoke('primarySources:dossier', itemId),
+  choosePrimarySourceFiles: () => ipcRenderer.invoke('primarySources:chooseFiles'),
+  ingestPrimarySources: (input) => ipcRenderer.invoke('primarySources:ingest', input),
+  createPrimarySourceUnit: (input) => ipcRenderer.invoke('primarySources:createUnit', input),
+  createPrimarySourceRepository: (input) => ipcRenderer.invoke('primarySources:createRepository', input),
+  createPrimarySourceCaptureSession: (input) => ipcRenderer.invoke('primarySources:createSession', input),
+  createPrimarySourceCollection: (name, parentId) => ipcRenderer.invoke('primarySources:createCollection', name, parentId),
+  createPrimarySourceDescriptionTemplate: (input) => ipcRenderer.invoke('primarySources:createTemplate', input),
+  updatePrimarySourceArchiveRecord: (itemId, input) => ipcRenderer.invoke('primarySources:updateRecord', itemId, input),
+  previewPrimarySourceBulkEdit: (itemIds) => ipcRenderer.invoke('primarySources:bulkPreview', itemIds),
+  applyPrimarySourceBulkEdit: (input) => ipcRenderer.invoke('primarySources:bulkApply', input),
+  addPrimarySourceFiles: (input) => ipcRenderer.invoke('primarySources:files:add', input),
+  updatePrimarySourceFileMetadata: (fileId, patch) =>
+    ipcRenderer.invoke('primarySources:files:updateMetadata', fileId, patch),
+  reorderPrimarySourceFileGroups: (itemId, rootFileIds) =>
+    ipcRenderer.invoke('primarySources:files:reorder', itemId, rootFileIds),
+  verifyPrimarySourceFiles: (itemId) => ipcRenderer.invoke('primarySources:files:verifyAll', itemId),
+  regeneratePrimarySourceThumbnail: (parentFileId) =>
+    ipcRenderer.invoke('primarySources:files:thumbnail', parentFileId),
+  savePrimarySourceFile: (fileId) => ipcRenderer.invoke('primarySources:files:save', fileId),
+  openPrimarySourceFileExternal: (fileId) =>
+    ipcRenderer.invoke('primarySources:files:openExternal', fileId),
+  createPrimarySourceTextVersion: (input) =>
+    ipcRenderer.invoke('primarySources:text:create', input),
+  setPrimarySourceTextReviewStatus: (textVersionId, status) =>
+    ipcRenderer.invoke('primarySources:text:review', textVersionId, status),
+  createPrimarySourceExcerpt: (input) =>
+    ipcRenderer.invoke('primarySources:excerpt:create', input),
+  setPrimarySourceExcerptReviewStatus: (excerptId, status) =>
+    ipcRenderer.invoke('primarySources:excerpt:review', excerptId, status),
+  savePrimarySourceAnalysis: (itemId, patch) =>
+    ipcRenderer.invoke('primarySources:analysis:save', itemId, patch),
+  extractPrimarySourceProposals: (input) =>
+    ipcRenderer.invoke('primarySources:proposals:extract', input),
+  acceptPrimarySourceProposal: (proposalId, input) =>
+    ipcRenderer.invoke('primarySources:proposals:accept', proposalId, input),
+  decidePrimarySourceProposal: (proposalId, status, input) =>
+    ipcRenderer.invoke('primarySources:proposals:decide', proposalId, status, input),
+  revertPrimarySourceEntityResolution: (itemId, resolutionId) =>
+    ipcRenderer.invoke('primarySources:resolutions:revert', itemId, resolutionId),
+  listPrimarySourcePersons: (search, filter) =>
+    ipcRenderer.invoke('primarySources:persons:list', search, filter),
+  getPrimarySourcePersonDossier: (personId) =>
+    ipcRenderer.invoke('primarySources:persons:dossier', personId),
+  addPrimarySourcePersonVariant: (personId, name) =>
+    ipcRenderer.invoke('primarySources:persons:addVariant', personId, name),
+  mergePrimarySourcePersons: (input) =>
+    ipcRenderer.invoke('primarySources:persons:merge', input),
+  revertPrimarySourcePersonMerge: (resolutionId) =>
+    ipcRenderer.invoke('primarySources:persons:revertMerge', resolutionId),
+  getPrimarySourceTimelineWorkspace: () =>
+    ipcRenderer.invoke('primarySources:timeline:workspace'),
+  getPrimarySourceMapWorkspace: () =>
+    ipcRenderer.invoke('primarySources:map:workspace'),
+  resolvePrimarySourceToponym: (input) =>
+    ipcRenderer.invoke('primarySources:map:resolveToponym', input),
+  revertPrimarySourceToponymResolution: (resolutionId) =>
+    ipcRenderer.invoke('primarySources:map:revertToponym', resolutionId),
+  getPrimarySourceRelationsWorkspace: () =>
+    ipcRenderer.invoke('primarySources:relations:workspace'),
+  searchPrimarySourceCorpus: (request) =>
+    ipcRenderer.invoke('primarySources:search', request),
+  getPrimarySourceNoteWorkspace: () =>
+    ipcRenderer.invoke('primarySources:notes:workspace'),
+  createPrimarySourceNote: (input) =>
+    ipcRenderer.invoke('primarySources:notes:create', input),
+  updatePrimarySourceNoteProfile: (noteId, patch) =>
+    ipcRenderer.invoke('primarySources:notes:updateProfile', noteId, patch),
+  addPrimarySourceNoteLink: (input) =>
+    ipcRenderer.invoke('primarySources:notes:addLink', input),
+  removePrimarySourceNoteLink: (linkId) =>
+    ipcRenderer.invoke('primarySources:notes:removeLink', linkId),
+  getPrimarySourceBacklinks: (targetKind, targetId) =>
+    ipcRenderer.invoke('primarySources:notes:backlinks', targetKind, targetId),
+  insertPrimarySourceExcerptCitation: (input) =>
+    ipcRenderer.invoke('primarySources:notes:insertCitation', input),
+  getPrimarySourceOperationalDashboard: () =>
+    ipcRenderer.invoke('primarySources:dashboard'),
+  getPrimarySourceGovernanceWorkspace: () =>
+    ipcRenderer.invoke('primarySources:governance:workspace'),
+  updatePrimarySourcePolicySettings: (patch) =>
+    ipcRenderer.invoke('primarySources:governance:updatePolicy', patch),
+  updatePrimarySourceCitationSettings: (patch) =>
+    ipcRenderer.invoke('primarySources:governance:updateCitations', patch),
+  getPrimarySourceLocalMetricSummary: () =>
+    ipcRenderer.invoke('primarySources:metrics:summary'),
+  clearPrimarySourceLocalMetrics: () =>
+    ipcRenderer.invoke('primarySources:metrics:clear').then(() => undefined),
+  previewPrimarySourceToolkitOperation: (request) =>
+    ipcRenderer.invoke('primarySources:toolkit:preview', request),
+  runPrimarySourceToolkitOperation: (request) =>
+    ipcRenderer.invoke('primarySources:toolkit:run', request),
+  buildPrimarySourceCitation: (request) =>
+    ipcRenderer.invoke('primarySources:citations:build', request),
+  previewPrimarySourceExport: (request) =>
+    ipcRenderer.invoke('primarySources:export:preview', request),
+  exportPrimarySourceResearchPackage: (request) =>
+    ipcRenderer.invoke('primarySources:export:package', request),
+  validatePrimarySourceResearchPackage: () =>
+    ipcRenderer.invoke('primarySources:export:validate'),
+  restorePrimarySourceResearchPackage: (name) =>
+    ipcRenderer.invoke('primarySources:export:restore', name),
   // databases mode
   listDatabases: () => ipcRenderer.invoke('db:list'),
   searchDatabases: (query, includeContent) => ipcRenderer.invoke('db:search', query, includeContent),
@@ -1036,6 +1193,7 @@ const api: NodusApi = {
   deleteStudyAudioMarker: (id) => ipcRenderer.invoke('study:recordings:marker:delete', id).then(() => undefined),
   saveStudyTranscript: (recordingId, input) => ipcRenderer.invoke('study:recordings:transcript:save', recordingId, input),
   updateStudyTranscript: (id, contentMarkdown, segments) => ipcRenderer.invoke('study:recordings:transcript:update', id, contentMarkdown, segments),
+  diarizeStudyRecording: (request) => ipcRenderer.invoke('study:recordings:diarize', request),
   updateStudyTranscriptSegment: (id, patch) => ipcRenderer.invoke('study:recordings:segment:update', id, patch),
   deleteStudyTranscript: (id) => ipcRenderer.invoke('study:recordings:transcript:delete', id).then(() => undefined),
   createStudyNoteFromTranscript: (recordingId, transcriptId, placements) => ipcRenderer.invoke('study:recordings:note:create', recordingId, transcriptId, placements),
@@ -1416,6 +1574,7 @@ const api: NodusApi = {
 
   hasAnyData: () => ipcRenderer.invoke('data:hasData'),
   seedDemoData: () => ipcRenderer.invoke('data:seedDemo'),
+  seedPrimarySourcesDemoData: () => ipcRenderer.invoke('data:seedPrimarySourcesDemo'),
   clearDemoData: () => ipcRenderer.invoke('data:clearDemo').then(() => undefined),
   seedGenealogyDemoData: () => ipcRenderer.invoke('data:seedGenealogyDemo'),
   seedDatabasesDemoData: () => ipcRenderer.invoke('data:seedDatabasesDemo'),

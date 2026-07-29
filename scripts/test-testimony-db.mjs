@@ -1,4 +1,4 @@
-// El esquema y los repositorios de Testimonios (v105) contra una bóveda REAL migrada.
+// El esquema y los repositorios de Testimonios (v119/v120) contra una bóveda REAL migrada.
 //
 // El criterio de salida de la fase 2 es que se pueda crear, editar, cerrar, reabrir,
 // archivar y restaurar una entrevista con participantes y acuerdo SIN el renderer. Eso es
@@ -48,7 +48,7 @@ const NEW_TABLES = [
   'testimony_agreements',
   'testimony_contrasts',
   'testimony_contrast_items',
-  'note_links',
+  'testimony_note_links',
 ];
 
 try {
@@ -57,18 +57,18 @@ try {
   const db = getDb();
 
   assert.equal(db.pragma('user_version', { simple: true }), SCHEMA_VERSION);
-  assert.ok(SCHEMA_VERSION >= 105, 'Testimonios llegó en la v105');
+  assert.ok(SCHEMA_VERSION >= 120, 'Testimonios llegó en la v119 y su índice semántico en la v120');
 
   // ── 0. La migración conserva sus dos caminos de reparación ────────────────
   {
-    const migration = migrations.find((m) => m.version === 105);
-    assert.ok(migration, 'existe la migración 105');
+    const migration = migrations.find((m) => m.version === 119);
+    assert.ok(migration, 'existe la migración 119');
     assert.ok(!migration.up.includes('`'), 'un backtick cerraría la plantilla en silencio');
     const bare = migration.up.replace(/--[^\n]*/g, ' ');
     // La palabra de borrado de SQL en el cuerpo — que es lo que lleva una cascada —
     // descalifica la migración de backfillMissingCreateOnly Y del reintento por
     // "table already exists".
-    assert.doesNotMatch(bare, /\b(ALTER|DROP|INSERT|UPDATE|DELETE|REPLACE)\b/i, 'la 105 es CREATE-only');
+    assert.doesNotMatch(bare, /\b(ALTER|DROP|INSERT|UPDATE|DELETE|REPLACE)\b/i, 'la 119 es CREATE-only');
     assert.doesNotMatch(bare, /REFERENCES/i, 'la propiedad la imponen los repos, no el esquema');
   }
 
@@ -86,7 +86,7 @@ try {
   assert.deepEqual(keyOf('testimony_participant_profiles'), ['person_id']);
   assert.deepEqual(keyOf('testimony_interview_participants'), ['interview_id', 'person_id', 'role'],
     'una persona puede tener DOS papeles en la misma entrevista');
-  assert.deepEqual(keyOf('note_links'), ['note_id', 'target_kind', 'target_id']);
+  assert.deepEqual(keyOf('testimony_note_links'), ['note_id', 'target_kind', 'target_id']);
 
   // ── 2. Clasificación de sincronización ────────────────────────────────────
   {
@@ -95,12 +95,12 @@ try {
     assert.deepEqual(coverage.unclassified, [], 'ninguna tabla queda sin clasificar');
     assert.deepEqual(coverage.unmergeable, [], 'toda tabla sincronizada tiene identidad de fila');
     // Decisión 18: Testimonios NO se sincroniza hasta demostrar cobertura completa.
-    for (const table of NEW_TABLES.filter((name) => name !== 'note_links')) {
+    for (const table of NEW_TABLES.filter((name) => name !== 'testimony_note_links')) {
       assert.ok(coverage.excluded.includes(table), `${table} está excluido de la sincronización a propósito`);
     }
     // Los enlaces de notas SÍ viajan: la tabla tolera un destino ausente, y una nota que
     // llega sin sus enlaces sí perdería trabajo.
-    assert.ok(coverage.included.notes.includes('note_links'), 'note_links viaja con las notas');
+    assert.ok(coverage.included.notes.includes('testimony_note_links'), 'testimony_note_links viaja con las notas');
   }
 
   const repo = require(path.join(repoRoot, 'electron/db/testimonyRepo.ts'));
@@ -372,7 +372,7 @@ try {
     assert.equal(db.prepare('SELECT COUNT(*) AS c FROM testimony_contrast_items').get().c, 0);
     // Pero la NOTA sobrevive con su texto: es autoría del investigador, no material.
     assert.ok(db.prepare('SELECT COUNT(*) AS c FROM notes WHERE id = ?').get(note.noteId).c === 1);
-    assert.equal(db.prepare('SELECT COUNT(*) AS c FROM note_links WHERE note_id = ?').get(note.noteId).c, 2,
+    assert.equal(db.prepare('SELECT COUNT(*) AS c FROM testimony_note_links WHERE note_id = ?').get(note.noteId).c, 2,
       'solo quedan los enlaces al participante y al código, que siguen existiendo');
     // Y el código, que es del vault y no de la entrevista, tampoco se va con ella.
     assert.ok(analysis.getCode(exilio.id));

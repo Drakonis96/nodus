@@ -36,7 +36,7 @@ test('the image is non-root, health-checked and visibly experimental', () => {
   assert.match(dockerfile, /USER node/);
   assert.match(dockerfile, /HEALTHCHECK/);
   assert.match(dockerfile, /app\.nodus\.stability="experimental"/);
-  assert.match(read('server/README.md'), /Experimental e inestable/);
+  assert.match(read('server/README.md'), /Experimental and unstable/);
 });
 
 test('desktop settings include a beginner-friendly server deployment guide', () => {
@@ -51,5 +51,5 @@ test('desktop settings include a beginner-friendly server deployment guide', () 
   assert.match(settings, /Nunca expongas 7443 directamente a Internet/);
   assert.match(settings, /ChatGPT o Claude/);
   assert.match(translations, /Step-by-step installation guide/);
-  assert.match(read('server/README.md'), /Mi cuenta/);
+  assert.match(read('server/README.md'), /My account/);
 });

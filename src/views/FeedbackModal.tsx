@@ -4,11 +4,30 @@ import type { AppInfo } from '@shared/types';
 import { Icon } from '../components/ui';
 import { t } from '../i18n';
 
-// GitHub repository that receives the preformatted feature requests / bug reports.
+// GitHub repository that receives the preformatted reports and feedback.
 const REPO = 'Drakonis96/nodus';
+const PRODUCT_FEEDBACK_THREAD = 272;
 
-type FeedbackKind = 'feature' | 'bug' | 'vault';
+type FeedbackKind = 'feature' | 'bug' | 'vault' | 'feedback';
 type Expertise = '' | 'specialist' | 'experienced' | 'interested';
+type FeedbackRatingKey = 'features' | 'usability' | 'performance' | 'stability' | 'design';
+type FeedbackRatings = Record<FeedbackRatingKey, number | null>;
+
+const FEEDBACK_RATING_QUESTIONS: ReadonlyArray<{ key: FeedbackRatingKey; label: string }> = [
+  { key: 'features', label: 'Cantidad y variedad de funciones' },
+  { key: 'usability', label: 'Usabilidad' },
+  { key: 'performance', label: 'Rendimiento' },
+  { key: 'stability', label: 'Estabilidad' },
+  { key: 'design', label: 'Diseño visual' },
+];
+
+const EMPTY_FEEDBACK_RATINGS: FeedbackRatings = {
+  features: null,
+  usability: null,
+  performance: null,
+  stability: null,
+  design: null,
+};
 
 const VAULT_AREA_SUGGESTIONS = [
   'Periodismo',
@@ -22,12 +41,11 @@ const VAULT_AREA_SUGGESTIONS = [
 ] as const;
 
 /**
- * Two-step modal that lets a user file a preformatted "new feature" or "bug
- * report" straight to the Nodus GitHub repo. Step 1 picks the kind; step 2 is a
- * kind-specific form. On send we build a Markdown issue body (title + fields +
- * an auto-collected environment footer with the exact Nodus version, OS and
- * architecture) and open GitHub's prefilled "new issue" page in the browser, so
- * the user reviews and submits the report themselves on GitHub.
+ * Two-step modal for preformatted feature requests, bug reports, vault
+ * proposals and product feedback. Feature, bug and vault submissions open a
+ * new GitHub issue. Product feedback is copied to the clipboard and sent to one
+ * permanent public thread, with an on-screen fallback in case clipboard access
+ * fails. Every submission includes the exact Nodus version, OS and architecture.
  */
 export function FeedbackModal({ onClose }: { onClose: () => void }) {
   const [kind, setKind] = useState<FeedbackKind | null>(null);
@@ -40,6 +58,12 @@ export function FeedbackModal({ onClose }: { onClose: () => void }) {
   const [expertise, setExpertise] = useState<Expertise>('');
   const [activeTester, setActiveTester] = useState(false);
   const [personalData, setPersonalData] = useState<'unknown' | 'yes' | 'no'>('unknown');
+  const [ratings, setRatings] = useState<FeedbackRatings>(EMPTY_FEEDBACK_RATINGS);
+  const [liked, setLiked] = useState('');
+  const [improve, setImprove] = useState('');
+  const [composedFeedback, setComposedFeedback] = useState<string | null>(null);
+  const [clipboardOk, setClipboardOk] = useState(true);
+  const [recopied, setRecopied] = useState(false);
 
   useEffect(() => {
     window.nodus?.getAppInfo().then(setAppInfo).catch(() => setAppInfo(null));
@@ -65,9 +89,12 @@ export function FeedbackModal({ onClose }: { onClose: () => void }) {
     ].join('\n');
   }, [appInfo]);
 
-  const canSend = kind === 'vault'
+  const canSend = kind === 'feedback'
+    ? true
+    : kind === 'vault'
     ? title.trim().length > 0 && summary.trim().length > 0 && detail.trim().length > 0 && extra.trim().length > 0 && expertise !== ''
     : kind !== null && title.trim().length > 0 && summary.trim().length > 0;
+  const feedbackThreadUrl = `https://github.com/${REPO}/issues/${PRODUCT_FEEDBACK_THREAD}`;
 
   const send = () => {
     if (!kind || !canSend) return;
@@ -79,7 +106,19 @@ export function FeedbackModal({ onClose }: { onClose: () => void }) {
         ? t('Tengo experiencia práctica o académica')
         : t('No soy especialista, pero conozco la necesidad');
     const body =
-      kind === 'vault'
+      kind === 'feedback'
+        ? [
+            `## ${t('Valoraciones')}`,
+            ...FEEDBACK_RATING_QUESTIONS.map(({ key, label: question }) => `- **${t(question)}**: ${ratings[key] ?? t('Sin respuesta')}`),
+            '',
+            `## ${t('¿Qué te gusta de Nodus?')}`,
+            liked.trim() || t('Sin respuesta'),
+            '',
+            `## ${t('¿Qué crees que debería mejorar?')}`,
+            improve.trim() || t('Sin respuesta'),
+            envFooter,
+          ].join('\n')
+        : kind === 'vault'
         ? [
             `## ${t('Rama de conocimiento o área')}`,
             title.trim(),
@@ -122,6 +161,20 @@ export function FeedbackModal({ onClose }: { onClose: () => void }) {
             extra.trim() || '—',
             envFooter,
           ].join('\n');
+
+    if (kind === 'feedback') {
+      setComposedFeedback(body);
+      setRecopied(false);
+      navigator.clipboard.writeText(body).then(
+        () => setClipboardOk(true),
+        () => setClipboardOk(false),
+      );
+      // Existing GitHub comments cannot be prefilled by URL. Copying the
+      // Markdown and anchoring the permanent thread at its comment field leaves
+      // the user one paste away from publishing, without creating duplicates.
+      window.nodus?.openExternal(`${feedbackThreadUrl}#new_comment_field`);
+      return;
+    }
 
     const params = new URLSearchParams({
       title: `${prefix} ${title.trim()}`,
@@ -206,6 +259,58 @@ export function FeedbackModal({ onClose }: { onClose: () => void }) {
                 <span className="feedback-kind-title">{t('Nuevo tipo de vault')} <Icon name="chevronRight" size={14} /></span>
                 <span className="feedback-kind-description">{t('Propón un espacio especializado y cómo colaborarías para hacerlo viable.')}</span>
               </button>
+              <button
+                className="feedback-kind-card"
+                data-kind="feedback"
+                onClick={() => setKind('feedback')}
+                data-testid="feedback-product-feedback"
+              >
+                <span className="feedback-kind-icon">
+                  <Icon name="chat" size={18} />
+                </span>
+                <span className="feedback-kind-title">{t('Dar feedback')} <Icon name="chevronRight" size={14} /></span>
+                <span className="feedback-kind-description">{t('Valora tu experiencia y cuéntanos qué funciona bien y qué deberíamos mejorar.')}</span>
+              </button>
+            </div>
+          ) : kind === 'feedback' && composedFeedback !== null ? (
+            <div className="feedback-form" data-kind="feedback">
+              <div
+                className={`feedback-note ${
+                  clipboardOk ? 'feedback-note-green' : 'feedback-note-amber'
+                }`}
+              >
+                <Icon name={clipboardOk ? 'check' : 'info'} size={14} className="mt-0.5 shrink-0" />
+                <span>
+                  {clipboardOk
+                    ? t('Tu aportación está copiada y el hilo se ha abierto en el navegador. Pégala en el cuadro de comentario y publícala.')
+                    : t('No se pudo copiar automáticamente. Copia el texto de abajo y pégalo en el comentario del hilo.')}
+                </span>
+              </div>
+
+              <textarea
+                readOnly
+                className="input feedback-input min-h-[260px] resize-y font-mono text-xs"
+                value={composedFeedback}
+              />
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  className="btn btn-ghost gap-1.5"
+                  onClick={() => void navigator.clipboard.writeText(composedFeedback).then(
+                    () => setRecopied(true),
+                    () => setRecopied(false),
+                  )}
+                >
+                  <Icon name={recopied ? 'check' : 'copy'} size={15} />
+                  {recopied ? t('Copiado') : t('Copiar de nuevo')}
+                </button>
+                <button
+                  className="btn btn-ghost gap-1.5"
+                  onClick={() => window.nodus?.openExternal(`${feedbackThreadUrl}#new_comment_field`)}
+                >
+                  <Icon name="external" size={15} /> {t('Volver a abrir el hilo')}
+                </button>
+              </div>
             </div>
           ) : (
             <div className="feedback-form" data-kind={kind}>
@@ -216,7 +321,69 @@ export function FeedbackModal({ onClose }: { onClose: () => void }) {
                 <Icon name="chevronLeft" size={14} /> {t('Cambiar tipo')}
               </button>
 
-              {kind === 'vault' ? (
+              {kind === 'feedback' ? (
+                <>
+                  <div className="feedback-note feedback-note-green">
+                    <Icon name="chat" size={14} className="mt-0.5" />
+                    <span>{t('Todas las preguntas son opcionales. Responde solo a las que quieras.')}</span>
+                  </div>
+
+                  <div className="feedback-system-info">
+                    <div>
+                      <Icon name="chat" size={13} /> {t('Se publicará en el hilo abierto de esta sección')}
+                    </div>
+                    <span>{t('Hilo')} #{PRODUCT_FEEDBACK_THREAD} · GitHub</span>
+                  </div>
+
+                  <div className="feedback-rating-legend" aria-label={t('Escala de valoración')}>
+                    <span data-band="low">0–4 <small>{t('Necesita mejorar')}</small></span>
+                    <span data-band="medium">5–6 <small>{t('Aceptable')}</small></span>
+                    <span data-band="good">7–8 <small>{t('Bien')}</small></span>
+                    <span data-band="excellent">9–10 <small>{t('Excelente')}</small></span>
+                  </div>
+
+                  <div className="feedback-ratings">
+                    {FEEDBACK_RATING_QUESTIONS.map(({ key, label: question }) => (
+                      <fieldset className="feedback-rating-field" key={key}>
+                        <legend>{t(question)}</legend>
+                        <div className="feedback-rating-scale" role="radiogroup" aria-label={t(question)}>
+                          {Array.from({ length: 11 }, (_, score) => (
+                            <button
+                              type="button"
+                              key={score}
+                              className="feedback-rating-button"
+                              data-score={score}
+                              aria-pressed={ratings[key] === score}
+                              aria-label={`${t(question)}: ${score}`}
+                              onClick={() => setRatings((current) => ({
+                                ...current,
+                                [key]: current[key] === score ? null : score,
+                              }))}
+                            >
+                              {score}
+                            </button>
+                          ))}
+                        </div>
+                      </fieldset>
+                    ))}
+                  </div>
+
+                  <FieldLabel>{t('¿Qué te gusta de Nodus?')}</FieldLabel>
+                  <textarea
+                    className="input feedback-input min-h-[80px] resize-y"
+                    value={liked}
+                    onChange={(event) => setLiked(event.target.value)}
+                    placeholder={t('Funciones, detalles o experiencias que valoras (opcional)')}
+                  />
+                  <FieldLabel>{t('¿Qué crees que debería mejorar?')}</FieldLabel>
+                  <textarea
+                    className="input feedback-input min-h-[80px] resize-y"
+                    value={improve}
+                    onChange={(event) => setImprove(event.target.value)}
+                    placeholder={t('Cambios que harían Nodus más útil para ti (opcional)')}
+                  />
+                </>
+              ) : kind === 'vault' ? (
                 <>
                   <div className="feedback-note feedback-note-teal">
                     <div className="flex items-start gap-2"><Icon name="users" size={14} className="mt-0.5" /><span>{t('Un vault especializado puede requerir arquitectura nueva. Se priorizará cuando haya colaboración activa, conocimiento del área y personas dispuestas a probarlo.')}</span></div>
@@ -287,11 +454,21 @@ export function FeedbackModal({ onClose }: { onClose: () => void }) {
         </div>
 
         <footer className="roadmap-footer feedback-footer">
-          <span>{kind === null ? <><Icon name="network" size={13} /> NODUS</> : t('Se abrirá GitHub para que revises y publiques.')}</span>
-          <span><Icon name="gitPr" size={13} /> GITHUB · ISSUES</span>
-          {kind !== null ? (
+          <span>
+            {kind === null
+              ? <><Icon name="network" size={13} /> NODUS</>
+              : kind === 'feedback' && composedFeedback !== null
+                ? t('Gracias por echar una mano con el diseño.')
+                : t('Se abrirá GitHub para que revises y publiques.')}
+          </span>
+          <span>
+            <Icon name="gitPr" size={13} /> GITHUB · {kind === 'feedback' ? `#${PRODUCT_FEEDBACK_THREAD}` : 'ISSUES'}
+          </span>
+          {kind === 'feedback' && composedFeedback !== null ? (
+            <button onClick={onClose}>{t('Cerrar')} <Icon name="check" size={14} /></button>
+          ) : kind !== null ? (
             <button onClick={send} disabled={!canSend}>
-              <Icon name="external" size={15} /> {t('Enviar a GitHub')}
+              <Icon name="external" size={15} /> {kind === 'feedback' ? t('Llevar al hilo') : t('Enviar a GitHub')}
             </button>
           ) : (
             <button onClick={onClose}>{t('Cerrar')} <Icon name="check" size={14} /></button>

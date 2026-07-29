@@ -56,7 +56,7 @@ if (provider === 'gemini') {
 }
 
 const modelRef = provider === 'gemini'
-  ? { provider: 'gemini', model: process.env.EXAM_VERIFY_MODEL || 'gemini-2.5-flash-lite' }
+  ? { provider: 'gemini', model: process.env.EXAM_VERIFY_MODEL || 'gemini-3.5-flash-lite' }
   : { provider, model: process.env.EXAM_VERIFY_MODEL || 'llama3.1' };
 
 settingsRepo.updateSettings({

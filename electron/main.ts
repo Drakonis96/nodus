@@ -32,6 +32,7 @@ import { stopGitHubCopilotSubscription } from './ai/githubCopilotSubscription';
 import { installProcessSafetyNet } from './util/processSafety';
 import { restoreAppWindows } from './windowLifecycle';
 import { registerImageProtocol, registerImageSchemePrivileges } from './imageProtocol';
+import { registerArchiveProtocol, registerArchiveSchemePrivileges } from './archiveProtocol';
 import {
   upgradeWorldbuildingDemoDynasties,
   upgradeWorldbuildingDemoImageQuality,
@@ -51,6 +52,7 @@ const { autoUpdater } = require('electron-updater') as typeof import('electron-u
 // recovery explicitly requests either released credential from macOS Keychain.
 app.setName('Nodus');
 registerImageSchemePrivileges();
+registerArchiveSchemePrivileges();
 
 if (process.platform === 'linux') {
   app.commandLine.appendSwitch('ozone-platform-hint', 'auto');
@@ -507,6 +509,7 @@ app.whenReady().then(() => {
   upgradeWorldbuildingDemoNarrativeDepth();
   relocalizeWorldbuildingDemoData();
   registerImageProtocol();
+  registerArchiveProtocol();
   reconcileAuthorLayerOnce(); // one-time: collapse duplicate author nodes onto Zotero identity
   // Maintenance: drop ideas that have sat dormant (no occurrences) for >30 days.
   // Recent dormancy is kept — it lets fusion revive an idea with the same

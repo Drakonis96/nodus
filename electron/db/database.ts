@@ -16,12 +16,13 @@ export function dbPath(): string {
 /** Cosine similarity between two Float32 BLOBs, computed inside SQLite. */
 function vecCosine(a: Buffer | null, b: Buffer | null): number {
   if (!a || !b) return 0;
+  if (a.byteLength === 0 || a.byteLength !== b.byteLength || a.byteLength % 4 !== 0) return 0;
   const fa = new Float32Array(a.buffer, a.byteOffset, a.byteLength / 4);
   const fb = new Float32Array(b.buffer, b.byteOffset, b.byteLength / 4);
   let dot = 0;
   let na = 0;
   let nb = 0;
-  const n = Math.min(fa.length, fb.length);
+  const n = fa.length;
   for (let i = 0; i < n; i++) {
     dot += fa[i] * fb[i];
     na += fa[i] * fa[i];

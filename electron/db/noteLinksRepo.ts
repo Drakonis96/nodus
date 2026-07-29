@@ -1,4 +1,4 @@
-// Enlaces de una nota con cualquier entidad (`note_links`, v105).
+// Enlaces de una nota con cualquier entidad (`testimony_note_links`, v105).
 //
 // Tabla y repositorio GENÉRICOS a propósito, aunque los estrene Testimonios: nada aquí
 // habla de entrevistas, así que cualquier otro vault puede colgar sus notas de sus
@@ -23,7 +23,7 @@ function now(): string {
 
 export function listNoteLinks(noteId: string): NoteLink[] {
   return (getDb()
-    .prepare('SELECT note_id, target_kind, target_id, label, created_at FROM note_links WHERE note_id = ? ORDER BY created_at')
+    .prepare('SELECT note_id, target_kind, target_id, label, created_at FROM testimony_note_links WHERE note_id = ? ORDER BY created_at')
     .all(noteId) as { note_id: string; target_kind: string; target_id: string; label: string | null; created_at: string }[])
     .map((row) => ({ noteId: row.note_id, targetKind: row.target_kind, targetId: row.target_id, label: row.label, createdAt: row.created_at }));
 }
@@ -31,7 +31,7 @@ export function listNoteLinks(noteId: string): NoteLink[] {
 /** Las notas que apuntan a una entidad. Lo que hace útil el panel «Notas» del dossier. */
 export function linksForTarget(targetKind: string, targetId: string): NoteLink[] {
   return (getDb()
-    .prepare('SELECT note_id, target_kind, target_id, label, created_at FROM note_links WHERE target_kind = ? AND target_id = ? ORDER BY created_at DESC')
+    .prepare('SELECT note_id, target_kind, target_id, label, created_at FROM testimony_note_links WHERE target_kind = ? AND target_id = ? ORDER BY created_at DESC')
     .all(targetKind, targetId) as { note_id: string; target_kind: string; target_id: string; label: string | null; created_at: string }[])
     .map((row) => ({ noteId: row.note_id, targetKind: row.target_kind, targetId: row.target_id, label: row.label, createdAt: row.created_at }));
 }
@@ -39,18 +39,18 @@ export function linksForTarget(targetKind: string, targetId: string): NoteLink[]
 export function addNoteLink(noteId: string, targetKind: string, targetId: string, label: string | null = null): void {
   getDb()
     .prepare(
-      `INSERT INTO note_links (note_id, target_kind, target_id, label, created_at) VALUES (?, ?, ?, ?, ?)
+      `INSERT INTO testimony_note_links (note_id, target_kind, target_id, label, created_at) VALUES (?, ?, ?, ?, ?)
        ON CONFLICT(note_id, target_kind, target_id) DO UPDATE SET label = excluded.label`
     )
     .run(noteId, targetKind, targetId, label, now());
 }
 
 export function removeNoteLink(noteId: string, targetKind: string, targetId: string): void {
-  getDb().prepare('DELETE FROM note_links WHERE note_id = ? AND target_kind = ? AND target_id = ?').run(noteId, targetKind, targetId);
+  getDb().prepare('DELETE FROM testimony_note_links WHERE note_id = ? AND target_kind = ? AND target_id = ?').run(noteId, targetKind, targetId);
 }
 
 export function removeLinksForNote(noteId: string): void {
-  getDb().prepare('DELETE FROM note_links WHERE note_id = ?').run(noteId);
+  getDb().prepare('DELETE FROM testimony_note_links WHERE note_id = ?').run(noteId);
 }
 
 /**

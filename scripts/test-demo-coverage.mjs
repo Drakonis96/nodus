@@ -528,7 +528,7 @@ try {
     ['contrasts', 'testimony_contrasts', "id LIKE 'demo-tst-%'"],
     ['pinned fragments', 'testimony_contrast_items', "contrast_id LIKE 'demo-tst-%'"],
     ['notes', 'notes', "id LIKE 'demo-tst-%'"],
-    ['note links', 'note_links', "note_id LIKE 'demo-tst-%'"],
+    ['note links', 'testimony_note_links', "note_id LIKE 'demo-tst-%'"],
   ]) assert.ok(count(table, where) > 0, `testimonios ${label} is populated`);
   assert.equal(settings.getSettings().testimonyProjectPurpose.length > 0, true, 'the demo writes the project purpose');
 
@@ -548,7 +548,7 @@ try {
     ['testimony_transcript_segments', "id LIKE 'demo-tst-%'"], ['testimony_annotations', "id LIKE 'demo-tst-%'"],
     ['testimony_contrasts', "id LIKE 'demo-tst-%'"], ['testimony_agreements', "id LIKE 'demo-tst-%'"],
     ['testimony_codes', "id LIKE 'demo-tst-%'"], ['notes', "id LIKE 'demo-tst-%'"],
-    ['note_links', "note_id LIKE 'demo-tst-%'"], ['persons', "person_id LIKE 'demo-tst-%'"],
+    ['testimony_note_links', "note_id LIKE 'demo-tst-%'"], ['persons', "person_id LIKE 'demo-tst-%'"],
   ]) assert.equal(count(table, where), 0, `exiting the demo removes ${table}`);
   assert.equal(count('testimony_interviews', "id = 'mine-1'"), 1, 'and keeps what the user created');
   assert.equal(count('testimony_codes', "id = 'mine-code'"), 1, 'and keeps the codes the user created');

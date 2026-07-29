@@ -1,7 +1,7 @@
 import type { CorpusHealthBucketId, ResearchContextSelection } from '@shared/types';
 import { type VaultType, normalizeVaultType } from '@shared/vaultTypes';
 
-export type View = 'home' | 'search' | 'testimonyInterviews' | 'testimonyParticipants' | 'testimonyContrasts' | 'library' | 'graph' | 'argument' | 'ideas' | 'authors' | 'persons' | 'encyclopedia' | 'continuity' | 'conflicts' | 'arcs' | 'rules' | 'questions' | 'worldChat' | 'manuscript' | 'characters' | 'places' | 'factions' | 'cultures' | 'dynasties' | 'scenes' | 'timeline' | 'tree' | 'relations' | 'map' | 'archive' | 'databases' | 'dbSearch' | 'dbAnalysis' | 'dbChat' | 'studyCourses' | 'studySchedule' | 'studyCalendar' | 'studySearch' | 'studyLibrary' | 'studyRecordings' | 'studyChat' | 'studyIdeas' | 'studyGraph' | 'studyQuestions' | 'studyReview' | 'studyDeepResearch' | 'teachingGroups' | 'teachingGrades' | 'teachingExams' | 'teachingRubrics' | 'teachingUnits' | 'immersion' | 'gaps' | 'debate' | 'research' | 'hypothesis' | 'reading' | 'writing' | 'deepResearch' | 'projects' | 'notes' | 'toolkit' | 'settings';
+export type View = 'home' | 'search' | 'testimonyInterviews' | 'testimonyParticipants' | 'testimonyContrasts' | 'library' | 'graph' | 'argument' | 'ideas' | 'authors' | 'persons' | 'prosopSearch' | 'prosopPopulation' | 'prosopPersons' | 'prosopSources' | 'prosopAnalysis' | 'prosopNetworks' | 'encyclopedia' | 'continuity' | 'conflicts' | 'arcs' | 'rules' | 'questions' | 'worldChat' | 'manuscript' | 'characters' | 'places' | 'factions' | 'cultures' | 'dynasties' | 'scenes' | 'timeline' | 'tree' | 'relations' | 'map' | 'archive' | 'databases' | 'dbSearch' | 'dbAnalysis' | 'dbChat' | 'studyCourses' | 'studySchedule' | 'studyCalendar' | 'studySearch' | 'studyLibrary' | 'studyRecordings' | 'studyChat' | 'studyIdeas' | 'studyGraph' | 'studyQuestions' | 'studyReview' | 'studyDeepResearch' | 'teachingGroups' | 'teachingGrades' | 'teachingExams' | 'teachingRubrics' | 'teachingUnits' | 'immersion' | 'gaps' | 'debate' | 'research' | 'hypothesis' | 'reading' | 'writing' | 'deepResearch' | 'projects' | 'notes' | 'toolkit' | 'settings';
 
 export type GraphPresetId = 'overview' | 'contradictions' | 'gaps' | 'reading' | 'unread' | 'authors';
 
@@ -44,6 +44,14 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'argument', label: 'Mapa de argumentos', icon: 'map', group: 'explore' },
   { id: 'ideas', label: 'Ideas', icon: 'bulb', group: 'explore' },
   { id: 'authors', label: 'Autores', icon: 'graduation', group: 'explore' },
+  // Prosopography uses dedicated views: its persons and sources must never fall
+  // through to the genealogical dossier or generic archive.
+  { id: 'prosopSearch', label: 'Buscar', icon: 'search', group: 'explore' },
+  { id: 'prosopPopulation', label: 'Población', icon: 'users', group: 'explore' },
+  { id: 'prosopPersons', label: 'Personas', icon: 'person', group: 'explore' },
+  { id: 'prosopSources', label: 'Fuentes', icon: 'archive', group: 'explore' },
+  { id: 'prosopAnalysis', label: 'Análisis', icon: 'chartBar', group: 'analyze' },
+  { id: 'prosopNetworks', label: 'Redes', icon: 'network', group: 'analyze' },
   // Records views — shown only for primary-source / genealogy vaults (see VAULT_TYPE_SCOPED_VIEWS).
   { id: 'persons', label: 'Personas', icon: 'users', group: 'explore' },
   { id: 'timeline', label: 'Línea temporal', icon: 'clock', group: 'explore' },
@@ -249,6 +257,13 @@ export interface NavGroup extends NavGroupDef {
  * component because they are not application Views.
  */
 const DEDICATED_VAULT_NAV_IDS: Partial<Record<ReturnType<typeof normalizeVaultType>, View[]>> = {
+  prosopography: [
+    'prosopSearch', 'prosopPopulation', 'prosopPersons', 'prosopSources',
+    'prosopAnalysis', 'prosopNetworks', 'notes', 'toolkit',
+  ],
+  primary_sources: [
+    'search', 'archive', 'persons', 'timeline', 'map', 'relations', 'notes', 'toolkit',
+  ],
   estudio: [
     'studyCourses', 'studySchedule', 'studyCalendar', 'studySearch', 'studyLibrary',
     'studyRecordings', 'studyChat', 'studyIdeas', 'studyGraph', 'studyQuestions',

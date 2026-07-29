@@ -250,9 +250,10 @@ test('a tool page returns to the hub and keeps the header action row uniform', a
   assert.match(app, /title=\{t\('Abrir Nodus Toolkit'\)\}/);
   assert.match(
     app,
-    /\{view === 'toolkit' && <ToolkitView page=\{toolkitPage\} onNavigate=\{setToolkitPage\} settings=\{settings\} \/>\}/,
-    'the view is rendered by the shell, with the active page owned by App'
+    /\{view === 'toolkit' && \(\s*<ToolkitView page=\{toolkitPage\} onNavigate=\{setToolkitPage\} settings=\{settings\} \/>\s*\)\}/,
+    'every vault renders the same generic Toolkit whose active page App owns'
   );
+  assert.doesNotMatch(app, /PrimarySourcesToolkitView/, 'there is no primary-source Toolkit fork');
   assert.match(app, /const ToolkitView = lazy\(/, 'the view is code-split like its siblings');
 });
 

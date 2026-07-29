@@ -757,7 +757,7 @@ export function seedTestimonyDemoData(): boolean {
       updated_at: AT,
     });
     const link = (noteId: string, kind: string, targetId: string, label: string) =>
-      insert('note_links', { note_id: noteId, target_kind: kind, target_id: targetId, label, created_at: AT });
+      insert('testimony_note_links', { note_id: noteId, target_kind: kind, target_id: targetId, label, created_at: AT });
     link(noteOne, 'testimony_interview', carmen.interviewId, text('Entrevista a Carmen R.', 'Interview with Carmen R.'));
     link(noteOne, 'testimony_interview', tomas.interviewId, text('Entrevista a Tomás Aguilar', 'Interview with Tomás Aguilar'));
     link(noteOne, 'testimony_annotation', `${PREFIX}n-carmen-2`, text('En casa no se hablaba de eso', 'At home nobody talked about it'));
@@ -805,7 +805,7 @@ export function clearTestimonyDemoData(): void {
     ]) {
       db.prepare(`DELETE FROM ${table} WHERE ${table === 'testimony_contrast_items' ? 'contrast_id' : table === 'testimony_annotation_codes' ? 'annotation_id' : table === 'testimony_interview_participants' ? 'interview_id' : table === 'testimony_participant_profiles' ? 'person_id' : 'id'} LIKE '${PREFIX}%'`).run();
     }
-    db.prepare(`DELETE FROM note_links WHERE note_id LIKE '${PREFIX}%' OR target_id LIKE '${PREFIX}%'`).run();
+    db.prepare(`DELETE FROM testimony_note_links WHERE note_id LIKE '${PREFIX}%' OR target_id LIKE '${PREFIX}%'`).run();
     db.prepare(`DELETE FROM persons WHERE person_id LIKE '${PREFIX}%'`).run();
     // Los ajustes del proyecto también los escribió la demo: el propósito ficticio y el
     // archivo municipal inventado se quedarían presidiendo Inicio en un proyecto real.

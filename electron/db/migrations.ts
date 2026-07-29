@@ -1,13 +1,16 @@
 import type Database from 'better-sqlite3';
+import { createHash } from 'node:crypto';
 
 export interface Migration {
   version: number;
   up: string;
+  /** Data transform that cannot be expressed safely in SQLite (for example SHA-256). */
+  after?: (db: Database.Database) => void;
 }
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 106;
+export const SCHEMA_VERSION = 120;
 
 export const migrations: Migration[] = [
   {
@@ -4405,6 +4408,1420 @@ export const migrations: Migration[] = [
   {
     version: 105,
     up: /* sql */ `
+      -- An embedding model id is not a provider identity. Two providers can expose
+      -- the same name with different revisions or dimensions, so archive retrieval
+      -- must pin both just like ideas, passages, notes and work summaries do.
+      ALTER TABLE archive_items ADD COLUMN embedding_provider TEXT;
+
+      -- Existing archive vectors predate provider provenance. Mark them stale rather
+      -- than comparing them with a query from an unknown/new provider.
+      UPDATE archive_items
+         SET embedding = NULL,
+             embedding_model = NULL,
+             embedding_dim = NULL,
+             embedding_text_hash = NULL
+       WHERE embedding IS NOT NULL;
+    `,
+  },
+  {
+    version: 106,
+    up: /* sql */ `
+      -- Prosopography is additive and deliberately does not use db_cells. Canonical
+      -- observations retain source, literal, uncertainty and review state.
+      CREATE TABLE prosop_studies (
+        study_id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        research_question TEXT NOT NULL DEFAULT '',
+        description TEXT NOT NULL DEFAULT '',
+        unit_of_analysis TEXT NOT NULL DEFAULT 'person',
+        temporal_scope TEXT NOT NULL DEFAULT '',
+        date_start_sort INTEGER,
+        date_end_sort INTEGER,
+        geographic_scope TEXT NOT NULL DEFAULT '',
+        population_definition TEXT NOT NULL DEFAULT '',
+        sampling_strategy TEXT NOT NULL DEFAULT '',
+        expected_population INTEGER,
+        source_strategy TEXT NOT NULL DEFAULT '',
+        known_biases TEXT NOT NULL DEFAULT '',
+        living_people_policy TEXT NOT NULL DEFAULT 'restricted'
+          CHECK (living_people_policy IN ('exclude','restricted','allow_with_consent')),
+        current_methodology_version_id TEXT,
+        current_questionnaire_version_id TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE TABLE prosop_methodology_versions (
+        version_id TEXT PRIMARY KEY,
+        study_id TEXT NOT NULL,
+        version_no INTEGER NOT NULL,
+        status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','published','retired')),
+        change_summary TEXT NOT NULL DEFAULT '',
+        population_definition TEXT NOT NULL DEFAULT '',
+        sampling_strategy TEXT NOT NULL DEFAULT '',
+        source_strategy TEXT NOT NULL DEFAULT '',
+        bias_notes TEXT NOT NULL DEFAULT '',
+        created_by TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        published_at TEXT,
+        UNIQUE(study_id, version_no)
+      );
+      CREATE INDEX idx_prosop_methodologies_study ON prosop_methodology_versions(study_id, status);
+
+      CREATE TABLE prosop_population_criteria (
+        criterion_id TEXT PRIMARY KEY,
+        methodology_version_id TEXT NOT NULL,
+        kind TEXT NOT NULL CHECK (kind IN ('include','exclude','supporting')),
+        label TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        rule_json TEXT,
+        weight REAL NOT NULL DEFAULT 1,
+        required INTEGER NOT NULL DEFAULT 0 CHECK (required IN (0,1)),
+        position INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_prosop_criteria_version ON prosop_population_criteria(methodology_version_id, position);
+
+      CREATE TABLE prosop_population_memberships (
+        membership_id TEXT PRIMARY KEY,
+        person_id TEXT NOT NULL,
+        methodology_version_id TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'candidate' CHECK (status IN ('candidate','included','excluded','uncertain')),
+        decision TEXT NOT NULL DEFAULT '',
+        rationale TEXT NOT NULL DEFAULT '',
+        decided_by TEXT,
+        decided_at TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE(person_id, methodology_version_id)
+      );
+      CREATE INDEX idx_prosop_memberships_version ON prosop_population_memberships(methodology_version_id, status);
+
+      CREATE TABLE prosop_membership_assessments (
+        assessment_id TEXT PRIMARY KEY,
+        membership_id TEXT NOT NULL,
+        criterion_id TEXT NOT NULL,
+        result TEXT NOT NULL CHECK (result IN ('met','not_met','unknown','not_applicable')),
+        factoid_id TEXT,
+        note TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        UNIQUE(membership_id, criterion_id)
+      );
+
+      CREATE TABLE prosop_questionnaire_versions (
+        questionnaire_version_id TEXT PRIMARY KEY,
+        study_id TEXT NOT NULL,
+        version_no INTEGER NOT NULL,
+        status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','published','retired')),
+        title TEXT NOT NULL,
+        change_summary TEXT NOT NULL DEFAULT '',
+        created_by TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        published_at TEXT,
+        UNIQUE(study_id, version_no)
+      );
+      CREATE INDEX idx_prosop_questionnaires_study ON prosop_questionnaire_versions(study_id, status);
+
+      CREATE TABLE prosop_variables (
+        variable_id TEXT PRIMARY KEY,
+        study_id TEXT NOT NULL,
+        key TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        retired_at TEXT,
+        UNIQUE(study_id, key)
+      );
+
+      CREATE TABLE prosop_vocabularies (
+        vocabulary_id TEXT PRIMARY KEY,
+        study_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        scope_notes TEXT NOT NULL DEFAULT '',
+        version TEXT NOT NULL DEFAULT '1',
+        external_uri TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE TABLE prosop_vocabulary_terms (
+        term_id TEXT PRIMARY KEY,
+        vocabulary_id TEXT NOT NULL,
+        parent_term_id TEXT,
+        code TEXT NOT NULL,
+        preferred_label TEXT NOT NULL,
+        definition TEXT NOT NULL DEFAULT '',
+        valid_from TEXT,
+        valid_to TEXT,
+        external_uri TEXT,
+        status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','deprecated')),
+        position INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE(vocabulary_id, code)
+      );
+      CREATE INDEX idx_prosop_terms_vocabulary ON prosop_vocabulary_terms(vocabulary_id, parent_term_id, position);
+
+      CREATE TABLE prosop_term_labels (
+        label_id TEXT PRIMARY KEY,
+        term_id TEXT NOT NULL,
+        label TEXT NOT NULL,
+        language TEXT NOT NULL DEFAULT '',
+        kind TEXT NOT NULL DEFAULT 'variant',
+        created_at TEXT NOT NULL
+      );
+
+      CREATE TABLE prosop_variable_revisions (
+        revision_id TEXT PRIMARY KEY,
+        variable_id TEXT NOT NULL,
+        questionnaire_version_id TEXT NOT NULL,
+        label TEXT NOT NULL,
+        question TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        value_type TEXT NOT NULL CHECK (value_type IN ('text','number','boolean','date','term','person','place','organization','event')),
+        cardinality TEXT NOT NULL DEFAULT 'one' CHECK (cardinality IN ('one','many')),
+        unit TEXT,
+        vocabulary_id TEXT,
+        applicability_json TEXT,
+        missing_reasons_json TEXT NOT NULL DEFAULT '[]',
+        analysis_policy_json TEXT NOT NULL DEFAULT '{}',
+        sensitivity TEXT NOT NULL DEFAULT 'ordinary' CHECK (sensitivity IN ('ordinary','sensitive','restricted')),
+        instructions TEXT NOT NULL DEFAULT '',
+        examples_json TEXT NOT NULL DEFAULT '[]',
+        position INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        UNIQUE(variable_id, questionnaire_version_id)
+      );
+      CREATE INDEX idx_prosop_revisions_questionnaire ON prosop_variable_revisions(questionnaire_version_id, position);
+
+      CREATE TABLE prosop_person_profiles (
+        person_id TEXT PRIMARY KEY,
+        identity_status TEXT NOT NULL DEFAULT 'provisional',
+        review_status TEXT NOT NULL DEFAULT 'unreviewed',
+        preferred_name_basis TEXT NOT NULL DEFAULT '',
+        privacy_status TEXT NOT NULL DEFAULT 'ordinary',
+        completeness_cache REAL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE TABLE prosop_sources (
+        source_id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        source_kind TEXT NOT NULL,
+        citation TEXT NOT NULL DEFAULT '',
+        repository TEXT NOT NULL DEFAULT '',
+        reference_code TEXT NOT NULL DEFAULT '',
+        date_display TEXT,
+        date_start_sort INTEGER,
+        date_end_sort INTEGER,
+        description TEXT NOT NULL DEFAULT '',
+        coverage_notes TEXT NOT NULL DEFAULT '',
+        reliability_notes TEXT NOT NULL DEFAULT '',
+        access_status TEXT NOT NULL DEFAULT 'open' CHECK (access_status IN ('open','restricted','embargoed')),
+        rights_notes TEXT NOT NULL DEFAULT '',
+        target_vault_id TEXT,
+        target_kind TEXT,
+        target_id TEXT,
+        target_label_snapshot TEXT,
+        url TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_prosop_sources_title ON prosop_sources(title);
+
+      CREATE TABLE prosop_source_assessments (
+        assessment_id TEXT PRIMARY KEY,
+        source_id TEXT NOT NULL,
+        variable_id TEXT,
+        scope_note TEXT NOT NULL DEFAULT '',
+        reliability_status TEXT NOT NULL DEFAULT 'unassessed'
+          CHECK (reliability_status IN ('unassessed','low','medium','high','disputed')),
+        representativeness_note TEXT NOT NULL DEFAULT '',
+        known_bias_note TEXT NOT NULL DEFAULT '',
+        rationale TEXT NOT NULL DEFAULT '',
+        assessed_by TEXT,
+        assessed_at TEXT
+      );
+
+      CREATE TABLE prosop_source_segments (
+        segment_id TEXT PRIMARY KEY,
+        source_id TEXT NOT NULL,
+        locator_display TEXT NOT NULL,
+        locator_json TEXT NOT NULL DEFAULT '{}',
+        quoted_text TEXT NOT NULL DEFAULT '',
+        transcription_status TEXT NOT NULL DEFAULT 'literal',
+        language TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_prosop_segments_source ON prosop_source_segments(source_id);
+
+      CREATE TABLE prosop_capture_templates (
+        template_id TEXT PRIMARY KEY,
+        study_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        source_kind TEXT NOT NULL,
+        questionnaire_version_id TEXT,
+        fields_json TEXT NOT NULL DEFAULT '[]',
+        mapping_json TEXT NOT NULL DEFAULT '{}',
+        version INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE TABLE prosop_capture_batches (
+        batch_id TEXT PRIMARY KEY,
+        source_id TEXT,
+        template_id TEXT,
+        questionnaire_version_id TEXT,
+        file_name TEXT NOT NULL,
+        content_hash TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'staging',
+        row_count INTEGER NOT NULL DEFAULT 0,
+        accepted_count INTEGER NOT NULL DEFAULT 0,
+        error_count INTEGER NOT NULL DEFAULT 0,
+        created_by TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE TABLE prosop_capture_rows (
+        capture_row_id TEXT PRIMARY KEY,
+        batch_id TEXT NOT NULL,
+        row_no INTEGER NOT NULL,
+        locator_display TEXT,
+        raw_json TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending',
+        error_json TEXT,
+        created_at TEXT NOT NULL,
+        reviewed_at TEXT,
+        UNIQUE(batch_id, row_no)
+      );
+
+      CREATE TABLE prosop_proposals (
+        proposal_id TEXT PRIMARY KEY,
+        proposal_kind TEXT NOT NULL,
+        source_id TEXT,
+        source_segment_id TEXT,
+        capture_row_id TEXT,
+        target_kind TEXT NOT NULL,
+        target_id TEXT,
+        payload_json TEXT NOT NULL,
+        confidence REAL,
+        rationale TEXT NOT NULL DEFAULT '',
+        producer_kind TEXT NOT NULL,
+        producer_id TEXT NOT NULL,
+        questionnaire_version_id TEXT,
+        status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','accepted','rejected','superseded')),
+        created_at TEXT NOT NULL,
+        reviewed_by TEXT,
+        reviewed_at TEXT,
+        decision_note TEXT NOT NULL DEFAULT ''
+      );
+      CREATE INDEX idx_prosop_proposals_status ON prosop_proposals(status, proposal_kind, created_at);
+
+      CREATE TABLE prosop_factoids (
+        factoid_id TEXT PRIMARY KEY,
+        source_id TEXT NOT NULL,
+        source_segment_id TEXT NOT NULL,
+        capture_row_id TEXT,
+        factoid_kind TEXT NOT NULL,
+        summary TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','proposed','reviewed','rejected','superseded')),
+        extraction_certainty TEXT NOT NULL DEFAULT 'unknown',
+        created_by TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        reviewed_by TEXT,
+        reviewed_at TEXT,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_prosop_factoids_source ON prosop_factoids(source_id, source_segment_id);
+
+      CREATE TABLE prosop_name_attestations (
+        attestation_id TEXT PRIMARY KEY,
+        source_id TEXT,
+        source_segment_id TEXT,
+        factoid_id TEXT,
+        literal_name TEXT NOT NULL,
+        normalized_search_name TEXT NOT NULL,
+        person_id TEXT,
+        context TEXT NOT NULL DEFAULT '',
+        role_or_title TEXT NOT NULL DEFAULT '',
+        language TEXT NOT NULL DEFAULT '',
+        identity_status TEXT NOT NULL DEFAULT 'unresolved',
+        certainty TEXT NOT NULL DEFAULT 'unknown',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_prosop_attestations_search ON prosop_name_attestations(normalized_search_name);
+
+      CREATE TABLE prosop_identity_hypotheses (
+        hypothesis_id TEXT PRIMARY KEY,
+        left_kind TEXT NOT NULL,
+        left_id TEXT NOT NULL,
+        right_kind TEXT NOT NULL,
+        right_id TEXT NOT NULL,
+        relation TEXT NOT NULL CHECK (relation IN ('same_as','different_from')),
+        status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','accepted','rejected','superseded')),
+        score REAL,
+        rationale TEXT NOT NULL DEFAULT '',
+        created_by TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        reviewed_by TEXT,
+        reviewed_at TEXT
+      );
+
+      CREATE TABLE prosop_identity_decision_evidence (
+        id TEXT PRIMARY KEY,
+        hypothesis_id TEXT NOT NULL,
+        factoid_id TEXT NOT NULL,
+        role TEXT NOT NULL CHECK (role IN ('supports','contradicts','context')),
+        note TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL
+      );
+
+      CREATE TABLE prosop_authority_ids (
+        authority_id TEXT PRIMARY KEY,
+        entity_kind TEXT NOT NULL,
+        entity_id TEXT NOT NULL,
+        scheme TEXT NOT NULL,
+        external_id TEXT NOT NULL,
+        uri TEXT,
+        label_snapshot TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'active',
+        factoid_id TEXT,
+        created_at TEXT NOT NULL,
+        UNIQUE(entity_kind, entity_id, scheme, external_id)
+      );
+
+      CREATE TABLE prosop_organizations (
+        organization_id TEXT PRIMARY KEY,
+        preferred_name TEXT NOT NULL,
+        kind TEXT NOT NULL DEFAULT '',
+        date_start TEXT,
+        date_start_sort INTEGER,
+        date_end TEXT,
+        date_end_sort INTEGER,
+        place_id TEXT,
+        description TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE TABLE prosop_organization_names (
+        id TEXT PRIMARY KEY,
+        organization_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        kind TEXT NOT NULL DEFAULT 'variant',
+        language TEXT NOT NULL DEFAULT '',
+        valid_from TEXT,
+        valid_to TEXT
+      );
+
+      CREATE TABLE prosop_statements (
+        statement_id TEXT PRIMARY KEY,
+        factoid_id TEXT NOT NULL,
+        variable_id TEXT,
+        variable_revision_id TEXT,
+        statement_type TEXT NOT NULL,
+        value_kind TEXT NOT NULL CHECK (value_kind IN ('text','number','boolean','date','term','person','place','organization','event')),
+        literal_value TEXT NOT NULL DEFAULT '',
+        value_text TEXT,
+        value_number REAL,
+        value_boolean INTEGER,
+        value_date_display TEXT,
+        value_date_start_sort INTEGER,
+        value_date_end_sort INTEGER,
+        value_term_id TEXT,
+        value_person_id TEXT,
+        value_place_id TEXT,
+        value_organization_id TEXT,
+        value_event_id TEXT,
+        unit TEXT,
+        negated INTEGER NOT NULL DEFAULT 0 CHECK (negated IN (0,1)),
+        source_modality TEXT NOT NULL DEFAULT 'asserted',
+        reading_certainty TEXT NOT NULL DEFAULT 'unknown',
+        source_assertion_certainty TEXT NOT NULL DEFAULT 'unknown',
+        interpretation_certainty TEXT NOT NULL DEFAULT 'unknown',
+        temporal_precision TEXT,
+        accuracy_status TEXT NOT NULL DEFAULT 'unassessed',
+        status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','proposed','reviewed','rejected','superseded')),
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_prosop_statements_factoid ON prosop_statements(factoid_id);
+      CREATE INDEX idx_prosop_statements_variable ON prosop_statements(variable_id, status);
+
+      CREATE TABLE prosop_statement_entities (
+        id TEXT PRIMARY KEY,
+        statement_id TEXT NOT NULL,
+        entity_kind TEXT NOT NULL,
+        entity_id TEXT NOT NULL,
+        role TEXT NOT NULL,
+        position INTEGER NOT NULL DEFAULT 0
+      );
+      CREATE INDEX idx_prosop_statement_entities_target ON prosop_statement_entities(entity_kind, entity_id);
+
+      CREATE TABLE prosop_resolutions (
+        resolution_id TEXT PRIMARY KEY,
+        person_id TEXT NOT NULL,
+        variable_id TEXT NOT NULL,
+        resolution_kind TEXT NOT NULL,
+        resolved_value_json TEXT,
+        rationale TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'draft',
+        created_by TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE TABLE prosop_resolution_statements (
+        resolution_id TEXT NOT NULL,
+        statement_id TEXT NOT NULL,
+        role TEXT NOT NULL,
+        PRIMARY KEY(resolution_id, statement_id)
+      );
+
+      CREATE TABLE prosop_missing_values (
+        missing_id TEXT PRIMARY KEY,
+        person_id TEXT NOT NULL,
+        variable_id TEXT NOT NULL,
+        questionnaire_version_id TEXT NOT NULL,
+        reason TEXT NOT NULL,
+        source_scope_json TEXT NOT NULL DEFAULT '{}',
+        note TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'active',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE(person_id, variable_id, questionnaire_version_id)
+      );
+
+      CREATE TABLE prosop_cohorts (
+        cohort_id TEXT PRIMARY KEY,
+        study_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        kind TEXT NOT NULL CHECK (kind IN ('dynamic','frozen')),
+        filter_json TEXT NOT NULL DEFAULT '{"conjunction":"and","rules":[]}',
+        methodology_version_id TEXT NOT NULL,
+        questionnaire_version_id TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        frozen_at TEXT
+      );
+
+      CREATE TABLE prosop_cohort_members (
+        cohort_id TEXT NOT NULL,
+        person_id TEXT NOT NULL,
+        membership_snapshot_json TEXT NOT NULL DEFAULT '{}',
+        created_at TEXT NOT NULL,
+        PRIMARY KEY(cohort_id, person_id)
+      );
+
+      CREATE TABLE prosop_analysis_definitions (
+        analysis_id TEXT PRIMARY KEY,
+        study_id TEXT NOT NULL,
+        title TEXT NOT NULL,
+        analysis_kind TEXT NOT NULL,
+        cohort_ids_json TEXT NOT NULL DEFAULT '[]',
+        projection_json TEXT NOT NULL,
+        filter_json TEXT NOT NULL DEFAULT '{}',
+        questionnaire_version_id TEXT NOT NULL,
+        source_cutoff TEXT,
+        created_by TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE TABLE prosop_analysis_runs (
+        run_id TEXT PRIMARY KEY,
+        analysis_id TEXT NOT NULL,
+        engine_version TEXT NOT NULL,
+        input_fingerprint TEXT NOT NULL,
+        population_count INTEGER NOT NULL,
+        included_count INTEGER NOT NULL,
+        missing_summary_json TEXT NOT NULL DEFAULT '{}',
+        result_json TEXT NOT NULL,
+        warnings_json TEXT NOT NULL DEFAULT '[]',
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_prosop_analysis_runs_definition ON prosop_analysis_runs(analysis_id, created_at);
+
+      CREATE TABLE prosop_network_layers (
+        layer_id TEXT PRIMARY KEY,
+        study_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        derivation_rule_json TEXT,
+        directionality TEXT NOT NULL DEFAULT 'undirected',
+        weight_policy TEXT NOT NULL DEFAULT 'count',
+        color TEXT NOT NULL DEFAULT '#2563eb',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE TABLE prosop_network_edges (
+        edge_id TEXT PRIMARY KEY,
+        layer_id TEXT NOT NULL,
+        source_person_id TEXT NOT NULL,
+        target_person_id TEXT NOT NULL,
+        relation_term_id TEXT,
+        date_display TEXT,
+        date_start_sort INTEGER,
+        date_end_sort INTEGER,
+        weight REAL NOT NULL DEFAULT 1,
+        origin TEXT NOT NULL CHECK (origin IN ('explicit','derived','hypothesis')),
+        derivation_fingerprint TEXT,
+        status TEXT NOT NULL DEFAULT 'active',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_prosop_edges_layer ON prosop_network_edges(layer_id, origin, status);
+      CREATE INDEX idx_prosop_edges_source ON prosop_network_edges(source_person_id);
+      CREATE INDEX idx_prosop_edges_target ON prosop_network_edges(target_person_id);
+
+      CREATE TABLE prosop_network_edge_factoids (
+        edge_id TEXT NOT NULL,
+        factoid_id TEXT NOT NULL,
+        role TEXT NOT NULL DEFAULT 'supports',
+        PRIMARY KEY(edge_id, factoid_id)
+      );
+
+      CREATE TABLE note_links (
+        link_id TEXT PRIMARY KEY,
+        nodus_id TEXT NOT NULL,
+        target_kind TEXT NOT NULL,
+        target_id TEXT NOT NULL,
+        target_vault_id TEXT,
+        relation_kind TEXT NOT NULL DEFAULT 'about',
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_note_links_target ON note_links(target_kind, target_id);
+
+      CREATE TABLE prosop_audit_log (
+        audit_id TEXT PRIMARY KEY,
+        entity_kind TEXT NOT NULL,
+        entity_id TEXT NOT NULL,
+        action TEXT NOT NULL,
+        before_json TEXT,
+        after_json TEXT,
+        reason TEXT NOT NULL DEFAULT '',
+        actor TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_prosop_audit_entity ON prosop_audit_log(entity_kind, entity_id, created_at);
+    `,
+  },
+  {
+    version: 107,
+    up: /* sql */ `
+      -- Fuentes primarias: additive archival description, digital representations,
+      -- versioned text, citable excerpts and reviewable derivations. archive_items
+      -- remains the compatibility record; none of its legacy columns are removed.
+      CREATE TABLE archive_repositories (
+        repository_id    TEXT PRIMARY KEY,
+        name             TEXT NOT NULL,
+        short_name       TEXT,
+        identifier       TEXT,
+        address          TEXT,
+        website_url      TEXT,
+        catalog_url      TEXT,
+        country_code     TEXT,
+        contact_notes    TEXT,
+        access_notes     TEXT,
+        citation_template TEXT,
+        created_at       TEXT NOT NULL,
+        updated_at       TEXT NOT NULL
+      );
+      CREATE INDEX idx_archive_repositories_name ON archive_repositories(name);
+      CREATE INDEX idx_archive_repositories_identifier ON archive_repositories(identifier);
+
+      CREATE TABLE archive_description_units (
+        unit_id                              TEXT PRIMARY KEY,
+        repository_id                       TEXT REFERENCES archive_repositories(repository_id) ON DELETE RESTRICT,
+        parent_unit_id                       TEXT REFERENCES archive_description_units(unit_id) ON DELETE RESTRICT,
+        level                                TEXT NOT NULL,
+        local_level_label                    TEXT,
+        reference_code                       TEXT,
+        title                                TEXT NOT NULL,
+        title_type                           TEXT NOT NULL DEFAULT 'unknown',
+        date_display                         TEXT,
+        date_start_sort                      TEXT,
+        date_end_sort                        TEXT,
+        date_certainty                       TEXT NOT NULL DEFAULT 'unknown',
+        creator_display                      TEXT,
+        extent_display                       TEXT,
+        scope_content                        TEXT,
+        arrangement                          TEXT,
+        administrative_biographical_history  TEXT,
+        custodial_history                    TEXT,
+        acquisition_info                     TEXT,
+        access_conditions                    TEXT,
+        reproduction_conditions              TEXT,
+        language_codes_json                  TEXT NOT NULL DEFAULT '[]',
+        script_codes_json                    TEXT NOT NULL DEFAULT '[]',
+        physical_characteristics             TEXT,
+        finding_aids                         TEXT,
+        related_units                        TEXT,
+        source_catalog_url                   TEXT,
+        position                             INTEGER NOT NULL DEFAULT 0,
+        metadata_json                        TEXT NOT NULL DEFAULT '{}',
+        created_at                           TEXT NOT NULL,
+        updated_at                           TEXT NOT NULL,
+        CHECK (parent_unit_id IS NULL OR parent_unit_id <> unit_id),
+        CHECK (level <> 'local' OR length(trim(local_level_label)) > 0)
+      );
+      CREATE INDEX idx_archive_units_parent_position ON archive_description_units(parent_unit_id, position);
+      CREATE INDEX idx_archive_units_repository_reference ON archive_description_units(repository_id, reference_code);
+      CREATE INDEX idx_archive_units_level ON archive_description_units(level);
+      CREATE INDEX idx_archive_units_dates ON archive_description_units(date_start_sort, date_end_sort);
+      CREATE INDEX idx_archive_units_title ON archive_description_units(title COLLATE NOCASE);
+
+      CREATE TABLE archive_item_units (
+        item_id       TEXT NOT NULL REFERENCES archive_items(item_id) ON DELETE CASCADE,
+        unit_id       TEXT NOT NULL REFERENCES archive_description_units(unit_id) ON DELETE CASCADE,
+        relation_kind TEXT NOT NULL DEFAULT 'describes',
+        position      INTEGER NOT NULL DEFAULT 0,
+        created_at    TEXT NOT NULL,
+        PRIMARY KEY (item_id, unit_id, relation_kind)
+      );
+      CREATE INDEX idx_archive_item_units_unit ON archive_item_units(unit_id, position);
+      CREATE UNIQUE INDEX idx_archive_item_primary_unit
+        ON archive_item_units(item_id) WHERE relation_kind = 'describes';
+
+      CREATE TABLE archive_capture_sessions (
+        session_id         TEXT PRIMARY KEY,
+        repository_id      TEXT REFERENCES archive_repositories(repository_id) ON DELETE SET NULL,
+        title              TEXT NOT NULL,
+        session_kind       TEXT NOT NULL DEFAULT 'other',
+        started_on         TEXT,
+        ended_on           TEXT,
+        researcher         TEXT,
+        device             TEXT,
+        fonds_scope        TEXT,
+        reference_scope    TEXT,
+        reproduction_terms TEXT,
+        naming_pattern     TEXT,
+        notes              TEXT,
+        created_at         TEXT NOT NULL,
+        updated_at         TEXT NOT NULL
+      );
+      CREATE INDEX idx_archive_capture_sessions_repository ON archive_capture_sessions(repository_id, started_on);
+
+      CREATE TABLE archive_item_profiles (
+        item_id                  TEXT PRIMARY KEY REFERENCES archive_items(item_id) ON DELETE CASCADE,
+        date_certainty           TEXT NOT NULL DEFAULT 'unknown',
+        access_status            TEXT NOT NULL DEFAULT 'unknown',
+        embargo_until            TEXT,
+        rights_statement         TEXT,
+        reproduction_conditions TEXT,
+        sensitivity              TEXT NOT NULL DEFAULT 'normal',
+        processing_status        TEXT NOT NULL DEFAULT 'imported',
+        description_status       TEXT NOT NULL DEFAULT 'minimal',
+        analysis_status          TEXT NOT NULL DEFAULT 'not_started',
+        citation_status          TEXT NOT NULL DEFAULT 'not_ready',
+        capture_session_id       TEXT REFERENCES archive_capture_sessions(session_id) ON DELETE SET NULL,
+        metadata_json            TEXT NOT NULL DEFAULT '{}',
+        created_at               TEXT NOT NULL,
+        updated_at               TEXT NOT NULL
+      );
+      CREATE INDEX idx_archive_item_profiles_attention
+        ON archive_item_profiles(description_status, analysis_status, citation_status);
+      CREATE INDEX idx_archive_item_profiles_access
+        ON archive_item_profiles(access_status, sensitivity, embargo_until);
+
+      CREATE TABLE archive_item_files (
+        file_id               TEXT PRIMARY KEY,
+        item_id               TEXT NOT NULL REFERENCES archive_items(item_id) ON DELETE CASCADE,
+        parent_file_id        TEXT REFERENCES archive_item_files(file_id) ON DELETE RESTRICT,
+        role                  TEXT NOT NULL,
+        version_no            INTEGER NOT NULL DEFAULT 1 CHECK (version_no >= 1),
+        sequence_no           INTEGER NOT NULL DEFAULT 0,
+        page_label            TEXT,
+        original_file_name    TEXT,
+        mime_type             TEXT,
+        byte_size             INTEGER NOT NULL DEFAULT 0 CHECK (byte_size >= 0),
+        content_blob          BLOB,
+        external_path         TEXT,
+        content_hash          TEXT,
+        hash_algorithm        TEXT,
+        transformation_json   TEXT,
+        capture_metadata_json TEXT,
+        created_by            TEXT,
+        created_at            TEXT NOT NULL,
+        verified_at           TEXT,
+        verification_status   TEXT NOT NULL DEFAULT 'pending',
+        superseded_at         TEXT,
+        CHECK (content_blob IS NULL OR (content_hash IS NOT NULL AND hash_algorithm = 'sha256')),
+        CHECK (role <> 'master' OR parent_file_id IS NULL),
+        CHECK (role <> 'derivative' OR (parent_file_id IS NOT NULL AND transformation_json IS NOT NULL))
+      );
+      CREATE INDEX idx_archive_item_files_item_sequence ON archive_item_files(item_id, sequence_no, version_no);
+      CREATE INDEX idx_archive_item_files_hash ON archive_item_files(content_hash);
+      CREATE INDEX idx_archive_item_files_parent ON archive_item_files(parent_file_id);
+      CREATE UNIQUE INDEX idx_archive_item_file_version
+        ON archive_item_files(item_id, role, sequence_no, version_no);
+
+      CREATE TABLE archive_text_versions (
+        text_version_id       TEXT PRIMARY KEY,
+        item_id               TEXT NOT NULL REFERENCES archive_items(item_id) ON DELETE CASCADE,
+        file_id               TEXT REFERENCES archive_item_files(file_id) ON DELETE SET NULL,
+        parent_version_id     TEXT REFERENCES archive_text_versions(text_version_id) ON DELETE SET NULL,
+        kind                  TEXT NOT NULL,
+        language_code         TEXT,
+        content               TEXT NOT NULL,
+        status                TEXT NOT NULL DEFAULT 'automatic',
+        engine                TEXT,
+        model                 TEXT,
+        confidence            REAL,
+        editorial_conventions TEXT,
+        created_by            TEXT,
+        created_at            TEXT NOT NULL,
+        updated_at            TEXT NOT NULL,
+        reviewed_at           TEXT
+      );
+      CREATE INDEX idx_archive_text_versions_item ON archive_text_versions(item_id, kind, created_at);
+      CREATE INDEX idx_archive_text_versions_file ON archive_text_versions(file_id);
+
+      CREATE TABLE archive_text_segments (
+        segment_id      TEXT PRIMARY KEY,
+        text_version_id TEXT NOT NULL REFERENCES archive_text_versions(text_version_id) ON DELETE CASCADE,
+        file_id         TEXT REFERENCES archive_item_files(file_id) ON DELETE SET NULL,
+        sequence_no     INTEGER NOT NULL DEFAULT 0,
+        page_label      TEXT,
+        start_offset    INTEGER,
+        end_offset      INTEGER,
+        content         TEXT NOT NULL,
+        bbox_json       TEXT,
+        time_start_ms   INTEGER,
+        time_end_ms     INTEGER,
+        confidence      REAL,
+        created_at      TEXT NOT NULL,
+        updated_at      TEXT NOT NULL,
+        CHECK (start_offset IS NULL OR (start_offset >= 0 AND end_offset > start_offset)),
+        CHECK (time_start_ms IS NULL OR (time_start_ms >= 0 AND time_end_ms > time_start_ms))
+      );
+      CREATE INDEX idx_archive_text_segments_version ON archive_text_segments(text_version_id, sequence_no);
+      CREATE INDEX idx_archive_text_segments_file ON archive_text_segments(file_id, sequence_no);
+
+      CREATE TABLE archive_excerpts (
+        excerpt_id       TEXT PRIMARY KEY,
+        item_id          TEXT NOT NULL REFERENCES archive_items(item_id) ON DELETE CASCADE,
+        file_id          TEXT REFERENCES archive_item_files(file_id) ON DELETE SET NULL,
+        text_version_id  TEXT REFERENCES archive_text_versions(text_version_id) ON DELETE SET NULL,
+        segment_id       TEXT REFERENCES archive_text_segments(segment_id) ON DELETE SET NULL,
+        locator_display  TEXT NOT NULL,
+        locator_json     TEXT NOT NULL DEFAULT '{}',
+        quoted_text      TEXT,
+        language_code    TEXT,
+        description      TEXT,
+        review_status    TEXT NOT NULL DEFAULT 'unreviewed',
+        created_by       TEXT,
+        created_at       TEXT NOT NULL,
+        updated_at       TEXT NOT NULL
+      );
+      CREATE INDEX idx_archive_excerpts_item ON archive_excerpts(item_id, created_at);
+      CREATE INDEX idx_archive_excerpts_segment ON archive_excerpts(segment_id);
+
+      CREATE TABLE archive_entity_proposals (
+        proposal_id      TEXT PRIMARY KEY,
+        item_id          TEXT NOT NULL REFERENCES archive_items(item_id) ON DELETE CASCADE,
+        excerpt_id       TEXT REFERENCES archive_excerpts(excerpt_id) ON DELETE SET NULL,
+        proposal_kind    TEXT NOT NULL,
+        payload_json     TEXT NOT NULL,
+        matched_target_id TEXT,
+        status           TEXT NOT NULL DEFAULT 'pending',
+        confidence       REAL,
+        rationale        TEXT,
+        source_engine    TEXT,
+        source_model     TEXT,
+        fingerprint      TEXT NOT NULL,
+        created_at       TEXT NOT NULL,
+        reviewed_at      TEXT,
+        reviewed_by      TEXT,
+        decision_note    TEXT
+      );
+      CREATE UNIQUE INDEX idx_archive_proposals_fingerprint ON archive_entity_proposals(fingerprint);
+      CREATE INDEX idx_archive_proposals_queue ON archive_entity_proposals(status, proposal_kind, created_at);
+      CREATE INDEX idx_archive_proposals_item ON archive_entity_proposals(item_id, status);
+
+      CREATE TABLE archive_source_analyses (
+        analysis_id         TEXT PRIMARY KEY,
+        item_id             TEXT NOT NULL UNIQUE REFERENCES archive_items(item_id) ON DELETE CASCADE,
+        origin_notes        TEXT,
+        purpose_audience    TEXT,
+        content_form        TEXT,
+        perspective_bias    TEXT,
+        silences_limits     TEXT,
+        authenticity_notes  TEXT,
+        representativeness  TEXT,
+        corroboration       TEXT,
+        questions           TEXT,
+        status              TEXT NOT NULL DEFAULT 'not_started',
+        created_at          TEXT NOT NULL,
+        updated_at          TEXT NOT NULL
+      );
+
+      CREATE TABLE archive_place_mentions (
+        mention_id     TEXT PRIMARY KEY,
+        item_id        TEXT NOT NULL REFERENCES archive_items(item_id) ON DELETE CASCADE,
+        excerpt_id     TEXT REFERENCES archive_excerpts(excerpt_id) ON DELETE SET NULL,
+        place_id       TEXT REFERENCES places(place_id) ON DELETE SET NULL,
+        original_label TEXT NOT NULL,
+        role           TEXT NOT NULL,
+        certainty      REAL,
+        status         TEXT NOT NULL DEFAULT 'unresolved',
+        created_at     TEXT NOT NULL,
+        updated_at     TEXT NOT NULL
+      );
+      CREATE INDEX idx_archive_place_mentions_item ON archive_place_mentions(item_id, status);
+      CREATE INDEX idx_archive_place_mentions_place ON archive_place_mentions(place_id);
+
+      CREATE TABLE archive_person_mentions (
+        mention_id      TEXT PRIMARY KEY,
+        item_id         TEXT NOT NULL REFERENCES archive_items(item_id) ON DELETE CASCADE,
+        excerpt_id      TEXT REFERENCES archive_excerpts(excerpt_id) ON DELETE SET NULL,
+        person_id       TEXT REFERENCES persons(person_id) ON DELETE SET NULL,
+        original_label  TEXT NOT NULL,
+        role            TEXT,
+        certainty       REAL,
+        identity_status TEXT NOT NULL DEFAULT 'unresolved_mention',
+        created_at      TEXT NOT NULL,
+        updated_at      TEXT NOT NULL
+      );
+      CREATE INDEX idx_archive_person_mentions_item ON archive_person_mentions(item_id, identity_status);
+      CREATE INDEX idx_archive_person_mentions_person ON archive_person_mentions(person_id);
+
+      CREATE TABLE entity_resolutions (
+        resolution_id   TEXT PRIMARY KEY,
+        entity_kind     TEXT NOT NULL,
+        source_entity_id TEXT NOT NULL,
+        target_entity_id TEXT,
+        decision        TEXT NOT NULL,
+        rationale       TEXT,
+        status          TEXT NOT NULL DEFAULT 'active',
+        created_by      TEXT,
+        created_at      TEXT NOT NULL,
+        reverted_at     TEXT
+      );
+      CREATE INDEX idx_entity_resolutions_source ON entity_resolutions(entity_kind, source_entity_id, status);
+      CREATE INDEX idx_entity_resolutions_target ON entity_resolutions(entity_kind, target_entity_id, status);
+
+      -- Prosopography migration 106 owns the shared note_links base table.
+      -- Primary Sources extends that cross-vault graph with an optional citable
+      -- excerpt without replacing or narrowing the existing relation contract.
+      ALTER TABLE note_links
+        ADD COLUMN excerpt_id TEXT REFERENCES archive_excerpts(excerpt_id) ON DELETE SET NULL;
+      CREATE UNIQUE INDEX idx_note_links_unique
+        ON note_links(nodus_id, target_kind, target_id, relation_kind);
+      CREATE INDEX idx_note_links_excerpt ON note_links(excerpt_id);
+
+      CREATE TABLE archive_integrity_checks (
+        check_id       TEXT PRIMARY KEY,
+        file_id        TEXT NOT NULL REFERENCES archive_item_files(file_id) ON DELETE CASCADE,
+        algorithm      TEXT NOT NULL DEFAULT 'sha256',
+        expected_hash  TEXT,
+        observed_hash  TEXT,
+        status         TEXT NOT NULL,
+        checked_at     TEXT NOT NULL,
+        details        TEXT
+      );
+      CREATE INDEX idx_archive_integrity_checks_file ON archive_integrity_checks(file_id, checked_at DESC);
+      CREATE INDEX idx_archive_integrity_checks_status ON archive_integrity_checks(status, checked_at DESC);
+
+      CREATE TABLE archive_exports (
+        export_id             TEXT PRIMARY KEY,
+        kind                  TEXT NOT NULL,
+        selection_json        TEXT NOT NULL,
+        policy_snapshot_json  TEXT NOT NULL,
+        included_files        INTEGER NOT NULL DEFAULT 0,
+        excluded_files        INTEGER NOT NULL DEFAULT 0,
+        manifest_hash         TEXT,
+        created_at            TEXT NOT NULL
+      );
+      CREATE INDEX idx_archive_exports_created ON archive_exports(created_at DESC);
+    `,
+  },
+  {
+    version: 108,
+    up: /* sql */ `
+      -- Compatible enrichment of existing evidence and social/entity tables.
+      ALTER TABLE record_evidence ADD COLUMN excerpt_id TEXT REFERENCES archive_excerpts(excerpt_id) ON DELETE SET NULL;
+      ALTER TABLE record_evidence ADD COLUMN evidence_role TEXT NOT NULL DEFAULT 'supports';
+      ALTER TABLE record_evidence ADD COLUMN certainty REAL;
+      ALTER TABLE record_evidence ADD COLUMN review_status TEXT NOT NULL DEFAULT 'unreviewed';
+      ALTER TABLE record_evidence ADD COLUMN source_version_id TEXT REFERENCES archive_text_versions(text_version_id) ON DELETE SET NULL;
+      ALTER TABLE record_evidence ADD COLUMN created_by TEXT;
+      ALTER TABLE record_evidence ADD COLUMN updated_at TEXT;
+
+      ALTER TABLE social_relations ADD COLUMN status TEXT NOT NULL DEFAULT 'proposal';
+      ALTER TABLE social_relations ADD COLUMN certainty REAL;
+      ALTER TABLE social_relations ADD COLUMN date_display TEXT;
+      ALTER TABLE social_relations ADD COLUMN date_start_sort TEXT;
+      ALTER TABLE social_relations ADD COLUMN date_end_sort TEXT;
+      ALTER TABLE social_relations ADD COLUMN direction TEXT NOT NULL DEFAULT 'directed';
+
+      ALTER TABLE persons ADD COLUMN identity_status TEXT NOT NULL DEFAULT 'confirmed';
+      ALTER TABLE persons ADD COLUMN merged_into TEXT REFERENCES persons(person_id) ON DELETE SET NULL;
+
+      ALTER TABLE events ADD COLUMN date_certainty TEXT NOT NULL DEFAULT 'unknown';
+      ALTER TABLE events ADD COLUMN review_status TEXT NOT NULL DEFAULT 'unreviewed';
+
+      ALTER TABLE places ADD COLUMN coordinate_precision TEXT;
+      ALTER TABLE places ADD COLUMN historical_context TEXT;
+      ALTER TABLE places ADD COLUMN valid_from_display TEXT;
+      ALTER TABLE places ADD COLUMN valid_to_display TEXT;
+      ALTER TABLE places ADD COLUMN authority_json TEXT;
+      ALTER TABLE places ADD COLUMN sensitivity TEXT NOT NULL DEFAULT 'normal';
+    `,
+  },
+  {
+    version: 109,
+    up: /* sql */ `
+      -- Backfill a provisional descriptive unit/profile for every legacy item.
+      -- IDs are deterministic so the transform is safely idempotent in fixtures.
+      INSERT OR IGNORE INTO archive_description_units (
+        unit_id, repository_id, parent_unit_id, level, reference_code, title,
+        title_type, date_display, date_start_sort, date_end_sort, date_certainty,
+        creator_display, extent_display, scope_content, arrangement,
+        administrative_biographical_history, custodial_history, acquisition_info,
+        access_conditions, reproduction_conditions, language_codes_json,
+        script_codes_json, physical_characteristics, finding_aids, related_units,
+        source_catalog_url, position, metadata_json, created_at, updated_at
+      )
+      SELECT
+        'legacy_unit_' || item_id, NULL, NULL, 'item', NULL, title,
+        'supplied', NULL, NULL, NULL, 'unknown',
+        NULL, NULL, description, NULL,
+        NULL, NULL, NULL,
+        NULL, NULL, '[]',
+        '[]', NULL, NULL, NULL,
+        NULL, 0, COALESCE(metadata_json, '{}'), created_at, updated_at
+      FROM archive_items;
+
+      INSERT OR IGNORE INTO archive_item_units (item_id, unit_id, relation_kind, position, created_at)
+      SELECT item_id, 'legacy_unit_' || item_id, 'describes', 0, created_at
+      FROM archive_items;
+
+      INSERT OR IGNORE INTO archive_item_profiles (
+        item_id, date_certainty, access_status, embargo_until, rights_statement,
+        reproduction_conditions, sensitivity, processing_status, description_status,
+        analysis_status, citation_status, capture_session_id, metadata_json, created_at, updated_at
+      )
+      SELECT item_id, 'unknown', 'unknown', NULL, NULL, NULL, 'normal',
+        CASE WHEN blob IS NULL THEN 'needs_description' ELSE 'imported' END,
+        'minimal', 'not_started', 'not_ready', NULL, '{}', created_at, updated_at
+      FROM archive_items;
+
+      INSERT OR IGNORE INTO archive_item_files (
+        file_id, item_id, parent_file_id, role, version_no, sequence_no, page_label,
+        original_file_name, mime_type, byte_size, content_blob, external_path,
+        content_hash, hash_algorithm, transformation_json, capture_metadata_json,
+        created_by, created_at, verified_at, verification_status, superseded_at
+      )
+      SELECT
+        'legacy_file_' || item_id, item_id, NULL, 'master', 1, 0, NULL,
+        file_name, mime_type, COALESCE(bytes, length(blob), 0), blob, NULL,
+        COALESCE(content_hash, 'pending:' || item_id), 'sha256',
+        NULL, NULL, 'legacy', created_at, NULL,
+        CASE WHEN content_hash IS NULL THEN 'pending' ELSE 'verified' END, NULL
+      FROM archive_items
+      WHERE blob IS NOT NULL;
+
+      INSERT OR IGNORE INTO archive_text_versions (
+        text_version_id, item_id, file_id, parent_version_id, kind, language_code,
+        content, status, engine, model, confidence, editorial_conventions, created_by,
+        created_at, updated_at, reviewed_at
+      )
+      SELECT
+        'legacy_text_' || item_id, item_id,
+        CASE WHEN blob IS NULL THEN NULL ELSE 'legacy_file_' || item_id END,
+        NULL, 'ocr', NULL, extracted_text, 'automatic', 'legacy', NULL, NULL, NULL,
+        'legacy', created_at, updated_at, NULL
+      FROM archive_items
+      WHERE COALESCE(extracted_text, '') <> '';
+
+      UPDATE record_evidence
+      SET certainty = COALESCE(certainty, confidence),
+          updated_at = COALESCE(updated_at, created_at);
+    `,
+    after: (db) => {
+      const rows = db.prepare(
+        `SELECT i.item_id, i.blob, i.content_hash
+         FROM archive_items i
+         JOIN archive_item_files f ON f.file_id = 'legacy_file_' || i.item_id
+         WHERE i.blob IS NOT NULL`
+      ).all() as Array<{ item_id: string; blob: Buffer; content_hash: string | null }>;
+      const updateLegacy = db.prepare(
+        `UPDATE archive_item_files
+         SET content_hash = ?, hash_algorithm = 'sha256',
+             verification_status = CASE WHEN ? IS NULL OR lower(?) = lower(?) THEN 'verified' ELSE 'mismatch' END,
+             verified_at = ?
+         WHERE file_id = ?`
+      );
+      const updateItemHash = db.prepare(
+        'UPDATE archive_items SET content_hash = COALESCE(content_hash, ?) WHERE item_id = ?'
+      );
+      const checkedAt = new Date().toISOString();
+      for (const row of rows) {
+        const observed = createHash('sha256').update(row.blob).digest('hex');
+        updateLegacy.run(observed, row.content_hash, row.content_hash, observed, checkedAt, `legacy_file_${row.item_id}`);
+        updateItemHash.run(observed, row.item_id);
+      }
+    },
+  },
+  {
+    version: 110,
+    up: /* sql */ `
+      -- Reusable archival description profiles. Built-ins are ordinary rows with
+      -- stable ids so users can inspect them and future syncs can refer to them.
+      CREATE TABLE archive_description_templates (
+        template_id          TEXT PRIMARY KEY,
+        name                 TEXT NOT NULL,
+        document_type        TEXT,
+        default_level        TEXT NOT NULL DEFAULT 'item',
+        unit_defaults_json   TEXT NOT NULL DEFAULT '{}',
+        profile_defaults_json TEXT NOT NULL DEFAULT '{}',
+        builtin              INTEGER NOT NULL DEFAULT 0,
+        created_at           TEXT NOT NULL,
+        updated_at           TEXT NOT NULL
+      );
+      CREATE INDEX idx_archive_description_templates_type
+        ON archive_description_templates(document_type, name);
+
+      INSERT INTO archive_description_templates (
+        template_id, name, document_type, default_level, unit_defaults_json,
+        profile_defaults_json, builtin, created_at, updated_at
+      ) VALUES
+        ('builtin_letter', 'Carta o correspondencia', 'correspondence', 'item',
+          '{"titleType":"supplied","extentDisplay":"1 unidad documental"}',
+          '{"descriptionStatus":"minimal"}', 1,
+          strftime('%Y-%m-%dT%H:%M:%fZ','now'), strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        ('builtin_register', 'Registro o acta', 'register', 'item',
+          '{"titleType":"formal"}', '{"descriptionStatus":"minimal"}', 1,
+          strftime('%Y-%m-%dT%H:%M:%fZ','now'), strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        ('builtin_photograph', 'Fotografía', 'photograph', 'item',
+          '{"titleType":"supplied","physicalCharacteristics":"Descripción del soporte pendiente"}',
+          '{"descriptionStatus":"minimal"}', 1,
+          strftime('%Y-%m-%dT%H:%M:%fZ','now'), strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        ('builtin_oral_history', 'Historia oral', 'oral_history', 'item',
+          '{"titleType":"supplied"}', '{"descriptionStatus":"provenance_incomplete"}', 1,
+          strftime('%Y-%m-%dT%H:%M:%fZ','now'), strftime('%Y-%m-%dT%H:%M:%fZ','now'));
+    `,
+  },
+  {
+    version: 111,
+    up: /* sql */ `
+      -- Append-only preservation history. File bytes stay in archive_item_files;
+      -- this table records why a representation/version/check exists and who or
+      -- what produced it without turning the mutable UI state into the audit trail.
+      CREATE TABLE archive_audit_log (
+        event_id       TEXT PRIMARY KEY,
+        item_id        TEXT NOT NULL REFERENCES archive_items(item_id) ON DELETE CASCADE,
+        file_id        TEXT REFERENCES archive_item_files(file_id) ON DELETE SET NULL,
+        action         TEXT NOT NULL,
+        details_json   TEXT NOT NULL DEFAULT '{}',
+        created_by     TEXT,
+        created_at     TEXT NOT NULL
+      );
+      CREATE INDEX idx_archive_audit_item
+        ON archive_audit_log(item_id, created_at DESC);
+      CREATE INDEX idx_archive_audit_file
+        ON archive_audit_log(file_id, created_at DESC);
+      CREATE INDEX idx_archive_audit_action
+        ON archive_audit_log(action, created_at DESC);
+    `,
+  },
+  {
+    version: 112,
+    up: /* sql */ `
+      -- Text and excerpt anchors are archival records. Review state may change, but
+      -- a correction is a child version and a changed quotation is a new excerpt.
+      CREATE INDEX idx_archive_text_versions_parent
+        ON archive_text_versions(parent_version_id, created_at);
+      CREATE INDEX idx_archive_excerpts_version
+        ON archive_excerpts(text_version_id, created_at);
+    `,
+    // Trigger bodies contain their own semicolons and therefore deliberately live
+    // in `after`, where SQLite parses the whole script rather than the migration
+    // recovery statement splitter.
+    after: (db) => db.exec(/* sql */ `
+        CREATE TRIGGER archive_text_versions_preserve_content
+        BEFORE UPDATE OF
+          item_id, file_id, parent_version_id, kind, language_code, content, engine,
+          model, confidence, editorial_conventions, created_by, created_at
+        ON archive_text_versions
+        WHEN
+          NEW.item_id IS NOT OLD.item_id
+          OR NEW.file_id IS NOT OLD.file_id
+          OR NEW.parent_version_id IS NOT OLD.parent_version_id
+          OR NEW.kind IS NOT OLD.kind
+          OR NEW.language_code IS NOT OLD.language_code
+          OR NEW.content IS NOT OLD.content
+          OR NEW.engine IS NOT OLD.engine
+          OR NEW.model IS NOT OLD.model
+          OR NEW.confidence IS NOT OLD.confidence
+          OR NEW.editorial_conventions IS NOT OLD.editorial_conventions
+          OR NEW.created_by IS NOT OLD.created_by
+          OR NEW.created_at IS NOT OLD.created_at
+        BEGIN
+          SELECT RAISE(ABORT, 'archive text versions are immutable; create a child version');
+        END;
+
+        CREATE TRIGGER archive_excerpts_preserve_anchor
+        BEFORE UPDATE OF
+          item_id, file_id, text_version_id, segment_id, locator_display,
+          locator_json, quoted_text, language_code, created_by, created_at
+        ON archive_excerpts
+        WHEN
+          NEW.item_id IS NOT OLD.item_id
+          OR NEW.file_id IS NOT OLD.file_id
+          OR NEW.text_version_id IS NOT OLD.text_version_id
+          OR NEW.segment_id IS NOT OLD.segment_id
+          OR NEW.locator_display IS NOT OLD.locator_display
+          OR NEW.locator_json IS NOT OLD.locator_json
+          OR NEW.quoted_text IS NOT OLD.quoted_text
+          OR NEW.language_code IS NOT OLD.language_code
+          OR NEW.created_by IS NOT OLD.created_by
+          OR NEW.created_at IS NOT OLD.created_at
+        BEGIN
+          SELECT RAISE(ABORT, 'archive excerpt anchors are immutable; create a new excerpt');
+        END;
+      `),
+  },
+  {
+    version: 113,
+    up: /* sql */ `
+      -- Human review ledger for AI proposals. Proposal model output is immutable;
+      -- edits and decisions are append-only, while one accepted row is the stable
+      -- materialization receipt used to make retries idempotent.
+      CREATE TABLE archive_proposal_decisions (
+        decision_id              TEXT PRIMARY KEY,
+        proposal_id              TEXT NOT NULL REFERENCES archive_entity_proposals(proposal_id) ON DELETE CASCADE,
+        item_id                  TEXT NOT NULL REFERENCES archive_items(item_id) ON DELETE CASCADE,
+        decision                 TEXT NOT NULL CHECK (decision IN ('accepted', 'rejected', 'deferred')),
+        original_payload_json    TEXT NOT NULL,
+        decided_payload_json     TEXT NOT NULL,
+        matched_target_id        TEXT,
+        materialized_target_kind TEXT,
+        materialized_target_id   TEXT,
+        evidence_id              TEXT REFERENCES record_evidence(id) ON DELETE SET NULL,
+        evidence_role            TEXT,
+        reviewer                 TEXT,
+        note                     TEXT,
+        created_at               TEXT NOT NULL
+      );
+      CREATE INDEX idx_archive_proposal_decisions_proposal
+        ON archive_proposal_decisions(proposal_id, created_at DESC);
+      CREATE INDEX idx_archive_proposal_decisions_item
+        ON archive_proposal_decisions(item_id, created_at DESC);
+      CREATE UNIQUE INDEX idx_archive_proposal_one_acceptance
+        ON archive_proposal_decisions(proposal_id)
+        WHERE decision='accepted';
+    `,
+  },
+  {
+    version: 114,
+    up: /* sql */ `
+      -- A toponym is quoted exactly in archive_place_mentions. Resolving it is a
+      -- separate, reversible editorial decision: this ledger records the selected
+      -- authority candidate, the alternatives that were considered, and the exact
+      -- previous place state needed to undo the decision without rewriting evidence.
+      CREATE TABLE archive_place_resolution_decisions (
+        resolution_id          TEXT PRIMARY KEY,
+        place_id               TEXT NOT NULL REFERENCES places(place_id) ON DELETE CASCADE,
+        mention_id             TEXT REFERENCES archive_place_mentions(mention_id) ON DELETE SET NULL,
+        selected_candidate_json TEXT NOT NULL,
+        alternatives_json      TEXT NOT NULL DEFAULT '[]',
+        previous_place_json    TEXT NOT NULL,
+        coordinate_precision   TEXT,
+        historical_context     TEXT,
+        valid_from_display     TEXT,
+        valid_to_display       TEXT,
+        rationale              TEXT,
+        status                 TEXT NOT NULL DEFAULT 'active'
+          CHECK (status IN ('active', 'reverted')),
+        created_by             TEXT,
+        created_at             TEXT NOT NULL,
+        reverted_at            TEXT
+      );
+      CREATE INDEX idx_archive_place_resolution_place
+        ON archive_place_resolution_decisions(place_id, status, created_at DESC);
+      CREATE INDEX idx_archive_place_resolution_mention
+        ON archive_place_resolution_decisions(mention_id, created_at DESC);
+      CREATE UNIQUE INDEX idx_archive_place_resolution_one_active
+        ON archive_place_resolution_decisions(place_id)
+        WHERE status='active';
+    `,
+  },
+  {
+    version: 115,
+    up: /* sql */ `
+      -- Primary-source notes reuse the shared Markdown note body while keeping
+      -- documentary type, workflow state and collection as an orthogonal overlay.
+      CREATE TABLE primary_source_note_profiles (
+        note_id       TEXT PRIMARY KEY REFERENCES notes(id) ON DELETE CASCADE,
+        note_type     TEXT NOT NULL DEFAULT 'observation'
+          CHECK (note_type IN (
+            'observation', 'question', 'hypothesis', 'comparison', 'task', 'method_memo'
+          )),
+        status        TEXT NOT NULL DEFAULT 'draft'
+          CHECK (status IN ('draft', 'in_review', 'stable', 'archived')),
+        collection    TEXT,
+        created_at    TEXT NOT NULL,
+        updated_at    TEXT NOT NULL
+      );
+      CREATE INDEX idx_primary_source_note_profiles_filter
+        ON primary_source_note_profiles(note_type, status, collection, updated_at DESC);
+
+      -- note_links remains the generic graph. This companion stores the literal
+      -- quotation and locator shown when a citation was inserted, so a later text
+      -- correction can warn without destroying or silently rewriting the note.
+      CREATE TABLE primary_source_note_link_snapshots (
+        link_id          TEXT PRIMARY KEY REFERENCES note_links(link_id) ON DELETE CASCADE,
+        quoted_text      TEXT,
+        locator_display  TEXT,
+        source_hash      TEXT,
+        created_at       TEXT NOT NULL
+      );
+    `,
+  },
+  {
+    version: 116,
+    up: /* sql */ `
+      -- A derived research note has its own permissions. It can be more private
+      -- (or more open) than the source it discusses, so export never inherits
+      -- access implicitly from a linked document.
+      ALTER TABLE primary_source_note_profiles
+        ADD COLUMN access_status TEXT NOT NULL DEFAULT 'private'
+          CHECK (access_status IN ('open','private','restricted','embargoed','unknown'));
+      ALTER TABLE primary_source_note_profiles
+        ADD COLUMN sensitivity TEXT NOT NULL DEFAULT 'normal'
+          CHECK (sensitivity IN ('normal','personal','sensitive','highly_sensitive'));
+      CREATE INDEX idx_primary_source_note_profiles_access
+        ON primary_source_note_profiles(access_status, sensitivity);
+
+      -- One policy row is the backend source of truth for search, AI, sync and
+      -- export. Renderer toggles can explain these rules but cannot bypass them.
+      CREATE TABLE primary_source_policies (
+        policy_id                       TEXT PRIMARY KEY,
+        allow_private_search            INTEGER NOT NULL DEFAULT 0,
+        allow_restricted_search         INTEGER NOT NULL DEFAULT 0,
+        allow_private_sync              INTEGER NOT NULL DEFAULT 0,
+        allow_restricted_sync           INTEGER NOT NULL DEFAULT 0,
+        allow_restricted_local_ai       INTEGER NOT NULL DEFAULT 0,
+        allow_private_external_ai       INTEGER NOT NULL DEFAULT 1,
+        require_external_confirmation   INTEGER NOT NULL DEFAULT 1,
+        retain_automatic_results_days   INTEGER NOT NULL DEFAULT 365,
+        export_private_files            INTEGER NOT NULL DEFAULT 1,
+        review_expired_embargoes         INTEGER NOT NULL DEFAULT 1,
+        redact_physical_locations       INTEGER NOT NULL DEFAULT 1,
+        redact_personal_metadata        INTEGER NOT NULL DEFAULT 1,
+        created_at                      TEXT NOT NULL,
+        updated_at                      TEXT NOT NULL
+      );
+
+      -- Citation text is editable and configurable, while its structured
+      -- components and stable Nodus link remain independently recoverable.
+      CREATE TABLE primary_source_citation_settings (
+        settings_id             TEXT PRIMARY KEY,
+        field_order_json        TEXT NOT NULL,
+        repository_aliases_json TEXT NOT NULL DEFAULT '{}',
+        required_fields_json    TEXT NOT NULL,
+        include_accessed_date   INTEGER NOT NULL DEFAULT 0,
+        updated_at              TEXT NOT NULL
+      );
+
+      -- Sanitised operational audit: hashes and counts only. No source text,
+      -- person names, local paths, prompts or provider responses are logged here.
+      CREATE TABLE primary_source_operation_runs (
+        run_id               TEXT PRIMARY KEY,
+        operation_id         TEXT NOT NULL,
+        processing_location  TEXT NOT NULL CHECK (processing_location IN ('local', 'external')),
+        selection_count      INTEGER NOT NULL,
+        selected_ids_hash    TEXT NOT NULL,
+        provider             TEXT,
+        model                TEXT,
+        context_hash         TEXT,
+        context_bytes        INTEGER NOT NULL DEFAULT 0,
+        left_device          INTEGER NOT NULL DEFAULT 0,
+        policy_decision      TEXT NOT NULL,
+        status               TEXT NOT NULL CHECK (status IN ('previewed', 'running', 'completed', 'blocked', 'failed')),
+        result_kind          TEXT,
+        created_at           TEXT NOT NULL,
+        completed_at         TEXT,
+        error_code           TEXT
+      );
+      CREATE INDEX idx_primary_source_operation_runs_created
+        ON primary_source_operation_runs(created_at DESC);
+
+      -- The full research-package manifest is preservation metadata. The generic
+      -- archive_exports row remains the compact audit/index used by Inicio.
+      CREATE TABLE primary_source_export_manifests (
+        export_id        TEXT PRIMARY KEY REFERENCES archive_exports(export_id) ON DELETE CASCADE,
+        format_version   INTEGER NOT NULL,
+        profile          TEXT NOT NULL,
+        schema_version   INTEGER NOT NULL,
+        package_hash     TEXT NOT NULL,
+        manifest_json    TEXT NOT NULL,
+        verified_at      TEXT,
+        created_at       TEXT NOT NULL
+      );
+      CREATE INDEX idx_primary_source_export_manifests_created
+        ON primary_source_export_manifests(created_at DESC);
+
+      -- Restores never retain the source path or source names in their log. A
+      -- validated package is materialised as a new vault and reported by hash.
+      CREATE TABLE primary_source_restore_reports (
+        report_id         TEXT PRIMARY KEY,
+        package_hash      TEXT NOT NULL,
+        source_schema     INTEGER,
+        result_vault_id   TEXT,
+        status            TEXT NOT NULL CHECK (status IN ('validated', 'restored', 'rejected', 'failed')),
+        missing_files     INTEGER NOT NULL DEFAULT 0,
+        invalid_files     INTEGER NOT NULL DEFAULT 0,
+        report_json       TEXT NOT NULL,
+        created_at        TEXT NOT NULL
+      );
+      CREATE INDEX idx_primary_source_restore_reports_created
+        ON primary_source_restore_reports(created_at DESC);
+    `,
+  },
+  {
+    version: 117,
+    up: /* sql */ `
+      -- Optional, strictly local beta diagnostics. Rows contain only an allow-listed
+      -- operation name, coarse corpus-size bucket, elapsed time and success flag:
+      -- never source ids, titles, paths, prompts, text or provider responses.
+      CREATE TABLE primary_source_local_metrics (
+        metric_id        TEXT PRIMARY KEY,
+        event_name       TEXT NOT NULL CHECK (event_name IN (
+          'archive_list', 'archive_filter', 'dossier_open', 'research_search',
+          'demo_seed', 'package_export', 'package_restore'
+        )),
+        duration_ms      REAL NOT NULL CHECK (duration_ms >= 0),
+        item_count_bucket TEXT NOT NULL CHECK (item_count_bucket IN (
+          '0', '1-10', '11-100', '101-1000', '1001-10000', '10001-100000', '100000+'
+        )),
+        success          INTEGER NOT NULL DEFAULT 1 CHECK (success IN (0, 1)),
+        created_at       TEXT NOT NULL
+      );
+      CREATE INDEX idx_primary_source_local_metrics_event_created
+        ON primary_source_local_metrics(event_name, created_at DESC);
+    `,
+  },
+  {
+    version: 118,
+    up: /* sql */ `
+      -- Speaker identity is a property of a time-coded transcript segment, not a
+      -- page label. Keeping it separate preserves both archival locators and the
+      -- output of an explicitly selected diarization engine.
+      ALTER TABLE archive_text_segments ADD COLUMN speaker_label TEXT;
+    `,
+  },
+  {
+    version: 119,
+    up: /* sql */ `
       -- El vault de Testimonios: historia oral. La unidad no es la grabacion ni la
       -- transcripcion, es LA ENTREVISTA COMO CONJUNTO DOCUMENTAL -- preparacion,
       -- participantes, sesiones, archivos, transcripciones, acuerdo, codigos, fragmentos
@@ -4718,7 +6135,7 @@ export const migrations: Migration[] = [
       -- destino se guarda por tipo e id y NO se comprueba contra ninguna tabla: una nota
       -- cuyo fragmento ha desaparecido debe conservar su texto y mostrar el enlace roto,
       -- no evaporarse con el.
-      CREATE TABLE note_links (
+      CREATE TABLE testimony_note_links (
         note_id     TEXT NOT NULL,
         target_kind TEXT NOT NULL,
         target_id   TEXT NOT NULL,
@@ -4726,11 +6143,11 @@ export const migrations: Migration[] = [
         created_at  TEXT NOT NULL,
         PRIMARY KEY (note_id, target_kind, target_id)
       );
-      CREATE INDEX idx_note_links_target ON note_links(target_kind, target_id);
+      CREATE INDEX idx_testimony_note_links_target ON testimony_note_links(target_kind, target_id);
     `,
   },
   {
-    version: 106,
+    version: 120,
     up: /* sql */ `
       -- El indice semantico de Testimonios.
       --
@@ -4864,7 +6281,7 @@ function backfillMissingCreateOnly(db: Database.Database, current: number): void
     (db.prepare("SELECT name FROM sqlite_master WHERE type IN ('table','index','view','trigger')").all() as { name: string }[])
       .map((row) => row.name)
   );
-  const applied = migrations.filter((m) => m.version <= current && isCreateOnly(m.up));
+  const applied = migrations.filter((m) => m.version <= current && isCreateOnly(m.up) && !m.after);
   const tx = db.transaction(() => {
     for (const m of applied) {
       const names = objectNamesCreatedBy(m.up);
@@ -4889,6 +6306,7 @@ export function runMigrations(db: Database.Database): void {
     try {
       const tx = db.transaction(() => {
         db.exec(m.up);
+        m.after?.(db);
         db.pragma(`user_version = ${m.version}`);
       });
       tx();
@@ -4897,7 +6315,7 @@ export function runMigrations(db: Database.Database): void {
       // build's number. Re-apply only what is missing and record the version, instead of
       // failing the vault switch with "table ... already exists". Anything else — or any
       // migration that transforms data — is re-thrown rather than risked.
-      if (!isAlreadyAppliedError(error) || !isCreateOnly(m.up)) throw error;
+      if (!isAlreadyAppliedError(error) || !isCreateOnly(m.up) || m.after) throw error;
       const tx = db.transaction(() => {
         execSkippingApplied(db, m.up);
         db.pragma(`user_version = ${m.version}`);

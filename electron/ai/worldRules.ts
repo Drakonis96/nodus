@@ -1,7 +1,7 @@
 // Draft the statement of a law, and never anything else.
 //
-// One of the two model calls the whole "Analizar" group keeps, and the narrow one. Every
-// diagnostic in that group is arithmetic over what the author typed — a warning they cannot
+// This is a narrow drafting call. Every diagnostic in the "Analizar" group is arithmetic
+// over what the author typed — a warning they cannot
 // reproduce is a warning they learn to skip — so the model is not asked to audit, judge or
 // find anything. It is asked for a first sentence to disagree with.
 //

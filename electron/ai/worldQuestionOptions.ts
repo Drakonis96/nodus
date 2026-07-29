@@ -1,7 +1,7 @@
 // Propose answers to something the author has not decided yet.
 //
-// The second and last model call of the "Analizar" group, and the one whose quarantine is
-// STRUCTURAL rather than a column: what comes back is stored as options with `origin='ai'`,
+// Its quarantine is structural rather than a column: what comes back is stored as
+// options with `origin='ai'`,
 // and an option is not part of the world until the author chooses it and presses the button
 // that names what it will write. So there is no accept step here — choosing is the accept
 // step — and three proposals nobody picks cost one row each and change nothing.

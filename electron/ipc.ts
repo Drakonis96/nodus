@@ -242,6 +242,7 @@ import type {
   StudyMaterialListOptions,
   StudyMaterialUpdateInput,
   StudyAudioMarkerInput,
+  StudyDiarizationRequest,
   StudyRecordingCreateInput,
   StudyRecordingListOptions,
   StudyRecordingUpdateInput,
@@ -262,12 +263,90 @@ import type {
   StudyRubricInput,
   StudyPronunciationEntry,
 } from '@shared/types';
+import type {
+  PrimarySourceBulkPatch,
+  PrimarySourceFileImportInput,
+  PrimarySourceFileMetadataPatch,
+  PrimarySourceExcerptCreateInput,
+  PrimarySourceIngestInput,
+  PrimarySourceAnalysis,
+  PrimarySourceProposalAcceptanceInput,
+  PrimarySourceProposalDecisionInput,
+  PrimarySourceProposalExtractionInput,
+  PrimarySourceNoteLinkInput,
+  PrimarySourceNoteProfilePatch,
+  PrimarySourcePersonFilter,
+  PrimarySourceSearchRequest,
+  PrimarySourceSearchTargetKind,
+  PrimarySourceCitationBuildRequest,
+  PrimarySourceCitationSettings,
+  PrimarySourceExportRequest,
+  PrimarySourcePolicySettingsPatch,
+  PrimarySourceToolkitRequest,
+  PrimarySourceToponymResolutionInput,
+  PrimarySourceTextVersionCreateInput,
+  PrimarySourceUnitCreateInput,
+} from '@shared/primarySourcesTypes';
+import type { ArchiveReviewStatus, ArchiveTextStatus } from '@shared/archiveTypes';
 
 // Mirrors MANUAL_IDEA_MARKER in shared/types.ts. Defined locally because the
 // electron sub-build erases type-only @shared imports but cannot resolve the
 // alias for a runtime value import.
 const MANUAL_IDEA_MARKER = 'manual-idea';
 import { getSettings, updateSettings } from './db/settingsRepo';
+import { getProsopPopulationWorkspace } from './db/prosopPopulationRepo';
+import {
+  createProsopMethodologyDraft,
+  publishProsopMethodology,
+  replaceProsopCriteria,
+  updateProsopStudy,
+} from './db/prosopStudyRepo';
+import {
+  createProsopQuestionnaireDraft,
+  deleteProsopVariableRevision,
+  publishProsopQuestionnaire,
+  saveProsopVariableRevision,
+  saveProsopVocabulary,
+  saveProsopVocabularyTerm,
+} from './db/prosopQuestionnaireRepo';
+import { deleteProsopSource, saveProsopSource, saveProsopSourceSegment } from './db/prosopSourcesRepo';
+import {
+  getProsopSourcesWorkspace,
+  importProsopDelimited,
+  reviewProsopCaptureRow,
+  saveProsopCaptureTemplate,
+} from './db/prosopCaptureRepo';
+import {
+  getProsopObservationsWorkspace,
+  retireProsopResolution,
+  reviewProsopFactoid,
+  saveProsopFactoid,
+  saveProsopMissingValue,
+  saveProsopResolution,
+} from './db/prosopFactoidsRepo';
+import {
+  createProsopPerson,
+  decideProsopIdentityHypothesis,
+  getProsopIdentityWorkspace,
+  mergeProsopPersons,
+  reverseProsopPersonMerge,
+  saveProsopAuthorityId,
+  saveProsopIdentityHypothesis,
+  saveProsopNameAttestation,
+  saveProsopOrganization,
+  searchProsopIdentityCandidates,
+} from './db/prosopIdentityRepo';
+import {
+  getProsopMembershipWorkspace,
+  refreshProsopDynamicCohort,
+  saveProsopCohort,
+  saveProsopMembership,
+} from './db/prosopMembershipRepo';
+import { getProsopAnalysisWorkspace, runProsopAnalysis } from './db/prosopAnalysisRepo';
+import { deriveProsopCooccurrenceLayer, getProsopNetworksWorkspace, saveProsopNetworkEdge, saveProsopNetworkLayer } from './db/prosopNetworksRepo';
+import { createProsopProposal, decideProsopProposal, listProsopProposals, saveProsopNoteLink, searchProsopography } from './db/prosopSearchRepo';
+import { auditProsopIntegrity, exportProsopIpif, exportProsopLongRows } from './db/prosopInterchangeRepo';
+import { seedProsopDemo } from './db/prosopDemoRepo';
 import { runToolkitJob, type ToolkitSignal } from './toolkit/toolkitJobs';
 import { TOOLKIT_REGISTRY } from './toolkit/convert';
 import {
@@ -472,6 +551,7 @@ import { seedGenealogyDemoData } from './db/genealogyDemoData';
 import { seedDatabasesDemoData } from './db/databasesDemoData';
 import { seedStudyDemoData } from './db/studyDemoData';
 import { seedTeachingDemoData } from './db/teachingDemoData';
+import { seedPrimarySourcesDemoData } from './db/primarySourcesDemoData';
 import {
   seedWorldbuildingDemoData,
   upgradeWorldbuildingDemoDynasties,
@@ -543,6 +623,7 @@ import {
   type TeachingExamInput,
 } from '@shared/teachingExams';
 import { transcribeStudyAudio as transcribeOpenAiStudyAudio } from './ai/studyTranscription';
+import { diarizeStudyRecording } from './ai/studyDiarization';
 import {
   cancelWhisperCpp,
   deleteWhisperCppModel,
@@ -931,6 +1012,91 @@ import {
   listItemsForPerson,
 } from './db/archiveRepo';
 import { ingestArchiveFile, replaceArchiveFile } from './archive/archiveIngest';
+import {
+  applyPrimarySourceBulkEdit,
+  createDescriptionOnlyUnit,
+  createDescriptionTemplate,
+  ensurePrimarySourceProjection,
+  getPrimarySourceDossier,
+  getPrimarySourceArchiveWorkspace,
+  previewPrimarySourceBulkEdit,
+  updatePrimarySourceArchiveRecord,
+} from './db/primarySourcesArchiveRepo';
+import {
+  createArchiveFilesFromPaths,
+  getArchiveFile,
+  getArchiveFileBlob,
+  regenerateArchiveThumbnail,
+  reorderArchiveFileGroups,
+  updateArchiveFileMetadata,
+  verifyArchiveItemFiles,
+} from './db/archiveFilesRepo';
+import { recordArchiveAudit } from './db/archiveAuditRepo';
+import {
+  createPrimarySourceTextVersion,
+  setArchiveTextReviewStatus,
+} from './db/archiveTextsRepo';
+import {
+  createStableArchiveExcerpt,
+  savePrimarySourceAnalysis,
+  setArchiveExcerptReviewStatus,
+} from './db/archiveEvidenceRepo';
+import {
+  acceptEntityProposal,
+  decideEntityProposal,
+  revertEntityResolution,
+} from './db/archiveProposalsRepo';
+import {
+  addPrimarySourcePersonVariant,
+  getPrimarySourcePersonDossier,
+  listPrimarySourcePersons,
+  mergePrimarySourcePersons,
+  revertPrimarySourcePersonMerge,
+} from './db/primarySourcePersonsRepo';
+import {
+  getPrimarySourceMapWorkspace,
+  getPrimarySourceRelationsWorkspace,
+  getPrimarySourceTimelineWorkspace,
+  resolvePrimarySourceToponym,
+  revertPrimarySourceToponymResolution,
+} from './db/primarySourceDerivedViewsRepo';
+import {
+  addPrimarySourceNoteLink,
+  createPrimarySourceNote,
+  getPrimarySourceBacklinks,
+  getPrimarySourceNoteWorkspace,
+  getPrimarySourceOperationalDashboard,
+  insertPrimarySourceExcerptCitation,
+  removePrimarySourceNoteLink,
+  searchPrimarySourceCorpus,
+  updatePrimarySourceNoteProfile,
+} from './db/primarySourceResearchRepo';
+import {
+  getPrimarySourceGovernanceWorkspace,
+  updatePrimarySourceCitationSettings,
+  updatePrimarySourcePolicySettings,
+} from './db/primarySourceGovernanceRepo';
+import {
+  buildPrimarySourceCitation,
+  previewPrimarySourceToolkitOperation,
+  runPrimarySourceToolkitOperation,
+} from './primarySources/primarySourceGovernance';
+import {
+  createPrimarySourceResearchPackage,
+  previewPrimarySourceExport,
+  restorePrimarySourceResearchPackage,
+  validatePrimarySourceResearchPackage,
+} from './primarySources/primarySourceExport';
+import {
+  clearPrimarySourceLocalMetrics,
+  getPrimarySourceLocalMetricSummary,
+  recordPrimarySourceLocalMetric,
+} from './db/primarySourceMetricsRepo';
+import { extractPrimarySourceProposals } from './ai/primarySourceProposals';
+import {
+  createArchiveRepository,
+  createCaptureSession,
+} from './db/archiveHierarchyRepo';
 import * as dbMode from './db/databasesRepo';
 import * as databaseChatHistory from './db/databaseChatRepo';
 import { setPersistentDockIcon } from './dockIcon';
@@ -1162,6 +1328,61 @@ export function registerIpc(
   const nodiChatAborters = new Map<string, AbortController>();
   const studyImproveAborters = new Map<string, AbortController>();
   const studyAssistantAborters = new Map<string, AbortController>();
+
+  // ── Prosopography: methodology and questionnaire ──────────────────────────
+  h('prosop:population:workspace', async () => getProsopPopulationWorkspace());
+  h('prosop:study:update', async (_e, patch) => updateProsopStudy(patch));
+  h('prosop:methodology:createDraft', async (_e, actor) => createProsopMethodologyDraft(actor));
+  h('prosop:methodology:replaceCriteria', async (_e, versionId, criteria) => replaceProsopCriteria(versionId, criteria));
+  h('prosop:methodology:publish', async (_e, versionId, changeSummary, actor) => publishProsopMethodology(versionId, changeSummary, actor));
+  h('prosop:questionnaire:createDraft', async (_e, input) => createProsopQuestionnaireDraft(input));
+  h('prosop:questionnaire:saveVariable', async (_e, questionnaireVersionId, input) => saveProsopVariableRevision(questionnaireVersionId, input));
+  h('prosop:questionnaire:deleteVariable', async (_e, questionnaireVersionId, variableId) => deleteProsopVariableRevision(questionnaireVersionId, variableId));
+  h('prosop:questionnaire:publish', async (_e, questionnaireVersionId, changeSummary, actor) => publishProsopQuestionnaire(questionnaireVersionId, changeSummary, actor));
+  h('prosop:vocabulary:save', async (_e, input) => saveProsopVocabulary(input));
+  h('prosop:vocabulary:saveTerm', async (_e, input) => saveProsopVocabularyTerm(input));
+  h('prosop:sources:workspace', async () => getProsopSourcesWorkspace());
+  h('prosop:sources:save', async (_e, input) => saveProsopSource(input));
+  h('prosop:sources:delete', async (_e, sourceId) => deleteProsopSource(sourceId));
+  h('prosop:sources:saveSegment', async (_e, input) => saveProsopSourceSegment(input));
+  h('prosop:capture:saveTemplate', async (_e, input) => saveProsopCaptureTemplate(input));
+  h('prosop:capture:importDelimited', async (_e, input) => importProsopDelimited(input));
+  h('prosop:capture:reviewRow', async (_e, captureRowId, status) => reviewProsopCaptureRow(captureRowId, status));
+  h('prosop:observations:workspace', async () => getProsopObservationsWorkspace());
+  h('prosop:factoids:save', async (_e, input) => saveProsopFactoid(input));
+  h('prosop:factoids:review', async (_e, factoidId, status, reviewedBy) => reviewProsopFactoid(factoidId, status, reviewedBy));
+  h('prosop:missing:save', async (_e, input) => saveProsopMissingValue(input));
+  h('prosop:resolutions:save', async (_e, input) => saveProsopResolution(input));
+  h('prosop:resolutions:retire', async (_e, resolutionId) => retireProsopResolution(resolutionId));
+  h('prosop:identity:workspace', async () => getProsopIdentityWorkspace());
+  h('prosop:identity:createPerson', async (_e, input) => createProsopPerson(input));
+  h('prosop:identity:saveAttestation', async (_e, input) => saveProsopNameAttestation(input));
+  h('prosop:identity:candidates', async (_e, literalName, limit) => searchProsopIdentityCandidates(literalName, limit));
+  h('prosop:identity:saveHypothesis', async (_e, input) => saveProsopIdentityHypothesis(input));
+  h('prosop:identity:decideHypothesis', async (_e, hypothesisId, status, reviewedBy) => decideProsopIdentityHypothesis(hypothesisId, status, reviewedBy));
+  h('prosop:identity:merge', async (_e, survivorId, absorbedId, rationale, actor) => mergeProsopPersons(survivorId, absorbedId, rationale, actor));
+  h('prosop:identity:reverseMerge', async (_e, mergeId, actor) => reverseProsopPersonMerge(mergeId, actor));
+  h('prosop:identity:saveAuthority', async (_e, input) => saveProsopAuthorityId(input));
+  h('prosop:identity:saveOrganization', async (_e, input) => saveProsopOrganization(input));
+  h('prosop:membership:workspace', async () => getProsopMembershipWorkspace());
+  h('prosop:membership:save', async (_e, input) => saveProsopMembership(input));
+  h('prosop:cohorts:save', async (_e, input) => saveProsopCohort(input));
+  h('prosop:cohorts:refresh', async (_e, cohortId) => refreshProsopDynamicCohort(cohortId));
+  h('prosop:analysis:workspace', async () => getProsopAnalysisWorkspace());
+  h('prosop:analysis:run', async (_e, input) => runProsopAnalysis(input));
+  h('prosop:networks:workspace', async () => getProsopNetworksWorkspace());
+  h('prosop:networks:saveLayer', async (_e, input) => saveProsopNetworkLayer(input));
+  h('prosop:networks:saveEdge', async (_e, input) => saveProsopNetworkEdge(input));
+  h('prosop:networks:deriveCooccurrence', async (_e, layerId) => deriveProsopCooccurrenceLayer(layerId));
+  h('prosop:search', async (_e, query, kind) => searchProsopography(query, kind));
+  h('prosop:proposals:list', async () => listProsopProposals());
+  h('prosop:proposals:create', async (_e, input) => createProsopProposal(input));
+  h('prosop:proposals:decide', async (_e, proposalId, status, reviewedBy, decisionNote) => decideProsopProposal(proposalId, status, reviewedBy, decisionNote));
+  h('prosop:notes:link', async (_e, input) => saveProsopNoteLink(input));
+  h('prosop:export:long', async () => exportProsopLongRows());
+  h('prosop:export:ipif', async () => exportProsopIpif());
+  h('prosop:integrity:audit', async () => auditProsopIntegrity());
+  h('prosop:demo:seed', async () => seedProsopDemo());
 
   const queueImportedStudyKnowledge = async (
     results: Awaited<ReturnType<typeof importStudyMaterialPaths>>,
@@ -1892,8 +2113,8 @@ export function registerIpc(
     deleteWorldRule(ruleId);
   });
   h('rules:inPlay', async (_e, sceneId: string) => rulesInPlay(sceneId));
-  // The first of the two model calls this layer keeps: a first sentence to disagree with,
-  // written into `proposed_text` and never into `statement`. Accepting is a separate call.
+  // A first sentence to disagree with, written into `proposed_text` and never into
+  // `statement`. Accepting is a separate call.
   h('rules:draft', async (_e, ruleId: string) => draftWorldRule(ruleId));
   h('rules:acceptDraft', async (_e, ruleId: string) => acceptRuleProposedText(ruleId));
   h('rules:rejectDraft', async (_e, ruleId: string) => {
@@ -1986,8 +2207,8 @@ export function registerIpc(
   h('manuscript:restore', async (_e, snapshotId: string) => restoreSceneSnapshot(snapshotId));
   h('manuscript:snapshotText', async (_e, snapshotId: string) => getSnapshotText(snapshotId));
   h('manuscript:progress', async () => manuscriptProgress());
-  // The third and last model call of this vault, and the narrowest: it reads, it does not
-  // write. A9 turned it down for lack of an input; the manuscript created one.
+  // A narrow, read-only model call. Its source is the manuscript text plus the
+  // author's declared beats; it cannot write back to either.
   h('manuscript:review', async (_e, sceneId: string) => reviewWorldProse(sceneId));
   h('manuscript:export', async (
     _e,
@@ -2485,6 +2706,505 @@ export function registerIpc(
     });
     await embedArchiveItem(itemId).catch(() => false);
     return { unsupported: false, description: analysis.description || null };
+  });
+
+  // ── Primary Sources archival workspace ────────────────────────────────────
+  h('primarySources:workspace', async (
+    _e,
+    search?: string,
+    offset?: number,
+    limit?: number
+  ) => {
+    const started = performance.now();
+    let success = false;
+    try {
+      const workspace = getPrimarySourceArchiveWorkspace(search ?? '', offset, limit);
+      success = true;
+      return workspace;
+    } finally {
+      recordPrimarySourceLocalMetric(
+        search?.trim() ? 'archive_filter' : 'archive_list',
+        performance.now() - started,
+        limit ?? 200,
+        success
+      );
+    }
+  });
+  h('primarySources:dossier', async (_e, itemId: string) => {
+    const started = performance.now();
+    let success = false;
+    try {
+      const dossier = getPrimarySourceDossier(itemId);
+      success = true;
+      return dossier;
+    } finally {
+      recordPrimarySourceLocalMetric('dossier_open', performance.now() - started, 1, success);
+    }
+  });
+  h('primarySources:chooseFiles', async () => {
+    const picked = await showImportOpenDialog(getWindow() ?? undefined!, {
+      title: 'Añadir fuentes primarias',
+      properties: ['openFile', 'multiSelections'],
+      filters: [
+        { name: 'Documentos, imágenes, audio y datos', extensions: ['pdf', 'epub', 'txt', 'md', 'csv', 'xlsx', 'png', 'jpg', 'jpeg', 'tif', 'tiff', 'webp', 'bmp', 'wav', 'mp3', 'm4a', 'mp4', 'mov'] },
+        { name: 'Todos los archivos', extensions: ['*'] },
+      ],
+    });
+    return picked.canceled ? [] : picked.filePaths;
+  });
+  h('primarySources:ingest', async (_e, input: PrimarySourceIngestInput) => {
+    const paths = [...new Set((input.paths ?? []).filter((candidate) => typeof candidate === 'string' && candidate.trim()))];
+    if (paths.length === 0) throw new Error('Selecciona al menos un archivo.');
+    const settings = getSettings();
+    const ocr = {
+      enabled: settings.ocrEnabled,
+      languages: settings.ocrLanguages,
+      maxPages: settings.ocrMaxPages,
+    };
+    const visionModel = settings.visionModel ?? settings.extractionModel ?? settings.synthesisModel ?? null;
+    let added = 0;
+    let duplicates = 0;
+    const rows = [];
+    for (const filePath of paths) {
+      const result = await ingestArchiveFile(filePath, {
+        title: paths.length === 1 ? input.title?.trim() || undefined : undefined,
+        tags: input.tags,
+        ocr,
+        visionModel,
+        docType: input.documentType ?? null,
+      });
+      if (result.duplicate) {
+        duplicates += 1;
+      } else {
+        added += 1;
+        updateItem(result.item.itemId, {
+          description: input.description?.trim() || result.item.description,
+          docType: input.documentType ?? result.item.docType,
+        });
+      }
+      rows.push(ensurePrimarySourceProjection(result.item.itemId, {
+        ...input,
+        paths: undefined,
+        title: paths.length === 1 && !result.duplicate
+          ? input.title
+          : result.item.title,
+      } as Omit<PrimarySourceIngestInput, 'paths'>));
+    }
+    void embedArchiveBacklog().catch(() => undefined);
+    return { added, duplicates, rows };
+  });
+  h('primarySources:createUnit', async (_e, input: PrimarySourceUnitCreateInput) =>
+    createDescriptionOnlyUnit(input)
+  );
+  h('primarySources:createRepository', async (
+    _e,
+    input: Parameters<typeof createArchiveRepository>[0]
+  ) => createArchiveRepository(input));
+  h('primarySources:createSession', async (
+    _e,
+    input: Parameters<typeof createCaptureSession>[0]
+  ) => createCaptureSession(input));
+  h('primarySources:createCollection', async (_e, name: string, parentId?: string | null) =>
+    createFolder(name, parentId ?? null)
+  );
+  h('primarySources:createTemplate', async (
+    _e,
+    input: Parameters<typeof createDescriptionTemplate>[0]
+  ) => createDescriptionTemplate(input));
+  h('primarySources:updateRecord', async (
+    _e,
+    itemId: string,
+    input: import('@shared/primarySourcesTypes').PrimarySourceArchiveEditInput
+  ) => updatePrimarySourceArchiveRecord(itemId, input));
+  h('primarySources:bulkPreview', async (_e, itemIds: string[]) =>
+    previewPrimarySourceBulkEdit(itemIds)
+  );
+  h('primarySources:bulkApply', async (
+    _e,
+    input: {
+      itemIds: string[];
+      patch: PrimarySourceBulkPatch;
+      expectedRevisions: Record<string, string>;
+    }
+  ) => applyPrimarySourceBulkEdit(input));
+  h('primarySources:files:add', async (_e, input: PrimarySourceFileImportInput) => {
+    const added = createArchiveFilesFromPaths(input);
+    const dossier = getPrimarySourceDossier(input.itemId);
+    if (!dossier) throw new Error('La fuente ya no existe.');
+    return { added, dossier };
+  });
+  h('primarySources:files:updateMetadata', async (
+    _e,
+    fileId: string,
+    patch: PrimarySourceFileMetadataPatch
+  ) => {
+    const file = updateArchiveFileMetadata(fileId, patch);
+    const dossier = getPrimarySourceDossier(file.itemId);
+    if (!dossier) throw new Error('La fuente ya no existe.');
+    return dossier;
+  });
+  h('primarySources:files:reorder', async (_e, itemId: string, rootFileIds: string[]) => {
+    reorderArchiveFileGroups(itemId, rootFileIds);
+    const dossier = getPrimarySourceDossier(itemId);
+    if (!dossier) throw new Error('La fuente ya no existe.');
+    return dossier;
+  });
+  h('primarySources:files:verifyAll', async (_e, itemId: string) => {
+    verifyArchiveItemFiles(itemId);
+    const dossier = getPrimarySourceDossier(itemId);
+    if (!dossier) throw new Error('La fuente ya no existe.');
+    return dossier;
+  });
+  h('primarySources:files:thumbnail', async (_e, parentFileId: string) => {
+    const thumbnail = await regenerateArchiveThumbnail(parentFileId);
+    const dossier = getPrimarySourceDossier(thumbnail.itemId);
+    if (!dossier) throw new Error('La fuente ya no existe.');
+    return dossier;
+  });
+  h('primarySources:files:save', async (event, fileId: string) => {
+    const file = getArchiveFile(fileId);
+    const blob = getArchiveFileBlob(fileId);
+    if (!file || !blob) throw new Error('El archivo preservado no está disponible.');
+    const win = BrowserWindow.fromWebContents(event.sender);
+    const picked = await dialog.showSaveDialog(win ?? undefined!, {
+      title: 'Guardar copia del archivo preservado',
+      defaultPath: file.originalFileName || `fuente-${file.fileId}`,
+    });
+    if (picked.canceled || !picked.filePath) return null;
+    fs.writeFileSync(picked.filePath, blob);
+    recordArchiveAudit({
+      itemId: file.itemId,
+      fileId,
+      action: 'file_exported',
+      createdBy: 'primary_sources_user',
+      details: { destinationKind: 'user_selected', byteSize: blob.byteLength },
+    });
+    return picked.filePath;
+  });
+  h('primarySources:files:openExternal', async (_e, fileId: string) => {
+    const file = getArchiveFile(fileId);
+    const blob = getArchiveFileBlob(fileId);
+    if (!file || !blob) throw new Error('El archivo preservado no está disponible.');
+    const safeName = [...path.basename(file.originalFileName || `fuente-${file.fileId}`)]
+      .map((character) => {
+        const code = character.charCodeAt(0);
+        return code < 32 || code === 127 ? '_' : character;
+      })
+      .join('');
+    const folder = path.join(app.getPath('temp'), 'nodus-primary-sources');
+    fs.mkdirSync(folder, { recursive: true });
+    const target = path.join(folder, `${file.contentHash?.slice(0, 12) || file.fileId}-${safeName}`);
+    if (!fs.existsSync(target)) fs.writeFileSync(target, blob, { flag: 'wx' });
+    const error = await shell.openPath(target);
+    if (error) throw new Error(error);
+    recordArchiveAudit({
+      itemId: file.itemId,
+      fileId,
+      action: 'file_opened_external',
+      createdBy: 'primary_sources_user',
+      details: { temporaryManagedCopy: true },
+    });
+    return true;
+  });
+  h('primarySources:text:create', async (
+    _e,
+    input: PrimarySourceTextVersionCreateInput
+  ) => {
+    createPrimarySourceTextVersion(input);
+    const dossier = getPrimarySourceDossier(input.itemId);
+    if (!dossier) throw new Error('La fuente ya no existe.');
+    return dossier;
+  });
+  h('primarySources:text:review', async (
+    _e,
+    textVersionId: string,
+    status: ArchiveTextStatus
+  ) => {
+    const version = setArchiveTextReviewStatus(textVersionId, status);
+    if (!version) throw new Error('La versión de texto ya no existe.');
+    const dossier = getPrimarySourceDossier(version.itemId);
+    if (!dossier) throw new Error('La fuente ya no existe.');
+    return dossier;
+  });
+  h('primarySources:excerpt:create', async (
+    _e,
+    input: PrimarySourceExcerptCreateInput
+  ) => {
+    createStableArchiveExcerpt(input);
+    const dossier = getPrimarySourceDossier(input.itemId);
+    if (!dossier) throw new Error('La fuente ya no existe.');
+    return dossier;
+  });
+  h('primarySources:excerpt:review', async (
+    _e,
+    excerptId: string,
+    status: ArchiveReviewStatus
+  ) => {
+    const excerpt = setArchiveExcerptReviewStatus(excerptId, status);
+    if (!excerpt) throw new Error('El fragmento ya no existe.');
+    const dossier = getPrimarySourceDossier(excerpt.itemId);
+    if (!dossier) throw new Error('La fuente ya no existe.');
+    return dossier;
+  });
+  h('primarySources:analysis:save', async (
+    _e,
+    itemId: string,
+    patch: Partial<Omit<
+      PrimarySourceAnalysis,
+      'analysisId' | 'itemId' | 'createdAt' | 'updatedAt'
+    >>
+  ) => {
+    savePrimarySourceAnalysis(itemId, patch);
+    const dossier = getPrimarySourceDossier(itemId);
+    if (!dossier) throw new Error('La fuente ya no existe.');
+    return dossier;
+  });
+  h('primarySources:proposals:extract', async (
+    _e,
+    input: PrimarySourceProposalExtractionInput
+  ) => {
+    const result = await extractPrimarySourceProposals(input);
+    const dossier = getPrimarySourceDossier(input.itemId);
+    if (!dossier) throw new Error('La fuente ya no existe.');
+    return { result, dossier };
+  });
+  h('primarySources:proposals:accept', async (
+    _e,
+    proposalId: string,
+    input: PrimarySourceProposalAcceptanceInput
+  ) => {
+    const result = acceptEntityProposal(proposalId, input);
+    const dossier = getPrimarySourceDossier(result.proposal.itemId);
+    if (!dossier) throw new Error('La fuente ya no existe.');
+    return { result, dossier };
+  });
+  h('primarySources:proposals:decide', async (
+    _e,
+    proposalId: string,
+    status: 'rejected' | 'deferred',
+    input: PrimarySourceProposalDecisionInput
+  ) => {
+    const proposal = decideEntityProposal(proposalId, status, input);
+    if (!proposal) throw new Error('La propuesta ya no existe.');
+    const dossier = getPrimarySourceDossier(proposal.itemId);
+    if (!dossier) throw new Error('La fuente ya no existe.');
+    return dossier;
+  });
+  h('primarySources:resolutions:revert', async (
+    _e,
+    itemId: string,
+    resolutionId: string
+  ) => {
+    const resolution = revertEntityResolution(resolutionId, itemId);
+    if (!resolution) throw new Error('La resolución ya no existe.');
+    const dossier = getPrimarySourceDossier(itemId);
+    if (!dossier) throw new Error('La fuente ya no existe.');
+    return dossier;
+  });
+  h('primarySources:persons:list', async (
+    _e,
+    search?: string,
+    filter?: PrimarySourcePersonFilter
+  ) => listPrimarySourcePersons({ search, filter }));
+  h('primarySources:persons:dossier', async (_e, personId: string) =>
+    getPrimarySourcePersonDossier(personId)
+  );
+  h('primarySources:persons:addVariant', async (
+    _e,
+    personId: string,
+    name: string
+  ) => addPrimarySourcePersonVariant(personId, name));
+  h('primarySources:persons:merge', async (
+    _e,
+    input: {
+      sourcePersonId: string;
+      targetPersonId: string;
+      rationale?: string | null;
+    }
+  ) => mergePrimarySourcePersons(input));
+  h('primarySources:persons:revertMerge', async (_e, resolutionId: string) =>
+    revertPrimarySourcePersonMerge(resolutionId)
+  );
+  h('primarySources:timeline:workspace', async () =>
+    getPrimarySourceTimelineWorkspace()
+  );
+  h('primarySources:map:workspace', async () =>
+    getPrimarySourceMapWorkspace()
+  );
+  h('primarySources:map:resolveToponym', async (
+    _e,
+    input: PrimarySourceToponymResolutionInput
+  ) => {
+    resolvePrimarySourceToponym(input);
+    return getPrimarySourceMapWorkspace();
+  });
+  h('primarySources:map:revertToponym', async (_e, resolutionId: string) => {
+    const resolution = revertPrimarySourceToponymResolution(resolutionId);
+    if (!resolution) throw new Error('La resolución geográfica ya no existe.');
+    return getPrimarySourceMapWorkspace();
+  });
+  h('primarySources:relations:workspace', async () =>
+    getPrimarySourceRelationsWorkspace()
+  );
+  h('primarySources:search', async (_e, request: PrimarySourceSearchRequest) => {
+    const started = performance.now();
+    let success = false;
+    try {
+      const response = searchPrimarySourceCorpus(request);
+      success = true;
+      return response;
+    } finally {
+      recordPrimarySourceLocalMetric(
+        'research_search',
+        performance.now() - started,
+        request.limit ?? 250,
+        success
+      );
+    }
+  });
+  h('primarySources:notes:workspace', async () =>
+    getPrimarySourceNoteWorkspace()
+  );
+  h('primarySources:notes:create', async (_e, input: Parameters<typeof createPrimarySourceNote>[0]) =>
+    createPrimarySourceNote(input)
+  );
+  h('primarySources:notes:updateProfile', async (
+    _e,
+    noteId: string,
+    patch: PrimarySourceNoteProfilePatch
+  ) => updatePrimarySourceNoteProfile(noteId, patch));
+  h('primarySources:notes:addLink', async (_e, input: PrimarySourceNoteLinkInput) =>
+    addPrimarySourceNoteLink(input)
+  );
+  h('primarySources:notes:removeLink', async (_e, linkId: string) =>
+    removePrimarySourceNoteLink(linkId)
+  );
+  h('primarySources:notes:backlinks', async (
+    _e,
+    targetKind: PrimarySourceSearchTargetKind,
+    targetId: string
+  ) => getPrimarySourceBacklinks(targetKind, targetId));
+  h('primarySources:notes:insertCitation', async (_e, input: PrimarySourceNoteLinkInput) =>
+    insertPrimarySourceExcerptCitation(input)
+  );
+  h('primarySources:dashboard', async () =>
+    getPrimarySourceOperationalDashboard()
+  );
+  h('primarySources:governance:workspace', async () =>
+    getPrimarySourceGovernanceWorkspace()
+  );
+  h('primarySources:governance:updatePolicy', async (
+    _e,
+    patch: PrimarySourcePolicySettingsPatch
+  ) => updatePrimarySourcePolicySettings(patch));
+  h('primarySources:governance:updateCitations', async (
+    _e,
+    patch: Partial<Omit<PrimarySourceCitationSettings, 'updatedAt'>>
+  ) => updatePrimarySourceCitationSettings(patch));
+  h('primarySources:metrics:summary', async () =>
+    getPrimarySourceLocalMetricSummary()
+  );
+  h('primarySources:metrics:clear', async () => {
+    clearPrimarySourceLocalMetrics();
+  });
+  h('primarySources:toolkit:preview', async (
+    _e,
+    request: PrimarySourceToolkitRequest
+  ) => previewPrimarySourceToolkitOperation(request));
+  h('primarySources:toolkit:run', async (
+    _e,
+    request: PrimarySourceToolkitRequest
+  ) => runPrimarySourceToolkitOperation(request));
+  h('primarySources:citations:build', async (
+    _e,
+    request: PrimarySourceCitationBuildRequest
+  ) => buildPrimarySourceCitation(request));
+  h('primarySources:export:preview', async (
+    _e,
+    request: PrimarySourceExportRequest
+  ) => previewPrimarySourceExport(request));
+  h('primarySources:export:package', async (
+    event,
+    request: PrimarySourceExportRequest
+  ) => {
+    const started = performance.now();
+    let success = false;
+    const built = await createPrimarySourceResearchPackage({
+      request,
+      tempDir: app.getPath('temp'),
+      appVersion: app.getVersion(),
+    });
+    const extension = request.profile === 'inventory'
+      ? 'nodus-inventory.zip'
+      : 'nodus-research.zip';
+    const picked = await dialog.showSaveDialog(BrowserWindow.fromWebContents(event.sender) ?? undefined!, {
+      title: 'Guardar paquete de investigación',
+      defaultPath: `${getActiveVault().name.replace(/[\\/:*?"<>|]/g, '_')}.${extension}`,
+      filters: [{ name: 'Paquete de investigación Nodus', extensions: ['zip'] }],
+    });
+    if (picked.canceled || !picked.filePath) {
+      success = true;
+      recordPrimarySourceLocalMetric(
+        'package_export',
+        performance.now() - started,
+        built.manifest.selection.included,
+        success
+      );
+      return {
+        canceled: true,
+        path: null,
+        exportId: built.exportId,
+        packageHash: built.packageHash,
+        manifest: built.manifest,
+      };
+    }
+    const temporary = `${picked.filePath}.tmp-${process.pid}-${Math.random().toString(36).slice(2)}`;
+    fs.writeFileSync(temporary, built.buffer);
+    fs.renameSync(temporary, picked.filePath);
+    success = true;
+    recordPrimarySourceLocalMetric(
+      'package_export',
+      performance.now() - started,
+      built.manifest.selection.included,
+      success
+    );
+    return {
+      canceled: false,
+      path: picked.filePath,
+      exportId: built.exportId,
+      packageHash: built.packageHash,
+      manifest: built.manifest,
+    };
+  });
+  h('primarySources:export:validate', async () => {
+    const picked = await showImportOpenDialog(getWindow() ?? undefined!, {
+      title: 'Validar paquete de investigación',
+      properties: ['openFile'],
+      filters: [{ name: 'Paquete de investigación Nodus', extensions: ['zip'] }],
+    });
+    if (picked.canceled || !picked.filePaths[0]) return null;
+    return validatePrimarySourceResearchPackage(fs.readFileSync(picked.filePaths[0]));
+  });
+  h('primarySources:export:restore', async (_e, name?: string | null) => {
+    const picked = await showImportOpenDialog(getWindow() ?? undefined!, {
+      title: 'Restaurar paquete como vault nuevo',
+      properties: ['openFile'],
+      filters: [{ name: 'Paquete de investigación Nodus', extensions: ['zip'] }],
+    });
+    if (picked.canceled || !picked.filePaths[0]) return null;
+    const started = performance.now();
+    let success = false;
+    try {
+      const restored = await restorePrimarySourceResearchPackage({
+        buffer: fs.readFileSync(picked.filePaths[0]),
+        tempDir: app.getPath('temp'),
+        name,
+      });
+      success = true;
+      return restored;
+    } finally {
+      recordPrimarySourceLocalMetric('package_restore', performance.now() - started, 1, success);
+    }
   });
 
   // ── Databases mode (Notion-like structured data) ───────────────────────────
@@ -3901,6 +4621,7 @@ export function registerIpc(
   h('study:recordings:marker:delete', async (_e, id: string) => studyRecordings.deleteStudyAudioMarker(id));
   h('study:recordings:transcript:save', async (_e, recordingId: string, input: StudyTranscriptInput) => studyRecordings.saveStudyTranscript(recordingId, input));
   h('study:recordings:transcript:update', async (_e, id: string, contentMarkdown: string, segments?: StudyTranscriptSegmentInput[]) => studyRecordings.updateStudyTranscript(id, contentMarkdown, segments));
+  h('study:recordings:diarize', async (_e, request: StudyDiarizationRequest) => diarizeStudyRecording(request));
   h('study:recordings:segment:update', async (_e, id: string, patch: Partial<StudyTranscriptSegmentInput>) => studyRecordings.updateStudyTranscriptSegment(id, patch));
   h('study:recordings:transcript:delete', async (_e, id: string) => studyRecordings.deleteStudyTranscript(id));
   h('study:recordings:note:create', async (_e, recordingId: string, transcriptId: string, placements?: StudyPlacementInput[]) => {
@@ -4599,6 +5320,7 @@ export function registerIpc(
   // demo mode: a curated sample corpus, only offered on an empty database.
   h('data:hasData', async () => hasAnyData());
   h('data:seedDemo', async () => seedDemoData());
+  h('data:seedPrimarySourcesDemo', async () => seedPrimarySourcesDemoData());
   h('data:clearDemo', async () => {
     scanQueue.clear();
     clearDemoData();

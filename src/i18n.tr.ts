@@ -4,11 +4,33 @@ import { TOOLKIT_APPS_TRANSLATIONS } from './i18n.toolkitApps';
 import { SERVER_TRANSLATIONS } from './i18n.server';
 import { TRANSLATE_TRANSLATIONS } from './i18n.translate';
 import { WORLD_CHAT_TRANSLATIONS } from './i18n.worldChat';
+import { PROSOPOGRAPHY_TRANSLATIONS } from './i18n.prosopography';
+import { DIARIZATION_TRANSLATIONS } from './i18n.diarization';
 import { WORLDBUILDING_TRANSLATIONS } from './i18n.worldbuilding';
+import { PRIMARY_SOURCES_TRANSLATIONS } from './i18n.primarySources';
+import { PRIMARY_SOURCES_ARCHIVE_TRANSLATIONS } from './i18n.primarySourcesArchive';
+import { PRIMARY_SOURCES_FILES_TRANSLATIONS } from './i18n.primarySourcesFiles';
+import { PRIMARY_SOURCES_TEXT_TRANSLATIONS } from './i18n.primarySourcesText';
+import { PRIMARY_SOURCES_EVIDENCE_TRANSLATIONS } from './i18n.primarySourcesEvidence';
+import { PRIMARY_SOURCES_PERSONS_TRANSLATIONS } from './i18n.primarySourcesPersons';
+import { PRIMARY_SOURCES_DERIVED_TRANSLATIONS } from './i18n.primarySourcesDerived';
+import { PRIMARY_SOURCES_RESEARCH_TRANSLATIONS } from './i18n.primarySourcesResearch';
+import { PRIMARY_SOURCES_RELEASE_TRANSLATIONS } from './i18n.primarySourcesRelease';
 import { TESTIMONY_TRANSLATIONS } from './i18n.testimonies';
 
 /** Complete static Turkish interface table; coverage prohibits runtime fallbacks. */
 export const TR: Record<string, string> = {
+  ...DIARIZATION_TRANSLATIONS.tr,
+  ...PROSOPOGRAPHY_TRANSLATIONS.tr,
+  ...PRIMARY_SOURCES_TRANSLATIONS.tr,
+  ...PRIMARY_SOURCES_ARCHIVE_TRANSLATIONS.tr,
+  ...PRIMARY_SOURCES_FILES_TRANSLATIONS.tr,
+  ...PRIMARY_SOURCES_TEXT_TRANSLATIONS.tr,
+  ...PRIMARY_SOURCES_EVIDENCE_TRANSLATIONS.tr,
+  ...PRIMARY_SOURCES_PERSONS_TRANSLATIONS.tr,
+  ...PRIMARY_SOURCES_DERIVED_TRANSLATIONS.tr,
+  ...PRIMARY_SOURCES_RESEARCH_TRANSLATIONS.tr,
+  ...PRIMARY_SOURCES_RELEASE_TRANSLATIONS.tr,
   ...WORLDBUILDING_TRANSLATIONS.tr,
   ...TESTIMONY_TRANSLATIONS.tr,
   ...WORLD_CHAT_TRANSLATIONS.tr,
@@ -1362,6 +1384,24 @@ export const TR: Record<string, string> = {
   "Cuéntanos qué falla, con los pasos para reproducirlo.": "Yeniden oluşturma adımlarıyla birlikte sorunun ne olduğunu bize bildirin.",
   "Nuevo tipo de vault": "Yeni kasa tipi",
   "Propón un espacio especializado y cómo colaborarías para hacerlo viable.": "Özel bir alan önerin ve bunu uygulanabilir kılmak için nasıl işbirliği yapacağınızı önerin.",
+  "Dar feedback": "Geri bildirim ver",
+  "Valora tu experiencia y cuéntanos qué funciona bien y qué deberíamos mejorar.": "Deneyiminizi değerlendirin; nelerin iyi çalıştığını ve neleri geliştirmemiz gerektiğini anlatın.",
+  "Valoraciones": "Değerlendirmeler",
+  "Cantidad y variedad de funciones": "Özelliklerin sayısı ve çeşitliliği",
+  "Usabilidad": "Kullanım kolaylığı",
+  "Rendimiento": "Performans",
+  "Estabilidad": "Kararlılık",
+  "Diseño visual": "Görsel tasarım",
+  "¿Qué te gusta de Nodus?": "Nodus'ta neleri seviyorsunuz?",
+  "¿Qué crees que debería mejorar?": "Sizce neleri geliştirmeliyiz?",
+  "Sin respuesta": "Yanıt yok",
+  "Opinión sobre Nodus": "Nodus hakkındaki görüşler",
+  "Todas las preguntas son opcionales. Responde solo a las que quieras.": "Tüm sorular isteğe bağlıdır. Yalnızca istediğiniz soruları yanıtlayın.",
+  "Escala de valoración": "Değerlendirme ölçeği",
+  "Necesita mejorar": "Geliştirilmeli",
+  "Aceptable": "Kabul edilebilir",
+  "Funciones, detalles o experiencias que valoras (opcional)": "Değer verdiğiniz özellikler, ayrıntılar veya deneyimler (isteğe bağlı)",
+  "Cambios que harían Nodus más útil para ti (opcional)": "Nodus'u sizin için daha kullanışlı hâle getirecek değişiklikler (isteğe bağlı)",
   "Un vault especializado puede requerir arquitectura nueva. Se priorizará cuando haya colaboración activa, conocimiento del área y personas dispuestas a probarlo.": "Özel bir kasa yeni bir mimari gerektirebilir. Aktif işbirliği, alan bilgisi ve bunu denemek isteyen kişiler olduğunda öncelik verilecektir.",
   "Rama de conocimiento o área": "Bilgi veya alan dalı",
   "Periodismo": "Gazetecilik",
@@ -7394,4 +7434,5 @@ export const TR: Record<string, string> = {
   "¿Eliminar esta unidad guardada? Esta acción no se puede deshacer.": "Kaydedilmiş bu ünite silinsin mi? Bu işlem geri alınamaz.",
   "Escribe el tema y Nodus redacta la unidad completa con tus materiales, citando cada uno. Puedes dejar que la IA proponga las partes o fijarlas tú: cuántas son, cómo se titulan y en qué debe centrarse cada una.": "Konuyu yaz; Nodus üniteyi materyallerinden baştan sona yazar ve her birine atıf yapar. Bölümleri yapay zekâya önerttirebilir ya da kendin belirleyebilirsin: kaç tane olacağı, nasıl adlandırılacağı ve her birinin neye odaklanacağı.",
   "Escribe el tema de los apuntes. El contenido lo explicará paso a paso con ejemplos y autoevaluación usando tus materiales.": "Ders notlarının konusunu yaz. İçerik, materyallerini kullanarak örnekler ve öz değerlendirmeyle adım adım açıklayacak.",
+  "La diarización detecta cambios de hablante y etiqueta cada segmento automáticamente. Revisa siempre las etiquetas antes de usar la transcripción.": "Konuşmacı ayrıştırma, konuşmacı değişikliklerini algılar ve her bölümü otomatik olarak etiketler. Dökümü kullanmadan önce etiketleri her zaman kontrol et.",
 };

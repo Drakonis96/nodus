@@ -8,6 +8,7 @@ import type { CitationPreview } from '@shared/types';
 import { parseTestimonyLink, type TestimonyDeepLink } from '@shared/testimonyDeepLinks';
 import { t } from '../i18n';
 import { VERIFY_DEBOUNCE_MS, planCitationVerification } from '../citationVerification';
+import { parsePrimarySourceExcerptDeepLink } from '@shared/primarySourceDeepLink';
 
 const nodusUrlTransform = (value: string) => {
   if (value.startsWith('nodus://')) return value;
@@ -140,6 +141,20 @@ export function Markdown({
                 <button
                   className="text-indigo-400 underline decoration-indigo-700 underline-offset-2 hover:text-indigo-300"
                   onClick={() => onWorldEntry(kind, id)}
+                >
+                  {children}
+                </button>
+              );
+            }
+            const primarySource = href ? parsePrimarySourceExcerptDeepLink(href) : null;
+            if (primarySource) {
+              return (
+                <button
+                  className="text-indigo-400 underline decoration-indigo-700 underline-offset-2 hover:text-indigo-300"
+                  onClick={() => window.dispatchEvent(new CustomEvent(
+                    'nodus:navigate-primary-source',
+                    { detail: primarySource }
+                  ))}
                 >
                   {children}
                 </button>

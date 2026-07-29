@@ -346,7 +346,7 @@ export function testimonyDashboard(options: { now?: Date; lastBackupAt?: string 
     notes: db
       .prepare(
         `SELECT n.id AS id, n.title AS title, n.updated_at AS updatedAt FROM notes n
-          WHERE EXISTS (SELECT 1 FROM note_links l WHERE l.note_id = n.id AND l.target_kind LIKE 'testimony_%')
+          WHERE EXISTS (SELECT 1 FROM testimony_note_links l WHERE l.note_id = n.id AND l.target_kind LIKE 'testimony_%')
           ORDER BY n.updated_at DESC LIMIT 6`
       ).all() as { id: string; title: string; updatedAt: string }[],
     contrasts: db

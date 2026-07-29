@@ -112,7 +112,7 @@ export function deleteContrast(id: string): void {
   const db = getDb();
   const tx = db.transaction(() => {
     db.prepare('DELETE FROM testimony_contrast_items WHERE contrast_id = ?').run(id);
-    db.prepare("DELETE FROM note_links WHERE target_kind = 'testimony_contrast' AND target_id = ?").run(id);
+    db.prepare("DELETE FROM testimony_note_links WHERE target_kind = 'testimony_contrast' AND target_id = ?").run(id);
     db.prepare('DELETE FROM testimony_contrasts WHERE id = ?').run(id);
   });
   tx();

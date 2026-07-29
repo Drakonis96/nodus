@@ -69,6 +69,12 @@ import * as teachingGroups from '../db/teachingGroupsRepo';
 import * as teachingGrades from '../db/teachingGradesRepo';
 import * as teachingExams from '../db/teachingExamsRepo';
 import * as teachingRubrics from '../db/teachingRubricsRepo';
+import { getProsopPopulationWorkspace } from '../db/prosopPopulationRepo';
+import { getProsopIdentityWorkspace } from '../db/prosopIdentityRepo';
+import { getProsopObservationsWorkspace } from '../db/prosopFactoidsRepo';
+import { getProsopMembershipWorkspace } from '../db/prosopMembershipRepo';
+import { getProsopAnalysisWorkspace, runProsopAnalysis } from '../db/prosopAnalysisRepo';
+import { createProsopProposal, searchProsopography } from '../db/prosopSearchRepo';
 import { gradebookToGrid, anonymousGrid, GRID_COL, type GridStudent } from '@shared/assessment';
 import { isStudentFilled } from '@shared/teachingGroups';
 import { normalizeVaultType, type VaultType } from '@shared/vaultTypes';
@@ -704,9 +710,18 @@ const DATABASE_VAULTS: VaultType[] = ['databases'];
 const STUDY_VAULTS: VaultType[] = ['estudio', 'docencia'];
 /** Vault types with the teaching layer (groups, gradebook, exams, rubrics). */
 const TEACHING_VAULTS: VaultType[] = ['docencia'];
+const PROSOPOGRAPHY_VAULTS: VaultType[] = ['prosopography'];
 
 /** Tool name → the vault types it is offered in. Absent = universal. */
 const TOOL_VAULT_SCOPE: Record<string, VaultType[]> = {
+  nodus_prosop_get_design: PROSOPOGRAPHY_VAULTS,
+  nodus_prosop_list_population: PROSOPOGRAPHY_VAULTS,
+  nodus_prosop_search: PROSOPOGRAPHY_VAULTS,
+  nodus_prosop_get_person: PROSOPOGRAPHY_VAULTS,
+  nodus_prosop_list_statements: PROSOPOGRAPHY_VAULTS,
+  nodus_prosop_get_coverage: PROSOPOGRAPHY_VAULTS,
+  nodus_prosop_run_analysis: PROSOPOGRAPHY_VAULTS,
+  nodus_prosop_create_proposal: PROSOPOGRAPHY_VAULTS,
   // Research & authoring graph.
   nodus_list_ideas: RESEARCH_VAULTS,
   nodus_get_idea: RESEARCH_VAULTS,
@@ -2806,6 +2821,15 @@ export function registerTools(server: McpServer): void {
         return { row: dbRowRecord(dbMode.getColumns(row.databaseId), updated) };
       })()
   );
+
+  server.registerTool('nodus_prosop_get_design',{title:'Get prosopography study design',description:'Returns the versioned population, criteria, questionnaire and vocabularies. Read-only.',inputSchema:{},annotations:{readOnlyHint:true,openWorldHint:false}},tool(()=>getProsopPopulationWorkspace()));
+  server.registerTool('nodus_prosop_list_population',{title:'List prosopography population',description:'Lists non-restricted people and auditable membership decisions. Read-only.',inputSchema:{},annotations:{readOnlyHint:true,openWorldHint:false}},tool(()=>{const identity=getProsopIdentityWorkspace();const persons=identity.persons.filter((item)=>item.privacyStatus!=='restricted');const ids=new Set(persons.map((item)=>item.personId));const membership=getProsopMembershipWorkspace();return{persons,memberships:membership.memberships.filter((item)=>ids.has(item.personId))};}));
+  server.registerTool('nodus_prosop_search',{title:'Search prosopography evidence',description:'Searches names, people, statements and sources while preserving deep links.',inputSchema:{query:z.string().trim().min(1)},annotations:{readOnlyHint:true,openWorldHint:false}},({query})=>tool(()=>({hits:searchProsopography(query)}))());
+  server.registerTool('nodus_prosop_get_person',{title:'Get documented person dossier',description:'Returns a non-restricted person with attestations and evidence counts; it never generates a biography.',inputSchema:{personId:z.string().trim().min(1)},annotations:{readOnlyHint:true,openWorldHint:false}},({personId})=>tool(()=>{const person=getProsopIdentityWorkspace().persons.find((item)=>item.personId===personId&&item.privacyStatus!=='restricted');if(!person)throw notFound('prosopography person',personId);return{person};})());
+  server.registerTool('nodus_prosop_list_statements',{title:'List documented statements',description:'Lists non-restricted factoids and atomic statements with source and locator.',inputSchema:{personId:z.string().trim().optional()},annotations:{readOnlyHint:true,openWorldHint:false}},({personId})=>tool(()=>{const restrictedPeople=new Set(getProsopIdentityWorkspace().persons.filter((item)=>item.privacyStatus==='restricted').map((item)=>item.personId));const factoids=getProsopObservationsWorkspace().factoids.map((factoid)=>({...factoid,statements:factoid.statements.filter((statement)=>!statement.entities.some((entity)=>entity.entityKind==='person'&&restrictedPeople.has(entity.entityId)))})).filter((factoid)=>factoid.statements.length>0);return{factoids:personId?factoids.filter((factoid)=>factoid.statements.some((statement)=>statement.entities.some((entity)=>entity.entityKind==='person'&&entity.entityId===personId))):factoids};})());
+  server.registerTool('nodus_prosop_get_coverage',{title:'Describe prosopography coverage',description:'Returns denominators, membership states, reviewed statements and explicit missing values.',inputSchema:{},annotations:{readOnlyHint:true,openWorldHint:false}},tool(()=>getProsopMembershipWorkspace().coverage));
+  server.registerTool('nodus_prosop_run_analysis',{title:'Run a validated prosopography analysis',description:'Runs and stores a reproducible projection. It does not alter canonical statements.',inputSchema:{title:z.string().trim().min(1),kind:z.enum(['frequency','timeline','trajectory','map']),variableIds:z.array(z.string().trim().min(1)).min(1)},annotations:{readOnlyHint:false,openWorldHint:false}},({title,kind,variableIds})=>tool(()=>runProsopAnalysis({title,analysisKind:kind,variableIds,createdBy:'mcp'}))());
+  server.registerTool('nodus_prosop_create_proposal',{title:'Create a reviewable prosopography proposal',description:'Creates a proposal only. It cannot merge identities, decide membership or write reviewed facts.',inputSchema:{proposalKind:z.string().trim().min(1),targetKind:z.string().trim().min(1),targetId:z.string().trim().optional(),payload:z.record(z.string(),z.unknown()),rationale:z.string().trim().min(1)},annotations:{readOnlyHint:false,openWorldHint:false}},({proposalKind,targetKind,targetId,payload,rationale})=>tool(()=>createProsopProposal({proposalKind,targetKind,targetId,payload:payload as never,rationale,producerKind:'ai',producerId:'mcp'}))());
 }
 
 /** Encodes an MCP-supplied typed value into the text cell a column stores, resolving

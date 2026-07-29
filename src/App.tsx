@@ -13,6 +13,7 @@ import { VaultSwitcher, vaultTypeIcon, vaultTypeLabel } from './components/Vault
 import { DatabasesSidebarExplore } from './components/DatabasesSidebarExplore';
 import { StudySidebar, type StudyNavigationTarget } from './components/StudySidebar';
 import { TeachingSidebar } from './components/TeachingSidebar';
+import { PrimarySourcesSidebar } from './components/PrimarySourcesSidebar';
 import { WorldMapsView } from './views/WorldMapsView';
 import { EncyclopediaView } from './views/EncyclopediaView';
 import { CONTINUITY_VIEWS, ContinuityProvider } from './components/world/ContinuityBadge';
@@ -24,6 +25,7 @@ import { QuestionsView } from './views/QuestionsView';
 import { WorldChatView } from './views/WorldChatView';
 import { ManuscriptView } from './views/ManuscriptView';
 import { WorldbuildingSidebar } from './components/WorldbuildingSidebar';
+import { ProsopographySidebar } from './components/ProsopographySidebar';
 import { TestimonySidebar } from './components/TestimonySidebar';
 import type { DossierTab } from './components/testimonies/InterviewDossier';
 import type { TestimonyDeepLink } from '@shared/testimonyDeepLinks';
@@ -36,6 +38,7 @@ import { DatabasesTour } from './views/DatabasesTour';
 import { TestimonyTour } from './views/TestimonyTour';
 import { StudyTour } from './views/StudyTour';
 import { TeachingTour } from './views/TeachingTour';
+import { PrimarySourcesTour } from './views/PrimarySourcesTour';
 import { BASICS_TUTORIAL_VERSION, BasicsTutorial } from './views/BasicsTutorial';
 import { FIRST_VAULT_VERSION, FirstVaultSetup } from './views/FirstVaultSetup';
 import { preferencesForTutorialLanguage } from '@shared/tutorialPreferences';
@@ -82,6 +85,21 @@ const DatabasesSearchView = lazy(() => import('./views/DatabasesSearchView').the
 const StudyHome = lazy(() => import('./views/StudyHome').then((module) => ({ default: module.StudyHome })));
 const TeachingHome = lazy(() => import('./views/TeachingHome').then((module) => ({ default: module.TeachingHome })));
 const WorldbuildingHome = lazy(() => import('./views/WorldbuildingHome').then((module) => ({ default: module.WorldbuildingHome })));
+const ProsopographyHome = lazy(() => import('./views/ProsopographyHome').then((module) => ({ default: module.ProsopographyHome })));
+const ProsopPopulationView = lazy(() => import('./views/ProsopPopulationView').then((module) => ({ default: module.ProsopPopulationView })));
+const ProsopSourcesView = lazy(() => import('./views/ProsopSourcesView').then((module) => ({ default: module.ProsopSourcesView })));
+const ProsopPersonsView = lazy(() => import('./views/ProsopPersonsView').then((module) => ({ default: module.ProsopPersonsView })));
+const ProsopAnalysisView = lazy(() => import('./views/ProsopAnalysisView').then((module) => ({ default: module.ProsopAnalysisView })));
+const ProsopNetworksView = lazy(() => import('./views/ProsopNetworksView').then((module) => ({ default: module.ProsopNetworksView })));
+const ProsopSearchView = lazy(() => import('./views/ProsopSearchView').then((module) => ({ default: module.ProsopSearchView })));
+const PrimarySourcesHomeView = lazy(() => import('./views/PrimarySourcesHomeView').then((module) => ({ default: module.PrimarySourcesHomeView })));
+const PrimarySourcesArchiveView = lazy(() => import('./views/PrimarySourcesArchiveView').then((module) => ({ default: module.PrimarySourcesArchiveView })));
+const PrimarySourcesPersonsView = lazy(() => import('./views/PrimarySourcesPersonsView').then((module) => ({ default: module.PrimarySourcesPersonsView })));
+const PrimarySourcesTimelineView = lazy(() => import('./views/PrimarySourcesTimelineView').then((module) => ({ default: module.PrimarySourcesTimelineView })));
+const PrimarySourcesMapView = lazy(() => import('./views/PrimarySourcesMapView').then((module) => ({ default: module.PrimarySourcesMapView })));
+const PrimarySourcesRelationsView = lazy(() => import('./views/PrimarySourcesRelationsView').then((module) => ({ default: module.PrimarySourcesRelationsView })));
+const PrimarySourcesSearchView = lazy(() => import('./views/PrimarySourcesSearchView').then((module) => ({ default: module.PrimarySourcesSearchView })));
+const PrimarySourcesNotesView = lazy(() => import('./views/PrimarySourcesNotesView').then((module) => ({ default: module.PrimarySourcesNotesView })));
 const TestimonyHome = lazy(() => import('./views/TestimonyHome').then((module) => ({ default: module.TestimonyHome })));
 const TestimonyInterviewsView = lazy(() => import('./views/TestimonyInterviewsView').then((module) => ({ default: module.TestimonyInterviewsView })));
 const TestimonyParticipantsView = lazy(() => import('./views/TestimonyParticipantsView').then((module) => ({ default: module.TestimonyParticipantsView })));
@@ -299,6 +317,40 @@ export function App() {
   const [studyRecordingTarget, setStudyRecordingTarget] = useState<{ id: string; timestamp?: number | null } | null>(null);
   const [studyGraphTarget, setStudyGraphTarget] = useState<PendingGraphNavigationTarget & { nonce: number } | null>(null);
   const [studyChatTarget, setStudyChatTarget] = useState<{ prompt: string; nonce: number } | null>(null);
+  const [primarySourceTarget, setPrimarySourceTarget] = useState<{
+    itemId: string;
+    excerptId?: string | null;
+    textVersionId?: string | null;
+    startOffset?: number | null;
+    endOffset?: number | null;
+    nonce: number;
+  } | null>(null);
+  const openPrimarySourceTarget = useCallback((target: {
+    itemId: string;
+    excerptId?: string | null;
+    textVersionId?: string | null;
+    startOffset?: number | null;
+    endOffset?: number | null;
+  }) => {
+    setPrimarySourceTarget({ ...target, nonce: Date.now() });
+    setView('archive');
+  }, []);
+  useEffect(() => {
+    const openPrimarySource = (event: Event) => {
+      const detail = (event as CustomEvent<unknown>).detail as
+        | { itemId?: unknown; excerptId?: unknown }
+        | null;
+      if (typeof detail?.itemId !== 'string' || typeof detail.excerptId !== 'string') return;
+      setPrimarySourceTarget({
+        itemId: detail.itemId,
+        excerptId: detail.excerptId,
+        nonce: Date.now(),
+      });
+      setView('archive');
+    };
+    window.addEventListener('nodus:navigate-primary-source', openPrimarySource);
+    return () => window.removeEventListener('nodus:navigate-primary-source', openPrimarySource);
+  }, []);
   useEffect(() => { if (view !== 'studyGraph') setStudyGraphTarget(null); }, [view]);
   useEffect(() => { if (view !== 'studyChat') setStudyChatTarget(null); }, [view]);
   const [syncing, setSyncing] = useState(false);
@@ -423,6 +475,10 @@ export function App() {
   useEffect(() => {
     document.documentElement.classList.toggle('genealogy', isGenealogy);
   }, [isGenealogy]);
+  const isPrimarySources = activeVault?.type === 'primary_sources';
+  useEffect(() => {
+    document.documentElement.classList.toggle('primary-sources', isPrimarySources);
+  }, [isPrimarySources]);
   // Databases vaults wear the Nodus crimson (#B30333) accent.
   const isDatabases = activeVault?.type === 'databases';
   useEffect(() => {
@@ -445,6 +501,11 @@ export function App() {
   useEffect(() => {
     document.documentElement.classList.toggle('worldbuilding', isWorldbuilding);
   }, [isWorldbuilding]);
+  // Prosopography is an evidence-first blue workspace with a strict dedicated shell.
+  const isProsopography = activeVault?.type === 'prosopography';
+  useEffect(() => {
+    document.documentElement.classList.toggle('prosopography', isProsopography);
+  }, [isProsopography]);
   // Testimonios: acento cian y sidebar propio de cinco entradas. Reutiliza la ontología
   // de personas para los participantes y Notas para los memos del investigador.
   const isTestimonios = activeVault?.type === 'testimonios';
@@ -727,6 +788,21 @@ export function App() {
     }
   }, [reloadSettings, refreshHasData]);
 
+  const loadPrimarySourcesDemo = useCallback(async () => {
+    setDemoBusy(true);
+    try {
+      const seeded = await window.nodus.seedPrimarySourcesDemoData();
+      if (seeded) {
+        await reloadSettings();
+        await refreshHasData();
+        notifyDataChanged();
+        setView('home');
+      }
+    } finally {
+      setDemoBusy(false);
+    }
+  }, [reloadSettings, refreshHasData]);
+
   const loadTestimonyDemo = useCallback(async () => {
     setDemoBusy(true);
     try {
@@ -939,10 +1015,14 @@ export function App() {
   // so labels stay translated.
   const paletteCommands = useMemo<Command[]>(() => {
     const groupLabel = new Map(NAV_GROUPS.map((g) => [g.id, t(g.label)] as const));
+    const dedicatedIds = dedicatedVaultNavIds(activeVault?.type);
     const bySection = [
       ...NAV_ITEMS.filter((n) => !n.group),
       ...NAV_GROUPS.flatMap((g) => NAV_ITEMS.filter((n) => n.group === g.id)),
-    ].filter((n) => isViewAllowedForVaultType(n.id, activeVault?.type));
+    ].filter((n) =>
+      isViewAllowedForVaultType(n.id, activeVault?.type)
+      && (!dedicatedIds || n.id === 'home' || n.id === 'settings' || dedicatedIds.includes(n.id))
+    );
     const navCommands: Command[] = bySection.map((n) => ({
       id: `nav:${n.id}`,
       label: t(n.label),
@@ -961,14 +1041,14 @@ export function App() {
     if (isEstudio) {
       actions.unshift({ id: 'act:reading-focus', label: settings?.readingFocusMode ? t('Salir del modo lectura') : t('Entrar en modo lectura'), section: t('Acciones'), icon: 'book', keywords: 'lectura enfoque focus estudio', run: () => void window.nodus.updateSettings({ readingFocusMode: !settings?.readingFocusMode }).then(reloadSettings) });
     }
-    if (!isGenealogy && !isDatabases && !isEstudio && !isDocencia && !isWorldbuilding && !isTestimonios) {
+    if (!isPrimarySources && !isGenealogy && !isDatabases && !isEstudio && !isDocencia && !isWorldbuilding && !isTestimonios) {
       actions.unshift(
         { id: 'act:sync', label: t('Actualizar (sincronizar Zotero)'), section: t('Acciones'), icon: 'sync', keywords: 'sync sincronizar', run: () => void onSync() },
         { id: 'act:collections', label: t('Colecciones'), section: t('Acciones'), icon: 'folder', keywords: 'collections zotero', run: () => setCollectionsOpen(true) },
       );
     }
     return [...navCommands, ...actions];
-  }, [settings?.uiLanguage, settings?.reduceMotion, settings?.readingFocusMode, activeVault?.type, isGenealogy, isDatabases, isEstudio, isDocencia, isWorldbuilding, isTestimonios, isDark, onSync, openAssistant, reloadSettings]);
+  }, [settings?.uiLanguage, settings?.reduceMotion, settings?.readingFocusMode, activeVault?.type, isPrimarySources, isGenealogy, isDatabases, isEstudio, isDocencia, isWorldbuilding, isTestimonios, isDark, onSync, openAssistant, reloadSettings]);
 
   if (loadError) {
     return (
@@ -1089,8 +1169,8 @@ export function App() {
         >
           <img
             data-testid="nodus-logo"
-            data-vault-logo={isGenealogy ? 'genealogy' : isDatabases ? 'databases' : isEstudio ? 'estudio' : isDocencia ? 'docencia' : isWorldbuilding ? 'worldbuilding' : isTestimonios ? 'testimonios' : 'academic'}
-            src={isGenealogy ? nodusLogoGold : isDatabases ? nodusLogoCrimson : isEstudio ? nodusLogoTeal : isDocencia ? nodusLogoOrange : isWorldbuilding ? nodusLogoViolet : isTestimonios ? nodusLogoCyan : nodusLogo}
+            data-vault-logo={isPrimarySources ? 'primary_sources' : isGenealogy ? 'genealogy' : isDatabases ? 'databases' : isEstudio ? 'estudio' : isDocencia ? 'docencia' : isWorldbuilding ? 'worldbuilding' : isTestimonios ? 'testimonios' : isProsopography ? 'prosopography' : 'academic'}
+            src={isGenealogy ? nodusLogoGold : isDatabases ? nodusLogoCrimson : isEstudio ? nodusLogoTeal : isDocencia ? nodusLogoOrange : isWorldbuilding ? nodusLogoViolet : nodusLogo}
             alt=""
             className="h-7 w-7"
           />
@@ -1173,7 +1253,7 @@ export function App() {
           {/* Colecciones y Actualizar dependen de Zotero → solo en bóvedas
               académicas; genealogía, bases de datos, estudio y docencia no
               sincronizan con Zotero. */}
-          {!isGenealogy && !isDatabases && !isEstudio && !isDocencia && !isWorldbuilding && !isTestimonios && (
+          {!isPrimarySources && !isGenealogy && !isDatabases && !isEstudio && !isDocencia && !isWorldbuilding && !isTestimonios && (
             <HeaderAction
               dataTour="collections"
               icon="folder"
@@ -1232,7 +1312,9 @@ export function App() {
         <div className="flex items-center gap-3 px-4 py-1.5 bg-amber-100 border-b border-amber-300 text-amber-800 text-xs dark:bg-amber-500/10 dark:border-amber-500/30 dark:text-amber-300">
           <Icon name="alert" size={14} />
           <span className="flex-1">
-            {t('Modo demostración: estás viendo un corpus de ejemplo. Sal del modo demo para empezar con tu propia biblioteca.')}
+            {isPrimarySources
+              ? t('Modo demostración: estás viendo un corpus ficticio de aprendizaje. Sal del modo demo para empezar con tus propias fuentes.')
+              : t('Modo demostración: estás viendo un corpus de ejemplo. Sal del modo demo para empezar con tu propia biblioteca.')}
           </span>
           <button className="btn btn-ghost border border-amber-400/60 text-amber-800 py-0.5 dark:border-amber-500/40 dark:text-amber-200" onClick={() => void exitDemo()} disabled={demoBusy}>
             {demoBusy ? t('Saliendo…') : t('Salir del modo demo')}
@@ -1357,6 +1439,21 @@ export function App() {
                   </>
                 );
               }
+              if (isProsopography) {
+                return (
+                  <>
+                    {navButton(homeItem)}
+                    <ProsopographySidebar
+                      activeView={view}
+                      onNavigate={(targetView) => setView(targetView)}
+                      sidebarOrder={settings?.sidebarOrder}
+                      sidebarHidden={activeSidebarHidden}
+                    />
+                    {navGroups.filter((group) => group.id === 'tools').map((group) => renderGroup(group))}
+                    <div className="mt-2 flex flex-col gap-1">{navButton(settingsItem)}</div>
+                  </>
+                );
+              }
               if (isTestimonios) {
                 return (
                   <>
@@ -1369,6 +1466,23 @@ export function App() {
                     />
                     {/* Solo el grupo de herramientas: Explorar/Analizar/Registrar ya los
                         cubre TestimonySidebar, y repetirlos duplicaría el menú. */}
+                    {navGroups.filter((group) => group.id === 'tools').map((group) => renderGroup(group))}
+                    <div className="mt-2 flex flex-col gap-1">{navButton(settingsItem)}</div>
+                  </>
+                );
+              }
+              if (isPrimarySources) {
+                return (
+                  <>
+                    {navButton(homeItem)}
+                    <PrimarySourcesSidebar
+                      activeView={view}
+                      onNavigate={(targetView) => setView(targetView)}
+                      sidebarOrder={settings?.sidebarOrder}
+                      sidebarHidden={activeSidebarHidden}
+                    />
+                    {/* Toolkit is universal. Reuse its canonical group and nested
+                        catalogue instead of maintaining a primary-source fork. */}
                     {navGroups.filter((group) => group.id === 'tools').map((group) => renderGroup(group))}
                     <div className="mt-2 flex flex-col gap-1">{navButton(settingsItem)}</div>
                   </>
@@ -1517,6 +1631,20 @@ export function App() {
               onLoadDatabasesDemo={loadDatabasesDemo}
             />
           )}
+          {view === 'home' && isPrimarySources && (
+            <PrimarySourcesHomeView
+              vault={activeVault}
+              onNavigate={setView}
+              onOpenSource={openPrimarySourceTarget}
+              onOpenNote={(id) => {
+                setNoteTarget({ id, nonce: Date.now() });
+                setView('notes');
+              }}
+              showDemoOffer={hasData === false && !settings.demoMode}
+              demoBusy={demoBusy}
+              onLoadDemo={() => void loadPrimarySourcesDemo()}
+            />
+          )}
           {view === 'home' && isDatabases && (
             <DatabasesHome
               databases={databases}
@@ -1567,7 +1695,8 @@ export function App() {
               onLoadDemo={loadTestimonyDemo}
             />
           )}
-          {view === 'home' && !isGenealogy && !isDatabases && !isEstudio && !isDocencia && !isWorldbuilding && !isTestimonios && !isPreviewVault && (
+          {view === 'home' && isProsopography && <ProsopographyHome onNavigate={setView} />}
+          {view === 'home' && !isPrimarySources && !isGenealogy && !isDatabases && !isEstudio && !isDocencia && !isWorldbuilding && !isProsopography && !isTestimonios && !isPreviewVault && (
             <HomeView
               vaultId={activeVault?.id ?? null}
               settings={settings}
@@ -1599,7 +1728,13 @@ export function App() {
           {view === 'argument' && <ArgumentMapView settings={settings} />}
           {view === 'ideas' && <IdeasView vaultId={activeVault?.id ?? null} target={ideaTarget} onOpenGraph={(target) => navigate('graph', target)} onOpenAssistant={openAssistant} />}
           {view === 'authors' && <AuthorsView vaultId={activeVault?.id ?? null} settings={settings} onOpenGraph={(target) => navigate('graph', target)} />}
-          {view === 'persons' && <PersonasView initialPersonId={personsTarget} />}
+          {view === 'persons' && (isPrimarySources ? <PrimarySourcesPersonsView /> : <PersonasView initialPersonId={personsTarget} />)}
+          {view === 'prosopSearch' && <ProsopSearchView />}
+          {view === 'prosopPopulation' && <ProsopPopulationView />}
+          {view === 'prosopPersons' && <ProsopPersonsView />}
+          {view === 'prosopSources' && <ProsopSourcesView />}
+          {view === 'prosopAnalysis' && <ProsopAnalysisView />}
+          {view === 'prosopNetworks' && <ProsopNetworksView />}
           {/* `setView` is passed straight through: it is referentially stable, and the
               encyclopedia's section descriptor depends on it. */}
           {view === 'encyclopedia' && <EncyclopediaView onNavigate={setView} />}
@@ -1619,14 +1754,19 @@ export function App() {
           {view === 'cultures' && <CulturesView />}
           {view === 'dynasties' && <DynastiesView />}
           {view === 'scenes' && <ScenesView onNavigate={setView} />}
-          {view === 'timeline' && <TimelineView worldbuilding={isWorldbuilding} />}
+          {view === 'timeline' && (isPrimarySources ? <PrimarySourcesTimelineView /> : <TimelineView worldbuilding={isWorldbuilding} />)}
           {view === 'tree' && <TreeView settings={settings} onSettingsChange={reloadSettings} />}
-          {view === 'relations' && <RelationsView onOpenPersons={() => setView('persons')} />}
+          {view === 'relations' && (isPrimarySources ? <PrimarySourcesRelationsView /> : <RelationsView onOpenPersons={() => setView('persons')} />)}
           {/* The genealogy map projects lat/lon onto OpenStreetMap tiles, so in an
               invented world — whose places have no gazetteer coordinates — it renders an
               empty planet every time. Worldbuilding gets its own section instead. */}
-          {view === 'map' && (isWorldbuilding ? <WorldMapsView /> : <MapView />)}
-          {view === 'archive' && <ArchiveView onOpenLibrary={() => setView('library')} isGenealogy={isGenealogy} />}
+          {view === 'map' && (isPrimarySources ? <PrimarySourcesMapView /> : isWorldbuilding ? <WorldMapsView /> : <MapView />)}
+          {view === 'archive' && (isPrimarySources
+            ? <PrimarySourcesArchiveView
+              target={primarySourceTarget}
+              onTargetConsumed={() => setPrimarySourceTarget(null)}
+            />
+            : <ArchiveView onOpenLibrary={() => setView('library')} isGenealogy={isGenealogy} />)}
           {view === 'databases' && (
             <DatabasesView
               databaseId={activeDatabaseId}
@@ -1752,7 +1892,17 @@ export function App() {
               onNavigate={(target) => setView(target)}
             />
           )}
-          {view === 'search' && !isTestimonios && (
+          {view === 'search' && isPrimarySources && (
+            <PrimarySourcesSearchView
+              onOpenSource={openPrimarySourceTarget}
+              onOpenNote={(id) => {
+                setNoteTarget({ id, nonce: Date.now() });
+                setView('notes');
+              }}
+              onNavigate={setView}
+            />
+          )}
+          {view === 'search' && !isPrimarySources && !isTestimonios && (
             <SearchView
               vaultType={activeVault?.type}
               onOpenGraph={(target) => navigate('graph', target)}
@@ -1766,10 +1916,15 @@ export function App() {
               onOpenArchive={() => setView('archive')}
             />
           )}
-          {view === 'notes' && (
+          {view === 'notes' && isPrimarySources && (
+            <PrimarySourcesNotesView focusNote={noteTarget} onOpenSource={openPrimarySourceTarget} />
+          )}
+          {view === 'notes' && !isPrimarySources && (
             <NotesView onOpenGraph={(target) => navigate('graph', target)} focusNote={noteTarget} onTestimonyLink={isTestimonios ? openTestimonyLink : undefined} />
           )}
-          {view === 'toolkit' && <ToolkitView page={toolkitPage} onNavigate={setToolkitPage} settings={settings} />}
+          {view === 'toolkit' && (
+            <ToolkitView page={toolkitPage} onNavigate={setToolkitPage} settings={settings} />
+          )}
           {view === 'settings' && (
             <Settings
               settings={settings}
@@ -1820,11 +1975,21 @@ export function App() {
       {roadmapTopic && <RoadmapFeedbackModal topic={roadmapTopic} onClose={() => setRoadmapTopic(null)} />}
       {roadmapOpen && <RoadmapModal onClose={() => setRoadmapOpen(false)} />}
 
-      {!isPreviewVault && settings.onboardingComplete && settings.basicsTutorialVersion > 0 && !settings.tourComplete && !isGenealogy && !isDatabases && !isEstudio && !isDocencia && !isWorldbuilding && !isTestimonios && (
+      {!isPreviewVault && settings.onboardingComplete && settings.basicsTutorialVersion > 0 && !settings.tourComplete && !isPrimarySources && !isGenealogy && !isDatabases && !isEstudio && !isDocencia && !isWorldbuilding && !isTestimonios && (
         <Tour
           onNavigate={setView}
           onClose={async () => {
             await window.nodus.updateSettings({ tourComplete: true });
+            void reloadSettings();
+          }}
+        />
+      )}
+
+      {settings.onboardingComplete && settings.basicsTutorialVersion > 0 && isPrimarySources && !settings.primarySourcesTourComplete && (
+        <PrimarySourcesTour
+          onNavigate={setView}
+          onClose={async () => {
+            await window.nodus.updateSettings({ primarySourcesTourComplete: true });
             void reloadSettings();
           }}
         />
@@ -1911,8 +2076,9 @@ export function App() {
       {!isPreviewVault && settings.onboardingComplete &&
         settings.basicsTutorialVersion > 0 &&
         !recoveryStatus?.needsSetup &&
-        (isGenealogy || isDatabases || isEstudio || isDocencia || settings.tourComplete) &&
+        (isPrimarySources || isGenealogy || isDatabases || isEstudio || isDocencia || settings.tourComplete) &&
         settings.advancedTourComplete &&
+        (!isPrimarySources || settings.primarySourcesTourComplete) &&
         (!isGenealogy || settings.genealogyTourComplete) &&
         (!isDatabases || settings.databasesTourComplete) &&
         (!isTestimonios || !settings.demoMode || settings.testimonyTourComplete) &&

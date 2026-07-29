@@ -1,176 +1,198 @@
-# Nodus Protect — matriz de paridad con IDprotector v0.4.1
+# Nodus Protect — parity matrix with IDprotector v0.4.1
 
-Versión de la matriz: **1.0.0 · 2026-07-19**
+Matrix version: **1.0.0 · 2026-07-19**
 
-Referencia original: **IDprotector v0.4.1**, commit `9f523158de3d597bdfe6bf35a6319c5f45c5c70c`
+Original reference: **IDprotector v0.4.1**, commit `9f523158de3d597bdfe6bf35a6319c5f45c5c70c`
 
-Licencia: MIT; atribución íntegra en [`THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md).
+License: MIT; full attribution in [`THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md).
 
-Esta matriz es el contrato de salida del port. `A-*` identifica una comprobación automatizada y `M-*` un escenario manual reproducible. Una fila solo puede considerarse cubierta cuando existe implementación y evidencia; no se permiten `TODO`, `skip` ni filas sin escenario.
+This array is the port output contract. `A-*` identifies an automated check and `M-*` a reproducible
+manual scenario. A row can only be considered covered when implementation and evidence exist;
+`TODO`, `skip` or rows without scenario are not allowed.
 
-## Evidencia ejecutable
+## Executable evidence
 
-- `A-ENG`: `node scripts/test-protect-engine.mjs` — vectores IDPS fijos, prueba cruzada contra el JavaScript original, geometría y patrones dorados.
-- `A-DB`: `node scripts/test-protect-persistence.mjs` — migración v90, CRUD, SHA-256 y lápidas sin BLOB. La tabla prevista inicialmente para v88 se desplazó porque `main` ya reservaba v88–v89 para el endurecimiento de sincronización.
-- `A-SYNC`: `node scripts/test-sync-package.mjs` — exportación/mezcla `.nodussync`, newest-wins y borrado lógico.
-- `A-I18N`: `node scripts/test-i18n-coverage.mjs` — mismo conjunto exacto de claves en siete idiomas y sin fallback visible.
-- `A-UI`: `node scripts/test-toolkit-ui.mjs` y `node scripts/e2e-smoke.mjs` — hub, navegación, estados y smoke de Electron.
-- `A-IPC`: `node scripts/test-protect-ipc.mjs` — referencias, formatos, MIME/firma, artefactos y rutas no autorizadas.
+- `A-ENG`: `node scripts/test-protect-engine.mjs` — fixed IDPS vectors, cross-test against original
+  JavaScript, geometry and gold patterns.
+- `A-DB`: `node scripts/test-protect-persistence.mjs` — migration v90, CRUD, SHA-256 and headstones
+  without BLOB. The table initially planned for v88 was moved because `main` already reserved
+  v88–v89 for the tightening of synchronization.
+- `A-SYNC`: `node scripts/test-sync-package.mjs` — export/mixture `.nodussync`, newest-wins and
+  logical deletion.
+- `A-I18N`: `node scripts/test-i18n-coverage.mjs` — same exact set of keys in seven languages and
+  without visible fallback.
+- `A-UI`: `node scripts/test-toolkit-ui.mjs` and `node scripts/e2e-smoke.mjs` — Electron hub,
+  navigation, states and smoke.
+- `A-IPC`: `node scripts/test-protect-ipc.mjs` — references, formats, MIME/signature, artifacts and
+  unauthorized paths.
 - `A-BUILD`: `npm run typecheck && npm run build`.
 
-## Integración y ciclo de sesión
+## Integration and session cycle
 
-| ID | Paridad exigida | Implementación/evidencia | Estado |
+| ID | Parity required | Implementation/evidence | State |
 | --- | --- | --- | --- |
-| UI-01 | Hub 2×2 con Convert y Protect en desarrollo, Presenter y OCR próximos | `ToolkitView.tsx`; A-UI | ✅ |
-| UI-02 | Port React/TypeScript, sin iframe ni WebView | `ToolkitProtectView.tsx`, `src/lib/protect/*`; A-UI | ✅ |
-| UI-03 | Portada con Proteger y Verificar | `ProtectHome`; A-UI | ✅ |
-| UI-04 | Estilo, tema, cabeceras, atrás, carga, avisos, confirmación y acento ámbar | componentes Toolkit/`ConfirmModal`; M-UI-01 | ✅ |
-| UI-05 | Idioma global sin selector duplicado | `t/tx`, `AppLanguage`; A-I18N | ✅ |
-| UI-06 | Conservar flujo al salir y volver al Toolkit | singleton `protectSession`; M-UI-02 | ✅ |
-| UI-07 | «Proteger más» reinicia documento/ajustes y conserva registro | `resetDocument` conserva `issuedCopies`; A-REG/M-UI-03 | ✅ |
-| UI-08 | Cerrar Nodus elimina registro y frases | memoria de módulo renderer; A-REG | ✅ |
+| UI-01 | Hub 2×2 with Convert and Protect in development, Presenter and upcoming OCR | `ToolkitView.tsx`; A-UI | D |
+| UI-02 | Port React/TypeScript, without iframe or WebView | `ToolkitProtectView.tsx`, `src/lib/protect/*`; A-UI | D |
+| UI-03 | Cover with Protect and Verify | `ProtectHome`; A-UI | D |
+| UI-04 | Style, theme, headers, back, upload, warnings, confirmation and amber accent | Toolkit/`ConfirmModal` components; M-UI-01 | D |
+| UI-05 | Global language without duplicate selector | `t/tx`, `AppLanguage`; A-I18N | D |
+| UI-06 | Keep flow when exiting and returning to Toolkit | singleton `protectSession`; M-UI-02 | D |
+| UI-07 | ‘Protect more’ restarts document/adjustments and retains record | `resetDocument` retains `issuedCopies`; A-REG/M-UI-03 | D |
+| UI-08 | Close Nodus deletes registration and phrases | renderer module memory; A-REG | D |
 
-## Entrada, composición y seguridad documental
+## Entry, composition and documentary security
 
-| ID | Paridad exigida | Implementación/evidencia | Estado |
+| ID | Parity required | Implementation/evidence | State |
 | --- | --- | --- | --- |
-| IN-01 | Disco y bóveda en protección y verificación | `SourcePicker`, IPC Protect; A-IPC/M-IN-01 | ✅ |
-| IN-02 | Selector nativo y arrastrar/soltar | preload `webUtils.getPathForFile`; A-IPC/A-UI | ✅ |
-| IN-03 | Protección múltiple ordenada; verificación única | selector, reordenación y modo discriminado; M-IN-02 | ✅ |
-| IN-04 | PDF, PNG, JPEG/JPG, GIF, WebP, BMP, HEIC y HEIF | firma+MIME+extensión; fixtures A-IPC | ✅ |
-| IN-05 | Mezcla concatenada y PDF predeterminado si existe alguno | `loadProtectPages`; A-UI | ✅ |
-| IN-06 | PDF cifrado, dañado o vacío con error accionable | errores `PasswordException`/`InvalidPDFException`/sin páginas; A-IPC | ✅ |
-| IN-07 | PDF a 1600 px e imágenes ≤2600 px | constantes del motor; A-ENG | ✅ |
-| IN-08 | Decodificación diferida, LRU 3 y exportación secuencial sin límite arbitrario | `ensureProtectPage`, LRU y bucles secuenciales; A-ENG | ✅ |
-| IN-09 | HEIC/HEIF consistente en el proceso principal | `normalizeHeic`, `@napi-rs/canvas`; A-IPC/M-PKG-01 | ✅ |
-| IN-10 | Primer fotograma decodificable de GIF/WebP animado | `createImageBitmap`; fixture A-IPC | ✅ |
-| IN-11 | Original inalterado | solo lectura, hash fixture antes/después; A-SEC | ✅ |
-| IN-12 | Resultado sin texto, capas ni metadatos fuente | compositor raster + PDF nuevo; A-SEC | ✅ |
+| IN-01 | Disk and vault in protection and verification | `SourcePicker`, IPC Protect; A-IPC/M-IN-01 | D |
+| IN-02 | Native selector and drag/drop | preload `webUtils.getPathForFile`; A-IPC/A-UI | D |
+| IN-03 | Ordered multiple protection; single verification | selector, rearrangement and discriminated mode; M-IN-02 | D |
+| IN-04 | PDF, PNG, JPEG/JPG, GIF, WebP, BMP, HEIC and HEIF | signature+MIME+extension; fixtures A-IPC | D |
+| IN-05 | Concatenated mix and default PDF if any | `loadProtectPages`; A-UI | D |
+| IN-06 | PDF encrypted, damaged or empty with actionable error | errors `PasswordException`/`InvalidPDFException`/without pages; A-IPC | D |
+| IN-07 | PDF at 1600 px and images ≤2600 px | engine constants; A-ENG | D |
+| IN-08 | Deferred decoding, LRU 3 and sequential export without arbitrary limit | `ensureProtectPage`, LRU and sequential loops; A-ENG | D |
+| IN-09 | HEIC/HEIF consisting of the main process | `normalizeHeic`, `@napi-rs/canvas`; A-IPC/M-PKG-01 | D |
+| IN-10 | First decodable GIF/WebP animated frame | `createImageBitmap`; fixture A-IPC | D |
+| IN-11 | Original unchanged | read only, hash fixture before/after; A-SEC | D |
+| IN-12 | Result without text, layers or source metadata | composer raster + new PDF; A-SEC | D |
 
-## Fuentes de la bóveda y aislamiento
+## Vault fountains and insulation
 
-| ID | Paridad exigida | Implementación/evidencia | Estado |
+| ID | Parity required | Implementation/evidence | State |
 | --- | --- | --- | --- |
-| VAULT-01 | Zotero local; nube deshabilitada y sin descarga automática | `listZoteroSources`; A-IPC/M-VLT-01 | ✅ |
-| VAULT-02 | Archivo de genealogía/fuentes/testimonios | adaptador `archive_items`; A-IPC | ✅ |
-| VAULT-03 | Materiales de estudio/docencia | adaptador `study_materials`; A-IPC | ✅ |
-| VAULT-04 | Adjuntos de base con base, fila y campo | adaptador `db_attachments`; A-IPC | ✅ |
-| VAULT-05 | Copias protegidas en cualquier bóveda | `protect_copies`; A-DB | ✅ |
-| VAULT-06 | Estado vacío si no hay fuentes compatibles | `SourcePicker`; M-VLT-02 | ✅ |
-| VAULT-07 | Cambio de bóveda invalida referencias y confirma descarte | `vaultId` + `onVaultChanged`; A-IPC/M-VLT-03 | ✅ |
-| VAULT-08 | Renderer no accede a rutas ni IDs de otra bóveda | allowlist de disco + `ensureActiveVault`; A-IPC | ✅ |
+| VAULT-01 | Local Zotero; cloud disabled and without automatic download | `listZoteroSources`; A-IPC/M-VLT-01 | D |
+| VAULT-02 | Genealogy file/sources/testimonies | adapter `archive_items`; A-IPC | D |
+| VALULT-03 | Study materials/docency | adapter `study_materials`; A-IPC | D |
+| VAULT-04 | Base attachments with base, row and field | adapter `db_attachments`; A-IPC | D |
+| VAULT-05 | Secured copies in any vault | `protect_copies`; A-DB | D |
+| VALULT-06 | Empty state if no compatible sources | `SourcePicker`; M-VLT-02 | D |
+| VAULT-07 | Vault change invalidates references and confirms discard | `vaultId` + `onVaultChanged`; A-IPC/M-VLT-03 | D |
+| VAULT-08 | Renderer does not access routes or IDs from another vault | permission list + `ensureActiveVault`; A-IPC | D |
 
-## Editor de ocultación
+## Hide Editor
 
-| ID | Paridad exigida | Implementación/evidencia | Estado |
+| ID | Parity required | Implementation/evidence | State |
 | --- | --- | --- | --- |
-| ED-01 | Navegación multipágina | `RedactionEditor`; M-ED-01 | ✅ |
-| ED-02 | Barra negra opaca, recta y en cualquier ángulo | `fillRotatedRect`; A-ENG | ✅ |
-| ED-03 | Grosores 10/20/34/52/74 | control exacto; A-UI | ✅ |
-| ED-04 | Desenfoque área 16–160, intensidad 2–30, inicial 52/8 | editor/UI; A-ENG | ✅ |
-| ED-05 | Seleccionar, mover, extremos, borrar | `ProtectEditor`; A-ENG/M-ED-02 | ✅ |
-| ED-06 | Deshacer altas, cambios y eliminaciones por página | pila discriminada; A-ENG | ✅ |
-| ED-07 | Copia proporcional a todas las páginas | `cloneRedactionForPage`; A-ENG | ✅ |
-| ED-08 | Pan, zoom ±, ajustar, rueda al puntero, máximo 8× y pinza | `ProtectEditor`; A-ENG/M-ED-03 | ✅ |
-| ED-09 | Recorte visual, borrar y aplicar con mínimo 24 px | `MIN_PROTECT_CROP`; A-ENG | ✅ |
-| ED-10 | Rotar 90° izquierda/derecha | `rotateProtectPage`; A-ENG | ✅ |
-| ED-11 | Enderezado −10°…+10° en 0,5°, no destructivo | preview + consolidación; A-ENG | ✅ |
-| ED-12 | Transformar marcas al recortar/rotar; crop vacía historial; rotate consolida straighten | geometría editor; A-ENG | ✅ |
-| ED-13 | Escala de grises completa | compositor; A-SEC | ✅ |
-| ED-14 | Controles contextuales y texto de continuación adaptado | UI por herramienta/contador; A-UI | ✅ |
-| ED-15 | Supr/Retroceso salvo foco de formulario | manejador de teclado; A-ENG/M-ED-04 | ✅ |
-| ED-16 | Pointer capture, ratón, trackpad y táctil | pointer events + touch-action; M-ED-05 | ✅ |
+| ED-01 | Multipage navigation | `RedactionEditor`; M-ED-01 | D |
+| ED-02 | Black bar opaque, straight and at any angle | `fillRotatedRect`; A-ENG | D |
+| ED-03 | Thickness 10/20/34/52/74 | exact control; A-UI | D |
+| ED-04 | Unfocus area 16–160, intensity 2–30, initial 52/8 | editor/UI; A-ENG | D |
+| ED-05 | Select, move, end, delete | `ProtectEditor`; A-ENG/M-ED-02 | D |
+| ED-06 | Undo highs, changes and deletions per page | discriminated battery; A-ENG | D |
+| ED-07 | Proportional copy to all pages | `cloneRedactionForPage`; A-ENG | D |
+| ED-08 | Pan, zoom ±, adjust, wheel to pointer, maximum 8× and clamp | `ProtectEditor`; A-ENG/M-ED-03 | D |
+| ED-09 | Visual trim, delete and apply with minimum 24 px | `MIN_PROTECT_CROP`; A-ENG | D |
+| ED-10 | Rotate 90° left/right | `rotateProtectPage`; A-ENG | D |
+| ED-11 | Straightening −10°...+10° in 0.5°, non-destructive | preview + consolidation; A-ENG | D |
+| ED-12 | Transform marks when trimming/rotating; empty crop history; rotate consolidate straighten | editor geometry; A-ENG | D |
+| ED-13 | Gray scale complete | composer; A-SEC | D |
+| ED-14 | Contextual controls and adapted continuation text | UI per tool/counter; A-UI | D |
+| ED-15 | Delete/Regress unless form focus | keyboard handler; A-ENG/M-ED-04 | D |
+| ED-16 | Pointer capture, mouse, trackpad and touch | pointer events + touch-action; M-ED-05 | D |
 
-## Marca de agua y pie legal
+## Watermark and legal foot
 
-| ID | Paridad exigida | Implementación/evidencia | Estado |
+| ID | Parity required | Implementation/evidence | State |
 | --- | --- | --- | --- |
-| WM-01 | Interruptor y texto ≤100 | modelo/UI; A-UI | ✅ |
-| WM-02 | Siete algoritmos: denso, topográfico, diagonal, malla, cuadrícula, único, manual | `watermark.ts`; dorados A-ENG | ✅ |
-| WM-03 | Opacidad 4–80 % (18 %) y tamaño 10–60 (22) | defaults/rangos; A-ENG | ✅ |
-| WM-04 | Seis colores y selector libre | `PROTECT_SWATCHES`; dorados A-ENG | ✅ |
-| WM-05 | Firma Nodus Protect con versión | copy del compositor; A-ENG | ✅ |
-| WM-06 | Manual: una inicial, ilimitadas, texto, posición normalizada y ángulo ±45° | UI/modelo; A-ENG/M-WM-01 | ✅ |
-| WM-07 | Arrastre, reset, añadir/eliminar sin borrar la última | `PreviewCanvas`/UI; M-WM-02 | ✅ |
-| WM-08 | Variación determinista por página y preview=export | PRNG/único compositor; dorados A-ENG | ✅ |
-| WM-09 | Preview viva multipágina | `PreviewCanvas`; M-WM-03 | ✅ |
-| FT-01 | Pie plegable, franja blanca, ajuste, azul y mensaje destacado | compositor/UI; dorados A-ENG | ✅ |
-| FT-02 | RGPD EUR-Lex localizado | mapa de siete idiomas; A-ENG | ✅ |
-| FT-03 | 32 autoridades y URLs oficiales | `PROTECT_AUTHORITIES`; A-ENG | ✅ |
-| FT-04 | País por idioma hasta cambio manual | `DEFAULT_AUTHORITY`; A-ENG | ✅ |
-| FT-05 | Email/teléfono opcionales | modelo/UI/compositor; A-ENG | ✅ |
-| FT-06 | Mensaje ≤260, idioma global hasta primera edición | `messageCustom`; A-I18N/M-FT-01 | ✅ |
-| FT-07 | Continuación adaptada sin marca/pie | UI resultado; A-UI | ✅ |
+| WM-01 | Switch and text ≤100 | model/UI; A-UI | D |
+| WM-02 | Seven algorithms: dense, topographic, diagonal, mesh, grid, unique, manual | `watermark.ts`; gold A-ENG | D |
+| WM-03 | Opacity 4–80 % (18 %) and size 10–60 (22) | defaults/ranges; A-ENG | D |
+| WM-04 | Six colors and free selector | `PROTECT_SWATCHES`; gold A-ENG | D |
+| WM-05 | Signature Nodus Protect with version | copy of the composer; A-ENG | D |
+| WM-06 | Manual: an initial, unlimited, text, normalized position and angle ±45° | UI/model; A-ENG/M-WM-01 | D |
+| WM-07 | Drag, reset, add/remove without deleting the last | `PreviewCanvas`/UI; M-WM-02 | D |
+| WM-08 | Deterministic variation per page and preview=export | PRNG/unique composer; gold A-ENG | D |
+| WM-09 | Multipage Live Preview | `PreviewCanvas`; M-WM-03 | D |
+| FT-01 | Folding foot, white strip, fit, blue and prominent message | composer/UI; gold A-ENG | D |
+| FT-02 | GDPR EUR-Lex located | map of seven languages; A-ENG | D |
+| FT-03 | 32 official authorities and URLs | `PROTECT_AUTHORITIES`; A-ENG | D |
+| FT-04 | Country by language until manual change | `DEFAULT_AUTHORITY`; A-ENG | D |
+| FT-05 | Optional e-mail/telephone | model/UI/compositor; A-ENG | D |
+| FT-06 | Message ≤260, global language until first edition | `messageCustom`; A-I18N/M-FT-01 | D |
+| FT-07 | Continuation adapted without mark/foot | UI result; A-UI | D |
 
-## Exportación, registro y biblioteca
+## Export, registration and library
 
-| ID | Paridad exigida | Implementación/evidencia | Estado |
+| ID | Parity required | Implementation/evidence | State |
 | --- | --- | --- | --- |
-| EX-01 | Preview multipágina y selector Imagen/PDF | `ResultStep`; A-UI | ✅ |
-| EX-02 | Una página imagen→PNG; varias→ZIP ordenado | `buildProtectArtifact`; A-ENG | ✅ |
-| EX-03 | PDF raster: JPEG 0,92 sin traza; PNG con traza | `pdf-lib` compositor; A-ENG/A-SEC | ✅ |
-| EX-04 | Sufijo localizado en siete idiomas | `SUFFIX`; A-I18N | ✅ |
-| EX-05 | Guardar, bóveda y compartir independientes | `ResultStep`/IPC; A-UI | ✅ |
-| EX-06 | ID nuevo por acción completada; cancelación sin registro | artefacto por acción + registro tras éxito; A-REG | ✅ |
-| EX-07 | ShareMenu Electron y fallback de guardado | proceso principal; M-PKG-02 | ✅ |
-| EX-08 | Escritura temporal+rename y sobrescritura del sistema | `writeArtifactAtomically` + diálogo nativo; A-IPC | ✅ |
-| EX-09 | CSV exacto y escapado; `nodus-protect-registro.csv` | `issuedCopiesCsv`; A-REG | ✅ |
-| LIB-01 | Migración v90 con UUID, MIME, SHA, BLOB, origen, fechas y borrado | migración/repo; A-DB | ✅ |
-| LIB-02 | Listar, leer, guardar, descargar, reutilizar y borrar con confirmación | IPC + listado UI; A-DB/M-LIB-01 | ✅ |
-| LIB-03 | Borrado vacía BLOB y conserva lápida | repo; A-DB | ✅ |
-| LIB-04 | Backup completo incluye tabla | copia integral de SQLite; A-DB | ✅ |
-| LIB-05 | `.nodussync` retrocompatible, merge UUID/updated_at/tombstone y resumen | `syncPackage`; A-SYNC | ✅ |
+| EX-01 | Multipage Preview and Selector Image/PDF | `ResultStep`; A-UI | D |
+| EX-02 | One page image→PNG; several→ZIP ordered | `buildProtectArtifact`; A-ENG | D |
+| EX-03 | PDF raster: JPEG 0.92 without trace; PNG with trace | `pdf-lib` composer; A-ENG/A-SEC | D |
+| EX-04 | Suffix located in seven languages | `SUFFIX`; A-I18N | D |
+| EX-05 | Save, vault and share independent | `ResultStep`/IPC; A-UI | D |
+| EX-06 | New ID per completed action; cancellation without registration | device by action + registration after success; A-REG | D |
+| EX-07 | ShareMenu Electron and default save | main process; M-PKG-02 | D |
+| EX-08 | Temporary Writing+Rename and System Overwriting | `writeArtifactAtomically` + native dialogue; A-IPC | D |
+| EX-09 | exact and escaped CSV; `nodus-protect-registro.csv` | `issuedCopiesCsv`; A-REG | D |
+| LIB-01 | Migration v90 with UUID, MIME, SHA, BLOB, origin, dates and deletion | migration/repo; A-DB | D |
+| LIB-02 | List, read, save, download, reuse and delete with confirmation | IPC + UI list; A-DB/M-LIB-01 | D |
+| LIB-03 | Empty erasing BLOB and preserving headstone | repo; A-DB | D |
+| LIB-04 | Full backup includes table | integral copy of SQLite; A-DB | D |
+| LIB-05 | `.nodussync` retrocompatible, merge UUID/updated_at/tombstone and summary | `syncPackage`; A-SYNC | D |
 
-## IDPS v1 y verificación
+## IDPS v1 and verification
 
-| ID | Paridad exigida | Implementación/evidencia | Estado |
+| ID | Parity required | Implementation/evidence | State |
 | --- | --- | --- | --- |
-| IDPS-01 | Trazabilidad apagada; etiqueta ≤120 y frase opcional | defaults/UI; A-UI | ✅ |
-| IDPS-02 | Registro de 24 bytes `IDPS`, versión, flags e ID aleatorio de 8 bytes | `stego.ts`; vectores A-ENG | ✅ |
-| IDPS-03 | HMAC-SHA256 truncado | Web Crypto; vectores A-ENG | ✅ |
-| IDPS-04 | Abierto y PBKDF2, sal original pública, 310.000 iteraciones | byte parity A-ENG | ✅ |
-| IDPS-05 | LSB RGB cíclico, mayoría y 4096 candidatos | `decodeIdps`; A-ENG | ✅ |
-| IDPS-06 | PNG iTXt sin comprimir y PDF Title/Subject/Keywords | metadata port; A-ENG | ✅ |
-| IDPS-07 | Claves técnicas `idprotector`, `idps1`, `copyId:<hex>`; Producer/Creator Nodus | engine; A-ENG | ✅ |
-| IDPS-08 | Compatibilidad bidireccional con IDprotector v0.4.1 | JavaScript original ↔ TypeScript; A-ENG | ✅ |
-| IDPS-09 | Registro solo en sesión y nunca frases | `session.ts`; A-REG | ✅ |
-| IDPS-10 | Explicación: autentica, no cifra; transformaciones destruyen marca | UI localizada; A-I18N | ✅ |
-| VER-01 | PDF/imagen desde disco, bóveda o biblioteca | selector común; A-UI | ✅ |
-| VER-02 | Cambiar frase y reintentar sin releer | caché `verifyPayloadCache`; A-UI | ✅ |
-| VER-03 | iTXt PNG y metadatos PDF | parser; A-ENG | ✅ |
-| VER-04 | Primer XObject exacto; raster fallback con aviso | `exactPdfPageImageData`; A-ENG | ✅ |
-| VER-05 | Todas las páginas; verificada prevalece; si no, primera no autenticada | bucle de verificación; A-ENG | ✅ |
-| VER-06 | Separación píxeles/metadatos y tres estados | `VerifyStep`; A-UI | ✅ |
-| VER-07 | ID, clave, concordancia, candidatos, página y registro de sesión | resultado UI; A-UI | ✅ |
-| VER-08 | Nunca afirmar que no estaba protegido | copy localizada; A-I18N | ✅ |
-| VER-09 | Sin Web Crypto: metadatos visibles y autenticación indisponible | rama `idpsAvailable`; A-ENG | ✅ |
+| IDPS-01 | Traceability off; label ≤120 and optional phrase | defaults/UI; A-UI | D |
+| IDPS-02 | 24 bytes record `IDPS`, version, flags and random 8 bytes ID | `stego.ts`; A-ENG vectors | D |
+| IDPS-03 | HMAC-SHA256 truncated | Web Crypto; A-ENG vectors | D |
+| IDPS-04 | Open and PBKDF2, original public salt, 310,000 iterations | byte parity A-ENG | D |
+| IDPS-05 | Cyclic LSB RGB, majority and 4096 candidates | `decodeIdps`; A-ENG | D |
+| IDPS-06 | Uncompressed PNG iTXt and PDF Title/Subject/Keywords | metadata port; A-ENG | D |
+| IDPS-07 | Technical keys `idprotector`, `idps1`, `copyId:<hex>`; Producer/Creator Nodus | engine; A-ENG | D |
+| IDPS-08 | Two-way compatibility with IDprotector v0.4.1 | Original JavaScript ↔ TypeScript; A-ENG | D |
+| IDPS-09 | Log only in session and never phrases | `session.ts`; A-REG | D |
+| IDPS-10 | Explanation: authentic, not encrypted; transformations destroy brand | Localized UI; A-I18N | D |
+| VER-01 | PDF/image from disk, vault or library | common selector; A-UI | D |
+| VER-02 | Change phrase and retry without rereading | cache `verifyPayloadCache`; A-UI | D |
+| VER-03 | iTXt PNG and PDF metadata | parser; A-ENG | D |
+| VER-04 | First Exact XObject; Raster Fallback with Warning | `exactPdfPageImageData`; A-ENG | D |
+| VER-05 | All pages; verified prevails; if not, first not authenticated | verification loop; A-ENG | D |
+| VIEW-06 | Separation pixels/metadata and three states | `VerifyStep`; A-UI | D |
+| VER-07 | ID, key, match, candidates, page and session log | result UI; A-UI | D |
+| VER-08 | Never claim he wasn't protected. | localized copy; A-I18N | D |
+| VER-09 | Without Web Crypto: visible metadata and unavailable authentication | branch `idpsAvailable`; A-ENG | D |
 
-## Italiano, documentación y empaquetado
+## Italian, documentation and packaging
 
-| ID | Paridad exigida | Implementación/evidencia | Estado |
+| ID | Parity required | Implementation/evidence | State |
 | --- | --- | --- | --- |
-| I18N-01 | `AppLanguage=it`, normalización, ajustes, tutorial, recuperación/runtime | tablas compartidas/UI; A-I18N | ✅ |
-| I18N-02 | Tabla italiana completa, exactamente mismas claves | `i18n.it.ts`; A-I18N | ✅ |
-| I18N-03 | Dominio, parentesco y todas las notas históricas en italiano | módulos `.it.ts`; A-I18N | ✅ |
-| I18N-04 | Protect completo en siete idiomas | `i18n.protect.ts`; A-I18N | ✅ |
-| I18N-05 | `PromptLanguage` sin italiano | tipos/tutorial/Settings; A-I18N | ✅ |
-| DOC-01 | Ayuda, Toolkit, novedades y privacidad precisa | README, FAQ, Nodi docs, release notes | ✅ |
-| PKG-01 | macOS/Windows/Linux: worker PDF, HEIC, guardado y share fallback | M-PKG-01/M-PKG-02 por artefacto CI | ✅ escenario |
-| NET-01 | Cero acceso de red durante procesamiento Protect | sin API de red en motor/servicio; A-IPC/M-NET-01 | ✅ |
-| REG-01 | Cero regresiones en Nodus Convert | suite Toolkit existente + build; A-UI/A-BUILD | ✅ |
+| I18N-01 | `AppLanguage=it`, normalization, settings, tutorial, recovery/runtime | shared tables/UI; A-I18N | D |
+| I18N-02 | Complete Italian table, exactly the same keys | `i18n.it.ts`; A-I18N | D |
+| I18N-03 | Dominion, kinship and all historical notes in Italian | modules `.it.ts`; A-I18N | D |
+| I18N-04 | Complete protection in seven languages | `i18n.protect.ts`; A-I18N | D |
+| I18N-05 | `PromptLanguage` without Italian | types/tutorial/Settings; A-I18N | D |
+| DOC-01 | Help, Toolkit, News and Accurate Privacy | README, FAQ, Nodi docs, release notes | D |
+| PKG-01 | macOS/Windows/Linux: worker PDF, HEIC, save and share failback | M-PKG-01/M-PKG-02 by IC device | Scenario |
+| NET-01 | Zero network access during Protect processing | no network API in engine/service; A-IPC/M-NET-01 | D |
+| REG-01 | Zero regressions in Nodus Convert | existing Toolkit suite + build; A-UI/A-BUILD | D |
 
-## Guiones manuales reproducibles
+## Reproducible manual scripts
 
-1. **M-UI-01…03**: abrir Protect en claro y oscuro y en cada idioma; iniciar un documento, salir a otra vista y volver; emitir una copia, pulsar «Proteger más» y comprobar que el documento se vacía pero el registro permanece.
-2. **M-IN-01…02**: arrastrar una mezcla PDF/PNG/HEIC, reordenarla, comprobar la salida PDF predeterminada; en Verificar confirmar que solo se admite una fuente.
-3. **M-VLT-01…03**: en cada tipo de bóveda listar su fuente; comprobar Zotero local/no local; cambiar de bóveda con cambios y aceptar/rechazar el descarte.
-4. **M-ED-01…05**: recorrer un PDF de cuatro páginas con ratón, trackpad y táctil; crear/mover/redimensionar/borrar; usar rueda, zoom al puntero, pinza, pan y teclas Supr/Retroceso dentro y fuera de un input.
-5. **M-WM-01…03 / M-FT-01**: crear varias marcas manuales, arrastrarlas, variar página, intentar borrar la última y comparar píxel a píxel preview/export; editar el mensaje legal y cambiar de idioma para comprobar que no se sobrescribe.
-6. **M-LIB-01**: guardar una copia en la bóveda, reutilizarla, descargarla y borrarla tras confirmar; sincronizar y comprobar la lápida en el segundo dispositivo.
-7. **M-PKG-01…02**: ejecutar el instalador CI de cada SO con HEIC real y PDF multipágina; guardar con sobrescritura y compartir (ShareMenu en macOS, diálogo de guardado en Windows/Linux).
-8. **M-NET-01**: bloquear/registrar tráfico saliente del proceso, completar protección y verificación y comprobar cero solicitudes; otras funciones de Nodus quedan fuera de este escenario.
+1. **M-UI-01...03**: open Protect in clear and dark and in each language; start a document, go out
+   to another view and return; issue a copy, press "Protect more" and check that the document is
+   empty but the record remains.
+2. **M-IN-01...02**: drag a PDF/PNG/HEIC mixture, reorder it, check the default PDF output; in
+   Verify confirm that only one source is supported.
+3. **M-VLT-01...03**: in each type of vault list its source; check local/non-local Zotero; change
+   vault with changes and accept/reject discard.
+4. **M-ED-01...05**: go through a four-page PDF with mouse, trackpad and touch;
+   create/move/resize/delete; use wheel, zoom pointer, clamp, bread and keys Delete/Regress inside
+   and outside an input.
+5. **M-WM-01...03 / M-FT-01**: create multiple handmarks, drag them, vary page, try deleting the
+   last and compare pixel to pixel preview/export; edit the legal message and change language to
+   check that it is not overwritten.
+6. **M-LIB-01**: save a copy in the vault, reuse, download and delete it after confirmation;
+   synchronize and check the tombstone on the second device.
+7. **M-PKG-01...02**: run the IC installer of each OS with real HEIC and multipage PDF; save with
+   overwrite and share (ShareMenu in macOS, save dialog in Windows/Linux).
+8. **M-NET-01**: block/register outgoing traffic from the process, complete protection and
+   verification and check zero requests; other Nodus functions are out of this scenario.
 
-## Criterio de salida
+## Exit criterion
 
-La entrega se bloquea si cualquier prueba anterior falla, aparece una fila pendiente, cambia un vector IDPS, existe texto extraíble en un PDF protegido, se modifica el hash de un original, Protect realiza una solicitud de red o las tarjetas de Convert/Protect dejan de figurar como disponibles.
+Delivery is blocked if any previous test fails, a pending row appears, changes an IDPS vector, there
+is removable text in a protected PDF, the hash of an original is modified, Protect makes a network
+request or Convert/Protect cards cease to appear as available.

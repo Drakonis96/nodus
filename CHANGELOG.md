@@ -511,7 +511,7 @@ drift had already caused are fixed.
 
 ### Added
 
-- New "Image design" dialog for Inmersión and Deep Research: preview the image,
+- New "Image design" dialog for Immersion and Deep Research: preview the image,
   switch style, edit the scene description, and regenerate or delete it in one place.
 - Five photographic and realistic decorative styles — realistic photograph,
   vintage photograph, black & white, cinematic, and oil painting (twelve in total).
@@ -522,7 +522,7 @@ drift had already caused are fixed.
 
 - Decorative images now render larger and more polished. The inline action buttons
   are replaced by a single unobtrusive "Design" pill that opens the design dialog,
-  keeping the Inmersión and Deep Research views uncluttered.
+  keeping the Immersion and Deep Research views uncluttered.
 - The "immersion ready" screen is now part of the main immersion view instead of a
   separate standalone page.
 
@@ -530,7 +530,7 @@ drift had already caused are fixed.
 
 ### Added
 
-- Optional single decorative images for Inmersión and Deep Research, generated
+- Optional single decorative images for Immersion and Deep Research, generated
   only after the main content has been saved.
 - Seven centralized styles, optimized reusable images and lazy list thumbnails.
 - Independent image-provider/model settings for Google, the official OpenAI
@@ -551,7 +551,7 @@ drift had already caused are fixed.
 ### Reliability
 
 - Image errors, timeouts, missing credit, or provider failures never roll back or
-  block an Inmersión or Deep Research report.
+  block an Immersion or Deep Research report.
 - No automatic image retries or duplicate generation of an existing ready image.
 - Stale and deleted in-flight attempts cannot overwrite the current image state.
 - Existing saved content without images remains fully compatible.

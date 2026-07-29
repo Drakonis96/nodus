@@ -16,6 +16,7 @@ const reportPath = path.resolve(process.env.NODUS_GEMINI_REPORT || path.join(os.
 
 if (!process.argv.includes('--electron-study-gemini-shadow')) {
   if (!process.env.GEMINI_API_KEY?.trim()) throw new Error('Set GEMINI_API_KEY for this one isolated run.');
+  if (!process.env.OPENROUTER_API_KEY?.trim()) throw new Error('Set OPENROUTER_API_KEY for this one isolated run.');
   execFileSync(path.join(repoRoot, 'node_modules/.bin/electron'), [path.join(repoRoot, 'scripts/verify-study-gemini-shadow.mjs'), '--electron-study-gemini-shadow'], {
     cwd: repoRoot,
     env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
@@ -26,7 +27,9 @@ if (!process.argv.includes('--electron-study-gemini-shadow')) {
 
 assert.ok(fs.existsSync(pdfPath), 'the shadow PDF fixture exists');
 const apiKey = process.env.GEMINI_API_KEY?.trim();
+const openRouterKey = process.env.OPENROUTER_API_KEY?.trim();
 assert.ok(apiKey, 'Gemini API key is available only to this process');
+assert.ok(openRouterKey, 'OpenRouter API key is available only to this process');
 const root = await mkdtemp(path.join(os.tmpdir(), 'nodus-study-gemini-shadow-'));
 installRuntimeHooks(root);
 
@@ -50,24 +53,28 @@ try {
   const assessments = require(path.join(repoRoot, 'electron/db/studyAssessmentsRepo.ts'));
   const usageRepo = require(path.join(repoRoot, 'electron/db/studyAiUsageRepo.ts'));
   ({ closeDb } = require(path.join(repoRoot, 'electron/db/database.ts')));
-  clearApiKey = () => secrets.clearApiKey('gemini');
+  clearApiKey = () => {
+    secrets.clearApiKey('gemini');
+    secrets.clearApiKey('openrouter');
+  };
 
   secrets.setApiKey('gemini', apiKey);
+  secrets.setApiKey('openrouter', openRouterKey);
   delete process.env.GEMINI_API_KEY;
+  delete process.env.OPENROUTER_API_KEY;
   const [chatModels, embeddingModels] = await Promise.all([
     providers.listModels('gemini', secrets.getApiKey('gemini')),
-    providers.listEmbeddingModels('gemini', secrets.getApiKey('gemini')),
+    providers.listEmbeddingModels('openrouter', secrets.getApiKey('openrouter')),
   ]);
-  const preferred = ['gemini-2.5-flash-lite', 'gemini-3.1-flash-lite'];
-  const modelName = preferred.find((id) => chatModels.some((model) => model.id === id));
-  assert.ok(modelName, `one cheap Gemini Flash Lite model is available (${preferred.join(', ')})`);
-  const embeddingName = ['gemini-embedding-001', 'text-embedding-004'].find((id) => embeddingModels.some((model) => model.id === id));
-  assert.ok(embeddingName, 'a stable Gemini embedding model is available');
+  const modelName = 'gemini-3.5-flash-lite';
+  const embeddingName = 'baai/bge-m3';
+  assert.ok(chatModels.some((model) => model.id === modelName), `${modelName} is available`);
+  assert.ok(embeddingModels.some((model) => model.id === embeddingName), `${embeddingName} is available`);
   const model = { provider: 'gemini', model: modelName };
 
   settingsRepo.updateSettings({
     promptLanguage: 'es',
-    embeddingProvider: 'gemini',
+    embeddingProvider: 'openrouter',
     embeddingModel: embeddingName,
     modelSettingsMode: 'advanced',
     studyAiEnabled: true,
@@ -103,7 +110,7 @@ try {
   const indexed = await materialIndex.reindexStudyMaterial(material.id);
   assert.equal(indexed.status, 'indexed', indexed.error || 'PDF material is embedded');
   const indexedMaterial = materials.getStudyMaterial(material.id);
-  assert.equal(indexedMaterial.embeddingProvider, 'gemini');
+  assert.equal(indexedMaterial.embeddingProvider, 'openrouter');
   assert.equal(indexedMaterial.embeddingModel, embeddingName);
   assert.ok((indexedMaterial.embeddingDim ?? 0) > 0, 'material embedding has dimensions');
   await search.rebuildStudySearchIndex();
@@ -111,7 +118,8 @@ try {
   assert.equal(searchStatus.state, 'ready', searchStatus.error || 'study search index is ready');
   assert.ok(searchStatus.embeddedEntries >= 2, 'both the note and PDF are embedded in the shadow search index');
 
-  knowledge.queueStudyKnowledgeSources('document', [note.id], true);
+  knowledge.queueStudyKnowledgeSources('document', [note.id], true, { explicit: true });
+  knowledge.queueStudyKnowledgeSources('material', [material.id], true, { explicit: true });
   await waitForKnowledge(knowledge, knowledgeRepo, subject.id, [
     `document:${note.id}`,
     `material:${material.id}`,
@@ -196,6 +204,7 @@ try {
   console.log('Live isolated Gemini Study verification passed.');
 } finally {
   delete process.env.GEMINI_API_KEY;
+  delete process.env.OPENROUTER_API_KEY;
   try { clearApiKey(); } catch { /* the whole profile is deleted below */ }
   try { closeDb(); } catch { /* database may not have opened */ }
   await rm(root, { recursive: true, force: true });

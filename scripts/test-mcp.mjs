@@ -108,6 +108,14 @@ try {
     'nodus_teaching_get_rubric',
     'nodus_create_database_row',
     'nodus_set_database_cell',
+    'nodus_prosop_get_design',
+    'nodus_prosop_list_population',
+    'nodus_prosop_search',
+    'nodus_prosop_get_person',
+    'nodus_prosop_list_statements',
+    'nodus_prosop_get_coverage',
+    'nodus_prosop_run_analysis',
+    'nodus_prosop_create_proposal',
   ];
   assert.deepEqual([...server.tools.keys()], expectedTools);
 
@@ -133,6 +141,19 @@ try {
   const genealogy = surfaceFor('genealogy');
   assert.ok(genealogy.has('nodus_list_persons') && genealogy.has('nodus_list_ideas'), 'genealogy exposes records + research layers');
   assert.ok(!genealogy.has('nodus_list_databases') && !genealogy.has('nodus_teaching_get_gradebook'), 'genealogy hides database/teaching tools');
+  const prosopography = surfaceFor('prosopography');
+  assert.ok(
+    prosopography.has('nodus_prosop_get_design')
+      && prosopography.has('nodus_prosop_search')
+      && prosopography.has('nodus_prosop_run_analysis'),
+    'prosopography exposes its evidence-first read and analysis surface',
+  );
+  assert.ok(
+    !prosopography.has('nodus_list_persons')
+      && !prosopography.has('nodus_list_databases')
+      && !prosopography.has('nodus_teaching_get_gradebook'),
+    'prosopography does not inherit genealogy, database or teaching tools',
+  );
   assert.equal(surfaceFor(null).size, expectedTools.length, 'a null vault type registers the full surface');
 
   seedMcpDatabase(getDb());
@@ -781,8 +802,20 @@ try {
     // clears the threshold and comes back compact with its similarity.
     const archiveItems = archiveRepo.listItems();
     const partida = archiveItems.find((item) => item.itemId !== padron.itemId);
-    archiveRepo.setItemEmbedding(padron.itemId, [1, 0], 'test-model', 'hash-padron');
-    archiveRepo.setItemEmbedding(partida.itemId, [0, 1], 'test-model', 'hash-partida');
+    archiveRepo.setItemEmbedding(
+      padron.itemId,
+      [1, 0],
+      embedConfig.provider,
+      embedConfig.model,
+      'hash-padron'
+    );
+    archiveRepo.setItemEmbedding(
+      partida.itemId,
+      [0, 1],
+      embedConfig.provider,
+      embedConfig.model,
+      'hash-partida'
+    );
     const archiveHits = await callTool(server, 'nodus_search_archive', { query: 'jornalero', limit: 5, minSimilarity: 0.35 });
     assert.equal(archiveHits.items.length, 1, 'only the similar archive item clears the threshold');
     assert.equal(archiveHits.items[0].itemId, padron.itemId);

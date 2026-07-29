@@ -10,10 +10,32 @@ import { TOOLKIT_APPS_TRANSLATIONS } from './i18n.toolkitApps';
 import { SERVER_TRANSLATIONS } from './i18n.server';
 import { TRANSLATE_TRANSLATIONS } from './i18n.translate';
 import { WORLD_CHAT_TRANSLATIONS } from './i18n.worldChat';
+import { PROSOPOGRAPHY_TRANSLATIONS } from './i18n.prosopography';
 import { WORLDBUILDING_TRANSLATIONS } from './i18n.worldbuilding';
+import { DIARIZATION_TRANSLATIONS } from './i18n.diarization';
+import { PRIMARY_SOURCES_TRANSLATIONS } from './i18n.primarySources';
+import { PRIMARY_SOURCES_ARCHIVE_TRANSLATIONS } from './i18n.primarySourcesArchive';
+import { PRIMARY_SOURCES_FILES_TRANSLATIONS } from './i18n.primarySourcesFiles';
+import { PRIMARY_SOURCES_TEXT_TRANSLATIONS } from './i18n.primarySourcesText';
+import { PRIMARY_SOURCES_EVIDENCE_TRANSLATIONS } from './i18n.primarySourcesEvidence';
+import { PRIMARY_SOURCES_PERSONS_TRANSLATIONS } from './i18n.primarySourcesPersons';
+import { PRIMARY_SOURCES_DERIVED_TRANSLATIONS } from './i18n.primarySourcesDerived';
+import { PRIMARY_SOURCES_RESEARCH_TRANSLATIONS } from './i18n.primarySourcesResearch';
+import { PRIMARY_SOURCES_RELEASE_TRANSLATIONS } from './i18n.primarySourcesRelease';
 import { TESTIMONY_TRANSLATIONS } from './i18n.testimonies';
 
 export const DE: Record<string, string> = {
+  ...DIARIZATION_TRANSLATIONS.de,
+  ...PROSOPOGRAPHY_TRANSLATIONS.de,
+  ...PRIMARY_SOURCES_TRANSLATIONS.de,
+  ...PRIMARY_SOURCES_ARCHIVE_TRANSLATIONS.de,
+  ...PRIMARY_SOURCES_FILES_TRANSLATIONS.de,
+  ...PRIMARY_SOURCES_TEXT_TRANSLATIONS.de,
+  ...PRIMARY_SOURCES_EVIDENCE_TRANSLATIONS.de,
+  ...PRIMARY_SOURCES_PERSONS_TRANSLATIONS.de,
+  ...PRIMARY_SOURCES_DERIVED_TRANSLATIONS.de,
+  ...PRIMARY_SOURCES_RESEARCH_TRANSLATIONS.de,
+  ...PRIMARY_SOURCES_RELEASE_TRANSLATIONS.de,
   ...WORLDBUILDING_TRANSLATIONS.de,
   ...TESTIMONY_TRANSLATIONS.de,
   ...WORLD_CHAT_TRANSLATIONS.de,
@@ -1043,6 +1065,28 @@ export const DE: Record<string, string> = {
   'Nuevo tipo de vault': 'Neuer Vault-Typ',
   'Propón un espacio especializado y cómo colaborarías para hacerlo viable.':
     'Schlagen Sie einen spezialisierten Arbeitsbereich vor und wie Sie mithelfen würden, ihn umsetzbar zu machen.',
+  'Dar feedback': 'Feedback geben',
+  'Valora tu experiencia y cuéntanos qué funciona bien y qué deberíamos mejorar.':
+    'Bewerten Sie Ihre Erfahrung und sagen Sie uns, was gut funktioniert und was wir verbessern sollten.',
+  Valoraciones: 'Bewertungen',
+  'Cantidad y variedad de funciones': 'Umfang und Vielfalt der Funktionen',
+  Usabilidad: 'Benutzerfreundlichkeit',
+  Rendimiento: 'Leistung',
+  Estabilidad: 'Stabilität',
+  'Diseño visual': 'Visuelles Design',
+  '¿Qué te gusta de Nodus?': 'Was gefällt Ihnen an Nodus?',
+  '¿Qué crees que debería mejorar?': 'Was sollten wir Ihrer Meinung nach verbessern?',
+  'Sin respuesta': 'Keine Antwort',
+  'Opinión sobre Nodus': 'Meinung zu Nodus',
+  'Todas las preguntas son opcionales. Responde solo a las que quieras.':
+    'Alle Fragen sind optional. Beantworten Sie nur die Fragen, die Sie beantworten möchten.',
+  'Escala de valoración': 'Bewertungsskala',
+  'Necesita mejorar': 'Verbesserungsbedürftig',
+  Aceptable: 'Akzeptabel',
+  'Funciones, detalles o experiencias que valoras (opcional)':
+    'Funktionen, Details oder Erfahrungen, die Sie schätzen (optional)',
+  'Cambios que harían Nodus más útil para ti (opcional)':
+    'Änderungen, die Nodus für Sie nützlicher machen würden (optional)',
   'Un vault especializado puede requerir arquitectura nueva. Se priorizará cuando haya colaboración activa, conocimiento del área y personas dispuestas a probarlo.':
     'Ein spezialisierter Vault kann eine neue Architektur erfordern. Er wird priorisiert, sobald es aktive Zusammenarbeit, Fachwissen im Bereich und Personen gibt, die bereit sind, ihn zu testen.',
   'Rama de conocimiento o área': 'Wissensgebiet oder Bereich',
@@ -7638,4 +7682,5 @@ export const DE: Record<string, string> = {
   '¿Eliminar esta unidad guardada? Esta acción no se puede deshacer.': 'Diese gespeicherte Einheit löschen? Dieser Vorgang kann nicht rückgängig gemacht werden.',
   'Escribe el tema y Nodus redacta la unidad completa con tus materiales, citando cada uno. Puedes dejar que la IA proponga las partes o fijarlas tú: cuántas son, cómo se titulan y en qué debe centrarse cada una.': 'Schreibe das Thema und Nodus verfasst die ganze Einheit aus deinen Materialien und zitiert jedes davon. Du kannst die KI die Teile vorschlagen lassen oder sie selbst festlegen: wie viele es sind, wie sie heißen und worauf sich jeder konzentrieren soll.',
   'Escribe el tema de los apuntes. El contenido lo explicará paso a paso con ejemplos y autoevaluación usando tus materiales.': 'Gib das Thema der Lernunterlagen ein. Der Inhalt erklärt es anhand deiner Materialien Schritt für Schritt mit Beispielen und Selbstkontrolle.',
+  'La diarización detecta cambios de hablante y etiqueta cada segmento automáticamente. Revisa siempre las etiquetas antes de usar la transcripción.': 'Die Diarisierung erkennt Sprecherwechsel und kennzeichnet jedes Segment automatisch. Prüfe die Kennzeichnungen immer, bevor du das Transkript verwendest.',
 };

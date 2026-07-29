@@ -197,7 +197,11 @@ test('"more tutorials on the way" is promised in every language', () => {
 
 test('the CSP admits the tutorial embed and nothing wider', async () => {
   const html = await read('index.html');
-  assert.match(html, /frame-src https:\/\/www\.youtube-nocookie\.com;/, 'frame-src names the no-cookie host');
+  assert.match(
+    html,
+    /frame-src[^;]*https:\/\/www\.youtube-nocookie\.com;/,
+    'frame-src names the no-cookie host',
+  );
   // frame-src overrides child-src for frames, so youtube.com proper must stay out: the
   // watch page is opened in the system browser, never framed.
   assert.doesNotMatch(html, /frame-src[^;]*https:\/\/www\.youtube\.com/);
@@ -363,9 +367,13 @@ test('a vault tour with a video offers three ways in', async () => {
   // Three buttons do not fit side by side in a 360px card: they overflowed it and each
   // label broke into three lines. The opening step stacks them full-width instead, in
   // every vault — the layout the rest of the videos will land on.
-  assert.match(engine, /isFirst \? 'flex flex-col gap-3' : 'flex items-center justify-between'/);
-  assert.match(engine, /isFirst \? 'flex flex-col gap-2' : 'flex gap-2'/);
-  assert.equal((engine.match(/className="btn btn-(primary|ghost) w-full"/g) ?? []).length, 2);
+  assert.match(engine, /isInvitation \? 'flex flex-col gap-3' : 'flex items-center justify-between'/);
+  assert.match(engine, /isInvitation \? 'flex flex-col gap-2' : 'flex gap-2'/);
+  assert.match(engine, /const isInvitation = isFirst && !started/);
+  assert.match(engine, /if \(isInvitation\) return;/);
+  assert.match(engine, /showUnavailableVideo\?: boolean/);
+  assert.match(engine, /disabled=\{!video\}/);
+  assert.match(engine, /t\('Próximamente'\)/);
   assert.match(engine, /className=\{`w-full \$\{video \?/);
   // Escape must reach the player, not dismiss the tour behind it.
   assert.match(engine, /if \(watchingVideo\) return;/);

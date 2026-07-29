@@ -10,10 +10,32 @@ import { TOOLKIT_APPS_TRANSLATIONS } from './i18n.toolkitApps';
 import { SERVER_TRANSLATIONS } from './i18n.server';
 import { TRANSLATE_TRANSLATIONS } from './i18n.translate';
 import { WORLD_CHAT_TRANSLATIONS } from './i18n.worldChat';
+import { PROSOPOGRAPHY_TRANSLATIONS } from './i18n.prosopography';
+import { DIARIZATION_TRANSLATIONS } from './i18n.diarization';
 import { WORLDBUILDING_TRANSLATIONS } from './i18n.worldbuilding';
+import { PRIMARY_SOURCES_TRANSLATIONS } from './i18n.primarySources';
+import { PRIMARY_SOURCES_ARCHIVE_TRANSLATIONS } from './i18n.primarySourcesArchive';
+import { PRIMARY_SOURCES_FILES_TRANSLATIONS } from './i18n.primarySourcesFiles';
+import { PRIMARY_SOURCES_TEXT_TRANSLATIONS } from './i18n.primarySourcesText';
+import { PRIMARY_SOURCES_EVIDENCE_TRANSLATIONS } from './i18n.primarySourcesEvidence';
+import { PRIMARY_SOURCES_PERSONS_TRANSLATIONS } from './i18n.primarySourcesPersons';
+import { PRIMARY_SOURCES_DERIVED_TRANSLATIONS } from './i18n.primarySourcesDerived';
+import { PRIMARY_SOURCES_RESEARCH_TRANSLATIONS } from './i18n.primarySourcesResearch';
+import { PRIMARY_SOURCES_RELEASE_TRANSLATIONS } from './i18n.primarySourcesRelease';
 import { TESTIMONY_TRANSLATIONS } from './i18n.testimonies';
 
 export const PT_BR: Record<string, string> = {
+  ...DIARIZATION_TRANSLATIONS['pt-BR'],
+  ...PROSOPOGRAPHY_TRANSLATIONS['pt-BR'],
+  ...PRIMARY_SOURCES_TRANSLATIONS.ptBR,
+  ...PRIMARY_SOURCES_ARCHIVE_TRANSLATIONS.ptBR,
+  ...PRIMARY_SOURCES_FILES_TRANSLATIONS.ptBR,
+  ...PRIMARY_SOURCES_TEXT_TRANSLATIONS.ptBR,
+  ...PRIMARY_SOURCES_EVIDENCE_TRANSLATIONS.ptBR,
+  ...PRIMARY_SOURCES_PERSONS_TRANSLATIONS.ptBR,
+  ...PRIMARY_SOURCES_DERIVED_TRANSLATIONS.ptBR,
+  ...PRIMARY_SOURCES_RESEARCH_TRANSLATIONS.ptBR,
+  ...PRIMARY_SOURCES_RELEASE_TRANSLATIONS.ptBR,
   ...WORLDBUILDING_TRANSLATIONS.ptBR,
   ...TESTIMONY_TRANSLATIONS.ptBR,
   ...WORLD_CHAT_TRANSLATIONS.ptBR,
@@ -1037,6 +1059,28 @@ export const PT_BR: Record<string, string> = {
   'Cuéntanos qué falla, con los pasos para reproducirlo.': 'Conte-nos o que está falhando, com os passos para reproduzi-lo.',
   'Nuevo tipo de vault': 'Novo tipo de vault',
   'Propón un espacio especializado y cómo colaborarías para hacerlo viable.': 'Proponha um espaço especializado e como você colaboraria para viabilizá-lo.',
+  'Dar feedback': 'Dar feedback',
+  'Valora tu experiencia y cuéntanos qué funciona bien y qué deberíamos mejorar.':
+    'Avalie sua experiência e conte o que funciona bem e o que devemos melhorar.',
+  Valoraciones: 'Avaliações',
+  'Cantidad y variedad de funciones': 'Quantidade e variedade de recursos',
+  Usabilidad: 'Facilidade de uso',
+  Rendimiento: 'Desempenho',
+  Estabilidad: 'Estabilidade',
+  'Diseño visual': 'Design visual',
+  '¿Qué te gusta de Nodus?': 'O que você gosta no Nodus?',
+  '¿Qué crees que debería mejorar?': 'O que você acha que devemos melhorar?',
+  'Sin respuesta': 'Sem resposta',
+  'Opinión sobre Nodus': 'Opinião sobre o Nodus',
+  'Todas las preguntas son opcionales. Responde solo a las que quieras.':
+    'Todas as perguntas são opcionais. Responda apenas às que quiser.',
+  'Escala de valoración': 'Escala de avaliação',
+  'Necesita mejorar': 'Precisa melhorar',
+  Aceptable: 'Aceitável',
+  'Funciones, detalles o experiencias que valoras (opcional)':
+    'Recursos, detalhes ou experiências que você valoriza (opcional)',
+  'Cambios que harían Nodus más útil para ti (opcional)':
+    'Mudanças que tornariam o Nodus mais útil para você (opcional)',
   'Un vault especializado puede requerir arquitectura nueva. Se priorizará cuando haya colaboración activa, conocimiento del área y personas dispuestas a probarlo.':
     'Um vault especializado pode exigir uma nova arquitetura. Será priorizado quando houver colaboração ativa, conhecimento da área e pessoas dispostas a testá-lo.',
   'Rama de conocimiento o área': 'Ramo de conhecimento ou área',
@@ -7588,4 +7632,5 @@ export const PT_BR: Record<string, string> = {
   '¿Eliminar esta unidad guardada? Esta acción no se puede deshacer.': 'Excluir esta unidade salva? Esta ação não pode ser desfeita.',
   'Escribe el tema y Nodus redacta la unidad completa con tus materiales, citando cada uno. Puedes dejar que la IA proponga las partes o fijarlas tú: cuántas son, cómo se titulan y en qué debe centrarse cada una.': 'Escreva o tema e o Nodus redige a unidade completa a partir dos seus materiais, citando cada um. Você pode deixar a IA propor as partes ou defini-las: quantas são, como se chamam e no que cada uma deve se concentrar.',
   'Escribe el tema de los apuntes. El contenido lo explicará paso a paso con ejemplos y autoevaluación usando tus materiales.': 'Escreva o tema do material. O conteúdo explicará passo a passo com exemplos e autoavaliação a partir dos seus materiais.',
+  'La diarización detecta cambios de hablante y etiqueta cada segmento automáticamente. Revisa siempre las etiquetas antes de usar la transcripción.': 'A diarização detecta mudanças de falante e identifica automaticamente cada segmento. Sempre revise os rótulos antes de usar a transcrição.',
 };

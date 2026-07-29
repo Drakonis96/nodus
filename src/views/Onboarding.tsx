@@ -57,9 +57,9 @@ export function Onboarding({
   const [skippingAi, setSkippingAi] = useState(false);
 
   // The onboarding adapts to the active vault: only academic research starts with
-  // Zotero. Genealogy, databases and study use a short intro → AI → done flow.
+  // Zotero. Dedicated workspaces use a short intro → AI → done flow.
   const vaultType = activeVault?.type ?? 'academic';
-  const simple = vaultType === 'genealogy' || vaultType === 'databases' || vaultType === 'estudio' || vaultType === 'docencia';
+  const simple = vaultType === 'primary_sources' || vaultType === 'genealogy' || vaultType === 'databases' || vaultType === 'estudio' || vaultType === 'docencia';
   const aiStep = simple ? 1 : 3; // the "AI provider" step index
   const doneStep = simple ? 2 : 4; // the final step index
 
@@ -229,7 +229,12 @@ export function Onboarding({
     ? [t('Introducción'), t('Proveedor de IA'), t('Listo')]
     : [t('Conectar Zotero'), t('Colecciones'), t('Lecturas'), t('Proveedor de IA'), t('Primer resultado')];
   const intro =
-    vaultType === 'genealogy'
+    vaultType === 'primary_sources'
+      ? {
+          subtitle: t('Investiga documentos originales sin mezclar lo que dice la fuente con tu interpretación.'),
+          body: t('Importa o registra fuentes, conserva su procedencia y sus originales, y construye personas, cronologías, mapas y relaciones únicamente desde evidencias revisadas.'),
+        }
+      : vaultType === 'genealogy'
       ? {
           subtitle: t('Reconstruye tu historia familiar en un árbol navegable, con evidencias citadas y parentescos sugeridos por la IA. Todo es local.'),
           body: t('Añade personas y sus vínculos, documenta cada dato con su fuente y explora el árbol, la línea temporal y el archivo de evidencias. Configura un modelo de IA para las sugerencias de parentesco.'),

@@ -16,6 +16,7 @@ import type {
   VaultSummary,
   VaultType,
 } from '@shared/types';
+import type { PrimarySourcePolicySettings } from '@shared/primarySourcesTypes';
 import { recoveryHealthAdvice, recoveryHealthAge, recoveryHealthHeadline } from '../recoveryHealth';
 import { ImageGenerationSettings, ProvidersSettings } from './ProvidersSettings';
 import { AudioGenerationSettings } from './AudioGenerationSettings';
@@ -116,6 +117,7 @@ export function Settings({
   const [backupResult, setBackupResult] = useState<{ path: string; password: string; recoveryKey: string } | null>(null);
   const [backupCopied, setBackupCopied] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [primarySourcePolicy, setPrimarySourcePolicy] = useState<PrimarySourcePolicySettings | null>(null);
 
   useEffect(() => {
     if (localStorage.getItem('nodus.settingsTarget') !== 'nodi') return;
@@ -123,6 +125,18 @@ export function Settings({
     setSettingsTab('interface');
     setSettingsQuery('Nodi');
   }, []);
+
+  useEffect(() => {
+    if (activeVault?.type !== 'primary_sources') {
+      setPrimarySourcePolicy(null);
+      return;
+    }
+    let cancelled = false;
+    void window.nodus.getPrimarySourceGovernanceWorkspace().then((workspace) => {
+      if (!cancelled) setPrimarySourcePolicy(workspace.policy);
+    });
+    return () => { cancelled = true; };
+  }, [activeVault?.id, activeVault?.type]);
   const [importPassword, setImportPassword] = useState('');
   const [showImportPassword, setShowImportPassword] = useState(false);
   const [importingBackup, setImportingBackup] = useState(false);
@@ -265,6 +279,11 @@ export function Settings({
         ? { deepLongChunkWords: parsed }
         : { deepStandardChunkWords: parsed }
     );
+  };
+
+  const patchPrimarySourcePolicy = async (value: Partial<PrimarySourcePolicySettings>) => {
+    const next = await window.nodus.updatePrimarySourcePolicySettings(value);
+    setPrimarySourcePolicy(next);
   };
 
   const startReset = async () => {
@@ -960,6 +979,21 @@ export function Settings({
                   onClick={() => patch({ genealogyTourComplete: false }).then(() => flash(t('Se mostrará el tutorial de genealogía.')))}
                 >
                   <Icon name="tree" /> {t('Ver de nuevo')}
+                </button>
+              </div>
+            )}
+            {activeVault?.type === 'primary_sources' && (
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <label className="text-sm text-neutral-300">{t('Recorrido de fuentes primarias')}</label>
+                  <p className="text-xs text-neutral-500 mt-0.5">{t('Seis pasos: importar con procedencia, preservar originales, revisar propuestas y volver de la conclusión a la evidencia.')}</p>
+                </div>
+                <button
+                  data-testid="primary-sources-tour-replay"
+                  className="btn btn-ghost border border-neutral-700"
+                  onClick={() => patch({ primarySourcesTourComplete: false }).then(() => flash(t('Se mostrará el recorrido de fuentes primarias.')))}
+                >
+                  <Icon name="archive" /> {t('Ver de nuevo')}
                 </button>
               </div>
             )}
@@ -2084,24 +2118,72 @@ export function Settings({
               </div>
               <VaultModelOverrides settings={settings} vaultType={activeVault?.type ?? 'academic'} vaultName={activeVault?.name ?? t('Vault actual')} patch={patch} />
             </>}
+            {activeVault?.type === 'primary_sources' && primarySourcePolicy && (
+              <div className="mt-5 space-y-3 border-t border-neutral-800 pt-4" data-testid="primary-sources-ai-policy">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('Política de IA de Fuentes primarias')}</h3>
+                <p className="text-xs leading-5 text-neutral-500">
+                  {t('Las fuentes restringidas o embargadas nunca salen del dispositivo. Nodi solo recibe fuentes abiertas y no altamente sensibles; las notas privadas y las propuestas pendientes quedan excluidas.')}
+                </p>
+                <Row
+                  label={t('Confirmar cada envío externo')}
+                  hint={t('Si está activo, la indexación externa en segundo plano no enviará documentos. Desactívalo solo si autorizas el procesamiento de fuentes abiertas con el proveedor configurado.')}
+                >
+                  <input
+                    type="checkbox"
+                    checked={primarySourcePolicy.requireExternalConfirmation}
+                    onChange={(event) => void patchPrimarySourcePolicy({ requireExternalConfirmation: event.target.checked })}
+                  />
+                </Row>
+                <Row
+                  label={t('Permitir IA externa con fuentes privadas')}
+                  hint={t('Cada fuente privada seguirá necesitando consentimiento explícito. Las fuentes restringidas y embargadas continúan bloqueadas.')}
+                >
+                  <input
+                    type="checkbox"
+                    checked={primarySourcePolicy.allowPrivateExternalAi}
+                    onChange={(event) => void patchPrimarySourcePolicy({ allowPrivateExternalAi: event.target.checked })}
+                  />
+                </Row>
+                <Row
+                  label={t('Permitir IA local con fuentes restringidas')}
+                  hint={t('Solo se aplica a modelos que se ejecutan en tu equipo; nunca autoriza un proveedor remoto.')}
+                >
+                  <input
+                    type="checkbox"
+                    checked={primarySourcePolicy.allowRestrictedLocalAi}
+                    onChange={(event) => void patchPrimarySourcePolicy({ allowRestrictedLocalAi: event.target.checked })}
+                  />
+                </Row>
+              </div>
+            )}
             <Row label={t('Indexación de embeddings')}>
               <div className="flex gap-2">
                 <button
                   className="btn btn-ghost border border-cyan-800 text-cyan-300"
-                  title={t('Genera embeddings solo para ideas que aún no los tienen.')}
+                  title={t(activeVault?.type === 'primary_sources'
+                    ? 'Indexa el texto revisado de las fuentes permitido por la política del vault.'
+                    : 'Genera embeddings solo para ideas que aún no los tienen.')}
                   onClick={() => {
-                    void window.nodus.startEmbedding();
+                    if (activeVault?.type === 'primary_sources') {
+                      void window.nodus.indexArchive().then((result) => {
+                        flash(result.indexed > 0
+                          ? tx('{n} fuentes indexadas.', { n: result.indexed })
+                          : t('No hay fuentes autorizadas pendientes de indexación.'));
+                      });
+                    } else {
+                      void window.nodus.startEmbedding();
+                    }
                   }}
                 >
                   <Icon name="search" /> {t('Indexar pendientes')}
                 </button>
-                <button
+                {activeVault?.type !== 'primary_sources' && <button
                   className="btn btn-ghost border border-cyan-800 text-cyan-300"
                   title={t('Borra todos los embeddings y los regenera desde cero. Útil tras cambiar de modelo.')}
                   onClick={() => setConfirmReindex(true)}
                 >
                   <Icon name="search" /> {t('Reindexar todo')}
-                </button>
+                </button>}
               </div>
             </Row>
             <Row label={t('Llamadas simultáneas')}>

@@ -4,11 +4,33 @@ import { TOOLKIT_APPS_TRANSLATIONS } from './i18n.toolkitApps';
 import { SERVER_TRANSLATIONS } from './i18n.server';
 import { TRANSLATE_TRANSLATIONS } from './i18n.translate';
 import { WORLD_CHAT_TRANSLATIONS } from './i18n.worldChat';
+import { PROSOPOGRAPHY_TRANSLATIONS } from './i18n.prosopography';
+import { DIARIZATION_TRANSLATIONS } from './i18n.diarization';
 import { WORLDBUILDING_TRANSLATIONS } from './i18n.worldbuilding';
+import { PRIMARY_SOURCES_TRANSLATIONS } from './i18n.primarySources';
+import { PRIMARY_SOURCES_ARCHIVE_TRANSLATIONS } from './i18n.primarySourcesArchive';
+import { PRIMARY_SOURCES_FILES_TRANSLATIONS } from './i18n.primarySourcesFiles';
+import { PRIMARY_SOURCES_TEXT_TRANSLATIONS } from './i18n.primarySourcesText';
+import { PRIMARY_SOURCES_EVIDENCE_TRANSLATIONS } from './i18n.primarySourcesEvidence';
+import { PRIMARY_SOURCES_PERSONS_TRANSLATIONS } from './i18n.primarySourcesPersons';
+import { PRIMARY_SOURCES_DERIVED_TRANSLATIONS } from './i18n.primarySourcesDerived';
+import { PRIMARY_SOURCES_RESEARCH_TRANSLATIONS } from './i18n.primarySourcesResearch';
+import { PRIMARY_SOURCES_RELEASE_TRANSLATIONS } from './i18n.primarySourcesRelease';
 import { TESTIMONY_TRANSLATIONS } from './i18n.testimonies';
 
 /** Complete static Italian interface table; coverage prohibits runtime fallbacks. */
 export const IT: Record<string, string> = {
+  ...DIARIZATION_TRANSLATIONS.it,
+  ...PROSOPOGRAPHY_TRANSLATIONS.it,
+  ...PRIMARY_SOURCES_TRANSLATIONS.it,
+  ...PRIMARY_SOURCES_ARCHIVE_TRANSLATIONS.it,
+  ...PRIMARY_SOURCES_FILES_TRANSLATIONS.it,
+  ...PRIMARY_SOURCES_TEXT_TRANSLATIONS.it,
+  ...PRIMARY_SOURCES_EVIDENCE_TRANSLATIONS.it,
+  ...PRIMARY_SOURCES_PERSONS_TRANSLATIONS.it,
+  ...PRIMARY_SOURCES_DERIVED_TRANSLATIONS.it,
+  ...PRIMARY_SOURCES_RESEARCH_TRANSLATIONS.it,
+  ...PRIMARY_SOURCES_RELEASE_TRANSLATIONS.it,
   ...WORLDBUILDING_TRANSLATIONS.it,
   ...TESTIMONY_TRANSLATIONS.it,
   ...WORLD_CHAT_TRANSLATIONS.it,
@@ -974,6 +996,24 @@ export const IT: Record<string, string> = {
   "Cuéntanos qué falla, con los pasos para reproducirlo.": "Raccontaci cosa si rompe, spiegando i passaggi per riprodurlo.",
   "Nuevo tipo de vault": "Nuovo tipo di caveau",
   "Propón un espacio especializado y cómo colaborarías para hacerlo viable.": "Proponi uno spazio di lavoro specializzato e spiega come contribuiresti a renderlo praticabile.",
+  "Dar feedback": "Invia feedback",
+  "Valora tu experiencia y cuéntanos qué funciona bien y qué deberíamos mejorar.": "Valuta la tua esperienza e raccontaci cosa funziona bene e cosa dovremmo migliorare.",
+  "Valoraciones": "Valutazioni",
+  "Cantidad y variedad de funciones": "Quantità e varietà delle funzionalità",
+  "Usabilidad": "Usabilità",
+  "Rendimiento": "Prestazioni",
+  "Estabilidad": "Stabilità",
+  "Diseño visual": "Design visivo",
+  "¿Qué te gusta de Nodus?": "Cosa ti piace di Nodus?",
+  "¿Qué crees que debería mejorar?": "Cosa pensi che dovremmo migliorare?",
+  "Sin respuesta": "Nessuna risposta",
+  "Opinión sobre Nodus": "Opinione su Nodus",
+  "Todas las preguntas son opcionales. Responde solo a las que quieras.": "Tutte le domande sono facoltative. Rispondi solo a quelle che desideri.",
+  "Escala de valoración": "Scala di valutazione",
+  "Necesita mejorar": "Da migliorare",
+  "Aceptable": "Accettabile",
+  "Funciones, detalles o experiencias que valoras (opcional)": "Funzionalità, dettagli o esperienze che apprezzi (facoltativo)",
+  "Cambios que harían Nodus más útil para ti (opcional)": "Modifiche che renderebbero Nodus più utile per te (facoltativo)",
   "Un vault especializado puede requerir arquitectura nueva. Se priorizará cuando haya colaboración activa, conocimiento del área y personas dispuestas a probarlo.": "Un deposito specializzato potrebbe richiedere una nuova architettura. Avrà la priorità quando ci sarà collaborazione attiva, conoscenza del dominio e persone disposte a testarlo.",
   "Rama de conocimiento o área": "Campo o area della conoscenza",
   "Periodismo": "Giornalismo",
@@ -7047,4 +7087,5 @@ export const IT: Record<string, string> = {
   "¿Eliminar esta unidad guardada? Esta acción no se puede deshacer.": "Eliminare questa unità salvata? Questa azione non può essere annullata.",
   "Escribe el tema y Nodus redacta la unidad completa con tus materiales, citando cada uno. Puedes dejar que la IA proponga las partes o fijarlas tú: cuántas son, cómo se titulan y en qué debe centrarse cada una.": "Scrivi il tema e Nodus redige l’intera unità a partire dai tuoi materiali, citandoli uno per uno. Puoi lasciare che l’IA proponga le parti oppure fissarle tu: quante sono, come si intitolano e su che cosa deve concentrarsi ciascuna.",
   "Escribe el tema de los apuntes. El contenido lo explicará paso a paso con ejemplos y autoevaluación usando tus materiales.": "Scrivi l’argomento delle dispense. Il contenuto lo spiegherà passo dopo passo con esempi e autovalutazione a partire dai tuoi materiali.",
+  "La diarización detecta cambios de hablante y etiqueta cada segmento automáticamente. Revisa siempre las etiquetas antes de usar la transcripción.": "La diarizzazione rileva i cambi di parlante ed etichetta automaticamente ogni segmento. Verifica sempre le etichette prima di usare la trascrizione.",
 };
