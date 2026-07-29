@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
@@ -17,6 +17,8 @@ import { fileURLToPath } from 'node:url';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
+const appSource = await readFile(path.join(repoRoot, 'src/App.tsx'), 'utf8');
+const styles = await readFile(path.join(repoRoot, 'src/index.css'), 'utf8');
 
 const outDir = await mkdtemp(path.join(os.tmpdir(), 'nodus-header-layout-'));
 const bundle = path.join(outDir, 'headerLayout.cjs');
@@ -142,4 +144,17 @@ test('the gap is configurable and is honoured on both sides', () => {
   const placement = placeHeaderBadge(metrics);
   assert.equal(right(placement, metrics), metrics.headerWidth - metrics.actionsWidth - 40);
   assert.equal(HEADER_BADGE_GAP, 12, 'the default gap is the shipped one');
+});
+
+test('the expanded vault badge has a dedicated light-theme surface', () => {
+  assert.match(appSource, /aria-expanded=\{Boolean\(vaultAnchor\)\}/);
+  assert.match(appSource, /className="header-vault-badge /);
+  assert.match(
+    styles,
+    /\.light \.app-titlebar button\.header-vault-badge\[aria-expanded='true'\]/
+  );
+  assert.match(
+    styles,
+    /background-color: color-mix\(in srgb, var\(--vault-accent, #6366f1\) 11%, white\)/
+  );
 });

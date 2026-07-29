@@ -45,8 +45,19 @@ test('Nodi context is explicit, bounded and rejects invented product claims', as
   assert.match(documentation, /Roadmap está en la parte superior derecha/);
   assert.match(documentation, /NODUS_ROADMAP/);
   assert.match(documentation, /Vault de docencia/);
-  assert.match(documentation, /Estado del roadmap/);
+  assert.match(documentation, /Estado resumido del roadmap/);
   assert.match(documentation, /planificados, en desarrollo e implementados/);
+  assert.match(documentation, /Fuentes primarias, Testimonios y Prosopografía están en PRE-ALPHA/);
+  assert.match(documentation, /Worldbuilding está en ALPHA/);
+  assert.match(documentation, /Apps para iOS y iPadOS/);
+  for (const type of ['docencia', 'testimonios', 'prosopography']) {
+    assert.match(backend, new RegExp(`${type}:`), `${type} has an explicit active-vault label`);
+  }
+  assert.match(backend, /active\.type === 'estudio' \|\| active\.type === 'docencia'/);
+  assert.match(backend, /active\.type === 'prosopography'/);
+  for (const language of ['French', 'German', 'European Portuguese', 'Brazilian Portuguese', 'Italian', 'Turkish']) {
+    assert.match(backend, new RegExp(language), `${language} is a supported Nodi response language`);
+  }
   assert.match(app, /data-nodi-view=\{view\}/);
   assert.match(app, /setNodiViewContext/);
   assert.match(app, /slice\(0, 12_000\)/);

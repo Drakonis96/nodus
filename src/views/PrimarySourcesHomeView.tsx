@@ -4,6 +4,7 @@ import type { VaultSummary } from '@shared/types';
 import { Icon } from '../components/ui';
 import { t, tx } from '../i18n';
 import type { View } from '../navigation';
+import { DemoOfferCard } from './HomeView';
 import type { PrimarySourceOpenTarget } from './PrimarySourcesSearchView';
 
 const EMPTY: PrimarySourceOperationalDashboard = {
@@ -105,32 +106,11 @@ export function PrimarySourcesHomeView({
         </header>
 
         {showDemoOffer && (
-          <section
-            className="rounded-2xl border border-indigo-200 bg-indigo-50 p-5 dark:border-indigo-900 dark:bg-indigo-950/30"
-            data-testid="primary-sources-demo-offer"
-          >
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="max-w-3xl">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-indigo-700 dark:text-indigo-300">
-                  {t('Corpus didáctico ficticio')}
-                </p>
-                <h2 className="mt-2 text-lg font-semibold">{t('Aprende el flujo completo con diez fuentes enlazadas')}</h2>
-                <p className="mt-1 text-sm leading-6 text-neutral-700 dark:text-neutral-300">
-                  {t('Incluye originales y derivados, OCR revisado y sin revisar, fechas inciertas, un topónimo ambiguo, una contradicción y una propuesta pendiente. No contiene personas ni datos reales.')}
-                </p>
-              </div>
-              <button
-                type="button"
-                className="btn btn-primary shrink-0 gap-2"
-                disabled={demoBusy}
-                aria-busy={demoBusy}
-                onClick={onLoadDemo}
-              >
-                <Icon name={demoBusy ? 'sync' : 'sparkles'} className={demoBusy ? 'animate-spin' : ''} />
-                {demoBusy ? t('Preparando corpus…') : t('Cargar corpus de aprendizaje')}
-              </button>
-            </div>
-          </section>
+          <DemoOfferCard
+            variant="primary-sources"
+            demoBusy={demoBusy}
+            onLoadPrimarySourcesDemo={onLoadDemo}
+          />
         )}
 
         <section aria-label={t('Métricas')} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

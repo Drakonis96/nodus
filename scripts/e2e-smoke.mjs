@@ -2423,7 +2423,7 @@ try {
   await page.reload();
   await page.getByTestId('primary-sources-home').waitFor({ timeout: 30_000 });
   await page.getByTestId('primary-sources-demo-offer').waitFor({ timeout: 30_000 });
-  await page.getByRole('button', { name: 'Cargar corpus de aprendizaje', exact: true }).click();
+  await page.getByRole('button', { name: 'Cargar demo de fuentes primarias', exact: true }).click();
   await waitForCondition('corpus de aprendizaje de fuentes primarias cargado', () => page.evaluate(async () => {
     const workspace = await window.nodus.getPrimarySourcesWorkspace('', 0, 200);
     const settings = await window.nodus.getSettings();
@@ -2639,9 +2639,17 @@ try {
   assert.equal(demoFixture.cellIdeas.length, 4);
   assert.equal(demoFixture.cellGraph.edges.length, 3);
   assert.equal(demoFixture.ecologyIdeas.length, 3);
-  const studyTourLabel = page.getByText(/^Tutorial de estudio/);
+  assert.equal(await page.getByTestId('tour-card').count(), 0, 'cargar la demo de estudio no reinicia ni abre el tutorial');
+
+  // Demo loading and tutorial replay are independent. Reopen the tour through the
+  // same Settings control available to users so the E2E covers both guarantees.
+  await page.locator('[data-tour="nav-settings"]').click();
+  await page.getByRole('button', { name: 'Tutoriales', exact: true }).click();
+  await page.getByTestId('study-tour-replay').click();
+  const studyTourCard = page.getByTestId('tour-card');
+  const studyTourLabel = studyTourCard.getByText(/^Tutorial de estudio/);
   await studyTourLabel.waitFor({ timeout: 30_000 });
-  await page.getByRole('button', { name: 'Cerrar tutorial', exact: true }).click();
+  await studyTourCard.getByRole('button', { name: 'Cerrar tutorial', exact: true }).click();
   await studyTourLabel.waitFor({ state: 'detached', timeout: 30_000 });
   await page.getByRole('button', { name: 'Salir del modo demo', exact: true }).click();
   await waitForCondition('datos de ejemplo de estudio eliminados', () => page.evaluate(async () => (await window.nodus.getStudyWorkspace()).courses.length === 0));
@@ -2670,6 +2678,11 @@ try {
     ]);
     return groups.length === 1 && rubrics.length === 1 && exams.length === 1 && plans.length === 1;
   }));
+  assert.equal(await page.getByTestId('tour-card').count(), 0, 'cargar la demo de docencia no reinicia ni abre el tutorial');
+
+  await page.locator('[data-tour="nav-settings"]').click();
+  await page.getByRole('button', { name: 'Tutoriales', exact: true }).click();
+  await page.getByTestId('teaching-tour-replay').click();
   const tourCard = page.getByTestId('tour-card');
   const teachingTourLabel = tourCard.getByText(/^Tutorial de docencia/);
   await teachingTourLabel.waitFor({ timeout: 30_000 });

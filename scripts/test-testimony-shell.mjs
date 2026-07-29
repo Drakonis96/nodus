@@ -10,7 +10,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { execFileSync } from 'node:child_process';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
@@ -37,6 +37,8 @@ function load(file) {
 const navigation = load('src/navigation.ts');
 const vaultTypes = load('shared/vaultTypes.ts');
 const { TESTIMONY_GROUPS } = load('src/components/TestimonySidebar.tsx');
+const appSource = await readFile(path.join(repoRoot, 'src/App.tsx'), 'utf8');
+const participantsSource = await readFile(path.join(repoRoot, 'src/views/TestimonyParticipantsView.tsx'), 'utf8');
 
 test.after(() => rm(outDir, { recursive: true, force: true }));
 
@@ -128,6 +130,20 @@ test('el acento es el cian del plan y el tipo ya se puede elegir', () => {
   // `available` pasó a true en la fase 9, cuando el vertical, la demo, el recorrido, las
   // traducciones y las pruebas estuvieron terminados — no antes.
   assert.equal(vaultTypes.getVaultTypeDef('testimonios').available, true);
+});
+
+test('el encabezado usa el logo cian cuando la bóveda activa es Testimonios', () => {
+  assert.match(appSource, /import nodusLogoCyan from '\.\/assets\/nodus-logo-cyan\.svg'/);
+  assert.match(appSource, /isTestimonios \? nodusLogoCyan : nodusLogo/);
+});
+
+test('editar un participante abre un modal sin reemplazar la tabla', () => {
+  assert.doesNotMatch(participantsSource, /if \(openId\) \{\s*return <Participant/);
+  assert.match(participantsSource, /\{openId && \(\s*<ParticipantModal/);
+  assert.match(participantsSource, /data-testid="testimony-participant-modal"/);
+  assert.match(participantsSource, /role="dialog"/);
+  assert.match(participantsSource, /aria-modal="true"/);
+  assert.match(participantsSource, /max-h-\[90vh\].*max-w-5xl.*overflow-hidden/);
 });
 
 test('las superficies ocultas por defecto no incluyen Buscar ni Notas', () => {

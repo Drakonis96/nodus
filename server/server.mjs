@@ -190,6 +190,92 @@ function rows(snapshot, table) {
   return Array.isArray(value) ? value : [];
 }
 
+const WORLD_ENTITIES = {
+  character: { table: 'persons', id: 'person_id', title: 'display_name' },
+  place: { table: 'places', id: 'place_id', title: 'name' },
+  group: { table: 'world_groups', id: 'group_id', title: 'name' },
+  scene: { table: 'world_scenes', id: 'scene_id', title: 'title' },
+  article: { table: 'world_articles', id: 'article_id', title: 'title' },
+  map: { table: 'world_maps', id: 'map_id', title: 'name' },
+  thread: { table: 'world_threads', id: 'thread_id', title: 'title' },
+  rule: { table: 'world_rules', id: 'rule_id', title: 'title' },
+  question: { table: 'world_questions', id: 'question_id', title: 'question' },
+  secret: { table: 'world_secrets', id: 'secret_id', title: 'title' },
+  event: { table: 'events', id: 'event_id', title: 'label' },
+};
+
+function requireWorldSnapshot(snapshot) {
+  if (snapshot?.vault?.type !== 'worldbuilding') {
+    return { error: 'This tool only applies to a published Worldbuilding vault.' };
+  }
+  return null;
+}
+
+function worldEntityRows(snapshot, kind) {
+  const def = WORLD_ENTITIES[kind];
+  if (!def) return [];
+  return rows(snapshot, def.table).map((row) => ({
+    ...row,
+    entityKind: kind,
+    id: row[def.id],
+    title: row[def.title] ?? '',
+  }));
+}
+
+function worldEntityDetail(snapshot, kind, id) {
+  const def = WORLD_ENTITIES[kind];
+  if (!def) return null;
+  const entity = rows(snapshot, def.table).find((row) => String(row[def.id]) === String(id));
+  if (!entity) return null;
+  const related = {};
+  if (kind === 'character') {
+    related.profile = rows(snapshot, 'character_profiles').find((row) => String(row.person_id) === String(id)) ?? null;
+    related.names = rows(snapshot, 'person_names').filter((row) => String(row.person_id) === String(id));
+    related.abilities = rows(snapshot, 'character_abilities').filter((row) => String(row.person_id) === String(id));
+    related.affiliations = rows(snapshot, 'character_affiliations').filter((row) => String(row.person_id) === String(id));
+    related.appearances = rows(snapshot, 'scene_characters').filter((row) => String(row.person_id) === String(id));
+    related.eventParticipants = rows(snapshot, 'event_participants').filter((row) => String(row.person_id) === String(id));
+    related.ownedSecrets = rows(snapshot, 'world_secrets').filter((row) => String(row.owner_person_id) === String(id));
+    related.knownSecrets = rows(snapshot, 'secret_knowers').filter((row) => String(row.person_id) === String(id));
+  } else if (kind === 'place') {
+    related.profile = rows(snapshot, 'place_profiles').find((row) => String(row.place_id) === String(id)) ?? null;
+    related.children = rows(snapshot, 'places').filter((row) => String(row.parent_id) === String(id));
+    related.maps = rows(snapshot, 'world_maps').filter((row) => String(row.place_id) === String(id));
+    related.markers = rows(snapshot, 'map_markers').filter((row) => String(row.place_id) === String(id));
+    related.scenes = rows(snapshot, 'world_scenes').filter((row) => String(row.place_id) === String(id));
+    related.inhabitants = rows(snapshot, 'person_places').filter((row) => String(row.place_id) === String(id));
+  } else if (kind === 'group') {
+    related.affiliations = rows(snapshot, 'character_affiliations').filter((row) => String(row.group_id) === String(id));
+    related.threadParties = rows(snapshot, 'thread_parties').filter((row) => row.party_kind === 'group' && String(row.party_id) === String(id));
+  } else if (kind === 'scene') {
+    related.cast = rows(snapshot, 'scene_characters').filter((row) => String(row.scene_id) === String(id));
+    related.manuscript = rows(snapshot, 'world_scene_text').find((row) => String(row.scene_id) === String(id)) ?? null;
+    related.day = rows(snapshot, 'world_scene_days').find((row) => String(row.scene_id) === String(id)) ?? null;
+    related.beats = rows(snapshot, 'world_beats').filter((row) => String(row.scene_id) === String(id));
+    related.questions = rows(snapshot, 'world_questions').filter((row) => row.anchor_kind === 'scene' && String(row.anchor_id) === String(id));
+  } else if (kind === 'article') {
+    related.links = rows(snapshot, 'world_links').filter((row) => row.source_kind === 'article' && String(row.source_id) === String(id));
+    related.backlinks = rows(snapshot, 'world_links').filter((row) => row.target_kind === 'article' && String(row.target_id) === String(id));
+  } else if (kind === 'map') {
+    related.layers = rows(snapshot, 'map_layers').filter((row) => String(row.map_id) === String(id));
+    related.markers = rows(snapshot, 'map_markers').filter((row) => String(row.map_id) === String(id));
+    related.travelModes = rows(snapshot, 'map_travel_modes').filter((row) => String(row.map_id) === String(id));
+  } else if (kind === 'thread') {
+    related.parties = rows(snapshot, 'thread_parties').filter((row) => String(row.thread_id) === String(id));
+    related.beats = rows(snapshot, 'world_beats').filter((row) => String(row.thread_id) === String(id));
+  } else if (kind === 'rule') {
+    related.beats = rows(snapshot, 'world_beats').filter((row) => row.thread_kind === 'rule' && String(row.thread_id) === String(id));
+  } else if (kind === 'question') {
+    related.options = rows(snapshot, 'world_question_options').filter((row) => String(row.question_id) === String(id));
+  } else if (kind === 'secret') {
+    related.knowers = rows(snapshot, 'secret_knowers').filter((row) => String(row.secret_id) === String(id));
+  } else if (kind === 'event') {
+    related.participants = rows(snapshot, 'event_participants').filter((row) => String(row.event_id) === String(id));
+    related.worldDate = rows(snapshot, 'event_world_dates').find((row) => String(row.event_id) === String(id)) ?? null;
+  }
+  return { kind, id, entity, related };
+}
+
 function userSpaces(userId) {
   const ids = new Set(store.state.memberships.filter((entry) => entry.userId === userId).map((entry) => entry.spaceId));
   return store.state.spaces.filter((space) => ids.has(space.id));
@@ -198,9 +284,14 @@ function userSpaces(userId) {
 const TOOLS = [
   { name: 'nodus_list_spaces', title: 'List Nodus spaces', description: 'Lists the shared Nodus spaces the authenticated user can read.', inputSchema: { type: 'object', properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true } },
   { name: 'nodus_get_space_summary', title: 'Get space summary', description: 'Returns counts and publication metadata for one authorized Nodus space.', inputSchema: { type: 'object', properties: { spaceId: { type: 'string' } }, required: ['spaceId'], additionalProperties: false }, annotations: { readOnlyHint: true } },
-  { name: 'nodus_search', title: 'Search Nodus', description: 'Searches works, ideas, themes, gaps, notes and passages in one authorized shared space.', inputSchema: { type: 'object', properties: { spaceId: { type: 'string' }, query: { type: 'string' }, limit: { type: 'integer', minimum: 1, maximum: 50 } }, required: ['spaceId', 'query'], additionalProperties: false }, annotations: { readOnlyHint: true } },
+  { name: 'nodus_search', title: 'Search Nodus', description: 'Searches the canonical text available in one authorized shared space, including academic and Worldbuilding corpora.', inputSchema: { type: 'object', properties: { spaceId: { type: 'string' }, query: { type: 'string' }, limit: { type: 'integer', minimum: 1, maximum: 50 } }, required: ['spaceId', 'query'], additionalProperties: false }, annotations: { readOnlyHint: true } },
   { name: 'nodus_get_work', title: 'Get work', description: 'Gets one shared bibliographic work by its Nodus id.', inputSchema: { type: 'object', properties: { spaceId: { type: 'string' }, id: { type: 'string' } }, required: ['spaceId', 'id'], additionalProperties: false }, annotations: { readOnlyHint: true } },
   { name: 'nodus_get_idea', title: 'Get idea', description: 'Gets one shared idea and its direct relations.', inputSchema: { type: 'object', properties: { spaceId: { type: 'string' }, id: { type: 'string' } }, required: ['spaceId', 'id'], additionalProperties: false }, annotations: { readOnlyHint: true } },
+  { name: 'nodus_world_get_overview', title: 'Get shared world overview', description: 'Returns counts, calendar and manuscript totals for one authorized Worldbuilding space.', inputSchema: { type: 'object', properties: { spaceId: { type: 'string' } }, required: ['spaceId'], additionalProperties: false }, annotations: { readOnlyHint: true } },
+  { name: 'nodus_world_search', title: 'Search shared fictional world', description: 'Searches canonical character, place, group, scene, article, rule, question, secret and manuscript text in one authorized Worldbuilding space.', inputSchema: { type: 'object', properties: { spaceId: { type: 'string' }, query: { type: 'string' }, limit: { type: 'integer', minimum: 1, maximum: 100 } }, required: ['spaceId', 'query'], additionalProperties: false }, annotations: { readOnlyHint: true } },
+  { name: 'nodus_world_list_entities', title: 'List shared world entities', description: 'Lists one kind of entity from a Worldbuilding space. Kinds: character, place, group, scene, article, map, thread, rule, question, secret, event.', inputSchema: { type: 'object', properties: { spaceId: { type: 'string' }, kind: { type: 'string', enum: Object.keys(WORLD_ENTITIES) }, query: { type: 'string' }, limit: { type: 'integer', minimum: 1, maximum: 200 }, offset: { type: 'integer', minimum: 0 } }, required: ['spaceId', 'kind'], additionalProperties: false }, annotations: { readOnlyHint: true } },
+  { name: 'nodus_world_get_entity', title: 'Get shared world entity', description: 'Gets one Worldbuilding entity with its directly related profile, cast, links, beats, options or manuscript data.', inputSchema: { type: 'object', properties: { spaceId: { type: 'string' }, kind: { type: 'string', enum: Object.keys(WORLD_ENTITIES) }, id: { type: 'string' } }, required: ['spaceId', 'kind', 'id'], additionalProperties: false }, annotations: { readOnlyHint: true } },
+  { name: 'nodus_world_get_manuscript', title: 'Get shared world manuscript', description: 'Returns ordered scene metadata, current prose and chapter/book starts from a Worldbuilding space.', inputSchema: { type: 'object', properties: { spaceId: { type: 'string' }, includeText: { type: 'boolean' } }, required: ['spaceId'], additionalProperties: false }, annotations: { readOnlyHint: true } },
 ];
 
 for (const tool of TOOLS) tool.securitySchemes = [{ type: 'oauth2', scopes: ['materials.read'] }];
@@ -210,7 +301,7 @@ function toolResult(value, isError = false) {
 }
 
 function callTool(auth, name, args) {
-  if (name === 'nodus_list_spaces') return toolResult({ spaces: userSpaces(auth.user.id).map(({ id, name, description, updatedAt }) => ({ id, name, description, updatedAt })) });
+  if (name === 'nodus_list_spaces') return toolResult({ spaces: userSpaces(auth.user.id).map(({ id, name, description, updatedAt, vault }) => ({ id, name, description, updatedAt, vault: vault ?? null })) });
   const spaceId = typeof args?.spaceId === 'string' ? args.spaceId : '';
   const space = store.state.spaces.find((entry) => entry.id === spaceId);
   if (!space || !membership(auth.user.id, spaceId)) return toolResult({ error: 'You do not have access to that space.' }, true);
@@ -226,6 +317,12 @@ function callTool(auth, name, args) {
     const definitions = [
       ['works', ['title', 'abstract', 'citation']], ['ideas', ['label', 'statement']], ['themes', ['label', 'description']],
       ['gaps', ['text', 'description']], ['notes', ['title', 'content']], ['passages', ['text']],
+      ['persons', ['display_name', 'notes', 'biography']], ['character_profiles', ['species', 'gender', 'pronouns', 'appearance', 'personality', 'backstory']],
+      ['places', ['name', 'kind', 'notes']], ['place_profiles', ['appearance', 'atmosphere', 'history']],
+      ['world_groups', ['name', 'summary', 'description', 'notes']], ['world_scenes', ['title', 'summary', 'notes']],
+      ['world_scene_text', ['text']], ['world_articles', ['title', 'summary', 'body', 'aka', 'notes']],
+      ['world_threads', ['title', 'pitch', 'stakes', 'outcome']], ['world_rules', ['title', 'statement', 'cost', 'limits']],
+      ['world_questions', ['question']], ['world_secrets', ['title', 'content', 'notes']],
     ];
     const results = [];
     for (const [table, fields] of definitions) {
@@ -248,6 +345,96 @@ function callTool(auth, name, args) {
     const relations = rows(snapshot, 'edges').filter((entry) => String(entry.from_id) === id || String(entry.to_id) === id);
     return toolResult({ idea, relations });
   }
+  if (name.startsWith('nodus_world_')) {
+    const wrongVault = requireWorldSnapshot(snapshot);
+    if (wrongVault) return toolResult(wrongVault, true);
+  }
+  if (name === 'nodus_world_get_overview') {
+    const counts = Object.fromEntries(Object.entries(WORLD_ENTITIES).map(([kind, def]) => [kind, rows(snapshot, def.table).length]));
+    const calendar = {
+      settings: rows(snapshot, 'world_calendar')[0] ?? null,
+      eras: rows(snapshot, 'world_calendar_eras'),
+      months: rows(snapshot, 'world_calendar_months'),
+    };
+    const sceneText = rows(snapshot, 'world_scene_text');
+    return toolResult({
+      vault: snapshot.vault,
+      counts,
+      calendar,
+      manuscript: {
+        scenes: rows(snapshot, 'world_scenes').length,
+        words: sceneText.reduce((sum, row) => sum + (Number(row.word_count) || 0), 0),
+        chapters: rows(snapshot, 'world_chapter_breaks').length,
+        books: rows(snapshot, 'world_manuscript_starts').length,
+      },
+    });
+  }
+  if (name === 'nodus_world_search') {
+    const query = String(args.query ?? '').trim().toLowerCase();
+    const limit = Math.max(1, Math.min(100, Number(args.limit) || 30));
+    if (!query) return toolResult({ results: [] });
+    const definitions = [
+      ['character', 'persons', 'person_id', 'display_name', ['display_name', 'notes', 'biography']],
+      ['character-profile', 'character_profiles', 'person_id', 'species', ['species', 'gender', 'pronouns', 'appearance', 'personality', 'backstory']],
+      ['place', 'places', 'place_id', 'name', ['name', 'kind', 'notes']],
+      ['place-profile', 'place_profiles', 'place_id', 'place_id', ['appearance', 'atmosphere', 'history']],
+      ['group', 'world_groups', 'group_id', 'name', ['name', 'summary', 'description', 'notes']],
+      ['scene', 'world_scenes', 'scene_id', 'title', ['title', 'summary', 'notes']],
+      ['manuscript', 'world_scene_text', 'scene_id', 'scene_id', ['text']],
+      ['article', 'world_articles', 'article_id', 'title', ['title', 'summary', 'body', 'aka', 'notes']],
+      ['thread', 'world_threads', 'thread_id', 'title', ['title', 'pitch', 'stakes', 'outcome']],
+      ['rule', 'world_rules', 'rule_id', 'title', ['title', 'statement', 'cost', 'limits']],
+      ['question', 'world_questions', 'question_id', 'question', ['question']],
+      ['secret', 'world_secrets', 'secret_id', 'title', ['title', 'content', 'notes']],
+    ];
+    const results = [];
+    for (const [kind, table, idField, titleField, fields] of definitions) {
+      for (const row of rows(snapshot, table)) {
+        const text = fields.map((field) => row[field]).filter((value) => typeof value === 'string').join('\n');
+        if (text.toLowerCase().includes(query)) {
+          results.push({ kind, id: row[idField], title: row[titleField] ?? '', excerpt: text.slice(0, 800) });
+        }
+        if (results.length >= limit) return toolResult({ query: args.query, results, truncated: true });
+      }
+    }
+    return toolResult({ query: args.query, results, truncated: false });
+  }
+  if (name === 'nodus_world_list_entities') {
+    const kind = String(args.kind ?? '');
+    if (!WORLD_ENTITIES[kind]) return toolResult({ error: 'Unknown world entity kind.' }, true);
+    const query = String(args.query ?? '').trim().toLowerCase();
+    const limit = Math.max(1, Math.min(200, Number(args.limit) || 100));
+    const offset = Math.max(0, Number(args.offset) || 0);
+    const all = worldEntityRows(snapshot, kind).filter((row) => !query || JSON.stringify(row).toLowerCase().includes(query));
+    return toolResult({ kind, entities: all.slice(offset, offset + limit), total: all.length, limit, offset, hasMore: offset + limit < all.length });
+  }
+  if (name === 'nodus_world_get_entity') {
+    const detail = worldEntityDetail(snapshot, String(args.kind ?? ''), String(args.id ?? ''));
+    return detail ? toolResult(detail) : toolResult({ error: 'World entity not found.' }, true);
+  }
+  if (name === 'nodus_world_get_manuscript') {
+    const includeText = args.includeText === true;
+    const texts = new Map(rows(snapshot, 'world_scene_text').map((row) => [String(row.scene_id), row]));
+    const chapters = new Map(rows(snapshot, 'world_chapter_breaks').map((row) => [String(row.scene_id), row]));
+    const books = new Map(rows(snapshot, 'world_manuscript_starts').map((row) => [String(row.scene_id), row]));
+    const scenes = [...rows(snapshot, 'world_scenes')]
+      .sort((a, b) => (Number(a.narrative_order) || 0) - (Number(b.narrative_order) || 0))
+      .map((scene) => {
+        const manuscript = texts.get(String(scene.scene_id)) ?? null;
+        const text = typeof manuscript?.text === 'string' ? manuscript.text : null;
+        return {
+          ...scene,
+          manuscript: manuscript ? {
+            word_count: manuscript.word_count ?? 0,
+            updated_at: manuscript.updated_at ?? null,
+            ...(includeText ? { text } : { text_snippet: text ? text.slice(0, 800) : null }),
+          } : null,
+          chapter: chapters.get(String(scene.scene_id)) ?? null,
+          book: books.get(String(scene.scene_id)) ?? null,
+        };
+      });
+    return toolResult({ scenes, includeText });
+  }
   return toolResult({ error: 'Unknown tool.' }, true);
 }
 
@@ -261,7 +448,7 @@ async function handleMcp(req, res) {
   let protocolVersion = MCP_PROTOCOLS.has(req.headers['mcp-protocol-version']) ? req.headers['mcp-protocol-version'] : '2025-11-25';
   if (request.method === 'initialize') {
     protocolVersion = MCP_PROTOCOLS.has(request.params?.protocolVersion) ? request.params.protocolVersion : '2025-11-25';
-    result = { protocolVersion, capabilities: { tools: { listChanged: false } }, serverInfo: { name: 'nodus-server', version: '0.1.0', description: 'Read-only access to explicitly shared Nodus academic spaces.' }, instructions: 'Consult only spaces authorized for this user. Use nodus_list_spaces before querying a space. Shared data is read-only.' };
+    result = { protocolVersion, capabilities: { tools: { listChanged: false } }, serverInfo: { name: 'nodus-server', version: '0.1.0', description: 'Read-only access to explicitly shared Nodus vaults, including Worldbuilding spaces.' }, instructions: 'Consult only spaces authorized for this user. Use nodus_list_spaces before querying a space and inspect its vault type. Shared data is read-only; use nodus_world_* tools for Worldbuilding spaces.' };
   } else if (request.method === 'tools/list') result = { tools: TOOLS };
   else if (request.method === 'tools/call') result = callTool(auth, request.params?.name, request.params?.arguments ?? {});
   else return json(res, 200, { jsonrpc: '2.0', id: request.id ?? null, error: { code: -32601, message: 'Method not found' } });

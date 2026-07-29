@@ -101,7 +101,8 @@ if (!process.argv.includes('--electron-primary-sources-release-test')) {
   assert.match(sources.dossier, /aria-keyshortcuts="\+ - 0 R"/);
   assert.match(sources.dossier, /alternativeText/);
   assert.match(sources.archiveView, /<PlacePicker onPick=\{setPlace\}/);
-  assert.match(sources.archiveView, /placeRole: 'creation'/);
+  assert.match(sources.archiveView, /Lugar de procedencia/);
+  assert.doesNotMatch(sources.archiveView, /placeRole: 'creation'/);
   assert.match(sources.placePicker, /searchGazetteer/);
   assert.match(sources.toolkit, /TOOLKIT_TOOLS\.map/);
   assert.doesNotMatch(sources.app, /PrimarySourcesToolkitView/);
@@ -150,6 +151,7 @@ try {
   const archive = require(path.join(repoRoot, 'electron/db/archiveRepo.ts'));
   const workspaceRepo = require(path.join(repoRoot, 'electron/db/primarySourcesArchiveRepo.ts'));
   const derived = require(path.join(repoRoot, 'electron/db/primarySourceDerivedViewsRepo.ts'));
+  const { getArchiveDocType } = require(path.join(repoRoot, 'shared/archiveDocTypes.ts'));
   const db = getDb();
   assert.ok(SCHEMA_VERSION >= 118, 'the primary-sources migrations are part of the schema');
   vaults.setVaultType(vaults.getActiveVault().id, 'primary_sources');
@@ -182,6 +184,7 @@ try {
   assert.equal(db.prepare("SELECT COUNT(*) AS value FROM archive_entity_proposals WHERE source_engine='ai_confirmed'").get().value, 0);
   assert.equal(db.prepare("SELECT COUNT(*) AS value FROM places WHERE gazetteer_id LIKE 'geonames:%' AND place_id LIKE 'demo-ps-%'").get().value, 3);
   assert.ok(db.prepare("SELECT COUNT(*) AS value FROM archive_place_mentions WHERE item_id LIKE 'demo-ps-%' AND status='resolved'").get().value >= 10);
+  assert.equal(db.prepare("SELECT COUNT(*) AS value FROM archive_item_profiles WHERE item_id LIKE 'demo-ps-%' AND provenance_place_id IS NOT NULL").get().value, 10);
   assert.ok(db.prepare("SELECT COUNT(*) AS value FROM record_evidence WHERE target_kind='place' AND nodus_id LIKE 'demo-ps-%'").get().value >= 9);
   assert.ok(db.prepare("SELECT COUNT(*) AS value FROM archive_excerpts WHERE item_id LIKE 'demo-ps-%'").get().value >= 9);
   assert.ok(db.prepare("SELECT COUNT(*) AS value FROM archive_item_tags WHERE item_id LIKE 'demo-ps-%'").get().value >= 25);
@@ -200,12 +203,17 @@ try {
   const visibleDemoPoints = demoMap.points.filter((point) =>
     !point.hypothesis && point.latitude !== null && point.longitude !== null
   );
-  assert.ok(visibleDemoPoints.length >= 10, 'the demo map opens with resolved documentary points');
+  assert.equal(visibleDemoPoints.length, 10, 'the demo map has exactly one provenance point per source');
   assert.deepEqual(
     [...new Set(visibleDemoPoints.map((point) => point.normalizedName))].sort(),
     ['Carmona', 'Sevilla', 'Écija'].sort(),
   );
-  assert.ok(visibleDemoPoints.every((point) => point.sourceIds.length > 0));
+  assert.ok(visibleDemoPoints.every((point) =>
+    point.role === 'provenance'
+    && point.layer === 'provenance'
+    && point.mentionId === null
+    && point.sourceIds.length === 1
+  ));
   assert.ok(derived.getPrimarySourceTimelineWorkspace().events.filter((event) => !event.hypothesis).length >= 2);
 
   const map = db.prepare(
@@ -224,6 +232,9 @@ try {
   assert.equal(workspace.page.total, 10);
   assert.equal(workspace.page.hasMore, true);
   assert.ok(workspace.rows.every((row) => row.item.extractedText === null));
+  const catalogue = workspaceRepo.getPrimarySourceArchiveWorkspace('', 0, 200);
+  assert.ok(catalogue.rows.every((row) => getArchiveDocType(row.item.docType)), 'every demo document uses the shared Genealogy catalogue');
+  assert.ok(catalogue.rows.every((row) => Object.keys(row.item.metadata).length >= 4), 'every demo row shows type-specific cataloguing data');
   const filtered = workspaceRepo.getPrimarySourceArchiveWorkspace('FCA/COR', 0, 200);
   assert.equal(filtered.page.total, 3);
   assert.ok(filtered.rows.every((row) => row.unit.referenceCode.startsWith('FCA/COR')));
@@ -262,10 +273,9 @@ try {
       longitude: -5.6469,
       population: 28531,
     },
-    placeRole: 'creation',
   });
   const attachedPoint = derived.getPrimarySourceMapWorkspace().points.find((point) =>
-    point.sourceIds.includes(userItem.itemId) && point.role === 'creation'
+    point.sourceIds.includes(userItem.itemId) && point.role === 'provenance'
   );
   assert.ok(attachedPoint, 'a gazetteer place selected during ingest is materialized on the map');
   assert.equal(attachedPoint.hypothesis, false);

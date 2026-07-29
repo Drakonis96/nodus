@@ -496,6 +496,19 @@ test('Nodus Server pairs a desktop publisher and protects read-only MCP with OAu
       clientInfo: { name: 'server-test', version: '1.0.0' },
     });
     assert.equal(initialized.result.serverInfo.name, 'nodus-server');
+    assert.match(initialized.result.serverInfo.description, /Worldbuilding/);
+
+    const toolSurface = await mcp(origin, tokens.access_token, 'tools/list', {}, 10);
+    const remoteToolNames = new Set(toolSurface.result.tools.map((tool) => tool.name));
+    for (const toolName of [
+      'nodus_world_get_overview',
+      'nodus_world_search',
+      'nodus_world_list_entities',
+      'nodus_world_get_entity',
+      'nodus_world_get_manuscript',
+    ]) {
+      assert.ok(remoteToolNames.has(toolName), `${toolName} is advertised by Nodus Server`);
+    }
 
     const listed = await mcp(origin, tokens.access_token, 'tools/call', {
       name: 'nodus_list_spaces', arguments: {},
@@ -506,6 +519,84 @@ test('Nodus Server pairs a desktop publisher and protects read-only MCP with OAu
       name: 'nodus_search', arguments: { spaceId: sharedSpaceId, query: 'acción' },
     }, 3);
     assert.ok(searched.result.structuredContent.results.length >= 1);
+    const wrongVaultWorldTool = await mcp(origin, tokens.access_token, 'tools/call', {
+      name: 'nodus_world_get_overview', arguments: { spaceId: sharedSpaceId },
+    }, 9);
+    assert.equal(wrongVaultWorldTool.result.isError, true, 'Worldbuilding tools fail closed on an academic publication');
+
+    const worldSnapshot = {
+      format: 'nodus.server-snapshot',
+      formatVersion: 1,
+      generatedAt: new Date().toISOString(),
+      vault: { id: 'vault-world', name: 'Orthea', type: 'worldbuilding' },
+      tables: {
+        persons: [{ person_id: 'per-ilyra', display_name: 'Ilyra Venn', notes: 'Custodia del archivo.' }],
+        character_profiles: [{ person_id: 'per-ilyra', species: 'Humana', narrative_role: 'protagonist', backstory: 'Lee las mareas.' }],
+        places: [{ place_id: 'pl-nacar', name: 'Ciudad de Nácar', kind: 'city' }],
+        place_profiles: [{ place_id: 'pl-nacar', atmosphere: 'Bruma azul.' }],
+        world_groups: [{ group_id: 'grp-council', kind: 'faction', name: 'Consejo de Nácar' }],
+        character_affiliations: [{ affiliation_id: 'aff-1', person_id: 'per-ilyra', group_id: 'grp-council', rank: 'cartógrafa' }],
+        world_scenes: [{ scene_id: 'scn-gate', title: 'La puerta lunar', place_id: 'pl-nacar', narrative_order: 0, status: 'draft' }],
+        scene_characters: [{ id: 'cast-1', scene_id: 'scn-gate', person_id: 'per-ilyra', role: 'viewpoint' }],
+        world_scene_text: [{ scene_id: 'scn-gate', text: 'Ilyra abrió la puerta lunar y la marea respondió.', word_count: 9, updated_at: new Date().toISOString() }],
+        world_chapter_breaks: [{ scene_id: 'scn-gate', title: 'Las cartas de marea' }],
+        world_manuscript_starts: [{ scene_id: 'scn-gate', title: 'Libro de Nácar' }],
+        world_articles: [{ article_id: 'art-moon', title: 'La tercera luna', body: 'Abre rutas imposibles.', category: 'concept' }],
+        world_links: [],
+        world_threads: [{ thread_id: 'thr-blockade', kind: 'conflict', title: 'El bloqueo del estuario', status: 'open' }],
+        thread_parties: [],
+        world_beats: [],
+        world_rules: [{ rule_id: 'rul-memory', title: 'Toda puerta exige una memoria', statement: 'Abrirla consume un recuerdo.' }],
+        world_questions: [{ question_id: 'q-memory', question: '¿Qué recuerdo entrega Ilyra?', status: 'open', anchor_kind: 'scene', anchor_id: 'scn-gate' }],
+        world_question_options: [],
+        world_secrets: [{ secret_id: 'sec-lie', title: 'El archivo miente', content: 'Las cartas fueron reescritas.', owner_person_id: 'per-ilyra' }],
+        secret_knowers: [{ id: 'kn-1', secret_id: 'sec-lie', person_id: 'per-ilyra' }],
+        world_maps: [],
+        map_layers: [],
+        map_markers: [],
+        map_travel_modes: [],
+        events: [],
+        event_participants: [],
+        event_world_dates: [],
+        world_calendar: [{ id: 1, name: 'Calendario de Mareas' }],
+        world_calendar_eras: [],
+        world_calendar_months: [],
+      },
+    };
+    const worldPublished = await fetch(`${origin}/api/v1/spaces/${sharedSpaceId}/snapshot`, {
+      method: 'PUT',
+      headers: {
+        authorization: `Bearer ${paired.accessToken}`,
+        'content-type': 'application/vnd.nodus.snapshot+json',
+        'content-encoding': 'gzip',
+        'x-nodus-revision': 'revision-world-1',
+      },
+      body: gzipSync(JSON.stringify(worldSnapshot)),
+    });
+    assert.equal(worldPublished.status, 200);
+
+    const worldOverview = await mcp(origin, tokens.access_token, 'tools/call', {
+      name: 'nodus_world_get_overview', arguments: { spaceId: sharedSpaceId },
+    }, 11);
+    assert.equal(worldOverview.result.structuredContent.counts.character, 1);
+    assert.equal(worldOverview.result.structuredContent.manuscript.words, 9);
+    const worldSearch = await mcp(origin, tokens.access_token, 'tools/call', {
+      name: 'nodus_world_search', arguments: { spaceId: sharedSpaceId, query: 'puerta lunar' },
+    }, 12);
+    assert.ok(worldSearch.result.structuredContent.results.some((result) => result.id === 'scn-gate'));
+    const worldCharacters = await mcp(origin, tokens.access_token, 'tools/call', {
+      name: 'nodus_world_list_entities', arguments: { spaceId: sharedSpaceId, kind: 'character' },
+    }, 13);
+    assert.equal(worldCharacters.result.structuredContent.entities[0].title, 'Ilyra Venn');
+    const worldCharacter = await mcp(origin, tokens.access_token, 'tools/call', {
+      name: 'nodus_world_get_entity', arguments: { spaceId: sharedSpaceId, kind: 'character', id: 'per-ilyra' },
+    }, 14);
+    assert.equal(worldCharacter.result.structuredContent.related.profile.backstory, 'Lee las mareas.');
+    assert.equal(worldCharacter.result.structuredContent.related.ownedSecrets[0].secret_id, 'sec-lie');
+    const worldManuscript = await mcp(origin, tokens.access_token, 'tools/call', {
+      name: 'nodus_world_get_manuscript', arguments: { spaceId: sharedSpaceId, includeText: true },
+    }, 15);
+    assert.match(worldManuscript.result.structuredContent.scenes[0].manuscript.text, /marea respondió/);
 
     const denied = await mcp(origin, tokens.access_token, 'tools/call', {
       name: 'nodus_get_space_summary', arguments: { spaceId: privateSpaceId },

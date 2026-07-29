@@ -21,14 +21,29 @@ if (!process.argv.includes('--electron-primary-sources-archive-test')) {
     "type DisplayMode = 'table' | 'gallery' | 'hierarchy'",
     "'Ubicación archivística'",
     "'Colecciones de trabajo'",
+    'ARCHIVE_SIDEBAR_SESSION_KEY',
+    'primary-sources-archive-sidebar',
+    'primary-sources-archive-sidebar-toggle',
+    "'Ocultar panel lateral'",
+    "'Mostrar panel lateral'",
     'BulkEditModal',
     'previewPrimarySourceBulkEdit',
     'PrimarySourceDossierView',
+    'primary-source-dossier-modal',
+    'primary-sources-archive-grid',
+    'ArchiveTablePreview',
+    'DocumentIconPicker',
+    'DocTypeSelect',
     'UnitModal',
     'IngestModal',
   ]) {
     assert.ok(view.includes(contract), `Archive workspace contains ${contract}`);
   }
+  assert.doesNotMatch(
+    view,
+    /if\s*\(editing\)\s*return\s*<PrimarySourceDossierView/,
+    'opening a document keeps the Archive mounted behind the modal'
+  );
   assert.match(app, /isPrimarySources[\s\S]*?<PrimarySourcesArchiveView/);
   for (const method of [
     'getPrimarySourcesWorkspace',
@@ -43,6 +58,7 @@ if (!process.argv.includes('--electron-primary-sources-archive-test')) {
   assert.match(ipc, /primarySources:ingest/);
   assert.match(ipc, /ingestArchiveFile/);
   assert.match(ipc, /ensurePrimarySourceProjection/);
+  assert.match(ipc, /metadata:\s*input\.documentMetadata/);
 
   const outDir = await mkdtemp(path.join(os.tmpdir(), 'nodus-primary-sources-archive-i18n-'));
   try {
@@ -142,10 +158,12 @@ try {
     accessStatus: 'restricted',
     sensitivity: 'personal',
     templateId: 'builtin_letter',
+    documentIcon: 'chat',
   });
   assert.equal(projected.unit.parentUnitId, series.unitId);
   assert.equal(projected.unit.referenceCode, 'AC/FA/1/7');
   assert.equal(projected.profile.captureSessionId, session.sessionId);
+  assert.equal(projected.profile.metadata.documentIcon, 'chat');
   assert.deepEqual(projected.item.folderIds, [collection.folderId]);
   assert.equal(projected.masterCount, 1);
   assert.equal(projected.textVersionCount, 1);
@@ -163,6 +181,15 @@ try {
     getDb().prepare('SELECT COUNT(*) AS count FROM archive_item_units WHERE item_id=?').get(item.itemId).count,
     1
   );
+
+  const classified = archive.updateItem(item.itemId, {
+    docType: 'letter',
+    metadata: { remitente: 'Archivo de la Ciudad' },
+  });
+  assert.equal(classified.docType, 'letter');
+  assert.equal(classified.metadata.remitente, 'Archivo de la Ciudad');
+  const classifiedRow = primaryArchive.getPrimarySourceArchiveRow(item.itemId);
+  assert.equal(classifiedRow.profile.metadata.documentIcon, 'chat', 'the custom icon survives catalogue edits');
 
   const workspace = primaryArchive.getPrimarySourceArchiveWorkspace('epidemia');
   assert.equal(workspace.rows.length, 1, 'metadata search finds the archival unit title');

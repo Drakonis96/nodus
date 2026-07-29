@@ -126,7 +126,7 @@ test('demo locale is not reduced to an English/Spanish binary', async () => {
   assert.match(narrative, /type WorldbuildingDemoLocalized/);
 });
 
-test('all Worldbuilding AI entry points explicitly request the active interface language', async () => {
+test('all Worldbuilding AI entry points use a native operation prompt in the selected prompt language', async () => {
   for (const relative of [
     'electron/ai/worldArticleDraft.ts',
     'electron/ai/worldChat.ts',
@@ -135,12 +135,13 @@ test('all Worldbuilding AI entry points explicitly request the active interface 
     'electron/ai/worldQuestionOptions.ts',
     'electron/ai/worldRules.ts',
     'electron/ai/characterInterview.ts',
+    'electron/ai/characterBiography.ts',
   ]) {
     const source = await readFile(path.join(repoRoot, relative), 'utf8');
-    assert.match(source, /withWorldPromptLanguage\(/, `${relative} misses the language contract`);
-    assert.match(source, /settings\.uiLanguage/, `${relative} ignores the selected language`);
+    assert.match(source, /world(?:OperationSystemPrompt|CharacterInterviewPrompt)\(/, `${relative} misses the native prompt contract`);
+    assert.match(source, /settings\.promptLanguage/, `${relative} ignores the selected prompt language`);
   }
-  const helper = await readFile(path.join(repoRoot, 'shared/worldPromptLanguage.ts'), 'utf8');
+  const helper = await readFile(path.join(repoRoot, 'shared/worldOperationPrompts.ts'), 'utf8');
   for (const language of languages) {
     assert.match(helper, new RegExp(`['"]?${language.replace('-', '\\-')}['"]?\\s*:`));
   }

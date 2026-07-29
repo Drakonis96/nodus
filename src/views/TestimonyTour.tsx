@@ -81,6 +81,7 @@ export function TestimonyTour({ onClose, onNavigate }: { onClose: () => void; on
       steps={STEPS}
       label="Tutorial de testimonios"
       vaultType="testimonios"
+      showUnavailableVideo
       onClose={onClose}
       onNavigate={(v) => onNavigate(v as View)}
     />

@@ -39,7 +39,7 @@ export function InterviewTable({
   if (rows.length === 0) {
     return (
       <div className="grid place-items-center rounded-xl border border-dashed border-neutral-300 p-10 text-center text-sm text-neutral-500 dark:border-neutral-800">
-        {t(emptyLabel)}
+        {emptyLabel}
       </div>
     );
   }

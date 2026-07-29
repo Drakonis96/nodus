@@ -326,10 +326,9 @@ export function seedDatabasesDemoData(): boolean {
       ]), now, now);
   });
   tx();
-  // Flag demo mode (so the exit-demo banner shows and the data is never mistaken
-  // for a real library) and re-arm the guided databases tour, mirroring the
-  // academic and genealogy demos.
-  updateSettings({ demoMode: true, databasesTourComplete: false });
+  // Flag demo mode so the exit-demo banner shows and the data is never mistaken for a
+  // real library. Do not touch tutorial state: demos and onboarding are independent.
+  updateSettings({ demoMode: true });
   return true;
 }
 

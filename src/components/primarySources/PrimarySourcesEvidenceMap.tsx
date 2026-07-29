@@ -5,6 +5,7 @@ import type { PrimarySourceMapPoint } from '@shared/primarySourcesTypes';
 import { t } from '../../i18n';
 
 const ROLE_COLORS: Record<string, string> = {
+  provenance: '#4f46e5',
   creation: '#8b5cf6',
   mentioned: '#6366f1',
   event: '#ef4444',
@@ -129,8 +130,8 @@ export function PrimarySourcesEvidenceMap({
       );
       const rows = group.map((point) => (
         `<button data-source-map-point="${esc(point.pointId)}" style="display:block;width:100%;border:0;background:transparent;text-align:left;padding:5px 2px;cursor:pointer;color:${light ? '#18181b' : '#f4f4f5'}">`
-        + `<b>${esc(point.originalLabel)}</b><br>`
-        + `<span style="font-size:10px;color:${light ? '#71717a' : '#a1a1aa'}">${esc(t(point.role))} · ${point.evidence.length} ${esc(t('evidencias'))}</span></button>`
+        + `<b>${esc(point.sourceTitle ?? point.originalLabel)}</b><br>`
+        + `<span style="font-size:10px;color:${light ? '#71717a' : '#a1a1aa'}">${esc(point.normalizedName)}</span></button>`
       )).join('');
       marker.bindPopup(`<div style="min-width:190px">${rows}</div>`, {
         className: light ? 'pm-popup pm-popup-light' : 'pm-popup pm-popup-dark',
@@ -175,7 +176,7 @@ export function PrimarySourcesEvidenceMap({
       <div ref={containerRef} className={`h-full w-full ${light ? '' : 'pm-dark'}`} />
       {geocoded.length === 0 && (
         <div className="pointer-events-none absolute inset-0 z-[500] flex items-center justify-center bg-white/85 p-8 text-center text-sm text-neutral-600 dark:bg-neutral-950/85 dark:text-neutral-300">
-          {t('No hay coordenadas aceptadas para los filtros actuales. Resuelve un topónimo desde la tabla.')}
+          {t('No hay fuentes con un lugar de procedencia georreferenciado para los filtros actuales.')}
         </div>
       )}
     </div>

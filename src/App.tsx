@@ -39,6 +39,8 @@ import { TestimonyTour } from './views/TestimonyTour';
 import { StudyTour } from './views/StudyTour';
 import { TeachingTour } from './views/TeachingTour';
 import { PrimarySourcesTour } from './views/PrimarySourcesTour';
+import { ProsopographyTour } from './views/ProsopographyTour';
+import { WorldbuildingTour } from './views/WorldbuildingTour';
 import { BASICS_TUTORIAL_VERSION, BasicsTutorial } from './views/BasicsTutorial';
 import { FIRST_VAULT_VERSION, FirstVaultSetup } from './views/FirstVaultSetup';
 import { preferencesForTutorialLanguage } from '@shared/tutorialPreferences';
@@ -1041,14 +1043,14 @@ export function App() {
     if (isEstudio) {
       actions.unshift({ id: 'act:reading-focus', label: settings?.readingFocusMode ? t('Salir del modo lectura') : t('Entrar en modo lectura'), section: t('Acciones'), icon: 'book', keywords: 'lectura enfoque focus estudio', run: () => void window.nodus.updateSettings({ readingFocusMode: !settings?.readingFocusMode }).then(reloadSettings) });
     }
-    if (!isPrimarySources && !isGenealogy && !isDatabases && !isEstudio && !isDocencia && !isWorldbuilding && !isTestimonios) {
+    if (!isPrimarySources && !isGenealogy && !isDatabases && !isEstudio && !isDocencia && !isWorldbuilding && !isProsopography && !isTestimonios) {
       actions.unshift(
         { id: 'act:sync', label: t('Actualizar (sincronizar Zotero)'), section: t('Acciones'), icon: 'sync', keywords: 'sync sincronizar', run: () => void onSync() },
         { id: 'act:collections', label: t('Colecciones'), section: t('Acciones'), icon: 'folder', keywords: 'collections zotero', run: () => setCollectionsOpen(true) },
       );
     }
     return [...navCommands, ...actions];
-  }, [settings?.uiLanguage, settings?.reduceMotion, settings?.readingFocusMode, activeVault?.type, isPrimarySources, isGenealogy, isDatabases, isEstudio, isDocencia, isWorldbuilding, isTestimonios, isDark, onSync, openAssistant, reloadSettings]);
+  }, [settings?.uiLanguage, settings?.reduceMotion, settings?.readingFocusMode, activeVault?.type, isPrimarySources, isGenealogy, isDatabases, isEstudio, isDocencia, isWorldbuilding, isProsopography, isTestimonios, isDark, onSync, openAssistant, reloadSettings]);
 
   if (loadError) {
     return (
@@ -1170,7 +1172,7 @@ export function App() {
           <img
             data-testid="nodus-logo"
             data-vault-logo={isPrimarySources ? 'primary_sources' : isGenealogy ? 'genealogy' : isDatabases ? 'databases' : isEstudio ? 'estudio' : isDocencia ? 'docencia' : isWorldbuilding ? 'worldbuilding' : isTestimonios ? 'testimonios' : isProsopography ? 'prosopography' : 'academic'}
-            src={isGenealogy ? nodusLogoGold : isDatabases ? nodusLogoCrimson : isEstudio ? nodusLogoTeal : isDocencia ? nodusLogoOrange : isWorldbuilding ? nodusLogoViolet : nodusLogo}
+            src={isGenealogy ? nodusLogoGold : isDatabases ? nodusLogoCrimson : isEstudio ? nodusLogoTeal : isDocencia ? nodusLogoOrange : isWorldbuilding ? nodusLogoViolet : isTestimonios ? nodusLogoCyan : nodusLogo}
             alt=""
             className="h-7 w-7"
           />
@@ -1191,11 +1193,12 @@ export function App() {
             data-vault-trigger
             data-testid="header-vault-badge"
             data-badge-fits={vaultBadgePlacement ? String(vaultBadgePlacement.fits) : undefined}
+            aria-expanded={Boolean(vaultAnchor)}
             style={{
               left: vaultBadgePlacement ? `${vaultBadgePlacement.left}px` : '50%',
               visibility: vaultBadgePlacement?.fits ? 'visible' : 'hidden',
             }}
-            className="absolute top-1/2 hidden -translate-y-1/2 items-center gap-1.5 rounded-full border border-indigo-700/60 bg-indigo-950/30 px-3 py-0.5 text-xs font-semibold uppercase tracking-wide text-indigo-200 transition-colors hover:border-indigo-500 hover:bg-indigo-900/40 xl:inline-flex"
+            className="header-vault-badge absolute top-1/2 hidden -translate-y-1/2 items-center gap-1.5 rounded-full border border-indigo-700/60 bg-indigo-950/30 px-3 py-0.5 text-xs font-semibold uppercase tracking-wide text-indigo-200 transition-colors hover:border-indigo-500 hover:bg-indigo-900/40 xl:inline-flex"
             title={t('Bóveda activa')}
             onClick={(e) => toggleVaults(e.currentTarget)}
           >
@@ -1253,7 +1256,7 @@ export function App() {
           {/* Colecciones y Actualizar dependen de Zotero → solo en bóvedas
               académicas; genealogía, bases de datos, estudio y docencia no
               sincronizan con Zotero. */}
-          {!isPrimarySources && !isGenealogy && !isDatabases && !isEstudio && !isDocencia && !isWorldbuilding && !isTestimonios && (
+          {!isPrimarySources && !isGenealogy && !isDatabases && !isEstudio && !isDocencia && !isWorldbuilding && !isProsopography && !isTestimonios && (
             <HeaderAction
               dataTour="collections"
               icon="folder"
@@ -1267,7 +1270,7 @@ export function App() {
             title={t('Enviar una propuesta o reporte a GitHub')}
             onClick={() => setFeedbackOpen(true)}
           />
-          {!isGenealogy && !isDatabases && !isEstudio && !isDocencia && !isWorldbuilding && !isTestimonios && (
+          {!isGenealogy && !isDatabases && !isEstudio && !isDocencia && !isWorldbuilding && !isProsopography && !isTestimonios && (
             <HeaderAction
               dataTour="sync"
               icon="refresh"
@@ -1975,8 +1978,28 @@ export function App() {
       {roadmapTopic && <RoadmapFeedbackModal topic={roadmapTopic} onClose={() => setRoadmapTopic(null)} />}
       {roadmapOpen && <RoadmapModal onClose={() => setRoadmapOpen(false)} />}
 
-      {!isPreviewVault && settings.onboardingComplete && settings.basicsTutorialVersion > 0 && !settings.tourComplete && !isPrimarySources && !isGenealogy && !isDatabases && !isEstudio && !isDocencia && !isWorldbuilding && !isTestimonios && (
+      {!isPreviewVault && settings.onboardingComplete && settings.basicsTutorialVersion > 0 && !settings.tourComplete && !isPrimarySources && !isGenealogy && !isDatabases && !isEstudio && !isDocencia && !isWorldbuilding && !isProsopography && !isTestimonios && (
         <Tour
+          onNavigate={setView}
+          onClose={async () => {
+            await window.nodus.updateSettings({ tourComplete: true });
+            void reloadSettings();
+          }}
+        />
+      )}
+
+      {settings.onboardingComplete && settings.basicsTutorialVersion > 0 && isProsopography && !settings.tourComplete && (
+        <ProsopographyTour
+          onNavigate={setView}
+          onClose={async () => {
+            await window.nodus.updateSettings({ tourComplete: true });
+            void reloadSettings();
+          }}
+        />
+      )}
+
+      {settings.onboardingComplete && settings.basicsTutorialVersion > 0 && isWorldbuilding && !settings.tourComplete && (
+        <WorldbuildingTour
           onNavigate={setView}
           onClose={async () => {
             await window.nodus.updateSettings({ tourComplete: true });
@@ -2015,7 +2038,7 @@ export function App() {
         />
       )}
 
-      {settings.onboardingComplete && settings.basicsTutorialVersion > 0 && isTestimonios && settings.demoMode && !settings.testimonyTourComplete && (
+      {settings.onboardingComplete && settings.basicsTutorialVersion > 0 && isTestimonios && !settings.testimonyTourComplete && (
         <TestimonyTour
           onNavigate={setView}
           onClose={async () => {
@@ -2076,12 +2099,12 @@ export function App() {
       {!isPreviewVault && settings.onboardingComplete &&
         settings.basicsTutorialVersion > 0 &&
         !recoveryStatus?.needsSetup &&
-        (isPrimarySources || isGenealogy || isDatabases || isEstudio || isDocencia || settings.tourComplete) &&
+        (isPrimarySources || isGenealogy || isDatabases || isTestimonios || isEstudio || isDocencia || settings.tourComplete) &&
         settings.advancedTourComplete &&
         (!isPrimarySources || settings.primarySourcesTourComplete) &&
         (!isGenealogy || settings.genealogyTourComplete) &&
         (!isDatabases || settings.databasesTourComplete) &&
-        (!isTestimonios || !settings.demoMode || settings.testimonyTourComplete) &&
+        (!isTestimonios || settings.testimonyTourComplete) &&
         (!isEstudio || settings.studyTourComplete) &&
         (!isDocencia || settings.docenciaTourComplete) && (
           <WhatsNewModal uiLanguage={settings.uiLanguage} onSettled={() => setWhatsNewSettled(true)} />

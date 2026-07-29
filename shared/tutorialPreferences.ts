@@ -10,6 +10,7 @@ const PROMPT_LANGUAGE_BY_TUTORIAL: Partial<Record<TutorialLanguage, PromptLangua
   de: 'de',
   pt: 'pt',
   'pt-BR': 'pt-BR',
+  it: 'it',
 };
 
 /** The tutorial speaks more languages than the interface does. Pick the UI in the

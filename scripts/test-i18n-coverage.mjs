@@ -121,9 +121,22 @@ const INDIRECT_KEY_SOURCES = [
   // Convert view.
   { file: 'shared/toolkitTypes.ts', pattern: /\b(?:label|description|placeholder):\s*(["'])((?:\\.|(?!\1).)*?)\1/g },
   // Tour steps are plain object literals fed through t() by the tour engine.
-  ...['Tour', 'AdvancedTour', 'StudyTour', 'GenealogyTour', 'DatabasesTour', 'TeachingTour', 'PrimarySourcesTour', 'TestimonyTour'].map((name) => ({
+  ...['Tour', 'AdvancedTour', 'StudyTour', 'GenealogyTour', 'DatabasesTour', 'TeachingTour', 'PrimarySourcesTour', 'TestimonyTour', 'ProsopographyTour', 'WorldbuildingTour'].map((name) => ({
     file: `src/views/${name}.tsx`,
     pattern: /(?:title|body|label):\s*(["'])((?:\\.|(?!\1).)*?)\1/g,
+  })),
+  // Testimony field and participant-picker labels are Spanish keys passed as JSX
+  // props and translated inside the reusable component.
+  ...[
+    'src/components/testimonies/InterviewAgreement.tsx',
+    'src/components/testimonies/InterviewOverview.tsx',
+    'src/components/testimonies/InterviewSessions.tsx',
+    'src/components/testimonies/NewInterviewModal.tsx',
+    'src/views/TestimonyInterviewsView.tsx',
+    'src/views/TestimonyParticipantsView.tsx',
+  ].map((file) => ({
+    file,
+    pattern: /\b(?:label|hint)=\s*(["'])((?:\\.|(?!\1).)*?)\1/g,
   })),
   // The chat's copy table: one component serves the study and the teaching vault, and
   // the strings that address the reader differ between them, so they reach t() as
@@ -563,13 +576,15 @@ test('issue #12 examples pass through localization at their render boundaries', 
 test('two-language compatibility paths choose English for every non-Spanish UI locale', () => {
   const files = [
     ['electron/copilot/server.ts', /uiLanguage === 'es' \? 'es' : 'en'/],
-    ['electron/ai/nodiChat.ts', /uiLanguage === 'es' \? 'Spanish' : 'English'/],
     ['electron/ai/argumentMap.ts', /uiLanguage === 'es' \? 'es' : 'en'/],
     ['electron/ipc.ts', /const es = language === 'es'/],
   ];
   for (const [file, expected] of files) {
     assert.match(fs.readFileSync(path.join(repoRoot, file), 'utf8'), expected, `${file} does not fall back to English`);
   }
+  const nodi = fs.readFileSync(path.join(repoRoot, 'electron/ai/nodiChat.ts'), 'utf8');
+  assert.match(nodi, /const RESPONSE_LANGUAGE/);
+  assert.match(nodi, /RESPONSE_LANGUAGE\[settings\.uiLanguage\] \?\? 'English'/);
 });
 
 test('the two Portuguese variants are really different', () => {

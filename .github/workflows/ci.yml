@@ -48,6 +48,8 @@ jobs:
         run: npm run lint
 
       - name: Build (includes typecheck)
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
         run: npm run build
 
       - name: Unit and integration tests

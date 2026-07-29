@@ -81,7 +81,8 @@ test('the vault picker derives selectable modes from the canonical registry', as
   assert.match(picker, /VAULT_TYPES\.filter\(\(type\) => type\.available\)/);
   assert.match(picker, /const CREATE_VAULT_TYPES: VaultType\[\] = \[\s*'academic', 'primary_sources', 'testimonios',\s*'databases', 'docencia', 'estudio',\s*'genealogy', 'prosopography', 'worldbuilding',\s*\]/s);
   assert.doesNotMatch(picker, /COMING_SOON_VAULT_TYPES[^\n]*estudio/);
-  assert.match(picker, /type === 'primary_sources' \|\| type === 'worldbuilding' \|\| type === 'testimonios'\) return 'alpha'/);
+  assert.match(picker, /type === 'primary_sources' \|\| type === 'prosopography' \|\| type === 'testimonios'\) return 'pre-alpha'/);
+  assert.match(picker, /type === 'worldbuilding'\) return 'alpha'/);
   assert.match(picker, /type === 'estudio' \|\| type === 'genealogy' \|\| type === 'databases' \|\| type === 'docencia'\) return 'beta'/);
   assert.doesNotMatch(picker, /type === 'primary_sources'[^\\n]*return 'beta'/);
   assert.doesNotMatch(picker, /type === '(?:estudio|genealogy)'\) return '(?:pre-alpha|alpha)'/);
@@ -195,10 +196,10 @@ test('the characters section belongs to worldbuilding alone', () => {
 test('the worldbuilding prompt pack makes the author the source of truth', () => {
   const pack = vt.vaultTypePromptPack('worldbuilding');
   assert.match(pack, /WORLDBUILDING/);
-  assert.match(pack, /AUTOR ES LA FUENTE DE VERDAD/);
+  assert.match(pack, /autor es la fuente de verdad/i);
   // The three instructions whose absence produced unusable output in the other vaults:
   // no invention, verbatim pronouns, and hands off an invented calendar.
-  assert.match(pack, /No introduzcas hechos/);
+  assert.match(pack, /no introduzcas hechos/i);
   assert.match(pack, /pronombres/);
   assert.match(pack, /calendario/);
 });
@@ -267,8 +268,8 @@ test('primary_sources uses a dedicated documentary shell and keeps optional auth
     assert.ok(!hidden.includes(kept), `${kept} stays visible in primary_sources`);
   }
   assert.match(vt.vaultTypePromptPack('primary_sources'), /FUENTES PRIMARIAS/);
-  assert.match(vt.vaultTypePromptPack('primary_sources'), /TRANSCRIPCIÓN, OBSERVACIÓN e INFERENCIA/);
-  assert.match(vt.vaultTypePromptPack('primary_sources'), /PROPUESTA pendiente de revisión/);
+  assert.match(vt.vaultTypePromptPack('primary_sources'), /transcripción, observación e inferencia/i);
+  assert.match(vt.vaultTypePromptPack('primary_sources'), /propuesta pendiente de revisión/i);
 });
 
 test('academic shows the full sidebar; estudio uses its dedicated learning workspace', () => {

@@ -51,12 +51,12 @@ test('the published tutorials keep their ids, shelves and vault mapping', () => 
   assert.equal(catalogue.TUTORIAL_INTRO_VIDEO_ID, 'essentials');
   assert.equal(catalogue.tutorialVideo(catalogue.TUTORIAL_INTRO_VIDEO_ID).youtubeId, 'QqSY1_DeDRM');
 
-  // Four vault tours can now be replaced by a video; the rest must keep their
-  // two-option opening step until their own video exists.
+  // Four vault tours can now be replaced by a video. The remaining dedicated tours
+  // still expose the route as a disabled "coming soon" placeholder.
   for (const [type, id] of [['academic', 'academic'], ['genealogy', 'genealogy'], ['databases', 'databases'], ['docencia', 'teaching']]) {
     assert.equal(catalogue.tutorialVideoForVault(type).id, id, `${type} is covered by the ${id} video`);
   }
-  for (const type of ['estudio', 'primary_sources', 'worldbuilding', 'testimonios']) {
+  for (const type of ['estudio', 'primary_sources', 'prosopography', 'worldbuilding', 'testimonios']) {
     assert.equal(catalogue.tutorialVideoForVault(type), undefined, `${type} has no video yet`);
   }
   assert.equal(catalogue.tutorialVideoForVault(undefined), undefined);
@@ -355,7 +355,11 @@ test('the announcement speaks every interface language', async () => {
 });
 
 test('a vault tour with a video offers three ways in', async () => {
-  const [engine, tour] = await Promise.all([read('src/views/tourEngine.tsx'), read('src/views/Tour.tsx')]);
+  const [engine, tour, app] = await Promise.all([
+    read('src/views/tourEngine.tsx'),
+    read('src/views/Tour.tsx'),
+    read('src/App.tsx'),
+  ]);
   assert.match(engine, /vaultType\?: VaultType/);
   assert.match(engine, /data-testid="tour-watch-video"/);
   assert.match(engine, /tutorialVideoCopy\(getActiveLang\(\)\)\.tourVideo/);
@@ -372,24 +376,39 @@ test('a vault tour with a video offers three ways in', async () => {
   assert.match(engine, /const isInvitation = isFirst && !started/);
   assert.match(engine, /if \(isInvitation\) return;/);
   assert.match(engine, /showUnavailableVideo\?: boolean/);
+  assert.match(engine, /showUnavailableVideo = true/);
   assert.match(engine, /disabled=\{!video\}/);
   assert.match(engine, /t\('Próximamente'\)/);
   assert.match(engine, /className=\{`w-full \$\{video \?/);
   // Escape must reach the player, not dismiss the tour behind it.
   assert.match(engine, /if \(watchingVideo\) return;/);
   assert.match(tour, /vaultType="academic"/);
-  // Every vault tour declares its type, so each gains the option the day its own video
-  // is published — without a release and without touching the engine. Four of them now
-  // have one, which is what makes "you'll see each vault's tutorial when you create it"
-  // a true statement rather than a promise.
+  // Every dedicated vault tour declares its type, so each gains the option the day its
+  // own video is published — without a release and without touching the engine.
   for (const [file, type] of [
     ['src/views/StudyTour.tsx', 'estudio'],
     ['src/views/GenealogyTour.tsx', 'genealogy'],
     ['src/views/DatabasesTour.tsx', 'databases'],
     ['src/views/TeachingTour.tsx', 'docencia'],
+    ['src/views/PrimarySourcesTour.tsx', 'primary_sources'],
+    ['src/views/ProsopographyTour.tsx', 'prosopography'],
+    ['src/views/WorldbuildingTour.tsx', 'worldbuilding'],
+    ['src/views/TestimonyTour.tsx', 'testimonios'],
   ]) {
     assert.match(await read(file), new RegExp(`vaultType="${type}"`), `${file} declares its vault type`);
   }
+  for (const file of [
+    'src/views/PrimarySourcesTour.tsx',
+    'src/views/ProsopographyTour.tsx',
+    'src/views/WorldbuildingTour.tsx',
+    'src/views/TestimonyTour.tsx',
+    'src/views/StudyTour.tsx',
+  ]) {
+    assert.match(await read(file), /showUnavailableVideo/, `${file} keeps the future video button visible`);
+  }
+  assert.match(app, /<ProsopographyTour/);
+  assert.match(app, /<WorldbuildingTour/);
+  assert.match(app, /!isWorldbuilding && !isProsopography && !isTestimonios/);
   for (const type of ['academic', 'genealogy', 'databases', 'docencia']) {
     assert.ok(catalogue.tutorialVideoForVault(type), `the ${type} tour has a video to offer`);
   }

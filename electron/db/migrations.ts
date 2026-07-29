@@ -10,7 +10,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 120;
+export const SCHEMA_VERSION = 121;
 
 export const migrations: Migration[] = [
   {
@@ -6170,6 +6170,35 @@ export const migrations: Migration[] = [
       );
       CREATE INDEX idx_testimony_embeddings_interview ON testimony_segment_embeddings(interview_id);
       CREATE INDEX idx_testimony_embeddings_transcript ON testimony_segment_embeddings(transcript_id);
+    `,
+  },
+  {
+    version: 121,
+    up: /* sql */ `
+      -- El lugar de procedencia es un dato descriptivo de la fuente, no una mención
+      -- encontrada dentro de su texto. La separación impide que el mapa documental
+      -- convierta cualquier ciudad citada en el origen del documento.
+      ALTER TABLE archive_item_profiles
+        ADD COLUMN provenance_place_id TEXT REFERENCES places(place_id) ON DELETE SET NULL;
+
+      -- Conserva la intención de las importaciones anteriores: cuando había un lugar
+      -- marcado explícitamente como creación, se promociona a procedencia canónica.
+      UPDATE archive_item_profiles
+         SET provenance_place_id = (
+           SELECT mention.place_id
+             FROM archive_place_mentions mention
+            WHERE mention.item_id = archive_item_profiles.item_id
+              AND mention.role = 'creation'
+              AND mention.place_id IS NOT NULL
+            ORDER BY CASE mention.status WHEN 'resolved' THEN 0 ELSE 1 END,
+                     mention.created_at,
+                     mention.mention_id
+            LIMIT 1
+         )
+       WHERE provenance_place_id IS NULL;
+
+      CREATE INDEX idx_archive_item_profiles_provenance_place
+        ON archive_item_profiles(provenance_place_id);
     `,
   },
 ];

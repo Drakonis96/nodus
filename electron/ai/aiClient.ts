@@ -229,6 +229,7 @@ const OUTPUT_LANGUAGE_NAME: Record<Exclude<PromptLanguage, 'es'>, string> = {
   de: 'ALEMÁN (Deutsch)',
   pt: 'PORTUGUÉS DE PORTUGAL (português europeu)',
   'pt-BR': 'PORTUGUÉS DE BRASIL (português brasileiro)',
+  it: 'ITALIANO (Italiano)',
 };
 
 function outputLanguageDirective(lang: Exclude<PromptLanguage, 'es'>): string {
@@ -257,7 +258,7 @@ export function withPromptLanguage<T extends { system: string }>(opts: T): T {
 export function withVaultTypeContext<T extends { system: string }>(opts: T): T {
   let pack = '';
   try {
-    pack = vaultTypePromptPack(getActiveVault().type);
+    pack = vaultTypePromptPack(getActiveVault().type, getSettings().promptLanguage ?? 'es');
   } catch {
     pack = '';
   }

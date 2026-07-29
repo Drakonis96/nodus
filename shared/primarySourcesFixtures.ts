@@ -123,6 +123,7 @@ export const PRIMARY_SOURCES_REFERENCE_UNITS: ArchiveDescriptionUnit[] = [
 
 export const PRIMARY_SOURCES_REFERENCE_PROFILE: PrimarySourceItemProfile = {
   itemId: 'ps-demo-item-letter',
+  provenancePlaceId: 'ps-demo-place-carmona',
   dateCertainty: 'circa',
   accessStatus: 'open',
   embargoUntil: null,

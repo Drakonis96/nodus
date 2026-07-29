@@ -514,7 +514,9 @@ try {
   vaults.setVaultType(vaults.getActiveVault().id, 'testimonios');
   const testimonies = require(path.join(repoRoot, 'electron/db/testimonyDemoData.ts'));
   const settings = require(path.join(repoRoot, 'electron/db/settingsRepo.ts'));
+  settings.updateSettings({ testimonyTourComplete: true });
   assert.equal(testimonies.seedTestimonyDemoData(), true);
+  assert.equal(settings.getSettings().testimonyTourComplete, true, 'loading the demo preserves the tutorial decision');
   for (const [label, table, where] of [
     ['interviews', 'testimony_interviews', "id LIKE 'demo-tst-%'"],
     ['participants', 'testimony_participant_profiles', "person_id LIKE 'demo-tst-%'"],

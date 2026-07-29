@@ -14,7 +14,7 @@ const RESPONSE_LANGUAGE_INSTRUCTION: Record<AppLanguage, string> = {
 
 /**
  * Worldbuilding prompts carry author prose and invented proper names verbatim, but every
- * generated explanation or draft must follow the interface language selected for the
+ * generated explanation or draft must follow the prompt language selected for the
  * vault. Keeping this instruction in the target language also works with small local
  * models that underweight a final English-only locale code.
  */

@@ -43,10 +43,6 @@ export function TestimonyParticipantsView() {
   }, [reload]);
   useDataRefresh(reload);
 
-  if (openId) {
-    return <ParticipantSheet personId={openId} onBack={() => { setOpenId(null); void reload(); }} onChanged={reload} />;
-  }
-
   return (
     <div className="flex h-full min-h-0 flex-col" data-testid="testimony-participants">
       <header className="flex flex-wrap items-center gap-3 border-b border-neutral-200 px-6 pb-3 pt-4 dark:border-neutral-800">
@@ -133,6 +129,13 @@ export function TestimonyParticipantsView() {
           onCreated={(personId) => { setCreating(false); setOpenId(personId); void reload(); }}
         />
       )}
+      {openId && (
+        <ParticipantModal
+          personId={openId}
+          onClose={() => { setOpenId(null); void reload(); }}
+          onChanged={reload}
+        />
+      )}
     </div>
   );
 }
@@ -209,7 +212,7 @@ function NewParticipantModal({ onClose, onCreated }: { onClose: () => void; onCr
   );
 }
 
-function ParticipantSheet({ personId, onBack, onChanged }: { personId: string; onBack: () => void; onChanged: () => Promise<void> }) {
+function ParticipantModal({ personId, onClose, onChanged }: { personId: string; onClose: () => void; onChanged: () => Promise<void> }) {
   const [profile, setProfile] = useState<TestimonyParticipantRow | null>(null);
   const [interviews, setInterviews] = useState<{ interviewId: string; title: string; shortId: string; role: string; at: string | null; workflowStatus: string; accessLevel: string }[]>([]);
 
@@ -241,115 +244,160 @@ function ParticipantSheet({ personId, onBack, onChanged }: { personId: string; o
     });
     if (!ok) return;
     await window.nodus.deleteTestimonyParticipant(personId);
-    onBack();
+    await onChanged();
+    onClose();
   };
 
-  if (!profile) {
-    return (
-      <div className="grid h-full place-items-center text-sm text-neutral-500">
-        <span className="flex items-center gap-2"><Icon name="sync" className="animate-spin" /> {t('Cargando...')}</span>
-      </div>
-    );
-  }
-
   return (
-    <div className="flex h-full min-h-0 flex-col" data-testid="testimony-participant-sheet">
-      <header className="flex flex-wrap items-center gap-3 border-b border-neutral-200 px-6 pb-3 pt-4 dark:border-neutral-800">
-        <button className="btn btn-ghost" onClick={onBack}><Icon name="arrowLeft" /> {t('Participantes')}</button>
-        <h1 className="truncate text-lg font-semibold text-neutral-800 dark:text-neutral-100">{profile.workingName}</h1>
-        {profile.pendingAgreements > 0 && (
-          <span className="rounded-full border border-amber-400 bg-amber-50 px-2 py-0.5 text-[11px] text-amber-800 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-300">
-            {tx('{n} acuerdos pendientes', { n: profile.pendingAgreements })}
-          </span>
-        )}
-        {interviews.length === 0 && (
-          <button className="btn btn-ghost ml-auto text-rose-500" onClick={() => void remove()}>
-            <Icon name="trash" /> {t('Eliminar')}
-          </button>
-        )}
-      </header>
-
-      <div className="min-h-0 flex-1 overflow-y-auto p-6">
-        <div className="grid gap-6 lg:grid-cols-2">
-          <section className="space-y-3">
-            <TestimonyField
-              label="Nombre de trabajo"
-              hint="Como lo llamas tú, dentro del proyecto."
-              multiline={false}
-              value={profile.workingName}
-              onSave={(next) => patch({ workingName: next })}
-            />
-            <TestimonyField
-              label="Nombre público o seudónimo"
-              hint="El que aparece en citas, derivados y exportaciones cuando el acuerdo lo exige."
-              multiline={false}
-              value={profile.publicName}
-              testid="testimony-participant-public-name"
-              onSave={(next) => patch({ publicName: next || null })}
-            />
-            <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-neutral-600 dark:text-neutral-400">{t('Modo de identificación')}</span>
-              <select
-                className="input w-full"
-                value={profile.identityMode}
-                onChange={(event) => void patch({ identityMode: event.target.value as TestimonyIdentityMode })}
-              >
-                {IDENTITY_MODES.map((mode) => (
-                  <option key={mode} value={mode}>{t(IDENTITY_MODE_LABEL[mode])}</option>
-                ))}
-              </select>
-              <span className="text-[11px] leading-4 text-neutral-500">
-                {t('Gana siempre el más restrictivo entre esto y el acuerdo de cada entrevista. Nodus no promete anonimato absoluto.')}
+    <ModalBackdrop onClose={onClose}>
+      <section
+        className="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-2xl dark:border-neutral-800 dark:bg-neutral-950"
+        data-testid="testimony-participant-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="testimony-participant-modal-title"
+      >
+        {!profile ? (
+          <div className="grid min-h-72 place-items-center text-sm text-neutral-500">
+            <span className="flex items-center gap-2"><Icon name="sync" className="animate-spin" /> {t('Cargando...')}</span>
+          </div>
+        ) : (
+          <div className="flex min-h-0 flex-1 flex-col" data-testid="testimony-participant-sheet">
+            <header className="flex items-start gap-3 border-b border-neutral-200 px-5 py-4 dark:border-neutral-800">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">
+                <Icon name="user" size={18} />
               </span>
-            </label>
-            <TestimonyField
-              label="Pronunciación"
-              hint="Cómo se pronuncia su nombre, si no es evidente."
-              multiline={false}
-              value={profile.pronunciation}
-              onSave={(next) => patch({ pronunciation: next || null })}
-            />
-          </section>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 id="testimony-participant-modal-title" className="truncate font-semibold text-neutral-900 dark:text-neutral-100">
+                    {profile.workingName}
+                  </h2>
+                  {profile.pendingAgreements > 0 && (
+                    <span className="rounded-full border border-amber-400 bg-amber-50 px-2 py-0.5 text-[11px] text-amber-800 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-300">
+                      {tx('{n} acuerdos pendientes', { n: profile.pendingAgreements })}
+                    </span>
+                  )}
+                </div>
+                <p className="mt-0.5 text-xs text-neutral-500">
+                  {t('Edita la identidad, el contexto y las preferencias de atribución de esta persona.')}
+                </p>
+              </div>
+              <button className="btn btn-ghost h-9 w-9 shrink-0 p-0" aria-label={t('Cerrar')} onClick={onClose}>
+                <Icon name="x" />
+              </button>
+            </header>
 
-          <section className="space-y-3">
-            <TestimonyField
-              label="Nota biográfica y contexto"
-              value={profile.biographicalNote}
-              rows={6}
-              onSave={(next) => patch({ biographicalNote: next || null })}
-            />
-            <TestimonyField
-              label="Preferencias de atribución"
-              hint="Lo que esta persona ha pedido sobre cómo se la nombra."
-              value={profile.attributionNote}
-              rows={4}
-              onSave={(next) => patch({ attributionNote: next || null })}
-            />
-          </section>
-        </div>
+            <div className="min-h-0 flex-1 overflow-y-auto p-5">
+              <div className="grid gap-4 lg:grid-cols-2">
+                <section className="space-y-3 rounded-xl border border-neutral-200 bg-neutral-50/70 p-4 dark:border-neutral-800 dark:bg-neutral-900/25">
+                  <div>
+                    <h3 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">{t('Identidad en el proyecto')}</h3>
+                    <p className="mt-1 text-[11px] leading-4 text-neutral-500">
+                      {t('Distingue el nombre interno del que puede aparecer en citas y exportaciones.')}
+                    </p>
+                  </div>
+                  <TestimonyField
+                    label="Nombre de trabajo"
+                    hint="Como lo llamas tú, dentro del proyecto."
+                    multiline={false}
+                    value={profile.workingName}
+                    onSave={(next) => patch({ workingName: next })}
+                  />
+                  <TestimonyField
+                    label="Nombre público o seudónimo"
+                    hint="El que aparece en citas, derivados y exportaciones cuando el acuerdo lo exige."
+                    multiline={false}
+                    value={profile.publicName}
+                    testid="testimony-participant-public-name"
+                    onSave={(next) => patch({ publicName: next || null })}
+                  />
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs font-medium text-neutral-600 dark:text-neutral-400">{t('Modo de identificación')}</span>
+                    <select
+                      className="input w-full"
+                      value={profile.identityMode}
+                      onChange={(event) => void patch({ identityMode: event.target.value as TestimonyIdentityMode })}
+                    >
+                      {IDENTITY_MODES.map((mode) => (
+                        <option key={mode} value={mode}>{t(IDENTITY_MODE_LABEL[mode])}</option>
+                      ))}
+                    </select>
+                    <span className="text-[11px] leading-4 text-neutral-500">
+                      {t('Gana siempre el más restrictivo entre esto y el acuerdo de cada entrevista. Nodus no promete anonimato absoluto.')}
+                    </span>
+                  </label>
+                  <TestimonyField
+                    label="Pronunciación"
+                    hint="Cómo se pronuncia su nombre, si no es evidente."
+                    multiline={false}
+                    value={profile.pronunciation}
+                    onSave={(next) => patch({ pronunciation: next || null })}
+                  />
+                </section>
 
-        <section className="mt-6">
-          <h2 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">{t('Entrevistas en las que participa')}</h2>
-          {interviews.length === 0 ? (
-            <p className="mt-2 text-sm text-neutral-500">{t('Todavía no participa en ninguna entrevista.')}</p>
-          ) : (
-            <ul className="mt-3 space-y-2">
-              {interviews.map((entry) => (
-                <li key={`${entry.interviewId}-${entry.role}`} className="flex flex-wrap items-center gap-2 rounded-lg border border-neutral-200 p-2 text-xs dark:border-neutral-800">
-                  <span className="font-medium text-neutral-700 dark:text-neutral-200">{entry.title}</span>
-                  <span className="text-neutral-500">{entry.shortId}</span>
-                  <span className="text-neutral-500">{t(PARTICIPANT_ROLE_LABEL[entry.role as keyof typeof PARTICIPANT_ROLE_LABEL] ?? entry.role)}</span>
-                  <span className="text-neutral-500">{t(WORKFLOW_STATUS_LABEL[entry.workflowStatus as InterviewWorkflowStatus] ?? entry.workflowStatus)}</span>
-                  <span className="ml-auto flex items-center gap-2">
-                    {entry.at && <span className="text-neutral-500">{entry.at.slice(0, 10)}</span>}
-                    <AccessBadge level={entry.accessLevel as TestimonyAccessLevel} compact />
+                <section className="space-y-3 rounded-xl border border-neutral-200 bg-neutral-50/70 p-4 dark:border-neutral-800 dark:bg-neutral-900/25">
+                  <div>
+                    <h3 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">{t('Contexto y atribución')}</h3>
+                    <p className="mt-1 text-[11px] leading-4 text-neutral-500">
+                      {t('Conserva únicamente el contexto necesario para interpretar y atribuir el testimonio.')}
+                    </p>
+                  </div>
+                  <TestimonyField
+                    label="Nota biográfica y contexto"
+                    value={profile.biographicalNote}
+                    rows={6}
+                    onSave={(next) => patch({ biographicalNote: next || null })}
+                  />
+                  <TestimonyField
+                    label="Preferencias de atribución"
+                    hint="Lo que esta persona ha pedido sobre cómo se la nombra."
+                    value={profile.attributionNote}
+                    rows={4}
+                    onSave={(next) => patch({ attributionNote: next || null })}
+                  />
+                </section>
+              </div>
+
+              <section className="mt-4 rounded-xl border border-neutral-200 p-4 dark:border-neutral-800">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">{t('Entrevistas en las que participa')}</h3>
+                  <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] text-neutral-600 dark:bg-neutral-900 dark:text-neutral-400">
+                    {interviews.length}
                   </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      </div>
-    </div>
+                </div>
+                {interviews.length === 0 ? (
+                  <p className="mt-2 text-sm text-neutral-500">{t('Todavía no participa en ninguna entrevista.')}</p>
+                ) : (
+                  <ul className="mt-3 grid gap-2 lg:grid-cols-2">
+                    {interviews.map((entry) => (
+                      <li key={`${entry.interviewId}-${entry.role}`} className="flex min-w-0 flex-wrap items-center gap-2 rounded-lg border border-neutral-200 bg-neutral-50/70 p-3 text-xs dark:border-neutral-800 dark:bg-neutral-900/30">
+                        <span className="min-w-0 flex-1 truncate font-medium text-neutral-700 dark:text-neutral-200">{entry.title}</span>
+                        <span className="text-neutral-500">{entry.shortId}</span>
+                        <span className="text-neutral-500">{t(PARTICIPANT_ROLE_LABEL[entry.role as keyof typeof PARTICIPANT_ROLE_LABEL] ?? entry.role)}</span>
+                        <span className="text-neutral-500">{t(WORKFLOW_STATUS_LABEL[entry.workflowStatus as InterviewWorkflowStatus] ?? entry.workflowStatus)}</span>
+                        <span className="ml-auto flex items-center gap-2">
+                          {entry.at && <span className="text-neutral-500">{entry.at.slice(0, 10)}</span>}
+                          <AccessBadge level={entry.accessLevel as TestimonyAccessLevel} compact />
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            </div>
+
+            <footer className="flex flex-wrap items-center gap-3 border-t border-neutral-200 px-5 py-3 dark:border-neutral-800">
+              {interviews.length === 0 && (
+                <button className="btn btn-ghost text-rose-600 dark:text-rose-400" onClick={() => void remove()}>
+                  <Icon name="trash" /> {t('Eliminar participante')}
+                </button>
+              )}
+              <span className="text-[11px] text-neutral-500 sm:ml-auto">{t('Los cambios se guardan automáticamente.')}</span>
+              <button className="btn btn-primary" onClick={onClose}>{t('Cerrar')}</button>
+            </footer>
+          </div>
+        )}
+      </section>
+    </ModalBackdrop>
   );
 }

@@ -13,20 +13,21 @@ export interface RoadmapItem {
 
 export const NODUS_ROADMAP = [
   { title: 'Pulido y estabilidad', detail: 'Corregir errores, mejorar el rendimiento y pulir la experiencia general con feedback de usuarios.', status: 'inProgress' },
-  { title: 'Vault de docencia', detail: 'Preparar clases, cursos y materiales docentes, protegiendo los datos del alumnado.', status: 'inProgress' },
-  { title: 'Vault de fuentes primarias', detail: 'Organizar documentos históricos y trabajar con evidencia documental.', status: 'planned' },
-  { title: 'Vault de testimonios (historia oral)', detail: 'Entrevistas, transcripciones y fuentes orales para historia y periodismo.', status: 'planned' },
+  { title: 'Servidor', detail: 'Infraestructura opcional para nuevas capacidades conectadas.', status: 'inProgress' },
+  { title: 'Compartir vaults y trabajo colaborativo', detail: 'Compartir espacios y colaborar con control sobre los datos.', status: 'planned' },
+  { title: 'Apps para iOS y iPadOS', detail: 'Llevar Nodus a iPhone y iPad con aplicaciones nativas adaptadas a cada dispositivo.', status: 'planned' },
+  { title: 'Vault de docencia', detail: 'Preparar clases, cursos y materiales docentes, protegiendo los datos del alumnado.', status: 'implemented' },
+  { title: 'Vault de fuentes primarias', detail: 'Organizar documentos históricos y trabajar con evidencia documental.', status: 'implemented' },
+  { title: 'Vault de testimonios (historia oral)', detail: 'Entrevistas, transcripciones y fuentes orales para historia y periodismo.', status: 'implemented' },
   {
     title: 'Vaults sugeridos por usuarios',
     detail: 'Nuevos ámbitos con especialistas, colaboración activa y testers.',
-    status: 'planned',
+    status: 'implemented',
     children: [
-      { title: 'Vault de prosopografía', detail: 'Personas, relaciones, identidades y evidencias biográficas para investigación histórica.', status: 'planned' },
-      { title: 'Vault de worldbuilding', detail: 'Personajes, lugares, cronologías y reglas de mundos narrativos.', status: 'planned' },
+      { title: 'Vault de prosopografía', detail: 'Personas, relaciones, identidades y evidencias biográficas para investigación histórica.', status: 'implemented' },
+      { title: 'Vault de worldbuilding', detail: 'Personajes, lugares, cronologías y reglas de mundos narrativos.', status: 'implemented' },
     ],
   },
-  { title: 'Servidor', detail: 'Infraestructura opcional para nuevas capacidades conectadas.', status: 'planned' },
-  { title: 'Compartir vaults y trabajo colaborativo', detail: 'Compartir espacios y colaborar con control sobre los datos.', status: 'planned' },
   { title: 'Nodus Toolkit', detail: 'Herramientas prácticas y local-first para convertir archivos y procesar documentos, integradas en Nodus.', status: 'implemented' },
   { title: 'Nodus Translate', detail: 'Traducir texto, documentos y adjuntos de Zotero con el modelo elegido, conservando la estructura de DOCX y EPUB y la apariencia de los PDF mediante un modo facsímil.', status: 'implemented' },
   { title: 'Nodus PDF Presenter', detail: 'Presentar archivos PDF y presentaciones externas con vista del presentador, control remoto desde el móvil, notas del orador y herramientas de anotación en directo.', status: 'implemented' },
@@ -51,11 +52,20 @@ const ROADMAP_GUIDE = NODUS_ROADMAP.map((item, index) => {
  */
 export const NODUS_DOCUMENTATION = `# Guía interna verificable de Nodus
 
-## Estado de las fuentes
+## Reglas de lectura de esta guía
 - Esta guía documenta la interfaz actual y el roadmap oficial visible de la aplicación.
 - El roadmap distingue entre elementos planificados, en desarrollo e implementados. No atribuyas fechas ni versiones si no aparecen aquí.
+- «Implementado» significa que el vault o la función existe y se puede abrir; no significa que haya alcanzado una versión estable.
 - Nodus es local-first: cada bóveda guarda sus datos en el equipo del usuario.
 - Las claves de proveedores se configuran en Ajustes > Proveedores. Los modelos favoritos se eligen allí y cada función conserva su propio selector.
+
+## Vaults disponibles y nivel de madurez
+- Todos los tipos que aparecen a continuación se pueden crear desde Bóvedas > Añadir bóveda: Académico, Fuentes primarias, Testimonios, Bases de datos, Docencia, Estudio, Genealogía, Prosopografía y Worldbuilding.
+- Fuentes primarias, Testimonios y Prosopografía están en PRE-ALPHA: no son utilizables para trabajo real. Solo están disponibles para personas que quieran probar funciones incompletas y reportar errores o propuestas de mejora. Antes de crearlos aparece una confirmación específica.
+- Worldbuilding está en ALPHA: sus funciones principales siguen en prueba y se recomienda únicamente a testers.
+- Bases de datos, Docencia, Estudio y Genealogía están en BETA: son funcionales, pero todavía necesitan feedback y correcciones.
+- Académico no muestra una etiqueta de fase en el selector.
+- Crear o cargar datos de demostración no abre el tutorial. El tutorial aparece al crear un vault o cuando el usuario lo abre expresamente desde Ajustes > Tutoriales.
 
 ## Cabecera y controles globales
 - En el extremo derecho de la cabecera están, en este orden general: Bóvedas, Comandos, Asistente, Herramientas, controles condicionales del vault, Sugerir / Reportar, Roadmap, selector de tema claro/oscuro y Ajustes.
@@ -72,19 +82,22 @@ ${ROADMAP_GUIDE}
 
 ## Ajustes
 - Ajustes es el último elemento de la barra lateral y también tiene un icono en el extremo derecho de la cabecera.
-- Sus pestañas reales son: Proveedores, Modelos IA, Biblioteca, Texto y OCR, Interfaz, Integraciones, Sistema y Datos.
+- Sus pestañas reales son: Proveedores, Modelos IA, Biblioteca, Texto y OCR, Interfaz, Integraciones, Servidor, Tutoriales, Backup / copia de seguridad, Acerca de Nodus y Actualizaciones y novedades.
 - Proveedores: claves API, proveedores locales y modelos favoritos.
 - Modelos IA: modelo general y modelos específicos de las distintas tareas.
+- Biblioteca: integración y sincronización con Zotero. Testimonios, Prosopografía y Worldbuilding no usan Zotero y no muestran ese recorrido.
 - Interfaz: idioma, tema, accesibilidad, barra lateral y Mascota Nodi.
-- Integraciones: MCP y copiloto de procesadores de texto.
-- Sistema: ayuda, tutoriales y actualizaciones.
-- Datos: copias, importación, exportación y mantenimiento.
+- Integraciones: servidor MCP local y copilotos de escritura para Word y LibreOffice.
+- Servidor: conexión de cada vault con Nodus Server y publicación de su copia filtrada.
+- Tutoriales: ayuda y recorridos de la aplicación.
+- Backup / copia de seguridad: copias, importación, exportación y mantenimiento.
 - La visibilidad, ventana flotante y trajes de Nodi están en Ajustes > Interfaz > Mascota Nodi.
 
 ## Vault académico
 - Se orienta a investigación y escritura académica.
 - Puede incluir Inicio, Buscar, Biblioteca, Grafo, Mapa de argumentos, Ideas, Autores, Inmersión, Huecos, Debates, Cobertura, Hipótesis, Ruta de lectura, Deep Research, Escritura, Proyectos, Notas y Ajustes.
 - Las secciones pueden ocultarse o reordenarse desde Ajustes > Interfaz > Barra lateral.
+- Deep Research recupera evidencia del corpus, genera un informe y permite exportarlo como documento o PDF con la identidad visual del vault.
 
 ## Vault de genealogía
 - Está disponible y se orienta a historia familiar respaldada por documentos.
@@ -103,6 +116,44 @@ ${ROADMAP_GUIDE}
 - El Calendario ofrece vistas mensual, semanal y anual, eventos con avisos y exportación a iCloud o Google Calendar.
 - El Banco de preguntas contiene preguntas, tests, exámenes y flashcards; una flashcard se abre en su modal específico.
 
+## Vault de docencia
+- Está implementado y disponible en BETA. Reutiliza la organización de Curso > Asignatura y añade un espacio de trabajo docente.
+- Sus secciones implementadas incluyen Cursos, asignaturas y grupos, Grupos, Horarios, Calendario, Materiales, Grabaciones, Chat, Ideas, Grafo, Banco de preguntas, Rúbricas, Exámenes, Calificaciones y Diseño de unidades.
+- Guía docente / Programación, Situaciones de aprendizaje, Adaptaciones, Notas y Proyectos de innovación aparecen como elementos «En diseño»: abren su hilo de feedback y no deben describirse como funciones terminadas.
+- Para empezar: crea cursos y asignaturas, crea los grupos, añade materiales y después usa las superficies de evaluación que necesites. Los datos del alumnado se gestionan dentro de Grupos y Calificaciones.
+
+## Vault de fuentes primarias
+- Está implementado y disponible en PRE-ALPHA exclusivamente para colaboración y pruebas, no para trabajo real.
+- Sus secciones son Buscar, Archivo, Personas, Línea temporal, Mapa, Relaciones sociales, Notas, Toolkit y Ajustes.
+- Archivo organiza documentos por ubicación archivística o colecciones de trabajo. El panel lateral del árbol se puede ocultar y volver a mostrar con su control de panel.
+- Para añadir documentos: abre Archivo y usa Añadir fuente. La tabla muestra los metadatos catalográficos y una miniatura cuando existe una imagen.
+- Al pulsar una fila se abre el modal del documento. Desde ese modal se consultan y editan los datos catalográficos, descripción, texto, evidencias, análisis, notas, historial, archivos y representaciones; las acciones compactas usan iconos con etiquetas accesibles.
+- El usuario puede escoger el icono o tipo documental; Nodus sugiere uno según el tipo de fuente, pero la decisión sigue siendo editable.
+- En Mapa se representa la procedencia asignada a cada fuente, no todas las ciudades mencionadas en su texto. La procedencia se elige en el documento mediante un desplegable conectado a los lugares disponibles en el mapa.
+- Todo resultado automático es una propuesta pendiente de revisión. Distingue transcripción, observación e inferencia y conserva procedencia, localizadores, contradicciones e incertidumbre.
+
+## Vault de testimonios
+- Está implementado y disponible en PRE-ALPHA exclusivamente para colaboración y pruebas, no para trabajo real.
+- Sus secciones son Buscar, Entrevistas, Participantes, Contrastes, Notas, Toolkit y Ajustes.
+- El trabajo específico sucede dentro del dossier de cada entrevista: sesiones, medios, transcripciones, fragmentos, códigos, anotaciones, acuerdos y restricciones. Las vistas del menú reúnen lo que atraviesa varias entrevistas.
+- Para empezar: crea una entrevista, registra participantes y acuerdos, añade una sesión o medio y prepara o importa la transcripción. Los códigos y anotaciones se aplican sobre fragmentos; Contrastes compara fragmentos documentados.
+- Al editar un participante se usa un modal dentro de la vista actual.
+- Nodi respeta acceso, anonimización, embargo y atribución. No debe exponer material que el acuerdo no autorice ni inferir atributos sensibles, emociones, sinceridad o credibilidad.
+
+## Vault de prosopografía
+- Está implementado y disponible en PRE-ALPHA exclusivamente para colaboración y pruebas, no para trabajo real.
+- Sus secciones son Buscar, Población, Personas, Fuentes, Análisis, Redes, Notas, Toolkit y Ajustes.
+- Flujo recomendado: define y versiona la metodología de población; diseña el cuestionario y vocabularios; registra fuentes y segmentos; captura factoids y statements atómicos; resuelve identidades; decide la pertenencia; y solo después ejecuta análisis o redes.
+- Buscar recorre personas, menciones, fuentes y statements. Análisis declara población, denominador, ausencias y huella de entrada. Redes separa visualmente relaciones explícitas, derivadas e hipótesis.
+- No confundas persona, mención, fuente, factoid y statement. No fusiones identidades ni conviertas una observación documental en hecho sin revisión.
+
+## Vault de worldbuilding
+- Está implementado y disponible en ALPHA, recomendado solo para testers.
+- Explorar incluye Enciclopedia, Personajes, Lugares, Facciones, Culturas, Cronología, Mapa, Relaciones, Familias y Dinastías.
+- Analizar incluye Chat del mundo, Reglas del mundo, Conflictos, Arcos narrativos, Continuidad y Preguntas abiertas. Crear incluye Notas, Escenas y Manuscrito.
+- Para empezar: registra las fichas canónicas del mundo; relaciona personajes, lugares, grupos y escenas; define reglas y líneas narrativas; usa Continuidad para detectar tensiones documentadas; y redacta en Manuscrito.
+- El autor es la fuente de verdad. Nodi no inventa canon: debe distinguir claramente entre información establecida y propuesta.
+
 ## Herramientas (Nodus Toolkit)
 - Herramientas es una sección de la barra lateral, en su propio grupo, y también tiene un icono en la cabecera. Aparece en todos los tipos de vault.
 - Su página principal es un hub con cinco tarjetas: Nodus Convert, Nodus Protect, Nodus Translate, PDF Presenter y OCR Workspace.
@@ -118,15 +169,25 @@ ${ROADMAP_GUIDE}
 - El procesamiento documental de Nodus Protect es local y no envía documentos a IA, proveedores ni servicios externos. Esta afirmación se refiere a Protect, no a todas las funciones opcionales de red de Nodus.
 - Dentro de una herramienta, un botón a la izquierda de su título vuelve al hub de Herramientas.
 
-## Estado del roadmap
-- Fuentes primarias, Testimonios, Prosopografía y Worldbuilding figuran como planificados.
-- Pulido y estabilidad y el vault de Docencia figuran en desarrollo.
-- Nodus Toolkit, Nodus Translate, PDF Presenter y OCR Workspace figuran como implementados y se pueden abrir.
-- El roadmap también contempla Servidor, compartir vaults y trabajo colaborativo, y otros vaults sugeridos por usuarios.
+## MCP local y Nodus Server
+- El servidor MCP local se configura en Ajustes > Integraciones > Servidor MCP. Se puede activar, consultar su estado, abrir la ayuda de conexión y regenerar su token.
+- MCP expone herramientas adecuadas al tipo de vault activo, además de herramientas generales. Cambiar de vault cambia el contexto que esas herramientas consultan.
+- Nodus Server es independiente del MCP local. Se configura en Ajustes > Servidor y cada vault se conecta por separado mediante la URL HTTPS del servidor y un código de un solo uso.
+- Nodus publica por HTTPS saliente una copia lógica y filtrada: no abre un puerto entrante en el ordenador y no comparte listener, puerto ni token con el MCP local.
+- Mientras Nodus está abierto mantiene actualizada la copia; el servidor Docker puede servir la última copia publicada a clientes autorizados aunque el ordenador esté apagado.
+- La interfaz permite publicar ahora, pausar, administrar o desconectar cada vault conectado. El acceso remoto usa OAuth y permisos de lectura sobre los espacios asignados.
+- En el roadmap, la iniciativa Servidor sigue «En desarrollo» y compartir vaults y trabajo colaborativo sigue «Planificado». No presentes el trabajo colaborativo como disponible.
+
+## Estado resumido del roadmap
+- En desarrollo: Pulido y estabilidad; Servidor.
+- Planificado: Compartir vaults y trabajo colaborativo; Apps para iOS y iPadOS.
+- Implementado: Docencia, Fuentes primarias, Testimonios, Vaults sugeridos por usuarios —Prosopografía y Worldbuilding—, Nodus Toolkit, Nodus Translate, PDF Presenter y OCR Workspace.
+- No hay fechas cerradas para las iniciativas del roadmap.
 
 ## Protocolo para responder sobre la interfaz
 - Usa los nombres exactos de esta guía y, si está seleccionada, la Vista actual.
 - No completes lagunas con patrones habituales de otras aplicaciones. No inventes botones, menús, rutas, atajos, versiones, fechas ni estados.
+- No conviertas la disponibilidad de un vault PRE-ALPHA o ALPHA en una recomendación de uso real. Indica siempre su fase cuando sea relevante.
 - Si una respuesta no está cubierta, di «No puedo verificarlo con las fuentes seleccionadas» e indica qué contexto ayudaría, sin proponer una ruta inventada.
 - Distingue siempre entre disponible, condicional, futuro y no verificado.
 - Cuando la pregunta pida una ubicación o instrucciones, ofrece pasos numerados breves y termina con una línea «Base: …» indicando las fuentes usadas.`;

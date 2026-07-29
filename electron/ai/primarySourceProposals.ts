@@ -87,7 +87,7 @@ export async function extractPrimarySourceProposals(
   if (!model) throw new Error('Configura un modelo de extracción en Ajustes.');
   const raw = await completeJson(
     {
-      system: primarySourceProposalPrompt(settings.uiLanguage),
+      system: primarySourceProposalPrompt(settings.promptLanguage ?? 'es'),
       user: JSON.stringify(buildRecordsInput(excerpt.quotedText, 0, 1)),
       temperature: 0,
       maxTokens: 7000,

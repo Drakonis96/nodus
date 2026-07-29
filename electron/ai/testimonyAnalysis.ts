@@ -22,6 +22,7 @@ import { isLocalProvider } from '@shared/providers';
 import { formatTimecode, preferredTranscript } from '@shared/testimonies';
 import { locateQuote, verifyRewrite } from '@shared/testimonyAiGuards';
 import type { ModelRef } from '@shared/types';
+import { testimonyAiPromptPack } from '@shared/testimonyPrompts';
 
 export interface ProposedCode {
   label: string;
@@ -111,23 +112,6 @@ function transcriptLines(interviewId: string): { transcriptId: string; lines: Tr
   };
 }
 
-const ANALYSIS_SYSTEM = `Eres un ayudante de análisis cualitativo en un proyecto de historia oral.
-Tu trabajo es PROPONER códigos temáticos y señalar pasajes que los ilustran.
-
-Reglas que no puedes romper:
-- CITA LITERAL. Cada pasaje debe copiarse palabra por palabra de la transcripción. No
-  resumas, no arregles la gramática y no juntes frases separadas: si no está tal cual, no
-  lo cites.
-- NO JUZGUES la credibilidad de quien habla ni la veracidad de lo que cuenta. Un testimonio
-  no es una declaración que haya que verificar.
-- NO INFIERAS emociones, intenciones ni diagnósticos que la persona no haya expresado.
-- NO APRUEBES la transcripción ni sugieras darla por buena.
-- Los códigos son temas, no juicios: «silencio familiar» sí, «trauma no resuelto» no.
-
-Devuelve SOLO JSON con esta forma:
-{"codes":[{"label":"...","note":"..."}],"passages":[{"quote":"...","code":"...","why":"..."}]}
-Entre 3 y 6 códigos, y entre 3 y 10 pasajes.`;
-
 interface RawAnalysis {
   codes: { label?: unknown; note?: unknown }[];
   passages: { quote?: unknown; code?: unknown; why?: unknown }[];
@@ -151,6 +135,7 @@ export async function analyzeTestimonyInterview(interviewId: string): Promise<In
   if (!interview) throw new Error('Esa entrevista no existe.');
   const settings = getSettings();
   const model = settings.studyModel ?? settings.chatModel ?? settings.synthesisModel ?? null;
+  const prompt = testimonyAiPromptPack(settings.promptLanguage ?? 'es');
   requireAccess(interviewId, channelFor(model));
 
   const { transcriptId, lines } = transcriptLines(interviewId);
@@ -160,8 +145,8 @@ export async function analyzeTestimonyInterview(interviewId: string): Promise<In
 
   const raw = await completeJson<RawAnalysis>(
     {
-      system: ANALYSIS_SYSTEM,
-      user: `Entrevista: ${interview.title}\n\nTranscripción:\n${body}`,
+      system: prompt.analysisSystem,
+      user: `${prompt.interviewLabel}: ${interview.title}\n\n${prompt.transcriptLabel}:\n${body}`,
       maxTokens: 2000,
       temperature: 0.1,
     },
@@ -226,21 +211,6 @@ export interface TranscriptImprovement {
   model: string;
 }
 
-const IMPROVE_SYSTEM = `Corriges transcripciones automáticas de entrevistas de historia oral.
-
-Tu trabajo es SOLO este:
-- puntuar y poner mayúsculas,
-- separar en frases lo que el reconocedor dejó seguido,
-- arreglar la ortografía de palabras mal reconocidas.
-
-Lo que NO puedes hacer:
-- cambiar, quitar ni añadir palabras,
-- resumir, reordenar ni «mejorar» la manera de hablar de nadie,
-- quitar repeticiones, titubeos ni muletillas: son parte del testimonio.
-
-Devuelve SOLO JSON: {"segments":[{"i":0,"text":"..."}]} con un objeto por cada línea que
-recibas, en el mismo orden y con el mismo índice.`;
-
 interface RawImprovement {
   segments: { i?: unknown; text?: unknown }[];
 }
@@ -274,6 +244,7 @@ export async function improveTestimonyTranscript(transcriptId: string): Promise<
 
   const settings = getSettings();
   const model = settings.improveModel ?? settings.chatModel ?? settings.synthesisModel ?? null;
+  const prompt = testimonyAiPromptPack(settings.promptLanguage ?? 'es');
   requireAccess(row.interview_id, channelFor(model));
 
   const segments = listSegments(transcriptId);
@@ -284,7 +255,7 @@ export async function improveTestimonyTranscript(transcriptId: string): Promise<
     const batch = segments.slice(start, start + IMPROVE_BATCH);
     const numbered = batch.map((segment, index) => `${index}. ${segment.text}`).join('\n');
     const raw = await completeJson<RawImprovement>(
-      { system: IMPROVE_SYSTEM, user: numbered, maxTokens: 2500, temperature: 0 },
+      { system: prompt.improveSystem, user: numbered, maxTokens: 2500, temperature: 0 },
       isRawImprovement,
       model,
     );

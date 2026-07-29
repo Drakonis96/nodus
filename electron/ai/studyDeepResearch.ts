@@ -137,6 +137,14 @@ export const STUDY_DEEP_RESEARCH_PROMPTS: Record<PromptLanguage, StudyPromptPack
     references: 'Fontes de estudo',
     limitations: 'Limitações',
   },
+  it: {
+    plan: 'Sei un docente esperto che pianifica una relazione di studio basata esclusivamente sulle fonti locali fornite. Organizza poche sezioni ampie con una progressione didattica chiara. Includi prerequisiti, definizioni, collegamenti, esempi, errori comuni e una sintesi che aiuti chi studia a verificare la propria comprensione. Non inventare informazioni o identificativi. Restituisci soltanto JSON nel formato {"title":"...","abstract":"...","sections":[{"id":"s1","title":"...","purpose":"...","keyClaims":["..."],"sourceIds":["S1"]}]}.',
+    write: 'Sei un docente esperto che redige una sezione di una relazione di studio usando esclusivamente le fonti fornite. Spiega i concetti difficili passo dopo passo, definisci ogni termine tecnico al primo utilizzo, collega ogni idea ai suoi prerequisiti e alle sue conseguenze e usa esempi o analogie quando chiariscono il ragionamento. Segnala sfumature, contraddizioni ed errori comuni. La chiarezza didattica conta quanto il rigore. Non inventare fatti. Cita ogni affermazione sostanziale copiando esattamente uno dei collegamenti consentiti. Scrivi prosa Markdown continua, con un solo titolo ## e senza microsezioni.',
+    finalize: 'Concludi una relazione di studio fondata sulle fonti. Restituisci soltanto JSON nel formato {"title":"...","abstract":"...","limitations":["..."],"nextSteps":["..."]}. La sintesi deve spiegare che cosa comprenderà chi studia; i passi successivi devono proporre modi concreti per verificare e consolidare la comprensione.',
+    fallbackSection: (index) => `Sviluppo guidato ${index}`,
+    references: 'Fonti di studio',
+    limitations: 'Limiti',
+  },
 };
 
 /**
@@ -204,6 +212,14 @@ export const TEACHING_UNIT_PROMPTS: Record<PromptLanguage, StudyPromptPack> = {
     fallbackSection: (index) => `Parte ${index} da unidade`,
     references: 'Materiais da unidade',
     limitations: 'Limitações e ajustes',
+  },
+  it: {
+    plan: 'Sei un docente esperto che progetta un’unità didattica esclusivamente a partire dai materiali locali forniti e dalla rete di idee già estratta da essi. Ordina le parti secondo le dipendenze fra i concetti: ciò che deve essere compreso prima viene prima. Ogni parte deve poter essere svolta in classe: che cosa si insegna, con quali materiali e come se ne verifica l’apprendimento. Non inventare informazioni, materiali o identificativi. Restituisci soltanto JSON nel formato {"title":"...","abstract":"...","sections":[{"id":"s1","title":"...","purpose":"...","keyClaims":["..."],"sourceIds":["S1"],"ideaIds":["..."]}]}.',
+    write: 'Sei un docente esperto che redige una parte di un’unità didattica usando esclusivamente i materiali forniti. Scrivi PER IL DOCENTE che terrà la lezione: esponi il contenuto con precisione, indica l’ordine in cui conviene presentarlo, segnala i prerequisiti, gli errori comuni degli studenti e i punti sui quali soffermarsi; proponi almeno un’attività in classe e un modo per verificare la comprensione, entrambi fondati sui materiali. Non inventare fatti. Cita ogni affermazione sostanziale copiando esattamente uno dei collegamenti consentiti. Scrivi prosa Markdown continua, con un solo titolo ## e senza microsezioni.',
+    finalize: 'Concludi un’unità didattica fondata sui materiali locali. Restituisci soltanto JSON nel formato {"title":"...","abstract":"...","limitations":["..."],"nextSteps":["..."]}. La sintesi deve indicare che cosa impareranno gli studenti e come si articola l’unità; i limiti devono dichiarare con onestà ciò che i materiali disponibili non coprono; i passi successivi devono proporre verifiche, consolidamento o approfondimento concreti.',
+    fallbackSection: (index) => `Parte ${index} dell’unità`,
+    references: 'Materiali dell’unità',
+    limitations: 'Limiti e adattamenti',
   },
 };
 

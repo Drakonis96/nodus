@@ -14,13 +14,12 @@ import { getSceneText } from '../db/worldManuscriptRepo';
 import { beatsForScene } from '../db/worldThreadsRepo';
 import { getDb } from '../db/database';
 import {
-  WORLD_PROSE_REVIEW_SYSTEM,
   composeProseReviewContext,
   hasProseReviewMaterial,
   parseProseReview,
   type ProseReviewSources,
 } from '@shared/worldProseReview';
-import { withWorldPromptLanguage } from '@shared/worldPromptLanguage';
+import { worldOperationSystemPrompt } from '@shared/worldOperationPrompts';
 import { BEAT_MARK_LABEL, THREAD_KIND_LABEL } from '@shared/worldThreads';
 import type { BeatThreadKind } from '@shared/types';
 import { stripWorldLinks } from '@shared/worldManuscript';
@@ -57,8 +56,9 @@ export async function reviewWorldProse(sceneId: string): Promise<ProseReviewResu
   const model = settings.synthesisModel ?? settings.extractionModel ?? null;
   const completion = await completeText(
     {
-      system: withWorldPromptLanguage(WORLD_PROSE_REVIEW_SYSTEM, settings.uiLanguage),
+      system: worldOperationSystemPrompt('proseReview', settings.promptLanguage ?? 'es'),
       user: composeProseReviewContext(sources),
+      plainContext: true,
       // Cold. This is a reading, not a piece of writing: everything true in the answer is
       // already on the page.
       temperature: 0.2,

@@ -32,6 +32,7 @@ try {
 
   const active = vaults.getActiveVault();
   vaults.setVaultType(active.id, 'estudio');
+  settings.updateSettings({ studyTourComplete: true });
   const userCourse = org.createStudyCourse({ name: 'Curso del usuario' });
   assert.equal(demo.seedStudyDemoData(), true, 'a study vault can add the isolated sample workspace alongside user data');
   assert.equal(demo.seedStudyDemoData(), false, 'seeding is idempotent and never duplicates the sample data');
@@ -55,6 +56,7 @@ try {
   assert.equal(knowledge.getStudyKnowledgeGraph('demo-study-subject-ecology').edges.length, 2, 'ecology placeholders include explicit conceptual connections');
   assert.ok(knowledge.getStudyIdeaDetail(cellIdeas[0].id).evidence.length > 0, 'placeholder ideas remain grounded in sample notes');
   assert.equal(settings.getSettings().demoMode, true);
+  assert.equal(settings.getSettings().studyTourComplete, true, 'loading the demo preserves the tutorial decision');
   assert.equal(generalDemo.hasAnyData(), true, 'study content participates in the global presence check');
   assert.deepEqual(getDb().pragma('foreign_key_check'), [], 'sample hierarchy satisfies every foreign key');
 

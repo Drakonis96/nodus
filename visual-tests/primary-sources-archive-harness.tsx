@@ -75,6 +75,7 @@ const photoUnit = {
   position: 1,
 };
 const profileBase = {
+  provenancePlaceId: 'place-puerto-claro',
   dateCertainty: 'circa' as const,
   embargoUntil: null,
   rightsStatement: null,
@@ -144,6 +145,19 @@ const workspace: PrimarySourceArchiveWorkspace = {
     updatedAt: createdAt,
   }],
   collections: [{ folderId: 'collection', name: 'Epidemias y sanidad', parentId: null, createdAt }],
+  places: [{
+    placeId: 'place-puerto-claro',
+    name: 'Puerto Claro',
+    parentId: null,
+    kind: 'municipality',
+    latitude: 36.52,
+    longitude: -6.28,
+    notes: null,
+    gazetteerId: 'demo:puerto-claro',
+    admin1: 'Andalucía',
+    country: 'España',
+    countryCode: 'ES',
+  }],
   templates: [],
   rows: [
     {

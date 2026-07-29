@@ -131,6 +131,11 @@ try {
     'el sidebar propio tiene exactamente las cinco entradas acordadas'
   );
   assert.equal(await page.getByTestId('nodus-logo').getAttribute('data-vault-logo'), 'testimonios');
+  assert.match(
+    await page.getByTestId('nodus-logo').getAttribute('src'),
+    /nodusMarkCyan/,
+    'la N del encabezado usa el SVG cian de Testimonios'
+  );
   // El cian llega por un remapeo CSS que solo aplica si la raíz lleva `.testimonios`;
   // sin el toggle la aplicación se quedaría índigo en silencio.
   assert.equal(await page.evaluate(() => document.documentElement.classList.contains('testimonios')), true);
@@ -238,6 +243,21 @@ try {
   await page.getByTestId('testimony-participant-table').waitFor();
   assert.match(await page.getByTestId('testimony-participant-table').innerText(), /Carmen Ruiz Salas/);
   await page.locator('[data-testid^="testimony-participant-"][role="button"]').first().click();
+  await page.getByTestId('testimony-participant-modal').waitFor();
+  assert.equal(await page.getByTestId('testimony-participant-table').isVisible(), true, 'la tabla permanece detrás del modal');
+  const modalLayout = await page.getByTestId('testimony-participant-modal').evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    return {
+      width: rect.width,
+      height: rect.height,
+      viewportWidth: window.innerWidth,
+      viewportHeight: window.innerHeight,
+      horizontalOverflow: element.scrollWidth > element.clientWidth,
+    };
+  });
+  assert.ok(modalLayout.width >= 720 && modalLayout.width < modalLayout.viewportWidth, 'el modal tiene un ancho equilibrado');
+  assert.ok(modalLayout.height < modalLayout.viewportHeight, 'el modal cabe completo en la ventana');
+  assert.equal(modalLayout.horizontalOverflow, false, 'el modal no genera scroll horizontal');
   await page.getByTestId('testimony-participant-sheet').waitFor();
   await page.getByTestId('testimony-participant-public-name').fill('Carmen R.');
   await waitForCondition('el nombre público se guarda', () => page.evaluate(async () => {
@@ -257,6 +277,8 @@ try {
     const carmen = rows.find((row) => row.workingName === 'Carmen Ruiz Salas');
     await window.nodus.updateTestimonyParticipant(carmen.personId, { identityMode: 'pseudonym' });
   });
+  await page.getByTestId('testimony-participant-modal').locator('footer').getByRole('button', { name: 'Cerrar', exact: true }).click();
+  await page.getByTestId('testimony-participant-modal').waitFor({ state: 'hidden' });
   await sidebar.getByRole('button', { name: 'Entrevistas', exact: true }).click();
   await page.getByTestId('testimony-interview-table').waitFor();
   await waitForCondition('la tabla muestra el nombre público, no el real', async () => {

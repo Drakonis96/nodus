@@ -153,6 +153,57 @@ try {
   );
   legacyDb.close();
 
+  // v121 separates the explicit source provenance from place names found in the
+  // document. Existing "creation" links are promoted once, without touching the
+  // original mention/evidence row.
+  const provenancePath = path.join(root, 'legacy-v120-provenance.sqlite');
+  const provenanceDb = new Database(provenancePath);
+  provenanceDb.pragma('foreign_keys = ON');
+  for (const migration of migrations.filter((entry) => entry.version <= 120).sort((a, b) => a.version - b.version)) {
+    provenanceDb.transaction(() => {
+      provenanceDb.exec(migration.up);
+      migration.after?.(provenanceDb);
+      provenanceDb.pragma(`user_version = ${migration.version}`);
+    })();
+  }
+  provenanceDb.prepare(
+    `INSERT INTO archive_items (item_id, title, kind, bytes, created_at, updated_at)
+     VALUES ('legacy_provenance_item', 'Fuente con origen', 'text', 0, ?, ?)`
+  ).run(createdAt, createdAt);
+  provenanceDb.prepare(
+    `INSERT INTO archive_item_profiles (item_id, created_at, updated_at)
+     VALUES ('legacy_provenance_item', ?, ?)`
+  ).run(createdAt, createdAt);
+  provenanceDb.prepare(
+    `INSERT INTO places (place_id, name, latitude, longitude, created_at, updated_at)
+     VALUES ('legacy_provenance_place', 'Carmona', 37.4713, -5.6469, ?, ?)`
+  ).run(createdAt, createdAt);
+  provenanceDb.prepare(
+    `INSERT INTO archive_place_mentions (
+      mention_id, item_id, place_id, original_label, role, certainty, status, created_at, updated_at
+    ) VALUES (
+      'legacy_creation_mention', 'legacy_provenance_item', 'legacy_provenance_place',
+      'Carmona', 'creation', 1, 'resolved', ?, ?
+    )`
+  ).run(createdAt, createdAt);
+  runMigrations(provenanceDb);
+  assert.equal(
+    provenanceDb.prepare(
+      "SELECT provenance_place_id FROM archive_item_profiles WHERE item_id='legacy_provenance_item'"
+    ).get().provenance_place_id,
+    'legacy_provenance_place',
+    'v121 promotes the old explicit creation place to canonical source provenance',
+  );
+  assert.equal(
+    provenanceDb.prepare(
+      "SELECT COUNT(*) AS count FROM archive_place_mentions WHERE mention_id='legacy_creation_mention'"
+    ).get().count,
+    1,
+    'the historical place mention is preserved as evidence',
+  );
+  assert.deepEqual(provenanceDb.pragma('foreign_key_check'), []);
+  provenanceDb.close();
+
   // Exercise the repositories on a normal current vault so SQL placeholder counts,
   // transactions, immutability and legacy projections are verified by execution.
   const archive = require(path.join(repoRoot, 'electron/db/archiveRepo.ts'));

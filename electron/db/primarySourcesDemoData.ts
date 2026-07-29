@@ -66,6 +66,7 @@ type DemoSource = {
   mimeType: string | null;
   content: Buffer | null;
   description: Copy;
+  metadata: Record<string, string>;
   access?: 'open' | 'private' | 'restricted' | 'unknown';
   sensitivity?: 'normal' | 'personal' | 'sensitive' | 'highly_sensitive';
 };
@@ -103,10 +104,17 @@ function sources(L: DemoLocale): DemoSource[] {
       seriesId: ID.seriesCorrespondence, reference: 'FCA/COR/001', kind: 'image',
       fileName: 'carta-clara-hoja-1.png', mimeType: 'image/png', content: demoAsset('letter-page-1.png'),
       description: { es: 'Carta manuscrita sobre ayuda tras una crecida y una reunión vecinal.', en: 'Handwritten letter about relief after a flood and a neighbourhood meeting.' },
+      metadata: {
+        remitente: text(L, { es: 'Clara Montes', en: 'Clara Montes' }),
+        destinatario: text(L, { es: 'Inés Vidal', en: 'Inés Vidal' }),
+        fecha: '1894-05-14',
+        lugar: text(L, { es: 'Aldea Clara', en: 'Clear Village' }),
+        resumen: text(L, { es: 'Ayuda tras una crecida y reunión vecinal.', en: 'Relief after a flood and a neighbourhood meeting.' }),
+      },
     },
     {
       suffix: 'minutes', title: { es: 'Acta de la asamblea del molino', en: 'Minutes of the mill assembly' },
-      docType: 'minutes', dateDisplay: { es: '17 de abril de 1894', en: '17 April 1894' },
+      docType: 'acta_de_asociacion_sociedad', dateDisplay: { es: '17 de abril de 1894', en: '17 April 1894' },
       dateStart: '1894-04-17', dateEnd: '1894-04-17', dateCertainty: 'exact',
       seriesId: ID.seriesCommunity, reference: 'FCA/COM/002', kind: 'text',
       fileName: 'acta-asamblea.txt', mimeType: 'text/plain',
@@ -115,6 +123,14 @@ function sources(L: DemoLocale): DemoSource[] {
         en: 'Minutes. Clara Montes, Inés Vidal and Elías N. attend. Flour is to be distributed. The marginal date appears to say 18, not 17.',
       })),
       description: { es: 'Acta con una fecha marginal contradictoria.', en: 'Minutes containing a contradictory marginal date.' },
+      metadata: {
+        asunto: text(L, { es: 'Reparto de harina tras la crecida', en: 'Flour distribution after the flood' }),
+        organismo: text(L, { es: 'Cooperativa de Aldea Clara', en: 'Clear Village Cooperative' }),
+        fecha: '1894-04-17',
+        personas_implicadas: 'Clara Montes, Inés Vidal, Elías N.',
+        lugar: text(L, { es: 'Molino de Aldea Clara', en: 'Clear Village mill' }),
+        referencia: 'FCA/COM/002',
+      },
     },
     {
       suffix: 'photograph', title: { es: 'Fotografía del taller comunitario', en: 'Photograph of the community workshop' },
@@ -123,14 +139,28 @@ function sources(L: DemoLocale): DemoSource[] {
       seriesId: ID.seriesCommunity, reference: 'FCA/COM/003', kind: 'image',
       fileName: 'taller-comunitario.png', mimeType: 'image/png', content: demoAsset('workshop-photograph.png'),
       description: { es: 'Cinco figuras no identificadas; la demo no usa reconocimiento facial.', en: 'Five unidentified figures; the demo does not use facial recognition.' },
+      metadata: {
+        personas: text(L, { es: 'Cinco personas no identificadas', en: 'Five unidentified people' }),
+        fecha: '1895-01-01',
+        lugar: text(L, { es: 'Taller comunitario', en: 'Community workshop' }),
+        fotografo: text(L, { es: 'Autoría no identificada', en: 'Unidentified creator' }),
+        ocasion: text(L, { es: 'Trabajo comunitario', en: 'Community work' }),
+      },
     },
     {
       suffix: 'newspaper', title: { es: 'Página de prensa: La Voz del Valle', en: 'Newspaper page: The Valley Voice' },
-      docType: 'newspaper', dateDisplay: { es: '3 de febrero de 1895', en: '3 February 1895' },
+      docType: 'recorte_de_hemeroteca_noticia_de_periodi', dateDisplay: { es: '3 de febrero de 1895', en: '3 February 1895' },
       dateStart: '1895-02-03', dateEnd: '1895-02-03', dateCertainty: 'exact',
       seriesId: ID.seriesCommunity, reference: 'FCA/COM/004', kind: 'image',
       fileName: 'voz-del-valle-1895.png', mimeType: 'image/png', content: demoAsset('valley-voice-newspaper.png'),
       description: { es: 'Página ficticia con OCR automático y una versión revisada.', en: 'Fictional page with automatic OCR and a reviewed version.' },
+      metadata: {
+        titular: text(L, { es: 'La crecida moviliza al valle', en: 'Flood mobilises the valley' }),
+        publicacion: text(L, { es: 'La Voz del Valle', en: 'The Valley Voice' }),
+        fecha: '1895-02-03',
+        lugar: text(L, { es: 'Sevilla', en: 'Seville' }),
+        resumen: text(L, { es: 'Página ficticia con OCR revisado.', en: 'Fictional page with reviewed OCR.' }),
+      },
     },
     {
       suffix: 'map', title: { es: 'Croquis del camino del río', en: 'Sketch map of the river road' },
@@ -139,51 +169,91 @@ function sources(L: DemoLocale): DemoSource[] {
       seriesId: ID.seriesCommunity, reference: 'FCA/COM/Δ-1895/07', kind: 'image',
       fileName: 'croquis-rio.png', mimeType: 'image/png', content: demoAsset('river-road-sketch-map.png'),
       description: { es: 'El topónimo «San Martín» permanece ambiguo.', en: 'The place-name “San Martín” remains ambiguous.' },
+      metadata: {
+        titulo: text(L, { es: 'Croquis del camino del río', en: 'Sketch map of the river road' }),
+        autor: text(L, { es: 'Comisión vecinal ficticia', en: 'Fictional neighbourhood committee' }),
+        anio: 'c. 1894',
+        lugar: 'San Martín',
+        escala: text(L, { es: 'Sin escala', en: 'No scale' }),
+      },
     },
     {
       suffix: 'register', title: { es: 'Registro de entregas de harina', en: 'Flour delivery register' },
-      docType: 'register', dateDisplay: { es: '1894–1895', en: '1894–1895' },
+      docType: 'administrative', dateDisplay: { es: '1894–1895', en: '1894–1895' },
       dateStart: '1894-01-01', dateEnd: '1895-12-31', dateCertainty: 'between',
       seriesId: ID.seriesCommunity, reference: 'FCA/COM/006', kind: 'image',
       fileName: 'registro-entregas.png', mimeType: 'image/png', content: demoAsset('flour-delivery-register.png'),
       description: { es: 'Registro seriado con menciones personales.', en: 'Serial register containing personal mentions.' },
+      metadata: {
+        tipo_tramite: text(L, { es: 'Entrega de suministros', en: 'Supply distribution' }),
+        organismo: text(L, { es: 'Cooperativa vecinal ficticia', en: 'Fictional village cooperative' }),
+        fecha: '1894-01-01',
+        personas_implicadas: text(L, { es: 'Familias receptoras de harina', en: 'Families receiving flour' }),
+        referencia: 'FCA/COM/006',
+      },
       access: 'private', sensitivity: 'personal',
     },
     {
       suffix: 'located-only', title: { es: 'Referencia a un cuaderno no digitalizado', en: 'Reference to an undigitised notebook' },
-      docType: 'notebook', dateDisplay: { es: 'Año de la gran crecida (hacia 1894)', en: 'Year of the great flood (circa 1894)' },
+      docType: 'other_doc', dateDisplay: { es: 'Año de la gran crecida (hacia 1894)', en: 'Year of the great flood (circa 1894)' },
       dateStart: '1893-01-01', dateEnd: '1895-12-31', dateCertainty: 'circa',
       seriesId: ID.seriesCorrespondence, reference: 'FCA/COR/007', kind: 'other',
       fileName: null, mimeType: null, content: null,
       description: { es: 'Fuente localizada y descrita, todavía sin imagen.', en: 'Located and described source, not yet digitised.' },
+      metadata: {
+        descripcion: text(L, { es: 'Cuaderno localizado pendiente de digitalización.', en: 'Located notebook awaiting digitisation.' }),
+        fecha: '1894-01-01',
+        lugar: text(L, { es: 'Aldea Clara', en: 'Clear Village' }),
+        referencia: 'FCA/COR/007',
+      },
     },
     {
       suffix: 'restricted', title: { es: 'Expediente ficticio restringido', en: 'Fictional restricted case file' },
-      docType: 'case_file', dateDisplay: { es: '1901', en: '1901' },
+      docType: 'administrative', dateDisplay: { es: '1901', en: '1901' },
       dateStart: '1901-01-01', dateEnd: '1901-12-31', dateCertainty: 'exact',
       seriesId: ID.seriesCommunity, reference: 'FCA/COM/R-008', kind: 'text',
       fileName: 'expediente-restringido.txt', mimeType: 'text/plain',
       content: Buffer.from('DEMO-RESTRICTED-CONTENT: fictional and intentionally blocked.'),
       description: { es: 'Ejercicio ficticio para probar restricciones; no contiene datos reales.', en: 'Fictional exercise for testing restrictions; contains no real data.' },
+      metadata: {
+        tipo_tramite: text(L, { es: 'Expediente de asistencia', en: 'Relief case file' }),
+        organismo: text(L, { es: 'Junta ficticia de asistencia', en: 'Fictional relief board' }),
+        fecha: '1901-01-01',
+        personas_implicadas: text(L, { es: 'Identidades ficticias restringidas', en: 'Restricted fictional identities' }),
+        referencia: 'FCA/COM/R-008',
+      },
       access: 'restricted', sensitivity: 'highly_sensitive',
     },
     {
       suffix: 'receipt', title: { es: 'Recibo de materiales para el puente', en: 'Receipt for bridge materials' },
-      docType: 'receipt', dateDisplay: { es: 'mayo de 1894', en: 'May 1894' },
+      docType: 'carta_de_pago_recibo_de_deuda', dateDisplay: { es: 'mayo de 1894', en: 'May 1894' },
       dateStart: '1894-05-01', dateEnd: '1894-05-31', dateCertainty: 'between',
       seriesId: ID.seriesCommunity, reference: 'FCA/COM/009', kind: 'text',
       fileName: 'recibo-puente.txt', mimeType: 'text/plain',
       content: Buffer.from(text(L, { es: 'Madera, clavos y cuerda. Recibido por I. Vidal.', en: 'Timber, nails and rope. Received by I. Vidal.' })),
       description: { es: 'Recibo breve relacionado con la reparación del puente.', en: 'Short receipt related to repairing the bridge.' },
+      metadata: {
+        otorgantes: text(L, { es: 'Taller de carpintería e Inés Vidal', en: 'Carpentry workshop and Inés Vidal' }),
+        fecha: '1894-05-01',
+        lugar: text(L, { es: 'Aldea Clara', en: 'Clear Village' }),
+        escribano: text(L, { es: 'No consta', en: 'Not recorded' }),
+        referencia: 'FCA/COM/009',
+      },
     },
     {
       suffix: 'margin-note', title: { es: 'Nota marginal sobre la fecha de la asamblea', en: 'Marginal note on the assembly date' },
-      docType: 'note', dateDisplay: { es: 'posterior a abril de 1894', en: 'after April 1894' },
+      docType: 'notes', dateDisplay: { es: 'posterior a abril de 1894', en: 'after April 1894' },
       dateStart: '1894-04-18', dateEnd: null, dateCertainty: 'after',
       seriesId: ID.seriesCorrespondence, reference: 'FCA/COR/010', kind: 'text',
       fileName: 'nota-marginal.txt', mimeType: 'text/plain',
       content: Buffer.from(text(L, { es: 'La reunión fue el día dieciocho; el acta quedó fechada por error.', en: 'The meeting was on the eighteenth; the minutes were dated incorrectly.' })),
       description: { es: 'Testimonio que contradice la fecha principal del acta.', en: 'Testimony contradicting the main date in the minutes.' },
+      metadata: {
+        autor: text(L, { es: 'Mano no identificada', en: 'Unidentified hand' }),
+        fecha: '1894-04-18',
+        tema: text(L, { es: 'Corrección de la fecha de la asamblea', en: 'Correction to the assembly date' }),
+        contenido: text(L, { es: 'La reunión fue el día dieciocho.', en: 'The meeting was on the eighteenth.' }),
+      },
     },
   ];
 }
@@ -352,7 +422,7 @@ export function seedPrimarySourcesDemoData(): boolean {
         itemId, text(L, source.title), source.kind, source.fileName, source.mimeType,
         bytes, source.content, text(L, source.description),
         `${ID.repository} · ${source.reference}`, digest, source.docType,
-        JSON.stringify({ demo: true, fictional: true }), now, now,
+        JSON.stringify({ demo: true, fictional: true, ...source.metadata }), now, now,
       );
       insertItemUnit.run(itemId, unitId, now);
       insertProfile.run(
@@ -659,6 +729,32 @@ export function seedPrimarySourcesDemoData(): boolean {
       text(L, { es: 'Varios candidatos posibles; se conserva para probar la resolución.', en: 'Several possible candidates; retained to test resolution.' }),
       JSON.stringify({ demo: true, unresolved: true }), now, now,
     );
+
+    // The provenance map is driven by one explicit archival field per source.
+    // Mentions below remain research evidence and deliberately do not feed that map.
+    const provenanceBySource: Record<string, string> = {
+      letter: ID.placeCarmona,
+      minutes: ID.placeCarmona,
+      photograph: ID.placeSevilla,
+      newspaper: ID.placeSevilla,
+      map: ID.placeCarmona,
+      register: ID.placeEcija,
+      'located-only': ID.placeSevilla,
+      restricted: ID.placeSevilla,
+      receipt: ID.placeCarmona,
+      'margin-note': ID.placeCarmona,
+    };
+    const setProvenancePlace = db.prepare(
+      'UPDATE archive_item_profiles SET provenance_place_id=?, updated_at=? WHERE item_id=?'
+    );
+    for (const source of demoSources) {
+      setProvenancePlace.run(
+        provenanceBySource[source.suffix],
+        now,
+        `${PREFIX}item-${source.suffix}`,
+      );
+    }
+
     const insertPlaceMention = db.prepare(
       `INSERT INTO archive_place_mentions (
         mention_id, item_id, excerpt_id, place_id, original_label, role,

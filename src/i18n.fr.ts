@@ -15,6 +15,7 @@ import { DIARIZATION_TRANSLATIONS } from './i18n.diarization';
 import { WORLDBUILDING_TRANSLATIONS } from './i18n.worldbuilding';
 import { PRIMARY_SOURCES_TRANSLATIONS } from './i18n.primarySources';
 import { PRIMARY_SOURCES_ARCHIVE_TRANSLATIONS } from './i18n.primarySourcesArchive';
+import { PRIMARY_SOURCES_CATALOG_TRANSLATIONS } from './i18n.primarySourcesCatalog';
 import { PRIMARY_SOURCES_FILES_TRANSLATIONS } from './i18n.primarySourcesFiles';
 import { PRIMARY_SOURCES_TEXT_TRANSLATIONS } from './i18n.primarySourcesText';
 import { PRIMARY_SOURCES_EVIDENCE_TRANSLATIONS } from './i18n.primarySourcesEvidence';
@@ -23,12 +24,14 @@ import { PRIMARY_SOURCES_DERIVED_TRANSLATIONS } from './i18n.primarySourcesDeriv
 import { PRIMARY_SOURCES_RESEARCH_TRANSLATIONS } from './i18n.primarySourcesResearch';
 import { PRIMARY_SOURCES_RELEASE_TRANSLATIONS } from './i18n.primarySourcesRelease';
 import { TESTIMONY_TRANSLATIONS } from './i18n.testimonies';
+import { NEW_VAULT_COMPLETION_TRANSLATIONS } from './i18n.newVaultCompletion';
 
 export const FR: Record<string, string> = {
   ...DIARIZATION_TRANSLATIONS.fr,
   ...PROSOPOGRAPHY_TRANSLATIONS.fr,
   ...PRIMARY_SOURCES_TRANSLATIONS.fr,
   ...PRIMARY_SOURCES_ARCHIVE_TRANSLATIONS.fr,
+  ...PRIMARY_SOURCES_CATALOG_TRANSLATIONS.fr,
   ...PRIMARY_SOURCES_FILES_TRANSLATIONS.fr,
   ...PRIMARY_SOURCES_TEXT_TRANSLATIONS.fr,
   ...PRIMARY_SOURCES_EVIDENCE_TRANSLATIONS.fr,
@@ -38,6 +41,7 @@ export const FR: Record<string, string> = {
   ...PRIMARY_SOURCES_RELEASE_TRANSLATIONS.fr,
   ...WORLDBUILDING_TRANSLATIONS.fr,
   ...TESTIMONY_TRANSLATIONS.fr,
+  ...NEW_VAULT_COMPLETION_TRANSLATIONS.fr,
   ...WORLD_CHAT_TRANSLATIONS.fr,
   "Lo que cuenta el mapa": "Ce que raconte la carte",
   "Ver dónde ocurren las escenas ({n})": "Voir où se passent les scènes ({n})",
@@ -1182,6 +1186,8 @@ export const FR: Record<string, string> = {
   'Infraestructura opcional para nuevas capacidades conectadas.': 'Infrastructure optionnelle pour de nouvelles fonctionnalités connectées.',
   'Compartir vaults y trabajo colaborativo': 'Partage d\'espaces et travail collaboratif',
   'Compartir espacios y colaborar con control sobre los datos.': 'Partager des espaces et collaborer en gardant le contrôle sur les données.',
+  'Apps para iOS y iPadOS': 'Apps pour iOS et iPadOS',
+  'Llevar Nodus a iPhone y iPad con aplicaciones nativas adaptadas a cada dispositivo.': 'Proposer Nodus sur iPhone et iPad avec des apps natives adaptées à chaque appareil.',
   'Otros vaults sugeridos por usuarios': 'Autres espaces suggérés par les utilisateurs',
   'Vaults sugeridos por usuarios': 'Espaces suggérés par les utilisateurs',
   'Vault de prosopografía': 'Espace de prosopographie',
@@ -1279,12 +1285,20 @@ export const FR: Record<string, string> = {
   'Escenas': 'Scènes',
   'Tramas': 'Intrigues',
   'Manuscritos': 'Manuscrits',
-  'Desarrollo muy temprano; solo recomendable para testers.': 'Développement très précoce ; recommandé uniquement pour les testeurs.',
+  'No utilizable para trabajo real; solo para colaboradores que prueben funciones incompletas y reporten errores y mejoras.':
+    'Non utilisable pour un travail réel ; réservé aux contributeurs qui testent des fonctions incomplètes et signalent des bugs et des améliorations.',
   'Funciones principales aún en prueba; solo recomendable para testers.':
     'Fonctionnalités principales encore en test ; recommandé uniquement pour les testeurs.',
   'Funcional, pero aún necesita feedback y corrección de errores.': 'Fonctionnel, mais nécessite encore des retours et des corrections de bugs.',
   'La fase avanzará cuando haya suficiente feedback y pulido.': 'La phase avancera lorsqu\'il y aura suffisamment de retours et de finitions.',
   'Reporta los errores desde el botón superior.': 'Signalez les bugs depuis le bouton en haut.',
+  'PRE-ALPHA: este vault no es utilizable para trabajo real. Está disponible exclusivamente para personas que quieran colaborar probando funciones incompletas y reportando errores y propuestas de mejora.':
+    'PRE-ALPHA : ce vault n’est pas utilisable pour un travail réel. Il est exclusivement destiné aux personnes souhaitant collaborer en testant des fonctions incomplètes et en signalant des bugs et des propositions d’amélioration.',
+  '¿Crear un vault PRE-ALPHA?': 'Créer un vault PRE-ALPHA ?',
+  'Sí, crear solo para pruebas': 'Oui, créer uniquement pour les tests',
+  'Este vault todavía no es utilizable para trabajo real.': 'Ce vault n’est pas encore utilisable pour un travail réel.',
+  'Continúa únicamente si quieres colaborar probando funciones incompletas y reportando errores y propuestas de mejora. Puede fallar, cambiar sin aviso o perder datos.':
+    'Continuez uniquement si vous souhaitez collaborer en testant des fonctions incomplètes et en signalant des bugs et des propositions d’amélioration. Il peut échouer, changer sans préavis ou perdre des données.',
   'Versión experimental recomendada solo para testers. Guarda copias de seguridad y reporta cualquier error desde el botón superior.':
     'Version expérimentale recommandée uniquement pour les testeurs. Conservez des sauvegardes et signalez tout bug depuis le bouton en haut.',
   'Versión beta: ayúdanos con sugerencias y reportando errores desde el botón superior.':
@@ -4999,6 +5013,7 @@ export const FR: Record<string, string> = {
   'Mostrar u ocultar miniaturas': 'Afficher ou masquer les miniatures',
   'Buscar dentro del PDF': 'Rechercher dans le PDF',
   'Ocultar panel lateral': 'Masquer le panneau latéral',
+  'Mostrar panel lateral': 'Afficher le panneau latéral',
   'Buscar dentro del PDF…': 'Rechercher dans le PDF…',
   'Escribe al menos dos caracteres para buscar en todas las páginas.': 'Saisissez au moins deux caractères pour effectuer une recherche dans toutes les pages.',
   'Buscando en el PDF…': 'Recherche dans le PDF…',

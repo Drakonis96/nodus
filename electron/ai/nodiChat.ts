@@ -13,6 +13,9 @@ import { buildDatabaseChatContext } from './databaseChat';
 import { listDatabases } from '../db/databasesRepo';
 import { retrieveStudyAssistantEntries } from './studySearch';
 import { buildNodiAllVaultsContext } from '../db/crossVault';
+import { getProsopIdentityWorkspace } from '../db/prosopIdentityRepo';
+import { getProsopMembershipWorkspace } from '../db/prosopMembershipRepo';
+import { searchProsopography } from '../db/prosopSearchRepo';
 import { buildWorldChatFacts } from './worldChat';
 import {
   composeWorldChatContext,
@@ -28,7 +31,21 @@ const VAULT_TYPE_LABEL: Record<string, string> = {
   databases: 'bases de datos',
   primary_sources: 'fuentes primarias',
   estudio: 'estudio',
+  docencia: 'docencia',
+  testimonios: 'testimonios e historia oral',
+  prosopography: 'prosopografía',
   worldbuilding: 'construcción de mundos',
+};
+
+const RESPONSE_LANGUAGE: Record<string, string> = {
+  es: 'Spanish',
+  en: 'English',
+  fr: 'French',
+  de: 'German',
+  pt: 'European Portuguese',
+  'pt-BR': 'Brazilian Portuguese',
+  it: 'Italian',
+  tr: 'Turkish',
 };
 
 const MAX_VIEW_CHARS = 12_000;
@@ -82,7 +99,7 @@ function primarySourceCitationsEnabled(request: NodiChatRequest): boolean {
 function buildSystemPrompt(request: NodiChatRequest, sources: string[]): string {
   const settings = getSettings();
   const active = getActiveVault();
-  const lang = settings.uiLanguage === 'es' ? 'Spanish' : 'English';
+  const lang = RESPONSE_LANGUAGE[settings.uiLanguage] ?? 'English';
   const model = resolveModelRef(request.model ?? settings.nodiModel ?? settings.chatModel);
   const selected = request.contexts.length ? request.contexts.join(', ') : 'ninguno';
   const citeCorpus = corpusCitationsEnabled(request);
@@ -136,7 +153,7 @@ async function buildActiveVaultContext(question: string, channel: 'localAi' | 'e
     const built = buildDatabaseChatContext(selected.map((database) => database.id));
     return { vault: active.name, type: active.type, databases: built.names, bounded_profile_and_sample: built.context };
   }
-  if (active.type === 'estudio') {
+  if (active.type === 'estudio' || active.type === 'docencia') {
     const entries = await retrieveStudyAssistantEntries(question, {}, [], 12);
     return {
       vault: active.name,
@@ -148,6 +165,29 @@ async function buildActiveVaultContext(question: string, channel: 'localAi' | 'e
         location: entry.location,
         text: clip(entry.text, 1_600),
       })),
+    };
+  }
+  if (active.type === 'prosopography') {
+    const identity = getProsopIdentityWorkspace();
+    return {
+      vault: active.name,
+      type: active.type,
+      coverage: getProsopMembershipWorkspace().coverage,
+      relevant_records: searchProsopography(question).slice(0, 24),
+      people: identity.persons
+        .filter((person) => person.privacyStatus !== 'restricted')
+        .slice(0, 40)
+        .map((person) => ({
+          personId: person.personId,
+          displayName: person.displayName,
+          identityStatus: person.identityStatus,
+          reviewStatus: person.reviewStatus,
+          birthDate: person.birthDate,
+          deathDate: person.deathDate,
+          statementCount: person.statementCount,
+          sourceCount: person.sourceCount,
+        })),
+      privacy_note: 'Las personas restringidas y las variables sensibles quedan fuera de este contexto.',
     };
   }
   if (active.type === 'worldbuilding') {
@@ -186,7 +226,7 @@ async function buildContext(
     sections.push({ name, content: clip(raw, limit) });
   };
 
-  if (selected.has('documentation')) add('DOCUMENTACIÓN DE NODUS', NODUS_DOCUMENTATION, 14_000);
+  if (selected.has('documentation')) add('DOCUMENTACIÓN DE NODUS', NODUS_DOCUMENTATION, 24_000);
   if (selected.has('current_view')) {
     const current = request.currentView ?? getNodiViewContext();
     if (current) add('VISTA ACTUAL', current, MAX_VIEW_CHARS + 1_000);

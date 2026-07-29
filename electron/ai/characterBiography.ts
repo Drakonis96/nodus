@@ -16,14 +16,13 @@ import { kinOf } from '../db/relationshipsRepo';
 import { listSocialRelationsForPerson } from '../db/socialRepo';
 import { getSettings } from '../db/settingsRepo';
 import {
-  CHARACTER_BIOGRAPHY_PROPOSE_SYSTEM,
-  CHARACTER_BIOGRAPHY_SYSTEM,
   composeCharacterBiographyContext,
   hasCharacterBiographyMaterial,
   type CharacterBiographySources,
 } from '@shared/characterBiographyContext';
 import type { CharacterBiographyMode } from '@shared/types';
 import { CHARACTER_NAME_KIND_LABEL } from '@shared/characterLabels';
+import { worldOperationSystemPrompt } from '@shared/worldOperationPrompts';
 
 export interface CharacterBiographyResult {
   biography: string | null;
@@ -94,8 +93,12 @@ export async function generateCharacterBiography(
   const model = settings.synthesisModel ?? settings.extractionModel ?? null;
   const text = await completeText(
     {
-      system: mode === 'propose' ? CHARACTER_BIOGRAPHY_PROPOSE_SYSTEM : CHARACTER_BIOGRAPHY_SYSTEM,
+      system: worldOperationSystemPrompt(
+        mode === 'propose' ? 'biographyPropose' : 'biography',
+        settings.promptLanguage ?? 'es',
+      ),
       user: composeCharacterBiographyContext(sources, mode),
+      plainContext: true,
       // Warmer than the genealogy biography's 0.3: this is narrative prose about an
       // invented person, not a cautious reading of records. Warmer still when proposing.
       temperature: mode === 'propose' ? 0.9 : 0.7,

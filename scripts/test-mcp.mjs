@@ -108,6 +108,52 @@ try {
     'nodus_teaching_get_rubric',
     'nodus_create_database_row',
     'nodus_set_database_cell',
+    'nodus_world_get_overview',
+    'nodus_world_search',
+    'nodus_world_list_characters',
+    'nodus_world_get_character',
+    'nodus_world_create_character',
+    'nodus_world_update_character',
+    'nodus_world_list_places',
+    'nodus_world_get_place',
+    'nodus_world_create_place',
+    'nodus_world_update_place',
+    'nodus_world_list_groups',
+    'nodus_world_get_group',
+    'nodus_world_create_group',
+    'nodus_world_update_group',
+    'nodus_world_list_scenes',
+    'nodus_world_get_scene',
+    'nodus_world_create_scene',
+    'nodus_world_update_scene',
+    'nodus_world_list_secrets',
+    'nodus_world_get_secret',
+    'nodus_world_create_secret',
+    'nodus_world_update_secret',
+    'nodus_world_list_entries',
+    'nodus_world_get_entry',
+    'nodus_world_list_unresolved_links',
+    'nodus_world_create_article',
+    'nodus_world_update_article',
+    'nodus_world_list_threads',
+    'nodus_world_get_thread',
+    'nodus_world_get_story_board',
+    'nodus_world_create_thread',
+    'nodus_world_update_thread',
+    'nodus_world_list_rules',
+    'nodus_world_get_rule',
+    'nodus_world_create_rule',
+    'nodus_world_update_rule',
+    'nodus_world_list_questions',
+    'nodus_world_get_question',
+    'nodus_world_create_question',
+    'nodus_world_update_question',
+    'nodus_world_list_maps',
+    'nodus_world_get_map',
+    'nodus_world_get_manuscript',
+    'nodus_world_update_scene_text',
+    'nodus_world_get_continuity',
+    'nodus_world_get_calendar',
     'nodus_prosop_get_design',
     'nodus_prosop_list_population',
     'nodus_prosop_search',
@@ -154,6 +200,25 @@ try {
       && !prosopography.has('nodus_teaching_get_gradebook'),
     'prosopography does not inherit genealogy, database or teaching tools',
   );
+  const worldbuilding = surfaceFor('worldbuilding');
+  assert.ok(
+    worldbuilding.has('nodus_world_get_overview')
+      && worldbuilding.has('nodus_world_create_character')
+      && worldbuilding.has('nodus_world_get_manuscript')
+      && worldbuilding.has('nodus_world_get_continuity'),
+    'worldbuilding exposes its complete namespaced read and non-destructive authoring surface',
+  );
+  assert.ok(
+    !worldbuilding.has('nodus_list_ideas')
+      && !worldbuilding.has('nodus_list_persons')
+      && !worldbuilding.has('nodus_list_databases')
+      && !worldbuilding.has('nodus_prosop_search'),
+    'worldbuilding does not inherit unrelated research, records, database or prosopography tools',
+  );
+  assert.ok(
+    [...academic].every((name) => !name.startsWith('nodus_world_')),
+    'world tools fail closed outside a Worldbuilding vault',
+  );
   assert.equal(surfaceFor(null).size, expectedTools.length, 'a null vault type registers the full surface');
 
   seedMcpDatabase(getDb());
@@ -182,7 +247,11 @@ try {
   assert.equal(capabilities.counts.teachingAssessmentPlans, 0, 'capabilities reports the assessment-plan count');
   assert.equal(capabilities.counts.teachingExams, 0, 'capabilities reports the exam count');
   assert.equal(capabilities.counts.teachingRubrics, 0, 'capabilities reports the rubric count');
+  assert.equal(capabilities.counts.worldCharacters, 0, 'capabilities reports Worldbuilding characters');
+  assert.equal(capabilities.counts.worldScenes, 0, 'capabilities reports Worldbuilding scenes');
+  assert.equal(capabilities.counts.worldEntries, 0, 'capabilities reports the unified world index');
   assert.ok(Array.isArray(capabilities.enums.eventTypes), 'capabilities exposes the event-type vocabulary');
+  assert.ok(Array.isArray(capabilities.enums.worldEntryKinds), 'capabilities exposes the Worldbuilding vocabulary');
   assert.ok(capabilities.vault.active.type, 'capabilities exposes the active vault type');
 
   // Read-only genealogy tools are wired and safe on a non-genealogy corpus, and use
@@ -577,6 +646,104 @@ try {
   assert.ok(rubricList.some((r) => r.id === teachRubric.id), 'list_rubrics returns the rubric');
   const rubricDetail = await callTool(server, 'nodus_teaching_get_rubric', { rubricId: teachRubric.id });
   assert.ok(Array.isArray(rubricDetail.criteria) && Array.isArray(rubricDetail.levels), 'get_rubric returns criteria and levels');
+
+  // Worldbuilding is a first-class MCP surface. It can build and inspect canonical
+  // author-owned data, while destructive deletion remains exclusive to the app.
+  const worldPlace = (await callTool(server, 'nodus_world_create_place', {
+    name: 'Ciudad de Nácar',
+    kind: 'city',
+    atmosphere: 'Bruma azul y campanas de marea.',
+  })).place;
+  const worldCharacter = (await callTool(server, 'nodus_world_create_character', {
+    displayName: 'Ilyra Venn',
+    species: 'Humana',
+    narrativeRole: 'protagonist',
+    lifeStatus: 'alive',
+    backstory: 'Custodia el archivo de mareas.',
+  })).character;
+  const worldGroup = (await callTool(server, 'nodus_world_create_group', {
+    name: 'Consejo de Nácar',
+    kind: 'faction',
+    summary: 'Gobierna las rutas de marea.',
+    seatPlaceId: worldPlace.placeId,
+  })).group;
+  assert.equal(worldGroup.seatPlaceId, worldPlace.placeId);
+  const worldScene = (await callTool(server, 'nodus_world_create_scene', {
+    title: 'La puerta lunar',
+    placeId: worldPlace.placeId,
+    status: 'draft',
+    summary: 'Ilyra abre la puerta durante la tercera luna.',
+  })).scene;
+  await callTool(server, 'nodus_world_update_scene_text', {
+    sceneId: worldScene.sceneId,
+    text: 'Ilyra apoyó la mano en la puerta lunar. La marea respondió.',
+  });
+  const worldArticle = (await callTool(server, 'nodus_world_create_article', {
+    title: 'La tercera luna',
+    category: 'concept',
+    summary: 'Una marea celeste que abre rutas imposibles.',
+    body: `La [[scene:${worldScene.sceneId}|puerta lunar]] solo responde a la tercera luna.`,
+  })).article;
+  const worldThread = (await callTool(server, 'nodus_world_create_thread', {
+    kind: 'conflict',
+    title: 'El bloqueo del estuario',
+    stakes: 'La ciudad perderá su única ruta segura.',
+  })).thread;
+  const worldRule = (await callTool(server, 'nodus_world_create_rule', {
+    title: 'Toda puerta exige una memoria',
+    statement: 'Las puertas de marea solo se abren entregando un recuerdo.',
+    cost: 'El recuerdo desaparece para siempre.',
+    hardness: 'costly',
+  })).rule;
+  const worldQuestion = (await callTool(server, 'nodus_world_create_question', {
+    question: '¿Qué recuerdo entrega Ilyra?',
+    anchorKind: 'scene',
+    anchorId: worldScene.sceneId,
+    anchorField: 'summary',
+    blocking: true,
+  })).question;
+  const worldSecret = (await callTool(server, 'nodus_world_create_secret', {
+    title: 'El archivo miente',
+    ownerPersonId: worldCharacter.personId,
+    content: 'Las cartas de marea fueron reescritas.',
+  })).secret;
+
+  const worldOverview = await callTool(server, 'nodus_world_get_overview');
+  assert.ok(worldOverview.counts.total >= 1 && worldOverview.counts.scenes >= 1, 'world overview counts the canonical cast and scenes');
+  const worldCharacterDetail = await callTool(server, 'nodus_world_get_character', { personId: worldCharacter.personId });
+  assert.equal(worldCharacterDetail.character.profile.backstory, 'Custodia el archivo de mareas.');
+  assert.ok(worldCharacterDetail.secrets.owned.some((secret) => secret.secretId === worldSecret.secretId));
+  const worldPlaceDetail = await callTool(server, 'nodus_world_get_place', { placeId: worldPlace.placeId });
+  assert.equal(worldPlaceDetail.place.profile.atmosphere, 'Bruma azul y campanas de marea.');
+  const worldEntry = await callTool(server, 'nodus_world_get_entry', { kind: 'article', id: worldArticle.articleId });
+  assert.match(worldEntry.body, /tercera luna/i);
+  const worldSearch = await callTool(server, 'nodus_world_search', { query: 'puerta lunar', limit: 20 });
+  assert.ok(worldSearch.results.some((result) => result.id === worldScene.sceneId || result.id === worldArticle.articleId));
+  const worldManuscript = await callTool(server, 'nodus_world_get_manuscript', { includeText: true });
+  assert.ok(worldManuscript.scenes.some((scene) => scene.sceneId === worldScene.sceneId && /marea respondió/.test(scene.text)));
+  assert.equal((await callTool(server, 'nodus_world_get_thread', { threadId: worldThread.threadId })).thread.title, 'El bloqueo del estuario');
+  assert.equal((await callTool(server, 'nodus_world_get_rule', { ruleId: worldRule.ruleId })).rule.hardness, 'costly');
+  assert.equal((await callTool(server, 'nodus_world_get_question', { questionId: worldQuestion.questionId })).question.blocking, true);
+  assert.ok(Array.isArray((await callTool(server, 'nodus_world_get_continuity')).findings));
+  assert.ok((await callTool(server, 'nodus_world_get_calendar')).calendar);
+
+  const { buildServerSnapshot, WORLDBUILDING_SERVER_TABLES } = require(path.join(repoRoot, 'electron/serverSync/serverSnapshot.ts'));
+  const publishedWorld = buildServerSnapshot(
+    { id: 'world-mcp-test', name: 'Orthea', type: 'worldbuilding' },
+    { nodusServerIncludeUserContent: false, nodusServerIncludePassages: false },
+    getDb(),
+  );
+  const publishedWorldPayload = JSON.parse(publishedWorld.buffer.toString('utf8'));
+  for (const table of ['persons', 'character_profiles', 'world_scenes', 'world_scene_text', 'world_articles', 'world_secrets']) {
+    assert.ok(WORLDBUILDING_SERVER_TABLES.includes(table), `${table} belongs to the explicit Worldbuilding server contract`);
+    assert.ok(Array.isArray(publishedWorldPayload.tables[table]), `${table} is published to Nodus Server`);
+  }
+  assert.ok(
+    publishedWorldPayload.tables.world_secrets.some((secret) => secret.secret_id === worldSecret.secretId),
+    'fictional secret ids remain linkable in the safe server projection',
+  );
+  assert.equal(publishedWorldPayload.tables.character_chat_messages, undefined, 'private character chats stay local');
+  assert.equal(publishedWorldPayload.tables.world_scene_snapshots, undefined, 'manuscript editing history stays local');
 
   const ideas = await callTool(server, 'nodus_list_ideas', { limit: 1, offset: 0, query: 'turismo' });
   assert.equal(ideas.total, 1);

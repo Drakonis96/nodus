@@ -56,6 +56,14 @@ try {
     'the language directive must come after the vault-type pack'
   );
 
+  // Newly added vaults use a native pack for the selected prompt language.
+  const testimony = registry.createVault('Testimonianze', 'testimonios');
+  registry.setActiveVault(testimony.id);
+  updateSettings({ promptLanguage: 'it' });
+  const testimonyPack = withVaultTypeContext({ system: BASE }).system;
+  assert.match(testimonyPack, /MODALITÀ TESTIMONIANZE/, 'Italian Testimonies pack is wired into runtime');
+  assert.doesNotMatch(testimonyPack, /MODO TESTIMONIOS/, 'runtime does not append the Spanish pack in Italian');
+
   // Switching back to the academic vault drops the pack again.
   updateSettings({ promptLanguage: 'es' });
   registry.setActiveVault('default');

@@ -15,13 +15,12 @@ import { getSettings } from '../db/settingsRepo';
 import { blockedSceneFor, getWorldQuestion, setQuestionOption } from '../db/worldQuestionsRepo';
 import { entryProse, linksFrom, listWorldEntries, worldBacklinks } from '../db/worldEncyclopediaRepo';
 import {
-  WORLD_QUESTION_OPTIONS_SYSTEM,
   composeWorldQuestionContext,
   hasWorldQuestionMaterial,
   parseQuestionOptions,
   type WorldQuestionSources,
 } from '@shared/worldQuestionContext';
-import { withWorldPromptLanguage } from '@shared/worldPromptLanguage';
+import { worldOperationSystemPrompt } from '@shared/worldOperationPrompts';
 import { findPlaceholders } from '@shared/worldQuestions';
 import { WORLD_ENTRY_KIND_LABEL, WORLD_LINK_FIELD_LABEL, entryKey } from '@shared/worldEncyclopedia';
 import type { WorldEntryKind, WorldQuestionOptionsResult } from '@shared/types';
@@ -91,8 +90,9 @@ export async function proposeQuestionOptions(questionId: string): Promise<WorldQ
   const model = settings.synthesisModel ?? settings.extractionModel ?? null;
   const completion = await completeText(
     {
-      system: withWorldPromptLanguage(WORLD_QUESTION_OPTIONS_SYSTEM, settings.uiLanguage),
+      system: worldOperationSystemPrompt('questionOptions', settings.promptLanguage ?? 'es'),
       user: composeWorldQuestionContext(sources),
+      plainContext: true,
       // The warmest call in the app, and deliberately so: three answers that differ only
       // in wording are not a decision, and a cold model writes exactly those.
       temperature: 0.9,

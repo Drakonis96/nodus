@@ -59,7 +59,8 @@ export function Onboarding({
   // The onboarding adapts to the active vault: only academic research starts with
   // Zotero. Dedicated workspaces use a short intro → AI → done flow.
   const vaultType = activeVault?.type ?? 'academic';
-  const simple = vaultType === 'primary_sources' || vaultType === 'genealogy' || vaultType === 'databases' || vaultType === 'estudio' || vaultType === 'docencia';
+  const usesZoteroOnboarding = vaultType === 'academic';
+  const simple = !usesZoteroOnboarding;
   const aiStep = simple ? 1 : 3; // the "AI provider" step index
   const doneStep = simple ? 2 : 4; // the final step index
 
@@ -253,6 +254,21 @@ export function Onboarding({
           ? {
               subtitle: t('Organiza tu docencia: cursos, materiales, horarios y clases en un espacio local y privado.'),
               body: t('Empieza creando tus cursos y asignaturas. Después podrás importar archivos o enlazar materiales de Zotero de forma opcional, planificar horarios y calendario, y grabar tus clases.'),
+            }
+        : vaultType === 'testimonios'
+          ? {
+              subtitle: t('Conserva entrevistas, participantes y transcripciones en un archivo de historia oral local y privado.'),
+              body: t('Empieza registrando una entrevista o un participante. Podrás añadir grabaciones, transcribirlas, codificar fragmentos y contrastar testimonios sin depender de una biblioteca bibliográfica externa.'),
+            }
+        : vaultType === 'prosopography'
+          ? {
+              subtitle: t('Estudia una población histórica desde sus fuentes, observaciones y criterios explícitos.'),
+              body: t('Define la población y sus variables, registra las fuentes y captura observaciones trazables antes de analizar personas, cohortes y redes.'),
+            }
+        : vaultType === 'worldbuilding'
+          ? {
+              subtitle: t('Construye un mundo de ficción coherente a partir de tu propio canon.'),
+              body: t('Empieza creando personajes, lugares y reglas. Después podrás desarrollar escenas, culturas, facciones, mapas y manuscritos manteniendo la continuidad del mundo.'),
             }
         : { subtitle: '', body: '' };
 
