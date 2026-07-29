@@ -170,9 +170,33 @@ Este vault es un gestor de bases de datos estructuradas (tablas con columnas tip
   },
   {
     id: 'testimonios',
-    available: false,
-    defaultHiddenViews: [],
-    promptPack: '',
+    available: true,
+    // Historia oral: la navegación se reduce deliberadamente a ocho entradas (Inicio,
+    // Buscar, Entrevistas, Participantes, Contrastes, Notas, Toolkit y Ajustes). Todo lo
+    // demás — el grafo de ideas, la biblioteca de Zotero, la escritura, los proyectos —
+    // pertenece a un corpus bibliográfico, no a un archivo de entrevistas, y mostrarlo
+    // comunicaría funciones que este vault no pretende ofrecer. `search` y `notes` se
+    // quedan: son las dos superficies universales que el vertical sí reutiliza.
+    defaultHiddenViews: [
+      'library',
+      'graph',
+      'argument',
+      'ideas',
+      'authors',
+      'immersion',
+      'gaps',
+      'debate',
+      'research',
+      'hypothesis',
+      'reading',
+      'deepResearch',
+      'writing',
+      'projects',
+    ],
+    promptPack: `
+
+═══ CONTEXTO DEL VAULT — MODO TESTIMONIOS ═══
+Este vault trabaja con entrevistas de historia oral y sus transcripciones. Trata cada testimonio como el relato situado de un narrador, no como una verificación automática de hechos. Distingue siempre entre palabras literales, correcciones editoriales, interpretaciones del investigador y contrastes con otras fuentes. Cuando cites, conserva el hablante, la entrevista y el código de tiempo. No borres contradicciones ni las resuelvas sin evidencia; muéstralas con su contexto. No infieras emociones, credibilidad, identidad ni atributos sensibles, ni evalúes la sinceridad de quien habla. Respeta las restricciones de acceso, anonimización, embargo y uso documentadas en la entrevista, y usa siempre el nombre público o el seudónimo cuando el acuerdo lo exija. Puedes proponer códigos, resumir, encontrar fragmentos relacionados y sugerir preguntas de seguimiento, pero no apliques códigos, no apruebes transcripciones y no cambies condiciones de acceso: esas decisiones son del investigador. Si el material no permite responder, dilo.`,
   },
   {
     id: 'worldbuilding',
@@ -319,6 +343,14 @@ export const VAULT_TYPE_SCOPED_VIEWS: Record<string, VaultType[]> = {
   cultures: ['worldbuilding'],
   dynasties: ['worldbuilding'],
   scenes: ['worldbuilding'],
+  // Testimonios: las tres secciones propias del vertical de historia oral. Las demás —
+  // Buscar, Notas, Toolkit y Ajustes — son universales y se reutilizan tal cual. No hay
+  // vistas de Grabaciones, Transcripciones, Fragmentos ni Temas y códigos: ese trabajo
+  // sucede DENTRO del dossier de una entrevista, y sacarlo al menú es exactamente la
+  // fragmentación que este vault existe para deshacer (decisiones 6 y 7 del plan).
+  testimonyInterviews: ['testimonios'],
+  testimonyParticipants: ['testimonios'],
+  testimonyContrasts: ['testimonios'],
   // Study mode owns its academic organisation, materials and question bank.
   // They must never leak into research/records/database vaults. The teaching
   // ('docencia') mode reuses the shared organisation surfaces — courses & subjects,

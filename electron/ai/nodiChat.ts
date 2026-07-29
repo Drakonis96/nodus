@@ -3,6 +3,8 @@ import { getSettings } from '../db/settingsRepo';
 import { getActiveVault } from '../vaults/vaultRegistry';
 import { buildNodiResearchContext, CHAT_CITATION_RULES, humanizeResearchCitations } from './researchAssistant';
 import { buildGenealogyContext } from './genealogyChatContext';
+import { buildTestimonyChatContext } from './testimonyChatContext';
+import { isLocalProvider } from '@shared/providers';
 import { buildDatabaseChatContext } from './databaseChat';
 import { listDatabases } from '../db/databasesRepo';
 import { retrieveStudyAssistantEntries } from './studySearch';
@@ -97,7 +99,7 @@ function buildSystemPrompt(request: NodiChatRequest, sources: string[]): string 
   ].join('\n');
 }
 
-async function buildActiveVaultContext(question: string): Promise<unknown> {
+async function buildActiveVaultContext(question: string, channel: 'localAi' | 'externalAi' = 'localAi'): Promise<unknown> {
   const active = getActiveVault();
   if (active.type === 'genealogy' || active.type === 'primary_sources') {
     return { vault: active.name, type: active.type, records: await buildGenealogyContext(question) };
@@ -131,11 +133,28 @@ async function buildActiveVaultContext(question: string): Promise<unknown> {
       bounded_world_context: composeWorldChatContext(buildWorldChatFacts({ question })),
     };
   }
+  if (active.type === 'testimonios') {
+    // TODO el material de una entrevista pasa por aquí, y aquí pasa por la puerta de
+    // acceso: lo que el acuerdo no autoriza no llega al prompt, ni siquiera recortado.
+    // `withheld` viaja a propósito — el modelo tiene que saber que hay material fuera de
+    // su alcance para no responder como si el corpus fuera lo que ve.
+    return {
+      vault: active.name,
+      type: active.type,
+      bounded_testimony_context: buildTestimonyChatContext(question, { vaultName: active.name, channel }),
+    };
+  }
   const research = await buildNodiResearchContext(question);
   return { vault: active.name, type: active.type, relevant_research_context: research.context, stats: research.stats };
 }
 
-async function buildContext(request: NodiChatRequest, question: string): Promise<{ text: string; sources: string[] }> {
+async function buildContext(
+  request: NodiChatRequest,
+  question: string,
+  /** El canal de acceso que corresponde al modelo elegido: un proveedor remoto SACA el
+   *  material del equipo, y eso exige un uso documentado distinto del de la IA local. */
+  channel: 'localAi' | 'externalAi',
+): Promise<{ text: string; sources: string[] }> {
   const selected = new Set<NodiContextKind>(request.contexts);
   const sections: Array<{ name: string; content: string }> = [];
   const add = (name: string, value: unknown, limit = MAX_SECTION_CHARS) => {
@@ -150,7 +169,7 @@ async function buildContext(request: NodiChatRequest, question: string): Promise
   }
   if (selected.has('vault') || selected.has('all_vaults')) {
     try {
-      add('BÓVEDA ACTIVA · RECUPERACIÓN RELEVANTE', await buildActiveVaultContext(question));
+      add('BÓVEDA ACTIVA · RECUPERACIÓN RELEVANTE', await buildActiveVaultContext(question, channel));
     } catch (error) {
       add('BÓVEDA ACTIVA · ESTADO', { unavailable: true, reason: error instanceof Error ? error.message : String(error) }, 2_000);
     }
@@ -180,7 +199,8 @@ export async function streamNodiChat(
   const messages = request.messages.filter((message) => message.content.trim()).slice(-MAX_HISTORY_MESSAGES);
   const latestUserIndex = messages.map((message) => message.role).lastIndexOf('user');
   const question = latestUserIndex >= 0 ? messages[latestUserIndex].content : '';
-  const context = await buildContext(request, question);
+  const chatModel = request.model ?? getSettings().nodiModel ?? getSettings().chatModel;
+  const context = await buildContext(request, question, chatModel && isLocalProvider(chatModel.provider) ? 'localAi' : 'externalAi');
   const history = messages.slice(0, Math.max(0, latestUserIndex)).map((message) => `${message.role === 'user' ? 'Usuario' : 'Nodi'}: ${clip(message.content, 6_000)}`).join('\n\n');
   const user = [
     context.text || '<contexto>El usuario no ha seleccionado ninguna fuente.</contexto>',

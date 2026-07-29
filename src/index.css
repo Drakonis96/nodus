@@ -2162,6 +2162,7 @@ body {
 .docencia .input:focus { border-color: #f97316; }
 .databases .input:focus { border-color: #cc0a3a; }
 .worldbuilding .input:focus { border-color: #8b5cf6; }
+.testimonios .input:focus { border-color: #06b6d4; }
 /* `.input` is declared after `@tailwind utilities`, so its `px-3` wins over a
    plain `pl-*` utility (same specificity, later in source). For an input with a
    leading icon, use this class instead of `pl-*` — its two-class selector wins. */
@@ -3272,3 +3273,149 @@ select.input optgroup {
   .study-editor-shell .study-milkdown { position: fixed; inset: 0; background: white; }
   .study-editor-shell .milkdown .ProseMirror { color: black; background: white; box-shadow: none; }
 }
+
+/* Testimonios vault → cyan (#0891b2) accent instead of the indigo default. Same remap
+   strategy as .worldbuilding / .docencia, and con su misma ampliación: el dossier de
+   entrevista y la ficha de participante se construyen sobre los componentes del
+   dossier de persona, que usan las variantes `dark:` del indigo mucho más que las
+   superficies de estudio. Una regla `.testimonios .text-indigo-300` nunca gana a
+   `dark:text-indigo-300`, así que las variantes oscuras se remapean explícitamente
+   más abajo bajo `.testimonios.dark`. */
+.testimonios { --tw-ring-color: rgba(8, 145, 178, 0.48); }
+.testimonios .btn-primary { background-color: #0891b2; }
+.testimonios .btn-primary:hover { background-color: #0e7490; }
+.testimonios .text-indigo-100 { color: #cffafe; }
+.testimonios .text-indigo-200 { color: #a5f3fc; }
+.testimonios .text-indigo-300 { color: #67e8f9; }
+.testimonios .text-indigo-400 { color: #22d3ee; }
+.testimonios .text-indigo-500 { color: #06b6d4; }
+.testimonios .text-indigo-600 { color: #0891b2; }
+.testimonios .text-indigo-700 { color: #0e7490; }
+.testimonios .text-indigo-900 { color: #164e63; }
+.testimonios .hover\:text-indigo-300:hover { color: #67e8f9; }
+.testimonios .hover\:text-indigo-400:hover { color: #22d3ee; }
+.testimonios .hover\:text-indigo-700:hover { color: #0e7490; }
+.testimonios .bg-indigo-400 { background-color: #22d3ee; }
+.testimonios .bg-indigo-500 { background-color: #06b6d4; }
+.testimonios .bg-indigo-600 { background-color: #0891b2; }
+.testimonios .hover\:bg-indigo-500:hover { background-color: #06b6d4; }
+.testimonios .bg-indigo-50 { background-color: #ecfeff; }
+.testimonios .bg-indigo-100 { background-color: #cffafe; }
+.testimonios .bg-indigo-900 { background-color: #164e63; }
+.testimonios .bg-indigo-950 { background-color: #083344; }
+.testimonios .bg-indigo-500\/15 { background-color: rgba(6, 182, 212, 0.15); }
+.testimonios .bg-indigo-600\/10 { background-color: rgba(8, 145, 178, 0.1); }
+.testimonios .bg-indigo-600\/15 { background-color: rgba(8, 145, 178, 0.15); }
+.testimonios .bg-indigo-600\/20 { background-color: rgba(8, 145, 178, 0.2); }
+.testimonios .bg-indigo-600\/30 { background-color: rgba(8, 145, 178, 0.3); }
+.testimonios .bg-indigo-900\/20 { background-color: rgba(22, 78, 99, 0.2); }
+.testimonios .bg-indigo-900\/30 { background-color: rgba(22, 78, 99, 0.3); }
+.testimonios .bg-indigo-900\/40 { background-color: rgba(22, 78, 99, 0.4); }
+.testimonios .bg-indigo-900\/50 { background-color: rgba(22, 78, 99, 0.5); }
+.testimonios .bg-indigo-950\/10 { background-color: rgba(8, 51, 68, 0.1); }
+.testimonios .bg-indigo-950\/15 { background-color: rgba(8, 51, 68, 0.15); }
+.testimonios .bg-indigo-950\/20 { background-color: rgba(8, 51, 68, 0.2); }
+.testimonios .bg-indigo-950\/25 { background-color: rgba(8, 51, 68, 0.25); }
+.testimonios .bg-indigo-950\/30 { background-color: rgba(8, 51, 68, 0.3); }
+.testimonios .bg-indigo-950\/40 { background-color: rgba(8, 51, 68, 0.4); }
+.testimonios .bg-indigo-950\/60 { background-color: rgba(8, 51, 68, 0.6); }
+.testimonios .border-indigo-200 { border-color: #a5f3fc; }
+.testimonios .border-indigo-400 { border-color: #22d3ee; }
+.testimonios .border-indigo-500 { border-color: #06b6d4; }
+.testimonios .border-indigo-600 { border-color: #0891b2; }
+.testimonios .border-indigo-700 { border-color: #0e7490; }
+.testimonios .border-indigo-800 { border-color: #155e75; }
+.testimonios .border-indigo-900 { border-color: #164e63; }
+.testimonios .border-indigo-600\/40 { border-color: rgba(8, 145, 178, 0.4); }
+.testimonios .border-indigo-600\/70 { border-color: rgba(8, 145, 178, 0.7); }
+.testimonios .border-indigo-700\/50 { border-color: rgba(14, 116, 144, 0.5); }
+.testimonios .border-indigo-700\/60 { border-color: rgba(14, 116, 144, 0.6); }
+.testimonios .border-indigo-700\/70 { border-color: rgba(14, 116, 144, 0.7); }
+.testimonios .border-indigo-800\/40 { border-color: rgba(21, 94, 117, 0.4); }
+.testimonios .border-indigo-800\/60 { border-color: rgba(21, 94, 117, 0.6); }
+.testimonios .border-indigo-800\/70 { border-color: rgba(21, 94, 117, 0.7); }
+.testimonios .border-indigo-900\/50 { border-color: rgba(22, 78, 99, 0.5); }
+.testimonios .border-indigo-900\/60 { border-color: rgba(22, 78, 99, 0.6); }
+.testimonios .border-indigo-900\/70 { border-color: rgba(22, 78, 99, 0.7); }
+.testimonios .ring-indigo-500 { --tw-ring-color: #06b6d4; }
+.testimonios .ring-indigo-500\/40 { --tw-ring-color: rgba(6, 182, 212, 0.4); }
+.testimonios .ring-indigo-600\/40 { --tw-ring-color: rgba(8, 145, 178, 0.4); }
+.testimonios .hover\:border-indigo-700\/60:hover { border-color: rgba(14, 116, 144, 0.6); }
+.testimonios .hover\:bg-indigo-600\/20:hover { background-color: rgba(8, 145, 178, 0.2); }
+.testimonios .hover\:bg-indigo-700:hover { background-color: #0e7490; }
+
+/* The `dark:` variants. The root carries .testimonios and .dark together, so these
+   need the compound selector to outrank Tailwind's own `.dark .dark\:…` rule. */
+.testimonios.dark .dark\:bg-indigo-900\/50 { background-color: rgba(22, 78, 99, 0.5); }
+.testimonios.dark .dark\:text-indigo-100 { color: #cffafe; }
+.testimonios.dark .dark\:text-indigo-200 { color: #a5f3fc; }
+.testimonios.dark .dark\:text-indigo-200\/75 { color: rgba(165, 243, 252, 0.75); }
+.testimonios.dark .dark\:text-indigo-300 { color: #67e8f9; }
+.testimonios.dark .dark\:text-indigo-300\/80 { color: rgba(103, 232, 249, 0.8); }
+.testimonios.dark .dark\:text-indigo-300\/90 { color: rgba(103, 232, 249, 0.9); }
+.testimonios.dark .dark\:text-indigo-400 { color: #22d3ee; }
+.testimonios.dark .dark\:hover\:text-indigo-200:hover { color: #a5f3fc; }
+.testimonios.dark .dark\:hover\:text-indigo-300:hover { color: #67e8f9; }
+.testimonios.dark .dark\:bg-indigo-400 { background-color: #22d3ee; }
+.testimonios.dark .dark\:bg-indigo-500\/15 { background-color: rgba(6, 182, 212, 0.15); }
+.testimonios.dark .dark\:bg-indigo-600\/10 { background-color: rgba(8, 145, 178, 0.1); }
+.testimonios.dark .dark\:bg-indigo-600\/15 { background-color: rgba(8, 145, 178, 0.15); }
+.testimonios.dark .dark\:bg-indigo-900\/20 { background-color: rgba(22, 78, 99, 0.2); }
+.testimonios.dark .dark\:bg-indigo-900\/30 { background-color: rgba(22, 78, 99, 0.3); }
+.testimonios.dark .dark\:bg-indigo-900\/40 { background-color: rgba(22, 78, 99, 0.4); }
+.testimonios.dark .dark\:bg-indigo-950 { background-color: #083344; }
+.testimonios.dark .dark\:bg-indigo-950\/10 { background-color: rgba(8, 51, 68, 0.1); }
+.testimonios.dark .dark\:bg-indigo-950\/15 { background-color: rgba(8, 51, 68, 0.15); }
+.testimonios.dark .dark\:bg-indigo-950\/20 { background-color: rgba(8, 51, 68, 0.2); }
+.testimonios.dark .dark\:bg-indigo-950\/25 { background-color: rgba(8, 51, 68, 0.25); }
+.testimonios.dark .dark\:bg-indigo-950\/30 { background-color: rgba(8, 51, 68, 0.3); }
+.testimonios.dark .dark\:bg-indigo-950\/40 { background-color: rgba(8, 51, 68, 0.4); }
+.testimonios.dark .dark\:bg-indigo-950\/60 { background-color: rgba(8, 51, 68, 0.6); }
+.testimonios.dark .dark\:hover\:bg-indigo-600:hover { background-color: #0891b2; }
+.testimonios.dark .dark\:border-indigo-400 { border-color: #22d3ee; }
+.testimonios.dark .dark\:border-indigo-600 { border-color: #0891b2; }
+.testimonios.dark .dark\:border-indigo-600\/40 { border-color: rgba(8, 145, 178, 0.4); }
+.testimonios.dark .dark\:border-indigo-600\/70 { border-color: rgba(8, 145, 178, 0.7); }
+.testimonios.dark .dark\:border-indigo-700 { border-color: #0e7490; }
+.testimonios.dark .dark\:border-indigo-700\/50 { border-color: rgba(14, 116, 144, 0.5); }
+.testimonios.dark .dark\:border-indigo-700\/60 { border-color: rgba(14, 116, 144, 0.6); }
+.testimonios.dark .dark\:border-indigo-700\/70 { border-color: rgba(14, 116, 144, 0.7); }
+.testimonios.dark .dark\:border-indigo-800 { border-color: #155e75; }
+.testimonios.dark .dark\:border-indigo-800\/40 { border-color: rgba(21, 94, 117, 0.4); }
+.testimonios.dark .dark\:border-indigo-800\/60 { border-color: rgba(21, 94, 117, 0.6); }
+.testimonios.dark .dark\:border-indigo-800\/70 { border-color: rgba(21, 94, 117, 0.7); }
+.testimonios.dark .dark\:border-indigo-900 { border-color: #164e63; }
+.testimonios.dark .dark\:border-indigo-900\/50 { border-color: rgba(22, 78, 99, 0.5); }
+.testimonios.dark .dark\:border-indigo-900\/60 { border-color: rgba(22, 78, 99, 0.6); }
+.testimonios.dark .dark\:border-indigo-900\/70 { border-color: rgba(22, 78, 99, 0.7); }
+.testimonios.dark .dark\:hover\:border-indigo-600:hover { border-color: #0891b2; }
+.testimonios.dark .dark\:ring-indigo-950 { --tw-ring-color: #083344; }
+
+/* Light mode: the deep 900/950 fills would be near-black panels, so they collapse to
+   the pale end of the violet scale, exactly as .light.docencia does for orange. */
+.light.testimonios .bg-indigo-950,
+.light.testimonios .bg-indigo-950\/10,
+.light.testimonios .bg-indigo-950\/15,
+.light.testimonios .bg-indigo-950\/20,
+.light.testimonios .bg-indigo-950\/25,
+.light.testimonios .bg-indigo-950\/30,
+.light.testimonios .bg-indigo-950\/40,
+.light.testimonios .bg-indigo-950\/60 { background-color: #cffafe; }
+.light.testimonios .bg-indigo-900,
+.light.testimonios .bg-indigo-900\/20,
+.light.testimonios .bg-indigo-900\/30,
+.light.testimonios .bg-indigo-900\/40,
+.light.testimonios .bg-indigo-900\/50 { background-color: #a5f3fc; }
+.light.testimonios .bg-indigo-600\/10 { background-color: rgba(8, 145, 178, 0.08); }
+.light.testimonios .bg-indigo-600\/15 { background-color: rgba(8, 145, 178, 0.1); }
+.light.testimonios .bg-indigo-600\/20 { background-color: rgba(8, 145, 178, 0.14); }
+.light.testimonios .hover\:bg-indigo-600\/20:hover { background-color: rgba(8, 145, 178, 0.18); }
+.light.testimonios .text-indigo-100,
+.light.testimonios .text-indigo-200 { color: #164e63; }
+.light.testimonios .text-indigo-300 { color: #0e7490; }
+.light.testimonios .text-indigo-400 { color: #0891b2; }
+.light.testimonios .border-indigo-700,
+.light.testimonios .border-indigo-700\/50,
+.light.testimonios .border-indigo-700\/60 { border-color: rgba(8, 145, 178, 0.45); }
+.light.testimonios .border-indigo-800\/40,
+.light.testimonios .border-indigo-800\/60 { border-color: rgba(8, 145, 178, 0.3); }

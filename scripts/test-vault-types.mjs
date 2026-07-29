@@ -49,7 +49,7 @@ test('unknown / missing values normalise to academic', () => {
 
 test('shipped and preview vaults are selectable; announced future vaults remain gated', () => {
   const ids = vt.availableVaultTypes().map((d) => d.id);
-  assert.deepEqual(ids, ['academic', 'genealogy', 'estudio', 'databases', 'worldbuilding', 'docencia']);
+  assert.deepEqual(ids, ['academic', 'genealogy', 'estudio', 'databases', 'testimonios', 'worldbuilding', 'docencia']);
   assert.equal(vt.getVaultTypeDef('genealogy').available, true);
   assert.equal(vt.getVaultTypeDef('estudio').available, true);
   assert.equal(vt.getVaultTypeDef('databases').available, true);
@@ -57,14 +57,14 @@ test('shipped and preview vaults are selectable; announced future vaults remain 
   // real workspaces, so no type is a preview any more. The mechanism stays — it is how
   // a type gets announced before it exists — but the list is empty, and putting a type
   // back into it means writing its sidebar and Inicio too (see PREVIEW_VAULT_TYPES).
-  for (const graduated of ['docencia', 'worldbuilding']) {
+  for (const graduated of ['docencia', 'worldbuilding', 'testimonios']) {
     assert.equal(vt.getVaultTypeDef(graduated).available, true);
     assert.equal(vt.isPreviewVaultType(graduated), false);
     assert.equal(vt.isViewAllowedForVaultType('home', graduated), true);
     assert.equal(vt.isViewAllowedForVaultType('settings', graduated), true);
   }
   assert.deepEqual(vt.PREVIEW_VAULT_TYPES, []);
-  for (const gated of ['primary_sources', 'testimonios', 'prosopography']) {
+  for (const gated of ['primary_sources', 'prosopography']) {
     assert.equal(vt.getVaultTypeDef(gated).available, false, `${gated} not selectable this release`);
   }
   assert.deepEqual(vt.VAULT_TYPES.map((d) => d.id), ['academic', 'genealogy', 'prosopography', 'estudio', 'primary_sources', 'databases', 'testimonios', 'worldbuilding', 'docencia']);
@@ -77,7 +77,7 @@ test('the vault picker derives selectable modes from the canonical registry', as
   assert.match(picker, /VAULT_TYPES\.filter\(\(type\) => type\.available\)/);
   assert.match(picker, /const CREATE_VAULT_TYPES: VaultType\[\] = \[\s*'academic', 'primary_sources', 'testimonios',\s*'databases', 'docencia', 'estudio',\s*'genealogy', 'prosopography', 'worldbuilding',\s*\]/s);
   assert.doesNotMatch(picker, /COMING_SOON_VAULT_TYPES[^\n]*estudio/);
-  assert.match(picker, /type === 'worldbuilding'\) return 'alpha'/);
+  assert.match(picker, /type === 'worldbuilding' \|\| type === 'testimonios'\) return 'alpha'/);
   assert.match(picker, /type === 'estudio' \|\| type === 'genealogy' \|\| type === 'databases' \|\| type === 'docencia'\) return 'beta'/);
   assert.doesNotMatch(picker, /type === '(?:estudio|genealogy)'\) return '(?:pre-alpha|alpha)'/);
   assert.match(picker, /data-testid="vault-phase-notice"/);

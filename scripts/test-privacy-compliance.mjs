@@ -157,9 +157,12 @@ test('every microphone access is blocked by the just-in-time recording notice', 
     assert.match(source, /confirmMicrophonePrivacy/);
     assert.ok(source.indexOf('confirmMicrophonePrivacy()') < source.indexOf('getUserMedia('), `${file}: notice must precede microphone access`);
   }
+  // La captura de audio se extrajo a un componente compartido por Estudio y Testimonios,
+  // así que ahora hay UN solo punto de acceso al micrófono además del dictado — que es
+  // menos superficie que auditar, no más.
   assert.deepEqual(microphoneSources.sort(), [
     'src/components/editor/StudyDictation.tsx',
-    'src/views/StudyRecordingsView.tsx',
+    'src/components/media/LocalAudioRecorder.tsx',
   ]);
   const notice = await read('src/privacyNotices.tsx');
   assert.match(notice, /base jurídica y autorización/);

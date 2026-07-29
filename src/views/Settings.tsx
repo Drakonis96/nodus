@@ -35,6 +35,9 @@ import { McpConnectionModal } from '../components/McpConnectionModal';
 import { dedicatedVaultNavIds, NAV_GROUPS, navItemLabel, orderSidebarItems, orderedNav } from '../navigation';
 import { teachingItemId, TEACHING_GROUPS } from '../components/TeachingSidebar';
 import { WORLDBUILDING_GROUPS } from '../components/WorldbuildingSidebar';
+import { TESTIMONY_GROUPS } from '../components/TestimonySidebar';
+import { ACCESS_LEVELS as TESTIMONY_ACCESS_LEVELS, ATTRIBUTION_MODES as TESTIMONY_ATTRIBUTION_MODES } from '@shared/testimonies';
+import { ACCESS_LEVEL_LABEL as TESTIMONY_ACCESS_LEVEL_LABEL, ATTRIBUTION_MODE_LABEL as TESTIMONY_ATTRIBUTION_MODE_LABEL } from '@shared/testimonyLabels';
 import { t, tx } from '../i18n';
 import { updateStatusMessage } from '../updateStatus';
 import { DEFAULT_EMBEDDING_MODELS, EMBEDDING_PROVIDERS } from '@shared/providers';
@@ -444,6 +447,7 @@ export function Settings({
     visibleSettingsSection('interface', 'Apariencia', 'tema claro oscuro animaciones velocidad'),
     visibleSettingsSection('interface', 'Accesibilidad y lectura', 'escala zoom fuente legible contraste movimiento animaciones enfoque lectura teclado lector pantalla'),
     visibleSettingsSection('interface', 'Mascota Nodi', 'nodi mascota mascot flotante superpuesta always on top encima escritorio companion acompanante'),
+    activeVault?.type === 'testimonios' && visibleSettingsSection('interface', 'Testimonios', 'historia oral entrevistas acuerdo acceso embargo narrador repositorio conservacion transcripcion proveedor externo'),
     visibleSettingsSection('interface', 'Barra lateral', 'menu lateral ordenar ocultar mostrar navegacion'),
     visibleSettingsSection('system', 'Ayuda', 'tutorial uso avanzado actualizaciones version update reiniciar'),
     visibleSettingsSection('integrations', 'Servidor MCP', 'mcp servidor puerto token cliente conexion chatgpt openai tunnel tunel'),
@@ -776,6 +780,114 @@ export function Settings({
           </Section>
       )}
 
+      {activeVault?.type === 'testimonios' && visibleSettingsSection('interface', 'Testimonios', 'historia oral entrevistas acuerdo acceso embargo narrador repositorio conservacion transcripcion proveedor externo') && (
+          <Section title={t('Testimonios')}>
+            {/* Valores PREDETERMINADOS del proyecto, no decisiones irrevocables: cada
+                entrevista puede acordarse de otra manera y el programa no puede impedirlo.
+                Solo hay uno que manda por encima del acuerdo, y solo para CERRAR: los
+                proveedores externos. */}
+            <Row
+              label={t('Propósito del proyecto')}
+              hint={t('Se muestra en Inicio. Para qué se recoge esta memoria.')}
+            >
+              <textarea
+                className="input w-full md:w-96"
+                rows={2}
+                defaultValue={settings.testimonyProjectPurpose}
+                onBlur={(e) => patch({ testimonyProjectPurpose: e.target.value })}
+              />
+            </Row>
+            <Row label={t('Idioma habitual de las entrevistas')}>
+              <input
+                className="input w-full md:w-40"
+                placeholder="es"
+                defaultValue={settings.testimonyDefaultLanguage}
+                onBlur={(e) => patch({ testimonyDefaultLanguage: e.target.value })}
+              />
+            </Row>
+            <Row
+              label={t('Acceso predeterminado')}
+              hint={t('El nivel con el que nace el acuerdo de una entrevista nueva.')}
+            >
+              <select
+                className="input w-full md:w-64"
+                data-testid="testimony-default-access"
+                value={settings.testimonyDefaultAccess}
+                onChange={(e) => patch({ testimonyDefaultAccess: e.target.value as AppSettings['testimonyDefaultAccess'] })}
+              >
+                {TESTIMONY_ACCESS_LEVELS.map((level) => (
+                  <option key={level} value={level}>{t(TESTIMONY_ACCESS_LEVEL_LABEL[level])}</option>
+                ))}
+              </select>
+            </Row>
+            <Row label={t('Nombre de atribución predeterminado')}>
+              <select
+                className="input w-full md:w-64"
+                value={settings.testimonyDefaultAttribution}
+                onChange={(e) => patch({ testimonyDefaultAttribution: e.target.value as AppSettings['testimonyDefaultAttribution'] })}
+              >
+                {TESTIMONY_ATTRIBUTION_MODES.map((mode) => (
+                  <option key={mode} value={mode}>{t(TESTIMONY_ATTRIBUTION_MODE_LABEL[mode])}</option>
+                ))}
+              </select>
+            </Row>
+            <Row
+              label={t('El narrador revisa por norma')}
+              hint={t('En este proyecto, la transcripción se envía al narrador antes de darla por buena.')}
+            >
+              <input
+                type="checkbox"
+                className="mt-2"
+                checked={settings.testimonyNarratorReviewDefault}
+                onChange={(e) => patch({ testimonyNarratorReviewDefault: e.target.checked })}
+              />
+            </Row>
+            <Row label={t('Repositorio de destino')}>
+              <input
+                className="input w-full md:w-96"
+                defaultValue={settings.testimonyRepositoryName}
+                onBlur={(e) => patch({ testimonyRepositoryName: e.target.value })}
+              />
+            </Row>
+            <Row
+              label={t('Política de conservación')}
+              hint={t('Dónde se depositará y cada cuánto se hace una copia fuera de este equipo.')}
+            >
+              <textarea
+                className="input w-full md:w-96"
+                rows={2}
+                defaultValue={settings.testimonyRetentionPolicy}
+                onBlur={(e) => patch({ testimonyRetentionPolicy: e.target.value })}
+              />
+            </Row>
+            <Row
+              label={t('Plantilla de acuerdo')}
+              hint={t('El nombre o la dirección del modelo de consentimiento que usa el proyecto.')}
+            >
+              <input
+                className="input w-full md:w-96"
+                defaultValue={settings.testimonyAgreementTemplate}
+                onBlur={(e) => patch({ testimonyAgreementTemplate: e.target.value })}
+              />
+            </Row>
+            <Row
+              label={t('Permitir proveedores externos')}
+              hint={t('Desactivado por omisión. Este ajuste puede CERRAR lo que un acuerdo abre, pero nunca al revés: el acuerdo de cada entrevista sigue mandando.')}
+            >
+              <input
+                type="checkbox"
+                className="mt-2"
+                data-testid="testimony-allow-external"
+                checked={settings.testimonyAllowExternalProviders}
+                onChange={(e) => patch({ testimonyAllowExternalProviders: e.target.checked })}
+              />
+            </Row>
+            <p className="text-xs leading-5 text-neutral-500">
+              {t('El motor de transcripción, los modelos descargados y el espacio que ocupan se configuran en Proveedores de IA. Las copias de seguridad, en Recuperación.')}
+            </p>
+          </Section>
+      )}
+
       {visibleSettingsSection('interface', 'Barra lateral', 'menu lateral ordenar ocultar mostrar navegacion') && (
           <Section title={t('Barra lateral')}>
             <p className="text-xs text-neutral-500 -mt-1">
@@ -862,6 +974,21 @@ export function Settings({
                   onClick={() => patch({ databasesTourComplete: false }).then(() => flash(t('Se mostrará el tutorial de bases de datos.')))}
                 >
                   <Icon name="table" /> {t('Ver de nuevo')}
+                </button>
+              </div>
+            )}
+            {activeVault?.type === 'testimonios' && (
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <label className="text-sm text-neutral-300">{t('Tutorial de testimonios')}</label>
+                  <p className="text-xs text-neutral-500 mt-0.5">{t('Las entrevistas, los participantes, las sesiones y su audio, la codificación, los contrastes y el acuerdo.')}</p>
+                </div>
+                <button
+                  data-testid="testimony-tour-replay"
+                  className="btn btn-ghost border border-neutral-700"
+                  onClick={() => patch({ testimonyTourComplete: false }).then(() => flash(t('Se mostrará el tutorial de testimonios.')))}
+                >
+                  <Icon name="microphone" /> {t('Ver de nuevo')}
                 </button>
               </div>
             )}
@@ -2372,6 +2499,15 @@ function SidebarOrderEditor({
         sidebarOrder,
       ).map((item) => ({ ...item, group: group.id })),
     }));
+  } else if (vaultType === 'testimonios') {
+    groups = TESTIMONY_GROUPS.map((group) => ({
+      id: group.id,
+      label: group.label,
+      items: orderSidebarItems(
+        group.items.map((item) => ({ ...item, id: item.view })),
+        sidebarOrder,
+      ).map((item) => ({ ...item, group: group.id })),
+    }));
   } else if (vaultType === 'worldbuilding') {
     groups = WORLDBUILDING_GROUPS.map((group) => ({
       id: group.id,
@@ -2397,7 +2533,7 @@ function SidebarOrderEditor({
         .map((item) => ({ ...item, label: navItemLabel(item, vaultType), group: group.id })),
     }));
   }
-  if ((vaultType === 'docencia' || vaultType === 'worldbuilding') && toolkit) {
+  if ((vaultType === 'docencia' || vaultType === 'worldbuilding' || vaultType === 'testimonios') && toolkit) {
     const tools = NAV_GROUPS.find((group) => group.id === 'tools')!;
     groups.push({
       ...tools,

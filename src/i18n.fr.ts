@@ -11,9 +11,11 @@ import { SERVER_TRANSLATIONS } from './i18n.server';
 import { TRANSLATE_TRANSLATIONS } from './i18n.translate';
 import { WORLD_CHAT_TRANSLATIONS } from './i18n.worldChat';
 import { WORLDBUILDING_TRANSLATIONS } from './i18n.worldbuilding';
+import { TESTIMONY_TRANSLATIONS } from './i18n.testimonies';
 
 export const FR: Record<string, string> = {
   ...WORLDBUILDING_TRANSLATIONS.fr,
+  ...TESTIMONY_TRANSLATIONS.fr,
   ...WORLD_CHAT_TRANSLATIONS.fr,
   "Lo que cuenta el mapa": "Ce que raconte la carte",
   "Ver dónde ocurren las escenas ({n})": "Voir où se passent les scènes ({n})",

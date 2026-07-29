@@ -5,6 +5,7 @@ import { SERVER_TRANSLATIONS } from './i18n.server';
 import { TRANSLATE_TRANSLATIONS } from './i18n.translate';
 import { WORLD_CHAT_TRANSLATIONS } from './i18n.worldChat';
 import { WORLDBUILDING_TRANSLATIONS } from './i18n.worldbuilding';
+import { TESTIMONY_TRANSLATIONS } from './i18n.testimonies';
 
 /**
  * English translations keyed by the Spanish source string (see {@link ../i18n}).
@@ -13,6 +14,7 @@ import { WORLDBUILDING_TRANSLATIONS } from './i18n.worldbuilding';
  */
 export const EN: Record<string, string> = {
   ...WORLDBUILDING_TRANSLATIONS.en,
+  ...TESTIMONY_TRANSLATIONS.en,
   ...WORLD_CHAT_TRANSLATIONS.en,
   "Lo que cuenta el mapa": "What the map tells you",
   "Ver dónde ocurren las escenas ({n})": "See where the scenes happen ({n})",

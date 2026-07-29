@@ -28,6 +28,14 @@ export const RELEASE_2_6_3_IT: string[] = [
   "I report PDF di Deep Research adottano un design più curato: copertina pulita con il marchio Nodus, riassunto esecutivo centrato, numerazione automatica delle sezioni e una matrice di tracciabilità compatta in forma di tabella.",
 ];
 
+export const RELEASE_2_8_0_IT: string[] = [
+  "Nuovo vault di Testimonianze, per storia orale e giornalismo. La sua unità non è la registrazione né la trascrizione: è l'intervista completa, con la sua preparazione, i suoi partecipanti, le sue sessioni, i suoi file originali, le sue trascrizioni e l'accordo con cui è stata fatta. Il menu resta a otto voci — Home, Cerca, Interviste, Partecipanti, Confronti, Note, Toolkit e Impostazioni — perché tutto il resto avviene dentro ciascuna intervista.",
+  "L'originale non si corregge mai. Il file entra così come è stato ricevuto, con la sua impronta SHA-256 e marcato immutabile, e nemmeno la trascrizione automatica si tocca: correggere, rivedere, approvare, anonimizzare o tradurre crea una nuova versione che ricorda da dove proviene. I frammenti citati si riancorano da soli quando è possibile e restano segnalati quando non lo è, così una citazione non si sposta mai in silenzio. E non c'è taglio dei silenzi: nella storia orale una pausa può far parte di ciò che si racconta.",
+  "L'accordo con ciascun narratore è versionato e ha effetto reale. Stato dell'accordo, livello di accesso e stato del lavoro sono tre dimensioni indipendenti, ogni modifica resta come versione datata, e quelle condizioni bloccano davvero esportazioni, pacchetti di consultazione e ciò che l'IA può vedere. Un'intervista limitata, sotto embargo o ritirata non esce da nessun canale, e il nome reale di chi ha chiesto uno pseudonimo non compare mai in una citazione, un derivato o un prompt.",
+  "Codificare, confrontare e citare senza uscire dall'audio. Selezioni un passaggio della trascrizione e gli applichi codici da un catalogo condiviso da tutto il vault; da un frammento crei una nota che porta già la citazione, il parlante, il minuto e un link di ritorno. I Confronti mettono più interviste una accanto all'altra per codice o per tema, segnalando ciò che condividono, ciò che differisce e quali interviste non hanno detto nulla — senza trasformare quell'assenza in una conclusione e senza IA in nessun passaggio.",
+  "Trascrizione locale ed esportazione archivistica. Whisper gira sul tuo computer e l'audio non esce da qui; l'attribuzione dei parlanti è manuale e in blocco, perché Nodus non riconosce le voci e non farà finta del contrario. Alla fine puoi esportare tre pacchetti distinti — conservazione, consultazione e revisione —, ciascuno con il suo manifesto, i suoi checksum SHA-256 e l'elenco esplicito di ciò che è rimasto fuori e perché. La demo «Memoria della valle» percorre l'intero cammino con audio sintetico e nessuna voce reale.",
+];
+
 export const RELEASE_2_7_0_IT: string[] = [
   "I tutorial di Nodus si possono ora guardare in video senza uscire dall'applicazione. Al primo avvio ti viene chiesto come preferisci imparare —guardare i tutorial o leggere la guida— e Impostazioni → Tutorial apre la stessa griglia, con lettore integrato, contrassegno «visto» condiviso tra i depositi e la guida scritta sempre a un clic come percorso offline. Anche i tour guidati di ogni deposito propongono il loro video, e il catalogo si aggiorna da solo ogni volta che ne pubblichiamo uno nuovo.",
   "I backup automatici non bloccano più l'applicazione. L'archivio viene ora compresso e cifrato senza bloccare il processo principale, così una libreria grande smette di scattare ogni mezz'ora; la sincronizzazione con Nodus Server fa lo stesso con la propria compressione. Il formato dei backup non cambia e quelli esistenti si ripristinano esattamente come prima.",
@@ -38,6 +46,7 @@ export const RELEASE_2_7_0_IT: string[] = [
 
 /** Italian history, indexed by release and highlight order. */
 export const RELEASE_NOTES_IT: Record<string, string[]> = {
+  "2.8.0": RELEASE_2_8_0_IT,
   "2.7.0": RELEASE_2_7_0_IT,
   "2.6.3": RELEASE_2_6_3_IT,
   "2.6.2": RELEASE_2_6_2_IT,

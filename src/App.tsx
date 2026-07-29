@@ -24,12 +24,16 @@ import { QuestionsView } from './views/QuestionsView';
 import { WorldChatView } from './views/WorldChatView';
 import { ManuscriptView } from './views/ManuscriptView';
 import { WorldbuildingSidebar } from './components/WorldbuildingSidebar';
+import { TestimonySidebar } from './components/TestimonySidebar';
+import type { DossierTab } from './components/testimonies/InterviewDossier';
+import type { TestimonyDeepLink } from '@shared/testimonyDeepLinks';
 import { FeedbackHost } from './components/feedback';
 import { PrivacyRequestHost } from './privacyNotices';
 import { Tour } from './views/Tour';
 import { AdvancedTour } from './views/AdvancedTour';
 import { GenealogyTour } from './views/GenealogyTour';
 import { DatabasesTour } from './views/DatabasesTour';
+import { TestimonyTour } from './views/TestimonyTour';
 import { StudyTour } from './views/StudyTour';
 import { TeachingTour } from './views/TeachingTour';
 import { BASICS_TUTORIAL_VERSION, BasicsTutorial } from './views/BasicsTutorial';
@@ -67,6 +71,7 @@ import nodusLogoCrimson from './assets/nodus-logo-crimson.svg';
 import nodusLogoTeal from './assets/nodus-logo-teal.svg';
 import nodusLogoOrange from './assets/nodus-logo-orange.svg';
 import nodusLogoViolet from './assets/nodus-logo-violet.svg';
+import nodusLogoCyan from './assets/nodus-logo-cyan.svg';
 import { buildDockIconDataUrl, dockColorForVaultType } from './dockIcon';
 
 const DatabasesView = lazy(() => import('./views/DatabasesView').then((module) => ({ default: module.DatabasesView })));
@@ -77,6 +82,11 @@ const DatabasesSearchView = lazy(() => import('./views/DatabasesSearchView').the
 const StudyHome = lazy(() => import('./views/StudyHome').then((module) => ({ default: module.StudyHome })));
 const TeachingHome = lazy(() => import('./views/TeachingHome').then((module) => ({ default: module.TeachingHome })));
 const WorldbuildingHome = lazy(() => import('./views/WorldbuildingHome').then((module) => ({ default: module.WorldbuildingHome })));
+const TestimonyHome = lazy(() => import('./views/TestimonyHome').then((module) => ({ default: module.TestimonyHome })));
+const TestimonyInterviewsView = lazy(() => import('./views/TestimonyInterviewsView').then((module) => ({ default: module.TestimonyInterviewsView })));
+const TestimonyParticipantsView = lazy(() => import('./views/TestimonyParticipantsView').then((module) => ({ default: module.TestimonyParticipantsView })));
+const TestimonyContrastsView = lazy(() => import('./views/TestimonyContrastsView').then((module) => ({ default: module.TestimonyContrastsView })));
+const TestimonySearchView = lazy(() => import('./views/TestimonySearchView').then((module) => ({ default: module.TestimonySearchView })));
 const ScenesView = lazy(() => import('./views/ScenesView').then((module) => ({ default: module.ScenesView })));
 const FactionsView = lazy(() => import('./views/GroupsView').then((module) => ({ default: module.FactionsView })));
 const CulturesView = lazy(() => import('./views/GroupsView').then((module) => ({ default: module.CulturesView })));
@@ -435,6 +445,43 @@ export function App() {
   useEffect(() => {
     document.documentElement.classList.toggle('worldbuilding', isWorldbuilding);
   }, [isWorldbuilding]);
+  // Testimonios: acento cian y sidebar propio de cinco entradas. Reutiliza la ontología
+  // de personas para los participantes y Notas para los memos del investigador.
+  const isTestimonios = activeVault?.type === 'testimonios';
+  // Apertura profunda de una entrevista (desde Inicio, Buscar, Contrastes o un enlace
+  // `nodus://testimonios/...`). El nonce fuerza la reapertura aunque sea la misma.
+  const [testimonyTarget, setTestimonyTarget] = useState<{ interviewId: string; tab?: DossierTab; nonce: number } | null>(null);
+  const openTestimonyInterview = useCallback((interviewId: string, tab?: DossierTab) => {
+    setTestimonyTarget({ interviewId, tab, nonce: Date.now() });
+    setView('testimonyInterviews');
+  }, []);
+  /**
+   * Abrir un enlace `nodus://testimonios/...`.
+   *
+   * Un fragmento abre la pestaña de Análisis, que es donde se ve la cita con su código y
+   * su tramo; una entrevista sin más abre el Resumen. Los enlaces de otra bóveda no
+   * llevan a ninguna parte a propósito: el destino tiene que pertenecer a la bóveda
+   * activa, y abrir «algo parecido» sería peor que no abrir nada.
+   */
+  const openTestimonyLink = useCallback((link: TestimonyDeepLink) => {
+    if (link.target === 'interview') {
+      setTestimonyTarget({
+        interviewId: link.id,
+        tab: link.annotationId ? 'analysis' : link.transcriptId || link.sessionId ? 'sessions' : 'overview',
+        nonce: Date.now(),
+      });
+      setView('testimonyInterviews');
+      return;
+    }
+    if (link.target === 'participant') {
+      setView('testimonyParticipants');
+      return;
+    }
+    setView('testimonyContrasts');
+  }, []);
+  useEffect(() => {
+    document.documentElement.classList.toggle('testimonios', isTestimonios);
+  }, [isTestimonios]);
 
   // Accessibility preferences are applied at the document root so dialogs,
   // floating panels and every vault inherit them consistently.
@@ -680,6 +727,21 @@ export function App() {
     }
   }, [reloadSettings, refreshHasData]);
 
+  const loadTestimonyDemo = useCallback(async () => {
+    setDemoBusy(true);
+    try {
+      const seeded = await window.nodus.seedTestimonyDemoData();
+      if (seeded) {
+        await reloadSettings();
+        await refreshHasData();
+        notifyDataChanged();
+        setView('home');
+      }
+    } finally {
+      setDemoBusy(false);
+    }
+  }, [reloadSettings, refreshHasData]);
+
   const loadWorldbuildingDemo = useCallback(async () => {
     setDemoBusy(true);
     try {
@@ -899,14 +961,14 @@ export function App() {
     if (isEstudio) {
       actions.unshift({ id: 'act:reading-focus', label: settings?.readingFocusMode ? t('Salir del modo lectura') : t('Entrar en modo lectura'), section: t('Acciones'), icon: 'book', keywords: 'lectura enfoque focus estudio', run: () => void window.nodus.updateSettings({ readingFocusMode: !settings?.readingFocusMode }).then(reloadSettings) });
     }
-    if (!isGenealogy && !isDatabases && !isEstudio && !isDocencia && !isWorldbuilding) {
+    if (!isGenealogy && !isDatabases && !isEstudio && !isDocencia && !isWorldbuilding && !isTestimonios) {
       actions.unshift(
         { id: 'act:sync', label: t('Actualizar (sincronizar Zotero)'), section: t('Acciones'), icon: 'sync', keywords: 'sync sincronizar', run: () => void onSync() },
         { id: 'act:collections', label: t('Colecciones'), section: t('Acciones'), icon: 'folder', keywords: 'collections zotero', run: () => setCollectionsOpen(true) },
       );
     }
     return [...navCommands, ...actions];
-  }, [settings?.uiLanguage, settings?.reduceMotion, settings?.readingFocusMode, activeVault?.type, isGenealogy, isDatabases, isEstudio, isDocencia, isWorldbuilding, isDark, onSync, openAssistant, reloadSettings]);
+  }, [settings?.uiLanguage, settings?.reduceMotion, settings?.readingFocusMode, activeVault?.type, isGenealogy, isDatabases, isEstudio, isDocencia, isWorldbuilding, isTestimonios, isDark, onSync, openAssistant, reloadSettings]);
 
   if (loadError) {
     return (
@@ -1027,8 +1089,8 @@ export function App() {
         >
           <img
             data-testid="nodus-logo"
-            data-vault-logo={isGenealogy ? 'genealogy' : isDatabases ? 'databases' : isEstudio ? 'estudio' : isDocencia ? 'docencia' : isWorldbuilding ? 'worldbuilding' : 'academic'}
-            src={isGenealogy ? nodusLogoGold : isDatabases ? nodusLogoCrimson : isEstudio ? nodusLogoTeal : isDocencia ? nodusLogoOrange : isWorldbuilding ? nodusLogoViolet : nodusLogo}
+            data-vault-logo={isGenealogy ? 'genealogy' : isDatabases ? 'databases' : isEstudio ? 'estudio' : isDocencia ? 'docencia' : isWorldbuilding ? 'worldbuilding' : isTestimonios ? 'testimonios' : 'academic'}
+            src={isGenealogy ? nodusLogoGold : isDatabases ? nodusLogoCrimson : isEstudio ? nodusLogoTeal : isDocencia ? nodusLogoOrange : isWorldbuilding ? nodusLogoViolet : isTestimonios ? nodusLogoCyan : nodusLogo}
             alt=""
             className="h-7 w-7"
           />
@@ -1111,7 +1173,7 @@ export function App() {
           {/* Colecciones y Actualizar dependen de Zotero → solo en bóvedas
               académicas; genealogía, bases de datos, estudio y docencia no
               sincronizan con Zotero. */}
-          {!isGenealogy && !isDatabases && !isEstudio && !isDocencia && !isWorldbuilding && (
+          {!isGenealogy && !isDatabases && !isEstudio && !isDocencia && !isWorldbuilding && !isTestimonios && (
             <HeaderAction
               dataTour="collections"
               icon="folder"
@@ -1125,7 +1187,7 @@ export function App() {
             title={t('Enviar una propuesta o reporte a GitHub')}
             onClick={() => setFeedbackOpen(true)}
           />
-          {!isGenealogy && !isDatabases && !isEstudio && !isDocencia && !isWorldbuilding && (
+          {!isGenealogy && !isDatabases && !isEstudio && !isDocencia && !isWorldbuilding && !isTestimonios && (
             <HeaderAction
               dataTour="sync"
               icon="refresh"
@@ -1290,6 +1352,23 @@ export function App() {
                     />
                     {/* Only the tools group: Explorar/Analizar/Crear are already covered
                         by WorldbuildingSidebar, so rendering them would duplicate. */}
+                    {navGroups.filter((group) => group.id === 'tools').map((group) => renderGroup(group))}
+                    <div className="mt-2 flex flex-col gap-1">{navButton(settingsItem)}</div>
+                  </>
+                );
+              }
+              if (isTestimonios) {
+                return (
+                  <>
+                    {navButton(homeItem)}
+                    <TestimonySidebar
+                      activeView={view}
+                      onNavigate={(targetView) => setView(targetView)}
+                      sidebarOrder={settings?.sidebarOrder}
+                      sidebarHidden={activeSidebarHidden}
+                    />
+                    {/* Solo el grupo de herramientas: Explorar/Analizar/Registrar ya los
+                        cubre TestimonySidebar, y repetirlos duplicaría el menú. */}
                     {navGroups.filter((group) => group.id === 'tools').map((group) => renderGroup(group))}
                     <div className="mt-2 flex flex-col gap-1">{navButton(settingsItem)}</div>
                   </>
@@ -1479,7 +1558,16 @@ export function App() {
               onLoadDemo={loadWorldbuildingDemo}
             />
           )}
-          {view === 'home' && !isGenealogy && !isDatabases && !isEstudio && !isDocencia && !isWorldbuilding && !isPreviewVault && (
+          {view === 'home' && isTestimonios && (
+            <TestimonyHome
+              onNavigate={setView}
+              onOpenInterview={openTestimonyInterview}
+              showDemoOffer={hasData === false && !settings.demoMode}
+              demoBusy={demoBusy}
+              onLoadDemo={loadTestimonyDemo}
+            />
+          )}
+          {view === 'home' && !isGenealogy && !isDatabases && !isEstudio && !isDocencia && !isWorldbuilding && !isTestimonios && !isPreviewVault && (
             <HomeView
               vaultId={activeVault?.id ?? null}
               settings={settings}
@@ -1523,6 +1611,9 @@ export function App() {
           {view === 'worldChat' && <WorldChatView settings={settings} onNavigate={setView} />}
           {view === 'manuscript' && <ManuscriptView onNavigate={setView} />}
           {view === 'characters' && <CharactersView />}
+          {view === 'testimonyInterviews' && <TestimonyInterviewsView target={testimonyTarget} />}
+          {view === 'testimonyParticipants' && <TestimonyParticipantsView />}
+          {view === 'testimonyContrasts' && <TestimonyContrastsView />}
           {view === 'places' && <PlacesView />}
           {view === 'factions' && <FactionsView />}
           {view === 'cultures' && <CulturesView />}
@@ -1652,7 +1743,16 @@ export function App() {
           {view === 'writing' && <WritingWorkshopView settings={settings} onOpenGraph={(target) => navigate('graph', target)} />}
           {view === 'deepResearch' && <DeepResearchView settings={settings} isGenealogy={isGenealogy} onOpenGraph={(target) => navigate('graph', target)} />}
           {view === 'projects' && <ProjectsView settings={settings} />}
-          {view === 'search' && (
+          {/* Buscar en una bóveda de testimonios NO es buscar en un corpus de Zotero:
+              lo que hay que encontrar son pasajes con su hablante, su minuto y su
+              condición de acceso. Es la misma sección del menú con otro motor detrás. */}
+          {view === 'search' && isTestimonios && (
+            <TestimonySearchView
+              onOpenInterview={openTestimonyInterview}
+              onNavigate={(target) => setView(target)}
+            />
+          )}
+          {view === 'search' && !isTestimonios && (
             <SearchView
               vaultType={activeVault?.type}
               onOpenGraph={(target) => navigate('graph', target)}
@@ -1667,7 +1767,7 @@ export function App() {
             />
           )}
           {view === 'notes' && (
-            <NotesView onOpenGraph={(target) => navigate('graph', target)} focusNote={noteTarget} />
+            <NotesView onOpenGraph={(target) => navigate('graph', target)} focusNote={noteTarget} onTestimonyLink={isTestimonios ? openTestimonyLink : undefined} />
           )}
           {view === 'toolkit' && <ToolkitView page={toolkitPage} onNavigate={setToolkitPage} settings={settings} />}
           {view === 'settings' && (
@@ -1720,7 +1820,7 @@ export function App() {
       {roadmapTopic && <RoadmapFeedbackModal topic={roadmapTopic} onClose={() => setRoadmapTopic(null)} />}
       {roadmapOpen && <RoadmapModal onClose={() => setRoadmapOpen(false)} />}
 
-      {!isPreviewVault && settings.onboardingComplete && settings.basicsTutorialVersion > 0 && !settings.tourComplete && !isGenealogy && !isDatabases && !isEstudio && !isDocencia && !isWorldbuilding && (
+      {!isPreviewVault && settings.onboardingComplete && settings.basicsTutorialVersion > 0 && !settings.tourComplete && !isGenealogy && !isDatabases && !isEstudio && !isDocencia && !isWorldbuilding && !isTestimonios && (
         <Tour
           onNavigate={setView}
           onClose={async () => {
@@ -1745,6 +1845,16 @@ export function App() {
           onNavigate={setView}
           onClose={async () => {
             await window.nodus.updateSettings({ databasesTourComplete: true });
+            void reloadSettings();
+          }}
+        />
+      )}
+
+      {settings.onboardingComplete && settings.basicsTutorialVersion > 0 && isTestimonios && settings.demoMode && !settings.testimonyTourComplete && (
+        <TestimonyTour
+          onNavigate={setView}
+          onClose={async () => {
+            await window.nodus.updateSettings({ testimonyTourComplete: true });
             void reloadSettings();
           }}
         />
@@ -1805,6 +1915,7 @@ export function App() {
         settings.advancedTourComplete &&
         (!isGenealogy || settings.genealogyTourComplete) &&
         (!isDatabases || settings.databasesTourComplete) &&
+        (!isTestimonios || !settings.demoMode || settings.testimonyTourComplete) &&
         (!isEstudio || settings.studyTourComplete) &&
         (!isDocencia || settings.docenciaTourComplete) && (
           <WhatsNewModal uiLanguage={settings.uiLanguage} onSettled={() => setWhatsNewSettled(true)} />

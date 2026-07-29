@@ -5,6 +5,7 @@ import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
 import type { CitationPreview } from '@shared/types';
+import { parseTestimonyLink, type TestimonyDeepLink } from '@shared/testimonyDeepLinks';
 import { t } from '../i18n';
 import { VERIFY_DEBOUNCE_MS, planCitationVerification } from '../citationVerification';
 
@@ -34,6 +35,7 @@ export function Markdown({
   onStudyRecording,
   onStudyEvidence,
   onWorldEntry,
+  onTestimonyLink,
   verify = true,
 }: {
   content: string;
@@ -41,6 +43,9 @@ export function Markdown({
   onCitation?: (citation: MarkdownCitation) => void;
   /** `nodus://world/<kind>/<id>`. `kind` is `new` when the entry does not exist yet. */
   onWorldEntry?: (kind: string, id: string) => void;
+  /** `nodus://testimonios/...`: abre la entrevista, el participante o el contraste, y
+   *  salta al minuto exacto cuando el enlace lo lleva. */
+  onTestimonyLink?: (link: TestimonyDeepLink) => void;
   onStudyDocument?: (documentId: string) => void;
   onStudyMaterial?: (materialId: string) => void;
   onStudyRecording?: (recordingId: string, timestamp?: number | null) => void;
@@ -135,6 +140,22 @@ export function Markdown({
                 <button
                   className="text-indigo-400 underline decoration-indigo-700 underline-offset-2 hover:text-indigo-300"
                   onClick={() => onWorldEntry(kind, id)}
+                >
+                  {children}
+                </button>
+              );
+            }
+            // Enlaces de Testimonios. Van ANTES de `parseCitation` por lo mismo que los
+            // del mundo: una píldora de cita pide por IPC la vista previa de una fuente
+            // ACADÉMICA, y un fragmento de entrevista no tiene esa respuesta. Además, el
+            // enlace lleva el minuto: pulsarlo tiene que devolver al audio, no abrir una
+            // ficha bibliográfica.
+            const testimonyLink = href?.startsWith('nodus://testimonios/') ? parseTestimonyLink(href) : null;
+            if (testimonyLink && onTestimonyLink) {
+              return (
+                <button
+                  className="text-indigo-400 underline decoration-indigo-700 underline-offset-2 hover:text-indigo-300"
+                  onClick={() => onTestimonyLink(testimonyLink)}
                 >
                   {children}
                 </button>
