@@ -745,6 +745,11 @@ export function seedTestimonyDemoData(): boolean {
 /** Quitar la demo sin tocar lo que el usuario haya creado mientras la exploraba. */
 export function clearTestimonyDemoData(): void {
   const db = getDb();
+  // La bandera y el tipo de bóveda son la prueba de propiedad: quien borre a mano las
+  // cinco entrevistas de la demo sigue teniendo sus notas y sus códigos, y una tabla
+  // representativa dejaría el resto imposible de limpiar.
+  if (!getSettings().demoMode || getActiveVault().type !== 'testimonios') return;
+
   const tx = db.transaction(() => {
     for (const table of [
       'testimony_contrast_items', 'testimony_contrasts', 'testimony_annotation_codes', 'testimony_annotations',
@@ -756,6 +761,17 @@ export function clearTestimonyDemoData(): void {
     }
     db.prepare(`DELETE FROM note_links WHERE note_id LIKE '${PREFIX}%' OR target_id LIKE '${PREFIX}%'`).run();
     db.prepare(`DELETE FROM persons WHERE person_id LIKE '${PREFIX}%'`).run();
+    // Los ajustes del proyecto también los escribió la demo: el propósito ficticio y el
+    // archivo municipal inventado se quedarían presidiendo Inicio en un proyecto real.
+    updateSettings({
+      testimonyProjectPurpose: '',
+      testimonyRepositoryName: '',
+      testimonyRetentionPolicy: '',
+      testimonyDefaultLanguage: '',
+      testimonyDefaultAccess: 'private',
+      testimonyDefaultAttribution: 'public_name',
+      testimonyNarratorReviewDefault: false,
+    });
   });
   tx();
 }

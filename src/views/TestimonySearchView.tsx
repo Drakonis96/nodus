@@ -106,24 +106,25 @@ export function TestimonySearchView({
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col" data-testid="testimony-search">
-      <header className="border-b border-neutral-200 px-6 pb-3 pt-4 dark:border-neutral-800">
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-lg font-semibold text-neutral-800 dark:text-neutral-100">{t('Buscar')}</h1>
-          <div className="relative min-w-0 flex-1">
-            <Icon name="search" size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-500" />
-            <input
-              autoFocus
-              className="input input-with-leading-icon w-full"
-              data-testid="testimony-search-input"
-              placeholder={t('Una frase, un nombre, un código…')}
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-            />
-          </div>
+    <div className="flex h-full min-h-0 flex-col p-6" data-testid="testimony-search">
+      <div className="mx-auto w-full max-w-3xl shrink-0">
+        <div className="mb-4 flex items-center gap-3">
+          <Icon name="search" size={22} className="text-indigo-300" />
+          <h1 className="text-xl font-semibold">{t('Buscar')}</h1>
           {searching && <Icon name="sync" size={14} className="animate-spin text-neutral-500" />}
         </div>
-        <div className="mt-2 flex flex-wrap gap-1">
+        <div className="relative">
+          <Icon name="search" size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
+          <input
+            autoFocus
+            className="input input-with-leading-icon w-full"
+            data-testid="testimony-search-input"
+            placeholder={t('Una frase, un nombre, un código…')}
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+        </div>
+        <div className="mt-3 flex flex-wrap justify-center gap-1.5">
           {ALL_KINDS.map((kind) => (
             <button
               key={kind}
@@ -135,19 +136,19 @@ export function TestimonySearchView({
                 else next.add(kind);
                 setKinds(next.size === 0 ? new Set(ALL_KINDS) : next);
               }}
-              className={`rounded-full border px-2 py-0.5 text-[11px] ${
+              className={`rounded-full border px-2.5 py-1 text-[11px] ${
                 kinds.has(kind)
                   ? 'border-indigo-500 bg-indigo-600 text-white'
-                  : 'border-neutral-300 text-neutral-600 dark:border-neutral-700 dark:text-neutral-400'
+                  : 'border-neutral-300 text-neutral-600 hover:text-neutral-800 dark:border-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200'
               }`}
             >
               {t(KIND_LABEL[kind])}
             </button>
           ))}
         </div>
-      </header>
+      </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-6">
+      <div className="mx-auto mt-5 w-full min-h-0 max-w-3xl flex-1 overflow-y-auto">
         {query.trim().length < 2 ? (
           <p className="rounded-xl border border-dashed border-neutral-300 p-10 text-center text-sm text-neutral-500 dark:border-neutral-800">
             {t('Busca una frase para encontrar el pasaje exacto y volver al minuto en que se dijo.')}

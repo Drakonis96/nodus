@@ -5,6 +5,7 @@ import { clearDatabasesDemoData } from './databasesDemoData';
 import { clearStudyDemoData } from './studyDemoData';
 import { clearTeachingDemoData } from './teachingDemoData';
 import { clearWorldbuildingDemoData } from './worldbuildingDemoData';
+import { clearTestimonyDemoData } from './testimonyDemoData';
 
 // A self-consistent corpus on the science of learning. It exists so a
 // first-time user can see every static view (graph, ideas, debates, gaps, notes,
@@ -886,6 +887,7 @@ export function clearDemoData(): void {
   clearStudyDemoData();
   clearTeachingDemoData();
   clearWorldbuildingDemoData();
+  clearTestimonyDemoData();
   const db = getDb();
   const tx = db.transaction(() => {
     db.exec(`
