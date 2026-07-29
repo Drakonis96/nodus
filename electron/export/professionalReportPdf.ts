@@ -221,15 +221,16 @@ export function renderProfessionalReportHtml(input: ProfessionalReportInput): st
       letter-spacing: -.035em;
     }
     .cover-subtitle { max-width: 150mm; margin: 5mm 0 0; color: var(--muted); font-size: 13pt; line-height: 1.48; }
-    .cover-image { margin: 10mm 0 0; }
+    .cover-image { margin: 10mm 0 0; background: #fff; }
+    /* Blurred shadows can be flattened as grey filter bounds by PDF viewers. */
     .cover-image img {
       display: block;
       width: 100%;
       height: 91mm;
       object-fit: cover;
+      background: #fff;
       border: .25mm solid #d9deea;
       border-radius: 4mm;
-      box-shadow: 0 4mm 12mm rgba(22, 31, 55, .13);
     }
     .cover-image figcaption { margin-top: 2mm; color: var(--muted); font: italic 7.7pt/1.35 Georgia, serif; text-align: right; }
     .cover-motif {
