@@ -1,19 +1,24 @@
 import { fileURLToPath } from 'node:url';
 import type { ZoteroAttachmentInfo, ZoteroCollection, ZoteroItem, ZoteroLibrary, WorkMeta } from '@shared/types';
 
-// Read-only client for the Zotero 7 local API. Never writes to Zotero, never
-// touches zotero.sqlite directly.
+// Read-only client for Zotero's local API: the desktop app's local implementation
+// of Web API v3, served from port 23119 since Zotero 7. There is no "Zotero 7 API" —
+// the API version is 3, and Zotero supports exactly one version at a time. Requires
+// Zotero 7 or newer. Never writes to Zotero, never touches zotero.sqlite directly.
 
 const BASE = process.env.NODUS_ZOTERO_API_BASE?.trim() || 'http://localhost:23119/api';
 
-// The Zotero 7 local API always addresses the local library as `users/0`,
-// regardless of the account's real numeric userID.
+// The local API accepts `0` as the user ID (the real numeric userID works too;
+// anything else answers 400), so we always address the local library as `users/0`.
 export const LOCAL_USER_ID = '0';
 export const PERSONAL_LIBRARY: ZoteroLibrary = { type: 'user', id: LOCAL_USER_ID, name: 'Mi biblioteca' };
 
 const HEADERS: Record<string, string> = {
-  // Required: Zotero rejects requests with a Mozilla/* User-Agent (Electron's) unless
-  // this header is present. https://www.zotero.org/support/dev/web_api/v3/basics
+  // Load-bearing, do not remove: this is Zotero's DNS-rebinding guard. Against a
+  // Mozilla/* User-Agent (Electron's) without this header, Zotero closes the TCP
+  // connection outright — not a 403, so callers see a socket error rather than an
+  // HTTP status. Verified against Zotero 9.0.6.
+  // https://www.zotero.org/support/dev/web_api/v3/basics
   'Zotero-Allowed-Request': '1',
 };
 
@@ -270,9 +275,10 @@ export async function itemChildren(userId: string, itemKey: string): Promise<Zot
   if (!res.ok) return [];
   const data = (await res.json()) as any[];
   return data
-    // Zotero's local API answers /items/<unknown>/children with a 200 listing
-    // of UNRELATED library items instead of a 404. Requiring parentItem to
-    // match keeps a stale/foreign key from resolving to someone else's file.
+    // Defensive: older Zotero builds answered /items/<unknown>/children with a 200
+    // listing of UNRELATED library items instead of a 404 (9.0.6 returns an empty
+    // array). Requiring parentItem to match keeps a stale/foreign key from ever
+    // resolving to someone else's file, whichever behaviour the client has.
     .filter((c) => c.data?.itemType === 'attachment' && c.data?.parentItem === parsed.rawKey)
     .map((c) => ({
       key: canonicalKey(parsed.library, c.data.key),
@@ -359,22 +365,10 @@ export async function itemAsAttachment(userId: string, itemKey: string): Promise
   };
 }
 
-/** Incremental diff: items changed since a library version. */
-export async function itemsSince(userId: string, since: number): Promise<{ items: ZoteroItem[]; version: number }> {
-  const out: ZoteroItem[] = [];
-  let start = 0;
-  const limit = 100;
-  let version = since;
-  for (;;) {
-    const res = await zfetch(`${BASE}/users/${userId}/items/top?since=${since}&limit=${limit}&start=${start}`);
-    if (!res.ok) throw new Error(`Zotero since HTTP ${res.status}`);
-    const v = res.headers.get('Last-Modified-Version');
-    if (v) version = parseInt(v, 10);
-    const data = (await res.json()) as any[];
-    for (const it of data) out.push(mapItem(it, { ...PERSONAL_LIBRARY, id: userId }));
-    const total = parseInt(res.headers.get('Total-Results') ?? '0', 10);
-    start += limit;
-    if (data.length < limit || start >= total) break;
-  }
-  return { items: out, version };
-}
+// An `itemsSince()` incremental diff used to live here, unreferenced by any caller.
+// It was removed rather than fixed: it built `users/<id>` by hand instead of going
+// through libraryPrefix(), so it could never have served a group library, and its
+// `since=0` contract shifted under it (Zotero 8 made since=0 return everything —
+// zotero/zotero#5011). Sync reads the library version via libraryVersion() and
+// re-walks collections; a real incremental path should be written against the
+// current API rather than resurrected from this.

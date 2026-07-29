@@ -2105,7 +2105,7 @@ export const TR: Record<string, string> = {
   "Tu bóveda está lista. El panel de Inicio te guiará en los primeros pasos.": "Kasanız hazır. Ana panel ilk adımlarda size yol gösterecektir.",
   "Bienvenido a Nodus": "Nodus'a hoş geldiniz",
   "Teje tu biblioteca de Zotero en un grafo navegable de ideas y autores. Todo es local.": "Zotero kitaplığınızı gezinilebilir bir fikir ve yazar grafiğine dönüştürün. Her şey yereldir.",
-  "Nodus usa la API local de Zotero 7 (solo lectura). Abre Zotero y verifica la conexión.": "Nodus, yerel Zotero 7 API'sini (salt okunur) kullanır. Zotero'yu açın ve bağlantıyı doğrulayın.",
+  "Nodus usa la API local de Zotero en modo solo lectura (requiere Zotero 7 o posterior). Abre Zotero y verifica la conexión.": "Nodus, yerel Zotero API'sini salt okunur modda kullanır (Zotero 7 veya üzeri gerekir). Zotero'yu açın ve bağlantıyı doğrulayın.",
   "Verificar conexión": "Bağlantıyı doğrula",
   "Conectado (userID {id})": "Bağlandı (kullanıcı kimliği {id})",
   "No disponible: {msg}": "Mevcut değil: {msg}",

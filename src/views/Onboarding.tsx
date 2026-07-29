@@ -335,7 +335,7 @@ export function Onboarding({
         {step === 0 && !simple && (
           <div className="space-y-4">
             <p className="text-sm">
-              {t('Nodus usa la API local de Zotero 7 (solo lectura). Abre Zotero y verifica la conexión.')}
+              {t('Nodus usa la API local de Zotero en modo solo lectura (requiere Zotero 7 o posterior). Abre Zotero y verifica la conexión.')}
             </p>
             <button className="btn btn-primary" onClick={checkZotero}>
               {t('Verificar conexión')}
