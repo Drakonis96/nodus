@@ -1039,6 +1039,28 @@ export const PT_BR: Record<string, string> = {
   'Cuéntanos qué falla, con los pasos para reproducirlo.': 'Conte-nos o que está falhando, com os passos para reproduzi-lo.',
   'Nuevo tipo de vault': 'Novo tipo de vault',
   'Propón un espacio especializado y cómo colaborarías para hacerlo viable.': 'Proponha um espaço especializado e como você colaboraria para viabilizá-lo.',
+  'Dar feedback': 'Dar feedback',
+  'Valora tu experiencia y cuéntanos qué funciona bien y qué deberíamos mejorar.':
+    'Avalie sua experiência e conte o que funciona bem e o que devemos melhorar.',
+  Valoraciones: 'Avaliações',
+  'Cantidad y variedad de funciones': 'Quantidade e variedade de recursos',
+  Usabilidad: 'Facilidade de uso',
+  Rendimiento: 'Desempenho',
+  Estabilidad: 'Estabilidade',
+  'Diseño visual': 'Design visual',
+  '¿Qué te gusta de Nodus?': 'O que você gosta no Nodus?',
+  '¿Qué crees que debería mejorar?': 'O que você acha que devemos melhorar?',
+  'Sin respuesta': 'Sem resposta',
+  'Opinión sobre Nodus': 'Opinião sobre o Nodus',
+  'Todas las preguntas son opcionales. Responde solo a las que quieras.':
+    'Todas as perguntas são opcionais. Responda apenas às que quiser.',
+  'Escala de valoración': 'Escala de avaliação',
+  'Necesita mejorar': 'Precisa melhorar',
+  Aceptable: 'Aceitável',
+  'Funciones, detalles o experiencias que valoras (opcional)':
+    'Recursos, detalhes ou experiências que você valoriza (opcional)',
+  'Cambios que harían Nodus más útil para ti (opcional)':
+    'Mudanças que tornariam o Nodus mais útil para você (opcional)',
   'Un vault especializado puede requerir arquitectura nueva. Se priorizará cuando haya colaboración activa, conocimiento del área y personas dispuestas a probarlo.':
     'Um vault especializado pode exigir uma nova arquitetura. Será priorizado quando houver colaboração ativa, conhecimento da área e pessoas dispostas a testá-lo.',
   'Rama de conocimiento o área': 'Ramo de conhecimento ou área',

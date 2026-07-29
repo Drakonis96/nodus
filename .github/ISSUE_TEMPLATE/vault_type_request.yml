@@ -1,0 +1,60 @@
+name: New vault type
+description: Propose a specialized Nodus workspace and explain how you could help validate it.
+title: "[Vault type] "
+labels:
+  - enhancement
+body:
+  - type: input
+    id: field
+    attributes:
+      label: Field of knowledge or professional area
+      placeholder: Health sciences, journalism, engineering…
+    validations:
+      required: true
+  - type: dropdown
+    id: relationship
+    attributes:
+      label: Your relationship with this field
+      options:
+        - I am a specialist or professional in this field
+        - I have practical or academic experience
+        - I am not a specialist, but I understand the need
+    validations:
+      required: true
+  - type: checkboxes
+    id: collaboration
+    attributes:
+      label: Testing and collaboration
+      options:
+        - label: I can actively test this vault and provide feedback
+  - type: textarea
+    id: features
+    attributes:
+      label: Essential features and workflows
+      description: What must this vault support to be useful in this field?
+    validations:
+      required: true
+  - type: textarea
+    id: structure
+    attributes:
+      label: Vault organization and structure
+      description: Describe sections, hierarchies, content types, and navigation.
+    validations:
+      required: true
+  - type: textarea
+    id: use_cases
+    attributes:
+      label: Benefits and use cases
+      description: Who would this help, and what work would it improve?
+    validations:
+      required: true
+  - type: dropdown
+    id: personal_data
+    attributes:
+      label: Would this vault handle personal or sensitive data?
+      options:
+        - I am not sure; this must be assessed
+        - "Yes"
+        - "No"
+    validations:
+      required: true

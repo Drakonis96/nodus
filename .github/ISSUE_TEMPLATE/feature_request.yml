@@ -1,0 +1,33 @@
+name: Feature request
+description: Propose a new capability or an improvement to an existing workflow.
+title: "[Feature] "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Explain the user need before describing a solution. Please search existing issues first.
+  - type: textarea
+    id: description
+    attributes:
+      label: Feature description
+      description: What should Nodus do?
+      placeholder: Describe the proposed capability or improvement.
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: What problem would this solve, and for whom?
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Describe current workarounds or other approaches you considered.
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+      description: Add mockups, examples, or related references if useful.

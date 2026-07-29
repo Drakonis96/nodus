@@ -1045,6 +1045,28 @@ export const DE: Record<string, string> = {
   'Nuevo tipo de vault': 'Neuer Vault-Typ',
   'Propón un espacio especializado y cómo colaborarías para hacerlo viable.':
     'Schlagen Sie einen spezialisierten Arbeitsbereich vor und wie Sie mithelfen würden, ihn umsetzbar zu machen.',
+  'Dar feedback': 'Feedback geben',
+  'Valora tu experiencia y cuéntanos qué funciona bien y qué deberíamos mejorar.':
+    'Bewerten Sie Ihre Erfahrung und sagen Sie uns, was gut funktioniert und was wir verbessern sollten.',
+  Valoraciones: 'Bewertungen',
+  'Cantidad y variedad de funciones': 'Umfang und Vielfalt der Funktionen',
+  Usabilidad: 'Benutzerfreundlichkeit',
+  Rendimiento: 'Leistung',
+  Estabilidad: 'Stabilität',
+  'Diseño visual': 'Visuelles Design',
+  '¿Qué te gusta de Nodus?': 'Was gefällt Ihnen an Nodus?',
+  '¿Qué crees que debería mejorar?': 'Was sollten wir Ihrer Meinung nach verbessern?',
+  'Sin respuesta': 'Keine Antwort',
+  'Opinión sobre Nodus': 'Meinung zu Nodus',
+  'Todas las preguntas son opcionales. Responde solo a las que quieras.':
+    'Alle Fragen sind optional. Beantworten Sie nur die Fragen, die Sie beantworten möchten.',
+  'Escala de valoración': 'Bewertungsskala',
+  'Necesita mejorar': 'Verbesserungsbedürftig',
+  Aceptable: 'Akzeptabel',
+  'Funciones, detalles o experiencias que valoras (opcional)':
+    'Funktionen, Details oder Erfahrungen, die Sie schätzen (optional)',
+  'Cambios que harían Nodus más útil para ti (opcional)':
+    'Änderungen, die Nodus für Sie nützlicher machen würden (optional)',
   'Un vault especializado puede requerir arquitectura nueva. Se priorizará cuando haya colaboración activa, conocimiento del área y personas dispuestas a probarlo.':
     'Ein spezialisierter Vault kann eine neue Architektur erfordern. Er wird priorisiert, sobald es aktive Zusammenarbeit, Fachwissen im Bereich und Personen gibt, die bereit sind, ihn zu testen.',
   'Rama de conocimiento o área': 'Wissensgebiet oder Bereich',

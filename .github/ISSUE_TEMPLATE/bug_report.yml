@@ -1,0 +1,50 @@
+name: Bug report
+description: Report a reproducible problem or incorrect behavior in Nodus.
+title: "[Bug] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting a problem. Do not include API keys, personal data, student data, private vault content, or confidential documents.
+
+        Security vulnerabilities must be reported through the private security form instead of this public issue.
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Describe the problem clearly and include the exact error message, if any.
+      placeholder: Tell us what went wrong.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Provide the smallest reliable sequence that reproduces the problem.
+      placeholder: |
+        1. Open…
+        2. Select…
+        3. Observe…
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      placeholder: What did you expect Nodus to do?
+  - type: input
+    id: version
+    attributes:
+      label: Nodus version
+      description: You can find this in Nodus settings or the About screen.
+      placeholder: "2.7.0"
+  - type: input
+    id: environment
+    attributes:
+      label: Operating system and architecture
+      placeholder: macOS 15 arm64, Windows 11 x64, Ubuntu 24.04 x64
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+      description: Add redacted logs or screenshots if they help explain the problem.

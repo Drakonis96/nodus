@@ -140,3 +140,5 @@ You can also visit the [interactive browser tour](https://drakonis96.github.io/n
 ## Open and evolving
 
 Nodus is released under the [MIT License](LICENSE). Its [privacy policy](PRIVACY.md), [third-party notices](THIRD_PARTY_NOTICES.md) and [deployment checklist](legal/RGPD_DEPLOYMENT_CHECKLIST.md) document the privacy and licensing boundaries of each installation. Ideas, bug reports and academic use cases are welcome through [GitHub Issues](https://github.com/Drakonis96/nodus/issues).
+
+Before participating, read the [contribution guide](CONTRIBUTING.md) and [Code of Conduct](CODE_OF_CONDUCT.md). Report vulnerabilities privately according to the [security policy](SECURITY.md).
