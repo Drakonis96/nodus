@@ -1473,6 +1473,14 @@ const api: NodusApi = {
   assignTestimonySpeaker: (transcriptId, speakerLabel, personId) =>
     ipcRenderer.invoke('testimony:transcripts:assignSpeaker', transcriptId, speakerLabel, personId),
   testimonySpeakerLabels: (transcriptId) => ipcRenderer.invoke('testimony:transcripts:speakers', transcriptId),
+  buildTestimonyIndex: () => ipcRenderer.invoke('testimony:index:build'),
+  testimonyIndexStatus: () => ipcRenderer.invoke('testimony:index:status'),
+  clearTestimonyIndex: () => ipcRenderer.invoke('testimony:index:clear'),
+  searchTestimoniesBySemantics: (query, limit) => ipcRenderer.invoke('testimony:search:semantic', query, limit ?? null),
+  analyzeTestimonyInterview: (interviewId) => ipcRenderer.invoke('testimony:ai:analyze', interviewId),
+  improveTestimonyTranscript: (transcriptId) => ipcRenderer.invoke('testimony:ai:improve', transcriptId),
+  applyDetectedTestimonySpeakers: (transcriptId, entries) =>
+    ipcRenderer.invoke('testimony:transcripts:applyDetectedSpeakers', transcriptId, entries),
 
   listTestimonyCodes: () => ipcRenderer.invoke('testimony:codes:list'),
   createTestimonyCode: (input) => ipcRenderer.invoke('testimony:codes:create', input),

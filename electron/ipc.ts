@@ -50,6 +50,7 @@ import {
   listSegments as listTestimonySegments,
   listTranscripts as listTestimonyTranscripts,
   remapAnnotationsTo as remapTestimonyAnnotationsTo,
+  applySpeakerLabels as applyTestimonySpeakerLabels,
   speakerLabels as testimonySpeakerLabels,
   updateSegment as updateTestimonySegment,
   verifyMediaHash as verifyTestimonyMediaHash,
@@ -87,6 +88,10 @@ import {
 } from './db/noteLinksRepo';
 import { evaluateAccess as evaluateTestimonyAccess } from '@shared/testimonyAccess';
 import { buildTestimonyPackage } from './export/testimonyExport';
+import { analyzeTestimonyInterview, improveTestimonyTranscript } from './ai/testimonyAnalysis';
+import { buildTestimonyIndex, testimonyIndexStatus } from './ai/testimonyIndex';
+import { dropAllEmbeddings as dropTestimonyEmbeddings, semanticSearch as testimonySemanticSearch } from './db/testimonyEmbeddingsRepo';
+import { embed as embedText } from './ai/aiClient';
 import { seedTestimonyDemoData } from './db/testimonyDemoData';
 
 import {
@@ -4765,6 +4770,23 @@ export function registerIpc(
   h('testimony:transcripts:assignSpeaker', async (_e, transcriptId: string, speakerLabel: string | null, personId: string | null) =>
     assignTestimonySpeaker(transcriptId, speakerLabel, personId));
   h('testimony:transcripts:speakers', async (_e, transcriptId: string) => testimonySpeakerLabels(transcriptId));
+  h('testimony:index:build', async () => buildTestimonyIndex());
+  h('testimony:index:status', async () => testimonyIndexStatus());
+  h('testimony:index:clear', async () => dropTestimonyEmbeddings());
+  h('testimony:search:semantic', async (_e, query: string, limit: number | null) => {
+    const vector = await embedText(query);
+    // Sin vector no hay búsqueda: devolver los resultados textuales disfrazados de
+    // semánticos haría creer que el índice funciona cuando el proveedor está caído.
+    if (!vector) throw new Error('No se pudo consultar el modelo de embeddings. Revisa el proveedor en Ajustes.');
+    return testimonySemanticSearch(vector, limit ?? 20);
+  });
+  h('testimony:ai:analyze', async (_e, interviewId: string) => analyzeTestimonyInterview(interviewId));
+  h('testimony:ai:improve', async (_e, transcriptId: string) => improveTestimonyTranscript(transcriptId));
+  h('testimony:transcripts:applyDetectedSpeakers', async (
+    _e,
+    transcriptId: string,
+    entries: { segmentId: string; label: string | null }[],
+  ) => applyTestimonySpeakerLabels(transcriptId, entries));
 
   h('testimony:codes:list', async () => listTestimonyCodes());
   h('testimony:codes:create', async (_e, input: TestimonyCodeInput) => createTestimonyCode(input));

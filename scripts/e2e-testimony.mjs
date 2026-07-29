@@ -656,6 +656,50 @@ try {
     'el recorrido arranca por lo que es una entrevista, no por dónde están los botones');
   console.log('[e2e-testimony] demo y recorrido: cinco entrevistas, audio sintético, un embargo, un acuerdo pendiente y el tutorial arrancando');
 
+  // ── 16. Las tres operaciones de IA existen, y la puerta se cierra sin acuerdo ──
+  //
+  // Aquí no hay proveedor configurado a propósito: lo que se comprueba es que los tres
+  // controles están donde tienen que estar y que, sin permiso, el fallo es un mensaje que
+  // dice qué hacer — no una excepción y no un análisis hecho a escondidas.
+  // El recorrido sigue abierto del bloque anterior y se traga los clics: se cierra antes.
+  await page.evaluate(async () => {
+    await window.nodus.updateSettings({ testimonyAllowExternalProviders: false, testimonyTourComplete: true });
+  });
+  await page.reload();
+  await page.waitForFunction(() => !!document.getElementById('root')?.children.length);
+  await page.getByTestId('testimony-sidebar').getByRole('button', { name: 'Entrevistas', exact: true }).click();
+  await page.getByTestId('testimony-row-INT-0002').click();
+  await page.getByTestId('testimony-tab-sessions').click();
+  await page.getByTestId('testimony-speaker-detection').waitFor();
+  // El aviso cambia según si el modelo ya está descargado; las dos formas dicen lo mismo:
+  // el análisis es local. En un perfil nuevo se ve la de la primera vez.
+  assert.match(await page.getByTestId('testimony-speaker-detection').innerText(),
+    /sin conexión|offline|No sale de aquí|does not leave|no se identifica/i,
+    'la detección de hablantes explica que trabaja en este equipo');
+  // Corregir sólo se ofrece sobre el LITERAL —es el único que admite derivar una
+  // corregida— y detectar hablantes sólo sobre una versión editable: el literal es la
+  // palabra de la máquina y no se toca. Las dos pestañas ofrecen cosas distintas a propósito.
+  await page.getByTestId('testimony-version-machine_literal').click();
+  await page.getByTestId('testimony-improve').waitFor();
+  assert.equal(await page.getByTestId('testimony-speaker-detection').count(), 0,
+    'sobre el literal no se ofrece etiquetar hablantes: no se puede editar');
+
+  await page.getByTestId('testimony-tab-analysis').click();
+  await page.getByTestId('testimony-analysis-proposal').waitFor();
+  await page.getByTestId('testimony-analyze').click();
+  await page.getByTestId('testimony-analysis-error').waitFor({ timeout: 30_000 });
+  const gateMessage = await page.getByTestId('testimony-analysis-error').innerText();
+  assert.match(gateMessage, /acuerdo|agreement/i, `la puerta explica el motivo: ${gateMessage}`);
+  assert.match(gateMessage, /modelo local|local model|Documenta/i, 'y dice qué hacer para poder usarla');
+
+  // Y la búsqueda por significado no finge: sin índice lo dice, no devuelve texto disfrazado.
+  await page.getByTestId('testimony-sidebar').getByRole('button', { name: 'Buscar', exact: true }).click();
+  await page.getByTestId('testimony-mode-semantic').click();
+  await page.getByTestId('testimony-index-panel').waitFor();
+  assert.match(await page.getByTestId('testimony-index-panel').innerText(), /acuerdo lo permite|agreement allows/i,
+    'el panel del índice dice que sólo entra lo que el acuerdo permite');
+  console.log('[e2e-testimony] IA: los tres controles existen, la puerta se cierra con un motivo y el índice no miente');
+
   assert.deepEqual(pageErrors, [], `errores del renderer: ${pageErrors.map((error) => error.message).join(' | ')}`);
   await closeElectronApp(app);
   app = null;

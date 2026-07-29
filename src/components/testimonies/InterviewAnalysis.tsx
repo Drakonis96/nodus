@@ -13,6 +13,7 @@ import { Icon } from '../ui';
 import { confirm, promptText, toast } from '../feedback';
 import { MediaPlayer } from '../media/MediaPlayer';
 import { TESTIMONY_MEDIA_ACCENT } from '../media/mediaFormat';
+import { AnalysisProposal } from './AnalysisProposal';
 import { TranscriptAnnotationLayer } from './TranscriptAnnotationLayer';
 import { t, tx } from '../../i18n';
 
@@ -127,6 +128,15 @@ export function InterviewAnalysis({ row, onChanged }: { row: TestimonyInterviewR
           >
             {tx('{n} fragmentos quedaron pendientes de revisar al crearse una versión nueva. Nodus no los ha movido: comprueba que la cita sigue siendo la misma.', { n: needsReview.length })}
           </div>
+        )}
+
+        {activeTranscript && (
+          <AnalysisProposal
+            interviewId={row.id}
+            segments={segments}
+            codes={codes}
+            onChanged={async () => { await reload(); await onChanged(); }}
+          />
         )}
 
         {activeTranscript ? (

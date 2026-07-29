@@ -35,6 +35,8 @@ import { LocalAudioRecorderPanel, useLocalAudioRecorder } from '../media/LocalAu
 import { MediaPlayer } from '../media/MediaPlayer';
 import { TranscriptionProgress } from '../media/TranscriptionProgress';
 import { TranscriptSegmentEditor } from '../media/TranscriptSegmentEditor';
+import { SpeakerDetection } from './SpeakerDetection';
+import { TranscriptImprove } from './TranscriptImprove';
 import { TESTIMONY_MEDIA_ACCENT, formatBytes } from '../media/mediaFormat';
 import { TestimonyField } from './TestimonyField';
 import { t, tx } from '../../i18n';
@@ -588,6 +590,32 @@ export function InterviewSessions({
                 testid="testimony-segments"
               />
 
+              {activeTranscript && allowedDerivations(activeTranscript.kind).includes('corrected') && (
+                <TranscriptImprove
+                  transcript={activeTranscript}
+                  onCreated={async (transcriptId) => {
+                    await onChanged();
+                    setActiveTranscriptId(transcriptId);
+                  }}
+                />
+              )}
+
+              {activeTranscript && isEditableTranscriptKind(activeTranscript.kind) && (
+                <SpeakerDetection
+                  transcriptId={activeTranscript.id}
+                  segments={segments}
+                  editable
+                  blob={async () => {
+                    const content = await window.nodus.getTestimonyMediaBlob(activeMedia.id);
+                    return content ? new Blob([content.bytes], { type: content.mimeType }) : null;
+                  }}
+                  onApplied={async () => {
+                    setSegments(await window.nodus.listTestimonySegments(activeTranscript.id));
+                    await onChanged();
+                  }}
+                />
+              )}
+
               {activeTranscript && isEditableTranscriptKind(activeTranscript.kind) && (
                 <SpeakerBulkAssign
                   transcriptId={activeTranscript.id}
@@ -609,9 +637,10 @@ export function InterviewSessions({
 /**
  * Atribuir en lote todos los tramos de una etiqueta a una persona.
  *
- * Es la operación real: nadie identifica «Hablante 2» tramo a tramo en hora y media de
- * entrevista. Y es MANUAL a propósito — Nodus no reconoce voces, porque una atribución
- * automática equivocada pone palabras en la boca de alguien sin dejar rastro.
+ * Es la operación real: nadie identifica «Voz 2» tramo a tramo en hora y media de
+ * entrevista. La detección acústica separa las voces —eso sí lo hace la máquina—, pero
+ * PONERLES NOMBRE sigue siendo manual: una atribución automática equivocada pone palabras
+ * en la boca de alguien sin dejar rastro.
  */
 function SpeakerBulkAssign({
   transcriptId,
@@ -639,7 +668,7 @@ function SpeakerBulkAssign({
     <div className="border-t border-neutral-200 p-3 dark:border-neutral-800" data-testid="testimony-speaker-assign">
       <p className="text-xs font-medium text-neutral-600 dark:text-neutral-400">{t('Atribuir hablantes')}</p>
       <p className="mt-0.5 text-[11px] leading-4 text-neutral-500">
-        {t('Nodus no reconoce voces: decides tú quién habla en cada etiqueta. Se aplica a todos sus tramos de una vez.')}
+        {t('Nodus separa las voces, pero no reconoce a las personas: decides tú quién habla en cada etiqueta. Se aplica a todos sus tramos de una vez.')}
       </p>
       <div className="mt-2 flex flex-wrap gap-2">
         {pending.map((entry) => (

@@ -27,7 +27,7 @@ try {
   const currentRelease = RELEASE_NOTES[0];
   assert.equal(currentRelease?.version, '2.8.0');
   assert.equal(currentRelease?.date, '2026-07-29');
-  assert.equal(currentRelease?.highlights.length, 5);
+  assert.equal(currentRelease?.highlights.length, 7);
   assert.ok(currentRelease?.highlights.every((highlight) => highlight.it.length > 0));
   const whatsNew = fs.readFileSync(path.join(root, 'src/components/WhatsNewModal.tsx'), 'utf8');
   assert.match(whatsNew, /function ZoteroReleaseIcon/);

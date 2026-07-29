@@ -376,19 +376,37 @@ function retryAfterMs(e: any): number {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/** True for a provider 5xx: the request did not run, so repeating it is not a double charge. */
+function isTransientServerError(e: any): boolean {
+  const status = e?.status ?? e?.response?.status;
+  return typeof status === 'number' && status >= 500 && status < 600;
+}
+
 /**
- * Run a provider call, and — only on a free tier — wait out 429s (up to a few times) instead of
- * letting the rate limit fail the whole scan. Normal (paid) usage is unchanged: no retry, the error
- * propagates immediately so the queue's own backoff handles it.
+ * Run a provider call, absorbing the two failures that are not the caller's fault.
+ *
+ * · 429 (rate limit): sólo en las capas gratuitas se espera el Retry-After, hasta cuatro
+ *   veces. En una cuenta de pago el error sube y lo gestiona el backoff de la cola.
+ * · 5xx: se reintenta SIEMPRE, dos veces con espera creciente. Un 503 puntual del
+ *   proveedor no debe tumbar una operación larga —corregir una transcripción de trescientos
+ *   tramos, indexar un corpus— cuando la petición ni siquiera llegó a ejecutarse. Y por eso
+ *   mismo no es doble facturación: no hubo primera.
  */
-async function withFreeTierRateLimit<T>(freeTier: boolean, make: () => Promise<T>): Promise<T> {
-  const maxWaits = freeTier ? 4 : 0;
+async function withProviderRetries<T>(freeTier: boolean, make: () => Promise<T>): Promise<T> {
+  const maxRateWaits = freeTier ? 4 : 0;
+  const maxServerRetries = 2;
+  let serverRetries = 0;
   for (let attempt = 0; ; attempt++) {
     try {
       return await make();
     } catch (e) {
-      if (attempt < maxWaits && isRateLimited(e)) {
+      if (attempt < maxRateWaits && isRateLimited(e)) {
         await sleep(retryAfterMs(e));
+        continue;
+      }
+      if (serverRetries < maxServerRetries && isTransientServerError(e)) {
+        await sleep(500 * (serverRetries + 1) ** 2);
+        serverRetries += 1;
         continue;
       }
       throw e;
@@ -588,12 +606,12 @@ async function rawComplete(
   try {
     let res;
     try {
-      res = await withFreeTierRateLimit(freeTier, () => client.chat.completions.create({ ...baseBody, ...extras } as any));
+      res = await withProviderRetries(freeTier, () => client.chat.completions.create({ ...baseBody, ...extras } as any));
     } catch (e: any) {
       // The optional reasoning/JSON/routing params may be unsupported by this model.
       // Retry once as a plain request before surfacing the error.
       if (!opts.noRetry && isBadRequest(e) && Object.keys(extras).length > 0) {
-        res = await withFreeTierRateLimit(freeTier, () => client.chat.completions.create(baseBody as any));
+        res = await withProviderRetries(freeTier, () => client.chat.completions.create(baseBody as any));
       } else {
         throw e;
       }
@@ -1012,10 +1030,10 @@ async function rawCompleteStream(
   try {
     let stream;
     try {
-      stream = await withFreeTierRateLimit(freeTier, () => client.chat.completions.create({ ...baseBody, ...extras } as any, { signal }));
+      stream = await withProviderRetries(freeTier, () => client.chat.completions.create({ ...baseBody, ...extras } as any, { signal }));
     } catch (e: any) {
       if (isBadRequest(e) && Object.keys(extras).length > 0) {
-        stream = await withFreeTierRateLimit(freeTier, () => client.chat.completions.create(baseBody as any, { signal }));
+        stream = await withProviderRetries(freeTier, () => client.chat.completions.create(baseBody as any, { signal }));
       } else {
         throw e;
       }

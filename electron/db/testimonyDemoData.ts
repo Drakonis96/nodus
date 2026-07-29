@@ -1,10 +1,15 @@
 // «Memoria del valle»: un proyecto de historia oral completo y ficticio.
 //
 // NO HAY NINGUNA VOZ REAL, y no es una limitación: es la única forma honesta de enviar
-// una demo de historia oral. Los maestros son un tono sintético de dos segundos, marcados
-// como tales en sus metadatos técnicos, y una de las cinco entrevistas llega con el audio
-// YA SOLTADO — conserva su ficha, su huella y su transcripción — para enseñar el flujo de
-// «exportar el original y liberar espacio» sin fingir que hay una grabación detrás.
+// una demo de historia oral. Los maestros son VOCES SINTÉTICAS generadas a partir del
+// guion de la propia demo (`testimonyDemoScript.ts`), marcadas como tales en sus metadatos
+// técnicos, y una de las cinco entrevistas llega con el audio YA SOLTADO — conserva su
+// ficha, su huella y su transcripción — para enseñar el flujo de «exportar el original y
+// liberar espacio» sin fingir que hay una grabación detrás.
+//
+// Que suene habla de verdad no es un capricho estético: sin ella no se puede probar la
+// transcripción ni la detección de hablantes desde la demo, que es lo primero que hace
+// cualquiera que abre un proyecto de historia oral.
 //
 // El corpus está construido para que las cinco pantallas tengan algo que enseñar el
 // primer minuto: entrevistas en estados distintos, una grupal, una versión literal junto a
@@ -15,7 +20,16 @@
 // con precisión sin tocar nada de lo que el usuario cree mientras lo explora.
 
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+import { app } from 'electron';
 import { getDb } from './database';
+import {
+  demoScriptFor,
+  type DemoAudioEntry,
+  type DemoAudioManifest,
+  type DemoInterviewScript,
+} from './testimonyDemoScript';
 import { getSettings, updateSettings } from './settingsRepo';
 import { getActiveVault } from '../vaults/vaultRegistry';
 import { normalizeCodeLabel } from '@shared/testimonies';
@@ -95,8 +109,35 @@ function hasAnyTestimonyData(): boolean {
 
 interface SegmentSeed {
   t: number;
+  tEnd: number;
   speaker: 'narrator' | 'narrator2' | 'interviewer';
   text: string;
+}
+
+/**
+ * El audio de la demo, generado a partir de su propio guion y empaquetado con la app.
+ *
+ * SON VOCES SINTÉTICAS y se dice en los metadatos técnicos de cada archivo, en su nombre y
+ * en el reproductor. Enviar voces reales en una demo de historia oral —aunque fueran de
+ * actores— enseñaría lo contrario de lo que este vault defiende. Pero un tono puro tampoco
+ * servía: sin habla no se puede probar ni la transcripción ni la detección de hablantes,
+ * que es justo lo que un proyecto de historia oral hace el primer día.
+ */
+const DEMO_AUDIO_DIR = path.join(app.getAppPath(), 'electron', 'assets', 'testimonios-demo');
+
+function demoAudio(key: string, english: boolean): { entry: DemoAudioEntry; bytes: Buffer } | null {
+  try {
+    const manifest = JSON.parse(fs.readFileSync(path.join(DEMO_AUDIO_DIR, 'manifest.json'), 'utf8')) as DemoAudioManifest;
+    const entry = manifest.entries.find((item) => item.key === key && item.language === (english ? 'en' : 'es'));
+    if (!entry) return null;
+    const bytes = fs.readFileSync(path.join(DEMO_AUDIO_DIR, entry.file));
+    // La huella del manifiesto no es decorativa: si el archivo se corrompe al empaquetar,
+    // la demo cae al tono sintético en vez de sembrar una grabación que no suena.
+    if (crypto.createHash('sha256').update(bytes).digest('hex') !== entry.sha256) return null;
+    return { entry, bytes };
+  } catch {
+    return null;
+  }
 }
 
 export function seedTestimonyDemoData(): boolean {
@@ -222,7 +263,6 @@ export function seedTestimonyDemoData(): boolean {
       /** Sin audio: la entrevista cuyo maestro se exportó y se soltó. */
       audio: 'tone' | 'dropped' | 'none';
       tone?: number;
-      segments?: SegmentSeed[];
       /** Si además del literal lleva una versión revisada. */
       reviewed?: boolean;
       fieldNotes?: string;
@@ -321,7 +361,11 @@ export function seedTestimonyDemoData(): boolean {
       });
 
       const dropped = spec.audio === 'dropped';
-      const bytes = syntheticTone(spec.tone ?? 440);
+      const generated = dropped ? null : demoAudio(spec.key, en);
+      // Sin los archivos empaquetados la demo NO se cae: vuelve al tono, que es lo que
+      // había antes, y lo dice en sus metadatos. Una demo que no siembra es peor que una
+      // demo con un tono.
+      const bytes = generated ? generated.bytes : syntheticTone(spec.tone ?? 440);
       const mediaId = `${PREFIX}m-${spec.key}`;
       insert('testimony_media', {
         id: mediaId,
@@ -331,17 +375,28 @@ export function seedTestimonyDemoData(): boolean {
         role: 'master',
         file_name: dropped
           ? text('valle-04-original.wav', 'valley-04-master.wav')
-          : text(`audio-sintetico-${spec.key}.wav`, `synthetic-audio-${spec.key}.wav`),
-        mime_type: 'audio/wav',
+          : generated
+            ? text(`voces-sinteticas-${spec.key}.mp3`, `synthetic-voices-${spec.key}.mp3`)
+            : text(`audio-sintetico-${spec.key}.wav`, `synthetic-audio-${spec.key}.wav`),
+        mime_type: generated ? generated.entry.mimeType : 'audio/wav',
         // La entrevista con el audio soltado conserva ficha y huella, y no un byte más.
         content_blob: dropped ? null : bytes,
         content_hash: sha256(bytes),
-        duration_seconds: dropped ? 4980 : 2,
+        duration_seconds: dropped ? 4980 : generated ? Math.round(generated.entry.durationSeconds) : 2,
         size_bytes: dropped ? 0 : bytes.byteLength,
         technical_json: JSON.stringify(
           dropped
             ? { nota: text('Original exportado al archivo y soltado de la bóveda.', 'Master exported to the archive and released from the vault.') }
-            : { sintetico: true, nota: text('Tono sintético de demostración. No es una voz real.', 'Synthetic demo tone. Not a real voice.') }
+            : generated
+              ? {
+                sintetico: true,
+                voces: generated.entry.voices,
+                nota: text(
+                  'Voces sintéticas generadas para la demo. Ninguna persona real ha sido grabada.',
+                  'Synthetic voices generated for the demo. No real person was recorded.'
+                ),
+              }
+              : { sintetico: true, nota: text('Tono sintético de demostración. No es una voz real.', 'Synthetic demo tone. Not a real voice.') }
         ),
         source_media_id: null,
         immutable: 1,
@@ -349,7 +404,19 @@ export function seedTestimonyDemoData(): boolean {
         deleted_at: null,
       });
 
-      const segments = spec.segments ?? [];
+      // Los segmentos SALEN DEL GUION, no de esta llamada: el texto que se oye y el que se
+      // lee son el mismo, y los tiempos son los medidos al generar el audio, no una rejilla
+      // de doce en doce segundos que no coincidiría con nada.
+      const script: DemoInterviewScript | null = demoScriptFor(spec.key);
+      const segments: SegmentSeed[] = (script?.turns ?? []).map((turn, index) => {
+        const timing = generated?.entry.turns[index] ?? null;
+        return {
+          t: timing ? timing.start : index * 12,
+          tEnd: timing ? timing.end : index * 12 + 11,
+          speaker: turn.speaker,
+          text: text(turn.es, turn.en),
+        };
+      });
       const literalId = `${PREFIX}t-${spec.key}-literal`;
       insert('testimony_transcripts', {
         id: literalId,
@@ -377,7 +444,7 @@ export function seedTestimonyDemoData(): boolean {
           transcript_id: literalId,
           source_segment_id: null,
           t_start: segment.t,
-          t_end: segment.t + 11,
+          t_end: segment.tEnd,
           // El literal llega en minúsculas y sin puntuar: es lo que devuelve el modelo, y
           // enseñarlo así es lo que hace evidente por qué existe la versión corregida.
           text: segment.text.toLocaleLowerCase(),
@@ -419,7 +486,7 @@ export function seedTestimonyDemoData(): boolean {
           transcript_id: reviewedId,
           source_segment_id: literalSegmentIds[index],
           t_start: segment.t,
-          t_end: segment.t + 11,
+          t_end: segment.tEnd,
           text: segment.text,
           speaker_person_id: segment.speaker === 'interviewer'
             ? `${PREFIX}p-jorge`
@@ -468,14 +535,6 @@ export function seedTestimonyDemoData(): boolean {
         'Se emocionó al hablar del padre y pedimos parar dos minutos. Al apagar la grabadora contó que guarda su carta de despedida; no quiso que constara.',
         'She became emotional talking about her father and we paused for two minutes. With the recorder off she said she keeps his farewell letter; she did not want that recorded.'
       ),
-      segments: [
-        { t: 0, speaker: 'interviewer', text: text('¿Se acuerda del día en que se marchó su padre?', 'Do you remember the day your father left?') },
-        { t: 12, speaker: 'narrator', text: text('Mi padre se marchó en el cuarenta y siete. Yo tenía dieciséis años y me acuerdo del ruido del camión.', 'My father left in ’47. I was sixteen and I remember the sound of the lorry.') },
-        { t: 24, speaker: 'narrator', text: text('Nunca volvimos a saber de él hasta muchos años después. En casa no se hablaba de eso.', 'We never heard from him again until many years later. At home nobody talked about it.') },
-        { t: 36, speaker: 'narrator', text: text('Aquel invierno comimos lo que había. Mi madre hacía pan con lo que le daban en el molino.', 'That winter we ate whatever there was. My mother made bread with what they gave her at the mill.') },
-        { t: 48, speaker: 'interviewer', text: text('¿Y usted siguió yendo a la escuela?', 'And did you keep going to school?') },
-        { t: 60, speaker: 'narrator', text: text('Hasta los catorce. Después ya no, porque hacía falta en casa.', 'Until I was fourteen. Not after that, because I was needed at home.') },
-      ],
     });
 
     const tomas = makeInterview({
@@ -496,17 +555,15 @@ export function seedTestimonyDemoData(): boolean {
         status: 'documented',
         access: 'open',
         attribution: 'real_name',
-        uses: ['research', 'teaching', 'publication', 'web_publication', 'deposit', 'ai_processing'],
+        // La ÚNICA entrevista de la demo que documenta las dos llaves del tratamiento por
+        // IA —«ai_processing» y «external_processing»—, para que se pueda ver funcionar el
+        // análisis sin que eso abra las otras cuatro. Que haga falta documentar las dos por
+        // separado es la parte que hay que enseñar.
+        uses: ['research', 'teaching', 'publication', 'web_publication', 'deposit', 'ai_processing', 'external_processing'],
       },
       audio: 'tone',
       tone: 440,
       reviewed: true,
-      segments: [
-        { t: 0, speaker: 'narrator', text: text('En el cincuenta y dos había cuarenta y un niños en la escuela. En el setenta y cuatro cerré con siete.', 'In ’52 there were forty-one children at the school. In ’74 I closed it with seven.') },
-        { t: 12, speaker: 'narrator', text: text('Los que se marchaban no volvían. Primero el padre, y al año siguiente la familia entera.', 'Those who left did not come back. First the father, and the following year the whole family.') },
-        { t: 24, speaker: 'interviewer', text: text('¿Se hablaba en clase de por qué se iban?', 'Was it talked about in class, why they were leaving?') },
-        { t: 36, speaker: 'narrator', text: text('No. Eso no se hablaba. Se sabía, pero no se decía.', 'No. That was not talked about. Everyone knew, but nobody said it.') },
-      ],
     });
 
     const grupal = makeInterview({
@@ -540,11 +597,6 @@ export function seedTestimonyDemoData(): boolean {
       tone: 349,
       reviewed: true,
       fieldNotes: text('Cinco personas en la sala; dos prefirieron no ser grabadas y sus intervenciones no constan.', 'Five people in the room; two preferred not to be recorded and their contributions are not included.'),
-      segments: [
-        { t: 0, speaker: 'narrator', text: text('Entré con catorce años. Se entraba a las seis y se salía cuando el molino paraba.', 'I started at fourteen. You went in at six and left when the mill stopped.') },
-        { t: 12, speaker: 'narrator2', text: text('A mí me pagaban la mitad que a mi hermano por el mismo turno.', 'They paid me half what they paid my brother for the same shift.') },
-        { t: 24, speaker: 'narrator', text: text('En casa no se decía lo que se ganaba. Eso tampoco se hablaba.', 'At home nobody said what they earned. That was another thing you did not talk about.') },
-      ],
     });
 
     const miguel = makeInterview({
@@ -571,12 +623,6 @@ export function seedTestimonyDemoData(): boolean {
       // transcripción siguen aquí, y el reproductor lo dice en vez de fallar.
       audio: 'dropped',
       reviewed: true,
-      segments: [
-        { t: 0, speaker: 'narrator', text: text('Me fui en el cincuenta y siete con una maleta de cartón. Volví en el dos mil siete.', 'I left in ’57 with a cardboard suitcase. I came back in 2007.') },
-        { t: 12, speaker: 'narrator', text: text('El valle que me encontré no era el que dejé. Estaban las casas, pero no la gente.', 'The valley I found was not the one I left. The houses were there, the people were not.') },
-        { t: 24, speaker: 'interviewer', text: text('¿Se arrepiente de haberse ido?', 'Do you regret leaving?') },
-        { t: 36, speaker: 'narrator', text: text('No. Aquí no había nada. Pero tampoco puedo decir que ganara.', 'No. There was nothing here. But I cannot say I came out ahead either.') },
-      ],
     });
 
     // La quinta: PROGRAMADA y sin acuerdo. Es el estado más incómodo y el que más se

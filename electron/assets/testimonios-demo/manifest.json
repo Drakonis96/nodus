@@ -1,0 +1,205 @@
+{
+  "generator": "Hume Octave (voces sintéticas; ninguna voz real)",
+  "entries": [
+    {
+      "key": "carmen",
+      "language": "es",
+      "file": "carmen.es.mp3",
+      "mimeType": "audio/mpeg",
+      "durationSeconds": 37.81,
+      "sizeBytes": 303212,
+      "sha256": "bc1c512f827e1f598890f9ca4dbb3536cfd0c8b92c73894cb87afc5fefd98fcc",
+      "voices": {
+        "jorge": "Santiago",
+        "carmen": "La Voz del Mar"
+      },
+      "turns": [
+        {
+          "start": 0,
+          "end": 2.91
+        },
+        {
+          "start": 3.36,
+          "end": 11.62
+        },
+        {
+          "start": 12.07,
+          "end": 19.78
+        },
+        {
+          "start": 20.23,
+          "end": 27.26
+        },
+        {
+          "start": 27.71,
+          "end": 31.25
+        },
+        {
+          "start": 31.7,
+          "end": 37.81
+        }
+      ],
+      "textSha256": "74d10c2d03ae35e3f504d39245a409e7edc527ba8034cbeb483d95cff6390a80"
+    },
+    {
+      "key": "carmen",
+      "language": "en",
+      "file": "carmen.en.mp3",
+      "mimeType": "audio/mpeg",
+      "durationSeconds": 29.41,
+      "sizeBytes": 236012,
+      "sha256": "134b2d05056422e74340c28ed93876e421af6710ecd6ef42456c22a59c25ece8",
+      "voices": {
+        "jorge": "Terrence Bentley",
+        "carmen": "Geraldine Wallace"
+      },
+      "turns": [
+        {
+          "start": 0,
+          "end": 2.51
+        },
+        {
+          "start": 2.96,
+          "end": 9.18
+        },
+        {
+          "start": 9.63,
+          "end": 15.18
+        },
+        {
+          "start": 15.63,
+          "end": 21.34
+        },
+        {
+          "start": 21.79,
+          "end": 23.45
+        },
+        {
+          "start": 23.9,
+          "end": 29.41
+        }
+      ],
+      "textSha256": "c11b038da68e98c0ca36b739561a1b73316c40cf3805b2a7e5082f28c9573118"
+    },
+    {
+      "key": "tomas",
+      "language": "es",
+      "file": "tomas.es.mp3",
+      "mimeType": "audio/mpeg",
+      "durationSeconds": 22.34,
+      "sizeBytes": 179372,
+      "sha256": "8b0eaf2687d7595fed965f51f6b6d8e014b77f722fba9c8490b34669d2f1e258",
+      "voices": {
+        "tomas": "El Narrador Urbano",
+        "jorge": "Santiago"
+      },
+      "turns": [
+        {
+          "start": 0,
+          "end": 6.55
+        },
+        {
+          "start": 7,
+          "end": 13.22
+        },
+        {
+          "start": 13.67,
+          "end": 16.74
+        },
+        {
+          "start": 17.19,
+          "end": 22.34
+        }
+      ],
+      "textSha256": "a28d4ba85e9828930b33f944c6de60e6fe329cf13303b9b9bf653a00cd5c6e49"
+    },
+    {
+      "key": "tomas",
+      "language": "en",
+      "file": "tomas.en.mp3",
+      "mimeType": "audio/mpeg",
+      "durationSeconds": 21.97,
+      "sizeBytes": 176492,
+      "sha256": "d66ac67f7567daaa69d4a593dbea9491da810a5713058c25e672d0d1735078a7",
+      "voices": {
+        "tomas": "Campfire Narrator",
+        "jorge": "Terrence Bentley"
+      },
+      "turns": [
+        {
+          "start": 0,
+          "end": 6.74
+        },
+        {
+          "start": 7.19,
+          "end": 14.22
+        },
+        {
+          "start": 14.67,
+          "end": 16.82
+        },
+        {
+          "start": 17.27,
+          "end": 21.97
+        }
+      ],
+      "textSha256": "9e1ea0eded3d800b1961c8697cfd6560e5a41e55d4c79cc7f8223306cf6ef6de"
+    },
+    {
+      "key": "grupal",
+      "language": "es",
+      "file": "grupal.es.mp3",
+      "mimeType": "audio/mpeg",
+      "durationSeconds": 17.54,
+      "sizeBytes": 140972,
+      "sha256": "959fcb489d10aa8e9f40d2af903f4100ce9917717cac5f7fd50ec39025f17991",
+      "voices": {
+        "rosario": "La Anfitriona Radiante",
+        "carmen": "La Voz del Mar"
+      },
+      "turns": [
+        {
+          "start": 0,
+          "end": 6.83
+        },
+        {
+          "start": 7.28,
+          "end": 11.66
+        },
+        {
+          "start": 12.11,
+          "end": 17.54
+        }
+      ],
+      "textSha256": "718696f7963e5ecafbbb764f380a0dc5ad294700a95575434757255ed29f01e7"
+    },
+    {
+      "key": "grupal",
+      "language": "en",
+      "file": "grupal.en.mp3",
+      "mimeType": "audio/mpeg",
+      "durationSeconds": 14.86,
+      "sizeBytes": 119660,
+      "sha256": "3e225c83a11c9b0b735a3874bec27e1910a100a7d69195800c1697a2fb018e35",
+      "voices": {
+        "rosario": "Caring Mother",
+        "carmen": "Geraldine Wallace"
+      },
+      "turns": [
+        {
+          "start": 0,
+          "end": 5.43
+        },
+        {
+          "start": 5.88,
+          "end": 9.38
+        },
+        {
+          "start": 9.83,
+          "end": 14.86
+        }
+      ],
+      "textSha256": "bc5b4b2ae7b8f214017d29afa9da4bcfe4b0cafc4c48fe3d31d8844ef3321771"
+    }
+  ]
+}

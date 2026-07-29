@@ -184,6 +184,7 @@ const NOT_SYNCED_TABLES = new Set([
   // que llegue a otra maquina sin su acuerdo llega como material sin condiciones de
   // acceso, que es exactamente la exposicion que este vault existe para evitar. Hasta
   // entonces se presenta como local y respaldable, y `describeSyncCoverage` lo dice.
+  'testimony_segment_embeddings',
   'testimony_interviews',
   'testimony_participant_profiles',
   'testimony_interview_participants',

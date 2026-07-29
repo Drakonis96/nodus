@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 105;
+export const SCHEMA_VERSION = 106;
 
 export const migrations: Migration[] = [
   {
@@ -4727,6 +4727,32 @@ export const migrations: Migration[] = [
         PRIMARY KEY (note_id, target_kind, target_id)
       );
       CREATE INDEX idx_note_links_target ON note_links(target_kind, target_id);
+    `,
+  },
+  {
+    version: 106,
+    up: /* sql */ `
+      -- El indice semantico de Testimonios.
+      --
+      -- Vive en su propia tabla y no en una columna de los tramos por una razon de
+      -- gobierno, no de rendimiento: un embedding es un DERIVADO de la voz de alguien que
+      -- puede viajar a un proveedor externo, y el acuerdo de cada entrevista decide si
+      -- puede existir. Teniendolo aparte, retirar el consentimiento es borrar filas de una
+      -- tabla concreta, y no reescribir la transcripcion.
+      --
+      -- Sin claves foraneas, como el resto del vertical: la migracion tiene que seguir
+      -- siendo CREATE-only para conservar sus dos caminos de reparacion.
+      CREATE TABLE testimony_segment_embeddings (
+        segment_id    TEXT PRIMARY KEY,
+        transcript_id TEXT NOT NULL,
+        interview_id  TEXT NOT NULL,
+        model         TEXT NOT NULL,
+        dim           INTEGER NOT NULL,
+        embedding     BLOB NOT NULL,
+        created_at    TEXT NOT NULL
+      );
+      CREATE INDEX idx_testimony_embeddings_interview ON testimony_segment_embeddings(interview_id);
+      CREATE INDEX idx_testimony_embeddings_transcript ON testimony_segment_embeddings(transcript_id);
     `,
   },
 ];

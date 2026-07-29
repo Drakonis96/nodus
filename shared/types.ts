@@ -6674,6 +6674,56 @@ export interface NodiViewContext {
   capturedAt: number;
 }
 
+export interface TestimonyIndexReport {
+  indexedInterviews: number;
+  indexedSegments: number;
+  withheld: { reason: string; interviews: number }[];
+  purged: number;
+  model: string;
+  failed: number;
+}
+
+export interface TestimonyIndexStatus {
+  indexable: number;
+  indexed: number;
+  segments: number;
+  /** Tramos indexados que el acuerdo ya no autoriza: hay que reconstruir. */
+  stale: number;
+  model: string | null;
+}
+
+export interface TestimonySemanticHit {
+  segmentId: string;
+  interviewId: string;
+  transcriptId: string;
+  similarity: number;
+  text: string;
+  tStart: number;
+  interviewTitle: string;
+  shortId: string;
+  speakerLabel: string | null;
+  speakerPersonId: string | null;
+}
+
+/** Lo que la IA propone para una entrevista. Nada de esto está guardado todavía. */
+export interface TestimonyInterviewAnalysis {
+  interviewId: string;
+  transcriptId: string;
+  codes: { label: string; note: string }[];
+  passages: { quote: string; code: string; why: string; segmentId: string; at: string; tStart: number }[];
+  /** Las citas que el modelo dio y no aparecen en la transcripción, con cuánto se acercaban. */
+  discarded: { quote: string; coverage: number }[];
+  model: string;
+}
+
+export interface TestimonyTranscriptImprovement {
+  transcriptId: string;
+  segments: { segmentId: string; before: string; after: string; accepted: boolean; removed: string[]; added: string[] }[];
+  accepted: number;
+  rejected: number;
+  model: string;
+}
+
 export interface NodiChatRequest {
   messages: NodiChatMessage[];
   contexts: NodiContextKind[];
@@ -8767,6 +8817,16 @@ export interface NodusApi {
   updateTestimonySegment(id: string, patch: { text?: string; speakerPersonId?: string | null; speakerLabel?: string | null; tStart?: number; tEnd?: number }): Promise<TestimonyTranscriptSegment | null>;
   assignTestimonySpeaker(transcriptId: string, speakerLabel: string | null, personId: string | null): Promise<number>;
   testimonySpeakerLabels(transcriptId: string): Promise<{ label: string | null; personId: string | null; segments: number }[]>;
+  buildTestimonyIndex(): Promise<TestimonyIndexReport>;
+  testimonyIndexStatus(): Promise<TestimonyIndexStatus>;
+  clearTestimonyIndex(): Promise<number>;
+  searchTestimoniesBySemantics(query: string, limit?: number): Promise<TestimonySemanticHit[]>;
+  analyzeTestimonyInterview(interviewId: string): Promise<TestimonyInterviewAnalysis>;
+  improveTestimonyTranscript(transcriptId: string): Promise<TestimonyTranscriptImprovement>;
+  applyDetectedTestimonySpeakers(
+    transcriptId: string,
+    entries: { segmentId: string; label: string | null }[],
+  ): Promise<{ changed: number; skipped: number }>;
 
   listTestimonyCodes(): Promise<TestimonyCode[]>;
   createTestimonyCode(input: TestimonyCodeInput): Promise<TestimonyCode>;

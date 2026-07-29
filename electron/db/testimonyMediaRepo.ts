@@ -636,9 +636,10 @@ export function updateSegment(
 /**
  * Atribuir en lote todos los tramos de una etiqueta provisional a una persona.
  *
- * Es la operación real: nadie identifica «Hablante 2» tramo a tramo en una entrevista de
- * hora y media. Es MANUAL a propósito — Nodus no reconoce voces, y una atribución
- * automática equivocada pone palabras en la boca de alguien sin dejar rastro.
+ * Es la operación real: nadie identifica «Voz 2» tramo a tramo en una entrevista de hora
+ * y media. La detección acústica separa las voces y las numera; PONERLES NOMBRE es manual
+ * a propósito, porque una atribución automática equivocada pone palabras en la boca de
+ * alguien sin dejar rastro.
  */
 export function assignSpeaker(transcriptId: string, speakerLabel: string | null, personId: string | null): number {
   const transcript = getTranscript(transcriptId);
@@ -649,6 +650,44 @@ export function assignSpeaker(transcriptId: string, speakerLabel: string | null,
     .prepare('UPDATE testimony_transcript_segments SET speaker_person_id = ?, updated_at = ? WHERE transcript_id = ? AND speaker_label IS ?')
     .run(personId, now(), transcriptId, speakerLabel);
   return result.changes;
+}
+
+/**
+ * Escribir de una vez las etiquetas que propuso la detección de hablantes.
+ *
+ * Va en UNA transacción y sólo sobre los tramos de esa versión, por dos razones que no son
+ * de rendimiento: una entrevista de hora y media tiene cientos de tramos, y aplicarlos de
+ * uno en uno dejaría la transcripción a medio etiquetar si algo falla por el camino —
+ * mitad con voces detectadas y mitad sin ellas, sin saber dónde se cortó.
+ *
+ * Devuelve cuántos tramos cambiaron de verdad, que es lo que la pantalla enseña. Los
+ * tramos que la detección dejó en blanco NO se tocan: borrar una atribución que ya había
+ * puesto una persona sería una pérdida silenciosa.
+ */
+export function applySpeakerLabels(
+  transcriptId: string,
+  entries: { segmentId: string; label: string | null }[],
+): { changed: number; skipped: number } {
+  const transcript = getTranscript(transcriptId);
+  if (!transcript) throw new Error('Esa versión de la transcripción no existe.');
+  if (!isEditableTranscriptKind(transcript.kind)) {
+    throw new Error('Esta versión no se puede editar. Crea una versión derivada para trabajar sobre ella.');
+  }
+  const db = getDb();
+  const update = db.prepare(
+    'UPDATE testimony_transcript_segments SET speaker_label = ?, updated_at = ? WHERE id = ? AND transcript_id = ?'
+  );
+  const stamp = now();
+  let changed = 0;
+  let skipped = 0;
+  const run = db.transaction(() => {
+    for (const entry of entries) {
+      if (entry.label === null) { skipped += 1; continue; }
+      changed += update.run(entry.label, stamp, entry.segmentId, transcriptId).changes;
+    }
+  });
+  run();
+  return { changed, skipped };
 }
 
 /** Las etiquetas de hablante de una versión, con cuántos tramos tiene cada una. */
