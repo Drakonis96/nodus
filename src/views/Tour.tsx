@@ -43,7 +43,7 @@ const STEPS: TourStep[] = [
     target: 'library-actions',
     view: 'library',
     title: 'Añadir una obra al grafo',
-    body: 'Selecciona una obra o varias y pulsa «Analizar ideas». Nodus lee el texto, extrae temas padre, ideas con evidencia y relaciones, y las añade al grafo.',
+    body: 'Pulsa «Analizar» en la fila de una obra, o selecciona varias y analízalas juntas. Nodus lee el texto, extrae temas padre, ideas con evidencia y relaciones, y las añade al grafo. La columna Estado te dice en qué punto va cada obra.',
   },
   {
     target: 'nav-ideas',

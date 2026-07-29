@@ -5337,6 +5337,28 @@ export interface CorpusHealthBucket {
 /** The work-level corpus-health buckets that can be replayed as a Library filter. */
 export type CorpusHealthBucketId = 'withoutText' | 'lightOnly' | 'deepPriority' | 'pdfsToRecover';
 
+/**
+ * How far along a work is, as one readable value. Derived in the renderer by
+ * `deriveWorkStatus` and, for filtering, reproduced in SQL by
+ * `electron/db/readinessFilters.ts` — the two must stay in step.
+ */
+export type WorkReadiness =
+  | 'unstarted'
+  /** Queued or being processed right now. Live-queue only: never a SQL filter. */
+  | 'running'
+  | 'failed'
+  /** Text extraction was attempted and there was nothing usable to read. */
+  | 'noText'
+  /**
+   * Analysed, but only the abstract was available. Its ideas are real and
+   * usable; only its citable passages can never exist. Kept apart from `noText`
+   * because calling a work with extracted ideas "no text" understates it, and
+   * calling it "ready" overstates it.
+   */
+  | 'abstractOnly'
+  | 'incomplete'
+  | 'ready';
+
 export interface CorpusHealth {
   totalWorks: number;
   /** Works with no usable full text (abstract-only, no source, or extraction skipped). */
@@ -9389,6 +9411,11 @@ export interface WorkFilter {
   statusFlags?: Array<'deep' | 'summary' | 'ideas' | 'passages' | '!deep' | '!summary' | '!ideas' | '!passages'>;
   /** Restrict to a corpus-health bucket (works without text, light-only, etc.). */
   healthBucket?: CorpusHealthBucketId;
+  /**
+   * Restrict to one readiness value — what the library's status presets use.
+   * 'running' is not accepted: it only exists in the live scan queue.
+   */
+  readiness?: Exclude<WorkReadiness, 'running'>;
   theme?: string;
   /** Zotero tags to match. Multiple tags can use any-match (default) or all-match. */
   zoteroTags?: string[];

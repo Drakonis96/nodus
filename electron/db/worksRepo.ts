@@ -3,6 +3,7 @@ import { expandCollectionKeys } from './collectionsRepo';
 import { currentEmbeddingConfig } from './ideasRepo';
 import type { Work, WorkView, WorkFilter, WorkPage, WorkPageRequest, DeepTrigger, ZoteroTag, SummaryStatus, WorkCreator } from '@shared/types';
 import { HEALTH_BUCKET_WHERE } from './corpusHealthBuckets';
+import { readinessWhere } from './readinessFilters';
 
 function normalizeZoteroTag(tag: string): string {
   return tag.trim().normalize('NFC').toLowerCase();
@@ -213,22 +214,26 @@ function queryWorks(filter: WorkFilter, request?: WorkPageRequest): WorkPage {
         case '!ideas':
           clauses.push('NOT EXISTS (SELECT 1 FROM idea_occurrences io WHERE io.nodus_id = w.nodus_id)');
           break;
+        // "Every passage is current", phrased as "has passages, and none is
+        // stale". The SUM(...) = COUNT(*) form these used to carry relied on a
+        // bare HAVING with no GROUP BY, which SQLite rejects as a non-aggregate
+        // query — so both of these filters threw instead of filtering.
         case 'passages': {
           const config = currentEmbeddingConfig();
           params.passProv = config.provider;
           params.passModel = config.model;
           clauses.push(
-            `EXISTS (
-              SELECT 1 FROM passages p
-               WHERE p.nodus_id = w.nodus_id
-              HAVING COUNT(*) > 0
-                 AND SUM(CASE
-                           WHEN p.embedding IS NOT NULL
+            `(
+              EXISTS (SELECT 1 FROM passages p WHERE p.nodus_id = w.nodus_id)
+              AND NOT EXISTS (
+                SELECT 1 FROM passages p
+                 WHERE p.nodus_id = w.nodus_id
+                   AND NOT (p.embedding IS NOT NULL
                             AND p.embedding_provider = @passProv
                             AND p.embedding_model    = @passModel
                             AND p.embedding_dim > 0
-                            AND (w.deep_hash IS NULL OR p.content_hash = w.deep_hash)
-                          THEN 1 ELSE 0 END) = COUNT(*)
+                            AND (w.deep_hash IS NULL OR p.content_hash = w.deep_hash))
+              )
             )`
           );
           break;
@@ -238,17 +243,17 @@ function queryWorks(filter: WorkFilter, request?: WorkPageRequest): WorkPage {
           params.passNegProv = config.provider;
           params.passNegModel = config.model;
           clauses.push(
-            `NOT EXISTS (
-              SELECT 1 FROM passages p
-               WHERE p.nodus_id = w.nodus_id
-              HAVING COUNT(*) > 0
-                 AND SUM(CASE
-                           WHEN p.embedding IS NOT NULL
+            `NOT (
+              EXISTS (SELECT 1 FROM passages p WHERE p.nodus_id = w.nodus_id)
+              AND NOT EXISTS (
+                SELECT 1 FROM passages p
+                 WHERE p.nodus_id = w.nodus_id
+                   AND NOT (p.embedding IS NOT NULL
                             AND p.embedding_provider = @passNegProv
                             AND p.embedding_model    = @passNegModel
                             AND p.embedding_dim > 0
-                            AND (w.deep_hash IS NULL OR p.content_hash = w.deep_hash)
-                          THEN 1 ELSE 0 END) = COUNT(*)
+                            AND (w.deep_hash IS NULL OR p.content_hash = w.deep_hash))
+              )
             )`
           );
           break;
@@ -260,6 +265,15 @@ function queryWorks(filter: WorkFilter, request?: WorkPageRequest): WorkPage {
     // Replay the exact predicate the corpus-health notice counted, so the list
     // matches the number the user clicked.
     clauses.push(`(${HEALTH_BUCKET_WHERE[filter.healthBucket]})`);
+  }
+  if (filter.readiness) {
+    // Same contract as the health buckets: the preset must return exactly the
+    // works whose status pill shows that word.
+    const readiness = readinessWhere(filter.readiness);
+    if (readiness) {
+      clauses.push(`(${readiness.sql})`);
+      Object.assign(params, readiness.params);
+    }
   }
   if (filter.yearMin != null) {
     clauses.push('year >= @yearMin');
