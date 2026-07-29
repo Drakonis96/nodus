@@ -5,6 +5,8 @@ import { SERVER_TRANSLATIONS } from './i18n.server';
 import { TRANSLATE_TRANSLATIONS } from './i18n.translate';
 import { WORLD_CHAT_TRANSLATIONS } from './i18n.worldChat';
 import { WORLDBUILDING_TRANSLATIONS } from './i18n.worldbuilding';
+import { PROSOPOGRAPHY_TRANSLATIONS } from './i18n.prosopography';
+import { DIARIZATION_TRANSLATIONS } from './i18n.diarization';
 
 /**
  * English translations keyed by the Spanish source string (see {@link ../i18n}).
@@ -12,6 +14,8 @@ import { WORLDBUILDING_TRANSLATIONS } from './i18n.worldbuilding';
  * every non-Spanish interface language.
  */
 export const EN: Record<string, string> = {
+  ...DIARIZATION_TRANSLATIONS.en,
+  ...PROSOPOGRAPHY_TRANSLATIONS.en,
   ...WORLDBUILDING_TRANSLATIONS.en,
   ...WORLD_CHAT_TRANSLATIONS.en,
   "Lo que cuenta el mapa": "What the map tells you",

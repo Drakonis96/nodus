@@ -23,7 +23,7 @@ const SYNC_GROUPS: { key: SyncGroupKey; prefix?: string; tables?: string[] }[] =
   // Deletions travel as their own records, and are applied before any row is merged so
   // a tombstone can stop a resurrection rather than undo it afterwards.
   { key: 'tombstones', tables: ['sync_tombstones'] },
-  { key: 'notes', tables: ['note_folders', 'notes'] },
+  { key: 'notes', tables: ['note_folders', 'notes', 'note_links'] },
   {
     key: 'writing',
     tables: [
@@ -46,6 +46,7 @@ const SYNC_GROUPS: { key: SyncGroupKey; prefix?: string; tables?: string[] }[] =
   { key: 'protect', tables: ['protect_copies'] },
   { key: 'study', prefix: 'study_' },
   { key: 'teaching', prefix: 'teaching_' },
+  { key: 'prosopography', prefix: 'prosop_' },
   {
     key: 'genealogy',
     tables: [

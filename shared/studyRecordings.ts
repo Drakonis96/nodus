@@ -160,6 +160,19 @@ export interface StudyTranscriptInput {
   segments?: StudyTranscriptSegmentInput[];
 }
 
+export interface StudyDiarizationRequest {
+  recordingId: string;
+  transcriptId: string;
+  expectedSpeakers?: number | null;
+}
+
+export interface StudyDiarizationResult {
+  provider: 'gemini';
+  model: string;
+  speakers: string[];
+  transcript: StudyTranscript;
+}
+
 export interface StudyWhisperChunk {
   text: string;
   timestamp?: [number | null, number | null] | null;

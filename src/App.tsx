@@ -24,6 +24,7 @@ import { QuestionsView } from './views/QuestionsView';
 import { WorldChatView } from './views/WorldChatView';
 import { ManuscriptView } from './views/ManuscriptView';
 import { WorldbuildingSidebar } from './components/WorldbuildingSidebar';
+import { ProsopographySidebar } from './components/ProsopographySidebar';
 import { FeedbackHost } from './components/feedback';
 import { PrivacyRequestHost } from './privacyNotices';
 import { Tour } from './views/Tour';
@@ -77,6 +78,13 @@ const DatabasesSearchView = lazy(() => import('./views/DatabasesSearchView').the
 const StudyHome = lazy(() => import('./views/StudyHome').then((module) => ({ default: module.StudyHome })));
 const TeachingHome = lazy(() => import('./views/TeachingHome').then((module) => ({ default: module.TeachingHome })));
 const WorldbuildingHome = lazy(() => import('./views/WorldbuildingHome').then((module) => ({ default: module.WorldbuildingHome })));
+const ProsopographyHome = lazy(() => import('./views/ProsopographyHome').then((module) => ({ default: module.ProsopographyHome })));
+const ProsopPopulationView = lazy(() => import('./views/ProsopPopulationView').then((module) => ({ default: module.ProsopPopulationView })));
+const ProsopSourcesView = lazy(() => import('./views/ProsopSourcesView').then((module) => ({ default: module.ProsopSourcesView })));
+const ProsopPersonsView = lazy(() => import('./views/ProsopPersonsView').then((module) => ({ default: module.ProsopPersonsView })));
+const ProsopAnalysisView = lazy(() => import('./views/ProsopAnalysisView').then((module) => ({ default: module.ProsopAnalysisView })));
+const ProsopNetworksView = lazy(() => import('./views/ProsopNetworksView').then((module) => ({ default: module.ProsopNetworksView })));
+const ProsopSearchView = lazy(() => import('./views/ProsopSearchView').then((module) => ({ default: module.ProsopSearchView })));
 const ScenesView = lazy(() => import('./views/ScenesView').then((module) => ({ default: module.ScenesView })));
 const FactionsView = lazy(() => import('./views/GroupsView').then((module) => ({ default: module.FactionsView })));
 const CulturesView = lazy(() => import('./views/GroupsView').then((module) => ({ default: module.CulturesView })));
@@ -435,6 +443,11 @@ export function App() {
   useEffect(() => {
     document.documentElement.classList.toggle('worldbuilding', isWorldbuilding);
   }, [isWorldbuilding]);
+  // Prosopography is an evidence-first blue workspace with a strict dedicated shell.
+  const isProsopography = activeVault?.type === 'prosopography';
+  useEffect(() => {
+    document.documentElement.classList.toggle('prosopography', isProsopography);
+  }, [isProsopography]);
 
   // Accessibility preferences are applied at the document root so dialogs,
   // floating panels and every vault inherit them consistently.
@@ -1027,7 +1040,7 @@ export function App() {
         >
           <img
             data-testid="nodus-logo"
-            data-vault-logo={isGenealogy ? 'genealogy' : isDatabases ? 'databases' : isEstudio ? 'estudio' : isDocencia ? 'docencia' : isWorldbuilding ? 'worldbuilding' : 'academic'}
+            data-vault-logo={isGenealogy ? 'genealogy' : isDatabases ? 'databases' : isEstudio ? 'estudio' : isDocencia ? 'docencia' : isWorldbuilding ? 'worldbuilding' : isProsopography ? 'prosopography' : 'academic'}
             src={isGenealogy ? nodusLogoGold : isDatabases ? nodusLogoCrimson : isEstudio ? nodusLogoTeal : isDocencia ? nodusLogoOrange : isWorldbuilding ? nodusLogoViolet : nodusLogo}
             alt=""
             className="h-7 w-7"
@@ -1295,6 +1308,21 @@ export function App() {
                   </>
                 );
               }
+              if (isProsopography) {
+                return (
+                  <>
+                    {navButton(homeItem)}
+                    <ProsopographySidebar
+                      activeView={view}
+                      onNavigate={(targetView) => setView(targetView)}
+                      sidebarOrder={settings?.sidebarOrder}
+                      sidebarHidden={activeSidebarHidden}
+                    />
+                    {navGroups.filter((group) => group.id === 'tools').map((group) => renderGroup(group))}
+                    <div className="mt-2 flex flex-col gap-1">{navButton(settingsItem)}</div>
+                  </>
+                );
+              }
               if (isDatabases) {
                 // A databases vault keeps the same Explorar · Analizar · Escribir
                 // structure as every other vault: the user's databases are the
@@ -1479,7 +1507,8 @@ export function App() {
               onLoadDemo={loadWorldbuildingDemo}
             />
           )}
-          {view === 'home' && !isGenealogy && !isDatabases && !isEstudio && !isDocencia && !isWorldbuilding && !isPreviewVault && (
+          {view === 'home' && isProsopography && <ProsopographyHome onNavigate={setView} />}
+          {view === 'home' && !isGenealogy && !isDatabases && !isEstudio && !isDocencia && !isWorldbuilding && !isProsopography && !isPreviewVault && (
             <HomeView
               vaultId={activeVault?.id ?? null}
               settings={settings}
@@ -1512,6 +1541,12 @@ export function App() {
           {view === 'ideas' && <IdeasView vaultId={activeVault?.id ?? null} target={ideaTarget} onOpenGraph={(target) => navigate('graph', target)} onOpenAssistant={openAssistant} />}
           {view === 'authors' && <AuthorsView vaultId={activeVault?.id ?? null} settings={settings} onOpenGraph={(target) => navigate('graph', target)} />}
           {view === 'persons' && <PersonasView initialPersonId={personsTarget} />}
+          {view === 'prosopSearch' && <ProsopSearchView />}
+          {view === 'prosopPopulation' && <ProsopPopulationView />}
+          {view === 'prosopPersons' && <ProsopPersonsView />}
+          {view === 'prosopSources' && <ProsopSourcesView />}
+          {view === 'prosopAnalysis' && <ProsopAnalysisView />}
+          {view === 'prosopNetworks' && <ProsopNetworksView />}
           {/* `setView` is passed straight through: it is referentially stable, and the
               encyclopedia's section descriptor depends on it. */}
           {view === 'encyclopedia' && <EncyclopediaView onNavigate={setView} />}
