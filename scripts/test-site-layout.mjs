@@ -90,8 +90,8 @@ test('the dedicated Pages worker owns the website and its scheduled cache refres
 
   assert.match(pagesWorkflow, /path:\s*site\b/);
   assert.match(pagesWorkflow, /actions\/deploy-pages@v5/);
-  assert.match(pagesWorkflow, /pages" -f build_type=workflow/);
   assert.match(pagesWorkflow, /node scripts\/github-release-downloads\.mjs/);
   assert.match(pagesWorkflow, /git add site\/data\/github-release-downloads\.json/);
+  assert.doesNotMatch(pagesWorkflow, /repos\/\$\{GITHUB_REPOSITORY\}\/pages/);
   assert.doesNotMatch(releaseWorkflow, /pages\/builds|github-release-downloads|docs\/data\//);
 });
