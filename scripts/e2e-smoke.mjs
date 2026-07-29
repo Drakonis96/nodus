@@ -3700,24 +3700,29 @@ try {
   await page.mouse.up();
   await waitForCondition('arrastrar un punto intermedio añade un vértice', async () =>
     (await storedPoints()).length === afterDrag.length + 1);
+  // The IPC write can finish before React has replaced Leaflet's old layer group. Wait
+  // for the handles too, or the next gesture can land on a detached vertex on a slow CI
+  // runner even though the database already contains the inserted point.
+  await waitForCondition('la capa editable refleja el vértice añadido', async () =>
+    (await vertexCount()) === afterDrag.length + 1);
 
   const beforeDelete = (await storedPoints()).length;
   // Pick a vertex whose centre is actually HIT-TESTABLE as a vertex. Handles and midpoints
   // are drawn a few pixels apart, so a blind index can land on a midpoint and the gesture
   // does nothing — a flake, and the reason the midpoint handler now ignores Alt too.
-  let victimAt = null;
+  let victimIndex = null;
   for (let index = 0; index < (await page.locator('.world-map-vertex').count()); index += 1) {
     const at = await centreOf('.world-map-vertex', index);
     const onTop = await page.evaluate(([x, y]) => {
       const element = document.elementFromPoint(x, y);
       return element ? element.getAttribute('class') ?? '' : '';
     }, [at.x, at.y]);
-    if (onTop.includes('world-map-vertex')) { victimAt = at; break; }
+    if (onTop.includes('world-map-vertex')) { victimIndex = index; break; }
   }
-  assert.ok(victimAt, 'at least one vertex handle is reachable by the mouse');
-  await page.keyboard.down('Alt');
-  await page.mouse.click(victimAt.x, victimAt.y);
-  await page.keyboard.up('Alt');
+  assert.notEqual(victimIndex, null, 'at least one vertex handle is reachable by the mouse');
+  // Let Playwright hold Alt for the complete native pointer gesture. Splitting keyboard
+  // and mouse commands can lose the modifier when Electron processes a focus transition.
+  await page.locator('.world-map-vertex').nth(victimIndex).click({ modifiers: ['Alt'] });
   await waitForCondition('Alt+clic elimina un vértice', async () => (await storedPoints()).length === beforeDelete - 1);
 
   // Measuring, with the travel modes seeded on first use.
