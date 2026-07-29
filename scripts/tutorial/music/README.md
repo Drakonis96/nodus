@@ -1,41 +1,40 @@
-# Música de fondo
+# Background music
 
-Los cuatro tutoriales usan **un solo tema en bucle**, con fundido de entrada y de
-salida y compresión lateral, de modo que la voz siempre va por delante.
+The four tutorials use **a single theme in loop**, with input and output cast and lateral
+compression, so that the voice always goes ahead.
 
-## Dónde se busca
+## Where to look
 
-`engine/cards.mjs` lo resuelve en este orden:
+`engine/cards.mjs` resolves it in this order:
 
 1. `NODUS_TUTORIAL_MUSIC=/ruta/al/tema.mp3`
-2. el primer archivo de audio que haya **en esta carpeta**
-3. `~/Desktop/Quiet Dashboard Glow.mp3`, de donde lo tomaron los primeros vídeos
+2. the first audio file **in this folder**
+3. `~/Desktop/Quiet Dashboard Glow.mp3`, where the first videos took it
 
-Si no encuentra ninguno, monta el vídeo **sin música** y lo dice por consola en vez
-de fallar.
+If none is found, assemble the video **without music** and report it in the console instead of failing.
 
-## Por qué el audio no está en el repositorio
+## Why audio is not in the repository
 
-Este repositorio es público y el tema usado hasta ahora es un archivo personal del
-autor, sin licencia declarada para redistribución. Añadirlo aquí sería publicarlo.
+This repository is public and the theme used so far is a personal file of the author, without a
+license declared for redistribution. Adding it here would be to publish it.
 
-Deja tu tema en esta carpeta (queda ignorado por git) o apunta a él con
-`NODUS_TUTORIAL_MUSIC`. Si en algún momento se elige una pista con licencia libre,
-este es su sitio y basta con quitarla del `.gitignore` de al lado.
+Leave your theme in this folder (it is ignored by git) or point to it with `NODUS_TUTORIAL_MUSIC`.
+If you choose a free-licensed track at any time, this is your site and just remove it from the
+`.gitignore` next door.
 
-## Cómo se mezcla
+## How it mixes
 
-Los parámetros están en `engine/cards.mjs` y conviene no tocarlos a ojo:
+The parameters are in `engine/cards.mjs` and should not be touched by eye:
 
-- `MUSIC_GAIN = 0.16` — el lecho, muy por debajo de la voz.
-- `sidechaincompress` — la música cede automáticamente cuando hay narración.
-- `acrossfade` — el bucle se encadena consigo mismo, sin corte audible.
-- Fundidos de entrada y salida en los extremos del vídeo.
+- `MUSIC_GAIN = 0.16` — the bed, far below the voice.
+- `sidechaincompress` — music automatically yields when there is narration.
+- `acrossfade` — the loop is chained to itself, without audible cutting.
+- Input and output funds at the ends of the video.
 
-El encargo original era claro: *"bajita y estable, sin cambios raros y sin solapar la
-voz bajo ninguna circunstancia"*. Cualquier cambio debe seguir cumpliéndolo.
+The original order was clear: *"low and stable, without unusual changes and without overlap of voice
+under any circumstances".* Any change must continue to fulfill it.
 
-## Duración
+## Duration
 
-No importa que el tema sea más corto que el vídeo: se repite en bucle y se recorta a
-la duración exacta del montaje.
+It doesn't matter that the theme is shorter than the video: it repeats in loop and is cut to the
+exact duration of the assembly.

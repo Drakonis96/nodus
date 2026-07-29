@@ -4,7 +4,7 @@ Verified against provider documentation on 2026-07-10.
 
 ## Behavior and persistence
 
-Decorative images are opt-in per Inmersión or Deep Research generation. When
+Decorative images are opt-in per Immersion or Deep Research generation. When
 disabled, Nodus neither asks the text model for visual context nor calls an image
 provider. When enabled, the complete main content is generated and committed
 first; image work is then queued independently in the Electron main process.

@@ -1,97 +1,112 @@
 # Nodus Server
 
-> **Experimental e inestable.** Esta versión solo está destinada a pruebas.
-> Conserva copias de seguridad, no la utilices todavía como único acceso a
-> materiales importantes y espera cambios incompatibles antes de la versión estable.
+> **Experimental and unstable.** This version is intended for testing only.
+> Keep backups, don't use it as your only access to
+> important materials and expect incompatible changes before the stable version.
 
-Nodus Server permite compartir una proyección de un vault con estudiantes o investigadores. Es independiente de Nodus Desktop: el servidor vive en Docker y la aplicación de escritorio solo realiza conexiones HTTPS salientes. No se publica el puerto del MCP local ni se copia la base SQLite original.
+Nodus Server allows you to share a Vault projection with students or researchers. It is independent
+of Nodus Desktop: the server lives on Docker and the desktop application only makes outgoing HTTPS
+connections. The local MCP port is not published and the original SQLite base is not copied.
 
-## Qué necesitas
+## What you need
 
-- Un ordenador que permanezca encendido o un VPS con Windows, macOS o Linux.
-- Docker Desktop (Windows/macOS) o Docker Engine con el complemento Compose (Linux).
-- Un dominio o subdominio apuntando a la IP pública del servidor, por ejemplo `nodus.universidad.es`.
-- Los puertos 80 y 443 accesibles si vas a usar el Caddy incluido.
+- A computer that remains on or a VPS with Windows, macOS or Linux.
+- Docker Desktop (Windows/macOS) or Docker Engine with Compose (Linux) plugin.
+- A domain or subdomain pointing to the public IP of the server, for example `nodus.universidad.es`.
+- Ports 80 and 443 accessible if you are going to use the Caddy included.
 
-La instalación recomendada define la cuenta administradora como variables del Stack y abre directamente la página de login. Como alternativa, puede utilizarse un token temporal y el asistente `/setup`. La gestión diaria de espacios, usuarios, permisos y dispositivos se hace por web.
+The recommended installation defines the administrator account as Stack variables and opens the
+login page directly. Alternatively, a temporary token and `/setup` wizard can be used. The daily
+management of spaces, users, permissions and devices is done by web.
 
-## Prueba desde Portainer
+## Test from Portainer
 
-El workflow `Nodus Server image (experimental)` prueba y publica desde `main`
-una imagen multi-arquitectura en GitHub Container Registry. Crea un Stack con
-`portainer-stack.yml` mediante el editor web. Portainer descargará siempre:
+The workflow `Nodus Server image (experimental)` tests and publishes from `main` a
+multi-architecture image in GitHub Container Registry. Create a Stack with `portainer-stack.yml` via
+the web editor. Portainer will always download:
 
 - `ghcr.io/drakonis96/nodus-server:main`
 
-La etiqueta `main` es móvil e inestable. Cada compilación también se publica con
-una etiqueta `main-<sha>` para poder fijar o restaurar una prueba concreta. Define
-estas variables en el Stack:
+The `main` tag moves and is unstable. Each build is also published with a `main-<sha>` tag so you can
+able to set or restore a particular test. Define these variables in the Stack:
 
-- `NODUS_DOMAIN`: dominio sin `https://`, por ejemplo `nodus.ejemplo.es`.
-- `NODUS_ADMIN_EMAIL`: correo de la cuenta administradora.
-- `NODUS_ADMIN_PASSWORD`: contraseña única y larga, de al menos 12 caracteres.
+- `NODUS_DOMAIN`: domain without `https://`, for example `nodus.example.com`.
+- `NODUS_ADMIN_EMAIL`: email address for the administrator account.
+- `NODUS_ADMIN_PASSWORD`: unique and long password, of at least 12 characters.
 
-Estas dos variables deben definirse juntas. En el primer arranque crean la cuenta; en despliegues posteriores actualizan el correo o rotan la contraseña si cambias sus valores. La contraseña nunca se escribe en `state.json`: solo se conserva su hash. Mientras mantengas estas variables, sus valores son la fuente autoritativa y volverán a aplicarse en cada reinicio.
+These two variables must be defined together. In the first boot they create the account; in later
+deployments they update the mail or rotate the password if you change their values. The password is
+never written in `state.json`: only your hash is preserved. As long as you maintain these variables,
+their values are the authoritative source and will be applied again at each restart.
 
-Como alternativa, deja ambas vacías y define `NODUS_SETUP_TOKEN` con un valor aleatorio temporal de al menos 16 caracteres. En ese caso completarás `/setup` manualmente y deberás borrar el token después.
+Alternatively, leave both empty and define `NODUS_SETUP_TOKEN` with a temporary random value of at least
+16 characters. In that case you will complete `/setup` manually and you will have to delete the
+token later.
 
-El workflow termina cerrando la sesión de GHCR y leyendo el manifiesto como usuario
-anónimo. Así falla si el paquete no es público o si falta `amd64` o `arm64`; una
-ejecución verde significa que Portainer puede descargar la etiqueta sin credenciales.
+The workflow ends by closing the GHCR session and reading the manifest as an anonymous user. Thus,
+it fails if the package is not public or if `amd64` or `arm64` is missing; a green run means that
+Portainer can download the label without credentials.
 
-Este Stack incluye Caddy y requiere que 80/443 estén libres. Si ya existe un
-reverse proxy, despliega únicamente `nodus-server`, conéctalo a la red Docker del
-proxy y configura como destino HTTP `nodus-server:7443`.
+This Stack includes Caddy and requires 80/443 to be free. If a proxy reverse already exists, display
+only `nodus-server`, connect it to the proxy Docker network and set HTTP `nodus-server:7443`
+destination.
 
-## Opción A: no tienes Caddy, Nginx ni otro proxy
+## Option A: You don't have Caddy, Nginx or another proxy
 
-1. Descarga esta carpeta `server` y abre una terminal dentro de ella.
-2. Copia `.env.example` como `.env`.
-3. Edita `.env`: cambia `NODUS_DOMAIN` y `NODUS_PUBLIC_URL`, introduce `NODUS_ADMIN_EMAIL` y genera una contraseña única para `NODUS_ADMIN_PASSWORD` (por ejemplo, con `openssl rand -base64 32`). Protege el archivo `.env` y no lo subas a Git.
-4. Ejecuta:
+1. Download this folder `server` and open a terminal inside it.
+2. Copy `.env.example` as `.env`.
+3. Edits `.env`: changes `NODUS_DOMAIN` and `NODUS_PUBLIC_URL`, inserts `NODUS_ADMIN_EMAIL` and
+   generates a unique password for `NODUS_ADMIN_PASSWORD` (for example, with `openssl rand -base64
+   32`). Protects the `.env` file and does not upload it to Git.
+4. Runs:
 
 ```sh
 docker compose --profile proxy pull
 docker compose --profile proxy up -d
 ```
 
-5. Abre `https://tu-dominio`: Nodus te enviará directamente al login y podrás entrar con esas credenciales.
-6. Para rotarlas, cambia las dos variables y vuelve a desplegar el contenedor. Se cerrarán las sesiones y conexiones OAuth anteriores si cambia la contraseña.
+5. Open `https://tu-dominio`: Nodus will send you directly to the login and you can enter with those
+   credentials.
+6. To rotate them, change the two variables and re-deploy the container. Previous OAuth sessions and
+   connections will be closed if the password changes.
 
-Caddy obtiene y renueva automáticamente el certificado HTTPS. Los datos quedan en el volumen Docker `nodus_data`; recrear o actualizar el contenedor no los borra.
+Caddy automatically obtains and renews the HTTPS certificate. The data is left in the Docker
+`nodus_data` volume; recreating or updating the container does not erase them.
 
-## Opción B: ya tienes Caddy o Nginx en el servidor
+## Option B: you already have Caddy or Nginx on the server
 
-Ejecuta solo Nodus Server:
+Run Nodus Server only:
 
 ```sh
 docker compose pull
 docker compose up -d
 ```
 
-Docker publica Nodus exclusivamente en `127.0.0.1:7443`. Así no ocupa 80/443, no queda accesible directamente desde Internet y no interfiere con tu proxy actual. Configura el dominio en ese proxy y reenvíalo a `http://127.0.0.1:7443`.
+Docker posts Nodus exclusively in `127.0.0.1:7443`. So it does not occupy 80/443, it is not directly
+accessible from the Internet and does not interfere with your current proxy. Set the domain in that
+proxy and forward it to `http://127.0.0.1:7443`.
 
-### Caddy ya instalado en el sistema
+### Caddy already installed in the system
 
 ```caddy
-nodus.ejemplo.es {
+nodus.example.com {
   encode zstd gzip
   reverse_proxy 127.0.0.1:7443
 }
 ```
 
-Recarga Caddy después de guardar la configuración.
+Reload Caddy after saving the settings.
 
-### Nginx ya instalado en el sistema
+### Nginx already installed in the system
 
 ```nginx
 server {
     listen 443 ssl http2;
-    server_name nodus.ejemplo.es;
+    server_name nodus.example.com;
 
-    # Conserva aquí las rutas de certificado que ya gestione tu instalación.
-    ssl_certificate /etc/letsencrypt/live/nodus.ejemplo.es/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/nodus.ejemplo.es/privkey.pem;
+    # Keep the certificate paths managed by your installation here.
+    ssl_certificate /etc/letsencrypt/live/nodus.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/nodus.example.com/privkey.pem;
 
     client_max_body_size 100m;
     location / {
@@ -108,58 +123,90 @@ server {
 }
 ```
 
-Si tu Caddy/Nginx también está dentro de Docker, conecta ambos proyectos a una misma red Docker externa y usa `nodus-server:7443` como destino. No cambies el puerto 7443 a `0.0.0.0`: el único servicio público debe ser el proxy HTTPS.
+If your Caddy/Nginx is also inside Docker, connect both projects to the same external Docker network
+and use `nodus-server:7443` as your destination. Do not change port 7443 to `0.0.0.0`: the only
+public service must be HTTPS proxy.
 
-## Dominio y URL pública
+## Public domain and URL
 
-`NODUS_PUBLIC_URL` debe ser exactamente el origen que usarán las personas, sin ruta final: `https://nodus.ejemplo.es`. La URL que se añade en ChatGPT y Claude será `https://nodus.ejemplo.es/mcp`.
+`NODUS_PUBLIC_URL` must be exactly the source that people will use, without final path:
+`https://nodus.example.com`. The URL added in ChatGPT and Claude will be
+`https://nodus.example.com/mcp`.
 
-Si cambias el dominio, actualiza `NODUS_DOMAIN`, `NODUS_PUBLIC_URL`, el DNS y el proxy; después ejecuta de nuevo `docker compose up -d`. No uses una IP pública con HTTP. Nodus Desktop rechaza HTTP salvo para pruebas en `localhost`.
+If you change the domain, update `NODUS_DOMAIN`, `NODUS_PUBLIC_URL`, DNS and proxy; then run `docker
+compose up -d` again. Do not use a public IP with HTTP. Nodus Desktop rejects HTTP except for tests
+in `localhost`.
 
-## Credenciales por entorno y Docker secrets
+## Credentials by environment and Docker secrets
 
-La opción sencilla para Portainer y Compose es `NODUS_ADMIN_EMAIL` + `NODUS_ADMIN_PASSWORD`. Quien tenga permisos para inspeccionar o editar el contenedor podrá ver sus variables, por lo que el acceso a Docker/Portainer debe limitarse a administradores.
+The simple option for Portainer and Compose is `NODUS_ADMIN_EMAIL` + `NODUS_ADMIN_PASSWORD`. Anyone
+who has permission to inspect or edit the container will be able to view its variables, so access to
+Docker/Portainer should be limited to administrators.
 
-Si tu plataforma admite secretos montados como archivos, puedes usar `NODUS_ADMIN_EMAIL_FILE` y `NODUS_ADMIN_PASSWORD_FILE` en lugar de los valores directos. No configures simultáneamente una variable directa y su variante `_FILE`. Nodus lee el archivo al arrancar y nunca registra el contenido.
+If your platform supports secrets mounted as files, you can use `NODUS_ADMIN_EMAIL_FILE` and
+`NODUS_ADMIN_PASSWORD_FILE` instead of the direct values. Do not simultaneously configure a direct
+variable and its variant `_FILE`. Nodus reads the file when booting and never records the content.
 
-## Conectar un vault de Nodus Desktop
+## Connect a Nodus Desktop Vault
 
-1. Entra como administrador en `https://tu-dominio`.
-2. Crea un espacio.
-3. Pulsa «Crear código para Nodus»; el código caduca en 15 minutos y solo funciona una vez.
-4. En Nodus Desktop abre **Ajustes → Servidor**, escribe la URL base y el código, y pulsa «Conectar vault».
-5. La primera publicación se hace inmediatamente. Después Nodus comprueba un contador SQLite cada 30 segundos y solo vuelve a publicar cuando hay cambios, ha transcurrido un minuto sin actividad y se respeta un mínimo de dos minutos entre envíos.
+1. Enter as administrator in `https://tu-dominio`.
+2. Create a space.
+3. Click "Create code for Nodus"; the code expires in 15 minutes and only works once.
+4. In Nodus Desktop opens **Adjustments → Server**, type the base URL and code, and press "Connect
+   Vault".
+5. The first publication is made immediately. After that Nodus checks a SQLite counter every 30
+   seconds and only reposts when there are changes, a minute has passed without activity and a
+   minimum of two minutes between submissions is respected.
 
-Por defecto se publican referencias y conocimiento académico derivado. PDF, credenciales, rutas, embeddings, listas de alumnos, grupos, calificaciones y resultados de evaluación nunca se publican. Las notas/proyectos/materiales docentes y los pasajes extraídos tienen interruptores separados.
+By default, references and derived academic knowledge are published. PDF, credentials, routes,
+embeddings, student lists, groups, grades and evaluation results are never published. Teacher
+notes/projects/materials and extracted passages have separate switches.
 
-## Dar acceso a estudiantes o investigadores
+## Provide access to students or researchers
 
-1. Desde la administración web crea una cuenta lectora con contraseña temporal y asígnala a un espacio.
-2. La persona inicia sesión y abre **Mi cuenta** para cambiar esa contraseña. Se cerrarán sus demás sesiones y se revocarán sus conexiones OAuth anteriores.
-3. Puedes conceder a esa cuenta acceso lector a otros espacios, revocarlo o restablecer su contraseña temporal desde la tabla de usuarios. Un restablecimiento administrativo cierra todas las sesiones y conexiones OAuth de esa cuenta.
-4. La persona añade `https://tu-dominio/mcp` como conector MCP personalizado en ChatGPT o Claude.
-5. El cliente abre la pantalla OAuth de Nodus Server. La persona inicia sesión y autoriza el permiso de lectura.
+1. From the web administration it creates a reading account with a temporary password and assigns it
+   to a space.
+2. The person signs in and opens **My account** to change that password. Your other sessions will be
+   closed and your previous OAuth connections will be revoked.
+3. You can grant that account reader access to other spaces, revoke it or reset your temporary
+   password from the user table. An administrative reset closes all sessions and OAuth connections
+   to that account.
+4. The person adds `https://tu-dominio/mcp` as a custom MCP connector in ChatGPT or Claude.
+5. The client opens the Nodus Server OAuth screen. The person log in and authorizes the reading
+   permission.
 
-Cada token está vinculado a esa persona y a esta URL MCP. Las herramientas comprueban la membresía del espacio en cada llamada. La versión actual es deliberadamente de solo lectura; las ediciones remotas no se mezclan con el vault local ni pueden sobrescribirlo.
+Each token is linked to that person and to this MCP URL. The tools check the membership of the space
+on each call. The current version is deliberately read-only; remote editions are not mixed with the
+local vault nor can they overwrite it.
 
-## Seguridad y operación
+## Security and operation
 
-- No expongas 7443 a Internet ni uses el servidor sin HTTPS.
-- Mantén Docker, Caddy/Nginx y la imagen de Nodus actualizados.
-- Usa contraseñas únicas; el servidor exige entre 12 y 1024 caracteres.
-- El login limita intentos simultáneamente por IP, por cuenta (mediante un identificador hash que no revela el correo) y en todo el servidor. Las cuentas inexistentes ejecutan la misma verificación criptográfica que las existentes para evitar su enumeración por tiempos de respuesta.
-- `/setup`, el emparejamiento, el registro OAuth y el intercambio de tokens tienen límites propios y límites globales. Los cuerpos de autenticación están acotados, las sesiones activas por cuenta se limitan y los registros internos de rate limiting no pueden crecer sin límite.
-- Caddy o Nginx debe conservar la IP real del cliente mediante `X-Forwarded-For`; no coloques otro proxy no confiable directamente delante del puerto interno.
-- Cambia tu propia contraseña desde **Mi cuenta**. El administrador solo puede restablecer contraseñas de cuentas lectoras; no puede ver las contraseñas existentes.
-- Revoca desde la web cualquier dispositivo perdido. Desconectar el vault en Desktop detiene los envíos, pero el administrador debe eliminar la publicación retenida cuando corresponda.
-- Haz copias periódicas del volumen `nodus_data` y prueba su restauración. El estado y las publicaciones están bajo `/data` dentro del contenedor.
-- La copia de seguridad debe protegerse como los materiales que contiene. Para datos institucionales, documenta alojamiento, conservación, accesos, encargados y transferencias conforme a tu política y al RGPD.
+- Do not expose 7443 to the Internet or use the server without HTTPS.
+- Keep Docker, Caddy/Nginx and Nodus image updated.
+- Use unique passwords; the server requires between 12 and 1024 characters.
+- The login limits attempts simultaneously by IP, by account (through a hash identifier that does
+  not reveal the mail) and across the server. Non-existent accounts perform the same cryptographic
+  verification as existing ones to avoid their enumeration by response times.
+- `/setup`, pairing, OAuth record and token exchange have their own limits and global limits.
+  Authentication bodies are limited, active sessions on their own are limited and internal rate
+  limiting records cannot grow without limit.
+- Caddy or Nginx must keep the client's actual IP via `X-Forwarded-For`; do not place another
+  unreliable proxy directly in front of the internal port.
+- Change your own password from **My account**. The administrator can only reset passwords for
+  reader accounts; you cannot view existing passwords.
+- It revokes any lost device from the web. Disconnecting the Vault on Desktop stops submissions, but
+  the administrator must remove the retained posting when appropriate.
+- Make periodic copies of the volume `nodus_data` and test its restoration. The status and
+  publications are under `/data` within the container.
+- The backup should be protected as the materials it contains. For institutional data, document
+  accommodation, conservation, accesses, managers and transfers according to your policy and GDPR.
 
-Comprobación rápida:
+Quick check:
 
 ```sh
 curl https://tu-dominio/healthz
 docker compose logs -f nodus-server
 ```
 
-El endpoint de salud debe responder con `{"ok":true,...}`. Para validar MCP y OAuth de extremo a extremo durante una instalación técnica puede utilizarse MCP Inspector.
+The health endpoint must respond with `{"ok":true,...}`. To validate MCP and OAuth end-to-end during
+a technical installation MCP Inspector can be used.

@@ -1,261 +1,231 @@
-# Política de privacidad de Nodus
+# Nodus Privacy Policy
 
-**Versión:** 1.2
+**Version:** 1.2
 
-**Fecha de vigencia:** 22 de julio de 2026
+** Date of validity:** 22 July 2026
 
-**Ámbito:** aplicación de escritorio Nodus 2.5 y posteriores
+**Scope:** Desktop application Nodus 2.5 and later
 
-## Resumen claro
+## Clear summary
 
-Nodus es una aplicación gratuita, de código abierto y principalmente local. No
-requiere una cuenta de Nodus, no incorpora publicidad, telemetría, analítica remota
-ni envía contenido a una nube operada por el proyecto. Las bases de datos, archivos,
-grabaciones, transcripciones, notas, expedientes y resultados se guardan en el
-dispositivo del usuario salvo que este active expresamente una función remota.
+Nodus is a free, open source and mainly local application. It does not require a Nodus account, does
+not incorporate advertising, telemetry, remote analytics or send content to a cloud operated by the
+project. Databases, files, recordings, transcripts, notes, files and results are saved on the user's
+device unless it expressly activates a remote function.
 
-Seleccionar un archivo o iniciar una grabación **no lo publica ni lo sube a Nodus**.
-Algunas funciones opcionales sí pueden contactar con servicios de terceros: por
-ejemplo, un proveedor de IA en la nube elegido por el usuario, Zotero, Unpaywall,
-GitHub para comprobar actualizaciones, Hugging Face para descargar modelos o el
-túnel MCP seguro de OpenAI para usar Nodus desde ChatGPT. Esos servicios reciben
-los datos necesarios para la operación solicitada y aplican sus propias condiciones
-y políticas.
+Selecting a file or starting a recording **does not publish it or upload it to Nodus**. Some
+optional features can contact third-party services: for example, a user-chosen cloud AI provider,
+Zotero, Unpaywall, GitHub to check updates, Hugging Face to download models or OpenAI secure MCP
+tunnel to use Nodus from ChatGPT. These services receive the necessary data for the requested
+operation and apply their own conditions and policies.
 
-**Nodus Server es opcional y autohospedado.** Si el usuario lo conecta en Ajustes,
-la aplicación publica por HTTPS una copia lógica y minimizada del vault en el
-servidor elegido por el usuario o su organización. Nunca sube la base SQLite, claves,
-contraseñas, rutas locales, embeddings ni archivos PDF. Los pasajes y el contenido
-creado por el usuario solo se incluyen si este activa sus opciones específicas. Las
-listas de estudiantes, grupos, calificaciones y resultados de evaluación no se
-publican mediante esta función.
+**Nodus Server is optional and self-hosted.** If the user connects it in Settings, the application
+publishes a logical and minimized copy of the vault on the server chosen by the user or his/her
+organization. Never uploads the SQLite database, keys, passwords, local paths, embeddings or PDF
+files. The passages and content created by the user are included only if it activates their specific
+options. Student lists, groups, ratings and evaluation results are not published using this
+function.
 
-Nodus **no usa IA para puntuar, calificar, clasificar, perfilar ni evaluar a ningún
-estudiante**. Las notas y rúbricas las introduce o confirma una persona. Las
-preguntas de opción múltiple pueden corregirse localmente mediante una coincidencia
-determinista con la respuesta marcada como correcta; no interviene ningún modelo.
+Nodus **does not use AI to rate, grade, rank, profile, or evaluate any student**. Notes and rubrics
+are entered or confirmed by a person. Multiple choice questions can be corrected locally by
+deterministic matching with the answer marked as correct; no model is involved.
 
-## 1. Quién trata los datos
+## 1. Who processes the data
 
-El proyecto Nodus, mantenido por Jorge Pérez Burgueño, publica el software pero no
-recibe ni puede acceder al contenido almacenado en una instalación normal o en un
-Nodus Server autohospedado por terceros. El proyecto no opera una nube, cuenta o
-backend central. Para incidencias de seguridad que no deban
-ser públicas puede utilizarse el canal privado de GitHub:
+The Nodus project, maintained by Jorge Pérez Burgueño, publishes the software but does not receive
+or access the content stored in a normal installation or in a third-party-hosted Nodus Server. The
+project does not operate a cloud, account or central backend. For security incidents that need not
+be public, the private channel GitHub can be used:
 https://github.com/Drakonis96/nodus/security/advisories/new
 
-La persona, universidad, centro educativo, empresa u organización que decide qué
-datos personales introduce, para qué los usa y durante cuánto tiempo los conserva
-es normalmente el **responsable del tratamiento** respecto de esos datos. El usuario
-individual puede actuar por cuenta propia o como persona autorizada por ese
-responsable. Esta política no sustituye el aviso de privacidad que deba facilitar el
-responsable concreto conforme a los artículos 13 y 14 del RGPD.
+The person, university, educational center, company or organization who decides which personal data
+he or she introduces, what he or she uses them for, and how long he or she normally retains them is
+the **processor responsible** for such data. The individual user may act on his or her own account
+or as a person authorized by that controller. This policy does not replace the privacy notice to be
+provided by the specific controller pursuant to Articles 13 and 14 of the GDPR.
 
-Cuando se configura un proveedor externo, el responsable debe determinar si ese
-proveedor actúa como encargado o como responsable independiente, revisar sus
-condiciones, formalizar en su caso el contrato del artículo 28 RGPD y comprobar las
-garantías para transferencias internacionales. Nodus no celebra esos contratos en
-nombre del usuario.
+When setting up an external provider, the controller must determine whether the provider acts as an
+independent maintainer or controller, review its terms, formalize the Article 28 GDPR contract where
+appropriate, and verify the guarantees for international transfers. Nodus does not conclude such
+contracts on behalf of the user.
 
-Quien instala y administra Nodus Server determina sus usuarios, permisos, dominio,
-alojamiento, copias y plazos de conservación. Esa persona u organización es
-normalmente responsable —o, según el contexto, encargado— del tratamiento efectuado
-en su servidor y debe informar a las personas con acceso.
+Whoever installs and manages Nodus Server determines its users, permissions, domain, hosting, copies
+and retention times. That person or organization is usually responsible — or, depending on the
+context, in charge — for the treatment performed on its server and must inform the persons with
+access.
 
-## 2. Datos que puede almacenar la aplicación
+## 2. Data that the application can store
 
-Según las funciones utilizadas, el dispositivo puede contener:
+Depending on the functions used, the device may contain:
 
-- documentos, referencias, citas, anotaciones, imágenes y archivos importados;
-- nombres, identificadores, grupos, asistencia, rúbricas y calificaciones introducidas
-  manualmente en un vault de Docencia;
-- grabaciones de audio, voces de terceros, transcripciones y marcas temporales;
-- notas, calendarios, planes de estudio, respuestas y progreso local;
-- datos históricos, genealógicos o de investigación aportados por el usuario;
-- prompts, respuestas y metadatos de uso de IA guardados localmente;
-- ajustes, rutas de archivos y credenciales de servicios. Las claves compatibles se
-  guardan mediante el almacén seguro del sistema operativo y no en la interfaz.
+- documents, references, quotations, annotations, images and imported files;
+- names, identifiers, groups, attendance, headings and qualifications manually entered in a teaching
+  vault;
+- audio recordings, third party voices, transcripts and temporary marks;
+- notes, timetables, curricula, responses and local progress;
+- historical, genealogical or research data provided by the user;
+- locally saved AI prompts, responses and metadata;
+- settings, file paths and service credentials. Supported keys are saved via secure operating system
+  storage and not in the interface.
 
-Nodus no necesita categorías especiales de datos para funcionar. No deben
-introducirse datos de salud, biométricos, ideología, religión, orientación sexual,
-afiliación sindical u otros datos especialmente protegidos salvo que exista una
-necesidad real, una base jurídica válida y salvaguardas adecuadas.
+Nodus does not need special categories of data to function. Health, biometrics, ideology, religion,
+sexual orientation, trade union membership or other specially protected data should not be entered
+unless there is a real need, a valid legal basis and adequate safeguards.
 
-## 3. Finalidades y bases jurídicas
+## 3. Legal purposes and bases
 
-Nodus procesa localmente la información para las funciones que el usuario activa:
-organizar fuentes, producir documentos, gestionar docencia o estudio, transcribir,
-buscar, exportar y crear copias de seguridad. La base jurídica no la decide la
-aplicación. Debe determinarla el responsable conforme al artículo 6 RGPD y, si
-procede, al artículo 9.
+Nodus processes the information locally for the functions that the user activates: organizing
+sources, producing documents, managing teaching or study, transcribing, searching, exporting and
+creating backups. The legal basis is not decided by the application. It must be determined by the
+person responsible in accordance with Article 6 GDPR and, where appropriate, Article 9.
 
-En enseñanza reglada puede resultar aplicable la misión de interés público y la
-normativa educativa, no necesariamente el consentimiento. En otros contextos puede
-ser aplicable un contrato, una obligación legal, un interés legítimo debidamente
-ponderado o un consentimiento libre y revocable. Marcar «continuar» en un aviso de
-Nodus confirma únicamente que el usuario ha leído el aviso; **no crea por sí solo una
-base jurídica ni sustituye el consentimiento de las personas afectadas**.
+In regulated education, the mission of public interest and educational regulations may be
+applicable, not necessarily consent. In other contexts, a contract, a legal obligation, a duly
+weighted legitimate interest, or a free and revocable consent may apply. Mark "continue" in a Nodus
+notice confirms only that the user has read the notice; **does not in itself create a legal basis or
+substitute the consent of the persons concerned**.
 
-## 4. Archivos y grabaciones
+## 4. Archives and recordings
 
-Los archivos que el usuario incorpora se tratan localmente y no se suben a Nodus
-Server. La publicación opcional puede incluir metadatos, contenido académico
-derivado y, solo con opciones separadas, pasajes o contenido creado por el usuario.
-Antes de activar el micrófono se muestra un aviso previo, que el
-usuario puede aceptar puntualmente o recordar para no volver a mostrarlo.
+The files that the user incorporates are processed locally and not uploaded to Nodus Server. The
+optional publication may include metadata, derived academic content and, only with separate options,
+passages or content created by the user. Before activating the microphone, a previous notice is
+displayed, which the user can accept promptly or remember not to display again.
 
-Quien grabe debe:
+Those who record should:
 
-1. informar previamente y de forma comprensible a todas las personas afectadas;
-2. identificar al responsable, finalidad, base jurídica, destinatarios y conservación;
-3. obtener consentimiento cuando sea la base aplicable, incluido el de representantes
-   legales cuando corresponda;
-4. limitar el acceso y evitar toda difusión incompatible con la finalidad informada;
-5. respetar las reglas del centro, la confidencialidad y la legislación sobre imagen,
-   voz, propiedad intelectual y secreto de las comunicaciones.
+1. inform all persons concerned in advance and in a comprehensible manner;
+2. identify the person responsible, purpose, legal basis, addressees and conservation;
+3. obtain consent where applicable, including that of legal representatives where appropriate;
+4. limit access and avoid any dissemination incompatible with the informed purpose;
+5. respect the rules of the centre, confidentiality and legislation on image, voice, intellectual
+   property and secrecy of communications.
 
-Nodus no está diseñado para grabación encubierta, vigilancia, reconocimiento de
-emociones, identificación biométrica ni control de exámenes.
+Nodus is not designed for covert recording, surveillance, emotional recognition, biometric
+identification, or test control.
 
-## 5. IA y alumnado: prohibición de evaluación
+## 5. AI and students: prohibition of evaluation
 
-La finalidad prevista de la IA de Nodus se limita a trabajar sobre contenido
-académico o docente: ayudar a estructurar una programación, generar borradores de
-materiales, preguntas, explicaciones o resúmenes y asistir en investigación.
+The aim of the IA of Nodus is limited to working on academic or teaching content: to help structure
+programming, generate draft materials, questions, explanations or summaries and to assist in
+research.
 
-Nodus no ofrece ni autoriza como finalidad prevista:
+Nodus does not offer or authorize as intended:
 
-- enviar a un modelo nombres, expedientes, notas o respuestas de estudiantes para
-  obtener una valoración;
-- producir notas, predicciones de rendimiento, rankings, perfiles o decisiones sobre
-  admisión, promoción, itinerarios o acceso a oportunidades;
-- inferir emociones, atención, conducta, discapacidad, personalidad o riesgo;
-- vigilar o detectar conductas prohibidas durante pruebas.
+- send to a model names, files, notes or student responses to obtain an evaluation;
+- produce notes, performance predictions, rankings, profiles or decisions on admission, promotion,
+  itineraries or access to opportunities;
+- Infer emotions, attention, behavior, disability, personality or risk;
+- monitor or detect prohibited conduct during testing.
 
-Las calificaciones del gradebook son entradas humanas o cálculos aritméticos
-deterministas definidos por el docente. Generar una pregunta o una rúbrica con IA no
-equivale a evaluar a una persona: el modelo no recibe la respuesta ni decide la nota.
+Gradebook grades are human inputs or deterministic arithmetical calculations defined by the teacher.
+Generating a question or rubric with AI does not amount to evaluating a person: the model does not
+receive the answer or decides the note.
 
-## 6. Comunicaciones externas opcionales
+## 6. Optional external communications
 
-Nodus puede realizar las siguientes conexiones, solo cuando la función está
-configurada o es necesaria para la operación indicada:
+Nodus can make the following connections, only when the function is configured or necessary for the
+specified operation:
 
-- **Proveedores de IA y audio en la nube:** se envían prompts, fragmentos, imágenes,
-  audio o texto necesarios para la petición que inicia el usuario. El proveedor,
-  modelo y cuenta los elige el usuario. Los modelos locales no realizan ese envío.
-- **Zotero:** consulta bibliotecas y archivos autorizados por el usuario.
-- **Unpaywall y servidores de publicaciones:** consulta un DOI y puede descargar el
-  texto accesible; el correo configurado para Unpaywall se incluye en la petición.
-- **GitHub:** comprobación y descarga de actualizaciones, apertura de incidencias y
-  descargas del proyecto. También aloja la descarga oficial del cliente de túnel de
-  OpenAI, cuya integridad verifica Nodus antes de ejecutarlo. GitHub puede recibir
-  datos de red como la dirección IP.
-- **Hugging Face u otros repositorios fijados:** descarga opcional de modelos, voces
-  y runtimes. El repositorio puede recibir datos de red.
-- **OpenAI Secure MCP Tunnel y ChatGPT:** si el usuario configura expresamente esta
-  integración, Nodus ejecuta el cliente oficial de OpenAI y abre una conexión HTTPS
-  saliente a OpenAI. El servidor MCP de Nodus continúa escuchando solo en localhost:
-  no se abre ningún puerto entrante ni se publica una URL de Nodus. OpenAI y ChatGPT
-  reciben las solicitudes de herramientas y sus resultados, que pueden contener
-  fragmentos, metadatos y contenido de la bóveda activa solicitado por el usuario o
-  por el modelo. La clave de ejecución del túnel se guarda en el almacén de
-  credenciales del dispositivo y no se incluye en las copias de seguridad.
-- **Nodus Server autohospedado, ChatGPT y Claude:** si el usuario empareja un vault,
-  Nodus abre una conexión HTTPS saliente al dominio configurado y publica una
-  proyección filtrada. El token de dispositivo se cifra con el almacén seguro del
-  sistema; si este no está disponible, solo se conserva en memoria hasta cerrar Nodus.
-  Permanece fuera del renderer y de los backups, y es distinto del token y
-  puerto del MCP local. Los lectores acceden al endpoint MCP remoto mediante OAuth;
-  el servidor comprueba usuario, espacio, caducidad, audiencia y permisos en cada
-  petición. El administrador del servidor y los proveedores de IA utilizados por
-  los lectores reciben los datos consultados. Los PDF, credenciales y datos de
-  calificación o alumnado no forman parte de la publicación.
-- **Enlaces externos:** PayPal, calendarios, páginas de licencias y otros enlaces solo
-  se abren cuando el usuario los solicita.
+- **IA and audio providers in the cloud:**prompts, fragments, images, audio or text necessary for
+  the user's request are sent.The provider, model and account is chosen by the user. Local models do
+  not make that submission.
+- **Zotero:** consults libraries and files authorized by the user.
+- **Unpaywall and publishing servers:** consult a DOI and you can download the accessible text; the
+  mail configured for Unpaywall is included in the request.
+- **GitHub:** Check and download updates, open incidents and downloads of the project. It also hosts
+  the official download of the OpenAI tunnel client, whose integrity checks Nodus before executing
+  it. GitHub can receive network data such as IP address.
+- **Hugging Face or other fixed repositories:** optional download of models, voices and runtimes.
+  The repository can receive network data.
+- **OpenAI Secure MCP Tunnel and ChatGPT:** If the user expressly configures this integration, Nodus
+  executes the official OpenAI client and opens an outgoing HTTPS connection to OpenAI. Nodus MCP
+  server continues to listen only to localhost: no incoming port is opened or a Nodus URL is
+  published. OpenAI and ChatGPT receive the tool requests and their results, which may contain
+  fragments, metadata and active vault content requested by the user or model. The tunnel execution
+  key is stored in the device's credentials warehouse and is not included in the backups.
+- **Nodus Server autohosted, ChatGPT and Claude:** if the user matches a Vault, Nodus opens a
+  outgoing HTTPS connection to the configured domain and publishes a filtered projection. The device
+  token is encrypted with the secure system warehouse; if it is not available, it is only stored in
+  memory until Nodus is closed. It remains outside the renderer and backups, and is different from
+  the local MCP token and port. Readers access the remote MCP endpoint via OAuth; the server checks
+  user, space, expiration, audience and permissions on each request. The server administrator and AI
+  providers used by readers receive the consulted data. PDFs, credentials and qualification or
+  student data are not part of the publication.
+- **External links:** PayPal, calendars, license pages and other links are only opened when
+  requested by the user.
 
-Nodus no controla la conservación posterior que realicen esos terceros. Antes de
-usar un servicio remoto con datos personales, el responsable debe revisar su región,
-retención, uso para entrenamiento, subencargados, medidas de seguridad y mecanismo
-de transferencia internacional. Para datos de alumnado o categorías especiales se
-recomienda utilizar exclusivamente modelos locales salvo autorización institucional
-documentada.
+Nodus does not control the subsequent preservation by these third parties. Before using a remote
+service with personal data, the controller must review your region, retention, use for training,
+sub-loads, security measures and international transfer mechanism. For student data or special
+categories it is recommended to use exclusively local models except documented institutional
+authorization.
 
-## 7. Conservación y borrado
+## 7. Maintenance and erasing
 
-Los datos locales se conservan hasta que el usuario los elimina. La papelera,
-historiales, exportaciones, clips preservados y copias de seguridad pueden mantener
-copias adicionales; deben revisarse y borrarse conforme al plazo definido por el
-responsable. Desinstalar la aplicación no garantiza que se borren automáticamente
-las bases de datos, exports o backups del usuario.
+Local data is kept until the user deletes them. Trash, records, exports, preserved clips and backups
+can maintain additional copies; they must be reviewed and deleted according to the time limit
+defined by the responsible. Uninstalling the application does not guarantee that the user's
+databases, exports or backups are automatically deleted.
 
-Los proveedores externos y cada Nodus Server autohospedado aplican sus propios
-plazos. Desconectar un vault detiene nuevos envíos, pero no borra automáticamente la
-última publicación del servidor; el administrador debe eliminarla conforme a su
-política. El responsable debe configurar y documentar estos plazos antes de
-transmitir datos personales.
+External providers and each self-hosted Nodus Server apply their own deadlines. Disconnecting a
+Vault stops new submissions, but does not automatically delete the latest server posting; the
+administrator must delete it in accordance with its policy. The responsible must configure and
+document these deadlines before transmitting personal data.
 
-## 8. Seguridad
+## 8. Security
 
-Nodus aplica minimización por defecto, procesamiento local, aislamiento de Electron,
-almacenamiento seguro de credenciales compatible con el sistema, avisos justo a
-tiempo y exportaciones o backups protegibles. Nodus Server exige HTTPS fuera de
-localhost, tokens de emparejamiento de un solo uso, OAuth con PKCE, sesiones con CSRF,
-control de acceso por espacio y tokens de acceso breves. Sin embargo, **local no significa
-cifrado automático de toda la base de datos**. El usuario o la organización debe
-proteger la cuenta del sistema, activar cifrado completo del disco, instalar
-actualizaciones, limitar permisos, cifrar backups y controlar el acceso físico.
+Nodus applies default minimization, local processing, Electron isolation, secure system-compatible
+credentials storage, just-in-time notifications and exports or protectionable backups. Nodus Server
+requires HTTPS out of localhost, single-use matching tokens, OAuth with PKCE, CSRF sessions, space
+access control, and short access tokens. However, **local does not mean automatic encryption of the
+entire database**. The user or organization must protect the system account, enable full disk
+encryption, install updates, limit permissions, encrypt backups and control physical access.
 
-Ningún software puede prometer riesgo cero. Una organización debe mantener medidas
-técnicas y organizativas apropiadas, pruebas periódicas, un procedimiento de brechas
-y recuperación conforme a su análisis de riesgos.
+No software can promise zero risk. An organization must maintain appropriate technical and
+organizational measures, periodic testing, a breach procedure and recovery according to its risk
+analysis.
 
-## 9. Derechos de las personas
+## 9. Rights of individuals
 
-Cuando los datos solo están en un dispositivo, el proyecto Nodus no puede buscarlos,
-rectificarlos ni borrarlos porque no tiene acceso. Las solicitudes de acceso,
-rectificación, supresión, limitación, oposición o portabilidad deben dirigirse al
-responsable que utilizó Nodus. La aplicación permite consultar, modificar, exportar
-y eliminar gran parte del contenido local; el responsable debe completar esas
-operaciones también en copias y sistemas externos.
+When the data is only on one device, the Nodus project cannot search, rectify or delete them because
+it does not have access. Requests for access, rectification, deletion, limitation, opposition or
+portability should be addressed to the controller who used Nodus. The application allows you to
+consult, modify, export and delete much of the local content; the controller must also complete
+those operations in copies and external systems.
 
-Las personas pueden presentar una reclamación ante la autoridad de protección de
-datos competente. En España: https://www.aepd.es/
+Individuals may file a complaint with the competent data protection authority. In Spain:
+https://www.aepd.es/
 
-## 10. Responsabilidad y uso legítimo
+## 10. Legitimate liability and use
 
-El usuario es responsable de no introducir ni comunicar datos que no esté autorizado
-a tratar y de no usar Nodus para fines ilícitos o incompatibles. El responsable del
-tratamiento debe cumplir sus propias obligaciones de información, licitud,
-minimización, contratos, seguridad, atención de derechos y evaluación de impacto.
+The user is responsible for not entering or communicating data that he or she is not authorized to
+process and not to use Nodus for unlawful or incompatible purposes. The controller must comply with
+his or her own obligations of information, legality, minimization, contracts, security, rights care
+and impact assessment.
 
-La licencia MIT entrega el software «tal cual», sin garantía técnica, en la máxima
-medida permitida por la ley. Esa cláusula **no elimina obligaciones legales
-imperativas, no convierte automáticamente al usuario en único responsable y no
-excluye responsabilidades que la ley no permita excluir**.
+The MIT license delivers the software "as is", without technical warranty, to the maximum extent
+permitted by law. **This clause does not eliminate mandatory legal obligations, does not
+automatically make the user solely responsible and does not exclude liability that the law does not
+allow to exclude**.
 
-## 11. Requisitos para una implantación RGPD
+## 11. Requirements for GDPR implementation
 
-La configuración local de Nodus facilita el cumplimiento, pero una aplicación por sí
-sola no puede certificar el tratamiento completo de una institución. Antes de usar
-datos personales en una organización deben completarse las acciones de
-`legal/RGPD_DEPLOYMENT_CHECKLIST.md`, incluida la identidad y contacto del responsable,
-registro de actividades, base jurídica, plazos, encargados, transferencias,
-procedimiento de derechos, seguridad y, cuando exista alto riesgo, una evaluación de
-impacto.
+The local configuration of Nodus facilitates compliance, but an application alone cannot certify the
+complete processing of an institution. Before using personal data in an organization, the actions of
+`legal/RGPD_DEPLOYMENT_CHECKLIST.md` must be completed, including the identity and contact of the
+controller, registration of activities, legal basis, deadlines, managers, transfers, rights
+procedure, security and, where there is a high risk, an impact assessment.
 
-## 12. Referencias oficiales
+## 12. Official references
 
-- Reglamento (UE) 2016/679 (RGPD):
-  https://eur-lex.europa.eu/eli/reg/2016/679/oj
-- Ley Orgánica 3/2018 (LOPDGDD):
-  https://www.boe.es/eli/es/lo/2018/12/05/3/con
-- Protección de datos por defecto, AEPD:
+- Regulation (EU) 2016/679 (GDPR): https://eur-lex.europa.eu/eli/reg/2016/679/oj
+- Organic Law 3/2018 (LOPDGDD): https://www.boe.es/eli/es/lo/2018/12/05/3/con
+- Default data protection, AEPD:
   https://www.aepd.es/derechos-y-deberes/cumple-tus-deberes/medidas-de-cumplimiento/proteccion-de-datos-por-defecto
-- Reglamento (UE) 2024/1689 de Inteligencia Artificial:
-  https://eur-lex.europa.eu/eli/reg/2024/1689/oj
+- Artificial Intelligence Regulation (EU) 2024/1689: https://eur-lex.europa.eu/eli/reg/2024/1689/oj
 
-## 13. Cambios de esta política
+## 13. Changes in this policy
 
-Los cambios materiales se publicarán en el repositorio y se incluirán en las nuevas
-versiones. El historial de Git permite auditar cada modificación.
+Material changes will be published in the repository and included in the new versions. Git's history
+allows you to audit each modification.

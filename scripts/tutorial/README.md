@@ -1,156 +1,153 @@
-# Tutoriales en vídeo de Nodus
+# Video tutorials by Nodus
 
-Motor para grabar tutoriales narrados **desde la aplicación real**, con voz en off en
-inglés, subtítulos en varios idiomas, tarjeta de inicio, tarjeta de cierre y música
-de fondo. No usa captura manual ni *computer use*: conduce la app con Playwright y
-captura los fotogramas por CDP.
+Engine to record narrated tutorials **from the actual application**, with voice off in English,
+subtitles in multiple languages, starter card, closing card and background music. Do not use manual
+capture or *computer use*: drive the app with Playwright and capture frames by CDP.
 
-Con esto se han hecho cuatro vídeos: introducción general (7:00), bóveda académica
-(4:58), Nodi (1:59) y MCP + Nodus Server (3:00).
-
----
-
-## Si eres el modelo que va a hacer el vídeo, empieza aquí
-
-1. Lee este archivo entero y después [PITFALLS.md](PITFALLS.md). El segundo es la
-   lista de fallos que ya han costado tomas enteras; casi todos reaparecen.
-2. Pregunta al usuario **qué debe contar el vídeo** y en qué orden, antes de escribir
-   una sola línea de guion.
-3. **Pide las claves de API si no las tienes.** Hacen falta dos, y no están en el
-   repositorio:
-   - **OpenRouter** — para la voz en off (TTS) y, en los vídeos que analizan corpus,
-     para los *embeddings*. Se lee de `~/.config/nodus/openrouter.key`, o de
-     `~/.config/nodus/openrouter-app.key`, o de `OPENROUTER_API_KEY`.
-   - **Google Gemini** — para el análisis de documentos en los vídeos que escanean.
-     Se lee de `~/.config/nodus/gemini-app.key`.
-
-   Si alguno no existe, **pregunta al usuario y espera**. No supongas que hay saldo,
-   y no escribas ninguna clave en el repositorio ni en un comentario: es público.
-4. **Nunca toques el Nodus instalado del usuario.** Toda grabación corre sobre un
-   `NODUS_USERDATA` desechable. El motor ya lo hace; no lo cambies.
-5. Ensaya con `--dry` antes de gastar en voz. Es gratis y caza casi todo.
+With this, four videos have been made: general introduction (7:00), academic vault (4:58), Nodi
+(1:59) and MCP + Nodus Server (3:00).
 
 ---
 
-## Requisitos
+## If you're the model that's going to make the video, start here.
+
+1. Read this whole file and then[PITFALLS.md](PITFALLS.md)The second is the list of failures that
+   have already cost whole shots; almost everyone reappears.
+2. Ask the user ** what the video should count** and in what order, before writing a single line of
+   script.
+3. **Ask for API keys if you don't have them.** It takes two, and they're not in the repository:
+   - **OpenRouter** — for voice-over (TTS) and, in the videos that analyze corpus, for
+     *embeddeds*.`~/.config/nodus/openrouter.key`, or`~/.config/nodus/openrouter-app.key`,
+     or`OPENROUTER_API_KEY`.
+   - **Google Gemini** — for document analysis in scanning videos. Read
+     from`~/.config/nodus/gemini-app.key`.
+
+If any does not exist, **ask the user and wait**.Do not suppose there is a balance, and do not write
+any keys in the repository or in a comment: it is public.
+4. **Never touch the user's installed Nodus.**All recording runs on a`NODUS_USERDATA`The engine
+   already does; don't change it.
+5. Test with`--dry`It's free and hunts almost everything.
+
+---
+
+## Requirements
 
 ```bash
 npm run build
 ```
 
-- `ffmpeg` y `ffprobe` en el PATH (`brew install ffmpeg`).
-- La app compilada: el grabador conduce `dist-electron/main.js`, no el código fuente.
-- Un tema de fondo en `scripts/tutorial/music/` (ver [music/README.md](music/README.md)).
+- `ffmpeg`and`ffprobe`in the PATH (`brew install ffmpeg`).
+- The compiled app: the recorder drives`dist-electron/main.js`Not the source code.
+- A theme in the background`scripts/tutorial/music/`(see[music/README.md](music/README.md)).
 
 ---
 
-## Las seis fases
+## The Six Phases
 
-Cada una es un comando. `--deck=<nombre>` elige el vídeo; la salida va siempre a
-`.tutorial-out/<nombre>/`, fuera del control de versiones.
+Each is a command.`--deck=<nombre>`choose the video; the output always goes
+to`.tutorial-out/<nombre>/`Out of version control.
 
-| # | Fase | Comando | Qué hace |
+| # | Phase | Command | What's he doing? |
 |---|------|---------|----------|
-| 1 | **Guion** | editas `decks/<deck>/shots.mjs` | Una frase por plano y lo que la app hace mientras |
-| 2 | **Voz** | `node scripts/tutorial/engine/narrate.mjs --deck=<deck>` | Un clip por frase, medido con ffprobe |
-| 3 | **Grabación** | `node scripts/tutorial/decks/<deck>/record.mjs` | Conduce la app y captura fotogramas |
-| 4 | **Subtítulos** | `node scripts/tutorial/engine/subtitles.mjs --deck=<deck>` | `.srt` y `.vtt`, normales y para YouTube |
-| 5 | **Montaje** | `node scripts/tutorial/engine/assemble.mjs --deck=<deck>` | Cámara, cortes y voz sobre los fotogramas |
-| 6 | **Tarjetas** | `node scripts/tutorial/engine/cards.mjs --deck=<deck>` | Inicio, cierre, música y pistas de subtítulos |
+| 1 | **Guion** | edits`decks/<deck>/shots.mjs` | One sentence per plane and what the app does while |
+| 2 | **Voice** | `node scripts/tutorial/engine/narrate.mjs --deck=<deck>` | One clip per sentence, measured with ffprobe |
+| 3 | **Recording** | `node scripts/tutorial/decks/<deck>/record.mjs` | Drive the app and capture frames |
+| 4 | **Subtitles** | `node scripts/tutorial/engine/subtitles.mjs --deck=<deck>` | `.srt`and`.vtt`, normal and for YouTube |
+| 5 | **Assembly** | `node scripts/tutorial/engine/assemble.mjs --deck=<deck>` | Camera, cuts and voice over frames |
+| 6 | **Cards** | `node scripts/tutorial/engine/cards.mjs --deck=<deck>` | Home, closing, music and subtitle tracks |
 
-Y para la descripción de YouTube:
+And for the description of YouTube:
 
 ```bash
 node scripts/tutorial/engine/describe.mjs --deck=<deck>
 ```
 
-### La regla que lo gobierna todo: **la narración manda el reloj**
+### The rule that governs everything: **narration commands the clock**
 
-Cada plano dura exactamente lo que dura su frase. De ahí se sigue:
+Each plane lasts exactly how long your phrase lasts. Hence follows:
 
-- **La voz se sintetiza ANTES de grabar.** Sin `narration.json` el grabador no sabe
-  cuánto aguantar cada plano y se niega a arrancar (salvo con `--dry`).
-- **Se puede rehacer una frase sin volver a grabar.** El montaje recorta cada clip a
-  la duración de su cue: cambias la línea, vuelves a narrar y a montar. Esto salvó
-  una toma en la que la voz decía "Gemini 2.5" y la pantalla mostraba 3.1.
-- **Si una acción tarda más que su frase, el plano se corta a media acción.** Ajusta
-  la acción, no la frase.
+- **The voice is synthesized BEFORE recording.**No`narration.json`the recorder does not know how
+  long to endure each plane and refuses to start (except with`--dry`).
+- **You can redo a sentence without re-recording.** The assembly step cuts each clip to the length of your
+  cue: you change the line, you re-narrify and assemble.This saved a shot in which the voice said
+  "Gemini 2.5" and the screen showed 3.1.
+- **If an action takes longer than its sentence, the plane is cut to half action.** Adjust the
+  action, not the phrase.
 
 ---
 
-## Hacer un vídeo nuevo, paso a paso
+## Make a new video, step by step
 
 ```bash
 cp -r scripts/tutorial/decks/_template scripts/tutorial/decks/miVideo
 ```
 
-1. **Escribe el guion** en `decks/miVideo/shots.mjs`. Una frase por plano, en inglés
-   hablado. Deletrea las siglas como suenan: `'M C P'`, `'H T T P S'`, `'P D F'`.
-2. **Escribe los ayudantes** en `decks/miVideo/record.mjs`. Cada uno debe
-   **verificar** lo que hizo (ver PITFALLS).
-3. **Ensaya gratis**: `node scripts/tutorial/decks/miVideo/record.mjs --dry`.
-   Objetivo: **cero avisos**. Cada `⚠` acaba viéndose en el vídeo de una forma u otra.
-4. **Sintetiza la voz**: `node scripts/tutorial/engine/narrate.mjs --deck=miVideo`.
-5. **Graba de verdad** y vuelve a exigir cero avisos.
-6. **Subtítulos, montaje y tarjetas** (fases 4-6).
-7. **Revisa fotogramas del vídeo YA MONTADO**, no del guion ni de los logs:
+1. **Writes the script** in`decks/miVideo/shots.mjs`. A phrase by plane, spoken in English. Spell
+   the acronyms as they sound:`'M C P'`, `'H T T P S'`, `'P D F'`.
+2. **Write the assistants** in`decks/miVideo/record.mjs`. Each one must **verify** what he did (see
+   PITFALLS).
+3. **Teach free**:`node scripts/tutorial/decks/miVideo/record.mjs --dry`Objective: **zero
+   notices**.`⚠`ends up being seen in the video one way or another.
+4. **Synthesizes the voice**:`node scripts/tutorial/engine/narrate.mjs --deck=miVideo`.
+5. **Really recorded** and again demanded zero notices.
+6. **Subtitles, assembly and cards** (phases 4-6).
+7. **Checks video frames YA MONTADO**, not script or log frames:
 
    ```bash
    ffmpeg -ss 90 -i .tutorial-out/miVideo/nodus-tutorial-miVideo-en-final.mp4 -frames:v 1 -y /tmp/check.png
    ```
 
-   Este paso ha destapado tres fallos que ningún log mostraba: ideas extraídas en
-   español bajo interfaz inglesa, una barra de progreso cruzando todas las vistas de
-   análisis, y una narración que hablaba de nodos mientras la pantalla mostraba temas.
+This step has uncovered three flaws that no log showed: ideas extracted in Spanish under English
+interface, a progress bar across all the analysis views, and a narrative that spoke of nodes while
+the screen showed themes.
 
 ---
 
-## Convenciones de la serie
+## Series conventions
 
-Se mantienen entre vídeos para que parezcan una colección y no cuatro cosas sueltas.
+They keep between videos to look like a collection and not four loose things.
 
-**Cámara.** Acercamiento (`focus`) **solo** para modales y para Nodi. Todo lo demás
-lleva aro (`highlight`). El zoom continuo marea.
+**Camera.** Approach (`focus`) ** only** for manners and for Nodi. Everything else carries a hoop
+(`highlight`). The continuous tide zoom.
 
-**Tarjeta de inicio.** Fondo claro, la N de Nodus centrada y debajo el título, 5
-segundos. El título sale de `TITLE` en el `shots.mjs` del mazo.
+**Start card.** Clear background, the N of Nodus centered and below the title, 5 seconds. The title
+comes out of`TITLE`in the`shots.mjs`The mallet.
 
-**Tarjeta de cierre.** 8 segundos, adaptación clara del cierre de marca.
+**Closing card.** 8 seconds, clear adaptation of the mark closure.
 
-Ambas se generan en `engine/cards.mjs` desde HTML, que queda en
-`.tutorial-out/<deck>/cards/` (`title.html`, `end.html`): se editan ahí y se ven al
-instante en el navegador.
+Both are generated in`engine/cards.mjs`from HTML, which is left in`.tutorial-out/<deck>/cards/`
+(`title.html`, `end.html`): they are edited there and seen instantly in the browser.
 
-**Música.** Un solo tema en bucle, con fundidos y **compresión lateral** para que la
-voz vaya siempre por delante (`MUSIC_GAIN = 0.16`). No debe pisar la narración nunca.
+**Music.**One single theme in loop, with casts and **side compression** for the voice to always go
+ahead (`MUSIC_GAIN = 0.16`) You should never step on the narrative.
 
-**Voz.** Siempre la misma, para que los vídeos suenen a una serie:
+**Voice.** Always the same, for videos to sound like a series:
 
 | | |
 |---|---|
-| Proveedor | **OpenRouter** (`/api/v1/audio/speech`) |
-| Modelo | **`deepgram/aura-2`** |
-| Voz | **`aura-2-thalia-en`** |
-| Idioma | inglés |
+| Provider | **OpenRouter** (`/api/v1/audio/speech`) |
+| Model | **`deepgram/aura-2`** |
+| Voice | **`aura-2-thalia-en`** |
+| Language | English |
 
-Queda registrado en `.tutorial-out/<deck>/narration.json` (`provider`, `model`,
-`voice`) en cada vídeo, y `describe.mjs` lo imprime. Se puede cambiar con
-`--voice=<id>` o `--model=<id>`, y hay rutas alternativas (`--provider=hume`,
-`--provider=openai`, `--local` para una voz de relleno sin coste).
+You are registered in`.tutorial-out/<deck>/narration.json` (`provider`, `model`, `voice`) in each
+video; and`describe.mjs`you can change it with`--voice=<id>`o`--model=<id>`, and there are
+alternative routes (`--provider=hume`, `--provider=openai`, `--local`for a voice filler without
+cost).
 
-Dos alternativas se probaron y se descartaron, por si vuelven a tentar:
+Two alternatives were tested and discarded, in case they were tempted again:
 
-- **`openai/gpt-audio-mini`** — es un modelo de chat, no de locución: **parafrasea el
-  guion**. Como los subtítulos se generan del guion, la voz y el texto dejan de
-  coincidir en todos los idiomas. El selector exige `output_modalities=speech`.
-- **Hume Octave** — la voz se cortaba a mitad de frase (minuto 0:52 del primer vídeo).
+- **`openai/gpt-audio-mini`** — is a chat model, not a speech: **paraphrases the script**. As
+  subtitles are generated from the script, the voice and text cease to match in all
+  languages.`output_modalities=speech`.
+- **Hume Octave** — the voice was cut in the middle of a sentence (minute 0:52 of the first video).
 
-**Subtítulos.** El inglés se lee del propio guion, así que voz y subtítulo no pueden
-desincronizarse. Los demás idiomas van en `decks/<deck>/captions.mjs`. Se generan dos
-juegos: uno normal y otro en `subtitles/youtube/` **desplazado +5 s** para compensar
-la tarjeta de inicio, con nombres BCP-47 listos para subir.
+**Subtitles.** English is read from the script itself, so voice and subtitle cannot be
+disinchronized.`decks/<deck>/captions.mjs`. Two games are generated: one normal and the other
+in`subtitles/youtube/`**displaced +5 s** to compensate the start card, with names BCP-47 ready to
+upload.
 
-**Miniatura.** Un fotograma de la tarjeta de inicio:
+**Minature.** A frame of the start card:
 
 ```bash
 ffmpeg -ss 2 -i .tutorial-out/<deck>/nodus-tutorial-<deck>-en-final.mp4 -frames:v 1 -q:v 2 -y miniatura.jpg
@@ -158,72 +155,69 @@ ffmpeg -ss 2 -i .tutorial-out/<deck>/nodus-tutorial-<deck>-en-final.mp4 -frames:
 
 ---
 
-## Privacidad — no negociable
+## Privacy — non-negotiable
 
-El repositorio es **público** y los vídeos se publican en YouTube.
+The repository is **public** and the videos are posted on YouTube.
 
-- **Claves de API y tokens: siempre difuminados.** El motor trae la clase
-  `.nodus-blur`; el mazo `mcp` enseña cómo tapar **solo** los caracteres del token
-  dejando legible el JSON que lo rodea.
-- **Colecciones de Zotero ajenas al vídeo: difuminadas desde el primer fotograma.**
-  Un temporizador que arranca al abrir el diálogo deja varios cientos de
-  milisegundos legibles, y esos fotogramas acaban publicados. Usa un
-  `MutationObserver`.
-- **Nada de fotos ni documentos personales del usuario en el repositorio.**
-- Verifica la privacidad **mirando fotogramas del vídeo montado**, no leyendo el
-  código: una regla de difuminado que no encaja con el marcado no da ningún error.
+- ** API keys and tokens: always faded.** Engine brings class`.nodus-blur`; the mallet`mcp`teaches
+  how to cover **only** the characters of the token leaving the JSON around it legible.
+- **Zoter's collections outside the video: blurred from the first frame.** A timer that starts when
+  the dialog opens leaves several hundred milliseconds legible, and those frames end up
+  published.`MutationObserver`.
+- **No photos or personal documents of the user in the repository.**
+- Verify privacy **by looking at frames from the assembled video**, not by reading the code: a blur rule that
+  doesn't fit the markup doesn't give any error.
 
 ---
 
-## Coste
+## Cost
 
-Grabar es gratis. Lo que se paga es la voz y, en los vídeos que analizan, el modelo.
+Recording is free. What you pay for is the voice and, in the videos you analyze, the model.
 
-- `--dry` no gasta nada: úsalo hasta que no queden avisos.
-- La voz **cachea por texto**: cambiar una frase cuesta una llamada, no el mazo entero.
-- **Reutiliza corpus ya escaneados** (`masterProfile`) en lugar de volver a analizar.
-- Las respuestas de chat de un tutorial deben ir **guionizadas**, no generadas: un
-  tutorial tiene que enseñar lo mismo cada vez, y además así no gasta.
+- `--dry` does not use any paid services. Use it until there are no warnings.
+- The voice **caches for text**: changing a phrase costs a call, not the whole mallet.
+- **Reuse already scanned corpus** (`masterProfile`) rather than re-analysing.
+- Tutorial chat responses should be **scripted**, not generated: a tutorial must teach
+  the same thing every time and should not consume API credits.
 
 ---
 
-## Estructura
+## Structure
 
 ```
 scripts/tutorial/
-  README.md              este archivo
-  PITFALLS.md            los fallos que ya han costado tomas
+  README.md              this file
+  PITFALLS.md            mistakes that have already ruined takes
   engine/
-    recorder.mjs         conduce la app y captura (lo comparten los mazos)
-    cursor.mjs           cursor sintético y aro de resalte
-    narrate.mjs          voz en off, una frase por plano, con caché
-    assemble.mjs         cámara, cortes y voz
-    cards.mjs            tarjetas, música y pistas de subtítulos
-    subtitles.mjs        .srt/.vtt, normales y para YouTube
-    describe.mjs         capítulos y guion para la descripción
+    recorder.mjs         drives and captures the app (shared by the decks)
+    cursor.mjs           synthetic cursor and highlight ring
+    narrate.mjs          voice-over, one sentence per shot, with caching
+    assemble.mjs         camera, cuts and voice
+    cards.mjs            cards, music and subtitle tracks
+    subtitles.mjs        standard and YouTube .srt/.vtt files
+    describe.mjs         chapters and description script
   decks/
-    _template/           punto de partida para un vídeo nuevo
-    intro/ academic/ nodi/ mcp/    los cuatro ya hechos, como ejemplos
-  probes/                sondas: interrogar la app sin grabar ni gastar
-  music/                 el tema de fondo
+    _template/           starting point for a new video
+    intro/ academic/ nodi/ mcp/    the four completed examples
+  probes/                probes: inspect the app without recording or spending
+  music/                 the background theme
 ```
 
-`intro` y `academic` son **anteriores** a la extracción del motor: sus `record.mjs`
-llevan su propio andamiaje. Funcionan y se conservan como referencia, sobre todo
-`academic`, que es el único que importa de Zotero y escanea de verdad. Los mazos
-`nodi` y `mcp` ya usan el motor y son el patrón a copiar.
+`intro`and`academic`are **anterior** to engine extraction: their`record.mjs`carry their own
+scaffolding. They function and are preserved as a reference, especially`academic`He's the only one
+who cares about Zotero and really scans the mallets.`nodi`and`mcp`They already use the engine and
+are the pattern to copy.
 
-`.tutorial-out/` (fotogramas, audio, perfiles, vídeos) está ignorado por git: es
-material de trabajo, pesa gigabytes y no pertenece al repositorio.
+`.tutorial-out/`(photograms, audio, profiles, videos) is ignored by git: it is working material,
+weighs gigabytes and does not belong to the repository.
 
 ---
 
-## Sondas
+## Probes
 
-`probes/` sirve para responder preguntas sobre la app **sin grabar**: qué selectores
-existen, cómo se llama un botón en inglés, si una vista devuelve resultados. Tardan
-segundos y no gastan nada.
+`probes/`is used to answer questions about the **unrecorded app**: what selectors exist, what a
+button is called in English, if a view returns results. It takes seconds and spends nothing.
 
-La regla que más tiempo ahorra: **cuando algo no funcione, vuelca el DOM real en vez
-de deducir el marcado**. Tres intentos seguidos de cerrar un modal fallaron por
-suponer cómo era su botón de cerrar; el cuarto, tras mirarlo, acertó a la primera.
+The rule that saves the most time: **when something doesn't work, flips the real DOM instead of
+deducing the dial**. Three attempts followed to close a modal failed to assume what its closing
+button looked like; the fourth, after looking at it, hit the first one.

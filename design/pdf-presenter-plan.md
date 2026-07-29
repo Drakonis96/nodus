@@ -1,291 +1,273 @@
-# PDF Presenter — plan de implementación (réplica fiel + mejora)
+# PDF Presenter — implementation plan (faithful replication + improvement)
 
-> Estado: **plan para revisión**, sin código todavía.
-> Objetivo acordado con el usuario (2026-07-20): **portar la app de referencia
-> `~/Documents/GitHub/pdfpresenter` de forma más o menos exacta**, verificar cada
-> función una a una, cubrir con tests, y **adaptar/mejorar el diseño** para
-> integrarlo en Nodus (iconos centralizados, temas claro/oscuro, ritmo de
-> espaciado, i18n). Las presentaciones viven en una **biblioteca global del
-> Toolkit** (agnóstica de bóveda, como Convert/Protect).
-
----
-
-## 1. Qué es la app de referencia (inventario completo)
-
-App Electron con **tres ventanas + una web móvil**, coordinadas por un servidor
-Express + WebSocket local. Todo el estado vive en un `currentState` central que
-se difunde por WS a los clientes y por IPC a las ventanas.
-
-### 1.1 Ventana principal — biblioteca (`src/js/renderer.js`)
-- Importar PDF (se copia a `userData/presentations/<id>.pdf` + entrada en `meta.json`).
-- Lista con **búsqueda**, **orden** (añadido reciente / abierto reciente / nombre ↑↓) y selección.
-- **Carpetas**: crear, borrar (mueve su contenido a raíz), mover presentación, breadcrumb, contadores, filtro.
-- **Renombrar** en línea (sidebar) y desde el título de detalle.
-- **Borrar** con modal de confirmación.
-- **Rejilla de miniaturas** con carga perezosa (`IntersectionObserver`, concurrencia limitada, liberación fuera de pantalla) y **badges** por diapositiva (tiene nota / tiene vídeo); botones rápidos "presentar" / "modo presentador" desde una diapositiva concreta.
-- **Importar notas .pptx** (valida que el nº de diapositivas coincide con el PDF).
-- **Visor de notas** a pantalla completa: canvas por diapositiva + textarea, sidebar de miniaturas, **undo/redo** (⌘Z / ⌘⇧Z), autoguardado, navegación con teclado, panel de notas redimensionable.
-- **Editor de vídeo** por diapositiva: URL de YouTube + posición (x,y,ancho,alto en %) con overlay arrastrable/redimensionable y miniatura de previsualización.
-- **Editar diapositivas** (rejilla para saltar al editor de vídeo).
-- **QR**, **Ajustes** (idioma), **info de detalle** (nº de páginas, notas, vídeos).
-
-### 1.2 Ventana de audiencia (`src/presentation.html`)
-Render de diapositiva a canvas (ajuste, DPR, cancelación de render en carrera),
-overlays de herramientas (linterna, dibujo, puntero, lupa con aumento),
-**overlay de vídeo YouTube** + sincronía de seek, **pantalla en negro**,
-**zoom de diapositiva** (⌘+rueda / pinch), barra de herramientas autoocultable
-(colores, tamaños, slider, QR, cast, fullscreen), atajos de teclado, tamaño por
-rueda, indicador de tamaño, y emisión de estado al servidor y al presentador.
-
-### 1.3 Ventana de presentador (`src/presenter.html`)
-Barra superior (nombre, ‹ contador ›, **temporizador** play/pausa/reset,
-pantalla negra, QR, cast, **reloj del sistema**, finalizar), diapositiva actual
-+ mismas herramientas (colores, tamaño, botones de aumento de lupa),
-**previsualización de la siguiente**, **notas del presentador** (con control de
-tamaño de fuente), **carrusel de miniaturas**, divisores redimensionables
-(vertical y horizontal), atajos, zoom de diapositiva, controles de vídeo + seek,
-sincronía de temporizador al servidor, y espejo de controles a la audiencia.
-
-### 1.4 Móvil (`src/mobile/`)
-Pantallas conectar / esperando / mando + toast de reconexión. WS con **PIN**,
-canvas de previsualización, notas (tamaño de fuente), **puntos** de diapositiva
-(ventana deslizante), prev/next, **swipe**, **carrusel**, **modo vista local**
-(adelantarse en las notas sin mover la audiencia), herramientas táctiles
-(→ audiencia + eco en la previsualización), **popup de tamaños** (por herramienta
-+ aumento de lupa + **volumen del sistema** + silenciar), **pinch-zoom** on/off,
-pantalla negra, alternar vídeo, temporizador (toca para pausar / reset), y **modo
-apaisado/pantalla completa** con su propia barra inferior.
-
-### 1.5 Proceso principal (`main.js` / `server.js`)
-Directorio de datos + `meta.json`; importar/borrar/leer PDF; abrir/cerrar
-ventanas con **detección de pantalla externa**; **power-save blocker**; limpieza
-de User-Agent (para que YouTube no bloquee a Electron); icono de dock; **selector
-de cast** (osascript, macOS); **volumen** get/set (osascript, macOS); **puente**
-`setElectronCallback` que traduce WS ↔ IPC; **PIN**; **QR**; servido de PDF con
-guardia anti-traversal.
+> Status: **plan for revision**, no code yet.
+> Objective agreed with the user (2026-07-20): **port the reference app
+> `~/Documents/GitHub/pdfpresenter`more or less accurately**, verify each
+> function one by one, cover with tests, and **adapt/improve design** for
+> integrate it into Nodus (centralised icons, clear/dark themes, rhythm of
+> spaced, i18n). The presentations live in a **global library of the
+> Toolkit** (agnostic vault, such as Convert/Protect).
 
 ---
 
-## 2. Cómo encaja en Nodus (lo que se reutiliza)
+## 1. What is the reference app (full inventory)
 
-| Necesidad | En Nodus |
+App Electron with **three windows + a mobile web**, coordinated by a local Express + WebSocket
+server. The whole state lives in a`currentState`which is broadcast by WS to customers and by IPC to
+windows.
+
+### 1.1 Main Window — Library (`src/js/renderer.js`)
+- Import PDF (copy to`userData/presentations/<id>.pdf`+ entry into`meta.json`).
+- List with **search**, **sorting** (recently added/recently opened/name ↑↓) and selection.
+- ** Folders**: create, delete (move your content to root), move presentation, breadcrumb, counters,
+  filter.
+- **Rename** online (sidebar) and from the detail title.
+- **Delete** with confirmation modal.
+- ** Miniature grid** with lazy load (`IntersectionObserver`, limited attendance, off-screen
+  release) and **badges** per slide (notes/has video); quick buttons "present" / "presenter mode"
+  from a specific slide.
+- **Import notes .pptx** (validates that the number of slides matches the PDF).
+- **Full-screen notes viewer**: slide canvas + textarea, thumbnail sidebar, **undo/redo** (⌘Z /
+  ⌘⇧Z), autosave, keyboard navigation, resizable notes panel.
+- **Video editor** per slide: YouTube URL + position (x,y,width,high in %) with dragable/resizeable
+  overlay and preview thumbnail.
+- **Edit slides** (screw to jump to the video editor).
+- **QR**, **Adjustments** (language), **detail info** (no pages, notes, videos).
+
+### 1.2 Audience window (`src/presentation.html`)
+Slide render to canvas (adjustment, DPR, cancellation of render in race), tool overlays (ilterna,
+drawing, pointer, magnifying magnifying magnifier), **overlay video YouTube** + seek synchrony,
+**black screen**, **slidezoom** (=rueda/pinch), auto-ocultable toolbar (colors, sizes, slider, QR,
+cast, fullscreen), keyboard shortcuts, wheel size, size indicator, and status emission to the server
+and presenter.
+
+### 1.3 Presenter window (`src/presenter.html`)
+Top bar (name, ‹ counter ›, **timer** play/pause/reset, black screen, QR, cast, **system clock**,
+finish), current slide
++ same tools (colours, size, magnifying magnifier buttons), **previsualization of the following**,
+  **host notes** (with font size control), **miniature carousel**, resizeable dividers (vertical and
+  horizontal), shortcuts, slide zoom, video controls + seek, timer synchrony to the server, and
+  monitor mirror to the audience.
+
+### 1.4 Mobile (`src/mobile/`)
+Displays connect / wait / command + reconnect toast. WS with **PIN**, preview canvas, notes (source
+size), ** slide points** (sliding window), prev/next, **swipe**, **carousel**, **local view mode**
+(advance in notes without moving the audience), touch tools (→ audience + echo in preview), **size
+popup** (per tool
++ magnifying of magnifying glass + **system volume** + mute), **pinch-zoom** on/off, black screen,
+  alternate video, timer (touch to pause / reset), and **pinch-zoom mode/complete screen** with its
+  own lower bar.
+
+### 1.5 Main process (`main.js` / `server.js`)
+Data directory +`meta.json`; import/delete/read PDF; open/close windows with **external screen
+detection**; **power-save blocker**; User-Agent cleaning (so YouTube does not block Electron); dock
+icon; **cast selector** (script, macOS); **volume**get/set (script, macOS);
+**bridge**`setElectronCallback`which translates WS ↔ IPC; **PIN**; **QR**; served as PDF with
+anti-traversal guard.
+
+---
+
+## 2. How it fits in Nodus (which is reused)
+
+| Need | In Nodus |
 |---|---|
-| Render PDF **offline** | `pdfjs-dist@4.8.69` **bundleado** + worker local (`src/components/materials/PdfViewer.tsx`, `src/lib/protect/engine.ts`). La referencia usa pdf.js por CDN — lo eliminamos. |
-| Tarjeta + navegación | `src/navigation.ts` ya declara `presenter` (`state:'soon'`). Se pasa a `'wip'` y el sidebar/hub la pintan solos. |
-| Patrón de vista con "volver" | `ToolkitConvertView.tsx`, `ToolkitProtectView.tsx`. |
-| Ventana secundaria | `electron/mascotWindow.ts` (crear/gestionar ciclo de vida de un `BrowserWindow`). |
-| Multi-entrada Vite | `vite.config.ts` ya construye `main` + `mascot`; añadiremos las entradas de audiencia/presentador/mando. |
-| IPC + preload del Toolkit | `electron/ipc.ts` (`h('toolkit:…')`), `electron/preload.ts` (`runToolkitJob`, `pickToolkitFiles`, …). |
-| Iconos centralizados | `src/components/ui.tsx` (`ICON_PATHS` + `<Icon>`). Sustituye los SVG en línea de la referencia. |
-| Zip (para .pptx) | `adm-zip` ya está (+ `@types/adm-zip`). **Sin `jszip`/`xml2js`.** |
-| IDs | `uuid` ya está. |
-| Jobs en 2º plano, i18n (8 idiomas), tema claro/oscuro | ya existen. |
+| Render PDF **offline** | `pdfjs-dist@4.8.69`**bundled** + local worker (`src/components/materials/PdfViewer.tsx`, `src/lib/protect/engine.ts`). The reference uses pdf.js by CDN — we delete it. |
+| Card + Navigation | `src/navigation.ts`already declares`presenter` (`state:'soon'`). It is moved to`'wip'`and the sidebar/hub paint it alone. |
+| View pattern with "come back" | `ToolkitConvertView.tsx`, `ToolkitProtectView.tsx`. |
+| Secondary window | `electron/mascotWindow.ts`(create/manage life cycle of a`BrowserWindow`). |
+| Multi-entry Vite | `vite.config.ts`You're building.`main` + `mascot`; we will add the audience/presenter/command entries. |
+| IPC + Toolkit preload | `electron/ipc.ts` (`h('toolkit:…')`), `electron/preload.ts` (`runToolkitJob`, `pickToolkitFiles`, …). |
+| Centralised icons | `src/components/ui.tsx` (`ICON_PATHS` + `<Icon>`) Replaces the online SVGs from the reference. |
+| Zip (for .pptx) | `adm-zip`already (+`@types/adm-zip`). **No`jszip`/`xml2js`.** |
+| IDs | `uuid`That's it. |
+| Jobs in 2nd plane, i18n (8 languages), clear/dark theme | They already exist. |
 
-**Dependencias nuevas (mínimas):** `ws` (servidor WebSocket, estándar y pequeño)
-y `qrcode` (generación de QR). Ambas puramente locales. *(Alternativa evaluada:
-implementar el handshake WS a mano sobre `http` nativo — descartado por frágil;
-QR propio sin dependencia — posible pero `qrcode` es más fiable.)*
+**New (minimum) dependencies:**`ws`(WebSocket server, standard and small) and`qrcode`(QR
+generation). Both are purely local. *(Alternative evaluated: implement handshake WS by hand
+on`http`native — discarded by fragile; own QR without dependence — possible but`qrcode`is more
+reliable.)*
 
 ---
 
-## 3. Decisiones de arquitectura
+## 3. Architecture decisions
 
-1. **Gestión = vista React dentro de Nodus.** `ToolkitPresenterView` (+ subcomponentes)
-   siguiendo el patrón Convert/Protect. Se voltea la tarjeta a `state:'wip'`.
+1. **Management = React view within Nodus.**`ToolkitPresenterView`(+ subcomponents) following the
+   Convert/Protect pattern. The card is flipped to`state:'wip'`.
 
-2. **Audiencia y presentador = `BrowserWindow` propios, entradas Vite dedicadas**
-   (`presenterAudience.html`, `presenterView.html`), que **reutilizan el preload
-   `preload.cjs`** y hablan con `main` por **IPC** (no por el servidor). Cargan
-   pdfjs bundleado y el tema/i18n de Nodus, pero **no** montan la app completa ni
-   tocan la base de datos (rendimiento: "presentaciones básicas que no colapsen").
-   Patrón de creación = `mascotWindow.ts`.
+2. **Audience and presenter =`BrowserWindow`own, dedicated Vite tickets** (`presenterAudience.html`,
+   `presenterView.html`), which **reusing preload`preload.cjs`** and talk to`main`by **IPC** (not
+   the server). They load pdfjs bundled and Nodus theme/i18n, but **do not** mount the complete app
+   or touch the database (performance: "basic presentations that do not
+   collapse").`mascotWindow.ts`.
 
-3. **Mando móvil = entrada Vite `presenterRemote.html`** construida a `dist/`,
-   **servida por el servidor local** al navegador del teléfono. No usa preload;
-   habla solo por **WebSocket + fetch**. pdfjs se le **sirve desde el servidor
-   local** (desde `node_modules/pdfjs-dist`) → 100 % offline.
+3. **Mobile command = entrance Vite`presenterRemote.html`** constructed to`dist/`, **served by the
+   local server** to the phone browser. It does not use preload; it speaks only by **WebSocket +
+   fetch**. pdfjs it is **served from the local server** (from`node_modules/pdfjs-dist`) → 100%
+   offline.
 
-4. **`main` es el hub.** Traduce controles WS (teléfono) ↔ IPC (ventanas), igual
-   que el `setElectronCallback` de la referencia. El estado canónico vive en un
-   reductor **Electron-free** (`presenterState.ts`) para poder testearlo.
+4. **`main`is the hub.** Translates WS controls (telephone) ↔ IPC (windows), just like
+   the`setElectronCallback`The canonical state lives in a reducer **Electron-free**
+   (`presenterState.ts`) in order to test it.
 
-5. **Almacenamiento global del Toolkit.** `app.getPath('userData')/toolkit/presenter/`:
-   PDFs internos como `<id>.pdf` + `library.json` (`{ presentations, folders }`).
-   Los formatos de presentación externos se convierten localmente mediante una
-   suite instalada, tras advertir de la pérdida de animaciones. Módulo
-   **Electron-free** `presenterLibrary.ts` (CRUD puro dada una ruta) + envoltura IPC.
-   Nunca se toca el original: se **copia** al importar (regla de oro del Toolkit).
+5. **Overall storage of Toolkit.**`app.getPath('userData')/toolkit/presenter/`: Internal PDFs
+   as`<id>.pdf` + `library.json` (`{ presentations, folders }`). External presentation formats are
+   converted locally using an installed suite, after warning of loss of animations. **Electron-free
+   module**`presenterLibrary.ts`(pure CRUD given a path) + IPC wrapper. Never touch the original: it
+   is **copy** when importing (Golden rule of the Toolkit).
 
-6. **El servidor solo existe mientras se presenta.** Se arranca al iniciar la
-   presentación y se apaga al terminarla. Escucha en `0.0.0.0` (necesario para el
-   teléfono) con **PIN de 6 dígitos** obligatorio para conexiones no-loopback.
-   La app avisa de que el mando es accesible en la red local mientras dure.
+6. **The server only exists while it is presented.** It starts when the presentation starts and is
+   turned off when it is finished.`0.0.0.0`(required for phone) with **6-digit PIN** required for
+   non-loopback connections. The app warns that the controller is accessible on the local network
+   for the duration.
 
-### 3.1 Superficie IPC nueva (`presenter:*`)
-Espejo del `preload`/`ipc` del Toolkit, p. ej.:
-`presenter:library:get|save`, `presenter:import:pick|file`, `presenter:import:pptxNotes`,
-`presenter:pdf:getData`, `presenter:delete`, `presenter:start` /
-`presenter:startPresenterMode` / `presenter:stop`, `presenter:server:info`,
-`presenter:control` (audiencia↔presentador↔servidor), `presenter:state:update`,
+### 3.1 New IPC area (`presenter:*`)
+Mirror of the`preload`/`ipc`Toolkit, e.g.:`presenter:library:get|save`,
+`presenter:import:pick|file`, `presenter:import:pptxNotes`, `presenter:pdf:getData`,
+`presenter:delete`, `presenter:start` / `presenter:startPresenterMode` / `presenter:stop`,
+`presenter:server:info`, `presenter:control`(audience-presenter~server),`presenter:state:update`,
 `presenter:timer:sync`, `presenter:cast:show`, `presenter:volume:get|set`.
 
 ---
 
-## 4. Diseño / "mejorar" (lo que NO es copia literal)
+## 4. Design / "improve" (which is NOT literal copy)
 
-- **Iconos:** sustituir los SVG en línea de la referencia por `<Icon>` centralizado.
-  `presentation` y `scanText` ya existen; se añaden a `ICON_PATHS` (trazo feather,
-  únicos, validados por el test del catálogo): `flashlight`, `pencil`/`draw`,
-  `pointer`, `magnifier`/`zoom`, `timer`, `monitor`/`cast`, `qr`, `blackScreen`,
-  `nextSlide`, etc.
-- **Acento de sección:** ámbar/bronce del Toolkit en el chrome de gestión (coherente
-  con Convert/Protect). Las ventanas de audiencia/presentador usan un tema oscuro
-  neutro (convención de presentaciones) pero coherente con la paleta de Nodus.
-- **Temas claro/oscuro:** cualquier utilidad nueva usada solo en dark necesita su
-  remap `.light .<utility>` en `index.css` (test de utilidades de tema claro).
-- **Ritmo de espaciado** e idioma como claves i18n (español primero) igual que el
-  resto de vistas. Cobertura en los 8 idiomas.
-- **Dropdowns** dentro de contenedores `overflow-hidden` → portal a `body` (landmine
-  de Databases/Convert).
-- **Landmine de spinners:** nunca `animate-spin` en el mismo elemento que un
-  `-translate-y-1/2` (el centrado va en un wrapper).
+- **Icons:** replace the online SVG of the reference
+  with`<Icon>`Centralized.`presentation`and`scanText`already exist; add to`ICON_PATHS`(feather
+  stroke, unique, validated by the catalog test):`flashlight`, `pencil`/`draw`, `pointer`,
+  `magnifier`/`zoom`, `timer`, `monitor`/`cast`, `qr`, `blackScreen`, `nextSlide`etc.
+- **Section accent:** amber/bronze Toolkit in the management chrome (coherent with
+  Convert/Protect).The audience/presenter windows use a neutral dark theme (convention of
+  presentations) but consistent with the Nodus palette.
+- **Clear/dark themes:**any new utility used only in dark needs its remap`.light
+  .<utility>`in`index.css`(light theme utility test).
+- **Space rhythm** and language as i18n keys (Spanish first) as well as other views. Coverage in all
+  8 languages.
+- **Dropdowns** inside containers`overflow-hidden`→ portal to`body`(landmine de Databases/Convert).
+- **Landmine de spinners:** never`animate-spin`in the same element as a`-translate-y-1/2`(center
+  goes in a wrapper).
 
 ---
 
-## 5. Fases (cada una: funciona en la app real + test de lógica pura)
+## 5. Phases (each: works in the real app + pure logic test)
 
-> **DoD por fase:** la función se verifica **en la app real** (no solo test) y su
-> lógica Electron-free tiene un test que asevera **contenido real** (no mera
-> existencia de fichero), al estilo de `scripts/test-toolkit-*.mjs`.
+> **DoD per phase:** the function is verified **in the real app** (not just test) and its
+> Electron-free logic has a test that asserts **real content** (not mere)
+> file existence), in the style of`scripts/test-toolkit-*.mjs`.
 
-### F0 — Andamiaje + biblioteca
+### F0 — Scaffolding + library
 - `navigation.ts`: `presenter` → `state:'wip'`.
-- `src/views/ToolkitPresenterView.tsx` + subcomponentes (biblioteca: importar,
-  lista, búsqueda, orden, carpetas, renombrar, mover, borrar, rejilla de
-  miniaturas con badges, detalle).
-- `electron/toolkit/presenter/library.ts` (**Electron-free**: CRUD de
-  `library.json`, colisión de nombres, mover a carpeta, borrado).
-- IPC `presenter:library:*`, `presenter:import:pick|file`, `presenter:pdf:getData`,
-  `presenter:delete` + preload.
-- Miniaturas: reutilizar el motor perezoso de la referencia (IntersectionObserver
-  + concurrencia + liberación), portado a React con pdfjs bundleado.
-- **Tests:** `test-presenter-library.mjs` (crear/mover/borrar/colisión, backward-compat).
-- **Verificar:** importar un PDF y un PowerPoint reales, verlos en la lista con
-  miniaturas y comprobar la conversión y las notas.
+- `src/views/ToolkitPresenterView.tsx`+ subcomponents (library: import, list, search, order,
+  folders, rename, move, delete, thumbnail grid with badges, detail).
+- `electron/toolkit/presenter/library.ts`(**Electron-free**: CRUD of`library.json`, name collision,
+  move to folder, delete).
+- IPC`presenter:library:*`, `presenter:import:pick|file`, `presenter:pdf:getData`,
+  `presenter:delete`+ preload.
+- Thumbnails: reuse the reference sloth engine (IntersectionOsserver
+  + continuance + release), ported to React with pdfjs bundled.
+- **Tests:**`test-presenter-library.mjs`(create/move/delete/collision, backward-compat).
+- **Check:** import a real PDF and PowerPoint, view them in the thumbnail list and check the
+  conversion and notes.
 
-### F1 — Notas del presentador (núcleo pedido explícitamente)
-- Visor de notas a pantalla completa: canvas + textarea por diapositiva, sidebar
-  de miniaturas, **undo/redo**, autoguardado, navegación por teclado, panel
-  redimensionable.
-- **Importar notas .pptx**: `electron/toolkit/presenter/pptxNotes.ts`
-  (**Electron-free**, `adm-zip` + extractor de `<a:t>`/`<a:br>` por regex, sin
-  `xml2js`); valida nº de diapositivas.
-- **Tests:** `test-presenter-notes.mjs` — parsea un `.pptx` de fixture real y
-  asevera el texto de notas por diapositiva (incluidos saltos de línea) + el
-  reductor de undo/redo.
-- **Verificar:** escribir/editar/undo notas; importar un `.pptx` real.
+### F1 — Notes by the presenter (core explicitly requested)
+- Full-screen note viewer: canvas + texture per slide, miniature sidebar, **undo/round**,
+  self-saved, keyboard navigation, resizeable panel.
+- **Import notes .pptx**:`electron/toolkit/presenter/pptxNotes.ts`(**Electron-free**,`adm-zip`+
+  extractor of`<a:t>`/`<a:br>`by regex, without`xml2js`); validates no slides.
+- **Tests:**`test-presenter-notes.mjs`— parsea un`.pptx`real fixture and asserts the text of notes
+  per slide (including line breaks) + the undo/round reducer.
+- **Check:** type/edit/undo notes; import a`.pptx`real.
 
-### F2 — Ventanas de audiencia y presentador (sin móvil)
-- Entradas Vite `presenterAudience.html` / `presenterView.html` + su código
-  (React lean, canvas, sin DB).
-- `electron/toolkit/presenter/windows.ts`: creación con **detección de pantalla
-  externa** (`screen.getAllDisplays`), fullscreen, power-save blocker, ciclo de
-  vida (cerrar una cierra la otra), patrón `mascotWindow.ts`.
-- Render seguro (cancelación por generación, DPR, ajuste), siguiente diapositiva,
-  **temporizador**, **reloj**, **carrusel**, **pantalla negra**, **zoom de
-  diapositiva**, navegación por teclado, divisores redimensionables.
-- `electron/toolkit/presenter/presenterState.ts` (**Electron-free**: reductor de
-  navegar/timer/black-screen/zoom con clamping).
-- Bridge IPC audiencia↔presentador por `main`.
-- **Tests:** `test-presenter-state.mjs` (clamp de diapositiva, deriva de
-  temporizador, transiciones).
-- **Verificar:** iniciar presentación + modo presentador (con 1 y con 2 pantallas
-  si es posible); navegar, timer, negro, zoom.
+### F2 — Audience windows and presenter (without mobile phone)
+- Vite Tickets`presenterAudience.html` / `presenterView.html`+ your code (React read, canvas, no
+  DB).
+- `electron/toolkit/presenter/windows.ts`: creation with **external screen detection**
+  (`screen.getAllDisplays`), fullscreen, power-save blocker, life cycle (closing one closes the
+  other), pattern`mascotWindow.ts`.
+- Secure render (cancellation per generation, DPR, adjustment), next slide, **timer**, **clock**,
+  **carousel**, **blackscreen**, **slidezoom**, keyboard navigation, resizeable dividers.
+- `electron/toolkit/presenter/presenterState.ts`(**Electron-free**:
+  navigator/timer/black-screen/zoom with clamping).
+- Audience ↔ presenter IPC bridge through `main`.
+- **Tests:**`test-presenter-state.mjs`(slide clamp, timer drift, transitions).
+- **Check:** start presentation + presenter mode (with 1 and 2 screens if possible); navigate,
+  timer, black, zoom.
 
-### F3 — Herramientas de anotación
-- Linterna, dibujo (colores + tamaño), puntero, lupa (con aumento), sincronizadas
-  audiencia↔presentador por IPC. Tamaño por slider / rueda / "tips".
-- **Verificar:** cada herramienta, visualmente, en ambas ventanas.
+### F3 — Annotation tools
+- Flashlight, drawing (colors + size), pointer, magnifying magnifier, synchronized
+  audience ↔ presenter via IPC. Size controlled by slider/wheel/keyboard shortcuts.
+- **Check:** each tool, visually, in both windows.
 
-### F4 — Servidor + mando móvil (mayor superficie nueva)
-- `electron/toolkit/presenter/server.ts`: `http` nativo + `ws`, `0.0.0.0`, puerto
-  escaneado, **PIN**, arranque/parada atados a presentar. Sirve `/remote` (entrada
-  Vite `presenterRemote.html` construida), `/api/pdf/:id` (con guardia
-  anti-traversal), `/api/qr`, `/api/state`, y pdfjs desde `node_modules`.
-- Entrada Vite `presenterRemote.html` + su código: conectar/esperando/mando,
-  navegación, notas, puntos, carrusel, swipe, **modo vista local**, herramientas
-  táctiles, **popup de tamaños**, pinch-zoom, pantalla negra, temporizador,
-  **modo apaisado/fullscreen**.
-- Puente servidor↔IPC en `main` (traduce controles del teléfono a las ventanas).
-- Deps nuevas: `ws`, `qrcode`.
-- **Tests:** `test-presenter-server.mjs` (reductor de estado, autenticación por PIN,
-  guardia de ruta de `/api/pdf`) — Electron-free.
-- **Verificar:** escanear el QR con el teléfono (o abrir la URL LAN en otra
-  pestaña); navegar, ver notas, herramientas, timer, modo local.
+### F4 — Server + mobile controller (larger new surface area)
+- `electron/toolkit/presenter/server.ts`: `http`native +`ws`, `0.0.0.0`, scanned port, **PIN**,
+  start/stop tied to present.`/remote`(Entrada
+  Vite`presenterRemote.html`constructed),`/api/pdf/:id`(with anti-traversal guard),`/api/qr`,
+  `/api/state`, and pdfjs from`node_modules`.
+- Vite Entry`presenterRemote.html`+ your code: connect/waiting/command, navigation, notes, points,
+  carousel, swipe, **local view mode**, touch tools, **popup sizes**, pinch-zoom, black screen,
+  timer, **paisado/fullscreen mode**.
+- Server ↔IPC bridge in`main`(translates phone controls to windows).
+- New Deps:`ws`, `qrcode`.
+- **Tests:**`test-presenter-server.mjs`(state reducer, PIN authentication, route guard`/api/pdf`) —
+  Electron-free.
+- **Check:** scan the QR with your phone (or open the LAN URL in another tab); browse, view notes,
+  tools, timer, local mode.
 
-### F5 — Vídeos de YouTube
-- Editor de vídeo por diapositiva (posición/redimensión con overlay), overlay en
-  audiencia, **sincronía de play/pausa y seek** entre ventanas y móvil, limpieza
-  de User-Agent para YouTube.
-- **Verificar:** insertar un vídeo, reproducir/pausar/seek desde presentador y móvil.
+### F5 — YouTube videos
+- Video editor by slide (position/resize with overlay), overlay in audience, **play/pause synchrony
+  and seek** between windows and mobile, User-Agent cleaning for YouTube.
+- **Check:** insert a video, play/pause/seek from presenter and mobile.
 
-### F6 — Extras macOS + pulido + integración
-- **Volumen** (osascript, macOS), **cast/AirPlay** (osascript, macOS) — gated a
-  darwin, no-op elegante en otros SO; icono de dock; indicador de tamaño; ajustes.
-- **Integración de shell:** i18n en los 8 idiomas, remaps de tema claro, iconos
-  nuevos en el catálogo, entrada en `WhatsNewModal`, doc para Nodi
-  (`shared/nodiDocumentation.ts`), comandos en `CommandPalette`.
-- **Verificar:** suite completa (`npm test`) y build (`test:e2e`) en verde.
+### F6 — MacOS extras + polishing + integration
+- **Volume** (script, macOS), **cast/AirPlay** (script, macOS) — gated a Darwin, non-op elegant in
+  other OS; dock icon; size indicator; adjustments.
+- **Shell integration:** i18n in the 8 languages, light theme rivets, new icons in the catalog,
+  entry into`WhatsNewModal`, doc for Nodi (`shared/nodiDocumentation.ts`), commands
+  in`CommandPalette`.
+- **Verify:** full suite (`npm test`) and build (`test:e2e`) in green.
 
-### F7 — Auditoría de rendimiento (PDFs enormes)
-Garantizar que **ni con un PDF de cientos de diapositivas** la herramienta cuelga
-o colapsa el ordenador. Se audita, se mide y se corrige.
-- **Miniaturas:** confirmar que la rejilla (gestión), el carrusel (presentador) y
-  los puntos/carrusel (móvil) **nunca renderizan todas las páginas a la vez** —
-  carga perezosa por `IntersectionObserver`, concurrencia limitada y **liberación
-  de canvas fuera de pantalla** (los canvas fuera de vista se ponen a 0×0 para no
-  retener memoria). Medir memoria con 300–500 diapositivas.
-- **Render de diapositiva:** cancelación por generación al navegar rápido (no
-  acumular tareas pdfjs), `page.cleanup()` tras cada render, y un solo documento
-  pdfjs por ventana (destruir el anterior).
-- **Bucle de eventos de `main`:** el servidor/serialización de estado no debe
-  bloquear el hilo principal (landmine histórica de Nodus: `main` es un único
-  event loop). El broadcast WS y el puente IPC deben ser O(nº de clientes), no
-  O(nº de diapositivas).
-- **Navegación con teclado mantenida** (flecha derecha sostenida) no debe encolar
-  renders sin fin: coalescencia/última-gana.
-- **Método de medición:** contar trabajo con un proxy (nº de renders lanzados,
-  canvas vivos, round-trips) **en vez de asertar milisegundos de reloj** (landmine
-  del harness: los tests paralelos hacen que el tiempo de pared mienta). Un
-  `scripts/test-presenter-perf.mjs` que, sobre un PDF sintético de N=400 páginas,
-  asevere que abrir la biblioteca lanza ≤ concurrencia renders y que navegar 50
-  veces deja ≤ K canvas vivos.
-- **Verificar:** abrir un PDF real grande, hacer scroll a fondo, navegar rápido y
-  presentar; observar memoria y fluidez (la captura, no solo los números).
+### F7 — Performance audit (massive PDFs)
+Ensure that **ni with a PDF of hundreds of slides** the tool hangs or collapses the computer. It is
+audited, measured and corrected.
+- **Minatures:** confirm that grid (management), carousel (presenter) and points/carousel (mobile)
+  **never render all pages at once** — lazy load by`IntersectionObserver`, limited attendance and
+  **freezing of out-of-screen canvas** (out-of-view canvas are set to 0×0 to not retain memory).
+  Measure memory with 300–500 slides.
+- **Slide render:** cancellation per generation when sailing fast (do not accumulate pdfjs
+  tasks),`page.cleanup()`after each render, and a single pdfjs document by window (destroy the
+  previous one).
+- **Bucle de eventos de`main`:** the server/status serialization should not block the main thread
+  (Nodus historical landmine:`main`The broadcast WS and the IPC bridge must be O(no customers), not
+  O(no slides).
+- **Browsing with keyboard held** (right arrow held) should not glue endless renders:
+  coalescence/last-gain.
+- **Method of measurement:** count on work with a proxy (no released renders, live canvas,
+  round-trips) ** instead of asserting milliseconds of clock** (harness-landmine: parallel tests
+  make wall time lie).`scripts/test-presenter-perf.mjs`that, on a synthetic PDF of N=400 pages,
+  assevere that opening the library launches ≤ concurrent renders and that navigating 50 times
+  leaves ≤ K canvas alive.
+- **Verify:** Open a large real PDF, scroll in depth, navigate fast and present; observe memory and
+  fluidity (capture, not just numbers).
 
 ---
 
-## 6. Riesgos y landmines conocidas
-- **El servidor expone la LAN.** Única superficie con implicación de seguridad:
-  PIN obligatorio, apagado al terminar, aviso claro. El resto de servidores de
-  Nodus (copilot, MCP) son solo-localhost por diseño; este es la excepción
-  justificada por el mando móvil.
-- **Rendimiento.** Reutilizar la cancelación de render por generación, el DPR y la
-  carga perezosa/por lotes de la referencia; las ventanas no montan la app ni la
-  DB. Objetivo del usuario: "que no colapsen el ordenador".
-- **Tema oscuro por defecto** en las ventanas; cualquier utilidad dark-only necesita
-  su remap `.light`.
-- **`test:e2e` NO reconstruye** (dist obsoleto miente en migraciones): recordar
-  `npm run build` antes de e2e si toca algo compilado.
-- **pdfjs para el teléfono** debe servirse desde el servidor local (no CDN) para
-  mantener el principio offline.
-- **YouTube requiere red** (no es offline) — es la única función que sale a
-  Internet; el resto de la herramienta funciona sin conexión.
+## 6. Known risks and landmines
+- **The server exposes the LAN.** Unique surface with security implication: mandatory PIN, off at
+  completion, clear warning. The rest of Nodus servers (copilot, MCP) are single-localhost by
+  design; this is the exception justified by the mobile controller.
+- **Return.**Reuse the cancellation of render per generation, the DPR and the lazy/lot load of the
+  reference; the windows do not mount the app or DB.User objective: "don't collapse the computer".
+- **Default dark theme** on windows; any dark-only utility needs its remap`.light`.
+- **`test:e2e`DO NOT reconstruct** (dist obsolete lies in migrations): remember`npm run build`before
+  e2e if you touch something compiled.
+- **pdfjs for the phone** must be used from the local server (not CDN) to maintain the offline
+  principle.
+- **YouTube requires network** (it's not offline) — it's the only function that comes out on the
+  Internet; the rest of the tool runs offline.
 
 ---
 
-## 7. Entregable de esta fase
-Este documento. A la espera de tu visto bueno (o ajustes de orden/alcance de
-fases) antes de escribir código. Sugerencia: empezar por **F0 + F1** (biblioteca
-+ notas del presentador, que es lo que más te importa) y verificarlas juntas antes
-de seguir con las ventanas.
+## 7. Deliverable from this phase
+This document. Pending your approval (or order/phase range settings) before writing code.
+Suggestion: start with **F0 + F1** (library
++ presenter notes, which is what matters most to you) and verify them together before continuing
+  with the windows.
