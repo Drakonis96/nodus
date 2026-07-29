@@ -64,5 +64,14 @@ const STEPS: TourStep[] = [
 ];
 
 export function StudyTour({ onClose, onNavigate }: { onClose: () => void; onNavigate: (view: View) => void }) {
-  return <TourOverlay steps={STEPS} label="Tutorial de estudio" vaultType="estudio" onClose={onClose} onNavigate={(view) => onNavigate(view as View)} />;
+  return (
+    <TourOverlay
+      steps={STEPS}
+      label="Tutorial de estudio"
+      vaultType="estudio"
+      showUnavailableVideo
+      onClose={onClose}
+      onNavigate={(view) => onNavigate(view as View)}
+    />
+  );
 }

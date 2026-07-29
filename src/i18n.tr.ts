@@ -9,6 +9,7 @@ import { DIARIZATION_TRANSLATIONS } from './i18n.diarization';
 import { WORLDBUILDING_TRANSLATIONS } from './i18n.worldbuilding';
 import { PRIMARY_SOURCES_TRANSLATIONS } from './i18n.primarySources';
 import { PRIMARY_SOURCES_ARCHIVE_TRANSLATIONS } from './i18n.primarySourcesArchive';
+import { PRIMARY_SOURCES_CATALOG_TRANSLATIONS } from './i18n.primarySourcesCatalog';
 import { PRIMARY_SOURCES_FILES_TRANSLATIONS } from './i18n.primarySourcesFiles';
 import { PRIMARY_SOURCES_TEXT_TRANSLATIONS } from './i18n.primarySourcesText';
 import { PRIMARY_SOURCES_EVIDENCE_TRANSLATIONS } from './i18n.primarySourcesEvidence';
@@ -17,6 +18,7 @@ import { PRIMARY_SOURCES_DERIVED_TRANSLATIONS } from './i18n.primarySourcesDeriv
 import { PRIMARY_SOURCES_RESEARCH_TRANSLATIONS } from './i18n.primarySourcesResearch';
 import { PRIMARY_SOURCES_RELEASE_TRANSLATIONS } from './i18n.primarySourcesRelease';
 import { TESTIMONY_TRANSLATIONS } from './i18n.testimonies';
+import { NEW_VAULT_COMPLETION_TRANSLATIONS } from './i18n.newVaultCompletion';
 
 /** Complete static Turkish interface table; coverage prohibits runtime fallbacks. */
 export const TR: Record<string, string> = {
@@ -24,6 +26,7 @@ export const TR: Record<string, string> = {
   ...PROSOPOGRAPHY_TRANSLATIONS.tr,
   ...PRIMARY_SOURCES_TRANSLATIONS.tr,
   ...PRIMARY_SOURCES_ARCHIVE_TRANSLATIONS.tr,
+  ...PRIMARY_SOURCES_CATALOG_TRANSLATIONS.tr,
   ...PRIMARY_SOURCES_FILES_TRANSLATIONS.tr,
   ...PRIMARY_SOURCES_TEXT_TRANSLATIONS.tr,
   ...PRIMARY_SOURCES_EVIDENCE_TRANSLATIONS.tr,
@@ -33,6 +36,7 @@ export const TR: Record<string, string> = {
   ...PRIMARY_SOURCES_RELEASE_TRANSLATIONS.tr,
   ...WORLDBUILDING_TRANSLATIONS.tr,
   ...TESTIMONY_TRANSLATIONS.tr,
+  ...NEW_VAULT_COMPLETION_TRANSLATIONS.tr,
   ...WORLD_CHAT_TRANSLATIONS.tr,
   "Lo que cuenta el mapa": "Haritanın anlattıkları",
   "Ver dónde ocurren las escenas ({n})": "Sahnelerin nerede geçtiğini gör ({n})",
@@ -1486,6 +1490,8 @@ export const TR: Record<string, string> = {
   "Infraestructura opcional para nuevas capacidades conectadas.": "Yeni bağlantılı yetenekler için isteğe bağlı altyapı.",
   "Compartir vaults y trabajo colaborativo": "Kasaları ve ortak çalışmayı paylaşma",
   "Compartir espacios y colaborar con control sobre los datos.": "Verileri kontrol ederek alanları paylaşın ve işbirliği yapın.",
+  "Apps para iOS y iPadOS": "iOS ve iPadOS uygulamaları",
+  "Llevar Nodus a iPhone y iPad con aplicaciones nativas adaptadas a cada dispositivo.": "Nodus'u her cihaza uyarlanmış yerel uygulamalarla iPhone ve iPad'e taşımak.",
   "Otros vaults sugeridos por usuarios": "Kullanıcılar tarafından önerilen diğer kasalar",
   "Vaults sugeridos por usuarios": "Kullanıcılar tarafından önerilen kasalar",
   "Vault de prosopografía": "Prosopografi Kasası",
@@ -1573,11 +1579,16 @@ export const TR: Record<string, string> = {
   "Escenas": "Sahneler",
   "Tramas": "Arsalar",
   "Manuscritos": "El yazmaları",
-  "Desarrollo muy temprano; solo recomendable para testers.": "Çok erken gelişme; yalnızca test kullanıcıları için önerilir.",
+  "No utilizable para trabajo real; solo para colaboradores que prueben funciones incompletas y reporten errores y mejoras.": "Gerçek çalışmalar için kullanılamaz; yalnızca eksik özellikleri test edip hataları ve iyileştirmeleri bildiren katkıda bulunanlar içindir.",
   "Funciones principales aún en prueba; solo recomendable para testers.": "Halen test aşamasında olan ana özellikler; yalnızca test kullanıcıları için önerilir.",
   "Funcional, pero aún necesita feedback y corrección de errores.": "İşlevsel ancak yine de geri bildirime ve hata düzeltmelerine ihtiyaç var.",
   "La fase avanzará cuando haya suficiente feedback y pulido.": "Yeterli geri bildirim ve cila olduğunda aşama ilerleyecektir.",
   "Reporta los errores desde el botón superior.": "Yukarıdaki düğmeyi kullanarak hataları bildirin.",
+  "PRE-ALPHA: este vault no es utilizable para trabajo real. Está disponible exclusivamente para personas que quieran colaborar probando funciones incompletas y reportando errores y propuestas de mejora.": "PRE-ALPHA: bu kasa gerçek çalışmalar için kullanılamaz. Yalnızca eksik özellikleri test ederek hata ve iyileştirme önerileri bildirmek isteyen katkıda bulunanlara açıktır.",
+  "¿Crear un vault PRE-ALPHA?": "PRE-ALPHA kasa oluşturulsun mu?",
+  "Sí, crear solo para pruebas": "Evet, yalnızca test için oluştur",
+  "Este vault todavía no es utilizable para trabajo real.": "Bu kasa henüz gerçek çalışmalar için kullanılamaz.",
+  "Continúa únicamente si quieres colaborar probando funciones incompletas y reportando errores y propuestas de mejora. Puede fallar, cambiar sin aviso o perder datos.": "Yalnızca eksik özellikleri test ederek hata ve iyileştirme önerileri bildirmek istiyorsanız devam edin. Başarısız olabilir, önceden haber verilmeden değişebilir veya veri kaybedebilir.",
   "Versión experimental recomendada solo para testers. Guarda copias de seguridad y reporta cualquier error desde el botón superior.": "Deneysel sürüm yalnızca test uzmanları için önerilir. Yedeklemeleri kaydedin ve yukarıdaki düğmeyi kullanarak hataları bildirin.",
   "Versión beta: ayúdanos con sugerencias y reportando errores desde el botón superior.": "Beta sürümü: Yukarıdaki düğmeyi kullanarak önerilerde bulunarak ve hataları bildirerek bize yardımcı olun.",
   "Las claves de IA se comparten entre todas las bóvedas: no hace falta reconfigurarlas.": "AI anahtarları tüm kasalarda paylaşılır; yeniden yapılandırma gerekmez.",
@@ -4863,6 +4874,7 @@ export const TR: Record<string, string> = {
   "Mostrar u ocultar miniaturas": "Küçük resimleri göster veya gizle",
   "Buscar dentro del PDF": "PDF içinde arama yapın",
   "Ocultar panel lateral": "Yan paneli gizle",
+  "Mostrar panel lateral": "Yan paneli göster",
   "Buscar dentro del PDF…": "PDF içinde ara…",
   "Escribe al menos dos caracteres para buscar en todas las páginas.": "Tüm sayfalarda arama yapmak için en az iki karakter girin.",
   "Buscando en el PDF…": "PDF aranıyor…",

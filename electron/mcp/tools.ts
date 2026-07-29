@@ -75,6 +75,78 @@ import { getProsopObservationsWorkspace } from '../db/prosopFactoidsRepo';
 import { getProsopMembershipWorkspace } from '../db/prosopMembershipRepo';
 import { getProsopAnalysisWorkspace, runProsopAnalysis } from '../db/prosopAnalysisRepo';
 import { createProsopProposal, searchProsopography } from '../db/prosopSearchRepo';
+import {
+  characterCounts,
+  createCharacter,
+  getCharacter,
+  listCharacterAbilities,
+  listCharacterEvents,
+  listCharacters,
+  listWorldEvents,
+  updateCharacter,
+} from '../db/charactersRepo';
+import {
+  createWorldPlace,
+  getWorldPlace,
+  inhabitantsOfPlace,
+  listWorldPlaces,
+  updateWorldPlace,
+} from '../db/worldPlacesRepo';
+import {
+  createWorldGroup,
+  getWorldGroup,
+  listAffiliationsForCharacter,
+  listAffiliationsForGroup,
+  listWorldGroups,
+  updateWorldGroup,
+} from '../db/worldGroupsRepo';
+import {
+  appearancesOfCharacter,
+  createScene,
+  createSecret,
+  listKnowers,
+  listSceneCharacters,
+  listScenes,
+  listSecrets,
+  secretsForCharacter,
+  updateScene,
+  updateSecret,
+} from '../db/worldStoryRepo';
+import {
+  createWorldArticle,
+  getWorldArticle,
+  getWorldEntry,
+  listWorldEntries,
+  searchWorldBodies,
+  updateWorldArticle,
+  worldBacklinks,
+  worldUnresolvedLinks,
+} from '../db/worldEncyclopediaRepo';
+import {
+  createWorldThread,
+  getWorldThread,
+  listWorldBeats,
+  listWorldThreads,
+  threadBoardData,
+  updateWorldThread,
+} from '../db/worldThreadsRepo';
+import { createWorldRule, getWorldRule, listWorldRules, updateWorldRule } from '../db/worldRulesRepo';
+import {
+  createWorldQuestion,
+  getWorldQuestion,
+  listWorldQuestions,
+  questionFeed,
+  updateWorldQuestion,
+} from '../db/worldQuestionsRepo';
+import { getWorldMap, listWorldMaps, mapAncestry, placeMapAppearances } from '../db/worldMapsRepo';
+import {
+  getSceneText,
+  manuscriptProgress,
+  manuscriptSpine,
+  saveSceneText,
+} from '../db/worldManuscriptRepo';
+import { continuitySummary, listNoticeMutes, runContinuity } from '../db/worldContinuityRepo';
+import { getWorldCalendar } from '../db/worldCalendarRepo';
 import { gradebookToGrid, anonymousGrid, GRID_COL, type GridStudent } from '@shared/assessment';
 import { isStudentFilled } from '@shared/teachingGroups';
 import { normalizeVaultType, type VaultType } from '@shared/vaultTypes';
@@ -163,6 +235,141 @@ const DB_FILTER_OPS = [
   'isChecked',
   'isUnchecked',
 ] as const satisfies readonly FilterOp[];
+
+const WORLD_CHARACTER_ROLES = ['protagonist', 'antagonist', 'secondary', 'tertiary', 'cameo'] as const;
+const WORLD_CHARACTER_STATUSES = ['unknown', 'alive', 'dead', 'missing', 'undead', 'immortal', 'unborn'] as const;
+const WORLD_GROUP_KINDS = ['faction', 'culture', 'religion', 'house', 'order', 'species', 'language'] as const;
+const WORLD_GROUP_STATUSES = ['active', 'extinct', 'dormant'] as const;
+const WORLD_SCENE_STATUSES = ['outline', 'draft', 'written'] as const;
+const WORLD_MAP_KINDS = [
+  'world', 'continent', 'region', 'city', 'town', 'building', 'interior',
+  'dungeon', 'battle', 'route', 'schematic', 'other',
+] as const;
+const WORLD_ENTRY_KINDS = ['article', 'character', 'place', 'group', 'scene', 'map', 'conflict', 'rule'] as const;
+const WORLD_ARTICLE_CATEGORIES = [
+  'magic', 'religion', 'language', 'creature', 'species', 'artifact', 'technology',
+  'concept', 'event', 'organization', 'flora', 'fauna', 'custom', 'other',
+] as const;
+const WORLD_THREAD_KINDS = ['conflict', 'arc'] as const;
+const WORLD_THREAD_STATUSES = ['open', 'resolved', 'archived'] as const;
+const WORLD_THREAD_SCOPES = ['external', 'background'] as const;
+const WORLD_RULE_HARDNESS = ['physical', 'costly', 'social'] as const;
+const WORLD_RULE_STATUSES = ['canon', 'tentative', 'retired'] as const;
+const WORLD_QUESTION_STATUSES = ['open', 'answered', 'parked'] as const;
+const WORLD_QUESTION_ORIGINS = ['author', 'placeholder'] as const;
+
+const nullableWorldText = (max = 200_000) => z.string().max(max).nullable().optional();
+const nullableWorldId = z.string().trim().min(1).nullable().optional();
+const nullableWorldInt = z.number().int().nullable().optional();
+const worldCharacterPatchSchema = {
+  displayName: z.string().trim().min(1).max(500).optional(),
+  species: nullableWorldText(500),
+  gender: nullableWorldText(500),
+  pronouns: nullableWorldText(500),
+  lifeStatus: z.enum(WORLD_CHARACTER_STATUSES).optional(),
+  narrativeRole: z.enum(WORLD_CHARACTER_ROLES).nullable().optional(),
+  accent: nullableWorldText(100),
+  appearance: nullableWorldText(),
+  personality: nullableWorldText(),
+  backstory: nullableWorldText(),
+  visualSeed: nullableWorldText(20_000),
+  birthDate: nullableWorldText(200),
+  deathDate: nullableWorldText(200),
+  birthYearSort: nullableWorldInt,
+  deathYearSort: nullableWorldInt,
+  notes: nullableWorldText(),
+  arc: z.object({
+    want: nullableWorldText(),
+    need: nullableWorldText(),
+    flaw: nullableWorldText(),
+    lie: nullableWorldText(),
+    wound: nullableWorldText(),
+  }).optional(),
+  voice: z.object({
+    register: nullableWorldText(),
+    tics: nullableWorldText(),
+    sample: nullableWorldText(),
+  }).optional(),
+};
+const worldPlacePatchSchema = {
+  name: z.string().trim().min(1).max(500).optional(),
+  kind: nullableWorldText(200),
+  parentId: nullableWorldId,
+  notes: nullableWorldText(),
+  appearance: nullableWorldText(),
+  atmosphere: nullableWorldText(),
+  history: nullableWorldText(),
+  visualSeed: nullableWorldText(20_000),
+  accent: nullableWorldText(100),
+};
+const worldGroupPatchSchema = {
+  kind: z.enum(WORLD_GROUP_KINDS).optional(),
+  name: z.string().trim().min(1).max(500).optional(),
+  summary: nullableWorldText(),
+  description: nullableWorldText(),
+  visualSeed: nullableWorldText(20_000),
+  accent: nullableWorldText(100),
+  status: z.enum(WORLD_GROUP_STATUSES).nullable().optional(),
+  parentId: nullableWorldId,
+  seatPlaceId: nullableWorldId,
+  foundedYear: nullableWorldInt,
+  endedYear: nullableWorldInt,
+  notes: nullableWorldText(),
+};
+const worldScenePatchSchema = {
+  title: z.string().trim().min(1).max(1_000).optional(),
+  summary: nullableWorldText(),
+  placeId: nullableWorldId,
+  worldYear: nullableWorldInt,
+  worldDay: nullableWorldInt,
+  status: z.enum(WORLD_SCENE_STATUSES).optional(),
+  narrativeOrder: z.number().int().min(0).optional(),
+  notes: nullableWorldText(),
+};
+const worldArticlePatchSchema = {
+  title: z.string().trim().min(1).max(1_000).optional(),
+  category: z.enum(WORLD_ARTICLE_CATEGORIES).optional(),
+  summary: nullableWorldText(),
+  body: nullableWorldText(500_000),
+  aka: nullableWorldText(10_000),
+  spoiler: z.boolean().optional(),
+  sortTitle: nullableWorldText(1_000),
+  notes: nullableWorldText(),
+};
+const worldThreadPatchSchema = {
+  kind: z.enum(WORLD_THREAD_KINDS).optional(),
+  title: z.string().trim().min(1).max(1_000).optional(),
+  pitch: nullableWorldText(),
+  stakes: nullableWorldText(),
+  scope: z.enum(WORLD_THREAD_SCOPES).optional(),
+  status: z.enum(WORLD_THREAD_STATUSES).optional(),
+  outcome: nullableWorldText(),
+};
+const worldRulePatchSchema = {
+  title: z.string().trim().min(1).max(1_000).optional(),
+  statement: nullableWorldText(),
+  cost: nullableWorldText(),
+  limits: nullableWorldText(),
+  hardness: z.enum(WORLD_RULE_HARDNESS).optional(),
+  parentRuleId: nullableWorldId,
+  articleId: nullableWorldId,
+  scopeKind: z.enum(['world', 'group', 'place']).optional(),
+  scopeId: nullableWorldId,
+  fromWorldDay: nullableWorldInt,
+  toWorldDay: nullableWorldInt,
+  status: z.enum(WORLD_RULE_STATUSES).optional(),
+  secretId: nullableWorldId,
+};
+const worldQuestionPatchSchema = {
+  question: z.string().trim().min(1).max(8_000).optional(),
+  anchorKind: nullableWorldText(100),
+  anchorId: nullableWorldId,
+  anchorField: nullableWorldText(100),
+  status: z.enum(WORLD_QUESTION_STATUSES).optional(),
+  origin: z.enum(WORLD_QUESTION_ORIGINS).optional(),
+  originKey: nullableWorldText(1_000),
+  blocking: z.boolean().optional(),
+};
 
 const modelSchema = z
   .object({
@@ -711,6 +918,7 @@ const STUDY_VAULTS: VaultType[] = ['estudio', 'docencia'];
 /** Vault types with the teaching layer (groups, gradebook, exams, rubrics). */
 const TEACHING_VAULTS: VaultType[] = ['docencia'];
 const PROSOPOGRAPHY_VAULTS: VaultType[] = ['prosopography'];
+const WORLDBUILDING_VAULTS: VaultType[] = ['worldbuilding'];
 
 /** Tool name → the vault types it is offered in. Absent = universal. */
 const TOOL_VAULT_SCOPE: Record<string, VaultType[]> = {
@@ -794,6 +1002,11 @@ const TOOL_VAULT_SCOPE: Record<string, VaultType[]> = {
 /** Whether a tool is offered for a vault type. Universal tools (absent from the map)
  *  are always offered; a preview vault type still gets only its universal tools. */
 export function isToolAllowedForVaultType(toolName: string, vaultType: VaultType): boolean {
+  // Worldbuilding has a deliberately namespaced surface. Keeping the prefix as the
+  // scope boundary makes adding a new world tool fail closed: it cannot accidentally
+  // appear in academic, testimony or records vaults because somebody forgot a second
+  // entry in this already-large table.
+  if (toolName.startsWith('nodus_world_')) return WORLDBUILDING_VAULTS.includes(vaultType);
   const scope = TOOL_VAULT_SCOPE[toolName];
   return scope ? scope.includes(vaultType) : true;
 }
@@ -835,6 +1048,7 @@ export function registerTools(server: McpServer): void {
       const records = recordCounts();
       const studyWorkspace = studyOrg.getStudyWorkspace();
       const teachingGroupList = teachingGroups.listTeachingGroups();
+      const worldCharacters = characterCounts();
       return {
         version: app.getVersion(),
         vault: vaultContext(),
@@ -859,8 +1073,28 @@ export function registerTools(server: McpServer): void {
           teachingAssessmentPlans: teachingGrades.listAssessmentPlans().length,
           teachingExams: teachingExams.listTeachingExams().length,
           teachingRubrics: teachingRubrics.listTeachingRubrics().length,
+          worldCharacters: worldCharacters.total,
+          worldPlaces: listWorldPlaces().length,
+          worldGroups: listWorldGroups().length,
+          worldScenes: listScenes().length,
+          worldEntries: listWorldEntries().length,
+          worldThreads: listWorldThreads().length,
+          worldRules: listWorldRules().length,
+          worldQuestions: listWorldQuestions().length,
+          worldMaps: listWorldMaps().length,
         },
-        enums: { ideaTypes: IDEA_TYPES, edgeTypes: EDGE_TYPES, gapKinds: GAP_KINDS, eventTypes: EVENT_TYPES },
+        enums: {
+          ideaTypes: IDEA_TYPES,
+          edgeTypes: EDGE_TYPES,
+          gapKinds: GAP_KINDS,
+          eventTypes: EVENT_TYPES,
+          worldCharacterRoles: WORLD_CHARACTER_ROLES,
+          worldCharacterStatuses: WORLD_CHARACTER_STATUSES,
+          worldGroupKinds: WORLD_GROUP_KINDS,
+          worldSceneStatuses: WORLD_SCENE_STATUSES,
+          worldEntryKinds: WORLD_ENTRY_KINDS,
+          worldMapKinds: WORLD_MAP_KINDS,
+        },
       };
     })
   );
@@ -2820,6 +3054,788 @@ export function registerTools(server: McpServer): void {
         if (!updated) throw notFound('database row', rowId);
         return { row: dbRowRecord(dbMode.getColumns(row.databaseId), updated) };
       })()
+  );
+
+  // ── Worldbuilding ──────────────────────────────────────────────────────────
+  // Worldbuilding is canonical author-owned data rather than a derived research graph.
+  // MCP may therefore create and edit it, just as it can edit notes/database rows, but
+  // it intentionally cannot delete anything. Destructive editing remains in the app,
+  // where the user can see the affected cast, links, manuscript and continuity checks.
+
+  server.registerTool(
+    'nodus_world_get_overview',
+    {
+      title: 'Get worldbuilding overview',
+      description:
+        'Returns the size, calendar, manuscript progress and continuity coverage of the active Worldbuilding vault. Read-only.',
+      inputSchema: {},
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    tool(() => ({
+      counts: {
+        ...characterCounts(),
+        places: listWorldPlaces().length,
+        groups: listWorldGroups().length,
+        scenes: listScenes().length,
+        secrets: listSecrets().length,
+        entries: listWorldEntries().length,
+        threads: listWorldThreads().length,
+        rules: listWorldRules().length,
+        questions: listWorldQuestions().length,
+        maps: listWorldMaps().length,
+        events: listWorldEvents().length,
+      },
+      calendar: getWorldCalendar(),
+      manuscript: manuscriptProgress(),
+      continuity: continuitySummary(),
+    }))
+  );
+
+  server.registerTool(
+    'nodus_world_search',
+    {
+      title: 'Search the fictional world',
+      description:
+        'Searches encyclopedia entries and their prose, character sheets, secrets, open questions and manuscript scenes in the active Worldbuilding vault. Results identify the owning entity and field. Read-only.',
+      inputSchema: {
+        query: z.string().trim().min(1).max(8_000),
+        limit: z.number().int().min(1).max(100).default(30),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ query, limit }) =>
+      tool(() => {
+        const q = query.trim();
+        const results: { kind: string; id: string; title: string; field: string; excerpt: string }[] = [];
+        const add = (kind: string, id: string, title: string, field: string, text: string | null | undefined) => {
+          if (results.length >= limit || !matchesText(q, [text])) return;
+          results.push({ kind, id, title, field, excerpt: snippet(text, 600) });
+        };
+        for (const hit of searchWorldBodies(q, limit)) {
+          results.push({ kind: hit.kind, id: hit.id, title: hit.title, field: hit.field, excerpt: hit.snippet });
+          if (results.length >= limit) break;
+        }
+        for (const character of listCharacters()) {
+          add('character', character.personId, character.displayName, 'sheet', [
+            character.displayName,
+            character.profile.appearance, character.profile.personality, character.profile.backstory,
+            character.notes, character.biography,
+          ].filter(Boolean).join('\n'));
+        }
+        for (const secret of listSecrets()) add('secret', secret.secretId, secret.title, 'content', `${secret.content ?? ''}\n${secret.notes ?? ''}`);
+        for (const question of listWorldQuestions()) add('question', question.questionId, question.question, 'question', question.question);
+        for (const scene of listScenes()) {
+          add('scene', scene.sceneId, scene.title, 'manuscript', getSceneText(scene.sceneId).text);
+        }
+        return { query: q, results: results.slice(0, limit), truncated: results.length >= limit };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_world_list_characters',
+    {
+      title: 'List worldbuilding characters',
+      description: 'Lists characters with their narrative role, life status, species, factions and cultures. Read-only and paginated.',
+      inputSchema: {
+        ...paginationSchema,
+        query: querySchema,
+        role: z.enum(WORLD_CHARACTER_ROLES).optional(),
+        status: z.enum(WORLD_CHARACTER_STATUSES).optional(),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ limit, offset, query, role, status }) =>
+      tool(() => {
+        const characters = listCharacters({ search: query || undefined, role, status }).map((character) => ({
+          personId: character.personId,
+          displayName: character.displayName,
+          species: character.profile.species,
+          gender: character.profile.gender,
+          pronouns: character.profile.pronouns,
+          lifeStatus: character.profile.lifeStatus,
+          narrativeRole: character.profile.narrativeRole,
+          factions: character.factions ?? [],
+          cultures: character.cultures ?? [],
+          updatedAt: character.updatedAt,
+        }));
+        return page('characters', characters, limit, offset);
+      })()
+  );
+
+  server.registerTool(
+    'nodus_world_get_character',
+    {
+      title: 'Get worldbuilding character',
+      description:
+        'Returns the complete character sheet plus abilities, affiliations, appearances, life events and secrets. Read-only.',
+      inputSchema: { personId: z.string().trim().min(1) },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ personId }) =>
+      tool(() => {
+        const character = getCharacter(personId);
+        if (!character) throw notFound('world character', personId);
+        return {
+          character,
+          abilities: listCharacterAbilities(personId),
+          affiliations: listAffiliationsForCharacter(personId),
+          appearances: appearancesOfCharacter(personId),
+          events: listCharacterEvents(personId),
+          secrets: secretsForCharacter(personId),
+        };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_world_create_character',
+    {
+      title: 'Create worldbuilding character',
+      description: 'Creates an author-owned character sheet. This modifies the active Worldbuilding vault; it never generates or accepts AI biography text.',
+      inputSchema: {
+        ...worldCharacterPatchSchema,
+        displayName: z.string().trim().min(1).max(500),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    },
+    (input) => tool(() => ({ character: createCharacter(input) }))()
+  );
+
+  server.registerTool(
+    'nodus_world_update_character',
+    {
+      title: 'Update worldbuilding character',
+      description: 'Edits fields on an existing author-owned character sheet. Omitted fields are preserved. This modifies the vault and never deletes a character.',
+      inputSchema: { personId: z.string().trim().min(1), ...worldCharacterPatchSchema },
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    },
+    ({ personId, ...patch }) =>
+      tool(() => {
+        const character = updateCharacter(personId, patch);
+        if (!character) throw notFound('world character', personId);
+        return { character };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_world_list_places',
+    {
+      title: 'List worldbuilding places',
+      description: 'Lists places with hierarchy and fiction-specific profile fields. Read-only and paginated.',
+      inputSchema: { ...paginationSchema, query: querySchema },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ limit, offset, query }) =>
+      tool(() => page(
+        'places',
+        listWorldPlaces().filter((place) => matchesText(query, [
+          place.name, place.kind, place.notes, place.profile.appearance, place.profile.atmosphere, place.profile.history,
+        ])),
+        limit,
+        offset,
+      ))()
+  );
+
+  server.registerTool(
+    'nodus_world_get_place',
+    {
+      title: 'Get worldbuilding place',
+      description: 'Returns a place sheet with inhabitants and every map where it appears. Read-only.',
+      inputSchema: { placeId: z.string().trim().min(1) },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ placeId }) =>
+      tool(() => {
+        const place = getWorldPlace(placeId);
+        if (!place) throw notFound('world place', placeId);
+        return { place, inhabitants: inhabitantsOfPlace(placeId), maps: placeMapAppearances(placeId) };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_world_create_place',
+    {
+      title: 'Create worldbuilding place',
+      description: 'Creates an author-owned place. This modifies the active Worldbuilding vault.',
+      inputSchema: { ...worldPlacePatchSchema, name: z.string().trim().min(1).max(500) },
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    },
+    (input) => tool(() => ({ place: createWorldPlace(input) }))()
+  );
+
+  server.registerTool(
+    'nodus_world_update_place',
+    {
+      title: 'Update worldbuilding place',
+      description: 'Edits an existing place. Parent cycles are refused by the same repository rules as the app. This never deletes a place.',
+      inputSchema: { placeId: z.string().trim().min(1), ...worldPlacePatchSchema },
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    },
+    ({ placeId, ...patch }) =>
+      tool(() => {
+        const place = updateWorldPlace(placeId, patch);
+        if (!place) throw notFound('world place', placeId);
+        return { place };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_world_list_groups',
+    {
+      title: 'List worldbuilding groups',
+      description: 'Lists factions, cultures, religions, houses, orders, species and languages. Read-only and paginated.',
+      inputSchema: { ...paginationSchema, kind: z.enum(WORLD_GROUP_KINDS).optional(), query: querySchema },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ limit, offset, kind, query }) =>
+      tool(() => page(
+        'groups',
+        listWorldGroups(kind).filter((group) => matchesText(query, [group.name, group.summary, group.description, group.notes])),
+        limit,
+        offset,
+      ))()
+  );
+
+  server.registerTool(
+    'nodus_world_get_group',
+    {
+      title: 'Get worldbuilding group',
+      description: 'Returns a group sheet and its character memberships. Read-only.',
+      inputSchema: { groupId: z.string().trim().min(1) },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ groupId }) =>
+      tool(() => {
+        const group = getWorldGroup(groupId);
+        if (!group) throw notFound('world group', groupId);
+        return { group, affiliations: listAffiliationsForGroup(groupId) };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_world_create_group',
+    {
+      title: 'Create worldbuilding group',
+      description: 'Creates an author-owned faction, culture, religion, house, order, species or language.',
+      inputSchema: { ...worldGroupPatchSchema, name: z.string().trim().min(1).max(500) },
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    },
+    (input) => tool(() => ({ group: createWorldGroup(input) }))()
+  );
+
+  server.registerTool(
+    'nodus_world_update_group',
+    {
+      title: 'Update worldbuilding group',
+      description: 'Edits an existing group without deleting memberships or related entities.',
+      inputSchema: { groupId: z.string().trim().min(1), ...worldGroupPatchSchema },
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    },
+    ({ groupId, ...patch }) =>
+      tool(() => {
+        const group = updateWorldGroup(groupId, patch);
+        if (!group) throw notFound('world group', groupId);
+        return { group };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_world_list_scenes',
+    {
+      title: 'List worldbuilding scenes',
+      description: 'Lists scenes in narrative or chronological order, optionally narrowed by title, summary, place or notes. Read-only.',
+      inputSchema: {
+        ...paginationSchema,
+        order: z.enum(['narrative', 'chronological']).default('narrative'),
+        query: querySchema,
+        status: z.enum(WORLD_SCENE_STATUSES).optional(),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ limit, offset, order, query, status }) =>
+      tool(() => page(
+        'scenes',
+        listScenes(order)
+          .filter((scene) => !status || scene.status === status)
+          .filter((scene) => matchesText(query, [scene.title, scene.summary, scene.placeName, scene.notes])),
+        limit,
+        offset,
+      ))()
+  );
+
+  server.registerTool(
+    'nodus_world_get_scene',
+    {
+      title: 'Get worldbuilding scene',
+      description: 'Returns a scene with cast, manuscript text, story beats and questions anchored to it. Read-only.',
+      inputSchema: { sceneId: z.string().trim().min(1) },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ sceneId }) =>
+      tool(() => {
+        const scene = listScenes().find((item) => item.sceneId === sceneId);
+        if (!scene) throw notFound('world scene', sceneId);
+        return {
+          scene,
+          cast: listSceneCharacters(sceneId),
+          manuscript: getSceneText(sceneId),
+          beats: listWorldBeats().filter((beat) => beat.sceneId === sceneId),
+          questions: listWorldQuestions().filter((question) => question.anchorKind === 'scene' && question.anchorId === sceneId),
+        };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_world_create_scene',
+    {
+      title: 'Create worldbuilding scene',
+      description: 'Creates an author-owned story scene at the end of the narrative unless narrativeOrder is supplied.',
+      inputSchema: { ...worldScenePatchSchema, title: z.string().trim().min(1).max(1_000) },
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    },
+    (input) => tool(() => ({ scene: createScene(input) }))()
+  );
+
+  server.registerTool(
+    'nodus_world_update_scene',
+    {
+      title: 'Update worldbuilding scene',
+      description: 'Edits scene metadata without deleting cast, beats or manuscript prose.',
+      inputSchema: { sceneId: z.string().trim().min(1), ...worldScenePatchSchema },
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    },
+    ({ sceneId, ...patch }) =>
+      tool(() => {
+        const scene = updateScene(sceneId, patch);
+        if (!scene) throw notFound('world scene', sceneId);
+        return { scene };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_world_list_secrets',
+    {
+      title: 'List worldbuilding secrets',
+      description: 'Lists secrets and their status. Optional ownerPersonId narrows to secrets owned or known by that character. Read-only.',
+      inputSchema: { ownerPersonId: z.string().trim().min(1).optional() },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ ownerPersonId }) =>
+      tool(() => ({ secrets: ownerPersonId ? secretsForCharacter(ownerPersonId) : listSecrets() }))()
+  );
+
+  server.registerTool(
+    'nodus_world_get_secret',
+    {
+      title: 'Get worldbuilding secret',
+      description: 'Returns a secret and the characters who know it, with acquisition timing. Read-only.',
+      inputSchema: { secretId: z.string().trim().min(1) },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ secretId }) =>
+      tool(() => {
+        const secret = listSecrets().find((item) => item.secretId === secretId);
+        if (!secret) throw notFound('world secret', secretId);
+        return { secret, knowers: listKnowers(secretId) };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_world_create_secret',
+    {
+      title: 'Create worldbuilding secret',
+      description: 'Creates a secret in the active Worldbuilding vault.',
+      inputSchema: {
+        title: z.string().trim().min(1).max(1_000),
+        content: nullableWorldText(),
+        ownerPersonId: nullableWorldId,
+        status: z.enum(['kept', 'revealed']).optional(),
+        revealedWorldDay: nullableWorldInt,
+        notes: nullableWorldText(),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    },
+    (input) => tool(() => ({ secret: createSecret(input) }))()
+  );
+
+  server.registerTool(
+    'nodus_world_update_secret',
+    {
+      title: 'Update worldbuilding secret',
+      description: 'Edits a secret without deleting it or its knower history.',
+      inputSchema: {
+        secretId: z.string().trim().min(1),
+        title: z.string().trim().min(1).max(1_000).optional(),
+        content: nullableWorldText(),
+        ownerPersonId: nullableWorldId,
+        status: z.enum(['kept', 'revealed']).optional(),
+        revealedWorldDay: nullableWorldInt,
+        notes: nullableWorldText(),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    },
+    ({ secretId, ...patch }) =>
+      tool(() => {
+        const secret = updateSecret(secretId, patch);
+        if (!secret) throw notFound('world secret', secretId);
+        return { secret };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_world_list_entries',
+    {
+      title: 'List world encyclopedia entries',
+      description: 'Lists the unified encyclopedia index across articles, characters, places, groups, scenes, maps, conflicts and rules. Read-only.',
+      inputSchema: {
+        ...paginationSchema,
+        query: querySchema,
+        kind: z.enum(WORLD_ENTRY_KINDS).optional(),
+        includeSpoilers: z.boolean().default(false),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ limit, offset, query, kind, includeSpoilers }) =>
+      tool(() => page(
+        'entries',
+        listWorldEntries()
+          .filter((entry) => !kind || entry.kind === kind)
+          .filter((entry) => includeSpoilers || !entry.spoiler)
+          .filter((entry) => matchesText(query, [entry.title, entry.summary, ...entry.aliases])),
+        limit,
+        offset,
+      ))()
+  );
+
+  server.registerTool(
+    'nodus_world_get_entry',
+    {
+      title: 'Get world encyclopedia entry',
+      description: 'Returns an encyclopedia entry with composed body, facts, outgoing links, backlinks and ontology relations. Read-only.',
+      inputSchema: { kind: z.enum(WORLD_ENTRY_KINDS), id: z.string().trim().min(1) },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ kind, id }) =>
+      tool(() => {
+        const entry = getWorldEntry({ kind, id });
+        if (!entry) throw notFound('world entry', `${kind}:${id}`);
+        return { ...entry, backlinks: worldBacklinks({ kind, id }) };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_world_list_unresolved_links',
+    {
+      title: 'List unresolved world links',
+      description: 'Lists [[wiki links]] in world prose that do not yet resolve to an encyclopedia entry. Read-only.',
+      inputSchema: {},
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    tool(() => ({ links: worldUnresolvedLinks() }))
+  );
+
+  server.registerTool(
+    'nodus_world_create_article',
+    {
+      title: 'Create world encyclopedia article',
+      description: 'Creates a canonical author-owned encyclopedia article. AI proposals are not auto-accepted by this tool.',
+      inputSchema: { ...worldArticlePatchSchema, title: z.string().trim().min(1).max(1_000) },
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    },
+    (input) => tool(() => ({ article: createWorldArticle(input) }))()
+  );
+
+  server.registerTool(
+    'nodus_world_update_article',
+    {
+      title: 'Update world encyclopedia article',
+      description: 'Edits a canonical encyclopedia article and reindexes its links. This never deletes an article.',
+      inputSchema: { articleId: z.string().trim().min(1), ...worldArticlePatchSchema },
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    },
+    ({ articleId, ...patch }) =>
+      tool(() => {
+        if (!getWorldArticle(articleId)) throw notFound('world article', articleId);
+        return { article: updateWorldArticle(articleId, patch) };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_world_list_threads',
+    {
+      title: 'List world conflicts and arcs',
+      description: 'Lists conflicts and character arcs with parties and status. Read-only.',
+      inputSchema: { kind: z.enum(WORLD_THREAD_KINDS).optional(), status: z.enum(WORLD_THREAD_STATUSES).optional() },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ kind, status }) =>
+      tool(() => ({ threads: listWorldThreads(kind).filter((thread) => !status || thread.status === status) }))()
+  );
+
+  server.registerTool(
+    'nodus_world_get_thread',
+    {
+      title: 'Get world conflict or arc',
+      description: 'Returns a conflict/arc and its scene beats. Read-only.',
+      inputSchema: { threadId: z.string().trim().min(1) },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ threadId }) =>
+      tool(() => {
+        const thread = getWorldThread(threadId);
+        if (!thread) throw notFound('world thread', threadId);
+        return { thread, beats: listWorldBeats().filter((beat) => beat.threadId === threadId) };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_world_get_story_board',
+    {
+      title: 'Get world story board',
+      description: 'Returns the cross-scene conflict/arc board used by the Worldbuilding analysis workspace. Read-only.',
+      inputSchema: {},
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    tool(() => threadBoardData())
+  );
+
+  server.registerTool(
+    'nodus_world_create_thread',
+    {
+      title: 'Create world conflict or arc',
+      description: 'Creates an author-owned conflict or arc. Parties and beats remain reviewable in Nodus.',
+      inputSchema: {
+        ...worldThreadPatchSchema,
+        kind: z.enum(WORLD_THREAD_KINDS),
+        title: z.string().trim().min(1).max(1_000),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    },
+    (input) => tool(() => ({ thread: createWorldThread(input) }))()
+  );
+
+  server.registerTool(
+    'nodus_world_update_thread',
+    {
+      title: 'Update world conflict or arc',
+      description: 'Edits a conflict or arc without deleting its parties or beats.',
+      inputSchema: { threadId: z.string().trim().min(1), ...worldThreadPatchSchema },
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    },
+    ({ threadId, ...patch }) =>
+      tool(() => {
+        const thread = updateWorldThread(threadId, patch);
+        if (!thread) throw notFound('world thread', threadId);
+        return { thread };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_world_list_rules',
+    {
+      title: 'List world rules',
+      description: 'Lists canon, tentative or retired physical, costly and social rules. Read-only.',
+      inputSchema: { status: z.enum(WORLD_RULE_STATUSES).optional(), hardness: z.enum(WORLD_RULE_HARDNESS).optional() },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ status, hardness }) =>
+      tool(() => ({ rules: listWorldRules().filter((rule) => (!status || rule.status === status) && (!hardness || rule.hardness === hardness)) }))()
+  );
+
+  server.registerTool(
+    'nodus_world_get_rule',
+    {
+      title: 'Get world rule',
+      description: 'Returns a world rule and every scene beat that tests it. Read-only.',
+      inputSchema: { ruleId: z.string().trim().min(1) },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ ruleId }) =>
+      tool(() => {
+        const rule = getWorldRule(ruleId);
+        if (!rule) throw notFound('world rule', ruleId);
+        return { rule, beats: listWorldBeats().filter((beat) => beat.threadKind === 'rule' && beat.threadId === ruleId) };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_world_create_rule',
+    {
+      title: 'Create world rule',
+      description: 'Creates a canonical author-owned world rule. It does not accept quarantined AI proposal text.',
+      inputSchema: { ...worldRulePatchSchema, title: z.string().trim().min(1).max(1_000) },
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    },
+    (input) => tool(() => ({ rule: createWorldRule(input) }))()
+  );
+
+  server.registerTool(
+    'nodus_world_update_rule',
+    {
+      title: 'Update world rule',
+      description: 'Edits a canonical rule without deleting its scene tests.',
+      inputSchema: { ruleId: z.string().trim().min(1), ...worldRulePatchSchema },
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    },
+    ({ ruleId, ...patch }) =>
+      tool(() => {
+        const rule = updateWorldRule(ruleId, patch);
+        if (!rule) throw notFound('world rule', ruleId);
+        return { rule };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_world_list_questions',
+    {
+      title: 'List worldbuilding open questions',
+      description: 'Lists stored world questions, or the ranked feed that also includes derived holes and blockers. Read-only.',
+      inputSchema: {
+        feed: z.boolean().default(true),
+        includeSettled: z.boolean().default(false),
+        status: z.enum(WORLD_QUESTION_STATUSES).optional(),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ feed, includeSettled, status }) =>
+      tool(() => {
+        const questions = feed ? questionFeed(includeSettled) : listWorldQuestions();
+        return { questions: status ? questions.filter((question) => question.status === status) : questions };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_world_get_question',
+    {
+      title: 'Get worldbuilding question',
+      description: 'Returns one stored question with its competing options and chosen state. Read-only.',
+      inputSchema: { questionId: z.string().trim().min(1) },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ questionId }) =>
+      tool(() => {
+        const question = getWorldQuestion(questionId);
+        if (!question) throw notFound('world question', questionId);
+        return { question };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_world_create_question',
+    {
+      title: 'Create worldbuilding question',
+      description: 'Creates an explicit author question. It does not choose or apply an answer.',
+      inputSchema: { ...worldQuestionPatchSchema, question: z.string().trim().min(1).max(8_000) },
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    },
+    (input) => tool(() => ({ question: createWorldQuestion(input) }))()
+  );
+
+  server.registerTool(
+    'nodus_world_update_question',
+    {
+      title: 'Update worldbuilding question',
+      description: 'Edits or parks a question without applying an answer to canonical prose.',
+      inputSchema: { questionId: z.string().trim().min(1), ...worldQuestionPatchSchema },
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    },
+    ({ questionId, ...patch }) =>
+      tool(() => {
+        const question = updateWorldQuestion(questionId, patch);
+        if (!question) throw notFound('world question', questionId);
+        return { question };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_world_list_maps',
+    {
+      title: 'List world maps',
+      description: 'Lists map canvases, hierarchy, calibration and temporal coverage; binary map images are never returned through MCP. Read-only.',
+      inputSchema: { kind: z.enum(WORLD_MAP_KINDS).optional() },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ kind }) => tool(() => ({ maps: listWorldMaps().filter((map) => !kind || map.kind === kind) }))()
+  );
+
+  server.registerTool(
+    'nodus_world_get_map',
+    {
+      title: 'Get world map',
+      description: 'Returns a map and its ancestry. Image binaries and local paths are not exposed. Read-only.',
+      inputSchema: { mapId: z.string().trim().min(1) },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ mapId }) =>
+      tool(() => {
+        const map = getWorldMap(mapId);
+        if (!map) throw notFound('world map', mapId);
+        return { map, ancestry: mapAncestry(mapId) };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_world_get_manuscript',
+    {
+      title: 'Get world manuscript',
+      description:
+        'Returns the manuscript spine, chapter/book structure and progress. Pass includeText=true for full scene prose; otherwise each scene only carries a snippet. Read-only.',
+      inputSchema: { includeText: z.boolean().default(false) },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ includeText }) =>
+      tool(() => {
+        const spine = manuscriptSpine();
+        const scenes = spine.chapters.flatMap((chapter) => chapter.scenes).map((scene) => {
+          const manuscript = getSceneText(scene.sceneId);
+          return includeText
+            ? { ...scene, text: manuscript.text, updatedAt: manuscript.updatedAt }
+            : { ...scene, textSnippet: snippet(manuscript.text, 600), updatedAt: manuscript.updatedAt };
+        });
+        return {
+          ...spine,
+          scenes,
+          progress: manuscriptProgress(),
+        };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_world_update_scene_text',
+    {
+      title: 'Update world manuscript scene',
+      description:
+        'Replaces the manuscript prose of one existing scene and updates its word count. This is a canonical authoring write; pass null to clear the prose. It does not delete the scene.',
+      inputSchema: { sceneId: z.string().trim().min(1), text: z.string().max(2_000_000).nullable() },
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    },
+    ({ sceneId, text }) =>
+      tool(() => {
+        if (!listScenes().some((scene) => scene.sceneId === sceneId)) throw notFound('world scene', sceneId);
+        return { manuscript: saveSceneText(sceneId, text) };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_world_get_continuity',
+    {
+      title: 'Run world continuity checks',
+      description:
+        'Runs the same deterministic continuity checks as the app (time, travel, affiliations, secrets, containment and character coherence), respecting the user’s muted notices. Read-only.',
+      inputSchema: {},
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    tool(() => ({ findings: runContinuity(), muted: listNoticeMutes(), summary: continuitySummary() }))
+  );
+
+  server.registerTool(
+    'nodus_world_get_calendar',
+    {
+      title: 'Get world calendar and events',
+      description: 'Returns the invented calendar plus all dated events in world order. Read-only.',
+      inputSchema: {},
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    tool(() => ({ calendar: getWorldCalendar(), events: listWorldEvents() }))
   );
 
   server.registerTool('nodus_prosop_get_design',{title:'Get prosopography study design',description:'Returns the versioned population, criteria, questionnaire and vocabularies. Read-only.',inputSchema:{},annotations:{readOnlyHint:true,openWorldHint:false}},tool(()=>getProsopPopulationWorkspace()));

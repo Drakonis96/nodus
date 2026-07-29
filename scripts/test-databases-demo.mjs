@@ -32,13 +32,15 @@ try {
   const dbmode = require(path.join(repoRoot, 'electron/db/databasesRepo.ts'));
   const shared = require(path.join(repoRoot, 'shared/databases.ts'));
   const vaults = require(path.join(repoRoot, 'electron/vaults/vaultRegistry.ts'));
-  const { getSettings } = require(path.join(repoRoot, 'electron/db/settingsRepo.ts'));
+  const { getSettings, updateSettings } = require(path.join(repoRoot, 'electron/db/settingsRepo.ts'));
 
   // Fresh academic vault → seeding flips it to databases and remembers the prior type.
   assert.equal(vaults.getActiveVault().type, 'academic', 'starts academic');
+  updateSettings({ databasesTourComplete: true });
   assert.equal(demo.seedDatabasesDemoData(), true, 'demo seeds on an empty vault');
   assert.equal(vaults.getActiveVault().type, 'databases', 'vault flipped to databases');
   assert.equal(getSettings().demoPriorVaultType, 'academic', 'prior type remembered');
+  assert.equal(getSettings().databasesTourComplete, true, 'loading the demo preserves the tutorial decision');
 
   // Three databases, every column type present, options coloured, rows + cells wired.
   const dbs = dbmode.listDatabases();

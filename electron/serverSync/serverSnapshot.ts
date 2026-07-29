@@ -28,6 +28,25 @@ const TEACHING_TABLES = [
   'teaching_exams', 'teaching_exam_questions', 'teaching_rubrics', 'teaching_logos',
 ] as const;
 
+// A Worldbuilding vault has no imported bibliography that can act as its "core":
+// these authored tables ARE the corpus. Once the user explicitly pairs that vault
+// with Nodus Server, its current canonical world is published just like academic
+// works are. Editing history, AI/chat transcripts, image binaries and discarded
+// proposals stay local; snapshots remain a read-only consultation projection.
+export const WORLDBUILDING_SERVER_TABLES = [
+  'persons', 'person_names', 'person_places', 'places', 'events', 'event_participants', 'relationships',
+  'character_profiles', 'event_world_dates', 'character_abilities',
+  'world_groups', 'character_affiliations', 'place_profiles',
+  'world_secrets', 'secret_knowers',
+  'world_scenes', 'scene_characters', 'world_scene_days',
+  'world_maps', 'map_layers', 'map_markers', 'map_travel_modes',
+  'world_calendar', 'world_calendar_eras', 'world_calendar_months',
+  'world_articles', 'world_links',
+  'world_threads', 'thread_parties', 'world_beats', 'world_rules',
+  'world_questions', 'world_question_options',
+  'world_scene_text', 'world_chapter_breaks', 'world_manuscript_starts',
+] as const;
+
 const OMIT_COLUMNS = new Set([
   'embedding', 'embedding_model', 'embedding_provider', 'blob', 'thumb', 'audio_blob',
   'file_path', 'source_path', 'storage_path', 'local_path', 'absolute_path',
@@ -43,7 +62,7 @@ function safeValue(column: string, value: unknown): unknown {
   if (
     OMIT_COLUMNS.has(normalized) ||
     normalized.endsWith('_path') ||
-    /(^|_)(api_key|access_token|refresh_token|password|secret|credential)(_|$)/.test(normalized) ||
+    /(^|_)(api_key|access_token|refresh_token|password|credential|credentials)(_|$)/.test(normalized) ||
     Buffer.isBuffer(value)
   ) return undefined;
   if (typeof value === 'bigint') return Number(value);
@@ -74,6 +93,9 @@ export function buildServerSnapshot(
 ): { buffer: Buffer; revision: string; counts: Record<string, number> } {
   const present = tableNames(db);
   const selected = new Set<string>(CORE_TABLES.filter((table) => present.has(table)));
+  if (vault.type === 'worldbuilding') {
+    WORLDBUILDING_SERVER_TABLES.filter((table) => present.has(table)).forEach((table) => selected.add(table));
+  }
   if (settings.nodusServerIncludePassages && present.has('passages')) selected.add('passages');
   if (settings.nodusServerIncludeUserContent) {
     USER_TABLES.filter((table) => present.has(table)).forEach((table) => selected.add(table));

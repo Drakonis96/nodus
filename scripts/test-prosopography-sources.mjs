@@ -317,9 +317,9 @@ try {
   assert.equal(integrity.ok, true);
   assert.ok(integrity.syncCoverage.included.prosopography.includes('prosop_statements'));
   assert.equal(integrity.syncCoverage.unclassified.filter((name) => name.startsWith('prosop_')).length, 0);
-  for (const language of ['es','en','fr','de','pt','pt-BR','tr']) {
+  for (const language of ['es','en','fr','de','pt','pt-BR','it','tr']) {
     const pack = prompts.prosopographyPromptPack(language);
-    assert.match(pack, language === 'es' ? /mención no equivale/i : /mention|mention|Nennung|menção|geçişi/i);
+    assert.match(pack, language === 'es' ? /mención no equivale/i : /mention|Nennung|menção|menzione|geçişi/i);
   }
 
   const [ipc, preload, api, view, panel, personsView, cohortsPanel, analysisView, networksView, searchView, mcpTools] = await Promise.all([

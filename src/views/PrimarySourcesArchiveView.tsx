@@ -9,15 +9,21 @@ import type {
 } from '@shared/primarySourcesTypes';
 import type { ArchiveDescriptionUnit } from '@shared/archiveTypes';
 import type { GazetteerPlace } from '@shared/types';
+import { getArchiveDocType } from '@shared/archiveDocTypes';
 import { Icon, ModalBackdrop } from '../components/ui';
+import { DocumentIconPicker } from '../components/DocumentIconPicker';
+import { DocTypeForm, DocTypeSelect, docTypeLabel } from '../components/DocTypeForm';
 import { PlacePicker } from '../components/PlacePicker';
 import { t } from '../i18n';
 import { consumePrimarySourceAttention } from '../primarySourcesAttention';
 import { PrimarySourceDossierView } from './PrimarySourceDossierView';
 import { archiveFileUrl } from '../lib/archiveFileUrl';
+import { archiveDocumentIcon, suggestedArchiveDocumentIcon } from '../lib/archiveDocumentIcon';
 
 type DisplayMode = 'table' | 'gallery' | 'hierarchy';
 type LeftTree = 'provenance' | 'collections';
+
+const ARCHIVE_SIDEBAR_SESSION_KEY = 'nodus.primarySources.archiveSidebarCollapsed';
 
 const EMPTY_WORKSPACE: PrimarySourceArchiveWorkspace = {
   rows: [],
@@ -25,6 +31,7 @@ const EMPTY_WORKSPACE: PrimarySourceArchiveWorkspace = {
   units: [],
   sessions: [],
   collections: [],
+  places: [],
   templates: [],
   page: {
     offset: 0,
@@ -121,6 +128,13 @@ export function PrimarySourcesArchiveView({
   const [query, setQuery] = useState('');
   const [mode, setMode] = useState<DisplayMode>('table');
   const [leftTree, setLeftTree] = useState<LeftTree>('provenance');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      return window.sessionStorage.getItem(ARCHIVE_SIDEBAR_SESSION_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
   const [unitFilter, setUnitFilter] = useState<string | null>(null);
   const [collectionFilter, setCollectionFilter] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -173,6 +187,34 @@ export function PrimarySourcesArchiveView({
     const timer = window.setTimeout(() => void reload(query), 180);
     return () => window.clearTimeout(timer);
   }, [query, reload]);
+
+  useEffect(() => {
+    let active = true;
+    void window.nodus.getSettings().then((settings) => {
+      if (!active || settings.primarySourcesTourComplete) return;
+      setSidebarCollapsed(false);
+      try {
+        window.sessionStorage.removeItem(ARCHIVE_SIDEBAR_SESSION_KEY);
+      } catch {
+        // Storage can be unavailable in hardened renderer contexts; the UI still works.
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const toggleSidebar = () => {
+    setSidebarCollapsed((current) => {
+      const next = !current;
+      try {
+        window.sessionStorage.setItem(ARCHIVE_SIDEBAR_SESSION_KEY, next ? '1' : '0');
+      } catch {
+        // Keep the in-memory toggle functional even when session storage is unavailable.
+      }
+      return next;
+    });
+  };
 
   const visibleRows = useMemo(() => {
     let rows = workspace.rows;
@@ -233,102 +275,112 @@ export function PrimarySourcesArchiveView({
     };
   }, [loading, onTargetConsumed, target, workspace.rows]);
 
-  if (editing) {
-    return (
-      <PrimarySourceDossierView
-        initialRow={editing}
-        initialExcerptId={deepLinkedExcerptId}
-        initialTextTarget={deepLinkedTextTarget}
-        workspace={workspace}
-        onBack={() => {
-          setEditing(null);
-          setDeepLinkedExcerptId(null);
-          setDeepLinkedTextTarget(null);
-        }}
-        onChanged={async () => {
-          await reload();
-        }}
-      />
-    );
-  }
-
   return (
     <div className="flex h-full min-h-0 bg-neutral-50 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100" data-testid="primary-sources-archive">
-      <aside
-        className="hidden w-72 shrink-0 flex-col border-r border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900 lg:flex"
-        data-tour="primary-sources-provenance-tree"
-      >
-        <div
-          className="grid grid-cols-2 border-b border-neutral-200 p-2 dark:border-neutral-800"
-          role="group"
-          aria-label={t('Modo de vista')}
+      {!sidebarCollapsed && (
+        <aside
+          className="hidden w-72 shrink-0 flex-col border-r border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900 lg:flex"
+          data-tour="primary-sources-provenance-tree"
+          data-testid="primary-sources-archive-sidebar"
         >
-          <button
-            className={`rounded-lg px-2 py-2 text-xs font-medium ${leftTree === 'provenance' ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-200' : 'text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-900'}`}
-            onClick={() => setLeftTree('provenance')}
-            aria-pressed={leftTree === 'provenance'}
-          >
-            {t('Ubicación archivística')}
-          </button>
-          <button
-            className={`rounded-lg px-2 py-2 text-xs font-medium ${leftTree === 'collections' ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-200' : 'text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-900'}`}
-            onClick={() => setLeftTree('collections')}
-            aria-pressed={leftTree === 'collections'}
-          >
-            {t('Colecciones de trabajo')}
-          </button>
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto p-3">
-          {leftTree === 'provenance' ? (
-            <>
-              <TreeButton active={!unitFilter} icon="archive" label={t('Todo el archivo')} onClick={() => setUnitFilter(null)} />
-              <UnitTree
-                units={workspace.units}
-                rows={workspace.rows}
-                parentId={null}
-                selectedId={unitFilter}
-                onSelect={(unitId) => {
-                  setUnitFilter(unitId);
-                  setCollectionFilter(null);
-                }}
-              />
-            </>
-          ) : (
-            <>
-              <TreeButton active={!collectionFilter} icon="folder" label={t('Todas las colecciones')} onClick={() => setCollectionFilter(null)} />
-              {workspace.collections.map((collection) => (
-                <TreeButton
-                  key={collection.folderId}
-                  active={collectionFilter === collection.folderId}
-                  icon="folder"
-                  label={collection.name}
-                  count={workspace.rows.filter((row) => row.item.folderIds.includes(collection.folderId)).length}
-                  onClick={() => {
-                    setCollectionFilter(collection.folderId);
-                    setUnitFilter(null);
+          <div className="flex items-center border-b border-neutral-200 p-2 dark:border-neutral-800">
+            <div
+              className="grid min-w-0 flex-1 grid-cols-2"
+              role="group"
+              aria-label={t('Modo de vista')}
+            >
+              <button
+                className={`rounded-lg px-2 py-2 text-xs font-medium ${leftTree === 'provenance' ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-200' : 'text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-900'}`}
+                onClick={() => setLeftTree('provenance')}
+                aria-pressed={leftTree === 'provenance'}
+              >
+                {t('Ubicación archivística')}
+              </button>
+              <button
+                className={`rounded-lg px-2 py-2 text-xs font-medium ${leftTree === 'collections' ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-200' : 'text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-900'}`}
+                onClick={() => setLeftTree('collections')}
+                aria-pressed={leftTree === 'collections'}
+              >
+                {t('Colecciones de trabajo')}
+              </button>
+            </div>
+            <button
+              type="button"
+              className="ml-1 grid h-8 w-8 shrink-0 place-items-center rounded-lg text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+              aria-label={t('Ocultar panel lateral')}
+              title={t('Ocultar panel lateral')}
+              aria-expanded="true"
+              data-testid="primary-sources-archive-sidebar-toggle"
+              onClick={toggleSidebar}
+            >
+              <Icon name="chevronLeft" size={15} />
+            </button>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto p-3">
+            {leftTree === 'provenance' ? (
+              <>
+                <TreeButton active={!unitFilter} icon="archive" label={t('Todo el archivo')} onClick={() => setUnitFilter(null)} />
+                <UnitTree
+                  units={workspace.units}
+                  rows={workspace.rows}
+                  parentId={null}
+                  selectedId={unitFilter}
+                  onSelect={(unitId) => {
+                    setUnitFilter(unitId);
+                    setCollectionFilter(null);
                   }}
                 />
-              ))}
-              {workspace.collections.length === 0 && (
-                <p className="px-2 py-4 text-xs leading-5 text-neutral-500">{t('Las colecciones agrupan trabajo sin alterar la procedencia.')}</p>
-              )}
-            </>
-          )}
-        </div>
-        <div className="flex h-8 shrink-0 items-center justify-center border-t border-neutral-200 px-3 dark:border-neutral-800">
-          <button
-            className="btn btn-secondary h-full w-full justify-center gap-2 py-0 text-xs"
-            data-testid="primary-sources-organize-open"
-            onClick={() => setManageOpen(true)}
-          >
-            <Icon name="settings" size={14} /> {t('Organizar')}
-          </button>
-        </div>
-      </aside>
+              </>
+            ) : (
+              <>
+                <TreeButton active={!collectionFilter} icon="folder" label={t('Todas las colecciones')} onClick={() => setCollectionFilter(null)} />
+                {workspace.collections.map((collection) => (
+                  <TreeButton
+                    key={collection.folderId}
+                    active={collectionFilter === collection.folderId}
+                    icon="folder"
+                    label={collection.name}
+                    count={workspace.rows.filter((row) => row.item.folderIds.includes(collection.folderId)).length}
+                    onClick={() => {
+                      setCollectionFilter(collection.folderId);
+                      setUnitFilter(null);
+                    }}
+                  />
+                ))}
+                {workspace.collections.length === 0 && (
+                  <p className="px-2 py-4 text-xs leading-5 text-neutral-500">{t('Las colecciones agrupan trabajo sin alterar la procedencia.')}</p>
+                )}
+              </>
+            )}
+          </div>
+          <div className="flex h-8 shrink-0 items-center justify-center border-t border-neutral-200 px-3 dark:border-neutral-800">
+            <button
+              className="btn btn-secondary h-full w-full justify-center gap-2 py-0 text-xs"
+              data-testid="primary-sources-organize-open"
+              onClick={() => setManageOpen(true)}
+            >
+              <Icon name="settings" size={14} /> {t('Organizar')}
+            </button>
+          </div>
+        </aside>
+      )}
 
       <main className="flex min-w-0 flex-1 flex-col">
         <header className="shrink-0 border-b border-neutral-200 bg-white px-4 py-3 dark:border-neutral-800 dark:bg-neutral-900">
           <div className="flex flex-wrap items-center gap-2">
+            {sidebarCollapsed && (
+              <button
+                type="button"
+                className="btn btn-ghost hidden h-9 w-9 shrink-0 p-0 lg:grid lg:place-items-center"
+                aria-label={t('Mostrar panel lateral')}
+                title={t('Mostrar panel lateral')}
+                aria-expanded="false"
+                data-testid="primary-sources-archive-sidebar-toggle"
+                onClick={toggleSidebar}
+              >
+                <Icon name="columns" size={16} />
+              </button>
+            )}
             <div className="mr-2 flex items-center gap-2">
               <Icon name="archive" className="text-indigo-600 dark:text-indigo-300" />
               <h1 className="text-base font-semibold">{t('Archivo')}</h1>
@@ -407,6 +459,8 @@ export function PrimarySourcesArchiveView({
           ) : mode === 'table' ? (
             <ArchiveTable
               rows={visibleRows}
+              collections={workspace.collections}
+              places={workspace.places}
               selected={selected}
               allSelected={allVisibleSelected}
               onToggle={toggleSelected}
@@ -494,6 +548,40 @@ export function PrimarySourcesArchiveView({
             await reload();
           }}
         />
+      )}
+      {editing && (
+        <ModalBackdrop
+          zIndex={150}
+          onClose={() => {
+            setEditing(null);
+            setDeepLinkedExcerptId(null);
+            setDeepLinkedTextTarget(null);
+          }}
+        >
+          <section
+            className="card-modal h-[92vh] w-[96vw] max-w-[1600px] overflow-hidden rounded-2xl shadow-2xl"
+            role="dialog"
+            aria-modal="true"
+            aria-label={t('Ficha documental')}
+            data-testid="primary-source-dossier-modal"
+          >
+            <PrimarySourceDossierView
+              initialRow={editing}
+              initialExcerptId={deepLinkedExcerptId}
+              initialTextTarget={deepLinkedTextTarget}
+              workspace={workspace}
+              presentation="modal"
+              onBack={() => {
+                setEditing(null);
+                setDeepLinkedExcerptId(null);
+                setDeepLinkedTextTarget(null);
+              }}
+              onChanged={async () => {
+                await reload();
+              }}
+            />
+          </section>
+        </ModalBackdrop>
       )}
     </div>
   );
@@ -584,6 +672,8 @@ function ArchiveEmpty({ onIngest, onUnit }: { onIngest: () => void; onUnit: () =
 
 function ArchiveTable({
   rows,
+  collections,
+  places,
   selected,
   allSelected,
   onToggle,
@@ -591,6 +681,8 @@ function ArchiveTable({
   onOpen,
 }: {
   rows: PrimarySourceArchiveRow[];
+  collections: PrimarySourceArchiveWorkspace['collections'];
+  places: PrimarySourceArchiveWorkspace['places'];
   selected: Set<string>;
   allSelected: boolean;
   onToggle: (id: string) => void;
@@ -598,38 +690,177 @@ function ArchiveTable({
   onOpen: (row: PrimarySourceArchiveRow) => void;
 }) {
   if (rows.length === 0) return <FilteredEmpty />;
+  const columns = [
+    { id: 'preview', label: 'Miniatura', width: 100 },
+    { id: 'title', label: 'Título', width: 270 },
+    { id: 'docType', label: 'Tipo de documento', width: 220 },
+    { id: 'typedMetadata', label: 'Datos de catalogación', width: 290 },
+    { id: 'description', label: 'Descripción', width: 300 },
+    { id: 'date', label: 'Fecha', width: 150 },
+    { id: 'creator', label: 'Creador documental', width: 210 },
+    { id: 'reference', label: 'Signatura', width: 150 },
+    { id: 'repository', label: 'Repositorio', width: 220 },
+    { id: 'level', label: 'Nivel', width: 135 },
+    { id: 'collections', label: 'Colecciones de trabajo', width: 220 },
+    { id: 'tags', label: 'Etiquetas', width: 220 },
+    { id: 'access', label: 'Acceso', width: 145 },
+    { id: 'sensitivity', label: 'Sensibilidad', width: 155 },
+    { id: 'status', label: 'Estado de procesamiento', width: 175 },
+    { id: 'files', label: 'Archivos', width: 115 },
+    { id: 'provenancePlace', label: 'Lugar de procedencia', width: 220 },
+    { id: 'updated', label: 'Actualizado', width: 170 },
+  ] as const;
+  const gutterWidth = 42;
+  const minWidth = gutterWidth + columns.reduce((total, column) => total + column.width, 0);
+  const collectionNames = new Map(collections.map((collection) => [collection.folderId, collection.name]));
+  const placeNames = new Map(places.map((place) => [place.placeId, place.name]));
+  const cellClass = 'flex shrink-0 items-center overflow-hidden border-r border-neutral-200 px-3 text-xs dark:border-neutral-800';
+
   return (
-    <div className="min-w-[816px] text-sm">
-      <div className="sticky top-0 z-10 grid grid-cols-[42px_minmax(200px,1.4fr)_115px_minmax(150px,1fr)_120px_120px_70px] border-b border-neutral-200 bg-neutral-100/95 text-xs font-medium text-neutral-500 backdrop-blur dark:border-neutral-800 dark:bg-neutral-900/95">
-        <label className="grid place-items-center p-3"><input type="checkbox" checked={allSelected} onChange={onToggleAll} aria-label={t('Seleccionar todo')} /></label>
-        {['Título', 'Signatura', 'Ubicación archivística', 'Fecha', 'Estado', 'Archivos'].map((label) => (
-          <div key={label} className="border-l border-neutral-200 px-3 py-3 dark:border-neutral-800">{t(label)}</div>
+    <div className="text-sm" style={{ minWidth }} data-testid="primary-sources-archive-grid">
+      <div className="sticky top-0 z-10 flex border-b border-neutral-200 bg-neutral-100/95 text-xs font-medium text-neutral-500 backdrop-blur dark:border-neutral-800 dark:bg-neutral-900/95">
+        <label className="grid shrink-0 place-items-center" style={{ width: gutterWidth }}>
+          <input type="checkbox" checked={allSelected} onChange={onToggleAll} aria-label={t('Seleccionar todo')} />
+        </label>
+        {columns.map((column) => (
+          <div
+            key={column.id}
+            className="shrink-0 truncate border-l border-neutral-200 px-3 py-3 dark:border-neutral-800"
+            style={{ width: column.width }}
+          >
+            {t(column.label)}
+          </div>
         ))}
       </div>
       {rows.map((row) => (
-        <div key={row.item.itemId} className="grid grid-cols-[42px_minmax(200px,1.4fr)_115px_minmax(150px,1fr)_120px_120px_70px] border-b border-neutral-200 bg-white hover:bg-indigo-50/40 dark:border-neutral-800 dark:bg-neutral-950 dark:hover:bg-indigo-950/20">
-          <label className="grid place-items-center p-3">
-            <input type="checkbox" checked={selected.has(row.item.itemId)} onChange={() => onToggle(row.item.itemId)} aria-label={t('Seleccionar {title}').replace('{title}', row.item.title)} />
+        <div
+          key={row.item.itemId}
+          className="flex min-h-[58px] cursor-pointer border-b border-neutral-200 bg-white outline-none transition hover:bg-indigo-50/60 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500 dark:border-neutral-800 dark:bg-neutral-950 dark:hover:bg-indigo-950/25"
+          role="button"
+          tabIndex={0}
+          data-testid={`primary-source-archive-row-${row.item.itemId}`}
+          aria-label={t('Abrir ficha de {title}').replace('{title}', row.item.title)}
+          onClick={() => onOpen(row)}
+          onKeyDown={(event) => {
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            event.preventDefault();
+            onOpen(row);
+          }}
+        >
+          <label
+            className="grid shrink-0 cursor-default place-items-center"
+            style={{ width: gutterWidth }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <input
+              type="checkbox"
+              checked={selected.has(row.item.itemId)}
+              onChange={() => onToggle(row.item.itemId)}
+              aria-label={t('Seleccionar {title}').replace('{title}', row.item.title)}
+            />
           </label>
-          <button className="flex min-w-0 items-center gap-3 border-l border-neutral-200 px-3 py-3 text-left dark:border-neutral-800" onClick={() => onOpen(row)}>
-            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-neutral-100 text-neutral-500 dark:bg-neutral-800">
-              <Icon name={fileKindIcon(row.item.kind)} size={15} />
+          <div className={`${cellClass} justify-center p-1.5`} style={{ width: columns[0].width }}>
+            <ArchiveTablePreview row={row} />
+          </div>
+          <div className={`${cellClass} gap-2`} style={{ width: columns[1].width }}>
+            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-300">
+              <Icon name={archiveDocumentIcon(row.profile.metadata, row.item.docType, row.item.kind)} size={15} />
             </span>
             <span className="min-w-0">
-              <span className="block truncate font-medium">{row.item.title}</span>
-              <span className="block truncate text-xs text-neutral-500">{row.unit.creatorDisplay || row.item.fileName || t('Sin archivo')}</span>
+              <span className="block truncate font-medium text-neutral-900 dark:text-neutral-100">{row.item.title}</span>
+              <span className="block truncate text-[10px] text-neutral-500">{row.item.fileName || t('Sin archivo')}</span>
             </span>
-          </button>
-          <div className="truncate border-l border-neutral-200 px-3 py-4 text-xs dark:border-neutral-800">{row.unit.referenceCode || '—'}</div>
-          <div className="truncate border-l border-neutral-200 px-3 py-4 text-xs dark:border-neutral-800">
-            {row.repositoryName ? `${row.repositoryName} · ` : ''}{row.unit.parentUnitId ? t('Jerarquía asignada') : t('Raíz')}
           </div>
-          <div className="truncate border-l border-neutral-200 px-3 py-4 text-xs dark:border-neutral-800">{row.unit.date.display || '—'}</div>
-          <div className="border-l border-neutral-200 px-3 py-3 dark:border-neutral-800"><AccessBadge row={row} /></div>
-          <div className="border-l border-neutral-200 px-3 py-4 text-center text-xs tabular-nums dark:border-neutral-800">{row.masterCount + row.derivativeCount}</div>
+          <div className={cellClass} style={{ width: columns[2].width }}>
+            <span className="truncate">{docTypeLabel(row.item.docType) || t('Sin clasificar')}</span>
+          </div>
+          <div className={cellClass} style={{ width: columns[3].width }} title={typedMetadataSummary(row)}>
+            <span className="line-clamp-2 leading-5 text-neutral-500">{typedMetadataSummary(row) || '—'}</span>
+          </div>
+          <div className={cellClass} style={{ width: columns[4].width }} title={row.unit.scopeContent ?? ''}>
+            <span className="line-clamp-2 leading-5 text-neutral-500">{row.unit.scopeContent || '—'}</span>
+          </div>
+          <div className={cellClass} style={{ width: columns[5].width }}>{row.unit.date.display || row.item.year || '—'}</div>
+          <div className={cellClass} style={{ width: columns[6].width }}><span className="truncate">{row.unit.creatorDisplay || '—'}</span></div>
+          <div className={`${cellClass} font-mono`} style={{ width: columns[7].width }}><span className="truncate">{row.unit.referenceCode || '—'}</span></div>
+          <div className={cellClass} style={{ width: columns[8].width }}><span className="truncate">{row.repositoryName || t('Procedencia por completar')}</span></div>
+          <div className={cellClass} style={{ width: columns[9].width }}>{t(LEVEL_LABELS[row.unit.level])}</div>
+          <div className={`${cellClass} gap-1`} style={{ width: columns[10].width }}>
+            <CompactValues values={row.item.folderIds.map((id) => collectionNames.get(id)).filter((value): value is string => Boolean(value))} />
+          </div>
+          <div className={`${cellClass} gap-1`} style={{ width: columns[11].width }}><CompactValues values={row.item.tags} /></div>
+          <div className={cellClass} style={{ width: columns[12].width }}><AccessBadge row={row} /></div>
+          <div className={cellClass} style={{ width: columns[13].width }}>{t(SENSITIVITY_LABELS[row.profile.sensitivity])}</div>
+          <div className={cellClass} style={{ width: columns[14].width }}>{t(PROCESSING_LABELS[row.profile.processingStatus])}</div>
+          <div className={`${cellClass} justify-center tabular-nums`} style={{ width: columns[15].width }}>
+            <span title={t('Másteres')}>{row.masterCount}</span>
+            <span className="text-neutral-300 dark:text-neutral-700">/</span>
+            <span title={t('Derivados')}>{row.derivativeCount}</span>
+            <span className="text-neutral-300 dark:text-neutral-700">/</span>
+            <span title={t('Versiones de texto')}>{row.textVersionCount}</span>
+          </div>
+          <div className={cellClass} style={{ width: columns[16].width }}>
+            <span className="truncate">
+              {row.profile.provenancePlaceId
+                ? placeNames.get(row.profile.provenancePlaceId) ?? t('Lugar no disponible')
+                : t('Sin lugar de procedencia')}
+            </span>
+          </div>
+          <div className={cellClass} style={{ width: columns[17].width }}>
+            {new Date(row.item.updatedAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+          </div>
         </div>
       ))}
     </div>
+  );
+}
+
+function ArchiveTablePreview({ row }: { row: PrimarySourceArchiveRow }) {
+  const [failed, setFailed] = useState(false);
+  const file = row.previewFile;
+  useEffect(() => setFailed(false), [file?.fileId, file?.contentHash]);
+  if (!file || failed) {
+    return (
+      <span className="grid h-10 w-12 place-items-center rounded-lg bg-neutral-100 text-neutral-400 dark:bg-neutral-800">
+        <Icon name={archiveDocumentIcon(row.profile.metadata, row.item.docType, row.item.kind)} size={17} />
+      </span>
+    );
+  }
+  return (
+    <img
+      src={archiveFileUrl(file)}
+      alt=""
+      className="h-11 w-14 rounded-lg border border-neutral-200 object-cover shadow-sm dark:border-neutral-700"
+      loading="lazy"
+      decoding="async"
+      data-testid={`primary-source-thumbnail-${row.item.itemId}`}
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
+function typedMetadataSummary(row: PrimarySourceArchiveRow): string {
+  const definition = getArchiveDocType(row.item.docType);
+  if (!definition || !row.item.metadata) return '';
+  return definition.fields
+    .map((field) => {
+      const value = row.item.metadata?.[field.key]?.trim();
+      return value ? `${t(field.label)}: ${value}` : '';
+    })
+    .filter(Boolean)
+    .join(' · ');
+}
+
+function CompactValues({ values }: { values: string[] }) {
+  if (!values.length) return <span className="text-neutral-400">—</span>;
+  return (
+    <span className="line-clamp-2 leading-5" title={values.join(' · ')}>
+      {values.map((value) => (
+        <span key={value} className="mr-1 inline-flex rounded bg-neutral-100 px-1.5 py-0.5 text-[10px] dark:bg-neutral-800">
+          {value}
+        </span>
+      ))}
+    </span>
   );
 }
 
@@ -772,7 +1003,7 @@ function DialogShell({
 }) {
   return (
     <ModalBackdrop onClose={onClose}>
-      <section className={`card-modal flex max-h-[90vh] w-full flex-col overflow-hidden ${wide ? 'max-w-4xl' : 'max-w-2xl'}`} role="dialog" aria-modal="true" aria-label={title}>
+      <section className={`card-modal flex max-h-[92vh] w-full flex-col overflow-hidden ${wide ? 'max-w-6xl' : 'max-w-2xl'}`} role="dialog" aria-modal="true" aria-label={title}>
         <header className="flex items-start gap-3 border-b border-neutral-200 p-5 dark:border-neutral-800">
           <div className="min-w-0 flex-1"><h2 className="text-lg font-semibold">{title}</h2>{subtitle && <p className="mt-1 text-sm text-neutral-500">{subtitle}</p>}</div>
           <button className="btn btn-ghost p-2" onClick={onClose} aria-label={t('Cerrar')}><Icon name="x" /></button>
@@ -806,6 +1037,9 @@ function IngestModal({
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [templateId, setTemplateId] = useState('');
+  const [documentType, setDocumentType] = useState<string | null>(null);
+  const [documentMetadata, setDocumentMetadata] = useState<Record<string, string>>({});
+  const [documentIcon, setDocumentIcon] = useState(() => suggestedArchiveDocumentIcon(null));
   const [repositoryId, setRepositoryId] = useState('');
   const [parentUnitId, setParentUnitId] = useState('');
   const [referenceCode, setReferenceCode] = useState('');
@@ -841,7 +1075,9 @@ function IngestModal({
         paths,
         title: paths.length === 1 ? title : null,
         description,
-        documentType: template?.documentType ?? null,
+        documentType: documentType ?? template?.documentType ?? null,
+        documentMetadata,
+        documentIcon,
         templateId: templateId || null,
         repositoryId: repositoryId || null,
         parentUnitId: parentUnitId || null,
@@ -853,7 +1089,6 @@ function IngestModal({
         accessStatus,
         sensitivity,
         place,
-        placeRole: 'creation',
       });
       onComplete(result);
     } catch (reason) {
@@ -874,9 +1109,24 @@ function IngestModal({
           {paths.length > 0 && <ul className="mt-3 max-h-24 overflow-y-auto text-xs text-neutral-600 dark:text-neutral-400">{paths.map((path) => <li key={path} className="truncate py-0.5">{path.split(/[\\/]/).pop()}</li>)}</ul>}
         </section>
 
-        <div className="grid gap-4 md:grid-cols-2">
+        <section className="rounded-xl border border-neutral-200 bg-white/70 p-4 dark:border-neutral-800 dark:bg-neutral-950/25">
+          <h3 className="mb-3 text-sm font-semibold">{t('1. Información básica')}</h3>
+          <div className="grid gap-4 md:grid-cols-2">
           <Field label={t('Plantilla de descripción')}>
-            <select className="input w-full" value={templateId} onChange={(event) => setTemplateId(event.target.value)}>
+            <select
+              className="input w-full"
+              value={templateId}
+              onChange={(event) => {
+                const nextId = event.target.value;
+                const nextTemplate = workspace.templates.find((candidate) => candidate.templateId === nextId);
+                setTemplateId(nextId);
+                if (nextTemplate?.documentType) {
+                  setDocumentType(nextTemplate.documentType);
+                  setDocumentMetadata({});
+                  setDocumentIcon(suggestedArchiveDocumentIcon(nextTemplate.documentType));
+                }
+              }}
+            >
               <option value="">{t('Descripción general')}</option>
               {workspace.templates.map((template) => <option key={template.templateId} value={template.templateId}>{t(template.name)}</option>)}
             </select>
@@ -884,13 +1134,49 @@ function IngestModal({
           <Field label={t('Título')} hint={paths.length > 1 ? t('En un lote se conserva el nombre individual de cada archivo.') : undefined}>
             <input className="input w-full" value={title} onChange={(event) => setTitle(event.target.value)} disabled={paths.length > 1} />
           </Field>
-        </div>
-        <Field label={t('Alcance y contenido')}>
-          <textarea className="input min-h-20 w-full resize-y" value={description} onChange={(event) => setDescription(event.target.value)} />
-        </Field>
+          </div>
+          <div className="mt-4">
+            <Field label={t('Alcance y contenido')}>
+              <textarea className="input min-h-20 w-full resize-y" value={description} onChange={(event) => setDescription(event.target.value)} />
+            </Field>
+          </div>
+        </section>
+
+        <section className="rounded-xl border border-neutral-200 bg-white/70 p-4 dark:border-neutral-800 dark:bg-neutral-950/25" data-testid="primary-source-ingest-classification">
+          <h3 className="mb-3 text-sm font-semibold">{t('2. Clasificación documental')}</h3>
+          <div className="grid gap-4 md:grid-cols-2">
+            <Field label={t('Tipo de documento')}>
+              <DocTypeSelect
+                value={documentType}
+                onChange={(value) => {
+                  setDocumentType(value);
+                  setDocumentMetadata({});
+                  setDocumentIcon(suggestedArchiveDocumentIcon(value));
+                }}
+                emptyLabel="Elegir tipo de documento…"
+              />
+            </Field>
+            <Field label={t('Icono')}>
+              <DocumentIconPicker
+                value={documentIcon}
+                suggested={suggestedArchiveDocumentIcon(documentType)}
+                onChange={setDocumentIcon}
+              />
+            </Field>
+          </div>
+          {getArchiveDocType(documentType) && (
+            <div className="mt-4 rounded-xl border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-800 dark:bg-neutral-900/60">
+              <DocTypeForm
+                docType={documentType}
+                values={documentMetadata}
+                onChange={(key, value) => setDocumentMetadata((current) => ({ ...current, [key]: value }))}
+              />
+            </div>
+          )}
+        </section>
 
         <fieldset className="rounded-xl border border-neutral-200 p-4 dark:border-neutral-800">
-          <legend className="px-2 text-sm font-semibold">{t('Ubicación archivística')}</legend>
+          <legend className="px-2 text-sm font-semibold">{t('3. Ubicación archivística')}</legend>
           <p className="mb-4 text-xs text-neutral-500">{t('No es una carpeta personal: conserva dónde vive intelectualmente la fuente.')}</p>
           <div className="grid gap-4 md:grid-cols-2">
             <Field label={t('Repositorio')}>
@@ -918,9 +1204,9 @@ function IngestModal({
         </fieldset>
 
         <fieldset className="rounded-xl border border-neutral-200 p-4 dark:border-neutral-800">
-          <legend className="px-2 text-sm font-semibold">{t('Lugar de creación')}</legend>
+          <legend className="px-2 text-sm font-semibold">{t('Lugar de procedencia')}</legend>
           <p className="mb-4 text-xs text-neutral-500">
-            {t('Busca y selecciona una localidad real del catálogo geográfico para situar la fuente en el mapa.')}
+            {t('Busca y selecciona el lugar donde se originó la fuente. Las ciudades mencionadas dentro del documento no se añadirán al mapa de procedencia.')}
           </p>
           {place ? (
             <div className="flex items-center gap-3 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 dark:border-indigo-900 dark:bg-indigo-950/40">

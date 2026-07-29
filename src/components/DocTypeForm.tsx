@@ -79,24 +79,24 @@ export function DocTypePicker({
   };
 
   const trigger = fill
-    ? `flex h-full w-full items-center gap-1 px-2 text-left text-sm hover:bg-neutral-800/40 ${value ? '' : 'text-neutral-600'}`
+    ? `flex h-full w-full items-center gap-1 px-2 text-left text-sm hover:bg-neutral-100 dark:hover:bg-neutral-800/40 ${value ? '' : 'text-neutral-500'}`
     : className ?? `input flex h-9 w-full items-center gap-1 text-sm ${value ? '' : 'text-neutral-500'}`;
 
   return (
     <>
-      <button ref={btnRef} type="button" className={trigger} onClick={() => setOpen((o) => !o)}>
+      <button ref={btnRef} type="button" className={trigger} data-testid="document-type-picker-trigger" onClick={() => setOpen((o) => !o)}>
         <span className="min-w-0 flex-1 truncate">{label || placeholder || t('Sin clasificar')}</span>
         <Icon name="chevronDown" size={13} className="shrink-0 opacity-60" />
       </button>
       {open && coords &&
         createPortal(
           <>
-            {/* Dismiss backdrop + popover sit above the containing modal (z-50/z-70)
-                so an outside click closes the picker even when it's opened from
-                inside a modal — a plain z-40 backdrop was trapped behind it. */}
-            <div className="fixed inset-0 z-[80]" onClick={close} />
+            {/* Dismiss backdrop + popover sit above every document modal so the
+                shared picker also works from the Primary Sources dossier. */}
+            <div className="fixed inset-0 z-[200]" onClick={close} />
             <div
-              className="fixed z-[81] card-modal p-2 text-sm shadow-2xl"
+              className="card-modal fixed z-[201] p-2 text-sm shadow-2xl"
+              data-testid="document-type-picker-popover"
               style={{ ...anchorStyle(coords), width: Math.max(coords.width, 300) }}
             >
               <div className="relative mb-1.5">
@@ -108,7 +108,10 @@ export function DocTypePicker({
                   autoFocus
                   onChange={(e) => setQ(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Escape') close();
+                    if (e.key === 'Escape') {
+                      e.stopPropagation();
+                      close();
+                    }
                     if (e.key === 'Enter' && results && results.length) choose(results[0].id);
                   }}
                 />
@@ -117,7 +120,7 @@ export function DocTypePicker({
                 <button
                   type="button"
                   className={`mb-1.5 flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-[11px] ${
-                    genOnly ? 'text-indigo-300' : 'text-neutral-500 hover:bg-neutral-800'
+                    genOnly ? 'text-indigo-600 dark:text-indigo-300' : 'text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800'
                   }`}
                   onClick={() => setGenOnly((v) => !v)}
                 >
@@ -128,7 +131,7 @@ export function DocTypePicker({
               <div className="max-h-72 overflow-y-auto">
                 {allowClear && !q.trim() && (
                   <button
-                    className="block w-full truncate rounded px-2 py-1 text-left text-xs text-neutral-500 hover:bg-neutral-800"
+                    className="block w-full truncate rounded px-2 py-1 text-left text-xs text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800"
                     onClick={() => choose(null)}
                   >
                     {t('Sin clasificar')}
@@ -141,10 +144,10 @@ export function DocTypePicker({
                     results.map((def) => (
                       <button
                         key={def.id}
-                        className={`flex w-full items-center gap-2 rounded px-2 py-1 text-left text-xs hover:bg-neutral-800 ${def.id === value ? 'bg-neutral-800/60' : ''}`}
+                        className={`flex w-full items-center gap-2 rounded px-2 py-1 text-left text-xs hover:bg-neutral-100 dark:hover:bg-neutral-800 ${def.id === value ? 'bg-indigo-50 dark:bg-neutral-800/60' : ''}`}
                         onClick={() => choose(def.id)}
                       >
-                        <span className="min-w-0 flex-1 truncate text-neutral-200">{defLabel(def)}</span>
+                        <span className="min-w-0 flex-1 truncate text-neutral-800 dark:text-neutral-200">{defLabel(def)}</span>
                         {def.id === value && <Icon name="check" size={12} className="text-indigo-400" />}
                       </button>
                     ))
@@ -156,10 +159,10 @@ export function DocTypePicker({
                       {g.types.map((def) => (
                         <button
                           key={def.id}
-                          className={`flex w-full items-center gap-2 rounded px-2 py-1 text-left text-xs hover:bg-neutral-800 ${def.id === value ? 'bg-neutral-800/60' : ''}`}
+                          className={`flex w-full items-center gap-2 rounded px-2 py-1 text-left text-xs hover:bg-neutral-100 dark:hover:bg-neutral-800 ${def.id === value ? 'bg-indigo-50 dark:bg-neutral-800/60' : ''}`}
                           onClick={() => choose(def.id)}
                         >
-                          <span className="min-w-0 flex-1 truncate text-neutral-200">{defLabel(def)}</span>
+                          <span className="min-w-0 flex-1 truncate text-neutral-800 dark:text-neutral-200">{defLabel(def)}</span>
                           {def.id === value && <Icon name="check" size={12} className="text-indigo-400" />}
                         </button>
                       ))}

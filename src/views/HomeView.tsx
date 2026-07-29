@@ -833,8 +833,9 @@ export function DemoOfferCard({
   onLoadTeachingDemo,
   onLoadWorldbuildingDemo,
   onLoadTestimonyDemo,
+  onLoadPrimarySourcesDemo,
 }: {
-  variant?: 'academic' | 'genealogy' | 'databases' | 'study' | 'teaching' | 'worldbuilding' | 'testimonios';
+  variant?: 'academic' | 'genealogy' | 'databases' | 'study' | 'teaching' | 'worldbuilding' | 'testimonios' | 'primary-sources';
   demoBusy: boolean;
   onLoadDemo?: () => Promise<void>;
   onLoadGenealogyDemo?: () => Promise<void>;
@@ -843,6 +844,7 @@ export function DemoOfferCard({
   onLoadTeachingDemo?: () => void | Promise<void>;
   onLoadWorldbuildingDemo?: () => void | Promise<void>;
   onLoadTestimonyDemo?: () => void | Promise<void>;
+  onLoadPrimarySourcesDemo?: () => void | Promise<void>;
 }) {
   const card =
     variant === 'genealogy'
@@ -893,6 +895,14 @@ export function DemoOfferCard({
                     label: t('Cargar demo de testimonios'),
                     onClick: onLoadTestimonyDemo ?? (async () => {}),
                   }
+                : variant === 'primary-sources'
+                  ? {
+                      title: t('Explora un corpus documental de ejemplo'),
+                      desc: t('Carga diez fuentes ficticias enlazadas con originales y derivados, OCR revisado y sin revisar, fechas inciertas, un topónimo ambiguo, una contradicción y una propuesta pendiente. No contiene personas ni datos reales.'),
+                      icon: 'archive',
+                      label: t('Cargar demo de fuentes primarias'),
+                      onClick: onLoadPrimarySourcesDemo ?? (async () => {}),
+                    }
         : {
             title: t('Explora una investigación de ejemplo'),
             desc: t('Seis obras sobre la ciencia del aprendizaje con grafo, notas, mapa de investigación, inmersión, borradores, informe profundo y proyecto guardado; sin conectar Zotero ni configurar IA.'),
@@ -901,11 +911,11 @@ export function DemoOfferCard({
             onClick: onLoadDemo ?? (async () => {}),
           };
   return (
-    <section className="rounded-xl border border-indigo-800/60 bg-indigo-950/20 p-5" data-testid={`${variant}-demo-offer`}>
+    <section className="rounded-xl border border-indigo-200 bg-indigo-50 p-5 dark:border-indigo-800/60 dark:bg-indigo-950/20" data-testid={`${variant}-demo-offer`}>
       <div className="flex flex-wrap items-center gap-4">
         <div className="min-w-0 flex-1">
-          <h2 className="text-sm font-semibold text-indigo-200">{card.title}</h2>
-          <p className="mt-1 text-xs leading-5 text-neutral-400">{card.desc}</p>
+          <h2 className="text-sm font-semibold text-indigo-900 dark:text-indigo-200">{card.title}</h2>
+          <p className="mt-1 text-xs leading-5 text-neutral-600 dark:text-neutral-400">{card.desc}</p>
         </div>
         <button className="btn btn-primary shrink-0" onClick={() => void card.onClick()} disabled={demoBusy}>
           <Icon name={demoBusy ? 'sync' : card.icon} className={demoBusy ? 'animate-spin' : ''} />

@@ -34,7 +34,7 @@ export function TourOverlay({
   label = 'Tutorial',
   accent = DEFAULT_ACCENT,
   vaultType,
-  showUnavailableVideo = false,
+  showUnavailableVideo = true,
   onClose,
   onNavigate,
 }: {
@@ -49,7 +49,11 @@ export function TourOverlay({
    * release required, and no change to this component.
    */
   vaultType?: VaultType;
-  /** Keep the future video route visible, but inert, before a tutorial is published. */
+  /**
+   * Keep the future video route visible, but inert, before a tutorial is published.
+   * This is the app-wide default: every vault has the same opening choices even while
+   * its video is still being produced.
+   */
   showUnavailableVideo?: boolean;
   /**
    * Spotlight colour. The eyebrow and the progress dots are Tailwind `indigo-*`

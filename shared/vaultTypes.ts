@@ -1,3 +1,6 @@
+import type { PromptLanguage } from './types';
+import { localizedNewVaultPromptPack } from './newVaultPromptPacks';
+
 /**
  * Vault types — a vault's "mode". Each type is a bundle of configuration layered
  * over the same engine: which sidebar sections show by default, and a prompt-pack
@@ -424,8 +427,9 @@ export function defaultHiddenViewsForType(value: unknown): string[] {
   return [...getVaultTypeDef(value).defaultHiddenViews];
 }
 
-export function vaultTypePromptPack(value: unknown): string {
-  return getVaultTypeDef(value).promptPack;
+export function vaultTypePromptPack(value: unknown, language: PromptLanguage = 'es'): string {
+  return localizedNewVaultPromptPack(normalizeVaultType(value), language)
+    ?? getVaultTypeDef(value).promptPack;
 }
 
 /** A style modifier appended to generated decorative-image prompts, by vault type. */

@@ -53,6 +53,7 @@ try {
     { lang: 'de', name: 'ALEMÁN' },
     { lang: 'pt', name: 'PORTUGUÉS DE PORTUGAL' },
     { lang: 'pt-BR', name: 'PORTUGUÉS DE BRASIL' },
+    { lang: 'it', name: 'ITALIANO' },
   ];
   for (const { lang, name } of cases) {
     updateSettings({ promptLanguage: lang });

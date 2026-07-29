@@ -5,7 +5,7 @@
 //   2. the CSP actually admits the embed — a blocked frame never attaches, it only
 //      logs "Refused to frame …", which no static check would catch;
 //   3. opening a video records the watched flag app-wide, and the card reflects it;
-//   4. the grid also reads correctly inside Settings, in light mode;
+//   4. the full, remotely refreshed grid reads correctly inside Settings, in light mode;
 //   5. the academic tour opens with three ways in.
 //
 // Run with: node scripts/verify-tutorial-videos.mjs   (build first: npm run build)
@@ -34,7 +34,7 @@ const userData = await mkdtemp(path.join(os.tmpdir(), 'nodus-tutorial-video-'));
 await mkdir(shots, { recursive: true });
 
 // A stand-in for the published catalogue, so the remote path is actually exercised
-// instead of only its fallback. It adds a fourth tutorial this build knows nothing
+// instead of only its fallback. It adds a tutorial this build knows nothing
 // about — the whole point of the file being remote.
 const PUBLISHED = {
   videos: [
@@ -108,32 +108,24 @@ try {
   await page.screenshot({ path: path.join(shots, '1-learn-mode-choice.png') });
   step('language → Nodi → "¿Cómo prefieres aprender?", with the video path recommended');
 
-  // ── 2. the grid, and the embed the CSP has to admit ───────────────────────────
+  // ── 2. the one first-run video, and the embed the CSP has to admit ────────────
   await page.getByTestId('tutorial-mode-video').click();
   await page.getByTestId('basics-tutorial-videos').waitFor();
-  // The published catalogue adds a fourth tutorial this build does not contain, so the
-  // grid growing from three to four is the proof that the remote path works.
-  await page.locator('[data-testid="tutorial-video-card-worldbuilding"]').waitFor({ timeout: 15_000 });
-  assert.equal(await page.locator('.tutorial-video-card').count(), 4, 'the grid picks up a tutorial published after this build');
-  await page.getByText('La bóveda de mundos', { exact: true }).waitFor();
-  const cataloguedIds = await page.evaluate(async () => (await window.nodus.getTutorialCatalogue()).map((video) => video.id));
-  assert.deepEqual(cataloguedIds, ['essentials', 'academic', 'nodi', 'worldbuilding']);
-  assert.ok(existsSync(path.join(userData, 'tutorial-catalogue.json')), 'the answer is cached for the next offline launch');
-  // The catalogue grows over time, so the grid must keep fitting the window instead of
-  // pushing the guide sideways.
+  await page.getByTestId('tutorial-video-feature').waitFor();
+  assert.equal(await page.locator('.tutorial-video-card').count(), 0, 'first run does not dump the full catalogue on a newcomer');
+  assert.equal(await page.locator('.tutorial-video-feature-card').count(), 1, 'first run offers exactly the essential video');
   const layout = await page.evaluate(() => ({
     scrollWidth: document.documentElement.scrollWidth,
     clientWidth: document.documentElement.clientWidth,
     zoom: window.devicePixelRatio,
-    gridWidth: document.querySelector('.tutorial-video-grid')?.scrollWidth ?? 0,
     stageWidth: document.querySelector('.tutorial-videos-cinema')?.clientWidth ?? 0,
   }));
   assert.ok(
     layout.scrollWidth <= layout.clientWidth,
-    `the video screen does not scroll sideways with a grown catalogue: ${JSON.stringify(layout)}`
+    `the first-run video screen does not scroll sideways: ${JSON.stringify(layout)}`
   );
-  await page.screenshot({ path: path.join(shots, '2-video-grid-cinema.png') });
-  step('the video mode renders the published catalogue, including a tutorial newer than the build');
+  await page.screenshot({ path: path.join(shots, '2-video-feature-cinema.png') });
+  step('the video path starts with the essential tutorial alone');
 
   await page.getByTestId('tutorial-video-play-essentials').click();
   const player = page.getByTestId('tutorial-video-player');
@@ -160,9 +152,9 @@ try {
   assert.deepEqual(watched, ['essentials'], 'opening the video records it as watched');
   await page.getByTestId('tutorial-video-close').click();
   await player.waitFor({ state: 'detached' });
-  assert.equal(await page.getByTestId('tutorial-video-card-essentials').getAttribute('data-watched'), 'true');
-  await page.screenshot({ path: path.join(shots, '4-grid-watched.png') });
-  step('the flag survives the player closing and the card shows it');
+  assert.equal(await page.locator('.tutorial-video-feature-card .tutorial-video-watched').count(), 1);
+  await page.screenshot({ path: path.join(shots, '4-feature-watched.png') });
+  step('the flag survives the player closing and the featured card shows it');
 
   // Leaving through the video path still completes the guide.
   await page.getByTestId('basics-tutorial-complete').click();
@@ -181,8 +173,14 @@ try {
   const settingsGrid = page.getByTestId('tutorial-video-grid').first();
   await settingsGrid.waitFor();
   await settingsGrid.scrollIntoViewIfNeeded();
-  // Same catalogue here, so Settings also shows the tutorial published after the build.
-  assert.equal(await settingsGrid.locator('.tutorial-video-card').count(), 4, 'Settings lists the same catalogue as the guide');
+  // Settings owns the full catalogue. The stand-in adds one entry newer than this build,
+  // proving that the remote path is exercised and cached without cluttering first run.
+  await settingsGrid.locator('[data-testid="tutorial-video-card-worldbuilding"]').waitFor({ timeout: 15_000 });
+  assert.equal(await settingsGrid.locator('.tutorial-video-card').count(), PUBLISHED.videos.length, 'Settings lists the complete published catalogue');
+  await page.getByText('La bóveda de mundos', { exact: true }).waitFor();
+  const cataloguedIds = await page.evaluate(async () => (await window.nodus.getTutorialCatalogue()).map((video) => video.id));
+  assert.ok(cataloguedIds.includes('worldbuilding'), 'the remotely published tutorial reaches the renderer');
+  assert.ok(existsSync(path.join(userData, 'tutorial-catalogue.json')), 'the answer is cached for the next offline launch');
   await page.getByTestId('basics-tutorial-replay').waitFor();
   await page.screenshot({ path: path.join(shots, '5-settings-grid-light.png') });
   step('Settings → Tutoriales leads with the same grid, readable in light mode');
@@ -209,7 +207,7 @@ try {
   }
   step('the academic tour offers video (recommended), in-app walkthrough and "not now"');
 
-  // ── 6. a vault WITHOUT a video keeps a clean two-option card ──────────────────
+  // ── 6. a vault WITHOUT a video keeps the future route visible but disabled ─────
   await page.evaluate(async () => {
     const vaults = await window.nodus.listVaults();
     await window.nodus.setVaultType(vaults[0].id, 'estudio');
@@ -220,9 +218,24 @@ try {
   await dismissStartupUpdate(page);
   const studyCard = page.getByTestId('tour-card');
   await studyCard.waitFor();
-  assert.equal(await studyCard.getByTestId('tour-watch-video').count(), 0, 'no video is offered where none is published yet');
+  const futureVideo = studyCard.getByTestId('tour-watch-video');
+  assert.equal(await futureVideo.count(), 1, 'the future video route stays visible');
+  assert.equal(await futureVideo.isDisabled(), true, 'an unpublished video cannot be opened');
+  assert.match(await futureVideo.innerText(), /Próximamente/, 'the disabled state explains why');
   await page.screenshot({ path: path.join(shots, '7-tour-without-video.png') });
-  step('a vault with no video yet still opens with "Sí, enséñame" / "Ahora no"');
+  step('a vault with no video yet shows the disabled video placeholder');
+
+  // Dismissing the creation-time invitation records the user's decision. Loading a
+  // sample workspace afterwards must not reset that flag or make the modal reappear.
+  await studyCard.getByRole('button', { name: 'Ahora no', exact: true }).click();
+  await studyCard.waitFor({ state: 'detached' });
+  await page.waitForFunction(async () => (await window.nodus.getSettings()).studyTourComplete === true);
+  assert.equal(await page.evaluate(() => window.nodus.seedStudyDemoData()), true, 'the study demo is loaded');
+  await page.reload();
+  await page.getByTestId('app-shell').waitFor();
+  await dismissStartupUpdate(page);
+  assert.equal(await page.getByTestId('tour-card').count(), 0, 'loading a demo does not reopen the tutorial');
+  step('loading a demo preserves the dismissed tutorial state');
 
   console.log(`\nScreenshots: ${shots}`);
 } finally {

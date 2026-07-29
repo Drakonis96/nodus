@@ -15,6 +15,7 @@ if (!process.argv.includes('--electron-primary-sources-research-test')) {
     ['search', 'src/views/PrimarySourcesSearchView.tsx'],
     ['notes', 'src/views/PrimarySourcesNotesView.tsx'],
     ['home', 'src/views/PrimarySourcesHomeView.tsx'],
+    ['sharedHome', 'src/views/HomeView.tsx'],
     ['app', 'src/App.tsx'],
     ['repo', 'electron/db/primarySourceResearchRepo.ts'],
     ['schema', 'electron/db/migrations.ts'],
@@ -48,6 +49,14 @@ if (!process.argv.includes('--electron-primary-sources-research-test')) {
   assert.match(files.app, /<PrimarySourcesNotesView/);
   assert.match(files.app, /<PrimarySourcesHomeView/);
   assert.doesNotMatch(files.app, /PrimarySourcesSectionView section="search"/);
+  assert.doesNotMatch(files.search, /<aside\b/, 'search filters do not use a dedicated sidebar');
+  assert.match(files.search, /className="input input-with-leading-icon h-10 w-full pr-10 text-sm"/,
+    'the corpus search reserves space for the leading search icon');
+  assert.match(files.search, /primary-sources-search-filter-toggle/);
+  assert.match(files.search, /primary-sources-search-active-filters/);
+  assert.match(files.home, /<DemoOfferCard[\s\S]*variant="primary-sources"/,
+    'the Primary Sources home reuses the shared demo card');
+  assert.match(files.sharedHome, /Cargar demo de fuentes primarias/);
   assert.ok(Number(files.schema.match(/SCHEMA_VERSION = (\d+)/)[1]) >= 114,
     'the research-workspace migration is applied');
   assert.match(files.schema, /primary_source_note_profiles/);

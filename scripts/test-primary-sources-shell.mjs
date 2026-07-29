@@ -67,7 +67,8 @@ test('creation and onboarding recognise primary sources without requiring Zotero
     read('shared/vaultTypes.ts'),
   ]);
   assert.match(picker, /case 'primary_sources': return 'archive'/);
-  assert.match(onboarding, /vaultType === 'primary_sources' \|\| vaultType === 'genealogy'/);
+  assert.match(onboarding, /usesZoteroOnboarding = vaultType === 'academic'/);
+  assert.match(onboarding, /const simple = !usesZoteroOnboarding/);
   assert.match(onboarding, /vaultType === 'primary_sources'[\s\S]{0,500}Investiga documentos originales/);
   assert.match(vaultTypes, /id: 'primary_sources'[\s\S]{0,900}defaultHiddenViews: \['library', 'writing', 'deepResearch'\]/);
 });

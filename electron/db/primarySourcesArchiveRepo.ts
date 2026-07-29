@@ -28,7 +28,7 @@ import {
   listCaptureSessions,
 } from './archiveHierarchyRepo';
 import { getDb } from './database';
-import { findOrCreateGazetteerPlace } from './entitiesRepo';
+import { findOrCreateGazetteerPlace, listPlaces } from './entitiesRepo';
 import {
   getPrimarySourceProfile,
   listPrimarySourceProfiles,
@@ -59,11 +59,9 @@ import {
 const PENDING_PROVENANCE_ID = 'primary_sources_pending_provenance';
 const now = () => new Date().toISOString();
 
-function attachGazetteerPlace(
-  itemId: string,
-  candidate: NonNullable<PrimarySourceIngestInput['place']>,
-  role: NonNullable<PrimarySourceIngestInput['placeRole']> = 'creation'
-): void {
+function resolveProvenancePlace(
+  candidate: NonNullable<PrimarySourceIngestInput['place']>
+): string {
   if (
     !candidate.gazetteerId?.trim()
     || !candidate.name?.trim()
@@ -76,26 +74,7 @@ function attachGazetteerPlace(
   ) {
     throw new Error('El lugar seleccionado no es válido.');
   }
-  const place = findOrCreateGazetteerPlace(candidate);
-  const ts = now();
-  const existing = getDb().prepare(
-    `SELECT mention_id FROM archive_place_mentions
-     WHERE item_id=? AND place_id=? AND role=? LIMIT 1`
-  ).get(itemId, place.placeId, role) as { mention_id: string } | undefined;
-  if (existing) {
-    getDb().prepare(
-      `UPDATE archive_place_mentions
-       SET original_label=?, certainty=1, status='resolved', updated_at=?
-       WHERE mention_id=?`
-    ).run(candidate.name, ts, existing.mention_id);
-    return;
-  }
-  getDb().prepare(
-    `INSERT INTO archive_place_mentions (
-      mention_id, item_id, excerpt_id, place_id, original_label, role,
-      certainty, status, created_at, updated_at
-    ) VALUES (?, ?, NULL, ?, ?, ?, 1, 'resolved', ?, ?)`
-  ).run(`alm_${randomUUID()}`, itemId, place.placeId, candidate.name, role, ts, ts);
+  return findOrCreateGazetteerPlace(candidate).placeId;
 }
 
 function parseObject<T extends object>(value: string | null, fallback: T): T {
@@ -293,13 +272,20 @@ export function ensurePrimarySourceProjection(
     if (!getPrimarySourceProfile(itemId)) {
       const ts = now();
       const defaults = template?.profileDefaults ?? {};
+      const provenancePlaceId = input.place
+        ? resolveProvenancePlace(input.place)
+        : defaults.provenancePlaceId ?? null;
+      const profileMetadata = {
+        ...(defaults.metadata ?? {}),
+        ...(input.documentIcon?.trim() ? { documentIcon: input.documentIcon.trim() } : {}),
+      };
       db.prepare(
         `INSERT INTO archive_item_profiles (
           item_id, date_certainty, access_status, embargo_until, rights_statement,
           reproduction_conditions, sensitivity, processing_status, description_status,
-          analysis_status, citation_status, capture_session_id, metadata_json,
-          created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          analysis_status, citation_status, capture_session_id, provenance_place_id,
+          metadata_json, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         itemId,
         input.dateCertainty ?? defaults.dateCertainty ?? 'unknown',
@@ -313,15 +299,21 @@ export function ensurePrimarySourceProjection(
         defaults.analysisStatus ?? 'not_started',
         defaults.citationStatus ?? 'not_ready',
         input.captureSessionId ?? null,
-        JSON.stringify(defaults.metadata ?? {}),
+        provenancePlaceId,
+        JSON.stringify(profileMetadata),
         ts,
         ts
       );
     } else {
+      const currentProfile = getPrimarySourceProfile(itemId)!;
       updatePrimarySourceProfile(itemId, {
         ...(input.captureSessionId !== undefined ? { captureSessionId: input.captureSessionId } : {}),
         ...(input.accessStatus ? { accessStatus: input.accessStatus } : {}),
         ...(input.sensitivity ? { sensitivity: input.sensitivity } : {}),
+        ...(input.place ? { provenancePlaceId: resolveProvenancePlace(input.place) } : {}),
+        ...(input.documentIcon?.trim()
+          ? { metadata: { ...currentProfile.metadata, documentIcon: input.documentIcon.trim() } }
+          : {}),
       });
     }
 
@@ -377,7 +369,6 @@ export function ensurePrimarySourceProjection(
 
     if (input.collectionIds) setItemFolders(itemId, input.collectionIds);
     for (const tag of input.tags ?? []) addTag(itemId, tag);
-    if (input.place) attachGazetteerPlace(itemId, input.place, input.placeRole);
   })();
 
   const row = getPrimarySourceArchiveRow(itemId);
@@ -563,6 +554,7 @@ export function getPrimarySourceArchiveWorkspace(
     units: hierarchy.units,
     sessions: listCaptureSessions(),
     collections: listFolders(),
+    places: listPlaces(),
     templates: listDescriptionTemplates(),
     page: {
       offset,

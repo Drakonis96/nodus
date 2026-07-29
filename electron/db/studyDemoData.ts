@@ -320,7 +320,8 @@ export function seedStudyDemoData(): boolean {
     insertCell.run('wednesday', ID.scheduleMorning, ID.subjectEco);
     insertCell.run('thursday', ID.scheduleAfternoon, ID.subjectCell);
 
-    updateSettings({ demoMode: true, studyTourComplete: false });
+    // Loading the sample workspace must not re-open a completed/dismissed tutorial.
+    updateSettings({ demoMode: true });
   })();
   seedStudyAssistantDemoConversation();
   return true;

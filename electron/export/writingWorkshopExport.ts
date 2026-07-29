@@ -143,6 +143,14 @@ const DEEP_LABELS: Record<PromptLanguage, DeepReportLabels> = {
     imageAi: 'Imagem de capa gerada por IA no Nodus.', imageCustom: 'Imagem de capa fornecida pelo usuário.',
     claims: 'Afirmações-chave', role: 'Papel', claim: 'Afirmação', source: 'Fonte', evidence: 'Evidência', notes: 'Notas',
   },
+  it: {
+    kind: 'Relazione professionale · Deep Research', contents: 'Indice', generated: 'Generato', objective: 'Obiettivo',
+    summary: 'Sintesi esecutiva', summaryEyebrow: 'Sintesi', outline: 'Schema della ricerca', outlineEyebrow: 'Architettura della relazione',
+    report: 'Relazione', reportEyebrow: 'Analisi', recommendations: 'Passi successivi', recommendationsEyebrow: 'Raccomandazioni',
+    traceability: 'Matrice di tracciabilità', traceabilityEyebrow: 'Evidenze e collegamenti', sections: 'sezioni', sources: 'fonti', words: 'parole',
+    imageAi: 'Immagine di copertina generata con l’IA in Nodus.', imageCustom: 'Immagine di copertina fornita dall’utente.',
+    claims: 'Affermazioni chiave', role: 'Ruolo', claim: 'Affermazione', source: 'Fonte', evidence: 'Evidenza', notes: 'Note',
+  },
 };
 
 export async function exportWritingWorkshopDraft(

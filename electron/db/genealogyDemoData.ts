@@ -578,7 +578,9 @@ export function seedGenealogyDemoData(): boolean {
     db.prepare('INSERT INTO writing_saved_drafts (id,title,brief_json,selection_json,model_json,draft_json,created_at,updated_at) VALUES (?,?,?,?,NULL,?,?,?)')
       .run('demo-genealogy-deep-research', deepDraft.title, JSON.stringify(deepBrief), JSON.stringify(deepSelection), JSON.stringify(deepDraft), now, now);
 
-    updateSettings({ demoMode: true, genealogyTourComplete: false });
+    // Demo data and onboarding are independent: loading a sample must never re-open
+    // a tutorial the user already completed or dismissed.
+    updateSettings({ demoMode: true });
   });
   tx();
   return true;

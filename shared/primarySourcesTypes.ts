@@ -14,7 +14,7 @@ import type {
   ArchiveTextVersion,
   ArchiveVerificationStatus,
 } from './archiveTypes';
-import type { ArchiveFolder, ArchiveItem, GazetteerPlace, Note } from './types';
+import type { ArchiveFolder, ArchiveItem, GazetteerPlace, Note, Place } from './types';
 
 export const PRIMARY_SOURCES_DOMAIN_VERSION = 1 as const;
 
@@ -50,6 +50,8 @@ export type PrimarySourceCitationStatus = (typeof PRIMARY_SOURCE_CITATION_STATUS
 
 export interface PrimarySourceItemProfile {
   itemId: string;
+  /** Canonical place where the source originated; independent from places mentioned in its content. */
+  provenancePlaceId: string | null;
   dateCertainty: ArchiveDateCertainty;
   accessStatus: PrimarySourceAccessStatus;
   embargoUntil: string | null;
@@ -410,8 +412,9 @@ export interface PrimarySourceTimelineWorkspace {
   eventTypes: string[];
 }
 
-export type PrimarySourceMapRole = PrimarySourcePlaceRole | 'event_location';
+export type PrimarySourceMapRole = PrimarySourcePlaceRole | 'event_location' | 'provenance';
 export type PrimarySourceMapLayer =
+  | 'provenance'
   | 'mentions'
   | 'events'
   | 'movements'
@@ -452,6 +455,8 @@ export interface PrimarySourceToponymResolutionInput {
 
 export interface PrimarySourceMapPoint {
   pointId: string;
+  /** Human-readable source title for provenance points and accessible map popovers. */
+  sourceTitle: string | null;
   placeId: string;
   mentionId: string | null;
   eventId: string | null;
@@ -486,6 +491,8 @@ export interface PrimarySourceMapPoint {
 export interface PrimarySourceMapWorkspace {
   points: PrimarySourceMapPoint[];
   sources: PrimarySourceDerivedFilterOption[];
+  /** Sources whose record still has no provenance place assigned. */
+  unassignedSources: PrimarySourceDerivedFilterOption[];
   persons: PrimarySourceDerivedFilterOption[];
   events: PrimarySourceDerivedFilterOption[];
   sourceTypes: string[];
@@ -619,6 +626,8 @@ export interface PrimarySourceArchiveWorkspace {
   units: ArchiveDescriptionUnit[];
   sessions: ArchiveCaptureSession[];
   collections: ArchiveFolder[];
+  /** Shared geographic catalogue used by source records and the provenance map. */
+  places: Place[];
   templates: PrimarySourceDescriptionTemplate[];
   page: {
     offset: number;
@@ -634,6 +643,10 @@ export interface PrimarySourceIngestInput {
   title?: string | null;
   description?: string | null;
   documentType?: string | null;
+  /** Values for the shared Genealogy/Archive document-type catalogue. */
+  documentMetadata?: Record<string, string> | null;
+  /** Renderer icon chosen for the source; stored independently from typed metadata. */
+  documentIcon?: string | null;
   templateId?: string | null;
   repositoryId?: string | null;
   parentUnitId?: string | null;
@@ -649,11 +662,10 @@ export interface PrimarySourceIngestInput {
   accessStatus?: PrimarySourceAccessStatus;
   sensitivity?: PrimarySourceSensitivity;
   /**
-   * Canonical real-world place selected from the bundled offline gazetteer.
+   * Canonical real-world place of provenance selected from the bundled offline gazetteer.
    * Free-form coordinates are deliberately not accepted by this workflow.
    */
   place?: GazetteerPlace | null;
-  placeRole?: PrimarySourcePlaceRole;
 }
 
 export interface PrimarySourceIngestSummary {

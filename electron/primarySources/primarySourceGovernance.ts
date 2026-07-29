@@ -750,7 +750,7 @@ export async function runPrimarySourceToolkitOperation(
       const model = selectedModel(request.operationId);
       if (!model) throw new Error('No hay un modelo configurado para esta operación.');
       const system = primarySourceToolkitPrompt(
-        getSettings().uiLanguage,
+        getSettings().promptLanguage ?? 'es',
         request.operationId as Parameters<typeof primarySourceToolkitPrompt>[1],
       );
       if (request.operationId === 'translate_text') {

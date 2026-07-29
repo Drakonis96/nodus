@@ -20,7 +20,11 @@ import type {
 } from '@shared/primarySourcesTypes';
 import { primarySourceExcerptDeepLink } from '@shared/primarySourceDeepLink';
 import { Icon } from '../components/ui';
+import { DocumentIconPicker } from '../components/DocumentIconPicker';
+import { DocTypeForm, DocTypeSelect } from '../components/DocTypeForm';
+import { PlacePicker } from '../components/PlacePicker';
 import { archiveFileUrl } from '../lib/archiveFileUrl';
+import { archiveDocumentIcon, suggestedArchiveDocumentIcon } from '../lib/archiveDocumentIcon';
 import { t } from '../i18n';
 
 type DossierTab = 'source' | 'description' | 'text' | 'evidence' | 'analysis' | 'notes' | 'history';
@@ -166,6 +170,7 @@ export function PrimarySourceDossierView({
   workspace,
   onBack,
   onChanged,
+  presentation = 'page',
 }: {
   initialRow: PrimarySourceArchiveRow;
   initialExcerptId?: string | null;
@@ -173,6 +178,7 @@ export function PrimarySourceDossierView({
   workspace: PrimarySourceArchiveWorkspace;
   onBack: () => void;
   onChanged: () => Promise<void>;
+  presentation?: 'page' | 'modal';
 }) {
   const [dossier, setDossier] = useState<PrimarySourceDossier | null>(null);
   const [tab, setTab] = useState<DossierTab>(initialExcerptId || initialTextTarget ? 'text' : 'source');
@@ -253,11 +259,19 @@ export function PrimarySourceDossierView({
     <div className="flex h-full min-h-0 flex-col bg-neutral-50 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100" data-testid="primary-source-dossier">
       <header className="shrink-0 border-b border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
         <div className="flex items-start gap-3 px-4 py-3">
-          <button className="btn btn-ghost mt-0.5 h-8 w-8 p-0" onClick={onBack} title={t('Volver al archivo')} aria-label={t('Volver al archivo')}>
-            <Icon name="arrowLeft" size={16} />
+          <button
+            className="btn btn-ghost mt-0.5 h-8 w-8 p-0"
+            onClick={onBack}
+            title={t(presentation === 'modal' ? 'Cerrar ficha' : 'Volver al archivo')}
+            aria-label={t(presentation === 'modal' ? 'Cerrar ficha' : 'Volver al archivo')}
+          >
+            <Icon name={presentation === 'modal' ? 'x' : 'arrowLeft'} size={16} />
           </button>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
+              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-300">
+                <Icon name={archiveDocumentIcon(dossier.row.profile.metadata, dossier.row.item.docType, dossier.row.item.kind)} size={14} />
+              </span>
               <h1 className="truncate text-base font-semibold">{dossier.row.item.title}</h1>
               {dossier.row.unit.referenceCode && <code className="rounded bg-neutral-100 px-2 py-0.5 text-[11px] dark:bg-neutral-800">{dossier.row.unit.referenceCode}</code>}
               <StatusPill status={dossier.row.profile.accessStatus} />
@@ -266,11 +280,16 @@ export function PrimarySourceDossierView({
               {[dossier.row.repositoryName, dossier.row.unit.creatorDisplay, dossier.row.unit.date.display].filter(Boolean).join(' · ') || t('Procedencia por completar')}
             </p>
           </div>
-          <button className="btn btn-secondary gap-2 text-xs" disabled={busy} onClick={() => void run(
+          <button
+            className="btn btn-secondary h-8 w-8 p-0"
+            title={t('Verificar todo')}
+            aria-label={t('Verificar todo')}
+            disabled={busy}
+            onClick={() => void run(
             () => window.nodus.verifyPrimarySourceFiles(dossier.row.item.itemId),
             'Verificación de integridad completada.'
           )}>
-            <Icon name="check" size={14} /> {t('Verificar todo')}
+            <Icon name="check" size={14} />
           </button>
         </div>
         <nav className="flex overflow-x-auto px-3" aria-label={t('Secciones del dossier')} role="tablist">
@@ -557,10 +576,10 @@ function FileToolbar({
         <div className="ml-auto flex flex-wrap gap-1">
           <button className="btn btn-ghost h-8 w-8 p-0" disabled={busy} onClick={onMoveEarlier} title={t('Subir en la secuencia')} aria-label={t('Subir en la secuencia')}><Icon name="arrowUp" size={13} /></button>
           <button className="btn btn-ghost h-8 w-8 p-0" disabled={busy} onClick={onMoveLater} title={t('Bajar en la secuencia')} aria-label={t('Bajar en la secuencia')}><Icon name="arrowDown" size={13} /></button>
-          {file.role === 'master' && <button className="btn btn-ghost h-8 gap-1.5 text-xs" disabled={busy} onClick={onNewVersion}><Icon name="refresh" size={13} />{t('Nueva versión')}</button>}
-          {file.role !== 'thumbnail' && <button className="btn btn-ghost h-8 gap-1.5 text-xs" disabled={busy} onClick={onRegenerate}><Icon name="image" size={13} />{t('Regenerar miniatura')}</button>}
-          <button className="btn btn-ghost h-8 gap-1.5 text-xs" disabled={busy} onClick={onSave}><Icon name="download" size={13} />{t('Guardar copia')}</button>
-          <button className="btn btn-ghost h-8 gap-1.5 text-xs" disabled={busy} onClick={onExternal}><Icon name="external" size={13} />{t('Abrir externamente')}</button>
+          {file.role === 'master' && <button className="btn btn-ghost h-8 w-8 p-0" disabled={busy} onClick={onNewVersion} title={t('Nueva versión')} aria-label={t('Nueva versión')}><Icon name="refresh" size={13} /></button>}
+          {file.role !== 'thumbnail' && <button className="btn btn-ghost h-8 w-8 p-0" disabled={busy} onClick={onRegenerate} title={t('Regenerar miniatura')} aria-label={t('Regenerar miniatura')}><Icon name="image" size={13} /></button>}
+          <button className="btn btn-ghost h-8 w-8 p-0" disabled={busy} onClick={onSave} title={t('Guardar copia')} aria-label={t('Guardar copia')}><Icon name="download" size={13} /></button>
+          <button className="btn btn-ghost h-8 w-8 p-0" disabled={busy} onClick={onExternal} title={t('Abrir externamente')} aria-label={t('Abrir externamente')}><Icon name="external" size={13} /></button>
         </div>
       </div>
       <div className="mt-1 flex min-w-0 gap-3 overflow-hidden text-[10px] text-neutral-500">
@@ -658,8 +677,8 @@ function MultiFormatViewer({ selected, files }: { selected: ArchiveItemFile; fil
           <button className="btn btn-ghost h-8 w-8 p-0" onClick={() => setZoom((value) => Math.max(0.25, value - 0.25))} aria-label={t('Alejar')}><Icon name="minus" size={14} /></button>
           <span role="status" aria-live="polite" className="min-w-14 py-2 text-center text-[10px] tabular-nums">{Math.round(zoom * 100)}%</span>
           <button className="btn btn-ghost h-8 w-8 p-0" onClick={() => setZoom((value) => Math.min(6, value + 0.25))} aria-label={t('Acercar')}><Icon name="plus" size={14} /></button>
-          <button className="btn btn-ghost h-8 gap-1 text-xs" aria-label={t('Girar vista 90 grados')} onClick={() => setRotation((value) => (value + 90) % 360)}><Icon name="rotateCw" size={14} />{t('Girar vista')}</button>
-          <button className="btn btn-ghost h-8 text-xs" onClick={() => { setZoom(1); setRotation(0); }}>{t('Restablecer vista')}</button>
+          <button className="btn btn-ghost h-8 w-8 p-0" title={t('Girar vista 90 grados')} aria-label={t('Girar vista 90 grados')} onClick={() => setRotation((value) => (value + 90) % 360)}><Icon name="rotateCw" size={14} /></button>
+          <button className="btn btn-ghost h-8 w-8 p-0" title={t('Restablecer vista')} aria-label={t('Restablecer vista')} onClick={() => { setZoom(1); setRotation(0); }}><Icon name="fit" size={14} /></button>
         </div>
         <div className="min-h-0 flex-1 overflow-auto p-8">
           <img
@@ -1168,7 +1187,7 @@ function TextTab({
         </div>
       </section>
 
-      {copied && <p className="fixed bottom-5 left-1/2 z-[90] -translate-x-1/2 rounded-full bg-neutral-900 px-4 py-2 text-xs text-white shadow-xl">{copied}</p>}
+      {copied && <p className="fixed bottom-5 left-1/2 z-[190] -translate-x-1/2 rounded-full bg-neutral-900 px-4 py-2 text-xs text-white shadow-xl">{copied}</p>}
       {excerptOpen && current && (
         <ExcerptDialog
           dossier={dossier}
@@ -1244,7 +1263,7 @@ function ExcerptDialog({
     }
   };
   return (
-    <div className="fixed inset-0 z-[80] grid place-items-center bg-black/50 p-4" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+    <div className="fixed inset-0 z-[180] grid place-items-center bg-black/50 p-4" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
       <section className="w-full max-w-xl overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-2xl dark:border-neutral-700 dark:bg-neutral-900" role="dialog" aria-modal="true" aria-labelledby="create-excerpt-title">
         <header className="flex items-start gap-3 border-b border-neutral-200 px-5 py-4 dark:border-neutral-800">
           <div className="min-w-0 flex-1">
@@ -1333,16 +1352,70 @@ function DescriptionTab({
 }) {
   const row = dossier.row;
   const [title, setTitle] = useState(row.unit.title);
+  const [titleType, setTitleType] = useState(row.unit.titleType);
+  const [level, setLevel] = useState(row.unit.level);
+  const [localLevelLabel, setLocalLevelLabel] = useState(row.unit.localLevelLabel ?? '');
   const [referenceCode, setReferenceCode] = useState(row.unit.referenceCode ?? '');
   const [creator, setCreator] = useState(row.unit.creatorDisplay ?? '');
   const [dateDisplay, setDateDisplay] = useState(row.unit.date.display ?? '');
+  const [dateCertainty, setDateCertainty] = useState(row.unit.date.certainty);
   const [scope, setScope] = useState(row.unit.scopeContent ?? '');
   const [repositoryId, setRepositoryId] = useState(row.unit.repositoryId ?? '');
   const [parentUnitId, setParentUnitId] = useState(row.unit.parentUnitId ?? '');
+  const [extentDisplay, setExtentDisplay] = useState(row.unit.extentDisplay ?? '');
+  const [arrangement, setArrangement] = useState(row.unit.arrangement ?? '');
+  const [administrativeHistory, setAdministrativeHistory] = useState(row.unit.administrativeBiographicalHistory ?? '');
+  const [custodialHistory, setCustodialHistory] = useState(row.unit.custodialHistory ?? '');
+  const [acquisitionInfo, setAcquisitionInfo] = useState(row.unit.acquisitionInfo ?? '');
+  const [accessConditions, setAccessConditions] = useState(row.unit.accessConditions ?? '');
+  const [unitReproductionConditions, setUnitReproductionConditions] = useState(row.unit.reproductionConditions ?? '');
+  const [physicalCharacteristics, setPhysicalCharacteristics] = useState(row.unit.physicalCharacteristics ?? '');
+  const [findingAids, setFindingAids] = useState(row.unit.findingAids ?? '');
+  const [relatedUnits, setRelatedUnits] = useState(row.unit.relatedUnits ?? '');
+  const [sourceCatalogUrl, setSourceCatalogUrl] = useState(row.unit.sourceCatalogUrl ?? '');
+  const [languageCodes, setLanguageCodes] = useState(row.unit.languageCodes.join(', '));
+  const [scriptCodes, setScriptCodes] = useState(row.unit.scriptCodes.join(', '));
   const [accessStatus, setAccessStatus] = useState(row.profile.accessStatus);
   const [sensitivity, setSensitivity] = useState(row.profile.sensitivity);
+  const [processingStatus, setProcessingStatus] = useState(row.profile.processingStatus);
+  const [descriptionStatus, setDescriptionStatus] = useState(row.profile.descriptionStatus);
+  const [citationStatus, setCitationStatus] = useState(row.profile.citationStatus);
+  const [embargoUntil, setEmbargoUntil] = useState(row.profile.embargoUntil ?? '');
+  const [rightsStatement, setRightsStatement] = useState(row.profile.rightsStatement ?? '');
+  const [reproductionConditions, setReproductionConditions] = useState(row.profile.reproductionConditions ?? '');
+  const [captureSessionId, setCaptureSessionId] = useState(row.profile.captureSessionId ?? '');
+  const [provenancePlaceId, setProvenancePlaceId] = useState(row.profile.provenancePlaceId ?? '');
+  const [availablePlaces, setAvailablePlaces] = useState(workspace.places);
+  const [addingPlace, setAddingPlace] = useState(false);
+  const [placeBusy, setPlaceBusy] = useState(false);
+  const [documentType, setDocumentType] = useState<string | null>(row.item.docType);
+  const [documentMetadata, setDocumentMetadata] = useState<Record<string, string>>(row.item.metadata ?? {});
+  const suggestedIcon = suggestedArchiveDocumentIcon(documentType, row.item.kind);
+  const [documentIcon, setDocumentIcon] = useState(
+    archiveDocumentIcon(row.profile.metadata, row.item.docType, row.item.kind),
+  );
+  const [tagsText, setTagsText] = useState(row.item.tags.join(', '));
+  const [collectionIds, setCollectionIds] = useState(row.item.folderIds);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const splitList = (value: string) => [...new Set(value.split(',').map((part) => part.trim()).filter(Boolean))];
+  const addPlaceFromGazetteer = async (candidate: Parameters<typeof window.nodus.resolveGazetteerPlace>[0]) => {
+    setPlaceBusy(true);
+    setError(null);
+    try {
+      const place = await window.nodus.resolveGazetteerPlace(candidate);
+      setAvailablePlaces((current) => current.some((entry) => entry.placeId === place.placeId)
+        ? current
+        : [...current, place].sort((a, b) => a.name.localeCompare(b.name)));
+      setProvenancePlaceId(place.placeId);
+      setAddingPlace(false);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason));
+    } finally {
+      setPlaceBusy(false);
+    }
+  };
+
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
     setBusy(true);
@@ -1352,15 +1425,55 @@ function DescriptionTab({
         expectedRevision: row.revision,
         unit: {
           title,
+          titleType,
+          level,
+          localLevelLabel: level === 'local' ? localLevelLabel || null : null,
           referenceCode: referenceCode || null,
           creatorDisplay: creator || null,
           repositoryId: repositoryId || null,
           parentUnitId: parentUnitId || null,
           scopeContent: scope || null,
-          date: { ...row.unit.date, display: dateDisplay || null },
+          extentDisplay: extentDisplay || null,
+          arrangement: arrangement || null,
+          administrativeBiographicalHistory: administrativeHistory || null,
+          custodialHistory: custodialHistory || null,
+          acquisitionInfo: acquisitionInfo || null,
+          accessConditions: accessConditions || null,
+          reproductionConditions: unitReproductionConditions || null,
+          physicalCharacteristics: physicalCharacteristics || null,
+          findingAids: findingAids || null,
+          relatedUnits: relatedUnits || null,
+          sourceCatalogUrl: sourceCatalogUrl || null,
+          languageCodes: splitList(languageCodes),
+          scriptCodes: splitList(scriptCodes),
+          date: { ...row.unit.date, display: dateDisplay || null, certainty: dateCertainty },
         },
-        profile: { accessStatus, sensitivity },
+        profile: {
+          accessStatus,
+          sensitivity,
+          processingStatus,
+          descriptionStatus,
+          citationStatus,
+          embargoUntil: embargoUntil || null,
+          rightsStatement: rightsStatement || null,
+          reproductionConditions: reproductionConditions || null,
+          captureSessionId: captureSessionId || null,
+          provenancePlaceId: provenancePlaceId || null,
+          metadata: { ...row.profile.metadata, documentIcon },
+        },
       });
+      await window.nodus.updateArchiveItem(row.item.itemId, {
+        docType: documentType,
+        metadata: documentMetadata,
+      });
+      await window.nodus.setArchiveItemFolders(row.item.itemId, collectionIds);
+      const nextTags = splitList(tagsText);
+      for (const tag of nextTags) {
+        if (!row.item.tags.includes(tag)) await window.nodus.addArchiveTag(row.item.itemId, tag);
+      }
+      for (const tag of row.item.tags) {
+        if (!nextTags.includes(tag)) await window.nodus.removeArchiveTag(row.item.itemId, tag);
+      }
       await onSaved();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason));
@@ -1368,26 +1481,162 @@ function DescriptionTab({
       setBusy(false);
     }
   };
+  const sectionClass = 'rounded-xl border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-900';
+
   return (
     <div className="h-full overflow-y-auto p-5">
-      <form className="mx-auto max-w-4xl space-y-5" onSubmit={save}>
-        <section className="rounded-xl border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-900">
-          <h2 className="text-sm font-semibold">{t('Descripción archivística')}</h2>
-          <p className="mt-1 text-xs text-neutral-500">{t('La descripción es canónica y está separada de los archivos digitales y de las colecciones de trabajo.')}</p>
+      <form className="mx-auto max-w-6xl space-y-5" onSubmit={save} data-testid="primary-source-description-form">
+        <div className="grid gap-5 xl:grid-cols-2">
+          <section className={sectionClass}>
+            <h2 className="text-sm font-semibold">{t('Identificación y catalogación')}</h2>
+            <p className="mt-1 text-xs text-neutral-500">{t('Usa el mismo catálogo documental que el Archivo de Genealogía.')}</p>
+            <div className="mt-5 grid gap-4 md:grid-cols-2">
+              <div className="md:col-span-2"><Field label={t('Título')}><input className="input w-full" required value={title} onChange={(event) => setTitle(event.target.value)} /></Field></div>
+              <Field label={t('Tipo de documento')}>
+                <DocTypeSelect
+                  value={documentType}
+                  onChange={(value) => {
+                    setDocumentType(value);
+                    setDocumentMetadata({});
+                    setDocumentIcon(suggestedArchiveDocumentIcon(value, row.item.kind));
+                  }}
+                  emptyLabel="Elegir tipo de documento…"
+                />
+              </Field>
+              <Field label={t('Icono')}>
+                <DocumentIconPicker value={documentIcon} suggested={suggestedIcon} onChange={setDocumentIcon} />
+              </Field>
+            </div>
+            {documentType && (
+              <div className="mt-4 rounded-xl border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-800 dark:bg-neutral-950/40">
+                <DocTypeForm
+                  docType={documentType}
+                  values={documentMetadata}
+                  onChange={(key, value) => setDocumentMetadata((current) => ({ ...current, [key]: value }))}
+                />
+              </div>
+            )}
+            <div className="mt-4"><Field label={t('Alcance y contenido')}><textarea className="input min-h-28 w-full resize-y" value={scope} onChange={(event) => setScope(event.target.value)} /></Field></div>
+          </section>
+
+          <section className={sectionClass}>
+            <h2 className="text-sm font-semibold">{t('Descripción archivística')}</h2>
+            <p className="mt-1 text-xs text-neutral-500">{t('La descripción es canónica y está separada de los archivos digitales y de las colecciones de trabajo.')}</p>
+            <div className="mt-5 grid gap-4 md:grid-cols-2">
+              <Field label={t('Signatura')}><input className="input w-full" value={referenceCode} onChange={(event) => setReferenceCode(event.target.value)} /></Field>
+              <Field label={t('Nivel')}><select className="input w-full" value={level} onChange={(event) => setLevel(event.target.value as typeof level)}>{(['repository', 'fonds', 'collection', 'subfonds', 'series', 'subseries', 'file', 'item', 'component', 'local'] as const).map((value) => <option key={value} value={value}>{t({ repository: 'Repositorio', fonds: 'Fondo', collection: 'Colección archivística', subfonds: 'Subfondo', series: 'Serie', subseries: 'Subserie', file: 'Unidad de instalación', item: 'Documento', component: 'Componente', local: 'Nivel local' }[value])}</option>)}</select></Field>
+              {level === 'local' && <Field label={t('Nombre del nivel local')}><input className="input w-full" required value={localLevelLabel} onChange={(event) => setLocalLevelLabel(event.target.value)} /></Field>}
+              <Field label={t('Tipo de título')}><select className="input w-full" value={titleType} onChange={(event) => setTitleType(event.target.value as typeof titleType)}><option value="original">{t('Original')}</option><option value="supplied">{t('Atribuido')}</option><option value="formal">{t('Formal')}</option><option value="unknown">{t('Desconocido')}</option></select></Field>
+              <Field label={t('Repositorio')}><select className="input w-full" value={repositoryId} onChange={(event) => setRepositoryId(event.target.value)}><option value="">{t('Sin repositorio')}</option>{workspace.repositories.map((repository) => <option key={repository.repositoryId} value={repository.repositoryId}>{repository.name}</option>)}</select></Field>
+              <Field label={t('Unidad padre')}><select className="input w-full" value={parentUnitId} onChange={(event) => setParentUnitId(event.target.value)}><option value="">{t('Nivel raíz')}</option>{workspace.units.filter((unit) => unit.unitId !== row.unit.unitId).map((unit) => <option key={unit.unitId} value={unit.unitId}>{unit.referenceCode ? `${unit.referenceCode} · ` : ''}{unit.title}</option>)}</select></Field>
+              <div className="md:col-span-2">
+                <Field
+                  label={t('Lugar de procedencia')}
+                  hint={t('Selecciona el lugar donde se originó esta fuente. Es el único lugar que la representa en el mapa de procedencia.')}
+                >
+                  <div className="space-y-2">
+                    <select
+                      className="input w-full"
+                      value={provenancePlaceId}
+                      onChange={(event) => setProvenancePlaceId(event.target.value)}
+                      data-testid="primary-source-provenance-place-select"
+                    >
+                      <option value="">{t('Sin lugar de procedencia')}</option>
+                      {availablePlaces.map((place) => (
+                        <option key={place.placeId} value={place.placeId}>
+                          {[place.name, place.admin1, place.country].filter(Boolean).join(' · ')}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1.5 text-[11px] font-medium text-indigo-600 hover:underline dark:text-indigo-300"
+                      onClick={() => setAddingPlace((current) => !current)}
+                      disabled={placeBusy}
+                    >
+                      <Icon name={addingPlace ? 'x' : 'plus'} size={12} />
+                      {t(addingPlace ? 'Cancelar nuevo lugar' : 'Añadir lugar al catálogo geográfico')}
+                    </button>
+                    {addingPlace && (
+                      <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 dark:border-neutral-800 dark:bg-neutral-950/50">
+                        <p className="mb-2 text-[10px] leading-4 text-neutral-500">
+                          {t('Busca en el gacetero local; al elegir un resultado se añadirá al catálogo compartido y quedará seleccionado.')}
+                        </p>
+                        <PlacePicker onPick={(candidate) => void addPlaceFromGazetteer(candidate)} />
+                        {placeBusy && <p className="mt-2 text-[10px] text-neutral-500">{t('Añadiendo lugar…')}</p>}
+                      </div>
+                    )}
+                  </div>
+                </Field>
+              </div>
+              <Field label={t('Creador documental')}><input className="input w-full" value={creator} onChange={(event) => setCreator(event.target.value)} /></Field>
+              <Field label={t('Extensión')}><input className="input w-full" value={extentDisplay} onChange={(event) => setExtentDisplay(event.target.value)} /></Field>
+              <Field label={t('Fecha tal como aparece')}><input className="input w-full" value={dateDisplay} onChange={(event) => setDateDisplay(event.target.value)} /></Field>
+              <Field label={t('Certeza de la fecha')}><select className="input w-full" value={dateCertainty} onChange={(event) => setDateCertainty(event.target.value as typeof dateCertainty)}>{(['exact', 'circa', 'before', 'after', 'between', 'uncertain', 'unknown'] as const).map((value) => <option key={value} value={value}>{t({ exact: 'Exacta', circa: 'Aproximada', before: 'Anterior a', after: 'Posterior a', between: 'Entre fechas', uncertain: 'Incierta', unknown: 'Desconocida' }[value])}</option>)}</select></Field>
+            </div>
+          </section>
+        </div>
+
+        <div className="grid gap-5 xl:grid-cols-2">
+          <section className={sectionClass}>
+            <h2 className="text-sm font-semibold">{t('Acceso, estado y preservación')}</h2>
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <Field label={t('Acceso')}><select className="input w-full" value={accessStatus} onChange={(event) => setAccessStatus(event.target.value as typeof accessStatus)}>{(['open', 'private', 'restricted', 'embargoed', 'unknown'] as const).map((value) => <option key={value} value={value}>{t({ open: 'Abierta', private: 'Privada', restricted: 'Restringida', embargoed: 'Embargada', unknown: 'Acceso por revisar' }[value])}</option>)}</select></Field>
+              <Field label={t('Sensibilidad')}><select className="input w-full" value={sensitivity} onChange={(event) => setSensitivity(event.target.value as typeof sensitivity)}>{(['normal', 'personal', 'sensitive', 'highly_sensitive'] as const).map((value) => <option key={value} value={value}>{t({ normal: 'Normal', personal: 'Datos personales', sensitive: 'Sensible', highly_sensitive: 'Muy sensible' }[value])}</option>)}</select></Field>
+              <Field label={t('Estado de procesamiento')}><select className="input w-full" value={processingStatus} onChange={(event) => setProcessingStatus(event.target.value as typeof processingStatus)}>{(['imported', 'needs_description', 'ready', 'processing', 'error', 'archived'] as const).map((value) => <option key={value} value={value}>{t({ imported: 'Importada', needs_description: 'Requiere descripción', ready: 'Preparada', processing: 'Procesando', error: 'Con incidencias', archived: 'Archivada' }[value])}</option>)}</select></Field>
+              <Field label={t('Estado de descripción')}><select className="input w-full" value={descriptionStatus} onChange={(event) => setDescriptionStatus(event.target.value as typeof descriptionStatus)}>{(['minimal', 'provenance_incomplete', 'described', 'citation_ready'] as const).map((value) => <option key={value} value={value}>{t({ minimal: 'Mínima', provenance_incomplete: 'Procedencia incompleta', described: 'Descrita', citation_ready: 'Lista para citar' }[value])}</option>)}</select></Field>
+              <Field label={t('Estado de cita')}><select className="input w-full" value={citationStatus} onChange={(event) => setCitationStatus(event.target.value as typeof citationStatus)}><option value="not_ready">{t('No preparada')}</option><option value="general_locator">{t('Localizador general')}</option><option value="ready">{t('Lista para citar')}</option></select></Field>
+              <Field label={t('Sesión de captura')}><select className="input w-full" value={captureSessionId} onChange={(event) => setCaptureSessionId(event.target.value)}><option value="">{t('Sin sesión')}</option>{workspace.sessions.map((session) => <option key={session.sessionId} value={session.sessionId}>{session.title}</option>)}</select></Field>
+              <Field label={t('Embargo hasta')}><input className="input w-full" type="date" value={embargoUntil} onChange={(event) => setEmbargoUntil(event.target.value)} /></Field>
+            </div>
+            <div className="mt-4 space-y-4">
+              <Field label={t('Declaración de derechos')}><textarea className="input min-h-20 w-full resize-y" value={rightsStatement} onChange={(event) => setRightsStatement(event.target.value)} /></Field>
+              <Field label={t('Condiciones de reproducción')}><textarea className="input min-h-20 w-full resize-y" value={reproductionConditions} onChange={(event) => setReproductionConditions(event.target.value)} /></Field>
+            </div>
+          </section>
+
+          <section className={sectionClass}>
+            <h2 className="text-sm font-semibold">{t('Organización')}</h2>
+            <div className="mt-4 space-y-4">
+              <Field label={t('Etiquetas')} hint={t('Separadas por comas')}><input className="input w-full" value={tagsText} onChange={(event) => setTagsText(event.target.value)} /></Field>
+              <div>
+                <p className="mb-2 text-xs font-medium text-neutral-600 dark:text-neutral-300">{t('Colecciones de trabajo')}</p>
+                <div className="grid gap-2 rounded-xl border border-neutral-200 p-3 dark:border-neutral-800 sm:grid-cols-2">
+                  {workspace.collections.map((collection) => (
+                    <label key={collection.folderId} className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs hover:bg-neutral-50 dark:hover:bg-neutral-800">
+                      <input type="checkbox" checked={collectionIds.includes(collection.folderId)} onChange={(event) => setCollectionIds((current) => event.target.checked ? [...current, collection.folderId] : current.filter((id) => id !== collection.folderId))} />
+                      <span className="truncate">{collection.name}</span>
+                    </label>
+                  ))}
+                  {workspace.collections.length === 0 && <p className="text-xs text-neutral-500">{t('Aún no hay colecciones.')}</p>}
+                </div>
+              </div>
+              <Field label={t('Idiomas')} hint={t('Códigos separados por comas, por ejemplo: es, la')}><input className="input w-full" value={languageCodes} onChange={(event) => setLanguageCodes(event.target.value)} /></Field>
+              <Field label={t('Escrituras')} hint={t('Códigos separados por comas, por ejemplo: Latn')}><input className="input w-full" value={scriptCodes} onChange={(event) => setScriptCodes(event.target.value)} /></Field>
+            </div>
+          </section>
+        </div>
+
+        <details className={sectionClass}>
+          <summary className="cursor-pointer text-sm font-semibold">{t('Descripción archivística avanzada')}</summary>
           <div className="mt-5 grid gap-4 md:grid-cols-2">
-            <Field label={t('Título')}><input className="input w-full" required value={title} onChange={(event) => setTitle(event.target.value)} /></Field>
-            <Field label={t('Signatura')}><input className="input w-full" value={referenceCode} onChange={(event) => setReferenceCode(event.target.value)} /></Field>
-            <Field label={t('Repositorio')}><select className="input w-full" value={repositoryId} onChange={(event) => setRepositoryId(event.target.value)}><option value="">{t('Sin repositorio')}</option>{workspace.repositories.map((repository) => <option key={repository.repositoryId} value={repository.repositoryId}>{repository.name}</option>)}</select></Field>
-            <Field label={t('Unidad padre')}><select className="input w-full" value={parentUnitId} onChange={(event) => setParentUnitId(event.target.value)}><option value="">{t('Nivel raíz')}</option>{workspace.units.filter((unit) => unit.unitId !== row.unit.unitId).map((unit) => <option key={unit.unitId} value={unit.unitId}>{unit.referenceCode ? `${unit.referenceCode} · ` : ''}{unit.title}</option>)}</select></Field>
-            <Field label={t('Creador documental')}><input className="input w-full" value={creator} onChange={(event) => setCreator(event.target.value)} /></Field>
-            <Field label={t('Fecha tal como aparece')}><input className="input w-full" value={dateDisplay} onChange={(event) => setDateDisplay(event.target.value)} /></Field>
-            <Field label={t('Acceso')}><select className="input w-full" value={accessStatus} onChange={(event) => setAccessStatus(event.target.value as typeof accessStatus)}>{(['open', 'private', 'restricted', 'embargoed', 'unknown'] as const).map((value) => <option key={value} value={value}>{t({ open: 'Abierta', private: 'Privada', restricted: 'Restringida', embargoed: 'Embargada', unknown: 'Acceso por revisar' }[value])}</option>)}</select></Field>
-            <Field label={t('Sensibilidad')}><select className="input w-full" value={sensitivity} onChange={(event) => setSensitivity(event.target.value as typeof sensitivity)}>{(['normal', 'personal', 'sensitive', 'highly_sensitive'] as const).map((value) => <option key={value} value={value}>{t({ normal: 'Normal', personal: 'Datos personales', sensitive: 'Sensible', highly_sensitive: 'Muy sensible' }[value])}</option>)}</select></Field>
+            <Field label={t('Organización original')}><textarea className="input min-h-20 w-full resize-y" value={arrangement} onChange={(event) => setArrangement(event.target.value)} /></Field>
+            <Field label={t('Historia administrativa o biográfica')}><textarea className="input min-h-20 w-full resize-y" value={administrativeHistory} onChange={(event) => setAdministrativeHistory(event.target.value)} /></Field>
+            <Field label={t('Historia de custodia')}><textarea className="input min-h-20 w-full resize-y" value={custodialHistory} onChange={(event) => setCustodialHistory(event.target.value)} /></Field>
+            <Field label={t('Forma de ingreso')}><textarea className="input min-h-20 w-full resize-y" value={acquisitionInfo} onChange={(event) => setAcquisitionInfo(event.target.value)} /></Field>
+            <Field label={t('Condiciones de acceso archivísticas')}><textarea className="input min-h-20 w-full resize-y" value={accessConditions} onChange={(event) => setAccessConditions(event.target.value)} /></Field>
+            <Field label={t('Condiciones de reproducción archivísticas')}><textarea className="input min-h-20 w-full resize-y" value={unitReproductionConditions} onChange={(event) => setUnitReproductionConditions(event.target.value)} /></Field>
+            <Field label={t('Características físicas')}><textarea className="input min-h-20 w-full resize-y" value={physicalCharacteristics} onChange={(event) => setPhysicalCharacteristics(event.target.value)} /></Field>
+            <Field label={t('Instrumentos de descripción')}><textarea className="input min-h-20 w-full resize-y" value={findingAids} onChange={(event) => setFindingAids(event.target.value)} /></Field>
+            <Field label={t('Unidades relacionadas')}><textarea className="input min-h-20 w-full resize-y" value={relatedUnits} onChange={(event) => setRelatedUnits(event.target.value)} /></Field>
+            <Field label={t('URL del catálogo')}><input className="input w-full" type="url" value={sourceCatalogUrl} onChange={(event) => setSourceCatalogUrl(event.target.value)} /></Field>
           </div>
-          <div className="mt-4"><Field label={t('Alcance y contenido')}><textarea className="input min-h-32 w-full" value={scope} onChange={(event) => setScope(event.target.value)} /></Field></div>
-        </section>
+        </details>
+
         {error && <p className="text-sm text-red-600">{error}</p>}
-        <div className="flex justify-end"><button className="btn btn-primary" disabled={busy}>{busy ? t('Guardando…') : t('Guardar descripción')}</button></div>
+        <div className="sticky bottom-0 flex justify-end border-t border-neutral-200 bg-neutral-50/95 py-3 backdrop-blur dark:border-neutral-800 dark:bg-neutral-950/95">
+          <button className="btn btn-primary gap-2" disabled={busy}><Icon name="save" size={14} />{busy ? t('Guardando…') : t('Guardar ficha')}</button>
+        </div>
       </form>
     </div>
   );
@@ -1981,7 +2230,7 @@ function AddRepresentationDialog({
     }
   };
   return (
-    <div className="fixed inset-0 z-[80] grid place-items-center bg-black/50 p-4" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+    <div className="fixed inset-0 z-[180] grid place-items-center bg-black/50 p-4" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
       <section className="w-full max-w-2xl overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-2xl dark:border-neutral-700 dark:bg-neutral-900" role="dialog" aria-modal="true" aria-labelledby="add-representation-title">
         <header className="flex items-start gap-3 border-b border-neutral-200 px-5 py-4 dark:border-neutral-800">
           <div className="min-w-0 flex-1"><h2 id="add-representation-title" className="font-semibold">{supersedesFileId ? t('Añadir nueva versión de máster') : t('Añadir archivo o representación')}</h2><p className="mt-1 text-xs leading-5 text-neutral-500">{supersedesFileId ? t('La versión anterior seguirá preservada y quedará marcada como sustituida.') : t('Los derivados conservan el enlace, la transformación y el checksum de su propio contenido.')}</p></div>
@@ -2024,6 +2273,6 @@ function StatusPill({ status }: { status: PrimarySourceArchiveRow['profile']['ac
   return <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">{t(labels[status])}</span>;
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <label className="block text-xs text-neutral-600 dark:text-neutral-400"><span className="mb-1.5 block font-medium">{label}</span>{children}</label>;
+function Field({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) {
+  return <label className="block text-xs text-neutral-600 dark:text-neutral-400"><span className="mb-1.5 block font-medium">{label}</span>{children}{hint && <span className="mt-1 block text-[10px] leading-4 text-neutral-500">{hint}</span>}</label>;
 }

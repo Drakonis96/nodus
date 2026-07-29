@@ -46,12 +46,14 @@ try {
   const priorType = getActiveVault().type;
 
   // ── Seed ──────────────────────────────────────────────────────────────────
+  updateSettings({ genealogyTourComplete: true });
   assert.equal(demo.seedGenealogyDemoData(), true, 'seeded on an empty vault');
   assert.equal(demo.seedGenealogyDemoData(), false, 'idempotent: no re-seed when data exists');
 
   // Vault flipped to genealogy; prior type remembered for restore.
   assert.equal(getActiveVault().type, 'genealogy', 'active vault is now genealogy');
   assert.equal(getSettings().demoMode, true, 'demo flag set');
+  assert.equal(getSettings().genealogyTourComplete, true, 'loading the demo preserves the tutorial decision');
   assert.equal(getSettings().demoPriorVaultType, priorType, 'prior vault type remembered');
 
   const counts = entities.recordCounts();

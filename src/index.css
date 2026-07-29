@@ -131,6 +131,22 @@
   gap: 0;
 }
 
+/* The centred vault trigger uses dark-theme indigo utilities as its baseline.
+   In the light theme it needs its own, much lighter surface; using --vault-accent
+   keeps the same treatment for every vault mode without global utility remaps. */
+.light .app-titlebar button.header-vault-badge {
+  border-color: color-mix(in srgb, var(--vault-accent, #6366f1) 48%, white);
+  background-color: color-mix(in srgb, var(--vault-accent, #6366f1) 5%, white);
+  color: color-mix(in srgb, var(--vault-accent, #6366f1) 84%, #1e293b);
+  box-shadow: 0 1px 3px rgb(15 23 42 / 6%);
+}
+
+.light .app-titlebar button.header-vault-badge:hover,
+.light .app-titlebar button.header-vault-badge[aria-expanded='true'] {
+  border-color: color-mix(in srgb, var(--vault-accent, #6366f1) 72%, white);
+  background-color: color-mix(in srgb, var(--vault-accent, #6366f1) 11%, white);
+}
+
 :root {
   color-scheme: dark;
   --interface-scale: 1;
@@ -973,15 +989,166 @@ body {
   margin-top: 1.5rem;
 }
 
-/* The first-vault chooser reuses the guide's card, but carries the same three-column
-   mode grid as the switcher's creation modal — 680px squeezes it to two. The card is
-   also the only one of these that can outgrow a short window, so it scrolls itself. */
+/* The first-vault chooser must remain a single, glanceable decision: the entire form
+   and its primary action fit in the window instead of hiding the action in a nested
+   scroll area. The regular create-vault modal keeps the roomier version of the shared
+   picker; only this first-run surface compacts it. */
 .first-vault-card {
-  width: min(760px, 100%);
-  max-height: calc(100vh - 4rem);
-  overflow-y: auto;
+  width: min(800px, 100%);
+  max-height: none;
+  overflow: hidden;
+  padding: clamp(1rem, 2.4vh, 1.5rem);
 }
-.first-vault-form { margin-top: 1.4rem; }
+.tutorial-cinema.first-vault-screen {
+  overflow: clip;
+}
+.first-vault-intro {
+  display: grid;
+  grid-template-columns: 108px minmax(0, 1fr);
+  align-items: center;
+  gap: 1.25rem;
+  text-align: left;
+}
+.first-vault-intro > .nodi-svg,
+.first-vault-intro > .nodi-orb {
+  margin-inline: auto;
+}
+.first-vault-copy .tutorial-language-brand {
+  justify-content: flex-start;
+  margin-bottom: 0.5rem;
+}
+.first-vault-copy h1 {
+  margin-top: 0;
+  font-size: clamp(1.55rem, 4vw, 2rem);
+  line-height: 1.08;
+}
+.first-vault-copy > p:not(.tutorial-eyebrow) {
+  margin-top: 0.4rem;
+  color: #a3a3a3;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+.first-vault-form {
+  margin-top: clamp(0.7rem, 1.8vh, 1rem);
+}
+.first-vault-form > .mt-4 {
+  margin-top: clamp(0.6rem, 1.4vh, 0.85rem);
+}
+.first-vault-card [data-testid='vault-type-picker'] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.375rem;
+}
+.first-vault-card [data-testid='vault-type-picker'] > button {
+  height: clamp(4.5rem, 9vh, 4.9rem);
+  gap: 0.2rem;
+  padding: 0.35rem;
+}
+.first-vault-card [data-testid^='new-vault-type-icon-'] {
+  width: 1.65rem;
+  height: 1.65rem;
+  border-radius: 0.45rem;
+}
+.first-vault-card [data-testid='vault-type-picker'] > button > span:last-child {
+  min-height: 0;
+  -webkit-line-clamp: 1;
+}
+.first-vault-card [data-testid='vault-phase-notice'],
+.first-vault-card [data-testid='vault-preview-notice'] {
+  margin-top: 0.5rem;
+  padding: 0.4rem 0.65rem;
+  line-height: 1.15rem;
+}
+.first-vault-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: clamp(0.65rem, 1.5vh, 0.9rem);
+}
+.first-vault-footer .btn {
+  flex: 0 0 auto;
+}
+
+@media (max-height: 760px) {
+  .tutorial-cinema.first-vault-screen {
+    padding: 0.5rem;
+  }
+  .first-vault-card {
+    padding: 0.75rem 1rem;
+  }
+  .first-vault-intro {
+    grid-template-columns: 76px minmax(0, 1fr);
+    gap: 0.8rem;
+  }
+  .first-vault-intro > .nodi-svg,
+  .first-vault-intro > .nodi-orb {
+    width: auto;
+    height: 76px !important;
+  }
+  .first-vault-copy .tutorial-language-brand {
+    margin-bottom: 0.25rem;
+    font-size: 0.65rem;
+  }
+  .first-vault-copy h1 {
+    font-size: 1.45rem;
+  }
+  .first-vault-copy > p:not(.tutorial-eyebrow) {
+    margin-top: 0.25rem;
+    font-size: 0.72rem;
+    line-height: 1.2;
+  }
+  .first-vault-form {
+    margin-top: 0.55rem;
+  }
+  .first-vault-card [data-testid='vault-type-picker'] > button {
+    height: 3.75rem;
+  }
+  .first-vault-card [data-testid='vault-type-picker'] > button > span:last-child {
+    display: none;
+  }
+  .first-vault-card [data-testid='vault-phase-notice'],
+  .first-vault-card [data-testid='vault-preview-notice'] {
+    padding-block: 0.3rem;
+  }
+  .first-vault-footer {
+    margin-top: 0.5rem;
+  }
+}
+
+@media (max-width: 620px) {
+  .tutorial-cinema.first-vault-screen {
+    padding: 0.5rem;
+  }
+  .first-vault-card {
+    padding-inline: 0.75rem;
+  }
+  .first-vault-intro {
+    grid-template-columns: 68px minmax(0, 1fr);
+    gap: 0.65rem;
+  }
+  .first-vault-intro > .nodi-svg,
+  .first-vault-intro > .nodi-orb {
+    width: auto;
+    height: 68px !important;
+  }
+  .first-vault-copy h1 {
+    font-size: 1.35rem;
+  }
+  .first-vault-card [data-testid='vault-type-picker'] > button {
+    height: 3.8rem;
+  }
+  .first-vault-card [data-testid='vault-type-picker'] > button > span:last-child {
+    display: none;
+  }
+  .first-vault-footer {
+    align-items: flex-end;
+    gap: 0.65rem;
+  }
+  .first-vault-footer p {
+    font-size: 0.65rem;
+    line-height: 1rem;
+  }
+}
 
 .tutorial-language-option {
   display: grid;

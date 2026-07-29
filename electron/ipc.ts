@@ -2780,6 +2780,7 @@ export function registerIpc(
         updateItem(result.item.itemId, {
           description: input.description?.trim() || result.item.description,
           docType: input.documentType ?? result.item.docType,
+          metadata: input.documentMetadata ?? result.item.metadata,
         });
       }
       rows.push(ensurePrimarySourceProjection(result.item.itemId, {

@@ -47,6 +47,7 @@ try {
   assert.equal(demo.seedTeachingDemoData(), false, 'the teaching demo is refused outside a docencia vault');
 
   vaults.setVaultType(active.id, 'docencia');
+  settings.updateSettings({ docenciaTourComplete: true });
   const userCourse = org.createStudyCourse({ name: 'Curso del usuario' });
   assert.equal(demo.seedTeachingDemoData(), true, 'a docencia vault accepts the sample workspace alongside user data');
   assert.equal(demo.seedTeachingDemoData(), false, 'seeding is idempotent and never duplicates the sample data');
@@ -113,7 +114,7 @@ try {
   assert.equal(Object.keys(chosen).length, 4, 'the rubric-marked cell records a level for each criterion');
 
   assert.equal(settings.getSettings().demoMode, true);
-  assert.equal(settings.getSettings().docenciaTourComplete, false, 'seeding re-arms the guided tutorial');
+  assert.equal(settings.getSettings().docenciaTourComplete, true, 'seeding preserves the tutorial decision');
   assert.equal(generalDemo.hasAnyData(), true, 'teaching content participates in the global presence check');
   assert.deepEqual(getDb().pragma('foreign_key_check'), [], 'the sample hierarchy satisfies every foreign key');
 

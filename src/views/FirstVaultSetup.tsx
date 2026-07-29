@@ -3,7 +3,11 @@ import { motion } from 'framer-motion';
 import type { VaultSummary, VaultType } from '@shared/types';
 import { NodiAvatar } from '../components/nodi/NodiAvatar';
 import { Icon } from '../components/ui';
-import { VaultTypePicker } from '../components/vaultTypeUi';
+import {
+  isPreAlphaVaultType,
+  PreAlphaVaultConfirmation,
+  VaultTypePicker,
+} from '../components/vaultTypeUi';
 import { errorText, t } from '../i18n';
 
 /**
@@ -45,8 +49,9 @@ export function FirstVaultSetup({
   const [nameError, setNameError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [preAlphaConfirmOpen, setPreAlphaConfirmOpen] = useState(false);
 
-  const submit = async () => {
+  const submit = async (preAlphaConfirmed = false) => {
     if (busy) return;
     const trimmed = name.trim();
     if (!trimmed) {
@@ -55,6 +60,10 @@ export function FirstVaultSetup({
     }
     setNameError(null);
     setError(null);
+    if (isPreAlphaVaultType(type) && !preAlphaConfirmed) {
+      setPreAlphaConfirmOpen(true);
+      return;
+    }
     setBusy(true);
     try {
       await window.nodus.renameVault(vault.id, trimmed);
@@ -70,57 +79,72 @@ export function FirstVaultSetup({
   };
 
   return (
-    <div className="tutorial-cinema tutorial-language-screen" data-testid="first-vault-setup" role="dialog" aria-modal="true" aria-labelledby="first-vault-title">
-      <div className="tutorial-aurora" aria-hidden="true" />
-      <motion.main
-        className="tutorial-language-card first-vault-card"
-        initial={{ opacity: 0, y: 24, scale: .97 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: .42, ease: [0.2, 0.8, 0.2, 1] }}
-      >
-        <NodiAvatar state="celebrating" height={150} />
-        <p className="tutorial-eyebrow tutorial-language-brand"><Icon name="layers" size={15} /> {t('TU PRIMERA BÓVEDA')}</p>
-        <h1 id="first-vault-title">{t('Vamos a crear tu primera bóveda')}</h1>
-        <p>{t('Ponle un nombre y elige su modo. El modo decide qué secciones verás y cómo trabaja la IA contigo; puedes crear más bóvedas, de otros modos, cuando quieras.')}</p>
-
-        <div className="first-vault-form">
-          <label className="block text-left text-sm">
-            {t('Nombre de la bóveda')}
-            <input
-              className="input mt-1 w-full"
-              autoFocus
-              data-testid="first-vault-name"
-              aria-invalid={Boolean(nameError)}
-              aria-describedby={nameError ? 'first-vault-name-error' : undefined}
-              value={name}
-              disabled={busy}
-              onChange={(event) => { setName(event.target.value); if (nameError) setNameError(null); }}
-              onKeyDown={(event) => { if (event.key === 'Enter') void submit(); }}
-              placeholder={t('Nombre de la bóveda')}
-            />
-            {nameError && <span id="first-vault-name-error" data-testid="first-vault-name-error" role="alert" className="mt-1 block text-xs text-red-400">{nameError}</span>}
-          </label>
-
-          <div className="mt-4 text-left">
-            <div className="mb-1.5 text-xs text-neutral-500">{t('Tipo de bóveda')}</div>
-            <VaultTypePicker value={type} onChange={setType} disabled={busy} />
+    <>
+      <div className="tutorial-cinema tutorial-language-screen first-vault-screen" data-testid="first-vault-setup" role="dialog" aria-modal="true" aria-labelledby="first-vault-title">
+        <div className="tutorial-aurora" aria-hidden="true" />
+        <motion.main
+          className="tutorial-language-card first-vault-card"
+          initial={{ opacity: 0, y: 24, scale: .97 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: .42, ease: [0.2, 0.8, 0.2, 1] }}
+        >
+          <div className="first-vault-intro">
+            <NodiAvatar state="celebrating" height={108} />
+            <div className="first-vault-copy">
+              <p className="tutorial-eyebrow tutorial-language-brand"><Icon name="layers" size={15} /> {t('TU PRIMERA BÓVEDA')}</p>
+              <h1 id="first-vault-title">{t('Vamos a crear tu primera bóveda')}</h1>
+              <p>{t('Ponle un nombre y elige su modo. El modo decide qué secciones verás y cómo trabaja la IA contigo; puedes crear más bóvedas, de otros modos, cuando quieras.')}</p>
+            </div>
           </div>
 
-          <p className="mt-4 flex items-start gap-2 text-left text-xs leading-5 text-neutral-500" data-testid="first-vault-next-step">
-            <Icon name="info" size={14} className="mt-0.5 shrink-0" />
-            <span>{t('Después el asistente te ayudará a elegir su modelo de IA y su modelo de embeddings. Puedes cambiar el nombre en cualquier momento desde el selector de bóvedas.')}</span>
-          </p>
+          <div className="first-vault-form">
+            <label className="block text-left text-sm">
+              {t('Nombre de la bóveda')}
+              <input
+                className="input mt-1 w-full"
+                autoFocus
+                data-testid="first-vault-name"
+                aria-invalid={Boolean(nameError)}
+                aria-describedby={nameError ? 'first-vault-name-error' : undefined}
+                value={name}
+                disabled={busy}
+                onChange={(event) => { setName(event.target.value); if (nameError) setNameError(null); }}
+                onKeyDown={(event) => { if (event.key === 'Enter') void submit(); }}
+                placeholder={t('Nombre de la bóveda')}
+              />
+              {nameError && <span id="first-vault-name-error" data-testid="first-vault-name-error" role="alert" className="mt-1 block text-xs text-red-400">{nameError}</span>}
+            </label>
 
-          {error && <p role="alert" data-testid="first-vault-error" className="mt-3 rounded-lg border border-red-900/60 bg-red-950/20 px-3 py-2 text-left text-xs text-red-300">{error}</p>}
+            <div className="mt-4 text-left">
+              <div className="mb-1.5 text-xs text-neutral-500">{t('Tipo de bóveda')}</div>
+              <VaultTypePicker value={type} onChange={setType} disabled={busy} />
+            </div>
 
-          <div className="mt-5 flex justify-end">
-            <button className="btn btn-primary gap-1.5" data-testid="first-vault-create" onClick={() => void submit()} disabled={busy}>
-              <Icon name={busy ? 'sync' : 'check'} className={busy ? 'animate-spin' : ''} />
-              {busy ? t('Preparando…') : t('Crear mi bóveda')}
-            </button>
+            {error && <p role="alert" data-testid="first-vault-error" className="mt-3 rounded-lg border border-red-900/60 bg-red-950/20 px-3 py-2 text-left text-xs text-red-300">{error}</p>}
+
+            <div className="first-vault-footer">
+              <p className="flex min-w-0 flex-1 items-start gap-2 text-left text-xs leading-5 text-neutral-500" data-testid="first-vault-next-step">
+                <Icon name="info" size={14} className="mt-0.5 shrink-0" />
+                <span>{t('Después el asistente te ayudará a elegir su modelo de IA y su modelo de embeddings. Puedes cambiar el nombre en cualquier momento desde el selector de bóvedas.')}</span>
+              </p>
+              <button className="btn btn-primary gap-1.5" data-testid="first-vault-create" onClick={() => void submit()} disabled={busy}>
+                <Icon name={busy ? 'sync' : 'check'} className={busy ? 'animate-spin' : ''} />
+                {busy ? t('Preparando…') : t('Crear mi bóveda')}
+              </button>
+            </div>
           </div>
-        </div>
-      </motion.main>
-    </div>
+        </motion.main>
+      </div>
+      {preAlphaConfirmOpen && (
+        <PreAlphaVaultConfirmation
+          type={type}
+          onCancel={() => setPreAlphaConfirmOpen(false)}
+          onConfirm={() => {
+            setPreAlphaConfirmOpen(false);
+            void submit(true);
+          }}
+        />
+      )}
+    </>
   );
 }

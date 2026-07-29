@@ -21,7 +21,6 @@ import { listPresences } from '../db/worldPresenceRepo';
 import { knowersAt, listSecrets, secretsForCharacter } from '../db/worldStoryRepo';
 import { getDb } from '../db/database';
 import {
-  WORLD_CHAT_SYSTEM,
   composeWorldChatContext,
   ensureWorldCitations,
   hasWorldChatMaterial,
@@ -32,7 +31,7 @@ import {
   type WorldChatFacts,
   type WorldChatRef,
 } from '@shared/worldChatContext';
-import { withWorldPromptLanguage } from '@shared/worldPromptLanguage';
+import { worldOperationSystemPrompt } from '@shared/worldOperationPrompts';
 import { findingsFor } from '@shared/worldFindings';
 import { BEAT_MARK_LABEL } from '@shared/worldThreads';
 import { RULE_SCOPE_LABEL } from '@shared/worldRules';
@@ -261,7 +260,7 @@ export async function streamWorldChat(
   const model = request.model ?? settings.chatModel ?? settings.synthesisModel ?? null;
   const raw = await completeTextStream(
     {
-      system: withWorldPromptLanguage(WORLD_CHAT_SYSTEM, settings.uiLanguage),
+      system: worldOperationSystemPrompt('worldChat', settings.promptLanguage ?? 'es'),
       user: composeWorldChatContext(facts),
       plainContext: true,
       // Cool. Everything true in the answer is already in the material; the model's job is

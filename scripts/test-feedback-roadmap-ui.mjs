@@ -61,14 +61,15 @@ test('roadmap follows the requested sequence and is opened from the header', asy
   ]);
   const steps = [
     'Pulido y estabilidad',
+    'Servidor',
+    'Compartir vaults y trabajo colaborativo',
+    'Apps para iOS y iPadOS',
     'Vault de docencia',
     'Vault de fuentes primarias',
     'Vault de testimonios (historia oral)',
     'Vaults sugeridos por usuarios',
     'Vault de prosopografía',
     'Vault de worldbuilding',
-    'Servidor',
-    'Compartir vaults y trabajo colaborativo',
     'Nodus Toolkit',
     'Nodus Translate',
     'Nodus PDF Presenter',
@@ -81,12 +82,29 @@ test('roadmap follows the requested sequence and is opened from the header', asy
     previous = current;
   }
   assert.match(roadmapSource, /title: 'Pulido y estabilidad'.+status: 'inProgress'/);
-  assert.match(roadmapSource, /title: 'Vault de docencia'.+status: 'inProgress'/);
-  for (const implemented of ['Nodus Toolkit', 'Nodus Translate', 'Nodus PDF Presenter', 'Nodus OCR Workspace']) {
-    assert.match(roadmapSource, new RegExp(`title: '${implemented}'.+status: 'implemented'`), `${implemented} is marked as implemented`);
+  assert.match(roadmapSource, /title: 'Servidor'.+status: 'inProgress'/);
+  assert.match(roadmapSource, /title: 'Compartir vaults y trabajo colaborativo'.+status: 'planned'/);
+  assert.match(roadmapSource, /title: 'Apps para iOS y iPadOS'.+status: 'planned'/);
+  for (const implemented of [
+    'Vault de docencia',
+    'Vault de fuentes primarias',
+    'Vault de testimonios (historia oral)',
+    'Vaults sugeridos por usuarios',
+    'Vault de prosopografía',
+    'Vault de worldbuilding',
+    'Nodus Toolkit',
+    'Nodus Translate',
+    'Nodus PDF Presenter',
+    'Nodus OCR Workspace',
+  ]) {
+    const itemStart = roadmapSource.indexOf(`title: '${implemented}'`);
+    assert.ok(
+      itemStart >= 0 && roadmapSource.slice(itemStart, itemStart + 320).includes("status: 'implemented'"),
+      `${implemented} is marked as implemented`,
+    );
   }
   assert.match(roadmapSource, /children: \[/, 'user-suggested vaults are rendered as a nested group');
-  assert.match(roadmapSource, /Nodus Toolkit, Nodus Translate, PDF Presenter y OCR Workspace figuran como implementados/, 'current Toolkit availability is documented');
+  assert.match(roadmapSource, /Implementado: Docencia, Fuentes primarias, Testimonios/, 'implemented vault availability is documented');
   for (const description of [
     'Handy local-first tools for file conversion and document processing, built into Nodus.',
     'Present PDFs and externally authored presentations with presenter view, mobile remote control, speaker notes, and live annotation tools.',

@@ -3,6 +3,13 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
 const read = (file) => readFile(new URL(`../${file}`, import.meta.url), 'utf8');
+const cssRule = (css, selector) => {
+  const start = css.indexOf(selector);
+  assert.ok(start >= 0, `missing CSS rule for ${selector}`);
+  const open = css.indexOf('{', start);
+  const close = css.indexOf('}', open);
+  return css.slice(open + 1, close);
+};
 
 test('worldbuilding and teaching use their own visible vault icons', async () => {
   const [picker, switcher, app, ui, dock] = await Promise.all([
@@ -59,8 +66,27 @@ test('the guide hands over to the first-vault chooser, not to an academic vault'
   assert.match(screen, /event\.key === 'Enter'/);
   assert.match(screen, /data-testid="first-vault-create"/);
   // Cinematic chrome, like the guide it follows.
-  assert.match(screen, /className="tutorial-cinema tutorial-language-screen"/);
+  assert.match(screen, /className="tutorial-cinema tutorial-language-screen first-vault-screen"/);
   assert.match(screen, /<NodiAvatar/);
+});
+
+test('the first-vault chooser keeps its create action visible without scrolling', async () => {
+  const [screen, css] = await Promise.all([
+    read('src/views/FirstVaultSetup.tsx'),
+    read('src/index.css'),
+  ]);
+  assert.match(screen, /className="tutorial-cinema tutorial-language-screen first-vault-screen"/);
+  assert.match(screen, /className="first-vault-intro"/);
+  assert.match(screen, /className="first-vault-footer"/);
+  assert.match(screen, /className="first-vault-footer"[\s\S]*data-testid="first-vault-create"/);
+
+  const screenRule = cssRule(css, '.tutorial-cinema.first-vault-screen');
+  const cardRule = cssRule(css, '.first-vault-card');
+  const pickerRule = cssRule(css, ".first-vault-card [data-testid='vault-type-picker'] > button");
+  assert.match(screenRule, /overflow:\s*clip/);
+  assert.match(cardRule, /overflow:\s*hidden/);
+  assert.doesNotMatch(cardRule, /overflow-y:\s*auto/);
+  assert.match(pickerRule, /height:\s*clamp/);
 });
 
 test('the first-vault chooser can only ever meet a genuinely new install', async () => {
@@ -96,12 +122,27 @@ test('preview vaults bypass setup and every automatic tutorial', async () => {
   assert.match(app, /\{!isPreviewVault && settings\.onboardingComplete &&/);
 });
 
-test('study onboarding is local-first and does not require Zotero', async () => {
+test('only academic onboarding requires Zotero; dedicated vaults stay local-first', async () => {
   const onboarding = await read('src/views/Onboarding.tsx');
-  assert.match(onboarding, /vaultType === 'primary_sources' \|\| vaultType === 'genealogy' \|\| vaultType === 'databases' \|\| vaultType === 'estudio'/);
+  assert.match(onboarding, /const usesZoteroOnboarding = vaultType === 'academic';/);
+  assert.match(onboarding, /const simple = !usesZoteroOnboarding;/);
   assert.match(onboarding, /if \(!simple\) void checkZotero\(\)/);
   assert.match(onboarding, /Organiza cursos, apuntes, materiales y repasos en un espacio de aprendizaje local/);
   assert.match(onboarding, /enlazar materiales de Zotero de forma opcional/);
+  assert.match(onboarding, /Conserva entrevistas, participantes y transcripciones en un archivo de historia oral local y privado/);
+  assert.match(onboarding, /Estudia una población histórica desde sus fuentes, observaciones y criterios explícitos/);
+  assert.match(onboarding, /Construye un mundo de ficción coherente a partir de tu propio canon/);
+});
+
+test('Zotero controls stay out of testimonies, prosopography and worldbuilding', async () => {
+  const [app, settings] = await Promise.all([
+    read('src/App.tsx'),
+    read('src/views/Settings.tsx'),
+  ]);
+  assert.match(settings, /ZOTERO_FREE_VAULT_TYPES = new Set<VaultType>\(\['testimonios', 'prosopography', 'worldbuilding'\]\)/);
+  assert.match(settings, /if \(tab === 'library' && !hasZoteroLibraryWorkflow\) return false;/);
+  assert.match(settings, /tab\.id !== 'library' \|\| hasZoteroLibraryWorkflow/);
+  assert.match(app, /!isWorldbuilding && !isProsopography && !isTestimonios/);
 });
 
 test('study has a first-run tour and a replay action in settings', async () => {
@@ -119,6 +160,52 @@ test('study has a first-run tour and a replay action in settings', async () => {
   assert.match(settings, /data-testid="study-tour-replay"/);
   assert.match(settings, /patch\(\{ studyTourComplete: false \}\)/);
   assert.match(sidebar, /data-tour=\{`nav-\$\{item\.view\}`\}/);
+});
+
+test('demos never trigger tutorials; only vault creation and Settings can do that', async () => {
+  const [app, engine, settings, ...demoSeeders] = await Promise.all([
+    read('src/App.tsx'),
+    read('src/views/tourEngine.tsx'),
+    read('src/views/Settings.tsx'),
+    read('electron/db/demoData.ts'),
+    read('electron/db/genealogyDemoData.ts'),
+    read('electron/db/databasesDemoData.ts'),
+    read('electron/db/studyDemoData.ts'),
+    read('electron/db/teachingDemoData.ts'),
+    read('electron/db/primarySourcesDemoData.ts'),
+    read('electron/db/testimonyDemoData.ts'),
+    read('electron/db/worldbuildingDemoData.ts'),
+    read('electron/db/prosopDemoRepo.ts'),
+  ]);
+
+  // Every tour shows the video route. A missing publication changes only its enabled
+  // state, not whether the choice exists.
+  assert.match(engine, /showUnavailableVideo = true/);
+  assert.match(engine, /\(video \|\| showUnavailableVideo\)/);
+  assert.match(engine, /disabled=\{!video\}/);
+
+  // Testimonios used to wait for demoMode, so loading its sample looked like the thing
+  // that launched the tutorial. Its creation-time gate is now independent of the demo.
+  assert.match(app, /isTestimonios && !settings\.testimonyTourComplete/);
+  assert.doesNotMatch(app, /isTestimonios && settings\.demoMode && !settings\.testimonyTourComplete/);
+
+  // The explicit replay controls in Settings are the only product code allowed to
+  // reset a completed dedicated tutorial.
+  for (const flag of [
+    'genealogyTourComplete',
+    'databasesTourComplete',
+    'testimonyTourComplete',
+    'studyTourComplete',
+    'docenciaTourComplete',
+  ]) {
+    assert.match(settings, new RegExp(`patch\\(\\{ ${flag}: false \\}\\)`), `${flag} remains replayable from Settings`);
+    for (const seeder of demoSeeders) {
+      assert.doesNotMatch(seeder, new RegExp(`${flag}: false`), `a demo seeder resets ${flag}`);
+    }
+  }
+  for (const seeder of demoSeeders) {
+    assert.doesNotMatch(seeder, /tourComplete: false/, 'a demo seeder resets the shared tutorial');
+  }
 });
 
 test('discarding a new onboarding vault switches away before deleting it', async () => {
@@ -156,6 +243,28 @@ test('both vault creation screens offer the SAME modes, from one picker', async 
   // The header and Settings have imported these from VaultSwitcher since before the
   // split, so it re-exports them rather than breaking those call sites.
   assert.match(switcher, /export \{ vaultTypeIcon, vaultTypeLabel \} from '\.\/vaultTypeUi'/);
+});
+
+test('PRE-ALPHA is explicit and blocks both creation flows behind confirmation', async () => {
+  const [shared, switcher, first] = await Promise.all([
+    read('src/components/vaultTypeUi.tsx'),
+    read('src/components/VaultSwitcher.tsx'),
+    read('src/views/FirstVaultSetup.tsx'),
+  ]);
+
+  assert.match(shared, /type === 'primary_sources' \|\| type === 'prosopography' \|\| type === 'testimonios'\) return 'pre-alpha'/);
+  assert.match(shared, /if \(type === 'worldbuilding'\) return 'alpha'/);
+  assert.match(shared, /PRE-ALPHA: este vault no es utilizable para trabajo real/);
+  assert.match(shared, /data-testid="pre-alpha-vault-confirmation"/);
+  assert.match(shared, /Sí, crear solo para pruebas/);
+
+  for (const file of [switcher, first]) {
+    assert.match(file, /isPreAlphaVaultType\(/);
+    assert.match(file, /<PreAlphaVaultConfirmation/);
+    assert.match(file, /preAlphaConfirmed/);
+  }
+  assert.match(switcher, /void createVault\(true\)/);
+  assert.match(first, /void submit\(true\)/);
 });
 
 test('the create-vault modal shows an inline accessible name error', async () => {

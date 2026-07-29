@@ -2423,7 +2423,7 @@ try {
   await page.reload();
   await page.getByTestId('primary-sources-home').waitFor({ timeout: 30_000 });
   await page.getByTestId('primary-sources-demo-offer').waitFor({ timeout: 30_000 });
-  await page.getByRole('button', { name: 'Cargar corpus de aprendizaje', exact: true }).click();
+  await page.getByRole('button', { name: 'Cargar demo de fuentes primarias', exact: true }).click();
   await waitForCondition('corpus de aprendizaje de fuentes primarias cargado', () => page.evaluate(async () => {
     const workspace = await window.nodus.getPrimarySourcesWorkspace('', 0, 200);
     const settings = await window.nodus.getSettings();

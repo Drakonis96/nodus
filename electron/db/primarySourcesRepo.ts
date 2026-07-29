@@ -23,6 +23,7 @@ export function primaryUnitForItem(itemId: string): ArchiveDescriptionUnit | nul
 
 type ProfileRow = {
   item_id: string; date_certainty: PrimarySourceItemProfile['dateCertainty'];
+  provenance_place_id: string | null;
   access_status: PrimarySourceItemProfile['accessStatus']; embargo_until: string | null;
   rights_statement: string | null; reproduction_conditions: string | null;
   sensitivity: PrimarySourceItemProfile['sensitivity'];
@@ -33,7 +34,8 @@ type ProfileRow = {
   metadata_json: string | null; created_at: string; updated_at: string;
 };
 const profileFromRow = (row: ProfileRow): PrimarySourceItemProfile => ({
-  itemId: row.item_id, dateCertainty: row.date_certainty, accessStatus: row.access_status,
+  itemId: row.item_id, provenancePlaceId: row.provenance_place_id,
+  dateCertainty: row.date_certainty, accessStatus: row.access_status,
   embargoUntil: row.embargo_until, rightsStatement: row.rights_statement,
   reproductionConditions: row.reproduction_conditions, sensitivity: row.sensitivity,
   processingStatus: row.processing_status, descriptionStatus: row.description_status,
@@ -70,12 +72,12 @@ export function updatePrimarySourceProfile(
     `UPDATE archive_item_profiles SET date_certainty=?, access_status=?, embargo_until=?,
       rights_statement=?, reproduction_conditions=?, sensitivity=?, processing_status=?,
       description_status=?, analysis_status=?, citation_status=?, capture_session_id=?,
-      metadata_json=?, updated_at=? WHERE item_id=?`
+      provenance_place_id=?, metadata_json=?, updated_at=? WHERE item_id=?`
   ).run(
     next.dateCertainty, next.accessStatus, next.embargoUntil, next.rightsStatement,
     next.reproductionConditions, next.sensitivity, next.processingStatus,
     next.descriptionStatus, next.analysisStatus, next.citationStatus,
-    next.captureSessionId, JSON.stringify(next.metadata), now(), itemId
+    next.captureSessionId, next.provenancePlaceId, JSON.stringify(next.metadata), now(), itemId
   );
   return getPrimarySourceProfile(itemId);
 }

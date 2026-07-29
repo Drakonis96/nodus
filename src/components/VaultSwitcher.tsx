@@ -8,6 +8,8 @@ import { ConfirmModal } from './ConfirmModal';
 import { Icon } from './ui';
 import {
   NEW_VAULT_TYPES,
+  isPreAlphaVaultType,
+  PreAlphaVaultConfirmation,
   PreviewBadge,
   VAULT_TYPE_COLOR,
   VaultPhaseBadge,
@@ -66,6 +68,7 @@ export function VaultSwitcher({ anchorEl, onClose, vaults, onVaultsChanged, onAc
   const [addNameError, setAddNameError] = useState<string | null>(null);
   const [addType, setAddType] = useState<VaultType>('academic');
   const [addError, setAddError] = useState<string | null>(null);
+  const [preAlphaConfirmOpen, setPreAlphaConfirmOpen] = useState(false);
 
   // Rename / duplicate modals.
   const [renameTarget, setRenameTarget] = useState<VaultSummary | null>(null);
@@ -168,18 +171,23 @@ export function VaultSwitcher({ anchorEl, onClose, vaults, onVaultsChanged, onAc
       }
     });
 
-  const createVault = async () => {
+  const createVault = async (preAlphaConfirmed = false) => {
     if (busy) return;
+    const name = addName.trim();
+    if (!name) {
+      setAddNameError(t('Escribe un nombre para la bóveda.'));
+      return;
+    }
+    setAddNameError(null);
+    if (isPreAlphaVaultType(addType) && !preAlphaConfirmed) {
+      setPreAlphaConfirmOpen(true);
+      return;
+    }
+
     let createdVaultId: string | null = null;
     setAddError(null);
     setBusy(true);
     try {
-      const name = addName.trim();
-      if (!name) {
-        setAddNameError(t('Escribe un nombre para la bóveda.'));
-        return;
-      }
-      setAddNameError(null);
       // The vault is created bare: its AI and embedding models are chosen in the
       // setup wizard that opens right after, where Nodus can discover them from
       // the keys already stored instead of asking here.
@@ -189,6 +197,7 @@ export function VaultSwitcher({ anchorEl, onClose, vaults, onVaultsChanged, onAc
       if (!result.ok) throw new Error(result.message);
       createdVaultId = null;
       setAddOpen(false);
+      setPreAlphaConfirmOpen(false);
       setAddName('');
       setAddType('academic');
       setMessage(tr(result.message));
@@ -454,6 +463,17 @@ export function VaultSwitcher({ anchorEl, onClose, vaults, onVaultsChanged, onAc
           </ModalShell>,
           document.body
         )}
+
+      {preAlphaConfirmOpen && (
+        <PreAlphaVaultConfirmation
+          type={addType}
+          onCancel={() => setPreAlphaConfirmOpen(false)}
+          onConfirm={() => {
+            setPreAlphaConfirmOpen(false);
+            void createVault(true);
+          }}
+        />
+      )}
 
       {/* Rename modal */}
       {renameTarget &&

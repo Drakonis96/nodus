@@ -791,7 +791,8 @@ export function seedTeachingDemoData(): boolean {
       });
     }
 
-    updateSettings({ demoMode: true, docenciaTourComplete: false });
+    // Loading the sample workspace must not re-open a completed/dismissed tutorial.
+    updateSettings({ demoMode: true });
   })();
   // Outside the transaction: the chat history is a file in the vault directory, not a
   // table, so it cannot take part in the SQLite rollback.

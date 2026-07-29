@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import type { VaultType } from '@shared/types';
 import { isPreviewVaultType, VAULT_TYPE_COLORS, VAULT_TYPES } from '@shared/vaultTypes';
 import { t } from '../i18n';
+import { ConfirmModal } from './ConfirmModal';
 import { Icon } from './ui';
 
 /**
@@ -12,7 +13,8 @@ import { Icon } from './ui';
  * This lives apart from `VaultSwitcher` because two screens now ask the same question —
  * the switcher's "Añadir bóveda" modal and the first-run chooser that follows the
  * cinematic guide — and they must never drift. Which types are selectable, which are
- * "Pronto", which carry a BETA or PREVIEW tag and what each one promises are decided
+ * "Pronto", which carry a PRE-ALPHA/ALPHA/BETA or PREVIEW tag and what each one
+ * promises are decided
  * ONCE, here, so a type that graduates in `shared/vaultTypes.ts` graduates in both
  * places at the same time.
  */
@@ -74,9 +76,14 @@ export function vaultTypeIcon(type: VaultType): string {
 }
 
 export function vaultTypePhase(type: VaultType): VaultPhase | null {
-  if (type === 'primary_sources' || type === 'worldbuilding' || type === 'testimonios') return 'alpha';
+  if (type === 'primary_sources' || type === 'prosopography' || type === 'testimonios') return 'pre-alpha';
+  if (type === 'worldbuilding') return 'alpha';
   if (type === 'estudio' || type === 'genealogy' || type === 'databases' || type === 'docencia') return 'beta';
   return null;
+}
+
+export function isPreAlphaVaultType(type: VaultType): boolean {
+  return vaultTypePhase(type) === 'pre-alpha';
 }
 
 export function vaultTypeDescription(type: VaultType): string {
@@ -109,7 +116,7 @@ export function VaultPhaseBadge({ phase, compact = false }: { phase: VaultPhase;
   const tooltipRef = useRef<HTMLDivElement>(null);
   const label = phase === 'pre-alpha' ? 'PRE-ALPHA' : phase === 'alpha' ? 'ALPHA' : 'BETA';
   const summary = phase === 'pre-alpha'
-    ? t('Desarrollo muy temprano; solo recomendable para testers.')
+    ? t('No utilizable para trabajo real; solo para colaboradores que prueben funciones incompletas y reporten errores y mejoras.')
     : phase === 'alpha'
       ? t('Funciones principales aún en prueba; solo recomendable para testers.')
       : t('Funcional, pero aún necesita feedback y corrección de errores.');
@@ -174,14 +181,46 @@ export function VaultPhaseBadge({ phase, compact = false }: { phase: VaultPhase;
 }
 
 export function VaultPhaseNotice({ phase }: { phase: VaultPhase }) {
-  const early = phase === 'pre-alpha' || phase === 'alpha';
+  const preAlpha = phase === 'pre-alpha';
+  const early = preAlpha || phase === 'alpha';
   return (
     <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-700/50 bg-amber-500/10 px-3 py-2 text-xs text-amber-300" data-testid="vault-phase-notice">
       <Icon name={early ? 'alert' : 'bug'} size={14} className="mt-0.5 shrink-0" />
-      <span>{early
-        ? t('Versión experimental recomendada solo para testers. Guarda copias de seguridad y reporta cualquier error desde el botón superior.')
-        : t('Versión beta: ayúdanos con sugerencias y reportando errores desde el botón superior.')}</span>
+      <span>{preAlpha
+        ? t('PRE-ALPHA: este vault no es utilizable para trabajo real. Está disponible exclusivamente para personas que quieran colaborar probando funciones incompletas y reportando errores y propuestas de mejora.')
+        : phase === 'alpha'
+          ? t('Versión experimental recomendada solo para testers. Guarda copias de seguridad y reporta cualquier error desde el botón superior.')
+          : t('Versión beta: ayúdanos con sugerencias y reportando errores desde el botón superior.')}</span>
     </div>
+  );
+}
+
+/** Shared gate shown immediately before either creation flow accepts a PRE-ALPHA type. */
+export function PreAlphaVaultConfirmation({
+  type,
+  onConfirm,
+  onCancel,
+}: {
+  type: VaultType;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <ConfirmModal
+      zIndex={240}
+      danger
+      title={t('¿Crear un vault PRE-ALPHA?')}
+      confirmLabel={t('Sí, crear solo para pruebas')}
+      onConfirm={onConfirm}
+      onCancel={onCancel}
+      message={(
+        <div className="space-y-3" data-testid="pre-alpha-vault-confirmation">
+          <p className="font-semibold text-amber-300">{vaultTypeLabel(type)} · PRE-ALPHA</p>
+          <p>{t('Este vault todavía no es utilizable para trabajo real.')}</p>
+          <p>{t('Continúa únicamente si quieres colaborar probando funciones incompletas y reportando errores y propuestas de mejora. Puede fallar, cambiar sin aviso o perder datos.')}</p>
+        </div>
+      )}
+    />
   );
 }
 

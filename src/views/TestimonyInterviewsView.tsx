@@ -228,11 +228,11 @@ export function TestimonyInterviewsView({
             sort={sort}
             onSort={setSort}
             onOpen={(id) => { setOpenId(id); setOpenTab('overview'); }}
-            emptyLabel={
+            emptyLabel={t(
               viewId === 'all' && !search && activeFilterCount === 0
                 ? 'Todavía no hay entrevistas. Empieza creando una: el audio y el acuerdo vienen después.'
                 : 'Ninguna entrevista coincide con este filtro.'
-            }
+            )}
           />
         )}
       </div>

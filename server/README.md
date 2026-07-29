@@ -158,9 +158,12 @@ variable and its variant `_FILE`. Nodus reads the file when booting and never re
    seconds and only reposts when there are changes, a minute has passed without activity and a
    minimum of two minutes between submissions is respected.
 
-By default, references and derived academic knowledge are published. PDF, credentials, routes,
-embeddings, student lists, groups, grades and evaluation results are never published. Teacher
-notes/projects/materials and extracted passages have separate switches.
+For an academic vault, references and derived academic knowledge are published by default. A
+Worldbuilding vault publishes its current canonical corpus: characters, places, groups, scenes,
+secrets, calendar, maps (without image binaries), encyclopedia, conflicts/arcs, rules, questions
+and current manuscript prose. Private chats, AI proposals, manuscript snapshots, word-history,
+credentials, local paths, embeddings and binary files are never published. Teacher
+notes/projects/materials and extracted academic passages have separate switches.
 
 ## Provide access to students or researchers
 
@@ -178,6 +181,12 @@ notes/projects/materials and extracted passages have separate switches.
 Each token is linked to that person and to this MCP URL. The tools check the membership of the space
 on each call. The current version is deliberately read-only; remote editions are not mixed with the
 local vault nor can they overwrite it.
+
+The remote MCP surface includes generic space discovery/search plus Worldbuilding-specific
+operations for overview, grounded world search, paginated entity lists, full entity dossiers and
+the ordered manuscript. `nodus_list_spaces` reports the published vault type so a client can choose
+the correct tool family. The local Desktop MCP has a broader Worldbuilding surface and may create or
+edit author-owned records, but it still exposes no destructive delete operation.
 
 ## Security and operation
 

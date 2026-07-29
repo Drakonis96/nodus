@@ -10,14 +10,13 @@ import { completeText } from './aiClient';
 import { getSettings } from '../db/settingsRepo';
 import { allWorldBodies, listWorldEntries, saveEntryProposals } from '../db/worldEncyclopediaRepo';
 import {
-  MISSING_ENTRIES_SYSTEM,
   collectEntryCandidates,
   composeMissingEntriesContext,
   type EntryCandidate,
 } from '@shared/worldMissingEntries';
 import { isArticleCategory } from '@shared/worldEncyclopedia';
 import type { WorldEntryProposal } from '@shared/types';
-import { withWorldPromptLanguage } from '@shared/worldPromptLanguage';
+import { worldOperationSystemPrompt } from '@shared/worldOperationPrompts';
 
 /** Beyond this the prompt stops being a shortlist and starts being the whole vocabulary. */
 const MAX_CANDIDATES = 40;
@@ -58,8 +57,9 @@ async function judge(candidates: EntryCandidate[]) {
   try {
     const text = await completeText(
       {
-        system: withWorldPromptLanguage(MISSING_ENTRIES_SYSTEM, settings.uiLanguage),
+        system: worldOperationSystemPrompt('missingEntries', settings.promptLanguage ?? 'es'),
         user: composeMissingEntriesContext(candidates),
+        plainContext: true,
         temperature: 0.2,
         maxTokens: 1200,
       },

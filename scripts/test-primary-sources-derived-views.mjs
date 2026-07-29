@@ -34,13 +34,10 @@ if (!process.argv.includes('--electron-primary-sources-derived-test')) {
     'Todos los repositorios',
     'Evidencia ordenada',
     'primary-sources-map-table',
-    'Forma exacta en la fuente',
-    'Resolver topónimo',
-    'Revertir resolución',
-    'Todos los tipos de fuente',
-    'Toda procedencia',
+    'Mapa de procedencia',
+    'Lugar de procedencia',
+    'Las ciudades mencionadas en su contenido no aparecen en este mapa',
     'Todas las colecciones',
-    'Mostrar ubicación física privada',
     'primary-sources-relations-table',
     'Arista confirmada con evidencia',
     'Apoyo y contradicción',
@@ -53,8 +50,9 @@ if (!process.argv.includes('--electron-primary-sources-derived-test')) {
   assert.match(files.app, /isPrimarySources \? <PrimarySourcesTimelineView \/>/);
   assert.match(files.app, /isPrimarySources \? <PrimarySourcesMapView \/>/);
   assert.match(files.app, /isPrimarySources \? <PrimarySourcesRelationsView \/>/);
-  assert.ok(Number(files.schema.match(/SCHEMA_VERSION = (\d+)/)[1]) >= 112,
+  assert.ok(Number(files.schema.match(/SCHEMA_VERSION = (\d+)/)[1]) >= 121,
     'the derived-views migration is applied');
+  assert.match(files.schema, /provenance_place_id/);
   assert.match(files.schema, /archive_place_resolution_decisions/);
   assert.match(files.schema, /idx_archive_place_resolution_one_active/);
   assert.match(files.sync, /'archive_place_resolution_decisions'/);
@@ -233,19 +231,35 @@ try {
     'SELECT mention_id FROM archive_place_mentions WHERE place_id=?'
   ).get(placeId).mention_id;
   let map = derived.getPrimarySourceMapWorkspace();
-  let placePoint = map.points.find((point) => point.mentionId === mentionId);
+  assert.equal(
+    map.points.some((point) => point.mentionId === mentionId),
+    false,
+    'a place mentioned in the text never appears as source provenance',
+  );
+  assert.ok(
+    map.unassignedSources.some((source) => source.id === placeSource.item.itemId),
+    'the source is listed as unassigned until its record receives a provenance place',
+  );
+  const placeRow = primary.getPrimarySourceArchiveRow(placeSource.item.itemId);
+  primary.updatePrimarySourceArchiveRecord(placeSource.item.itemId, {
+    expectedRevision: placeRow.revision,
+    profile: { provenancePlaceId: placeId },
+  });
+  map = derived.getPrimarySourceMapWorkspace();
+  let placePoint = map.points.find((point) => point.sourceIds.includes(placeSource.item.itemId));
   assert.ok(placePoint);
-  assert.equal(placePoint.originalLabel, 'Sancta Maria del Río');
+  assert.equal(placePoint.sourceTitle, placeSource.item.title);
+  assert.equal(placePoint.originalLabel, 'Santa Maria del Río');
   assert.equal(placePoint.normalizedName, 'Santa Maria del Río');
-  assert.equal(placePoint.role, 'custody');
-  assert.equal(placePoint.layer, 'custody');
+  assert.equal(placePoint.role, 'provenance');
+  assert.equal(placePoint.layer, 'provenance');
   assert.equal(placePoint.hypothesis, false);
-  assert.equal(placePoint.evidence.length, 1);
+  assert.equal(placePoint.evidence.length, 0);
   assert.ok(map.repositories.some((entry) => entry.label === repository.name));
   assert.ok(map.collections.some((entry) => entry.id === mapCollection.folderId));
   assert.ok(map.sourceTypes.length > 0);
-  assert.ok(map.persons.some((entry) => entry.id === personA.personId));
-  assert.ok(map.events.some((entry) => entry.id === eventId));
+  assert.deepEqual(map.persons, []);
+  assert.deepEqual(map.events, []);
 
   const selectedCandidate = {
     gazetteerId: 'geonames:phase8-1',
@@ -280,8 +294,8 @@ try {
   });
   assert.equal(resolution.alternatives.length, 1);
   map = derived.getPrimarySourceMapWorkspace();
-  placePoint = map.points.find((point) => point.mentionId === mentionId);
-  assert.equal(placePoint.originalLabel, 'Sancta Maria del Río', 'resolution never rewrites the quoted toponym');
+  placePoint = map.points.find((point) => point.sourceIds.includes(placeSource.item.itemId));
+  assert.equal(placePoint.originalLabel, 'Santa María del Río');
   assert.equal(placePoint.normalizedName, 'Santa María del Río');
   assert.equal(placePoint.latitude, 40.4168);
   assert.equal(placePoint.coordinatePrecision, 'municipality');
@@ -291,8 +305,8 @@ try {
 
   derived.revertPrimarySourceToponymResolution(resolution.resolutionId);
   map = derived.getPrimarySourceMapWorkspace();
-  placePoint = map.points.find((point) => point.mentionId === mentionId);
-  assert.equal(placePoint.originalLabel, 'Sancta Maria del Río');
+  placePoint = map.points.find((point) => point.sourceIds.includes(placeSource.item.itemId));
+  assert.equal(placePoint.originalLabel, 'Santa Maria del Río');
   assert.equal(placePoint.normalizedName, 'Santa Maria del Río');
   assert.equal(placePoint.latitude, null);
   assert.equal(
@@ -307,7 +321,9 @@ try {
     ).get().count,
     2
   );
-  assert.ok(map.points.filter((point) => !point.hypothesis).every((point) => point.evidence.length > 0));
+  assert.ok(map.points.every((point) =>
+    point.role === 'provenance' && point.mentionId === null && point.evidence.length === 0
+  ));
 
   const relationSource = createSource(4, 'Tomás actuó como notario de María entre 1888 y 1891.');
   const acceptedRelation = proposal(relationSource, 'relation', {

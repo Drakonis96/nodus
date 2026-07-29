@@ -718,7 +718,8 @@ function filterSnapshot(
     db.prepare('DELETE FROM person_places WHERE person_id NOT IN (SELECT person_id FROM persons)').run();
     db.prepare(
       `DELETE FROM places WHERE place_id NOT IN (
-        SELECT place_id FROM archive_place_mentions WHERE place_id IS NOT NULL
+        SELECT provenance_place_id FROM archive_item_profiles WHERE provenance_place_id IS NOT NULL
+        UNION SELECT place_id FROM archive_place_mentions WHERE place_id IS NOT NULL
         UNION SELECT target_id FROM record_evidence WHERE target_kind='place'
       )`
     ).run();
@@ -896,10 +897,22 @@ function interoperableData(itemIds: string[]): { geojson: unknown; graph: unknow
   if (!itemIds.length) return { geojson: { type: 'FeatureCollection', features: [] }, graph: { nodes: [], edges: [] } };
   const placeholders = itemIds.map(() => '?').join(',');
   const places = getDb().prepare(
-    `SELECT DISTINCT p.place_id, p.name, p.latitude, p.longitude, m.role, m.original_label
-       FROM archive_place_mentions m JOIN places p ON p.place_id=m.place_id
-      WHERE m.item_id IN (${placeholders}) AND p.latitude IS NOT NULL AND p.longitude IS NOT NULL`
-  ).all(...itemIds) as Array<{ place_id: string; name: string; latitude: number; longitude: number; role: string; original_label: string }>;
+    `SELECT profile.item_id, item.title AS source_title, p.place_id, p.name,
+      p.latitude, p.longitude
+       FROM archive_item_profiles profile
+       JOIN archive_items item ON item.item_id=profile.item_id
+       JOIN places p ON p.place_id=profile.provenance_place_id
+      WHERE profile.item_id IN (${placeholders})
+        AND p.latitude IS NOT NULL AND p.longitude IS NOT NULL
+      ORDER BY item.title COLLATE NOCASE`
+  ).all(...itemIds) as Array<{
+    item_id: string;
+    source_title: string;
+    place_id: string;
+    name: string;
+    latitude: number;
+    longitude: number;
+  }>;
   const evidence = getDb().prepare(
     `SELECT id AS evidence_id, target_kind, target_id, nodus_id AS item_id, excerpt_id, evidence_role,
             certainty, review_status FROM record_evidence WHERE nodus_id IN (${placeholders})`
@@ -909,9 +922,14 @@ function interoperableData(itemIds: string[]): { geojson: unknown; graph: unknow
       type: 'FeatureCollection',
       features: places.map((place) => ({
         type: 'Feature',
-        id: place.place_id,
+        id: `provenance:${place.item_id}`,
         geometry: { type: 'Point', coordinates: [place.longitude, place.latitude] },
-        properties: { name: place.name, role: place.role, originalLabel: place.original_label },
+        properties: {
+          name: place.name,
+          role: 'provenance',
+          sourceId: place.item_id,
+          sourceTitle: place.source_title,
+        },
       })),
     },
     graph: {

@@ -61,6 +61,8 @@ const SETTINGS_TABS: { id: SettingsTabId; label: string; icon: string; keywords:
   { id: 'updates', label: 'Actualizaciones y novedades', icon: 'sync', keywords: 'actualizaciones update actualizar version novedades ultimos cambios latest changes changelog buscar instalar reiniciar' },
 ];
 
+const ZOTERO_FREE_VAULT_TYPES = new Set<VaultType>(['testimonios', 'prosopography', 'worldbuilding']);
+
 const ABOUT_ACTION_BUTTON_CLASS = 'btn btn-ghost w-full shrink-0 justify-center border border-neutral-300 dark:border-neutral-700 sm:w-56';
 const ABOUT_CARD_CLASS = 'rounded-xl border border-neutral-200 bg-neutral-50 p-5 dark:border-neutral-800 dark:bg-neutral-900/50';
 const NODUS_REPOSITORY_URL = 'https://github.com/Drakonis96/nodus';
@@ -118,6 +120,7 @@ export function Settings({
   const [backupCopied, setBackupCopied] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [primarySourcePolicy, setPrimarySourcePolicy] = useState<PrimarySourcePolicySettings | null>(null);
+  const hasZoteroLibraryWorkflow = !activeVault || !ZOTERO_FREE_VAULT_TYPES.has(activeVault.type);
 
   useEffect(() => {
     if (localStorage.getItem('nodus.settingsTarget') !== 'nodi') return;
@@ -137,6 +140,10 @@ export function Settings({
     });
     return () => { cancelled = true; };
   }, [activeVault?.id, activeVault?.type]);
+
+  useEffect(() => {
+    if (!hasZoteroLibraryWorkflow && settingsTab === 'library') setSettingsTab('providers');
+  }, [hasZoteroLibraryWorkflow, settingsTab]);
   const [importPassword, setImportPassword] = useState('');
   const [showImportPassword, setShowImportPassword] = useState(false);
   const [importingBackup, setImportingBackup] = useState(false);
@@ -454,6 +461,7 @@ export function Settings({
   const normalizedSettingsQuery = normalizeSettingsText(settingsQuery);
   const settingsSearchActive = normalizedSettingsQuery.length > 0;
   const visibleSettingsSection = (tab: SettingsTabId, title: string, keywords: string): boolean => {
+    if (tab === 'library' && !hasZoteroLibraryWorkflow) return false;
     if (!settingsSearchActive) return settingsTab === tab;
     const tabMeta = SETTINGS_TABS.find((item) => item.id === tab);
     return normalizeSettingsText(`${title} ${t(title)} ${tabMeta?.label ?? ''} ${t(tabMeta?.label ?? '')} ${tabMeta?.keywords ?? ''} ${keywords}`).includes(normalizedSettingsQuery);
@@ -505,7 +513,7 @@ export function Settings({
       </div>
 
       <div className="mb-5 flex flex-wrap gap-2">
-        {SETTINGS_TABS.map((tab) => (
+        {SETTINGS_TABS.filter((tab) => tab.id !== 'library' || hasZoteroLibraryWorkflow).map((tab) => (
           <SettingsTabButton
             key={tab.id}
             active={!settingsSearchActive && settingsTab === tab.id}
@@ -623,6 +631,7 @@ export function Settings({
                 <option value="de">Deutsch</option>
                 <option value="pt">Português (Portugal)</option>
                 <option value="pt-BR">Português (Brasil)</option>
+                <option value="it">Italiano</option>
                 <option value="tr">Türkçe</option>
               </select>
             </Row>

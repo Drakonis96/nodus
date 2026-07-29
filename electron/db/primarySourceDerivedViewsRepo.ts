@@ -5,9 +5,7 @@ import type {
   PrimarySourceEvidenceRole,
   PrimarySourceEvidenceTargetKind,
   PrimarySourceEvidenceTrace,
-  PrimarySourceMapLayer,
   PrimarySourceMapPoint,
-  PrimarySourceMapRole,
   PrimarySourceMapWorkspace,
   PrimarySourcePlaceResolutionDecision,
   PrimarySourceRelationEdge,
@@ -315,36 +313,6 @@ function resolutionFromRow(row: ResolutionRow): PrimarySourcePlaceResolutionDeci
   };
 }
 
-type PlaceMentionRow = {
-  mention_id: string;
-  item_id: string;
-  excerpt_id: string | null;
-  place_id: string;
-  original_label: string;
-  role: PrimarySourceMapRole;
-  certainty: number | null;
-  mention_status: PrimarySourceMapPoint['resolutionStatus'];
-  name: string;
-  latitude: number | null;
-  longitude: number | null;
-  coordinate_precision: string | null;
-  historical_context: string | null;
-  valid_from_display: string | null;
-  valid_to_display: string | null;
-  authority_json: string | null;
-  sensitivity: PrimarySourceMapPoint['sensitivity'];
-};
-
-function layerForRole(role: PrimarySourceMapRole): PrimarySourceMapLayer {
-  if (role === 'event' || role === 'event_location') return 'events';
-  if (role === 'route_origin' || role === 'route_destination') return 'movements';
-  if (role === 'repository') return 'repositories';
-  if (role === 'custody') return 'custody';
-  if (role === 'consultation') return 'consultation';
-  if (role === 'physical_location') return 'physical';
-  return 'mentions';
-}
-
 function safeCoordinates(
   latitude: number | null,
   longitude: number | null,
@@ -363,17 +331,7 @@ function safeCoordinates(
 
 export function getPrimarySourceMapWorkspace(): PrimarySourceMapWorkspace {
   const db = getDb();
-  const evidence = allEvidence();
   const metadataBySource = sourceMetadata();
-  const personMentions = db.prepare(
-    `SELECT m.item_id, m.excerpt_id, m.person_id, p.display_name
-     FROM archive_person_mentions m
-     JOIN persons p ON p.person_id=m.person_id
-     WHERE m.person_id IS NOT NULL`
-  ).all() as Array<{
-    item_id: string; excerpt_id: string | null; person_id: string; display_name: string;
-  }>;
-  const personLabels = new Map(personMentions.map((mention) => [mention.person_id, mention.display_name]));
   const resolutionRows = db.prepare(
     `SELECT * FROM archive_place_resolution_decisions
      WHERE status='active' ORDER BY created_at DESC`
@@ -381,132 +339,78 @@ export function getPrimarySourceMapWorkspace(): PrimarySourceMapWorkspace {
   const resolutions = new Map(
     resolutionRows.map((row) => [row.place_id, resolutionFromRow(row)])
   );
-  const mentions = db.prepare(
-    `SELECT m.mention_id, m.item_id, m.excerpt_id, m.place_id, m.original_label,
-      m.role, m.certainty, m.status AS mention_status, p.name, p.latitude,
-      p.longitude, p.coordinate_precision, p.historical_context,
-      p.valid_from_display, p.valid_to_display, p.authority_json, p.sensitivity
-     FROM archive_place_mentions m
-     JOIN places p ON p.place_id=m.place_id
-     ORDER BY m.created_at`
-  ).all() as PlaceMentionRow[];
+  const sourceRows = db.prepare(
+    `SELECT item.item_id, item.title, profile.provenance_place_id,
+      unit.date_display, unit.date_start_sort, unit.date_end_sort,
+      place.name AS place_name, place.latitude, place.longitude,
+      place.coordinate_precision, place.historical_context,
+      place.valid_from_display, place.valid_to_display,
+      place.authority_json, place.sensitivity
+     FROM archive_item_profiles profile
+     JOIN archive_items item ON item.item_id=profile.item_id
+     LEFT JOIN archive_item_units link
+       ON link.item_id=item.item_id AND link.relation_kind='describes'
+     LEFT JOIN archive_description_units unit ON unit.unit_id=link.unit_id
+     LEFT JOIN places place ON place.place_id=profile.provenance_place_id
+     ORDER BY item.title COLLATE NOCASE, item.item_id`
+  ).all() as Array<{
+    item_id: string;
+    title: string;
+    provenance_place_id: string | null;
+    date_display: string | null;
+    date_start_sort: string | null;
+    date_end_sort: string | null;
+    place_name: string | null;
+    latitude: number | null;
+    longitude: number | null;
+    coordinate_precision: string | null;
+    historical_context: string | null;
+    valid_from_display: string | null;
+    valid_to_display: string | null;
+    authority_json: string | null;
+    sensitivity: PrimarySourceMapPoint['sensitivity'] | null;
+  }>;
 
-  const points: PrimarySourceMapPoint[] = mentions.map((mention) => {
-    const placeEvidence = targetEvidence(evidence, 'place', mention.place_id)
-      .filter((trace) =>
-        (mention.excerpt_id && trace.excerptId === mention.excerpt_id)
-        || (!mention.excerpt_id && trace.itemId === mention.item_id)
-      );
-    const coordinates = safeCoordinates(
-      mention.latitude,
-      mention.longitude,
-      mention.sensitivity
-    );
-    // A place explicitly attached by the researcher is already a resolved
-    // documentary assertion. It must remain visible even before the researcher
-    // creates a quotable excerpt, and it must participate in source filters.
-    const sourceIds = [...new Set([
-      mention.item_id,
-      ...placeEvidence.map((trace) => trace.itemId),
-    ])];
-    const sourceMetadataRows = sourceIds.flatMap((id) => {
-      const metadata = metadataBySource.get(id);
-      return metadata ? [metadata] : [];
-    });
-    const personIds = [...new Set(personMentions
-      .filter((person) =>
-        (mention.excerpt_id && person.excerpt_id === mention.excerpt_id)
-        || (!mention.excerpt_id && person.item_id === mention.item_id)
-      )
-      .map((person) => person.person_id))];
-    return {
-      pointId: `mention:${mention.mention_id}`,
-      placeId: mention.place_id,
-      mentionId: mention.mention_id,
+  const points: PrimarySourceMapPoint[] = sourceRows.flatMap((source) => {
+    if (!source.provenance_place_id || !source.place_name) return [];
+    const metadata = metadataBySource.get(source.item_id);
+    const sensitivity = source.sensitivity ?? 'normal';
+    const coordinates = safeCoordinates(source.latitude, source.longitude, sensitivity);
+    return [{
+      pointId: `provenance:${source.item_id}`,
+      sourceTitle: source.title,
+      placeId: source.provenance_place_id,
+      mentionId: null,
       eventId: null,
-      originalLabel: mention.original_label,
-      normalizedName: mention.name,
-      role: mention.role,
-      layer: layerForRole(mention.role),
+      originalLabel: source.place_name,
+      normalizedName: source.place_name,
+      role: 'provenance',
+      layer: 'provenance',
       latitude: coordinates.latitude,
       longitude: coordinates.longitude,
-      coordinatePrecision: mention.coordinate_precision,
-      authority: parseObject(mention.authority_json),
-      historicalContext: mention.historical_context,
-      validFromDisplay: mention.valid_from_display,
-      validToDisplay: mention.valid_to_display,
-      dateDisplay: null,
-      dateStartSort: null,
-      dateEndSort: null,
-      certainty: mention.certainty,
-      resolutionStatus: mention.mention_status,
-      sensitivity: mention.sensitivity,
-      hypothesis: mention.mention_status !== 'resolved' && placeEvidence.length === 0,
-      evidence: placeEvidence,
-      sourceIds,
-      personIds,
+      coordinatePrecision: source.coordinate_precision,
+      authority: parseObject(source.authority_json),
+      historicalContext: source.historical_context,
+      validFromDisplay: source.valid_from_display,
+      validToDisplay: source.valid_to_display,
+      dateDisplay: source.date_display,
+      dateStartSort: source.date_start_sort,
+      dateEndSort: source.date_end_sort,
+      certainty: 1,
+      resolutionStatus: source.latitude === null || source.longitude === null ? 'unresolved' : 'resolved',
+      sensitivity,
+      hypothesis: false,
+      evidence: [],
+      sourceIds: [source.item_id],
+      personIds: [],
       eventType: null,
-      sourceTypes: [...new Set(sourceMetadataRows.map((metadata) => metadata.sourceType))],
-      repositoryNames: [...new Set(sourceMetadataRows.flatMap((metadata) => [...metadata.repositories]))],
-      collectionIds: [...new Set(sourceMetadataRows.flatMap((metadata) => [...metadata.collections.keys()]))],
-      resolution: resolutions.get(mention.place_id) ?? null,
-    };
+      sourceTypes: metadata ? [metadata.sourceType] : [],
+      repositoryNames: metadata ? [...metadata.repositories] : [],
+      collectionIds: metadata ? [...metadata.collections.keys()] : [],
+      resolution: resolutions.get(source.provenance_place_id) ?? null,
+    }];
   });
 
-  for (const event of getPrimarySourceTimelineWorkspace().events) {
-    if (!event.placeId || !event.placeName) continue;
-    const place = db.prepare(
-      `SELECT latitude, longitude, coordinate_precision, historical_context,
-        valid_from_display, valid_to_display, authority_json, sensitivity
-       FROM places WHERE place_id=?`
-    ).get(event.placeId) as {
-      latitude: number | null; longitude: number | null;
-      coordinate_precision: string | null; historical_context: string | null;
-      valid_from_display: string | null; valid_to_display: string | null;
-      authority_json: string | null; sensitivity: PrimarySourceMapPoint['sensitivity'];
-    } | undefined;
-    if (!place) continue;
-    const coordinates = safeCoordinates(place.latitude, place.longitude, place.sensitivity);
-    const sourceMetadataRows = event.sourceIds.flatMap((id) => {
-      const metadata = metadataBySource.get(id);
-      return metadata ? [metadata] : [];
-    });
-    for (const person of event.participants) personLabels.set(person.personId, person.displayName);
-    points.push({
-      pointId: `event:${event.eventId}`,
-      placeId: event.placeId,
-      mentionId: null,
-      eventId: event.eventId,
-      originalLabel: event.placeName,
-      normalizedName: event.placeName,
-      role: 'event_location',
-      layer: 'events',
-      latitude: coordinates.latitude,
-      longitude: coordinates.longitude,
-      coordinatePrecision: place.coordinate_precision,
-      authority: parseObject(place.authority_json),
-      historicalContext: place.historical_context,
-      validFromDisplay: place.valid_from_display,
-      validToDisplay: place.valid_to_display,
-      dateDisplay: event.dateDisplay,
-      dateStartSort: event.dateStartSort,
-      dateEndSort: event.dateEndSort,
-      certainty: event.evidence[0]?.certainty ?? null,
-      resolutionStatus: place.latitude === null ? 'unresolved' : 'resolved',
-      sensitivity: place.sensitivity,
-      hypothesis: event.hypothesis,
-      evidence: event.evidence,
-      sourceIds: event.sourceIds,
-      personIds: event.participants.map((person) => person.personId),
-      eventType: event.type,
-      sourceTypes: [...new Set(sourceMetadataRows.map((metadata) => metadata.sourceType))],
-      repositoryNames: [...new Set(sourceMetadataRows.flatMap((metadata) => [...metadata.repositories]))],
-      collectionIds: [...new Set(sourceMetadataRows.flatMap((metadata) => [...metadata.collections.keys()]))],
-      resolution: resolutions.get(event.placeId) ?? null,
-    });
-  }
-
-  const confirmedEvidence = points.flatMap((point) => point.evidence);
   const pointSourceIds = new Set(points.flatMap((point) => point.sourceIds));
   const collectionLabels = new Map<string, string>();
   for (const sourceId of pointSourceIds) {
@@ -514,26 +418,24 @@ export function getPrimarySourceMapWorkspace(): PrimarySourceMapWorkspace {
       collectionLabels.set(id, label);
     }
   }
-  const eventLabels = new Map(
-    getPrimarySourceTimelineWorkspace().events
-      .filter((event) => points.some((point) => point.eventId === event.eventId))
-      .map((event) => [event.eventId, event.label])
-  );
+  const sourceOptions = sourceRows
+    .map((source) => ({ id: source.item_id, label: source.title }))
+    .sort((a, b) => a.label.localeCompare(b.label));
   return {
     points,
-    sources: uniqueOptions(confirmedEvidence),
-    persons: [...new Set(points.flatMap((point) => point.personIds))]
-      .flatMap((id) => personLabels.has(id) ? [{ id, label: personLabels.get(id)! }] : [])
-      .sort((a, b) => a.label.localeCompare(b.label)),
-    events: [...eventLabels].map(([id, label]) => ({ id, label }))
-      .sort((a, b) => a.label.localeCompare(b.label)),
+    sources: sourceOptions,
+    unassignedSources: sourceRows
+      .filter((source) => !source.provenance_place_id)
+      .map((source) => ({ id: source.item_id, label: source.title })),
+    persons: [],
+    events: [],
     sourceTypes: [...new Set(points.flatMap((point) => point.sourceTypes))].sort(),
     repositories: [...new Set(points.flatMap((point) => point.repositoryNames))]
       .sort().map((label) => ({ id: label, label })),
     collections: [...collectionLabels].map(([id, label]) => ({ id, label }))
       .sort((a, b) => a.label.localeCompare(b.label)),
-    roles: [...new Set(points.map((point) => point.role))].sort(),
-    layers: [...new Set(points.map((point) => point.layer))].sort(),
+    roles: points.length > 0 ? ['provenance'] : [],
+    layers: points.length > 0 ? ['provenance'] : [],
   };
 }
 

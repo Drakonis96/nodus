@@ -68,6 +68,7 @@ export function PrimarySourcesSearchView({
   const [allowRestricted, setAllowRestricted] = useState(false);
   const [allowUnknownRights, setAllowUnknownRights] = useState(false);
   const [grouped, setGrouped] = useState(true);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -99,6 +100,34 @@ export function PrimarySourcesSearchView({
     value: PrimarySourceSearchFilters[K]
   ) => setFilters((current) => ({ ...current, [key]: value || undefined }));
 
+  const clearFilters = () => {
+    setFilters({});
+    setAllowPrivate(false);
+    setAllowRestricted(false);
+    setAllowUnknownRights(false);
+  };
+
+  const facetLabel = (options: Array<{ id: string; label: string }>, id: string) =>
+    options.find((option) => option.id === id)?.label ?? id;
+
+  const activeFilters: Array<{ key: string; label: string; clear: () => void }> = [];
+  const layer = filters.layers?.[0];
+  if (layer) activeFilters.push({ key: 'layer', label: `${t('Tipo de resultado')}: ${t(LAYER_LABELS[layer])}`, clear: () => setFilter('layers', undefined) });
+  if (filters.repositoryId) activeFilters.push({ key: 'repository', label: `${t('Repositorio')}: ${facetLabel(response.facets.repositories, filters.repositoryId)}`, clear: () => setFilter('repositoryId', undefined) });
+  if (filters.level) activeFilters.push({ key: 'level', label: `${t('Nivel descriptivo')}: ${facetLabel(response.facets.levels, filters.level)}`, clear: () => setFilter('level', undefined) });
+  if (filters.format) activeFilters.push({ key: 'format', label: `${t('Formato')}: ${facetLabel(response.facets.formats, filters.format)}`, clear: () => setFilter('format', undefined) });
+  if (filters.personId) activeFilters.push({ key: 'person', label: `${t('Persona')}: ${facetLabel(response.facets.persons, filters.personId)}`, clear: () => setFilter('personId', undefined) });
+  if (filters.placeId) activeFilters.push({ key: 'place', label: `${t('Lugar')}: ${facetLabel(response.facets.places, filters.placeId)}`, clear: () => setFilter('placeId', undefined) });
+  if (filters.reviewStatus) activeFilters.push({ key: 'review', label: `${t('Estado de revisión')}: ${facetLabel(response.facets.reviewStatuses, filters.reviewStatus)}`, clear: () => setFilter('reviewStatus', undefined) });
+  if (filters.accessStatus) activeFilters.push({ key: 'access', label: `${t('Restricción')}: ${facetLabel(response.facets.accessStatuses, filters.accessStatus)}`, clear: () => setFilter('accessStatus', undefined) });
+  if (filters.dateFrom) activeFilters.push({ key: 'dateFrom', label: `${t('Desde')}: ${filters.dateFrom}`, clear: () => setFilter('dateFrom', undefined) });
+  if (filters.dateTo) activeFilters.push({ key: 'dateTo', label: `${t('Hasta')}: ${filters.dateTo}`, clear: () => setFilter('dateTo', undefined) });
+  if (allowPrivate) activeFilters.push({ key: 'private', label: t('Privado'), clear: () => setAllowPrivate(false) });
+  if (allowRestricted) activeFilters.push({ key: 'restricted', label: t('Restringido'), clear: () => setAllowRestricted(false) });
+  if (allowUnknownRights) activeFilters.push({ key: 'unknownRights', label: t('Derechos por revisar'), clear: () => setAllowUnknownRights(false) });
+
+  const hasSearchCriteria = Boolean(query.trim() || Object.values(filters).some(Boolean));
+
   const open = (result: PrimarySourceSearchResult) => {
     if (result.noteId) {
       onOpenNote(result.noteId);
@@ -121,75 +150,98 @@ export function PrimarySourcesSearchView({
   };
 
   return (
-    <div className="flex h-full min-h-0 bg-neutral-50 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100" data-testid="primary-sources-search">
-      <aside className="hidden w-64 shrink-0 overflow-y-auto border-r border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900 lg:block">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-neutral-500">{t('Filtros')}</h2>
-          <button className="text-[10px] text-indigo-600 hover:underline dark:text-indigo-300" onClick={() => setFilters({})}>{t('Limpiar')}</button>
-        </div>
-        <div className="mt-4 space-y-4">
-          <FacetSelect label={t('Tipo de resultado')} value={filters.layers?.[0] ?? ''} options={response.facets.layers} onChange={(value) => setFilter('layers', value ? [value as PrimarySourceSearchLayer] : undefined)} />
-          <FacetSelect label={t('Repositorio')} value={filters.repositoryId ?? ''} options={response.facets.repositories} onChange={(value) => setFilter('repositoryId', value)} />
-          <FacetSelect label={t('Nivel descriptivo')} value={filters.level ?? ''} options={response.facets.levels} onChange={(value) => setFilter('level', value)} />
-          <FacetSelect label={t('Formato')} value={filters.format ?? ''} options={response.facets.formats} onChange={(value) => setFilter('format', value)} />
-          <FacetSelect label={t('Persona')} value={filters.personId ?? ''} options={response.facets.persons} onChange={(value) => setFilter('personId', value)} />
-          <FacetSelect label={t('Lugar')} value={filters.placeId ?? ''} options={response.facets.places} onChange={(value) => setFilter('placeId', value)} />
-          <FacetSelect label={t('Estado de revisión')} value={filters.reviewStatus ?? ''} options={response.facets.reviewStatuses} onChange={(value) => setFilter('reviewStatus', value)} />
-          <FacetSelect label={t('Restricción')} value={filters.accessStatus ?? ''} options={response.facets.accessStatuses} onChange={(value) => setFilter('accessStatus', value as PrimarySourceSearchFilters['accessStatus'])} />
-          <div>
-            <p className="mb-1 text-[10px] font-medium text-neutral-500">{t('Intervalo de fechas')}</p>
-            <div className="grid grid-cols-2 gap-2">
-              <input className="input h-8 px-2 text-[11px]" type="number" placeholder={t('Desde')} value={filters.dateFrom ?? ''} onChange={(event) => setFilter('dateFrom', event.target.value)} />
-              <input className="input h-8 px-2 text-[11px]" type="number" placeholder={t('Hasta')} value={filters.dateTo ?? ''} onChange={(event) => setFilter('dateTo', event.target.value)} />
-            </div>
+    <div className="flex h-full min-h-0 flex-col bg-neutral-50 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100" data-testid="primary-sources-search">
+      <header className="shrink-0 border-b border-neutral-200 bg-white/95 px-5 py-4 backdrop-blur dark:border-neutral-800 dark:bg-neutral-900/95">
+        <div className="mx-auto max-w-5xl">
+          <div className="mb-4 flex items-center gap-3">
+            <Icon name="search" size={22} className="text-indigo-500 dark:text-indigo-300" />
+            <h1 className="text-xl font-semibold">{t('Buscar')}</h1>
+            <button
+              type="button"
+              className={`btn btn-ghost ml-auto h-8 gap-1.5 px-2.5 text-xs ${filtersOpen ? 'text-indigo-600 dark:text-indigo-300' : ''}`}
+              aria-expanded={filtersOpen}
+              data-testid="primary-sources-search-filter-toggle"
+              onClick={() => setFiltersOpen((value) => !value)}
+            >
+              <Icon name="settings" size={13} />
+              {t('Filtros')}
+              {activeFilters.length > 0 && (
+                <span className="rounded-full bg-indigo-100 px-1.5 py-0.5 text-[9px] font-semibold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-200">
+                  {activeFilters.length}
+                </span>
+              )}
+            </button>
           </div>
-          <label className="flex items-start gap-2 text-[11px] leading-4 text-neutral-600 dark:text-neutral-400">
-            <input className="mt-0.5" type="checkbox" checked={allowPrivate} onChange={(event) => setAllowPrivate(event.target.checked)} />
-            {t('Incluir contenido privado en esta búsqueda local')}
-          </label>
-          <label className="flex items-start gap-2 text-[11px] leading-4 text-neutral-600 dark:text-neutral-400">
-            <input className="mt-0.5" type="checkbox" checked={allowRestricted} onChange={(event) => setAllowRestricted(event.target.checked)} />
-            {t('Incluir contenido restringido permitido por la política del vault')}
-          </label>
-          <label className="flex items-start gap-2 text-[11px] leading-4 text-neutral-600 dark:text-neutral-400">
-            <input className="mt-0.5" type="checkbox" checked={allowUnknownRights} onChange={(event) => setAllowUnknownRights(event.target.checked)} />
-            {t('Confirmo buscar contenido cuyos derechos están por revisar')}
-          </label>
-        </div>
-      </aside>
-
-      <main className="min-w-0 flex-1 overflow-y-auto">
-        <header className="sticky top-0 z-10 border-b border-neutral-200 bg-white/95 px-5 py-4 backdrop-blur dark:border-neutral-800 dark:bg-neutral-900/95">
-          <div className="mx-auto max-w-5xl">
-            <div className="relative">
-              <Icon name="search" className="pointer-events-none absolute left-3 top-2.5 text-neutral-400" size={17} />
-              <input
-                autoFocus
-                className="input h-10 w-full pl-10 pr-10 text-sm"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder={t('Busca metadatos, OCR, transcripciones, fragmentos, entidades y notas…')}
-                data-testid="primary-sources-search-input"
-              />
-              {loading && <Icon name="sync" className="absolute right-3 top-2.5 animate-spin text-indigo-500" size={17} />}
-            </div>
-            <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[10px] text-neutral-500">
-              <span>{t('Sintaxis: comillas para frases; persona:, lugar:, repositorio:, fecha:, tipo:, estado: o referencia:.')}</span>
-              <span className="flex items-center gap-3">
-                {response.results.length > 0 && tx('{n} resultados · {ms} ms · SQLite local', {
-                  n: response.total,
-                  ms: Math.round(response.elapsedMs),
-                })}
-                <button className="text-indigo-600 hover:underline dark:text-indigo-300" onClick={() => setGrouped((value) => !value)}>
-                  {grouped ? t('Lista única') : t('Agrupar por capa')}
-                </button>
-              </span>
-            </div>
+          <div className="relative">
+            <Icon name="search" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" size={17} />
+            <input
+              autoFocus
+              className="input input-with-leading-icon h-10 w-full pr-10 text-sm"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder={t('Busca metadatos, OCR, transcripciones, fragmentos, entidades y notas…')}
+              data-testid="primary-sources-search-input"
+            />
+            {loading && <Icon name="sync" className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-indigo-500" size={17} />}
           </div>
-        </header>
 
+          {filtersOpen && (
+            <section className="mt-3 rounded-xl border border-neutral-200 bg-neutral-50 p-3 dark:border-neutral-800 dark:bg-neutral-950/50" data-testid="primary-sources-search-filters">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <FacetSelect label={t('Tipo de resultado')} value={filters.layers?.[0] ?? ''} options={response.facets.layers} onChange={(value) => setFilter('layers', value ? [value as PrimarySourceSearchLayer] : undefined)} />
+                <FacetSelect label={t('Repositorio')} value={filters.repositoryId ?? ''} options={response.facets.repositories} onChange={(value) => setFilter('repositoryId', value)} />
+                <FacetSelect label={t('Nivel descriptivo')} value={filters.level ?? ''} options={response.facets.levels} onChange={(value) => setFilter('level', value)} />
+                <FacetSelect label={t('Formato')} value={filters.format ?? ''} options={response.facets.formats} onChange={(value) => setFilter('format', value)} />
+                <FacetSelect label={t('Persona')} value={filters.personId ?? ''} options={response.facets.persons} onChange={(value) => setFilter('personId', value)} />
+                <FacetSelect label={t('Lugar')} value={filters.placeId ?? ''} options={response.facets.places} onChange={(value) => setFilter('placeId', value)} />
+                <FacetSelect label={t('Estado de revisión')} value={filters.reviewStatus ?? ''} options={response.facets.reviewStatuses} onChange={(value) => setFilter('reviewStatus', value)} />
+                <FacetSelect label={t('Restricción')} value={filters.accessStatus ?? ''} options={response.facets.accessStatuses} onChange={(value) => setFilter('accessStatus', value as PrimarySourceSearchFilters['accessStatus'])} />
+                <div>
+                  <p className="mb-1 text-[10px] font-medium text-neutral-500">{t('Intervalo de fechas')}</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input aria-label={t('Desde')} className="input h-8 px-2 text-[11px]" type="number" placeholder={t('Desde')} value={filters.dateFrom ?? ''} onChange={(event) => setFilter('dateFrom', event.target.value)} />
+                    <input aria-label={t('Hasta')} className="input h-8 px-2 text-[11px]" type="number" placeholder={t('Hasta')} value={filters.dateTo ?? ''} onChange={(event) => setFilter('dateTo', event.target.value)} />
+                  </div>
+                </div>
+                <div className="grid gap-2 sm:col-span-2 lg:col-span-3 lg:grid-cols-3">
+                  <PrivacyToggle checked={allowPrivate} label={t('Incluir contenido privado en esta búsqueda local')} onChange={setAllowPrivate} />
+                  <PrivacyToggle checked={allowRestricted} label={t('Incluir contenido restringido permitido por la política del vault')} onChange={setAllowRestricted} />
+                  <PrivacyToggle checked={allowUnknownRights} label={t('Confirmo buscar contenido cuyos derechos están por revisar')} onChange={setAllowUnknownRights} />
+                </div>
+              </div>
+            </section>
+          )}
+
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px] text-neutral-500">
+            <span className="mr-auto">{t('Sintaxis: comillas para frases; persona:, lugar:, repositorio:, fecha:, tipo:, estado: o referencia:.')}</span>
+            {response.results.length > 0 && tx('{n} resultados · {ms} ms · SQLite local', {
+              n: response.total,
+              ms: Math.round(response.elapsedMs),
+            })}
+            <button className="text-indigo-600 hover:underline dark:text-indigo-300" onClick={() => setGrouped((value) => !value)}>
+              {grouped ? t('Lista única') : t('Agrupar por capa')}
+            </button>
+          </div>
+
+          {activeFilters.length > 0 && (
+            <div className="mt-3 flex flex-wrap items-center gap-1.5" data-testid="primary-sources-search-active-filters">
+              {activeFilters.map((filter) => (
+                <span key={filter.key} className="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 py-1 pl-2.5 pr-1 text-[10px] text-indigo-800 dark:border-indigo-900 dark:bg-indigo-950/50 dark:text-indigo-200">
+                  {filter.label}
+                  <button type="button" className="grid h-5 w-5 place-items-center rounded-full hover:bg-indigo-100 dark:hover:bg-indigo-900" aria-label={`${t('Limpiar')} ${filter.label}`} onClick={filter.clear}>
+                    <Icon name="x" size={10} />
+                  </button>
+                </span>
+              ))}
+              <button type="button" className="ml-1 text-[10px] text-indigo-600 hover:underline dark:text-indigo-300" onClick={clearFilters}>{t('Limpiar filtros')}</button>
+            </div>
+          )}
+        </div>
+      </header>
+
+      <main className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto max-w-5xl space-y-5 p-5">
-          {!query.trim() && response.results.length === 0 && (
+          {!hasSearchCriteria && response.results.length === 0 && (
             <section className="rounded-2xl border border-dashed border-neutral-300 bg-white p-10 text-center dark:border-neutral-700 dark:bg-neutral-900">
               <Icon name="search" className="mx-auto text-indigo-500" size={28} />
               <h1 className="mt-4 text-lg font-semibold">{t('Busca en todo el corpus')}</h1>
@@ -197,7 +249,7 @@ export function PrimarySourcesSearchView({
               <code className="mt-4 inline-block rounded-lg bg-neutral-100 px-3 py-2 text-xs dark:bg-neutral-800">"cólera" persona:"María López"</code>
             </section>
           )}
-          {query.trim() && !loading && response.results.length === 0 && (
+          {hasSearchCriteria && !loading && response.results.length === 0 && (
             <p className="rounded-xl border border-neutral-200 bg-white p-8 text-center text-sm text-neutral-500 dark:border-neutral-800 dark:bg-neutral-900">{t('No hay coincidencias con estos filtros.')}</p>
           )}
           {response.ftsRecommended && (
@@ -238,10 +290,27 @@ function FacetSelect({
   return (
     <label className="block">
       <span className="mb-1 block text-[10px] font-medium text-neutral-500">{label}</span>
-      <select className="input h-8 w-full px-2 text-[11px]" value={value} onChange={(event) => onChange(event.target.value)}>
+      <select aria-label={label} className="input h-8 w-full px-2 text-[11px]" value={value} onChange={(event) => onChange(event.target.value)}>
         <option value="">{t('Todos')}</option>
         {options.map((option) => <option key={option.id} value={option.id}>{t(option.label)} ({option.count})</option>)}
       </select>
+    </label>
+  );
+}
+
+function PrivacyToggle({
+  checked,
+  label,
+  onChange,
+}: {
+  checked: boolean;
+  label: string;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label className={`flex min-h-12 cursor-pointer items-start gap-2 rounded-lg border p-2.5 text-[10px] leading-4 transition ${checked ? 'border-indigo-300 bg-indigo-50 text-indigo-900 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-100' : 'border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-400 dark:hover:border-neutral-700'}`}>
+      <input className="mt-0.5 accent-indigo-600" type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />
+      <span>{label}</span>
     </label>
   );
 }
