@@ -11,7 +11,7 @@
   video watched in one vault stays watched in the others. Settings → Tutorials
   leads with the same grid above its replay buttons, and a vault tour whose
   ground a video covers opens with three ways in (watch, walk the app, not now).
-  The catalogue is fetched from `docs/tutorials.json` in the main process,
+  The catalogue is fetched from `site/tutorials.json` in the main process,
   validated entry by entry and cached in `userData`; the three built-in
   tutorials are always a complete fallback. The written deck remains the offline
   path. Existing installs, which were never asked the question, get a one-time

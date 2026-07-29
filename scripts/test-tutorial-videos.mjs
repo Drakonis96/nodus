@@ -518,13 +518,13 @@ test('a broken catalogue can never hide a tutorial the app already ships', () =>
 });
 
 test('the published file matches what this build ships', async () => {
-  const published = JSON.parse(await read('docs/tutorials.json'));
+  const published = JSON.parse(await read('site/tutorials.json'));
   const { videos, rejected } = catalogue.parseTutorialCatalogue(published);
-  assert.equal(rejected, 0, 'every entry in docs/tutorials.json passes the app\'s own validation');
+  assert.equal(rejected, 0, 'every entry in site/tutorials.json passes the app\'s own validation');
   assert.deepEqual(
     videos.map((video) => [video.id, video.youtubeId, video.order, video.category, video.vaultType ?? null]),
     catalogue.TUTORIAL_VIDEOS.map((video) => [video.id, video.youtubeId, video.order, video.category, video.vaultType ?? null]),
-    'docs/tutorials.json and the built-in list agree'
+    'site/tutorials.json and the built-in list agree'
   );
   assert.equal(catalogue.TUTORIAL_CATALOGUE_URL, 'https://drakonis96.github.io/nodus/tutorials.json');
 });

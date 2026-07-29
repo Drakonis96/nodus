@@ -9,14 +9,14 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 const read = (relative) => fs.readFileSync(path.join(repoRoot, relative), 'utf8');
 
 test('the Teaching web demo is reachable from every live vault demo', () => {
-  const teachingHtml = read('docs/demo/teaching.html');
+  const teachingHtml = read('site/demo/teaching.html');
   assert.match(teachingHtml, /class="vault-tab teach" href="teaching\.html" aria-current="page"/);
   assert.match(teachingHtml, /src="teaching-data\.js/);
   assert.match(teachingHtml, /src="teaching-app\.js/);
   assert.match(teachingHtml, /AI for generating teaching content only; AI never evaluates students/);
 
   for (const page of ['index.html', 'study.html', 'genealogy.html', 'databases.html']) {
-    const html = read(`docs/demo/${page}`);
+    const html = read(`site/demo/${page}`);
     assert.match(html, /class="vault-tab teach" href="teaching\.html"/, `${page} links to Teaching`);
     assert.doesNotMatch(html, /Shell in the app · preview/, `${page} no longer labels Teaching as a preview`);
   }
@@ -27,7 +27,7 @@ test('every live demo exposes the same vault tags and marks exactly one active',
   const expectedHrefs = ['index.html', 'teaching.html', 'study.html', 'genealogy.html', 'databases.html'];
 
   for (const page of pages) {
-    const html = read(`docs/demo/${page}`);
+    const html = read(`site/demo/${page}`);
     const tabs = [...html.matchAll(/<a class="vault-tab [^"]+" href="([^"]+)"([^>]*)>/g)];
     assert.deepEqual(tabs.map((match) => match[1]), expectedHrefs, `${page} keeps the visible vault order`);
     assert.equal(tabs.filter((match) => match[2].includes('aria-current="page"')).length, 1, `${page} marks one active vault`);
@@ -37,8 +37,8 @@ test('every live demo exposes the same vault tags and marks exactly one active',
 
 test('the browser fixture preserves the important facts from the real app fixture', () => {
   const realFixture = read('electron/db/teachingDemoData.ts');
-  const webFixture = read('docs/demo/teaching-data.js');
-  const webApp = read('docs/demo/teaching-app.js');
+  const webFixture = read('site/demo/teaching-data.js');
+  const webApp = read('site/demo/teaching-app.js');
 
   for (const marker of ['Lucía', 'Historical source commentary', 'Written test · unit 3']) {
     assert.ok(realFixture.includes(marker), `real fixture contains ${marker}`);
@@ -56,7 +56,7 @@ test('the browser fixture preserves the important facts from the real app fixtur
 });
 
 test('landing copy describes the current Teaching scope and names Nodus directly', () => {
-  const landing = read('docs/index.html');
+  const landing = read('site/index.html');
   assert.match(landing, /href="demo\/teaching\.html"[^>]*data-i18n="vaults\.teaching\.cta"/);
   assert.match(landing, /Tú traes los datos, Nodus hace los números/);
   assert.doesNotMatch(landing, /Tú traes los datos, él hace los números/);
@@ -68,10 +68,10 @@ test('landing copy describes the current Teaching scope and names Nodus directly
 });
 
 test('the FAQ documents Teaching availability in every maintained FAQ translation', () => {
-  let source = read('docs/faq.js');
+  let source = read('site/faq.js');
   source = source.replace('window.renderFaq = renderFaq;', 'window.__FAQ = FAQ; window.__COMPACT = COMPACT; window.renderFaq = renderFaq;');
   const context = { window: {} };
-  vm.runInNewContext(source, context, { filename: 'docs/faq.js' });
+  vm.runInNewContext(source, context, { filename: 'site/faq.js' });
 
   const faq = context.window.__FAQ;
   for (const lang of ['en', 'es', 'fr', 'it', 'de', 'pt', 'tr', 'zh']) {

@@ -38,7 +38,7 @@ await mkdir(shots, { recursive: true });
 // about — the whole point of the file being remote.
 const PUBLISHED = {
   videos: [
-    ...JSON.parse(await readFile(path.join(repoRoot, 'docs/tutorials.json'), 'utf8')).videos,
+    ...JSON.parse(await readFile(path.join(repoRoot, 'site/tutorials.json'), 'utf8')).videos,
     {
       id: 'worldbuilding', youtubeId: 'dQw4w9WgXcQ', order: 4, icon: 'tree', vaultType: 'worldbuilding',
       copy: {

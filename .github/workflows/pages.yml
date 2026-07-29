@@ -1,0 +1,73 @@
+name: Website
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'site/**'
+      - '.github/workflows/pages.yml'
+  schedule:
+    # Keep one shared download-count cache on the site instead of making every
+    # visitor fan out into individual GitHub API requests.
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'schedule' && 'main' || github.ref }}
+
+      - name: Set up Node
+        if: github.event_name == 'schedule'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Refresh shared release download totals
+        if: github.event_name == 'schedule'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/github-release-downloads.mjs
+
+      - name: Persist the refreshed cache
+        if: github.event_name == 'schedule'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add site/data/github-release-downloads.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Update GitHub release download totals"
+          git push origin HEAD:main
+
+      - name: Use GitHub Actions as the Pages source
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh api --method PUT "repos/${GITHUB_REPOSITORY}/pages" -f build_type=workflow
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v6
+
+      - name: Package the static website
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+      - name: Deploy the website
+        id: deployment
+        uses: actions/deploy-pages@v5

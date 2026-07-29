@@ -1,6 +1,6 @@
 /* Generated completion packs for every language offered by the landing page.
  * The coverage test in scripts/test-site-i18n-coverage.mjs keeps this file in sync
- * with both docs/index.html and docs/faq.js.
+ * with both site/index.html and site/faq.js.
  */
 window.NODUS_LANDING_I18N = {
   "de": {
