@@ -22,10 +22,11 @@ export interface NeighborMatch {
 }
 
 export function cosineF32(a: Float32Array, b: Float32Array): number {
+  if (a.length === 0 || a.length !== b.length) return 0;
   let dot = 0;
   let na = 0;
   let nb = 0;
-  const n = Math.min(a.length, b.length);
+  const n = a.length;
   for (let i = 0; i < n; i++) {
     dot += a[i] * b[i];
     na += a[i] * a[i];
@@ -39,10 +40,10 @@ export function cosineF32(a: Float32Array, b: Float32Array): number {
 export function centroidF32(vectors: Float32Array[]): Float32Array | null {
   if (vectors.length === 0) return null;
   const dim = vectors[0].length;
+  if (dim === 0 || vectors.some((vector) => vector.length !== dim)) return null;
   const sum = new Float32Array(dim);
   for (const v of vectors) {
-    const n = Math.min(dim, v.length);
-    for (let i = 0; i < n; i++) sum[i] += v[i];
+    for (let i = 0; i < dim; i++) sum[i] += v[i];
   }
   for (let i = 0; i < dim; i++) sum[i] /= vectors.length;
   return sum;
@@ -105,7 +106,8 @@ export async function topMatchesPerCentroidChunked(
 }
 
 function coarseCosine(a: Float32Array, b: Float32Array, maxDimensions: number): number {
-  const n = Math.min(a.length, b.length);
+  if (a.length === 0 || a.length !== b.length) return 0;
+  const n = a.length;
   const stride = Math.max(1, Math.floor(n / Math.max(1, maxDimensions)));
   let dot = 0;
   let na = 0;

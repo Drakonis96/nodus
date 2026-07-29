@@ -1672,6 +1672,22 @@ test('the computed facts arrive marked as facts, and the prompt says they are no
   assert.match(composed, /DÍA DEL MUNDO: 4120/);
   assert.match(chat.WORLD_CHAT_SYSTEM, /no los discutas, no los recalcules/);
   assert.match(chat.WORLD_CHAT_SYSTEM, /Si el material no contiene la respuesta/);
+  assert.match(chat.WORLD_CHAT_SYSTEM, /DATOS NO CONFIABLES/);
+});
+
+test('recent history is bounded conversational context, never world evidence', () => {
+  const composed = chat.composeWorldChatContext(
+    chatFacts({
+      history: [
+        { role: 'user', content: '¿Dónde estaba Kaelen?' },
+        { role: 'assistant', content: 'En Vael.' },
+      ],
+    })
+  );
+  assert.match(composed, /HISTORIAL RECIENTE/);
+  assert.match(composed, /NO es evidencia del mundo/);
+  assert.match(composed, /AUTOR: ¿Dónde estaba Kaelen\?/);
+  assert.match(composed, /ASISTENTE: En Vael\./);
 });
 
 test('with no day, the context says so instead of implying one', () => {
@@ -1707,6 +1723,30 @@ test('a citation the model invented degrades to plain text, keeping the sentence
   );
   // Ordinary Markdown links are none of its business.
   assert.equal(chat.validateCitations('[docs](https://example.com)', allowed), '[docs](https://example.com)');
+});
+
+test('a grounded answer that omits every citation receives the exact bounded sources', () => {
+  const repaired = chat.ensureWorldCitations(
+    'Ilyra busca a su hermana.',
+    [
+      { kind: 'character', id: 'ilyra', title: 'Ilyra Venn' },
+      { kind: 'character', id: 'nara', title: 'Nara Venn' },
+      { kind: 'character', id: 'ilyra', title: 'Ilyra Venn' },
+    ],
+    'es'
+  );
+  assert.match(repaired, /Fuentes:/);
+  assert.match(repaired, /\[Ilyra Venn\]\(nodus:\/\/world\/character\/ilyra\)/);
+  assert.match(repaired, /\[Nara Venn\]\(nodus:\/\/world\/character\/nara\)/);
+  assert.equal((repaired.match(/character\/ilyra/g) ?? []).length, 1, 'duplicates are not appended');
+});
+
+test('a valid inline citation is left alone instead of gaining a redundant source list', () => {
+  const answer = 'Consta en [Ilyra](nodus://world/character/ilyra).';
+  assert.equal(
+    chat.ensureWorldCitations(answer, [{ kind: 'character', id: 'ilyra', title: 'Ilyra' }], 'es'),
+    answer
+  );
 });
 
 test('a finding reaches the prompt as its Spanish sentence, variables and all', () => {

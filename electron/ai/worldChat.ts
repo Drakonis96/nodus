@@ -23,6 +23,7 @@ import { getDb } from '../db/database';
 import {
   WORLD_CHAT_SYSTEM,
   composeWorldChatContext,
+  ensureWorldCitations,
   hasWorldChatMaterial,
   matchFocus,
   plainFindingText,
@@ -42,6 +43,8 @@ import type { WorldChatRequest, WorldChatResult, WorldEntryKind } from '@shared/
 /** Enough of a sheet to answer from; past this the focus stops fitting a local window. */
 const MAX_PROSE_CHARS = 1200;
 const MAX_FOCUS = 6;
+const MAX_HISTORY_TURNS = 6;
+const MAX_HISTORY_TURN_CHARS = 900;
 
 function clip(text: string): string {
   return text.length > MAX_PROSE_CHARS ? `${text.slice(0, MAX_PROSE_CHARS).trimEnd()}…` : text;
@@ -75,6 +78,13 @@ function resolveFocus(request: WorldChatRequest): WorldChatRef[] {
 export function buildWorldChatFacts(request: WorldChatRequest): WorldChatFacts {
   const focus = resolveFocus(request);
   const worldDay = readWorldDay(request.question);
+  const history = (request.history ?? [])
+    .filter((turn) => (turn.role === 'user' || turn.role === 'assistant') && turn.content.trim())
+    .slice(-MAX_HISTORY_TURNS)
+    .map((turn) => ({
+      role: turn.role,
+      content: clip(turn.content.trim()).slice(0, MAX_HISTORY_TURN_CHARS),
+    }));
 
   // Nothing anchored, nothing computed — and that is the design, not an optimisation.
   // Everything below would happily answer without a focus: the laws of the world reach
@@ -82,7 +92,7 @@ export function buildWorldChatFacts(request: WorldChatRequest): WorldChatFacts {
   // world's legal code attached and an answer built on it. A chat that cannot say what it
   // is talking about should say exactly that.
   if (focus.length === 0) {
-    return { question: request.question, focus, prose: [], computed: {}, citable: [], worldDay };
+    return { question: request.question, history, focus, prose: [], computed: {}, citable: [], worldDay };
   }
 
   const db = getDb();
@@ -228,6 +238,7 @@ export function buildWorldChatFacts(request: WorldChatRequest): WorldChatFacts {
 
   return {
     question: request.question,
+    history,
     focus,
     prose,
     computed,
@@ -265,10 +276,18 @@ export async function streamWorldChat(
     signal
   );
 
-  // Every entry that exists, so a citation of something real but outside the focus still
-  // works — and an invented id degrades to plain text rather than to a dead link.
-  const allowed = new Set(listWorldEntries().map((entry) => entry.key));
-  return { text: validateCitations(raw, allowed), focus: facts.focus, noMaterial: false };
+  // Only entries actually supplied in CÓMO SE CITA are allowed. A real but unrelated id
+  // is still an unsupported citation: existence elsewhere in the vault does not make it
+  // evidence for this answer.
+  const allowed = new Set(
+    facts.citable.map((ref) => `${ref.kind}:${ref.id}`)
+  );
+  const validated = validateCitations(raw, allowed);
+  return {
+    text: ensureWorldCitations(validated, facts.citable, settings.uiLanguage),
+    focus: facts.focus,
+    noMaterial: false,
+  };
 }
 
 /** Exported for the tests: the keys a reply is allowed to cite. */

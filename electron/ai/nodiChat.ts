@@ -8,8 +8,11 @@ import { listDatabases } from '../db/databasesRepo';
 import { retrieveStudyAssistantEntries } from './studySearch';
 import { buildNodiAllVaultsContext } from '../db/crossVault';
 import { buildWorldChatFacts } from './worldChat';
-import { composeWorldChatContext, validateCitations as validateWorldCitations } from '@shared/worldChatContext';
-import { listWorldEntries } from '../db/worldEncyclopediaRepo';
+import {
+  composeWorldChatContext,
+  ensureWorldCitations,
+  validateCitations as validateWorldCitations,
+} from '@shared/worldChatContext';
 import { NODUS_DOCUMENTATION } from '@shared/nodiDocumentation';
 import type { NodiChatRequest, NodiContextKind, NodiViewContext } from '@shared/types';
 
@@ -199,7 +202,13 @@ export async function streamNodiChat(
   // proper nodus:// links) so weaker/local models still produce clickable sources. The
   // frontend re-renders with this returned answer, replacing the streamed deltas.
   if (worldCitationsEnabled(request)) {
-    return validateWorldCitations(answer, new Set(listWorldEntries().map((entry) => entry.key)));
+    const facts = buildWorldChatFacts({ question });
+    const allowed = new Set(facts.citable.map((ref) => `${ref.kind}:${ref.id}`));
+    return ensureWorldCitations(
+      validateWorldCitations(answer, allowed),
+      facts.citable,
+      settings.uiLanguage
+    );
   }
   return corpusCitationsEnabled(request) ? humanizeResearchCitations(answer) : answer;
 }

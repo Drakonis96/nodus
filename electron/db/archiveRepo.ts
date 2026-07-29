@@ -5,8 +5,9 @@
 
 import { getDb } from './database';
 import { v4 as uuid } from 'uuid';
-import { encodeEmbedding } from './ideasRepo';
+import { currentEmbeddingConfig, encodeEmbedding } from './ideasRepo';
 import { sanitizeDocMetadata, extractItemYear } from '@shared/archiveDocTypes';
+import { archiveEmbeddingText } from '@shared/archiveDiscovery';
 import { applyArchiveFilters, sortArchiveItems } from '@shared/archiveFilters';
 import type {
   ArchiveFolder,
@@ -337,13 +338,35 @@ export function updateItem(
   const source = patch.source !== undefined ? (patch.source?.trim() || null) : existing.source;
   const extractedText = patch.extractedText !== undefined ? patch.extractedText : existing.extractedText;
   const docType = patch.docType !== undefined ? patch.docType : existing.docType;
+  const embeddingSourceChanged =
+    archiveEmbeddingText(existing) !== archiveEmbeddingText({ title, description, extractedText, docType });
   // Re-sanitise against the (possibly changed) type; a type change drops stray fields.
   const metadata = patch.metadata !== undefined ? patch.metadata : existing.metadata;
   getDb()
     .prepare(
-      'UPDATE archive_items SET title = ?, folder_id = ?, description = ?, source = ?, extracted_text = ?, doc_type = ?, metadata_json = ?, updated_at = ? WHERE item_id = ?'
+      `UPDATE archive_items
+          SET title = ?, folder_id = ?, description = ?, source = ?, extracted_text = ?,
+              doc_type = ?, metadata_json = ?,
+              embedding = CASE WHEN ? THEN NULL ELSE embedding END,
+              embedding_provider = CASE WHEN ? THEN NULL ELSE embedding_provider END,
+              embedding_model = CASE WHEN ? THEN NULL ELSE embedding_model END,
+              embedding_dim = CASE WHEN ? THEN NULL ELSE embedding_dim END,
+              embedding_text_hash = CASE WHEN ? THEN NULL ELSE embedding_text_hash END,
+              updated_at = ?
+        WHERE item_id = ?`
     )
-    .run(title, folderId, description, source, extractedText, docType, metadataJson(docType, metadata), now(), itemId);
+    .run(
+      title,
+      folderId,
+      description,
+      source,
+      extractedText,
+      docType,
+      metadataJson(docType, metadata),
+      ...Array(5).fill(embeddingSourceChanged ? 1 : 0),
+      now(),
+      itemId
+    );
   return getItem(itemId);
 }
 
@@ -374,8 +397,9 @@ export function replaceItemFile(
   getDb()
     .prepare(
       `UPDATE archive_items SET file_name = ?, mime_type = ?, bytes = ?, blob = ?, kind = ?, extracted_text = ?,
-        description = ?, content_hash = ?, embedding = NULL, embedding_model = NULL, embedding_dim = NULL,
-        embedding_text_hash = NULL, updated_at = ? WHERE item_id = ?`
+        description = ?, content_hash = ?, embedding = NULL, embedding_provider = NULL,
+        embedding_model = NULL, embedding_dim = NULL, embedding_text_hash = NULL,
+        updated_at = ? WHERE item_id = ?`
     )
     .run(
       input.fileName,
@@ -451,7 +475,9 @@ export interface ArchiveEmbeddingRow {
   extractedText: string | null;
   docType: string | null;
   hasEmbedding: boolean;
+  embeddingProvider: string | null;
   embeddingModel: string | null;
+  embeddingDim: number | null;
   embeddingTextHash: string | null;
 }
 
@@ -460,7 +486,8 @@ export function archiveItemsForEmbedding(): ArchiveEmbeddingRow[] {
   const rows = getDb()
     .prepare(
       `SELECT item_id, title, description, extracted_text, doc_type,
-        (embedding IS NOT NULL) AS has_embedding, embedding_model, embedding_text_hash
+        (embedding IS NOT NULL) AS has_embedding, embedding_provider, embedding_model,
+        embedding_dim, embedding_text_hash
        FROM archive_items
        WHERE COALESCE(extracted_text, '') <> '' OR COALESCE(description, '') <> ''`
     )
@@ -471,7 +498,9 @@ export function archiveItemsForEmbedding(): ArchiveEmbeddingRow[] {
     extracted_text: string | null;
     doc_type: string | null;
     has_embedding: number;
+    embedding_provider: string | null;
     embedding_model: string | null;
+    embedding_dim: number | null;
     embedding_text_hash: string | null;
   }[];
   return rows.map((r) => ({
@@ -481,29 +510,64 @@ export function archiveItemsForEmbedding(): ArchiveEmbeddingRow[] {
     extractedText: r.extracted_text,
     docType: r.doc_type,
     hasEmbedding: Boolean(r.has_embedding),
+    embeddingProvider: r.embedding_provider,
     embeddingModel: r.embedding_model,
+    embeddingDim: r.embedding_dim,
     embeddingTextHash: r.embedding_text_hash,
   }));
 }
 
-export function setItemEmbedding(itemId: string, vec: number[], model: string, textHash: string): void {
+export function setItemEmbedding(
+  itemId: string,
+  vec: number[],
+  provider: string,
+  model: string,
+  textHash: string
+): void {
+  if (
+    vec.length === 0
+    || !vec.every(Number.isFinite)
+    || !vec.some((value) => value !== 0)
+    || !provider.trim()
+    || !model.trim()
+  ) {
+    throw new Error('No se puede guardar un embedding de archivo vacío o inválido.');
+  }
   getDb()
     .prepare(
-      'UPDATE archive_items SET embedding = ?, embedding_model = ?, embedding_dim = ?, embedding_text_hash = ?, updated_at = ? WHERE item_id = ?'
+      `UPDATE archive_items
+          SET embedding = ?, embedding_provider = ?, embedding_model = ?,
+              embedding_dim = ?, embedding_text_hash = ?, updated_at = ?
+        WHERE item_id = ?`
     )
-    .run(encodeEmbedding(vec), model, vec.length, textHash, now(), itemId);
+    .run(encodeEmbedding(vec), provider, model, vec.length, textHash, now(), itemId);
 }
 
 export function clearAllArchiveEmbeddings(): void {
   getDb()
-    .prepare('UPDATE archive_items SET embedding = NULL, embedding_model = NULL, embedding_dim = NULL, embedding_text_hash = NULL')
+    .prepare(
+      `UPDATE archive_items
+          SET embedding = NULL, embedding_provider = NULL, embedding_model = NULL,
+              embedding_dim = NULL, embedding_text_hash = NULL`
+    )
     .run();
 }
 
 export function archiveEmbeddingCount(): { indexed: number; total: number } {
   const db = getDb();
+  const config = currentEmbeddingConfig();
   return {
-    indexed: (db.prepare('SELECT COUNT(*) AS c FROM archive_items WHERE embedding IS NOT NULL').get() as { c: number }).c,
+    indexed: (
+      db
+        .prepare(
+          `SELECT COUNT(*) AS c FROM archive_items
+            WHERE embedding IS NOT NULL
+              AND embedding_provider = ?
+              AND embedding_model = ?
+              AND embedding_dim > 0`
+        )
+        .get(config.provider, config.model) as { c: number }
+    ).c,
     total: (
       db
         .prepare("SELECT COUNT(*) AS c FROM archive_items WHERE COALESCE(extracted_text,'') <> '' OR COALESCE(description,'') <> ''")
@@ -523,8 +587,15 @@ export function findArchiveItemsSimilar(
 ): (ArchiveItem & { similarity: number })[] {
   const limit = opts.limit ?? 8;
   const minSim = opts.minSimilarity ?? 0.35;
-  const where: string[] = ['embedding IS NOT NULL'];
-  const params: unknown[] = [encodeEmbedding(queryVec)];
+  if (queryVec.length === 0) return [];
+  const config = currentEmbeddingConfig();
+  const where: string[] = [
+    'embedding IS NOT NULL',
+    'embedding_provider = ?',
+    'embedding_model = ?',
+    'embedding_dim = ?',
+  ];
+  const params: unknown[] = [encodeEmbedding(queryVec), config.provider, config.model, queryVec.length];
   if (opts.excludePersonId) {
     where.push('item_id NOT IN (SELECT item_id FROM archive_item_persons WHERE person_id = ?)');
     params.push(opts.excludePersonId);

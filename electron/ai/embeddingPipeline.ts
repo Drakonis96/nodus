@@ -247,18 +247,20 @@ export async function startEmbedding(nodusIds?: string[]): Promise<void> {
           const text = embeddingTextForIdea(idea);
           const embedding = await embed(text);
 
-          if (embedding) {
-            updateIdeaEmbedding(idea.globalId, text, embedding);
+          if (!embedding?.length) {
+            throw new Error('El proveedor no devolvió un embedding utilizable.');
           }
+          updateIdeaEmbedding(idea.globalId, text, embedding);
 
           state.ideasEmbedded++;
 
         } catch (e) {
+          const message = e instanceof Error ? e.message : String(e);
+          state.error ??= message;
           console.error(
             `[embeddingPipeline] error embedding idea ${idea.globalId}:`,
-            e instanceof Error ? e.message : String(e)
+            message
           );
-          state.ideasEmbedded++;
         }
 
         emit();
@@ -302,7 +304,8 @@ async function reembedAllSummaries(): Promise<void> {
     if (!summaryNeedsEmbedding(row, row.summary)) continue;
     try {
       const embedding = await embed(row.summary);
-      if (embedding) updateWorkSummaryEmbedding(row.nodus_id, row.summary, embedding);
+      if (!embedding?.length) throw new Error('El proveedor no devolvió un embedding utilizable.');
+      updateWorkSummaryEmbedding(row.nodus_id, row.summary, embedding);
     } catch (error) {
       console.error(
         `[embeddingPipeline] error embedding work summary ${row.nodus_id}:`,
