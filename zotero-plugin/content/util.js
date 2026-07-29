@@ -72,5 +72,33 @@
     return fallback === "es" ? "Spanish" : "English";
   }
 
-  window.NodusUtil = { sampleDocText, conversationToHtml, buildItemsSummary, detectLanguage };
+  // ---- auto-connect policy ----
+  // The sidebar must latch onto the Nodus server on its own: the app may be
+  // launched after Zotero, restarted on another port, or have rotated its
+  // token. Pressing "Test connection" is a manual override, never the normal
+  // path. These two helpers are the pure decisions behind the retry loop.
+
+  // Backoff for the reconnection loop: eager right after a failure (Nodus was
+  // probably just launched), then calm. `connected` is how often an established
+  // link looks at the bridge file (cheap, local); `revalidate` is how rarely it
+  // actually calls the server, because /health counts rows in SQLite on Nodus's
+  // single main-process event loop and must not be polled every few seconds.
+  const CONNECT_DELAYS = { first: 1500, max: 15000, connected: 20000, revalidate: 300000 };
+  function nextConnectDelay(status) {
+    if (status && status.connected) return CONNECT_DELAYS.connected;
+    const attempts = Math.max(0, Math.floor(Number(status && status.attempts) || 0));
+    return Math.min(CONNECT_DELAYS.max, CONNECT_DELAYS.first * Math.pow(2, attempts));
+  }
+
+  // Did the bridge file (port/token) change under us? A restarted Nodus writes
+  // a new port, and the cached config must be dropped even while "connected".
+  function bridgeConfigChanged(a, b) {
+    if (!a || !b) return Boolean(a) !== Boolean(b);
+    return Number(a.port) !== Number(b.port) || String(a.token) !== String(b.token);
+  }
+
+  window.NodusUtil = {
+    sampleDocText, conversationToHtml, buildItemsSummary, detectLanguage,
+    nextConnectDelay, bridgeConfigChanged, CONNECT_DELAYS,
+  };
 })();

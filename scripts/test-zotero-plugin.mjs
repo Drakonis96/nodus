@@ -3,7 +3,9 @@
 // them in a vm sandbox with minimal stubs (ChromeUtils/Zotero/document) and
 // exercise the parts that don't need a live Zotero or a real DOM.
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import http from 'node:http';
+import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -169,6 +171,198 @@ test('util: sampleDocText keeps head AND tail of long docs', () => {
   assert.ok(r.sentChars <= 200 + 60, 'roughly within budget');
   assert.equal(r.totalChars, big.length);
   assert.ok(r.ratio > 0 && r.ratio < 1);
+});
+
+// ─────────────────────────────────────────── auto-connect
+test('util: reconnection backs off while down and idles while connected', () => {
+  const { NodusUtil } = loadModule('util.js');
+  const d = (attempts) => NodusUtil.nextConnectDelay({ connected: false, attempts });
+  assert.equal(d(0), NodusUtil.CONNECT_DELAYS.first, 'first retry is eager — Nodus was probably just launched');
+  assert.ok(d(1) > d(0) && d(2) > d(1), 'backs off instead of hammering the port');
+  assert.equal(d(50), NodusUtil.CONNECT_DELAYS.max, 'capped: a Zotero left open for hours still retries');
+  assert.equal(
+    NodusUtil.nextConnectDelay({ connected: true, attempts: 0 }),
+    NodusUtil.CONNECT_DELAYS.connected,
+    'an established link is only re-validated occasionally',
+  );
+});
+
+test('util: a restarted Nodus (new port or token) invalidates the cached bridge config', () => {
+  const { NodusUtil } = loadModule('util.js');
+  const cfg = { port: 4321, token: 'abc' };
+  assert.equal(NodusUtil.bridgeConfigChanged(cfg, { port: 4321, token: 'abc' }), false);
+  assert.equal(NodusUtil.bridgeConfigChanged(cfg, { port: 4322, token: 'abc' }), true, 'restarted on another port');
+  assert.equal(NodusUtil.bridgeConfigChanged(cfg, { port: 4321, token: 'zzz' }), true, 'token rotated');
+  assert.equal(NodusUtil.bridgeConfigChanged(cfg, null), true, 'bridge file disappeared');
+  assert.equal(NodusUtil.bridgeConfigChanged(null, cfg), true, 'bridge file appeared — Nodus just started');
+  assert.equal(NodusUtil.bridgeConfigChanged(null, null), false);
+});
+
+test('sidebar: the link is established without the user pressing "Test connection"', () => {
+  const src = readSource('zotero-plugin/content/sidebar.js');
+  // The background loop must be armed at boot and re-armed after every attempt,
+  // or the sidebar would go back to needing a manual click.
+  assert.match(src, /scheduleConnectionCheck\(\);\s*\n\s*await refreshItem/, 'boot arms the auto-connect loop');
+  assert.match(src, /connTimer = setTimeout\([\s\S]*?connect\(\)[\s\S]*?scheduleConnectionCheck\)/, 'each attempt schedules the next');
+  assert.match(src, /window\.addEventListener\("focus", retryConnectionNow\)/, 'refocusing Zotero retries immediately');
+  // Sending must try to connect first: "not connected" to a message the user
+  // just typed is exactly the failure this replaces.
+  const send = src.slice(src.indexOf('async function send(text)'), src.indexOf('async function generateAssistant'));
+  assert.ok(send.indexOf('ensureConnected()') < send.indexOf('chat.offline'), 'send() reconnects before refusing');
+  assert.ok(!/state\.mode === "connected" && !state\.connected/.test(send), 'no bare offline gate left in send()');
+  // The token is checked against a guarded endpoint: /health is tokenless.
+  const probe = src.slice(src.indexOf('async function probeConfig'), src.indexOf('let connectInFlight'));
+  assert.match(probe, /\/api\/z\/health/);
+  assert.match(probe, /\/api\/z\/models/, 'a stale token must not read as "connected"');
+});
+
+// ── the sidebar, running for real against a fake Nodus server ────────────────
+// sidebar.js is a plain chrome:// script: its top-level `function`s land on the
+// sandbox global, and `const state` stays visible to later scripts evaluated in
+// the same realm. That is enough to boot the real thing over stub DOM/Zotero
+// and watch it connect on its own.
+function stubEl(doc, tag) {
+  const attrs = {};
+  return {
+    tagName: String(tag || 'div').toUpperCase(), ownerDocument: doc, children: [],
+    className: '', id: '', value: '', textContent: '', innerHTML: '', hidden: false, disabled: false,
+    style: {}, dataset: {},
+    classList: { add() {}, remove() {}, toggle() {}, contains: () => false },
+    appendChild(c) { this.children.push(c); return c; },
+    insertBefore(c) { this.children.push(c); return c; },
+    removeChild() {}, remove() {}, focus() {}, blur() {}, scrollIntoView() {},
+    setAttribute(k, v) { attrs[k] = v; }, getAttribute: (k) => (k in attrs ? attrs[k] : null), removeAttribute(k) { delete attrs[k]; },
+    addEventListener() {}, removeEventListener() {},
+    querySelector: () => null, querySelectorAll: () => [],
+    getBoundingClientRect: () => ({ top: 0, left: 0, width: 0, height: 0 }),
+  };
+}
+function stubDoc() {
+  const byId = new Map();
+  const doc = {
+    createElement: (tag) => stubEl(doc, tag),
+    createTextNode: (text) => ({ nodeType: 3, textContent: String(text) }),
+    createDocumentFragment: () => stubEl(doc, 'fragment'),
+    getElementById(id) { if (!byId.has(id)) byId.set(id, stubEl(doc, 'div')); return byId.get(id); },
+    querySelector(sel) { return doc.getElementById(String(sel)); },
+    querySelectorAll: () => [],
+    addEventListener() {}, removeEventListener() {},
+  };
+  doc.body = stubEl(doc, 'body');
+  doc.documentElement = stubEl(doc, 'html');
+  return doc;
+}
+const FAKE_STORE = {
+  getMode: () => 'connected', setMode() {}, getLang: () => 'en', setLang() {},
+  getModel: () => null, setModel() {}, getMaxTokens: () => 8192, setMaxTokens() {},
+  getReasoning: () => 'default', setReasoning() {},
+  getHlColors: () => ({ high: '#ff6666', medium: '#ffd400' }), setHlColors() {},
+  getContext: () => ({ useIdeas: true, useCorpus: true, useFulltext: true, strategy: 'auto', ocr: 'off', repair: 'auto', agenticRounds: 1, fullTextThreshold: 48000 }),
+  setContext() {}, getKey: () => '', setKey() {}, getLocalBase: () => '', setLocalBase() {},
+  getPinned: () => [], setPinned() {}, isPinned: () => false, togglePinned: () => [],
+  getCustomPrompts: () => [], addCustomPrompt: () => [], removeCustomPrompt() {},
+  getAutoUpdate: () => false, setAutoUpdate() {}, getAgent: () => false, setAgent() {},
+  getAgentAuto: () => false, setAgentAuto() {},
+  getManual: () => ({ port: 0, token: '' }), setManual() {},
+  loadConversations: async () => [], saveConversations: async () => {},
+  saveEvidenceIndex: async () => {}, loadEvidenceIndex: async () => null,
+  newId: () => 'conv-1', compactAudit: (a) => a,
+};
+// A stand-in for electron/zotero-plugin/server.ts with the property that
+// matters here: /health is tokenless, everything else demands the bearer token.
+const openServers = new Set();
+function fakeNodus(token) {
+  const hits = { total: 0 };
+  const server = http.createServer((req, res) => {
+    hits.total++;
+    const send = (code, body) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); };
+    const url = (req.url || '/').split('?')[0];
+    if (url === '/api/z/health') return send(200, { ok: true, app: 'nodus', vault: 'Test', corpusSize: 3 });
+    if (req.headers.authorization !== `Bearer ${token}`) return send(401, { error: 'bad token' });
+    if (url === '/api/z/models') return send(200, { models: [{ provider: 'openai', model: 'gpt-test' }], default: null });
+    return send(404, {});
+  });
+  openServers.add(server);
+  return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve({ server, hits, port: server.address().port })));
+}
+// A failed assertion must FAIL the run, not hang it: an open listener keeps the
+// test process alive forever, so every server is closed from the after hook.
+const closeServers = async () => {
+  for (const s of openServers) await new Promise((r) => s.close(() => r()));
+  openServers.clear();
+};
+const waitFor = async (fn, ms = 4000) => {
+  const deadline = Date.now() + ms;
+  for (;;) {
+    if (await fn()) return true;
+    if (Date.now() > deadline) return false;
+    await new Promise((r) => setTimeout(r, 25));
+  }
+};
+
+test('sidebar: connects to Nodus by itself, follows a restart, and refuses a stale token', async (t) => {
+  const home = mkdtempSync(path.join(os.tmpdir(), 'nodus-zotero-'));
+  mkdirSync(path.join(home, '.nodus'), { recursive: true });
+  const bridge = path.join(home, '.nodus', 'zotero-bridge.json');
+  const writeBridge = (port, token) => writeFileSync(bridge, JSON.stringify({ port, token, updatedAt: 'now' }));
+
+  const doc = stubDoc();
+  const Zotero = { logError() {}, launchURL() {}, getMainWindow: () => null };
+  const sandbox = {
+    window: { NodusStore: FAKE_STORE, addEventListener() {}, removeEventListener() {}, parent: null },
+    document: doc, console, Zotero,
+    ChromeUtils: { importESModule: () => ({ Zotero }) },
+    Components: { interfaces: { nsIFile: {} } },
+    Services: { dirsvc: { get: () => ({ path: home }) } },
+    PathUtils: { join: (...parts) => path.join(...parts) },
+    IOUtils: { readUTF8: async (p) => readFileSync(p, 'utf8') },
+    fetch, AbortController, AbortSignal, TextDecoder, URL,
+    setTimeout, clearTimeout, setInterval, clearInterval, queueMicrotask,
+  };
+  vm.createContext(sandbox);
+  const run = (code) => vm.runInContext(code, sandbox);
+  t.after(async () => {
+    try { run('stopConnectionWatch(); clearInterval(state.pollTimer);'); } catch (e) {}
+    await closeServers();
+    rmSync(home, { recursive: true, force: true });
+  });
+
+  // Nodus is NOT running and there is no bridge file: exactly the situation in
+  // which the plugin used to sit until the user pressed "Test connection".
+  for (const file of ['util.js', 'sidebar.js']) vm.runInContext(readFileSync(path.join(contentDir, file), 'utf8'), sandbox, { filename: file });
+  run('NU.CONNECT_DELAYS.first = 30; NU.CONNECT_DELAYS.max = 60; NU.CONNECT_DELAYS.connected = 60;');
+  assert.equal(await waitFor(async () => run('state.connAttempts') >= 1, 2000), true, 'the loop keeps trying while Nodus is down');
+  assert.equal(run('state.connected'), false);
+
+  // Nodus starts. Nothing in the UI is touched — only the bridge file appears.
+  const token = 'tok-first';
+  const first = await fakeNodus(token);
+  writeBridge(first.port, token);
+  assert.equal(await waitFor(async () => run('state.connected'), 4000), true, 'the sidebar connects with no user action');
+  assert.equal(run('state.config.port'), first.port);
+  assert.equal(await waitFor(async () => run('state.modelsConnected.length') === 1, 2000), true, 'models arrive too, so the composer is usable');
+
+  // Watching must be nearly free: while the link is up and the bridge file is
+  // untouched, the loop reads a local file and leaves Nodus's main process
+  // alone. Measured as requests served, not as elapsed time.
+  const settled = first.hits.total;
+  const tick = run('NU.CONNECT_DELAYS.connected');
+  await new Promise((r) => setTimeout(r, 400)); // ~6 ticks at the 60ms test cadence
+  assert.equal(first.hits.total, settled, `an idle connected sidebar does not poll the server (tick=${tick}ms)`);
+  assert.equal(run('state.connected'), true, 'and it stays connected while idle');
+
+  // Nodus restarts on another port with a fresh token: the cached config is
+  // stale and must be replaced without anyone clicking anything.
+  await new Promise((r) => { openServers.delete(first.server); first.server.close(() => r()); });
+  const second = await fakeNodus('tok-second');
+  writeBridge(second.port, 'tok-second');
+  assert.equal(await waitFor(async () => run('state.connected && state.config.port') === second.port, 4000), true, 'follows a restarted Nodus to its new port');
+
+  // A wrong token still passes the tokenless /health, so the link must be
+  // judged by an endpoint that actually checks it.
+  writeBridge(second.port, 'tok-wrong');
+  assert.equal(await waitFor(async () => run('state.connected') === false, 4000), true, 'a stale token does not read as connected');
+  await new Promise((r) => { openServers.delete(second.server); second.server.close(() => r()); });
 });
 
 // ─────────────────────────────────────────── evidence retrieval
@@ -1047,7 +1241,7 @@ test('#9: build-zotero-xpi produces a valid xpi + updates.json', () => {
   ]) {
     assert.ok(names.includes(need), `xpi contains ${need}`);
   }
-  assert.equal(manifest.version, '2.7.0');
+  assert.equal(manifest.version, '3.0.0', 'bumped so installed plugins pull the auto-connect fix via updates.json');
   assert.equal(manifest.icons['64'], 'icons/nodus.svg');
   assert.match(zip.readAsText('icons/nodus.svg'), /M18 48V16L46 48V16/, 'Zotero keeps the normal Nodus N');
   assert.ok(!names.includes('icons/zotero-z.svg'), 'the rotated release-note mark is not shipped as Zotero UI');

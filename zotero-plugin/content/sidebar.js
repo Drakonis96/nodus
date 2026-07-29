@@ -64,7 +64,8 @@ const I18N = {
     "confirm.agentOn": "Enable Agent mode? Nodus will be able to act on your Zotero library (create notes, highlight, tag). Each action still asks for approval unless auto-approve is on.",
     "modal.delOne": "Delete this conversation? This cannot be undone.", "modal.delAll": "Delete ALL conversations? This cannot be undone.",
     "conn.on": "Connected", "conn.off": "Not connected",
-    "conn.detailOn": "Connected to Nodus on port", "conn.detailOff": "Nodus server not found. Enable it in Nodus → Settings → Nodus for Zotero.",
+    "conn.detailOn": "Connected to Nodus on port", "conn.detailOff": "Looking for Nodus… Start the app and enable Nodus → Settings → Nodus for Zotero; the sidebar connects on its own.",
+    "conn.autoOn": "Connected to Nodus.", "conn.autoOff": "Lost the connection to Nodus. Retrying automatically.",
     "item.none": "Select a document in Zotero.", "item.analyzed": "Full analysis in Nodus", "item.notAnalyzed": "Not analyzed in Nodus", "item.ideas": "ideas",
     "prompt.summary": "Summary", "prompt.ideas": "Main ideas", "prompt.connections": "Connections", "prompt.selection": "Explain selection", "prompt.quotes": "Key quotes",
     "p.summary": "Summarize this document.", "p.ideas": "What are the main ideas of this document?",
@@ -161,7 +162,8 @@ const I18N = {
     "confirm.agentOn": "¿Activar el modo Agente? Nodus podrá actuar sobre tu biblioteca de Zotero (crear notas, subrayar, etiquetar). Cada acción pide aprobación salvo que la aprobación automática esté activada.",
     "modal.delOne": "¿Eliminar esta conversación? No se puede deshacer.", "modal.delAll": "¿Eliminar TODAS las conversaciones? No se puede deshacer.",
     "conn.on": "Conectado", "conn.off": "Sin conexión",
-    "conn.detailOn": "Conectado a Nodus en el puerto", "conn.detailOff": "No se encontró el servidor de Nodus. Actívalo en Nodus → Ajustes → Nodus para Zotero.",
+    "conn.detailOn": "Conectado a Nodus en el puerto", "conn.detailOff": "Buscando Nodus… Abre la app y actívalo en Nodus → Ajustes → Nodus para Zotero; la barra se conecta sola.",
+    "conn.autoOn": "Conectado con Nodus.", "conn.autoOff": "Se perdió la conexión con Nodus. Reintentando automáticamente.",
     "item.none": "Selecciona un documento en Zotero.", "item.analyzed": "Análisis completo en Nodus", "item.notAnalyzed": "Sin analizar en Nodus", "item.ideas": "ideas",
     "prompt.summary": "Resumen", "prompt.ideas": "Ideas principales", "prompt.connections": "Conexiones", "prompt.selection": "Explicar selección", "prompt.quotes": "Citas clave",
     "p.summary": "Haz un resumen de este documento.", "p.ideas": "¿Cuáles son las ideas principales de este documento?",
@@ -226,6 +228,7 @@ const I18N = {
 
 const state = {
   mode: "connected", lang: "en", connected: false, config: null,
+  connAttempts: 0, connMisses: 0, connOkAt: 0,
   modelsConnected: [], model: null,
   item: null, attachmentKey: null, selection: "", ideaLabels: {},
   conversations: [], conv: null, busy: false, lastItemKey: null, abort: null,
@@ -262,13 +265,119 @@ async function api(pathname, opts) {
 }
 async function apiJson(pathname, opts) { const r = await api(pathname, opts); if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); }
 
-async function connect() {
-  state.connected = false; state.config = null;
-  if (state.mode === "connected") {
-    state.config = await loadConfig();
-    if (state.config) { try { const h = await apiJson("/api/z/health"); state.connected = Boolean(h && h.ok); } catch (e) {} }
+// Probe a candidate config WITHOUT committing it to state.config, so a failed
+// attempt never tears down a link that still works. Short timeout: the server
+// is on 127.0.0.1, so anything slow is a hang, not latency.
+const HEALTH_TIMEOUT_MS = 4000;
+function timeoutSignal(ms) {
+  try { if (typeof AbortSignal !== "undefined" && AbortSignal.timeout) return AbortSignal.timeout(ms); } catch (e) {}
+  try { const c = new AbortController(); setTimeout(() => { try { c.abort(); } catch (e) {} }, ms); return c.signal; } catch (e) { return undefined; }
+}
+async function probeGet(cfg, pathname) {
+  const r = await fetch("http://127.0.0.1:" + cfg.port + pathname, {
+    method: "GET",
+    headers: { "Content-Type": "application/json", Authorization: "Bearer " + cfg.token },
+    signal: timeoutSignal(HEALTH_TIMEOUT_MS),
+  });
+  if (!r.ok) return null;
+  return r.json();
+}
+async function probeConfig(cfg) {
+  if (!cfg || !cfg.port || !cfg.token) return false;
+  try {
+    // /health is tokenless (it only proves *something* Nodus-shaped is on that
+    // port), so the token is validated against a guarded endpoint: otherwise a
+    // stale manual token would show "connected" and 401 on every real call.
+    const h = await probeGet(cfg, "/api/z/health");
+    if (!h || !h.ok || (h.app && h.app !== "nodus")) return false;
+    const m = await probeGet(cfg, "/api/z/models");
+    return Boolean(m && Array.isArray(m.models));
+  } catch (e) { return false; }
+}
+
+// One connection attempt. Always re-reads the bridge file first, so a Nodus
+// that restarted on another port (or rotated its token) is picked up without
+// the user touching anything. Returns nothing; state + UI are updated in place.
+let connectInFlight = null;
+async function connect(opts) {
+  if (connectInFlight) return connectInFlight;
+  connectInFlight = (async () => {
+    try { await attemptConnect(opts); } catch (e) { try { Zotero.logError(e); } catch (x) {} }
+  })();
+  try { await connectInFlight; } finally { connectInFlight = null; }
+}
+async function attemptConnect(opts) {
+  const wasConnected = state.connected;
+  if (state.mode !== "connected") {
+    state.connected = false; state.config = null; state.connMisses = 0; state.connAttempts = 0;
+    renderConn();
+    return;
+  }
+  const cfg = await loadConfig();
+  const moved = NU && NU.bridgeConfigChanged ? NU.bridgeConfigChanged(state.config, cfg) : false;
+  // A live link whose bridge file hasn't changed needs nothing from the server:
+  // /health counts rows in SQLite on Nodus's single main-process event loop, so
+  // the loop watches the (local, cheap) bridge file and only re-validates over
+  // HTTP once in a while. `force` is the user asking explicitly.
+  const revalidateMs = (NU && NU.CONNECT_DELAYS && NU.CONNECT_DELAYS.revalidate) || 300000;
+  if (state.connected && !moved && !(opts && opts.force) && Date.now() - state.connOkAt < revalidateMs) return;
+  const ok = await probeConfig(cfg);
+  state.config = cfg;
+  if (ok) {
+    state.connected = true; state.connMisses = 0; state.connAttempts = 0; state.connOkAt = Date.now();
+  } else {
+    state.connAttempts++;
+    state.connMisses++;
+    // Tolerate ONE miss on an established link (a busy server, a bridge file
+    // being rewritten) so the composer doesn't flicker off mid-conversation.
+    // A config change is not a hiccup: drop the link immediately.
+    if (!wasConnected || moved || state.connMisses >= 2) state.connected = false;
   }
   renderConn();
+  // `quiet` = the caller (boot, mode switch, Test button) refreshes the model
+  // list itself and the user knows what they did. Only the background loop
+  // reports a link that came up or went down on its own.
+  if (state.connected !== wasConnected && !(opts && opts.quiet)) {
+    await loadModelsForMode();
+    showToast(t(state.connected ? "conn.autoOn" : "conn.autoOff"));
+  }
+}
+
+// ── auto-connect loop ────────────────────────────────────────────────────────
+// Nodus is not necessarily running when Zotero starts, and it may be restarted
+// at any time. Instead of asking the user to press "Test connection", the
+// sidebar keeps looking for the server in the background with a backoff, and
+// re-validates the link periodically once it is up.
+let connTimer = null;
+function scheduleConnectionCheck() {
+  if (connTimer) { clearTimeout(connTimer); connTimer = null; }
+  if (state.mode !== "connected") return; // standalone talks to providers directly
+  const delay = NU && NU.nextConnectDelay
+    ? NU.nextConnectDelay({ connected: state.connected, attempts: state.connAttempts })
+    : 15000;
+  connTimer = setTimeout(() => {
+    connTimer = null;
+    connect().catch(() => {}).then(scheduleConnectionCheck);
+  }, delay);
+}
+function stopConnectionWatch() { if (connTimer) { clearTimeout(connTimer); connTimer = null; } }
+// Before an action that needs the server, give the link one immediate chance
+// instead of waiting out the backoff: the user may have launched Nodus a
+// second ago. Returns true when the action can proceed.
+async function ensureConnected() {
+  if (state.mode !== "connected" || state.connected) return true;
+  state.connAttempts = 0;
+  await connect({ quiet: true });
+  scheduleConnectionCheck();
+  if (state.connected) await loadModelsForMode();
+  return state.connected;
+}
+// Immediate retry on a user-visible moment (focus, opening Settings): the user
+// has typically just launched Nodus and shouldn't wait out the backoff.
+function retryConnectionNow() {
+  if (state.mode !== "connected" || state.connected || connectInFlight) return;
+  state.connAttempts = 0;
+  connect().catch(() => {}).then(scheduleConnectionCheck);
 }
 function renderConn() {
   const chip = $("#nd-conn");
@@ -1283,8 +1392,8 @@ async function fetchHighlightsConnected(doc, signal) {
 }
 async function autoHighlight() {
   if (state.busy || !NH) return;
+  if (!(await ensureConnected())) { if (!state.conv) startNewConversation(); addMessage("assistant", t("chat.offline")); return; }
   if (!currentModel()) { if (!state.conv) startNewConversation(); addMessage("assistant", t("chat.noModel")); return; }
-  if (state.mode === "connected" && !state.connected) { if (!state.conv) startNewConversation(); addMessage("assistant", t("chat.offline")); return; }
   if (!NH.getReaderPdf()) { if (!state.conv) startNewConversation(); addMessage("assistant", t("hl.noReader")); return; }
   if (!state.conv) startNewConversation();
   state.busy = true; state.abort = new AbortController(); updateSendEnabled();
@@ -1325,8 +1434,10 @@ function renderHighlightResult(bodyEl, res) {
 // ─────────────────────────────────────────── send
 async function send(text) {
   if (!text || !text.trim() || state.busy) return;
+  // Connection first: if Nodus started after Zotero, this reconnects in place
+  // instead of answering "not connected" to a message the user just typed.
+  if (!(await ensureConnected())) { if (!state.conv) startNewConversation(); addMessage("assistant", t("chat.offline")); return; }
   if (!currentModel()) { if (!state.conv) startNewConversation(); addMessage("assistant", t("chat.noModel")); return; }
-  if (state.mode === "connected" && !state.connected) { if (!state.conv) startNewConversation(); addMessage("assistant", t("chat.offline")); return; }
   if (!state.conv) startNewConversation();
   const uidx = state.conv.messages.push({ role: "user", content: text }) - 1;
   addMessage("user", text, uidx);
@@ -1336,8 +1447,8 @@ async function send(text) {
 // Streams an assistant reply for the current conversation tail (which must end
 // in a user message). Shared by send() and regenerateFrom().
 async function generateAssistant() {
+  if (!(await ensureConnected())) { addMessage("assistant", t("chat.offline")); return; }
   if (!currentModel()) { addMessage("assistant", t("chat.noModel")); return; }
-  if (state.mode === "connected" && !state.connected) { addMessage("assistant", t("chat.offline")); return; }
   state.busy = true; state.abort = new AbortController(); updateSendEnabled();
 
   // Wrapped in try/finally so state.busy ALWAYS resets — otherwise a throw in the
@@ -1668,8 +1779,10 @@ function renderMode() {
 async function setMode(m) {
   state.mode = m === "standalone" ? "standalone" : "connected"; NS.setMode(state.mode);
   renderMode();
-  await connect();
+  state.connAttempts = 0;
+  await connect({ quiet: true });
   await loadModelsForMode();
+  scheduleConnectionCheck(); // stops the loop in standalone, (re)starts it in link mode
   startNewConversation();
 }
 // Swap the static toolbar/composer/header glyphs for inline SVG icons.
@@ -1795,6 +1908,9 @@ function switchTab(name) {
   $$(".nd-tab").forEach((b) => b.classList.toggle("nd-tab--active", b.getAttribute("data-tab") === name));
   $$(".nd-panel").forEach((p) => p.classList.toggle("nd-panel--active", p.getAttribute("data-panel") === name));
   if (name === "providers") renderProviders();
+  // Opening Settings usually means "why isn't it connected?" — retry now
+  // instead of making the user press the button to find out.
+  if (name === "settings") retryConnectionNow();
 }
 
 function wire() {
@@ -1871,7 +1987,16 @@ function wire() {
     finally { state.busy = false; state.abort = null; updateSendEnabled(); }
   });
   $("#nd-visual-btn").addEventListener("click", () => analyzeCurrentPage());
-  $("#nd-test").addEventListener("click", () => { NS.setManual($("#nd-port").value, $("#nd-token").value.trim()); connect().then(loadModelsForMode); });
+  // Manual override (custom port/token). The sidebar connects by itself, so
+  // this is only needed for a non-default setup — it forces an attempt now.
+  $("#nd-test").addEventListener("click", async () => {
+    NS.setManual($("#nd-port").value, $("#nd-token").value.trim());
+    state.connAttempts = 0;
+    await connect({ quiet: true, force: true });
+    await loadModelsForMode();
+    showToast(t(state.connected ? "conn.autoOn" : "conn.detailOff"));
+    scheduleConnectionCheck();
+  });
   window.addEventListener("message", (e) => {
     if (!e.data || e.data.type !== "nodus-selection") return;
     state.selection = String(e.data.text || ""); state.selectionDraft = e.data.draft || null;
@@ -1901,6 +2026,8 @@ function wire() {
   // public event for. Tab switches and item edits arrive instantly via the
   // Notifier below, so this can be slow.
   state.pollTimer = setInterval(() => scheduleRefresh(false), 2000);
+  // Coming back to Zotero is the moment right after "I just opened Nodus".
+  window.addEventListener("focus", retryConnectionNow);
 }
 function saveContext() {
   state.contextStrategy = $("#nd-ctx-strategy").value;
@@ -1940,6 +2067,7 @@ function registerNotifier() {
     window.addEventListener("unload", () => {
       try { if (state.notifierID) Zotero.Notifier.unregisterObserver(state.notifierID); } catch (e) {}
       try { if (state.pollTimer) clearInterval(state.pollTimer); } catch (e) {}
+      try { stopConnectionWatch(); } catch (e) {}
     });
   } catch (e) { try { Zotero.logError(e); } catch (x) {} }
 }
@@ -1979,8 +2107,11 @@ async function boot() {
   renderMode();
   state.conversations = await NS.loadConversations();
   startNewConversation();
-  await connect();
+  await connect({ quiet: true });
   await loadModelsForMode();
+  // Keep looking for Nodus in the background: it may not be running yet (or may
+  // be restarted later), and the user should never have to press a button.
+  scheduleConnectionCheck();
   await refreshItem(true);
 }
 boot().catch((e) => { try { Zotero.logError(e); } catch (x) {} });
