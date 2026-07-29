@@ -13,10 +13,28 @@ import { WORLD_CHAT_TRANSLATIONS } from './i18n.worldChat';
 import { PROSOPOGRAPHY_TRANSLATIONS } from './i18n.prosopography';
 import { DIARIZATION_TRANSLATIONS } from './i18n.diarization';
 import { WORLDBUILDING_TRANSLATIONS } from './i18n.worldbuilding';
+import { PRIMARY_SOURCES_TRANSLATIONS } from './i18n.primarySources';
+import { PRIMARY_SOURCES_ARCHIVE_TRANSLATIONS } from './i18n.primarySourcesArchive';
+import { PRIMARY_SOURCES_FILES_TRANSLATIONS } from './i18n.primarySourcesFiles';
+import { PRIMARY_SOURCES_TEXT_TRANSLATIONS } from './i18n.primarySourcesText';
+import { PRIMARY_SOURCES_EVIDENCE_TRANSLATIONS } from './i18n.primarySourcesEvidence';
+import { PRIMARY_SOURCES_PERSONS_TRANSLATIONS } from './i18n.primarySourcesPersons';
+import { PRIMARY_SOURCES_DERIVED_TRANSLATIONS } from './i18n.primarySourcesDerived';
+import { PRIMARY_SOURCES_RESEARCH_TRANSLATIONS } from './i18n.primarySourcesResearch';
+import { PRIMARY_SOURCES_RELEASE_TRANSLATIONS } from './i18n.primarySourcesRelease';
 
 export const FR: Record<string, string> = {
   ...DIARIZATION_TRANSLATIONS.fr,
   ...PROSOPOGRAPHY_TRANSLATIONS.fr,
+  ...PRIMARY_SOURCES_TRANSLATIONS.fr,
+  ...PRIMARY_SOURCES_ARCHIVE_TRANSLATIONS.fr,
+  ...PRIMARY_SOURCES_FILES_TRANSLATIONS.fr,
+  ...PRIMARY_SOURCES_TEXT_TRANSLATIONS.fr,
+  ...PRIMARY_SOURCES_EVIDENCE_TRANSLATIONS.fr,
+  ...PRIMARY_SOURCES_PERSONS_TRANSLATIONS.fr,
+  ...PRIMARY_SOURCES_DERIVED_TRANSLATIONS.fr,
+  ...PRIMARY_SOURCES_RESEARCH_TRANSLATIONS.fr,
+  ...PRIMARY_SOURCES_RELEASE_TRANSLATIONS.fr,
   ...WORLDBUILDING_TRANSLATIONS.fr,
   ...WORLD_CHAT_TRANSLATIONS.fr,
   "Lo que cuenta el mapa": "Ce que raconte la carte",
@@ -7653,4 +7671,5 @@ export const FR: Record<string, string> = {
   '¿Eliminar esta unidad guardada? Esta acción no se puede deshacer.': 'Supprimer cette unité enregistrée? Cette action est irréversible.',
   'Escribe el tema y Nodus redacta la unidad completa con tus materiales, citando cada uno. Puedes dejar que la IA proponga las partes o fijarlas tú: cuántas son, cómo se titulan y en qué debe centrarse cada una.': 'Écris le sujet et Nodus rédige l’unité complète à partir de tes supports, en citant chacun d’eux. Tu peux laisser l’IA proposer les parties ou les fixer toi-même: combien il y en a, comment elles s’intitulent et sur quoi chacune doit se concentrer.',
   'Escribe el tema de los apuntes. El contenido lo explicará paso a paso con ejemplos y autoevaluación usando tus materiales.': 'Écris le sujet des notes. Le contenu l’expliquera pas à pas avec des exemples et une autoévaluation à partir de tes supports.',
+  'La diarización detecta cambios de hablante y etiqueta cada segmento automáticamente. Revisa siempre las etiquetas antes de usar la transcripción.': 'La diarisation détecte les changements de locuteur et étiquette automatiquement chaque segment. Vérifie toujours les étiquettes avant d’utiliser la transcription.',
 };

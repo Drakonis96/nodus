@@ -7,6 +7,15 @@ import { WORLD_CHAT_TRANSLATIONS } from './i18n.worldChat';
 import { WORLDBUILDING_TRANSLATIONS } from './i18n.worldbuilding';
 import { PROSOPOGRAPHY_TRANSLATIONS } from './i18n.prosopography';
 import { DIARIZATION_TRANSLATIONS } from './i18n.diarization';
+import { PRIMARY_SOURCES_TRANSLATIONS } from './i18n.primarySources';
+import { PRIMARY_SOURCES_ARCHIVE_TRANSLATIONS } from './i18n.primarySourcesArchive';
+import { PRIMARY_SOURCES_FILES_TRANSLATIONS } from './i18n.primarySourcesFiles';
+import { PRIMARY_SOURCES_TEXT_TRANSLATIONS } from './i18n.primarySourcesText';
+import { PRIMARY_SOURCES_EVIDENCE_TRANSLATIONS } from './i18n.primarySourcesEvidence';
+import { PRIMARY_SOURCES_PERSONS_TRANSLATIONS } from './i18n.primarySourcesPersons';
+import { PRIMARY_SOURCES_DERIVED_TRANSLATIONS } from './i18n.primarySourcesDerived';
+import { PRIMARY_SOURCES_RESEARCH_TRANSLATIONS } from './i18n.primarySourcesResearch';
+import { PRIMARY_SOURCES_RELEASE_TRANSLATIONS } from './i18n.primarySourcesRelease';
 
 /**
  * English translations keyed by the Spanish source string (see {@link ../i18n}).
@@ -16,6 +25,15 @@ import { DIARIZATION_TRANSLATIONS } from './i18n.diarization';
 export const EN: Record<string, string> = {
   ...DIARIZATION_TRANSLATIONS.en,
   ...PROSOPOGRAPHY_TRANSLATIONS.en,
+  ...PRIMARY_SOURCES_TRANSLATIONS.en,
+  ...PRIMARY_SOURCES_ARCHIVE_TRANSLATIONS.en,
+  ...PRIMARY_SOURCES_FILES_TRANSLATIONS.en,
+  ...PRIMARY_SOURCES_TEXT_TRANSLATIONS.en,
+  ...PRIMARY_SOURCES_EVIDENCE_TRANSLATIONS.en,
+  ...PRIMARY_SOURCES_PERSONS_TRANSLATIONS.en,
+  ...PRIMARY_SOURCES_DERIVED_TRANSLATIONS.en,
+  ...PRIMARY_SOURCES_RESEARCH_TRANSLATIONS.en,
+  ...PRIMARY_SOURCES_RELEASE_TRANSLATIONS.en,
   ...WORLDBUILDING_TRANSLATIONS.en,
   ...WORLD_CHAT_TRANSLATIONS.en,
   "Lo que cuenta el mapa": "What the map tells you",
@@ -7889,4 +7907,5 @@ export const EN: Record<string, string> = {
   '¿Eliminar esta unidad guardada? Esta acción no se puede deshacer.': 'Delete this saved unit? This action cannot be undone.',
   'Escribe el tema y Nodus redacta la unidad completa con tus materiales, citando cada uno. Puedes dejar que la IA proponga las partes o fijarlas tú: cuántas son, cómo se titulan y en qué debe centrarse cada una.': 'Write the topic and Nodus drafts the whole unit from your materials, citing each one. You can let the AI propose the parts or fix them yourself: how many there are, what they are called and what each one should concentrate on.',
   'Escribe el tema de los apuntes. El contenido lo explicará paso a paso con ejemplos y autoevaluación usando tus materiales.': 'Enter the topic for the notes. The content will explain it step by step with examples and self-assessment drawn from your materials.',
+  'La diarización detecta cambios de hablante y etiqueta cada segmento automáticamente. Revisa siempre las etiquetas antes de usar la transcripción.': 'Diarization detects speaker changes and labels every segment automatically. Always review the labels before using the transcript.',
 };

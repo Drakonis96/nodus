@@ -15,6 +15,7 @@ const reportPath = path.resolve(process.env.NODUS_GENEALOGY_REPORT || path.join(
 
 if (!process.argv.includes('--electron-genealogy-gemini-shadow')) {
   if (!process.env.GEMINI_API_KEY?.trim()) throw new Error('Set GEMINI_API_KEY for this one isolated run.');
+  if (!process.env.OPENROUTER_API_KEY?.trim()) throw new Error('Set OPENROUTER_API_KEY for this one isolated run.');
   execFileSync(path.join(repoRoot, 'node_modules/.bin/electron'), [path.join(repoRoot, 'scripts/verify-genealogy-gemini-shadow.mjs'), '--electron-genealogy-gemini-shadow'], {
     cwd: repoRoot, env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' }, stdio: 'inherit',
   });
@@ -22,7 +23,9 @@ if (!process.argv.includes('--electron-genealogy-gemini-shadow')) {
 }
 
 const apiKey = process.env.GEMINI_API_KEY?.trim();
+const openRouterKey = process.env.OPENROUTER_API_KEY?.trim();
 assert.ok(apiKey, 'Gemini key is available only to the isolated process');
+assert.ok(openRouterKey, 'OpenRouter key is available only to the isolated process');
 const root = await mkdtemp(path.join(os.tmpdir(), 'nodus-genealogy-gemini-shadow-'));
 installRuntimeHooks(root);
 let closeDb = () => undefined;
@@ -52,22 +55,27 @@ try {
   const genealogyDeep = require(path.join(repoRoot, 'electron/ai/genealogyDeepResearch.ts'));
   const matchRepo = require(path.join(repoRoot, 'electron/db/matchRepo.ts'));
   ({ closeDb } = require(path.join(repoRoot, 'electron/db/database.ts')));
-  clearApiKey = () => secrets.clearApiKey('gemini');
+  clearApiKey = () => {
+    secrets.clearApiKey('gemini');
+    secrets.clearApiKey('openrouter');
+  };
 
   secrets.setApiKey('gemini', apiKey);
+  secrets.setApiKey('openrouter', openRouterKey);
   delete process.env.GEMINI_API_KEY;
+  delete process.env.OPENROUTER_API_KEY;
   const [chatModels, embeddingModels] = await Promise.all([
     providers.listModels('gemini', secrets.getApiKey('gemini')),
-    providers.listEmbeddingModels('gemini', secrets.getApiKey('gemini')),
+    providers.listEmbeddingModels('openrouter', secrets.getApiKey('openrouter')),
   ]);
-  const modelName = ['gemini-2.5-flash-lite', 'gemini-3.1-flash-lite'].find((id) => chatModels.some((item) => item.id === id));
-  const embeddingName = ['gemini-embedding-001', 'text-embedding-004'].find((id) => embeddingModels.some((item) => item.id === id));
-  assert.ok(modelName, 'a cheap Gemini Flash Lite model is available');
-  assert.ok(embeddingName, 'a Gemini embedding model is available');
+  const modelName = 'gemini-3.5-flash-lite';
+  const embeddingName = 'baai/bge-m3';
+  assert.ok(chatModels.some((item) => item.id === modelName), `${modelName} is available`);
+  assert.ok(embeddingModels.some((item) => item.id === embeddingName), `${embeddingName} is available`);
   const model = { provider: 'gemini', model: modelName };
   settingsRepo.updateSettings({
     promptLanguage: 'es', uiLanguage: 'es', modelSettingsMode: 'advanced',
-    embeddingProvider: 'gemini', embeddingModel: embeddingName,
+    embeddingProvider: 'openrouter', embeddingModel: embeddingName,
     extractionModel: model, synthesisModel: model, chatModel: model, nodiModel: model, deepResearchModel: model,
   });
 
@@ -236,6 +244,7 @@ try {
   console.log('Live isolated Gemini genealogy verification passed.');
 } finally {
   delete process.env.GEMINI_API_KEY;
+  delete process.env.OPENROUTER_API_KEY;
   try { clearApiKey(); } catch { /* profile deletion is the final backstop */ }
   try { closeDb(); } catch { /* database may not have opened */ }
   await rm(root, { recursive: true, force: true });

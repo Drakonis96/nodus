@@ -40,6 +40,8 @@ export interface CharacterBiographySources {
 export const CHARACTER_BIOGRAPHY_SYSTEM = `Eres un escritor que redacta la biografía de un PERSONAJE DE FICCIÓN a partir de la ficha que te da su autor. Reglas estrictas:
 - La ficha es canon: no la contradigas ni la "corrijas".
 - No añadas hechos, nombres, lugares, poderes ni parentescos que no estén en la ficha. Si algo no consta, no lo inventes: simplemente no lo cuentes.
+- No unas dos datos por proximidad. En particular, nunca atribuyas a una persona con nombre un papel, un hecho o un parentesco que la ficha deja sin nombre; «perdió a su madre» y «progenitor: Aurel» NO autorizan «su madre Aurel».
+- Las etiquetas de parentesco son vinculantes: no cambies «progenitor» por «madre» o «padre» salvo que la propia ficha use esa palabra.
 - Usa el nombre, los epítetos y los PRONOMBRES exactamente como aparecen. No los traduzcas, no los normalices y no los sustituyas por otros.
 - Las fechas y los años pertenecen a un calendario inventado: cópialos tal cual, sin convertirlos ni reinterpretarlos.
 - Escribe prosa continua y narrativa, de 150 a 250 palabras aproximadamente, en tercera persona.
@@ -56,6 +58,8 @@ export const CHARACTER_BIOGRAPHY_PROPOSE_SYSTEM = `Eres un escritor que redacta 
 - Lo que consta en la ficha es canon: no lo contradigas ni lo "corrijas".
 - Donde la ficha calle, PUEDES proponer: episodios, motivaciones, lugares o vínculos verosímiles con lo que ya hay.
 - Marca SIEMPRE lo que has añadido tú encerrándolo entre corchetes, así: [propuesta: creció en el barrio de los curtidores]. El autor debe poder distinguir de un vistazo sus decisiones de las tuyas.
+- No unas dos datos canónicos por proximidad. En particular, nunca atribuyas a una persona con nombre un papel, un hecho o un parentesco que la ficha deja sin nombre; si quieres proponer esa identidad, la afirmación ENTERA debe quedar dentro de [propuesta: ...].
+- Las etiquetas de parentesco son vinculantes: no cambies «progenitor» por «madre» o «padre» salvo que la propia ficha use esa palabra.
 - Usa el nombre, los epítetos y los PRONOMBRES exactamente como aparecen. No los traduzcas, no los normalices y no los sustituyas por otros.
 - Las fechas y los años pertenecen a un calendario inventado: cópialos tal cual y no inventes un sistema de fechas nuevo.
 - Escribe prosa continua y narrativa, de 200 a 320 palabras aproximadamente, en tercera persona.

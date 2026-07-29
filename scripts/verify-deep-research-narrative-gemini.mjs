@@ -33,12 +33,11 @@ try {
     apiKey,
     baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai',
   });
-  const model = 'gemini-2.5-flash-lite';
+  const model = 'gemini-3.5-flash-lite';
   const rules = DEEP_RESEARCH_NARRATIVE_RULES.join('\n');
 
   const planResponse = await client.chat.completions.create({
     model,
-    temperature: 0.2,
     response_format: { type: 'json_object' },
     messages: [
       {
@@ -58,7 +57,6 @@ try {
   const sectionTitle = String(plan.sections[1]?.title ?? plan.sections[0]?.title ?? 'Desarrollo argumental');
   const sectionResponse = await client.chat.completions.create({
     model,
-    temperature: 0.3,
     messages: [
       {
         role: 'system',

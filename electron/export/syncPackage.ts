@@ -6,6 +6,9 @@ import { decryptWithKey, deriveKeyFromDescriptor, encryptWithKey, newKdfDescript
 import { identityColumns, identityWhere, quoteIdentifier, tableColumns, type TableColumn } from '../db/rowIdentity';
 import { measureClockSkewAhead, packageIsOlderThanHorizon, type TombstoneRow } from '../db/tombstones';
 import { describeSyncCoverage, groupOfTable, localTableNames, syncedTablesByGroup } from '../db/syncTables';
+import { getPrimarySourcePolicySettings } from '../db/primarySourceGovernanceRepo';
+import { decidePrimarySourcePolicy } from '@shared/primarySourcesTypes';
+import { getActiveVault } from '../vaults/vaultRegistry';
 
 /** Re-exported so the sync package stays the single entry point for callers. */
 export { describeSyncCoverage };
@@ -79,6 +82,22 @@ interface SyncIndex {
 type PortableScalar = string | number | null | { __nodusBuffer: string } | { __nodusBlob: string };
 type PortableRow = Record<string, PortableScalar>;
 type TableRows = Map<string, PortableRow[]>;
+
+type PrimarySourceSyncScope = {
+  deniedItemIds: Set<string>;
+  unitIds: Set<string>;
+  repositoryIds: Set<string>;
+  captureSessionIds: Set<string>;
+  fileIds: Set<string>;
+  textVersionIds: Set<string>;
+  excerptIds: Set<string>;
+  proposalIds: Set<string>;
+  mentionIds: Set<string>;
+  noteIds: Set<string>;
+  deniedNoteIds: Set<string>;
+  noteFolderIds: Set<string>;
+  noteLinkIds: Set<string>;
+};
 
 interface ForeignKey { table: string; from: string; to: string | null }
 
@@ -166,6 +185,191 @@ function sha256(data: Buffer): string {
   return createHash('sha256').update(data).digest('hex');
 }
 
+function primarySourceSyncScope(db: ReturnType<typeof getDb>): PrimarySourceSyncScope | null {
+  if (getActiveVault().type !== 'primary_sources') return null;
+  const settings = getPrimarySourcePolicySettings();
+  const profiles = db.prepare(
+    `SELECT item_id, access_status, sensitivity, embargo_until
+       FROM archive_item_profiles`
+  ).all() as Array<{
+    item_id: string;
+    access_status: 'open' | 'private' | 'restricted' | 'embargoed' | 'unknown';
+    sensitivity: 'normal' | 'personal' | 'sensitive' | 'highly_sensitive';
+    embargo_until: string | null;
+  }>;
+  const deniedItemIds = new Set(profiles.filter((row) =>
+    decidePrimarySourcePolicy({
+      accessStatus: row.access_status,
+      sensitivity: row.sensitivity,
+      embargoUntil: row.embargo_until,
+      action: 'sync',
+      allowPrivateSync: settings.allowPrivateSync,
+      allowRestrictedSync: settings.allowRestrictedSync,
+    }).decision !== 'allow'
+  ).map((row) => row.item_id));
+  const allowedClause = deniedItemIds.size
+    ? `WHERE item_id NOT IN (${[...deniedItemIds].map(() => '?').join(',')})`
+    : '';
+  const denied = [...deniedItemIds];
+  const columnSet = (sql: string, column: string, ...params: unknown[]): Set<string> =>
+    new Set((db.prepare(sql).all(...params) as Record<string, unknown>[])
+      .map((row) => row[column])
+      .filter((value): value is string => typeof value === 'string'));
+  const unitIds = columnSet(
+    `WITH RECURSIVE kept(unit_id, parent_unit_id) AS (
+       SELECT u.unit_id, u.parent_unit_id
+         FROM archive_description_units u
+        WHERE u.unit_id IN (
+          SELECT unit_id FROM archive_item_units ${allowedClause}
+        )
+       UNION
+       SELECT parent.unit_id, parent.parent_unit_id
+         FROM archive_description_units parent JOIN kept ON kept.parent_unit_id=parent.unit_id
+     ) SELECT unit_id FROM kept`,
+    'unit_id',
+    ...denied,
+  );
+  const repositoryIds = unitIds.size ? columnSet(
+    `SELECT DISTINCT repository_id FROM archive_description_units
+      WHERE unit_id IN (${[...unitIds].map(() => '?').join(',')})
+        AND repository_id IS NOT NULL`,
+    'repository_id',
+    ...unitIds,
+  ) : new Set<string>();
+  const captureSessionIds = columnSet(
+    `SELECT capture_session_id FROM archive_item_profiles
+      WHERE capture_session_id IS NOT NULL
+        ${deniedItemIds.size ? `AND item_id NOT IN (${denied.map(() => '?').join(',')})` : ''}`,
+    'capture_session_id',
+    ...denied,
+  );
+  const allowedItemWhere = deniedItemIds.size
+    ? `WHERE item_id NOT IN (${denied.map(() => '?').join(',')})`
+    : '';
+  const fileIds = columnSet(`SELECT file_id FROM archive_item_files ${allowedItemWhere}`, 'file_id', ...denied);
+  const textVersionIds = columnSet(`SELECT text_version_id FROM archive_text_versions ${allowedItemWhere}`, 'text_version_id', ...denied);
+  const excerptIds = columnSet(`SELECT excerpt_id FROM archive_excerpts ${allowedItemWhere}`, 'excerpt_id', ...denied);
+  const proposalIds = columnSet(`SELECT proposal_id FROM archive_entity_proposals ${allowedItemWhere}`, 'proposal_id', ...denied);
+  const mentionIds = new Set([
+    ...columnSet(`SELECT mention_id FROM archive_person_mentions ${allowedItemWhere}`, 'mention_id', ...denied),
+    ...columnSet(`SELECT mention_id FROM archive_place_mentions ${allowedItemWhere}`, 'mention_id', ...denied),
+  ]);
+
+  const noteProfiles = db.prepare(
+    `SELECT note_id, access_status, sensitivity FROM primary_source_note_profiles`
+  ).all() as Array<{
+    note_id: string;
+    access_status: 'open' | 'private' | 'restricted' | 'embargoed' | 'unknown';
+    sensitivity: 'normal' | 'personal' | 'sensitive' | 'highly_sensitive';
+  }>;
+  const deniedNotes = new Set(noteProfiles.filter((row) =>
+    decidePrimarySourcePolicy({
+      accessStatus: row.access_status,
+      sensitivity: row.sensitivity,
+      action: 'sync',
+      allowPrivateSync: settings.allowPrivateSync,
+      allowRestrictedSync: settings.allowRestrictedSync,
+    }).decision !== 'allow'
+  ).map((row) => row.note_id));
+  const noteIds = columnSet(
+    deniedNotes.size
+      ? `SELECT id FROM notes WHERE id NOT IN (${[...deniedNotes].map(() => '?').join(',')})`
+      : 'SELECT id FROM notes',
+    'id',
+    ...deniedNotes,
+  );
+  const directFolders = noteIds.size ? columnSet(
+    `SELECT folder_id FROM notes WHERE id IN (${[...noteIds].map(() => '?').join(',')})
+      AND folder_id IS NOT NULL`,
+    'folder_id',
+    ...noteIds,
+  ) : new Set<string>();
+  const noteFolderIds = directFolders.size ? columnSet(
+    `WITH RECURSIVE kept(id, parent_id) AS (
+       SELECT id, parent_id FROM note_folders
+        WHERE id IN (${[...directFolders].map(() => '?').join(',')})
+       UNION
+       SELECT parent.id, parent.parent_id
+         FROM note_folders parent JOIN kept ON kept.parent_id=parent.id
+     ) SELECT id FROM kept`,
+    'id',
+    ...directFolders,
+  ) : new Set<string>();
+  const noteLinkIds = new Set(
+    (db.prepare('SELECT link_id, nodus_id, target_kind, target_id FROM note_links').all() as Array<{
+      link_id: string;
+      nodus_id: string;
+      target_kind: string;
+      target_id: string;
+    }>).filter((row) => {
+      if (!noteIds.has(row.nodus_id)) return false;
+      if (row.target_kind === 'source') return !deniedItemIds.has(row.target_id);
+      if (row.target_kind === 'excerpt') return excerptIds.has(row.target_id);
+      if (row.target_kind === 'text_version') return textVersionIds.has(row.target_id);
+      if (row.target_kind === 'unit') return unitIds.has(row.target_id);
+      if (row.target_kind === 'note') return noteIds.has(row.target_id);
+      return true;
+    }).map((row) => row.link_id)
+  );
+  return {
+    deniedItemIds,
+    unitIds,
+    repositoryIds,
+    captureSessionIds,
+    fileIds,
+    textVersionIds,
+    excerptIds,
+    proposalIds,
+    mentionIds,
+    noteIds,
+    deniedNoteIds: deniedNotes,
+    noteFolderIds,
+    noteLinkIds,
+  };
+}
+
+function primarySourceSyncRows(
+  table: string,
+  rows: Record<string, unknown>[],
+  scope: PrimarySourceSyncScope | null,
+): Record<string, unknown>[] {
+  if (!scope) return rows;
+  // Export and model-call audits are deliberately local. Their aggregate counts
+  // remain visible on this device, while package paths and selection snapshots do
+  // not become a second channel around source policy.
+  if ([
+    'archive_exports',
+    'primary_source_export_manifests',
+    'primary_source_operation_runs',
+    'primary_source_restore_reports',
+  ].includes(table)) return [];
+  const allowed = (value: unknown, set: Set<string>) => typeof value !== 'string' || set.has(value);
+  return rows.filter((row) => {
+    if (table === 'sync_tombstones' && typeof row.key_json === 'string') {
+      const keyJson = row.key_json;
+      if ([...scope.deniedItemIds, ...scope.deniedNoteIds].some((id) => keyJson.includes(id))) {
+        return false;
+      }
+    }
+    if (typeof row.item_id === 'string' && scope.deniedItemIds.has(row.item_id)) return false;
+    if (table === 'archive_items' && scope.deniedItemIds.has(String(row.item_id))) return false;
+    if (table === 'record_evidence' && scope.deniedItemIds.has(String(row.nodus_id))) return false;
+    if (table === 'archive_description_units') return allowed(row.unit_id, scope.unitIds);
+    if (table === 'archive_repositories') return allowed(row.repository_id, scope.repositoryIds);
+    if (table === 'archive_capture_sessions') return allowed(row.session_id, scope.captureSessionIds);
+    if (table === 'archive_integrity_checks') return allowed(row.file_id, scope.fileIds);
+    if (table === 'archive_text_segments') return allowed(row.text_version_id, scope.textVersionIds);
+    if (table === 'archive_proposal_decisions') return allowed(row.proposal_id, scope.proposalIds);
+    if (table === 'archive_place_resolution_decisions') return allowed(row.mention_id, scope.mentionIds);
+    if (table === 'notes') return allowed(row.id, scope.noteIds);
+    if (table === 'note_folders') return allowed(row.id, scope.noteFolderIds);
+    if (table === 'primary_source_note_profiles') return allowed(row.note_id, scope.noteIds);
+    if (table === 'note_links') return allowed(row.link_id, scope.noteLinkIds);
+    if (table === 'primary_source_note_link_snapshots') return allowed(row.link_id, scope.noteLinkIds);
+    return true;
+  });
+}
+
 /**
  * Snapshot the user layer into an encrypted zip.
  *
@@ -189,6 +393,7 @@ export function buildSyncPackage(appVersion: string, passphrase: string): { buff
   const groups: Partial<Record<SyncGroupKey, string[]>> = {};
   const tableEntries: Record<string, string> = {};
   const blobEntries: Record<string, string> = {};
+  const sourceScope = primarySourceSyncScope(db);
 
   const opaqueName = () => `e/${randomUUID().replace(/-/g, '')}`;
   const seal = (name: string, plaintext: Buffer) => zip.addFile(name, encryptWithKey(plaintext, key));
@@ -213,7 +418,8 @@ export function buildSyncPackage(appVersion: string, passphrase: string): { buff
     if (group.tables.length === 0) continue;
     groups[group.key] = group.tables;
     for (const table of group.tables) {
-      const rows = (db.prepare(`SELECT * FROM ${quoteIdentifier(table)}`).all() as Record<string, unknown>[]).map((row) =>
+      const rawRows = db.prepare(`SELECT * FROM ${quoteIdentifier(table)}`).all() as Record<string, unknown>[];
+      const rows = primarySourceSyncRows(table, rawRows, sourceScope).map((row) =>
         Object.fromEntries(Object.entries(row).map(([key_, value]) => [key_, encodeValue(value, key_)]))
       );
       counts[table] = rows.length;

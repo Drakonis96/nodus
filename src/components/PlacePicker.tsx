@@ -66,7 +66,7 @@ export function PlacePicker({
         onFocus={() => results.length > 0 && setOpen(true)}
       />
       {open && query.trim().length >= 2 && (
-        <div className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-md border border-neutral-800 bg-neutral-950 p-1 shadow-xl">
+        <div className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-md border border-neutral-200 bg-white p-1 shadow-xl dark:border-neutral-800 dark:bg-neutral-950">
           {loading && results.length === 0 ? (
             <p className="px-2 py-2 text-center text-xs text-neutral-500">{t('Buscando…')}</p>
           ) : results.length === 0 ? (
@@ -75,7 +75,7 @@ export function PlacePicker({
             results.map((p) => (
               <button
                 key={p.gazetteerId}
-                className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left hover:bg-neutral-800"
+                className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left hover:bg-neutral-100 dark:hover:bg-neutral-800"
                 onClick={() => {
                   onPick(p);
                   setQuery('');
@@ -85,7 +85,7 @@ export function PlacePicker({
               >
                 <Icon name="map" size={13} className="shrink-0 text-neutral-500" />
                 <span className="min-w-0">
-                  <span className="block truncate text-sm text-neutral-100">{p.name}</span>
+                  <span className="block truncate text-sm text-neutral-900 dark:text-neutral-100">{p.name}</span>
                   <span className="block truncate text-[11px] text-neutral-500">
                     {[p.admin1, p.country].filter(Boolean).join(', ')}
                   </span>

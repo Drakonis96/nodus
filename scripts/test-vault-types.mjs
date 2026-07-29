@@ -49,11 +49,13 @@ test('unknown / missing values normalise to academic', () => {
 
 test('shipped and preview vaults are selectable; announced future vaults remain gated', () => {
   const ids = vt.availableVaultTypes().map((d) => d.id);
-  assert.deepEqual(ids, ['academic', 'genealogy', 'prosopography', 'estudio', 'databases', 'worldbuilding', 'docencia']);
+  assert.deepEqual(ids, ['academic', 'genealogy', 'prosopography', 'estudio', 'primary_sources', 'databases', 'worldbuilding', 'docencia']);
   assert.equal(vt.getVaultTypeDef('genealogy').available, true);
   assert.equal(vt.getVaultTypeDef('estudio').available, true);
   assert.equal(vt.getVaultTypeDef('databases').available, true);
   assert.equal(vt.getVaultTypeDef('prosopography').available, true);
+  assert.equal(vt.PRIMARY_SOURCES_RELEASE_ENABLED, true);
+  assert.equal(vt.getVaultTypeDef('primary_sources').available, true);
   // docencia (teaching) and worldbuilding both graduated from a preview shell into
   // real workspaces, so no type is a preview any more. The mechanism stays — it is how
   // a type gets announced before it exists — but the list is empty, and putting a type
@@ -65,7 +67,7 @@ test('shipped and preview vaults are selectable; announced future vaults remain 
     assert.equal(vt.isViewAllowedForVaultType('settings', graduated), true);
   }
   assert.deepEqual(vt.PREVIEW_VAULT_TYPES, []);
-  for (const gated of ['primary_sources', 'testimonios']) {
+  for (const gated of ['testimonios']) {
     assert.equal(vt.getVaultTypeDef(gated).available, false, `${gated} not selectable this release`);
   }
   assert.deepEqual(vt.VAULT_TYPES.map((d) => d.id), ['academic', 'genealogy', 'prosopography', 'estudio', 'primary_sources', 'databases', 'testimonios', 'worldbuilding', 'docencia']);
@@ -78,8 +80,9 @@ test('the vault picker derives selectable modes from the canonical registry', as
   assert.match(picker, /VAULT_TYPES\.filter\(\(type\) => type\.available\)/);
   assert.match(picker, /const CREATE_VAULT_TYPES: VaultType\[\] = \[\s*'academic', 'primary_sources', 'testimonios',\s*'databases', 'docencia', 'estudio',\s*'genealogy', 'prosopography', 'worldbuilding',\s*\]/s);
   assert.doesNotMatch(picker, /COMING_SOON_VAULT_TYPES[^\n]*estudio/);
-  assert.match(picker, /type === 'worldbuilding'\) return 'alpha'/);
+  assert.match(picker, /type === 'primary_sources' \|\| type === 'worldbuilding'\) return 'alpha'/);
   assert.match(picker, /type === 'estudio' \|\| type === 'genealogy' \|\| type === 'databases' \|\| type === 'docencia'\) return 'beta'/);
+  assert.doesNotMatch(picker, /type === 'primary_sources'[^\\n]*return 'beta'/);
   assert.doesNotMatch(picker, /type === '(?:estudio|genealogy)'\) return '(?:pre-alpha|alpha)'/);
   assert.match(picker, /data-testid="vault-phase-notice"/);
   assert.match(picker, /data-testid="vault-preview-notice"/);
@@ -254,13 +257,17 @@ test('vaultTypeImagePrompt steers image aesthetics by type', () => {
   assert.equal(vt.vaultTypeImagePrompt('estudio'), '');
 });
 
-test('primary_sources hides argument surfaces but keeps ideas/authors', () => {
+test('primary_sources uses a dedicated documentary shell and keeps optional authoring views hidden', () => {
   const hidden = vt.defaultHiddenViewsForType('primary_sources');
-  assert.ok(hidden.includes('argument') && hidden.includes('debate'));
-  for (const kept of ['ideas', 'authors', 'library', 'graph', 'notes']) {
+  for (const optional of ['library', 'writing', 'deepResearch']) {
+    assert.ok(hidden.includes(optional), `${optional} is optional and hidden by default`);
+  }
+  for (const kept of ['search', 'archive', 'persons', 'timeline', 'map', 'relations', 'notes', 'toolkit']) {
     assert.ok(!hidden.includes(kept), `${kept} stays visible in primary_sources`);
   }
   assert.match(vt.vaultTypePromptPack('primary_sources'), /FUENTES PRIMARIAS/);
+  assert.match(vt.vaultTypePromptPack('primary_sources'), /TRANSCRIPCIÓN, OBSERVACIÓN e INFERENCIA/);
+  assert.match(vt.vaultTypePromptPack('primary_sources'), /PROPUESTA pendiente de revisión/);
 });
 
 test('academic shows the full sidebar; estudio uses its dedicated learning workspace', () => {

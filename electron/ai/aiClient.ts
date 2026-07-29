@@ -4,6 +4,7 @@ import {
   openAiCompatBase,
   supportsJsonMode,
   reasoningBody,
+  samplingTemperatureBody,
   openRouterRoutingBody,
   OPENROUTER_HEADERS,
   isLocalProvider,
@@ -308,7 +309,7 @@ export async function localModelContextWindow(model: ModelRef): Promise<number |
 function optionalBody(model: ModelRef, jsonMode: boolean, reasoning: ReasoningEffort): Record<string, unknown> {
   return {
     ...(jsonMode && supportsJsonMode(model.provider) ? { response_format: { type: 'json_object' as const } } : {}),
-    ...reasoningBody(model.provider, reasoning),
+    ...reasoningBody(model.provider, reasoning, model.model),
     // Groq's reasoning models (gpt-oss/qwen3) reason at medium by default, which slows scans and
     // burns tokens. reasoningBody can't send it (no model id), so minimise it here. Groq rejects
     // reasoning_effort:'none' — 'low' is its floor; non-reasoning models 400 and the caller strips it.
@@ -577,7 +578,7 @@ async function rawComplete(
   });
   const baseBody = {
     model: model.model,
-    temperature: opts.temperature ?? 0.15,
+    ...samplingTemperatureBody(model.provider, model.model, opts.temperature ?? 0.15),
     ...completionTokensBody(model, maxTokens),
     messages: [
       { role: 'system' as const, content: opts.system },
@@ -999,7 +1000,7 @@ async function rawCompleteStream(
   });
   const baseBody = {
     model: model.model,
-    temperature: opts.temperature ?? 0.15,
+    ...samplingTemperatureBody(model.provider, model.model, opts.temperature ?? 0.15),
     ...completionTokensBody(model, maxTokens),
     stream: true as const,
     messages: [

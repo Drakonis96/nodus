@@ -8,6 +8,7 @@
 
 import {
   archiveEmbeddingCount,
+  archiveItemForEmbedding,
   archiveItemsForEmbedding,
   findArchiveItemsSimilar,
   getItem,
@@ -16,14 +17,50 @@ import {
 } from '../db/archiveRepo';
 import { getPerson, listEvents, listPersons } from '../db/entitiesRepo';
 import { currentEmbeddingConfig, embeddingTextHash } from '../db/ideasRepo';
+import { getDb } from '../db/database';
+import { getPrimarySourcePolicySettings } from '../db/primarySourceGovernanceRepo';
+import { getActiveVault } from '../vaults/vaultRegistry';
 import { embed } from '../ai/aiClient';
 import { archiveEmbeddingText, documentHasGenealogyAnchor, nameAppearsInText, personProfileText } from '@shared/archiveDiscovery';
+import { decidePrimarySourcePolicy } from '@shared/primarySourcesTypes';
 import type { DocumentLinkSuggestion, PersonLinkSuggestion } from '@shared/types';
+
+/**
+ * Primary Sources has a stricter content boundary than the legacy evidence archive.
+ * Background indexing has no per-item consent UI, so it may only send an open source
+ * to an external embedding provider when the vault has disabled confirmation.
+ */
+function archiveEmbeddingAllowed(itemId: string): boolean {
+  if (getActiveVault().type !== 'primary_sources') return true;
+  const row = getDb().prepare(
+    'SELECT access_status, sensitivity, embargo_until FROM archive_item_profiles WHERE item_id=?'
+  ).get(itemId) as {
+    access_status: 'open' | 'private' | 'restricted' | 'embargoed' | 'unknown';
+    sensitivity: 'normal' | 'personal' | 'sensitive' | 'highly_sensitive';
+    embargo_until: string | null;
+  } | undefined;
+  if (!row) return false;
+  const config = currentEmbeddingConfig();
+  const local = config.provider === 'nodus'
+    || config.provider === 'ollama'
+    || config.provider === 'lmstudio';
+  const policy = getPrimarySourcePolicySettings();
+  if (!local && policy.requireExternalConfirmation) return false;
+  return decidePrimarySourcePolicy({
+    accessStatus: row.access_status,
+    sensitivity: row.sensitivity,
+    embargoUntil: row.embargo_until,
+    action: local ? 'local_ai' : 'external_ai',
+    allowRestrictedLocalAi: policy.allowRestrictedLocalAi,
+    allowPrivateExternalAi: policy.allowPrivateExternalAi,
+  }).decision === 'allow';
+}
 
 /** Embed one archive item's text for semantic discovery. Returns false when there is
  *  no text or no embedding provider configured. */
 export async function embedArchiveItem(itemId: string): Promise<boolean> {
-  const item = getItem(itemId);
+  if (!archiveEmbeddingAllowed(itemId)) return false;
+  const item = archiveItemForEmbedding(itemId);
   if (!item) return false;
   const text = archiveEmbeddingText(item);
   if (!text) return false;
@@ -49,6 +86,10 @@ export async function embedArchiveBacklog(): Promise<{ indexed: number; skipped:
       row.embeddingDim > 0 &&
       row.embeddingTextHash === embeddingTextHash(text);
     if (fresh) continue;
+    if (!archiveEmbeddingAllowed(row.itemId)) {
+      skipped++;
+      continue;
+    }
     const ok = await embedArchiveItem(row.itemId);
     if (ok) indexed++;
     else skipped++;

@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { VaultType } from '@shared/types';
 import { tutorialVideoCopy, tutorialVideoForVault, type TutorialVideo } from '@shared/tutorialVideos';
 import { TutorialVideoPlayer } from '../components/TutorialVideos';
@@ -34,6 +34,7 @@ export function TourOverlay({
   label = 'Tutorial',
   accent = DEFAULT_ACCENT,
   vaultType,
+  showUnavailableVideo = false,
   onClose,
   onNavigate,
 }: {
@@ -48,6 +49,8 @@ export function TourOverlay({
    * release required, and no change to this component.
    */
   vaultType?: VaultType;
+  /** Keep the future video route visible, but inert, before a tutorial is published. */
+  showUnavailableVideo?: boolean;
   /**
    * Spotlight colour. The eyebrow and the progress dots are Tailwind `indigo-*`
    * utilities, which the per-vault `.<type>` blocks in index.css already remap; the
@@ -59,6 +62,7 @@ export function TourOverlay({
   onNavigate: (view: string) => void;
 }) {
   const [i, setI] = useState(0);
+  const [started, setStarted] = useState(false);
   const [watchingVideo, setWatchingVideo] = useState(false);
   const [video, setVideo] = useState<TutorialVideo | undefined>(() => tutorialVideoForVault(vaultType));
   const [rect, setRect] = useState<Rect | null>(null);
@@ -66,14 +70,19 @@ export function TourOverlay({
   // soon as it mounts; a plain ref is still null on the pass that positions it.
   const [card, setCard] = useState<HTMLDivElement | null>(null);
   const [cardHeight, setCardHeight] = useState(180);
+  const previousFocus = useRef<HTMLElement | null>(null);
   const step = steps[i];
   const isFirst = i === 0;
   const isLast = i === steps.length - 1;
+  const isInvitation = isFirst && !started;
+  const activeTarget = isInvitation ? undefined : step.target;
 
-  // Switch view first so the target element exists when we measure.
+  // The invitation is deliberately inert and centred. It must not move the app or
+  // point at anything until the user explicitly chooses the in-app walkthrough.
   useEffect(() => {
+    if (isInvitation) return;
     if (step.view) onNavigate(step.view);
-  }, [i, step.view, onNavigate]);
+  }, [isInvitation, step.view, onNavigate]);
 
   // A video published after this build still reaches the opening step.
   useEffect(() => {
@@ -98,7 +107,7 @@ export function TourOverlay({
    * a slow view catch up.
    */
   useLayoutEffect(() => {
-    if (!step.target) {
+    if (!activeTarget) {
       setRect(null);
       return;
     }
@@ -107,7 +116,7 @@ export function TourOverlay({
     const deadline = Date.now() + 5_000;
     const measure = () => {
       if (cancelled) return;
-      const el = document.querySelector<HTMLElement>(`[data-tour="${step.target}"]`);
+      const el = document.querySelector<HTMLElement>(`[data-tour="${activeTarget}"]`);
       const r = el?.getBoundingClientRect();
       if (r && r.width > 0 && r.height > 0) {
         setRect({ top: r.top, left: r.left, width: r.width, height: r.height });
@@ -124,7 +133,7 @@ export function TourOverlay({
       clearTimeout(timer);
       window.removeEventListener('resize', measure);
     };
-  }, [i, step.target]);
+  }, [i, activeTarget]);
 
   // Re-measure whenever the step changes the copy, or the window resizes and reflows it.
   useLayoutEffect(() => {
@@ -137,17 +146,63 @@ export function TourOverlay({
   }, [card, i]);
 
   useEffect(() => {
+    previousFocus.current = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    return () => previousFocus.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    card?.focus();
+  }, [card, i]);
+
+  useEffect(() => {
     // While the video plays, the keyboard belongs to the player: Escape has to leave
     // fullscreen or close it, not dismiss the tour underneath.
     if (watchingVideo) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-      else if (e.key === 'ArrowRight' || e.key === 'Enter') setI((n) => Math.min(steps.length - 1, n + 1));
-      else if (e.key === 'ArrowLeft') setI((n) => Math.max(0, n - 1));
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      } else if (e.key === 'Tab' && card) {
+        const focusable = [...card.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        )];
+        if (focusable.length === 0) {
+          e.preventDefault();
+          card.focus();
+          return;
+        }
+        const first = focusable[0];
+        const last = focusable.at(-1)!;
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      } else if (e.key === 'ArrowRight') {
+        if (isInvitation) return;
+        e.preventDefault();
+        setI((n) => Math.min(steps.length - 1, n + 1));
+      } else if (e.key === 'ArrowLeft') {
+        if (isInvitation) return;
+        e.preventDefault();
+        setI((n) => Math.max(0, n - 1));
+      } else if (
+        e.key === 'Enter'
+        && !isInvitation
+        && !(e.target instanceof HTMLButtonElement)
+        && !(e.target instanceof HTMLAnchorElement)
+      ) {
+        e.preventDefault();
+        setI((n) => Math.min(steps.length - 1, n + 1));
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose, steps.length, watchingVideo]);
+  }, [card, isInvitation, onClose, steps.length, watchingVideo]);
 
   const pad = 6;
   const spotlight: Rect | null = rect
@@ -192,24 +247,38 @@ export function TourOverlay({
         <div className="fixed inset-0 bg-black/70" />
       )}
 
-      <div ref={setCard} data-testid="tour-card" style={ttStyle} className="card bg-neutral-900 border border-neutral-700 p-4 shadow-2xl text-sm">
+      <div
+        ref={setCard}
+        data-testid="tour-card"
+        style={ttStyle}
+        className="card bg-neutral-900 border border-neutral-700 p-4 shadow-2xl text-sm"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="nodus-tour-title"
+        aria-describedby="nodus-tour-body"
+        tabIndex={-1}
+      >
         <div className="flex items-center justify-between mb-2">
-          <div className="text-[11px] uppercase tracking-wide text-indigo-400">
+          <div className="text-[11px] uppercase tracking-wide text-indigo-400" aria-live="polite">
             {t(label)} · {i + 1}/{steps.length}
           </div>
-          <button className="text-neutral-500 hover:text-white text-xs" onClick={onClose}>
+          <button
+            className="text-neutral-500 hover:text-white text-xs"
+            onClick={onClose}
+            aria-label={t('Cerrar tutorial')}
+          >
             {t('Saltar')} ✕
           </button>
         </div>
-        <h3 className="font-semibold text-base mb-1">{t(step.title)}</h3>
-        <p className="text-neutral-300 leading-relaxed">{t(step.body)}</p>
+        <h3 id="nodus-tour-title" className="font-semibold text-base mb-1">{t(step.title)}</h3>
+        <p id="nodus-tour-body" className="text-neutral-300 leading-relaxed">{t(step.body)}</p>
 
         {/* The opening step offers up to three ways in, and the card is only 360px wide:
             side by side they overflowed it and each label broke into three lines. They
             are stacked full-width instead — which is also the shape every other vault
             gets the day its own video is published. Later steps keep the compact row. */}
-        <div className={`mt-4 ${isFirst ? 'flex flex-col gap-3' : 'flex items-center justify-between'}`}>
-          <div className="flex gap-1">
+        <div className={`mt-4 ${isInvitation ? 'flex flex-col gap-3' : 'flex items-center justify-between'}`}>
+          <div className="flex gap-1" aria-hidden="true">
             {steps.map((_, n) => (
               <span
                 key={n}
@@ -217,23 +286,32 @@ export function TourOverlay({
               />
             ))}
           </div>
-          <div className={isFirst ? 'flex flex-col gap-2' : 'flex gap-2'}>
-            {!isFirst && (
+          <div className={isInvitation ? 'flex flex-col gap-2' : 'flex gap-2'}>
+            {!isInvitation && !isFirst && (
               <button className="btn btn-ghost" onClick={() => setI((n) => Math.max(0, n - 1))}>
                 {t('Atrás')}
               </button>
             )}
-            {isFirst ? (
+            {isInvitation ? (
               <>
-                {video && (
-                  <button className="btn btn-primary w-full" data-testid="tour-watch-video" onClick={() => setWatchingVideo(true)}>
+                {(video || showUnavailableVideo) && (
+                  <button
+                    className={`btn w-full ${video ? 'btn-primary' : 'cursor-not-allowed border border-neutral-700 bg-neutral-800 text-neutral-500'}`}
+                    data-testid="tour-watch-video"
+                    disabled={!video}
+                    onClick={() => setWatchingVideo(true)}
+                  >
                     <Icon name="play" size={14} />
                     {tutorialVideoCopy(getActiveLang()).tourVideo}
+                    {!video && ` (${t('Próximamente')})`}
                   </button>
                 )}
                 <button
                   className={`w-full ${video ? 'btn btn-ghost border border-neutral-700' : 'btn btn-primary'}`}
-                  onClick={() => setI(1)}
+                  onClick={() => {
+                    setStarted(true);
+                    if (!step.target && !step.view) setI(1);
+                  }}
                 >
                   {t('Sí, enséñame')}
                 </button>

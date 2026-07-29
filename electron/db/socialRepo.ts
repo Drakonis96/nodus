@@ -102,6 +102,12 @@ interface RelationRow {
   notes: string | null;
   valence: string | null;
   since_event_id: string | null;
+  status: SocialRelation['status'];
+  certainty: number | null;
+  date_display: string | null;
+  date_start_sort: string | null;
+  date_end_sort: string | null;
+  direction: SocialRelation['direction'];
   created_at: string;
   updated_at: string;
 }
@@ -125,6 +131,12 @@ function rowToRelation(row: RelationRow): SocialRelation {
     // shape. A genealogy relation leaves both NULL and reads as before.
     valence: (row.valence as SocialRelation['valence']) ?? null,
     sinceEventId: row.since_event_id ?? null,
+    status: row.status ?? 'proposal',
+    certainty: row.certainty ?? null,
+    dateDisplay: row.date_display ?? null,
+    dateStartSort: row.date_start_sort ?? null,
+    dateEndSort: row.date_end_sort ?? null,
+    direction: row.direction ?? 'directed',
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -136,8 +148,10 @@ export function createSocialRelation(input: SocialRelationInput): SocialRelation
   getDb()
     .prepare(
       `INSERT INTO social_relations
-        (relation_id, person_id, target_kind, target_id, role, notes, valence, since_event_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        (relation_id, person_id, target_kind, target_id, role, notes, valence,
+         since_event_id, status, certainty, date_display, date_start_sort,
+         date_end_sort, direction, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       id,
@@ -148,6 +162,12 @@ export function createSocialRelation(input: SocialRelationInput): SocialRelation
       input.notes ?? null,
       input.valence ?? null,
       input.sinceEventId ?? null,
+      input.status ?? 'proposal',
+      input.certainty ?? null,
+      input.dateDisplay ?? null,
+      input.dateStartSort ?? null,
+      input.dateEndSort ?? null,
+      input.direction ?? 'directed',
       ts,
       ts
     );
@@ -159,7 +179,7 @@ export function getSocialRelation(relationId: string): SocialRelation | null {
   return row ? rowToRelation(row) : null;
 }
 
-/** Only role/notes/valence are mutable; a wrong target is deleted and recreated instead. */
+/** A wrong target is deleted and recreated; descriptive/review fields stay editable. */
 export function updateSocialRelation(relationId: string, patch: Partial<SocialRelationInput>): SocialRelation | null {
   const existing = getDb().prepare('SELECT * FROM social_relations WHERE relation_id = ?').get(relationId) as RelationRow | undefined;
   if (!existing) return null;
@@ -167,11 +187,22 @@ export function updateSocialRelation(relationId: string, patch: Partial<SocialRe
   const notes = patch.notes !== undefined ? patch.notes : existing.notes;
   const valence = patch.valence !== undefined ? patch.valence ?? null : existing.valence;
   const sinceEventId = patch.sinceEventId !== undefined ? patch.sinceEventId ?? null : existing.since_event_id;
+  const status = patch.status ?? existing.status;
+  const certainty = patch.certainty !== undefined ? patch.certainty ?? null : existing.certainty;
+  const dateDisplay = patch.dateDisplay !== undefined ? patch.dateDisplay ?? null : existing.date_display;
+  const dateStartSort = patch.dateStartSort !== undefined ? patch.dateStartSort ?? null : existing.date_start_sort;
+  const dateEndSort = patch.dateEndSort !== undefined ? patch.dateEndSort ?? null : existing.date_end_sort;
+  const direction = patch.direction ?? existing.direction;
   getDb()
     .prepare(
-      'UPDATE social_relations SET role = ?, notes = ?, valence = ?, since_event_id = ?, updated_at = ? WHERE relation_id = ?'
+      `UPDATE social_relations SET role=?, notes=?, valence=?, since_event_id=?,
+       status=?, certainty=?, date_display=?, date_start_sort=?, date_end_sort=?,
+       direction=?, updated_at=? WHERE relation_id=?`
     )
-    .run(role, notes, valence, sinceEventId, now(), relationId);
+    .run(
+      role, notes, valence, sinceEventId, status, certainty, dateDisplay,
+      dateStartSort, dateEndSort, direction, now(), relationId
+    );
   return getSocialRelation(relationId);
 }
 

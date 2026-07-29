@@ -13,10 +13,28 @@ import { WORLD_CHAT_TRANSLATIONS } from './i18n.worldChat';
 import { PROSOPOGRAPHY_TRANSLATIONS } from './i18n.prosopography';
 import { WORLDBUILDING_TRANSLATIONS } from './i18n.worldbuilding';
 import { DIARIZATION_TRANSLATIONS } from './i18n.diarization';
+import { PRIMARY_SOURCES_TRANSLATIONS } from './i18n.primarySources';
+import { PRIMARY_SOURCES_ARCHIVE_TRANSLATIONS } from './i18n.primarySourcesArchive';
+import { PRIMARY_SOURCES_FILES_TRANSLATIONS } from './i18n.primarySourcesFiles';
+import { PRIMARY_SOURCES_TEXT_TRANSLATIONS } from './i18n.primarySourcesText';
+import { PRIMARY_SOURCES_EVIDENCE_TRANSLATIONS } from './i18n.primarySourcesEvidence';
+import { PRIMARY_SOURCES_PERSONS_TRANSLATIONS } from './i18n.primarySourcesPersons';
+import { PRIMARY_SOURCES_DERIVED_TRANSLATIONS } from './i18n.primarySourcesDerived';
+import { PRIMARY_SOURCES_RESEARCH_TRANSLATIONS } from './i18n.primarySourcesResearch';
+import { PRIMARY_SOURCES_RELEASE_TRANSLATIONS } from './i18n.primarySourcesRelease';
 
 export const DE: Record<string, string> = {
   ...DIARIZATION_TRANSLATIONS.de,
   ...PROSOPOGRAPHY_TRANSLATIONS.de,
+  ...PRIMARY_SOURCES_TRANSLATIONS.de,
+  ...PRIMARY_SOURCES_ARCHIVE_TRANSLATIONS.de,
+  ...PRIMARY_SOURCES_FILES_TRANSLATIONS.de,
+  ...PRIMARY_SOURCES_TEXT_TRANSLATIONS.de,
+  ...PRIMARY_SOURCES_EVIDENCE_TRANSLATIONS.de,
+  ...PRIMARY_SOURCES_PERSONS_TRANSLATIONS.de,
+  ...PRIMARY_SOURCES_DERIVED_TRANSLATIONS.de,
+  ...PRIMARY_SOURCES_RESEARCH_TRANSLATIONS.de,
+  ...PRIMARY_SOURCES_RELEASE_TRANSLATIONS.de,
   ...WORLDBUILDING_TRANSLATIONS.de,
   ...WORLD_CHAT_TRANSLATIONS.de,
   "Lo que cuenta el mapa": "Was die Karte erzählt",
@@ -7662,4 +7680,5 @@ export const DE: Record<string, string> = {
   '¿Eliminar esta unidad guardada? Esta acción no se puede deshacer.': 'Diese gespeicherte Einheit löschen? Dieser Vorgang kann nicht rückgängig gemacht werden.',
   'Escribe el tema y Nodus redacta la unidad completa con tus materiales, citando cada uno. Puedes dejar que la IA proponga las partes o fijarlas tú: cuántas son, cómo se titulan y en qué debe centrarse cada una.': 'Schreibe das Thema und Nodus verfasst die ganze Einheit aus deinen Materialien und zitiert jedes davon. Du kannst die KI die Teile vorschlagen lassen oder sie selbst festlegen: wie viele es sind, wie sie heißen und worauf sich jeder konzentrieren soll.',
   'Escribe el tema de los apuntes. El contenido lo explicará paso a paso con ejemplos y autoevaluación usando tus materiales.': 'Gib das Thema der Lernunterlagen ein. Der Inhalt erklärt es anhand deiner Materialien Schritt für Schritt mit Beispielen und Selbstkontrolle.',
+  'La diarización detecta cambios de hablante y etiqueta cada segmento automáticamente. Revisa siempre las etiquetas antes de usar la transcripción.': 'Die Diarisierung erkennt Sprecherwechsel und kennzeichnet jedes Segment automatisch. Prüfe die Kennzeichnungen immer, bevor du das Transkript verwendest.',
 };

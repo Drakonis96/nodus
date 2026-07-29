@@ -24,6 +24,32 @@ export interface WhisperCppModel {
   multilingual: boolean;
 }
 
+export interface OpenAiStudySttModel {
+  id: 'gpt-4o-mini-transcribe' | 'gpt-4o-transcribe' | 'gpt-4o-transcribe-diarize';
+  label: string;
+  diarization: boolean;
+}
+
+export const DEFAULT_OPENAI_TRANSCRIPTION_MODEL: OpenAiStudySttModel['id'] = 'gpt-4o-transcribe';
+
+/** Models accepted by the OpenAI audio-transcriptions endpoint and intentionally
+ * exposed by Nodus. Chat favorites never belong in this selector: their provider
+ * may be OpenAI too, but the audio endpoint cannot run them. */
+export const OPENAI_STUDY_STT_MODELS: readonly OpenAiStudySttModel[] = [
+  { id: 'gpt-4o-mini-transcribe', label: 'GPT-4o mini Transcribe', diarization: false },
+  { id: 'gpt-4o-transcribe', label: 'GPT-4o Transcribe', diarization: false },
+  { id: 'gpt-4o-transcribe-diarize', label: 'GPT-4o Transcribe Diarize', diarization: true },
+] as const;
+
+export function isOpenAiStudySttModel(value: string | null | undefined): value is OpenAiStudySttModel['id'] {
+  const clean = value?.trim();
+  return Boolean(clean && OPENAI_STUDY_STT_MODELS.some((model) => model.id === clean));
+}
+
+export function isOpenAiDiarizationModel(value: string | null | undefined): boolean {
+  return OPENAI_STUDY_STT_MODELS.some((model) => model.id === value?.trim() && model.diarization);
+}
+
 /** Official multilingual GGML files published by whisper.cpp. English-only
  * variants are deliberately omitted because the UI allows per-audio language
  * selection. */
@@ -199,5 +225,9 @@ export interface StudySttResult {
   text: string;
   provider: StudySttProvider;
   model: string;
-  chunks?: Array<{ text: string; timestamp: [number | null, number | null] | null }>;
+  chunks?: Array<{
+    text: string;
+    timestamp: [number | null, number | null] | null;
+    speaker?: string;
+  }>;
 }

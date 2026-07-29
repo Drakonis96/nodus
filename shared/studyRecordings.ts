@@ -176,6 +176,7 @@ export interface StudyDiarizationResult {
 export interface StudyWhisperChunk {
   text: string;
   timestamp?: [number | null, number | null] | null;
+  speaker?: string;
 }
 
 export function formatStudyTimestamp(seconds: number): string {
@@ -197,6 +198,7 @@ export function normalizeStudyTranscriptSegments(
     text: chunk.text.replace(/\s+/g, ' ').trim(),
     tStart: Math.max(0, Number(chunk.timestamp?.[0] ?? 0)),
     tEnd: Math.max(0, Number(chunk.timestamp?.[1] ?? chunk.timestamp?.[0] ?? 0)),
+    speaker: chunk.speaker?.trim() || undefined,
   })).filter((chunk) => chunk.text);
   if (valid.length) {
     return valid.map((chunk, index) => ({
