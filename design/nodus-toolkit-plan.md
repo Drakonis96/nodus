@@ -1,465 +1,438 @@
-# Nodus Toolkit — Plan de implementación original
+# Nodus Toolkit — Original Implementation Plan
 
-> Estado: **Nodus Convert implementado; ampliado con Nodus Protect** (2026-07-19).
-> Este documento conserva las decisiones históricas del primer lanzamiento del Toolkit.
-> La especificación y matriz de aceptación vigente de la cuarta tarjeta están en
+> Status: **Nodus Convert implemented; expanded with Nodus Protect** (2026-07-19).
+> This document preserves the historic decisions of the first release of the Toolkit.
+> The current specification and acceptance matrix of the fourth card are in
 > [`nodus-protect-parity-v0.4.1.md`](nodus-protect-parity-v0.4.1.md).
 
 ---
 
-## 1. Visión y nombres
+## 1. Vision and names
 
-**Nodus Toolkit** es una nueva sección de primer nivel ("Herramientas" en el sidebar)
-que centraliza utilidades de proceso de archivos para investigación, docencia y estudio,
-al estilo ConvertX pero con los formatos del ámbito académico. Contiene cuatro
-herramientas, cada una con su propia página:
+**Nodus Toolkit** is a new first-level section ("Tools" in the sidebar) that centralizes file
+processing utilities for research, teaching and study, ConvertX style but with formats in the
+academic field. It contains four tools, each with its own page:
 
-| Herramienta | id interno | Estado v1 | Descripción de tarjeta (ES) |
+| Tool | internal id | Status v1 | Description of card (ES) |
 |---|---|---|---|
-| **Nodus Convert** | `convert` | ✅ se implementa ahora | Convierte documentos, PDFs e imágenes; OCR ligero y utilidades de texto, individual o en bulk. |
-| **Nodus Protect** | `protect` | ✅ disponible | Oculta datos, marca documentos y crea o verifica copias trazables mediante procesamiento local. |
-| **PDF Presenter** | `presenter` | 🔜 Próximamente | Presenta PDFs como diapositivas para clase. |
-| **OCR Workspace** | `aiOcr` | 🔜 Próximamente | Transcripción de documentos difíciles con modelos de visión. |
+| **Nodus Convert** | `convert` | is now implemented | Convert documents, PDFs and images; light OCR and text utilities, individual or bulk. |
+| **Nodus Protect** | `protect` | Available | Hide data, mark documents and create or verify traceable copies by local processing. |
+| **PDF Present** | `presenter` | Coming soon. | It presents PDFs as slides for class. |
+| **OCR Workspace** | `aiOcr` | Coming soon. | Transcription of difficult documents with vision models. |
 
-Decisiones de nombre:
-- La sección del sidebar se llama **"Herramientas"** (clave i18n en español, como todo).
-  El nombre de marca para release notes / web es **"Nodus Toolkit"**.
-- El conversor se llama **"Nodus Convert"** — encaja con el trío de nombres en inglés de
-  marca y con precedentes como Deep Research. En la tarjeta el subtítulo en ES lo hace
-  autoexplicativo.
-- ⚠️ La tercera herramienta se implementó como **"OCR Workspace"**, no como "AI OCR"
-  (el nombre que usó el usuario al encargarlo): el roadmap ya visible en la app la
-  anuncia como *Nodus OCR Workspace*, y estrenar la tarjeta con otro nombre haría que
-  la app se contradijera consigo misma. **Decisión reversible**: si el usuario prefiere
-  "AI OCR", hay que cambiarlo en `ToolkitView.tsx`, en `NODUS_ROADMAP` y en el test.
+Name decisions:
+- The sidebar section is called **"Tools"** (key i18n in Spanish, like everything else).The brand
+  name for release notes / web is **"Nodus Toolkit"**.
+- The converter is called **"Nodus Convert"** — fits the trio of brand names in English and with
+  precedents like Deep Research. On the card the subtitle in ES makes it self-explanatory.
+- ⚠️ The third tool was implemented as **"OCR Workspace"**, not as "AI OCR" (the name used by the
+  user when ordering it): the roadmap already visible in the app announces it as *Nodus OCR
+  Workspace*, and to release the card with another name would make the app contradict itself.
+  **Reversible decision**: if the user prefers "AI OCR", it must be changed in`ToolkitView.tsx`,
+  in`NODUS_ROADMAP`And in the test.
 
-**Principio rector**: el Toolkit es **determinista y 100 % offline** (salvo la descarga
-opt-in de idiomas de Tesseract, ver §7). Nada de IA en Nodus Convert: la IA vive en la
-futura herramienta AI OCR. Ninguna operación toca jamás el archivo original.
+** Guiding principle**: Toolkit is **deterministic and 100% offline** (except for the opt-in
+download of Tesseract languages, see §7). No AI in Nodus Convert: AI lives in the future AI OCR
+tool. No operation ever touches the original file.
 
-**Hallazgo clave**: casi toda la maquinaria ya está en `package.json` — `pdf-lib`,
-`pdfjs-dist`, `tesseract.js`, `mammoth`, `docx`, `turndown`, `adm-zip`,
-`@napi-rs/canvas`, `diff` — e incluso hay OCR funcionando en
-`electron/extraction/ocr.ts` (imagen y PDF→PNG→Tesseract). El coste en bundle es ~0;
-la única dependencia nueva prevista es `heic-decode` (WASM pequeño) en la fase de
-imágenes.
+**Key finding**: almost all the machinery is already in`package.json` — `pdf-lib`, `pdfjs-dist`,
+`tesseract.js`, `mammoth`, `docx`, `turndown`, `adm-zip`, `@napi-rs/canvas`, `diff`— and there are
+even OCRs running in`electron/extraction/ocr.ts`(image and PDF→PNG→Tesseract).The cost in bundle is
+~0; the only new dependency planned is`heic-decode`(small WASM) in the imaging phase.
 
 ---
 
-## 2. Navegación e integración en el shell
+## 2. Navigation and integration into the shell
 
 ### 2.1 Sidebar
-- `src/navigation.ts`: añadir `'toolkit'` a la union `View` y a `NAV_ITEMS`.
-- Nuevo grupo de navegación `tools` (`NavGroupId`), label **"Herramientas"**, renderizado
-  tras `create` ("Escribir"). Un grupo de un solo ítem es válido (`groupedNav` ya
-  tolera grupos de tamaño arbitrario y descarta los vacíos).
-- Icono nuevo y único: `tools` (llave inglesa estilo feather). Recordar que
-  `test-icons.mjs` valida el catálogo.
-- **Vista universal**: no se añade a `VAULT_TYPE_SCOPED_VIEWS` (aparece en todos los
-  tipos de vault) ni a ningún `defaultHiddenViews`. Limitación conocida: los tipos
-  preview (`docencia`, `worldbuilding`) solo permiten `home`; el Toolkit no estará ahí
-  hasta que dejen de ser preview — aceptado para v1.
+- `src/navigation.ts`: add`'toolkit'`to the union`View`and a`NAV_ITEMS`.
+- New navigation group`tools` (`NavGroupId`), label **"Tools"**, rendered after`create`("Write"). A
+  single item group is valid (`groupedNav`already tolerates arbitrary size groups and discards
+  gaps).
+- New and unique icon:`tools`Remember that`test-icons.mjs`validates the catalogue.
+- **Universal view**: not added to`VAULT_TYPE_SCOPED_VIEWS`(appears in all types of vault) or to
+  any`defaultHiddenViews`. Known limitation: the preview types (`docencia`, `worldbuilding`) allow
+  only`home`; the Toolkit won't be there until they stop being previewed — accepted for v1.
 
 ### 2.2 Header
-- Añadir un `HeaderAction` (icono `tools`) en la fila de acciones del top bar de
-  `App.tsx` que navega a la vista `toolkit` desde cualquier sitio. Mismo patrón
-  `h-9 min-h-9 px-2.5` que el resto de acciones del header.
+- Add a`HeaderAction`(icon`tools`) in the stock row of the top bar of`App.tsx`navigating in
+  sight`toolkit`from anywhere. Same pattern`h-9 min-h-9 px-2.5`That's the rest of the header's
+  stock.
 
-### 2.3 Otras superficies
-- `CommandPalette`: comando "Ir a Herramientas" (+ "Abrir Nodus Convert").
-- `shared/nodiDocumentation.ts` (`NODUS_ROADMAP`): al lanzar, mover el ítem del Toolkit
-  a "hecho" o retirarlo, y documentar la sección para que Nodi sepa explicarla.
-- `WhatsNewModal`: entrada de novedades en el release que lo estrene.
+### 2.3 Other areas
+- `CommandPalette`: "Go to Tools" command (+ "Open Nodus Convert").
+- `shared/nodiDocumentation.ts` (`NODUS_ROADMAP`): when launching, move the Toolkit item to "made"
+  or remove it, and document the section so Nodi can explain it.
+- `WhatsNewModal`: entry of news in the release that premieres it.
 
-### 2.4 Navegación interna del Toolkit
-`ToolkitView.tsx` gestiona un sub-estado propio (no se añaden más ids a `View`):
+### 2.4 Internal navigation of Toolkit
+`ToolkitView.tsx`manages a sub-state of its own (no more ids added to`View`):
 
 ```
 type ToolkitPage = 'home' | 'convert' | 'presenter' | 'aiOcr'
 ```
 
-- `home` = hub con las 3 tarjetas.
-- Cada herramienta renderiza una cabecera con **botón volver** (`chevronLeft` +
-  "Herramientas") y el título/icono de la herramienta — breadcrumb estilo
-  "Herramientas / Nodus Convert".
-- El sub-estado se conserva al cambiar de vista y volver (state en el componente App o
-  módulo de estado ligero, como hace Study con `StudyNavigationTarget`).
-- `presenter` y `aiOcr` en v1: tarjeta deshabilitada (badge "Próximamente", opacidad
-  reducida, sin onClick). No hay página placeholder navegable — menos superficie que
-  testear y ningún callejón sin salida.
+- `home`= hub with the 3 cards.
+- Each tool renders a header with **button back** (`chevronLeft`+ "Tools") and the title/icon of the
+  tool — Breadcrumb style "Tools / Nodus Convert".
+- The sub-state is conserved when you change your view and return (state in the App component or
+  light status module, as does Study with`StudyNavigationTarget`).
+- `presenter`and`aiOcr`in v1: disabled card (badge "Next", reduced opacity, no onClick). There is no
+  navigable placeholder page — less surface than testing and no dead end.
 
 ---
 
-## 3. Diseño del hub (página principal de Herramientas)
+## 3. Hub Design (Main Tool Page)
 
-Requisitos de diseño explícitos del usuario, que se convierten en checklist de PR:
+Explicit user design requirements, which become PR checklist:
 
-- [ ] Márgenes y ritmo de espaciado idénticos al resto de vistas (contenedor
-      `px-6 py-6`, `gap-3/gap-4` de la escala existente; comparar lado a lado con
-      Deep Research y Home).
-- [ ] Las 3 tarjetas del hub tienen **exactamente el mismo tamaño** (grid
-      `sm:grid-cols-2 lg:grid-cols-3` con `h-full` en la tarjeta; el contenido no
-      puede desalinear alturas).
-- [ ] Botones hermanos con la misma altura (`btn` + `h-9 min-h-9`); nunca mezclar
-      alturas en una misma fila.
-- [ ] Iconos **perfectamente centrados**: el icono de cada tarjeta va en una "loseta"
-      cuadrada fija (`h-12 w-12 rounded-xl flex items-center justify-center`) y los
-      iconos de botón llevan `shrink-0`. Landmine conocida: jamás `animate-spin` en el
-      mismo elemento que un `-translate-y-1/2` (el spinner "bota" y no gira) — el
-      centrado va siempre en un wrapper.
-- [ ] Dark y light: cualquier clase utilitaria nueva usada solo en dark necesita su
-      remap `.light .<utility>` en `index.css` (`test-light-theme-utilities.mjs` ayuda,
-      pero revisar visualmente ambos temas).
-- [ ] Dropdowns/selects dentro de contenedores `overflow-hidden` → portal a `body`
-      (landmine de Databases).
+- [ ] Margins and spacing rhythm identical to the rest of views (container`px-6 py-6`,
+  `gap-3/gap-4`of the existing scale; compare side by side with Deep Research and Home).
+- [ ] The 3 hub cards are **exactly the same size** (grid)`sm:grid-cols-2
+  lg:grid-cols-3`with`h-full`on the card; the content cannot misalign heights).
+- [ ] Brothers buttons with the same height (`btn` + `h-9 min-h-9`); never mix heights in the same
+  row.
+- [ ] Icons **perfectly centered**: the icon of each card goes on a fixed square "loset" (`h-12 w-12
+  rounded-xl flex items-center justify-center`) and button icons carry`shrink-0`. Landmine known:
+  never`animate-spin`in the same element as a`-translate-y-1/2`(the spinner "boot" and does not
+  spin) — the center always goes on a wrapper.
+- [ ] Dark and light: any new utilitarian class used only in dark needs its remap`.light
+  .<utility>`in`index.css` (`test-light-theme-utilities.mjs`help, but visually review both topics).
+- [ ] Dropdowns/selects inside containers`overflow-hidden`→ portal to`body`(landmine of Databases).
 
-Estructura del hub:
+Structure of the hub:
 
 ```
 ┌────────────────────────────────────────────────────────┐
-│ [🔧] Herramientas                                       │
-│ Utilidades de proceso de archivos para investigación,  │
-│ docencia y estudio. Todo local, nada sale de tu equipo.│
+│ [🔧] Tools                                              │
+│ File-processing utilities for research, teaching and   │
+│ study. Everything stays local on your computer.        │
 │                                                        │
 │ ┌──────────┐  ┌──────────┐  ┌──────────┐               │
 │ │ [swap]   │  │ [presen.]│  │ [scanTxt]│               │
 │ │ Nodus    │  │ PDF      │  │ AI OCR   │               │
 │ │ Convert  │  │ Presenter│  │          │               │
-│ │ subtítulo│  │ subtítulo│  │ subtítulo│               │
-│ │          │  │ Próxima- │  │ Próxima- │               │
-│ │          │  │ mente    │  │ mente    │               │
+│ │ subtitle │  │ subtitle │  │ subtitle │               │
+│ │          │  │ Coming   │  │ Coming   │               │
+│ │          │  │ soon     │  │ soon     │               │
 │ └──────────┘  └──────────┘  └──────────┘               │
 └────────────────────────────────────────────────────────┘
 ```
 
-Acento de color de la sección: **ámbar/bronce** (tono "taller"), distinto del índigo
-base, del crimson de Databases y del teal de Estudio. Se usa solo en iconos-loseta,
-badges y detalles — el chrome sigue siendo neutral como el resto de la app.
+Color accent of the section: **ambar/bronze** (tone "workshop"), other than the base indigo, the
+Crimson of Databases and the Study teal. It is used only in icons-loseta, badges and details — the
+chrome remains neutral like the rest of the app.
 
-Iconos nuevos en `ICON_PATHS` (todos trazos feather, únicos): `tools` (llave inglesa),
-`swap` (flechas de intercambio, para Convert), `scanText` (para AI OCR). PDF Presenter
-reutiliza el icono `presentation` existente.
+New icons in`ICON_PATHS`(all feather strokes, unique):`tools`(English key),`swap`(exchange arrows,
+for Convert),`scanText`(for AI OCR). PDF Presenter reuses the icon`presentation`existing.
 
 ---
 
-## 4. Nodus Convert — especificación funcional
+## 4. Nodus Convert — functional specification
 
 ### 4.1 UI
 
 ```
-┌ Herramientas / Nodus Convert ──────────────────────────────┐
+┌ Tools / Nodus Convert ─────────────────────────────────────┐
 │ [←] [swap] Nodus Convert                                   │
 │                                                            │
-│ ┌ Categorías ┐ ┌ Zona principal ──────────────────────────┐│
-│ │ Documentos │ │  ┌ Dropzone ─────────────────────────┐   ││
-│ │ PDF        │ │  │  Arrastra archivos o carpetas,    │   ││
-│ │ OCR        │ │  │  o haz clic para elegir           │   ││
-│ │ Imágenes   │ │  └───────────────────────────────────┘   ││
-│ │ Texto      │ │  Lista de archivos (nombre, tamaño,      ││
-│ └────────────┘ │  estado/progreso por archivo, quitar)    ││
-│                │  ┌ Opciones de la operación ┐             ││
-│                │  │ Formato destino, calidad, │            ││
-│                │  │ rangos de página, idioma… │            ││
+│ ┌ Categories ┐ ┌ Main area ──────────────────────────────┐│
+│ │ Documents  │ │  ┌ Drop zone ────────────────────────┐  ││
+│ │ PDF        │ │  │  Drag files or folders here,      │  ││
+│ │ OCR        │ │  │  or click to choose them          │  ││
+│ │ Images     │ │  └───────────────────────────────────┘  ││
+│ │ Text       │ │  File list (name, size, status/progress,││
+│ └────────────┘ │  remove)                                 ││
+│                │  ┌ Operation options ┐                   ││
+│                │  │ Target format, quality,               ││
+│                │  │ page ranges, language… │              ││
 │                │  └───────────────────────────┘            ││
-│                │  [Carpeta de salida ▾] [□ Abrir al        ││
-│                │   terminar]              [ Convertir ]    ││
+│                │  [Output folder ▾] [□ Open when done]    ││
+│                │                         [ Convert ]       ││
 │                └──────────────────────────────────────────┘│
 └────────────────────────────────────────────────────────────┘
 ```
 
-- Panel izquierdo de categorías: pills/botones **del mismo tamaño**, patrón visual del
-  sidebar de Study/Databases.
-- La operación se elige con un select "De → A" filtrado por los archivos añadidos
-  (p. ej. si sueltas `.docx` solo se ofrecen las salidas válidas). Bulk = N archivos,
-  misma operación.
-- Progreso: lista por archivo con estado (`pendiente / procesando (x%) / hecho /
-  error`), botón cancelar el lote. El job sobrevive a la navegación (corre en main;
-  el renderer se re-suscribe vía `backgroundJobs.ts`).
-- Resultado por archivo: ruta de salida + "Mostrar en Finder" (`shell.showItemInFolder`)
-  + error legible si falló (sin stack traces al usuario).
-- Estados vacíos y errores con el tono del resto de la app; textos ES como claves i18n.
+- Left category panel: pills/buttons ** of the same size**, visual sidebar pattern of
+  Study/Databases.
+- The operation is chosen with a select "From → A" filtered by the added files (e.g. if you
+  release`.docx`only valid outputs are offered). Bulk = N files, same operation.
+- Progress: list by file with status (`pending / processing (x%) / done / error`), button to cancel
+  the lot. Job survives navigation (runs in main; renderer is re-subscribed via`backgroundJobs.ts`).
+- Result per file: output path + "Show in Finder" (`shell.showItemInFolder`)
+  + readable error if failed (no stack tracks to user).
+- Empty states and errors with the tone of the rest of the app; ES texts as i18n keys.
 
-### 4.2 Política de salida (regla de oro)
+### 4.2 Exit policy (gold rule)
 
-- **Nunca** se modifica ni sobrescribe el original.
-- Destino por defecto: junto al original con la extensión nueva; si existe colisión,
-  sufijo incremental ` (2)`, ` (3)`… (nunca overwrite silencioso).
-- Alternativa: carpeta de salida elegida por el usuario (persistida en settings).
-- Bulk conserva nombres base; operaciones N→1 (merge, imágenes→PDF) piden nombre.
+- **Never change or overwrite the original.
+- Default destination: next to the original with the new extension; if collision exists, incremental
+  suffix` (2)`, ` (3)`... (never overwrite silent).
+- Alternative: output folder chosen by the user (persisted in settings).
+- Bulk retains base names; operations N→1 (merge, images→PDF) request name.
 
-### 4.3 Catálogo de operaciones v1
+### 4.3 Catalogue of operations v1
 
-Cada operación lista su motor y su **test real de aceptación** (ver §6). *Regla DoD:
-una operación solo se mergea con su test de procesado real en verde.*
+Each operation lists its engine and its **real acceptance test** (see §6). *DoD rule: one operation
+is only required with its actual green processing test.*
 
-**A. Documentos** — `electron/toolkit/convert/docs.ts`
+**A. Documents** —`electron/toolkit/convert/docs.ts`
 
-| # | Operación | Motor | Test real (aserción principal) |
+| # | Operation | Engine | Actual test (main assertion) |
 |---|---|---|---|
-| A1 | PDF → TXT | pdfjs (reutiliza `pdfjsLoader`/`textExtractor`) | El TXT contiene las frases conocidas de las 3 páginas del fixture, en orden |
-| A2 | PDF → Markdown | A1 + heurística ligera (títulos por tamaño de fuente, párrafos) | Encabezados `#` presentes; texto íntegro |
-| A3 | DOCX → Markdown / HTML / TXT | mammoth (+ turndown para MD) | `# Título`, `**negrita**`, lista y tabla del fixture presentes |
-| A4 | Markdown / HTML → DOCX | lib `docx` | Descomprimir el .docx (adm-zip) y asertar texto y estilos de heading en `document.xml` |
-| A5 | Markdown / HTML → PDF | render con CSS de la app + KaTeX → `printToPDF` (main, ventana oculta) | **e2e**: extraer texto del PDF con pdfjs y casarlo; nº páginas > 0 |
-| A6 | EPUB → Markdown / TXT | adm-zip + orden del spine OPF + turndown | Texto de ambos capítulos del fixture, en orden del spine |
-| A7 | Markdown → EPUB | zip manual (mimetype sin comprimir + container.xml + OPF + XHTML) | Estructura válida: `mimetype` primera entrada y STORED; container/OPF parseables; capítulos con el texto |
+| A1 | PDF → TXT | pdfjs (reuses`pdfjsLoader`/`textExtractor`) | The TXT contains the known phrases of the 3 pages of the fixture, in order |
+| A2 | PDF → Markdown | A1 + light heuristics (titles by font size, paragraphs) | Headers`#`present; full text |
+| A3 | DOCX → Markdown / HTML / TXT | mammoth (+ turndown for MD) | `# Title`, `**bold**`, list and fixture table present |
+| A4 | Markdown / HTML → DOCX | lib`docx` | Decompress the .docx (adm-zip) and assert text and styles of heating in`document.xml` |
+| A5 | Markdown / HTML → PDF | render with CSS of the app + KaTeX →`printToPDF`(main, hidden window) | **e2e**: extract text from PDF with pdfjs and compare it; no pages > 0 |
+| A6 | EPUB → Markdown / TXT | adm-zip + spine order OFP + turndown | Text of both chapters of the fixture, in spine order |
+| A7 | Markdown → EPUB | manual zip (uncompressed mimetype + container.xml + OPF + XHTML) | Valid structure:`mimetype`first entry and STORED; container/OPF parseables; chapters with text |
 
-**B. Utilidades PDF** — `electron/toolkit/convert/pdfOps.ts` (pdf-lib)
+**B. PDF Utilities** —`electron/toolkit/convert/pdfOps.ts`(pdf-lib)
 
-| # | Operación | Test real |
+| # | Operation | Actual test |
 |---|---|---|
-| B1 | Unir PDFs | páginas = suma; texto de ambos fixtures presente vía pdfjs |
-| B2 | Dividir / extraer páginas (rangos "1-3,5") | nº páginas y texto de la página concreta correctos |
-| B3 | Rotar páginas | `/Rotate` correcto en el page dict; re-abrible |
-| B4 | Reordenar / eliminar páginas | orden verificado por el texto de cada página |
-| B5 | Extraer imágenes incrustadas | ≥1 imagen, decodificable por canvas, dimensiones > 0 |
-| B6 | Imágenes → PDF (una por página) | nº páginas = nº imágenes; tamaño de página coherente |
-| B7 | Ver/editar metadatos (título, autor, tema, fecha) | round-trip: escribir → releer → igual |
-| B8 | Comprimir PDF escaneado (re-render a JPEG, calidad configurable, etiquetado "con pérdida") | salida < entrada; mismo nº páginas; OCR-able. *Fase tardía* |
+| B1 | Unite PDFs | pages = sum; text of both fixes present via pdfjs |
+| B2 | Split / extract pages (ranges "1-3,5") | no pages and text of the specific page correct |
+| B3 | Rotate Pages | `/Rotate`correct on page dict; re-openable |
+| B4 | Reorder / Remove Pages | command verified by the text of each page |
+| B5 | Extract embedded images | ≥1 image, canvas decodable, dimensions > 0 |
+| B6 | Images → PDF (one per page) | no pages = no images; coherent page size |
+| B7 | View/edit metadata (title, author, theme, date) | round-trip: write → reread → same |
+| B8 | Compress scanned PDF (re-render to JPEG, configurable quality, labeled "with loss") | output < input; same no pages; OCR-able. * Late phase* |
 
-**C. OCR ligero** — `electron/toolkit/convert/ocrOps.ts` (reutiliza `extraction/ocr.ts`)
+**C. Light OCR** —`electron/toolkit/convert/ocrOps.ts`(reuses`extraction/ocr.ts`)
 
-| # | Operación | Test real |
+| # | Operation | Actual test |
 |---|---|---|
-| C1 | Imagen(es) → TXT | el texto reconocido contiene las palabras clave del fixture renderizado a 300 dpi (match normalizado) |
-| C2 | PDF escaneado → TXT | ídem sobre el PDF-imagen de 2 páginas |
-| C3 | PDF escaneado → **PDF buscable** (sandwich: capa de texto invisible con bboxes de Tesseract vía pdf-lib) | pdfjs encuentra las palabras en las posiciones correctas; el PDF visualmente intacto (mismo nº páginas, imágenes preservadas) |
-| C4 | Preprocesado: escala de grises / binarizar (Otsu) | dimensiones intactas; histograma binario; C1 sobre la imagen preprocesada sigue pasando |
-| C5 | Deskew (perfil de proyección) | *Fase tardía*; ángulo detectado ±1° en fixture girado 3° |
+| C1 | Image(s) → TXT | the recognized text contains the keywords of the fixture rendered at 300 dpi (standardized match) |
+| C2 | PDF Scanned → TXT | about the PDF image of 2 pages |
+| C3 | PDF scan → **PDF searchable** (sandwich: invisible text layer with Tesseract bboxes via pdf-lib) | pdfjs finds the words in the correct positions; the PDF visually intact (same as no pages, preserved images) |
+| C4 | Preprocessed: gray scale / binarize (Otsu) | intact dimensions; binary histogram; C1 over preprocessed image continues to pass |
+| C5 | Deskew (projection profile) | *Late phase*; angle detected ±1° in rotated fixture 3° |
 
-- Idiomas Tesseract descargables bajo demanda con UI de gestión (patrón
-  Piper/Kokoro), caché en userData, consentimiento reutilizando el copy de
-  `ocrEnabled` (es la única llamada de red del Toolkit).
+- Tesseract languages downloadable on demand with management UI (Piper/Kokoro pattern), userData
+  cache, consent reusing copy`ocrEnabled`(it's the only network call in the Toolkit).
 
-**D. Imágenes** — `electron/toolkit/convert/imageOps.ts` (@napi-rs/canvas; `heic-decode` nuevo)
+**D. Images** —`electron/toolkit/convert/imageOps.ts`(@napi-rs/canvas;`heic-decode`new)
 
-| # | Operación | Test real |
+| # | Operation | Actual test |
 |---|---|---|
-| D1 | Convertir PNG/JPEG/WebP (+AVIF si el canvas lo soporta — *spike* al inicio de la fase) | salida decodificable; dimensiones intactas; magic bytes correctos |
-| D2 | HEIC → JPEG/PNG | detección por magic bytes en `npm test`; la conversión real se verifica **en local contra una foto de iPhone aportada por el usuario, que nunca se commitea** (ver §6.2-bis) |
-| D3 | Redimensionar (lado máx. / %) en bulk | dimensiones exactas esperadas; aspect ratio intacto |
-| D4 | Comprimir (calidad JPEG/WebP) | salida < entrada; decodificable |
+| D1 | Convert PNG/JPEG/WebP (+AVIF if canvas supports it — *spike* at start of phase) | decodable output; intact dimensions; correct magic bytes |
+| D2 | HEIC → JPEG/PNG | magic bytes detection in`npm test`; the actual conversion is verified **in local against an iPhone photo provided by the user, which is never committed** (see §6.2-bis) |
+| D3 | Resize (max. / %) in bulk | Exact expected dimensions; undisturbed view ratio |
+| D4 | Compress (JPEG/WebP quality) | output < input; decodable |
 
-**E. Texto** — `shared/toolkitText.ts` (puro, sin Electron)
+**E. Text** —`shared/toolkitText.ts`(pure, without Electron)
 
-| # | Operación | Test real |
+| # | Operation | Actual test |
 |---|---|---|
-| E1 | Limpiador de texto pegado de PDF (des-guionado, unir líneas partidas respetando párrafos, espacios dobles, comillas) | golden tests: entrada real pegada de PDF → salida exacta esperada |
-| E2 | Mayúsculas/minúsculas (Tipo oración / Título / MAYÚS / minús, con reglas ES: no capitalizar "de", "la"…) | golden tests |
-| E3 | SRT/VTT → TXT limpio (sin timestamps, líneas unidas por cue) | golden test sobre entrevista fixture |
-| E4 | Checksum SHA-256 / MD5 de archivos | hash conocido del fixture, byte a byte |
+| E1 | PDF glued text cleaner (de-tuned, join split lines respecting paragraphs, double spaces, quotes) | golden tests: real entry pasted from PDF → exact output expected |
+| E2 | Shifts/minuscules (Prayer type / Title / MAYUS/minus, with ES rules: do not capitalize "of", "la"...) | golden tests |
+| E3 | SRT/VTT → Clean TXT (without timestamps, lines attached by cue) | golden test on fixture interview |
+| E4 | Checksum SHA-256 / MD5 files | known hash of fixture, byte a byte |
 
-**F. Datos y citas** — *v1.1, planificado pero fuera del primer release*
-BibTeX ↔ RIS ↔ CSL-JSON (con "importar a Zotero" vía puente existente),
-CSV ↔ JSON ↔ tabla Markdown (reutilizando el parser robusto de Databases).
+**F. Data and citations** — *v1.1 planned but out of first release* BibTeX ★ RIS ★ CSL-JSON (with
+"importing Zotero" via existing bridge), CSV ↔ JSON ↔ Markdown table (reusing Robust Parser from
+Databases).
 
 ---
 
-## 5. Arquitectura técnica
+## 5. Technical architecture
 
-### 5.1 Módulos
+### 5.1 Modules
 
 ```
 electron/toolkit/
   convert/
-    docs.ts        # A*  (mammoth, docx, turndown, adm-zip, pdfjs — imports lazy)
-    pdfOps.ts      # B*  (pdf-lib, pdfjs)
-    ocrOps.ts      # C*  (tesseract.js vía extraction/ocr.ts, canvas)
-    imageOps.ts    # D*  (@napi-rs/canvas, heic-decode)
-    index.ts       # registro tipado de operaciones (id, categoría, entradas, salidas)
-  toolkitWorker.ts # worker_thread runner (patrón computeWorker)
-  toolkitJobs.ts   # cola en main: 1 job activo, progreso, cancelación, naming de salida
+    docs.ts        # A* (mammath, docx, turndown, adm-zip, pdfjs — imports lazy)
+    pdfOps.ts      # B* (pdf-lib, pdfjs)
+    ocrOps.ts      # C* (testeract.js via extraction/ocr.ts, canvas)
+    imageOps.ts    # D* (@napi-rs/canvas, heic-decode)
+    index.ts       # Typed transaction log (id, category, inputs, outputs)
+  toolkitWorker.ts # worker_thread runner (computeWorker pattern)
+  toolkitJobs.ts   # Main queue: 1 active job, progress, cancellation, output naming
 shared/
-  toolkitText.ts   # E* puro
+  toolkitText.ts   # E* pure
   toolkitTypes.ts  # ToolkitOpId, ToolkitJobRequest/Progress/FileResult
 src/views/
-  ToolkitView.tsx      # hub + sub-navegación
+  ToolkitView.tsx      # hub + sub-navigation
   ToolkitConvertView.tsx
 ```
 
-**Reglas duras:**
-- Los módulos `convert/*` son **Electron-free** (como `databasesRepo`): imports de
-  Node y libs solamente, deps pesadas con `import()` lazy (patrón de `ocr.ts`). Esto
-  es lo que permite testearlos de verdad con esbuild + node:test.
-- Todo el trabajo corre en `toolkitWorker.ts` (worker_thread), **nunca** en el event
-  loop del main (landmine histórica de la app). *Spike en F1*: verificar
-  `@napi-rs/canvas` + tesseract dentro de worker_threads en las 3 plataformas; plan B:
-  `utilityProcess`.
-- Excepción: A5 (`printToPDF`) necesita `BrowserWindow` → corre en main con ventana
-  oculta; es I/O asíncrono de Chromium, no bloquea.
-- Cancelación cooperativa: el worker comprueba una flag entre archivos y entre páginas;
-  cancelar nunca deja archivos a medias (escritura a `.tmp` + rename atómico).
+** Hard rules:**
+- The modules`convert/*`are **Electron-free** (as`databasesRepo`): Node imports and only libs, heavy
+  deps with`import()`lazy (pattern of`ocr.ts`). This is what allows you to test them with esbuild +
+  node:test.
+- All the work runs in`toolkitWorker.ts`(worker_thread), **never** in the event loop of the main
+  (historical landmine of the app). *Spike in F1*: verify`@napi-rs/canvas`+ tesseract within
+  worker_threads on all 3 platforms; plan B:`utilityProcess`.
+- Exception: A5 (`printToPDF`) you need`BrowserWindow`→ Runs in main with hidden window; is I/O
+  asynchronous Chromium, does not block.
+- Cooperative cancellation: the worker checks a flag between files and between pages; cancel never
+  leaves files half (write a`.tmp`+ atomic rename).
 
-### 5.2 IPC y estado
+### 5.2 IPC and status
 
-- Canales: `toolkit:job:start`, `toolkit:job:cancel`, `toolkit:job:event` (progreso
-  push), `toolkit:ops:list`, `toolkit:pickFiles`, `toolkit:pickOutputDir`,
-  `toolkit:showInFolder`. Tipados en `NodusApi` (preload sin fugas de nombres IPC,
-  como el resto).
-- Renderer: `startBackgroundJob('toolkit:convert', …)` de `backgroundJobs.ts` para que
-  el progreso sobreviva a la navegación y se re-suscriba al volver.
-- Settings nuevas en `AppSettings` (JSON de settings, **sin migración de schema**):
-  `toolkitOcrLanguages` (default `'spa+eng'`), `toolkitOutputDir` (null = junto al
-  original), `toolkitOpenFolderOnDone` (bool). "Trabajos recientes" en localStorage.
+- Channels:`toolkit:job:start`, `toolkit:job:cancel`, `toolkit:job:event`(push
+  progress),`toolkit:ops:list`, `toolkit:pickFiles`, `toolkit:pickOutputDir`,
+  `toolkit:showInFolder`. Typed in`NodusApi`(preload without leaking IPC names, like the rest).
+- Renderer:`startBackgroundJob('toolkit:convert', …)`of`backgroundJobs.ts`so that progress survives
+  navigation and is re-subscribed upon return.
+- New settings in`AppSettings`(JSON of settings, **no schema
+  migration**):`toolkitOcrLanguages`(default`'spa+eng'`), `toolkitOutputDir`(null = next to the
+  original),`toolkitOpenFolderOnDone`"Recent jobs" on local Storage.
 
 ### 5.3 i18n
 
-Todas las cadenas nuevas en ES como clave + entradas en EN/FR/DE/PT/PT-BR
-(`test-i18n-coverage.mjs` obliga; presupuestar este trabajo en cada fase, no al final).
+All new strings in ES as key + entries in EN/FR/DE/PT/PT-BR (`test-i18n-coverage.mjs`it requires;
+budget this work at each stage, not at the end).
 
 ---
 
-## 6. Estrategia de testing — "ninguna operación pasa sin procesado real"
+## 6. Testing strategy — "no operation passes without actual processing"
 
-### 6.1 Fixtures reales — `scripts/fixtures/toolkit/`
+### 6.1 Actual Fixtures —`scripts/fixtures/toolkit/`
 
-Generadas una vez por `scripts/gen-toolkit-fixtures.mjs` y **commiteadas** (deterministas,
-< 200 KB cada una), para que los tests sean herméticos:
+Generated once by`scripts/gen-toolkit-fixtures.mjs`and **committed** (determinists, < 200 KB each),
+so that the tests are airtight:
 
-| Fixture | Contenido |
+| Fixture | Content |
 |---|---|
-| `sample-3pages.pdf` | PDF con capa de texto, 3 páginas con frases conocidas ES/EN + títulos con jerarquía de tamaños |
-| `sample-b.pdf` | segundo PDF (para merge) |
-| `scanned-2pages.pdf` | PDF **solo imagen** (texto renderizado a 300 dpi, sin capa de texto) |
-| `scan-es.png`, `scan-en.jpg` | párrafos renderizados a 300 dpi para OCR |
-| `scan-skewed.png` | ídem girado 3° (para C5) |
-| `sample.docx` | headings, negrita, lista, tabla |
-| `sample.epub` | 2 capítulos con spine definido |
-| `sample.md`, `sample.html` | con encabezados, tabla y una fórmula KaTeX |
-| `photo.jpg` | foto pequeña real |
-| ~~`photo.heic`~~ | ⛔ **NO se commitea. Ver §6.2-bis** — una foto HEIC real es un archivo personal del usuario y no entra en el repo bajo ninguna circunstancia. |
-| `interview.srt` | 6 cues con timestamps |
-| `pdf-paste.txt` + `pdf-paste.expected.txt` | golden del limpiador E1 |
+| `sample-3pages.pdf` | PDF with text layer, 3 pages with well-known phrases ES/EN + titles with size hierarchy |
+| `sample-b.pdf` | second PDF (for merge) |
+| `scanned-2pages.pdf` | PDF **image only** (text rendered at 300 dpi, without text layer) |
+| `scan-es.png`, `scan-en.jpg` | paragraphs rendered at 300 dpi for OCR |
+| `scan-skewed.png` | Idem turned 3° (for C5) |
+| `sample.docx` | Headings, bold, list, table |
+| `sample.epub` | 2 chapters with defined spin |
+| `sample.md`, `sample.html` | with headers, table and a KaTeX formula |
+| `photo.jpg` | real small photo |
+| ~~`photo.heic`~~ | * **DO NOT commit. See §6.2-bis** — a real HEIC photo is a personal user file and does not enter the repo under any circumstances. |
+| `interview.srt` | 6 cues with timestamps |
+| `pdf-paste.txt` + `pdf-paste.expected.txt` | golden cleaner E1 |
 
-### 6.2 Tests unitarios (node --test, patrón esbuild-bundle existente)
+### 6.2 Unit tests (node --test, existing esbuild-bundle pattern)
 
-`test-toolkit-docs.mjs`, `test-toolkit-pdf.mjs`, `test-toolkit-ocr.mjs`,
-`test-toolkit-images.mjs`, `test-toolkit-text.mjs`, `test-toolkit-jobs.mjs`.
+`test-toolkit-docs.mjs`, `test-toolkit-pdf.mjs`, `test-toolkit-ocr.mjs`, `test-toolkit-images.mjs`,
+`test-toolkit-text.mjs`, `test-toolkit-jobs.mjs`.
 
-- Cada test bundlea el módulo real con esbuild (patrón `test-image-analysis.mjs`),
-  procesa el fixture **de verdad** y aserta **contenido del resultado** (texto
-  extraído, nº de páginas, dimensiones, hashes), jamás la mera existencia del archivo.
-- OCR: `langPath` apuntando a una caché (`scripts/.cache/tessdata/`); primera ejecución
-  descarga `spa`/`eng` (tessdata_fast); timeout generoso. Sin red y sin caché el test
-  **falla** — correcto según la regla ("sin procesado real no hay verde"). CI ya tiene
-  red (instala npm).
-- `test-toolkit-jobs.mjs`: semántica de cola — naming anticolisión, cancelación limpia
-  (no deja `.tmp`), progreso monótono, error en un archivo no aborta el lote.
+- Each test loads the actual module with esbuild (pattern`test-image-analysis.mjs`), processes the
+  true **fixture** and serves **content of the result** (text extracted, not from pages, dimensions,
+  hashes), never the mere existence of the archive.
+- OCR:`langPath`pointing to a cache (`scripts/.cache/tessdata/`); first download
+  run`spa`/`eng`(tessdata_fast); generous timeout. Without network and without cached the test
+  **fault** — correct according to the rule ("without actual processing there is no green"). IC
+  already has network (install npm).
+- `test-toolkit-jobs.mjs`: tail semantics — anti-collision naming, clean cancellation (does not
+  leave`.tmp`), monotonous progress, error in a file does not abort the lot.
 
-### 6.2-bis HEIC: verificación local, nunca una fixture
+### 6.2-bis HEIC: local verification, never a fixture
 
-**Regla dura: ninguna foto real del usuario entra en el repo.** Un HEIC de verdad es
-un archivo personal (lleva metadatos de dispositivo, fecha y posiblemente GPS), y
-además el repo es público. No se commitea ni se sube a GitHub de ningún modo.
+**Hard rule: no real photo of the user enters the repo.** A real HEIC is a personal file (carrying
+device metadata, date and possibly GPS), and also the repo is public. It is not committed or
+uploaded to GitHub in any way.
 
-Eso choca con la regla "sin procesado real no hay verde", porque un HEIC real no se
-puede generar en CI (no hay codificador HEIC en las dependencias). Se resuelve como
-ya hace el repo con Whisper y otros recursos pesados: un script `verify-*` manual,
-no un test de `npm test`.
+That clashes with the rule "without actual processing there is no green", because a real HEIC cannot
+be generated in IC (there is no HEIC encoder in dependencies). It resolves as the repo already does
+with Whisper and other heavy resources: a script`verify-*`manual, not a test of`npm test`.
 
-- `scripts/verify-toolkit-heic.mjs` (patrón de `verify-study-whisper.mjs`), invocado
-  como `npm run verify:toolkit-heic -- /ruta/a/una/foto.HEIC`, o vía la variable
-  `NODUS_HEIC_FIXTURE`. Procesa el archivo REAL y aserta el resultado (decodifica,
-  dimensiones correctas, JPEG/PNG de salida válido). Si no se le pasa archivo, falla
-  con un mensaje que explica cómo aportarlo — nunca se salta en silencio.
-- En `npm test`/CI, D2 se cubre solo en su parte determinista: detección de HEIC por
-  magic bytes / marca `ftyp` (fixture sintética mínima de unas decenas de bytes,
-  construida en el propio test, sin ser una foto), y el mensaje de error cuando el
-  decodificador no está disponible.
-- La conversión HEIC no se da por terminada hasta que `verify:toolkit-heic` pasa en
-  local contra una foto real de iPhone. El usuario aporta el archivo desde fuera del
-  repo; el plan no lo referencia por ruta dentro del árbol.
+- `scripts/verify-toolkit-heic.mjs`(pattern of`verify-study-whisper.mjs`), invoked as`npm run
+  verify:toolkit-heic -- /path/to/a/photo.HEIC`, or via the `NODUS_HEIC_FIXTURE` variable. Process
+  the REAL file and file the result (decode, correct dimensions, valid output JPEG/PNG). If you do
+  not pass file, it fails with a message that explains how to contribute it — you never skip
+  silently.
+- In`npm test`/CI, D2 is covered only in its deterministic part: detection of HEIC by magic bytes /
+  brand`ftyp`(minimum synthetic fixture of a few dozen bytes, built on the test itself, without
+  being a photo), and error message when the decoder is not available.
+- The HEIC conversion is not terminated until`verify:toolkit-heic`it happens locally against an
+  actual iPhone photo. The user provides the file from outside the repo; the plan does not reference
+  it by path within the tree.
 
-### 6.3 e2e (app real)
+### 6.3 e2e (actual app)
 
-`scripts/e2e-toolkit.mjs` (patrón `e2e-smoke.mjs`: Electron real + playwright-core +
-perfil desechable):
-1. Sidebar muestra "Herramientas"; el hub renderiza 3 tarjetas con igual tamaño y las
-   dos "Próximamente" no navegan.
-2. Entrar a Nodus Convert, cargar `sample.md`, ejecutar **MD → PDF real**
-   (`printToPDF`), asertar que el PDF de salida existe y que pdfjs extrae el texto
-   esperado (cubre A5, imposible en unit).
-3. Volver al hub con el botón atrás; sin errores no capturados en consola.
+`scripts/e2e-toolkit.mjs`(pattern`e2e-smoke.mjs`: Electron real + playwright-core + disposable
+profile:
+1. Sidebar displays "Tools"; the hub renders 3 cards of equal size and the two "nextly" do not
+   navigate.
+2. Enter Nodus Convert, load`sample.md`, run **MD → real PDF** (`printToPDF`), assert that the
+   output PDF exists and that pdfjs extracts the expected text (covers A5, impossible in unit).
+3. Return to hub with the back button; no errors not captured in console.
 
-⚠️ Landmine conocida: `test:e2e` **no** rebuidea — ejecutar `npm run build` antes o el
-dist obsoleto da falsos rojos.
+Landmine known:`test:e2e`**no** rebuidea — execute`npm run build`before or the obsolete dist gives
+false reds.
 
-### 6.4 Puertas de calidad por PR
+### 6.4 Quality doors per PR
 
-`npm run typecheck` + `npm run lint` + `npm test` + e2e afectado, más el checklist de
-diseño de §3 revisado en ambos temas (dark/light) y capturas en el PR.
+`npm run typecheck` + `npm run lint` + `npm test`+ e2e affected, plus the revised §3 design
+checklist on both themes (dark/light) and catches in the PR.
 
 ---
 
-## 7. Fases de implementación
+## 7. Implementation phases
 
-Cada fase termina con la suite completa en verde y es mergeable por sí sola.
+Each phase ends with the complete suite in green and is mergeable on its own.
 
-**F0 — Sección y hub** ✅ **COMPLETADA** (2026-07-17)
-`View 'toolkit'`, grupo nav `tools` (tras Escribir, antes de Ajustes), iconos
-`tools`/`swap`/`scanText`, `ToolkitView` con hub de 3 tarjetas + sub-navegación +
-volver, HeaderAction en el top bar (tras Asistente), i18n completa (5 tablas),
-documentación de Nodi actualizada con el estado real. Tests: `test-toolkit-ui.mjs`
-(8 casos) + paso del hub en `e2e-smoke.mjs` que mide en el shell real que las tres
-tarjetas tienen dimensiones idénticas, que el glifo está centrado en su loseta
-(±0,5 px), que las tarjetas "Próximamente" no navegan y que el botón volver regresa.
-Verificado además con capturas en tema oscuro y claro. Suite: 388/388 + e2e en verde.
+**F0 — Section and hub** **COMPLETATE** (2026-07-17)`View 'toolkit'`, nav group`tools`(after
+writing, before Settings), icons`tools`/`swap`/`scanText`, `ToolkitView`with 3-card hub +
+sub-navigation + back, HeaderAction in top bar (after Wizard), i18n complete (5 tables), Nodi
+documentation updated with actual status. Tests:`test-toolkit-ui.mjs`(8 cases) + passage of hub
+in`e2e-smoke.mjs`which measures in the real shell that the three cards have identical dimensions,
+that the glyph is centered on its slab (±0.5 px), that the cards "nextly" do not navigate and that
+the return button returns. Also verified with catches in dark and clear theme. Suite: 388/388 + e2e
+in green.
 
-Notas de lo aprendido en F0:
-- La paleta de comandos ya expone la sección automáticamente: recorre `NAV_ITEMS`
-  filtrando por tipo de vault, así que no hizo falta añadir un comando a mano.
-- `'Nodus Toolkit'` YA existía como clave i18n (viene del roadmap); duplicarla rompe
-  el typecheck (TS1117). Antes de añadir claves, comprobar si ya existen.
-- El nombre de marca de la 3.ª herramienta se alineó con el roadmap: **OCR Workspace**
-  (no "AI OCR"), que es como ya se anuncia en `NODUS_ROADMAP`.
+Notes from what you learned in F0:
+- The command palette displays the section automatically:`NAV_ITEMS`filtering by type of vault, so
+  you didn't need to add a command by hand.
+- `'Nodus Toolkit'`YA existed as a key i18n (comes from roadmap); duplicating it breaks the
+  typecheck (TS1117). Before adding keys, check if they already exist.
+- The brand name of the 3rd tool was aligned with the roadmap: **OCR Workspace** (not "AI OCR"),
+  which is as already announced in`NODUS_ROADMAP`.
 
-**F1 — Motor de jobs** *(spike primero)*
-Spike: canvas+tesseract+pdfjs dentro de worker_thread en macOS (y CI Linux). Después:
-`toolkitTypes`, `toolkitWorker`, `toolkitJobs`, IPC + preload, política de salida,
-`startBackgroundJob` en renderer. Tests: `test-toolkit-jobs.mjs`.
-**DoD**: un job dummy multi-archivo con progreso y cancelación, main thread libre
-(ventana responde durante el job).
+**F1 — Job engine** *(spike first)* Spike: canvas+tesseract+pdfjs within worker_thread on macOS (and
+CI Linux). Then:`toolkitTypes`, `toolkitWorker`, `toolkitJobs`, IPC + preload, exit
+policy,`startBackgroundJob`Tests:`test-toolkit-jobs.mjs`. **DoD**: a job dummy multi-archive with
+progress and cancellation, main thread free (window responds during the job).
 
-**F2 — Utilidades PDF (B1–B7)** + categoría "PDF" en la UI. `test-toolkit-pdf.mjs`.
+**F2 — PDF Utilities (B1–B7)** + category "PDF" in the UI.`test-toolkit-pdf.mjs`.
 
-**F3 — Documentos (A1–A7)** + categoría "Documentos". `test-toolkit-docs.mjs` +
-e2e MD→PDF.
+**F3 — Documents (A1–A7)** + category "Documents".`test-toolkit-docs.mjs`+ e2e MD→PDF.
 
-**F4 — OCR ligero (C1–C4)** + categoría "OCR" + gestor de idiomas con consentimiento.
-`test-toolkit-ocr.mjs`. El PDF buscable (C3) es el buque insignia — priorizarlo.
+**F4 — Light OCR (C1–C4)** + category "OCR" + language manager with consent.`test-toolkit-ocr.mjs`.
+The searchable PDF (C3) is the flagship — prioritize it.
 
-**F5 — Imágenes (D1–D4)** + dep `heic-decode` + spike AVIF. `test-toolkit-images.mjs`.
-D2 se cierra con `npm run verify:toolkit-heic` en local contra una foto real del
-usuario (§6.2-bis); esa foto no se commitea jamás.
+**F5 — Images (D1–D4)** + dep`heic-decode`+ AVIF spy.`test-toolkit-images.mjs`D2 closes with`npm run
+verify:toolkit-heic`in local against a real photo of the user (§6.2-bis); that photo is never
+committed.
 
-**F6 — Texto (E1–E4)** + categoría "Texto". `test-toolkit-text.mjs` (goldens).
+**F6 — Text (E1-E4)** + category "Text".`test-toolkit-text.mjs`(goldens).
 
-**F7 — Pulido y release**
-Drag & drop de carpetas, trabajos recientes, estados vacíos, roadmap→hecho, What's New,
-documentación de Nodi, capturas para la web/README, release notes (inglés, política
-habitual). Fases tardías pendientes: B8, C5, categoría F (citas/datos), contact sheet.
+**F7 — Polished and released** Drag & drop folders, recent works, empty states, roadmap→made, What's
+New, Nodi documentation, web/README captures, release notes (English, usual policy). Late pending
+phases: B8, C5, category F (dates/data), contact sheet.
 
-Orden F2 antes que F3 a propósito: pdf-lib puro es el terreno más firme para validar el
-motor de F1 antes de meter mammoth/turndown/printToPDF.
+Order F2 before F3 by the way: pure pdf-lib is the firmest ground to validate the F1 engine before
+inserting mammoth/turndown/printToPDF.
 
 ---
 
-## 8. Riesgos y mitigaciones
+## 8. Risks and mitigations
 
-| Riesgo | Mitigación |
+| Risk | Mitigation |
 |---|---|
-| Nativos (@napi-rs/canvas) o tesseract fallan dentro de worker_threads en alguna plataforma | Spike en F1; plan B `utilityProcess`; plan C troceo asíncrono en main (último recurso) |
-| AVIF no soportado por el canvas | Spike en F5; si no, ocultar AVIF del select (el registro de operaciones lo permite) |
-| Descarga de traineddata (única red) sorprende al usuario | Opt-in explícito reutilizando el copy de `ocrEnabled`; caché persistente; gestor de idiomas visible |
-| Fidelidad MD/HTML→PDF (no es Word) | Etiquetar como "re-maquetación con estilo Nodus"; nunca prometer fidelidad DOCX→PDF |
-| EPUBs reales malformados | adm-zip tolerante + spine fallback a orden de archivos; test adicional con un EPUB real descargado en F7 |
-| PDFs grandes → memoria | Proceso página a página, sin cargar rasterizados completos; progreso por página |
-| Cadenas i18n nuevas rompen `test-i18n-coverage` | Traducciones dentro de cada fase, no al final |
+| Native (@napi-rs/canvas) or Tesseract fail within worker_threads on some platform | Spike in F1; plan B`utilityProcess`; plan C asynchronous cut in main (last resort) |
+| AVIF not supported by canvas | Spike in F5; if not, hide select AVIF (the transaction log allows) |
+| Download Traineddata (one network) surprises the user | Opt-in explicit reusing copy from`ocrEnabled`; persistent cache; visible language manager |
+| Fidelity MD/HTML→PDF (not Word) | Tag as "Nodus-style re-layout"; never promise fidelity DOCX→PDF |
+| Malformed real EPUBs | adm-zip tolerant + spin fallback in order of files; additional test with a real EPUB downloaded in F7 |
+| Big PDFs → memory | Page-to-page process, without loading full rasterized; progress per page |
+| New i18n chains break`test-i18n-coverage` | Translations within each phase, not at the end |
 
-## 9. Fuera de alcance (explícito)
+## 9. Out of range (explicit)
 
-- ffmpeg / audio / vídeo (Whisper ya existe en Study; no se duplica).
-- Binarios nativos por plataforma (Ghostscript, LibreOffice, Calibre).
-- IA en Nodus Convert (determinista; la IA es de AI OCR).
-- Cambios de schema de base de datos (no hay persistencia nueva en DB).
-- PDF Presenter y AI OCR: solo tarjeta "Próximamente"; se diseñan en planes propios.
+- ffmpeg / audio / video (Whisper already exists in Study; does not duplicate).
+- Native binaries per platform (Ghostscript, LibreOffice, Calibre).
+- AI in Nodus Convert (deterministic; AI OCR AI).
+- Database schema changes (no new persistence in DB).
+- PDF Presenter and AI OCR: only "Next" card; designed in own plans.

@@ -1,75 +1,77 @@
-# Plan: modelos locales de extracción + modo "API gratuita"
+# Plan: local extraction models + free "API" mode
 
-Origen: auditoría de lentitud/fallo de análisis con modelos locales (hilo Reddit) + benchmark
-estandarizado (paper 7000 palabras, 5 chunks, `PROMPT_DEEP` real). Datos y veredicto en la memoria
-`model-analysis-benchmark.md`. Todo lo de abajo es de comportamiento **verificado empíricamente**.
+Source: slow/failure analysis audit with local models (reddit thread) + standardized benchmark
+(paper 7000 words, 5 chunks, `PROMPT_DEEP` real). Data and verdict in memory
+`model-analysis-benchmark.md`. Everything below is behavior ** empirically verified**.
 
-## Hechos que fundamentan el plan
+## Facts underlying the plan
 
-- Built-in que **extrae ideas de forma fiable**: solo **Gemma 4 E2B** (20/20, 0 fallos, ~92 s/chunk).
-- Built-in que **extrajo 0 ideas válidas** pese a todas las técnicas (reasoning-off de servidor,
-  json_schema grammar, concisión, presupuesto 16k, penalties): **Qwen3.5-0.8B** y **LFM2.5-VL-1.6B**.
-  Son modelos de **visión/OCR** (`vision:true`). El 0.8B entra en loop de repetición dentro del JSON.
-- Nube: Gemini 2.5 Flash Lite y DeepSeek v4 Flash funcionan bien (reasoning ya se apaga en scans).
-- **Groq free tier**: el límite es tokens/minuto (6k para 8b, 12k para 70b) y cuenta
-  `prompt + max_tokens`. Un chunk (~4.8k prompt) + `max_tokens:8000` = ~12.8k → "Request too large".
-- **OpenRouter**: modelos `:free` limitan por requests/min (~20) y req/día.
+- Built-in that ** extracts ideas reliably**: only **Gemma 4 E2B** (20/20, 0 bugs, ~92 s/chunk).
+- Built-in that ** extracts 0 valid ideas** despite all the techniques (server soning-off,
+  json_schema grammar, conciseness, budget 16k, penalties): **Qwen3.5-0.8B** and **LFM2.5-VL-1.6B**.
+  They are models of **vision/OCR** (`vision:true`). The 0.8B enters in repeat loop within the JSON.
+- Cloud: Gemini 2.5 Flash Lite and DeepSeek v4 Flash work well (reasoning is already turned off on
+  scanners).
+- **Groq free tier**: the limit is tokens/minute (6k for 8b, 12k for 70b) and counts `prompt +
+  max_tokens`. A chunk (~4.8k prompt) + `max_tokens:8000` = ~12.8k → "Request too large".
+- **OpenRouter**: models `:free` limit by request/min (~20) and req/day.
 
-## Parte A — Modelos locales built-in
+## Part A — Local built-in models
 
-### A1. Clasificar modelos por aptitud para extracción
-`shared/localAiModels.ts`: añadir a `NodusLocalModelDefinition` un flag de aptitud, p.ej.
-`supportsExtraction?: boolean` (o `roles`). Valores:
-- `gemma-4-e2b-q4`: apto (true).
-- `qwen3.5-0.8b-q4`, `lfm2.5-vl-1.6b-q4`: NO apto (false) — siguen aptos para chat/visión/imagen.
-- Helper `nodusModelSupportsExtraction(id)` reutilizable en main y renderer.
+### A1. Sorting models by aptitude for extraction
+`shared/localAiModels.ts`: add to `NodusLocalModelDefinition` an aptitude flag, e.g.
+`supportsExtraction?: boolean` (or `roles`). Values:
+- `gemma-4-e2b-q4`: fit (true).
+- `qwen3.5-0.8b-q4`, `lfm2.5-vl-1.6b-q4`: NOT fit (false) — still fit for chat/vision/image.
+- Helper `nodusModelSupportsExtraction(id)` reusable in main and renderer.
 
-### A2. Bloquear + avisar en la UI de selección
-- Los roles de **extracción** (`extractionModel`) y **modelo genérico del modo básico**
-  (`synthesisModel` en modo básico) NO permiten elegir un modelo con `supportsExtraction:false`.
-- Al intentar seleccionarlo para ese rol: **aviso** explicando el porqué (tiende a divagar / no
-  cierra JSON; es un modelo de visión) y sugiriendo Gemma. Reutilizar el patrón de aviso existente.
-- Los roles de chat/visión/imagen/embedding NO se tocan: esos modelos siguen elegibles ahí.
-- El bloqueo es genérico (por capacidad del modelo), no exclusivo de 'nodus': si algún día otro
-  provider marca un modelo como no-extractor, aplica igual.
+### A2. Lock + alert in the selection UI
+- The roles of **extraction** (`extractionModel`) and **generic model in basic mode**
+  (`synthesisModel` in basic mode) do NOT allow to choose a model with `supportsExtraction:false`.
+- When trying to select him for that role: **notice** explaining why (he tends to wander/does not
+  close JSON; he is a vision model) and suggesting Gemma. Reusing the existing warning pattern.
+- Chat/vision/image/embedding roles are NOT played: those models are still eligible there.
+- The lock is generic (by capacity of the model), not exclusive to 'nodus': if one day another
+  provider marks a model as non-extractor, it applies the same.
 
-### A3. Gemma como extractor local por defecto
-- `shared/onboardingModels.ts` / `OnboardingModelStep`: cuando se sugiere un modelo local de texto
-  para el modo básico/extracción, sugerir `gemma-4-e2b-q4` (no el primero de la lista, que es Qwen).
-- Mantener a Qwen como opción ligera solo para chat/visión.
+### A3. Gemma as local extractor by default
+- `shared/onboardingModels.ts` / `OnboardingModelStep`: When a local text model is suggested for the
+  basic/extract mode, suggest `gemma-4-e2b-q4` (not the first one in the list, which is Qwen).
+- Keep Qwen as a light option for chat/vision only.
 
-### A4. `--reasoning off` en el servidor de chat built-in (accionable, ver A5)
-- `electron/ai/nodusLocalAi.ts`: el binario b10002 soporta `--reasoning off`. Apaga el thinking de
-  forma fiable (el campo de request `enable_thinking:false` es un bug conocido). Neutro para Gemma.
+### A4. `--reasoning off` on the built-in chat server (actionable, see A5)
+- `electron/ai/nodusLocalAi.ts`: the binary b10002 supports `--reasoning off`. It reliably turns off
+  the thinking (the request field `enable_thinking:false` is a known bug).
 
-### A5. Toggle "optimizar modelo local" (accionable, desactivado por defecto)
-- Setting booleano nuevo, off por defecto. Cuando ON, para provider local: `--reasoning off` +
-  sufijo de concisión + presupuesto de salida ampliado. Pensado para modelos de razonamiento que el
-  usuario cargue en Ollama/LM Studio (deepseek-r1, qwen3…), donde sí ayuda.
+### A5. Toggle "optimize local model" (actionable, disabled by default)
+- Setting boolean new, off by default. When ON, for local provider: `--reasoning off` + concision
+  suffix + expanded output budget. Thought for reasoning models that the user loads to Ollama/LM
+  Studio (deepseek-r1, qwen3...), where it does help.
 
-## Parte B — Otros proveedores
+## Part B — Other suppliers
 
-### B1. Reasoning apagado en scans (revisión)
-`electron/ai/providers.ts` `reasoningBody`: ya apaga reasoning para openrouter/gemini/openai/
-deepseek/xiaomi cuando `effort==='off'` (el default de `completeJson`). Revisar `groq`/`cerebras`
-(hoy `{}`): añadir apagado explícito donde el modelo lo soporte (p.ej. `reasoning_effort` en gpt-oss).
+### B1. Reasoning off in scan (revision)
+`electron/ai/providers.ts` `reasoningBody`: already switches off reasoning for
+openrouter/gemini/openai/ deepseek/xiaomi when `effort==='off'` (the default of `completeJson`).
+Check `groq`/`cerebras` (now `{}`): add explicit shutdown where the model supports it (e.g.
+`reasoning_effort` in gpt-oss).
 
-### B2. Checkmark "usar API gratuita" por proveedor (Groq/OpenRouter)
-- Setting nuevo `providerFreeTier?: Partial<Record<AiProvider, boolean>>`, default `{}`, en
-  `SHARED_MODEL_KEYS` (compartido entre vaults, como las API keys).
-- UI: checkbox por proveedor en `ProvidersSettings` (ProviderRow) y en el onboarding, para
-  proveedores con free tier real (groq, openrouter). Off por defecto.
-- Efecto en `aiClient` cuando el provider del modelo está marcado free (si no, comportamiento normal):
-  - **Groq**: capar `max_tokens` para que `prompt + max_tokens ≤ TPM` del modelo (tabla conservadora
-    por modelo/límite), y **backoff en 429** leyendo `retry-after`/`x-ratelimit-reset-tokens`.
-  - **OpenRouter**: **backoff en 429** + throttle suave de req/min.
-  - Pieza común: manejar 429 con espera y reintento (hoy `completeJson` aborta en fallos de
-    transporte; añadir reintento con backoff SOLO cuando free-tier activo).
+### B2. Checkmark "use free API" per provider (Groq/OpenRouter)
+- Setting new `providerFreeTier?: Partial<Record<AiProvider, boolean>>`, default `{}`, in
+  `SHARED_MODEL_KEYS` (shared between valves, such as API keys).
+- UI: checkbox per provider in `ProvidersSettings` (ProviderRow) and onboarding, for suppliers with
+  real freetier (groq, openrouter). Off by default.
+- Effect on `aiClient` when the provider of the model is marked free (if not, normal behavior):
+  - **Groq**: capper `max_tokens` so that `prompt + max_tokens ≤ TPM` of the model (conservative
+    table per model/limit), and **backoff in 429** reading `retry-after`/`x-ratelimit-reset-tokens`.
+  - **OpenRouter**: **backoff at 429** + soft req/min throttle.
+  - Common part: handle 429 with waiting and retrying (today `completeJson` aborts transport
+    failures; add retry with backoff ONLY when free-tier active).
 
-## Verificación
+## Verification
 1. `tsc --noEmit` + build.
-2. Test de cobertura i18n (5 idiomas) para claves nuevas.
-3. Benchmark parcial (1 chunk) y luego completo (7000 palabras) de los modelos afectados:
-   Gemma (debe seguir 20/20), Qwen/LFM (deben quedar BLOQUEADOS para extracción en UI), Groq free
-   (debe COMPLETAR sin "Request too large"), OpenRouter free. No repetir Gemini 2.5/DeepSeek/llama-OR.
-4. Regenerar la tabla comparativa.
+2. i18n (5 languages) coverage test for new keys.
+3. Partial (1 chunk) and then complete (7000 words) of the affected models: Gemma (must follow
+   20/20), Qwen/LFM (must be LOCKED FOR UI extraction), Groq free (must COMPLETE without "Request
+   too large"), OpenRouter free. Do not repeat Gemini 2.5/DeepSeek/call-OR.
+4. Regenerate the comparative table.

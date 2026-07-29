@@ -1,135 +1,130 @@
-# Fallos que ya han costado tomas
+# Judgements that have already cost shots
 
-Todo lo de aquí ocurrió de verdad haciendo los cuatro primeros tutoriales. Están
-ordenados por lo caro que salió cada uno. Léelo antes de grabar.
+Everything here really happened by doing the first four tutorials. They are ordered by how expensive
+each one came out. Read it before recording.
 
 ---
 
-## 1. Lo que tapa la app y se traga los clics
+## 1. What covers the app and swallows the clicks
 
-Un modal abierto convierte cada clic siguiente en un no-op **silencioso**: la
-grabación termina, informa de éxito, y son veinte planos de un fondo gris.
+An open modal turns each next click into a non-op **silent**: the recording ends, reports success,
+and is twenty plans of a grey background.
 
-| Qué lo abría | Cómo se calla |
+| Open it. | How he shuts up |
 |---|---|
-| Modal de Novedades | `localStorage['nodus.lastSeenVersion']` = la versión real. Se abre cuando difiere; poner `'9999.0.0'` lo abre siempre, no lo cierra |
-| Modal de actualización al arrancar | `sessionStorage['nodus.startupUpdateChecked'] = '1'`. `NODUS_E2E_UPDATE_STATUS` **no** basta |
-| Asistente de recuperación | `recoverySetupVersion: 9999`. Lo destapa `basicsTutorialVersion: 9999` |
-| Elección de Nodi | `mascotStyleChosen: true` |
-| Aviso de copias de seguridad | clic en `.backup-health-dismiss` |
+| Modal de Novedades | `localStorage['nodus.lastSeenVersion']` = the actual version. It opens when it differs; putting `'9999.0.0'` always opens it, does not close it |
+| Update mode when booting | `sessionStorage['nodus.startupUpdateChecked'] = '1'`. `NODUS_E2E_UPDATE_STATUS` **not** enough |
+| Recovery Wizard | `recoverySetupVersion: 9999`. Uncovers `basicsTutorialVersion: 9999` |
+| Election of Nodi | `mascotStyleChosen: true` |
+| Backup Notice | click on `.backup-health-dismiss` |
 
-El motor ya hace todo esto (`BASE_SETTINGS`) y además **se niega a filmar** si algo
-grande cubre la app al arrancar.
+The engine already does all this (`BASE_SETTINGS`) and also ** refuses to film** if something big
+covers the app when it starts.
 
-## 2. Cerrar un modal: no adivines su botón
+## 2. Close a modal: do not guess your button
 
-Tres intentos seguidos fallaron y los tres informaron de éxito:
+Three successive attempts failed and all three reported success:
 
-- Clic en (24, 24) para "dar al fondo" → cae en los **botones de ventana de macOS**.
-- `button:has-text("✕")` → engancha el chip de monitorización, no el modal.
-- Comprobar el cierre en un punto tapado por el propio fondo → `closest('[role=dialog]')`
-  del fondo es `null`, así que "no hay diálogo".
+- Click on (24, 24) to "give to the bottom" → falls on the **macOS window buttons**.
+- `button:has-text("✕")` → engages the monitoring chip, not the modal.
+- Checking the closure at a point covered by the background itself → `closest('[role=dialog]')` from
+  the background is `null`, so "there is no dialogue".
 
-Lo que funciona, y está en `closeAnyDialog`: buscar la capa fija a pantalla completa
-con `z-index ≥ 40` y, dentro, **un botón pequeño cerca de su borde superior**. Se
-busca por **forma**, no por texto: el ✕ suele ser un SVG con `textContent` vacío.
+What works, and is in `closeAnyDialog`: Find the layer fixed to full screen with `z-index ≥ 40` and,
+inside, **a small button near its top edge**. Searched by **form**, not by text: the ☆☆☆☆☆ is
+usually an SVG with `textContent` empty.
 
-## 3. La IA "no funciona" y la app miente sobre por qué
+## 3. The AI "does not work" and the app lies about why
 
-Síntoma: el escaneo se pausa con *"This message could not be translated"*.
-Causa real: `Falta la clave de IA para gemini`.
+Symptom: Scan is paused with *"This message could not be translated"*. Real cause:
+`Missing AI key for Gemini`.
 
-Nodus cifra las claves con `safeStorage`, pero descifrarlas pide permiso al Llavero
-y **nadie lo concede** en una sesión automatizada. La UI dice "clave guardada" y el
-motor no puede leerla. La salida: escribir el archivo en formato legible.
+Nodus encrypts the keys with `safeStorage`, but decrypting them asks permission from the Keychain
+and **nobody grants it** in an automated session. The UI says "saved key" and the engine cannot read
+it. The output: write the file in readable format.
 
 ```js
 await writeFile(path.join(userData, 'secrets', `ai_key_${provider}.bin`),
   `b64:${Buffer.from(key, 'utf8').toString('base64')}`, 'utf8');
 ```
 
-El motor refleja el `stderr` del proceso principal para que el motivo real se vea.
+The engine reflects the `stderr` of the main process so that the actual motif is seen.
 
-## 4. El aislamiento del perfil es una ilusión si no copias el vault
+## 4. Profile isolation is an illusion if you don't copy the Vault
 
-`vaults.json` guarda la **ruta absoluta** de la base de datos del vault. Copiar el
-perfil copia el puntero, no el vault: todas las tomas leen y escriben el mismo
-archivo, y el estado se filtra de una a otra. Así apareció un vault ya emparejado con
-Nodus Server, sin formulario de conexión, en una toma que debía empezar limpia.
+`vaults.json` saves the **absolute path** of the Vault database. Copying the profile copies the
+pointer, not the vault: all the shots read and write the same file, and the status is filtered from
+one to the other. Thus a Vault already paired with Nodus Server appeared, without a connection form,
+in a shot that had to start clean.
 
-El motor copia el vault y reescribe el registro. Si añades otro almacén, comprueba si
-también guarda rutas absolutas.
+The engine copies the Vault and rewrites the log. If you add another store, check to see if it also
+saves absolute routes.
 
-## 5. Esperar a que termine un trabajo: un instante de calma no es el final
+## 5. Waiting for a job to end: an instant of calm is not the end
 
-El escaneo encadena fases (ligera, profunda, resumen, embeddings, pasajes, puentes) y
-cada una encola la siguiente. Un `done >= total` momentáneo entre dos fases **es
-idéntico a haber terminado**. Filmar ahí da un grafo vacío.
+Scanning chains phases (light, deep, summary, embeddings, passages, bridges) and each glues the next
+one. A momentary `done >= total` between two phases **is identical to having finished**. Filming
+there gives an empty graph.
 
-Exige calma **sostenida**: 20 sondeos de 3 s (un minuto). 21 segundos no bastaron.
+It demands calm **sustained**: 20 surveys of 3 s (one minute). 21 seconds were not enough.
 
-Y el reverso: una cola que sigue vacía a los 45 s es un trabajo terminado, no uno
-pendiente. Sin esa salida, un temporizador posterior se queda 45 minutos filmando una
-app quieta.
+And the reverse: a queue that remains empty at 45 s is a finished job, not a slope. Without that
+output, a subsequent timer stays 45 minutes filming a still app.
 
-## 6. Elementos que existen aunque no se vean
+## 6. Elements that exist but are not visible
 
-Los botones del menú radial de Nodi (`.nodi-node`) están en el DOM **abierto o
-cerrado**: cerrados se apilan bajo el orbe. Contarlos para saber si el menú está
-abierto siempre da "abierto", nunca se abre, y cada clic cae sobre el orbe.
+The buttons in the Nodi radial menu (`.nodi-node`) are in the DOM **open or closed**: closed are
+stacked under the orb. Counting them to know if the menu is always open gives "open", never opens,
+and each click falls on the orb.
 
-Mira el estado (`.nodi-node.open`), no la existencia. Y prefiere identificadores
-estables (`[data-nodi-action="chat"]`) a posiciones.
+Look at the state (`.nodi-node.open`), not the existence. And prefer stable identifiers
+(`[data-nodi-action="chat"]`) to positions.
 
-## 7. `data-testid` no siempre envuelve lo que parece
+## 7. `data-testid` does not always wrap what it looks like
 
-`[data-testid="mcp-settings-card"]` envuelve solo la cajita de ChatGPT; la casilla y
-los botones de MCP son **hermanos** suyos. Buscar dentro del testid da cero casillas y
-un solo botón. Lo correcto: `section.card:has([data-testid="mcp-settings-card"])`.
+`[data-testid="mcp-settings-card"]` wraps only the ChatGPT box; the box and the MCP buttons are
+**hermans** yours. Search within the testid gives zero boxes and one button. The correct thing:
+`section.card:has([data-testid="mcp-settings-card"])`.
 
-## 8. Guardas que no comprueban nada
+## 8. Guards that check nothing
 
-- Medir el **texto de la página** para saber si una búsqueda funcionó: la página
-  siempre es larga, así que pasa aunque no se haya escrito nada. Comprueba
-  `inputValue()`.
-- Registrar `current.state` cuando `current` solo trae `{title, kind}`: un escaneo en
-  marcha se lee como parado.
-- Un ayudante que no verifica su efecto deja que la toma "triunfe" con el fallo
-  dentro. Cada ayudante debe afirmar lo que hizo y avisar si no lo hizo.
+- Measure the **text of the page** to see if a search worked: the page is always long, so it happens
+  even if nothing has been written. Check `inputValue()`.
+- Register `current.state` when `current` only brings `{title, kind}`: a running scan is read as
+  stopped.
+- An assistant who does not verify its effect lets the take "triunfe" with the fault inside. Each
+  assistant must affirm what he did and warn if he did not.
 
-## 9. El idioma de la IA es un ajuste aparte
+## 9. The AI language is a separate setting
 
-`uiLanguage` **no** arrastra a `promptLanguage`, que viene en español por defecto. Con
-interfaz en inglés, todas las ideas extraídas salieron en español. Solo se ve mirando
-fotogramas. `BASE_SETTINGS` ya fija los dos.
+`uiLanguage` **no** drags to `promptLanguage`, which comes in default Spanish. With English
+interface, all the ideas extracted came out in Spanish. You can only see frames. `BASE_SETTINGS`
+already fixes the two.
 
-## 10. La cámara apunta fuera de pantalla
+## 10. The camera points off-screen
 
-`boundingBox()` devuelve coordenadas de elementos que están bajo el pliegue, y el
-zoom se va a un hueco vacío. Hay que hacer `scrollIntoViewIfNeeded` y comprobar
-visibilidad antes de medir.
+`boundingBox()` returns coordinates of elements under the fold, and the zoom goes to an empty slot.
+You have to do `scrollIntoViewIfNeeded` and check visibility before measuring.
 
-## 11. ffmpeg: `crop` no anima
+## 11. ffmpeg: `crop` does not animate
 
-`crop` evalúa `w`/`h` una sola vez: no hay movimiento de cámara. Lo que sí anima es
-`zoompan`.
+`crop` evaluates `w`/`h` once: there is no camera movement. What it does animates is `zoompan`.
 
-## 12. Difuminar de más es tan malo como difuminar de menos
+## 12. More blurring is as bad as blurring less.
 
-Tapar el elemento entero dejó ilegible todo el bloque de configuración de Claude
-Desktop, porque el token vive dentro. Envuelve **solo** los caracteres del secreto en
-un `<span>` propio (ver `TOKEN_BLUR` en el mazo `mcp`).
+Covering the entire element left unreadable the entire configuration block of Claude Desktop,
+because the token lives inside. It wraps **only** the characters of the secret in an own `<span>`
+(see `TOKEN_BLUR` in the mallet `mcp`).
 
-Y al revés: una regla de difuminado que no encaja con el marcado **no da error**. En
-una toma quedaron legibles todas las colecciones de Zotero del usuario porque la
-regla buscaba dentro de un `[role="dialog"]` que ese modal no tiene. Compruébalo
-mirando fotogramas.
+And the other way around: a blur rule that doesn't fit the **mark makes no mistake**. In one shot
+all the user's Zotero collections were read because the rule looked within a `[role="dialog"]` that
+modal doesn't have. Check it by looking at frames.
 
-## 13. `window.nodus` no admite reasignación
+## 13. `window.nodus` does not support reassignment
 
-Viene del *contextBridge*. Sobrescribir `window.nodus.nodiChatStream` desde la página
-falla **en silencio** y responde el modelo de verdad — con su coste. Para guionizar
-una respuesta hay que sustituir el manejador IPC en el **proceso principal**:
+It comes from *contextBridge*. Overwrite `window.nodus.nodiChatStream` from the page fails **in
+silence** and responds to the true model — at its cost. To script a response you have to replace the
+IPC handler in the main **process**:
 
 ```js
 await app.evaluate(({ ipcMain }, text) => {
@@ -138,21 +133,19 @@ await app.evaluate(({ ipcMain }, text) => {
 }, answer);
 ```
 
-## 14. La voz y la pantalla se descuadran sin avisar
+## 14. The voice and screen are broken without warning
 
-Casos reales: la voz decía "cada nodo es una idea" mientras se veían 7 temas; y decía
-"Gemini 2.5" con 3.1 en pantalla. Ningún log lo detecta.
+Real cases: the voice said "each node is an idea" while 7 themes were seen; and it said "Gemini 2.5"
+with 3.1 on screen. No log detects it.
 
-Como la narración manda el reloj, **una línea se puede rehacer sin volver a grabar**:
-cambia el texto, vuelve a narrar (solo esa frase, por la caché) y vuelve a montar.
+As the narration commands the clock, **a line can be redone without re-recording**: it changes the
+text, re-narrates (only that phrase, by the cache) and re-assembles.
 
-## 15. Cosas de la tubería que muerden
+## 15. Pipeline things that bite
 
-- **El montaje no reconstruye la app.** Si tocas código de Nodus, `npm run build`
-  antes de grabar.
-- **Cada mazo escribe en su carpeta.** Antes no era así y las tarjetas de un vídeo
-  sobrescribieron el vídeo final de otro.
-- **La caché de voz es por texto.** Sin ella, cambiar una palabra revocaba el mazo
-  entero.
-- **Un aviso en la grabación casi siempre se ve en el vídeo.** No montes con avisos
-  pendientes sin mirar antes ese momento del metraje.
+- **Assembly does not rebuild the app.** If you change Nodus code, run `npm run build` before recording.
+- **Each deck writes in its folder.** Before it was not so and the cards of one video overwrote the
+  final video of another.
+- **The voice cache is for text.** Without it, changing a word overturned the entire deck.
+- **A notice visible in the recording is almost always visible in the video.** Do not assemble with pending notices
+  without looking earlier at that moment of the footage.

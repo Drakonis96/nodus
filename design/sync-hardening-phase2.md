@@ -1,191 +1,185 @@
-# Sincronización: borrados, cifrado y relojes
+# Synchronization: deleted, encrypted and clocks
 
-Propuesta de diseño · 2026-07-19 · continúa `backup-recovery-audit.md`
+Design proposal · 2026-07-19 · continues `backup-recovery-audit.md`
 
-Los tres puntos que quedaron conscientemente fuera de la primera corrección. No son
-independientes: **el mismo mecanismo que hace seguros los borrados hace seguro el sesgo
-de reloj**, así que conviene decidirlos juntos.
-
----
-
-## Principio rector
-
-Hoy la fusión es *newest-wins destructivo*: la versión que pierde la comparación
-desaparece sin dejar rastro. Eso es aceptable cuando los relojes coinciden y nadie borra
-nada; deja de serlo en cuanto una de las dos cosas falla.
-
-La propuesta se apoya en una sola idea:
-
-> **Que la fusión deje de destruir.** Si toda versión perdedora se conserva y se puede
-> recuperar, entonces un reloj mal puesto, un borrado a destiempo o una resolución
-> equivocada dejan de ser pérdida de datos y pasan a ser una decisión revisable.
-
-Con esa base, los tres problemas se vuelven tratables sin reescribir la app.
+The three points that were consciously left out of the first correction. They are not independent:
+**The same mechanism that makes the erased secure makes the clock bias** safe, so it is appropriate
+to decide them together.
 
 ---
 
-## 1 · Borrados (tombstones)
+## Guiding principle
 
-### El comportamiento actual
+Today the fusion is *newest-wins destructive*: the version that loses the comparison disappears
+without leaving a trace. That is acceptable when the clocks match and nobody erases anything; it
+ceases to be as soon as one of the two things fails.
 
-Notas, carpetas, búsquedas, borradores, veredictos y bases de datos se borran en duro.
-Al importar cualquier paquete anterior al borrado, la rama `INSERT` los revive con sus
-marcas originales — y lo repetirá en cada sincronización, en ambos sentidos.
-**No hay forma de borrar nada de manera definitiva entre dos equipos.**
+The proposal is based on a single idea:
 
-Las entidades de estudio son la excepción correcta: usan `deleted_at`, así que el borrado
-es una actualización y se propaga sola.
+> **Let the merger stop destroying.** If every losing version is preserved and can
+> recover, then a misplaced clock, a timeless erasing or a resolution
+> They cease to be data loss and become a reviewable decision.
 
-### Diseño propuesto
+On that basis, the three problems become treatable without rewriting the app.
 
-**Una tabla de lápidas, alimentada por triggers.**
+---
+
+## 1 · Deleted (tombstones)
+
+### Current behaviour
+
+Notes, folders, searches, drafts, verdicts and databases are deleted hard. When importing any
+package prior to deletion, the `INSERT` branch revives them with its original marks — and repeats it
+in each synchronization, in both directions. **There is no way to permanently delete anything
+between two computers.**
+
+Study entities are the correct exception: they use `deleted_at`, so deletion is an update and
+spreads itself.
+
+### Proposed design
+
+**A tablet board, powered by triggers.**
 
 ```sql
 CREATE TABLE sync_tombstones (
   table_name TEXT NOT NULL,
-  row_key    TEXT NOT NULL,          -- clave de identidad serializada
+  row_key    TEXT NOT NULL,          -- serialized identity key
   deleted_at TEXT NOT NULL,
   PRIMARY KEY (table_name, row_key)
 );
 ```
 
-Los triggers se generan **desde el registro de grupos de sync**, no a mano, en cada
-apertura de la base (`ensureTombstoneTriggers()`). Así una tabla nueva queda cubierta por
-el mismo mecanismo que ya obliga a clasificarla, y no hay forma de olvidarse.
+Triggers are generated ** from the recording of sync groups**, not by hand, in each opening of the
+base (`ensureTombstoneTriggers()`). Thus a new table is covered by the same mechanism that already
+forces to classify it, and there is no way to forget.
 
-> Verificado sobre la librería que usa la app: un `DELETE` en cascada **sí** dispara los
-> `AFTER DELETE` de las tablas hijas, con y sin `recursive_triggers`. Los triggers, por
-> tanto, capturan también los borrados en cascada — no hace falta razonar sobre árboles.
+> Checked on the library using the app: a `DELETE` cascaded **yes** shoots the
+> `AFTER DELETE` of the child tables, with and without `recursive_triggers`. The triggers, by
+> so much, they also capture those erased by waterfall — there is no need to reason on trees.
 
-**Reglas de fusión** (last-writer-wins, tratando el borrado como una escritura más):
+**Full Rules** (last-writer-wins, treating the deleted as one more writing):
 
-| Situación | Resultado |
+| Status | Outcome |
 |---|---|
-| Llega una fila desconocida y hay lápida con `deleted_at >= updated_at` | No se inserta. Se borró después de escribirse. |
-| Llega una fila desconocida y hay lápida con `deleted_at < updated_at` | Se inserta y se retira la lápida: el otro equipo la editó *después* del borrado, y esa edición es la última palabra. |
-| Llega una lápida más nueva que la fila local | Se borra la fila local y se guarda la lápida. **La fila borrada va a `sync_superseded`** (§4): un borrado remoto nunca destruye trabajo local sin retorno. |
-| Llega una lápida más antigua que la fila local | Se descarta: la fila se editó después de que el otro la borrara. |
+| An unknown row arrives and there is a tombstone with `deleted_at >= updated_at` | It was deleted after writing. |
+| An unknown row arrives and there is a tombstone with `deleted_at < updated_at` | The tombstone is inserted and removed: the other computer edited it *after* the deletion, and that edition is the last word. |
+| A newer tombstone arrives than the local row | The local row is deleted and the tombstone is saved. **The deleted row goes to `sync_superseded`** (§4): a remote deletion never destroys local work without return. |
+| There comes a tombstone older than the local row | It is discarded: the row was edited after the other one deleted it. |
 
-Las lápidas viajan en el paquete como una tabla más.
+The tombstones travel in the package as one more table.
 
-### El problema real: la recolección de lápidas
+### The real problem: tombstone collection
 
-Una lápida no puede vivir para siempre, y si se recoge antes de que un equipo rezagado
-sincronice, la fila resucita. Es una limitación inherente a la sincronización por
-ficheros, no un descuido.
+A tombstone cannot live forever, and if it is collected before a team lags behind syncs, the row
+resurrects. It is an inherent limitation to file synchronization, not an oversight.
 
-Propuesta: **horizonte de 180 días**, y —esto es lo importante— al importar un paquete
-construido hace más de ese horizonte, **avisar explícitamente** de que los borrados
-antiguos pueden reaparecer. El límite deja de ser una trampa silenciosa y pasa a ser
-información.
+Proposal: ** 180-day horizon**, and — this is important — when importing a package built more than
+that horizon, ** explicitly warn** that old erasers can reappear. The limit ceases to be a silent
+trap and becomes information.
 
 ---
 
-## 2 · Cifrado del `.nodussync`
+## 2 · Encryption of `.nodussync`
 
-### El comportamiento actual
+### Current behaviour
 
-Zip en claro. Contiene cuerpos de notas, documentos de estudio, calificaciones, evidencia
-genealógica y adjuntos. Convive en Ajustes con la copia cifrada por contraseña maestra,
-sin advertir de la asimetría.
+Zip in clear. It contains bodies of notes, study papers, grades, genealogical evidence and
+attachments. It lives in Settings with the copy encrypted by master password, without warning of
+asymmetry.
 
-### Diseño propuesto
+### Proposed design
 
-**Cifrar siempre. Sin casilla de «sin cifrar».** Una opción de conveniencia en claro es
-exactamente el camino por el que se filtran estos ficheros.
+**Always Encrypt. No "unencrypted" box.** A clear convenience option is exactly the way these files
+are filtered.
 
-Reutilizando las primitivas ya auditadas de `backupCrypto.ts` (scrypt N=32768 +
-AES-256-GCM), con un cambio necesario: **derivar la clave una sola vez**, no por entrada.
-scrypt cuesta ~100 ms; aplicado a 500 entradas serían casi un minuto. Se añaden
-`deriveBackupKey()` y `encryptWithKey()/decryptWithKey()` al módulo existente.
+Reusing the already audited primitives of `backupCrypto.ts` (scrypt N=32768 + AES-256-GCM), with a
+necessary change: **derivate the key once**, not per input. scrypt costs ~100 ms; applied to 500
+entries would be almost a minute. `deriveBackupKey()` and `encryptWithKey()/decryptWithKey()` are
+added to the existing module.
 
-**Estructura (formato v3)** — preserva la propiedad que arregló el límite de tamaño:
+**Structure (format v3)** — preserves the property that fixed the size limit:
 
 ```
-manifest.json     ← en claro: formato, versión, fecha, schemaVersion, parámetros KDF
-index.bin         ← cifrado: qué entrada corresponde a cada tabla y a cada blob
+manifest.json     ← plaintext: format, version, date, schemaVersion, KDF parameters
+index.bin         ← encrypted: which entry corresponds to each table and blob
 <id opaco>        ← cifrado: IV(12) ‖ authTag(16) ‖ ciphertext, uno por tabla y por blob
 ```
 
-Cada entrada se cifra por separado con su propio IV. **No hay ningún punto en el que el
-paquete entero exista como un solo búfer**, que es justo lo que hacía imposible
-sincronizar bóvedas grandes. Los nombres de tabla viven en `index.bin` cifrado, así que
-el fichero no revela que contiene, por ejemplo, calificaciones.
+Each entry is encrypted separately with its own IV. **There is no point at which the entire package
+exists as a single buffer**, which is just what made it impossible to synchronize large vaults.
+Table names live in `index.bin` encrypted, so the file does not reveal that it contains, for
+example, ratings.
 
-`schemaVersion` queda fuera a propósito: permite rechazar un paquete de una versión más
-reciente **sin pedir la contraseña**, que es mejor experiencia y no revela nada.
+`schemaVersion` is out on purpose: it allows you to reject a package from a newer version ** without
+asking for the password**, which is better experience and reveals nothing.
 
-### La credencial: aquí está la decisión de diseño
+### The credential: here is the design decision
 
-La exportación manual `.nodus` genera una clave aleatoria de un solo uso. **Para sync eso
-sería un error**: es una operación *recurrente*, y copiar una clave nueva en cada
-exportación se abandona a la tercera vez.
+Manual export `.nodus` generates a random single-use key. **For sync that would be an error**: it is
+a *recurrent* operation, and copying a new key on each export is abandoned the third time.
 
-Tampoco sirve reutilizar la contraseña maestra de copias: tras una restauración con clave
-de recuperación, Nodus **genera una contraseña maestra nueva y aleatoria**, así que los
-dos equipos tendrían credenciales distintas y el sync fallaría sin motivo aparente.
+It is also useless to reuse the master copy password: after a recovery key restoration, Nodus **
+generates a new, random master password**, so the two teams would have different credentials and the
+sync would fail for no apparent reason.
 
-Propuesta: **una «frase de sincronización» propia**, que el usuario fija una vez y
-escribe en ambos equipos. Se guarda con `safeStorage` como las demás. La exportación se
-niega si no está configurada; la importación la usa automáticamente y solo pregunta si no
-descifra. Explícita, estable, sin acoplarse al ciclo de vida de las copias.
+Proposal: **a proper "sync" phrase**, which the user fixes once and writes on both computers. It is
+saved with `safeStorage` like the others. Export is denied if it is not configured; import uses it
+automatically and only asks if it does not decrypt. Explicit, stable, without attaching to the life
+cycle of copies.
 
-Compatibilidad: se siguen **leyendo** paquetes v1 y v2 en claro; solo se **escribe** v3.
-
----
-
-## 3 · Sesgo de reloj
-
-### El comportamiento actual
-
-El ganador se decide comparando `updated_at` como cadenas. Un equipo con el reloj
-atrasado pierde **todas** las comparaciones, siempre, en silencio, y el resumen lo
-presenta como `skipped`, indistinguible de «ya estaba al día».
-
-### Lo que se puede y lo que no se puede detectar
-
-Conviene ser honesto: con paquetes de fichero en un solo sentido **no se puede medir el
-desfase de relojes**. Un paquete con fecha de hace tres días puede ser un paquete
-genuinamente antiguo o un reloj atrasado tres días; no hay forma de distinguirlos sin un
-viaje de ida y vuelta.
-
-Sí es detectable **una** dirección, que además es la peligrosa:
-
-- Fecha del paquete o marcas de fila **en el futuro** respecto al reloj local ⇒ el reloj
-  del emisor va adelantado. Ese equipo ganaría todas las comparaciones.
-
-La dirección contraria (emisor atrasado) es indistinguible de un paquete viejo.
-
-### Diseño propuesto: tres capas
-
-**Capa 1 — detectar lo detectable.** Si el paquete o sus filas vienen del futuro, avisar;
-si el desfase supera las 24 h, exigir confirmación explícita antes de fusionar.
-
-**Capa 2 — comparar sobre una línea temporal común.** Cuando se detecta un adelanto
-consistente, compensar las marcas entrantes por el desfase medido **solo a efectos de
-comparación**, sin reescribir nada, y registrar que se hizo.
-
-**Capa 3 — y esta es la que de verdad resuelve el problema — no destruir nunca al
-perdedor** (§4). Aunque un reloj mal puesto resuelva mal un conflicto, la versión que
-pierde se conserva y se puede recuperar. El sesgo de reloj deja de ser pérdida de datos y
-pasa a ser una resolución subóptima, revisable.
-
-### La alternativa de libro, y por qué no la recomiendo ahora
-
-Lo correcto en teoría son relojes lógicos por fila (Lamport/HLC): cada escritura
-incrementa un contador y la comparación deja de depender del reloj de pared.
-
-El coste real en este código: **una columna nueva en ~60 tablas** y tocar **todas** las
-rutas de escritura de ~70 repositorios, porque hoy cada una hace `updated_at = now()` por
-su cuenta. Es un cambio grande, transversal y con mucha superficie de regresión, para
-resolver un problema que la capa 3 vuelve inofensivo.
-
-Mi recomendación es hacer las tres capas ahora y dejar los relojes lógicos como evolución
-posterior: **`sync_superseded` es precisamente la base sobre la que se construirían**.
+Compatibility: still **read** packages v1 and v2 in clear; only **write** v3.
 
 ---
 
-## 4 · La pieza común: `sync_superseded`
+## 3 · Watch bias
+
+### Current behaviour
+
+The winner is chosen by comparing `updated_at` as strings. A team with the back clock loses **all**
+comparisons, always, silently, and the summary presents it as `skipped`, indistinguishable from
+"already up to date".
+
+### What can and cannot be detected
+
+You should be honest: with one-way file packages ** you can't measure the clock lag**. A
+three-day-old package can be a genuinely old package or a three-day-long clock; there's no way to
+distinguish them without a round trip.
+
+Yes it is detectable ** one** address, which is also the dangerous one:
+
+- Package date or row marks **in the future** with respect to the local clock the transmitter clock
+  is ahead. That team would win all comparisons.
+
+The opposite direction (retarded transmitter) is indistinguishable from an old package.
+
+### Proposed design: three layers
+
+**Capa 1 — detect the detectable.** If the package or its rows come from the future, warn; if the
+lag exceeds 24 h, require explicit confirmation before merging.
+
+**Capa 2 — compare over a common time line.** When a consistent advance is detected, compensate
+incoming marks for the time lag measured **only for comparison purposes**, without rewriting
+anything, and record that it was made.
+
+**Capa 3 — and this is the one that really solves the problem — never destroy the loser** (§4). Even
+if a misplaced watch missolves a conflict, the version that loses is preserved and can be recovered.
+Watch bias ceases to be data loss and becomes a suboptimal, reviewable resolution.
+
+### The book alternative, and why I don't recommend it now
+
+The correct thing in theory is logical clocks per row (Lamport/HLC): each writing increases a
+counter and the comparison ceases to depend on the wall clock.
+
+The actual cost in this code: **a new column in ~60 tables** and touch **all the write paths of ~70
+repositories, because today each makes `updated_at = now()` on its own. It is a big, cross-sectional
+change with a lot of regression surface, to solve a problem that layer 3 becomes harmless.
+
+My recommendation is to make the three layers now and leave the logical clocks as later evolution:
+**`sync_superseded` is precisely the basis on which they would be built**.
+
+---
+
+## 4 · The common piece: `sync_superseded`
 
 ```sql
 CREATE TABLE sync_superseded (
@@ -193,7 +187,7 @@ CREATE TABLE sync_superseded (
   table_name    TEXT NOT NULL,
   row_key       TEXT NOT NULL,
   origin        TEXT NOT NULL,   -- 'incoming-lost' | 'local-overwritten' | 'deleted-remotely'
-  row_json      TEXT NOT NULL,   -- la fila, sin columnas BLOB
+  row_json      TEXT NOT NULL,   -- row, no BLOB columns
   row_stamp     TEXT,
   winner_stamp  TEXT,
   package_date  TEXT,
@@ -201,179 +195,170 @@ CREATE TABLE sync_superseded (
 );
 ```
 
-Se escribe en **tres** situaciones, y la segunda es la más importante:
+It is written in **three** situations, and the second is the most important:
 
-1. La fila entrante pierde y su contenido difiere de la local (`incoming-lost`).
-2. La fila entrante gana y **sobrescribe** trabajo local distinto (`local-overwritten`)
-   ← el caso que hoy destruye trabajo del usuario sin dejar rastro.
-3. Una lápida remota borra una fila local (`deleted-remotely`).
+1. The incoming row loses and its content differs from the local one (`incoming-lost`).
+2. The incoming row wins and **overwrites** different local work (`local-overwritten`) ← the case
+   that today destroys user work without leaving a trace.
+3. A remote headstone deletes a local row (`deleted-remotely`).
 
-**Limitación honesta:** no se guardan las columnas BLOB (adjuntos, grabaciones, retratos).
-Duplicarlas multiplicaría el tamaño de la base. Para esas columnas se conserva la fila y
-un marcador, no los bytes. Recolección a los 90 días.
+** Honest limitation:** the BLOB columns (attaches, recordings, portraits) are not saved. Duplicate
+them would multiply the size of the base. For those columns the row and a marker are kept, not
+bytes. Collection at 90 days.
 
-**Superficie de usuario:** en Ajustes → Sincronización, «N versiones sustituidas»,
-con vista de detalle y acción de restaurar. Sin esa vista, la tabla es solo consuelo.
+**User surface:** in Settings → Synchronization, "N substituted versions", with view of detail and
+action to restore. Without that view, the table is just comfort.
 
 ---
 
-## Fases propuestas
+## Proposed phases
 
-| Fase | Contenido | Riesgo |
+| Phase | Content | Risk |
 |---|---|---|
-| **F1** ✅ | `sync_superseded` + registro en las tres situaciones + vista en Ajustes | Bajo. No cambia ninguna resolución, solo deja de destruir. |
-| **F2** ✅ | Tombstones: tabla, triggers generados, reglas de fusión, horizonte y aviso | Medio. Cambia el comportamiento observable del borrado. |
-| **F3** ✅ | Cifrado v3 + frase de sincronización + lectura de v1/v2 | Medio. Formato nuevo; conviene ir después de F1/F2 para no mezclar. |
-| **F4** ✅ | Capas 1 y 2 del reloj (detección, confirmación, compensación) | Bajo. |
+| **F1** | `sync_superseded` + record in all three situations + view in Settings | It doesn't change any resolution, it just stops destroying. |
+| **F2** | Tombstones: table, triggers generated, fusion rules, horizon and warning | Medium. Change the observable behavior of erasing. |
+| **F3** | Encryption v3 + synchronization phrase + v1/v2 reading | Medium. New format; it is advisable to go after F1/F2 so as not to mix. |
+| **F4** | Watch layers 1 and 2 (detection, confirmation, compensation) | Low. |
 
-**F1 primero, deliberadamente.** Es la que convierte cualquier error de las otras dos en
-recuperable, así que conviene tenerla antes de tocar borrados o resolución temporal. Cada
-fase es verificable por separado con el arnés de esquema real que ya existe.
-
----
-
-## F1 · Implementada (esquema v88)
-
-`scripts/test-superseded-versions.mjs`. 532/532 tests, build y smoke e2e sobre la app
-real (v88). Lo entregado:
-
-- Migración **88**, puramente aditiva: crea `sync_superseded` y no toca ninguna tabla
-  existente. Se construye una base **real en v87**, se puebla (notas, genealogía con
-  blob, calificaciones, bases de datos) y se comprueba que tras migrar **cada tabla
-  conserva su recuento exacto**, la integridad y las claves foráneas están limpias, los
-  bytes de la evidencia son idénticos, y volver a migrar no cambia nada.
-- Registro en las dos direcciones del conflicto, incluida la que antes destruía trabajo
-  sin dejar rastro: **la versión local sobrescrita por la del otro equipo**.
-- Restauración **reversible**: al promover una versión, la que desplaza se guarda a su
-  vez, así que restaurar por error también se deshace. Una fila borrada puede
-  recrearse desde su versión guardada.
-- `sync_superseded` es explícitamente **local**: no viaja en el paquete, porque el
-  registro de lo que *este* equipo descartó no tiene sentido en el otro.
-- Compatibilidad verificada en ambos sentidos: un `.nodussync` construido con esquema 87
-  sigue importándose, una copia de un esquema **más reciente** se rechaza sin tocar los
-  datos, y una de un esquema anterior se restaura con normalidad.
-
-### Defecto encontrado durante la implementación
-
-La primera versión guardaba **la misma versión perdedora en cada sincronización**: una
-fila que pierde una vez pierde en todas las importaciones futuras del mismo paquete, así
-que la lista habría crecido con un duplicado por sync hasta enterrar los conflictos
-reales. `recordSuperseded` deduplica y devuelve si llegó a almacenar; el contador del
-resumen solo cuenta lo realmente guardado.
-
-### Limitaciones asumidas
-
-- **No se guardan las columnas BLOB.** Duplicar adjuntos, grabaciones y retratos
-  multiplicaría el tamaño de la base. Se conserva la fila y un marcador con el tamaño; al
-  restaurar se mantienen los adjuntos actuales y se avisa de ello.
-- **No hay recolección automática.** Esta tabla *es* la red de seguridad, así que nada la
-  borra por tiempo: solo el usuario, de forma explícita. El crecimiento está acotado por
-  los conflictos reales, que son raros, y la deduplicación evita la repetición.
+**F1 first, deliberately.** It is the one that turns any error of the other two into recoverable, so
+it is convenient to have it before touching deleted or temporary resolution. Each phase is
+verifiable separately with the real scheme harness that already exists.
 
 ---
 
-## F2 · Implementada (esquema v89)
+## F1 · Implemented (scheme v88)
 
-`scripts/test-tombstones.mjs` (10 supuestos) + `scripts/test-source-hygiene.mjs`.
-534/534 tests, build y smoke e2e sobre la app real (v89).
+`scripts/test-superseded-versions.mjs`. 532/532 tests, build and smoke e2e on the real app (v88).
+Delivered:
 
-Un borrado deja de resucitar: se registra en `sync_tombstones` mediante triggers
-generados desde el mismo registro que decide qué se sincroniza, viaja en el paquete, se
-aplica antes de fusionar filas, y lo que elimina queda recuperable en `sync_superseded`.
+- Migration **88**, purely additive: creates `sync_superseded` and does not touch any existing
+  table. A real **base is constructed in v87**, it is populated (notes, genealogy with blob,
+  ratings, databases) and it is verified that after migrating **each table retains its exact
+  count**, the integrity and foreign keys are clean, the bytes of the evidence are identical, and
+  remigration does not change anything.
+- Recording in the two directions of the conflict, including the one that previously destroyed work
+  without leaving a trace: **the local version overwritten by the other team.**
+- Restore **reversible**: by promoting a version, the one that moves is saved in turn, so restoring
+  by mistake is also undone. A deleted row can be recreated from its saved version.
+- `sync_superseded` is explicitly **local**: does not travel in the package, because the record of
+  what *this* computer discarded makes no sense in the other.
+- Verified compatibility in both directions: a `.nodussync` built with scheme 87 continues to
+  matter, a copy of a newer ** scheme** is rejected without touching the data, and one of an earlier
+  scheme is restored normally.
 
-### La mitad peligrosa: lo que NO debe parecer un borrado
+### Default found during implementation
 
-Propagar borrados es fácil; lo difícil es no propagar los que no lo son. Cada uno de
-estos habría eliminado datos del usuario **en el otro equipo**:
+The first version kept **the same losing version at each synchronization**: a row that lost once
+lost in all future imports of the same package, so the list would have grown with a duplicate by
+sync until it buried the actual conflicts. `recordSuperseded` deduplicates and returns if it got to
+store; the summary counter only counts what is actually saved.
 
-- **Guardar borrando y reescribiendo.** El horario borra todos los periodos de un curso y
-  los reinserta con los mismos ids. Sin el trigger `AFTER INSERT` que retira la lápida,
-  un guardado normal habría dicho al otro equipo que borrara el horario. Verificado, y
-  verificado también que una fila que *sí* desaparece en ese reescrito sí se marca.
-- **La limpieza interna de la fusión.** Al soltar filas recién insertadas cuyas claves
-  foráneas quedan colgando, el trigger no distingue eso de un borrado del usuario: la
-  lápida se retira explícitamente.
-- **Restaurar una versión guardada.** Escribe una fila que una lápida da por muerta. Sin
-  una marca de tiempo nueva, la siguiente sincronización la habría vuelto a borrar y el
-  usuario habría visto cómo su recuperación se deshacía sola. Ahora restaurar es el hecho
-  más reciente sobre la fila.
+### Limitations assumed
 
-Y en sentido contrario: un borrado no es sagrado. Si el otro equipo editó la fila
-**después** del borrado, esa edición es el hecho más reciente y la fila vuelve.
+- **BLOB columns are not saved.** Duplicate attachments, recordings and portraits would multiply the
+  size of the base. The row and a marker with size are retained; current attachments are maintained
+  when restored and notice is given.
+- **There is no automatic collection.** This table *is* the safety net, so nothing erases it for
+  time: only the user, explicitly. Growth is limited by real conflicts, which are rare, and
+  deduplication prevents repetition.
 
-### Defecto encontrado durante la implementación
+---
 
-La clave de búsqueda de lápidas se construía en dos sitios, y en uno el separador acabó
-siendo un **byte NUL** en vez de un espacio. Resultado: la búsqueda no coincidía nunca,
-la supresión de resurrecciones no hacía nada, y **TypeScript compilaba sin quejarse**;
-`grep` además dejaba de encontrar el fichero porque pasaba a considerarlo binario.
+## F2 · Implemented (Scheme v89)
 
-Dos correcciones: la clave se construye ahora en **una sola función** (`tombstoneKey`), y
-`scripts/test-source-hygiene.mjs` rechaza caracteres de control y UTF-8 inválido en todo
-el código. Ese guard destapó tres ficheros ya en `main` que usan NUL como separador de
-claves compuestas de forma **deliberada y correcta** (`ideaDedupe`, `graph/lod`, `stats`):
-están en una lista explícita, no tocados, para que un NUL *nuevo* siga fallando.
+`scripts/test-tombstones.mjs` (10 assumptions) + `scripts/test-source-hygiene.mjs`. 534/534 tests,
+build and smoke e2e on the real app (v89).
 
-### Interacción conocida (documentada, no un fallo)
+A deletion ceases to resurrect: it is recorded in `sync_tombstones` by triggers generated from the
+same record that decides what is synchronized, travels in the package, applies before merging rows,
+and what it removes is recoverable in `sync_superseded`.
 
-Restaurar una copia anterior a un borrado devuelve la fila **y** retrocede el estado local
-de lápidas. Si el otro equipo sigue teniendo la suya, la siguiente sincronización volverá
-a aplicar el borrado, porque es el hecho más reciente. No se pierde nada: queda en
-«Versiones sustituidas» como *borrado en el otro equipo*.
+### The Dangerous Half: What Must NOT Look Like a Wipe
 
-### Limitaciones asumidas
+Propagating deleted is easy; it is difficult not to propagate those that are not. Each of these
+would have deleted user data ** on the other computer**:
 
-- **Horizonte de 180 días.** Pasado ese plazo la lápida se olvida y la fila podría volver
-  desde un equipo muy rezagado. Al importar un paquete más antiguo que el horizonte se
-  avisa explícitamente en el resumen.
-- **Una lápida por fila borrada.** Medido: 20.000 borrados en cascada con el trigger
-  cuestan 20 ms, así que el coste no es un problema; el tamaño lo acota el horizonte.
+- **Save by deleting and rewriting.**The schedule deletes all periods of a course and resets them
+  with the same ids. Without the trigger `AFTER INSERT` that removes the tombstone, a normal save
+  would have told the other computer to delete the schedule. Verified, and also verified that a row
+  that *yes* disappears in that rewrite is marked.
+- **The internal cleaning of the merge.** By dropping newly inserted rows whose foreign keys are
+  hanging, the trigger does not distinguish that from a user deletion: the tombstone is explicitly
+  removed.
+- **Restore a saved version.** Write a row that a tombstone gives for dead. Without a new time mark,
+  the following synchronization would have erased it again and the user would have seen how its
+  recovery was undone alone. Now restoring is the latest fact about the row.
+
+And in the opposite direction: one deleted is not sacred. If the other team edited the row **after**
+the deleted one, that edition is the most recent fact and the row returns.
+
+### Default found during implementation
+
+The tombstone search key was built in two places, and in one the separator ended up being a **byte
+NUL** instead of a space. Result: the search never coincided, the suppression of resurrections did
+nothing, and **TypeScript compiled without complaining**; `grep` also stopped finding the file
+because it was considered binary.
+
+Two corrections: the key is now built into ** a single function** (`tombstoneKey`), and
+`scripts/test-source-hygiene.mjs` rejects control characters and invalid UTF-8 throughout the code.
+That guard uncovered three files already in `main` that use NUL as a code separator composed of
+**deliberate and correct** (`ideaDedupe`, `graph/lod`, `stats`): they are in an explicit list, not
+touched, for a new *NUL* to continue to fail.
+
+### Known interaction (documented, not a failure)
+
+Restore a previous copy to a deleted one returns the row ** and** backs the local state of
+tombstones. If the other computer still has yours, the following synchronization will reapply the
+deleted one, because it is the most recent fact. Nothing is lost: it remains in "Replaced version"
+as *delete on the other computer*.
+
+### Limitations assumed
+
+- ** 180-day horizon.** After that time the tombstone is forgotten and the row could come back from
+  a very backward team. By importing an older package that the horizon is explicitly warned in the
+  summary.
+- **One stone per row deleted.** Measured: 20,000 erased by cascade with the trigger cost 20 ms, so
+  cost is not a problem; size is narrowed by the horizon.
 
 
 ---
 
-## F3 y F4 · Implementadas
+## F3 and F4 implemented
 
-`scripts/test-sync-package.mjs` (ampliado). 534/534 tests, build y smoke e2e (v89).
-**Sin cambio de esquema**: la frase vive en `safeStorage`, no en la base, así que estas
-dos fases no tocan los datos de nadie.
+`scripts/test-sync-package.mjs` (enlarged). 534/534 tests, build and smoke e2e (v89). **No schema
+change**: the phrase lives on `safeStorage`, not on the base, so these two phases do not touch
+anyone's data.
 
-### F3 · Cifrado (formato v3)
+### F3 · Encryption (format v3)
 
-Cada tabla y cada adjunto se sella por separado bajo una clave derivada **una sola vez**
-(scrypt N=32768 + AES-256-GCM, IV propio por entrada). Así el cifrado **no reintroduce**
-el búfer único que hacía imposible sincronizar bóvedas grandes. Los nombres de tabla
-viven en un índice cifrado y las entradas tienen nombres opacos: el fichero no anuncia
-que contiene un cuaderno de calificaciones.
+Each table and attachment is sealed separately under a derived key ** once** (scrypt N=32768 +
+AES-256-GCM, IV own per entry). Thus the encryption ** does not reintroduce** the unique buffer that
+made it impossible to synchronize large vaults. The table names live in an encrypted index and the
+entries have opaque names: the file does not announce that it contains a notebook of ratings.
 
-El manifiesto sigue en claro a propósito — permite rechazar un paquete incompatible o
-avisar de su antigüedad **sin pedir la frase**.
+The manifest is clear on purpose — it allows you to reject an incompatible package or warn of its
+antiquity ** without asking for the phrase**.
 
-**Compatibilidad verificada**: se siguen importando paquetes **v1** (JSON único con
-blobs en base64) y **v2** (una entrada por tabla, en claro), incluidos sus adjuntos. Solo
-se escribe v3.
+** Verified compatibility**: packages are still imported **v1** (JSON unique with base64 blobs) and
+**v2** (one entry per table, clear), including their attachments. Only v3 is written.
 
-**La credencial**: una «frase de sincronización» propia, no la contraseña maestra —
-restaurar con la clave de recuperación genera una contraseña maestra nueva y aleatoria,
-así que los dos equipos habrían acabado con credenciales distintas y el sync habría
-fallado sin motivo aparente. Queda incluida en el kit de recuperación. Al importar un
-paquete ajeno, la interfaz pide la frase del equipo que lo generó en vez de dejar al
-usuario atascado.
+**Credential**: a proper "sync" phrase, not the master password — restoring with the recovery key
+generates a new, random master password, so the two teams would have ended up with different
+credentials and the sync would have failed for no apparent reason. It is included in the recovery
+kit. When importing a foreign package, the interface asks for the phrase of the computer that
+generated it instead of leaving the user stuck.
 
-### F4 · Sesgo de reloj
+### F4 · Watch bias
 
-Se mide y se reporta lo único que un paquete de un solo sentido permite medir: que el
-reloj del emisor va **adelantado**. Un paquete con fecha antigua es indistinguible de un
-reloj atrasado, así que no se adivina — y el test comprueba explícitamente que un paquete
-viejo **no** se confunde con desfase.
+The only thing that a one-way package can measure is measured and reported: that the emitter clock
+is **advanced**. A packet with an old date is indistinguishable from a backward clock, so it is not
+guessed — and the test explicitly checks that an old package **no** is confused with a lag.
 
-Lo que de verdad resuelve el problema no es la detección, sino la F1: gane quien gane la
-comparación, la versión perdedora se conserva. Un reloj mal puesto cuesta una revisión,
-no el trabajo.
+What really solves the problem is not the detection, but the F1: win whoever wins the comparison,
+the losing version is preserved. A bad clock costs a review, not the job.
 
-### Aserciones que eran débiles
+### Assertions that were weak
 
-Las comprobaciones de privacidad buscaban el texto plano en el fichero completo. Un zip
-**comprime** sus entradas, así que pasaban igual sin cifrar nada. Ahora se hacen sobre
-los bytes **descomprimidos** de cada entrada, y se verificó que con `seal` desactivado el
-test falla.
+The privacy checks looked for the flat text in the entire file. A zip **compressed** its entries, so
+they passed the same without encrypting anything. Now they are done over the **decompressed** bytes
+of each entry, and it was verified that with `seal` disabled the test fails.
