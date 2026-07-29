@@ -91,9 +91,17 @@ Este vault reconstruye historia familiar a partir de fuentes primarias (censos, 
   },
   {
     id: 'prosopography',
-    available: false,
-    defaultHiddenViews: [],
-    promptPack: '',
+    available: true,
+    defaultHiddenViews: [
+      'search', 'library', 'graph', 'argument', 'ideas', 'authors', 'persons',
+      'timeline', 'tree', 'relations', 'map', 'archive', 'immersion', 'gaps',
+      'debate', 'research', 'hypothesis', 'reading', 'deepResearch', 'writing',
+      'projects',
+    ],
+    promptPack: `
+
+═══ CONTEXTO DEL VAULT — MODO PROSOPOGRAFÍA ═══
+Este vault estudia colectivamente una POBLACIÓN HISTÓRICA definida mediante criterios explícitos. Distingue siempre persona, mención, fuente, factoid y statement. Una observación documental no es un hecho: conserva la forma literal, la procedencia, la fecha, la incertidumbre y las contradicciones. No fusiones identidades, no decidas pertenencia, no normalices categorías históricas y no rellenes ausencias automáticamente. La IA solo propone; una persona revisa y publica. En análisis, declara población, denominador, ausencias, cobertura y fuentes dominantes.`,
   },
   // Study mode ships as a first-class local workspace. primary_sources remains
   // declared but gated until its own product surface is complete.
@@ -246,7 +254,7 @@ export const VAULT_TYPE_COLORS: Record<VaultType, string> = {
   estudio: '#0f766e',
   primary_sources: '#6366f1',
   genealogy: '#ca8a04',
-  prosopography: '#475569',
+  prosopography: '#2563eb',
   databases: '#b30333',
   testimonios: '#0891b2',
   worldbuilding: '#7c3aed',
@@ -283,6 +291,12 @@ export function isPreviewVaultType(value: unknown): boolean {
  * by phase C.
  */
 export const VAULT_TYPE_SCOPED_VIEWS: Record<string, VaultType[]> = {
+  prosopSearch: ['prosopography'],
+  prosopPopulation: ['prosopography'],
+  prosopPersons: ['prosopography'],
+  prosopSources: ['prosopography'],
+  prosopAnalysis: ['prosopography'],
+  prosopNetworks: ['prosopography'],
   persons: ['primary_sources', 'genealogy'],
   // The timeline, the map and the kinship tree work on `persons`, `events` and
   // `relationships`, which a worldbuilding vault fills with characters — so they are
@@ -404,6 +418,12 @@ export function effectiveSidebarHidden(userHidden: string[], customized: boolean
 /** Whether a view may appear for the given vault type (universal views always may). */
 export function isViewAllowedForVaultType(viewId: string, type: unknown): boolean {
   if (isPreviewVaultType(type)) return viewId === 'home';
+  if (normalizeVaultType(type) === 'prosopography') {
+    return [
+      'home', 'settings', 'prosopSearch', 'prosopPopulation', 'prosopPersons',
+      'prosopSources', 'prosopAnalysis', 'prosopNetworks', 'notes', 'toolkit',
+    ].includes(viewId);
+  }
   const allowed = VAULT_TYPE_SCOPED_VIEWS[viewId];
   return allowed ? allowed.includes(normalizeVaultType(type)) : true;
 }

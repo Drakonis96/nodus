@@ -15,6 +15,7 @@
     "citation:check": "node scripts/sync-citation.mjs --check",
     "version": "npm run citation:sync && git add CITATION.cff",
     "test:e2e": "node scripts/e2e-smoke.mjs",
+    "test:e2e:prosopography": "node scripts/test-prosopography-e2e.mjs",
     "verify:nodi-overlay": "npm run build && node scripts/verify-nodi-overlay.mjs",
     "verify:study-whisper": "node scripts/verify-study-whisper.mjs",
     "verify:study-improve-local": "node scripts/verify-study-improve-local.mjs",

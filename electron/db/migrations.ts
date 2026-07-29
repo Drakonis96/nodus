@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 105;
+export const SCHEMA_VERSION = 106;
 
 export const migrations: Migration[] = [
   {
@@ -4418,6 +4418,595 @@ export const migrations: Migration[] = [
              embedding_dim = NULL,
              embedding_text_hash = NULL
        WHERE embedding IS NOT NULL;
+    `,
+  },
+  {
+    version: 106,
+    up: /* sql */ `
+      -- Prosopography is additive and deliberately does not use db_cells. Canonical
+      -- observations retain source, literal, uncertainty and review state.
+      CREATE TABLE prosop_studies (
+        study_id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        research_question TEXT NOT NULL DEFAULT '',
+        description TEXT NOT NULL DEFAULT '',
+        unit_of_analysis TEXT NOT NULL DEFAULT 'person',
+        temporal_scope TEXT NOT NULL DEFAULT '',
+        date_start_sort INTEGER,
+        date_end_sort INTEGER,
+        geographic_scope TEXT NOT NULL DEFAULT '',
+        population_definition TEXT NOT NULL DEFAULT '',
+        sampling_strategy TEXT NOT NULL DEFAULT '',
+        expected_population INTEGER,
+        source_strategy TEXT NOT NULL DEFAULT '',
+        known_biases TEXT NOT NULL DEFAULT '',
+        living_people_policy TEXT NOT NULL DEFAULT 'restricted'
+          CHECK (living_people_policy IN ('exclude','restricted','allow_with_consent')),
+        current_methodology_version_id TEXT,
+        current_questionnaire_version_id TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE TABLE prosop_methodology_versions (
+        version_id TEXT PRIMARY KEY,
+        study_id TEXT NOT NULL,
+        version_no INTEGER NOT NULL,
+        status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','published','retired')),
+        change_summary TEXT NOT NULL DEFAULT '',
+        population_definition TEXT NOT NULL DEFAULT '',
+        sampling_strategy TEXT NOT NULL DEFAULT '',
+        source_strategy TEXT NOT NULL DEFAULT '',
+        bias_notes TEXT NOT NULL DEFAULT '',
+        created_by TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        published_at TEXT,
+        UNIQUE(study_id, version_no)
+      );
+      CREATE INDEX idx_prosop_methodologies_study ON prosop_methodology_versions(study_id, status);
+
+      CREATE TABLE prosop_population_criteria (
+        criterion_id TEXT PRIMARY KEY,
+        methodology_version_id TEXT NOT NULL,
+        kind TEXT NOT NULL CHECK (kind IN ('include','exclude','supporting')),
+        label TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        rule_json TEXT,
+        weight REAL NOT NULL DEFAULT 1,
+        required INTEGER NOT NULL DEFAULT 0 CHECK (required IN (0,1)),
+        position INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_prosop_criteria_version ON prosop_population_criteria(methodology_version_id, position);
+
+      CREATE TABLE prosop_population_memberships (
+        membership_id TEXT PRIMARY KEY,
+        person_id TEXT NOT NULL,
+        methodology_version_id TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'candidate' CHECK (status IN ('candidate','included','excluded','uncertain')),
+        decision TEXT NOT NULL DEFAULT '',
+        rationale TEXT NOT NULL DEFAULT '',
+        decided_by TEXT,
+        decided_at TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE(person_id, methodology_version_id)
+      );
+      CREATE INDEX idx_prosop_memberships_version ON prosop_population_memberships(methodology_version_id, status);
+
+      CREATE TABLE prosop_membership_assessments (
+        assessment_id TEXT PRIMARY KEY,
+        membership_id TEXT NOT NULL,
+        criterion_id TEXT NOT NULL,
+        result TEXT NOT NULL CHECK (result IN ('met','not_met','unknown','not_applicable')),
+        factoid_id TEXT,
+        note TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        UNIQUE(membership_id, criterion_id)
+      );
+
+      CREATE TABLE prosop_questionnaire_versions (
+        questionnaire_version_id TEXT PRIMARY KEY,
+        study_id TEXT NOT NULL,
+        version_no INTEGER NOT NULL,
+        status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','published','retired')),
+        title TEXT NOT NULL,
+        change_summary TEXT NOT NULL DEFAULT '',
+        created_by TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        published_at TEXT,
+        UNIQUE(study_id, version_no)
+      );
+      CREATE INDEX idx_prosop_questionnaires_study ON prosop_questionnaire_versions(study_id, status);
+
+      CREATE TABLE prosop_variables (
+        variable_id TEXT PRIMARY KEY,
+        study_id TEXT NOT NULL,
+        key TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        retired_at TEXT,
+        UNIQUE(study_id, key)
+      );
+
+      CREATE TABLE prosop_vocabularies (
+        vocabulary_id TEXT PRIMARY KEY,
+        study_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        scope_notes TEXT NOT NULL DEFAULT '',
+        version TEXT NOT NULL DEFAULT '1',
+        external_uri TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE TABLE prosop_vocabulary_terms (
+        term_id TEXT PRIMARY KEY,
+        vocabulary_id TEXT NOT NULL,
+        parent_term_id TEXT,
+        code TEXT NOT NULL,
+        preferred_label TEXT NOT NULL,
+        definition TEXT NOT NULL DEFAULT '',
+        valid_from TEXT,
+        valid_to TEXT,
+        external_uri TEXT,
+        status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','deprecated')),
+        position INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE(vocabulary_id, code)
+      );
+      CREATE INDEX idx_prosop_terms_vocabulary ON prosop_vocabulary_terms(vocabulary_id, parent_term_id, position);
+
+      CREATE TABLE prosop_term_labels (
+        label_id TEXT PRIMARY KEY,
+        term_id TEXT NOT NULL,
+        label TEXT NOT NULL,
+        language TEXT NOT NULL DEFAULT '',
+        kind TEXT NOT NULL DEFAULT 'variant',
+        created_at TEXT NOT NULL
+      );
+
+      CREATE TABLE prosop_variable_revisions (
+        revision_id TEXT PRIMARY KEY,
+        variable_id TEXT NOT NULL,
+        questionnaire_version_id TEXT NOT NULL,
+        label TEXT NOT NULL,
+        question TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        value_type TEXT NOT NULL CHECK (value_type IN ('text','number','boolean','date','term','person','place','organization','event')),
+        cardinality TEXT NOT NULL DEFAULT 'one' CHECK (cardinality IN ('one','many')),
+        unit TEXT,
+        vocabulary_id TEXT,
+        applicability_json TEXT,
+        missing_reasons_json TEXT NOT NULL DEFAULT '[]',
+        analysis_policy_json TEXT NOT NULL DEFAULT '{}',
+        sensitivity TEXT NOT NULL DEFAULT 'ordinary' CHECK (sensitivity IN ('ordinary','sensitive','restricted')),
+        instructions TEXT NOT NULL DEFAULT '',
+        examples_json TEXT NOT NULL DEFAULT '[]',
+        position INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        UNIQUE(variable_id, questionnaire_version_id)
+      );
+      CREATE INDEX idx_prosop_revisions_questionnaire ON prosop_variable_revisions(questionnaire_version_id, position);
+
+      CREATE TABLE prosop_person_profiles (
+        person_id TEXT PRIMARY KEY,
+        identity_status TEXT NOT NULL DEFAULT 'provisional',
+        review_status TEXT NOT NULL DEFAULT 'unreviewed',
+        preferred_name_basis TEXT NOT NULL DEFAULT '',
+        privacy_status TEXT NOT NULL DEFAULT 'ordinary',
+        completeness_cache REAL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE TABLE prosop_sources (
+        source_id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        source_kind TEXT NOT NULL,
+        citation TEXT NOT NULL DEFAULT '',
+        repository TEXT NOT NULL DEFAULT '',
+        reference_code TEXT NOT NULL DEFAULT '',
+        date_display TEXT,
+        date_start_sort INTEGER,
+        date_end_sort INTEGER,
+        description TEXT NOT NULL DEFAULT '',
+        coverage_notes TEXT NOT NULL DEFAULT '',
+        reliability_notes TEXT NOT NULL DEFAULT '',
+        access_status TEXT NOT NULL DEFAULT 'open' CHECK (access_status IN ('open','restricted','embargoed')),
+        rights_notes TEXT NOT NULL DEFAULT '',
+        target_vault_id TEXT,
+        target_kind TEXT,
+        target_id TEXT,
+        target_label_snapshot TEXT,
+        url TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_prosop_sources_title ON prosop_sources(title);
+
+      CREATE TABLE prosop_source_assessments (
+        assessment_id TEXT PRIMARY KEY,
+        source_id TEXT NOT NULL,
+        variable_id TEXT,
+        scope_note TEXT NOT NULL DEFAULT '',
+        reliability_status TEXT NOT NULL DEFAULT 'unassessed'
+          CHECK (reliability_status IN ('unassessed','low','medium','high','disputed')),
+        representativeness_note TEXT NOT NULL DEFAULT '',
+        known_bias_note TEXT NOT NULL DEFAULT '',
+        rationale TEXT NOT NULL DEFAULT '',
+        assessed_by TEXT,
+        assessed_at TEXT
+      );
+
+      CREATE TABLE prosop_source_segments (
+        segment_id TEXT PRIMARY KEY,
+        source_id TEXT NOT NULL,
+        locator_display TEXT NOT NULL,
+        locator_json TEXT NOT NULL DEFAULT '{}',
+        quoted_text TEXT NOT NULL DEFAULT '',
+        transcription_status TEXT NOT NULL DEFAULT 'literal',
+        language TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_prosop_segments_source ON prosop_source_segments(source_id);
+
+      CREATE TABLE prosop_capture_templates (
+        template_id TEXT PRIMARY KEY,
+        study_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        source_kind TEXT NOT NULL,
+        questionnaire_version_id TEXT,
+        fields_json TEXT NOT NULL DEFAULT '[]',
+        mapping_json TEXT NOT NULL DEFAULT '{}',
+        version INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE TABLE prosop_capture_batches (
+        batch_id TEXT PRIMARY KEY,
+        source_id TEXT,
+        template_id TEXT,
+        questionnaire_version_id TEXT,
+        file_name TEXT NOT NULL,
+        content_hash TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'staging',
+        row_count INTEGER NOT NULL DEFAULT 0,
+        accepted_count INTEGER NOT NULL DEFAULT 0,
+        error_count INTEGER NOT NULL DEFAULT 0,
+        created_by TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE TABLE prosop_capture_rows (
+        capture_row_id TEXT PRIMARY KEY,
+        batch_id TEXT NOT NULL,
+        row_no INTEGER NOT NULL,
+        locator_display TEXT,
+        raw_json TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending',
+        error_json TEXT,
+        created_at TEXT NOT NULL,
+        reviewed_at TEXT,
+        UNIQUE(batch_id, row_no)
+      );
+
+      CREATE TABLE prosop_proposals (
+        proposal_id TEXT PRIMARY KEY,
+        proposal_kind TEXT NOT NULL,
+        source_id TEXT,
+        source_segment_id TEXT,
+        capture_row_id TEXT,
+        target_kind TEXT NOT NULL,
+        target_id TEXT,
+        payload_json TEXT NOT NULL,
+        confidence REAL,
+        rationale TEXT NOT NULL DEFAULT '',
+        producer_kind TEXT NOT NULL,
+        producer_id TEXT NOT NULL,
+        questionnaire_version_id TEXT,
+        status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','accepted','rejected','superseded')),
+        created_at TEXT NOT NULL,
+        reviewed_by TEXT,
+        reviewed_at TEXT,
+        decision_note TEXT NOT NULL DEFAULT ''
+      );
+      CREATE INDEX idx_prosop_proposals_status ON prosop_proposals(status, proposal_kind, created_at);
+
+      CREATE TABLE prosop_factoids (
+        factoid_id TEXT PRIMARY KEY,
+        source_id TEXT NOT NULL,
+        source_segment_id TEXT NOT NULL,
+        capture_row_id TEXT,
+        factoid_kind TEXT NOT NULL,
+        summary TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','proposed','reviewed','rejected','superseded')),
+        extraction_certainty TEXT NOT NULL DEFAULT 'unknown',
+        created_by TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        reviewed_by TEXT,
+        reviewed_at TEXT,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_prosop_factoids_source ON prosop_factoids(source_id, source_segment_id);
+
+      CREATE TABLE prosop_name_attestations (
+        attestation_id TEXT PRIMARY KEY,
+        source_id TEXT,
+        source_segment_id TEXT,
+        factoid_id TEXT,
+        literal_name TEXT NOT NULL,
+        normalized_search_name TEXT NOT NULL,
+        person_id TEXT,
+        context TEXT NOT NULL DEFAULT '',
+        role_or_title TEXT NOT NULL DEFAULT '',
+        language TEXT NOT NULL DEFAULT '',
+        identity_status TEXT NOT NULL DEFAULT 'unresolved',
+        certainty TEXT NOT NULL DEFAULT 'unknown',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_prosop_attestations_search ON prosop_name_attestations(normalized_search_name);
+
+      CREATE TABLE prosop_identity_hypotheses (
+        hypothesis_id TEXT PRIMARY KEY,
+        left_kind TEXT NOT NULL,
+        left_id TEXT NOT NULL,
+        right_kind TEXT NOT NULL,
+        right_id TEXT NOT NULL,
+        relation TEXT NOT NULL CHECK (relation IN ('same_as','different_from')),
+        status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','accepted','rejected','superseded')),
+        score REAL,
+        rationale TEXT NOT NULL DEFAULT '',
+        created_by TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        reviewed_by TEXT,
+        reviewed_at TEXT
+      );
+
+      CREATE TABLE prosop_identity_decision_evidence (
+        id TEXT PRIMARY KEY,
+        hypothesis_id TEXT NOT NULL,
+        factoid_id TEXT NOT NULL,
+        role TEXT NOT NULL CHECK (role IN ('supports','contradicts','context')),
+        note TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL
+      );
+
+      CREATE TABLE prosop_authority_ids (
+        authority_id TEXT PRIMARY KEY,
+        entity_kind TEXT NOT NULL,
+        entity_id TEXT NOT NULL,
+        scheme TEXT NOT NULL,
+        external_id TEXT NOT NULL,
+        uri TEXT,
+        label_snapshot TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'active',
+        factoid_id TEXT,
+        created_at TEXT NOT NULL,
+        UNIQUE(entity_kind, entity_id, scheme, external_id)
+      );
+
+      CREATE TABLE prosop_organizations (
+        organization_id TEXT PRIMARY KEY,
+        preferred_name TEXT NOT NULL,
+        kind TEXT NOT NULL DEFAULT '',
+        date_start TEXT,
+        date_start_sort INTEGER,
+        date_end TEXT,
+        date_end_sort INTEGER,
+        place_id TEXT,
+        description TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE TABLE prosop_organization_names (
+        id TEXT PRIMARY KEY,
+        organization_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        kind TEXT NOT NULL DEFAULT 'variant',
+        language TEXT NOT NULL DEFAULT '',
+        valid_from TEXT,
+        valid_to TEXT
+      );
+
+      CREATE TABLE prosop_statements (
+        statement_id TEXT PRIMARY KEY,
+        factoid_id TEXT NOT NULL,
+        variable_id TEXT,
+        variable_revision_id TEXT,
+        statement_type TEXT NOT NULL,
+        value_kind TEXT NOT NULL CHECK (value_kind IN ('text','number','boolean','date','term','person','place','organization','event')),
+        literal_value TEXT NOT NULL DEFAULT '',
+        value_text TEXT,
+        value_number REAL,
+        value_boolean INTEGER,
+        value_date_display TEXT,
+        value_date_start_sort INTEGER,
+        value_date_end_sort INTEGER,
+        value_term_id TEXT,
+        value_person_id TEXT,
+        value_place_id TEXT,
+        value_organization_id TEXT,
+        value_event_id TEXT,
+        unit TEXT,
+        negated INTEGER NOT NULL DEFAULT 0 CHECK (negated IN (0,1)),
+        source_modality TEXT NOT NULL DEFAULT 'asserted',
+        reading_certainty TEXT NOT NULL DEFAULT 'unknown',
+        source_assertion_certainty TEXT NOT NULL DEFAULT 'unknown',
+        interpretation_certainty TEXT NOT NULL DEFAULT 'unknown',
+        temporal_precision TEXT,
+        accuracy_status TEXT NOT NULL DEFAULT 'unassessed',
+        status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','proposed','reviewed','rejected','superseded')),
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_prosop_statements_factoid ON prosop_statements(factoid_id);
+      CREATE INDEX idx_prosop_statements_variable ON prosop_statements(variable_id, status);
+
+      CREATE TABLE prosop_statement_entities (
+        id TEXT PRIMARY KEY,
+        statement_id TEXT NOT NULL,
+        entity_kind TEXT NOT NULL,
+        entity_id TEXT NOT NULL,
+        role TEXT NOT NULL,
+        position INTEGER NOT NULL DEFAULT 0
+      );
+      CREATE INDEX idx_prosop_statement_entities_target ON prosop_statement_entities(entity_kind, entity_id);
+
+      CREATE TABLE prosop_resolutions (
+        resolution_id TEXT PRIMARY KEY,
+        person_id TEXT NOT NULL,
+        variable_id TEXT NOT NULL,
+        resolution_kind TEXT NOT NULL,
+        resolved_value_json TEXT,
+        rationale TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'draft',
+        created_by TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE TABLE prosop_resolution_statements (
+        resolution_id TEXT NOT NULL,
+        statement_id TEXT NOT NULL,
+        role TEXT NOT NULL,
+        PRIMARY KEY(resolution_id, statement_id)
+      );
+
+      CREATE TABLE prosop_missing_values (
+        missing_id TEXT PRIMARY KEY,
+        person_id TEXT NOT NULL,
+        variable_id TEXT NOT NULL,
+        questionnaire_version_id TEXT NOT NULL,
+        reason TEXT NOT NULL,
+        source_scope_json TEXT NOT NULL DEFAULT '{}',
+        note TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'active',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE(person_id, variable_id, questionnaire_version_id)
+      );
+
+      CREATE TABLE prosop_cohorts (
+        cohort_id TEXT PRIMARY KEY,
+        study_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        kind TEXT NOT NULL CHECK (kind IN ('dynamic','frozen')),
+        filter_json TEXT NOT NULL DEFAULT '{"conjunction":"and","rules":[]}',
+        methodology_version_id TEXT NOT NULL,
+        questionnaire_version_id TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        frozen_at TEXT
+      );
+
+      CREATE TABLE prosop_cohort_members (
+        cohort_id TEXT NOT NULL,
+        person_id TEXT NOT NULL,
+        membership_snapshot_json TEXT NOT NULL DEFAULT '{}',
+        created_at TEXT NOT NULL,
+        PRIMARY KEY(cohort_id, person_id)
+      );
+
+      CREATE TABLE prosop_analysis_definitions (
+        analysis_id TEXT PRIMARY KEY,
+        study_id TEXT NOT NULL,
+        title TEXT NOT NULL,
+        analysis_kind TEXT NOT NULL,
+        cohort_ids_json TEXT NOT NULL DEFAULT '[]',
+        projection_json TEXT NOT NULL,
+        filter_json TEXT NOT NULL DEFAULT '{}',
+        questionnaire_version_id TEXT NOT NULL,
+        source_cutoff TEXT,
+        created_by TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE TABLE prosop_analysis_runs (
+        run_id TEXT PRIMARY KEY,
+        analysis_id TEXT NOT NULL,
+        engine_version TEXT NOT NULL,
+        input_fingerprint TEXT NOT NULL,
+        population_count INTEGER NOT NULL,
+        included_count INTEGER NOT NULL,
+        missing_summary_json TEXT NOT NULL DEFAULT '{}',
+        result_json TEXT NOT NULL,
+        warnings_json TEXT NOT NULL DEFAULT '[]',
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_prosop_analysis_runs_definition ON prosop_analysis_runs(analysis_id, created_at);
+
+      CREATE TABLE prosop_network_layers (
+        layer_id TEXT PRIMARY KEY,
+        study_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        derivation_rule_json TEXT,
+        directionality TEXT NOT NULL DEFAULT 'undirected',
+        weight_policy TEXT NOT NULL DEFAULT 'count',
+        color TEXT NOT NULL DEFAULT '#2563eb',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE TABLE prosop_network_edges (
+        edge_id TEXT PRIMARY KEY,
+        layer_id TEXT NOT NULL,
+        source_person_id TEXT NOT NULL,
+        target_person_id TEXT NOT NULL,
+        relation_term_id TEXT,
+        date_display TEXT,
+        date_start_sort INTEGER,
+        date_end_sort INTEGER,
+        weight REAL NOT NULL DEFAULT 1,
+        origin TEXT NOT NULL CHECK (origin IN ('explicit','derived','hypothesis')),
+        derivation_fingerprint TEXT,
+        status TEXT NOT NULL DEFAULT 'active',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_prosop_edges_layer ON prosop_network_edges(layer_id, origin, status);
+      CREATE INDEX idx_prosop_edges_source ON prosop_network_edges(source_person_id);
+      CREATE INDEX idx_prosop_edges_target ON prosop_network_edges(target_person_id);
+
+      CREATE TABLE prosop_network_edge_factoids (
+        edge_id TEXT NOT NULL,
+        factoid_id TEXT NOT NULL,
+        role TEXT NOT NULL DEFAULT 'supports',
+        PRIMARY KEY(edge_id, factoid_id)
+      );
+
+      CREATE TABLE note_links (
+        link_id TEXT PRIMARY KEY,
+        nodus_id TEXT NOT NULL,
+        target_kind TEXT NOT NULL,
+        target_id TEXT NOT NULL,
+        target_vault_id TEXT,
+        relation_kind TEXT NOT NULL DEFAULT 'about',
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_note_links_target ON note_links(target_kind, target_id);
+
+      CREATE TABLE prosop_audit_log (
+        audit_id TEXT PRIMARY KEY,
+        entity_kind TEXT NOT NULL,
+        entity_id TEXT NOT NULL,
+        action TEXT NOT NULL,
+        before_json TEXT,
+        after_json TEXT,
+        reason TEXT NOT NULL DEFAULT '',
+        actor TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_prosop_audit_entity ON prosop_audit_log(entity_kind, entity_id, created_at);
     `,
   },
 ];

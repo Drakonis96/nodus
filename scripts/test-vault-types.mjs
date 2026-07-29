@@ -49,10 +49,11 @@ test('unknown / missing values normalise to academic', () => {
 
 test('shipped and preview vaults are selectable; announced future vaults remain gated', () => {
   const ids = vt.availableVaultTypes().map((d) => d.id);
-  assert.deepEqual(ids, ['academic', 'genealogy', 'estudio', 'databases', 'worldbuilding', 'docencia']);
+  assert.deepEqual(ids, ['academic', 'genealogy', 'prosopography', 'estudio', 'databases', 'worldbuilding', 'docencia']);
   assert.equal(vt.getVaultTypeDef('genealogy').available, true);
   assert.equal(vt.getVaultTypeDef('estudio').available, true);
   assert.equal(vt.getVaultTypeDef('databases').available, true);
+  assert.equal(vt.getVaultTypeDef('prosopography').available, true);
   // docencia (teaching) and worldbuilding both graduated from a preview shell into
   // real workspaces, so no type is a preview any more. The mechanism stays — it is how
   // a type gets announced before it exists — but the list is empty, and putting a type
@@ -64,7 +65,7 @@ test('shipped and preview vaults are selectable; announced future vaults remain 
     assert.equal(vt.isViewAllowedForVaultType('settings', graduated), true);
   }
   assert.deepEqual(vt.PREVIEW_VAULT_TYPES, []);
-  for (const gated of ['primary_sources', 'testimonios', 'prosopography']) {
+  for (const gated of ['primary_sources', 'testimonios']) {
     assert.equal(vt.getVaultTypeDef(gated).available, false, `${gated} not selectable this release`);
   }
   assert.deepEqual(vt.VAULT_TYPES.map((d) => d.id), ['academic', 'genealogy', 'prosopography', 'estudio', 'primary_sources', 'databases', 'testimonios', 'worldbuilding', 'docencia']);
