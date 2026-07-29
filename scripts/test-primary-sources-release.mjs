@@ -30,7 +30,7 @@ if (!process.argv.includes('--electron-primary-sources-release-test')) {
     ['app', 'src/App.tsx'],
     ['toolkit', 'src/views/ToolkitView.tsx'],
   ].map(([key, relative]) => [key, fs.readFileSync(path.join(repoRoot, relative), 'utf8')]));
-  assert.match(sources.schema, /SCHEMA_VERSION = 117/);
+  assert.match(sources.schema, /SCHEMA_VERSION = 118/);
   assert.match(sources.schema, /CREATE TABLE primary_source_local_metrics/);
   assert.match(sources.vaults, /PRIMARY_SOURCES_RELEASE_ENABLED = true/);
   assert.match(sources.demo, /primary-sources-demo/);
@@ -150,7 +150,7 @@ try {
   const workspaceRepo = require(path.join(repoRoot, 'electron/db/primarySourcesArchiveRepo.ts'));
   const derived = require(path.join(repoRoot, 'electron/db/primarySourceDerivedViewsRepo.ts'));
   const db = getDb();
-  assert.equal(SCHEMA_VERSION, 117);
+  assert.equal(SCHEMA_VERSION, 118);
   vaults.setVaultType(vaults.getActiveVault().id, 'primary_sources');
   settings.updateSettings({ uiLanguage: 'es', primarySourcesTourComplete: true });
 

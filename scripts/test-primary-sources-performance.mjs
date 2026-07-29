@@ -56,7 +56,7 @@ try {
   const workspaceRepo = require(path.join(repoRoot, 'electron/db/primarySourcesArchiveRepo.ts'));
   const researchRepo = require(path.join(repoRoot, 'electron/db/primarySourceResearchRepo.ts'));
   const db = getDb();
-  assert.equal(SCHEMA_VERSION, 117);
+  assert.equal(SCHEMA_VERSION, 118);
   vaults.setVaultType(vaults.getActiveVault().id, 'primary_sources');
   db.pragma('journal_mode = WAL');
   db.pragma('synchronous = NORMAL');

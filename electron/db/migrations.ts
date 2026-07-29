@@ -5307,18 +5307,13 @@ export const migrations: Migration[] = [
       CREATE INDEX idx_entity_resolutions_source ON entity_resolutions(entity_kind, source_entity_id, status);
       CREATE INDEX idx_entity_resolutions_target ON entity_resolutions(entity_kind, target_entity_id, status);
 
-      CREATE TABLE note_links (
-        link_id       TEXT PRIMARY KEY,
-        nodus_id      TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
-        target_kind   TEXT NOT NULL,
-        target_id     TEXT NOT NULL,
-        excerpt_id    TEXT REFERENCES archive_excerpts(excerpt_id) ON DELETE SET NULL,
-        relation_kind TEXT NOT NULL DEFAULT 'references',
-        created_at    TEXT NOT NULL
-      );
+      -- Prosopography migration 106 owns the shared note_links base table.
+      -- Primary Sources extends that cross-vault graph with an optional citable
+      -- excerpt without replacing or narrowing the existing relation contract.
+      ALTER TABLE note_links
+        ADD COLUMN excerpt_id TEXT REFERENCES archive_excerpts(excerpt_id) ON DELETE SET NULL;
       CREATE UNIQUE INDEX idx_note_links_unique
         ON note_links(nodus_id, target_kind, target_id, relation_kind);
-      CREATE INDEX idx_note_links_target ON note_links(target_kind, target_id);
       CREATE INDEX idx_note_links_excerpt ON note_links(excerpt_id);
 
       CREATE TABLE archive_integrity_checks (
