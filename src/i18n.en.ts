@@ -1040,6 +1040,28 @@ export const EN: Record<string, string> = {
   'Nuevo tipo de vault': 'New vault type',
   'Propón un espacio especializado y cómo colaborarías para hacerlo viable.':
     'Propose a specialized workspace and how you would help make it viable.',
+  'Dar feedback': 'Give feedback',
+  'Valora tu experiencia y cuéntanos qué funciona bien y qué deberíamos mejorar.':
+    'Rate your experience and tell us what works well and what we should improve.',
+  Valoraciones: 'Ratings',
+  'Cantidad y variedad de funciones': 'Number and variety of features',
+  Usabilidad: 'Ease of use',
+  Rendimiento: 'Performance',
+  Estabilidad: 'Stability',
+  'Diseño visual': 'Visual design',
+  '¿Qué te gusta de Nodus?': 'What do you like about Nodus?',
+  '¿Qué crees que debería mejorar?': 'What do you think should be improved?',
+  'Sin respuesta': 'No answer',
+  'Opinión sobre Nodus': 'Thoughts on Nodus',
+  'Todas las preguntas son opcionales. Responde solo a las que quieras.':
+    'All questions are optional. Answer only those you want to.',
+  'Escala de valoración': 'Rating scale',
+  'Necesita mejorar': 'Needs improvement',
+  Aceptable: 'Acceptable',
+  'Funciones, detalles o experiencias que valoras (opcional)':
+    'Features, details, or experiences you value (optional)',
+  'Cambios que harían Nodus más útil para ti (opcional)':
+    'Changes that would make Nodus more useful to you (optional)',
   'Un vault especializado puede requerir arquitectura nueva. Se priorizará cuando haya colaboración activa, conocimiento del área y personas dispuestas a probarlo.':
     'A specialized vault may require new architecture. It will be prioritized when there is active collaboration, domain knowledge, and people willing to test it.',
   'Rama de conocimiento o área': 'Field of knowledge or area',

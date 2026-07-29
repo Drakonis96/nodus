@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Product feedback
+    url: https://github.com/Drakonis96/nodus/issues/272#new_comment_field
+    about: Add your feedback as a comment in the permanent shared product-feedback thread.
+  - name: Report a security vulnerability
+    url: https://github.com/Drakonis96/nodus/security/advisories/new
+    about: Report security vulnerabilities privately. Do not disclose them in a public issue.

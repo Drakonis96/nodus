@@ -63,9 +63,9 @@ export const ROADMAP_THREADS: Record<RoadmapTopicKey, RoadmapThread> = {
 /**
  * Feedback modal for teaching sections that are planned but not built yet.
  *
- * Unlike {@link FeedbackModal}, which files a brand-new issue, this one funnels
- * everybody into a single permanent thread per section so the discussion reads
- * like a forum. GitHub can only prefill *new* issues — there is no way to
+ * Like product feedback in {@link FeedbackModal}, this funnels everybody into
+ * a permanent thread so the discussion reads like a forum. GitHub can only
+ * prefill *new* issues — there is no way to
  * preload the comment box of an existing one — so on send we copy the composed
  * Markdown to the clipboard and open the thread anchored at its comment field,
  * leaving the user one paste away from posting. The confirmation step keeps the

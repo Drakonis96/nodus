@@ -9,7 +9,7 @@ const read = (file) => readFile(path.join(root, file), 'utf8');
 
 test('feedback offers a structured new-vault collaboration request', async () => {
   const feedback = await read('src/views/FeedbackModal.tsx');
-  assert.match(feedback, /type FeedbackKind = 'feature' \| 'bug' \| 'vault'/);
+  assert.match(feedback, /type FeedbackKind = 'feature' \| 'bug' \| 'vault' \| 'feedback'/);
   assert.match(feedback, /data-testid="feedback-new-vault-type"/);
   for (const area of ['Periodismo', 'Ciencias de la salud', 'Ciencias experimentales', 'Psicología y psiquiatría', 'Jurídico', 'Política', 'Economía y finanzas', 'Ingeniería']) {
     assert.ok(feedback.includes(`'${area}'`), `${area} is suggested`);
@@ -25,6 +25,31 @@ test('feedback offers a structured new-vault collaboration request', async () =>
   assert.match(feedback, /className="roadmap-backdrop feedback-backdrop"/);
   assert.match(feedback, /className="roadmap-hero feedback-hero"/);
   assert.match(feedback, /initial=\{\{ opacity: 0, y: 28, scale: 0\.96 \}\}/);
+});
+
+test('feedback offers an optional 0–10 product survey in one permanent thread', async () => {
+  const [feedback, styles] = await Promise.all([
+    read('src/views/FeedbackModal.tsx'),
+    read('src/index.css'),
+  ]);
+  assert.match(feedback, /data-testid="feedback-product-feedback"/);
+  assert.match(feedback, /kind === 'feedback'\s*\?\s*true/);
+  assert.match(feedback, /const PRODUCT_FEEDBACK_THREAD = 272/);
+  assert.match(feedback, /navigator\.clipboard\.writeText\(body\)/);
+  assert.match(feedback, /issues\/\$\{PRODUCT_FEEDBACK_THREAD\}/);
+  assert.match(feedback, /#new_comment_field/);
+  assert.match(feedback, /setComposedFeedback\(body\)/);
+  assert.match(feedback, /No se pudo copiar automáticamente/);
+  assert.doesNotMatch(feedback, /\[Feedback\]/);
+  assert.doesNotMatch(feedback, /kind === 'feedback' \? 'feedback'/);
+  assert.match(feedback, /Array\.from\(\{ length: 11 \}/);
+  for (const question of ['Cantidad y variedad de funciones', 'Usabilidad', 'Rendimiento', 'Estabilidad', 'Diseño visual', '¿Qué te gusta de Nodus?', '¿Qué crees que debería mejorar?']) {
+    assert.ok(feedback.includes(question), `${question} is included in the survey`);
+  }
+  assert.match(styles, /data-score='0'.+data-score='4'/);
+  assert.match(styles, /data-score='5'.+data-score='6'/);
+  assert.match(styles, /data-score='7'.+data-score='8'/);
+  assert.match(styles, /data-score='9'.+data-score='10'/);
 });
 
 test('roadmap follows the requested sequence and is opened from the header', async () => {
