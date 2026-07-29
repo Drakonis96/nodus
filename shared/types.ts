@@ -57,6 +57,62 @@ import type {
 } from './prosopography';
 import type { ProsopIpifDocument } from './prosopographyInterchange';
 
+// Testimonios (historia oral). Las REGLAS del dominio — transiciones, normalización de
+// códigos, remapeo de citas, la puerta de acceso — viven en './testimonies' y
+// './testimonyAccess', que son módulos puros y se prueban sin arrancar Electron. Aquí
+// solo se reexportan sus tipos, para que NodusApi y el renderer los reciban desde
+// '@shared/types' igual que el resto del sistema.
+import type {
+  AccessLevel,
+  AgreementStatus,
+  AnnotationKind,
+  AttributionMode,
+  CodeKind,
+  DocumentedUse,
+  IdentityMode,
+  InterviewFilters,
+  InterviewKind,
+  InterviewMode,
+  InterviewSort,
+  InterviewWorkflowStatus,
+  MediaKind,
+  MediaRole,
+  NarratorReviewStatus,
+  ParticipantRole as OralHistoryParticipantRole,
+  SavedInterviewView,
+  SessionStatus,
+  TranscriptKind,
+  TranscriptStatus,
+} from './testimonies';
+import type { AccessChannel, AccessDecision, AccessDenialReason, VaultAccessPolicy } from './testimonyAccess';
+
+export type {
+  InterviewKind,
+  InterviewMode,
+  InterviewWorkflowStatus,
+  SavedInterviewView,
+  InterviewFilters as TestimonyInterviewFilters,
+  InterviewSort as TestimonyInterviewSort,
+  OralHistoryParticipantRole as TestimonyParticipantRole,
+  IdentityMode as TestimonyIdentityMode,
+  SessionStatus as TestimonySessionStatus,
+  MediaKind as TestimonyMediaKind,
+  MediaRole as TestimonyMediaRole,
+  TranscriptKind as TestimonyTranscriptKind,
+  TranscriptStatus as TestimonyTranscriptStatus,
+  CodeKind as TestimonyCodeKind,
+  AnnotationKind as TestimonyAnnotationKind,
+  AgreementStatus as TestimonyAgreementStatus,
+  AccessLevel as TestimonyAccessLevel,
+  AttributionMode as TestimonyAttributionMode,
+  NarratorReviewStatus as TestimonyNarratorReviewStatus,
+  DocumentedUse as TestimonyDocumentedUse,
+  AccessChannel as TestimonyAccessChannel,
+  AccessDecision as TestimonyAccessDecision,
+  AccessDenialReason as TestimonyAccessDenialReason,
+  VaultAccessPolicy as TestimonyVaultAccessPolicy,
+};
+
 // Type-only re-export of the Nodus Toolkit type surface, so NodusApi (and callers
 // that import from '@shared/types') get the toolkit types from one place. The
 // runtime catalogue (TOOLKIT_OPS, toolkitOp, …) is imported directly from
@@ -1570,6 +1626,7 @@ export interface AppSettings {
   genealogyTourComplete: boolean;
   // Completion flag for the databases-mode guided tour (shown once per databases vault).
   databasesTourComplete: boolean;
+  testimonyTourComplete: boolean;
   // Completion flag for the optional study-vault orientation tour.
   studyTourComplete: boolean;
   // Completion flag for the teaching-vault guided tour.
@@ -1683,6 +1740,35 @@ export interface AppSettings {
   // Google Drive to get off-machine copies for free). Encrypted with the
   // master backup password stored in the OS keychain; unlike the manual
   // export. MCP tokens are never included; API keys are protected inside backups.
+
+  // ── Testimonios (historia oral). Preferencias POR BÓVEDA ────────────────────
+  // Son valores predeterminados que cada entrevista puede sobrescribir, no decisiones
+  // irrevocables: un proyecto de historia oral suele tener una política («todo se
+  // deposita en el archivo municipal, el narrador siempre revisa»), pero una entrevista
+  // concreta puede acordarse de otra manera y el programa no puede impedirlo.
+  /** Idioma habitual de las entrevistas de este proyecto (BCP-47 cuando sea posible). */
+  testimonyDefaultLanguage: string;
+  /** Nivel de acceso con el que nace un acuerdo si nadie dice otra cosa. */
+  testimonyDefaultAccess: AccessLevel;
+  /** Modo de atribución predeterminado. */
+  testimonyDefaultAttribution: AttributionMode;
+  /** Si en este proyecto el narrador revisa la transcripción por norma. */
+  testimonyNarratorReviewDefault: boolean;
+  /** Institución o repositorio de destino previsto. */
+  testimonyRepositoryName: string;
+  /** Política de conservación, en texto libre: es una decisión del proyecto, no un enum. */
+  testimonyRetentionPolicy: string;
+  /** Plantilla o referencia del acuerdo utilizado (un nombre o una URL). */
+  testimonyAgreementTemplate: string;
+  /**
+   * Si esta bóveda permite mandar material a proveedores externos. DESACTIVADO por
+   * omisión y a propósito: el ajuste puede CERRAR lo que un acuerdo abre, pero nunca al
+   * revés. El acuerdo de cada entrevista sigue mandando por encima de esta casilla.
+   */
+  testimonyAllowExternalProviders: boolean;
+  /** Propósito general del proyecto, mostrado en Inicio. */
+  testimonyProjectPurpose: string;
+
   autoBackupEnabled: boolean;
   autoBackupFolder: string;
   autoBackupIntervalHours: number;
@@ -6695,6 +6781,56 @@ export interface NodiViewContext {
   capturedAt: number;
 }
 
+export interface TestimonyIndexReport {
+  indexedInterviews: number;
+  indexedSegments: number;
+  withheld: { reason: string; interviews: number }[];
+  purged: number;
+  model: string;
+  failed: number;
+}
+
+export interface TestimonyIndexStatus {
+  indexable: number;
+  indexed: number;
+  segments: number;
+  /** Tramos indexados que el acuerdo ya no autoriza: hay que reconstruir. */
+  stale: number;
+  model: string | null;
+}
+
+export interface TestimonySemanticHit {
+  segmentId: string;
+  interviewId: string;
+  transcriptId: string;
+  similarity: number;
+  text: string;
+  tStart: number;
+  interviewTitle: string;
+  shortId: string;
+  speakerLabel: string | null;
+  speakerPersonId: string | null;
+}
+
+/** Lo que la IA propone para una entrevista. Nada de esto está guardado todavía. */
+export interface TestimonyInterviewAnalysis {
+  interviewId: string;
+  transcriptId: string;
+  codes: { label: string; note: string }[];
+  passages: { quote: string; code: string; why: string; segmentId: string; at: string; tStart: number }[];
+  /** Las citas que el modelo dio y no aparecen en la transcripción, con cuánto se acercaban. */
+  discarded: { quote: string; coverage: number }[];
+  model: string;
+}
+
+export interface TestimonyTranscriptImprovement {
+  transcriptId: string;
+  segments: { segmentId: string; before: string; after: string; accepted: boolean; removed: string[]; added: string[] }[];
+  accepted: number;
+  rejected: number;
+  model: string;
+}
+
 export interface NodiChatRequest {
   messages: NodiChatMessage[];
   contexts: NodiContextKind[];
@@ -6756,6 +6892,504 @@ export type NodiNavigationTarget =
       kind: string;
       id: string;
     };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Testimonios — historia oral. El dominio puro (estados, transiciones, reglas de
+// acceso, citas) vive en shared/testimonies.ts y shared/testimonyAccess.ts; aquí solo
+// están las FORMAS que viajan por IPC. Los dos ficheros se separan a propósito: las
+// reglas se prueban sin arrancar Electron.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface TestimonyInterview {
+  id: string;
+  shortId: string;
+  title: string;
+  interviewKind: InterviewKind;
+  workflowStatus: InterviewWorkflowStatus;
+  collectionLabel: string | null;
+  scheduledAt: string | null;
+  conductedAt: string | null;
+  locationText: string | null;
+  interviewMode: InterviewMode | null;
+  language: string | null;
+  objective: string | null;
+  contextMarkdown: string | null;
+  guideMarkdown: string | null;
+  abstract: string | null;
+  repositoryName: string | null;
+  accessionId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  archivedAt: string | null;
+  deletedAt: string | null;
+}
+
+/** Una entrevista con lo que la tabla necesita mostrar sin abrir su dossier. */
+export interface TestimonyInterviewRow extends TestimonyInterview {
+  participants: TestimonyInterviewParticipant[];
+  /** Nombres YA resueltos contra el modo de atribución del acuerdo vigente. */
+  narratorNames: string[];
+  interviewerNames: string[];
+  sessionCount: number;
+  mediaCount: number;
+  durationSeconds: number;
+  transcriptionState: TestimonyTranscriptionState;
+  agreement: TestimonyAgreement | null;
+  annotationCount: number;
+  needsReviewCount: number;
+}
+
+/** El estado agregado de transcripción de una entrevista, para la tabla y los filtros. */
+export type TestimonyTranscriptionState = 'none' | 'pending' | 'processing' | 'ready' | 'reviewed' | 'error';
+
+export interface TestimonyInterviewInput {
+  title: string;
+  interviewKind?: InterviewKind;
+  workflowStatus?: InterviewWorkflowStatus;
+  collectionLabel?: string | null;
+  scheduledAt?: string | null;
+  conductedAt?: string | null;
+  locationText?: string | null;
+  interviewMode?: InterviewMode | null;
+  language?: string | null;
+  objective?: string | null;
+  contextMarkdown?: string | null;
+  guideMarkdown?: string | null;
+  abstract?: string | null;
+  repositoryName?: string | null;
+  accessionId?: string | null;
+  narratorIds?: string[];
+  interviewerIds?: string[];
+}
+
+export interface TestimonyInterviewParticipant {
+  interviewId: string;
+  personId: string;
+  role: OralHistoryParticipantRole;
+  speakerLabel: string | null;
+  isPrimary: boolean;
+  position: number;
+  /** Nombre de trabajo, tal como consta en `persons`. Nunca sale a un derivado. */
+  workingName: string;
+  /** Nombre mostrable, ya resuelto contra el acuerdo vigente. */
+  displayName: string;
+  identityMode: IdentityMode;
+}
+
+export interface TestimonyParticipantProfile {
+  personId: string;
+  workingName: string;
+  publicName: string | null;
+  identityMode: IdentityMode;
+  pronunciation: string | null;
+  biographicalNote: string | null;
+  attributionNote: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TestimonyParticipantInput {
+  workingName: string;
+  publicName?: string | null;
+  identityMode?: IdentityMode;
+  pronunciation?: string | null;
+  biographicalNote?: string | null;
+  attributionNote?: string | null;
+  nameVariants?: string[];
+}
+
+/** Una persona en la tabla de Participantes. */
+export interface TestimonyParticipantRow extends TestimonyParticipantProfile {
+  roles: OralHistoryParticipantRole[];
+  interviewCount: number;
+  lastInterviewAt: string | null;
+  pendingAgreements: number;
+  noteCount: number;
+}
+
+export interface TestimonySession {
+  id: string;
+  shortId: string;
+  interviewId: string;
+  sequenceNo: number;
+  title: string | null;
+  status: SessionStatus;
+  scheduledAt: string | null;
+  recordedAt: string | null;
+  locationText: string | null;
+  mode: InterviewMode | null;
+  language: string | null;
+  fieldNotes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  media: TestimonyMedia[];
+}
+
+export interface TestimonySessionInput {
+  interviewId: string;
+  title?: string | null;
+  status?: SessionStatus;
+  scheduledAt?: string | null;
+  recordedAt?: string | null;
+  locationText?: string | null;
+  mode?: InterviewMode | null;
+  language?: string | null;
+  fieldNotes?: string | null;
+}
+
+/** Un archivo. NUNCA lleva el blob: se pide aparte, por id. */
+export interface TestimonyMedia {
+  id: string;
+  shortId: string;
+  sessionId: string;
+  mediaKind: MediaKind;
+  role: MediaRole;
+  fileName: string | null;
+  mimeType: string | null;
+  contentHash: string | null;
+  durationSeconds: number | null;
+  sizeBytes: number | null;
+  technical: Record<string, string | number | null> | null;
+  sourceMediaId: string | null;
+  immutable: boolean;
+  createdAt: string;
+  deletedAt: string | null;
+  transcripts: TestimonyTranscript[];
+}
+
+export interface TestimonyMediaImportInput {
+  sessionId: string;
+  fileName: string;
+  mimeType: string;
+  bytes: ArrayBuffer | Uint8Array;
+  durationSeconds?: number | null;
+  role?: MediaRole;
+  mediaKind?: MediaKind;
+  sourceMediaId?: string | null;
+  technical?: Record<string, string | number | null> | null;
+}
+
+/** Qué pasó al importar: un duplicado exacto no se guarda dos veces. */
+export interface TestimonyMediaImportResult {
+  media: TestimonyMedia;
+  duplicateOf: string | null;
+  proposedStatus: InterviewWorkflowStatus | null;
+}
+
+export interface TestimonyTranscript {
+  id: string;
+  shortId: string;
+  mediaId: string;
+  kind: TranscriptKind;
+  language: string | null;
+  contentMarkdown: string | null;
+  status: TranscriptStatus;
+  versionNo: number;
+  sourceTranscriptId: string | null;
+  modelProvider: string | null;
+  modelName: string | null;
+  approvedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  segmentCount: number;
+}
+
+export interface TestimonyTranscriptSegment {
+  id: string;
+  shortId: string;
+  transcriptId: string;
+  sourceSegmentId: string | null;
+  tStart: number;
+  tEnd: number;
+  text: string;
+  speakerPersonId: string | null;
+  speakerLabel: string | null;
+  confidence: number | null;
+  position: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TestimonyCode {
+  id: string;
+  label: string;
+  normalizedLabel: string;
+  kind: CodeKind;
+  parentId: string | null;
+  description: string | null;
+  color: string | null;
+  createdAt: string;
+  updatedAt: string;
+  /** Cuántas anotaciones lo usan y en cuántas entrevistas aparece. */
+  usageCount: number;
+  interviewCount: number;
+}
+
+export interface TestimonyCodeInput {
+  label: string;
+  kind?: CodeKind;
+  parentId?: string | null;
+  description?: string | null;
+  color?: string | null;
+}
+
+export interface TestimonyAnnotation {
+  id: string;
+  shortId: string;
+  interviewId: string;
+  transcriptId: string;
+  segmentId: string | null;
+  kind: AnnotationKind;
+  tStart: number;
+  tEnd: number;
+  startOffset: number | null;
+  endOffset: number | null;
+  quoteSnapshot: string;
+  memo: string | null;
+  linkStatus: 'valid' | 'needs_review';
+  createdAt: string;
+  updatedAt: string;
+  codes: TestimonyCode[];
+}
+
+export interface TestimonyAnnotationInput {
+  interviewId: string;
+  transcriptId: string;
+  segmentId?: string | null;
+  kind?: AnnotationKind;
+  tStart: number;
+  tEnd: number;
+  startOffset?: number | null;
+  endOffset?: number | null;
+  quoteSnapshot: string;
+  memo?: string | null;
+  codeIds?: string[];
+}
+
+export interface TestimonyAgreement {
+  id: string;
+  interviewId: string;
+  versionNo: number;
+  isCurrent: boolean;
+  status: AgreementStatus;
+  documentedAt: string | null;
+  accessLevel: AccessLevel;
+  embargoUntil: string | null;
+  attributionMode: AttributionMode;
+  allowedUses: DocumentedUse[];
+  narratorReviewRequired: boolean;
+  narratorReviewStatus: NarratorReviewStatus;
+  narratorReviewSentAt: string | null;
+  narratorReviewNotes: string | null;
+  restrictionsMarkdown: string | null;
+  documentMediaId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TestimonyAgreementInput {
+  interviewId: string;
+  status?: AgreementStatus;
+  documentedAt?: string | null;
+  accessLevel?: AccessLevel;
+  embargoUntil?: string | null;
+  attributionMode?: AttributionMode;
+  allowedUses?: DocumentedUse[];
+  narratorReviewRequired?: boolean;
+  narratorReviewStatus?: NarratorReviewStatus;
+  narratorReviewSentAt?: string | null;
+  narratorReviewNotes?: string | null;
+  restrictionsMarkdown?: string | null;
+  documentMediaId?: string | null;
+}
+
+/** Un fragmento tal y como lo pintan Contrastes, Buscar y una nota. */
+export interface TestimonyFragment {
+  annotationId: string;
+  shortId: string;
+  interviewId: string;
+  interviewTitle: string;
+  interviewShortId: string;
+  transcriptId: string;
+  transcriptKind: TranscriptKind;
+  sessionId: string | null;
+  mediaId: string | null;
+  /** Ya resuelto contra el acuerdo: nunca el nombre real bajo seudónimo. */
+  speakerName: string;
+  speakerPersonId: string | null;
+  tStart: number;
+  tEnd: number;
+  text: string;
+  memo: string | null;
+  codes: TestimonyCode[];
+  accessLevel: AccessLevel;
+  agreementStatus: AgreementStatus;
+  linkStatus: 'valid' | 'needs_review';
+  conductedAt: string | null;
+}
+
+export interface TestimonyContrast {
+  id: string;
+  shortId: string;
+  title: string;
+  filters: TestimonyContrastFilters;
+  memoMarkdown: string | null;
+  createdAt: string;
+  updatedAt: string;
+  pinned: TestimonyContrastItem[];
+}
+
+export interface TestimonyContrastItem {
+  contrastId: string;
+  annotationId: string;
+  position: number;
+  note: string | null;
+}
+
+export interface TestimonyContrastFilters {
+  interviewIds?: string[];
+  codeIds?: string[];
+  personIds?: string[];
+  search?: string;
+  languages?: string[];
+  collections?: string[];
+  from?: string;
+  to?: string;
+  /** Solo versiones revisadas o aprobadas, si el investigador lo pide. */
+  reviewedOnly?: boolean;
+  mode?: 'parallel' | 'byTheme' | 'matrix';
+}
+
+export interface TestimonyContrastInput {
+  title: string;
+  filters?: TestimonyContrastFilters;
+  memoMarkdown?: string | null;
+}
+
+/** El resultado de un contraste. Nodus muestra; interpretar es del investigador. */
+export interface TestimonyContrastResult {
+  fragments: TestimonyFragment[];
+  /** Códigos presentes en TODAS las entrevistas seleccionadas. */
+  sharedCodeIds: string[];
+  /** Entrevistas seleccionadas que no aportan ningún fragmento: ausencia, no conclusión. */
+  silentInterviewIds: string[];
+  matrix: { codeId: string; interviewId: string; count: number }[];
+}
+
+/** El tablero de Inicio. */
+export interface TestimonyDashboard {
+  metrics: {
+    interviews: number;
+    scheduled: number;
+    pendingTranscription: number;
+    reviewing: number;
+    completed: number;
+    recordedSeconds: number;
+    storageBytes: number;
+    participants: number;
+    codes: number;
+    annotations: number;
+  };
+  alerts: TestimonyAlert[];
+  recent: {
+    interviews: { id: string; title: string; updatedAt: string }[];
+    transcripts: { id: string; interviewId: string; interviewTitle: string; kind: TranscriptKind; createdAt: string }[];
+    notes: { id: string; title: string; updatedAt: string }[];
+    contrasts: { id: string; title: string; updatedAt: string }[];
+  };
+  preservation: {
+    lastBackupAt: string | null;
+    interviewsWithoutMaster: number;
+    mediaWithoutHash: number;
+    storageBytes: number;
+  };
+}
+
+export interface TestimonyAlert {
+  kind: TestimonyAlertKind;
+  count: number;
+  /** Las primeras entrevistas afectadas, para poder saltar sin abrir la lista. */
+  interviewIds: string[];
+}
+
+export type TestimonyAlertKind =
+  | 'upcoming'
+  | 'agreement_missing'
+  | 'backup_stale'
+  | 'transcription_error'
+  | 'transcription_pending_review'
+  | 'narrator_review_pending'
+  | 'embargo_expiring'
+  | 'annotation_needs_review'
+  | 'master_missing';
+
+/** Qué desaparece al borrar una entrevista. Se enseña ANTES de preguntar. */
+export interface TestimonyDeletionImpact {
+  interviewId: string;
+  title: string;
+  sessions: number;
+  media: number;
+  masterMedia: number;
+  transcripts: number;
+  segments: number;
+  annotations: number;
+  agreements: number;
+  contrastItems: number;
+  noteLinks: number;
+  bytes: number;
+}
+
+export type TestimonySearchKind =
+  | 'interview'
+  | 'participant'
+  | 'segment'
+  | 'code'
+  | 'note'
+  | 'contrast';
+
+export interface TestimonySearchHit {
+  kind: TestimonySearchKind;
+  id: string;
+  title: string;
+  snippet: string | null;
+  /** Presente solo en los pasajes. */
+  interviewId?: string;
+  transcriptId?: string;
+  segmentId?: string;
+  speakerName?: string;
+  tStart?: number;
+  accessLevel?: AccessLevel;
+  agreementStatus?: AgreementStatus;
+}
+
+/** Un enlace de una nota con cualquier entidad. Tabla genérica `note_links`. */
+export interface NoteLink {
+  noteId: string;
+  targetKind: string;
+  targetId: string;
+  label: string | null;
+  createdAt: string;
+}
+
+/** El paquete archivístico que se puede exportar. */
+export type TestimonyExportKind = 'preservation' | 'access' | 'review';
+
+export interface TestimonyExportRequest {
+  kind: TestimonyExportKind;
+  interviewIds: string[];
+  /** El documento del acuerdo solo viaja tras una casilla explícita. */
+  includeAgreementDocuments?: boolean;
+  includeNotes?: boolean;
+}
+
+export interface TestimonyExportResult {
+  path: string;
+  interviews: number;
+  files: number;
+  bytes: number;
+  /** Entrevistas que la puerta de acceso dejó fuera, con su motivo. */
+  excluded: { interviewId: string; title: string; reason: string }[];
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // IPC API surface exposed on window.nodus via the preload bridge.
@@ -8487,7 +9121,102 @@ export interface NodusApi {
    *  Returns false outside a `docencia` vault, or when the demo is already loaded. */
   seedTeachingDemoData(): Promise<boolean>;
   /** Seed an empty worldbuilding vault with the complete local-only Ashen Tides world. */
+
+  // ── Testimonios (historia oral) ────────────────────────────────────────────
+  // Los canales van agrupados por entidad y NUNCA exponen rutas ni SQL: el renderer
+  // pide entrevistas, no consultas. El blob de un medio se pide siempre aparte, por id,
+  // para que ninguna lista arrastre horas de audio.
+  testimonyDashboard(): Promise<TestimonyDashboard>;
+  listTestimonyInterviews(options?: { filters?: InterviewFilters; sort?: InterviewSort; limit?: number }): Promise<TestimonyInterviewRow[]>;
+  getTestimonyInterview(id: string): Promise<TestimonyInterviewRow | null>;
+  createTestimonyInterview(input: TestimonyInterviewInput): Promise<TestimonyInterview>;
+  updateTestimonyInterview(id: string, patch: Partial<TestimonyInterviewInput>): Promise<TestimonyInterview | null>;
+  archiveTestimonyInterview(id: string, archived: boolean): Promise<TestimonyInterview | null>;
+  trashTestimonyInterview(id: string, trashed: boolean): Promise<TestimonyInterview | null>;
+  testimonyDeletionImpact(id: string): Promise<TestimonyDeletionImpact | null>;
+  purgeTestimonyInterview(id: string): Promise<void>;
+  testimonyInterviewFacets(): Promise<{ collections: string[]; languages: string[] }>;
+
+  listTestimonyParticipants(search?: string): Promise<TestimonyParticipantRow[]>;
+  getTestimonyParticipant(personId: string): Promise<TestimonyParticipantProfile | null>;
+  createTestimonyParticipant(input: TestimonyParticipantInput): Promise<TestimonyParticipantProfile>;
+  updateTestimonyParticipant(personId: string, patch: Partial<TestimonyParticipantInput>): Promise<TestimonyParticipantProfile | null>;
+  deleteTestimonyParticipant(personId: string): Promise<void>;
+  testimonyParticipantInterviews(personId: string): Promise<{ interviewId: string; title: string; shortId: string; role: OralHistoryParticipantRole; at: string | null; workflowStatus: string; accessLevel: string }[]>;
+  addTestimonyParticipant(interviewId: string, personId: string, role: OralHistoryParticipantRole, options?: { isPrimary?: boolean; speakerLabel?: string | null }): Promise<void>;
+  removeTestimonyParticipant(interviewId: string, personId: string, role: OralHistoryParticipantRole): Promise<void>;
+  listTestimonyInterviewParticipants(interviewId: string): Promise<TestimonyInterviewParticipant[]>;
+
+  testimonyAgreementHistory(interviewId: string): Promise<TestimonyAgreement[]>;
+  saveTestimonyAgreement(input: TestimonyAgreementInput): Promise<TestimonyAgreement>;
+
+  listTestimonySessions(interviewId: string): Promise<TestimonySession[]>;
+  createTestimonySession(input: TestimonySessionInput): Promise<TestimonySession>;
+  updateTestimonySession(id: string, patch: Partial<TestimonySessionInput>): Promise<TestimonySession | null>;
+  deleteTestimonySession(id: string): Promise<void>;
+
+  importTestimonyMedia(input: { sessionId: string; fileName: string; mimeType: string; bytes: ArrayBuffer; durationSeconds?: number | null; role?: MediaRole }): Promise<TestimonyMediaImportResult>;
+  importTestimonyMediaPaths(sessionId: string, paths: string[]): Promise<TestimonyMediaImportResult[]>;
+  pickTestimonyMediaFiles(): Promise<string[]>;
+  getTestimonyMediaBlob(mediaId: string): Promise<{ bytes: ArrayBuffer; mimeType: string; fileName: string } | null>;
+  verifyTestimonyMediaHash(mediaId: string): Promise<{ ok: boolean; expected: string | null; actual: string | null }>;
+  exportTestimonyMaster(mediaId: string): Promise<string | null>;
+  dropTestimonyMediaBytes(mediaId: string): Promise<TestimonyMedia | null>;
+  deleteTestimonyMedia(mediaId: string): Promise<void>;
+
+  listTestimonyTranscripts(mediaId: string): Promise<TestimonyTranscript[]>;
+  listTestimonySegments(transcriptId: string): Promise<TestimonyTranscriptSegment[]>;
+  createTestimonyTranscript(input: { mediaId: string; kind: TranscriptKind; language?: string | null; contentMarkdown?: string | null; status?: TranscriptStatus; sourceTranscriptId?: string | null; modelProvider?: string | null; modelName?: string | null; segments?: { tStart: number; tEnd: number; text: string; speakerLabel?: string | null; confidence?: number | null }[] }): Promise<TestimonyTranscript>;
+  deriveTestimonyTranscript(sourceId: string, kind: TranscriptKind, options?: { language?: string | null }): Promise<{ transcript: TestimonyTranscript; remapped: number; needsReview: number }>;
+  deleteTestimonyTranscript(id: string): Promise<void>;
+  updateTestimonySegment(id: string, patch: { text?: string; speakerPersonId?: string | null; speakerLabel?: string | null; tStart?: number; tEnd?: number }): Promise<TestimonyTranscriptSegment | null>;
+  assignTestimonySpeaker(transcriptId: string, speakerLabel: string | null, personId: string | null): Promise<number>;
+  testimonySpeakerLabels(transcriptId: string): Promise<{ label: string | null; personId: string | null; segments: number }[]>;
+  buildTestimonyIndex(): Promise<TestimonyIndexReport>;
+  testimonyIndexStatus(): Promise<TestimonyIndexStatus>;
+  clearTestimonyIndex(): Promise<number>;
+  searchTestimoniesBySemantics(query: string, limit?: number): Promise<TestimonySemanticHit[]>;
+  analyzeTestimonyInterview(interviewId: string): Promise<TestimonyInterviewAnalysis>;
+  improveTestimonyTranscript(transcriptId: string): Promise<TestimonyTranscriptImprovement>;
+  applyDetectedTestimonySpeakers(
+    transcriptId: string,
+    entries: { segmentId: string; label: string | null }[],
+  ): Promise<{ changed: number; skipped: number }>;
+
+  listTestimonyCodes(): Promise<TestimonyCode[]>;
+  createTestimonyCode(input: TestimonyCodeInput): Promise<TestimonyCode>;
+  updateTestimonyCode(id: string, patch: Partial<TestimonyCodeInput>): Promise<TestimonyCode | null>;
+  deleteTestimonyCode(id: string): Promise<void>;
+  mergeTestimonyCodes(sourceId: string, targetId: string): Promise<TestimonyCode | null>;
+  listTestimonyAnnotations(interviewId: string): Promise<TestimonyAnnotation[]>;
+  createTestimonyAnnotation(input: TestimonyAnnotationInput): Promise<TestimonyAnnotation>;
+  updateTestimonyAnnotation(id: string, patch: { memo?: string | null; kind?: AnnotationKind; codeIds?: string[]; linkStatus?: 'valid' | 'needs_review' }): Promise<TestimonyAnnotation | null>;
+  deleteTestimonyAnnotation(id: string): Promise<void>;
+  testimonyFragments(filters: TestimonyContrastFilters): Promise<TestimonyFragment[]>;
+
+  listTestimonyContrasts(): Promise<TestimonyContrast[]>;
+  getTestimonyContrast(id: string): Promise<TestimonyContrast | null>;
+  createTestimonyContrast(input: TestimonyContrastInput): Promise<TestimonyContrast>;
+  updateTestimonyContrast(id: string, patch: Partial<TestimonyContrastInput>): Promise<TestimonyContrast | null>;
+  deleteTestimonyContrast(id: string): Promise<void>;
+  pinTestimonyFragment(contrastId: string, annotationId: string, pinned: boolean): Promise<TestimonyContrast | null>;
+  reorderTestimonyContrastItems(contrastId: string, annotationIds: string[]): Promise<TestimonyContrast | null>;
+  runTestimonyContrast(filters: TestimonyContrastFilters): Promise<TestimonyContrastResult>;
+
+  searchTestimonies(query: string, kinds?: TestimonySearchKind[]): Promise<TestimonySearchHit[]>;
+
+  listNoteLinks(noteId: string): Promise<NoteLink[]>;
+  linksForTarget(targetKind: string, targetId: string): Promise<NoteLink[]>;
+  addNoteLink(noteId: string, targetKind: string, targetId: string, label?: string | null): Promise<void>;
+  removeNoteLink(noteId: string, targetKind: string, targetId: string): Promise<void>;
+  createNoteFromFragment(annotationId: string): Promise<{ noteId: string; title: string }>;
+
+  exportTestimonyPackage(request: TestimonyExportRequest): Promise<TestimonyExportResult | null>;
+  testimonyAccessDecision(interviewId: string, channel: AccessChannel): Promise<AccessDecision>;
+
   seedWorldbuildingDemoData(): Promise<boolean>;
+  /** Sembrar un vault de testimonios con el proyecto ficticio «Memoria del valle». */
+  seedTestimonyDemoData(): Promise<boolean>;
   /** Generate daguerreotype portraits for the demo people (cheap Gemini model). */
   generateDemoPortraits(): Promise<{ generated: number; skipped: number }>;
   /** Progress of demo portrait generation. Returns an unsubscribe function. */

@@ -7,6 +7,7 @@ import { showImportOpenDialog } from '../privacy';
 import type { AiProvider, AppSettings, BackupSelection } from '@shared/types';
 import { SECRET_PROVIDERS } from '@shared/providers';
 import { closeDb, getDb, replaceDbFile, SCHEMA_VERSION } from '../db/database';
+import { testimonyBackupInventory } from './testimonyExport';
 import { getSettings } from '../db/settingsRepo';
 import { listVaults, getActiveVault, restoreVaultDatabase, setActiveVault } from '../vaults/vaultRegistry';
 import type { VaultType } from '@shared/types';
@@ -80,6 +81,13 @@ interface EmbeddingInventory {
 /** A human-auditable record of the data that must survive without reindexing. */
 interface BackupInventory {
   tableRows: Record<string, number>;
+  /**
+   * Testimonios, aparte de los recuentos de filas. HORAS y BYTES son las dos cifras que
+   * un recuento de filas no puede dar y que convierten «restauró» en «restauró completo»:
+   * mil filas de `testimony_media` con los blobs vacíos son mil filas igualmente.
+   * `null` en cualquier bóveda que no sea de testimonios.
+   */
+  testimony: ReturnType<typeof testimonyBackupInventory>;
   embeddings: {
     ideas: EmbeddingInventory;
     workSummaries: EmbeddingInventory;
@@ -881,6 +889,7 @@ function databaseInventory(
     );
     return {
       tableRows,
+      testimony: testimonyBackupInventory(db),
       embeddings: {
         ideas: embeddingInventory(db, 'ideas'),
         workSummaries: embeddingInventory(db, 'work_summaries'),

@@ -32,7 +32,8 @@ if (!process.argv.includes('--electron-primary-sources-proposals-test')) {
     'Resoluciones reversibles',
     'Aceptar y crear evidencia',
   ]) assert.ok(view.includes(marker), `phase 6 UI contains ${marker}`);
-  assert.match(schema, /SCHEMA_VERSION = 11[2-9]/);
+  assert.ok(Number(schema.match(/SCHEMA_VERSION = (\d+)/)[1]) >= 112,
+    'the proposals/evidence migration is applied');
   assert.match(schema, /archive_proposal_decisions/);
   assert.match(schema, /idx_archive_proposal_one_acceptance/);
   assert.match(sync, /'archive_proposal_decisions'/);

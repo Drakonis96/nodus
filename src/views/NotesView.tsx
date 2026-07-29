@@ -18,6 +18,7 @@ import { buildNotesTree, countNotesInSubtree, flattenFolders, type FolderNode } 
 import { ManualIdeaEditor } from './ManualIdeaEditor';
 import { FolderIdeaSuggestionsModal } from './FolderIdeaSuggestionsModal';
 import type { PendingGraphNavigationTarget } from '../navigation';
+import type { TestimonyDeepLink } from '@shared/testimonyDeepLinks';
 import { t, tx } from '../i18n';
 
 type FolderScope = { kind: 'all' } | { kind: 'unfiled' } | { kind: 'folder'; id: string };
@@ -71,10 +72,13 @@ const KIND_COLORS: Record<NoteKind, 'neutral' | 'indigo' | 'cyan' | 'red' | 'gre
 export function NotesView({
   onOpenGraph,
   focusNote,
+  onTestimonyLink,
 }: {
   onOpenGraph?: (target: PendingGraphNavigationTarget) => void;
   /** A note to open (e.g. from global search); the nonce re-triggers on repeats. */
   focusNote?: { id: string; nonce: number } | null;
+  /** Abre un enlace `nodus://testimonios/...` en su entrevista y su minuto. */
+  onTestimonyLink?: (link: TestimonyDeepLink) => void;
 }) {
   const [folders, setFolders] = useState<NoteFolder[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
@@ -831,7 +835,7 @@ export function NotesView({
               ) : (
                 <div className="max-w-3xl mx-auto px-5 py-4">
                   {editContent.trim() ? (
-                    <Markdown content={editContent} onCitation={(c: MarkdownCitation) => setCitation(c)} />
+                    <Markdown content={editContent} onCitation={(c: MarkdownCitation) => setCitation(c)} onTestimonyLink={onTestimonyLink} />
                   ) : (
                     <p className="text-sm text-neutral-600">{t('Nota vacía. Cambia a «Editar» para escribir.')}</p>
                   )}

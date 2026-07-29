@@ -22,6 +22,7 @@ import { PRIMARY_SOURCES_PERSONS_TRANSLATIONS } from './i18n.primarySourcesPerso
 import { PRIMARY_SOURCES_DERIVED_TRANSLATIONS } from './i18n.primarySourcesDerived';
 import { PRIMARY_SOURCES_RESEARCH_TRANSLATIONS } from './i18n.primarySourcesResearch';
 import { PRIMARY_SOURCES_RELEASE_TRANSLATIONS } from './i18n.primarySourcesRelease';
+import { TESTIMONY_TRANSLATIONS } from './i18n.testimonies';
 
 export const DE: Record<string, string> = {
   ...DIARIZATION_TRANSLATIONS.de,
@@ -36,6 +37,7 @@ export const DE: Record<string, string> = {
   ...PRIMARY_SOURCES_RESEARCH_TRANSLATIONS.de,
   ...PRIMARY_SOURCES_RELEASE_TRANSLATIONS.de,
   ...WORLDBUILDING_TRANSLATIONS.de,
+  ...TESTIMONY_TRANSLATIONS.de,
   ...WORLD_CHAT_TRANSLATIONS.de,
   "Lo que cuenta el mapa": "Was die Karte erzählt",
   "Ver dónde ocurren las escenas ({n})": "Zeigen, wo die Szenen spielen ({n})",

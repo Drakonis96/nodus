@@ -121,7 +121,7 @@ const INDIRECT_KEY_SOURCES = [
   // Convert view.
   { file: 'shared/toolkitTypes.ts', pattern: /\b(?:label|description|placeholder):\s*(["'])((?:\\.|(?!\1).)*?)\1/g },
   // Tour steps are plain object literals fed through t() by the tour engine.
-  ...['Tour', 'AdvancedTour', 'StudyTour', 'GenealogyTour', 'DatabasesTour', 'TeachingTour', 'PrimarySourcesTour'].map((name) => ({
+  ...['Tour', 'AdvancedTour', 'StudyTour', 'GenealogyTour', 'DatabasesTour', 'TeachingTour', 'PrimarySourcesTour', 'TestimonyTour'].map((name) => ({
     file: `src/views/${name}.tsx`,
     pattern: /(?:title|body|label):\s*(["'])((?:\\.|(?!\1).)*?)\1/g,
   })),
@@ -172,6 +172,16 @@ const INDIRECT_KEY_SOURCES = [
   // Map kind names, rendered as t(kind.label) in the map cards, the side panel and the
   // creation modal. They never appear literally inside a t() call.
   { file: 'src/views/WorldMapsView.tsx', pattern: /\blabel:\s*(["'])((?:\\.|(?!\1).)*?)\1/g },
+  // El vocabulario visible de Testimonios: estados del flujo, del acuerdo y del acceso,
+  // usos documentados, papeles, tipos de transcripción y motivos de denegación. TODO
+  // llega a la interfaz como t(LABEL[x]) — nunca como literal dentro de un t() — así que
+  // sin registrarlo aquí una etiqueta sin traducir pasaría desapercibida, que es
+  // exactamente como el vault de genealogía se publicó a medias.
+  { file: 'shared/testimonyLabels.ts', pattern: /^\s{2}\w+:\s*(["'])((?:\\.|(?!\1).)*?)\1,$/gm },
+  // El sidebar propio de Testimonios: sus grupos y sus entradas se pintan con t(item.label).
+  { file: 'src/components/TestimonySidebar.tsx', pattern: /\blabel:\s*(["'])((?:\\.|(?!\1).)*?)\1/g },
+  // Las siete vistas guardadas de la tabla de entrevistas, rendidas como t(view.label).
+  { file: 'shared/testimonies.ts', pattern: /\blabel:\s*(["'])((?:\\.|(?!\1).)*?)\1/g },
   // Worldbuilding character vocabularies (life status, narrative role, event kinds),
   // rendered as t(CHARACTER_*_LABEL[x]) in the grid, the sheet and the AI prompts. The
   // two-space-indent form deliberately skips the `{ id: 'violet', hex: '#7c3aed' }`

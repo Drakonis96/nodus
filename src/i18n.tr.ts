@@ -16,6 +16,7 @@ import { PRIMARY_SOURCES_PERSONS_TRANSLATIONS } from './i18n.primarySourcesPerso
 import { PRIMARY_SOURCES_DERIVED_TRANSLATIONS } from './i18n.primarySourcesDerived';
 import { PRIMARY_SOURCES_RESEARCH_TRANSLATIONS } from './i18n.primarySourcesResearch';
 import { PRIMARY_SOURCES_RELEASE_TRANSLATIONS } from './i18n.primarySourcesRelease';
+import { TESTIMONY_TRANSLATIONS } from './i18n.testimonies';
 
 /** Complete static Turkish interface table; coverage prohibits runtime fallbacks. */
 export const TR: Record<string, string> = {
@@ -31,6 +32,7 @@ export const TR: Record<string, string> = {
   ...PRIMARY_SOURCES_RESEARCH_TRANSLATIONS.tr,
   ...PRIMARY_SOURCES_RELEASE_TRANSLATIONS.tr,
   ...WORLDBUILDING_TRANSLATIONS.tr,
+  ...TESTIMONY_TRANSLATIONS.tr,
   ...WORLD_CHAT_TRANSLATIONS.tr,
   "Lo que cuenta el mapa": "Haritanın anlattıkları",
   "Ver dónde ocurren las escenas ({n})": "Sahnelerin nerede geçtiğini gör ({n})",

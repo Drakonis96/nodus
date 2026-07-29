@@ -41,7 +41,8 @@ if (!process.argv.includes('--electron-primary-sources-text-test')) {
   assert.match(textRepo, /parentPreserved/);
   assert.match(evidenceRepo, /createStableArchiveExcerpt/);
   assert.match(evidenceRepo, /version\.content\.slice\(input\.startOffset, input\.endOffset\)/);
-  assert.match(schema, /SCHEMA_VERSION = 11[0-9]/);
+  assert.ok(Number(schema.match(/SCHEMA_VERSION = (\d+)/)[1]) >= 110,
+    'the text-criticism migration is applied');
   assert.match(schema, /archive_text_versions_preserve_content/);
   assert.match(schema, /archive_excerpts_preserve_anchor/);
   assert.match(deepLink, /nodus:\/\/primary-source\//);

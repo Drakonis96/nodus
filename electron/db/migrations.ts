@@ -10,7 +10,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 118;
+export const SCHEMA_VERSION = 120;
 
 export const migrations: Migration[] = [
   {
@@ -5817,6 +5817,359 @@ export const migrations: Migration[] = [
       -- page label. Keeping it separate preserves both archival locators and the
       -- output of an explicitly selected diarization engine.
       ALTER TABLE archive_text_segments ADD COLUMN speaker_label TEXT;
+    `,
+  },
+  {
+    version: 119,
+    up: /* sql */ `
+      -- El vault de Testimonios: historia oral. La unidad no es la grabacion ni la
+      -- transcripcion, es LA ENTREVISTA COMO CONJUNTO DOCUMENTAL -- preparacion,
+      -- participantes, sesiones, archivos, transcripciones, acuerdo, codigos, fragmentos
+      -- y notas. Ese es el problema que resuelve: en la practica ese conjunto vive roto
+      -- entre carpetas, una grabadora, un procesador de textos y un programa de analisis,
+      -- y lo primero que se pierde al romperlo es que la cita vuelva al audio.
+      --
+      -- POR QUE NO SE REUTILIZA study_recordings. Es la pregunta obvia: Estudio ya graba y
+      -- transcribe. Pero una clase es UN archivo con UNA transcripcion, y una entrevista
+      -- es varias sesiones, cada una con varios archivos, cada uno con varias VERSIONES de
+      -- transcripcion cuyos hablantes se enlazan con personas y cuyo acuerdo cambia con el
+      -- tiempo. Meter eso en study_recordings obligaria a ensanchar la tabla de Estudio
+      -- con seis conceptos que Estudio no tiene, y su vocabulario docente ("clase",
+      -- "asignatura", "apuntes") se filtraria en un archivo de historia oral. Se comparten
+      -- los COMPONENTES (captura, reproduccion, whisper local, formatos); no las tablas.
+      --
+      -- NINGUNA CLAVE FORANEA, A PROPOSITO, igual que las migraciones 98-103. isCreateOnly()
+      -- quita los comentarios y rechaza cualquier cuerpo que contenga la palabra de borrado
+      -- de SQL, y la clausula de cascada la contiene. Una migracion escrita asi pierde SUS
+      -- DOS caminos de reparacion: backfillMissingCreateOnly() no restaura sus tablas, y
+      -- una base migrada por una rama con otra numeracion muere con "table already exists"
+      -- en vez de reejecutarse. La propiedad la imponen las transacciones del repositorio,
+      -- exactamente como ya hacen world_images y las escenas.
+
+      -- La entrevista. Ni el audio ni la transcripcion son columnas suyas: una entrevista
+      -- existe -- y se prepara, y se planifica -- antes de que exista un solo archivo.
+      CREATE TABLE testimony_interviews (
+        id                TEXT PRIMARY KEY,
+        short_id          TEXT UNIQUE,
+        title             TEXT NOT NULL,
+        interview_kind    TEXT NOT NULL DEFAULT 'thematic',
+        -- El FLUJO. Es una de las TRES dimensiones independientes de una entrevista; las
+        -- otras dos (acuerdo y acceso) viven en testimony_agreements y NO se derivan de
+        -- esta. Colapsarlas en un solo estado es como se pierde el rastro de que puede
+        -- hacerse con un testimonio: una entrevista completada puede seguir sin acuerdo.
+        workflow_status   TEXT NOT NULL DEFAULT 'preparation',
+        collection_label  TEXT,
+        scheduled_at      TEXT,
+        conducted_at      TEXT,
+        location_text     TEXT,
+        interview_mode    TEXT,
+        language          TEXT,
+        objective         TEXT,
+        context_markdown  TEXT,
+        guide_markdown    TEXT,
+        abstract          TEXT,
+        repository_name   TEXT,
+        accession_id      TEXT,
+        created_at        TEXT NOT NULL,
+        updated_at        TEXT NOT NULL,
+        archived_at       TEXT,
+        -- Papelera logica. Un archivo de historia oral no borra: retira. Y lo que se
+        -- retira tiene que poder volver mientras se decide.
+        deleted_at        TEXT
+      );
+      CREATE INDEX idx_testimony_interviews_status ON testimony_interviews(workflow_status, updated_at);
+      CREATE INDEX idx_testimony_interviews_conducted ON testimony_interviews(conducted_at);
+      CREATE INDEX idx_testimony_interviews_collection ON testimony_interviews(collection_label);
+      CREATE INDEX idx_testimony_interviews_bin ON testimony_interviews(archived_at, deleted_at);
+
+      -- La capa 1:1 sobre persons. Los participantes SON personas de la ontologia
+      -- compartida -- la misma que usan genealogia y worldbuilding -- porque un narrador
+      -- tiene nombres y variantes como cualquier persona. Lo que esta tabla anade es lo
+      -- unico que la ontologia no sabe: con que nombre puede aparecer en publico.
+      --
+      -- public_name NO es un apodo: es el nombre que sale en derivados, citas y
+      -- exportaciones cuando el acuerdo lo exige. Separarlo del nombre de trabajo es lo
+      -- que permite anonimizar sin perder de vista con quien se hablo.
+      CREATE TABLE testimony_participant_profiles (
+        person_id          TEXT PRIMARY KEY,
+        public_name        TEXT,
+        identity_mode      TEXT NOT NULL DEFAULT 'identified',
+        pronunciation      TEXT,
+        biographical_note  TEXT,
+        attribution_note   TEXT,
+        created_at         TEXT NOT NULL,
+        updated_at         TEXT NOT NULL
+      );
+
+      -- Quien participa y con que papel. La clave incluye el papel porque una misma
+      -- persona puede ser narradora en una sesion y traductora en otra de la misma
+      -- entrevista, y eso no es un error de datos.
+      CREATE TABLE testimony_interview_participants (
+        interview_id   TEXT NOT NULL,
+        person_id      TEXT NOT NULL,
+        role           TEXT NOT NULL DEFAULT 'narrator',
+        speaker_label  TEXT,
+        is_primary     INTEGER NOT NULL DEFAULT 0,
+        position       INTEGER NOT NULL DEFAULT 0,
+        created_at     TEXT NOT NULL,
+        PRIMARY KEY (interview_id, person_id, role)
+      );
+      CREATE INDEX idx_testimony_participants_person ON testimony_interview_participants(person_id);
+
+      -- Una sesion. Existe porque una historia de vida no cabe en una tarde: se hacen tres
+      -- sesiones en tres semanas, en sitios distintos y a veces en idiomas distintos, y
+      -- todas son LA MISMA entrevista.
+      CREATE TABLE testimony_sessions (
+        id             TEXT PRIMARY KEY,
+        short_id       TEXT UNIQUE,
+        interview_id   TEXT NOT NULL,
+        sequence_no    INTEGER NOT NULL DEFAULT 1,
+        title          TEXT,
+        status         TEXT NOT NULL DEFAULT 'planned',
+        scheduled_at   TEXT,
+        recorded_at    TEXT,
+        location_text  TEXT,
+        mode           TEXT,
+        language       TEXT,
+        field_notes    TEXT,
+        created_at     TEXT NOT NULL,
+        updated_at     TEXT NOT NULL
+      );
+      CREATE UNIQUE INDEX idx_testimony_sessions_seq ON testimony_sessions(interview_id, sequence_no);
+
+      -- Los archivos. El maestro se guarda TAL Y COMO SE RECIBIO, sin transcodificar, y
+      -- con su huella: es la fuente primaria, y cualquier proceso que lo sustituya por una
+      -- version "mejor" destruye la unica copia de lo que se grabo. Los derivados apuntan
+      -- a su origen con source_media_id, de modo que una copia de consulta nunca puede
+      -- confundirse con el original.
+      --
+      -- El blob vive dentro de SQLite para que el vault siga siendo autocontenido y
+      -- respaldable de una pieza. Esa decision se revisara antes de habilitar video: horas
+      -- de imagen dentro de un unico archivo lo harian inviable, y el audio del MVP no
+      -- debe esperar a esa evaluacion.
+      CREATE TABLE testimony_media (
+        id               TEXT PRIMARY KEY,
+        short_id         TEXT UNIQUE,
+        session_id       TEXT NOT NULL,
+        media_kind       TEXT NOT NULL DEFAULT 'audio',
+        role             TEXT NOT NULL DEFAULT 'master',
+        file_name        TEXT,
+        mime_type        TEXT,
+        content_blob     BLOB,
+        content_hash     TEXT,
+        duration_seconds REAL,
+        size_bytes       INTEGER,
+        technical_json   TEXT,
+        source_media_id  TEXT,
+        -- El maestro se marca inmutable en la fila, no solo en la interfaz: es la bandera
+        -- que consulta el repositorio antes de aceptar cualquier escritura sobre el.
+        immutable        INTEGER NOT NULL DEFAULT 1,
+        created_at       TEXT NOT NULL,
+        deleted_at       TEXT
+      );
+      CREATE INDEX idx_testimony_media_session ON testimony_media(session_id, role);
+      CREATE INDEX idx_testimony_media_hash ON testimony_media(content_hash);
+      CREATE INDEX idx_testimony_media_source ON testimony_media(source_media_id);
+
+      -- Las versiones de la transcripcion. La automatica literal NO se sobrescribe nunca;
+      -- corregir, revisar, anonimizar o traducir CREA OTRA FILA que recuerda de cual
+      -- procede. Sin ese linaje, la pregunta "que version estoy citando" no tiene
+      -- respuesta seis meses despues, y es la pregunta que decide si una cita es honesta.
+      CREATE TABLE testimony_transcripts (
+        id                   TEXT PRIMARY KEY,
+        short_id             TEXT UNIQUE,
+        media_id             TEXT NOT NULL,
+        kind                 TEXT NOT NULL DEFAULT 'machine_literal',
+        language             TEXT,
+        content_markdown     TEXT,
+        status               TEXT NOT NULL DEFAULT 'pending',
+        version_no           INTEGER NOT NULL DEFAULT 1,
+        source_transcript_id TEXT,
+        model_provider       TEXT,
+        model_name           TEXT,
+        approved_at          TEXT,
+        created_at           TEXT NOT NULL,
+        updated_at           TEXT NOT NULL
+      );
+      CREATE UNIQUE INDEX idx_testimony_transcripts_version ON testimony_transcripts(media_id, kind, version_no);
+      CREATE INDEX idx_testimony_transcripts_source ON testimony_transcripts(source_transcript_id);
+      CREATE INDEX idx_testimony_transcripts_status ON testimony_transcripts(status);
+
+      -- El segmento: un tramo de tiempo, su texto y QUIEN LO DIJO. speaker_person_id
+      -- enlaza con la persona real; speaker_label guarda la etiqueta provisional
+      -- ("Hablante 1") mientras nadie la ha identificado. Las dos conviven porque atribuir
+      -- una voz es una decision del investigador, no una inferencia: aqui no hay
+      -- biometria, y una atribucion automatica equivocada pone palabras en la boca de
+      -- alguien sin dejar rastro.
+      CREATE TABLE testimony_transcript_segments (
+        id                TEXT PRIMARY KEY,
+        short_id          TEXT UNIQUE,
+        transcript_id     TEXT NOT NULL,
+        source_segment_id TEXT,
+        t_start           REAL NOT NULL DEFAULT 0,
+        t_end             REAL NOT NULL DEFAULT 0,
+        text              TEXT,
+        speaker_person_id TEXT,
+        speaker_label     TEXT,
+        confidence        REAL,
+        position          INTEGER NOT NULL DEFAULT 0,
+        created_at        TEXT NOT NULL,
+        updated_at        TEXT NOT NULL
+      );
+      CREATE INDEX idx_testimony_segments_transcript ON testimony_transcript_segments(transcript_id, t_start, position);
+      CREATE INDEX idx_testimony_segments_speaker ON testimony_transcript_segments(speaker_person_id);
+
+      -- El catalogo de codigos y temas. NO tiene seccion propia -- se crean desde la
+      -- transcripcion de una entrevista -- pero se guardan A NIVEL DE VAULT, y esa es toda
+      -- la diferencia: un codigo que solo existiera dentro de una entrevista convertiria
+      -- Contrastes en una lista de coincidencias imposibles.
+      --
+      -- normalized_label es UNIQUE y es la defensa contra el gemelo: "Posguerra",
+      -- "posguerra" y "post-guerra " son un solo codigo.
+      CREATE TABLE testimony_codes (
+        id               TEXT PRIMARY KEY,
+        label            TEXT NOT NULL,
+        normalized_label TEXT NOT NULL UNIQUE,
+        kind             TEXT NOT NULL DEFAULT 'code',
+        parent_id        TEXT,
+        description      TEXT,
+        color            TEXT,
+        created_at       TEXT NOT NULL,
+        updated_at       TEXT NOT NULL
+      );
+      CREATE INDEX idx_testimony_codes_parent ON testimony_codes(parent_id);
+
+      -- El fragmento codificado. quote_snapshot guarda EL TEXTO TAL CUAL ESTABA: es lo que
+      -- permite que una cita sobreviva a una version nueva de la transcripcion sin moverse
+      -- sola. Cuando el remapeo no puede reanclarla con seguridad, link_status pasa a
+      -- 'needs_review' y aparece en Inicio -- nunca se desplaza en silencio, porque una
+      -- cita movida es indistinguible de una cita correcta y falsa.
+      CREATE TABLE testimony_annotations (
+        id             TEXT PRIMARY KEY,
+        short_id       TEXT UNIQUE,
+        interview_id   TEXT NOT NULL,
+        transcript_id  TEXT NOT NULL,
+        segment_id     TEXT,
+        kind           TEXT NOT NULL DEFAULT 'highlight',
+        t_start        REAL NOT NULL DEFAULT 0,
+        t_end          REAL NOT NULL DEFAULT 0,
+        start_offset   INTEGER,
+        end_offset     INTEGER,
+        quote_snapshot TEXT,
+        memo           TEXT,
+        link_status    TEXT NOT NULL DEFAULT 'valid',
+        created_at     TEXT NOT NULL,
+        updated_at     TEXT NOT NULL
+      );
+      CREATE INDEX idx_testimony_annotations_interview ON testimony_annotations(interview_id, t_start);
+      CREATE INDEX idx_testimony_annotations_transcript ON testimony_annotations(transcript_id);
+      CREATE INDEX idx_testimony_annotations_link ON testimony_annotations(link_status);
+
+      CREATE TABLE testimony_annotation_codes (
+        annotation_id TEXT NOT NULL,
+        code_id       TEXT NOT NULL,
+        created_at    TEXT NOT NULL,
+        PRIMARY KEY (annotation_id, code_id)
+      );
+      CREATE INDEX idx_testimony_annotation_codes_code ON testimony_annotation_codes(code_id);
+
+      -- EL ACUERDO SE VERSIONA. No es una casilla: un narrador puede ampliar los usos que
+      -- autoriza, pedir un embargo o retirarlo entero, y cada uno de esos cambios es un
+      -- hecho fechado que hay que poder consultar despues. Guardarlo como un booleano
+      -- convierte el consentimiento en un tramite y borra la agencia que sostiene todo el
+      -- metodo.
+      --
+      -- is_current tiene indice UNICO PARCIAL: exactamente una version vigente por
+      -- entrevista, impuesto por la base y no por la disciplina de quien escribe el repo.
+      CREATE TABLE testimony_agreements (
+        id                        TEXT PRIMARY KEY,
+        interview_id              TEXT NOT NULL,
+        version_no                INTEGER NOT NULL DEFAULT 1,
+        is_current                INTEGER NOT NULL DEFAULT 1,
+        status                    TEXT NOT NULL DEFAULT 'pending',
+        documented_at             TEXT,
+        access_level              TEXT NOT NULL DEFAULT 'private',
+        -- NULL con nivel 'embargoed' significa embargo SIN fecha, que no vence solo.
+        embargo_until             TEXT,
+        attribution_mode          TEXT NOT NULL DEFAULT 'public_name',
+        allowed_uses_json         TEXT NOT NULL DEFAULT '[]',
+        narrator_review_required  INTEGER NOT NULL DEFAULT 0,
+        narrator_review_status    TEXT NOT NULL DEFAULT 'not_started',
+        narrator_review_sent_at   TEXT,
+        narrator_review_notes     TEXT,
+        restrictions_markdown     TEXT,
+        document_media_id         TEXT,
+        created_at                TEXT NOT NULL,
+        updated_at                TEXT NOT NULL
+      );
+      CREATE INDEX idx_testimony_agreements_interview ON testimony_agreements(interview_id, version_no DESC);
+      CREATE UNIQUE INDEX idx_testimony_agreements_current ON testimony_agreements(interview_id) WHERE is_current = 1;
+      CREATE INDEX idx_testimony_agreements_access ON testimony_agreements(access_level, embargo_until);
+
+      -- Un contraste guardado. Guarda la CONFIGURACION y los fragmentos fijados, nunca una
+      -- sintesis generada: si una sintesis merece conservarse, se convierte en nota con
+      -- sus referencias, que es donde una interpretacion puede seguir discutiendose.
+      CREATE TABLE testimony_contrasts (
+        id             TEXT PRIMARY KEY,
+        short_id       TEXT UNIQUE,
+        title          TEXT NOT NULL,
+        filters_json   TEXT NOT NULL DEFAULT '{}',
+        memo_markdown  TEXT,
+        created_at     TEXT NOT NULL,
+        updated_at     TEXT NOT NULL
+      );
+
+      CREATE TABLE testimony_contrast_items (
+        contrast_id   TEXT NOT NULL,
+        annotation_id TEXT NOT NULL,
+        position      INTEGER NOT NULL DEFAULT 0,
+        note          TEXT,
+        created_at    TEXT NOT NULL,
+        PRIMARY KEY (contrast_id, annotation_id)
+      );
+      CREATE INDEX idx_testimony_contrast_items_annotation ON testimony_contrast_items(annotation_id);
+
+      -- Enlaces de una nota con CUALQUIER entidad. Tabla generica a proposito: la estrena
+      -- Testimonios, pero nada en ella habla de entrevistas, asi que cualquier otro vault
+      -- puede colgar sus notas de sus propias entidades sin una segunda tabla igual. El
+      -- destino se guarda por tipo e id y NO se comprueba contra ninguna tabla: una nota
+      -- cuyo fragmento ha desaparecido debe conservar su texto y mostrar el enlace roto,
+      -- no evaporarse con el.
+      CREATE TABLE testimony_note_links (
+        note_id     TEXT NOT NULL,
+        target_kind TEXT NOT NULL,
+        target_id   TEXT NOT NULL,
+        label       TEXT,
+        created_at  TEXT NOT NULL,
+        PRIMARY KEY (note_id, target_kind, target_id)
+      );
+      CREATE INDEX idx_testimony_note_links_target ON testimony_note_links(target_kind, target_id);
+    `,
+  },
+  {
+    version: 120,
+    up: /* sql */ `
+      -- El indice semantico de Testimonios.
+      --
+      -- Vive en su propia tabla y no en una columna de los tramos por una razon de
+      -- gobierno, no de rendimiento: un embedding es un DERIVADO de la voz de alguien que
+      -- puede viajar a un proveedor externo, y el acuerdo de cada entrevista decide si
+      -- puede existir. Teniendolo aparte, retirar el consentimiento es borrar filas de una
+      -- tabla concreta, y no reescribir la transcripcion.
+      --
+      -- Sin claves foraneas, como el resto del vertical: la migracion tiene que seguir
+      -- siendo CREATE-only para conservar sus dos caminos de reparacion.
+      CREATE TABLE testimony_segment_embeddings (
+        segment_id    TEXT PRIMARY KEY,
+        transcript_id TEXT NOT NULL,
+        interview_id  TEXT NOT NULL,
+        model         TEXT NOT NULL,
+        dim           INTEGER NOT NULL,
+        embedding     BLOB NOT NULL,
+        created_at    TEXT NOT NULL
+      );
+      CREATE INDEX idx_testimony_embeddings_interview ON testimony_segment_embeddings(interview_id);
+      CREATE INDEX idx_testimony_embeddings_transcript ON testimony_segment_embeddings(transcript_id);
     `,
   },
 ];

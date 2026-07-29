@@ -507,6 +507,58 @@ try {
   assert.equal(academic.hasAnyData(), true);
   assert.equal(worldbuilding.seedWorldbuildingDemoData(), false);
   db.prepare('DELETE FROM world_calendar WHERE id = 1').run();
+  // ── Testimonios ──────────────────────────────────────────────────────────
+  // Regression: salir del modo demo dejaba entera la bóveda de historia oral, porque
+  // `clearDemoData` no llamaba a su limpieza. La prueba sale por la MISMA puerta que usa
+  // la aplicación — `clearDemoData()` —, no por la limpieza específica del vertical.
+  vaults.setVaultType(vaults.getActiveVault().id, 'testimonios');
+  const testimonies = require(path.join(repoRoot, 'electron/db/testimonyDemoData.ts'));
+  const settings = require(path.join(repoRoot, 'electron/db/settingsRepo.ts'));
+  assert.equal(testimonies.seedTestimonyDemoData(), true);
+  for (const [label, table, where] of [
+    ['interviews', 'testimony_interviews', "id LIKE 'demo-tst-%'"],
+    ['participants', 'testimony_participant_profiles', "person_id LIKE 'demo-tst-%'"],
+    ['sessions', 'testimony_sessions', "id LIKE 'demo-tst-%'"],
+    ['media', 'testimony_media', "id LIKE 'demo-tst-%'"],
+    ['transcripts', 'testimony_transcripts', "id LIKE 'demo-tst-%'"],
+    ['segments', 'testimony_transcript_segments', "id LIKE 'demo-tst-%'"],
+    ['codes', 'testimony_codes', "id LIKE 'demo-tst-%'"],
+    ['annotations', 'testimony_annotations', "id LIKE 'demo-tst-%'"],
+    ['agreements', 'testimony_agreements', "id LIKE 'demo-tst-%'"],
+    ['contrasts', 'testimony_contrasts', "id LIKE 'demo-tst-%'"],
+    ['pinned fragments', 'testimony_contrast_items', "contrast_id LIKE 'demo-tst-%'"],
+    ['notes', 'notes', "id LIKE 'demo-tst-%'"],
+    ['note links', 'testimony_note_links', "note_id LIKE 'demo-tst-%'"],
+  ]) assert.ok(count(table, where) > 0, `testimonios ${label} is populated`);
+  assert.equal(settings.getSettings().testimonyProjectPurpose.length > 0, true, 'the demo writes the project purpose');
+
+  // Lo que el usuario cree mientras explora la demo tiene que sobrevivir a la salida.
+  db.prepare(`
+    INSERT INTO testimony_interviews (id, short_id, title, workflow_status, interview_kind, created_at, updated_at)
+    VALUES ('mine-1', 'ENT-9999', 'Mi entrevista', 'planned', 'individual', '2026-01-01', '2026-01-01')
+  `).run();
+  db.prepare(`
+    INSERT INTO testimony_codes (id, label, normalized_label, created_at, updated_at)
+    VALUES ('mine-code', 'Mi código', 'mi codigo', '2026-01-01', '2026-01-01')
+  `).run();
+
+  academic.clearDemoData();
+  for (const [table, where] of [
+    ['testimony_interviews', "id LIKE 'demo-tst-%'"], ['testimony_media', "id LIKE 'demo-tst-%'"],
+    ['testimony_transcript_segments', "id LIKE 'demo-tst-%'"], ['testimony_annotations', "id LIKE 'demo-tst-%'"],
+    ['testimony_contrasts', "id LIKE 'demo-tst-%'"], ['testimony_agreements', "id LIKE 'demo-tst-%'"],
+    ['testimony_codes', "id LIKE 'demo-tst-%'"], ['notes', "id LIKE 'demo-tst-%'"],
+    ['testimony_note_links', "note_id LIKE 'demo-tst-%'"], ['persons', "person_id LIKE 'demo-tst-%'"],
+  ]) assert.equal(count(table, where), 0, `exiting the demo removes ${table}`);
+  assert.equal(count('testimony_interviews', "id = 'mine-1'"), 1, 'and keeps what the user created');
+  assert.equal(count('testimony_codes', "id = 'mine-code'"), 1, 'and keeps the codes the user created');
+  const afterExit = settings.getSettings();
+  assert.equal(afterExit.testimonyProjectPurpose, '', 'the fictional purpose does not stay presiding over Inicio');
+  assert.equal(afterExit.testimonyRepositoryName, '', 'nor the invented municipal archive');
+  assert.equal(afterExit.testimonyDefaultAccess, 'private', 'and the default access goes back to the safe one');
+  db.prepare("DELETE FROM testimony_interviews WHERE id = 'mine-1'").run();
+  db.prepare("DELETE FROM testimony_codes WHERE id = 'mine-code'").run();
+
   assert.deepEqual(db.pragma('foreign_key_check'), []);
   closeDb();
   console.log('Cross-vault demo coverage tests passed!');

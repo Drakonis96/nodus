@@ -16,6 +16,7 @@ import { PRIMARY_SOURCES_PERSONS_TRANSLATIONS } from './i18n.primarySourcesPerso
 import { PRIMARY_SOURCES_DERIVED_TRANSLATIONS } from './i18n.primarySourcesDerived';
 import { PRIMARY_SOURCES_RESEARCH_TRANSLATIONS } from './i18n.primarySourcesResearch';
 import { PRIMARY_SOURCES_RELEASE_TRANSLATIONS } from './i18n.primarySourcesRelease';
+import { TESTIMONY_TRANSLATIONS } from './i18n.testimonies';
 
 /** Complete static Italian interface table; coverage prohibits runtime fallbacks. */
 export const IT: Record<string, string> = {
@@ -31,6 +32,7 @@ export const IT: Record<string, string> = {
   ...PRIMARY_SOURCES_RESEARCH_TRANSLATIONS.it,
   ...PRIMARY_SOURCES_RELEASE_TRANSLATIONS.it,
   ...WORLDBUILDING_TRANSLATIONS.it,
+  ...TESTIMONY_TRANSLATIONS.it,
   ...WORLD_CHAT_TRANSLATIONS.it,
   "Lo que cuenta el mapa": "Cosa racconta la mappa",
   "Ver dónde ocurren las escenas ({n})": "Vedi dove accadono le scene ({n})",

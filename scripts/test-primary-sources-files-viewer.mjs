@@ -59,7 +59,8 @@ if (!process.argv.includes('--electron-primary-sources-files-test')) {
   }
   assert.match(ipc, /primarySources:files:verifyAll/);
   assert.match(ipc, /primarySources:files:thumbnail/);
-  assert.match(schema, /SCHEMA_VERSION = 1(?:09|1[0-9])/);
+  assert.ok(Number(schema.match(/SCHEMA_VERSION = (\d+)/)[1]) >= 109,
+    'the files-viewer migration is applied');
   assert.match(schema, /CREATE TABLE archive_audit_log/);
   assert.match(sync, /'archive_audit_log'/);
 

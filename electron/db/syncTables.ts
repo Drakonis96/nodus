@@ -23,7 +23,12 @@ const SYNC_GROUPS: { key: SyncGroupKey; prefix?: string; tables?: string[] }[] =
   // Deletions travel as their own records, and are applied before any row is merged so
   // a tombstone can stop a resurrection rather than undo it afterwards.
   { key: 'tombstones', tables: ['sync_tombstones'] },
-  { key: 'notes', tables: ['note_folders', 'notes', 'note_links'] },
+  // `testimony_note_links` viaja con las notas y no con lo que enlaza: la tabla esta hecha para
+  // tolerar un destino ausente (la nota conserva su texto y muestra el enlace roto), asi
+  // que un enlace que llega a una maquina sin la entrevista de destino degrada bien. Lo
+  // contrario -- una nota que llega sin sus enlaces -- perderia trabajo del investigador
+  // en silencio.
+  { key: 'notes', tables: ['note_folders', 'notes', 'note_links', 'testimony_note_links'] },
   {
     key: 'writing',
     tables: [
@@ -85,6 +90,7 @@ const SYNC_GROUPS: { key: SyncGroupKey; prefix?: string; tables?: string[] }[] =
       'archive_person_mentions',
       'entity_resolutions',
       'note_links',
+      'testimony_note_links',
       'primary_source_note_profiles',
       'primary_source_note_link_snapshots',
       'primary_source_policies',
@@ -206,6 +212,27 @@ const NOT_SYNCED_TABLES = new Set([
   // discarded. Shipping it would let one machine's audit trail overwrite the other's,
   // and restoring an entry there would write a row that never lost anything here.
   'sync_superseded',
+  // TESTIMONIOS NO SE SINCRONIZA, y es una decision, no una omision (decision 18 del
+  // plan). Antes de activarlo hay que demostrar que TODAS estas tablas viajan, que los
+  // blobs de los maestros tienen una politica explicita, y sobre todo que las
+  // restricciones y el acuerdo viajan DE FORMA ATOMICA con su entrevista. Una entrevista
+  // que llegue a otra maquina sin su acuerdo llega como material sin condiciones de
+  // acceso, que es exactamente la exposicion que este vault existe para evitar. Hasta
+  // entonces se presenta como local y respaldable, y `describeSyncCoverage` lo dice.
+  'testimony_segment_embeddings',
+  'testimony_interviews',
+  'testimony_participant_profiles',
+  'testimony_interview_participants',
+  'testimony_sessions',
+  'testimony_media',
+  'testimony_transcripts',
+  'testimony_transcript_segments',
+  'testimony_codes',
+  'testimony_annotations',
+  'testimony_annotation_codes',
+  'testimony_agreements',
+  'testimony_contrasts',
+  'testimony_contrast_items',
 ]);
 
 export function localTableNames(db: Database.Database = getDb()): Set<string> {

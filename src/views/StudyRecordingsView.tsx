@@ -23,13 +23,17 @@ import {
   transcribeLocalWhisperDetailed,
 } from '../lib/stt/localWhisper';
 import { announceStudyWorkspaceChanged } from '../components/StudySidebar';
-import { Icon, Spinner } from '../components/ui';
+import { Icon } from '../components/ui';
 import { t, getActiveLang } from '../i18n';
 import { AudioPanel } from '../components/AudioPanel';
 import { ConfirmModal } from '../components/ConfirmModal';
-import { confirmMicrophonePrivacy } from '../privacyNotices';
-
-type CaptureState = 'idle' | 'recording' | 'paused' | 'saving';
+// La captura, la reproducción y el progreso son ahora componentes compartidos con el
+// vault de Testimonios (src/components/media/). Estudio los sigue usando tal cual: es lo
+// que comprueba que la extracción no cambió su comportamiento.
+import { LocalAudioRecorderPanel, useLocalAudioRecorder } from '../components/media/LocalAudioRecorder';
+import { MediaPlayer } from '../components/media/MediaPlayer';
+import { TranscriptionProgress } from '../components/media/TranscriptionProgress';
+import { STUDY_MEDIA_ACCENT } from '../components/media/mediaFormat';
 
 const STATUS_LABELS: Record<StudyRecordingStatus, string> = {
   pending: 'Pendiente de transcribir', transcribing: 'Transcribiendo', ready: 'Transcrita', cancelled: 'Pausada', error: 'Con error',
@@ -42,61 +46,8 @@ function bytesLabel(bytes: number): string {
   return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
 }
 
-function bestRecorderMime(): string {
-  return ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus'].find((mime) => MediaRecorder.isTypeSupported(mime)) ?? '';
-}
-
 function recordingName(): string {
   return `${t('Clase')} ${new Intl.DateTimeFormat(getActiveLang(), { dateStyle: 'medium', timeStyle: 'short' }).format(new Date())}`;
-}
-
-async function blobDuration(blob: Blob): Promise<number> {
-  const url = URL.createObjectURL(blob);
-  try {
-    return await new Promise<number>((resolve) => {
-      const audio = new Audio();
-      const done = (value: number) => resolve(Number.isFinite(value) ? value : 0);
-      audio.onloadedmetadata = () => done(audio.duration);
-      audio.onerror = () => done(0);
-      audio.src = url;
-    });
-  } finally {
-    URL.revokeObjectURL(url);
-  }
-}
-
-function RecordingPlayer({ detail, onTime }: { detail: StudyRecordingDetail; onTime: (audio: HTMLAudioElement | null) => void }) {
-  const [url, setUrl] = useState('');
-  const [error, setError] = useState('');
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  useEffect(() => {
-    let active = true; let current = '';
-    void window.nodus.getStudyRecordingContent(detail.id).then((content) => {
-      if (!active) return;
-      current = URL.createObjectURL(new Blob([content.bytes.slice().buffer as ArrayBuffer], { type: content.mimeType }));
-      setUrl(current); setError('');
-    }).catch((cause) => setError(cause instanceof Error ? cause.message : String(cause)));
-    return () => { active = false; if (current) URL.revokeObjectURL(current); onTime(null); };
-  }, [detail.id]);
-  if (error) return <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-300">{error}</div>;
-  if (!url) return <div className="flex h-20 items-center justify-center"><Spinner /></div>;
-  return (
-    <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-3 dark:border-neutral-800 dark:bg-neutral-950/60" data-testid="study-recording-player">
-      <audio ref={(node) => { audioRef.current = node; onTime(node); }} className="w-full" controls preload="metadata" src={url} />
-      <div className="mt-2 flex flex-wrap items-center gap-2">
-        <button className="btn btn-ghost h-7 px-2 text-xs" onClick={() => { if (audioRef.current) audioRef.current.currentTime = Math.max(0, audioRef.current.currentTime - 10); }}>−10 s</button>
-        <button className="btn btn-ghost h-7 px-2 text-xs" onClick={() => { if (audioRef.current) audioRef.current.currentTime += 10; }}>+10 s</button>
-        <label className="ml-auto flex items-center gap-1 text-[10px] text-neutral-500">{t('Velocidad')}
-          <select className="input h-7 w-20 py-0 text-xs" defaultValue="1" onChange={(event) => { if (audioRef.current) audioRef.current.playbackRate = Number(event.target.value); }}>
-            {[0.5, 0.75, 1, 1.25, 1.5, 2].map((speed) => <option key={speed} value={speed}>{speed}×</option>)}
-          </select>
-        </label>
-        <label className="flex items-center gap-1 text-[10px] text-neutral-500">{t('Volumen')}
-          <input className="w-20 accent-teal-500" type="range" min="0" max="1" step="0.05" defaultValue="1" onChange={(event) => { if (audioRef.current) audioRef.current.volume = Number(event.target.value); }} />
-        </label>
-      </div>
-    </div>
-  );
 }
 
 interface RecordingNoteLocation {
@@ -171,10 +122,6 @@ export function StudyRecordingsView({ onOpenDocument, initialRecordingId, initia
   const [courseId, setCourseId] = useState('');
   const [subjectId, setSubjectId] = useState('');
   const [topicId, setTopicId] = useState('');
-  const [captureState, setCaptureState] = useState<CaptureState>('idle');
-  const [captureSeconds, setCaptureSeconds] = useState(0);
-  const [captureLevel, setCaptureLevel] = useState(0);
-  const [trimSilence, setTrimSilence] = useState(true);
   const [processProgress, setProcessProgress] = useState(0);
   const [processError, setProcessError] = useState('');
   const [processPartial, setProcessPartial] = useState('');
@@ -185,18 +132,8 @@ export function StudyRecordingsView({ onOpenDocument, initialRecordingId, initia
   const [diarizing, setDiarizing] = useState(false);
   const [noteTranscriptId, setNoteTranscriptId] = useState<string | null>(null);
 
-  const recorderRef = useRef<MediaRecorder | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
-  const timerRef = useRef<number | null>(null);
-  const animationRef = useRef<number | null>(null);
-  const contextRef = useRef<AudioContext | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const silenceSinceRef = useRef<number | null>(null);
-  const autoPausedRef = useRef(false);
-  const manuallyPausedRef = useRef(false);
   const cancelledRef = useRef(false);
-  const initialSeekConsumedRef = useRef(false);
 
   const reload = useCallback(async () => {
     const [nextWorkspace, nextRecordings] = await Promise.all([
@@ -215,110 +152,39 @@ export function StudyRecordingsView({ onOpenDocument, initialRecordingId, initia
   }, []);
 
   useEffect(() => { void reload(); }, [reload]);
-  useEffect(() => { if (initialRecordingId) { initialSeekConsumedRef.current = false; void open(initialRecordingId); } }, [initialRecordingId, open]);
+  useEffect(() => { if (initialRecordingId) void open(initialRecordingId); }, [initialRecordingId, open]);
   useEffect(() => {
     if (!selected) return;
     const transcript = selected.transcripts.find((entry) => entry.kind === activeTranscriptKind);
     setDraft(transcript?.contentMarkdown ?? '');
   }, [selected, activeTranscriptKind]);
   useEffect(() => { if (selected) setTranscriptionLanguage(selected.language || 'auto'); }, [selected?.id]);
-  useEffect(() => () => {
-    if (timerRef.current) window.clearInterval(timerRef.current);
-    if (animationRef.current) cancelAnimationFrame(animationRef.current);
-    if (recorderRef.current && recorderRef.current.state !== 'inactive') recorderRef.current.stop();
-    streamRef.current?.getTracks().forEach((track) => track.stop());
-    void contextRef.current?.close();
-    // Deliberately NOT cancelling local Whisper here: leaving the view must not
-    // kill an in-flight transcription. The worker keeps going and saveStudyTranscript
-    // persists the result (and resets the recording status) from its own promise
-    // chain, matching how the cloud / whisper_cpp providers already survive
-    // navigation. The explicit Cancel button still stops it on purpose.
-  }, []);
+  // Deliberately NOT cancelling local Whisper on unmount: leaving the view must not kill
+  // an in-flight transcription. The worker keeps going and saveStudyTranscript persists
+  // the result (and resets the recording status) from its own promise chain, matching how
+  // the cloud / whisper_cpp providers already survive navigation. The explicit Cancel
+  // button still stops it on purpose. The capture stream is torn down by
+  // LocalAudioRecorder's own unmount effect.
 
   const subjects = useMemo(() => workspace?.subjects.filter((subject) => !courseId || subject.courseId === courseId) ?? [], [workspace, courseId]);
   const topics = useMemo(() => workspace?.topics.filter((topic) => !subjectId || topic.subjectId === subjectId) ?? [], [workspace, subjectId]);
   const storageBytes = recordings.reduce((sum, recording) => sum + recording.sizeBytes, 0);
   const latestTranscript = (kind: StudyTranscriptKind) => selected?.transcripts.find((entry) => entry.kind === kind) ?? null;
 
-  const cleanupCapture = async () => {
-    if (timerRef.current) window.clearInterval(timerRef.current);
-    timerRef.current = null;
-    if (animationRef.current) cancelAnimationFrame(animationRef.current);
-    animationRef.current = null;
-    streamRef.current?.getTracks().forEach((track) => track.stop());
-    streamRef.current = null; recorderRef.current = null; setCaptureLevel(0);
-    if (contextRef.current) await contextRef.current.close().catch(() => undefined);
-    contextRef.current = null; silenceSinceRef.current = null; autoPausedRef.current = false; manuallyPausedRef.current = false;
-  };
+  const recorder = useLocalAudioRecorder({
+    fileBaseName: 'clase',
+    allowSilenceTrim: true,
+    onError: setProcessError,
+    onSaved: (audio) => saveRecording(audio),
+  });
 
-  const startLevelMeter = (stream: MediaStream) => {
-    const context = new AudioContext(); contextRef.current = context;
-    const analyser = context.createAnalyser(); analyser.fftSize = 512;
-    context.createMediaStreamSource(stream).connect(analyser);
-    const values = new Uint8Array(analyser.fftSize);
-    const frame = () => {
-      analyser.getByteTimeDomainData(values);
-      let sum = 0;
-      for (const value of values) { const centered = (value - 128) / 128; sum += centered * centered; }
-      const rms = Math.sqrt(sum / values.length); setCaptureLevel(Math.min(1, rms * 7));
-      const recorder = recorderRef.current;
-      if (trimSilence && recorder && !manuallyPausedRef.current) {
-        if (rms < 0.014) silenceSinceRef.current ??= performance.now(); else silenceSinceRef.current = null;
-        if (!autoPausedRef.current && silenceSinceRef.current && performance.now() - silenceSinceRef.current > 1800 && recorder.state === 'recording') {
-          recorder.pause(); autoPausedRef.current = true;
-        } else if (autoPausedRef.current && rms >= 0.02 && recorder.state === 'paused') {
-          recorder.resume(); autoPausedRef.current = false; silenceSinceRef.current = null;
-        }
-      }
-      animationRef.current = requestAnimationFrame(frame);
-    };
-    frame();
-  };
-
-  const startRecording = async () => {
-    setProcessError(''); setCaptureSeconds(0);
-    if (!(await confirmMicrophonePrivacy())) return;
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: { noiseSuppression: true, echoCancellation: true, autoGainControl: true } });
-      streamRef.current = stream;
-      const mime = bestRecorderMime();
-      const recorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
-      recorderRef.current = recorder; chunksRef.current = [];
-      recorder.ondataavailable = (event) => { if (event.data.size) chunksRef.current.push(event.data); };
-      recorder.start(1000); setCaptureState('recording'); startLevelMeter(stream);
-      timerRef.current = window.setInterval(() => setCaptureSeconds((value) => value + (recorder.state === 'recording' ? 1 : 0)), 1000);
-    } catch (cause) {
-      setProcessError(cause instanceof Error ? cause.message : String(cause));
-    }
-  };
-
-  const toggleCapturePause = () => {
-    const recorder = recorderRef.current;
-    if (!recorder) return;
-    if (captureState === 'recording') { recorder.pause(); manuallyPausedRef.current = true; setCaptureState('paused'); }
-    else { recorder.resume(); manuallyPausedRef.current = false; autoPausedRef.current = false; setCaptureState('recording'); }
-  };
-
-  const finishRecording = async (discard = false) => {
-    const recorder = recorderRef.current;
-    if (!recorder || recorder.state === 'inactive') return;
-    setCaptureState('saving');
-    const blob = await new Promise<Blob>((resolve) => {
-      recorder.addEventListener('stop', () => resolve(new Blob(chunksRef.current, { type: recorder.mimeType || 'audio/webm' })), { once: true });
-      recorder.requestData(); recorder.stop();
+  const saveRecording = async (audio: { bytes: Uint8Array; fileName: string; mimeType: string; durationSeconds: number }) => {
+    const result = await window.nodus.createStudyRecording({
+      title: recordingName(), fileName: audio.fileName, mimeType: audio.mimeType, bytes: audio.bytes,
+      durationSeconds: audio.durationSeconds, language: 'auto',
+      courseId: courseId || null, subjectId: subjectId || null, topicId: topicId || null,
     });
-    await cleanupCapture();
-    if (discard) { setCaptureState('idle'); setCaptureSeconds(0); return; }
-    try {
-      const bytes = new Uint8Array(await blob.arrayBuffer());
-      const result = await window.nodus.createStudyRecording({
-        title: recordingName(), fileName: `clase-${Date.now()}.${blob.type.includes('ogg') ? 'ogg' : 'webm'}`,
-        mimeType: blob.type || 'audio/webm', bytes, durationSeconds: await blobDuration(blob), language: 'auto',
-        courseId: courseId || null, subjectId: subjectId || null, topicId: topicId || null,
-      });
-      await reload(); await open(result.recording.id);
-    } catch (cause) { setProcessError(cause instanceof Error ? cause.message : String(cause)); }
-    finally { setCaptureState('idle'); setCaptureSeconds(0); }
+    await reload(); await open(result.recording.id);
   };
 
   const importAudio = async () => {
@@ -439,7 +305,7 @@ export function StudyRecordingsView({ onOpenDocument, initialRecordingId, initia
           <p className="mt-1 text-sm text-neutral-500">{t('El audio y Whisper local permanecen en este vault. Los audios grandes no se incluyen en sincronización.')}</p></div>
         <div className="flex gap-2">
           <button className="btn btn-secondary" onClick={() => void importAudio()} disabled={busy}><Icon name="upload" />{t('Subir audio')}</button>
-          {captureState === 'idle' ? <button className="btn btn-primary" onClick={() => void startRecording()}><Icon name="microphone" />{t('Grabar clase')}</button> : null}
+          {recorder.state === 'idle' ? <button className="btn btn-primary" onClick={() => void recorder.start()}><Icon name="microphone" />{t('Grabar clase')}</button> : null}
         </div>
       </header>
 
@@ -454,16 +320,10 @@ export function StudyRecordingsView({ onOpenDocument, initialRecordingId, initia
         <div className="mt-2 flex items-center justify-between text-[10px] text-neutral-600"><span>{recordings.length} {t('grabaciones')} · {bytesLabel(storageBytes)}</span><span>{t('Aviso al alcanzar 2 GB; puedes borrar el audio y conservar la transcripción.')}</span></div>
       </section>
 
-      {captureState !== 'idle' && (
-        <section className="mx-auto mb-4 max-w-7xl rounded-xl border border-teal-200 bg-teal-50 p-4 dark:border-teal-800/60 dark:bg-teal-950/20" data-testid="study-class-recorder">
-          <div className="flex flex-wrap items-center gap-3"><span className={`h-3 w-3 rounded-full ${captureState === 'recording' ? 'animate-pulse bg-red-500' : 'bg-amber-400'}`} /><strong>{formatStudyTimestamp(captureSeconds)}</strong>
-            <div className="h-2 min-w-32 flex-1 overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-800"><div className="h-full bg-teal-500 transition-[width] dark:bg-teal-400" style={{ width: `${captureLevel * 100}%` }} /></div>
-            <label className="flex items-center gap-2 text-xs text-neutral-400"><input type="checkbox" checked={trimSilence} onChange={(event) => setTrimSilence(event.target.checked)} />{t('Omitir silencios largos')}</label>
-            {captureState !== 'saving' && <button className="btn btn-secondary" onClick={toggleCapturePause}><Icon name={captureState === 'paused' ? 'play' : 'pause'} />{captureState === 'paused' ? t('Reanudar') : t('Pausar')}</button>}
-            <button className="btn btn-primary" disabled={captureState === 'saving'} onClick={() => void finishRecording()}><Icon name="stop" />{t('Guardar')}</button>
-            <button className="btn btn-ghost" disabled={captureState === 'saving'} onClick={() => void finishRecording(true)}>{t('Descartar')}</button>
-          </div>
-        </section>
+      {recorder.state !== 'idle' && (
+        <div className="mx-auto mb-4 max-w-7xl">
+          <LocalAudioRecorderPanel recorder={recorder} accent={STUDY_MEDIA_ACCENT} allowSilenceTrim testid="study-class-recorder" />
+        </div>
       )}
 
       {processError && <div className="mx-auto mb-4 max-w-7xl rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700 dark:border-red-900/60 dark:bg-red-950/20 dark:text-red-300">{processError}</div>}
@@ -487,7 +347,17 @@ export function StudyRecordingsView({ onOpenDocument, initialRecordingId, initia
                 <button className="btn btn-ghost px-2" title={t('Cerrar')} aria-label={t('Cerrar')} onClick={() => setSelected(null)}><Icon name="x" /></button>
               </div>
 
-              <RecordingPlayer detail={selected} onTime={(audio) => { audioRef.current = audio; if (audio && initialTimestamp != null && !initialSeekConsumedRef.current) { audio.currentTime = initialTimestamp; initialSeekConsumedRef.current = true; } }} />
+              <MediaPlayer
+                mediaId={selected.id}
+                accent={STUDY_MEDIA_ACCENT}
+                load={async (id) => {
+                  const content = await window.nodus.getStudyRecordingContent(id);
+                  return { bytes: content.bytes, mimeType: content.mimeType };
+                }}
+                onAudioRef={(audio) => { audioRef.current = audio; }}
+                initialTime={initialTimestamp ?? null}
+                testid="study-recording-player"
+              />
               <div className="flex flex-wrap items-center gap-2">
                 <button className="btn btn-secondary" onClick={() => void addMarker()}><Icon name="plus" />{t('Añadir marcador')}</button>
                 <label className="flex items-center gap-2 text-xs text-neutral-500">{t('Idioma del audio')}<select data-testid="study-recording-language" className="input h-8" value={transcriptionLanguage} onChange={(event) => setTranscriptionLanguage(event.target.value)}>{STUDY_STT_LANGUAGES.map((entry) => <option key={entry.code} value={entry.code}>{t(entry.label)}</option>)}</select></label>
@@ -495,7 +365,9 @@ export function StudyRecordingsView({ onOpenDocument, initialRecordingId, initia
                 {busy && processProgress > 0 && <button className="btn btn-secondary" onClick={() => void cancelTranscription()}><Icon name="stop" />{t('Cancelar transcripción')}</button>}
                 <button className="btn btn-ghost ml-auto text-red-400" disabled={!selected.sizeBytes} onClick={() => void window.nodus.deleteStudyRecordingAudio(selected.id).then(() => open(selected.id)).then(reload)}>{t('Borrar solo audio')}</button>
               </div>
-              {busy && processProgress > 0 && <div className="rounded-lg border border-teal-200 bg-teal-50 p-2 dark:border-teal-900/50 dark:bg-teal-950/20"><div className="mb-1 flex justify-between text-[10px] text-teal-700 dark:text-teal-300"><span>{t('La transcripción se procesa en segundo plano')}</span><span>{Math.round(processProgress * 100)}%</span></div><div className="h-1.5 overflow-hidden rounded bg-neutral-200 dark:bg-neutral-800"><div className="h-full bg-teal-500 dark:bg-teal-400" style={{ width: `${processProgress * 100}%` }} /></div>{processPartial && <p className="mt-2 max-h-24 overflow-y-auto whitespace-pre-wrap text-xs leading-5 text-neutral-700 dark:text-neutral-300" data-testid="study-transcription-stream">{processPartial}</p>}</div>}
+              {busy && processProgress > 0 && (
+                <TranscriptionProgress accent={STUDY_MEDIA_ACCENT} progress={processProgress} partial={processPartial} testid="study-transcription" />
+              )}
 
               {selected.markers.length > 0 && <div className="flex flex-wrap gap-2">{selected.markers.map((marker) => <div key={marker.id} className="flex items-center rounded-full border border-neutral-200 bg-white text-xs dark:border-neutral-700 dark:bg-neutral-950"><button className="px-3 py-1.5 text-teal-700 dark:text-teal-300" onClick={() => jumpTo(marker.tSeconds)}>{formatStudyTimestamp(marker.tSeconds)} · {marker.label}</button><button className="px-2 text-neutral-500 hover:text-red-600 dark:text-neutral-600 dark:hover:text-red-400" onClick={() => void window.nodus.deleteStudyAudioMarker(marker.id).then(() => open(selected.id))}>×</button></div>)}</div>}
 

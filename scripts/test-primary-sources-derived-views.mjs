@@ -53,7 +53,8 @@ if (!process.argv.includes('--electron-primary-sources-derived-test')) {
   assert.match(files.app, /isPrimarySources \? <PrimarySourcesTimelineView \/>/);
   assert.match(files.app, /isPrimarySources \? <PrimarySourcesMapView \/>/);
   assert.match(files.app, /isPrimarySources \? <PrimarySourcesRelationsView \/>/);
-  assert.match(files.schema, /SCHEMA_VERSION = 11[2-9]/);
+  assert.ok(Number(files.schema.match(/SCHEMA_VERSION = (\d+)/)[1]) >= 112,
+    'the derived-views migration is applied');
   assert.match(files.schema, /archive_place_resolution_decisions/);
   assert.match(files.schema, /idx_archive_place_resolution_one_active/);
   assert.match(files.sync, /'archive_place_resolution_decisions'/);

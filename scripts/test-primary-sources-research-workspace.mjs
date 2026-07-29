@@ -48,7 +48,8 @@ if (!process.argv.includes('--electron-primary-sources-research-test')) {
   assert.match(files.app, /<PrimarySourcesNotesView/);
   assert.match(files.app, /<PrimarySourcesHomeView/);
   assert.doesNotMatch(files.app, /PrimarySourcesSectionView section="search"/);
-  assert.match(files.schema, /SCHEMA_VERSION = 11[4-9]/);
+  assert.ok(Number(files.schema.match(/SCHEMA_VERSION = (\d+)/)[1]) >= 114,
+    'the research-workspace migration is applied');
   assert.match(files.schema, /primary_source_note_profiles/);
   assert.match(files.schema, /primary_source_note_link_snapshots/);
   assert.match(files.sync, /'primary_source_note_profiles'/);

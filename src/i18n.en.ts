@@ -16,6 +16,7 @@ import { PRIMARY_SOURCES_PERSONS_TRANSLATIONS } from './i18n.primarySourcesPerso
 import { PRIMARY_SOURCES_DERIVED_TRANSLATIONS } from './i18n.primarySourcesDerived';
 import { PRIMARY_SOURCES_RESEARCH_TRANSLATIONS } from './i18n.primarySourcesResearch';
 import { PRIMARY_SOURCES_RELEASE_TRANSLATIONS } from './i18n.primarySourcesRelease';
+import { TESTIMONY_TRANSLATIONS } from './i18n.testimonies';
 
 /**
  * English translations keyed by the Spanish source string (see {@link ../i18n}).
@@ -35,6 +36,7 @@ export const EN: Record<string, string> = {
   ...PRIMARY_SOURCES_RESEARCH_TRANSLATIONS.en,
   ...PRIMARY_SOURCES_RELEASE_TRANSLATIONS.en,
   ...WORLDBUILDING_TRANSLATIONS.en,
+  ...TESTIMONY_TRANSLATIONS.en,
   ...WORLD_CHAT_TRANSLATIONS.en,
   "Lo que cuenta el mapa": "What the map tells you",
   "Ver dónde ocurren las escenas ({n})": "See where the scenes happen ({n})",

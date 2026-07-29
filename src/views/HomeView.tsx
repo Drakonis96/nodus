@@ -832,8 +832,9 @@ export function DemoOfferCard({
   onLoadStudyDemo,
   onLoadTeachingDemo,
   onLoadWorldbuildingDemo,
+  onLoadTestimonyDemo,
 }: {
-  variant?: 'academic' | 'genealogy' | 'databases' | 'study' | 'teaching' | 'worldbuilding';
+  variant?: 'academic' | 'genealogy' | 'databases' | 'study' | 'teaching' | 'worldbuilding' | 'testimonios';
   demoBusy: boolean;
   onLoadDemo?: () => Promise<void>;
   onLoadGenealogyDemo?: () => Promise<void>;
@@ -841,6 +842,7 @@ export function DemoOfferCard({
   onLoadStudyDemo?: () => void | Promise<void>;
   onLoadTeachingDemo?: () => void | Promise<void>;
   onLoadWorldbuildingDemo?: () => void | Promise<void>;
+  onLoadTestimonyDemo?: () => void | Promise<void>;
 }) {
   const card =
     variant === 'genealogy'
@@ -883,6 +885,14 @@ export function DemoOfferCard({
                   label: t('Cargar demo de worldbuilding'),
                   onClick: onLoadWorldbuildingDemo ?? (async () => {}),
                 }
+              : variant === 'testimonios'
+                ? {
+                    title: t('Explora un proyecto de historia oral de ejemplo'),
+                    desc: t('Carga «Memoria del valle»: cinco entrevistas ficticias con sus narradores, sesiones, transcripciones literal y revisada, códigos compartidos, fragmentos citables, un acuerdo pendiente, un embargo, notas enlazadas al minuto exacto y un contraste guardado. Sin voces reales y sin necesitar IA.'),
+                    icon: 'microphone',
+                    label: t('Cargar demo de testimonios'),
+                    onClick: onLoadTestimonyDemo ?? (async () => {}),
+                  }
         : {
             title: t('Explora una investigación de ejemplo'),
             desc: t('Seis obras sobre la ciencia del aprendizaje con grafo, notas, mapa de investigación, inmersión, borradores, informe profundo y proyecto guardado; sin conectar Zotero ni configurar IA.'),

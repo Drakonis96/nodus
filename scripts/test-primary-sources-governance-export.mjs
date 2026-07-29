@@ -25,7 +25,8 @@ if (!process.argv.includes('--electron-primary-sources-governance-test')) {
 
   assert.doesNotMatch(files.app, /PrimarySourcesToolkitView/);
   assert.match(files.app, /view === 'toolkit'[\s\S]{0,120}<ToolkitView/);
-  assert.match(files.schema, /SCHEMA_VERSION = 118/);
+  assert.ok(Number(files.schema.match(/SCHEMA_VERSION = (\d+)/)[1]) >= 118,
+    'the primary-sources governance migration is applied');
   for (const table of [
     'primary_source_policies',
     'primary_source_citation_settings',
@@ -115,7 +116,7 @@ try {
   const vaultRegistry = require(path.join(repoRoot, 'electron/vaults/vaultRegistry.ts'));
   const { getDb, SCHEMA_VERSION } = require(path.join(repoRoot, 'electron/db/database.ts'));
   const db = getDb();
-  assert.equal(SCHEMA_VERSION, 118);
+  assert.ok(SCHEMA_VERSION >= 118, 'the primary-sources migrations are part of the schema');
   vaultRegistry.setVaultType(vaultRegistry.getActiveVault().id, 'primary_sources');
 
   settings.updateSettings({
@@ -643,7 +644,7 @@ try {
 
   governanceRepo.updatePrimarySourcePolicySettings({ retainAutomaticResultsDays: 0 });
   const workspace = governanceRepo.getPrimarySourceGovernanceWorkspace();
-  assert.equal(workspace.inventory.schemaVersion, 118);
+  assert.ok(workspace.inventory.schemaVersion >= 118, 'the inventory reports the live schema version');
   assert.deepEqual(workspace.inventory.unclassifiedPrimarySourceTables, []);
   assert.ok(workspace.recentAiAudit.some((entry) => entry.runId === localResult.runId));
   assert.ok(workspace.recentExports.some((entry) => entry.exportId === packageResult.exportId));

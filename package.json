@@ -1,6 +1,6 @@
 {
   "name": "nodus",
-  "version": "2.7.0",
+  "version": "2.8.0",
   "description": "Local-first desktop app that turns a Zotero library into a navigable graph of ideas and authors.",
   "author": "Nodus",
   "license": "MIT",
@@ -16,6 +16,8 @@
     "version": "npm run citation:sync && git add CITATION.cff",
     "test:e2e": "node scripts/e2e-smoke.mjs",
     "test:e2e:prosopography": "node scripts/test-prosopography-e2e.mjs",
+    "test:e2e:testimony": "npm run build && node scripts/e2e-testimony.mjs",
+    "verify:testimony-performance": "node scripts/verify-testimony-performance.mjs",
     "verify:nodi-overlay": "npm run build && node scripts/verify-nodi-overlay.mjs",
     "verify:study-whisper": "node scripts/verify-study-whisper.mjs",
     "verify:study-improve-local": "node scripts/verify-study-improve-local.mjs",
@@ -43,7 +45,9 @@
     "verify:exam-pdf": "node scripts/verify-exam-pdf.mjs",
     "verify:professional-pdf": "node scripts/verify-professional-report-pdf.mjs",
     "verify:rubric-generation": "node scripts/verify-rubric-generation.mjs",
-    "capture:docs": "npm run build && electron-rebuild -f -w better-sqlite3 && node scripts/capture-doc-screenshots.mjs"
+    "capture:docs": "npm run build && electron-rebuild -f -w better-sqlite3 && node scripts/capture-doc-screenshots.mjs",
+    "verify:testimony-diarization": "npm run build && node scripts/verify-testimony-diarization.mjs",
+    "audit:ai": "npm run build && node scripts/ai-audit/run.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",

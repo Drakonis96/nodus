@@ -61,7 +61,7 @@ try {
     { text: 'Respuesta.', speaker: 'B', tStart: 2.5, tEnd: 5 },
   ], 'diarized speakers and timestamps survive transcript normalization');
 
-  const [pkg, worker, backend, cppBackend, ipc, preload, editor, settingsUi, recordingsUi, dossierUi, settingsRepo, html] = await Promise.all([
+  const [pkg, worker, backend, cppBackend, ipc, preload, editor, settingsUi, recordingsUi, progressUi, dossierUi, settingsRepo, html] = await Promise.all([
     readFile(path.join(root, 'package.json'), 'utf8'),
     readFile(path.join(root, 'src/lib/stt/stt.worker.ts'), 'utf8'),
     readFile(path.join(root, 'electron/ai/studyTranscription.ts'), 'utf8'),
@@ -71,6 +71,7 @@ try {
     readFile(path.join(root, 'src/components/editor/StudyEditor.tsx'), 'utf8'),
     readFile(path.join(root, 'src/components/SttSettings.tsx'), 'utf8'),
     readFile(path.join(root, 'src/views/StudyRecordingsView.tsx'), 'utf8'),
+    readFile(path.join(root, 'src/components/media/TranscriptionProgress.tsx'), 'utf8'),
     readFile(path.join(root, 'src/views/PrimarySourceDossierView.tsx'), 'utf8'),
     readFile(path.join(root, 'electron/db/settingsRepo.ts'), 'utf8'),
     readFile(path.join(root, 'index.html'), 'utf8'),
@@ -110,7 +111,13 @@ try {
   assert.doesNotMatch(settingsUi, /xl:grid-cols-[45]/, 'transcription model catalogs do not regress to card grids');
   assert.match(settingsUi, /bg-white[^\n]*dark:bg-neutral-950/, 'STT settings has explicit light and dark surfaces');
   assert.match(recordingsUi, /study-recording-language/, 'recordings expose per-audio language selection');
-  assert.match(recordingsUi, /study-transcription-stream/, 'recordings render partial transcription while processing');
+  // El progreso y el texto parcial se extrajeron a src/components/media, compartidos con
+  // el vault de Testimonios. El invariante no cambia — se ve lo que va saliendo mientras
+  // el modelo trabaja — pero ahora vive en el componente y Estudio lo monta con su testid,
+  // así que el testid completo sigue siendo `study-transcription-stream`.
+  assert.match(recordingsUi, /TranscriptionProgress[\s\S]*testid="study-transcription"/, 'recordings mount the shared progress panel');
+  assert.match(progressUi, /\$\{testid\}-stream/, 'the shared panel renders partial transcription while processing');
+  assert.match(progressUi, /\{partial\}/, 'and shows the text as it arrives');
   assert.match(editor, /StudyDictation/, 'dictation is mounted inside the editor');
   assert.match(editor, /editorViewCtx/, 'WYSIWYG insertion uses the real ProseMirror selection');
   assert.match(html, /worker-src 'self' blob:/, 'CSP permits the packaged Whisper worker');
