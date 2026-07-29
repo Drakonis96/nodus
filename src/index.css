@@ -530,6 +530,7 @@ body {
 
 /* Library filters use an explicit light palette so selected controls never inherit
    dark surfaces from the dark-mode utility classes. */
+.light .library-preset.is-active,
 .light .library-filter-button.is-active.tone-indigo {
   background-color: #eef2ff;
   border-color: #818cf8;
@@ -550,7 +551,10 @@ body {
   background-color: #a5f3fc;
   color: #164e63;
 }
-.light .library-filter-popover {
+.light .library-filter-popover,
+/* The row overflow menu is portaled to <body>, so it inherits nothing from the
+   table: it needs the same explicit light surface as the filter popovers. */
+.light .library-row-menu {
   background-color: #ffffff;
   border-color: #d4d4d4;
   box-shadow: 0 20px 40px rgba(15, 23, 42, 0.14);

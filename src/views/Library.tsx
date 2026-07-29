@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type {
   WorkView,
   WorkFilter,
   CorpusHealthBucketId,
-  DeepStatus,
-  LightStatus,
-  SummaryStatus,
+  QueueItem,
   WorkEmbeddingStatus,
   WorkPassageStatus,
   VaultAnalysisReuseKind,
@@ -15,14 +14,16 @@ import type {
   CollectionFacet,
   WorkSortKey,
 } from '@shared/types';
-import { Badge, Icon } from '../components/ui';
-import { ConfirmModal } from '../components/ConfirmModal';
+import { Icon } from '../components/ui';
 import { confirm, toast } from '../components/feedback';
 import { WorkGraphModal } from './WorkGraphModal';
 import { WorkIdeasModal } from './WorkIdeasModal';
+import { WorkStatusModal } from './WorkStatusModal';
 import { DuplicatesModal } from './DuplicatesModal';
 import { VirtualList } from '../components/VirtualList';
+import { anchorStyle, useAnchoredCoords } from '../components/dbGrid';
 import { useDataRefresh, useDismissableLayer, useScanComplete } from '../hooks';
+import { deriveWorkStatus, queueItemsByWork, type StepId, type WorkReadiness, type WorkStatus } from '../libraryStatus';
 import {
   ASSISTANT_CONTEXTS,
   type LibraryNavigationTarget,
@@ -34,51 +35,78 @@ import { getVaultQueryCache, setVaultQueryCache } from '../vaultQueryCache';
 
 const LIBRARY_ROW_HEIGHT = 64;
 const LIBRARY_PAGE_SIZE = 200;
+// Title and authors get the room the five pipeline-status columns used to take:
+// checkbox, title, authors, year, theme(s), ideas, status, actions.
 const LIBRARY_GRID_TEMPLATE =
-  '2rem minmax(18rem,2fr) minmax(9rem,1fr) 4.5rem minmax(8rem,1fr) 4.5rem 5.25rem 6.25rem 5.75rem 5.75rem 5.75rem 14.5rem';
+  '2rem minmax(18rem,2fr) minmax(10rem,1fr) 4.5rem minmax(9rem,1fr) 5rem 11rem 8.5rem';
 
 type StatusFlag = 'deep' | 'summary' | 'ideas' | 'passages' | '!deep' | '!summary' | '!ideas' | '!passages';
 
-/** Columns the library table can be ordered by (client-side sort). */
-type SortKey = WorkSortKey;
+/**
+ * Columns the table can be ordered by. Only keys the backend can express in SQL
+ * are offered: it sorts the WHOLE library before paging, whereas a client-side
+ * sort would only reorder the 200 rows already on screen — which reads as "the
+ * most incomplete works" while actually being "the most incomplete of this page".
+ * Readiness has no SQL expression, so the Status column is filtered, not sorted.
+ */
+type SortKey = Extract<WorkSortKey, 'title' | 'authors' | 'year' | 'themes' | 'ideas'>;
 type SortState = { key: SortKey; dir: 'asc' | 'desc' };
 
-// Counts and pipeline-status columns default to descending (most/furthest-along
-// first); text columns default to ascending. A third click clears back to the
-// default backend order (year desc, title asc).
-const NUMERIC_SORT_KEYS = new Set<SortKey>(['year', 'ideas', 'light', 'deep', 'summary', 'embeddings', 'passages']);
+// Counts default to descending (most first); text columns to ascending. A third
+// click clears back to the default backend order (year desc, title asc).
+const NUMERIC_SORT_KEYS = new Set<SortKey>(['year', 'ideas']);
 const initialSortDir = (key: SortKey): 'asc' | 'desc' => (NUMERIC_SORT_KEYS.has(key) ? 'desc' : 'asc');
 
-function lightRank(s: LightStatus): number {
-  return s === 'done' ? 3 : s === 'pending' ? 2 : s === 'failed' ? 1 : 0;
-}
+/**
+ * How each readiness value is presented. Kept in this file, with display-shaped
+ * values, so the i18n coverage scan follows it from the `t()` call below.
+ */
+const READINESS_LABEL: Record<WorkReadiness, string> = {
+  unstarted: 'Sin analizar',
+  running: 'Analizando…',
+  failed: 'Con fallos',
+  noText: 'Sin texto',
+  abstractOnly: 'Solo abstract',
+  incomplete: 'Incompleto',
+  ready: 'Listo',
+};
 
-/** Shared "how far along" rank for the deep and summary status columns. */
-function analysisRank(s: DeepStatus | SummaryStatus): number {
-  switch (s) {
-    case 'done':
-      return 4;
-    case 'pending':
-      return 3;
-    case 'failed':
-      return 2;
-    case 'skipped_no_text':
-      return 1;
-    default:
-      return 0;
+const READINESS_TONE: Record<WorkReadiness, string> = {
+  // Reuses utilities that already have a light-mode remap in index.css.
+  unstarted: 'border-neutral-700 text-neutral-400',
+  running: 'border-amber-700/60 bg-amber-900/20 text-amber-300',
+  failed: 'border-red-700/60 bg-red-900/20 text-red-300',
+  noText: 'border-neutral-700 bg-neutral-900/40 text-neutral-400',
+  abstractOnly: 'border-amber-700/60 bg-amber-900/20 text-amber-300',
+  incomplete: 'border-amber-700/60 bg-amber-900/20 text-amber-300',
+  ready: 'border-emerald-700/60 bg-emerald-900/20 text-emerald-300',
+};
+
+const READINESS_ICON: Record<WorkReadiness, string> = {
+  unstarted: 'minus',
+  running: 'clock',
+  failed: 'x',
+  // Nodus never got to see the text of this work.
+  noText: 'eyeOff',
+  abstractOnly: 'file',
+  incomplete: 'alert',
+  ready: 'check',
+};
+
+/**
+ * Why a work can never reach "ready", when that is the case. Written as literal
+ * `t()` calls rather than a lookup map: the i18n coverage scan follows literals
+ * at the call site, and a map read through a variable slips past it — which ships
+ * Spanish to every other language with nothing failing.
+ */
+function readinessHint(readiness: WorkReadiness): string | null {
+  if (readiness === 'noText') {
+    return t('Nodus no encontró texto que leer. Añade el PDF o EPUB en Zotero y vuelve a analizar.');
   }
-}
-
-function embeddingRank(status: WorkEmbeddingStatus | undefined): number {
-  if (!status || status.totalIdeas === 0) return -1;
-  // Fully-indexed works rank above partially-indexed ones; ties broken by count.
-  return (status.complete ? 1_000_000 : 0) + status.embeddedIdeas;
-}
-
-function passageRank(status: WorkPassageStatus | undefined): number {
-  if (!status || status.status === 'missing') return -1;
-  if (status.status === 'complete') return 1_000_000 + status.totalPassages;
-  return 0; // outdated
+  if (readiness === 'abstractOnly') {
+    return t('El análisis solo pudo usar el abstract, así que esta obra no tendrá texto citable. Añade el PDF o EPUB en Zotero y vuelve a analizar.');
+  }
+  return null;
 }
 
 /** Human label for a corpus-health bucket, matching the notice text on Home. */
@@ -230,80 +258,108 @@ function StatusFlagsPicker({
   );
 }
 
-function lightBadge(s: LightStatus) {
-  if (s === 'done') return <Badge color="green">{t('ligero')} ✓</Badge>;
-  if (s === 'none') return <Badge color="neutral">—</Badge>;
-  if (s === 'failed') return <Badge color="red">{t('ligero')} ✕</Badge>;
-  return <Badge color="neutral">{t('ligero')}…</Badge>;
-}
+/**
+ * The one-click status filters. They run in SQL over the WHOLE library, so what
+ * a preset returns is exactly what the pills say — see readinessFilters.ts.
+ * 'running' is absent on purpose: it exists only in the live queue.
+ */
+const STATUS_PRESETS: Exclude<WorkReadiness, 'running'>[] = [
+  'unstarted',
+  'incomplete',
+  'ready',
+  'abstractOnly',
+  'noText',
+  'failed',
+];
 
-function deepBadge(s: DeepStatus, sourceType?: WorkView['source_type']) {
-  switch (s) {
-    case 'done':
-      // The scan finished, but only the abstract was available — no full text was
-      // read. Flag it so the reader knows to re-scan once the PDF/EPUB is in Zotero.
-      if (sourceType === 'abstract_only' || sourceType === 'none') {
-        return (
-          <Badge
-            color="amber"
-            title={t('El análisis profundo solo usó el abstract, no el texto completo (el PDF/EPUB no estaba disponible al analizar). Reanaliza cuando esté en Zotero.')}
-          >
-            {t('solo abstract')}
-          </Badge>
-        );
-      }
-      return <Badge color="indigo">{t('profundo')} ✓</Badge>;
-    case 'pending':
-      return <Badge color="amber">{t('profundo')}…</Badge>;
-    case 'failed':
-      return <Badge color="red">{t('profundo')} ✕</Badge>;
-    case 'skipped_no_text':
-      return <Badge color="amber" title={t('Sin texto disponible')}>{t('sin texto')}</Badge>;
-    default:
-      return <Badge color="neutral">—</Badge>;
-  }
-}
+/** Short names for the five analysis steps, used by the status tooltip. */
+const STEP_LABEL: Record<StepId, string> = {
+  themes: 'Temas',
+  ideas: 'Ideas',
+  summary: 'Resumen',
+  semantic: 'Búsqueda semántica',
+  citable: 'Texto citable',
+};
 
-function summaryBadge(s: SummaryStatus) {
-  switch (s) {
-    case 'done':
-      return <Badge color="indigo">{t('resumen')} ✓</Badge>;
-    case 'pending':
-      return <Badge color="amber">{t('resumen')}…</Badge>;
-    case 'failed':
-      return <Badge color="red">{t('resumen')} ✕</Badge>;
-    case 'skipped_no_text':
-      return <Badge color="amber" title={t('Sin texto disponible')}>{t('sin texto')}</Badge>;
-    default:
-      return <Badge color="neutral">—</Badge>;
-  }
-}
-
-function triggerBadge(w: WorkView) {
-  if (!w.deep_trigger) return null;
-  if (w.deep_trigger === 'tag') return <span title={t('Por tag')}>🏷</span>;
-  if (w.deep_trigger === 'manual') return <span title={t('Manual')}>✦</span>;
+/**
+ * The one status a reader actually needs: can I use this work yet? Clicking it
+ * opens the per-step breakdown, which is where retrying an individual step lives.
+ */
+function StatusPill({ status, onClick }: { status: WorkStatus; onClick: () => void }) {
+  const { readiness, missing } = status;
+  const hint = readinessHint(readiness);
+  const detail = hint
+    ? hint
+    : missing.length > 0
+      ? `${t('Falta')}: ${missing.map((step) => t(STEP_LABEL[step])).join(', ')}`
+      : t(READINESS_LABEL[readiness]);
   return (
-    <span title={t('Tag + manual')}>
-      🏷✦
-    </span>
+    <button
+      type="button"
+      className={`library-status-pill inline-flex max-w-full items-center gap-1.5 rounded-md border px-2 py-1 text-xs transition-opacity hover:opacity-80 ${READINESS_TONE[readiness]}`}
+      title={`${detail}\n${t('Ver el detalle paso a paso')}`}
+      onClick={onClick}
+    >
+      <Icon name={READINESS_ICON[readiness]} size={12} className="shrink-0" />
+      <span className="truncate">{t(READINESS_LABEL[readiness])}</span>
+      {readiness === 'incomplete' && (
+        <span className="shrink-0 tabular-nums opacity-80">· {missing.length}</span>
+      )}
+    </button>
   );
 }
 
-function embeddingBadge(status: WorkEmbeddingStatus | undefined) {
-  if (!status || status.totalIdeas === 0) return <Badge color="neutral">—</Badge>;
-  if (status.complete) return <Badge color="cyan">✓ {status.embeddedIdeas}</Badge>;
+/**
+ * Overflow menu for the row's secondary actions. It is portaled to `document.body`
+ * because the rows live inside a virtualised, clipping scroller — an in-flow menu
+ * would be cut off by the row above it — and `useAnchoredCoords` re-measures on
+ * scroll so the menu stays glued to its trigger instead of drifting away.
+ */
+function RowMenu({ label, items }: { label: string; items: { label: string; icon: string; onClick: () => void; disabled?: boolean }[] }) {
+  const [open, setOpen] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const coords = useAnchoredCoords(open, btnRef, 232, 232, 'below');
   return (
-    <Badge color="amber" title={tx('{a}/{b} ideas indexadas', { a: status.embeddedIdeas, b: status.totalIdeas })}>
-      {status.embeddedIdeas}/{status.totalIdeas}
-    </Badge>
+    <>
+      <button
+        ref={btnRef}
+        type="button"
+        className="library-row-action library-row-action-neutral inline-flex h-7 w-7 items-center justify-center rounded-md text-base leading-none text-neutral-400 hover:bg-neutral-800 hover:text-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/70"
+        title={label}
+        aria-label={label}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+      >
+        ⋯
+      </button>
+      {open && coords &&
+        createPortal(
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+            <div role="menu" aria-label={label} className="library-row-menu fixed z-50 rounded-lg border border-neutral-700 bg-neutral-950 p-1 shadow-2xl" style={anchorStyle(coords)}>
+              {items.map((item) => (
+                <button
+                  key={item.label}
+                  type="button"
+                  role="menuitem"
+                  disabled={item.disabled}
+                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-neutral-300 hover:bg-neutral-800 hover:text-neutral-100 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+                  onClick={() => {
+                    setOpen(false);
+                    item.onClick();
+                  }}
+                >
+                  <Icon name={item.icon} size={13} className="shrink-0 opacity-70" />
+                  <span className="truncate">{item.label}</span>
+                </button>
+              ))}
+            </div>
+          </>,
+          document.body
+        )}
+    </>
   );
-}
-
-function passageBadge(status: WorkPassageStatus | undefined) {
-  if (!status || status.status === 'missing') return <Badge color="neutral">—</Badge>;
-  if (status.status === 'complete') return <Badge color="green">✓ {status.totalPassages}</Badge>;
-  return <Badge color="amber" title={t('El texto o el modelo de embeddings cambió.')}>{t('obsoleto')}</Badge>;
 }
 
 /** A clickable column header that cycles asc → desc → default on the shared sort. */
@@ -379,10 +435,15 @@ export function Library({
   const [reuseAnalysisFromVaults, setReuseAnalysisFromVaults] = useState(false);
   const [reuseNotice, setReuseNotice] = useState<string | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
-  const [confirmReindex, setConfirmReindex] = useState(false);
+  const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
   const [graphWork, setGraphWork] = useState<{ nodus_id: string; title: string } | null>(null);
   const [ideasWork, setIdeasWork] = useState<{ nodus_id: string; title: string } | null>(null);
+  const [statusWork, setStatusWork] = useState<WorkView | null>(null);
   const [duplicatesOpen, setDuplicatesOpen] = useState(false);
+  // Live scan-queue items indexed by work. The persisted *_status fields go
+  // 'pending' when a job is enqueued but never say whether it is waiting in line
+  // or running right now, so this is the only way a row can show "Analizando…".
+  const [queuedByWork, setQueuedByWork] = useState<Map<string, QueueItem[]>>(new Map());
   // Client-side ordering over the already-in-memory filtered set. `null` keeps
   // the backend order (year desc, title asc).
   const [sort, setSort] = useState<SortState | null>(null);
@@ -499,6 +560,19 @@ export function Library({
   useEffect(() => window.nodus.onPassageProgress((progress) => {
     if (!progress.running) refreshAllRef.current();
   }), []);
+  // Seed from the current queue as well as subscribing: a reader arriving at the
+  // Library mid-analysis would otherwise see nothing until the next queue event.
+  useEffect(() => {
+    let alive = true;
+    void window.nodus.getQueue().then((progress) => {
+      if (alive) setQueuedByWork(queueItemsByWork(progress.items));
+    });
+    const off = window.nodus.onQueueProgress((progress) => setQueuedByWork(queueItemsByWork(progress.items)));
+    return () => {
+      alive = false;
+      off();
+    };
+  }, []);
 
   // Focus the list on a corpus-health bucket when the user clicks a health notice
   // on Home. The nonce re-triggers even if the same bucket is chosen twice. We
@@ -548,11 +622,6 @@ export function Library({
     } else {
       await window.nodus.setManualDeep(w.nodus_id, true);
     }
-    await load();
-  };
-
-  const analyzeBoth = async (w: WorkView) => {
-    await window.nodus.analyzeBoth(w.nodus_id);
     await load();
   };
 
@@ -704,10 +773,6 @@ export function Library({
     else toast(tx('Reanálisis en cola para {n} obra(s) «solo abstract». Verás el progreso en la cola.', { n }));
   };
 
-  const embedWork = async (nodusId: string) => {
-    await window.nodus.startEmbedding([nodusId]);
-  };
-
   const embedSelected = async () => {
     const ids = selectedVisibleIds;
     if (ids.length === 0) return;
@@ -720,10 +785,6 @@ export function Library({
     await window.nodus.startEmbedding();
   };
 
-  const indexPassageWork = async (nodusId: string) => {
-    await window.nodus.startPassageEmbedding([nodusId]);
-  };
-
   const indexSelectedPassages = async () => {
     const ids = selectedVisibleIds;
     if (ids.length === 0) return;
@@ -733,29 +794,9 @@ export function Library({
     await load();
   };
 
-  const indexMissingPassages = async () => {
-    const ids = works
-      .filter((work) => passageStatuses.get(work.nodus_id)?.status !== 'complete')
-      .map((work) => work.nodus_id);
-    if (ids.length > 0) await window.nodus.startPassageEmbedding(ids);
-  };
-
   const indexAllPassages = async () => {
     await window.nodus.startPassageEmbedding();
   };
-
-  const doReindexAll = async () => {
-    setConfirmReindex(false);
-    await window.nodus.reindexAll();
-  };
-
-  const needsEmbedding = (w: WorkView) => {
-    const s = embeddingStatuses.get(w.nodus_id);
-    return w.deep_status === 'done' && s && !s.complete && s.totalIdeas > 0;
-  };
-
-  const needsPassageIndex = (w: WorkView) =>
-    passageStatuses.get(w.nodus_id)?.status !== 'complete';
 
   const discoverBridges = async () => {
     await window.nodus.enqueueBridgeDiscovery();
@@ -819,12 +860,20 @@ export function Library({
 
   const selectedStatusFlags = filter.statusFlags ?? [];
   const selectedHealthBucket = filter.healthBucket ?? null;
+  const selectedReadiness = filter.readiness ?? null;
+  // Presets and the corpus-health buckets are both whole-corpus status filters;
+  // letting them stack would mean two answers to the same question.
+  const setReadiness = (readiness: Exclude<WorkReadiness, 'running'> | null) => {
+    setPageOffset(0);
+    setFilter((current) => ({ ...current, readiness: readiness ?? undefined, healthBucket: undefined }));
+  };
   const searchValue = searchDraft;
   const hasActiveFilters =
     searchValue.trim().length > 0 ||
     selectedStatusFlags.length > 0 ||
     selectedZoteroTags.length > 0 ||
     selectedCollections.length > 0 ||
+    selectedReadiness !== null ||
     selectedHealthBucket !== null;
   const clearHealthBucket = () => setFilter((c) => ({ ...c, healthBucket: undefined }));
   const toggleStatusFlag = (f: StatusFlag) =>
@@ -880,21 +929,6 @@ export function Library({
     setReuseNotice(null);
     setSelected(new Set(works.map((work) => work.nodus_id)));
   };
-  const summary = useMemo(() => {
-    const pendingEmbeddings = works.filter((w) => {
-      const s = embeddingStatuses.get(w.nodus_id);
-      return w.deep_status === 'done' && s && !s.complete && s.totalIdeas > 0;
-    }).length;
-    return {
-      withoutThemes: works.filter((w) => w.light_status === 'none').length,
-      themesDone: works.filter((w) => w.light_status === 'done').length,
-      ideasDone: works.filter((w) => w.deep_status === 'done').length,
-      summariesDone: works.filter((w) => w.summary_status === 'done').length,
-      failed: works.filter((w) => w.light_status === 'failed' || w.deep_status === 'failed' || w.summary_status === 'failed').length,
-      pendingEmbeddings,
-    };
-  }, [embeddingStatuses, works]);
-
   // Click a header: sort by it (default direction), flip direction on the second
   // click, and clear back to the backend order on the third.
   const cycleSort = (key: SortKey) =>
@@ -923,16 +957,6 @@ export function Library({
           return (w.themes[0] ?? '').toLocaleLowerCase();
         case 'ideas':
           return w.ideaCount;
-        case 'light':
-          return lightRank(w.light_status);
-        case 'deep':
-          return analysisRank(w.deep_status);
-        case 'summary':
-          return analysisRank(w.summary_status);
-        case 'embeddings':
-          return embeddingRank(embeddingStatuses.get(w.nodus_id));
-        case 'passages':
-          return passageRank(passageStatuses.get(w.nodus_id));
       }
     };
     return [...works].sort((a, b) => {
@@ -944,7 +968,19 @@ export function Library({
       // Stable, predictable tiebreak so equal keys don't jitter between renders.
       return cmp !== 0 ? cmp * dir : a.title.localeCompare(b.title);
     });
-  }, [works, sort, embeddingStatuses, passageStatuses]);
+  }, [works, sort]);
+
+  /** One derived status per visible row, recomputed when its inputs move. */
+  const statusByWork = useMemo(() => {
+    const map = new Map<string, WorkStatus>();
+    for (const w of works) {
+      map.set(
+        w.nodus_id,
+        deriveWorkStatus(w, embeddingStatuses.get(w.nodus_id), passageStatuses.get(w.nodus_id), queuedByWork.get(w.nodus_id))
+      );
+    }
+    return map;
+  }, [works, embeddingStatuses, passageStatuses, queuedByWork]);
 
   return (
     <div className="h-full flex flex-col p-6 min-h-0">
@@ -973,11 +1009,6 @@ export function Library({
             value={searchDraft}
             placeholder={t('Buscar título o autor…')}
             onChange={(e) => setSearchDraft(e.target.value)}
-          />
-          <StatusFlagsPicker
-            value={selectedStatusFlags}
-            setDimension={setStatusDimension}
-            onClear={clearStatusFlags}
           />
           <div className="relative" ref={tagFilterRef}>
             <button
@@ -1166,16 +1197,64 @@ export function Library({
             </button>
           )}
           <div className="flex-1" />
-          <span className="text-xs text-neutral-500">{t('Los modelos de análisis se configuran en Ajustes.')}</span>
         </div>
-        <div className="flex flex-wrap gap-2 mt-3">
-          <SummaryPill label={t('temas hechos')} value={summary.themesDone} />
-          <SummaryPill label={t('sin temas')} value={summary.withoutThemes} />
-          <SummaryPill label={t('ideas hechas')} value={summary.ideasDone} />
-          <SummaryPill label={t('resúmenes hechos')} value={summary.summariesDone} tone="violet" />
-          <SummaryPill label={t('embeddings pendientes')} value={summary.pendingEmbeddings} tone="cyan" />
-          {summary.failed > 0 && <SummaryPill label={t('fallos')} value={summary.failed} tone="red" />}
+        {/* One-click status filters. These replaced a row of counters that showed
+            the same information but could not be clicked, sitting next to a
+            separate control that filtered by it. */}
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            className={`library-preset btn border px-2.5 py-1 text-xs ${
+              selectedReadiness === null ? 'is-active border-indigo-700 bg-indigo-950/40 text-indigo-100' : 'btn-ghost border-neutral-700'
+            }`}
+            onClick={() => setReadiness(null)}
+          >
+            {t('Todo')}
+          </button>
+          {STATUS_PRESETS.map((preset) => (
+            <button
+              key={preset}
+              type="button"
+              className={`library-preset btn border gap-1.5 px-2.5 py-1 text-xs ${
+                selectedReadiness === preset
+                  ? 'is-active border-indigo-700 bg-indigo-950/40 text-indigo-100'
+                  : 'btn-ghost border-neutral-700'
+              }`}
+              onClick={() => setReadiness(selectedReadiness === preset ? null : preset)}
+            >
+              <Icon name={READINESS_ICON[preset]} size={12} className="opacity-70" />
+              {t(READINESS_LABEL[preset])}
+            </button>
+          ))}
+          <div className="flex-1" />
+          <button
+            type="button"
+            className={`btn border px-2.5 py-1 text-xs ${
+              advancedFiltersOpen || selectedStatusFlags.length > 0
+                ? 'is-active border-neutral-600 bg-neutral-800 text-neutral-100'
+                : 'btn-ghost border-neutral-700'
+            }`}
+            onClick={() => setAdvancedFiltersOpen((v) => !v)}
+            aria-expanded={advancedFiltersOpen}
+          >
+            {t('Filtros avanzados')}
+            {selectedStatusFlags.length > 0 && (
+              <span className="ml-1.5 tabular-nums opacity-80">{selectedStatusFlags.length}</span>
+            )}
+          </button>
         </div>
+        {advancedFiltersOpen && (
+          <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-neutral-800 pt-3">
+            <StatusFlagsPicker
+              value={selectedStatusFlags}
+              setDimension={setStatusDimension}
+              onClear={clearStatusFlags}
+            />
+            <span className="text-xs text-neutral-500">
+              {t('Combina condiciones sueltas de la tubería de análisis. Los presets de arriba cubren los casos habituales.')}
+            </span>
+          </div>
+        )}
         {selectedZoteroTags.length > 0 && (
           <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs text-neutral-500">
             <span>{t('Etiquetas:')}</span>
@@ -1278,7 +1357,6 @@ export function Library({
           >
             <Icon name="compass" size={13} /> {t('Procesar biblioteca')}
           </button>
-          <span className="text-neutral-600">{t('Después elige Temas, Ideas o Ambos.')}</span>
         </div>
       )}
 
@@ -1313,14 +1391,17 @@ export function Library({
           </label>
           {reuseNotice && <span className="min-w-0 max-w-full text-xs text-indigo-200/80">{reuseNotice}</span>}
           <span className="hidden sm:block h-5 w-px bg-indigo-800/70" />
+          {/* One verb, with the scope spelled out. The partial verbs live in the
+              menu: offering seven equally-weighted buttons was what made this bar
+              read as seven unrelated decisions instead of one. */}
           <button
             className="btn btn-primary"
             onClick={processFullSelected}
             title={t('Encadena temas, ideas, resumen, indexado (ideas y pasajes) y descubrimiento de relaciones.')}
           >
-            <Icon name="compass" /> {t('Procesar todo')}
+            <Icon name="compass" /> {tx('Analizar las {n} seleccionadas', { n: selectedVisibleIds.length })}
           </button>
-          <span className="hidden sm:block h-5 w-px bg-indigo-800/70" />
+          {/* Not a pipeline step in records vaults — it is what the view is for. */}
           {isRecordsVault && (
             <button
               className="btn btn-ghost border border-amber-700/70 text-amber-300"
@@ -1330,24 +1411,17 @@ export function Library({
               <Icon name="users" /> {t('Extraer personas y eventos')}
             </button>
           )}
-          <button className="btn btn-ghost border border-neutral-700" onClick={analyzeSelectedThemes}>
-            <Icon name="tag" /> {t('Temas')}
-          </button>
-          <button className="btn btn-ghost border border-neutral-700" onClick={analyzeSelectedIdeas}>
-            <Icon name="bulb" /> {t('Ideas')}
-          </button>
-          <button className="btn btn-ghost border border-neutral-700" onClick={analyzeSelectedBoth}>
-            <Icon name="layers" /> {t('Temas + ideas')}
-          </button>
-          <button className="btn btn-ghost border border-violet-800 text-violet-300" onClick={summarizeSelected}>
-            <Icon name="wand" /> {t('Generar resumen')}
-          </button>
-          <button className="btn btn-ghost border border-cyan-800 text-cyan-300" onClick={embedSelected}>
-            <Icon name="search" /> {t('Indexar')}
-          </button>
-          <button className="btn btn-ghost border border-green-800 text-green-300" onClick={indexSelectedPassages}>
-            <Icon name="book" /> {t('Indexar pasajes')}
-          </button>
+          <RowMenu
+            label={t('Analizar solo un paso')}
+            items={[
+              { label: t('Analizar solo temas'), icon: 'tag', onClick: () => void analyzeSelectedThemes() },
+              { label: t('Analizar solo ideas'), icon: 'bulb', onClick: () => void analyzeSelectedIdeas() },
+              { label: t('Analizar temas e ideas'), icon: 'layers', onClick: () => void analyzeSelectedBoth() },
+              { label: t('Generar resumen'), icon: 'wand', onClick: () => void summarizeSelected() },
+              { label: t('Preparar búsqueda semántica'), icon: 'search', onClick: () => void embedSelected() },
+              { label: t('Indexar texto citable'), icon: 'book', onClick: () => void indexSelectedPassages() },
+            ]}
+          />
           <div className="flex-1" />
           <button
             className="btn btn-ghost"
@@ -1391,37 +1465,24 @@ export function Library({
             buttonLabel={t('Reanalizar')}
             onClick={rescanAbstractOnly}
           />
+          {/* Two indexes, each named for what it gives the reader. There used to be
+              five cards saying "Indexar", two of them called "todo" and meaning
+              opposite things. */}
           <OperationCard
             icon="search"
-            title={t('Indexar pendientes')}
-            description={t('Genera embeddings para las ideas que aún no los tienen. No regenera los existentes.')}
-            buttonLabel={t('Indexar pendientes')}
+            title={t('Preparar búsqueda semántica')}
+            description={t('Genera los embeddings que faltan para poder encontrar ideas por significado. No regenera los existentes.')}
+            buttonLabel={t('Preparar las que falten')}
             tone="cyan"
             onClick={embedPending}
           />
           <OperationCard
             icon="book"
-            title={t('Procesar pasajes faltantes')}
-            description={t('Indexa fragmentos de texto completo en las obras que faltan o están obsoletas. No requiere análisis de ideas; el texto se mantiene como evidencia citable.')}
-            buttonLabel={t('Procesar faltantes')}
-            tone="cyan"
-            onClick={indexMissingPassages}
-          />
-          <OperationCard
-            icon="book"
-            title={t('Pasajes (texto completo)')}
-            description={t('Recorre toda la biblioteca y actualiza solo los índices que hayan cambiado. Los ya actuales se omiten.')}
-            buttonLabel={t('Indexar todo')}
+            title={t('Indexar texto citable')}
+            description={t('Indexa los fragmentos de texto completo que falten o estén obsoletos, en toda la biblioteca. No requiere análisis de ideas y los ya actuales se omiten.')}
+            buttonLabel={t('Indexar lo que falte')}
             tone="cyan"
             onClick={indexAllPassages}
-          />
-          <OperationCard
-            icon="search"
-            title={t('Reindexar todo')}
-            description={t('Borra todos los embeddings y los regenera desde cero. Útil tras cambiar de modelo de embeddings.')}
-            buttonLabel={t('Reindexar todo')}
-            tone="cyan"
-            onClick={() => setConfirmReindex(true)}
           />
           <OperationCard
             icon="compass"
@@ -1465,11 +1526,7 @@ export function Library({
           <SortHeader label={t('Año')} sortKey="year" sort={sort} onSort={cycleSort} />
           <SortHeader label={t('Tema(s)')} sortKey="themes" sort={sort} onSort={cycleSort} />
           <SortHeader label={t('Ideas')} sortKey="ideas" sort={sort} onSort={cycleSort} />
-          <SortHeader label={t('Ligero')} sortKey="light" sort={sort} onSort={cycleSort} />
-          <SortHeader label={t('Profundo')} sortKey="deep" sort={sort} onSort={cycleSort} />
-          <SortHeader label={t('Resumen')} sortKey="summary" sort={sort} onSort={cycleSort} />
-          <SortHeader label={t('Embeddings')} sortKey="embeddings" sort={sort} onSort={cycleSort} />
-          <SortHeader label={t('Pasajes')} sortKey="passages" sort={sort} onSort={cycleSort} />
+          <div className="font-medium">{t('Estado')}</div>
           <div className="font-medium" data-tour="library-actions">{t('Acciones')}</div>
         </div>
         {loading ? (
@@ -1481,7 +1538,9 @@ export function Library({
             getKey={(w) => w.nodus_id}
             className="flex-1 min-h-0"
             empty={<div className="p-4 text-neutral-500">{t('No hay obras con los filtros actuales.')}</div>}
-            renderItem={(w) => (
+            renderItem={(w) => {
+              const status = statusByWork.get(w.nodus_id);
+              return (
               <div
                 className="grid h-full items-center border-b border-neutral-800/70 px-2 hover:bg-neutral-900/50"
                 style={{ gridTemplateColumns: LIBRARY_GRID_TEMPLATE }}
@@ -1501,7 +1560,6 @@ export function Library({
                   >
                     {w.title}
                   </button>
-                  <div className="text-[10px] text-neutral-600 font-mono">{w.nodus_id.slice(0, 8)}</div>
                 </div>
                 <div className="p-1 min-w-0 truncate text-neutral-400">
                   {w.authors[0] ?? '—'}
@@ -1509,108 +1567,99 @@ export function Library({
                 </div>
                 <div className="p-1 text-neutral-400">{w.year ?? '—'}</div>
                 <div className="p-1 text-neutral-400 truncate">{w.themes.join(', ')}</div>
-                <div className="p-1 tabular-nums text-neutral-400" title={tx('{n} ideas extraídas', { n: w.ideaCount })}>
-                  {w.ideaCount > 0 ? w.ideaCount : '—'}
-                </div>
-                <div className="p-1">{lightBadge(w.light_status)}</div>
-                <div className="p-1 whitespace-nowrap">
-                  {deepBadge(w.deep_status, w.source_type)} {triggerBadge(w)}
-                </div>
-                <div className="p-1 whitespace-nowrap">{summaryBadge(w.summary_status)}</div>
-                <div className="p-1 whitespace-nowrap">
-                  {embeddingBadge(embeddingStatuses.get(w.nodus_id))}
-                  {needsEmbedding(w) && (
+                <div className="p-1">
+                  {w.ideaCount > 0 ? (
                     <button
-                      className="ml-1 inline-flex items-center gap-0.5 text-[10px] text-cyan-400 hover:text-cyan-300"
-                      title={t('Indexar embeddings de esta obra')}
-                      onClick={() => embedWork(w.nodus_id)}
+                      className="tabular-nums text-neutral-300 hover:text-indigo-300 hover:underline"
+                      title={tx('Ver las {n} ideas de esta obra', { n: w.ideaCount })}
+                      onClick={() => setIdeasWork({ nodus_id: w.nodus_id, title: w.title })}
                     >
-                      <Icon name="search" size={11} />
+                      {w.ideaCount}
                     </button>
+                  ) : (
+                    <span className="text-neutral-600">—</span>
                   )}
                 </div>
-                <div className="p-1 whitespace-nowrap">
-                  {passageBadge(passageStatuses.get(w.nodus_id))}
-                  {needsPassageIndex(w) && (
-                    <button
-                      className="ml-1 inline-flex items-center gap-0.5 text-[10px] text-green-400 hover:text-green-300"
-                      title={t('Indexar pasajes de esta obra')}
-                      onClick={() => indexPassageWork(w.nodus_id)}
-                    >
-                      <Icon name="book" size={11} />
-                    </button>
-                  )}
+                <div className="min-w-0 p-1">
+                  {status && <StatusPill status={status} onClick={() => setStatusWork(w)} />}
                 </div>
                 <div className="p-1 whitespace-nowrap">
                   <div className="flex items-center gap-1">
-                    <RowIconButton
-                      title={t('Procesar todo: temas, ideas, resumen, indexado y relaciones')}
-                      icon="compass"
-                      tone="indigo"
+                    <button
+                      className="btn btn-ghost border border-neutral-700 px-2 py-1 text-xs"
+                      title={t('Analizar: temas, ideas, resumen, indexado y relaciones')}
                       onClick={() => processFullWork(w)}
-                    />
-                    <RowIconButton title={t('Ver las ideas de esta obra')} icon="list" onClick={() => setIdeasWork({ nodus_id: w.nodus_id, title: w.title })} />
-                    {isRecordsVault && (
+                    >
+                      {t('Analizar')}
+                    </button>
+                    {/* The column is nullable in SQLite despite the non-null type, and demo
+                        vaults carry synthetic keys that open nothing. */}
+                    {w.zotero_key && (
                       <RowIconButton
-                        title={t('Extraer personas, lugares y eventos de esta obra')}
-                        icon="users"
-                        tone="amber"
-                        onClick={() => void scanRecords(w)}
+                        title={t('Abrir en Zotero')}
+                        icon="external"
+                        tone="indigo"
+                        onClick={() => window.nodus.openInZotero(w.zotero_key)}
                       />
                     )}
-                    <RowIconButton title={t('Analizar temas')} icon="tag" onClick={() => analyzeThemes(w)} />
-                    <RowIconButton title={w.deep_status === 'done' ? t('Reanalizar ideas') : t('Analizar ideas')} icon="bulb" onClick={() => analyzeIdeas(w)} />
-                    <RowIconButton title={t('Analizar temas e ideas')} icon="layers" onClick={() => analyzeBoth(w)} />
-                    <RowIconButton
-                      title={w.summary_status === 'done' ? t('Regenerar resumen') : t('Generar resumen')}
-                      icon="wand"
-                      tone="violet"
-                      onClick={() => summarizeWork(w)}
+                    <RowMenu
+                      label={t('Más acciones')}
+                      items={[
+                        ...(isRecordsVault
+                          ? [{
+                              label: t('Extraer personas y eventos'),
+                              icon: 'users',
+                              onClick: () => void scanRecords(w),
+                            }]
+                          : []),
+                        { label: t('Analizar solo temas'), icon: 'tag', onClick: () => void analyzeThemes(w) },
+                        {
+                          label: w.deep_status === 'done' ? t('Reanalizar solo ideas') : t('Analizar solo ideas'),
+                          icon: 'bulb',
+                          onClick: () => void analyzeIdeas(w),
+                        },
+                        {
+                          label: w.summary_status === 'done' ? t('Regenerar resumen') : t('Generar resumen'),
+                          icon: 'wand',
+                          onClick: () => void summarizeWork(w),
+                        },
+                        {
+                          label: t('Grafo de ideas de la obra'),
+                          icon: 'network',
+                          disabled: w.deep_status !== 'done',
+                          onClick: () => setGraphWork({ nodus_id: w.nodus_id, title: w.title }),
+                        },
+                        {
+                          label: t('Ver esta obra en el grafo'),
+                          icon: 'map',
+                          onClick: () =>
+                            onOpenGraph({
+                              preset: 'reading',
+                              workId: w.nodus_id,
+                              workTitle: w.title,
+                              zoteroKey: w.zotero_key,
+                              label: `${t('Lectura:')} ${w.title}`,
+                            }),
+                        },
+                        {
+                          label: t('Preguntar al asistente'),
+                          icon: 'chat',
+                          onClick: () =>
+                            onOpenAssistant({
+                              title: `${t('Lectura:')} ${w.title}`,
+                              selection: ASSISTANT_CONTEXTS.reading,
+                              prompt:
+                                `${t('Analiza esta lectura dentro del corpus: ideas extraídas, temas, huecos, contradicciones y próximas lecturas relacionadas.')}\n\n` +
+                                `${w.title}\n${w.authors.join(', ')}${w.year ? ` (${w.year})` : ''}`,
+                            }),
+                        },
+                      ]}
                     />
-                    <RowIconButton
-                      title={
-                        w.deep_status === 'done'
-                          ? t('Ver el grafo de ideas de esta obra')
-                          : t('Requiere análisis profundo para ver el grafo de ideas')
-                      }
-                      icon="network"
-                      tone="cyan"
-                      disabled={w.deep_status !== 'done'}
-                      onClick={() => setGraphWork({ nodus_id: w.nodus_id, title: w.title })}
-                    />
-                    <RowIconButton
-                      title={t('Ver esta obra en el grafo')}
-                      icon="map"
-                      tone="cyan"
-                      onClick={() =>
-                        onOpenGraph({
-                          preset: 'reading',
-                          workId: w.nodus_id,
-                          workTitle: w.title,
-                          zoteroKey: w.zotero_key,
-                          label: `${t('Lectura:')} ${w.title}`,
-                        })
-                      }
-                    />
-                    <RowIconButton
-                      title={t('Preguntar al asistente sobre esta obra')}
-                      icon="chat"
-                      tone="violet"
-                      onClick={() =>
-                        onOpenAssistant({
-                          title: `${t('Lectura:')} ${w.title}`,
-                          selection: ASSISTANT_CONTEXTS.reading,
-                          prompt:
-                            `${t('Analiza esta lectura dentro del corpus: ideas extraídas, temas, huecos, contradicciones y próximas lecturas relacionadas.')}\n\n` +
-                            `${w.title}\n${w.authors.join(', ')}${w.year ? ` (${w.year})` : ''}`,
-                        })
-                      }
-                    />
-                    <RowIconButton title={t('Abrir en Zotero')} icon="external" tone="indigo" onClick={() => window.nodus.openInZotero(w.zotero_key)} />
                   </div>
                 </div>
               </div>
-            )}
+              );
+            }}
           />
         )}
         {!loading && totalWorks > LIBRARY_PAGE_SIZE && (
@@ -1637,16 +1686,6 @@ export function Library({
           </div>
         )}
       </div>
-      {confirmReindex && (
-        <ConfirmModal
-          title={t('Reindexar todos los embeddings')}
-          message={t('Se borrarán TODOS los embeddings existentes y se regenerarán desde cero. Esto consumirá tokens del proveedor de embeddings configurado. ¿Continuar?')}
-          confirmLabel={t('Reindexar todo')}
-          danger
-          onConfirm={() => void doReindexAll()}
-          onCancel={() => setConfirmReindex(false)}
-        />
-      )}
       {graphWork && <WorkGraphModal work={graphWork} onClose={() => setGraphWork(null)} />}
       {ideasWork && (
         <WorkIdeasModal
@@ -1659,33 +1698,16 @@ export function Library({
           }}
         />
       )}
+      {statusWork && statusByWork.get(statusWork.nodus_id) && (
+        <WorkStatusModal
+          work={statusWork}
+          status={statusByWork.get(statusWork.nodus_id)!}
+          onClose={() => setStatusWork(null)}
+          onChanged={() => void load()}
+        />
+      )}
       {duplicatesOpen && <DuplicatesModal onClose={() => setDuplicatesOpen(false)} />}
     </div>
-  );
-}
-
-function SummaryPill({
-  label,
-  value,
-  tone = 'neutral',
-}: {
-  label: string;
-  value: number;
-  tone?: 'neutral' | 'cyan' | 'red' | 'violet';
-}) {
-  const toneClass =
-    tone === 'cyan'
-      ? 'border-cyan-900/70 text-cyan-300'
-      : tone === 'red'
-        ? 'border-red-900/70 text-red-300'
-        : tone === 'violet'
-          ? 'border-violet-900/70 text-violet-300'
-        : 'border-neutral-800 text-neutral-400';
-  return (
-    <span className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs ${toneClass}`}>
-      <span className="font-semibold tabular-nums text-neutral-100">{value}</span>
-      {label}
-    </span>
   );
 }
 
