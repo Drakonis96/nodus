@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/nodus-logo.svg" width="104" alt="Nodus logo">
+  <img src="site/assets/nodus-logo.svg" width="104" alt="Nodus logo">
 </p>
 
 <h1 align="center">Nodus</h1>

@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 const REPOSITORY = 'Drakonis96/nodus';
 const DEFAULT_OUTPUT = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
-  '../docs/data/github-release-downloads.json',
+  '../site/data/github-release-downloads.json',
 );
 
 export function classifyReleaseAsset(name) {

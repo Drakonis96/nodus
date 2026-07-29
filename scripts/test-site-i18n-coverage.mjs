@@ -5,9 +5,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const landing = fs.readFileSync(path.join(repoRoot, 'docs/index.html'), 'utf8');
-const completionSource = fs.readFileSync(path.join(repoRoot, 'docs/i18n-complete.js'), 'utf8');
-const faqSource = fs.readFileSync(path.join(repoRoot, 'docs/faq.js'), 'utf8');
+const landing = fs.readFileSync(path.join(repoRoot, 'site/index.html'), 'utf8');
+const completionSource = fs.readFileSync(path.join(repoRoot, 'site/i18n-complete.js'), 'utf8');
+const faqSource = fs.readFileSync(path.join(repoRoot, 'site/faq.js'), 'utf8');
 
 function loadLandingTranslations() {
   const source = landing.slice(

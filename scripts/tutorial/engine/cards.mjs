@@ -66,7 +66,7 @@ const main = path.join(OUT, `${NAME}.mp4`);
 if (!existsSync(main)) throw new Error('Run assemble.mjs first — this stage wraps its output.');
 await mkdir(CARDS, { recursive: true });
 
-const logoSvg = await readFile(path.join(repoRoot, 'docs', 'assets', 'nodus-logo.svg'), 'utf8');
+const logoSvg = await readFile(path.join(repoRoot, 'site', 'assets', 'nodus-logo.svg'), 'utf8');
 
 // Google's fonts are what the site uses; if the machine is offline the cards fall
 // back to system faces rather than failing to render.

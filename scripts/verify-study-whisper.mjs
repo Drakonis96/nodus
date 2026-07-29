@@ -19,12 +19,12 @@ const models = (process.env.NODUS_WHISPER_MODELS || 'Xenova/whisper-tiny,Xenova/
 const fixtures = [
   {
     name: 'deep-research-sample.m4a',
-    url: '/docs/assets/audio/deep-research-sample.m4a',
+    url: '/site/assets/audio/deep-research-sample.m4a',
     expected: ['retrieval', 'practice', 'testing', 'memory', 'reading', 'recalling'],
   },
   {
     name: 'immersion-sample.m4a',
-    url: '/docs/assets/audio/immersion-sample.m4a',
+    url: '/site/assets/audio/immersion-sample.m4a',
     expected: ['library', 'sky', 'constellation', 'stars', 'shelves', 'ideas'],
   },
 ];
