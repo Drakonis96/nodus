@@ -1,10 +1,9 @@
 // Ask a worldbuilding character a question and get their answer, in voice.
 //
-// Ephemeral by design: the exchange lives in the renderer for as long as the modal is
-// open and is never written to the vault. An interview is a thinking tool — the author
-// keeps what it produced by editing the sheet, which is where canon belongs. Persisting
-// transcripts would create a second, unversioned account of the character that nothing
-// else reads.
+// This function is deliberately stateless: it receives bounded history and returns one
+// in-character turn. The current interview UI calls it through characterChat.ts, which
+// persists the conversation as non-canon authoring history. The direct legacy IPC route
+// remains ephemeral. Neither path edits the character sheet or promotes chat to canon.
 
 import { completeText } from './aiClient';
 import { getCharacter, listCharacterAbilities, listCharacterEvents } from '../db/charactersRepo';

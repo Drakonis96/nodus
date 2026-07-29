@@ -121,9 +121,9 @@ const INDIRECT_KEY_SOURCES = [
   // Convert view.
   { file: 'shared/toolkitTypes.ts', pattern: /\b(?:label|description|placeholder):\s*(["'])((?:\\.|(?!\1).)*?)\1/g },
   // Tour steps are plain object literals fed through t() by the tour engine.
-  ...['Tour', 'AdvancedTour', 'StudyTour', 'GenealogyTour', 'DatabasesTour', 'TeachingTour'].map((name) => ({
+  ...['Tour', 'AdvancedTour', 'StudyTour', 'GenealogyTour', 'DatabasesTour', 'TeachingTour', 'PrimarySourcesTour'].map((name) => ({
     file: `src/views/${name}.tsx`,
-    pattern: /(?:title|body):\s*(["'])((?:\\.|(?!\1).)*?)\1/g,
+    pattern: /(?:title|body|label):\s*(["'])((?:\\.|(?!\1).)*?)\1/g,
   })),
   // The chat's copy table: one component serves the study and the teaching vault, and
   // the strings that address the reader differ between them, so they reach t() as

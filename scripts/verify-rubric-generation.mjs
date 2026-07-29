@@ -50,7 +50,7 @@ if (provider === 'gemini') {
 }
 
 const modelRef = provider === 'gemini'
-  ? { provider: 'gemini', model: process.env.RUBRIC_VERIFY_MODEL || 'gemini-2.5-flash-lite' }
+  ? { provider: 'gemini', model: process.env.RUBRIC_VERIFY_MODEL || 'gemini-3.5-flash-lite' }
   : { provider, model: process.env.RUBRIC_VERIFY_MODEL || 'qwen2.5:7b' };
 
 settingsRepo.updateSettings({

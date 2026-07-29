@@ -255,6 +255,9 @@ const DEDICATED_VAULT_NAV_IDS: Partial<Record<ReturnType<typeof normalizeVaultTy
     'prosopSearch', 'prosopPopulation', 'prosopPersons', 'prosopSources',
     'prosopAnalysis', 'prosopNetworks', 'notes', 'toolkit',
   ],
+  primary_sources: [
+    'search', 'archive', 'persons', 'timeline', 'map', 'relations', 'notes', 'toolkit',
+  ],
   estudio: [
     'studyCourses', 'studySchedule', 'studyCalendar', 'studySearch', 'studyLibrary',
     'studyRecordings', 'studyChat', 'studyIdeas', 'studyGraph', 'studyQuestions',

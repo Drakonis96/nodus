@@ -91,14 +91,41 @@ export type ReasoningEffort = 'off' | 'low' | 'medium' | 'high';
  * an empty object when the provider exposes no usable OpenAI-compat knob. The caller
  * retries without these on a 400, so it is safe to be slightly optimistic here.
  */
-export function reasoningBody(provider: AiProvider, effort: ReasoningEffort): Record<string, unknown> {
+function isGemini3Model(modelId: string | undefined): boolean {
+  return Boolean(modelId && /^gemini-3(?:[.-]|$)/i.test(modelId));
+}
+
+/**
+ * Sampling controls are deliberately absent for Gemini 3.x. Google recommends the
+ * model defaults for the whole family and, starting with 3.5 Flash-Lite / 3.6,
+ * rejects deprecated temperature/top-p/top-k fields with HTTP 400. Keeping this
+ * decision at the transport seam makes non-streaming and streaming calls identical.
+ */
+export function samplingTemperatureBody(
+  provider: AiProvider,
+  modelId: string,
+  temperature: number,
+): Record<string, number> {
+  return provider === 'gemini' && isGemini3Model(modelId) ? {} : { temperature };
+}
+
+export function reasoningBody(
+  provider: AiProvider,
+  effort: ReasoningEffort,
+  modelId?: string,
+): Record<string, unknown> {
   switch (provider) {
     case 'openrouter':
       // OpenRouter's unified `reasoning` param: disable entirely, or pick an effort.
       return effort === 'off' ? { reasoning: { enabled: false } } : { reasoning: { effort } };
     case 'gemini':
-      // Gemini's OpenAI-compat surface accepts reasoning_effort, including "none".
-      return { reasoning_effort: effort === 'off' ? 'none' : effort };
+      // Gemini 3 models cannot disable thinking. Omitting the field selects the
+      // model's own lowest/default level (minimal for Flash-Lite); sending "none"
+      // makes the OpenAI-compatible endpoint reject an otherwise valid request.
+      // Gemini 2.5 still accepts "none", so retain the useful explicit opt-out there.
+      return effort === 'off' && isGemini3Model(modelId)
+        ? {}
+        : { reasoning_effort: effort === 'off' ? 'none' : effort };
     case 'openai':
       // Only the reasoning (o-series / gpt-5) models honor reasoning_effort; sending
       // it elsewhere 400s and the caller strips it. Omit for "off" (the default).

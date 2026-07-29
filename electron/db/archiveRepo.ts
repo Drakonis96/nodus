@@ -166,7 +166,12 @@ function itemLinkedPersons(itemId: string): ArchiveLinkedPerson[] {
   ).map((r) => ({ personId: r.person_id, displayName: r.display_name }));
 }
 
-function rowToItem(row: ItemMetaRow): ArchiveItem {
+function rowToItemWithRelations(
+  row: ItemMetaRow,
+  linkedPersons: ArchiveLinkedPerson[],
+  tags: string[],
+  folderIds: string[],
+): ArchiveItem {
   const metadata = parseMetadata(row.metadata_json);
   return {
     itemId: row.item_id,
@@ -184,13 +189,78 @@ function rowToItem(row: ItemMetaRow): ArchiveItem {
     docType: row.doc_type,
     metadata,
     year: extractItemYear(row.doc_type, metadata),
-    linkedPersons: itemLinkedPersons(row.item_id),
-    tags: itemTags(row.item_id),
-    folderIds: itemFolderIds(row.item_id),
+    linkedPersons,
+    tags,
+    folderIds,
     hasEmbedding: Boolean(row.has_embedding),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+function rowToItem(row: ItemMetaRow): ArchiveItem {
+  return rowToItemWithRelations(
+    row,
+    itemLinkedPersons(row.item_id),
+    itemTags(row.item_id),
+    itemFolderIds(row.item_id),
+  );
+}
+
+/**
+ * Hydrate one bounded archive page without reading file BLOBs or extracted full
+ * text and without the per-row relation queries used by the legacy archive view.
+ */
+export function listArchiveItemsMetadataByIds(itemIds: string[]): ArchiveItem[] {
+  const ids = [...new Set(itemIds)].slice(0, 500);
+  if (ids.length === 0) return [];
+  const placeholders = ids.map(() => '?').join(',');
+  const db = getDb();
+  const rows = db.prepare(
+    `SELECT item_id, folder_id, title, kind, file_name, mime_type, bytes,
+       (blob IS NOT NULL) AS has_blob, NULL AS extracted_text, description, source,
+       content_hash, doc_type, metadata_json, (embedding IS NOT NULL) AS has_embedding,
+       created_at, updated_at
+     FROM archive_items WHERE item_id IN (${placeholders})`
+  ).all(...ids) as ItemMetaRow[];
+
+  const tags = new Map<string, string[]>();
+  for (const row of db.prepare(
+    `SELECT item_id, tag FROM archive_item_tags
+     WHERE item_id IN (${placeholders}) ORDER BY item_id, tag`
+  ).all(...ids) as Array<{ item_id: string; tag: string }>) {
+    tags.set(row.item_id, [...(tags.get(row.item_id) ?? []), row.tag]);
+  }
+  const folders = new Map<string, string[]>();
+  for (const row of db.prepare(
+    `SELECT item_id, folder_id FROM archive_item_folders
+     WHERE item_id IN (${placeholders}) ORDER BY item_id, folder_id`
+  ).all(...ids) as Array<{ item_id: string; folder_id: string }>) {
+    folders.set(row.item_id, [...(folders.get(row.item_id) ?? []), row.folder_id]);
+  }
+  const people = new Map<string, ArchiveLinkedPerson[]>();
+  for (const row of db.prepare(
+    `SELECT ap.item_id, p.person_id, p.display_name
+       FROM archive_item_persons ap
+       JOIN persons p ON p.person_id=ap.person_id
+      WHERE ap.item_id IN (${placeholders})
+      ORDER BY ap.item_id, p.display_name`
+  ).all(...ids) as Array<{ item_id: string; person_id: string; display_name: string }>) {
+    people.set(row.item_id, [
+      ...(people.get(row.item_id) ?? []),
+      { personId: row.person_id, displayName: row.display_name },
+    ]);
+  }
+  const byId = new Map(rows.map((row) => [
+    row.item_id,
+    rowToItemWithRelations(
+      row,
+      people.get(row.item_id) ?? [],
+      tags.get(row.item_id) ?? [],
+      folders.get(row.item_id) ?? [],
+    ),
+  ]));
+  return ids.map((itemId) => byId.get(itemId)).filter((item): item is ArchiveItem => Boolean(item));
 }
 
 /** Adapt an ArchiveItem to the shape shared/archiveFilters.ts needs for matching. */
@@ -481,40 +551,77 @@ export interface ArchiveEmbeddingRow {
   embeddingTextHash: string | null;
 }
 
+/**
+ * Prefer a reviewed source-faithful text version for semantic indexing. The legacy
+ * `archive_items.extracted_text` remains the fallback for genealogy/older vaults.
+ * Translations are intentionally lowest priority so a derived language version never
+ * silently replaces the document's diplomatic/OCR/transcription text.
+ */
+const PREFERRED_ARCHIVE_TEXT_SQL = `(SELECT tv.content
+  FROM archive_text_versions tv
+ WHERE tv.item_id=ai.item_id
+ ORDER BY
+   CASE tv.status WHEN 'reviewed' THEN 0 WHEN 'closed' THEN 0 WHEN 'in_review' THEN 1 ELSE 2 END,
+   CASE tv.kind WHEN 'diplomatic' THEN 0 WHEN 'transcription' THEN 0 WHEN 'ocr' THEN 1 WHEN 'normalized' THEN 2 ELSE 3 END,
+   tv.updated_at DESC
+ LIMIT 1)`;
+
+type ArchiveEmbeddingSqlRow = {
+  item_id: string;
+  title: string;
+  description: string | null;
+  extracted_text: string | null;
+  doc_type: string | null;
+  has_embedding: number;
+  embedding_provider: string | null;
+  embedding_model: string | null;
+  embedding_dim: number | null;
+  embedding_text_hash: string | null;
+};
+
+function embeddingRow(row: ArchiveEmbeddingSqlRow): ArchiveEmbeddingRow {
+  return {
+    itemId: row.item_id,
+    title: row.title,
+    description: row.description,
+    extractedText: row.extracted_text,
+    docType: row.doc_type,
+    hasEmbedding: Boolean(row.has_embedding),
+    embeddingProvider: row.embedding_provider,
+    embeddingModel: row.embedding_model,
+    embeddingDim: row.embedding_dim,
+    embeddingTextHash: row.embedding_text_hash,
+  };
+}
+
 /** Text-bearing items with their embedding metadata (no blobs), for the indexer. */
 export function archiveItemsForEmbedding(): ArchiveEmbeddingRow[] {
   const rows = getDb()
     .prepare(
-      `SELECT item_id, title, description, extracted_text, doc_type,
-        (embedding IS NOT NULL) AS has_embedding, embedding_provider, embedding_model,
-        embedding_dim, embedding_text_hash
-       FROM archive_items
-       WHERE COALESCE(extracted_text, '') <> '' OR COALESCE(description, '') <> ''`
+      `SELECT ai.item_id, ai.title, ai.description,
+              COALESCE(${PREFERRED_ARCHIVE_TEXT_SQL}, ai.extracted_text) AS extracted_text,
+              ai.doc_type, (ai.embedding IS NOT NULL) AS has_embedding,
+              ai.embedding_provider, ai.embedding_model, ai.embedding_dim,
+              ai.embedding_text_hash
+         FROM archive_items ai
+        WHERE COALESCE(${PREFERRED_ARCHIVE_TEXT_SQL}, ai.extracted_text, ai.description, '') <> ''`
     )
-    .all() as {
-    item_id: string;
-    title: string;
-    description: string | null;
-    extracted_text: string | null;
-    doc_type: string | null;
-    has_embedding: number;
-    embedding_provider: string | null;
-    embedding_model: string | null;
-    embedding_dim: number | null;
-    embedding_text_hash: string | null;
-  }[];
-  return rows.map((r) => ({
-    itemId: r.item_id,
-    title: r.title,
-    description: r.description,
-    extractedText: r.extracted_text,
-    docType: r.doc_type,
-    hasEmbedding: Boolean(r.has_embedding),
-    embeddingProvider: r.embedding_provider,
-    embeddingModel: r.embedding_model,
-    embeddingDim: r.embedding_dim,
-    embeddingTextHash: r.embedding_text_hash,
-  }));
+    .all() as ArchiveEmbeddingSqlRow[];
+  return rows.map(embeddingRow);
+}
+
+/** One source's exact current indexing input, without loading its BLOB. */
+export function archiveItemForEmbedding(itemId: string): ArchiveEmbeddingRow | null {
+  const row = getDb().prepare(
+    `SELECT ai.item_id, ai.title, ai.description,
+            COALESCE(${PREFERRED_ARCHIVE_TEXT_SQL}, ai.extracted_text) AS extracted_text,
+            ai.doc_type, (ai.embedding IS NOT NULL) AS has_embedding,
+            ai.embedding_provider, ai.embedding_model, ai.embedding_dim,
+            ai.embedding_text_hash
+       FROM archive_items ai
+      WHERE ai.item_id=?`
+  ).get(itemId) as ArchiveEmbeddingSqlRow | undefined;
+  return row ? embeddingRow(row) : null;
 }
 
 export function setItemEmbedding(
@@ -570,7 +677,10 @@ export function archiveEmbeddingCount(): { indexed: number; total: number } {
     ).c,
     total: (
       db
-        .prepare("SELECT COUNT(*) AS c FROM archive_items WHERE COALESCE(extracted_text,'') <> '' OR COALESCE(description,'') <> ''")
+        .prepare(
+          `SELECT COUNT(*) AS c FROM archive_items ai
+            WHERE COALESCE(${PREFERRED_ARCHIVE_TEXT_SQL}, ai.extracted_text, ai.description, '') <> ''`
+        )
         .get() as { c: number }
     ).c,
   };

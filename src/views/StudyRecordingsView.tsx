@@ -6,6 +6,7 @@ import type {
   StudyRecordingSummary,
   StudyRecordingStatus,
   StudyTranscriptKind,
+  StudyWhisperChunk,
   StudyWorkspace,
 } from '@shared/types';
 import {
@@ -337,7 +338,7 @@ export function StudyRecordingsView({ onOpenDocument, initialRecordingId, initia
       const [content, settings] = await Promise.all([window.nodus.getStudyRecordingContent(selected.id), window.nodus.getSettings()]);
       const blob = new Blob([content.bytes.slice().buffer as ArrayBuffer], { type: content.mimeType });
       let text = ''; const provider = settings.sttProvider; let model = '';
-      let chunks: Array<{ text: string; timestamp: [number | null, number | null] | null }> = [];
+      let chunks: StudyWhisperChunk[] = [];
       if (provider === 'transformers') {
         model = settings.sttTransformersModel;
         if (!isLocalWhisperModelReady(model)) throw new Error(t('Descarga el modelo ONNX seleccionado desde Ajustes antes de transcribir.'));

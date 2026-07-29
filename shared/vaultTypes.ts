@@ -49,6 +49,13 @@ export interface VaultTypeDef {
 }
 
 /**
+ * Single release gate for the complete vertical slice. Keeping it named makes a
+ * rollback explicit and prevents the picker, onboarding and backend support from
+ * drifting into separate ad-hoc flags.
+ */
+export const PRIMARY_SOURCES_RELEASE_ENABLED = true;
+
+/**
  * Canonical registry. `academic` stays first and is the default for every
  * pre-existing vault. The creation grid has its own product order in
  * `src/components/vaultTypeUi.tsx`.
@@ -103,8 +110,7 @@ Este vault reconstruye historia familiar a partir de fuentes primarias (censos, 
 ═══ CONTEXTO DEL VAULT — MODO PROSOPOGRAFÍA ═══
 Este vault estudia colectivamente una POBLACIÓN HISTÓRICA definida mediante criterios explícitos. Distingue siempre persona, mención, fuente, factoid y statement. Una observación documental no es un hecho: conserva la forma literal, la procedencia, la fecha, la incertidumbre y las contradicciones. No fusiones identidades, no decidas pertenencia, no normalices categorías históricas y no rellenes ausencias automáticamente. La IA solo propone; una persona revisa y publica. En análisis, declara población, denominador, ausencias, cobertura y fuentes dominantes.`,
   },
-  // Study mode ships as a first-class local workspace. primary_sources remains
-  // declared but gated until its own product surface is complete.
+  // Study mode ships as a first-class local workspace.
   {
     id: 'estudio',
     available: true,
@@ -135,16 +141,14 @@ Este vault se usa para APRENDER y ESTUDIAR, no para investigación original. Pri
   },
   {
     id: 'primary_sources',
-    available: false,
-    // A primary-source corpus mixes secondary literature (ideas/authors stay) with
-    // archival records (persons/timeline/archive come in via scoping). Hide the
-    // argument and debate surfaces that don't fit source/record work; keep
-    // gaps/coverage/deep-research (reframed by the prompt pack).
-    defaultHiddenViews: ['argument', 'debate', 'immersion', 'hypothesis', 'reading'],
+    available: PRIMARY_SOURCES_RELEASE_ENABLED,
+    // A dedicated documentary workspace. Library, Writing and Deep Research may be
+    // offered later as optional views, but never enter the default ten-section shell.
+    defaultHiddenViews: ['library', 'writing', 'deepResearch'],
     promptPack: `
 
 ═══ CONTEXTO DEL VAULT — MODO FUENTES PRIMARIAS ═══
-Este vault trabaja con FUENTES PRIMARIAS y documentos de archivo (censos, padrones, actas, partidas, prensa histórica, correspondencia), no solo con literatura secundaria. Prioriza la fidelidad al documento: extrae hechos, personas, lugares, fechas y eventos tal como constan, cita siempre de forma literal y con su localización, y aplica crítica de fuentes (distingue lo que la fuente afirma de lo que se infiere). No deduzcas parentescos, identidades ni fechas que la fuente no sostenga; si un dato es incierto, dilo. Respeta la ortografía y los nombres de época.`,
+Este vault trabaja con FUENTES PRIMARIAS y documentos de archivo. Prioriza la fidelidad al documento y conserva ortografía, nombres y formas históricas. Distingue siempre TRANSCRIPCIÓN, OBSERVACIÓN e INFERENCIA. Cita el fragmento y su localizador. No inventes texto ilegible, no resuelvas identidades por similitud, no conviertas intervalos en fechas exactas y no deduzcas relaciones o intenciones sin formulación explícita. Conserva contradicciones, incertidumbre y silencios. Considera creador, propósito, audiencia, forma y contexto. Todo resultado automático es una PROPUESTA pendiente de revisión; advierte si falta procedencia y no emitas un juicio definitivo de autenticidad.`,
   },
   {
     id: 'databases',

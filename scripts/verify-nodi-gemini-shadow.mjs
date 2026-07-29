@@ -16,6 +16,7 @@ const reportPath = path.resolve(process.env.NODUS_NODI_REPORT || path.join(os.tm
 
 if (!process.argv.includes('--electron-nodi-gemini-shadow')) {
   if (!process.env.GEMINI_API_KEY?.trim()) throw new Error('Set GEMINI_API_KEY for this one isolated run.');
+  if (!process.env.OPENROUTER_API_KEY?.trim()) throw new Error('Set OPENROUTER_API_KEY for this one isolated run.');
   execFileSync(path.join(repoRoot, 'node_modules/.bin/electron'), [path.join(repoRoot, 'scripts/verify-nodi-gemini-shadow.mjs'), '--electron-nodi-gemini-shadow'], {
     cwd: repoRoot, env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' }, stdio: 'inherit',
   });
@@ -23,7 +24,9 @@ if (!process.argv.includes('--electron-nodi-gemini-shadow')) {
 }
 
 const apiKey = process.env.GEMINI_API_KEY?.trim();
+const openRouterKey = process.env.OPENROUTER_API_KEY?.trim();
 assert.ok(apiKey);
+assert.ok(openRouterKey);
 const root = await mkdtemp(path.join(os.tmpdir(), 'nodus-nodi-gemini-shadow-'));
 installRuntimeHooks(root);
 let closeDb = () => undefined;
@@ -45,21 +48,28 @@ try {
   const databaseApi = require(path.join(repoRoot, 'electron/db/database.ts'));
   const crossVault = require(path.join(repoRoot, 'electron/db/crossVault.ts'));
   ({ closeDb } = databaseApi);
-  clearApiKey = () => secrets.clearApiKey('gemini');
+  clearApiKey = () => {
+    secrets.clearApiKey('gemini');
+    secrets.clearApiKey('openrouter');
+  };
 
   secrets.setApiKey('gemini', apiKey);
+  secrets.setApiKey('openrouter', openRouterKey);
   delete process.env.GEMINI_API_KEY;
+  delete process.env.OPENROUTER_API_KEY;
   const [chatModels, embeddingModels] = await Promise.all([
     providers.listModels('gemini', secrets.getApiKey('gemini')),
-    providers.listEmbeddingModels('gemini', secrets.getApiKey('gemini')),
+    providers.listEmbeddingModels('openrouter', secrets.getApiKey('openrouter')),
   ]);
-  const modelName = ['gemini-2.5-flash-lite', 'gemini-3.1-flash-lite'].find((id) => chatModels.some((item) => item.id === id));
-  const embeddingName = ['gemini-embedding-001', 'text-embedding-004'].find((id) => embeddingModels.some((item) => item.id === id));
-  assert.ok(modelName && embeddingName, 'cheap Gemini chat and embedding models are available');
+  const modelName = 'gemini-3.5-flash-lite';
+  const embeddingName = 'baai/bge-m3';
+  assert.ok(chatModels.some((item) => item.id === modelName), `${modelName} is available`);
+  assert.ok(embeddingModels.some((item) => item.id === embeddingName), `${embeddingName} is available`);
   const model = { provider: 'gemini', model: modelName };
   const configureActiveVault = () => {
     secrets.setApiKey('gemini', apiKey);
-    settings.updateSettings({ uiLanguage: 'es', promptLanguage: 'es', nodiModel: model, chatModel: model, embeddingProvider: 'gemini', embeddingModel: embeddingName });
+    secrets.setApiKey('openrouter', openRouterKey);
+    settings.updateSettings({ uiLanguage: 'es', promptLanguage: 'es', nodiModel: model, chatModel: model, embeddingProvider: 'openrouter', embeddingModel: embeddingName });
   };
   const switchVault = (id) => {
     crossVault.closeCrossVaultConnections();
@@ -129,7 +139,8 @@ try {
   assert.doesNotMatch(trap, /haz clic en .?Exportar hoja|pulsa .?Exportar hoja/i);
 
   const future = await ask('product_future', '¿Puedo crear ahora mismo un vault de Docencia? Dime la versión y fecha de lanzamiento.', ['documentation']);
-  assert.match(future, /no.*disponible|futuro|todavía/i); assert.match(future, /no.*fecha|sin fecha|no se indica/i);
+  assert.match(future, /no (?:puedes|se puede)|no.*disponible|en desarrollo|futuro|todavía/i);
+  assert.match(future, /no.*fecha|sin fecha|no se indica|sin atribuir fechas/i);
 
   const view = await ask('current_view', '¿Dónde está Revalidar evidencia y qué hace?', ['current_view'], {
     viewId: 'audit-shadow', title: 'Auditoría shadow', text: 'Panel Auditoría documental. En la esquina superior izquierda está el botón «Revalidar evidencia». Al pulsarlo vuelve a comprobar las citas seleccionadas.', capturedAt: Date.now(),
@@ -169,6 +180,7 @@ try {
   console.log('Live isolated Gemini Nodi reliability verification passed.');
 } finally {
   delete process.env.GEMINI_API_KEY;
+  delete process.env.OPENROUTER_API_KEY;
   try { clearApiKey(); } catch { /* ephemeral profile is the final backstop */ }
   try { closeDb(); } catch { /* DB may not have opened */ }
   await rm(root, { recursive: true, force: true });

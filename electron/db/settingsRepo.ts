@@ -1,6 +1,7 @@
 import { getDb } from './database';
-import type { AppSettings } from '@shared/types';
+import type { AppSettings, ModelRef } from '@shared/types';
 import { DEFAULT_EMBEDDING_MODELS, DEFAULT_LOCAL_BASE_URLS, normalizeEmbeddingProvider } from '@shared/providers';
+import { isOpenAiStudySttModel } from '@shared/sttModels';
 import { NODI_ORB_DEFAULT_COLOR } from '@shared/nodiOrb';
 import { lockedApiKeyProviders, providerKeyMap } from '../secrets/secretStore';
 import { GRANULAR_MODEL_KEYS, migrateModelSettings } from '@shared/modelSettings';
@@ -29,6 +30,14 @@ function sanitizeCodexReasoningEfforts(value: unknown): AppSettings['codexReason
       // identifier-shaped value here; the live model catalog validates support again.
       .filter(([model, effort]) => model.trim().length > 0 && /^[a-z][a-z0-9_-]{0,31}$/.test(String(effort)))
   ) as AppSettings['codexReasoningEfforts'];
+}
+
+function sanitizeTranscriptionModel(value: unknown): ModelRef | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const candidate = value as Partial<ModelRef>;
+  return candidate.provider === 'openai' && isOpenAiStudySttModel(candidate.model)
+    ? { provider: 'openai', model: candidate.model.trim() }
+    : null;
 }
 
 const DEFAULTS: Omit<AppSettings, 'providerKeys' | 'lockedProviderKeys'> = {
@@ -136,6 +145,8 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys' | 'lockedProviderKeys'> = {
   databasesTourComplete: false,
   studyTourComplete: false,
   docenciaTourComplete: false,
+  primarySourcesTourComplete: false,
+  primarySourcesLocalMetricsEnabled: false,
   preferZoteroFulltext: true,
   ocrEnabled: false,
   ocrLanguages: 'spa+eng',
@@ -275,6 +286,16 @@ export function getSettings(): AppSettings {
       seed[key] = merged[key];
     }
   }
+  const safeTranscriptionModel = sanitizeTranscriptionModel(merged.transcriptionModel);
+  if (
+    safeTranscriptionModel?.provider !== merged.transcriptionModel?.provider
+    || safeTranscriptionModel?.model !== merged.transcriptionModel?.model
+  ) {
+    merged.transcriptionModel = safeTranscriptionModel;
+    // Repair stale values written by the old generic model picker. This also
+    // prevents another vault from re-seeding the invalid shared preference.
+    seed.transcriptionModel = safeTranscriptionModel;
+  }
   merged.codexReasoningEfforts = sanitizeCodexReasoningEfforts(merged.codexReasoningEfforts);
   if ((merged.sttProvider as string) === 'local') {
     merged.sttProvider = 'transformers';
@@ -322,6 +343,9 @@ export function updateSettings(patch: Partial<AppSettings>): AppSettings {
   }
   if (patch.studyImproveToolbarStyleIds) {
     patch = { ...patch, studyImproveToolbarStyleIds: [...new Set(patch.studyImproveToolbarStyleIds.filter((value) => typeof value === 'string' && value.trim()))].slice(0, 4) };
+  }
+  if (patch.transcriptionModel !== undefined) {
+    patch = { ...patch, transcriptionModel: sanitizeTranscriptionModel(patch.transcriptionModel) };
   }
   if (patch.modelSettingsMode === undefined && GRANULAR_MODEL_KEYS.some((key) => patch[key] != null)) {
     patch = { ...patch, modelSettingsMode: 'advanced' };

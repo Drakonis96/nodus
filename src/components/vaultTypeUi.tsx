@@ -74,7 +74,7 @@ export function vaultTypeIcon(type: VaultType): string {
 }
 
 export function vaultTypePhase(type: VaultType): VaultPhase | null {
-  if (type === 'worldbuilding') return 'alpha';
+  if (type === 'primary_sources' || type === 'worldbuilding') return 'alpha';
   if (type === 'estudio' || type === 'genealogy' || type === 'databases' || type === 'docencia') return 'beta';
   return null;
 }

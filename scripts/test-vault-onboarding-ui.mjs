@@ -98,7 +98,7 @@ test('preview vaults bypass setup and every automatic tutorial', async () => {
 
 test('study onboarding is local-first and does not require Zotero', async () => {
   const onboarding = await read('src/views/Onboarding.tsx');
-  assert.match(onboarding, /vaultType === 'genealogy' \|\| vaultType === 'databases' \|\| vaultType === 'estudio'/);
+  assert.match(onboarding, /vaultType === 'primary_sources' \|\| vaultType === 'genealogy' \|\| vaultType === 'databases' \|\| vaultType === 'estudio'/);
   assert.match(onboarding, /if \(!simple\) void checkZotero\(\)/);
   assert.match(onboarding, /Organiza cursos, apuntes, materiales y repasos en un espacio de aprendizaje local/);
   assert.match(onboarding, /enlazar materiales de Zotero de forma opcional/);

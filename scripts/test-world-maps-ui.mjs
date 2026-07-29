@@ -12,7 +12,7 @@ test('worldbuilding gets its own map section, and genealogy keeps its own', asyn
   // The genealogy map projects lat/lon onto OpenStreetMap tiles. An invented world has no
   // gazetteer coordinates, so that view renders an empty planet every single time — it is
   // not "worse", it cannot work. One entry in the sidebar, two implementations behind it.
-  assert.match(app, /view === 'map' && \(isWorldbuilding \? <WorldMapsView \/> : <MapView \/>\)/);
+  assert.match(app, /view === 'map' && \(isPrimarySources \? <PrimarySourcesMapView \/> : isWorldbuilding \? <WorldMapsView \/> : <MapView \/>\)/);
   assert.match(app, /import \{ WorldMapsView \} from '\.\/views\/WorldMapsView'/);
   // And no second entry was added to the sidebar for it.
   const sidebar = await read('src/components/WorldbuildingSidebar.tsx');

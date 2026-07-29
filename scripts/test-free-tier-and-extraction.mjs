@@ -68,3 +68,37 @@ test('groq free-tier max_tokens: caps to budget, refuses when prompt overflows, 
   assert.equal(m.isGroqReasoningModel('openai/gpt-oss-20b'), true);
   assert.equal(m.isGroqReasoningModel('llama-3.1-8b-instant'), false);
 });
+
+test('Gemini 3 transport omits rejected sampling and impossible thinking-off controls', async () => {
+  const m = await load('electron/ai/providers.ts');
+  assert.deepEqual(
+    m.samplingTemperatureBody('gemini', 'gemini-3.5-flash-lite', 0.1),
+    {},
+    'Gemini 3.5 Flash-Lite must not receive deprecated temperature',
+  );
+  assert.deepEqual(
+    m.samplingTemperatureBody('gemini', 'gemini-3.1-flash-lite', 0.1),
+    {},
+    'all Gemini 3 models keep their optimized default sampler',
+  );
+  assert.deepEqual(
+    m.samplingTemperatureBody('gemini', 'gemini-2.5-flash-lite', 0.1),
+    { temperature: 0.1 },
+    'Gemini 2.5 keeps its supported temperature control',
+  );
+  assert.deepEqual(
+    m.reasoningBody('gemini', 'off', 'gemini-3.5-flash-lite'),
+    {},
+    'thinking cannot be disabled on Gemini 3 and must be omitted',
+  );
+  assert.deepEqual(
+    m.reasoningBody('gemini', 'off', 'gemini-2.5-flash-lite'),
+    { reasoning_effort: 'none' },
+    'Gemini 2.5 still supports explicitly disabling thinking',
+  );
+  assert.deepEqual(
+    m.reasoningBody('gemini', 'high', 'gemini-3.5-flash-lite'),
+    { reasoning_effort: 'high' },
+    'explicit supported Gemini 3 thinking levels remain available',
+  );
+});

@@ -7,11 +7,29 @@ import { WORLD_CHAT_TRANSLATIONS } from './i18n.worldChat';
 import { PROSOPOGRAPHY_TRANSLATIONS } from './i18n.prosopography';
 import { DIARIZATION_TRANSLATIONS } from './i18n.diarization';
 import { WORLDBUILDING_TRANSLATIONS } from './i18n.worldbuilding';
+import { PRIMARY_SOURCES_TRANSLATIONS } from './i18n.primarySources';
+import { PRIMARY_SOURCES_ARCHIVE_TRANSLATIONS } from './i18n.primarySourcesArchive';
+import { PRIMARY_SOURCES_FILES_TRANSLATIONS } from './i18n.primarySourcesFiles';
+import { PRIMARY_SOURCES_TEXT_TRANSLATIONS } from './i18n.primarySourcesText';
+import { PRIMARY_SOURCES_EVIDENCE_TRANSLATIONS } from './i18n.primarySourcesEvidence';
+import { PRIMARY_SOURCES_PERSONS_TRANSLATIONS } from './i18n.primarySourcesPersons';
+import { PRIMARY_SOURCES_DERIVED_TRANSLATIONS } from './i18n.primarySourcesDerived';
+import { PRIMARY_SOURCES_RESEARCH_TRANSLATIONS } from './i18n.primarySourcesResearch';
+import { PRIMARY_SOURCES_RELEASE_TRANSLATIONS } from './i18n.primarySourcesRelease';
 
 /** Complete static Italian interface table; coverage prohibits runtime fallbacks. */
 export const IT: Record<string, string> = {
   ...DIARIZATION_TRANSLATIONS.it,
   ...PROSOPOGRAPHY_TRANSLATIONS.it,
+  ...PRIMARY_SOURCES_TRANSLATIONS.it,
+  ...PRIMARY_SOURCES_ARCHIVE_TRANSLATIONS.it,
+  ...PRIMARY_SOURCES_FILES_TRANSLATIONS.it,
+  ...PRIMARY_SOURCES_TEXT_TRANSLATIONS.it,
+  ...PRIMARY_SOURCES_EVIDENCE_TRANSLATIONS.it,
+  ...PRIMARY_SOURCES_PERSONS_TRANSLATIONS.it,
+  ...PRIMARY_SOURCES_DERIVED_TRANSLATIONS.it,
+  ...PRIMARY_SOURCES_RESEARCH_TRANSLATIONS.it,
+  ...PRIMARY_SOURCES_RELEASE_TRANSLATIONS.it,
   ...WORLDBUILDING_TRANSLATIONS.it,
   ...WORLD_CHAT_TRANSLATIONS.it,
   "Lo que cuenta el mapa": "Cosa racconta la mappa",
@@ -7067,4 +7085,5 @@ export const IT: Record<string, string> = {
   "¿Eliminar esta unidad guardada? Esta acción no se puede deshacer.": "Eliminare questa unità salvata? Questa azione non può essere annullata.",
   "Escribe el tema y Nodus redacta la unidad completa con tus materiales, citando cada uno. Puedes dejar que la IA proponga las partes o fijarlas tú: cuántas son, cómo se titulan y en qué debe centrarse cada una.": "Scrivi il tema e Nodus redige l’intera unità a partire dai tuoi materiali, citandoli uno per uno. Puoi lasciare che l’IA proponga le parti oppure fissarle tu: quante sono, come si intitolano e su che cosa deve concentrarsi ciascuna.",
   "Escribe el tema de los apuntes. El contenido lo explicará paso a paso con ejemplos y autoevaluación usando tus materiales.": "Scrivi l’argomento delle dispense. Il contenuto lo spiegherà passo dopo passo con esempi e autovalutazione a partire dai tuoi materiali.",
+  "La diarización detecta cambios de hablante y etiqueta cada segmento automáticamente. Revisa siempre las etiquetas antes de usar la transcripción.": "La diarizzazione rileva i cambi di parlante ed etichetta automaticamente ogni segmento. Verifica sempre le etichette prima di usare la trascrizione.",
 };
