@@ -49,11 +49,17 @@ try {
   assert.ok(Math.abs(core.cosineF32(v(1, 0), v(1, 0)) - 1) < 1e-6, 'identical vectors → 1');
   assert.equal(core.cosineF32(v(1, 0), v(0, 1)), 0, 'orthogonal → 0');
   assert.equal(core.cosineF32(v(0, 0), v(1, 1)), 0, 'zero vector → 0, not NaN');
+  assert.equal(
+    core.cosineF32(v(1, 0), v(1, 0, 99)),
+    0,
+    'vectors from different embedding dimensions are incomparable, not prefix matches'
+  );
   assert.ok(core.cosineF32(v(1, 1), v(1, 0.9)) > 0.99, 'near-parallel → ~1');
 
   assert.equal(core.centroidF32([]), null, 'empty centroid → null');
   const c = core.centroidF32([v(1, 0), v(0, 1)]);
   assert.deepEqual([...c], [0.5, 0.5], 'centroid is the mean');
+  assert.equal(core.centroidF32([v(1, 0), v(1, 0, 0)]), null, 'mixed-model dimensions cannot form a centroid');
 
   // ── topMatchesPerCentroid vs a brute-force oracle on seeded random data ───
   let seed = 42;

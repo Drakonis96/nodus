@@ -781,8 +781,20 @@ try {
     // clears the threshold and comes back compact with its similarity.
     const archiveItems = archiveRepo.listItems();
     const partida = archiveItems.find((item) => item.itemId !== padron.itemId);
-    archiveRepo.setItemEmbedding(padron.itemId, [1, 0], 'test-model', 'hash-padron');
-    archiveRepo.setItemEmbedding(partida.itemId, [0, 1], 'test-model', 'hash-partida');
+    archiveRepo.setItemEmbedding(
+      padron.itemId,
+      [1, 0],
+      embedConfig.provider,
+      embedConfig.model,
+      'hash-padron'
+    );
+    archiveRepo.setItemEmbedding(
+      partida.itemId,
+      [0, 1],
+      embedConfig.provider,
+      embedConfig.model,
+      'hash-partida'
+    );
     const archiveHits = await callTool(server, 'nodus_search_archive', { query: 'jornalero', limit: 5, minSimilarity: 0.35 });
     assert.equal(archiveHits.items.length, 1, 'only the similar archive item clears the threshold');
     assert.equal(archiveHits.items[0].itemId, padron.itemId);

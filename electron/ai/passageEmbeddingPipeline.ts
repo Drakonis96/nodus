@@ -175,6 +175,12 @@ export async function startPassageEmbedding(nodusIds?: string[]): Promise<void> 
       if (chunks.length === 0) continue;
 
       const embeddings = await embedMany(chunks.map((chunk) => chunk.text));
+      const missing = embeddings.findIndex((embedding) => !embedding?.length);
+      if (missing >= 0) {
+        throw new Error(
+          `El proveedor no devolvió un embedding utilizable para el fragmento ${missing + 1} de ${chunks.length}.`
+        );
+      }
       if (state.stopRequested) break;
       for (let index = 0; index < chunks.length; index++) {
         if (await waitIfPaused()) break;

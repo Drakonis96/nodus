@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 104;
+export const SCHEMA_VERSION = 105;
 
 export const migrations: Migration[] = [
   {
@@ -4400,6 +4400,24 @@ export const migrations: Migration[] = [
 
       ALTER TABLE map_images ADD COLUMN thumbnail_mime_type TEXT;
       ALTER TABLE character_chat_images ADD COLUMN thumbnail_mime_type TEXT;
+    `,
+  },
+  {
+    version: 105,
+    up: /* sql */ `
+      -- An embedding model id is not a provider identity. Two providers can expose
+      -- the same name with different revisions or dimensions, so archive retrieval
+      -- must pin both just like ideas, passages, notes and work summaries do.
+      ALTER TABLE archive_items ADD COLUMN embedding_provider TEXT;
+
+      -- Existing archive vectors predate provider provenance. Mark them stale rather
+      -- than comparing them with a query from an unknown/new provider.
+      UPDATE archive_items
+         SET embedding = NULL,
+             embedding_model = NULL,
+             embedding_dim = NULL,
+             embedding_text_hash = NULL
+       WHERE embedding IS NOT NULL;
     `,
   },
 ];

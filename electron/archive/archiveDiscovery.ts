@@ -29,7 +29,8 @@ export async function embedArchiveItem(itemId: string): Promise<boolean> {
   if (!text) return false;
   const vec = await embed(text);
   if (!vec) return false;
-  setItemEmbedding(itemId, vec, currentEmbeddingConfig().model, embeddingTextHash(text));
+  const config = currentEmbeddingConfig();
+  setItemEmbedding(itemId, vec, config.provider, config.model, embeddingTextHash(text));
   return true;
 }
 
@@ -40,7 +41,13 @@ export async function embedArchiveBacklog(): Promise<{ indexed: number; skipped:
   let skipped = 0;
   for (const row of archiveItemsForEmbedding()) {
     const text = archiveEmbeddingText(row);
-    const fresh = row.hasEmbedding && row.embeddingModel === config.model && row.embeddingTextHash === embeddingTextHash(text);
+    const fresh =
+      row.hasEmbedding &&
+      row.embeddingProvider === config.provider &&
+      row.embeddingModel === config.model &&
+      row.embeddingDim != null &&
+      row.embeddingDim > 0 &&
+      row.embeddingTextHash === embeddingTextHash(text);
     if (fresh) continue;
     const ok = await embedArchiveItem(row.itemId);
     if (ok) indexed++;
