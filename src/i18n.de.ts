@@ -1937,8 +1937,8 @@ export const DE: Record<string, string> = {
   'Bienvenido a Nodus': 'Willkommen bei Nodus',
   'Teje tu biblioteca de Zotero en un grafo navegable de ideas y autores. Todo es local.':
     'Verweben Sie Ihre Zotero-Bibliothek zu einem navigierbaren Graphen aus Ideen und Autoren. Alles bleibt lokal.',
-  'Nodus usa la API local de Zotero 7 (solo lectura). Abre Zotero y verifica la conexión.':
-    'Nodus verwendet die lokale API von Zotero 7 (nur Lesezugriff). Öffnen Sie Zotero und überprüfen Sie die Verbindung.',
+  'Nodus usa la API local de Zotero en modo solo lectura (requiere Zotero 7 o posterior). Abre Zotero y verifica la conexión.':
+    'Nodus verwendet die lokale Zotero-API im Nur-Lese-Modus (erfordert Zotero 7 oder neuer). Öffnen Sie Zotero und überprüfen Sie die Verbindung.',
   'Verificar conexión': 'Verbindung überprüfen',
   'Conectado (userID {id})': 'Verbunden (Benutzer-ID {id})',
   'No disponible: {msg}': 'Nicht verfügbar: {msg}',
