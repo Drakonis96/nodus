@@ -6,7 +6,7 @@ import type {
   ModelInfo,
 } from '@shared/types';
 import { getSettings } from '../db/settingsRepo';
-import { DEFAULT_LOCAL_BASE_URLS, FREE_TIER_PROVIDERS } from '@shared/providers';
+import { DEFAULT_LOCAL_BASE_URLS } from '@shared/providers';
 import { listNodusLocalChatModels, listNodusLocalEmbeddingModels } from './nodusLocalAi';
 
 export { AI_PROVIDERS, PROVIDER_LABELS, LOCAL_PROVIDERS, isLocalProvider } from '@shared/providers';

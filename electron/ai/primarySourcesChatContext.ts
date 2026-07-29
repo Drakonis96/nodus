@@ -17,7 +17,7 @@ const MAX_EXCERPTS = 6;
 const MAX_EVIDENCE = 10;
 
 function clip(value: string | null | undefined, limit: number): string | null {
-  const clean = String(value ?? '').replace(/\u0000/g, '').trim();
+  const clean = String(value ?? '').split('\u0000').join('').trim();
   if (!clean) return null;
   return clean.length > limit ? `${clean.slice(0, limit)}…` : clean;
 }

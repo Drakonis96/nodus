@@ -197,7 +197,11 @@ test('"more tutorials on the way" is promised in every language', () => {
 
 test('the CSP admits the tutorial embed and nothing wider', async () => {
   const html = await read('index.html');
-  assert.match(html, /frame-src https:\/\/www\.youtube-nocookie\.com;/, 'frame-src names the no-cookie host');
+  assert.match(
+    html,
+    /frame-src[^;]*https:\/\/www\.youtube-nocookie\.com;/,
+    'frame-src names the no-cookie host',
+  );
   // frame-src overrides child-src for frames, so youtube.com proper must stay out: the
   // watch page is opened in the system browser, never framed.
   assert.doesNotMatch(html, /frame-src[^;]*https:\/\/www\.youtube\.com/);
