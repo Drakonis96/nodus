@@ -208,9 +208,6 @@ const api: NodusApi = {
     ipcRenderer.invoke('study:knowledge:processing:resolve', requestId, decision).then(() => undefined),
   uploadText: (nodusId, filePath) => ipcRenderer.invoke('works:uploadText', nodusId, filePath),
 
-  syncNow: () => ipcRenderer.invoke('sync:now'),
-  getSyncLog: () => ipcRenderer.invoke('sync:log'),
-
   getQueue: () => ipcRenderer.invoke('queue:get'),
   pauseQueue: () => ipcRenderer.invoke('queue:pause'),
   resumeQueue: () => ipcRenderer.invoke('queue:resume'),
@@ -364,7 +361,6 @@ const api: NodusApi = {
   importStudyMaterials: (input) => ipcRenderer.invoke('study:materials:import', input),
   importStudyMaterialFolder: (input) => ipcRenderer.invoke('study:materials:importFolder', input),
   chooseStudyMaterialPaths: (folder) => ipcRenderer.invoke('study:materials:choosePaths', folder),
-  getPathForDroppedFile: (file) => webUtils.getPathForFile(file as Parameters<typeof webUtils.getPathForFile>[0]),
   importStudyMaterialPaths: (paths, input) => ipcRenderer.invoke('study:materials:importPaths', paths, input),
   importZoteroStudyMaterial: (input) => ipcRenderer.invoke('study:materials:importZotero', input),
   openStudyMaterialInZotero: (id) => ipcRenderer.invoke('study:materials:openZotero', id).then(() => undefined),
@@ -752,28 +748,10 @@ const api: NodusApi = {
   importData: (password) => ipcRenderer.invoke('data:import', password),
   exportSyncPackage: () => ipcRenderer.invoke('data:exportSync'),
   importSyncPackage: (passphrase?: string) => ipcRenderer.invoke('data:importSync', passphrase),
-  hasSyncPassphrase: () => ipcRenderer.invoke('sync:hasPassphrase'),
-  setSyncPassphrase: (passphrase: string) => ipcRenderer.invoke('sync:setPassphrase', passphrase),
-  clearSyncPassphrase: () => ipcRenderer.invoke('sync:clearPassphrase'),
-  countSupersededVersions: () => ipcRenderer.invoke('sync:supersededCount'),
-  listSupersededVersions: (limit?: number, offset?: number) => ipcRenderer.invoke('sync:supersededList', limit, offset),
-  restoreSupersededVersion: (id: string) => ipcRenderer.invoke('sync:supersededRestore', id),
-  clearSupersededVersions: (ids?: string[]) => ipcRenderer.invoke('sync:supersededClear', ids),
   getStudyDataOverview: () => ipcRenderer.invoke('study:data:overview'),
   maintainStudyData: (action) => ipcRenderer.invoke('study:data:maintain', action),
   exportStudyDiagnostic: () => ipcRenderer.invoke('study:data:diagnostic'),
   exportStudyScope: (scope, format) => ipcRenderer.invoke('study:data:exportScope', scope, format),
-  setBackupPassword: (password) => ipcRenderer.invoke('backup:setPassword', password),
-  clearBackupPassword: () => ipcRenderer.invoke('backup:clearPassword'),
-  hasBackupPassword: () => ipcRenderer.invoke('backup:hasPassword'),
-  chooseBackupFolder: () => ipcRenderer.invoke('backup:chooseFolder'),
-  runBackupNow: () => ipcRenderer.invoke('backup:runNow'),
-  saveBackupRecoveryKit: () => ipcRenderer.invoke('backup:saveRecoveryKit'),
-  getTutorialCatalogue: () => ipcRenderer.invoke('tutorials:catalogue'),
-  getRecoveryStatus: () => ipcRenderer.invoke('recovery:status'),
-  chooseRecoveryFolder: (mode, language) => ipcRenderer.invoke('recovery:chooseFolder', mode, language),
-  initializeRecoveryFolder: (folder, password, language) => ipcRenderer.invoke('recovery:initialize', folder, password, language),
-  restoreRecoverySnapshot: (root, fileName, password, language) => ipcRenderer.invoke('recovery:restore', root, fileName, password, language),
   resetGraph: () => ipcRenderer.invoke('data:resetGraph').then(() => undefined),
 
   hasAnyData: () => ipcRenderer.invoke('data:hasData'),
@@ -829,6 +807,33 @@ const api: NodusApi = {
     ipcRenderer.on('bridges:progress', listener);
     return () => ipcRenderer.removeListener('bridges:progress', listener);
   },
+
+  // Core: sync, backups, recovery. Regrouped here so the academic and study
+  // bindings above form one range — they used to sit inside it.
+  syncNow: () => ipcRenderer.invoke('sync:now'),
+  getSyncLog: () => ipcRenderer.invoke('sync:log'),
+  hasSyncPassphrase: () => ipcRenderer.invoke('sync:hasPassphrase'),
+  setSyncPassphrase: (passphrase: string) => ipcRenderer.invoke('sync:setPassphrase', passphrase),
+  clearSyncPassphrase: () => ipcRenderer.invoke('sync:clearPassphrase'),
+  countSupersededVersions: () => ipcRenderer.invoke('sync:supersededCount'),
+  listSupersededVersions: (limit?: number, offset?: number) => ipcRenderer.invoke('sync:supersededList', limit, offset),
+  restoreSupersededVersion: (id: string) => ipcRenderer.invoke('sync:supersededRestore', id),
+  clearSupersededVersions: (ids?: string[]) => ipcRenderer.invoke('sync:supersededClear', ids),
+  setBackupPassword: (password) => ipcRenderer.invoke('backup:setPassword', password),
+  clearBackupPassword: () => ipcRenderer.invoke('backup:clearPassword'),
+  hasBackupPassword: () => ipcRenderer.invoke('backup:hasPassword'),
+  chooseBackupFolder: () => ipcRenderer.invoke('backup:chooseFolder'),
+  runBackupNow: () => ipcRenderer.invoke('backup:runNow'),
+  saveBackupRecoveryKit: () => ipcRenderer.invoke('backup:saveRecoveryKit'),
+  getTutorialCatalogue: () => ipcRenderer.invoke('tutorials:catalogue'),
+  getRecoveryStatus: () => ipcRenderer.invoke('recovery:status'),
+  chooseRecoveryFolder: (mode, language) => ipcRenderer.invoke('recovery:chooseFolder', mode, language),
+  initializeRecoveryFolder: (folder, password, language) => ipcRenderer.invoke('recovery:initialize', folder, password, language),
+  restoreRecoverySnapshot: (root, fileName, password, language) => ipcRenderer.invoke('recovery:restore', root, fileName, password, language),
+
+  // Dropped-file paths come from webUtils, not from a channel, so this one lives
+  // wherever the bridge itself lives rather than with any domain slice.
+  getPathForDroppedFile: (file) => webUtils.getPathForFile(file as Parameters<typeof webUtils.getPathForFile>[0]),
 
   checkForUpdates: () => ipcRenderer.invoke('updates:check'),
   installUpdate: () => ipcRenderer.invoke('updates:install'),

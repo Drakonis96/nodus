@@ -455,21 +455,6 @@ export function registerIpc(
   // documents why three separate streaming chats key into one registry.
   const { chatAborters } = context;
   const nodiChatAborters = new Map<string, AbortController>();
-  const studyImproveAborters = new Map<string, AbortController>();
-  const studyAssistantAborters = new Map<string, AbortController>();
-
-
-  const queueImportedStudyKnowledge = async (
-    results: Awaited<ReturnType<typeof importStudyMaterialPaths>>,
-    subjectId?: string | null,
-  ): Promise<void> => {
-    const decision = await decideStudyMaterialAiProcessing(results, subjectId, getWindow());
-    if (!decision.process) return;
-    queueStudyKnowledgeSources('material', results.map((result) => result.material.id), false, {
-      approved: true,
-      externalConsentModelKey: decision.externalConsentModelKey,
-    });
-  };
 
   onChatGptSubscriptionStatusChanged((status) => {
     for (const win of BrowserWindow.getAllWindows()) {
@@ -799,6 +784,21 @@ export function registerIpc(
 
 
 
+  const studyImproveAborters = new Map<string, AbortController>();
+  const studyAssistantAborters = new Map<string, AbortController>();
+
+  const queueImportedStudyKnowledge = async (
+    results: Awaited<ReturnType<typeof importStudyMaterialPaths>>,
+    subjectId?: string | null,
+  ): Promise<void> => {
+    const decision = await decideStudyMaterialAiProcessing(results, subjectId, getWindow());
+    if (!decision.process) return;
+    queueStudyKnowledgeSources('material', results.map((result) => result.material.id), false, {
+      approved: true,
+      externalConsentModelKey: decision.externalConsentModelKey,
+    });
+  };
+
   // ── Corpus: works and ideas ─────────────────────────────────────────────────
   h('works:list', async (_e, filter?: WorkFilter) => works.listWorks(filter));
   h('works:listPage', async (_e, filter, request) => works.listWorksPage(filter, request));
@@ -997,10 +997,6 @@ export function registerIpc(
     works.setDeepPending(nodusId);
     await runDeepScan(w, doc);
   });
-
-  // sync
-  h('sync:now', async () => fullSync('manual'));
-  h('sync:log', async () => getSyncLog());
 
   // queue
   h('queue:get', async () => scanQueue.snapshot());
@@ -1936,6 +1932,136 @@ export function registerIpc(
     fs.writeFileSync(filePath, buffer);
     return { path: filePath, counts };
   });
+
+  h('data:importSync', async (_e, passphrase?: string) => {
+    if (getActiveVault().type === 'estudio' && !getSettings().studySyncEnabled) throw new Error('La sincronización del vault de estudio está desactivada en Ajustes.');
+    const { canceled, filePaths } = await showImportOpenDialog({
+      title: 'Importar paquete de sincronización',
+      properties: ['openFile'],
+      filters: [{ name: 'Nodus Sync', extensions: ['nodussync'] }],
+    });
+    if (canceled || filePaths.length === 0) return null;
+    // The local passphrase is tried first; the renderer prompts only if it does not fit,
+    // which is the case where the package came from a machine set up separately.
+    return mergeSyncPackage(fs.readFileSync(filePaths[0]), passphrase?.trim() || getSyncPassphrase() || undefined);
+  });
+  h('study:data:overview', async () => studyDataAdmin.getStudyDataOverview());
+  h('study:data:exportScope', async (_e, scope, format) => {
+    if (!getSettings().studySharingEnabled) throw new Error('La exportación para compartir está desactivada en Ajustes.');
+    return exportStudyScope(scope, format);
+  });
+  h('study:data:maintain', async (_e, action: 'rebuild-indexes' | 'clear-embeddings' | 'empty-trash' | 'repair') => {
+    if (action === 'rebuild-indexes') return studyDataAdmin.rebuildStudyIndexes();
+    if (action === 'clear-embeddings') { studySearch.deleteStudySearchIndex(); return studyDataAdmin.clearStudyEmbeddingCache(); }
+    if (action === 'empty-trash') return studyDataAdmin.emptyStudyTrash();
+    if (action === 'repair') return studyDataAdmin.repairStudyData();
+    throw new Error('Acción de mantenimiento no válida.');
+  });
+  h('study:data:diagnostic', async () => {
+    const picked = await dialog.showSaveDialog(getWindow() ?? undefined!, {
+      title: 'Exportar diagnóstico del vault de estudio', defaultPath: 'nodus-estudio-diagnostico.json',
+      filters: [{ name: 'JSON', extensions: ['json'] }],
+    });
+    if (picked.canceled || !picked.filePath) return null;
+    fs.writeFileSync(picked.filePath, JSON.stringify(studyDataAdmin.buildStudyDiagnostic(), null, 2), 'utf8');
+    return { path: picked.filePath };
+  });
+  h('data:import', async (_e, password: string) => {
+    const result = await importData(password);
+    // Imports intentionally restore MCP as disabled and tokenless. Stop any
+    // listener from the previous local profile once the swap succeeds.
+    if (result.ok) {
+      await stopMcpTunnel();
+      await stopMcpServer();
+    }
+    return result;
+  });
+  h('data:resetGraph', async () => {
+    // Stop any pending scans first so a finishing job can't repopulate after the wipe.
+    scanQueue.clear();
+    ideas.resetGraphData();
+  });
+
+  // demo mode: a curated sample corpus, only offered on an empty database.
+  h('data:hasData', async () => hasAnyData());
+  h('data:seedDemo', async () => seedDemoData());
+  h('data:seedPrimarySourcesDemo', async () => seedPrimarySourcesDemoData());
+  h('data:clearDemo', async () => {
+    scanQueue.clear();
+    clearDemoData();
+  });
+  // Genealogy demo: seeds the Serrano–Vidal family (tree, archive, evidence, open
+  // kinship suggestions) and flips the vault to the genealogy type. Portraits are
+  // generated in the background with the cheap Gemini model when a key is present.
+  h('data:seedGenealogyDemo', async () => {
+    const seeded = seedGenealogyDemoData();
+    const willGeneratePortraits = seeded && hasDemoPortraitKey();
+    if (willGeneratePortraits) {
+      void generateDemoPortraits({
+        onProgress: (done, total) => getWindow()?.webContents.send('demo:portraits', { done, total }),
+      }).catch(() => undefined);
+    }
+    return { seeded, willGeneratePortraits };
+  });
+  h('data:generateDemoPortraits', async () =>
+    generateDemoPortraits({
+      onProgress: (done, total) => getWindow()?.webContents.send('demo:portraits', { done, total }),
+    })
+  );
+  // Databases demo: seeds three sample databases covering every column type and flips
+  // the vault to the databases type.
+  h('data:seedDatabasesDemo', async () => seedDatabasesDemoData());
+  // Study demo stays entirely local and is only accepted by an empty study vault.
+  h('data:seedStudyDemo', async () => seedStudyDemoData());
+  // Teaching demo, likewise local-only. Unlike genealogy and databases it never
+  // converts the active vault: it is refused outside a `docencia` vault instead.
+  h('data:seedTeachingDemo', async () => seedTeachingDemoData());
+  // Worldbuilding demo is a complete, local-only fictional world. It is refused
+  // outside an empty worldbuilding vault and never invokes an AI provider.
+  h('data:seedWorldbuildingDemo', async () => seedWorldbuildingDemoData());
+  // Demo de Testimonios: proyecto de historia oral completo y local. Sin ninguna voz real
+  // — los maestros son un tono sintético marcado como tal — y sin una sola llamada a IA.
+  h('data:seedTestimonyDemo', async () => seedTestimonyDemoData());
+
+
+
+
+  // Stream queue progress to the renderer.
+  scanQueue.onProgress((p) => {
+    getWindow()?.webContents.send('queue:progress', p);
+  });
+
+  // Stream embedding pipeline progress to the renderer.
+  onEmbeddingProgress((p) => {
+    getWindow()?.webContents.send('embeddings:progress', p);
+  });
+
+  onPassageProgress((p) => {
+    getWindow()?.webContents.send('passages:progress', p);
+  });
+
+  onStudyMaterialIndexChanged((materialId) => {
+    getWindow()?.webContents.send('study:materials:indexChanged', materialId);
+  });
+
+  onStudyKnowledgeChanged((next) => {
+    getWindow()?.webContents.send('study:knowledge:changed', next);
+  });
+
+  onChapterRelationsProgress((p) => {
+    getWindow()?.webContents.send('projects:chapterRelations:progress', p);
+  });
+
+  // Stream semantic bridge progress to the renderer.
+  onSemanticBridgeProgress((p) => {
+    getWindow()?.webContents.send('bridges:progress', p);
+  });
+
+  // ── Core: sync, backups, recovery, updates ─────────────────────────────────
+  // Regrouped here so the academic and study channels above form one range. They
+  // used to sit inside it, which is why extracting that range needed this first.
+  h('sync:now', async () => fullSync('manual'));
+  h('sync:log', async () => getSyncLog());
   // automatic encrypted backups (master password lives in the OS keychain)
   h('sync:hasPassphrase', async () => hasSyncPassphrase());
   h('sync:setPassphrase', async (_e, passphrase: string) => {
@@ -2033,102 +2159,11 @@ export function registerIpc(
     }
     return result;
   });
-
-  h('data:importSync', async (_e, passphrase?: string) => {
-    if (getActiveVault().type === 'estudio' && !getSettings().studySyncEnabled) throw new Error('La sincronización del vault de estudio está desactivada en Ajustes.');
-    const { canceled, filePaths } = await showImportOpenDialog({
-      title: 'Importar paquete de sincronización',
-      properties: ['openFile'],
-      filters: [{ name: 'Nodus Sync', extensions: ['nodussync'] }],
-    });
-    if (canceled || filePaths.length === 0) return null;
-    // The local passphrase is tried first; the renderer prompts only if it does not fit,
-    // which is the case where the package came from a machine set up separately.
-    return mergeSyncPackage(fs.readFileSync(filePaths[0]), passphrase?.trim() || getSyncPassphrase() || undefined);
-  });
   // Versions a merge discarded. Read/restore only — nothing here deletes on a timer.
   h('sync:supersededCount', async () => countSuperseded());
   h('sync:supersededList', async (_e, limit?: number, offset?: number) => listSuperseded(limit, offset));
   h('sync:supersededRestore', async (_e, id: string) => restoreSuperseded(id));
   h('sync:supersededClear', async (_e, ids?: string[]) => clearSuperseded(ids));
-  h('study:data:overview', async () => studyDataAdmin.getStudyDataOverview());
-  h('study:data:exportScope', async (_e, scope, format) => {
-    if (!getSettings().studySharingEnabled) throw new Error('La exportación para compartir está desactivada en Ajustes.');
-    return exportStudyScope(scope, format);
-  });
-  h('study:data:maintain', async (_e, action: 'rebuild-indexes' | 'clear-embeddings' | 'empty-trash' | 'repair') => {
-    if (action === 'rebuild-indexes') return studyDataAdmin.rebuildStudyIndexes();
-    if (action === 'clear-embeddings') { studySearch.deleteStudySearchIndex(); return studyDataAdmin.clearStudyEmbeddingCache(); }
-    if (action === 'empty-trash') return studyDataAdmin.emptyStudyTrash();
-    if (action === 'repair') return studyDataAdmin.repairStudyData();
-    throw new Error('Acción de mantenimiento no válida.');
-  });
-  h('study:data:diagnostic', async () => {
-    const picked = await dialog.showSaveDialog(getWindow() ?? undefined!, {
-      title: 'Exportar diagnóstico del vault de estudio', defaultPath: 'nodus-estudio-diagnostico.json',
-      filters: [{ name: 'JSON', extensions: ['json'] }],
-    });
-    if (picked.canceled || !picked.filePath) return null;
-    fs.writeFileSync(picked.filePath, JSON.stringify(studyDataAdmin.buildStudyDiagnostic(), null, 2), 'utf8');
-    return { path: picked.filePath };
-  });
-  h('data:import', async (_e, password: string) => {
-    const result = await importData(password);
-    // Imports intentionally restore MCP as disabled and tokenless. Stop any
-    // listener from the previous local profile once the swap succeeds.
-    if (result.ok) {
-      await stopMcpTunnel();
-      await stopMcpServer();
-    }
-    return result;
-  });
-  h('data:resetGraph', async () => {
-    // Stop any pending scans first so a finishing job can't repopulate after the wipe.
-    scanQueue.clear();
-    ideas.resetGraphData();
-  });
-
-  // demo mode: a curated sample corpus, only offered on an empty database.
-  h('data:hasData', async () => hasAnyData());
-  h('data:seedDemo', async () => seedDemoData());
-  h('data:seedPrimarySourcesDemo', async () => seedPrimarySourcesDemoData());
-  h('data:clearDemo', async () => {
-    scanQueue.clear();
-    clearDemoData();
-  });
-  // Genealogy demo: seeds the Serrano–Vidal family (tree, archive, evidence, open
-  // kinship suggestions) and flips the vault to the genealogy type. Portraits are
-  // generated in the background with the cheap Gemini model when a key is present.
-  h('data:seedGenealogyDemo', async () => {
-    const seeded = seedGenealogyDemoData();
-    const willGeneratePortraits = seeded && hasDemoPortraitKey();
-    if (willGeneratePortraits) {
-      void generateDemoPortraits({
-        onProgress: (done, total) => getWindow()?.webContents.send('demo:portraits', { done, total }),
-      }).catch(() => undefined);
-    }
-    return { seeded, willGeneratePortraits };
-  });
-  h('data:generateDemoPortraits', async () =>
-    generateDemoPortraits({
-      onProgress: (done, total) => getWindow()?.webContents.send('demo:portraits', { done, total }),
-    })
-  );
-  // Databases demo: seeds three sample databases covering every column type and flips
-  // the vault to the databases type.
-  h('data:seedDatabasesDemo', async () => seedDatabasesDemoData());
-  // Study demo stays entirely local and is only accepted by an empty study vault.
-  h('data:seedStudyDemo', async () => seedStudyDemoData());
-  // Teaching demo, likewise local-only. Unlike genealogy and databases it never
-  // converts the active vault: it is refused outside a `docencia` vault instead.
-  h('data:seedTeachingDemo', async () => seedTeachingDemoData());
-  // Worldbuilding demo is a complete, local-only fictional world. It is refused
-  // outside an empty worldbuilding vault and never invokes an AI provider.
-  h('data:seedWorldbuildingDemo', async () => seedWorldbuildingDemoData());
-  // Demo de Testimonios: proyecto de historia oral completo y local. Sin ninguna voz real
-  // — los maestros son un tono sintético marcado como tal — y sin una sola llamada a IA.
-  h('data:seedTestimonyDemo', async () => seedTestimonyDemoData());
-
 
   h('updates:check', async () => checkForUpdates());
   h('updates:install', async () => installUpdate());
@@ -2138,37 +2173,5 @@ export function registerIpc(
   // app.dock. No-op (and never throws) on Windows/Linux.
   h('dock:setIcon', async (_e, pngDataUrl: string) => {
     setPersistentDockIcon(pngDataUrl);
-  });
-
-
-  // Stream queue progress to the renderer.
-  scanQueue.onProgress((p) => {
-    getWindow()?.webContents.send('queue:progress', p);
-  });
-
-  // Stream embedding pipeline progress to the renderer.
-  onEmbeddingProgress((p) => {
-    getWindow()?.webContents.send('embeddings:progress', p);
-  });
-
-  onPassageProgress((p) => {
-    getWindow()?.webContents.send('passages:progress', p);
-  });
-
-  onStudyMaterialIndexChanged((materialId) => {
-    getWindow()?.webContents.send('study:materials:indexChanged', materialId);
-  });
-
-  onStudyKnowledgeChanged((next) => {
-    getWindow()?.webContents.send('study:knowledge:changed', next);
-  });
-
-  onChapterRelationsProgress((p) => {
-    getWindow()?.webContents.send('projects:chapterRelations:progress', p);
-  });
-
-  // Stream semantic bridge progress to the renderer.
-  onSemanticBridgeProgress((p) => {
-    getWindow()?.webContents.send('bridges:progress', p);
   });
 }

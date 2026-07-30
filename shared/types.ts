@@ -7393,10 +7393,6 @@ export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, 
   resolveStudyMaterialAiProcessingRequest(requestId: string, decision: StudyMaterialAiProcessingDecision): Promise<void>;
   uploadText(nodusId: string, filePath: string): Promise<void>;
 
-  // sync
-  syncNow(): Promise<SyncLogEntry>;
-  getSyncLog(): Promise<SyncLogEntry[]>;
-
   // queue
   getQueue(): Promise<QueueProgress>;
   pauseQueue(): Promise<void>;
@@ -7524,7 +7520,6 @@ export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, 
   importStudyMaterials(input?: StudyMaterialImportInput): Promise<StudyMaterialImportResult[]>;
   importStudyMaterialFolder(input?: StudyMaterialImportInput): Promise<StudyMaterialImportResult[]>;
   chooseStudyMaterialPaths(folder?: boolean): Promise<string[]>;
-  getPathForDroppedFile(file: unknown): string;
   importStudyMaterialPaths(paths: string[], input?: StudyMaterialImportInput): Promise<StudyMaterialImportResult[]>;
   importZoteroStudyMaterial(input: ZoteroStudyMaterialImportInput): Promise<StudyMaterialImportResult>;
   openStudyMaterialInZotero(id: string): Promise<void>;
@@ -7870,43 +7865,10 @@ export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, 
   exportSyncPackage(): Promise<{ path: string; counts: Record<string, number> } | null>;
   /** Merge a sync package from another machine. Additive; newest row wins; never deletes local data. */
   importSyncPackage(passphrase?: string): Promise<SyncMergeSummary | null>;
-  /** Sync packages are encrypted with a passphrase the user sets on both machines. */
-  hasSyncPassphrase(): Promise<boolean>;
-  setSyncPassphrase(passphrase: string): Promise<void>;
-  clearSyncPassphrase(): Promise<void>;
-  /** Versions a sync merge discarded, kept so a wrong resolution stays recoverable. */
-  countSupersededVersions(): Promise<number>;
-  listSupersededVersions(limit?: number, offset?: number): Promise<SupersededEntry[]>;
-  restoreSupersededVersion(id: string): Promise<SupersededRestoreResult>;
-  clearSupersededVersions(ids?: string[]): Promise<number>;
   getStudyDataOverview(): Promise<StudyDataOverview>;
   maintainStudyData(action: 'rebuild-indexes' | 'clear-embeddings' | 'empty-trash' | 'repair'): Promise<StudyDataMaintenanceResult>;
   exportStudyDiagnostic(): Promise<{ path: string } | null>;
   exportStudyScope(scope: StudyExportScope, format: StudyExportFormat): Promise<{ path: string } | null>;
-  /** Set (≥8 chars) the master password that encrypts every automatic backup. Stored in the OS keychain. */
-  setBackupPassword(password: string): Promise<void>;
-  clearBackupPassword(): Promise<void>;
-  hasBackupPassword(): Promise<boolean>;
-  /** Folder picker for the automatic-backup destination. Returns the chosen path or null. */
-  chooseBackupFolder(): Promise<string | null>;
-  /** Run one automatic-style backup immediately (no secrets, master password, prune). */
-  runBackupNow(): Promise<AutoBackupResult>;
-  /** Write a plaintext recovery kit (master password + independent recovery key) to a user-chosen file. */
-  saveBackupRecoveryKit(): Promise<{ ok: boolean; message: string }>;
-  /**
-   * The video tutorials to show: this build's list plus any published since, fetched
-   * and validated in the main process. Falls back to the built-in list, so it is safe
-   * to render whatever comes back.
-   */
-  getTutorialCatalogue(): Promise<TutorialVideo[]>;
-  /** Inspect whether recovery onboarding is required for this installation. */
-  getRecoveryStatus(): Promise<RecoveryStatus>;
-  /** Pick and inspect an empty folder or an existing Nodus recovery root. */
-  chooseRecoveryFolder(mode: 'create' | 'restore', language?: AppLanguage): Promise<RecoveryFolderInspection | null>;
-  /** Create a recovery root and commit its first verified full-state snapshot. */
-  initializeRecoveryFolder(path: string, password: string, language?: AppLanguage): Promise<RecoverySetupResult>;
-  /** Restore a selected snapshot from an existing recovery root. */
-  restoreRecoverySnapshot(root: string, fileName: string, password: string, language?: AppLanguage): Promise<RecoverySetupResult>;
   /** Wipe all derived graph data (ideas, themes, edges, authors, gaps) and reset scan
    *  status on every work. The library and settings are kept. */
   resetGraph(): Promise<void>;
@@ -7971,6 +7933,46 @@ export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, 
   discoverSemanticBridges(model?: ModelRef | null): Promise<SemanticBridgeResult>;
   isSemanticBridgeRunning(): Promise<boolean>;
   onSemanticBridgeProgress(cb: (p: SemanticBridgeProgress) => void): () => void;
+
+  // core: sync, backups, recovery. Regrouped here so the academic and study
+  // declarations above form one range — they used to sit inside it.
+  syncNow(): Promise<SyncLogEntry>;
+  getSyncLog(): Promise<SyncLogEntry[]>;
+  /** Sync packages are encrypted with a passphrase the user sets on both machines. */
+  hasSyncPassphrase(): Promise<boolean>;
+  setSyncPassphrase(passphrase: string): Promise<void>;
+  clearSyncPassphrase(): Promise<void>;
+  /** Versions a sync merge discarded, kept so a wrong resolution stays recoverable. */
+  countSupersededVersions(): Promise<number>;
+  listSupersededVersions(limit?: number, offset?: number): Promise<SupersededEntry[]>;
+  restoreSupersededVersion(id: string): Promise<SupersededRestoreResult>;
+  clearSupersededVersions(ids?: string[]): Promise<number>;
+  /** Set (≥8 chars) the master password that encrypts every automatic backup. Stored in the OS keychain. */
+  setBackupPassword(password: string): Promise<void>;
+  clearBackupPassword(): Promise<void>;
+  hasBackupPassword(): Promise<boolean>;
+  /** Folder picker for the automatic-backup destination. Returns the chosen path or null. */
+  chooseBackupFolder(): Promise<string | null>;
+  /** Run one automatic-style backup immediately (no secrets, master password, prune). */
+  runBackupNow(): Promise<AutoBackupResult>;
+  /** Write a plaintext recovery kit (master password + independent recovery key) to a user-chosen file. */
+  saveBackupRecoveryKit(): Promise<{ ok: boolean; message: string }>;
+  /**
+   * The video tutorials to show: this build's list plus any published since, fetched
+   * and validated in the main process. Falls back to the built-in list, so it is safe
+   * to render whatever comes back.
+   */
+  getTutorialCatalogue(): Promise<TutorialVideo[]>;
+  /** Inspect whether recovery onboarding is required for this installation. */
+  getRecoveryStatus(): Promise<RecoveryStatus>;
+  /** Pick and inspect an empty folder or an existing Nodus recovery root. */
+  chooseRecoveryFolder(mode: 'create' | 'restore', language?: AppLanguage): Promise<RecoveryFolderInspection | null>;
+  /** Create a recovery root and commit its first verified full-state snapshot. */
+  initializeRecoveryFolder(path: string, password: string, language?: AppLanguage): Promise<RecoverySetupResult>;
+  /** Restore a selected snapshot from an existing recovery root. */
+  restoreRecoverySnapshot(root: string, fileName: string, password: string, language?: AppLanguage): Promise<RecoverySetupResult>;
+  /** The absolute path of a file dropped on the window. webUtils, not a channel. */
+  getPathForDroppedFile(file: unknown): string;
 
   // app updates
   checkForUpdates(): Promise<UpdateCheckResponse>;
