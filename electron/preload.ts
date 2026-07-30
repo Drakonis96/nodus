@@ -16,6 +16,7 @@ import { toolkitApi } from './preload/toolkit';
 import { teachingApi } from './preload/teaching';
 import { databasesApi } from './preload/databases';
 import { primarySourcesApi } from './preload/primarySources';
+import { archiveApi } from './preload/archive';
 
 // Tracks the research-chat stream currently in flight so `cancelResearchChat`
 // can abort it without the renderer having to juggle request ids. Only one chat
@@ -65,6 +66,7 @@ function readInitialOverlayPlacement(): NodiOverlayPlacement {
 // rather than an `undefined` the renderer discovers at runtime.
 const api: NodusApi = {
   ...prosopographyApi,
+  ...archiveApi,
   ...primarySourcesApi,
   ...databasesApi,
   ...teachingApi,
@@ -464,39 +466,7 @@ const api: NodusApi = {
   kinSuggestionCount: () => ipcRenderer.invoke('kinship:suggestionCount'),
   confirmKinSuggestion: (suggestionId) => ipcRenderer.invoke('kinship:confirmSuggestion', suggestionId),
   dismissKinSuggestion: (suggestionId) => ipcRenderer.invoke('kinship:dismissSuggestion', suggestionId),
-  // Evidence archive
-  archiveCounts: () => ipcRenderer.invoke('archive:counts'),
-  listArchiveFolders: () => ipcRenderer.invoke('archive:listFolders'),
-  createArchiveFolder: (name, parentId) => ipcRenderer.invoke('archive:createFolder', name, parentId),
-  renameArchiveFolder: (id, name) => ipcRenderer.invoke('archive:renameFolder', id, name),
-  deleteArchiveFolder: (id) => ipcRenderer.invoke('archive:deleteFolder', id).then(() => undefined),
-  listArchiveItemFolders: (itemId) => ipcRenderer.invoke('archive:listItemFolders', itemId),
-  setArchiveItemFolders: (itemId, folderIds) => ipcRenderer.invoke('archive:setItemFolders', itemId, folderIds),
-  listArchiveItems: (opts) => ipcRenderer.invoke('archive:listItems', opts),
-  getArchiveItem: (id) => ipcRenderer.invoke('archive:getItem', id),
-  getArchiveItemBlob: (id) => ipcRenderer.invoke('archive:getItemBlob', id),
-  createArchiveItem: (input) => ipcRenderer.invoke('archive:createItem', input),
-  updateArchiveItem: (id, patch) => ipcRenderer.invoke('archive:updateItem', id, patch),
-  deleteArchiveItem: (id) => ipcRenderer.invoke('archive:deleteItem', id).then(() => undefined),
-  addArchiveTag: (id, tag) => ipcRenderer.invoke('archive:addTag', id, tag).then(() => undefined),
-  removeArchiveTag: (id, tag) => ipcRenderer.invoke('archive:removeTag', id, tag).then(() => undefined),
-  listArchiveTags: () => ipcRenderer.invoke('archive:listTags'),
-  linkArchivePerson: (itemId, personId) => ipcRenderer.invoke('archive:linkPerson', itemId, personId).then(() => undefined),
-  unlinkArchivePerson: (itemId, personId) => ipcRenderer.invoke('archive:unlinkPerson', itemId, personId).then(() => undefined),
-  listArchiveItemsForPerson: (personId) => ipcRenderer.invoke('archive:listItemsForPerson', personId),
-  pickAndIngestArchive: (folderId, docType) => ipcRenderer.invoke('archive:pickAndIngest', folderId, docType),
-  chooseArchiveEntryFiles: () => ipcRenderer.invoke('archive:chooseEntryFiles'),
-  createArchiveEntry: (input) => ipcRenderer.invoke('archive:createEntry', input),
-  importZoteroArchiveEntry: (input) => ipcRenderer.invoke('archive:importZoteroEntry', input),
-  createArchiveTextEntry: (input) => ipcRenderer.invoke('archive:createTextEntry', input),
   scanWorkRecords: (nodusId) => ipcRenderer.invoke('works:scanRecords', nodusId),
-  scanArchiveItem: (itemId) => ipcRenderer.invoke('archive:scanItem', itemId),
-  analyzeArchiveItem: (itemId) => ipcRenderer.invoke('archive:analyzeItem', itemId),
-  replaceArchiveFile: (itemId) => ipcRenderer.invoke('archive:replaceFile', itemId),
-  suggestPersonsForItem: (itemId) => ipcRenderer.invoke('archive:suggestPersonsForItem', itemId),
-  suggestDocumentsForPerson: (personId) => ipcRenderer.invoke('archive:suggestDocumentsForPerson', personId),
-  indexArchive: () => ipcRenderer.invoke('archive:index'),
-  archiveIndexStatus: () => ipcRenderer.invoke('archive:indexStatus'),
   getMcpStatus: () => ipcRenderer.invoke('mcp:status'),
   regenerateMcpToken: () => ipcRenderer.invoke('mcp:regenerateToken'),
   getMcpTunnelStatus: () => ipcRenderer.invoke('mcp:tunnel:status'),

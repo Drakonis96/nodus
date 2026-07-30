@@ -4,6 +4,7 @@
 // renderer surface stays flat and unchanged; only the file each method is
 // declared in moves. See shared/api/ for the slices extracted so far.
 import type { ProsopographyApi } from './api/prosopography';
+import type { ArchiveApi } from './api/archive';
 import type { PrimarySourcesApi } from './api/primarySources';
 import type { DatabasesApi } from './api/databases';
 import type { TeachingApi } from './api/teaching';
@@ -7296,7 +7297,7 @@ export interface TestimonyExportResult {
 // IPC API surface exposed on window.nodus via the preload bridge.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, TeachingApi, DatabasesApi, PrimarySourcesApi {
+export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, TeachingApi, DatabasesApi, PrimarySourcesApi, ArchiveApi {
   // settings + secrets
   getSettings(): Promise<AppSettings>;
   updateSettings(patch: Partial<AppSettings>): Promise<AppSettings>;
@@ -7808,52 +7809,7 @@ export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, 
   kinSuggestionCount(): Promise<number>;
   confirmKinSuggestion(suggestionId: string): Promise<boolean>;
   dismissKinSuggestion(suggestionId: string): Promise<boolean>;
-  // evidence archive
-  archiveCounts(): Promise<ArchiveCounts>;
-  listArchiveFolders(): Promise<ArchiveFolder[]>;
-  createArchiveFolder(name: string, parentId?: string | null): Promise<ArchiveFolder>;
-  renameArchiveFolder(id: string, name: string): Promise<ArchiveFolder | null>;
-  deleteArchiveFolder(id: string): Promise<void>;
-  listArchiveItemFolders(itemId: string): Promise<string[]>;
-  setArchiveItemFolders(itemId: string, folderIds: string[]): Promise<ArchiveItem | null>;
-  listArchiveItems(opts?: ArchiveListOptions): Promise<ArchiveItem[]>;
-  getArchiveItem(id: string): Promise<ArchiveItem | null>;
-  getArchiveItemBlob(id: string): Promise<Uint8Array | null>;
-  createArchiveItem(input: ArchiveItemInput): Promise<ArchiveItem>;
-  updateArchiveItem(id: string, patch: Partial<ArchiveItemInput>): Promise<ArchiveItem | null>;
-  deleteArchiveItem(id: string): Promise<void>;
-  addArchiveTag(id: string, tag: string): Promise<void>;
-  removeArchiveTag(id: string, tag: string): Promise<void>;
-  listArchiveTags(): Promise<ArchiveTagCount[]>;
-  linkArchivePerson(itemId: string, personId: string): Promise<void>;
-  unlinkArchivePerson(itemId: string, personId: string): Promise<void>;
-  listArchiveItemsForPerson(personId: string): Promise<ArchiveItem[]>;
-  pickAndIngestArchive(folderId?: string | null, docType?: string | null): Promise<ArchiveIngestSummary>;
-  chooseArchiveEntryFiles(): Promise<string[]>;
-  createArchiveEntry(input: ArchiveEntryCreateInput): Promise<ArchiveIngestSummary>;
-  importZoteroArchiveEntry(input: ZoteroArchiveEntryImportInput): Promise<ArchiveIngestSummary>;
-  createArchiveTextEntry(input: {
-    title: string;
-    content: string;
-    folderId?: string | null;
-    docType?: string | null;
-    metadata?: Record<string, string> | null;
-    source?: string | null;
-    tags?: string[];
-  }): Promise<ArchiveItem>;
-  /** Records lens on a Zotero library work: extract persons/places/events from its text. */
   scanWorkRecords(nodusId: string): Promise<RecordsScanSummary>;
-  scanArchiveItem(itemId: string): Promise<RecordsScanSummary>;
-  analyzeArchiveItem(itemId: string): Promise<{ unsupported: boolean; description: string | null }>;
-  /** Replace an archive item's attached file (re-extracts text; keeps its links/tags). */
-  replaceArchiveFile(itemId: string): Promise<{ replaced: boolean; item: ArchiveItem | null }>;
-  /** Persons whose name appears in a document's text but who are not yet linked. */
-  suggestPersonsForItem(itemId: string): Promise<PersonLinkSuggestion[]>;
-  /** Documents that likely concern a person (lexical + semantic), not yet linked. */
-  suggestDocumentsForPerson(personId: string): Promise<DocumentLinkSuggestion[]>;
-  /** Embed text-bearing archive items for semantic discovery (idempotent). */
-  indexArchive(): Promise<{ indexed: number; skipped: number }>;
-  archiveIndexStatus(): Promise<{ indexed: number; total: number }>;
   getMcpStatus(): Promise<McpServerStatus>;
   regenerateMcpToken(): Promise<string>;
   getMcpTunnelStatus(): Promise<McpTunnelStatus>;
