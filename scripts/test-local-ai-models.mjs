@@ -4,6 +4,7 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { readSource } from './ipc-channel-census.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const tmp = await mkdtemp(path.join(os.tmpdir(), 'nodus-local-ai-'));
@@ -37,15 +38,15 @@ try {
   assert.ok(catalog.NODUS_LOCAL_MODELS.every((model) => model.assets.filter((asset) => asset.bytes > 1_000_000).every((asset) => /^[a-f0-9]{64}$/.test(asset.sha256))), 'large assets are pinned by SHA-256');
 
   const [manager, aiClient, ipc, preload, settings, ui, onboarding, providers, studyPolicy] = await Promise.all([
-    readFile(path.join(root, 'electron/ai/nodusLocalAi.ts'), 'utf8'),
-    readFile(path.join(root, 'electron/ai/aiClient.ts'), 'utf8'),
-    readFile(path.join(root, 'electron/ipc.ts'), 'utf8'),
-    readFile(path.join(root, 'electron/preload.ts'), 'utf8'),
-    readFile(path.join(root, 'src/views/Settings.tsx'), 'utf8'),
-    readFile(path.join(root, 'src/components/LocalAiModelsSettings.tsx'), 'utf8'),
-    readFile(path.join(root, 'src/views/Onboarding.tsx'), 'utf8'),
-    readFile(path.join(root, 'shared/providers.ts'), 'utf8'),
-    readFile(path.join(root, 'shared/studyAi.ts'), 'utf8'),
+    Promise.resolve(readSource('electron/ai/nodusLocalAi.ts')),
+    Promise.resolve(readSource('electron/ai/aiClient.ts')),
+    Promise.resolve(readSource('@main')),
+    Promise.resolve(readSource('@bridge')),
+    Promise.resolve(readSource('src/views/Settings.tsx')),
+    Promise.resolve(readSource('src/components/LocalAiModelsSettings.tsx')),
+    Promise.resolve(readSource('src/views/Onboarding.tsx')),
+    Promise.resolve(readSource('shared/providers.ts')),
+    Promise.resolve(readSource('shared/studyAi.ts')),
   ]);
   assert.match(manager, /\.download/, 'downloads use partial files before atomic rename');
   assert.match(manager, /fsp\.stat\(`\$\{path\.join\(directory, asset\.file\)\}\.download`\)/, 'status includes bytes from an in-progress partial asset');

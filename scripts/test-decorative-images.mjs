@@ -8,6 +8,7 @@ import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { readSource } from './ipc-channel-census.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -50,19 +51,19 @@ try {
   }
 
   const [service, imageStorage, ipc, jobs, migration, imageModels, card, imageModal, searchView, app, providersUi, modelListUi, audioSettingsUi] = await Promise.all([
-    readFile(path.join(root, 'electron/ai/decorativeImages.ts'), 'utf8'),
-    readFile(path.join(root, 'electron/imageStorage.ts'), 'utf8'),
-    readFile(path.join(root, 'electron/ipc.ts'), 'utf8'),
-    readFile(path.join(root, 'src/backgroundJobs.ts'), 'utf8'),
-    readFile(path.join(root, 'electron/db/migrations.ts'), 'utf8'),
-    readFile(path.join(root, 'electron/ai/imageModels.ts'), 'utf8'),
-    readFile(path.join(root, 'src/components/DecorativeImageCard.tsx'), 'utf8'),
-    readFile(path.join(root, 'src/components/DecorativeImageModal.tsx'), 'utf8'),
-    readFile(path.join(root, 'src/views/SearchView.tsx'), 'utf8'),
-    readFile(path.join(root, 'src/App.tsx'), 'utf8'),
-    readFile(path.join(root, 'src/views/ProvidersSettings.tsx'), 'utf8'),
-    readFile(path.join(root, 'src/components/SettingsModelList.tsx'), 'utf8'),
-    readFile(path.join(root, 'src/views/AudioGenerationSettings.tsx'), 'utf8'),
+    Promise.resolve(readSource('electron/ai/decorativeImages.ts')),
+    Promise.resolve(readSource('electron/imageStorage.ts')),
+    Promise.resolve(readSource('@main')),
+    Promise.resolve(readSource('src/backgroundJobs.ts')),
+    Promise.resolve(readSource('electron/db/migrations.ts')),
+    Promise.resolve(readSource('electron/ai/imageModels.ts')),
+    Promise.resolve(readSource('src/components/DecorativeImageCard.tsx')),
+    Promise.resolve(readSource('src/components/DecorativeImageModal.tsx')),
+    Promise.resolve(readSource('src/views/SearchView.tsx')),
+    Promise.resolve(readSource('src/App.tsx')),
+    Promise.resolve(readSource('src/views/ProvidersSettings.tsx')),
+    Promise.resolve(readSource('src/components/SettingsModelList.tsx')),
+    Promise.resolve(readSource('src/views/AudioGenerationSettings.tsx')),
   ]);
 
   // Disabled means a DB-only not-requested state: no text/image provider path.

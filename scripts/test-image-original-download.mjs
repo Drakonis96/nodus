@@ -4,6 +4,7 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { build } from 'esbuild';
+import { readSource } from './ipc-channel-census.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -80,11 +81,11 @@ test('the download resolver returns full internal images and rejects thumbnails 
 
 test('the shared lightbox exposes an icon button that downloads its current full source', async () => {
   const [lightbox, ipc, preload, types, maps] = await Promise.all([
-    readFile(path.join(root, 'src/components/ImageLightbox.tsx'), 'utf8'),
-    readFile(path.join(root, 'electron/ipc.ts'), 'utf8'),
-    readFile(path.join(root, 'electron/preload.ts'), 'utf8'),
-    readFile(path.join(root, 'shared/types.ts'), 'utf8'),
-    readFile(path.join(root, 'src/views/WorldMapsView.tsx'), 'utf8'),
+    Promise.resolve(readSource('src/components/ImageLightbox.tsx')),
+    Promise.resolve(readSource('@main')),
+    Promise.resolve(readSource('@bridge')),
+    Promise.resolve(readSource('@api')),
+    Promise.resolve(readSource('src/views/WorldMapsView.tsx')),
   ]);
   assert.ok(lightbox.includes('data-testid="image-lightbox-download"'));
   assert.ok(lightbox.includes("Icon name={downloading ? 'sync' : 'download'}"));

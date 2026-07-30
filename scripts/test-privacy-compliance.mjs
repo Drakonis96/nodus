@@ -4,9 +4,10 @@ import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { readSource } from './ipc-channel-census.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const read = (relative) => readFile(path.join(repoRoot, relative), 'utf8');
+const read = (relative) => Promise.resolve(readSource(relative));
 
 async function sourceFiles(root, extensions = new Set(['.ts', '.tsx'])) {
   const result = [];
@@ -55,7 +56,7 @@ test('the distributable contains the privacy policy and controller checklist', a
   }
   assert.match(legalDocs, /cannot grade, profile or evaluate students/);
 
-  for (const source of await Promise.all(['electron/ipc.ts', 'electron/preload.ts', 'shared/types.ts'].map(read))) {
+  for (const source of await Promise.all(['@main', '@bridge', '@api'].map(read))) {
     assert.match(source, /openPrivacyPolicy/);
   }
 });
@@ -80,9 +81,9 @@ test('the policy states the real local and controller boundaries without an inva
 test('no production bridge can send student work to AI for grading, feedback or evaluation', async () => {
   assert.equal(existsSync(path.join(repoRoot, 'electron/ai/studyGrading.ts')), false);
   const sources = await Promise.all([
-    'electron/ipc.ts',
-    'electron/preload.ts',
-    'shared/types.ts',
+    '@main',
+    '@bridge',
+    '@api',
     'electron/ai/assessmentImport.ts',
     'electron/ai/studyGuide.ts',
     'src/views/TeachingGradesView.tsx',
@@ -204,9 +205,9 @@ test('file pickers open directly, with no import privacy modal', async () => {
   const [rendererNotice, app, preload, apiTypes, ipc] = await Promise.all([
     read('src/privacyNotices.tsx'),
     read('src/App.tsx'),
-    read('electron/preload.ts'),
-    read('shared/types.ts'),
-    read('electron/ipc.ts'),
+    read('@bridge'),
+    read('@api'),
+    read('@main'),
   ]);
   assert.match(rendererNotice, /PrivacyRequestHost/);
   assert.match(app, /<PrivacyRequestHost\s*\/>/);
@@ -220,9 +221,9 @@ test('new study materials use a remembered in-app AI processing decision', async
     read('src/privacyNotices.tsx'),
     read('src/views/Settings.tsx'),
     read('electron/db/settingsRepo.ts'),
-    read('electron/preload.ts'),
-    read('shared/types.ts'),
-    read('electron/ipc.ts'),
+    read('@bridge'),
+    read('@api'),
+    read('@main'),
     read('electron/ai/studyKnowledgeConsent.ts'),
     read('electron/ai/studyAiPolicy.ts'),
     read('electron/ai/studyKnowledge.ts'),
