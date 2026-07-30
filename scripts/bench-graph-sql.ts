@@ -66,6 +66,7 @@ async function main(): Promise<void> {
   const { buildIdeaGraph, buildIdeaGraphOverview } = await import('../electron/graph/graphService');
   const { getAcademicHomeStats } = await import('../electron/db/homeRepo');
   const { getDebates } = await import('../electron/graph/graphService');
+  const { buildAuthorDossier } = await import('../electron/ai/authorDossier');
   const { buildReadingPath } = await import('../electron/graph/graphService');
 
   const target = process.env.BENCH_TARGET ?? 'graph';
@@ -73,6 +74,7 @@ async function main(): Promise<void> {
     if (target === 'overview') return buildIdeaGraphOverview();
     if (target === 'home') return getAcademicHomeStats();
     if (target === 'debates') return getDebates();
+    if (target === 'author') return buildAuthorDossier(process.env.BENCH_AUTHOR ?? '');
     if (target === 'reading') return buildReadingPath();
     return buildIdeaGraph();
   };

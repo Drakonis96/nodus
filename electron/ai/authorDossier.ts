@@ -216,18 +216,38 @@ function themesByIdeaForAuthor(authorId: string): Map<string, string[]> {
   return map;
 }
 
-/** The distinct set of theme labels an author touches (for shared-theme overlap). */
-function authorThemeSet(authorId: string): Set<string> {
+/**
+ * The distinct theme labels each of these authors touches, for shared-theme overlap.
+ *
+ * Takes the whole set at once because the caller needs it for the author plus every
+ * counterpart it is related to. Asked one author at a time it cost about 4 ms each,
+ * and a well-connected author has dozens of counterparts — 190 ms of the 197 ms an
+ * author dossier took was this one query run 47 times.
+ *
+ * The ORDER BY is load-bearing, not decoration. Per author, the old query happened
+ * to come back alphabetical, so the shared-theme lists the UI shows were alphabetical
+ * too — by accident of the plan, never by request. Grouping several authors into one
+ * query changes that accident. Asking for the order makes it a guarantee instead.
+ */
+function authorThemeSets(authorIds: string[]): Map<string, Set<string>> {
+  const result = new Map<string, Set<string>>();
+  if (authorIds.length === 0) return result;
   const rows = getDb()
     .prepare(
-      `SELECT DISTINCT t.label AS label
+      `SELECT DISTINCT wa.author_id AS authorId, t.label AS label
          FROM work_authors wa
          JOIN idea_theme_links itl ON itl.nodus_id = wa.nodus_id
          JOIN themes t ON t.theme_id = itl.theme_id
-        WHERE wa.author_id = ?`
+        WHERE wa.author_id IN (${authorIds.map(() => '?').join(',')})
+        ORDER BY t.label`
     )
-    .all(authorId) as { label: string }[];
-  return new Set(rows.map((r) => r.label));
+    .all(...authorIds) as { authorId: string; label: string }[];
+  for (const row of rows) {
+    const set = result.get(row.authorId) ?? new Set<string>();
+    set.add(row.label);
+    result.set(row.authorId, set);
+  }
+  return result;
 }
 
 function loadIdeas(authorId: string): AuthorDossierIdea[] {
@@ -315,15 +335,15 @@ function loadRelations(authorId: string): AuthorDossierRelation[] {
       (a) => [a.author_id, a.name] as const
     )
   );
-  const mine = authorThemeSet(authorId);
-  const themeCache = new Map<string, Set<string>>();
+  const counterparts = rows.map((r) => (r.from_author === authorId ? r.to_author : r.from_author));
+  const themeCache = authorThemeSets([...new Set([authorId, ...counterparts])]);
+  const mine = themeCache.get(authorId) ?? new Set<string>();
 
   // aggregate per counterpart + relation type
   const agg = new Map<string, AuthorDossierRelation>();
   for (const r of rows) {
     const other = r.from_author === authorId ? r.to_author : r.from_author;
-    if (!themeCache.has(other)) themeCache.set(other, authorThemeSet(other));
-    const shared = [...themeCache.get(other)!].filter((t) => mine.has(t));
+    const shared = [...(themeCache.get(other) ?? [])].filter((t) => mine.has(t));
     const key = `${other}::${r.type}`;
     const cur = agg.get(key) ?? {
       author_id: other,
