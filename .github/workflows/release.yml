@@ -51,6 +51,13 @@ jobs:
         run: npm ci
 
       - name: Build renderer + main
+        env:
+          # The main-process bundle is ~1,000 modules and 6.4 MB, and rolling it up
+          # peaks above Node's default heap on the macOS arm64 runner — which is the
+          # smallest of the three and dies at ~2 GB with "Reached heap limit".
+          # ci.yml has carried this same bump since it hit the wall; release.yml
+          # never got it, so the mismatch only ever surfaced at release time.
+          NODE_OPTIONS: --max-old-space-size=4096
         run: npm run build
 
       - name: Build and publish Windows installer
