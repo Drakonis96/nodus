@@ -18,6 +18,7 @@ import {
 } from '../components/NodeDetailPanel';
 import { useDismissableLayer } from '../hooks';
 import { useFeatureModel } from '../hooks/useFeatureModel';
+import { expandableIdsByDepth } from '../argumentMapTree';
 import { t, tx } from '../i18n';
 
 const RELATION_LABELS: Record<string, string> = {
@@ -52,17 +53,6 @@ function typeColor(type: ArgumentBlock['type']): string {
   return type === 'framing' ? '#a78bfa' : NODE_COLORS[type as IdeaType] ?? '#888';
 }
 
-/** Collect every block id that has children — used to default all branches expanded. */
-function collectExpandable(block: ArgumentBlock, acc: Set<string>): void {
-  if (block.children.length > 0) acc.add(block.id);
-  for (const c of block.children) collectExpandable(c, acc);
-}
-
-function maxDepth(block: ArgumentBlock, depth = 0): number {
-  if (block.children.length === 0) return depth;
-  return Math.max(...block.children.map((c) => maxDepth(c, depth + 1)));
-}
-
 export function ArgumentMapView({ settings }: { settings: AppSettings }) {
   const [ideaNodes, setIdeaNodes] = useState<IdeaPickerItem[]>([]);
   const [graphLoaded, setGraphLoaded] = useState(false);
@@ -79,10 +69,10 @@ export function ArgumentMapView({ settings }: { settings: AppSettings }) {
   const [building, setBuilding] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Progressive unfold: the map opens one level per tick after it is built. The
+  // expanded set is the single source of truth, so a manual toggle and the
+  // automatic unfold can never disagree about what is on screen.
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  // Progressive reveal: blocks only render once their depth passes this gate,
-  // which ramps up after the map loads so the scheme "deploys" level by level.
-  const [revealDepth, setRevealDepth] = useState(0);
   const revealTimerRef = useRef<number | null>(null);
 
   const [ideaDetail, setIdeaDetail] = useState<IdeaDetail | null>(null);
@@ -168,21 +158,27 @@ export function ArgumentMapView({ settings }: { settings: AppSettings }) {
     }
   }, []);
 
-  // Drive the progressive reveal once a map is built.
+  // Drive the progressive unfold once a map is built: open the root, then one
+  // deeper level per tick. Stops as soon as the last level is open.
   useEffect(() => {
-    if (!map) return;
-    const depth = maxDepth(map.root);
-    setRevealDepth(0);
     stopReveal();
+    if (!map) {
+      setExpanded(new Set());
+      return;
+    }
+    const levels = expandableIdsByDepth(map.root);
+    setExpanded(new Set(levels[0] ?? []));
+    if (levels.length <= 1) return;
+    let level = 1;
     revealTimerRef.current = window.setInterval(() => {
-      setRevealDepth((d) => {
-        if (d >= depth) {
-          stopReveal();
-          return d;
-        }
-        return d + 1;
+      const ids = levels[level++] ?? [];
+      setExpanded((cur) => {
+        const next = new Set(cur);
+        for (const id of ids) next.add(id);
+        return next;
       });
-    }, 220);
+      if (level >= levels.length) stopReveal();
+    }, 260);
     return stopReveal;
   }, [map, stopReveal]);
 
@@ -197,10 +193,8 @@ export function ArgumentMapView({ settings }: { settings: AppSettings }) {
     setDetailLoading(null);
     try {
       const result = await window.nodus.buildArgumentMap({ seedIdeaId: sid, model, mode });
+      // The unfold effect seeds `expanded` from the new map.
       setMap(result);
-      const ex = new Set<string>();
-      collectExpandable(result.root, ex);
-      setExpanded(ex);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -228,14 +222,17 @@ export function ArgumentMapView({ settings }: { settings: AppSettings }) {
     );
   }, []);
 
-  const toggleExpand = (id: string) => {
+  // A manual toggle hands control to the user: the automatic unfold stops so it
+  // cannot reopen a branch the user just collapsed.
+  const toggleExpand = useCallback((id: string) => {
+    stopReveal();
     setExpanded((cur) => {
       const next = new Set(cur);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
-  };
+  }, [stopReveal]);
 
   const closeDetail = () => {
     detailSeqRef.current++;
@@ -255,6 +252,15 @@ export function ArgumentMapView({ settings }: { settings: AppSettings }) {
     <div className="h-full flex flex-col min-h-0">
       {/* Header / setup */}
       <div className="border-b border-neutral-800 p-3 flex flex-wrap gap-2 items-end text-xs">
+        {map && (
+          <button
+            className="btn btn-ghost text-xs gap-1.5 px-2.5 py-1.5 mr-1 border border-neutral-700"
+            title={t('Volver al selector')}
+            onClick={() => setMap(null)}
+          >
+            <Icon name="chevronLeft" size={12} /> {isAuto ? t('Recorridos') : t('Empezar de nuevo')}
+          </button>
+        )}
         <div className="flex rounded-lg overflow-hidden border border-neutral-700">
           <button
             className={`px-3 py-1.5 ${isAuto ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:bg-neutral-800'}`}
@@ -467,13 +473,6 @@ export function ArgumentMapView({ settings }: { settings: AppSettings }) {
                   <span>· {tx('{n} ideas', { n: map.ideaCount })}</span>
                   {map.truncated && <span className="text-amber-500">· {t('subgrafo recortado')}</span>}
                   <span className="text-neutral-600">· {isAuto ? t('modo automático') : t('modo IA')}</span>
-                  <button
-                    className="ml-auto btn btn-ghost text-xs gap-1 py-0.5 px-2"
-                    title={t('Volver al selector')}
-                    onClick={() => setMap(null)}
-                  >
-                    <Icon name="chevronLeft" size={12} /> {isAuto ? t('Recorridos') : t('Empezar de nuevo')}
-                  </button>
                 </div>
                 {map.overview && <p className="text-sm text-neutral-300 leading-relaxed">{map.overview}</p>}
               </div>
@@ -481,7 +480,6 @@ export function ArgumentMapView({ settings }: { settings: AppSettings }) {
                 block={map.root}
                 depth={0}
                 expanded={expanded}
-                revealDepth={revealDepth}
                 onToggle={toggleExpand}
                 onSelect={selectBlock}
               />
@@ -510,78 +508,78 @@ function BlockTree({
   block,
   depth,
   expanded,
-  revealDepth,
   onToggle,
   onSelect,
 }: {
   block: ArgumentBlock;
   depth: number;
   expanded: Set<string>;
-  revealDepth: number;
   onToggle: (id: string) => void;
   onSelect: (block: ArgumentBlock) => void;
 }) {
   const isExpanded = expanded.has(block.id);
   const hasChildren = block.children.length > 0;
-  const revealed = depth <= revealDepth;
   const accent = RELATION_ACCENT[block.relation] ?? '#737373';
 
   return (
-    <AnimatePresence initial={false}>
-      {revealed && (
-        <motion.div
-          layout
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -6 }}
-          transition={{ duration: 0.28, ease: 'easeOut' }}
-          className="relative"
-        >
-          <div
-            className="group relative rounded-lg border bg-neutral-900/80 hover:bg-neutral-800/80 transition-colors cursor-pointer"
-            style={{ borderLeftColor: accent, borderLeftWidth: 4 }}
-            onClick={() => onSelect(block)}
-          >
-            <div className="p-3">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 mb-1 flex-wrap">
-                    <span
-                      className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded"
-                      style={{ backgroundColor: `${typeColor(block.type)}22`, color: typeColor(block.type) }}
-                    >
-                      {t(typeLabel(block.type))}
-                    </span>
-                    {block.relation !== 'root' && (
-                      <span className="text-[10px] text-neutral-500 flex items-center gap-1">
-                        <span style={{ color: accent }}><Icon name="arrowUp" size={10} className="rotate-90" /></span>
-                        {t(RELATION_LABELS[block.relation as EdgeType]) ?? block.relation}
-                      </span>
-                    )}
-                  </div>
-                  <div className="font-medium text-sm text-neutral-100">{block.label}</div>
-                  {block.summary && <div className="text-xs text-neutral-400 mt-1 leading-relaxed">{block.summary}</div>}
-                  {block.statement && depth === 0 && (
-                    <div className="text-xs text-neutral-500 mt-1.5 leading-relaxed">{block.statement}</div>
-                  )}
-                </div>
-                {hasChildren && (
-                  <button
-                    className="shrink-0 p-1 rounded hover:bg-neutral-700 text-neutral-400"
-                    title={isExpanded ? t('Contraer rama') : t('Desplegar rama')}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onToggle(block.id);
-                    }}
-                  >
-                    <Icon name={isExpanded ? 'minus' : 'plus'} size={14} />
-                  </button>
+    <div className="relative">
+      <div
+        className="group relative rounded-lg border bg-neutral-900/80 hover:bg-neutral-800/80 transition-colors cursor-pointer"
+        style={{ borderLeftColor: accent, borderLeftWidth: 4 }}
+        onClick={() => onSelect(block)}
+      >
+        <div className="p-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                <span
+                  className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded"
+                  style={{ backgroundColor: `${typeColor(block.type)}22`, color: typeColor(block.type) }}
+                >
+                  {t(typeLabel(block.type))}
+                </span>
+                {block.relation !== 'root' && (
+                  <span className="text-[10px] text-neutral-500 flex items-center gap-1">
+                    <span style={{ color: accent }}><Icon name="arrowUp" size={10} className="rotate-90" /></span>
+                    {t(RELATION_LABELS[block.relation as EdgeType]) ?? block.relation}
+                  </span>
                 )}
               </div>
+              <div className="font-medium text-sm text-neutral-100">{block.label}</div>
+              {block.summary && <div className="text-xs text-neutral-400 mt-1 leading-relaxed">{block.summary}</div>}
+              {block.statement && depth === 0 && (
+                <div className="text-xs text-neutral-500 mt-1.5 leading-relaxed">{block.statement}</div>
+              )}
             </div>
+            {hasChildren && (
+              <button
+                className="shrink-0 p-1 rounded hover:bg-neutral-700 text-neutral-400"
+                title={isExpanded ? t('Contraer rama') : t('Desplegar rama')}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggle(block.id);
+                }}
+              >
+                <Icon name={isExpanded ? 'minus' : 'plus'} size={14} />
+              </button>
+            )}
           </div>
+        </div>
+      </div>
 
-          {hasChildren && isExpanded && (
+      {/* Only the children wrapper animates. A `layout` animation on the block
+          itself scale-corrects its own text, which left collapsed cards stretched
+          to the height the whole branch used to occupy. */}
+      <AnimatePresence initial={false}>
+        {hasChildren && isExpanded && (
+          <motion.div
+            key="children"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.24, ease: 'easeOut' }}
+            className="overflow-hidden"
+          >
             <div className="ml-3 pl-4 border-l border-neutral-800 mt-1 space-y-1.5">
               {block.children.map((child) => (
                 <BlockTree
@@ -589,15 +587,14 @@ function BlockTree({
                   block={child}
                   depth={depth + 1}
                   expanded={expanded}
-                  revealDepth={revealDepth}
                   onToggle={onToggle}
                   onSelect={onSelect}
                 />
               ))}
             </div>
-          )}
-        </motion.div>
-      )}
-    </AnimatePresence>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }

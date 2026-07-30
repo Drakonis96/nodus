@@ -27,7 +27,12 @@ const STRATEGY_HELP: Record<ReadingPathStrategy, string> = {
   connected_authors: 'Da peso a autores relacionados por el grafo de ideas.',
   bridges: 'Busca textos que conectan varias líneas temáticas o zonas del grafo.',
 };
-const READING_ENTRY_ROW_HEIGHT = 246;
+// Virtual row pitch = card height + the gap between cards. The card itself stays
+// 246 px (`h-[246px]` below); the extra 12 px is what separates one block from the
+// next, matching the gaps and ideas lists.
+const READING_ENTRY_CARD_HEIGHT = 246;
+const READING_ENTRY_ROW_GAP = 12;
+const READING_ENTRY_ROW_HEIGHT = READING_ENTRY_CARD_HEIGHT + READING_ENTRY_ROW_GAP;
 
 export function ReadingPathView({
   onOpenGraph,
