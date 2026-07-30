@@ -16,6 +16,17 @@ import { getSettings } from '../db/settingsRepo';
 
 export interface IpcContext {
   /**
+   * In-flight streaming chats, keyed by the requestId the renderer generates, so a
+   * Stop button can abort the provider mid-answer.
+   *
+   * Genuinely shared, unlike the other closure state the split found: three separate
+   * streaming chats key into the same registry — `worldChat:stream`, `db:chatStream`
+   * and `research:chatStream` — each paired with its own `:cancel` channel. Since
+   * requestIds are unique per request, giving each domain its own map would behave
+   * identically, but that is a semantic change and does not belong in a move.
+   */
+  chatAborters: Map<string, AbortController>;
+  /**
    * ipcMain.handle with the app's error and payload localization applied. Every
    * channel goes through it: results are localized for the current UI language,
    * and a thrown message is translated when a translation exists (and rethrown
@@ -39,5 +50,5 @@ export function createIpcContext(getWindow: () => BrowserWindow | null): IpcCont
       throw new Error(localized);
     }
   });
-  return { h, getWindow };
+  return { h, getWindow, chatAborters: new Map() };
 }

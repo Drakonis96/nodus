@@ -10,6 +10,7 @@ import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { assertChannelsWired } from './ipc-channel-census.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
@@ -980,10 +981,10 @@ try {
   assert.match(chatView, /listDatabaseChatConversations/);
   assert.match(chatView, /saveDatabaseChatConversation/);
   assert.match(chatView, /<ConfirmModal/);
-  const preloadSource = fs.readFileSync(path.join(repoRoot, 'electron/preload.ts'), 'utf8');
-  const ipcSource = fs.readFileSync(path.join(repoRoot, 'electron/ipc.ts'), 'utf8');
-  assert.match(preloadSource, /db:chatHistory:list/);
-  assert.match(ipcSource, /db:chatHistory:delete/);
+  // Asks the census whether the channels are wired, not which file holds them: the
+  // handlers moved to electron/ipc/databases.ts and the bindings to
+  // electron/preload/databases.ts.
+  assertChannelsWired(assert, ['db:chatHistory:list', 'db:chatHistory:delete']);
   console.log('Databases mode test passed!');
 } finally {
   await rm(root, { recursive: true, force: true });
