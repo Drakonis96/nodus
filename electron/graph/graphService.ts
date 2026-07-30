@@ -868,7 +868,27 @@ function clip(value: string, max: number): string {
  */
 const DEBATE_LIST_EVIDENCE_PER_WORK = 1;
 
-function buildDebateSide(ideaId: string, opts: { lean?: boolean } = {}): DebateSide | null {
+/**
+ * Sides already built during this one `getDebates()` call.
+ *
+ * An idea can sit on either end of several contradiction edges, and each debate
+ * rebuilt its sides from scratch: measured on a real corpus, 1,147 debate edges
+ * asked for 2,294 sides drawn from only 1,310 distinct ideas, and every one of
+ * those asks costs ~6 queries through getIdeaDetail. The map is per call and
+ * never outlives it — nothing writes to the database while debates assemble, so
+ * within one call the answer for an idea cannot change.
+ */
+type DebateSideCache = Map<string, DebateSide | null>;
+
+function buildDebateSide(ideaId: string, opts: { lean?: boolean; cache?: DebateSideCache } = {}): DebateSide | null {
+  const cached = opts.cache?.get(ideaId);
+  if (cached !== undefined) return cached;
+  const side = assembleDebateSide(ideaId, opts);
+  opts.cache?.set(ideaId, side);
+  return side;
+}
+
+function assembleDebateSide(ideaId: string, opts: { lean?: boolean }): DebateSide | null {
   const detail = getIdeaDetail(ideaId);
   if (!detail) return null;
   const evidenceByWork = new Map<string, Evidence[]>();
@@ -927,7 +947,7 @@ function assembleDebate(
   clusterSize: number,
   supportCount: Map<string, number>,
   themesByIdea: Map<string, Set<string>>,
-  opts: { lean?: boolean } = {}
+  opts: { lean?: boolean; cache?: DebateSideCache } = {}
 ): Debate | null {
   const sideA = buildDebateSide(row.from_id, opts);
   const sideB = buildDebateSide(row.to_id, opts);
@@ -1035,11 +1055,12 @@ export function getDebates(): Debate[] {
   const { clusterId, clusterSize } = clusterDebateEdges(rows);
   const supportCount = loadSupportCounts(db);
   const themesByIdea = loadThemesByIdea(db);
+  const cache: DebateSideCache = new Map();
 
   const debates = rows
     .map((row) => {
       const root = clusterId.get(row.id)!;
-      return assembleDebate(row, root, clusterSize.get(root) ?? 1, supportCount, themesByIdea, { lean: true });
+      return assembleDebate(row, root, clusterSize.get(root) ?? 1, supportCount, themesByIdea, { lean: true, cache });
     })
     .filter((d): d is Debate => d !== null);
 

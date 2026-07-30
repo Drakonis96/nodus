@@ -65,11 +65,15 @@ proto.prepare = function patchedPrepare(sql: string) {
 async function main(): Promise<void> {
   const { buildIdeaGraph, buildIdeaGraphOverview } = await import('../electron/graph/graphService');
   const { getAcademicHomeStats } = await import('../electron/db/homeRepo');
+  const { getDebates } = await import('../electron/graph/graphService');
+  const { buildReadingPath } = await import('../electron/graph/graphService');
 
   const target = process.env.BENCH_TARGET ?? 'graph';
   const run = async () => {
     if (target === 'overview') return buildIdeaGraphOverview();
     if (target === 'home') return getAcademicHomeStats();
+    if (target === 'debates') return getDebates();
+    if (target === 'reading') return buildReadingPath();
     return buildIdeaGraph();
   };
 
