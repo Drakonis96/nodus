@@ -2787,6 +2787,9 @@ export const EN: Record<string, string> = {
   'Mesa preparada con materiales recomendados.': 'Table prepared with recommended materials.',
   'Borrador generado con matriz y citas.': 'Draft generated with matrix and citations.',
   'Borrador copiado.': 'Draft copied.',
+  'Copiar sin referencias': 'Copy without references',
+  'Copia solo la prosa, sin citas ni referencias, para pegarla en un lector de voz': 'Copies the prose only, with no citations or reference list, to paste into a voice reader',
+  'Texto copiado sin citas ni referencias.': 'Text copied without citations or references.',
   'Borrador guardado localmente.': 'Draft saved locally.',
   'Borrador guardado abierto. Puedes exportarlo o reutilizar su prompt para actualizarlo.':
     'Saved draft opened. You can export it or reuse its prompt to update it.',

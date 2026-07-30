@@ -2722,6 +2722,9 @@ export const DE: Record<string, string> = {
   'Mesa preparada con materiales recomendados.': 'Tisch mit empfohlenen Materialien vorbereitet.',
   'Borrador generado con matriz y citas.': 'Entwurf mit Matrix und Zitaten erzeugt.',
   'Borrador copiado.': 'Entwurf kopiert.',
+  'Copiar sin referencias': 'Ohne Quellenangaben kopieren',
+  'Copia solo la prosa, sin citas ni referencias, para pegarla en un lector de voz': 'Kopiert nur den Fließtext, ohne Zitate und Literaturverzeichnis, zum Einfügen in einen Vorleser',
+  'Texto copiado sin citas ni referencias.': 'Text ohne Zitate und Literaturverzeichnis kopiert.',
   'Borrador guardado localmente.': 'Entwurf lokal gespeichert.',
   'Borrador guardado abierto. Puedes exportarlo o reutilizar su prompt para actualizarlo.':
     'Gespeicherter Entwurf geöffnet. Sie können ihn exportieren oder seinen Prompt wiederverwenden, um ihn zu aktualisieren.',
