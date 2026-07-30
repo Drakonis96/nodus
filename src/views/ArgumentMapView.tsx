@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { AppSettings, ArgumentBlock, ArgumentMap, ArgumentRouteSuggestion, EdgeDetail, EdgeType, GraphData, IdeaDetail, IdeaType } from '@shared/types';
+import type { AppSettings, ArgumentBlock, ArgumentMap, ArgumentRouteSuggestion, EdgeDetail, EdgeType, IdeaDetail, IdeaPickerItem, IdeaType } from '@shared/types';
 import { EDGE_LABELS, NODE_COLORS, NODE_LABELS, Icon, Spinner } from '../components/ui';
 import { ModelPicker } from '../components/ModelPicker';
 import {
@@ -64,7 +64,7 @@ function maxDepth(block: ArgumentBlock, depth = 0): number {
 }
 
 export function ArgumentMapView({ settings }: { settings: AppSettings }) {
-  const [graph, setGraph] = useState<GraphData>({ nodes: [], edges: [] });
+  const [ideaNodes, setIdeaNodes] = useState<IdeaPickerItem[]>([]);
   const [graphLoaded, setGraphLoaded] = useState(false);
   const [mode, setMode] = useState<'auto' | 'ai'>('auto');
   const [suggestions, setSuggestions] = useState<ArgumentRouteSuggestion[]>([]);
@@ -96,9 +96,13 @@ export function ArgumentMapView({ settings }: { settings: AppSettings }) {
     onDismiss: () => setSeedSearchOpen(false),
   });
 
+  // The seed picker shows at most 60 ideas and searches their label and statement.
+  // It used to get that list by loading the entire ideas graph — 9,721 nodes and
+  // 34,531 edges, none of the edges ever read — which cost ~170 ms of blocked main
+  // process and a multi-megabyte IPC message every time this view opened.
   useEffect(() => {
-    void window.nodus.getGraph('ideas').then((g) => {
-      setGraph(g);
+    void window.nodus.listPickerIdeas().then((ideas) => {
+      setIdeaNodes(ideas);
       setGraphLoaded(true);
     });
   }, []);
@@ -140,12 +144,6 @@ export function ArgumentMapView({ settings }: { settings: AppSettings }) {
   useEffect(() => {
     localStorage.setItem(DETAIL_FONT_KEY, String(detailFontSize));
   }, [detailFontSize]);
-
-  // Idea candidates for the picker (real ideas only, no themes/authors).
-  const ideaNodes = useMemo(
-    () => graph.nodes.filter((n) => n.type !== 'theme' && n.type !== 'author'),
-    [graph]
-  );
 
   const filteredIdeas = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -300,10 +298,10 @@ export function ArgumentMapView({ settings }: { settings: AppSettings }) {
                     )}
                     {filteredIdeas.map((n) => (
                       <button
-                        key={n.id}
+                        key={n.global_id}
                         className="w-full text-left px-3 py-2 hover:bg-neutral-800 border-b border-neutral-800/60 last:border-0"
                         onClick={() => {
-                          setSeedId(n.id);
+                          setSeedId(n.global_id);
                           setSearch(n.label);
                           setSeedSearchOpen(false);
                         }}

@@ -1,5 +1,40 @@
 # Changelog
 
+## 3.0.1 — 2026-07-30
+
+A performance release, from an audit run against a real 465 MB academic vault.
+No new surface; three causes behind the app feeling slow, plus the tooling that
+found them so the other vault types can be measured the same way.
+
+### Fixed
+
+- **Sections that blocked the whole window now open promptly.** Every read path
+  runs to completion on the single main-process event loop that also answers the
+  renderer, so a slow query is not slow rendering — it is a frozen application.
+  The graph bound one placeholder per idea into its aggregate queries, making
+  SQLite's cost grow with ideas x works (2,745 ms -> 170 ms). The argument map
+  loaded 9,721 nodes and 34,531 edges to fill a picker that shows sixty and never
+  reads an edge (448 ms -> 16 ms, and its IPC payload 10.0 MB -> 2.4 MB). Debates
+  rebuilt each side once per edge and fetched works one at a time through a batch
+  API (261 ms -> 87 ms). The reading path assembled every gap statement in the
+  corpus to display three (212 ms -> 157 ms). Author dossiers ran the same theme
+  query once per related author (397 ms -> 69 ms).
+- **Nodi no longer animates when nothing is happening.** Its SVG repainted every
+  frame forever, costing about half a core with the application idle and warming
+  the machine. It now holds its pose a few seconds after the last activity and
+  wakes on hover, on a state change or on a notification; the animations are
+  paused, not removed, so they resume exactly where they stopped.
+- **The extracted-text cache is bounded.** It was written with an upsert and never
+  pruned, reaching a quarter of the vault file and entering every backup archive.
+  It is capped at 64 MB, newest first; evicted text is re-extracted on demand.
+
+### Added
+
+- Six benchmarks under `scripts/bench-*` that measure main-process blocking, idle
+  CPU per helper process, per-section render cost in the real window, and SQL
+  attribution per statement. They run against a copy of a profile, never the live
+  one.
+
 ## 3.0.0 — 2026-07-30
 
 Four new vault types arrived in this cycle, which is what moves the major. A

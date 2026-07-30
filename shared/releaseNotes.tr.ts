@@ -1,4 +1,11 @@
+const RELEASE_3_0_1_TR: string[] = [
+  "Eskiden takılan bölümler artık anında açılıyor. Grafik, argüman haritası, tartışmalar, okuma rotası ve yazar dosyaları tüm kütüphaneyi dolaşarak yükleniyor ve bu sırada uygulamanın tamamını donduruyordu; artık yalnızca gösterdiklerini istiyorlar. Yaklaşık 10.000 fikirlik bir kasada grafik 2,7 saniyelik donmuş pencereden 0,2 saniyenin altına indi.",
+  "Nodi söyleyecek bir şeyi yokken duruşunu koruyor, olduğu anda yeniden hareket ediyor. Animasyonu hiç durmuyordu, uygulama boştayken bile: bu sürekli olarak yarım çekirdeğe mal oluyor ve makineyi ısıtıyordu. Artık son etkinlikten birkaç saniye sonra duruluyor; imleç üzerine gelince, durum değişince veya bir bildirim gelince uyanıyor. Hiçbir animasyon kaldırılmadı.",
+  "PDF'lerden çıkarılan metin önbelleği artık sınırlı. Yazılıyor ama hiç budanmıyordu ve kasa dosyasının dörtte birine ulaşıyordu; üstelik bu dosya her yedeğe olduğu gibi kopyalanıyor. Artık en yenisi korunarak 64 MB ile sınırlı; hiçbir şey kaybolmuyor, çünkü atılan metin gerektiğinde PDF'inden yeniden çıkarılıyor.",
+];
+
 export const RELEASE_NOTES_TR: Record<string, string[]> = {
+  "3.0.1": RELEASE_3_0_1_TR,
   // Index-matched with RELEASE_3_0_0_HIGHLIGHTS — keep this order.
   "3.0.0": [
     "Tarihsel toplulukları kişi kişi incelemek için yeni Prosopografi kasası. Kaynak yakalama ve eleştirisi, kimlik çözümleme, kanıtıyla birlikte olgucuklar, topluluklar, kohortlar ve anketler, arama, katmanlı ağ çözümlemesi ve veri alışverişi: kanıt, verinin arkasında durmak yerine ona yapışık gelir.",

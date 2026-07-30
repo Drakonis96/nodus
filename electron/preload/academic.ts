@@ -71,6 +71,7 @@ export const academicApi: AcademicApi = {
   getGraphOverview: () => ipcRenderer.invoke('graph:overview'),
   getGraphTheme: (theme, cap) => ipcRenderer.invoke('graph:theme', theme, cap),
   listIdeasPage: (request) => ipcRenderer.invoke('ideas:listPage', request),
+  listPickerIdeas: () => ipcRenderer.invoke('ideas:picker'),
   listIdeaConnections: (globalId) => ipcRenderer.invoke('ideas:connections', globalId),
   getIdeaDetail: (globalId) => ipcRenderer.invoke('graph:ideaDetail', globalId),
   deleteIdea: (globalId) => ipcRenderer.invoke('ideas:delete', globalId).then(() => undefined),

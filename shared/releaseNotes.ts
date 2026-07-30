@@ -36,6 +36,40 @@ export interface ReleaseNote {
 
 interface RawReleaseNote extends Omit<ReleaseNote, 'highlights'> { highlights: RawReleaseHighlight[] }
 
+/**
+ * 3.0.1 is a performance release: no new surface, three things that were making
+ * the app feel slow on a large vault. One highlight per cause, not one per query.
+ */
+const RELEASE_3_0_1_HIGHLIGHTS: RawReleaseHighlight[] = [
+  {
+    scope: 'academic',
+    es: 'Las secciones que se quedaban pensando ahora abren de inmediato. El grafo, el mapa de argumentos, los debates, la ruta de lectura y las fichas de autor cargaban recorriendo la biblioteca entera y bloqueaban la aplicación entera mientras lo hacían; ahora piden solo lo que muestran. En una bóveda de casi 10.000 ideas, el grafo pasa de 2,7 segundos de congelación a menos de 0,2.',
+    en: 'Sections that used to hang now open straight away. The graph, argument map, debates, reading path and author dossiers each loaded by walking the whole library, freezing the entire app while they did it; now they ask only for what they show. On a vault of nearly 10,000 ideas the graph went from 2.7 seconds of frozen window to under 0.2.',
+    fr: 'Les sections qui restaient bloquées s’ouvrent désormais immédiatement. Le graphe, la carte d’arguments, les débats, le parcours de lecture et les fiches d’auteur se chargeaient en parcourant toute la bibliothèque et figeaient l’application entière ; ils ne demandent plus que ce qu’ils affichent. Sur une bibliothèque de près de 10 000 idées, le graphe passe de 2,7 secondes de fenêtre figée à moins de 0,2.',
+    de: 'Abschnitte, die sich aufhängten, öffnen jetzt sofort. Graph, Argumentkarte, Debatten, Lesepfad und Autorendossiers luden jeweils die gesamte Bibliothek und blockierten dabei die ganze Anwendung; jetzt fragen sie nur noch ab, was sie anzeigen. In einem Tresor mit fast 10.000 Ideen sank der Graph von 2,7 Sekunden eingefrorenem Fenster auf unter 0,2.',
+    pt: 'As secções que ficavam a pensar abrem agora de imediato. O grafo, o mapa de argumentos, os debates, o percurso de leitura e as fichas de autor carregavam percorrendo toda a biblioteca e bloqueavam a aplicação inteira enquanto o faziam; agora pedem apenas o que mostram. Num cofre com quase 10 000 ideias, o grafo passou de 2,7 segundos de janela congelada para menos de 0,2.',
+    'pt-BR': 'As seções que ficavam travadas agora abrem na hora. O grafo, o mapa de argumentos, os debates, a trilha de leitura e as fichas de autor carregavam percorrendo a biblioteca inteira e travavam o aplicativo todo enquanto isso; agora pedem apenas o que exibem. Em um cofre com quase 10.000 ideias, o grafo caiu de 2,7 segundos de janela congelada para menos de 0,2.',
+  },
+  {
+    scope: 'nodi',
+    es: 'Nodi se queda quieto cuando no tiene nada que decir, y vuelve a moverse en cuanto lo tiene. Su animación no paraba nunca, ni siquiera con la aplicación en reposo: eso costaba la mitad de un núcleo de forma permanente y calentaba el equipo. Ahora mantiene la pose unos segundos después de la última actividad y despierta al pasar el ratón, al cambiar de estado o al llegar un aviso. Ninguna animación se ha eliminado.',
+    en: 'Nodi holds its pose when it has nothing to say, and moves again the moment it does. Its animation never stopped, not even with the app idle: that cost half a core permanently and warmed the machine. It now settles a few seconds after the last activity and wakes on hover, on a change of state or on a notification. No animation was removed.',
+    fr: 'Nodi garde la pose quand il n’a rien à dire, et repart dès qu’il a quelque chose. Son animation ne s’arrêtait jamais, même application au repos : cela coûtait en permanence un demi-cœur et chauffait la machine. Il se fige désormais quelques secondes après la dernière activité et se réveille au survol, à un changement d’état ou à une notification. Aucune animation n’a été supprimée.',
+    de: 'Nodi hält seine Pose, wenn es nichts zu sagen hat, und bewegt sich wieder, sobald doch. Seine Animation hörte nie auf, auch nicht bei ruhender App: das kostete dauerhaft einen halben Kern und erwärmte das Gerät. Jetzt kommt es einige Sekunden nach der letzten Aktivität zur Ruhe und erwacht beim Überfahren, bei einem Zustandswechsel oder bei einer Benachrichtigung. Es wurde keine Animation entfernt.',
+    pt: 'O Nodi mantém a pose quando não tem nada a dizer e volta a mover-se assim que tem. A sua animação nunca parava, nem com a aplicação em repouso: isso custava permanentemente meio núcleo e aquecia o equipamento. Agora assenta alguns segundos após a última atividade e acorda ao passar o rato, ao mudar de estado ou ao chegar um aviso. Nenhuma animação foi removida.',
+    'pt-BR': 'O Nodi mantém a pose quando não tem nada a dizer e volta a se mexer assim que tem. Sua animação nunca parava, nem com o aplicativo em repouso: isso custava meio núcleo permanentemente e esquentava a máquina. Agora ele descansa alguns segundos após a última atividade e acorda ao passar o mouse, ao mudar de estado ou ao chegar um aviso. Nenhuma animação foi removida.',
+  },
+  {
+    scope: 'general',
+    es: 'La caché de texto extraído de los PDF ya tiene un tope. Se escribía sin borrarse nunca y llegaba a ocupar una cuarta parte del archivo de la bóveda, que además se copia entera en cada copia de seguridad. Ahora se limita a 64 MB conservando lo más reciente; nada se pierde, porque cualquier texto descartado se vuelve a extraer del PDF cuando hace falta.',
+    en: 'The cache of text extracted from PDFs is now bounded. It was written and never pruned, growing to a quarter of the vault file — which is copied whole into every backup. It is now capped at 64 MB keeping the most recent; nothing is lost, because any discarded text is extracted from its PDF again when needed.',
+    fr: 'Le cache du texte extrait des PDF est désormais borné. Il était écrit sans jamais être purgé et atteignait un quart du fichier de la bibliothèque, lui-même copié en entier dans chaque sauvegarde. Il est maintenant limité à 64 Mo en conservant le plus récent ; rien n’est perdu, car tout texte écarté est réextrait de son PDF au besoin.',
+    de: 'Der Cache des aus PDFs extrahierten Texts ist jetzt begrenzt. Er wurde geschrieben und nie bereinigt und erreichte ein Viertel der Tresordatei, die vollständig in jede Sicherung kopiert wird. Er ist nun auf 64 MB begrenzt und behält das Neueste; nichts geht verloren, denn verworfener Text wird bei Bedarf erneut aus seinem PDF extrahiert.',
+    pt: 'A cache do texto extraído dos PDF passa a ter um limite. Era escrita sem nunca ser purgada e chegava a ocupar um quarto do ficheiro do cofre, que é copiado por inteiro em cada cópia de segurança. Agora está limitada a 64 MB mantendo o mais recente; nada se perde, porque qualquer texto descartado é extraído de novo do PDF quando for preciso.',
+    'pt-BR': 'O cache do texto extraído dos PDFs agora tem limite. Ele era gravado e nunca podado, chegando a ocupar um quarto do arquivo do cofre, que é copiado inteiro em cada backup. Agora está limitado a 64 MB mantendo o mais recente; nada se perde, porque qualquer texto descartado é extraído do PDF de novo quando necessário.',
+  },
+];
+
 // v2.6.0 shipped with only three Zotero highlights, silently dropping every other
 // change merged since 2.5.4 (Nodus Apps, Nodus Translate, local image generation,
 // professional PDF exports, the experimental Nodus Server, and the rest of the
@@ -434,6 +468,11 @@ const RELEASE_2_7_0_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
+  {
+    version: '3.0.1',
+    date: '2026-07-30',
+    highlights: RELEASE_3_0_1_HIGHLIGHTS,
+  },
   {
     version: '3.0.0',
     date: '2026-07-30',

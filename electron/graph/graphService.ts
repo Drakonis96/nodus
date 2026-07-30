@@ -19,8 +19,10 @@ import type {
   ReadingPathRequest,
   ReadingPathStrategy,
   ReadingPathEntry,
+  WorkView,
 } from '@shared/types';
 import { getEdgeDetail, getEdgeTrace, getIdeaDetail, currentEmbeddingConfig } from '../db/ideasRepo';
+import { getWorksByIds } from '../db/worksRepo';
 import { listGraphThemes, normalizeThemeLabel } from '../db/themesRepo';
 import { computeThemeMatches } from './computeHost';
 import { centroidF32, type LabeledVector } from './similarityCore';
@@ -126,17 +128,25 @@ export async function buildIdeaGraph(): Promise<GraphData> {
   // single query for ideas and another for themes, then aggregate in memory.
   // This is the main reason the graph took ages to load on large corpora.
   const ideaIds = ideas.map((i) => i.global_id);
+  // Both aggregates below restrict to the ideas selected above. Binding that set
+  // as an `IN (?,?,…)` list of one placeholder per idea is what made the graph
+  // take seconds: with ~9,700 placeholders SQLite drives the join from the id
+  // list and probes (global_id, nodus_id) once per id × per matching work, so the
+  // cost grows with ideas × works instead of with rows. Joining `ideas` instead
+  // expresses the same restriction — the id list *is* that join — and lets the
+  // planner drive from `works`. Measured on a 9,707-idea corpus: 6.9 s → 74 ms
+  // and 8.9 s → 49 ms, row-for-row identical (scripts/bench-graph-in-clause.ts).
   const ideaWorkRows = ideaIds.length
     ? (db
         .prepare(
           `SELECT io.global_id, w.nodus_id, w.year, w.authors_json, w.read_tag
              FROM idea_occurrences io
              JOIN works w ON w.nodus_id = io.nodus_id
-            WHERE io.global_id IN (${ideaIds.map(() => '?').join(',')})
-              AND w.archived = 0
+             JOIN ideas i ON i.global_id = io.global_id
+            WHERE w.archived = 0
               AND w.deep_status = 'done'`
         )
-        .all(...ideaIds) as { global_id: string; nodus_id: string; year: number | null; authors_json: string; read_tag: number }[])
+        .all() as { global_id: string; nodus_id: string; year: number | null; authors_json: string; read_tag: number }[])
     : [];
   const ideaAggById = new Map<string, { works: Set<string>; unread: boolean; years: number[]; authors: Set<string> }>();
   // maxConfidence comes from idea_occurrences.confidence; fetch in a second tiny query.
@@ -146,12 +156,12 @@ export async function buildIdeaGraph(): Promise<GraphData> {
           `SELECT io.global_id, MAX(io.confidence) AS c
              FROM idea_occurrences io
              JOIN works w ON w.nodus_id = io.nodus_id
-            WHERE io.global_id IN (${ideaIds.map(() => '?').join(',')})
-              AND w.archived = 0
+             JOIN ideas i ON i.global_id = io.global_id
+            WHERE w.archived = 0
               AND w.deep_status = 'done'
             GROUP BY io.global_id`
         )
-        .all(...ideaIds) as { global_id: string; c: number | null }[])
+        .all() as { global_id: string; c: number | null }[])
     : [];
   const ideaConfById = new Map(ideaConfRows.map((r) => [r.global_id, r.c ?? 0]));
   for (const row of ideaWorkRows) {
@@ -597,8 +607,10 @@ function normalizeText(text: string | null | undefined): string {
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
+    // No `\s+` pass after this one: `[^a-z0-9ñ]+` is greedy and whitespace is
+    // itself outside the class, so every run of it has already become exactly one
+    // space. scripts/bench-normalize-text.ts checks that on the vault's own strings.
     .replace(/[^a-z0-9ñ]+/gi, ' ')
-    .replace(/\s+/g, ' ')
     .trim();
 }
 
@@ -860,8 +872,28 @@ function clip(value: string, max: number): string {
  */
 const DEBATE_LIST_EVIDENCE_PER_WORK = 1;
 
-function buildDebateSide(ideaId: string, opts: { lean?: boolean } = {}): DebateSide | null {
-  const detail = getIdeaDetail(ideaId);
+/**
+ * Sides already built during this one `getDebates()` call.
+ *
+ * An idea can sit on either end of several contradiction edges, and each debate
+ * rebuilt its sides from scratch: measured on a real corpus, 1,147 debate edges
+ * asked for 2,294 sides drawn from only 1,310 distinct ideas, and every one of
+ * those asks costs ~6 queries through getIdeaDetail. The map is per call and
+ * never outlives it — nothing writes to the database while debates assemble, so
+ * within one call the answer for an idea cannot change.
+ */
+type DebateSideCache = Map<string, DebateSide | null>;
+
+function buildDebateSide(ideaId: string, opts: { lean?: boolean; cache?: DebateSideCache; works?: Map<string, WorkView> } = {}): DebateSide | null {
+  const cached = opts.cache?.get(ideaId);
+  if (cached !== undefined) return cached;
+  const side = assembleDebateSide(ideaId, opts);
+  opts.cache?.set(ideaId, side);
+  return side;
+}
+
+function assembleDebateSide(ideaId: string, opts: { lean?: boolean; works?: Map<string, WorkView> }): DebateSide | null {
+  const detail = getIdeaDetail(ideaId, opts.works);
   if (!detail) return null;
   const evidenceByWork = new Map<string, Evidence[]>();
   for (const ev of detail.evidence) {
@@ -919,7 +951,7 @@ function assembleDebate(
   clusterSize: number,
   supportCount: Map<string, number>,
   themesByIdea: Map<string, Set<string>>,
-  opts: { lean?: boolean } = {}
+  opts: { lean?: boolean; cache?: DebateSideCache; works?: Map<string, WorkView> } = {}
 ): Debate | null {
   const sideA = buildDebateSide(row.from_id, opts);
   const sideB = buildDebateSide(row.to_id, opts);
@@ -1017,6 +1049,21 @@ function loadThemesByIdea(db: ReturnType<typeof getDb>): Map<string, Set<string>
  * grouped into clusters (connected components over shared ideas) so multi-sided
  * debates surface together. Pure DB reads — no AI, no new persistence.
  */
+/** Every idea on either side of a contradiction, as a subquery rather than a bound id list. */
+const DEBATE_IDEA_IDS = `SELECT from_id FROM visible_edges WHERE type IN ('contradicts','refutes')
+                          UNION SELECT to_id FROM visible_edges WHERE type IN ('contradicts','refutes')`;
+
+/**
+ * Every work cited by any debate, in one batch, so getIdeaDetail does not re-run
+ * its four work queries once per idea.
+ */
+function loadDebateWorks(db: ReturnType<typeof getDb>): Map<string, WorkView> {
+  const rows = db
+    .prepare(`SELECT DISTINCT nodus_id FROM idea_occurrences WHERE global_id IN (${DEBATE_IDEA_IDS})`)
+    .all() as { nodus_id: string }[];
+  return getWorksByIds(rows.map((r) => r.nodus_id));
+}
+
 export function getDebates(): Debate[] {
   const db = getDb();
   const rows = db
@@ -1027,11 +1074,13 @@ export function getDebates(): Debate[] {
   const { clusterId, clusterSize } = clusterDebateEdges(rows);
   const supportCount = loadSupportCounts(db);
   const themesByIdea = loadThemesByIdea(db);
+  const cache: DebateSideCache = new Map();
+  const works = loadDebateWorks(db);
 
   const debates = rows
     .map((row) => {
       const root = clusterId.get(row.id)!;
-      return assembleDebate(row, root, clusterSize.get(root) ?? 1, supportCount, themesByIdea, { lean: true });
+      return assembleDebate(row, root, clusterSize.get(root) ?? 1, supportCount, themesByIdea, { lean: true, cache, works });
     })
     .filter((d): d is Debate => d !== null);
 
@@ -1048,6 +1097,9 @@ export function getDebate(edgeId: string): Debate | null {
   if (!row) return null;
   return assembleDebate(row, row.from_id, 1, loadSupportCounts(db), loadThemesByIdea(db));
 }
+
+/** How many related gaps a reading-path entry shows. */
+const RELATED_GAPS_SHOWN = 3;
 
 const DEFAULT_READING_LIMIT = 72;
 const MIN_READING_LIMIT = 18;
@@ -1280,10 +1332,18 @@ function toReadingEntry(
   };
   const diversityKey = themes[0] ?? null;
   const gapThemes = themes.filter((theme) => opts.gapSignals.themeLabels.has(normalizeThemeLabel(theme)));
-  const relatedGaps = unique([
-    ...gapStatements,
-    ...gapThemes.flatMap((theme) => opts.gapSignals.statementsByTheme.get(normalizeThemeLabel(theme)) ?? []),
-  ]).slice(0, 3);
+  // Only three of these are ever shown. Building the whole deduplicated list
+  // first meant normalising every gap statement of every theme this work touches
+  // — measured at 114 ms of the reading path's 212 ms on a corpus with 11,119
+  // gaps — and then throwing all but three away. Yielding the candidates lazily
+  // lets unique() stop at the third.
+  const relatedGaps = unique(
+    (function* gapCandidates() {
+      yield* gapStatements;
+      for (const theme of gapThemes) yield* opts.gapSignals.statementsByTheme.get(normalizeThemeLabel(theme)) ?? [];
+    })(),
+    RELATED_GAPS_SHOWN
+  );
   const gapIdeaHit = ideaIds.some((id) => opts.gapSignals.ideaIds.has(id));
   const gapScore = clamp01(
     (row.gap_count > 0 ? 0.36 : 0) +
@@ -1697,10 +1757,19 @@ function splitGapStatements(value: string | null): string[] {
   );
 }
 
-function unique(values: string[]): string[] {
+/**
+ * Distinct values in order, comparing them normalised.
+ *
+ * Takes an iterable and a limit so a caller that only wants the first few can
+ * stop the normalisation there. `unique(xs).slice(0, n)` and `unique(xs, n)`
+ * return the same thing — the function preserves input order, so the first n
+ * distinct values are the same either way — but the second stops looking.
+ */
+function unique(values: Iterable<string>, limit = Infinity): string[] {
   const out: string[] = [];
   const seen = new Set<string>();
   for (const value of values) {
+    if (out.length >= limit) break;
     const key = normalizeText(value);
     if (!key || seen.has(key)) continue;
     seen.add(key);

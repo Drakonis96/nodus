@@ -4,6 +4,42 @@ import { orbHue } from '@shared/nodiOrb';
 import { Nodi, type NodiRole, type NodiState } from './Nodi';
 import { NodiOrb } from './NodiOrb';
 
+/** How long Nodi keeps breathing after the last thing that happened to it. */
+const REST_DELAY_MS = 6_000;
+
+/** States in which Nodi has nothing to say and may hold still. */
+const QUIESCENT: ReadonlySet<NodiState> = new Set<NodiState>(['idle', 'sleeping']);
+
+/**
+ * Whether Nodi may stop animating.
+ *
+ * Nodi's ambient motion is drawn as SVG, and SVG subtrees do not get their own
+ * compositor layer: one animating property repaints the whole figure, filters
+ * (`feTurbulence`, `feGaussianBlur`) included, on every frame. Measured on an idle
+ * app that costs ~50% CPU permanently — with all the animations running or with
+ * only one, it barely differs. The only cheap number of animations is zero, so the
+ * lever that works is *when* rather than *how many*.
+ *
+ * So Nodi animates while something is happening — a real state, an unread
+ * notification, a pointer reaching for it — and holds its pose a few seconds after
+ * the last of those. `animation-play-state: paused` freezes it mid-keyframe and
+ * resumes exactly there, so nothing is lost and no animation is removed.
+ */
+function useAtRest(state: NodiState, raiseArm: boolean, hovered: boolean, reduceMotion: boolean): boolean {
+  const settled = QUIESCENT.has(state) && !raiseArm && !hovered;
+  const [atRest, setAtRest] = useState(false);
+  useEffect(() => {
+    if (!settled) {
+      setAtRest(false);
+      return;
+    }
+    // Someone who asked for less motion gets the still pose immediately.
+    const timer = window.setTimeout(() => setAtRest(true), reduceMotion ? 0 : REST_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, [settled, reduceMotion]);
+  return atRest;
+}
+
 /**
  * Nodi, in whichever shape the user chose: the classic character or the orb. Every
  * surface that draws Nodi renders THIS rather than either one directly, so the choice
@@ -53,6 +89,16 @@ export function NodiAvatar({
     return window.nodus.onVaultChanged((vault) => setVaultType(vault?.type ?? null));
   }, []);
 
+  const [hovered, setHovered] = useState(false);
+  const atRest = useAtRest(state, raiseArm, hovered, resolved?.reduceMotion ?? false);
+  // Reaching for Nodi wakes it before the pointer arrives, so it is already moving
+  // by the time it is grabbed rather than starting with a jolt.
+  const wake = {
+    onPointerEnter: () => setHovered(true),
+    onPointerLeave: () => setHovered(false),
+  };
+  const classes = [className, atRest ? 'nodi-at-rest' : ''].filter(Boolean).join(' ') || undefined;
+
   // Until the settings land we can't know which Nodi to draw. Hold the space rather
   // than guessing: drawing the classic one first would flash and swap for orb users.
   if (!resolved) return <span aria-hidden="true" style={{ display: 'block', height, width: height * 0.9 }} />;
@@ -65,10 +111,22 @@ export function NodiAvatar({
         height={height}
         draggable={draggable}
         raiseArm={raiseArm}
-        className={className}
+        className={classes}
         style={style}
+        {...wake}
       />
     );
   }
-  return <Nodi state={state} role={role} height={height} draggable={draggable} raiseArm={raiseArm} className={className} style={style} />;
+  return (
+    <Nodi
+      state={state}
+      role={role}
+      height={height}
+      draggable={draggable}
+      raiseArm={raiseArm}
+      className={classes}
+      style={style}
+      {...wake}
+    />
+  );
 }

@@ -1,4 +1,4 @@
-import { useId, useMemo, type CSSProperties } from 'react';
+import { useId, useMemo, type CSSProperties, type PointerEventHandler } from 'react';
 import { NODI_ORB_DEFAULT_COLOR, hueOfHex } from '@shared/nodiOrb';
 import type { NodiState } from './Nodi';
 import './nodiOrb.css';
@@ -155,6 +155,8 @@ export function NodiOrb({
   raiseArm = false,
   className,
   style,
+  onPointerEnter,
+  onPointerLeave,
 }: {
   state?: NodiState;
   /** Hue (0–359) every cool colour derives from. Defaults to Nodi's own blue. */
@@ -165,6 +167,8 @@ export function NodiOrb({
   raiseArm?: boolean;
   className?: string;
   style?: CSSProperties;
+  onPointerEnter?: PointerEventHandler<SVGSVGElement>;
+  onPointerLeave?: PointerEventHandler<SVGSVGElement>;
 }) {
   const starfield = useMemo(buildStarfield, []);
   const mesh = useMemo(buildMesh, []);
@@ -188,6 +192,8 @@ export function NodiOrb({
       role="img"
       aria-label="Nodi"
       data-state={state}
+      onPointerEnter={onPointerEnter}
+      onPointerLeave={onPointerLeave}
     >
       <defs>
         <filter id={u('b1')} x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="1.2" /></filter>

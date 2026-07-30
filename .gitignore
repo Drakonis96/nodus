@@ -33,6 +33,13 @@ release/
 
 # esbuild smoke-test bundles (generated at repo root)
 .smoke-*.mjs
+# Bundles the perf benches build next to the sources they import (esbuild needs the
+# output inside the repo for --packages=external to resolve).
+.bench-*.cjs
+.bench-*.cjs.map
+.bench-*.mjs
+.dump*.cjs
+.tmpbench/
 build/NodusDockTile.docktileplugin/
 
 # Local tooling / caches

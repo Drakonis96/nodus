@@ -20,6 +20,8 @@ import type {
   IdeaListItem,
   IdeaPage,
   IdeaPageRequest,
+  IdeaPickerItem,
+  WorkView,
 } from '@shared/types';
 import { DEFAULT_EMBEDDING_MODELS, normalizeEmbeddingModel } from '@shared/providers';
 import { getWorksByIds } from './worksRepo';
@@ -712,7 +714,14 @@ export function pruneDormantIdeas(maxAgeDays = 30): number {
 
 // ── Detail panels ───────────────────────────────────────────────────────────
 
-export function getIdeaDetail(globalId: string): IdeaDetail | null {
+/**
+ * @param worksCache Works already loaded by the caller. `getWorksByIds` is a batch
+ *   API, but called from here it only ever gets one idea's worth of ids at a time —
+ *   usually a single one — so a caller assembling many ideas pays its four queries
+ *   once per idea. Handing in a map built by that same function for the whole set
+ *   collapses them to four in total; the values are identical either way.
+ */
+export function getIdeaDetail(globalId: string, worksCache?: Map<string, WorkView>): IdeaDetail | null {
   const db = getDb();
   const idea = getIdeaSummary(globalId);
   if (!idea) return null;
@@ -725,15 +734,41 @@ export function getIdeaDetail(globalId: string): IdeaDetail | null {
   }[];
   // Batch-load all works for the occurrences in 2 queries instead of N+1
   // (previously each occurrence called getWork() → 2 queries each).
-  const worksById = getWorksByIds(occRows.map((o) => o.nodus_id));
+  const needed = worksCache ? occRows.map((o) => o.nodus_id).filter((id) => !worksCache.has(id)) : occRows.map((o) => o.nodus_id);
+  const fetched = needed.length ? getWorksByIds(needed) : null;
+  const worksById = (id: string) => worksCache?.get(id) ?? fetched?.get(id);
   const occurrences = occRows
     .map((o) => {
-      const work = worksById.get(o.nodus_id);
+      const work = worksById(o.nodus_id);
       return work ? { ...o, work } : null;
     })
     .filter((x): x is NonNullable<typeof x> => x !== null);
   const evidence = db.prepare('SELECT * FROM evidence WHERE global_id = ?').all(globalId) as Evidence[];
   return { idea, occurrences, evidence };
+}
+
+/**
+ * Every idea the graph would show, with only the fields a picker reads.
+ *
+ * Same population as the ideas lens — an idea counts once at least one
+ * un-archived, deep-analysed work carries it — expressed as EXISTS rather than a
+ * join plus DISTINCT, so no statement text has to be sorted to deduplicate.
+ */
+export function listPickerIdeas(): IdeaPickerItem[] {
+  return getDb()
+    .prepare(
+      `SELECT i.global_id, i.type, i.label, i.statement
+         FROM ideas i
+        WHERE EXISTS (
+          SELECT 1
+            FROM idea_occurrences io
+            JOIN works w ON w.nodus_id = io.nodus_id
+           WHERE io.global_id = i.global_id
+             AND w.archived = 0
+             AND w.deep_status = 'done'
+        )`
+    )
+    .all() as IdeaPickerItem[];
 }
 
 export function listIdeasPage(request: IdeaPageRequest): IdeaPage {
