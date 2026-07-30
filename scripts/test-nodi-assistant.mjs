@@ -3,18 +3,19 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { readSource } from './ipc-channel-census.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const read = (file) => readFile(path.join(root, file), 'utf8');
+const read = async (file) => readSource(file);
 
 test('Nodi owns an independent persisted model and chat history', async () => {
   const [types, settings, prefs, store, ipc, preload] = await Promise.all([
-    read('shared/types.ts'),
+    read('@api'),
     read('electron/db/settingsRepo.ts'),
     read('electron/db/appPrefs.ts'),
     read('electron/nodiConversations.ts'),
-    read('electron/ipc.ts'),
-    read('electron/preload.ts'),
+    read('@main'),
+    read('@bridge'),
   ]);
   assert.match(types, /nodiModel: ModelRef \| null/);
   assert.match(settings, /nodiModel: null/);
@@ -162,9 +163,9 @@ test('Nodi uses the bounded world model and opens validated worldbuilding refere
   const [backend, companion, ipc, preload, types, app] = await Promise.all([
     read('electron/ai/nodiChat.ts'),
     read('src/components/nodi/NodiCompanion.tsx'),
-    read('electron/ipc.ts'),
-    read('electron/preload.ts'),
-    read('shared/types.ts'),
+    read('@main'),
+    read('@bridge'),
+    read('@api'),
     read('src/App.tsx'),
   ]);
   assert.match(backend, /buildWorldChatFacts\(\{ question \}\)/);
@@ -210,9 +211,9 @@ test('floating Nodi dismisses every open surface on an outside click or window b
   const [component, mascot, ipc, preload, types] = await Promise.all([
     read('src/components/nodi/NodiCompanion.tsx'),
     read('electron/mascotWindow.ts'),
-    read('electron/ipc.ts'),
-    read('electron/preload.ts'),
-    read('shared/types.ts'),
+    read('@main'),
+    read('@bridge'),
+    read('@api'),
   ]);
   assert.match(component, /const hasOpenSurface = menuOpen \|\| helpOpen \|\| panel !== 'none' \|\| contextMenuOpen \|\| closing/);
   assert.match(component, /nodiSetExpanded\(true\)/, 'the transparent overlay captures outside clicks while expanded');
@@ -282,9 +283,9 @@ test('Nodi drags in absolute screen space and closes through an animated context
     read('src/components/nodi/nodi.css'),
     read('src/components/nodi/companion.css'),
     read('electron/mascotWindow.ts'),
-    read('electron/ipc.ts'),
-    read('electron/preload.ts'),
-    read('shared/types.ts'),
+    read('@main'),
+    read('@bridge'),
+    read('@api'),
     read('src/i18n.en.ts'),
     read('src/App.tsx'),
   ]);

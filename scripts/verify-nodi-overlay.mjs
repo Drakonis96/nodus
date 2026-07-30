@@ -1,5 +1,13 @@
 // Regression verification for the always-on-top Nodi overlay: the native window
-// must not clip radial buttons while they animate back to the mascot.
+// must not clip radial buttons while they animate back to the mascot, and every
+// panel it can open must work through its own narrowed preload.
+//
+// The second half matters because the overlay no longer receives the whole
+// NodusApi (see shared/api/windows.ts). `src/global.d.ts` declares window.nodus as
+// the full contract for every renderer, so the compiler cannot see a hole in a
+// per-window subset; a missing method surfaces at runtime, in a window with no
+// devtools open, as "x is not a function". This walk drives notifications, chat,
+// notes and the native drag, and fails on any TypeError the overlay logs.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { mkdir, mkdtemp, rm } from 'node:fs/promises';
@@ -46,6 +54,20 @@ try {
   }
   if (!overlay) throw new Error('overlay window never appeared');
   await overlay.waitForLoadState('domcontentloaded');
+
+  // A hole in the overlay's preload reads as a TypeError and nothing else: the
+  // panel simply stays empty. Collect them and assert at the end, so one run
+  // reports every gap instead of stopping at the first.
+  const overlayFailures = [];
+  const recordFailure = (source, text) => {
+    if (/TypeError|is not a function|is not available in the Nodi window|Cannot read propert/.test(text)) {
+      overlayFailures.push(`${source}: ${text}`);
+    }
+  };
+  overlay.on('pageerror', (error) => recordFailure('pageerror', `${error.message}`));
+  overlay.on('console', (message) => {
+    if (message.type() === 'error') recordFailure('console', message.text());
+  });
   const nativeOverlay = await app.browserWindow(overlay);
   assert.equal(
     await nativeOverlay.evaluate((win) => win.webContents.getBackgroundThrottling()),
@@ -187,6 +209,81 @@ try {
   await overlay.evaluate(async () => window.nodus.nodiEndWindowDrag());
   console.log('[verify] lower-left native bounds ->', JSON.stringify(lowerLeftSamples));
   assert.equal(new Set(lowerLeftSamples.map(({ x }) => x)).size, 1, 'the stable panel rebounds horizontally at the left edge');
+
+  // ── The overlay's own bridge: every panel, through the narrowed preload ──────
+  await moveNodi(-10_000, -10_000);
+  const openPanel = async (action) => {
+    await setMenuOpen(true);
+    await overlay.locator(`.nodi-node[data-nodi-action="${action}"]`).click();
+    await overlay.waitForTimeout(400);
+  };
+
+  // Every method the overlay is allowed to call must actually be there. This is the
+  // cheap half of the check; the walk below is the half that catches a method that
+  // exists but is wired to a channel nobody registered.
+  const exposed = await overlay.evaluate(() => {
+    const names = [
+      'listNotifications', 'markNotificationsRead', 'clearNotifications', 'onNotificationsChanged',
+      'listNodiConversations', 'saveNodiConversation', 'deleteNodiConversation', 'clearNodiConversations',
+      'listNodiNotes', 'saveNodiNote', 'deleteNodiNote',
+      'nodiChatStream', 'cancelNodiChat', 'getNodiViewContext',
+      'nodiGetOverlayPlacement', 'nodiRefreshOverlayPlacement', 'nodiSetExpanded', 'nodiSetMouseIgnore',
+      'nodiBeginWindowDrag', 'nodiDragWindow', 'nodiEndWindowDrag', 'onNodiDismiss',
+      'nodiOpenMainWindow', 'nodiOpenSettings', 'nodiOpenWorldEntry',
+      'getSettings', 'updateSettings', 'onSettingsChanged', 'getActiveVault', 'onVaultChanged',
+      'getIdeaDetail', 'getEdgeDetail', 'getGapDetail', 'getWork', 'getPassage', 'openInZotero',
+    ];
+    return names.filter((name) => typeof window.nodus?.[name] !== 'function');
+  });
+  assert.deepEqual(exposed, [], 'the overlay preload is missing methods Nodi calls');
+
+  const closePanel = async () => {
+    await overlay.locator('.nodi-panel [aria-label="Cerrar"]').last().click();
+    await overlay.locator('.nodi-panel').waitFor({ state: 'detached' });
+  };
+
+  // Notifications: listNotifications on open, markNotificationsRead behind it, and
+  // clearNotifications on the Limpiar button.
+  await openPanel('ntf');
+  assert.equal(await overlay.locator('.nodi-panel').count(), 1, 'the notifications panel did not open');
+  console.log('[verify] notifications panel ->', JSON.stringify(await overlay.locator('.nodi-panel-body').innerText()));
+  await overlay.locator('.nodi-panel-head button', { hasText: 'Limpiar' }).click();
+  await overlay.locator('.nodi-empty').waitFor();
+  console.log('[verify] clearNotifications -> empty');
+  await closePanel();
+
+  // Chat: opening it reads the conversations, the view context and the settings. The
+  // message is never sent — no provider is configured in a clean profile — but the
+  // composer becoming enabled proves the panel finished loading.
+  await openPanel('chat');
+  await overlay.locator('.nodi-panel textarea').first().fill('Hola Nodi');
+  await overlay.waitForFunction(() => {
+    const send = document.querySelector('.nodi-chat-send');
+    return !!send && !send.hasAttribute('disabled');
+  });
+  console.log('[verify] chat panel composer ready');
+  await closePanel();
+
+  // Notes: a full round-trip through the bridge — list, save, list again, delete.
+  await openPanel('notes');
+  await overlay.locator('.nodi-notes-panel [aria-label="Nueva nota"]').click();
+  await overlay.locator('.nodi-note-title-input').fill('Nota de verificación');
+  await overlay.locator('.nodi-note-textarea').fill('Escrita por verify-nodi-overlay.');
+  await overlay.locator('.nodi-notes-panel [aria-label="Volver"]').click();
+  await overlay.locator('.nodi-note-row').first().waitFor();
+  const savedTitles = await overlay.locator('.nodi-note-title').allInnerTexts();
+  console.log('[verify] notes after save ->', JSON.stringify(savedTitles));
+  assert.ok(savedTitles.includes('Nota de verificación'), 'saveNodiNote did not reach the main process');
+  const persisted = await overlay.evaluate(async () => (await window.nodus.listNodiNotes()).map((note) => note.title));
+  assert.ok(persisted.includes('Nota de verificación'), 'the saved note is not in listNodiNotes');
+  await overlay.evaluate(async () => {
+    for (const note of await window.nodus.listNodiNotes()) await window.nodus.deleteNodiNote(note.id);
+  });
+  await overlay.screenshot({ path: `${shots}/overlay-4-panels.png` });
+  await closePanel();
+
+  assert.deepEqual(overlayFailures, [], 'the overlay hit a missing bridge method');
+  console.log('[verify] overlay bridge walk clean');
   console.log('[verify] shots in', shots);
 } finally {
   await app.close().catch(() => {});

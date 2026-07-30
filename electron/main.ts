@@ -19,7 +19,7 @@ import { startNodusServerSync, stopNodusServerSync } from './serverSync/serverSy
 import { killMcpTunnelSync, startMcpServer, startMcpTunnelIfConfigured, stopMcpServer } from './mcp';
 import { setCopilotWindowProvider, startCopilotServer, stopCopilotServer } from './copilot/server';
 import { setZoteroPluginWindowProvider, startZoteroPluginServer, stopZoteroPluginServer } from './zotero-plugin/server';
-import { applyMascotWindow, destroyMascotWindow } from './mascotWindow';
+import { applyMascotWindow, destroyMascotWindow, setMascotTutorialVisible } from './mascotWindow';
 import { seedWelcomeNotification } from './notifications';
 import { startStudyCalendarReminders, stopStudyCalendarReminders } from './studyCalendarReminders';
 import { restorePersistedDockIcon } from './dockIcon';
@@ -230,10 +230,22 @@ function createWindow(): void {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
+      // The preload imports `electron` and nothing else — no Node builtins — which
+      // is exactly the constraint a sandboxed renderer places on it. webUtils is
+      // designed for this case and keeps drag-and-drop file paths working.
+      sandbox: true,
     },
   });
   protectMainWindowNavigation(mainWindow);
+
+  // `nodi:tutorialVisible` is set by a React effect in BasicsTutorial and cleared by
+  // that effect's cleanup — which a full page reload never runs. The main process
+  // was then left believing a tutorial was still on screen and refused to bring the
+  // overlay back for the rest of the session. A navigation is a fresh renderer, so
+  // nothing is on screen yet; whatever mounts will say so again.
+  mainWindow.webContents.on('did-start-navigation', (_event, _url, _isInPlace, isMainFrame) => {
+    if (isMainFrame) setMascotTutorialVisible(false);
+  });
 
   if (VITE_DEV_SERVER_URL) {
     void mainWindow.loadURL(VITE_DEV_SERVER_URL);
