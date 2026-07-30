@@ -6,6 +6,7 @@ import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { assertApiMethods, assertChannelsWired } from './ipc-channel-census.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
@@ -108,21 +109,17 @@ try {
   assert.equal(workspace.study.currentQuestionnaireVersionId, q1.questionnaireVersionId);
   assert.equal(workspace.vocabularies[0].terms.length, 1);
 
-  const [ipc, preload, api, view] = await Promise.all([
-    readFile(path.join(repoRoot, 'electron/ipc.ts'), 'utf8'),
-    readFile(path.join(repoRoot, 'electron/preload.ts'), 'utf8'),
-    readFile(path.join(repoRoot, 'shared/types.ts'), 'utf8'),
-    readFile(path.join(repoRoot, 'src/views/ProsopPopulationView.tsx'), 'utf8'),
-  ]);
-  for (const channel of [
+  const view = await readFile(path.join(repoRoot, 'src/views/ProsopPopulationView.tsx'), 'utf8');
+  // Asks whether the channel is wired, not which file it lives in: the handlers
+  // moved to electron/ipc/prosopography.ts and the bindings to
+  // electron/preload/prosopography.ts, and this assertion should survive the next
+  // move too.
+  assertChannelsWired(assert, [
     'prosop:population:workspace', 'prosop:study:update', 'prosop:methodology:publish',
     'prosop:questionnaire:saveVariable', 'prosop:questionnaire:publish',
     'prosop:vocabulary:saveTerm',
-  ]) {
-    assert.match(ipc, new RegExp(channel.replaceAll(':', '\\:')));
-    assert.match(preload, new RegExp(channel.replaceAll(':', '\\:')));
-  }
-  assert.match(api, /getProsopPopulationWorkspace/);
+  ]);
+  assertApiMethods(assert, ['getProsopPopulationWorkspace']);
   assert.match(view, /data-testid="prosop-population-view"/);
   assert.match(view, /Publicar versión/);
   assert.match(view, /dark:/);

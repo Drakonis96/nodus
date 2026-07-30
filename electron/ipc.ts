@@ -294,59 +294,6 @@ import type { ArchiveReviewStatus, ArchiveTextStatus } from '@shared/archiveType
 // alias for a runtime value import.
 const MANUAL_IDEA_MARKER = 'manual-idea';
 import { getSettings, updateSettings } from './db/settingsRepo';
-import { getProsopPopulationWorkspace } from './db/prosopPopulationRepo';
-import {
-  createProsopMethodologyDraft,
-  publishProsopMethodology,
-  replaceProsopCriteria,
-  updateProsopStudy,
-} from './db/prosopStudyRepo';
-import {
-  createProsopQuestionnaireDraft,
-  deleteProsopVariableRevision,
-  publishProsopQuestionnaire,
-  saveProsopVariableRevision,
-  saveProsopVocabulary,
-  saveProsopVocabularyTerm,
-} from './db/prosopQuestionnaireRepo';
-import { deleteProsopSource, saveProsopSource, saveProsopSourceSegment } from './db/prosopSourcesRepo';
-import {
-  getProsopSourcesWorkspace,
-  importProsopDelimited,
-  reviewProsopCaptureRow,
-  saveProsopCaptureTemplate,
-} from './db/prosopCaptureRepo';
-import {
-  getProsopObservationsWorkspace,
-  retireProsopResolution,
-  reviewProsopFactoid,
-  saveProsopFactoid,
-  saveProsopMissingValue,
-  saveProsopResolution,
-} from './db/prosopFactoidsRepo';
-import {
-  createProsopPerson,
-  decideProsopIdentityHypothesis,
-  getProsopIdentityWorkspace,
-  mergeProsopPersons,
-  reverseProsopPersonMerge,
-  saveProsopAuthorityId,
-  saveProsopIdentityHypothesis,
-  saveProsopNameAttestation,
-  saveProsopOrganization,
-  searchProsopIdentityCandidates,
-} from './db/prosopIdentityRepo';
-import {
-  getProsopMembershipWorkspace,
-  refreshProsopDynamicCohort,
-  saveProsopCohort,
-  saveProsopMembership,
-} from './db/prosopMembershipRepo';
-import { getProsopAnalysisWorkspace, runProsopAnalysis } from './db/prosopAnalysisRepo';
-import { deriveProsopCooccurrenceLayer, getProsopNetworksWorkspace, saveProsopNetworkEdge, saveProsopNetworkLayer } from './db/prosopNetworksRepo';
-import { createProsopProposal, decideProsopProposal, listProsopProposals, saveProsopNoteLink, searchProsopography } from './db/prosopSearchRepo';
-import { auditProsopIntegrity, exportProsopIpif, exportProsopLongRows } from './db/prosopInterchangeRepo';
-import { seedProsopDemo } from './db/prosopDemoRepo';
 import { runToolkitJob, type ToolkitSignal } from './toolkit/toolkitJobs';
 import { TOOLKIT_REGISTRY } from './toolkit/convert';
 import {
@@ -400,7 +347,8 @@ import type { PresenterAction } from '@shared/presenterState';
 import type { ProtectArtifact, ProtectListSourcesRequest, ProtectSourceRef } from '@shared/protectTypes';
 import { PROTECT_INPUT_EXTENSIONS } from '@shared/protectTypes';
 import * as protect from './protect/protectService';
-import { localizeIpcPayload, localizeRuntimeError } from '@shared/uiLanguage';
+import { createIpcContext } from './ipc/context';
+import { registerProsopographyIpc } from './ipc/prosopography';
 import { toolkitDialogText, type ToolkitDialogKey } from './toolkit/dialogI18n';
 import {
   connectMcpTunnel,
@@ -1309,17 +1257,13 @@ export function registerIpc(
   checkForUpdates: () => Promise<UpdateCheckResponse>,
   installUpdate: () => Promise<UpdateCheckResponse>
 ): void {
-  const h: typeof ipcMain.handle = (channel, listener) => ipcMain.handle(channel, async (event, ...args) => {
-    try {
-      const result = await listener(event, ...args);
-      return localizeIpcPayload(result, getSettings().uiLanguage);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      const localized = localizeRuntimeError(message, getSettings().uiLanguage);
-      if (localized === message) throw error;
-      throw new Error(localized);
-    }
-  });
+  const context = createIpcContext(getWindow);
+  const { h } = context;
+
+  // Domains extracted from this file, each owning its own channels and repo
+  // imports. What remains below is everything not yet split out.
+  registerProsopographyIpc(context);
+
   const toolkitCopy = (key: ToolkitDialogKey): string => toolkitDialogText(key, getSettings().uiLanguage);
 
   // In-flight research-chat streams, keyed by requestId, so the renderer's Stop
@@ -1329,60 +1273,6 @@ export function registerIpc(
   const studyImproveAborters = new Map<string, AbortController>();
   const studyAssistantAborters = new Map<string, AbortController>();
 
-  // ── Prosopography: methodology and questionnaire ──────────────────────────
-  h('prosop:population:workspace', async () => getProsopPopulationWorkspace());
-  h('prosop:study:update', async (_e, patch) => updateProsopStudy(patch));
-  h('prosop:methodology:createDraft', async (_e, actor) => createProsopMethodologyDraft(actor));
-  h('prosop:methodology:replaceCriteria', async (_e, versionId, criteria) => replaceProsopCriteria(versionId, criteria));
-  h('prosop:methodology:publish', async (_e, versionId, changeSummary, actor) => publishProsopMethodology(versionId, changeSummary, actor));
-  h('prosop:questionnaire:createDraft', async (_e, input) => createProsopQuestionnaireDraft(input));
-  h('prosop:questionnaire:saveVariable', async (_e, questionnaireVersionId, input) => saveProsopVariableRevision(questionnaireVersionId, input));
-  h('prosop:questionnaire:deleteVariable', async (_e, questionnaireVersionId, variableId) => deleteProsopVariableRevision(questionnaireVersionId, variableId));
-  h('prosop:questionnaire:publish', async (_e, questionnaireVersionId, changeSummary, actor) => publishProsopQuestionnaire(questionnaireVersionId, changeSummary, actor));
-  h('prosop:vocabulary:save', async (_e, input) => saveProsopVocabulary(input));
-  h('prosop:vocabulary:saveTerm', async (_e, input) => saveProsopVocabularyTerm(input));
-  h('prosop:sources:workspace', async () => getProsopSourcesWorkspace());
-  h('prosop:sources:save', async (_e, input) => saveProsopSource(input));
-  h('prosop:sources:delete', async (_e, sourceId) => deleteProsopSource(sourceId));
-  h('prosop:sources:saveSegment', async (_e, input) => saveProsopSourceSegment(input));
-  h('prosop:capture:saveTemplate', async (_e, input) => saveProsopCaptureTemplate(input));
-  h('prosop:capture:importDelimited', async (_e, input) => importProsopDelimited(input));
-  h('prosop:capture:reviewRow', async (_e, captureRowId, status) => reviewProsopCaptureRow(captureRowId, status));
-  h('prosop:observations:workspace', async () => getProsopObservationsWorkspace());
-  h('prosop:factoids:save', async (_e, input) => saveProsopFactoid(input));
-  h('prosop:factoids:review', async (_e, factoidId, status, reviewedBy) => reviewProsopFactoid(factoidId, status, reviewedBy));
-  h('prosop:missing:save', async (_e, input) => saveProsopMissingValue(input));
-  h('prosop:resolutions:save', async (_e, input) => saveProsopResolution(input));
-  h('prosop:resolutions:retire', async (_e, resolutionId) => retireProsopResolution(resolutionId));
-  h('prosop:identity:workspace', async () => getProsopIdentityWorkspace());
-  h('prosop:identity:createPerson', async (_e, input) => createProsopPerson(input));
-  h('prosop:identity:saveAttestation', async (_e, input) => saveProsopNameAttestation(input));
-  h('prosop:identity:candidates', async (_e, literalName, limit) => searchProsopIdentityCandidates(literalName, limit));
-  h('prosop:identity:saveHypothesis', async (_e, input) => saveProsopIdentityHypothesis(input));
-  h('prosop:identity:decideHypothesis', async (_e, hypothesisId, status, reviewedBy) => decideProsopIdentityHypothesis(hypothesisId, status, reviewedBy));
-  h('prosop:identity:merge', async (_e, survivorId, absorbedId, rationale, actor) => mergeProsopPersons(survivorId, absorbedId, rationale, actor));
-  h('prosop:identity:reverseMerge', async (_e, mergeId, actor) => reverseProsopPersonMerge(mergeId, actor));
-  h('prosop:identity:saveAuthority', async (_e, input) => saveProsopAuthorityId(input));
-  h('prosop:identity:saveOrganization', async (_e, input) => saveProsopOrganization(input));
-  h('prosop:membership:workspace', async () => getProsopMembershipWorkspace());
-  h('prosop:membership:save', async (_e, input) => saveProsopMembership(input));
-  h('prosop:cohorts:save', async (_e, input) => saveProsopCohort(input));
-  h('prosop:cohorts:refresh', async (_e, cohortId) => refreshProsopDynamicCohort(cohortId));
-  h('prosop:analysis:workspace', async () => getProsopAnalysisWorkspace());
-  h('prosop:analysis:run', async (_e, input) => runProsopAnalysis(input));
-  h('prosop:networks:workspace', async () => getProsopNetworksWorkspace());
-  h('prosop:networks:saveLayer', async (_e, input) => saveProsopNetworkLayer(input));
-  h('prosop:networks:saveEdge', async (_e, input) => saveProsopNetworkEdge(input));
-  h('prosop:networks:deriveCooccurrence', async (_e, layerId) => deriveProsopCooccurrenceLayer(layerId));
-  h('prosop:search', async (_e, query, kind) => searchProsopography(query, kind));
-  h('prosop:proposals:list', async () => listProsopProposals());
-  h('prosop:proposals:create', async (_e, input) => createProsopProposal(input));
-  h('prosop:proposals:decide', async (_e, proposalId, status, reviewedBy, decisionNote) => decideProsopProposal(proposalId, status, reviewedBy, decisionNote));
-  h('prosop:notes:link', async (_e, input) => saveProsopNoteLink(input));
-  h('prosop:export:long', async () => exportProsopLongRows());
-  h('prosop:export:ipif', async () => exportProsopIpif());
-  h('prosop:integrity:audit', async () => auditProsopIntegrity());
-  h('prosop:demo:seed', async () => seedProsopDemo());
 
   const queueImportedStudyKnowledge = async (
     results: Awaited<ReturnType<typeof importStudyMaterialPaths>>,
@@ -1591,19 +1481,6 @@ export function registerIpc(
     win?.setIgnoreMouseEvents(Boolean(ignore), { forward: true });
   });
   h('nodi:overlayPlacement:get', async () => getMascotWindowPlacement());
-  // Retained for compatibility with older preload bundles.
-  ipcMain.on('nodi:setMouseIgnoreSync', (e, ignore: boolean) => {
-    const win = BrowserWindow.fromWebContents(e.sender);
-    win?.setIgnoreMouseEvents(Boolean(ignore), { forward: true });
-    e.returnValue = true;
-  });
-  ipcMain.on('nodi:getOverlayPlacementSync', (e) => {
-    e.returnValue = getMascotWindowPlacement();
-  });
-  h('nodi:setMouseIgnore', async (e, ignore: boolean) => {
-    const win = BrowserWindow.fromWebContents(e.sender);
-    win?.setIgnoreMouseEvents(Boolean(ignore), { forward: true });
-  });
   h('nodi:setExpanded', async (e, expanded: boolean) => {
     const win = BrowserWindow.fromWebContents(e.sender);
     if (!win) return { x: 16, y: 16, horizontal: 'left', vertical: 'up' };
