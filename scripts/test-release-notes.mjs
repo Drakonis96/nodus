@@ -25,10 +25,15 @@ try {
 
   const { RELEASE_NOTES, releaseNotesForMajor } = await import(pathToFileURL(bundlePath).href);
   const currentRelease = RELEASE_NOTES[0];
-  assert.equal(currentRelease?.version, '2.8.0');
-  assert.equal(currentRelease?.date, '2026-07-29');
-  assert.equal(currentRelease?.highlights.length, 7);
-  assert.ok(currentRelease?.highlights.every((highlight) => highlight.it.length > 0));
+  assert.equal(currentRelease?.version, '3.0.0');
+  assert.equal(currentRelease?.date, '2026-07-30');
+  assert.equal(currentRelease?.highlights.length, 29);
+  // 2.8.0 was authored and never published; its highlights live inside 3.0.0 now, so
+  // no entry may claim that version or the picker would offer a release nobody ran.
+  assert.ok(!RELEASE_NOTES.some((note) => note.version === '2.8.0'));
+  // it/tr fall back to en when their index-matched array is short, which would pass a
+  // mere length check while silently shipping English to two locales.
+  assert.ok(currentRelease?.highlights.every((h) => h.it !== h.en && h.tr !== h.en));
   const whatsNew = fs.readFileSync(path.join(root, 'src/components/WhatsNewModal.tsx'), 'utf8');
   assert.match(whatsNew, /function ZoteroReleaseIcon/);
   assert.match(whatsNew, /M16 18H48L16 46H48/);
@@ -47,6 +52,7 @@ try {
     'estudio',
     'primary_sources',
     'genealogy',
+    'prosopography',
     'databases',
     'testimonios',
     'worldbuilding',
