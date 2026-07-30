@@ -19,6 +19,7 @@ import { PRIMARY_SOURCES_RESEARCH_TRANSLATIONS } from './i18n.primarySourcesRese
 import { PRIMARY_SOURCES_RELEASE_TRANSLATIONS } from './i18n.primarySourcesRelease';
 import { TESTIMONY_TRANSLATIONS } from './i18n.testimonies';
 import { NEW_VAULT_COMPLETION_TRANSLATIONS } from './i18n.newVaultCompletion';
+import { NODI_NOTIFICATION_TRANSLATIONS } from './i18n.nodiNotifications';
 
 /** Complete static Italian interface table; coverage prohibits runtime fallbacks. */
 export const IT: Record<string, string> = {
@@ -37,6 +38,7 @@ export const IT: Record<string, string> = {
   ...WORLDBUILDING_TRANSLATIONS.it,
   ...TESTIMONY_TRANSLATIONS.it,
   ...NEW_VAULT_COMPLETION_TRANSLATIONS.it,
+  ...NODI_NOTIFICATION_TRANSLATIONS['it'],
   ...WORLD_CHAT_TRANSLATIONS.it,
   "Lo que cuenta el mapa": "Cosa racconta la mappa",
   "Ver dónde ocurren las escenas ({n})": "Vedi dove accadono le scene ({n})",

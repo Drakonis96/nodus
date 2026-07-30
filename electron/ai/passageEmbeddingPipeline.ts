@@ -7,7 +7,7 @@ import { planRetrievalChunks, resolveWorkText } from '../extraction/textExtracto
 import { getItem, LOCAL_USER_ID } from '../zotero/zoteroClient';
 import { embedMany } from './aiClient';
 import { addNotification } from '../notifications';
-import { uiText } from '@shared/uiLanguage';
+import { nodiText } from '@shared/nodiNotifications';
 
 type ProgressListener = (progress: PassageEmbeddingProgress) => void;
 
@@ -204,12 +204,13 @@ export async function startPassageEmbedding(nodusIds?: string[]): Promise<void> 
     state.running = false;
     emit();
     if (!state.stopRequested && state.totalPassages > 0) {
-      const language = getSettings().uiLanguage;
       addNotification({
-        title: state.error
-          ? uiText(language, { es: 'La indexación de textos necesita atención', en: 'Text indexing needs attention', fr: 'L’indexation des textes nécessite votre attention', de: 'Die Textindexierung erfordert Aufmerksamkeit', pt: 'A indexação de textos requer atenção', 'pt-BR': 'A indexação de textos requer atenção', it: 'L’indicizzazione dei testi richiede attenzione', tr: 'Metin indeksleme ilgilenmenizi gerektiriyor' })
-          : uiText(language, { es: 'Índice de textos completado', en: 'Text index completed', fr: 'Index des textes terminé', de: 'Textindex abgeschlossen', pt: 'Índice de textos concluído', 'pt-BR': 'Índice de textos concluído', it: 'Indice dei testi completato', tr: 'Metin indeksi tamamlandı' }),
-        body: state.error ? state.error : uiText(language, { es: `${state.passagesEmbedded} fragmentos indexados en ${state.works.length} obra(s).`, en: `${state.passagesEmbedded} passages indexed across ${state.works.length} work(s).`, fr: `${state.passagesEmbedded} passages indexés dans ${state.works.length} œuvre(s).`, de: `${state.passagesEmbedded} Passagen in ${state.works.length} Werk(en) indexiert.`, pt: `${state.passagesEmbedded} passagens indexadas em ${state.works.length} obra(s).`, 'pt-BR': `${state.passagesEmbedded} trechos indexados em ${state.works.length} obra(s).`, it: `${state.passagesEmbedded} passaggi indicizzati in ${state.works.length} opere.`, tr: `${state.passagesEmbedded} parça ${state.works.length} eserde indekslendi.` }),
+        title: nodiText(state.error ? 'passageEmbeddingsFailedTitle' : 'passageEmbeddingsDoneTitle'),
+        // The failure body is the provider's own message: runtime prose with no key,
+        // translated as best the renderer can at render time.
+        body: state.error
+          ? state.error
+          : nodiText('passageEmbeddingsDoneBody', { passages: state.passagesEmbedded, works: state.works.length }),
         kind: state.error ? 'warning' : 'success',
         dedupeKey: `passage-embeddings:${state.error ? 'error' : 'complete'}`,
       });

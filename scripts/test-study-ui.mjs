@@ -398,8 +398,8 @@ test('study timetable exposes editable weekdays, periods and subject styling', a
 });
 
 test('student calendar exposes month, week and year views with durable event actions', async () => {
-  const [view, layout, navigation, app, sidebar, types, preload, ipc, reminders] = await Promise.all([
-    read('src/views/StudyCalendarView.tsx'), read('src/views/studyCalendarLayout.ts'), read('src/navigation.ts'), read('@shell'), read('src/components/StudySidebar.tsx'), read('@api'), read('@bridge'), read('@main'), read('electron/studyCalendarReminders.ts'),
+  const [view, layout, navigation, app, sidebar, types, preload, ipc, reminders, notificationCatalogue] = await Promise.all([
+    read('src/views/StudyCalendarView.tsx'), read('src/views/studyCalendarLayout.ts'), read('src/navigation.ts'), read('@shell'), read('src/components/StudySidebar.tsx'), read('@api'), read('@bridge'), read('@main'), read('electron/studyCalendarReminders.ts'), read('shared/nodiNotifications.ts'),
   ]);
   for (const marker of ['study-calendar-view', 'study-calendar-month-grid', 'study-calendar-week-grid', 'study-calendar-year-grid', 'study-calendar-editor', 'study-calendar-reminder']) assert.match(view, new RegExp(marker));
   for (const marker of ['study-calendar-event-bar', 'study-calendar-month-event-layer', 'study-calendar-week-event-layer']) assert.match(view, new RegExp(marker));
@@ -421,7 +421,12 @@ test('student calendar exposes month, week and year views with durable event act
   assert.match(navigation, /studyCalendar/); assert.match(app, /<StudyCalendarView/); assert.match(sidebar, /studyCalendar/);
   assert.match(types, /updateStudyCalendarEvent/); assert.match(types, /deleteStudyCalendarEvent/);
   assert.match(preload, /study:planner:event:external/); assert.match(ipc, /calendar\.google\.com/); assert.match(ipc, /params\.append\('sprop', 'name:Nodus'\)/);
-  assert.match(reminders, /reminder_at <= \?/); assert.match(reminders, /Aviso mostrado con retraso/); assert.match(reminders, /notified_at/);
+  assert.match(reminders, /reminder_at <= \?/); assert.match(reminders, /notified_at/);
+  // The reminder is stored as a key plus the event's own timestamp, so it reads in the
+  // reader's language and date format rather than in the emitting vault's.
+  assert.match(reminders, /nodiText\(delayed \? 'studyCalendarLateBody' : 'studyCalendarBody'/);
+  assert.match(reminders, /datetime: new Date\(String\(row\.starts_at\)\)\.toISOString\(\)/);
+  assert.match(notificationCatalogue, /Aviso mostrado con retraso/);
 });
 
 test('study editor keeps Crepe controls contained and uses a compact icon toolbar', async () => {

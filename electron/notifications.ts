@@ -1,13 +1,17 @@
 import { app } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { AppLanguage, NodiNotification } from '@shared/types';
-import { uiText } from '@shared/uiLanguage';
+import type { NodiNotification } from '@shared/types';
+import { nodiText, nodiTextSignature, type NodiNotificationText } from '@shared/nodiNotifications';
 
 // Lightweight, app-wide notification centre for the Nodi companion. Stored as a
 // single JSON file in userData (no schema migration) and capped so it can't grow
 // unbounded. Any part of the app can push a notification via addNotification();
 // the renderer is told to refresh through the notifier callback below.
+//
+// Notifications are stored as translation keys, never as prose. This file is global
+// while the UI language is a per-vault setting, so prose written here would be stuck
+// in the language of whatever vault raised it — see shared/nodiNotifications.
 
 const MAX = 50;
 const DEFAULT_COOLDOWN_MS = 30_000;
@@ -46,22 +50,34 @@ export function unreadNotificationCount(): number {
   return read().reduce((n, x) => n + (x.read ? 0 : 1), 0);
 }
 
+/** Identify a line for deduplication whether it is a key or raw provider prose. */
+function signature(line: NodiNotificationText | string | undefined): string {
+  if (!line) return '';
+  return typeof line === 'string' ? line : nodiTextSignature(line);
+}
+
 export function addNotification(input: {
-  title: string;
-  body?: string;
+  /** A catalogue entry. Plain strings are accepted only for prose with no key —
+   *  in practice a provider error, which cannot be translated in advance. */
+  title: NodiNotificationText | string;
+  body?: NodiNotificationText | string;
   kind?: NodiNotification['kind'];
   dedupeKey?: string;
   cooldownMs?: number;
 }): NodiNotification | null {
-  const dedupeKey = input.dedupeKey ?? `${input.title}\0${input.body ?? ''}`;
+  const dedupeKey = input.dedupeKey ?? `${signature(input.title)}\0${signature(input.body)}`;
   const cooldownMs = Math.max(0, input.cooldownMs ?? DEFAULT_COOLDOWN_MS);
   const timestamp = Date.now();
   if (timestamp - (lastEmitted.get(dedupeKey) ?? 0) < cooldownMs) return null;
   lastEmitted.set(dedupeKey, timestamp);
   const item: NodiNotification = {
     id: `ntf-${timestamp}-${Math.random().toString(36).slice(2, 8)}`,
-    title: input.title,
-    body: input.body ?? '',
+    ...(typeof input.title === 'string' ? { title: input.title } : { titleText: input.title }),
+    ...(input.body === undefined
+      ? {}
+      : typeof input.body === 'string'
+        ? { body: input.body }
+        : { bodyText: input.body }),
     kind: input.kind ?? 'info',
     createdAt: timestamp,
     read: false,
@@ -89,7 +105,7 @@ export function clearNotifications(): void {
 
 /** Seed a one-time welcome notification so the centre isn't empty on first run.
  *  Idempotent: keyed on a marker file next to the store. */
-export function seedWelcomeNotification(language: AppLanguage): void {
+export function seedWelcomeNotification(): void {
   const marker = path.join(app.getPath('userData'), 'nodi-welcome.seed');
   try {
     if (fs.existsSync(marker)) return;
@@ -98,20 +114,8 @@ export function seedWelcomeNotification(language: AppLanguage): void {
     return;
   }
   addNotification({
-    title: uiText(language, {
-      es: '¡Hola! Soy Nodi', en: 'Hi! I’m Nodi', fr: 'Bonjour ! Je suis Nodi', de: 'Hallo! Ich bin Nodi',
-      pt: 'Olá! Sou o Nodi', 'pt-BR': 'Olá! Eu sou o Nodi', it: 'Ciao! Sono Nodi', tr: 'Merhaba! Ben Nodi',
-    }),
-    body: uiText(language, {
-      es: 'Tu nodo acompañante. Haz clic en mí para abrir el chat, tus notificaciones y la ayuda.',
-      en: 'Your companion node. Click me to open chat, notifications and help.',
-      fr: 'Votre nœud compagnon. Cliquez sur moi pour ouvrir le chat, les notifications et l’aide.',
-      de: 'Dein Begleitknoten. Klicke auf mich, um Chat, Benachrichtigungen und Hilfe zu öffnen.',
-      pt: 'O teu nodo companheiro. Clica em mim para abrir o chat, as notificações e a ajuda.',
-      'pt-BR': 'Seu nodo companheiro. Clique em mim para abrir o chat, as notificações e a ajuda.',
-      it: 'Il tuo nodo compagno. Fai clic su di me per aprire la chat, le notifiche e la guida.',
-      tr: 'Size eşlik eden düğümüm. Sohbeti, bildirimleri ve yardımı açmak için bana tıklayın.',
-    }),
+    title: nodiText('welcomeTitle'),
+    body: nodiText('welcomeBody'),
     kind: 'success',
   });
 }

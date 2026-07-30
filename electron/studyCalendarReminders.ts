@@ -1,5 +1,6 @@
 import { getDb } from './db/database';
 import { addNotification } from './notifications';
+import { nodiText } from '@shared/nodiNotifications';
 
 type Row = Record<string, unknown>;
 
@@ -19,10 +20,15 @@ export function deliverDueStudyCalendarReminders(at = new Date()): number {
   for (const row of rows) {
     const reminderAt = new Date(String(row.reminder_at));
     const delayed = at.getTime() - reminderAt.getTime() > 60_000;
-    const start = new Date(String(row.starts_at)).toLocaleString('es-ES', { dateStyle: 'medium', timeStyle: 'short' });
+    // The event's own start time travels as a timestamp, not as a formatted date: the
+    // renderer knows the reader's locale, this process only knows the vault's.
+    const when = { datetime: new Date(String(row.starts_at)).toISOString() };
+    const detail = row.description ? String(row.description) : '';
     const notification = addNotification({
-      title: `📅 ${String(row.title)}`,
-      body: `${delayed ? 'Aviso mostrado con retraso. ' : ''}${start}${row.description ? ` · ${String(row.description)}` : ''}`,
+      title: nodiText('studyCalendarTitle', { title: String(row.title) }),
+      body: detail
+        ? nodiText(delayed ? 'studyCalendarLateBodyWithDetail' : 'studyCalendarBodyWithDetail', { when, detail })
+        : nodiText(delayed ? 'studyCalendarLateBody' : 'studyCalendarBody', { when }),
       kind: delayed ? 'warning' : 'info',
       dedupeKey: `study-calendar:${String(row.id)}:${String(row.reminder_at)}`,
       cooldownMs: 0,

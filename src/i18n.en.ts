@@ -19,6 +19,7 @@ import { PRIMARY_SOURCES_RESEARCH_TRANSLATIONS } from './i18n.primarySourcesRese
 import { PRIMARY_SOURCES_RELEASE_TRANSLATIONS } from './i18n.primarySourcesRelease';
 import { TESTIMONY_TRANSLATIONS } from './i18n.testimonies';
 import { NEW_VAULT_COMPLETION_TRANSLATIONS } from './i18n.newVaultCompletion';
+import { NODI_NOTIFICATION_TRANSLATIONS } from './i18n.nodiNotifications';
 
 /**
  * English translations keyed by the Spanish source string (see {@link ../i18n}).
@@ -41,6 +42,7 @@ export const EN: Record<string, string> = {
   ...WORLDBUILDING_TRANSLATIONS.en,
   ...TESTIMONY_TRANSLATIONS.en,
   ...NEW_VAULT_COMPLETION_TRANSLATIONS.en,
+  ...NODI_NOTIFICATION_TRANSLATIONS['en'],
   ...WORLD_CHAT_TRANSLATIONS.en,
   "Lo que cuenta el mapa": "What the map tells you",
   "Ver dónde ocurren las escenas ({n})": "See where the scenes happen ({n})",
