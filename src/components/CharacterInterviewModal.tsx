@@ -8,6 +8,7 @@ import type {
 import { Icon, AiBadge } from './ui';
 import { ConfirmModal } from './ConfirmModal';
 import { ImageLightbox } from './ImageLightbox';
+import { PersonPortrait } from './PersonPortrait';
 import { characterChatImageUrl, characterChatThumbnailUrl } from '../lib/imageUrl';
 import { t, tx } from '../i18n';
 
@@ -288,8 +289,8 @@ export function CharacterInterviewModal({
                 onClick={() => void toggleImages()}
               >
                 <span
-                  className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${
-                    imageEnabled ? 'translate-x-4' : 'translate-x-0.5'
+                  className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${
+                    imageEnabled ? 'translate-x-4' : 'translate-x-0'
                   }`}
                 />
               </button>
@@ -339,13 +340,22 @@ export function CharacterInterviewModal({
             {messages.map((message) => (
               <div
                 key={message.id}
-                className={message.role === 'author' ? 'flex justify-end' : 'flex justify-start'}
+                className={message.role === 'author' ? 'flex justify-end' : 'flex items-end gap-2.5'}
               >
+                {message.role === 'character' && (
+                  <div
+                    className="mb-0.5 shrink-0 rounded-full ring-2 ring-white shadow-sm dark:ring-neutral-900"
+                    data-testid="character-chat-character-avatar"
+                    title={character.displayName}
+                  >
+                    <PersonPortrait person={character} size={34} />
+                  </div>
+                )}
                 <div
-                  className={`max-w-[88%] overflow-hidden rounded-xl text-sm leading-6 ${
+                  className={`overflow-hidden text-sm leading-6 ${
                     message.role === 'author'
-                      ? 'bg-indigo-600 px-3 py-2 text-white'
-                      : 'border border-neutral-200 bg-white text-neutral-800 shadow-sm dark:border-neutral-800 dark:bg-neutral-950/70 dark:text-neutral-200'
+                      ? 'max-w-[82%] rounded-2xl rounded-br-md bg-indigo-600 px-3.5 py-2 text-white shadow-sm'
+                      : 'max-w-[78%] rounded-2xl rounded-bl-md border border-neutral-200 bg-white text-neutral-800 shadow-sm dark:border-neutral-800 dark:bg-neutral-950/70 dark:text-neutral-200 sm:max-w-[80%]'
                   }`}
                 >
                   <p className={message.role === 'author' ? 'whitespace-pre-wrap' : 'whitespace-pre-wrap px-3 py-2'}>
@@ -369,9 +379,14 @@ export function CharacterInterviewModal({
               </div>
             ))}
             {busy && (
-              <p className="flex items-center gap-2 text-xs text-neutral-500">
-                <Icon name="sync" size={12} className="animate-spin" /> {t('Pensando…')}
-              </p>
+              <div className="flex items-end gap-2.5">
+                <div className="mb-0.5 shrink-0 rounded-full ring-2 ring-white shadow-sm dark:ring-neutral-900">
+                  <PersonPortrait person={character} size={34} />
+                </div>
+                <p className="flex items-center gap-2 rounded-2xl rounded-bl-md border border-neutral-200 bg-white px-3 py-2 text-xs text-neutral-500 shadow-sm dark:border-neutral-800 dark:bg-neutral-950/70">
+                  <Icon name="sync" size={12} className="animate-spin" /> {t('Pensando…')}
+                </p>
+              </div>
             )}
           </div>
 

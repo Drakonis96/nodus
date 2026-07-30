@@ -18,6 +18,9 @@ test('character chat exposes persistent history, image opt-in and destructive co
   assert.match(modal, /data-testid="character-chat-history-toggle"/);
   assert.match(modal, /data-testid="character-chat-image-toggle"/);
   assert.match(modal, /role="switch"/);
+  assert.match(modal, /absolute left-0\.5 top-0\.5/, 'the switch thumb is anchored inside its track');
+  assert.match(modal, /PersonPortrait/);
+  assert.match(modal, /data-testid="character-chat-character-avatar"/);
   assert.match(modal, /listCharacterChatConversations/);
   assert.match(modal, /getCharacterChatConversation/);
   assert.match(modal, /deleteCharacterChatConversation/);
