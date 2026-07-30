@@ -11,6 +11,16 @@ const releaseNotes = await readFile(path.join(root, 'shared/releaseNotes.ts'), '
 const styles = await readFile(path.join(root, 'src/index.css'), 'utf8');
 const translations = await readFile(path.join(root, 'src/i18n.en.ts'), 'utf8');
 const icons = await readFile(path.join(root, 'src/components/ui.tsx'), 'utf8');
+const vaultUi = await readFile(path.join(root, 'src/components/vaultTypeUi.tsx'), 'utf8');
+const vaultTypes = await readFile(path.join(root, 'shared/vaultTypes.ts'), 'utf8');
+
+/** Every vault type, read from its own union so a new one cannot skip this file. */
+const VAULT_TYPES = [
+  ...vaultTypes
+    .slice(vaultTypes.indexOf('export type VaultType ='), vaultTypes.indexOf(';', vaultTypes.indexOf('export type VaultType =')))
+    .matchAll(/'([a-z_]+)'/g),
+].map((m) => m[1]);
+assert.ok(VAULT_TYPES.length >= 9, `expected the VaultType union to parse, got ${VAULT_TYPES.length}`);
 
 assert.match(modal, /data-testid="whats-new-paypal-support"/);
 assert.match(modal, /data-testid="whats-new-cinematic-modal"/);
@@ -37,11 +47,23 @@ assert.match(smoke, /the release modal renders exactly one version at a time/);
 assert.match(smoke, /whats-new-version-2\.5\.3[\s\S]*selecting a historical version replaces the rendered release/);
 assert.match(modal, /const scope = h\.scope;/);
 assert.match(modal, /data-testid=\{`whats-new-scope-\$\{scope\}`\}/);
-assert.match(modal, /genealogy: \{ icon: 'tree', color: '#ca8a04', label: 'Genealogía' \}/);
 assert.match(modal, /general: \{ icon: 'sparkles', color: '#64748b', label: 'General' \}/);
+// A vault scope must not carry a second copy of its vault's glyph and accent: four
+// vaults landed in one release, and the hardcoded table had already drifted
+// (prosopography was slate here and blue everywhere else). Every vault scope reads
+// the canonical registry instead.
+assert.match(modal, /const vaultScope = \(type: VaultType\) => \(\{ icon: vaultTypeIcon\(type\), color: VAULT_TYPE_COLORS\[type\] \}\)/);
+for (const type of VAULT_TYPES) {
+  assert.match(
+    modal,
+    new RegExp(`  ${type}: \\{ \\.\\.\\.vaultScope\\('${type}'\\), label: '[^']+' \\}`),
+    `vault scope "${type}" must take its icon and colour from the vault registry`,
+  );
+}
 // Cross-vault surfaces with an identity of their own get their own chip instead of
-// the anonymous 'general' sparkles.
-assert.match(modal, /mcp: \{ icon: 'plug', color: '#2563eb', label: 'Servidor MCP' \}/);
+// the anonymous 'general' sparkles. MCP is navy, not blue-600: that shade belongs to
+// the prosopography vault, and the two scopes share a release from v3.0.0 on.
+assert.match(modal, /mcp: \{ icon: 'plug', color: '#1e3a8a', label: 'Servidor MCP' \}/);
 assert.match(modal, /nodi: \{ icon: 'nodi', color: '#d4af37', label: 'Mascota Nodi' \}/);
 assert.match(modal, /toolkit: \{ icon: 'tools', color: '#059669', label: 'Herramientas' \}/);
 assert.match(modal, /plugin: \{ icon: 'puzzle', color: '#0ea5e9', label: 'Plugins' \}/);
@@ -51,9 +73,14 @@ assert.match(releaseNotes, /version: '2\.2\.0'[\s\S]*scope: 'nodi'/);
 assert.match(releaseNotes, /version: '2\.3\.8'[\s\S]*scope: 'languages'/);
 
 // Icon() renders nothing for an unknown name, so a typo here would ship an empty
-// coloured chip rather than fail. Every scope icon must exist in the catalogue.
-const scopeIcons = [...modal.matchAll(/icon: '([^']+)'/g)].map((m) => m[1]);
-assert.ok(scopeIcons.length >= 13, `expected every scope to declare an icon, got ${scopeIcons.length}`);
+// coloured chip rather than fail. Every scope icon must exist in the catalogue —
+// both the cross-vault literals in the modal and the vault glyphs it now inherits.
+const vaultIconBody = vaultUi.slice(vaultUi.indexOf('export function vaultTypeIcon'));
+const scopeIcons = [
+  ...[...modal.matchAll(/icon: '([^']+)'/g)].map((m) => m[1]),
+  ...[...vaultIconBody.slice(0, vaultIconBody.indexOf('\n}')).matchAll(/return '([^']+)'/g)].map((m) => m[1]),
+];
+assert.ok(scopeIcons.length >= 15, `expected every scope to declare an icon, got ${scopeIcons.length}`);
 for (const icon of scopeIcons) {
   assert.match(icons, new RegExp(`^  ${icon}: '<`, 'm'), `scope icon "${icon}" is missing from ICON_PATHS`);
 }

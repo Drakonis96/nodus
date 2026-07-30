@@ -1,9 +1,11 @@
 import { motion } from 'framer-motion';
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { releaseNotesForMajor, releaseNotesSince, type ReleaseNote, type ReleaseNoteScope } from '@shared/releaseNotes';
-import type { AppLanguage } from '@shared/types';
+import type { AppLanguage, VaultType } from '@shared/types';
+import { VAULT_TYPE_COLORS } from '@shared/vaultTypes';
 import { Icon } from './ui';
 import { t } from '../i18n';
+import { vaultTypeIcon } from './vaultTypeUi';
 import { NodiAvatar } from './nodi/NodiAvatar';
 
 // Shown once after the app updates, initially focused on the latest release.
@@ -14,18 +16,28 @@ import { NodiAvatar } from './nodi/NodiAvatar';
 
 const LAST_SEEN_KEY = 'nodus.lastSeenVersion';
 
+/**
+ * A vault scope wears its own vault's glyph and accent, read from the canonical
+ * registry rather than copied here. Four vaults arrived in one release; hardcoding
+ * their colours was how `prosopography` ended up slate in this modal and blue
+ * everywhere else. Only the cross-vault surfaces below own their identity outright.
+ */
+const vaultScope = (type: VaultType) => ({ icon: vaultTypeIcon(type), color: VAULT_TYPE_COLORS[type] });
+
 const RELEASE_SCOPE_META: Record<ReleaseNoteScope, { icon: string; color: string; label: string }> = {
   general: { icon: 'sparkles', color: '#64748b', label: 'General' },
-  academic: { icon: 'network', color: '#6366f1', label: 'Académico' },
-  estudio: { icon: 'graduation', color: '#0f766e', label: 'Estudio' },
-  primary_sources: { icon: 'archive', color: '#6366f1', label: 'Fuentes primarias' },
-  genealogy: { icon: 'tree', color: '#ca8a04', label: 'Genealogía' },
-  prosopography: { icon: 'users', color: '#475569', label: 'Prosopografía' },
-  databases: { icon: 'table', color: '#b30333', label: 'Bases de datos' },
-  testimonios: { icon: 'microphone', color: '#0891b2', label: 'Testimonios' },
-  worldbuilding: { icon: 'globe', color: '#7c3aed', label: 'Worldbuilding' },
-  docencia: { icon: 'presentation', color: '#ea580c', label: 'Docencia' },
-  mcp: { icon: 'plug', color: '#2563eb', label: 'Servidor MCP' },
+  academic: { ...vaultScope('academic'), label: 'Académico' },
+  estudio: { ...vaultScope('estudio'), label: 'Estudio' },
+  primary_sources: { ...vaultScope('primary_sources'), label: 'Fuentes primarias' },
+  genealogy: { ...vaultScope('genealogy'), label: 'Genealogía' },
+  prosopography: { ...vaultScope('prosopography'), label: 'Prosopografía' },
+  databases: { ...vaultScope('databases'), label: 'Bases de datos' },
+  testimonios: { ...vaultScope('testimonios'), label: 'Testimonios' },
+  worldbuilding: { ...vaultScope('worldbuilding'), label: 'Worldbuilding' },
+  docencia: { ...vaultScope('docencia'), label: 'Docencia' },
+  // Navy rather than the blue-600 it used to be: that shade now belongs to the
+  // prosopography vault, and the two scopes appear side by side from v3.0.0 on.
+  mcp: { icon: 'plug', color: '#1e3a8a', label: 'Servidor MCP' },
   nodi: { icon: 'nodi', color: '#d4af37', label: 'Mascota Nodi' },
   toolkit: { icon: 'tools', color: '#059669', label: 'Herramientas' },
   plugin: { icon: 'puzzle', color: '#0ea5e9', label: 'Plugins' },

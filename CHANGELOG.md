@@ -1,5 +1,136 @@
 # Changelog
 
+## 3.0.0 — 2026-07-30
+
+Four new vault types arrived in this cycle, which is what moves the major. A
+"2.8.0" was briefly authored for the Testimony vault alone and never published;
+its notes are part of this release, and no 2.8.0 exists.
+
+### Added
+
+- **Testimony vault, for oral history and journalism.** The unit is the whole
+  interview — its preparation, participants, sessions, master files, transcripts
+  and the agreement it was made under. The master file enters exactly as
+  received, with its SHA-256 checksum and marked immutable; correcting,
+  reviewing, approving, anonymising or translating creates a derived version that
+  remembers where it came from, and quoted fragments re-anchor when they can and
+  are flagged when they cannot. Agreement status, access level and workflow
+  status are three independent dimensions behind one gate (`evaluateAccess`) that
+  genuinely blocks exports, access packages and what the AI may see. Coding by
+  selection, comparisons across interviews, notes carrying quotation and
+  timecode, local Whisper transcription, speaker separation with manual naming,
+  a consent-governed semantic index, and three archival export packages
+  (preservation, access, review) with manifests and stated exclusions. Schema
+  v105–v106; demo "Memoria del valle" with synthetic voices generated from its
+  own script.
+- **Worldbuilding vault.** Characters (a `persons` row plus a
+  `character_profiles` overlay, so kinship, life events, places and portrait are
+  inherited rather than duplicated), places as a tree of 37 kinds, factions and
+  cultures, scenes with independent world-day and narrative orderings, secrets
+  with their knowers, and an invented calendar. Maps with nested canvases,
+  calibrated scale, pins/outlines/routes, distances and travel-time reports, and
+  labels drawn by Nodus rather than the image model. An A–Z encyclopedia with
+  `[[wiki-links]]` promoted to `nodus://` links on save. The Analizar layer —
+  Rules, Conflicts, Arcs, Continuity and Open questions as five readings of
+  `world_beats`, surfaced on the scene sheet. The manuscript as the column the
+  scene was missing, with a books shelf, snapshots, typewriter mode and a
+  beats-only AI reading. World chat where Nodus computes the facts and the model
+  writes with them. Schema v91–v101.
+- **Primary Sources vault.** Repositories and archival hierarchy, capture
+  sessions, working collections, templates, files served over a restricted
+  `nodus-archive:` protocol, reviewed text, excerpts, evidence links,
+  proposals, citations, policies, audit records, exports and recovery, plus map,
+  timeline, people, relations, notes and research. Reversible synthetic
+  documentary demo corpus with generated document images and gazetteer-backed
+  places.
+- **Prosopography vault.** Canonical evidence-aware domain model, source capture
+  and criticism, identity resolution, factoids, population/cohort/questionnaire
+  workflows, layered network analysis and interchange. Interview diarization
+  preserves the literal transcript, aligns to the timeline, accepts
+  expected-speaker guidance and large uploads, and guarantees remote-file
+  cleanup.
+- **Teaching: the Analyze group and Unit design.** Chat, Ideas and Graph scoped
+  to `docencia` over the same `study_*` corpus, and "Unidades didácticas" becomes
+  Deep Research with a target audience — teacher lesson plan or student handout —
+  threaded through the plan, write and finalize prompts in all seven languages
+  (`shared/studyDeepResearchAudience.ts`).
+- **Turkish.** The seventh complete interface language, kinship terminology
+  included, plus full localization of every Toolkit surface.
+- **Product feedback in Suggest / Report.** An optional 0–10 survey (coverage,
+  usability, performance, stability, visual design) with free-text, routed to one
+  permanent shared thread instead of a new issue per response, with the Nodus
+  version and OS filled in. Community Standards files added alongside it.
+- **Genealogy branch visibility, custom searchable fact types, configured places
+  when recording a fact, and multi-day calendar event bars.**
+- **Tutorial video pipeline** (`scripts/tutorial/`), which records narrated
+  tutorials by driving the real application. Nothing in the app changes.
+
+### Changed
+
+- **The academic Library is organised around one readable status.** The five
+  analysis-pipeline fields fold into one derived readiness value
+  (`src/libraryStatus.ts`): twelve columns become eight, each row keeps one
+  primary verb plus Zotero and an overflow menu, the four-dimension status matrix
+  becomes one-click presets that filter in SQL over the whole corpus, and the
+  selection bar drops from eight buttons to one verb with an explicit scope. A
+  per-work breakdown retries each step on its own. The two indexes are renamed
+  for what they give the reader — semantic search and citable text — replacing
+  five controls that all said "Indexar".
+- **First run.** The guide shows the introduction alone and says where the rest
+  are; the ten published tutorials live in Settings on four shelves with tabs and
+  a search box, and a vault's video is offered when that vault is created. After
+  the guide, a cinematic screen names the first vault and picks its mode instead
+  of handing over an academic vault called "Principal". The vault-type picker
+  moved to `src/components/vaultTypeUi.tsx` so the switcher modal and the
+  first-run chooser cannot drift.
+- **AI setup can be postponed and model downloads cancelled.**
+- **Sidebar customization is scoped per vault** instead of applying globally.
+- **MCP and Nodus Server reach parity with the new vaults** in snapshots, tools,
+  validation and tests; Deep Research export branding is standardized and
+  vault-aware; Nodi's product knowledge now describes the implemented Toolkit,
+  the available vaults, the server roadmap, collaboration and the planned
+  iOS/iPadOS apps.
+- **What's New badges read their vault's own glyph and accent** from
+  `VAULT_TYPE_COLORS`/`vaultTypeIcon` rather than a second hardcoded copy, which
+  is how `prosopography` had ended up slate here and blue everywhere else. The
+  MCP scope moves to navy, since blue-600 now belongs to a vault.
+- **The Zotero setup assistant names the local API correctly.** There is no
+  "local Zotero 7 API"; the client talks to Zotero's local implementation of Web
+  API v3. Reworded across the source and all seven translations, and the dead
+  `itemsSince()` client path removed.
+- **Project documentation is in English**, and the website moved under `site/`
+  with its own Pages deployment workflow.
+
+### Fixed
+
+- **The Zotero sidebar connects on its own.** It read
+  `~/.nodus/zotero-bridge.json` once at boot, so starting Nodus after Zotero left
+  the sidebar on "not connected" until the user opened Settings and pressed Test
+  connection. A backoff loop (1.5s → 15s) re-reads the bridge file on every
+  attempt and retries immediately on Zotero regaining focus, Settings opening and
+  before sending a message. The probe validates the token against
+  `/api/z/models`, because `/api/z/health` is deliberately tokenless and would
+  report "connected" for a stale token; while the link is up, HTTP
+  re-validation happens every five minutes rather than every tick. Plugin
+  bumped to 3.0.0.
+- **Worldbuilding AI workflows are bounded to author-provided canon.** World chat
+  consumes bounded conversation history as non-evidentiary context, citations are
+  restricted to the exact retrieved context with a deterministic source fallback,
+  prompts are hardened against instructions embedded in vault data, embedding
+  vectors are validated so partial indexing cannot be counted or persisted,
+  cosine comparisons across incompatible dimensions are rejected, and archive
+  embeddings persist provider/model/dimension provenance so edited or legacy
+  vectors are invalidated instead of silently reused.
+- **Word add-in navigation and localization.**
+- **Gray bands around Deep Research PDF cover images**, caused by a blurred cover
+  shadow some viewers flatten into filter bounds.
+- **Full-resolution originals are preserved and downloadable**, portrait framing
+  is retained after dragging, and database image assets load through the native
+  cache.
+- Light-theme coverage across the worldbuilding views, dropdowns kept inside the
+  viewport, manuscript rail overflow, group card styling, and PDF.js font-face
+  disabling.
+
 ## 2.7.0 — 2026-07-26
 
 ### Added
