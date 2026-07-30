@@ -126,17 +126,25 @@ export async function buildIdeaGraph(): Promise<GraphData> {
   // single query for ideas and another for themes, then aggregate in memory.
   // This is the main reason the graph took ages to load on large corpora.
   const ideaIds = ideas.map((i) => i.global_id);
+  // Both aggregates below restrict to the ideas selected above. Binding that set
+  // as an `IN (?,?,…)` list of one placeholder per idea is what made the graph
+  // take seconds: with ~9,700 placeholders SQLite drives the join from the id
+  // list and probes (global_id, nodus_id) once per id × per matching work, so the
+  // cost grows with ideas × works instead of with rows. Joining `ideas` instead
+  // expresses the same restriction — the id list *is* that join — and lets the
+  // planner drive from `works`. Measured on a 9,707-idea corpus: 6.9 s → 74 ms
+  // and 8.9 s → 49 ms, row-for-row identical (scripts/bench-graph-in-clause.ts).
   const ideaWorkRows = ideaIds.length
     ? (db
         .prepare(
           `SELECT io.global_id, w.nodus_id, w.year, w.authors_json, w.read_tag
              FROM idea_occurrences io
              JOIN works w ON w.nodus_id = io.nodus_id
-            WHERE io.global_id IN (${ideaIds.map(() => '?').join(',')})
-              AND w.archived = 0
+             JOIN ideas i ON i.global_id = io.global_id
+            WHERE w.archived = 0
               AND w.deep_status = 'done'`
         )
-        .all(...ideaIds) as { global_id: string; nodus_id: string; year: number | null; authors_json: string; read_tag: number }[])
+        .all() as { global_id: string; nodus_id: string; year: number | null; authors_json: string; read_tag: number }[])
     : [];
   const ideaAggById = new Map<string, { works: Set<string>; unread: boolean; years: number[]; authors: Set<string> }>();
   // maxConfidence comes from idea_occurrences.confidence; fetch in a second tiny query.
@@ -146,12 +154,12 @@ export async function buildIdeaGraph(): Promise<GraphData> {
           `SELECT io.global_id, MAX(io.confidence) AS c
              FROM idea_occurrences io
              JOIN works w ON w.nodus_id = io.nodus_id
-            WHERE io.global_id IN (${ideaIds.map(() => '?').join(',')})
-              AND w.archived = 0
+             JOIN ideas i ON i.global_id = io.global_id
+            WHERE w.archived = 0
               AND w.deep_status = 'done'
             GROUP BY io.global_id`
         )
-        .all(...ideaIds) as { global_id: string; c: number | null }[])
+        .all() as { global_id: string; c: number | null }[])
     : [];
   const ideaConfById = new Map(ideaConfRows.map((r) => [r.global_id, r.c ?? 0]));
   for (const row of ideaWorkRows) {
