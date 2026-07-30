@@ -1,6 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { AppSettings, CorpusHealthBucketId, DatabaseSummary, RecoveryStatus, SyncLogEntry, VaultSummary } from '@shared/types';
-import { Onboarding } from './views/Onboarding';
 import { HomeView, GenealogyHome, DatabasesHome } from './views/HomeView';
 import type { CsvImportPlanData } from './views/DatabasesView';
 import { FeedbackModal } from './views/FeedbackModal';
@@ -41,21 +40,19 @@ import { TeachingTour } from './views/TeachingTour';
 import { PrimarySourcesTour } from './views/PrimarySourcesTour';
 import { ProsopographyTour } from './views/ProsopographyTour';
 import { WorldbuildingTour } from './views/WorldbuildingTour';
-import { BASICS_TUTORIAL_VERSION, BasicsTutorial } from './views/BasicsTutorial';
-import { FIRST_VAULT_VERSION, FirstVaultSetup } from './views/FirstVaultSetup';
-import { preferencesForTutorialLanguage } from '@shared/tutorialPreferences';
+import { FIRST_VAULT_VERSION } from './views/FirstVaultSetup';
 import { hasPendingWhatsNew, WhatsNewModal } from './components/WhatsNewModal';
-import { markTutorialVideosAnnouncementSeen, TutorialVideosUpdateTour } from './components/TutorialVideosGuide';
+import { TutorialVideosUpdateTour } from './components/TutorialVideosGuide';
 import { PlatformHighlightsUpdateTour } from './components/PlatformHighlightsGuide';
 import { ToolkitBetaUpdateTour } from './components/ToolkitBetaGuide';
 import { StartupUpdateModal } from './components/StartupUpdateModal';
 import { recoveryHealthAdvice, recoveryHealthHeadline } from './recoveryHealth';
-import { RecoverySetupWizard } from './views/RecoverySetupWizard';
 import { NodiMascot } from './components/nodi/NodiMascot';
 import { NodiStyleModal } from './components/NodiStyleModal';
 import { Icon } from './components/ui';
 import { AppErrorBoundary } from './components/AppErrorBoundary';
 import { t, tx, setActiveLang } from './i18n';
+import { resolveStartupGate } from './app/StartupGate';
 import { notifyDataChanged, useDataRefresh } from './hooks';
 import { setActiveVaultQueryScope } from './vaultQueryCache';
 import type {
@@ -1052,99 +1049,27 @@ export function App() {
     return [...navCommands, ...actions];
   }, [settings?.uiLanguage, settings?.reduceMotion, settings?.readingFocusMode, activeVault?.type, isPrimarySources, isGenealogy, isDatabases, isEstudio, isDocencia, isWorldbuilding, isProsopography, isTestimonios, isDark, onSync, openAssistant, reloadSettings]);
 
-  if (loadError) {
-    return (
-      <div className="h-full flex flex-col items-center justify-center gap-3 p-8 text-center">
-        <div className="text-red-400 font-semibold">{t('No se pudo iniciar Nodus')}</div>
-        <div className="text-neutral-400 text-sm max-w-md">{loadError}</div>
-        <button className="btn btn-primary" onClick={() => { setLoadError(null); void reloadSettings(); }}>
-          {t('Reintentar')}
-        </button>
-      </div>
-    );
-  }
-
-  if (!settings) {
-    return <div className="h-full flex items-center justify-center text-neutral-500">{t('Cargando Nodus…')}</div>;
-  }
-
-  // Authoritative per-render language: set before any child renders so every t() call
-  // (including in plain helper functions) reads the current language.
-  setActiveLang(settings.uiLanguage);
-
-  // The cinematic guide owns first-run language selection. A positive value means
-  // it has been seen and remains authoritative across every future app update;
-  // Settings deliberately resets it to zero when the user asks to replay it.
-  if (!isPreviewVault && settings.basicsTutorialVersion === 0) {
-    return (
-      <BasicsTutorial
-        language={settings.uiLanguage}
-        onLanguageChosen={async (language) => {
-          await window.nodus.updateSettings(preferencesForTutorialLanguage(language));
-          await reloadSettings();
-        }}
-        onNodiStyleChosen={async (mascotStyle) => {
-          await window.nodus.updateSettings({ mascotStyle, mascotStyleChosen: true });
-          await reloadSettings();
-        }}
-        onComplete={async () => {
-          // The guide itself asks video or text, so whoever finishes it has already met
-          // the catalogue: the announcement for older installs must not follow them out.
-          markTutorialVideosAnnouncementSeen();
-          await window.nodus.updateSettings({ basicsTutorialVersion: BASICS_TUTORIAL_VERSION });
-          await reloadSettings();
-        }}
-      />
-    );
-  }
-
-  // Straight out of the guide, and before anything else asks for a decision: name the
-  // vault and pick its mode. Nodus used to skip this and hand over an academic vault
-  // called «Principal», which is why the mode felt like something that had happened to
-  // the user rather than something they chose. Only a run that STARTED before the guide
-  // was ever completed gets here (see `newInstall`), so no existing vault is ever
-  // renamed underneath its owner.
-  if (!isPreviewVault && newInstall && settings.firstVaultVersion === 0 && activeVault) {
-    return (
-      <FirstVaultSetup
-        vault={activeVault}
-        onComplete={async () => {
-          await Promise.all([reloadSettings(), reloadVaults()]);
-        }}
-      />
-    );
-  }
-
-  if (!isPreviewVault && recoveryStatus === null) {
-    return <div className="h-full flex items-center justify-center text-neutral-500">{t('Verificando la protección de tus datos…')}</div>;
-  }
-
-  // New installs see this immediately after the cinematic tutorial. Existing
-  // installs first dismiss the release notes and then receive the migration wizard.
-  if (!isPreviewVault && recoveryStatus?.needsSetup && (!recoveryStatus.previousInstallation || whatsNewSettled)) {
-    return (
-      <RecoverySetupWizard
-        status={recoveryStatus}
-        language={settings.uiLanguage}
-        onComplete={async () => {
-          await Promise.all([reloadSettings(), reloadVaults(), reloadRecoveryStatus()]);
-        }}
-      />
-    );
-  }
-
-  if (!isPreviewVault && !settings.onboardingComplete) {
-    return (
-      <Onboarding
-        activeVault={activeVault}
-        settings={settings}
-        providerKeys={settings.providerKeys}
-        onDone={(nextView = 'home') => reloadSettings().then(() => setView(nextView))}
-        onCancel={cancelOnboarding}
-        discardsVault={onboardingDiscardsVault}
-      />
-    );
-  }
+  // The startup sequence, as an ordered list of guards rather than a run of early
+  // returns. It also sets this render's authoritative language, which is why it is
+  // called before anything below reads `settings`.
+  const startupGate = resolveStartupGate({
+    loadError,
+    settings,
+    activeVault,
+    recoveryStatus,
+    isPreviewVault,
+    newInstall,
+    whatsNewSettled,
+    onboardingDiscardsVault,
+    clearLoadError: () => setLoadError(null),
+    reloadSettings,
+    reloadVaults,
+    reloadRecoveryStatus,
+    cancelOnboarding,
+    setView,
+  });
+  if (startupGate) return startupGate;
+  if (!settings) return null; // unreachable: the settings guard above owns this case
 
   return (
     <div

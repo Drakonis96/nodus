@@ -327,7 +327,7 @@ test('the videos are announced once to installs that predate them', async () => 
 
   // Completing the cinematic guide answers the same question, so it settles the
   // announcement too — a fresh install must never be told about a choice it just made.
-  assert.match(app, /markTutorialVideosAnnouncementSeen\(\);\s*\n\s*await window\.nodus\.updateSettings\(\{ basicsTutorialVersion: BASICS_TUTORIAL_VERSION \}\)/);
+  assert.match(await read('src/app/StartupGate.tsx'), /markTutorialVideosAnnouncementSeen\(\);\s*\n\s*await window\.nodus\.updateSettings\(\{ basicsTutorialVersion: BASICS_TUTORIAL_VERSION \}\)/);
   // It queues behind the other one-time tours and ahead of the update check, so two
   // modals never fight for the foreground.
   const order = ['<WhatsNewModal', '<PlatformHighlightsUpdateTour', '<ToolkitBetaUpdateTour', '<TutorialVideosUpdateTour', '<StartupUpdateModal'].map((tag) => app.indexOf(tag));

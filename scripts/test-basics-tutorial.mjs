@@ -28,10 +28,11 @@ test('essential tutorial is global, seen-once, skippable with confirmation and r
   assert.match(tutorial, /IdeaExtractionPanel/);
   assert.match(tutorial, /LocalPerformancePanel/);
   assert.match(tutorial, /SubscriptionAccessPanel/);
-  assert.match(app, /settings\.basicsTutorialVersion === 0/);
-  assert.doesNotMatch(app, /settings\.basicsTutorialVersion < BASICS_TUTORIAL_VERSION/);
-  assert.match(app, /preferencesForTutorialLanguage\(language\)/);
-  assert.match(app, /updateSettings\(\{ basicsTutorialVersion: BASICS_TUTORIAL_VERSION \}\)/);
+  const startup = await read('src/app/StartupGate.tsx');
+  assert.match(startup, /settings\.basicsTutorialVersion === 0/);
+  assert.doesNotMatch(startup, /settings\.basicsTutorialVersion < BASICS_TUTORIAL_VERSION/);
+  assert.match(startup, /preferencesForTutorialLanguage\(language\)/);
+  assert.match(startup, /updateSettings\(\{ basicsTutorialVersion: BASICS_TUTORIAL_VERSION \}\)/);
   assert.match(settings, /Guía esencial de Nodus e IA/);
   assert.match(settings, /patch\(\{ basicsTutorialVersion: 0 \}\)/);
   assert.match(tutorial, /ConfirmModal zIndex=\{220\}/);

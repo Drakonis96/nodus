@@ -104,9 +104,9 @@ test('every way out of the modal records the choice, so it can never return', as
 });
 
 test('both surfaces that offer the choice write the flag', async () => {
-  const [app, tutorial] = await Promise.all([read('src/App.tsx'), read('src/views/BasicsTutorial.tsx')]);
+  const [startup, tutorial] = await Promise.all([read('src/app/StartupGate.tsx'), read('src/views/BasicsTutorial.tsx')]);
   // The tutorial's own screen, for new users.
-  assert.match(app, /onNodiStyleChosen=\{async \(mascotStyle\) => \{[\s\S]{0,160}?mascotStyleChosen: true/);
+  assert.match(startup, /onNodiStyleChosen=\{async \(mascotStyle\) => \{[\s\S]{0,160}?mascotStyleChosen: true/);
   assert.match(tutorial, /onPick=\{\(style\) => \{ setStyleChosen\(true\); setIndex\(0\); void onNodiStyleChosen\(style\); \}\}/);
 });
 
