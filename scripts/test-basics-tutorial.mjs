@@ -3,15 +3,16 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { readSource } from './ipc-channel-census.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const read = (file) => readFile(path.join(root, file), 'utf8');
+const read = async (file) => readSource(file);
 
 test('essential tutorial is global, seen-once, skippable with confirmation and replayable', async () => {
   const [tutorial, app, types, defaults, prefs, settings, modal] = await Promise.all([
     read('src/views/BasicsTutorial.tsx'),
     read('src/App.tsx'),
-    read('shared/types.ts'),
+    read('@api'),
     read('electron/db/settingsRepo.ts'),
     read('electron/db/appPrefs.ts'),
     read('src/views/Settings.tsx'),
@@ -27,10 +28,11 @@ test('essential tutorial is global, seen-once, skippable with confirmation and r
   assert.match(tutorial, /IdeaExtractionPanel/);
   assert.match(tutorial, /LocalPerformancePanel/);
   assert.match(tutorial, /SubscriptionAccessPanel/);
-  assert.match(app, /settings\.basicsTutorialVersion === 0/);
-  assert.doesNotMatch(app, /settings\.basicsTutorialVersion < BASICS_TUTORIAL_VERSION/);
-  assert.match(app, /preferencesForTutorialLanguage\(language\)/);
-  assert.match(app, /updateSettings\(\{ basicsTutorialVersion: BASICS_TUTORIAL_VERSION \}\)/);
+  const startup = await read('src/app/StartupGate.tsx');
+  assert.match(startup, /settings\.basicsTutorialVersion === 0/);
+  assert.doesNotMatch(startup, /settings\.basicsTutorialVersion < BASICS_TUTORIAL_VERSION/);
+  assert.match(startup, /preferencesForTutorialLanguage\(language\)/);
+  assert.match(startup, /updateSettings\(\{ basicsTutorialVersion: BASICS_TUTORIAL_VERSION \}\)/);
   assert.match(settings, /Guía esencial de Nodus e IA/);
   assert.match(settings, /patch\(\{ basicsTutorialVersion: 0 \}\)/);
   assert.match(tutorial, /ConfirmModal zIndex=\{220\}/);
@@ -109,7 +111,7 @@ test('essential tutorial teaches the complete novice AI and Nodus foundation in 
   assert.match(tutorial, /motionProfiles = \[/);
 
   const [mascot, ipc, preload, types] = await Promise.all([
-    read('electron/mascotWindow.ts'), read('electron/ipc.ts'), read('electron/preload.ts'), read('shared/types.ts'),
+    read('electron/mascotWindow.ts'), read('@main'), read('@bridge'), read('@api'),
   ]);
   assert.match(mascot, /tutorialVisible/);
   assert.match(mascot, /mascotWindow\.hide\(\)/);

@@ -2,9 +2,10 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readSource } from './ipc-channel-census.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const read = (file) => readFile(path.join(root, file), 'utf8');
+const read = async (file) => readSource(file);
 const [library, ideas, gaps, authors, worksRepo, ideasRepo, types, ipc, preload] = await Promise.all([
   read('src/views/Library.tsx'),
   read('src/views/IdeasView.tsx'),
@@ -12,9 +13,9 @@ const [library, ideas, gaps, authors, worksRepo, ideasRepo, types, ipc, preload]
   read('src/views/AuthorsView.tsx'),
   read('electron/db/worksRepo.ts'),
   read('electron/db/ideasRepo.ts'),
-  read('shared/types.ts'),
-  read('electron/ipc.ts'),
-  read('electron/preload.ts'),
+  read('@api'),
+  read('@main'),
+  read('@bridge'),
 ]);
 
 assert.match(library, /listWorksPage\(filter/, 'Library must request bounded pages');

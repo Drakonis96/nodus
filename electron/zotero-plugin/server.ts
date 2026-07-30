@@ -290,7 +290,7 @@ function parseVisionImages(value: unknown): VisionImagePart[] {
 
 // ------------------------------------------------------------- request router
 
-async function handleRequest(req: IncomingMessage, res: ServerResponse, port: number): Promise<void> {
+async function handleRequest(req: IncomingMessage, res: ServerResponse, _port: number): Promise<void> {
   setCors(req, res);
   if (req.method === 'OPTIONS') {
     res.writeHead(204);

@@ -35,18 +35,19 @@ test('worldbuilding and teaching use their own visible vault icons', async () =>
 
 test('the guide hands over to the first-vault chooser, not to an academic vault', async () => {
   const [app, screen, registry] = await Promise.all([
-    read('src/App.tsx'),
+    read('src/app/StartupGate.tsx'),
     read('src/views/FirstVaultSetup.tsx'),
     read('electron/vaults/vaultRegistry.ts'),
   ]);
   // It comes straight after the guide and before anything else asks for a decision.
-  const guideAt = app.indexOf('if (!isPreviewVault && settings.basicsTutorialVersion === 0)');
+  // The order is now the order of the guard list, so read it off the ids.
+  const guideAt = app.indexOf("id: 'basics-tutorial'");
   const chooserAt = app.indexOf('<FirstVaultSetup');
   const recoveryAt = app.indexOf('<RecoverySetupWizard');
   const onboardingAt = app.indexOf('<Onboarding');
   assert.ok(guideAt > 0 && chooserAt > guideAt, 'the chooser follows the guide');
   assert.ok(chooserAt < recoveryAt && chooserAt < onboardingAt, 'and precedes recovery setup and the model wizard');
-  assert.match(app, /!isPreviewVault && newInstall && settings\.firstVaultVersion === 0 && activeVault/);
+  assert.match(app, /!state\.isPreviewVault && state\.newInstall && state\.settings\.firstVaultVersion === 0 && !!state\.activeVault/);
 
   // It RENAMES the vault the registry always materialises rather than creating a second
   // one — `defaultVaultRecord` is re-added whenever it is missing, so a create here
@@ -114,9 +115,9 @@ test('the first-vault chooser can only ever meet a genuinely new install', async
 });
 
 test('preview vaults bypass setup and every automatic tutorial', async () => {
-  const app = await read('src/App.tsx');
-  assert.match(app, /if \(!isPreviewVault && settings\.basicsTutorialVersion === 0\)/);
-  assert.match(app, /if \(!isPreviewVault && !settings\.onboardingComplete\)/);
+  const [app, startup] = await Promise.all([read('src/App.tsx'), read('src/app/StartupGate.tsx')]);
+  assert.match(startup, /!state\.isPreviewVault && state\.settings\.basicsTutorialVersion === 0/);
+  assert.match(startup, /!state\.isPreviewVault && !state\.settings\.onboardingComplete/);
   assert.match(app, /\{!isPreviewVault && settings\.onboardingComplete[^\n]+!settings\.tourComplete/);
   assert.match(app, /\{!isPreviewVault && settings\.onboardingComplete[^\n]+settings\.tourComplete[^\n]+!settings\.advancedTourComplete/);
   assert.match(app, /\{!isPreviewVault && settings\.onboardingComplete &&/);

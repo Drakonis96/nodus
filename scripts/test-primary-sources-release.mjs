@@ -6,6 +6,7 @@ import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readSource } from './ipc-channel-census.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
@@ -17,9 +18,9 @@ if (!process.argv.includes('--electron-primary-sources-release-test')) {
     ['metrics', 'electron/db/primarySourceMetricsRepo.ts'],
     ['workspace', 'electron/db/primarySourcesArchiveRepo.ts'],
     ['archive', 'electron/db/archiveRepo.ts'],
-    ['preload', 'electron/preload.ts'],
-    ['ipc', 'electron/ipc.ts'],
-    ['types', 'shared/types.ts'],
+    ['preload', '@bridge'],
+    ['ipc', '@main'],
+    ['types', '@api'],
     ['vaults', 'shared/vaultTypes.ts'],
     ['tour', 'src/views/PrimarySourcesTour.tsx'],
     ['tourEngine', 'src/views/tourEngine.tsx'],
@@ -27,9 +28,9 @@ if (!process.argv.includes('--electron-primary-sources-release-test')) {
     ['archiveView', 'src/views/PrimarySourcesArchiveView.tsx'],
     ['placePicker', 'src/components/PlacePicker.tsx'],
     ['settings', 'src/views/Settings.tsx'],
-    ['app', 'src/App.tsx'],
+    ['app', '@shell'],
     ['toolkit', 'src/views/ToolkitView.tsx'],
-  ].map(([key, relative]) => [key, fs.readFileSync(path.join(repoRoot, relative), 'utf8')]));
+  ].map(([key, relative]) => [key, readSource(relative)]));
   assert.ok(Number(sources.schema.match(/SCHEMA_VERSION = (\d+)/)[1]) >= 118,
     'the release migration is applied');
   assert.match(sources.schema, /CREATE TABLE primary_source_local_metrics/);
@@ -106,7 +107,7 @@ if (!process.argv.includes('--electron-primary-sources-release-test')) {
   assert.match(sources.placePicker, /searchGazetteer/);
   assert.match(sources.toolkit, /TOOLKIT_TOOLS\.map/);
   assert.doesNotMatch(sources.app, /PrimarySourcesToolkitView/);
-  assert.match(sources.app, /view === 'toolkit'[\s\S]{0,120}<ToolkitView/);
+  assert.match(sources.app, /toolkit: \([^)]*\)[\s\S]{0,120}<ToolkitView/);
   for (const relative of [
     'docs/primary-sources/README.md',
     'docs/primary-sources/demo-and-onboarding.md',

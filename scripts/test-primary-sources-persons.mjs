@@ -6,6 +6,7 @@ import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readSource } from './ipc-channel-census.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
@@ -13,12 +14,12 @@ const require = createRequire(import.meta.url);
 if (!process.argv.includes('--electron-primary-sources-persons-test')) {
   const [view, app, repo, shared, preload, ipc] = [
     'src/views/PrimarySourcesPersonsView.tsx',
-    'src/App.tsx',
+    '@shell',
     'electron/db/primarySourcePersonsRepo.ts',
-    'shared/types.ts',
-    'electron/preload.ts',
-    'electron/ipc.ts',
-  ].map((file) => fs.readFileSync(path.join(repoRoot, file), 'utf8'));
+    '@api',
+    '@bridge',
+    '@main',
+  ].map((file) => readSource(file));
 
   for (const marker of [
     'primary-sources-persons-view',
@@ -30,7 +31,7 @@ if (!process.argv.includes('--electron-primary-sources-persons-test')) {
     'Revertir fusión',
     'nodus:navigate-primary-source',
   ]) assert.ok(view.includes(marker), `phase 7 UI contains ${marker}`);
-  assert.match(app, /isPrimarySources \? <PrimarySourcesPersonsView \/>/);
+  assert.match(app, /isPrimarySources\s*\? <PrimarySourcesPersonsView \/>/);
   assert.doesNotMatch(view, /GEDCOM|árbol genealógico|sugerencias de parentesco/i);
   assert.match(repo, /entity_resolutions/);
   assert.match(repo, /decision='merge'/);

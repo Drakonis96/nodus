@@ -65,10 +65,12 @@ function baseWindowOptions(display: Electron.Display, fullscreen = true): Electr
     fullscreen,
     backgroundColor: '#000000',
     webPreferences: {
-      preload: path.join(__dirname, 'preload.cjs'),
+      // Deck playback and the cast handoff, nine methods, none of which writes to a
+      // vault. See shared/api/windows.ts.
+      preload: path.join(__dirname, 'preload.presenter.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
+      sandbox: true,
     },
   };
 }

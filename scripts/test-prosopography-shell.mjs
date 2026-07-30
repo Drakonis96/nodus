@@ -6,6 +6,7 @@ import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readSource } from './ipc-channel-census.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
@@ -33,17 +34,17 @@ test('prosopography has six exclusive domain views and no genealogical UI', asyn
 });
 
 test('the app renders the dedicated sidebar, home and all six domain routes', async () => {
-  const app = await readFile(path.join(root, 'src/App.tsx'), 'utf8');
+  const app = await Promise.resolve(readSource('@shell'));
   assert.match(app, /const isProsopography = activeVault\?\.type === 'prosopography'/);
   assert.match(app, /<ProsopographySidebar[\s\S]*?activeView=\{view\}/);
-  assert.match(app, /view === 'home' && isProsopography && <ProsopographyHome/);
+  assert.match(app, /if \(ctx\.isProsopography\) return <ProsopographyHome/);
   const components = {
     prosopSearch: 'ProsopSearchView', prosopPopulation: 'ProsopPopulationView',
     prosopPersons: 'ProsopPersonsView', prosopSources: 'ProsopSourcesView',
     prosopAnalysis: 'ProsopAnalysisView', prosopNetworks: 'ProsopNetworksView',
   };
   for (const [view, component] of Object.entries(components)) {
-    assert.match(app, new RegExp(`view === '${view}' && <${component}`));
+    assert.match(app, new RegExp(`${view}: \\(\\) => <${component}`));
   }
 });
 

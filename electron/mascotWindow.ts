@@ -136,10 +136,13 @@ function createMascotWindow(): BrowserWindow {
     // setVisibleOnAllWorkspaces only covers windowed apps, not fullscreen ones.
     ...(isMac ? { type: 'panel' as const } : {}),
     webPreferences: {
-      preload: path.join(__dirname, 'preload.cjs'),
+      // Nodi's own bridge: 36 methods rather than the whole NodusApi. An overlay
+      // that floats above every other app has no business being able to delete a
+      // vault. See shared/api/windows.ts for the list.
+      preload: path.join(__dirname, 'preload.nodi.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
+      sandbox: true,
       // Nodi is an animated desktop overlay and remains visible while another app
       // owns the active window. Chromium's default background throttling suspends
       // its compositor in that exact state; the first click would otherwise resume

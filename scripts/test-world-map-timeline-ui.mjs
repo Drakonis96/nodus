@@ -8,8 +8,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFile } from 'node:fs/promises';
+import { readSource } from './ipc-channel-census.mjs';
 
-const read = (file) => readFile(new URL(`../${file}`, import.meta.url), 'utf8');
+// readSource resolves the '@main' / '@bridge' / '@api' sentinels to whole surfaces —
+// the three former hot files are directories now — and any other path to that file.
+const read = async (file) => readSource(file);
 
 test('scrubbing the playhead is arithmetic, not a query', async () => {
   const view = await read('src/views/WorldMapsView.tsx');
@@ -113,7 +116,9 @@ test('map coverage is one query, not one per map per tick', async () => {
   assert.match(view, /window\.nodus\.mapCoverage\(\)/);
   // `mapCoverage` already means research-map coverage in this codebase; the world-map one
   // carries its own name so the two can never be confused at an import site.
-  const ipc = await read('electron/ipc.ts');
-  assert.match(ipc, /import \{ decomposeQuestion, mapCoverage \} from '\.\/ai\/researchMap'/);
+  const ipc = await read('@main');
+  // `\.\.?/` because the importing module can sit at the root of electron/ or one
+  // level down in electron/ipc/; what matters is the name, not the depth.
+  assert.match(ipc, /import \{ decomposeQuestion, mapCoverage \} from '\.\.?\/ai\/researchMap'/);
   assert.match(ipc, /worldMapCoverage\(\)/);
 });

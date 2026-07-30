@@ -1,7 +1,6 @@
 import crypto from 'node:crypto';
 import { v4 as uuid } from 'uuid';
 import type {
-  JsonValue,
   ProsopCaptureBatch,
   ProsopCaptureRow,
   ProsopCaptureTemplate,

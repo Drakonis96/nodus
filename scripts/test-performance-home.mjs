@@ -2,16 +2,17 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readSource } from './ipc-channel-census.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const read = (file) => readFile(path.join(root, file), 'utf8');
+const read = (file) => Promise.resolve(readSource(file));
 
 const [home, pipeline, ipc, preload, types, repo] = await Promise.all([
   read('src/views/HomeView.tsx'),
   read('electron/ai/embeddingPipeline.ts'),
-  read('electron/ipc.ts'),
-  read('electron/preload.ts'),
-  read('shared/types.ts'),
+  read('@main'),
+  read('@bridge'),
+  read('@api'),
   read('electron/db/homeRepo.ts'),
 ]);
 

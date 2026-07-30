@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readSource } from './ipc-channel-census.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
@@ -35,8 +36,8 @@ assert.equal(aligned.map((segment) => segment.text).join(' '), originalSegments.
 assert.deepEqual(aligned.map((segment) => [segment.tStart, segment.tEnd]), [[0, 4], [4, 10], [10, 15]]);
 
 const source = fs.readFileSync(path.join(repoRoot, 'src/views/StudyRecordingsView.tsx'), 'utf8');
-const preload = fs.readFileSync(path.join(repoRoot, 'electron/preload.ts'), 'utf8');
-const ipc = fs.readFileSync(path.join(repoRoot, 'electron/ipc.ts'), 'utf8');
+const preload = readSource('@bridge');
+const ipc = readSource('@main');
 assert.match(source, /data-testid="study-recording-diarize"/);
 assert.match(source, /diarizeStudyRecording/);
 assert.match(preload, /study:recordings:diarize/);

@@ -48,7 +48,6 @@ function answerLinesHtml(count: number): string {
 
 function questionBodyHtml(question: ExamQuestion, exam: TeachingExam): string {
   const labels = examDocumentLabels(exam.language);
-  const def = examQuestionTypeDef(question.type);
   switch (question.type) {
     case 'multiple_choice':
       return `<ol class="options">${question.options

@@ -6,6 +6,7 @@ import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { assertApiMethods, assertChannelsWired } from './ipc-channel-census.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
@@ -322,10 +323,7 @@ try {
     assert.match(pack, language === 'es' ? /mención no equivale/i : /mention|Nennung|menção|menzione|geçişi/i);
   }
 
-  const [ipc, preload, api, view, panel, personsView, cohortsPanel, analysisView, networksView, searchView, mcpTools] = await Promise.all([
-    readFile(path.join(repoRoot, 'electron/ipc.ts'), 'utf8'),
-    readFile(path.join(repoRoot, 'electron/preload.ts'), 'utf8'),
-    readFile(path.join(repoRoot, 'shared/types.ts'), 'utf8'),
+  const [view, panel, personsView, cohortsPanel, analysisView, networksView, searchView, mcpTools] = await Promise.all([
     readFile(path.join(repoRoot, 'src/views/ProsopSourcesView.tsx'), 'utf8'),
     readFile(path.join(repoRoot, 'src/components/ProsopObservationsPanel.tsx'), 'utf8'),
     readFile(path.join(repoRoot, 'src/views/ProsopPersonsView.tsx'), 'utf8'),
@@ -335,15 +333,15 @@ try {
     readFile(path.join(repoRoot, 'src/views/ProsopSearchView.tsx'), 'utf8'),
     readFile(path.join(repoRoot, 'electron/mcp/tools.ts'), 'utf8'),
   ]);
-  for (const channel of [
+  // Asks whether the channel is wired, not which file it lives in: the handlers
+  // moved to electron/ipc/prosopography.ts and the bindings to
+  // electron/preload/prosopography.ts, and this assertion should survive the next
+  // move too.
+  assertChannelsWired(assert, [
     'prosop:sources:workspace', 'prosop:sources:save', 'prosop:sources:saveSegment',
     'prosop:capture:saveTemplate', 'prosop:capture:importDelimited', 'prosop:capture:reviewRow',
-  ]) {
-    assert.match(ipc, new RegExp(channel.replaceAll(':', '\\:')));
-    assert.match(preload, new RegExp(channel.replaceAll(':', '\\:')));
-  }
-  assert.match(api, /getProsopSourcesWorkspace/);
-  assert.match(api, /getProsopObservationsWorkspace/);
+  ]);
+  assertApiMethods(assert, ['getProsopSourcesWorkspace', 'getProsopObservationsWorkspace']);
   assert.match(view, /data-testid="prosop-sources-view"/);
   assert.match(panel, /data-testid="prosop-observations-panel"/);
   assert.match(panel, /dark:/);

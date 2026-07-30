@@ -6,16 +6,17 @@ import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readSource } from './ipc-channel-census.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
 
 if (!process.argv.includes('--electron-primary-sources-archive-test')) {
-  const view = fs.readFileSync(path.join(repoRoot, 'src/views/PrimarySourcesArchiveView.tsx'), 'utf8');
-  const app = fs.readFileSync(path.join(repoRoot, 'src/App.tsx'), 'utf8');
-  const shared = fs.readFileSync(path.join(repoRoot, 'shared/types.ts'), 'utf8');
-  const preload = fs.readFileSync(path.join(repoRoot, 'electron/preload.ts'), 'utf8');
-  const ipc = fs.readFileSync(path.join(repoRoot, 'electron/ipc.ts'), 'utf8');
+  const view = readSource('src/views/PrimarySourcesArchiveView.tsx');
+  const app = readSource('@shell');
+  const shared = readSource('@api');
+  const preload = readSource('@bridge');
+  const ipc = readSource('@main');
 
   for (const contract of [
     "type DisplayMode = 'table' | 'gallery' | 'hierarchy'",

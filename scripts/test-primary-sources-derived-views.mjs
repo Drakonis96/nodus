@@ -6,6 +6,7 @@ import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readSource } from './ipc-channel-census.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
@@ -14,18 +15,18 @@ if (!process.argv.includes('--electron-primary-sources-derived-test')) {
   const files = Object.fromEntries([
     'timeline', 'map', 'relations', 'app', 'repo', 'schema', 'sync', 'shared',
     'preload', 'ipc',
-  ].map((name, index) => [name, fs.readFileSync(path.join(repoRoot, [
+  ].map((name, index) => [name, readSource([
     'src/views/PrimarySourcesTimelineView.tsx',
     'src/views/PrimarySourcesMapView.tsx',
     'src/views/PrimarySourcesRelationsView.tsx',
-    'src/App.tsx',
+    '@shell',
     'electron/db/primarySourceDerivedViewsRepo.ts',
     'electron/db/migrations.ts',
     'electron/db/syncTables.ts',
-    'shared/types.ts',
-    'electron/preload.ts',
-    'electron/ipc.ts',
-  ][index]), 'utf8')]));
+    '@api',
+    '@bridge',
+    '@main',
+  ][index])]));
 
   for (const marker of [
     'Fecha e intervalo',
@@ -47,9 +48,9 @@ if (!process.argv.includes('--electron-primary-sources-derived-test')) {
       `phase 8 UI contains ${marker}`
     );
   }
-  assert.match(files.app, /isPrimarySources \? <PrimarySourcesTimelineView \/>/);
-  assert.match(files.app, /isPrimarySources \? <PrimarySourcesMapView \/>/);
-  assert.match(files.app, /isPrimarySources \? <PrimarySourcesRelationsView \/>/);
+  assert.match(files.app, /isPrimarySources\s*\? <PrimarySourcesTimelineView \/>/);
+  assert.match(files.app, /isPrimarySources\s*\? <PrimarySourcesMapView \/>/);
+  assert.match(files.app, /isPrimarySources\s*\? <PrimarySourcesRelationsView \/>/);
   assert.ok(Number(files.schema.match(/SCHEMA_VERSION = (\d+)/)[1]) >= 121,
     'the derived-views migration is applied');
   assert.match(files.schema, /provenance_place_id/);

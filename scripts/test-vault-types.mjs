@@ -6,6 +6,7 @@ import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readSource } from './ipc-channel-census.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
@@ -105,7 +106,7 @@ test('the vault picker derives selectable modes from the canonical registry', as
 test('the worldbuilding sidebar keeps its full announced shape, with only the built sections live', async () => {
   const [sidebar, app, english] = await Promise.all([
     readFile(path.join(repoRoot, 'src/components/WorldbuildingSidebar.tsx'), 'utf8'),
-    readFile(path.join(repoRoot, 'src/App.tsx'), 'utf8'),
+    Promise.resolve(readSource('@shell')),
     readFile(path.join(repoRoot, 'src/i18n.en.ts'), 'utf8'),
   ]);
   // The whole promised structure stays visible while it is built one section at a time.
@@ -139,8 +140,10 @@ test('the worldbuilding sidebar keeps its full announced shape, with only the bu
   }
   assert.match(app, /<WorldbuildingSidebar[\s\S]*?activeView=\{view\}[\s\S]*?onNavigate=/);
   // Its own Inicio, and the generic academic home must not also render for it.
-  assert.match(app, /view === 'home' && isWorldbuilding && \(\s*<WorldbuildingHome/);
-  assert.match(app, /view === 'home' &&[^\n]*!isWorldbuilding[^\n]*&& \(/);
+  assert.match(app, /if \(ctx\.isWorldbuilding\) \{\s*return \(\s*<WorldbuildingHome/);
+  // The academic home is reached only after every vault flag has declined it,
+  // worldbuilding's among them.
+  assert.match(app, /if \(ctx\.isWorldbuilding\)[\s\S]*return \(\s*<HomeView/);
   assert.match(english, /'World chat'/);
   // The world graph was dropped: the encyclopedia's A–Z plus its backlinks answer what a
   // node-and-edge picture of a fictional world was ever going to answer.
@@ -149,15 +152,15 @@ test('the worldbuilding sidebar keeps its full announced shape, with only the bu
 
 test('an empty worldbuilding home offers the complete local demo through the typed IPC bridge', async () => {
   const [app, home, offer, ipc, preload, types] = await Promise.all([
-    readFile(path.join(repoRoot, 'src/App.tsx'), 'utf8'),
+    Promise.resolve(readSource('@shell')),
     readFile(path.join(repoRoot, 'src/views/WorldbuildingHome.tsx'), 'utf8'),
     readFile(path.join(repoRoot, 'src/views/HomeView.tsx'), 'utf8'),
-    readFile(path.join(repoRoot, 'electron/ipc.ts'), 'utf8'),
-    readFile(path.join(repoRoot, 'electron/preload.ts'), 'utf8'),
-    readFile(path.join(repoRoot, 'shared/types.ts'), 'utf8'),
+    Promise.resolve(readSource('@main')),
+    Promise.resolve(readSource('@bridge')),
+    Promise.resolve(readSource('@api')),
   ]);
   assert.match(app, /const loadWorldbuildingDemo = useCallback/);
-  assert.match(app, /showDemoOffer=\{hasData === false && !settings\.demoMode\}/);
+  assert.match(app, /const showDemoOffer = hasData === false && !settings\.demoMode;/);
   assert.match(home, /<DemoOfferCard\s+variant="worldbuilding"/s);
   assert.match(offer, /variant\?:[^;]*'worldbuilding'/);
   assert.match(offer, /Cargar demo de worldbuilding/);
@@ -205,7 +208,7 @@ test('the worldbuilding prompt pack makes the author the source of truth', () =>
 });
 
 test('the header vault action uses a stable localized label', async () => {
-  const app = await readFile(path.join(repoRoot, 'src/App.tsx'), 'utf8');
+  const app = await Promise.resolve(readSource('@shell'));
   assert.match(app, /icon="archive"\s+label=\{t\('Bóvedas'\)\}/s);
   assert.doesNotMatch(app, /label=\{activeVault\?\.name \?\? t\('Bóveda'\)\}/);
 });
@@ -335,7 +338,7 @@ test('teaching reuses the study organisation and analysis surfaces but hides the
 });
 
 test('the teaching sidebar keeps the Tools group and never duplicates its own sections', async () => {
-  const app = await readFile(path.join(repoRoot, 'src/App.tsx'), 'utf8');
+  const app = await Promise.resolve(readSource('@shell'));
   const branch = /if \(isDocencia\) \{([\s\S]*?)\n              \}/.exec(app);
   assert.ok(branch, 'the docencia sidebar branch must exist');
   const body = branch[1];

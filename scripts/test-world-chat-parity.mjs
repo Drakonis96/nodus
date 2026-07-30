@@ -3,16 +3,19 @@ import test from 'node:test';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readSource } from './ipc-channel-census.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const read = (file) => readFile(path.join(root, file), 'utf8');
+// readSource resolves the '@main' / '@bridge' / '@api' sentinels to whole surfaces —
+// the three former hot files are directories now — and any other path to that file.
+const read = async (file) => readSource(file);
 
 test('world chat has the same conversation, model, context and streaming controls as study chat', async () => {
   const [view, types, preload, ipc] = await Promise.all([
     read('src/views/WorldChatView.tsx'),
-    read('shared/types.ts'),
-    read('electron/preload.ts'),
-    read('electron/ipc.ts'),
+    read('@api'),
+    read('@bridge'),
+    read('@main'),
   ]);
   for (const contract of [
     'listWorldChatConversations',
@@ -37,7 +40,7 @@ test('world chat has the same conversation, model, context and streaming control
 });
 
 test('the global assistant action is mode-aware in worldbuilding', async () => {
-  const app = await read('src/App.tsx');
+  const app = await read('@shell');
   assert.match(app, /if \(isWorldbuilding\)[\s\S]{0,160}setView\('worldChat'\)/);
   assert.match(app, /isWorldbuilding \? 'Chat del mundo' : 'Asistente de investigación'/);
   assert.match(app, /isWorldbuilding \? 'Abrir chat del mundo' : 'Abrir asistente de investigación'/);

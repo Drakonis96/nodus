@@ -6,6 +6,7 @@ import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readSource } from './ipc-channel-census.mjs';
 
 // The video tutorials are the one place Nodus embeds a remote frame, and the one place
 // the tutorial's twelve languages are served from a table that is NOT the i18n one.
@@ -13,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
-const read = (file) => readFile(path.join(repoRoot, file), 'utf8');
+const read = async (file) => readSource(file);
 
 // shared/tutorialVideos.ts only imports types, so a plain esbuild bundle is enough.
 const outDir = await mkdtemp(path.join(os.tmpdir(), 'nodus-tutorial-videos-'));
@@ -230,7 +231,7 @@ test('the grid never reaches Google until a video is opened', async () => {
 
 test('the watched flags are app-wide, like the tutorial version they sit next to', async () => {
   const [types, defaults, prefs] = await Promise.all([
-    read('shared/types.ts'),
+    read('@api'),
     read('electron/db/settingsRepo.ts'),
     read('electron/db/appPrefs.ts'),
   ]);
@@ -326,7 +327,7 @@ test('the videos are announced once to installs that predate them', async () => 
 
   // Completing the cinematic guide answers the same question, so it settles the
   // announcement too — a fresh install must never be told about a choice it just made.
-  assert.match(app, /markTutorialVideosAnnouncementSeen\(\);\s*\n\s*await window\.nodus\.updateSettings\(\{ basicsTutorialVersion: BASICS_TUTORIAL_VERSION \}\)/);
+  assert.match(await read('src/app/StartupGate.tsx'), /markTutorialVideosAnnouncementSeen\(\);\s*\n\s*await window\.nodus\.updateSettings\(\{ basicsTutorialVersion: BASICS_TUTORIAL_VERSION \}\)/);
   // It queues behind the other one-time tours and ahead of the update check, so two
   // modals never fight for the foreground.
   const order = ['<WhatsNewModal', '<PlatformHighlightsUpdateTour', '<ToolkitBetaUpdateTour', '<TutorialVideosUpdateTour', '<StartupUpdateModal'].map((tag) => app.indexOf(tag));
@@ -337,7 +338,7 @@ test('the videos are announced once to installs that predate them', async () => 
 test('the announcement speaks every interface language', async () => {
   const [guide, types] = await Promise.all([
     read('src/components/TutorialVideosGuide.tsx'),
-    read('shared/types.ts'),
+    read('@api'),
   ]);
   // Read the languages from the type itself, so an eighth UI language fails here.
   const declared = types.match(/export type AppLanguage = ([^;]+);/)[1]
@@ -532,8 +533,8 @@ test('the published file matches what this build ships', async () => {
 test('the catalogue is fetched in the main process, cached, and never fatal', async () => {
   const [main, ipc, preload] = await Promise.all([
     read('electron/tutorialCatalogue.ts'),
-    read('electron/ipc.ts'),
-    read('electron/preload.ts'),
+    read('@main'),
+    read('@bridge'),
   ]);
   assert.match(ipc, /h\('tutorials:catalogue', async \(\) => getTutorialCatalogue\(\)\)/);
   assert.match(preload, /getTutorialCatalogue: \(\) => ipcRenderer\.invoke\('tutorials:catalogue'\)/);

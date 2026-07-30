@@ -1,14 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { readSource } from './ipc-channel-census.mjs';
 
-const read = (file) => readFile(new URL(`../${file}`, import.meta.url), 'utf8');
+const read = async (file) => readSource(file);
 
 test('primary sources owns exactly the agreed ten-section shell', async () => {
   const [sidebar, navigation, app] = await Promise.all([
     read('src/components/PrimarySourcesSidebar.tsx'),
     read('src/navigation.ts'),
-    read('src/App.tsx'),
+    read('@shell'),
   ]);
   const itemBlock = sidebar.slice(
     sidebar.indexOf('export const PRIMARY_SOURCES_SIDEBAR_ITEMS'),
@@ -32,12 +33,14 @@ test('primary sources owns exactly the agreed ten-section shell', async () => {
 });
 
 test('primary sources never renders legacy genealogy/academic views for its core routes', async () => {
-  const app = await read('src/App.tsx');
-  assert.match(app, /view === 'home' && isPrimarySources[\s\S]{0,180}<PrimarySourcesHomeView/);
-  assert.match(app, /view === 'home' && !isPrimarySources && !isGenealogy/);
+  const app = await read('@shell');
+  assert.match(app, /if \(ctx\.isPrimarySources\) \{[\s\S]{0,180}<PrimarySourcesHomeView/);
+  // The academic home is the fallback of the dispatch, reached only when no vault
+  // flag claimed the screen — which is what keeps primary sources off it.
+  assert.match(app, /if \(ctx\.isPreviewVault\) return null;\s*return \(\s*<HomeView/);
   assert.match(
     app,
-    /view === 'persons'[^\n]+isPrimarySources \? <PrimarySourcesPersonsView \/>/,
+    /persons: \([^)]*\) => \(isPrimarySources\s*\? <PrimarySourcesPersonsView \/>/,
     'persons has its functional primary-source-specific route'
   );
   for (const [section, component] of [
@@ -47,17 +50,21 @@ test('primary sources never renders legacy genealogy/academic views for its core
   ]) {
     assert.match(
       app,
-      new RegExp(`view === '${section}'[^\\n]+isPrimarySources \\? <${component} \\/>`),
+      new RegExp(`${section}: \\([^)]*\\) => \\(isPrimarySources\\s*\\? <${component} \\/>`),
       `${section} has a functional primary-source-specific route`
     );
   }
   assert.match(
     app,
-    /view === 'archive'[\s\S]{0,120}isPrimarySources[\s\S]{0,120}\? <PrimarySourcesArchiveView/,
+    /archive: \([^)]*\)[\s\S]{0,160}isPrimarySources[\s\S]{0,120}\? \(\s*<PrimarySourcesArchiveView/,
     'archive has its functional primary-source-specific route'
   );
-  assert.match(app, /view === 'search' && isPrimarySources[\s\S]*?<PrimarySourcesSearchView/);
-  assert.match(app, /view === 'search' && !isPrimarySources/);
+  assert.match(app, /if \(isPrimarySources\) \{[\s\S]{0,120}<PrimarySourcesSearchView/);
+  // …and the academic engine is the fallback, not a branch primary sources can reach.
+  assert.match(app, /<PrimarySourcesSearchView[\s\S]*?return \(\s*<SearchView/);
+  // The academic search engine is the fallback of the branch, which is what keeps
+  // a primary-sources vault from ever reaching it.
+  assert.match(app, /if \(isPrimarySources\) \{[\s\S]*?return \(\s*<SearchView/);
 });
 
 test('creation and onboarding recognise primary sources without requiring Zotero', async () => {

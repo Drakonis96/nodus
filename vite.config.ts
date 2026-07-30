@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import electron from 'vite-plugin-electron/simple';
+import electronPlugin from 'vite-plugin-electron';
 import renderer from 'vite-plugin-electron-renderer';
 import path from 'node:path';
 import { createRequire } from 'node:module';
@@ -40,6 +41,40 @@ const mainExternals = [
   'openai',
   'electron-updater',
 ];
+
+/**
+ * One preload build, emitting `<name>.cjs` into dist-electron.
+ *
+ * Each window class gets its OWN build rather than sharing one multi-entry build,
+ * and the reason is `sandbox: true`: a sandboxed preload's `require` only resolves
+ * electron and a couple of builtins, so it cannot load a sibling chunk. Rollup
+ * splits shared code out the moment a build has two entries, which is exactly what
+ * `inlineDynamicImports` prevents — and rollup rejects that flag with more than one
+ * entry. Separate builds keep every preload a single self-contained file.
+ *
+ * `onstart` mirrors what vite-plugin-electron/simple does for its own preload:
+ * reload the renderer instead of spawning another Electron instance in dev.
+ */
+const preloadBuild = (name: string, entry: string) => ({
+  onstart: (args: { reload: () => void }) => args.reload(),
+  vite: {
+    // The top-level resolve.alias only applies to the renderer build.
+    resolve: {
+      alias: { '@shared': path.resolve(__dirname, 'shared') },
+    },
+    build: {
+      outDir: 'dist-electron',
+      emptyOutDir: false,
+      rollupOptions: {
+        input: { [name]: path.join(__dirname, entry) },
+        external: mainExternals,
+        // CommonJS: Electron loads a .cjs preload unambiguously as CJS, which is far
+        // more reliable in packaged apps than an ESM (.mjs) one.
+        output: { format: 'cjs' as const, entryFileNames: '[name].cjs', inlineDynamicImports: true },
+      },
+    },
+  },
+});
 
 export default defineConfig({
   // Expose the app version to the renderer at build time (shown in Settings).
@@ -137,6 +172,12 @@ export default defineConfig({
         },
       },
     }),
+    // Nodi and the Presenter get their own preload, exposing a named subset of the
+    // bridge instead of all ~1,250 methods (see shared/api/windows.ts).
+    electronPlugin([
+      preloadBuild('preload.nodi', 'electron/preload/nodi.ts'),
+      preloadBuild('preload.presenter', 'electron/preload/presenter.ts'),
+    ]),
     renderer(),
   ],
 });

@@ -73,7 +73,7 @@ import { getProsopPopulationWorkspace } from '../db/prosopPopulationRepo';
 import { getProsopIdentityWorkspace } from '../db/prosopIdentityRepo';
 import { getProsopObservationsWorkspace } from '../db/prosopFactoidsRepo';
 import { getProsopMembershipWorkspace } from '../db/prosopMembershipRepo';
-import { getProsopAnalysisWorkspace, runProsopAnalysis } from '../db/prosopAnalysisRepo';
+import { runProsopAnalysis } from '../db/prosopAnalysisRepo';
 import { createProsopProposal, searchProsopography } from '../db/prosopSearchRepo';
 import {
   characterCounts,

@@ -1,6 +1,5 @@
 import { v4 as uuid } from 'uuid';
 import type {
-  JsonValue,
   ProsopFactoid,
   ProsopFactoidDossier,
   ProsopFactoidInput,

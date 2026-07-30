@@ -6,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { readSource } from './ipc-channel-census.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
@@ -42,7 +43,7 @@ test('the selected audience crosses the UI, queue request, prompt phases and sav
     readFile(path.join(repoRoot, 'src/views/DeepResearchView.tsx'), 'utf8'),
     readFile(path.join(repoRoot, 'electron/ai/studyDeepResearch.ts'), 'utf8'),
     readFile(path.join(repoRoot, 'src/components/TeachingSidebar.tsx'), 'utf8'),
-    readFile(path.join(repoRoot, 'src/App.tsx'), 'utf8'),
+    Promise.resolve(readSource('@shell')),
   ]);
 
   assert.match(view, /data-testid="deep-research-audience"/);
@@ -50,7 +51,7 @@ test('the selected audience crosses the UI, queue request, prompt phases and sav
   assert.match(view, /value="students"/);
   assert.match(view, /\.\.\.\(isStudy \? \{ audience \} : \{\}\)/);
   assert.match(sidebar, /\{ label: 'Diseño de unidades', icon: 'compass', view: 'teachingUnits' \}/);
-  assert.match(app, /view === 'teachingUnits'/);
+  assert.match(app, /teachingUnits: \(/);
   assert.match(app, /\bisTeaching\b/);
 
   assert.match(engine, /normalizeStudyDeepResearchAudience\(\s*request\.audience/);

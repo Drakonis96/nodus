@@ -3,16 +3,17 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { readSource } from './ipc-channel-census.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const read = (file) => readFile(path.join(root, file), 'utf8');
+const read = async (file) => readSource(file);
 
 test('restarting a completed immersion clears answers and all prior progress', async () => {
   const [repo, ipc, preload, types, view] = await Promise.all([
     read('electron/db/immersionRepo.ts'),
-    read('electron/ipc.ts'),
-    read('electron/preload.ts'),
-    read('shared/types.ts'),
+    read('@main'),
+    read('@bridge'),
+    read('@api'),
     read('src/views/ImmersionView.tsx'),
   ]);
   assert.match(repo, /export function restartImmersionSession[\s\S]*setImmersionProgress\(id, emptyImmersionProgress\(\)\)/);

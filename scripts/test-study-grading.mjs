@@ -5,16 +5,17 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { readSource } from './ipc-channel-census.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const read = (relative) => readFile(path.join(repoRoot, relative), 'utf8');
+const read = async (relative) => readSource(relative);
 
 test('student answers cannot reach an AI grading route', async () => {
   assert.equal(existsSync(path.join(repoRoot, 'electron/ai/studyGrading.ts')), false);
   const [ipc, preload, api, studyTasks] = await Promise.all([
-    read('electron/ipc.ts'),
-    read('electron/preload.ts'),
-    read('shared/types.ts'),
+    read('@main'),
+    read('@bridge'),
+    read('@api'),
     read('shared/studyAi.ts'),
   ]);
   for (const source of [ipc, preload, api]) {
@@ -25,7 +26,7 @@ test('student answers cannot reach an AI grading route', async () => {
 
 test('manual gradebook and deterministic answer matching remain separate from AI', async () => {
   const [ipc, engine, immersion] = await Promise.all([
-    read('electron/ipc.ts'),
+    read('@main'),
     read('shared/assessment/engine.ts'),
     read('electron/ai/immersion.ts'),
   ]);

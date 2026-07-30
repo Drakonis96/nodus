@@ -1,7 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { AppSettings, CorpusHealthBucketId, DatabaseSummary, RecoveryStatus, SyncLogEntry, VaultSummary } from '@shared/types';
-import { Onboarding } from './views/Onboarding';
-import { HomeView, GenealogyHome, DatabasesHome } from './views/HomeView';
 import type { CsvImportPlanData } from './views/DatabasesView';
 import { FeedbackModal } from './views/FeedbackModal';
 import { RoadmapFeedbackModal, type RoadmapTopicKey } from './views/RoadmapFeedbackModal';
@@ -14,16 +12,7 @@ import { DatabasesSidebarExplore } from './components/DatabasesSidebarExplore';
 import { StudySidebar, type StudyNavigationTarget } from './components/StudySidebar';
 import { TeachingSidebar } from './components/TeachingSidebar';
 import { PrimarySourcesSidebar } from './components/PrimarySourcesSidebar';
-import { WorldMapsView } from './views/WorldMapsView';
-import { EncyclopediaView } from './views/EncyclopediaView';
 import { CONTINUITY_VIEWS, ContinuityProvider } from './components/world/ContinuityBadge';
-import { ContinuityView } from './views/ContinuityView';
-import { ConflictsView } from './views/ConflictsView';
-import { ArcsView } from './views/ArcsView';
-import { RulesView } from './views/RulesView';
-import { QuestionsView } from './views/QuestionsView';
-import { WorldChatView } from './views/WorldChatView';
-import { ManuscriptView } from './views/ManuscriptView';
 import { WorldbuildingSidebar } from './components/WorldbuildingSidebar';
 import { ProsopographySidebar } from './components/ProsopographySidebar';
 import { TestimonySidebar } from './components/TestimonySidebar';
@@ -41,21 +30,21 @@ import { TeachingTour } from './views/TeachingTour';
 import { PrimarySourcesTour } from './views/PrimarySourcesTour';
 import { ProsopographyTour } from './views/ProsopographyTour';
 import { WorldbuildingTour } from './views/WorldbuildingTour';
-import { BASICS_TUTORIAL_VERSION, BasicsTutorial } from './views/BasicsTutorial';
-import { FIRST_VAULT_VERSION, FirstVaultSetup } from './views/FirstVaultSetup';
-import { preferencesForTutorialLanguage } from '@shared/tutorialPreferences';
+import { FIRST_VAULT_VERSION } from './views/FirstVaultSetup';
 import { hasPendingWhatsNew, WhatsNewModal } from './components/WhatsNewModal';
-import { markTutorialVideosAnnouncementSeen, TutorialVideosUpdateTour } from './components/TutorialVideosGuide';
+import { TutorialVideosUpdateTour } from './components/TutorialVideosGuide';
 import { PlatformHighlightsUpdateTour } from './components/PlatformHighlightsGuide';
 import { ToolkitBetaUpdateTour } from './components/ToolkitBetaGuide';
 import { StartupUpdateModal } from './components/StartupUpdateModal';
 import { recoveryHealthAdvice, recoveryHealthHeadline } from './recoveryHealth';
-import { RecoverySetupWizard } from './views/RecoverySetupWizard';
 import { NodiMascot } from './components/nodi/NodiMascot';
 import { NodiStyleModal } from './components/NodiStyleModal';
 import { Icon } from './components/ui';
 import { AppErrorBoundary } from './components/AppErrorBoundary';
 import { t, tx, setActiveLang } from './i18n';
+import { resolveStartupGate } from './app/StartupGate';
+import { VIEW_REGISTRY } from './app/viewRegistry';
+import type { ViewContext } from './app/ViewContext';
 import { notifyDataChanged, useDataRefresh } from './hooks';
 import { setActiveVaultQueryScope } from './vaultQueryCache';
 import type {
@@ -79,79 +68,7 @@ import nodusLogoViolet from './assets/nodus-logo-violet.svg';
 import nodusLogoCyan from './assets/nodus-logo-cyan.svg';
 import { buildDockIconDataUrl, dockColorForVaultType } from './dockIcon';
 
-const DatabasesView = lazy(() => import('./views/DatabasesView').then((module) => ({ default: module.DatabasesView })));
 const CsvImportModal = lazy(() => import('./views/DatabasesView').then((module) => ({ default: module.CsvImportModal })));
-const DatabasesAnalysisView = lazy(() => import('./views/DatabasesAnalysisView').then((module) => ({ default: module.DatabasesAnalysisView })));
-const DatabasesChatView = lazy(() => import('./views/DatabasesChatView').then((module) => ({ default: module.DatabasesChatView })));
-const DatabasesSearchView = lazy(() => import('./views/DatabasesSearchView').then((module) => ({ default: module.DatabasesSearchView })));
-const StudyHome = lazy(() => import('./views/StudyHome').then((module) => ({ default: module.StudyHome })));
-const TeachingHome = lazy(() => import('./views/TeachingHome').then((module) => ({ default: module.TeachingHome })));
-const WorldbuildingHome = lazy(() => import('./views/WorldbuildingHome').then((module) => ({ default: module.WorldbuildingHome })));
-const ProsopographyHome = lazy(() => import('./views/ProsopographyHome').then((module) => ({ default: module.ProsopographyHome })));
-const ProsopPopulationView = lazy(() => import('./views/ProsopPopulationView').then((module) => ({ default: module.ProsopPopulationView })));
-const ProsopSourcesView = lazy(() => import('./views/ProsopSourcesView').then((module) => ({ default: module.ProsopSourcesView })));
-const ProsopPersonsView = lazy(() => import('./views/ProsopPersonsView').then((module) => ({ default: module.ProsopPersonsView })));
-const ProsopAnalysisView = lazy(() => import('./views/ProsopAnalysisView').then((module) => ({ default: module.ProsopAnalysisView })));
-const ProsopNetworksView = lazy(() => import('./views/ProsopNetworksView').then((module) => ({ default: module.ProsopNetworksView })));
-const ProsopSearchView = lazy(() => import('./views/ProsopSearchView').then((module) => ({ default: module.ProsopSearchView })));
-const PrimarySourcesHomeView = lazy(() => import('./views/PrimarySourcesHomeView').then((module) => ({ default: module.PrimarySourcesHomeView })));
-const PrimarySourcesArchiveView = lazy(() => import('./views/PrimarySourcesArchiveView').then((module) => ({ default: module.PrimarySourcesArchiveView })));
-const PrimarySourcesPersonsView = lazy(() => import('./views/PrimarySourcesPersonsView').then((module) => ({ default: module.PrimarySourcesPersonsView })));
-const PrimarySourcesTimelineView = lazy(() => import('./views/PrimarySourcesTimelineView').then((module) => ({ default: module.PrimarySourcesTimelineView })));
-const PrimarySourcesMapView = lazy(() => import('./views/PrimarySourcesMapView').then((module) => ({ default: module.PrimarySourcesMapView })));
-const PrimarySourcesRelationsView = lazy(() => import('./views/PrimarySourcesRelationsView').then((module) => ({ default: module.PrimarySourcesRelationsView })));
-const PrimarySourcesSearchView = lazy(() => import('./views/PrimarySourcesSearchView').then((module) => ({ default: module.PrimarySourcesSearchView })));
-const PrimarySourcesNotesView = lazy(() => import('./views/PrimarySourcesNotesView').then((module) => ({ default: module.PrimarySourcesNotesView })));
-const TestimonyHome = lazy(() => import('./views/TestimonyHome').then((module) => ({ default: module.TestimonyHome })));
-const TestimonyInterviewsView = lazy(() => import('./views/TestimonyInterviewsView').then((module) => ({ default: module.TestimonyInterviewsView })));
-const TestimonyParticipantsView = lazy(() => import('./views/TestimonyParticipantsView').then((module) => ({ default: module.TestimonyParticipantsView })));
-const TestimonyContrastsView = lazy(() => import('./views/TestimonyContrastsView').then((module) => ({ default: module.TestimonyContrastsView })));
-const TestimonySearchView = lazy(() => import('./views/TestimonySearchView').then((module) => ({ default: module.TestimonySearchView })));
-const ScenesView = lazy(() => import('./views/ScenesView').then((module) => ({ default: module.ScenesView })));
-const FactionsView = lazy(() => import('./views/GroupsView').then((module) => ({ default: module.FactionsView })));
-const CulturesView = lazy(() => import('./views/GroupsView').then((module) => ({ default: module.CulturesView })));
-const DynastiesView = lazy(() => import('./views/GroupsView').then((module) => ({ default: module.DynastiesView })));
-const PlacesView = lazy(() => import('./views/PlacesView').then((module) => ({ default: module.PlacesView })));
-const CharactersView = lazy(() => import('./views/CharactersView').then((module) => ({ default: module.CharactersView })));
-const TeachingGroupsView = lazy(() => import('./views/TeachingGroupsView').then((module) => ({ default: module.TeachingGroupsView })));
-const TeachingGradesView = lazy(() => import('./views/TeachingGradesView').then((module) => ({ default: module.TeachingGradesView })));
-const RubricsView = lazy(() => import('./views/RubricsView').then((module) => ({ default: module.RubricsView })));
-const ExamBuilderView = lazy(() => import('./views/ExamBuilderView').then((module) => ({ default: module.ExamBuilderView })));
-const StudyOrganizationView = lazy(() => import('./views/StudyOrganizationView').then((module) => ({ default: module.StudyOrganizationView })));
-const StudyScheduleView = lazy(() => import('./views/StudyScheduleView').then((module) => ({ default: module.StudyScheduleView })));
-const StudyCalendarView = lazy(() => import('./views/StudyCalendarView').then((module) => ({ default: module.StudyCalendarView })));
-const StudyMaterialsView = lazy(() => import('./views/StudyMaterialsView').then((module) => ({ default: module.StudyMaterialsView })));
-const StudyRecordingsView = lazy(() => import('./views/StudyRecordingsView').then((module) => ({ default: module.StudyRecordingsView })));
-const StudySearchView = lazy(() => import('./views/StudySearchView').then((module) => ({ default: module.StudySearchView })));
-const StudyBankView = lazy(() => import('./views/StudyBankView').then((module) => ({ default: module.StudyBankView })));
-const StudyIdeasView = lazy(() => import('./views/StudyIdeasView').then((module) => ({ default: module.StudyIdeasView })));
-const StudyGraphView = lazy(() => import('./views/StudyGraphView').then((module) => ({ default: module.StudyGraphView })));
-const StudyChatView = lazy(() => import('./views/StudyChatView').then((module) => ({ default: module.StudyChatView })));
-const StudyReviewView = lazy(() => import('./views/StudyReviewView').then((module) => ({ default: module.StudyReviewView })));
-const Library = lazy(() => import('./views/Library').then((module) => ({ default: module.Library })));
-const GraphView = lazy(() => import('./views/GraphView').then((module) => ({ default: module.GraphView })));
-const GapsView = lazy(() => import('./views/GapsView').then((module) => ({ default: module.GapsView })));
-const DebateView = lazy(() => import('./views/DebateView').then((module) => ({ default: module.DebateView })));
-const ResearchMapView = lazy(() => import('./views/ResearchMapView').then((module) => ({ default: module.ResearchMapView })));
-const HypothesisLabView = lazy(() => import('./views/HypothesisLabView').then((module) => ({ default: module.HypothesisLabView })));
-const ReadingPathView = lazy(() => import('./views/ReadingPathView').then((module) => ({ default: module.ReadingPathView })));
-const WritingWorkshopView = lazy(() => import('./views/WritingWorkshopView').then((module) => ({ default: module.WritingWorkshopView })));
-const DeepResearchView = lazy(() => import('./views/DeepResearchView').then((module) => ({ default: module.DeepResearchView })));
-const ProjectsView = lazy(() => import('./views/ProjectsView').then((module) => ({ default: module.ProjectsView })));
-const NotesView = lazy(() => import('./views/NotesView').then((module) => ({ default: module.NotesView })));
-const SearchView = lazy(() => import('./views/SearchView').then((module) => ({ default: module.SearchView })));
-const ArgumentMapView = lazy(() => import('./views/ArgumentMapView').then((module) => ({ default: module.ArgumentMapView })));
-const IdeasView = lazy(() => import('./views/IdeasView').then((module) => ({ default: module.IdeasView })));
-const AuthorsView = lazy(() => import('./views/AuthorsView').then((module) => ({ default: module.AuthorsView })));
-const PersonasView = lazy(() => import('./views/PersonasView').then((module) => ({ default: module.PersonasView })));
-const TimelineView = lazy(() => import('./views/TimelineView').then((module) => ({ default: module.TimelineView })));
-const TreeView = lazy(() => import('./views/TreeView').then((module) => ({ default: module.TreeView })));
-const RelationsView = lazy(() => import('./views/RelationsView').then((module) => ({ default: module.RelationsView })));
-const MapView = lazy(() => import('./views/MapView').then((module) => ({ default: module.MapView })));
-const ArchiveView = lazy(() => import('./views/ArchiveView').then((module) => ({ default: module.ArchiveView })));
-const ImmersionView = lazy(() => import('./views/ImmersionView').then((module) => ({ default: module.ImmersionView })));
-const ToolkitView = lazy(() => import('./views/ToolkitView').then((module) => ({ default: module.ToolkitView })));
-const Settings = lazy(() => import('./views/Settings').then((module) => ({ default: module.Settings })));
 const CollectionsModal = lazy(() => import('./views/CollectionsModal').then((module) => ({ default: module.CollectionsModal })));
 const ResearchAssistantModal = lazy(() => import('./views/ResearchAssistantModal').then((module) => ({ default: module.ResearchAssistantModal })));
 
@@ -1052,99 +969,101 @@ export function App() {
     return [...navCommands, ...actions];
   }, [settings?.uiLanguage, settings?.reduceMotion, settings?.readingFocusMode, activeVault?.type, isPrimarySources, isGenealogy, isDatabases, isEstudio, isDocencia, isWorldbuilding, isProsopography, isTestimonios, isDark, onSync, openAssistant, reloadSettings]);
 
-  if (loadError) {
-    return (
-      <div className="h-full flex flex-col items-center justify-center gap-3 p-8 text-center">
-        <div className="text-red-400 font-semibold">{t('No se pudo iniciar Nodus')}</div>
-        <div className="text-neutral-400 text-sm max-w-md">{loadError}</div>
-        <button className="btn btn-primary" onClick={() => { setLoadError(null); void reloadSettings(); }}>
-          {t('Reintentar')}
-        </button>
-      </div>
-    );
-  }
+  // The startup sequence, as an ordered list of guards rather than a run of early
+  // returns. It also sets this render's authoritative language, which is why it is
+  // called before anything below reads `settings`.
+  const startupGate = resolveStartupGate({
+    loadError,
+    settings,
+    activeVault,
+    recoveryStatus,
+    isPreviewVault,
+    newInstall,
+    whatsNewSettled,
+    onboardingDiscardsVault,
+    clearLoadError: () => setLoadError(null),
+    reloadSettings,
+    reloadVaults,
+    reloadRecoveryStatus,
+    cancelOnboarding,
+    setView,
+  });
+  if (startupGate) return startupGate;
+  if (!settings) return null; // unreachable: the settings guard above owns this case
 
-  if (!settings) {
-    return <div className="h-full flex items-center justify-center text-neutral-500">{t('Cargando Nodus…')}</div>;
-  }
-
-  // Authoritative per-render language: set before any child renders so every t() call
-  // (including in plain helper functions) reads the current language.
-  setActiveLang(settings.uiLanguage);
-
-  // The cinematic guide owns first-run language selection. A positive value means
-  // it has been seen and remains authoritative across every future app update;
-  // Settings deliberately resets it to zero when the user asks to replay it.
-  if (!isPreviewVault && settings.basicsTutorialVersion === 0) {
-    return (
-      <BasicsTutorial
-        language={settings.uiLanguage}
-        onLanguageChosen={async (language) => {
-          await window.nodus.updateSettings(preferencesForTutorialLanguage(language));
-          await reloadSettings();
-        }}
-        onNodiStyleChosen={async (mascotStyle) => {
-          await window.nodus.updateSettings({ mascotStyle, mascotStyleChosen: true });
-          await reloadSettings();
-        }}
-        onComplete={async () => {
-          // The guide itself asks video or text, so whoever finishes it has already met
-          // the catalogue: the announcement for older installs must not follow them out.
-          markTutorialVideosAnnouncementSeen();
-          await window.nodus.updateSettings({ basicsTutorialVersion: BASICS_TUTORIAL_VERSION });
-          await reloadSettings();
-        }}
-      />
-    );
-  }
-
-  // Straight out of the guide, and before anything else asks for a decision: name the
-  // vault and pick its mode. Nodus used to skip this and hand over an academic vault
-  // called «Principal», which is why the mode felt like something that had happened to
-  // the user rather than something they chose. Only a run that STARTED before the guide
-  // was ever completed gets here (see `newInstall`), so no existing vault is ever
-  // renamed underneath its owner.
-  if (!isPreviewVault && newInstall && settings.firstVaultVersion === 0 && activeVault) {
-    return (
-      <FirstVaultSetup
-        vault={activeVault}
-        onComplete={async () => {
-          await Promise.all([reloadSettings(), reloadVaults()]);
-        }}
-      />
-    );
-  }
-
-  if (!isPreviewVault && recoveryStatus === null) {
-    return <div className="h-full flex items-center justify-center text-neutral-500">{t('Verificando la protección de tus datos…')}</div>;
-  }
-
-  // New installs see this immediately after the cinematic tutorial. Existing
-  // installs first dismiss the release notes and then receive the migration wizard.
-  if (!isPreviewVault && recoveryStatus?.needsSetup && (!recoveryStatus.previousInstallation || whatsNewSettled)) {
-    return (
-      <RecoverySetupWizard
-        status={recoveryStatus}
-        language={settings.uiLanguage}
-        onComplete={async () => {
-          await Promise.all([reloadSettings(), reloadVaults(), reloadRecoveryStatus()]);
-        }}
-      />
-    );
-  }
-
-  if (!isPreviewVault && !settings.onboardingComplete) {
-    return (
-      <Onboarding
-        activeVault={activeVault}
-        settings={settings}
-        providerKeys={settings.providerKeys}
-        onDone={(nextView = 'home') => reloadSettings().then(() => setView(nextView))}
-        onCancel={cancelOnboarding}
-        discardsVault={onboardingDiscardsVault}
-      />
-    );
-  }
+  // Everything the sections need from the shell, assembled once. Built after the
+  // startup gate so `settings` is known to be there, which is what lets a renderer
+  // read `ctx.settings` without a null check of its own.
+  const viewContext: ViewContext = {
+    settings,
+    activeVault,
+    vaults,
+    recoveryStatus,
+    isGenealogy,
+    isPrimarySources,
+    isDatabases,
+    isEstudio,
+    isDocencia,
+    isWorldbuilding,
+    isTestimonios,
+    isProsopography,
+    isPreviewVault,
+    hasData,
+    demoBusy,
+    lastSync,
+    syncing,
+    databases,
+    activeDatabaseId,
+    pendingRecordId,
+    toolkitPage,
+    graphTarget,
+    ideaTarget,
+    libraryTarget,
+    noteTarget,
+    personsTarget,
+    testimonyTarget,
+    primarySourceTarget,
+    studyTarget,
+    studyMaterialTarget,
+    studyRecordingTarget,
+    studyGraphTarget,
+    studyChatTarget,
+    setView,
+    navigate,
+    setToolkitPage,
+    reloadSettings,
+    reloadVaults,
+    reloadDatabases,
+    openAssistant,
+    openLibraryBucket,
+    openNoteFromSearch,
+    openPrimarySourceTarget,
+    openTestimonyInterview,
+    openTestimonyLink,
+    onSync,
+    setNoteTarget,
+    setPersonsTarget,
+    setPrimarySourceTarget,
+    setStudyTarget,
+    setStudyMaterialTarget,
+    setStudyRecordingTarget,
+    setStudyGraphTarget,
+    setStudyChatTarget,
+    setActiveDatabaseId,
+    setPendingRecordId,
+    setCollectionsOpen,
+    setManualWhatsNewOpen,
+    createDatabase,
+    importCsv,
+    loadDemo,
+    loadGenealogyDemo,
+    loadDatabasesDemo,
+    loadPrimarySourcesDemo,
+    loadStudyDemo,
+    loadTeachingDemo,
+    loadWorldbuildingDemo,
+    loadTestimonyDemo,
+  };
 
   return (
     <div
@@ -1622,323 +1541,7 @@ export function App() {
               recovery card here instead of blanking the whole window. key={view}
               clears the error automatically when the user switches sections. */}
           <AppErrorBoundary key={view}>
-          {view === 'home' && isGenealogy && (
-            <GenealogyHome
-              settings={settings}
-              onNavigate={(target) => navigate(target)}
-              onOpenAssistant={() => openAssistant()}
-              showDemoOffer={hasData === false && !settings.demoMode}
-              demoBusy={demoBusy}
-              onLoadDemo={loadDemo}
-              onLoadGenealogyDemo={loadGenealogyDemo}
-              onLoadDatabasesDemo={loadDatabasesDemo}
-            />
-          )}
-          {view === 'home' && isPrimarySources && (
-            <PrimarySourcesHomeView
-              vault={activeVault}
-              onNavigate={setView}
-              onOpenSource={openPrimarySourceTarget}
-              onOpenNote={(id) => {
-                setNoteTarget({ id, nonce: Date.now() });
-                setView('notes');
-              }}
-              showDemoOffer={hasData === false && !settings.demoMode}
-              demoBusy={demoBusy}
-              onLoadDemo={() => void loadPrimarySourcesDemo()}
-            />
-          )}
-          {view === 'home' && isDatabases && (
-            <DatabasesHome
-              databases={databases}
-              onOpenDatabase={(id) => {
-                setActiveDatabaseId(id);
-                setView('databases');
-              }}
-              onNewDatabase={() => void createDatabase()}
-              onImportCsv={() => void importCsv()}
-              onOpenAnalysis={() => setView('dbAnalysis')}
-              onOpenChat={() => setView('dbChat')}
-              demoBusy={demoBusy}
-              onLoadDatabasesDemo={loadDatabasesDemo}
-            />
-          )}
-          {view === 'home' && isEstudio && (
-            <StudyHome
-              onNavigate={setView}
-              onOpenDocument={(id) => { setStudyTarget({ kind: 'document', id }); setView('studyCourses'); }}
-              showDemoOffer={!settings.demoMode}
-              demoBusy={demoBusy}
-              onLoadDemo={loadStudyDemo}
-            />
-          )}
-          {view === 'home' && isDocencia && (
-            <TeachingHome
-              onNavigate={setView}
-              onOpenDocument={(id) => { setStudyTarget({ kind: 'document', id }); setView('studyCourses'); }}
-              showDemoOffer={hasData === false && !settings.demoMode}
-              demoBusy={demoBusy}
-              onLoadDemo={loadTeachingDemo}
-            />
-          )}
-          {view === 'home' && isWorldbuilding && (
-            <WorldbuildingHome
-              onNavigate={setView}
-              showDemoOffer={hasData === false && !settings.demoMode}
-              demoBusy={demoBusy}
-              onLoadDemo={loadWorldbuildingDemo}
-            />
-          )}
-          {view === 'home' && isTestimonios && (
-            <TestimonyHome
-              onNavigate={setView}
-              onOpenInterview={openTestimonyInterview}
-              showDemoOffer={hasData === false && !settings.demoMode}
-              demoBusy={demoBusy}
-              onLoadDemo={loadTestimonyDemo}
-            />
-          )}
-          {view === 'home' && isProsopography && <ProsopographyHome onNavigate={setView} />}
-          {view === 'home' && !isPrimarySources && !isGenealogy && !isDatabases && !isEstudio && !isDocencia && !isWorldbuilding && !isProsopography && !isTestimonios && !isPreviewVault && (
-            <HomeView
-              vaultId={activeVault?.id ?? null}
-              settings={settings}
-              lastSync={lastSync}
-              syncing={syncing}
-              onSync={onSync}
-              onNavigate={(target) => navigate(target)}
-              onOpenLibraryBucket={openLibraryBucket}
-              onOpenAssistant={() => openAssistant()}
-              showDemoOffer={hasData === false && !settings.demoMode}
-              demoBusy={demoBusy}
-              onLoadDemo={loadDemo}
-              onLoadGenealogyDemo={loadGenealogyDemo}
-              onLoadDatabasesDemo={loadDatabasesDemo}
-            />
-          )}
-          {view === 'library' && (
-            <Library
-              vaultId={activeVault?.id ?? null}
-              target={libraryTarget}
-              vaultType={activeVault?.type}
-              onOpenCollections={() => setCollectionsOpen(true)}
-              onOpenGraph={(target) => navigate('graph', target)}
-              onOpenAssistant={openAssistant}
-              onOpenArchive={() => setView('archive')}
-            />
-          )}
-          {view === 'graph' && <GraphView settings={settings} onSettingsChange={reloadSettings} target={graphTarget} />}
-          {view === 'argument' && <ArgumentMapView settings={settings} />}
-          {view === 'ideas' && <IdeasView vaultId={activeVault?.id ?? null} target={ideaTarget} onOpenGraph={(target) => navigate('graph', target)} onOpenAssistant={openAssistant} />}
-          {view === 'authors' && <AuthorsView vaultId={activeVault?.id ?? null} settings={settings} onOpenGraph={(target) => navigate('graph', target)} />}
-          {view === 'persons' && (isPrimarySources ? <PrimarySourcesPersonsView /> : <PersonasView initialPersonId={personsTarget} />)}
-          {view === 'prosopSearch' && <ProsopSearchView />}
-          {view === 'prosopPopulation' && <ProsopPopulationView />}
-          {view === 'prosopPersons' && <ProsopPersonsView />}
-          {view === 'prosopSources' && <ProsopSourcesView />}
-          {view === 'prosopAnalysis' && <ProsopAnalysisView />}
-          {view === 'prosopNetworks' && <ProsopNetworksView />}
-          {/* `setView` is passed straight through: it is referentially stable, and the
-              encyclopedia's section descriptor depends on it. */}
-          {view === 'encyclopedia' && <EncyclopediaView onNavigate={setView} />}
-          {view === 'continuity' && <ContinuityView onNavigate={setView} />}
-          {view === 'conflicts' && <ConflictsView onNavigate={setView} />}
-          {view === 'arcs' && <ArcsView onNavigate={setView} />}
-          {view === 'rules' && <RulesView onNavigate={setView} />}
-          {view === 'questions' && <QuestionsView onNavigate={setView} />}
-          {view === 'worldChat' && <WorldChatView settings={settings} onNavigate={setView} />}
-          {view === 'manuscript' && <ManuscriptView onNavigate={setView} />}
-          {view === 'characters' && <CharactersView />}
-          {view === 'testimonyInterviews' && <TestimonyInterviewsView target={testimonyTarget} />}
-          {view === 'testimonyParticipants' && <TestimonyParticipantsView />}
-          {view === 'testimonyContrasts' && <TestimonyContrastsView />}
-          {view === 'places' && <PlacesView />}
-          {view === 'factions' && <FactionsView />}
-          {view === 'cultures' && <CulturesView />}
-          {view === 'dynasties' && <DynastiesView />}
-          {view === 'scenes' && <ScenesView onNavigate={setView} />}
-          {view === 'timeline' && (isPrimarySources ? <PrimarySourcesTimelineView /> : <TimelineView worldbuilding={isWorldbuilding} />)}
-          {view === 'tree' && <TreeView settings={settings} onSettingsChange={reloadSettings} />}
-          {view === 'relations' && (isPrimarySources ? <PrimarySourcesRelationsView /> : <RelationsView onOpenPersons={() => setView('persons')} />)}
-          {/* The genealogy map projects lat/lon onto OpenStreetMap tiles, so in an
-              invented world — whose places have no gazetteer coordinates — it renders an
-              empty planet every time. Worldbuilding gets its own section instead. */}
-          {view === 'map' && (isPrimarySources ? <PrimarySourcesMapView /> : isWorldbuilding ? <WorldMapsView /> : <MapView />)}
-          {view === 'archive' && (isPrimarySources
-            ? <PrimarySourcesArchiveView
-              target={primarySourceTarget}
-              onTargetConsumed={() => setPrimarySourceTarget(null)}
-            />
-            : <ArchiveView onOpenLibrary={() => setView('library')} isGenealogy={isGenealogy} />)}
-          {view === 'databases' && (
-            <DatabasesView
-              databaseId={activeDatabaseId}
-              onDatabasesChanged={reloadDatabases}
-              onCreateDatabase={() => void createDatabase()}
-              initialRowId={pendingRecordId}
-              onConsumeInitialRow={() => setPendingRecordId(null)}
-            />
-          )}
-          {view === 'dbSearch' && (
-            <DatabasesSearchView
-              onOpenDatabase={(id, rowId) => {
-                setActiveDatabaseId(id);
-                setPendingRecordId(rowId ?? null);
-                setView('databases');
-              }}
-            />
-          )}
-          {view === 'dbAnalysis' && <DatabasesAnalysisView initialDatabaseId={activeDatabaseId} />}
-          {view === 'dbChat' && <DatabasesChatView initialDatabaseId={activeDatabaseId} />}
-          {view === 'studyCourses' && <StudyOrganizationView target={studyTarget} mode="organization" onTargetChange={setStudyTarget} onOpenMaterial={(id) => { setStudyMaterialTarget(id); setView('studyLibrary'); }} onOpenRecording={(id, timestamp) => { setStudyRecordingTarget({ id, timestamp }); setView('studyRecordings'); }} />}
-          {view === 'studySchedule' && <StudyScheduleView />}
-          {view === 'studyCalendar' && <StudyCalendarView />}
-          {view === 'studySearch' && <StudySearchView
-            onOpenDocument={(id) => { setStudyTarget({ kind: 'document', id }); setView('studyCourses'); }}
-            onOpenMaterial={(id) => { setStudyMaterialTarget(id); setView('studyLibrary'); }}
-            onOpenRecording={(id, timestamp) => { setStudyRecordingTarget({ id, timestamp }); setView('studyRecordings'); }}
-          />}
-          {view === 'studyLibrary' && <StudyMaterialsView initialMaterialId={studyMaterialTarget} onOpenDocument={(id) => { setStudyTarget({ kind: 'document', id }); setView('studyCourses'); }} />}
-          {view === 'studyRecordings' && <StudyRecordingsView initialRecordingId={studyRecordingTarget?.id} initialTimestamp={studyRecordingTarget?.timestamp} onOpenDocument={(id) => { setStudyTarget({ kind: 'document', id }); setView('studyCourses'); }} />}
-          {view === 'studyChat' && <StudyChatView
-            settings={settings}
-            variant={isDocencia ? 'teaching' : 'study'}
-            initialPrompt={studyChatTarget?.prompt}
-            onOpenDocument={(id) => { setStudyTarget({ kind: 'document', id }); setView('studyCourses'); }}
-            onOpenMaterial={(id) => { setStudyMaterialTarget(id); setView('studyLibrary'); }}
-            onOpenRecording={(id, timestamp) => { setStudyRecordingTarget({ id, timestamp: timestamp ?? null }); setView('studyRecordings'); }}
-          />}
-          {view === 'studyIdeas' && <StudyIdeasView
-            vaultId={activeVault?.id ?? null}
-            onOpenGraph={(target) => { setStudyGraphTarget({ ...target, nonce: Date.now() }); setView('studyGraph'); }}
-            onOpenAssistant={(target) => { setStudyChatTarget({ prompt: target?.prompt ?? '', nonce: Date.now() }); setView('studyChat'); }}
-            onOpenMaterial={(id) => { setStudyMaterialTarget(id); setView('studyLibrary'); }}
-            onOpenDocument={(id) => { setStudyTarget({ kind: 'document', id }); setView('studyCourses'); }}
-          />}
-          {view === 'studyGraph' && <StudyGraphView
-            settings={settings}
-            onSettingsChange={reloadSettings}
-            target={studyGraphTarget}
-            onOpenMaterial={(id) => { setStudyMaterialTarget(id); setView('studyLibrary'); }}
-            onOpenDocument={(id) => { setStudyTarget({ kind: 'document', id }); setView('studyCourses'); }}
-          />}
-          {view === 'studyQuestions' && <StudyBankView
-            onOpenDocument={(id) => { setStudyTarget({ kind: 'document', id }); setView('studyCourses'); }}
-            onOpenMaterial={(id) => { setStudyMaterialTarget(id); setView('studyLibrary'); }}
-            onOpenRecording={(id, timestamp) => { setStudyRecordingTarget({ id, timestamp: timestamp ?? null }); setView('studyRecordings'); }}
-          />}
-          {view === 'teachingExams' && <ExamBuilderView />}
-          {view === 'teachingGroups' && <TeachingGroupsView />}
-          {view === 'teachingGrades' && <TeachingGradesView onOpenOrganization={() => setView('studyCourses')} />}
-          {view === 'teachingRubrics' && <RubricsView />}
-          {view === 'studyReview' && <StudyReviewView />}
-          {/* Unit design: the same Deep Research surface over the teaching corpus, with
-              a structure the teacher may fix section by section. */}
-          {view === 'teachingUnits' && <DeepResearchView
-            settings={settings}
-            isStudy
-            isTeaching
-            onOpenGraph={(target) => { setStudyGraphTarget({ ...target, nonce: Date.now() }); setView('studyGraph'); }}
-            onOpenStudyDocument={(id) => { setStudyTarget({ kind: 'document', id }); setView('studyCourses'); }}
-            onOpenStudyMaterial={(id) => { setStudyMaterialTarget(id); setView('studyLibrary'); }}
-            onOpenStudyRecording={(id, timestamp) => { setStudyRecordingTarget({ id, timestamp }); setView('studyRecordings'); }}
-          />}
-          {view === 'studyDeepResearch' && <DeepResearchView
-            settings={settings}
-            isStudy
-            isTeaching={isDocencia}
-            onOpenGraph={(target) => navigate('graph', target)}
-            onOpenStudyDocument={(id) => { setStudyTarget({ kind: 'document', id }); setView('studyCourses'); }}
-            onOpenStudyMaterial={(id) => { setStudyMaterialTarget(id); setView('studyLibrary'); }}
-            onOpenStudyRecording={(id, timestamp) => { setStudyRecordingTarget({ id, timestamp }); setView('studyRecordings'); }}
-          />}
-          {view === 'immersion' && (
-            <ImmersionView settings={settings} onOpenGraph={(target) => navigate('graph', target)} />
-          )}
-          {view === 'gaps' && (
-            <GapsView
-              vaultId={activeVault?.id ?? null}
-              onOpenGraph={(target) => navigate('graph', target)}
-              onOpenAssistant={openAssistant}
-              onOpenDebates={() => setView('debate')}
-            />
-          )}
-          {view === 'debate' && (
-            <DebateView onOpenGraph={(target) => navigate('graph', target)} onOpenAssistant={openAssistant} />
-          )}
-          {view === 'research' && (
-            <ResearchMapView
-              onOpenGraph={(target) => navigate('graph', target)}
-              onOpenAssistant={openAssistant}
-              onOpenDebates={() => setView('debate')}
-            />
-          )}
-          {view === 'hypothesis' && (
-            <HypothesisLabView
-              settings={settings}
-              onOpenGraph={(target) => navigate('graph', target)}
-              onOpenAssistant={openAssistant}
-            />
-          )}
-          {view === 'reading' && (
-            <ReadingPathView onOpenGraph={(target) => navigate('graph', target)} onOpenAssistant={openAssistant} />
-          )}
-          {view === 'writing' && <WritingWorkshopView settings={settings} onOpenGraph={(target) => navigate('graph', target)} />}
-          {view === 'deepResearch' && <DeepResearchView settings={settings} isGenealogy={isGenealogy} onOpenGraph={(target) => navigate('graph', target)} />}
-          {view === 'projects' && <ProjectsView settings={settings} />}
-          {/* Buscar en una bóveda de testimonios NO es buscar en un corpus de Zotero:
-              lo que hay que encontrar son pasajes con su hablante, su minuto y su
-              condición de acceso. Es la misma sección del menú con otro motor detrás. */}
-          {view === 'search' && isTestimonios && (
-            <TestimonySearchView
-              onOpenInterview={openTestimonyInterview}
-              onNavigate={(target) => setView(target)}
-            />
-          )}
-          {view === 'search' && isPrimarySources && (
-            <PrimarySourcesSearchView
-              onOpenSource={openPrimarySourceTarget}
-              onOpenNote={(id) => {
-                setNoteTarget({ id, nonce: Date.now() });
-                setView('notes');
-              }}
-              onNavigate={setView}
-            />
-          )}
-          {view === 'search' && !isPrimarySources && !isTestimonios && (
-            <SearchView
-              vaultType={activeVault?.type}
-              onOpenGraph={(target) => navigate('graph', target)}
-              onOpenNote={openNoteFromSearch}
-              onOpenGaps={() => setView('gaps')}
-              onOpenPerson={(id) => {
-                setPersonsTarget({ id, nonce: Date.now() });
-                setView('persons');
-              }}
-              onOpenTimeline={() => setView('timeline')}
-              onOpenArchive={() => setView('archive')}
-            />
-          )}
-          {view === 'notes' && isPrimarySources && (
-            <PrimarySourcesNotesView focusNote={noteTarget} onOpenSource={openPrimarySourceTarget} />
-          )}
-          {view === 'notes' && !isPrimarySources && (
-            <NotesView onOpenGraph={(target) => navigate('graph', target)} focusNote={noteTarget} onTestimonyLink={isTestimonios ? openTestimonyLink : undefined} />
-          )}
-          {view === 'toolkit' && (
-            <ToolkitView page={toolkitPage} onNavigate={setToolkitPage} settings={settings} />
-          )}
-          {view === 'settings' && (
-            <Settings
-              settings={settings}
-              vaults={vaults}
-              activeVault={activeVault}
-              recoveryHealth={recoveryStatus?.health ?? null}
-              onChange={reloadSettings}
-              onVaultsChanged={reloadVaults}
-              onOpenWhatsNew={() => setManualWhatsNewOpen(true)}
-            />
-          )}
+          {VIEW_REGISTRY[view](viewContext)}
           </AppErrorBoundary>
           </Suspense>
           </div>

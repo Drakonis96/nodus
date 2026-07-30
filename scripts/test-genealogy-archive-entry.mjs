@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
+import { readSource } from './ipc-channel-census.mjs';
 
 const view = fs.readFileSync(new URL('../src/views/ArchiveView.tsx', import.meta.url), 'utf8');
 const modal = fs.readFileSync(new URL('../src/components/GenealogyArchiveEntryModal.tsx', import.meta.url), 'utf8');
-const ipc = fs.readFileSync(new URL('../electron/ipc.ts', import.meta.url), 'utf8');
-const preload = fs.readFileSync(new URL('../electron/preload.ts', import.meta.url), 'utf8');
+const ipc = readSource('@main');
+const preload = readSource('@bridge');
 
 test('genealogy Archive uses one add action and one complete ordered modal', () => {
   assert.match(view, /isGenealogy \? \(\s*<ArchiveActionButton label=\{t\('Añadir entrada'\)\} icon="plus"/);

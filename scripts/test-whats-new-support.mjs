@@ -2,10 +2,11 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readSource } from './ipc-channel-census.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const modal = await readFile(path.join(root, 'src/components/WhatsNewModal.tsx'), 'utf8');
-const app = await readFile(path.join(root, 'src/App.tsx'), 'utf8');
+const app = await Promise.resolve(readSource('@shell'));
 const smoke = await readFile(path.join(root, 'scripts/e2e-smoke.mjs'), 'utf8');
 const releaseNotes = await readFile(path.join(root, 'shared/releaseNotes.ts'), 'utf8');
 const styles = await readFile(path.join(root, 'src/index.css'), 'utf8');

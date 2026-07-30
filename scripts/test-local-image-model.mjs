@@ -4,6 +4,7 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { readSource } from './ipc-channel-census.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const temporary = await mkdtemp(path.join(os.tmpdir(), 'nodus-local-image-model-'));
@@ -30,14 +31,14 @@ try {
   assert.deepEqual(catalog.NODUS_IMAGE_QUALITY_PRESETS.map(({ width, height }) => [width, height]), [[640, 384], [896, 512], [1152, 640]]);
 
   const [manager, decorative, imageModels, ipc, preload, settings, ui, notices] = await Promise.all([
-    readFile(path.join(root, 'electron/ai/nodusLocalImages.ts'), 'utf8'),
-    readFile(path.join(root, 'electron/ai/decorativeImages.ts'), 'utf8'),
-    readFile(path.join(root, 'electron/ai/imageModels.ts'), 'utf8'),
-    readFile(path.join(root, 'electron/ipc.ts'), 'utf8'),
-    readFile(path.join(root, 'electron/preload.ts'), 'utf8'),
-    readFile(path.join(root, 'electron/db/settingsRepo.ts'), 'utf8'),
-    readFile(path.join(root, 'src/components/LocalImageModelSettings.tsx'), 'utf8'),
-    readFile(path.join(root, 'THIRD_PARTY_NOTICES.md'), 'utf8'),
+    Promise.resolve(readSource('electron/ai/nodusLocalImages.ts')),
+    Promise.resolve(readSource('electron/ai/decorativeImages.ts')),
+    Promise.resolve(readSource('electron/ai/imageModels.ts')),
+    Promise.resolve(readSource('@main')),
+    Promise.resolve(readSource('@bridge')),
+    Promise.resolve(readSource('electron/db/settingsRepo.ts')),
+    Promise.resolve(readSource('src/components/LocalImageModelSettings.tsx')),
+    Promise.resolve(readSource('THIRD_PARTY_NOTICES.md')),
   ]);
   assert.match(manager, /stable-diffusion\.cpp\/releases\/download/);
   assert.match(manager, /createHash\('sha256'\)/);
