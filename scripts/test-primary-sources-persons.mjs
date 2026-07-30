@@ -6,6 +6,7 @@ import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readSource } from './ipc-channel-census.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
@@ -15,10 +16,10 @@ if (!process.argv.includes('--electron-primary-sources-persons-test')) {
     'src/views/PrimarySourcesPersonsView.tsx',
     'src/App.tsx',
     'electron/db/primarySourcePersonsRepo.ts',
-    'shared/types.ts',
-    'electron/preload.ts',
-    'electron/ipc.ts',
-  ].map((file) => fs.readFileSync(path.join(repoRoot, file), 'utf8'));
+    '@api',
+    '@bridge',
+    '@main',
+  ].map((file) => readSource(file));
 
   for (const marker of [
     'primary-sources-persons-view',

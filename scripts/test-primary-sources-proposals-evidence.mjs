@@ -6,6 +6,7 @@ import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readSource } from './ipc-channel-census.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
@@ -16,12 +17,12 @@ if (!process.argv.includes('--electron-primary-sources-proposals-test')) {
     'electron/db/archiveProposalsRepo.ts',
     'electron/ai/primarySourceProposals.ts',
     'shared/primarySourceProposalPrompts.ts',
-    'shared/types.ts',
-    'electron/preload.ts',
-    'electron/ipc.ts',
+    '@api',
+    '@bridge',
+    '@main',
     'electron/db/migrations.ts',
     'electron/db/syncTables.ts',
-  ].map((file) => fs.readFileSync(path.join(repoRoot, file), 'utf8'));
+  ].map((file) => readSource(file));
 
   for (const marker of [
     'primary-source-evidence-workspace',

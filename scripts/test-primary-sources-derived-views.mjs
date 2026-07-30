@@ -6,6 +6,7 @@ import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readSource } from './ipc-channel-census.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
@@ -14,7 +15,7 @@ if (!process.argv.includes('--electron-primary-sources-derived-test')) {
   const files = Object.fromEntries([
     'timeline', 'map', 'relations', 'app', 'repo', 'schema', 'sync', 'shared',
     'preload', 'ipc',
-  ].map((name, index) => [name, fs.readFileSync(path.join(repoRoot, [
+  ].map((name, index) => [name, readSource([
     'src/views/PrimarySourcesTimelineView.tsx',
     'src/views/PrimarySourcesMapView.tsx',
     'src/views/PrimarySourcesRelationsView.tsx',
@@ -22,10 +23,10 @@ if (!process.argv.includes('--electron-primary-sources-derived-test')) {
     'electron/db/primarySourceDerivedViewsRepo.ts',
     'electron/db/migrations.ts',
     'electron/db/syncTables.ts',
-    'shared/types.ts',
-    'electron/preload.ts',
-    'electron/ipc.ts',
-  ][index]), 'utf8')]));
+    '@api',
+    '@bridge',
+    '@main',
+  ][index])]));
 
   for (const marker of [
     'Fecha e intervalo',

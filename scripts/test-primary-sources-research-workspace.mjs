@@ -6,6 +6,7 @@ import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readSource } from './ipc-channel-census.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
@@ -20,10 +21,10 @@ if (!process.argv.includes('--electron-primary-sources-research-test')) {
     ['repo', 'electron/db/primarySourceResearchRepo.ts'],
     ['schema', 'electron/db/migrations.ts'],
     ['sync', 'electron/db/syncTables.ts'],
-    ['shared', 'shared/types.ts'],
-    ['preload', 'electron/preload.ts'],
-    ['ipc', 'electron/ipc.ts'],
-  ].map(([name, relative]) => [name, fs.readFileSync(path.join(repoRoot, relative), 'utf8')]));
+    ['shared', '@api'],
+    ['preload', '@bridge'],
+    ['ipc', '@main'],
+  ].map(([name, relative]) => [name, readSource(relative)]));
 
   for (const marker of [
     'primary-sources-search-input',

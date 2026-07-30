@@ -141,3 +141,40 @@ export function bridgeSourceText() {
     .bridgeFiles.map((entry) => entry.code)
     .join('\n');
 }
+
+/**
+ * Read a repo-relative source file, or the whole of one of the three surfaces the
+ * IPC split spread across many files.
+ *
+ * Tests that assert on IPC by matching source text used to read electron/ipc.ts,
+ * electron/preload.ts and shared/types.ts by path. Those three are now a directory
+ * each, so the three sentinels below stand in for "wherever that surface lives":
+ *
+ *   '@main'   → every main-process file
+ *   '@bridge' → every preload file
+ *   '@api'    → shared/types.ts plus every slice in shared/api/
+ *
+ * Swapping the path for a sentinel keeps the assertion and its position in a list
+ * intact, which is what makes the migration of these tests mechanical.
+ */
+export function readSource(relative) {
+  if (relative === '@main') return mainSourceText();
+  if (relative === '@bridge') return bridgeSourceText();
+  if (relative === '@api') return apiSourceText();
+  return readFileSync(path.join(repoRoot, relative), 'utf8');
+}
+
+/**
+ * The whole window.nodus contract as text: shared/types.ts plus every slice in
+ * shared/api/. For assertions that match a signature or a comment in the contract
+ * rather than asking whether a named method exists.
+ */
+export function apiSourceText() {
+  const files = [path.join(repoRoot, 'shared/types.ts')];
+  try {
+    files.push(...tsFiles(path.join(repoRoot, 'shared/api')));
+  } catch {
+    // shared/api/ does not exist yet in older trees.
+  }
+  return files.map((file) => readFileSync(file, 'utf8')).join('\n');
+}

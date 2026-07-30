@@ -6,6 +6,7 @@ import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readSource } from './ipc-channel-census.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
@@ -15,13 +16,13 @@ if (!process.argv.includes('--electron-primary-sources-governance-test')) {
     ['app', 'src/App.tsx'],
     ['schema', 'electron/db/migrations.ts'],
     ['sync', 'electron/db/syncTables.ts'],
-    ['preload', 'electron/preload.ts'],
-    ['ipc', 'electron/ipc.ts'],
+    ['preload', '@bridge'],
+    ['ipc', '@main'],
     ['governance', 'electron/primarySources/primarySourceGovernance.ts'],
     ['export', 'electron/primarySources/primarySourceExport.ts'],
     ['backup', 'electron/export/exportImport.ts'],
-    ['types', 'shared/types.ts'],
-  ].map(([name, relative]) => [name, fs.readFileSync(path.join(repoRoot, relative), 'utf8')]));
+    ['types', '@api'],
+  ].map(([name, relative]) => [name, readSource(relative)]));
 
   assert.doesNotMatch(files.app, /PrimarySourcesToolkitView/);
   assert.match(files.app, /view === 'toolkit'[\s\S]{0,120}<ToolkitView/);
