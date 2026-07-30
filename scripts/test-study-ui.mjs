@@ -3,9 +3,10 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { readSource } from './ipc-channel-census.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const read = (file) => readFile(path.join(root, file), 'utf8');
+const read = async (file) => readSource(file);
 
 test('study vault uses its teal header logo and the shared dock accent', async () => {
   const [app, logo, dock, vaultTypes] = await Promise.all([
@@ -26,7 +27,7 @@ test('study vault uses its teal header logo and the shared dock accent', async (
 test('macOS keeps the last vault and theme dock icon after Nodus exits', async () => {
   const [main, ipc, persistentIcon, dockPlugin, packageJson, generator, rendererIcon, geometrySource] = await Promise.all([
     read('electron/main.ts'),
-    read('electron/ipc.ts'),
+    read('@main'),
     read('electron/dockIcon.ts'),
     read('build/docktile/NodusDockTilePlugin.m'),
     read('package.json'),
@@ -109,9 +110,9 @@ test('study searches reserve icon space through the common input contract', asyn
 test('study materials expose downloadable hover actions and pedagogical Deep Research', async () => {
   const [materials, preload, ipc, types, app, navigation, deep, markdown] = await Promise.all([
     read('src/views/StudyMaterialsView.tsx'),
-    read('electron/preload.ts'),
-    read('electron/ipc.ts'),
-    read('shared/types.ts'),
+    read('@bridge'),
+    read('@main'),
+    read('@api'),
     read('src/App.tsx'),
     read('src/navigation.ts'),
     read('electron/ai/studyDeepResearch.ts'),
@@ -202,9 +203,9 @@ test('study and teaching sources share two-step linked-knowledge deletion', asyn
     read('src/views/StudyOrganizationView.tsx'),
     read('src/components/LinkedKnowledgeDeleteFlow.tsx'),
     read('src/views/IdeasView.tsx'),
-    read('electron/preload.ts'),
-    read('electron/ipc.ts'),
-    read('shared/types.ts'),
+    read('@bridge'),
+    read('@main'),
+    read('@api'),
   ]);
   assert.match(materials, /selectedSources/);
   assert.match(materials, /study-library-delete-selected/);
@@ -348,8 +349,8 @@ test('study timetable exposes editable weekdays, periods and subject styling', a
     read('src/components/StudySidebar.tsx'),
     read('src/navigation.ts'),
     read('src/App.tsx'),
-    read('electron/preload.ts'),
-    read('electron/ipc.ts'),
+    read('@bridge'),
+    read('@main'),
   ]);
   assert.match(sidebar, /view: 'studySchedule'/);
   assert.match(navigation, /id: 'studySchedule'/);
@@ -398,7 +399,7 @@ test('study timetable exposes editable weekdays, periods and subject styling', a
 
 test('student calendar exposes month, week and year views with durable event actions', async () => {
   const [view, layout, navigation, app, sidebar, types, preload, ipc, reminders] = await Promise.all([
-    read('src/views/StudyCalendarView.tsx'), read('src/views/studyCalendarLayout.ts'), read('src/navigation.ts'), read('src/App.tsx'), read('src/components/StudySidebar.tsx'), read('shared/types.ts'), read('electron/preload.ts'), read('electron/ipc.ts'), read('electron/studyCalendarReminders.ts'),
+    read('src/views/StudyCalendarView.tsx'), read('src/views/studyCalendarLayout.ts'), read('src/navigation.ts'), read('src/App.tsx'), read('src/components/StudySidebar.tsx'), read('@api'), read('@bridge'), read('@main'), read('electron/studyCalendarReminders.ts'),
   ]);
   for (const marker of ['study-calendar-view', 'study-calendar-month-grid', 'study-calendar-week-grid', 'study-calendar-year-grid', 'study-calendar-editor', 'study-calendar-reminder']) assert.match(view, new RegExp(marker));
   for (const marker of ['study-calendar-event-bar', 'study-calendar-month-event-layer', 'study-calendar-week-event-layer']) assert.match(view, new RegExp(marker));
@@ -487,9 +488,9 @@ test('study material state reuses database select chips', async () => {
     read('src/views/StudyMaterialsView.tsx'),
     read('src/components/materials/PdfViewer.tsx'),
     read('src/components/materials/EpubViewer.tsx'),
-    read('electron/preload.ts'),
-    read('electron/ipc.ts'),
-    read('shared/types.ts'),
+    read('@bridge'),
+    read('@main'),
+    read('@api'),
     read('src/index.css'),
     read('electron/ai/studyMaterialIndex.ts'),
     read('electron/ai/studySearch.ts'),

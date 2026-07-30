@@ -15,6 +15,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { build } from 'esbuild';
+import { readSource } from './ipc-channel-census.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
@@ -302,8 +303,8 @@ async function bundleGraphService() {
 async function assertRendererContracts() {
   const graphView = await readFile(path.join(repoRoot, 'src/views/GraphView.tsx'), 'utf8');
   const sigmaGraph = await readFile(path.join(repoRoot, 'src/views/graph/SigmaGraph.tsx'), 'utf8');
-  const preload = await readFile(path.join(repoRoot, 'electron/preload.ts'), 'utf8');
-  const ipc = await readFile(path.join(repoRoot, 'electron/ipc.ts'), 'utf8');
+  const preload = await Promise.resolve(readSource('@bridge'));
+  const ipc = await Promise.resolve(readSource('@main'));
 
   assert.match(graphView, /if \(USE_SIGMA\) return \[\];/, 'Sigma path skips legacy Cytoscape elements');
   assert.match(graphView, /getGraphOverview\(\)/, 'initial scene uses the compact overview endpoint');

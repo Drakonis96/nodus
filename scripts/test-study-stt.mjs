@@ -6,6 +6,7 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { readSource } from './ipc-channel-census.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const tmp = await mkdtemp(path.join(os.tmpdir(), 'nodus-study-stt-'));
@@ -66,8 +67,8 @@ try {
     readFile(path.join(root, 'src/lib/stt/stt.worker.ts'), 'utf8'),
     readFile(path.join(root, 'electron/ai/studyTranscription.ts'), 'utf8'),
     readFile(path.join(root, 'electron/stt/whisperCpp.ts'), 'utf8'),
-    readFile(path.join(root, 'electron/ipc.ts'), 'utf8'),
-    readFile(path.join(root, 'electron/preload.ts'), 'utf8'),
+    Promise.resolve(readSource('@main')),
+    Promise.resolve(readSource('@bridge')),
     readFile(path.join(root, 'src/components/editor/StudyEditor.tsx'), 'utf8'),
     readFile(path.join(root, 'src/components/SttSettings.tsx'), 'utf8'),
     readFile(path.join(root, 'src/views/StudyRecordingsView.tsx'), 'utf8'),

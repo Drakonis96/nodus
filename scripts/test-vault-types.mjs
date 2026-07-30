@@ -6,6 +6,7 @@ import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readSource } from './ipc-channel-census.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
@@ -152,9 +153,9 @@ test('an empty worldbuilding home offers the complete local demo through the typ
     readFile(path.join(repoRoot, 'src/App.tsx'), 'utf8'),
     readFile(path.join(repoRoot, 'src/views/WorldbuildingHome.tsx'), 'utf8'),
     readFile(path.join(repoRoot, 'src/views/HomeView.tsx'), 'utf8'),
-    readFile(path.join(repoRoot, 'electron/ipc.ts'), 'utf8'),
-    readFile(path.join(repoRoot, 'electron/preload.ts'), 'utf8'),
-    readFile(path.join(repoRoot, 'shared/types.ts'), 'utf8'),
+    Promise.resolve(readSource('@main')),
+    Promise.resolve(readSource('@bridge')),
+    Promise.resolve(readSource('@api')),
   ]);
   assert.match(app, /const loadWorldbuildingDemo = useCallback/);
   assert.match(app, /showDemoOffer=\{hasData === false && !settings\.demoMode\}/);

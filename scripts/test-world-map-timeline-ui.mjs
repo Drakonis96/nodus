@@ -117,6 +117,8 @@ test('map coverage is one query, not one per map per tick', async () => {
   // `mapCoverage` already means research-map coverage in this codebase; the world-map one
   // carries its own name so the two can never be confused at an import site.
   const ipc = await read('@main');
-  assert.match(ipc, /import \{ decomposeQuestion, mapCoverage \} from '\.\/ai\/researchMap'/);
+  // `\.\.?/` because the importing module can sit at the root of electron/ or one
+  // level down in electron/ipc/; what matters is the name, not the depth.
+  assert.match(ipc, /import \{ decomposeQuestion, mapCoverage \} from '\.\.?\/ai\/researchMap'/);
   assert.match(ipc, /worldMapCoverage\(\)/);
 });
