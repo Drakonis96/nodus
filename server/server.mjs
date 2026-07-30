@@ -2,6 +2,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { constants as bufferLimits } from 'node:buffer';
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import { gunzipSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
@@ -10,12 +11,32 @@ import { body, contentSecurityPolicy, cookies, escapeHtml, form, html, json, jso
 import { normalizeServerLanguage, serverTranslator } from './lib/i18n.mjs';
 import { helpTip, languagePicker, nodusMark, WEB_STYLES } from './lib/webUi.mjs';
 
+// A zero, a `200m`-style unit or a value past what Node can hold in a single buffer
+// would otherwise reach zlib and turn every publication into an opaque rejection, so
+// an unusable limit stops the server at boot the way a half-configured admin does.
+function byteLimit(name, fallback, ceiling) {
+  const configured = String(process.env[name] ?? '').trim();
+  if (!configured) return fallback;
+  const value = Number(configured);
+  if (!Number.isSafeInteger(value) || value < 64 * 1024 || value > ceiling) {
+    throw new Error(`${name} must be a whole number of bytes between ${64 * 1024} and ${ceiling}.`);
+  }
+  return value;
+}
+
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = process.env.NODUS_DATA_DIR || path.join(ROOT, 'data');
 const PORT = Number(process.env.NODUS_PORT || 7443);
 const HOST = process.env.NODUS_HOST || '0.0.0.0';
 const SETUP_TOKEN = process.env.NODUS_SETUP_TOKEN || '';
-const MAX_SNAPSHOT_BYTES = Number(process.env.NODUS_MAX_SNAPSHOT_BYTES || 100 * 1024 * 1024);
+/** How large the gzipped upload may be on the wire. Mirror it in your proxy. */
+const MAX_SNAPSHOT_BYTES = byteLimit('NODUS_MAX_SNAPSHOT_BYTES', 100 * 1024 * 1024, bufferLimits.MAX_LENGTH);
+// A publication travels gzipped but is expanded into one JSON string before parsing,
+// and JSON of this shape shrinks around ten times over: the upload cap says nothing
+// about the memory the expanded projection needs, so it gets a ceiling of its own
+// rather than borrowing the one meant for the wire. Sharing a single number made a
+// perfectly ordinary vault fail as if its upload had been corrupt.
+const MAX_SNAPSHOT_JSON_BYTES = byteLimit('NODUS_MAX_SNAPSHOT_JSON_BYTES', 384 * 1024 * 1024, bufferLimits.MAX_STRING_LENGTH);
 const store = new Store(DATA_DIR);
 const snapshotCache = new Map();
 const rateBuckets = new Map();
@@ -199,13 +220,48 @@ function oauthChallenge(res, scope = 'materials.read') {
   });
 }
 
+function mib(value) {
+  return `${(value / (1024 * 1024)).toFixed(1)} MiB`;
+}
+
+/** Expanded size a gzip stream declares in its trailer, or null when it is not gzip. */
+function declaredGzipSize(bytes) {
+  return bytes.length >= 18 && bytes[0] === 0x1f && bytes[1] === 0x8b ? bytes.readUInt32LE(bytes.length - 4) : null;
+}
+
+/**
+ * Expand an uploaded publication, keeping the two ways it can fail apart: too big to
+ * hold in memory, or not readable gzipped JSON at all. The trailer is only a hint —
+ * it costs nothing, it names the real size in the rejection, and `maxOutputLength`
+ * still enforces the limit when a client lies about it.
+ */
+function expandSnapshot(bytes) {
+  const declared = declaredGzipSize(bytes);
+  if (declared !== null && declared > MAX_SNAPSHOT_JSON_BYTES) return { reason: 'too-large', expanded: declared };
+  let text;
+  try {
+    text = gunzipSync(bytes, { maxOutputLength: MAX_SNAPSHOT_JSON_BYTES }).toString('utf8');
+  } catch (error) {
+    if (error?.code === 'ERR_BUFFER_TOO_LARGE' || error?.code === 'ERR_STRING_TOO_LONG') return { reason: 'too-large', expanded: declared };
+    return { reason: 'invalid' };
+  }
+  try {
+    return { value: JSON.parse(text) };
+  } catch {
+    return { reason: 'invalid' };
+  }
+}
+
 function readSnapshot(spaceId) {
   const target = store.snapshotPath(spaceId);
   if (!fs.existsSync(target)) return null;
   const stat = fs.statSync(target);
   const cached = snapshotCache.get(spaceId);
   if (cached?.mtimeMs === stat.mtimeMs) return cached.value;
-  const value = JSON.parse(gunzipSync(fs.readFileSync(target), { maxOutputLength: MAX_SNAPSHOT_BYTES }).toString('utf8'));
+  // Stored publications passed the publish-time limit already, so read them against
+  // the hard ceiling: lowering NODUS_MAX_SNAPSHOT_JSON_BYTES must not make a space
+  // that is already on disk unreadable to every MCP client.
+  const value = JSON.parse(gunzipSync(fs.readFileSync(target), { maxOutputLength: bufferLimits.MAX_STRING_LENGTH }).toString('utf8'));
   snapshotCache.set(spaceId, { mtimeMs: stat.mtimeMs, value });
   return value;
 }
@@ -807,9 +863,18 @@ async function route(req, res) {
     if (req.headers['content-encoding'] !== 'gzip') return json(res, 415, { error: 'The publication must be gzip-compressed.' });
     const revision = String(req.headers['x-nodus-revision'] || '');
     if (revision && revision === space.revision) return json(res, 200, { ok: true, unchanged: true, updatedAt: space.updatedAt });
+    const announced = Number(req.headers['content-length'] || 0);
+    if (announced > MAX_SNAPSHOT_BYTES) {
+      return json(res, 413, { error: `The compressed publication is ${mib(announced)} and this server accepts uploads of up to ${mib(MAX_SNAPSHOT_BYTES)} (NODUS_MAX_SNAPSHOT_BYTES).`, limitBytes: MAX_SNAPSHOT_BYTES, uploadBytes: announced });
+    }
     const bytes = await body(req, MAX_SNAPSHOT_BYTES);
-    let snapshot;
-    try { snapshot = JSON.parse(gunzipSync(bytes, { maxOutputLength: MAX_SNAPSHOT_BYTES }).toString('utf8')); } catch { return json(res, 400, { error: 'The compressed publication is invalid or exceeds the size limit.' }); }
+    const expanded = expandSnapshot(bytes);
+    if (expanded.reason === 'too-large') {
+      const size = expanded.expanded === null ? 'past the limit' : `to ${mib(expanded.expanded)}`;
+      return json(res, 413, { error: `The publication expands ${size} and this server accepts up to ${mib(MAX_SNAPSHOT_JSON_BYTES)} of expanded data (NODUS_MAX_SNAPSHOT_JSON_BYTES).`, limitBytes: MAX_SNAPSHOT_JSON_BYTES, expandedBytes: expanded.expanded });
+    }
+    if (expanded.reason) return json(res, 400, { error: 'The compressed publication is not readable: the body must be gzipped JSON.' });
+    const snapshot = expanded.value;
     if (snapshot?.format !== 'nodus.server-snapshot' || snapshot?.formatVersion !== 1) return json(res, 400, { error: 'Unsupported publication format.' });
     store.writeSnapshot(space.id, bytes); snapshotCache.delete(space.id);
     space.updatedAt = new Date().toISOString(); space.revision = revision || snapshot.revision || ''; space.vault = snapshot.vault; space.bytes = bytes.length;

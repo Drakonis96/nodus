@@ -72,6 +72,19 @@ function ensureRuntime(vaultId: string): VaultRuntime {
   return rt;
 }
 
+// A rejection for size is the one publish failure the user can act on from the app,
+// so it says how big this vault actually is and which switch shrinks it. The server
+// only knows the compressed upload; the uncompressed figure lives here.
+function tooLargeMessage(config: VaultServerConfig, serverError: string, rawBytes: number): string {
+  const size = `Esta bóveda ocupa ${(rawBytes / (1024 * 1024)).toFixed(1)} MiB sin comprimir.`;
+  const lever = config.includePassages
+    ? 'Desactiva «Incluir pasajes extraídos» para dejar fuera el texto completo de las obras.'
+    : config.includeUserContent
+      ? 'Desactiva «Incluir contenido creado por mí» para dejar fuera notas, proyectos y borradores.'
+      : 'Pide a quien administra el servidor que amplíe NODUS_MAX_SNAPSHOT_JSON_BYTES.';
+  return `${serverError || 'El servidor ha rechazado la publicación por su tamaño.'} ${size} ${lever}`;
+}
+
 function normalizeUrl(value: string): string {
   const clean = value.trim().replace(/\/+$/, '');
   let parsed: URL;
@@ -290,6 +303,7 @@ async function publishVault(vaultId: string): Promise<void> {
       rt.pending = false;
       return;
     }
+    if (response.status === 413) throw new Error(tooLargeMessage(config, result.error || '', snapshot.buffer.length));
     if (!response.ok) throw new Error(result.error || `El servidor respondió con HTTP ${response.status}.`);
     rt.lastRevision = snapshot.revision;
     rt.dirtySince = 0;

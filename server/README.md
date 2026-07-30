@@ -165,6 +165,22 @@ and current manuscript prose. Private chats, AI proposals, manuscript snapshots,
 credentials, local paths, embeddings and binary files are never published. Teacher
 notes/projects/materials and extracted academic passages have separate switches.
 
+### Publication size
+
+A publication travels gzipped and is expanded into JSON in memory, and that JSON is around ten
+times larger than the upload. The two sizes therefore have separate limits:
+
+- `NODUS_MAX_SNAPSHOT_BYTES`: largest gzipped upload accepted, 100 MiB by default. Keep your proxy
+  in agreement with it (`client_max_body_size` in Nginx).
+- `NODUS_MAX_SNAPSHOT_JSON_BYTES`: largest expanded publication accepted, 384 MiB by default. This
+  is what a big vault runs into first, and it is what bounds the memory the server needs to read a
+  space. It can never go past 512 MiB, the largest string Node can build.
+
+Both accept a whole number of bytes, at least 65536; a value the server cannot use (`0`, `200m`)
+stops the boot instead of making every publication fail. When a vault no longer fits, the desktop
+says how large it is and which switch to turn off ("Include extracted passages" is usually most of
+the weight).
+
 ## Provide access to students or researchers
 
 1. From the web administration it creates a reading account with a temporary password and assigns it
