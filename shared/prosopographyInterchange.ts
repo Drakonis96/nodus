@@ -36,7 +36,6 @@ export function toProsopIpif(input: {
   statements: ProsopStatement[];
   entities: ProsopStatementEntity[];
 }): ProsopIpifDocument {
-  const segmentById = new Map(input.segments.map((item) => [item.segmentId, item]));
   const subjects = new Map<string, string[]>();
   for (const entity of input.entities) {
     if (entity.entityKind !== 'person' || !['subject', 'principal', 'self'].includes(entity.role)) continue;
