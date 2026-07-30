@@ -40,7 +40,7 @@ test('world chat has the same conversation, model, context and streaming control
 });
 
 test('the global assistant action is mode-aware in worldbuilding', async () => {
-  const app = await read('src/App.tsx');
+  const app = await read('@shell');
   assert.match(app, /if \(isWorldbuilding\)[\s\S]{0,160}setView\('worldChat'\)/);
   assert.match(app, /isWorldbuilding \? 'Chat del mundo' : 'Asistente de investigación'/);
   assert.match(app, /isWorldbuilding \? 'Abrir chat del mundo' : 'Abrir asistente de investigación'/);

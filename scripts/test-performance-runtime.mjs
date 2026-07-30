@@ -2,13 +2,14 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readSource } from './ipc-channel-census.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const read = (file) => readFile(path.join(root, file), 'utf8');
+const read = async (file) => readSource(file);
 const [database, migrations, app] = await Promise.all([
   read('electron/db/database.ts'),
   read('electron/db/migrations.ts'),
-  read('src/App.tsx'),
+  read('@shell'),
 ]);
 
 for (const pragma of [

@@ -19,7 +19,7 @@ if (!process.argv.includes('--electron-primary-sources-derived-test')) {
     'src/views/PrimarySourcesTimelineView.tsx',
     'src/views/PrimarySourcesMapView.tsx',
     'src/views/PrimarySourcesRelationsView.tsx',
-    'src/App.tsx',
+    '@shell',
     'electron/db/primarySourceDerivedViewsRepo.ts',
     'electron/db/migrations.ts',
     'electron/db/syncTables.ts',
@@ -48,9 +48,9 @@ if (!process.argv.includes('--electron-primary-sources-derived-test')) {
       `phase 8 UI contains ${marker}`
     );
   }
-  assert.match(files.app, /isPrimarySources \? <PrimarySourcesTimelineView \/>/);
-  assert.match(files.app, /isPrimarySources \? <PrimarySourcesMapView \/>/);
-  assert.match(files.app, /isPrimarySources \? <PrimarySourcesRelationsView \/>/);
+  assert.match(files.app, /isPrimarySources\s*\? <PrimarySourcesTimelineView \/>/);
+  assert.match(files.app, /isPrimarySources\s*\? <PrimarySourcesMapView \/>/);
+  assert.match(files.app, /isPrimarySources\s*\? <PrimarySourcesRelationsView \/>/);
   assert.ok(Number(files.schema.match(/SCHEMA_VERSION = (\d+)/)[1]) >= 121,
     'the derived-views migration is applied');
   assert.match(files.schema, /provenance_place_id/);

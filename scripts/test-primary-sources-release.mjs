@@ -28,7 +28,7 @@ if (!process.argv.includes('--electron-primary-sources-release-test')) {
     ['archiveView', 'src/views/PrimarySourcesArchiveView.tsx'],
     ['placePicker', 'src/components/PlacePicker.tsx'],
     ['settings', 'src/views/Settings.tsx'],
-    ['app', 'src/App.tsx'],
+    ['app', '@shell'],
     ['toolkit', 'src/views/ToolkitView.tsx'],
   ].map(([key, relative]) => [key, readSource(relative)]));
   assert.ok(Number(sources.schema.match(/SCHEMA_VERSION = (\d+)/)[1]) >= 118,
@@ -107,7 +107,7 @@ if (!process.argv.includes('--electron-primary-sources-release-test')) {
   assert.match(sources.placePicker, /searchGazetteer/);
   assert.match(sources.toolkit, /TOOLKIT_TOOLS\.map/);
   assert.doesNotMatch(sources.app, /PrimarySourcesToolkitView/);
-  assert.match(sources.app, /view === 'toolkit'[\s\S]{0,120}<ToolkitView/);
+  assert.match(sources.app, /toolkit: \([^)]*\)[\s\S]{0,120}<ToolkitView/);
   for (const relative of [
     'docs/primary-sources/README.md',
     'docs/primary-sources/demo-and-onboarding.md',

@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { bridgeSourceText, mainSourceText } from './ipc-channel-census.mjs';
+import { bridgeSourceText, mainSourceText, readSource } from './ipc-channel-census.mjs';
 
 // Nodus Toolkit — the Herramientas section (hub + per-tool pages). These checks
 // cover the wiring that no e2e step can see cheaply: that the view is registered
@@ -17,7 +17,7 @@ import { bridgeSourceText, mainSourceText } from './ipc-channel-census.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
-const read = (file) => readFile(path.join(repoRoot, file), 'utf8');
+const read = async (file) => readSource(file);
 
 const outDir = await mkdtemp(path.join(os.tmpdir(), 'nodus-toolkit-ui-'));
 test.after(() => rm(outDir, { recursive: true, force: true }));
@@ -180,7 +180,7 @@ test('Protect exposes the complete local workflow and the secure preload boundar
 });
 
 test('the toolkit nests one sidebar button per tool under its section', async () => {
-  const app = await read('src/App.tsx');
+  const app = await read('@shell');
   // The tools are NOT views: they must never enter NAV_ITEMS, or they would show
   // up in sidebarOrder, the reordering UI and the vault-type allow-lists.
   const toolPages = new Set(navigation.TOOLKIT_TOOLS.map((tool) => tool.page));
@@ -237,7 +237,7 @@ test('a tool page returns to the hub and keeps the header action row uniform', a
     read('src/views/ToolkitView.tsx'),
     read('src/views/ToolkitConvertView.tsx'),
     read('src/views/ToolkitProtectView.tsx'),
-    read('src/App.tsx'),
+    read('@shell'),
   ]);
   // The convert workspace owns its own back-to-hub control.
   assert.ok(convert.includes('data-testid="toolkit-back"'), 'the back control exists');
@@ -251,7 +251,7 @@ test('a tool page returns to the hub and keeps the header action row uniform', a
   assert.match(app, /title=\{t\('Abrir Nodus Toolkit'\)\}/);
   assert.match(
     app,
-    /\{view === 'toolkit' && \(\s*<ToolkitView page=\{toolkitPage\} onNavigate=\{setToolkitPage\} settings=\{settings\} \/>\s*\)\}/,
+    /toolkit: \([^)]*\) => <ToolkitView page=\{toolkitPage\} onNavigate=\{setToolkitPage\} settings=\{settings\} \/>/,
     'every vault renders the same generic Toolkit whose active page App owns'
   );
   assert.doesNotMatch(app, /PrimarySourcesToolkitView/, 'there is no primary-source Toolkit fork');

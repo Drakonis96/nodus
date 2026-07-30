@@ -4,16 +4,17 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFile } from 'node:fs/promises';
+import { readSource } from './ipc-channel-census.mjs';
 
-const read = (file) => readFile(new URL(`../${file}`, import.meta.url), 'utf8');
+const read = async (file) => readSource(file);
 
 test('worldbuilding gets its own map section, and genealogy keeps its own', async () => {
-  const app = await read('src/App.tsx');
+  const app = await read('@shell');
   // The genealogy map projects lat/lon onto OpenStreetMap tiles. An invented world has no
   // gazetteer coordinates, so that view renders an empty planet every single time — it is
   // not "worse", it cannot work. One entry in the sidebar, two implementations behind it.
-  assert.match(app, /view === 'map' && \(isPrimarySources \? <PrimarySourcesMapView \/> : isWorldbuilding \? <WorldMapsView \/> : <MapView \/>\)/);
-  assert.match(app, /import \{ WorldMapsView \} from '\.\/views\/WorldMapsView'/);
+  assert.match(app, /map: \([^)]*\) => \(isPrimarySources\s*\? <PrimarySourcesMapView \/>\s*: isWorldbuilding \? <WorldMapsView \/> : <MapView \/>\)/);
+  assert.match(app, /import \{ WorldMapsView \} from '(?:\.\.\/)*\.?\.?\/?views\/WorldMapsView'/);
   // And no second entry was added to the sidebar for it.
   const sidebar = await read('src/components/WorldbuildingSidebar.tsx');
   assert.equal((sidebar.match(/view: 'map'/g) ?? []).length, 1, 'exactly one Mapa entry');

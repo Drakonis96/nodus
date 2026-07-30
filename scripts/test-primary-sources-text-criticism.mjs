@@ -16,7 +16,7 @@ if (!process.argv.includes('--electron-primary-sources-text-test')) {
     'src/views/PrimarySourceDossierView.tsx',
     'src/views/PrimarySourcesArchiveView.tsx',
     'src/components/Markdown.tsx',
-    'src/App.tsx',
+    '@shell',
     'electron/db/archiveTextsRepo.ts',
     'electron/db/archiveEvidenceRepo.ts',
     '@api',

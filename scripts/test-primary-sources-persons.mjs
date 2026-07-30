@@ -14,7 +14,7 @@ const require = createRequire(import.meta.url);
 if (!process.argv.includes('--electron-primary-sources-persons-test')) {
   const [view, app, repo, shared, preload, ipc] = [
     'src/views/PrimarySourcesPersonsView.tsx',
-    'src/App.tsx',
+    '@shell',
     'electron/db/primarySourcePersonsRepo.ts',
     '@api',
     '@bridge',
@@ -31,7 +31,7 @@ if (!process.argv.includes('--electron-primary-sources-persons-test')) {
     'Revertir fusión',
     'nodus:navigate-primary-source',
   ]) assert.ok(view.includes(marker), `phase 7 UI contains ${marker}`);
-  assert.match(app, /isPrimarySources \? <PrimarySourcesPersonsView \/>/);
+  assert.match(app, /isPrimarySources\s*\? <PrimarySourcesPersonsView \/>/);
   assert.doesNotMatch(view, /GEDCOM|árbol genealógico|sugerencias de parentesco/i);
   assert.match(repo, /entity_resolutions/);
   assert.match(repo, /decision='merge'/);

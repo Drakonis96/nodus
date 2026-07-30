@@ -153,6 +153,11 @@ export function bridgeSourceText() {
  *   '@main'   → every main-process file
  *   '@bridge' → every preload file
  *   '@api'    → shared/types.ts plus every slice in shared/api/
+ *   '@shell'  → src/App.tsx plus the startup gate and the view registry
+ *
+ * '@shell' is the same idea applied to the renderer: the startup steps and the 84
+ * `view === …` branches used to be inside App.tsx, and a test that matched a route
+ * or a guard there was never really asserting about that file.
  *
  * Swapping the path for a sentinel keeps the assertion and its position in a list
  * intact, which is what makes the migration of these tests mechanical.
@@ -161,7 +166,19 @@ export function readSource(relative) {
   if (relative === '@main') return mainSourceText();
   if (relative === '@bridge') return bridgeSourceText();
   if (relative === '@api') return apiSourceText();
+  if (relative === '@shell') return shellSourceText();
   return readFileSync(path.join(repoRoot, relative), 'utf8');
+}
+
+/** App.tsx plus src/app/: the shell, the startup sequence and every view renderer. */
+export function shellSourceText() {
+  const files = [path.join(repoRoot, 'src/App.tsx')];
+  try {
+    files.push(...tsFiles(path.join(repoRoot, 'src/app')));
+  } catch {
+    // src/app/ does not exist yet in older trees.
+  }
+  return files.map((file) => readFileSync(file, 'utf8')).join('\n');
 }
 
 /**

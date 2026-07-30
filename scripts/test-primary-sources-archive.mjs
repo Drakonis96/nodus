@@ -13,7 +13,7 @@ const require = createRequire(import.meta.url);
 
 if (!process.argv.includes('--electron-primary-sources-archive-test')) {
   const view = readSource('src/views/PrimarySourcesArchiveView.tsx');
-  const app = readSource('src/App.tsx');
+  const app = readSource('@shell');
   const shared = readSource('@api');
   const preload = readSource('@bridge');
   const ipc = readSource('@main');

@@ -10,18 +10,19 @@ import test from 'node:test';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readSource } from './ipc-channel-census.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const read = (file) => readFile(path.join(repoRoot, file), 'utf8');
+const read = async (file) => readSource(file);
 
 test('the encyclopedia is routed and reachable', async () => {
   const [app, sidebar, navigation, vaultTypes] = await Promise.all([
-    read('src/App.tsx'),
+    read('@shell'),
     read('src/components/WorldbuildingSidebar.tsx'),
     read('src/navigation.ts'),
     read('shared/vaultTypes.ts'),
   ]);
-  assert.match(app, /view === 'encyclopedia' && <EncyclopediaView onNavigate=\{setView\} \/>/);
+  assert.match(app, /encyclopedia: \([^)]*\) => <EncyclopediaView onNavigate=\{setView\} \/>/);
   assert.match(sidebar, /\{ label: 'Enciclopedia', icon: 'book', view: 'encyclopedia' \}/);
   assert.match(navigation, /'encyclopedia'/);
   assert.match(vaultTypes, /encyclopedia: \['worldbuilding'\]/);
@@ -97,7 +98,7 @@ test('Continuity is a reading, not a collection you add to', async () => {
     read('src/components/world/WorldWorkspace.tsx'),
     read('src/views/ContinuityView.tsx'),
     read('src/components/WorldbuildingSidebar.tsx'),
-    read('src/App.tsx'),
+    read('@shell'),
   ]);
   // The create button exists only where creating is a thing. Without this guard the
   // section shows an "add" button that opens nothing.
@@ -110,14 +111,14 @@ test('Continuity is a reading, not a collection you add to', async () => {
   // "continuity error" is what a novelist already says.
   assert.doesNotMatch(sidebar, /Consistencia/);
   assert.match(sidebar, /\{ label: 'Continuidad', icon: 'check', view: 'continuity' \}/);
-  assert.match(app, /view === 'continuity' && <ContinuityView onNavigate=\{setView\} \/>/);
+  assert.match(app, /continuity: \([^)]*\) => <ContinuityView onNavigate=\{setView\} \/>/);
 });
 
 test('the badge and the section read the same array', async () => {
   const [badge, view, appSource] = await Promise.all([
     read('src/components/world/ContinuityBadge.tsx'),
     read('src/views/ContinuityView.tsx'),
-    read('src/App.tsx'),
+    read('@shell'),
   ]);
   // One provider for the whole vault, refreshed when the view changes: section edits do
   // not go through notifyDataChanged, so navigation is the signal. Without it a writer
@@ -152,12 +153,12 @@ test('conflicts open on the board, and are created from the scene', async () => 
   const [view, sidebar, app] = await Promise.all([
     read('src/views/ConflictsView.tsx'),
     read('src/components/WorldbuildingSidebar.tsx'),
-    read('src/App.tsx'),
+    read('@shell'),
   ]);
   // The board is the product; the CRUD around it is infrastructure.
   assert.match(view, /useState<'board' \| 'list'>\('board'\)/);
   assert.match(sidebar, /\{ label: 'Conflictos', icon: 'scale', view: 'conflicts' \}/);
-  assert.match(app, /view === 'conflicts' && <ConflictsView onNavigate=\{setView\} \/>/);
+  assert.match(app, /conflicts: \([^)]*\) => <ConflictsView onNavigate=\{setView\} \/>/);
   // The primary creation path is the scene strip, so the sheet never writes a beat.
   assert.doesNotMatch(view, /setWorldBeat/);
 });
@@ -166,13 +167,13 @@ test('Arcs is a reading, and «Tramas» is gone', async () => {
   const [view, sidebar, app] = await Promise.all([
     read('src/views/ArcsView.tsx'),
     read('src/components/WorldbuildingSidebar.tsx'),
-    read('src/App.tsx'),
+    read('@shell'),
   ]);
   // A plot IS a thread with kind='arc' and no character subject. Shipping both guarantees
   // two lists of the same thing that disagree within a week.
   assert.doesNotMatch(sidebar, /'Tramas'/);
   assert.match(sidebar, /\{ label: 'Arcos narrativos', icon: 'route', view: 'arcs' \}/);
-  assert.match(app, /view === 'arcs' && <ArcsView onNavigate=\{setView\} \/>/);
+  assert.match(app, /arcs: \([^)]*\) => <ArcsView onNavigate=\{setView\} \/>/);
 
   // Nothing here writes: the milestones are marked on the scene sheet.
   assert.doesNotMatch(view, /setWorldBeat|updateWorldThread|createWorldThread|deleteWorldThread/);

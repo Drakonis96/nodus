@@ -1,14 +1,15 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFile, stat } from 'node:fs/promises';
+import { readSource } from './ipc-channel-census.mjs';
 
-const read = (file) => readFile(new URL(`../${file}`, import.meta.url), 'utf8');
+const read = async (file) => readSource(file);
 
 test('families and dynasties are separate worldbuilding destinations', async () => {
   const [sidebar, navigation, app, vaultTypes] = await Promise.all([
     read('src/components/WorldbuildingSidebar.tsx'),
     read('src/navigation.ts'),
-    read('src/App.tsx'),
+    read('@shell'),
     read('shared/vaultTypes.ts'),
   ]);
 
@@ -17,7 +18,7 @@ test('families and dynasties are separate worldbuilding destinations', async () 
   assert.match(navigation, /'dynasties'/);
   assert.match(vaultTypes, /dynasties: \['worldbuilding'\]/);
   assert.match(app, /const DynastiesView = lazy/);
-  assert.match(app, /view === 'dynasties' && <DynastiesView \/>/);
+  assert.match(app, /dynasties: \([^)]*\) => <DynastiesView \/>/);
 });
 
 test('dynasties are house groups with emblem cards and a complete editable sheet', async () => {

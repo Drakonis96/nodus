@@ -17,7 +17,7 @@ if (!process.argv.includes('--electron-primary-sources-research-test')) {
     ['notes', 'src/views/PrimarySourcesNotesView.tsx'],
     ['home', 'src/views/PrimarySourcesHomeView.tsx'],
     ['sharedHome', 'src/views/HomeView.tsx'],
-    ['app', 'src/App.tsx'],
+    ['app', '@shell'],
     ['repo', 'electron/db/primarySourceResearchRepo.ts'],
     ['schema', 'electron/db/migrations.ts'],
     ['sync', 'electron/db/syncTables.ts'],

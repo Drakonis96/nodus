@@ -13,7 +13,7 @@ const require = createRequire(import.meta.url);
 
 if (!process.argv.includes('--electron-primary-sources-governance-test')) {
   const files = Object.fromEntries([
-    ['app', 'src/App.tsx'],
+    ['app', '@shell'],
     ['schema', 'electron/db/migrations.ts'],
     ['sync', 'electron/db/syncTables.ts'],
     ['preload', '@bridge'],
@@ -25,7 +25,7 @@ if (!process.argv.includes('--electron-primary-sources-governance-test')) {
   ].map(([name, relative]) => [name, readSource(relative)]));
 
   assert.doesNotMatch(files.app, /PrimarySourcesToolkitView/);
-  assert.match(files.app, /view === 'toolkit'[\s\S]{0,120}<ToolkitView/);
+  assert.match(files.app, /toolkit: \([^)]*\)[\s\S]{0,120}<ToolkitView/);
   assert.ok(Number(files.schema.match(/SCHEMA_VERSION = (\d+)/)[1]) >= 118,
     'the primary-sources governance migration is applied');
   for (const table of [

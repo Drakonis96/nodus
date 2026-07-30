@@ -12,10 +12,11 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { assertApiMethods, assertChannelsWired, bridgeSourceText, mainSourceText } from './ipc-channel-census.mjs';
+import { readSource } from './ipc-channel-census.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
-const read = (rel) => fs.promises.readFile(path.join(repoRoot, rel), 'utf8');
+const read = async (rel) => readSource(rel);
 
 const outDir = await mkdtemp(path.join(repoRoot, 'node_modules', '.nodus-aiocr-ui-'));
 function loadModule(file) {
@@ -41,7 +42,7 @@ test('the OCR Workspace card is activated and routed to its own view', async () 
   assert.match(view, /<ToolkitAiOcrView onBack=\{\(\) => onNavigate\('home'\)\} settings=\{settings\} \/>/, 'the view gets a back handler and settings');
   assert.match(view, /settings: AppSettings \| null/, 'the hub accepts settings to pass down');
 
-  const app = await read('src/App.tsx');
+  const app = await read('@shell');
   assert.match(app, /<ToolkitView page=\{toolkitPage\} onNavigate=\{setToolkitPage\} settings=\{settings\} \/>/, 'App threads settings into the toolkit');
 });
 

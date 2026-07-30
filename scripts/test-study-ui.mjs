@@ -10,7 +10,7 @@ const read = async (file) => readSource(file);
 
 test('study vault uses its teal header logo and the shared dock accent', async () => {
   const [app, logo, dock, vaultTypes] = await Promise.all([
-    read('src/App.tsx'),
+    read('@shell'),
     read('src/assets/nodus-logo-teal.svg'),
     read('src/dockIcon.ts'),
     read('shared/vaultTypes.ts'),
@@ -52,7 +52,7 @@ test('macOS keeps the last vault and theme dock icon after Nodus exits', async (
 });
 
 test('left sidebar is resizable and remembers the selected width', async () => {
-  const [app, css] = await Promise.all([read('src/App.tsx'), read('src/index.css')]);
+  const [app, css] = await Promise.all([read('@shell'), read('src/index.css')]);
   assert.match(app, /nodus\.sidebarWidth/);
   assert.match(app, /data-testid="resizable-sidebar"/);
   assert.match(app, /data-testid="sidebar-scroll-region"[^>]*mr-\[6px\][^>]*overflow-y-auto/);
@@ -71,7 +71,7 @@ test('left sidebar is resizable and remembers the selected width', async () => {
 });
 
 test('sidebar header keeps the Nodus brand centered, stable when hidden and fully clickable', async () => {
-  const app = await read('src/App.tsx');
+  const app = await read('@shell');
   assert.match(app, /data-testid="sidebar-header-toggle"/);
   assert.match(
     app,
@@ -113,7 +113,7 @@ test('study materials expose downloadable hover actions and pedagogical Deep Res
     read('@bridge'),
     read('@main'),
     read('@api'),
-    read('src/App.tsx'),
+    read('@shell'),
     read('src/navigation.ts'),
     read('electron/ai/studyDeepResearch.ts'),
     read('src/components/Markdown.tsx'),
@@ -124,7 +124,7 @@ test('study materials expose downloadable hover actions and pedagogical Deep Res
   assert.match(types, /downloadStudyMaterial/);
   assert.match(ipc, /study:materials:download/);
   assert.match(navigation, /studyDeepResearch/);
-  assert.match(app, /view === 'studyDeepResearch'/);
+  assert.match(app, /studyDeepResearch: \(/);
   assert.match(app, /isStudy/);
   for (const language of ['es', 'en', 'fr', 'tr', 'de', 'pt']) assert.match(deep, new RegExp(`\\n  ${language}: \\{`));
   assert.match(deep, /\n {2}'pt-BR': \{/);
@@ -247,7 +247,7 @@ test('study test, exam and flashcard creation share a searchable multi-content s
   const [organization, generator, app] = await Promise.all([
     read('src/views/StudyOrganizationView.tsx'),
     read('src/components/StudyTestGenerator.tsx'),
-    read('src/App.tsx'),
+    read('@shell'),
   ]);
   assert.match(organization, /testId="study-create-ai-test"/);
   assert.match(organization, /testId="study-create-ai-exam"/);
@@ -264,13 +264,13 @@ test('study test, exam and flashcard creation share a searchable multi-content s
   assert.match(generator, /createStudyFlashcardsFromQuestions/);
   assert.doesNotMatch(generator, /gradeStudyAnswer|Finalizar y calcular nota/);
   assert.match(generator, /La IA solo genera el contenido de la actividad/);
-  assert.match(app, /view === 'studyQuestions' && <StudyBankView/);
+  assert.match(app, /studyQuestions: \([^)]*\) => \(\s*<StudyBankView/);
 });
 
 test('redundant study views are removed while courses, chat, review and the question bank remain', async () => {
   const [navigation, app, home, organization, bank, chat, sidebar, review] = await Promise.all([
     read('src/navigation.ts'),
-    read('src/App.tsx'),
+    read('@shell'),
     read('src/views/StudyHome.tsx'),
     read('src/views/StudyOrganizationView.tsx'),
     read('src/views/StudyBankView.tsx'),
@@ -348,13 +348,13 @@ test('study timetable exposes editable weekdays, periods and subject styling', a
     read('src/views/StudyScheduleView.tsx'),
     read('src/components/StudySidebar.tsx'),
     read('src/navigation.ts'),
-    read('src/App.tsx'),
+    read('@shell'),
     read('@bridge'),
     read('@main'),
   ]);
   assert.match(sidebar, /view: 'studySchedule'/);
   assert.match(navigation, /id: 'studySchedule'/);
-  assert.match(app, /view === 'studySchedule' && <StudyScheduleView/);
+  assert.match(app, /studySchedule: \([^)]*\) => <StudyScheduleView/);
   for (const marker of ['study-schedule-view', 'study-schedule-table', 'study-schedule-add-morning', 'study-schedule-add-afternoon', 'study-schedule-subject-styles']) assert.match(view, new RegExp(marker));
   assert.match(view, /study-schedule-add-morning" className="btn btn-primary"/);
   assert.match(view, /study-schedule-add-afternoon" className="btn btn-primary"/);
@@ -399,7 +399,7 @@ test('study timetable exposes editable weekdays, periods and subject styling', a
 
 test('student calendar exposes month, week and year views with durable event actions', async () => {
   const [view, layout, navigation, app, sidebar, types, preload, ipc, reminders] = await Promise.all([
-    read('src/views/StudyCalendarView.tsx'), read('src/views/studyCalendarLayout.ts'), read('src/navigation.ts'), read('src/App.tsx'), read('src/components/StudySidebar.tsx'), read('@api'), read('@bridge'), read('@main'), read('electron/studyCalendarReminders.ts'),
+    read('src/views/StudyCalendarView.tsx'), read('src/views/studyCalendarLayout.ts'), read('src/navigation.ts'), read('@shell'), read('src/components/StudySidebar.tsx'), read('@api'), read('@bridge'), read('@main'), read('electron/studyCalendarReminders.ts'),
   ]);
   for (const marker of ['study-calendar-view', 'study-calendar-month-grid', 'study-calendar-week-grid', 'study-calendar-year-grid', 'study-calendar-editor', 'study-calendar-reminder']) assert.match(view, new RegExp(marker));
   for (const marker of ['study-calendar-event-bar', 'study-calendar-month-event-layer', 'study-calendar-week-event-layer']) assert.match(view, new RegExp(marker));
@@ -495,7 +495,7 @@ test('study material state reuses database select chips', async () => {
     read('electron/ai/studyMaterialIndex.ts'),
     read('electron/ai/studySearch.ts'),
     read('src/views/StudyOrganizationView.tsx'),
-    read('src/App.tsx'),
+    read('@shell'),
   ]);
   assert.match(materials, /import \{ ChipSelectCell \} from '\.\.\/components\/dbGrid'/);
   assert.match(materials, /<ChipSelectCell values=\{\[material\.readState\]\}/);
@@ -563,7 +563,7 @@ test('study material state reuses database select chips', async () => {
   assert.match(organization, /data-testid=\{`study-organization-material-\$\{material\.id\}`\}/);
   assert.match(organization, /documents\.length \+ scopedMaterials\.length/);
   assert.match(organization, /onOpenMaterial\(material\.id\)/);
-  assert.match(app, /<StudyOrganizationView[^>]+onOpenMaterial=\{\(id\) => \{ setStudyMaterialTarget\(id\); setView\('studyLibrary'\); \}\}/);
+  assert.match(app, /const openMaterial = \(ctx: ViewContext\) => \(id: string\) => \{\s*ctx\.setStudyMaterialTarget\(id\);\s*ctx\.setView\('studyLibrary'\);/);
   assert.match(materials, /className="absolute inset-0 z-40 flex flex-col/);
   assert.doesNotMatch(materials, /data-testid="study-material-viewer"[^\n]*fixed/);
   assert.match(materials, /material\.extension === 'md' \|\| material\.extension === 'markdown'/);
@@ -604,7 +604,7 @@ test('study recordings use explicit light and dark surfaces throughout the audio
     read('src/components/editor/StudyEditor.tsx'),
     read('src/components/Markdown.tsx'),
     read('src/views/StudyOrganizationView.tsx'),
-    read('src/App.tsx'),
+    read('@shell'),
     read('electron/db/studyRecordingsRepo.ts'),
   ]);
   assert.match(recordings, /border-neutral-200 bg-neutral-50 p-3 dark:border-neutral-800 dark:bg-neutral-900\/35/);
@@ -631,7 +631,7 @@ test('study recordings use explicit light and dark surfaces throughout the audio
   assert.match(editor, /onOpenRecording\(decodeURIComponent\(match\[1\]\)/);
   assert.match(markdown, /onStudyRecording/);
   assert.match(organization, /onOpenRecording=\{onOpenRecording\}/);
-  assert.match(app, /setStudyRecordingTarget\(\{ id, timestamp \}\); setView\('studyRecordings'\)/);
+  assert.match(app, /setStudyRecordingTarget\(\{ id, timestamp \}\); ctx\.setView\('studyRecordings'\)/);
   assert.match(audio, /border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900\/40/);
   assert.match(audio, /bg-teal-100[^"\n]*text-teal-800 dark:bg-teal-950\/70 dark:text-teal-200/);
 });
