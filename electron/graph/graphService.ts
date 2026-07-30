@@ -19,8 +19,10 @@ import type {
   ReadingPathRequest,
   ReadingPathStrategy,
   ReadingPathEntry,
+  WorkView,
 } from '@shared/types';
 import { getEdgeDetail, getEdgeTrace, getIdeaDetail, currentEmbeddingConfig } from '../db/ideasRepo';
+import { getWorksByIds } from '../db/worksRepo';
 import { listGraphThemes, normalizeThemeLabel } from '../db/themesRepo';
 import { computeThemeMatches } from './computeHost';
 import { centroidF32, type LabeledVector } from './similarityCore';
@@ -882,7 +884,7 @@ const DEBATE_LIST_EVIDENCE_PER_WORK = 1;
  */
 type DebateSideCache = Map<string, DebateSide | null>;
 
-function buildDebateSide(ideaId: string, opts: { lean?: boolean; cache?: DebateSideCache } = {}): DebateSide | null {
+function buildDebateSide(ideaId: string, opts: { lean?: boolean; cache?: DebateSideCache; works?: Map<string, WorkView> } = {}): DebateSide | null {
   const cached = opts.cache?.get(ideaId);
   if (cached !== undefined) return cached;
   const side = assembleDebateSide(ideaId, opts);
@@ -890,8 +892,8 @@ function buildDebateSide(ideaId: string, opts: { lean?: boolean; cache?: DebateS
   return side;
 }
 
-function assembleDebateSide(ideaId: string, opts: { lean?: boolean }): DebateSide | null {
-  const detail = getIdeaDetail(ideaId);
+function assembleDebateSide(ideaId: string, opts: { lean?: boolean; works?: Map<string, WorkView> }): DebateSide | null {
+  const detail = getIdeaDetail(ideaId, opts.works);
   if (!detail) return null;
   const evidenceByWork = new Map<string, Evidence[]>();
   for (const ev of detail.evidence) {
@@ -949,7 +951,7 @@ function assembleDebate(
   clusterSize: number,
   supportCount: Map<string, number>,
   themesByIdea: Map<string, Set<string>>,
-  opts: { lean?: boolean; cache?: DebateSideCache } = {}
+  opts: { lean?: boolean; cache?: DebateSideCache; works?: Map<string, WorkView> } = {}
 ): Debate | null {
   const sideA = buildDebateSide(row.from_id, opts);
   const sideB = buildDebateSide(row.to_id, opts);
@@ -1047,6 +1049,21 @@ function loadThemesByIdea(db: ReturnType<typeof getDb>): Map<string, Set<string>
  * grouped into clusters (connected components over shared ideas) so multi-sided
  * debates surface together. Pure DB reads — no AI, no new persistence.
  */
+/** Every idea on either side of a contradiction, as a subquery rather than a bound id list. */
+const DEBATE_IDEA_IDS = `SELECT from_id FROM visible_edges WHERE type IN ('contradicts','refutes')
+                          UNION SELECT to_id FROM visible_edges WHERE type IN ('contradicts','refutes')`;
+
+/**
+ * Every work cited by any debate, in one batch, so getIdeaDetail does not re-run
+ * its four work queries once per idea.
+ */
+function loadDebateWorks(db: ReturnType<typeof getDb>): Map<string, WorkView> {
+  const rows = db
+    .prepare(`SELECT DISTINCT nodus_id FROM idea_occurrences WHERE global_id IN (${DEBATE_IDEA_IDS})`)
+    .all() as { nodus_id: string }[];
+  return getWorksByIds(rows.map((r) => r.nodus_id));
+}
+
 export function getDebates(): Debate[] {
   const db = getDb();
   const rows = db
@@ -1058,11 +1075,12 @@ export function getDebates(): Debate[] {
   const supportCount = loadSupportCounts(db);
   const themesByIdea = loadThemesByIdea(db);
   const cache: DebateSideCache = new Map();
+  const works = loadDebateWorks(db);
 
   const debates = rows
     .map((row) => {
       const root = clusterId.get(row.id)!;
-      return assembleDebate(row, root, clusterSize.get(root) ?? 1, supportCount, themesByIdea, { lean: true, cache });
+      return assembleDebate(row, root, clusterSize.get(root) ?? 1, supportCount, themesByIdea, { lean: true, cache, works });
     })
     .filter((d): d is Debate => d !== null);
 

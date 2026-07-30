@@ -21,6 +21,7 @@ import type {
   IdeaPage,
   IdeaPageRequest,
   IdeaPickerItem,
+  WorkView,
 } from '@shared/types';
 import { DEFAULT_EMBEDDING_MODELS, normalizeEmbeddingModel } from '@shared/providers';
 import { getWorksByIds } from './worksRepo';
@@ -713,7 +714,14 @@ export function pruneDormantIdeas(maxAgeDays = 30): number {
 
 // ── Detail panels ───────────────────────────────────────────────────────────
 
-export function getIdeaDetail(globalId: string): IdeaDetail | null {
+/**
+ * @param worksCache Works already loaded by the caller. `getWorksByIds` is a batch
+ *   API, but called from here it only ever gets one idea's worth of ids at a time —
+ *   usually a single one — so a caller assembling many ideas pays its four queries
+ *   once per idea. Handing in a map built by that same function for the whole set
+ *   collapses them to four in total; the values are identical either way.
+ */
+export function getIdeaDetail(globalId: string, worksCache?: Map<string, WorkView>): IdeaDetail | null {
   const db = getDb();
   const idea = getIdeaSummary(globalId);
   if (!idea) return null;
@@ -726,10 +734,12 @@ export function getIdeaDetail(globalId: string): IdeaDetail | null {
   }[];
   // Batch-load all works for the occurrences in 2 queries instead of N+1
   // (previously each occurrence called getWork() → 2 queries each).
-  const worksById = getWorksByIds(occRows.map((o) => o.nodus_id));
+  const needed = worksCache ? occRows.map((o) => o.nodus_id).filter((id) => !worksCache.has(id)) : occRows.map((o) => o.nodus_id);
+  const fetched = needed.length ? getWorksByIds(needed) : null;
+  const worksById = (id: string) => worksCache?.get(id) ?? fetched?.get(id);
   const occurrences = occRows
     .map((o) => {
-      const work = worksById.get(o.nodus_id);
+      const work = worksById(o.nodus_id);
       return work ? { ...o, work } : null;
     })
     .filter((x): x is NonNullable<typeof x> => x !== null);
