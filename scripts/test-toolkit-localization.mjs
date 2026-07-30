@@ -6,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { mainSourceText } from './ipc-channel-census.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
@@ -101,7 +102,7 @@ test('included App metadata is complete in every interface language', () => {
 });
 
 test('Toolkit IPC obtains file-dialog copy from the active UI language', async () => {
-  const ipc = await readFile(path.join(root, 'electron/ipc.ts'), 'utf8');
+  const ipc = mainSourceText();
   assert.match(ipc, /const toolkitCopy = \(key: ToolkitDialogKey\).*getSettings\(\)\.uiLanguage/);
   for (const key of ['addFiles', 'saveTranslation', 'importPresentation', 'downloadAppPackage', 'selectProtectDocuments']) {
     assert.match(ipc, new RegExp(`toolkitCopy\\('${key}'\\)`));

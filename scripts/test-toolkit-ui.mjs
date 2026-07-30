@@ -6,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { bridgeSourceText, mainSourceText } from './ipc-channel-census.mjs';
 
 // Nodus Toolkit — the Herramientas section (hub + per-tool pages). These checks
 // cover the wiring that no e2e step can see cheaply: that the view is registered
@@ -137,8 +138,8 @@ test('the hub renders every built tool including Nodus Translate', async () => {
 test('Translate exposes balanced text panes, resilient Zotero controls and persistent history', async () => {
   const [view, preload, ipc, history, shared] = await Promise.all([
     read('src/views/ToolkitTranslateView.tsx'),
-    read('electron/preload.ts'),
-    read('electron/ipc.ts'),
+    Promise.resolve(bridgeSourceText()),
+    Promise.resolve(mainSourceText()),
     read('electron/toolkit/translate/history.ts'),
     read('shared/toolkitTranslateTypes.ts'),
   ]);
@@ -160,8 +161,8 @@ test('Translate exposes balanced text panes, resilient Zotero controls and persi
 test('Protect exposes the complete local workflow and the secure preload boundary', async () => {
   const [view, preload, ipc, shared] = await Promise.all([
     read('src/views/ToolkitProtectView.tsx'),
-    read('electron/preload.ts'),
-    read('electron/ipc.ts'),
+    Promise.resolve(bridgeSourceText()),
+    Promise.resolve(mainSourceText()),
     read('shared/protectTypes.ts'),
   ]);
   for (const marker of ['protect-home', 'Proteger documentos', 'Verificar una copia trazable', 'Guardar como…', 'Guardar en esta bóveda', 'Compartir']) {

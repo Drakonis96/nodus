@@ -11,6 +11,7 @@ import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { assertApiMethods, assertChannelsWired, bridgeSourceText, mainSourceText } from './ipc-channel-census.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
@@ -77,12 +78,11 @@ test('the view drives OCR only through the typed preload surface', async () => {
 });
 
 test('preload, ipc and NodusApi expose the aiOcr surface consistently', async () => {
-  const [preload, ipc, types] = await Promise.all([
-    read('electron/preload.ts'),
-    read('electron/ipc.ts'),
-    read('shared/types.ts'),
-  ]);
-  // Every preload method has a matching ipc handler and a NodusApi type.
+  const preload = bridgeSourceText();
+  const ipc = mainSourceText();
+  // Every preload method has a matching ipc handler and a NodusApi type. The
+  // channel half is asked of the census, so it survives handlers moving between
+  // domain modules.
   const methods = {
     createOcrDocs: 'aiOcr:create',
     listOcrDocs: 'aiOcr:list',
@@ -100,11 +100,11 @@ test('preload, ipc and NodusApi expose the aiOcr surface consistently', async ()
     saveOcrToVault: 'aiOcr:saveToVault',
     pickOcrFiles: 'aiOcr:pickFiles',
   };
-  for (const [method, channel] of Object.entries(methods)) {
+  for (const method of Object.keys(methods)) {
     assert.match(preload, new RegExp(`${method}:`), `preload defines ${method}`);
-    assert.match(ipc, new RegExp(`h\\('${channel.replace(':', '\\:')}'`), `ipc handles ${channel}`);
-    assert.match(types, new RegExp(`${method}\\(`), `NodusApi types ${method}`);
   }
+  assertChannelsWired(assert, Object.values(methods));
+  assertApiMethods(assert, Object.keys(methods));
   assert.match(preload, /onOcrEvent:/, 'preload exposes the progress subscription');
   assert.match(ipc, /initAiOcr\(getWindow\)/, 'the manager is initialised with the window');
   assert.match(ipc, /resumeAiOcr\(\)/, 'unfinished documents resume on startup');

@@ -121,3 +121,23 @@ export function assertApiMethods(assert, methods) {
     assert.ok(apiMethods.has(method), `NodusApi does not declare '${method}'`);
   }
 }
+
+/**
+ * All main-process source, concatenated. For the assertions that are genuinely
+ * about main-process behaviour rather than about a channel — "the OCR manager is
+ * initialised with the window", "deleting uses the OS Trash" — and which used to
+ * be written against electron/ipc.ts because that is where everything lived.
+ * Matching the whole tree keeps the assertion true after a handler moves.
+ */
+export function mainSourceText() {
+  return ipcCensus()
+    .mainFiles.map((entry) => entry.code)
+    .join('\n');
+}
+
+/** All bridge (preload) source, concatenated. Same reasoning as mainSourceText. */
+export function bridgeSourceText() {
+  return ipcCensus()
+    .bridgeFiles.map((entry) => entry.code)
+    .join('\n');
+}
