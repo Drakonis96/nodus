@@ -3,16 +3,19 @@ import test from 'node:test';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readSource } from './ipc-channel-census.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const read = (file) => readFile(path.join(root, file), 'utf8');
+// readSource resolves the '@main' / '@bridge' / '@api' sentinels to whole surfaces —
+// the three former hot files are directories now — and any other path to that file.
+const read = async (file) => readSource(file);
 
 test('character chat exposes persistent history, image opt-in and destructive confirmation', async () => {
   const [modal, preload, ipc, api] = await Promise.all([
     read('src/components/CharacterInterviewModal.tsx'),
-    read('electron/preload.ts'),
-    read('electron/ipc.ts'),
-    read('shared/types.ts'),
+    read('@bridge'),
+    read('@main'),
+    read('@api'),
   ]);
 
   assert.match(modal, /data-testid="character-chat-history-toggle"/);
