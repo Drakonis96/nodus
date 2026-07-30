@@ -321,6 +321,23 @@
   100% { transform: scale(1.9); opacity: 0; }
 }
 
+/* ── at rest ───────────────────────────────────────────────────────────────────────
+ * Nodi holds its pose when nothing is happening (see NodiAvatar's useAtRest).
+ *
+ * `animation-play-state: paused` and NOT `animation: none`: every keyframe above
+ * stays exactly as authored, the orb freezes wherever in its cycle it happened to
+ * be, and resuming picks up from there instead of snapping back to 0%. Nothing is
+ * removed — flip the class off and the whole thing runs again.
+ *
+ * Why it is worth doing: an SVG subtree has no compositor layer of its own, so any
+ * one animating property repaints the entire orb — turbulence clouds, gaussian
+ * glows, blend modes and all — every frame. Measured idle on this corpus, the orb
+ * cost ~50% CPU with all its animations and still ~23% with only one left running.
+ * Zero is the only cheap number, which is why this is a switch rather than a diet.
+ */
+.nodi-orb.nodi-at-rest,
+.nodi-orb.nodi-at-rest * { animation-play-state: paused; }
+
 @media (prefers-reduced-motion: reduce) {
   .nodi-orb, .nodi-orb * { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
 }

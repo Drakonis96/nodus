@@ -1,4 +1,4 @@
-import { useId, useMemo, type CSSProperties } from 'react';
+import { useId, useMemo, type CSSProperties, type PointerEventHandler } from 'react';
 import './nodi.css';
 
 export type NodiState =
@@ -78,6 +78,8 @@ export function Nodi({
   raiseArm = false,
   className,
   style,
+  onPointerEnter,
+  onPointerLeave,
 }: {
   state?: NodiState;
   role?: NodiRole;
@@ -87,6 +89,8 @@ export function Nodi({
   raiseArm?: boolean;
   className?: string;
   style?: CSSProperties;
+  onPointerEnter?: PointerEventHandler<SVGSVGElement>;
+  onPointerLeave?: PointerEventHandler<SVGSVGElement>;
 }) {
   const mesh = useMemo(buildMesh, []);
   // Namespace the gradient/filter/clip IDs so several Nodi can coexist in one document.
@@ -104,6 +108,8 @@ export function Nodi({
       aria-label="Nodi"
       data-state={state}
       data-role={role}
+      onPointerEnter={onPointerEnter}
+      onPointerLeave={onPointerLeave}
     >
       <defs>
         <radialGradient id={u('bodyG')} cx="40%" cy="30%" r="75%">

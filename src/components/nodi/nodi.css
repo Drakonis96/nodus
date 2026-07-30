@@ -236,6 +236,12 @@
 @keyframes nodi-close-halo { 0%,68%{opacity:.7;transform:scale(1)} 84%{opacity:1;transform:scale(1.28)} 100%{opacity:0;transform:scale(1.65)} }
 @keyframes nodi-close-smoke { 0%{opacity:0;transform:translateY(4px) scale(.2)} 32%{opacity:.92} 100%{opacity:0;transform:translateY(-18px) scale(1.8)} }
 
+/* Holds the pose when nothing is happening — paused, not removed, so every keyframe
+   above survives and resumes where it left off. See nodiOrb.css for the measurements
+   that made this necessary; the classic Nodi pays the same per-frame SVG repaint. */
+.nodi-svg.nodi-at-rest,
+.nodi-svg.nodi-at-rest * { animation-play-state: paused; }
+
 @media (prefers-reduced-motion: reduce) {
   .nodi-svg * { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
 }
