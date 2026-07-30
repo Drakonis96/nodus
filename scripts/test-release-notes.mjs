@@ -25,21 +25,28 @@ try {
 
   const { RELEASE_NOTES, releaseNotesForMajor } = await import(pathToFileURL(bundlePath).href);
   const currentRelease = RELEASE_NOTES[0];
-  assert.equal(currentRelease?.version, '3.0.0');
+  assert.equal(currentRelease?.version, '3.0.1');
   assert.equal(currentRelease?.date, '2026-07-30');
+  // A performance release: one highlight per cause, not one per query fixed.
+  assert.equal(currentRelease?.highlights.length, 3);
+
+  // The vault introductions live in 3.0.0 and must keep their shape as newer
+  // releases land on top of them — hence looked up by version, not as `[0]`.
+  const vaultsRelease = RELEASE_NOTES.find((note) => note.version === '3.0.0');
+  assert.equal(vaultsRelease?.date, '2026-07-30');
   // One highlight per new vault, not one per refinement inside it — see the note
   // above RELEASE_3_0_0_HIGHLIGHTS.
-  assert.equal(currentRelease?.highlights.length, 16);
+  assert.equal(vaultsRelease?.highlights.length, 16);
   const newVaults = ['prosopography', 'primary_sources', 'testimonios', 'worldbuilding'];
   for (const scope of newVaults) {
     assert.equal(
-      currentRelease.highlights.filter((h) => h.scope === scope).length,
+      vaultsRelease.highlights.filter((h) => h.scope === scope).length,
       1,
       `${scope} must introduce itself once, not once per refinement`,
     );
   }
   // And they lead, in the order shared/vaultTypes.ts declares them.
-  assert.deepEqual(currentRelease.highlights.slice(0, 4).map((h) => h.scope), newVaults);
+  assert.deepEqual(vaultsRelease.highlights.slice(0, 4).map((h) => h.scope), newVaults);
   // 2.8.0 was authored and never published; its highlights live inside 3.0.0 now, so
   // no entry may claim that version or the picker would offer a release nobody ran.
   assert.ok(!RELEASE_NOTES.some((note) => note.version === '2.8.0'));

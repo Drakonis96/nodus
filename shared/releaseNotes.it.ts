@@ -58,7 +58,14 @@ export const RELEASE_2_7_0_IT: string[] = [
 ];
 
 /** Italian history, indexed by release and highlight order. */
+const RELEASE_3_0_1_IT: string[] = [
+  "Le sezioni che restavano a pensare ora si aprono subito. Il grafo, la mappa degli argomenti, i dibattiti, il percorso di lettura e le schede d'autore si caricavano percorrendo l'intera biblioteca e bloccavano tutta l'applicazione mentre lo facevano; ora chiedono solo ciò che mostrano. In una cassaforte di quasi 10.000 idee il grafo passa da 2,7 secondi di finestra congelata a meno di 0,2.",
+  "Nodi resta fermo quando non ha nulla da dire e torna a muoversi appena ce l'ha. La sua animazione non si fermava mai, nemmeno con l'applicazione a riposo: costava in permanenza mezzo core e scaldava la macchina. Ora mantiene la posa qualche secondo dopo l'ultima attività e si sveglia al passaggio del mouse, a un cambio di stato o all'arrivo di una notifica. Nessuna animazione è stata rimossa.",
+  "La cache del testo estratto dai PDF ora ha un limite. Veniva scritta e mai ripulita, arrivando a occupare un quarto del file della cassaforte, che per giunta finisce intero in ogni backup. Ora è limitata a 64 MB conservando il più recente; nulla va perso, perché qualsiasi testo scartato viene riestratto dal suo PDF quando serve.",
+];
+
 export const RELEASE_NOTES_IT: Record<string, string[]> = {
+  "3.0.1": RELEASE_3_0_1_IT,
   "3.0.0": RELEASE_3_0_0_IT,
   "2.7.0": RELEASE_2_7_0_IT,
   "2.6.3": RELEASE_2_6_3_IT,
