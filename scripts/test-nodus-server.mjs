@@ -312,6 +312,25 @@ test('Nodus Server pairs a desktop publisher and protects read-only MCP with OAu
     const initialSetupHtml = await initialSetupResponse.text();
     assert.match(initialSetupHtml, /<html lang="en">/);
     assert.match(initialSetupHtml, /<h1>Set up Nodus Server<\/h1>/);
+    assert.match(initialSetupHtml, /data-testid="nodus-brand"/);
+    assert.match(initialSetupHtml, /data-testid="auth-layout"/);
+    assert.match(initialSetupHtml, /data-testid="language-picker"/);
+    assert.match(initialSetupHtml, /class="help-tip"/);
+    for (const language of ['en', 'es', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr']) {
+      assert.match(initialSetupHtml, new RegExp(`<option value="${language}"`));
+    }
+    assert.doesNotMatch(initialSetupHtml, /<script/i, 'the redesigned server UI stays compatible with the script-free CSP');
+
+    const spanishPreference = await postForm(`${origin}/language`, { language: 'es' }, {
+      headers: { referer: `${origin}/setup` },
+    });
+    assert.equal(spanishPreference.status, 303);
+    assert.equal(spanishPreference.headers.get('location'), '/setup');
+    const languageCookie = cookieFrom(spanishPreference);
+    const spanishSetupHtml = await (await fetch(`${origin}/setup`, { headers: { cookie: languageCookie } })).text();
+    assert.match(spanishSetupHtml, /<html lang="es">/);
+    assert.match(spanishSetupHtml, /<h1>Configurar Nodus Server<\/h1>/);
+    assert.match(spanishSetupHtml, /<option value="es" selected>/);
 
     const setup = await postForm(`${origin}/setup`, {
       setupToken,
@@ -325,6 +344,10 @@ test('Nodus Server pairs a desktop publisher and protects read-only MCP with OAu
 
     let dashboardResponse = await fetch(`${origin}/`, { headers: { cookie: adminCookie } });
     let dashboard = await dashboardResponse.text();
+    assert.match(dashboard, /class="server-overview"/);
+    assert.match(dashboard, /class="metric-grid"/);
+    assert.match(dashboard, /data-testid="language-picker"/);
+    assert.match(dashboard, /This is the address ChatGPT, Claude and other compatible MCP clients/);
     const csrf = hidden(dashboard, 'csrf');
 
     for (const [name, description] of [['Curso de teoría', 'Materiales del curso'], ['Vault privado', 'No asignado']]) {

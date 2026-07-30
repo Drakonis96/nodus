@@ -1,12 +1,14 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import { gunzipSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { Store, digest, token } from './lib/store.mjs';
 import { body, contentSecurityPolicy, cookies, escapeHtml, form, html, json, jsonBody, redirect } from './lib/http.mjs';
 import { normalizeServerLanguage, serverTranslator } from './lib/i18n.mjs';
+import { helpTip, languagePicker, nodusMark, WEB_STYLES } from './lib/webUi.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = process.env.NODUS_DATA_DIR || path.join(ROOT, 'data');
@@ -21,6 +23,7 @@ const SCOPES = new Set(['profile', 'spaces.read', 'materials.read']);
 const MCP_PROTOCOLS = new Set(['2025-11-25', '2025-06-18', '2025-03-26']);
 const AUTH_BODY_BYTES = 32 * 1024;
 const MAX_RATE_BUCKETS = 20_000;
+const languageContext = new AsyncLocalStorage();
 
 function environmentCredential(name) {
   const direct = process.env[name] || '';
@@ -48,7 +51,7 @@ function syncEnvironmentAdmin() {
 const ENVIRONMENT_ADMIN_CONFIGURED = syncEnvironmentAdmin();
 
 function language() {
-  return normalizeServerLanguage(store.state.settings.language);
+  return normalizeServerLanguage(languageContext.getStore() || store.state.settings.language);
 }
 
 function tr(key, variables) {
@@ -71,9 +74,31 @@ function mcpResource() {
   return `${publicUrl()}/mcp`;
 }
 
-function page(title, content) {
-  return `<!doctype html><html lang="${escapeHtml(language())}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title)} · Nodus Server</title><style>
-  :root{font-family:Inter,ui-sans-serif,system-ui,sans-serif;color:#e5e7eb;background:#09090b}body{max-width:920px;margin:0 auto;padding:40px 20px}a{color:#a5b4fc}h1,h2{color:#fff}.card{background:#18181b;border:1px solid #303038;border-radius:14px;padding:20px;margin:16px 0}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}label{display:block;margin:12px 0 5px;color:#d4d4d8}input,select{box-sizing:border-box;width:100%;padding:10px;border-radius:8px;border:1px solid #3f3f46;background:#09090b;color:#fff}button{margin-top:14px;border:0;border-radius:8px;padding:10px 14px;background:#4f46e5;color:white;font-weight:600;cursor:pointer}.secondary{background:#27272a}.muted{color:#a1a1aa;font-size:.9rem}.ok{color:#6ee7b7}.warn{color:#fbbf24}code{background:#27272a;padding:2px 5px;border-radius:5px;word-break:break-all}table{width:100%;border-collapse:collapse}th,td{text-align:left;border-bottom:1px solid #303038;padding:9px 5px}</style></head><body>${content}</body></html>`;
+function page(title, content, options = {}) {
+  const picker = languagePicker(language(), { language: tr('language'), apply: tr('applyLanguage') });
+  const header = `<header class="site-header">
+    <a class="site-brand" href="/" data-testid="nodus-brand">
+      ${nodusMark('nodus-header-mark')}
+      <span>Nodus Server<small>${tr('administration')}</small></span>
+    </a>
+    ${picker}
+  </header>`;
+  const main = options.variant === 'auth'
+    ? `<main class="auth-main" data-testid="auth-layout">
+        <section class="auth-story">
+          ${nodusMark('nodus-auth-mark', 'auth-mark')}
+          <p class="brand-kicker">Nodus Server</p>
+          <h2>${tr('brandTagline')}</h2>
+          <p>${tr('brandIntro')}</p>
+          <div class="trust-list">
+            <span class="trust-pill">${tr('privateByDesign')}</span>
+            <span class="trust-pill">${tr('oauthProtected')}</span>
+          </div>
+        </section>
+        <section class="auth-card">${content}</section>
+      </main>`
+    : `<main class="app-main">${content}</main>`;
+  return `<!doctype html><html lang="${escapeHtml(language())}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#08080d"><title>${escapeHtml(title)} · Nodus Server</title><style>${WEB_STYLES}</style></head><body>${header}${main}<footer class="site-footer">Nodus Server · ${tr('brandTagline')}</footer></body></html>`;
 }
 
 function sessionFor(req) {
@@ -456,44 +481,142 @@ async function handleMcp(req, res) {
 }
 
 function setupPage(error = '') {
-  return page(tr('setupTitle'), `<h1>${tr('setupHeading')}</h1><p class="muted">${tr('setupIntro')}</p>${error ? `<p class="warn">${escapeHtml(error)}</p>` : ''}<form class="card" method="post" action="/setup"><label>${tr('setupToken')}</label><input name="setupToken" type="password" maxlength="1024" required><label>${tr('serverName')}</label><input name="name" value="Nodus Server" maxlength="120" required><label>${tr('publicUrl')}</label><input name="publicUrl" placeholder="https://nodus.example.com" maxlength="2048" required><label>${tr('adminEmail')}</label><input name="email" type="email" maxlength="320" required><label>${tr('adminPassword')}</label><input name="password" type="password" minlength="12" maxlength="1024" required><button>${tr('createServer')}</button></form>`);
+  return page(tr('setupTitle'), `<p class="eyebrow">${tr('setupTitle')}</p><h1>${tr('setupHeading')}</h1><p class="lead">${tr('setupIntro')}</p>${error ? `<p class="warn">${escapeHtml(error)}</p>` : ''}<form class="card" method="post" action="/setup">
+    <div class="field"><div class="label-line"><label for="setup-token">${tr('setupToken')}</label>${helpTip(tr('setupTokenHelp'), tr('moreInformation'))}</div><input id="setup-token" name="setupToken" type="password" maxlength="1024" required></div>
+    <div class="field"><label for="server-name">${tr('serverName')}</label><input id="server-name" name="name" value="Nodus Server" maxlength="120" required></div>
+    <div class="field"><div class="label-line"><label for="public-url">${tr('publicUrl')}</label>${helpTip(tr('publicUrlHelp'), tr('moreInformation'))}</div><input id="public-url" name="publicUrl" type="url" placeholder="https://nodus.example.com" maxlength="2048" required></div>
+    <div class="field"><label for="admin-email">${tr('adminEmail')}</label><input id="admin-email" name="email" type="email" autocomplete="username" maxlength="320" required></div>
+    <div class="field"><label for="admin-password">${tr('adminPassword')}</label><input id="admin-password" name="password" type="password" autocomplete="new-password" minlength="12" maxlength="1024" required></div>
+    <button type="submit">${tr('createServer')}</button>
+  </form>`, { variant: 'auth' });
 }
 
 function loginPage(next = '/', error = '') {
-  return page(tr('loginTitle'), `<h1>${tr('loginHeading')}</h1>${error ? `<p class="warn">${escapeHtml(error)}</p>` : ''}<form class="card" method="post" action="/login"><input type="hidden" name="next" value="${escapeHtml(next)}"><label>${tr('email')}</label><input name="email" type="email" autocomplete="username" maxlength="320" required><label>${tr('password')}</label><input name="password" type="password" autocomplete="current-password" maxlength="1024" required><button>${tr('signIn')}</button></form>`);
+  return page(tr('loginTitle'), `<p class="eyebrow">${tr('oauthProtected')}</p><h1>${tr('loginHeading')}</h1><p class="lead">${tr('serverReady')}</p>${error ? `<p class="warn">${escapeHtml(error)}</p>` : ''}<form class="card" method="post" action="/login">
+    <input type="hidden" name="next" value="${escapeHtml(next)}">
+    <div class="field"><label for="login-email">${tr('email')}</label><input id="login-email" name="email" type="email" autocomplete="username" maxlength="320" required autofocus></div>
+    <div class="field"><label for="login-password">${tr('password')}</label><input id="login-password" name="password" type="password" autocomplete="current-password" maxlength="1024" required></div>
+    <button type="submit">${tr('signIn')}</button>
+  </form>`, { variant: 'auth' });
 }
 
 function accountPage(current, notice = '', error = '') {
-  const adminLink = current.user.role === 'admin' ? `<a href="/">${tr('administration')}</a> · ` : '';
-  return page(tr('accountTitle'), `<div style="display:flex;gap:16px;align-items:center"><h1 style="flex:1">${tr('accountTitle')}</h1><form method="post" action="/logout"><input type="hidden" name="csrf" value="${current.session.csrf}"><button class="secondary">${tr('signOut')}</button></form></div><p>${adminLink}<span class="muted">${escapeHtml(current.user.email)}</span></p>${notice ? `<p class="ok">${escapeHtml(notice)}</p>` : ''}${error ? `<p class="warn">${escapeHtml(error)}</p>` : ''}<form class="card" method="post" action="/account/password"><h2>${tr('changePassword')}</h2><p class="muted">${tr('passwordHelp')}</p><input type="hidden" name="csrf" value="${current.session.csrf}"><label>${tr('currentPassword')}</label><input name="currentPassword" type="password" autocomplete="current-password" required><label>${tr('newPassword')}</label><input name="newPassword" type="password" autocomplete="new-password" minlength="12" required><label>${tr('repeatPassword')}</label><input name="confirmPassword" type="password" autocomplete="new-password" minlength="12" required><button>${tr('changePassword')}</button></form>`);
+  const adminLink = current.user.role === 'admin' ? `<a class="button-link" href="/">${tr('administration')}</a>` : '';
+  return page(tr('accountTitle'), `<div class="page-heading">
+    <div><p class="eyebrow">${tr('oauthProtected')}</p><h1>${tr('accountTitle')}</h1><p class="lead">${escapeHtml(current.user.email)}</p></div>
+    <div class="heading-actions">${adminLink}<form method="post" action="/logout"><input type="hidden" name="csrf" value="${current.session.csrf}"><button class="secondary" type="submit">${tr('signOut')}</button></form></div>
+  </div>
+  ${notice ? `<p class="ok">${escapeHtml(notice)}</p>` : ''}${error ? `<p class="warn">${escapeHtml(error)}</p>` : ''}
+  <form class="card" method="post" action="/account/password">
+    <div class="section-header"><div><h2>${tr('changePassword')}</h2><p>${tr('passwordHelp')}</p></div></div>
+    <input type="hidden" name="csrf" value="${current.session.csrf}">
+    <div class="grid">
+      <div class="field"><label for="current-password">${tr('currentPassword')}</label><input id="current-password" name="currentPassword" type="password" autocomplete="current-password" required></div>
+      <div></div>
+      <div class="field"><label for="new-password">${tr('newPassword')}</label><input id="new-password" name="newPassword" type="password" autocomplete="new-password" minlength="12" required></div>
+      <div class="field"><label for="confirm-password">${tr('repeatPassword')}</label><input id="confirm-password" name="confirmPassword" type="password" autocomplete="new-password" minlength="12" required></div>
+    </div>
+    <button type="submit">${tr('changePassword')}</button>
+  </form>`);
 }
 
 function resetPasswordPage(current, user, error = '') {
-  return page(tr('resetPassword'), `<h1>${tr('resetPassword')}</h1><p><a href="/">${tr('backAdmin')}</a></p>${error ? `<p class="warn">${escapeHtml(error)}</p>` : ''}<form class="card" method="post" action="/admin/users/password"><h2>${escapeHtml(user.email)}</h2><p class="muted">${tr('resetHelp')}</p><input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="userId" value="${user.id}"><label>${tr('temporaryPassword')}</label><input name="newPassword" type="password" autocomplete="new-password" minlength="12" required><label>${tr('repeatPassword')}</label><input name="confirmPassword" type="password" autocomplete="new-password" minlength="12" required><button>${tr('resetPassword')}</button></form>`);
+  return page(tr('resetPassword'), `<div class="page-heading"><div><p class="eyebrow">${tr('usersAccess')}</p><h1>${tr('resetPassword')}</h1><p class="lead">${escapeHtml(user.email)}</p></div><a class="button-link" href="/">${tr('backAdmin')}</a></div>${error ? `<p class="warn">${escapeHtml(error)}</p>` : ''}<form class="card" method="post" action="/admin/users/password">
+    <p class="muted">${tr('resetHelp')}</p>
+    <input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="userId" value="${user.id}">
+    <div class="grid">
+      <div class="field"><label for="temporary-password">${tr('temporaryPassword')}</label><input id="temporary-password" name="newPassword" type="password" autocomplete="new-password" minlength="12" required></div>
+      <div class="field"><label for="temporary-password-confirm">${tr('repeatPassword')}</label><input id="temporary-password-confirm" name="confirmPassword" type="password" autocomplete="new-password" minlength="12" required></div>
+    </div>
+    <button type="submit">${tr('resetPassword')}</button>
+  </form>`);
 }
 
 function dashboard(current, notice = '') {
-  const spaces = store.state.spaces.map((space) => `<tr><td>${escapeHtml(space.name)}</td><td><code>${space.id}</code></td><td>${escapeHtml(space.updatedAt || tr('unpublished'))}</td><td><form method="post" action="/admin/pairing"><input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="spaceId" value="${space.id}"><button class="secondary">${tr('createPairing')}</button></form>${space.updatedAt ? `<form method="post" action="/admin/spaces/clear-request"><input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="spaceId" value="${space.id}"><button class="secondary">${tr('deletePublication')}</button></form>` : ''}</td></tr>`).join('');
+  const spaces = store.state.spaces.map((space) => `<tr><td><strong>${escapeHtml(space.name)}</strong>${space.description ? `<div class="muted">${escapeHtml(space.description)}</div>` : ''}</td><td><code>${space.id}</code></td><td>${escapeHtml(space.updatedAt || tr('unpublished'))}</td><td><form method="post" action="/admin/pairing"><input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="spaceId" value="${space.id}"><button class="secondary" type="submit">${tr('createPairing')}</button></form>${space.updatedAt ? `<form method="post" action="/admin/spaces/clear-request"><input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="spaceId" value="${space.id}"><button class="danger" type="submit">${tr('deletePublication')}</button></form>` : ''}</td></tr>`).join('');
   const spaceOptions = store.state.spaces.map((space) => `<option value="${space.id}">${escapeHtml(space.name)}</option>`).join('');
   const users = store.state.users.map((user) => {
     const access = store.state.memberships.filter((entry) => entry.userId === user.id).map((entry) => {
       const space = store.state.spaces.find((candidate) => candidate.id === entry.spaceId);
-      const remove = entry.role === 'owner' ? '' : `<form method="post" action="/admin/access/revoke" style="display:inline"><input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="userId" value="${user.id}"><input type="hidden" name="spaceId" value="${entry.spaceId}"><button class="secondary" title="${tr('revokeAccess')}">×</button></form>`;
-      return `<div>${escapeHtml(space?.name || entry.spaceId)} · ${escapeHtml(entry.role)} ${remove}</div>`;
-    }).join('') || '—';
+      const remove = entry.role === 'owner' ? '' : `<form method="post" action="/admin/access/revoke"><input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="userId" value="${user.id}"><input type="hidden" name="spaceId" value="${entry.spaceId}"><button class="secondary" type="submit" title="${tr('revokeAccess')}" aria-label="${tr('revokeAccess')}">×</button></form>`;
+      return `<div class="access-chip"><span>${escapeHtml(space?.name || entry.spaceId)} · ${escapeHtml(entry.role)}</span>${remove}</div>`;
+    }).join('') || '<span class="muted">—</span>';
     const grant = user.role === 'admin' || !spaceOptions ? '' : `<form method="post" action="/admin/access/grant"><input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="userId" value="${user.id}"><select name="spaceId">${spaceOptions}</select><button class="secondary">${tr('grantReader')}</button></form>`;
-    const reset = user.role === 'member' ? `<p><a href="/admin/users/password?userId=${encodeURIComponent(user.id)}">${tr('resetPassword')}</a></p>` : `<p><a href="/account">${tr('changeMyPassword')}</a></p>`;
-    return `<tr><td>${escapeHtml(user.email)}</td><td>${escapeHtml(user.role)}</td><td>${access}</td><td>${grant}${reset}</td></tr>`;
+    const reset = user.role === 'member' ? `<a href="/admin/users/password?userId=${encodeURIComponent(user.id)}">${tr('resetPassword')}</a>` : `<a href="/account">${tr('changeMyPassword')}</a>`;
+    return `<tr><td><strong>${escapeHtml(user.email)}</strong></td><td>${escapeHtml(user.role)}</td><td><div class="access-list">${access}</div></td><td>${grant}<p>${reset}</p></td></tr>`;
   }).join('');
   const devices = store.state.deviceTokens.map((device) => {
     const space = store.state.spaces.find((entry) => entry.id === device.spaceId);
-    return `<tr><td>${escapeHtml(device.deviceName)}</td><td>${escapeHtml(space?.name || device.spaceId)}</td><td>${escapeHtml(device.lastUsedAt || tr('never'))}</td><td><form method="post" action="/admin/devices/revoke"><input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="tokenHash" value="${device.hash}"><button class="secondary">${tr('revokeAccess')}</button></form></td></tr>`;
+    return `<tr><td><strong>${escapeHtml(device.deviceName)}</strong></td><td>${escapeHtml(space?.name || device.spaceId)}</td><td>${escapeHtml(device.lastUsedAt || tr('never'))}</td><td><form method="post" action="/admin/devices/revoke"><input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="tokenHash" value="${device.hash}"><button class="secondary" type="submit">${tr('revokeAccess')}</button></form></td></tr>`;
   }).join('');
-  return page(tr('administration'), `<div style="display:flex;gap:16px;align-items:center"><h1 style="flex:1">${escapeHtml(store.state.settings.name)}</h1><a href="/account">${tr('accountTitle')}</a><form method="post" action="/logout"><input type="hidden" name="csrf" value="${current.session.csrf}"><button class="secondary">${tr('signOut')}</button></form></div><p class="muted">${tr('mcpUrl')}: <code>${escapeHtml(mcpResource())}</code></p>${notice ? `<p class="ok">${escapeHtml(notice)}</p>` : ''}<div class="grid"><form class="card" method="post" action="/admin/spaces"><h2>${tr('newSpace')}</h2><input type="hidden" name="csrf" value="${current.session.csrf}"><label>${tr('name')}</label><input name="name" required><label>${tr('description')}</label><input name="description"><button>${tr('createSpace')}</button></form><form class="card" method="post" action="/admin/users"><h2>${tr('newUser')}</h2><input type="hidden" name="csrf" value="${current.session.csrf}"><label>${tr('email')}</label><input name="email" type="email" required><label>${tr('temporaryPasswordLabel')}</label><input name="password" type="password" autocomplete="new-password" minlength="12" required><label>${tr('space')}</label><select name="spaceId">${spaceOptions}</select><button>${tr('createReader')}</button></form></div><div class="card"><h2>${tr('spaces')}</h2><table><tr><th>${tr('name')}</th><th>ID</th><th>${tr('lastPublication')}</th><th></th></tr>${spaces || `<tr><td colspan="4">${tr('noSpaces')}</td></tr>`}</table></div><div class="card"><h2>${tr('usersAccess')}</h2><p class="muted">${tr('mcpReadOnly')}</p><table><tr><th>${tr('email')}</th><th>${tr('account')}</th><th>${tr('access')}</th><th>${tr('actions')}</th></tr>${users}</table></div><div class="card"><h2>${tr('publisherDevices')}</h2><table><tr><th>${tr('device')}</th><th>${tr('space')}</th><th>${tr('lastUsed')}</th><th></th></tr>${devices || `<tr><td colspan="4">${tr('noDevices')}</td></tr>`}</table></div>`);
+  return page(tr('administration'), `<div class="page-heading">
+    <div><p class="eyebrow">${tr('administration')}</p><h1>${escapeHtml(store.state.settings.name)}</h1><p class="lead">${tr('serverReady')}</p></div>
+    <div class="heading-actions"><a class="button-link" href="/account">${tr('accountTitle')}</a><form method="post" action="/logout"><input type="hidden" name="csrf" value="${current.session.csrf}"><button class="secondary" type="submit">${tr('signOut')}</button></form></div>
+  </div>
+  <section class="server-overview">
+    <div>
+      <div class="status-line"><span class="status-dot"></span>${tr('administration')}</div>
+      <div class="section-title"><h2>${tr('mcpUrl')}</h2>${helpTip(tr('mcpHelp'), tr('moreInformation'))}</div>
+      <div class="endpoint"><code>${escapeHtml(mcpResource())}</code></div>
+    </div>
+    <div class="metric-grid">
+      <div class="metric"><strong>${store.state.spaces.length}</strong><span>${tr('spaces')}</span></div>
+      <div class="metric"><strong>${store.state.users.length}</strong><span>${tr('usersAccess')}</span></div>
+      <div class="metric"><strong>${store.state.deviceTokens.length}</strong><span>${tr('publisherDevices')}</span></div>
+    </div>
+  </section>
+  ${notice ? `<p class="ok">${escapeHtml(notice)}</p>` : ''}
+  <section class="section"><div class="grid">
+    <form class="card" method="post" action="/admin/spaces">
+      <div class="section-header"><div><div class="section-title"><h2>${tr('newSpace')}</h2>${helpTip(tr('newSpaceHelp'), tr('moreInformation'))}</div></div></div>
+      <input type="hidden" name="csrf" value="${current.session.csrf}">
+      <div class="field"><label for="space-name">${tr('name')}</label><input id="space-name" name="name" required></div>
+      <div class="field"><label for="space-description">${tr('description')}</label><input id="space-description" name="description"></div>
+      <button type="submit">${tr('createSpace')}</button>
+    </form>
+    <form class="card" method="post" action="/admin/users">
+      <div class="section-header"><div><div class="section-title"><h2>${tr('newUser')}</h2>${helpTip(tr('newUserHelp'), tr('moreInformation'))}</div></div></div>
+      <input type="hidden" name="csrf" value="${current.session.csrf}">
+      <div class="field"><label for="reader-email">${tr('email')}</label><input id="reader-email" name="email" type="email" autocomplete="off" required></div>
+      <div class="field"><label for="reader-password">${tr('temporaryPasswordLabel')}</label><input id="reader-password" name="password" type="password" autocomplete="new-password" minlength="12" required></div>
+      <div class="field"><label for="reader-space">${tr('space')}</label><select id="reader-space" name="spaceId">${spaceOptions}</select></div>
+      <button type="submit">${tr('createReader')}</button>
+    </form>
+  </div></section>
+  <section class="section">
+    <div class="section-header"><div><div class="section-title"><h2>${tr('spaces')}</h2>${helpTip(tr('spacesHelp'), tr('moreInformation'))}</div></div></div>
+    <div class="table-shell"><table><thead><tr><th>${tr('name')}</th><th>ID</th><th>${tr('lastPublication')}</th><th>${tr('actions')}</th></tr></thead><tbody>${spaces || `<tr><td class="empty" colspan="4">${tr('noSpaces')}</td></tr>`}</tbody></table></div>
+  </section>
+  <section class="section">
+    <div class="section-header"><div><div class="section-title"><h2>${tr('usersAccess')}</h2>${helpTip(tr('usersHelp'), tr('moreInformation'))}</div><p>${tr('mcpReadOnly')}</p></div></div>
+    <div class="table-shell"><table><thead><tr><th>${tr('email')}</th><th>${tr('account')}</th><th>${tr('access')}</th><th>${tr('actions')}</th></tr></thead><tbody>${users}</tbody></table></div>
+  </section>
+  <section class="section">
+    <div class="section-header"><div><div class="section-title"><h2>${tr('publisherDevices')}</h2>${helpTip(tr('devicesHelp'), tr('moreInformation'))}</div></div></div>
+    <div class="table-shell"><table><thead><tr><th>${tr('device')}</th><th>${tr('space')}</th><th>${tr('lastUsed')}</th><th>${tr('actions')}</th></tr></thead><tbody>${devices || `<tr><td class="empty" colspan="4">${tr('noDevices')}</td></tr>`}</tbody></table></div>
+  </section>`);
+}
+
+function languageReturnPath(req) {
+  try {
+    const referer = new URL(String(req.headers.referer || ''), publicUrl());
+    if (referer.origin === new URL(publicUrl()).origin) return `${referer.pathname}${referer.search}`;
+  } catch {
+    // A missing or malformed Referer simply returns to the appropriate home page.
+  }
+  return store.state.users.length === 0 ? '/setup' : '/';
 }
 
 async function route(req, res) {
   const url = new URL(req.url || '/', publicUrl());
+  if (url.pathname === '/language' && req.method === 'POST') {
+    const values = await form(req, 4 * 1024);
+    const selected = normalizeServerLanguage(values.language);
+    const secure = publicUrl().startsWith('https:') ? '; Secure' : '';
+    return redirect(res, languageReturnPath(req), {
+      'set-cookie': `nodus_language=${encodeURIComponent(selected)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000${secure}`,
+    });
+  }
   if (url.pathname === '/healthz') return json(res, 200, { ok: true, service: 'nodus-server', version: '0.1.0', language: language() });
   if (url.pathname === '/.well-known/oauth-protected-resource' || url.pathname === '/.well-known/oauth-protected-resource/mcp') return json(res, 200, { resource: mcpResource(), authorization_servers: [publicUrl()], scopes_supported: [...SCOPES], resource_documentation: `${publicUrl()}/` });
   if (url.pathname === '/.well-known/oauth-authorization-server' || url.pathname === '/.well-known/openid-configuration') return json(res, 200, { issuer: publicUrl(), authorization_endpoint: `${publicUrl()}/oauth/authorize`, token_endpoint: `${publicUrl()}/oauth/token`, registration_endpoint: `${publicUrl()}/oauth/register`, code_challenge_methods_supported: ['S256'], token_endpoint_auth_methods_supported: ['none'], response_types_supported: ['code'], grant_types_supported: ['authorization_code', 'refresh_token'], scopes_supported: [...SCOPES] });
@@ -595,7 +718,7 @@ async function route(req, res) {
     const requestedInput = (url.searchParams.get('scope') || 'profile spaces.read materials.read').split(/\s+/).filter((scope) => SCOPES.has(scope));
     const requested = requestedInput.length > 0 ? requestedInput : ['materials.read'];
     const hidden = [...url.searchParams].map(([key, value]) => `<input type="hidden" name="${escapeHtml(key)}" value="${escapeHtml(value)}">`).join('');
-    return html(res, 200, page(tr('authorize'), `<h1>${tr('connectClient', { name: escapeHtml(client.client_name) })}</h1><div class="card"><p>${tr('appCan')}</p><ul>${requested.map((scope) => `<li>${escapeHtml(scope)}</li>`).join('')}</ul><p class="muted">${tr('assignedOnly', { email: escapeHtml(current.user.email) })}</p><form method="post" action="/oauth/authorize">${hidden}<input type="hidden" name="csrf" value="${current.session.csrf}"><button>${tr('authorize')}</button></form></div>`), oauthRedirectHeaders(redirectUri));
+    return html(res, 200, page(tr('authorize'), `<div class="page-heading"><div><p class="eyebrow">${tr('oauthProtected')}</p><h1>${tr('connectClient', { name: escapeHtml(client.client_name) })}</h1><p class="lead">${tr('assignedOnly', { email: escapeHtml(current.user.email) })}</p></div></div><div class="card"><h2>${tr('appCan')}</h2><ul>${requested.map((scope) => `<li>${escapeHtml(scope)}</li>`).join('')}</ul><form method="post" action="/oauth/authorize">${hidden}<input type="hidden" name="csrf" value="${current.session.csrf}"><button type="submit">${tr('authorize')}</button></form></div>`), oauthRedirectHeaders(redirectUri));
   }
 
   if (url.pathname === '/oauth/authorize' && req.method === 'POST') {
@@ -671,7 +794,7 @@ async function route(req, res) {
     store.state.settings.language = input.language;
     device.lastUsedAt = new Date().toISOString();
     store.save();
-    return json(res, 200, { language: language() });
+    return json(res, 200, { language: normalizeServerLanguage(store.state.settings.language) });
   }
 
   const snapshotMatch = url.pathname.match(/^\/api\/v1\/spaces\/([^/]+)\/snapshot$/);
@@ -718,7 +841,7 @@ async function route(req, res) {
     const values = await form(req, AUTH_BODY_BYTES); if (!checkCsrf(current, values.csrf)) return html(res, 403, page(tr('error'), `<h1>${tr('sessionExpired')}</h1>`));
     const space = store.state.spaces.find((entry) => entry.id === values.spaceId);
     if (!space) return html(res, 404, page(tr('error'), `<h1>${tr('spaceNotFound')}</h1>`));
-    return html(res, 200, page(tr('deletePublication'), `<h1>${tr('deletePublicationHeading')}</h1><div class="card"><p>${tr('deletePublicationHelp', { name: `<strong>${escapeHtml(space.name)}</strong>` })}</p><form method="post" action="/admin/spaces/clear"><input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="spaceId" value="${space.id}"><button>${tr('deletePermanently')}</button></form><p><a href="/">${tr('cancel')}</a></p></div>`));
+    return html(res, 200, page(tr('deletePublication'), `<div class="page-heading"><div><p class="eyebrow">${tr('spaces')}</p><h1>${tr('deletePublicationHeading')}</h1></div><a class="button-link" href="/">${tr('cancel')}</a></div><div class="card danger-card"><p>${tr('deletePublicationHelp', { name: `<strong>${escapeHtml(space.name)}</strong>` })}</p><form method="post" action="/admin/spaces/clear"><input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="spaceId" value="${space.id}"><button class="danger" type="submit">${tr('deletePermanently')}</button></form></div>`));
   }
   if (url.pathname === '/admin/spaces/clear' && req.method === 'POST') {
     const current = requireSession(req, res, true); if (!current) return;
@@ -770,16 +893,19 @@ async function route(req, res) {
     if (!membership(current.user.id, values.spaceId)) return html(res, 403, page(tr('error'), '<h1>No access to that space.</h1>'));
     const raw = `${token(4).slice(0, 4)}-${token(4).slice(0, 4)}`.toUpperCase();
     store.state.pairingCodes.push({ hash: digest(raw), userId: current.user.id, spaceId: values.spaceId, expiresAt: new Date(Date.now() + 15 * 60_000).toISOString(), usedAt: null }); store.save();
-    return html(res, 200, page(tr('createPairing'), `<h1>${tr('connectDesktop')}</h1><div class="card"><p>${tr('pairingHelp')}</p><h2><code>${raw}</code></h2><p class="muted">${tr('pairingExpiry')}</p><p><a href="/">${tr('back')}</a></p></div>`));
+    return html(res, 200, page(tr('createPairing'), `<div class="page-heading"><div><p class="eyebrow">${tr('publisherDevices')}</p><h1>${tr('connectDesktop')}</h1></div><a class="button-link" href="/">${tr('back')}</a></div><div class="card code-panel"><p>${tr('pairingHelp')}</p><h2><code>${raw}</code></h2><p class="muted">${tr('pairingExpiry')}</p></div>`));
   }
   return json(res, 404, { error: 'not_found' });
 }
 
 const server = http.createServer((req, res) => {
-  Promise.resolve(route(req, res)).catch((error) => {
-    console.error('[server]', error);
-    if (!res.headersSent) json(res, Number(error?.statusCode) || 500, { error: Number(error?.statusCode) ? error.message : tr('internalError') });
-    else res.end();
+  const requestLanguage = normalizeServerLanguage(cookies(req).nodus_language || store.state.settings.language);
+  languageContext.run(requestLanguage, () => {
+    Promise.resolve(route(req, res)).catch((error) => {
+      console.error('[server]', error);
+      if (!res.headersSent) json(res, Number(error?.statusCode) || 500, { error: Number(error?.statusCode) ? error.message : tr('internalError') });
+      else res.end();
+    });
   });
 });
 
