@@ -516,6 +516,7 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
   h('graph:overview', async () => buildIdeaGraphOverview());
   h('graph:theme', async (_e, theme: string, cap?: number) => buildIdeaThemeGraph(theme, cap));
   h('ideas:listPage', async (_e, request) => ideas.listIdeasPage(request));
+  h('ideas:picker', async () => ideas.listPickerIdeas());
   h('ideas:connections', async (_e, globalId: string) => ideas.listIdeaConnections(globalId));
   h('graph:ideaDetail', async (_e, globalId: string) => ideas.getIdeaDetail(globalId));
   h('ideas:delete', async (_e, globalId: string) => ideas.deleteIdea(globalId));

@@ -20,6 +20,7 @@ import type {
   IdeaListItem,
   IdeaPage,
   IdeaPageRequest,
+  IdeaPickerItem,
 } from '@shared/types';
 import { DEFAULT_EMBEDDING_MODELS, normalizeEmbeddingModel } from '@shared/providers';
 import { getWorksByIds } from './worksRepo';
@@ -734,6 +735,30 @@ export function getIdeaDetail(globalId: string): IdeaDetail | null {
     .filter((x): x is NonNullable<typeof x> => x !== null);
   const evidence = db.prepare('SELECT * FROM evidence WHERE global_id = ?').all(globalId) as Evidence[];
   return { idea, occurrences, evidence };
+}
+
+/**
+ * Every idea the graph would show, with only the fields a picker reads.
+ *
+ * Same population as the ideas lens — an idea counts once at least one
+ * un-archived, deep-analysed work carries it — expressed as EXISTS rather than a
+ * join plus DISTINCT, so no statement text has to be sorted to deduplicate.
+ */
+export function listPickerIdeas(): IdeaPickerItem[] {
+  return getDb()
+    .prepare(
+      `SELECT i.global_id, i.type, i.label, i.statement
+         FROM ideas i
+        WHERE EXISTS (
+          SELECT 1
+            FROM idea_occurrences io
+            JOIN works w ON w.nodus_id = io.nodus_id
+           WHERE io.global_id = i.global_id
+             AND w.archived = 0
+             AND w.deep_status = 'done'
+        )`
+    )
+    .all() as IdeaPickerItem[];
 }
 
 export function listIdeasPage(request: IdeaPageRequest): IdeaPage {

@@ -78,6 +78,7 @@ import type {
   IdeaDetail,
   IdeaPage,
   IdeaPageRequest,
+  IdeaPickerItem,
   ImmersionAnswerRequest,
   ImmersionAnswerResult,
   ImmersionProgress,
@@ -247,6 +248,8 @@ export interface AcademicApi {
   /** Bounded theme backbone plus cross-theme bridges. */
   getGraphTheme(theme: string, cap?: number): Promise<GraphData>;
   listIdeasPage(request: IdeaPageRequest): Promise<IdeaPage>;
+  /** Every graph idea, with only the fields a picker shows and searches. */
+  listPickerIdeas(): Promise<IdeaPickerItem[]>;
   listIdeaConnections(globalId: string): Promise<IdeaConnection[]>;
   getIdeaDetail(globalId: string): Promise<IdeaDetail | null>;
   deleteIdea(globalId: string): Promise<void>;

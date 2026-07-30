@@ -4124,6 +4124,18 @@ export interface IdeaListItem {
   connectionCount: number;
 }
 
+/**
+ * The least an idea picker needs: enough to show it and to search it, nothing else.
+ * Views that only let the user *choose* an idea used to load the whole ideas graph
+ * for this, edges included.
+ */
+export interface IdeaPickerItem {
+  global_id: string;
+  type: IdeaType;
+  label: string;
+  statement: string;
+}
+
 export interface IdeaPageRequest {
   offset: number;
   limit: number;
