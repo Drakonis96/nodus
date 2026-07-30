@@ -163,6 +163,7 @@ export type {
 // Type-only import (erased at compile time) — keeps the no-runtime-import rule intact.
 import type { VaultType } from './vaultTypes';
 import type { TutorialVideo } from './tutorialVideos';
+import type { NodiNotificationText } from './nodiNotifications';
 import type {
 } from './toolkitApps';
 import type {
@@ -6550,8 +6551,19 @@ export interface AppInfo {
 
 export interface NodiNotification {
   id: string;
-  title: string;
-  body: string;
+  /**
+   * The notification as a translation key plus its values, translated by the panel on
+   * every paint. Everything the app raises comes this way; see shared/nodiNotifications.
+   */
+  titleText?: NodiNotificationText;
+  bodyText?: NodiNotificationText;
+  /**
+   * Prose with no key, translated as best it can be at render time. Two producers:
+   * notifications stored by builds that predate the catalogue, and provider errors,
+   * which are runtime text nobody can key in advance.
+   */
+  title?: string;
+  body?: string;
   kind: 'info' | 'success' | 'warning';
   createdAt: number;
   read: boolean;

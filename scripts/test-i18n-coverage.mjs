@@ -112,6 +112,11 @@ function walk(dir) {
 
 // Data tables whose Spanish values are handed to t() from somewhere else.
 const INDIRECT_KEY_SOURCES = [
+  // Nodi's notification catalogue. Electron stores the KEY and its values, and the
+  // panel renders them through notificationLine() → tx(), so none of these sentences
+  // ever appears literally inside a t() call. Leaving one untranslated is what made
+  // the centre answer "this message could not be translated".
+  { file: 'shared/nodiNotifications.ts', pattern: /^\s{2}\w+:\s*(["'])((?:\\.|(?!\1).)*?)\1,$/gm },
   // Sidebar + command palette labels, rendered as t(n.label) / t(g.label) in App.tsx.
   { file: 'src/navigation.ts', pattern: /\blabel:\s*(["'])((?:\\.|(?!\1).)*?)\1/g },
   // Settings tab labels, rendered as t(tab.label).

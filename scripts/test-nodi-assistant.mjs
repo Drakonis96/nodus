@@ -365,8 +365,9 @@ test('Nodi drags in absolute screen space and closes through an animated context
 });
 
 test('Nodi receives aggregated, rate-limited lifecycle notifications', async () => {
-  const [notifications, queue, embeddings, passages, component] = await Promise.all([
+  const [notifications, catalogue, queue, embeddings, passages, component] = await Promise.all([
     read('electron/notifications.ts'),
+    read('shared/nodiNotifications.ts'),
     read('electron/pipeline/scanQueue.ts'),
     read('electron/ai/embeddingPipeline.ts'),
     read('electron/ai/passageEmbeddingPipeline.ts'),
@@ -375,12 +376,20 @@ test('Nodi receives aggregated, rate-limited lifecycle notifications', async () 
   assert.match(notifications, /DEFAULT_COOLDOWN_MS/);
   assert.match(notifications, /dedupeKey/);
   assert.match(notifications, /lastEmitted/);
-  assert.match(queue, /Cola de análisis completada/);
-  assert.match(queue, /Nuevas conexiones en tu bóveda/);
-  assert.match(queue, /Nodi ha encontrado relaciones semánticas/);
+  // The wording lives in the catalogue; the emitters only name its keys, so the same
+  // stored notification reads in whatever language the panel is showing.
+  assert.match(catalogue, /Cola de análisis completada/);
+  assert.match(catalogue, /Nuevas conexiones en tu bóveda/);
+  assert.match(catalogue, /Nodi ha encontrado relaciones semánticas/);
+  assert.match(catalogue, /Embeddings de ideas completados/);
+  assert.match(catalogue, /Índice de textos completado/);
+  assert.match(queue, /nodiText\(failed \? 'scanQueueFailedTitle' : 'scanQueueDoneTitle'\)/);
+  assert.match(queue, /nodiText\('connectionsTitle'\)/);
+  assert.match(queue, /nodiText\('bridgesTitle'\)/);
   assert.match(queue, /notifiedTerminalIds/);
-  assert.match(embeddings, /Embeddings de ideas completados/);
-  assert.match(passages, /Índice de textos completado/);
+  assert.match(embeddings, /nodiText\(state\.error \? 'ideaEmbeddingsFailedTitle' : 'ideaEmbeddingsDoneTitle'\)/);
+  assert.match(passages, /nodiText\(state\.error \? 'passageEmbeddingsFailedTitle' : 'passageEmbeddingsDoneTitle'\)/);
+  assert.match(component, /notificationLine\(n\.titleText, n\.title\)/);
   assert.match(component, /onNotificationsChanged/);
   assert.match(component, /nodi-ntf-dot/);
   assert.match(component, /latestNotificationId/);

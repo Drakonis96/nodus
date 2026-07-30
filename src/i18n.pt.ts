@@ -25,6 +25,7 @@ import { PRIMARY_SOURCES_RESEARCH_TRANSLATIONS } from './i18n.primarySourcesRese
 import { PRIMARY_SOURCES_RELEASE_TRANSLATIONS } from './i18n.primarySourcesRelease';
 import { TESTIMONY_TRANSLATIONS } from './i18n.testimonies';
 import { NEW_VAULT_COMPLETION_TRANSLATIONS } from './i18n.newVaultCompletion';
+import { NODI_NOTIFICATION_TRANSLATIONS } from './i18n.nodiNotifications';
 
 export const PT: Record<string, string> = {
   ...DIARIZATION_TRANSLATIONS.pt,
@@ -42,6 +43,7 @@ export const PT: Record<string, string> = {
   ...WORLDBUILDING_TRANSLATIONS.pt,
   ...TESTIMONY_TRANSLATIONS.pt,
   ...NEW_VAULT_COMPLETION_TRANSLATIONS.pt,
+  ...NODI_NOTIFICATION_TRANSLATIONS['pt'],
   ...WORLD_CHAT_TRANSLATIONS.pt,
   "Lo que cuenta el mapa": "O que conta o mapa",
   "Ver dónde ocurren las escenas ({n})": "Ver onde acontecem as cenas ({n})",

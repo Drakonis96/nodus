@@ -7,6 +7,7 @@ import { PT_BR } from './i18n.pt-BR';
 import { IT } from './i18n.it';
 import { TR } from './i18n.tr';
 import { looksLikeSpanishUiText, normalizeUiLanguage } from '@shared/uiLanguage';
+import { NODI_NOTIFICATION_TEXT, type NodiNotificationText } from '@shared/nodiNotifications';
 
 /**
  * Lightweight, dependency-free i18n. The source language is Spanish and the
@@ -178,4 +179,55 @@ export function tr(value: string): string {
 export function errorText(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
   return tr(message);
+}
+
+/**
+ * Every catalogue sentence as a matcher, so a notification stored as Spanish prose by
+ * an older build can be read back as the key it would be written with today. A plain
+ * table lookup cannot do this: the stored sentence carries its values inline
+ * ("102 tareas completadas y 183 con errores."), which is exactly why those lines used
+ * to end up as "this message could not be translated".
+ */
+const LEGACY_NOTIFICATION_PATTERNS = Object.values(NODI_NOTIFICATION_TEXT).map((source) => ({
+  source,
+  names: [...source.matchAll(/\{(\w+)\}/g)].map((match) => match[1]),
+  pattern: new RegExp(`^${source.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\\\{\w+\\\}/g, '(.+?)')}$`),
+}));
+
+/** Re-key a stored Spanish sentence, or null when it is not one of ours. */
+function recoverLegacyNotification(prose: string): string | null {
+  for (const entry of LEGACY_NOTIFICATION_PATTERNS) {
+    const match = prose.match(entry.pattern);
+    if (!match) continue;
+    const values: Record<string, string> = {};
+    entry.names.forEach((name, index) => { values[name] = match[index + 1]; });
+    return tx(entry.source, values);
+  }
+  return null;
+}
+
+/**
+ * Render one line of a Nodi notification. The main process stores a catalogue key and
+ * its values rather than a finished sentence — Nodi's centre is global while the UI
+ * language is per-vault, so prose written there is stuck in the language of whichever
+ * vault raised it.
+ *
+ * `fallback` covers the two cases with no key: notifications stored before the
+ * catalogue existed, and provider errors, which are runtime prose.
+ */
+export function notificationLine(text: NodiNotificationText | undefined, fallback: string | undefined): string {
+  const source = text ? NODI_NOTIFICATION_TEXT[text.id] : undefined;
+  if (!source) {
+    if (!fallback) return '';
+    return recoverLegacyNotification(fallback) ?? tr(fallback);
+  }
+  const values: Record<string, string | number> = {};
+  for (const [name, value] of Object.entries(text?.params ?? {})) {
+    // A timestamp is formatted here, not by the emitter, for the same reason the
+    // sentence is: only the renderer knows the locale this reader is looking at.
+    values[name] = typeof value === 'object'
+      ? new Date(value.datetime).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+      : value;
+  }
+  return tx(source, values);
 }

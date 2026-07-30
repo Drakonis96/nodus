@@ -19,7 +19,7 @@ import { startPassageEmbedding, getPassageSnapshot } from '../ai/passageEmbeddin
 import { startPerf } from '../perf';
 import { addNotification } from '../notifications';
 import { coalesce } from '../util/coalesce';
-import { uiText } from '@shared/uiLanguage';
+import { nodiText } from '@shared/nodiNotifications';
 
 type ProgressListener = (p: QueueProgress) => void;
 
@@ -318,14 +318,11 @@ class ScanQueue {
     for (const item of terminal) this.notifiedTerminalIds.add(item.id);
     const done = terminal.filter((item) => item.state === 'done').length;
     const failed = terminal.length - done;
-    const language = getSettings().uiLanguage;
     addNotification({
-      title: failed
-        ? uiText(language, { es: 'La cola de análisis ha terminado con incidencias', en: 'The analysis queue finished with issues', fr: 'La file d’analyse s’est terminée avec des problèmes', de: 'Die Analysewarteschlange wurde mit Problemen beendet', pt: 'A fila de análise terminou com problemas', 'pt-BR': 'A fila de análise terminou com problemas', it: 'La coda di analisi si è conclusa con problemi', tr: 'Analiz kuyruğu sorunlarla tamamlandı' })
-        : uiText(language, { es: 'Cola de análisis completada', en: 'Analysis queue completed', fr: 'File d’analyse terminée', de: 'Analysewarteschlange abgeschlossen', pt: 'Fila de análise concluída', 'pt-BR': 'Fila de análise concluída', it: 'Coda di analisi completata', tr: 'Analiz kuyruğu tamamlandı' }),
+      title: nodiText(failed ? 'scanQueueFailedTitle' : 'scanQueueDoneTitle'),
       body: failed
-        ? uiText(language, { es: `${done} tareas completadas y ${failed} con errores.`, en: `${done} tasks completed and ${failed} failed.`, fr: `${done} tâches terminées et ${failed} échouées.`, de: `${done} Aufgaben abgeschlossen und ${failed} fehlgeschlagen.`, pt: `${done} tarefas concluídas e ${failed} falharam.`, 'pt-BR': `${done} tarefas concluídas e ${failed} falharam.`, it: `${done} attività completate e ${failed} non riuscite.`, tr: `${done} görev tamamlandı, ${failed} görev başarısız oldu.` })
-        : uiText(language, { es: `${done} tareas completadas. El conocimiento de la bóveda está actualizado.`, en: `${done} tasks completed. The vault knowledge is up to date.`, fr: `${done} tâches terminées. Les connaissances du vault sont à jour.`, de: `${done} Aufgaben abgeschlossen. Der Wissensstand des Vaults ist aktuell.`, pt: `${done} tarefas concluídas. O conhecimento do vault está atualizado.`, 'pt-BR': `${done} tarefas concluídas. O conhecimento do vault está atualizado.`, it: `${done} attività completate. La conoscenza del vault è aggiornata.`, tr: `${done} görev tamamlandı. Kasanın bilgi tabanı güncel.` }),
+        ? nodiText('scanQueueFailedBody', { done, failed })
+        : nodiText('scanQueueDoneBody', { done }),
       kind: failed ? 'warning' : 'success',
       dedupeKey: `scan-queue:${failed ? 'warning' : 'success'}`,
     });
@@ -382,10 +379,9 @@ class ScanQueue {
     try {
       const result = await reprocessConnections({ relations: true, nodusIds });
       if (result.relationsAdded > 0 || result.newThemes > 0) {
-        const language = getSettings().uiLanguage;
         addNotification({
-          title: uiText(language, { es: 'Nuevas conexiones en tu bóveda', en: 'New connections in your vault', fr: 'Nouvelles connexions dans votre vault', de: 'Neue Verbindungen in deinem Vault', pt: 'Novas ligações no teu vault', 'pt-BR': 'Novas conexões no seu vault', it: 'Nuove connessioni nel tuo vault', tr: 'Kasanızda yeni bağlantılar' }),
-          body: uiText(language, { es: `${result.relationsAdded} relaciones y ${result.newThemes} temas nuevos detectados.`, en: `${result.relationsAdded} relations and ${result.newThemes} new themes detected.`, fr: `${result.relationsAdded} relations et ${result.newThemes} nouveaux thèmes détectés.`, de: `${result.relationsAdded} Beziehungen und ${result.newThemes} neue Themen erkannt.`, pt: `${result.relationsAdded} relações e ${result.newThemes} novos temas detetados.`, 'pt-BR': `${result.relationsAdded} relações e ${result.newThemes} novos temas detectados.`, it: `${result.relationsAdded} relazioni e ${result.newThemes} nuovi temi rilevati.`, tr: `${result.relationsAdded} ilişki ve ${result.newThemes} yeni tema algılandı.` }),
+          title: nodiText('connectionsTitle'),
+          body: nodiText('connectionsBody', { relations: result.relationsAdded, themes: result.newThemes }),
           kind: 'info',
           dedupeKey: 'knowledge-connections',
         });
@@ -624,10 +620,9 @@ class ScanQueue {
     item.subPct = 1;
     this.emit();
     if (result.added > 0) {
-      const language = getSettings().uiLanguage;
       addNotification({
-        title: uiText(language, { es: 'Nodi ha encontrado relaciones semánticas', en: 'Nodi found semantic relations', fr: 'Nodi a trouvé des relations sémantiques', de: 'Nodi hat semantische Beziehungen gefunden', pt: 'O Nodi encontrou relações semânticas', 'pt-BR': 'O Nodi encontrou relações semânticas', it: 'Nodi ha trovato relazioni semantiche', tr: 'Nodi anlamsal ilişkiler buldu' }),
-        body: uiText(language, { es: `${result.added} conexiones nuevas tras revisar ${result.candidatesScanned} candidatos.`, en: `${result.added} new connections after reviewing ${result.candidatesScanned} candidates.`, fr: `${result.added} nouvelles connexions après l’examen de ${result.candidatesScanned} candidats.`, de: `${result.added} neue Verbindungen nach der Prüfung von ${result.candidatesScanned} Kandidaten.`, pt: `${result.added} novas ligações após rever ${result.candidatesScanned} candidatos.`, 'pt-BR': `${result.added} novas conexões após revisar ${result.candidatesScanned} candidatos.`, it: `${result.added} nuove connessioni dopo aver esaminato ${result.candidatesScanned} candidati.`, tr: `${result.candidatesScanned} aday incelendikten sonra ${result.added} yeni bağlantı bulundu.` }),
+        title: nodiText('bridgesTitle'),
+        body: nodiText('bridgesBody', { added: result.added, scanned: result.candidatesScanned }),
         kind: 'info',
         dedupeKey: 'semantic-bridges',
       });

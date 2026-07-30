@@ -19,6 +19,7 @@ import { PRIMARY_SOURCES_RESEARCH_TRANSLATIONS } from './i18n.primarySourcesRese
 import { PRIMARY_SOURCES_RELEASE_TRANSLATIONS } from './i18n.primarySourcesRelease';
 import { TESTIMONY_TRANSLATIONS } from './i18n.testimonies';
 import { NEW_VAULT_COMPLETION_TRANSLATIONS } from './i18n.newVaultCompletion';
+import { NODI_NOTIFICATION_TRANSLATIONS } from './i18n.nodiNotifications';
 
 /** Complete static Turkish interface table; coverage prohibits runtime fallbacks. */
 export const TR: Record<string, string> = {
@@ -37,6 +38,7 @@ export const TR: Record<string, string> = {
   ...WORLDBUILDING_TRANSLATIONS.tr,
   ...TESTIMONY_TRANSLATIONS.tr,
   ...NEW_VAULT_COMPLETION_TRANSLATIONS.tr,
+  ...NODI_NOTIFICATION_TRANSLATIONS['tr'],
   ...WORLD_CHAT_TRANSLATIONS.tr,
   "Lo que cuenta el mapa": "Haritanın anlattıkları",
   "Ver dónde ocurren las escenas ({n})": "Sahnelerin nerede geçtiğini gör ({n})",

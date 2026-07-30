@@ -592,7 +592,7 @@ app.whenReady().then(() => {
   if (settings.copilotEnabled) void startCopilotServer();
   if (settings.zoteroPluginEnabled) void startZoteroPluginServer();
   // Nodi mascot: open the always-on-top desktop window when the user has opted into it.
-  seedWelcomeNotification(settings.uiLanguage);
+  seedWelcomeNotification();
   startStudyCalendarReminders();
   applyMascotWindow();
   setupAutoUpdates();
