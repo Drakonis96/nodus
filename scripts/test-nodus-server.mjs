@@ -71,6 +71,7 @@ function serverEnvironment(overrides = {}) {
   for (const name of [
     'NODUS_ADMIN_EMAIL', 'NODUS_ADMIN_PASSWORD', 'NODUS_ADMIN_EMAIL_FILE', 'NODUS_ADMIN_PASSWORD_FILE',
     'NODUS_SETUP_TOKEN', 'NODUS_PUBLIC_URL', 'NODUS_DATA_DIR', 'NODUS_HOST', 'NODUS_PORT',
+    'NODUS_MAX_SNAPSHOT_BYTES', 'NODUS_MAX_SNAPSHOT_JSON_BYTES',
   ]) delete env[name];
   return { ...env, ...overrides };
 }
@@ -280,6 +281,132 @@ test('partial environment administrator configuration fails closed', { timeout: 
     assert.match(logs.join(''), /must be configured together/);
     assert.ok(!logs.join('').includes('partial-admin@example.test'));
   } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('an unusable publication limit stops the server instead of rejecting every publication', { timeout: 10_000 }, async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'nodus-server-limit-env-test-'));
+  const child = spawn(process.execPath, ['server/server.mjs'], {
+    cwd: path.resolve('.'),
+    env: serverEnvironment({
+      NODUS_DATA_DIR: root,
+      NODUS_HOST: '127.0.0.1',
+      NODUS_PORT: String(await freePort()),
+      // "0 means no limit" everywhere else; here it used to reach zlib and make every
+      // upload fail as if it were corrupt.
+      NODUS_MAX_SNAPSHOT_BYTES: '0',
+    }),
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  const logs = [];
+  child.stdout.on('data', (chunk) => logs.push(chunk.toString()));
+  child.stderr.on('data', (chunk) => logs.push(chunk.toString()));
+  try {
+    const exitCode = await new Promise((resolve) => child.once('exit', resolve));
+    assert.notEqual(exitCode, 0);
+    assert.match(logs.join(''), /NODUS_MAX_SNAPSHOT_BYTES must be a whole number of bytes/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('the upload limit and the expanded-publication limit are enforced separately', { timeout: 20_000 }, async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'nodus-server-snapshot-size-test-'));
+  const port = await freePort();
+  const origin = `http://127.0.0.1:${port}`;
+  const setupToken = 'size-test-setup-token-very-long';
+  const uploadLimit = 64 * 1024;
+  const expandedLimit = 1024 * 1024;
+  const logs = [];
+  const child = spawn(process.execPath, ['server/server.mjs'], {
+    cwd: path.resolve('.'),
+    env: serverEnvironment({
+      NODUS_DATA_DIR: root,
+      NODUS_HOST: '127.0.0.1',
+      NODUS_PORT: String(port),
+      NODUS_PUBLIC_URL: origin,
+      NODUS_SETUP_TOKEN: setupToken,
+      NODUS_MAX_SNAPSHOT_BYTES: String(uploadLimit),
+      NODUS_MAX_SNAPSHOT_JSON_BYTES: String(expandedLimit),
+    }),
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  child.stdout.on('data', (chunk) => logs.push(chunk.toString()));
+  child.stderr.on('data', (chunk) => logs.push(chunk.toString()));
+
+  const publish = (body, revision) => fetch(`${origin}/api/v1/spaces/${spaceId}/snapshot`, {
+    method: 'PUT',
+    headers: {
+      authorization: `Bearer ${deviceToken}`,
+      'content-type': 'application/vnd.nodus.snapshot+json',
+      'content-encoding': 'gzip',
+      'x-nodus-revision': revision,
+    },
+    body,
+  });
+  const snapshotWithAbstract = (length) => JSON.stringify({
+    format: 'nodus.server-snapshot',
+    formatVersion: 1,
+    generatedAt: new Date().toISOString(),
+    vault: { id: 'vault-size', name: 'Corpus grande', type: 'academic' },
+    tables: { works: [{ nodus_id: 'work-1', title: 'Obra extensa', abstract: 'p'.repeat(length) }] },
+  });
+
+  let spaceId;
+  let deviceToken;
+  try {
+    await waitForHealth(origin, child, logs);
+    const setup = await postForm(`${origin}/setup`, {
+      setupToken, name: 'Nodus Size', publicUrl: origin, email: 'admin@example.test', password: 'admin-password-strong',
+    });
+    assert.equal(setup.status, 303);
+    const adminCookie = cookieFrom(setup);
+    const csrf = hidden(await (await fetch(`${origin}/`, { headers: { cookie: adminCookie } })).text(), 'csrf');
+    assert.equal((await postForm(`${origin}/admin/spaces`, { csrf, name: 'Corpus', description: '' }, { headers: { cookie: adminCookie } })).status, 303);
+    const dashboard = await (await fetch(`${origin}/`, { headers: { cookie: adminCookie } })).text();
+    spaceId = dashboard.match(/<code>([0-9a-f-]{36})<\/code>/)?.[1];
+    assert.ok(spaceId);
+    const pairingHtml = await (await postForm(`${origin}/admin/pairing`, { csrf, spaceId }, { headers: { cookie: adminCookie } })).text();
+    const paired = await (await fetch(`${origin}/api/v1/pair`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ code: pairingHtml.match(/<h2><code>([^<]+)<\/code><\/h2>/)?.[1], deviceName: 'Size test desktop' }),
+    })).json();
+    deviceToken = paired.accessToken;
+    assert.ok(deviceToken);
+
+    // The regression: 200 KiB of JSON is far past the 64 KiB upload cap yet gzips to a
+    // few hundred bytes, so it must publish. Reusing the upload cap as the expansion
+    // cap rejected exactly this case as an invalid publication.
+    const roomy = await publish(gzipSync(Buffer.from(snapshotWithAbstract(200 * 1024))), 'revision-roomy');
+    assert.equal(roomy.status, 200, 'a small upload that expands past the upload cap still fits the expansion cap');
+    assert.equal((await roomy.json()).unchanged, false);
+
+    const expandedTooBig = await publish(gzipSync(Buffer.from(snapshotWithAbstract(2 * 1024 * 1024))), 'revision-huge');
+    assert.equal(expandedTooBig.status, 413);
+    const expandedError = await expandedTooBig.json();
+    assert.equal(expandedError.limitBytes, expandedLimit);
+    assert.ok(expandedError.expandedBytes > expandedLimit, 'the rejection names the real expanded size');
+    assert.match(expandedError.error, /expands to 2\.0 MiB .* up to 1\.0 MiB/);
+
+    // Random base64 does not compress, so this one is rejected on the wire instead.
+    const uploadTooBig = await publish(gzipSync(randomBytes(120 * 1024).toString('base64')), 'revision-wire');
+    assert.equal(uploadTooBig.status, 413);
+    assert.equal((await uploadTooBig.json()).limitBytes, uploadLimit);
+
+    const corrupt = await publish(Buffer.from('this is not gzip at all'), 'revision-corrupt');
+    assert.equal(corrupt.status, 400);
+    assert.match((await corrupt.json()).error, /must be gzipped JSON/);
+
+    const notJson = await publish(gzipSync(Buffer.from('{"format": broken')), 'revision-not-json');
+    assert.equal(notJson.status, 400);
+
+    // Every rejection above left the accepted publication in place.
+    const state = JSON.parse(await readFile(path.join(root, 'state.json'), 'utf8'));
+    assert.equal(state.spaces[0].revision, 'revision-roomy');
+  } finally {
+    await stopServer(child);
     await rm(root, { recursive: true, force: true });
   }
 });
