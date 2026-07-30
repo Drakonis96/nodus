@@ -2703,6 +2703,9 @@ export const PT_BR: Record<string, string> = {
   'Mesa preparada con materiales recomendados.': 'Mesa preparada com materiais recomendados.',
   'Borrador generado con matriz y citas.': 'Rascunho gerado com matriz e citações.',
   'Borrador copiado.': 'Rascunho copiado.',
+  'Copiar sin referencias': 'Copiar sem referências',
+  'Copia solo la prosa, sin citas ni referencias, para pegarla en un lector de voz': 'Copia apenas a prosa, sem citações nem referências, para colar em um leitor de voz',
+  'Texto copiado sin citas ni referencias.': 'Texto copiado sem citações nem referências.',
   'Borrador guardado localmente.': 'Rascunho salvo localmente.',
   'Borrador guardado abierto. Puedes exportarlo o reutilizar su prompt para actualizarlo.':
     'Rascunho salvo aberto. Você pode exportá-lo ou reaproveitar o prompt dele para atualizá-lo.',

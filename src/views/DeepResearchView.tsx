@@ -18,6 +18,7 @@ import type {
 } from '@shared/types';
 import type { StudyDeepResearchAudience } from '@shared/studyDeepResearchAudience';
 import { DECORATIVE_IMAGE_STYLES } from '@shared/imageStyles';
+import { toReadingCopy } from '@shared/readingCopy';
 import type { PendingGraphNavigationTarget } from '../navigation';
 import { Icon, modelLabel } from '../components/ui';
 import { ModelPicker } from '../components/ModelPicker';
@@ -464,6 +465,18 @@ export function DeepResearchView({
     setMessage(t('Borrador copiado.'));
   };
 
+  /** The same report, prepared to be listened to instead of read: no citation
+   *  buttons, no author-year parentheses, no reference list, no Markdown. A
+   *  translated report already carries its title, so it is copied as it stands. */
+  const copyForListening = async () => {
+    if (!openDraft) return;
+    const text = appliedTranslation
+      ? toReadingCopy(appliedTranslation.markdown)
+      : toReadingCopy(openDraft.draft.draftMarkdown, { title: openDraft.draft.title });
+    await navigator.clipboard.writeText(text);
+    setMessage(t('Texto copiado sin citas ni referencias.'));
+  };
+
   const onImageChange = (image: DecorativeImage) => {
     if (!openDraft) return;
     const next = { ...openDraft, image };
@@ -502,6 +515,7 @@ export function DeepResearchView({
           onToggleMatrix={() => setShowMatrix((v) => !v)}
           onBack={backToGallery}
           onCopy={() => void copyDraft()}
+          onCopyReading={() => void copyForListening()}
           onSaveToNotes={() => setSavingToNotes(true)}
           onTranslate={() => setTranslationOpen(true)}
           onExport={(format) => void exportDraft(format)}
@@ -984,6 +998,7 @@ function ReaderView({
   onToggleMatrix,
   onBack,
   onCopy,
+  onCopyReading,
   onSaveToNotes,
   onTranslate,
   onExport,
@@ -1003,6 +1018,7 @@ function ReaderView({
   onToggleMatrix: () => void;
   onBack: () => void;
   onCopy: () => void;
+  onCopyReading: () => void;
   onSaveToNotes: () => void;
   onTranslate: () => void;
   onExport: (format: 'markdown' | 'pdf') => void;
@@ -1028,6 +1044,7 @@ function ReaderView({
           savingDraft={false}
           draftSaved
           onCopy={onCopy}
+          onCopyReading={onCopyReading}
           onSaveDraft={() => undefined}
           onSaveToNotes={onSaveToNotes}
           onExport={onExport}

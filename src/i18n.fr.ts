@@ -2720,6 +2720,9 @@ export const FR: Record<string, string> = {
   'Mesa preparada con materiales recomendados.': 'Table préparée avec les matériaux recommandés.',
   'Borrador generado con matriz y citas.': 'Brouillon généré avec matrice et citations.',
   'Borrador copiado.': 'Brouillon copié.',
+  'Copiar sin referencias': 'Copier sans références',
+  'Copia solo la prosa, sin citas ni referencias, para pegarla en un lector de voz': 'Copie uniquement la prose, sans citations ni références, à coller dans un lecteur vocal',
+  'Texto copiado sin citas ni referencias.': 'Texte copié sans citations ni références.',
   'Borrador guardado localmente.': 'Brouillon enregistré localement.',
   'Borrador guardado abierto. Puedes exportarlo o reutilizar su prompt para actualizarlo.':
     'Brouillon enregistré ouvert. Vous pouvez l\'exporter ou réutiliser son prompt pour le mettre à jour.',

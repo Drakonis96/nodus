@@ -25,6 +25,7 @@ export function DraftActionBar({
   savingDraft,
   draftSaved = false,
   onCopy,
+  onCopyReading,
   onSaveDraft,
   onSaveToNotes,
   onExport,
@@ -33,6 +34,8 @@ export function DraftActionBar({
   savingDraft: boolean;
   draftSaved?: boolean;
   onCopy: () => void;
+  /** Offered where the artefact is a finished report meant to be listened to. */
+  onCopyReading?: () => void;
   onSaveDraft: () => void;
   onSaveToNotes: () => void;
   onExport: (format: 'markdown' | 'pdf') => void;
@@ -42,6 +45,15 @@ export function DraftActionBar({
       <button className="btn btn-ghost border border-neutral-700 gap-1.5" onClick={onCopy}>
         <Icon name="check" /> {t('Copiar')}
       </button>
+      {onCopyReading && (
+        <button
+          className="btn btn-ghost border border-neutral-700 gap-1.5"
+          onClick={onCopyReading}
+          title={t('Copia solo la prosa, sin citas ni referencias, para pegarla en un lector de voz')}
+        >
+          <Icon name="volume" /> {t('Copiar sin referencias')}
+        </button>
+      )}
       <button className="btn btn-ghost border border-neutral-700 gap-1.5" onClick={onSaveDraft} disabled={savingDraft || draftSaved}>
         <Icon name={savingDraft ? 'sync' : draftSaved ? 'check' : 'save'} className={savingDraft ? 'animate-spin' : ''} />{' '}
         {savingDraft ? t('Guardando…') : draftSaved ? t('Guardado') : t('Guardar borrador')}
