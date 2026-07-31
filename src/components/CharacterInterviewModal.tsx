@@ -28,6 +28,8 @@ export function CharacterInterviewModal({
   const [historyOpen, setHistoryOpen] = useState(false);
   const [imageEnabled, setImageEnabled] = useState(false);
   const [question, setQuestion] = useState('');
+  /** The turn the author just sent, shown while the character is still answering. */
+  const [pending, setPending] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -46,8 +48,17 @@ export function CharacterInterviewModal({
     setLoading(true);
     window.nodus
       .listCharacterChatConversations(character.personId)
-      .then((rows) => {
-        if (alive) setHistory(rows);
+      .then(async (rows) => {
+        if (!alive) return;
+        setHistory(rows);
+        // Reopen the most recent interview (the list comes back newest first) rather than
+        // a blank one. Starting fresh on every open is what makes a character look as if
+        // they had forgotten everything the author told them a minute ago.
+        if (!rows.length) return;
+        const last = await window.nodus.getCharacterChatConversation(rows[0].id);
+        if (!alive || !last || last.personId !== character.personId) return;
+        setConversation(last);
+        setImageEnabled(last.imageEnabled);
       })
       .catch((err) => {
         if (alive) setError(err instanceof Error ? err.message : String(err));
@@ -62,7 +73,7 @@ export function CharacterInterviewModal({
 
   useEffect(() => {
     scroller.current?.scrollTo({ top: scroller.current.scrollHeight });
-  }, [conversation?.messages, busy]);
+  }, [conversation?.messages, pending]);
 
   const openConversation = async (id: string) => {
     if (busy) return;
@@ -112,6 +123,9 @@ export function CharacterInterviewModal({
     setError(null);
     setImageNotice(null);
     setQuestion('');
+    // Show the author's turn at once. It is already durable server-side, and waiting for
+    // the character's reply to reveal it makes the chat look as if the send had failed.
+    setPending(trimmed);
     let active = conversation;
     try {
       if (!active) {
@@ -136,6 +150,7 @@ export function CharacterInterviewModal({
       }
       await refreshHistory().catch(() => undefined);
     } finally {
+      setPending(null);
       setBusy(false);
     }
   };
@@ -319,7 +334,7 @@ export function CharacterInterviewModal({
             ref={scroller}
             className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-neutral-50/60 p-3 dark:bg-neutral-950/30 sm:p-5"
           >
-            {messages.length === 0 && !loading && (
+            {messages.length === 0 && !loading && pending === null && (
               <div className="py-10 text-center">
                 {hasSheet ? (
                   <>
@@ -378,15 +393,29 @@ export function CharacterInterviewModal({
                 </div>
               </div>
             ))}
-            {busy && (
-              <div className="flex items-end gap-2.5">
-                <div className="mb-0.5 shrink-0 rounded-full ring-2 ring-white shadow-sm dark:ring-neutral-900">
-                  <PersonPortrait person={character} size={34} />
+            {pending !== null && (
+              <>
+                <div className="flex justify-end">
+                  <div className="max-w-[82%] overflow-hidden rounded-2xl rounded-br-md bg-indigo-600 px-3.5 py-2 text-sm leading-6 text-white opacity-80 shadow-sm">
+                    <p className="whitespace-pre-wrap">{pending}</p>
+                  </div>
                 </div>
-                <p className="flex items-center gap-2 rounded-2xl rounded-bl-md border border-neutral-200 bg-white px-3 py-2 text-xs text-neutral-500 shadow-sm dark:border-neutral-800 dark:bg-neutral-950/70">
-                  <Icon name="sync" size={12} className="animate-spin" /> {t('Pensando…')}
-                </p>
-              </div>
+                <div className="flex items-end gap-2.5">
+                  <div className="mb-0.5 shrink-0 rounded-full ring-2 ring-white shadow-sm dark:ring-neutral-900">
+                    <PersonPortrait person={character} size={34} />
+                  </div>
+                  <p
+                    className="rounded-2xl rounded-bl-md border border-neutral-200 bg-white px-3.5 py-3 text-neutral-500 shadow-sm dark:border-neutral-800 dark:bg-neutral-950/70"
+                    data-testid="character-chat-typing"
+                  >
+                    <span className="stream-dots" aria-label={t('Pensando…')}>
+                      <i />
+                      <i />
+                      <i />
+                    </span>
+                  </p>
+                </div>
+              </>
             )}
           </div>
 

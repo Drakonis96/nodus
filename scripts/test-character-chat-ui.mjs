@@ -47,6 +47,21 @@ test('character chat exposes persistent history, image opt-in and destructive co
   assert.match(ipc, /characters:deleteChatConversation/);
 });
 
+test('the interview reopens where it was left and shows the turn being sent', async () => {
+  const modal = await read('src/components/CharacterInterviewModal.tsx');
+
+  // Opening a blank chat every time is indistinguishable, from the author's seat, from a
+  // character who forgets everything they were told.
+  assert.match(modal, /setPending\(trimmed\)/, 'the author turn is rendered before the reply arrives');
+  assert.match(modal, /pending !== null/, 'the pending turn and the typing bubble are driven by it');
+  assert.match(modal, /getCharacterChatConversation\(rows\[0\]\.id\)/, 'the newest conversation is reopened on mount');
+
+  // A spinner is the app working; dots are someone typing. This surface is a chat.
+  assert.match(modal, /className="stream-dots"/);
+  assert.match(modal, /data-testid="character-chat-typing"/);
+  assert.doesNotMatch(modal, /animate-spin/, 'no spinner stands in for the typing indicator');
+});
+
 test('character chat images use the database-backed image protocol', async () => {
   const [protocol, urls] = await Promise.all([
     read('electron/imageProtocol.ts'),
