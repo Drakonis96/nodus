@@ -253,15 +253,80 @@ test('the interview prompt keeps the character in voice and ignorant of what is 
 });
 
 test('the interview prompt keeps only the recent turns and ends on the character', () => {
-  const history = Array.from({ length: 20 }, (_, i) => ({
+  const history = Array.from({ length: 40 }, (_, i) => ({
     role: i % 2 === 0 ? 'author' : 'character',
     content: `turno ${i}`,
   }));
   const prompt = interview.composeInterviewPrompt(history, '¿De qué te arrepientes?');
   assert.doesNotMatch(prompt, /turno 0\b/, 'an unbounded transcript would grow the prompt without limit');
-  assert.match(prompt, /turno 19/);
+  assert.match(prompt, /turno 39/);
+  // Six exchanges was too short to hold an interview: the author refers back to what they
+  // said several questions ago and the character must still have it.
+  assert.match(prompt, /turno 20/, 'the window spans more than a handful of exchanges');
   assert.match(prompt, /Autor: ¿De qué te arrepientes\?/);
   assert.ok(prompt.trimEnd().endsWith('Tú:'), 'the prompt must hand the turn to the character');
+});
+
+test('one long-winded turn cannot blow the transcript budget', () => {
+  const history = Array.from({ length: 12 }, (_, i) => ({
+    role: i % 2 === 0 ? 'author' : 'character',
+    content: `turno ${i} ${'x'.repeat(1200)}`,
+  }));
+  const prompt = interview.composeInterviewPrompt(history, '¿Y ahora?');
+  assert.ok(prompt.length < 9000, `the transcript stays bounded by characters, not just turns (${prompt.length})`);
+  assert.match(prompt, /turno 11/, 'the newest turns are the ones kept');
+  assert.doesNotMatch(prompt, /turno 0\b/, 'the oldest turns are the ones dropped');
+});
+
+test('the interview prompt names the openings the character has already worn out', () => {
+  // The demo characters carry literal catchphrases in voiceTics, and a model told to
+  // preserve a speech pattern opens EVERY reply with them. Only the openings already
+  // spent are checkable, so those are what the prompt forbids.
+  const history = [
+    { role: 'author', content: '¿Quién eres?' },
+    { role: 'character', content: 'Mira al borde, pequeña cartógrafa. El centro presume de ser el mundo.' },
+    { role: 'author', content: '¿Y tu hija?' },
+    { role: 'character', content: 'Mira al borde, pequeña cartógrafa. Ella aprendió a leer costas antes que letras.' },
+  ];
+  const prompt = interview.composeInterviewPrompt(history, '¿Qué te debe el Faro?');
+  assert.match(prompt, /Ya has abierto respuestas así/);
+  assert.match(prompt, /«Mira al borde»/);
+  assert.equal(
+    prompt.match(/Ya has abierto respuestas así/g).length,
+    1,
+    'the same opening is listed once, not once per repetition'
+  );
+  assert.ok(prompt.trimEnd().endsWith('Tú:'), 'the stage direction still hands over the turn');
+
+  // A first turn has nothing to avoid, so it must not carry the direction at all.
+  assert.doesNotMatch(interview.composeInterviewPrompt([], 'Hola'), /Ya has abierto/);
+});
+
+test('the opening signature captures a formula, not a whole sentence', () => {
+  assert.equal(interview.openingSignature('—Queda oído. No queda obedecido.'), 'Queda oído');
+  assert.equal(interview.openingSignature('«Uno: la carta es falsa»'), 'Uno');
+  assert.equal(
+    interview.openingSignature('Es una pregunta que llevo nueve meses evitando responder'),
+    'Es una pregunta que llevo nueve',
+    'an opening without punctuation is capped at a few words'
+  );
+});
+
+test('the transcript speaks the same language as the task contract', () => {
+  const { PROMPT_LANGUAGES } = load('shared/types.ts');
+  const history = [
+    { role: 'author', content: 'Hola' },
+    { role: 'character', content: 'Look at the edge, traveller. The centre lies.' },
+  ];
+  const labels = { es: 'Tú', en: 'You', fr: 'Toi', tr: 'Sen', de: 'Du', pt: 'Tu', 'pt-BR': 'Você', it: 'Tu' };
+  for (const language of PROMPT_LANGUAGES) {
+    const prompt = interview.composeInterviewPrompt(history, '¿Y bien?', language);
+    assert.ok(
+      prompt.trimEnd().endsWith(`${labels[language]}:`),
+      `${language}: the turn is handed over in the prompt language`
+    );
+    assert.match(prompt, /«Look at the edge»/, `${language}: the spent opening is still named`);
+  }
 });
 
 test('character chat invokes images only for an explicit request and builds a safe prompt', () => {

@@ -93,10 +93,11 @@ export async function interviewCharacter(
 
   const settings = getSettings();
   const model = settings.chatModel ?? settings.synthesisModel ?? settings.extractionModel ?? null;
+  const language = settings.promptLanguage ?? 'es';
   const reply = await completeText(
     {
-      system: worldCharacterInterviewPrompt(sources, settings.promptLanguage ?? 'es'),
-      user: composeInterviewPrompt(history, trimmed),
+      system: worldCharacterInterviewPrompt(sources, language),
+      user: composeInterviewPrompt(history, trimmed, language),
       plainContext: true,
       // High: this is performance, not extraction. A cold temperature makes every
       // character sound like the same polite narrator.

@@ -12,6 +12,7 @@
 
 import type { CharacterBiographySources } from './characterBiographyContext';
 import { composeCharacterBiographyContext } from './characterBiographyContext';
+import type { PromptLanguage } from './types';
 
 export interface InterviewTurn {
   role: 'author' | 'character';
@@ -101,10 +102,130 @@ export function characterInterviewSystem(sources: CharacterInterviewSources): st
   return lines.join('\n');
 }
 
+/**
+ * Transcript scaffolding, per prompt language. The task contract the character reads is
+ * localized, so the transcript must be too: a Spanish «Tú:» under an English contract is
+ * the kind of seam that makes a model narrate the scene instead of answering inside it.
+ */
+interface InterviewTranscriptCopy {
+  author: string;
+  character: string;
+  /** Stage direction naming the openings this character has already worn out. */
+  avoidOpenings: (openings: string) => string;
+}
+
+const TRANSCRIPT_COPY: Record<PromptLanguage, InterviewTranscriptCopy> = {
+  es: {
+    author: 'Autor',
+    character: 'Tú',
+    avoidOpenings: (openings) =>
+      `[Ya has abierto respuestas así: ${openings}. Empieza esta de otra forma y no repitas esas fórmulas.]`,
+  },
+  en: {
+    author: 'Author',
+    character: 'You',
+    avoidOpenings: (openings) =>
+      `[You have already opened replies like this: ${openings}. Start this one differently and do not reuse those formulas.]`,
+  },
+  fr: {
+    author: 'Auteur',
+    character: 'Toi',
+    avoidOpenings: (openings) =>
+      `[Tu as déjà commencé des réponses ainsi : ${openings}. Commence celle-ci autrement et ne réutilise pas ces formules.]`,
+  },
+  tr: {
+    author: 'Yazar',
+    character: 'Sen',
+    avoidOpenings: (openings) =>
+      `[Yanıtlarına daha önce şöyle başladın: ${openings}. Bu yanıta farklı başla ve bu kalıpları yineleme.]`,
+  },
+  de: {
+    author: 'Autor',
+    character: 'Du',
+    avoidOpenings: (openings) =>
+      `[Du hast Antworten bereits so begonnen: ${openings}. Beginne diese anders und wiederhole diese Formeln nicht.]`,
+  },
+  pt: {
+    author: 'Autor',
+    character: 'Tu',
+    avoidOpenings: (openings) =>
+      `[Já começaste respostas assim: ${openings}. Começa esta de outra forma e não repitas essas fórmulas.]`,
+  },
+  'pt-BR': {
+    author: 'Autor',
+    character: 'Você',
+    avoidOpenings: (openings) =>
+      `[Você já começou respostas assim: ${openings}. Comece esta de outro jeito e não repita essas fórmulas.]`,
+  },
+  it: {
+    author: 'Autore',
+    character: 'Tu',
+    avoidOpenings: (openings) =>
+      `[Hai già iniziato risposte così: ${openings}. Inizia questa in un altro modo e non ripetere quelle formule.]`,
+  },
+};
+
+/**
+ * How much of the exchange the character can see. Wide enough that the author can refer
+ * back to something said several questions ago — a character who forgets the name you
+ * gave them two turns earlier is not an interview — and bounded twice (turns AND
+ * characters) so one long answer can't blow the prompt on the next turn.
+ */
+const HISTORY_TURNS = 24;
+const HISTORY_CHARS = 7000;
+
+/** How many past replies are checked for a repeated opening. */
+const OPENINGS_CHECKED = 6;
+
+/**
+ * The opening words of a reply: long enough to recognise a formula the character keeps
+ * reusing («Mira al borde, viajero», «Uno: …»), short enough that forbidding it forbids
+ * a habit rather than a topic. Cut at the first punctuation, because the formula is the
+ * clause and not the sentence, then capped twice — a reply with no punctuation at all
+ * would otherwise be quoted back to the model almost whole.
+ */
+export function openingSignature(content: string): string {
+  const flat = content.replace(/\s+/g, ' ').replace(/^[\s"“«—–-]+/, '').trim();
+  const stop = flat.search(/[.,;:!?…]/);
+  const head = (stop > 0 ? flat.slice(0, stop) : flat).trim();
+  return head.split(' ').slice(0, 6).join(' ').slice(0, 70).trim();
+}
+
 /** Flatten the exchange into the plain transcript the completion endpoint receives. */
-export function composeInterviewPrompt(history: InterviewTurn[], question: string): string {
-  const lines = history.slice(-12).map((turn) => `${turn.role === 'author' ? 'Autor' : 'Tú'}: ${turn.content.trim()}`);
-  lines.push(`Autor: ${question.trim()}`);
-  lines.push('Tú:');
+export function composeInterviewPrompt(
+  history: InterviewTurn[],
+  question: string,
+  language: PromptLanguage = 'es'
+): string {
+  const copy = TRANSCRIPT_COPY[language] ?? TRANSCRIPT_COPY.es;
+
+  // Newest first, so the character budget drops the OLDEST turns rather than the ones
+  // that just happened.
+  const recent: string[] = [];
+  let budget = HISTORY_CHARS;
+  for (const turn of history.slice(-HISTORY_TURNS).reverse()) {
+    const line = `${turn.role === 'author' ? copy.author : copy.character}: ${turn.content.trim()}`;
+    budget -= line.length + 1;
+    if (budget < 0) break;
+    recent.unshift(line);
+  }
+  const lines = [...recent, `${copy.author}: ${question.trim()}`];
+
+  // Repetition is the failure mode of a voice sheet: told to preserve a speech pattern,
+  // a model opens every single reply with the same catchphrase until the character reads
+  // as a machine. A rule about frequency is not checkable by the model; the openings it
+  // has already spent are, so they are named here, right before it takes the turn.
+  const seen = new Set<string>();
+  const openings: string[] = [];
+  for (const turn of history.filter((entry) => entry.role === 'character').slice(-OPENINGS_CHECKED)) {
+    const opening = openingSignature(turn.content);
+    const key = opening.toLocaleLowerCase();
+    if (opening.length < 3 || seen.has(key)) continue;
+    seen.add(key);
+    openings.push(`«${opening}»`);
+  }
+  if (openings.length) lines.push('', copy.avoidOpenings(openings.join('; ')));
+
+  lines.push(`${copy.character}:`);
   return lines.join('\n');
 }
