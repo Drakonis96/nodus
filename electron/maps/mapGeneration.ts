@@ -111,13 +111,14 @@ async function generateWithReference(
         { type: 'input_image', image_url: `data:${reference.mimeType};base64,${reference.bytes.toString('base64')}` },
       ] as never,
       store: false,
-      response_format: { type: 'image', mime_type: 'image/png', image_size: '2K' },
+      // JPEG is the only mime the Interactions API accepts; PNG returns a 400.
+      response_format: { type: 'image', mime_type: 'image/jpeg', image_size: '2K' },
     },
     { timeout: IMAGE_TIMEOUT_MS, maxRetries: 0 },
   );
   const data = response.output_image?.data;
   if (!data) throw new Error('Google no devolvió datos de imagen.');
-  return { bytes: Buffer.from(data, 'base64'), mimeType: 'image/png' };
+  return { bytes: Buffer.from(data, 'base64'), mimeType: response.output_image?.mime_type ?? 'image/jpeg' };
 }
 
 /**

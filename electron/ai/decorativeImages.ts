@@ -144,13 +144,16 @@ async function generateGoogle(model: string, prompt: string, key: string): Promi
       model,
       input: prompt,
       store: false,
-      response_format: { type: 'image', mime_type: 'image/png', aspect_ratio: '16:9', image_size: '1K' },
+      // JPEG is the ONLY mime the Interactions API accepts here — PNG is rejected with a
+      // 400 before the model runs. The declared type is a fallback anyway: the stored mime
+      // comes from sniffing the returned bytes.
+      response_format: { type: 'image', mime_type: 'image/jpeg', aspect_ratio: '16:9', image_size: '1K' },
     },
     { timeout: IMAGE_TIMEOUT_MS, maxRetries: 0 }
   );
   const data = response.output_image?.data;
   if (!data) throw new Error('Google no devolvió datos de imagen.');
-  return { bytes: Buffer.from(data, 'base64'), mimeType: 'image/png' };
+  return { bytes: Buffer.from(data, 'base64'), mimeType: response.output_image?.mime_type ?? 'image/jpeg' };
 }
 
 async function postBase64Image(url: string, body: Record<string, unknown>, key: string): Promise<GeneratedImageBytes> {

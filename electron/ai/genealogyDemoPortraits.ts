@@ -46,7 +46,8 @@ async function googlePortraitGenerator(prompt: string): Promise<Buffer | null> {
       model: DEMO_PORTRAIT_MODEL,
       input: prompt,
       store: false,
-      response_format: { type: 'image', mime_type: 'image/png', aspect_ratio: '1:1', image_size: '1K' },
+      // JPEG is the only mime the Interactions API accepts; PNG returns a 400.
+      response_format: { type: 'image', mime_type: 'image/jpeg', aspect_ratio: '1:1', image_size: '1K' },
     },
     { timeout: PORTRAIT_TIMEOUT_MS, maxRetries: 0 }
   );
@@ -86,7 +87,7 @@ export async function generateDemoPortraits(opts: {
     try {
       const bytes = await generate(buildDaguerreotypePrompt(targets[i]));
       if (bytes && bytes.length) {
-        setPersonPortrait(targets[i].personId, bytes, 'image/png', { focusX: 0.5, focusY: 0.42, scale: 1 });
+        setPersonPortrait(targets[i].personId, bytes, 'image/jpeg', { focusX: 0.5, focusY: 0.42, scale: 1 });
         generated++;
       } else {
         skipped++;
