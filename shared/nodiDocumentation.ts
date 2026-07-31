@@ -13,7 +13,7 @@ export interface RoadmapItem {
 
 export const NODUS_ROADMAP = [
   { title: 'Pulido y estabilidad', detail: 'Corregir errores, mejorar el rendimiento y pulir la experiencia general con feedback de usuarios.', status: 'inProgress' },
-  { title: 'Servidor', detail: 'Infraestructura opcional para nuevas capacidades conectadas.', status: 'inProgress' },
+  { title: 'Servidor', detail: 'Infraestructura opcional para nuevas capacidades conectadas.', status: 'planned' },
   { title: 'Compartir vaults y trabajo colaborativo', detail: 'Compartir espacios y colaborar con control sobre los datos.', status: 'planned' },
   { title: 'Apps para iOS y iPadOS', detail: 'Llevar Nodus a iPhone y iPad con aplicaciones nativas adaptadas a cada dispositivo.', status: 'planned' },
   { title: 'Vault de docencia', detail: 'Preparar clases, cursos y materiales docentes, protegiendo los datos del alumnado.', status: 'implemented' },
@@ -176,11 +176,11 @@ ${ROADMAP_GUIDE}
 - Nodus publica por HTTPS saliente una copia lógica y filtrada: no abre un puerto entrante en el ordenador y no comparte listener, puerto ni token con el MCP local.
 - Mientras Nodus está abierto mantiene actualizada la copia; el servidor Docker puede servir la última copia publicada a clientes autorizados aunque el ordenador esté apagado.
 - La interfaz permite publicar ahora, pausar, administrar o desconectar cada vault conectado. El acceso remoto usa OAuth y permisos de lectura sobre los espacios asignados.
-- En el roadmap, la iniciativa Servidor sigue «En desarrollo» y compartir vaults y trabajo colaborativo sigue «Planificado». No presentes el trabajo colaborativo como disponible.
+- En el roadmap, la iniciativa Servidor figura como «Planificado», igual que compartir vaults y trabajo colaborativo. No presentes el trabajo colaborativo como disponible.
 
 ## Estado resumido del roadmap
-- En desarrollo: Pulido y estabilidad; Servidor.
-- Planificado: Compartir vaults y trabajo colaborativo; Apps para iOS y iPadOS.
+- En desarrollo: Pulido y estabilidad.
+- Planificado: Servidor; Compartir vaults y trabajo colaborativo; Apps para iOS y iPadOS.
 - Implementado: Docencia, Fuentes primarias, Testimonios, Vaults sugeridos por usuarios —Prosopografía y Worldbuilding—, Nodus Toolkit, Nodus Translate, PDF Presenter y OCR Workspace.
 - No hay fechas cerradas para las iniciativas del roadmap.
 
