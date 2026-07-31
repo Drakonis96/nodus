@@ -130,6 +130,17 @@ export interface PlatformApi {
   getDecorativeImage(entityKind: DecorativeImageEntityKind, entityId: string): Promise<DecorativeImage | null>;
   getDecorativeImageDataUrl(entityKind: DecorativeImageEntityKind, entityId: string, thumbnail?: boolean): Promise<string | null>;
   queueDecorativeImage(request: DecorativeImageActionRequest): Promise<DecorativeImage>;
+  /**
+   * Stream a scene description derived from the owner content (a report's summary, an
+   * immersion's plan) into the design modal, so the user can read it appear and decide
+   * whether to keep it. Nothing is persisted; it becomes the image's context only if
+   * the user generates with it. Resolves to the cleaned, single-line description.
+   */
+  suggestDecorativeImageContext(
+    entityKind: DecorativeImageEntityKind,
+    entityId: string,
+    onDelta: (delta: string) => void
+  ): Promise<string>;
   /** Store a user-supplied image without altering its source bytes. */
   uploadDecorativeImage(
     entityKind: DecorativeImageEntityKind,

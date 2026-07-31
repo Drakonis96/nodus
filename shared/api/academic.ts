@@ -51,6 +51,8 @@ import type {
   DebateAnalysisRequest,
   DebateAnalysisResponse,
   DebateAnalysisStreamHandlers,
+  DeepResearchArchiveRequest,
+  DeepResearchArchiveResult,
   DeepResearchReport,
   DeepResearchRequest,
   DeepResearchStreamHandlers,
@@ -564,6 +566,15 @@ export interface AcademicApi {
   getWritingWorkshopSnapshot(brief: WritingWorkshopBrief): Promise<WritingWorkshopSnapshot>;
   generateWritingWorkshopDraft(request: WritingWorkshopDraftRequest): Promise<WritingWorkshopDraft>;
   exportWritingWorkshopDraft(request: WritingWorkshopExportRequest): Promise<{ path: string } | null>;
+  /**
+   * Zip several saved Deep Research reports into one archive the user places.
+   * Resolves to `null` when the save dialog is dismissed. `onProgress` fires before
+   * and after each report, because rendering PDFs runs serially and can take a while.
+   */
+  exportDeepResearchArchive(
+    request: DeepResearchArchiveRequest,
+    onProgress?: (done: number, total: number, title: string) => void
+  ): Promise<DeepResearchArchiveResult | null>;
   listWritingWorkshopDrafts(): Promise<WritingWorkshopSavedDraft[]>;
   saveWritingWorkshopDraft(request: WritingWorkshopSaveDraftRequest): Promise<WritingWorkshopSavedDraft>;
   deleteWritingWorkshopDraft(id: string): Promise<void>;

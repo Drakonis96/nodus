@@ -33,6 +33,7 @@ import type {
   CreateStudyTemplateInput,
   CreateStudyTopicInput,
   DebateAnalysisRequest,
+  DeepResearchArchiveRequest,
   DeepResearchRequest,
   ExportProjectChapterRequest,
   ExportProjectRequest,
@@ -201,7 +202,7 @@ import * as writingDrafts from '../db/writingDraftsRepo';
 import * as translationsRepo from '../db/translationsRepo';
 import * as workSummaries from '../db/workSummariesRepo';
 import * as projects from '../db/projectsRepo';
-import { exportWritingWorkshopDraft } from '../export/writingWorkshopExport';
+import { exportDeepResearchArchive, exportWritingWorkshopDraft } from '../export/writingWorkshopExport';
 import { exportImmersionSessionPdf } from '../export/immersionExport';
 import { generateProjectSuggestions } from '../ai/projectInsertion';
 import { exportProject, exportProjectChapter } from '../export/projectExport';
@@ -1180,6 +1181,11 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
   h('writing:snapshot', async (_e, brief: WritingWorkshopBrief) => buildWritingWorkshopSnapshot(brief));
   h('writing:draft', async (_e, request: WritingWorkshopDraftRequest) => generateWritingWorkshopDraft(request));
   h('writing:export', async (_e, request: WritingWorkshopExportRequest) => exportWritingWorkshopDraft(request));
+  h('writing:exportZip', async (e, requestId: string, request: DeepResearchArchiveRequest) =>
+    exportDeepResearchArchive(request, (done, total, title) => {
+      if (!e.sender.isDestroyed()) e.sender.send('writing:exportZip:progress', requestId, done, total, title);
+    })
+  );
   h('writing:saved:list', async () => writingDrafts.listWritingWorkshopDrafts());
   h('writing:saved:save', async (e, request: WritingWorkshopSaveDraftRequest) => {
     const saved = writingDrafts.saveWritingWorkshopDraft(request);

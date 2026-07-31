@@ -181,6 +181,7 @@ export function DecorativeImageCard({
       onUpload={(file) => void upload(file)}
       onRevert={() => void revert()}
       onDelete={() => void remove()}
+      onSuggest={(onDelta) => window.nodus.suggestDecorativeImageContext(entityKind, entityId, onDelta)}
       onClose={() => setModalOpen(false)}
     />
   );

@@ -107,6 +107,13 @@ export const platformApi: PlatformApi = {
   getDecorativeImageDataUrl: (entityKind, entityId, thumbnail) =>
     ipcRenderer.invoke('images:data', entityKind, entityId, thumbnail),
   queueDecorativeImage: (request) => ipcRenderer.invoke('images:queue', request),
+  suggestDecorativeImageContext: async (entityKind, entityId, onDelta) => {
+    const requestId = `images-context-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const listener = (_e: unknown, id: string, delta: string) => { if (id === requestId) onDelta(delta); };
+    ipcRenderer.on('images:suggestContext:delta', listener);
+    try { return await ipcRenderer.invoke('images:suggestContext', requestId, entityKind, entityId); }
+    finally { ipcRenderer.removeListener('images:suggestContext:delta', listener); }
+  },
   uploadDecorativeImage: (entityKind, entityId, bytes, mimeType, style) =>
     ipcRenderer.invoke('images:upload', entityKind, entityId, bytes, mimeType, style),
   revertDecorativeImage: (entityKind, entityId) => ipcRenderer.invoke('images:revert', entityKind, entityId),

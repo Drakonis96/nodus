@@ -17,7 +17,7 @@ import { cancelChatGptSubscriptionLogin, getChatGptSubscriptionStatus, listChatG
 import { cancelGitHubCopilotSubscriptionLogin, getGitHubCopilotSubscriptionStatus, listGitHubCopilotSubscriptionModels, logoutGitHubCopilotSubscription, startGitHubCopilotSubscriptionLogin } from '../ai/githubCopilotSubscription';
 import { getOpenCodeGoUsageStatus } from '../ai/openCodeGoUsage';
 import { listImageModels } from '../ai/imageModels';
-import { deleteDecorativeImage, queueDecorativeImageGeneration, revertDecorativeImage, saveCustomDecorativeImage } from '../ai/decorativeImages';
+import { deleteDecorativeImage, queueDecorativeImageGeneration, revertDecorativeImage, saveCustomDecorativeImage, streamDecorativeImageContext } from '../ai/decorativeImages';
 import { getDecorativeImage, getDecorativeImageData } from '../db/decorativeImagesRepo';
 import { clearEntityClips, deleteClip as deleteAudioClip, deleteEntityClips, getEntitySegments, audioClipPath, createStudyAudioBookmark, deleteStudyAudioBookmark, getStudyPronunciations, listStudyAudioBookmarks, listStudyAudioPlaylist, listEntityClips, readClipBytes, saveClip, setStudyPronunciations } from '../audio/audioService';
 import { clearHumeKey, humeHasKey, listHumeVoices, setHumeKey, synthesizeHume } from '../audio/hume';
@@ -174,6 +174,16 @@ export function registerPlatformIpc({ h, getWindow }: IpcContext): void {
   h('images:queue', async (e, request: DecorativeImageActionRequest) =>
     queueDecorativeImageGeneration(request, (image) => {
       if (!e.sender.isDestroyed()) e.sender.send('images:changed', image);
+    })
+  );
+  h('images:suggestContext', async (
+    e,
+    requestId: string,
+    entityKind: DecorativeImageEntityKind,
+    entityId: string
+  ) =>
+    streamDecorativeImageContext(entityKind, entityId, (delta) => {
+      if (!e.sender.isDestroyed()) e.sender.send('images:suggestContext:delta', requestId, delta);
     })
   );
   h('images:upload', async (
