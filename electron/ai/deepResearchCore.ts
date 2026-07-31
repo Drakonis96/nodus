@@ -272,8 +272,8 @@ export interface SnapshotMaps {
   passagePage: Map<string, string | null>;
   /** Literal passage text. A passage with no text here is never offered as citable. */
   passageText: Map<string, string>;
-  /** What each gap actually says, so the writer can argue it instead of naming it. */
-  gapById: Map<string, { label: string; summary: string }>;
+  /** What each gap actually says, plus the author-year it is anchored to. */
+  gapById: Map<string, { label: string; summary: string; source: string }>;
   /** What each contradiction actually opposes, and who holds each side. */
   contradictionById: Map<string, { label: string; summary: string; sources: string[] }>;
   validIds: Set<string>;
@@ -481,6 +481,10 @@ export async function orchestrateDeepResearch(
       stoppedReason = L.stoppedPages(targetPages.max);
       break;
     }
+    // The page range is a target, not a cap. A stronger model writes longer sections
+    // than the plan assumed and overshoots by a page or two; cutting a section to
+    // claw that back would cost an argument to save a page, which is a bad trade in
+    // a research report. Only the hard budget check above stops the loop.
     const isConclusion = i === plan.sections.length - 1;
     await runSection(plan.sections[i], isConclusion);
   }
@@ -1117,7 +1121,7 @@ export function buildSnapshotMaps(snapshot: WritingWorkshopSnapshot): SnapshotMa
   const passageWorkId = new Map<string, string>();
   const passagePage = new Map<string, string | null>();
   const passageText = new Map<string, string>();
-  const gapById = new Map<string, { label: string; summary: string }>();
+  const gapById = new Map<string, { label: string; summary: string; source: string }>();
   const contradictionById = new Map<string, { label: string; summary: string; sources: string[] }>();
 
   for (const idea of snapshot.ideas) {
@@ -1144,7 +1148,8 @@ export function buildSnapshotMaps(snapshot: WritingWorkshopSnapshot): SnapshotMa
       });
     }
   }
-  for (const g of snapshot.gaps) gapById.set(g.id, { label: g.label, summary: g.summary ?? '' });
+  for (const g of snapshot.gaps)
+    gapById.set(g.id, { label: g.label, summary: g.summary ?? '', source: sourceLabelFromWork(g.work) });
   for (const c of snapshot.contradictions)
     contradictionById.set(c.id, { label: c.label, summary: c.summary ?? '', sources: c.sources ?? [] });
   for (const p of snapshot.passages) {
@@ -1402,10 +1407,10 @@ export function applyCitationPolicy(
       // not in the visible citation.
       case 'gap':
         cited.gaps.add(id);
-        return `[hueco](nodus://gap/${encodeURIComponent(id)})`;
+        return `[${maps.gapById.get(id)?.source || 'hueco'}](nodus://gap/${encodeURIComponent(id)})`;
       case 'contradiction':
         cited.contradictions.add(id);
-        return `[contradicción](nodus://contradiction/${encodeURIComponent(id)})`;
+        return `[${maps.contradictionById.get(id)?.sources[0] || 'contradicción'}](nodus://contradiction/${encodeURIComponent(id)})`;
       default:
         return label || '';
     }
@@ -1709,7 +1714,7 @@ export function buildCitationMenu(section: DeepResearchPlanSection, maps: Snapsh
     const gap = maps.gapById.get(id);
     if (!gap) continue;
     items.push({
-      token: `[hueco](nodus://gap/${encodeURIComponent(id)})`,
+      token: `[${gap.source || 'hueco'}](nodus://gap/${encodeURIComponent(id)})`,
       kind: 'gap',
       note: clip(gap.summary || gap.label, IDEA_NOTE_CHARS),
     });
@@ -1720,7 +1725,7 @@ export function buildCitationMenu(section: DeepResearchPlanSection, maps: Snapsh
     const sides = contradiction.label ? `Posturas enfrentadas: ${contradiction.label}. ` : '';
     const who = contradiction.sources.length ? ` Lo sostienen ${contradiction.sources.join('; ')}.` : '';
     items.push({
-      token: `[contradicción](nodus://contradiction/${encodeURIComponent(id)})`,
+      token: `[${contradiction.sources[0] || 'contradicción'}](nodus://contradiction/${encodeURIComponent(id)})`,
       kind: 'contradiction',
       note: `${sides}${clip(contradiction.summary, IDEA_NOTE_CHARS)}${who}`.trim(),
       source: contradiction.sources.join('; ') || undefined,
@@ -1790,11 +1795,11 @@ export function buildCitationCatalog(snapshot: WritingWorkshopSnapshot): Citatio
       note: clip(w.title || w.label, 160),
     })),
     gaps: snapshot.gaps.slice(0, POOL_LIMITS.gaps).map((g) => ({
-      token: `[hueco](nodus://gap/${encodeURIComponent(g.id)})`,
+      token: `[${sourceLabelFromWork(g.work) || 'hueco'}](nodus://gap/${encodeURIComponent(g.id)})`,
       note: clip(g.summary || g.label, 160),
     })),
     contradictions: snapshot.contradictions.slice(0, POOL_LIMITS.contradictions).map((c) => ({
-      token: `[contradicción](nodus://contradiction/${encodeURIComponent(c.id)})`,
+      token: `[${c.sources?.[0] || 'contradicción'}](nodus://contradiction/${encodeURIComponent(c.id)})`,
       note: `Posturas enfrentadas: ${c.label}. ${clip(c.summary, 200)}${c.sources?.length ? ` Lo sostienen ${c.sources.join('; ')}.` : ''}`.trim(),
     })),
     // Only passages whose text is actually present; a page number the writer cannot
@@ -1814,15 +1819,21 @@ export function buildCitationCatalog(snapshot: WritingWorkshopSnapshot): Citatio
   };
 }
 
-function sourceLabelFromWork(work: { authors: string[]; year: number | null } | undefined): string {
+function sourceLabelFromWork(work: { authors: string[]; year: number | null; title?: string } | undefined): string {
   if (!work) return '';
-  return authorYearLabel(work.authors[0], work.year);
+  return authorYearLabel(work.authors[0], work.year, work.title);
 }
 
 /** Turn Nodus's stored `Apellido, I.` name into a readable inline citation. */
-function authorYearLabel(author: string | undefined, year: number | null | undefined): string {
+function authorYearLabel(author: string | undefined, year: number | null | undefined, title?: string): string {
   const raw = author?.replace(/\s+/g, ' ').trim();
-  if (!raw) return year ? `Autor (${year})` : 'Autor';
+  if (!raw) {
+    // "Autor" reads as a placeholder in the middle of academic prose. A shortened
+    // title is a real citation for a source whose author the corpus never captured.
+    const short = clip((title ?? '').replace(/\s+/g, ' ').trim(), 42);
+    if (short) return year ? `${short} (${year})` : short;
+    return year ? `Obra sin autor (${year})` : 'Obra sin autor';
+  }
   const comma = raw.indexOf(',');
   const surname = (comma >= 0 ? raw.slice(0, comma) : raw.split(' ').slice(-1).join(' ')).trim() || raw;
   const given = (comma >= 0 ? raw.slice(comma + 1) : raw.split(' ').slice(0, -1).join(' ')).trim();

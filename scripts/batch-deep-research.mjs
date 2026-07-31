@@ -90,12 +90,27 @@ try {
   delete process.env.GEMINI_API_KEY;
   delete process.env.OPENROUTER_API_KEY;
 
-  const wanted = argOf('--model', 'gemini-3.1-flash-lite');
-  const available = await providers.listModels('gemini', secrets.getApiKey('gemini'));
-  const modelName = available.some((m) => m.id === wanted) ? wanted : available.find((m) => /flash-lite/.test(m.id))?.id;
-  assert.ok(modelName, 'no flash-lite model available');
-  settingsRepo.updateSettings({ deepResearchModel: { provider: 'gemini', model: modelName }, promptLanguage: 'es' });
-  console.log(`[model] ${modelName} · ${TOPICS.length} temas × ${RUNS} ejecuciones = ${TOPICS.length * RUNS} informes\n`);
+  // Codex is a managed subscription: its models come from the CLI runtime, not from
+  // a keyed /models endpoint, and its credentials are bound to this profile's
+  // codexHome — a copied profile reports itself disconnected.
+  const provider = argOf('--provider', 'gemini');
+  let modelName;
+  if (provider === 'codex') {
+    const codex = require(path.join(repoRoot, 'electron/ai/codexSubscription.ts'));
+    const status = await codex.getChatGptSubscriptionStatus(true);
+    assert.ok(status?.connected, 'Connect a ChatGPT subscription in this profile before running with --provider codex');
+    const wanted = argOf('--model', 'gpt-5.6-luna');
+    const available = await codex.listChatGptSubscriptionModels();
+    modelName = available.some((m) => (m.id ?? m) === wanted) ? wanted : (available[0]?.id ?? available[0]);
+    assert.ok(modelName, 'no Codex model available');
+  } else {
+    const wanted = argOf('--model', 'gemini-3.1-flash-lite');
+    const available = await providers.listModels('gemini', secrets.getApiKey('gemini'));
+    modelName = available.some((m) => m.id === wanted) ? wanted : available.find((m) => /flash-lite/.test(m.id))?.id;
+    assert.ok(modelName, 'no flash-lite model available');
+  }
+  settingsRepo.updateSettings({ deepResearchModel: { provider, model: modelName }, promptLanguage: 'es' });
+  console.log(`[model] ${provider}/${modelName} · ${TOPICS.length} temas × ${RUNS} ejecuciones = ${TOPICS.length * RUNS} informes\n`);
 
   const workshop = require(path.join(repoRoot, 'electron/ai/writingWorkshop.ts'));
   const { generateDeepResearchReport } = require(path.join(repoRoot, 'electron/ai/deepResearch.ts'));

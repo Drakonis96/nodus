@@ -828,6 +828,31 @@ try {
     assert.ok(broken.draft.draftMarkdown.includes('## Referencias'), 'and the report still assembles');
   }
 
+  // ── 11m. Every visible citation reads like a citation ──────────────────────
+  {
+    const snapshot = makeSnapshot(6);
+    // A gap anchored to a work, a debate with a named side, and a work whose author
+    // the corpus never captured.
+    snapshot.gaps[0].work = { nodus_id: 'w-0', title: 'Obra 0', authors: ['Fuentes Vega, Ana'], year: 2017, zotero_key: 'zk-0' };
+    snapshot.contradictions[0].sources = ['Brandis García (2015)', 'Otro (2011)'];
+    snapshot.ideas[1].works = [{ nodus_id: 'w-x', title: 'Bibliografía de viajeros por España y Portugal', authors: [], year: 2004, zotero_key: 'zk-x' }];
+    const maps = buildSnapshotMaps(snapshot);
+    const menu = buildCitationMenu(
+      { id: 's1', title: 't', purpose: '', keyClaims: [], ideaIds: ['g-1'], workIds: [], gapIds: ['gap-1'], contradictionIds: ['edge-1'], passageIds: [] },
+      maps
+    );
+    const anchorOf = (kind) => menu.find((i) => i.kind === kind).token.match(/^\[([^\]]*)\]/)[1];
+    assert.equal(anchorOf('gap'), 'Fuentes Vega, A. (2017)', 'a gap is cited by the work it is anchored to');
+    assert.equal(anchorOf('contradiction'), 'Brandis García (2015)', 'a debate is cited by whoever holds a side');
+    assert.ok(!/^Autor$|^Autor \(/.test(anchorOf('idea')), 'no bare "Autor" placeholder reaches the prose');
+    assert.ok(anchorOf('idea').includes('Bibliografía de viajeros'), 'an authorless work is cited by its shortened title');
+
+    // And the anchors survive the citation policy unchanged.
+    const { markdown } = applyCitationPolicy(`Frase (${menu.find((i) => i.kind === 'gap').token}).`, maps);
+    assert.ok(markdown.includes('[Fuentes Vega, A. (2017)]'), 'the policy keeps the readable anchor');
+    assert.ok(!markdown.includes('[hueco]'), 'the debug-looking label is gone');
+  }
+
   // ── 12. All writer routes inherit the same narrative contract ──────────────
   {
     const sources = await Promise.all([
