@@ -5621,7 +5621,7 @@ export interface WritingWorkshopIdeaCandidate extends WritingWorkshopCandidateBa
   themes: string[];
   workCount: number;
   evidenceCount: number;
-  works: { nodus_id: string; title: string; authors: string[]; year: number | null; zotero_key: string }[];
+  works: { nodus_id: string; title: string; authors: string[]; year: number | null; zotero_key: string; doi?: string | null }[];
 }
 
 export interface WritingWorkshopThemeCandidate extends WritingWorkshopCandidateBase {
@@ -5643,6 +5643,10 @@ export interface WritingWorkshopContradictionCandidate extends WritingWorkshopCa
   type: EdgeType | string;
   basis: EdgeBasis;
   confidence: number;
+  /** Author-year labels of the works behind the dispute, so a writer can attribute
+   * the debate to whoever actually holds each position instead of describing a
+   * nameless tension. */
+  sources?: string[];
 }
 
 export interface WritingWorkshopWorkCandidate extends WritingWorkshopCandidateBase {
@@ -5650,6 +5654,8 @@ export interface WritingWorkshopWorkCandidate extends WritingWorkshopCandidateBa
   authors: string[];
   year: number | null;
   zotero_key: string;
+  /** Present when the source carries one; the only locator the local schema stores. */
+  doi?: string | null;
   themes: string[];
   deepStatus: DeepStatus;
   /** Orientation only; never evidence or a citation target. */
@@ -5874,6 +5880,18 @@ export interface DeepResearchMeta {
   targetPages: { min: number; max: number };
   /** Non-null when the loop stopped before covering everything (budget cap, cap on sections, etc.). */
   stoppedReason: string | null;
+  /**
+   * Result of checking that each citation's source really supports the sentence it
+   * was attached to. Null when no verification pass ran. `unsupported` citations were
+   * removed from the prose, so this is a record of what the report stopped claiming.
+   */
+  verification?: { checked: number; partial: number; unsupported: number } | null;
+  /** How many sections came back under their word target and were developed further. */
+  expansions?: number;
+  /** Words each section ended up with, against the target it was given. */
+  sectionFill?: { words: number; target: number }[];
+  /** Passages of the report that contradict each other, reported rather than repaired. */
+  coherenceIssues?: number;
 }
 
 /**

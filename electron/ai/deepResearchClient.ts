@@ -101,6 +101,7 @@ export async function buildDeepResearchBrief(
       'Prefiere POCAS secciones LARGAS y profundas antes que muchas cortas: cada sección agrupa varias ideas afines y las relaciona (continuidad, tensiones, consecuencias), no una idea por sección.',
       ...DEEP_RESEARCH_NARRATIVE_RULES,
       'Reparte TODAS las ideas relevantes del catálogo entre las secciones. Sitúa los huecos y contradicciones donde aporten tensión argumental. Cierra con una síntesis.',
+      'Cada entrada del catálogo trae en `note` el contenido real de lo que cita. Los pasajes traen el texto literal de la obra entre comillas angulares: úsalos como evidencia textual y no extiendas su sentido. Los huecos y las contradicciones traen lo que afirman, así que arguméntalos por su contenido en vez de nombrarlos de pasada.',
       'Empieza cada sección con un encabezado Markdown "## Título". No incluyas el resumen, las limitaciones ni las referencias en `sectionsMarkdown`: pásalos como campos aparte a la herramienta de ensamblado.',
       `Cuando termines de redactar, llama a \`${'nodus_finalize_deep_research'}\` con tu markdown para validar las citas, construir las referencias y (si quieres) guardar el borrador.`,
     ],
