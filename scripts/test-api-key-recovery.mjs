@@ -104,6 +104,39 @@ try {
   assert.equal(recovery.decryptChromiumV10Blob(encrypted, password), 'known-legacy-secret', 'Chromium v10 compatibility fixture decrypts');
   assert.equal(recovery.decryptChromiumV10Blob(encrypted, Buffer.from('wrong-password')), null, 'wrong Keychain credential is rejected');
 
+  // A key that survives only in the emergency archive must come back, and an
+  // explicit delete must not be undone by that same archive on the next read.
+  const archiveDir = path.join(globalDir, 'locked-archive');
+  assert.equal(store.apiKeyStorageState('anthropic'), 'missing');
+  fs.writeFileSync(path.join(archiveDir, 'ai_key_anthropic-2026-01-01T00-00-00-000Z-aaaaaaaa.bin'), 'legacy:anthropic-unreadable');
+  assert.equal(store.apiKeyStorageState('anthropic'), 'locked', 'an archive-only blob is reported as recoverable, not missing');
+  fs.writeFileSync(path.join(archiveDir, 'ai_key_anthropic-2026-01-02T00-00-00-000Z-bbbbbbbb.bin'), 'current:anthropic-archived');
+  assert.equal(store.getApiKey('anthropic'), 'anthropic-archived', 'the emergency archive is a recovery source');
+  assert.equal(fs.existsSync(path.join(globalDir, 'ai_key_anthropic.bin')), true, 'the rescued key is promoted to the canonical file');
+  store.clearApiKey('anthropic');
+  assert.equal(store.getApiKey('anthropic'), null, 'an explicit delete purges the archive too');
+  assert.equal(store.apiKeyStorageState('anthropic'), 'missing');
+
+  // An isolated profile sitting beside the real one must not see — let alone
+  // retire — its neighbour's credentials. This is what deleted real API keys.
+  const neighbour = path.join(path.dirname(root), 'nodus');
+  const neighbourSecrets = path.join(neighbour, 'secrets');
+  fs.mkdirSync(neighbourSecrets, { recursive: true });
+  const neighbourKey = path.join(neighbourSecrets, 'ai_key_mistral.bin');
+  fs.writeFileSync(neighbourKey, 'current:neighbour-real-key');
+  try {
+    assert.deepEqual(store.apiKeyCandidateFiles('mistral'), [], 'an isolated profile never scans a sibling profile');
+    store.setApiKey('mistral', 'isolated-profile-key');
+    assert.equal(fs.readFileSync(neighbourKey, 'utf8'), 'current:neighbour-real-key', 'writing a key in an isolated profile leaves the real profile untouched');
+    store.clearApiKey('mistral');
+    assert.equal(fs.existsSync(neighbourKey), true, 'clearing a key in an isolated profile leaves the real profile untouched');
+  } finally {
+    fs.rmSync(neighbour, { recursive: true, force: true });
+  }
+
+  const secretSource = fs.readFileSync(path.join(repoRoot, 'electron/secrets/secretStore.ts'), 'utf8');
+  assert.match(secretSource, /path\.basename\(currentRoot\)\.toLowerCase\(\) !== 'nodus'/, 'sibling-root migration stays gated on the default profile');
+
   const exportSource = fs.readFileSync(path.join(repoRoot, 'electron/export/exportImport.ts'), 'utf8');
   assert.match(exportSource, /lockedApiKeyProviders\(\)/, 'full backup refuses silently locked API keys');
   const restoreBody = exportSource.match(/function restoreApiKeys[\s\S]*?\n}/)?.[0] ?? '';

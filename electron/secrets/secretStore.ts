@@ -29,17 +29,29 @@ function legacyRootKeyFile(provider: AiProvider): string {
   return keyFileInDir(app.getPath('userData'), provider);
 }
 
+/** The released userData roots this profile may migrate from.
+ *
+ * app.setName('Nodus') also changed the default userData casing on
+ * case-sensitive systems, so the default profile scans both released spellings;
+ * inode/path deduplication below makes that harmless on Windows and macOS.
+ *
+ * An ISOLATED profile (NODUS_USERDATA — tests, the demo instance, a second copy
+ * opened on purpose) is a different install that merely sits next to the real
+ * one. It must never reach into its neighbour: these paths are not only read,
+ * they are retired and deleted, so scanning the sibling would let a throwaway
+ * profile destroy the user's real API keys. */
+function historicalRoots(currentRoot: string): string[] {
+  if (path.basename(currentRoot).toLowerCase() !== 'nodus') return [currentRoot];
+  const parent = path.dirname(currentRoot);
+  return [currentRoot, path.join(parent, 'nodus'), path.join(parent, 'Nodus')];
+}
+
 /** Every location used by released Nodus versions. The global file remains the
  * canonical target; the others are read-only recovery candidates. */
 export function apiKeyCandidateFiles(provider: AiProvider): string[] {
   const candidates = [keyFile(provider), legacyRootKeyFile(provider)];
   const currentRoot = app.getPath('userData');
-  const parent = path.dirname(currentRoot);
-  // app.setName('Nodus') also changed the default userData casing on
-  // case-sensitive systems. Scan both released roots on every platform;
-  // inode/path deduplication below makes this harmless on Windows and macOS.
-  const roots = [currentRoot, path.join(parent, 'nodus'), path.join(parent, 'Nodus')];
-  for (const root of [...new Set(roots)]) {
+  for (const root of [...new Set(historicalRoots(currentRoot))]) {
     candidates.push(keyFileInDir(path.join(root, 'secrets'), provider), keyFileInDir(root, provider));
     const vaultsRoot = path.join(root, 'vaults');
     try {
@@ -118,6 +130,15 @@ export function getApiKey(provider: AiProvider): string | null {
       return legacy;
     }
   }
+  // Last resort: the emergency archive. Nothing used to read it, so a key that
+  // only survived there was lost in practice.
+  for (const archived of archivedApiKeyFiles(provider)) {
+    const rescued = readKeyFile(archived);
+    if (rescued !== null) {
+      setApiKey(provider, rescued);
+      return rescued;
+    }
+  }
   return null;
 }
 
@@ -127,9 +148,10 @@ export function hasApiKey(provider: AiProvider): boolean {
 
 export function clearApiKey(provider: AiProvider): void {
   if (provider === 'codex' || provider === 'github-copilot') return;
-  // An explicit delete applies to every released storage location; otherwise an
-  // old per-vault copy could silently recreate the key on the next read.
-  for (const file of apiKeyCandidateFiles(provider)) {
+  // An explicit delete applies to every released storage location AND to the
+  // emergency archive; otherwise an old per-vault copy — or the archive getApiKey
+  // now falls back to — would silently recreate the key on the next read.
+  for (const file of [...apiKeyCandidateFiles(provider), ...archivedApiKeyFiles(provider)]) {
     if (fs.existsSync(file)) fs.unlinkSync(file);
   }
 }
@@ -159,10 +181,31 @@ function preserveLockedFile(file: string): void {
   archiveEncryptedFile(file);
 }
 
+function lockedArchiveDir(): string {
+  return path.join(globalSecretsDir(), 'locked-archive');
+}
+
+/** The emergency copies written by preserveLockedFile/retireHistoricalFile,
+ * newest first. Deliberately NOT part of apiKeyCandidateFiles: setApiKey retires
+ * that list, and retiring the rollback would defeat its only purpose. */
+export function archivedApiKeyFiles(provider: AiProvider): string[] {
+  const dir = lockedArchiveDir();
+  const prefix = `ai_key_${provider}-`;
+  try {
+    return fs.readdirSync(dir)
+      .filter((name) => name.startsWith(prefix) && name.endsWith('.bin'))
+      .sort()
+      .reverse()
+      .map((name) => path.join(dir, name));
+  } catch {
+    return []; // nothing was ever archived
+  }
+}
+
 function archiveEncryptedFile(file: string): void {
   const contents = fs.readFileSync(file);
   if (contents.toString('utf8').startsWith('b64:')) return;
-  const archiveDir = path.join(globalSecretsDir(), 'locked-archive');
+  const archiveDir = lockedArchiveDir();
   fs.mkdirSync(archiveDir, { recursive: true });
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
   const sourceHint = Buffer.from(path.dirname(file)).toString('base64url').slice(-8);
@@ -184,7 +227,8 @@ export type ApiKeyStorageState = 'available' | 'locked' | 'missing';
 
 export function apiKeyStorageState(provider: AiProvider): ApiKeyStorageState {
   if (getApiKey(provider) !== null) return 'available';
-  return apiKeyCandidateFiles(provider).length > 0 ? 'locked' : 'missing';
+  const blobs = [...apiKeyCandidateFiles(provider), ...archivedApiKeyFiles(provider)];
+  return blobs.length > 0 ? 'locked' : 'missing';
 }
 
 export function lockedApiKeyProviders(): AiProvider[] {

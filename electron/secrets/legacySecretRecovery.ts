@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process';
 import { createDecipheriv, pbkdf2Sync } from 'node:crypto';
 import fs from 'node:fs';
 import type { AiProvider } from '@shared/types';
-import { lockedApiKeyProviders, apiKeyCandidateFiles, getApiKey, setApiKey } from './secretStore';
+import { lockedApiKeyProviders, apiKeyCandidateFiles, archivedApiKeyFiles, getApiKey, setApiKey } from './secretStore';
 
 const KEYCHAIN_TIMEOUT_MS = 120_000;
 const STORAGE_NAMES = ['nodus', 'Nodus'] as const;
@@ -139,7 +139,12 @@ async function performLegacyApiKeyRecovery(
   for (const storageName of STORAGE_NAMES) {
     const pending = lockedApiKeyProviders();
     if (pending.length === 0) break;
-    const candidates = Object.fromEntries(pending.map((provider) => [provider, apiKeyCandidateFiles(provider)])) as Partial<Record<AiProvider, string[]>>;
+    // The emergency archive is included: a blob that only survives there is
+    // exactly the case this recovery exists for.
+    const candidates = Object.fromEntries(pending.map((provider) => [
+      provider,
+      [...apiKeyCandidateFiles(provider), ...archivedApiKeyFiles(provider)],
+    ])) as Partial<Record<AiProvider, string[]>>;
     const keys = await runCredentialRecovery(storageName, candidates);
     for (const provider of pending) {
       const key = keys[provider];
