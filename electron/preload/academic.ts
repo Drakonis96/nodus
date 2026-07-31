@@ -469,6 +469,18 @@ export const academicApi: AcademicApi = {
   getWritingWorkshopSnapshot: (brief) => ipcRenderer.invoke('writing:snapshot', brief),
   generateWritingWorkshopDraft: (request) => ipcRenderer.invoke('writing:draft', request),
   exportWritingWorkshopDraft: (request) => ipcRenderer.invoke('writing:export', request),
+  exportDeepResearchArchive: async (request, onProgress) => {
+    const requestId = `dr-archive-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const listener = (_e: unknown, id: string, done: number, total: number, title: string) => {
+      if (id === requestId) onProgress?.(done, total, title);
+    };
+    ipcRenderer.on('writing:exportZip:progress', listener);
+    try {
+      return await ipcRenderer.invoke('writing:exportZip', requestId, request);
+    } finally {
+      ipcRenderer.removeListener('writing:exportZip:progress', listener);
+    }
+  },
   listWritingWorkshopDrafts: () => ipcRenderer.invoke('writing:saved:list'),
   saveWritingWorkshopDraft: (request) => ipcRenderer.invoke('writing:saved:save', request),
   deleteWritingWorkshopDraft: (id) => ipcRenderer.invoke('writing:saved:delete', id).then(() => undefined),

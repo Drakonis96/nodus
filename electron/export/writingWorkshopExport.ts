@@ -1,17 +1,22 @@
+import AdmZip from 'adm-zip';
 import fs from 'node:fs';
 import path from 'node:path';
 import { app, dialog } from 'electron';
 import type {
   DecorativeImageSource,
+  DeepResearchArchiveRequest,
+  DeepResearchArchiveResult,
   PromptLanguage,
   WritingWorkshopDraft,
   WritingWorkshopExportFormat,
   WritingWorkshopExportRequest,
   WritingWorkshopMatrixRow,
+  WritingWorkshopSavedDraft,
 } from '@shared/types';
 import { stripLeadingAbstract } from '@shared/writingDocument';
 import { markdownToPdf } from './markdownRender';
 import { getDecorativeImage, getDecorativeImageData } from '../db/decorativeImagesRepo';
+import { getWritingWorkshopDraft } from '../db/writingDraftsRepo';
 import {
   PROFESSIONAL_REPORT_THEMES,
   anchoredMarkdown,
@@ -189,6 +194,85 @@ export async function exportWritingWorkshopDraft(
     fs.writeFileSync(filePath, markdown, 'utf8');
   }
   return { path: filePath };
+}
+
+/** One report rendered to bytes, in every requested format. */
+async function archiveEntries(
+  saved: WritingWorkshopSavedDraft,
+  base: string,
+  format: DeepResearchArchiveRequest['format']
+): Promise<{ name: string; bytes: Buffer }[]> {
+  const entries: { name: string; bytes: Buffer }[] = [];
+  if (format !== 'pdf') {
+    entries.push({ name: `${base}.md`, bytes: Buffer.from(renderDraftMarkdown(saved.draft), 'utf8') });
+  }
+  if (format !== 'markdown') {
+    const bytes = saved.draft.brief.kind === 'deep_research'
+      ? await professionalReportPdf(buildDeepResearchPdfInput(saved.draft, saved.id))
+      : await markdownToPdf(renderDraftMarkdown(saved.draft), saved.draft.title || 'Informe');
+    entries.push({ name: `${base}.pdf`, bytes });
+  }
+  return entries;
+}
+
+/**
+ * Download a batch of saved reports as one zip.
+ *
+ * Rendered one report at a time on purpose: a PDF is printed by a real Chromium
+ * window (see htmlToPdf.ts), and the deferred teardown that makes repeated exports
+ * reliable only holds if the next print starts after the previous one let go. The
+ * `onProgress` callback exists because that serial pass can run for a minute over a
+ * large selection, and a silent minute reads as a hang.
+ */
+export async function exportDeepResearchArchive(
+  request: DeepResearchArchiveRequest,
+  onProgress?: (done: number, total: number, title: string) => void
+): Promise<DeepResearchArchiveResult | null> {
+  const format = request.format ?? 'markdown';
+  const drafts = request.ids
+    .map((id) => getWritingWorkshopDraft(id))
+    .filter((saved): saved is WritingWorkshopSavedDraft => saved !== null);
+  if (drafts.length === 0) throw new Error('No hay informes que descargar.');
+
+  const stamp = new Date().toISOString().slice(0, 10);
+  const { canceled, filePath } = await dialog.showSaveDialog({
+    title: 'Descargar informes',
+    defaultPath: path.join(app.getPath('downloads'), `nodus-deep-research-${stamp}.zip`),
+    filters: [{ name: 'ZIP', extensions: ['zip'] }],
+  });
+  if (canceled || !filePath) return null;
+
+  const zip = new AdmZip();
+  const failed: DeepResearchArchiveResult['failed'] = [];
+  const used = new Set<string>();
+  let done = 0;
+  for (const saved of drafts) {
+    onProgress?.(done, drafts.length, saved.title);
+    // Distinct reports can share a title, and a zip entry silently overwrites its
+    // namesake — so the name is claimed before anything is rendered into it.
+    const base = uniqueName(used, slug(saved.title || 'informe'));
+    try {
+      // Staged first, added second: a report whose PDF fails must not leave a lone
+      // Markdown file behind while being reported as failed.
+      for (const entry of await archiveEntries(saved, base, format)) {
+        zip.addFile(entry.name, entry.bytes);
+      }
+    } catch (error) {
+      failed.push({ title: saved.title, reason: error instanceof Error ? error.message : String(error) });
+    }
+    done += 1;
+    onProgress?.(done, drafts.length, saved.title);
+  }
+
+  fs.writeFileSync(filePath, zip.toBuffer());
+  return { path: filePath, count: drafts.length - failed.length, failed };
+}
+
+function uniqueName(used: Set<string>, base: string): string {
+  let candidate = base;
+  for (let n = 2; used.has(candidate); n += 1) candidate = `${base}-${n}`;
+  used.add(candidate);
+  return candidate;
 }
 
 function reportImage(entityId: string | undefined, labels: DeepReportLabels): { dataUrl: string | null; credit: string | null } {

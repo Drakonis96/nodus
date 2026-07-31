@@ -19,7 +19,7 @@ import { addWorldImage } from '../db/worldImagesRepo';
 import { getWorldPlace } from '../db/worldPlacesRepo';
 import { getWorldGroup } from '../db/worldGroupsRepo';
 import { getActiveVault } from '../vaults/vaultRegistry';
-import { completeText } from './aiClient';
+import { completeText, completeTextStream } from './aiClient';
 import { generateImageWithChatGptSubscription } from './codexSubscription';
 import { getSettings } from '../db/settingsRepo';
 import { generateNodusLocalImage } from './nodusLocalImages';
@@ -109,27 +109,61 @@ function imageSource(kind: DecorativeImageEntityKind, id: string): ImageSource {
   };
 }
 
-async function visualContextFor(source: ImageSource): Promise<string> {
-  const settings = getSettings();
-  const model = source.textModel ?? settings.synthesisModel ?? null;
+const VISUAL_CONTEXT_SYSTEM = [
+  'Describe una sola escena visual concreta que represente el contenido dado.',
+  'Máximo 45 palabras. Solo la escena: sin títulos, texto visible, letras, logos ni explicaciones.',
+].join('\n');
+
+function visualContextCall(source: ImageSource) {
+  return {
+    system: VISUAL_CONTEXT_SYSTEM,
+    user: `Título: ${source.title}\nContenido: ${source.content}`,
+    temperature: 0.2,
+    maxTokens: 100,
+    noRetry: true,
+    timeoutMs: IMAGE_CONTEXT_TIMEOUT_MS,
+  };
+}
+
+/** The text model behind a scene description: the one that wrote the content, if any. */
+function visualContextModel(source: ImageSource): ModelRef {
+  const model = source.textModel ?? getSettings().synthesisModel ?? null;
   if (!model) throw new Error('No hay un modelo de texto configurado para crear el contexto visual.');
-  const response = await completeText(
-    {
-      system: [
-        'Describe una sola escena visual concreta que represente el contenido dado.',
-        'Máximo 45 palabras. Solo la escena: sin títulos, texto visible, letras, logos ni explicaciones.',
-      ].join('\n'),
-      user: `Título: ${source.title}\nContenido: ${source.content}`,
-      temperature: 0.2,
-      maxTokens: 100,
-      noRetry: true,
-      timeoutMs: IMAGE_CONTEXT_TIMEOUT_MS,
-    },
-    model
-  );
+  return model;
+}
+
+/** Collapse to a single prompt-sized line; the stored context is never multi-paragraph. */
+function cleanVisualContext(response: string): string {
   const clean = response.replace(/\s+/g, ' ').trim().slice(0, 260);
   if (!clean) throw new Error('El modelo de texto no devolvió un contexto visual.');
   return clean;
+}
+
+async function visualContextFor(source: ImageSource): Promise<string> {
+  return cleanVisualContext(await completeText(visualContextCall(source), visualContextModel(source)));
+}
+
+/**
+ * The same scene description the generator would have written on its own, but streamed
+ * so the user can read it appear, edit it and decide whether to use it. Nothing is
+ * persisted here: the description only becomes the image's context if the user then
+ * generates with it (see queueDecorativeImageGeneration).
+ */
+export async function streamDecorativeImageContext(
+  entityKind: DecorativeImageEntityKind,
+  entityId: string,
+  onDelta: (delta: string) => void
+): Promise<string> {
+  const source = imageSource(entityKind, entityId);
+  const response = await completeTextStream(
+    visualContextCall(source),
+    (delta, kind) => {
+      // The reasoning trace is not the answer, and would read as gibberish in a textarea.
+      if (kind !== 'reasoning') onDelta(delta);
+    },
+    visualContextModel(source)
+  );
+  return cleanVisualContext(response);
 }
 
 function providerKey(provider: ImageProvider): string | null {

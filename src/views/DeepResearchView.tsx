@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   AppSettings,
+  DeepResearchArchiveFormat,
   DeepResearchOutlineSection,
   DeepResearchProgress,
   DeepResearchSectionLimit,
@@ -277,6 +278,10 @@ export function DeepResearchView({
   const [showTutorial, setShowTutorial] = useState(false);
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  // Bulk download: the ids the archive modal is about, then its live progress.
+  const [archiveIds, setArchiveIds] = useState<string[] | null>(null);
+  const [archiveProgress, setArchiveProgress] = useState<{ done: number; total: number } | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   // Reader + shared modals.
   const [openDraft, setOpenDraft] = useState<WritingWorkshopSavedDraft | null>(null);
@@ -445,6 +450,73 @@ export function DeepResearchView({
     }
   };
 
+  /**
+   * One report, straight to disk. The native dialog offers both extensions and the
+   * chosen one decides the format, so the card needs a single button rather than a
+   * format menu of its own.
+   */
+  const downloadDraft = async (saved: WritingWorkshopSavedDraft) => {
+    if (downloadingId) return;
+    setDownloadingId(saved.id);
+    setError(null);
+    setMessage(null);
+    try {
+      const result = await window.nodus.exportWritingWorkshopDraft({ draft: saved.draft, format: 'pdf', entityId: saved.id });
+      if (result) setMessage(`${t('Descargado')}: ${result.path}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  const runArchive = async (format: DeepResearchArchiveFormat) => {
+    const ids = archiveIds ?? [];
+    if (ids.length === 0) return;
+    setArchiveProgress({ done: 0, total: ids.length });
+    setError(null);
+    setMessage(null);
+    try {
+      const result = await window.nodus.exportDeepResearchArchive({ ids, format }, (done, total) =>
+        setArchiveProgress({ done, total })
+      );
+      setArchiveIds(null);
+      if (!result) return; // the user dismissed the save dialog
+      exitSelection();
+      setMessage(
+        result.failed.length === 0
+          ? tx('Informes descargados: {n}. Se han guardado en {path}', { n: result.count, path: result.path })
+          : tx('Informes descargados: {n} (en {path}). No se pudieron preparar {failed}: {reasons}', {
+              n: result.count,
+              path: result.path,
+              failed: result.failed.length,
+              reasons: result.failed.map((item) => `${item.title} (${item.reason})`).join('; '),
+            })
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setArchiveIds(null);
+    } finally {
+      setArchiveProgress(null);
+    }
+  };
+
+  /** The header button: pick first, download second — with the selection already made. */
+  const startDownload = () => {
+    if (!selecting) {
+      setSelecting(true);
+      setError(null);
+      setMessage(t('Marca los informes que quieres descargar y vuelve a pulsar «Descargar».'));
+      return;
+    }
+    if (selected.size === 0) {
+      setMessage(t('Marca al menos un informe para descargarlo.'));
+      return;
+    }
+    setMessage(null);
+    setArchiveIds([...selected]);
+  };
+
   const exportDraft = async (format: 'markdown' | 'pdf') => {
     if (!openDraft) return;
     setExporting(true);
@@ -576,6 +648,16 @@ export function DeepResearchView({
         <button className="btn btn-ghost gap-1.5 border border-neutral-700" onClick={() => setShowTutorial((v) => !v)}>
           <Icon name="help" /> {showTutorial ? t('Ocultar tutorial') : t('Tutorial')}
         </button>
+        {savedDrafts.length > 0 && (
+          <button
+            className={`btn btn-ghost gap-1.5 border ${selecting ? 'border-indigo-700/60 text-indigo-200' : 'border-neutral-700'}`}
+            onClick={startDownload}
+            title={t('Descargar en un ZIP los informes seleccionados')}
+          >
+            <Icon name="download" /> {t('Descargar')}
+            {selecting && selected.size > 0 && <span className="text-xs text-indigo-300">({selected.size})</span>}
+          </button>
+        )}
         <button className="btn btn-primary gap-1.5" onClick={() => setComposerOpen(true)}>
           <Icon name="plus" /> {t(copy.newAction)}
         </button>
@@ -658,6 +740,13 @@ export function DeepResearchView({
           <span className="text-neutral-500">{tx('{n} seleccionados', { n: selected.size })}</span>
           <div className="flex-1" />
           <button
+            className="btn btn-ghost !py-1 gap-1 text-xs text-indigo-300 disabled:text-neutral-600"
+            onClick={() => setArchiveIds([...selected])}
+            disabled={selected.size === 0}
+          >
+            <Icon name="download" size={13} /> {t('Descargar seleccionados')}
+          </button>
+          <button
             className="btn btn-ghost !py-1 gap-1 text-xs text-red-400 disabled:text-neutral-600"
             onClick={() => void deleteSelected()}
             disabled={selected.size === 0}
@@ -693,9 +782,11 @@ export function DeepResearchView({
                 settings={settings}
                 selecting={selecting}
                 selected={selected.has(saved.id)}
+                downloading={downloadingId === saved.id}
                 onToggle={() => toggleSelected(saved.id)}
                 onOpen={() => openReader(saved)}
                 onReuse={() => reusePrompt(saved)}
+                onDownload={() => void downloadDraft(saved)}
                 onDelete={() => void deleteDraft(saved)}
               />
             ))}
@@ -709,15 +800,26 @@ export function DeepResearchView({
                 settings={settings}
                 selecting={selecting}
                 selected={selected.has(saved.id)}
+                downloading={downloadingId === saved.id}
                 onToggle={() => toggleSelected(saved.id)}
                 onOpen={() => openReader(saved)}
                 onReuse={() => reusePrompt(saved)}
+                onDownload={() => void downloadDraft(saved)}
                 onDelete={() => void deleteDraft(saved)}
               />
             ))}
           </div>
         )}
       </div>
+
+      {archiveIds && (
+        <ArchiveModal
+          count={archiveIds.length}
+          progress={archiveProgress}
+          onDownload={(format) => void runArchive(format)}
+          onClose={() => setArchiveIds(null)}
+        />
+      )}
 
       {composerOpen && (
         <ComposerModal
@@ -842,18 +944,22 @@ function DraftGridCard({
   settings,
   selecting,
   selected,
+  downloading,
   onToggle,
   onOpen,
   onReuse,
+  onDownload,
   onDelete,
 }: {
   saved: WritingWorkshopSavedDraft;
   settings: AppSettings;
   selecting: boolean;
   selected: boolean;
+  downloading: boolean;
   onToggle: () => void;
   onOpen: () => void;
   onReuse: () => void;
+  onDownload: () => void;
   onDelete: () => void;
 }) {
   const primary = selecting ? onToggle : onOpen;
@@ -901,6 +1007,14 @@ function DraftGridCard({
             <button className="btn btn-ghost !py-1 gap-1 border border-neutral-700 text-xs" onClick={onReuse} title={t('Reutilizar la idea para un informe nuevo')}>
               <Icon name="refresh" size={12} />
             </button>
+            <button
+              className="btn btn-ghost !py-1 gap-1 border border-neutral-700 text-xs"
+              onClick={onDownload}
+              disabled={downloading}
+              title={t('Descargar este informe')}
+            >
+              <Icon name={downloading ? 'sync' : 'download'} size={12} className={downloading ? 'animate-spin' : ''} />
+            </button>
             <div className="flex-1" />
             <button className="btn btn-ghost !py-1 text-xs text-neutral-500 hover:text-red-400" onClick={onDelete} title={t('Eliminar informe')}>
               <Icon name="trash" size={12} />
@@ -917,18 +1031,22 @@ function DraftListRow({
   settings,
   selecting,
   selected,
+  downloading,
   onToggle,
   onOpen,
   onReuse,
+  onDownload,
   onDelete,
 }: {
   saved: WritingWorkshopSavedDraft;
   settings: AppSettings;
   selecting: boolean;
   selected: boolean;
+  downloading: boolean;
   onToggle: () => void;
   onOpen: () => void;
   onReuse: () => void;
+  onDownload: () => void;
   onDelete: () => void;
 }) {
   const primary = selecting ? onToggle : onOpen;
@@ -975,11 +1093,121 @@ function DraftListRow({
           <button className="btn btn-ghost !py-1 gap-1 border border-neutral-700 text-xs" onClick={onReuse} title={t('Reutilizar la idea para un informe nuevo')}>
             <Icon name="refresh" size={12} />
           </button>
+          <button
+            className="btn btn-ghost !py-1 gap-1 border border-neutral-700 text-xs"
+            onClick={onDownload}
+            disabled={downloading}
+            title={t('Descargar este informe')}
+          >
+            <Icon name={downloading ? 'sync' : 'download'} size={12} className={downloading ? 'animate-spin' : ''} />
+          </button>
           <button className="btn btn-ghost !py-1 text-xs text-neutral-500 hover:text-red-400" onClick={onDelete} title={t('Eliminar informe')}>
             <Icon name="trash" size={12} />
           </button>
         </>
       )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Bulk download — format choice, then one zip
+// ─────────────────────────────────────────────────────────────────────────────
+
+const ARCHIVE_FORMATS: { value: DeepResearchArchiveFormat; label: string; hint: string }[] = [
+  { value: 'markdown', label: 'Markdown (.md)', hint: 'Texto editable, listo para otro editor. Se prepara al instante.' },
+  { value: 'pdf', label: 'PDF', hint: 'El informe maquetado, con portada y matriz. Tarda unos segundos por informe.' },
+  { value: 'both', label: 'Markdown y PDF', hint: 'Ambos archivos de cada informe dentro del mismo ZIP.' },
+];
+
+function ArchiveModal({
+  count,
+  progress,
+  onDownload,
+  onClose,
+}: {
+  count: number;
+  progress: { done: number; total: number } | null;
+  onDownload: (format: DeepResearchArchiveFormat) => void;
+  onClose: () => void;
+}) {
+  const [format, setFormat] = useState<DeepResearchArchiveFormat>('pdf');
+  const busy = progress !== null;
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      // Closing mid-render would leave the export running with nowhere to report to.
+      if (event.key === 'Escape' && !busy) onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [busy, onClose]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onMouseDown={() => !busy && onClose()}>
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-label={t('Descargar informes')}
+        className="flex w-full max-w-lg flex-col overflow-hidden rounded-xl border border-neutral-700 bg-white shadow-2xl dark:bg-neutral-950"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <header className="flex items-center gap-3 border-b border-neutral-200 px-5 py-4 dark:border-neutral-800">
+          <Icon name="download" className="text-indigo-500 dark:text-indigo-300" />
+          <div className="min-w-0 flex-1">
+            <h2 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">{t('Descargar informes')}</h2>
+            <p className="text-xs text-neutral-500">
+              {tx('Informes seleccionados: {n}. Se guardarán en un único ZIP, en la carpeta que elijas.', { n: count })}
+            </p>
+          </div>
+          <button className="btn btn-ghost px-2" onClick={onClose} disabled={busy} aria-label={t('Cerrar')}>
+            <Icon name="x" />
+          </button>
+        </header>
+
+        <div className="space-y-2 px-5 py-4">
+          {ARCHIVE_FORMATS.map((option) => (
+            <label
+              key={option.value}
+              className={`flex cursor-pointer items-start gap-2.5 rounded-lg border p-3 text-sm transition ${
+                format === option.value
+                  ? 'border-indigo-600/70 bg-indigo-950/20'
+                  : 'border-neutral-200 hover:border-neutral-400 dark:border-neutral-800 dark:hover:border-neutral-600'
+              }`}
+            >
+              <input
+                type="radio"
+                name="deep-research-archive-format"
+                className="mt-0.5"
+                value={option.value}
+                checked={format === option.value}
+                disabled={busy}
+                onChange={() => setFormat(option.value)}
+              />
+              <span className="min-w-0">
+                <span className="block font-medium text-neutral-800 dark:text-neutral-200">{t(option.label)}</span>
+                <span className="mt-0.5 block text-[11px] leading-5 text-neutral-500">{t(option.hint)}</span>
+              </span>
+            </label>
+          ))}
+          {progress && (
+            <div className="flex items-center gap-2 pt-1 text-xs text-indigo-500 dark:text-indigo-300">
+              <Icon name="sync" size={13} className="animate-spin" />
+              {tx('Preparando {done} de {total}…', { done: progress.done, total: progress.total })}
+            </div>
+          )}
+        </div>
+
+        <footer className="flex items-center justify-end gap-2 border-t border-neutral-200 px-5 py-3 dark:border-neutral-800">
+          <button className="btn btn-ghost border border-neutral-300 dark:border-neutral-700" onClick={onClose} disabled={busy}>
+            {t('Cancelar')}
+          </button>
+          <button className="btn btn-primary gap-1.5" onClick={() => onDownload(format)} disabled={busy}>
+            <Icon name={busy ? 'sync' : 'download'} className={busy ? 'animate-spin' : ''} />
+            {busy ? t('Descargando…') : t('Descargar ZIP')}
+          </button>
+        </footer>
+      </section>
     </div>
   );
 }

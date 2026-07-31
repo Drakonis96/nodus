@@ -5783,6 +5783,28 @@ export interface WritingWorkshopExportRequest {
   entityId?: string;
 }
 
+/** `'both'` writes one `.md` AND one `.pdf` per report into the same archive. */
+export type DeepResearchArchiveFormat = 'markdown' | 'pdf' | 'both';
+
+/** Bulk download: several saved reports zipped into a single archive the user places. */
+export interface DeepResearchArchiveRequest {
+  ids: string[];
+  /** Defaults to `'markdown'` when omitted — the only format that costs nothing to render. */
+  format?: DeepResearchArchiveFormat;
+}
+
+export interface DeepResearchArchiveResult {
+  path: string;
+  /** Reports actually written into the archive. */
+  count: number;
+  /**
+   * Reports left out because they could not be rendered. Reported rather than
+   * swallowed: a zip that silently holds 9 of 10 selected reports is worse than
+   * one that says which one is missing and why.
+   */
+  failed: { title: string; reason: string }[];
+}
+
 /** A locally saved workshop draft, including the exact prompt and selected evidence. */
 export interface WritingWorkshopSavedDraft {
   id: string;

@@ -18,6 +18,7 @@ export function DecorativeImageModal({
   onUpload,
   onRevert,
   onDelete,
+  onSuggest,
   onClose,
 }: {
   image: DecorativeImage | null;
@@ -29,13 +30,40 @@ export function DecorativeImageModal({
   onUpload: (file: File) => void;
   onRevert: () => void;
   onDelete: () => void;
+  /** Streams a scene description written from the owner content. Resolves to the final text. */
+  onSuggest?: (onDelta: (delta: string) => void) => Promise<string>;
   onClose: () => void;
 }) {
   const status = image?.status ?? 'not_requested';
   const [style, setStyle] = useState<DecorativeImageStyle>(image?.style ?? defaultStyle);
   const [description, setDescription] = useState(image?.visualContext ?? '');
   const [touched, setTouched] = useState(false);
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestError, setSuggestError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
+
+  /**
+   * Write the model's answer into the box as it arrives. The text is the user's from
+   * the first character — they can edit it, wipe it, or just close the modal — so it
+   * counts as touched and the stored context must never overwrite it afterwards.
+   */
+  const suggest = async () => {
+    if (!onSuggest || suggesting) return;
+    setSuggesting(true);
+    setSuggestError(null);
+    setTouched(true);
+    setDescription('');
+    try {
+      const final = await onSuggest((delta) => setDescription((current) => current + delta));
+      // The stream arrives raw; the resolved value is the same text collapsed to the
+      // single line the generator would actually receive.
+      setDescription(final);
+    } catch (reason) {
+      setSuggestError(reason instanceof Error ? reason.message : String(reason));
+    } finally {
+      setSuggesting(false);
+    }
+  };
 
   const onFilePicked = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -125,7 +153,21 @@ export function DecorativeImageModal({
           </label>
 
           <label className="block">
-            <span className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">{t('Descripción de la escena')}</span>
+            <span className="flex items-center gap-2">
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">{t('Descripción de la escena')}</span>
+              {onSuggest && (
+                <button
+                  type="button"
+                  className="ml-auto inline-flex items-center gap-1 rounded-full border border-neutral-300 px-2 py-0.5 text-[11px] text-neutral-600 transition hover:border-indigo-400 hover:text-indigo-500 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:border-indigo-600 dark:hover:text-indigo-300"
+                  onClick={() => void suggest()}
+                  disabled={suggesting || status === 'pending'}
+                  title={t('Escribe la escena a partir del contenido de este informe')}
+                >
+                  <Icon name={suggesting ? 'sync' : 'wand'} size={12} className={suggesting ? 'animate-spin' : ''} />
+                  {suggesting ? t('Escribiendo…') : t('Sugerir con IA')}
+                </button>
+              )}
+            </span>
             <textarea
               className="input mt-1 min-h-24 w-full resize-y text-sm"
               value={description}
@@ -139,6 +181,9 @@ export function DecorativeImageModal({
             <span className="mt-1 block text-[11px] text-neutral-500">
               {t('El estilo y las protecciones de «sin texto» se aplican automáticamente al generar.')}
             </span>
+            {suggestError && (
+              <span className="mt-1 block text-[11px] text-amber-700 dark:text-amber-400">{suggestError}</span>
+            )}
           </label>
 
           <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 dark:border-neutral-800 dark:bg-neutral-900/40">
