@@ -4,6 +4,7 @@ const RELEASE_3_0_2_TR: string[] = [
   "Argüman haritası ve tartışmalar artık pencereyi dondurmuyor. On binlerce ögeyi tek seferde çiziyor ve açtığınızda uygulamanın tamamı bir iki saniye kilitleniyordu; artık siz kaydırdıkça parça parça çiziliyor. Harita ayrıca tümden açılmak yerine dal dal açılıyor; böylece bir argüman hattını yerinizi kaybetmeden izleyebiliyorsunuz.",
   "Röportaj yapılan karakterler ezber okumak yerine konuşuyor. Tanıtım modunda karakter künyesini yüksek sesle okuyarak yanıt veriyorlardı; artık kendi sesleriyle, kendi mizaçları ve suskunluklarıyla, gerçek bir röportajdaki gibi yanıt veriyorlar.",
   "Nodus ile gelen Codex çalışma zamanı artık görsel de üretiyor; ChatGPT aboneliğiniz bağlıysa ek bir anahtar ayarlamadan illüstrasyon oluşturabilirsiniz. Google ile üretim de yeniden çalışıyor: artık kabul etmediği bir görsel biçimi isteniyordu.",
+  "macOS güncellemeleri yeniden kendiliğinden kuruluyor. Nodus yeni sürümü indiriyor, ardından bir türlü kapanmıyordu; kurulum programı sonsuza kadar bekliyor, zorla kapattığında da onu yanında götürüyordu ve tek bir uyarı olmadan eski sürümde açılıyordun. Artık kapanma her zaman tamamlanıyor, zorla çıksan bile kurulum işini bitiriyor ve bir güncelleme kurulamazsa Nodus sessizce yeniden denemek yerine açılışta bunu söylüyor.",
 ];
 
 const RELEASE_3_0_1_TR: string[] = [

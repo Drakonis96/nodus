@@ -136,12 +136,25 @@ function unsignedMacUpdateHelperScript(): string {
     'ZIP="$2"',
     'TARGET="$3"',
     'STATE="$4"',
+    // Force-quitting the app kills its descendants, and this helper is one. Without
+    // ignoring the terminating signals it dies mid-wait, leaving the update staged
+    // but never installed — which is exactly what a user reaching for Force Quit
+    // does every single time the quit below fails to land.
+    "trap '' TERM HUP INT",
     'STAGING="$(/usr/bin/mktemp -d /private/tmp/nodus-update.XXXXXX)"',
     'BACKUP="${TARGET}.previous"',
     'finish() { /bin/rm -rf "$STAGING"; /bin/rm -f "$0"; }',
     "fail() { /usr/bin/printf '%s\\n' '{\"status\":\"failed\"}' > \"$STATE\"; finish; exit 1; }",
     'trap finish EXIT',
-    'while /bin/kill -0 "$PID" 2>/dev/null; do /bin/sleep 0.1; done',
+    // Never wait forever. If the app is still alive after this many seconds the
+    // quit did not land, and a helper that waits until the heat death of the
+    // universe is worse than one that reports the failure.
+    'WAITED=0',
+    'while /bin/kill -0 "$PID" 2>/dev/null; do',
+    '  /bin/sleep 0.1',
+    '  WAITED=$((WAITED + 1))',
+    '  [ "$WAITED" -ge 1200 ] && fail',
+    'done',
     '/usr/bin/ditto -x -k "$ZIP" "$STAGING" || fail',
     'NEW_APP="$(/usr/bin/find "$STAGING" -type d -name Nodus.app -print -quit)"',
     '[ -n "$NEW_APP" ] && [ -d "$NEW_APP/Contents" ] || fail',
@@ -176,7 +189,65 @@ async function installUnsignedMacUpdate(downloadedFile: string): Promise<void> {
     stdio: 'ignore',
   });
   helper.unref();
+  quitForUpdate();
+}
+
+/** Quit so the waiting helper can replace the bundle — and make sure the quit
+ *  actually lands.
+ *
+ *  app.quit() is cooperative: it runs before-quit, closes every window, then
+ *  will-quit, and any one of those steps can leave the process alive. On macOS
+ *  that is not theoretical. Finishing a download makes electron-updater's
+ *  MacUpdater start a local proxy server and hand the app to the native
+ *  Squirrel.Mac updater via setFeedURL, both of which happen before it consults
+ *  autoInstallOnAppQuit — so they happen even here, where Nodus installs the
+ *  update itself and wants nothing to do with Squirrel. The app then sits idle in
+ *  its run loop, the helper waits for a PID that never dies, and the user force
+ *  quits, which kills the helper too. Nothing installs, every time.
+ *
+ *  app.exit() skips the cooperative path entirely and terminates. before-quit has
+ *  already run by then, so the database and the vendor runtimes are closed down
+ *  the same way they would be on any other quit. */
+function quitForUpdate(): void {
   app.quit();
+  const giveUp = setTimeout(() => {
+    console.warn('[updates] app.quit() did not terminate the process; forcing exit so the installer can proceed');
+    app.exit(0);
+  }, 4000);
+  giveUp.unref?.();
+}
+
+function updateInstallStatePath(): string {
+  return path.join(app.getPath('userData'), 'update-install-state.json');
+}
+
+/** Report an install that was staged but never finished.
+ *
+ *  The helper records its outcome in this file and, until now, nothing ever read
+ *  it. So when an install stalled the app started up on the old version, offered
+ *  the very same update again, and staged another helper doomed the same way —
+ *  a loop with no visible symptom beyond "the update does nothing". */
+async function reportInterruptedUpdateInstall(): Promise<void> {
+  const statePath = updateInstallStatePath();
+  let state: { status?: string; version?: string };
+  try {
+    state = JSON.parse(await fs.readFile(statePath, 'utf8')) as typeof state;
+  } catch {
+    return; // no install was ever staged from this profile
+  }
+  // Clear it either way: this is a report about the previous launch, and keeping
+  // it would turn one failure into a permanent warning.
+  await fs.rm(statePath, { force: true }).catch(() => { /* reported anyway */ });
+  if (!state?.status || state.status === 'installed') return;
+  if (state.version && state.version === app.getVersion()) return; // it did land
+  emitUpdate({
+    status: 'error',
+    message: state.version
+      ? `La actualización a Nodus ${state.version} se descargó pero no llegó a instalarse, así que sigues en la ${app.getVersion()}. Vuelve a intentarlo desde Ajustes.`
+      : 'Una actualización descargada no llegó a instalarse. Vuelve a intentarlo desde Ajustes.',
+    version: state.version ?? app.getVersion(),
+    progress: null,
+  });
 }
 
 function emitUpdate(event: UpdateCheckResponse): UpdateCheckResponse {
@@ -596,6 +667,7 @@ app.whenReady().then(() => {
   startStudyCalendarReminders();
   applyMascotWindow();
   setupAutoUpdates();
+  void reportInterruptedUpdateInstall();
 
   // Genealogy demo: fill in the daguerreotype portraits in the background if this
   // vault is showing the demo, a Gemini key is present, and some are still missing.

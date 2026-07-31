@@ -64,6 +64,7 @@ const RELEASE_3_0_2_IT: string[] = [
   "La mappa degli argomenti e i dibattiti non congelano più la finestra. Disegnavano in un colpo solo decine di migliaia di elementi e l’intera applicazione restava bloccata per uno o due secondi all’apertura; ora vengono disegnati a tratti mentre scorri. La mappa si dispiega inoltre un ramo alla volta invece di aprirsi tutta, così puoi seguire una linea argomentativa senza perderti.",
   "I personaggi intervistati parlano invece di recitare. In modalità dimostrativa rispondevano leggendo la propria scheda ad alta voce; ora rispondono con la loro voce, il loro carattere e i loro silenzi, come in un’intervista vera.",
   "Il runtime di Codex incluso in Nodus genera anche immagini, così puoi creare illustrazioni senza configurare alcuna chiave aggiuntiva se hai già collegato il tuo abbonamento ChatGPT. E la generazione con Google torna a funzionare: le veniva richiesto un formato di immagine che non accetta più.",
+  "Gli aggiornamenti su macOS tornano a installarsi da soli. Nodus scaricava la nuova versione e poi non riusciva a chiudersi, così il programma di installazione restava in attesa all’infinito; forzare la chiusura se lo portava dietro e riaprivi sulla versione precedente, senza il minimo avviso. Ora la chiusura va sempre a buon fine, il programma di installazione porta a termine il lavoro anche se forzi l’uscita, e se un aggiornamento non si installa Nodus te lo dice all’avvio invece di riprovarci in silenzio.",
 ];
 
 const RELEASE_3_0_1_IT: string[] = [
