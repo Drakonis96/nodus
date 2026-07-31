@@ -312,6 +312,49 @@ try {
   const cancelledResult = jobs.getBackgroundJob(cancelKey).result;
   assert.equal(cancelledResult.cancelled, true, 'cancellation is reported');
   assert.ok(cancelledResult.count < 3, 'cancelling stops before every segment is synthesised');
+  jobs.clearBackgroundJob(cancelKey, jobs.getBackgroundJob(cancelKey).id);
+
+  // ── Cancelling a segment that is still synthesising ─────────────────────────
+  // The real case behind the bug report: a long section takes minutes on a local
+  // voice (and a dead worker or a stalled cloud request never settles at all).
+  // Cancel must not wait for it — the click has to be acknowledged on screen and
+  // the job has to end, without the segment ever completing.
+  const stuckKey = jobs.audioGenerationJobKey('deep_research', 'report-stuck');
+  let abortedSegments = 0;
+  let stuckSynthCalls = 0;
+  const stuckSynth = (_provider, _voiceId, _text, signal) => {
+    stuckSynthCalls += 1;
+    // Never resolves: only aborting can end it.
+    return new Promise((_resolve, reject) => {
+      signal?.addEventListener('abort', () => { abortedSegments += 1; reject(new Error('Síntesis de audio cancelada.')); }, { once: true });
+    });
+  };
+  const stuckStates = [];
+  const unsubscribeStuck = jobs.subscribeBackgroundJob(stuckKey, (job) => {
+    stuckStates.push({ status: job?.status ?? null, cancelling: job?.progress?.cancelling ?? false });
+  });
+  jobs.startAudioGeneration({ ...audioRequest, entityKind: 'deep_research', entityId: 'report-stuck' }, stuckSynth);
+  await waitFor(() => stuckSynthCalls === 1, 'stuck segment synthesis started');
+
+  const notificationsBeforeCancel = stuckStates.length;
+  jobs.cancelAudioGeneration('deep_research', 'report-stuck');
+  assert.ok(
+    stuckStates.length > notificationsBeforeCancel,
+    'clicking Cancel notifies subscribers at once, so the panel re-renders'
+  );
+  assert.equal(stuckStates.at(-1).cancelling, true, 'the panel is told the cancellation is under way');
+  assert.equal(abortedSegments, 1, 'the synthesiser is aborted so the segment stops instead of finishing');
+
+  await waitFor(() => jobs.getBackgroundJob(stuckKey)?.status === 'completed', 'cancelled audio ends without the segment settling');
+  assert.deepEqual(jobs.getBackgroundJob(stuckKey).result, { count: 0, cancelled: true }, 'nothing is saved and cancellation is reported');
+  assert.equal(stuckSynthCalls, 1, 'no further segment is synthesised after cancelling');
+  unsubscribeStuck();
+  jobs.clearBackgroundJob(stuckKey, jobs.getBackgroundJob(stuckKey).id);
+
+  // Cancelling clears its own state: the panel can start over straight away.
+  jobs.startAudioGeneration({ ...audioRequest, entityKind: 'deep_research', entityId: 'report-stuck' }, fakeSynth);
+  await waitFor(() => jobs.getBackgroundJob(stuckKey)?.status === 'completed', 'a run after a cancellation finishes');
+  assert.deepEqual(jobs.getBackgroundJob(stuckKey).result, { count: 3, cancelled: false }, 'a fresh run is not cancelled by the previous one');
 
   console.log('background generation jobs test passed');
 } finally {

@@ -35,6 +35,7 @@ interface RunProgress {
   done: number;
   total: number;
   label: string;
+  cancelling?: boolean;
 }
 
 export function AudioPanel({
@@ -244,8 +245,13 @@ export function AudioPanel({
             </>
           )}
           {generating ? (
-            <button className="btn btn-ghost border border-neutral-700 text-xs" onClick={cancel}>
-              {t('Cancelar')}
+            <button
+              data-testid="audio-cancel"
+              className="btn btn-ghost border border-neutral-700 text-xs disabled:opacity-60"
+              onClick={cancel}
+              disabled={run?.cancelling}
+            >
+              {run?.cancelling ? t('Cancelando…') : t('Cancelar')}
             </button>
           ) : (
             <button className="btn btn-primary text-xs" onClick={() => void generate()}>

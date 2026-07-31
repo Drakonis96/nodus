@@ -1761,6 +1761,7 @@ export const DE: Record<string, string> = {
   'Esto borrará todo el grafo de forma permanente. Para confirmar, escribe este código:':
     'Dadurch wird der gesamte Graph dauerhaft gelöscht. Geben Sie zur Bestätigung diesen Code ein:',
   'Cancelar': 'Abbrechen',
+  'Cancelando…': 'Wird abgebrochen…',
   'Borrando…': 'Wird gelöscht…',
   'Borrar grafo': 'Graph löschen',
   'Contraseña de la copia': 'Passwort der Sicherung',

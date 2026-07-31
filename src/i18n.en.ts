@@ -1773,6 +1773,7 @@ export const EN: Record<string, string> = {
   'Esto borrará todo el grafo de forma permanente. Para confirmar, escribe este código:':
     'This will permanently delete the entire graph. To confirm, type this code:',
   Cancelar: 'Cancel',
+  'Cancelando…': 'Cancelling…',
   'Borrando…': 'Deleting…',
   'Borrar grafo': 'Delete graph',
   'Contraseña de la copia': 'Backup password',

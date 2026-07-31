@@ -1760,6 +1760,7 @@ export const FR: Record<string, string> = {
   'Esto borrará todo el grafo de forma permanente. Para confirmar, escribe este código:':
     'Cela supprimera définitivement tout le graphe. Pour confirmer, saisissez ce code :',
   'Cancelar': 'Annuler',
+  'Cancelando…': 'Annulation…',
   'Borrando…': 'Suppression…',
   'Borrar grafo': 'Supprimer le graphe',
   'Contraseña de la copia': 'Mot de passe de la sauvegarde',

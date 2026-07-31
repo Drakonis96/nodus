@@ -492,6 +492,9 @@ export interface AudioGenerationProgress {
   done: number;
   total: number;
   label: string;
+  /** Set the moment the user asks to cancel, so the panel can acknowledge the click
+   *  instead of looking frozen while the segment in flight is abandoned. */
+  cancelling?: boolean;
 }
 
 export interface AudioGenerationResult {
@@ -505,17 +508,67 @@ export function audioGenerationJobKey(kind: AudioEntityKind, id: string): string
   return `audio:generate:${kind}:${id}`;
 }
 
-// Keys whose in-flight generation the user has asked to cancel. Checked between
-// segments; cleared when the loop observes it (so a later run starts clean).
-const audioCancellations = new Set<string>();
+/**
+ * A pending cancellation for one generation key. It is more than a flag: a segment
+ * can take minutes (a long section on a local voice) or never settle at all (a dead
+ * worker, a stalled cloud request), and the loop used to only look at the flag
+ * *between* segments — so Cancel appeared to do nothing, sometimes forever. The
+ * promise lets the loop stop waiting for the segment in flight, and the abort
+ * controller lets the synthesiser drop the work it is doing.
+ */
+interface AudioCancellation {
+  requested: boolean;
+  signal: Promise<void>;
+  request: () => void;
+  controller: AbortController;
+}
+
+const CANCELLED = Symbol('audio-cancelled');
+
+const audioCancellations = new Map<string, AudioCancellation>();
+
+function audioCancellation(key: string): AudioCancellation {
+  const existing = audioCancellations.get(key);
+  if (existing) return existing;
+  let request!: () => void;
+  const signal = new Promise<void>((resolve) => { request = resolve; });
+  const entry: AudioCancellation = { requested: false, signal, request, controller: new AbortController() };
+  audioCancellations.set(key, entry);
+  return entry;
+}
+
+/** Stop waiting on `promise` as soon as cancellation is requested. */
+function untilCancelled<T>(cancellation: AudioCancellation, promise: Promise<T>): Promise<T | typeof CANCELLED> {
+  const cancelled: Promise<typeof CANCELLED> = cancellation.signal.then(() => CANCELLED);
+  return Promise.race<T | typeof CANCELLED>([promise, cancelled]);
+}
 
 export function cancelAudioGeneration(kind: AudioEntityKind, id: string): void {
-  audioCancellations.add(audioGenerationJobKey(kind, id));
+  const key = audioGenerationJobKey(kind, id);
+  const current = getBackgroundJob<AudioGenerationRequest, AudioGenerationProgress, AudioGenerationResult>(key);
+  if (current?.status !== 'running') return;
+  const cancellation = audioCancellation(key);
+  if (cancellation.requested) return;
+  cancellation.requested = true;
+  cancellation.request();
+  cancellation.controller.abort();
+  // Re-render the panel immediately: without this the click mutated a module-level
+  // flag only, so nothing on screen changed until the current segment finished.
+  replaceJob({
+    ...current,
+    progress: { done: 0, total: 0, label: '', ...(current.progress ?? {}), cancelling: true },
+  } as AnyJob);
 }
 
 /** The synthesis backend, injected by the caller so this module stays free of the
- *  heavy WASM/onnx audio engines (and can be bundled and unit-tested on its own). */
-export type SegmentSynthesizer = (provider: AudioProvider, voiceId: string, text: string) => Promise<Uint8Array>;
+ *  heavy WASM/onnx audio engines (and can be bundled and unit-tested on its own).
+ *  `signal` aborts when the user cancels, so the backend can drop the segment. */
+export type SegmentSynthesizer = (
+  provider: AudioProvider,
+  voiceId: string,
+  text: string,
+  signal?: AbortSignal
+) => Promise<Uint8Array>;
 
 export function startAudioGeneration(request: AudioGenerationRequest, synthesize: SegmentSynthesizer): AudioGenerationJob {
   const key = audioGenerationJobKey(request.entityKind, request.entityId);
@@ -524,32 +577,51 @@ export function startAudioGeneration(request: AudioGenerationRequest, synthesize
   audioCancellations.delete(key);
 
   return startBackgroundJob<AudioGenerationRequest, AudioGenerationProgress, AudioGenerationResult>(key, request, async (req, onProgress) => {
-    const segments = await window.nodus.getAudioSegments(req.entityKind, req.entityId, req.segmentRequest);
-    if (!segments.length) throw new Error(req.labels.noText);
-
-    await window.nodus.clearAudioClips(req.entityKind, req.entityId);
-    onProgress({ done: 0, total: segments.length, label: req.labels.preparing });
-
+    const cancellation = audioCancellation(key);
     let done = 0;
-    let cancelled = false;
-    for (const segment of segments) {
-      if (audioCancellations.has(key)) { cancelled = true; break; }
-      onProgress({ done, total: segments.length, label: segment.label });
-      const bytes = await synthesize(req.provider, req.voiceId, segment.text);
-      if (audioCancellations.has(key)) { cancelled = true; break; }
-      await window.nodus.saveAudioClip(req.entityKind, req.entityId, {
-        segmentIndex: segment.index,
-        segmentLabel: segment.label,
-        provider: req.provider,
-        voice: req.voiceId,
-        language: req.language,
-        bytes,
-      });
-      done += 1;
-      onProgress({ done, total: segments.length, label: segment.label });
-    }
+    try {
+      const segments = await untilCancelled(cancellation, window.nodus.getAudioSegments(req.entityKind, req.entityId, req.segmentRequest));
+      if (segments === CANCELLED) return { count: 0, cancelled: true };
+      if (!segments.length) throw new Error(req.labels.noText);
 
-    audioCancellations.delete(key);
-    return { count: done, cancelled };
+      const report = (label: string) =>
+        onProgress({ done, total: segments.length, label, cancelling: cancellation.requested });
+
+      if (await untilCancelled(cancellation, window.nodus.clearAudioClips(req.entityKind, req.entityId)) === CANCELLED) {
+        return { count: 0, cancelled: true };
+      }
+      report(req.labels.preparing);
+
+      for (const segment of segments) {
+        if (cancellation.requested) return { count: done, cancelled: true };
+        report(segment.label);
+        // Race the synthesis: cancelling must end the job now, even when the segment
+        // in flight would take minutes more (or never resolve at all).
+        const synthesized: Promise<Uint8Array | typeof CANCELLED> = synthesize(req.provider, req.voiceId, segment.text, cancellation.controller.signal)
+          // Aborting the backend rejects the segment; that is the cancellation the
+          // user asked for, not a failure to report to them.
+          .catch((error: unknown) => {
+            if (cancellation.requested) return CANCELLED;
+            throw error;
+          });
+        const bytes = await untilCancelled(cancellation, synthesized);
+        if (bytes === CANCELLED || cancellation.requested) return { count: done, cancelled: true };
+        await window.nodus.saveAudioClip(req.entityKind, req.entityId, {
+          segmentIndex: segment.index,
+          segmentLabel: segment.label,
+          provider: req.provider,
+          voice: req.voiceId,
+          language: req.language,
+          bytes,
+        });
+        done += 1;
+        report(segment.label);
+      }
+
+      return { count: done, cancelled: false };
+    } finally {
+      // Clear on every exit — including the throwing one — so a later run starts clean.
+      audioCancellations.delete(key);
+    }
   });
 }
