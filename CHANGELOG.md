@@ -1,5 +1,47 @@
 # Changelog
 
+## 3.0.3 — 2026-07-31
+
+Getting reports out of Deep Research, and a Cancel button that left the job
+running. Both the archive and the cancellation are covered by tests that were
+watched failing before the fix.
+
+### Added
+
+- **Reports leave Deep Research in bulk, and by the card.** Everything the
+  gallery produced left one report at a time through the reader: thirty reports
+  meant thirty save dialogs, and a card could not be downloaded without opening
+  it. A Download button in the header turns the existing selection mode into a
+  bulk export — select-all included, Markdown / PDF / both — and returns one ZIP;
+  every card and list row also gains a download icon. Reports are rendered one at
+  a time because a PDF is printed by a real Chromium window whose deferred
+  teardown only holds if the next print starts after the previous one let go,
+  hence the progress bar: a serial pass can run for a minute, and a silent minute
+  reads as a hang. Two things `scripts/test-deep-research-archive.mjs` pins that
+  a naive archive gets wrong — a zip entry overwrites its namesake, so reports
+  sharing a title get distinct names; and each report's files are staged before
+  being added, so a report whose PDF fails leaves nothing behind instead of an
+  orphan Markdown.
+- **"Suggest with AI" in the image design modal.** It streams a scene description
+  written from the report's own summary into the prompt box — what the generator
+  would have written for itself, which was only ever invisible. Nothing is
+  persisted until the user generates with it. Closes #325.
+
+### Fixed
+
+- **The audio Cancel button did not cancel.** Cancelling only added the job key
+  to a module-level `Set`. That notified no subscriber, so the panel never
+  re-rendered and the click looked like a no-op; and the loop read the flag only
+  between segments, always awaiting the synthesis in flight. A long section takes
+  minutes, a dead TTS worker or a stalled cloud request never settles, and the
+  job then stayed running for the rest of the session with no way to start over.
+  Cancellation is now a record per key: a promise the loop races against the
+  segment in flight, an `AbortSignal` handed to the synthesiser, and an immediate
+  job update so the button acknowledges the click as "Cancelling…". The
+  local-voice synthesiser drops the aborted request and terminates its worker
+  when nothing else is using it, so a cancelled segment stops burning a core to
+  finish a narration nobody will hear. Closes #323.
+
 ## 3.0.2 — 2026-07-31
 
 The Deep Research release. The engine used to overstate itself in ways that
@@ -67,6 +109,22 @@ academic vault, not on fixtures.
   API no longer accepts.
 - **Interviewed characters recited their sheet.** In worldbuilding demo mode they
   answered by reading their own character sheet aloud instead of speaking.
+- **The macOS update never finished installing.** Nodus ships unsigned, so it
+  replaces its own bundle with an external helper rather than handing off to
+  Squirrel.Mac, and the helper waits for the app to exit first. `app.quit()` is
+  cooperative and did not always terminate the process — finishing a download
+  makes electron-updater start a local proxy and register with Squirrel.Mac
+  before it ever consults `autoInstallOnAppQuit` — so the app sat idle in its run
+  loop while the helper waited on a PID that never died. Force Quit then killed
+  the helper too, nothing was installed, and reopening staged another helper
+  doomed the same way. Three layers, because each failed independently: the quit
+  falls back to `app.exit(0)` if the process is still alive shortly after
+  `app.quit()`; the helper ignores TERM/HUP/INT so it survives a force quit, and
+  stops waiting after two minutes instead of forever; and startup reads the
+  helper's state file — written all along, read by nobody — so a stalled install
+  is reported instead of silently re-offered. Covered by
+  `scripts/test-unsigned-mac-update.mjs`, which runs the real generated helper
+  against fake bundles and force-quits it mid-wait.
 
 ### Changed
 

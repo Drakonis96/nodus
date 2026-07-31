@@ -25,11 +25,15 @@ try {
 
   const { RELEASE_NOTES, releaseNotesForMajor } = await import(pathToFileURL(bundlePath).href);
   const currentRelease = RELEASE_NOTES[0];
-  assert.equal(currentRelease?.version, '3.0.2');
+  assert.equal(currentRelease?.version, '3.0.3');
   assert.equal(currentRelease?.date, '2026-07-31');
-  // The Deep Research release: one highlight per user-visible change, plus the
-  // macOS update install that could never finish.
-  assert.equal(currentRelease?.highlights.length, 6);
+  // Bulk export, the AI-suggested image prompt, and the audio Cancel that did nothing.
+  assert.equal(currentRelease?.highlights.length, 3);
+
+  // 3.0.2 shipped after the macOS update fix merged, so that highlight stays there.
+  const deepResearchRelease = RELEASE_NOTES.find((note) => note.version === '3.0.2');
+  assert.equal(deepResearchRelease?.date, '2026-07-31');
+  assert.equal(deepResearchRelease?.highlights.length, 6);
 
   // 3.0.1 stays reachable from the version picker underneath it.
   const performanceRelease = RELEASE_NOTES.find((note) => note.version === '3.0.1');

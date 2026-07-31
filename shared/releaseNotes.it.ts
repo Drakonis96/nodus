@@ -58,6 +58,12 @@ export const RELEASE_2_7_0_IT: string[] = [
 ];
 
 /** Italian history, indexed by release and highlight order. */
+const RELEASE_3_0_3_IT: string[] = [
+  "I report escono da Deep Research in blocco, e anche dalla loro scheda. Tutto ciò che la galleria produceva usciva uno alla volta, passando dal lettore: una libreria di trenta report significava trenta finestre di salvataggio, e una scheda non si poteva scaricare senza prima aprirla. Ora il pulsante Scarica dell’intestazione riutilizza la modalità di selezione — «seleziona tutto» compreso —, ti lascia scegliere Markdown, PDF o entrambi e consegna un unico ZIP; ogni scheda e ogni riga guadagnano inoltre la propria icona di download. I PDF vengono stampati uno alla volta con una barra di avanzamento, perché quella passata può durare un minuto e un minuto in silenzio sembra un blocco.",
+  "Il design dell’immagine di un report può ora suggerirti la scena. «Suggerisci con l’IA» scrive nel campo del prompt una descrizione visiva ricavata dal riassunto del report stesso — la stessa che il generatore si sarebbe scritto da sé e che finora non vedevi mai. Puoi modificarla, e non viene salvato nulla finché non generi con essa.",
+  "Annullare una narrazione ora la annulla davvero. Il pulsante non produceva nulla di visibile: il lavoro proseguiva fino alla fine della sezione — minuti di attesa, o all’infinito se la voce non rispondeva mai — e restava poi bloccato per tutto il resto della sessione, senza modo di ricominciare. Ora il clic viene riconosciuto subito, il segmento in corso viene scartato e una voce locale smette di consumare un core per finire una narrazione che nessuno ascolterà.",
+];
+
 const RELEASE_3_0_2_IT: string[] = [
   "Deep Research non afferma più di quanto possa sostenere. Ogni citazione viene verificata rispetto a ciò che la fonte dice davvero, e quella che non la sostiene sparisce dal testo e dalla bibliografia. Chi redige riceve ora il contenuto reale di ciò che cita — l’enunciato di ogni idea, ciò che afferma ogni lacuna, chi sostiene ciascuna posizione di un dibattito e il testo letterale di ogni passaggio con la sua pagina —, così i disaccordi fra autori vengono argomentati con nomi anziché citati di sfuggita. La copertura dichiarata è quella realmente citata, non quella assegnata.",
   "Un nuovo pannello indica quali affermazioni conviene verificare prima di citarle. Un terzo delle citazioni che superano la verifica ha un riscontro parziale: la fonte sostiene una versione più debole di quanto la frase affermi. Il report le elenca accanto al testo della loro fonte e all’autore e anno da aprire, così controllare un report passa dal leggere opere intere al confrontare una manciata di coppie.",
@@ -74,6 +80,7 @@ const RELEASE_3_0_1_IT: string[] = [
 ];
 
 export const RELEASE_NOTES_IT: Record<string, string[]> = {
+  "3.0.3": RELEASE_3_0_3_IT,
   "3.0.2": RELEASE_3_0_2_IT,
   "3.0.1": RELEASE_3_0_1_IT,
   "3.0.0": RELEASE_3_0_0_IT,

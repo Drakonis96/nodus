@@ -1,3 +1,9 @@
+const RELEASE_3_0_3_TR: string[] = [
+  "Raporlar Deep Research'ten toplu olarak, kendi kartından da çıkabiliyor. Galerinin ürettiği her şey şimdiye dek okuyucudan geçerek teker teker çıkıyordu: otuz raporluk bir kitaplık otuz kaydetme penceresi demekti ve bir kartı önce açmadan indiremiyordunuz. Artık başlıktaki İndir düğmesi seçim kipini —tümünü seç dahil— yeniden kullanıyor, Markdown, PDF ya da her ikisini seçmenize izin veriyor ve tek bir ZIP veriyor; ayrıca her kart ve her satır kendi indirme simgesini kazanıyor. PDF'ler ilerleme çubuğu eşliğinde teker teker yazdırılıyor, çünkü bu geçiş bir dakika sürebiliyor ve sessiz geçen bir dakika donma gibi görünüyor.",
+  "Bir raporun görsel tasarımı artık sahneyi size önerebiliyor. «Yapay zekâ ile öner», raporun kendi özetinden yazılmış görsel bir betimlemeyi istem kutusuna akıtıyor — üreticinin kendisi için yazacağı, şimdiye dek hiç görmediğiniz betimlemenin ta kendisi. Düzenleyebilirsiniz ve onunla üretim yapana kadar hiçbir şey kaydedilmiyor.",
+  "Bir seslendirmeyi iptal etmek artık gerçekten iptal ediyor. Düğme görünür hiçbir şey yapmıyordu: iş bölümün sonuna kadar sürüyor —dakikalarca bekleme, ses hiç yanıt vermezse sonsuza kadar— ve ardından oturumun geri kalanında, baştan başlamanın hiçbir yolu olmadan takılı kalıyordu. Artık tıklama anında karşılık buluyor, işlenmekte olan parça bırakılıyor ve yerel bir ses, kimsenin dinlemeyeceği bir seslendirmeyi bitirmek için bir çekirdeği tüketmeyi bırakıyor.",
+];
+
 const RELEASE_3_0_2_TR: string[] = [
   "Deep Research artık destekleyebileceğinden fazlasını iddia etmiyor. Her kaynak gösterimi, kaynağın gerçekte ne söylediğine karşı denetleniyor; desteklemeyen gösterim metinden de kaynakçadan da siliniyor. Yazan taraf artık aktardığı şeyin gerçek içeriğini alıyor — her fikrin ifadesi, her araştırma boşluğunun iddiası, bir tartışmada hangi tarafı kimin savunduğu ve her pasajın sayfasıyla birlikte birebir metni —, böylece yazarlar arasındaki anlaşmazlıklar geçerken anılmak yerine adlarıyla tartışılıyor. Raporun bildirdiği kapsam, atanan değil gerçekten atıf yapılan kapsamdır.",
   "Yeni bir panel, hangi ifadeleri aktarmadan önce denetlemeniz gerektiğini gösteriyor. Denetimi geçen kaynak gösterimlerinin üçte biri yalnızca kısmen destekleniyor: kaynak, cümlenin iddia ettiğinden daha zayıf bir sürümü destekliyor. Rapor bunları kaynağının metniyle ve açılacak yazar ve yılla birlikte listeliyor; böylece bir raporu denetlemek, eserlerin tamamını okumaktan birkaç çifti karşılaştırmaya iniyor.",
@@ -14,6 +20,7 @@ const RELEASE_3_0_1_TR: string[] = [
 ];
 
 export const RELEASE_NOTES_TR: Record<string, string[]> = {
+  "3.0.3": RELEASE_3_0_3_TR,
   "3.0.2": RELEASE_3_0_2_TR,
   "3.0.1": RELEASE_3_0_1_TR,
   // Index-matched with RELEASE_3_0_0_HIGHLIGHTS — keep this order.
