@@ -99,7 +99,7 @@ try {
     assert.equal(brief.materials.ideas.length, 70, 'pool trimmed to POOL_LIMITS.ideas');
     assert.ok(brief.materials.ideas.every((i) => /\]\(nodus:\/\/idea\/g-\d+\)$/.test(i.token)), 'idea tokens are real nodus citations');
     assert.ok(brief.sections.target >= 3 && brief.sections.hardCap >= brief.sections.target, 'section scope resolved');
-    assert.equal(brief.sections.target, 4, 'standard client brief defaults to four deep sections');
+    assert.equal(brief.sections.target, 5, 'the client brief is sized like the in-app plan, to what a section really delivers');
     assert.deepEqual(brief.targetPages, { min: 9, max: 14 }, 'standard length → 9–14 pp');
     assert.equal(brief.finalizeWith, 'nodus_finalize_deep_research', 'points the writer at the finalize tool');
     assert.ok(brief.citationPolicy.length > 0 && brief.method.length > 0, 'ships a citation policy + method');

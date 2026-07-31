@@ -3,6 +3,7 @@ import type {
   IdeaType,
   WritingWorkshopBrief,
   WritingWorkshopCandidateBase,
+  EdgeDetail,
   WritingWorkshopContradictionCandidate,
   WritingWorkshopDraft,
   WritingWorkshopDraftRequest,
@@ -21,7 +22,7 @@ import { getDb } from '../db/database';
 import { getContradictions } from '../graph/graphService';
 import { listTutorRoutes } from '../db/tutorRepo';
 import { completeJson } from './aiClient';
-import { embed } from './aiClient';
+import { embed, embedMany } from './aiClient';
 import { findSimilarIdeas } from '../db/ideasRepo';
 import { findSimilarWorks } from '../db/workSummariesRepo';
 import { findSimilarPassages, type SimilarPassage } from '../db/passagesRepo';
@@ -32,6 +33,10 @@ const MAX_GAPS = 36;
 const MAX_CONTRADICTIONS = 30;
 const MAX_WORKS = 80;
 const MAX_PASSAGES = 24;
+/** How many semantic probes a single snapshot may run. */
+const MAX_PROBES = 8;
+/** Share of the pool reserved for the objective itself; the rest is split between sub-questions. */
+const OBJECTIVE_SHARE = 0.4;
 const MAX_ROUTES = 12;
 const MAX_CONTEXT_CHARS = 420_000;
 const MAX_PASSAGE_CONTEXT_CHARS = 30_000;
@@ -59,6 +64,7 @@ interface WorkLinkRow {
   authors_json: string;
   year: number | null;
   zotero_key: string;
+  doi: string | null;
 }
 
 interface ThemeRow {
@@ -103,6 +109,7 @@ interface WorkRow {
   authors_json: string;
   year: number | null;
   deep_status: WritingWorkshopWorkCandidate['deepStatus'];
+  doi: string | null;
   orientation_summary: string | null;
   themes: string | null;
   idea_count: number;
@@ -139,9 +146,13 @@ function isAiWorkshopResult(value: unknown): value is AiWorkshopResult {
   return typeof v.title === 'string' && typeof v.draftMarkdown === 'string' && Array.isArray(v.outline);
 }
 
-export async function buildWritingWorkshopSnapshot(brief: WritingWorkshopBrief): Promise<WritingWorkshopSnapshot> {
+export async function buildWritingWorkshopSnapshot(
+  brief: WritingWorkshopBrief,
+  /** Extra sub-questions to probe the corpus with, on top of the objective itself. */
+  extraProbes: string[] = []
+): Promise<WritingWorkshopSnapshot> {
   const tokens = tokenize(`${brief.objective} ${kindLabel(brief.kind)}`);
-  const semantic = await buildSemanticRanking(brief.objective);
+  const semantic = await buildSemanticRanking([brief.objective, ...extraProbes]);
   const ideas = rankedIdeas(tokens, semantic);
   const themes = rankedThemes(tokens, semantic);
   const gaps = rankedGaps(tokens, brief.kind, semantic);
@@ -247,24 +258,115 @@ function countTable(table: string): number {
  * idea/work vectors for broad ranking and the fine passage index for direct
  * evidence candidates; lexical matching remains only as an offline fallback.
  */
-async function buildSemanticRanking(objective: string): Promise<WorkshopSemanticRanking> {
+async function buildSemanticRanking(queries: string[]): Promise<WorkshopSemanticRanking> {
   const empty: WorkshopSemanticRanking = { active: false, ideaScores: new Map(), workScores: new Map(), passages: [] };
-  if (!objective.trim()) return empty;
+  // One probe reaches only the corpus neighbourhood of the objective *as a whole*.
+  // A question spanning several axes ("turismo, género y mirada colonial") retrieves
+  // what resembles that whole sentence and misses what each axis would find alone,
+  // so several probes are merged by best score per item.
+  const probes = [...new Set(queries.map((q) => q.trim()).filter(Boolean))].slice(0, MAX_PROBES);
+  if (probes.length === 0) return empty;
   try {
-    const query = await embed(objective.trim());
-    if (!query) return empty;
-    const ideaScores = new Map(findSimilarIdeas(query, -1, MAX_IDEAS).map((hit) => [hit.global_id, semanticStrength(hit.similarity)]));
-    const workScores = new Map(findSimilarWorks(query, -1, MAX_WORKS).map((hit) => [hit.nodus_id, semanticStrength(hit.similarity)]));
-    const passageHits = findSimilarPassages(query, -1, MAX_PASSAGES);
-    for (const hit of passageHits) {
-      const current = workScores.get(hit.nodus_id) ?? 0;
-      workScores.set(hit.nodus_id, Math.max(current, semanticStrength(hit.similarity)));
+    const vectors = (await embedMany(probes)).filter((v): v is number[] => Array.isArray(v) && v.length > 0);
+    if (vectors.length === 0) return empty;
+
+    // Merging by score and then trimming to the cap is NOT enough: the objective's
+    // own neighbourhood scores highest across the board, so the trim throws away
+    // exactly what the sub-questions were meant to add and the pool collapses back
+    // to the single-probe one. Each probe therefore gets a guaranteed quota of
+    // slots, and only what is left over is filled by global score.
+    const ideaScores = new Map<string, number>();
+    const workScores = new Map<string, number>();
+    const passages = new Map<string, SimilarPassage>();
+    const passageScore = new Map<string, number>();
+    const reserve = <T>(chosen: Map<string, T>, limit: number) => chosen.size < limit;
+
+    const quotaFor = (limit: number, index: number) => {
+      // A lone probe is the whole search: quotas must never shrink it below what a
+      // single-probe snapshot used to retrieve.
+      if (vectors.length === 1) return limit;
+      return index === 0
+        ? Math.max(1, Math.round(limit * OBJECTIVE_SHARE))
+        : Math.max(1, Math.floor((limit * (1 - OBJECTIVE_SHARE)) / (vectors.length - 1)));
+    };
+
+    // A quota with no quality floor is how breadth turns into noise: a sub-question
+    // with few good matches still spends its slots on weak material, the writer
+    // argues from it, and the claims it produces are not supported by the sources
+    // they cite. Measured: unsupported citations tripled. So a sub-question may only
+    // contribute material at least as relevant as the WEAKEST hit the objective
+    // itself accepted — breadth, never at the cost of relevance.
+    // The bar is what the single-probe pool would itself have accepted: the weakest
+    // item in the objective's own full-size result set. A sub-question may add
+    // anything that clears it and nothing that does not, so the pool gains breadth
+    // without ever lowering its standard of relevance.
+    const objectiveIdeas = findSimilarIdeas(vectors[0], -1, MAX_IDEAS);
+    const objectiveWorks = findSimilarWorks(vectors[0], -1, MAX_WORKS);
+    const objectivePassages = findSimilarPassages(vectors[0], -1, MAX_PASSAGES * 2);
+    const weakest = <T extends { similarity: number }>(hits: T[]) => (hits.length ? hits[hits.length - 1].similarity : -1);
+    const floors = {
+      ideas: weakest(objectiveIdeas),
+      works: weakest(objectiveWorks),
+      passages: weakest(objectivePassages),
+    };
+
+    vectors.forEach((vector, index) => {
+      const isObjective = index === 0;
+      const ideaHits = isObjective
+        ? objectiveIdeas.slice(0, quotaFor(MAX_IDEAS, index))
+        : findSimilarIdeas(vector, floors.ideas, quotaFor(MAX_IDEAS, index));
+      const workHits = isObjective
+        ? objectiveWorks.slice(0, quotaFor(MAX_WORKS, index))
+        : findSimilarWorks(vector, floors.works, quotaFor(MAX_WORKS, index));
+      const passageHits = isObjective
+        ? objectivePassages.slice(0, quotaFor(MAX_PASSAGES * 2, index))
+        : findSimilarPassages(vector, floors.passages, quotaFor(MAX_PASSAGES * 2, index));
+      for (const hit of ideaHits) {
+        if (reserve(ideaScores, MAX_IDEAS) || ideaScores.has(hit.global_id)) {
+          ideaScores.set(hit.global_id, Math.max(ideaScores.get(hit.global_id) ?? 0, semanticStrength(hit.similarity)));
+        }
+      }
+      for (const hit of workHits) {
+        if (reserve(workScores, MAX_WORKS) || workScores.has(hit.nodus_id)) {
+          workScores.set(hit.nodus_id, Math.max(workScores.get(hit.nodus_id) ?? 0, semanticStrength(hit.similarity)));
+        }
+      }
+      for (const hit of passageHits) {
+        const strength = semanticStrength(hit.similarity);
+        workScores.set(hit.nodus_id, Math.max(workScores.get(hit.nodus_id) ?? 0, strength));
+        if (!passages.has(hit.passage_id) && !reserve(passages, MAX_PASSAGES * 2)) continue;
+        if ((passageScore.get(hit.passage_id) ?? -1) < strength) {
+          passageScore.set(hit.passage_id, strength);
+          passages.set(hit.passage_id, hit);
+        }
+      }
+    });
+
+    // Pass two: the objective fills any slots the quotas left unused.
+    for (const hit of objectiveIdeas) {
+      if (ideaScores.size >= MAX_IDEAS) break;
+      if (!ideaScores.has(hit.global_id)) ideaScores.set(hit.global_id, semanticStrength(hit.similarity));
     }
+    for (const hit of objectiveWorks) {
+      if (workScores.size >= MAX_WORKS) break;
+      if (!workScores.has(hit.nodus_id)) workScores.set(hit.nodus_id, semanticStrength(hit.similarity));
+    }
+    for (const hit of objectivePassages) {
+      if (passages.size >= MAX_PASSAGES * 2) break;
+      if (passages.has(hit.passage_id)) continue;
+      passageScore.set(hit.passage_id, semanticStrength(hit.similarity));
+      passages.set(hit.passage_id, hit);
+    }
+
+    const rankedPassages = [...passages.values()].sort(
+      (a, b) => (passageScore.get(b.passage_id) ?? 0) - (passageScore.get(a.passage_id) ?? 0)
+    );
+
     return {
-      active: ideaScores.size > 0 || workScores.size > 0 || passageHits.length > 0,
+      active: ideaScores.size > 0 || workScores.size > 0 || rankedPassages.length > 0,
       ideaScores,
       workScores,
-      passages: passageHits.map(toPassageCandidate),
+      passages: rankedPassages.map(toPassageCandidate),
     };
   } catch (error) {
     console.warn('[writingWorkshop] semantic ranking unavailable:', error instanceof Error ? error.message : String(error));
@@ -307,6 +409,73 @@ function toPassageCandidate(hit: SimilarPassage): WritingWorkshopPassageCandidat
     year: hit.year,
     zotero_key: hit.zotero_key,
     citation: `nodus://passage/${encodeURIComponent(hit.passage_id)}`,
+  };
+}
+
+/**
+ * Second-pass retrieval for one Deep Research section.
+ *
+ * The workshop snapshot is ranked once against the whole objective, which caps how
+ * much any single sub-question can bring back — passages worst of all. This asks the
+ * same indexes again using the section's own focus as the query, so a section about
+ * a narrow theme can reach material the objective-level ranking never surfaced.
+ * Returns candidates in the same shape the snapshot uses so they merge cleanly.
+ */
+export async function retrieveSectionMaterial(input: {
+  objective: string;
+  sectionTitle: string;
+  purpose: string;
+  keyClaims: string[];
+  excludeIdeaIds: string[];
+  excludePassageIds: string[];
+  limits: { ideas: number; passages: number };
+}): Promise<{ ideas: WritingWorkshopIdeaCandidate[]; passages: WritingWorkshopPassageCandidate[] }> {
+  const query = [input.sectionTitle, input.purpose, ...input.keyClaims].filter(Boolean).join('. ').trim();
+  if (!query) return { ideas: [], passages: [] };
+  const vector = await embed(`${input.objective}\n${query}`);
+  if (!vector) return { ideas: [], passages: [] };
+
+  const skipIdeas = new Set(input.excludeIdeaIds);
+  const skipPassages = new Set(input.excludePassageIds);
+  const ideaHits = findSimilarIdeas(vector, -1, input.limits.ideas * 4).filter((hit) => !skipIdeas.has(hit.global_id));
+  const passageHits = findSimilarPassages(vector, -1, input.limits.passages * 4).filter((hit) => !skipPassages.has(hit.passage_id));
+
+  return {
+    ideas: ideaHits.slice(0, input.limits.ideas).map((hit) => ideaCandidateById(hit.global_id, semanticStrength(hit.similarity))).filter((idea): idea is WritingWorkshopIdeaCandidate => !!idea),
+    passages: passageHits.slice(0, input.limits.passages).map(toPassageCandidate),
+  };
+}
+
+/** Load one idea in snapshot shape. Used by the per-section retrieval. */
+function ideaCandidateById(globalId: string, score: number): WritingWorkshopIdeaCandidate | null {
+  const row = getDb()
+    .prepare(
+      `SELECT i.global_id, i.type, i.label, i.statement,
+              COALESCE(GROUP_CONCAT(DISTINCT t.label), '') AS themes,
+              COUNT(DISTINCT io.nodus_id) AS work_count,
+              COUNT(DISTINCT e.id) AS evidence_count
+         FROM ideas i
+         LEFT JOIN idea_occurrences io ON io.global_id = i.global_id
+         LEFT JOIN evidence e ON e.global_id = i.global_id
+         LEFT JOIN idea_theme_links itl ON itl.global_id = i.global_id
+         LEFT JOIN themes t ON t.theme_id = itl.theme_id
+        WHERE i.global_id = ?
+        GROUP BY i.global_id`
+    )
+    .get(globalId) as Omit<IdeaRow, 'work_ids'> | undefined;
+  if (!row) return null;
+  return {
+    id: row.global_id,
+    label: row.label,
+    summary: clip(row.statement, 240),
+    score,
+    reason: 'Recuperado por similitud semántica con esta sección.',
+    type: row.type,
+    statement: row.statement,
+    themes: splitList(row.themes),
+    workCount: row.work_count,
+    evidenceCount: row.evidence_count,
+    works: ideaWorks(row.global_id),
   };
 }
 
@@ -362,7 +531,7 @@ function rankedIdeas(tokens: Set<string>, semanticIndex: WorkshopSemanticRanking
 function ideaWorks(globalId: string): WritingWorkshopIdeaCandidate['works'] {
   const rows = getDb()
     .prepare(
-      `SELECT w.nodus_id, w.title, w.authors_json, w.year, w.zotero_key
+      `SELECT w.nodus_id, w.title, w.authors_json, w.year, w.zotero_key, w.doi
          FROM idea_occurrences io
          JOIN works w ON w.nodus_id = io.nodus_id
         WHERE io.global_id = ?
@@ -376,6 +545,7 @@ function ideaWorks(globalId: string): WritingWorkshopIdeaCandidate['works'] {
     authors: parseAuthors(row.authors_json),
     year: row.year,
     zotero_key: row.zotero_key,
+    doi: row.doi,
   }));
 }
 
@@ -471,6 +641,21 @@ function rankedGaps(tokens: Set<string>, kind: WritingWorkshopBrief['kind'], sem
     .map(({ item, score, reason }) => ({ ...item, score, reason }));
 }
 
+/** Author-year labels of the works standing behind a dispute, so the writer can say
+ * who holds each side instead of reporting a nameless tension. */
+function debateSources(detail: EdgeDetail): string[] {
+  const ids = [...new Set(detail.evidence.map((e) => e.nodus_id).filter(Boolean))].slice(0, 6);
+  if (ids.length === 0) return [];
+  const rows = getDb()
+    .prepare(`SELECT authors_json, year FROM works WHERE nodus_id IN (${ids.map(() => '?').join(',')})`)
+    .all(...ids) as { authors_json: string; year: number | null }[];
+  const labels = rows.map((row) => {
+    const author = parseAuthors(row.authors_json)[0];
+    return author ? `${author.split(',')[0].trim()}${row.year ? ` (${row.year})` : ''}` : '';
+  });
+  return [...new Set(labels.filter(Boolean))];
+}
+
 function rankedContradictions(tokens: Set<string>, semanticIndex: WorkshopSemanticRanking): WritingWorkshopContradictionCandidate[] {
   return getContradictions()
     .map((detail): Scored<WritingWorkshopContradictionCandidate> => {
@@ -497,6 +682,7 @@ function rankedContradictions(tokens: Set<string>, semanticIndex: WorkshopSemant
           type: detail.edge.type,
           basis: detail.edge.basis,
           confidence: detail.edge.confidence,
+          sources: debateSources(detail),
         },
       };
     })
@@ -508,7 +694,7 @@ function rankedContradictions(tokens: Set<string>, semanticIndex: WorkshopSemant
 function rankedWorks(tokens: Set<string>, semanticIndex: WorkshopSemanticRanking): WritingWorkshopWorkCandidate[] {
   const rows = getDb()
     .prepare(
-      `SELECT w.nodus_id, w.zotero_key, w.title, w.authors_json, w.year, w.deep_status,
+      `SELECT w.nodus_id, w.zotero_key, w.title, w.authors_json, w.year, w.deep_status, w.doi,
               CASE WHEN w.summary_status = 'done' THEN ws.summary ELSE NULL END AS orientation_summary,
               COALESCE(GROUP_CONCAT(DISTINCT t.label), '') AS themes,
               COUNT(DISTINCT io.global_id) AS idea_count,
@@ -545,6 +731,7 @@ function rankedWorks(tokens: Set<string>, semanticIndex: WorkshopSemanticRanking
           authors: parseAuthors(row.authors_json),
           year: row.year,
           zotero_key: row.zotero_key,
+          doi: row.doi,
           themes,
           deepStatus: row.deep_status,
           orientationSummary: row.orientation_summary,

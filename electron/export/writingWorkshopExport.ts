@@ -9,6 +9,7 @@ import type {
   WritingWorkshopExportRequest,
   WritingWorkshopMatrixRow,
 } from '@shared/types';
+import { stripLeadingAbstract } from '@shared/writingDocument';
 import { markdownToPdf } from './markdownRender';
 import { getDecorativeImage, getDecorativeImageData } from '../db/decorativeImagesRepo';
 import {
@@ -215,18 +216,6 @@ function localizedDate(iso: string, language: PromptLanguage): string {
   }
 }
 
-function stripLeadingAbstract(markdown: string, abstract: string): string {
-  const lines = markdown.replace(/\r\n?/g, '\n').split('\n');
-  const first = lines.findIndex((line) => line.trim().length > 0);
-  if (first < 0 || !/^#{1,3}\s+/.test(lines[first])) return markdown;
-  let next = first + 1;
-  while (next < lines.length && !/^#{1,3}\s+/.test(lines[next])) next++;
-  const block = lines.slice(first + 1, next).join(' ').replace(/\s+/g, ' ').trim();
-  const expected = abstract.replace(/\s+/g, ' ').trim();
-  if (!expected || !block || !block.includes(expected.slice(0, Math.min(80, expected.length)))) return markdown;
-  return lines.slice(next).join('\n').trim();
-}
-
 function matrixHtml(rows: WritingWorkshopMatrixRow[], labels: DeepReportLabels): string {
   if (!rows.length) return '';
   const head = `<colgroup><col style="width:20mm" /><col /><col style="width:26mm" /><col /><col style="width:26mm" /></colgroup>
@@ -354,19 +343,15 @@ function renderDraftMarkdown(draft: WritingWorkshopDraft): string {
       '',
     ]),
     '## Borrador',
-    draft.draftMarkdown,
+    // The body already opens with the abstract and closes with its limitations and
+    // references, so those are rendered once — here from the body, not twice.
+    stripLeadingAbstract(draft.draftMarkdown, draft.abstract),
     '',
     '## Matriz de apoyo',
     matrixTable(draft.matrix),
     '',
-    '## Bibliografia sugerida',
-    ...(draft.bibliography.length ? draft.bibliography.map((item) => `- ${item}`) : ['- Sin bibliografia generada.']),
-    '',
     '## Siguientes pasos',
     ...(draft.nextSteps.length ? draft.nextSteps.map((item) => `- ${item}`) : ['- Revisar el borrador.']),
-    '',
-    '## Limitaciones',
-    ...(draft.limitations.length ? draft.limitations.map((item) => `- ${item}`) : ['- Sin limitaciones declaradas.']),
     '',
   ];
   return parts.join('\n');

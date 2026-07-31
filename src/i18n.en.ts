@@ -7968,4 +7968,8 @@ export const EN: Record<string, string> = {
   'Escribe el tema y Nodus redacta la unidad completa con tus materiales, citando cada uno. Puedes dejar que la IA proponga las partes o fijarlas tú: cuántas son, cómo se titulan y en qué debe centrarse cada una.': 'Write the topic and Nodus drafts the whole unit from your materials, citing each one. You can let the AI propose the parts or fix them yourself: how many there are, what they are called and what each one should concentrate on.',
   'Escribe el tema de los apuntes. El contenido lo explicará paso a paso con ejemplos y autoevaluación usando tus materiales.': 'Enter the topic for the notes. The content will explain it step by step with examples and self-assessment drawn from your materials.',
   'La diarización detecta cambios de hablante y etiqueta cada segmento automáticamente. Revisa siempre las etiquetas antes de usar la transcripción.': 'Diarization detects speaker changes and labels every segment automatically. Always review the labels before using the transcript.',
+  'Comprobación del respaldo': 'Support check',
+  '{partial} afirmaciones con respaldo parcial · {removed} citas retiradas': '{partial} claims with partial support · {removed} citations removed',
+  'parcial': 'partial',
+  'retirada': 'removed',
 };

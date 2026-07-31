@@ -7490,4 +7490,8 @@ export const TR: Record<string, string> = {
   "Escribe el tema y Nodus redacta la unidad completa con tus materiales, citando cada uno. Puedes dejar que la IA proponga las partes o fijarlas tú: cuántas son, cómo se titulan y en qué debe centrarse cada una.": "Konuyu yaz; Nodus üniteyi materyallerinden baştan sona yazar ve her birine atıf yapar. Bölümleri yapay zekâya önerttirebilir ya da kendin belirleyebilirsin: kaç tane olacağı, nasıl adlandırılacağı ve her birinin neye odaklanacağı.",
   "Escribe el tema de los apuntes. El contenido lo explicará paso a paso con ejemplos y autoevaluación usando tus materiales.": "Ders notlarının konusunu yaz. İçerik, materyallerini kullanarak örnekler ve öz değerlendirmeyle adım adım açıklayacak.",
   "La diarización detecta cambios de hablante y etiqueta cada segmento automáticamente. Revisa siempre las etiquetas antes de usar la transcripción.": "Konuşmacı ayrıştırma, konuşmacı değişikliklerini algılar ve her bölümü otomatik olarak etiketler. Dökümü kullanmadan önce etiketleri her zaman kontrol et.",
+  'Comprobación del respaldo': 'Dayanak denetimi',
+  '{partial} afirmaciones con respaldo parcial · {removed} citas retiradas': '{partial} kısmi dayanaklı ifade · {removed} kaynak kaldırıldı',
+  'parcial': 'kısmi',
+  'retirada': 'kaldırıldı',
 };

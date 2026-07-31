@@ -7683,4 +7683,8 @@ export const PT: Record<string, string> = {
   'Escribe el tema y Nodus redacta la unidad completa con tus materiales, citando cada uno. Puedes dejar que la IA proponga las partes o fijarlas tú: cuántas son, cómo se titulan y en qué debe centrarse cada una.': 'Escreve o tema e o Nodus redige a unidade completa a partir dos teus materiais, citando cada um. Podes deixar a IA propor as partes ou fixá-las tu: quantas são, como se intitulam e em que se deve centrar cada uma.',
   'Escribe el tema de los apuntes. El contenido lo explicará paso a paso con ejemplos y autoevaluación usando tus materiales.': 'Escreve o tema dos apontamentos. O conteúdo explica-o passo a passo com exemplos e autoavaliação a partir dos teus materiais.',
   'La diarización detecta cambios de hablante y etiqueta cada segmento automáticamente. Revisa siempre las etiquetas antes de usar la transcripción.': 'A diarização deteta mudanças de orador e etiqueta automaticamente cada segmento. Revê sempre as etiquetas antes de usar a transcrição.',
+  'Comprobación del respaldo': 'Verificação do apoio',
+  '{partial} afirmaciones con respaldo parcial · {removed} citas retiradas': '{partial} afirmações com apoio parcial · {removed} citações retiradas',
+  'parcial': 'parcial',
+  'retirada': 'retirada',
 };

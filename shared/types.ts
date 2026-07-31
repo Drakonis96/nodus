@@ -5621,7 +5621,7 @@ export interface WritingWorkshopIdeaCandidate extends WritingWorkshopCandidateBa
   themes: string[];
   workCount: number;
   evidenceCount: number;
-  works: { nodus_id: string; title: string; authors: string[]; year: number | null; zotero_key: string }[];
+  works: { nodus_id: string; title: string; authors: string[]; year: number | null; zotero_key: string; doi?: string | null }[];
 }
 
 export interface WritingWorkshopThemeCandidate extends WritingWorkshopCandidateBase {
@@ -5643,6 +5643,10 @@ export interface WritingWorkshopContradictionCandidate extends WritingWorkshopCa
   type: EdgeType | string;
   basis: EdgeBasis;
   confidence: number;
+  /** Author-year labels of the works behind the dispute, so a writer can attribute
+   * the debate to whoever actually holds each position instead of describing a
+   * nameless tension. */
+  sources?: string[];
 }
 
 export interface WritingWorkshopWorkCandidate extends WritingWorkshopCandidateBase {
@@ -5650,6 +5654,8 @@ export interface WritingWorkshopWorkCandidate extends WritingWorkshopCandidateBa
   authors: string[];
   year: number | null;
   zotero_key: string;
+  /** Present when the source carries one; the only locator the local schema stores. */
+  doi?: string | null;
   themes: string[];
   deepStatus: DeepStatus;
   /** Orientation only; never evidence or a citation target. */
@@ -5715,6 +5721,20 @@ export interface WritingWorkshopMatrixRow {
   notes: string;
 }
 
+/** One claim the verification pass flagged, with the source text to check it against. */
+export interface SupportAuditEntry {
+  verdict: 'partial' | 'removed';
+  kind: 'idea' | 'passage' | 'gap' | 'contradiction';
+  /** The section the claim sits in. */
+  section: string;
+  /** The sentence as it appears in the report. */
+  sentence: string;
+  /** What the cited source actually says. */
+  source: string;
+  /** Author-year of the work behind it, when there is one. */
+  sourceLabel: string;
+}
+
 export interface WritingWorkshopDraft {
   generatedAt: string;
   brief: WritingWorkshopBrief;
@@ -5727,6 +5747,13 @@ export interface WritingWorkshopDraft {
   bibliography: string[];
   nextSteps: string[];
   limitations: string[];
+  /**
+   * What the entailment pass concluded about individual claims, so a researcher can
+   * spot-check the weakest ones instead of re-reading every source. Only claims that
+   * are worth a second look are listed: those whose source supports a weaker version
+   * of the sentence, and those whose citation was removed for not supporting it.
+   */
+  supportAudit?: SupportAuditEntry[];
   stats: {
     selectedIdeas: number;
     selectedThemes: number;
@@ -5874,6 +5901,18 @@ export interface DeepResearchMeta {
   targetPages: { min: number; max: number };
   /** Non-null when the loop stopped before covering everything (budget cap, cap on sections, etc.). */
   stoppedReason: string | null;
+  /**
+   * Result of checking that each citation's source really supports the sentence it
+   * was attached to. Null when no verification pass ran. `unsupported` citations were
+   * removed from the prose, so this is a record of what the report stopped claiming.
+   */
+  verification?: { checked: number; partial: number; unsupported: number } | null;
+  /** How many sections came back under their word target and were developed further. */
+  expansions?: number;
+  /** Words each section ended up with, against the target it was given. */
+  sectionFill?: { words: number; target: number }[];
+  /** Passages of the report that contradict each other, reported rather than repaired. */
+  coherenceIssues?: number;
 }
 
 /**
