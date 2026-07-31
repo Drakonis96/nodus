@@ -2214,6 +2214,7 @@ export const IT: Record<string, string> = {
   "Construyendo el esquema…": "Costruire lo schema…",
   "El modelo está trazando el esquema de argumentos…": "Il modello sta tracciando lo schema argomentativo...",
   "No hay ideas conectadas todavía. Analiza tus obras (escaneo profundo) para que el grafo genere conexiones entre ideas.": "Nessuna idea collegata ancora. Analizza i tuoi lavori (scansione profonda) in modo che il grafico generi connessioni tra le idee.",
+  "Mostrar más": "Mostra altri",
   "Ningún recorrido coincide con los filtros actuales.": "Nessun percorso corrisponde ai filtri attuali.",
   "Trazar el esquema desde esta idea": "Traccia lo schema da questa idea",
   "{n} debate(s)": "{n} dibattito(i)",

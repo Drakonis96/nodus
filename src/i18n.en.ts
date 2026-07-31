@@ -2534,6 +2534,7 @@ export const EN: Record<string, string> = {
   'El modelo está trazando el esquema de argumentos…': 'The model is tracing the argument scheme…',
   'No hay ideas conectadas todavía. Analiza tus obras (escaneo profundo) para que el grafo genere conexiones entre ideas.':
     'No connected ideas yet. Analyze your works (deep scan) so the graph generates connections between ideas.',
+  'Mostrar más': 'Show more',
   'Ningún recorrido coincide con los filtros actuales.': 'No route matches the current filters.',
   'Trazar el esquema desde esta idea': 'Trace the scheme from this idea',
   '{n} debate(s)': '{n} debate(s)',

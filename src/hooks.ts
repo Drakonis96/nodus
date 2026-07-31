@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { RefObject } from 'react';
+import { incrementalSliceLength } from './incrementalList';
 import { invalidateVaultQueryCache } from './vaultQueryCache';
 
 /** Track whether the light theme is active (App stamps `.light` on <html>). */
@@ -66,6 +67,61 @@ export function useScanComplete(onComplete: () => void): void {
       prevActive = active;
     });
   }, []);
+}
+
+/**
+ * Reveal a long list one page at a time, growing as the sentinel scrolls near.
+ *
+ * The debates list and the argument-route picker are unbounded: a real corpus
+ * produces ~1.100 debates and ~8.500 ranked routes. Painting them all in the
+ * single render that opens the section blocked the renderer's main thread for
+ * one to two seconds — long enough that a click on another sidebar section was
+ * not processed at all until the paint finished, which is exactly what the
+ * section felt like from the outside. One page keeps that first paint cheap
+ * without taking the "scroll through everything" behaviour away.
+ *
+ * `items` must be referentially stable across renders that do not change it
+ * (a `useMemo`'d filter result), because a new array means a new list and
+ * collapses back to the first page.
+ *
+ * `weight` counts an item as more than one towards the page — a debate cluster
+ * holds several cards, and paging by clusters alone let one big cluster paint
+ * hundreds of them. It must be stable for the same reason `items` is.
+ */
+export function useIncrementalList<T, E extends HTMLElement = HTMLDivElement>(
+  items: T[],
+  pageSize: number,
+  weight?: (item: T) => number
+): { visible: T[]; hasMore: boolean; sentinelRef: RefObject<E>; showMore: () => void } {
+  const [count, setCount] = useState(pageSize);
+  const sentinelRef = useRef<E>(null);
+
+  useEffect(() => {
+    setCount(pageSize);
+  }, [items, pageSize]);
+
+  const shown = useMemo(() => incrementalSliceLength(items, count, weight), [items, count, weight]);
+
+  const hasMore = shown < items.length;
+  const showMore = useCallback(() => setCount((n) => n + pageSize), [pageSize]);
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !hasMore) return;
+    // Ancestor scroll containers clip the intersection rectangle, so the viewport
+    // root is right even though the sentinel lives inside the section's scroller.
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) setCount((n) => n + pageSize);
+      },
+      { rootMargin: '600px' }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasMore, pageSize]);
+
+  const visible = useMemo(() => (shown >= items.length ? items : items.slice(0, shown)), [items, shown]);
+  return { visible, hasMore, sentinelRef, showMore };
 }
 
 /**
