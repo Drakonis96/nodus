@@ -37,6 +37,41 @@ export interface ReleaseNote {
 interface RawReleaseNote extends Omit<ReleaseNote, 'highlights'> { highlights: RawReleaseHighlight[] }
 
 /**
+ * 3.0.3: reports leave Deep Research in bulk, and a button that did nothing now
+ * does what it says. Both bugs behind it were invisible while they happened, so
+ * each highlight says what you saw before, not only what changed.
+ */
+const RELEASE_3_0_3_HIGHLIGHTS: RawReleaseHighlight[] = [
+  {
+    scope: 'academic',
+    es: 'Los informes salen de Deep Research en bloque, y también desde su tarjeta. Antes todo lo que producía la galería se descargaba de uno en uno y desde el lector: una biblioteca de treinta informes eran treinta diálogos de guardado, y una tarjeta no se podía descargar sin abrirla. Ahora el botón Descargar de la cabecera reutiliza el modo de selección —con seleccionar todo—, te deja elegir Markdown, PDF o ambos y entrega un único ZIP; cada tarjeta y cada fila tienen además su icono de descarga. Los PDF se imprimen de uno en uno con una barra de progreso, porque esa pasada puede durar un minuto y un minuto en silencio parece un cuelgue.',
+    en: 'Reports leave Deep Research in bulk, and from their card too. Everything the gallery produced used to leave one at a time through the reader: a library of thirty reports meant thirty save dialogs, and a card could not be downloaded without opening it first. The header’s Download button now reuses selection mode — select-all included — lets you pick Markdown, PDF or both, and hands back a single ZIP; every card and list row also gains a download icon. PDFs are printed one at a time behind a progress bar, because that pass can run for a minute and a silent minute reads as a hang.',
+    fr: 'Les rapports quittent Deep Research en lot, et depuis leur fiche. Tout ce que produisait la galerie sortait un par un, via le lecteur : une bibliothèque de trente rapports, c’étaient trente boîtes de dialogue d’enregistrement, et une fiche ne pouvait pas être téléchargée sans être ouverte. Le bouton Télécharger de l’en-tête réutilise désormais le mode de sélection — tout sélectionner compris —, vous laisse choisir Markdown, PDF ou les deux, et renvoie une seule archive ZIP ; chaque fiche et chaque ligne gagnent aussi une icône de téléchargement. Les PDF sont imprimés un par un derrière une barre de progression, car ce passage peut durer une minute et une minute silencieuse ressemble à un blocage.',
+    de: 'Berichte verlassen Deep Research jetzt im Bündel — und auch direkt von ihrer Karte. Alles, was die Galerie erzeugte, ging bisher einzeln über den Leser hinaus: eine Bibliothek mit dreißig Berichten bedeutete dreißig Speicherdialoge, und eine Karte ließ sich nicht herunterladen, ohne sie zu öffnen. Die Schaltfläche „Herunterladen“ in der Kopfzeile nutzt nun den Auswahlmodus — samt Alles auswählen —, lässt Markdown, PDF oder beides wählen und liefert ein einziges ZIP; jede Karte und jede Listenzeile erhält zudem ein Download-Symbol. PDFs werden nacheinander hinter einem Fortschrittsbalken gedruckt, denn dieser Durchlauf kann eine Minute dauern, und eine stille Minute wirkt wie ein Absturz.',
+    pt: 'Os relatórios saem do Deep Research em bloco, e também a partir do seu cartão. Tudo o que a galeria produzia saía um de cada vez, pelo leitor: uma biblioteca de trinta relatórios eram trinta caixas de gravação, e um cartão não se podia descarregar sem o abrir. O botão Descarregar do cabeçalho reutiliza agora o modo de seleção — incluindo selecionar tudo —, deixa escolher Markdown, PDF ou ambos e devolve um único ZIP; cada cartão e cada linha ganham também um ícone de descarga. Os PDF são impressos um a um com uma barra de progresso, porque essa passagem pode demorar um minuto e um minuto em silêncio parece um bloqueio.',
+    'pt-BR': 'Os relatórios saem do Deep Research em lote, e também pelo próprio card. Tudo o que a galeria produzia saía um por vez, pelo leitor: uma biblioteca de trinta relatórios eram trinta caixas de salvamento, e um card não dava para baixar sem abrir. O botão Baixar do cabeçalho agora reaproveita o modo de seleção — com selecionar tudo —, deixa escolher Markdown, PDF ou os dois e devolve um único ZIP; cada card e cada linha ganham também um ícone de download. Os PDFs são impressos um a um com barra de progresso, porque essa passagem pode levar um minuto e um minuto em silêncio parece travamento.',
+  },
+  {
+    scope: 'academic',
+    es: 'El diseño de imagen de un informe puede sugerirte la escena. «Sugerir con IA» escribe en el cuadro del prompt una descripción visual a partir del resumen del propio informe, la misma que el generador se habría escrito para sí y que hasta ahora nunca veías. Puedes editarla, y no se guarda nada hasta que generas con ella.',
+    en: 'A report’s image design can now suggest the scene for you. “Suggest with AI” streams a visual description written from the report’s own summary into the prompt box — the same one the generator would have written for itself, which until now you never saw. You can edit it, and nothing is saved until you generate with it.',
+    fr: 'La conception d’image d’un rapport peut désormais vous suggérer la scène. « Suggérer avec l’IA » écrit dans le champ du prompt une description visuelle tirée du résumé du rapport lui-même — celle-là même que le générateur se serait écrite et que vous ne voyiez jamais. Vous pouvez la modifier, et rien n’est enregistré tant que vous ne générez pas avec elle.',
+    de: 'Der Bildentwurf eines Berichts kann die Szene jetzt vorschlagen. „Mit KI vorschlagen“ schreibt eine visuelle Beschreibung aus der Zusammenfassung des Berichts selbst in das Prompt-Feld — genau die, die sich der Generator selbst geschrieben hätte und die bisher unsichtbar blieb. Sie lässt sich bearbeiten, und nichts wird gespeichert, bis Sie damit generieren.',
+    pt: 'O desenho de imagem de um relatório pode agora sugerir-lhe a cena. «Sugerir com IA» escreve na caixa do prompt uma descrição visual feita a partir do resumo do próprio relatório — a mesma que o gerador teria escrito para si e que até agora nunca via. Pode editá-la, e nada é guardado até gerar com ela.',
+    'pt-BR': 'O design de imagem de um relatório pode sugerir a cena para você. “Sugerir com IA” escreve na caixa do prompt uma descrição visual feita a partir do resumo do próprio relatório — a mesma que o gerador teria escrito para si e que até agora você nunca via. Dá para editar, e nada é salvo até você gerar com ela.',
+  },
+  {
+    scope: 'general',
+    es: 'Cancelar una narración ahora la cancela de verdad. El botón no hacía nada visible: el trabajo seguía hasta el final de la sección —minutos de espera, o para siempre si la voz no llegaba a responder— y se quedaba atascado el resto de la sesión sin manera de empezar de nuevo. Ahora el clic se acusa al instante, el fragmento en curso se descarta y una voz local deja de consumir un núcleo para terminar una narración que nadie va a escuchar.',
+    en: 'Cancelling a narration now actually cancels it. The button did nothing visible: the job ran on to the end of the section — minutes of waiting, or forever if the voice never answered — and then stayed stuck for the rest of the session with no way to start over. The click is now acknowledged straight away, the segment in flight is dropped, and a local voice stops burning a core to finish a narration nobody will hear.',
+    fr: 'Annuler une narration l’annule désormais vraiment. Le bouton ne produisait rien de visible : le travail se poursuivait jusqu’à la fin de la section — plusieurs minutes d’attente, ou indéfiniment si la voix ne répondait jamais — puis restait bloqué pour le reste de la session, sans possibilité de recommencer. Le clic est maintenant pris en compte immédiatement, le segment en cours est abandonné, et une voix locale cesse de consommer un cœur pour terminer une narration que personne n’écoutera.',
+    de: 'Das Abbrechen einer Erzählung bricht sie jetzt wirklich ab. Die Schaltfläche bewirkte nichts Sichtbares: Der Auftrag lief bis zum Ende des Abschnitts weiter — minutenlanges Warten, oder endlos, wenn die Stimme nie antwortete — und blieb dann für den Rest der Sitzung hängen, ohne Möglichkeit, neu zu beginnen. Der Klick wird nun sofort bestätigt, das laufende Segment verworfen, und eine lokale Stimme verbraucht keinen Kern mehr, um eine Erzählung zu Ende zu bringen, die niemand hören wird.',
+    pt: 'Cancelar uma narração passa a cancelá-la mesmo. O botão não fazia nada de visível: o trabalho seguia até ao fim da secção — minutos de espera, ou para sempre se a voz nunca chegasse a responder — e depois ficava preso o resto da sessão, sem forma de recomeçar. Agora o clique é reconhecido de imediato, o segmento em curso é descartado e uma voz local deixa de consumir um núcleo para terminar uma narração que ninguém vai ouvir.',
+    'pt-BR': 'Cancelar uma narração agora cancela de verdade. O botão não fazia nada visível: o trabalho seguia até o fim da seção — minutos de espera, ou para sempre se a voz nunca respondesse — e depois ficava travado pelo resto da sessão, sem como recomeçar. Agora o clique é reconhecido na hora, o trecho em andamento é descartado e uma voz local deixa de consumir um núcleo para terminar uma narração que ninguém vai ouvir.',
+  },
+];
+
+/**
  * 3.0.2 is the Deep Research release: the report now proves what it claims,
  * says which claims are worth a second look, and stops freezing the argument
  * views. One highlight per user-visible change, not one per commit.
@@ -530,6 +565,11 @@ const RELEASE_2_7_0_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
+  {
+    version: '3.0.3',
+    date: '2026-07-31',
+    highlights: RELEASE_3_0_3_HIGHLIGHTS,
+  },
   {
     version: '3.0.2',
     date: '2026-07-31',
