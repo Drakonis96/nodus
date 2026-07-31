@@ -82,7 +82,7 @@ test('roadmap follows the requested sequence and is opened from the header', asy
     previous = current;
   }
   assert.match(roadmapSource, /title: 'Pulido y estabilidad'.+status: 'inProgress'/);
-  assert.match(roadmapSource, /title: 'Servidor'.+status: 'inProgress'/);
+  assert.match(roadmapSource, /title: 'Servidor'.+status: 'planned'/);
   assert.match(roadmapSource, /title: 'Compartir vaults y trabajo colaborativo'.+status: 'planned'/);
   assert.match(roadmapSource, /title: 'Apps para iOS y iPadOS'.+status: 'planned'/);
   for (const implemented of [
