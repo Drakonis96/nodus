@@ -221,6 +221,7 @@ export const TR: Record<string, string> = {
   "Volver": "Geri dönmek",
   "Cerrar": "Kapalı",
   "Cancelar": "İptal etmek",
+  "Cancelando…": "İptal ediliyor…",
   "Eliminar": "Elemek",
   "Revisar": "Gözden geçirmek",
   "Volver a la biblioteca": "Kütüphaneye dön",

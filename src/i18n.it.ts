@@ -1596,6 +1596,7 @@ export const IT: Record<string, string> = {
   "Confirmación final": "Conferma finale",
   "Esto borrará todo el grafo de forma permanente. Para confirmar, escribe este código:": "Ciò eliminerà permanentemente l'intero grafico. Per confermare digita questo codice:",
   "Cancelar": "Annulla",
+  "Cancelando…": "Annullamento…",
   "Borrando…": "Eliminazione…",
   "Borrar grafo": "Elimina il grafico",
   "Contraseña de la copia": "Password di backup",

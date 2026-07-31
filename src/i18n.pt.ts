@@ -1745,6 +1745,7 @@ export const PT: Record<string, string> = {
   'Esto borrará todo el grafo de forma permanente. Para confirmar, escribe este código:':
     'Isto eliminará todo o grafo de forma permanente. Para confirmar, escreva este código:',
   'Cancelar': 'Cancelar',
+  'Cancelando…': 'A cancelar…',
   'Borrando…': 'A eliminar…',
   'Borrar grafo': 'Eliminar grafo',
   'Contraseña de la copia': 'Palavra-passe da cópia de segurança',

@@ -14,6 +14,8 @@ interface SynthResponse {
   error?: string;
 }
 
+const CANCELLED_MESSAGE = 'Síntesis de audio cancelada.';
+
 let worker: Worker | null = null;
 let seq = 0;
 const pending = new Map<number, { resolve: (b: Uint8Array) => void; reject: (e: Error) => void }>();
@@ -48,17 +50,39 @@ function getWorker(): Worker {
 /**
  * Synthesise one segment to WAV bytes. Piper/Kokoro run in the worker; Hume runs
  * on the main thread (its synthesis is a non-blocking IPC call to the main process).
+ * `signal` fires when the user cancels the narration: the pending request is dropped
+ * so the caller stops waiting for a segment nobody wants any more.
  */
-export async function synthesizeSegment(
+export function synthesizeSegment(
   provider: AudioProvider,
   voiceId: string,
-  text: string
+  text: string,
+  signal?: AbortSignal
 ): Promise<Uint8Array> {
+  if (signal?.aborted) return Promise.reject(new Error(CANCELLED_MESSAGE));
   if (provider === 'hume') return getEngine('hume').synthesize(text, voiceId);
   const id = ++seq;
   const w = getWorker();
   return new Promise<Uint8Array>((resolve, reject) => {
-    pending.set(id, { resolve, reject });
+    const onAbort = (): void => {
+      pending.delete(id);
+      // onnxruntime's inference inside the worker is synchronous, so nothing can
+      // interrupt the segment from here. When ours was the only request in flight,
+      // terminating is the one way to stop it actually burning a core — and it keeps
+      // the next narration from queueing behind the abandoned segment. If another
+      // narration is still using the worker, leave it alone and just drop ours.
+      if (pending.size === 0) {
+        w.terminate();
+        if (worker === w) worker = null;
+      }
+      reject(new Error(CANCELLED_MESSAGE));
+    };
+    const settle = <T>(fn: (value: T) => void) => (value: T): void => {
+      signal?.removeEventListener('abort', onAbort);
+      fn(value);
+    };
+    pending.set(id, { resolve: settle(resolve), reject: settle(reject) });
+    signal?.addEventListener('abort', onAbort, { once: true });
     w.postMessage({ id, provider, voiceId, text });
   });
 }
