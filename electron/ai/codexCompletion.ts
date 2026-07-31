@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { CodexReasoningEffort, ReasoningEffort } from '@shared/types';
 import type { VisionImagePart } from '@shared/imageAnalysis';
+import { codexFeatures } from './codexAppServerClient';
 import { ProviderRuntimeError } from './providerErrors';
 
 export interface CodexCompletionTransport {
@@ -110,22 +111,7 @@ export async function runIsolatedCodexCompletion(
       config: {
         web_search: 'disabled',
         mcp_servers: {},
-        features: {
-          apps: false,
-          browser_use: false,
-          code_mode_host: false,
-          computer_use: false,
-          goals: false,
-          hooks: false,
-          image_generation: false,
-          in_app_browser: false,
-          multi_agent: false,
-          plugins: false,
-          shell_tool: false,
-          tool_suggest: false,
-          unified_exec: false,
-          workspace_dependencies: false,
-        },
+        features: codexFeatures(false),
       },
       baseInstructions: [
         'You are a constrained text-generation runtime embedded in Nodus.',

@@ -22,6 +22,34 @@ export interface CodexAppServerClientOptions {
 export type CodexNotificationHandler = (method: string, params: unknown) => void;
 
 /**
+ * Every Codex runtime feature Nodus keeps switched off, declared once so the
+ * process-wide flags below and the per-thread `config.features` of each turn cannot
+ * drift apart as the runtime gains new ones.
+ *
+ * Image generation is the single flag a caller may turn on, and only per thread: the
+ * app-server honours the thread value over the process one, so an image thread can
+ * hold the `image_gen` tool while every text thread stays unable to reach it.
+ */
+export function codexFeatures(imageGeneration: boolean): Record<string, boolean> {
+  return {
+    apps: false,
+    browser_use: false,
+    code_mode_host: false,
+    computer_use: false,
+    goals: false,
+    hooks: false,
+    image_generation: imageGeneration,
+    in_app_browser: false,
+    multi_agent: false,
+    plugins: false,
+    shell_tool: false,
+    tool_suggest: false,
+    unified_exec: false,
+    workspace_dependencies: false,
+  };
+}
+
+/**
  * Minimal JSONL client for the official Codex App Server. Authentication is
  * deliberately forced to managed ChatGPT OAuth; API-key environment variables
  * are stripped before the child process starts.
@@ -123,20 +151,9 @@ export class CodexAppServerClient {
         '--config', 'model_provider="openai"',
         '--config', 'web_search="disabled"',
         '--config', 'mcp_servers={}',
-        '--config', 'features.apps=false',
-        '--config', 'features.browser_use=false',
-        '--config', 'features.code_mode_host=false',
-        '--config', 'features.computer_use=false',
-        '--config', 'features.goals=false',
-        '--config', 'features.hooks=false',
-        '--config', 'features.image_generation=false',
-        '--config', 'features.in_app_browser=false',
-        '--config', 'features.multi_agent=false',
-        '--config', 'features.plugins=false',
-        '--config', 'features.shell_tool=false',
-        '--config', 'features.tool_suggest=false',
-        '--config', 'features.unified_exec=false',
-        '--config', 'features.workspace_dependencies=false',
+        // The process-wide default denies everything, image generation included. A
+        // thread that needs the image tool opts in through its own config.
+        ...Object.entries(codexFeatures(false)).flatMap(([name, value]) => ['--config', `features.${name}=${value}`]),
         'app-server', '--listen', 'stdio://',
       ],
       {

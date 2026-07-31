@@ -529,6 +529,7 @@ const IMAGE_PROVIDER_LABELS: Record<ImageModelInfo['provider'], string> = {
   openai: 'OpenAI',
   openrouter: 'OpenRouter',
   nodus: 'Nodus local',
+  codex: 'ChatGPT · Codex',
 };
 
 export function ImageGenerationSettings({ settings, onChange }: { settings: AppSettings; onChange: () => Promise<unknown> }) {

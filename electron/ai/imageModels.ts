@@ -1,9 +1,11 @@
 import type { ImageModelInfo } from '@shared/types';
 import { NODUS_LOCAL_IMAGE_MODEL } from '@shared/localImageModels';
+import { listChatGptSubscriptionModels } from './codexSubscription';
 
 const GOOGLE_SOURCE = 'https://ai.google.dev/gemini-api/docs/pricing';
 const OPENAI_SOURCE = 'https://developers.openai.com/api/docs/guides/image-generation';
 const OPENROUTER_SOURCE = 'https://openrouter.ai/models?output_modalities=image&order=pricing-low-to-high';
+const CODEX_SOURCE = 'https://developers.openai.com/codex';
 
 const NODUS_LOCAL_MODELS: ImageModelInfo[] = [{
   provider: 'nodus',
@@ -168,9 +170,32 @@ async function openRouterModels(): Promise<ImageModelInfo[]> {
   });
 }
 
+/**
+ * Codex generates images with a tool built into the agent, so the "image model" the
+ * user picks is the agent that drives it. Every non-hidden model in the catalog
+ * reaches the same tool; the list is empty when no ChatGPT subscription is connected,
+ * which is also exactly when none of them could generate anything.
+ */
+async function codexModels(): Promise<ImageModelInfo[]> {
+  const models = await listChatGptSubscriptionModels();
+  return models.map((model) => ({
+    provider: 'codex' as const,
+    id: model.id,
+    name: model.name ?? model.id,
+    inputPriceUsdPerMillion: null,
+    outputPriceUsdPerMillion: null,
+    imagePriceUsd: null,
+    imagePriceLabel: 'Incluido en tu suscripción de ChatGPT',
+    sourceUrl: CODEX_SOURCE,
+  }));
+}
+
 export async function listImageModels(): Promise<ImageModelInfo[]> {
-  const openrouter = await openRouterModels().catch(() => []);
-  return [...NODUS_LOCAL_MODELS, ...GOOGLE_MODELS, ...OPENAI_MODELS, ...openrouter].sort(
+  const [openrouter, codex] = await Promise.all([
+    openRouterModels().catch(() => []),
+    codexModels().catch(() => []),
+  ]);
+  return [...NODUS_LOCAL_MODELS, ...GOOGLE_MODELS, ...OPENAI_MODELS, ...openrouter, ...codex].sort(
     (a, b) => a.provider.localeCompare(b.provider) || a.name.localeCompare(b.name)
   );
 }

@@ -14,6 +14,7 @@ import type {
 import type { VisionImagePart } from '@shared/imageAnalysis';
 import { CodexAppServerClient } from './codexAppServerClient';
 import { resolveCodexReasoningEffort, runIsolatedCodexCompletion } from './codexCompletion';
+import { runIsolatedCodexImage } from './codexImage';
 import { ProviderRuntimeError } from './providerErrors';
 
 interface CodexAccountResponse {
@@ -352,6 +353,48 @@ export async function completeWithChatGptSubscription(options: CodexCompletionOp
   } catch (error) {
     // The cached check can outlive the session it vouched for (revoked, expired,
     // signed out elsewhere). Any failure re-arms the full check for the next call
+    // so a stale "connected" cannot pin the provider in a broken state.
+    invalidateConnectedCache();
+    throw error;
+  } finally {
+    await fs.promises.rm(workdir, { recursive: true, force: true });
+  }
+}
+
+/**
+ * Generate one image through the built-in tool of an ephemeral Codex thread.
+ *
+ * Unlike the image APIs of the other providers this one takes no size, quality or
+ * format: the agent decides them from the prompt, and the bytes come back inline.
+ */
+export async function generateImageWithChatGptSubscription(options: {
+  model: string;
+  prompt: string;
+  timeoutMs?: number;
+  signal?: AbortSignal;
+}): Promise<{ bytes: Buffer; mimeType: string }> {
+  await ensureConnectedForCompletion();
+
+  const runtime = getClient();
+  // A stored model that left the catalog would fail deep inside `thread/start` with a
+  // protocol error. Say plainly what happened and where to fix it instead.
+  const catalog = await readModelCatalog(false);
+  if (!catalog.some((model) => model.id === options.model)) {
+    throw new ProviderRuntimeError(
+      `El modelo «${options.model}» ya no está en el catálogo de ChatGPT. Elige otro en Proveedores y modelos.`,
+      'unavailable'
+    );
+  }
+
+  const tempRoot = path.join(app.getPath('temp') || os.tmpdir(), 'nodus-codex-image-');
+  const workdir = await fs.promises.mkdtemp(tempRoot);
+  try { await fs.promises.chmod(workdir, 0o700); } catch { /* Windows */ }
+
+  try {
+    const generated = await runIsolatedCodexImage(runtime, { ...options, workdir });
+    return { bytes: generated.bytes, mimeType: generated.mimeType };
+  } catch (error) {
+    // Same reasoning as the completion path: a failure re-arms the connection check
     // so a stale "connected" cannot pin the provider in a broken state.
     invalidateConnectedCache();
     throw error;
