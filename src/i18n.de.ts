@@ -2477,6 +2477,7 @@ export const DE: Record<string, string> = {
   'El modelo está trazando el esquema de argumentos…': 'Das Modell zeichnet das Argumentationsschema…',
   'No hay ideas conectadas todavía. Analiza tus obras (escaneo profundo) para que el grafo genere conexiones entre ideas.':
     'Es gibt noch keine verbundenen Ideen. Analysieren Sie Ihre Werke (tiefer Scan), damit der Graph Verbindungen zwischen Ideen erzeugt.',
+  'Mostrar más': 'Mehr anzeigen',
   'Ningún recorrido coincide con los filtros actuales.': 'Keine Route entspricht den aktuellen Filtern.',
   'Trazar el esquema desde esta idea': 'Das Schema von dieser Idee aus zeichnen',
   '{n} debate(s)': '{n} Debatte(n)',

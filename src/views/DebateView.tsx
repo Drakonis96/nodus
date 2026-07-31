@@ -4,7 +4,7 @@ import { Badge, EDGE_LABELS, Icon, Spinner } from '../components/ui';
 import { Markdown, type MarkdownCitation } from '../components/Markdown';
 import { SourceCitationModal, type CitationTarget } from '../components/SourceCitationModal';
 import { SaveToNotesModal } from '../components/SaveToNotesModal';
-import { useDataRefresh, useScanComplete } from '../hooks';
+import { useDataRefresh, useIncrementalList, useScanComplete } from '../hooks';
 import {
   ASSISTANT_CONTEXTS,
   type PendingAssistantNavigationTarget,
@@ -18,6 +18,12 @@ type StatusFilter = 'all' | 'open' | 'leaning';
 // Above this many distinct ideas, a connected component is no longer a meaningful
 // single "debate" — render its face-offs as standalone cards instead of one cluster.
 const MAX_CLUSTER_POSITIONS = 6;
+
+// A real corpus surfaces over a thousand contradictions. Every card carries two
+// evidence columns and a timeline, so painting the whole list in the render that
+// opens the section blocked the window for over a second — the section could not
+// even be left again until it finished.
+const DEBATES_PAGE_SIZE = 25;
 
 interface AnalysisState {
   text: string;
@@ -65,15 +71,44 @@ export function DebateView({
     });
   }, [debates, search, basis, status]);
 
-  // Group by cluster so multi-sided debates render together (already cluster-sorted).
-  const clusters = useMemo(() => {
-    const map = new Map<string, Debate[]>();
+  // Group by cluster so multi-sided debates render together (already cluster-sorted),
+  // then settle here — rather than in the JSX — which groups earn the cluster box.
+  // A huge connected component already rendered as loose cards, so splitting it
+  // across pages is invisible; only the boxed clusters have to stay whole.
+  const blocks = useMemo(() => {
+    const byCluster = new Map<string, Debate[]>();
     for (const d of filtered) {
-      if (!map.has(d.clusterId)) map.set(d.clusterId, []);
-      map.get(d.clusterId)!.push(d);
+      if (!byCluster.has(d.clusterId)) byCluster.set(d.clusterId, []);
+      byCluster.get(d.clusterId)!.push(d);
     }
-    return Array.from(map.values());
+    const out: { key: string; debates: Debate[]; positions: number; themes: string[] }[] = [];
+    for (const group of byCluster.values()) {
+      const positions = new Set(group.flatMap((d) => [d.sideA.ideaId, d.sideB.ideaId])).size;
+      if (group.length > 1 && positions <= MAX_CLUSTER_POSITIONS) {
+        out.push({
+          key: group[0].clusterId,
+          debates: group,
+          positions,
+          themes: Array.from(new Set(group.flatMap((d) => d.sharedThemes))),
+        });
+        continue;
+      }
+      for (const d of group) out.push({ key: d.id, debates: [d], positions: 0, themes: [] });
+    }
+    return out;
   }, [filtered]);
+
+  const blockWeight = useCallback((block: (typeof blocks)[number]) => block.debates.length, []);
+  const {
+    visible: shownBlocks,
+    hasMore: hasMoreBlocks,
+    sentinelRef: blocksSentinelRef,
+    showMore: showMoreBlocks,
+  } = useIncrementalList(blocks, DEBATES_PAGE_SIZE, blockWeight);
+  const shownDebates = useMemo(
+    () => shownBlocks.reduce((sum, block) => sum + block.debates.length, 0),
+    [shownBlocks]
+  );
 
   const analyze = useCallback((debate: Debate) => {
     setAnalyses((prev) => ({ ...prev, [debate.id]: { text: '', loading: true } }));
@@ -167,13 +202,8 @@ export function DebateView({
           </div>
         )}
 
-        {clusters.map((group) => {
-          const positions = new Set(group.flatMap((d) => [d.sideA.ideaId, d.sideB.ideaId])).size;
-          // Only wrap genuinely small multi-sided debates; a huge connected component
-          // (e.g. most contradictions chaining together) renders as standalone cards.
-          const isCluster = group.length > 1 && positions <= MAX_CLUSTER_POSITIONS;
-          const clusterThemes = Array.from(new Set(group.flatMap((d) => d.sharedThemes)));
-          const cards = group.map((d) => (
+        {shownBlocks.map((block) => {
+          const cards = block.debates.map((d) => (
             <DebateCard
               key={d.id}
               debate={d}
@@ -190,13 +220,13 @@ export function DebateView({
               }
             />
           ));
-          if (!isCluster) return <Fragment key={group[0].clusterId}>{cards}</Fragment>;
+          if (block.positions === 0) return <Fragment key={block.key}>{cards}</Fragment>;
           return (
-            <div key={group[0].clusterId} className="rounded-lg border border-neutral-800 p-3 bg-neutral-900/40">
+            <div key={block.key} className="rounded-lg border border-neutral-800 p-3 bg-neutral-900/40">
               <div className="flex flex-wrap items-center gap-2 mb-3 px-1">
                 <Icon name="network" size={15} className="text-rose-300" />
-                <span className="text-sm font-medium">{tx('Debate de {n} posiciones', { n: positions })}</span>
-                {clusterThemes.slice(0, 4).map((th) => (
+                <span className="text-sm font-medium">{tx('Debate de {n} posiciones', { n: block.positions })}</span>
+                {block.themes.slice(0, 4).map((th) => (
                   <Badge key={th} color="neutral">
                     {th}
                   </Badge>
@@ -206,6 +236,14 @@ export function DebateView({
             </div>
           );
         })}
+
+        {hasMoreBlocks && (
+          <div ref={blocksSentinelRef} className="pt-1 pb-6 text-center">
+            <button className="btn btn-ghost border border-neutral-700 text-xs" onClick={showMoreBlocks}>
+              {t('Mostrar más')} ({filtered.length - shownDebates})
+            </button>
+          </div>
+        )}
       </div>
 
       {citation && (

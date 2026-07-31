@@ -2595,6 +2595,7 @@ export const TR: Record<string, string> = {
   "Construyendo el esquema…": "Plan oluşturuluyor…",
   "El modelo está trazando el esquema de argumentos…": "Model argümanların şemasını çiziyor…",
   "No hay ideas conectadas todavía. Analiza tus obras (escaneo profundo) para que el grafo genere conexiones entre ideas.": "Henüz bağlantılı fikir yok. Grafiğin fikirler arasında bağlantılar oluşturması için çalışmalarınızı analiz edin (derin tarama).",
+  "Mostrar más": "Daha fazla göster",
   "Ningún recorrido coincide con los filtros actuales.": "Mevcut filtrelerle eşleşen tur yok.",
   "Trazar el esquema desde esta idea": "Bu fikirden şemayı çizin",
   "{n} debate(s)": "{n} tartışma(lar)",

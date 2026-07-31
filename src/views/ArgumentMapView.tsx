@@ -16,7 +16,7 @@ import {
   DETAIL_DEFAULT_FONT,
   type DetailLoading,
 } from '../components/NodeDetailPanel';
-import { useDismissableLayer } from '../hooks';
+import { useDismissableLayer, useIncrementalList } from '../hooks';
 import { useFeatureModel } from '../hooks/useFeatureModel';
 import { expandableIdsByDepth } from '../argumentMapTree';
 import { t, tx } from '../i18n';
@@ -53,12 +53,20 @@ function typeColor(type: ArgumentBlock['type']): string {
   return type === 'framing' ? '#a78bfa' : NODE_COLORS[type as IdeaType] ?? '#888';
 }
 
+// A well-connected corpus ranks thousands of routes. Painting them all at once is
+// what froze the section; one screenful at a time is enough to scroll from.
+const ROUTES_PAGE_SIZE = 40;
+
 export function ArgumentMapView({ settings }: { settings: AppSettings }) {
   const [ideaNodes, setIdeaNodes] = useState<IdeaPickerItem[]>([]);
   const [graphLoaded, setGraphLoaded] = useState(false);
   const [mode, setMode] = useState<'auto' | 'ai'>('auto');
   const [suggestions, setSuggestions] = useState<ArgumentRouteSuggestion[]>([]);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  // Only a click on «Actualizar» spins that button's icon. The automatic discovery
+  // on entering the section has its own indicator, and spinning both at once read
+  // as if the app were refreshing on its own.
+  const [refreshing, setRefreshing] = useState(false);
   const [seedId, setSeedId] = useState('');
   const [search, setSearch] = useState('');
   const [seedSearchOpen, setSeedSearchOpen] = useState(false);
@@ -90,17 +98,25 @@ export function ArgumentMapView({ settings }: { settings: AppSettings }) {
   // It used to get that list by loading the entire ideas graph — 9,721 nodes and
   // 34,531 edges, none of the edges ever read — which cost ~170 ms of blocked main
   // process and a multi-megabyte IPC message every time this view opened.
+  //
+  // Only the IA mode has a seed picker, and the section opens in automatic mode, so
+  // the query waits until the user actually switches: entering the section then
+  // costs one blocking main-process round trip instead of two.
+  const pickerRequested = useRef(false);
   useEffect(() => {
+    if (mode !== 'ai' || pickerRequested.current) return;
+    pickerRequested.current = true;
     void window.nodus.listPickerIdeas().then((ideas) => {
       setIdeaNodes(ideas);
       setGraphLoaded(true);
     });
-  }, []);
+  }, [mode]);
 
   // Discover ranked idea hubs for the automatic mode. Cheap (local DB, no AI),
   // so we run it on mount and whenever the user (re)enters automatic mode.
-  const discoverRoutes = useCallback(async () => {
+  const discoverRoutes = useCallback(async (manual = false) => {
     setSuggestionsLoading(true);
+    if (manual) setRefreshing(true);
     setError(null);
     try {
       const raw = await window.nodus.discoverArgumentRoutes();
@@ -109,6 +125,7 @@ export function ArgumentMapView({ settings }: { settings: AppSettings }) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setSuggestionsLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
@@ -150,6 +167,13 @@ export function ArgumentMapView({ settings }: { settings: AppSettings }) {
     if (minConnections > 1) base = base.filter((s) => s.degree >= minConnections);
     return base;
   }, [suggestions, suggestionSearch, minConnections]);
+
+  const {
+    visible: shownSuggestions,
+    hasMore: hasMoreSuggestions,
+    sentinelRef: suggestionsSentinelRef,
+    showMore: showMoreSuggestions,
+  } = useIncrementalList<ArgumentRouteSuggestion>(filteredSuggestions, ROUTES_PAGE_SIZE);
 
   const stopReveal = useCallback(() => {
     if (revealTimerRef.current != null) {
@@ -367,8 +391,13 @@ export function ArgumentMapView({ settings }: { settings: AppSettings }) {
                 onChange={(e) => setMinConnections(Math.max(0, Number(e.target.value)))}
               />
             </label>
-            <button className="btn btn-ghost gap-1.5" onClick={() => discoverRoutes()} disabled={suggestionsLoading}>
-              <Icon name="sync" className={suggestionsLoading ? 'animate-spin' : ''} /> {t('Actualizar')}
+            <button
+              data-testid="argument-routes-refresh"
+              className="btn btn-ghost gap-1.5"
+              onClick={() => discoverRoutes(true)}
+              disabled={suggestionsLoading}
+            >
+              <Icon name="sync" className={refreshing ? 'animate-spin' : ''} /> {t('Actualizar')}
             </button>
           </div>
         )}
@@ -415,7 +444,7 @@ export function ArgumentMapView({ settings }: { settings: AppSettings }) {
                     {t('Ningún recorrido coincide con los filtros actuales.')}
                   </div>
                 )}
-                {filteredSuggestions.map((s, i) => (
+                {shownSuggestions.map((s, i) => (
                   <button
                     key={s.ideaId}
                     className="w-full text-left card p-3 hover:bg-neutral-800/80 transition-colors group"
@@ -453,6 +482,13 @@ export function ArgumentMapView({ settings }: { settings: AppSettings }) {
                     </div>
                   </button>
                 ))}
+                {hasMoreSuggestions && (
+                  <div ref={suggestionsSentinelRef} className="pt-2 pb-6 text-center">
+                    <button className="btn btn-ghost border border-neutral-700 text-xs" onClick={showMoreSuggestions}>
+                      {t('Mostrar más')} ({filteredSuggestions.length - shownSuggestions.length})
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           )}
