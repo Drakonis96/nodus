@@ -58,6 +58,14 @@ export const RELEASE_2_7_0_IT: string[] = [
 ];
 
 /** Italian history, indexed by release and highlight order. */
+const RELEASE_3_0_2_IT: string[] = [
+  "Deep Research non afferma più di quanto possa sostenere. Ogni citazione viene verificata rispetto a ciò che la fonte dice davvero, e quella che non la sostiene sparisce dal testo e dalla bibliografia. Chi redige riceve ora il contenuto reale di ciò che cita — l’enunciato di ogni idea, ciò che afferma ogni lacuna, chi sostiene ciascuna posizione di un dibattito e il testo letterale di ogni passaggio con la sua pagina —, così i disaccordi fra autori vengono argomentati con nomi anziché citati di sfuggita. La copertura dichiarata è quella realmente citata, non quella assegnata.",
+  "Un nuovo pannello indica quali affermazioni conviene verificare prima di citarle. Un terzo delle citazioni che superano la verifica ha un riscontro parziale: la fonte sostiene una versione più debole di quanto la frase affermi. Il report le elenca accanto al testo della loro fonte e all’autore e anno da aprire, così controllare un report passa dal leggere opere intere al confrontare una manciata di coppie.",
+  "La mappa degli argomenti e i dibattiti non congelano più la finestra. Disegnavano in un colpo solo decine di migliaia di elementi e l’intera applicazione restava bloccata per uno o due secondi all’apertura; ora vengono disegnati a tratti mentre scorri. La mappa si dispiega inoltre un ramo alla volta invece di aprirsi tutta, così puoi seguire una linea argomentativa senza perderti.",
+  "I personaggi intervistati parlano invece di recitare. In modalità dimostrativa rispondevano leggendo la propria scheda ad alta voce; ora rispondono con la loro voce, il loro carattere e i loro silenzi, come in un’intervista vera.",
+  "Il runtime di Codex incluso in Nodus genera anche immagini, così puoi creare illustrazioni senza configurare alcuna chiave aggiuntiva se hai già collegato il tuo abbonamento ChatGPT. E la generazione con Google torna a funzionare: le veniva richiesto un formato di immagine che non accetta più.",
+];
+
 const RELEASE_3_0_1_IT: string[] = [
   "Le sezioni che restavano a pensare ora si aprono subito. Il grafo, la mappa degli argomenti, i dibattiti, il percorso di lettura e le schede d'autore si caricavano percorrendo l'intera biblioteca e bloccavano tutta l'applicazione mentre lo facevano; ora chiedono solo ciò che mostrano. In una cassaforte di quasi 10.000 idee il grafo passa da 2,7 secondi di finestra congelata a meno di 0,2.",
   "Nodi resta fermo quando non ha nulla da dire e torna a muoversi appena ce l'ha. La sua animazione non si fermava mai, nemmeno con l'applicazione a riposo: costava in permanenza mezzo core e scaldava la macchina. Ora mantiene la posa qualche secondo dopo l'ultima attività e si sveglia al passaggio del mouse, a un cambio di stato o all'arrivo di una notifica. Nessuna animazione è stata rimossa.",
@@ -65,6 +73,7 @@ const RELEASE_3_0_1_IT: string[] = [
 ];
 
 export const RELEASE_NOTES_IT: Record<string, string[]> = {
+  "3.0.2": RELEASE_3_0_2_IT,
   "3.0.1": RELEASE_3_0_1_IT,
   "3.0.0": RELEASE_3_0_0_IT,
   "2.7.0": RELEASE_2_7_0_IT,

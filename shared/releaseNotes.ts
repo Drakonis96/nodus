@@ -37,6 +37,59 @@ export interface ReleaseNote {
 interface RawReleaseNote extends Omit<ReleaseNote, 'highlights'> { highlights: RawReleaseHighlight[] }
 
 /**
+ * 3.0.2 is the Deep Research release: the report now proves what it claims,
+ * says which claims are worth a second look, and stops freezing the argument
+ * views. One highlight per user-visible change, not one per commit.
+ */
+const RELEASE_3_0_2_HIGHLIGHTS: RawReleaseHighlight[] = [
+  {
+    scope: 'academic',
+    es: 'Deep Research ya no afirma más de lo que puede sostener. Cada cita se comprueba contra lo que su fuente dice de verdad, y la que no lo sostiene desaparece del texto y de la bibliografía. El redactor recibe ahora el contenido real de lo que cita —el enunciado de cada idea, lo que afirma cada hueco, quién sostiene cada lado de un debate y el texto literal de cada pasaje con su página—, de modo que los desacuerdos entre autores se argumentan con nombres en vez de mencionarse de pasada. La cobertura que declara el informe es la que realmente cita, no la que tenía asignada.',
+    en: 'Deep Research no longer claims more than it can support. Every citation is checked against what its source actually says, and one the source does not support disappears from the text and from the bibliography. The writer now receives the real content of what it cites — each idea’s statement, what each gap claims, who holds each side of a debate and the literal text of each passage with its page — so disagreements between authors are argued with names instead of mentioned in passing. The coverage the report declares is what it really cites, not what it was assigned.',
+    fr: 'Deep Research n’affirme plus au-delà de ce qu’il peut étayer. Chaque citation est confrontée à ce que sa source dit réellement, et celle qui n’est pas étayée disparaît du texte et de la bibliographie. Le rédacteur reçoit désormais le contenu réel de ce qu’il cite — l’énoncé de chaque idée, ce qu’affirme chaque lacune, qui défend chaque position d’un débat et le texte littéral de chaque passage avec sa page —, si bien que les désaccords entre auteurs sont argumentés avec des noms au lieu d’être évoqués en passant. La couverture annoncée est celle qui est réellement citée, non celle qui avait été assignée.',
+    de: 'Deep Research behauptet nicht mehr, als es belegen kann. Jede Quellenangabe wird daran geprüft, was ihre Quelle tatsächlich sagt; was sie nicht stützt, verschwindet aus dem Text und aus dem Literaturverzeichnis. Der Schreiber erhält jetzt den echten Inhalt dessen, was er zitiert — die Aussage jeder Idee, was jede Forschungslücke behauptet, wer welche Seite einer Debatte vertritt und den wörtlichen Text jeder Passage mit Seitenangabe —, sodass Meinungsverschiedenheiten zwischen Autoren mit Namen ausgetragen statt nebenbei erwähnt werden. Die angegebene Abdeckung ist die tatsächlich zitierte, nicht die zugewiesene.',
+    pt: 'O Deep Research deixou de afirmar mais do que consegue sustentar. Cada citação é confrontada com o que a fonte realmente diz, e a que não a sustenta desaparece do texto e da bibliografia. O redator recebe agora o conteúdo real do que cita — o enunciado de cada ideia, o que afirma cada lacuna, quem defende cada lado de um debate e o texto literal de cada passagem com a sua página —, pelo que os desacordos entre autores são argumentados com nomes em vez de referidos de passagem. A cobertura declarada é a realmente citada, não a atribuída.',
+    'pt-BR': 'O Deep Research não afirma mais do que consegue sustentar. Cada citação é checada contra o que a fonte realmente diz, e a que não sustenta some do texto e da bibliografia. O redator agora recebe o conteúdo real do que cita — o enunciado de cada ideia, o que afirma cada lacuna, quem defende cada lado de um debate e o texto literal de cada passagem com sua página —, então divergências entre autores são argumentadas com nomes em vez de citadas de passagem. A cobertura declarada é a realmente citada, não a atribuída.',
+  },
+  {
+    scope: 'academic',
+    es: 'Un panel nuevo te dice qué afirmaciones conviene comprobar antes de citarlas. Un tercio de las citas que sobreviven a la verificación tienen respaldo parcial: la fuente sostiene una versión más débil de lo que la frase afirma. El informe las lista junto al texto de su fuente y el autor y año que abrir, así que contrastar un informe pasa de leerse las obras enteras a comparar un puñado de pares.',
+    en: 'A new panel tells you which claims to check before citing them. A third of the citations that survive verification are only partially supported: the source backs a weaker version of the sentence than the sentence claims. The report lists them next to the text of their source and the author and year to open, so checking a report goes from reading whole works to comparing a handful of pairs.',
+    fr: 'Un nouveau panneau indique quelles affirmations vérifier avant de les citer. Un tiers des citations qui passent la vérification ne sont qu’en partie étayées : la source soutient une version plus faible que ce qu’affirme la phrase. Le rapport les liste à côté du texte de leur source et de l’auteur et de l’année à ouvrir ; vérifier un rapport passe donc de la lecture d’ouvrages entiers à la comparaison de quelques paires.',
+    de: 'Ein neues Panel zeigt, welche Aussagen vor dem Zitieren zu prüfen sind. Ein Drittel der Belege, die die Prüfung überstehen, ist nur teilweise gedeckt: Die Quelle stützt eine schwächere Fassung als der Satz behauptet. Der Bericht listet sie neben dem Text ihrer Quelle sowie Autor und Jahr zum Nachschlagen, sodass die Prüfung eines Berichts vom Lesen ganzer Werke zum Vergleich weniger Paare wird.',
+    pt: 'Um novo painel indica que afirmações convém verificar antes de as citar. Um terço das citações que sobrevivem à verificação tem apoio parcial: a fonte sustenta uma versão mais fraca do que a frase afirma. O relatório lista-as junto ao texto da sua fonte e ao autor e ano a abrir, pelo que conferir um relatório passa de ler obras inteiras a comparar um punhado de pares.',
+    'pt-BR': 'Um painel novo mostra quais afirmações conferir antes de citá-las. Um terço das citações que passam na verificação tem apoio parcial: a fonte sustenta uma versão mais fraca do que a frase afirma. O relatório as lista junto ao texto da fonte e ao autor e ano a abrir, então conferir um relatório passa de ler obras inteiras a comparar alguns pares.',
+  },
+  {
+    scope: 'academic',
+    es: 'El mapa de argumentos y los debates ya no congelan la ventana. Pintaban de golpe decenas de miles de elementos y la aplicación entera se quedaba bloqueada uno o dos segundos al abrirlos; ahora se dibujan por tramos a medida que bajas. Además, el mapa se despliega rama a rama en vez de abrirse entero, así que puedes seguir una línea de argumentación sin perderte.',
+    en: 'The argument map and debates no longer freeze the window. They painted tens of thousands of elements at once and the whole app locked up for a second or two when you opened them; now they draw in chunks as you scroll. The map also unfolds one branch at a time instead of opening whole, so you can follow a line of argument without losing your place.',
+    fr: 'La carte d’arguments et les débats ne figent plus la fenêtre. Ils affichaient d’un coup des dizaines de milliers d’éléments et toute l’application se bloquait une ou deux secondes à l’ouverture ; ils se dessinent désormais par tranches au fil du défilement. La carte se déplie aussi branche par branche au lieu de s’ouvrir entièrement, ce qui permet de suivre un fil argumentatif sans se perdre.',
+    de: 'Argumentkarte und Debatten frieren das Fenster nicht mehr ein. Sie zeichneten Zehntausende Elemente auf einmal und die ganze App blockierte beim Öffnen für ein bis zwei Sekunden; jetzt wird beim Scrollen abschnittsweise gezeichnet. Die Karte klappt zudem Zweig für Zweig auf, statt sich vollständig zu öffnen, sodass man einer Argumentationslinie folgen kann, ohne den Faden zu verlieren.',
+    pt: 'O mapa de argumentos e os debates deixaram de bloquear a janela. Desenhavam de uma vez dezenas de milhares de elementos e a aplicação inteira ficava presa um ou dois segundos ao abri-los; agora desenham-se por troços à medida que percorre. O mapa também se desdobra ramo a ramo em vez de abrir por completo, para poder seguir uma linha de argumentação sem se perder.',
+    'pt-BR': 'O mapa de argumentos e os debates não travam mais a janela. Eles desenhavam dezenas de milhares de elementos de uma vez e o aplicativo inteiro ficava travado um ou dois segundos ao abri-los; agora desenham em trechos conforme você rola. O mapa também se abre galho por galho em vez de tudo de uma vez, para você seguir uma linha de argumentação sem se perder.',
+  },
+  {
+    scope: 'worldbuilding',
+    es: 'Los personajes entrevistados hablan en vez de recitar. En el modo demostración respondían con la ficha del personaje leída en voz alta; ahora contestan desde su propia voz, con su carácter y sus silencios, como una entrevista de verdad.',
+    en: 'Interviewed characters speak instead of reciting. In demo mode they answered by reading their character sheet aloud; now they reply in their own voice, with their temperament and their silences, like a real interview.',
+    fr: 'Les personnages interviewés parlent au lieu de réciter. En mode démonstration, ils répondaient en lisant leur fiche à voix haute ; ils répondent désormais avec leur propre voix, leur tempérament et leurs silences, comme dans un véritable entretien.',
+    de: 'Befragte Figuren sprechen, statt zu rezitieren. Im Demomodus antworteten sie, indem sie ihr Datenblatt vorlasen; jetzt antworten sie mit eigener Stimme, mit ihrem Temperament und ihren Pausen, wie in einem echten Interview.',
+    pt: 'As personagens entrevistadas falam em vez de recitar. No modo demonstração respondiam lendo a sua ficha em voz alta; agora respondem com a sua própria voz, com o seu carácter e os seus silêncios, como numa entrevista a sério.',
+    'pt-BR': 'Os personagens entrevistados falam em vez de recitar. No modo demonstração respondiam lendo a ficha em voz alta; agora respondem com a própria voz, com seu temperamento e seus silêncios, como numa entrevista de verdade.',
+  },
+  {
+    scope: 'toolkit',
+    es: 'El runtime de Codex incluido en Nodus también genera imágenes, así que puedes crear ilustraciones sin configurar ninguna clave adicional si ya tienes conectada tu suscripción de ChatGPT. Y la generación con Google vuelve a funcionar: se le pedía un formato de imagen que ya no acepta.',
+    en: 'The Codex runtime bundled with Nodus now generates images too, so you can create illustrations without setting up any extra key if your ChatGPT subscription is already connected. Generation with Google works again as well: it was being asked for an image format it no longer accepts.',
+    fr: 'Le runtime Codex fourni avec Nodus génère aussi des images : vous pouvez créer des illustrations sans configurer de clé supplémentaire si votre abonnement ChatGPT est déjà connecté. La génération avec Google refonctionne également : on lui demandait un format d’image qu’il n’accepte plus.',
+    de: 'Die mit Nodus gelieferte Codex-Laufzeit erzeugt jetzt auch Bilder, sodass Sie Illustrationen ohne zusätzlichen Schlüssel erstellen können, wenn Ihr ChatGPT-Abo bereits verbunden ist. Auch die Erzeugung mit Google funktioniert wieder: Es wurde ein Bildformat angefordert, das nicht mehr akzeptiert wird.',
+    pt: 'O runtime do Codex incluído no Nodus também gera imagens, pelo que pode criar ilustrações sem configurar qualquer chave adicional se já tiver ligada a sua subscrição do ChatGPT. E a geração com o Google volta a funcionar: pedia-se-lhe um formato de imagem que já não aceita.',
+    'pt-BR': 'O runtime do Codex incluído no Nodus também gera imagens, então você pode criar ilustrações sem configurar nenhuma chave extra se sua assinatura do ChatGPT já estiver conectada. E a geração com o Google voltou a funcionar: pedia-se um formato de imagem que ele não aceita mais.',
+  },
+];
+
+/**
  * 3.0.1 is a performance release: no new surface, three things that were making
  * the app feel slow on a large vault. One highlight per cause, not one per query.
  */
@@ -468,6 +521,11 @@ const RELEASE_2_7_0_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
+  {
+    version: '3.0.2',
+    date: '2026-07-31',
+    highlights: RELEASE_3_0_2_HIGHLIGHTS,
+  },
   {
     version: '3.0.1',
     date: '2026-07-30',

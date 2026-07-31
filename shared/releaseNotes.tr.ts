@@ -1,3 +1,11 @@
+const RELEASE_3_0_2_TR: string[] = [
+  "Deep Research artık destekleyebileceğinden fazlasını iddia etmiyor. Her kaynak gösterimi, kaynağın gerçekte ne söylediğine karşı denetleniyor; desteklemeyen gösterim metinden de kaynakçadan da siliniyor. Yazan taraf artık aktardığı şeyin gerçek içeriğini alıyor — her fikrin ifadesi, her araştırma boşluğunun iddiası, bir tartışmada hangi tarafı kimin savunduğu ve her pasajın sayfasıyla birlikte birebir metni —, böylece yazarlar arasındaki anlaşmazlıklar geçerken anılmak yerine adlarıyla tartışılıyor. Raporun bildirdiği kapsam, atanan değil gerçekten atıf yapılan kapsamdır.",
+  "Yeni bir panel, hangi ifadeleri aktarmadan önce denetlemeniz gerektiğini gösteriyor. Denetimi geçen kaynak gösterimlerinin üçte biri yalnızca kısmen destekleniyor: kaynak, cümlenin iddia ettiğinden daha zayıf bir sürümü destekliyor. Rapor bunları kaynağının metniyle ve açılacak yazar ve yılla birlikte listeliyor; böylece bir raporu denetlemek, eserlerin tamamını okumaktan birkaç çifti karşılaştırmaya iniyor.",
+  "Argüman haritası ve tartışmalar artık pencereyi dondurmuyor. On binlerce ögeyi tek seferde çiziyor ve açtığınızda uygulamanın tamamı bir iki saniye kilitleniyordu; artık siz kaydırdıkça parça parça çiziliyor. Harita ayrıca tümden açılmak yerine dal dal açılıyor; böylece bir argüman hattını yerinizi kaybetmeden izleyebiliyorsunuz.",
+  "Röportaj yapılan karakterler ezber okumak yerine konuşuyor. Tanıtım modunda karakter künyesini yüksek sesle okuyarak yanıt veriyorlardı; artık kendi sesleriyle, kendi mizaçları ve suskunluklarıyla, gerçek bir röportajdaki gibi yanıt veriyorlar.",
+  "Nodus ile gelen Codex çalışma zamanı artık görsel de üretiyor; ChatGPT aboneliğiniz bağlıysa ek bir anahtar ayarlamadan illüstrasyon oluşturabilirsiniz. Google ile üretim de yeniden çalışıyor: artık kabul etmediği bir görsel biçimi isteniyordu.",
+];
+
 const RELEASE_3_0_1_TR: string[] = [
   "Eskiden takılan bölümler artık anında açılıyor. Grafik, argüman haritası, tartışmalar, okuma rotası ve yazar dosyaları tüm kütüphaneyi dolaşarak yükleniyor ve bu sırada uygulamanın tamamını donduruyordu; artık yalnızca gösterdiklerini istiyorlar. Yaklaşık 10.000 fikirlik bir kasada grafik 2,7 saniyelik donmuş pencereden 0,2 saniyenin altına indi.",
   "Nodi söyleyecek bir şeyi yokken duruşunu koruyor, olduğu anda yeniden hareket ediyor. Animasyonu hiç durmuyordu, uygulama boştayken bile: bu sürekli olarak yarım çekirdeğe mal oluyor ve makineyi ısıtıyordu. Artık son etkinlikten birkaç saniye sonra duruluyor; imleç üzerine gelince, durum değişince veya bir bildirim gelince uyanıyor. Hiçbir animasyon kaldırılmadı.",
@@ -5,6 +13,7 @@ const RELEASE_3_0_1_TR: string[] = [
 ];
 
 export const RELEASE_NOTES_TR: Record<string, string[]> = {
+  "3.0.2": RELEASE_3_0_2_TR,
   "3.0.1": RELEASE_3_0_1_TR,
   // Index-matched with RELEASE_3_0_0_HIGHLIGHTS — keep this order.
   "3.0.0": [

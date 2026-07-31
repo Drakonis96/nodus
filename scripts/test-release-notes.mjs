@@ -25,10 +25,15 @@ try {
 
   const { RELEASE_NOTES, releaseNotesForMajor } = await import(pathToFileURL(bundlePath).href);
   const currentRelease = RELEASE_NOTES[0];
-  assert.equal(currentRelease?.version, '3.0.1');
-  assert.equal(currentRelease?.date, '2026-07-30');
-  // A performance release: one highlight per cause, not one per query fixed.
-  assert.equal(currentRelease?.highlights.length, 3);
+  assert.equal(currentRelease?.version, '3.0.2');
+  assert.equal(currentRelease?.date, '2026-07-31');
+  // The Deep Research release: one highlight per user-visible change.
+  assert.equal(currentRelease?.highlights.length, 5);
+
+  // 3.0.1 stays reachable from the version picker underneath it.
+  const performanceRelease = RELEASE_NOTES.find((note) => note.version === '3.0.1');
+  assert.equal(performanceRelease?.date, '2026-07-30');
+  assert.equal(performanceRelease?.highlights.length, 3);
 
   // The vault introductions live in 3.0.0 and must keep their shape as newer
   // releases land on top of them — hence looked up by version, not as `[0]`.
