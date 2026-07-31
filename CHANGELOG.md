@@ -1,5 +1,88 @@
 # Changelog
 
+## 3.0.2 — 2026-07-31
+
+The Deep Research release. The engine used to overstate itself in ways that
+compounded: it reported coverage it had not achieved, published attributions its
+sources did not support, and printed raw identifiers where a citation should be.
+Every number below was measured on reports generated over a snapshot of a real
+academic vault, not on fixtures.
+
+### Added
+
+- **The writer now sees the evidence it cites.** The citation menu carried
+  placeholders — "an anchored research gap", "a literal passage from the full
+  text" — so a report cited zero passages and argued gaps and debates from a
+  label. It now carries each idea's statement, what a gap claims, what a
+  contradiction opposes and who holds each side, and the literal text of a
+  passage with its page. A passage whose text cannot be read is never offered.
+- **Citations are checked against their sources.** Each claim is paired with the
+  material cited for it and judged for entailment; what a source does not support
+  is removed from the prose and from the bibliography, so a false attribution
+  cannot survive anywhere in the report.
+- **A support-check panel.** A third of the citations that pass verification are
+  only partially supported — the source backs a weaker version of the sentence
+  than the sentence claims. Those are listed beside the text of their source and
+  the author-year to open, turning a manual check from hours into minutes.
+- **Reading order is planned.** The planner declares each section's role and what
+  it presupposes, and a stable topological sort turns that into the sequence. Two
+  runs of the same objective previously produced a genealogy and a flat thematic
+  list; the progression is now a property of the engine.
+- **Self-contradictions are reported.** A read-only pass flags passages of the
+  report that cannot both be right, quoting both sides verbatim and discarding
+  any finding whose quotes are not in the text. It never rewrites: editing
+  assembled prose would put every verified citation at risk.
+
+### Fixed
+
+- **Coverage counted the plan, not the prose.** Every idea is assigned to some
+  section, and assignment counted as coverage, so the statistic read 120/120
+  while 77 ideas were really cited — and the top-up that lifts a short report was
+  unreachable dead code. Reports landed two pages under their minimum with no
+  truncation flag. Coverage is now what the text cites.
+- **Reports landed on the floor of their page range.** Sections were sized at
+  1400 words on the theory that few long sections beat many short ones; measured,
+  a section asked for 1575 words came back with ~1040 and stayed there even after
+  being rewritten. Sizing the plan to what a section really delivers moves a
+  report from 9 pages to 11–12, with 20% more citations and 22% more ideas.
+- **Malformed citations printed raw identifiers.** Models emit references in
+  shapes the citation pattern never matched, and those escaped both the prose and
+  the accounting. References are now repaired where the label can be
+  reconstructed and dropped where it cannot, and a final sweep guarantees no
+  `nodus://` identifier can reach the page.
+- **Gaps and debates read as debug labels.** "(hueco)" and "(contradicción)"
+  appeared 50 times across three reports as visible text in academic prose. A gap
+  is now cited by the work it is anchored to and a debate by whoever holds one of
+  its sides. Sources whose author the corpus never captured are cited by a
+  shortened title instead of "(Author)".
+- **Split headings.** `Title: subtitle` headings are folded into one phrase,
+  keeping the subtitle rather than truncating it.
+- **The abstract and limitations appeared twice.** The reader showed the abstract
+  as a subtitle and again as the first section, and the markdown export added its
+  own copies on top of the ones already in the body.
+- **The argument map and debates froze the window.** They painted tens of
+  thousands of elements at once; they now render in chunks as you scroll, and the
+  map unfolds one branch at a time instead of opening whole.
+- **Image generation with Google.** It was being asked for an image format the
+  API no longer accepts.
+- **Interviewed characters recited their sheet.** In worldbuilding demo mode they
+  answered by reading their own character sheet aloud instead of speaking.
+
+### Changed
+
+- **The Codex runtime bundled with Nodus can generate images**, so a connected
+  ChatGPT subscription needs no extra key for illustrations.
+
+### Measured and rejected
+
+Kept in the code with the measurement beside it, so none is retried blind:
+multi-probe retrieval (tripled unsupported citations without a relevance floor;
+with one, changed 5–10% of the pool while reducing the distinct works behind it),
+longer sections (the expansion pass fires on 10 of 12 sections, is accepted, and
+the section still finishes at ~1040 words), and preferring literal passages over
+derived ideas (verbatim quoting more than tripled, the argument leaned on a third
+fewer distinct works, and unsupported citations doubled).
+
 ## 3.0.1 — 2026-07-30
 
 A performance release, from an audit run against a real 465 MB academic vault.

@@ -813,7 +813,7 @@ export function normalizePlan(
     gapIds: strList(s.gapIds).filter((id) => gapIds.has(id)),
     contradictionIds: strList(s.contradictionIds).filter((id) => contradictionIds.has(id)),
     passageIds: strList(s.passageIds).filter((id) => passageIds.has(id)),
-    role: s.role === 'intro' || s.role === 'synthesis' ? s.role : 'body',
+    role: (s.role === 'intro' || s.role === 'synthesis' ? s.role : 'body') as DeepResearchPlanSection['role'],
     dependsOn: strList(s.dependsOn),
   }));
 
