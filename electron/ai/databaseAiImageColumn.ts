@@ -27,7 +27,7 @@ export interface AiImageDeps {
   generate?: (prompt: string, model: AiImageModelRef | null) => Promise<{ image: Buffer; mimeType: string }>;
 }
 
-const IMAGE_PROVIDERS = new Set<ImageProvider>(['google', 'openai', 'openrouter', 'nodus']);
+const IMAGE_PROVIDERS = new Set<ImageProvider>(['google', 'openai', 'openrouter', 'nodus', 'codex']);
 
 function extensionForImageMime(mimeType: string): string {
   if (mimeType === 'image/png') return 'png';

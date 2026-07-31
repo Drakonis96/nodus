@@ -20,6 +20,7 @@ import { getWorldPlace } from '../db/worldPlacesRepo';
 import { getWorldGroup } from '../db/worldGroupsRepo';
 import { getActiveVault } from '../vaults/vaultRegistry';
 import { completeText } from './aiClient';
+import { generateImageWithChatGptSubscription } from './codexSubscription';
 import { getSettings } from '../db/settingsRepo';
 import { generateNodusLocalImage } from './nodusLocalImages';
 import { getApiKey } from '../secrets/secretStore';
@@ -132,7 +133,9 @@ async function visualContextFor(source: ImageSource): Promise<string> {
 }
 
 function providerKey(provider: ImageProvider): string | null {
-  if (provider === 'nodus') return null;
+  // Nodus generates locally and Codex authenticates with the managed ChatGPT session:
+  // neither has an API key to look up.
+  if (provider === 'nodus' || provider === 'codex') return null;
   if (provider === 'google') return getApiKey('gemini');
   return getApiKey(provider);
 }
@@ -204,6 +207,9 @@ function generateOpenRouter(model: string, prompt: string, key: string): Promise
 
 export async function callImageProvider(provider: ImageProvider, model: string, prompt: string): Promise<GeneratedImageBytes> {
   if (provider === 'nodus') return generateNodusLocalImage(model, prompt, getSettings().imageQuality);
+  // Billed to the user's ChatGPT plan, and the only provider whose size and format are
+  // the agent's decision rather than a request parameter.
+  if (provider === 'codex') return generateImageWithChatGptSubscription({ model, prompt });
   const key = providerKey(provider);
   if (!key) throw new Error(`Falta la clave de ${provider === 'google' ? 'Google' : provider === 'openai' ? 'OpenAI' : 'OpenRouter'}.`);
   switch (provider) {

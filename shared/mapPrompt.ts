@@ -19,7 +19,7 @@
  * Pure and dependency-light so all of it is unit-tested without a provider.
  */
 
-import type { WorldMapKind } from './types';
+import type { ImageProvider, WorldMapKind } from './types';
 
 export type MapStyleId =
   | 'parchment'
@@ -219,7 +219,9 @@ export function hasMapPromptMaterial(input: MapPromptInput): boolean {
 
 // ── what a provider can actually do ─────────────────────────────────────────────
 
-export type MapImageProvider = 'google' | 'openai' | 'openrouter' | 'nodus';
+/** Alias rather than a second union: a provider added to one and forgotten in the
+ *  other used to compile fine and only fail at the call site. */
+export type MapImageProvider = ImageProvider;
 
 /**
  * Can this provider take a REFERENCE image?
@@ -237,8 +239,9 @@ export function supportsReferenceImage(provider: MapImageProvider, model: string
   if (provider === 'google') return true;
   if (provider === 'openai') return /gpt-image|dall-e-2/i.test(model);
   if (provider === 'openrouter') return /gemini|flash-image|nano-banana|gpt-image|seedream|qwen-image/i.test(model);
-  // The local generator is text-to-image only. Promising otherwise would fail offline,
-  // where there is no fallback at all.
+  // The local generator is text-to-image only, and so is the Codex path: its built-in
+  // tool takes a prompt and nothing else. Promising otherwise would fail offline, where
+  // there is no fallback at all.
   return false;
 }
 

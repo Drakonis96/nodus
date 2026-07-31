@@ -789,7 +789,7 @@ export type AiProvider =
  *  They need no API key (an optional token is supported for secured instances). */
 export type LocalProvider = Extract<AiProvider, 'ollama' | 'lmstudio'>;
 export type EmbeddingProvider = Extract<AiProvider, 'openai' | 'openrouter' | 'gemini' | 'ollama' | 'lmstudio' | 'nodus'>;
-export type ImageProvider = 'google' | 'openai' | 'openrouter' | 'nodus';
+export type ImageProvider = 'google' | 'openai' | 'openrouter' | 'nodus' | 'codex';
 
 /** User-editable connection settings for a local provider. The base URL includes
  *  scheme, host and port (e.g. "http://localhost:11434"); no trailing "/v1". */
