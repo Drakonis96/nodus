@@ -5721,6 +5721,20 @@ export interface WritingWorkshopMatrixRow {
   notes: string;
 }
 
+/** One claim the verification pass flagged, with the source text to check it against. */
+export interface SupportAuditEntry {
+  verdict: 'partial' | 'removed';
+  kind: 'idea' | 'passage' | 'gap' | 'contradiction';
+  /** The section the claim sits in. */
+  section: string;
+  /** The sentence as it appears in the report. */
+  sentence: string;
+  /** What the cited source actually says. */
+  source: string;
+  /** Author-year of the work behind it, when there is one. */
+  sourceLabel: string;
+}
+
 export interface WritingWorkshopDraft {
   generatedAt: string;
   brief: WritingWorkshopBrief;
@@ -5733,6 +5747,13 @@ export interface WritingWorkshopDraft {
   bibliography: string[];
   nextSteps: string[];
   limitations: string[];
+  /**
+   * What the entailment pass concluded about individual claims, so a researcher can
+   * spot-check the weakest ones instead of re-reading every source. Only claims that
+   * are worth a second look are listed: those whose source supports a weaker version
+   * of the sentence, and those whose citation was removed for not supporting it.
+   */
+  supportAudit?: SupportAuditEntry[];
   stats: {
     selectedIdeas: number;
     selectedThemes: number;

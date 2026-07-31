@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { DecorativeImageStyle, WritingWorkshopBrief, WritingWorkshopDraft, WritingWorkshopSavedDraft } from '@shared/types';
+import type { DecorativeImageStyle, SupportAuditEntry, WritingWorkshopBrief, WritingWorkshopDraft, WritingWorkshopSavedDraft } from '@shared/types';
 import { documentBodyForPanels } from '@shared/writingDocument';
 import { Badge, Icon } from '../components/ui';
 import { Markdown, type MarkdownCitation } from '../components/Markdown';
@@ -214,6 +214,7 @@ export function SupportMatrix({
               </div>
             </div>
           ))}
+          <SupportAudit entries={draft.supportAudit ?? []} />
           <PanelList title={t('Siguientes pasos')} items={draft.nextSteps} />
           <PanelList title={t('Limitaciones')} items={draft.limitations} />
           <PanelList title={t('Bibliografía')} items={draft.bibliography} />
@@ -321,6 +322,51 @@ export function Metric({ label, value }: { label: string; value: string | number
       <div className="text-[11px] text-neutral-500">{label}</div>
       <div className="text-sm font-semibold">{value}</div>
     </div>
+  );
+}
+
+/**
+ * The claims worth checking before citing the report, each next to the source text
+ * it rests on. The engine already removed the citations no source supported; what is
+ * left here is the grey zone — a source that backs a weaker version of the sentence
+ * than the sentence claims — which no automatic check can settle for the reader.
+ */
+export function SupportAudit({ entries }: { entries: SupportAuditEntry[] }) {
+  const [open, setOpen] = useState(false);
+  if (entries.length === 0) return null;
+  const partial = entries.filter((entry) => entry.verdict === 'partial').length;
+  const removed = entries.length - partial;
+  return (
+    <section className="pt-3 border-t border-neutral-800">
+      <button className="flex items-center gap-2 w-full text-left" onClick={() => setOpen((v) => !v)}>
+        <Icon name={open ? 'chevronDown' : 'chevronRight'} size={14} className="text-neutral-500" />
+        <h3 className="font-semibold text-sm">{t('Comprobación del respaldo')}</h3>
+        <Badge color={partial > 0 ? 'amber' : 'neutral'}>{String(entries.length)}</Badge>
+      </button>
+      <p className="text-xs text-neutral-500 mt-1">
+        {tx('{partial} afirmaciones con respaldo parcial · {removed} citas retiradas', {
+          partial: String(partial),
+          removed: String(removed),
+        })}
+      </p>
+      {open && (
+        <ul className="space-y-3 mt-3">
+          {entries.map((entry, index) => (
+            <li key={index} className="text-xs">
+              <div className="flex items-center gap-2 mb-1">
+                <Badge color={entry.verdict === 'partial' ? 'amber' : 'red'}>
+                  {entry.verdict === 'partial' ? t('parcial') : t('retirada')}
+                </Badge>
+                {entry.sourceLabel && <span className="text-neutral-500">{entry.sourceLabel}</span>}
+                <span className="text-neutral-600 truncate">{entry.section}</span>
+              </div>
+              <p className="text-neutral-300">{entry.sentence}</p>
+              <p className="text-neutral-500 mt-1 border-l-2 border-neutral-700 pl-2">{entry.source}</p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 

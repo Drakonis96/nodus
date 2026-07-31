@@ -11,6 +11,7 @@ import type {
   WritingWorkshopMatrixRow,
   WritingWorkshopSection,
   WritingWorkshopSnapshot,
+  SupportAuditEntry,
 } from '@shared/types';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -68,6 +69,8 @@ const IDEA_NOTE_CHARS = 240;
 const PASSAGE_NOTE_CHARS = 480;
 /** Extra material a per-section retrieval may add on top of what the planner assigned. */
 const SECTION_RETRIEVAL_LIMITS = { ideas: 6, passages: 4 } as const;
+/** How many flagged claims the audit lists. Enough to spot-check, not a second report. */
+const MAX_SUPPORT_AUDIT = 40;
 /** Below this share of its word target a section gets one expansion pass. */
 const MIN_SECTION_FILL = 0.78;
 
@@ -338,6 +341,7 @@ export async function orchestrateDeepResearch(
   let totalWords = 0;
   let stoppedReason: string | null = null;
   const verification = { checked: 0, partial: 0, unsupported: 0 };
+  const supportAudit: SupportAuditEntry[] = [];
   let expansions = 0;
   const sectionFill: { words: number; target: number }[] = [];
 
@@ -434,6 +438,17 @@ export async function orchestrateDeepResearch(
             verification.checked += outcome.checked;
             verification.partial += outcome.partial;
             verification.unsupported += outcome.unsupported;
+            for (const entry of outcome.audit) {
+              if (supportAudit.length >= MAX_SUPPORT_AUDIT) break;
+              supportAudit.push({
+                verdict: entry.verdict,
+                kind: entry.claim.kind,
+                section: section.title,
+                sentence: entry.claim.sentence,
+                source: clip(entry.claim.content, 400),
+                sourceLabel: sourceLabelForClaim(entry.claim, maps),
+              });
+            }
             if (outcome.unsupported > 0) {
               markdown = outcome.markdown;
               ({ cited } = applyCitationPolicy(markdown, maps));
@@ -585,6 +600,7 @@ export async function orchestrateDeepResearch(
     matrix,
     bibliography: references,
     nextSteps: finalize.nextSteps,
+    supportAudit,
     limitations: [...finalize.limitations, ...coherenceIssues.map((issue) => L.coherenceLimitation(issue))],
     stats: {
       selectedIdeas: coveredIdeaIds.size,
@@ -1562,6 +1578,8 @@ export interface VerificationOutcome {
   unsupported: number;
   /** Sentences that lost their only support, for honest reporting. */
   strippedSentences: string[];
+  /** The claims worth a second look, paired with the source to check them against. */
+  audit: { verdict: 'partial' | 'removed'; claim: CitationClaim }[];
 }
 
 /**
@@ -1588,7 +1606,11 @@ export function applyVerification(markdown: string, claims: CitationClaim[], ver
     .replace(/\(\s*[;,]?\s*\)/g, '')
     .replace(/\s+([.,;)])/g, '$1')
     .replace(/[ \t]{2,}/g, ' ');
-  return { markdown: out, checked: claims.length, partial, unsupported: doomed.length, strippedSentences };
+  const audit = claims
+    .map((claim, index) => ({ verdict: verdicts[index], claim }))
+    .filter((entry) => entry.verdict === 'partial' || entry.verdict === 'unsupported')
+    .map((entry) => ({ verdict: entry.verdict === 'partial' ? ('partial' as const) : ('removed' as const), claim: entry.claim }));
+  return { markdown: out, checked: claims.length, partial, unsupported: doomed.length, strippedSentences, audit };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1690,6 +1712,10 @@ function sectionSources(section: DeepResearchPlanSection, maps: SnapshotMaps): s
 
 export function buildCitationMenu(section: DeepResearchPlanSection, maps: SnapshotMaps): CitationMenuItem[] {
   const items: CitationMenuItem[] = [];
+  // Passages are offered last, on purpose. Leading with them was measured and made
+  // the report worse: verbatim quoting more than tripled, the argument leaned on a
+  // third fewer distinct works because each passage belongs to a single one, and
+  // unsupported citations doubled as claims overreached a narrow snippet.
   for (const id of section.ideaIds) {
     const idea = maps.ideaById.get(id);
     if (!idea) continue;
@@ -1747,6 +1773,26 @@ export function buildCitationMenu(section: DeepResearchPlanSection, maps: Snapsh
     });
   }
   return items;
+}
+
+/** Author-year behind a flagged claim, so the reader knows which source to open. */
+function sourceLabelForClaim(claim: CitationClaim, maps: SnapshotMaps): string {
+  switch (claim.kind) {
+    case 'idea':
+      return sourceLabelFromWork(maps.ideaById.get(claim.id)?.works[0]) || '';
+    case 'passage': {
+      const workId = maps.passageWorkId.get(claim.id);
+      const page = maps.passagePage.get(claim.id);
+      const base = sourceLabelFromWork(workId ? maps.workInfoById.get(workId) : undefined);
+      return page ? `${base}, ${page}` : base;
+    }
+    case 'gap':
+      return maps.gapById.get(claim.id)?.source || '';
+    case 'contradiction':
+      return maps.contradictionById.get(claim.id)?.sources[0] || '';
+    default:
+      return '';
+  }
 }
 
 /** Which works back an idea, so the writer can name them in prose. */
