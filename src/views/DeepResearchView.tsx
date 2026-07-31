@@ -19,6 +19,7 @@ import type {
 import type { StudyDeepResearchAudience } from '@shared/studyDeepResearchAudience';
 import { DECORATIVE_IMAGE_STYLES } from '@shared/imageStyles';
 import { toReadingCopy } from '@shared/readingCopy';
+import { stripLeadingAbstract } from '@shared/writingDocument';
 import type { PendingGraphNavigationTarget } from '../navigation';
 import { Icon, modelLabel } from '../components/ui';
 import { ModelPicker } from '../components/ModelPicker';
@@ -530,7 +531,7 @@ export function DeepResearchView({
             entityKind="deep_research"
             entityId={openDraft.id}
             sourceTitle={openDraft.draft.title}
-            sourceMarkdown={`# ${openDraft.draft.title}\n\n${openDraft.draft.abstract ? `${openDraft.draft.abstract}\n\n` : ''}${openDraft.draft.draftMarkdown}`}
+            sourceMarkdown={`# ${openDraft.draft.title}\n\n${openDraft.draft.abstract ? `${openDraft.draft.abstract}\n\n` : ''}${stripLeadingAbstract(openDraft.draft.draftMarkdown, openDraft.draft.abstract)}`}
             model={openDraft.model}
             activeTranslationId={appliedTranslation?.id ?? null}
             onApply={setAppliedTranslation}
@@ -549,7 +550,7 @@ export function DeepResearchView({
         )}
         {savingToNotes && (
           <SaveToNotesModal
-            content={`# ${openDraft.draft.title}\n\n${openDraft.draft.abstract ? `${openDraft.draft.abstract}\n\n` : ''}${openDraft.draft.draftMarkdown}`}
+            content={`# ${openDraft.draft.title}\n\n${openDraft.draft.abstract ? `${openDraft.draft.abstract}\n\n` : ''}${stripLeadingAbstract(openDraft.draft.draftMarkdown, openDraft.draft.abstract)}`}
             defaultTitle={openDraft.draft.title}
             kind="writing"
             source={{ origin: 'writing', model: openDraft.model, ref: 'deep_research' }}

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { DecorativeImageStyle, WritingWorkshopBrief, WritingWorkshopDraft, WritingWorkshopSavedDraft } from '@shared/types';
+import { documentBodyForPanels } from '@shared/writingDocument';
 import { Badge, Icon } from '../components/ui';
 import { Markdown, type MarkdownCitation } from '../components/Markdown';
 import type { CitationTarget } from '../components/SourceCitationModal';
@@ -139,7 +140,9 @@ export function DraftResultMain({
         </div>
       </section>
       <section className={`card p-4 ${justify ? 'text-justify hyphens-auto' : ''}`}>
-        <Markdown content={draft.draftMarkdown} onCitation={onCitation} onStudyDocument={onStudyDocument} onStudyMaterial={onStudyMaterial} onStudyRecording={onStudyRecording} />
+        {/* The abstract is the subtitle above and the limitations have their own
+            panel below, so the body drops both rather than repeating them. */}
+        <Markdown content={documentBodyForPanels(draft.draftMarkdown, draft.abstract)} onCitation={onCitation} onStudyDocument={onStudyDocument} onStudyMaterial={onStudyMaterial} onStudyRecording={onStudyRecording} />
       </section>
     </div>
   );
