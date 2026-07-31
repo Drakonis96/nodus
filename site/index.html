@@ -808,9 +808,10 @@
   .vault-tag[data-vault="study"] { order: 3; }
   .vault-tag[data-vault="genealogy"] { order: 4; }
   .vault-tag[data-vault="databases"] { order: 5; }
-  .vault-tag[data-vault="primary"] { order: 6; }
-  .vault-tag[data-vault="testimony"] { order: 7; }
-  .vault-tag[data-vault="prosopography"] { order: 8; }
+  .vault-tag[data-vault="worldbuilding"] { order: 6; }
+  .vault-tag[data-vault="primary"] { order: 7; }
+  .vault-tag[data-vault="testimony"] { order: 8; }
+  .vault-tag[data-vault="prosopography"] { order: 9; }
   .vault-tag {
     --vc: var(--violet); display: inline-flex; align-items: center; gap: 9px; min-height: 40px; padding: 8px 15px;
     border-radius: 999px; border: 1px solid color-mix(in srgb, var(--vc) 52%, var(--border));
@@ -1063,13 +1064,14 @@
   <div class="wrap">
     <span class="kicker" data-i18n="vaults.kicker">The vaults</span>
     <h2 class="title" data-i18n="vaults.title">The same engine, shaped to your work.</h2>
-    <p class="lead" data-i18n="vaults.lead">A vault is a single file on your device, holding one project. Its mode decides which sections appear and how the AI assistant is briefed. The engine, private storage and settings stay the same across every mode. Five modes are available today; Primary Sources, Testimony and Prosopography show what is coming next.</p>
+    <p class="lead" data-i18n="vaults.lead">A vault is a single file on your device, holding one project. Its mode decides which sections appear and how the AI assistant is briefed. The engine, private storage and settings stay the same across every mode. Six modes are available today; Primary Sources, Testimony and Prosopography show what is coming next.</p>
 
     <div class="vault-selector" role="tablist" aria-label="Vault modes">
       <button class="vault-tag" id="vault-tab-academic" role="tab" aria-selected="true" aria-controls="vault-panel-academic" tabindex="0" style="--vc:#6366f1" data-vault="academic" data-i18n="vaults.academic.t">Academic</button>
       <button class="vault-tag" id="vault-tab-study" role="tab" aria-selected="false" aria-controls="vault-panel-study" tabindex="-1" style="--vc:#0f766e" data-vault="study" data-i18n="vaults.study.t">Study</button>
       <button class="vault-tag" id="vault-tab-genealogy" role="tab" aria-selected="false" aria-controls="vault-panel-genealogy" tabindex="-1" style="--vc:#ca8a04" data-vault="genealogy" data-i18n="vaults.genealogy.t">Genealogy</button>
       <button class="vault-tag" id="vault-tab-databases" role="tab" aria-selected="false" aria-controls="vault-panel-databases" tabindex="-1" style="--vc:#b30333" data-vault="databases" data-i18n="vaults.databases.t">Databases</button>
+      <button class="vault-tag" id="vault-tab-worldbuilding" role="tab" aria-selected="false" aria-controls="vault-panel-worldbuilding" tabindex="-1" style="--vc:#8b5cf6" data-vault="worldbuilding">Worldbuilding</button>
       <button class="vault-tag" id="vault-tab-teaching" role="tab" aria-selected="false" aria-controls="vault-panel-teaching" tabindex="-1" style="--vc:#ea580c" data-vault="teaching" data-i18n="road.teaching.t">Teaching</button>
       <button class="vault-tag" id="vault-tab-primary" role="tab" aria-selected="false" aria-controls="vault-panel-primary" tabindex="-1" style="--vc:#6366f1" data-vault="primary" data-i18n="road.primary.t">Primary Sources</button>
       <button class="vault-tag" id="vault-tab-testimony" role="tab" aria-selected="false" aria-controls="vault-panel-testimony" tabindex="-1" style="--vc:#0891b2" data-vault="testimony" data-i18n="road.testimony.t">Testimony</button>
@@ -1126,6 +1128,19 @@
           <div class="vault-capability"><span>01</span><p data-i18n="vaults.databases.f1"><b>Build structured databases with real field types</b>, relations, formulas, rollups, attachments, CSV import and reusable filtered views.</p></div>
           <div class="vault-capability"><span>02</span><p data-i18n="vaults.databases.f2"><b>Run reproducible analysis and charts over your actual rows</b>, from correlations and chi-square to ANOVA and regressions.</p></div>
           <div class="vault-capability"><span>03</span><p data-i18n="vaults.databases.f3"><b>Ask questions in plain language and automate classification with AI columns</b>, without inventing a field or value that is not in your data.</p></div>
+        </div>
+      </article>
+
+      <article class="vault-panel" id="vault-panel-worldbuilding" role="tabpanel" aria-labelledby="vault-tab-worldbuilding" style="--vc:#8b5cf6" hidden>
+        <div class="vault-panel-copy">
+          <div class="vault-panel-head"><span class="vault-panel-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.4 2.5 3.6 5.5 3.6 9S14.4 18.5 12 21c-2.4-2.5-3.6-5.5-3.6-9S9.6 5.5 12 3Z"/></svg></span><div><h3>Worldbuilding</h3><span class="vault-status" data-i18n="vaults.status.available">Available now</span></div></div>
+          <p>Build a living fictional world from connected characters, places, factions, cultures, maps and histories. Plan narrative threads while keeping the rules and continuity of the setting visible.</p>
+          <a class="vault-panel-cta" href="demo/worldbuilding.html">Open the worldbuilding demo →</a>
+        </div>
+        <div class="vault-capabilities">
+          <div class="vault-capability"><span>01</span><p><b>Keep characters, places, factions and cultures connected</b> through illustrated records, relations, dynasties and family trees.</p></div>
+          <div class="vault-capability"><span>02</span><p><b>Explore the world through interactive maps, timelines and an encyclopedia</b>, using the same demo data and artwork as the desktop vault.</p></div>
+          <div class="vault-capability"><span>03</span><p><b>Plan stories without losing continuity</b> with scenes, manuscripts, arcs, conflicts, rules and open questions in one workspace.</p></div>
         </div>
       </article>
 
@@ -1638,7 +1653,7 @@
 
     </div>
     <div style="text-align:center;margin-top:56px">
-      <a class="btn primary" href="demo/index.html" data-i18n="views.cta">Open the five live demos →</a>
+      <a class="btn primary" href="demo/index.html" data-i18n="views.cta">Open the six live demos →</a>
     </div>
   </div>
 </section>
@@ -2325,7 +2340,7 @@ const I18N = {
     'step5.t': `Escribe con pruebas`, 'step5.b': `El taller de escritura redacta secciones ancladas en el grafo, y se niega a citar nada que no corresponda a un elemento real de Zotero. Deep Research compone informes completos de varias páginas con citas. El mismo copiloto funciona en vivo dentro de Microsoft Word y LibreOffice Writer.`,
     'step6.t': `Y luego, escúchalo`, 'step6.b': `Convierte cualquier informe en audio narrado, o haz un paseo guiado e inmersivo por un rincón de tu corpus. Las voces funcionan en local (Piper, Kokoro), o usa una clave de Hume para voces en la nube.`,
     'views.kicker': `Cada vault, en movimiento`, 'views.title': `Mira lo que puede hacer cada modo.`, 'views.lead': `Cada panel de abajo es una vista real de la app, abierta en el modo al que pertenece. Cuanto más bajas, más cosas resulta que hace el mismo motor.`,
-    'views.cta': `Abre las cinco demos en vivo →`, 'v.open': `Abrir en la demo →`,
+    'views.cta': `Abre las seis demos en vivo →`, 'v.open': `Abrir en la demo →`,
     'v.library.t': `Entra Zotero, salen ideas`, 'v.library.b': `Sincroniza tus colecciones, conserva las etiquetas de leído, fusiona duplicados sin pérdidas. Cada obra guarda su estado de análisis, nada se escanea dos veces.`,
     'v.graph.t': `El corpus como constelación`, 'v.graph.b': `Temas, afirmaciones, hallazgos y métodos con aristas tipadas como apoya, contradice y matiza. Los ajustes preestablecidos saltan directamente a contradicciones, huecos o tu ruta de lectura.`,
     'v.ideas.t': `Afirmaciones con pruebas`, 'v.ideas.b': `Cada idea lleva evidencia literal y una referencia de página. Haz clic en una y obtienes sus relaciones, su autor y el pasaje exacto. Nunca afirmaciones huérfanas.`,
@@ -2364,7 +2379,7 @@ const I18N = {
     'step5.t': `Écrivez avec des preuves`, 'step5.b': `L'atelier d'écriture rédige des sections ancrées dans le graphe, et refuse de citer tout ce qui ne correspond pas à un véritable élément Zotero. Deep Research compose des rapports complets de plusieurs pages avec citations. Le même copilote fonctionne en direct dans Microsoft Word et LibreOffice Writer.`,
     'step6.t': `Puis écoutez-le`, 'step6.b': `Transformez n'importe quel rapport en audio narré, ou faites une promenade guidée et immersive dans un coin de votre corpus. Les voix fonctionnent en local (Piper, Kokoro), ou utilisez une clé Hume pour des voix cloud.`,
     'views.kicker': `Les vues`, 'views.title': `Voyez chaque section prendre vie.`, 'views.lead': `Chaque vignette ci-dessous reflète une vraie vue de l'application, et chacune est explorable dans la démo, dans le mode de coffre auquel elle appartient.`,
-    'views.cta': `Ouvrez les cinq démos →`, 'v.open': `Ouvrir dans la démo →`,
+    'views.cta': `Ouvrez les six démos →`, 'v.open': `Ouvrir dans la démo →`,
     'v.library.t': `Zotero entre, les idées sortent`, 'v.library.b': `Synchronisez vos collections, gardez les étiquettes « lu », fusionnez les doublons sans perte. Chaque ouvrage conserve son état d'analyse, rien n'est scanné deux fois.`,
     'v.graph.t': `Le corpus comme une constellation`, 'v.graph.b': `Thèmes, affirmations, résultats et méthodes avec des liens typés comme soutient, contredit et affine. Les préréglages sautent directement aux contradictions, aux lacunes ou à votre parcours de lecture.`,
     'v.ideas.t': `Des affirmations avec preuves`, 'v.ideas.b': `Chaque idée porte une preuve textuelle et une référence de page. Cliquez sur l'une d'elles et vous obtenez ses relations, son auteur et le passage exact. Jamais d'affirmations orphelines.`,
@@ -2403,7 +2418,7 @@ const I18N = {
     'step5.t': `Scrivi con prove`, 'step5.b': `Il laboratorio di scrittura redige sezioni ancorate al grafo, e si rifiuta di citare qualsiasi cosa non corrisponda a un vero elemento Zotero. Deep Research compone report completi di più pagine con citazioni. Lo stesso copilota funziona dal vivo dentro Microsoft Word e LibreOffice Writer.`,
     'step6.t': `Poi ascoltalo`, 'step6.b': `Trasforma qualsiasi report in audio narrato, o fai una passeggiata guidata e immersiva in un angolo del tuo corpus. Le voci funzionano in locale (Piper, Kokoro), o usa una chiave Hume per voci nel cloud.`,
     'views.kicker': `Le viste`, 'views.title': `Guarda ogni sezione prendere vita.`, 'views.lead': `Ogni vignetta qui sotto rispecchia una vista reale dell'app ed è esplorabile nella demo, nella modalità di vault a cui appartiene.`,
-    'views.cta': `Apri le cinque demo dal vivo →`, 'v.open': `Apri nella demo →`,
+    'views.cta': `Apri le sei demo dal vivo →`, 'v.open': `Apri nella demo →`,
     'v.library.t': `Entra Zotero, escono idee`, 'v.library.b': `Sincronizza le tue raccolte, mantieni le etichette di lettura, unisci i duplicati senza perdite. Ogni opera conserva il suo stato di analisi, niente viene scansionato due volte.`,
     'v.graph.t': `Il corpus come costellazione`, 'v.graph.b': `Temi, affermazioni, scoperte e metodi con archi tipizzati come sostiene, contraddice e affina. I preset saltano direttamente a contraddizioni, lacune o al tuo percorso di lettura.`,
     'v.ideas.t': `Affermazioni con prove`, 'v.ideas.b': `Ogni idea porta una prova testuale e un riferimento di pagina. Cliccane una e ottieni le sue relazioni, il suo autore e il passaggio esatto. Mai affermazioni orfane.`,
@@ -2442,7 +2457,7 @@ const I18N = {
     'step5.t': `Schreibe mit Belegen`, 'step5.b': `Die Schreibwerkstatt verfasst Abschnitte, die im Graphen verankert sind, und weigert sich, irgendetwas zu zitieren, das nicht auf ein echtes Zotero-Objekt verweist. Deep Research verfasst vollständige mehrseitige Berichte mit Zitaten. Derselbe Copilot läuft live in Microsoft Word und LibreOffice Writer.`,
     'step6.t': `Und dann hör es dir an`, 'step6.b': `Verwandle jeden Bericht in erzähltes Audio oder mach einen immersiven, geführten Rundgang durch eine Ecke deines Korpus. Die Stimmen laufen lokal (Piper, Kokoro), oder nutze einen Hume-Schlüssel für Cloud-Stimmen.`,
     'views.kicker': `Die Ansichten`, 'views.title': `Sieh jeden Bereich lebendig werden.`, 'views.lead': `Jede Miniatur unten spiegelt eine echte Ansicht der App und ist in der Demo erkundbar — im Tresor-Modus, zu dem sie gehört.`,
-    'views.cta': `Öffne die fünf Live-Demos →`, 'v.open': `In der Demo öffnen →`,
+    'views.cta': `Öffne die sechs Live-Demos →`, 'v.open': `In der Demo öffnen →`,
     'v.library.t': `Zotero rein, Ideen raus`, 'v.library.b': `Synchronisiere deine Sammlungen, behalte die Gelesen-Tags, führe Duplikate verlustfrei zusammen. Jedes Werk trägt seinen Analysestatus, nichts wird zweimal gescannt.`,
     'v.graph.t': `Der Korpus als Sternbild`, 'v.graph.b': `Themen, Aussagen, Befunde und Methoden mit typisierten Kanten wie stützt, widerspricht und verfeinert. Voreinstellungen springen direkt zu Widersprüchen, Lücken oder deiner Leseroute.`,
     'v.ideas.t': `Aussagen mit Belegen`, 'v.ideas.b': `Jede Idee trägt einen wörtlichen Beleg und eine Seitenangabe. Klick eine an und du erhältst ihre Beziehungen, ihren Autor und die exakte Passage. Niemals verwaiste Behauptungen.`,
@@ -2481,7 +2496,7 @@ const I18N = {
     'step5.t': `Escreva com provas`, 'step5.b': `A oficina de escrita redige seções ancoradas no grafo e se recusa a citar qualquer coisa que não corresponda a um item real do Zotero. O Deep Research compõe relatórios completos de várias páginas com citações. O mesmo copiloto funciona ao vivo dentro do Microsoft Word e do LibreOffice Writer.`,
     'step6.t': `E depois ouça`, 'step6.b': `Transforme qualquer relatório em áudio narrado, ou faça um passeio guiado e imersivo por um canto do seu corpus. As vozes funcionam localmente (Piper, Kokoro), ou use uma chave Hume para vozes na nuvem.`,
     'views.kicker': `As vistas`, 'views.title': `Veja cada seção ganhar vida.`, 'views.lead': `Cada vinheta abaixo reflete uma vista real da app e é explorável na demo, no modo de cofre a que pertence.`,
-    'views.cta': `Abre as cinco demos ao vivo →`, 'v.open': `Abrir na demo →`,
+    'views.cta': `Abre as seis demos ao vivo →`, 'v.open': `Abrir na demo →`,
     'v.library.t': `Entra Zotero, saem ideias`, 'v.library.b': `Sincronize as suas coleções, mantenha as etiquetas de lido, mescle duplicados sem perdas. Cada obra guarda o seu estado de análise, nada é escaneado duas vezes.`,
     'v.graph.t': `O corpus como constelação`, 'v.graph.b': `Temas, afirmações, descobertas e métodos com arestas tipadas como apoia, contradiz e refina. As predefinições saltam direto para contradições, lacunas ou a sua rota de leitura.`,
     'v.ideas.t': `Afirmações com provas`, 'v.ideas.b': `Cada ideia carrega evidência literal e uma referência de página. Clique numa e você obtém as suas relações, o seu autor e a passagem exata. Nunca afirmações órfãs.`,
@@ -2520,7 +2535,7 @@ const I18N = {
     'step5.t': `Kanıtla yazın`, 'step5.b': `Yazma Atölyesi grafta temellenen bölümler taslaklar ve gerçek bir Zotero kaydına bağlanmayan hiçbir şeyi kaynak göstermez. Deep Research, atıflı ve çok sayfalı tam raporlar oluşturur. Aynı yardımcı Microsoft Word ve LibreOffice Writer içinde canlı çalışır.`,
     'step6.t': `Sonra dinleyin`, 'step6.b': `Herhangi bir raporu sesli anlatıma dönüştürün veya derleminizin bir köşesinde rehberli, sürükleyici bir yolculuğa çıkın. Sesler yerel olarak çalışır (Piper, Kokoro); bulut sesleri için kendi Hume anahtarınızı da kullanabilirsiniz.`,
     'views.kicker': `Görünümler`, 'views.title': `Her bölümün canlanışını görün.`, 'views.lead': `Aşağıdaki her küçük görsel uygulamanın gerçek bir görünümünü yansıtır ve ait olduğu kasa modunda demoda gezilebilir.`,
-    'views.cta': `Beş canlı demoyu açın →`, 'v.open': `Demoda aç →`,
+    'views.cta': `Altı canlı demoyu açın →`, 'v.open': `Demoda aç →`,
     'v.library.t': `Zotero girer, fikirler çıkar`, 'v.library.b': `Koleksiyonlarınızı eşitleyin, okundu etiketlerini koruyun ve yinelenenleri kayıpsız birleştirin. Her eser analiz durumunu saklar; hiçbir şey iki kez taranmaz.`,
     'v.graph.t': `Bir takımyıldız olarak derlem`, 'v.graph.b': `Temalar, iddialar, bulgular ve yöntemler; destekler, çelişir ve inceltir gibi türlendirilmiş kenarlarla bağlanır. Hazır görünümler sizi doğrudan çelişkilere, boşluklara veya okuma rotanıza götürür.`,
     'v.ideas.t': `Kanıtlı iddialar`, 'v.ideas.b': `Her fikir birebir kanıt ve sayfa bilgisi taşır. Birine tıklayın; ilişkilerini, yazarını ve tam pasajı görün. Kaynaksız iddia yok.`,
@@ -2559,7 +2574,7 @@ const I18N = {
     'step5.t': `有据地写作`, 'step5.b': `写作工坊撰写扎根于图谱的章节，并拒绝引用任何无法对应到真实 Zotero 条目的内容。Deep Research 撰写完整的多页引用报告。同一个副驾也在 Microsoft Word 和 LibreOffice Writer 中实时运行。`,
     'step6.t': `然后聆听它`, 'step6.b': `把任何报告变成朗读音频，或在你语料的一角来一次沉浸式的引导漫步。语音在本地运行（Piper、Kokoro），或用 Hume 密钥使用云端语音。`,
     'views.kicker': `各个视图`, 'views.title': `看每个板块活起来。`, 'views.lead': `下面每个小图都对应应用里真实的一个视图，并且都能在演示中、在它所属的保险库模式里探索。`,
-    'views.cta': `打开五个在线演示 →`, 'v.open': `在演示中打开 →`,
+    'views.cta': `打开六个在线演示 →`, 'v.open': `在演示中打开 →`,
     'v.library.t': `输入 Zotero，输出想法`, 'v.library.b': `同步你的合集，保留“已读”标签，无损合并重复项。每部作品都记录其分析状态，绝不重复扫描。`,
     'v.graph.t': `语料如星座`, 'v.graph.b': `主题、论点、发现与方法之间是有类型的连线，如支持、反驳与细化。预设可直接跳转到矛盾、空白或你的阅读路线。`,
     'v.ideas.t': `有凭据的论点`, 'v.ideas.b': `每个想法都带有原文证据和页码引用。点开一个，你就能看到它的关系、作者以及确切的段落。绝无无源之言。`,
@@ -2591,7 +2606,7 @@ const I18N_V2 = {
     'nav.vaults': `Vaults`, 'nav.contrib': `Contribuir`,
     'github.downloads': `{n} descargas`, 'github.downloads.tooltip': `Descargas de paquetes desde GitHub Releases · actualizado diariamente`,
     'vaults.kicker': `Los vaults`, 'vaults.title': `Cada proyecto, su propio espacio de trabajo.`,
-    'vaults.lead': `Un vault es un único archivo en tu dispositivo con un proyecto dentro. Su modo decide qué secciones aparecen y cómo se instruye al asistente de IA. El motor, el almacenamiento privado y los ajustes son los mismos en todos los modos. Hoy hay cinco modos disponibles; Fuentes primarias, Testimonio y Prosopografía muestran lo que llegará después.`,
+    'vaults.lead': `Un vault es un único archivo en tu dispositivo con un proyecto dentro. Su modo decide qué secciones aparecen y cómo se instruye al asistente de IA. El motor, el almacenamiento privado y los ajustes son los mismos en todos los modos. Hoy hay seis modos disponibles; Fuentes primarias, Testimonio y Prosopografía muestran lo que llegará después.`,
     'toolkit.kicker': `Nodus Toolkit · Incluido`,
     'toolkit.title': `Cuatro herramientas potentes. Ya dentro de Nodus.`,
     'toolkit.lead': `Los vaults dan estructura a cada proyecto. Nodus Toolkit resuelve las tareas prácticas de antes, durante y después, con utilidades especializadas incluidas en la misma aplicación de escritorio privada.`,
@@ -2716,7 +2731,7 @@ const I18N_V2 = {
     'nav.vaults': `Coffres`, 'nav.contrib': `Contribuer`,
     'github.downloads': `{n} téléchargements`, 'github.downloads.tooltip': `Téléchargements de paquets depuis GitHub Releases · mis à jour quotidiennement`,
     'vaults.kicker': `Les coffres`, 'vaults.title': `Le même moteur, adapté à votre travail.`,
-    'vaults.lead': `Un coffre est un seul fichier sur votre appareil, contenant un projet. Son mode décide des sections affichées et de la façon dont l'assistant IA est briefé. Le moteur, le stockage privé et les réglages restent les mêmes dans chaque mode. Cinq modes sont disponibles aujourd'hui ; Sources primaires, Témoignages et Prosopographie montrent ce qui viendra ensuite.`,
+    'vaults.lead': `Un coffre est un seul fichier sur votre appareil, contenant un projet. Son mode décide des sections affichées et de la façon dont l'assistant IA est briefé. Le moteur, le stockage privé et les réglages restent les mêmes dans chaque mode. Six modes sont disponibles aujourd'hui ; Sources primaires, Témoignages et Prosopographie montrent ce qui viendra ensuite.`,
     'vaults.academic.t': `Académique`,
     'vaults.academic.b': `Connectez votre bibliothèque Zotero et transformez chaque ouvrage en un réseau d'affirmations, de résultats et de méthodes. Chaque idée conserve le passage exact et la page qui l'étayent.`,
     'vaults.academic.f1': `<b>Un graphe d'idées</b>, pas de fichiers : soutient, contredit, affine, étend.`,
@@ -2786,7 +2801,7 @@ const I18N_V2 = {
     'nav.vaults': `Vault`, 'nav.contrib': `Contribuisci`,
     'github.downloads': `{n} download`, 'github.downloads.tooltip': `Download dei pacchetti da GitHub Releases · aggiornato ogni giorno`,
     'vaults.kicker': `I vault`, 'vaults.title': `Lo stesso motore, adattato al tuo lavoro.`,
-    'vaults.lead': `Un vault è un unico file sul tuo dispositivo, con dentro un progetto. La sua modalità decide quali sezioni compaiono e come viene istruito l'assistente IA. Il motore, l'archiviazione privata e le impostazioni restano gli stessi in ogni modalità. Oggi sono disponibili cinque modalità; Fonti primarie, Testimonianze e Prosopografia mostrano ciò che arriverà in seguito.`,
+    'vaults.lead': `Un vault è un unico file sul tuo dispositivo, con dentro un progetto. La sua modalità decide quali sezioni compaiono e come viene istruito l'assistente IA. Il motore, l'archiviazione privata e le impostazioni restano gli stessi in ogni modalità. Oggi sono disponibili sei modalità; Fonti primarie, Testimonianze e Prosopografia mostrano ciò che arriverà in seguito.`,
     'vaults.academic.t': `Accademico`,
     'vaults.academic.b': `Collega la tua libreria Zotero e trasforma ogni opera in una rete di affermazioni, risultati e metodi. Ogni idea conserva il passaggio esatto e la pagina che la sostengono.`,
     'vaults.academic.f1': `<b>Un grafo di idee</b>, non di file: sostiene, contraddice, affina, estende.`,
@@ -2856,7 +2871,7 @@ const I18N_V2 = {
     'nav.vaults': `Tresore`, 'nav.contrib': `Mitmachen`,
     'github.downloads': `{n} Downloads`, 'github.downloads.tooltip': `Paket-Downloads aus GitHub Releases · täglich aktualisiert`,
     'vaults.kicker': `Die Tresore`, 'vaults.title': `Dieselbe Engine, auf deine Arbeit zugeschnitten.`,
-    'vaults.lead': `Ein Tresor ist eine einzige Datei auf deinem Gerät, die ein Projekt enthält. Sein Modus entscheidet, welche Bereiche erscheinen und wie der KI-Assistent gebrieft wird. Engine, privater Speicher und Einstellungen bleiben in jedem Modus gleich. Fünf Modi sind heute verfügbar; Primärquellen, Zeugnisse und Prosopographie zeigen, was als Nächstes kommt.`,
+    'vaults.lead': `Ein Tresor ist eine einzige Datei auf deinem Gerät, die ein Projekt enthält. Sein Modus entscheidet, welche Bereiche erscheinen und wie der KI-Assistent gebrieft wird. Engine, privater Speicher und Einstellungen bleiben in jedem Modus gleich. Sechs Modi sind heute verfügbar; Primärquellen, Zeugnisse und Prosopographie zeigen, was als Nächstes kommt.`,
     'vaults.academic.t': `Akademisch`,
     'vaults.academic.b': `Verbinde deine Zotero-Bibliothek und verwandle jedes Werk in ein Netz aus Thesen, Erkenntnissen und Methoden. Jede Idee behält die genaue Textstelle und Seite, die sie belegen.`,
     'vaults.academic.f1': `<b>Ein Graph aus Ideen</b>, nicht aus Dateien: stützt, widerspricht, präzisiert, erweitert.`,
@@ -2926,7 +2941,7 @@ const I18N_V2 = {
     'nav.vaults': `Cofres`, 'nav.contrib': `Contribuir`,
     'github.downloads': `{n} downloads`, 'github.downloads.tooltip': `Downloads de pacotes do GitHub Releases · atualizado diariamente`,
     'vaults.kicker': `Os cofres`, 'vaults.title': `O mesmo motor, adaptado ao teu trabalho.`,
-    'vaults.lead': `Um cofre é um único ficheiro no teu dispositivo, com um projeto lá dentro. O seu modo decide que secções aparecem e como o assistente de IA é instruído. O motor, o armazenamento privado e as definições são os mesmos em cada modo. Hoje há cinco modos disponíveis; Fontes primárias, Testemunhos e Prosopografia mostram o que virá a seguir.`,
+    'vaults.lead': `Um cofre é um único ficheiro no teu dispositivo, com um projeto lá dentro. O seu modo decide que secções aparecem e como o assistente de IA é instruído. O motor, o armazenamento privado e as definições são os mesmos em cada modo. Hoje há seis modos disponíveis; Fontes primárias, Testemunhos e Prosopografia mostram o que virá a seguir.`,
     'vaults.academic.t': `Acadêmico`,
     'vaults.academic.b': `Liga a tua biblioteca do Zotero e transforma cada obra numa rede de afirmações, descobertas e métodos. Cada ideia conserva o excerto exato e a página que a sustentam.`,
     'vaults.academic.f1': `<b>Um grafo de ideias</b>, não de ficheiros: apoia, contradiz, matiza, amplia.`,
@@ -2996,7 +3011,7 @@ const I18N_V2 = {
     'nav.vaults': `Kasalar`, 'nav.contrib': `Katkıda bulun`,
     'github.downloads': `{n} indirme`, 'github.downloads.tooltip': `GitHub Releases paket indirmeleri · günlük güncellenir`,
     'vaults.kicker': `Kasalar`, 'vaults.title': `Aynı motor, işine göre biçimlenir.`,
-    'vaults.lead': `Bir kasa, cihazınızda tek bir projeyi tutan tek bir dosyadır. Modu, hangi bölümlerin görüneceğine ve yapay zekâ asistanının nasıl bilgilendirileceğine karar verir. Motor, özel depolama ve ayarlar her modda aynı kalır. Bugün beş mod kullanılabilir; Birincil Kaynaklar, Tanıklıklar ve Prosopografi sırada ne olduğunu gösterir.`,
+    'vaults.lead': `Bir kasa, cihazınızda tek bir projeyi tutan tek bir dosyadır. Modu, hangi bölümlerin görüneceğine ve yapay zekâ asistanının nasıl bilgilendirileceğine karar verir. Motor, özel depolama ve ayarlar her modda aynı kalır. Bugün altı mod kullanılabilir; Birincil Kaynaklar, Tanıklıklar ve Prosopografi sırada ne olduğunu gösterir.`,
     'vaults.academic.t': `Akademik`,
     'vaults.academic.b': `Zotero kitaplığınızı bağlayın ve her eseri iddialar, bulgular ve yöntemlerden oluşan bir ağa dönüştürün. Her fikir, kendisini destekleyen tam pasajı ve sayfayı korur.`,
     'vaults.academic.f1': `<b>Dosyaların değil fikirlerin grafiği</b>: destekler, çelişir, inceltir, genişletir.`,
@@ -3066,7 +3081,7 @@ const I18N_V2 = {
     'nav.vaults': `保险库`, 'nav.contrib': `参与贡献`,
     'github.downloads': `{n} 次下载`, 'github.downloads.tooltip': `GitHub Releases 软件包下载量 · 每日更新`,
     'vaults.kicker': `保险库`, 'vaults.title': `同一引擎，因你的工作而变。`,
-    'vaults.lead': `保险库就是你设备上的一个文件，里面装着一个项目。它的模式决定显示哪些板块、如何设定 AI 助手的身份。底层的引擎、私密存储和设置在每种模式下都相同。目前有五种模式可用；原始档案、口述证言与群体传记研究展示接下来将推出的方向。`,
+    'vaults.lead': `保险库就是你设备上的一个文件，里面装着一个项目。它的模式决定显示哪些板块、如何设定 AI 助手的身份。底层的引擎、私密存储和设置在每种模式下都相同。目前有六种模式可用；原始档案、口述证言与群体传记研究展示接下来将推出的方向。`,
     'vaults.academic.t': `学术`,
     'vaults.academic.b': `连接你的 Zotero 文库，将每部著作转化为由论点、发现和方法构成的网络。每条观点都会保留支撑它的原文段落和准确页码。`,
     'vaults.academic.f1': `<b>一张观点的图谱</b>，而不是文件：支持、反驳、修正、延伸。`,
@@ -3145,7 +3160,7 @@ Object.assign(I18N, {
     'hero.demo': `ライブデモを試す`, 'hero.download': `macOS・Windows・Linux版をダウンロード`,
     'hero.meta': `<b>完全無料・オープンソース。</b> アカウント、購読、テレメトリはなく、コーパスは端末の外に出ません。`, 'hero.scroll': `スクロール`,
     'vaults.kicker': `Vault`, 'vaults.title': `同じエンジンを、あなたの仕事の形に。`,
-    'vaults.lead': `Vaultは、端末上の一つのプロジェクトを収める単一ファイルです。モードによって表示される機能とAIアシスタントの役割が変わります。現在5モードを利用でき、一次資料、証言、プロソポグラフィは今後追加予定です。`,
+    'vaults.lead': `Vaultは、端末上の一つのプロジェクトを収める単一ファイルです。モードによって表示される機能とAIアシスタントの役割が変わります。現在6モードを利用でき、一次資料、証言、プロソポグラフィは今後追加予定です。`,
     'vaults.status.available': `利用可能`, 'vaults.status.soon': `近日公開`, 'vaults.roadmap': `ロードマップ掲載`,
     'vaults.academic.t': `学術研究`, 'vaults.academic.b': `Zoteroライブラリをつなぎ、各文献を主張・知見・手法のネットワークに変換します。各アイデアには、それを裏づける正確な箇所とページが残ります。`,
     'vaults.academic.f1': `<b>Zoteroライブラリをアイデアのグラフに変換</b>し、主張・知見・手法を原文とページへ結びます。`,
@@ -3197,7 +3212,7 @@ Object.assign(I18N, {
     'hero.h1': `<span class="hw hw1">Досліджуйте</span> глибше<br/><span class="hw hw2">Викладайте</span> розумніше<br/><span class="hw hw3">Навчайтеся</span> краще`,
     'hero.sub': `Локальний робочий простір, у якому дослідники, викладачі та студенти можуть пов’язувати джерела, нотатки, дані, ідеї та навчальні матеріали.`,
     'hero.demo': `Спробувати демо`, 'hero.download': `Завантажити для macOS, Windows і Linux`, 'hero.meta': `<b>Повністю безкоштовно й з відкритим кодом.</b> Без облікових записів, підписок і телеметрії; корпус не залишає ваш пристрій.`, 'hero.scroll': `гортайте`,
-    'vaults.kicker': `Сховища`, 'vaults.title': `Один рушій, пристосований до вашої роботи.`, 'vaults.lead': `Сховище — це один файл проєкту на вашому пристрої. Режим визначає розділи та інструкції для ШІ-помічника. П’ять режимів доступні зараз; «Первинні джерела», «Свідчення» та «Просопографія» заплановані.`,
+    'vaults.kicker': `Сховища`, 'vaults.title': `Один рушій, пристосований до вашої роботи.`, 'vaults.lead': `Сховище — це один файл проєкту на вашому пристрої. Режим визначає розділи та інструкції для ШІ-помічника. Шість режимів доступні зараз; «Первинні джерела», «Свідчення» та «Просопографія» заплановані.`,
     'vaults.status.available': `Доступно зараз`, 'vaults.status.soon': `Незабаром`, 'vaults.roadmap': `У планах`,
     'vaults.academic.t': `Академічне`, 'vaults.academic.b': `Під’єднайте бібліотеку Zotero й перетворіть кожну працю на мережу тверджень, висновків і методів. Кожна ідея зберігає точний уривок і сторінку, що її підтверджують.`,
     'vaults.academic.f1': `<b>Перетворюйте бібліотеку Zotero на граф ідей</b>, пов’язуючи твердження, висновки й методи з точними уривками та сторінками.`, 'vaults.academic.f2': `<b>Виявляйте дискусії, суперечності й прогалини</b> за допомогою семантичного пошуку, аналізу охоплення та маршрутів читання.`, 'vaults.academic.f3': `<b>Досліджуйте й пишіть із перевірюваними цитатами</b> у Deep Research, майстерні письма та помічниках для Word і LibreOffice.`, 'vaults.academic.cta': `Відкрити академічне демо →`,
@@ -3219,7 +3234,7 @@ Object.assign(I18N, {
   ru: {
     'nav.vaults': `Хранилища`, 'nav.how': `Как это работает`, 'nav.views': `Обзоры`, 'nav.contrib': `Участвовать`, 'nav.demo': `Открыть демо`,
     'hero.h1': `<span class="hw hw1">Исследуйте</span> глубже<br/><span class="hw hw2">Преподавайте</span> умнее<br/><span class="hw hw3">Учитесь</span> лучше`, 'hero.sub': `Локальное рабочее пространство, где исследователи, преподаватели и студенты могут связывать источники, заметки, данные, идеи и учебные материалы.`, 'hero.demo': `Открыть демо`, 'hero.download': `Скачать для macOS, Windows и Linux`, 'hero.meta': `<b>Полностью бесплатно и с открытым исходным кодом.</b> Без аккаунтов, подписок и телеметрии; корпус не покидает ваш компьютер.`, 'hero.scroll': `листайте`,
-    'vaults.kicker': `Хранилища`, 'vaults.title': `Один движок, настроенный под вашу работу.`, 'vaults.lead': `Хранилище — один файл проекта на вашем устройстве. Режим определяет разделы и инструкции для ИИ-помощника. Пять режимов доступны сейчас; «Первичные источники», «Свидетельства» и «Просопография» запланированы.`, 'vaults.status.available': `Доступно сейчас`, 'vaults.status.soon': `Скоро`, 'vaults.roadmap': `В планах`,
+    'vaults.kicker': `Хранилища`, 'vaults.title': `Один движок, настроенный под вашу работу.`, 'vaults.lead': `Хранилище — один файл проекта на вашем устройстве. Режим определяет разделы и инструкции для ИИ-помощника. Шесть режимов доступны сейчас; «Первичные источники», «Свидетельства» и «Просопография» запланированы.`, 'vaults.status.available': `Доступно сейчас`, 'vaults.status.soon': `Скоро`, 'vaults.roadmap': `В планах`,
     'vaults.academic.t': `Академический`, 'vaults.academic.b': `Подключите библиотеку Zotero и превратите каждую работу в сеть утверждений, выводов и методов. Каждая идея сохраняет точный фрагмент и страницу, которые её подтверждают.`, 'vaults.academic.f1': `<b>Превратите библиотеку Zotero в граф идей</b>, связывая утверждения, выводы и методы с точными фрагментами и страницами.`, 'vaults.academic.f2': `<b>Находите дискуссии, противоречия и пробелы</b> с помощью семантического поиска, анализа охвата и маршрутов чтения.`, 'vaults.academic.f3': `<b>Исследуйте и пишите с проверяемыми ссылками</b> в Deep Research, мастерской письма и помощниках для Word и LibreOffice.`, 'vaults.academic.cta': `Открыть академическое демо →`,
     'vaults.study.t': `Учёба`, 'vaults.study.b': `Организуйте предметы, заметки и материалы в одном месте. Учитесь в своём темпе, готовьтесь к проверочным работам и следите за прогрессом без зависимости от Zotero и загрузки файлов.`, 'vaults.study.f1': `<b>Организуйте материалы по учебному году, курсу и предмету</b>, добавляя расписание, сроки и события с напоминаниями.`, 'vaults.study.f2': `<b>Записывайте и расшифровывайте занятия локально</b>, читайте PDF и EPUB и возвращайтесь от ответа к точной странице, заметке или секунде.`, 'vaults.study.f3': `<b>Создавайте из своих материалов банки вопросов, тесты, экзамены и карточки</b> с интервальным повторением и отслеживанием прогресса.`, 'vaults.study.cta': `Открыть демо учёбы →`,
     'vaults.genealogy.t': `Генеалогия`, 'vaults.genealogy.b': `Исследуйте семейные истории и жизненные пути отдельных людей по первичным источникам. Сопоставляйте личности, события и родственные связи и связывайте каждый вывод с подтверждающими документами.`, 'vaults.genealogy.f1': `<b>Восстанавливайте людей в семейном древе, хронологии и на карте</b> с импортом и экспортом GEDCOM и доказательствами каждого события.`, 'vaults.genealogy.f2': `<b>Создавайте связанный архив переписей, реестров, писем и фотографий</b>, привязанный к людям, местам и событиям.`, 'vaults.genealogy.f3': `<b>Проверяйте предполагаемые личности и родство как доказательные гипотезы</b>, сохраняя противоречия, исторические написания и неточные даты.`, 'vaults.genealogy.cta': `Открыть демо генеалогии →`,
@@ -3262,7 +3277,7 @@ const PT_PT = {
   'hero.download': `Descarregar para macOS, Windows e Linux`,
   'hero.meta': `<b>Totalmente gratuito e de código aberto.</b> Sem contas, sem assinaturas, sem telemetria, e o teu corpus nunca sai da tua máquina.`,
   'vaults.kicker': `Os cofres`, 'vaults.title': `O mesmo motor, adaptado ao teu trabalho.`,
-  'vaults.lead': `Um cofre é um único ficheiro no teu dispositivo, com um projeto lá dentro. O seu modo decide que secções aparecem e como o assistente de IA é instruído. O motor, o armazenamento privado e as definições são os mesmos em cada modo. Hoje há cinco modos disponíveis; Fontes primárias, Testemunhos e Prosopografia mostram o que virá a seguir.`,
+  'vaults.lead': `Um cofre é um único ficheiro no teu dispositivo, com um projeto lá dentro. O seu modo decide que secções aparecem e como o assistente de IA é instruído. O motor, o armazenamento privado e as definições são os mesmos em cada modo. Hoje há seis modos disponíveis; Fontes primárias, Testemunhos e Prosopografia mostram o que virá a seguir.`,
   'vaults.academic.t': `Académico`,
   'vaults.academic.b': `Liga a tua biblioteca do Zotero e transforma cada obra numa rede de afirmações, descobertas e métodos. Cada ideia conserva o excerto exato e a página que a sustentam.`,
   'vaults.academic.f1': `<b>Transforma a tua biblioteca do Zotero num grafo de ideias</b>, ligando afirmações, descobertas e métodos à passagem e página exatas.`,
@@ -3301,7 +3316,7 @@ const PT_BR = {
   'hero.meta': `<b>Totalmente gratuito e de código aberto.</b> Sem contas, sem assinaturas, sem telemetria, e seu corpus nunca sai da sua máquina.`,
   'story.title': `Das suas fontes a ideias que você pode usar.`,
   'vaults.kicker': `Os cofres`, 'vaults.title': `O mesmo motor, adaptado ao seu trabalho.`,
-  'vaults.lead': `Um cofre é um único arquivo no seu dispositivo, com um projeto dentro. Seu modo decide quais seções aparecem e como o assistente de IA é instruído. O motor, o armazenamento privado e as configurações são os mesmos em todos os modos. Hoje há cinco modos disponíveis; Fontes primárias, Testemunhos e Prosopografia mostram o que virá depois.`,
+  'vaults.lead': `Um cofre é um único arquivo no seu dispositivo, com um projeto dentro. Seu modo decide quais seções aparecem e como o assistente de IA é instruído. O motor, o armazenamento privado e as configurações são os mesmos em todos os modos. Hoje há seis modos disponíveis; Fontes primárias, Testemunhos e Prosopografia mostram o que virá depois.`,
   'vaults.academic.t': `Acadêmico`,
   'vaults.academic.b': `Conecte sua biblioteca do Zotero e transforme cada obra em uma rede de afirmações, descobertas e métodos. Cada ideia conserva o trecho exato e a página que a sustentam.`,
   'vaults.academic.f1': `<b>Transforme sua biblioteca do Zotero em um grafo de ideias</b>, conectando afirmações, descobertas e métodos à passagem e página exatas.`,

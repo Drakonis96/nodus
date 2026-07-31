@@ -15,7 +15,7 @@ test('the Teaching web demo is reachable from every live vault demo', () => {
   assert.match(teachingHtml, /src="teaching-app\.js/);
   assert.match(teachingHtml, /AI for generating teaching content only; AI never evaluates students/);
 
-  for (const page of ['index.html', 'study.html', 'genealogy.html', 'databases.html']) {
+  for (const page of ['index.html', 'study.html', 'genealogy.html', 'databases.html', 'worldbuilding.html']) {
     const html = read(`site/demo/${page}`);
     assert.match(html, /class="vault-tab teach" href="teaching\.html"/, `${page} links to Teaching`);
     assert.doesNotMatch(html, /Shell in the app · preview/, `${page} no longer labels Teaching as a preview`);
@@ -23,8 +23,8 @@ test('the Teaching web demo is reachable from every live vault demo', () => {
 });
 
 test('every live demo exposes the same vault tags and marks exactly one active', () => {
-  const pages = ['index.html', 'teaching.html', 'study.html', 'genealogy.html', 'databases.html'];
-  const expectedHrefs = ['index.html', 'teaching.html', 'study.html', 'genealogy.html', 'databases.html'];
+  const pages = ['index.html', 'teaching.html', 'study.html', 'genealogy.html', 'databases.html', 'worldbuilding.html'];
+  const expectedHrefs = ['index.html', 'teaching.html', 'study.html', 'genealogy.html', 'databases.html', 'worldbuilding.html'];
 
   for (const page of pages) {
     const html = read(`site/demo/${page}`);

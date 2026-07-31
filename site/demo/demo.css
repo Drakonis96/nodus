@@ -564,6 +564,7 @@ textarea.search-input { resize: vertical; min-height: 74px; line-height: 1.5; }
 .vault-tab.st { --vault-color: #0f766e; }
 .vault-tab.gen { --vault-color: #ca8a04; }
 .vault-tab.db { --vault-color: #b30333; }
+.vault-tab.world { --vault-color: #8b5cf6; }
 .vault-active-label {
   padding-left: 6px; border-left: 1px solid color-mix(in srgb, currentColor 38%, transparent);
   font-size: 9px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;

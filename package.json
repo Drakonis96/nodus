@@ -27,6 +27,8 @@
     "verify:single-instance": "node scripts/verify-single-instance.mjs",
     "verify:api-key-recovery-macos": "node scripts/verify-api-key-recovery-macos.mjs",
     "verify:toolkit-heic": "node scripts/verify-toolkit-heic.mjs",
+    "capture:worldbuilding-site": "npm run build && electron-rebuild -f -w better-sqlite3 && node scripts/capture-worldbuilding-site-demo.mjs",
+    "test:worldbuilding-site": "node --test scripts/test-worldbuilding-site-demo.mjs",
     "verify:aiocr": "node scripts/verify-aiocr.mjs",
     "verify:local-image": "node scripts/verify-local-image-generation.mjs",
     "licenses:generate": "node scripts/generate-third-party-licenses.mjs",
