@@ -1,5 +1,69 @@
 # Changelog
 
+## 3.0.4 — 2026-08-01
+
+Deep Research becomes something an MCP client can queue instead of wait on, and
+two surfaces stop repeating themselves: a retry that always returned to the
+engine that had just refused, and an argument map that redrew every hub as a
+star.
+
+### Added
+
+- **Deep Research reports can be queued over MCP.** `nodus_generate_deep_research`
+  holds the call open for the whole generation — minutes during which a client can
+  time out — and it competed with whatever the window was already generating. A
+  single generation lane (`electron/ai/deepResearchQueue.ts`) is now shared by the
+  app and MCP clients, and four tools let a client enqueue and poll instead of
+  wait: `nodus_enqueue_deep_research`, `nodus_list_deep_research_jobs`,
+  `nodus_get_deep_research_job`, `nodus_cancel_deep_research_job`. Each job is
+  bound to the vault active when it was queued — checked again before it starts
+  and once more before its draft is saved — and switching vault cancels anything
+  still waiting for a different one. MCP-originated reports appear in the app's
+  queue strip with an MCP badge and raise a Nodi notification when they finish,
+  since the client that asked for them may have disconnected by then.
+- **The image engine is choosable per image.** The design modal gains a model
+  picker listing the whole catalogue with its per-image price; the footer states
+  what the button is about to use rather than what last ran.
+
+### Fixed
+
+- **A failed image was retried on the engine that had just refused it.** The retry
+  read the provider and model off the failed record, so a report stuck on "the
+  image could not be generated" reproduced the identical failure on every attempt,
+  and changing the image provider in Settings did nothing for it. The engine now
+  comes from the request or from Settings: a failed image opens on the current
+  default, a ready one keeps its own, and what a retry repeats is the request, its
+  prompt and its style — not the engine.
+- **Image failure reasons leaked Spanish or were flattened into a generic
+  message.** These reasons are stored and read back later, unlike every other
+  runtime error, and reached the renderer two ways that disagreed:
+  `localizeIpcPayload` collapsed most of them into "the operation could not be
+  completed", the ones its Spanish detector missed leaked verbatim, and the
+  `images:changed` event bypassed localization entirely. They are now registered
+  as renderer-translated, translated in all seven languages, and every
+  `images:changed` broadcast is localized like an IPC result. The modal leads with
+  the reason; the reassurance about the report is a footnote. Four reasons that
+  interpolated a model or provider name became fixed sentences so they can have a
+  translation key at all.
+- **The argument map collapsed hub ideas into a flat star.** The local-subgraph
+  walk capped the idea budget in row order before ranking by relevance, so a
+  well-connected idea silently lost some of its strongest debates; and it kept only
+  the edges the walk itself crossed, which for any hub meant no neighbour-to-
+  neighbour edge survived — every branch was forced to be a leaf regardless of the
+  configured tree depth — while the header quoted the post-cap counts instead of
+  the idea's real connectivity. It now expands strongest-link-first, keeps the full
+  induced subgraph so branches can ramify, grows the structural tree level by level
+  with branches split across debates/support/other instead of ranking alone (which
+  handed every slot to debates), and reports real graph-wide connection counts plus
+  how many links were left undrawn. Pinned by
+  `scripts/test-argument-map-graph.mjs`. Closes #329.
+
+### Changed
+
+- **The website's live demos are usable on a phone.** All six demo vaults ship a
+  mobile layout (`site/demo/mobile.css`, `site/demo/mobile.js`) instead of a
+  desktop shell squeezed into a narrow viewport.
+
 ## 3.0.3 — 2026-07-31
 
 Getting reports out of Deep Research, and a Cancel button that left the job

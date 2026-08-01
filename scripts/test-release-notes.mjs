@@ -25,10 +25,18 @@ try {
 
   const { RELEASE_NOTES, releaseNotesForMajor } = await import(pathToFileURL(bundlePath).href);
   const currentRelease = RELEASE_NOTES[0];
-  assert.equal(currentRelease?.version, '3.0.3');
-  assert.equal(currentRelease?.date, '2026-07-31');
-  // Bulk export, the AI-suggested image prompt, and the audio Cancel that did nothing.
+  assert.equal(currentRelease?.version, '3.0.4');
+  assert.equal(currentRelease?.date, '2026-08-01');
+  // Deep Research queued over MCP, the retry that ignored the engine, and the
+  // argument map that drew every hub as a star.
   assert.equal(currentRelease?.highlights.length, 3);
+  // The MCP queue is the release's headline and owns the cross-vault MCP scope.
+  assert.equal(currentRelease?.highlights[0]?.scope, 'mcp');
+
+  // 3.0.3 keeps its own three highlights underneath.
+  const bulkExportRelease = RELEASE_NOTES.find((note) => note.version === '3.0.3');
+  assert.equal(bulkExportRelease?.date, '2026-07-31');
+  assert.equal(bulkExportRelease?.highlights.length, 3);
 
   // 3.0.2 shipped after the macOS update fix merged, so that highlight stays there.
   const deepResearchRelease = RELEASE_NOTES.find((note) => note.version === '3.0.2');

@@ -1,3 +1,9 @@
+const RELEASE_3_0_4_TR: string[] = [
+  "Bir MCP istemcisi Deep Research raporlarını sıraya alabiliyor. Şimdiye dek rapor isteyen istemci, çağrıyı üretimin tamamı boyunca açık tutmak zorundaydı — her şeyin zaman aşımına uğrayabileceği birkaç dakika — ve uygulamadan sizin başlattığınız bir raporla çakışabiliyordu. Artık raporu sıraya alıp istediği zaman durumunu soruyor: Nodus'un pencereyle paylaştığı tek bir üretim şeridi var, yani asla iki rapor aynı anda çalışmıyor; kuyruk şeridi bir istemciden gelenleri MCP rozetiyle işaretliyor ve Nodi biri bittiğinde ya da başarısız olduğunda sizi uyarıyor, çünkü onu isteyen taraf çoktan bağlantısını kesmiş olabilir. Her iş, sıraya alındığı kasaya bağlı kalıyor ve kasa değiştirmek başka bir kasayı bekleyen ne varsa iptal ediyor.",
+  "Başarısız bir görsel başka bir motorla yeniden denenebiliyor. Yeniden deneme, az önce reddeden görselde kayıtlı sağlayıcıyı ve modeli yeniden kullanıyordu; böylece «görsel üretilemedi» durumunda takılı kalan bir rapor hep aynı motora dönüyor, Ayarlar'dan sağlayıcıyı değiştirmek de işe yaramıyordu. Artık motor, istediğiniz şeyden ya da Ayarlar'dan geliyor: başarısız bir görsel güncel varsayılanla açılıyor, üretilmiş olan kendi motorunu koruyor ve tasarım penceresi, tüm kataloğu görsel başına fiyatıyla listeleyen bir model seçici kazanıyor; alt bilgi de düğmenin neyi kullanacağını söylüyor. Ayrıca başarısızlığın gerçek nedeni, kendisiyle çelişen genel bir başlığın altında kalmak yerine mesajın başına geçiyor ve yedi dilin tamamına çevriliyor.",
+  "Argüman haritası, iyi bağlanmış bir fikri olduğu gibi çiziyor. Merkezî bir fikri açmak onu bir yıldıza düzleştiriyordu: gezinti, fikirleri önem sırasına dizmeden önce veritabanı sırasına göre kırpıyordu, dolayısıyla en güçlü tartışmalarından bazıları sessizce eleniyordu; üstelik yalnızca kendi geçtiği bağlantıları saklıyordu, yani hangi derinliği ayarlarsanız ayarlayın hiçbir dal çatallanamıyordu. Artık önce en güçlü bağlantıdan genişliyor, gösterdiği fikirler arasındaki bütün bağlantıları koruyor, her düzeyi tartışmalar, destekler ve geri kalanlar arasında paylaştırıyor —tüm yerleri tartışmalara bırakmak yerine— ve başlık, fikrin gerçek bağlantı sayısını ve çizilmeden kalan bağlantı sayısını veriyor.",
+];
+
 const RELEASE_3_0_3_TR: string[] = [
   "Raporlar Deep Research'ten toplu olarak, kendi kartından da çıkabiliyor. Galerinin ürettiği her şey şimdiye dek okuyucudan geçerek teker teker çıkıyordu: otuz raporluk bir kitaplık otuz kaydetme penceresi demekti ve bir kartı önce açmadan indiremiyordunuz. Artık başlıktaki İndir düğmesi seçim kipini —tümünü seç dahil— yeniden kullanıyor, Markdown, PDF ya da her ikisini seçmenize izin veriyor ve tek bir ZIP veriyor; ayrıca her kart ve her satır kendi indirme simgesini kazanıyor. PDF'ler ilerleme çubuğu eşliğinde teker teker yazdırılıyor, çünkü bu geçiş bir dakika sürebiliyor ve sessiz geçen bir dakika donma gibi görünüyor.",
   "Bir raporun görsel tasarımı artık sahneyi size önerebiliyor. «Yapay zekâ ile öner», raporun kendi özetinden yazılmış görsel bir betimlemeyi istem kutusuna akıtıyor — üreticinin kendisi için yazacağı, şimdiye dek hiç görmediğiniz betimlemenin ta kendisi. Düzenleyebilirsiniz ve onunla üretim yapana kadar hiçbir şey kaydedilmiyor.",
@@ -20,6 +26,7 @@ const RELEASE_3_0_1_TR: string[] = [
 ];
 
 export const RELEASE_NOTES_TR: Record<string, string[]> = {
+  "3.0.4": RELEASE_3_0_4_TR,
   "3.0.3": RELEASE_3_0_3_TR,
   "3.0.2": RELEASE_3_0_2_TR,
   "3.0.1": RELEASE_3_0_1_TR,
