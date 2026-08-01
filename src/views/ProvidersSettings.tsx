@@ -17,6 +17,7 @@ import type {
 import { DECORATIVE_IMAGE_STYLES } from '@shared/imageStyles';
 import { DEFAULT_LOCAL_BASE_URLS, supportsFreeTierShaping } from '@shared/providers';
 import { AI_PROVIDERS, PROVIDER_LABELS, isLocalAiProvider, modelLabel, sameModel } from '../components/ui';
+import { IMAGE_PROVIDER_LABELS } from '@shared/providers';
 import { SettingsModelDot, SettingsModelList, settingsModelRowClass } from '../components/SettingsModelList';
 import { t, tx } from '../i18n';
 
@@ -524,13 +525,6 @@ function GitHubQuotaCard({ quota }: { quota: GitHubCopilotSubscriptionQuotaWindo
 }
 
 type ImageSort = 'provider' | 'alpha' | 'price_asc' | 'price_desc';
-const IMAGE_PROVIDER_LABELS: Record<ImageModelInfo['provider'], string> = {
-  google: 'Google',
-  openai: 'OpenAI',
-  openrouter: 'OpenRouter',
-  nodus: 'Nodus local',
-  codex: 'ChatGPT · Codex',
-};
 
 export function ImageGenerationSettings({ settings, onChange }: { settings: AppSettings; onChange: () => Promise<unknown> }) {
   const [models, setModels] = useState<ImageModelInfo[]>([]);

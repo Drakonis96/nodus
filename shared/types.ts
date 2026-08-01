@@ -963,6 +963,13 @@ export interface DecorativeImageActionRequest {
   style?: DecorativeImageStyle;
   /** Optional user-edited scene description. Rebuilds the prompt for this style. */
   visualContext?: string;
+  /**
+   * Engine for THIS image, chosen in the design modal. Omitted means "use the
+   * default from Ajustes → Proveedores"; the pair is only honoured together, so a
+   * half-specified request falls back to the setting rather than mixing engines.
+   */
+  provider?: ImageProvider;
+  model?: string;
 }
 export type SyncMode = 'realtime' | 'manual';
 /** 'system' follows the OS light/dark preference and reacts to changes at runtime. */

@@ -1,6 +1,6 @@
 // platform channels, moved verbatim out of the monolithic registerIpc.
 // The channel names are unchanged; scripts/test-ipc-contract.mjs is what proves it.
-import type { IpcContext } from './context';
+import { localizedForUi, type IpcContext } from './context';
 import { originalImagePayloadFromUrl } from '../imageProtocol';
 import { openPrivacyPolicy } from '../privacy';
 import type { AudioEntityKind, AudioProvider, AudioSegmentRequest, AiProvider, LocalProvider, ZoteroLibrary, EmbeddingProvider, TranslationEntityKind, GenerateTranslationRequest, DecorativeImageActionRequest, DecorativeImageEntityKind, DecorativeImageStyle, StudyPronunciationEntry } from '@shared/types';
@@ -173,7 +173,7 @@ export function registerPlatformIpc({ h, getWindow }: IpcContext): void {
   });
   h('images:queue', async (e, request: DecorativeImageActionRequest) =>
     queueDecorativeImageGeneration(request, (image) => {
-      if (!e.sender.isDestroyed()) e.sender.send('images:changed', image);
+      if (!e.sender.isDestroyed()) e.sender.send('images:changed', localizedForUi(image));
     })
   );
   h('images:suggestContext', async (
@@ -195,12 +195,12 @@ export function registerPlatformIpc({ h, getWindow }: IpcContext): void {
     style?: DecorativeImageStyle
   ) => {
     const image = await saveCustomDecorativeImage(entityKind, entityId, Buffer.from(bytes), mimeType, style);
-    if (!e.sender.isDestroyed()) e.sender.send('images:changed', image);
+    if (!e.sender.isDestroyed()) e.sender.send('images:changed', localizedForUi(image));
     return image;
   });
   h('images:revert', async (e, entityKind: DecorativeImageEntityKind, entityId: string) => {
     const image = revertDecorativeImage(entityKind, entityId);
-    if (!e.sender.isDestroyed()) e.sender.send('images:changed', image);
+    if (!e.sender.isDestroyed()) e.sender.send('images:changed', localizedForUi(image));
     return image;
   });
   h('images:delete', async (_e, entityKind: DecorativeImageEntityKind, entityId: string) =>

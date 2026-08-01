@@ -37,6 +37,18 @@ export interface IpcContext {
   getWindow: () => BrowserWindow | null;
 }
 
+/**
+ * The same localization `h` applies to a handler's return value, for payloads that
+ * are PUSHED to the renderer instead of returned. `webContents.send` never goes
+ * through `h`, so an event carrying a `message`/`error` field arrived in Spanish
+ * while the identical record fetched over IPC arrived localized — visible in the
+ * decorative image card, which learns of a failure by event and re-reads it by
+ * invoke, and so could show two different texts for one failure.
+ */
+export function localizedForUi<T>(payload: T): T {
+  return localizeIpcPayload(payload, getSettings().uiLanguage);
+}
+
 /** Build the context handed to every `register*Ipc` function. */
 export function createIpcContext(getWindow: () => BrowserWindow | null): IpcContext {
   const h: typeof ipcMain.handle = (channel, listener) => ipcMain.handle(channel, async (event, ...args) => {
