@@ -122,6 +122,7 @@
     draft: 'wd1',
     note: 'nn1',
     settingsTab: 'providers',
+    graphPreset: 'Overview',
     quiz: {},               // imId -> chosen index
     toggles: { autoAnalyze: false, readTag: true, animations: true, ocr: false, mcp: true, word: true, autoBackup: true, prerelease: false },
   };
@@ -614,7 +615,7 @@
     const canvas = $('#graph-canvas');
     if (!canvas) return;
     const dpr = window.devicePixelRatio || 1;
-    const W = canvas.clientWidth, H = 560;
+    const W = canvas.clientWidth, H = canvas.clientHeight || 560;
     canvas.width = W * dpr; canvas.height = H * dpr;
     const ctx = canvas.getContext('2d');
     ctx.scale(dpr, dpr);
@@ -1280,13 +1281,15 @@
     el.innerHTML = `<div class="fade-in">${VIEWS[view]()}</div>`;
     el.scrollTop = 0;
     if (view === 'graph') {
-      initGraph('Overview');
+      state.graphPreset = 'Overview';
+      initGraph(state.graphPreset);
       $('#graph-presets').addEventListener('click', (e) => {
         const b = e.target.closest('.pill');
         if (!b) return;
         document.querySelectorAll('#graph-presets .pill').forEach((p) => p.classList.remove('active'));
         b.classList.add('active');
-        initGraph(b.dataset.p);
+        state.graphPreset = b.dataset.p;
+        initGraph(state.graphPreset);
       });
     }
     if (view === 'ideas') {
@@ -1431,5 +1434,13 @@
   window.addEventListener('hashchange', () => {
     const v = location.hash.slice(1);
     if (VIEWS[v] && v !== state.view) { state.immersion = null; state.report = null; window.go(v); }
+  });
+  let graphViewportWidth = window.innerWidth;
+  let graphResizeTimer = 0;
+  window.addEventListener('resize', () => {
+    if (state.view !== 'graph' || Math.abs(window.innerWidth - graphViewportWidth) < 20) return;
+    graphViewportWidth = window.innerWidth;
+    clearTimeout(graphResizeTimer);
+    graphResizeTimer = setTimeout(() => initGraph(state.graphPreset), 120);
   });
 })();
