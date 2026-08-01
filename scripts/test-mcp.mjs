@@ -76,6 +76,10 @@ try {
     'nodus_list_writing_drafts',
     'nodus_generate_deep_research',
     'nodus_finalize_deep_research',
+    'nodus_enqueue_deep_research',
+    'nodus_list_deep_research_jobs',
+    'nodus_get_deep_research_job',
+    'nodus_cancel_deep_research_job',
     'nodus_create_folder',
     'nodus_update_folder_summary',
     'nodus_create_note',
@@ -913,6 +917,55 @@ try {
   assert.notEqual(silentReport.isError, true);
   assert.equal(silentNotes.length, 0);
 
+  // Queued reports: the tool returns a job id at once and the report is written in the
+  // background, one at a time. The second is still waiting when the first is generating,
+  // which is exactly when it can be cancelled.
+  const firstQueued = await callTool(server, 'nodus_enqueue_deep_research', {
+    objective: 'Informe encolado sobre el corpus',
+    targetLength: 'adaptive',
+    sectionLimit: 'auto',
+    save: true,
+  });
+  const secondQueued = await callTool(server, 'nodus_enqueue_deep_research', {
+    objective: 'Segundo informe encolado',
+    targetLength: 'adaptive',
+    sectionLimit: 'auto',
+    save: false,
+  });
+  assert.equal(firstQueued.job.origin, 'mcp');
+  assert.equal(firstQueued.job.status, 'running', 'an idle lane starts the first report immediately');
+  assert.equal(secondQueued.job.status, 'queued');
+  assert.equal(secondQueued.job.ahead, 1, 'the second report is told what is in front of it');
+  assert.ok(firstQueued.job.vaultId, 'a job is bound to the vault it was queued against');
+
+  const listed = await callTool(server, 'nodus_list_deep_research_jobs', { status: 'active' });
+  assert.equal(listed.jobs.length, 2);
+  assert.equal(listed.running, true);
+
+  const cancelled = await callTool(server, 'nodus_cancel_deep_research_job', { jobId: secondQueued.job.id });
+  assert.equal(cancelled.cancelled, true);
+  assert.equal(cancelled.job.status, 'cancelled');
+
+  const deadline = Date.now() + 60_000;
+  let finished = await callTool(server, 'nodus_get_deep_research_job', { jobId: firstQueued.job.id, includeReport: true });
+  while (finished.job.status === 'running' || finished.job.status === 'queued') {
+    if (Date.now() > deadline) throw new Error(`queued report never finished (status ${finished.job.status})`);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    finished = await callTool(server, 'nodus_get_deep_research_job', { jobId: firstQueued.job.id, includeReport: true });
+  }
+  assert.equal(finished.job.status, 'completed', `queued report failed: ${finished.job.error}`);
+  assert.ok(finished.job.savedDraftId, 'save=true files the finished report as a draft');
+  assert.ok(finished.report.draft.title, 'includeReport returns the report itself');
+  const savedByQueue = await callTool(server, 'nodus_list_writing_drafts', {});
+  assert.ok(
+    savedByQueue.drafts.some((draft) => draft.id === finished.job.savedDraftId),
+    'the queued report is readable through the ordinary drafts tool once the job is dropped'
+  );
+
+  const missing = await callTool(server, 'nodus_get_deep_research_job', { jobId: 'drj-does-not-exist' });
+  assert.equal(missing.job, null);
+  assert.match(missing.error, /nodus_list_writing_drafts/, 'a dropped job points the client at where the report lives');
+
   // Semantic passage search: unconfigured provider must fail cleanly…
   const passageAiError = await callToolRaw(server, 'nodus_search_passages', {
     query: 'turismo visual',
@@ -1100,7 +1153,13 @@ function installRuntimeHooks(userDataPath) {
     },
     dialog: {},
     shell: {},
-    BrowserWindow: class {},
+    // The Deep Research lane broadcasts its queue to every window; with none open
+    // (as here) that is an empty sweep, exactly as in the real app before first paint.
+    BrowserWindow: class {
+      static getAllWindows() {
+        return [];
+      }
+    },
   };
 
   Module._resolveFilename = function resolveFilename(request, parent, isMain, options) {

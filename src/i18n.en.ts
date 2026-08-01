@@ -2824,6 +2824,7 @@ export const EN: Record<string, string> = {
   'Cola de generación · {n} en curso': 'Generation queue · {n} in progress',
   'Limpiar fallidos': 'Clear failed',
   'pág.': 'pp.',
+  'Pedido desde un cliente MCP': 'Requested from an MCP client',
   'Quitar de la cola': 'Remove from queue',
   'Falló': 'Failed',
   'Abrir a pantalla completa': 'Open full-screen',

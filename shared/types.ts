@@ -5902,7 +5902,8 @@ export interface DeepResearchRequest {
 
 /** One live progress event emitted while a report is being orchestrated. */
 export interface DeepResearchProgress {
-  phase: 'snapshot' | 'planning' | 'section' | 'coverage' | 'assembling' | 'done';
+  /** `queued` is emitted while the report waits its turn in the single generation lane. */
+  phase: 'queued' | 'snapshot' | 'planning' | 'section' | 'coverage' | 'assembling' | 'done';
   message: string;
   /** 1-based index of the section being written (phase === 'section'). */
   sectionIndex?: number;
@@ -5910,6 +5911,37 @@ export interface DeepResearchProgress {
   sectionTitle?: string;
   wordsSoFar?: number;
   pagesSoFar?: number;
+}
+
+export type DeepResearchJobStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
+
+/** Who asked for a queued report: the Nodus window, or an MCP client. */
+export type DeepResearchJobOrigin = 'app' | 'mcp';
+
+/**
+ * One report in the single generation lane (electron/ai/deepResearchQueue.ts), as seen
+ * by the app window and by MCP clients. Bound to the vault it was enqueued against, so
+ * a deferred report can never be researched — or saved — against a different corpus.
+ */
+export interface DeepResearchJobRecord {
+  id: string;
+  origin: DeepResearchJobOrigin;
+  vaultId: string;
+  vaultName: string;
+  objective: string;
+  /** Short single-line preview of the objective, for list UIs. */
+  title: string;
+  status: DeepResearchJobStatus;
+  progress: DeepResearchProgress | null;
+  error: string | null;
+  savedDraftId: string | null;
+  /** The report finished but could not be stored as a draft. The work is not lost — it is readable through the job. */
+  saveError: string | null;
+  /** How many reports are ahead of this one; `null` unless it is still queued. */
+  ahead: number | null;
+  enqueuedAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
 }
 
 /** Coverage + budget accounting attached to a finished report. */
