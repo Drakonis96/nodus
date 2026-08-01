@@ -586,6 +586,13 @@ function BlockTree({
               {block.statement && depth === 0 && (
                 <div className="text-xs text-neutral-500 mt-1.5 leading-relaxed">{block.statement}</div>
               )}
+              {/* A hub has far more links than a readable map can draw. Saying how
+                  many were left out keeps the map from reading as the whole story. */}
+              {!!block.hiddenChildren && (
+                <div className="text-[11px] text-neutral-600 mt-1.5">
+                  {tx('+{n} conexiones no dibujadas', { n: block.hiddenChildren })}
+                </div>
+              )}
             </div>
             {hasChildren && (
               <button
