@@ -2601,6 +2601,7 @@ export const TR: Record<string, string> = {
   "Trazar el esquema desde esta idea": "Bu fikirden şemayı çizin",
   "{n} debate(s)": "{n} tartışma(lar)",
   "{n} conexiones": "{n} bağlantı",
+  "+{n} conexiones no dibujadas": "+{n} çizilmemiş bağlantı",
   "conf media": "yapılandırma ortamı",
   "Selecciona una idea y traza su": "Bir fikir seçin ve onun izini sürün",
   "mapa de argumentos": "argüman haritası",

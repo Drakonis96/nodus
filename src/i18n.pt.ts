@@ -2461,6 +2461,7 @@ export const PT: Record<string, string> = {
   'Trazar el esquema desde esta idea': 'Traçar o esquema a partir desta ideia',
   '{n} debate(s)': '{n} debate(s)',
   '{n} conexiones': '{n} ligações',
+  '+{n} conexiones no dibujadas': '+{n} ligações não desenhadas',
   'conf media': 'conf média',
   'Selecciona una idea y traza su': 'Selecione uma ideia e trace o seu',
   'mapa de argumentos': 'mapa de argumentos',

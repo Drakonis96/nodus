@@ -2540,6 +2540,7 @@ export const EN: Record<string, string> = {
   'Trazar el esquema desde esta idea': 'Trace the scheme from this idea',
   '{n} debate(s)': '{n} debate(s)',
   '{n} conexiones': '{n} connections',
+  '+{n} conexiones no dibujadas': '+{n} connections not drawn',
   'conf media': 'avg conf',
   'Selecciona una idea y traza su': 'Select an idea and trace its',
   'mapa de argumentos': 'argument map',

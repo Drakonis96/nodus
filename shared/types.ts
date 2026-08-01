@@ -4731,6 +4731,9 @@ export interface ArgumentBlock {
   /** How this block relates to its parent (a real edge type, or 'root'/'framing'). */
   relation: EdgeType | 'root' | 'framing' | 'related';
   children: ArgumentBlock[];
+  /** Connections this idea has in the graph that the map did not draw as branches,
+   *  so a trimmed hub says so instead of passing for a fully explored one. */
+  hiddenChildren?: number;
 }
 
 export interface ArgumentMap {

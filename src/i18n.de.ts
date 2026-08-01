@@ -2483,6 +2483,7 @@ export const DE: Record<string, string> = {
   'Trazar el esquema desde esta idea': 'Das Schema von dieser Idee aus zeichnen',
   '{n} debate(s)': '{n} Debatte(n)',
   '{n} conexiones': '{n} Verbindungen',
+  '+{n} conexiones no dibujadas': '+{n} nicht gezeichnete Verbindungen',
   'conf media': 'Ø Konf.',
   'Selecciona una idea y traza su': 'Wählen Sie eine Idee aus und zeichnen Sie ihre',
   'mapa de argumentos': 'Argumentationskarte',

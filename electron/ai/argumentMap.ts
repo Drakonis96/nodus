@@ -7,11 +7,18 @@ import { completeJson } from './aiClient';
 
 // The argument map is built from the LOCAL subgraph around the seed idea (BFS
 // over real idea↔idea edges), so the model can only reference ideas that
-// actually connect to the seed. We cap the volume so it stays focused and
-// within context limits.
+// actually connect to the seed. We cap the volume so it stays focused.
+//
+// The two paths have very different budgets: the AI path has to fit a model
+// context, while the automatic path is pure local computation and only pays for
+// what it draws. Sharing the AI's cap was what flattened every hub route into a
+// star — an idea with more neighbours than the cap consumed the whole budget at
+// depth 0, so not one neighbour↔neighbour edge survived to branch from.
 const MAX_DEPTH = 3;
-const MAX_IDEAS = 80;
-const MAX_EDGES = 160;
+const AI_MAX_IDEAS = 80;
+const AI_MAX_EDGES = 160;
+const STRUCTURAL_MAX_IDEAS = 400;
+const STRUCTURAL_MAX_EDGES = 1200;
 const STATEMENT_CLIP = 220;
 const MAX_BLOCKS = 90;
 const MAX_TREE_DEPTH = 4;
@@ -80,13 +87,23 @@ function clip(text: string, max = STATEMENT_CLIP): string {
   return clean.length > max ? `${clean.slice(0, max)}…` : clean;
 }
 
-/** BFS the real idea↔idea edges from a seed, returning the focused subgraph. */
-function buildLocalSubgraph(seedId: string): {
+interface LocalSubgraph {
   ideas: IdeaRow[];
   edges: EdgeRow[];
   ideaById: Map<string, IdeaRow>;
   truncated: boolean;
-} {
+  /** Connection counts in the FULL graph, so a capped subgraph can still report
+   *  how many links an idea really has instead of how many survived the cap. */
+  graphDegree: Map<string, number>;
+  graphDebate: Map<string, number>;
+}
+
+function isDebateEdge(type: string): boolean {
+  return type === 'contradicts' || type === 'refutes';
+}
+
+/** BFS the real idea↔idea edges from a seed, returning the focused subgraph. */
+function buildLocalSubgraph(seedId: string, maxIdeas = AI_MAX_IDEAS, maxEdges = AI_MAX_EDGES): LocalSubgraph {
   const allIdeas = getDb()
     .prepare('SELECT global_id, type, label, statement FROM ideas')
     .all() as IdeaRow[];
@@ -95,58 +112,74 @@ function buildLocalSubgraph(seedId: string): {
     throw new Error('La idea indicada no existe en el grafo.');
   }
 
-  const allEdges = getDb()
-    .prepare(
-      `SELECT id, from_id, to_id, type, basis, confidence FROM visible_edges WHERE type != 'contains'`
-    )
-    .all() as EdgeRow[];
+  const allEdges = (
+    getDb()
+      .prepare(
+        `SELECT id, from_id, to_id, type, basis, confidence FROM visible_edges WHERE type != 'contains'`
+      )
+      .all() as EdgeRow[]
+  ).filter((e) => ideaById.has(e.from_id) && ideaById.has(e.to_id));
 
-  // Undirected adjacency over idea↔idea edges.
+  // Undirected adjacency over idea↔idea edges, plus whole-graph counts.
   const adj = new Map<string, { edge: EdgeRow; other: string }[]>();
+  const graphDegree = new Map<string, number>();
+  const graphDebate = new Map<string, number>();
   for (const e of allEdges) {
-    if (!ideaById.has(e.from_id) || !ideaById.has(e.to_id)) continue;
-    (adj.get(e.from_id) ?? adj.set(e.from_id, []).get(e.from_id)!).push({ edge: e, other: e.to_id });
-    (adj.get(e.to_id) ?? adj.set(e.to_id, []).get(e.to_id)!).push({ edge: e, other: e.from_id });
+    for (const [a, b] of [
+      [e.from_id, e.to_id],
+      [e.to_id, e.from_id],
+    ] as const) {
+      (adj.get(a) ?? adj.set(a, []).get(a)!).push({ edge: e, other: b });
+      graphDegree.set(a, (graphDegree.get(a) ?? 0) + 1);
+      if (isDebateEdge(e.type)) graphDebate.set(a, (graphDebate.get(a) ?? 0) + 1);
+    }
   }
 
+  // Expand strongest-link-first (debates lead, see edgePriority). The walk used to
+  // take neighbours in row order, so a capped subgraph kept an arbitrary slice —
+  // for a hub that silently dropped some of the very debates the route promised.
   const visited = new Set<string>([seedId]);
-  const keptEdges = new Map<string, EdgeRow>();
   let frontier: string[] = [seedId];
   let truncated = false;
 
-  for (let depth = 0; depth < MAX_DEPTH && frontier.length > 0; depth++) {
+  for (let depth = 0; depth < MAX_DEPTH && frontier.length > 0 && !truncated; depth++) {
     const next: string[] = [];
     for (const node of frontier) {
-      const neighbors = adj.get(node) ?? [];
-      for (const { edge, other } of neighbors) {
-        if (!keptEdges.has(edge.id)) keptEdges.set(edge.id, edge);
-        if (!visited.has(other)) {
-          visited.add(other);
-          next.push(other);
+      const neighbors = [...(adj.get(node) ?? [])].sort((a, b) => edgePriority(b.edge) - edgePriority(a.edge));
+      for (const { other } of neighbors) {
+        if (visited.has(other)) continue;
+        if (visited.size >= maxIdeas) {
+          truncated = true;
+          break;
         }
+        visited.add(other);
+        next.push(other);
       }
+      if (truncated) break;
     }
     frontier = next;
-    if (visited.size > MAX_IDEAS) {
-      truncated = true;
-      break;
-    }
   }
 
-  // If we capped ideas, keep only the closest ones (BFS order) + their edges.
-  let keptIdeaIds = [...visited];
-  if (keptIdeaIds.length > MAX_IDEAS) {
-    keptIdeaIds = keptIdeaIds.slice(0, MAX_IDEAS);
+  // Keep the INDUCED subgraph: every edge between two kept ideas, not merely the
+  // ones the walk happened to cross. The walk only ever crosses edges out of the
+  // frontier, so collecting them was what left the neighbours with no links of
+  // their own and every branch a leaf.
+  const induced = allEdges.filter((e) => visited.has(e.from_id) && visited.has(e.to_id));
+  let edges = induced;
+  if (induced.length > maxEdges) {
     truncated = true;
+    // The seed's own links are the map's top-level branches: never trade them for
+    // a stronger link buried deeper in the subgraph.
+    const seedEdges = induced.filter((e) => e.from_id === seedId || e.to_id === seedId);
+    const rest = induced
+      .filter((e) => e.from_id !== seedId && e.to_id !== seedId)
+      .sort((a, b) => edgePriority(b) - edgePriority(a))
+      .slice(0, Math.max(0, maxEdges - seedEdges.length));
+    edges = [...seedEdges, ...rest];
   }
-  const keptSet = new Set(keptIdeaIds);
-  const edges = [...keptEdges.values()]
-    .filter((e) => keptSet.has(e.from_id) && keptSet.has(e.to_id))
-    .sort((a, b) => b.confidence - a.confidence)
-    .slice(0, MAX_EDGES);
-  const ideas = keptIdeaIds.map((id) => ideaById.get(id)!).filter(Boolean);
+  const ideas = [...visited].map((id) => ideaById.get(id)!).filter(Boolean);
 
-  return { ideas, edges, ideaById, truncated };
+  return { ideas, edges, ideaById, truncated, graphDegree, graphDebate };
 }
 
 interface RawBlock {
@@ -351,7 +384,11 @@ export async function buildArgumentMap(request: ArgumentMapRequest, model?: Mode
 // ── Automatic mode: structural discovery + tree (no AI) ───────────────────────
 
 const STRUCTURAL_MAX_DEPTH = 3;
-const STRUCTURAL_MAX_CHILDREN = 6;
+/** Branches drawn per level: wide at the seed, narrowing as the map descends.
+ *  1 + 12 + 12·4 + 48·2 = 157 blocks, so a full map always fits the budget below
+ *  and no branch is starved by one that happened to be walked first. */
+const STRUCTURAL_BRANCHES_BY_DEPTH = [12, 4, 2];
+const STRUCTURAL_MAX_BLOCKS = 160;
 
 interface AdjEntry {
   other: string;
@@ -361,9 +398,38 @@ interface AdjEntry {
 /** Sort priority: surface debates (contradicts/refutes) first, then by confidence. */
 function edgePriority(edge: EdgeRow): number {
   let p = edge.confidence;
-  if (edge.type === 'contradicts' || edge.type === 'refutes') p += 1.5;
+  if (isDebateEdge(edge.type)) p += 1.5;
   else if (edge.type === 'supports' || edge.type === 'extends') p += 0.4;
   return p;
+}
+
+/** Which side of the argument a link is on, for the branch quota below. */
+function relationFamily(type: string): 'debate' | 'support' | 'other' {
+  if (isDebateEdge(type)) return 'debate';
+  if (type === 'supports' || type === 'extends' || type === 'precondition_of') return 'support';
+  return 'other';
+}
+
+/**
+ * Choose which connections become branches. Ranking by priority alone hands every
+ * slot to the debates (they carry a +1.5 bonus), which paints a hub as nothing but
+ * contradiction; a map of an argument has to show what backs the idea too. So the
+ * slots are dealt round-robin across the three families, strongest link first
+ * within each, and the result is re-sorted so debates still lead the reading.
+ */
+function pickBranches(candidates: AdjEntry[], cap: number): AdjEntry[] {
+  const buckets: Record<'debate' | 'support' | 'other', AdjEntry[]> = { debate: [], support: [], other: [] };
+  for (const c of [...candidates].sort((a, b) => edgePriority(b.edge) - edgePriority(a.edge))) {
+    buckets[relationFamily(c.edge.type)].push(c);
+  }
+  const families = ['debate', 'support', 'other'] as const;
+  const picked: AdjEntry[] = [];
+  for (let i = 0; picked.length < cap && families.some((f) => buckets[f].length > 0); i++) {
+    const bucket = buckets[families[i % families.length]];
+    const next = bucket.shift();
+    if (next) picked.push(next);
+  }
+  return picked.sort((a, b) => edgePriority(b.edge) - edgePriority(a.edge));
 }
 
 /** Rank idea hubs by weighted connectivity for the automatic route picker. */
@@ -396,7 +462,7 @@ export function discoverArgumentRoutes(): ArgumentRouteSuggestion[] {
       (adj.get(a) ?? adj.set(a, []).get(a)!).push({ other: b, edge: e });
       degree.set(a, (degree.get(a) ?? 0) + 1);
       confSum.set(a, (confSum.get(a) ?? 0) + e.confidence);
-      if (e.type === 'contradicts' || e.type === 'refutes') debate.set(a, (debate.get(a) ?? 0) + 1);
+      if (isDebateEdge(e.type)) debate.set(a, (debate.get(a) ?? 0) + 1);
       const rc = relationCounts.get(a) ?? relationCounts.set(a, new Map()).get(a)!;
       rc.set(e.type, (rc.get(e.type) ?? 0) + 1);
     }
@@ -443,7 +509,11 @@ export function buildStructuralArgumentMap(seedIdeaId: string): ArgumentMap {
   const seed = getIdeaSummary(seedIdeaId);
   if (!seed) throw new Error('La idea indicada no existe en el grafo.');
 
-  const { ideaById, edges, truncated } = buildLocalSubgraph(seedIdeaId);
+  const { ideaById, edges, truncated, graphDegree, graphDebate } = buildLocalSubgraph(
+    seedIdeaId,
+    STRUCTURAL_MAX_IDEAS,
+    STRUCTURAL_MAX_EDGES
+  );
 
   // Adjacency over the kept subgraph.
   const adj = new Map<string, AdjEntry[]>();
@@ -456,59 +526,76 @@ export function buildStructuralArgumentMap(seedIdeaId: string): ArgumentMap {
   const lang: 'es' | 'en' = getSettings().uiLanguage === 'es' ? 'es' : 'en';
   const relLabelOf = (rel: string): string =>
     (lang === 'en' ? EDGE_TYPE_LABELS_EN[rel] : EDGE_TYPE_LABELS[rel]) ?? rel;
-  const seedDegree = adj.get(seed.global_id)?.length ?? 0;
-  const seedDebate =
-    (adj.get(seed.global_id) ?? []).filter((n) => n.edge.type === 'contradicts' || n.edge.type === 'refutes').length;
+  // Counted over the whole graph, not the kept subgraph: the route list promises
+  // the real figure, and a map that quietly reported the post-cap one read as if
+  // connections had gone missing.
+  const seedDegree = graphDegree.get(seed.global_id) ?? 0;
+  const seedDebate = graphDebate.get(seed.global_id) ?? 0;
 
-  let blockCount = 0;
-  const buildNode = (ideaId: string, parentEdge: EdgeRow | null, visited: Set<string>, depth: number): ArgumentBlock => {
-    blockCount++;
-    const idea = ideaById.get(ideaId)!;
-    const relation: ArgumentBlock['relation'] = parentEdge ? (parentEdge.type as ArgumentBlock['relation']) : 'root';
+  const makeBlock = (idea: IdeaRow, parentEdge: EdgeRow | null): ArgumentBlock => ({
+    id: uuid(),
+    ideaId: idea.global_id,
+    label: idea.label,
+    statement: idea.statement,
+    type: idea.type,
+    summary: '',
+    relation: parentEdge ? (parentEdge.type as ArgumentBlock['relation']) : 'root',
+    children: [],
+  });
 
-    const neighbors = (adj.get(ideaId) ?? [])
-      .filter((n) => !visited.has(n.other))
-      .sort((a, b) => edgePriority(b.edge) - edgePriority(a.edge))
-      .slice(0, STRUCTURAL_MAX_CHILDREN);
+  // Grow the tree level by level. A depth-first walk let the first branch it
+  // descended spend the whole block budget, leaving its siblings bare; taking one
+  // level at a time spends the budget evenly across the argument.
+  const root = makeBlock(ideaById.get(seed.global_id)!, null);
+  const placed = new Set<string>([seed.global_id]);
+  const parentEdgeOf = new Map<string, EdgeRow>();
+  let blockCount = 1;
+  let frontier: ArgumentBlock[] = [root];
 
-    const children: ArgumentBlock[] = [];
-    for (const { other, edge } of neighbors) {
-      if (blockCount >= MAX_BLOCKS) break;
-      if (depth >= STRUCTURAL_MAX_DEPTH) break;
-      if (visited.has(other)) continue;
-      visited.add(other);
-      children.push(buildNode(other, edge, visited, depth + 1));
+  for (let depth = 0; depth < STRUCTURAL_MAX_DEPTH && frontier.length > 0 && blockCount < STRUCTURAL_MAX_BLOCKS; depth++) {
+    const cap = STRUCTURAL_BRANCHES_BY_DEPTH[depth] ?? STRUCTURAL_BRANCHES_BY_DEPTH[STRUCTURAL_BRANCHES_BY_DEPTH.length - 1];
+    const next: ArgumentBlock[] = [];
+    for (const block of frontier) {
+      if (blockCount >= STRUCTURAL_MAX_BLOCKS) break;
+      // Ideas already placed elsewhere are skipped: each idea appears once, so the
+      // tree stays a tree and the same card never shows up on two branches.
+      const candidates = (adj.get(block.ideaId!) ?? []).filter((n) => !placed.has(n.other));
+      for (const { other, edge } of pickBranches(candidates, cap)) {
+        if (blockCount >= STRUCTURAL_MAX_BLOCKS) break;
+        if (placed.has(other)) continue;
+        placed.add(other);
+        const child = makeBlock(ideaById.get(other)!, edge);
+        parentEdgeOf.set(child.id, edge);
+        block.children.push(child);
+        blockCount++;
+        next.push(child);
+      }
     }
+    frontier = next;
+  }
 
-    const childCount = children.length;
-    let summary: string;
-    if (relation === 'root') {
-      summary =
+  // Summaries last, so each block can state how many of its connections it drew.
+  const describe = (block: ArgumentBlock): void => {
+    const degree = graphDegree.get(block.ideaId!) ?? 0;
+    const hidden = Math.max(0, degree - block.children.length);
+    if (hidden > 0) block.hiddenChildren = hidden;
+    if (block.relation === 'root') {
+      block.summary =
         lang === 'en'
           ? `${seedDegree} connection(s)${seedDebate ? ` · ${seedDebate} debate(s)` : ''}`
           : `${seedDegree} conexiones${seedDebate ? ` · ${seedDebate} debate(s)` : ''}`;
     } else {
-      const relLabel = relLabelOf(relation);
-      const branches =
-        childCount > 0
-          ? `${relLabel} · ${childCount} ${lang === 'en' ? 'derivation(s)' : 'derivación(es)'}`
-          : `${relLabel} · conf ${parentEdge!.confidence.toFixed(2)}`;
-      summary = branches;
+      const relLabel = relLabelOf(block.relation);
+      const conf = parentEdgeOf.get(block.id)?.confidence ?? 0;
+      block.summary =
+        block.children.length > 0
+          ? `${relLabel} · conf ${conf.toFixed(2)} · ${block.children.length} ${lang === 'en' ? 'derivation(s)' : 'derivación(es)'}`
+          : `${relLabel} · conf ${conf.toFixed(2)}`;
     }
-
-    return {
-      id: uuid(),
-      ideaId,
-      label: idea.label,
-      statement: idea.statement,
-      type: idea.type,
-      summary,
-      relation,
-      children,
-    };
+    for (const child of block.children) describe(child);
   };
+  describe(root);
 
-  const root = buildNode(seed.global_id, null, new Set([seed.global_id]), 0);
   const overview =
     seedDegree === 0
       ? lang === 'en'
@@ -517,10 +604,10 @@ export function buildStructuralArgumentMap(seedIdeaId: string): ArgumentMap {
       : lang === 'en'
         ? `Automatic walkthrough: the central idea links ${seedDegree} connection(s)${
             seedDebate ? `, of which ${seedDebate} are debates (contradictions/refutations)` : ''
-          }. Expand the branches to explore the argument.`
+          }. The map opens its ${root.children.length} strongest branch(es) — debates, support and refinements — and follows each one down the real connections. Expand the branches to explore the argument.`
         : `Recorrido automático: la idea central articula ${seedDegree} conexiones${
             seedDebate ? `, de las cuales ${seedDebate} son debates (contradicciones/refutaciones)` : ''
-          }. Despliega las ramas para explorar la argumentación.`;
+          }. El mapa abre sus ${root.children.length} ramas más fuertes —debates, apoyos y refinamientos— y sigue cada una por las conexiones reales. Despliega las ramas para explorar la argumentación.`;
 
   return {
     seedIdeaId: seed.global_id,
