@@ -8,7 +8,7 @@
 // so there was no cut that produced two pure blocks. What they genuinely share is
 // the corpus: a study material and a work both end up as ideas in the same graph,
 // and `queueImportedStudyKnowledge` below is where the two meet.
-import type { IpcContext } from './context';
+import { localizedForUi, type IpcContext } from './context';
 import { shell } from 'electron';
 import { seedTestimonyDemoData } from '../db/testimonyDemoData';
 import type {
@@ -1065,7 +1065,7 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
     // Content has already been committed. This only persists/queues the optional
     // decoration and therefore cannot roll back or delay the immersion.
     const image = applyDecorativeImageOption('immersion', session.id, request.decorativeImage, (next) => {
-      if (!e.sender.isDestroyed()) e.sender.send('images:changed', next);
+      if (!e.sender.isDestroyed()) e.sender.send('images:changed', localizedForUi(next));
     });
     return { ...session, image };
   });
@@ -1192,7 +1192,7 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
     if (saved.brief.kind !== 'deep_research') return saved;
     // Like Inmersión, the complete report is durable before image work begins.
     const image = applyDecorativeImageOption('deep_research', saved.id, request.decorativeImage, (next) => {
-      if (!e.sender.isDestroyed()) e.sender.send('images:changed', next);
+      if (!e.sender.isDestroyed()) e.sender.send('images:changed', localizedForUi(next));
     });
     return { ...saved, image };
   });

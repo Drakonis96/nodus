@@ -115,6 +115,53 @@ try {
   assert.ok(imageModal.includes("action: 'regenerate'") && imageModal.includes('coste adicional'), 'the design modal regenerates and discloses the new cost');
   assert.ok(imageModal.includes('Descripción de la escena'), 'the design modal lets the user edit the scene');
 
+  // The engine is chosen per image, and a retry must NOT go back to the provider that
+  // just failed: switching provider in Ajustes (or here) was the one reaction a failure
+  // invites, and pinning made it look like nothing had changed.
+  assert.ok(
+    !/action === 'retry' && current\?\.(provider|model)/.test(service),
+    'a retry no longer repeats the provider and model of the failed attempt'
+  );
+  assert.ok(
+    service.includes('IMAGE_PROVIDERS.includes(request.provider)'),
+    'a renderer-supplied provider is validated against the known image providers'
+  );
+  assert.ok(
+    service.includes('request.provider && request.model') && service.includes('?? settings.imageProvider'),
+    'the chosen engine falls back to the Ajustes default, and only as a complete pair'
+  );
+  assert.ok(
+    imageModal.includes("t('Modelo de imagen')") && imageModal.includes('listImageModels'),
+    'the design modal offers the full image-model catalogue'
+  );
+  assert.ok(
+    imageModal.includes('provider: engine?.provider') && imageModal.includes('model: engine?.model'),
+    'the modal sends the chosen engine with every generation request'
+  );
+  assert.ok(
+    imageModal.includes("const keepsOwnEngine = status !== 'failed'"),
+    'a failed image opens on the current default engine, not on the one that refused it'
+  );
+  assert.ok(
+    card.includes('provider: opts.provider') && card.includes('model: opts.model'),
+    'the card forwards the chosen engine across the bridge'
+  );
+
+  // One failure, one message. The modal used to print a generic sentence AND the
+  // provider's reason under it, which read as two answers disagreeing.
+  assert.ok(
+    imageModal.includes("t(image?.error || 'La imagen no pudo generarse.')"),
+    'the modal leads with the real reason, translated'
+  );
+  assert.ok(
+    card.includes("t(current?.error || 'La imagen no pudo generarse.')"),
+    'the card leads with the real reason, translated'
+  );
+  assert.ok(
+    !imageModal.includes('La imagen no pudo generarse. El contenido está guardado'),
+    'the contradictory combined headline is gone'
+  );
+
   // Custom upload + revert-to-previous are reachable from the same design modal.
   assert.ok(imageModal.includes("t('Subir mi imagen')") && imageModal.includes('accept="image/*"'), 'the modal offers a user image upload');
   assert.ok(imageModal.includes('image?.hasPrevious') && imageModal.includes("t('Volver a la imagen anterior')"), 'the modal offers reverting to the previous image only when one exists');
@@ -125,7 +172,14 @@ try {
   assert.ok(imageStorage.includes('image: Buffer.from(bytes)') && imageStorage.includes("thumbnailMimeType: 'image/jpeg'"), 'the shared pipeline keeps the original byte-for-byte');
   assert.ok(service.includes('export function revertDecorativeImage') && service.includes('invalidateDecorativeImageGeneration'), 'revert discards any in-flight generation');
   assert.ok(ipc.includes("h('images:upload'") && ipc.includes("h('images:revert'"), 'upload and revert are exposed over IPC');
-  assert.ok(ipc.includes("e.sender.send('images:changed', image)"), 'upload/revert broadcast so other mounted cards stay in sync');
+  assert.ok(ipc.includes("e.sender.send('images:changed', localizedForUi(image))"), 'upload/revert broadcast so other mounted cards stay in sync');
+  // A pushed event never passes through `h`, so without this the SAME failure read
+  // localized when fetched over IPC and raw Spanish when it arrived by event.
+  assert.equal(
+    (ipc.match(/sender\.send\('images:changed', /g) ?? []).length,
+    (ipc.match(/sender\.send\('images:changed', localizedForUi\(/g) ?? []).length,
+    'every images:changed broadcast is localized like an IPC result'
+  );
   for (const column of ['source', 'prev_image_blob', 'prev_thumbnail_blob', 'thumbnail_mime_type', 'prev_thumbnail_mime_type', 'prev_style', 'prev_source']) {
     assert.ok(migration.includes(column), `migration persists ${column}`);
   }
@@ -213,6 +267,94 @@ try {
   img = repo.restorePreviousDecorativeImage(K, ID);
   assert.equal(img.source, 'ai', 'reverting an upload restores the generated image it replaced');
   assert.equal(bytesOf(), 'C-full');
+
+  // Drive the real queue over that same database. Two Deep Research reports were
+  // stuck exactly here: they had failed on `codex`, the user changed the image
+  // provider to Google in Ajustes, and every "Reintentar" went straight back to
+  // codex because a retry reused the record's own provider and model. Source-text
+  // assertions could not have caught it — only the persisted pending row can.
+  const serviceOutfile = path.join(tmp, 'decorativeService.mjs');
+  const stub = (filter, name, contents) => ({
+    name: `stub-${name}`,
+    setup(builder) {
+      builder.onResolve({ filter }, () => ({ path: name, namespace: `stub-${name}` }));
+      builder.onLoad({ filter: /.*/, namespace: `stub-${name}` }, () => ({ contents, loader: 'js' }));
+    },
+  });
+  await build({
+    entryPoints: [path.join(root, 'electron/ai/decorativeImages.ts')],
+    outfile: serviceOutfile,
+    bundle: true,
+    format: 'esm',
+    platform: 'node',
+    external: ['@shared/types'],
+    plugins: [
+      // Matches both `../db/database` (the service) and `./database` (the repo it bundles).
+      stub(/\/database$/, 'db', 'export function getDb(){ return globalThis.__nodusDecorativeRepoDb; }'),
+      stub(/\/db\/settingsRepo$/, 'settings', 'export function getSettings(){ return globalThis.__nodusImageSettings; }'),
+      stub(/@google\/genai$/, 'genai', 'export class GoogleGenAI { constructor(){ throw new Error("no network in tests"); } }'),
+      stub(/\/vaults\/vaultRegistry$/, 'vault', "export function getActiveVault(){ return { type: 'academic' }; }"),
+      stub(/\.\/aiClient$/, 'ai', 'export async function completeText(){ return "escena"; } export async function completeTextStream(){ return "escena"; }'),
+      stub(/\.\/codexSubscription$/, 'codex', 'export async function generateImageWithChatGptSubscription(){ throw new Error("codex must not be called"); }'),
+      stub(/\.\/nodusLocalImages$/, 'local', 'export async function generateNodusLocalImage(){ throw new Error("local engine must not be called"); }'),
+      stub(/\/secrets\/secretStore$/, 'secrets', 'export function getApiKey(){ return null; }'),
+      stub(/\/db\/entitiesRepo$/, 'entities', 'export function setPersonPortrait(){}'),
+      stub(/\/db\/charactersRepo$/, 'characters', 'export function addCharacterImage(){} export function getCharacter(){ return null; }'),
+      stub(/\/db\/worldImagesRepo$/, 'worldImages', 'export function addWorldImage(){}'),
+      stub(/\/db\/worldPlacesRepo$/, 'worldPlaces', 'export function getWorldPlace(){ return null; }'),
+      stub(/\/db\/worldGroupsRepo$/, 'worldGroups', 'export function getWorldGroup(){ return null; }'),
+      stub(/\/imageStorage$/, 'storage', 'export function prepareImageStorage(){ throw new Error("unreached"); }'),
+    ],
+    logLevel: 'silent',
+  });
+  const queueService = await import(pathToFileURL(serviceOutfile).href);
+  globalThis.__nodusImageSettings = {
+    imageProvider: 'google',
+    imageModel: 'gemini-3.1-flash-image',
+    imageStyle: 'antique_book',
+    imageQuality: 'balanced',
+  };
+
+  const failOn = (provider, model) => {
+    repo.markDecorativeImagePending({
+      entityKind: K, entityId: ID, provider, model,
+      style: 'black_and_white', preserveContext: false, preservePrompt: false,
+    });
+    repo.saveDecorativeImageFailure(K, ID, 'ChatGPT no pudo generar la imagen.');
+    queueService.invalidateDecorativeImageGeneration(K, ID);
+  };
+
+  failOn('codex', 'gpt-5.6-luna');
+  let requeued = queueService.queueDecorativeImageGeneration({ entityKind: K, entityId: ID, action: 'retry' });
+  assert.equal(requeued.provider, 'google', 'a retry follows the provider now configured, not the one that failed');
+  assert.equal(requeued.model, 'gemini-3.1-flash-image', 'a retry follows the model now configured');
+  assert.equal(requeued.style, 'black_and_white', 'a retry still repeats the style of the failed request');
+  queueService.invalidateDecorativeImageGeneration(K, ID);
+
+  failOn('codex', 'gpt-5.6-luna');
+  requeued = queueService.queueDecorativeImageGeneration({
+    entityKind: K, entityId: ID, action: 'retry', provider: 'openai', model: 'gpt-image-2',
+  });
+  assert.equal(requeued.provider, 'openai', 'the engine picked in the design modal wins over the Ajustes default');
+  assert.equal(requeued.model, 'gpt-image-2');
+  queueService.invalidateDecorativeImageGeneration(K, ID);
+
+  failOn('codex', 'gpt-5.6-luna');
+  requeued = queueService.queueDecorativeImageGeneration({
+    entityKind: K, entityId: ID, action: 'retry', provider: 'not-a-provider', model: 'whatever',
+  });
+  assert.equal(requeued.provider, 'google', 'an unknown provider from the renderer falls back to the setting');
+  assert.equal(requeued.model, 'gemini-3.1-flash-image', 'the fallback takes provider and model together');
+  queueService.invalidateDecorativeImageGeneration(K, ID);
+
+  failOn('codex', 'gpt-5.6-luna');
+  requeued = queueService.queueDecorativeImageGeneration({
+    entityKind: K, entityId: ID, action: 'retry', provider: 'openai',
+  });
+  assert.equal(requeued.provider, 'google', 'a provider without a model is not honoured on its own');
+  queueService.invalidateDecorativeImageGeneration(K, ID);
+
+  delete globalThis.__nodusImageSettings;
   repoDb.close();
   delete globalThis.__nodusDecorativeRepoDb;
 

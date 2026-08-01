@@ -61,7 +61,53 @@ export function localizeRuntimeError(message: string, language: unknown): string
   });
 }
 
+/**
+ * Why an image could not be generated.
+ *
+ * These differ from every other Electron error in one decisive way: they are STORED.
+ * A failed decorative image keeps its reason in the vault and shows it days later, so
+ * the generic "the operation could not be completed" fallback would erase the only
+ * clue the user has about which provider refused and why — while the messages the
+ * fallback happens not to recognise (`ChatGPT no pudo generar la imagen.` carries no
+ * diacritic and only one function word) leaked Spanish into an English interface.
+ * Both failure modes have the same fix: hand the sentence to the renderer untouched
+ * and let t() translate it. Every string here is a key in src/i18n.*.ts, which
+ * scripts/test-i18n-coverage.mjs holds to full coverage in all seven languages.
+ */
+export const IMAGE_GENERATION_ERROR_MESSAGES = [
+  // Codex / ChatGPT subscription.
+  'ChatGPT no pudo generar la imagen.',
+  'ChatGPT terminó la petición sin generar ninguna imagen.',
+  'ChatGPT no generó la imagen dentro del tiempo esperado.',
+  'ChatGPT devolvió una imagen vacía.',
+  'La generación de imagen de Codex no llegó a completarse.',
+  'Codex intentó usar una herramienta deshabilitada; Nodus interrumpió la petición.',
+  'El modelo de imagen elegido ya no está en el catálogo de ChatGPT. Elige otro en Proveedores y modelos.',
+  'La suscripción de ChatGPT no está conectada. Ábrela en Proveedores y modelos.',
+  // Direct API providers.
+  'Falta la clave de Google.',
+  'Falta la clave de OpenAI.',
+  'Falta la clave de OpenRouter.',
+  'Google no devolvió datos de imagen.',
+  'El proveedor no devolvió datos de imagen.',
+  // Local engine.
+  'El prompt de imagen está vacío.',
+  'El motor local no produjo una imagen.',
+  'Instala el motor local de imágenes antes de generar.',
+  'Descarga FLUX.2 Klein 4B Q4 en Ajustes → Modelos IA antes de generar imágenes locales.',
+  // Nodus' own preconditions and interruptions.
+  'No hay proveedor o modelo de imagen seleccionado.',
+  'No hay un modelo de texto configurado para crear el contexto visual.',
+  'El modelo de texto no devolvió un contexto visual.',
+  'La generación de imagen se canceló.',
+  'La generación superó el tiempo máximo. Puedes reintentarlo manualmente.',
+  'La generación se interrumpió al cambiar de bóveda o cerrar la aplicación. Puedes reintentarlo manualmente.',
+  'La inmersión ya no existe.',
+  'El informe guardado ya no existe.',
+];
+
 const RENDERER_TRANSLATED_MESSAGES = new Set([
+  ...IMAGE_GENERATION_ERROR_MESSAGES,
   'Bóveda no encontrada.',
   'No se encontró la bóveda de origen de las claves API.',
   'Esta bóveda ya está cargada.',

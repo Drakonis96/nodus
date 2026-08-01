@@ -380,8 +380,11 @@ export async function generateImageWithChatGptSubscription(options: {
   // protocol error. Say plainly what happened and where to fix it instead.
   const catalog = await readModelCatalog(false);
   if (!catalog.some((model) => model.id === options.model)) {
+    // Fixed wording, not interpolated: this reason is stored beside a failed image and
+    // read back later in the interface language, and the design modal already shows
+    // which provider and model produced it.
     throw new ProviderRuntimeError(
-      `El modelo «${options.model}» ya no está en el catálogo de ChatGPT. Elige otro en Proveedores y modelos.`,
+      'El modelo de imagen elegido ya no está en el catálogo de ChatGPT. Elige otro en Proveedores y modelos.',
       'unavailable'
     );
   }

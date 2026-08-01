@@ -12,6 +12,7 @@ import type {
   ModelRef,
 } from '@shared/types';
 import { buildDecorativeImagePrompt, DEFAULT_DECORATIVE_IMAGE_STYLE } from '@shared/imageStyles';
+import { IMAGE_PROVIDERS } from '@shared/providers';
 import { buildCharacterPortraitPrompt, buildWorldEntityImagePrompt, hasCharacterImageMaterial } from '@shared/characterImagePrompt';
 import { vaultTypeImagePrompt } from '@shared/vaultTypes';
 import { addCharacterImage, getCharacter } from '../db/charactersRepo';
@@ -245,7 +246,16 @@ export async function callImageProvider(provider: ImageProvider, model: string, 
   // the agent's decision rather than a request parameter.
   if (provider === 'codex') return generateImageWithChatGptSubscription({ model, prompt });
   const key = providerKey(provider);
-  if (!key) throw new Error(`Falta la clave de ${provider === 'google' ? 'Google' : provider === 'openai' ? 'OpenAI' : 'OpenRouter'}.`);
+  // One fixed sentence per provider instead of one interpolated sentence: a stored
+  // failure reason has to survive into every interface language, and an interpolated
+  // string has no translation key.
+  if (!key) {
+    throw new Error(
+      provider === 'google' ? 'Falta la clave de Google.'
+        : provider === 'openai' ? 'Falta la clave de OpenAI.'
+          : 'Falta la clave de OpenRouter.'
+    );
+  }
   switch (provider) {
     case 'google':
       return generateGoogle(model, prompt, key);
@@ -319,8 +329,17 @@ export function queueDecorativeImageGeneration(
   if (request.action === 'retry' && current?.status !== 'failed') return current ?? markNotRequested(request.entityKind, request.entityId);
 
   const settings = getSettings();
-  const provider = request.action === 'retry' && current?.provider ? current.provider : settings.imageProvider;
-  const model = request.action === 'retry' && current?.model ? current.model : settings.imageModel;
+  // The engine is what the user picked for this image in the design modal, or the
+  // default from Ajustes. A retry used to repeat the FAILED provider and model, which
+  // made the one reaction a failure invites — switch to another image provider — look
+  // like it did nothing: the report stayed pinned to the engine that had just refused
+  // it, and every retry reproduced the same error. What a retry repeats is the request
+  // (its prompt and its style), never the engine.
+  const chosen = request.provider && request.model && IMAGE_PROVIDERS.includes(request.provider)
+    ? { provider: request.provider, model: request.model }
+    : null;
+  const provider = chosen?.provider ?? settings.imageProvider;
+  const model = chosen?.model ?? settings.imageModel;
   // A retry repeats the exact failed request. Changing style is a regeneration,
   // which the UI confirms as a new cost.
   const style = request.action === 'retry' && current?.style

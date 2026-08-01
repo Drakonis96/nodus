@@ -1,4 +1,4 @@
-import type { AiProvider, EmbeddingProvider, LocalProvider, ModelRef } from './types';
+import type { AiProvider, EmbeddingProvider, ImageProvider, LocalProvider, ModelRef } from './types';
 
 // Single source of truth for provider identity, labels and defaults, shared by
 // the main process (electron/) and the renderer (src/). Adding a provider to
@@ -37,6 +37,23 @@ export const SECRET_PROVIDERS: Exclude<AiProvider, 'codex' | 'github-copilot' | 
   'ollama',
   'lmstudio',
 ];
+
+/**
+ * Image generation is a separate provider set from text: it has its own key
+ * ('google', not 'gemini' — the image models live under a different API), and not
+ * every text provider can return pixels. Kept here so the settings picker, the
+ * per-image picker in the design modal and the main-process validation all read
+ * the same list instead of each hardcoding one.
+ */
+export const IMAGE_PROVIDERS: ImageProvider[] = ['google', 'openai', 'openrouter', 'nodus', 'codex'];
+
+export const IMAGE_PROVIDER_LABELS: Record<ImageProvider, string> = {
+  google: 'Google',
+  openai: 'OpenAI',
+  openrouter: 'OpenRouter',
+  nodus: 'Nodus local',
+  codex: 'ChatGPT · Codex',
+};
 
 export const PROVIDER_LABELS: Record<AiProvider, string> = {
   anthropic: 'Anthropic',

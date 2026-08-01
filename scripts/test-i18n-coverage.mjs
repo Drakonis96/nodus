@@ -509,6 +509,29 @@ test('no translation is empty', () => {
   }
 });
 
+test('stored image-generation failures are translated, not flattened or leaked', () => {
+  // A failed decorative image keeps its reason in the vault and shows it later, so
+  // this is the one class of Electron error the renderer must translate itself. Two
+  // things have to hold together, and each one alone shipped a bug: the reason has to
+  // survive `localizeIpcPayload` (otherwise it collapses into "the operation could not
+  // be completed" and the user learns nothing), and it has to exist in every table
+  // (otherwise it leaks Spanish — `ChatGPT no pudo generar la imagen.` carries no
+  // diacritic and one function word, so the Spanish detector never caught it).
+  const { IMAGE_GENERATION_ERROR_MESSAGES, localizeIpcPayload } = loadModule('shared/uiLanguage.ts');
+  assert.ok(IMAGE_GENERATION_ERROR_MESSAGES.length > 0);
+  for (const message of IMAGE_GENERATION_ERROR_MESSAGES) {
+    assert.equal(
+      localizeIpcPayload({ error: message }, 'en').error,
+      message,
+      `${JSON.stringify(message)} must reach the renderer intact`
+    );
+  }
+  for (const { name, table } of TRANSLATIONS) {
+    const missing = IMAGE_GENERATION_ERROR_MESSAGES.filter((key) => !table[key]?.trim());
+    assert.deepEqual(missing, [], `${name} is missing image-generation failure reasons`);
+  }
+});
+
 test('issue #12 runtime UI payloads have a translation in every language', () => {
   for (const { name, table } of TRANSLATIONS) {
     const missing = ISSUE_12_RUNTIME_KEYS.filter((key) => !table[key]?.trim());

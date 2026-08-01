@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { DecorativeImage, DecorativeImageEntityKind, DecorativeImageStyle } from '@shared/types';
+import type { DecorativeImage, DecorativeImageEntityKind, DecorativeImageStyle, ImageProvider } from '@shared/types';
 import { confirm } from './feedback';
 import { AiBadge, Icon } from './ui';
 import { t } from '../i18n';
@@ -89,11 +89,22 @@ export function DecorativeImageCard({
     };
   }, [current?.status, current?.updatedAt, entityKind, entityId, thumbnail]);
 
-  const queue = async (action: DecorativeImageQueueAction, opts: { style: DecorativeImageStyle; visualContext?: string }) => {
+  const queue = async (
+    action: DecorativeImageQueueAction,
+    opts: { style: DecorativeImageStyle; visualContext?: string; provider?: ImageProvider; model?: string }
+  ) => {
     setBusy(true);
     setActionError(null);
     try {
-      const pending = await window.nodus.queueDecorativeImage({ entityKind, entityId, action, style: opts.style, visualContext: opts.visualContext });
+      const pending = await window.nodus.queueDecorativeImage({
+        entityKind,
+        entityId,
+        action,
+        style: opts.style,
+        visualContext: opts.visualContext,
+        provider: opts.provider,
+        model: opts.model,
+      });
       setCurrent(pending);
       onChange?.(pending);
     } catch (reason) {
@@ -218,7 +229,9 @@ export function DecorativeImageCard({
       <>
         <div className={`flex aspect-[16/9] max-h-[26rem] flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-amber-300 bg-amber-50 px-6 text-center dark:border-amber-900/50 dark:bg-amber-950/20 ${className}`}>
           <div className="flex items-center gap-2 text-sm text-amber-800 dark:text-amber-300">
-            <Icon name="alert" size={16} /> {t('La imagen no pudo generarse.')}
+            {/* The provider's own reason, translated, rather than a generic headline
+                that leaves the design modal as the only place to learn what failed. */}
+            <Icon name="alert" size={16} /> {t(current?.error || 'La imagen no pudo generarse.')}
           </div>
           {interactive && <DesignPill onClick={() => setModalOpen(true)} />}
         </div>

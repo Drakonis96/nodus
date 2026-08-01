@@ -59,7 +59,12 @@ function sniffImageMime(bytes: Buffer): string {
 
 function turnError(turn: any): Error {
   const message = turn?.error?.message ?? turn?.error?.additionalDetails;
-  return new Error(message || `La generación de imagen de Codex terminó con estado «${turn?.status ?? 'desconocido'}».`);
+  // The runtime's own message is the informative one and is passed through as it
+  // comes. The fallback is a fixed sentence rather than one built around the turn
+  // status, because a failed image is STORED with its reason and read back later
+  // in whatever language the interface is in — an interpolated string could not be
+  // translated, and the raw status told the user nothing they could act on.
+  return new Error(message || 'La generación de imagen de Codex no llegó a completarse.');
 }
 
 /**
