@@ -58,6 +58,12 @@ export const RELEASE_2_7_0_IT: string[] = [
 ];
 
 /** Italian history, indexed by release and highlight order. */
+const RELEASE_3_0_4_IT: string[] = [
+  "Un client MCP può mettere in coda i report di Deep Research. Finora il client che ne chiedeva uno doveva tenere aperta la chiamata per tutta la generazione — diversi minuti in cui qualsiasi cosa poteva scadere — e rischiava di scontrarsi con un report avviato da te nell’applicazione. Ora lo mette in coda e torna a consultarlo quando vuole: Nodus ha un’unica corsia di generazione condivisa con la finestra, così non girano mai due report insieme; la striscia della coda contrassegna con un distintivo MCP quelli che arrivano da un client e Nodi ti avvisa quando uno finisce o fallisce, perché chi l’ha chiesto potrebbe essersi già disconnesso. Ogni lavoro resta legato alla cassaforte in cui è stato messo in coda, e cambiare cassaforte annulla ciò che era ancora in attesa per un’altra.",
+  "Un’immagine fallita si può ritentare con un altro motore. Il nuovo tentativo riutilizzava il fornitore e il modello salvati sull’immagine che si era appena rifiutata, così un report bloccato su «non è stato possibile generare l’immagine» tornava sempre allo stesso motore, e cambiare fornitore nelle Impostazioni non serviva a nulla. Ora il motore viene da ciò che chiedi o dalle Impostazioni: un’immagine fallita si apre con il predefinito attuale, una già generata mantiene il suo, e la finestra di progettazione guadagna un selettore di modello con l’intero catalogo e il prezzo per immagine, mentre il piè di pagina dice che cosa userà il pulsante. Anche il motivo reale del fallimento apre il messaggio, tradotto in tutte e sette le lingue, invece di stare sotto un titolo generico che lo contraddiceva.",
+  "La mappa degli argomenti disegna un’idea ben collegata per quello che è. Aprire un’idea centrale la appiattiva in una stella: il percorso limitava le sue idee nell’ordine del database prima di ordinarle per rilevanza, così alcuni dei suoi dibattiti più forti sparivano in silenzio, e conservava solo i collegamenti che aveva attraversato lui stesso, cosicché nessun ramo poteva ramificarsi per quanta profondità avessi impostato. Ora si espande partendo dal collegamento più forte, conserva tutti i collegamenti fra le idee che mostra, ripartisce ogni livello fra dibattiti, sostegni e il resto invece di lasciare che i dibattiti prendano tutti i posti, e l’intestazione conta le connessioni reali dell’idea e quanti collegamenti sono rimasti non disegnati.",
+];
+
 const RELEASE_3_0_3_IT: string[] = [
   "I report escono da Deep Research in blocco, e anche dalla loro scheda. Tutto ciò che la galleria produceva usciva uno alla volta, passando dal lettore: una libreria di trenta report significava trenta finestre di salvataggio, e una scheda non si poteva scaricare senza prima aprirla. Ora il pulsante Scarica dell’intestazione riutilizza la modalità di selezione — «seleziona tutto» compreso —, ti lascia scegliere Markdown, PDF o entrambi e consegna un unico ZIP; ogni scheda e ogni riga guadagnano inoltre la propria icona di download. I PDF vengono stampati uno alla volta con una barra di avanzamento, perché quella passata può durare un minuto e un minuto in silenzio sembra un blocco.",
   "Il design dell’immagine di un report può ora suggerirti la scena. «Suggerisci con l’IA» scrive nel campo del prompt una descrizione visiva ricavata dal riassunto del report stesso — la stessa che il generatore si sarebbe scritto da sé e che finora non vedevi mai. Puoi modificarla, e non viene salvato nulla finché non generi con essa.",
@@ -80,6 +86,7 @@ const RELEASE_3_0_1_IT: string[] = [
 ];
 
 export const RELEASE_NOTES_IT: Record<string, string[]> = {
+  "3.0.4": RELEASE_3_0_4_IT,
   "3.0.3": RELEASE_3_0_3_IT,
   "3.0.2": RELEASE_3_0_2_IT,
   "3.0.1": RELEASE_3_0_1_IT,
