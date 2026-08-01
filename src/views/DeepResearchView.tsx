@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   AppSettings,
   DeepResearchArchiveFormat,
+  DeepResearchJobRecord,
   DeepResearchOutlineSection,
   DeepResearchProgress,
   DeepResearchSectionLimit,
@@ -267,6 +268,8 @@ export function DeepResearchView({
   const [savedDrafts, setSavedDrafts] = useState<WritingWorkshopSavedDraft[]>([]);
   const [loadingSavedDrafts, setLoadingSavedDrafts] = useState(false);
   const [queue, setQueue] = useState<DeepResearchQueueItem[]>(() => getDeepResearchQueue());
+  // The main-process lane, which also holds reports queued by MCP clients.
+  const [laneJobs, setLaneJobs] = useState<DeepResearchJobRecord[]>([]);
   const [deepJob, setDeepJob] = useState<DeepResearchGenerationJob | null>(() =>
     getBackgroundJob(DEEP_RESEARCH_MAIN_JOB_KEY)
   );
@@ -300,6 +303,10 @@ export function DeepResearchView({
 
   useEffect(() => subscribeBackgroundJob(DEEP_RESEARCH_MAIN_JOB_KEY, setDeepJob), []);
   useEffect(() => subscribeDeepResearchQueue(setQueue), []);
+  useEffect(() => {
+    void window.nodus.listDeepResearchJobs().then(setLaneJobs);
+    return window.nodus.onDeepResearchQueue(setLaneJobs);
+  }, []);
 
   useEffect(() => {
     if (!composerOpen || !isGenealogy) return;
@@ -341,6 +348,18 @@ export function DeepResearchView({
       void refreshSavedDrafts();
     }
   }, [deepJob, refreshSavedDrafts]);
+
+  // A report queued over MCP is saved by the main process, so nothing in this window
+  // knows about it until the gallery is re-read.
+  const seenMcpDraftsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const landed = laneJobs.filter(
+      (job) => job.origin === 'mcp' && job.savedDraftId && !seenMcpDraftsRef.current.has(job.savedDraftId)
+    );
+    if (landed.length === 0) return;
+    for (const job of landed) seenMcpDraftsRef.current.add(job.savedDraftId as string);
+    void refreshSavedDrafts();
+  }, [laneJobs, refreshSavedDrafts]);
 
   const submitComposer = () => {
     if (!objective.trim()) {
@@ -571,8 +590,46 @@ export function DeepResearchView({
     return sorted;
   }, [savedDrafts, search, sortKey]);
 
-  const activeQueue = queue.filter((item) => item.status === 'queued' || item.status === 'running');
-  const finishedQueue = queue.filter((item) => item.status === 'failed');
+  // The strip shows one lane, not two. Reports queued from this window come from the
+  // renderer store; reports queued by an MCP client live in the main process and arrive
+  // over `onDeepResearchQueue`. Only MCP ones are taken from there — an app report is
+  // already represented by its renderer entry, and would otherwise appear twice.
+  const stripItems = useMemo<QueueStripItem[]>(() => {
+    const local = queue.map<QueueStripItem>((item) => ({
+      id: item.id,
+      title: item.title,
+      status: item.status,
+      detail: item.status === 'running' ? progressDetail(deepProgress) : null,
+      error: item.error,
+      origin: 'app',
+      enqueuedAt: item.enqueuedAt,
+    }));
+    const remote = laneJobs
+      .filter((job) => job.origin === 'mcp')
+      .map<QueueStripItem>((job) => ({
+        id: job.id,
+        title: job.title,
+        status: job.status === 'cancelled' ? 'failed' : job.status,
+        detail: job.status === 'running' || job.status === 'queued' ? progressDetail(job.progress) : null,
+        error: job.error,
+        origin: 'mcp',
+        enqueuedAt: job.enqueuedAt,
+      }));
+    return [...local, ...remote].sort((a, b) => a.enqueuedAt.localeCompare(b.enqueuedAt));
+  }, [queue, laneJobs, deepProgress]);
+
+  const activeQueue = stripItems.filter((item) => item.status === 'queued' || item.status === 'running');
+  const finishedQueue = stripItems.filter((item) => item.status === 'failed');
+
+  const removeQueued = (item: QueueStripItem) => {
+    if (item.origin === 'mcp') void window.nodus.cancelDeepResearchJob(item.id);
+    else removeQueuedDeepResearch(item.id);
+  };
+
+  const clearFinished = () => {
+    clearFinishedDeepResearch();
+    void window.nodus.clearFinishedDeepResearchJobs();
+  };
 
   if (mode === 'reader' && openDraft) {
     return (
@@ -675,10 +732,9 @@ export function DeepResearchView({
         <QueueStrip
           active={activeQueue}
           failed={finishedQueue}
-          progress={deepProgress}
-          running={deepRunning}
-          onRemove={(id) => removeQueuedDeepResearch(id)}
-          onClearFinished={() => clearFinishedDeepResearch()}
+          running={deepRunning || activeQueue.some((item) => item.status === 'running')}
+          onRemove={removeQueued}
+          onClearFinished={clearFinished}
         />
       )}
 
@@ -864,19 +920,46 @@ export function DeepResearchView({
 // Queue strip
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** One row of the strip, whichever lane it came from. */
+interface QueueStripItem {
+  id: string;
+  title: string;
+  status: 'queued' | 'running' | 'completed' | 'failed';
+  /** Already-resolved progress line, so the strip does not need to know whose progress it is. */
+  detail: string | null;
+  error: string | null;
+  origin: 'app' | 'mcp';
+  enqueuedAt: string;
+}
+
+/** Marks a report someone asked for through MCP, so a queue the user did not fill is not a mystery. */
+function OriginBadge() {
+  return (
+    <span
+      className="shrink-0 rounded border border-indigo-800/70 bg-indigo-950/40 px-1 py-px text-[10px] font-semibold uppercase tracking-wide text-indigo-300"
+      title={t('Pedido desde un cliente MCP')}
+    >
+      MCP
+    </span>
+  );
+}
+
+function progressDetail(progress: DeepResearchProgress | null): string | null {
+  if (!progress) return null;
+  return progress.pagesSoFar != null ? `${progress.message} · ~${progress.pagesSoFar} ${t('pág.')}` : progress.message;
+}
+
 function QueueStrip({
   active,
   failed,
-  progress,
   running,
   onRemove,
   onClearFinished,
 }: {
-  active: DeepResearchQueueItem[];
-  failed: DeepResearchQueueItem[];
-  progress: DeepResearchProgress | null;
+  active: QueueStripItem[];
+  failed: QueueStripItem[];
   running: boolean;
-  onRemove: (id: string) => void;
+  onRemove: (item: QueueStripItem) => void;
   onClearFinished: () => void;
 }) {
   return (
@@ -899,15 +982,16 @@ function QueueStrip({
               className={item.status === 'running' ? 'animate-spin text-indigo-300' : 'text-neutral-500'}
             />
             <span className="min-w-0 flex-1 truncate text-neutral-300" title={item.title}>{item.title}</span>
+            {item.origin === 'mcp' && <OriginBadge />}
             {item.status === 'running' ? (
-              <span className="shrink-0 text-[11px] text-indigo-300">
-                {progress?.message ?? t('Generando…')}
-                {progress?.pagesSoFar != null && ` · ~${progress.pagesSoFar} ${t('pág.')}`}
-              </span>
+              <span className="shrink-0 text-[11px] text-indigo-300">{item.detail ?? t('Generando…')}</span>
             ) : (
-              <button className="shrink-0 text-neutral-500 hover:text-red-400" onClick={() => onRemove(item.id)} title={t('Quitar de la cola')}>
-                <Icon name="x" size={13} />
-              </button>
+              <>
+                {item.detail && <span className="shrink-0 text-[11px] text-neutral-500">{item.detail}</span>}
+                <button className="shrink-0 text-neutral-500 hover:text-red-400" onClick={() => onRemove(item)} title={t('Quitar de la cola')}>
+                  <Icon name="x" size={13} />
+                </button>
+              </>
             )}
           </div>
         ))}
@@ -915,6 +999,7 @@ function QueueStrip({
           <div key={item.id} className="flex items-center gap-2 rounded-md border border-red-900/50 bg-red-950/20 px-2.5 py-1.5 text-xs">
             <Icon name="alert" size={12} className="text-red-400" />
             <span className="min-w-0 flex-1 truncate text-red-300" title={item.error ?? item.title}>{item.title}</span>
+            {item.origin === 'mcp' && <OriginBadge />}
             <span className="shrink-0 text-[11px] text-red-400/80">{t('Falló')}</span>
           </div>
         ))}

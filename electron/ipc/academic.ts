@@ -190,7 +190,13 @@ import * as studyAssessments from '../db/studyAssessmentsRepo';
 import { buildStudyTest } from '../ai/studyTests';
 import * as studyGrading from '../db/studyGradingRepo';
 import { buildWritingWorkshopSnapshot, generateWritingWorkshopDraft } from '../ai/writingWorkshop';
-import { generateDeepResearchReport } from '../ai/deepResearch';
+import { ensureDeepResearchLane } from '../ai/deepResearchLane';
+import {
+  cancelDeepResearchJob,
+  clearFinishedDeepResearchJobs,
+  listDeepResearchJobs,
+  runDeepResearchJob,
+} from '../ai/deepResearchQueue';
 import { reprocessConnections } from '../ai/reprocessConnections';
 import { startEmbedding, reindexAll, pauseEmbedding, resumeEmbedding, stopEmbedding, clearEmbeddingProgress, onEmbeddingProgress, getWorkEmbeddingStatuses } from '../ai/embeddingPipeline';
 import { startPassageEmbedding, pausePassageEmbedding, resumePassageEmbedding, stopPassageEmbedding, clearPassageProgress, onPassageProgress, getWorkPassageStatuses } from '../ai/passageEmbeddingPipeline';
@@ -1203,9 +1209,31 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
   });
 
   // deep research (orchestrated, coverage-guided multi-page report)
-  h('research:deep', async (e, requestId: string, request: DeepResearchRequest) =>
-    generateDeepResearchReport(request, (p) => e.sender.send('research:deep:progress', requestId, p))
-  );
+  //
+  // Routed through the shared queue rather than called directly: MCP clients can queue
+  // reports too, and two pipelines running at once would put two multi-minute
+  // generations on the single event loop of this process. The window still streams
+  // progress — it just also sees `queued` while another report is ahead of it. The
+  // draft is saved by the renderer (which owns the decorative image), so `save` is
+  // false here.
+  h('research:deep', async (e, requestId: string, request: DeepResearchRequest) => {
+    ensureDeepResearchLane();
+    return runDeepResearchJob({ request, origin: 'app', save: false }, (p) => {
+      if (!e.sender.isDestroyed()) e.sender.send('research:deep:progress', requestId, p);
+    });
+  });
+  h('research:deep:queue:list', async () => {
+    ensureDeepResearchLane();
+    return listDeepResearchJobs();
+  });
+  h('research:deep:queue:cancel', async (_e, id: string) => {
+    ensureDeepResearchLane();
+    return cancelDeepResearchJob(id);
+  });
+  h('research:deep:queue:clear', async () => {
+    ensureDeepResearchLane();
+    return clearFinishedDeepResearchJobs();
+  });
 
   // tutor mode (AI-guided graph walkthrough)
   h('tutor:plan', async (_e, request: TutorPlanRequest) => buildTutorPlan(request));

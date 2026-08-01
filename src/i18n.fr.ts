@@ -2755,6 +2755,7 @@ export const FR: Record<string, string> = {
   'Cola de generación · {n} en curso': 'File de génération · {n} en cours',
   'Limpiar fallidos': 'Effacer les échecs',
   'pág.': 'p.',
+  'Pedido desde un cliente MCP': 'Demandé depuis un client MCP',
   'Quitar de la cola': 'Retirer de la file',
   'Falló': 'Échoué',
   'Abrir a pantalla completa': 'Ouvrir en plein écran',

@@ -104,6 +104,7 @@ import {
   getPassageSnapshot,
 } from './ai/passageEmbeddingPipeline';
 import { isSemanticBridgeRunning } from './ai/semanticBridges';
+import { cancelDeepResearchJobsForOtherVaults, isDeepResearchLaneBusy } from './ai/deepResearchQueue';
 import { closeDb, getDb } from './db/database';
 import {
   createVault,
@@ -139,6 +140,12 @@ function vaultBusyMessage(): string | null {
   }
   if (isSemanticBridgeRunning()) {
     return 'No se puede cambiar de bóveda mientras se descubren relaciones semánticas.';
+  }
+  // A report in flight reads the corpus for minutes. Switching closes the database
+  // under it — and a report can now be running because an MCP client asked for it,
+  // with nothing on screen unless the user is looking at Deep Research.
+  if (isDeepResearchLaneBusy()) {
+    return 'No se puede cambiar de bóveda mientras se genera un informe de Deep Research. Espera a que termine; en Deep Research puedes quitar de la cola los que aún no han empezado.';
   }
   return null;
 }
@@ -252,6 +259,9 @@ export function registerIpc(
     closeDb();
     setActiveVault(id);
     getDb();
+    // Reports still waiting were researched against the corpus just closed; running
+    // them now would answer about a vault nobody asked about.
+    cancelDeepResearchJobsForOtherVaults(id);
     upgradeWorldbuildingDemoDynasties();
     upgradeWorldbuildingDemoImageQuality();
     upgradeWorldbuildingDemoNarrativeDepth();

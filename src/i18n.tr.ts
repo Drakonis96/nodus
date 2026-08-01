@@ -2841,6 +2841,7 @@ export const TR: Record<string, string> = {
   "Cargando informes…": "Raporlar yükleniyor…",
   "Ningún informe coincide con tu búsqueda.": "Aramanızla eşleşen rapor yok.",
   "Aún no hay informes. Crea el primero y quedará aquí, listo para leerse a pantalla completa.": "Henüz rapor yok. İlkini oluşturduğunuzda tam ekranda okunmaya hazır olarak burada olacaktır.",
+  "Pedido desde un cliente MCP": "Bir MCP istemcisinden istendi",
   "Cola de generación · {n} en curso": "Sıra oluşturma · {n} devam ediyor",
   "Limpiar fallidos": "Temizleme başarısız oldu",
   "pág.": "s.",

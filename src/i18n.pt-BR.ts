@@ -2738,6 +2738,7 @@ export const PT_BR: Record<string, string> = {
   'Cola de generación · {n} en curso': 'Fila de geração · {n} em andamento',
   'Limpiar fallidos': 'Limpar falhas',
   'pág.': 'pág.',
+  'Pedido desde un cliente MCP': 'Solicitado a partir de um cliente MCP',
   'Quitar de la cola': 'Remover da fila',
   'Falló': 'Falhou',
   'Abrir a pantalla completa': 'Abrir em tela cheia',

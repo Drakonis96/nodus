@@ -53,6 +53,7 @@ import type {
   DebateAnalysisStreamHandlers,
   DeepResearchArchiveRequest,
   DeepResearchArchiveResult,
+  DeepResearchJobRecord,
   DeepResearchReport,
   DeepResearchRequest,
   DeepResearchStreamHandlers,
@@ -582,6 +583,14 @@ export interface AcademicApi {
   // deep research (orchestrated, coverage-guided multi-page report over the whole corpus)
   /** Plan → write section by section (guided by coverage) → assemble a fully cited 5–20 page report. */
   generateDeepResearchReport(request: DeepResearchRequest, handlers?: DeepResearchStreamHandlers): Promise<DeepResearchReport>;
+  /** Every report in the shared generation lane, including those queued by MCP clients. */
+  listDeepResearchJobs(): Promise<DeepResearchJobRecord[]>;
+  /** Drop a report that has not started yet. Returns false for one already running or finished. */
+  cancelDeepResearchJob(id: string): Promise<boolean>;
+  /** Forget the finished tail of the lane; returns how many jobs were dropped. */
+  clearFinishedDeepResearchJobs(): Promise<number>;
+  /** Subscribe to the lane; fires on every state change. Returns an unsubscribe function. */
+  onDeepResearchQueue(cb: (jobs: DeepResearchJobRecord[]) => void): () => void;
 
   // tutor mode (AI-guided graph walkthrough)
   /** Analyse the whole idea graph and propose weighted guided routes (overview or prompt-driven). */

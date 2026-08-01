@@ -155,8 +155,16 @@ import { buildAuthorGraph, getDebate, getDebates } from '../graph/graphService';
 import { embed, AiError } from '../ai/aiClient';
 import { decomposeQuestion, mapCoverage } from '../ai/researchMap';
 import { buildWritingWorkshopSnapshot, generateWritingWorkshopDraft } from '../ai/writingWorkshop';
-import { generateDeepResearchReport } from '../ai/deepResearch';
 import { buildDeepResearchBrief, assembleClientDeepResearchReport } from '../ai/deepResearchClient';
+import { ensureDeepResearchLane } from '../ai/deepResearchLane';
+import {
+  cancelDeepResearchJob,
+  enqueueDeepResearchJob,
+  getDeepResearchJob,
+  listDeepResearchJobs,
+  runDeepResearchJob,
+  type DeepResearchJobRecord,
+} from '../ai/deepResearchQueue';
 import { analyzeText, composeCopilotIdeaInsertion, getCopilotIdeaDetail } from '../ai/liveRelations';
 import {
   buildAuthorDossier,
@@ -965,6 +973,10 @@ const TOOL_VAULT_SCOPE: Record<string, VaultType[]> = {
   nodus_list_writing_drafts: RESEARCH_VAULTS,
   nodus_generate_deep_research: RESEARCH_VAULTS,
   nodus_finalize_deep_research: RESEARCH_VAULTS,
+  nodus_enqueue_deep_research: RESEARCH_VAULTS,
+  nodus_list_deep_research_jobs: RESEARCH_VAULTS,
+  nodus_get_deep_research_job: RESEARCH_VAULTS,
+  nodus_cancel_deep_research_job: RESEARCH_VAULTS,
   // Records layer.
   nodus_list_persons: RECORDS_VAULTS,
   nodus_get_person: RECORDS_VAULTS,
@@ -1990,7 +2002,7 @@ export function registerTools(server: McpServer): void {
       description:
         'Runs the orchestrated, coverage-guided, fully-cited Deep Research pipeline over the whole corpus (5–20 pp). Two writers via `writer`: ' +
         '"nodus" (default) — Nodus\'s own configured model plans and writes the whole report and returns it (save=true also stores it as a draft). ' +
-        '"client" — returns a self-contained writing kit (corpus materials with verbatim citation tokens, target scope, method and citation policy) so the MODEL CALLING THIS MCP articulates and drafts the report itself; when done, that draft is passed to nodus_finalize_deep_research to validate citations and assemble references. Both keep Nodus as the grounding authority. writer="nodus" can consume provider tokens and may take several minutes; it sends MCP progress notifications (planning, per-section, assembly) when the request carries a progressToken.',
+        '"client" — returns a self-contained writing kit (corpus materials with verbatim citation tokens, target scope, method and citation policy) so the MODEL CALLING THIS MCP articulates and drafts the report itself; when done, that draft is passed to nodus_finalize_deep_research to validate citations and assemble references. Both keep Nodus as the grounding authority. writer="nodus" can consume provider tokens and may take several minutes; it sends MCP progress notifications (planning, per-section, assembly) when the request carries a progressToken. It also holds this call open for the whole generation and waits behind anything already in the shared lane — prefer nodus_enqueue_deep_research unless the report is needed in this very turn.',
       inputSchema: {
         objective: z.string().trim().min(1).max(8_000),
         language: promptLanguageSchema.optional(),
@@ -2013,8 +2025,16 @@ export function registerTools(server: McpServer): void {
           return buildDeepResearchBrief({ objective, language, audience, targetLength, sectionLimit });
         }
         const notify = progressNotifier(extra);
-        const report = await generateDeepResearchReport(
-          { objective, language, audience, targetLength, sectionLimit, model: asModel(model) ?? null },
+        ensureDeepResearchLane();
+        // Through the lane like everything else, so this blocking call cannot run
+        // beside a queued report. The draft is saved below, keeping this tool's
+        // response shape (the full saved draft, not just its id).
+        const report = await runDeepResearchJob(
+          {
+            request: { objective, language, audience, targetLength, sectionLimit, model: asModel(model) ?? null },
+            origin: 'mcp',
+            save: false,
+          },
           (p) =>
             notify(
               p.phase === 'section' && p.sectionIndex
@@ -2060,6 +2080,114 @@ export function registerTools(server: McpServer): void {
         });
         const saved = save ? writingDrafts.saveWritingWorkshopDraft({ draft: report.draft, title }) : null;
         return { report, savedDraftId: saved?.id ?? null, savedDraft: saved };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_enqueue_deep_research',
+    {
+      title: 'Queue a Deep Research report',
+      description:
+        'Queues the same report as nodus_generate_deep_research(writer="nodus") but returns a job id immediately instead of holding the call open for the minutes it takes. Use this instead of the blocking tool whenever you do not need the text in this turn: the report survives this MCP session ending, and Nodus notifies the user when it lands. ' +
+        'Reports run ONE AT A TIME in a single lane shared with the Nodus window, so a queued report waits for anything already generating. ' +
+        'The job is bound to the vault active right now: if the user switches vault before it starts, it is cancelled rather than researched against a different corpus. ' +
+        'Poll nodus_get_deep_research_job for status; with save=true (the default) the finished report is stored as a Nodus writing draft and appears in the user\'s Deep Research gallery.',
+      inputSchema: {
+        objective: z.string().trim().min(1).max(8_000),
+        language: promptLanguageSchema.optional(),
+        audience: z.string().trim().max(1_000).optional(),
+        targetLength: deepResearchTargetLengthSchema,
+        sectionLimit: deepResearchSectionLimitSchema,
+        model: modelSchema.optional(),
+        save: z.boolean().default(true).describe('Store the finished report as a Nodus writing draft. Leave true unless the user only wants to read it here.'),
+        title: z.string().trim().min(1).max(2_000).optional(),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    },
+    ({ objective, language, audience, targetLength, sectionLimit, model, save, title }) =>
+      tool(() => {
+        ensureDeepResearchLane();
+        const job = enqueueDeepResearchJob({
+          request: { objective, language, audience, targetLength, sectionLimit, model: asModel(model) ?? null },
+          origin: 'mcp',
+          save,
+          title,
+        });
+        return { job, hint: 'Call nodus_get_deep_research_job with this id to follow it. Do not claim the report exists until its status is "completed".' };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_list_deep_research_jobs',
+    {
+      title: 'List queued Deep Research reports',
+      description:
+        'Lists the Deep Research reports in the generation lane — queued, running and recently finished — including those started from the Nodus window rather than over MCP (`origin`). Read-only. Finished jobs are kept for a while and then dropped; a report saved as a draft remains available through nodus_list_writing_drafts.',
+      inputSchema: {
+        status: z
+          .enum(['all', 'active', 'finished'])
+          .default('all')
+          .describe('"active": queued or running. "finished": completed, failed or cancelled.'),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ status }) =>
+      tool(() => {
+        ensureDeepResearchLane();
+        const all = listDeepResearchJobs();
+        const active = (job: DeepResearchJobRecord) => job.status === 'queued' || job.status === 'running';
+        const jobs = status === 'all' ? all : all.filter((job) => (status === 'active' ? active(job) : !active(job)));
+        return { jobs, running: all.some((job) => job.status === 'running'), queued: all.filter((job) => job.status === 'queued').length };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_get_deep_research_job',
+    {
+      title: 'Get a queued Deep Research report',
+      description:
+        'Returns one job from the Deep Research lane: its status, live progress, and the error or saved draft id it ended with. Read-only. ' +
+        'With includeReport=true a completed job also returns the full report (kept in memory for the last few finished jobs only — after that read it through nodus_list_writing_drafts using `savedDraftId`). ' +
+        'A `queued` job has not started; `ahead` says how many reports are in front of it.',
+      inputSchema: {
+        jobId: z.string().trim().min(1).max(200),
+        includeReport: z.boolean().default(false),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ jobId, includeReport }) =>
+      tool(() => {
+        ensureDeepResearchLane();
+        const found = getDeepResearchJob(jobId);
+        if (!found) {
+          return {
+            job: null,
+            error: 'No job with that id is in the Deep Research lane. Finished jobs are eventually dropped; look for the report in nodus_list_writing_drafts.',
+          };
+        }
+        return {
+          job: found.job,
+          ...(includeReport
+            ? { report: found.report, reportAvailable: found.report !== null }
+            : {}),
+        };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_cancel_deep_research_job',
+    {
+      title: 'Cancel a queued Deep Research report',
+      description:
+        'Drops a report that has not started yet. A report already being generated is never abandoned mid-flight — the call returns cancelled=false and the job runs to the end. This modifies Nodus data.',
+      inputSchema: { jobId: z.string().trim().min(1).max(200) },
+      annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
+    },
+    ({ jobId }) =>
+      tool(() => {
+        ensureDeepResearchLane();
+        const cancelled = cancelDeepResearchJob(jobId);
+        return { cancelled, job: getDeepResearchJob(jobId)?.job ?? null };
       })()
   );
 

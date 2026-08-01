@@ -2758,6 +2758,7 @@ export const DE: Record<string, string> = {
   'Cola de generación · {n} en curso': 'Erzeugungswarteschlange · {n} in Bearbeitung',
   'Limpiar fallidos': 'Fehlgeschlagene entfernen',
   'pág.': 'S.',
+  'Pedido desde un cliente MCP': 'Von einem MCP-Client angefordert',
   'Quitar de la cola': 'Aus der Warteschlange entfernen',
   'Falló': 'Fehlgeschlagen',
   'Abrir a pantalla completa': 'Im Vollbild öffnen',

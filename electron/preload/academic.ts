@@ -497,6 +497,14 @@ export const academicApi: AcademicApi = {
       ipcRenderer.removeListener('research:deep:progress', onProgress);
     }
   },
+  listDeepResearchJobs: () => ipcRenderer.invoke('research:deep:queue:list'),
+  cancelDeepResearchJob: (id) => ipcRenderer.invoke('research:deep:queue:cancel', id),
+  clearFinishedDeepResearchJobs: () => ipcRenderer.invoke('research:deep:queue:clear'),
+  onDeepResearchQueue: (cb) => {
+    const listener = (_e: unknown, jobs: import('@shared/types').DeepResearchJobRecord[]) => cb(jobs);
+    ipcRenderer.on('research:deep:queue', listener);
+    return () => ipcRenderer.removeListener('research:deep:queue', listener);
+  },
 
   tutorPlan: (request) => ipcRenderer.invoke('tutor:plan', request),
   listTutorRoutes: () => ipcRenderer.invoke('tutor:routes:list'),
