@@ -116,7 +116,8 @@ export function DecorativeImageModal({
     return () => {
       mounted = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Deliberately empty: `engine` is read as a guard, not as a dependency. Re-running
+    // this on every change would overwrite the choice the user just made in the picker.
   }, []);
 
   // The full catalogue, so the engine can be changed here instead of only in Ajustes.
