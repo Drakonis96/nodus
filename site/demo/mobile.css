@@ -1,0 +1,1036 @@
+/* Nodus web demos — mobile and tablet layout.
+   The desktop replica keeps its framed window above 900px. Below that point the
+   demo becomes a native, full-screen touch interface instead of shrinking the
+   desktop shell. */
+
+@media (max-width: 900px) {
+  :root {
+    --mobile-gutter: clamp(12px, 3.5vw, 20px);
+  }
+
+  html,
+  body {
+    width: 100%;
+    height: 100%;
+    overscroll-behavior: none;
+  }
+
+  body.demo-page {
+    display: block;
+    width: 100%;
+    height: 100dvh;
+    min-height: 100dvh;
+    overflow: hidden;
+    background: var(--bg);
+  }
+
+  /* The demo is the product on a small screen; the ornamental website and
+     macOS chrome only consume useful space. The in-app Nodus brand still links
+     back to the main site. */
+  .site-nav,
+  .mac-titlebar {
+    display: none;
+  }
+
+  .demo-frame,
+  .worldbuilding .demo-frame {
+    width: 100%;
+    height: 100dvh;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    overflow: hidden;
+  }
+
+  .shell,
+  .demo-frame .shell,
+  .worldbuilding .wb-shell {
+    width: 100%;
+    min-width: 0;
+    height: 100dvh;
+    min-height: 0;
+  }
+
+  /* App bar: actions stay reachable as icon buttons and the vault picker is a
+     single swipeable row. */
+  .topbar {
+    flex: 0 0 auto;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: max(8px, env(safe-area-inset-top)) var(--mobile-gutter) 7px;
+    background: rgba(10, 10, 10, 0.98);
+  }
+
+  .topbar .brand {
+    min-width: 0;
+    margin-right: auto;
+    font-size: 14px;
+  }
+
+  .topbar .brand img {
+    width: 23px;
+    height: 23px;
+  }
+
+  .topbar .spacer {
+    display: none;
+  }
+
+  .topbar .tb-btn {
+    display: inline-grid;
+    place-items: center;
+    flex: 0 0 38px;
+    width: 38px;
+    min-height: 38px;
+    padding: 0;
+    border-color: var(--border);
+    background: var(--card);
+    font-size: 0;
+  }
+
+  .topbar .tb-btn svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .vault-tabs {
+    order: 10;
+    flex: 1 0 100%;
+    flex-wrap: nowrap;
+    gap: 6px;
+    width: 100%;
+    padding: 2px 0 3px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x proximity;
+    touch-action: pan-x;
+  }
+
+  .vault-tab,
+  .worldbuilding .vault-tab {
+    min-height: 34px;
+    padding: 7px 11px;
+    font-size: 11px;
+    scroll-snap-align: center;
+  }
+
+  .vault-active-label {
+    display: none;
+  }
+
+  .demo-banner {
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 8px;
+    min-height: 45px;
+    padding: 7px var(--mobile-gutter);
+    font-size: 11px;
+    line-height: 1.35;
+  }
+
+  .demo-banner > span {
+    display: -webkit-box;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .demo-banner a {
+    flex: 0 0 auto;
+    margin-left: 0;
+    padding: 6px 8px;
+    border: 1px solid rgba(251, 191, 36, 0.28);
+    border-radius: 8px;
+    background: rgba(251, 191, 36, 0.08);
+    font-size: 10px;
+    line-height: 1.1;
+  }
+
+  /* On mobile the section rail becomes a labelled, horizontal touch nav. */
+  .body {
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .sidebar,
+  .worldbuilding .wb-sidebar {
+    display: flex;
+    flex: 0 0 54px;
+    align-items: center;
+    gap: 5px;
+    width: 100%;
+    height: 54px;
+    padding: 5px var(--mobile-gutter);
+    overflow-x: auto;
+    overflow-y: hidden;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+    background: #0c0c0e;
+    scrollbar-width: none;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x proximity;
+    touch-action: pan-x;
+  }
+
+  .sidebar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .sidebar .nav-group-label {
+    display: none;
+  }
+
+  .sidebar .nav-item,
+  .worldbuilding .nav-item {
+    display: inline-flex;
+    flex: 0 0 auto;
+    width: auto;
+    min-height: 42px;
+    margin: 0;
+    padding: 8px 11px;
+    border-color: var(--border);
+    border-radius: 10px;
+    background: var(--card);
+    white-space: nowrap;
+    scroll-snap-align: center;
+  }
+
+  .sidebar .nav-item span {
+    display: inline;
+  }
+
+  .sidebar .nav-item svg {
+    width: 15px;
+    height: 15px;
+  }
+
+  .worldbuilding .wb-nav-settings {
+    margin-top: 0;
+  }
+
+  /* Shared content rhythm and touch targets. */
+  .main,
+  .worldbuilding .wb-main {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    padding: 18px var(--mobile-gutter) calc(32px + env(safe-area-inset-bottom));
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .view-head {
+    gap: 10px;
+    margin-bottom: 2px;
+  }
+
+  .view-head > * {
+    min-width: 0;
+  }
+
+  .view-title {
+    font-size: clamp(19px, 5vw, 22px);
+    line-height: 1.25;
+  }
+
+  .view-sub {
+    margin-bottom: 16px;
+    font-size: 12.5px;
+  }
+
+  .card {
+    padding: 14px;
+    border-radius: 12px;
+  }
+
+  .grid.cols-2,
+  .grid.cols-3,
+  .gallery,
+  .db-profile,
+  .db-dist,
+  .teach-stats {
+    grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
+  }
+
+  .btn,
+  .pill,
+  .select,
+  .quiz-opt,
+  .search-input {
+    min-height: 40px;
+  }
+
+  .btn.small,
+  .btn.ghost.small,
+  .chip,
+  .set-tab {
+    min-height: 36px;
+  }
+
+  .toolbar,
+  .pills,
+  .tag-row {
+    max-width: 100%;
+  }
+
+  .list-row,
+  .route-row,
+  .gap-card,
+  .step-item {
+    padding: 13px 14px;
+  }
+
+  .route-detail {
+    padding: 0 12px 12px;
+  }
+
+  .route-conn-row {
+    align-items: flex-start;
+  }
+
+  .route-conn-row .rc-open {
+    opacity: 1;
+  }
+
+  .settings-grid {
+    gap: 12px;
+  }
+
+  .settings-grid .set-tabs {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 6px;
+    margin: 0 calc(var(--mobile-gutter) * -1);
+    padding: 0 var(--mobile-gutter) 4px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .settings-grid .set-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .set-tab {
+    flex: 0 0 auto;
+    width: auto;
+    white-space: nowrap;
+  }
+
+  .card:has(> table.tbl),
+  .gp-arch-main,
+  .db-statscroll,
+  .db-cor-wrap,
+  .teach-table-wrap,
+  .teach-rubric-wrap,
+  .teach-grade-wrap {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  table.tbl {
+    width: max-content;
+    min-width: 100%;
+  }
+
+  .graph-wrap,
+  .gp-tree-wrap,
+  .teach-table-wrap,
+  .teach-rubric-wrap,
+  .teach-grade-wrap,
+  .wb-arcs,
+  .wb-board {
+    border-radius: 10px;
+  }
+
+  .teach-table-wrap,
+  .teach-rubric-wrap,
+  .teach-grade-wrap {
+    margin-right: 0;
+  }
+
+  #graph-canvas,
+  #st-graph {
+    height: 440px;
+  }
+
+  .node-panel {
+    inset: auto 10px 10px;
+    width: auto;
+    max-height: 48%;
+    overflow-y: auto;
+  }
+
+  /* Modals behave like mobile sheets and respect device safe areas. */
+  .modal-overlay {
+    align-items: end;
+    padding: 8px 8px max(8px, env(safe-area-inset-bottom));
+  }
+
+  .modal,
+  .modal.wide,
+  .wb-modal {
+    width: 100%;
+    max-height: calc(100dvh - 16px - env(safe-area-inset-bottom));
+    padding: 18px var(--mobile-gutter);
+    border-radius: 18px;
+  }
+
+  .chat-modal {
+    width: 100%;
+    height: min(720px, calc(100dvh - 16px - env(safe-area-inset-bottom)));
+    padding: 0;
+  }
+
+  .chat-head,
+  .chat-tools,
+  .chat-msgs {
+    padding-right: var(--mobile-gutter);
+    padding-left: var(--mobile-gutter);
+  }
+
+  .msg {
+    max-width: 94%;
+  }
+
+  #bottom-player {
+    bottom: max(8px, env(safe-area-inset-bottom));
+    width: calc(100vw - 16px);
+    gap: 8px;
+    padding: 9px 11px;
+  }
+
+  #bottom-player .time {
+    display: none;
+  }
+
+  #toast {
+    bottom: max(14px, env(safe-area-inset-bottom));
+    width: calc(100vw - 28px);
+  }
+
+  /* Genealogy: keep the two working panes usable vertically, rather than
+     placing a very long person/folder list above the selected record. */
+  .gen .main,
+  .db .main,
+  .st .main {
+    padding: 0;
+  }
+
+  .gp-viewroot.gp-scroll,
+  .db-viewroot.db-scroll,
+  .st-viewroot.st-scroll {
+    padding: 18px var(--mobile-gutter) calc(32px + env(safe-area-inset-bottom));
+  }
+
+  .db .main > .db-viewroot.db-scroll {
+    padding: 18px var(--mobile-gutter) calc(32px + env(safe-area-inset-bottom));
+  }
+
+  .gen .main > .gp-viewroot > * {
+    margin-right: 0;
+    margin-left: 0;
+  }
+
+  .gp-viewroot.gp-full {
+    overflow: hidden;
+  }
+
+  .gp-people {
+    display: grid;
+    grid-template-rows: minmax(220px, 42%) minmax(0, 1fr);
+    grid-template-columns: 1fr;
+    height: 100%;
+  }
+
+  .gp-people-list {
+    padding: 14px var(--mobile-gutter);
+    overflow-y: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .gp-people-detail {
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .gp-people-detail > div {
+    padding: 14px var(--mobile-gutter) 28px !important;
+  }
+
+  .gp-people-detail > div > div:first-child {
+    flex-wrap: wrap;
+  }
+
+  .gp-people-detail > div > div:first-child > .btn {
+    margin-left: 0 !important;
+  }
+
+  .gp-archive {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-columns: 1fr;
+    height: 100%;
+  }
+
+  .gp-arch-folders {
+    display: flex;
+    gap: 6px;
+    padding: 8px var(--mobile-gutter);
+    overflow-x: auto;
+    overflow-y: hidden;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .gp-arch-folders .view-head {
+    display: none;
+  }
+
+  .gp-folder {
+    flex: 0 0 auto;
+    min-height: 40px;
+    border: 1px solid var(--border);
+    white-space: nowrap;
+  }
+
+  .gp-arch-main {
+    padding: 14px var(--mobile-gutter) 28px;
+  }
+
+  .gp-tree-head {
+    flex-wrap: wrap;
+    padding: 10px var(--mobile-gutter);
+  }
+
+  .gp-tree-head > div:last-child {
+    margin-left: 0 !important;
+  }
+
+  .gp-tl-item {
+    gap: 8px;
+    padding-right: 4px;
+    padding-left: 16px;
+  }
+
+  .gp-tl-year {
+    min-width: 88px;
+    font-size: 12px;
+  }
+
+  .gp-leaflet,
+  .gp-relwrap {
+    height: min(520px, 62dvh);
+  }
+
+  /* Databases: table data remains horizontally explorable while controls and
+     analysis cards use the full phone width. */
+  .db-head {
+    gap: 9px;
+    padding: 12px var(--mobile-gutter);
+  }
+
+  .db-head-l {
+    flex-wrap: wrap;
+  }
+
+  .db-head-r {
+    width: 100%;
+    margin-left: 0;
+    overflow-x: auto;
+  }
+
+  .db-head-r > .tag-row {
+    flex-wrap: nowrap;
+    width: max-content;
+  }
+
+  .db-tabs {
+    padding-right: var(--mobile-gutter);
+    padding-left: var(--mobile-gutter);
+    overflow-x: auto;
+  }
+
+  .db-gallery {
+    grid-template-columns: repeat(auto-fit, minmax(min(210px, 100%), 1fr));
+    padding: 0 var(--mobile-gutter) 24px;
+  }
+
+  .db-chat-view {
+    padding: 14px var(--mobile-gutter) 0;
+  }
+
+  .db-chat-pills {
+    flex-wrap: nowrap;
+    max-width: calc(100vw - (var(--mobile-gutter) * 2));
+    overflow-x: auto;
+  }
+
+  .db-chat-input {
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+  }
+
+  .db-cor-wrap {
+    flex-wrap: nowrap;
+  }
+
+  .db-scatter {
+    flex: 0 0 auto;
+  }
+
+  /* Study: dense calendar and chat views get dedicated small-screen forms. */
+  .st-chat-msgs {
+    padding: 14px var(--mobile-gutter);
+  }
+
+  .st-chat-head,
+  .st-chat-input {
+    padding-right: var(--mobile-gutter);
+    padding-left: var(--mobile-gutter);
+  }
+
+  .st-calcell {
+    min-height: 72px;
+    padding: 4px;
+  }
+
+  .st-calhead span {
+    padding: 7px 2px;
+    font-size: 9px;
+  }
+
+  .st-segments {
+    margin-left: 0;
+  }
+
+  .st-editor,
+  .st-fc,
+  .st-card {
+    padding-right: var(--mobile-gutter);
+    padding-left: var(--mobile-gutter);
+  }
+
+  .st-player {
+    gap: 8px;
+  }
+
+  /* Teaching: cards stack, but intrinsically tabular teaching tools keep an
+     obvious horizontal pan instead of crushing their columns. */
+  .teach-hero {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 17px;
+  }
+
+  .teach-exam-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .teach-preview {
+    position: static;
+    max-height: none;
+  }
+
+  .teach-paper {
+    min-height: 520px;
+    margin: 10px;
+    padding: 22px 18px;
+  }
+
+  .teach-recording {
+    align-items: flex-start;
+  }
+
+  .teach-question {
+    grid-template-columns: 28px minmax(0, 1fr);
+  }
+
+  .teach-question > em {
+    grid-column: 2;
+    white-space: normal;
+  }
+
+  /* Worldbuilding: remove the former 840px floor and reflow every multi-pane
+     workspace. Wide creative canvases remain deliberately pannable. */
+  .worldbuilding .wb-main {
+    padding: 18px var(--mobile-gutter) calc(32px + env(safe-area-inset-bottom));
+  }
+
+  .wb-hero {
+    padding: 20px;
+  }
+
+  .wb-hero h1 {
+    margin-top: 12px;
+    font-size: 24px;
+  }
+
+  .wb-stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .wb-character-strip {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    padding: 12px;
+  }
+
+  .wb-card-grid,
+  .wb-scenes {
+    grid-template-columns: repeat(auto-fit, minmax(min(190px, 100%), 1fr));
+  }
+
+  .wb-entry {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 7px 10px;
+  }
+
+  .wb-entry p {
+    grid-column: 1 / -1;
+    white-space: normal;
+  }
+
+  .wb-timeline {
+    margin-left: 6px;
+    padding-left: 20px;
+  }
+
+  .wb-time-row {
+    display: block;
+  }
+
+  .wb-time-row > div:empty {
+    display: none;
+  }
+
+  .wb-time-date {
+    position: static;
+    width: auto;
+    margin: 0 0 5px;
+    text-align: left;
+  }
+
+  .wb-map-canvas,
+  .wb-map-canvas img {
+    height: min(520px, 58dvh);
+    min-height: 400px;
+  }
+
+  .wb-graph {
+    min-height: min(560px, 62dvh);
+    overflow: auto;
+  }
+
+  .wb-family-view {
+    min-height: 520px;
+  }
+
+  .wb-family-toolbar {
+    align-items: stretch;
+    padding: 10px;
+  }
+
+  .wb-family-toolbar .select,
+  .wb-family-search {
+    min-width: 0;
+  }
+
+  .wb-family-search {
+    flex-basis: 100%;
+  }
+
+  .wb-family-canvas {
+    min-height: 400px;
+  }
+
+  .wb-chat {
+    grid-template-columns: 1fr;
+    min-height: min(620px, 65dvh);
+  }
+
+  .wb-chat-side {
+    display: none;
+  }
+
+  .wb-chat-scroll {
+    padding: 18px var(--mobile-gutter);
+  }
+
+  .wb-chat-welcome {
+    margin: 20px auto;
+  }
+
+  .wb-notes,
+  .wb-manuscript {
+    grid-template-columns: 1fr;
+  }
+
+  .wb-note-list,
+  .wb-spine {
+    max-height: 210px;
+    overflow-y: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .wb-note-editor {
+    padding: 22px var(--mobile-gutter);
+  }
+
+  .wb-paper {
+    min-height: 520px;
+    padding: 26px var(--mobile-gutter);
+  }
+
+  .wb-modal-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .wb-modal-art img {
+    max-height: 42dvh;
+  }
+}
+
+@media (max-width: 560px) {
+  .topbar {
+    padding-right: 10px;
+    padding-left: 10px;
+  }
+
+  .topbar .tb-btn {
+    flex-basis: 36px;
+    width: 36px;
+    min-height: 36px;
+  }
+
+  .demo-banner a {
+    max-width: 76px;
+    white-space: normal;
+    text-align: center;
+  }
+
+  .grid.cols-2,
+  .grid.cols-3,
+  .gallery,
+  .db-profile,
+  .db-dist {
+    grid-template-columns: 1fr;
+  }
+
+  .view-head > .toolbar,
+  .view-head > .tag-row,
+  .view-head > .btn,
+  .view-head > select {
+    width: 100%;
+  }
+
+  .view-head > .toolbar .btn,
+  .view-head > .tag-row .btn {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+
+  .set-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .set-row > .btn,
+  .set-row > .select,
+  .set-row > select {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .gap-head,
+  .page-nav,
+  .session-head,
+  .st-calbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .gap-type {
+    align-self: flex-start;
+  }
+
+  .st-calbar {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+  }
+
+  .st-calbar .st-caltitle,
+  .st-calbar .st-segments {
+    grid-column: 1 / -1;
+  }
+
+  .st-calbar .st-caltitle {
+    margin: 4px 0 0;
+  }
+
+  .st-calbar .st-segments {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .st-calcell {
+    min-height: 58px;
+  }
+
+  .st-caldate {
+    width: 22px;
+    height: 22px;
+    font-size: 11px;
+  }
+
+  .st-evchip {
+    justify-content: center;
+    padding: 3px;
+  }
+
+  .st-evchip-t {
+    display: none;
+  }
+
+  .st-rates {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .teach-stats,
+  .wb-stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .teach-subject {
+    grid-template-columns: 8px minmax(0, 1fr);
+  }
+
+  .teach-subject > .chip {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .teach-privacy {
+    align-items: flex-start;
+  }
+
+  .teach-switch {
+    flex: 0 0 auto;
+  }
+
+  .teach-exam-card,
+  .teach-recording {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .teach-exam-card .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .teach-status-options,
+  .teach-form {
+    grid-template-columns: 1fr;
+  }
+
+  .teach-form .span-2 {
+    grid-column: auto;
+  }
+
+  .wb-character-strip,
+  .wb-card-grid,
+  .wb-scenes {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .wb-record {
+    grid-template-columns: 92px minmax(0, 1fr);
+    min-height: 104px;
+  }
+
+  .wb-record img {
+    width: 92px;
+  }
+
+  .wb-toolbar .search-input,
+  .wb-toolbar .wb-filter {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .wb-chat-prompts,
+  .wb-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .wb-finding {
+    grid-template-columns: 28px minmax(0, 1fr);
+  }
+
+  .wb-finding > .wb-badge,
+  .wb-finding > .chip {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
+
+@media (max-width: 360px) {
+  .topbar .brand {
+    font-size: 0;
+  }
+
+  .topbar .brand img {
+    width: 25px;
+    height: 25px;
+  }
+
+  .demo-banner > span {
+    -webkit-line-clamp: 1;
+  }
+
+  .sidebar .nav-item,
+  .worldbuilding .nav-item {
+    padding-right: 9px;
+    padding-left: 9px;
+  }
+}
+
+/* Phones in landscape have very little vertical room. The promotional strip is
+   intentionally omitted there; the primary app and vault navigation remain. */
+@media (max-width: 900px) and (max-height: 520px) {
+  .demo-banner {
+    display: none;
+  }
+
+  .sidebar,
+  .worldbuilding .wb-sidebar {
+    flex-basis: 48px;
+    height: 48px;
+    padding-top: 3px;
+    padding-bottom: 3px;
+  }
+
+  .sidebar .nav-item,
+  .worldbuilding .nav-item {
+    min-height: 40px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vault-tabs,
+  .sidebar,
+  .main {
+    scroll-behavior: auto;
+  }
+}

@@ -700,4 +700,12 @@
   const initial = (location.hash || '#home').slice(1);
   window.go(VIEWS[initial] ? initial : 'home');
   window.addEventListener('hashchange', () => { const v = location.hash.slice(1); if (VIEWS[v] && v !== state.view) window.go(v); });
+  let graphViewportWidth = window.innerWidth;
+  let graphResizeTimer = 0;
+  window.addEventListener('resize', () => {
+    if (state.view !== 'relations' || Math.abs(window.innerWidth - graphViewportWidth) < 20) return;
+    graphViewportWidth = window.innerWidth;
+    clearTimeout(graphResizeTimer);
+    graphResizeTimer = setTimeout(initRelations, 120);
+  });
 })();

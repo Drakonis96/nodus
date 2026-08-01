@@ -782,7 +782,7 @@
     const ctx = cv.getContext('2d');
     const wrap = cv.parentElement;
     const dpr = Math.min(2, window.devicePixelRatio || 1);
-    cv.width = wrap.clientWidth * dpr; cv.height = 560 * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    cv.width = wrap.clientWidth * dpr; cv.height = (cv.clientHeight || 560) * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     const W = () => cv.width / dpr, H = () => cv.height / dpr;
     const ideas = S.ideas.filter((i) => i.subjectId === state.subject);
     const edges = S.edges.filter((e) => e.subjectId === state.subject);

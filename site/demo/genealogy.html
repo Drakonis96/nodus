@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
   <title>Nodus — Genealogy demo</title>
   <meta name="description" content="Interactive demo of Nodus in Genealogy mode: reconstruct a family from primary sources — persons, family tree, timeline, evidence archive, map and a family-history report."/>
   <link rel="icon" type="image/svg+xml" href="../assets/nodus-logo.svg"/>
@@ -11,6 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <link rel="stylesheet" href="demo.css?v=20260720-vault-tabs"/>
+  <link rel="stylesheet" href="mobile.css?v=20260801-responsive"/>
 </head>
 <body class="demo-page gen">
   <nav class="site-nav">
@@ -90,6 +91,7 @@
         });
     })();
   </script>
+  <script src="mobile.js?v=20260801-responsive"></script>
   <script src="../nodi.js?v=20260720-menu1"></script>
 </body>
 </html>
