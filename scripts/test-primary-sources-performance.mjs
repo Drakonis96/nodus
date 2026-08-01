@@ -61,6 +61,7 @@ try {
   db.pragma('journal_mode = WAL');
   db.pragma('synchronous = NORMAL');
   db.exec('ANALYZE');
+  const work = installWorkRecorder(db);
 
   const ts = '2026-01-01T00:00:00.000Z';
   db.prepare(
@@ -188,37 +189,113 @@ try {
   assert.equal(count('archive_description_units') - 1, 10_000, 'medium corpus has 10,000 units');
   assert.equal(count('archive_item_files'), 50_000, 'medium corpus has 50,000 pages');
 
-  const initial = measure(() => workspaceRepo.getPrimarySourceArchiveWorkspace('', 0, 200));
-  assert.ok(initial.elapsedMs < 1_500, `medium initial list took ${initial.elapsedMs.toFixed(1)} ms`);
+  const CORPUS_TABLES = [
+    'archive_items',
+    'archive_description_units',
+    'archive_item_units',
+    'archive_item_profiles',
+    'archive_item_files',
+    'archive_text_versions',
+    'archive_excerpts',
+  ];
+
+  const initial = work.measure('medium initial list', () =>
+    workspaceRepo.getPrimarySourceArchiveWorkspace('', 0, 200),
+  );
   assert.equal(initial.value.rows.length, 200);
   assert.equal(initial.value.page.total, 10_000);
   assert.equal(initial.value.page.hasMore, true);
   assert.equal(initial.value.page.unitsTruncated, true);
   assert.ok(initial.value.rows.every((row) => row.item.extractedText === null));
+  // A listing pages: the detail queries are keyed by the 200 ids on screen plus
+  // the bounded hierarchy slice, never by the size of the archive. Dropping the
+  // LIMIT or fanning a query out per row is what this number catches.
+  assert.ok(
+    initial.rowsToJs <= 4_000,
+    `medium initial list moved ${initial.rowsToJs} rows into JavaScript`,
+  );
+  assert.ok(
+    initial.statements <= 30,
+    `medium initial list issued ${initial.statements} statements`,
+  );
+  // The COUNT and the paged SELECT each sweep the join — the listing groups and
+  // sorts the whole archive to cut one page out of it — so a handful of passes
+  // is expected. More than five means another full-corpus query has slipped
+  // into opening a screen.
+  assert.ok(
+    initial.sweptRows <= 5 * 10_000,
+    `medium initial list walked ${initial.sweptRows} rows over a 10,000-source archive`,
+  );
 
-  const filtered = measure(() =>
+  const filtered = work.measure('medium metadata filter', () =>
     workspaceRepo.getPrimarySourceArchiveWorkspace('aguja-medio-4242', 0, 200),
   );
-  assert.ok(filtered.elapsedMs < 300, `medium metadata filter took ${filtered.elapsedMs.toFixed(1)} ms`);
   assert.equal(filtered.value.page.total, 1);
+  // The metadata filter is a substring LIKE, so SQLite sweeping the join is the
+  // design, not the bug. What must never happen is that sweep crossing into
+  // JavaScript: only the matches get materialized.
+  assert.ok(
+    filtered.rowsToJs <= 200,
+    `medium metadata filter moved ${filtered.rowsToJs} rows into JavaScript for 1 match`,
+  );
+  assert.ok(
+    filtered.statements <= 30,
+    `medium metadata filter issued ${filtered.statements} statements`,
+  );
 
-  const dossier = measure(() => workspaceRepo.getPrimarySourceDossier('perf-item-004242'));
-  assert.ok(dossier.elapsedMs < 500, `medium dossier took ${dossier.elapsedMs.toFixed(1)} ms`);
+  const dossier = work.measure('medium dossier', () =>
+    workspaceRepo.getPrimarySourceDossier('perf-item-004242'),
+  );
   assert.equal(dossier.value.files.length, 5);
   assert.equal(dossier.value.files.every((file) => file.hasContent === false), true);
+  // Opening one source is the assertion that really means "this query does not
+  // read the whole table": every lookup is keyed by item_id or file_id, so not a
+  // single row of the 10,000 sources or the 50,000 pages may be walked to build
+  // it. Leave any of those tables without an index leading on the key it is
+  // looked up by and this trips on the first run, on any machine — verified by
+  // dropping them and watching the swept row counts appear in this message.
+  assert.equal(
+    sweptRowsIn(dossier, ...CORPUS_TABLES),
+    0,
+    `medium dossier swept ${JSON.stringify(dossier.sweeps.filter((sweep) => sweep.rows > 0))}`,
+  );
+  assert.ok(
+    dossier.rowsToJs <= 100,
+    `medium dossier moved ${dossier.rowsToJs} rows into JavaScript for a 5-page source`,
+  );
 
-  const search = measure(() => researchRepo.searchPrimarySourceCorpus({
+  const search = work.measure('medium text search', () => researchRepo.searchPrimarySourceCorpus({
     query: '"aguja-medio-4242"',
     limit: 100,
   }));
-  assert.ok(search.elapsedMs < 1_000, `medium text search took ${search.elapsedMs.toFixed(1)} ms`);
   assert.ok(search.value.results.some((result) => result.itemId === 'perf-item-004242'));
+  // The corpus search has no FTS index behind it — `indexStrategy: 'sqlite_like'`
+  // is a deliberate, documented choice — so it reads every source once and folds
+  // in JavaScript. One sweep per layer is the contract. A query per candidate,
+  // or a second pass over the corpus, is the regression.
+  assert.ok(
+    search.statements <= 20,
+    `medium text search issued ${search.statements} statements; a per-candidate query would explode this`,
+  );
+  assert.ok(
+    search.sweptRows <= 5 * 10_000,
+    `medium text search walked ${search.sweptRows} rows: more than five passes over a 10,000-source archive`,
+  );
 
   seedSources(10_000, 100_000, 0, false);
   db.exec('ANALYZE');
   assert.equal(count('archive_description_units') - 1, 100_000, 'large corpus has 100,000 metadata units');
   assert.equal(count('archive_item_files'), 50_000, 'large corpus keeps a bounded file subset');
-  const largePage = measure(() => workspaceRepo.getPrimarySourceArchiveWorkspace('', 0, 200));
+
+  // ── The same operations against ten times the corpus ──────────────────────
+  //
+  // This is the comparison the milliseconds were reaching for, done in units
+  // that a busy runner cannot perturb: the corpus grew 10×, so any operation
+  // whose work grows with it is not paged, and any operation that grows faster
+  // than it is quadratic.
+  const largePage = work.measure('large initial list', () =>
+    workspaceRepo.getPrimarySourceArchiveWorkspace('', 0, 200),
+  );
   assert.equal(largePage.value.rows.length, 200);
   assert.equal(largePage.value.page.total, 100_000);
   assert.equal(largePage.value.page.hasMore, true);
@@ -228,6 +305,94 @@ try {
     Buffer.byteLength(JSON.stringify(largePage.value), 'utf8') < 5_000_000,
     'large-corpus listing payload remains bounded below 5 MB',
   );
+  assert.equal(
+    largePage.statements,
+    initial.statements,
+    'a listing issues the same statements whatever the archive holds',
+  );
+  assert.equal(
+    largePage.rowsToJs,
+    initial.rowsToJs,
+    `the listing moved ${initial.rowsToJs} rows at 10,000 sources and ${largePage.rowsToJs} at 100,000: it stopped paging`,
+  );
+  assert.ok(
+    largePage.sweptRows <= 5 * 100_000,
+    `large initial list walked ${largePage.sweptRows} rows over a 100,000-source archive`,
+  );
+
+  const largeFiltered = work.measure('large metadata filter', () =>
+    workspaceRepo.getPrimarySourceArchiveWorkspace('aguja-medio-4242', 0, 200),
+  );
+  assert.equal(largeFiltered.value.page.total, 1);
+  assert.equal(
+    largeFiltered.rowsToJs,
+    filtered.rowsToJs,
+    `the filter moved ${filtered.rowsToJs} rows at 10,000 sources and ${largeFiltered.rowsToJs} at 100,000`,
+  );
+
+  const largeDossier = work.measure('large dossier', () =>
+    workspaceRepo.getPrimarySourceDossier('perf-item-004242'),
+  );
+  assert.equal(largeDossier.value.files.length, 5);
+  assert.equal(
+    sweptRowsIn(largeDossier, ...CORPUS_TABLES),
+    0,
+    `large dossier swept ${JSON.stringify(largeDossier.sweeps.filter((sweep) => sweep.rows > 0))}`,
+  );
+  assert.equal(
+    largeDossier.statements,
+    dossier.statements,
+    'opening a source costs the same in a 100,000-source archive as in a 10,000-source one',
+  );
+  assert.equal(
+    largeDossier.rowsToJs,
+    dossier.rowsToJs,
+    'opening a source reads its own rows and nothing else',
+  );
+
+  const largeSearch = work.measure('large text search', () =>
+    researchRepo.searchPrimarySourceCorpus({ query: '"aguja-medio-4242"', limit: 100 }),
+  );
+  assert.ok(largeSearch.value.results.some((result) => result.itemId === 'perf-item-004242'));
+  assert.equal(
+    largeSearch.statements,
+    search.statements,
+    'the corpus search issues a fixed number of statements at any size',
+  );
+  // 10× the sources, so at most 10× the rows read plus a margin. Anything above
+  // this is a second pass over the corpus rather than a bigger corpus.
+  assert.ok(
+    largeSearch.rowsToJs <= search.rowsToJs * 11,
+    `the corpus search moved ${search.rowsToJs} rows at 10,000 sources and ${largeSearch.rowsToJs} at 100,000: it is growing faster than the archive`,
+  );
+  assert.ok(
+    largeSearch.sweptRows <= 5 * 100_000,
+    `large text search walked ${largeSearch.sweptRows} rows: more than five passes over a 100,000-source archive`,
+  );
+
+  // ── The clock, kept only as a backstop ────────────────────────────────────
+  //
+  // Wide enough that a loaded CI runner can never reach it (the run that broke
+  // this suite was 5.8× the local figure and still nowhere near these), narrow
+  // enough that an operation that has genuinely gone pathological still trips.
+  // If one of these fails, the counters above say which shape changed.
+  const backstops = [
+    [initial, 5_000], [filtered, 5_000], [dossier, 5_000], [search, 10_000],
+    [largePage, 15_000], [largeFiltered, 15_000], [largeDossier, 5_000], [largeSearch, 30_000],
+  ];
+  for (const [report, ceilingMs] of backstops) {
+    // Counters that silently miss a sweep would turn every budget above into a
+    // rubber stamp, so the recorder has to account for every table it saw.
+    assert.deepEqual(
+      report.unresolvedSweeps,
+      [],
+      `the work recorder could not resolve a swept relation during ${report.label}`,
+    );
+    assert.ok(
+      report.elapsedMs < ceilingMs,
+      `${report.label} took ${report.elapsedMs.toFixed(1)} ms, past the ${ceilingMs} ms pathological-regression backstop`,
+    );
+  }
 
   assert.deepEqual(db.pragma('foreign_key_check'), []);
   assert.equal(db.pragma('quick_check', { simple: true }), 'ok');
@@ -236,19 +401,22 @@ try {
     medium: {
       units: 10_000,
       pages: 50_000,
-      initialListMs: round(initial.elapsedMs),
-      metadataFilterMs: round(filtered.elapsedMs),
-      dossierMs: round(dossier.elapsedMs),
-      textSearchMs: round(search.elapsedMs),
+      initialList: counters(initial),
+      metadataFilter: counters(filtered),
+      dossier: counters(dossier),
+      textSearch: counters(search),
     },
     large: {
       units: 100_000,
       fileSubset: 50_000,
-      initialListMs: round(largePage.elapsedMs),
+      initialList: counters(largePage),
+      metadataFilter: counters(largeFiltered),
+      dossier: counters(largeDossier),
+      textSearch: counters(largeSearch),
       payloadBytes: Buffer.byteLength(JSON.stringify(largePage.value), 'utf8'),
     },
   }, null, 2));
-  console.log('Primary Sources performance budgets passed!');
+  console.log('Primary Sources work budgets passed!');
 
   function count(table) {
     return Number(db.prepare(`SELECT COUNT(*) AS value FROM ${table}`).get().value);
@@ -257,10 +425,190 @@ try {
   await rm(root, { recursive: true, force: true });
 }
 
-function measure(operation) {
-  const started = performance.now();
-  const value = operation();
-  return { value, elapsedMs: performance.now() - started };
+// ── Counting work instead of reading a clock ────────────────────────────────
+//
+// These budgets used to be raw milliseconds, and a shared GitHub Actions macOS
+// runner failed the text search at 1274 ms that the very next run passed. The
+// clock of a borrowed machine is not an invariant of this code. The work is:
+// how many statements an operation issues, how many rows cross into JavaScript,
+// and which tables SQLite sweeps end to end. Those numbers are identical on a
+// busy runner and on an idle laptop, and they move the instant somebody loses
+// an index, adds a query per row, or stops paging. Milliseconds survive only as
+// a backstop set far enough away that runner noise cannot reach it.
+//
+// The recorder shadows `prepare` on the live connection, so it observes the SQL
+// the repositories actually issue rather than a copy of it kept in this file.
+// EXPLAIN QUERY PLAN runs afterwards, never inside the timed window.
+function installWorkRecorder(db) {
+  const prepare = db.prepare.bind(db);
+  const scopes = new Map();
+  let plans = new Map();
+  let tableRows = new Map();
+  let log = null;
+
+  db.prepare = function prepareWithCounters(source) {
+    const statement = prepare(source);
+    for (const method of ['all', 'get', 'run']) {
+      const call = statement[method].bind(statement);
+      statement[method] = (...params) => {
+        const result = call(...params);
+        if (log) log.push({ source, params, rows: rowsDelivered(method, result) });
+        return result;
+      };
+    }
+    const iterate = statement.iterate.bind(statement);
+    statement.iterate = (...params) => {
+      const execution = { source, params, rows: 0 };
+      if (log) log.push(execution);
+      return (function* counted() {
+        for (const row of iterate(...params)) {
+          execution.rows += 1;
+          yield row;
+        }
+      })();
+    };
+    return statement;
+  };
+
+  function rowsDelivered(method, result) {
+    if (Array.isArray(result)) return result.length;
+    if (method === 'get') return result === undefined ? 0 : 1;
+    return 0;
+  }
+
+  // EXPLAIN QUERY PLAN names the alias, not the table: `SCAN iu`, never
+  // `SCAN archive_item_units`. Read the aliases straight off the statement, and
+  // note the CTEs, so that a sweep whose name resolves to nothing is reported
+  // rather than quietly counted as zero rows.
+  function scopeOf(source) {
+    if (scopes.has(source)) return scopes.get(source);
+    const reserved = new Set([
+      'on', 'where', 'group', 'order', 'limit', 'left', 'right', 'inner', 'outer',
+      'cross', 'natural', 'join', 'union', 'select', 'set', 'values', 'using', 'as',
+      'and', 'or', 'having', 'window', 'returning', 'offset',
+    ]);
+    const tables = new Map();
+    for (const match of source.matchAll(
+      /\b(?:FROM|JOIN)\s+([A-Za-z_]\w*)(?:\s+(?:AS\s+)?([A-Za-z_]\w*))?/gi,
+    )) {
+      const [, table, alias] = match;
+      tables.set(table.toLowerCase(), table);
+      if (alias && !reserved.has(alias.toLowerCase())) tables.set(alias.toLowerCase(), table);
+    }
+    const ctes = new Set();
+    for (const match of source.matchAll(
+      /(?:\bWITH\s+(?:RECURSIVE\s+)?|,\s*)([A-Za-z_]\w*)\s*(?:\([^)]*\)\s*)?AS\s*\(/gi,
+    )) {
+      ctes.add(match[1].toLowerCase());
+    }
+    const scope = { tables, ctes };
+    scopes.set(source, scope);
+    return scope;
+  }
+
+  function relationExists(name) {
+    if (!tableRows.has(name)) {
+      const present = prepare(
+        "SELECT 1 AS present FROM sqlite_master WHERE type IN ('table','view') AND name=?",
+      ).get(name);
+      tableRows.set(
+        name,
+        present ? Number(prepare(`SELECT COUNT(*) AS value FROM "${name}"`).get().value) : null,
+      );
+    }
+    return tableRows.get(name) !== null;
+  }
+
+  function rowsIn(name) {
+    return relationExists(name) ? tableRows.get(name) : 0;
+  }
+
+  function planOf(source, params) {
+    const key = `${source} :: ${JSON.stringify(params)}`;
+    if (plans.has(key)) return plans.get(key);
+    let details = [];
+    try {
+      details = prepare(`EXPLAIN QUERY PLAN ${source}`).all(...params).map((row) => row.detail);
+    } catch {
+      details = [];
+    }
+    plans.set(key, details);
+    return details;
+  }
+
+  return {
+    measure(label, operation) {
+      // The corpus grows between phases, so neither the row counts nor the
+      // planner's choices from an earlier phase may be reused.
+      plans = new Map();
+      tableRows = new Map();
+      log = [];
+      const started = performance.now();
+      const value = operation();
+      const elapsedMs = performance.now() - started;
+      const executions = log;
+      log = null;
+
+      const sweeps = [];
+      const unresolvedSweeps = [];
+      let rowsToJs = 0;
+      let indexedSearches = 0;
+      let sorts = 0;
+      for (const execution of executions) {
+        rowsToJs += execution.rows;
+        const scope = scopeOf(execution.source);
+        for (const detail of planOf(execution.source, execution.params)) {
+          const scan = /^SCAN\s+(\S+)/.exec(detail);
+          if (scan) {
+            const name = scan[1];
+            const table = scope.tables.get(name.toLowerCase()) ?? name;
+            // A CTE or a derived table sweeps rows that are already accounted
+            // for upstream; anything else that names no relation means this
+            // recorder failed to read the statement and must say so.
+            if (relationExists(table)) sweeps.push({ table, rows: rowsIn(table) });
+            else if (!scope.ctes.has(table.toLowerCase()) && !name.startsWith('(')) {
+              unresolvedSweeps.push({ name, table, source: execution.source });
+            }
+          } else if (detail.startsWith('SEARCH')) {
+            indexedSearches += 1;
+          } else if (detail.startsWith('USE TEMP B-TREE')) {
+            sorts += 1;
+          }
+        }
+      }
+      return {
+        label,
+        value,
+        elapsedMs,
+        statements: executions.length,
+        rowsToJs,
+        sweeps,
+        unresolvedSweeps,
+        sweptRows: sweeps.reduce((total, sweep) => total + sweep.rows, 0),
+        indexedSearches,
+        sorts,
+      };
+    },
+  };
+}
+
+// Rows SQLite had to walk through the named tables to answer the operation —
+// the figure that says "this query read the whole corpus" out loud.
+function sweptRowsIn(report, ...tables) {
+  return report.sweeps
+    .filter((sweep) => tables.includes(sweep.table))
+    .reduce((total, sweep) => total + sweep.rows, 0);
+}
+
+function counters(report) {
+  return {
+    statements: report.statements,
+    rowsToJs: report.rowsToJs,
+    sweptRows: report.sweptRows,
+    indexedSearches: report.indexedSearches,
+    sorts: report.sorts,
+    observedMs: round(report.elapsedMs),
+  };
 }
 
 function round(value) {
