@@ -7,6 +7,13 @@ on:
       - 'server/**'
       - 'scripts/test-nodus-server.mjs'
       - 'scripts/test-nodus-server-deployment.mjs'
+      - 'scripts/test-nodus-server-roles.mjs'
+      - 'scripts/test-nodus-server-api.mjs'
+      - 'scripts/test-nodus-server-assets.mjs'
+      - 'scripts/test-nodus-server-mutations.mjs'
+      - 'scripts/test-server-vectors.mjs'
+      - 'scripts/lib/nodusServerHarness.mjs'
+      - 'scripts/lib/nodusServerFixtures.mjs'
       - '.github/workflows/nodus-server-image.yml'
   workflow_dispatch:
 
@@ -38,7 +45,18 @@ jobs:
           node-version: 22
 
       - name: Test server and deployment contract
-        run: node --test scripts/test-nodus-server.mjs scripts/test-nodus-server-deployment.mjs
+        # Every suite that exercises the server, not just the two that predate the client
+        # API. A published image that fails a role check or an asset rejection is exactly
+        # what this job exists to stop.
+        run: >-
+          node --test
+          scripts/test-nodus-server.mjs
+          scripts/test-nodus-server-deployment.mjs
+          scripts/test-nodus-server-roles.mjs
+          scripts/test-nodus-server-api.mjs
+          scripts/test-nodus-server-assets.mjs
+          scripts/test-nodus-server-mutations.mjs
+          scripts/test-server-vectors.mjs
 
       - name: Build smoke-test image
         run: docker build --tag nodus-server:ci ./server

@@ -340,22 +340,25 @@ test('the server never receives an AI provider key', async () => {
 });
 
 test('a connected vault has a screen, and a revoked one says so', async () => {
-  const [settings, preload, types] = await Promise.all([
+  const [settings, panel, preload, types] = await Promise.all([
     read('src/views/Settings.tsx'),
+    read('src/components/ConnectedVaultsPanel.tsx'),
     read('electron/preload/api.ts'),
     read('shared/types.ts'),
   ]);
   // The IPC existed with nothing calling it, so a replica that lost access simply stopped
-  // updating and never told anyone. The panel is what makes that state visible.
-  assert.match(settings, /data-testid="connected-vault-panel"/);
-  assert.match(settings, /data-testid="replica-revoked-notice"/);
+  // updating and never told anyone. The panel is what makes that state visible, and it is
+  // its own component precisely so scripts/test-connected-vaults-panel.mjs can render it.
+  assert.match(panel, /data-testid="connected-vault-panel"/);
+  assert.match(panel, /data-testid="replica-revoked-notice"/);
+  assert.match(settings, /<ConnectedVaultsPanel/);
   assert.match(settings, /window\.nodus\.replicaOverview\(\)/);
   assert.match(settings, /window\.nodus\.replicaSyncNow\(/);
   assert.match(settings, /window\.nodus\.replicaDetach\(/);
   // Disconnecting must never read as deleting.
   assert.match(settings, /se quedan en este equipo; solo deja de sincronizarse/);
   // A reader is told plainly that their work stays put.
-  assert.match(settings, /se queda en este equipo y nunca se envía al vault principal/);
+  assert.match(panel, /se queda en este equipo y nunca se envía al vault principal/);
   for (const channel of ['vaults:replicaOverview', 'vaults:replicaSyncNow', 'vaults:replicaDetach']) {
     assert.match(preload, new RegExp(channel.replace(':', ':')), `${channel} is not bridged`);
   }
