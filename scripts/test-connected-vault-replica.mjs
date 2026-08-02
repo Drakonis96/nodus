@@ -236,6 +236,83 @@ test('a corpus travels to two replicas, a writer sends work back, and a reader n
   });
 });
 
+test('an incoming mutation never blanks a column it does not carry', { timeout: 60_000 }, async () => {
+  // Found against a real corpus, not in theory. A publication carries no binary, so a
+  // mutation that legitimately updates a row arrives without the blob columns — and an
+  // INSERT OR REPLACE then wiped them. In practice a collaborator touching a Deep Research
+  // report destroyed the owner's only copy of its illustration.
+  const root = await mkdtemp(path.join(os.tmpdir(), 'nodus-inbox-blob-'));
+  try {
+    const { runMigrations } = require(path.join(repoRoot, 'electron/db/migrations.ts'));
+    const Database = require('better-sqlite3');
+    const file = path.join(root, 'owner.sqlite');
+    const db = new Database(file);
+    runMigrations(db);
+    const image = Buffer.from('89504e470d0a1a0a0000000d49484452', 'hex');
+    db.prepare(
+      `INSERT INTO decorative_images (entity_kind, entity_id, requested, status, style, mime_type, image_blob, created_at, updated_at)
+       VALUES ('deep_research', 'dr-1', 1, 'ready', 'antique_book', 'image/png', ?, ?, ?)`
+    ).run(image, '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z');
+
+    // The row as a replica would send it: every scalar column, and no binary at all.
+    const summary = applyIncomingMutations(db, [{
+      id: 'mut-blob', seq: 1, kind: 'upsert', table: 'decorative_images',
+      key: ['deep_research', 'dr-1'],
+      row: { entity_kind: 'deep_research', entity_id: 'dr-1', requested: 1, status: 'ready', style: 'antique_book', mime_type: 'image/png', created_at: '2026-01-01T00:00:00.000Z', updated_at: '2026-02-02T00:00:00.000Z' },
+      schemaVersion: 122, createdAt: '2026-02-02T00:00:00.000Z',
+    }]);
+    assert.equal(summary.applied, 1);
+    const after = db.prepare("SELECT * FROM decorative_images WHERE entity_id = 'dr-1'").get();
+    assert.ok(Buffer.isBuffer(after.image_blob), 'the illustration was destroyed by an update that never mentioned it');
+    assert.ok(after.image_blob.equals(image), 'the illustration was altered');
+    assert.equal(after.updated_at, '2026-02-02T00:00:00.000Z', 'the update did not take effect');
+    db.close();
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('storing downloaded illustrations does not queue them straight back', { timeout: 60_000 }, async () => {
+  // `decorative_images` is a table a writer replica may queue from, so writing the owner's
+  // own images into it without suppressing the triggers enqueued every single one — a
+  // replica trying to send the corpus its illustrations back.
+  const root = await mkdtemp(path.join(os.tmpdir(), 'nodus-asset-queue-'));
+  try {
+    const { runMigrations } = require(path.join(repoRoot, 'electron/db/migrations.ts'));
+    const { downloadReplicaAssets } = require(path.join(repoRoot, 'electron/serverSync/replicaApply.ts'));
+    const { ensureOutboxTriggers } = require(path.join(repoRoot, 'electron/serverSync/outboxTriggers.ts'));
+    const Database = require('better-sqlite3');
+    const db = new Database(path.join(root, 'writer.sqlite'));
+    runMigrations(db);
+    ensureOutboxTriggers(db, true);
+    db.prepare(
+      `INSERT INTO decorative_images (entity_kind, entity_id, requested, status, style, mime_type, created_at, updated_at)
+       VALUES ('deep_research', 'dr-1', 1, 'ready', 'antique_book', 'image/png', ?, ?)`
+    ).run('2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z');
+    db.prepare("DELETE FROM server_outbox").run();
+
+    const png = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+      'base64',
+    );
+    const hash = require('node:crypto').createHash('sha256').update(png).digest('hex');
+    const result = await downloadReplicaAssets(
+      db,
+      [{ hash, thumbHash: null, mime: 'image/png', thumbMime: null, bytes: png.length, thumbBytes: null, kind: 'deep_research_image', table: 'decorative_images', key: ['deep_research', 'dr-1'] }],
+      async () => png,
+    );
+    assert.equal(result.downloaded, 1);
+    assert.ok(db.prepare("SELECT image_blob FROM decorative_images WHERE entity_id = 'dr-1'").get().image_blob.equals(png));
+    assert.equal(db.prepare("SELECT COUNT(*) n FROM server_outbox").get().n, 0, 'the replica queued the owner\'s own illustration');
+    // A second pull with the bytes already present costs nothing and downloads nothing.
+    const again = await downloadReplicaAssets(db, [{ hash, thumbHash: null, mime: 'image/png', thumbMime: null, bytes: png.length, thumbBytes: null, kind: 'deep_research_image', table: 'decorative_images', key: ['deep_research', 'dr-1'] }], async () => { throw new Error('should not fetch'); });
+    assert.equal(again.downloaded, 0);
+    db.close();
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test('a revoked replica stops syncing and keeps every byte', { timeout: 180_000 }, async () => {
   await withServer({ label: 'replica-revocation' }, async (server) => {
     const spaceId = await server.createSpace('Corpus');

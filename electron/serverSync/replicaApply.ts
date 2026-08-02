@@ -1,6 +1,8 @@
+import { createHash } from 'node:crypto';
 import type Database from 'better-sqlite3';
 import { quoteIdentifier, identityColumns, tableColumns } from '../db/rowIdentity';
 import { MUTABLE_TABLES, withOutboxSuppressed } from './outboxTriggers';
+import { ASSET_SOURCES, type SnapshotAssetRef } from './serverSnapshot';
 
 /**
  * Write a published snapshot into a replica's database.
@@ -90,18 +92,25 @@ export function applySnapshotToReplica(db: Database.Database, snapshot: { tables
         if (columns.length === 0) { summary.merged[table] = { inserted: 0, updated: 0, kept: 0 }; continue; }
         const where = identity.map((column) => `${quoteIdentifier(column)} IS ?`).join(' AND ');
         const find = db.prepare(`SELECT * FROM ${quoteIdentifier(table)} WHERE ${where}`);
-        const statement = insertStatement(db, table, columns);
+        const insert = insertStatement(db, table, columns);
+        // An existing row is UPDATED column by column rather than replaced. A publication
+        // never carries binary, so INSERT OR REPLACE would blank the illustration bytes a
+        // previous pull had downloaded — every report losing its image on the next sync.
+        const assignable = columns.filter((column) => !identity.includes(column));
+        const update = assignable.length > 0
+          ? db.prepare(`UPDATE ${quoteIdentifier(table)} SET ${assignable.map((column) => `${quoteIdentifier(column)} = ?`).join(', ')} WHERE ${where}`)
+          : null;
         const counts = { inserted: 0, updated: 0, kept: 0 };
         for (const row of rows) {
           const key = identity.map((column) => row[column] ?? null);
           const local = find.get(...key) as Record<string, unknown> | undefined;
           if (!local) {
-            statement.run(columns.map((column) => (row[column] === undefined ? null : row[column])));
+            insert.run(columns.map((column) => (row[column] === undefined ? null : row[column])));
             counts.inserted += 1;
             continue;
           }
-          if (timestampOf(row) > timestampOf(local)) {
-            statement.run(columns.map((column) => (row[column] === undefined ? null : row[column])));
+          if (timestampOf(row) > timestampOf(local) && update) {
+            update.run([...assignable.map((column) => (row[column] === undefined ? null : row[column])), ...key]);
             counts.updated += 1;
           } else {
             counts.kept += 1;
@@ -113,4 +122,92 @@ export function applySnapshotToReplica(db: Database.Database, snapshot: { tables
   });
 
   return summary;
+}
+
+/**
+ * Fetch the images a publication references and put their bytes back in the database.
+ *
+ * A snapshot carries no binary at all — that invariant is what keeps documents off the
+ * server — so the rows arrive with `status = 'ready'` and an empty `image_blob`. Without
+ * this pass every Deep Research report in a replica shows a broken illustration while
+ * claiming to have one, which is worse than having none.
+ *
+ * Only what is missing is fetched: an image already present keeps its bytes, so a routine
+ * pull of an unchanged corpus costs nothing.
+ */
+export async function downloadReplicaAssets(
+  db: Database.Database,
+  assets: SnapshotAssetRef[],
+  fetchAsset: (hash: string) => Promise<Buffer | null>,
+): Promise<{ downloaded: number; bytes: number; skipped: number }> {
+  const result = { downloaded: 0, bytes: 0, skipped: 0 };
+  if (!assets?.length) return result;
+  const sources = new Map<string, (typeof ASSET_SOURCES)[number]>(ASSET_SOURCES.map((source) => [source.table, source]));
+  const present = new Set(
+    (db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[]).map((row) => row.name)
+  );
+
+  // Three phases on purpose: decide what is missing, fetch it, then write it. Keeping the
+  // network out of the middle phase means the write pass is short and synchronous, which is
+  // what lets it run with the queue triggers detached without holding them off across I/O.
+  interface Pending { table: string; key: readonly string[]; blobColumn: string; mimeColumn: string | null; hash: string; mime: string | null }
+  const pending: Pending[] = [];
+
+  for (const asset of assets) {
+    const source = sources.get(asset.table);
+    // A table this vault type does not publish still has its images uploaded, so the row
+    // may simply not be here. Nothing to attach them to; skip rather than invent a row.
+    if (!source || !present.has(asset.table)) { result.skipped += 1; continue; }
+    const where = source.keyColumns.map((column) => `${quoteIdentifier(column)} = ?`).join(' AND ');
+    const local = db.prepare(`SELECT * FROM ${quoteIdentifier(asset.table)} WHERE ${where}`).get(...asset.key) as Record<string, unknown> | undefined;
+    if (!local) { result.skipped += 1; continue; }
+
+    for (const [hash, blobColumn, mimeColumn, mime] of [
+      [asset.hash, source.blobColumn, source.mimeColumn, asset.mime],
+      [asset.thumbHash, source.thumbColumn, source.thumbMimeColumn, asset.thumbMime],
+    ] as [string | null, string, string, string | null][]) {
+      if (!hash) continue;
+      const existing = local[blobColumn];
+      // Length is checked before the digest so an unchanged replica does not read megabytes
+      // through sha256 on every single pull.
+      if (Buffer.isBuffer(existing) && existing.length > 0 && createHash('sha256').update(existing).digest('hex') === hash) continue;
+      pending.push({
+        table: asset.table,
+        key: asset.key,
+        blobColumn,
+        mimeColumn: Object.prototype.hasOwnProperty.call(local, mimeColumn) ? mimeColumn : null,
+        hash,
+        mime,
+      });
+    }
+  }
+  if (pending.length === 0) return result;
+
+  const fetched: (Pending & { bytes: Buffer })[] = [];
+  for (const item of pending) {
+    const bytes = await fetchAsset(item.hash);
+    if (!bytes) continue;
+    // Verify before storing. Content addressing is only a guarantee if it is checked.
+    if (createHash('sha256').update(bytes).digest('hex') !== item.hash) continue;
+    fetched.push({ ...item, bytes });
+  }
+  if (fetched.length === 0) return result;
+
+  // Suppressed, and this is not optional: `decorative_images` is a table a writer replica
+  // may queue changes from, so storing the owner's own illustrations without this would
+  // enqueue every one of them and try to send the images straight back where they came from.
+  withOutboxSuppressed(db, () => {
+    db.transaction(() => {
+      for (const item of fetched) {
+        const where = (sources.get(item.table)!).keyColumns.map((column) => `${quoteIdentifier(column)} = ?`).join(' AND ');
+        const columns = [item.blobColumn, ...(item.mimeColumn && item.mime ? [item.mimeColumn] : [])];
+        const values: unknown[] = [item.bytes, ...(columns.length > 1 ? [item.mime] : [])];
+        db.prepare(`UPDATE ${quoteIdentifier(item.table)} SET ${columns.map((column) => `${quoteIdentifier(column)} = ?`).join(', ')} WHERE ${where}`)
+          .run([...values, ...item.key]);
+        result.downloaded += 1;
+        result.bytes += item.bytes.length;
+      }
+    })();
+  });
+  return result;
 }

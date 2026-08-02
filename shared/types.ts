@@ -1713,6 +1713,8 @@ export interface ReplicaConnectionView {
   pendingMutations: number;
   /** Changes the server refused, kept locally so the work is never lost in silence. */
   rejectedMutations: number;
+  /** Illustrations fetched on the last pull; zero once the replica holds them all. */
+  lastImages: { downloaded: number; bytes: number; skipped: number } | null;
 }
 
 export interface VaultSummary {

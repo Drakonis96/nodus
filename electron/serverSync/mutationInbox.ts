@@ -115,10 +115,27 @@ export function applyIncomingMutations(db: Database.Database, mutations: Incomin
           summary.keptLocal += 1;
           return;
         }
-        db.prepare(
-          `INSERT OR REPLACE INTO ${quoteIdentifier(mutation.table)} (${columns.map(quoteIdentifier).join(', ')}) ` +
-          `VALUES (${columns.map(() => '?').join(', ')})`
-        ).run(columns.map((column) => (incoming[column] === undefined ? null : incoming[column])));
+        if (local) {
+          // UPDATE the columns the mutation carries, never INSERT OR REPLACE.
+          //
+          // A mutation never carries binary — images travel on their own channel — so
+          // replacing the whole row blanks every column it left out. In practice that meant
+          // a collaborator touching a Deep Research report's metadata silently destroyed the
+          // owner's copy of its illustration. Measured, not hypothetical: it happened.
+          const assignable = columns.filter((column) => !identity.includes(column));
+          if (assignable.length === 0) {
+            summary.keptLocal += 1;
+            return;
+          }
+          db.prepare(
+            `UPDATE ${quoteIdentifier(mutation.table)} SET ${assignable.map((column) => `${quoteIdentifier(column)} = ?`).join(', ')} WHERE ${where}`
+          ).run([...assignable.map((column) => (incoming[column] === undefined ? null : incoming[column])), ...key]);
+        } else {
+          db.prepare(
+            `INSERT INTO ${quoteIdentifier(mutation.table)} (${columns.map(quoteIdentifier).join(', ')}) ` +
+            `VALUES (${columns.map(() => '?').join(', ')})`
+          ).run(columns.map((column) => (incoming[column] === undefined ? null : incoming[column])));
+        }
         summary.applied += 1;
       })();
       summary.cursor = Number(mutation.seq);

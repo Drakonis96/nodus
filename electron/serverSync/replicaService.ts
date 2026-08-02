@@ -9,8 +9,8 @@ import { createVault, deleteVault, getVault, listVaults, updateVaultRemote } fro
 import { clearNodusServerTokenFor, getNodusServerTokenFor, setNodusServerTokenFor } from '../secrets/secretStore';
 import type { VaultRemote, VaultRemoteRole, VaultSummary, VaultType } from '@shared/types';
 import { normalizeVaultType } from '@shared/vaultTypes';
-import { applySnapshotToReplica } from './replicaApply';
-import { stripUnpublishableColumns } from './serverSnapshot';
+import { applySnapshotToReplica, downloadReplicaAssets } from './replicaApply';
+import { stripUnpublishableColumns, type SnapshotAssetRef } from './serverSnapshot';
 import {
   countOutbox, ensureOutboxTriggers, listPendingOutbox, markOutboxRejected, markOutboxSent, MUTABLE_TABLES, pruneSentOutbox,
 } from './outboxTriggers';
@@ -45,6 +45,8 @@ interface ReplicaRuntime {
   lastError: string | null;
   pendingMutations: number;
   rejectedMutations: number;
+  /** Illustrations fetched on the last pull; zero once the replica holds them all. */
+  lastImages: { downloaded: number; bytes: number; skipped: number } | null;
 }
 
 const runtimes = new Map<string, ReplicaRuntime>();
@@ -53,7 +55,7 @@ const readonlyPool = new Map<string, Database.Database>();
 function runtimeFor(vaultId: string): ReplicaRuntime {
   let runtime = runtimes.get(vaultId);
   if (!runtime) {
-    runtime = { phase: 'idle', lastPulledAt: null, lastError: null, pendingMutations: 0, rejectedMutations: 0 };
+    runtime = { phase: 'idle', lastPulledAt: null, lastError: null, pendingMutations: 0, rejectedMutations: 0, lastImages: null };
     runtimes.set(vaultId, runtime);
   }
   return runtime;
@@ -260,7 +262,7 @@ export async function pullReplica(vaultId: string, options: { force?: boolean } 
     const raw = Buffer.from(await response.arrayBuffer());
     // fetch() transparently decompresses, but a proxy may hand the bytes over untouched.
     const text = raw[0] === 0x1f && raw[1] === 0x8b ? gunzipSync(raw).toString('utf8') : raw.toString('utf8');
-    const snapshot = JSON.parse(text) as { schemaVersion?: number; revision?: string; tables?: Record<string, unknown> };
+    const snapshot = JSON.parse(text) as { schemaVersion?: number; revision?: string; tables?: Record<string, unknown>; assets?: SnapshotAssetRef[] };
 
     if (Number(snapshot.schemaVersion) > SCHEMA_VERSION) {
       throw new Error(`Este espacio se publica con un esquema más reciente (v${snapshot.schemaVersion}) que el de esta instalación (v${SCHEMA_VERSION}). Actualiza Nodus para recibirlo.`);
@@ -269,6 +271,22 @@ export async function pullReplica(vaultId: string, options: { force?: boolean } 
     const db = openReplicaDb(vault);
     if (!db) throw new Error('No se ha podido abrir la base de datos de la réplica.');
     applySnapshotToReplica(db, snapshot);
+
+    // The JSON carries no binary by design, so the illustration of every Deep Research
+    // report arrives as a row saying "ready" with nothing behind it. Fetch the bytes and
+    // put them back, skipping whatever this replica already holds.
+    const images = await downloadReplicaAssets(db, snapshot.assets ?? [], async (hash) => {
+      try {
+        const response = await request(`${endpoint}/assets/${hash}`, { headers: { authorization: `Bearer ${token}` } });
+        if (!response.ok) return null;
+        return Buffer.from(await response.arrayBuffer());
+      } catch {
+        // One unreachable image must not abort a publication that is otherwise complete;
+        // the next pull sees the blob still missing and tries again.
+        return null;
+      }
+    });
+    runtime.lastImages = images;
 
     const revision = response.headers.get('x-nodus-revision') || snapshot.revision || null;
     updateVaultRemote(vaultId, { lastPulledRevision: revision, lastPulledAt: new Date().toISOString() });
@@ -451,6 +469,8 @@ export interface ReplicaConnection {
   lastError: string | null;
   pendingMutations: number;
   rejectedMutations: number;
+  /** Illustrations fetched on the last pull; zero once the replica holds them all. */
+  lastImages: { downloaded: number; bytes: number; skipped: number } | null;
 }
 
 export function getReplicaOverview(): ReplicaConnection[] {
@@ -472,6 +492,7 @@ export function getReplicaOverview(): ReplicaConnection[] {
       lastError: runtime.lastError,
       pendingMutations: runtime.pendingMutations,
       rejectedMutations: runtime.rejectedMutations,
+      lastImages: runtime.lastImages,
     };
   });
 }
