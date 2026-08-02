@@ -315,7 +315,7 @@ private struct MaterialBrowser: View {
     private func sectionLabel(_ section: CorpusRetrieval.MaterialSection) -> some View {
         HStack(spacing: 6) {
             Image(systemName: section.icon).font(.caption2).foregroundStyle(accent)
-            Text(section.label).font(.caption)
+            Text(LocalizedStringKey(section.label)).font(.caption)
             Spacer()
             Text("\(section.rows.count)")
                 .font(.caption2.monospacedDigit())

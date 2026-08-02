@@ -103,7 +103,7 @@ struct ModelPickerView: View {
                 .listRowBackground(Color.clear)
             }
         }
-        .navigationTitle(task.label)
+        .navigationTitle(Text(LocalizedStringKey(task.label)))
         .navigationBarTitleDisplayMode(.inline)
         .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search model or provider")
         .task { await loadAll() }

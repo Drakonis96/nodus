@@ -40,7 +40,7 @@ struct HomeView: View {
                                     CollectionListView(session: session, collection: collection)
                                 } label: {
                                     SectionTile(
-                                        title: collection.label,
+                                        title: LocalizedStringKey(collection.label),
                                         icon: collection.icon,
                                         count: session.count(of: collection),
                                         accent: session.accent
@@ -62,7 +62,7 @@ struct HomeView: View {
                                 NavigationLink {
                                     tool.destination()
                                 } label: {
-                                    SectionTile(title: tool.title, icon: tool.icon, count: nil, accent: session.accent)
+                                    SectionTile(title: LocalizedStringKey(tool.title), icon: tool.icon, count: nil, accent: session.accent)
                                 }
                                 .buttonStyle(.plain)
                             }
@@ -77,7 +77,7 @@ struct HomeView: View {
                         NavigationLink {
                             WritingView(session: session)
                         } label: {
-                            SectionTile(title: "Notes and queue", icon: "square.and.pencil", count: nil, accent: session.accent)
+                            SectionTile(title: LocalizedStringKey("Notes and queue"), icon: "square.and.pencil", count: nil, accent: session.accent)
                         }
                         .buttonStyle(.plain)
                     }
@@ -185,7 +185,7 @@ struct HomeView: View {
         NavigationLink {
             SpecialListView(session: session, resource: resource)
         } label: {
-            SectionTile(title: title, icon: icon, count: nil, accent: session.accent)
+            SectionTile(title: LocalizedStringKey(title), icon: icon, count: nil, accent: session.accent)
         }
         .buttonStyle(.plain)
     }
@@ -217,7 +217,7 @@ struct HomeView: View {
 }
 
 struct SectionTile: View {
-    let title: String
+    let title: LocalizedStringKey
     let icon: String
     let count: Int?
     let accent: Color

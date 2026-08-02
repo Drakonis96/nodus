@@ -72,7 +72,7 @@ struct DeepResearchScreen: View {
                 set: { mode = $0 }
             )) {
                 ForEach(DeepResearchMode.allCases, id: \.self) { option in
-                    Text(option.label).tag(option)
+                    Text(LocalizedStringKey(option.label)).tag(option)
                 }
             }
             .pickerStyle(.segmented)
@@ -82,7 +82,7 @@ struct DeepResearchScreen: View {
 
             Picker("Length", selection: $length) {
                 ForEach(DeepResearchLength.allCases, id: \.self) { option in
-                    Text(option.label).tag(option)
+                    Text(LocalizedStringKey(option.label)).tag(option)
                 }
             }
             .pickerStyle(.menu)

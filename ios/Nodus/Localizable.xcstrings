@@ -4511,6 +4511,193 @@
           }
         }
       }
+    },
+    "%@ records": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ registros"
+          }
+        }
+      }
+    },
+    "Research": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Investigación"
+          }
+        }
+      }
+    },
+    "Reports": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Informes"
+          }
+        }
+      }
+    },
+    "All reports": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Todos los informes"
+          }
+        }
+      }
+    },
+    "On this device": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En este dispositivo"
+          }
+        }
+      }
+    },
+    "Published in the vault": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Publicados en el vault"
+          }
+        }
+      }
+    },
+    "Search reports": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Buscar informes"
+          }
+        }
+      }
+    },
+    "No reports": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sin informes"
+          }
+        }
+      }
+    },
+    "Nothing published, and nothing generated here yet.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nada publicado y nada generado aquí todavía."
+          }
+        }
+      }
+    },
+    "Generated here and kept on this device. They are not part of the vault until you send one.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Generados aquí y guardados en este dispositivo. No forman parte del vault hasta que envíes uno."
+          }
+        }
+      }
+    },
+    "Published tables": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tablas publicadas"
+          }
+        }
+      }
+    },
+    "Filter tables": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filtrar tablas"
+          }
+        }
+      }
+    },
+    "Artificial intelligence": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inteligencia artificial"
+          }
+        }
+      }
+    },
+    "None configured": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ninguna configurada"
+          }
+        }
+      }
+    },
+    "Show the key": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar la clave"
+          }
+        }
+      }
+    },
+    "Hide the key": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ocultar la clave"
+          }
+        }
+      }
+    },
+    "Delete": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Borrar"
+          }
+        }
+      }
     }
   }
 }

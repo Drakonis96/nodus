@@ -49,7 +49,7 @@ struct MirrorTableView: View {
         }
         .scrollContentBackground(.hidden)
         .listStyle(.plain)
-        .navigationTitle(title)
+        .navigationTitle(Text(LocalizedStringKey(title)))
         .navigationBarTitleDisplayMode(.inline)
         .searchable(text: $query, prompt: "Filter on any field")
         .onChange(of: query) { _, _ in schedule() }
@@ -133,7 +133,7 @@ struct MirrorOnlySectionsView: View {
                     } label: {
                         Label {
                             HStack {
-                                Text(Self.label(for: entry.table))
+                                Text(LocalizedStringKey(Self.label(for: entry.table)))
                                 Spacer()
                                 CountBadge(count: entry.count, accent: session.accent)
                             }

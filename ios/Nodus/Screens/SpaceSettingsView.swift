@@ -94,7 +94,7 @@ struct SpaceSettingsView: View {
                                 .environment(ai)
                         } label: {
                             HStack {
-                                Text(task.label)
+                                Text(LocalizedStringKey(task.label))
                                 Spacer()
                                 Text(ai.model(for: task)?.model ?? String(localized: "Not chosen"))
                                     .font(.caption).foregroundStyle(.secondary)

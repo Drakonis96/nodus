@@ -64,7 +64,7 @@ struct CollectionListView: View {
         }
         .scrollContentBackground(.hidden)
         .listStyle(.plain)
-        .navigationTitle(collection.label)
+        .navigationTitle(Text(LocalizedStringKey(collection.label)))
         .navigationBarTitleDisplayMode(.inline)
         .searchable(text: $query, prompt: "Filter on any field")
         .onChange(of: query) { _, _ in scheduleReload() }
@@ -211,7 +211,7 @@ struct SpecialListView: View {
         }
         .scrollContentBackground(.hidden)
         .listStyle(.plain)
-        .navigationTitle(title)
+        .navigationTitle(Text(LocalizedStringKey(title)))
         .navigationBarTitleDisplayMode(.inline)
         .task { if rows.isEmpty { await reload() } }
         .refreshable { await reload() }

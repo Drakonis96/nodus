@@ -147,7 +147,7 @@ struct ProviderSettingsView: View {
             ModelPickerView(task: task, accent: accent)
         } label: {
             HStack {
-                Text(task.label)
+                Text(LocalizedStringKey(task.label))
                 Spacer()
                 if let model = settings.model(for: task) {
                     Text(model.model)

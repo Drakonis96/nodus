@@ -110,7 +110,7 @@ struct SpaceShell: View {
                     ForEach(session.sections, id: \.path) { collection in
                         Label {
                             HStack {
-                                Text(collection.label)
+                                Text(LocalizedStringKey(collection.label))
                                 Spacer()
                                 CountBadge(count: session.count(of: collection), accent: session.accent)
                             }
@@ -206,6 +206,6 @@ struct SpaceShell: View {
         guard let overview = session.overview else { return nil }
         let rows = overview.counts.values.reduce(0, +)
         guard rows > 0 else { return nil }
-        return "\(rows.formatted()) registros"
+        return String(localized: "\(rows.formatted()) records")
     }
 }
