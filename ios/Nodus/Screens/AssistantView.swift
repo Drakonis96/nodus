@@ -16,6 +16,9 @@ struct ChatScreen: View {
         var citations: [CitationCatalog.Entry] = []
         var mode: CorpusRetrieval.Mode?
         var warning: String?
+        /// The material the answer was built from, grouped by kind — ideas, temas, huecos —
+        /// so it can be read beside the answer instead of taken on trust.
+        var sections: [CorpusRetrieval.MaterialSection] = []
     }
 
     @State private var turns: [Turn] = []
@@ -23,6 +26,8 @@ struct ChatScreen: View {
     @State private var isThinking = false
     @State private var error: String?
     @State private var running: Task<Void, Never>?
+    @State private var include: Set<ContextSectionKind> = Set(ContextSectionKind.allCases)
+    @State private var showingLayers = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -49,6 +54,28 @@ struct ChatScreen: View {
         }
         .navigationTitle("Chat")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    // Which layers of the corpus enter the payload, the same choice the
+                    // desktop's assistant offers: a question about a gap in the literature
+                    // wants different material from one about what a work argues.
+                    ForEach(ContextSectionKind.allCases, id: \.self) { kind in
+                        Button {
+                            if include.contains(kind) { include.remove(kind) } else { include.insert(kind) }
+                        } label: {
+                            Label(
+                                CorpusRetrieval.MaterialSection(kind: kind, rows: []).label,
+                                systemImage: include.contains(kind) ? "checkmark" : ""
+                            )
+                        }
+                    }
+                } label: {
+                    Image(systemName: "line.3.horizontal.decrease.circle")
+                }
+                .tint(session.accent)
+            }
+        }
     }
 
     private var emptyState: some View {
@@ -108,11 +135,15 @@ struct ChatScreen: View {
                     embeddings: EmbeddingService(keyProvider: ai.keyProvider),
                     identity: semanticIdentity
                 )
-                let material = try await retrieval.material(for: question)
+                let material = try await retrieval.material(
+                    for: question,
+                    include: ContextSectionKind.allCases.filter(include.contains)
+                )
                 guard !Task.isCancelled else { return }
 
                 turns[answerIndex].mode = material.mode
                 turns[answerIndex].warning = material.warning
+                turns[answerIndex].sections = material.sections
 
                 let provider = ProviderClient(keyProvider: ai.keyProvider)
                 let request = ChatRequest(
@@ -198,6 +229,10 @@ private struct TurnBubble: View {
                     .background(accent.opacity(0.1), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
                 }
 
+                if !turn.sections.isEmpty {
+                    MaterialBrowser(sections: turn.sections, accent: accent, session: session)
+                }
+
                 if let mode = turn.mode {
                     Text(mode == .semantic ? "Recuperación semántica" : "Recuperación léxica")
                         .font(.caption2).foregroundStyle(.tertiary)
@@ -212,6 +247,113 @@ private struct TurnBubble: View {
         case "passage": return "text.quote"
         case "work": return "book.closed"
         default: return "doc"
+        }
+    }
+}
+
+
+/// The corpus the answer was built from, browsable.
+///
+/// The desktop shows the assistant's context as named sections — ideas generadas, temas
+/// principales, huecos de investigación — and that is more than decoration: an answer is only
+/// as good as what it was given, and a reader who can see the material can tell the difference
+/// between a thin retrieval and a thin corpus.
+private struct MaterialBrowser: View {
+    let sections: [CorpusRetrieval.MaterialSection]
+    let accent: Color
+    let session: SpaceSession
+
+    @State private var expanded: Set<String> = []
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Material recuperado")
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            ForEach(sections) { section in
+                sectionGroup(section)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .nodusGlass(NodusGlass(.thin, tint: accent), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    private func binding(for section: CorpusRetrieval.MaterialSection) -> Binding<Bool> {
+        Binding(
+            get: { expanded.contains(section.id) },
+            set: { isOpen in
+                if isOpen { expanded.insert(section.id) } else { expanded.remove(section.id) }
+            }
+        )
+    }
+
+    private func sectionGroup(_ section: CorpusRetrieval.MaterialSection) -> some View {
+        DisclosureGroup(isExpanded: binding(for: section)) {
+            sectionBody(section)
+        } label: {
+            sectionLabel(section)
+        }
+        .tint(accent)
+    }
+
+    private func sectionBody(_ section: CorpusRetrieval.MaterialSection) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(Array(section.rows.prefix(20).enumerated()), id: \.offset) { _, row in
+                materialRow(row, kind: section.kind)
+            }
+            if section.rows.count > 20 {
+                Text("y \(section.rows.count - 20) más")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+        }
+        .padding(.top, 6)
+    }
+
+    private func sectionLabel(_ section: CorpusRetrieval.MaterialSection) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: section.icon).font(.caption2).foregroundStyle(accent)
+            Text(section.label).font(.caption)
+            Spacer()
+            Text("\(section.rows.count)")
+                .font(.caption2.monospacedDigit())
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    /// Which collection a retrieved row belongs to, so it can be opened.
+    private static func collection(for kind: ContextSectionKind) -> CollectionDescriptor? {
+        switch kind {
+        case .ideas: return Collections["ideas"]
+        case .works: return Collections["works"]
+        case .themes: return Collections["themes"]
+        case .gaps: return Collections["gaps"]
+        case .passages: return nil
+        }
+    }
+
+    @ViewBuilder
+    private func materialRow(_ row: Row, kind: ContextSectionKind) -> some View {
+        let collection = Self.collection(for: kind)
+        if let collection, row.string(collection.idField) != nil {
+            NavigationLink {
+                RowDetailView(session: session, collection: collection, row: row)
+            } label: {
+                RowCell(row: row, presenter: collection.presenter, accent: accent)
+            }
+            .buttonStyle(.plain)
+        } else {
+            // A passage has no page of its own; it is read here, as the quotation it is.
+            Text(row.text("text") ?? row.text("statement") ?? row.text("label") ?? "—")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(4)
+                .padding(.leading, 8)
+                .overlay(alignment: .leading) {
+                    Rectangle().fill(accent.opacity(0.4)).frame(width: 2)
+                }
         }
     }
 }

@@ -241,3 +241,54 @@ private final class PhaseRecorder: @unchecked Sendable {
         return storage
     }
 }
+
+@Suite("Research modes")
+struct DeepResearchModeTests {
+    // The desktop keeps two prompt packs rather than one with a flag, because a teaching unit
+    // and a research report want contradictory things: one sequences by concept dependency and
+    // names classroom activities, the other argues a thesis. Asking for both gets neither.
+    @Test("the two modes are distinct requests, not a label on the same one")
+    func modesAreDistinct() {
+        let base = DeepResearchRequest(
+            objective: "La autarquía",
+            model: ModelRef(provider: .gemini, model: "gemini-2.5-flash-lite")
+        )
+        #expect(base.mode == .research, "a plain request is a report unless asked otherwise")
+
+        let unit = DeepResearchRequest(
+            objective: "La autarquía",
+            mode: .teachingUnit,
+            model: ModelRef(provider: .gemini, model: "gemini-2.5-flash-lite")
+        )
+        #expect(unit.mode == .teachingUnit)
+        #expect(DeepResearchMode.allCases.count == 2)
+        for mode in DeepResearchMode.allCases {
+            #expect(!mode.label.isEmpty)
+            #expect(mode.explanation.count > 40, "each mode has to explain what it produces")
+        }
+    }
+
+    @Test("a unit run still enforces the citation contract")
+    func unitsAreStillCited() async throws {
+        let source = CitationCatalog(entries: [
+            .init(token: "nodus://idea/i-1", kind: "idea", id: "i-1", label: "Fuente"),
+        ])
+        let orchestrator = DeepResearchOrchestrator(deps: DeepResearchDeps(
+            buildCatalog: { _ in source },
+            retrieveForSection: { _, _ in source },
+            plan: { _, _, _, _ in ["Prerrequisitos"] },
+            writeSection: { _, _, _, _, _, _ in
+                "Actividad de aula apoyada en (nodus://idea/i-1) y en (nodus://work/inventada)."
+            }
+        ))
+        let report = try await orchestrator.run(DeepResearchRequest(
+            objective: "Preparar una unidad sobre la autarquía",
+            targetLength: .concise,
+            mode: .teachingUnit,
+            model: ModelRef(provider: .gemini, model: "gemini-2.5-flash-lite")
+        ))
+        // Teaching prose is prose: an invented source is stripped there too.
+        #expect(report.citationsRejected == 1)
+        #expect(!report.markdown.contains("inventada"))
+    }
+}

@@ -19,12 +19,43 @@ public enum DeepResearchLength: String, Sendable, Codable, CaseIterable {
     }
 }
 
+/// Who the report is written for, which changes what it is.
+///
+/// The desktop keeps two prompt packs rather than one with a variable in it
+/// (`electron/ai/studyDeepResearch.ts:232-239`), and the reason is that mixing teacher and
+/// learner instructions produces a document that serves neither: a teaching unit sequences by
+/// concept dependency and names classroom activities and common student errors, while a
+/// research report argues a thesis.
+public enum DeepResearchMode: String, Sendable, Codable, CaseIterable {
+    /// A cited report that argues from the corpus.
+    case research
+    /// A teaching unit, written for whoever is going to give the class.
+    case teachingUnit
+
+    public var label: String {
+        switch self {
+        case .research: return "Informe"
+        case .teachingUnit: return "Unidad didáctica"
+        }
+    }
+
+    public var explanation: String {
+        switch self {
+        case .research:
+            return "Prosa académica continua que defiende una tesis apoyada en el corpus."
+        case .teachingUnit:
+            return "Partes secuenciadas por dependencia entre conceptos, escritas para quien da la clase: qué se enseña, con qué materiales, errores frecuentes y cómo comprobar la comprensión."
+        }
+    }
+}
+
 public struct DeepResearchRequest: Sendable {
     public var objective: String
     public var language: String
     public var audience: String?
     public var targetLength: DeepResearchLength
     public var sectionLimit: Int?
+    public var mode: DeepResearchMode
     public var model: ModelRef
 
     public init(
@@ -33,6 +64,7 @@ public struct DeepResearchRequest: Sendable {
         audience: String? = nil,
         targetLength: DeepResearchLength = .adaptive,
         sectionLimit: Int? = nil,
+        mode: DeepResearchMode = .research,
         model: ModelRef
     ) {
         self.objective = objective
@@ -40,6 +72,7 @@ public struct DeepResearchRequest: Sendable {
         self.audience = audience
         self.targetLength = targetLength
         self.sectionLimit = sectionLimit
+        self.mode = mode
         self.model = model
     }
 }

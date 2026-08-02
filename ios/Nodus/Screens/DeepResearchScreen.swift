@@ -10,6 +10,7 @@ struct DeepResearchScreen: View {
 
     @State private var objective = ""
     @State private var length: DeepResearchLength = .concise
+    @State private var mode: DeepResearchMode?
     @State private var progress: DeepResearchProgress?
     @State private var report: DeepResearchReport?
     @State private var error: String?
@@ -48,12 +49,35 @@ struct DeepResearchScreen: View {
 
     private var form: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Objetivo").font(.subheadline.weight(.medium))
-            TextField("Qué quieres que investigue en este corpus", text: $objective, axis: .vertical)
+            Text((mode ?? defaultMode) == .teachingUnit ? "Tema de la unidad" : "Objetivo")
+                .font(.subheadline.weight(.medium))
+            TextField(
+                (mode ?? defaultMode) == .teachingUnit
+                    ? "Qué unidad quieres preparar con estos materiales"
+                    : "Qué quieres que investigue en este corpus",
+                text: $objective,
+                axis: .vertical
+            )
                 .lineLimit(2...5)
                 .textFieldStyle(.plain)
                 .padding(13)
                 .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+
+            // Teaching vaults default to the unit pack, the way the desktop does
+            // (`electron/ai/deepResearch.ts:39`), but it stays a choice: a teacher may well
+            // want a plain report about their own materials.
+            Picker("Modo", selection: Binding(
+                get: { mode ?? defaultMode },
+                set: { mode = $0 }
+            )) {
+                ForEach(DeepResearchMode.allCases, id: \.self) { option in
+                    Text(option.label).tag(option)
+                }
+            }
+            .pickerStyle(.segmented)
+
+            Text((mode ?? defaultMode).explanation)
+                .font(.caption).foregroundStyle(.secondary)
 
             Picker("Extensión", selection: $length) {
                 ForEach(DeepResearchLength.allCases, id: \.self) { option in
@@ -84,7 +108,7 @@ struct DeepResearchScreen: View {
             Button {
                 start()
             } label: {
-                Label("Generar el informe", systemImage: "sparkles")
+                Label((mode ?? defaultMode) == .teachingUnit ? "Generar la unidad" : "Generar el informe", systemImage: "sparkles")
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(NodusPrimaryButtonStyle(accent: session.accent))
@@ -92,6 +116,11 @@ struct DeepResearchScreen: View {
         }
         .padding(16)
         .nodusGlass(NodusGlass(.regular, tint: session.accent))
+    }
+
+    /// Docencia vaults open on the unit pack; everything else on the report.
+    private var defaultMode: DeepResearchMode {
+        session.vaultType == .docencia ? .teachingUnit : .research
     }
 
     private var costEstimate: String {
@@ -214,6 +243,7 @@ struct DeepResearchScreen: View {
         let request = DeepResearchRequest(
             objective: objective.trimmingCharacters(in: .whitespacesAndNewlines),
             targetLength: length,
+            mode: mode ?? defaultMode,
             model: model
         )
         let retrieval = CorpusRetrieval(

@@ -33,17 +33,57 @@ struct CorpusRetrieval: Sendable {
         let truncated: Bool
         /// Present when retrieval fell back and the server explained why.
         let warning: String?
+        /// What was retrieved, grouped the way the desktop's assistant groups it, so the
+        /// answer can be read beside the material it was built from rather than on trust.
+        let sections: [MaterialSection]
+    }
+
+    /// One kind of retrieved material.
+    struct MaterialSection: Sendable, Identifiable {
+        let kind: ContextSectionKind
+        let rows: [Row]
+        var id: String { kind.rawValue }
+
+        var label: String {
+            switch kind {
+            case .ideas: return "Ideas"
+            case .themes: return "Temas"
+            case .gaps: return "Huecos"
+            case .works: return "Obras"
+            case .passages: return "Pasajes"
+            }
+        }
+
+        var icon: String {
+            switch kind {
+            case .ideas: return "lightbulb"
+            case .themes: return "number"
+            case .gaps: return "questionmark.diamond"
+            case .works: return "book.closed"
+            case .passages: return "text.quote"
+            }
+        }
     }
 
     /// Material for one query.
-    func material(for query: String, budget: Int = 60_000) async throws -> Result {
-        if let identity, let semantic = try? await semanticMaterial(query: query, identity: identity), !semantic.catalog.isEmpty {
+    ///
+    /// `include` mirrors the desktop's own selector (`electron/ai/researchAssistant.ts:557-590`):
+    /// which layers of the corpus enter the payload is a choice, because a question about a
+    /// gap in the literature wants different material from one about what a work argues.
+    func material(
+        for query: String,
+        budget: Int = 60_000,
+        include: [ContextSectionKind] = ContextSectionKind.allCases
+    ) async throws -> Result {
+        if let identity,
+           let semantic = try? await semanticMaterial(query: query, identity: identity, include: include),
+           !semantic.catalog.isEmpty {
             return semantic
         }
-        return try await lexicalMaterial(query: query, budget: budget)
+        return try await lexicalMaterial(query: query, budget: budget, include: include)
     }
 
-    private func semanticMaterial(query: String, identity: EmbeddingIdentity) async throws -> Result {
+    private func semanticMaterial(query: String, identity: EmbeddingIdentity, include: [ContextSectionKind]) async throws -> Result {
         let vector = try await embeddings.embed(query, as: identity)
 
         // Ideas carry the argument; passages carry the evidence. A report needs both, and the
@@ -69,19 +109,51 @@ struct CorpusRetrieval: Sendable {
         }
 
         guard !entries.isEmpty else {
-            return try await lexicalMaterial(query: query, budget: 60_000)
+            return try await lexicalMaterial(query: query, budget: 60_000, include: include)
         }
-        return Result(catalog: CitationCatalog(entries: entries), mode: .semantic, truncated: false, warning: warning)
+        // The semantic path ranks ideas and passages; themes, gaps and works come from the
+        // lexical package, so both are merged rather than one replacing the other.
+        let lexical = try? await lexicalMaterial(query: query, budget: 30_000, include: include)
+        return Result(
+            catalog: CitationCatalog(entries: entries).merging(lexical?.catalog ?? CitationCatalog(entries: [])),
+            mode: .semantic,
+            truncated: lexical?.truncated ?? false,
+            warning: warning,
+            sections: semanticSections(entries) + (lexical?.sections.filter { $0.kind != .ideas && $0.kind != .passages } ?? [])
+        )
     }
 
-    private func lexicalMaterial(query: String, budget: Int) async throws -> Result {
-        let package = try await client.context(query: query, in: spaceId, budget: budget)
+    private func lexicalMaterial(query: String, budget: Int, include: [ContextSectionKind]) async throws -> Result {
+        let package = try await client.context(query: query, in: spaceId, budget: budget, include: include)
+        let sections = package.sections.compactMap { section -> MaterialSection? in
+            guard let kind = ContextSectionKind(rawValue: section.kind), !section.items.isEmpty else { return nil }
+            return MaterialSection(kind: kind, rows: section.items)
+        }
         return Result(
             catalog: CitationCatalog.from(package),
             mode: .lexical,
             truncated: package.stats.truncated,
-            warning: nil
+            warning: nil,
+            sections: sections
         )
+    }
+
+    /// The semantically ranked hits, split back into the kinds the UI groups by.
+    private func semanticSections(_ entries: [CitationCatalog.Entry]) -> [MaterialSection] {
+        var ideas: [Row] = []
+        var passages: [Row] = []
+        for entry in entries {
+            let row = Row([
+                "label": .string(entry.label),
+                "statement": .string(entry.detail ?? ""),
+                entry.kind == "idea" ? "global_id" : "passage_id": .string(entry.id),
+            ])
+            if entry.kind == "idea" { ideas.append(row) } else if entry.kind == "passage" { passages.append(row) }
+        }
+        var sections: [MaterialSection] = []
+        if !ideas.isEmpty { sections.append(MaterialSection(kind: .ideas, rows: ideas)) }
+        if !passages.isEmpty { sections.append(MaterialSection(kind: .passages, rows: passages)) }
+        return sections
     }
 
     private static func entry(from hit: SemanticHit) -> CitationCatalog.Entry? {
@@ -138,7 +210,7 @@ nonisolated enum DeepResearchWiring {
                 let text = try await provider.complete(ChatRequest(
                     model: request.model,
                     messages: [
-                        .init(role: .system, content: Prompts.system(language: request.language)),
+                        .init(role: .system, content: Prompts.system(language: request.language, mode: request.mode)),
                         .init(role: .user, content: prompt),
                     ],
                     temperature: 0.3,
@@ -154,7 +226,7 @@ nonisolated enum DeepResearchWiring {
                 return try await provider.complete(ChatRequest(
                     model: request.model,
                     messages: [
-                        .init(role: .system, content: Prompts.system(language: request.language)),
+                        .init(role: .system, content: Prompts.system(language: request.language, mode: request.mode)),
                         .init(role: .user, content: prompt),
                     ],
                     temperature: 0.55,
@@ -170,7 +242,22 @@ nonisolated enum DeepResearchWiring {
 /// `nonisolated` because the app target defaults every type to the main actor, and these are
 /// pure string building called from the orchestrator's background closures.
 nonisolated enum Prompts {
-    static func system(language: String) -> String {
+    /// Two packs rather than one with a flag in it, exactly as
+    /// `electron/ai/studyDeepResearch.ts:159-237` keeps them: a teaching unit and a research
+    /// report want contradictory things from the model, and a prompt that asks for both gets a
+    /// document that is neither.
+    static func system(language: String, mode: DeepResearchMode = .research) -> String {
+        if mode == .teachingUnit {
+            return """
+            Eres un docente experto que prepara una unidad didáctica a partir exclusivamente de \
+            los materiales locales y de la red de ideas ya extraída de ellos.
+            Escribe en \(languageName(language)). No inventes información, materiales ni identificadores.
+            """
+        }
+        return systemResearch(language: language)
+    }
+
+    private static func systemResearch(language: String) -> String {
         """
         Eres un investigador académico que escribe a partir de un corpus concreto y solo de él.
         Escribe en \(languageName(language)). No inventes fuentes, autores, años ni identificadores.
@@ -198,12 +285,13 @@ nonisolated enum Prompts {
 
     static func plan(request: DeepResearchRequest, catalog: CitationCatalog, target: Int, cap: Int) -> String {
         """
-        Objetivo del informe: \(request.objective)
+        \(request.mode == .teachingUnit ? "Tema de la unidad" : "Objetivo del informe"): \(request.objective)
         \(request.audience.map { "Público: \($0)" } ?? "")
 
-        Propón entre \(max(1, target - 1)) y \(cap) secciones que cubran el objetivo apoyándose \
-        en el catálogo. Cada título debe ser específico y distinto de los demás; nada de \
-        «Introducción» ni «Conclusión» genéricas.
+        Propón entre \(max(1, target - 1)) y \(cap) partes que cubran el tema apoyándose en el \
+        catálogo. \(request.mode == .teachingUnit
+            ? "Secuencia las partes según las dependencias entre conceptos: lo que hay que entender antes va antes. Cada parte debe poder darse en clase."
+            : "Cada título debe ser específico y distinto de los demás; nada de «Introducción» ni «Conclusión» genéricas.")
 
         Responde SOLO con JSON: {"sections": ["Título 1", "Título 2", ...]}
 
@@ -219,12 +307,23 @@ nonisolated enum Prompts {
         catalog: CitationCatalog,
         wordTarget: Int
     ) -> String {
-        """
-        Informe: \(request.objective)
-        Escribe la sección \(index + 1) de \(total): «\(title)».
+        let shape = request.mode == .teachingUnit
+            ? """
+            Escribes PARA EL DOCENTE que va a dar la clase: expón el contenido con precisión, \
+            indica el orden en que conviene presentarlo, señala los prerrequisitos, los errores \
+            frecuentes del alumnado y en qué conviene detenerse, y propón al menos una actividad \
+            de aula y una forma de comprobar la comprensión, ambas apoyadas en los materiales.
+            """
+            : """
+            Prosa académica continua, sin encabezados internos ni listas salvo que el contenido \
+            lo exija.
+            """
 
-        Extensión objetivo: unas \(wordTarget) palabras. Prosa académica continua, sin \
-        encabezados internos ni listas salvo que el contenido lo exija. No repitas el título.
+        return """
+        \(request.mode == .teachingUnit ? "Unidad" : "Informe"): \(request.objective)
+        Escribe la parte \(index + 1) de \(total): «\(title)».
+
+        Extensión objetivo: unas \(wordTarget) palabras. \(shape) No repitas el título.
 
         \(citationPolicy(catalog: catalog))
         """
