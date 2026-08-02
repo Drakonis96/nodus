@@ -50,15 +50,57 @@ struct Lab {
     }
 
     /// Sign in and take a device token, the way the app does.
-    func signIn(_ credentials: (email: String, password: String)) async throws -> (NodusClient, DeviceCredential) {
-        let anonymous = client()
-        let ticket = try await anonymous.login(email: credentials.email, password: credentials.password)
+    ///
+    /// `space` is a parameter and not a default read from `self.spaceId`, because a token is
+    /// bound to exactly one space: reusing one across spaces earns a 401, correctly, and a
+    /// test that assumed otherwise is testing its own mistake.
+    ///
+    /// The credential is cached per (account, space). Signing in once per test looked harmless
+    /// and is not: `/auth/login` is rate limited to ten attempts per account per ten minutes,
+    /// so a suite of twenty tests locks itself out for twelve minutes on the way through. The
+    /// app takes a token once and holds it; the suite now does the same thing.
+    func signIn(
+        _ credentials: (email: String, password: String),
+        space: String? = nil
+    ) async throws -> (NodusClient, DeviceCredential) {
+        let target = space ?? spaceId
+        let credential = try await TokenCache.shared.credential(
+            email: credentials.email,
+            password: credentials.password,
+            spaceId: target,
+            address: address
+        )
+        return (client(token: credential.token), credential)
+    }
+}
+
+/// One device token per account and space, for the whole test run.
+actor TokenCache {
+    static let shared = TokenCache()
+    private var cached: [String: DeviceCredential] = [:]
+
+    func credential(
+        email: String,
+        password: String,
+        spaceId: String,
+        address: ServerAddress
+    ) async throws -> DeviceCredential {
+        let key = "\(email)|\(spaceId)"
+        if let existing = cached[key] { return existing }
+
+        let anonymous = NodusClient(
+            address: address,
+            cache: ResponseCache(directory: FileManager.default.temporaryDirectory
+                .appendingPathComponent("nodus-token-cache-\(UUID().uuidString)"))
+        )
+        let ticket = try await anonymous.login(email: email, password: password)
         let credential = try await anonymous.createDeviceToken(
             ticket: ticket.ticket,
             spaceId: spaceId,
             deviceName: "Swift contract suite"
         )
-        return (client(token: credential.token), credential)
+        cached[key] = credential
+        return credential
     }
 }
 

@@ -86,6 +86,55 @@ struct SpaceSettingsView: View {
                 }
 
                 Section {
+                    switch session.mirrorProgress {
+                    case .absent:
+                        Button {
+                            Task { await session.downloadMirror() }
+                        } label: {
+                            Label("Descargar para sin conexión", systemImage: "arrow.down.circle")
+                        }
+                    case .downloading:
+                        Label("Descargando la publicación…", systemImage: "arrow.down.circle")
+                            .foregroundStyle(.secondary)
+                    case .importing:
+                        Label("Indexando…", systemImage: "gearshape.2")
+                            .foregroundStyle(.secondary)
+                    case .current(let rows, let tables):
+                        labelled("Filas", rows.formatted())
+                        labelled("Tablas", "\(tables)")
+                        if let summary = session.mirrorSummary {
+                            labelled("Descargada", summary.importedAt.formatted(date: .abbreviated, time: .shortened))
+                        }
+                        Button { Task { await session.downloadMirror() } } label: {
+                            Label("Volver a descargar", systemImage: "arrow.clockwise")
+                        }
+                        Button(role: .destructive) { Task { await session.removeMirror() } } label: {
+                            Label("Borrar la copia", systemImage: "trash")
+                        }
+                    case .stale(let rows):
+                        Label("La copia está desfasada", systemImage: "exclamationmark.arrow.circlepath")
+                            .foregroundStyle(.orange)
+                        Text("Guarda \(rows.formatted()) filas de una publicación anterior.")
+                            .font(.caption).foregroundStyle(.secondary)
+                        Button { Task { await session.downloadMirror() } } label: {
+                            Label("Actualizar", systemImage: "arrow.clockwise")
+                        }
+                    case .failed(let message):
+                        Text(message).font(.caption).foregroundStyle(.red)
+                        Button { Task { await session.downloadMirror() } } label: {
+                            Label("Reintentar", systemImage: "arrow.clockwise")
+                        }
+                    }
+                } header: {
+                    Text("Sin conexión")
+                } footer: {
+                    // Not a nicety. The API has no sort parameter anywhere, and it projects
+                    // twenty tables out of the dozens a publication can carry — a worldbuilding
+                    // vault's scenes and articles have no route at all.
+                    Text("Guarda la publicación completa en el dispositivo: funciona sin red, ordena al instante y alcanza las tablas que la API no expone.")
+                }
+
+                Section {
                     Button(role: .destructive) {
                         model.forget(session.connection)
                         dismiss()

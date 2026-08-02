@@ -231,7 +231,7 @@ async function publishVault(vault, spaceName) {
     const negotiated = await fetch(`${ORIGIN}/api/v1/spaces/${spaceId}/assets/negotiate`, {
       method: 'POST',
       headers: { authorization: `Bearer ${ownerToken}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ assets: snapshot.assets.map((asset) => ({ hash: asset.hash, bytes: asset.bytes.length })) }),
+      body: JSON.stringify({ assets: snapshot.assets.map((asset) => ({ hash: asset.hash, bytes: asset.bytes })) }),
     });
     const missing = new Set((await negotiated.json()).missing ?? []);
     let uploaded = 0;
@@ -240,7 +240,7 @@ async function publishVault(vault, spaceName) {
       const response = await fetch(`${ORIGIN}/api/v1/spaces/${spaceId}/assets/${asset.hash}`, {
         method: 'PUT',
         headers: { authorization: `Bearer ${ownerToken}`, 'content-type': 'application/octet-stream' },
-        body: asset.bytes,
+        body: asset.data,
       });
       if (response.status === 200) uploaded += 1;
       else console.warn(`  ! image ${asset.hash.slice(0, 8)} refused (${response.status})`);

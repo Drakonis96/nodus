@@ -38,6 +38,7 @@ struct SpaceShell: View {
         }
         .task {
             await session.load()
+            await session.loadMirror()
             await session.probeEmbedding()
         }
         .sheet(isPresented: $showingSettings) {

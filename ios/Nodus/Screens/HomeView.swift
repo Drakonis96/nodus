@@ -52,6 +52,24 @@ struct HomeView: View {
                     }
                 }
 
+                if !session.mirrorOnlyTables.isEmpty {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Más del espacio").font(.subheadline.weight(.semibold))
+                        NavigationLink {
+                            MirrorOnlySectionsView(session: session)
+                        } label: {
+                            SectionTile(
+                                title: "Solo sin conexión",
+                                icon: "internaldrive",
+                                count: session.mirrorOnlyTables.reduce(0) { $0 + $1.count },
+                                accent: session.accent
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
                 if session.hasDebates || session.hasNotes || session.hasDeepResearch || session.hasImmersion {
                     VStack(alignment: .leading, spacing: 10) {
                         Text("Analizar").font(.subheadline.weight(.semibold))

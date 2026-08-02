@@ -23,6 +23,12 @@ final class SpaceSession {
     /// probed, `.none` when the vault has no published vectors.
     private(set) var embedding: EmbeddingProbeResult = .unknown
 
+    /// The offline copy, when one has been downloaded.
+    private(set) var mirror: MirrorStore?
+    private(set) var mirrorSummary: MirrorStore.Summary?
+    private(set) var mirrorProgress: MirrorProgress = .absent
+    private let mirrorDirectory: URL
+
     var accent: Color { connection.accent }
     var vaultType: VaultType? { overview?.vault?.type ?? connection.vaultType }
 
@@ -39,8 +45,115 @@ final class SpaceSession {
             token: token,
             cache: ResponseCache(directory: cacheDirectory)
         )
+        // Application Support, not Caches: the mirror is what the app falls back to on a plane,
+        // and the system is free to delete Caches whenever it likes.
+        mirrorDirectory = URL.applicationSupportDirectory.appendingPathComponent("spaces", isDirectory: true)
         Task { await client.setUnauthorizedHandler(onUnauthorized) }
     }
+
+    // MARK: - Offline mirror
+
+    enum MirrorProgress: Equatable {
+        case absent
+        case downloading
+        case importing
+        /// Held locally and matching the server's current revision.
+        case current(rows: Int, tables: Int)
+        /// Held locally, but the owner has republished since.
+        case stale(rows: Int)
+        case failed(String)
+    }
+
+    /// Opens an existing mirror without downloading anything.
+    func loadMirror() async {
+        guard mirror == nil else { return }
+        do {
+            let store = try MirrorStore(spaceId: connection.spaceId, directory: mirrorDirectory)
+            guard let summary = try await store.summary() else { return }
+            mirror = store
+            mirrorSummary = summary
+            await refreshMirrorFreshness()
+        } catch {
+            mirrorProgress = .failed(error.localizedDescription)
+        }
+    }
+
+    /// Asks the server for its revision only. A HEAD carries it with no body at all, so
+    /// discovering a mirror is current costs one round trip rather than a whole snapshot.
+    func refreshMirrorFreshness() async {
+        guard let mirror, let summary = mirrorSummary else { return }
+        do {
+            let revision = try await client.snapshotRevision(in: connection.spaceId)
+            let current = try await mirror.isCurrent(with: revision ?? "")
+            let counts = try await mirror.tableCounts()
+            mirrorProgress = current
+                ? .current(rows: counts.values.reduce(0, +), tables: counts.count)
+                : .stale(rows: summary.totalRows)
+        } catch let error as APIError where error.isNotPublished {
+            mirrorProgress = .stale(rows: summary.totalRows)
+        } catch {
+            // Offline is the normal case for a mirror check. Holding the last known state is
+            // more useful than reporting a failure the user cannot act on.
+            let counts = (try? await mirror.tableCounts()) ?? [:]
+            mirrorProgress = .current(rows: counts.values.reduce(0, +), tables: counts.count)
+        }
+    }
+
+    func downloadMirror() async {
+        mirrorProgress = .downloading
+        do {
+            let snapshot = try await client.snapshot(in: connection.spaceId)
+            let revision = try await client.snapshotRevision(in: connection.spaceId)
+                ?? snapshot.revision
+                ?? overview?.space.revision
+                ?? ""
+            mirrorProgress = .importing
+            let store = try mirror ?? MirrorStore(spaceId: connection.spaceId, directory: mirrorDirectory)
+            let summary = try await store.replace(with: snapshot, revision: revision)
+            mirror = store
+            mirrorSummary = summary
+            mirrorProgress = .current(rows: summary.totalRows, tables: summary.counts.count)
+        } catch let error as APIError where error.isNotPublished {
+            mirrorProgress = .failed("Este espacio todavía no tiene publicación que descargar.")
+        } catch {
+            mirrorProgress = .failed(error.localizedDescription)
+        }
+    }
+
+    func removeMirror() async {
+        guard let mirror else { return }
+        try? await mirror.drop()
+        self.mirror = nil
+        mirrorSummary = nil
+        mirrorProgress = .absent
+    }
+
+    var hasMirror: Bool { mirror != nil }
+
+    /// Tables the publication carried that no REST route can list.
+    ///
+    /// For a worldbuilding vault this is most of the corpus — scenes, articles, factions,
+    /// threads, character profiles. They are reachable only because the snapshot carries them.
+    var mirrorOnlyTables: [(table: String, count: Int)] {
+        guard let summary = mirrorSummary else { return [] }
+        return summary.counts
+            .filter { Collections.byTable[$0.key] == nil && $0.value > 0 }
+            .filter { !Self.internalTables.contains($0.key) }
+            .map { (table: $0.key, count: $0.value) }
+            .sorted { $0.count > $1.count }
+    }
+
+    /// Join tables and machinery: real rows, but nothing a person browses.
+    private static let internalTables: Set<String> = [
+        "idea_occurrences", "idea_theme_links", "work_themes", "work_authors", "work_aliases",
+        "work_collections", "work_zotero_tags", "zotero_tags", "evidence", "edges",
+        "event_participants", "person_names", "person_places", "note_links",
+        "project_chapter_chunks", "project_chapter_ideas", "project_chapter_idea_relations",
+        "research_coverage_links", "study_doc_links", "study_doc_tags", "study_placements",
+        "study_material_fragment_links", "study_style_associations",
+        "teaching_exam_questions", "db_cells", "db_columns", "db_select_options",
+        "world_scene_text", "person_portraits", "decorative_images", "content_translations",
+    ]
 
     func load() async {
         guard !isLoading else { return }

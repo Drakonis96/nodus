@@ -52,6 +52,23 @@ public extension NodusClient {
     }
 }
 
+/// One image the publication carried, described by everything except its bytes.
+///
+/// `kind` is `person_portrait` or `deep_research_image` — the only two kinds that ever travel.
+/// `key` holds the source row's key columns, so a portrait's key is `[person_id]` and a Deep
+/// Research illustration's is `[entity_kind, entity_id]`.
+public struct SnapshotAssetRef: Sendable, Hashable, Codable {
+    public let hash: String
+    public let thumbHash: String?
+    public let mime: String
+    public let thumbMime: String?
+    public let bytes: Int
+    public let thumbBytes: Int?
+    public let kind: String
+    public let table: String
+    public let key: [String]
+}
+
 public struct SnapshotDownload: Sendable {
     public let document: [String: JSONValue]
     public let formatVersion: Int
@@ -69,6 +86,38 @@ public struct SnapshotDownload: Sendable {
 
     public var schemaVersion: Int? { document["schemaVersion"]?.intValue }
     public var generatedAt: String? { document["generatedAt"]?.stringValue }
+
+    /// The image references the publication carried.
+    ///
+    /// This is the *only* place a client can learn which hash belongs to which row. The rows
+    /// themselves do not carry it: a `person_portraits` row arrives with `focus_x`, `mime`,
+    /// `scale` and so on, but its `blob` column is stripped and no hash replaces it. So a
+    /// REST-only client can fetch `/assets/<hash>` perfectly well and has no way to find out
+    /// what `<hash>` is — `createCorpusRoutes` even accepts an `assetHashesFor` helper and
+    /// never calls it (`server/lib/routes/corpus.mjs:126`).
+    ///
+    /// Resolving portraits is therefore one of the things the offline mirror is *for*, not
+    /// merely faster at.
+    public var assetRefs: [SnapshotAssetRef] {
+        (document["assets"]?.arrayValue ?? []).compactMap { value in
+            guard
+                let object = value.objectValue,
+                let hash = object["hash"]?.stringValue,
+                let table = object["table"]?.stringValue
+            else { return nil }
+            return SnapshotAssetRef(
+                hash: hash,
+                thumbHash: object["thumbHash"]?.stringValue,
+                mime: object["mime"]?.stringValue ?? "application/octet-stream",
+                thumbMime: object["thumbMime"]?.stringValue,
+                bytes: object["bytes"]?.intValue ?? 0,
+                thumbBytes: object["thumbBytes"]?.intValue,
+                kind: object["kind"]?.stringValue ?? "",
+                table: table,
+                key: (object["key"]?.arrayValue ?? []).compactMap(\.stringValue)
+            )
+        }
+    }
 
     /// Table name → rows, which is how the snapshot stores everything.
     public var tables: [String: [Row]] {
