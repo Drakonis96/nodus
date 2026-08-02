@@ -38,9 +38,13 @@ public struct Row: Sendable, Hashable, Codable {
     public func bool(_ key: String) -> Bool? { columns[key]?.boolValue }
 
     /// ISO-8601 timestamps, which is what every `created_at` / `updated_at` in the snapshot is.
+    /// Node writes fractional seconds and SQLite columns often do not, so both are accepted —
+    /// the same pair `JSONDecoder.nodus` accepts, from the same place.
     public func date(_ key: String) -> Date? {
         guard let raw = text(key) else { return nil }
-        return Row.isoWithFraction.date(from: raw) ?? Row.iso.date(from: raw)
+        return ISO8601DateFormatter.nodusFractional.date(from: raw)
+            ?? ISO8601DateFormatter.nodusPlain.date(from: raw)
+            ?? DateFormatter.sqliteDatetime.date(from: raw)
     }
 
     /// Several columns hold JSON encoded as text — `authors_json` on a work is the one that
@@ -60,16 +64,4 @@ public struct Row: Sendable, Hashable, Codable {
             return nil
         }.joined(separator: " ")
     }
-
-    nonisolated(unsafe) private static let iso: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
-        return formatter
-    }()
-
-    nonisolated(unsafe) private static let isoWithFraction: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter
-    }()
 }
