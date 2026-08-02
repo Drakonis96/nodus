@@ -262,6 +262,10 @@ function membership(userId, spaceId) {
  * that space, so it keeps owner powers. Refusing it would stop every installed desktop from
  * publishing the moment its server was upgraded.
  */
+function ownerCount(spaceId) {
+  return store.state.memberships.filter((entry) => entry.spaceId === spaceId && normalizeSpaceRole(entry.role) === 'owner').length;
+}
+
 function effectiveRole(device) {
   const entry = membership(device.userId, device.spaceId);
   if (device.grandfathered && (device.kind ?? 'publisher') === 'publisher') return 'owner';
@@ -714,9 +718,9 @@ function dashboard(current, notice = '') {
   const users = store.state.users.map((user) => {
     const access = store.state.memberships.filter((entry) => entry.userId === user.id).map((entry) => {
       const space = store.state.spaces.find((candidate) => candidate.id === entry.spaceId);
-      // An owner's own membership is neither revocable nor editable here: it is what makes
-      // the space publishable at all, and downgrading it from a dropdown would strand it.
-      const controls = entry.role === 'owner'
+      // The last owner of a space is the one membership that cannot be touched: without it
+      // nobody can ever publish there again, and no screen could undo that.
+      const controls = entry.role === 'owner' && ownerCount(entry.spaceId) <= 1
         ? `<span class="role-tag">${escapeHtml(roleLabel(entry.role))}</span>`
         : `<form method="post" action="/admin/access/role"><input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="userId" value="${user.id}"><input type="hidden" name="spaceId" value="${entry.spaceId}"><select name="role" aria-label="${escapeHtml(tr('accessLevel'))}">${roleOptions(entry.role)}</select><button class="secondary" type="submit">${tr('updateRole')}</button></form>`
         + `<form method="post" action="/admin/access/revoke"><input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="userId" value="${user.id}"><input type="hidden" name="spaceId" value="${entry.spaceId}"><button class="secondary" type="submit" title="${tr('revokeAccess')}" aria-label="${tr('revokeAccess')}">×</button></form>`;
@@ -1068,8 +1072,13 @@ async function route(req, res) {
     const current = requireSession(req, res, true); if (!current) return;
     const values = await form(req, AUTH_BODY_BYTES); if (!checkCsrf(current, values.csrf)) return html(res, 403, page(tr('error'), `<h1>${tr('sessionExpired')}</h1>`));
     const entry = membership(values.userId, values.spaceId);
-    if (!entry || entry.role === 'owner') return html(res, 400, dashboard(current, 'That access cannot be changed here.'));
+    if (!entry) return html(res, 400, dashboard(current, 'That access cannot be changed here.'));
     if (!isSpaceRole(values.role)) return html(res, 400, dashboard(current, 'Unknown access level.'));
+    // A space with no owner can never be published to again, and nothing in the interface
+    // can undo that. Demoting the last one is refused; demoting one of several is fine.
+    if (entry.role === 'owner' && values.role !== 'owner' && ownerCount(values.spaceId) <= 1) {
+      return html(res, 400, dashboard(current, 'A space needs at least one owner. Grant owner access to another account before changing this one.'));
+    }
     entry.role = values.role;
     // Nothing else to revoke: authorize() reads the role live on every request, so an
     // already-issued device or OAuth token drops to the new level on its very next call.
@@ -1090,7 +1099,10 @@ async function route(req, res) {
     const current = requireSession(req, res, true); if (!current) return;
     const values = await form(req, AUTH_BODY_BYTES); if (!checkCsrf(current, values.csrf)) return html(res, 403, page(tr('error'), `<h1>${tr('sessionExpired')}</h1>`));
     const entry = membership(values.userId, values.spaceId);
-    if (!entry || entry.role === 'owner') return html(res, 400, dashboard(current, 'That access cannot be revoked here.'));
+    if (!entry) return html(res, 400, dashboard(current, 'That access cannot be revoked here.'));
+    if (entry.role === 'owner' && ownerCount(values.spaceId) <= 1) {
+      return html(res, 400, dashboard(current, 'A space needs at least one owner. Grant owner access to another account before revoking this one.'));
+    }
     store.state.memberships = store.state.memberships.filter((candidate) => candidate !== entry);
     store.state.deviceTokens = store.state.deviceTokens.filter((device) => device.userId !== values.userId || device.spaceId !== values.spaceId);
     store.save();

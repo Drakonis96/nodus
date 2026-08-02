@@ -185,10 +185,19 @@ test('an account can be created with several spaces and a different level in eac
     const dashboard = await server.dashboard();
     for (const role of SPACE_ROLES) assert.match(dashboard, new RegExp(`value="${role}"`), `the ${role} level is offered`);
 
-    // An owner's own membership stays untouchable from this form.
+    // The LAST owner of a space cannot be demoted or revoked: without one, nobody could
+    // ever publish there again and no screen could undo it.
     const adminUser = state.users.find((entry) => entry.role === 'admin');
-    const refused = await postForm(`${server.origin}/admin/access/role`, { csrf: await server.csrf(), userId: adminUser.id, spaceId: alpha, role: 'reader' }, { headers: { cookie: server.adminCookie } });
-    assert.equal(refused.status, 400);
+    const lastOwner = await postForm(`${server.origin}/admin/access/role`, { csrf: await server.csrf(), userId: adminUser.id, spaceId: alpha, role: 'reader' }, { headers: { cookie: server.adminCookie } });
+    assert.equal(lastOwner.status, 400);
+    const lastOwnerRevoke = await postForm(`${server.origin}/admin/access/revoke`, { csrf: await server.csrf(), userId: adminUser.id, spaceId: alpha }, { headers: { cookie: server.adminCookie } });
+    assert.equal(lastOwnerRevoke.status, 400);
+
+    // But once a second owner exists, either of them can be changed or removed. Without
+    // this, granting owner to a test account would pin it to the space permanently.
+    await postForm(`${server.origin}/admin/access/grant`, { csrf: await server.csrf(), userId: user.id, spaceId: beta, role: 'owner' }, { headers: { cookie: server.adminCookie } });
+    const secondOwner = await postForm(`${server.origin}/admin/access/role`, { csrf: await server.csrf(), userId: user.id, spaceId: beta, role: 'reader' }, { headers: { cookie: server.adminCookie } });
+    assert.equal(secondOwner.status, 303, 'a non-final owner membership can be demoted');
     const unknown = await postForm(`${server.origin}/admin/access/role`, { csrf: await server.csrf(), userId: user.id, spaceId: alpha, role: 'superuser' }, { headers: { cookie: server.adminCookie } });
     assert.equal(unknown.status, 400, 'an unknown level is refused rather than coerced');
   });
