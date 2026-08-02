@@ -24,7 +24,7 @@ struct CollectionListView: View {
     var body: some View {
         List {
             if let error {
-                NodusNotice(tone: .blocked, title: "No se pudo cargar", message: error)
+                NodusNotice(tone: .blocked, title: "Could not load", message: error)
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
             }
@@ -53,11 +53,11 @@ struct CollectionListView: View {
 
             if rows.isEmpty, !isLoading, error == nil {
                 ContentUnavailableView(
-                    query.isEmpty ? "Nada aquí" : "Sin coincidencias",
+                    query.isEmpty ? "Nothing here" : "No matches",
                     systemImage: collection.icon,
                     description: Text(query.isEmpty
-                        ? "Esta publicación no trae nada en \(collection.label.lowercased())."
-                        : "Ninguna fila contiene «\(query)».")
+                        ? "This publication carries nothing under \(collection.label.lowercased())."
+                        : "No row contains “\(query)”.")
                 )
                 .listRowBackground(Color.clear)
             }
@@ -66,7 +66,7 @@ struct CollectionListView: View {
         .listStyle(.plain)
         .navigationTitle(collection.label)
         .navigationBarTitleDisplayMode(.inline)
-        .searchable(text: $query, prompt: "Filtrar en cualquier campo")
+        .searchable(text: $query, prompt: "Filter on any field")
         .onChange(of: query) { _, _ in scheduleReload() }
         .task { if rows.isEmpty { await reload() } }
         .refreshable { await reload() }
@@ -194,7 +194,7 @@ struct SpecialListView: View {
     var body: some View {
         List {
             if let error {
-                NodusNotice(tone: .blocked, title: "No se pudo cargar", message: error)
+                NodusNotice(tone: .blocked, title: "Could not load", message: error)
                     .listRowBackground(Color.clear)
             }
             ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
@@ -205,7 +205,7 @@ struct SpecialListView: View {
                 }
             }
             if rows.isEmpty, !isLoading, error == nil {
-                ContentUnavailableView("Nada aquí", systemImage: icon)
+                ContentUnavailableView("Nothing here", systemImage: icon)
                     .listRowBackground(Color.clear)
             }
         }
@@ -220,9 +220,9 @@ struct SpecialListView: View {
     private var title: String {
         switch resource {
         case .debates: return "Debates"
-        case .notes: return "Notas"
+        case .notes: return "Notes"
         case .deepResearch: return "Deep Research"
-        case .immersion: return "Inmersión"
+        case .immersion: return "Immersion"
         }
     }
 
@@ -248,7 +248,7 @@ struct SpecialListView: View {
             }
         case .deepResearch:
             return RowPresenter(collection: "reports", icon: icon) { row in
-                row.text("title") ?? "Informe"
+                row.text("title") ?? "Report"
             } subtitle: { row in
                 row.text("objective")
             } detail: { row in
@@ -256,7 +256,7 @@ struct SpecialListView: View {
             }
         case .immersion:
             return RowPresenter(collection: "sessions", icon: icon) { row in
-                row.text("title") ?? row.text("topic") ?? "Sesión"
+                row.text("title") ?? row.text("topic") ?? "Session"
             } subtitle: { row in
                 row.text("topic")
             } detail: { row in
@@ -267,11 +267,11 @@ struct SpecialListView: View {
 
     private func relationLabel(_ relation: String) -> String {
         switch relation {
-        case "contradicts": return "Contradice"
-        case "refutes": return "Refuta"
-        case "refines": return "Matiza"
-        case "variant_of": return "Variante de"
-        case "extends": return "Extiende"
+        case "contradicts": return "Contradicts"
+        case "refutes": return "Refutes"
+        case "refines": return "Refines"
+        case "variant_of": return "Variant of"
+        case "extends": return "Extends"
         default: return relation
         }
     }

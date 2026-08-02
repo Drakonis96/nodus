@@ -169,18 +169,18 @@ public actor MutationOutbox {
     static func explain(_ reason: String) -> String {
         if reason.hasPrefix("unknown_column:") {
             let column = reason.replacingOccurrences(of: "unknown_column:", with: "")
-            return "La publicación de este espacio no tiene la columna «\(column)». Su esquema es más antiguo que esta app."
+            return "This space's publication has no column “\(column)”. Its schema is older than this app."
         }
         switch reason {
-        case "table_not_mutable": return "Esa tabla no admite cambios desde un cliente."
-        case "constraint": return "El servidor rechazó la fila por una restricción de la base de datos."
-        case "missing_asset", "bad_asset": return "Falta subir una imagen a la que la fila hace referencia."
-        case "too_large": return "El cambio supera el tamaño máximo por fila."
-        case "malformed", "missing_id", "unknown_kind", "bad_key": return "El cambio venía mal formado."
-        case "delete_has_row": return "Un borrado no puede llevar contenido."
-        case "missing_row": return "Un alta necesita contenido."
-        case "non_scalar_value": return "Una columna llevaba un valor que no es un dato simple."
-        default: return "El servidor lo rechazó: \(reason)."
+        case "table_not_mutable": return "That table does not accept changes from a client."
+        case "constraint": return "The server rejected the row on a database constraint."
+        case "missing_asset", "bad_asset": return "An image the row refers to has not been uploaded."
+        case "too_large": return "The change exceeds the maximum row size."
+        case "malformed", "missing_id", "unknown_kind", "bad_key": return "The change was malformed."
+        case "delete_has_row": return "A delete cannot carry content."
+        case "missing_row": return "An insert needs content."
+        case "non_scalar_value": return "A column carried a value that is not a scalar."
+        default: return "The server rejected it: \(reason)."
         }
     }
 }

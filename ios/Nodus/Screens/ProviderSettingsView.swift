@@ -15,27 +15,37 @@ struct ProviderSettingsView: View {
     let accent: Color
     /// The identity this space needs, so the provider that matters can be marked.
     var requiredEmbedding: EmbeddingIdentity?
+    /// Pushed inside Settings rather than presented as a sheet: it must not wrap itself in a
+    /// second NavigationStack, or the model picker pushes into nowhere.
+    var embedded = false
 
     @State private var editing: AIProvider?
     @State private var draftKey = ""
+    @State private var revealed = false
     @State private var error: String?
 
     var body: some View {
-        NavigationStack {
-            List {
+        Group {
+            if embedded { content } else { NavigationStack { content } }
+        }
+        .sheet(item: $editing) { provider in keySheet(provider) }
+    }
+
+    private var content: some View {
+        List {
                 Section {
-                    Text("Tus claves se guardan en el llavero de este dispositivo, sin sincronizar con iCloud, y nunca se envían al Nodus Server: el servidor entrega el material y tú llamas a tu proveedor.")
+                    Text("Your keys are kept in this device's keychain, not synced to iCloud, and never sent to the Nodus Server: the server hands over the material and this app calls your provider.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
 
                 if let requiredEmbedding {
-                    Section("Necesario para la búsqueda semántica") {
+                    Section("Needed for semantic search") {
                         embeddingRequirement(requiredEmbedding)
                     }
                 }
 
-                Section("Proveedores") {
+                Section("Providers") {
                     ForEach(AIProvider.allCases, id: \.self) { provider in
                         providerRow(provider)
                     }
@@ -51,14 +61,14 @@ struct ProviderSettingsView: View {
                         .padding(.vertical, 2)
                     }
                 } header: {
-                    Text("No disponibles en iOS")
+                    Text("Not available on iOS")
                 } footer: {
                     // Named rather than silently absent: a vault indexed with one of these has
                     // to be explainable, not merely unsupported.
-                    Text("Estos proveedores existen en Nodus de escritorio. Se listan para que, si tu vault se indexó con uno, la app pueda decirte exactamente por qué no puede reproducirlo.")
+                    Text("These providers exist in Nodus desktop. They are listed so that, if your vault was indexed with one, the app can say exactly why it cannot reproduce it.")
                 }
 
-                Section("Modelos por tarea") {
+                Section("Models by task") {
                     ForEach(AISettings.Task.allCases, id: \.self) { task in
                         modelRow(task)
                     }
@@ -68,13 +78,11 @@ struct ProviderSettingsView: View {
                     Section { Text(error).font(.caption).foregroundStyle(.red) }
                 }
             }
-            .navigationTitle("Proveedores de IA")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) { Button("Listo") { dismiss() } }
-            }
-            .sheet(item: $editing) { provider in
-                keySheet(provider)
+        .navigationTitle("AI providers")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if !embedded {
+                ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
             }
         }
     }
@@ -87,10 +95,10 @@ struct ProviderSettingsView: View {
                     Text(provider.label).font(.callout.weight(.medium))
                     Spacer()
                     if settings.hasKey(for: provider) {
-                        Label("Lista", systemImage: "checkmark.circle.fill")
+                        Label("Ready", systemImage: "checkmark.circle.fill")
                             .font(.caption).foregroundStyle(.green)
                     } else {
-                        Button("Añadir clave") { editing = provider }
+                        Button("Add key") { editing = provider }
                             .font(.caption)
                     }
                 }
@@ -99,13 +107,13 @@ struct ProviderSettingsView: View {
             }
         } else if let unreachable = UnreachableProvider(rawValue: identity.provider) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("\(unreachable.label) — no alcanzable desde iOS")
+                Text("\(unreachable.label) — not reachable from iOS")
                     .font(.callout.weight(.medium)).foregroundStyle(.orange)
-                Text("Este vault se indexó con un motor que corre en el ordenador de Nodus. La búsqueda seguirá funcionando, pero será léxica.")
+                Text("This vault was indexed with an engine that runs on the Nodus computer. Search will still work, but it will be lexical.")
                     .font(.caption).foregroundStyle(.secondary)
             }
         } else {
-            Text("Indexado con «\(identity.provider)», que esta versión no conoce.")
+            Text("Indexed with “\(identity.provider)”, which this version does not know.")
                 .font(.caption).foregroundStyle(.orange)
         }
     }
@@ -113,6 +121,7 @@ struct ProviderSettingsView: View {
     private func providerRow(_ provider: AIProvider) -> some View {
         Button {
             draftKey = ""
+            revealed = false
             editing = provider
         } label: {
             HStack {
@@ -124,7 +133,7 @@ struct ProviderSettingsView: View {
                 }
                 Spacer()
                 if settings.rejectedProviders.contains(provider) {
-                    Label("Rechazada", systemImage: "exclamationmark.triangle.fill")
+                    Label("Rejected", systemImage: "exclamationmark.triangle.fill")
                         .labelStyle(.iconOnly).foregroundStyle(.orange)
                 } else if settings.hasKey(for: provider) {
                     Image(systemName: "checkmark.circle.fill").foregroundStyle(accent)
@@ -145,7 +154,7 @@ struct ProviderSettingsView: View {
                         .font(.caption).foregroundStyle(.secondary)
                         .lineLimit(1).truncationMode(.head)
                 } else {
-                    Text("Sin elegir").font(.caption).foregroundStyle(.tertiary)
+                    Text("Not chosen").font(.caption).foregroundStyle(.tertiary)
                 }
             }
         }
@@ -155,15 +164,38 @@ struct ProviderSettingsView: View {
         NavigationStack {
             Form {
                 Section {
-                    SecureField(ProviderNotes.keyPlaceholder(provider), text: $draftKey)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
+                    HStack {
+                        // Revealing is the user's own choice on their own screen, and a key
+                        // typed blind on a simulator keyboard is a key nobody can verify.
+                        if revealed {
+                            TextField(ProviderNotes.keyPlaceholder(provider), text: $draftKey)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                                .font(.callout.monospaced())
+                        } else {
+                            SecureField(ProviderNotes.keyPlaceholder(provider), text: $draftKey)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                        }
+                        Button {
+                            revealed.toggle()
+                        } label: {
+                            Image(systemName: revealed ? "eye.slash" : "eye")
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(revealed ? "Hide the key" : "Show the key")
+                    }
+                    if !draftKey.isEmpty {
+                        Text("\(draftKey.count) characters")
+                            .font(.caption2).foregroundStyle(.secondary)
+                    }
                 } header: {
                     Text(provider.label)
                 } footer: {
                     Text(settings.hasKey(for: provider)
-                        ? "Ya hay una clave guardada. Escribe una nueva para reemplazarla; no se puede volver a leer la actual."
-                        : "Se guardará en el llavero, disponible solo con el dispositivo desbloqueado y sin salir de él.")
+                        ? "A key is already stored. Type a new one to replace it; the current one cannot be read back."
+                        : "It will be stored in the keychain, available only while the device is unlocked and never leaving it.")
                 }
 
                 if settings.hasKey(for: provider) {
@@ -172,17 +204,17 @@ struct ProviderSettingsView: View {
                             try? settings.removeKey(for: provider)
                             editing = nil
                         } label: {
-                            Label("Borrar la clave", systemImage: "trash")
+                            Label("Delete the key", systemImage: "trash")
                         }
                     }
                 }
             }
-            .navigationTitle("Clave")
+            .navigationTitle("Key")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancelar") { editing = nil } }
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { editing = nil } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Guardar") {
+                    Button("Save") {
                         do {
                             try settings.setKey(draftKey, for: provider)
                             draftKey = ""
@@ -200,9 +232,9 @@ struct ProviderSettingsView: View {
 
     private func reason(_ reason: UnreachableProvider.Reason) -> String {
         switch reason {
-        case .runsOnTheDesktopMachine: return "Servidor local en el ordenador donde está Nodus."
-        case .noPhoneRuntime: return "Modelos que Nodus ejecuta dentro de su propio proceso."
-        case .desktopSubscriptionSession: return "Se autentica con una sesión de suscripción del escritorio."
+        case .runsOnTheDesktopMachine: return "A local server on the computer running Nodus."
+        case .noPhoneRuntime: return "Models Nodus runs inside its own process."
+        case .desktopSubscriptionSession: return "Authenticated through a desktop subscription session."
         }
     }
 }

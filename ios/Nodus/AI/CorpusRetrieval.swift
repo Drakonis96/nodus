@@ -47,10 +47,10 @@ struct CorpusRetrieval: Sendable {
         var label: String {
             switch kind {
             case .ideas: return "Ideas"
-            case .themes: return "Temas"
-            case .gaps: return "Huecos"
-            case .works: return "Obras"
-            case .passages: return "Pasajes"
+            case .themes: return "Themes"
+            case .gaps: return "Gaps"
+            case .works: return "Works"
+            case .passages: return "Passages"
             }
         }
 
@@ -172,7 +172,7 @@ struct CorpusRetrieval: Sendable {
                 token: "nodus://passage/\(id)",
                 kind: "passage",
                 id: id,
-                label: String((row.text("text") ?? "Pasaje").prefix(160)),
+                label: String((row.text("text") ?? "Passage").prefix(160)),
                 detail: row.text("section")
             )
         }
@@ -181,7 +181,7 @@ struct CorpusRetrieval: Sendable {
                 token: "nodus://work/\(id)",
                 kind: "work",
                 id: id,
-                label: row.text("title") ?? "Obra",
+                label: row.text("title") ?? "Work",
                 detail: row.text("year")
             )
         }
@@ -242,6 +242,15 @@ nonisolated enum DeepResearchWiring {
 /// `nonisolated` because the app target defaults every type to the main actor, and these are
 /// pure string building called from the orchestrator's background closures.
 nonisolated enum Prompts {
+    /// The language the model should answer in: the one the interface is showing.
+    ///
+    /// Not a setting and not a constant. A Spanish interface that returns an English report is
+    /// a bug the user cannot fix, and a hard-coded "es" is that bug for everybody else.
+    static var interfaceLanguage: String {
+        let preferred = Bundle.main.preferredLocalizations.first ?? "en"
+        return preferred.hasPrefix("es") ? "es" : "en"
+    }
+
     /// Two packs rather than one with a flag in it, exactly as
     /// `electron/ai/studyDeepResearch.ts:159-237` keeps them: a teaching unit and a research
     /// report want contradictory things from the model, and a prompt that asks for both gets a
@@ -276,7 +285,7 @@ nonisolated enum Prompts {
         - Usa SOLO los tokens del catálogo. Cualquier cita que no esté en él se ELIMINARÁ al \
         ensamblar: no inventes autores, obras, años ni identificadores.
         - Puedes citar el mismo token varias veces.
-        - No añadas una sección de Referencias: se construye a partir de lo realmente citado.
+        - No añadas una sección de References: se construye a partir de lo realmente citado.
 
         CATÁLOGO (\(catalog.entries.count) fuentes)
         \(catalog.entries.prefix(120).map { "- \($0.token) — \($0.label)" }.joined(separator: "\n"))
@@ -285,15 +294,15 @@ nonisolated enum Prompts {
 
     static func plan(request: DeepResearchRequest, catalog: CitationCatalog, target: Int, cap: Int) -> String {
         """
-        \(request.mode == .teachingUnit ? "Tema de la unidad" : "Objetivo del informe"): \(request.objective)
-        \(request.audience.map { "Público: \($0)" } ?? "")
+        \(request.mode == .teachingUnit ? "Unit topic" : "Report objective"): \(request.objective)
+        \(request.audience.map { "Audience: \($0)" } ?? "")
 
         Propón entre \(max(1, target - 1)) y \(cap) partes que cubran el tema apoyándose en el \
         catálogo. \(request.mode == .teachingUnit
-            ? "Secuencia las partes según las dependencias entre conceptos: lo que hay que entender antes va antes. Cada parte debe poder darse en clase."
-            : "Cada título debe ser específico y distinto de los demás; nada de «Introducción» ni «Conclusión» genéricas.")
+            ? "Sequence the parts by dependency between concepts: what must be understood first comes first. Each part must be teachable in class."
+            : "Each title must be specific and distinct from the others; no generic “Introduction” or “Conclusion”.")
 
-        Responde SOLO con JSON: {"sections": ["Título 1", "Título 2", ...]}
+        Responde SOLO con JSON: {"sections": ["Title 1", "Title 2", ...]}
 
         \(citationPolicy(catalog: catalog))
         """
@@ -320,10 +329,10 @@ nonisolated enum Prompts {
             """
 
         return """
-        \(request.mode == .teachingUnit ? "Unidad" : "Informe"): \(request.objective)
+        \(request.mode == .teachingUnit ? "Unidad" : "Report"): \(request.objective)
         Escribe la parte \(index + 1) de \(total): «\(title)».
 
-        Extensión objetivo: unas \(wordTarget) palabras. \(shape) No repitas el título.
+        Length objetivo: unas \(wordTarget) palabras. \(shape) No repitas el título.
 
         \(citationPolicy(catalog: catalog))
         """
@@ -356,16 +365,17 @@ nonisolated enum Prompts {
     }
 
     static func languageName(_ code: String) -> String {
+        // Named in English, because the system prompt around it is English.
         switch code {
-        case "es": return "español"
-        case "en": return "inglés"
-        case "fr": return "francés"
-        case "de": return "alemán"
-        case "pt": return "portugués"
-        case "pt-BR": return "portugués de Brasil"
-        case "it": return "italiano"
-        case "tr": return "turco"
-        default: return "español"
+        case "es": return "Spanish"
+        case "en": return "English"
+        case "fr": return "French"
+        case "de": return "German"
+        case "pt": return "Portuguese"
+        case "pt-BR": return "Brazilian Portuguese"
+        case "it": return "Italian"
+        case "tr": return "Turkish"
+        default: return "English"
         }
     }
 }

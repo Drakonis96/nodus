@@ -112,7 +112,7 @@ final class AISettings {
             switch self {
             case .chat: return "Chat"
             case .deepResearch: return "Deep Research"
-            case .image: return "Imágenes"
+            case .image: return "Images"
             }
         }
     }
@@ -150,13 +150,13 @@ final class AISettings {
 enum ProviderNotes {
     static func description(_ provider: AIProvider) -> String {
         switch provider {
-        case .anthropic: return "Claude. Protocolo propio, sin modo JSON."
-        case .openai: return "GPT y embeddings. El más habitual para indexar un vault."
-        case .openrouter: return "Pasarela a muchos modelos, con embeddings propios."
-        case .groq: return "Muy rápido. Su nivel gratuito cuenta prompt y respuesta juntos."
-        case .cerebras: return "Muy rápido, catálogo corto."
-        case .deepseek: return "Económico, con razonamiento conmutable."
-        case .gemini: return "Google. También sirve embeddings e imágenes."
+        case .anthropic: return "Claude. Its own protocol, no JSON mode."
+        case .openai: return "GPT and embeddings. The usual choice for indexing a vault."
+        case .openrouter: return "A gateway to many models, with its own embeddings."
+        case .groq: return "Very fast. Its free tier counts prompt and answer against one budget."
+        case .cerebras: return "Very fast, short catalogue."
+        case .deepseek: return "Inexpensive, with switchable reasoning."
+        case .gemini: return "Google. Also serves embeddings and images."
         case .xiaomi: return "MiMo."
         }
     }
@@ -167,7 +167,7 @@ enum ProviderNotes {
         case .openai: return "sk-…"
         case .openrouter: return "sk-or-…"
         case .gemini: return "AIza…"
-        default: return "Clave de API"
+        default: return "API key"
         }
     }
 }

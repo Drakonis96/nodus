@@ -23,6 +23,7 @@ settings:
     IPHONEOS_DEPLOYMENT_TARGET: "17.0"
     TARGETED_DEVICE_FAMILY: "1,2"
     DEVELOPMENT_TEAM: ""
+    SWIFT_EMIT_LOC_STRINGS: YES
     CODE_SIGN_STYLE: Automatic
     # Simulator builds sign ad hoc. This is not cosmetic: without a signature the app has no
     # `application-identifier` entitlement, and every SecItemAdd fails with -34018 — which is

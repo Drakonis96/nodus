@@ -13,19 +13,19 @@ struct HomeView: View {
                     // simply has not published yet, and the desktop is the only thing that can.
                     NodusNotice(
                         tone: .caution,
-                        title: "Este espacio todavía no tiene publicación",
-                        message: "Aparecerá en cuanto quien lo posee publique desde Nodus de escritorio.",
+                        title: "This space has no publication yet",
+                        message: "It will appear as soon as its owner publishes from Nodus desktop.",
                         systemImage: "tray"
                     )
                 } else if let error = session.loadError {
-                    NodusNotice(tone: .blocked, title: "No se pudo leer el espacio", message: error)
+                    NodusNotice(tone: .blocked, title: "Could not read the space", message: error)
                 }
 
                 if session.connection.role == .reader {
                     NodusNotice(
                         tone: .info,
-                        title: "Acceso de lectura",
-                        message: "Lo que escribas o generes aquí se queda en este dispositivo.",
+                        title: "Read-only access",
+                        message: "Anything you write or generate here stays on this device.",
                         systemImage: "eye"
                     )
                 }
@@ -73,11 +73,11 @@ struct HomeView: View {
 
                 if session.connection.role.canSendChanges {
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("Escribir").font(.subheadline.weight(.semibold))
+                        Text("Write").font(.subheadline.weight(.semibold))
                         NavigationLink {
                             WritingView(session: session)
                         } label: {
-                            SectionTile(title: "Notas y cola", icon: "square.and.pencil", count: nil, accent: session.accent)
+                            SectionTile(title: "Notes and queue", icon: "square.and.pencil", count: nil, accent: session.accent)
                         }
                         .buttonStyle(.plain)
                     }
@@ -86,12 +86,12 @@ struct HomeView: View {
 
                 if !session.mirrorOnlyTables.isEmpty {
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("Más del espacio").font(.subheadline.weight(.semibold))
+                        Text("More from this space").font(.subheadline.weight(.semibold))
                         NavigationLink {
                             MirrorOnlySectionsView(session: session)
                         } label: {
                             SectionTile(
-                                title: "Solo sin conexión",
+                                title: "Offline only",
                                 icon: "internaldrive",
                                 count: session.mirrorOnlyTables.reduce(0) { $0 + $1.count },
                                 accent: session.accent
@@ -104,7 +104,7 @@ struct HomeView: View {
 
                 if session.hasDebates || session.hasNotes || session.hasDeepResearch || session.hasImmersion {
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("Analizar").font(.subheadline.weight(.semibold))
+                        Text("Analyse").font(.subheadline.weight(.semibold))
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 12)], spacing: 12) {
                             if session.hasDebates {
                                 specialTile(.debates, "Debates", "bubble.left.and.bubble.right")
@@ -113,10 +113,10 @@ struct HomeView: View {
                                 specialTile(.deepResearch, "Deep Research", "doc.text.magnifyingglass")
                             }
                             if session.hasImmersion {
-                                specialTile(.immersion, "Inmersión", "waveform")
+                                specialTile(.immersion, "Immersion", "waveform")
                             }
                             if session.hasNotes {
-                                specialTile(.notes, "Notas", "note.text")
+                                specialTile(.notes, "Notes", "note.text")
                             }
                         }
                     }
@@ -125,9 +125,9 @@ struct HomeView: View {
 
                 if session.isPublished, session.sections.isEmpty, session.loadError == nil, !session.isLoading {
                     ContentUnavailableView(
-                        "Publicación vacía",
+                        "Empty publication",
                         systemImage: "square.dashed",
-                        description: Text("La última publicación de este espacio no traía ninguna tabla con contenido.")
+                        description: Text("This space's last publication carried no table with anything in it.")
                     )
                     .padding(.top, 40)
                 }
@@ -159,22 +159,22 @@ struct HomeView: View {
         let counts = session.overview?.counts ?? [:]
 
         if (counts["persons"] ?? 0) > 0, (counts["relationships"] ?? 0) > 0 {
-            tools.append(VaultTool(title: "Árbol genealógico", icon: "tree") {
+            tools.append(VaultTool(title: "Family tree", icon: "tree") {
                 AnyView(FamilyTreeView(session: session))
             })
         }
         if (counts["study_schedule_cells"] ?? 0) > 0 {
-            tools.append(VaultTool(title: "Horarios", icon: "calendar") {
+            tools.append(VaultTool(title: "Timetables", icon: "calendar") {
                 AnyView(ScheduleView(session: session))
             })
         }
         if (counts["study_flashcards"] ?? 0) > 0 {
-            tools.append(VaultTool(title: "Fichas", icon: "rectangle.on.rectangle") {
+            tools.append(VaultTool(title: "Flashcards", icon: "rectangle.on.rectangle") {
                 AnyView(FlashcardsView(session: session))
             })
         }
         if (counts["study_questions"] ?? 0) > 0 {
-            tools.append(VaultTool(title: "Banco de preguntas", icon: "checklist") {
+            tools.append(VaultTool(title: "Question bank", icon: "checklist") {
                 AnyView(QuestionBankView(session: session))
             })
         }
@@ -199,15 +199,15 @@ struct HomeView: View {
         case .published(let identity) where !session.embedding.isReachableFromPhone:
             NodusNotice(
                 tone: .caution,
-                title: "La búsqueda semántica no está disponible aquí",
-                message: "Este vault se indexó con \(identity.provider)/\(identity.model), que corre en el ordenador donde está Nodus. Desde el móvil la búsqueda será léxica.",
+                title: "Semantic search is not available here",
+                message: "This vault was indexed with \(identity.provider)/\(identity.model), which runs on the computer where Nodus lives. From a phone, search will be lexical.",
                 systemImage: "desktopcomputer"
             )
         case .noVectors:
             NodusNotice(
                 tone: .info,
-                title: "Sin vectores publicados",
-                message: "La búsqueda será léxica hasta que quien posee el espacio publique los embeddings.",
+                title: "No published vectors",
+                message: "Search will be lexical until the space's owner publishes the embeddings.",
                 systemImage: "magnifyingglass"
             )
         default:

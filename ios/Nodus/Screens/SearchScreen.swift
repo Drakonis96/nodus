@@ -22,14 +22,14 @@ struct SearchScreen: View {
     var body: some View {
         List {
             if let error {
-                NodusNotice(tone: .blocked, title: "La búsqueda falló", message: error)
+                NodusNotice(tone: .blocked, title: "Search failed", message: error)
                     .listRowBackground(Color.clear).listRowSeparator(.hidden)
             }
 
             if let semanticWarning {
                 NodusNotice(
                     tone: .caution,
-                    title: "Resultados léxicos",
+                    title: "Lexical results",
                     message: semanticWarning,
                     systemImage: "magnifyingglass"
                 )
@@ -42,7 +42,7 @@ struct SearchScreen: View {
 
             if hits.isEmpty, !query.isEmpty, !isSearching, error == nil {
                 ContentUnavailableView(
-                    "Sin resultados",
+                    "No results",
                     systemImage: "magnifyingglass",
                     description: Text(emptyDescription)
                 )
@@ -51,7 +51,7 @@ struct SearchScreen: View {
         }
         .scrollContentBackground(.hidden)
         .listStyle(.plain)
-        .navigationTitle("Buscar")
+        .navigationTitle("Search")
         .navigationBarTitleDisplayMode(.inline)
         .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: prompt)
         .onChange(of: query) { _, _ in schedule() }
@@ -61,7 +61,7 @@ struct SearchScreen: View {
     }
 
     private var prompt: String {
-        session.embedding.isReachableFromPhone ? "Buscar en el corpus" : "Buscar (léxico)"
+        session.embedding.isReachableFromPhone ? "Search the corpus" : "Search (lexical)"
     }
 
     /// When the search really was lexical, "no results" means "no row contains this string" —
@@ -69,8 +69,8 @@ struct SearchScreen: View {
     /// which one it is explicit.
     private var emptyDescription: String {
         session.embedding.isReachableFromPhone
-            ? "Ninguna coincidencia para «\(query)»."
-            : "Ninguna fila contiene la cadena «\(query)». Esta búsqueda es literal, no semántica: un sinónimo no la satisface."
+            ? "Nothing matched “\(query)”."
+            : "No row contains the string “\(query)”. This search is literal, not semantic: a synonym will not satisfy it."
     }
 
     private var idleState: some View {
@@ -78,18 +78,18 @@ struct SearchScreen: View {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 42))
                 .foregroundStyle(session.accent.opacity(0.65))
-            Text("Busca en \(session.connection.spaceName)")
+            Text("Search \(session.connection.spaceName)")
                 .font(.headline)
             switch session.embedding {
             case .published(let identity) where session.embedding.isReachableFromPhone:
-                Text("Indexado con \(identity.model) · \(identity.dim) dimensiones")
+                Text("Indexed with \(identity.model) · \(identity.dim) dimensions")
                     .font(.caption).foregroundStyle(.secondary)
             case .published(let identity):
-                Text("Indexado con \(identity.provider), que no es alcanzable desde el móvil. La búsqueda será léxica.")
+                Text("Indexed with \(identity.provider), which a phone cannot reach. Search will be lexical.")
                     .font(.caption).foregroundStyle(.secondary)
                     .multilineTextAlignment(.center).padding(.horizontal, 40)
             case .noVectors:
-                Text("Sin vectores publicados. La búsqueda será léxica.")
+                Text("No published vectors. Search will be lexical.")
                     .font(.caption).foregroundStyle(.secondary)
             default:
                 EmptyView()
@@ -128,7 +128,7 @@ struct SearchScreen: View {
         } catch let apiError as APIError where apiError.isNotPublished {
             hits = []; error = nil
         } catch let apiError as APIError where apiError.isRateLimited {
-            error = "Demasiadas búsquedas seguidas. Espera \(Int(apiError.retryAfter ?? 30)) s."
+            error = "Too many searches in a row. Wait \(Int(apiError.retryAfter ?? 30)) s."
         } catch is CancellationError {
             // Superseded.
         } catch {
@@ -147,7 +147,7 @@ private struct HitCell: View {
                 Image(systemName: icon).font(.caption2).foregroundStyle(accent)
                 Text(typeLabel).font(.caption2.weight(.medium)).foregroundStyle(accent)
             }
-            Text(hit.title ?? "Sin título").font(.subheadline.weight(.medium)).lineLimit(2)
+            Text(hit.title ?? "Untitled").font(.subheadline.weight(.medium)).lineLimit(2)
             if let excerpt = hit.excerpt {
                 Text(excerpt).font(.caption).foregroundStyle(.secondary).lineLimit(3)
             }
@@ -157,14 +157,14 @@ private struct HitCell: View {
 
     private var typeLabel: String {
         switch hit.type {
-        case "work": return "Obra"
+        case "work": return "Work"
         case "idea": return "Idea"
-        case "theme": return "Tema"
-        case "gap": return "Hueco"
-        case "note": return "Nota"
-        case "passage": return "Pasaje"
-        case "person": return "Persona"
-        case "place": return "Lugar"
+        case "theme": return "Theme"
+        case "gap": return "Gap"
+        case "note": return "Note"
+        case "passage": return "Passage"
+        case "person": return "Person"
+        case "place": return "Place"
         default: return hit.type.capitalized
         }
     }

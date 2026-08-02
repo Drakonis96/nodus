@@ -69,7 +69,7 @@ final class OutboxController {
             row: row,
             schemaVersion: schemaVersion
         )
-        try? await outbox.enqueue(mutation, title: title.isEmpty ? "Nota sin título" : title)
+        try? await outbox.enqueue(mutation, title: title.isEmpty ? "Untitled note" : title)
         await refresh()
     }
 
@@ -95,7 +95,7 @@ final class OutboxController {
             }
         } catch let error as APIError where error.isForbidden {
             lastError = error.requiredNeed == .write
-                ? "Tu acceso a este espacio es de solo lectura."
+                ? "Your access to this space is read only."
                 : error.localizedDescription
         } catch {
             lastError = error.localizedDescription

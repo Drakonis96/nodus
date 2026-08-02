@@ -18,7 +18,7 @@ struct ThemeIdeasView: View {
     @State private var needsMirror = false
 
     private var themeId: String? { theme.string("theme_id") }
-    private var label: String { theme.text("label") ?? "Tema" }
+    private var label: String { theme.text("label") ?? "Theme" }
 
     private var filtered: [Row] {
         let needle = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -32,8 +32,8 @@ struct ThemeIdeasView: View {
                 Section {
                     NodusNotice(
                         tone: .info,
-                        title: "Hace falta la copia sin conexión",
-                        message: "El vínculo entre temas e ideas viaja en la publicación, pero la API no lo expone. Descárgala y esta lista funcionará al instante.",
+                        title: "The offline copy is needed",
+                        message: "The link between themes and ideas travels in the publication but the API does not expose it. Download it and this list works instantly.",
                         systemImage: "internaldrive"
                     )
                     .listRowBackground(Color.clear)
@@ -44,7 +44,7 @@ struct ThemeIdeasView: View {
                             await load()
                         }
                     } label: {
-                        Label("Descargar para sin conexión", systemImage: "arrow.down.circle")
+                        Label("Download for offline use", systemImage: "arrow.down.circle")
                     }
                 }
             }
@@ -59,9 +59,9 @@ struct ThemeIdeasView: View {
 
             if !isLoading, ideas.isEmpty, !needsMirror {
                 ContentUnavailableView(
-                    "Sin ideas",
+                    "No ideas",
                     systemImage: "lightbulb",
-                    description: Text("Ninguna idea de esta publicación está vinculada a «\(label)».")
+                    description: Text("No idea in this publication is linked to “\(label)”.")
                 )
                 .listRowBackground(Color.clear)
             }
@@ -70,7 +70,7 @@ struct ThemeIdeasView: View {
         .listStyle(.plain)
         .navigationTitle(label)
         .navigationBarTitleDisplayMode(.inline)
-        .searchable(text: $query, prompt: "Filtrar ideas de este tema")
+        .searchable(text: $query, prompt: "Filter ideas under this theme")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 if !ideas.isEmpty {

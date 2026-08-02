@@ -259,7 +259,7 @@ public enum TreeLayout {
                         members.min() ?? ""
                     )
                 }
-                // Paternal left, maternal right, everything else between — then by
+                // Paternall left, maternal right, everything else between — then by
                 // barycentre so a couple sits under the kin it belongs to. The id is the
                 // final tie-break, without which equal barycentres shuffle between runs.
                 .sorted {

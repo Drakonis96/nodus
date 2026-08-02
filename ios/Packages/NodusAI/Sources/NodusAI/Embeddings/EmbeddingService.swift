@@ -34,11 +34,11 @@ public actor EmbeddingService {
         public var explanation: String {
             switch self {
             case .providerRunsOnDesktop(let name):
-                return "Este vault se indexó con \(name), que corre en el ordenador donde está Nodus de escritorio. Desde iOS no se puede generar un vector que case."
+                return "This vault was indexed with \(name), which runs on the computer where Nodus desktop lives. iOS cannot produce a matching vector."
             case .unknownProvider(let name):
-                return "Este vault se indexó con «\(name)», un proveedor que esta versión no conoce."
+                return "This vault was indexed with “\(name)”, a provider this version does not know."
             case .missingKey(let provider):
-                return "Falta la clave de \(provider.label), que es el proveedor con el que se indexó este vault."
+                return "The \(provider.label) key is missing, and that is the provider this vault was indexed with."
             }
         }
     }
@@ -147,13 +147,13 @@ extension EmbeddingError: LocalizedError {
         case .unavailable(let reason):
             return reason.explanation
         case .http(let status, let message):
-            return message ?? "El proveedor de embeddings respondió \(status)."
+            return message ?? "The embedding provider answered \(status)."
         case .malformed(let detail):
-            return "Respuesta inesperada del proveedor de embeddings (\(detail))."
+            return "Unexpected answer from the embedding provider (\(detail))."
         case .dimensionMismatch(let expected, let received):
-            return "El modelo devolvió \(received) dimensiones y este vault necesita \(expected)."
+            return "The model returned \(received) dimensions and this vault needs \(expected)."
         case .degenerateVector:
-            return "El proveedor devolvió un vector vacío."
+            return "The provider returned an empty vector."
         }
     }
 }

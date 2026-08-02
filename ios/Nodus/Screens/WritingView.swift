@@ -20,13 +20,13 @@ struct WritingView: View {
                 list(controller)
             } else {
                 ContentUnavailableView(
-                    "Acceso de lectura",
+                    "Read-only access",
                     systemImage: "eye",
-                    description: Text("Tu acceso a este espacio no permite enviar cambios. Lo que escribas se queda en este dispositivo.")
+                    description: Text("Your access to this space does not allow sending changes. Anything you write stays on this device.")
                 )
             }
         }
-        .navigationTitle("Escritura")
+        .navigationTitle("Writing")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             if controller != nil {
@@ -59,7 +59,7 @@ struct WritingView: View {
                         Task { await controller.flush() }
                     } label: {
                         if controller.isFlushing {
-                            Label("Enviando…", systemImage: "arrow.up.circle")
+                            Label("Sending…", systemImage: "arrow.up.circle")
                         } else {
                             Label("Enviar \(controller.pending) cambio\(controller.pending == 1 ? "" : "s")", systemImage: "arrow.up.circle")
                         }
@@ -69,19 +69,19 @@ struct WritingView: View {
             }
 
             if let error = controller.lastError {
-                Section { NodusNotice(tone: .blocked, title: "No se pudo enviar", message: error) }
+                Section { NodusNotice(tone: .blocked, title: "Could not send", message: error) }
             }
 
             if controller.items.isEmpty {
                 Section {
                     ContentUnavailableView(
-                        "Nada en la cola",
+                        "Nothing queued",
                         systemImage: "tray",
-                        description: Text("Las notas que escribas aparecerán aquí antes de viajar.")
+                        description: Text("Notes you write appear here before they travel.")
                     )
                 }
             } else {
-                Section("Cola") {
+                Section("Queue") {
                     ForEach(controller.items) { item in
                         row(item, controller: controller)
                     }
@@ -94,9 +94,9 @@ struct WritingView: View {
 
     private var relayExplanation: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Label("Cómo llega esto al vault", systemImage: "arrow.triangle.branch")
+            Label("How this reaches the vault", systemImage: "arrow.triangle.branch")
                 .font(.footnote.weight(.medium))
-            Text("El servidor guarda tus cambios en un libro mayor. Se incorporan al vault cuando quien lo posee abre Nodus de escritorio y vuelve a publicar. Hasta entonces no los ve nadie, tú incluido.")
+            Text("The server keeps your changes in a ledger. They join the vault when its owner opens Nodus desktop and republishes. Until then nobody sees them, you included.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -119,16 +119,16 @@ struct WritingView: View {
             Button(role: .destructive) {
                 Task { await controller.discard(item.id) }
             } label: {
-                Label("Quitar", systemImage: "trash")
+                Label("Remove", systemImage: "trash")
             }
         }
     }
 
     private func stateBadge(_ state: MutationOutbox.State) -> some View {
         let (label, colour): (String, Color) = switch state {
-        case .pending: ("Sin enviar", .orange)
-        case .accepted: ("En el servidor", session.accent)
-        case .rejected: ("Rechazado", .red)
+        case .pending: ("Not sent", .orange)
+        case .accepted: ("On the server", session.accent)
+        case .rejected: ("Rejected", .red)
         }
         return Text(label)
             .font(.caption2.weight(.medium))
@@ -141,12 +141,12 @@ struct WritingView: View {
         if let detail = item.detail { return detail }
         switch item.state {
         case .pending:
-            return "Guardado en este dispositivo."
+            return "Saved on this device."
         case .accepted:
             // The important sentence on this screen.
-            return "Pendiente de que el propietario vuelva a publicar."
+            return "Waiting for the owner to republish."
         case .rejected:
-            return "El servidor lo rechazó."
+            return "The server rejected it."
         }
     }
 }
@@ -162,20 +162,20 @@ private struct NoteComposer: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Título") {
-                    TextField("Título de la nota", text: $title)
+                Section("Title") {
+                    TextField("Note title", text: $title)
                 }
-                Section("Contenido") {
+                Section("Content") {
                     TextEditor(text: $text)
                         .frame(minHeight: 220)
                 }
             }
-            .navigationTitle("Nueva nota")
+            .navigationTitle("New note")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancelar") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Guardar") {
+                    Button("Save") {
                         Task {
                             await onSave(title, text)
                             dismiss()

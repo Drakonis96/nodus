@@ -116,7 +116,7 @@ final class SpaceSession {
             await refreshBrowsableTables()
             mirrorProgress = .current(rows: summary.totalRows, tables: summary.counts.count)
         } catch let error as APIError where error.isNotPublished {
-            mirrorProgress = .failed("Este espacio todavía no tiene publicación que descargar.")
+            mirrorProgress = .failed("This space has no publication to download yet.")
         } catch {
             mirrorProgress = .failed(error.localizedDescription)
         }
@@ -149,7 +149,7 @@ final class SpaceSession {
     ///
     /// Filtered by `browsableTables()`, which measures whether a table's rows have titles at
     /// all. Half a published corpus is join tables with two foreign keys and nothing to show,
-    /// and listing those gives screens of "Sin título" under names like "Thread Parties".
+    /// and listing those gives screens of "Untitled" under names like "Thread Parties".
     private(set) var mirrorOnlyTables: [(table: String, count: Int)] = []
 
 

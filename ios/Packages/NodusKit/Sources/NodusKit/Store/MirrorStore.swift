@@ -459,7 +459,7 @@ public actor MirrorStore {
     ///
     /// A published corpus is roughly half join tables — `world_links`, `scene_characters`,
     /// `event_participants` — which hold real rows and no titles, because their whole content
-    /// is two foreign keys. Listing them produces screens of "Sin título".
+    /// is two foreign keys. Listing them produces screens of "Untitled".
     ///
     /// The rule is measured rather than a denylist: a table is browsable when most of its rows
     /// yielded a title at import. That keeps working when the schema adds its next join table,

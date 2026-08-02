@@ -40,7 +40,7 @@ struct ChatScreen: View {
                                 .id(turn.id)
                         }
                         if let error {
-                            NodusNotice(tone: .blocked, title: "La consulta falló", message: error)
+                            NodusNotice(tone: .blocked, title: "The query failed", message: error)
                         }
                     }
                     .padding(16)
@@ -80,9 +80,9 @@ struct ChatScreen: View {
 
     private var emptyState: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Pregunta a \(session.connection.spaceName)")
+            Text("Ask \(session.connection.spaceName)")
                 .font(.headline)
-            Text("Cada respuesta se apoya en filas reales del corpus. Las citas se comprueban contra el catálogo: si el modelo se inventa una fuente, se elimina.")
+            Text("Every answer rests on real corpus rows. Citations are checked against the catalogue: if the model invents a source, it is removed.")
                 .font(.footnote).foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -92,7 +92,7 @@ struct ChatScreen: View {
 
     private var composer: some View {
         HStack(spacing: 10) {
-            TextField("Escribe una pregunta", text: $draft, axis: .vertical)
+            TextField("Ask a question", text: $draft, axis: .vertical)
                 .lineLimit(1...5)
                 .textFieldStyle(.plain)
                 .padding(.horizontal, 14).padding(.vertical, 10)
@@ -113,7 +113,7 @@ struct ChatScreen: View {
 
     private func ask() {
         guard let model = ai.model(for: .chat) else {
-            error = "Elige un modelo de chat en Proveedores."
+            error = "Choose a chat model under Providers."
             return
         }
         let question = draft.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -149,7 +149,7 @@ struct ChatScreen: View {
                 let request = ChatRequest(
                     model: model,
                     messages: [
-                        .init(role: .system, content: Prompts.system(language: "es")),
+                        .init(role: .system, content: Prompts.system(language: Prompts.interfaceLanguage)),
                         .init(role: .user, content: """
                         \(question)
 
@@ -174,7 +174,7 @@ struct ChatScreen: View {
                 turns[answerIndex].text = validated.prose
                 turns[answerIndex].citations = validated.accepted.compactMap(material.catalog.entry(for:))
             } catch is CancellationError {
-                turns[answerIndex].text += "\n\n_Cancelado._"
+                turns[answerIndex].text += "\n\n_Cancelled._"
             } catch {
                 if case ProviderError.missingKey(let provider) = error { ai.markRejected(provider) }
                 if case ProviderError.http(let status, let provider, _) = error, status == 401 || status == 403 {
@@ -206,7 +206,7 @@ private struct TurnBubble: View {
                     .nodusGlass(NodusGlass(.regular, tint: accent))
             } else {
                 if let warning = turn.warning {
-                    NodusNotice(tone: .caution, title: "Recuperación léxica", message: warning)
+                    NodusNotice(tone: .caution, title: "Lexical retrieval", message: warning)
                 }
                 Text(turn.text.isEmpty ? "…" : turn.text)
                     .textSelection(.enabled)
@@ -214,7 +214,7 @@ private struct TurnBubble: View {
 
                 if !turn.citations.isEmpty {
                     VStack(alignment: .leading, spacing: 5) {
-                        Text("Fuentes").font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
+                        Text("Sources").font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
                         ForEach(Array(Set(turn.citations.map(\.token))).sorted(), id: \.self) { token in
                             if let entry = turn.citations.first(where: { $0.token == token }) {
                                 HStack(spacing: 6) {
@@ -234,7 +234,7 @@ private struct TurnBubble: View {
                 }
 
                 if let mode = turn.mode {
-                    Text(mode == .semantic ? "Recuperación semántica" : "Recuperación léxica")
+                    Text(mode == .semantic ? "Semantic retrieval" : "Lexical retrieval")
                         .font(.caption2).foregroundStyle(.tertiary)
                 }
             }
@@ -267,7 +267,7 @@ private struct MaterialBrowser: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Material recuperado")
+            Text("Retrieved material")
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(.secondary)
 
@@ -304,7 +304,7 @@ private struct MaterialBrowser: View {
                 materialRow(row, kind: section.kind)
             }
             if section.rows.count > 20 {
-                Text("y \(section.rows.count - 20) más")
+                Text("and \(section.rows.count - 20) more")
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
             }

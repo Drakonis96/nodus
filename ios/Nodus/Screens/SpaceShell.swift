@@ -52,15 +52,15 @@ struct SpaceShell: View {
     // MARK: iPhone
 
     private var tabView: some View {
-        // Four tabs, not five. "Explorar" showed the same sections as Home in a list instead
+        // Four tabs, not five. "Browse" showed the same sections as Home in a list instead
         // of a grid, so it cost a tab to say nothing new.
         TabView(selection: $tab) {
             page { HomeView(session: session) }
-                .tabItem { Label("Inicio", systemImage: "house") }
+                .tabItem { Label("Home", systemImage: "house") }
                 .tag(Tab.home)
 
             page { SearchScreen(session: session) }
-                .tabItem { Label("Buscar", systemImage: "magnifyingglass") }
+                .tabItem { Label("Search", systemImage: "magnifyingglass") }
                 .tag(Tab.search)
 
             page { ResearchView(session: session) }
@@ -101,12 +101,12 @@ struct SpaceShell: View {
         NavigationSplitView {
             List(selection: $sidebarSelection) {
                 Section {
-                    Label("Inicio", systemImage: "house").tag(SidebarItem.home)
-                    Label("Buscar", systemImage: "magnifyingglass").tag(SidebarItem.search)
+                    Label("Home", systemImage: "house").tag(SidebarItem.home)
+                    Label("Search", systemImage: "magnifyingglass").tag(SidebarItem.search)
                     Label("Research", systemImage: "doc.text.magnifyingglass").tag(SidebarItem.research)
                     Label("Chat", systemImage: "bubble.left.and.text.bubble.right").tag(SidebarItem.chat)
                 }
-                Section("Explorar") {
+                Section("Browse") {
                     ForEach(session.sections, id: \.path) { collection in
                         Label {
                             HStack {
@@ -121,12 +121,12 @@ struct SpaceShell: View {
                     }
                 }
                 if session.connection.role.canSendChanges {
-                    Section("Escribir") {
-                        Label("Notas y cola", systemImage: "square.and.pencil").tag(SidebarItem.writing)
+                    Section("Write") {
+                        Label("Notes and queue", systemImage: "square.and.pencil").tag(SidebarItem.writing)
                     }
                 }
                 if session.hasDebates || session.hasNotes || session.hasDeepResearch {
-                    Section("Analizar") {
+                    Section("Analyse") {
                         if session.hasDebates {
                             Label("Debates", systemImage: "bubble.left.and.bubble.right").tag(SidebarItem.debates)
                         }
@@ -134,7 +134,7 @@ struct SpaceShell: View {
                             Label("Deep Research", systemImage: "doc.text.magnifyingglass").tag(SidebarItem.deepResearch)
                         }
                         if session.hasNotes {
-                            Label("Notas", systemImage: "note.text").tag(SidebarItem.notes)
+                            Label("Notes", systemImage: "note.text").tag(SidebarItem.notes)
                         }
                     }
                 }
@@ -167,7 +167,7 @@ struct SpaceShell: View {
             if let collection = Collections[path] {
                 CollectionListView(session: session, collection: collection)
             } else {
-                ContentUnavailableView("Sección desconocida", systemImage: "questionmark.folder")
+                ContentUnavailableView("Unknown section", systemImage: "questionmark.folder")
             }
         }
     }
@@ -188,7 +188,7 @@ struct SpaceShell: View {
                     .font(.callout)
             }
             .tint(session.accent)
-            .accessibilityLabel("Cambiar de espacio")
+            .accessibilityLabel("Switch space")
         } trailing: {
             Button {
                 showingSettings = true
@@ -197,7 +197,7 @@ struct SpaceShell: View {
                     .font(.callout)
             }
             .tint(session.accent)
-            .accessibilityLabel("Ajustes")
+            .accessibilityLabel("Settings")
         }
     }
 

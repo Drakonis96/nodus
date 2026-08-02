@@ -87,7 +87,7 @@ final class LiveActivityController {
         let state = NodusActivityAttributes.ContentState(
             phase: .done,
             fraction: failure == nil ? 1 : nil,
-            detail: failure == nil ? "Terminado" : nil,
+            detail: failure == nil ? "Finished" : nil,
             failure: failure
         )
         Task {

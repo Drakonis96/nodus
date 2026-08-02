@@ -12,18 +12,26 @@ struct ResearchView: View {
     let session: SpaceSession
 
     @State private var showingProviders = false
+    @State private var store: LocalReportStore?
 
     var body: some View {
+        Group {
+            if let store { content(store) } else { ProgressView().tint(session.accent) }
+        }
+        .task { if store == nil { store = LocalReportStore(spaceId: session.connection.spaceId) } }
+    }
+
+    private func content(_ local: LocalReportStore) -> some View {
         List {
             Section {
                 NavigationLink {
-                    DeepResearchScreen(session: session)
+                    DeepResearchScreen(session: session, local: local)
                         .environment(ai)
                 } label: {
                     Label {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Generar un informe")
-                            Text(ai.model(for: .deepResearch)?.model ?? "Sin modelo elegido")
+                            Text("Generate a report")
+                            Text(ai.model(for: .deepResearch)?.model ?? "No model chosen")
                                 .font(.caption).foregroundStyle(.secondary)
                                 .lineLimit(1).truncationMode(.head)
                         }
@@ -34,32 +42,35 @@ struct ResearchView: View {
             } header: {
                 Text("Deep Research")
             } footer: {
-                Text("Una llamada al modelo por sección, con las citas comprobadas contra el corpus. Tu clave no pasa por el servidor.")
+                Text("One model call per section, with citations checked against the corpus. Your key never passes through the server.")
             }
 
-            if session.hasDeepResearch {
-                Section("Informes publicados") {
-                    NavigationLink {
-                        SpecialListView(session: session, resource: .deepResearch)
-                    } label: {
-                        Label("Informes del vault", systemImage: "doc.text")
+            Section("Reports") {
+                NavigationLink {
+                    ResearchLibraryView(session: session, local: local)
+                } label: {
+                    HStack {
+                        Label("All reports", systemImage: "books.vertical")
+                        Spacer()
+                        Text("\(local.reports.count)")
+                            .font(.caption).foregroundStyle(.secondary)
                     }
                 }
             }
 
             if session.hasImmersion {
-                Section("Inmersión") {
+                Section("Immersion") {
                     NavigationLink {
                         SpecialListView(session: session, resource: .immersion)
                     } label: {
-                        Label("Sesiones", systemImage: "waveform")
+                        Label("Sessions", systemImage: "waveform")
                     }
                 }
             }
 
             if !session.hasDeepResearch, !session.hasImmersion {
                 Section {
-                    Text("Este espacio todavía no ha publicado informes ni sesiones de inmersión. Puedes generar uno arriba.")
+                    Text("This space has published no reports or immersion sessions yet. You can generate one above.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }
@@ -123,9 +134,9 @@ struct ChatTab: View {
                 Image(systemName: "sparkles")
                     .font(.system(size: 44))
                     .foregroundStyle(session.accent)
-                Text("Pon tu propio modelo")
+                Text("Bring your own model")
                     .font(.title3.weight(.semibold))
-                Text("El servidor entrega el material y el presupuesto; el modelo lo eliges tú. Tu clave se guarda en el llavero de este dispositivo y nunca pasa por el Nodus Server.")
+                Text("The server hands over the material and the budget; you choose the model. Your key is kept in this device's keychain and never passes through the Nodus Server.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -133,7 +144,7 @@ struct ChatTab: View {
                 Button {
                     showingProviders = true
                 } label: {
-                    Label("Añadir una clave", systemImage: "key")
+                    Label("Add a key", systemImage: "key")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(NodusPrimaryButtonStyle(accent: session.accent))
@@ -141,8 +152,8 @@ struct ChatTab: View {
                 if case .published(let identity) = session.embedding, session.embedding.isReachableFromPhone {
                     NodusNotice(
                         tone: .info,
-                        title: "Para la búsqueda semántica",
-                        message: "Este vault se indexó con \(identity.provider)/\(identity.model). Con esa clave, la recuperación será semántica; sin ella, léxica.",
+                        title: "For semantic search",
+                        message: "This vault was indexed with \(identity.provider)/\(identity.model). With that key, retrieval will be semantic; without it, lexical.",
                         systemImage: "magnifyingglass"
                     )
                 }

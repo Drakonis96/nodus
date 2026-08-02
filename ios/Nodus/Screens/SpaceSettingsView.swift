@@ -7,6 +7,7 @@ struct SpaceSettingsView: View {
     @Environment(\.dismiss) private var dismiss
     let session: SpaceSession
 
+    @Environment(AISettings.self) private var ai
     @State private var health: ServerHealth?
     @State private var capabilities: ServerCapabilities?
     @State private var diagnosticError: String?
@@ -14,37 +15,37 @@ struct SpaceSettingsView: View {
     var body: some View {
         NavigationStack {
             List {
-                Section("Espacio") {
-                    labelled("Nombre", session.connection.spaceName)
+                Section("Space") {
+                    labelled("Name", session.connection.spaceName)
                     labelled("Vault", session.connection.vaultName ?? "—")
-                    labelled("Tipo", session.vaultType?.rawValue ?? "—")
-                    labelled("Acceso", roleLabel)
+                    labelled("Type", session.vaultType?.rawValue ?? "—")
+                    labelled("Access", roleLabel)
                     if let revision = session.overview?.space.revision {
-                        labelled("Revisión", String(revision.prefix(12)))
+                        labelled("Revision", String(revision.prefix(12)))
                     }
                     if let schema = session.overview?.schemaVersion {
-                        labelled("Esquema", "v\(schema)")
+                        labelled("Schema", "v\(schema)")
                     }
                 }
 
                 Section {
-                    labelled("Servidor", session.connection.serverName)
-                    labelled("Dirección", session.connection.origin)
+                    labelled("Server", session.connection.serverName)
+                    labelled("Address", session.connection.origin)
                     if let health {
-                        labelled("Estado", health.ok ? "En línea · v\(health.version ?? "?")" : "Sin respuesta")
+                        labelled("Status", health.ok ? "Online · v\(health.version ?? "?")" : "No answer")
                     }
                     if let capabilities {
-                        labelled("Imagen máxima", ByteCountFormatter.string(fromByteCount: Int64(capabilities.maxAssetBytes), countStyle: .file))
-                        labelled("Lote de cambios", "\(capabilities.maxMutationBatch)")
+                        labelled("Largest image", ByteCountFormatter.string(fromByteCount: Int64(capabilities.maxAssetBytes), countStyle: .file))
+                        labelled("Change batch", "\(capabilities.maxMutationBatch)")
                     }
                     if let diagnosticError {
                         Text(diagnosticError).font(.caption).foregroundStyle(.red)
                     }
                 } header: {
-                    Text("Servidor")
+                    Text("Server")
                 } footer: {
                     if ServerAddress(trusted: session.connection.origin).isInsecure {
-                        Text("Esta conexión no está cifrada. Solo debería serlo en pruebas locales.")
+                        Text("This connection is not encrypted. That should only ever be a local test.")
                             .foregroundStyle(.orange)
                     }
                 }
@@ -52,15 +53,15 @@ struct SpaceSettingsView: View {
                 Section {
                     switch session.embedding {
                     case .published(let identity):
-                        labelled("Proveedor", identity.provider)
-                        labelled("Modelo", identity.model)
-                        labelled("Dimensiones", "\(identity.dim)")
+                        labelled("Provider", identity.provider)
+                        labelled("Model", identity.model)
+                        labelled("Dimensions", "\(identity.dim)")
                         if !session.embedding.isReachableFromPhone {
-                            Text("Este proveedor corre en el ordenador donde está Nodus de escritorio. Desde iOS no se puede generar un vector que case, así que la búsqueda es léxica.")
+                            Text("This provider runs on the computer where Nodus desktop lives. iOS cannot produce a matching vector, so search is lexical.")
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                     case .noVectors:
-                        Text("Este espacio no tiene vectores publicados.")
+                        Text("This space has no published vectors.")
                             .font(.caption).foregroundStyle(.secondary)
                     case .unavailable(let message):
                         Text(message).font(.caption).foregroundStyle(.orange)
@@ -70,7 +71,41 @@ struct SpaceSettingsView: View {
                 } header: {
                     Text("Embeddings")
                 } footer: {
-                    Text("El modelo lo fija el vault, no esta app: la recuperación solo funciona si el proveedor, el modelo y la dimensión coinciden exactamente.")
+                    Text("The vault fixes the model, not this app: retrieval only works when provider, model and dimension all match exactly.")
+                }
+
+                Section {
+                    NavigationLink {
+                        ProviderSettingsView(accent: session.accent, requiredEmbedding: requiredEmbedding, embedded: true)
+                            .environment(ai)
+                    } label: {
+                        HStack {
+                            Label("AI providers", systemImage: "key")
+                            Spacer()
+                            Text(ai.configuredProviders.isEmpty
+                                 ? String(localized: "None configured")
+                                 : "\(ai.configuredProviders.count)")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    ForEach(AISettings.Task.allCases, id: \.self) { task in
+                        NavigationLink {
+                            ModelPickerView(task: task, accent: session.accent)
+                                .environment(ai)
+                        } label: {
+                            HStack {
+                                Text(task.label)
+                                Spacer()
+                                Text(ai.model(for: task)?.model ?? String(localized: "Not chosen"))
+                                    .font(.caption).foregroundStyle(.secondary)
+                                    .lineLimit(1).truncationMode(.head)
+                            }
+                        }
+                    }
+                } header: {
+                    Text("Artificial intelligence")
+                } footer: {
+                    Text("Your keys stay in this device's keychain. The Nodus Server never receives one — it hands over the material, and this app calls your provider itself.")
                 }
 
                 Section {
@@ -79,56 +114,61 @@ struct SpaceSettingsView: View {
                         Button {
                             Task { await session.downloadMirror() }
                         } label: {
-                            Label("Descargar para sin conexión", systemImage: "arrow.down.circle")
+                            Label("Download for offline use", systemImage: "arrow.down.circle")
                         }
                     case .downloading:
-                        Label("Descargando la publicación…", systemImage: "arrow.down.circle")
+                        Label("Downloading the publication…", systemImage: "arrow.down.circle")
                             .foregroundStyle(.secondary)
                     case .importing:
-                        Label("Indexando…", systemImage: "gearshape.2")
+                        Label("Indexing…", systemImage: "gearshape.2")
                             .foregroundStyle(.secondary)
                     case .current(let rows, let tables):
-                        labelled("Filas", rows.formatted())
-                        labelled("Tablas", "\(tables)")
+                        labelled("Rows", rows.formatted())
+                        labelled("Tables", "\(tables)")
                         if let summary = session.mirrorSummary {
-                            labelled("Descargada", summary.importedAt.formatted(date: .abbreviated, time: .shortened))
+                            labelled("Downloaded", summary.importedAt.formatted(date: .abbreviated, time: .shortened))
                         }
                         Button { Task { await session.downloadMirror() } } label: {
-                            Label("Volver a descargar", systemImage: "arrow.clockwise")
+                            Label("Download again", systemImage: "arrow.clockwise")
                         }
                         Button(role: .destructive) { Task { await session.removeMirror() } } label: {
-                            Label("Borrar la copia", systemImage: "trash")
+                            Label("Delete the copy", systemImage: "trash")
                         }
                     case .stale(let rows):
-                        Label("La copia está desfasada", systemImage: "exclamationmark.arrow.circlepath")
+                        Label("The copy is out of date", systemImage: "exclamationmark.arrow.circlepath")
                             .foregroundStyle(.orange)
-                        Text("Guarda \(rows.formatted()) filas de una publicación anterior.")
+                        Text("It holds \(rows.formatted()) rows from an earlier publication.")
                             .font(.caption).foregroundStyle(.secondary)
                         Button { Task { await session.downloadMirror() } } label: {
-                            Label("Actualizar", systemImage: "arrow.clockwise")
+                            Label("Update", systemImage: "arrow.clockwise")
                         }
                     case .failed(let message):
                         Text(message).font(.caption).foregroundStyle(.red)
                         Button { Task { await session.downloadMirror() } } label: {
-                            Label("Reintentar", systemImage: "arrow.clockwise")
+                            Label("Try again", systemImage: "arrow.clockwise")
                         }
                     }
                 } header: {
-                    Text("Sin conexión")
+                    Text("Offline")
                 } footer: {
                     // Not a nicety. The API has no sort parameter anywhere, and it projects
                     // twenty tables out of the dozens a publication can carry — a worldbuilding
                     // vault's scenes and articles have no route at all.
-                    Text("Guarda la publicación completa en el dispositivo: funciona sin red, ordena al instante y alcanza las tablas que la API no expone.")
+                    Text("Keeps the whole publication on the device: works with no network, sorts instantly, and reaches the tables the API does not expose.")
                 }
 
                 if let overview = session.overview, !overview.counts.isEmpty {
-                    Section("Tablas publicadas") {
-                        ForEach(overview.counts.sorted(by: { $0.key < $1.key }), id: \.key) { table, count in
+                    Section {
+                        // A hundred table names is diagnostics, not settings. It stays
+                        // reachable and stops swallowing the screen it lives on.
+                        NavigationLink {
+                            PublishedTablesView(counts: overview.counts, accent: session.accent)
+                        } label: {
                             HStack {
-                                Text(table).font(.caption.monospaced())
+                                Label("Published tables", systemImage: "tablecells")
                                 Spacer()
-                                Text(count.formatted()).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                                Text("\(overview.counts.values.filter { $0 > 0 }.count)")
+                                    .font(.caption).foregroundStyle(.secondary)
                             }
                         }
                     }
@@ -139,26 +179,31 @@ struct SpaceSettingsView: View {
                         model.forget(session.connection)
                         dismiss()
                     } label: {
-                        Label("Olvidar este espacio", systemImage: "trash")
+                        Label("Forget this space", systemImage: "trash")
                     }
                 } footer: {
-                    Text("Se borra la credencial de este dispositivo. Nada cambia en el servidor.")
+                    Text("The credential is deleted from this device. Nothing changes on the server.")
                 }
             }
-            .navigationTitle("Ajustes")
+            .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) { Button("Listo") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
             }
             .task { await diagnose() }
         }
     }
 
+    private var requiredEmbedding: EmbeddingIdentity? {
+        if case .published(let identity) = session.embedding { return identity }
+        return nil
+    }
+
     private var roleLabel: String {
         switch session.connection.role {
-        case .reader: return "Lectura"
-        case .writer: return "Puede enviar cambios"
-        case .owner: return "Propietario"
+        case .reader: return "Read only"
+        case .writer: return "Can send changes"
+        case .owner: return "Owner"
         }
     }
 
@@ -180,5 +225,45 @@ struct SpaceSettingsView: View {
         } catch {
             diagnosticError = error.localizedDescription
         }
+    }
+}
+
+
+/// The published-table census, on its own screen.
+struct PublishedTablesView: View {
+    let counts: [String: Int]
+    let accent: Color
+
+    @State private var query = ""
+
+    private var rows: [(table: String, count: Int)] {
+        let needle = query.trimmingCharacters(in: .whitespaces).lowercased()
+        return counts
+            .filter { needle.isEmpty || $0.key.lowercased().contains(needle) }
+            .map { (table: $0.key, count: $0.value) }
+            .sorted { $0.count == $1.count ? $0.table < $1.table : $0.count > $1.count }
+    }
+
+    var body: some View {
+        List {
+            Section {
+                ForEach(rows, id: \.table) { row in
+                    HStack {
+                        Text(row.table)
+                            .font(.caption.monospaced())
+                            .foregroundStyle(row.count > 0 ? .primary : .secondary)
+                        Spacer()
+                        Text(row.count.formatted())
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(row.count > 0 ? accent : Color.secondary)
+                    }
+                }
+            } footer: {
+                Text("A table with no rows was published empty. A table that is absent was never published at all — and the endpoint for it answers an empty page rather than an error.")
+            }
+        }
+        .navigationTitle("Published tables")
+        .navigationBarTitleDisplayMode(.inline)
+        .searchable(text: $query, prompt: Text("Filter tables"))
     }
 }

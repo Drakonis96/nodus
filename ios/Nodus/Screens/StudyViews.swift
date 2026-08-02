@@ -16,7 +16,7 @@ struct ScheduleView: View {
     @State private var isLoading = true
     @State private var needsMirror = false
 
-    private let days = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+    private let days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
     var body: some View {
         ScrollView {
@@ -24,14 +24,14 @@ struct ScheduleView: View {
                 if needsMirror {
                     NodusNotice(
                         tone: .info,
-                        title: "Hace falta la copia sin conexión",
-                        message: "El horario viaja en la publicación pero no tiene ruta en la API. Descárgala y aparecerá al instante.",
+                        title: "The offline copy is needed",
+                        message: "The timetable travels in the publication but has no API route. Download it and it appears instantly.",
                         systemImage: "internaldrive"
                     )
                     Button {
                         Task { await session.downloadMirror(); await load() }
                     } label: {
-                        Label("Descargar para sin conexión", systemImage: "arrow.down.circle")
+                        Label("Download for offline use", systemImage: "arrow.down.circle")
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(NodusPrimaryButtonStyle(accent: session.accent))
@@ -41,7 +41,7 @@ struct ScheduleView: View {
                     ContentUnavailableView(
                         "Sin horario",
                         systemImage: "calendar",
-                        description: Text("Esta publicación no trae franjas horarias.")
+                        description: Text("This publication carries no time slots.")
                     )
                 } else {
                     ForEach(activeDays, id: \.self) { day in
@@ -51,7 +51,7 @@ struct ScheduleView: View {
             }
             .padding(16)
         }
-        .navigationTitle("Horarios")
+        .navigationTitle("Timetables")
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
     }
@@ -192,14 +192,14 @@ struct FlashcardsView: View {
                     .disabled(index >= cards.count - 1)
                 }
 
-                Text("El calendario de repaso lo lleva Nodus de escritorio; aquí puedes repasar, no reprogramar.")
+                Text("Nodus desktop keeps the review schedule; here you can review, not reschedule.")
                     .font(.caption2).foregroundStyle(.tertiary)
                     .multilineTextAlignment(.center)
             }
         }
         .padding(20)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .navigationTitle("Fichas")
+        .navigationTitle("Flashcards")
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
     }
@@ -317,7 +317,7 @@ struct QuestionBankView: View {
         }
         .scrollContentBackground(.hidden)
         .listStyle(.plain)
-        .navigationTitle("Banco de preguntas")
+        .navigationTitle("Question bank")
         .navigationBarTitleDisplayMode(.inline)
         .searchable(text: $query, prompt: "Filtrar preguntas")
         .task { await load() }

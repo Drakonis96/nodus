@@ -32,12 +32,12 @@ struct DatabaseGridView: View {
             } else if isLoading {
                 ProgressView().tint(session.accent)
             } else if let error {
-                NodusNotice(tone: .blocked, title: "No se pudo abrir", message: error).padding(16)
+                NodusNotice(tone: .blocked, title: "Could not open", message: error).padding(16)
             } else {
-                ContentUnavailableView("Base vacía", systemImage: "tablecells")
+                ContentUnavailableView("Empty database", systemImage: "tablecells")
             }
         }
-        .navigationTitle(database.text("name") ?? "Base de datos")
+        .navigationTitle(database.text("name") ?? "Database")
         .navigationBarTitleDisplayMode(.inline)
         .task { if detail == nil { await load(offset: 0) } }
     }
@@ -104,7 +104,7 @@ struct DatabaseGridView: View {
             }
             .tint(session.accent)
 
-            Text("Solo lectura: el servidor no acepta cambios en celdas, así que se editan desde Nodus de escritorio.")
+            Text("Read only: the server accepts no cell changes, so they are edited from Nodus desktop.")
                 .font(.caption2).foregroundStyle(.tertiary)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }

@@ -53,8 +53,8 @@ struct ModelPickerView: View {
                 Section {
                     NodusNotice(
                         tone: .caution,
-                        title: "Sin claves configuradas",
-                        message: "Añade la clave de algún proveedor y sus modelos aparecerán aquí.",
+                        title: "No keys configured",
+                        message: "Add a provider's key and its models will appear here.",
                         systemImage: "key"
                     )
                     .listRowBackground(Color.clear)
@@ -62,13 +62,13 @@ struct ModelPickerView: View {
             }
 
             if !pinned.isEmpty {
-                Section("Destacados") {
+                Section("Pinned") {
                     ForEach(pinned) { option in row(option) }
                 }
             }
 
             if !rest.isEmpty {
-                Section(pinned.isEmpty ? "Modelos" : "Todos") {
+                Section(pinned.isEmpty ? "Models" : "All") {
                     ForEach(rest) { option in row(option) }
                 }
             }
@@ -77,14 +77,14 @@ struct ModelPickerView: View {
                 Section {
                     HStack(spacing: 8) {
                         ProgressView().tint(accent)
-                        Text("Consultando \(loading.map(\.label).sorted().joined(separator: ", "))…")
+                        Text("Querying \(loading.map(\.label).sorted().joined(separator: ", "))…")
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }
             }
 
             if !errors.isEmpty {
-                Section("No se pudieron listar") {
+                Section("Could not be listed") {
                     ForEach(errors.sorted(by: { $0.key.label < $1.key.label }), id: \.key) { provider, message in
                         VStack(alignment: .leading, spacing: 2) {
                             Text(provider.label).font(.caption.weight(.medium))
@@ -96,16 +96,16 @@ struct ModelPickerView: View {
 
             if matches.isEmpty, loading.isEmpty, !options.isEmpty {
                 ContentUnavailableView(
-                    "Sin coincidencias",
+                    "No matches",
                     systemImage: "magnifyingglass",
-                    description: Text("Ningún modelo contiene «\(query)».")
+                    description: Text("No model contains “\(query)”.")
                 )
                 .listRowBackground(Color.clear)
             }
         }
         .navigationTitle(task.label)
         .navigationBarTitleDisplayMode(.inline)
-        .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Buscar modelo o proveedor")
+        .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search model or provider")
         .task { await loadAll() }
         .refreshable { await loadAll(force: true) }
     }
@@ -138,7 +138,7 @@ struct ModelPickerView: View {
                 settings.togglePinned(option.ref)
             } label: {
                 Label(
-                    settings.isPinned(option.ref) ? "Quitar" : "Destacar",
+                    settings.isPinned(option.ref) ? "Remove" : "Pin",
                     systemImage: settings.isPinned(option.ref) ? "star.slash" : "star"
                 )
             }
@@ -149,7 +149,7 @@ struct ModelPickerView: View {
                 settings.togglePinned(option.ref)
             } label: {
                 Label(
-                    settings.isPinned(option.ref) ? "Quitar de destacados" : "Destacar",
+                    settings.isPinned(option.ref) ? "Unpin" : "Pin",
                     systemImage: settings.isPinned(option.ref) ? "star.slash" : "star"
                 )
             }

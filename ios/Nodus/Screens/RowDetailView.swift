@@ -38,7 +38,7 @@ struct RowDetailView: View {
                 heading
 
                 if let error {
-                    NodusNotice(tone: .caution, title: "No se pudo ampliar", message: error)
+                    NodusNotice(tone: .caution, title: "Could not expand", message: error)
                 }
 
                 if collection?.path == "themes", theme != nil {
@@ -46,7 +46,7 @@ struct RowDetailView: View {
                         ThemeIdeasView(session: session, theme: row)
                     } label: {
                         HStack {
-                            Label("Ver las ideas de este tema", systemImage: "lightbulb")
+                            Label("See the ideas under this theme", systemImage: "lightbulb")
                             Spacer()
                             Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary)
                         }
@@ -98,12 +98,12 @@ struct RowDetailView: View {
     private func ideaBody(_ detail: IdeaDetail) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             if !detail.themes.isEmpty {
-                chips(detail.themes, label: "Temas")
+                chips(detail.themes, label: "Themes")
             }
             // The passages live here rather than in a section of their own, because a quotation
             // means something as the support for a claim and very little in a list of 5 803.
             if !detail.evidence.isEmpty {
-                section("Pasajes que la sostienen · \(detail.evidence.count)") {
+                section("Passages that support it · \(detail.evidence.count)") {
                     VStack(alignment: .leading, spacing: 12) {
                         ForEach(Array(detail.evidence.prefix(40).enumerated()), id: \.offset) { index, item in
                             VStack(alignment: .leading, spacing: 5) {
@@ -123,7 +123,7 @@ struct RowDetailView: View {
                                         Text(location).font(.caption2).foregroundStyle(.secondary)
                                     }
                                     if let kind = item.text("kind") {
-                                        Text(kind == "explicit" ? "explícita" : "parafraseada")
+                                        Text(kind == "explicit" ? "explicit" : "paraphrased")
                                             .font(.caption2).foregroundStyle(session.accent.opacity(0.85))
                                     }
                                 }
@@ -134,8 +134,8 @@ struct RowDetailView: View {
                 }
             }
             fields(of: detail.idea)
-            group("Relaciones", detail.relations, table: "edges")
-            group("Apariciones", detail.occurrences, table: "idea_occurrences")
+            group("Relationships", detail.relations, table: "edges")
+            group("Occurrences", detail.occurrences, table: "idea_occurrences")
         }
     }
 
@@ -144,15 +144,15 @@ struct RowDetailView: View {
             if detail.passages > 0 {
                 NodusNotice(
                     tone: .info,
-                    title: detail.passages == 1 ? "1 pasaje extraído" : "\(detail.passages) pasajes extraídos",
-                    message: "Se leen desde cada idea que se apoya en ellos. El documento original nunca sale del escritorio.",
+                    title: detail.passages == 1 ? "1 passage extracted" : "\(detail.passages) passages extracted",
+                    message: "They are read from each idea that rests on them. The original document never leaves the desktop.",
                     systemImage: "text.quote"
                 )
             }
             fields(of: detail.work)
             group("Ideas", detail.ideas, table: "ideas", linksTo: Collections["ideas"])
             if let summary = detail.summary {
-                section("Síntesis") { fields(of: summary) }
+                section("Synthesis") { fields(of: summary) }
             }
         }
     }
@@ -164,7 +164,7 @@ struct RowDetailView: View {
                     FamilyTreeView(session: session, rootPersonId: personId)
                 } label: {
                     HStack {
-                        Label("Ver el árbol desde aquí", systemImage: "point.3.filled.connected.trianglepath.dotted")
+                        Label("See the tree from here", systemImage: "point.3.filled.connected.trianglepath.dotted")
                         Spacer()
                         Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary)
                     }
@@ -181,20 +181,20 @@ struct RowDetailView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             }
             fields(of: detail.person)
-            group("Nombres", detail.names, table: "person_names")
-            group("Relaciones", detail.relationships, table: "relationships")
-            group("Eventos", detail.events, table: "events", linksTo: Collections["events"])
-            group("Lugares", detail.places, table: "places", linksTo: Collections["places"])
+            group("Names", detail.names, table: "person_names")
+            group("Relationships", detail.relationships, table: "relationships")
+            group("Events", detail.events, table: "events", linksTo: Collections["events"])
+            group("Places", detail.places, table: "places", linksTo: Collections["places"])
         }
     }
 
     private func authorBody(_ detail: AuthorDetail) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             fields(of: detail.author)
-            group("Obras", detail.works, table: "works", linksTo: Collections["works"])
-            group("Relaciones", detail.relations, table: "author_relations")
+            group("Works", detail.works, table: "works", linksTo: Collections["works"])
+            group("Relationships", detail.relations, table: "author_relations")
             if let synthesis = detail.synthesis {
-                section("Síntesis") { fields(of: synthesis) }
+                section("Synthesis") { fields(of: synthesis) }
             }
         }
     }
@@ -203,8 +203,8 @@ struct RowDetailView: View {
         VStack(alignment: .leading, spacing: 14) {
             Text("\(detail.total.formatted()) filas · \(detail.columns.count) columnas")
                 .font(.caption).foregroundStyle(.secondary)
-            group("Columnas", detail.columns, table: "db_columns")
-            group("Vistas", detail.views, table: "db_views")
+            group("Columns", detail.columns, table: "db_columns")
+            group("Views", detail.views, table: "db_views")
         }
     }
 
@@ -269,7 +269,7 @@ struct RowDetailView: View {
                             if index < min(rows.count, 60) - 1 { Divider().opacity(0.35) }
                         }
                         if rows.count > 60 {
-                            Text("y \(rows.count - 60) más")
+                            Text("and \(rows.count - 60) more")
                                 .font(.caption2).foregroundStyle(.secondary)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(.top, 8)
@@ -343,9 +343,9 @@ struct RowDetailView: View {
         guard let value, !value.isNull else { return nil }
         switch value {
         case .array(let items):
-            return items.count == 1 ? "1 elemento" : "\(items.count) elementos"
+            return items.count == 1 ? "1 item" : "\(items.count) items"
         case .object(let object):
-            return object.count == 1 ? "1 campo" : "\(object.count) campos"
+            return object.count == 1 ? "1 field" : "\(object.count) fields"
         case .int(let number) where Self.booleanColumns.contains(key):
             // SQLite has no boolean type, so these arrive as 0 and 1. Printing the integer is
             // technically the value and tells the reader nothing.

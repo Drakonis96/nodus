@@ -70,7 +70,7 @@ struct ConnectView: View {
             }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancelar") { dismiss() }
+                    Button("Cancel") { dismiss() }
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
@@ -80,9 +80,9 @@ struct ConnectView: View {
     private var header: some View {
         VStack(spacing: 12) {
             NodusMark(style: .accent(accent)).frame(width: 64, height: 64)
-            Text("Conectar con un Nodus Server")
+            Text("Connect to a Nodus Server")
                 .font(.title3.weight(.semibold))
-            Text("Tu servidor guarda una proyección publicada del vault. Las claves de IA nunca salen de este dispositivo.")
+            Text("Your server holds a published projection of the vault. AI keys never leave this device.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -94,7 +94,7 @@ struct ConnectView: View {
 
     private var addressStep: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Dirección del servidor").font(.subheadline.weight(.medium))
+            Text("Server address").font(.subheadline.weight(.medium))
             TextField("nodus.ejemplo.org", text: $addressInput)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
@@ -103,14 +103,14 @@ struct ConnectView: View {
                 .padding(14)
                 .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
 
-            Text("Se asume HTTPS. El servidor rechaza cualquier dirección pública que no lo sea.")
+            Text("HTTPS is assumed. The server refuses any public address that is not.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
             Button {
                 Task { await probe() }
             } label: {
-                Label("Continuar", systemImage: "arrow.right")
+                Label("Continue", systemImage: "arrow.right")
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(NodusPrimaryButtonStyle(accent: accent))
@@ -133,14 +133,14 @@ struct ConnectView: View {
                 if address.isInsecure {
                     // Saying so is the point. A padlock this connection has not earned would be
                     // worse than no padlock at all.
-                    Label("Sin cifrar", systemImage: "lock.open")
+                    Label("Not encrypted", systemImage: "lock.open")
                         .font(.caption2).foregroundStyle(.orange)
                 }
             }
 
             Picker("", selection: $usePairingCode) {
-                Text("Cuenta").tag(false)
-                Text("Código").tag(true)
+                Text("Account").tag(false)
+                Text("Code").tag(true)
             }
             .pickerStyle(.segmented)
 
@@ -151,17 +151,17 @@ struct ConnectView: View {
                     .textFieldStyle(.plain)
                     .padding(14)
                     .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                Text("Un código de emparejamiento caduca a los quince minutos y solo sirve una vez.")
+                Text("A pairing code expires after fifteen minutes and works once.")
                     .font(.caption).foregroundStyle(.secondary)
             } else {
-                TextField("Correo", text: $email)
+                TextField("Email", text: $email)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .keyboardType(.emailAddress)
                     .textFieldStyle(.plain)
                     .padding(14)
                     .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                SecureField("Contraseña", text: $password)
+                SecureField("Password", text: $password)
                     .textFieldStyle(.plain)
                     .padding(14)
                     .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
@@ -170,7 +170,7 @@ struct ConnectView: View {
             Button {
                 Task { usePairingCode ? await pair(address) : await signIn(address) }
             } label: {
-                Label(usePairingCode ? "Emparejar" : "Entrar", systemImage: "arrow.right")
+                Label(usePairingCode ? "Pair" : "Sign in", systemImage: "arrow.right")
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(NodusPrimaryButtonStyle(accent: accent))
@@ -184,15 +184,15 @@ struct ConnectView: View {
 
     private func spaceStep(_ address: ServerAddress, _ ticket: LoginTicket) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Elige un espacio").font(.subheadline.weight(.medium))
-            Text("Cada espacio necesita su propio acceso: una credencial vale para uno solo.")
+            Text("Choose a space").font(.subheadline.weight(.medium))
+            Text("Each space needs its own credential: one works for exactly one space.")
                 .font(.caption).foregroundStyle(.secondary)
 
             if ticket.spaces.isEmpty {
                 ContentUnavailableView(
-                    "Sin espacios",
+                    "No spaces",
                     systemImage: "square.dashed",
-                    description: Text("Esta cuenta todavía no tiene acceso a ningún espacio. Pídeselo a quien administra el servidor.")
+                    description: Text("This account has no access to any space yet. Ask whoever administers the server.")
                 )
             }
 
@@ -263,17 +263,17 @@ struct ConnectView: View {
     private func describe(_ error: any Error) -> String {
         if let api = error as? APIError {
             switch api.code {
-            case "invalid_credentials": return "Ese correo o esa contraseña no son correctos."
-            case "invalid_ticket": return "El acceso caducó. Vuelve a entrar."
+            case "invalid_credentials": return "That email or password is not right."
+            case "invalid_ticket": return "The sign-in expired. Sign in again."
             case "rate_limited":
                 let seconds = Int(api.retryAfter ?? 60)
-                return "Demasiados intentos. Prueba de nuevo en \(seconds) s."
+                return "Too many attempts. Try again in \(seconds) s."
             default: return api.localizedDescription
             }
         }
         if let transport = error as? TransportError {
             if case .badServerURL = transport {
-                return "Esa dirección no sirve. Escribe solo el dominio, sin rutas."
+                return "That address will not work. Enter just the domain, with no path."
             }
             return transport.localizedDescription
         }
@@ -293,7 +293,7 @@ private struct SpaceRow: View {
                 HStack(spacing: 6) {
                     Text(roleLabel(space.role)).font(.caption2)
                     if !space.hasSnapshot {
-                        Text("· sin publicar").font(.caption2).foregroundStyle(.orange)
+                        Text("· not published").font(.caption2).foregroundStyle(.orange)
                     }
                 }
                 .foregroundStyle(.secondary)
@@ -308,9 +308,9 @@ private struct SpaceRow: View {
 
     private func roleLabel(_ role: SpaceRole) -> String {
         switch role {
-        case .reader: return "Lectura"
-        case .writer: return "Puede enviar cambios"
-        case .owner: return "Propietario"
+        case .reader: return "Read only"
+        case .writer: return "Can send changes"
+        case .owner: return "Owner"
         }
     }
 }

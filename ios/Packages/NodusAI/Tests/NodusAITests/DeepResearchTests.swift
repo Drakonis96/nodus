@@ -166,7 +166,7 @@ struct DeepResearchOrchestratorTests {
         let report = try await orchestrator.run(request)
 
         #expect(report.references.map(\.id) == ["w-1"], "w-2 was in the catalogue and never cited")
-        #expect(report.markdown.contains("Referencias"))
+        #expect(report.markdown.contains("References"))
         #expect(!report.markdown.contains("w-2"))
     }
 

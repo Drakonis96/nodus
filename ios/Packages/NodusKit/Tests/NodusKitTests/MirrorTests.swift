@@ -313,7 +313,14 @@ struct MutationOutboxTests {
         ]
         for reason in reasons {
             let explanation = MutationOutbox.explain(reason)
-            #expect(!explanation.contains(reason), "\(reason) is echoed rather than explained")
+            // The property is that the code became a sentence, not that the sentence avoids
+            // the code's own word: "The change was malformed" is the right English for
+            // `malformed`, and an earlier version of this only passed because the sentences
+            // happened to be in Spanish.
+            #expect(explanation != reason, "\(reason) is echoed verbatim")
+            #expect(explanation.contains(" "), "\(reason) has no sentence")
+            #expect(explanation.hasSuffix("."), "\(reason) is not phrased as a sentence")
+            #expect(explanation.count > reason.count + 8, "\(reason) is barely more than its code")
         }
     }
 }

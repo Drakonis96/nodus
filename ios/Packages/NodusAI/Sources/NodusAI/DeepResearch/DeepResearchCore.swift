@@ -11,10 +11,10 @@ public enum DeepResearchLength: String, Sendable, Codable, CaseIterable {
 
     public var label: String {
         switch self {
-        case .adaptive: return "Adaptada al corpus"
-        case .concise: return "Breve (5–8 páginas)"
-        case .standard: return "Estándar (9–14 páginas)"
-        case .exhaustive: return "Exhaustiva (15–20 páginas)"
+        case .adaptive: return "Adapted to the corpus"
+        case .concise: return "Brief (5–8 pages)"
+        case .standard: return "Standard (9–14 pages)"
+        case .exhaustive: return "Exhaustive (15–20 pages)"
         }
     }
 }
@@ -34,17 +34,17 @@ public enum DeepResearchMode: String, Sendable, Codable, CaseIterable {
 
     public var label: String {
         switch self {
-        case .research: return "Informe"
-        case .teachingUnit: return "Unidad didáctica"
+        case .research: return "Report"
+        case .teachingUnit: return "Teaching unit"
         }
     }
 
     public var explanation: String {
         switch self {
         case .research:
-            return "Prosa académica continua que defiende una tesis apoyada en el corpus."
+            return "Continuous academic prose arguing a thesis grounded in the corpus."
         case .teachingUnit:
-            return "Partes secuenciadas por dependencia entre conceptos, escritas para quien da la clase: qué se enseña, con qué materiales, errores frecuentes y cómo comprobar la comprensión."
+            return "Parts sequenced by concept dependency, written for whoever gives the class: what is taught, with which materials, common mistakes, and how to check understanding."
         }
     }
 }
@@ -161,7 +161,7 @@ public enum DeepResearchLimits {
 /// `citationScheme` it returns with every context package. This type is that rule made
 /// enforceable: anything not in here is removed at assembly.
 public struct CitationCatalog: Sendable {
-    public struct Entry: Sendable, Hashable {
+    public struct Entry: Sendable, Hashable, Codable {
         public let token: String
         public let kind: String
         public let id: String
@@ -210,7 +210,7 @@ public struct CitationCatalog: Sendable {
                         token: "nodus://passage/\(id)",
                         kind: "passage",
                         id: id,
-                        label: String((row.text("text") ?? "Pasaje").prefix(120)),
+                        label: String((row.text("text") ?? "Passage").prefix(120)),
                         detail: row.text("section")
                     ))
                 case "works":
@@ -220,7 +220,7 @@ public struct CitationCatalog: Sendable {
                         token: "nodus://work/\(id)",
                         kind: "work",
                         id: id,
-                        label: (row.text("title") ?? "Obra") + year,
+                        label: (row.text("title") ?? "Work") + year,
                         detail: nil
                     ))
                 default:
@@ -244,7 +244,14 @@ public struct CitationCatalog: Sendable {
 
 // MARK: - Output
 
-public struct DeepResearchSection: Sendable {
+public struct DeepResearchSection: Sendable, Codable, Hashable {
+    public init(title: String, prose: String, citations: [String], rejectedCitations: [String]) {
+        self.title = title
+        self.prose = prose
+        self.citations = citations
+        self.rejectedCitations = rejectedCitations
+    }
+
     public let title: String
     public let prose: String
     /// Tokens that survived validation.
@@ -258,7 +265,27 @@ public struct DeepResearchSection: Sendable {
     }
 }
 
-public struct DeepResearchReport: Sendable {
+public struct DeepResearchReport: Sendable, Codable, Hashable {
+    public init(
+        objective: String,
+        sections: [DeepResearchSection],
+        references: [CitationCatalog.Entry],
+        words: Int,
+        pages: Double,
+        citationsChecked: Int,
+        citationsRejected: Int,
+        stoppedReason: String?
+    ) {
+        self.objective = objective
+        self.sections = sections
+        self.references = references
+        self.words = words
+        self.pages = pages
+        self.citationsChecked = citationsChecked
+        self.citationsRejected = citationsRejected
+        self.stoppedReason = stoppedReason
+    }
+
     public let objective: String
     public let sections: [DeepResearchSection]
     /// The works actually cited, in the order they first appear. Built from citations, not
@@ -277,7 +304,7 @@ public struct DeepResearchReport: Sendable {
             output += "## \(section.title)\n\n\(section.prose)\n\n"
         }
         if !references.isEmpty {
-            output += "## Referencias\n\n"
+            output += "## References\n\n"
             for reference in references {
                 output += "- \(reference.label)\n"
             }
@@ -331,16 +358,16 @@ public struct DeepResearchOrchestrator: Sendable {
         _ request: DeepResearchRequest,
         onProgress: @Sendable (DeepResearchProgress) -> Void = { _ in }
     ) async throws -> DeepResearchReport {
-        onProgress(.init(phase: .snapshot, message: "Preparando el corpus", wordsSoFar: 0))
+        onProgress(.init(phase: .snapshot, message: "Preparing the corpus", wordsSoFar: 0))
         let catalog = try await deps.buildCatalog(request.objective)
         guard !catalog.isEmpty else { throw DeepResearchError.emptyCorpus }
 
         let pages = DeepResearchLimits.targetPages(request.targetLength, citableCount: catalog.entries.count)
         let plan = DeepResearchLimits.sectionPlan(pages: pages, requested: request.sectionLimit)
 
-        onProgress(.init(phase: .planning, message: "Planificando \(plan.target) secciones", wordsSoFar: 0))
+        onProgress(.init(phase: .planning, message: "Planning \(plan.target) secciones", wordsSoFar: 0))
         var titles = try await deps.plan(request, catalog, plan.target, plan.hardCap)
-        guard !titles.isEmpty else { throw DeepResearchError.planningFailed("el plan vino vacío") }
+        guard !titles.isEmpty else { throw DeepResearchError.planningFailed("the plan came back empty") }
         if titles.count > plan.hardCap { titles = Array(titles.prefix(plan.hardCap)) }
 
         let wordTarget = max(
@@ -359,7 +386,7 @@ public struct DeepResearchOrchestrator: Sendable {
 
             onProgress(.init(
                 phase: .retrieving,
-                message: "Recuperando para «\(title)»",
+                message: "Retrieving for “\(title)”",
                 sectionIndex: index, sectionTotal: titles.count, sectionTitle: title,
                 wordsSoFar: words
             ))
@@ -370,7 +397,7 @@ public struct DeepResearchOrchestrator: Sendable {
 
             onProgress(.init(
                 phase: .writing,
-                message: "Escribiendo «\(title)»",
+                message: "Writing “\(title)”",
                 sectionIndex: index, sectionTotal: titles.count, sectionTitle: title,
                 wordsSoFar: words
             ))
@@ -393,7 +420,7 @@ public struct DeepResearchOrchestrator: Sendable {
             } catch {
                 // One failed section does not throw away the ones already paid for. The report
                 // says which section is missing rather than pretending it was never planned.
-                stoppedReason = "La sección «\(title)» falló: \(error.localizedDescription)"
+                stoppedReason = "Section “\(title)” failed: \(error.localizedDescription)"
                 break
             }
         }
@@ -401,7 +428,7 @@ public struct DeepResearchOrchestrator: Sendable {
         try Task.checkCancellation()
         onProgress(.init(
             phase: .assembling,
-            message: "Ensamblando",
+            message: "Assembling",
             sectionIndex: titles.count, sectionTotal: titles.count,
             wordsSoFar: words
         ))
@@ -418,7 +445,7 @@ public struct DeepResearchOrchestrator: Sendable {
             }
         }
 
-        onProgress(.init(phase: .done, message: "Terminado", wordsSoFar: words))
+        onProgress(.init(phase: .done, message: "Finished", wordsSoFar: words))
 
         return DeepResearchReport(
             objective: request.objective,

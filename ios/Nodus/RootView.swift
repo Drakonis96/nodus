@@ -46,7 +46,7 @@ struct SpacePickerView: View {
                     VStack(spacing: 12) {
                         NodusMark(style: .brand).frame(width: 84, height: 84)
                         Text("Nodus").font(.largeTitle.weight(.semibold))
-                        Text("Tus vaults, donde estés.")
+                        Text("Your vaults, wherever you are.")
                             .font(.subheadline).foregroundStyle(.secondary)
                     }
                     .padding(.top, 50)
@@ -72,8 +72,8 @@ struct SpacePickerView: View {
                     } else {
                         NodusNotice(
                             tone: .info,
-                            title: "Ningún espacio todavía",
-                            message: "Conéctate al Nodus Server donde tu vault está publicado.",
+                            title: "No spaces yet",
+                            message: "Connect to the Nodus Server where your vault is published.",
                             systemImage: "antenna.radiowaves.left.and.right"
                         )
                     }
@@ -81,7 +81,7 @@ struct SpacePickerView: View {
                     Button {
                         showingConnect = true
                     } label: {
-                        Label("Añadir un servidor", systemImage: "plus")
+                        Label("Add a server", systemImage: "plus")
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(NodusPrimaryButtonStyle(accent: accent))
@@ -119,9 +119,9 @@ private struct ConnectionCard: View {
 
     private var roleLabel: String {
         switch connection.role {
-        case .reader: return "lectura"
-        case .writer: return "escritura"
-        case .owner: return "propietario"
+        case .reader: return "read"
+        case .writer: return "write"
+        case .owner: return "owner"
         }
     }
 }

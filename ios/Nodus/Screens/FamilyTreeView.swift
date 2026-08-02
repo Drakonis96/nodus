@@ -32,7 +32,7 @@ struct FamilyTreeView: View {
         ScrollView {
             VStack(spacing: 18) {
                 if let error {
-                    NodusNotice(tone: .blocked, title: "No se pudo montar el árbol", message: error)
+                    NodusNotice(tone: .blocked, title: "Could not build the tree", message: error)
                 }
 
                 if isLoading, focus == nil {
@@ -49,7 +49,7 @@ struct FamilyTreeView: View {
                     generation(children, title: "Descendencia", icon: "arrow.down")
 
                     if parents.isEmpty, children.isEmpty, partners.isEmpty, siblings.isEmpty {
-                        Text("Esta persona no tiene parentescos registrados en la publicación.")
+                        Text("This person has no relationships recorded in the publication.")
                             .font(.footnote).foregroundStyle(.secondary)
                             .padding(.top, 12)
                     }
@@ -57,13 +57,13 @@ struct FamilyTreeView: View {
                     ContentUnavailableView(
                         "Sin personas",
                         systemImage: "person.2",
-                        description: Text("Esta publicación no trae personas ni parentescos.")
+                        description: Text("This publication carries no people or relationships.")
                     )
                 }
             }
             .padding(16)
         }
-        .navigationTitle("Árbol genealógico")
+        .navigationTitle("Family tree")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             if !history.isEmpty {
@@ -107,7 +107,7 @@ struct FamilyTreeView: View {
             NavigationLink {
                 RowDetailView(session: session, collection: Collections["persons"], row: person)
             } label: {
-                Label("Ver la ficha completa", systemImage: "person.text.rectangle")
+                Label("Open the full record", systemImage: "person.text.rectangle")
                     .font(.caption)
             }
             .buttonStyle(NodusGlassButtonStyle(accent: session.accent))
@@ -271,7 +271,7 @@ struct FamilyTreeView: View {
                 parent = from; child = to; partners = nil
             case "child", "hijo", "hija":
                 parent = to; child = from; partners = nil
-            case "spouse", "partner", "conyuge", "cónyuge", "pareja":
+            case "spouse", "partner", "conyuge", "spouse", "pareja":
                 parent = nil; child = nil; partners = (from, to)
             default:
                 return nil

@@ -7,6 +7,7 @@ import SwiftUI
 struct DeepResearchScreen: View {
     @Environment(AISettings.self) private var ai
     let session: SpaceSession
+    let local: LocalReportStore
 
     @State private var objective = ""
     @State private var length: DeepResearchLength = .concise
@@ -29,7 +30,7 @@ struct DeepResearchScreen: View {
                 }
 
                 if let error {
-                    NodusNotice(tone: .blocked, title: "El informe falló", message: error)
+                    NodusNotice(tone: .blocked, title: "The report failed", message: error)
                 }
             }
             .padding(16)
@@ -39,7 +40,7 @@ struct DeepResearchScreen: View {
         .toolbar {
             if report != nil {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Nuevo") { report = nil; progress = nil; error = nil }
+                    Button("New") { report = nil; progress = nil; error = nil }
                 }
             }
         }
@@ -49,12 +50,12 @@ struct DeepResearchScreen: View {
 
     private var form: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text((mode ?? defaultMode) == .teachingUnit ? "Tema de la unidad" : "Objetivo")
+            Text((mode ?? defaultMode) == .teachingUnit ? "Unit topic" : "Objective")
                 .font(.subheadline.weight(.medium))
             TextField(
                 (mode ?? defaultMode) == .teachingUnit
-                    ? "Qué unidad quieres preparar con estos materiales"
-                    : "Qué quieres que investigue en este corpus",
+                    ? "What unit do you want to prepare from these materials"
+                    : "What should it research in this corpus",
                 text: $objective,
                 axis: .vertical
             )
@@ -66,7 +67,7 @@ struct DeepResearchScreen: View {
             // Teaching vaults default to the unit pack, the way the desktop does
             // (`electron/ai/deepResearch.ts:39`), but it stays a choice: a teacher may well
             // want a plain report about their own materials.
-            Picker("Modo", selection: Binding(
+            Picker("Mode", selection: Binding(
                 get: { mode ?? defaultMode },
                 set: { mode = $0 }
             )) {
@@ -79,7 +80,7 @@ struct DeepResearchScreen: View {
             Text((mode ?? defaultMode).explanation)
                 .font(.caption).foregroundStyle(.secondary)
 
-            Picker("Extensión", selection: $length) {
+            Picker("Length", selection: $length) {
                 ForEach(DeepResearchLength.allCases, id: \.self) { option in
                     Text(option.label).tag(option)
                 }
@@ -92,15 +93,15 @@ struct DeepResearchScreen: View {
             NodusNotice(
                 tone: .info,
                 title: costEstimate,
-                message: "Cada sección es una llamada al modelo. Puedes cancelarla en cualquier momento y conservas lo escrito hasta ahí.",
+                message: "Each section is one model call. You can cancel at any point and keep what was written up to then.",
                 systemImage: "hourglass"
             )
 
             if ai.model(for: .deepResearch) == nil {
                 NodusNotice(
                     tone: .caution,
-                    title: "Sin modelo elegido",
-                    message: "Elige uno en Proveedores antes de empezar.",
+                    title: "No model chosen",
+                    message: "Choose one under Providers before starting.",
                     systemImage: "key"
                 )
             }
@@ -108,7 +109,7 @@ struct DeepResearchScreen: View {
             Button {
                 start()
             } label: {
-                Label((mode ?? defaultMode) == .teachingUnit ? "Generar la unidad" : "Generar el informe", systemImage: "sparkles")
+                Label((mode ?? defaultMode) == .teachingUnit ? "Generate the unit" : "Generate the report", systemImage: "sparkles")
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(NodusPrimaryButtonStyle(accent: session.accent))
@@ -126,7 +127,7 @@ struct DeepResearchScreen: View {
     private var costEstimate: String {
         let pages = DeepResearchLimits.targetPages(length, citableCount: 200)
         let plan = DeepResearchLimits.sectionPlan(pages: pages, requested: nil)
-        return "≈ \(plan.target) secciones · \(pages.lowerBound)–\(pages.upperBound) páginas"
+        return "≈ \(plan.target) sections · \(pages.lowerBound)–\(pages.upperBound) pages"
     }
 
     // MARK: Progress
@@ -136,7 +137,7 @@ struct DeepResearchScreen: View {
             HStack {
                 Text(objective).font(.subheadline.weight(.medium)).lineLimit(2)
                 Spacer()
-                Button("Cancelar") { running?.cancel() }
+                Button("Cancel") { running?.cancel() }
                     .font(.caption).tint(.red)
             }
 
@@ -149,11 +150,11 @@ struct DeepResearchScreen: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(progress.message).font(.callout)
                 if let index = progress.sectionIndex, let total = progress.sectionTotal {
-                    Text("Sección \(index + 1) de \(total)")
+                    Text("Section \(index + 1) of \(total)")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 if progress.wordsSoFar > 0 {
-                    Text("\(progress.wordsSoFar.formatted()) palabras · \(String(format: "%.1f", progress.pagesSoFar)) páginas")
+                    Text("\(progress.wordsSoFar.formatted()) palabras · \(String(format: "%.1f", progress.pagesSoFar)) pages")
                         .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
                 }
             }
@@ -171,7 +172,7 @@ struct DeepResearchScreen: View {
                 Text(report.objective).font(.title3.weight(.semibold))
                 HStack(spacing: 12) {
                     Label("\(report.words.formatted()) palabras", systemImage: "text.alignleft")
-                    Label(String(format: "%.1f pág.", report.pages), systemImage: "doc")
+                    Label(String(format: "%.1f pp.", report.pages), systemImage: "doc")
                 }
                 .font(.caption).foregroundStyle(.secondary)
 
@@ -182,16 +183,16 @@ struct DeepResearchScreen: View {
                     NodusNotice(
                         tone: .caution,
                         title: "\(report.citationsRejected) citas inventadas, eliminadas",
-                        message: "De \(report.citationsChecked) comprobadas. Las frases que solo se apoyaban en ellas quedaron sin respaldo.",
+                        message: "Of \(report.citationsChecked) checked. Sentences that rested only on them are left unsupported.",
                         systemImage: "exclamationmark.triangle"
                     )
                 } else if report.citationsChecked > 0 {
-                    Label("\(report.citationsChecked) citas, todas del corpus", systemImage: "checkmark.seal")
+                    Label("\(report.citationsChecked) citations, all from the corpus", systemImage: "checkmark.seal")
                         .font(.caption).foregroundStyle(.green)
                 }
 
                 if let stopped = report.stoppedReason {
-                    NodusNotice(tone: .caution, title: "El informe quedó incompleto", message: stopped)
+                    NodusNotice(tone: .caution, title: "The report is incomplete", message: stopped)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -212,8 +213,8 @@ struct DeepResearchScreen: View {
 
             if !report.references.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Referencias").font(.headline)
-                    Text("Construidas a partir de las obras realmente citadas.")
+                    Text("References").font(.headline)
+                    Text("Built from the works actually cited.")
                         .font(.caption2).foregroundStyle(.secondary)
                     ForEach(report.references, id: \.token) { reference in
                         Text("· \(reference.label)").font(.caption)
@@ -225,7 +226,7 @@ struct DeepResearchScreen: View {
             }
 
             ShareLink(item: report.markdown) {
-                Label("Compartir en Markdown", systemImage: "square.and.arrow.up")
+                Label("Share as Markdown", systemImage: "square.and.arrow.up")
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(NodusGlassButtonStyle(accent: session.accent))
@@ -238,10 +239,11 @@ struct DeepResearchScreen: View {
         guard let model = ai.model(for: .deepResearch) else { return }
         error = nil
         report = nil
-        progress = DeepResearchProgress(phase: .queued, message: "En cola", wordsSoFar: 0)
+        progress = DeepResearchProgress(phase: .queued, message: "Queued", wordsSoFar: 0)
 
         let request = DeepResearchRequest(
             objective: objective.trimmingCharacters(in: .whitespacesAndNewlines),
+            language: Prompts.interfaceLanguage,
             targetLength: length,
             mode: mode ?? defaultMode,
             model: model
@@ -286,14 +288,17 @@ struct DeepResearchScreen: View {
                 }
                 report = finished
                 progress = nil
+                // Saved before anything else can go wrong. A run is one model call per section
+                // and losing it to a dismissed screen means paying for it twice.
+                local.save(finished, mode: request.mode, model: model.model)
                 activity.finish()
             } catch is CancellationError {
                 progress = nil
-                error = "Cancelado."
+                error = "Cancelled."
                 activity.finish(failure: "Cancelado")
             } catch DeepResearchError.emptyCorpus {
                 progress = nil
-                error = "No se encontró nada citable para ese objetivo en este espacio."
+                error = "Nothing citable was found for that objective in this space."
                 activity.finish(failure: "Sin material citable")
             } catch {
                 progress = nil

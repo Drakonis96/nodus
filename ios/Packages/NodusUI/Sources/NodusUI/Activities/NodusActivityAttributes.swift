@@ -64,16 +64,16 @@ public struct NodusActivityAttributes: ActivityAttributes {
         /// so the two surfaces describe a run in the same words.
         public var label: String {
             switch self {
-            case .queued: return "En cola"
-            case .snapshot: return "Preparando el corpus"
-            case .planning: return "Planificando"
-            case .writing: return "Escribiendo"
-            case .retrieving: return "Recuperando"
-            case .verifying: return "Verificando citas"
-            case .assembling: return "Ensamblando"
-            case .importing: return "Importando"
-            case .uploading: return "Enviando"
-            case .done: return "Terminado"
+            case .queued: return "Queued"
+            case .snapshot: return "Preparing the corpus"
+            case .planning: return "Planning"
+            case .writing: return "Writing"
+            case .retrieving: return "Retrieving"
+            case .verifying: return "Verifying citations"
+            case .assembling: return "Assembling"
+            case .importing: return "Importing"
+            case .uploading: return "Sending"
+            case .done: return "Finished"
             }
         }
     }

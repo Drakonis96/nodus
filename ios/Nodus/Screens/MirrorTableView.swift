@@ -24,7 +24,7 @@ struct MirrorTableView: View {
     var body: some View {
         List {
             if let error {
-                NodusNotice(tone: .blocked, title: "No se pudo leer el espejo", message: error)
+                NodusNotice(tone: .blocked, title: "Could not read the mirror", message: error)
                     .listRowBackground(Color.clear).listRowSeparator(.hidden)
             }
             ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
@@ -41,7 +41,7 @@ struct MirrorTableView: View {
             }
             if rows.isEmpty, error == nil {
                 ContentUnavailableView(
-                    query.isEmpty ? "Nada aquí" : "Sin coincidencias",
+                    query.isEmpty ? "Nothing here" : "No matches",
                     systemImage: presenter.icon
                 )
                 .listRowBackground(Color.clear)
@@ -51,7 +51,7 @@ struct MirrorTableView: View {
         .listStyle(.plain)
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
-        .searchable(text: $query, prompt: "Filtrar en cualquier campo")
+        .searchable(text: $query, prompt: "Filter on any field")
         .onChange(of: query) { _, _ in schedule() }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) { sortMenu }
@@ -61,12 +61,12 @@ struct MirrorTableView: View {
 
     private var sortMenu: some View {
         Menu {
-            Picker("Orden", selection: $sort) {
-                Text("Publicación").tag(MirrorStore.SortOrder.published)
-                Text("Título A–Z").tag(MirrorStore.SortOrder.titleAscending)
-                Text("Título Z–A").tag(MirrorStore.SortOrder.titleDescending)
-                Text("Más reciente").tag(MirrorStore.SortOrder.dateDescending)
-                Text("Más antiguo").tag(MirrorStore.SortOrder.dateAscending)
+            Picker("Sort", selection: $sort) {
+                Text("Publication").tag(MirrorStore.SortOrder.published)
+                Text("Title A–Z").tag(MirrorStore.SortOrder.titleAscending)
+                Text("Title Z–A").tag(MirrorStore.SortOrder.titleDescending)
+                Text("Newest").tag(MirrorStore.SortOrder.dateDescending)
+                Text("Oldest").tag(MirrorStore.SortOrder.dateAscending)
             }
         } label: {
             Image(systemName: "arrow.up.arrow.down")
@@ -144,51 +144,51 @@ struct MirrorOnlySectionsView: View {
                     }
                 }
             } header: {
-                Text("Solo sin conexión")
+                Text("Offline only")
             } footer: {
-                Text("Estas tablas viajan en la publicación pero no tienen ruta REST, así que solo se pueden listar desde la copia descargada.")
+                Text("These tables travel in the publication but have no REST route, so they can only be listed from the downloaded copy.")
             }
         }
         .scrollContentBackground(.hidden)
-        .navigationTitle("Más del espacio")
+        .navigationTitle("More from this space")
         .navigationBarTitleDisplayMode(.inline)
     }
 
     /// Spanish names for the tables the desktop shows under its own labels.
     static func label(for table: String) -> String {
         switch table {
-        case "character_profiles": return "Personajes"
-        case "place_profiles": return "Perfiles de lugar"
-        case "world_groups": return "Facciones"
-        case "world_cultures": return "Culturas"
-        case "world_scenes": return "Escenas"
-        case "world_articles": return "Enciclopedia"
-        case "world_threads": return "Arcos narrativos"
-        case "world_rules": return "Reglas del mundo"
-        case "world_questions": return "Preguntas abiertas"
-        case "world_secrets": return "Secretos"
-        case "world_beats": return "Ritmos"
-        case "world_families": return "Familias"
-        case "world_dynasties": return "Dinastías"
-        case "kinship_suggestions": return "Parentescos sugeridos"
-        case "archive_items": return "Archivo"
-        case "archive_folders": return "Carpetas de archivo"
-        case "study_recordings": return "Grabaciones"
-        case "study_transcripts": return "Transcripciones"
-        case "study_plans": return "Planes de estudio"
-        case "study_goals": return "Objetivos"
-        case "study_calendar_events": return "Calendario"
-        case "study_schedule_periods": return "Horarios"
-        case "teaching_logos": return "Logotipos"
-        case "work_summaries": return "Síntesis de obras"
-        case "author_dossier_synthesis": return "Dosieres de autor"
-        case "projects": return "Proyectos"
-        case "project_chapters": return "Capítulos"
-        case "saved_searches": return "Búsquedas guardadas"
-        case "research_questions": return "Preguntas de investigación"
-        case "collections": return "Colecciones"
-        case "db_rows": return "Filas de bases de datos"
-        case "db_views": return "Vistas"
+        case "character_profiles": return "Characters"
+        case "place_profiles": return "Place profiles"
+        case "world_groups": return "Factions"
+        case "world_cultures": return "Cultures"
+        case "world_scenes": return "Scenes"
+        case "world_articles": return "Encyclopedia"
+        case "world_threads": return "Story arcs"
+        case "world_rules": return "World rules"
+        case "world_questions": return "Open questions"
+        case "world_secrets": return "Secrets"
+        case "world_beats": return "Beats"
+        case "world_families": return "Families"
+        case "world_dynasties": return "Dynasties"
+        case "kinship_suggestions": return "Suggested kinships"
+        case "archive_items": return "Archive"
+        case "archive_folders": return "Archive folders"
+        case "study_recordings": return "Recordings"
+        case "study_transcripts": return "Transcripts"
+        case "study_plans": return "Study plans"
+        case "study_goals": return "Goals"
+        case "study_calendar_events": return "Calendar"
+        case "study_schedule_periods": return "Timetables"
+        case "teaching_logos": return "Logos"
+        case "work_summaries": return "Work summaries"
+        case "author_dossier_synthesis": return "Author dossiers"
+        case "projects": return "Projects"
+        case "project_chapters": return "Chapters"
+        case "saved_searches": return "Saved searches"
+        case "research_questions": return "Research questions"
+        case "collections": return "Collections"
+        case "db_rows": return "Database rows"
+        case "db_views": return "Views"
         default:
             return table.replacingOccurrences(of: "_", with: " ").capitalized
         }
