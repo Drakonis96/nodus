@@ -24,7 +24,7 @@ struct MirrorTableView: View {
     var body: some View {
         List {
             if let error {
-                NodusNotice(tone: .blocked, title: "Could not read the mirror", message: error)
+                NodusNotice(tone: .blocked, title: "Could not read the mirror", message: LocalizedStringKey(error))
                     .listRowBackground(Color.clear).listRowSeparator(.hidden)
             }
             ForEach(Array(rows.enumerated()), id: \.offset) { _, row in

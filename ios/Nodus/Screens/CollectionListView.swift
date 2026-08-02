@@ -24,7 +24,7 @@ struct CollectionListView: View {
     var body: some View {
         List {
             if let error {
-                NodusNotice(tone: .blocked, title: "Could not load", message: error)
+                NodusNotice(tone: .blocked, title: "Could not load", message: LocalizedStringKey(error))
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
             }
@@ -190,18 +190,44 @@ struct SpecialListView: View {
     @State private var hasMore = false
     @State private var error: String?
     @State private var isLoading = false
+    @State private var outbox: OutboxController?
+    @State private var composing = false
+    @State private var editing: EditableNote?
+    @State private var queued = false
 
     var body: some View {
         List {
             if let error {
-                NodusNotice(tone: .blocked, title: "Could not load", message: error)
+                NodusNotice(tone: .blocked, title: "Could not load", message: LocalizedStringKey(error))
                     .listRowBackground(Color.clear)
             }
             ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
                 NavigationLink {
-                    RowDetailView(session: session, collection: nil, row: row, title: title)
+                    // An immersion session is a whole study route — stations, quizzes, an exam
+                    // — and rendering it as a column dump showed a wall of JSON. It gets its
+                    // own reader; everything else here really is a row.
+                    if resource == .immersion, let id = row.string("id") {
+                        ImmersionView(session: session, sessionId: id, title: row.text("title") ?? title)
+                    } else {
+                        RowDetailView(session: session, collection: nil, row: row, title: title)
+                    }
                 } label: {
                     RowCell(row: row, presenter: presenter, accent: session.accent)
+                }
+                .swipeActions(edge: .trailing) {
+                    if canEditNotes {
+                        Button(role: .destructive) {
+                            Task { await deleteNote(row) }
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                        Button {
+                            editing = EditableNote(row)
+                        } label: {
+                            Label("Edit", systemImage: "pencil")
+                        }
+                        .tint(session.accent)
+                    }
                 }
             }
             if rows.isEmpty, !isLoading, error == nil {
@@ -213,8 +239,57 @@ struct SpecialListView: View {
         .listStyle(.plain)
         .navigationTitle(Text(LocalizedStringKey(title)))
         .navigationBarTitleDisplayMode(.inline)
-        .task { if rows.isEmpty { await reload() } }
+        .toolbar {
+            if canEditNotes {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { composing = true } label: { Image(systemName: "square.and.pencil") }
+                        .tint(session.accent)
+                }
+            }
+        }
+        .sheet(isPresented: $composing) {
+            NoteEditor(accent: session.accent, note: nil) { title, body in
+                await outbox?.queueNote(title: title, body: body, folderId: nil)
+                queued = true
+            }
+        }
+        .sheet(item: $editing) { note in
+            NoteEditor(accent: session.accent, note: note) { title, body in
+                await outbox?.queueNote(
+                    id: note.id,
+                    title: title,
+                    body: body,
+                    folderId: note.folderId,
+                    createdAt: note.createdAt
+                )
+                queued = true
+            }
+        }
+        // The one sentence this screen owes the user. A change here is not in the vault: it is
+        // on the phone until it is sent, and in the ledger until the owner republishes. The
+        // list underneath still shows the published rows, which is why nothing appears to
+        // change when a note is edited.
+        .alert("Queued on this device", isPresented: $queued) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Send it from Notes and queue. It joins the vault when its owner next opens Nodus desktop and republishes — until then this list still shows what was published.")
+        }
+        .task {
+            if outbox == nil { outbox = OutboxController(session: session) }
+            if rows.isEmpty { await reload() }
+        }
         .refreshable { await reload() }
+    }
+
+    /// Only notes are writable here, and only for a role the server would accept a change from.
+    private var canEditNotes: Bool {
+        resource == .notes && session.connection.role.canSendChanges && outbox != nil
+    }
+
+    private func deleteNote(_ row: Row) async {
+        guard let id = row.string("id") else { return }
+        await outbox?.queueNoteDeletion(id: id, title: row.text("title") ?? String(localized: "Untitled"))
+        queued = true
     }
 
     private var title: String {

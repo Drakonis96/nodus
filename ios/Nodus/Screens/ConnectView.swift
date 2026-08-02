@@ -107,11 +107,22 @@ struct ConnectView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
+            // A disabled button with no explanation is what a slow probe used to look like:
+            // the user tapped, the address was fine, and the only feedback was the button
+            // going grey for half a minute. Now it says what it is doing.
             Button {
                 Task { await probe() }
             } label: {
-                Label("Continue", systemImage: "arrow.right")
-                    .frame(maxWidth: .infinity)
+                HStack(spacing: 7) {
+                    if isBusy {
+                        ProgressView().controlSize(.small).tint(.white)
+                        Text("Looking for the server…")
+                    } else {
+                        Image(systemName: "arrow.right")
+                        Text("Continue")
+                    }
+                }
+                .frame(maxWidth: .infinity)
             }
             .buttonStyle(NodusPrimaryButtonStyle(accent: accent))
             .disabled(addressInput.trimmingCharacters(in: .whitespaces).isEmpty || isBusy)
@@ -138,11 +149,15 @@ struct ConnectView: View {
                 }
             }
 
-            Picker("", selection: $usePairingCode) {
+            // A real label, hidden rather than empty: an empty one is still a string to
+            // translate, it lands in the catalogue as a blank key, and VoiceOver reads the
+            // control as unnamed.
+            Picker("How to sign in", selection: $usePairingCode) {
                 Text("Account").tag(false)
                 Text("Code").tag(true)
             }
             .pickerStyle(.segmented)
+            .labelsHidden()
 
             if usePairingCode {
                 TextField("XXXX-XXXX", text: $pairingCode)
@@ -271,11 +286,28 @@ struct ConnectView: View {
             default: return api.localizedDescription
             }
         }
+        // The wording lives here, not in NodusKit. The package has no string catalogue — a
+        // literal returned from it is English on every phone — so the typed case crosses the
+        // boundary and the sentence is chosen on this side, where it can be translated.
         if let transport = error as? TransportError {
-            if case .badServerURL = transport {
-                return "That address will not work. Enter just the domain, with no path."
+            switch transport {
+            case .badServerURL:
+                return String(localized: "That address will not work. Enter just the domain, with no path.")
+            case .hostNotFound:
+                return String(localized: "No machine by that name. If the server is on a private network — Tailscale, a VPN, your own Wi-Fi — this device has to be on it too.")
+            case .cannotConnect:
+                return String(localized: "The name resolves, but nothing answered. The server may be stopped, or reachable only from the machine it runs on.")
+            case .certificateRejected:
+                return String(localized: "The certificate was refused. A Nodus Server needs one this device already trusts.")
+            case .insecureBlocked:
+                return String(localized: "iOS refuses plain HTTP to anything but this device. Use an https:// address.")
+            case .offline:
+                return String(localized: "This device has no network.")
+            case .timedOut:
+                return String(localized: "The server took too long to answer.")
+            case .cancelled, .malformedResponse, .underlying:
+                return transport.localizedDescription
             }
-            return transport.localizedDescription
         }
         return error.localizedDescription
     }
@@ -291,7 +323,7 @@ private struct SpaceRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(space.name).font(.subheadline.weight(.medium))
                 HStack(spacing: 6) {
-                    Text(roleLabel(space.role)).font(.caption2)
+                    Text(LocalizedStringKey(roleLabel(space.role))).font(.caption2)
                     if !space.hasSnapshot {
                         Text("· not published").font(.caption2).foregroundStyle(.orange)
                     }

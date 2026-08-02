@@ -35,7 +35,7 @@ struct ResearchLibraryView: View {
     var body: some View {
         List {
             if let error {
-                NodusNotice(tone: .blocked, title: "Could not load", message: error)
+                NodusNotice(tone: .blocked, title: "Could not load", message: LocalizedStringKey(error))
                     .listRowBackground(Color.clear)
             }
 
@@ -243,7 +243,7 @@ struct PublishedReportReader: View {
                 .nodusGlass(NodusGlass(.regular, tint: session.accent))
 
                 if let error {
-                    NodusNotice(tone: .blocked, title: "Could not open", message: error)
+                    NodusNotice(tone: .blocked, title: "Could not open", message: LocalizedStringKey(error))
                 }
 
                 if let sections = prose {
@@ -252,7 +252,10 @@ struct PublishedReportReader: View {
                             if let heading = section.heading {
                                 Text(heading).font(.headline)
                             }
-                            Text(section.body).font(.callout).textSelection(.enabled)
+                            // The desktop writes one Markdown document with its own headings
+                            // and `nodus://` citations in it. Rendered as plain text, both
+                            // arrived as punctuation.
+                            CorpusProse(section.body, accent: session.accent)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(16)
@@ -271,22 +274,40 @@ struct PublishedReportReader: View {
 
     private struct Prose { let heading: String?; let body: String }
 
-    /// The draft is a Writing-Workshop document: a `draft` object whose `sections` carry
-    /// `title` and `markdown`. Rendered as plain paragraphs rather than parsed as Markdown,
-    /// because a half-parsed heading reads worse than none.
+    /// The draft is a Writing-Workshop document (`shared/types.ts:5838`), and the field that
+    /// actually carries the prose is `draftMarkdown` — one document, not a list of section
+    /// bodies. `outline` beside it holds titles and purposes with no text in them, which is why
+    /// reading `outline` for prose returns a report of empty sections.
+    ///
+    /// The `sections` branch is kept because that is the shape this app's own orchestrator
+    /// produces, and a report written on the phone before it could be sent to the vault is
+    /// still on the phone. Rendered as plain paragraphs rather than parsed as Markdown, because
+    /// a half-parsed heading reads worse than none.
     private var prose: [Prose]? {
         guard let detail else { return nil }
-        let draft = detail.report.embeddedJSON("draft") ?? detail.report["draft"]
-        guard let sections = draft?.objectValue?["sections"]?.arrayValue, !sections.isEmpty else {
-            guard let body = detail.report.text("content") ?? detail.report.text("markdown") else { return nil }
-            return [Prose(heading: nil, body: body)]
+        let draft = (detail.report.embeddedJSON("draft") ?? detail.report["draft"])?.objectValue
+
+        if let sections = draft?["sections"]?.arrayValue, !sections.isEmpty {
+            let parsed = sections.compactMap { entry -> Prose? in
+                guard let object = entry.objectValue else { return nil }
+                let body = object["markdown"]?.stringValue ?? object["body"]?.stringValue ?? object["prose"]?.stringValue
+                guard let body, !body.isEmpty else { return nil }
+                return Prose(heading: object["title"]?.stringValue, body: body)
+            }
+            if !parsed.isEmpty { return parsed }
         }
-        return sections.compactMap { entry in
-            guard let object = entry.objectValue else { return nil }
-            let body = object["markdown"]?.stringValue ?? object["body"]?.stringValue ?? object["prose"]?.stringValue
-            guard let body, !body.isEmpty else { return nil }
-            return Prose(heading: object["title"]?.stringValue, body: body)
+
+        // The desktop's own drafts, and everything this app now sends to a vault.
+        //
+        // `abstract` is deliberately not shown beside it: `draftMarkdown` is the whole
+        // document and already opens with the abstract under its own heading, so rendering
+        // both printed the summary twice.
+        if let markdown = draft?["draftMarkdown"]?.stringValue, !markdown.isEmpty {
+            return [Prose(heading: nil, body: markdown)]
         }
+
+        guard let body = detail.report.text("content") ?? detail.report.text("markdown") else { return nil }
+        return [Prose(heading: nil, body: body)]
     }
 
     private func load() async {

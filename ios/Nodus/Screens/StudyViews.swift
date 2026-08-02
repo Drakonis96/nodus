@@ -156,7 +156,7 @@ struct FlashcardsView: View {
             if isLoading {
                 ProgressView().tint(session.accent)
             } else if let error {
-                NodusNotice(tone: .blocked, title: "Could not load", message: error)
+                NodusNotice(tone: .blocked, title: "Could not load", message: LocalizedStringKey(error))
             } else if cards.isEmpty {
                 ContentUnavailableView("No flashcards", systemImage: "rectangle.on.rectangle")
             } else {

@@ -31,12 +31,20 @@ final class AppModel {
     var isConnecting = false
 
     private let keychain = KeychainStore()
-    private let defaultsKey = "nodus.connections.v1"
+    private static let defaultsKey = "nodus.connections.v1"
     private let cacheDirectory: URL
 
     init() {
         cacheDirectory = URL.cachesDirectory.appendingPathComponent("nodus-http", isDirectory: true)
-        connections = Self.loadConnections(key: defaultsKey)
+        connections = Self.loadConnections(key: Self.defaultsKey)
+    }
+
+    /// The connections on disk, without an `AppModel` to ask.
+    ///
+    /// The background tasks run in a process that may have no window and therefore no model,
+    /// and they still need to know which spaces this device holds a token for.
+    static func storedConnections() -> [Connection] {
+        loadConnections(key: defaultsKey)
     }
 
     var hasAnyConnection: Bool { !connections.isEmpty }
@@ -50,8 +58,16 @@ final class AppModel {
     /// Step one: reach a server and ask what it supports, before asking the user for anything.
     func probe(_ input: String) async throws -> (ServerAddress, ServerCapabilities) {
         let address = try ServerAddress(validating: input)
-        let client = NodusClient(address: address, cache: ResponseCache(directory: cacheDirectory))
-        let capabilities = try await client.capabilities()
+        // `nodusProbe`, not the default session: the default waits for connectivity, and while
+        // it waits it ignores request timeouts — so an address with nothing behind it left the
+        // screen saying "looking for the server" indefinitely instead of saying there was
+        // nothing there.
+        let client = NodusClient(
+            address: address,
+            session: .nodusProbe,
+            cache: ResponseCache(directory: cacheDirectory)
+        )
+        let capabilities = try await client.capabilities(timeout: 12)
         guard capabilities.supportsAnyKnownSnapshotVersion else {
             throw TransportError.malformedResponse(
                 expected: "a snapshot format this app reads (\(SnapshotFormat.supportedVersions.sorted()))"
@@ -171,7 +187,7 @@ final class AppModel {
 
     private func persist() {
         guard let data = try? JSONEncoder().encode(connections) else { return }
-        UserDefaults.standard.set(data, forKey: defaultsKey)
+        UserDefaults.standard.set(data, forKey: Self.defaultsKey)
     }
 
     private static func loadConnections(key: String) -> [Connection] {

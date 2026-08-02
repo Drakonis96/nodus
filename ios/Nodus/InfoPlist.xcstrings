@@ -1,0 +1,30 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "NSFaceIDUsageDescription" : {
+      "comment" : "Shown by iOS when the app first asks to use Face ID to unlock itself.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nodus usa Face ID para proteger tus claves de proveedor y las copias de tus vaults en este dispositivo."
+          }
+        }
+      }
+    },
+    "NSLocalNetworkUsageDescription" : {
+      "comment" : "Shown by iOS the first time the app reaches a Nodus Server on the local network.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nodus se conecta a un Nodus Server de tu red local cuando le indicas su dirección."
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

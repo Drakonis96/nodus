@@ -202,7 +202,9 @@ struct SpaceShell: View {
     }
 
     private var subtitle: String? {
-        if !session.isPublished { return "Sin publicar" }
+        // `String(localized:)` rather than a bare literal: this is a computed value handed to a
+        // header that renders it as data, and a literal would ship in one language only.
+        if !session.isPublished { return String(localized: "Not published") }
         guard let overview = session.overview else { return nil }
         let rows = overview.counts.values.reduce(0, +)
         guard rows > 0 else { return nil }

@@ -11,8 +11,16 @@ public extension NodusClient {
 
     /// `GET /api/v1/capabilities` — public, and the first call the app makes against a new
     /// address. Every ceiling the client enforces comes from here rather than from a constant.
-    func capabilities() async throws -> ServerCapabilities {
-        let response = try await perform(.init(path: "/api/v1/capabilities", authenticated: false, cacheable: true))
+    /// - Parameter timeout: how long to wait before deciding nothing is there. The default is
+    ///   the session's 30 s, which is right for a request to a server known to exist and far
+    ///   too long for the first knock at an address somebody just typed.
+    func capabilities(timeout: TimeInterval? = nil) async throws -> ServerCapabilities {
+        let response = try await perform(.init(
+            path: "/api/v1/capabilities",
+            authenticated: false,
+            cacheable: true,
+            timeout: timeout
+        ))
         return try decode(ServerCapabilities.self, from: response)
     }
 

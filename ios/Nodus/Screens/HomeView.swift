@@ -18,7 +18,7 @@ struct HomeView: View {
                         systemImage: "tray"
                     )
                 } else if let error = session.loadError {
-                    NodusNotice(tone: .blocked, title: "Could not read the space", message: error)
+                    NodusNotice(tone: .blocked, title: "Could not read the space", message: LocalizedStringKey(error))
                 }
 
                 if session.connection.role == .reader {
@@ -71,22 +71,23 @@ struct HomeView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
+                // In the same grid as everything else, even alone. A single `NavigationLink`
+                // outside a `LazyVGrid` stretches to the full width, and a lone stretched tile
+                // among rows of square ones reads as a different kind of thing rather than as
+                // the one item in its section.
                 if session.connection.role.canSendChanges {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Write").font(.subheadline.weight(.semibold))
+                    tileSection("Write") {
                         NavigationLink {
                             WritingView(session: session)
                         } label: {
-                            SectionTile(title: LocalizedStringKey("Notes and queue"), icon: "square.and.pencil", count: nil, accent: session.accent)
+                            SectionTile(title: "Notes and queue", icon: "square.and.pencil", count: nil, accent: session.accent)
                         }
                         .buttonStyle(.plain)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
                 if !session.mirrorOnlyTables.isEmpty {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("More from this space").font(.subheadline.weight(.semibold))
+                    tileSection("More from this space") {
                         NavigationLink {
                             MirrorOnlySectionsView(session: session)
                         } label: {
@@ -99,28 +100,31 @@ struct HomeView: View {
                         }
                         .buttonStyle(.plain)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
                 if session.hasDebates || session.hasNotes || session.hasDeepResearch || session.hasImmersion {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Analyse").font(.subheadline.weight(.semibold))
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 12)], spacing: 12) {
-                            if session.hasDebates {
-                                specialTile(.debates, "Debates", "bubble.left.and.bubble.right")
+                    tileSection("Analyse") {
+                        if session.hasDebates {
+                            specialTile(.debates, "Debates", "bubble.left.and.bubble.right")
+                            // The same edges the debates come from, read as one argument
+                            // instead of as a list of disagreements.
+                            NavigationLink {
+                                ArgumentMapView(session: session)
+                            } label: {
+                                SectionTile(title: "Argument map", icon: "arrow.triangle.branch", count: nil, accent: session.accent)
                             }
-                            if session.hasDeepResearch {
-                                specialTile(.deepResearch, "Deep Research", "doc.text.magnifyingglass")
-                            }
-                            if session.hasImmersion {
-                                specialTile(.immersion, "Immersion", "waveform")
-                            }
-                            if session.hasNotes {
-                                specialTile(.notes, "Notes", "note.text")
-                            }
+                            .buttonStyle(.plain)
+                        }
+                        if session.hasDeepResearch {
+                            specialTile(.deepResearch, "Deep Research", "doc.text.magnifyingglass")
+                        }
+                        if session.hasImmersion {
+                            specialTile(.immersion, "Immersion", "waveform")
+                        }
+                        if session.hasNotes {
+                            specialTile(.notes, "Notes", "note.text")
                         }
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
                 if session.isPublished, session.sections.isEmpty, session.loadError == nil, !session.isLoading {
@@ -137,18 +141,42 @@ struct HomeView: View {
         .refreshable { await session.load() }
     }
 
+    /// A headed section whose contents sit in the one grid this screen uses.
+    ///
+    /// Every tile on Home is the same size — that is what makes the screen read as one board
+    /// rather than as several lists — so the grid is defined once and every section goes
+    /// through it, including the ones that hold a single tile.
+    @ViewBuilder
+    private func tileSection<Content: View>(
+        _ title: LocalizedStringKey,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title).font(.subheadline.weight(.semibold))
+            LazyVGrid(columns: Self.tileColumns, spacing: 12) {
+                content()
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private static let tileColumns = [GridItem(.adaptive(minimum: 150), spacing: 12)]
+
     struct VaultTool {
         let title: String
         let icon: String
         let destination: () -> AnyView
     }
 
-    private var toolsHeading: String {
+    /// A `LocalizedStringKey`, not a `String`. `Text(someString)` does not localise — only a
+    /// literal does — so a computed heading returned as a plain `String` would show the same
+    /// words on every phone regardless of its language, which is exactly what these four did.
+    private var toolsHeading: LocalizedStringKey {
         switch session.vaultType {
-        case .genealogy, .prosopography: return "Parentesco"
-        case .estudio: return "Estudiar"
-        case .docencia: return "Docencia"
-        default: return "Herramientas"
+        case .genealogy, .prosopography: return "Kinship"
+        case .estudio: return "Study"
+        case .docencia: return "Teaching"
+        default: return "Tools"
         }
     }
 

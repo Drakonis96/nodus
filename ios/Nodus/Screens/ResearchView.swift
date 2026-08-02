@@ -13,12 +13,21 @@ struct ResearchView: View {
 
     @State private var showingProviders = false
     @State private var store: LocalReportStore?
+    /// How many the vault itself has published, so the count beside "All reports" is the
+    /// number of reports there are rather than the number this phone happens to have written.
+    @State private var publishedReports = 0
 
     var body: some View {
         Group {
             if let store { content(store) } else { ProgressView().tint(session.accent) }
         }
-        .task { if store == nil { store = LocalReportStore(spaceId: session.connection.spaceId) } }
+        .task {
+            if store == nil { store = LocalReportStore(spaceId: session.connection.spaceId) }
+            publishedReports = (try? await session.client.deepResearchReports(
+                in: session.connection.spaceId,
+                limit: 1
+            ).total) ?? 0
+        }
     }
 
     private func content(_ local: LocalReportStore) -> some View {
@@ -31,7 +40,9 @@ struct ResearchView: View {
                     Label {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Generate a report")
-                            Text(ai.model(for: .deepResearch)?.model ?? "No model chosen")
+                            // `String(localized:)`, because the fallback is a literal reaching
+                            // `Text` as a value — the model name beside it really is data.
+                            Text(ai.model(for: .deepResearch)?.model ?? String(localized: "No model chosen"))
                                 .font(.caption).foregroundStyle(.secondary)
                                 .lineLimit(1).truncationMode(.head)
                         }
@@ -52,7 +63,9 @@ struct ResearchView: View {
                     HStack {
                         Label("All reports", systemImage: "books.vertical")
                         Spacer()
-                        Text("\(local.reports.count)")
+                        // Both origins. Counting only the ones generated here read as "this
+                        // vault has no reports" beside a vault with eighteen of them.
+                        Text("\(local.reports.count + publishedReports)")
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }

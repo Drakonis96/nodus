@@ -105,10 +105,13 @@
 		</dict>
 	</dict>
 
+	<!-- These two are the base (English) strings. `Nodus/InfoPlist.xcstrings` carries the
+	     Spanish, which iOS substitutes by key at runtime — a plist string on its own is
+	     shown verbatim in every language, which is how both of these were Spanish-only. -->
 	<key>NSFaceIDUsageDescription</key>
-	<string>Nodus usa Face ID para proteger tus claves de proveedor y el acceso a tus vaults.</string>
+	<string>Nodus uses Face ID to protect your provider keys and the copies of your vaults on this device.</string>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Nodus se conecta a un Nodus Server de tu red local cuando le indicas su dirección.</string>
+	<string>Nodus connects to a Nodus Server on your local network when you give it the address.</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>CFBundleURLTypes</key>

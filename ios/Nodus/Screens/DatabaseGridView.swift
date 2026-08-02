@@ -32,7 +32,7 @@ struct DatabaseGridView: View {
             } else if isLoading {
                 ProgressView().tint(session.accent)
             } else if let error {
-                NodusNotice(tone: .blocked, title: "Could not open", message: error).padding(16)
+                NodusNotice(tone: .blocked, title: "Could not open", message: LocalizedStringKey(error)).padding(16)
             } else {
                 ContentUnavailableView("Empty database", systemImage: "tablecells")
             }

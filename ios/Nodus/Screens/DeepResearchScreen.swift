@@ -17,6 +17,11 @@ struct DeepResearchScreen: View {
     @State private var error: String?
     @State private var running: Task<Void, Never>?
     @State private var liveActivity: LiveActivityController?
+    /// A run that stopped before its last section. Kept so the sections already paid for are
+    /// not thrown away by a screen that was dismissed or a phone that ran out of patience.
+    @State private var unfinished: DeepResearchCheckpoint?
+    /// Set once this report has been put in the queue, so it cannot be queued twice.
+    @State private var sentReportId: String?
 
     var body: some View {
         ScrollView {
@@ -26,22 +31,63 @@ struct DeepResearchScreen: View {
                 } else if let progress {
                     progressView(progress)
                 } else {
+                    if let unfinished { resumeNotice(unfinished) }
                     form
                 }
 
                 if let error {
-                    NodusNotice(tone: .blocked, title: "The report failed", message: error)
+                    NodusNotice(tone: .blocked, title: "The report failed", message: LocalizedStringKey(error))
                 }
             }
             .padding(16)
         }
         .navigationTitle("Deep Research")
         .navigationBarTitleDisplayMode(.inline)
+        .task {
+            guard running == nil, report == nil else { return }
+            let saved = DeepResearchCheckpointStore.load(spaceId: session.connection.spaceId)
+            unfinished = (saved?.isComplete == false) ? saved : nil
+        }
         .toolbar {
             if report != nil {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("New") { report = nil; progress = nil; error = nil }
                 }
+            }
+        }
+    }
+
+    // MARK: Resuming
+
+    /// What a half-finished run looks like when you come back to it.
+    ///
+    /// The number of sections is the point: it is what the user already paid a model call each
+    /// for, and resuming spends nothing on them a second time.
+    private func resumeNotice(_ checkpoint: DeepResearchCheckpoint) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            NodusNotice(
+                tone: .info,
+                title: "An unfinished report",
+                message: "“\(checkpoint.request.objective)” stopped after \(checkpoint.sections.count) of \(checkpoint.titles.count) sections. Carrying on writes only the ones that are missing.",
+                systemImage: "hourglass"
+            )
+            HStack {
+                Button {
+                    resume(checkpoint)
+                } label: {
+                    Label("Carry on", systemImage: "play")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(NodusPrimaryButtonStyle(accent: session.accent))
+                .disabled(ai.model(for: .deepResearch) == nil)
+
+                Button(role: .destructive) {
+                    DeepResearchCheckpointStore.clear(spaceId: session.connection.spaceId)
+                    unfinished = nil
+                } label: {
+                    Label("Discard", systemImage: "trash")
+                }
+                .font(.caption)
             }
         }
     }
@@ -92,7 +138,7 @@ struct DeepResearchScreen: View {
             // is pressed is the difference between a cost and a surprise.
             NodusNotice(
                 tone: .info,
-                title: costEstimate,
+                title: LocalizedStringKey(costEstimate),
                 message: "Each section is one model call. You can cancel at any point and keep what was written up to then.",
                 systemImage: "hourglass"
             )
@@ -192,7 +238,7 @@ struct DeepResearchScreen: View {
                 }
 
                 if let stopped = report.stoppedReason {
-                    NodusNotice(tone: .caution, title: "The report is incomplete", message: stopped)
+                    NodusNotice(tone: .caution, title: "The report is incomplete", message: LocalizedStringKey(stopped))
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -225,6 +271,28 @@ struct DeepResearchScreen: View {
                 .nodusGlass(NodusGlass(.thin, tint: session.accent))
             }
 
+            // Two different acts, kept apart. Sharing takes a copy off the phone; sending puts
+            // it in the ledger, where it becomes part of the vault the next time its owner
+            // republishes — which is a change to somebody's corpus, not an export.
+            if session.connection.role.canSendChanges {
+                Button {
+                    Task { await send(report) }
+                } label: {
+                    Label(sentReportId == nil ? "Send to the vault" : "Sent — waiting for the owner",
+                          systemImage: sentReportId == nil ? "arrow.up.doc" : "checkmark.circle")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(NodusPrimaryButtonStyle(accent: session.accent))
+                .disabled(sentReportId != nil)
+
+                Text(sentReportId == nil
+                     ? "It is queued on this device and travels when you send the queue. It joins the vault when its owner next opens Nodus desktop and republishes."
+                     : "Queued. Open Notes and queue to send it.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
             ShareLink(item: report.markdown) {
                 Label("Share as Markdown", systemImage: "square.and.arrow.up")
                     .frame(maxWidth: .infinity)
@@ -233,15 +301,44 @@ struct DeepResearchScreen: View {
         }
     }
 
+    /// Put the finished report in the queue, with the citations it really used.
+    private func send(_ report: DeepResearchReport) async {
+        guard let controller = OutboxController(session: session), let model = ai.model(for: .deepResearch) else { return }
+        await controller.queueReport(
+            report,
+            mode: mode ?? defaultMode,
+            model: model,
+            language: Prompts.interfaceLanguage
+        )
+        sentReportId = report.objective
+    }
+
     // MARK: Run
 
-    private func start() {
+    /// Pick up a run that stopped, on its own terms rather than on the form's.
+    ///
+    /// The checkpoint carries the request it was started with, so the objective, mode and
+    /// length come from there — using whatever happens to be in the fields would resume a
+    /// half-written report into a different question.
+    private func resume(_ checkpoint: DeepResearchCheckpoint) {
+        objective = checkpoint.request.objective
+        length = checkpoint.request.targetLength
+        mode = checkpoint.request.mode
+        start(from: checkpoint)
+    }
+
+    private func start(from checkpoint: DeepResearchCheckpoint? = nil) {
         guard let model = ai.model(for: .deepResearch) else { return }
         error = nil
         report = nil
-        progress = DeepResearchProgress(phase: .queued, message: "Queued", wordsSoFar: 0)
+        unfinished = nil
+        progress = DeepResearchProgress(
+            phase: .queued,
+            message: checkpoint == nil ? "Queued" : "Resuming",
+            wordsSoFar: checkpoint?.words ?? 0
+        )
 
-        let request = DeepResearchRequest(
+        let request = checkpoint?.request ?? DeepResearchRequest(
             objective: objective.trimmingCharacters(in: .whitespacesAndNewlines),
             language: Prompts.interfaceLanguage,
             targetLength: length,
@@ -272,37 +369,57 @@ struct DeepResearchScreen: View {
         activity.start()
         liveActivity = activity
 
+        let spaceId = session.connection.spaceId
+
         running = Task {
             do {
-                let finished = try await orchestrator.run(request) { update in
-                    Task { @MainActor in
-                        progress = update
-                        activity.update(
-                            phase: update.phase.rawValue,
-                            detail: update.sectionTitle ?? update.message,
-                            fraction: update.fraction,
-                            step: update.sectionIndex.map { $0 + 1 },
-                            stepCount: update.sectionTotal
-                        )
+                let finished = try await orchestrator.run(
+                    request,
+                    resuming: checkpoint,
+                    // Written after every section, on whichever thread finished it. This is the
+                    // persisted state Info.plist has always claimed a run resumes from, and the
+                    // difference between an interrupted run and a wasted one.
+                    onCheckpoint: { reached in
+                        DeepResearchCheckpointStore.save(reached, spaceId: spaceId)
+                    },
+                    // Labelled, not trailing: `run` takes two closures now, and an unlabelled
+                    // one binds to the checkpoint hook.
+                    onProgress: { update in
+                        Task { @MainActor in
+                            progress = update
+                            activity.update(
+                                phase: update.phase.rawValue,
+                                detail: update.sectionTitle ?? update.message,
+                                fraction: update.fraction,
+                                step: update.sectionIndex.map { $0 + 1 },
+                                stepCount: update.sectionTotal
+                            )
+                        }
                     }
-                }
+                )
                 report = finished
                 progress = nil
                 // Saved before anything else can go wrong. A run is one model call per section
                 // and losing it to a dismissed screen means paying for it twice.
-                local.save(finished, mode: request.mode, model: model.model)
+                local.save(finished, mode: request.mode, model: request.model.model)
+                DeepResearchCheckpointStore.clear(spaceId: spaceId)
                 activity.finish()
             } catch is CancellationError {
                 progress = nil
                 error = "Cancelled."
-                activity.finish(failure: "Cancelado")
+                // Deliberately kept: cancelling stops the spending, it does not throw away the
+                // sections already written. The screen offers to carry on from here.
+                unfinished = DeepResearchCheckpointStore.load(spaceId: spaceId)
+                activity.finish(failure: "Cancelled")
             } catch DeepResearchError.emptyCorpus {
                 progress = nil
                 error = "Nothing citable was found for that objective in this space."
-                activity.finish(failure: "Sin material citable")
+                DeepResearchCheckpointStore.clear(spaceId: spaceId)
+                activity.finish(failure: "No citable material")
             } catch {
                 progress = nil
                 self.error = error.localizedDescription
+                unfinished = DeepResearchCheckpointStore.load(spaceId: spaceId).flatMap { $0.isComplete ? nil : $0 }
                 activity.finish(failure: error.localizedDescription)
             }
             liveActivity = nil
