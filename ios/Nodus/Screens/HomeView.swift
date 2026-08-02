@@ -52,6 +52,25 @@ struct HomeView: View {
                     }
                 }
 
+                // Screens a vault type deserves that are not just a table listing: a family
+                // tree, a timetable, a deck of cards.
+                if !vaultTools.isEmpty {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text(toolsHeading).font(.subheadline.weight(.semibold))
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 12)], spacing: 12) {
+                            ForEach(vaultTools, id: \.title) { tool in
+                                NavigationLink {
+                                    tool.destination()
+                                } label: {
+                                    SectionTile(title: tool.title, icon: tool.icon, count: nil, accent: session.accent)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
                 if session.connection.role.canSendChanges {
                     VStack(alignment: .leading, spacing: 10) {
                         Text("Escribir").font(.subheadline.weight(.semibold))
@@ -116,6 +135,50 @@ struct HomeView: View {
             .padding(16)
         }
         .refreshable { await session.load() }
+    }
+
+    struct VaultTool {
+        let title: String
+        let icon: String
+        let destination: () -> AnyView
+    }
+
+    private var toolsHeading: String {
+        switch session.vaultType {
+        case .genealogy, .prosopography: return "Parentesco"
+        case .estudio: return "Estudiar"
+        case .docencia: return "Docencia"
+        default: return "Herramientas"
+        }
+    }
+
+    /// What each vault type gets beyond its tables, gated on the publication actually having
+    /// the rows — a timetable tile over an empty timetable is worse than no tile.
+    private var vaultTools: [VaultTool] {
+        var tools: [VaultTool] = []
+        let counts = session.overview?.counts ?? [:]
+
+        if (counts["persons"] ?? 0) > 0, (counts["relationships"] ?? 0) > 0 {
+            tools.append(VaultTool(title: "Árbol genealógico", icon: "tree") {
+                AnyView(FamilyTreeView(session: session))
+            })
+        }
+        if (counts["study_schedule_cells"] ?? 0) > 0 {
+            tools.append(VaultTool(title: "Horarios", icon: "calendar") {
+                AnyView(ScheduleView(session: session))
+            })
+        }
+        if (counts["study_flashcards"] ?? 0) > 0 {
+            tools.append(VaultTool(title: "Fichas", icon: "rectangle.on.rectangle") {
+                AnyView(FlashcardsView(session: session))
+            })
+        }
+        if (counts["study_questions"] ?? 0) > 0 {
+            tools.append(VaultTool(title: "Banco de preguntas", icon: "checklist") {
+                AnyView(QuestionBankView(session: session))
+            })
+        }
+        return tools
     }
 
     private func specialTile(_ resource: SpecialResource, _ title: String, _ icon: String) -> some View {

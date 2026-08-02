@@ -31,7 +31,11 @@ struct CollectionListView: View {
 
             ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
                 NavigationLink {
-                    RowDetailView(session: session, collection: collection, row: row)
+                    if collection.path == "databases" {
+                        DatabaseGridView(session: session, database: row)
+                    } else {
+                        RowDetailView(session: session, collection: collection, row: row)
+                    }
                 } label: {
                     RowCell(row: row, presenter: collection.presenter, accent: session.accent)
                 }
