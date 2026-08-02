@@ -38,15 +38,15 @@ struct FamilyTreeView: View {
                 if isLoading, focus == nil {
                     ProgressView().tint(session.accent).padding(.top, 60)
                 } else if let focus {
-                    generation(parents, title: "Padres y madres", icon: "arrow.up")
+                    generation(parents, title: "Parents", icon: "arrow.up")
                     focusCard(focus)
                     if !partners.isEmpty {
-                        generation(partners, title: "Pareja", icon: "heart")
+                        generation(partners, title: "Partner", icon: "heart")
                     }
                     if !siblings.isEmpty {
-                        generation(siblings, title: "Hermanos y hermanas", icon: "arrow.left.and.right")
+                        generation(siblings, title: "Siblings", icon: "arrow.left.and.right")
                     }
-                    generation(children, title: "Descendencia", icon: "arrow.down")
+                    generation(children, title: "Children", icon: "arrow.down")
 
                     if parents.isEmpty, children.isEmpty, partners.isEmpty, siblings.isEmpty {
                         Text("This person has no relationships recorded in the publication.")
@@ -55,7 +55,7 @@ struct FamilyTreeView: View {
                     }
                 } else if !isLoading {
                     ContentUnavailableView(
-                        "Sin personas",
+                        "No people",
                         systemImage: "person.2",
                         description: Text("This publication carries no people or relationships.")
                     )

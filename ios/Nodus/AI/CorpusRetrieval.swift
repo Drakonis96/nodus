@@ -332,7 +332,7 @@ nonisolated enum Prompts {
         \(request.mode == .teachingUnit ? "Unidad" : "Report"): \(request.objective)
         Escribe la parte \(index + 1) de \(total): «\(title)».
 
-        Length objetivo: unas \(wordTarget) palabras. \(shape) No repitas el título.
+        Extensión objetivo: unas \(wordTarget) palabras. \(shape) No repitas el título.
 
         \(citationPolicy(catalog: catalog))
         """

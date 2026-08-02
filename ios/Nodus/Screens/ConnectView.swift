@@ -95,7 +95,7 @@ struct ConnectView: View {
     private var addressStep: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Server address").font(.subheadline.weight(.medium))
-            TextField("nodus.ejemplo.org", text: $addressInput)
+            TextField("nodus.example.org", text: $addressInput)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .keyboardType(.URL)

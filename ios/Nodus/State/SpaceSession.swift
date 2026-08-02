@@ -48,6 +48,7 @@ final class SpaceSession {
         // Application Support, not Caches: the mirror is what the app falls back to on a plane,
         // and the system is free to delete Caches whenever it likes.
         mirrorDirectory = URL.applicationSupportDirectory.appendingPathComponent("spaces", isDirectory: true)
+        names = CorpusNames(client: client, spaceId: connection.spaceId)
         Task { await client.setUnauthorizedHandler(onUnauthorized) }
     }
 
@@ -73,6 +74,7 @@ final class SpaceSession {
             mirror = store
             mirrorSummary = summary
             await refreshBrowsableTables()
+            await names.preload(from: store)
             await refreshMirrorFreshness()
         } catch {
             mirrorProgress = .failed(error.localizedDescription)
@@ -114,6 +116,7 @@ final class SpaceSession {
             mirror = store
             mirrorSummary = summary
             await refreshBrowsableTables()
+            await names.preload(from: store)
             mirrorProgress = .current(rows: summary.totalRows, tables: summary.counts.count)
         } catch let error as APIError where error.isNotPublished {
             mirrorProgress = .failed("This space has no publication to download yet.")
@@ -151,6 +154,10 @@ final class SpaceSession {
     /// all. Half a published corpus is join tables with two foreign keys and nothing to show,
     /// and listing those gives screens of "Untitled" under names like "Thread Parties".
     private(set) var mirrorOnlyTables: [(table: String, count: Int)] = []
+
+    /// Resolves the ids inside relations into names. Populated from the mirror when there is
+    /// one, and by request otherwise.
+    let names: CorpusNames
 
 
     func load() async {

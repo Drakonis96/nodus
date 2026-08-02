@@ -39,7 +39,7 @@ struct ScheduleView: View {
                     ProgressView().tint(session.accent).frame(maxWidth: .infinity).padding(.top, 50)
                 } else if periods.isEmpty {
                     ContentUnavailableView(
-                        "Sin horario",
+                        "No timetable",
                         systemImage: "calendar",
                         description: Text("This publication carries no time slots.")
                     )
@@ -156,11 +156,11 @@ struct FlashcardsView: View {
             if isLoading {
                 ProgressView().tint(session.accent)
             } else if let error {
-                NodusNotice(tone: .blocked, title: "No se pudieron cargar", message: error)
+                NodusNotice(tone: .blocked, title: "Could not load", message: error)
             } else if cards.isEmpty {
-                ContentUnavailableView("Sin fichas", systemImage: "rectangle.on.rectangle")
+                ContentUnavailableView("No flashcards", systemImage: "rectangle.on.rectangle")
             } else {
-                Text("\(index + 1) de \(cards.count)")
+                Text("\(index + 1) of \(cards.count)")
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
 
@@ -179,7 +179,7 @@ struct FlashcardsView: View {
                     Button {
                         withAnimation(.spring(duration: 0.4)) { revealed.toggle() }
                     } label: {
-                        Text(revealed ? "Ocultar" : "Ver respuesta").frame(maxWidth: .infinity)
+                        Text(revealed ? "Hide" : "Show answer").frame(maxWidth: .infinity)
                     }
                     .buttonStyle(NodusPrimaryButtonStyle(accent: session.accent))
 
@@ -300,7 +300,7 @@ struct QuestionBankView: View {
                             Text(explanation).font(.caption).foregroundStyle(.secondary)
                         }
                     } else {
-                        Button("Ver respuesta") {
+                        Button("Show answer") {
                             withAnimation { _ = revealed.insert(entry.offset) }
                         }
                         .font(.caption)
@@ -311,7 +311,7 @@ struct QuestionBankView: View {
             }
 
             if questions.isEmpty, !isLoading {
-                ContentUnavailableView("Sin preguntas", systemImage: "checklist")
+                ContentUnavailableView("No questions", systemImage: "checklist")
                     .listRowBackground(Color.clear)
             }
         }
@@ -319,7 +319,7 @@ struct QuestionBankView: View {
         .listStyle(.plain)
         .navigationTitle("Question bank")
         .navigationBarTitleDisplayMode(.inline)
-        .searchable(text: $query, prompt: "Filtrar preguntas")
+        .searchable(text: $query, prompt: "Filter questions")
         .task { await load() }
     }
 

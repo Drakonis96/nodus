@@ -154,7 +154,7 @@ struct DeepResearchScreen: View {
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 if progress.wordsSoFar > 0 {
-                    Text("\(progress.wordsSoFar.formatted()) palabras · \(String(format: "%.1f", progress.pagesSoFar)) pages")
+                    Text("\(progress.wordsSoFar.formatted()) words · \(String(format: "%.1f", progress.pagesSoFar)) pages")
                         .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
                 }
             }
@@ -171,7 +171,7 @@ struct DeepResearchScreen: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text(report.objective).font(.title3.weight(.semibold))
                 HStack(spacing: 12) {
-                    Label("\(report.words.formatted()) palabras", systemImage: "text.alignleft")
+                    Label("\(report.words.formatted()) words", systemImage: "text.alignleft")
                     Label(String(format: "%.1f pp.", report.pages), systemImage: "doc")
                 }
                 .font(.caption).foregroundStyle(.secondary)
@@ -182,7 +182,7 @@ struct DeepResearchScreen: View {
                 if report.citationsRejected > 0 {
                     NodusNotice(
                         tone: .caution,
-                        title: "\(report.citationsRejected) citas inventadas, eliminadas",
+                        title: "\(report.citationsRejected) invented citations, removed",
                         message: "Of \(report.citationsChecked) checked. Sentences that rested only on them are left unsupported.",
                         systemImage: "exclamationmark.triangle"
                     )

@@ -64,7 +64,7 @@ struct SpacePickerView: View {
                                     Button(role: .destructive) {
                                         model.forget(connection)
                                     } label: {
-                                        Label("Olvidar", systemImage: "trash")
+                                        Label("Forget", systemImage: "trash")
                                     }
                                 }
                             }

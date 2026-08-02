@@ -134,8 +134,8 @@ struct RowDetailView: View {
                 }
             }
             fields(of: detail.idea)
-            group("Relationships", detail.relations, table: "edges")
-            group("Occurrences", detail.occurrences, table: "idea_occurrences")
+            relationsSection(detail)
+            occurrencesSection(detail)
         }
     }
 
@@ -201,10 +201,120 @@ struct RowDetailView: View {
 
     private func databaseBody(_ detail: DatabaseDetail) -> some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("\(detail.total.formatted()) filas · \(detail.columns.count) columnas")
+            Text("\(detail.total.formatted()) rows · \(detail.columns.count) columns")
                 .font(.caption).foregroundStyle(.secondary)
             group("Columns", detail.columns, table: "db_columns")
             group("Views", detail.views, table: "db_views")
+        }
+    }
+
+    /// An edge shown as the idea at its other end.
+    ///
+    /// The row is `{from_id, to_id, relation}` and nothing else, so without resolving the id
+    /// this list renders as a column of "Untitled" — which is exactly what it did.
+    private func relationsSection(_ detail: IdeaDetail) -> some View {
+        let selfId = detail.idea.string("global_id") ?? ""
+        let others = detail.relations.compactMap {
+            $0.string("from_id") == selfId ? $0.string("to_id") : $0.string("from_id")
+        }
+        return Group {
+            if !detail.relations.isEmpty {
+                section("Relationships · \(detail.relations.count)") {
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(Array(detail.relations.enumerated()), id: \.offset) { index, edge in
+                            relationRow(edge, selfId: selfId)
+                            if index < detail.relations.count - 1 { Divider().opacity(0.35) }
+                        }
+                    }
+                }
+            }
+        }
+        .task { await session.names.resolve(ideaIds: others, workIds: []) }
+    }
+
+    private func relationRow(_ edge: Row, selfId: String) -> some View {
+        let otherId = (edge.string("from_id") == selfId ? edge.string("to_id") : edge.string("from_id")) ?? ""
+        let outgoing = edge.string("from_id") == selfId
+        return NavigationLink {
+            IdeaByIdView(session: session, globalId: otherId)
+        } label: {
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Image(systemName: outgoing ? "arrow.right" : "arrow.left")
+                        .font(.caption2).foregroundStyle(session.accent)
+                    Text(LocalizedStringKey(Self.relationLabel(edge.text("relation") ?? "")))
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(session.accent)
+                }
+                Text(session.names.idea(otherId) ?? String(localized: "Loading…"))
+                    .font(.subheadline).lineLimit(2).foregroundStyle(.primary)
+                if let rationale = edge.text("rationale") {
+                    Text(rationale).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .padding(.vertical, 6)
+    }
+
+    /// An occurrence shown as the work it appears in.
+    private func occurrencesSection(_ detail: IdeaDetail) -> some View {
+        let workIds = detail.occurrences.compactMap { $0.string("nodus_id") }
+        return Group {
+            if !detail.occurrences.isEmpty {
+                section("Appears in · \(detail.occurrences.count)") {
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(Array(detail.occurrences.enumerated()), id: \.offset) { index, occurrence in
+                            occurrenceRow(occurrence)
+                            if index < detail.occurrences.count - 1 { Divider().opacity(0.35) }
+                        }
+                    }
+                }
+            }
+        }
+        .task { await session.names.resolve(ideaIds: [], workIds: workIds) }
+    }
+
+    private func occurrenceRow(_ occurrence: Row) -> some View {
+        let workId = occurrence.string("nodus_id") ?? ""
+        return NavigationLink {
+            WorkByIdView(session: session, nodusId: workId)
+        } label: {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(session.names.work(workId) ?? String(localized: "Loading…"))
+                    .font(.subheadline).lineLimit(2).foregroundStyle(.primary)
+                if let development = occurrence.text("development") {
+                    Text(development).font(.caption).foregroundStyle(.secondary).lineLimit(3)
+                }
+                if let role = occurrence.text("role") {
+                    Text(LocalizedStringKey(role == "principal" ? "Principal" : "Secondary"))
+                        .font(.caption2).foregroundStyle(session.accent.opacity(0.85))
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .padding(.vertical, 6)
+    }
+
+    /// The edge vocabulary, in the desktop's words.
+    static func relationLabel(_ relation: String) -> String {
+        switch relation {
+        case "supports": return "Supports"
+        case "contradicts": return "Contradicts"
+        case "refutes": return "Refutes"
+        case "refines": return "Refines"
+        case "extends": return "Extends"
+        case "variant_of": return "Variant of"
+        case "depends_on": return "Depends on"
+        case "exemplifies": return "Exemplifies"
+        case "applies": return "Applies"
+        case "compares": return "Compares"
+        case "responds_to": return "Responds to"
+        default: return relation
         }
     }
 
@@ -447,6 +557,59 @@ struct FlowLayout: Layout {
             subview.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))
             x += size.width + spacing
             rowHeight = max(rowHeight, size.height)
+        }
+    }
+}
+
+
+/// Opens an idea from its id alone, fetching the row first.
+struct IdeaByIdView: View {
+    let session: SpaceSession
+    let globalId: String
+
+    @State private var row: Row?
+    @State private var failed = false
+
+    var body: some View {
+        Group {
+            if let row {
+                RowDetailView(session: session, collection: Collections["ideas"], row: row)
+            } else if failed {
+                ContentUnavailableView("Could not open", systemImage: "questionmark.circle")
+            } else {
+                ProgressView().tint(session.accent)
+            }
+        }
+        .task {
+            guard row == nil, !failed else { return }
+            do { row = try await session.client.idea(globalId, in: session.connection.spaceId).idea }
+            catch { failed = true }
+        }
+    }
+}
+
+/// Opens a work from its id alone.
+struct WorkByIdView: View {
+    let session: SpaceSession
+    let nodusId: String
+
+    @State private var row: Row?
+    @State private var failed = false
+
+    var body: some View {
+        Group {
+            if let row {
+                RowDetailView(session: session, collection: Collections["works"], row: row)
+            } else if failed {
+                ContentUnavailableView("Could not open", systemImage: "questionmark.circle")
+            } else {
+                ProgressView().tint(session.accent)
+            }
+        }
+        .task {
+            guard row == nil, !failed else { return }
+            do { row = try await session.client.work(nodusId, in: session.connection.spaceId).work }
+            catch { failed = true }
         }
     }
 }

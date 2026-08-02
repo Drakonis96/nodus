@@ -61,7 +61,7 @@ struct WritingView: View {
                         if controller.isFlushing {
                             Label("Sending…", systemImage: "arrow.up.circle")
                         } else {
-                            Label("Enviar \(controller.pending) cambio\(controller.pending == 1 ? "" : "s")", systemImage: "arrow.up.circle")
+                            Label("Send \(controller.pending) change\(controller.pending == 1 ? "" : "s")", systemImage: "arrow.up.circle")
                         }
                     }
                     .disabled(controller.isFlushing)

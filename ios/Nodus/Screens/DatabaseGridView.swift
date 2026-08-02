@@ -90,15 +90,15 @@ struct DatabaseGridView: View {
     private func footer(_ detail: DatabaseDetail) -> some View {
         VStack(spacing: 8) {
             HStack {
-                Text("\(detail.total.formatted()) filas · \(detail.columns.count) columnas")
+                Text("\(detail.total.formatted()) rows · \(detail.columns.count) columns")
                     .font(.caption2).foregroundStyle(.secondary)
                 Spacer()
                 if offset > 0 {
-                    Button("Anterior") { Task { await load(offset: max(0, offset - pageSize)) } }
+                    Button("Previous") { Task { await load(offset: max(0, offset - pageSize)) } }
                         .font(.caption)
                 }
                 if detail.hasMore {
-                    Button("Siguiente") { Task { await load(offset: offset + pageSize) } }
+                    Button("Next") { Task { await load(offset: offset + pageSize) } }
                         .font(.caption)
                 }
             }

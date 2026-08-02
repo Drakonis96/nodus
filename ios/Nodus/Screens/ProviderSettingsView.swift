@@ -102,7 +102,7 @@ struct ProviderSettingsView: View {
                             .font(.caption)
                     }
                 }
-                Text("\(identity.model) · \(identity.dim) dimensiones")
+                Text("\(identity.model) · \(identity.dim) dimensions")
                     .font(.caption).foregroundStyle(.secondary)
             }
         } else if let unreachable = UnreachableProvider(rawValue: identity.provider) {
