@@ -1,0 +1,103 @@
+# Nodus Server behind a Cloudflare tunnel, built from THIS checkout.
+#
+# Two things separate this from docker-compose.yml, and both matter if you already run a
+# Nodus Server on the same host:
+#
+#   1. It BUILDS the image instead of pulling `ghcr.io/drakonis96/nodus-server:main`. Those
+#      tags are only published from `main`, so a branch under review has no image to pull —
+#      pulling would silently run older code and every /api/v1 route would answer 404.
+#   2. Every name is suffixed and the listener moved off 7443, so a second stack cannot
+#      collide with the first over the volume, the network, the container name or the port.
+#
+# Nothing is published to the host by default: cloudflared reaches the server over the
+# internal network. Uncomment the `ports` block only if you want to curl it locally.
+#
+#   docker compose -f docker-compose.cloudflared.yml up -d --build
+#
+# In Portainer, create the stack from a Repository pointing at this branch with the compose
+# path `server/docker-compose.cloudflared.yml`, so Portainer performs the build itself.
+
+x-nodus-port: &nodus_port "7444"
+
+services:
+  nodus-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: nodus-server:branch
+    container_name: nodus-server-test
+    restart: unless-stopped
+    environment:
+      # The Dockerfile bakes 7443; this moves the listener so two stacks can coexist.
+      NODUS_PORT: *nodus_port
+      NODUS_HOST: 0.0.0.0
+      NODUS_PUBLIC_URL: ${NODUS_PUBLIC_URL}
+      # Use EITHER the setup token (you complete /setup by hand) or the admin pair below.
+      # With the pair, the account is created on first boot and its password is rotated
+      # whenever you change the value here.
+      NODUS_SETUP_TOKEN: ${NODUS_SETUP_TOKEN:-}
+      NODUS_ADMIN_EMAIL: ${NODUS_ADMIN_EMAIL:-}
+      NODUS_ADMIN_PASSWORD: ${NODUS_ADMIN_PASSWORD:-}
+      # Optional ceilings. Unset they default to 8 MiB per image, 2 GiB of images per
+      # space, 100 MiB per compressed publication and 384 MiB expanded.
+      NODUS_MAX_ASSET_BYTES: ${NODUS_MAX_ASSET_BYTES:-}
+      NODUS_MAX_SPACE_ASSET_BYTES: ${NODUS_MAX_SPACE_ASSET_BYTES:-}
+      NODUS_MAX_SNAPSHOT_BYTES: ${NODUS_MAX_SNAPSHOT_BYTES:-}
+      NODUS_MAX_SNAPSHOT_JSON_BYTES: ${NODUS_MAX_SNAPSHOT_JSON_BYTES:-}
+    volumes:
+      - nodus_test_data:/data
+    expose:
+      - *nodus_port
+    # Uncomment to reach it from the host without going through Cloudflare. Loopback only:
+    # this port must never be exposed to the Internet directly.
+    # ports:
+    #   - "127.0.0.1:7444:7444"
+    networks:
+      - nodus_test_internal
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    # The image's own healthcheck is wired to 7443, so moving the listener would leave the
+    # container permanently unhealthy and cloudflared waiting on a dependency that never
+    # comes up. Override it alongside the port.
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:7444/healthz >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    pull_policy: always
+    container_name: nodus-cloudflared-test
+    restart: unless-stopped
+    depends_on:
+      nodus-server:
+        condition: service_healthy
+    command:
+      - tunnel
+      - --no-autoupdate
+      - --url
+      - http://nodus-server:7444
+      - run
+      - --token
+      - ${TUNNEL_TOKEN}
+    networks:
+      - nodus_test_internal
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+networks:
+  nodus_test_internal:
+    internal: false
+
+volumes:
+  nodus_test_data:

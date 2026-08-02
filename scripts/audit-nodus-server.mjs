@@ -163,7 +163,9 @@ await check('build a snapshot from the vault copy', async () => {
   const db = new Database(VAULT, { readonly: true, fileMustExist: true });
   try {
     snapshot = buildServerSnapshot(
-      { id: 'audit', name: 'Audit', type: 'academic' },
+      // The type decides which table families are published, so a genealogy or
+      // worldbuilding vault has to declare itself or its corpus simply will not travel.
+      { id: 'audit', name: 'Audit', type: process.env.NODUS_AUDIT_VAULT_TYPE || 'academic' },
       { nodusServerIncludeUserContent: true, nodusServerIncludePassages: process.env.NODUS_AUDIT_PASSAGES === '1' },
       db,
     );
