@@ -74,14 +74,18 @@ public actor ModelCatalogue {
 
     private func geminiModels() async throws -> [String] {
         guard let key = keyProvider(.gemini) else { throw ProviderError.missingKey(.gemini) }
-        // The key goes in the query string here because that is the only form this endpoint
-        // takes; it is Google's own API, not a third party, and nothing else is appended.
+        // `x-goog-api-key`, never `?key=`.
+        //
+        // Google's own examples put the key in the query string and the desktop follows them,
+        // but a URL is the least private place to carry a secret: it lands in URLCache, in
+        // proxy and server access logs, and in `NSURLErrorFailingURLStringErrorKey` on any
+        // failure — which is exactly where a crash reporter would pick it up. The header is
+        // equally supported and none of that happens.
         var components = URLComponents(string: "https://generativelanguage.googleapis.com/v1beta/models")!
-        components.queryItems = [
-            URLQueryItem(name: "key", value: key),
-            URLQueryItem(name: "pageSize", value: "1000"),
-        ]
-        let data = try await fetch(URLRequest(url: components.url!), provider: .gemini)
+        components.queryItems = [URLQueryItem(name: "pageSize", value: "1000")]
+        var request = URLRequest(url: components.url!)
+        request.setValue(key, forHTTPHeaderField: "x-goog-api-key")
+        let data = try await fetch(request, provider: .gemini)
         guard
             let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
             let entries = object["models"] as? [[String: Any]]

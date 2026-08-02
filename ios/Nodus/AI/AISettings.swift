@@ -22,17 +22,24 @@ final class AISettings {
     }
 
     private(set) var models = Models()
+    /// Models the user pinned, so a list of several hundred opens on the four they use.
+    private(set) var pinnedModels: [ModelRef] = []
     private(set) var configuredProviders: Set<AIProvider> = []
     /// Providers whose key was entered but which the last call rejected.
     private(set) var rejectedProviders: Set<AIProvider> = []
 
     private let keychain = KeychainStore()
     private let defaultsKey = "nodus.ai.models.v1"
+    private let pinnedKey = "nodus.ai.pinned.v1"
 
     init() {
         if let data = UserDefaults.standard.data(forKey: defaultsKey),
            let decoded = try? JSONDecoder().decode(Models.self, from: data) {
             models = decoded
+        }
+        if let data = UserDefaults.standard.data(forKey: pinnedKey),
+           let decoded = try? JSONDecoder().decode([ModelRef].self, from: data) {
+            pinnedModels = decoded
         }
         refreshConfigured()
     }
@@ -115,9 +122,27 @@ final class AISettings {
         AIProvider.allCases.filter { configuredProviders.contains($0) }
     }
 
+    // MARK: - Pinned
+
+    func isPinned(_ model: ModelRef) -> Bool { pinnedModels.contains(model) }
+
+    func togglePinned(_ model: ModelRef) {
+        if let index = pinnedModels.firstIndex(of: model) {
+            pinnedModels.remove(at: index)
+        } else {
+            pinnedModels.append(model)
+        }
+        persistPinned()
+    }
+
     private func persist() {
         guard let data = try? JSONEncoder().encode(models) else { return }
         UserDefaults.standard.set(data, forKey: defaultsKey)
+    }
+
+    private func persistPinned() {
+        guard let data = try? JSONEncoder().encode(pinnedModels) else { return }
+        UserDefaults.standard.set(data, forKey: pinnedKey)
     }
 }
 
