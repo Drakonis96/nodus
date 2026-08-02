@@ -234,3 +234,86 @@ struct BrowsableTableTests {
         #expect(browsable["world_links"] == nil, "a table with no titles is not a section")
     }
 }
+
+@Suite("Mutation outbox")
+struct MutationOutboxTests {
+    private func makeOutbox() throws -> (MutationOutbox, URL) {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("nodus-outbox-\(UUID().uuidString)")
+        return (try MutationOutbox(spaceId: "s", directory: directory), directory)
+    }
+
+    private func note(_ id: String) -> Mutation {
+        Mutation(
+            id: id,
+            clientId: "test",
+            kind: .upsert,
+            table: .notes,
+            key: [id],
+            row: ["id": .string(id), "title": .string("Nota \(id)")],
+            schemaVersion: 1
+        )
+    }
+
+    // "Sent" and "in the vault" are different states, and the server is explicit that a
+    // writer's change is invisible to everyone — including its author — until the owner
+    // republishes. Collapsing the two would tell the user their note landed when it has not.
+    @Test("a queued change is pending, then accepted — never simply done")
+    func statesAreDistinct() async throws {
+        let (outbox, directory) = try makeOutbox()
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        try await outbox.enqueue(note("n1"), title: "Nota 1")
+        #expect(try await outbox.counts().pending == 1)
+        #expect(try await outbox.counts().accepted == 0)
+
+        try await outbox.markAccepted(["n1"])
+        let counts = try await outbox.counts()
+        #expect(counts.pending == 0)
+        #expect(counts.accepted == 1)
+        #expect(try await outbox.items().first?.sentAt != nil)
+    }
+
+    @Test("a change is stored before it is sent, so a crash between the two loses nothing")
+    func persistsBeforeSending() async throws {
+        let (outbox, directory) = try makeOutbox()
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        try await outbox.enqueue(note("n1"), title: "Nota 1")
+        try await outbox.enqueue(note("n2"), title: "Nota 2")
+
+        // A second handle on the same directory is what a relaunch looks like.
+        let reopened = try MutationOutbox(spaceId: "s", directory: directory)
+        let pending = try await reopened.pending(limit: 10)
+        #expect(pending.count == 2)
+        #expect(Set(pending.map(\.id)) == ["n1", "n2"])
+    }
+
+    @Test("a rejection is explained in words, not left as a machine code")
+    func rejectionsAreExplained() async throws {
+        let (outbox, directory) = try makeOutbox()
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        try await outbox.enqueue(note("n1"), title: "Nota 1")
+        try await outbox.markRejected([(id: "n1", reason: "unknown_column:colour")])
+
+        let item = try #require(try await outbox.items().first)
+        #expect(item.state == .rejected)
+        #expect(item.detail?.contains("colour") == true)
+        #expect(item.detail?.contains("unknown_column") == false, "the code itself is not an explanation")
+    }
+
+    @Test("every rejection reason the server can send has a sentence")
+    func everyReasonIsCovered() {
+        // From server/lib/core/mutations.mjs. A code with no sentence surfaces raw.
+        let reasons = [
+            "malformed", "missing_id", "unknown_kind", "table_not_mutable", "bad_key",
+            "constraint", "delete_has_row", "missing_row", "non_scalar_value",
+            "bad_asset", "missing_asset", "too_large",
+        ]
+        for reason in reasons {
+            let explanation = MutationOutbox.explain(reason)
+            #expect(!explanation.contains(reason), "\(reason) is echoed rather than explained")
+        }
+    }
+}
