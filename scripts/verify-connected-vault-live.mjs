@@ -292,7 +292,61 @@ await check('a revoked replica keeps every byte', async () => {
     expect(after.prepare('SELECT COUNT(*) n FROM works').get().n === works, 'the corpus was destroyed on revocation');
     expect(after.prepare("SELECT 1 FROM notes WHERE title = 'Nota privada del lector'").get(), "the reader's own work was destroyed");
   } finally { after.close(); }
+  // Restore the membership this check deliberately removed, so the script can be run twice
+  // against the same space without every earlier check failing on the second pass.
+  const page2 = await (await fetch(`${URL_BASE}/`, { headers: { cookie } })).text();
+  await fetch(`${URL_BASE}/admin/access/grant`, {
+    method: 'POST', redirect: 'manual',
+    headers: { 'content-type': 'application/x-www-form-urlencoded', cookie },
+    body: new URLSearchParams({ csrf: page2.match(/name="csrf" value="([^"]+)"/)[1], userId, spaceId: SPACE_ID, role: 'reader' }),
+  });
   return `${works} works still readable offline, own notes intact`;
+});
+
+await check('the owner publishes its embeddings and semantic search works', async () => {
+  const { buildVectorSet } = require(path.join(repoRoot, 'electron/serverSync/serverVectors.ts'));
+  const db = new Database(VAULT, { readonly: true, fileMustExist: true });
+  let built;
+  let probe;
+  try {
+    built = buildVectorSet(db, 'ideas');
+    expect(built, 'this corpus has no idea embeddings to publish');
+    // A vector taken FROM the corpus: its nearest neighbour must be itself, which is the
+    // only end-to-end proof that quantization, the wire format and the search all agree.
+    probe = db.prepare(
+      `SELECT global_id, label, embedding FROM ideas
+        WHERE embedding IS NOT NULL AND embedding_provider = ? AND embedding_model = ? AND embedding_dim = ?
+        ORDER BY global_id LIMIT 1`
+    ).get(built.summary.provider, built.summary.model, built.summary.dim);
+  } finally { db.close(); }
+
+  const gz = gzipSync(built.buffer, { level: 1 });
+  const upload = await api(owner.deviceToken, 'PUT', `/api/v1/spaces/${SPACE_ID}/vectors?kind=ideas`, {
+    body: gz, headers: { 'content-type': 'application/vnd.nodus.vectors', 'content-encoding': 'gzip' },
+  });
+  // Read the body once: interpolating a second read into the failure message consumes it.
+  const stored = await upload.json().catch(() => ({}));
+  expect(upload.ok, `vector upload HTTP ${upload.status}: ${JSON.stringify(stored)}`);
+  expect(stored.count === built.summary.count, `server stored ${stored.count} of ${built.summary.count}`);
+
+  const vector = Array.from(new Float32Array(probe.embedding.buffer, probe.embedding.byteOffset, built.summary.dim));
+  const started = Date.now();
+  const search = await (await api(owner.deviceToken, 'POST', `/api/v1/spaces/${SPACE_ID}/search/semantic`, {
+    json: { vector, provider: built.summary.provider, model: built.summary.model, dim: built.summary.dim, limit: 10 },
+  })).json();
+  const elapsed = Date.now() - started;
+  expect(search.indexed === true, `search says indexed=${search.indexed} (${search.reason ?? ''})`);
+  expect(search.results[0]?.id === probe.global_id, `nearest neighbour was ${search.results[0]?.id}, expected itself`);
+  expect(search.results[0].score > 0.99, `self-similarity came back as ${search.results[0].score}`);
+  expect(search.results[0].row?.label === probe.label, 'the hit did not resolve to its corpus row');
+
+  // A different provider must be told, not handed an empty list.
+  const mismatched = await (await api(owner.deviceToken, 'POST', `/api/v1/spaces/${SPACE_ID}/search/semantic`, {
+    json: { query: 'memoria', vector, provider: 'openai', model: 'text-embedding-3-small', dim: built.summary.dim },
+  })).json();
+  expect(mismatched.indexed === false && mismatched.reason === 'provider_mismatch', 'a mismatched provider was not reported');
+
+  return `${stored.count.toLocaleString('es-ES')} vectors of ${stored.dim}d, ${(gz.length / 1048576).toFixed(1)} MiB on the wire (${(built.buffer.length / 1048576).toFixed(1)} raw), query in ${elapsed} ms, self-match ${search.results[0].score.toFixed(4)}`;
 });
 
 console.log(`\n${failures === 0 ? 'All' : `${failures} of the`} checks ${failures === 0 ? 'passed' : 'FAILED'}.`);

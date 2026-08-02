@@ -245,7 +245,16 @@ export function createApiRoutes(ctx) {
 
   async function uploadVectors(req, res, space) {
     const kind = String(new URL(req.url, publicUrl()).searchParams.get('kind') || 'ideas');
-    const bytes = await body(req, limits.maxVectorBytes);
+    let bytes = await body(req, limits.maxVectorBytes);
+    // The matrix is highly compressible and the desktop sends it gzipped, exactly like a
+    // snapshot. Decoding the raw body would fail on the header before saying anything useful.
+    if (req.headers['content-encoding'] === 'gzip') {
+      try { bytes = ctx.gunzip(bytes, limits.maxVectorBytes); }
+      catch {
+        json(res, 400, { error: 'bad_vectors', error_description: 'The payload declares gzip but could not be decompressed.' });
+        return true;
+      }
+    }
     let set;
     try { set = decodeVectorSet(bytes); }
     catch (error) {

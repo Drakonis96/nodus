@@ -23,6 +23,7 @@ import type {
 import { normalizeUiLanguage } from '@shared/uiLanguage';
 import { buildServerSnapshot, lightweightVaultRevision, type SnapshotAsset } from './serverSnapshot';
 import { applyIncomingMutations, type IncomingMutation } from './mutationInbox';
+import { buildVectorSet, vectorRevision, type VectorKind } from './serverVectors';
 
 // A Nodus Server pairing belongs to ONE vault and one remote space. Unlike the old
 // single-active-vault publisher, every paired vault keeps publishing in the background
@@ -57,6 +58,9 @@ interface VaultRuntime {
   lastAssetsSent: number;
   /** What the last collection from the mutation ledger did, for the Settings panel. */
   lastInbox: { applied: number; deleted: number; keptLocal: number; refused: number } | null;
+  /** Fingerprint of the embeddings last uploaded, so an unchanged index is not resent. */
+  lastVectorRevision: Partial<Record<VectorKind, string>>;
+  lastVectors: Partial<Record<VectorKind, { count: number; dim: number; bytes: number }>>;
 }
 
 const runtimes = new Map<string, VaultRuntime>();
@@ -71,7 +75,7 @@ function ensureRuntime(vaultId: string): VaultRuntime {
     rt = {
       observed: null, dirtySince: 0, lastUploadStartedAt: 0, pending: false,
       lastRevision: null, phase: 'idle', lastSyncAt: null, lastError: null, lastBytes: null,
-      lastAssetsSent: 0, lastInbox: null,
+      lastAssetsSent: 0, lastInbox: null, lastVectorRevision: {}, lastVectors: {},
     };
     runtimes.set(vaultId, rt);
   }
@@ -346,6 +350,52 @@ async function collectMutations(
   }
 }
 
+/**
+ * Publish the corpus embeddings so the server can answer a semantic query.
+ *
+ * Separate from the snapshot on purpose: the matrix is binary, it is an order of magnitude
+ * larger than the JSON, and it changes only when the vault is re-indexed — so it carries its
+ * own fingerprint and is skipped entirely on a normal publication.
+ *
+ * Ideas always; passages only when the user has chosen to share the passages themselves,
+ * because a vector set is derived from the very text that switch exists to withhold.
+ */
+async function publishVectors(
+  config: VaultServerConfig,
+  token: string,
+  db: Database.Database,
+  rt: VaultRuntime,
+): Promise<void> {
+  const kinds: VectorKind[] = config.includePassages ? ['ideas', 'passages'] : ['ideas'];
+  const endpoint = `${normalizeUrl(config.url)}/api/v1/spaces/${encodeURIComponent(config.spaceId)}/vectors`;
+  for (const kind of kinds) {
+    const revision = vectorRevision(db, kind);
+    if (!revision || rt.lastVectorRevision[kind] === revision) continue;
+    const built = buildVectorSet(db, kind);
+    if (!built) continue;
+    try {
+      const compressed = await gzipAsync(built.buffer, { level: 1 });
+      const response = await fetchWithTimeout(`${endpoint}?kind=${kind}`, {
+        method: 'PUT',
+        headers: {
+          authorization: `Bearer ${token}`,
+          'content-type': 'application/vnd.nodus.vectors',
+          'content-encoding': 'gzip',
+        },
+        body: compressed,
+      });
+      // A server too old to know about vectors has no such route; the corpus is still
+      // published and semantic search simply reports itself as unindexed there.
+      if (response.status === 404) return;
+      if (!response.ok) return;
+      rt.lastVectorRevision[kind] = revision;
+      rt.lastVectors = { ...rt.lastVectors, [kind]: { count: built.summary.count, dim: built.summary.dim, bytes: compressed.length } };
+    } catch {
+      // Retried on the next publication; nothing was recorded as sent.
+    }
+  }
+}
+
 /** Upload one vault's filtered snapshot. Serialized: at most one publish at a time. */
 async function publishVault(vaultId: string): Promise<void> {
   if (publishing) return;
@@ -425,6 +475,9 @@ async function publishVault(vaultId: string): Promise<void> {
     rt.phase = 'ok';
     rt.lastSyncAt = result.updatedAt || new Date().toISOString();
     rt.lastBytes = compressed.length;
+    // After the snapshot, so a client that sees the new revision already has rows for
+    // whatever the matrix points at.
+    await publishVectors(config, token, db, rt);
     if (vault.active) rt.observed = lightweightVaultRevision(db);
   } catch (error) {
     rt.phase = 'error';

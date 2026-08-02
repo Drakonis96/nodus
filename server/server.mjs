@@ -799,6 +799,7 @@ const apiRoutes = createApiRoutes({
   store, authorize, json, body, jsonBody, fs,
   readSnapshot, invalidateSnapshot, expandSnapshot,
   publicUrl, language, rateLimit, clearRateLimit, mib,
+  gunzip: (bytes, maxOutputLength) => gunzipSync(bytes, { maxOutputLength }),
   // A function, not a snapshot: the public URL is only settled once /setup has run.
   resourceMap,
   corpus: corpusRoutes,
