@@ -144,7 +144,11 @@ test('remote vault publication excludes credentials, files and student administr
   assert.match(secretStore, /nodus_server_token\.bin/);
   assert.match(backup, /nodusServerEnabled = false/);
   assert.match(backup, /obj\.nodusServerUrl = ''/);
-  assert.match(settings, /Nunca: archivos PDF, claves API, contraseñas, rutas locales, embeddings/);
+  // Embeddings deliberately left OFF this list: idea vectors DO travel now, behind their own
+  // switch, and a privacy notice that claims otherwise is worse than no notice at all.
+  assert.match(settings, /Nunca: archivos PDF, audio, claves API, contraseñas, rutas locales/);
+  assert.doesNotMatch(settings, /Nunca:[^']*embeddings/, 'the panel must not claim embeddings never travel');
+  assert.match(settings, /Incluir vectores semánticos/, 'the vectors switch must be offered');
   assert.match(settings, /listas de alumnos, grupos, calificaciones/);
 });
 
@@ -324,4 +328,47 @@ test('the server never receives an AI provider key', async () => {
   // hold a third-party credential.
   assert.match(api, /contextPackage/);
   assert.match(api, /citationScheme/);
+});
+
+test('a connected vault has a screen, and a revoked one says so', async () => {
+  const [settings, preload, types] = await Promise.all([
+    read('src/views/Settings.tsx'),
+    read('electron/preload/api.ts'),
+    read('shared/types.ts'),
+  ]);
+  // The IPC existed with nothing calling it, so a replica that lost access simply stopped
+  // updating and never told anyone. The panel is what makes that state visible.
+  assert.match(settings, /data-testid="connected-vault-panel"/);
+  assert.match(settings, /data-testid="replica-revoked-notice"/);
+  assert.match(settings, /window\.nodus\.replicaOverview\(\)/);
+  assert.match(settings, /window\.nodus\.replicaSyncNow\(/);
+  assert.match(settings, /window\.nodus\.replicaDetach\(/);
+  // Disconnecting must never read as deleting.
+  assert.match(settings, /se quedan en este equipo; solo deja de sincronizarse/);
+  // A reader is told plainly that their work stays put.
+  assert.match(settings, /se queda en este equipo y nunca se envía al vault principal/);
+  for (const channel of ['vaults:replicaOverview', 'vaults:replicaSyncNow', 'vaults:replicaDetach']) {
+    assert.match(preload, new RegExp(channel.replace(':', ':')), `${channel} is not bridged`);
+  }
+  assert.match(types, /pendingMutations: number/);
+  assert.match(types, /rejectedMutations: number/);
+});
+
+test('the vectors switch exists and the privacy notice matches what really travels', async () => {
+  const [privacy, settings, publisher] = await Promise.all([
+    read('PRIVACY.md'),
+    read('src/views/Settings.tsx'),
+    read('electron/serverSync/serverSyncService.ts'),
+  ]);
+  // PRIVACY.md used to state outright that embeddings were never uploaded. They are now,
+  // behind a switch — and a privacy notice that contradicts the code is the worst outcome.
+  assert.doesNotMatch(privacy, /Never uploads[^.]*embeddings/i, 'the notice still claims embeddings never travel');
+  assert.match(privacy, /Semantic search vectors/);
+  assert.match(privacy, /no longer accurate and the statement has been corrected/);
+  assert.match(privacy, /Vectors derived from passages follow\s+the passages switch/);
+  assert.match(settings, /nodusServerIncludeVectors/);
+  // Off means off.
+  assert.match(publisher, /if \(!config\.includeVectors\) return;/);
+  // Passage vectors are gated by the passages switch, not by the vectors one alone.
+  assert.match(publisher, /config\.includePassages \? \['ideas', 'passages'\] : \['ideas'\]/);
 });

@@ -169,6 +169,7 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys' | 'lockedProviderKeys'> = {
   nodusServerLanguage: 'en',
   nodusServerIncludeUserContent: false,
   nodusServerIncludePassages: false,
+  nodusServerIncludeVectors: true,
   nodusServerAutoSync: true,
   copilotEnabled: false,
   copilotPort: 4320,

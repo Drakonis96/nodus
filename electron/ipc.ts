@@ -322,7 +322,8 @@ export function registerIpc(
       patch.nodusServerUrl !== undefined ||
       patch.nodusServerSpaceId !== undefined ||
       patch.nodusServerIncludeUserContent !== undefined ||
-      patch.nodusServerIncludePassages !== undefined
+      patch.nodusServerIncludePassages !== undefined ||
+      patch.nodusServerIncludeVectors !== undefined
     ) {
       restartNodusServerSync();
     }

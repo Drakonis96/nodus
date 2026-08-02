@@ -192,6 +192,26 @@ await check('a reader cannot queue anything, whatever the app does', async () =>
   return 'no triggers, nothing queued, the note stays on this machine';
 });
 
+await check('the panel sees what it needs to show', async () => {
+  // These three are exactly what the Settings panel calls. They had no coverage at all:
+  // the channels existed and nothing invoked them, so a replica's state was invisible.
+  const overview = replica.getReplicaOverview();
+  const entry = overview.find((item) => item.vaultId === readerVault.id);
+  expect(entry, 'the replica does not appear in the overview');
+  expect(entry.role === 'reader' && entry.state === 'active', `role ${entry.role}, state ${entry.state}`);
+  expect(entry.spaceName && entry.serverName && entry.userEmail, 'the panel would render an unidentifiable card');
+  expect(entry.lastPulledAt, 'no last-update timestamp to show');
+  expect(entry.phase === 'ok', `phase ${entry.phase}`);
+  expect(typeof entry.pendingMutations === 'number' && typeof entry.rejectedMutations === 'number', 'the counters are missing');
+
+  // "Update now" is a manual pull, and it must be a no-op against an unchanged revision.
+  const after = await replica.syncReplicaNow(readerVault.id);
+  const refreshed = after.find((item) => item.vaultId === readerVault.id);
+  expect(refreshed.phase === 'ok', `manual sync left phase ${refreshed.phase}: ${refreshed.lastError ?? ''}`);
+  expect(refreshed.lastImages?.downloaded === 0, `a second pull re-downloaded ${refreshed.lastImages?.downloaded} images`);
+  return `role, state, timestamps and counters all present; manual sync downloaded 0 images`;
+});
+
 // ── The writer's replica ────────────────────────────────────────────────────
 let writerVault = null;
 let writtenNoteId = null;
@@ -347,6 +367,23 @@ await check('the owner publishes its embeddings and semantic search works', asyn
   expect(mismatched.indexed === false && mismatched.reason === 'provider_mismatch', 'a mismatched provider was not reported');
 
   return `${stored.count.toLocaleString('es-ES')} vectors of ${stored.dim}d, ${(gz.length / 1048576).toFixed(1)} MiB on the wire (${(built.buffer.length / 1048576).toFixed(1)} raw), query in ${elapsed} ms, self-match ${search.results[0].score.toFixed(4)}`;
+});
+
+await check('disconnecting keeps the vault and stops the syncing', async () => {
+  const before = new Database(writerVault.path, { fileMustExist: true });
+  const works = before.prepare('SELECT COUNT(*) AS n FROM works').get().n;
+  before.close();
+  const after = replica.detachReplica(writerVault.id);
+  const entry = after.find((item) => item.vaultId === writerVault.id);
+  expect(entry.state === 'paused', `state is ${entry.state}`);
+  const db = new Database(writerVault.path, { fileMustExist: true });
+  try {
+    expect(db.prepare('SELECT COUNT(*) AS n FROM works').get().n === works, 'disconnecting destroyed the corpus');
+  } finally { db.close(); }
+  // A detached vault is not pulled again on the next tick.
+  await replica.pullReplica(writerVault.id);
+  expect(replica.getReplicaOverview().find((item) => item.vaultId === writerVault.id).state === 'paused', 'a detached replica resumed syncing');
+  return `${works} works kept, syncing stopped`;
 });
 
 console.log(`\n${failures === 0 ? 'All' : `${failures} of the`} checks ${failures === 0 ? 'passed' : 'FAILED'}.`);

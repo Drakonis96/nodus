@@ -127,6 +127,7 @@ interface VaultServerConfig {
   autoSync: boolean;
   includeUserContent: boolean;
   includePassages: boolean;
+  includeVectors: boolean;
   hasToken: boolean;
   configured: boolean;
 }
@@ -176,6 +177,7 @@ function toConfig(vault: VaultSummary, blob: Partial<AppSettings>): VaultServerC
     autoSync: blob.nodusServerAutoSync !== false,
     includeUserContent: Boolean(blob.nodusServerIncludeUserContent),
     includePassages: Boolean(blob.nodusServerIncludePassages),
+    includeVectors: blob.nodusServerIncludeVectors !== false,
     hasToken,
     configured: Boolean(url && spaceId && hasToken),
   };
@@ -193,6 +195,7 @@ function readVaultConfig(vault: VaultSummary): VaultServerConfig {
       nodusServerAutoSync: s.nodusServerAutoSync,
       nodusServerIncludeUserContent: s.nodusServerIncludeUserContent,
       nodusServerIncludePassages: s.nodusServerIncludePassages,
+      nodusServerIncludeVectors: s.nodusServerIncludeVectors,
     });
   }
   // A sibling connection always has a device token, so skip opening its database (and
@@ -225,6 +228,7 @@ function connectionFrom(config: VaultServerConfig): NodusServerConnection {
     autoSync: config.autoSync,
     includeUserContent: config.includeUserContent,
     includePassages: config.includePassages,
+    includeVectors: config.includeVectors,
     phase,
     lastSyncAt: rt?.lastSyncAt ?? null,
     lastError: rt?.lastError ?? null,
@@ -366,6 +370,7 @@ async function publishVectors(
   db: Database.Database,
   rt: VaultRuntime,
 ): Promise<void> {
+  if (!config.includeVectors) return;
   const kinds: VectorKind[] = config.includePassages ? ['ideas', 'passages'] : ['ideas'];
   const endpoint = `${normalizeUrl(config.url)}/api/v1/spaces/${encodeURIComponent(config.spaceId)}/vectors`;
   for (const kind of kinds) {

@@ -1452,6 +1452,16 @@ export interface AppSettings {
   nodusServerIncludeUserContent: boolean;
   /** Include citable extracted passages. Off by default because full text may be licensed. */
   nodusServerIncludePassages: boolean;
+  /**
+   * Publish the idea embeddings so the space can answer a semantic query.
+   *
+   * The vectors are derived from ideas that already travel, and without them a phone or a
+   * replica can only search literally — but they are still a computed projection of the
+   * corpus, so it is a choice rather than an assumption. Passage vectors follow
+   * `nodusServerIncludePassages`: a matrix built from full text is not something to publish
+   * when the text itself was withheld.
+   */
+  nodusServerIncludeVectors: boolean;
   /** Low-cost periodic publication while the desktop app remains open. */
   nodusServerAutoSync: boolean;
   /** Opt-in local HTTPS server that serves the Word writing-copilot add-in + its JSON API. */
@@ -3717,6 +3727,7 @@ export interface NodusServerConnection {
   autoSync: boolean;
   includeUserContent: boolean;
   includePassages: boolean;
+  includeVectors: boolean;
   phase: NodusServerSyncPhase;
   lastSyncAt: string | null;
   lastError: string | null;
