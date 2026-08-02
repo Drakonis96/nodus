@@ -61,6 +61,12 @@ public actor NodusClient {
         var authenticated: Bool = true
         /// Only GETs revalidate; a POST has no tag to send.
         var cacheable: Bool = false
+        /// Overrides the session's 30 s default.
+        ///
+        /// A probe is asking "is there a Nodus Server at this address?", and the answer "no" is
+        /// most often silence — a name that resolves to a machine with nothing listening on the
+        /// port. Half a minute of a dead button is not a reasonable way to say that.
+        var timeout: TimeInterval?
     }
 
     struct Response: Sendable {
@@ -77,6 +83,7 @@ public actor NodusClient {
         let url = try address.url(path: request.path, query: request.query)
         var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = request.method
+        if let timeout = request.timeout { urlRequest.timeoutInterval = timeout }
         urlRequest.httpBody = request.body
         if let contentType = request.contentType {
             urlRequest.setValue(contentType, forHTTPHeaderField: "Content-Type")
@@ -115,16 +122,7 @@ public actor NodusClient {
             data = responseData
             httpResponse = http
         } catch let error as URLError {
-            switch error.code {
-            case .notConnectedToInternet, .dataNotAllowed, .networkConnectionLost:
-                throw TransportError.offline
-            case .cancelled:
-                throw TransportError.cancelled
-            case .timedOut:
-                throw TransportError.timedOut
-            default:
-                throw TransportError.underlying(error.localizedDescription)
-            }
+            throw TransportError.from(error)
         }
 
         var headers: [String: String] = [:]
@@ -195,6 +193,29 @@ public extension URLSession {
         // large corpus does, and it is worth waiting for.
         configuration.timeoutIntervalForResource = 600
         configuration.waitsForConnectivity = true
+        configuration.httpAdditionalHeaders = ["User-Agent": "Nodus-iOS/3.1.0"]
+        return URLSession(configuration: configuration)
+    }()
+
+    /// The session for the first knock at an address somebody just typed.
+    ///
+    /// `nodusDefault` sets `waitsForConnectivity`, which is right for an app that is already
+    /// talking to a server it knows: a tunnel coming back up resumes the request instead of
+    /// failing it. It is wrong here, and quietly so — while URLSession is *waiting for
+    /// connectivity* it ignores `timeoutIntervalForRequest` entirely, so a 12-second timeout on
+    /// an unreachable host bought nothing and the screen sat on "looking for the server" until
+    /// `timeoutIntervalForResource` gave up ten minutes later.
+    ///
+    /// A probe has to be able to answer "there is nothing here", so it does not wait.
+    static let nodusProbe: URLSession = {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.urlCache = nil
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        configuration.timeoutIntervalForRequest = 12
+        // Bounded as well as the request: the two are different clocks, and only this one caps
+        // the whole attempt.
+        configuration.timeoutIntervalForResource = 15
+        configuration.waitsForConnectivity = false
         configuration.httpAdditionalHeaders = ["User-Agent": "Nodus-iOS/3.1.0"]
         return URLSession(configuration: configuration)
     }()

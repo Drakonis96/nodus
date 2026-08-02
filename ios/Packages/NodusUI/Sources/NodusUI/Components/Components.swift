@@ -131,11 +131,17 @@ public struct NodusNotice: View {
     public enum Tone: Sendable { case info, caution, blocked }
 
     public var tone: Tone
-    public var title: String
-    public var message: String?
+    /// `LocalizedStringKey`, not `String`. Every notice in the app passes a literal here, and a
+    /// `String` parameter meant `Text` received a value rather than a key — so not one notice
+    /// was ever translated, however complete the catalogue was.
+    public var title: LocalizedStringKey
+    /// Also a key, so a literal is translated. A runtime value — a server's warning, an error's
+    /// description — is wrapped by the caller as `LocalizedStringKey(text)`, which finds no
+    /// entry and renders the text as it is.
+    public var message: LocalizedStringKey?
     public var systemImage: String?
 
-    public init(tone: Tone = .info, title: String, message: String? = nil, systemImage: String? = nil) {
+    public init(tone: Tone = .info, title: LocalizedStringKey, message: LocalizedStringKey? = nil, systemImage: String? = nil) {
         self.tone = tone
         self.title = title
         self.message = message

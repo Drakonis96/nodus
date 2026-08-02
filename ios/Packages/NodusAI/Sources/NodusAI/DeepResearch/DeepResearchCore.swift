@@ -49,7 +49,7 @@ public enum DeepResearchMode: String, Sendable, Codable, CaseIterable {
     }
 }
 
-public struct DeepResearchRequest: Sendable {
+public struct DeepResearchRequest: Sendable, Codable, Hashable {
     public var objective: String
     public var language: String
     public var audience: String?
@@ -60,7 +60,11 @@ public struct DeepResearchRequest: Sendable {
 
     public init(
         objective: String,
-        language: String = "es",
+        // English unless the caller says otherwise. The app always passes
+        // `Prompts.interfaceLanguage`, which follows the phone; a Spanish default here meant a
+        // request built without one — a resumed run, a test — silently changed the language the
+        // report was written in.
+        language: String = "en",
         audience: String? = nil,
         targetLength: DeepResearchLength = .adaptive,
         sectionLimit: Int? = nil,
@@ -345,6 +349,63 @@ public enum DeepResearchError: Error, Sendable {
     case cancelled
 }
 
+// MARK: - Resuming
+
+/// Everything a half-finished run needs to carry on somewhere else.
+///
+/// A run is one model call per section. Being killed halfway — by the user leaving the app, by
+/// iOS reclaiming memory, by a background task expiring — would waste every call already paid
+/// for, so the orchestrator emits one of these after each section and can be handed one back.
+///
+/// The citation catalogue is deliberately *not* in here. Rebuilding it costs retrieval and at
+/// most one embedding call, while a section costs a full completion; persisting a few hundred
+/// entries to save the cheaper of the two would be the wrong trade, and a catalogue rebuilt
+/// from the current publication is more correct than one frozen an hour ago.
+public struct DeepResearchCheckpoint: Sendable, Codable, Hashable {
+    public let request: DeepResearchRequest
+    /// The plan, fixed at the first attempt. Re-planning on resume would produce a report whose
+    /// second half answers a different outline from its first.
+    public let titles: [String]
+    public let wordTarget: Int
+    public let sections: [DeepResearchSection]
+    public let citationsChecked: Int
+    public let citationsRejected: Int
+    public let startedAt: Date
+
+    public init(
+        request: DeepResearchRequest,
+        titles: [String],
+        wordTarget: Int,
+        sections: [DeepResearchSection],
+        citationsChecked: Int,
+        citationsRejected: Int,
+        startedAt: Date
+    ) {
+        self.request = request
+        self.titles = titles
+        self.wordTarget = wordTarget
+        self.sections = sections
+        self.citationsChecked = citationsChecked
+        self.citationsRejected = citationsRejected
+        self.startedAt = startedAt
+    }
+
+    /// The next section to write. Everything before it is already paid for.
+    public var nextSectionIndex: Int { min(sections.count, titles.count) }
+    public var isComplete: Bool { sections.count >= titles.count }
+    public var words: Int { sections.reduce(0) { $0 + $1.wordCount } }
+
+    /// Whether this checkpoint can still be resumed against a given request.
+    ///
+    /// Resuming into a *different* objective would silently graft half a report onto another
+    /// question, so the objective and the shape of the run must match.
+    public func resumes(_ other: DeepResearchRequest) -> Bool {
+        request.objective == other.objective
+            && request.mode == other.mode
+            && request.targetLength == other.targetLength
+    }
+}
+
 // MARK: - The orchestrator
 
 public struct DeepResearchOrchestrator: Sendable {
@@ -354,34 +415,74 @@ public struct DeepResearchOrchestrator: Sendable {
         self.deps = deps
     }
 
+    /// - Parameters:
+    ///   - resuming: a checkpoint from an earlier attempt at the same request. Its sections are
+    ///     kept and its plan is reused; only the sections it never reached are written.
+    ///   - onCheckpoint: called after every section, and once after planning. Persisting what it
+    ///     hands over is what makes a killed run resumable rather than wasted.
     public func run(
         _ request: DeepResearchRequest,
+        resuming checkpoint: DeepResearchCheckpoint? = nil,
+        onCheckpoint: @Sendable (DeepResearchCheckpoint) -> Void = { _ in },
         onProgress: @Sendable (DeepResearchProgress) -> Void = { _ in }
     ) async throws -> DeepResearchReport {
-        onProgress(.init(phase: .snapshot, message: "Preparing the corpus", wordsSoFar: 0))
+        // A checkpoint for a different objective is not a checkpoint for this run.
+        let resume = checkpoint.flatMap { $0.resumes(request) ? $0 : nil }
+
+        onProgress(.init(
+            phase: .snapshot,
+            message: resume == nil ? "Preparing the corpus" : "Picking up where it stopped",
+            wordsSoFar: resume?.words ?? 0
+        ))
+        // Rebuilt even on resume: it is the cheap half of the run, and the sections still to be
+        // written must be able to cite the corpus as it stands now.
         let catalog = try await deps.buildCatalog(request.objective)
         guard !catalog.isEmpty else { throw DeepResearchError.emptyCorpus }
 
         let pages = DeepResearchLimits.targetPages(request.targetLength, citableCount: catalog.entries.count)
         let plan = DeepResearchLimits.sectionPlan(pages: pages, requested: request.sectionLimit)
 
-        onProgress(.init(phase: .planning, message: "Planning \(plan.target) secciones", wordsSoFar: 0))
-        var titles = try await deps.plan(request, catalog, plan.target, plan.hardCap)
-        guard !titles.isEmpty else { throw DeepResearchError.planningFailed("the plan came back empty") }
-        if titles.count > plan.hardCap { titles = Array(titles.prefix(plan.hardCap)) }
+        var titles: [String]
+        let wordTarget: Int
+        if let resume {
+            titles = resume.titles
+            wordTarget = resume.wordTarget
+        } else {
+            onProgress(.init(phase: .planning, message: "Planning \(plan.target) sections", wordsSoFar: 0))
+            titles = try await deps.plan(request, catalog, plan.target, plan.hardCap)
+            guard !titles.isEmpty else { throw DeepResearchError.planningFailed("the plan came back empty") }
+            if titles.count > plan.hardCap { titles = Array(titles.prefix(plan.hardCap)) }
+            wordTarget = max(
+                250,
+                (pages.lowerBound + pages.upperBound) / 2 * DeepResearchLimits.wordsPerPage / max(1, titles.count)
+            )
+        }
 
-        let wordTarget = max(
-            250,
-            (pages.lowerBound + pages.upperBound) / 2 * DeepResearchLimits.wordsPerPage / max(1, titles.count)
-        )
-
-        var sections: [DeepResearchSection] = []
-        var words = 0
-        var checked = 0
-        var rejected = 0
+        var sections: [DeepResearchSection] = resume?.sections ?? []
+        var words = sections.reduce(0) { $0 + $1.wordCount }
+        var checked = resume?.citationsChecked ?? 0
+        var rejected = resume?.citationsRejected ?? 0
         var stoppedReason: String?
+        let startedAt = resume?.startedAt ?? Date()
 
-        for (index, title) in titles.enumerated() {
+        func currentCheckpoint() -> DeepResearchCheckpoint {
+            DeepResearchCheckpoint(
+                request: request,
+                titles: titles,
+                wordTarget: wordTarget,
+                sections: sections,
+                citationsChecked: checked,
+                citationsRejected: rejected,
+                startedAt: startedAt
+            )
+        }
+
+        // Emitted before the first model call so a run killed during its first section still
+        // resumes with a plan rather than paying to draw one up again.
+        onCheckpoint(currentCheckpoint())
+
+        let first = resume?.nextSectionIndex ?? 0
+        for (index, title) in titles.enumerated() where index >= first {
             try Task.checkCancellation()
 
             onProgress(.init(
@@ -415,6 +516,8 @@ public struct DeepResearchOrchestrator: Sendable {
                 )
                 sections.append(section)
                 words += section.wordCount
+                // After the call has been paid for, not before.
+                onCheckpoint(currentCheckpoint())
             } catch is CancellationError {
                 throw DeepResearchError.cancelled
             } catch {

@@ -142,7 +142,9 @@ struct DeepResearchOrchestratorTests {
     func runsEndToEnd() async throws {
         let orchestrator = DeepResearchOrchestrator(deps: deps())
         let phases = PhaseRecorder()
-        let report = try await orchestrator.run(request) { phases.record($0.phase) }
+        // Labelled rather than trailing: `run` now takes two closures, and an unlabelled one
+        // would quietly bind to the checkpoint hook instead of the progress hook.
+        let report = try await orchestrator.run(request, onProgress: { phases.record($0.phase) })
 
         #expect(report.sections.count == 3)
         #expect(report.words > 0)

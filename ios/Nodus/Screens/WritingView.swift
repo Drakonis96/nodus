@@ -37,7 +37,7 @@ struct WritingView: View {
             }
         }
         .sheet(isPresented: $composing) {
-            NoteComposer(accent: session.accent) { title, body in
+            NoteEditor(accent: session.accent, note: nil) { title, body in
                 await controller?.queueNote(title: title, body: body, folderId: nil)
             }
         }
@@ -69,7 +69,7 @@ struct WritingView: View {
             }
 
             if let error = controller.lastError {
-                Section { NodusNotice(tone: .blocked, title: "Could not send", message: error) }
+                Section { NodusNotice(tone: .blocked, title: "Could not send", message: LocalizedStringKey(error)) }
             }
 
             if controller.items.isEmpty {
@@ -125,7 +125,9 @@ struct WritingView: View {
     }
 
     private func stateBadge(_ state: MutationOutbox.State) -> some View {
-        let (label, colour): (String, Color) = switch state {
+        // `LocalizedStringKey`: a computed `String` here reached `Text` as data and shipped the
+        // three most-read words on this screen in English on every phone.
+        let (label, colour): (LocalizedStringKey, Color) = switch state {
         case .pending: ("Not sent", .orange)
         case .accepted: ("On the server", session.accent)
         case .rejected: ("Rejected", .red)
@@ -137,54 +139,18 @@ struct WritingView: View {
             .background(colour.opacity(0.15), in: Capsule())
     }
 
+    /// `String(localized:)` rather than a bare literal: the result is handed to `Text` as a
+    /// value, and a value is never looked up in the catalogue.
     private func caption(for item: MutationOutbox.Item) -> String {
         if let detail = item.detail { return detail }
         switch item.state {
         case .pending:
-            return "Saved on this device."
+            return String(localized: "Saved on this device.")
         case .accepted:
             // The important sentence on this screen.
-            return "Waiting for the owner to republish."
+            return String(localized: "Waiting for the owner to republish.")
         case .rejected:
-            return "The server rejected it."
-        }
-    }
-}
-
-private struct NoteComposer: View {
-    @Environment(\.dismiss) private var dismiss
-    let accent: Color
-    let onSave: (String, String) async -> Void
-
-    @State private var title = ""
-    @State private var text = ""
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section("Title") {
-                    TextField("Note title", text: $title)
-                }
-                Section("Content") {
-                    TextEditor(text: $text)
-                        .frame(minHeight: 220)
-                }
-            }
-            .navigationTitle("New note")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        Task {
-                            await onSave(title, text)
-                            dismiss()
-                        }
-                    }
-                    .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty
-                        && text.trimmingCharacters(in: .whitespaces).isEmpty)
-                }
-            }
+            return String(localized: "The server rejected it.")
         }
     }
 }

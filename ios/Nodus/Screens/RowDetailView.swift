@@ -38,7 +38,7 @@ struct RowDetailView: View {
                 heading
 
                 if let error {
-                    NodusNotice(tone: .caution, title: "Could not expand", message: error)
+                    NodusNotice(tone: .caution, title: "Could not expand", message: LocalizedStringKey(error))
                 }
 
                 if collection?.path == "themes", theme != nil {
@@ -390,7 +390,9 @@ struct RowDetailView: View {
         }
     }
 
-    private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+    /// `LocalizedStringKey`, not `String`: every call site passes a literal, and a `String`
+    /// parameter is what silently turns a translated heading back into English.
+    private func section<Content: View>(_ title: LocalizedStringKey, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title).font(.subheadline.weight(.semibold))
             content()
@@ -400,7 +402,7 @@ struct RowDetailView: View {
         }
     }
 
-    private func chips(_ values: [String], label: String) -> some View {
+    private func chips(_ values: [String], label: LocalizedStringKey) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(label).font(.caption2.weight(.medium)).foregroundStyle(.secondary)
             FlowLayout(spacing: 6) {

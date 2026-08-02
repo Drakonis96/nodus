@@ -60,6 +60,13 @@ public actor MutationOutbox {
                 );
                 CREATE INDEX IF NOT EXISTS outbox_state ON outbox (state, created_at);
                 """)
+            // Added after the queue already existed on devices, so it is an ALTER guarded by a
+            // column check rather than a change to the CREATE above — which would never run
+            // again on a database that already has the table.
+            let columns = try db.columns(in: "outbox").map(\.name)
+            if !columns.contains("authorised") {
+                try db.execute(sql: "ALTER TABLE outbox ADD COLUMN authorised INTEGER NOT NULL DEFAULT 0")
+            }
         }
     }
 
@@ -68,9 +75,12 @@ public actor MutationOutbox {
     public func enqueue(_ mutation: Mutation, title: String) throws {
         let payload = try JSONEncoder.nodus.encode(mutation)
         try dbQueue.write { db in
+            // `authorised` is written as 0 rather than left to its default because this is an
+            // INSERT OR REPLACE: editing a change that was already authorised puts it back
+            // behind the send button, which is the honest reading of "this is a new change".
             try db.execute(sql: """
-                INSERT OR REPLACE INTO outbox (id, tbl, title, state, detail, payload, created_at, sent_at)
-                VALUES (?, ?, ?, ?, NULL, ?, ?, NULL)
+                INSERT OR REPLACE INTO outbox (id, tbl, title, state, detail, payload, created_at, sent_at, authorised)
+                VALUES (?, ?, ?, ?, NULL, ?, ?, NULL, 0)
                 """, arguments: [
                     mutation.id, mutation.table, title, State.pending.rawValue,
                     String(data: payload, encoding: .utf8) ?? "{}",
@@ -80,12 +90,53 @@ public actor MutationOutbox {
     }
 
     public func pending(limit: Int) throws -> [Mutation] {
+        try mutations(sql: "SELECT payload FROM outbox WHERE state = ? ORDER BY created_at LIMIT ?",
+                      arguments: [State.pending.rawValue, limit])
+    }
+
+    /// Pending changes the user has already asked to send.
+    ///
+    /// The background flush reads this and never `pending(limit:)`, which is the whole
+    /// difference between finishing a journey the user started and starting one for them. A
+    /// note written on a plane and never sent stays on the device until they press the button,
+    /// exactly as the Writing screen promises.
+    public func authorisedPending(limit: Int) throws -> [Mutation] {
+        try mutations(sql: """
+            SELECT payload FROM outbox
+            WHERE state = ? AND authorised = 1
+            ORDER BY created_at LIMIT ?
+            """, arguments: [State.pending.rawValue, limit])
+    }
+
+    /// Record that the user pressed send. Returns how many changes that covered.
+    ///
+    /// Called at the start of a foreground flush, before the first request, so a flush cut off
+    /// by a dead network leaves behind changes the background task is allowed to finish.
+    @discardableResult
+    public func authorisePending() throws -> Int {
+        try dbQueue.write { db in
+            try db.execute(
+                sql: "UPDATE outbox SET authorised = 1 WHERE state = ? AND authorised = 0",
+                arguments: [State.pending.rawValue]
+            )
+            return db.changesCount
+        }
+    }
+
+    /// How many changes the background flush would be allowed to send right now.
+    public func authorisedCount() throws -> Int {
         try dbQueue.read { db in
-            try GRDB.Row.fetchAll(
+            try Int.fetchOne(
                 db,
-                sql: "SELECT payload FROM outbox WHERE state = ? ORDER BY created_at LIMIT ?",
-                arguments: [State.pending.rawValue, limit]
-            ).compactMap { row in
+                sql: "SELECT COUNT(*) FROM outbox WHERE state = ? AND authorised = 1",
+                arguments: [State.pending.rawValue]
+            ) ?? 0
+        }
+    }
+
+    private func mutations(sql: String, arguments: StatementArguments) throws -> [Mutation] {
+        try dbQueue.read { db in
+            try GRDB.Row.fetchAll(db, sql: sql, arguments: arguments).compactMap { row in
                 guard
                     let payload: String = row["payload"],
                     let data = payload.data(using: .utf8)

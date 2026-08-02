@@ -32,7 +32,7 @@ struct FamilyTreeView: View {
         ScrollView {
             VStack(spacing: 18) {
                 if let error {
-                    NodusNotice(tone: .blocked, title: "Could not build the tree", message: error)
+                    NodusNotice(tone: .blocked, title: "Could not build the tree", message: LocalizedStringKey(error))
                 }
 
                 if isLoading, focus == nil {

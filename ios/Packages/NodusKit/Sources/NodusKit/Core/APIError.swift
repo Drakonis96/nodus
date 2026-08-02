@@ -97,15 +97,54 @@ extension APIError: LocalizedError {
 }
 
 /// Failures that never reached a Nodus Server, or that came back malformed.
-public enum TransportError: Error, Sendable {
+public enum TransportError: Error, Sendable, Equatable {
     case offline
     case cancelled
     case timedOut
+    /// Nothing answers to that name.
+    ///
+    /// Kept apart from `cannotConnect` because the two need opposite things from the user, and
+    /// flattening both into one sentence is what made "could not connect" useless: a Nodus
+    /// Server usually lives on a private network, and this is the case where the *device* is
+    /// not on it.
+    case hostNotFound
+    /// The name resolves and nothing is listening behind it.
+    case cannotConnect
+    /// TLS refused: an untrusted, expired or self-signed certificate.
+    case certificateRejected
+    /// iOS blocked the request for being plain HTTP to something that is not this device.
+    case insecureBlocked
     /// The origin is not a valid absolute URL, or carries a path/query the server would reject.
     case badServerURL(String)
     /// A 2xx whose body did not match the documented shape. Carries what was expected.
     case malformedResponse(expected: String)
     case underlying(String)
+
+    /// The one place a `URLError` becomes a Nodus error.
+    ///
+    /// Static and pure so the mapping can be tested without a network — the cases below are
+    /// exactly the ones a user hits while pointing the app at a server for the first time.
+    public static func from(_ error: URLError) -> TransportError {
+        switch error.code {
+        case .notConnectedToInternet, .dataNotAllowed:
+            return .offline
+        case .cancelled:
+            return .cancelled
+        case .timedOut, .networkConnectionLost:
+            return .timedOut
+        case .cannotFindHost, .dnsLookupFailed:
+            return .hostNotFound
+        case .cannotConnectToHost:
+            return .cannotConnect
+        case .secureConnectionFailed, .serverCertificateUntrusted, .serverCertificateHasBadDate,
+             .serverCertificateNotYetValid, .serverCertificateHasUnknownRoot, .clientCertificateRejected:
+            return .certificateRejected
+        case .appTransportSecurityRequiresSecureConnection:
+            return .insecureBlocked
+        default:
+            return .underlying(error.localizedDescription)
+        }
+    }
 }
 
 extension TransportError: LocalizedError {
@@ -114,6 +153,14 @@ extension TransportError: LocalizedError {
         case .offline: return "No connection."
         case .cancelled: return "Cancelled."
         case .timedOut: return "The server took too long to answer."
+        case .hostNotFound:
+            return "No machine by that name. If the server is on a private network — Tailscale, a VPN, your own Wi‑Fi — this device has to be on it too."
+        case .cannotConnect:
+            return "The name resolves, but nothing answered. The server may be stopped, or reachable only from the machine it runs on."
+        case .certificateRejected:
+            return "The certificate was refused. A Nodus Server needs one this device already trusts."
+        case .insecureBlocked:
+            return "iOS refuses plain HTTP to anything but this device. Use an https:// address."
         case .badServerURL(let value): return "Not a usable server address: \(value)"
         case .malformedResponse(let expected): return "Unexpected answer from the server (expected \(expected))."
         case .underlying(let value): return value

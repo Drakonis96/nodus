@@ -8,6 +8,7 @@ struct SpaceSettingsView: View {
     let session: SpaceSession
 
     @Environment(AISettings.self) private var ai
+    @Environment(AppLock.self) private var lock
     @State private var health: ServerHealth?
     @State private var capabilities: ServerCapabilities?
     @State private var diagnosticError: String?
@@ -109,6 +110,31 @@ struct SpaceSettingsView: View {
                 }
 
                 Section {
+                    Toggle(isOn: Binding(
+                        get: { lock.isEnabled },
+                        // Turning it on authenticates first, so a sensor that does not work is
+                        // discovered here rather than at the door.
+                        set: { wanted in Task { await lock.enable(wanted) } }
+                    )) {
+                        Label(lock.biometry.label, systemImage: lock.biometry.systemImage)
+                    }
+                    .disabled(!lock.biometry.isAvailable)
+                    .tint(session.accent)
+
+                    if let failure = lock.failure {
+                        Text(failure).font(.caption).foregroundStyle(.red)
+                    }
+                } header: {
+                    Text("This device")
+                } footer: {
+                    if lock.biometry.isAvailable {
+                        Text("Nodus asks again every time it comes back to the screen. Your keys and any offline copy are already unreadable while the phone is locked; this covers a phone that is unlocked and not in your hands.")
+                    } else {
+                        Text("This device has no passcode set, so there is nothing to lock with.")
+                    }
+                }
+
+                Section {
                     switch session.mirrorProgress {
                     case .absent:
                         Button {
@@ -199,15 +225,24 @@ struct SpaceSettingsView: View {
         return nil
     }
 
+    /// `String(localized:)`: this is the *value* half of a settings row, so it is rendered as
+    /// data — but unlike a model name or a revision hash it is a word this app chose, and a
+    /// word this app chose is a word it should translate.
     private var roleLabel: String {
         switch session.connection.role {
-        case .reader: return "Read only"
-        case .writer: return "Can send changes"
-        case .owner: return "Owner"
+        case .reader: return String(localized: "Read only")
+        case .writer: return String(localized: "Can send changes")
+        case .owner: return String(localized: "Owner")
         }
     }
 
-    private func labelled(_ title: String, _ value: String) -> some View {
+    /// The row label is a `LocalizedStringKey`; the value is not.
+    ///
+    /// Taking a `String` for the label was enough to leave this whole screen in English on a
+    /// Spanish phone: `Text(aString)` renders the string, and only `Text("a literal")` — or a
+    /// `LocalizedStringKey` — is looked up. The value stays a `String` on purpose: it is data
+    /// from the server, and translating a model name or a revision hash would be a lie.
+    private func labelled(_ title: LocalizedStringKey, _ value: String) -> some View {
         HStack {
             Text(title)
             Spacer()

@@ -73,18 +73,22 @@ final class LocalReportStore {
     }
 }
 
+// Built per call rather than shared. A `JSONDecoder` is not `Sendable`, and a stored one would
+// have to be pinned to an actor — which the Deep Research checkpoint cannot honour, because it
+// is written from whichever thread finished a section. Constructing one costs nothing next to
+// the file read it accompanies.
 extension JSONDecoder {
-    static let nodusReports: JSONDecoder = {
+    nonisolated static var nodusReports: JSONDecoder {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         return decoder
-    }()
+    }
 }
 
 extension JSONEncoder {
-    static let nodusReports: JSONEncoder = {
+    nonisolated static var nodusReports: JSONEncoder {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         return encoder
-    }()
+    }
 }

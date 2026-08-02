@@ -226,3 +226,63 @@ struct VaultTypeTests {
         #expect(vault.type == nil)
     }
 }
+
+/// What a failed connection is allowed to say.
+///
+/// A Nodus Server usually lives on a private network, so the two ordinary failures — "this
+/// device is not on that network" and "nothing is listening" — are the ones a user actually
+/// hits, and they need opposite things done about them. Collapsing both into "could not
+/// connect" is what left a real user staring at a screen with nothing to act on.
+@Suite("Transport errors")
+struct TransportErrorTests {
+    @Test("a name that resolves to nothing is told apart from a port with nothing behind it")
+    func namingTheTwoFailures() {
+        #expect(TransportError.from(URLError(.cannotFindHost)) == .hostNotFound)
+        #expect(TransportError.from(URLError(.dnsLookupFailed)) == .hostNotFound)
+        #expect(TransportError.from(URLError(.cannotConnectToHost)) == .cannotConnect)
+
+        let notFound = TransportError.hostNotFound.errorDescription ?? ""
+        let refused = TransportError.cannotConnect.errorDescription ?? ""
+        #expect(notFound != refused)
+        #expect(notFound.contains("private network"), "the fix is to join the network, and it should say so")
+        #expect(refused.contains("stopped") || refused.contains("reachable"))
+    }
+
+    @Test("a refused certificate is not reported as a missing server")
+    func certificatesAreTheirOwnFailure() {
+        for code: URLError.Code in [.secureConnectionFailed, .serverCertificateUntrusted,
+                                    .serverCertificateHasBadDate, .serverCertificateHasUnknownRoot] {
+            #expect(TransportError.from(URLError(code)) == .certificateRejected)
+        }
+        #expect(TransportError.certificateRejected.errorDescription?.contains("certificate") == true)
+    }
+
+    @Test("ATS blocking cleartext says what to type instead")
+    func cleartextIsExplained() {
+        #expect(TransportError.from(URLError(.appTransportSecurityRequiresSecureConnection)) == .insecureBlocked)
+        #expect(TransportError.insecureBlocked.errorDescription?.contains("https://") == true)
+    }
+
+    @Test("the ordinary three keep their meaning")
+    func theUsualSuspects() {
+        #expect(TransportError.from(URLError(.notConnectedToInternet)) == .offline)
+        #expect(TransportError.from(URLError(.cancelled)) == .cancelled)
+        #expect(TransportError.from(URLError(.timedOut)) == .timedOut)
+        // A code with no case of its own keeps the system's own words rather than being
+        // flattened into a wrong one.
+        #expect(TransportError.from(URLError(.badServerResponse)) != .hostNotFound)
+    }
+
+    @Test("every case says something, because a blank error is worse than a wrong one")
+    func nothingIsSilent() {
+        let cases: [TransportError] = [
+            .offline, .cancelled, .timedOut, .hostNotFound, .cannotConnect,
+            .certificateRejected, .insecureBlocked, .badServerURL("x"),
+            .malformedResponse(expected: "y"), .underlying("z"),
+        ]
+        for value in cases {
+            let text = value.errorDescription ?? ""
+            #expect(!text.isEmpty, "\(value) has no description")
+        }
+    }
+}

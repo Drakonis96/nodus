@@ -40,7 +40,7 @@ struct ChatScreen: View {
                                 .id(turn.id)
                         }
                         if let error {
-                            NodusNotice(tone: .blocked, title: "The query failed", message: error)
+                            NodusNotice(tone: .blocked, title: "The query failed", message: LocalizedStringKey(error))
                         }
                     }
                     .padding(16)
@@ -206,7 +206,7 @@ private struct TurnBubble: View {
                     .nodusGlass(NodusGlass(.regular, tint: accent))
             } else {
                 if let warning = turn.warning {
-                    NodusNotice(tone: .caution, title: "Lexical retrieval", message: warning)
+                    NodusNotice(tone: .caution, title: "Lexical retrieval", message: LocalizedStringKey(warning))
                 }
                 Text(turn.text.isEmpty ? "…" : turn.text)
                     .textSelection(.enabled)

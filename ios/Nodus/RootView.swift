@@ -3,8 +3,10 @@ import NodusUI
 import SwiftUI
 
 struct RootView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @State private var model = AppModel()
     @State private var ai = AISettings()
+    @State private var lock = AppLock()
     @State private var tilt = DeviceTiltProvider()
     @State private var showingConnect = false
 
@@ -16,8 +18,20 @@ struct RootView: View {
                 SpacePickerView(showingConnect: $showingConnect)
             }
         }
+        // Over everything, including any sheet: a settings screen presented before the app went
+        // away must not be readable through the lock.
+        .overlay {
+            if lock.isLocked {
+                LockScreen(lock: lock)
+            } else if lock.isEnabled, scenePhase == .inactive {
+                // The multitasking snapshot is taken here. Without this it would show the
+                // corpus, which makes the lock decorative.
+                PrivacyCover()
+            }
+        }
         .environment(model)
         .environment(ai)
+        .environment(lock)
         .detectingScreenCutout()
         .nodusTiltDriven(tilt)
         .sheet(isPresented: $showingConnect) { ConnectView().environment(model) }
@@ -27,6 +41,16 @@ struct RootView: View {
             if model.session == nil, let recent = model.mostRecent {
                 model.open(recent)
             }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .background else { return }
+            // Immediately, with no grace period. A window in which the app reopens unlocked is
+            // a window somebody else can use.
+            lock.lock()
+            // The moment work stops being foreground work is the moment to ask iOS to finish
+            // it. Asking earlier is refused — the scheduler will not accept a request from an
+            // app that is on screen.
+            Task { await BackgroundWork.scheduleWhatIsPending() }
         }
     }
 }
@@ -117,11 +141,13 @@ private struct ConnectionCard: View {
         .nodusGlass(NodusGlass(.regular, tint: connection.accent, interactive: true))
     }
 
+    /// `String(localized:)`: interpolated into a line of data, so it reaches `Text` as a value
+    /// and would otherwise stay English on a Spanish phone.
     private var roleLabel: String {
         switch connection.role {
-        case .reader: return "read"
-        case .writer: return "write"
-        case .owner: return "owner"
+        case .reader: return String(localized: "read")
+        case .writer: return String(localized: "write")
+        case .owner: return String(localized: "owner")
         }
     }
 }
