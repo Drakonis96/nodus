@@ -129,3 +129,24 @@ public struct KeychainStore: Sendable {
         return query
     }
 }
+
+extension KeychainStore.Failure: LocalizedError {
+    /// A bare `OSStatus` in an alert helps nobody, and the default `Error` description does not
+    /// even show the number. These are the three that actually happen.
+    public var errorDescription: String? {
+        switch self {
+        case .notData:
+            return "No se pudo codificar el secreto."
+        case .unexpectedStatus(errSecMissingEntitlement):
+            // −34018. The build has no `application-identifier`, which for a simulator build
+            // means it was not signed. It is a build problem, not a user problem, and saying
+            // "error 0" would have hidden that.
+            return "El llavero rechazó la operación porque esta compilación no está firmada (−34018)."
+        case .unexpectedStatus(errSecInteractionNotAllowed):
+            return "El llavero no está disponible mientras el dispositivo está bloqueado."
+        case .unexpectedStatus(let status):
+            let message = SecCopyErrorMessageString(status, nil) as String? ?? "sin descripción"
+            return "El llavero falló: \(message) (\(status))."
+        }
+    }
+}

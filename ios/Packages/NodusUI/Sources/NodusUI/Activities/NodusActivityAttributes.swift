@@ -1,6 +1,8 @@
 import Foundation
 
-#if canImport(ActivityKit)
+// ActivityKit's module exists on macOS but `ActivityAttributes` itself does not, so the
+// guard has to be on the platform, not on the import.
+#if os(iOS)
 import ActivityKit
 
 /// The shape of every Nodus Live Activity, shared by the app that starts one and the widget

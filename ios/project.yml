@@ -24,8 +24,12 @@ settings:
     TARGETED_DEVICE_FAMILY: "1,2"
     DEVELOPMENT_TEAM: ""
     CODE_SIGN_STYLE: Automatic
-    CODE_SIGNING_REQUIRED: NO
-    CODE_SIGNING_ALLOWED: NO
+    # Simulator builds sign ad hoc. This is not cosmetic: without a signature the app has no
+    # `application-identifier` entitlement, and every SecItemAdd fails with -34018 — which is
+    # exactly how the first run failed, at the moment it tried to store a device token.
+    CODE_SIGN_IDENTITY[sdk=iphonesimulator*]: "-"
+    CODE_SIGNING_REQUIRED[sdk=iphonesimulator*]: YES
+    CODE_SIGNING_ALLOWED[sdk=iphonesimulator*]: YES
 
 packages:
   NodusKit:

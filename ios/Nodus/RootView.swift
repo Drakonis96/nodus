@@ -2,34 +2,119 @@ import NodusKit
 import NodusUI
 import SwiftUI
 
-/// The scaffold's root. Phase 2 replaces this with the real shell — the notch-aware header,
-/// the tab bar on iPhone and the split view on iPad. It exists now so the project has
-/// something to launch and the toolchain can be proved end to end.
 struct RootView: View {
-    @State private var markProgress: Double = 0
+    @State private var model = AppModel()
+    @State private var tilt = DeviceTiltProvider()
+    @State private var showingConnect = false
+
+    var body: some View {
+        Group {
+            if let session = model.session {
+                SpaceShell(session: session)
+            } else {
+                SpacePickerView(showingConnect: $showingConnect)
+            }
+        }
+        .environment(model)
+        .detectingScreenCutout()
+        .nodusTiltDriven(tilt)
+        .sheet(isPresented: $showingConnect) { ConnectView().environment(model) }
+        .task {
+            // Reopen where the user left off, but only if the credential is still there — a
+            // revoked token should land on the picker, not on a broken shell.
+            if model.session == nil, let recent = model.mostRecent {
+                model.open(recent)
+            }
+        }
+    }
+}
+
+/// The list of spaces this device holds a credential for.
+struct SpacePickerView: View {
+    @Environment(AppModel.self) private var model
+    @Binding var showingConnect: Bool
+
+    private let accent = Color(hex: VaultType.academic.accentHex)
 
     var body: some View {
         ZStack {
-            LinearGradient(
-                colors: [Color(hex: "#0b0a12"), Color(hex: "#1a1430")],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
+            NodusBackdrop(accent: accent)
+            ScrollView {
+                VStack(spacing: 20) {
+                    VStack(spacing: 12) {
+                        NodusMark(style: .brand).frame(width: 84, height: 84)
+                        Text("Nodus").font(.largeTitle.weight(.semibold))
+                        Text("Tus vaults, donde estés.")
+                            .font(.subheadline).foregroundStyle(.secondary)
+                    }
+                    .padding(.top, 50)
 
-            VStack(spacing: 20) {
-                NodusMark(progress: markProgress, nodeReveal: markProgress)
-                    .frame(width: 96, height: 96)
-                Text("Nodus")
-                    .font(.system(size: 28, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white)
-                Text("\(Collections.all.count) colecciones · \(VaultType.allCases.count) tipos de vault")
-                    .font(.footnote)
-                    .foregroundStyle(.white.opacity(0.6))
+                    if model.hasAnyConnection {
+                        VStack(spacing: 10) {
+                            ForEach(model.connections.sorted { ($0.lastOpenedAt ?? .distantPast) > ($1.lastOpenedAt ?? .distantPast) }) { connection in
+                                Button {
+                                    model.open(connection)
+                                } label: {
+                                    ConnectionCard(connection: connection)
+                                }
+                                .buttonStyle(.plain)
+                                .contextMenu {
+                                    Button(role: .destructive) {
+                                        model.forget(connection)
+                                    } label: {
+                                        Label("Olvidar", systemImage: "trash")
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        NodusNotice(
+                            tone: .info,
+                            title: "Ningún espacio todavía",
+                            message: "Conéctate al Nodus Server donde tu vault está publicado.",
+                            systemImage: "antenna.radiowaves.left.and.right"
+                        )
+                    }
+
+                    Button {
+                        showingConnect = true
+                    } label: {
+                        Label("Añadir un servidor", systemImage: "plus")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(NodusPrimaryButtonStyle(accent: accent))
+                }
+                .padding(20)
             }
         }
-        .task {
-            withAnimation(.easeOut(duration: 1.1)) { markProgress = 1 }
+    }
+}
+
+private struct ConnectionCard: View {
+    let connection: AppModel.Connection
+
+    var body: some View {
+        HStack(spacing: 13) {
+            NodusMark(style: .accent(connection.accent)).frame(width: 38, height: 38)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(connection.spaceName).font(.subheadline.weight(.semibold))
+                Text("\(connection.serverName) · \(roleLabel)")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            Spacer()
+            Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary)
+        }
+        .padding(15)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .nodusGlass(NodusGlass(.regular, tint: connection.accent, interactive: true))
+    }
+
+    private var roleLabel: String {
+        switch connection.role {
+        case .reader: return "lectura"
+        case .writer: return "escritura"
+        case .owner: return "propietario"
         }
     }
 }
