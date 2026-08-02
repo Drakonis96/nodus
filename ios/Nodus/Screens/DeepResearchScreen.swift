@@ -14,6 +14,7 @@ struct DeepResearchScreen: View {
     @State private var report: DeepResearchReport?
     @State private var error: String?
     @State private var running: Task<Void, Never>?
+    @State private var liveActivity: LiveActivityController?
 
     var body: some View {
         ScrollView {
@@ -228,23 +229,48 @@ struct DeepResearchScreen: View {
             )
         )
 
+        // The island is where a run this long belongs: it outlives the screen that started
+        // it, and the phone should be able to say what it is doing without being unlocked.
+        let activity = LiveActivityController(
+            kind: .deepResearch,
+            title: request.objective,
+            accentHex: session.vaultType?.accentHex ?? VaultType.academic.accentHex,
+            spaceName: session.connection.spaceName
+        )
+        activity.start()
+        liveActivity = activity
+
         running = Task {
             do {
                 let finished = try await orchestrator.run(request) { update in
-                    Task { @MainActor in progress = update }
+                    Task { @MainActor in
+                        progress = update
+                        activity.update(
+                            phase: update.phase.rawValue,
+                            detail: update.sectionTitle ?? update.message,
+                            fraction: update.fraction,
+                            step: update.sectionIndex.map { $0 + 1 },
+                            stepCount: update.sectionTotal
+                        )
+                    }
                 }
                 report = finished
                 progress = nil
+                activity.finish()
             } catch is CancellationError {
                 progress = nil
                 error = "Cancelado."
+                activity.finish(failure: "Cancelado")
             } catch DeepResearchError.emptyCorpus {
                 progress = nil
                 error = "No se encontró nada citable para ese objetivo en este espacio."
+                activity.finish(failure: "Sin material citable")
             } catch {
                 progress = nil
                 self.error = error.localizedDescription
+                activity.finish(failure: error.localizedDescription)
             }
+            liveActivity = nil
         }
     }
 

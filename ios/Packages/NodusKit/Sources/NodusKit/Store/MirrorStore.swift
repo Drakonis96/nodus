@@ -410,6 +410,51 @@ public actor MirrorStore {
         try dbQueue.read { db in try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM asset_refs") ?? 0 }
     }
 
+    /// Rows of one table whose JSON body has `column` equal to `value`.
+    ///
+    /// This is how a link table gets traversed — `idea_theme_links` for the ideas under a
+    /// theme, say. The API has no route for those tables and no way to filter by a column even
+    /// where it does, so a relationship the desktop shows as a list is only reachable here.
+    public func rows(table: String, where column: String, equals value: String, limit: Int = 500) throws -> [Row] {
+        try dbQueue.read { db in
+            try GRDB.Row.fetchAll(db, sql: """
+                SELECT body FROM rows_json
+                WHERE tbl = ? AND json_extract(body, '$.' || ?) = ?
+                ORDER BY ordinal
+                LIMIT ?
+                """, arguments: [table, column, value, limit])
+                .compactMap { row in
+                    guard
+                        let body: String = row["body"],
+                        let data = body.data(using: .utf8),
+                        let columns = try? JSONDecoder().decode([String: JSONValue].self, from: data)
+                    else { return nil }
+                    return NodusKit.Row(columns)
+                }
+        }
+    }
+
+    /// Rows of one table whose declared key is in a set. Used after a link table hands back ids.
+    public func rows(table: String, ids: [String]) throws -> [Row] {
+        guard !ids.isEmpty else { return [] }
+        return try dbQueue.read { db in
+            let placeholders = databaseQuestionMarks(count: ids.count)
+            return try GRDB.Row.fetchAll(db, sql: """
+                SELECT body FROM rows_json
+                WHERE tbl = ? AND row_id IN (\(placeholders))
+                ORDER BY ordinal
+                """, arguments: StatementArguments([table] + ids))
+                .compactMap { row in
+                    guard
+                        let body: String = row["body"],
+                        let data = body.data(using: .utf8),
+                        let columns = try? JSONDecoder().decode([String: JSONValue].self, from: data)
+                    else { return nil }
+                    return NodusKit.Row(columns)
+                }
+        }
+    }
+
     /// Tables worth putting in a menu: ones whose rows have something to show.
     ///
     /// A published corpus is roughly half join tables — `world_links`, `scene_characters`,

@@ -7,8 +7,11 @@ import SwiftUI
 /// — the same numbers `src/dockIcon.ts` rasterises the macOS dock icon from — so one accent
 /// colour produces the whole mark, at any size, with no asset at all.
 ///
-/// Geometry: a 64×64 box, the stroke `M18 48 V16 L46 48 V16`, and four nodes of radius 6.5 at
-/// its corners.
+/// **The layout is driven by the ink, not by the viewBox.** The canonical box is 64×64, but the
+/// stroke is 6.5 wide with round caps and the nodes are radius 6.5 on the corners, so the glyph
+/// actually paints from (11.5, 9.5) to (52.5, 54.5) — 41×45 inside a 64×64 frame. Fitting the
+/// viewBox instead of the ink leaves a third of the space empty and off-centre by a couple of
+/// points, which is exactly what a 20-point mark under the Dynamic Island cannot afford.
 public struct NodusMark: View {
     public enum Style: Sendable, Hashable {
         /// The house violet from `src/assets/nodus-logo.svg`.
@@ -33,30 +36,48 @@ public struct NodusMark: View {
     }
 
     public var body: some View {
-        GeometryReader { proxy in
-            let scale = min(proxy.size.width, proxy.size.height) / Geometry.viewBox
-            ZStack {
-                Self.strokePath
-                    .trim(from: 0, to: max(0, min(1, progress)))
-                    .stroke(
-                        gradient,
-                        style: StrokeStyle(lineWidth: Geometry.strokeWidth, lineCap: .round, lineJoin: .round)
+        Canvas { context, size in
+            let fit = Geometry.fit(in: size)
+
+            // Stroke first, nodes on top: the nodes sit exactly on the path's vertices and are
+            // what give the joins their round finish.
+            var stroke = Path()
+            let points = Geometry.strokePoints.map(fit.point)
+            stroke.move(to: points[0])
+            for point in points.dropFirst() { stroke.addLine(to: point) }
+
+            let visible = max(0, min(1, progress))
+            if visible > 0 {
+                context.stroke(
+                    visible >= 1 ? stroke : stroke.trimmedPath(from: 0, to: visible),
+                    with: .linearGradient(
+                        Gradient(stops: stops.map { .init(color: $0.color, location: $0.location) }),
+                        startPoint: fit.point(Geometry.gradientStart),
+                        endPoint: fit.point(Geometry.gradientEnd)
+                    ),
+                    style: StrokeStyle(
+                        lineWidth: Geometry.strokeWidth * fit.scale,
+                        lineCap: .round,
+                        lineJoin: .round
                     )
-                ForEach(Array(Geometry.nodes.enumerated()), id: \.offset) { index, node in
-                    Circle()
-                        .fill(nodeColor(at: index))
-                        .frame(width: Geometry.nodeRadius * 2, height: Geometry.nodeRadius * 2)
-                        .position(x: node.x, y: node.y)
-                        .opacity(nodeOpacity(at: index))
-                }
+                )
             }
-            .frame(width: Geometry.viewBox, height: Geometry.viewBox)
-            .scaleEffect(scale, anchor: .topLeading)
-            .frame(width: proxy.size.width, height: proxy.size.height, alignment: .center)
-            .offset(
-                x: (proxy.size.width - Geometry.viewBox * scale) / 2,
-                y: (proxy.size.height - Geometry.viewBox * scale) / 2
-            )
+
+            for (index, node) in Geometry.nodes.enumerated() {
+                let opacity = nodeOpacity(at: index)
+                guard opacity > 0 else { continue }
+                let centre = fit.point(node)
+                let radius = Geometry.nodeRadius * fit.scale
+                let circle = Path(ellipseIn: CGRect(
+                    x: centre.x - radius,
+                    y: centre.y - radius,
+                    width: radius * 2,
+                    height: radius * 2
+                ))
+                context.opacity = opacity
+                context.fill(circle, with: .color(nodeColour(at: index)))
+                context.opacity = 1
+            }
         }
         .accessibilityHidden(true)
     }
@@ -74,33 +95,53 @@ public struct NodusMark: View {
         public static let gradientStart = CGPoint(x: 14, y: 10)
         public static let gradientEnd = CGPoint(x: 50, y: 54)
 
-        /// Bottom-left, top-left, bottom-right, top-right — the order the stroke visits them,
-        /// which is what makes the staggered reveal follow the pen.
-        public static let nodes: [CGPoint] = [
+        /// `M18 48 V16 L46 48 V16` — up the left leg, down the diagonal, up the right leg.
+        public static let strokePoints: [CGPoint] = [
             CGPoint(x: leftX, y: bottomY),
             CGPoint(x: leftX, y: topY),
             CGPoint(x: rightX, y: bottomY),
             CGPoint(x: rightX, y: topY),
         ]
+
+        /// Bottom-left, top-left, bottom-right, top-right — the order the stroke visits them,
+        /// which is what makes the staggered reveal follow the pen.
+        public static let nodes: [CGPoint] = strokePoints
+
+        /// What the mark actually paints, half a stroke wider than its vertices on every side.
+        public static let inkBounds = CGRect(
+            x: leftX - nodeRadius,
+            y: topY - nodeRadius,
+            width: (rightX - leftX) + nodeRadius * 2,
+            height: (bottomY - topY) + nodeRadius * 2
+        )
+
+        /// Maps canonical coordinates into a frame, fitting the ink and centring it.
+        struct Fit {
+            let scale: CGFloat
+            let originX: CGFloat
+            let originY: CGFloat
+
+            func point(_ value: CGPoint) -> CGPoint {
+                CGPoint(x: originX + value.x * scale, y: originY + value.y * scale)
+            }
+        }
+
+        static func fit(in size: CGSize) -> Fit {
+            let scale = min(size.width / inkBounds.width, size.height / inkBounds.height)
+            // Centre the ink box, not the viewBox.
+            let originX = (size.width - inkBounds.width * scale) / 2 - inkBounds.minX * scale
+            let originY = (size.height - inkBounds.height * scale) / 2 - inkBounds.minY * scale
+            return Fit(scale: scale, originX: originX, originY: originY)
+        }
     }
 
-    /// `M18 48 V16 L46 48 V16` — up the left leg, down the diagonal, up the right leg.
+    /// The canonical path in viewBox coordinates, for anything that needs the shape itself.
     public static let strokePath = Path { path in
-        path.move(to: CGPoint(x: Geometry.leftX, y: Geometry.bottomY))
-        path.addLine(to: CGPoint(x: Geometry.leftX, y: Geometry.topY))
-        path.addLine(to: CGPoint(x: Geometry.rightX, y: Geometry.bottomY))
-        path.addLine(to: CGPoint(x: Geometry.rightX, y: Geometry.topY))
+        path.move(to: Geometry.strokePoints[0])
+        for point in Geometry.strokePoints.dropFirst() { path.addLine(to: point) }
     }
 
     // MARK: Colour
-
-    private var gradient: LinearGradient {
-        LinearGradient(
-            stops: stops.map { Gradient.Stop(color: $0.color, location: $0.location) },
-            startPoint: .init(x: Geometry.gradientStart.x / Geometry.viewBox, y: Geometry.gradientStart.y / Geometry.viewBox),
-            endPoint: .init(x: Geometry.gradientEnd.x / Geometry.viewBox, y: Geometry.gradientEnd.y / Geometry.viewBox)
-        )
-    }
 
     private var stops: [(color: Color, location: CGFloat)] {
         switch style {
@@ -115,7 +156,7 @@ public struct NodusMark: View {
         }
     }
 
-    private func nodeColor(at index: Int) -> Color {
+    private func nodeColour(at index: Int) -> Color {
         switch style {
         case .brand:
             return [
@@ -142,11 +183,19 @@ public struct NodusMark: View {
 
 #if DEBUG
 #Preview("Mark") {
-    HStack(spacing: 24) {
-        NodusMark(style: .brand).frame(width: 72, height: 72)
-        NodusMark(style: .accent(Color(hex: "#ca8a04"))).frame(width: 72, height: 72)
-        NodusMark(style: .accent(Color(hex: "#0f766e"))).frame(width: 72, height: 72)
-        NodusMark(style: .monochrome(.white)).frame(width: 72, height: 72)
+    VStack(spacing: 24) {
+        HStack(spacing: 24) {
+            ForEach([18.0, 30.0, 48.0, 84.0], id: \.self) { size in
+                NodusMark(style: .brand)
+                    .frame(width: size, height: size)
+                    .border(.red.opacity(0.3))
+            }
+        }
+        HStack(spacing: 24) {
+            NodusMark(style: .accent(Color(hex: "#ca8a04"))).frame(width: 64, height: 64)
+            NodusMark(style: .accent(Color(hex: "#0f766e"))).frame(width: 64, height: 64)
+            NodusMark(style: .monochrome(.white)).frame(width: 64, height: 64)
+        }
     }
     .padding(40)
     .background(Color.black)

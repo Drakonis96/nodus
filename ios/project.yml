@@ -59,6 +59,10 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.drakonis96.nodus.ios
         PRODUCT_NAME: Nodus
+        # Generated from shared/nodusMark.json by scripts/ios-app-icon.mjs, so the icon and the
+        # in-app mark cannot drift apart.
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         MARKETING_VERSION: "3.1.0"
         CURRENT_PROJECT_VERSION: "1"
         INFOPLIST_FILE: Nodus/Info.plist

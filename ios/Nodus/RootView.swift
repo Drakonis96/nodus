@@ -87,6 +87,11 @@ struct SpacePickerView: View {
                     .buttonStyle(NodusPrimaryButtonStyle(accent: accent))
                 }
                 .padding(20)
+                // A 13-inch iPad is not a very wide iPhone. Stretching a list of four
+                // connections across 1 000 points gives rows that are mostly empty and a line
+                // length nobody reads comfortably.
+                .frame(maxWidth: 560)
+                .frame(maxWidth: .infinity)
             }
         }
     }

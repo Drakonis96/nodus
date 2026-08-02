@@ -30,6 +30,8 @@ struct RowDetailView: View {
         collection?.presenter ?? RowPresenter.generic(table: title ?? "row")
     }
 
+    private var theme: String? { row.string("theme_id") }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
@@ -37,6 +39,22 @@ struct RowDetailView: View {
 
                 if let error {
                     NodusNotice(tone: .caution, title: "No se pudo ampliar", message: error)
+                }
+
+                if collection?.path == "themes", theme != nil {
+                    NavigationLink {
+                        ThemeIdeasView(session: session, theme: row)
+                    } label: {
+                        HStack {
+                            Label("Ver las ideas de este tema", systemImage: "lightbulb")
+                            Spacer()
+                            Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary)
+                        }
+                        .padding(15)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .nodusGlass(NodusGlass(.regular, tint: session.accent, interactive: true))
+                    }
+                    .buttonStyle(.plain)
                 }
 
                 switch enriched {
@@ -82,10 +100,42 @@ struct RowDetailView: View {
             if !detail.themes.isEmpty {
                 chips(detail.themes, label: "Temas")
             }
+            // The passages live here rather than in a section of their own, because a quotation
+            // means something as the support for a claim and very little in a list of 5 803.
+            if !detail.evidence.isEmpty {
+                section("Pasajes que la sostienen · \(detail.evidence.count)") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        ForEach(Array(detail.evidence.prefix(40).enumerated()), id: \.offset) { index, item in
+                            VStack(alignment: .leading, spacing: 5) {
+                                if let quote = item.text("quote") {
+                                    Text(quote)
+                                        .font(.callout)
+                                        .textSelection(.enabled)
+                                        .padding(.leading, 10)
+                                        .overlay(alignment: .leading) {
+                                            Rectangle()
+                                                .fill(session.accent.opacity(0.5))
+                                                .frame(width: 2)
+                                        }
+                                }
+                                HStack(spacing: 8) {
+                                    if let location = item.text("location") {
+                                        Text(location).font(.caption2).foregroundStyle(.secondary)
+                                    }
+                                    if let kind = item.text("kind") {
+                                        Text(kind == "explicit" ? "explícita" : "parafraseada")
+                                            .font(.caption2).foregroundStyle(session.accent.opacity(0.85))
+                                    }
+                                }
+                            }
+                            if index < min(detail.evidence.count, 40) - 1 { Divider().opacity(0.3) }
+                        }
+                    }
+                }
+            }
             fields(of: detail.idea)
             group("Relaciones", detail.relations, table: "edges")
             group("Apariciones", detail.occurrences, table: "idea_occurrences")
-            group("Evidencia", detail.evidence, table: "evidence")
         }
     }
 
@@ -95,12 +145,12 @@ struct RowDetailView: View {
                 NodusNotice(
                     tone: .info,
                     title: detail.passages == 1 ? "1 pasaje extraído" : "\(detail.passages) pasajes extraídos",
-                    message: "Los pasajes viven en su propia sección; el documento original nunca sale del escritorio.",
+                    message: "Se leen desde cada idea que se apoya en ellos. El documento original nunca sale del escritorio.",
                     systemImage: "text.quote"
                 )
             }
             fields(of: detail.work)
-            group("Ideas", detail.ideas, table: "ideas")
+            group("Ideas", detail.ideas, table: "ideas", linksTo: Collections["ideas"])
             if let summary = detail.summary {
                 section("Síntesis") { fields(of: summary) }
             }
@@ -118,15 +168,15 @@ struct RowDetailView: View {
             fields(of: detail.person)
             group("Nombres", detail.names, table: "person_names")
             group("Relaciones", detail.relationships, table: "relationships")
-            group("Eventos", detail.events, table: "events")
-            group("Lugares", detail.places, table: "places")
+            group("Eventos", detail.events, table: "events", linksTo: Collections["events"])
+            group("Lugares", detail.places, table: "places", linksTo: Collections["places"])
         }
     }
 
     private func authorBody(_ detail: AuthorDetail) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             fields(of: detail.author)
-            group("Obras", detail.works, table: "works")
+            group("Obras", detail.works, table: "works", linksTo: Collections["works"])
             group("Relaciones", detail.relations, table: "author_relations")
             if let synthesis = detail.synthesis {
                 section("Síntesis") { fields(of: synthesis) }
@@ -167,18 +217,44 @@ struct RowDetailView: View {
         .nodusGlass(NodusGlass(.thin, tint: session.accent))
     }
 
-    private func group(_ title: String, _ rows: [Row], table: String) -> some View {
+    /// A related list inside a detail.
+    ///
+    /// `linksTo` is what makes a dossier a graph rather than a dead end: an idea listed under a
+    /// work opens that idea's own page, exactly as if it had been reached from Ideas, and the
+    /// work under an author opens the work as the library shows it.
+    private func group(
+        _ title: String,
+        _ rows: [Row],
+        table: String,
+        linksTo collection: CollectionDescriptor? = nil
+    ) -> some View {
         Group {
             if !rows.isEmpty {
                 section("\(title) · \(rows.count)") {
                     VStack(spacing: 0) {
-                        ForEach(Array(rows.prefix(40).enumerated()), id: \.offset) { index, row in
-                            RowCell(row: row, presenter: RowPresenter.forTable(table), accent: session.accent)
+                        ForEach(Array(rows.prefix(60).enumerated()), id: \.offset) { index, row in
+                            if let collection, row.string(collection.idField) != nil {
+                                NavigationLink {
+                                    RowDetailView(session: session, collection: collection, row: row)
+                                } label: {
+                                    HStack {
+                                        RowCell(row: row, presenter: RowPresenter.forTable(table), accent: session.accent)
+                                        Spacer(minLength: 6)
+                                        Image(systemName: "chevron.right")
+                                            .font(.caption2).foregroundStyle(.tertiary)
+                                    }
+                                    .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
                                 .padding(.vertical, 4)
-                            if index < min(rows.count, 40) - 1 { Divider().opacity(0.35) }
+                            } else {
+                                RowCell(row: row, presenter: RowPresenter.forTable(table), accent: session.accent)
+                                    .padding(.vertical, 4)
+                            }
+                            if index < min(rows.count, 60) - 1 { Divider().opacity(0.35) }
                         }
-                        if rows.count > 40 {
-                            Text("y \(rows.count - 40) más")
+                        if rows.count > 60 {
+                            Text("y \(rows.count - 60) más")
                                 .font(.caption2).foregroundStyle(.secondary)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(.top, 8)
@@ -220,9 +296,14 @@ struct RowDetailView: View {
     /// showing both means a screen that opens with a readable author line and then repeats it
     /// as `[{"lastName":"Arco Blanco","firstName":…}]`.
     private func displayableKeys(of row: Row) -> [String] {
+        // Pipeline bookkeeping: when the desktop last scanned this work and how it went. Real
+        // columns, and nothing a reader of the corpus has any use for.
         let hidden: Set<String> = [
             "embedding", "embedding_provider", "embedding_model", "embedding_dim", "embedding_text_hash",
             "content_hash", "light_hash", "deep_hash", "summary_hash",
+            "light_at", "light_status", "deep_at", "deep_status", "deep_trigger", "manual_deep",
+            "summary_at", "summary_status", "source_type", "zotero_version", "order_idx",
+            "created_at", "updated_at",
         ]
         return row.columns.keys
             .filter { key in

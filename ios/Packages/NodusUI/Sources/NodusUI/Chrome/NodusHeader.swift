@@ -48,8 +48,10 @@ public struct NodusHeader<Leading: View, Trailing: View>: View {
             .overlay(alignment: .leading) { leading }
             .overlay(alignment: .trailing) { trailing }
             .padding(.horizontal, 16)
-            .padding(.top, 4)
-            .padding(.bottom, 12)
+            // Room to breathe under the cutout, and under the mark. Tucked against either one
+            // the header reads as clipped rather than as chrome the hardware sits on.
+            .padding(.top, 10)
+            .padding(.bottom, 14)
         // The chrome bleeds up behind the cutout; the content does not. Putting the halo and
         // the glass in the *background* rather than beside the content in a ZStack is what
         // keeps them separable — an earlier version had the halo's GeometryReader stretch the
@@ -66,9 +68,9 @@ public struct NodusHeader<Leading: View, Trailing: View>: View {
     }
 
     private var centrepiece: some View {
-        VStack(spacing: 2) {
+        VStack(spacing: 6) {
             NodusMark(style: .accent(accent), progress: markProgress, nodeReveal: markProgress)
-                .frame(width: 30, height: 30)
+                .frame(width: 28, height: 28)
                 .accessibilityHidden(false)
                 .accessibilityLabel("Nodus")
             if let title {

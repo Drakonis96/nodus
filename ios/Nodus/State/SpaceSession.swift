@@ -186,10 +186,17 @@ final class SpaceSession {
         }
     }
 
+    /// Collections that exist in the data but are not offered as a section of their own.
+    ///
+    /// Passages are read from the idea that cites them — that is where they mean something,
+    /// and it is how the desktop shows them. A flat list of 5 803 quotations in snapshot order
+    /// is not something anyone browses.
+    private static let notBrowsedDirectly: Set<String> = ["passages"]
+
     /// The collections this space actually has rows for, in the order the menu shows them.
     var sections: [CollectionDescriptor] {
         guard let overview else { return [] }
-        let populated = overview.populatedCollections
+        let populated = overview.populatedCollections.filter { !Self.notBrowsedDirectly.contains($0.path) }
         guard let vaultType else { return populated }
         // Order by the vault's own families first; anything else it happens to have published
         // still appears, just after. Hiding a published table because the type did not predict

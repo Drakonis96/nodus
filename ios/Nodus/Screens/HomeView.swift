@@ -181,32 +181,3 @@ struct SectionTile: View {
         .nodusGlass(NodusGlass(.regular, tint: accent, interactive: true), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 }
-
-/// The full section list, when the home grid is not enough.
-struct BrowseView: View {
-    let session: SpaceSession
-
-    var body: some View {
-        List {
-            Section("Explorar") {
-                ForEach(session.sections, id: \.path) { collection in
-                    NavigationLink {
-                        CollectionListView(session: session, collection: collection)
-                    } label: {
-                        Label {
-                            HStack {
-                                Text(collection.label)
-                                Spacer()
-                                CountBadge(count: session.count(of: collection), accent: session.accent)
-                            }
-                        } icon: {
-                            Image(systemName: collection.icon).foregroundStyle(session.accent)
-                        }
-                    }
-                }
-            }
-        }
-        .scrollContentBackground(.hidden)
-        .listStyle(.insetGrouped)
-    }
-}

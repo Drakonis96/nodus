@@ -17,7 +17,7 @@ struct SpaceShell: View {
     @State private var sidebarSelection: SidebarItem? = .home
     @State private var showingSettings = false
 
-    enum Tab: Hashable { case home, browse, search, ai }
+    enum Tab: Hashable { case home, search, research, chat }
 
     enum SidebarItem: Hashable {
         case home
@@ -27,6 +27,8 @@ struct SpaceShell: View {
         case deepResearch
         case search
         case writing
+        case research
+        case chat
     }
 
     var body: some View {
@@ -50,22 +52,24 @@ struct SpaceShell: View {
     // MARK: iPhone
 
     private var tabView: some View {
+        // Four tabs, not five. "Explorar" showed the same sections as Home in a list instead
+        // of a grid, so it cost a tab to say nothing new.
         TabView(selection: $tab) {
             page { HomeView(session: session) }
                 .tabItem { Label("Inicio", systemImage: "house") }
                 .tag(Tab.home)
 
-            page { BrowseView(session: session) }
-                .tabItem { Label("Explorar", systemImage: "square.stack.3d.up") }
-                .tag(Tab.browse)
-
             page { SearchScreen(session: session) }
                 .tabItem { Label("Buscar", systemImage: "magnifyingglass") }
                 .tag(Tab.search)
 
-            page { AssistantView(session: session) }
-                .tabItem { Label("IA", systemImage: "sparkles") }
-                .tag(Tab.ai)
+            page { ResearchView(session: session) }
+                .tabItem { Label("Research", systemImage: "doc.text.magnifyingglass") }
+                .tag(Tab.research)
+
+            page { ChatTab(session: session) }
+                .tabItem { Label("Chat", systemImage: "bubble.left.and.text.bubble.right") }
+                .tag(Tab.chat)
         }
         .tint(session.accent)
     }
@@ -99,6 +103,8 @@ struct SpaceShell: View {
                 Section {
                     Label("Inicio", systemImage: "house").tag(SidebarItem.home)
                     Label("Buscar", systemImage: "magnifyingglass").tag(SidebarItem.search)
+                    Label("Research", systemImage: "doc.text.magnifyingglass").tag(SidebarItem.research)
+                    Label("Chat", systemImage: "bubble.left.and.text.bubble.right").tag(SidebarItem.chat)
                 }
                 Section("Explorar") {
                     ForEach(session.sections, id: \.path) { collection in
@@ -135,11 +141,11 @@ struct SpaceShell: View {
             }
             .navigationTitle(session.connection.spaceName)
             .tint(session.accent)
-            .safeAreaInset(edge: .top) { Color.clear.frame(height: 92) }
+            .safeAreaInset(edge: .top) { Color.clear.frame(height: 96) }
         } detail: {
             NavigationStack {
                 detailContent
-                    .safeAreaInset(edge: .top) { Color.clear.frame(height: 92) }
+                    .safeAreaInset(edge: .top) { Color.clear.frame(height: 96) }
             }
         }
         .background { NodusBackdrop(accent: session.accent) }
@@ -151,6 +157,8 @@ struct SpaceShell: View {
         switch sidebarSelection {
         case .home, .none: HomeView(session: session)
         case .search: SearchScreen(session: session)
+        case .research: ResearchView(session: session)
+        case .chat: ChatTab(session: session)
         case .debates: SpecialListView(session: session, resource: .debates)
         case .notes: SpecialListView(session: session, resource: .notes)
         case .deepResearch: SpecialListView(session: session, resource: .deepResearch)
