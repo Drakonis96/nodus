@@ -86,14 +86,41 @@ function ideaGraph(snapshot, seedId, depth, limit) {
   return { seedId: String(seedId), depth, ideas, edges: included, truncated: seen.size >= limit };
 }
 
-/** Resource collections that are a plain filtered projection of one table. */
+/**
+ * Resource collections that are a plain filtered projection of one table.
+ *
+ * Grouped by the vault type they belong to, but the dispatcher does not gate on type: a
+ * table a space never published simply is not in its snapshot, and the endpoint answers an
+ * empty page. Gating instead would mean a client had to know the type before it could ask,
+ * and would turn "this vault has no people" into a 404 that reads like a broken route.
+ */
 const COLLECTIONS = {
+  // Academic
   works: { table: 'works', key: 'works', id: 'nodus_id' },
   ideas: { table: 'ideas', key: 'ideas', id: 'global_id' },
   themes: { table: 'themes', key: 'themes', id: 'theme_id' },
   gaps: { table: 'gaps', key: 'gaps', id: 'id' },
   authors: { table: 'authors', key: 'authors', id: 'author_id' },
   passages: { table: 'passages', key: 'passages', id: 'passage_id' },
+  // Genealogy and prosopography
+  persons: { table: 'persons', key: 'persons', id: 'person_id' },
+  places: { table: 'places', key: 'places', id: 'place_id' },
+  events: { table: 'events', key: 'events', id: 'event_id' },
+  relationships: { table: 'relationships', key: 'relationships', id: 'id' },
+  // Study
+  'study-subjects': { table: 'study_subjects', key: 'subjects', id: 'subject_id' },
+  'study-courses': { table: 'study_courses', key: 'courses', id: 'course_id' },
+  'study-topics': { table: 'study_topics', key: 'topics', id: 'topic_id' },
+  'study-docs': { table: 'study_docs', key: 'docs', id: 'doc_id' },
+  'study-materials': { table: 'study_materials', key: 'materials', id: 'material_id' },
+  'study-flashcards': { table: 'study_flashcards', key: 'flashcards', id: 'card_id' },
+  'study-questions': { table: 'study_questions', key: 'questions', id: 'question_id' },
+  // Teaching materials. Rosters, groups and grades are not published at all, so there is
+  // deliberately no collection that could ever serve them.
+  'teaching-exams': { table: 'teaching_exams', key: 'exams', id: 'exam_id' },
+  'teaching-rubrics': { table: 'teaching_rubrics', key: 'rubrics', id: 'rubric_id' },
+  // Databases
+  databases: { table: 'db_databases', key: 'databases', id: 'id' },
 };
 
 export function createCorpusRoutes({ readSnapshot, assetHashesFor }) {
@@ -199,6 +226,51 @@ export function createCorpusRoutes({ readSnapshot, assetHashesFor }) {
           ideas: rows(snapshot, 'ideas').filter((idea) => ideaIds.has(String(idea.global_id))),
           summary: rows(snapshot, 'work_summaries').find((entry) => String(entry.nodus_id) === nodusId) ?? null,
           passages: rows(snapshot, 'passages').filter((entry) => String(entry.nodus_id) === nodusId).length,
+          revision: space.revision,
+        });
+      }
+
+      if (head === 'persons') {
+        if (notModified(req, res, json, space, url, key)) return true;
+        const personId = String(row.person_id);
+        const involved = (table, column) => rows(snapshot, table).filter((entry) => String(entry[column]) === personId);
+        const eventIds = new Set(involved('event_participants', 'person_id').map((entry) => String(entry.event_id)));
+        return send(res, json, {
+          person: row,
+          names: involved('person_names', 'person_id'),
+          places: involved('person_places', 'person_id'),
+          relationships: rows(snapshot, 'relationships').filter((entry) => String(entry.from_person_id) === personId || String(entry.to_person_id) === personId),
+          events: rows(snapshot, 'events').filter((entry) => eventIds.has(String(entry.event_id))),
+          // Metadata only: the portrait's bytes live on the asset channel.
+          portrait: rows(snapshot, 'person_portraits').find((entry) => String(entry.person_id) === personId) ?? null,
+          revision: space.revision,
+        });
+      }
+
+      if (head === 'databases') {
+        if (notModified(req, res, json, space, url, key)) return true;
+        const databaseId = String(row.id);
+        const columns = rows(snapshot, 'db_columns').filter((entry) => String(entry.database_id) === databaseId);
+        const dbRows = rows(snapshot, 'db_rows').filter((entry) => String(entry.database_id) === databaseId);
+        const rowIds = new Set(dbRows.map((entry) => String(entry.id)));
+        const limit = readLimit(url.searchParams.get('limit'));
+        const offset = readOffset(url.searchParams.get('offset'));
+        const page = dbRows.slice(offset, offset + limit);
+        const pageIds = new Set(page.map((entry) => String(entry.id)));
+        return send(res, json, {
+          database: row,
+          columns,
+          views: rows(snapshot, 'db_views').filter((entry) => String(entry.database_id) === databaseId),
+          options: rows(snapshot, 'db_select_options').filter((entry) => columns.some((column) => String(column.id) === String(entry.column_id))),
+          rows: page,
+          // Only the cells of the page being served: a database with fifty thousand rows
+          // would otherwise ship every value it has to render twenty of them.
+          cells: rows(snapshot, 'db_cells').filter((entry) => pageIds.has(String(entry.row_id))),
+          total: dbRows.length,
+          limit,
+          offset,
+          hasMore: offset + page.length < dbRows.length,
+          attachments: rows(snapshot, 'db_attachments').filter((entry) => rowIds.has(String(entry.row_id))).length,
           revision: space.revision,
         });
       }

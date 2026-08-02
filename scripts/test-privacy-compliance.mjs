@@ -135,10 +135,19 @@ test('remote vault publication excludes credentials, files and student administr
     read('electron/export/exportImport.ts'),
     read('src/views/Settings.tsx'),
   ]);
-  assert.match(snapshot, /const TEACHING_TABLES = \[[\s\S]*'teaching_exams'[\s\S]*'teaching_rubrics'/);
-  assert.doesNotMatch(snapshot, /table\.startsWith\('teaching_'\)/);
+  assert.match(snapshot, /TEACHING_SERVER_TABLES = \[[\s\S]*'teaching_exams'[\s\S]*'teaching_rubrics'/);
+  // Comments explain the wildcards that were REMOVED, and naming a pattern is not using it,
+  // so these assertions read the code with the prose stripped out.
+  const snapshotCode = snapshot.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  assert.doesNotMatch(snapshotCode, /table\.startsWith\('teaching_'\)/);
+  // The same mistake lived in the other family: `study_` was selected by prefix, which swept
+  // in class recordings, attempt records and grading runs. Every table is now named.
+  assert.doesNotMatch(snapshotCode, /table\.startsWith\('study_'\)/);
+  for (const sensitive of ['study_recordings', 'study_attempts', 'study_grading_runs', 'study_mastery']) {
+    assert.doesNotMatch(snapshotCode, new RegExp(`'${sensitive}'`), `${sensitive} must not be publishable`);
+  }
   for (const sensitive of ['teaching_students', 'teaching_groups', 'teaching_grade_entries', 'teaching_rubric_evaluations']) {
-    assert.doesNotMatch(snapshot, new RegExp(`['"]${sensitive}['"]`));
+    assert.doesNotMatch(snapshotCode, new RegExp(`['"]${sensitive}['"]`));
   }
   assert.match(snapshot, /embedding[\s\S]*file_path[\s\S]*api_key[\s\S]*access_token/);
   assert.match(secretStore, /nodus_server_token\.bin/);

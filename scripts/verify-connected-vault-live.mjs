@@ -93,7 +93,11 @@ async function publish(token) {
   const db = new Database(VAULT, { readonly: true, fileMustExist: true });
   let snapshot;
   try {
-    snapshot = buildServerSnapshot({ id: 'lab', name: 'Lab', type: 'academic' }, { nodusServerIncludeUserContent: true, nodusServerIncludePassages: false }, db);
+    snapshot = buildServerSnapshot(
+      { id: 'lab', name: 'Lab', type: process.env.NODUS_LAB_VAULT_TYPE || 'academic' },
+      { nodusServerIncludeUserContent: true, nodusServerIncludePassages: false },
+      db,
+    );
   } finally { db.close(); }
 
   const wanted = new Map();
@@ -140,7 +144,10 @@ await check('a reader creates a connected vault from the real desktop flow', asy
     userEmail: session.userEmail, serverName: session.serverName,
   });
   expect(readerVault.origin === 'connected', 'the vault was not registered as connected');
-  expect(readerVault.type === 'academic', `vault type came back as ${readerVault.type}`);
+  // The type comes from the publication, never from a picker, so it must match the vault
+  // that was actually published rather than a hard-coded academic default.
+  const expectedType = process.env.NODUS_LAB_VAULT_TYPE || 'academic';
+  expect(readerVault.type === expectedType, `vault type came back as ${readerVault.type}, expected ${expectedType}`);
   return `"${readerVault.name}", ${readerVault.remote.role}, schema migrated locally`;
 });
 
@@ -148,18 +155,28 @@ await check('the corpus really arrived', async () => {
   const db = new Database(readerVault.path, { fileMustExist: true });
   try {
     const n = (t) => db.prepare(`SELECT COUNT(*) n FROM ${t}`).get().n;
-    const local = { works: n('works'), ideas: n('ideas'), edges: n('edges'), drafts: n('writing_saved_drafts'), immersion: n('immersion_sessions') };
-    expect(local.works === published.counts.works, `works ${local.works} vs published ${published.counts.works}`);
-    expect(local.ideas === published.counts.ideas, `ideas ${local.ideas} vs ${published.counts.ideas}`);
-    expect(local.edges === published.counts.edges, `edges ${local.edges} vs ${published.counts.edges}`);
-    return `${local.works} works, ${local.ideas} ideas, ${local.edges} edges, ${local.drafts} drafts, ${local.immersion} immersion`;
+    // Compare against whatever this vault type actually published, table by table, rather
+    // than against a hard-coded academic shape.
+    const mismatched = [];
+    let total = 0;
+    for (const [table, expected] of Object.entries(published.counts)) {
+      if (expected === 0) continue;
+      total += expected;
+      const actual = n(table);
+      if (actual !== expected) mismatched.push(`${table} ${actual}≠${expected}`);
+    }
+    expect(mismatched.length === 0, `tables did not arrive intact: ${mismatched.join(', ')}`);
+    const summary = Object.entries(published.counts).filter(([, count]) => count > 0)
+      .sort((a, b) => b[1] - a[1]).slice(0, 4).map(([table, count]) => `${count} ${table}`).join(', ');
+    return `${total.toLocaleString('es-ES')} rows across ${Object.values(published.counts).filter((count) => count > 0).length} tables — ${summary}`;
   } finally { db.close(); }
 });
 
 await check('a Deep Research report is readable in the replica', async () => {
   const db = new Database(readerVault.path, { fileMustExist: true });
   try {
-    const row = db.prepare("SELECT id, title, draft_json FROM writing_saved_drafts WHERE brief_json LIKE '%deep_research%' LIMIT 1").get();
+    let row = null;
+    try { row = db.prepare("SELECT id, title, draft_json FROM writing_saved_drafts WHERE brief_json LIKE '%deep_research%' LIMIT 1").get(); } catch { row = null; }
     if (!row) return 'no reports in this corpus';
     const draft = JSON.parse(row.draft_json);
     expect(draft.draftMarkdown?.length > 0, 'the report arrived without its prose');
@@ -167,13 +184,28 @@ await check('a Deep Research report is readable in the replica', async () => {
   } finally { db.close(); }
 });
 
-await check('the illustrations reached the replica', async () => {
+await check('the images reached the replica', async () => {
+  // Both kinds that may travel: a Deep Research illustration and a person's portrait. The
+  // check used to look only at the first, so a genealogy vault reported 0/0 while its
+  // portraits were silently missing.
   const db = new Database(readerVault.path, { fileMustExist: true });
   try {
-    const ready = db.prepare("SELECT COUNT(*) n FROM decorative_images WHERE entity_kind = 'deep_research' AND status = 'ready'").get().n;
-    const withBytes = db.prepare("SELECT COUNT(*) n FROM decorative_images WHERE image_blob IS NOT NULL").get().n;
-    expect(ready === 0 || withBytes > 0, `${ready} illustration(s) are marked ready but ${withBytes} have bytes — a broken image in every report`);
-    return `${withBytes}/${ready} illustrations have their bytes`;
+    const parts = [];
+    const reports = db.prepare("SELECT COUNT(*) n FROM decorative_images WHERE entity_kind = 'deep_research' AND status = 'ready'").get().n;
+    if (reports > 0) {
+      const withBytes = db.prepare("SELECT COUNT(*) n FROM decorative_images WHERE entity_kind = 'deep_research' AND status = 'ready' AND LENGTH(image_blob) > 0").get().n;
+      expect(withBytes === reports, `${withBytes} of ${reports} report illustrations have bytes — a broken image in the rest`);
+      parts.push(`${withBytes}/${reports} report illustrations`);
+    }
+    const portraits = db.prepare('SELECT COUNT(*) n FROM person_portraits').get().n;
+    if (portraits > 0) {
+      const withBytes = db.prepare('SELECT COUNT(*) n FROM person_portraits WHERE LENGTH(blob) > 0').get().n;
+      // A zero-length blob is the placeholder the row was inserted with. Still zero means
+      // the asset pass never filled it, and every face on the tree would be blank.
+      expect(withBytes === portraits, `${withBytes} of ${portraits} portraits have bytes — the rest are empty placeholders`);
+      parts.push(`${withBytes}/${portraits} portraits`);
+    }
+    return parts.length ? parts.join(', ') : 'this corpus has no images';
   } finally { db.close(); }
 });
 
@@ -277,14 +309,20 @@ await check('the reader now sees it, and keeps their own note', async () => {
     expect(db.prepare('SELECT 1 FROM notes WHERE id = ?').get(writtenNoteId), "the collaborator's note did not arrive");
     const mine = db.prepare("SELECT COUNT(*) n FROM notes WHERE title = 'Nota privada del lector'").get().n;
     expect(mine === 1, `the reader's own note survived ${mine} times`);
-    expect(db.prepare('SELECT COUNT(*) n FROM works').get().n === published.counts.works, 'the corpus was damaged by the pull');
+    for (const [table, expected] of Object.entries(published.counts)) {
+      if (expected === 0) continue;
+      expect(db.prepare(`SELECT COUNT(*) n FROM "${table}"`).get().n >= expected, `${table} was damaged by the pull`);
+    }
   } finally { db.close(); }
   return "the collaborator's work arrived and the reader's own survived the overwrite";
 });
 
 await check('a revoked replica keeps every byte', async () => {
+  // Measure whatever this vault type's largest published table is: `works` is empty in a
+  // genealogy or study corpus and would prove nothing.
+  const biggest = Object.entries(published.counts).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'works';
   const before = new Database(readerVault.path, { fileMustExist: true });
-  const works = before.prepare('SELECT COUNT(*) n FROM works').get().n;
+  const works = before.prepare(`SELECT COUNT(*) n FROM "${biggest}"`).get().n;
   before.close();
 
   // Revoke through the real administration form.
@@ -309,7 +347,7 @@ await check('a revoked replica keeps every byte', async () => {
   expect(overview.state === 'revoked', `state is ${overview.state}`);
   const after = new Database(readerVault.path, { fileMustExist: true });
   try {
-    expect(after.prepare('SELECT COUNT(*) n FROM works').get().n === works, 'the corpus was destroyed on revocation');
+    expect(after.prepare(`SELECT COUNT(*) n FROM "${biggest}"`).get().n === works, 'the corpus was destroyed on revocation');
     expect(after.prepare("SELECT 1 FROM notes WHERE title = 'Nota privada del lector'").get(), "the reader's own work was destroyed");
   } finally { after.close(); }
   // Restore the membership this check deliberately removed, so the script can be run twice
@@ -330,7 +368,7 @@ await check('the owner publishes its embeddings and semantic search works', asyn
   let probe;
   try {
     built = buildVectorSet(db, 'ideas');
-    expect(built, 'this corpus has no idea embeddings to publish');
+    if (!built) return 'this corpus has no idea embeddings (only academic vaults index ideas)';
     // A vector taken FROM the corpus: its nearest neighbour must be itself, which is the
     // only end-to-end proof that quantization, the wire format and the search all agree.
     probe = db.prepare(
@@ -370,20 +408,21 @@ await check('the owner publishes its embeddings and semantic search works', asyn
 });
 
 await check('disconnecting keeps the vault and stops the syncing', async () => {
+  const biggestTable = Object.entries(published.counts).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'works';
   const before = new Database(writerVault.path, { fileMustExist: true });
-  const works = before.prepare('SELECT COUNT(*) AS n FROM works').get().n;
+  const works = before.prepare(`SELECT COUNT(*) AS n FROM "${biggestTable}"`).get().n;
   before.close();
   const after = replica.detachReplica(writerVault.id);
   const entry = after.find((item) => item.vaultId === writerVault.id);
   expect(entry.state === 'paused', `state is ${entry.state}`);
   const db = new Database(writerVault.path, { fileMustExist: true });
   try {
-    expect(db.prepare('SELECT COUNT(*) AS n FROM works').get().n === works, 'disconnecting destroyed the corpus');
+    expect(db.prepare(`SELECT COUNT(*) AS n FROM "${biggestTable}"`).get().n === works, 'disconnecting destroyed the corpus');
   } finally { db.close(); }
   // A detached vault is not pulled again on the next tick.
   await replica.pullReplica(writerVault.id);
   expect(replica.getReplicaOverview().find((item) => item.vaultId === writerVault.id).state === 'paused', 'a detached replica resumed syncing');
-  return `${works} works kept, syncing stopped`;
+  return `${works} ${biggestTable} kept, syncing stopped`;
 });
 
 console.log(`\n${failures === 0 ? 'All' : `${failures} of the`} checks ${failures === 0 ? 'passed' : 'FAILED'}.`);

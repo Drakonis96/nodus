@@ -31,9 +31,10 @@ const USER_TABLES = [
 // Shareable teaching materials only. Student rosters, groups, grades, grading
 // runs and assessment results are deliberately absent even when the user opts
 // into sharing authored content: those records are not teaching materials.
-const TEACHING_TABLES = [
+export const TEACHING_SERVER_TABLES = [
   'teaching_exams', 'teaching_exam_questions', 'teaching_rubrics', 'teaching_logos',
 ] as const;
+const TEACHING_TABLES = TEACHING_SERVER_TABLES;
 
 // A Worldbuilding vault has no imported bibliography that can act as its "core":
 // these authored tables ARE the corpus. Once the user explicitly pairs that vault
@@ -52,6 +53,54 @@ export const WORLDBUILDING_SERVER_TABLES = [
   'world_threads', 'thread_parties', 'world_beats', 'world_rules',
   'world_questions', 'world_question_options',
   'world_scene_text', 'world_chapter_breaks', 'world_manuscript_starts',
+] as const;
+
+/**
+ * Genealogy and prosopography: the people, where and when, and how they relate.
+ *
+ * Portraits are metadata here; their bytes ride the asset channel, which is the only place a
+ * binary is allowed to travel. Archive item FILES are absent on purpose — a scanned parish
+ * register is a heavy document, and those never leave the machine.
+ */
+export const GENEALOGY_SERVER_TABLES = [
+  'persons', 'person_names', 'person_places', 'person_portraits',
+  'places', 'events', 'event_participants', 'relationships',
+] as const;
+
+/**
+ * A study vault: what the user is learning, and how they organised it.
+ *
+ * Three deliberate absences. `study_recordings` is class audio, and audio never travels.
+ * `study_ai_usage` is local telemetry that means nothing to a reader. And the attempt and
+ * grading tables (`study_attempts`, `study_attempt_answers`, `study_grading_runs`,
+ * `study_grading_annotations`, `study_mastery`, `study_reviews`, `study_srs_state`) are a
+ * record of how well somebody performed — that is not shareable material, it is a transcript.
+ *
+ * `study_materials` travels as metadata only: the row says a document exists and what it is
+ * about, while `content_blob` and `file_path` are stripped like every other binary and path.
+ */
+export const STUDY_SERVER_TABLES = [
+  'study_academic_years', 'study_subjects', 'study_courses', 'study_topics', 'study_folders',
+  'study_docs', 'study_doc_links', 'study_doc_tags', 'study_tags',
+  'study_materials', 'study_material_annotations', 'study_material_placements', 'study_material_fragment_links',
+  'study_schedule_periods', 'study_schedule_cells', 'study_schedule_day_styles',
+  'study_calendar_events', 'study_plans', 'study_plan_blocks', 'study_goals', 'study_placements',
+  'study_ideas', 'study_idea_edges', 'study_idea_evidence', 'study_idea_occurrences',
+  'study_flashcards', 'study_questions', 'study_question_collections', 'study_question_collection_items',
+  'study_rubrics', 'study_templates', 'study_styles', 'study_style_associations',
+  'study_annotations', 'study_transcripts', 'study_transcript_segments', 'study_audio_markers',
+] as const;
+
+/**
+ * A Notion-style databases vault: the shape and the values, not the files.
+ *
+ * `db_attachments` is included for its metadata — a reader can see that a row has a file and
+ * what it is called — while its `blob` and `thumb` are stripped on the way out. An attachment
+ * can be a PDF or a 5 GB photo, and those are exactly what must never reach the server.
+ */
+export const DATABASES_SERVER_TABLES = [
+  'db_databases', 'db_columns', 'db_rows', 'db_cells', 'db_views', 'db_select_options', 'db_relations',
+  'db_attachments',
 ] as const;
 
 const OMIT_COLUMNS = new Set([
@@ -134,6 +183,24 @@ export interface SnapshotAsset extends SnapshotAssetRef {
   data: Buffer;
   thumbData: Buffer | null;
 }
+
+/**
+ * What each vault type publishes beyond the academic core.
+ *
+ * A type absent from this map publishes only CORE_TABLES, which for a non-academic vault
+ * means almost nothing — that was the state genealogy, teaching, study and databases were in:
+ * a connected replica received their images and no rows at all.
+ */
+const TABLES_BY_VAULT_TYPE: Partial<Record<VaultSummary['type'], readonly string[]>> = {
+  worldbuilding: WORLDBUILDING_SERVER_TABLES,
+  genealogy: GENEALOGY_SERVER_TABLES,
+  prosopography: GENEALOGY_SERVER_TABLES,
+  estudio: STUDY_SERVER_TABLES,
+  // Teaching reuses the study views, so a shared teaching vault carries both its own
+  // materials and the study structure they hang from. Rosters and grades are in neither.
+  docencia: [...TEACHING_SERVER_TABLES, ...STUDY_SERVER_TABLES],
+  databases: DATABASES_SERVER_TABLES,
+};
 
 function tableNames(db: Database.Database): Set<string> {
   return new Set((db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'").all() as { name: string }[]).map((row) => row.name));
@@ -260,15 +327,21 @@ export function buildServerSnapshot(
 ): BuiltSnapshot {
   const present = tableNames(db);
   const selected = new Set<string>(CORE_TABLES.filter((table) => present.has(table)));
-  if (vault.type === 'worldbuilding') {
-    WORLDBUILDING_SERVER_TABLES.filter((table) => present.has(table)).forEach((table) => selected.add(table));
+  // Each vault type contributes its own corpus. Academic has none listed here because
+  // CORE_TABLES already IS the academic corpus; the others have no imported bibliography, so
+  // these authored tables are what a reader would come for.
+  for (const table of TABLES_BY_VAULT_TYPE[vault.type] ?? []) {
+    if (present.has(table)) selected.add(table);
   }
   if (settings.nodusServerIncludePassages && present.has('passages')) selected.add('passages');
   if (settings.nodusServerIncludeUserContent) {
     USER_TABLES.filter((table) => present.has(table)).forEach((table) => selected.add(table));
-    for (const table of present) {
-      if (table.startsWith('study_')) selected.add(table);
-    }
+    // Was `table.startsWith('study_')`, which swept in everything the prefix touched:
+    // `study_recordings` (what was recorded in a class and when), `study_attempts`,
+    // `study_grading_runs` and `study_mastery` (how well somebody performed), and
+    // `study_ai_usage` (local telemetry). None of that is shareable material. The explicit
+    // list is the point: a table added by a later migration now has to be named to travel.
+    STUDY_SERVER_TABLES.filter((table) => present.has(table)).forEach((table) => selected.add(table));
     TEACHING_TABLES.filter((table) => present.has(table)).forEach((table) => selected.add(table));
   }
 

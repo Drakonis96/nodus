@@ -56,6 +56,99 @@ function usableColumns(db: Database.Database, table: string, rows: Record<string
   return [...seen];
 }
 
+interface ColumnInfo { name: string; type: string; notnull: number; dflt_value: unknown; pk: number }
+
+/**
+ * Empty the corpus tables in an order where no cascade can damage a surviving row.
+ *
+ * Deleting a parent fires ON DELETE SET NULL on its children, and a child with a CHECK like
+ * "at least one of these four references must be present" then fails — which aborted the
+ * entire pull. Measured on a real study vault: emptying `study_courses` nulled a placement
+ * that still existed and broke its constraint.
+ *
+ * Dependants are therefore emptied first. Only edges between tables in this batch matter; a
+ * cycle (rare, and SQLite allows it) simply keeps its arbitrary order, which is no worse
+ * than what we had.
+ */
+function deletionOrder(db: Database.Database, tables: string[]): string[] {
+  const set = new Set(tables);
+  const dependsOn = new Map<string, Set<string>>();
+  for (const table of tables) {
+    const parents = new Set<string>();
+    try {
+      for (const fk of db.pragma(`foreign_key_list(${quoteIdentifier(table)})`) as { table: string }[]) {
+        if (fk.table !== table && set.has(fk.table)) parents.add(fk.table);
+      }
+    } catch { /* a table without foreign keys reports nothing */ }
+    dependsOn.set(table, parents);
+  }
+  const ordered: string[] = [];
+  const done = new Set<string>();
+  const visiting = new Set<string>();
+  const visit = (table: string) => {
+    if (done.has(table) || visiting.has(table)) return;
+    visiting.add(table);
+    // Emit the tables that point AT this one before this one.
+    for (const other of tables) {
+      if (other !== table && dependsOn.get(other)?.has(table)) visit(other);
+    }
+    visiting.delete(table);
+    done.add(table);
+    ordered.push(table);
+  };
+  for (const table of tables) visit(table);
+  return ordered;
+}
+
+/**
+ * Keep the image bytes a previous pull downloaded.
+ *
+ * A corpus table is replaced wholesale, which would reset every portrait to the empty
+ * placeholder and make the asset pass re-download the whole gallery on every single pull.
+ * The bytes are content-addressed and cannot have changed if their row has not, so they are
+ * lifted out before the delete and put back after the insert.
+ */
+function captureAssetBlobs(db: Database.Database, table: string): { key: unknown[]; values: Record<string, Buffer> }[] {
+  const source = ASSET_SOURCES.find((entry) => entry.table === table);
+  if (!source) return [];
+  const columns = [source.blobColumn, source.thumbColumn];
+  try {
+    return (db.prepare(`SELECT * FROM ${quoteIdentifier(table)}`).all() as Record<string, unknown>[])
+      .map((row) => {
+        const values: Record<string, Buffer> = {};
+        for (const column of columns) {
+          const value = row[column];
+          if (Buffer.isBuffer(value) && value.length > 0) values[column] = value;
+        }
+        return { key: source.keyColumns.map((column) => row[column]), values };
+      })
+      .filter((entry) => Object.keys(entry.values).length > 0);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Columns the local schema REQUIRES but the publication cannot carry.
+ *
+ * `person_portraits.blob` is NOT NULL, and a snapshot never carries binary — so inserting a
+ * portrait's metadata failed the constraint and took the entire hydration transaction with
+ * it. A genealogy replica arrived completely empty, and the failure was swallowed into a
+ * phase nothing displayed.
+ *
+ * The answer is a zero-length placeholder: the row exists, so the asset pass has something
+ * to fill, and a length of zero is exactly what that pass treats as "not downloaded yet".
+ * Only BLOB columns qualify — inventing a value for a required text or numeric column would
+ * be fabricating data rather than reserving a place for it.
+ */
+function blobPlaceholders(db: Database.Database, table: string, provided: Set<string>): string[] {
+  return (db.pragma(`table_info(${quoteIdentifier(table)})`) as ColumnInfo[])
+    .filter((column) => column.notnull === 1 && column.dflt_value === null && column.pk === 0)
+    .filter((column) => !provided.has(column.name))
+    .filter((column) => /BLOB/i.test(String(column.type ?? '')))
+    .map((column) => column.name);
+}
+
 export function applySnapshotToReplica(db: Database.Database, snapshot: { tables?: Record<string, unknown> }): SnapshotApplySummary {
   const summary: SnapshotApplySummary = { replaced: {}, merged: {}, skipped: [] };
   const present = new Set(
@@ -68,18 +161,53 @@ export function applySnapshotToReplica(db: Database.Database, snapshot: { tables
       // publication is in place — the same discipline mergeSyncPackage uses.
       db.pragma('defer_foreign_keys = ON');
 
-      for (const [table, value] of Object.entries(snapshot.tables ?? {})) {
-        if (!Array.isArray(value)) continue;
+      const incoming = Object.entries(snapshot.tables ?? {})
+        .filter((entry): entry is [string, Record<string, unknown>[]] => Array.isArray(entry[1]));
+
+      // Every corpus table is emptied BEFORE any of them is refilled, and in dependency
+      // order. Doing it table by table meant a later DELETE could cascade into rows an
+      // earlier INSERT had just written — `person_portraits` hangs off `persons` with ON
+      // DELETE CASCADE, and the publication is ordered alphabetically, so portraits went in
+      // before people came out.
+      const replaceable = incoming.map(([table]) => table).filter((table) => present.has(table) && !AUTHORED.has(table));
+      const preserved = new Map<string, ReturnType<typeof captureAssetBlobs>>();
+      for (const table of replaceable) {
+        const captured = captureAssetBlobs(db, table);
+        if (captured.length > 0) preserved.set(table, captured);
+      }
+      for (const table of deletionOrder(db, replaceable)) {
+        db.prepare(`DELETE FROM ${quoteIdentifier(table)}`).run();
+      }
+
+      for (const [table, value] of incoming) {
         if (!present.has(table)) { summary.skipped.push(table); continue; }
-        const rows = value as Record<string, unknown>[];
+        const rows = value;
 
         if (!AUTHORED.has(table)) {
-          db.prepare(`DELETE FROM ${quoteIdentifier(table)}`).run();
           if (rows.length > 0) {
-            const columns = usableColumns(db, table, rows);
-            if (columns.length === 0) { summary.skipped.push(table); continue; }
+            const carried = usableColumns(db, table, rows);
+            if (carried.length === 0) { summary.skipped.push(table); continue; }
+            const placeholders = blobPlaceholders(db, table, new Set(carried));
+            const columns = [...carried, ...placeholders];
             const statement = insertStatement(db, table, columns);
-            for (const row of rows) statement.run(columns.map((column) => (row[column] === undefined ? null : row[column])));
+            for (const row of rows) {
+              statement.run([
+                ...carried.map((column) => (row[column] === undefined ? null : row[column])),
+                ...placeholders.map(() => Buffer.alloc(0)),
+              ]);
+            }
+          }
+          // Put back the image bytes this replica had already fetched, so an unchanged
+          // gallery is not downloaded again on every pull.
+          const keep = preserved.get(table);
+          const source = keep ? ASSET_SOURCES.find((entry) => entry.table === table) : null;
+          if (keep && source) {
+            const where = source.keyColumns.map((column) => `${quoteIdentifier(column)} = ?`).join(' AND ');
+            for (const entry of keep) {
+              const columns = Object.keys(entry.values);
+              db.prepare(`UPDATE ${quoteIdentifier(table)} SET ${columns.map((column) => `${quoteIdentifier(column)} = ?`).join(', ')} WHERE ${where}`)
+                .run([...columns.map((column) => entry.values[column]), ...entry.key]);
+            }
           }
           summary.replaced[table] = rows.length;
           continue;
@@ -92,7 +220,8 @@ export function applySnapshotToReplica(db: Database.Database, snapshot: { tables
         if (columns.length === 0) { summary.merged[table] = { inserted: 0, updated: 0, kept: 0 }; continue; }
         const where = identity.map((column) => `${quoteIdentifier(column)} IS ?`).join(' AND ');
         const find = db.prepare(`SELECT * FROM ${quoteIdentifier(table)} WHERE ${where}`);
-        const insert = insertStatement(db, table, columns);
+        const insertPlaceholders = blobPlaceholders(db, table, new Set(columns));
+        const insert = insertStatement(db, table, [...columns, ...insertPlaceholders]);
         // An existing row is UPDATED column by column rather than replaced. A publication
         // never carries binary, so INSERT OR REPLACE would blank the illustration bytes a
         // previous pull had downloaded — every report losing its image on the next sync.
@@ -105,7 +234,10 @@ export function applySnapshotToReplica(db: Database.Database, snapshot: { tables
           const key = identity.map((column) => row[column] ?? null);
           const local = find.get(...key) as Record<string, unknown> | undefined;
           if (!local) {
-            insert.run(columns.map((column) => (row[column] === undefined ? null : row[column])));
+            insert.run([
+              ...columns.map((column) => (row[column] === undefined ? null : row[column])),
+              ...insertPlaceholders.map(() => Buffer.alloc(0)),
+            ]);
             counts.inserted += 1;
             continue;
           }
