@@ -34,7 +34,7 @@ public extension JSONEncoder {
     }()
 }
 
-extension ISO8601DateFormatter {
+public extension ISO8601DateFormatter {
     nonisolated(unsafe) static let nodusFractional: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]

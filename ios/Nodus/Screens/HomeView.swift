@@ -52,6 +52,19 @@ struct HomeView: View {
                     }
                 }
 
+                if session.connection.role.canSendChanges {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Escribir").font(.subheadline.weight(.semibold))
+                        NavigationLink {
+                            WritingView(session: session)
+                        } label: {
+                            SectionTile(title: "Notas y cola", icon: "square.and.pencil", count: nil, accent: session.accent)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
                 if !session.mirrorOnlyTables.isEmpty {
                     VStack(alignment: .leading, spacing: 10) {
                         Text("Más del espacio").font(.subheadline.weight(.semibold))

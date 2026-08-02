@@ -26,6 +26,7 @@ struct SpaceShell: View {
         case notes
         case deepResearch
         case search
+        case writing
     }
 
     var body: some View {
@@ -113,6 +114,11 @@ struct SpaceShell: View {
                         .tag(SidebarItem.collection(collection.path))
                     }
                 }
+                if session.connection.role.canSendChanges {
+                    Section("Escribir") {
+                        Label("Notas y cola", systemImage: "square.and.pencil").tag(SidebarItem.writing)
+                    }
+                }
                 if session.hasDebates || session.hasNotes || session.hasDeepResearch {
                     Section("Analizar") {
                         if session.hasDebates {
@@ -148,6 +154,7 @@ struct SpaceShell: View {
         case .debates: SpecialListView(session: session, resource: .debates)
         case .notes: SpecialListView(session: session, resource: .notes)
         case .deepResearch: SpecialListView(session: session, resource: .deepResearch)
+        case .writing: WritingView(session: session)
         case .collection(let path):
             if let collection = Collections[path] {
                 CollectionListView(session: session, collection: collection)
