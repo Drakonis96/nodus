@@ -62,7 +62,7 @@ struct SpaceShell: View {
                 .tabItem { Label("Buscar", systemImage: "magnifyingglass") }
                 .tag(Tab.search)
 
-            page { AssistantPlaceholderView(session: session) }
+            page { AssistantView(session: session) }
                 .tabItem { Label("IA", systemImage: "sparkles") }
                 .tag(Tab.ai)
         }

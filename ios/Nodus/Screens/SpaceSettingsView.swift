@@ -182,31 +182,3 @@ struct SpaceSettingsView: View {
         }
     }
 }
-
-/// Phase 4 fills this in. Until then it says what it will do rather than showing a dead tab.
-struct AssistantPlaceholderView: View {
-    let session: SpaceSession
-
-    var body: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 44))
-                    .foregroundStyle(session.accent)
-                Text("Chat y Deep Research")
-                    .font(.title3.weight(.semibold))
-                Text("El servidor entrega el material y el presupuesto; el modelo lo pones tú. Tu clave de proveedor nunca sale de este dispositivo ni pasa por el servidor.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                NodusNotice(
-                    tone: .info,
-                    title: "En construcción",
-                    message: "La recuperación (contexto y búsqueda semántica) ya funciona; falta conectar los proveedores.",
-                    systemImage: "hammer"
-                )
-            }
-            .padding(28)
-        }
-    }
-}

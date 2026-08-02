@@ -55,6 +55,22 @@ public struct DeepResearchProgress: Sendable {
     public var sectionTotal: Int?
     public var sectionTitle: String?
     public var wordsSoFar: Int
+
+    public init(
+        phase: DeepResearchPhase,
+        message: String,
+        sectionIndex: Int? = nil,
+        sectionTotal: Int? = nil,
+        sectionTitle: String? = nil,
+        wordsSoFar: Int
+    ) {
+        self.phase = phase
+        self.message = message
+        self.sectionIndex = sectionIndex
+        self.sectionTotal = sectionTotal
+        self.sectionTitle = sectionTitle
+        self.wordsSoFar = wordsSoFar
+    }
     public var pagesSoFar: Double { Double(wordsSoFar) / Double(DeepResearchLimits.wordsPerPage) }
 
     public var fraction: Double? {

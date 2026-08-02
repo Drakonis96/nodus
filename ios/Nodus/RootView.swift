@@ -4,6 +4,7 @@ import SwiftUI
 
 struct RootView: View {
     @State private var model = AppModel()
+    @State private var ai = AISettings()
     @State private var tilt = DeviceTiltProvider()
     @State private var showingConnect = false
 
@@ -16,6 +17,7 @@ struct RootView: View {
             }
         }
         .environment(model)
+        .environment(ai)
         .detectingScreenCutout()
         .nodusTiltDriven(tilt)
         .sheet(isPresented: $showingConnect) { ConnectView().environment(model) }

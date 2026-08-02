@@ -118,7 +118,7 @@ struct CorpusRetrieval: Sendable {
 }
 
 /// The real `DeepResearchDeps`, wired to a space and a provider.
-enum DeepResearchWiring {
+nonisolated enum DeepResearchWiring {
     static func deps(
         retrieval: CorpusRetrieval,
         provider: ProviderClient
@@ -166,7 +166,10 @@ enum DeepResearchWiring {
 }
 
 /// The prompts, kept together so the citation contract is stated once.
-enum Prompts {
+///
+/// `nonisolated` because the app target defaults every type to the main actor, and these are
+/// pure string building called from the orchestrator's background closures.
+nonisolated enum Prompts {
     static func system(language: String) -> String {
         """
         Eres un investigador académico que escribe a partir de un corpus concreto y solo de él.
