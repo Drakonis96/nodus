@@ -303,14 +303,78 @@ await check('the context package carries material and no key', async () => {
   return `${value.sections.length} sections, ${value.stats.chars.toLocaleString('es-ES')} chars${value.stats.truncated ? ' (truncated)' : ''}`;
 });
 
-await check('an image can be fetched back', async () => {
+await check('every published image comes back byte-for-byte', async () => {
   if (!snapshot?.assets.length) return 'no images in this vault';
-  const asset = snapshot.assets[0];
-  const response = await api(token(), 'GET', `/api/v1/spaces/${SPACE_ID}/assets/${asset.thumbHash ?? asset.hash}`);
-  expect(response.ok, `HTTP ${response.status}`);
-  const bytes = Buffer.from(await response.arrayBuffer());
-  expect(response.headers.get('content-type').startsWith('image/'), 'not served as an image');
-  return `${(bytes.length / 1024).toFixed(0)} KiB, ${response.headers.get('content-type')}`;
+  const { createHash } = require('node:crypto');
+  let checked = 0;
+  let bytes = 0;
+  for (const asset of snapshot.assets) {
+    for (const hash of [asset.hash, asset.thumbHash].filter(Boolean)) {
+      const response = await api(token(), 'GET', `/api/v1/spaces/${SPACE_ID}/assets/${hash}`);
+      expect(response.ok, `image ${hash.slice(0, 8)} returned HTTP ${response.status}`);
+      const body = Buffer.from(await response.arrayBuffer());
+      // Content addressing is only a guarantee if it is checked: the bytes that come back
+      // must hash to the address they were asked for, or the store has drifted.
+      expect(createHash('sha256').update(body).digest('hex') === hash, `image ${hash.slice(0, 8)} came back altered`);
+      expect(response.headers.get('content-type').startsWith('image/'), 'not served as an image');
+      checked += 1;
+      bytes += body.length;
+    }
+  }
+  return `${checked} images verified, ${(bytes / 1048576).toFixed(1)} MiB, all hashes match`;
+});
+
+await check('a Deep Research report survives the round trip intact', async () => {
+  const list = await (await api(token(), 'GET', `/api/v1/spaces/${SPACE_ID}/deep-research?limit=200`)).json();
+  if (!list.reports.length) return 'no Deep Research reports in this vault';
+  // Compare against what is actually in the vault rather than against itself.
+  const db = new Database(VAULT, { readonly: true, fileMustExist: true });
+  let worst = null;
+  try {
+    for (const summary of list.reports) {
+      const detail = await (await api(token(), 'GET', `/api/v1/spaces/${SPACE_ID}/deep-research/${encodeURIComponent(summary.id)}`)).json();
+      expect(detail.report?.draft, `report ${summary.id} came back without its draft`);
+      const local = db.prepare('SELECT draft_json FROM writing_saved_drafts WHERE id = ?').get(summary.id);
+      const original = JSON.parse(local.draft_json);
+      expect(detail.report.draft.draftMarkdown === original.draftMarkdown, `report ${summary.id} lost or altered its prose`);
+      expect(detail.report.draft.title === original.title, `report ${summary.id} lost its title`);
+      const words = String(original.draftMarkdown || '').split(/\s+/).filter(Boolean).length;
+      if (!worst || words > worst.words) worst = { id: summary.id, words, refs: (original.bibliography ?? []).length, image: Boolean(detail.image) };
+    }
+  } finally {
+    db.close();
+  }
+  return `${list.reports.length} reports, longest ${worst.words.toLocaleString('es-ES')} words / ${worst.refs} references${worst.image ? ' + its illustration' : ''}`;
+});
+
+await check('an immersion session replays without new AI calls', async () => {
+  const list = await (await api(token(), 'GET', `/api/v1/spaces/${SPACE_ID}/immersion?limit=50`)).json();
+  if (!list.sessions.length) return 'no immersion sessions in this vault';
+  const detail = await (await api(token(), 'GET', `/api/v1/spaces/${SPACE_ID}/immersion/${encodeURIComponent(list.sessions[0].id)}`)).json();
+  expect(detail.session?.plan, 'the session came back without its plan');
+  const db = new Database(VAULT, { readonly: true, fileMustExist: true });
+  try {
+    const local = JSON.parse(db.prepare('SELECT plan_json FROM immersion_sessions WHERE id = ?').get(list.sessions[0].id).plan_json);
+    expect(JSON.stringify(detail.session.plan) === JSON.stringify(local), 'the plan came back altered');
+  } finally {
+    db.close();
+  }
+  const stations = detail.session.plan.stations?.length ?? 0;
+  // Another device's position in the experience is deliberately not served.
+  expect(!('progress' in detail.session), 'the reader was served somebody else\'s progress');
+  return `plan identical, ${stations} stations, ${detail.session.minutes} min`;
+});
+
+await check('an immersion illustration does NOT travel', async () => {
+  const db = new Database(VAULT, { readonly: true, fileMustExist: true });
+  let local = 0;
+  try {
+    local = db.prepare("SELECT COUNT(*) n FROM decorative_images WHERE entity_kind = 'immersion' AND status = 'ready'").get().n;
+  } catch { local = 0; } finally { db.close(); }
+  if (local === 0) return 'this vault has none to check';
+  const published = (snapshot?.assets ?? []).filter((asset) => asset.kind !== 'deep_research_image' && asset.table === 'decorative_images');
+  expect(published.length === 0, `${published.length} immersion image(s) were published`);
+  return `${local} local immersion image(s), 0 published — only Deep Research illustrations travel`;
 });
 
 await check('the snapshot can be pulled back for hydration', async () => {
