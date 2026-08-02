@@ -16,6 +16,7 @@ import { generateDemoPortraits, hasDemoPortraitKey, demoPortraitsPending } from 
 import { interruptDecorativeImageGenerations } from './ai/decorativeImages';
 import { startRealtimeSync, stopRealtimeSync } from './sync/syncService';
 import { startNodusServerSync, stopNodusServerSync } from './serverSync/serverSyncService';
+import { startReplicaSync, stopReplicaSync } from './serverSync/replicaService';
 import { killMcpTunnelSync, startMcpServer, startMcpTunnelIfConfigured, stopMcpServer } from './mcp';
 import { setCopilotWindowProvider, startCopilotServer, stopCopilotServer } from './copilot/server';
 import { setZoteroPluginWindowProvider, startZoteroPluginServer, stopZoteroPluginServer } from './zotero-plugin/server';
@@ -659,6 +660,9 @@ app.whenReady().then(() => {
 
   if (settings.syncMode === 'realtime') startRealtimeSync();
   startNodusServerSync();
+  // Connected vaults pull on their own timer: a replica must stay current whichever vault
+  // happens to be open, exactly like the publisher already does.
+  startReplicaSync();
   if (settings.mcpEnabled) void startMcpServer().then(() => startMcpTunnelIfConfigured());
   if (settings.copilotEnabled) void startCopilotServer();
   if (settings.zoteroPluginEnabled) void startZoteroPluginServer();
@@ -701,6 +705,7 @@ app.on('window-all-closed', () => {
     if (autoBackupFirstTimer) clearTimeout(autoBackupFirstTimer);
     stopRealtimeSync();
     stopNodusServerSync();
+  stopReplicaSync();
     interruptDecorativeImageGenerations();
     stopAllWhisperCpp();
     closeDb();
@@ -720,6 +725,7 @@ app.on('before-quit', () => {
   if (autoBackupFirstTimer) clearTimeout(autoBackupFirstTimer);
   stopRealtimeSync();
   stopNodusServerSync();
+  stopReplicaSync();
   interruptDecorativeImageGenerations();
   killMcpTunnelSync();
   void stopMcpServer();
@@ -740,6 +746,7 @@ updateAwareApp.on('before-quit-for-update', () => {
   if (autoBackupFirstTimer) clearTimeout(autoBackupFirstTimer);
   stopRealtimeSync();
   stopNodusServerSync();
+  stopReplicaSync();
   interruptDecorativeImageGenerations();
   stopAllWhisperCpp();
   killMcpTunnelSync();

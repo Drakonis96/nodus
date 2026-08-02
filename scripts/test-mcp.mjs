@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
-import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+// The TypeScript/electron require hooks live in scripts/lib so the server suites can drive
+// the same production modules without a second, subtly different copy of them.
+import { installRuntimeHooks } from './lib/tsRuntimeHooks.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
@@ -1119,79 +1121,6 @@ async function callToolRaw(server, name, args = {}, extra = undefined) {
   const entry = server.tools.get(name);
   assert.ok(entry, `missing MCP tool ${name}`);
   return entry.handler(args, extra);
-}
-
-function installRuntimeHooks(userDataPath) {
-  const ts = require('typescript');
-  const Module = require('node:module');
-  const originalResolveFilename = Module._resolveFilename;
-  const originalLoad = Module._load;
-  const electronStub = {
-    app: {
-      getPath(name) {
-        if (name === 'userData' || name === 'temp' || name === 'documents') return userDataPath;
-        return userDataPath;
-      },
-      getVersion() {
-        return '0.0.0-test';
-      },
-      getAppPath() {
-        return repoRoot;
-      },
-      isPackaged: false,
-    },
-    safeStorage: {
-      isEncryptionAvailable() {
-        return false;
-      },
-      encryptString(value) {
-        return Buffer.from(String(value), 'utf8');
-      },
-      decryptString(value) {
-        return Buffer.from(value).toString('utf8');
-      },
-    },
-    dialog: {},
-    shell: {},
-    // The Deep Research lane broadcasts its queue to every window; with none open
-    // (as here) that is an empty sweep, exactly as in the real app before first paint.
-    BrowserWindow: class {
-      static getAllWindows() {
-        return [];
-      }
-    },
-  };
-
-  Module._resolveFilename = function resolveFilename(request, parent, isMain, options) {
-    if (request.startsWith('@shared/')) {
-      // A shared entry is either a file (shared/x.ts) or a directory barrel
-      // (shared/x/index.ts) — fall back to the index so a package-style import resolves.
-      const base = path.join(repoRoot, request.replace('@shared/', 'shared/'));
-      const asFile = `${base}.ts`;
-      return fs.existsSync(asFile) ? asFile : path.join(base, 'index.ts');
-    }
-    return originalResolveFilename.call(this, request, parent, isMain, options);
-  };
-  Module._load = function load(request, parent, isMain) {
-    if (request === 'electron') return electronStub;
-    return originalLoad.call(this, request, parent, isMain);
-  };
-  require.extensions['.ts'] = function loadTs(module, filename) {
-    const source = fs.readFileSync(filename, 'utf8');
-    const output = ts.transpileModule(source, {
-      fileName: filename,
-      compilerOptions: {
-        target: ts.ScriptTarget.ES2022,
-        module: ts.ModuleKind.CommonJS,
-        moduleResolution: ts.ModuleResolutionKind.NodeJs,
-        esModuleInterop: true,
-        jsx: ts.JsxEmit.ReactJSX,
-        resolveJsonModule: true,
-        skipLibCheck: true,
-      },
-    }).outputText;
-    module._compile(output, filename);
-  };
 }
 
 function seedMcpDatabase(db) {

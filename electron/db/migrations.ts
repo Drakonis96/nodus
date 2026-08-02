@@ -10,7 +10,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 121;
+export const SCHEMA_VERSION = 122;
 
 export const migrations: Migration[] = [
   {
@@ -6199,6 +6199,43 @@ export const migrations: Migration[] = [
 
       CREATE INDEX idx_archive_item_profiles_provenance_place
         ON archive_item_profiles(provenance_place_id);
+    `,
+  },
+  {
+    version: 122,
+    up: /* sql */ `
+      -- Outgoing queue for a CONNECTED vault: rows this machine has changed that still
+      -- have to reach the owner's vault through Nodus Server.
+      --
+      -- It stores the row's IDENTITY, never a copy of its payload. Three reasons, and each
+      -- one alone would justify it: a stored copy goes stale the moment the user edits
+      -- again; the partial unique index below then collapses repeated edits of one row into
+      -- a single pending entry instead of a pile of them; and an image's hash can only be
+      -- computed when the row is actually read for sending.
+      --
+      -- The table exists in every vault because migrations are not conditional, but its
+      -- triggers are installed only for a connected vault whose account may write. A
+      -- reader's database therefore has nothing writing to it at all — see
+      -- electron/serverSync/outboxTriggers.ts.
+      CREATE TABLE server_outbox (
+        id             TEXT PRIMARY KEY,
+        seq            INTEGER NOT NULL,
+        table_name     TEXT NOT NULL,
+        row_key        TEXT NOT NULL,
+        op             TEXT NOT NULL CHECK (op IN ('upsert', 'delete')),
+        schema_version INTEGER NOT NULL,
+        created_at     TEXT NOT NULL,
+        state          TEXT NOT NULL DEFAULT 'pending'
+                       CHECK (state IN ('pending', 'sending', 'sent', 'rejected')),
+        attempts       INTEGER NOT NULL DEFAULT 0,
+        last_error     TEXT
+      );
+
+      -- One pending entry per row. A second edit updates the entry that is already queued
+      -- rather than adding another, so a long editing session sends one mutation, not fifty.
+      CREATE UNIQUE INDEX idx_server_outbox_pending
+        ON server_outbox(table_name, row_key) WHERE state = 'pending';
+      CREATE INDEX idx_server_outbox_drain ON server_outbox(state, seq);
     `,
   },
 ];

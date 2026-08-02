@@ -852,43 +852,42 @@ function zeroCounts(): SyncTableCounts {
   return { inserted: 0, updated: 0, skipped: 0 };
 }
 
+
+export interface MergeTablesOptions {
+  /** Wall clock the incoming rows were produced at, used for inherited timestamps. */
+  packageDate: string | null;
+  source: 'sync-package' | 'server-mutations';
+}
+
+export interface MergeTablesResult {
+  groups: Record<SyncGroupKey, SyncTableCounts>;
+  conflicts: SyncConflict[];
+  unknownTables: string[];
+  supersededKept: { count: number };
+  deletions: { applied: number };
+  clockSkewAheadMs: number;
+  packageDate: string | null;
+}
+
 /**
- * Merge a sync package into the live database. Additive and newest-wins: unknown rows
- * are inserted, rows present on both sides take whichever `updated_at` (or
- * `created_at`) is newer, and local rows absent from the package are left alone.
+ * Merge a set of incoming rows into the live database.
+ *
+ * Extracted verbatim from mergeSyncPackage() so that a .nodussync import and a batch of
+ * mutations pulled from Nodus Server go through ONE conflict policy rather than two. Two
+ * answers to "which version of this row wins" is exactly the kind of divergence that shows
+ * up months later as data that disappeared on one machine and not the other.
+ *
+ * The policy itself is unchanged: newest-wins by updated_at (or created_at), deletions
+ * applied first and local tombstones consulted while merging so a deleted row is not
+ * re-inserted, foreign keys deferred until the whole batch is in place, and the LOSER of
+ * every comparison preserved in sync_superseded so a wrong clock costs a review rather than
+ * the work itself.
  */
-export function mergeSyncPackage(buffer: Buffer, passphrase?: string): SyncMergeSummary {
-  let zip: AdmZip;
-  try {
-    zip = new AdmZip(buffer);
-  } catch {
-    throw new Error('Archivo de sincronización ilegible.');
-  }
-  const manifestEntry = zip.getEntry('manifest.json');
-  if (!manifestEntry) throw new Error('Paquete inválido: faltan manifest o datos.');
-
-  const manifest = JSON.parse(zip.readAsText(manifestEntry)) as SyncManifest;
-  if (manifest.format !== SYNC_FORMAT || !(manifest.formatVersion >= 1 && manifest.formatVersion <= SYNC_FORMAT_VERSION)) {
-    throw new Error('Formato de paquete de sincronización no soportado.');
-  }
-  // A package from a newer schema carries columns and tables this build does not know.
-  // Merging it anyway silently DROPS them, and because the truncated row keeps the newer
-  // timestamp, the next sync back propagates the loss to the machine that was up to
-  // date. Refusing is the only safe answer.
-  if (Number.isFinite(manifest.schemaVersion) && manifest.schemaVersion > SCHEMA_VERSION) {
-    throw new Error(
-      `El paquete procede de una versión más reciente de Nodus (esquema v${manifest.schemaVersion}, este equipo usa v${SCHEMA_VERSION}). Actualiza la app antes de importarlo.`
-    );
-  }
-
-  const { tables, counts: declaredCounts, resolveBlob } = openPackage(zip, manifest, passphrase);
-  for (const [table, expected] of Object.entries(declaredCounts)) {
-    const rows = tables.get(table);
-    if (!Array.isArray(rows) || rows.length !== expected) {
-      throw new Error(`Paquete inválido: el recuento de ${table} no coincide con su manifiesto.`);
-    }
-  }
-
+export function mergeTables(
+  tables: TableRows,
+  resolveBlob: BlobResolver,
+  options: MergeTablesOptions,
+): MergeTablesResult {
   const db = getDb();
   const present = localTableNames();
   const tableGroup = groupOfTable();
@@ -897,7 +896,7 @@ export function mergeSyncPackage(buffer: Buffer, passphrase?: string): SyncMerge
   const unknownTables: string[] = [];
   const insertedRowIds = new Map<string, Set<number>>();
   const supersededKept = { count: 0 };
-  const packageDate = typeof manifest.date === 'string' ? manifest.date : null;
+  const packageDate = options.packageDate;
   // Newest-wins compares wall clocks, so a machine whose clock runs ahead wins every
   // conflict it takes part in. That is the only direction a one-way package can reveal
   // (an old package and a slow clock look identical), so it is measured and reported —
@@ -935,6 +934,52 @@ export function mergeSyncPackage(buffer: Buffer, passphrase?: string): SyncMerge
     dropDanglingRows(insertedRowIds, conflicts);
   });
   tx();
+
+  return { groups, conflicts, unknownTables: [...new Set(unknownTables)].sort(), supersededKept, deletions, clockSkewAheadMs, packageDate };
+}
+
+/**
+ * Merge a sync package into the live database. Additive and newest-wins: unknown rows
+ * are inserted, rows present on both sides take whichever `updated_at` (or
+ * `created_at`) is newer, and local rows absent from the package are left alone.
+ */
+export function mergeSyncPackage(buffer: Buffer, passphrase?: string): SyncMergeSummary {
+  let zip: AdmZip;
+  try {
+    zip = new AdmZip(buffer);
+  } catch {
+    throw new Error('Archivo de sincronización ilegible.');
+  }
+  const manifestEntry = zip.getEntry('manifest.json');
+  if (!manifestEntry) throw new Error('Paquete inválido: faltan manifest o datos.');
+
+  const manifest = JSON.parse(zip.readAsText(manifestEntry)) as SyncManifest;
+  if (manifest.format !== SYNC_FORMAT || !(manifest.formatVersion >= 1 && manifest.formatVersion <= SYNC_FORMAT_VERSION)) {
+    throw new Error('Formato de paquete de sincronización no soportado.');
+  }
+  // A package from a newer schema carries columns and tables this build does not know.
+  // Merging it anyway silently DROPS them, and because the truncated row keeps the newer
+  // timestamp, the next sync back propagates the loss to the machine that was up to
+  // date. Refusing is the only safe answer.
+  if (Number.isFinite(manifest.schemaVersion) && manifest.schemaVersion > SCHEMA_VERSION) {
+    throw new Error(
+      `El paquete procede de una versión más reciente de Nodus (esquema v${manifest.schemaVersion}, este equipo usa v${SCHEMA_VERSION}). Actualiza la app antes de importarlo.`
+    );
+  }
+
+  const { tables, counts: declaredCounts, resolveBlob } = openPackage(zip, manifest, passphrase);
+  for (const [table, expected] of Object.entries(declaredCounts)) {
+    const rows = tables.get(table);
+    if (!Array.isArray(rows) || rows.length !== expected) {
+      throw new Error(`Paquete inválido: el recuento de ${table} no coincide con su manifiesto.`);
+    }
+  }
+
+  const merged = mergeTables(tables, resolveBlob, {
+    packageDate: typeof manifest.date === 'string' ? manifest.date : null,
+    source: 'sync-package',
+  });
+  const { groups, conflicts, unknownTables, supersededKept, deletions, clockSkewAheadMs, packageDate } = merged;
 
   return {
     groups,

@@ -251,3 +251,77 @@ test('public copy matches the no-AI-student-evaluation product boundary', async 
     assert.match(source, /(?:never|does not use AI to) [\s\S]{0,80}(?:grade|evaluate)[\s\S]{0,40}students|nunca (?:califica|envía)[\s\S]{0,120}(?:estudiantes|alumnado)|nunca evalúa estudiantes/i);
   }
 });
+
+test('only two tables can ever produce a published image, and no document can', async () => {
+  const snapshot = await read('electron/serverSync/serverSnapshot.ts');
+  // ASSET_SOURCES is the single code path that turns a database blob into something the
+  // server can receive. Anything added to it becomes publishable, so its size is pinned.
+  const sources = snapshot.slice(snapshot.indexOf('export const ASSET_SOURCES'), snapshot.indexOf('MAX_ASSET_BYTES'));
+  assert.equal((sources.match(/table: '/g) ?? []).length, 2, 'exactly two tables may produce an asset');
+  assert.match(sources, /table: 'decorative_images'/);
+  assert.match(sources, /table: 'person_portraits'/);
+  assert.match(sources, /entity_kind = 'deep_research'/, 'immersion illustrations are not published');
+  // Audio metadata lives in audio_clips and the files themselves on disk; a work's PDF is
+  // outside the vault entirely. Neither may appear as a source of publishable bytes.
+  for (const forbidden of ['audio_clips', 'study_recordings', 'study_materials', 'archive_item_files', 'db_attachments']) {
+    assert.doesNotMatch(sources, new RegExp(`table: '${forbidden}'`));
+  }
+  // The server refuses by content, not by declaration, and WAV must not pass as WEBP.
+  // The server refuses by content, not by declaration, and a WAV must not pass as a WEBP.
+  const { sniffImageMime } = await import('../server/lib/assets.mjs');
+  const wav = Buffer.concat([Buffer.from('RIFF'), Buffer.from([36, 0, 0, 0]), Buffer.from('WAVEfmt '), Buffer.alloc(20)]);
+  const webp = Buffer.concat([Buffer.from('RIFF'), Buffer.from([26, 0, 0, 0]), Buffer.from('WEBPVP8 '), Buffer.alloc(18)]);
+  assert.equal(sniffImageMime(wav), null, 'audio sharing the RIFF header is still refused');
+  assert.equal(sniffImageMime(webp), 'image/webp');
+  assert.equal(sniffImageMime(Buffer.from('%PDF-1.7 padded out past twelve bytes')), null);
+});
+
+test('a replica can only send back content its own user authored', async () => {
+  const [desktop, syncTables] = await Promise.all([
+    read('electron/serverSync/outboxTriggers.ts'),
+    read('electron/db/syncTables.ts'),
+  ]);
+  const { MUTABLE_TABLES } = await import('../server/lib/core/mutations.mjs');
+  const serverTables = Object.keys(MUTABLE_TABLES);
+  // The desktop list is read from source (it is TypeScript); the round-trip test asserts the
+  // two are identical, so pinning either one pins both.
+  const desktopList = desktop.slice(desktop.indexOf('export const MUTABLE_TABLES'), desktop.indexOf('] as const'));
+
+  // Anything derived from the owner's corpus, and everything about students, testimonies or
+  // prosopography, must be absent from both whitelists.
+  for (const forbidden of [
+    'works', 'ideas', 'edges', 'evidence', 'passages', 'themes', 'gaps', 'authors',
+    'teaching_students', 'teaching_groups', 'teaching_grade_entries',
+    'testimony_interviews', 'prosop_audit_log', 'settings',
+  ]) {
+    assert.ok(!serverTables.includes(forbidden), `${forbidden} must not be writable from a replica`);
+    assert.doesNotMatch(desktopList, new RegExp(`'${forbidden}'`), `${forbidden} must not be queued by a replica`);
+  }
+  for (const allowed of ['notes', 'writing_saved_drafts', 'immersion_sessions']) {
+    assert.ok(serverTables.includes(allowed));
+    assert.match(desktopList, new RegExp(`'${allowed}'`));
+  }
+  // decorative_images travels only as a Deep Research illustration, never an immersion one.
+  assert.equal(MUTABLE_TABLES.decorative_images.require.entity_kind, 'deep_research');
+  // A reader's database has no triggers at all, which is the guarantee that holds even if
+  // every other check were wrong.
+  assert.match(desktop, /ensureOutboxTriggers\(db: Database\.Database, enabled: boolean\)/);
+  assert.match(await read('electron/db/database.ts'), /mayQueueMutations/);
+  // The queue is this machine's own record and must never travel in a sync package.
+  assert.match(syncTables, /'server_outbox'/);
+});
+
+test('the server never receives an AI provider key', async () => {
+  const [api, corpus] = await Promise.all([
+    read('server/lib/routes/api.mjs'),
+    read('server/lib/routes/corpus.mjs'),
+  ]);
+  for (const source of [api, corpus]) {
+    assert.doesNotMatch(source, /apiKey|api_key|OPENAI_API_KEY|anthropic/i);
+  }
+  // The chat endpoint hands over retrieval and a budget, and the client calls its own
+  // provider. A server that produced answers would be the first place in this project to
+  // hold a third-party credential.
+  assert.match(api, /contextPackage/);
+  assert.match(api, /citationScheme/);
+});

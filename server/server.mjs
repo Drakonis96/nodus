@@ -10,6 +10,10 @@ import { Store, digest, token } from './lib/store.mjs';
 import { body, contentSecurityPolicy, cookies, escapeHtml, form, html, json, jsonBody, redirect } from './lib/http.mjs';
 import { normalizeServerLanguage, serverTranslator } from './lib/i18n.mjs';
 import { helpTip, languagePicker, nodusMark, WEB_STYLES } from './lib/webUi.mjs';
+import { can as canRole, isSpaceRole, normalizeSpaceRole, SPACE_ROLES } from './lib/roles.mjs';
+import { createAuthorizer } from './lib/auth.mjs';
+import { createApiRoutes } from './lib/routes/api.mjs';
+import { createCorpusRoutes } from './lib/routes/corpus.mjs';
 
 // A zero, a `200m`-style unit or a value past what Node can hold in a single buffer
 // would otherwise reach zlib and turn every publication into an opaque rejection, so
@@ -37,10 +41,29 @@ const MAX_SNAPSHOT_BYTES = byteLimit('NODUS_MAX_SNAPSHOT_BYTES', 100 * 1024 * 10
 // rather than borrowing the one meant for the wire. Sharing a single number made a
 // perfectly ordinary vault fail as if its upload had been corrupt.
 const MAX_SNAPSHOT_JSON_BYTES = byteLimit('NODUS_MAX_SNAPSHOT_JSON_BYTES', 384 * 1024 * 1024, bufferLimits.MAX_STRING_LENGTH);
+/** One image. Comfortably above a 1536×1024 render and far below any real PDF or recording. */
+const MAX_ASSET_BYTES = byteLimit('NODUS_MAX_ASSET_BYTES', 8 * 1024 * 1024, bufferLimits.MAX_LENGTH);
+/** Total image budget for one space, so a shared server cannot be filled from one vault. */
+const MAX_SPACE_ASSET_BYTES = byteLimit('NODUS_MAX_SPACE_ASSET_BYTES', 2 * 1024 * 1024 * 1024, bufferLimits.MAX_LENGTH);
+const MAX_VECTOR_BYTES = byteLimit('NODUS_MAX_VECTOR_BYTES', 512 * 1024 * 1024, bufferLimits.MAX_LENGTH);
+/**
+ * How long an unreferenced image survives before the sweeper takes it.
+ *
+ * Not politeness — it closes a race. A writer uploads an image and then sends the mutation
+ * that points at it; a republication landing in between would legitimately not mention that
+ * hash yet, and an eager sweep would delete bytes still in flight.
+ */
+const ASSET_GRACE_MS = 24 * 60 * 60_000;
 const store = new Store(DATA_DIR);
 const snapshotCache = new Map();
+/**
+ * A parsed snapshot can be hundreds of megabytes. MCP touched it rarely; the REST API is hit
+ * on every screen a phone opens, so the cache needs a ceiling or a server with several large
+ * spaces runs itself out of memory.
+ */
+const MAX_CACHED_SNAPSHOTS = Math.max(1, Number(process.env.NODUS_MAX_CACHED_SNAPSHOTS || 3));
 const rateBuckets = new Map();
-const SCOPES = new Set(['profile', 'spaces.read', 'materials.read']);
+const SCOPES = new Set(['profile', 'spaces.read', 'materials.read', 'materials.write', 'assets.read']);
 const MCP_PROTOCOLS = new Set(['2025-11-25', '2025-06-18', '2025-03-26']);
 const AUTH_BODY_BYTES = 32 * 1024;
 const MAX_RATE_BUCKETS = 20_000;
@@ -91,9 +114,38 @@ function publicUrl() {
   return normalizePublicUrl(process.env.NODUS_PUBLIC_URL || store.state.settings.publicUrl || `http://localhost:${PORT}`);
 }
 
-function mcpResource() {
-  return `${publicUrl()}/mcp`;
+/**
+ * Two OAuth protected resources over one origin.
+ *
+ * MCP and the client API are different surfaces with different powers — an AI client reads,
+ * an app reads and writes — so a token minted for one must not open the other. The boundary
+ * is the resource identifier plus its scopes, which is enforced in software; a second
+ * hostname would cost a second certificate and buy nothing.
+ *
+ * Before this existed, `oauthAccess()` compared against the MCP resource and nothing else,
+ * so any future REST route would have accepted an MCP token, and vice versa.
+ */
+function resourceMap() {
+  return { mcp: `${publicUrl()}/mcp`, api: `${publicUrl()}/api/v1` };
 }
+
+function mcpResource() {
+  return resourceMap().mcp;
+}
+
+function apiResource() {
+  return resourceMap().api;
+}
+
+function knownResource(value) {
+  return Object.values(resourceMap()).includes(String(value));
+}
+
+const { authorize, challenge: authChallenge } = createAuthorizer({
+  store,
+  resourceFor: (key) => resourceMap()[key],
+  publicUrl,
+});
 
 function page(title, content, options = {}) {
   const picker = languagePicker(language(), { language: tr('language'), apply: tr('applyLanguage') });
@@ -203,6 +255,19 @@ function membership(userId, spaceId) {
   return store.state.memberships.find((entry) => entry.userId === userId && entry.spaceId === spaceId) ?? null;
 }
 
+/**
+ * The role a device token actually operates with.
+ *
+ * A token paired before roles existed belongs, by construction, to whoever was publishing
+ * that space, so it keeps owner powers. Refusing it would stop every installed desktop from
+ * publishing the moment its server was upgraded.
+ */
+function effectiveRole(device) {
+  const entry = membership(device.userId, device.spaceId);
+  if (device.grandfathered && (device.kind ?? 'publisher') === 'publisher') return 'owner';
+  return entry ? normalizeSpaceRole(entry.role) : null;
+}
+
 function oauthAccess(req, neededScope = 'materials.read') {
   const raw = bearer(req);
   if (!raw) return null;
@@ -263,7 +328,19 @@ function readSnapshot(spaceId) {
   // that is already on disk unreadable to every MCP client.
   const value = JSON.parse(gunzipSync(fs.readFileSync(target), { maxOutputLength: bufferLimits.MAX_STRING_LENGTH }).toString('utf8'));
   snapshotCache.set(spaceId, { mtimeMs: stat.mtimeMs, value });
+  // Insertion-ordered Map, so the first key is the least recently loaded. Without this the
+  // cache is unbounded, and a server holding several large spaces would grow until the REST
+  // API — which reads a snapshot on every request, unlike MCP — exhausted its memory.
+  while (snapshotCache.size > MAX_CACHED_SNAPSHOTS) {
+    const oldest = snapshotCache.keys().next().value;
+    if (oldest === spaceId) break;
+    snapshotCache.delete(oldest);
+  }
   return value;
+}
+
+function invalidateSnapshot(spaceId) {
+  snapshotCache.delete(spaceId);
 }
 
 function rows(snapshot, table) {
@@ -588,16 +665,64 @@ function resetPasswordPage(current, user, error = '') {
   </form>`);
 }
 
+const ROLE_LABEL_KEYS = { reader: 'roleReader', writer: 'roleWriter', owner: 'roleOwner' };
+
+function roleLabel(role) {
+  return tr(ROLE_LABEL_KEYS[normalizeSpaceRole(role)]);
+}
+
+function roleOptions(selected) {
+  return SPACE_ROLES.map((role) => `<option value="${role}"${role === normalizeSpaceRole(selected) ? ' selected' : ''}>${escapeHtml(roleLabel(role))}</option>`).join('');
+}
+
+/**
+ * One checkbox plus one role selector per space.
+ *
+ * The keys are namespaced per space (`space:<id>` / `role:<id>`) rather than repeated under
+ * a single name, because `form()` builds a plain object from URLSearchParams and a repeated
+ * key would silently collapse to its last value — which is exactly how a multi-space grant
+ * would quietly become a single-space one.
+ */
+function spaceGrantPicker() {
+  if (store.state.spaces.length === 0) return `<p class="muted">${tr('noSpacesYet')}</p>`;
+  return `<div class="grant-list">${store.state.spaces.map((space) => `<div class="grant-row">
+    <label class="grant-name"><input type="checkbox" name="space:${space.id}" value="on"> <span>${escapeHtml(space.name)}</span></label>
+    <select name="role:${space.id}" aria-label="${escapeHtml(tr('accessLevel'))}">${roleOptions('reader')}</select>
+  </div>`).join('')}</div>`;
+}
+
+function readSpaceGrants(values) {
+  const grants = [];
+  for (const [key, value] of Object.entries(values)) {
+    if (!key.startsWith('space:') || value !== 'on') continue;
+    const spaceId = key.slice('space:'.length);
+    if (!store.state.spaces.some((space) => space.id === spaceId)) continue;
+    grants.push({ spaceId, role: normalizeSpaceRole(values[`role:${spaceId}`]) });
+  }
+  // The form used to carry a single `spaceId` with an implicit reader role. Anything that
+  // still posts that shape keeps working rather than silently creating an account with no
+  // access at all, which is the failure mode that would be hardest to notice.
+  if (grants.length === 0 && values.spaceId && store.state.spaces.some((space) => space.id === values.spaceId)) {
+    grants.push({ spaceId: values.spaceId, role: normalizeSpaceRole(values.role) });
+  }
+  return grants;
+}
+
 function dashboard(current, notice = '') {
   const spaces = store.state.spaces.map((space) => `<tr><td><strong>${escapeHtml(space.name)}</strong>${space.description ? `<div class="muted">${escapeHtml(space.description)}</div>` : ''}</td><td><code>${space.id}</code></td><td>${escapeHtml(space.updatedAt || tr('unpublished'))}</td><td><form method="post" action="/admin/pairing"><input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="spaceId" value="${space.id}"><button class="secondary" type="submit">${tr('createPairing')}</button></form>${space.updatedAt ? `<form method="post" action="/admin/spaces/clear-request"><input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="spaceId" value="${space.id}"><button class="danger" type="submit">${tr('deletePublication')}</button></form>` : ''}</td></tr>`).join('');
   const spaceOptions = store.state.spaces.map((space) => `<option value="${space.id}">${escapeHtml(space.name)}</option>`).join('');
   const users = store.state.users.map((user) => {
     const access = store.state.memberships.filter((entry) => entry.userId === user.id).map((entry) => {
       const space = store.state.spaces.find((candidate) => candidate.id === entry.spaceId);
-      const remove = entry.role === 'owner' ? '' : `<form method="post" action="/admin/access/revoke"><input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="userId" value="${user.id}"><input type="hidden" name="spaceId" value="${entry.spaceId}"><button class="secondary" type="submit" title="${tr('revokeAccess')}" aria-label="${tr('revokeAccess')}">×</button></form>`;
-      return `<div class="access-chip"><span>${escapeHtml(space?.name || entry.spaceId)} · ${escapeHtml(entry.role)}</span>${remove}</div>`;
+      // An owner's own membership is neither revocable nor editable here: it is what makes
+      // the space publishable at all, and downgrading it from a dropdown would strand it.
+      const controls = entry.role === 'owner'
+        ? `<span class="role-tag">${escapeHtml(roleLabel(entry.role))}</span>`
+        : `<form method="post" action="/admin/access/role"><input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="userId" value="${user.id}"><input type="hidden" name="spaceId" value="${entry.spaceId}"><select name="role" aria-label="${escapeHtml(tr('accessLevel'))}">${roleOptions(entry.role)}</select><button class="secondary" type="submit">${tr('updateRole')}</button></form>`
+        + `<form method="post" action="/admin/access/revoke"><input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="userId" value="${user.id}"><input type="hidden" name="spaceId" value="${entry.spaceId}"><button class="secondary" type="submit" title="${tr('revokeAccess')}" aria-label="${tr('revokeAccess')}">×</button></form>`;
+      return `<div class="access-chip"><span>${escapeHtml(space?.name || entry.spaceId)}</span>${controls}</div>`;
     }).join('') || '<span class="muted">—</span>';
-    const grant = user.role === 'admin' || !spaceOptions ? '' : `<form method="post" action="/admin/access/grant"><input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="userId" value="${user.id}"><select name="spaceId">${spaceOptions}</select><button class="secondary">${tr('grantReader')}</button></form>`;
+    const grant = user.role === 'admin' || !spaceOptions ? '' : `<form method="post" action="/admin/access/grant"><input type="hidden" name="csrf" value="${current.session.csrf}"><input type="hidden" name="userId" value="${user.id}"><select name="spaceId">${spaceOptions}</select><select name="role" aria-label="${escapeHtml(tr('accessLevel'))}">${roleOptions('reader')}</select><button class="secondary">${tr('grantAccess')}</button></form>`;
     const reset = user.role === 'member' ? `<a href="/admin/users/password?userId=${encodeURIComponent(user.id)}">${tr('resetPassword')}</a>` : `<a href="/account">${tr('changeMyPassword')}</a>`;
     return `<tr><td><strong>${escapeHtml(user.email)}</strong></td><td>${escapeHtml(user.role)}</td><td><div class="access-list">${access}</div></td><td>${grant}<p>${reset}</p></td></tr>`;
   }).join('');
@@ -635,8 +760,9 @@ function dashboard(current, notice = '') {
       <input type="hidden" name="csrf" value="${current.session.csrf}">
       <div class="field"><label for="reader-email">${tr('email')}</label><input id="reader-email" name="email" type="email" autocomplete="off" required></div>
       <div class="field"><label for="reader-password">${tr('temporaryPasswordLabel')}</label><input id="reader-password" name="password" type="password" autocomplete="new-password" minlength="12" required></div>
-      <div class="field"><label for="reader-space">${tr('space')}</label><select id="reader-space" name="spaceId">${spaceOptions}</select></div>
-      <button type="submit">${tr('createReader')}</button>
+      <div class="field"><div class="label-line"><label>${tr('spacesAndRoles')}</label>${helpTip(tr('newUserSpacesHelp'), tr('moreInformation'))}</div>${spaceGrantPicker()}</div>
+      <p class="muted role-legend"><strong>${escapeHtml(tr('roleReader'))}:</strong> ${tr('roleReaderHelp')}<br><strong>${escapeHtml(tr('roleWriter'))}:</strong> ${tr('roleWriterHelp')}<br><strong>${escapeHtml(tr('roleOwner'))}:</strong> ${tr('roleOwnerHelp')}</p>
+      <button type="submit">${tr('createUser')}</button>
     </form>
   </div></section>
   <section class="section">
@@ -663,6 +789,25 @@ function languageReturnPath(req) {
   return store.state.users.length === 0 ? '/setup' : '/';
 }
 
+const corpusRoutes = createCorpusRoutes({ readSnapshot });
+
+const apiRoutes = createApiRoutes({
+  store, authorize, json, body, jsonBody, fs,
+  readSnapshot, invalidateSnapshot, expandSnapshot,
+  publicUrl, language, rateLimit, clearRateLimit, mib,
+  // A function, not a snapshot: the public URL is only settled once /setup has run.
+  resourceMap,
+  corpus: corpusRoutes,
+  limits: {
+    maxSnapshotBytes: MAX_SNAPSHOT_BYTES,
+    maxSnapshotJsonBytes: MAX_SNAPSHOT_JSON_BYTES,
+    maxAssetBytes: MAX_ASSET_BYTES,
+    maxSpaceAssetBytes: MAX_SPACE_ASSET_BYTES,
+    maxVectorBytes: MAX_VECTOR_BYTES,
+    assetGraceMs: ASSET_GRACE_MS,
+  },
+});
+
 async function route(req, res) {
   const url = new URL(req.url || '/', publicUrl());
   if (url.pathname === '/language' && req.method === 'POST') {
@@ -674,9 +819,17 @@ async function route(req, res) {
     });
   }
   if (url.pathname === '/healthz') return json(res, 200, { ok: true, service: 'nodus-server', version: '0.1.0', language: language() });
-  if (url.pathname === '/.well-known/oauth-protected-resource' || url.pathname === '/.well-known/oauth-protected-resource/mcp') return json(res, 200, { resource: mcpResource(), authorization_servers: [publicUrl()], scopes_supported: [...SCOPES], resource_documentation: `${publicUrl()}/` });
+  if (url.pathname === '/.well-known/oauth-protected-resource' || url.pathname === '/.well-known/oauth-protected-resource/mcp') return json(res, 200, { resource: mcpResource(), authorization_servers: [publicUrl()], scopes_supported: ['profile', 'spaces.read', 'materials.read'], resource_documentation: `${publicUrl()}/` });
+  // The client API is a separate protected resource from MCP: an AI client reads the corpus,
+  // an app also writes to it, and a token for one must not be accepted by the other.
+  if (url.pathname === '/.well-known/oauth-protected-resource/api/v1') return json(res, 200, { resource: apiResource(), authorization_servers: [publicUrl()], scopes_supported: [...SCOPES], resource_documentation: `${publicUrl()}/` });
   if (url.pathname === '/.well-known/oauth-authorization-server' || url.pathname === '/.well-known/openid-configuration') return json(res, 200, { issuer: publicUrl(), authorization_endpoint: `${publicUrl()}/oauth/authorize`, token_endpoint: `${publicUrl()}/oauth/token`, registration_endpoint: `${publicUrl()}/oauth/register`, code_challenge_methods_supported: ['S256'], token_endpoint_auth_methods_supported: ['none'], response_types_supported: ['code'], grant_types_supported: ['authorization_code', 'refresh_token'], scopes_supported: [...SCOPES] });
   if (url.pathname === '/mcp') return handleMcp(req, res);
+
+  // The client API answers before the "no users yet" gate below. A machine surface should
+  // get a 401 it can act on, not a 303 to an HTML setup page it cannot read. Routes this
+  // handler does not recognise fall through untouched.
+  if (await apiRoutes.handle(req, res, url)) return;
 
   if (store.state.users.length === 0) {
     if (url.pathname !== '/setup') return redirect(res, '/setup');
@@ -770,7 +923,7 @@ async function route(req, res) {
     const client = store.state.oauthClients.find((entry) => entry.client_id === url.searchParams.get('client_id'));
     const redirectUri = url.searchParams.get('redirect_uri') || '';
     const resource = url.searchParams.get('resource') || mcpResource();
-    if (!client || !client.redirect_uris.includes(redirectUri) || resource !== mcpResource() || url.searchParams.get('response_type') !== 'code' || url.searchParams.get('code_challenge_method') !== 'S256') return html(res, 400, page('OAuth', `<h1>${tr('invalidOauth')}</h1>`));
+    if (!client || !client.redirect_uris.includes(redirectUri) || !knownResource(resource) || url.searchParams.get('response_type') !== 'code' || url.searchParams.get('code_challenge_method') !== 'S256') return html(res, 400, page('OAuth', `<h1>${tr('invalidOauth')}</h1>`));
     const requestedInput = (url.searchParams.get('scope') || 'profile spaces.read materials.read').split(/\s+/).filter((scope) => SCOPES.has(scope));
     const requested = requestedInput.length > 0 ? requestedInput : ['materials.read'];
     const hidden = [...url.searchParams].map(([key, value]) => `<input type="hidden" name="${escapeHtml(key)}" value="${escapeHtml(value)}">`).join('');
@@ -782,11 +935,14 @@ async function route(req, res) {
     const values = await form(req, 64 * 1024);
     if (!checkCsrf(current, values.csrf)) return html(res, 403, page(tr('error'), `<h1>${tr('sessionExpired')}</h1>`));
     const client = store.state.oauthClients.find((entry) => entry.client_id === values.client_id);
-    if (!client || !client.redirect_uris.includes(values.redirect_uri) || values.code_challenge_method !== 'S256' || String(values.resource || mcpResource()) !== mcpResource()) return html(res, 400, page('OAuth', `<h1>${tr('invalidOauth')}</h1>`));
+    const grantedResource = String(values.resource || mcpResource());
+    if (!client || !client.redirect_uris.includes(values.redirect_uri) || values.code_challenge_method !== 'S256' || !knownResource(grantedResource)) return html(res, 400, page('OAuth', `<h1>${tr('invalidOauth')}</h1>`));
     const scopeInput = String(values.scope || 'profile spaces.read materials.read').split(/\s+/).filter((scope) => SCOPES.has(scope));
     const scopes = scopeInput.length > 0 ? scopeInput : ['materials.read'];
     const raw = token(24);
-    store.state.oauthCodes.push({ hash: digest(raw), userId: current.user.id, clientId: client.client_id, redirectUri: values.redirect_uri, codeChallenge: values.code_challenge, scopes, resource: mcpResource(), expiresAt: new Date(Date.now() + 5 * 60_000).toISOString() });
+    // The code carries the resource it was granted for, and /oauth/token copies it onto the
+    // access token, so the surface a client asked for is the only one it can reach.
+    store.state.oauthCodes.push({ hash: digest(raw), userId: current.user.id, clientId: client.client_id, redirectUri: values.redirect_uri, codeChallenge: values.code_challenge, scopes, resource: grantedResource, expiresAt: new Date(Date.now() + 5 * 60_000).toISOString() });
     store.save();
     const target = new URL(values.redirect_uri); target.searchParams.set('code', raw); if (values.state) target.searchParams.set('state', values.state);
     return redirect(res, target.toString(), oauthRedirectHeaders(values.redirect_uri));
@@ -842,7 +998,10 @@ async function route(req, res) {
   if (url.pathname === '/api/v1/settings/language' && req.method === 'PUT') {
     const raw = bearer(req);
     const device = store.state.deviceTokens.find((entry) => entry.hash === digest(raw));
-    if (!device || !membership(device.userId, device.spaceId)) return json(res, 401, { error: 'Invalid or revoked device token.' });
+    // The web interface language is server-wide, so only a space owner may change it.
+    // A reader's replica must not be able to relabel the administration UI for everyone.
+    const role = device ? effectiveRole(device) : null;
+    if (!device || !role || !canRole(role, 'own')) return json(res, 401, { error: 'Invalid or revoked device token.' });
     const input = await jsonBody(req, 4 * 1024);
     if (typeof input.language !== 'string' || normalizeServerLanguage(input.language) !== input.language) {
       return json(res, 400, { error: 'Unsupported server language.' });
@@ -851,35 +1010,6 @@ async function route(req, res) {
     device.lastUsedAt = new Date().toISOString();
     store.save();
     return json(res, 200, { language: normalizeServerLanguage(store.state.settings.language) });
-  }
-
-  const snapshotMatch = url.pathname.match(/^\/api\/v1\/spaces\/([^/]+)\/snapshot$/);
-  if (snapshotMatch && req.method === 'PUT') {
-    const raw = bearer(req);
-    const device = store.state.deviceTokens.find((entry) => entry.hash === digest(raw) && entry.spaceId === snapshotMatch[1]);
-    if (!device) return json(res, 401, { error: 'Invalid device token.' });
-    const space = store.state.spaces.find((entry) => entry.id === device.spaceId);
-    if (!space || !membership(device.userId, space.id)) return json(res, 403, { error: 'You do not have permission to publish this space.' });
-    if (req.headers['content-encoding'] !== 'gzip') return json(res, 415, { error: 'The publication must be gzip-compressed.' });
-    const revision = String(req.headers['x-nodus-revision'] || '');
-    if (revision && revision === space.revision) return json(res, 200, { ok: true, unchanged: true, updatedAt: space.updatedAt });
-    const announced = Number(req.headers['content-length'] || 0);
-    if (announced > MAX_SNAPSHOT_BYTES) {
-      return json(res, 413, { error: `The compressed publication is ${mib(announced)} and this server accepts uploads of up to ${mib(MAX_SNAPSHOT_BYTES)} (NODUS_MAX_SNAPSHOT_BYTES).`, limitBytes: MAX_SNAPSHOT_BYTES, uploadBytes: announced });
-    }
-    const bytes = await body(req, MAX_SNAPSHOT_BYTES);
-    const expanded = expandSnapshot(bytes);
-    if (expanded.reason === 'too-large') {
-      const size = expanded.expanded === null ? 'past the limit' : `to ${mib(expanded.expanded)}`;
-      return json(res, 413, { error: `The publication expands ${size} and this server accepts up to ${mib(MAX_SNAPSHOT_JSON_BYTES)} of expanded data (NODUS_MAX_SNAPSHOT_JSON_BYTES).`, limitBytes: MAX_SNAPSHOT_JSON_BYTES, expandedBytes: expanded.expanded });
-    }
-    if (expanded.reason) return json(res, 400, { error: 'The compressed publication is not readable: the body must be gzipped JSON.' });
-    const snapshot = expanded.value;
-    if (snapshot?.format !== 'nodus.server-snapshot' || snapshot?.formatVersion !== 1) return json(res, 400, { error: 'Unsupported publication format.' });
-    store.writeSnapshot(space.id, bytes); snapshotCache.delete(space.id);
-    space.updatedAt = new Date().toISOString(); space.revision = revision || snapshot.revision || ''; space.vault = snapshot.vault; space.bytes = bytes.length;
-    device.lastUsedAt = space.updatedAt; store.save();
-    return json(res, 200, { ok: true, unchanged: false, updatedAt: space.updatedAt, bytes: bytes.length });
   }
 
   if (url.pathname === '/') {
@@ -924,8 +1054,27 @@ async function route(req, res) {
   if (url.pathname === '/admin/users' && req.method === 'POST') {
     const current = requireSession(req, res, true); if (!current) return;
     const values = await form(req, AUTH_BODY_BYTES); if (!checkCsrf(current, values.csrf)) return html(res, 403, page(tr('error'), `<h1>${tr('sessionExpired')}</h1>`));
-    try { const user = store.createUser(values.email, values.password, 'member'); if (values.spaceId) { store.state.memberships.push({ userId: user.id, spaceId: values.spaceId, role: 'reader' }); store.save(); } return redirect(res, '/?notice=' + encodeURIComponent('User created.')); }
-    catch (error) { return html(res, 400, dashboard(current, error instanceof Error ? error.message : String(error))); }
+    try {
+      const user = store.createUser(values.email, values.password, 'member');
+      // A researcher is rarely given exactly one space, and their level differs per space:
+      // reader on a colleague's corpus, writer on the shared one. Both are set here at once.
+      const grants = readSpaceGrants(values);
+      for (const grant of grants) store.state.memberships.push({ userId: user.id, spaceId: grant.spaceId, role: grant.role });
+      if (grants.length) store.save();
+      return redirect(res, '/?notice=' + encodeURIComponent(`User created with access to ${grants.length} space(s).`));
+    } catch (error) { return html(res, 400, dashboard(current, error instanceof Error ? error.message : String(error))); }
+  }
+  if (url.pathname === '/admin/access/role' && req.method === 'POST') {
+    const current = requireSession(req, res, true); if (!current) return;
+    const values = await form(req, AUTH_BODY_BYTES); if (!checkCsrf(current, values.csrf)) return html(res, 403, page(tr('error'), `<h1>${tr('sessionExpired')}</h1>`));
+    const entry = membership(values.userId, values.spaceId);
+    if (!entry || entry.role === 'owner') return html(res, 400, dashboard(current, 'That access cannot be changed here.'));
+    if (!isSpaceRole(values.role)) return html(res, 400, dashboard(current, 'Unknown access level.'));
+    entry.role = values.role;
+    // Nothing else to revoke: authorize() reads the role live on every request, so an
+    // already-issued device or OAuth token drops to the new level on its very next call.
+    store.save();
+    return redirect(res, '/?notice=' + encodeURIComponent('Access level updated.'));
   }
   if (url.pathname === '/admin/access/grant' && req.method === 'POST') {
     const current = requireSession(req, res, true); if (!current) return;
@@ -933,8 +1082,9 @@ async function route(req, res) {
     const user = store.state.users.find((entry) => entry.id === values.userId);
     const space = store.state.spaces.find((entry) => entry.id === values.spaceId);
     if (!user || !space) return html(res, 400, dashboard(current, 'Invalid user or space.'));
-    if (!membership(user.id, space.id)) { store.state.memberships.push({ userId: user.id, spaceId: space.id, role: 'reader' }); store.save(); }
-    return redirect(res, '/?notice=' + encodeURIComponent('Read access granted.'));
+    const role = isSpaceRole(values.role) ? values.role : 'reader';
+    if (!membership(user.id, space.id)) { store.state.memberships.push({ userId: user.id, spaceId: space.id, role }); store.save(); }
+    return redirect(res, '/?notice=' + encodeURIComponent(`Access granted (${role}).`));
   }
   if (url.pathname === '/admin/access/revoke' && req.method === 'POST') {
     const current = requireSession(req, res, true); if (!current) return;

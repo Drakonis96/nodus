@@ -21,7 +21,8 @@ import type {
   VaultSummary,
 } from '@shared/types';
 import { normalizeUiLanguage } from '@shared/uiLanguage';
-import { buildServerSnapshot, lightweightVaultRevision } from './serverSnapshot';
+import { buildServerSnapshot, lightweightVaultRevision, type SnapshotAsset } from './serverSnapshot';
+import { applyIncomingMutations, type IncomingMutation } from './mutationInbox';
 
 // A Nodus Server pairing belongs to ONE vault and one remote space. Unlike the old
 // single-active-vault publisher, every paired vault keeps publishing in the background
@@ -52,6 +53,10 @@ interface VaultRuntime {
   lastSyncAt: string | null;
   lastError: string | null;
   lastBytes: number | null;
+  /** Images sent on the last publication; zero on a republish whose bytes were unchanged. */
+  lastAssetsSent: number;
+  /** What the last collection from the mutation ledger did, for the Settings panel. */
+  lastInbox: { applied: number; deleted: number; keptLocal: number; refused: number } | null;
 }
 
 const runtimes = new Map<string, VaultRuntime>();
@@ -66,6 +71,7 @@ function ensureRuntime(vaultId: string): VaultRuntime {
     rt = {
       observed: null, dirtySince: 0, lastUploadStartedAt: 0, pending: false,
       lastRevision: null, phase: 'idle', lastSyncAt: null, lastError: null, lastBytes: null,
+      lastAssetsSent: 0, lastInbox: null,
     };
     runtimes.set(vaultId, rt);
   }
@@ -244,6 +250,102 @@ export function getNodusServerOverview(): NodusServerOverview {
 
 // ── Publishing ──────────────────────────────────────────────────────────────
 
+/**
+ * Send the images this publication references, skipping the ones the server already holds.
+ *
+ * The negotiation round-trip is what makes republishing an unchanged vault nearly free: a
+ * corpus with two hundred portraits re-uploads none of them, because the address of an image
+ * is the hash of its bytes and unchanged bytes keep their address.
+ *
+ * A single image failing is not fatal to the publication. The snapshot still names it, the
+ * server serves a 404 for that one asset, and the next tick retries — which is a far better
+ * outcome than refusing to publish an entire corpus over one unreadable thumbnail.
+ */
+async function uploadAssets(
+  baseUrl: string,
+  spaceId: string,
+  token: string,
+  assets: SnapshotAsset[],
+  rt: VaultRuntime,
+): Promise<void> {
+  const wanted = new Map<string, { data: Buffer; mime: string }>();
+  for (const asset of assets) {
+    wanted.set(asset.hash, { data: asset.data, mime: asset.mime });
+    if (asset.thumbHash && asset.thumbData) wanted.set(asset.thumbHash, { data: asset.thumbData, mime: asset.thumbMime ?? 'image/jpeg' });
+  }
+  if (wanted.size === 0) return;
+
+  const endpoint = `${baseUrl}/api/v1/spaces/${encodeURIComponent(spaceId)}`;
+  const negotiation = await fetchWithTimeout(`${endpoint}/assets/negotiate`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ assets: [...wanted].map(([hash, value]) => ({ hash, bytes: value.data.length, mime: value.mime })) }),
+  });
+  // A server too old to know about assets simply has no such route. Publishing the JSON is
+  // still the right thing to do; it just arrives without its illustrations.
+  if (negotiation.status === 404) return;
+  if (!negotiation.ok) return;
+  const { missing = [] } = await negotiation.json().catch(() => ({ missing: [] })) as { missing?: string[] };
+
+  let sent = 0;
+  for (const hash of missing) {
+    const asset = wanted.get(hash);
+    if (!asset) continue;
+    try {
+      const response = await fetchWithTimeout(`${endpoint}/assets/${hash}`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}`, 'content-type': asset.mime },
+        body: asset.data,
+      });
+      if (response.ok) sent += 1;
+    } catch {
+      // Network trouble on one image; the next tick negotiates again and retries it.
+    }
+  }
+  rt.lastAssetsSent = sent;
+}
+
+/**
+ * Take the mutations collaborators have queued, apply them, and acknowledge.
+ *
+ * Only for the active vault: applying is a write, and a sibling vault is opened read-only
+ * by this service. Acknowledgement happens strictly after the transaction commits, and only
+ * up to the cursor that was genuinely applied — anything refused stays in the ledger so its
+ * author can be told rather than silently losing the work.
+ */
+async function collectMutations(
+  config: VaultServerConfig,
+  token: string,
+  db: Database.Database,
+  rt: VaultRuntime,
+): Promise<void> {
+  const endpoint = `${normalizeUrl(config.url)}/api/v1/spaces/${encodeURIComponent(config.spaceId)}/mutations`;
+  try {
+    const response = await fetchWithTimeout(endpoint, { headers: { authorization: `Bearer ${token}` } });
+    // A server that predates the ledger has no such route; publishing carries on regardless.
+    if (response.status === 404 || response.status === 403) return;
+    if (!response.ok) return;
+    const value = await response.json() as { mutations?: IncomingMutation[]; cursor?: number };
+    const mutations = value.mutations ?? [];
+    if (mutations.length === 0) return;
+
+    const summary = applyIncomingMutations(db, mutations);
+    rt.lastInbox = { applied: summary.applied, deleted: summary.deleted, keptLocal: summary.keptLocal, refused: summary.refused.length };
+    if (summary.refused.length > 0) {
+      rt.lastError = `Hay cambios de otro equipo que no se han podido aplicar: ${summary.refused[0].reason}`;
+    }
+    if (summary.cursor > 0) {
+      await fetchWithTimeout(`${endpoint}/ack`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ cursor: summary.cursor }),
+      });
+    }
+  } catch {
+    // The next tick tries again; nothing was acknowledged, so nothing was lost.
+  }
+}
+
 /** Upload one vault's filtered snapshot. Serialized: at most one publish at a time. */
 async function publishVault(vaultId: string): Promise<void> {
   if (publishing) return;
@@ -261,6 +363,12 @@ async function publishVault(vaultId: string): Promise<void> {
   rt.lastUploadStartedAt = Date.now();
   rt.phase = 'syncing';
   try {
+    // Collect what collaborators sent BEFORE building the snapshot, so their work travels
+    // back out in this same publication instead of waiting a further two minutes. This is
+    // also the only moment a mutation becomes visible to anyone: the server stores, the
+    // owner decides, and the republication is what everybody else finally reads.
+    if (vault.active) await collectMutations(config, token, db, rt);
+
     const snapshot = buildServerSnapshot(
       { ...vault },
       { nodusServerIncludeUserContent: config.includeUserContent, nodusServerIncludePassages: config.includePassages },
@@ -274,6 +382,12 @@ async function publishVault(vaultId: string): Promise<void> {
       rt.dirtySince = 0;
       if (vault.active) rt.observed = lightweightVaultRevision(db);
       return;
+    }
+    // Images travel on their own content-addressed channel, before the JSON that references
+    // them: a snapshot naming a hash the server does not hold would leave a report with a
+    // broken illustration until the next publication.
+    if (snapshot.assets.length > 0) {
+      await uploadAssets(normalizeUrl(config.url), config.spaceId, token, snapshot.assets, rt);
     }
     // Level 1 deliberately trades a little bandwidth for very low desktop CPU usage.
     // Compressing asynchronously puts even that on libuv's threadpool: this runs on

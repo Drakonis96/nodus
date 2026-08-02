@@ -4,21 +4,28 @@ import type { AppSettings, VaultSummary } from '@shared/types';
 import { getDb } from '../db/database';
 
 export const SERVER_SNAPSHOT_FORMAT = 'nodus.server-snapshot';
-export const SERVER_SNAPSHOT_VERSION = 1;
+export const SERVER_SNAPSHOT_VERSION = 2;
 
 const CORE_TABLES = [
   'works', 'work_aliases', 'authors', 'work_authors', 'collections', 'work_collections',
   'zotero_tags', 'work_zotero_tags', 'themes', 'work_themes', 'ideas', 'idea_occurrences',
-  'idea_theme_links', 'evidence', 'edges', 'gaps', 'external_refs', 'work_summaries',
+  'idea_theme_links', 'evidence', 'edges', 'edge_feedback', 'gaps', 'external_refs', 'work_summaries',
   'author_relations', 'author_dossier_synthesis', 'synthesis_matrix_cell', 'work_idea_synthesis',
   'research_questions', 'research_subquestions', 'research_coverage_links', 'tutor_saved_routes',
 ] as const;
+
+// `edge_feedback` is core rather than user content on purpose. Every reader of the graph
+// goes through the `visible_edges` view, which hides a pair the user has vetoed in BOTH
+// directions. Without those rows the server would serve debates the owner already
+// dismissed from their own screen, and no amount of care elsewhere could make the two
+// agree. The rows carry no prose beyond an optional note.
 
 const USER_TABLES = [
   'note_folders', 'notes', 'writing_saved_drafts', 'projects', 'project_sections',
   'project_chapters', 'project_chapter_versions', 'project_chapter_chunks',
   'project_chapter_ideas', 'project_chapter_idea_relations', 'project_links',
   'project_insertion_suggestions', 'saved_searches', 'immersion_sessions',
+  'decorative_images', 'content_translations',
 ] as const;
 
 // Shareable teaching materials only. Student rosters, groups, grades, grading
@@ -48,10 +55,85 @@ export const WORLDBUILDING_SERVER_TABLES = [
 ] as const;
 
 const OMIT_COLUMNS = new Set([
-  'embedding', 'embedding_model', 'embedding_provider', 'blob', 'thumb', 'audio_blob',
+  'embedding', 'embedding_model', 'embedding_provider', 'embedding_dim', 'embedding_text_hash',
+  'blob', 'thumb', 'audio_blob',
   'file_path', 'source_path', 'storage_path', 'local_path', 'absolute_path',
   'api_key', 'access_token', 'refresh_token', 'password', 'secret', 'credentials',
 ]);
+
+// `embedding_dim` and `embedding_text_hash` used to survive while `embedding` itself was
+// stripped, which left a replica holding rows that claimed a 1536-dimension vector they did
+// not have. That made PASSAGE_IS_CURRENT (electron/db/readinessFilters.ts:44) report those
+// passages as indexed, so the library said "ready" over a corpus with no vectors at all.
+
+/**
+ * The ONLY code path that turns a database blob into something the server can receive.
+ *
+ * The product rule is that heavy documents never travel — no PDFs, no audio — while two
+ * kinds of image do: the illustration on a Deep Research report, and a person's portrait.
+ * Rather than scan for blob columns and try to exclude the wrong ones, this list names the
+ * two tables that may produce an asset. Nothing else is even looked at.
+ *
+ * It is also why TTS audio and source PDFs are safe by construction rather than by filter:
+ * narration is a loose .wav under <vault>/audio/ with only metadata in SQLite, and a work's
+ * PDF lives in Zotero's own storage/ directory, outside the vault entirely.
+ */
+export const ASSET_SOURCES = [
+  {
+    kind: 'deep_research_image',
+    table: 'decorative_images',
+    keyColumns: ['entity_kind', 'entity_id'],
+    where: "entity_kind = 'deep_research' AND status = 'ready'",
+    blobColumn: 'image_blob',
+    mimeColumn: 'mime_type',
+    thumbColumn: 'thumbnail_blob',
+    thumbMimeColumn: 'thumbnail_mime_type',
+  },
+  {
+    kind: 'person_portrait',
+    table: 'person_portraits',
+    keyColumns: ['person_id'],
+    where: null,
+    blobColumn: 'blob',
+    mimeColumn: 'mime',
+    thumbColumn: 'thumbnail',
+    thumbMimeColumn: 'thumbnail_mime',
+  },
+] as const;
+
+/** Matches the server's own ceiling; an oversized image is skipped, never fatal. */
+export const MAX_ASSET_BYTES = 8 * 1024 * 1024;
+
+const IMAGE_SIGNATURES: { mime: string; test: (bytes: Buffer) => boolean }[] = [
+  { mime: 'image/png', test: (b) => b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) },
+  { mime: 'image/jpeg', test: (b) => b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff },
+  // WAV opens with the same four RIFF bytes as WEBP; the format name at 8..12 is what
+  // tells them apart, and getting that wrong would ship audio through the image channel.
+  { mime: 'image/webp', test: (b) => b.subarray(0, 4).toString('ascii') === 'RIFF' && b.subarray(8, 12).toString('ascii') === 'WEBP' },
+  { mime: 'image/gif', test: (b) => /^GIF8[79]a$/.test(b.subarray(0, 6).toString('ascii')) },
+];
+
+function sniffImage(bytes: Buffer): string | null {
+  if (bytes.length < 12) return null;
+  return IMAGE_SIGNATURES.find((signature) => signature.test(bytes))?.mime ?? null;
+}
+
+export interface SnapshotAssetRef {
+  hash: string;
+  thumbHash: string | null;
+  mime: string;
+  thumbMime: string | null;
+  bytes: number;
+  thumbBytes: number | null;
+  kind: string;
+  table: string;
+  key: string[];
+}
+
+export interface SnapshotAsset extends SnapshotAssetRef {
+  data: Buffer;
+  thumbData: Buffer | null;
+}
 
 function tableNames(db: Database.Database): Set<string> {
   return new Set((db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'").all() as { name: string }[]).map((row) => row.name));
@@ -70,6 +152,23 @@ function safeValue(column: string, value: unknown): unknown {
   return undefined;
 }
 
+/**
+ * Drop the columns a publication never carries.
+ *
+ * Shared with the outgoing mutation queue, and it has to be: the server validates an
+ * incoming row against the shape of the last snapshot, so a replica sending the full live
+ * row would be refused for naming `embedding` — a column that is local by design and whose
+ * value belongs to whichever machine computed it, not to the vault.
+ */
+export function stripUnpublishableColumns(row: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(row).flatMap(([column, value]) => {
+      const safe = safeValue(column, value);
+      return safe === undefined ? [] : [[column, safe]];
+    })
+  );
+}
+
 function readTable(db: Database.Database, table: string): Record<string, unknown>[] {
   return (db.prepare(`SELECT * FROM "${table.replace(/"/g, '""')}"`).all() as Record<string, unknown>[]).map((row) =>
     Object.fromEntries(Object.entries(row).flatMap(([column, value]) => {
@@ -79,6 +178,66 @@ function readTable(db: Database.Database, table: string): Record<string, unknown
   );
 }
 
+function columnNames(db: Database.Database, table: string): Set<string> {
+  return new Set((db.pragma(`table_info("${table.replace(/"/g, '""')}")`) as { name: string }[]).map((row) => row.name));
+}
+
+/**
+ * Read the publishable images out of the two whitelisted tables.
+ *
+ * Every candidate is sniffed from its own bytes rather than trusted from its declared mime
+ * column: the database is local and honest, but the same rule holds on both ends of the
+ * wire, and it means a corrupt row is skipped instead of shipped.
+ */
+export function collectSnapshotAssets(db: Database.Database, present: Set<string>): SnapshotAsset[] {
+  const assets: SnapshotAsset[] = [];
+  for (const source of ASSET_SOURCES) {
+    if (!present.has(source.table)) continue;
+    const columns = columnNames(db, source.table);
+    if (!columns.has(source.blobColumn)) continue;
+    const selected: string[] = [...source.keyColumns, source.blobColumn];
+    if (columns.has(source.mimeColumn)) selected.push(source.mimeColumn);
+    if (columns.has(source.thumbColumn)) selected.push(source.thumbColumn);
+    if (columns.has(source.thumbMimeColumn)) selected.push(source.thumbMimeColumn);
+    const where = source.where ? ` WHERE ${source.where}` : '';
+    const rows = db
+      .prepare(`SELECT ${selected.map((name) => `"${name}"`).join(', ')} FROM "${source.table}"${where}`)
+      .all() as Record<string, unknown>[];
+
+    for (const row of rows) {
+      const cell = (column: string): unknown => (row as Record<string, unknown>)[column];
+      const data = cell(source.blobColumn);
+      if (!Buffer.isBuffer(data) || data.length === 0 || data.length > MAX_ASSET_BYTES) continue;
+      const mime = sniffImage(data);
+      if (!mime) continue;
+      const rawThumb = cell(source.thumbColumn);
+      const thumbData = Buffer.isBuffer(rawThumb) && rawThumb.length > 0 && rawThumb.length <= MAX_ASSET_BYTES ? rawThumb : null;
+      const thumbMime = thumbData ? sniffImage(thumbData) : null;
+      const usableThumb = thumbMime ? thumbData : null;
+      assets.push({
+        hash: createHash('sha256').update(data).digest('hex'),
+        thumbHash: usableThumb ? createHash('sha256').update(usableThumb).digest('hex') : null,
+        mime,
+        thumbMime,
+        bytes: data.length,
+        thumbBytes: usableThumb ? usableThumb.length : null,
+        kind: source.kind,
+        table: source.table,
+        key: source.keyColumns.map((column) => String(cell(column) ?? '')),
+        data,
+        thumbData: usableThumb,
+      });
+    }
+  }
+  // Stable order so an unchanged vault hashes to an unchanged revision.
+  return assets.sort((a, b) => (a.kind === b.kind ? a.key.join('\u0000').localeCompare(b.key.join('\u0000')) : a.kind.localeCompare(b.kind)));
+}
+
+function assetRef(asset: SnapshotAsset): SnapshotAssetRef {
+  const { data, thumbData, ...ref } = asset;
+  return ref;
+}
+
 export function lightweightVaultRevision(db: Database.Database = getDb()): string {
   const changes = db.prepare('SELECT total_changes() AS value').get() as { value: number };
   const dataVersion = db.pragma('data_version', { simple: true }) as number;
@@ -86,11 +245,19 @@ export function lightweightVaultRevision(db: Database.Database = getDb()): strin
   return `${changes.value}:${dataVersion}:${schemaVersion}`;
 }
 
+export interface BuiltSnapshot {
+  buffer: Buffer;
+  revision: string;
+  counts: Record<string, number>;
+  assets: SnapshotAsset[];
+  schemaVersion: number;
+}
+
 export function buildServerSnapshot(
   vault: VaultSummary,
   settings: Pick<AppSettings, 'nodusServerIncludeUserContent' | 'nodusServerIncludePassages'>,
   db: Database.Database = getDb(),
-): { buffer: Buffer; revision: string; counts: Record<string, number> } {
+): BuiltSnapshot {
   const present = tableNames(db);
   const selected = new Set<string>(CORE_TABLES.filter((table) => present.has(table)));
   if (vault.type === 'worldbuilding') {
@@ -107,17 +274,43 @@ export function buildServerSnapshot(
 
   const tables: Record<string, Record<string, unknown>[]> = {};
   for (const table of [...selected].sort()) tables[table] = readTable(db, table);
+
+  // Images ride their own channel, addressed by content hash, so the JSON keeps its
+  // invariant of holding no binary at all. A portrait is only published for a vault that
+  // has people; a Deep Research illustration only when its report travels.
+  const wantsAssets = settings.nodusServerIncludeUserContent || vault.type !== 'academic';
+  const assets = wantsAssets ? collectSnapshotAssets(db, present) : [];
+  const assetRefs = assets.map(assetRef);
+  const schemaVersion = db.pragma('user_version', { simple: true }) as number;
+
   const generatedAt = new Date().toISOString();
   const payload = {
     format: SERVER_SNAPSHOT_FORMAT,
     formatVersion: SERVER_SNAPSHOT_VERSION,
     generatedAt,
+    schemaVersion,
     vault: { id: vault.id, name: vault.name, type: vault.type },
+    capabilities: {
+      includesUserContent: Boolean(settings.nodusServerIncludeUserContent),
+      includesPassages: Boolean(settings.nodusServerIncludePassages),
+      hasAssets: assetRefs.length > 0,
+    },
+    assets: assetRefs,
     tables,
   };
   const raw = Buffer.from(JSON.stringify(payload));
   // generatedAt describes this upload, not its contents. Keeping it outside the
   // digest lets the server recognize an unchanged projection after app restarts.
-  const revision = createHash('sha256').update(JSON.stringify({ vault: payload.vault, tables })).digest('base64url');
-  return { buffer: raw, revision, counts: Object.fromEntries(Object.entries(tables).map(([table, rows]) => [table, rows.length])) };
+  // Asset hashes ARE part of it: replacing only a report's illustration has to count
+  // as a change, or the republish would be short-circuited as "unchanged".
+  const revision = createHash('sha256')
+    .update(JSON.stringify({ vault: payload.vault, schemaVersion, assets: assetRefs, tables }))
+    .digest('base64url');
+  return {
+    buffer: raw,
+    revision,
+    counts: Object.fromEntries(Object.entries(tables).map(([table, rows]) => [table, rows.length])),
+    assets,
+    schemaVersion,
+  };
 }

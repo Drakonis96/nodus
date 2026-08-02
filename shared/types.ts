@@ -1641,6 +1641,80 @@ export interface RecoverySetupResult {
   recoveryKey?: string;
 }
 
+/**
+ * Where a vault's canonical data lives.
+ *
+ * 'local' is every vault that has ever existed: the SQLite on this machine IS the vault.
+ * 'connected' is a replica of a Nodus Server space — still a real, fully migrated database
+ * that every repository reads normally, but one a remote publication can overwrite, and
+ * whose authored content may travel back depending on the account's role.
+ */
+export type VaultOrigin = 'local' | 'connected';
+
+export type VaultRemoteRole = 'reader' | 'writer' | 'owner';
+
+export interface VaultRemote {
+  url: string;
+  spaceId: string;
+  spaceName: string;
+  serverName: string;
+  userEmail: string;
+  /**
+   * Last role the server reported. Advisory only, for offline UI: every request re-reads
+   * the real role server-side, so a stale copy here can never grant anything.
+   */
+  role: VaultRemoteRole;
+  /**
+   * 'revoked' stops syncing and keeps every local byte readable. A server withdrawing
+   * access is not a reason to destroy the notes its user wrote on their own machine.
+   */
+  state: 'active' | 'revoked' | 'paused';
+  lastPulledRevision: string | null;
+  lastPulledAt: string | null;
+}
+
+/** One space the signed-in account can reach, as offered by the picker. */
+export interface RemoteSpaceChoice {
+  id: string;
+  name: string;
+  description: string;
+  role: VaultRemoteRole;
+  vault: { id: string; name: string; type: string } | null;
+  updatedAt: string | null;
+  hasSnapshot: boolean;
+}
+
+export interface RemoteSignIn {
+  /** Single use, five minutes: the password is never sent a second time. */
+  ticket: string;
+  url: string;
+  serverName: string;
+  userEmail: string;
+  spaces: RemoteSpaceChoice[];
+}
+
+export type ReplicaPhaseView = 'idle' | 'syncing' | 'ok' | 'error' | 'revoked' | 'paused';
+
+export interface ReplicaConnectionView {
+  vaultId: string;
+  vaultName: string;
+  vaultType: VaultType;
+  isActiveVault: boolean;
+  url: string;
+  spaceName: string;
+  serverName: string;
+  userEmail: string;
+  role: VaultRemoteRole;
+  state: VaultRemote['state'];
+  phase: ReplicaPhaseView;
+  lastPulledAt: string | null;
+  lastError: string | null;
+  /** Changes written here that have not reached the main vault yet. */
+  pendingMutations: number;
+  /** Changes the server refused, kept locally so the work is never lost in silence. */
+  rejectedMutations: number;
+}
+
 export interface VaultSummary {
   id: string;
   name: string;
@@ -1651,6 +1725,9 @@ export interface VaultSummary {
   legacy: boolean;
   /** The vault's mode. Pre-existing vaults default to 'academic'. */
   type: VaultType;
+  /** Pre-existing vaults default to 'local'. */
+  origin: VaultOrigin;
+  remote: VaultRemote | null;
   apiKeyProviders: AiProvider[];
 }
 
@@ -7353,6 +7430,20 @@ export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, 
   onSettingsChanged(cb: (settings: AppSettings) => void): () => void;
   getActiveVault(): Promise<VaultSummary>;
   createVault(input: CreateVaultInput): Promise<VaultCreateResult>;
+  /** Step one of connecting to a Nodus Server space: verify credentials, list the spaces. */
+  remoteSignIn(url: string, email: string, password: string): Promise<RemoteSignIn>;
+  /** Step two: take a device token for one space and hydrate a local replica of it. */
+  createConnectedVault(input: {
+    url: string;
+    ticket: string;
+    space: RemoteSpaceChoice;
+    userEmail: string;
+    serverName: string;
+  }): Promise<VaultCreateResult>;
+  replicaOverview(): Promise<ReplicaConnectionView[]>;
+  replicaSyncNow(vaultId: string): Promise<ReplicaConnectionView[]>;
+  /** Keep the data, stop syncing: what a revoked or unwanted replica becomes. */
+  replicaDetach(vaultId: string): Promise<ReplicaConnectionView[]>;
   renameVault(id: string, name: string): Promise<VaultSummary>;
   setVaultType(id: string, type: VaultType): Promise<VaultSummary>;
   switchVault(id: string, options?: VaultSwitchOptions): Promise<VaultSwitchResult>;

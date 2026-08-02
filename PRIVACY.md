@@ -26,6 +26,27 @@ files. The passages and content created by the user are included only if it acti
 options. Student lists, groups, ratings and evaluation results are not published using this
 function.
 
+The publication also carries the user's **dismissed relations** (`edge_feedback`). These are needed
+so a shared space hides the same debates the owner has already dismissed on their own screen; without
+them the server would present, to other people, connections the user had explicitly rejected. Each
+row records a rejected pair of ideas and an optional note.
+
+**Documents never travel; two kinds of image do.** No PDF, no audio and no recording is ever sent to
+Nodus Server: source PDFs live in Zotero's own storage outside the vault, and narration audio is a
+file on disk that is not part of the publication. The only binaries that travel are the illustration
+attached to a Deep Research report and a person's portrait, and only when the user has enabled
+sharing of authored content. Three independent mechanisms enforce this, and the server refuses any
+upload whose bytes are not a PNG, JPEG, WEBP or GIF image regardless of what the sender declared.
+
+**Connected vaults.** A user may create a vault that is a replica of a space on somebody else's
+Nodus Server. What their account may do there is decided by that server, not by the application:
+with read-only access, everything they write or generate stays on their own computer and is never
+uploaded. With write access, only content they authored themselves — notes, saved drafts, Deep
+Research reports, immersion sessions, saved searches, research questions and dismissed relations —
+is queued and sent; nothing derived from someone else's corpus is ever sent back. If the server
+revokes their access, synchronisation stops and **the local copy is kept intact**: their own work is
+not deleted because a server withdrew permission.
+
 Nodus **does not use AI to rate, grade, rank, profile, or evaluate any student**. Notes and rubrics
 are entered or confirmed by a person. Multiple choice questions can be corrected locally by
 deterministic matching with the answer marked as correct; no model is involved.

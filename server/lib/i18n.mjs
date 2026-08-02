@@ -66,10 +66,92 @@ const TR = {
   error: 'Hata', sessionExpired: 'Oturumun süresi doldu.', readerNotFound: 'Okuyucu hesabı bulunamadı.', spaceNotFound: 'Alan bulunamadı.', internalError: 'Sunucu iç hatası.',
 };
 
-const TABLES = { en: EN, es: ES, fr: FR, de: DE, pt: PT, 'pt-BR': PT_BR, it: IT, tr: TR };
+// Added when space membership stopped being a yes/no and became reader | writer | owner.
+// The administration screen now has to say what an account may DO in a space, not only
+// which spaces it can see, and a user can be given several spaces at once with a different
+// level in each. Kept in its own block so the older tables stay diff-legible.
+const ROLE_KEYS = {
+  en: {
+    accessLevel: 'Access level', roleReader: 'Reader', roleWriter: 'Writer', roleOwner: 'Owner',
+    roleReaderHelp: 'Reads the published copy. Whatever they write or generate stays on their own device.',
+    roleWriterHelp: 'Reads, and their notes and reports travel back to the main vault when its owner connects.',
+    roleOwnerHelp: 'Publishes this space and collects what writers send to it.',
+    spacesAndRoles: 'Spaces and access level',
+    newUserSpacesHelp: 'Tick every space this account should reach and choose what it may do in each one.',
+    createUser: 'Create account', grantAccess: 'Grant access', updateRole: 'Update', noSpacesYet: 'Create a space first.',
+  },
+  es: {
+    accessLevel: 'Nivel de acceso', roleReader: 'Lectura', roleWriter: 'Escritura', roleOwner: 'Propietario',
+    roleReaderHelp: 'Consulta la copia publicada. Todo lo que escriba o genere se queda en su propio equipo.',
+    roleWriterHelp: 'Consulta, y sus notas e informes viajan al vault principal cuando su propietario se conecta.',
+    roleOwnerHelp: 'Publica este espacio y recoge lo que le envían quienes tienen escritura.',
+    spacesAndRoles: 'Espacios y nivel de acceso',
+    newUserSpacesHelp: 'Marca los espacios a los que llegará esta cuenta y elige qué puede hacer en cada uno.',
+    createUser: 'Crear cuenta', grantAccess: 'Dar acceso', updateRole: 'Actualizar', noSpacesYet: 'Crea antes un espacio.',
+  },
+  fr: {
+    accessLevel: 'Niveau d’accès', roleReader: 'Lecture', roleWriter: 'Écriture', roleOwner: 'Propriétaire',
+    roleReaderHelp: 'Consulte la copie publiée. Tout ce qu’il écrit ou génère reste sur son propre appareil.',
+    roleWriterHelp: 'Consulte, et ses notes et rapports remontent vers le coffre principal quand son propriétaire se connecte.',
+    roleOwnerHelp: 'Publie cet espace et récupère ce que lui envoient les comptes en écriture.',
+    spacesAndRoles: 'Espaces et niveau d’accès',
+    newUserSpacesHelp: 'Cochez les espaces accessibles à ce compte et choisissez ce qu’il peut y faire.',
+    createUser: 'Créer le compte', grantAccess: 'Accorder l’accès', updateRole: 'Mettre à jour', noSpacesYet: 'Créez d’abord un espace.',
+  },
+  de: {
+    accessLevel: 'Zugriffsstufe', roleReader: 'Lesen', roleWriter: 'Schreiben', roleOwner: 'Eigentümer',
+    roleReaderHelp: 'Liest die veröffentlichte Kopie. Alles Geschriebene oder Erzeugte bleibt auf dem eigenen Gerät.',
+    roleWriterHelp: 'Liest, und Notizen sowie Berichte gelangen zurück in den Haupttresor, sobald dessen Eigentümer sich verbindet.',
+    roleOwnerHelp: 'Veröffentlicht diesen Bereich und holt ab, was Schreibberechtigte senden.',
+    spacesAndRoles: 'Bereiche und Zugriffsstufe',
+    newUserSpacesHelp: 'Wählen Sie jeden Bereich für dieses Konto aus und legen Sie fest, was es dort darf.',
+    createUser: 'Konto erstellen', grantAccess: 'Zugriff gewähren', updateRole: 'Aktualisieren', noSpacesYet: 'Erstellen Sie zuerst einen Bereich.',
+  },
+  pt: {
+    accessLevel: 'Nível de acesso', roleReader: 'Leitura', roleWriter: 'Escrita', roleOwner: 'Proprietário',
+    roleReaderHelp: 'Consulta a cópia publicada. Tudo o que escrever ou gerar fica no seu próprio dispositivo.',
+    roleWriterHelp: 'Consulta, e as suas notas e relatórios voltam ao cofre principal quando o proprietário se liga.',
+    roleOwnerHelp: 'Publica este espaço e recolhe o que lhe enviam as contas com escrita.',
+    spacesAndRoles: 'Espaços e nível de acesso',
+    newUserSpacesHelp: 'Assinale os espaços a que esta conta terá acesso e escolha o que pode fazer em cada um.',
+    createUser: 'Criar conta', grantAccess: 'Conceder acesso', updateRole: 'Atualizar', noSpacesYet: 'Crie primeiro um espaço.',
+  },
+  it: {
+    accessLevel: 'Livello di accesso', roleReader: 'Lettura', roleWriter: 'Scrittura', roleOwner: 'Proprietario',
+    roleReaderHelp: 'Consulta la copia pubblicata. Tutto ciò che scrive o genera resta sul suo dispositivo.',
+    roleWriterHelp: 'Consulta, e le sue note e relazioni tornano al vault principale quando il proprietario si connette.',
+    roleOwnerHelp: 'Pubblica questo spazio e raccoglie ciò che inviano gli account in scrittura.',
+    spacesAndRoles: 'Spazi e livello di accesso',
+    newUserSpacesHelp: 'Seleziona gli spazi a cui questo account potrà accedere e scegli cosa può farvi.',
+    createUser: 'Crea account', grantAccess: 'Concedi accesso', updateRole: 'Aggiorna', noSpacesYet: 'Crea prima uno spazio.',
+  },
+  tr: {
+    accessLevel: 'Erişim düzeyi', roleReader: 'Okuma', roleWriter: 'Yazma', roleOwner: 'Sahip',
+    roleReaderHelp: 'Yayınlanan kopyayı okur. Yazdığı veya ürettiği her şey kendi cihazında kalır.',
+    roleWriterHelp: 'Okur; notları ve raporları, sahibi bağlandığında ana kasaya geri gider.',
+    roleOwnerHelp: 'Bu alanı yayınlar ve yazma yetkisi olanların gönderdiklerini toplar.',
+    spacesAndRoles: 'Alanlar ve erişim düzeyi',
+    newUserSpacesHelp: 'Bu hesabın erişeceği alanları işaretleyin ve her birinde ne yapabileceğini seçin.',
+    createUser: 'Hesap oluştur', grantAccess: 'Erişim ver', updateRole: 'Güncelle', noSpacesYet: 'Önce bir alan oluşturun.',
+  },
+};
+ROLE_KEYS['pt-BR'] = { ...ROLE_KEYS.pt, createUser: 'Criar conta', newUserSpacesHelp: 'Marque os espaços que esta conta poderá acessar e escolha o que pode fazer em cada um.' };
+
+const TABLES = {
+  en: { ...EN, ...ROLE_KEYS.en },
+  es: { ...ES, ...ROLE_KEYS.es },
+  fr: { ...FR, ...ROLE_KEYS.fr },
+  de: { ...DE, ...ROLE_KEYS.de },
+  pt: { ...PT, ...ROLE_KEYS.pt },
+  'pt-BR': { ...PT_BR, ...ROLE_KEYS['pt-BR'] },
+  it: { ...IT, ...ROLE_KEYS.it },
+  tr: { ...TR, ...ROLE_KEYS.tr },
+};
 
 export function missingServerTranslations() {
-  const keys = Object.keys(EN);
+  // Keyed off the assembled English table, not the raw EN literal, so a key added to one of
+  // the grouped blocks is still checked against every language.
+  const keys = Object.keys(TABLES.en);
   return Object.fromEntries(SERVER_LANGUAGES.map((language) => [language, keys.filter((key) => TABLES[language][key] == null)]));
 }
 
