@@ -300,8 +300,9 @@ export function collectSnapshotAssets(db: Database.Database, present: Set<string
   return assets.sort((a, b) => (a.kind === b.kind ? a.key.join('\u0000').localeCompare(b.key.join('\u0000')) : a.kind.localeCompare(b.kind)));
 }
 
+/** The reference that rides in the JSON: everything about the image except its bytes. */
 function assetRef(asset: SnapshotAsset): SnapshotAssetRef {
-  const { data, thumbData, ...ref } = asset;
+  const { data: _data, thumbData: _thumbData, ...ref } = asset;
   return ref;
 }
 
