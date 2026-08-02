@@ -159,6 +159,21 @@ struct RowDetailView: View {
 
     private func personBody(_ detail: PersonDetail) -> some View {
         VStack(alignment: .leading, spacing: 14) {
+            if let personId = detail.person.string("person_id") {
+                NavigationLink {
+                    FamilyTreeView(session: session, rootPersonId: personId)
+                } label: {
+                    HStack {
+                        Label("Ver el árbol desde aquí", systemImage: "point.3.filled.connected.trianglepath.dotted")
+                        Spacer()
+                        Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary)
+                    }
+                    .padding(15)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .nodusGlass(NodusGlass(.regular, tint: session.accent, interactive: true))
+                }
+                .buttonStyle(.plain)
+            }
             if let portrait = detail.portrait, let hash = portrait.text("asset_ref") ?? portrait.text("hash") {
                 AssetImage(session: session, hash: hash)
                     .frame(maxWidth: .infinity)
