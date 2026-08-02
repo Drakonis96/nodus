@@ -72,6 +72,7 @@ final class SpaceSession {
             guard let summary = try await store.summary() else { return }
             mirror = store
             mirrorSummary = summary
+            await refreshBrowsableTables()
             await refreshMirrorFreshness()
         } catch {
             mirrorProgress = .failed(error.localizedDescription)
@@ -112,6 +113,7 @@ final class SpaceSession {
             let summary = try await store.replace(with: snapshot, revision: revision)
             mirror = store
             mirrorSummary = summary
+            await refreshBrowsableTables()
             mirrorProgress = .current(rows: summary.totalRows, tables: summary.counts.count)
         } catch let error as APIError where error.isNotPublished {
             mirrorProgress = .failed("Este espacio todavía no tiene publicación que descargar.")
@@ -125,35 +127,31 @@ final class SpaceSession {
         try? await mirror.drop()
         self.mirror = nil
         mirrorSummary = nil
+        mirrorOnlyTables = []
         mirrorProgress = .absent
     }
 
     var hasMirror: Bool { mirror != nil }
 
-    /// Tables the publication carried that no REST route can list.
-    ///
-    /// For a worldbuilding vault this is most of the corpus — scenes, articles, factions,
-    /// threads, character profiles. They are reachable only because the snapshot carries them.
-    var mirrorOnlyTables: [(table: String, count: Int)] {
-        guard let summary = mirrorSummary else { return [] }
-        return summary.counts
-            .filter { Collections.byTable[$0.key] == nil && $0.value > 0 }
-            .filter { !Self.internalTables.contains($0.key) }
+    private func refreshBrowsableTables() async {
+        guard let mirror else { mirrorOnlyTables = []; return }
+        let browsable = (try? await mirror.browsableTables()) ?? [:]
+        mirrorOnlyTables = browsable
+            .filter { Collections.byTable[$0.key] == nil }
             .map { (table: $0.key, count: $0.value) }
             .sorted { $0.count > $1.count }
     }
 
-    /// Join tables and machinery: real rows, but nothing a person browses.
-    private static let internalTables: Set<String> = [
-        "idea_occurrences", "idea_theme_links", "work_themes", "work_authors", "work_aliases",
-        "work_collections", "work_zotero_tags", "zotero_tags", "evidence", "edges",
-        "event_participants", "person_names", "person_places", "note_links",
-        "project_chapter_chunks", "project_chapter_ideas", "project_chapter_idea_relations",
-        "research_coverage_links", "study_doc_links", "study_doc_tags", "study_placements",
-        "study_material_fragment_links", "study_style_associations",
-        "teaching_exam_questions", "db_cells", "db_columns", "db_select_options",
-        "world_scene_text", "person_portraits", "decorative_images", "content_translations",
-    ]
+    /// Tables the publication carried that no REST route can list.
+    ///
+    /// For a worldbuilding vault this is most of the corpus — scenes, articles, factions,
+    /// threads, character profiles. They are reachable only because the snapshot carries them.
+    ///
+    /// Filtered by `browsableTables()`, which measures whether a table's rows have titles at
+    /// all. Half a published corpus is join tables with two foreign keys and nothing to show,
+    /// and listing those gives screens of "Sin título" under names like "Thread Parties".
+    private(set) var mirrorOnlyTables: [(table: String, count: Int)] = []
+
 
     func load() async {
         guard !isLoading else { return }

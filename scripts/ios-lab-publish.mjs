@@ -129,17 +129,48 @@ async function createSpace(name) {
   return created;
 }
 
+/** The user table, so an account created on an earlier run can be found again. */
+async function findUserId(email) {
+  const html = await dashboard();
+  const row = html.match(new RegExp(`<strong>${email.replace(/[.*+?^$()|[\\]\\\\]/g, '\\\\$&')}</strong>[\\s\\S]*?name="userId" value="([^"]+)"`));
+  return row ? row[1] : null;
+}
+
+/**
+ * Create the account once, then grant it one space at a time.
+ *
+ * `POST /admin/users` sets the memberships it is given, so re-posting the same account for each
+ * new space *replaced* its access instead of adding to it: after publishing eight vaults the
+ * reader could reach exactly one of them. Grants have their own endpoint, and it accumulates.
+ */
 async function ensureUser({ email, password }, grants) {
-  const fields = { csrf: await csrf(), email, password };
-  for (const grant of grants) {
-    fields[`space:${grant.spaceId}`] = 'on';
-    fields[`role:${grant.spaceId}`] = grant.role;
+  let userId = await findUserId(email);
+
+  if (!userId) {
+    const fields = { csrf: await csrf(), email, password };
+    for (const grant of grants) {
+      fields[`space:${grant.spaceId}`] = 'on';
+      fields[`role:${grant.spaceId}`] = grant.role;
+    }
+    const response = await postForm('/admin/users', fields);
+    if (response.status !== 303) {
+      console.warn(`  ! could not create ${email} (${response.status})`);
+      return;
+    }
+    userId = await findUserId(email);
+    return;
   }
-  const response = await postForm('/admin/users', fields);
-  // A repeat run re-posts an account that already exists; the server answers 303 either way,
-  // and anything else is worth surfacing rather than swallowing.
-  if (response.status !== 303 && response.status !== 200) {
-    console.warn(`  ! could not create/update ${email} (${response.status})`);
+
+  for (const grant of grants) {
+    const response = await postForm('/admin/access/grant', {
+      csrf: await csrf(),
+      userId,
+      spaceId: grant.spaceId,
+      role: grant.role,
+    });
+    if (response.status !== 303) {
+      console.warn(`  ! could not grant ${email} ${grant.role} on ${grant.spaceId} (${response.status})`);
+    }
   }
 }
 

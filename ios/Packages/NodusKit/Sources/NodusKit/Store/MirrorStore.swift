@@ -410,6 +410,31 @@ public actor MirrorStore {
         try dbQueue.read { db in try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM asset_refs") ?? 0 }
     }
 
+    /// Tables worth putting in a menu: ones whose rows have something to show.
+    ///
+    /// A published corpus is roughly half join tables — `world_links`, `scene_characters`,
+    /// `event_participants` — which hold real rows and no titles, because their whole content
+    /// is two foreign keys. Listing them produces screens of "Sin título".
+    ///
+    /// The rule is measured rather than a denylist: a table is browsable when most of its rows
+    /// yielded a title at import. That keeps working when the schema adds its next join table,
+    /// which a hand-maintained list does not.
+    public func browsableTables() throws -> [String: Int] {
+        try dbQueue.read { db in
+            try GRDB.Row.fetchAll(db, sql: """
+                SELECT tbl, COUNT(*) AS total, SUM(CASE WHEN title IS NOT NULL AND title <> '' THEN 1 ELSE 0 END) AS titled
+                FROM rows_json
+                GROUP BY tbl
+                """)
+                .reduce(into: [String: Int]()) { result, row in
+                    let total: Int = row["total"]
+                    let titled: Int = row["titled"] ?? 0
+                    guard total > 0, Double(titled) / Double(total) >= 0.5 else { return }
+                    result[row["tbl"]] = total
+                }
+        }
+    }
+
     /// Which tables the mirror holds and how many rows each has — including the ones the REST
     /// surface has no route for.
     public func tableCounts() throws -> [String: Int] {

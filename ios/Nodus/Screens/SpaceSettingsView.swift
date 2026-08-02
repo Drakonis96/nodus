@@ -73,18 +73,6 @@ struct SpaceSettingsView: View {
                     Text("El modelo lo fija el vault, no esta app: la recuperación solo funciona si el proveedor, el modelo y la dimensión coinciden exactamente.")
                 }
 
-                if let overview = session.overview, !overview.counts.isEmpty {
-                    Section("Tablas publicadas") {
-                        ForEach(overview.counts.sorted(by: { $0.key < $1.key }), id: \.key) { table, count in
-                            HStack {
-                                Text(table).font(.caption.monospaced())
-                                Spacer()
-                                Text(count.formatted()).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                }
-
                 Section {
                     switch session.mirrorProgress {
                     case .absent:
@@ -132,6 +120,18 @@ struct SpaceSettingsView: View {
                     // twenty tables out of the dozens a publication can carry — a worldbuilding
                     // vault's scenes and articles have no route at all.
                     Text("Guarda la publicación completa en el dispositivo: funciona sin red, ordena al instante y alcanza las tablas que la API no expone.")
+                }
+
+                if let overview = session.overview, !overview.counts.isEmpty {
+                    Section("Tablas publicadas") {
+                        ForEach(overview.counts.sorted(by: { $0.key < $1.key }), id: \.key) { table, count in
+                            HStack {
+                                Text(table).font(.caption.monospaced())
+                                Spacer()
+                                Text(count.formatted()).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
                 }
 
                 Section {

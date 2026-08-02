@@ -191,3 +191,46 @@ struct MirrorStoreTests {
         #expect(try await store.page(table: "odd_table").total == 3)
     }
 }
+
+@Suite("Browsable tables")
+struct BrowsableTableTests {
+    // Half a published corpus is join tables: two foreign keys, no title, nothing to show.
+    // Listing them gives a screen of "Sin título" under a raw name like "Thread Parties".
+    // Measuring beats a denylist, which stops working at the schema's next migration.
+    @Test("a table whose rows have no titles is not offered as a section")
+    func joinTablesAreNotBrowsable() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("nodus-browsable-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = try MirrorStore(spaceId: "s", directory: directory)
+
+        let document: [String: JSONValue] = [
+            "format": .string(SnapshotFormat.identifier),
+            "formatVersion": .int(2),
+            "tables": .object([
+                // Real entities.
+                "world_articles": .array([
+                    .object(["id": .string("a1"), "title": .string("Flujo de vidrio")]),
+                    .object(["id": .string("a2"), "title": .string("Liturgia")]),
+                ]),
+                // A join table: real rows, nothing to read.
+                "world_links": .array([
+                    .object(["id": .string("l1"), "from_id": .string("a1"), "to_id": .string("a2")]),
+                    .object(["id": .string("l2"), "from_id": .string("a2"), "to_id": .string("a1")]),
+                    .object(["id": .string("l3"), "from_id": .string("a1"), "to_id": .string("a1")]),
+                ]),
+            ]),
+        ]
+        try await store.replace(
+            with: SnapshotDownload(document: document, formatVersion: 2, revision: "r", byteCount: 1),
+            revision: "r"
+        )
+
+        let all = try await store.tableCounts()
+        #expect(all["world_links"] == 3, "the rows are still stored and still searchable")
+
+        let browsable = try await store.browsableTables()
+        #expect(browsable["world_articles"] == 2)
+        #expect(browsable["world_links"] == nil, "a table with no titles is not a section")
+    }
+}
