@@ -319,3 +319,53 @@ test('a version 1 snapshot from an older desktop is still accepted', { timeout: 
     assert.equal(summary.assets, 0);
   });
 });
+
+// A person's dossier returned an empty relationships list for every genealogy vault, because
+// the filter named columns the table does not have. `relationships` is created by migration
+// 1154 as {rel_id, from_person, to_person, type}; the filter compared `from_person_id` and
+// `to_person_id`, which are undefined on every row, so nothing ever matched. The bug is
+// invisible from the academic fixture — that vault has no people at all.
+test('a person dossier returns the relationships that name them', { timeout: 60_000 }, async () => {
+  await withServer({ label: 'person-relationships' }, async (server) => {
+    const spaceId = await server.createSpace('Familia');
+    const owner = await server.deviceToken(server.adminEmail, server.adminPassword, spaceId);
+
+    const tables = {
+      persons: [
+        { person_id: 'per-1', display_name: 'Ana Ruiz', sex: 'female', birth_date: '1950' },
+        { person_id: 'per-2', display_name: 'Luis Ruiz', sex: 'male', birth_date: '1948' },
+        { person_id: 'per-3', display_name: 'Marta Ruiz', sex: 'female', birth_date: '1975' },
+      ],
+      relationships: [
+        { rel_id: 'r-1', from_person: 'per-1', to_person: 'per-3', type: 'parent', created_at: '2026-01-01T00:00:00.000Z' },
+        { rel_id: 'r-2', from_person: 'per-2', to_person: 'per-3', type: 'parent', created_at: '2026-01-01T00:00:00.000Z' },
+        { rel_id: 'r-3', from_person: 'per-1', to_person: 'per-2', type: 'spouse', created_at: '2026-01-01T00:00:00.000Z' },
+      ],
+    };
+    const payload = {
+      format: 'nodus.server-snapshot',
+      formatVersion: 2,
+      generatedAt: '2026-02-01T00:00:00.000Z',
+      schemaVersion: 121,
+      vault: { id: 'vault-g', name: 'Familia', type: 'genealogy' },
+      capabilities: { includesUserContent: true, includesPassages: false, hasAssets: false },
+      assets: [],
+      tables,
+    };
+    const { createHash } = await import('node:crypto');
+    const { gzipSync } = await import('node:zlib');
+    await publish(server.origin, owner.deviceToken, spaceId, {
+      revision: createHash('sha256').update(JSON.stringify(tables)).digest('base64url'),
+      gzipped: gzipSync(Buffer.from(JSON.stringify(payload))),
+    });
+
+    const ana = await (await server.api(owner.deviceToken, 'GET', `/api/v1/spaces/${spaceId}/persons/per-1`)).json();
+    assert.equal(ana.person.display_name, 'Ana Ruiz');
+    // Ana is a parent of per-3 and the spouse of per-2: three rows name her, two of them here.
+    assert.equal(ana.relationships.length, 2, 'Ana appears in two relationships');
+    assert.deepEqual(ana.relationships.map((entry) => entry.rel_id).sort(), ['r-1', 'r-3']);
+
+    const marta = await (await server.api(owner.deviceToken, 'GET', `/api/v1/spaces/${spaceId}/persons/per-3`)).json();
+    assert.equal(marta.relationships.length, 2, 'Marta is named by both parent edges');
+  });
+});

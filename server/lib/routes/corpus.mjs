@@ -239,7 +239,10 @@ export function createCorpusRoutes({ readSnapshot, assetHashesFor }) {
           person: row,
           names: involved('person_names', 'person_id'),
           places: involved('person_places', 'person_id'),
-          relationships: rows(snapshot, 'relationships').filter((entry) => String(entry.from_person_id) === personId || String(entry.to_person_id) === personId),
+          // `from_person`/`to_person`, which is what migration 1154 actually creates. Filtering
+          // on `*_person_id` matched nothing, so every person in every genealogy and
+          // prosopography vault came back with an empty relationships list.
+          relationships: rows(snapshot, 'relationships').filter((entry) => String(entry.from_person) === personId || String(entry.to_person) === personId),
           events: rows(snapshot, 'events').filter((entry) => eventIds.has(String(entry.event_id))),
           // Metadata only: the portrait's bytes live on the asset channel.
           portrait: rows(snapshot, 'person_portraits').find((entry) => String(entry.person_id) === personId) ?? null,
