@@ -135,16 +135,29 @@ test('remote vault publication excludes credentials, files and student administr
     read('electron/export/exportImport.ts'),
     read('src/views/Settings.tsx'),
   ]);
-  assert.match(snapshot, /const TEACHING_TABLES = \[[\s\S]*'teaching_exams'[\s\S]*'teaching_rubrics'/);
-  assert.doesNotMatch(snapshot, /table\.startsWith\('teaching_'\)/);
+  assert.match(snapshot, /TEACHING_SERVER_TABLES = \[[\s\S]*'teaching_exams'[\s\S]*'teaching_rubrics'/);
+  // Comments explain the wildcards that were REMOVED, and naming a pattern is not using it,
+  // so these assertions read the code with the prose stripped out.
+  const snapshotCode = snapshot.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  assert.doesNotMatch(snapshotCode, /table\.startsWith\('teaching_'\)/);
+  // The same mistake lived in the other family: `study_` was selected by prefix, which swept
+  // in class recordings, attempt records and grading runs. Every table is now named.
+  assert.doesNotMatch(snapshotCode, /table\.startsWith\('study_'\)/);
+  for (const sensitive of ['study_recordings', 'study_attempts', 'study_grading_runs', 'study_mastery']) {
+    assert.doesNotMatch(snapshotCode, new RegExp(`'${sensitive}'`), `${sensitive} must not be publishable`);
+  }
   for (const sensitive of ['teaching_students', 'teaching_groups', 'teaching_grade_entries', 'teaching_rubric_evaluations']) {
-    assert.doesNotMatch(snapshot, new RegExp(`['"]${sensitive}['"]`));
+    assert.doesNotMatch(snapshotCode, new RegExp(`['"]${sensitive}['"]`));
   }
   assert.match(snapshot, /embedding[\s\S]*file_path[\s\S]*api_key[\s\S]*access_token/);
   assert.match(secretStore, /nodus_server_token\.bin/);
   assert.match(backup, /nodusServerEnabled = false/);
   assert.match(backup, /obj\.nodusServerUrl = ''/);
-  assert.match(settings, /Nunca: archivos PDF, claves API, contraseñas, rutas locales, embeddings/);
+  // Embeddings deliberately left OFF this list: idea vectors DO travel now, behind their own
+  // switch, and a privacy notice that claims otherwise is worse than no notice at all.
+  assert.match(settings, /Nunca: archivos PDF, audio, claves API, contraseñas, rutas locales/);
+  assert.doesNotMatch(settings, /Nunca:[^']*embeddings/, 'the panel must not claim embeddings never travel');
+  assert.match(settings, /Incluir vectores semánticos/, 'the vectors switch must be offered');
   assert.match(settings, /listas de alumnos, grupos, calificaciones/);
 });
 
@@ -250,4 +263,124 @@ test('public copy matches the no-AI-student-evaluation product boundary', async 
     assert.doesNotMatch(source, /When AI assists with feedback or assessment|student-name pseudonymisation|códigos seudónimos locales siempre que interviene la IA/i);
     assert.match(source, /(?:never|does not use AI to) [\s\S]{0,80}(?:grade|evaluate)[\s\S]{0,40}students|nunca (?:califica|envía)[\s\S]{0,120}(?:estudiantes|alumnado)|nunca evalúa estudiantes/i);
   }
+});
+
+test('only two tables can ever produce a published image, and no document can', async () => {
+  const snapshot = await read('electron/serverSync/serverSnapshot.ts');
+  // ASSET_SOURCES is the single code path that turns a database blob into something the
+  // server can receive. Anything added to it becomes publishable, so its size is pinned.
+  const sources = snapshot.slice(snapshot.indexOf('export const ASSET_SOURCES'), snapshot.indexOf('MAX_ASSET_BYTES'));
+  assert.equal((sources.match(/table: '/g) ?? []).length, 2, 'exactly two tables may produce an asset');
+  assert.match(sources, /table: 'decorative_images'/);
+  assert.match(sources, /table: 'person_portraits'/);
+  assert.match(sources, /entity_kind = 'deep_research'/, 'immersion illustrations are not published');
+  // Audio metadata lives in audio_clips and the files themselves on disk; a work's PDF is
+  // outside the vault entirely. Neither may appear as a source of publishable bytes.
+  for (const forbidden of ['audio_clips', 'study_recordings', 'study_materials', 'archive_item_files', 'db_attachments']) {
+    assert.doesNotMatch(sources, new RegExp(`table: '${forbidden}'`));
+  }
+  // The server refuses by content, not by declaration, and WAV must not pass as WEBP.
+  // The server refuses by content, not by declaration, and a WAV must not pass as a WEBP.
+  const { sniffImageMime } = await import('../server/lib/assets.mjs');
+  const wav = Buffer.concat([Buffer.from('RIFF'), Buffer.from([36, 0, 0, 0]), Buffer.from('WAVEfmt '), Buffer.alloc(20)]);
+  const webp = Buffer.concat([Buffer.from('RIFF'), Buffer.from([26, 0, 0, 0]), Buffer.from('WEBPVP8 '), Buffer.alloc(18)]);
+  assert.equal(sniffImageMime(wav), null, 'audio sharing the RIFF header is still refused');
+  assert.equal(sniffImageMime(webp), 'image/webp');
+  assert.equal(sniffImageMime(Buffer.from('%PDF-1.7 padded out past twelve bytes')), null);
+});
+
+test('a replica can only send back content its own user authored', async () => {
+  const [desktop, syncTables] = await Promise.all([
+    read('electron/serverSync/outboxTriggers.ts'),
+    read('electron/db/syncTables.ts'),
+  ]);
+  const { MUTABLE_TABLES } = await import('../server/lib/core/mutations.mjs');
+  const serverTables = Object.keys(MUTABLE_TABLES);
+  // The desktop list is read from source (it is TypeScript); the round-trip test asserts the
+  // two are identical, so pinning either one pins both.
+  const desktopList = desktop.slice(desktop.indexOf('export const MUTABLE_TABLES'), desktop.indexOf('] as const'));
+
+  // Anything derived from the owner's corpus, and everything about students, testimonies or
+  // prosopography, must be absent from both whitelists.
+  for (const forbidden of [
+    'works', 'ideas', 'edges', 'evidence', 'passages', 'themes', 'gaps', 'authors',
+    'teaching_students', 'teaching_groups', 'teaching_grade_entries',
+    'testimony_interviews', 'prosop_audit_log', 'settings',
+  ]) {
+    assert.ok(!serverTables.includes(forbidden), `${forbidden} must not be writable from a replica`);
+    assert.doesNotMatch(desktopList, new RegExp(`'${forbidden}'`), `${forbidden} must not be queued by a replica`);
+  }
+  for (const allowed of ['notes', 'writing_saved_drafts', 'immersion_sessions']) {
+    assert.ok(serverTables.includes(allowed));
+    assert.match(desktopList, new RegExp(`'${allowed}'`));
+  }
+  // decorative_images travels only as a Deep Research illustration, never an immersion one.
+  assert.equal(MUTABLE_TABLES.decorative_images.require.entity_kind, 'deep_research');
+  // A reader's database has no triggers at all, which is the guarantee that holds even if
+  // every other check were wrong.
+  assert.match(desktop, /ensureOutboxTriggers\(db: Database\.Database, enabled: boolean\)/);
+  assert.match(await read('electron/db/database.ts'), /mayQueueMutations/);
+  // The queue is this machine's own record and must never travel in a sync package.
+  assert.match(syncTables, /'server_outbox'/);
+});
+
+test('the server never receives an AI provider key', async () => {
+  const [api, corpus] = await Promise.all([
+    read('server/lib/routes/api.mjs'),
+    read('server/lib/routes/corpus.mjs'),
+  ]);
+  for (const source of [api, corpus]) {
+    assert.doesNotMatch(source, /apiKey|api_key|OPENAI_API_KEY|anthropic/i);
+  }
+  // The chat endpoint hands over retrieval and a budget, and the client calls its own
+  // provider. A server that produced answers would be the first place in this project to
+  // hold a third-party credential.
+  assert.match(api, /contextPackage/);
+  assert.match(api, /citationScheme/);
+});
+
+test('a connected vault has a screen, and a revoked one says so', async () => {
+  const [settings, panel, preload, types] = await Promise.all([
+    read('src/views/Settings.tsx'),
+    read('src/components/ConnectedVaultsPanel.tsx'),
+    read('electron/preload/api.ts'),
+    read('shared/types.ts'),
+  ]);
+  // The IPC existed with nothing calling it, so a replica that lost access simply stopped
+  // updating and never told anyone. The panel is what makes that state visible, and it is
+  // its own component precisely so scripts/test-connected-vaults-panel.mjs can render it.
+  assert.match(panel, /data-testid="connected-vault-panel"/);
+  assert.match(panel, /data-testid="replica-revoked-notice"/);
+  assert.match(settings, /<ConnectedVaultsPanel/);
+  assert.match(settings, /window\.nodus\.replicaOverview\(\)/);
+  assert.match(settings, /window\.nodus\.replicaSyncNow\(/);
+  assert.match(settings, /window\.nodus\.replicaDetach\(/);
+  // Disconnecting must never read as deleting.
+  assert.match(settings, /se quedan en este equipo; solo deja de sincronizarse/);
+  // A reader is told plainly that their work stays put.
+  assert.match(panel, /se queda en este equipo y nunca se envía al vault principal/);
+  for (const channel of ['vaults:replicaOverview', 'vaults:replicaSyncNow', 'vaults:replicaDetach']) {
+    assert.match(preload, new RegExp(channel.replace(':', ':')), `${channel} is not bridged`);
+  }
+  assert.match(types, /pendingMutations: number/);
+  assert.match(types, /rejectedMutations: number/);
+});
+
+test('the vectors switch exists and the privacy notice matches what really travels', async () => {
+  const [privacy, settings, publisher] = await Promise.all([
+    read('PRIVACY.md'),
+    read('src/views/Settings.tsx'),
+    read('electron/serverSync/serverSyncService.ts'),
+  ]);
+  // PRIVACY.md used to state outright that embeddings were never uploaded. They are now,
+  // behind a switch — and a privacy notice that contradicts the code is the worst outcome.
+  assert.doesNotMatch(privacy, /Never uploads[^.]*embeddings/i, 'the notice still claims embeddings never travel');
+  assert.match(privacy, /Semantic search vectors/);
+  assert.match(privacy, /no longer accurate and the statement has been corrected/);
+  assert.match(privacy, /Vectors derived from passages follow\s+the passages switch/);
+  assert.match(settings, /nodusServerIncludeVectors/);
+  // Off means off.
+  assert.match(publisher, /if \(!config\.includeVectors\) return;/);
+  // Passage vectors are gated by the passages switch, not by the vectors one alone.
+  assert.match(publisher, /config\.includePassages \? \['ideas', 'passages'\] : \['ideas'\]/);
 });

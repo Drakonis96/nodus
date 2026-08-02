@@ -1,0 +1,54 @@
+# Build Nodus Server from THIS checkout instead of pulling a published image.
+#
+# The `ghcr.io/drakonis96/nodus-server` tags are only built from `main`, so a branch under
+# review has no image to pull. Use this file to run exactly the code you have checked out —
+# for testing a branch, or for an air-gapped install that cannot reach GHCR.
+#
+#   docker compose -f docker-compose.source.yml up -d --build
+#
+# Everything else matches docker-compose.yml: the port is bound to loopback, and Caddy is
+# behind the `proxy` profile so an existing reverse proxy is not disturbed.
+
+services:
+  nodus-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: nodus-server:source
+    restart: unless-stopped
+    environment:
+      NODUS_PUBLIC_URL: ${NODUS_PUBLIC_URL}
+      NODUS_ADMIN_EMAIL: ${NODUS_ADMIN_EMAIL:-}
+      NODUS_ADMIN_PASSWORD: ${NODUS_ADMIN_PASSWORD:-}
+      NODUS_SETUP_TOKEN: ${NODUS_SETUP_TOKEN:-}
+      # Optional ceilings. Left unset they default to 8 MiB per image, 2 GiB of images per
+      # space, and the snapshot limits documented in the README.
+      NODUS_MAX_ASSET_BYTES: ${NODUS_MAX_ASSET_BYTES:-}
+      NODUS_MAX_SPACE_ASSET_BYTES: ${NODUS_MAX_SPACE_ASSET_BYTES:-}
+      NODUS_MAX_SNAPSHOT_BYTES: ${NODUS_MAX_SNAPSHOT_BYTES:-}
+      NODUS_MAX_SNAPSHOT_JSON_BYTES: ${NODUS_MAX_SNAPSHOT_JSON_BYTES:-}
+    volumes:
+      - nodus_data:/data
+    ports:
+      - "127.0.0.1:7443:7443"
+
+  caddy:
+    image: caddy:2-alpine
+    profiles: ["proxy"]
+    restart: unless-stopped
+    depends_on: [nodus-server]
+    environment:
+      NODUS_DOMAIN: ${NODUS_DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  nodus_data:
+  caddy_data:
+  caddy_config:

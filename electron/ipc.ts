@@ -83,6 +83,16 @@ import {
   startNodusServerSync,
   stopNodusServerSync,
 } from './serverSync/serverSyncService';
+import {
+  createConnectedVault,
+  detachReplica,
+  getReplicaOverview,
+  signInToNodusServer,
+  startReplicaSync,
+  stopReplicaSync,
+  syncReplicaNow,
+  type RemoteSpaceOption,
+} from './serverSync/replicaService';
 import { scanQueue } from './pipeline/scanQueue';
 import {
   getRecoveryStatus,
@@ -249,6 +259,7 @@ export function registerIpc(
 
     stopRealtimeSync();
     stopNodusServerSync();
+  stopReplicaSync();
     await stopMcpTunnel();
     await stopMcpServer();
     await stopCopilotServer();
@@ -271,6 +282,7 @@ export function registerIpc(
     const settings = getSettings();
     if (settings.syncMode === 'realtime') startRealtimeSync();
     startNodusServerSync();
+  startReplicaSync();
     if (settings.mcpEnabled) void startMcpServer().then(() => startMcpTunnelIfConfigured());
     if (settings.copilotEnabled) void startCopilotServer();
     if (settings.zoteroPluginEnabled) void startZoteroPluginServer();
@@ -310,7 +322,8 @@ export function registerIpc(
       patch.nodusServerUrl !== undefined ||
       patch.nodusServerSpaceId !== undefined ||
       patch.nodusServerIncludeUserContent !== undefined ||
-      patch.nodusServerIncludePassages !== undefined
+      patch.nodusServerIncludePassages !== undefined ||
+      patch.nodusServerIncludeVectors !== undefined
     ) {
       restartNodusServerSync();
     }
@@ -452,6 +465,18 @@ export function registerIpc(
     }
     return { vault: withVaultKeyProviders(vault) };
   });
+  // ── Connected vaults ──────────────────────────────────────────────────────
+  // Two steps by design: the user knows their server address, email and password, but not
+  // the space ids, so signing in returns a short-lived ticket plus the spaces the account
+  // can actually reach, and the app shows a picker before anything is created on disk.
+  h('vaults:remoteSignIn', async (_e, url: string, email: string, password: string) => signInToNodusServer(url, email, password));
+  h('vaults:createConnected', async (_e, input: {
+    url: string; ticket: string; space: RemoteSpaceOption; userEmail: string; serverName: string;
+  }) => ({ vault: withVaultKeyProviders(await createConnectedVault(input)) }));
+  h('vaults:replicaOverview', async () => getReplicaOverview());
+  h('vaults:replicaSyncNow', async (_e, vaultId: string) => syncReplicaNow(vaultId));
+  h('vaults:replicaDetach', async (_e, vaultId: string) => detachReplica(vaultId));
+
   h('vaults:rename', async (_e, id: string, name: string) => withVaultKeyProviders(renameVault(id, name)));
   h('vaults:setType', async (_e, id: string, type: VaultType) => withVaultKeyProviders(setVaultType(id, type)));
   h('vaults:switch', async (_e, id: string, options?: VaultSwitchOptions) => switchVaultSafely(id, options));
@@ -485,6 +510,7 @@ export function registerIpc(
       if (busy) throw new Error(busy);
       stopRealtimeSync();
       stopNodusServerSync();
+      stopReplicaSync();
       await stopMcpTunnel();
       await stopMcpServer();
       await stopCopilotServer();
@@ -497,6 +523,7 @@ export function registerIpc(
       const settings = getSettings();
       if (settings.syncMode === 'realtime') startRealtimeSync();
       startNodusServerSync();
+  startReplicaSync();
       if (settings.mcpEnabled) void startMcpServer().then(() => startMcpTunnelIfConfigured());
       if (settings.copilotEnabled) void startCopilotServer();
       if (settings.zoteroPluginEnabled) void startZoteroPluginServer();
@@ -614,6 +641,7 @@ export function registerIpc(
     const result = await restoreRecoverySnapshot(root, fileName, password, app.getVersion(), language);
     if (result.ok) {
       stopNodusServerSync();
+      stopReplicaSync();
       await stopMcpTunnel();
       await stopMcpServer();
     }

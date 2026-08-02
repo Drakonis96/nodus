@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import type { VaultSummary, VaultType } from '@shared/types';
+import type { RemoteSignIn, VaultSummary, VaultType } from '@shared/types';
 import { isPreviewVaultType } from '@shared/vaultTypes';
 import { errorText, t, tr, tx } from '../i18n';
 import { ConfirmModal } from './ConfirmModal';
@@ -69,6 +69,15 @@ export function VaultSwitcher({ anchorEl, onClose, vaults, onVaultsChanged, onAc
   const [addType, setAddType] = useState<VaultType>('academic');
   const [addError, setAddError] = useState<string | null>(null);
   const [preAlphaConfirmOpen, setPreAlphaConfirmOpen] = useState(false);
+
+  // Connected-vault flow. Signing in returns a ticket plus the spaces this account can
+  // reach, so the space is picked from what the server actually offers rather than typed.
+  const [addMode, setAddMode] = useState<'local' | 'connected'>('local');
+  const [remoteUrl, setRemoteUrl] = useState('');
+  const [remoteEmail, setRemoteEmail] = useState('');
+  const [remotePassword, setRemotePassword] = useState('');
+  const [remoteSession, setRemoteSession] = useState<RemoteSignIn | null>(null);
+  const [remoteSpaceId, setRemoteSpaceId] = useState('');
 
   // Rename / duplicate modals.
   const [renameTarget, setRenameTarget] = useState<VaultSummary | null>(null);
@@ -170,6 +179,59 @@ export function VaultSwitcher({ anchorEl, onClose, vaults, onVaultsChanged, onAc
         await onVaultsChanged();
       }
     });
+
+  /**
+   * Connect to a Nodus Server space, in the two steps the server itself imposes.
+   *
+   * First press signs in and lists the spaces this account can reach; second press takes a
+   * device token for the chosen one and hydrates the replica. Splitting it this way is what
+   * lets the user pick from what really exists instead of typing a space id, and it means
+   * the password is sent exactly once.
+   */
+  const connectVault = async () => {
+    if (busy) return;
+    setAddError(null);
+    setBusy(true);
+    try {
+      if (!remoteSession) {
+        const session = await window.nodus.remoteSignIn(remoteUrl, remoteEmail, remotePassword);
+        setRemoteSession(session);
+        setRemoteSpaceId(session.spaces[0]?.id ?? '');
+        // The password is not kept once it has been exchanged for a ticket.
+        setRemotePassword('');
+        return;
+      }
+      const space = remoteSession.spaces.find((candidate) => candidate.id === remoteSpaceId);
+      if (!space) {
+        setAddError(t('Elige el espacio al que quieres conectarte.'));
+        return;
+      }
+      const created = await window.nodus.createConnectedVault({
+        url: remoteSession.url,
+        ticket: remoteSession.ticket,
+        space,
+        userEmail: remoteSession.userEmail,
+        serverName: remoteSession.serverName,
+      });
+      const switched = await window.nodus.switchVault(created.vault.id);
+      if (!switched.ok) throw new Error(switched.message);
+      setAddOpen(false);
+      setRemoteSession(null);
+      setRemoteSpaceId('');
+      setRemoteUrl('');
+      setRemoteEmail('');
+      setMessage(tr(switched.message));
+      await onActiveVaultChanged();
+      onClose();
+    } catch (error) {
+      // A ticket is single use, so a failure past that point has to start over rather than
+      // leave the user pressing a button that can no longer work.
+      setRemoteSession(null);
+      setAddError(errorText(error));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const createVault = async (preAlphaConfirmed = false) => {
     if (busy) return;
@@ -430,6 +492,85 @@ export function VaultSwitcher({ anchorEl, onClose, vaults, onVaultsChanged, onAc
       {addOpen &&
         createPortal(
           <ModalShell title={t('Añadir bóveda')} onCancel={() => { if (!busy) setAddOpen(false); }} wide>
+            <div className="mb-4 grid grid-cols-2 gap-2" role="radiogroup" aria-label={t('Origen de la bóveda')}>
+              {(['local', 'connected'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  role="radio"
+                  aria-checked={addMode === mode}
+                  data-testid={`vault-origin-${mode}`}
+                  disabled={busy}
+                  onClick={() => { setAddMode(mode); setAddError(null); }}
+                  className={`rounded-xl border px-3 py-2.5 text-left transition ${addMode === mode ? 'border-indigo-500 bg-indigo-500/10' : 'border-neutral-800 hover:border-neutral-700'}`}
+                >
+                  <span className="block text-sm font-medium">{mode === 'local' ? t('Bóveda local') : t('Bóveda conectada')}</span>
+                  <span className="mt-0.5 block text-xs leading-4 text-neutral-500">
+                    {mode === 'local'
+                      ? t('Vive solo en este equipo. Es lo habitual.')
+                      : t('Réplica de un espacio de Nodus Server. Necesitas su dirección y tus credenciales.')}
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            {addMode === 'connected' ? (
+              <div className="space-y-3">
+                {!remoteSession ? (
+                  <>
+                    <label className="block text-sm">
+                      {t('Dirección del servidor')}
+                      <input className="input mt-1 w-full" type="url" placeholder="https://nodus.ejemplo.es" value={remoteUrl} onChange={(e) => setRemoteUrl(e.target.value)} />
+                    </label>
+                    <label className="block text-sm">
+                      {t('Correo')}
+                      <input className="input mt-1 w-full" type="email" autoComplete="username" value={remoteEmail} onChange={(e) => setRemoteEmail(e.target.value)} />
+                    </label>
+                    <label className="block text-sm">
+                      {t('Contraseña')}
+                      <input className="input mt-1 w-full" type="password" autoComplete="current-password" value={remotePassword} onChange={(e) => setRemotePassword(e.target.value)} />
+                    </label>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-xs text-neutral-500">{t('Espacios disponibles para {email} en {server}.').replace('{email}', remoteSession.userEmail).replace('{server}', remoteSession.serverName)}</p>
+                    <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
+                      {remoteSession.spaces.length === 0 && (
+                        <p className="rounded-lg border border-neutral-800 px-3 py-2 text-xs text-neutral-500">{t('Esta cuenta todavía no tiene acceso a ningún espacio.')}</p>
+                      )}
+                      {remoteSession.spaces.map((space) => (
+                        <button
+                          key={space.id}
+                          type="button"
+                          data-testid={`remote-space-${space.id}`}
+                          onClick={() => setRemoteSpaceId(space.id)}
+                          className={`flex w-full items-start justify-between gap-3 rounded-xl border px-3 py-2.5 text-left transition ${remoteSpaceId === space.id ? 'border-indigo-500 bg-indigo-500/10' : 'border-neutral-800 hover:border-neutral-700'}`}
+                        >
+                          <span>
+                            <span className="block text-sm font-medium">{space.name}</span>
+                            <span className="mt-0.5 block text-xs text-neutral-500">
+                              {space.hasSnapshot ? t('Publicado por última vez el {date}.').replace('{date}', new Date(space.updatedAt ?? '').toLocaleString()) : t('Todavía sin publicar.')}
+                            </span>
+                          </span>
+                          <span className="shrink-0 rounded-full border border-neutral-700 px-2 py-0.5 text-[11px] text-neutral-400">
+                            {space.role === 'reader' ? t('Solo lectura') : space.role === 'writer' ? t('Escritura') : t('Propietario')}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                    <p className="flex items-start gap-2 text-xs leading-5 text-neutral-500">
+                      <Icon name="info" size={14} className="mt-0.5 shrink-0" />
+                      <span>
+                        {remoteSession.spaces.find((space) => space.id === remoteSpaceId)?.role === 'reader'
+                          ? t('Con acceso de solo lectura, todo lo que escribas o generes se quedará en este equipo y no se enviará al vault principal.')
+                          : t('Lo que escribas aquí viajará al vault principal la próxima vez que su propietario se conecte.')}
+                      </span>
+                    </p>
+                  </>
+                )}
+              </div>
+            ) : (
+            <>
             <label className="block text-sm">
               {t('Nombre de la bóveda')}
               <input
@@ -451,13 +592,20 @@ export function VaultSwitcher({ anchorEl, onClose, vaults, onVaultsChanged, onAc
               <Icon name="info" size={14} className="mt-0.5 shrink-0" />
               <span>{t('Al crear la bóveda, el asistente te llevará a elegir su modelo de IA y su modelo de embeddings, con los modelos de tus proveedores ya cargados.')}</span>
             </p>
+            </>
+            )}
             {addError && <p role="alert" data-testid="vault-creation-error" className="mt-3 rounded-lg border border-red-900/60 bg-red-950/20 px-3 py-2 text-xs text-red-300">{addError}</p>}
             <div className="mt-5 flex justify-end gap-2">
               <button className="btn btn-ghost" onClick={() => setAddOpen(false)} disabled={busy}>
                 {t('Cancelar')}
               </button>
-              <button className="btn btn-primary gap-1.5" onClick={() => void createVault()} disabled={busy}>
-                <Icon name={busy ? 'sync' : 'plus'} className={busy ? 'animate-spin' : ''} /> {busy ? t('Preparando…') : t('Crear')}
+              <button
+                className="btn btn-primary gap-1.5"
+                onClick={() => void (addMode === 'connected' ? connectVault() : createVault())}
+                disabled={busy || (addMode === 'connected' && Boolean(remoteSession) && !remoteSpaceId)}
+              >
+                <Icon name={busy ? 'sync' : 'plus'} className={busy ? 'animate-spin' : ''} />
+                {busy ? t('Preparando…') : addMode === 'connected' && !remoteSession ? t('Continuar') : t('Crear')}
               </button>
             </div>
           </ModalShell>,

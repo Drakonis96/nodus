@@ -4,7 +4,8 @@ import fs from 'node:fs';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { runMigrations, SCHEMA_VERSION } from './migrations';
 import { ensureTombstoneTriggers, pruneTombstones } from './tombstones';
-import { activeVaultDbPath, getVault } from '../vaults/vaultRegistry';
+import { ensureOutboxTriggers } from '../serverSync/outboxTriggers';
+import { activeVaultDbPath, getVault, getVaultByPath } from '../vaults/vaultRegistry';
 
 let db: Database.Database | null = null;
 const jobDatabase = new AsyncLocalStorage<Database.Database>();
@@ -32,6 +33,24 @@ function vecCosine(a: Buffer | null, b: Buffer | null): number {
   return dot / (Math.sqrt(na) * Math.sqrt(nb));
 }
 
+/**
+ * Whether the database at `file` is a replica whose account may write.
+ *
+ * Deliberately fail-closed: if the registry cannot be read, or the vault is not connected,
+ * or its role is reader, nothing is queued. A wrong answer here in the permissive direction
+ * would send a reader's private notes to someone else's vault.
+ */
+function mayQueueMutations(file: string): boolean {
+  try {
+    const vault = getVaultByPath(file);
+    if (!vault || vault.origin !== 'connected' || !vault.remote) return false;
+    if (vault.remote.state !== 'active') return false;
+    return vault.remote.role === 'writer' || vault.remote.role === 'owner';
+  } catch {
+    return false;
+  }
+}
+
 function openDatabase(file: string): Database.Database {
   const next = new Database(file);
   runMigrations(next);
@@ -40,6 +59,10 @@ function openDatabase(file: string): Database.Database {
   // could only ever capture the shape it had on the day it was written.
   ensureTombstoneTriggers(next);
   pruneTombstones(next);
+  // Same reasoning for the outgoing queue of a connected vault — and this is the gate that
+  // stops a reader from queueing anything: without triggers, nothing can write to
+  // server_outbox no matter what the rest of the app believes.
+  ensureOutboxTriggers(next, mayQueueMutations(file));
   next.pragma('busy_timeout = 5000');
   next.pragma('synchronous = NORMAL');
   next.pragma('temp_store = MEMORY');

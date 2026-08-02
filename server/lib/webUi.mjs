@@ -181,7 +181,14 @@ export const WEB_STYLES = `
   .access-list{display:grid;gap:6px}
   .access-chip{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 8px;border:1px solid #2d2d39;border-radius:8px;background:#101016}
   .access-chip form{margin:0}
-  .access-chip button{display:grid;width:26px;min-height:26px;padding:0;place-items:center}
+  .access-chip button{display:grid;min-width:26px;min-height:26px;padding:0 8px;place-items:center}
+  .access-chip select{min-height:26px;padding:2px 6px;font-size:.85rem}
+  .role-tag{padding:2px 8px;border:1px solid #3b3b4a;border-radius:999px;font-size:.8rem;color:#a9a9bd}
+  .grant-list{display:grid;gap:8px;margin-top:6px}
+  .grant-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 10px;border:1px solid #2d2d39;border-radius:8px;background:#101016}
+  .grant-name{display:flex;align-items:center;gap:8px;margin:0;font-weight:500}
+  .grant-row select{min-height:30px;padding:2px 8px;font-size:.85rem}
+  .role-legend{margin-top:4px;font-size:.82rem;line-height:1.6}
   .code-panel{text-align:center}
   .code-panel h2{margin:22px 0}
   .code-panel h2 code{display:inline-block;padding:12px 18px;border-color:rgba(139,92,246,.4);background:rgba(139,92,246,.1);color:#ddd6fe;font-size:1.6rem;letter-spacing:.12em}

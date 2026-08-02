@@ -3,7 +3,7 @@ import { app } from 'electron';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { VaultSummary, VaultType } from '@shared/types';
+import type { VaultOrigin, VaultRemote, VaultSummary, VaultType } from '@shared/types';
 import { normalizeVaultType } from '@shared/vaultTypes';
 import { runMigrations } from '../db/migrations';
 
@@ -15,6 +15,17 @@ interface VaultRecord {
   lastOpenedAt: string;
   legacy: boolean;
   type: VaultType;
+  /**
+   * Where this vault's canonical data lives.
+   *
+   * 'local'     — the SQLite here IS the vault. The historical and default case.
+   * 'connected' — this SQLite is a replica of a Nodus Server space. It is still a real,
+   *               fully migrated database that every repository reads normally; what
+   *               differs is that a remote publication can overwrite rows in it, and that
+   *               what the user writes may (or may not, for a reader) travel back.
+   */
+  origin: VaultOrigin;
+  remote?: VaultRemote;
 }
 
 interface VaultRegistryFile {
@@ -51,6 +62,26 @@ function cleanName(name: string): string {
   return trimmed || 'Nueva bóveda';
 }
 
+/**
+ * `normalizeRegistry` rebuilds each record field by field and drops what it does not know,
+ * so an older Nodus opening a newer vaults.json would quietly demote a connected vault to a
+ * local one. The remote block is therefore mirrored next to the database as remote.json and
+ * re-read from there, which is also where `readVaultRemote` recovers it from.
+ */
+function normalizeRemote(input: VaultRemote): VaultRemote {
+  return {
+    url: String(input.url ?? ''),
+    spaceId: String(input.spaceId ?? ''),
+    spaceName: String(input.spaceName ?? ''),
+    serverName: String(input.serverName ?? ''),
+    userEmail: String(input.userEmail ?? ''),
+    role: input.role === 'owner' || input.role === 'writer' ? input.role : 'reader',
+    state: input.state === 'revoked' || input.state === 'paused' ? input.state : 'active',
+    lastPulledRevision: input.lastPulledRevision ?? null,
+    lastPulledAt: input.lastPulledAt ?? null,
+  };
+}
+
 function defaultVaultRecord(): VaultRecord {
   const now = nowIso();
   return {
@@ -61,6 +92,7 @@ function defaultVaultRecord(): VaultRecord {
     lastOpenedAt: now,
     legacy: true,
     type: 'academic',
+    origin: 'local',
   };
 }
 
@@ -86,12 +118,21 @@ function normalizeRegistry(input: VaultRegistryFile): VaultRegistryFile {
       legacy: Boolean(vault.legacy),
       // Pre-existing vaults have no `type`; they default to academic.
       type: normalizeVaultType(vault.type),
+      // …and none of them have an `origin` either. Same retrofit, same default.
+      origin: (vault.origin === 'connected' ? 'connected' : 'local') as VaultOrigin,
+      ...(vault.remote ? { remote: normalizeRemote(vault.remote) } : {}),
     }))
     .filter((vault) => {
       if (seen.has(vault.id)) return false;
       seen.add(vault.id);
       return true;
     });
+
+  for (const vault of vaults) {
+    if (vault.origin === 'connected' && vault.remote) continue;
+    const recovered = readVaultRemoteFile(vault.path);
+    if (recovered) { vault.origin = 'connected'; vault.remote = recovered; }
+  }
 
   if (!vaults.some((vault) => vault.id === LEGACY_VAULT_ID)) {
     vaults.unshift(defaultVaultRecord());
@@ -130,6 +171,9 @@ export function ensureVaultRegistry(): VaultRegistryFile {
 }
 
 function writeVaultManifest(vault: VaultRecord): void {
+  // The remote sidecar is written for the legacy vault too: it has no manifest, but it can
+  // still be connected, and losing its remote block would be the same silent demotion.
+  writeVaultRemote(vault);
   if (vault.legacy) return;
   const dir = path.dirname(vault.path);
   fs.mkdirSync(dir, { recursive: true });
@@ -152,6 +196,33 @@ function writeVaultManifest(vault: VaultRecord): void {
     'utf8'
   );
   fs.renameSync(temporary, target);
+}
+
+const REMOTE_FILE = 'remote.json';
+
+/**
+ * The remote block, mirrored beside the database.
+ *
+ * `normalizeRegistry` rebuilds every record from the fields it knows, so a Nodus older than
+ * this feature would rewrite vaults.json without `remote` and silently turn a replica into
+ * an ordinary local vault — pointed at a database that a server can still overwrite. The
+ * sidecar is the authority we can recover from when that happens.
+ */
+function writeVaultRemote(vault: VaultRecord): void {
+  const dir = path.dirname(vault.path);
+  fs.mkdirSync(dir, { recursive: true });
+  const target = path.join(dir, REMOTE_FILE);
+  if (!vault.remote) { fs.rmSync(target, { force: true }); return; }
+  const temporary = `${target}.tmp-${process.pid}-${Math.random().toString(36).slice(2)}`;
+  fs.writeFileSync(temporary, JSON.stringify({ vaultId: vault.id, ...vault.remote }, null, 2), 'utf8');
+  fs.renameSync(temporary, target);
+}
+
+export function readVaultRemoteFile(vaultPath: string): VaultRemote | null {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(path.join(path.dirname(vaultPath), REMOTE_FILE), 'utf8')) as VaultRemote;
+    return parsed?.spaceId ? normalizeRemote(parsed) : null;
+  } catch { return null; }
 }
 
 function initializeDatabase(file: string): void {
@@ -177,6 +248,8 @@ function toSummary(vault: VaultRecord, activeVaultId: string): VaultSummary {
     path: vault.path,
     createdAt: vault.createdAt,
     lastOpenedAt: vault.lastOpenedAt,
+    origin: vault.origin,
+    remote: vault.remote ?? null,
     active: vault.id === activeVaultId,
     legacy: vault.legacy,
     type: vault.type,
@@ -201,6 +274,20 @@ export function getVault(id: string): VaultSummary | null {
   return vault ? toSummary(vault, registry.activeVaultId) : null;
 }
 
+/**
+ * The vault a database file belongs to.
+ *
+ * `openDatabase()` is handed a path, not a vault id — a background job may be opening a
+ * sibling vault — and it has to know whether that database is a replica before it decides
+ * which triggers to install.
+ */
+export function getVaultByPath(dbPath: string): VaultSummary | null {
+  const registry = ensureVaultRegistry();
+  const resolved = path.resolve(dbPath);
+  const vault = registry.vaults.find((candidate) => candidate.path === resolved);
+  return vault ? toSummary(vault, registry.activeVaultId) : null;
+}
+
 export function activeVaultDbPath(): string {
   return getActiveVault().path;
 }
@@ -214,7 +301,11 @@ export function vaultDir(vaultId: string): string | null {
   return vault ? path.dirname(vault.path) : null;
 }
 
-export function createVault(name: string, type: VaultType = 'academic'): VaultSummary {
+export function createVault(
+  name: string,
+  type: VaultType = 'academic',
+  options: { origin?: VaultOrigin; remote?: VaultRemote } = {},
+): VaultSummary {
   const registry = ensureVaultRegistry();
   const id = randomUUID();
   const createdAt = nowIso();
@@ -227,6 +318,8 @@ export function createVault(name: string, type: VaultType = 'academic'): VaultSu
     lastOpenedAt: createdAt,
     legacy: false,
     type: normalizeVaultType(type),
+    origin: options.origin === 'connected' ? 'connected' : 'local',
+    ...(options.remote ? { remote: normalizeRemote(options.remote) } : {}),
   };
   initializeDatabase(vault.path);
   writeVaultManifest(vault);
@@ -265,6 +358,9 @@ export function restoreVaultDatabase(
       lastOpenedAt: nowIso(),
       legacy,
       type: normalizeVaultType(input.type),
+      // A restored backup is a local vault. If it was a replica, its remote block is
+      // recovered from the remote.json sidecar the next time the registry normalizes.
+      origin: 'local',
     };
     registry.vaults.push(record);
   }
@@ -306,6 +402,9 @@ export function createVaultFromDatabaseFile(
     lastOpenedAt: createdAt,
     legacy: false,
     type: normalizeVaultType(type),
+    // A vault restored from a database file the user picked is always local: there is
+    // no server behind it, and no remote block to carry.
+    origin: 'local',
   };
   fs.mkdirSync(dir, { recursive: true });
   fs.copyFileSync(sourceFile, vault.path);
@@ -367,6 +466,24 @@ export function resetVaultDatabase(id: string): VaultSummary {
   removeSqliteDatabaseFiles(vault.path);
   initializeDatabase(vault.path);
   vault.lastOpenedAt = nowIso();
+  writeVaultManifest(vault);
+  writeRegistry(registry);
+  return toSummary(vault, registry.activeVaultId);
+}
+
+/**
+ * Update the remote block of a connected vault.
+ *
+ * Called on every pull (to advance the revision), when the server reports a different role,
+ * and when access is revoked. A revocation only sets `state`: the replica keeps every byte
+ * it has, because deleting a colleague's own notes because a server said no is not a
+ * recovery, it is data loss.
+ */
+export function updateVaultRemote(id: string, patch: Partial<VaultRemote>): VaultSummary | null {
+  const registry = ensureVaultRegistry();
+  const vault = registry.vaults.find((candidate) => candidate.id === id);
+  if (!vault || !vault.remote) return null;
+  vault.remote = normalizeRemote({ ...vault.remote, ...patch });
   writeVaultManifest(vault);
   writeRegistry(registry);
   return toSummary(vault, registry.activeVaultId);

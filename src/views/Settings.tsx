@@ -8,6 +8,7 @@ import type {
   ModelInfo,
   NodusServerConnection,
   NodusServerOverview,
+  ReplicaConnectionView,
   ZoteroPluginServerStatus,
   RecoveryHealth,
   StudyDataOverview,
@@ -20,6 +21,7 @@ import type { PrimarySourcePolicySettings } from '@shared/primarySourcesTypes';
 import { recoveryHealthAdvice, recoveryHealthAge, recoveryHealthHeadline } from '../recoveryHealth';
 import { ImageGenerationSettings, ProvidersSettings } from './ProvidersSettings';
 import { AudioGenerationSettings } from './AudioGenerationSettings';
+import { ConnectedVaultsPanel } from '../components/ConnectedVaultsPanel';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { LegalDocModal } from '../components/LegalDocModal';
 import { LEGAL_DOCS, type LegalDocId } from '../legalDocs';
@@ -39,7 +41,7 @@ import { WORLDBUILDING_GROUPS } from '../components/WorldbuildingSidebar';
 import { TESTIMONY_GROUPS } from '../components/TestimonySidebar';
 import { ACCESS_LEVELS as TESTIMONY_ACCESS_LEVELS, ATTRIBUTION_MODES as TESTIMONY_ATTRIBUTION_MODES } from '@shared/testimonies';
 import { ACCESS_LEVEL_LABEL as TESTIMONY_ACCESS_LEVEL_LABEL, ATTRIBUTION_MODE_LABEL as TESTIMONY_ATTRIBUTION_MODE_LABEL } from '@shared/testimonyLabels';
-import { t, tx } from '../i18n';
+import { errorText, t, tx } from '../i18n';
 import { updateStatusMessage } from '../updateStatus';
 import { DEFAULT_EMBEDDING_MODELS, EMBEDDING_PROVIDERS } from '@shared/providers';
 import { ORB_COLOR_CHOICES, orbHue } from '@shared/nodiOrb';
@@ -163,6 +165,10 @@ export function Settings({
   const [nodusServerBusy, setNodusServerBusy] = useState(false);
   const [nodusServerMessage, setNodusServerMessage] = useState<string | null>(null);
   const [nodusServerGuideOpen, setNodusServerGuideOpen] = useState(false);
+  // A connected vault is the mirror image of a published one: this machine PULLS it. Its
+  // state had no screen at all, so a revoked replica simply stopped updating in silence.
+  const [replicas, setReplicas] = useState<ReplicaConnectionView[]>([]);
+  const [replicaBusy, setReplicaBusy] = useState<string | null>(null);
   const [copilotStatus, setCopilotStatus] = useState<CopilotServerStatus>({ running: false, port: null, addinUrl: null, certReady: false, error: null });
   const [zoteroStatus, setZoteroStatus] = useState<ZoteroPluginServerStatus>({ running: false, port: null, url: null, error: null });
   const [zoteroInstallBusy, setZoteroInstallBusy] = useState(false);
@@ -213,6 +219,36 @@ export function Settings({
   useEffect(() => setMcpPortInput(String(settings.mcpPort)), [settings.mcpPort]);
 
   useEffect(() => setNodusServerUrlInput(settings.nodusServerUrl), [settings.nodusServerUrl]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const value = await window.nodus.replicaOverview();
+        if (!cancelled) setReplicas(value);
+      } catch {
+        // The panel is informational; a failed poll simply leaves the last state showing.
+      }
+    };
+    void load();
+    const timer = window.setInterval(() => void load(), 5000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, []);
+
+  const syncReplica = async (vaultId: string) => {
+    setReplicaBusy(vaultId);
+    try { setReplicas(await window.nodus.replicaSyncNow(vaultId)); }
+    catch (error) { setNodusServerMessage(errorText(error)); }
+    finally { setReplicaBusy(null); }
+  };
+
+  const detachReplica = async (vaultId: string, vaultName: string) => {
+    if (!window.confirm(t('¿Desconectar «{name}» del servidor? La bóveda y todo su contenido se quedan en este equipo; solo deja de sincronizarse.').replace('{name}', vaultName))) return;
+    setReplicaBusy(vaultId);
+    try { setReplicas(await window.nodus.replicaDetach(vaultId)); }
+    catch (error) { setNodusServerMessage(errorText(error)); }
+    finally { setReplicaBusy(null); }
+  };
 
   useEffect(() => {
     let active = true;
@@ -1397,6 +1433,13 @@ export function Settings({
             </ul>
           </div>
 
+          <ConnectedVaultsPanel
+            replicas={replicas}
+            busyVaultId={replicaBusy}
+            onSync={(vaultId) => void syncReplica(vaultId)}
+            onDetach={(vaultId, vaultName) => void detachReplica(vaultId, vaultName)}
+          />
+
           {nodusServerOverview.connections.length > 0 && (
             <div className="space-y-3">
               <h3 className="text-sm font-medium">{t('Vaults conectados')}</h3>
@@ -1487,7 +1530,7 @@ export function Settings({
                       <div className="border-t border-neutral-200 pt-4 dark:border-neutral-800">
                         <h3 className="text-sm font-medium">{t('Qué se publica')}</h3>
                         <p className="mt-1 text-xs text-neutral-500">
-                          {t('Siempre: referencias, autores, temas, ideas, evidencias, conexiones y preguntas. Nunca: archivos PDF, claves API, contraseñas, rutas locales, embeddings, listas de alumnos, grupos, calificaciones, resultados de evaluación ni la base SQLite original.')}
+                          {t('Siempre: referencias, autores, temas, ideas, evidencias, conexiones y preguntas. Nunca: archivos PDF, audio, claves API, contraseñas, rutas locales, listas de alumnos, grupos, calificaciones, resultados de evaluación ni la base SQLite original.')}
                         </p>
                       </div>
                       <div className="flex items-center justify-between gap-4">
@@ -1503,6 +1546,13 @@ export function Settings({
                           <p className="mt-0.5 text-xs text-amber-700 dark:text-amber-400">{t('Puede incluir texto protegido por derechos de autor. Actívalo solo si tienes permiso para compartirlo.')}</p>
                         </div>
                         <input type="checkbox" checked={settings.nodusServerIncludePassages} onChange={(event) => void patch({ nodusServerIncludePassages: event.target.checked })} />
+                      </div>
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <label className="text-sm text-neutral-700 dark:text-neutral-300">{t('Incluir vectores semánticos')}</label>
+                          <p className="mt-0.5 text-xs text-neutral-500">{t('Permite buscar por significado desde el móvil o una réplica. Sin ellos solo se puede buscar por texto literal. Se derivan de ideas que ya viajan y no se pueden revertir al texto original.')}</p>
+                        </div>
+                        <input type="checkbox" checked={settings.nodusServerIncludeVectors} onChange={(event) => void patch({ nodusServerIncludeVectors: event.target.checked })} />
                       </div>
                     </div>
                   ) : (

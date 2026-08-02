@@ -287,9 +287,14 @@ test('the create-vault modal asks for a name and a type, never for models', asyn
   assert.doesNotMatch(picker, /aiModel|embeddingProvider|embeddingModel/, 'creation must not send a model payload');
   assert.doesNotMatch(picker, /downloadNodusLocalModel|installNodusLocalRuntime/, 'downloading belongs to the wizard, not to creation');
   assert.match(picker, /createVault\(\{ name, type: addType \}\)/);
-  // The create button must depend on the name alone now that models are gone.
-  assert.match(picker, /onClick=\{\(\) => void createVault\(\)\} disabled=\{busy\}/);
+  // The button now routes to one of the two origins — a local vault or a replica of a Nodus
+  // Server space — but neither branch may depend on a model selection, which is the point.
+  assert.match(picker, /addMode === 'connected' \? connectVault\(\) : createVault\(\)/);
+  assert.doesNotMatch(picker, /disabled=\{[^}]*(aiModel|embeddingModel|modelsReady|selectedModel)[^}]*\}/);
   assert.match(picker, /data-testid="vault-models-next-step"/);
+  // Both origins are offered, and the local one is the default.
+  assert.match(picker, /data-testid=\{`vault-origin-\$\{mode\}`\}/);
+  assert.match(picker, /useState<'local' \| 'connected'>\('local'\)/);
   for (const type of ['academic', 'genealogy', 'estudio', 'databases']) {
     assert.match(types, new RegExp(`id: '${type}'[\\s\\S]{0,180}available: true`));
   }

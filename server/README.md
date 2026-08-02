@@ -181,6 +181,63 @@ stops the boot instead of making every publication fail. When a vault no longer 
 says how large it is and which switch to turn off ("Include extracted passages" is usually most of
 the weight).
 
+## Access levels
+
+A membership grants one of three levels in one space. An account can hold a different level in each
+space it belongs to, and every level is assigned from the web administration — when the account is
+created, or later from the user table without having to revoke and grant again.
+
+| Level | Can read | Can send changes back | Can publish |
+|---|---|---|---|
+| **Reader** | yes | no — anything they write or generate stays on their own device | no |
+| **Writer** | yes | yes, once the owner collects them | no |
+| **Owner** | yes | yes | yes |
+
+Two things are worth being explicit about.
+
+**The level is re-read on every request.** Downgrading or revoking somebody takes effect on their
+very next call, even with a token they already hold; nothing has to be revoked separately.
+
+**A writer's change is not visible to anyone until the owner's desktop collects it.** The server is
+a relay with a ledger, not a second copy of the vault: it stores the change, the owner's machine
+applies it to the canonical SQLite, and the republication that follows is what everybody else finally
+reads. If the owner does not open Nodus, nothing moves. That is a deliberate design decision — one
+authority over what the vault contains — and not a fault.
+
+## Connected vaults and the client API
+
+Besides the MCP surface, the server exposes `/api/v1` for Nodus Desktop replicas and for future
+mobile clients. **They are two separate OAuth protected resources over the same origin**
+(`https://your-domain/mcp` and `https://your-domain/api/v1`), so a token minted for one is refused by
+the other. An AI client reads; only an application can write.
+
+- `GET /api/v1/capabilities` — public, unauthenticated. What this build supports.
+- `POST /api/v1/auth/login` then `POST /api/v1/auth/device` — sign in with email and password,
+  receive a single-use five-minute ticket plus the spaces the account can reach, then take a device
+  token for the chosen one. The pairing code flow stays as it is for publishers.
+- `GET /api/v1/spaces/:id/...` — works, ideas, themes, gaps, authors, debates, notes, Deep Research
+  reports, immersion sessions, passages, search.
+- `POST /api/v1/spaces/:id/context` — the retrieval package for a client-side chat. **The server
+  never receives an AI provider key**; the client builds its own prompt and calls its own provider.
+- `POST /api/v1/spaces/:id/mutations` (writer) and `GET` + `/ack` (owner) — the ledger.
+- `PUT /api/v1/spaces/:id/vectors` (owner) and `POST .../search/semantic` — quantized embeddings for
+  semantic search. A client whose embedding provider does not match the published one is told so
+  explicitly and given a lexical fallback, never a silent empty list.
+
+### Images, and what never travels
+
+Documents never reach the server. No PDFs, no audio, no recordings. Two kinds of image do: the
+illustration attached to a Deep Research report, and a person's portrait. Three independent layers
+enforce that, and each would be sufficient alone:
+
+1. the desktop reads images from exactly two whitelisted tables and nothing else;
+2. no binary can ride inside the publication JSON at all;
+3. the server sniffs the bytes of every upload and refuses anything that is not PNG, JPEG, WEBP or
+   GIF — including a WAV, which shares its first four bytes with WEBP.
+
+Images are addressed by the SHA-256 of their content, so republishing an unchanged corpus re-uploads
+none of them. Unreferenced images are swept after a grace period.
+
 ## Provide access to students or researchers
 
 1. From the web administration it creates a reading account with a temporary password and assigns it

@@ -25,13 +25,25 @@ try {
 
   const { RELEASE_NOTES, releaseNotesForMajor } = await import(pathToFileURL(bundlePath).href);
   const currentRelease = RELEASE_NOTES[0];
-  assert.equal(currentRelease?.version, '3.0.4');
-  assert.equal(currentRelease?.date, '2026-08-01');
-  // Deep Research queued over MCP, the retry that ignored the engine, and the
-  // argument map that drew every hub as a star.
-  assert.equal(currentRelease?.highlights.length, 3);
-  // The MCP queue is the release's headline and owns the cross-vault MCP scope.
-  assert.equal(currentRelease?.highlights[0]?.scope, 'mcp');
+  assert.equal(currentRelease?.version, '3.1.0');
+  assert.equal(currentRelease?.date, '2026-08-02');
+  // Connected vaults, the access level that decides where a person's work ends up, and the
+  // correction to what the privacy notice promised about embeddings. More highlights will
+  // land here before 3.1.0 ships, so this is a floor rather than an exact count.
+  assert.ok(currentRelease?.highlights.length >= 3, 'the release must describe what changed');
+  for (const highlight of currentRelease.highlights) {
+    // Written for the person using Nodus: no module names, no internal vocabulary.
+    for (const language of ['es', 'en', 'fr', 'de', 'pt', 'pt-BR']) {
+      assert.ok(highlight[language]?.length > 80, `a ${language} highlight is too short to explain anything`);
+    }
+  }
+
+  // 3.0.4 keeps its own three highlights underneath: Deep Research queued over MCP, the
+  // retry that ignored the engine, and the argument map that drew every hub as a star.
+  const mcpQueueRelease = RELEASE_NOTES.find((note) => note.version === '3.0.4');
+  assert.equal(mcpQueueRelease?.date, '2026-08-01');
+  assert.equal(mcpQueueRelease?.highlights.length, 3);
+  assert.equal(mcpQueueRelease?.highlights[0]?.scope, 'mcp');
 
   // 3.0.3 keeps its own three highlights underneath.
   const bulkExportRelease = RELEASE_NOTES.find((note) => note.version === '3.0.3');

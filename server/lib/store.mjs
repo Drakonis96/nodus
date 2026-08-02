@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash, randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
 import { normalizeServerLanguage } from './i18n.mjs';
+import { migrateState, STATE_VERSION } from './roles.mjs';
 
 export function token(bytes = 32) {
   return randomBytes(bytes).toString('base64url');
@@ -38,12 +39,15 @@ function validatePassword(value) {
 
 function initialState() {
   return {
-    version: 1,
+    version: STATE_VERSION,
     settings: { name: 'Nodus Server', publicUrl: '', language: 'en' },
     users: [],
     spaces: [],
     memberships: [],
     pairingCodes: [],
+    // A short-lived, single-use ticket handed out by POST /api/v1/auth/login so the client
+    // can pick a space without sending its password a second time.
+    authTickets: [],
     deviceTokens: [],
     sessions: [],
     oauthClients: [],
@@ -59,7 +63,12 @@ export class Store {
     this.stateFile = path.join(this.root, 'state.json');
     this.spacesDir = path.join(this.root, 'spaces');
     fs.mkdirSync(this.spacesDir, { recursive: true });
+    this.migration = { migrated: false, from: STATE_VERSION, to: STATE_VERSION };
     this.state = this.readState();
+    // Persist the upgrade immediately. Leaving it in memory would mean re-running it on
+    // every boot and, worse, a crash between here and the first write would leave a state
+    // file whose shape no longer matches what the running code assumes.
+    if (this.migration.migrated) this.save();
   }
 
   readState() {
@@ -68,7 +77,11 @@ export class Store {
       const parsed = JSON.parse(fs.readFileSync(this.stateFile, 'utf8'));
       const settings = { ...initialState().settings, ...(parsed.settings ?? {}) };
       settings.language = normalizeServerLanguage(settings.language);
-      return { ...initialState(), ...parsed, settings };
+      // The spread puts the stored `version` back on top of the one initialState declares,
+      // so the migration has to run after it, not before.
+      const merged = { ...initialState(), ...parsed, settings };
+      this.migration = migrateState(merged);
+      return merged;
     } catch (error) {
       throw new Error(`Could not read ${this.stateFile}: ${error instanceof Error ? error.message : String(error)}`);
     }
@@ -88,6 +101,10 @@ export class Store {
     this.state.accessTokens = this.state.accessTokens.filter(keep);
     this.state.refreshTokens = this.state.refreshTokens.filter(keep);
     this.state.pairingCodes = this.state.pairingCodes.filter((entry) => keep(entry) && !entry.usedAt);
+    this.state.authTickets = (this.state.authTickets ?? []).filter((entry) => keep(entry) && !entry.usedAt);
+    // Replica device tokens carry a sliding expiry; publisher tokens have none and are
+    // revoked by hand, by a membership change, or by a password rotation.
+    this.state.deviceTokens = this.state.deviceTokens.filter(keep);
   }
 
   createUser(email, password, role = 'member') {
@@ -147,6 +164,10 @@ export class Store {
     this.state.accessTokens = this.state.accessTokens.filter((entry) => entry.userId !== userId);
     this.state.refreshTokens = this.state.refreshTokens.filter((entry) => entry.userId !== userId);
     this.state.pairingCodes = this.state.pairingCodes.filter((entry) => entry.userId !== userId);
+    // Device tokens were exempt from this sweep, which meant rotating a password left every
+    // paired desktop and replica publishing and pulling as if nothing had happened. They are
+    // long-lived bearer credentials for this account like any other, so they go too.
+    this.state.deviceTokens = this.state.deviceTokens.filter((entry) => entry.userId !== userId);
     this.save();
     return user;
   }
@@ -199,5 +220,33 @@ export class Store {
   removeSnapshot(spaceId) {
     const dir = path.join(this.spacesDir, spaceId);
     fs.rmSync(dir, { recursive: true, force: true });
+  }
+
+  spaceDir(spaceId) {
+    const dir = path.join(this.spacesDir, spaceId);
+    fs.mkdirSync(dir, { recursive: true });
+    return dir;
+  }
+
+  // Assets are addressed by the sha256 of their bytes and fanned out two levels. A shared
+  // genealogy or Deep Research space can hold tens of thousands of images, and a flat
+  // directory degrades badly at that size on every filesystem we ship on.
+  assetPath(spaceId, hash) {
+    return path.join(this.spacesDir, spaceId, 'assets', hash.slice(0, 2), hash.slice(2, 4), hash);
+  }
+
+  assetsDir(spaceId) {
+    return path.join(this.spacesDir, spaceId, 'assets');
+  }
+
+  // The mutation ledger is append-only NDJSON rather than a key in state.json, because
+  // `save()` rewrites that whole file on every change: a space with fifty thousand pending
+  // mutations would rewrite megabytes on each login.
+  mutationsPath(spaceId) {
+    return path.join(this.spacesDir, spaceId, 'mutations.ndjson');
+  }
+
+  vectorsPath(spaceId, kind) {
+    return path.join(this.spacesDir, spaceId, `vectors-${kind}.bin`);
   }
 }

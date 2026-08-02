@@ -22,7 +22,16 @@ test('the main workflow tests then publishes amd64 and arm64 images', () => {
   const workflow = read('.github/workflows/nodus-server-image.yml');
   assert.doesNotMatch(read('.gitignore'), /^\.github\/$/m);
   assert.match(workflow, /branches:\s*\[main\]/);
-  assert.match(workflow, /node --test scripts\/test-nodus-server\.mjs scripts\/test-nodus-server-deployment\.mjs/);
+  // Every server suite has to run before an image is published, not just the two that
+  // predate the client API: an image that fails a role check or an asset rejection is
+  // exactly what this job exists to stop.
+  for (const suite of [
+    'test-nodus-server.mjs', 'test-nodus-server-deployment.mjs', 'test-nodus-server-roles.mjs',
+    'test-nodus-server-api.mjs', 'test-nodus-server-assets.mjs', 'test-nodus-server-mutations.mjs',
+    'test-server-vectors.mjs',
+  ]) {
+    assert.match(workflow, new RegExp(`scripts/${suite.replace('.', '\\.')}`), `${suite} does not run before publishing`);
+  }
   assert.match(workflow, /Run image health smoke test/);
   assert.match(workflow, /platforms:\s*linux\/amd64,linux\/arm64/);
   assert.match(workflow, /type=raw,value=main/);
