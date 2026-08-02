@@ -1,0 +1,114 @@
+name: Nodus
+options:
+  bundleIdPrefix: com.drakonis96.nodus
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+  generateEmptyDirectories: true
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    # Swift 6.2 lets a whole module default to the main actor. For an app that is almost
+    # entirely SwiftUI, that removes the annotation noise and makes the few genuinely
+    # background pieces — the client actor, the snapshot importer, the Deep Research
+    # orchestrator — stand out because they had to opt out.
+    SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
+    SWIFT_APPROACHABLE_CONCURRENCY: YES
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    DEAD_CODE_STRIPPING: YES
+    CLANG_ENABLE_MODULE_DEBUGGING: NO
+    IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+    TARGETED_DEVICE_FAMILY: "1,2"
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_STYLE: Automatic
+    CODE_SIGNING_REQUIRED: NO
+    CODE_SIGNING_ALLOWED: NO
+
+packages:
+  NodusKit:
+    path: Packages/NodusKit
+  NodusUI:
+    path: Packages/NodusUI
+  NodusAI:
+    path: Packages/NodusAI
+
+targets:
+  Nodus:
+    type: application
+    platform: iOS
+    sources:
+      - path: Nodus
+    dependencies:
+      - package: NodusKit
+        product: NodusKit
+      - package: NodusUI
+        product: NodusUI
+      - package: NodusAI
+        product: NodusAI
+      - target: NodusActivities
+        embed: true
+        codeSign: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.drakonis96.nodus.ios
+        PRODUCT_NAME: Nodus
+        MARKETING_VERSION: "3.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        INFOPLIST_FILE: Nodus/Info.plist
+        ENABLE_PREVIEWS: YES
+        SUPPORTS_MACCATALYST: NO
+      configs:
+        Debug:
+          # Only Debug talks to the Docker server over plain HTTP on 127.0.0.1. Release has
+          # no exception at all, and the server itself refuses any public URL that is not
+          # HTTPS (server.mjs:105-111).
+          OTHER_SWIFT_FLAGS: "-D DEBUG -D NODUS_LOCAL_LAB"
+
+  NodusActivities:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: NodusActivities
+    dependencies:
+      - package: NodusUI
+        product: NodusUI
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.drakonis96.nodus.ios.activities
+        PRODUCT_NAME: NodusActivities
+        MARKETING_VERSION: "3.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        INFOPLIST_FILE: NodusActivities/Info.plist
+        SKIP_INSTALL: YES
+
+  NodusTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: NodusTests
+    dependencies:
+      - target: Nodus
+      - package: NodusKit
+        product: NodusKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.drakonis96.nodus.ios.tests
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  Nodus:
+    build:
+      targets:
+        Nodus: all
+        NodusActivities: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - NodusTests
+    archive:
+      config: Release

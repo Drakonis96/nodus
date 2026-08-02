@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>es</string>
+	<key>CFBundleDisplayName</key>
+	<string>Nodus</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>UILaunchScreen</key>
+	<dict>
+		<key>UIColorName</key>
+		<string>LaunchBackground</string>
+	</dict>
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<true/>
+	</dict>
+	<key>UIUserInterfaceStyle</key>
+	<string>Automatic</string>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+
+	<!-- Live Activities: the honest way to use the Dynamic Island. A Deep Research run, a
+	     snapshot download and a mutation flush all outlive the screen the user started them
+	     on, and each reports its own progress there. -->
+	<key>NSSupportsLiveActivities</key>
+	<true/>
+	<key>NSSupportsLiveActivitiesFrequentUpdates</key>
+	<true/>
+
+	<!-- A Deep Research run is one model call per section plus plan, expansion, verification
+	     and coherence passes. It does not fit in the foreground, and being killed halfway
+	     would waste real money, so it continues as a processing task and resumes from its
+	     persisted state. -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>processing</string>
+		<string>fetch</string>
+	</array>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>com.drakonis96.nodus.ios.deepresearch</string>
+		<string>com.drakonis96.nodus.ios.mirror-refresh</string>
+		<string>com.drakonis96.nodus.ios.mutation-flush</string>
+	</array>
+
+	<!-- Transport security.
+	     Production is HTTPS-only, and so is the server: normalizePublicUrl (server.mjs:105-111)
+	     rejects any public URL that is not HTTPS unless it is loopback. The single exception
+	     below exists so a Debug build can reach the Docker container on this machine; it is
+	     scoped to 127.0.0.1 and does not weaken anything else. -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<false/>
+		<key>NSExceptionDomains</key>
+		<dict>
+			<key>127.0.0.1</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+				<key>NSIncludesSubdomains</key>
+				<false/>
+			</dict>
+			<key>localhost</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+				<key>NSIncludesSubdomains</key>
+				<false/>
+			</dict>
+		</dict>
+	</dict>
+
+	<key>NSFaceIDUsageDescription</key>
+	<string>Nodus usa Face ID para proteger tus claves de proveedor y el acceso a tus vaults.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Nodus se conecta a un Nodus Server de tu red local cuando le indicas su dirección.</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.drakonis96.nodus.citation</string>
+			<!-- Citations in a Deep Research report and in chat resolve against real corpus
+			     rows, never against model output. Registering the scheme lets a tapped
+			     citation open the idea, passage or work it names. -->
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>nodus</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

@@ -81,3 +81,14 @@ scripts/.cache/
 
 # Local Nodus Server state (admin hashes, device tokens) — never committed
 server/data/
+
+# iOS app — the Xcode project is generated from ios/project.yml (`cd ios && xcodegen generate`),
+# so committing the .pbxproj would only add churn and merge conflicts.
+ios/Nodus.xcodeproj/
+ios/*.xcworkspace/
+ios/**/.build/
+ios/**/*.xcuserdatad/
+ios/DerivedData/
+# The lab publishes COPIES of real vaults to a local server. Real corpora never enter a
+# public repository.
+ios/.lab/
