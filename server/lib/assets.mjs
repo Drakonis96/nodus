@@ -1,14 +1,17 @@
 // Content-addressed image storage.
 //
 // The hard product rule is that heavy documents never reach the server: no PDFs, no audio.
-// Images do travel, but only two kinds — the illustration attached to a Deep Research
-// report, and a person's portrait. Three independent layers enforce that, and each one
-// would be sufficient on its own:
+// Images do travel, but only three kinds — the illustration attached to a Deep Research
+// report, a person's portrait, and the pictures in a database's attachment columns. Three
+// independent layers enforce that, and each one would be sufficient on its own:
 //
 //   1. Origin.  `ASSET_SOURCES` in electron/serverSync/serverSnapshot.ts is the only code
-//      path that produces an asset, and it names exactly two tables. TTS audio is a loose
+//      path that produces an asset, and it names exactly three tables. TTS audio is a loose
 //      .wav under <vault>/audio/ with only metadata in SQLite, and a work's PDF lives in
 //      Zotero's storage/ directory outside the vault entirely: there is nothing to read.
+//      The database one is the only source whose rows are not images by construction, which
+//      is why layer 3 below is what actually decides for it — an attachment column takes
+//      whatever the user dropped on it, and only four image formats get past the sniffer.
 //   2. Wire.    `safeValue()` in that same file discards every Buffer, so no binary can
 //      ride inside the snapshot JSON regardless of which tables are selected.
 //   3. Server.  This file. Bytes are sniffed, and anything that is not one of four image

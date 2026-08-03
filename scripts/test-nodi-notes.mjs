@@ -1,9 +1,19 @@
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
+import { existsSync } from 'node:fs';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { installRuntimeHooks, requireElectronRuntime } from './lib/tsRuntimeHooks.mjs';
+
+// The store is SQLite now — `nodi.sqlite`, its own table in the user-data directory rather
+// than a JSON file — and better-sqlite3 here is built against Electron's ABI. So this suite
+// re-execs under Electron-as-Node and loads the real module instead of bundling it.
+if (!requireElectronRuntime(fileURLToPath(import.meta.url), '--electron-nodi-notes-suite')) {
+  process.exit(0);
+}
 
 const root = path.resolve(import.meta.dirname, '..');
 const tmp = await mkdtemp(path.join(os.tmpdir(), 'nodus-nodi-notes-'));
@@ -24,27 +34,10 @@ try {
   assert.equal(helper.deriveNodiNoteTitle(''), '');
 
   const storeRoot = path.join(tmp, 'user-data');
-  const repositoryBundle = path.join(tmp, 'nodiNotes-repository.mjs');
-  await build({
-    entryPoints: [path.join(root, 'electron/nodiNotes.ts')],
-    outfile: repositoryBundle,
-    bundle: true,
-    platform: 'node',
-    format: 'esm',
-    tsconfig: path.join(root, 'tsconfig.json'),
-    logLevel: 'silent',
-    plugins: [{
-      name: 'electron-test-stub',
-      setup(buildApi) {
-        buildApi.onResolve({ filter: /^electron$/ }, () => ({ path: 'electron', namespace: 'nodi-notes-test' }));
-        buildApi.onLoad({ filter: /.*/, namespace: 'nodi-notes-test' }, () => ({
-          contents: `export const app = { getPath: () => ${JSON.stringify(storeRoot)} };`,
-          loader: 'js',
-        }));
-      },
-    }],
-  });
-  const repository = await import(pathToFileURL(repositoryBundle).href);
+  installRuntimeHooks(storeRoot);
+  const require = createRequire(import.meta.url);
+
+  const repository = require(path.join(root, 'electron/nodiNotes.ts'));
   const derived = repository.saveNodiNote({ content: 'Primera nota guardada sin título manual' });
   assert.equal(derived.title, 'Primera nota guardada');
   assert.equal(derived.titleExplicit, false);
@@ -55,6 +48,19 @@ try {
   assert.equal(updated.id, derived.id);
   assert.equal(updated.title, 'Nuevo comienzo para');
   assert.equal(repository.listNodiNotes().length, 2);
+
+  // The store is a table of its own, install-wide, and never inside a vault: Nodi follows
+  // the person, so a note made while one corpus is open is there when the next one is.
+  assert.ok(existsSync(path.join(storeRoot, 'nodi.sqlite')), 'the notes live in their own database');
+
+  // A deletion is a tombstone rather than a removal, so it can travel to the other devices
+  // instead of looking like a note they have simply not heard about yet.
+  repository.deleteNodiNote(explicit.id);
+  assert.equal(repository.listNodiNotes().length, 1, 'a deleted note is gone from the list');
+  const notesDb = require(path.join(root, 'electron/nodiNotesDb.ts'));
+  const tombstone = notesDb.selectNote(explicit.id);
+  assert.ok(tombstone && tombstone.deletedAt !== null, 'and remembered as a tombstone');
+  assert.equal(tombstone.content, '', 'which carries nothing that was private');
 
   const [component, css, types] = await Promise.all([
     readFile(path.join(root, 'src/components/nodi/NodiCompanion.tsx'), 'utf8'),

@@ -15,6 +15,8 @@ import { can as canRole, isSpaceRole, normalizeSpaceRole, SPACE_ROLES } from './
 import { createAuthorizer } from './lib/auth.mjs';
 import { createApiRoutes } from './lib/routes/api.mjs';
 import { createCorpusRoutes } from './lib/routes/corpus.mjs';
+import { NODUS_VERSION } from './lib/version.mjs';
+import { readAsset } from './lib/assets.mjs';
 
 // A zero, a `200m`-style unit or a value past what Node can hold in a single buffer
 // would otherwise reach zlib and turn every publication into an opaque rejection, so
@@ -244,7 +246,7 @@ function page(title, content, options = {}) {
         <section class="auth-card">${content}</section>
       </main>`
     : `<main class="app-main">${content}</main>`;
-  return `<!doctype html><html lang="${escapeHtml(language())}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#08080d"><title>${escapeHtml(title)} · Nodus Server</title><style>${WEB_STYLES}</style></head><body>${header}${main}<footer class="site-footer">Nodus Server · ${tr('brandTagline')}</footer></body></html>`;
+  return `<!doctype html><html lang="${escapeHtml(language())}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#08080d"><title>${escapeHtml(title)} · Nodus Server</title><style>${WEB_STYLES}</style></head><body>${header}${main}<footer class="site-footer">Nodus Server ${escapeHtml(NODUS_VERSION)} · ${tr('brandTagline')}</footer></body></html>`;
 }
 
 function sessionFor(req) {
@@ -683,7 +685,7 @@ async function handleMcp(req, res) {
   let protocolVersion = MCP_PROTOCOLS.has(req.headers['mcp-protocol-version']) ? req.headers['mcp-protocol-version'] : '2025-11-25';
   if (request.method === 'initialize') {
     protocolVersion = MCP_PROTOCOLS.has(request.params?.protocolVersion) ? request.params.protocolVersion : '2025-11-25';
-    result = { protocolVersion, capabilities: { tools: { listChanged: false } }, serverInfo: { name: 'nodus-server', version: '0.1.0', description: 'Read-only access to explicitly shared Nodus vaults, including Worldbuilding spaces.' }, instructions: 'Consult only spaces authorized for this user. Use nodus_list_spaces before querying a space and inspect its vault type. Shared data is read-only; use nodus_world_* tools for Worldbuilding spaces.' };
+    result = { protocolVersion, capabilities: { tools: { listChanged: false } }, serverInfo: { name: 'nodus-server', version: NODUS_VERSION, description: 'Read-only access to explicitly shared Nodus vaults, including Worldbuilding spaces.' }, instructions: 'Consult only spaces authorized for this user. Use nodus_list_spaces before querying a space and inspect its vault type. Shared data is read-only; use nodus_world_* tools for Worldbuilding spaces.' };
   } else if (request.method === 'tools/list') result = { tools: TOOLS };
   else if (request.method === 'tools/call') result = callTool(auth, request.params?.name, request.params?.arguments ?? {});
   else return json(res, 200, { jsonrpc: '2.0', id: request.id ?? null, error: { code: -32601, message: 'Method not found' } });
@@ -866,7 +868,12 @@ function languageReturnPath(req) {
   return store.state.users.length === 0 ? '/setup' : '/';
 }
 
-const corpusRoutes = createCorpusRoutes({ readSnapshot });
+// `readAssetBytes` is here for one route: the styled report document inlines its cover image
+// as a `data:` URL, because the client that prints it may not be able to fetch anything else.
+const corpusRoutes = createCorpusRoutes({
+  readSnapshot,
+  readAssetBytes: (spaceId, hash) => readAsset(store, spaceId, hash),
+});
 
 const apiRoutes = createApiRoutes({
   store, authorize, json, body, jsonBody, fs,
@@ -941,7 +948,7 @@ async function route(req, res) {
       'set-cookie': `nodus_language=${encodeURIComponent(selected)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000${secure}`,
     });
   }
-  if (url.pathname === '/healthz') return json(res, 200, { ok: true, service: 'nodus-server', version: '0.1.0', language: language() });
+  if (url.pathname === '/healthz') return json(res, 200, { ok: true, service: 'nodus-server', version: NODUS_VERSION, language: language() });
   if (url.pathname === '/.well-known/oauth-protected-resource' || url.pathname === '/.well-known/oauth-protected-resource/mcp') return json(res, 200, { resource: mcpResource(), authorization_servers: [publicUrl()], scopes_supported: ['profile', 'spaces.read', 'materials.read'], resource_documentation: `${publicUrl()}/` });
   // The client API is a separate protected resource from MCP: an AI client reads the corpus,
   // an app also writes to it, and a token for one must not be accepted by the other.

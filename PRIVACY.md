@@ -39,12 +39,16 @@ so a shared space hides the same debates the owner has already dismissed on thei
 them the server would present, to other people, connections the user had explicitly rejected. Each
 row records a rejected pair of ideas and an optional note.
 
-**Documents never travel; two kinds of image do.** No PDF, no audio and no recording is ever sent to
-Nodus Server: source PDFs live in Zotero's own storage outside the vault, and narration audio is a
-file on disk that is not part of the publication. The only binaries that travel are the illustration
-attached to a Deep Research report and a person's portrait, and only when the user has enabled
-sharing of authored content. Three independent mechanisms enforce this, and the server refuses any
-upload whose bytes are not a PNG, JPEG, WEBP or GIF image regardless of what the sender declared.
+**Documents never travel; three kinds of image do.** No PDF, no audio and no recording is ever sent
+to Nodus Server: source PDFs live in Zotero's own storage outside the vault, and narration audio is
+a file on disk that is not part of the publication. The only binaries that travel are the
+illustration attached to a Deep Research report, a person's portrait, and the images held in a
+database's attachment columns — and only when the user has enabled sharing of authored content.
+Three independent mechanisms enforce this, and the server refuses any upload whose bytes are not a
+PNG, JPEG, WEBP or GIF image regardless of what the sender declared. That last rule is what governs
+database attachments in particular: such a column accepts any file, so a photograph in one is
+published while a PDF, a video or an audio file in the same column is not — the row still records
+that the file exists and what it is called, and its bytes stay on the computer.
 
 **Connected vaults.** A user may create a vault that is a replica of a space on somebody else's
 Nodus Server. What their account may do there is decided by that server, not by the application:

@@ -1,3 +1,4 @@
+import { deepResearchReportInput, renderProfessionalReportHtml } from '../core/generated/deepResearchReport.mjs';
 // The read surface: everything a mobile client or a desktop replica asks the server for.
 //
 // Shape rule: every list answers with the same envelope the desktop MCP `page()` helper
@@ -107,23 +108,60 @@ const COLLECTIONS = {
   places: { table: 'places', key: 'places', id: 'place_id' },
   events: { table: 'events', key: 'events', id: 'event_id' },
   relationships: { table: 'relationships', key: 'relationships', id: 'id' },
-  // Study
-  'study-subjects': { table: 'study_subjects', key: 'subjects', id: 'subject_id' },
-  'study-courses': { table: 'study_courses', key: 'courses', id: 'course_id' },
-  'study-topics': { table: 'study_topics', key: 'topics', id: 'topic_id' },
-  'study-docs': { table: 'study_docs', key: 'docs', id: 'doc_id' },
-  'study-materials': { table: 'study_materials', key: 'materials', id: 'material_id' },
-  'study-flashcards': { table: 'study_flashcards', key: 'flashcards', id: 'card_id' },
-  'study-questions': { table: 'study_questions', key: 'questions', id: 'question_id' },
+  // Study.
+  //
+  // Every one of these is keyed on `id`, not on `<thing>_id`. The study and teaching
+  // migrations name their primary key `id` throughout (migrations.ts:1573 onwards), and
+  // declaring `subject_id`, `card_id` or `exam_id` here named a column none of these tables
+  // has. On this side the detail lookup fell through to `candidate.id` and worked by
+  // accident; on the client, where the same table is the contract, it meant an exam had no id
+  // to enrich by and no study row listed inside another dossier could be opened at all.
+  'study-subjects': { table: 'study_subjects', key: 'subjects', id: 'id' },
+  'study-courses': { table: 'study_courses', key: 'courses', id: 'id' },
+  'study-topics': { table: 'study_topics', key: 'topics', id: 'id' },
+  'study-docs': { table: 'study_docs', key: 'docs', id: 'id' },
+  'study-materials': { table: 'study_materials', key: 'materials', id: 'id' },
+  'study-flashcards': { table: 'study_flashcards', key: 'flashcards', id: 'id' },
+  'study-questions': { table: 'study_questions', key: 'questions', id: 'id' },
+  // What the week actually holds. `study_plan_blocks` has no collection of its own: a block
+  // outside its plan is a title and a timestamp, so it arrives inside the plan and inside the
+  // agenda instead of as a list nobody would browse.
+  'study-plans': { table: 'study_plans', key: 'plans', id: 'id' },
+  'study-goals': { table: 'study_goals', key: 'goals', id: 'id' },
+  'study-calendar': { table: 'study_calendar_events', key: 'events', id: 'id' },
   // Teaching materials. Rosters, groups and grades are not published at all, so there is
   // deliberately no collection that could ever serve them.
-  'teaching-exams': { table: 'teaching_exams', key: 'exams', id: 'exam_id' },
-  'teaching-rubrics': { table: 'teaching_rubrics', key: 'rubrics', id: 'rubric_id' },
+  'teaching-exams': { table: 'teaching_exams', key: 'exams', id: 'id' },
+  'teaching-rubrics': { table: 'teaching_rubrics', key: 'rubrics', id: 'id' },
   // Databases
   databases: { table: 'db_databases', key: 'databases', id: 'id' },
 };
 
-export function createCorpusRoutes({ readSnapshot, assetHashesFor }) {
+/**
+ * One saved draft, rendered as the styled document.
+ *
+ * The cover image is inlined as a `data:` URL: the document has to be printable by a client
+ * that may not be able to fetch anything else, and a page whose cover is a broken link is
+ * worse than one with no cover.
+ *
+ * The snapshot's asset entry carries a hash and no bytes — that is the whole point of the
+ * asset channel — so the bytes are read from the store here. Reading `image.dataUrl`, a field
+ * a snapshot asset has never had, is why every report the phone printed came out with the
+ * fallback motif where the desktop puts the illustration.
+ */
+function renderReportDocument(draft, image, readAssetBytes) {
+  return renderProfessionalReportHtml(deepResearchReportInput(draft, coverImage(image, readAssetBytes)));
+}
+
+function coverImage(image, readAssetBytes) {
+  const empty = { dataUrl: null, credit: null };
+  if (!image?.hash || typeof readAssetBytes !== 'function') return empty;
+  const asset = readAssetBytes(image.hash);
+  if (!asset?.bytes) return empty;
+  return { dataUrl: `data:${asset.mime};base64,${asset.bytes.toString('base64')}`, credit: null };
+}
+
+export function createCorpusRoutes({ readSnapshot, readAssetBytes }) {
   function requireSnapshot(res, json, spaceId) {
     const snapshot = readSnapshot(spaceId);
     if (!snapshot) {
@@ -239,7 +277,10 @@ export function createCorpusRoutes({ readSnapshot, assetHashesFor }) {
           person: row,
           names: involved('person_names', 'person_id'),
           places: involved('person_places', 'person_id'),
-          relationships: rows(snapshot, 'relationships').filter((entry) => String(entry.from_person_id) === personId || String(entry.to_person_id) === personId),
+          // `from_person`/`to_person`, which is what migration 1154 actually creates. Filtering
+          // on `*_person_id` matched nothing, so every person in every genealogy and
+          // prosopography vault came back with an empty relationships list.
+          relationships: rows(snapshot, 'relationships').filter((entry) => String(entry.from_person) === personId || String(entry.to_person) === personId),
           events: rows(snapshot, 'events').filter((entry) => eventIds.has(String(entry.event_id))),
           // Metadata only: the portrait's bytes live on the asset channel.
           portrait: rows(snapshot, 'person_portraits').find((entry) => String(entry.person_id) === personId) ?? null,
@@ -250,27 +291,103 @@ export function createCorpusRoutes({ readSnapshot, assetHashesFor }) {
       if (head === 'databases') {
         if (notModified(req, res, json, space, url, key)) return true;
         const databaseId = String(row.id);
-        const columns = rows(snapshot, 'db_columns').filter((entry) => String(entry.database_id) === databaseId);
-        const dbRows = rows(snapshot, 'db_rows').filter((entry) => String(entry.database_id) === databaseId);
-        const rowIds = new Set(dbRows.map((entry) => String(entry.id)));
+        const byPosition = (a, b) => (Number(a.position) || 0) - (Number(b.position) || 0);
+        // The user's own order, not the snapshot's. It matters twice over for rows: the page
+        // is cut *after* this sort, so serving snapshot order would make page two a different
+        // set of rows from the one the desktop shows.
+        const columns = rows(snapshot, 'db_columns').filter((entry) => String(entry.database_id) === databaseId).sort(byPosition);
+        const dbRows = rows(snapshot, 'db_rows').filter((entry) => String(entry.database_id) === databaseId).sort(byPosition);
         const limit = readLimit(url.searchParams.get('limit'));
         const offset = readOffset(url.searchParams.get('offset'));
         const page = dbRows.slice(offset, offset + limit);
         const pageIds = new Set(page.map((entry) => String(entry.id)));
+
+        // Which attachment's bytes actually travelled, by hash. An `attachment` column takes
+        // whatever the user dropped on it, and only images ride the asset channel
+        // (`ASSET_SOURCES` in electron/serverSync/serverSnapshot.ts) — so a row with a PDF
+        // still says it has a PDF, and says it has no image to show.
+        const images = new Map(
+          (Array.isArray(snapshot.assets) ? snapshot.assets : [])
+            .filter((asset) => asset.kind === 'db_attachment')
+            .map((asset) => [String(asset.key?.[0] ?? ''), asset])
+        );
+        const attachments = rows(snapshot, 'db_attachments')
+          .filter((entry) => pageIds.has(String(entry.row_id)))
+          .sort(byPosition)
+          .map((entry) => {
+            const asset = images.get(String(entry.id)) ?? null;
+            // `extracted_text` is the whole of a scanned document's text and nothing here
+            // renders it, so it stays in the snapshot — where the offline copy still has it —
+            // rather than riding along with every page of a gallery.
+            const { extracted_text: _text, ...rest } = entry;
+            return {
+              ...rest,
+              hash: asset?.hash ?? null,
+              // The grid draws the thumbnail and the row draws the full image; sending both
+              // hashes means a page of forty photographs costs forty thumbnails, not forty
+              // originals.
+              thumbHash: asset?.thumbHash ?? null,
+              imageMime: asset?.mime ?? null,
+            };
+          });
+
         return send(res, json, {
           database: row,
           columns,
-          views: rows(snapshot, 'db_views').filter((entry) => String(entry.database_id) === databaseId),
-          options: rows(snapshot, 'db_select_options').filter((entry) => columns.some((column) => String(column.id) === String(entry.column_id))),
+          views: rows(snapshot, 'db_views').filter((entry) => String(entry.database_id) === databaseId).sort(byPosition),
+          options: rows(snapshot, 'db_select_options').filter((entry) => columns.some((column) => String(column.id) === String(entry.column_id))).sort(byPosition),
           rows: page,
           // Only the cells of the page being served: a database with fifty thousand rows
           // would otherwise ship every value it has to render twenty of them.
           cells: rows(snapshot, 'db_cells').filter((entry) => pageIds.has(String(entry.row_id))),
+          // Same rule, same reason. A relation cell is a list of rows in `db_relations`, and
+          // without them a relation column renders as nothing at all.
+          relations: rows(snapshot, 'db_relations').filter((entry) => pageIds.has(String(entry.row_id))).sort(byPosition),
+          attachments,
           total: dbRows.length,
           limit,
           offset,
           hasMore: offset + page.length < dbRows.length,
-          attachments: rows(snapshot, 'db_attachments').filter((entry) => rowIds.has(String(entry.row_id))).length,
+          revision: space.revision,
+        });
+      }
+
+      // An exam is its questions. Without them the detail is a title, a language and a
+      // target count — which is what a teacher opening an exam on a phone got.
+      if (head === 'teaching-exams') {
+        if (notModified(req, res, json, space, url, key)) return true;
+        const examId = String(row.id);
+        const questions = rows(snapshot, 'teaching_exam_questions')
+          .filter((entry) => String(entry.exam_id) === examId)
+          .sort((a, b) => (Number(a.position) || 0) - (Number(b.position) || 0));
+        return send(res, json, {
+          exam: row,
+          questions,
+          // The two names the header prints. Sending the ids alone would make the client
+          // fetch two more rows to render one line.
+          subject: rows(snapshot, 'study_subjects').find((entry) => String(entry.id) === String(row.subject_id)) ?? null,
+          course: rows(snapshot, 'study_courses').find((entry) => String(entry.id) === String(row.course_id)) ?? null,
+          // `examTotalPoints` (shared/teachingExams.ts:290) to the letter: a `section` is a
+          // shared statement, not a question, and its mark is the sum of the sub-questions
+          // hanging from it. Counting its own points would print an exam worth more than it is.
+          points: questions.reduce(
+            (total, question) => (question.type === 'section' ? total : total + (Number(question.points) || 0)),
+            0
+          ),
+          revision: space.revision,
+        });
+      }
+
+      // A plan is its blocks, in the order they happen — not in snapshot order, which for a
+      // calendar is no order at all.
+      if (head === 'study-plans') {
+        if (notModified(req, res, json, space, url, key)) return true;
+        const planId = String(row.id);
+        return send(res, json, {
+          plan: row,
+          blocks: rows(snapshot, 'study_plan_blocks')
+            .filter((entry) => String(entry.plan_id) === planId)
+            .sort((a, b) => String(a.starts_at ?? '').localeCompare(String(b.starts_at ?? ''))),
           revision: space.revision,
         });
       }
@@ -351,13 +468,96 @@ export function createCorpusRoutes({ readSnapshot, assetHashesFor }) {
       const wanted = decodeURIComponent(rest[0]);
       const row = drafts.find((candidate) => String(candidate.id) === wanted);
       if (!row) return missing(res, json);
-      if (notModified(req, res, json, space, url, key)) return true;
       let draft = null;
       try { draft = JSON.parse(row.draft_json || 'null'); } catch { draft = null; }
+
+      // ── The styled document ───────────────────────────────────────────────
+      //
+      // `.../deep-research/<id>/document.html` is the report laid out the way the desktop
+      // lays it out for print: cover, contents, section rules, traceability matrix, `@page`
+      // box. The design is `shared/professionalReport.ts`, compiled into
+      // `lib/core/generated/` so this process needs no dependency and no build to serve it.
+      //
+      // HTML rather than PDF because printing needs a browser, and this server is a hundred
+      // and fifty megabytes of Alpine and Node with nothing else in it. The client that asks
+      // for this has a browser engine already; it prints the page it is given.
+      if (rest[1] === 'document.html') {
+        if (!draft) return missing(res, json);
+        const image = assets.get(wanted) ?? null;
+        let html;
+        try {
+          html = renderReportDocument(draft, image, (hash) => readAssetBytes?.(space.id, hash));
+        } catch (error) {
+          // A draft written by an older Nodus, or by something that is not Nodus, can be
+          // missing a field the layout reads. That is a document this server cannot lay out,
+          // not a broken server — and saying so is what stops the client showing "could not
+          // build the PDF" with a stack trace inside it.
+          json(res, 422, {
+            error: 'unrenderable_draft',
+            error_description: `This report cannot be laid out for printing: ${error.message}`,
+          });
+          return true;
+        }
+        const bytes = Buffer.from(html, 'utf8');
+        res.writeHead(200, {
+          'content-type': 'text/html; charset=utf-8',
+          'content-length': bytes.length,
+          'cache-control': 'private, max-age=0, must-revalidate',
+          etag: `W/"${space.revision}|${wanted}|document"`,
+        });
+        if (req.method === 'HEAD') res.end();
+        else res.end(bytes);
+        return true;
+      }
+
+      if (notModified(req, res, json, space, url, key)) return true;
       return send(res, json, {
         report: { ...draftSummary(row), draft },
         image: assets.get(wanted) ?? null,
         translations: rows(snapshot, 'content_translations').filter((entry) => entry.entity_kind === 'deep_research' && String(entry.entity_id) === wanted),
+        revision: space.revision,
+      });
+    }
+
+    // ── The agenda ────────────────────────────────────────────────────────────
+    //
+    // `GET .../study-agenda?from=&to=` — what a study or teaching vault actually has on,
+    // from the two tables that carry a moment in time: the calendar and the blocks of a
+    // study plan.
+    //
+    // A resource rather than two collections, for two reasons. A collection answers in
+    // snapshot order, which for a calendar is no order at all; and a phone asking "what have
+    // I got this fortnight" should not download every block ever planned to find out. Both
+    // lists come back sorted by `starts_at` and cut to the window.
+    //
+    // The subjects ride along because every row here names one by id and nothing else, and
+    // one small table beside the answer is cheaper than a request per row — the same reason
+    // an author's works travel inside the author.
+    if (head === 'study-agenda' && rest.length === 0) {
+      const snapshot = requireSnapshot(res, json, space.id);
+      if (!snapshot) return true;
+      if (notModified(req, res, json, space, url, key)) return true;
+
+      // ISO-8601 sorts and compares lexicographically, which is the whole reason these
+      // columns are stored as text.
+      const from = url.searchParams.get('from') || '';
+      const to = url.searchParams.get('to') || '';
+      const inWindow = (value) => {
+        const at = String(value ?? '');
+        if (!at) return false;
+        return (!from || at >= from) && (!to || at <= to);
+      };
+      const byStart = (a, b) => String(a.starts_at ?? '').localeCompare(String(b.starts_at ?? ''));
+      const limit = readLimit(url.searchParams.get('limit'));
+
+      const events = rows(snapshot, 'study_calendar_events').filter((row) => inWindow(row.starts_at)).sort(byStart);
+      const blocks = rows(snapshot, 'study_plan_blocks').filter((row) => inWindow(row.starts_at)).sort(byStart);
+      return send(res, json, {
+        events: events.slice(0, limit),
+        blocks: blocks.slice(0, limit),
+        subjects: rows(snapshot, 'study_subjects').map((row) => ({ id: row.id, name: row.name, color: row.color ?? null })),
+        total: events.length + blocks.length,
+        hasMore: events.length > limit || blocks.length > limit,
         revision: space.revision,
       });
     }
