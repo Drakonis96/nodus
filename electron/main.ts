@@ -18,6 +18,8 @@ import { startRealtimeSync, stopRealtimeSync } from './sync/syncService';
 import { startNodusServerSync, stopNodusServerSync } from './serverSync/serverSyncService';
 import { startReplicaSync, stopReplicaSync } from './serverSync/replicaService';
 import { killMcpTunnelSync, startMcpServer, startMcpTunnelIfConfigured, stopMcpServer } from './mcp';
+import { killLocalServerSync, startLocalServerIfEnabled } from './localServer/process';
+import { holdAwake, releaseAllPower } from './localServer/power';
 import { setCopilotWindowProvider, startCopilotServer, stopCopilotServer } from './copilot/server';
 import { setZoteroPluginWindowProvider, startZoteroPluginServer, stopZoteroPluginServer } from './zotero-plugin/server';
 import { applyMascotWindow, destroyMascotWindow, setMascotTutorialVisible } from './mascotWindow';
@@ -664,6 +666,11 @@ app.whenReady().then(() => {
   // happens to be open, exactly like the publisher already does.
   startReplicaSync();
   if (settings.mcpEnabled) void startMcpServer().then(() => startMcpTunnelIfConfigured());
+  // Basic mode: the Nodus Server the user chose to run on this computer, plus whichever sleep
+  // defence they left held. Both are fire-and-forget — a server that will not start is a
+  // message in Settings, not a reason to hold up the window.
+  void startLocalServerIfEnabled();
+  if (settings.localServerKeepAwake) holdAwake();
   if (settings.copilotEnabled) void startCopilotServer();
   if (settings.zoteroPluginEnabled) void startZoteroPluginServer();
   // Nodi mascot: open the always-on-top desktop window when the user has opted into it.
@@ -728,6 +735,10 @@ app.on('before-quit', () => {
   stopReplicaSync();
   interruptDecorativeImageGenerations();
   killMcpTunnelSync();
+  // The local server is a child process and the sleep defences are machine-wide state: both
+  // have to be let go here, or quitting leaves an orphan serving and a laptop that cannot sleep.
+  killLocalServerSync();
+  releaseAllPower();
   void stopMcpServer();
   void stopCopilotServer();
   void stopZoteroPluginServer();
@@ -750,6 +761,10 @@ updateAwareApp.on('before-quit-for-update', () => {
   interruptDecorativeImageGenerations();
   stopAllWhisperCpp();
   killMcpTunnelSync();
+  // The local server is a child process and the sleep defences are machine-wide state: both
+  // have to be let go here, or quitting leaves an orphan serving and a laptop that cannot sleep.
+  killLocalServerSync();
+  releaseAllPower();
   void stopMcpServer();
   void stopCopilotServer();
   void stopZoteroPluginServer();

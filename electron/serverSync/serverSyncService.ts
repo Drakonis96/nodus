@@ -95,6 +95,16 @@ function tooLargeMessage(config: VaultServerConfig, serverError: string, rawByte
   return `${serverError || 'El servidor ha rechazado la publicación por su tamaño.'} ${size} ${lever}`;
 }
 
+/** Whether this address names this very machine, and so never crosses a network. */
+export function isLoopbackUrl(value: string): boolean {
+  try {
+    const hostname = new URL(value).hostname;
+    return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' || hostname === '[::1]';
+  } catch {
+    return false;
+  }
+}
+
 function normalizeUrl(value: string): string {
   const clean = value.trim().replace(/\/+$/, '');
   let parsed: URL;
@@ -574,7 +584,12 @@ export async function pairNodusServer(urlValue: string, code: string): Promise<N
     });
     const result = await response.json().catch(() => ({})) as { accessToken?: string; error?: string; space?: { id: string; name: string }; server?: { name: string; publicUrl: string; language?: AppLanguage } };
     if (!response.ok || !result.accessToken || !result.space) throw new Error(result.error || `El servidor respondió con HTTP ${response.status}.`);
-    const pairedUrl = normalizeUrl(result.server?.publicUrl || url);
+    // A server states its own public URL, and normally that is the address worth keeping: the
+    // domain people type is not necessarily the one used to pair. The exception is a server on
+    // this very machine — basic mode — whose public URL names how *other devices* reach it, over
+    // a certificate this process cannot validate. Pairing over loopback means the caller wants
+    // the loopback channel, so it keeps it.
+    const pairedUrl = isLoopbackUrl(url) ? url : normalizeUrl(result.server?.publicUrl || url);
     // Pairing always targets the currently open vault, so the active-vault token wrapper
     // and updateSettings both write to the right place.
     setNodusServerToken(result.accessToken);

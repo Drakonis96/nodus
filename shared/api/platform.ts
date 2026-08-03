@@ -37,6 +37,9 @@ import type {
   ModelInfo,
   NodusServerOverview,
   NodusServerPairResult,
+  LocalServerStatus,
+  LocalServerTailscale,
+  LocalServerPowerStatus,
   OpenCodeGoUsageStatus,
   StudyAudioBookmark,
   StudyAudioPlaylistItem,
@@ -65,6 +68,28 @@ export interface PlatformApi {
   setNodusServerLanguage(language: AppLanguage, vaultId?: string): Promise<NodusServerOverview>;
   syncNodusServerVaultNow(vaultId: string): Promise<NodusServerOverview>;
   disconnectNodusServerVault(vaultId: string): Promise<NodusServerOverview>;
+  // ── Nodus Server, basic mode: the server runs on this computer ──────────
+  getLocalServerStatus(): Promise<LocalServerStatus>;
+  /** Start it and remember the preference, so it comes back with the app. */
+  startLocalServer(): Promise<LocalServerStatus>;
+  stopLocalServer(): Promise<LocalServerStatus>;
+  /** Re-launch with the current port and access path. */
+  restartLocalServer(): Promise<LocalServerStatus>;
+  /** Give the open vault a space on the local server and pair with it, in one step. */
+  connectVaultToLocalServer(): Promise<NodusServerPairResult>;
+  /** Ask Tailscale to publish (or stop publishing) the local server to the tailnet. */
+  setLocalServerTailscaleServe(enable: boolean): Promise<LocalServerTailscale>;
+  /**
+   * The generated password for the local server's own web administration.
+   *
+   * Its own call rather than a field on the status object: that one is polled on a timer, and a
+   * password has no business riding a wire nobody asked to open.
+   */
+  getLocalServerAdminPassword(): Promise<string | null>;
+  getLocalServerPower(): Promise<LocalServerPowerStatus>;
+  setLocalServerKeepAwake(enable: boolean): Promise<LocalServerPowerStatus>;
+  /** Disable system sleep so a closed lid keeps serving. Raises the system's own admin dialog. */
+  setLocalServerLidServing(enable: boolean): Promise<LocalServerPowerStatus>;
   getCopilotStatus(): Promise<CopilotServerStatus>;
   regenerateCopilotToken(): Promise<string>;
   /** Runtime state of the opt-in local server for the Nodus-for-Zotero plugin. */

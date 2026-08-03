@@ -93,6 +93,8 @@ import {
   syncReplicaNow,
   type RemoteSpaceOption,
 } from './serverSync/replicaService';
+import { restartLocalServer } from './localServer/process';
+import { forwardOutlivedSetting, stopTailscaleServe } from './localServer/tailscale';
 import { scanQueue } from './pipeline/scanQueue';
 import {
   getRecoveryStatus,
@@ -326,6 +328,19 @@ export function registerIpc(
       patch.nodusServerIncludeVectors !== undefined
     ) {
       restartNodusServerSync();
+    }
+    // The port and the access path decide which addresses the local server binds and whether it
+    // presents a certificate at all, so a running one has to come back up under the new setting.
+    // Without this a switch to the local-network path would leave it quietly loopback-only.
+    if (patch.localServerPort !== undefined || patch.localServerAccess !== undefined) {
+      // Leaving Tailscale — or moving to another port while on it — has to take the forward down
+      // with it, against the port it was actually configured for, which is the previous one.
+      const before = { access: previous.localServerAccess, port: previous.localServerPort };
+      const after = { access: next.localServerAccess, port: next.localServerPort };
+      if (forwardOutlivedSetting(before, after)) {
+        void stopTailscaleServe(before.port).catch(() => undefined);
+      }
+      if (next.localServerEnabled) void restartLocalServer();
     }
     if (patch.copilotEnabled !== undefined || patch.copilotPort !== undefined) {
       if (next.copilotEnabled) await restartCopilotServer();

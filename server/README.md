@@ -8,7 +8,45 @@ Nodus Server allows you to share a Vault projection with students or researchers
 of Nodus Desktop: the server lives on Docker and the desktop application only makes outgoing HTTPS
 connections. The local MCP port is not published and the original SQLite base is not copied.
 
-## What you need
+## Two ways to run it
+
+**Basic — this computer.** Nodus Desktop starts this exact server itself, as a child process, and
+does the whole setup for you. No Docker, no domain, no DNS, no reverse proxy, no port forwarding.
+Turn it on in **Settings → Nodus Server → Basic**. This is the right choice if what you want is to
+open your own vault from your own phone or tablet. The rest of this document describes the other
+one; the basic mode has no manual steps and is documented in the application itself.
+
+Two things are worth knowing before you pick it. The server runs only while Nodus Desktop is open —
+quit Nodus and it stops, by design, so nothing is left running in the background without you
+knowing. And a sleeping computer answers nothing, which is why the panel offers to hold the machine
+awake.
+
+Devices reach a basic-mode server one of two ways, and both are encrypted:
+
+- **Tailscale** (recommended). Nodus detects it, and one button runs
+  `tailscale serve --bg --https=443 http://127.0.0.1:7443`. You get a real Let's Encrypt
+  certificate for a name like `laptop.tail1234.ts.net`, reachable only from devices signed in to
+  your own tailnet, with no port opened on your router and no certificate warning to click through.
+  It works from anywhere, not only from home. That forward is configuration held by the Tailscale
+  daemon, and it outlives this application and a reboot — so Nodus takes it down again whenever you
+  stop the server or choose a different access path. "Nobody else can reach this" has to be true at
+  the moment the panel says it.
+- **Local network.** Nodus generates a certificate authority and a certificate naming this
+  machine's private addresses, and serves HTTPS on them. The first visit from each device shows a
+  warning, because the certificate was not signed by an authority the browser already knows — the
+  application shows the CA fingerprint so you can check it against what the browser reports before
+  you type anything. Carry the laptop to a different network and Nodus notices the addresses have
+  changed, re-cuts the certificate and rebinds to the new ones. The authority itself is never
+  reissued, so a phone that trusted it once is not asked to trust it again.
+
+There is deliberately **no unencrypted option**. Serving over plain HTTP on a wifi network would put
+the password protecting your work in the clear, and that is what these two paths exist to avoid.
+
+One consequence for anyone editing this server: the basic mode runs it on the Node that ships inside
+Electron, which trails the current release. `engines` records the floor that is actually exercised —
+a Node 22-only API would compile, pass the Docker tests, and break basic mode silently.
+
+## What you need for the advanced mode
 
 - A computer that remains on or a VPS with Windows, macOS or Linux.
 - Docker Desktop (Windows/macOS) or Docker Engine with Compose (Linux) plugin.
@@ -260,6 +298,27 @@ operations for overview, grounded world search, paginated entity lists, full ent
 the ordered manuscript. `nodus_list_spaces` reports the published vault type so a client can choose
 the correct tool family. The local Desktop MCP has a broader Worldbuilding surface and may create or
 edit author-owned records, but it still exposes no destructive delete operation.
+
+## Environment variables the basic mode uses
+
+These exist for Nodus Desktop's basic mode and are unset in every Docker deployment. They are
+documented here because they change what the server binds and who it will answer.
+
+- `NODUS_HOST` accepts a comma-separated list, binding the main listener to several addresses. The
+  basic mode's local-network path names this machine's private addresses individually rather than
+  `0.0.0.0`, so the loopback listener below can hold the same port.
+- `NODUS_TLS_CERT_FILE` + `NODUS_TLS_KEY_FILE` serve TLS directly instead of behind a proxy. They
+  must be set together: half a pair stops the boot rather than quietly falling back to cleartext.
+- `NODUS_LOOPBACK_PORT` opens a second, plain-HTTP listener on 127.0.0.1 only, and is refused
+  unless TLS is configured. It exists so the desktop can publish into a server whose self-signed
+  certificate it has no way to validate — loopback never leaves the machine, so there is nothing on
+  that path to encrypt against.
+- `NODUS_LOCAL_PROVISION_FILE` writes a per-boot secret, mode 0600, that unlocks
+  `POST /api/v1/local/provision`. That route creates a space and a pairing code for one vault, so
+  the desktop does not have to drive the web administration to connect itself. Two independent
+  gates guard it: the caller must have read a file only this operating-system user can open, **and**
+  must have arrived over loopback — the correct secret presented from the local network gets a 404.
+  Without this variable the route does not exist at all.
 
 ## Security and operation
 
