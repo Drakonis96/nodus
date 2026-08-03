@@ -10,9 +10,13 @@ import {
   assetExists, collectAssetGarbage, hashBytes, isValidAssetHash, readAsset, snapshotAssetHashes, sniffImageMime, writeAsset,
 } from '../assets.mjs';
 import { MAX_MUTATION_BATCH, validateMutation } from '../core/mutations.mjs';
+import {
+  MAX_NODI_NOTES, mergeNodiNotes, notesSince, validateNodiNote,
+} from '../core/nodiNotes.mjs';
 import { decodeVectorSet, embeddingMatches, searchVectors } from '../core/vectors.mjs';
 import { lexicalSearch } from '../core/search.mjs';
 import { rows } from '../core/snapshot.mjs';
+import { NODUS_VERSION } from '../version.mjs';
 
 const AUTH_BODY_BYTES = 32 * 1024;
 const TICKET_TTL_MS = 5 * 60_000;
@@ -53,7 +57,11 @@ export function createApiRoutes(ctx) {
   function capabilities() {
     return {
       api: 'v1',
-      server: { name: store.state.settings.name, publicUrl: publicUrl(), language: language() },
+      // The release this server is running. The desktop, the phone and this process ship as
+      // one version, so a client that shows both side by side turns "it stopped working" into
+      // "these two are not the same release".
+      version: NODUS_VERSION,
+      server: { name: store.state.settings.name, publicUrl: publicUrl(), language: language(), version: NODUS_VERSION },
       snapshotVersions: [1, 2],
       assets: true,
       mutations: true,
@@ -542,6 +550,70 @@ export function createApiRoutes(ctx) {
     return true;
   }
 
+  // ── Nodi's quick notes ────────────────────────────────────────────────────
+
+  const NODI_NOTES_BODY_BYTES = 8 * 1024 * 1024;
+
+  /** `?since=` in epoch milliseconds, so a client can ask only for what changed. */
+  function sinceParam(url) {
+    const raw = url.searchParams.get('since');
+    if (raw === null || raw === '') return Number.NaN;
+    const value = Number(raw);
+    return Number.isFinite(value) ? value : Number.NaN;
+  }
+
+  function getNodiNotes(req, res, url) {
+    const auth = authorize(req, res, { via: ['device', 'oauth'], resource: 'api', scope: 'materials.read' });
+    if (!auth) return true;
+    const notes = store.readNodiNotes(auth.user.id);
+    json(res, 200, {
+      notes: notesSince(notes, sinceParam(url)),
+      total: notes.filter((note) => note.deletedAt === null).length,
+      // The client's clock is not the server's, and `since` is compared against the
+      // server's. Handing back the reference it should send next time is what keeps a
+      // skewed device from re-reading everything or, worse, missing a note.
+      serverTime: Date.now(),
+    });
+    return true;
+  }
+
+  async function postNodiNotes(req, res, url) {
+    const auth = authorize(req, res, { via: ['device', 'oauth'], resource: 'api', scope: 'materials.write' });
+    if (!auth) return true;
+    // One person's own notes, so the limit is about a runaway client rather than abuse.
+    if (!rateLimit(req, res, 'nodi-notes', 120, 60_000)) return true;
+
+    const input = await jsonBody(req, NODI_NOTES_BODY_BYTES);
+    const incoming = Array.isArray(input?.notes) ? input.notes : null;
+    if (!incoming) {
+      json(res, 400, { error: 'malformed', error_description: 'Send { notes: [...] }.' });
+      return true;
+    }
+    if (incoming.length > MAX_NODI_NOTES) {
+      json(res, 413, { error: 'too_many', error_description: `At most ${MAX_NODI_NOTES} notes per request.` });
+      return true;
+    }
+
+    const now = Date.now();
+    const accepted = [];
+    const rejected = [];
+    for (const value of incoming) {
+      const { note, error } = validateNodiNote(value, now);
+      if (note) accepted.push(note);
+      else rejected.push({ id: String(value?.id ?? ''), reason: error });
+    }
+
+    const merged = mergeNodiNotes(store.readNodiNotes(auth.user.id), accepted, now);
+    store.writeNodiNotes(auth.user.id, merged);
+    json(res, 200, {
+      notes: notesSince(merged, sinceParam(url)),
+      total: merged.filter((note) => note.deletedAt === null).length,
+      rejected,
+      serverTime: now,
+    });
+    return true;
+  }
+
   // ── Dispatch ──────────────────────────────────────────────────────────────
 
   async function handle(req, res, url) {
@@ -564,6 +636,19 @@ export function createApiRoutes(ctx) {
         device: auth.device ? { name: auth.device.deviceName, kind: auth.device.kind ?? 'publisher', spaceId: auth.device.spaceId, expiresAt: auth.device.expiresAt ?? null } : null,
         server: capabilities().server,
       });
+      return true;
+    }
+
+    // ── Nodi's quick notes ────────────────────────────────────────────────
+    //
+    // The only resource here that is not a space. Nodi is the companion, and its notes are
+    // shared across every vault a person opens, so they hang off the account: the same
+    // device token authorises them, by the user it was issued to rather than by the space
+    // it was scoped to.
+    if (segments.length === 2 && segments[0] === 'nodi' && segments[1] === 'notes') {
+      if (req.method === 'GET') return getNodiNotes(req, res, url);
+      if (req.method === 'POST') return postNodiNotes(req, res, url);
+      json(res, 405, { error: 'method_not_allowed' });
       return true;
     }
 

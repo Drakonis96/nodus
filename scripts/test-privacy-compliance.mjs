@@ -265,18 +265,31 @@ test('public copy matches the no-AI-student-evaluation product boundary', async 
   }
 });
 
-test('only two tables can ever produce a published image, and no document can', async () => {
+test('only three tables can ever produce a published image, and no document can', async () => {
   const snapshot = await read('electron/serverSync/serverSnapshot.ts');
   // ASSET_SOURCES is the single code path that turns a database blob into something the
   // server can receive. Anything added to it becomes publishable, so its size is pinned.
-  const sources = snapshot.slice(snapshot.indexOf('export const ASSET_SOURCES'), snapshot.indexOf('MAX_ASSET_BYTES'));
-  assert.equal((sources.match(/table: '/g) ?? []).length, 2, 'exactly two tables may produce an asset');
+  const sources = snapshot.slice(snapshot.indexOf('export const ASSET_SOURCES'), snapshot.indexOf('const IMAGE_SIGNATURES'));
+  assert.ok(sources.length > 0, 'the ASSET_SOURCES block was not found — this test is reading nothing');
+  assert.equal((sources.match(/table: '/g) ?? []).length, 3, 'exactly three tables may produce an asset');
   assert.match(sources, /table: 'decorative_images'/);
   assert.match(sources, /table: 'person_portraits'/);
   assert.match(sources, /entity_kind = 'deep_research'/, 'immersion illustrations are not published');
+
+  // The third source is the one that needs watching. An attachment column takes any file the
+  // user drops on it, so it may only be read under a size ceiling applied in SQL — before the
+  // blob is loaded, which is the difference between skipping a 5 GB video and reading it.
+  // What makes it safe at all is the sniffer, asserted at the bottom of this test.
+  assert.match(sources, /table: 'db_attachments'/);
+  assert.match(
+    sources,
+    /kind: 'db_attachment',[\s\S]*?where: `blob IS NOT NULL AND length\(blob\) > 0 AND length\(blob\) <= \$\{MAX_ASSET_BYTES\}`/,
+    'database attachments are read only under the size ceiling, in SQL'
+  );
+
   // Audio metadata lives in audio_clips and the files themselves on disk; a work's PDF is
   // outside the vault entirely. Neither may appear as a source of publishable bytes.
-  for (const forbidden of ['audio_clips', 'study_recordings', 'study_materials', 'archive_item_files', 'db_attachments']) {
+  for (const forbidden of ['audio_clips', 'study_recordings', 'study_materials', 'archive_item_files']) {
     assert.doesNotMatch(sources, new RegExp(`table: '${forbidden}'`));
   }
   // The server refuses by content, not by declaration, and WAV must not pass as WEBP.

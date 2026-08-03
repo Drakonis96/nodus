@@ -95,8 +95,10 @@ export const STUDY_SERVER_TABLES = [
  * A Notion-style databases vault: the shape and the values, not the files.
  *
  * `db_attachments` is included for its metadata — a reader can see that a row has a file and
- * what it is called — while its `blob` and `thumb` are stripped on the way out. An attachment
- * can be a PDF or a 5 GB photo, and those are exactly what must never reach the server.
+ * what it is called — while its `blob` and `thumb` are stripped on the way out, as every
+ * binary is. The images among them travel on the asset channel instead, by hash, under the
+ * sniffer and the size ceiling (`ASSET_SOURCES` above); a PDF or a 5 GB video is metadata here
+ * and nothing anywhere else.
  */
 export const DATABASES_SERVER_TABLES = [
   'db_databases', 'db_columns', 'db_rows', 'db_cells', 'db_views', 'db_select_options', 'db_relations',
@@ -116,12 +118,30 @@ const OMIT_COLUMNS = new Set([
 // passages as indexed, so the library said "ready" over a corpus with no vectors at all.
 
 /**
+ * Matches the server's own ceiling; an oversized image is skipped, never fatal.
+ *
+ * Declared before `ASSET_SOURCES` because one of them reads it: a source whose rows are not
+ * images by construction applies the ceiling in SQL, and a `const` used inside an array
+ * literal has to exist by the time that literal is evaluated.
+ */
+export const MAX_ASSET_BYTES = 8 * 1024 * 1024;
+
+/**
  * The ONLY code path that turns a database blob into something the server can receive.
  *
- * The product rule is that heavy documents never travel — no PDFs, no audio — while two
- * kinds of image do: the illustration on a Deep Research report, and a person's portrait.
- * Rather than scan for blob columns and try to exclude the wrong ones, this list names the
- * two tables that may produce an asset. Nothing else is even looked at.
+ * The product rule is that heavy documents never travel — no PDFs, no audio — while three
+ * kinds of image do: the illustration on a Deep Research report, a person's portrait, and the
+ * pictures in a database's attachment columns. Rather than scan for blob columns and try to
+ * exclude the wrong ones, this list names the three tables that may produce an asset. Nothing
+ * else is even looked at.
+ *
+ * The third one is different in kind from the first two, and worth saying out loud: a Deep
+ * Research illustration and a portrait are images by construction, while an attachment column
+ * holds whatever the user dropped on it. It is admitted here on the strength of the two rules
+ * that follow it — the sniffer, which passes four image formats and refuses everything else
+ * including a PDF and a WAV, and a size ceiling applied in SQL before any blob is read. A
+ * database of scanned documents therefore publishes its metadata and none of its documents,
+ * which is the same answer as before; a database of photographs publishes its photographs.
  *
  * It is also why TTS audio and source PDFs are safe by construction rather than by filter:
  * narration is a loose .wav under <vault>/audio/ with only metadata in SQLite, and a work's
@@ -148,10 +168,31 @@ export const ASSET_SOURCES = [
     thumbColumn: 'thumbnail',
     thumbMimeColumn: 'thumbnail_mime',
   },
+  {
+    // The images in a database's `attachment` and `ai_image` columns.
+    //
+    // This is the one source where the row itself decides whether it may travel: an
+    // attachment column takes anything the user drops on it, and that is explicitly allowed
+    // to be a PDF or a five-gigabyte photograph. The sniffer already refuses everything that
+    // is not one of four image formats, so a PDF is skipped rather than shipped; the `where`
+    // adds the size ceiling *before* the blob is read, because the point of a ceiling that
+    // only applies after loading a 5 GB column is hard to defend.
+    //
+    // What does not travel still travels as metadata: `db_attachments` is in
+    // DATABASES_SERVER_TABLES, so a reader sees that a row has a file and what it is called
+    // even when its bytes stayed at home.
+    kind: 'db_attachment',
+    table: 'db_attachments',
+    keyColumns: ['id'],
+    where: `blob IS NOT NULL AND length(blob) > 0 AND length(blob) <= ${MAX_ASSET_BYTES}`,
+    blobColumn: 'blob',
+    mimeColumn: 'mime_type',
+    thumbColumn: 'thumb',
+    // There is no thumbnail mime column here; the sniffer derives it from the bytes, which
+    // is what it does for every source anyway.
+    thumbMimeColumn: 'thumb_mime',
+  },
 ] as const;
-
-/** Matches the server's own ceiling; an oversized image is skipped, never fatal. */
-export const MAX_ASSET_BYTES = 8 * 1024 * 1024;
 
 const IMAGE_SIGNATURES: { mime: string; test: (bytes: Buffer) => boolean }[] = [
   { mime: 'image/png', test: (b) => b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) },

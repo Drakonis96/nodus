@@ -264,14 +264,20 @@ the other. An AI client reads; only an application can write.
 
 ### Images, and what never travels
 
-Documents never reach the server. No PDFs, no audio, no recordings. Two kinds of image do: the
-illustration attached to a Deep Research report, and a person's portrait. Three independent layers
-enforce that, and each would be sufficient alone:
+Documents never reach the server. No PDFs, no audio, no recordings. Three kinds of image do: the
+illustration attached to a Deep Research report, a person's portrait, and the pictures in a
+database's attachment columns. Three independent layers enforce that, and each would be sufficient
+alone:
 
-1. the desktop reads images from exactly two whitelisted tables and nothing else;
+1. the desktop reads images from exactly three whitelisted tables and nothing else;
 2. no binary can ride inside the publication JSON at all;
 3. the server sniffs the bytes of every upload and refuses anything that is not PNG, JPEG, WEBP or
    GIF — including a WAV, which shares its first four bytes with WEBP.
+
+The third table is the only one whose rows are not images by construction — an attachment column
+takes whatever file the user dropped on it — so for that source layer 3 is what decides. A database
+of photographs publishes its photographs; a database of scanned PDFs publishes their names, their
+sizes and nothing else. A ceiling of 8 MiB per file applies before any blob is read.
 
 Images are addressed by the SHA-256 of their content, so republishing an unchanged corpus re-uploads
 none of them. Unreferenced images are swept after a grace period.
