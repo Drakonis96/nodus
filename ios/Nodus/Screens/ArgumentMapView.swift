@@ -43,6 +43,7 @@ struct ArgumentMapView: View {
         }
         .navigationTitle("Argument map")
         .navigationBarTitleDisplayMode(.inline)
+        .nodusPageBackdrop(accent: session.accent)
         .toolbar {
             if map != nil {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -207,22 +208,42 @@ private struct ArgumentSeedPicker: View {
 
     var body: some View {
         List {
-            Section {
-                HStack(spacing: 9) {
-                    Image(systemName: "magnifyingglass").foregroundStyle(session.accent)
-                    TextField("Find the idea to start from", text: $query)
-                        .textFieldStyle(.plain)
-                        .autocorrectionDisabled()
-                        .submitLabel(.search)
-                }
-                .listRowBackground(Color.clear)
-            } footer: {
-                Text("The map grows from one idea, following the relations the analysis found: what supports it, what refines it, and what argues against it.")
+            HStack(spacing: 9) {
+                Image(systemName: "magnifyingglass").foregroundStyle(session.accent)
+                TextField("Find the idea to start from", text: $query)
+                    .textFieldStyle(.plain)
+                    .autocorrectionDisabled()
+                    .submitLabel(.search)
             }
+            .listRowBackground(Color.clear)
+
+            // An ordinary row rather than a section footer: a footer keeps the list's own
+            // opaque backing, which over the accent backdrop drew as a black band across the
+            // one sentence this screen most wants read.
+            Text("The map grows from one idea, following the relations the analysis found: what supports it, what refines it, and what argues against it.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
 
             if let error {
                 NodusNotice(tone: .blocked, title: "Could not load the ideas", message: LocalizedStringKey(error))
                     .listRowBackground(Color.clear)
+            }
+
+            // A screen whose only content is a sentence about what the map does, held for as
+            // long as a corpus of ten thousand ideas takes to answer, reads as a screen that
+            // has failed. It is fetching; it should say so.
+            if isLoading, rows.isEmpty {
+                HStack(spacing: 10) {
+                    ProgressView().tint(session.accent)
+                    Text("Reading the ideas in this space…")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.vertical, 24)
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
             }
 
             ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
@@ -239,6 +260,7 @@ private struct ArgumentSeedPicker: View {
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                     }
+                    .listRowBackground(Color.clear)
                 }
             }
 

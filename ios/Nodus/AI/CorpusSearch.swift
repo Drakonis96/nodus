@@ -46,6 +46,13 @@ struct CorpusSearch: Sendable {
         /// Why the search was not semantic — shown whenever there is one, because "no results"
         /// from a lexical search is a claim about spelling, not about the corpus.
         var warning: String?
+        /// The same reason, still typed.
+        ///
+        /// `warning` is a sentence built inside NodusAI, which carries no string catalogue, so
+        /// it reaches the screen in English on a Spanish phone. Keeping the case beside it lets
+        /// the app say the same thing in the user's language and fall back to the sentence for
+        /// anything that is not one of these three.
+        var unavailability: EmbeddingService.Unavailability?
     }
 
     func run(_ query: String, limit: Int = 50) async throws -> Outcome {
@@ -54,7 +61,12 @@ struct CorpusSearch: Sendable {
             return Outcome(hits: try await lexicalHits(query, limit), mode: .lexical, warning: nil)
         }
         if case .failure(let reason) = availability(identity) {
-            return Outcome(hits: try await lexicalHits(query, limit), mode: .lexical, warning: reason.explanation)
+            return Outcome(
+                hits: try await lexicalHits(query, limit),
+                mode: .lexical,
+                warning: reason.explanation,
+                unavailability: reason
+            )
         }
 
         let vector: [Float]

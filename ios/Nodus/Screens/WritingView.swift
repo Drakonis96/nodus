@@ -13,11 +13,16 @@ struct WritingView: View {
 
     @State private var controller: OutboxController?
     @State private var composing = false
+    /// Nil until the queue has been opened. Without it the read-only empty state flashed on
+    /// every entry, because "no controller yet" and "not allowed one" looked the same.
+    @State private var isOpening = true
 
     var body: some View {
         Group {
             if let controller {
                 list(controller)
+            } else if isOpening {
+                ProgressView().tint(session.accent).frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ContentUnavailableView(
                     "Read-only access",
@@ -26,8 +31,9 @@ struct WritingView: View {
                 )
             }
         }
-        .navigationTitle("Writing")
+        .navigationTitle("Send queue")
         .navigationBarTitleDisplayMode(.inline)
+        .nodusPageBackdrop(accent: session.accent)
         .toolbar {
             if controller != nil {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -42,7 +48,8 @@ struct WritingView: View {
             }
         }
         .task {
-            if controller == nil { controller = OutboxController(session: session) }
+            if controller == nil { controller = await OutboxController.open(session: session) }
+            isOpening = false
             await controller?.refresh()
         }
     }

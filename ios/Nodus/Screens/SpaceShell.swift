@@ -89,10 +89,8 @@ struct SpaceShell: View {
             content()
                 .safeAreaInset(edge: .top) { header }
                 .toolbar(.hidden, for: .navigationBar)
+                .nodusPageBackdrop(accent: session.accent)
         }
-        // Behind the whole stack, not behind the root's content: a pushed screen is a new
-        // view, and a backdrop attached to the root simply is not under it.
-        .background { NodusBackdrop(accent: session.accent).ignoresSafeArea() }
     }
 
     // MARK: iPad
@@ -122,7 +120,7 @@ struct SpaceShell: View {
                 }
                 if session.connection.role.canSendChanges {
                     Section("Write") {
-                        Label("Notes and queue", systemImage: "square.and.pencil").tag(SidebarItem.writing)
+                        Label("Send queue", systemImage: "tray.and.arrow.up").tag(SidebarItem.writing)
                     }
                 }
                 if session.hasDebates || session.hasNotes || session.hasDeepResearch {

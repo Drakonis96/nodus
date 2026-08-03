@@ -39,6 +39,7 @@ struct CollectionListView: View {
                 } label: {
                     RowCell(row: row, presenter: collection.presenter, accent: session.accent)
                 }
+                .listRowBackground(Color.clear)
             }
 
             if hasMore {
@@ -66,6 +67,7 @@ struct CollectionListView: View {
         .listStyle(.plain)
         .navigationTitle(Text(LocalizedStringKey(collection.label)))
         .navigationBarTitleDisplayMode(.inline)
+        .nodusPageBackdrop(accent: session.accent)
         .searchable(text: $query, prompt: "Filter on any field")
         .onChange(of: query) { _, _ in scheduleReload() }
         .task { if rows.isEmpty { await reload() } }
@@ -214,6 +216,7 @@ struct SpecialListView: View {
                 } label: {
                     RowCell(row: row, presenter: presenter, accent: session.accent)
                 }
+                .listRowBackground(Color.clear)
                 .swipeActions(edge: .trailing) {
                     if canEditNotes {
                         Button(role: .destructive) {
@@ -239,6 +242,7 @@ struct SpecialListView: View {
         .listStyle(.plain)
         .navigationTitle(Text(LocalizedStringKey(title)))
         .navigationBarTitleDisplayMode(.inline)
+        .nodusPageBackdrop(accent: session.accent)
         .toolbar {
             if canEditNotes {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -272,11 +276,17 @@ struct SpecialListView: View {
         .alert("Queued on this device", isPresented: $queued) {
             Button("OK", role: .cancel) {}
         } message: {
-            Text("Send it from Notes and queue. It joins the vault when its owner next opens Nodus desktop and republishes — until then this list still shows what was published.")
+            Text("Send it from the send queue. It joins the vault when its owner next opens Nodus desktop and republishes — until then this list still shows what was published.")
         }
         .task {
-            if outbox == nil { outbox = OutboxController(session: session) }
+            // The rows first, and the queue afterwards. The queue is a SQLite file being opened
+            // and migrated, and opening it before the fetch meant Debates, Deep Research and
+            // Immersion — none of which can write anything — all waited on a disk they were
+            // never going to use.
             if rows.isEmpty { await reload() }
+            if resource == .notes, outbox == nil {
+                outbox = await OutboxController.open(session: session)
+            }
         }
         .refreshable { await reload() }
     }

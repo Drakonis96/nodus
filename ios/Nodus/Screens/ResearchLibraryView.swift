@@ -86,6 +86,7 @@ struct ResearchLibraryView: View {
         .scrollContentBackground(.hidden)
         .navigationTitle("Reports")
         .navigationBarTitleDisplayMode(.inline)
+        .nodusPageBackdrop(accent: session.accent)
         .searchable(text: $query, prompt: Text("Search reports"))
         .task { await load() }
         .refreshable { await load() }
@@ -154,6 +155,11 @@ struct LocalReportReader: View {
     let session: SpaceSession
     let saved: LocalReportStore.Saved
 
+    /// Token → label for the works this report really cited.
+    private var referenceLabels: [String: String] {
+        Dictionary(saved.report.references.map { ($0.token, $0.label) }, uniquingKeysWith: { first, _ in first })
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
@@ -182,7 +188,12 @@ struct LocalReportReader: View {
                 ForEach(Array(saved.report.sections.enumerated()), id: \.offset) { _, section in
                     VStack(alignment: .leading, spacing: 8) {
                         Text(section.title).font(.headline)
-                        Text(section.prose).font(.callout).textSelection(.enabled)
+                        CorpusProse(
+                            section.prose,
+                            accent: session.accent,
+                            session: session,
+                            labels: referenceLabels
+                        )
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(16)
@@ -211,6 +222,7 @@ struct LocalReportReader: View {
         }
         .navigationTitle(saved.mode.label)
         .navigationBarTitleDisplayMode(.inline)
+        .nodusPageBackdrop(accent: session.accent)
     }
 }
 
@@ -255,7 +267,7 @@ struct PublishedReportReader: View {
                             // The desktop writes one Markdown document with its own headings
                             // and `nodus://` citations in it. Rendered as plain text, both
                             // arrived as punctuation.
-                            CorpusProse(section.body, accent: session.accent)
+                            CorpusProse(section.body, accent: session.accent, session: session)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(16)
@@ -269,6 +281,7 @@ struct PublishedReportReader: View {
         }
         .navigationTitle("Report")
         .navigationBarTitleDisplayMode(.inline)
+        .nodusPageBackdrop(accent: session.accent)
         .task { await load() }
     }
 

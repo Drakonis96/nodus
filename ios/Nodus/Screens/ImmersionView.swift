@@ -28,7 +28,7 @@ struct ImmersionView: View {
                     header(plan)
                     if !plan.overview.isEmpty {
                         card(title: "Overview", icon: "text.alignleft") {
-                            CorpusProse(plan.overview, accent: session.accent)
+                            CorpusProse(plan.overview, accent: session.accent, session: session)
                         }
                     }
                     stations(plan)
@@ -44,6 +44,7 @@ struct ImmersionView: View {
         }
         .navigationTitle("Immersion")
         .navigationBarTitleDisplayMode(.inline)
+        .nodusPageBackdrop(accent: session.accent)
         .task { await load() }
     }
 
@@ -73,7 +74,7 @@ struct ImmersionView: View {
             Text("Stations").font(.subheadline.weight(.semibold))
             ForEach(Array(plan.stations.enumerated()), id: \.element.id) { index, station in
                 NavigationLink {
-                    ImmersionStationView(station: station, number: index + 1, accent: session.accent)
+                    ImmersionStationView(session: session, station: station, number: index + 1)
                 } label: {
                     HStack(alignment: .top, spacing: 11) {
                         Text("\(index + 1)")
@@ -207,9 +208,11 @@ struct ImmersionView: View {
 // MARK: - One station
 
 private struct ImmersionStationView: View {
+    let session: SpaceSession
     let station: ImmersionPlan.Station
     let number: Int
-    let accent: Color
+
+    private var accent: Color { session.accent }
 
     var body: some View {
         ScrollView {
@@ -226,10 +229,10 @@ private struct ImmersionStationView: View {
                 .nodusGlass(NodusGlass(.regular, tint: accent))
 
                 if !station.context.isEmpty {
-                    block("Why this matters", "map") { CorpusProse(station.context, accent: accent) }
+                    block("Why this matters", "map") { CorpusProse(station.context, accent: accent, session: session) }
                 }
                 if !station.synthesis.isEmpty {
-                    block("Synthesis", "text.alignleft") { CorpusProse(station.synthesis, accent: accent) }
+                    block("Synthesis", "text.alignleft") { CorpusProse(station.synthesis, accent: accent, session: session) }
                 }
                 if !station.takeaways.isEmpty {
                     block("What to take away", "checkmark.circle") {
@@ -295,6 +298,7 @@ private struct ImmersionStationView: View {
         }
         .navigationTitle(station.title)
         .navigationBarTitleDisplayMode(.inline)
+        .nodusPageBackdrop(accent: accent)
     }
 
     @ViewBuilder
@@ -350,6 +354,7 @@ private struct ImmersionQuizView: View {
         }
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
+        .nodusPageBackdrop(accent: accent)
     }
 
     private func questionCard(_ question: ImmersionPlan.Question, number: Int) -> some View {
@@ -410,97 +415,5 @@ private struct ImmersionQuizView: View {
         guard revealed.contains(question.id) else { return .secondary }
         if index == question.correctIndex { return .green }
         return chosen[question.id] == index ? .red : .secondary
-    }
-}
-
-// MARK: - Prose with corpus citations
-
-/// Immersion prose is Markdown with citations in it: `[Arco Blanco (2020)](nodus://idea/g-8969)`.
-///
-/// Rendered as an `AttributedString` so the citation reads as a citation — its label, in the
-/// accent — rather than as a URL in the middle of a sentence. The links are not tappable: the
-/// station already lists its real sources with author, year and the quoted passage, and a link
-/// that looks live but goes nowhere is worse than one that never claimed to.
-struct CorpusProse: View {
-    private let text: String
-    private let accent: Color
-
-    init(_ text: String, accent: Color) {
-        self.text = text
-        self.accent = accent
-    }
-
-    private struct Block: Identifiable {
-        let id = UUID()
-        let level: Int
-        let text: String
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 9) {
-            ForEach(blocks) { block in
-                if block.level > 0 {
-                    Text(block.text)
-                        .font(block.level == 1 ? .headline : .subheadline.weight(.semibold))
-                        .padding(.top, 3)
-                } else {
-                    Text(attributed(block.text))
-                        .font(.callout)
-                        .textSelection(.enabled)
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    /// Split into headings and paragraphs before parsing.
-    ///
-    /// `AttributedString(markdown:)` in inline mode leaves `###` sitting in the text, and its
-    /// full mode carries a heading as a presentation intent that `Text` then ignores — so
-    /// either way a heading arrives as literal hashes in the middle of the prose. Splitting
-    /// first is what makes a heading look like one.
-    private var blocks: [Block] {
-        var result: [Block] = []
-        var paragraph: [String] = []
-
-        func flush() {
-            let joined = paragraph.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
-            if !joined.isEmpty { result.append(Block(level: 0, text: joined)) }
-            paragraph = []
-        }
-
-        for line in text.components(separatedBy: .newlines) {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            if trimmed.hasPrefix("#") {
-                let hashes = trimmed.prefix { $0 == "#" }.count
-                let heading = trimmed.dropFirst(hashes).trimmingCharacters(in: .whitespaces)
-                if !heading.isEmpty {
-                    flush()
-                    result.append(Block(level: min(hashes, 3), text: heading))
-                    continue
-                }
-            }
-            paragraph.append(line)
-        }
-        flush()
-        return result
-    }
-
-    private func attributed(_ source: String) -> AttributedString {
-        guard var parsed = try? AttributedString(
-            markdown: source,
-            options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
-        ) else {
-            return AttributedString(source)
-        }
-        // The link is stripped rather than followed. The station lists its real sources with
-        // author, year and the quoted passage; a link that looks live but goes nowhere is worse
-        // than one that never claimed to.
-        for run in parsed.runs where run.link != nil {
-            parsed[run.range].link = nil
-            parsed[run.range].foregroundColor = accent
-            parsed[run.range].font = .callout.weight(.medium)
-        }
-        return parsed
     }
 }

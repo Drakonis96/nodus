@@ -68,8 +68,13 @@ struct RowDetailView: View {
             }
             .padding(16)
         }
-        .navigationTitle(collection?.label ?? title ?? "Detalle")
+        // `LocalizedStringKey`, not the bare `String`: a collection's label is a value, and a
+        // value handed to `navigationTitle` ships in the base language on every phone — which
+        // is how a Spanish reader opening a citation landed on a screen titled "Library". The
+        // fallback was worse: a Spanish literal, in an app whose base language is English.
+        .navigationTitle(Text(LocalizedStringKey(collection?.label ?? title ?? "Detail")))
         .navigationBarTitleDisplayMode(.inline)
+        .nodusPageBackdrop(accent: session.accent)
         .task { await enrich() }
     }
 
@@ -103,7 +108,7 @@ struct RowDetailView: View {
             // The passages live here rather than in a section of their own, because a quotation
             // means something as the support for a claim and very little in a list of 5 803.
             if !detail.evidence.isEmpty {
-                section("Passages that support it · \(detail.evidence.count)") {
+                section("Passages that support it", count: detail.evidence.count) {
                     VStack(alignment: .leading, spacing: 12) {
                         ForEach(Array(detail.evidence.prefix(40).enumerated()), id: \.offset) { index, item in
                             VStack(alignment: .leading, spacing: 5) {
@@ -219,7 +224,7 @@ struct RowDetailView: View {
         }
         return Group {
             if !detail.relations.isEmpty {
-                section("Relationships · \(detail.relations.count)") {
+                section("Relationships", count: detail.relations.count) {
                     VStack(alignment: .leading, spacing: 0) {
                         ForEach(Array(detail.relations.enumerated()), id: \.offset) { index, edge in
                             relationRow(edge, selfId: selfId)
@@ -264,7 +269,7 @@ struct RowDetailView: View {
         let workIds = detail.occurrences.compactMap { $0.string("nodus_id") }
         return Group {
             if !detail.occurrences.isEmpty {
-                section("Appears in · \(detail.occurrences.count)") {
+                section("Appears in", count: detail.occurrences.count) {
                     VStack(alignment: .leading, spacing: 0) {
                         ForEach(Array(detail.occurrences.enumerated()), id: \.offset) { index, occurrence in
                             occurrenceRow(occurrence)
@@ -348,14 +353,17 @@ struct RowDetailView: View {
     /// work opens that idea's own page, exactly as if it had been reached from Ideas, and the
     /// work under an author opens the work as the library shows it.
     private func group(
-        _ title: String,
+        _ title: LocalizedStringKey,
         _ rows: [Row],
         table: String,
         linksTo collection: CollectionDescriptor? = nil
     ) -> some View {
         Group {
             if !rows.isEmpty {
-                section("\(title) · \(rows.count)") {
+                // The heading is the key and the count is data beside it. Interpolating the
+                // two — `"\(title) · \(rows.count)"` — made the *whole line* the key, so the
+                // catalogue never matched and every group on a dossier read in English.
+                section(title, count: rows.count) {
                     VStack(spacing: 0) {
                         ForEach(Array(rows.prefix(60).enumerated()), id: \.offset) { index, row in
                             if let collection, row.string(collection.idField) != nil {
@@ -392,9 +400,20 @@ struct RowDetailView: View {
 
     /// `LocalizedStringKey`, not `String`: every call site passes a literal, and a `String`
     /// parameter is what silently turns a translated heading back into English.
-    private func section<Content: View>(_ title: LocalizedStringKey, @ViewBuilder content: () -> Content) -> some View {
+    private func section<Content: View>(
+        _ title: LocalizedStringKey,
+        count: Int? = nil,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(title).font(.subheadline.weight(.semibold))
+            HStack(spacing: 6) {
+                Text(title).font(.subheadline.weight(.semibold))
+                if let count {
+                    Text("· \(count.formatted())")
+                        .font(.subheadline.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+            }
             content()
                 .padding(14)
                 .frame(maxWidth: .infinity, alignment: .leading)

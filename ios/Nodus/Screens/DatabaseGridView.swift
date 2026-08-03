@@ -39,6 +39,7 @@ struct DatabaseGridView: View {
         }
         .navigationTitle(database.text("name") ?? "Database")
         .navigationBarTitleDisplayMode(.inline)
+        .nodusPageBackdrop(accent: session.accent)
         .task { if detail == nil { await load(offset: 0) } }
     }
 

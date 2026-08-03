@@ -33,6 +33,7 @@ struct MirrorTableView: View {
                 } label: {
                     RowCell(row: row, presenter: presenter, accent: session.accent)
                 }
+                .listRowBackground(Color.clear)
             }
             if rows.count < total {
                 HStack { Spacer(); ProgressView().tint(session.accent); Spacer() }
@@ -51,6 +52,7 @@ struct MirrorTableView: View {
         .listStyle(.plain)
         .navigationTitle(Text(LocalizedStringKey(title)))
         .navigationBarTitleDisplayMode(.inline)
+        .nodusPageBackdrop(accent: session.accent)
         .searchable(text: $query, prompt: "Filter on any field")
         .onChange(of: query) { _, _ in schedule() }
         .toolbar {
@@ -152,6 +154,7 @@ struct MirrorOnlySectionsView: View {
         .scrollContentBackground(.hidden)
         .navigationTitle("More from this space")
         .navigationBarTitleDisplayMode(.inline)
+        .nodusPageBackdrop(accent: session.accent)
     }
 
     /// Spanish names for the tables the desktop shows under its own labels.

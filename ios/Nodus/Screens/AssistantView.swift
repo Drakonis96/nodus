@@ -208,9 +208,18 @@ private struct TurnBubble: View {
                 if let warning = turn.warning {
                     NodusNotice(tone: .caution, title: "Lexical retrieval", message: LocalizedStringKey(warning))
                 }
-                Text(turn.text.isEmpty ? "…" : turn.text)
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                if turn.text.isEmpty {
+                    Text("…").frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    // The same citations the report gets, in the same shape: the source's name,
+                    // and a tap opens it.
+                    CorpusProse(
+                        turn.text,
+                        accent: accent,
+                        session: session,
+                        labels: Dictionary(turn.citations.map { ($0.token, $0.label) }, uniquingKeysWith: { first, _ in first })
+                    )
+                }
 
                 if !turn.citations.isEmpty {
                     VStack(alignment: .leading, spacing: 5) {

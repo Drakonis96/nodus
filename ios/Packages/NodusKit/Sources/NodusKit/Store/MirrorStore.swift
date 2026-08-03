@@ -123,6 +123,18 @@ public actor MirrorStore {
         }
     }
 
+    /// Opens the mirror off the caller's thread.
+    ///
+    /// `init` creates a directory, opens SQLite and runs a migration that creates seven tables
+    /// and an FTS5 index. An `actor`'s initialiser runs wherever it was called from, and the
+    /// caller here is the shell's `task` on the main actor — so on every launch the first thing
+    /// the app did was block its own interface on the disk.
+    public static func open(spaceId: String, directory: URL) async throws -> MirrorStore {
+        try await Task.detached(priority: .userInitiated) {
+            try MirrorStore(spaceId: spaceId, directory: directory)
+        }.value
+    }
+
     // MARK: - Import
 
     /// Replaces the mirror with a downloaded snapshot.

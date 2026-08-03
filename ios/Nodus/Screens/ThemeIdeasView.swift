@@ -55,6 +55,7 @@ struct ThemeIdeasView: View {
                 } label: {
                     RowCell(row: idea, presenter: RowPresenter.forTable("ideas"), accent: session.accent)
                 }
+                .listRowBackground(Color.clear)
             }
 
             if !isLoading, ideas.isEmpty, !needsMirror {
@@ -70,6 +71,7 @@ struct ThemeIdeasView: View {
         .listStyle(.plain)
         .navigationTitle(label)
         .navigationBarTitleDisplayMode(.inline)
+        .nodusPageBackdrop(accent: session.accent)
         .searchable(text: $query, prompt: "Filter ideas under this theme")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {

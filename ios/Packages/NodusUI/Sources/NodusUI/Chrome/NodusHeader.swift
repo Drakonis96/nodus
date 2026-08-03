@@ -45,9 +45,9 @@ public struct NodusHeader<Leading: View, Trailing: View>: View {
         // subtitle being cut off by the glass.
         centrepiece
             .frame(maxWidth: .infinity)
-            .overlay(alignment: .leading) { leading }
-            .overlay(alignment: .trailing) { trailing }
-            .padding(.horizontal, 16)
+            .overlay(alignment: .leading) { accessory(Leading.self) { leading } }
+            .overlay(alignment: .trailing) { accessory(Trailing.self) { trailing } }
+            .padding(.horizontal, 10)
             // Room to breathe under the cutout, and under the mark. Tucked against either one
             // the header reads as clipped rather than as chrome the hardware sits on.
             .padding(.top, 10)
@@ -64,6 +64,29 @@ public struct NodusHeader<Leading: View, Trailing: View>: View {
             } else {
                 withAnimation(.easeOut(duration: 0.9)) { markProgress = 1 }
             }
+        }
+    }
+
+    /// The tappable box an accessory gets, whatever glyph the caller put in it.
+    ///
+    /// The two header buttons were a `callout`-sized SF Symbol and nothing else: a target of
+    /// roughly 17 × 17 points, sitting 16 points from the edge of the screen, where the palm
+    /// already rests and the system's own edge gestures start. Both of them read as broken —
+    /// most taps landed beside the glyph and did nothing at all.
+    ///
+    /// 44 × 44 is Apple's minimum, `contentShape` is what makes the whole box tappable rather
+    /// than the glyph's own outline, and the horizontal padding around it moves the icon
+    /// further in from the bezel than the old layout put its entire target.
+    ///
+    /// A header with no accessory on a side gets nothing there — a 44-point `contentShape` over
+    /// an `EmptyView` is an invisible button that eats every tap in that corner.
+    @ViewBuilder
+    private func accessory<V: View>(_ type: V.Type, @ViewBuilder _ content: () -> V) -> some View {
+        if type != EmptyView.self {
+            content()
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+                .padding(.horizontal, 6)
         }
     }
 

@@ -53,6 +53,7 @@ struct ScheduleView: View {
         }
         .navigationTitle("Timetables")
         .navigationBarTitleDisplayMode(.inline)
+        .nodusPageBackdrop(accent: session.accent)
         .task { await load() }
     }
 
@@ -201,6 +202,7 @@ struct FlashcardsView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .navigationTitle("Flashcards")
         .navigationBarTitleDisplayMode(.inline)
+        .nodusPageBackdrop(accent: session.accent)
         .task { await load() }
     }
 
@@ -308,6 +310,7 @@ struct QuestionBankView: View {
                     }
                 }
                 .padding(.vertical, 5)
+                .listRowBackground(Color.clear)
             }
 
             if questions.isEmpty, !isLoading {
@@ -319,6 +322,7 @@ struct QuestionBankView: View {
         .listStyle(.plain)
         .navigationTitle("Question bank")
         .navigationBarTitleDisplayMode(.inline)
+        .nodusPageBackdrop(accent: session.accent)
         .searchable(text: $query, prompt: "Filter questions")
         .task { await load() }
     }

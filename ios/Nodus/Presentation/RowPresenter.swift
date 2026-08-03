@@ -104,11 +104,16 @@ struct RowPresenter {
             }
 
         case "relationships":
+            // The column is `type`, not `kind` — the same rename that once made a person's
+            // dossier report zero relations. Reading the wrong one gave a screen of rows that
+            // all said the word "Relationship" and nothing else.
             return RowPresenter(collection: table, icon: "arrow.triangle.branch") { row in
-                row.text("kind") ?? "Relationship"
+                Self.kinship(row.text("type") ?? row.text("kind"))
             } subtitle: { row in
                 row.text("notes")
-            } detail: { _ in nil }
+            } detail: { row in
+                row.text("subtype")
+            }
 
         case "notes":
             return RowPresenter(collection: table, icon: "note.text") { row in
@@ -194,6 +199,20 @@ struct RowPresenter {
         }
         guard !names.isEmpty else { return nil }
         return names.count > 2 ? "\(names[0]) et al." : names.joined(separator: "; ")
+    }
+
+    /// The three kinship types the vault stores (`shared/types.ts:1873`), in the reader's words.
+    ///
+    /// `String(localized:)` rather than a literal, because the result is handed to `Text` as a
+    /// value by the presenter and a value is never looked up in the catalogue.
+    private static func kinship(_ type: String?) -> String {
+        switch type?.lowercased() {
+        case "parent": return String(localized: "Parent")
+        case "spouse": return String(localized: "Spouse")
+        case "sibling": return String(localized: "Sibling")
+        case let other?: return other
+        case nil: return String(localized: "Relationship")
+        }
     }
 
     private static func gapKindLabel(_ kind: String) -> String {

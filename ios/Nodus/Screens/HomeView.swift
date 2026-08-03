@@ -32,10 +32,12 @@ struct HomeView: View {
 
                 embeddingNotice
 
-                if !session.sections.isEmpty {
+                if !sections.isEmpty {
                     NodusGlassContainer(spacing: 16) {
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 12)], spacing: 12) {
-                            ForEach(session.sections, id: \.path) { collection in
+                        // `Self.tileColumns`, not a fresh `[GridItem]` per body pass, and the
+                        // same grid every other section on this screen uses.
+                        LazyVGrid(columns: Self.tileColumns, spacing: 12) {
+                            ForEach(sections, id: \.path) { collection in
                                 NavigationLink {
                                     CollectionListView(session: session, collection: collection)
                                 } label: {
@@ -80,7 +82,7 @@ struct HomeView: View {
                         NavigationLink {
                             WritingView(session: session)
                         } label: {
-                            SectionTile(title: "Notes and queue", icon: "square.and.pencil", count: nil, accent: session.accent)
+                            SectionTile(title: "Send queue", icon: "tray.and.arrow.up", count: nil, accent: session.accent)
                         }
                         .buttonStyle(.plain)
                     }
@@ -161,6 +163,12 @@ struct HomeView: View {
     }
 
     private static let tileColumns = [GridItem(.adaptive(minimum: 150), spacing: 12)]
+
+    /// Read once per body pass rather than three times.
+    ///
+    /// `session.sections` sorts the whole published menu on every access, and the grid asked
+    /// for it in the `if`, in the `ForEach` and again on every diff.
+    private var sections: [CollectionDescriptor] { session.sections }
 
     struct VaultTool {
         let title: String

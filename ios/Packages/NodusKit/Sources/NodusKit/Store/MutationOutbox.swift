@@ -70,6 +70,20 @@ public actor MutationOutbox {
         }
     }
 
+    /// Opens the queue without holding up whoever asked for it.
+    ///
+    /// `init` creates a directory, opens SQLite, sets a file-protection attribute and runs a
+    /// migration — four synchronous disk operations. An `actor`'s initialiser runs on the
+    /// caller's thread, and every caller here is a SwiftUI screen on the main actor, so opening
+    /// the queue froze the interface for as long as the disk took. On a cold launch that was
+    /// most of the delay before Notes, Debates, Immersion or the queue itself would draw
+    /// anything at all.
+    public static func open(spaceId: String, directory: URL) async throws -> MutationOutbox {
+        try await Task.detached(priority: .userInitiated) {
+            try MutationOutbox(spaceId: spaceId, directory: directory)
+        }.value
+    }
+
     /// Queue a change. It is stored before any attempt to send it, so a crash between the two
     /// loses nothing.
     public func enqueue(_ mutation: Mutation, title: String) throws {

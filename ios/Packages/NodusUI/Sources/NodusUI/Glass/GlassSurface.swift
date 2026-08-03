@@ -74,6 +74,16 @@ private struct NodusGlassModifier<S: InsettableShape>: ViewModifier {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.colorScheme) private var colorScheme
 
+    /// Every path ends in `contentShape`, and that is the whole of why the app is tappable.
+    ///
+    /// A glass surface is a *background*. Backgrounds do not take touches, so a card's hit
+    /// region was whatever its content happened to draw — the icon, the badge, the title — and
+    /// the rest of it was a hole. On a 92-point tile with a 20-point icon and one line of text
+    /// that is most of the card, which is exactly why tapping a section on Home usually did
+    /// nothing and occasionally worked: the taps that worked landed on the words.
+    ///
+    /// The pre-26 fallback always had this; the iOS 26 branch never did, so the bug arrived
+    /// with the phone the app was designed for.
     func body(content: Content) -> some View {
         if reduceTransparency {
             // Not a degraded glass — a deliberate opaque surface with the same geometry and
@@ -81,10 +91,11 @@ private struct NodusGlassModifier<S: InsettableShape>: ViewModifier {
             content
                 .background(opaqueFill, in: shape)
                 .overlay(shape.strokeBorder(borderColor, lineWidth: 1))
+                .contentShape(shape)
         } else {
             #if os(iOS)
             if #available(iOS 26.0, *) {
-                content.glassEffect(systemGlass, in: shape)
+                content.glassEffect(systemGlass, in: shape).contentShape(shape)
             } else {
                 content.modifier(GlassFallback(glass: glass, shape: shape))
             }

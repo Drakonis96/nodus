@@ -18,6 +18,7 @@ struct SearchScreen: View {
     @State private var hits: [CorpusSearch.Hit] = []
     @State private var mode: CorpusSearch.Mode = .lexical
     @State private var semanticWarning: String?
+    @State private var unavailability: EmbeddingService.Unavailability?
     @State private var isSearching = false
     @State private var error: String?
     @State private var searchTask: Task<Void, Never>?
@@ -29,11 +30,11 @@ struct SearchScreen: View {
                     .listRowBackground(Color.clear).listRowSeparator(.hidden)
             }
 
-            if let semanticWarning {
+            if let message = warningMessage {
                 NodusNotice(
                     tone: .caution,
                     title: "Lexical results",
-                    message: LocalizedStringKey(semanticWarning),
+                    message: LocalizedStringKey(message),
                     systemImage: "magnifyingglass"
                 )
                 .listRowBackground(Color.clear).listRowSeparator(.hidden)
@@ -48,8 +49,21 @@ struct SearchScreen: View {
                     .listRowBackground(Color.clear).listRowSeparator(.hidden)
             }
 
+            // A search that finds a work and then does nothing when you tap it is half a
+            // search. A hit's id is already `kind/id`, which is the same shape a citation
+            // uses, so every result opens the record it named.
             ForEach(Array(hits.enumerated()), id: \.offset) { _, hit in
-                HitCell(hit: hit, accent: session.accent)
+                if let reference = CorpusReference(hitId: hit.id) {
+                    NavigationLink {
+                        CorpusReferenceView(session: session, reference: reference)
+                    } label: {
+                        HitCell(hit: hit, accent: session.accent)
+                    }
+                    .listRowBackground(Color.clear)
+                } else {
+                    HitCell(hit: hit, accent: session.accent)
+                        .listRowBackground(Color.clear)
+                }
             }
 
             if hits.isEmpty, !query.isEmpty, !isSearching, error == nil {
@@ -105,6 +119,24 @@ struct SearchScreen: View {
         .nodusGlass(NodusGlass(.regular, tint: session.accent), in: Capsule())
         .padding(.horizontal, 16)
         .padding(.bottom, 8)
+    }
+
+    /// Why the search was lexical, in the phone's language.
+    ///
+    /// The sentence NodusAI builds is English: the package ships no string catalogue, and the
+    /// app is where the translations live. The three cases that have a Spanish form are said
+    /// here; anything else falls back to the package's own words rather than to silence.
+    private var warningMessage: String? {
+        switch unavailability {
+        case .missingKey(let provider):
+            return String(localized: "The \(provider.label) key is missing, and that is the provider this vault was indexed with.")
+        case .providerRunsOnDesktop(let name):
+            return String(localized: "This vault was indexed with \(name), which runs on the computer where Nodus desktop lives. A phone cannot produce a matching vector.")
+        case .unknownProvider(let name):
+            return String(localized: "This vault was indexed with “\(name)”, a provider this version does not know.")
+        case .none:
+            return semanticWarning
+        }
     }
 
     /// What the field promises, decided by what this device can actually do — the vault having
@@ -186,6 +218,7 @@ struct SearchScreen: View {
             hits = outcome.hits
             mode = outcome.mode
             semanticWarning = outcome.warning
+            unavailability = outcome.unavailability
             error = nil
         } catch let apiError as APIError where apiError.isNotPublished {
             hits = []; error = nil

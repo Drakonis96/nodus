@@ -43,6 +43,7 @@ struct DeepResearchScreen: View {
         }
         .navigationTitle("Deep Research")
         .navigationBarTitleDisplayMode(.inline)
+        .nodusPageBackdrop(accent: session.accent)
         .task {
             guard running == nil, report == nil else { return }
             let saved = DeepResearchCheckpointStore.load(spaceId: session.connection.spaceId)
@@ -248,9 +249,15 @@ struct DeepResearchScreen: View {
             ForEach(Array(report.sections.enumerated()), id: \.offset) { _, section in
                 VStack(alignment: .leading, spacing: 8) {
                     Text(section.title).font(.headline)
-                    Text(section.prose)
-                        .font(.callout)
-                        .textSelection(.enabled)
+                    // The prose carries the citation tokens the validator kept. Rendered as
+                    // plain text they were bare `nodus://` URLs in the middle of a sentence;
+                    // rendered here they are the source's own name, and they open it.
+                    CorpusProse(
+                        section.prose,
+                        accent: session.accent,
+                        session: session,
+                        labels: referenceLabels(report)
+                    )
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(16)
@@ -287,7 +294,7 @@ struct DeepResearchScreen: View {
 
                 Text(sentReportId == nil
                      ? "It is queued on this device and travels when you send the queue. It joins the vault when its owner next opens Nodus desktop and republishes."
-                     : "Queued. Open Notes and queue to send it.")
+                     : "Queued. Open the send queue to send it.")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -301,9 +308,15 @@ struct DeepResearchScreen: View {
         }
     }
 
+    /// Token → label for everything the report actually cited, so a bare token in the prose
+    /// can be shown as the source it names.
+    private func referenceLabels(_ report: DeepResearchReport) -> [String: String] {
+        Dictionary(report.references.map { ($0.token, $0.label) }, uniquingKeysWith: { first, _ in first })
+    }
+
     /// Put the finished report in the queue, with the citations it really used.
     private func send(_ report: DeepResearchReport) async {
-        guard let controller = OutboxController(session: session), let model = ai.model(for: .deepResearch) else { return }
+        guard let controller = await OutboxController.open(session: session), let model = ai.model(for: .deepResearch) else { return }
         await controller.queueReport(
             report,
             mode: mode ?? defaultMode,

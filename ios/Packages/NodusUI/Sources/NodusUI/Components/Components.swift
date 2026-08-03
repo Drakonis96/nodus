@@ -8,45 +8,72 @@ import SwiftUI
 /// of the text.
 public struct NodusBackdrop: View {
     public var accent: Color
-    /// Set false on dense reading screens, where a moving background is a distraction.
+    /// Kept for source compatibility. Nothing here moves any more — see below.
     public var animated: Bool
 
     @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var drift: CGFloat = 0
 
     public init(accent: Color, animated: Bool = true) {
         self.accent = accent
         self.animated = animated
     }
 
+    /// Two radial washes over a near-black base.
+    ///
+    /// This used to be two `Circle`s under `.blur(radius: 44)`, drifting on a `repeatForever`
+    /// animation. Both halves of that were expensive in a way nothing on screen justified: a
+    /// 44-point blur is a full-screen offscreen pass, the animation made the system redraw it
+    /// on *every frame for the life of the app*, and there were four of these alive at once —
+    /// one per tab. A radial gradient draws the same soft bloom in a single pass with no
+    /// offscreen buffer, and a background that holds still is a background nobody notices,
+    /// which is what a background is for.
     public var body: some View {
         ZStack {
-            base.ignoresSafeArea()
-            GeometryReader { proxy in
-                let size = min(proxy.size.width, proxy.size.height)
-                bloom(accent.shaded(by: 0.15), diameter: size * 1.25)
-                    .position(x: proxy.size.width * 0.16, y: proxy.size.height * (0.14 + drift * 0.05))
-                bloom(accent.shaded(by: -0.35), diameter: size * 1.05)
-                    .position(x: proxy.size.width * 0.9, y: proxy.size.height * (0.78 - drift * 0.06))
-            }
-            .ignoresSafeArea()
-            .blur(radius: 44)
+            base
+            bloom(accent.shaded(by: 0.15), centre: UnitPoint(x: 0.16, y: 0.14), scale: 0.72)
+            bloom(accent.shaded(by: -0.35), centre: UnitPoint(x: 0.9, y: 0.78), scale: 0.62)
         }
-        .task {
-            guard animated, !reduceMotion else { return }
-            withAnimation(.easeInOut(duration: 14).repeatForever(autoreverses: true)) { drift = 1 }
-        }
+        .ignoresSafeArea()
+        // The wash never changes and never reacts to a touch. Flattening it means the
+        // compositor can treat it as one static layer, and hit-testing skips it entirely.
+        .drawingGroup(opaque: false)
+        .allowsHitTesting(false)
     }
 
     private var base: Color {
         colorScheme == .dark ? Color(hex: "#0a0912") : Color(hex: "#f6f5fb")
     }
 
-    private func bloom(_ color: Color, diameter: CGFloat) -> some View {
-        Circle()
-            .fill(color.opacity(colorScheme == .dark ? 0.42 : 0.22))
-            .frame(width: diameter, height: diameter)
+    private func bloom(_ color: Color, centre: UnitPoint, scale: CGFloat) -> some View {
+        GeometryReader { proxy in
+            let radius = max(proxy.size.width, proxy.size.height) * scale
+            RadialGradient(
+                stops: [
+                    .init(color: color.opacity(colorScheme == .dark ? 0.5 : 0.28), location: 0),
+                    .init(color: color.opacity(colorScheme == .dark ? 0.22 : 0.12), location: 0.45),
+                    .init(color: color.opacity(0), location: 1),
+                ],
+                center: centre,
+                startRadius: 0,
+                endRadius: radius
+            )
+        }
+    }
+}
+
+public extension View {
+    /// The accent backdrop, behind one screen's content.
+    ///
+    /// It goes on the screen's *content*, and every screen has to ask for it. That is not an
+    /// oversight — it is the only place it shows. Attached to the `NavigationStack`, or to the
+    /// `TabView`, it was never visible at all: both containers paint their own opaque
+    /// `systemBackground` — plain black in dark mode — over anything behind them. That is why
+    /// the whole app sat on black with only the glass on top of it carrying any colour, and why
+    /// scrolling looked like it "lost" the tint: there was never any tint underneath to lose.
+    ///
+    /// A pushed screen is a new view in the same container, so it needs its own.
+    func nodusPageBackdrop(accent: Color) -> some View {
+        background { NodusBackdrop(accent: accent).ignoresSafeArea() }
     }
 }
 

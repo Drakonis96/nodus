@@ -65,6 +65,7 @@ struct FamilyTreeView: View {
         }
         .navigationTitle("Family tree")
         .navigationBarTitleDisplayMode(.inline)
+        .nodusPageBackdrop(accent: session.accent)
         .toolbar {
             if !history.isEmpty {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -117,7 +118,10 @@ struct FamilyTreeView: View {
         .nodusGlass(NodusGlass(.prominent, tint: session.accent))
     }
 
-    private func generation(_ rows: [Row], title: String, icon: String) -> some View {
+    /// `LocalizedStringKey`, not `String`. The four headings of the tree — Parents, Partner,
+    /// Siblings, Children — reached `Label` as values, so they stayed English on a Spanish
+    /// phone however complete the catalogue was.
+    private func generation(_ rows: [Row], title: LocalizedStringKey, icon: String) -> some View {
         Group {
             if !rows.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {

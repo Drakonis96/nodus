@@ -69,7 +69,7 @@ final class SpaceSession {
     func loadMirror() async {
         guard mirror == nil else { return }
         do {
-            let store = try MirrorStore(spaceId: connection.spaceId, directory: mirrorDirectory)
+            let store = try await MirrorStore.open(spaceId: connection.spaceId, directory: mirrorDirectory)
             guard let summary = try await store.summary() else { return }
             mirror = store
             mirrorSummary = summary
@@ -111,7 +111,12 @@ final class SpaceSession {
                 ?? overview?.space.revision
                 ?? ""
             mirrorProgress = .importing
-            let store = try mirror ?? MirrorStore(spaceId: connection.spaceId, directory: mirrorDirectory)
+            let store: MirrorStore
+            if let mirror {
+                store = mirror
+            } else {
+                store = try await MirrorStore.open(spaceId: connection.spaceId, directory: mirrorDirectory)
+            }
             let summary = try await store.replace(with: snapshot, revision: revision)
             mirror = store
             mirrorSummary = summary

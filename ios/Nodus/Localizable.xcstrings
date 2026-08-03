@@ -89,23 +89,6 @@
         }
       }
     },
-    "%@ · %lld": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": "%1$@ · %2$lld"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ · %lld"
-          }
-        }
-      }
-    },
     "%@ · %lld dimensions": {
       "extractionState": "manual",
       "localizations": {
@@ -613,13 +596,13 @@
         }
       }
     },
-    "Appears in · %lld": {
+    "Appears in": {
       "extractionState": "manual",
       "localizations": {
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Aparece en · %lld"
+            "value": "Aparece en"
           }
         }
       }
@@ -1412,6 +1395,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Depende de"
+          }
+        }
+      }
+    },
+    "Detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Detalle"
           }
         }
       }
@@ -2296,6 +2290,17 @@
         }
       }
     },
+    "It refers to a “%@”, which this space does not publish.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se refiere a un «%@», que este espacio no publica."
+          }
+        }
+      }
+    },
     "It will appear as soon as its owner publishes from Nodus desktop.": {
       "extractionState": "manual",
       "localizations": {
@@ -3088,17 +3093,6 @@
         }
       }
     },
-    "Notes and queue": {
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Notas y cola"
-          }
-        }
-      }
-    },
     "Notes you write appear here before they travel.": {
       "extractionState": "manual",
       "localizations": {
@@ -3396,6 +3390,17 @@
         }
       }
     },
+    "Parent": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Progenitor"
+          }
+        }
+      }
+    },
     "Parents": {
       "extractionState": "manual",
       "localizations": {
@@ -3451,13 +3456,13 @@
         }
       }
     },
-    "Passages that support it · %lld": {
+    "Passages that support it": {
       "extractionState": "manual",
       "localizations": {
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pasajes que la apoyan · %lld"
+            "value": "Pasajes que la apoyan"
           }
         }
       }
@@ -3770,13 +3775,13 @@
         }
       }
     },
-    "Queued. Open Notes and queue to send it.": {
+    "Queued. Open the send queue to send it.": {
       "extractionState": "manual",
       "localizations": {
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "En la cola. Abre Notas y cola para enviarlo."
+            "value": "En cola. Abre la cola de envío para enviarlo."
           }
         }
       }
@@ -3821,6 +3826,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Acceso de lectura"
+          }
+        }
+      }
+    },
+    "Reading the ideas in this space…": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leyendo las ideas de este espacio…"
           }
         }
       }
@@ -3909,17 +3925,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Relaciones"
-          }
-        }
-      }
-    },
-    "Relationships · %lld": {
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Relaciones · %lld"
           }
         }
       }
@@ -4408,13 +4413,24 @@
         }
       }
     },
-    "Send it from Notes and queue. It joins the vault when its owner next opens Nodus desktop and republishes — until then this list still shows what was published.": {
+    "Send it from the send queue. It joins the vault when its owner next opens Nodus desktop and republishes — until then this list still shows what was published.": {
       "extractionState": "manual",
       "localizations": {
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Envíalo desde Notas y cola. Se incorpora al vault cuando quien lo posee abre Nodus de escritorio y vuelve a publicar; hasta entonces esta lista sigue mostrando lo que se publicó."
+            "value": "Envíalo desde la cola de envío. Se incorpora al vault cuando quien lo posee abra Nodus de escritorio y vuelva a publicar; hasta entonces esta lista sigue mostrando lo publicado."
+          }
+        }
+      }
+    },
+    "Send queue": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cola de envío"
           }
         }
       }
@@ -4573,6 +4589,17 @@
         }
       }
     },
+    "Sibling": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hermano o hermana"
+          }
+        }
+      }
+    },
     "Siblings": {
       "extractionState": "manual",
       "localizations": {
@@ -4624,6 +4651,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Espacio"
+          }
+        }
+      }
+    },
+    "Spouse": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cónyuge"
           }
         }
       }
@@ -4844,6 +4882,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Esa tabla no admite cambios desde un cliente."
+          }
+        }
+      }
+    },
+    "The %@ key is missing, and that is the provider this vault was indexed with.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Falta la clave de %@, y ese es el proveedor con el que se indexó este vault."
           }
         }
       }
@@ -5244,6 +5293,17 @@
         }
       }
     },
+    "This citation points outside the corpus": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esta cita apunta fuera del corpus"
+          }
+        }
+      }
+    },
     "This connection is not encrypted. That should only ever be a local test.": {
       "extractionState": "manual",
       "localizations": {
@@ -5464,6 +5524,17 @@
         }
       }
     },
+    "This vault was indexed with %@, which runs on the computer where Nodus desktop lives. A phone cannot produce a matching vector.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este vault se indexó con %@, que se ejecuta en el ordenador donde vive Nodus de escritorio. Un teléfono no puede producir un vector equivalente."
+          }
+        }
+      }
+    },
     "This vault was indexed with %@/%@, which runs on the computer where Nodus lives. From a phone, search will be lexical.": {
       "extractionState": "manual",
       "localizations": {
@@ -5538,6 +5609,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Este vault se indexó con un motor que corre en el ordenador de Nodus. La búsqueda seguirá funcionando, pero será léxica."
+          }
+        }
+      }
+    },
+    "This vault was indexed with “%@”, a provider this version does not know.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este vault se indexó con «%@», un proveedor que esta versión no conoce."
           }
         }
       }
@@ -6088,17 +6170,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Escribir"
-          }
-        }
-      }
-    },
-    "Writing": {
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Escritura"
           }
         }
       }

@@ -26,12 +26,22 @@ final class OutboxController {
     private let maxBatch: Int
     private let schemaVersion: Int
 
-    init?(session: SpaceSession) {
+    /// Opens the queue for a space, or answers nil when this access cannot send anything.
+    ///
+    /// Asynchronous because opening the queue means opening SQLite, and doing that in an
+    /// initialiser meant doing it on the main actor — the screen that asked for a controller
+    /// stopped drawing until the disk answered.
+    static func open(session: SpaceSession) async -> OutboxController? {
         guard session.connection.role.canSendChanges else { return nil }
         let directory = URL.applicationSupportDirectory.appendingPathComponent("spaces", isDirectory: true)
-        guard let outbox = try? MutationOutbox(spaceId: session.connection.spaceId, directory: directory) else {
-            return nil
-        }
+        guard let outbox = try? await MutationOutbox.open(
+            spaceId: session.connection.spaceId,
+            directory: directory
+        ) else { return nil }
+        return OutboxController(session: session, outbox: outbox)
+    }
+
+    private init(session: SpaceSession, outbox: MutationOutbox) {
         self.outbox = outbox
         client = session.client
         spaceId = session.connection.spaceId
