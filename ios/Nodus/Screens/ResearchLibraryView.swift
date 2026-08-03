@@ -256,11 +256,24 @@ struct PublishedReportReader: View {
                         Text(objective).font(.subheadline).foregroundStyle(.secondary)
                     }
                     if let document {
-                        ReportCopyButtons(
-                            markdown: document,
-                            title: row.text("title"),
-                            accent: session.accent
-                        )
+                        HStack(spacing: 0) {
+                            ReportCopyButtons(
+                                markdown: document,
+                                title: row.text("title"),
+                                accent: session.accent
+                            )
+                            // Beside the two copies, because it is the third way to take the
+                            // report with you — and the only one that keeps its layout.
+                            if let id = row.string("id") {
+                                ReportPDFButton(
+                                    session: session,
+                                    reportId: id,
+                                    title: row.text("title") ?? "informe",
+                                    accent: session.accent
+                                )
+                            }
+                            Spacer(minLength: 0)
+                        }
                         .padding(.top, 4)
                     }
                 }

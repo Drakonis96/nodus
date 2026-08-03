@@ -1,3 +1,4 @@
+import { deepResearchReportInput, renderProfessionalReportHtml } from '../core/generated/deepResearchReport.mjs';
 // The read surface: everything a mobile client or a desktop replica asks the server for.
 //
 // Shape rule: every list answers with the same envelope the desktop MCP `page()` helper
@@ -122,6 +123,18 @@ const COLLECTIONS = {
   // Databases
   databases: { table: 'db_databases', key: 'databases', id: 'id' },
 };
+
+/**
+ * One saved draft, rendered as the styled document.
+ *
+ * The cover image is inlined as a `data:` URL when the space published one: the document has
+ * to be printable by a client that may not be able to fetch anything else, and a page whose
+ * cover is a broken link is worse than one with no cover.
+ */
+function renderReportDocument(draft, image, _space) {
+  const cover = image?.dataUrl ? { dataUrl: image.dataUrl, credit: image.credit ?? null } : { dataUrl: null, credit: null };
+  return renderProfessionalReportHtml(deepResearchReportInput(draft, cover));
+}
 
 export function createCorpusRoutes({ readSnapshot, assetHashesFor }) {
   function requireSnapshot(res, json, spaceId) {
@@ -354,9 +367,36 @@ export function createCorpusRoutes({ readSnapshot, assetHashesFor }) {
       const wanted = decodeURIComponent(rest[0]);
       const row = drafts.find((candidate) => String(candidate.id) === wanted);
       if (!row) return missing(res, json);
-      if (notModified(req, res, json, space, url, key)) return true;
       let draft = null;
       try { draft = JSON.parse(row.draft_json || 'null'); } catch { draft = null; }
+
+      // ── The styled document ───────────────────────────────────────────────
+      //
+      // `.../deep-research/<id>/document.html` is the report laid out the way the desktop
+      // lays it out for print: cover, contents, section rules, traceability matrix, `@page`
+      // box. The design is `shared/professionalReport.ts`, compiled into
+      // `lib/core/generated/` so this process needs no dependency and no build to serve it.
+      //
+      // HTML rather than PDF because printing needs a browser, and this server is a hundred
+      // and fifty megabytes of Alpine and Node with nothing else in it. The client that asks
+      // for this has a browser engine already; it prints the page it is given.
+      if (rest[1] === 'document.html') {
+        if (!draft) return missing(res, json);
+        const image = assets.get(wanted) ?? null;
+        const html = renderReportDocument(draft, image, assetHashesFor ? space : null);
+        const bytes = Buffer.from(html, 'utf8');
+        res.writeHead(200, {
+          'content-type': 'text/html; charset=utf-8',
+          'content-length': bytes.length,
+          'cache-control': 'private, max-age=0, must-revalidate',
+          etag: `W/"${space.revision}|${wanted}|document"`,
+        });
+        if (req.method === 'HEAD') res.end();
+        else res.end(bytes);
+        return true;
+      }
+
+      if (notModified(req, res, json, space, url, key)) return true;
       return send(res, json, {
         report: { ...draftSummary(row), draft },
         image: assets.get(wanted) ?? null,

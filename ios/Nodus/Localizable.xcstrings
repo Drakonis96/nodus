@@ -1278,6 +1278,17 @@
         }
       }
     },
+    "Could not build the PDF": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo generar el PDF"
+          }
+        }
+      }
+    },
     "Could not build the tree": {
       "extractionState": "manual",
       "localizations": {
@@ -1637,6 +1648,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Volver a descargar"
+          }
+        }
+      }
+    },
+    "Download as a PDF": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Descargar como PDF"
           }
         }
       }
@@ -4479,6 +4501,17 @@
         }
       }
     },
+    "Save the PDF": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Guardar el PDF"
+          }
+        }
+      }
+    },
     "Saved on this device.": {
       "extractionState": "manual",
       "localizations": {
@@ -5432,6 +5465,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "La consulta falló"
+          }
+        }
+      }
+    },
+    "The report could not be laid out for printing.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo maquetar el informe para imprimirlo."
           }
         }
       }

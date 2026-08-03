@@ -193,6 +193,23 @@ public extension NodusClient {
         return try page(from: response, key: SpecialResource.deepResearch.listKey)
     }
 
+    /// `GET .../deep-research/<id>/document.html` — the report laid out for print.
+    ///
+    /// The same design the desktop prints: cover, contents, section rules, traceability
+    /// matrix, `@page` box. It arrives as HTML rather than as a PDF because printing needs a
+    /// browser engine, and this device has one while the server deliberately has nothing at
+    /// all — no dependencies, no build, a hundred and fifty megabytes of Alpine and Node.
+    func deepResearchDocument(_ id: String, in spaceId: String) async throws -> String {
+        let response = try await perform(.init(
+            path: address.spacePath(spaceId, "/deep-research/\(escape(id))/document.html"),
+            cacheable: true
+        ))
+        guard let html = String(data: response.data, encoding: .utf8) else {
+            throw TransportError.malformedResponse(expected: "an HTML document")
+        }
+        return html
+    }
+
     /// The full report, its illustration's metadata, and any translations of it.
     func deepResearchReport(_ id: String, in spaceId: String) async throws -> DeepResearchReportDetail {
         let response = try await perform(.init(

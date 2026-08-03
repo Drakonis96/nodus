@@ -29,7 +29,11 @@ struct ReportCopyButtons: View {
     }
 
     var body: some View {
-        HStack(spacing: 10) {
+        // No spacing between them: each button is already a 44-point target around a
+        // callout-sized glyph, so the frames alone give an even gap — and adding to it on
+        // one side only made the pair sit further from the download beside them than from
+        // each other.
+        HStack(spacing: 0) {
             button(
                 .withReferences,
                 systemImage: "doc",
@@ -42,9 +46,11 @@ struct ReportCopyButtons: View {
                 label: "Copy without references",
                 text: ReadingCopy.text(from: markdown, title: title)
             )
-            Spacer(minLength: 0)
         }
-        .overlay(alignment: .trailing) {
+        // Floated under the row rather than beside it: there is a third button to the right
+        // now, and a confirmation that pushes it sideways is worse than one that appears
+        // where the eye already is.
+        .overlay(alignment: .bottomLeading) {
             if let copied {
                 Label(
                     copied == .withReferences ? "Copied" : "Copied without references",
@@ -52,6 +58,9 @@ struct ReportCopyButtons: View {
                 )
                 .font(.caption2)
                 .foregroundStyle(accent)
+                .fixedSize()
+                .offset(y: 16)
+                .allowsHitTesting(false)
                 .transition(.opacity)
             }
         }
