@@ -1519,6 +1519,22 @@ body {
 .btn.header-action {
   gap: 0;
 }
+/* The two ways of supporting the project wear their own brands, so neither is
+   mistaken for the other and neither reads as a Nodus feature. */
+.btn-paypal {
+  @apply text-white shadow-sm;
+  background: #0070ba;
+}
+.btn-paypal:hover {
+  background: #005ea6;
+}
+.btn-kofi {
+  @apply text-white shadow-sm;
+  background: #ff5e5b;
+}
+.btn-kofi:hover {
+  background: #e14b48;
+}
 /* Toolkit amber accent (PDF Presenter etc.). Solid fill so it reads clearly in both
    themes — previously `btn-accent` was undefined and these buttons had no background. */
 .btn-accent {
@@ -3077,20 +3093,31 @@ select.input optgroup {
 .whats-new-scope-general { color: #e2e8f0; background: #475569; box-shadow: 0 5px 14px rgb(15 23 42 / .22); }
 .light .whats-new-scope-general { border-color: #cbd5e1; color: #334155; background: #e2e8f0; box-shadow: 0 5px 12px rgb(15 23 42 / .1); }
 .whats-new-support { display: flex; align-items: center; gap: 14px; border: 1px solid rgb(0 112 186 / .25); border-radius: 17px; padding: 16px 18px; background: linear-gradient(105deg, rgb(0 112 186 / .1), rgb(0 156 222 / .035)); }
+.whats-new-support-icons { display: flex; flex: 0 0 auto; gap: 8px; }
 .whats-new-support-icon { display: grid; width: 44px; height: 44px; flex: 0 0 auto; place-items: center; border-radius: 13px; color: white; background: linear-gradient(145deg, #0089d6, #005ea6); box-shadow: 0 10px 24px rgb(0 112 186 / .25); }
+/* Ko-fi's own coral, so the two ways of supporting are told apart by colour and
+   not only by the glyph inside them. */
+.whats-new-support-icon-kofi { background: linear-gradient(145deg, #ff7b78, #e14b48); box-shadow: 0 10px 24px rgb(255 94 91 / .25); }
 .whats-new-support-label { color: #0284c7; font-size: 9px; font-weight: 800; letter-spacing: .12em; }
 .dark .whats-new-support-label { color: #7dd3fc; }
 .whats-new-support h3 { margin-top: 2px; color: var(--wn-text); font-size: 14px; font-weight: 700; }
 .whats-new-support p { max-width: 550px; margin-top: 3px; color: var(--wn-muted); font-size: 11px; line-height: 1.55; }
 .whats-new-paypal-button { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 7px; border-radius: 10px; padding: 9px 12px; color: white; background: #0070ba; font-size: 11px; font-weight: 750; box-shadow: 0 9px 22px rgb(0 112 186 / .2); }
 .whats-new-paypal-button:hover { background: #005ea6; transform: translateY(-1px); }
+.whats-new-kofi-button { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 7px; border-radius: 10px; padding: 9px 12px; color: white; background: #ff5e5b; font-size: 11px; font-weight: 750; box-shadow: 0 9px 22px rgb(255 94 91 / .2); }
+.whats-new-kofi-button:hover { background: #e14b48; transform: translateY(-1px); }
 .whats-new-footer { display: grid; flex: 0 0 auto; grid-template-columns: 1fr auto 1fr; align-items: center; border-top: 1px solid var(--wn-border); padding: 13px 22px; background: var(--wn-surface); }
 .whats-new-footer > span { display: flex; align-items: center; gap: 7px; color: var(--wn-muted); font-size: 9px; font-weight: 700; letter-spacing: .12em; }
 .whats-new-footer button { display: inline-flex; align-items: center; gap: 7px; border-radius: 10px; padding: 9px 14px; color: #07151a; background: linear-gradient(135deg, #5eead4, #a7f3d0); font-size: 11px; font-weight: 800; box-shadow: 0 10px 25px rgb(45 212 191 / .18); }
 .whats-new-footer button:hover { transform: translateY(-1px); filter: brightness(1.04); }
 .whats-new-footer > button:last-child { justify-self: end; }
-.whats-new-footer .whats-new-footer-support { justify-self: center; margin-left: 0; color: white; background: #0070ba; box-shadow: 0 9px 22px rgb(0 112 186 / .2); }
+/* PayPal and Ko-fi ride together in the middle column, so the pair stays centred
+   under the modal rather than each drifting to one side. */
+.whats-new-footer-support-group { display: flex; align-items: center; justify-self: center; gap: 8px; }
+.whats-new-footer .whats-new-footer-support { margin-left: 0; color: white; background: #0070ba; box-shadow: 0 9px 22px rgb(0 112 186 / .2); }
 .whats-new-footer .whats-new-footer-support:hover { background: #005ea6; }
+.whats-new-footer .whats-new-footer-support-kofi { color: white; background: #ff5e5b; box-shadow: 0 9px 22px rgb(255 94 91 / .2); }
+.whats-new-footer .whats-new-footer-support-kofi:hover { background: #e14b48; }
 @media (max-width: 680px) { .whats-new-backdrop { padding: 12px; } .whats-new-cinema { max-height: 92vh; border-radius: 20px; } .whats-new-hero { min-height: 205px; grid-template-columns: 1fr 145px; padding: 25px 20px; } .whats-new-hero h2 { font-size: 31px; } .whats-new-hero-copy > p { font-size: 11px; } .whats-new-nodi svg { height: 150px !important; } .whats-new-scroll { padding: 18px; } .whats-new-section-header { align-items: stretch; flex-direction: column; gap: 9px; } .whats-new-version-trigger { width: 100%; } .whats-new-version-menu { right: auto; left: 0; width: min(100%, 320px); } .whats-new-support { align-items: flex-start; flex-wrap: wrap; } }
 @media (prefers-reduced-motion: reduce) { .whats-new-aurora, .whats-new-confetti { animation: none; } }
 

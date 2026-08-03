@@ -1,5 +1,75 @@
 # Changelog
 
+## 3.1.0 — 2026-08-03
+
+Nodus Server stops being a read-only shop window. A vault can now live on a
+server and be replicated whole onto a machine, an account's access level in a
+space decides where that person's work ends up, and the computer in front of
+you can be the server without Docker or a domain.
+
+### Added
+
+- **Connected vaults.** Creating a vault offers a second origin: enter a Nodus
+  Server address and your credentials, pick from the spaces the account can
+  reach, and pull down a complete replica. It is a real SQLite database on
+  disk, not a remote viewer, so the graph, debates, argument map, Deep Research
+  and immersions work offline exactly as a local vault does, and a background
+  service refreshes it. Losing access leaves the vault whole and merely stops
+  the sync, with a plain notice saying so.
+- **Per-space access levels, enforced by the replica's own schema.** A reader's
+  notes, reports and immersions have no route out of their machine, rather than
+  an interface that declines to offer one; a writer's travel to the main vault
+  the next time its owner connects, and the screen states how many changes are
+  waiting. An administrator assigns several spaces at once, each at its own
+  level, and changes a level without revoking and re-granting.
+- **Genealogy, teaching, study and database vaults publish too**, not only
+  academic ones.
+- **Basic server mode.** Settings → Nodus Server runs the identical
+  `server/server.mjs` as a child of the desktop, with no Docker, no domain and
+  no port forwarding (`electron/localServer/`). The card states who can reach
+  it at any moment — this computer only, the local network, or a tailnet — and
+  there is deliberately no option to serve the network over plain HTTP. A
+  network change that breaks a bound address relaunches the listener, and
+  keeping the lid open asks for the administrator password through the OS, not
+  through Nodus.
+- **The report layout became shared code.** `shared/professionalReport.ts` and
+  `shared/deepResearchReport.ts` compile into `server/lib/core/generated/` via
+  `npm run build:server-shared`, so a replica or a phone prints the document the
+  desktop prints instead of an approximation of it.
+
+### Changed
+
+- **The privacy policy told the truth about embeddings.** It claimed vectors are
+  never uploaded, which shared semantic search had made false: idea vectors do
+  travel, so a replica or a phone can search by meaning. The document now says
+  so and says that it changed, and a new "Include semantic vectors" switch
+  really stops it. Passage vectors stay tied to the passages switch.
+- **The Deep Research reader header is a rail of icons** that open their labels
+  on hover or keyboard focus, the same treatment the titlebar uses, and the
+  permanently disabled "Guardado" button is gone — the reader auto-saves, so it
+  could never do anything.
+- **The add-vault dialog keeps one size** whichever origin is selected, instead
+  of collapsing to a third of its height and back.
+- **The desktop, Nodus Server and the mobile app share one version number.**
+  `scripts/test-version-agreement.mjs` holds `package.json`,
+  `server/package.json` and `server/lib/version.mjs` together.
+
+### Fixed
+
+- **A shared study or teaching vault was publishing class recordings, attempt
+  records and grading runs.** It no longer does. Report illustrations and
+  people's portraits, which a replica used to lose, now arrive complete.
+- **Pairing codes contained characters nobody could transcribe.** They were
+  built from uppercased base64url, so 22% carried a `-` or `_` inside a group,
+  next to the group separator, and the fold of `a` onto `A` made a letter twice
+  as likely as a digit. `pairingCode()` now draws from a fixed 32-symbol
+  alphabet with no I, O, 0 or 1, five bits per symbol and no modulo bias. The
+  endpoint test only failed on an unlucky draw, so the generator has a
+  ten-thousand-draw test of its own.
+- **An owner membership could not be changed while another owner remained.**
+- **The connected password field can be revealed** before it is sent, since
+  signing in is one shot and a typo comes back only as "wrong credentials".
+
 ## 3.0.4 — 2026-08-01
 
 Deep Research becomes something an MCP client can queue instead of wait on, and

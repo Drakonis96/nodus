@@ -23,10 +23,10 @@ try {
     { cwd: root, stdio: 'pipe' },
   );
 
-  const { RELEASE_NOTES, releaseNotesForMajor } = await import(pathToFileURL(bundlePath).href);
+  const { RELEASE_NOTES, releaseNotesForMajor, compareVersions } = await import(pathToFileURL(bundlePath).href);
   const currentRelease = RELEASE_NOTES[0];
   assert.equal(currentRelease?.version, '3.1.0');
-  assert.equal(currentRelease?.date, '2026-08-02');
+  assert.equal(currentRelease?.date, '2026-08-03');
   // Connected vaults, the access level that decides where a person's work ends up, and the
   // correction to what the privacy notice promised about embeddings. More highlights will
   // land here before 3.1.0 ships, so this is a floor rather than an exact count.
@@ -83,6 +83,27 @@ try {
   // it/tr fall back to en when their index-matched array is short, which would pass a
   // mere length check while silently shipping English to two locales.
   assert.ok(currentRelease?.highlights.every((h) => h.it !== h.en && h.tr !== h.en));
+
+  // From 3.1.0 on, a highlight is short plain sentences: no semicolons, no em dashes.
+  // Both were how these notes grew into paragraph-long subordinate clauses, and the
+  // modal is read once, in a hurry. Older releases keep the prose they shipped with.
+  const LANGUAGES = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr'];
+  for (const note of RELEASE_NOTES) {
+    if (compareVersions(note.version, '3.1.0') < 0) continue;
+    for (const [index, highlight] of note.highlights.entries()) {
+      for (const language of LANGUAGES) {
+        const text = highlight[language] ?? '';
+        assert.ok(
+          !text.includes(';'),
+          `v${note.version} highlight ${index + 1} (${language}) uses a semicolon: split it into two sentences`,
+        );
+        assert.ok(
+          !text.includes('—'),
+          `v${note.version} highlight ${index + 1} (${language}) uses an em dash: split it into two sentences`,
+        );
+      }
+    }
+  }
   const whatsNew = fs.readFileSync(path.join(root, 'src/components/WhatsNewModal.tsx'), 'utf8');
   assert.match(whatsNew, /function ZoteroReleaseIcon/);
   assert.match(whatsNew, /M16 18H48L16 46H48/);

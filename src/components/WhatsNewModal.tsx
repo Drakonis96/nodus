@@ -355,14 +355,19 @@ export function WhatsNewModal({
             className="whats-new-support"
             data-testid="whats-new-paypal-support"
           >
-            <div className="whats-new-support-icon">
-              <Icon name="paypal" size={22} />
+            <div className="whats-new-support-icons">
+              <div className="whats-new-support-icon">
+                <Icon name="paypal" size={22} />
+              </div>
+              <div className="whats-new-support-icon whats-new-support-icon-kofi">
+                <Icon name="kofi" size={22} />
+              </div>
             </div>
             <div className="min-w-0 flex-1">
               <span className="whats-new-support-label">OPEN SOURCE · {t('APOYO OPCIONAL')}</span>
               <h3>{t('Apoya el proyecto')}</h3>
               <p>
-                {t('Si Nodus te ayuda a estudiar, investigar o escribir y quieres contribuir voluntariamente a su desarrollo, puedes apoyar el proyecto mediante PayPal. La donación es completamente opcional: no desbloquea funciones ni cambia el acceso a la aplicación.')}
+                {t('Si Nodus te ayuda a estudiar, investigar o escribir y quieres contribuir voluntariamente a su desarrollo, puedes apoyar el proyecto mediante PayPal o Ko-fi. La donación es completamente opcional: no desbloquea funciones ni cambia el acceso a la aplicación.')}
               </p>
             </div>
           </aside>
@@ -370,13 +375,22 @@ export function WhatsNewModal({
 
         <footer className="whats-new-footer">
           <span><Icon name="network" size={13} /> NODUS · v{current}</span>
-          <button
-            className="whats-new-paypal-button whats-new-footer-support"
-            data-testid="whats-new-footer-support-paypal"
-            onClick={() => void window.nodus.openExternal('https://paypal.me/Jorgepb96')}
-          >
-            <Icon name="paypal" size={16} /> {t('Apoyar')}
-          </button>
+          <div className="whats-new-footer-support-group">
+            <button
+              className="whats-new-paypal-button whats-new-footer-support"
+              data-testid="whats-new-footer-support-paypal"
+              onClick={() => void window.nodus.openExternal('https://paypal.me/Jorgepb96')}
+            >
+              <Icon name="paypal" size={16} /> {t('Apoyar')}
+            </button>
+            <button
+              className="whats-new-kofi-button whats-new-footer-support-kofi"
+              data-testid="whats-new-footer-support-kofi"
+              onClick={() => void window.nodus.openExternal('https://ko-fi.com/nodus_app')}
+            >
+              <Icon name="kofi" size={16} /> Ko-fi
+            </button>
+          </div>
           <button onClick={close}>{t('Explorar las novedades')} <Icon name="chevronRight" size={14} /></button>
         </footer>
       </motion.section>

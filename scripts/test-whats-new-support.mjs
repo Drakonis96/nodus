@@ -14,6 +14,7 @@ const translations = await readFile(path.join(root, 'src/i18n.en.ts'), 'utf8');
 const icons = await readFile(path.join(root, 'src/components/ui.tsx'), 'utf8');
 const vaultUi = await readFile(path.join(root, 'src/components/vaultTypeUi.tsx'), 'utf8');
 const vaultTypes = await readFile(path.join(root, 'shared/vaultTypes.ts'), 'utf8');
+const settings = await readFile(path.join(root, 'src/views/Settings.tsx'), 'utf8');
 
 /** Every vault type, read from its own union so a new one cannot skip this file. */
 const VAULT_TYPES = [
@@ -32,6 +33,14 @@ assert.doesNotMatch(modal, /data-testid="whats-new-support-paypal"/);
 assert.match(modal, /data-testid="whats-new-footer-support-paypal"/);
 assert.equal((modal.match(/https:\/\/paypal\.me\/Jorgepb96/g) ?? []).length, 1);
 assert.match(modal, /<footer className="whats-new-footer">[\s\S]*whats-new-footer-support[\s\S]*Explorar las novedades[\s\S]*<\/footer>/);
+// Ko-fi rides beside PayPal, in one centred group rather than each drifting to a side,
+// and the aside above shows both marks so the message and the buttons agree.
+assert.match(modal, /data-testid="whats-new-footer-support-kofi"/);
+assert.equal((modal.match(/https:\/\/ko-fi\.com\/nodus_app/g) ?? []).length, 1);
+assert.match(modal, /<div className="whats-new-footer-support-group">[\s\S]*whats-new-footer-support-paypal[\s\S]*whats-new-footer-support-kofi[\s\S]*<\/div>/);
+assert.match(styles, /\.whats-new-footer-support-group \{[^}]*justify-self: center/);
+assert.match(modal, /whats-new-support-icon whats-new-support-icon-kofi/);
+assert.match(icons, /kofi:/);
 assert.match(modal, /<div className="whats-new-release-version">v\{selectedNote\.version\}<\/div>/);
 assert.match(modal, /groupHighlightsByScope\(selectedNote\.highlights\)\.map[\s\S]*<li key=\{i\}>/);
 // The uniform-view grouping clusters highlights by scope and orders clusters by size.
@@ -103,12 +112,25 @@ assert.doesNotMatch(styles, /\.whats-new-check/);
 assert.doesNotMatch(styles, /\.whats-new-paypal-button \{ margin-left: 58px; \}/);
 assert.doesNotMatch(modal, /<motion\.li/);
 assert.match(modal, /Icon name="paypal"/);
+assert.match(modal, /Icon name="kofi"/);
 assert.match(modal, /https:\/\/paypal\.me\/Jorgepb96/);
 assert.match(modal, /La donación es completamente opcional: no desbloquea funciones ni cambia el acceso a la aplicación/);
+// The copy names both ways of supporting, or one of the two buttons would appear
+// out of nowhere.
+assert.match(modal, /puedes apoyar el proyecto mediante PayPal o Ko-fi/);
 assert.match(translations, /'Apoya el proyecto': 'Support the project'/);
+assert.match(translations, /you can support the project through PayPal or Ko-fi/);
 assert.match(translations, /Donations are entirely optional: they do not unlock features or change access to the application/);
+assert.match(translations, /'Apoyar con Ko-fi': 'Support through Ko-fi'/);
 assert.match(icons, /paypal:/);
 assert.match(icons, /sparkles:/);
+// "Acerca de Nodus" offers the same two ways of supporting as the release modal, or
+// somebody who reads one surface would think only PayPal exists.
+assert.match(settings, /data-testid="support-nodus-paypal"[\s\S]*https:\/\/paypal\.me\/Jorgepb96/);
+assert.match(settings, /data-testid="support-nodus-kofi"[\s\S]*https:\/\/ko-fi\.com\/nodus_app/);
+assert.match(settings, /puedes apoyar el proyecto mediante PayPal o Ko-fi/);
+assert.match(styles, /\.btn-kofi \{/);
+
 assert.match(app, /onOpenWhatsNew=\{\(\) => setManualWhatsNewOpen\(true\)\}/);
 assert.match(app, /manualWhatsNewOpen[\s\S]*<WhatsNewModal[\s\S]*showSeenReleaseNotes[\s\S]*setManualWhatsNewOpen\(false\)/);
 

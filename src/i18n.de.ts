@@ -353,9 +353,10 @@ export const DE: Record<string, string> = {
   'Acerca de Nodus': 'Über Nodus',
   'Nodus es un proyecto independiente de código abierto, desarrollado y mantenido principalmente por una sola persona. No es un servicio comercial ni un producto de pago: la aplicación seguirá siendo gratuita y su código permanecerá abierto.':
     'Nodus ist ein unabhängiges Open-Source-Projekt, das hauptsächlich von einer einzelnen Person entwickelt und gepflegt wird. Es ist kein kommerzieller Dienst und kein kostenpflichtiges Produkt: Die Anwendung bleibt kostenlos, und ihr Quellcode bleibt offen.',
-  'Si Nodus te ayuda a estudiar, investigar o escribir y quieres contribuir voluntariamente a su desarrollo, puedes apoyar el proyecto mediante PayPal. La donación es completamente opcional: no desbloquea funciones ni cambia el acceso a la aplicación.':
-    'Wenn Nodus Ihnen beim Lernen, Forschen oder Schreiben hilft und Sie freiwillig zur weiteren Entwicklung beitragen möchten, können Sie das Projekt über PayPal unterstützen. Die Spende ist völlig optional: Sie schaltet keine Funktionen frei und ändert nichts am Zugang zur Anwendung.',
+  'Si Nodus te ayuda a estudiar, investigar o escribir y quieres contribuir voluntariamente a su desarrollo, puedes apoyar el proyecto mediante PayPal o Ko-fi. La donación es completamente opcional: no desbloquea funciones ni cambia el acceso a la aplicación.':
+    'Wenn Nodus Ihnen beim Lernen, Forschen oder Schreiben hilft und Sie freiwillig zur weiteren Entwicklung beitragen möchten, können Sie das Projekt über PayPal oder Ko-fi unterstützen. Die Spende ist völlig optional: Sie schaltet keine Funktionen frei und ändert nichts am Zugang zur Anwendung.',
   'Apoyar con PayPal': 'Mit PayPal unterstützen',
+  'Apoyar con Ko-fi': 'Mit Ko-fi unterstützen',
   'Apoyar': 'Unterstützen',
   'Comienza': 'Beginnt',
   'Finaliza': 'Endet',

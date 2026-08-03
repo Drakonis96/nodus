@@ -1226,18 +1226,28 @@ export function Settings({
                 {t('Nodus es un proyecto independiente de código abierto, desarrollado y mantenido principalmente por una sola persona. No es un servicio comercial ni un producto de pago: la aplicación seguirá siendo gratuita y su código permanecerá abierto.')}
               </p>
               <p>
-                {t('Si Nodus te ayuda a estudiar, investigar o escribir y quieres contribuir voluntariamente a su desarrollo, puedes apoyar el proyecto mediante PayPal. La donación es completamente opcional: no desbloquea funciones ni cambia el acceso a la aplicación.')}
+                {t('Si Nodus te ayuda a estudiar, investigar o escribir y quieres contribuir voluntariamente a su desarrollo, puedes apoyar el proyecto mediante PayPal o Ko-fi. La donación es completamente opcional: no desbloquea funciones ni cambia el acceso a la aplicación.')}
               </p>
             </div>
 
-            <button
-              data-testid="support-nodus-paypal"
-              className="btn btn-primary mt-5"
-              onClick={() => void window.nodus.openExternal('https://paypal.me/Jorgepb96')}
-            >
-              <Icon name="paypal" size={17} /> {t('Apoyar con PayPal')}
-              <Icon name="external" size={13} className="opacity-70" />
-            </button>
+            <div className="mt-5 flex flex-wrap gap-2">
+              <button
+                data-testid="support-nodus-paypal"
+                className="btn btn-paypal"
+                onClick={() => void window.nodus.openExternal('https://paypal.me/Jorgepb96')}
+              >
+                <Icon name="paypal" size={17} /> {t('Apoyar con PayPal')}
+                <Icon name="external" size={13} className="opacity-70" />
+              </button>
+              <button
+                data-testid="support-nodus-kofi"
+                className="btn btn-kofi"
+                onClick={() => void window.nodus.openExternal('https://ko-fi.com/nodus_app')}
+              >
+                <Icon name="kofi" size={17} /> {t('Apoyar con Ko-fi')}
+                <Icon name="external" size={13} className="opacity-70" />
+              </button>
+            </div>
             <p className="mt-2 text-xs text-neutral-500">
               {t('El enlace se abrirá en tu navegador. Nodus no procesa pagos ni recibe información de pago.')}
             </p>
