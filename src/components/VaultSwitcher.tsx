@@ -76,6 +76,7 @@ export function VaultSwitcher({ anchorEl, onClose, vaults, onVaultsChanged, onAc
   const [remoteUrl, setRemoteUrl] = useState('');
   const [remoteEmail, setRemoteEmail] = useState('');
   const [remotePassword, setRemotePassword] = useState('');
+  const [showRemotePassword, setShowRemotePassword] = useState(false);
   const [remoteSession, setRemoteSession] = useState<RemoteSignIn | null>(null);
   const [remoteSpaceId, setRemoteSpaceId] = useState('');
 
@@ -165,6 +166,7 @@ export function VaultSwitcher({ anchorEl, onClose, vaults, onVaultsChanged, onAc
   const openAddVault = () => {
     setAddNameError(null);
     setAddError(null);
+    setShowRemotePassword(false);
     setAddOpen(true);
   };
 
@@ -180,9 +182,11 @@ export function VaultSwitcher({ anchorEl, onClose, vaults, onVaultsChanged, onAc
       }
     });
 
-  /** Dismiss the add-vault dialog. */
+  /** Dismiss the add-vault dialog, leaving nothing typed behind it — a revealed
+   *  password must never still be on screen the next time it opens. */
   const closeAddModal = () => {
     setAddOpen(false);
+    setShowRemotePassword(false);
   };
 
   /**
@@ -204,6 +208,7 @@ export function VaultSwitcher({ anchorEl, onClose, vaults, onVaultsChanged, onAc
         setRemoteSpaceId(session.spaces[0]?.id ?? '');
         // The password is not kept once it has been exchanged for a ticket.
         setRemotePassword('');
+        setShowRemotePassword(false);
         return;
       }
       const space = remoteSession.spaces.find((candidate) => candidate.id === remoteSpaceId);
@@ -538,7 +543,27 @@ export function VaultSwitcher({ anchorEl, onClose, vaults, onVaultsChanged, onAc
                     </label>
                     <label className="block text-sm">
                       {t('Contraseña')}
-                      <input className="input mt-1 w-full" type="password" autoComplete="current-password" value={remotePassword} onChange={(e) => setRemotePassword(e.target.value)} />
+                      {/* `.input` is declared after the utilities layer, so its own px-3
+                          beats a plain pr-* class: the trailing-action helper is what
+                          actually keeps the text from running under the eye. */}
+                      <div className="relative mt-1">
+                        <input
+                          className="input input-with-trailing-action w-full"
+                          type={showRemotePassword ? 'text' : 'password'}
+                          autoComplete="current-password"
+                          value={remotePassword}
+                          onChange={(e) => setRemotePassword(e.target.value)}
+                        />
+                        <button
+                          type="button"
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-100"
+                          onClick={() => setShowRemotePassword((value) => !value)}
+                          aria-label={t(showRemotePassword ? 'Ocultar contraseña' : 'Mostrar contraseña')}
+                          title={t(showRemotePassword ? 'Ocultar contraseña' : 'Mostrar contraseña')}
+                        >
+                          <Icon name={showRemotePassword ? 'eyeOff' : 'eye'} size={17} />
+                        </button>
+                      </div>
                     </label>
                   </>
                 ) : (
