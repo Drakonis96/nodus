@@ -139,7 +139,9 @@ struct HomeView: View {
                 }
             }
             .padding(16)
+            .nodusTopAnchor()
         }
+        .nodusScrollToTop(accent: session.accent)
         .refreshable { await session.load() }
     }
 

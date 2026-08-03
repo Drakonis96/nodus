@@ -67,7 +67,9 @@ struct RowDetailView: View {
                 }
             }
             .padding(16)
+            .nodusTopAnchor()
         }
+        .nodusScrollToTop(accent: session.accent)
         // `LocalizedStringKey`, not the bare `String`: a collection's label is a value, and a
         // value handed to `navigationTitle` ships in the base language on every phone — which
         // is how a Spanish reader opening a citation landed on a screen titled "Library". The

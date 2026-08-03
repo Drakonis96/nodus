@@ -180,6 +180,8 @@ struct LocalReportReader: View {
                             message: "Of \(saved.report.citationsChecked) checked."
                         )
                     }
+
+                    ReportCopyButtons(markdown: saved.report.markdown, title: nil, accent: session.accent)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(16)
@@ -219,7 +221,9 @@ struct LocalReportReader: View {
                 .buttonStyle(NodusGlassButtonStyle(accent: session.accent))
             }
             .padding(16)
+            .nodusTopAnchor()
         }
+        .nodusScrollToTop(accent: session.accent)
         .navigationTitle(saved.mode.label)
         .navigationBarTitleDisplayMode(.inline)
         .nodusPageBackdrop(accent: session.accent)
@@ -248,6 +252,14 @@ struct PublishedReportReader: View {
                     Text(row.text("title") ?? "Report").font(.title3.weight(.semibold))
                     if let objective = row.text("objective") {
                         Text(objective).font(.subheadline).foregroundStyle(.secondary)
+                    }
+                    if let document {
+                        ReportCopyButtons(
+                            markdown: document,
+                            title: row.text("title"),
+                            accent: session.accent
+                        )
+                        .padding(.top, 4)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -278,7 +290,9 @@ struct PublishedReportReader: View {
                 }
             }
             .padding(16)
+            .nodusTopAnchor()
         }
+        .nodusScrollToTop(accent: session.accent)
         .navigationTitle("Report")
         .navigationBarTitleDisplayMode(.inline)
         .nodusPageBackdrop(accent: session.accent)
@@ -321,6 +335,20 @@ struct PublishedReportReader: View {
 
         guard let body = detail.report.text("content") ?? detail.report.text("markdown") else { return nil }
         return [Prose(heading: nil, body: body)]
+    }
+
+    /// The report as one Markdown document, which is what a copy is of.
+    ///
+    /// `prose` is a list because a report written on this phone arrives as sections; a report
+    /// the desktop published is already one document and comes back as a single entry.
+    private var document: String? {
+        guard let sections = prose, !sections.isEmpty else { return nil }
+        return sections
+            .map { section in
+                guard let heading = section.heading, !heading.isEmpty else { return section.body }
+                return "## \(heading)\n\n\(section.body)"
+            }
+            .joined(separator: "\n\n")
     }
 
     private func load() async {

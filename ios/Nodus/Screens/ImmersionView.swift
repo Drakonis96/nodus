@@ -41,7 +41,9 @@ struct ImmersionView: View {
                 }
             }
             .padding(16)
+            .nodusTopAnchor()
         }
+        .nodusScrollToTop(accent: session.accent)
         .navigationTitle("Immersion")
         .navigationBarTitleDisplayMode(.inline)
         .nodusPageBackdrop(accent: session.accent)
@@ -295,7 +297,9 @@ private struct ImmersionStationView: View {
                 }
             }
             .padding(16)
+            .nodusTopAnchor()
         }
+        .nodusScrollToTop(accent: accent)
         .navigationTitle(station.title)
         .navigationBarTitleDisplayMode(.inline)
         .nodusPageBackdrop(accent: accent)

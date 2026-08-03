@@ -761,6 +761,28 @@
         }
       }
     },
+    "Back to top": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Volver arriba"
+          }
+        }
+      }
+    },
+    "Back-to-top button": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Botón para volver arriba"
+          }
+        }
+      }
+    },
     "Beats": {
       "extractionState": "manual",
       "localizations": {
@@ -1131,6 +1153,50 @@
           "stringUnit": {
             "state": "translated",
             "value": "Contradice"
+          }
+        }
+      }
+    },
+    "Copied": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copiado"
+          }
+        }
+      }
+    },
+    "Copied without references": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copiado sin referencias"
+          }
+        }
+      }
+    },
+    "Copy with references": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copiar con referencias"
+          }
+        }
+      }
+    },
+    "Copy without references": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copiar sin referencias"
           }
         }
       }

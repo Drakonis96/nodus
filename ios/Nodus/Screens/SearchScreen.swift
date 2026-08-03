@@ -25,6 +25,7 @@ struct SearchScreen: View {
 
     var body: some View {
         List {
+            NodusTopAnchorRow()
             if let error {
                 NodusNotice(tone: .blocked, title: "Search failed", message: LocalizedStringKey(error))
                     .listRowBackground(Color.clear).listRowSeparator(.hidden)
@@ -77,6 +78,7 @@ struct SearchScreen: View {
         }
         .scrollContentBackground(.hidden)
         .listStyle(.plain)
+        .nodusScrollToTop(accent: session.accent)
         .navigationTitle("Search")
         .navigationBarTitleDisplayMode(.inline)
         // The field is drawn here rather than with `.searchable`. This is a *root* screen of

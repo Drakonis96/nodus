@@ -40,7 +40,9 @@ struct DeepResearchScreen: View {
                 }
             }
             .padding(16)
+            .nodusTopAnchor()
         }
+        .nodusScrollToTop(accent: session.accent)
         .navigationTitle("Deep Research")
         .navigationBarTitleDisplayMode(.inline)
         .nodusPageBackdrop(accent: session.accent)
@@ -241,6 +243,10 @@ struct DeepResearchScreen: View {
                 if let stopped = report.stoppedReason {
                     NodusNotice(tone: .caution, title: "The report is incomplete", message: LocalizedStringKey(stopped))
                 }
+
+                // `report.markdown` already opens with the objective as its heading, so the
+                // listening copy is not given a title to prepend on top of it.
+                ReportCopyButtons(markdown: report.markdown, title: nil, accent: session.accent)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(16)

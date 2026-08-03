@@ -9,6 +9,7 @@ struct SpaceSettingsView: View {
 
     @Environment(AISettings.self) private var ai
     @Environment(AppLock.self) private var lock
+    @Environment(AppPreferences.self) private var preferences
     @State private var health: ServerHealth?
     @State private var capabilities: ServerCapabilities?
     @State private var diagnosticError: String?
@@ -124,6 +125,14 @@ struct SpaceSettingsView: View {
                     if let failure = lock.failure {
                         Text(failure).font(.caption).foregroundStyle(.red)
                     }
+
+                    Toggle(isOn: Binding(
+                        get: { preferences.showsScrollToTop },
+                        set: { preferences.showsScrollToTop = $0 }
+                    )) {
+                        Label("Back-to-top button", systemImage: "chevron.up.circle")
+                    }
+                    .tint(session.accent)
                 } header: {
                     Text("This device")
                 } footer: {

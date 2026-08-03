@@ -23,6 +23,7 @@ struct CollectionListView: View {
 
     var body: some View {
         List {
+            NodusTopAnchorRow()
             if let error {
                 NodusNotice(tone: .blocked, title: "Could not load", message: LocalizedStringKey(error))
                     .listRowBackground(Color.clear)
@@ -65,6 +66,7 @@ struct CollectionListView: View {
         }
         .scrollContentBackground(.hidden)
         .listStyle(.plain)
+        .nodusScrollToTop(accent: session.accent)
         .navigationTitle(Text(LocalizedStringKey(collection.label)))
         .navigationBarTitleDisplayMode(.inline)
         .nodusPageBackdrop(accent: session.accent)
@@ -199,6 +201,7 @@ struct SpecialListView: View {
 
     var body: some View {
         List {
+            NodusTopAnchorRow()
             if let error {
                 NodusNotice(tone: .blocked, title: "Could not load", message: LocalizedStringKey(error))
                     .listRowBackground(Color.clear)
@@ -240,6 +243,7 @@ struct SpecialListView: View {
         }
         .scrollContentBackground(.hidden)
         .listStyle(.plain)
+        .nodusScrollToTop(accent: session.accent)
         .navigationTitle(Text(LocalizedStringKey(title)))
         .navigationBarTitleDisplayMode(.inline)
         .nodusPageBackdrop(accent: session.accent)
