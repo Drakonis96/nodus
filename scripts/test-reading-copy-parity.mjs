@@ -119,6 +119,15 @@ async function labReports() {
 }
 
 try {
+  // Xcode is not a reasonable thing to require of everybody who runs `npm test`. Without a
+  // Swift toolchain this says so and stops, rather than failing as though the port were wrong.
+  try {
+    await run('swift', ['--version']);
+  } catch {
+    console.log('reading-copy parity: skipped, no Swift toolchain on this machine');
+    process.exit(0);
+  }
+
   const outfile = path.join(tmp, 'readingCopy.mjs');
   await build({
     entryPoints: [path.join(repoRoot, 'shared/readingCopy.ts')],

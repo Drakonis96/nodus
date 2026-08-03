@@ -1,86 +1,69 @@
 import crypto from 'node:crypto';
-import fs from 'node:fs';
-import path from 'node:path';
-import { app } from 'electron';
 import { deriveNodiNoteTitle } from '@shared/nodiNotes';
 import type { NodiNote, NodiNoteInput } from '@shared/types';
+import { mergeIncoming, selectLiveNotes, selectNote, upsertNote, type StoredNodiNote } from './nodiNotesDb';
 
-// Quick Markdown notes for the Nodi companion. Stored as a small JSON file in the
-// user-data directory (install-wide, not per-vault) so a jot survives vault
-// switches and app restarts. Mirrors the atomic read/write of `nodiConversations`.
-
-interface Store {
-  version: 1;
-  notes: NodiNote[];
-}
+// Quick Markdown notes for the Nodi companion.
+//
+// The store is `nodi.sqlite` in the user-data directory — install-wide, not per-vault — so a
+// jot survives vault switches and app restarts, and so the same notes are there whichever
+// corpus is open. See `electron/nodiNotesDb.ts` for why it is a table of its own rather than
+// a row in somebody's vault.
+//
+// This file keeps the shape the companion and the IPC layer already call, so nothing above
+// it had to change when the JSON file became a table.
 
 const MAX_NOTES = 500;
 
-function storePath(): string {
-  return path.join(app.getPath('userData'), 'nodi-notes.json');
-}
-
-function normalizeNote(value: NodiNote): NodiNote {
-  const content = typeof value.content === 'string' ? value.content : '';
-  const explicitTitle = value.titleExplicit === true ? String(value.title || '').trim() : '';
+function normalize(note: StoredNodiNote): NodiNote {
   return {
-    id: String(value.id || crypto.randomUUID()),
-    title: (explicitTitle || deriveNodiNoteTitle(content)).slice(0, 100),
-    titleExplicit: Boolean(explicitTitle),
-    content,
-    createdAt: Number(value.createdAt) || Date.now(),
-    updatedAt: Number(value.updatedAt) || Date.now(),
+    id: note.id,
+    title: note.title,
+    titleExplicit: note.titleExplicit,
+    content: note.content,
+    createdAt: note.createdAt,
+    updatedAt: note.updatedAt,
   };
 }
 
-function read(): Store {
-  try {
-    const parsed = JSON.parse(fs.readFileSync(storePath(), 'utf8')) as Partial<Store>;
-    return {
-      version: 1,
-      notes: Array.isArray(parsed.notes) ? parsed.notes.map(normalizeNote) : [],
-    };
-  } catch {
-    return { version: 1, notes: [] };
-  }
-}
-
-function write(store: Store): void {
-  const target = storePath();
-  const temporary = `${target}.tmp`;
-  fs.mkdirSync(path.dirname(target), { recursive: true });
-  fs.writeFileSync(temporary, JSON.stringify(store), 'utf8');
-  fs.renameSync(temporary, target);
-}
-
 export function listNodiNotes(): NodiNote[] {
-  return read().notes.sort((a, b) => b.updatedAt - a.updatedAt);
+  return selectLiveNotes(MAX_NOTES).map(normalize);
 }
 
 export function saveNodiNote(input: NodiNoteInput): NodiNote {
-  const store = read();
-  const existingIndex = input.id ? store.notes.findIndex((note) => note.id === input.id) : -1;
-  const existing = existingIndex >= 0 ? store.notes[existingIndex] : null;
+  const existing = input.id ? selectNote(input.id) : null;
   const now = Date.now();
   const content = typeof input.content === 'string' ? input.content : '';
   const explicitTitle = String(input.title || '').trim();
-  const note = normalizeNote({
-    id: existing?.id ?? crypto.randomUUID(),
-    title: explicitTitle || deriveNodiNoteTitle(content),
+  const note: StoredNodiNote = {
+    id: existing?.id ?? String(input.id || crypto.randomUUID()),
+    title: (explicitTitle || deriveNodiNoteTitle(content)).slice(0, 100),
     titleExplicit: Boolean(explicitTitle),
     content,
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
-  });
-  if (existingIndex >= 0) store.notes.splice(existingIndex, 1);
-  store.notes.unshift(note);
-  store.notes = store.notes.slice(0, MAX_NOTES);
-  write(store);
-  return note;
+    // Writing to a note that was deleted brings it back, which is what editing one means.
+    deletedAt: null,
+  };
+  upsertNote(note);
+  return normalize(note);
 }
 
+/**
+ * Delete a note.
+ *
+ * A tombstone rather than a `DELETE`: these notes travel between a person's devices, and an
+ * absent row is indistinguishable from one the other device has not heard about yet. The row
+ * keeps its id and its timestamps and loses its content, which is the part that was private.
+ */
 export function deleteNodiNote(id: string): void {
-  const store = read();
-  store.notes = store.notes.filter((note) => note.id !== id);
-  write(store);
+  const existing = selectNote(id);
+  if (!existing) return;
+  const now = Date.now();
+  upsertNote({ ...existing, title: '', content: '', updatedAt: now, deletedAt: now });
+}
+
+/** Apply notes that arrived from the Nodus Server. Used by the sync lane only. */
+export function applyRemoteNodiNotes(notes: StoredNodiNote[]): number {
+  return mergeIncoming(notes);
 }

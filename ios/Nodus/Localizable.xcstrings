@@ -585,6 +585,17 @@
         }
       }
     },
+    "Anything you write here appears in Nodi on your computer, whichever vault is open.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lo que escribas aquí aparece en Nodi en tu ordenador, sea cual sea el vault abierto."
+          }
+        }
+      }
+    },
     "Anything you write or generate here stays on this device.": {
       "extractionState": "manual",
       "localizations": {
@@ -1289,6 +1300,17 @@
         }
       }
     },
+    "Could not reach Nodi’s notes": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo acceder a las notas de Nodi"
+          }
+        }
+      }
+    },
     "Could not read the mirror": {
       "extractionState": "manual",
       "localizations": {
@@ -1846,6 +1868,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Filtrar ideas de este tema"
+          }
+        }
+      }
+    },
+    "Filter notes": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filtrar notas"
           }
         }
       }
@@ -2455,6 +2488,17 @@
         }
       }
     },
+    "Left empty, Nodi names the note after its first words.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Si lo dejas vacío, Nodi nombra la nota con sus primeras palabras."
+          }
+        }
+      }
+    },
     "Length": {
       "extractionState": "manual",
       "localizations": {
@@ -2692,7 +2736,7 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Nueva nota"
+            "value": "Nota nueva"
           }
         }
       }
@@ -2836,6 +2880,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ningún modelo contiene «\\(query)»."
+          }
+        }
+      }
+    },
+    "No note contains “%@”.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ninguna nota contiene «%@»."
+          }
+        }
+      }
+    },
+    "No notes yet": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Todavía no hay notas"
           }
         }
       }
@@ -3001,6 +3067,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sin horario"
+          }
+        }
+      }
+    },
+    "Nodi’s notes": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notas de Nodi"
+          }
+        }
+      }
+    },
+    "Nodi’s notes are the same in every vault, and they reach your computer as soon as this saves — they do not wait for a republication.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Las notas de Nodi son las mismas en todos los vaults y llegan a tu ordenador en cuanto se guardan: no esperan a una nueva publicación."
           }
         }
       }
@@ -5745,6 +5833,17 @@
         }
       }
     },
+    "Title (optional)": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Título (opcional)"
+          }
+        }
+      }
+    },
     "Title 1": {
       "extractionState": "manual",
       "localizations": {
@@ -6236,6 +6335,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Escribir"
+          }
+        }
+      }
+    },
+    "Write the note": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escribe la nota"
           }
         }
       }

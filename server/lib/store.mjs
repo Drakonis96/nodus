@@ -228,6 +228,42 @@ export class Store {
     return dir;
   }
 
+  // ── Nodi's quick notes ──────────────────────────────────────────────────────
+  //
+  // One file per *user*, not per space: Nodi is the companion, and a jot made while reading
+  // one vault is still there when the next one is open. Kept out of `state.json` because
+  // that file is rewritten whole on every session, token and pairing change, and a person's
+  // notes have no business being copied five hundred times an hour.
+
+  nodiNotesPath(userId) {
+    const dir = path.join(this.root, 'nodi');
+    fs.mkdirSync(dir, { recursive: true });
+    // The id is a UUID the server minted, but a path is a path: anything that could climb
+    // out of the directory is refused rather than sanitised.
+    if (!/^[A-Za-z0-9_-]{1,64}$/.test(String(userId))) throw new Error('Invalid user id');
+    return path.join(dir, `${userId}.json`);
+  }
+
+  readNodiNotes(userId) {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(this.nodiNotesPath(userId), 'utf8'));
+      return Array.isArray(parsed?.notes) ? parsed.notes : [];
+    } catch {
+      return [];
+    }
+  }
+
+  writeNodiNotes(userId, notes) {
+    const target = this.nodiNotesPath(userId);
+    const temporary = `${target}.tmp-${process.pid}-${Date.now()}`;
+    fs.writeFileSync(temporary, JSON.stringify({ version: 1, notes }), { mode: 0o600 });
+    fs.renameSync(temporary, target);
+  }
+
+  removeNodiNotes(userId) {
+    try { fs.rmSync(this.nodiNotesPath(userId), { force: true }); } catch { /* never existed */ }
+  }
+
   // Assets are addressed by the sha256 of their bytes and fanned out two levels. A shared
   // genealogy or Deep Research space can hold tens of thousands of images, and a flat
   // directory degrades badly at that size on every filesystem we ship on.

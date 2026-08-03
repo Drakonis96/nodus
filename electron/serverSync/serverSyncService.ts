@@ -66,6 +66,9 @@ interface VaultRuntime {
 const runtimes = new Map<string, VaultRuntime>();
 const readonlyPool = new Map<string, Database.Database>();
 let timer: ReturnType<typeof setInterval> | null = null;
+/** When Nodi's notes last went round, so an idle install is not asking every tick. */
+let lastNodiNotesSyncAt = 0;
+const NODI_NOTES_INTERVAL_MS = 60_000;
 let firstTimer: ReturnType<typeof setTimeout> | null = null;
 let publishing = false;
 
@@ -492,10 +495,30 @@ async function publishVault(vaultId: string): Promise<void> {
   }
 }
 
+/**
+ * Nodi's notes, on the same tick but on their own terms.
+ *
+ * They are not a space, so they do not belong to any of the per-vault runtimes: one exchange
+ * per tick, over whichever connection happens to be configured, and never more than once
+ * even when five vaults are connected to the same server.
+ */
+async function tickNodiNotes(configs: VaultServerConfig[]): Promise<void> {
+  const target = configs.find((config) => config.url && hasNodusServerTokenFor(config.vaultId));
+  if (!target) return;
+  const token = getNodusServerTokenFor(target.vaultId);
+  if (!token) return;
+  if (Date.now() - lastNodiNotesSyncAt < NODI_NOTES_INTERVAL_MS && !nodiNotesPending(target.url)) return;
+  lastNodiNotesSyncAt = Date.now();
+  await syncNodiNotes({ url: target.url, token });
+}
+
 async function tick(): Promise<void> {
   if (publishing) return;
   const configs = listVaultConfigs().filter((config) => config.configured && config.enabled);
   if (configs.length === 0) return;
+
+  // 0) Nodi's notes first: one small request, and it must not wait behind a 40 MB snapshot.
+  await tickNodiNotes(configs);
 
   // 1) The active vault is the only one whose contents change while the app runs.
   //    Detect a change cheaply and, after the quiet + min-interval windows, flag it.

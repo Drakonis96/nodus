@@ -77,8 +77,12 @@ struct HomeView: View {
                 // outside a `LazyVGrid` stretches to the full width, and a lone stretched tile
                 // among rows of square ones reads as a different kind of thing rather than as
                 // the one item in its section.
-                if session.connection.role.canSendChanges {
-                    tileSection("Write") {
+                // Nodi's notes sit beside the queue rather than under Analyse, because both
+                // are things you *write*. They are also the one tile here that is not about
+                // this vault: Nodi follows the person, so the same notes are behind this tile
+                // in every space.
+                tileSection("Write") {
+                    if session.connection.role.canSendChanges {
                         NavigationLink {
                             WritingView(session: session)
                         } label: {
@@ -86,6 +90,12 @@ struct HomeView: View {
                         }
                         .buttonStyle(.plain)
                     }
+                    NavigationLink {
+                        NodiNotesView(session: session)
+                    } label: {
+                        SectionTile(title: "Nodi’s notes", icon: "sparkles", count: nil, accent: session.accent)
+                    }
+                    .buttonStyle(.plain)
                 }
 
                 if !session.mirrorOnlyTables.isEmpty {
