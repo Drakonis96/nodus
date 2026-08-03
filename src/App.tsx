@@ -39,7 +39,7 @@ import { StartupUpdateModal } from './components/StartupUpdateModal';
 import { recoveryHealthAdvice, recoveryHealthHeadline } from './recoveryHealth';
 import { NodiMascot } from './components/nodi/NodiMascot';
 import { NodiStyleModal } from './components/NodiStyleModal';
-import { Icon } from './components/ui';
+import { HoverLabelButton, Icon } from './components/ui';
 import { AppErrorBoundary } from './components/AppErrorBoundary';
 import { t, tx, setActiveLang } from './i18n';
 import { resolveStartupGate } from './app/StartupGate';
@@ -118,27 +118,19 @@ function HeaderAction({
   vaultTrigger?: boolean;
 }) {
   return (
-    <button
+    <HoverLabelButton
       data-tour={dataTour}
       data-vault-trigger={vaultTrigger ? '' : undefined}
+      icon={icon}
+      label={label}
+      title={title}
       onClick={onClick}
       disabled={disabled}
-      title={title ?? label}
-      aria-label={label}
-      className={`header-action group btn btn-ghost h-9 min-h-9 justify-center px-2.5 py-0 leading-none ${tone}`}
-    >
-      <Icon name={icon} className={`shrink-0 ${spinning ? 'animate-spin' : ''}`} />
-      <span
-        className={`flex items-center overflow-hidden whitespace-nowrap transition-all duration-200 ${
-          showLabel
-            ? 'ml-1.5 max-w-[14rem] opacity-100'
-            : 'ml-0 max-w-0 opacity-0 group-hover:ml-1.5 group-hover:max-w-[14rem] group-hover:opacity-100 group-focus-visible:ml-1.5 group-focus-visible:max-w-[14rem] group-focus-visible:opacity-100'
-        }`}
-      >
-        {label}
-        {kbd && <kbd className="composer-kbd ml-1.5">{kbd}</kbd>}
-      </span>
-    </button>
+      spinning={spinning}
+      showLabel={showLabel}
+      className={`btn-ghost h-9 min-h-9 ${tone}`}
+      trailing={kbd ? <kbd className="composer-kbd ml-1.5">{kbd}</kbd> : undefined}
+    />
   );
 }
 

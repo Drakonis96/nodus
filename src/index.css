@@ -124,13 +124,6 @@
   -webkit-app-region: no-drag;
 }
 
-/* HeaderAction always renders an icon plus a zero-width label. The generic .btn
-   gap would still reserve 6px for that hidden label and shift every icon 3px to
-   the left, so labels provide their own margin only when they become visible. */
-.app-titlebar .header-action {
-  gap: 0;
-}
-
 /* The centred vault trigger uses dark-theme indigo utilities as its baseline.
    In the light theme it needs its own, much lighter surface; using --vault-accent
    keeps the same treatment for every vault mode without global utility remaps. */
@@ -1518,6 +1511,13 @@ body {
 }
 .btn-primary {
   @apply bg-indigo-600 hover:bg-indigo-500 text-white;
+}
+/* HoverLabelButton always renders an icon plus a zero-width label. The generic .btn
+   gap would still reserve 6px for that hidden label and shift every icon 3px to
+   the left, so labels provide their own margin only when they become visible. The
+   two-class selector is what outranks `.btn`'s own gap. */
+.btn.header-action {
+  gap: 0;
 }
 /* Toolkit amber accent (PDF Presenter etc.). Solid fill so it reads clearly in both
    themes — previously `btn-accent` was undefined and these buttons had no background. */

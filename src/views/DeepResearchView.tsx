@@ -23,7 +23,7 @@ import { DECORATIVE_IMAGE_STYLES } from '@shared/imageStyles';
 import { toReadingCopy } from '@shared/readingCopy';
 import { stripLeadingAbstract } from '@shared/writingDocument';
 import type { PendingGraphNavigationTarget } from '../navigation';
-import { Icon, modelLabel } from '../components/ui';
+import { HoverLabelButton, Icon, modelLabel } from '../components/ui';
 import { ModelPicker } from '../components/ModelPicker';
 import { confirm } from '../components/feedback';
 import { SourceCitationModal, type CitationTarget } from '../components/SourceCitationModal';
@@ -1353,25 +1353,30 @@ function ReaderView({
           <div className="truncate text-sm font-semibold text-neutral-100" title={appliedTranslation?.title ?? saved.title}>{appliedTranslation?.title ?? saved.title}</div>
           <div className="text-[11px] text-neutral-500">{formatDate(saved.updatedAt)}</div>
         </div>
+        {/* Icons only: the report title needs the room, and the reader already
+            auto-saves, so there is no "Guardar borrador" action to offer here. */}
         <DraftActionBar
           exporting={exporting}
           savingDraft={false}
-          draftSaved
+          compact
           onCopy={onCopy}
           onCopyReading={onCopyReading}
-          onSaveDraft={() => undefined}
           onSaveToNotes={onSaveToNotes}
           onExport={onExport}
         />
-        <button className="btn btn-ghost gap-1.5 border border-neutral-700" onClick={onTranslate}>
-          <Icon name="languages" size={13} /> {t('Traducir')}
-        </button>
-        <button
-          className={`btn btn-ghost gap-1.5 border ${showMatrix ? 'border-indigo-700/60 text-indigo-200' : 'border-neutral-700'}`}
+        <HoverLabelButton
+          icon="languages"
+          label={t('Traducir')}
+          onClick={onTranslate}
+          className="btn-ghost h-9 min-h-9 border border-neutral-700"
+        />
+        <HoverLabelButton
+          icon="layers"
+          label={t('Matriz de apoyo')}
           onClick={onToggleMatrix}
-        >
-          <Icon name="layers" size={13} /> {t('Matriz de apoyo')}
-        </button>
+          showLabel={showMatrix}
+          className={`btn-ghost h-9 min-h-9 border ${showMatrix ? 'border-indigo-700/60 text-indigo-200' : 'border-neutral-700'}`}
+        />
       </header>
 
       {(message || error) && (
@@ -1400,7 +1405,6 @@ function ReaderView({
               hideActions
               justify
               onCopy={onCopy}
-              onSaveDraft={() => undefined}
               onSaveToNotes={onSaveToNotes}
               onExport={onExport}
               onCitation={onCitation}

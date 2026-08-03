@@ -256,6 +256,67 @@ export function AiBadge({
   );
 }
 
+/**
+ * An action rendered as an icon that opens its label on hover or keyboard focus, so a
+ * row of them reads as a clean rail of icons instead of a wall of text.
+ *
+ * Shared by the titlebar's action rail and the Deep Research reader header. The label
+ * is always in the accessibility tree (`aria-label` plus the `title` tooltip); only its
+ * width is animated, so nothing is hidden from a screen reader or a pointerless user.
+ * `showLabel` pins the text open — use it for an action in progress or one that must be
+ * noticed. Sizing and tone come from `className` (`h-9 min-h-9 btn-ghost`, …).
+ */
+export function HoverLabelButton({
+  icon,
+  label,
+  onClick,
+  title,
+  className = '',
+  spinning = false,
+  showLabel = false,
+  disabled = false,
+  trailing,
+  ...rest
+}: {
+  icon: string;
+  label: string;
+  onClick: (event: React.MouseEvent<HTMLButtonElement>) => void;
+  title?: string;
+  className?: string;
+  spinning?: boolean;
+  showLabel?: boolean;
+  disabled?: boolean;
+  /** Rendered inside the expanding label (a keyboard shortcut, a dropdown chevron). */
+  trailing?: React.ReactNode;
+  'data-tour'?: string;
+  'data-vault-trigger'?: string;
+  'data-testid'?: string;
+}) {
+  return (
+    <button
+      {...rest}
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={title ?? label}
+      aria-label={label}
+      className={`header-action group btn justify-center px-2.5 py-0 leading-none ${className}`}
+    >
+      <Icon name={icon} className={spinning ? 'animate-spin' : ''} />
+      <span
+        className={`flex items-center overflow-hidden whitespace-nowrap transition-all duration-200 ${
+          showLabel
+            ? 'ml-1.5 max-w-[14rem] opacity-100'
+            : 'ml-0 max-w-0 opacity-0 group-hover:ml-1.5 group-hover:max-w-[14rem] group-hover:opacity-100 group-focus-visible:ml-1.5 group-focus-visible:max-w-[14rem] group-focus-visible:opacity-100'
+        }`}
+      >
+        {label}
+        {trailing}
+      </span>
+    </button>
+  );
+}
+
 export function Spinner({ label }: { label?: string }) {
   return (
     <div className="flex items-center gap-2 text-neutral-400 text-sm">

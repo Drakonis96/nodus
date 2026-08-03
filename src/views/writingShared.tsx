@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { DecorativeImageStyle, SupportAuditEntry, WritingWorkshopBrief, WritingWorkshopDraft, WritingWorkshopSavedDraft } from '@shared/types';
 import { documentBodyForPanels } from '@shared/writingDocument';
-import { Badge, Icon } from '../components/ui';
+import { Badge, HoverLabelButton, Icon } from '../components/ui';
 import { Markdown, type MarkdownCitation } from '../components/Markdown';
 import type { CitationTarget } from '../components/SourceCitationModal';
 import { useDismissableLayer } from '../hooks';
@@ -19,12 +19,54 @@ export const KIND_LABELS: Record<WritingWorkshopBrief['kind'], string> = {
   deep_research: 'Deep Research',
 };
 
+/** One action of the bar. `compact` swaps the labelled button for an icon that opens
+ *  its label on hover — the same treatment the titlebar's action rail uses. */
+function BarAction({
+  compact,
+  icon,
+  label,
+  onClick,
+  title,
+  disabled = false,
+  spinning = false,
+}: {
+  compact: boolean;
+  icon: string;
+  label: string;
+  onClick: () => void;
+  title?: string;
+  disabled?: boolean;
+  spinning?: boolean;
+}) {
+  if (compact) {
+    return (
+      <HoverLabelButton
+        icon={icon}
+        label={label}
+        title={title}
+        onClick={onClick}
+        disabled={disabled}
+        spinning={spinning}
+        showLabel={spinning}
+        className="btn-ghost h-9 min-h-9 border border-neutral-700"
+      />
+    );
+  }
+  return (
+    <button className="btn btn-ghost border border-neutral-700 gap-1.5" onClick={onClick} disabled={disabled} title={title}>
+      <Icon name={icon} className={spinning ? 'animate-spin' : ''} /> {label}
+    </button>
+  );
+}
+
 /** The copy/save/export action row. Reusable so the Deep Research reader can host
- *  it in its header instead of above the text. */
+ *  it in its header instead of above the text. Omit `onSaveDraft` where the artefact
+ *  is already saved: a permanently disabled "Guardado" button only eats space. */
 export function DraftActionBar({
   exporting,
   savingDraft,
   draftSaved = false,
+  compact = false,
   onCopy,
   onCopyReading,
   onSaveDraft,
@@ -34,35 +76,41 @@ export function DraftActionBar({
   exporting: boolean;
   savingDraft: boolean;
   draftSaved?: boolean;
+  /** Icons only, labels on hover — for the reader header, where space is tight. */
+  compact?: boolean;
   onCopy: () => void;
   /** Offered where the artefact is a finished report meant to be listened to. */
   onCopyReading?: () => void;
-  onSaveDraft: () => void;
+  onSaveDraft?: () => void;
   onSaveToNotes: () => void;
   onExport: (format: 'markdown' | 'pdf') => void;
 }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <button className="btn btn-ghost border border-neutral-700 gap-1.5" onClick={onCopy}>
-        <Icon name="check" /> {t('Copiar')}
-      </button>
+      {/* A tick reads as "done", not as "copy" — which the icon-only bar has to say
+          on its own. */}
+      <BarAction compact={compact} icon="copy" label={t('Copiar')} onClick={onCopy} />
       {onCopyReading && (
-        <button
-          className="btn btn-ghost border border-neutral-700 gap-1.5"
-          onClick={onCopyReading}
+        <BarAction
+          compact={compact}
+          icon="volume"
+          label={t('Copiar sin referencias')}
           title={t('Copia solo la prosa, sin citas ni referencias, para pegarla en un lector de voz')}
-        >
-          <Icon name="volume" /> {t('Copiar sin referencias')}
-        </button>
+          onClick={onCopyReading}
+        />
       )}
-      <button className="btn btn-ghost border border-neutral-700 gap-1.5" onClick={onSaveDraft} disabled={savingDraft || draftSaved}>
-        <Icon name={savingDraft ? 'sync' : draftSaved ? 'check' : 'save'} className={savingDraft ? 'animate-spin' : ''} />{' '}
-        {savingDraft ? t('Guardando…') : draftSaved ? t('Guardado') : t('Guardar borrador')}
-      </button>
-      <button className="btn btn-ghost border border-neutral-700 gap-1.5" onClick={onSaveToNotes}>
-        <Icon name="notebook" /> {t('Guardar en notas')}
-      </button>
-      <ExportMenu exporting={exporting} onExport={onExport} />
+      {onSaveDraft && (
+        <BarAction
+          compact={compact}
+          icon={savingDraft ? 'sync' : draftSaved ? 'check' : 'save'}
+          spinning={savingDraft}
+          label={savingDraft ? t('Guardando…') : draftSaved ? t('Guardado') : t('Guardar borrador')}
+          onClick={onSaveDraft}
+          disabled={savingDraft || draftSaved}
+        />
+      )}
+      <BarAction compact={compact} icon="notebook" label={t('Guardar en notas')} onClick={onSaveToNotes} />
+      <ExportMenu exporting={exporting} compact={compact} onExport={onExport} />
     </div>
   );
 }
@@ -94,7 +142,7 @@ export function DraftResultMain({
   /** Justify the rendered report body. */
   justify?: boolean;
   onCopy: () => void;
-  onSaveDraft: () => void;
+  onSaveDraft?: () => void;
   onSaveToNotes: () => void;
   onExport: (format: 'markdown' | 'pdf') => void;
   onCitation: (citation: MarkdownCitation) => void;
@@ -148,7 +196,7 @@ export function DraftResultMain({
   );
 }
 
-function ExportMenu({ exporting, onExport }: { exporting: boolean; onExport: (format: 'markdown' | 'pdf') => void }) {
+function ExportMenu({ exporting, compact = false, onExport }: { exporting: boolean; compact?: boolean; onExport: (format: 'markdown' | 'pdf') => void }) {
   const [open, setOpen] = useState(false);
   const menuRef = useDismissableLayer<HTMLDivElement>({ open, onDismiss: () => setOpen(false) });
   const choose = (format: 'markdown' | 'pdf') => {
@@ -157,10 +205,23 @@ function ExportMenu({ exporting, onExport }: { exporting: boolean; onExport: (fo
   };
   return (
     <div className="relative" ref={menuRef}>
+      {compact ? (
+        <HoverLabelButton
+          icon={exporting ? 'sync' : 'download'}
+          label={t('Exportar')}
+          onClick={() => setOpen((value) => !value)}
+          disabled={exporting}
+          spinning={exporting}
+          showLabel={exporting || open}
+          className="btn-primary h-9 min-h-9"
+          trailing={<Icon name="chevronDown" size={14} className="ml-1" />}
+        />
+      ) : (
       <button className="btn btn-primary gap-1.5" onClick={() => setOpen((value) => !value)} disabled={exporting}>
         <Icon name={exporting ? 'sync' : 'download'} className={exporting ? 'animate-spin' : ''} /> {t('Exportar')}
         <Icon name="chevronDown" size={14} />
       </button>
+      )}
       {open && (
         <div className="absolute right-0 z-20 mt-1 w-44 rounded-md border border-neutral-700 bg-neutral-900 shadow-xl py-1">
           <button className="w-full text-left px-3 py-2 text-sm hover:bg-neutral-800 flex items-center gap-2" onClick={() => choose('markdown')}>
