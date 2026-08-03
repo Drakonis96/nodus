@@ -17,8 +17,17 @@ test('packaging generates and exposes the legal bundle', () => {
       ['PRIVACY.md', 'legal/PRIVACY.md'],
       ['legal', 'legal'],
       ['dist-zotero/nodus-zotero.xpi', 'zotero/nodus-zotero.xpi'],
+      // Nodus Server itself, so the basic mode can run it as a child process. Outside the asar
+      // because it is executed as ESM from disk rather than read as an asset.
+      ['server', 'nodus-server'],
     ],
   );
+  // Whatever else that folder gains, the shipped copy must never carry a live deployment's state:
+  // .env holds an administrator password and data/ is somebody's published corpus.
+  const server = pkg.build.extraResources.find((entry) => entry.from === 'server');
+  for (const excluded of ['!data', '!data/**/*', '!.env']) {
+    assert.ok(server.filter.includes(excluded), `the packaged server must exclude ${excluded}`);
+  }
   for (const unpacked of ['node_modules/libheif-js/**/*', 'node_modules/@img/sharp-libvips-*/**/*']) {
     assert.ok(pkg.build.asarUnpack.includes(unpacked));
   }

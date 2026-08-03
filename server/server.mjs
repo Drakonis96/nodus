@@ -1,4 +1,5 @@
 import http from 'node:http';
+import https from 'node:https';
 import fs from 'node:fs';
 import path from 'node:path';
 import { AsyncLocalStorage } from 'node:async_hooks';
@@ -31,8 +32,46 @@ function byteLimit(name, fallback, ceiling) {
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = process.env.NODUS_DATA_DIR || path.join(ROOT, 'data');
 const PORT = Number(process.env.NODUS_PORT || 7443);
-const HOST = process.env.NODUS_HOST || '0.0.0.0';
+/** Addresses the main listener binds. A comma-separated list binds several. */
+const HOSTS = String(process.env.NODUS_HOST || '0.0.0.0').split(',').map((value) => value.trim()).filter(Boolean);
+/**
+ * Optional second listener: plain HTTP, loopback only, same port.
+ *
+ * Only meaningful together with TLS, and it exists for one situation. When Nodus Desktop runs
+ * this server itself and serves the local network over a self-signed certificate, the desktop
+ * would have to validate its own certificate to publish into it — and Node's fetch has no way
+ * to be handed a certificate authority after the process has started. Rather than weaken
+ * certificate checking anywhere, the desktop gets a channel that needs none: 127.0.0.1 never
+ * leaves the machine, so there is nothing on that path to encrypt against.
+ */
+const LOOPBACK_PORT = Number(process.env.NODUS_LOOPBACK_PORT || 0);
 const SETUP_TOKEN = process.env.NODUS_SETUP_TOKEN || '';
+/**
+ * Serve TLS directly instead of behind a reverse proxy.
+ *
+ * The Docker recipe terminates HTTPS in Caddy or Nginx and this stays empty. Nodus Desktop's
+ * basic mode has no proxy to lean on, so it hands the server a certificate of its own. Half a
+ * pair is refused at boot rather than quietly falling back to cleartext: a typo in one variable
+ * name must not be the reason passwords cross a wifi network unencrypted.
+ */
+const TLS = tlsMaterial();
+/**
+ * Path to the shared secret that lets the desktop that launched this process provision its own
+ * spaces. Empty for every Docker deployment, so the endpoint below does not exist there at all.
+ */
+const LOCAL_PROVISION_FILE = process.env.NODUS_LOCAL_PROVISION_FILE || '';
+
+function tlsMaterial() {
+  const certFile = String(process.env.NODUS_TLS_CERT_FILE ?? '').trim();
+  const keyFile = String(process.env.NODUS_TLS_KEY_FILE ?? '').trim();
+  if (!certFile && !keyFile) return null;
+  if (!certFile || !keyFile) throw new Error('NODUS_TLS_CERT_FILE and NODUS_TLS_KEY_FILE must be configured together.');
+  try {
+    return { cert: fs.readFileSync(certFile), key: fs.readFileSync(keyFile) };
+  } catch (error) {
+    throw new Error(`Could not read the configured TLS material: ${error.message}`);
+  }
+}
 /** How large the gzipped upload may be on the wire. Mirror it in your proxy. */
 const MAX_SNAPSHOT_BYTES = byteLimit('NODUS_MAX_SNAPSHOT_BYTES', 100 * 1024 * 1024, bufferLimits.MAX_LENGTH);
 // A publication travels gzipped but is expanded into one JSON string before parsing,
@@ -94,6 +133,40 @@ function syncEnvironmentAdmin() {
 
 const ENVIRONMENT_ADMIN_CONFIGURED = syncEnvironmentAdmin();
 
+/**
+ * The secret behind /api/v1/local/provision, regenerated on every boot.
+ *
+ * Nodus Desktop's basic mode runs this process itself and needs a space per vault, but creating
+ * one is an administration form built for a browser with a session and a CSRF token. Rather than
+ * drive that form, the desktop reads this file — which only a process running as the same
+ * operating-system user can open — and presents its contents as a bearer token.
+ *
+ * The file is the whole authentication story, so it is written before the listener opens and the
+ * endpoint additionally refuses anything that did not arrive over loopback.
+ */
+const LOCAL_PROVISION_SECRET = writeLocalProvisionSecret();
+
+function writeLocalProvisionSecret() {
+  if (!LOCAL_PROVISION_FILE) return '';
+  const secret = token(32);
+  fs.mkdirSync(path.dirname(LOCAL_PROVISION_FILE), { recursive: true });
+  fs.writeFileSync(LOCAL_PROVISION_FILE, `${secret}\n`, { encoding: 'utf8', mode: 0o600 });
+  // writeFileSync's mode is ignored when the file already exists, and this one survives restarts.
+  try { fs.chmodSync(LOCAL_PROVISION_FILE, 0o600); } catch { /* best effort on Windows */ }
+  return secret;
+}
+
+/**
+ * Whether the request reached us over loopback, judged by the socket alone.
+ *
+ * Deliberately not clientIp(): that trusts the X-Forwarded-For a reverse proxy appends, which is
+ * exactly the header a remote caller would forge to look local.
+ */
+function fromLoopback(req) {
+  const address = req.socket.remoteAddress || '';
+  return address === '127.0.0.1' || address === '::1' || address === '::ffff:127.0.0.1';
+}
+
 function language() {
   return normalizeServerLanguage(languageContext.getStore() || store.state.settings.language);
 }
@@ -111,7 +184,7 @@ function normalizePublicUrl(value) {
 }
 
 function publicUrl() {
-  return normalizePublicUrl(process.env.NODUS_PUBLIC_URL || store.state.settings.publicUrl || `http://localhost:${PORT}`);
+  return normalizePublicUrl(process.env.NODUS_PUBLIC_URL || store.state.settings.publicUrl || `${TLS ? 'https' : 'http'}://localhost:${PORT}`);
 }
 
 /**
@@ -813,6 +886,51 @@ const apiRoutes = createApiRoutes({
   },
 });
 
+/**
+ * Give the desktop that launched this process a space and a pairing code for one vault.
+ *
+ * Two independent gates guard it, and neither is a password the user chose: the caller must have
+ * read a 0600 file owned by this operating-system user, and must have reached us over loopback.
+ * Either alone would do; a remote attacker has to defeat both. In a Docker deployment
+ * NODUS_LOCAL_PROVISION_FILE is unset and this answers 404 like any unknown path, so the surface
+ * is not merely closed there — it does not exist.
+ *
+ * Idempotent per vault: re-provisioning reuses the space created the first time, so reconnecting
+ * a vault does not scatter empty duplicates across the administration page.
+ */
+async function handleLocalProvision(req, res) {
+  if (!LOCAL_PROVISION_SECRET || !fromLoopback(req)) return json(res, 404, { error: 'not_found' });
+  if (!rateLimit(req, res, 'local-provision', 60, 15 * 60_000)) return;
+  const presented = Buffer.from(bearer(req), 'utf8');
+  const expected = Buffer.from(LOCAL_PROVISION_SECRET, 'utf8');
+  if (presented.length !== expected.length || !timingSafeEqual(presented, expected)) {
+    return json(res, 401, { error: 'unauthorized', error_description: 'Invalid local provisioning secret.' });
+  }
+
+  const admin = store.state.users.find((entry) => entry.role === 'admin');
+  if (!admin) return json(res, 409, { error: 'not_configured', error_description: 'The server has no administrator account yet.' });
+
+  const input = await jsonBody(req, AUTH_BODY_BYTES);
+  const vaultId = String(input.vaultId || '').trim().slice(0, 120);
+  if (!vaultId) return json(res, 400, { error: 'invalid_request', error_description: 'A vaultId is required.' });
+  const vaultName = String(input.vaultName || '').trim().slice(0, 120) || 'Nodus';
+
+  let space = store.state.spaces.find((entry) => entry.localVaultId === vaultId);
+  if (!space) {
+    space = { id: randomUUID(), name: vaultName, description: '', createdAt: new Date().toISOString(), updatedAt: null, revision: '', bytes: 0, localVaultId: vaultId };
+    store.state.spaces.push(space);
+    store.state.memberships.push({ userId: admin.id, spaceId: space.id, role: 'owner' });
+  } else if (space.name !== vaultName) {
+    // Renaming the vault in Nodus should rename the space people see, not orphan it.
+    space.name = vaultName;
+  }
+
+  const code = `${token(4).slice(0, 4)}-${token(4).slice(0, 4)}`.toUpperCase();
+  store.state.pairingCodes.push({ hash: digest(code), userId: admin.id, spaceId: space.id, expiresAt: new Date(Date.now() + 15 * 60_000).toISOString(), usedAt: null });
+  store.save();
+  return json(res, 200, { spaceId: space.id, spaceName: space.name, code, publicUrl: publicUrl() });
+}
+
 async function route(req, res) {
   const url = new URL(req.url || '/', publicUrl());
   if (url.pathname === '/language' && req.method === 'POST') {
@@ -830,6 +948,7 @@ async function route(req, res) {
   if (url.pathname === '/.well-known/oauth-protected-resource/api/v1') return json(res, 200, { resource: apiResource(), authorization_servers: [publicUrl()], scopes_supported: [...SCOPES], resource_documentation: `${publicUrl()}/` });
   if (url.pathname === '/.well-known/oauth-authorization-server' || url.pathname === '/.well-known/openid-configuration') return json(res, 200, { issuer: publicUrl(), authorization_endpoint: `${publicUrl()}/oauth/authorize`, token_endpoint: `${publicUrl()}/oauth/token`, registration_endpoint: `${publicUrl()}/oauth/register`, code_challenge_methods_supported: ['S256'], token_endpoint_auth_methods_supported: ['none'], response_types_supported: ['code'], grant_types_supported: ['authorization_code', 'refresh_token'], scopes_supported: [...SCOPES] });
   if (url.pathname === '/mcp') return handleMcp(req, res);
+  if (url.pathname === '/api/v1/local/provision' && req.method === 'POST') return handleLocalProvision(req, res);
 
   // The client API answers before the "no users yet" gate below. A machine surface should
   // get a 401 it can act on, not a 303 to an HTML setup page it cannot read. Routes this
@@ -1126,7 +1245,7 @@ async function route(req, res) {
   return json(res, 404, { error: 'not_found' });
 }
 
-const server = http.createServer((req, res) => {
+const handler = (req, res) => {
   const requestLanguage = normalizeServerLanguage(cookies(req).nodus_language || store.state.settings.language);
   languageContext.run(requestLanguage, () => {
     Promise.resolve(route(req, res)).catch((error) => {
@@ -1135,14 +1254,32 @@ const server = http.createServer((req, res) => {
       else res.end();
     });
   });
-});
+};
 
-server.requestTimeout = 5 * 60_000;
-server.headersTimeout = 65_000;
-server.maxHeadersCount = 100;
-server.maxRequestsPerSocket = 1_000;
-server.listen(PORT, HOST, () => {
-  console.log(`[nodus-server] listening on http://${HOST}:${PORT}`);
-  console.log(`[nodus-server] public URL: ${publicUrl()}`);
-  if (!ENVIRONMENT_ADMIN_CONFIGURED && store.state.users.length === 0 && (!SETUP_TOKEN || SETUP_TOKEN.length < 16)) console.warn('[nodus-server] Configure NODUS_ADMIN_EMAIL + NODUS_ADMIN_PASSWORD, or provide a temporary NODUS_SETUP_TOKEN with at least 16 characters.');
-});
+function applyLimits(instance) {
+  instance.requestTimeout = 5 * 60_000;
+  instance.headersTimeout = 65_000;
+  instance.maxHeadersCount = 100;
+  instance.maxRequestsPerSocket = 1_000;
+  return instance;
+}
+
+const server = applyLimits(TLS ? https.createServer({ cert: TLS.cert, key: TLS.key }, handler) : http.createServer(handler));
+const scheme = TLS ? 'https' : 'http';
+let pending = HOSTS.length;
+for (const host of HOSTS) {
+  server.listen(PORT, host, () => {
+    console.log(`[nodus-server] listening on ${scheme}://${host}:${PORT}`);
+    pending -= 1;
+    if (pending > 0) return;
+    console.log(`[nodus-server] public URL: ${publicUrl()}`);
+    if (!ENVIRONMENT_ADMIN_CONFIGURED && store.state.users.length === 0 && (!SETUP_TOKEN || SETUP_TOKEN.length < 16)) console.warn('[nodus-server] Configure NODUS_ADMIN_EMAIL + NODUS_ADMIN_PASSWORD, or provide a temporary NODUS_SETUP_TOKEN with at least 16 characters.');
+  });
+}
+
+if (LOOPBACK_PORT) {
+  if (!TLS) throw new Error('NODUS_LOOPBACK_PORT is only meaningful when TLS is configured; without it the main listener already speaks HTTP.');
+  applyLimits(http.createServer(handler)).listen(LOOPBACK_PORT, '127.0.0.1', () => {
+    console.log(`[nodus-server] loopback listener on http://127.0.0.1:${LOOPBACK_PORT}`);
+  });
+}

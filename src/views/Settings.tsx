@@ -1,8 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type {
   AppSettings,
   CopilotServerStatus,
   EmbeddingProvider,
+  LocalServerAccess,
+  LocalServerPowerStatus,
+  LocalServerStatus,
   McpServerStatus,
   McpTunnelStatus,
   ModelInfo,
@@ -22,6 +25,7 @@ import { recoveryHealthAdvice, recoveryHealthAge, recoveryHealthHeadline } from 
 import { ImageGenerationSettings, ProvidersSettings } from './ProvidersSettings';
 import { AudioGenerationSettings } from './AudioGenerationSettings';
 import { ConnectedVaultsPanel } from '../components/ConnectedVaultsPanel';
+import { LocalServerPanel } from '../components/LocalServerPanel';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { LegalDocModal } from '../components/LegalDocModal';
 import { LEGAL_DOCS, type LegalDocId } from '../legalDocs';
@@ -169,6 +173,23 @@ export function Settings({
   // state had no screen at all, so a revoked replica simply stopped updating in silence.
   const [replicas, setReplicas] = useState<ReplicaConnectionView[]>([]);
   const [replicaBusy, setReplicaBusy] = useState<string | null>(null);
+  // Basic mode: Nodus Server running on this very computer. Its own state because it is a
+  // process this application owns, unlike every connection above, which points somewhere else.
+  const [localServerStatus, setLocalServerStatus] = useState<LocalServerStatus | null>(null);
+  const [localServerPower, setLocalServerPower] = useState<LocalServerPowerStatus | null>(null);
+  const [localServerBusy, setLocalServerBusy] = useState(false);
+  const [localServerMessage, setLocalServerMessage] = useState<string | null>(null);
+  // Deliberately not part of the status object above: that one is polled on a timer, and this is
+  // a password. Fetched only while the server is actually up, which is when it exists at all.
+  const [localServerPassword, setLocalServerPassword] = useState<string | null>(null);
+  // Read through a ref so the poll below can tell "already have it" from "never asked" without
+  // re-subscribing every time it changes — one fetch per run of the server, not one every tick.
+  const localServerPasswordRef = useRef<string | null>(null);
+  // Which of the two server modes this section shows. Somebody already publishing to a Docker
+  // deployment opens on that one; everybody else opens on the one that needs no Docker.
+  const [serverMode, setServerMode] = useState<'basic' | 'advanced'>(
+    settings.localServerEnabled || !settings.nodusServerUrl ? 'basic' : 'advanced',
+  );
   const [copilotStatus, setCopilotStatus] = useState<CopilotServerStatus>({ running: false, port: null, addinUrl: null, certReady: false, error: null });
   const [zoteroStatus, setZoteroStatus] = useState<ZoteroPluginServerStatus>({ running: false, port: null, url: null, error: null });
   const [zoteroInstallBusy, setZoteroInstallBusy] = useState(false);
@@ -217,6 +238,42 @@ export function Settings({
   }, [settings.mcpEnabled, settings.mcpPort, settings.mcpToken]);
 
   useEffect(() => setMcpPortInput(String(settings.mcpPort)), [settings.mcpPort]);
+
+  // Basic mode polls on a slow tick, unlike MCP's 1.5s: the answers here involve running the
+  // Tailscale CLI, and a status read should not cost a subprocess every second and a half.
+  useEffect(() => {
+    let active = true;
+    const refresh = async () => {
+      try {
+        const [status, power] = await Promise.all([
+          window.nodus.getLocalServerStatus(),
+          window.nodus.getLocalServerPower(),
+        ]);
+        if (!active) return;
+        setLocalServerStatus(status);
+        setLocalServerPower(power);
+        // The account only exists once the server has run, and the password never changes while
+        // it is up, so this asks once per run rather than on every tick.
+        if (status.phase !== 'running') {
+          localServerPasswordRef.current = null;
+          setLocalServerPassword(null);
+        } else if (!localServerPasswordRef.current) {
+          const password = await window.nodus.getLocalServerAdminPassword();
+          if (!active) return;
+          localServerPasswordRef.current = password;
+          setLocalServerPassword(password);
+        }
+      } catch {
+        // Transient during startup; the next tick retries.
+      }
+    };
+    void refresh();
+    const interval = window.setInterval(() => void refresh(), 6000);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, [settings.localServerAccess, settings.localServerPort]);
 
   useEffect(() => setNodusServerUrlInput(settings.nodusServerUrl), [settings.nodusServerUrl]);
 
@@ -470,6 +527,53 @@ export function Settings({
       setNodusServerBusy(false);
     }
   };
+
+  // ── Basic mode: the server running on this computer ──────────────────────
+  // Every action here does the same three things — mark busy, run, refresh both status and
+  // power — so they share one wrapper rather than repeating the try/finally eight times.
+  const refreshLocalServer = async () => {
+    const [status, power] = await Promise.all([
+      window.nodus.getLocalServerStatus(),
+      window.nodus.getLocalServerPower(),
+    ]);
+    setLocalServerStatus(status);
+    setLocalServerPower(power);
+    if (status.phase !== 'running') {
+      localServerPasswordRef.current = null;
+      setLocalServerPassword(null);
+      return;
+    }
+    if (localServerPasswordRef.current) return;
+    const password = await window.nodus.getLocalServerAdminPassword();
+    localServerPasswordRef.current = password;
+    setLocalServerPassword(password);
+  };
+
+  const runLocalServerAction = async (action: () => Promise<unknown>, success?: string) => {
+    setLocalServerBusy(true);
+    setLocalServerMessage(null);
+    try {
+      await action();
+      if (success) setLocalServerMessage(success);
+    } catch (error) {
+      setLocalServerMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      await refreshLocalServer().catch(() => undefined);
+      setLocalServerBusy(false);
+    }
+  };
+
+  const connectVaultToLocalServer = () => runLocalServerAction(async () => {
+    await window.nodus.connectVaultToLocalServer();
+    setNodusServerOverview(await window.nodus.getNodusServerOverview());
+    await onChange();
+  }, t('Vault conectado al servidor de este ordenador.'));
+
+  // Just the setting: the main process restarts a running server when this changes, because the
+  // access path decides which addresses it binds and whether it presents a certificate. Asking
+  // for the restart here as well would race the one already under way.
+  const chooseLocalServerAccess = (access: LocalServerAccess) =>
+    runLocalServerAction(() => patch({ localServerAccess: access }));
 
   const importBackup = async () => {
     if (!importPassword.trim()) {
@@ -1399,6 +1503,67 @@ export function Settings({
           <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-300">
             {t('Versión experimental recomendada solo para testers. Guarda copias de seguridad y reporta cualquier error desde el botón superior.')}
           </p>
+
+          {/* Two ways to have a server, and the choice is really "how much do you want to
+              administer". Basic runs it here; advanced is the Docker deployment. */}
+          {/* Written out rather than mapped over a table: a key reached through a variable is
+              invisible to scripts/test-i18n-coverage.mjs, and an untranslated string that no
+              test can see is exactly how the Spanish sidebar labels once shipped. */}
+          <div className="grid gap-2 sm:grid-cols-2" data-testid="nodus-server-mode-switch">
+            <button
+              data-testid="nodus-server-mode-basic"
+              aria-pressed={serverMode === 'basic'}
+              onClick={() => setServerMode('basic')}
+              className={`rounded-xl border p-3 text-left transition ${serverMode === 'basic' ? 'border-indigo-400 bg-indigo-50 dark:border-indigo-600 dark:bg-indigo-950/30' : 'border-neutral-200 hover:border-neutral-300 dark:border-neutral-800 dark:hover:border-neutral-700'}`}
+            >
+              <span className="flex items-center gap-2 text-sm font-medium">
+                <Icon name="home" /> {t('Básico · este ordenador')}
+              </span>
+              <span className="mt-1 block text-xs leading-5 text-neutral-600 dark:text-neutral-400">
+                {t('Nodus arranca el servidor aquí. Sin Docker, sin dominio y sin tocar el router.')}
+              </span>
+            </button>
+            <button
+              data-testid="nodus-server-mode-advanced"
+              aria-pressed={serverMode === 'advanced'}
+              onClick={() => setServerMode('advanced')}
+              className={`rounded-xl border p-3 text-left transition ${serverMode === 'advanced' ? 'border-indigo-400 bg-indigo-50 dark:border-indigo-600 dark:bg-indigo-950/30' : 'border-neutral-200 hover:border-neutral-300 dark:border-neutral-800 dark:hover:border-neutral-700'}`}
+            >
+              <span className="flex items-center gap-2 text-sm font-medium">
+                <Icon name="tools" /> {t('Avanzado · Docker y dominio propio')}
+              </span>
+              <span className="mt-1 block text-xs leading-5 text-neutral-600 dark:text-neutral-400">
+                {t('Un servidor independiente que sigue disponible aunque apagues este ordenador.')}
+              </span>
+            </button>
+          </div>
+
+          {serverMode === 'basic' && localServerStatus && localServerPower && (
+            <>
+              <LocalServerPanel
+                status={localServerStatus}
+                power={localServerPower}
+                busy={localServerBusy}
+                vaultConnected={nodusServerOverview.activeVault.connected}
+                adminPassword={localServerPassword}
+                onStart={() => void runLocalServerAction(() => window.nodus.startLocalServer())}
+                onStop={() => void runLocalServerAction(() => window.nodus.stopLocalServer())}
+                onChooseAccess={(access) => void chooseLocalServerAccess(access)}
+                onTailscaleServe={(enable) => void runLocalServerAction(() => window.nodus.setLocalServerTailscaleServe(enable))}
+                onConnectVault={() => void connectVaultToLocalServer()}
+                onKeepAwake={(enable) => void runLocalServerAction(() => window.nodus.setLocalServerKeepAwake(enable))}
+                onLidServing={(enable) => void runLocalServerAction(() => window.nodus.setLocalServerLidServing(enable))}
+                onCopy={(value) => void navigator.clipboard.writeText(value)}
+                onOpenExternal={(url) => void window.nodus.openExternal(url)}
+              />
+              {localServerMessage && (
+                <p className="text-xs text-neutral-600 dark:text-neutral-400" data-testid="local-server-message">{localServerMessage}</p>
+              )}
+            </>
+          )}
+
+          {serverMode === 'advanced' && (
+          <>
           <button
             className="btn btn-ghost w-full justify-center border border-indigo-300 text-indigo-700 dark:border-indigo-800 dark:text-indigo-300 sm:w-auto"
             onClick={() => setNodusServerGuideOpen(true)}
@@ -1619,6 +1784,8 @@ export function Settings({
             <strong className="text-neutral-800 dark:text-neutral-200">{t('Instalación del servidor')}:</strong>{' '}
             {t('se ejecuta con Docker en otro equipo o VPS. Puede usar el Caddy incluido o tu Caddy/Nginx existente con un dominio o subdominio y HTTPS. La configuración inicial y la gestión de usuarios se hacen desde el navegador.')}
           </div>
+          </>
+          )}
         </Section>
       )}
 

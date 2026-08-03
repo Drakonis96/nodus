@@ -10,7 +10,7 @@ import { getZoteroPluginStatus, regenerateZoteroPluginToken } from '../zotero-pl
 import { exportZoteroPluginXpi, getZoteroInstallInfo, installZoteroPlugin } from '../zotero-plugin/install';
 import { ensureCopilotCert } from '../copilot/certs';
 import { installCopilotAddin, installLibreOfficeCopilot } from '../copilot/install';
-import { setApiKey, clearApiKey, getApiKey } from '../secrets/secretStore';
+import { setApiKey, clearApiKey, getApiKey, getLocalServerAdminPassword } from '../secrets/secretStore';
 import { recoverLegacyApiKeys } from '../secrets/legacySecretRecovery';
 import { listEmbeddingModels, listModels, testLocalProvider } from '../ai/providers';
 import { cancelChatGptSubscriptionLogin, getChatGptSubscriptionStatus, listChatGptSubscriptionModels, logoutChatGptSubscription, startChatGptSubscriptionLogin } from '../ai/codexSubscription';
@@ -22,6 +22,10 @@ import { getDecorativeImage, getDecorativeImageData } from '../db/decorativeImag
 import { clearEntityClips, deleteClip as deleteAudioClip, deleteEntityClips, getEntitySegments, audioClipPath, createStudyAudioBookmark, deleteStudyAudioBookmark, getStudyPronunciations, listStudyAudioBookmarks, listStudyAudioPlaylist, listEntityClips, readClipBytes, saveClip, setStudyPronunciations } from '../audio/audioService';
 import { clearHumeKey, humeHasKey, listHumeVoices, setHumeKey, synthesizeHume } from '../audio/hume';
 import { disconnectNodusServerVault, getNodusServerOverview, pairNodusServer, setNodusServerLanguage, syncNodusServerVaultNow } from '../serverSync/serverSyncService';
+import { localServerStatusAsync, restartLocalServer, startLocalServer, stopLocalServer } from '../localServer/process';
+import { connectActiveVaultToLocalServer } from '../localServer/connect';
+import { startTailscaleServe, stopTailscaleServe } from '../localServer/tailscale';
+import { holdAwake, holdLid, powerStatus, recordPowerError, releaseAwake, releaseLid } from '../localServer/power';
 import { getAcademicHomeStats } from '../db/homeRepo';
 import { cancelNodusLocalDownloads, deleteNodusLocalModel, downloadNodusLocalModel, getNodusLocalAiStatus, installNodusLocalRuntime } from '../ai/nodusLocalAi';
 import { deleteNodusLocalImageModel, downloadNodusLocalImageModel, getNodusLocalImageStatus, installNodusLocalImageRuntime } from '../ai/nodusLocalImages';
@@ -82,6 +86,54 @@ export function registerPlatformIpc({ h, getWindow }: IpcContext): void {
   h('nodusServer:setLanguage', async (_e, language: AppLanguage, vaultId?: string) => setNodusServerLanguage(language, vaultId));
   h('nodusServer:syncVaultNow', async (_e, vaultId: string) => syncNodusServerVaultNow(vaultId));
   h('nodusServer:disconnectVault', async (_e, vaultId: string) => disconnectNodusServerVault(vaultId));
+  h('localServer:status', async () => localServerStatusAsync());
+  h('localServer:start', async () => {
+    updateSettings({ localServerEnabled: true });
+    await startLocalServer();
+    return localServerStatusAsync();
+  });
+  h('localServer:stop', async () => {
+    const before = getSettings();
+    updateSettings({ localServerEnabled: false });
+    await stopLocalServer();
+    // Off has to mean off. The `tailscale serve` forward is held by the daemon and survives both
+    // this application and a reboot, so leaving it would hand the tailnet to whatever binds that
+    // port next — including this same server the next time somebody starts it expecting privacy.
+    if (before.localServerAccess === 'tailscale') {
+      await stopTailscaleServe(before.localServerPort).catch(() => undefined);
+    }
+    return localServerStatusAsync();
+  });
+  // Read on demand rather than carried in the status object, which is polled every few seconds
+  // and would put the password on that wire whether or not anybody is looking at it.
+  h('localServer:adminPassword', async () => getLocalServerAdminPassword());
+  h('localServer:restart', async () => {
+    await restartLocalServer();
+    return localServerStatusAsync();
+  });
+  h('localServer:connectVault', async () => connectActiveVaultToLocalServer());
+  h('localServer:tailscaleServe', async (_e, enable: boolean) => {
+    const port = getSettings().localServerPort;
+    return enable ? startTailscaleServe(port) : stopTailscaleServe(port);
+  });
+  h('localServer:power', async () => powerStatus());
+  h('localServer:setKeepAwake', async (_e, enable: boolean) => {
+    updateSettings({ localServerKeepAwake: enable });
+    if (enable) holdAwake(); else releaseAwake();
+    return powerStatus();
+  });
+  h('localServer:setLidServing', async (_e, enable: boolean) => {
+    // The system dialog this raises is the user's own; a refusal there is an answer, not a fault,
+    // so it is reported back rather than thrown into an error toast.
+    try {
+      if (enable) await holdLid(); else await releaseLid();
+      updateSettings({ localServerKeepServingOnLidClose: enable });
+      recordPowerError(null);
+    } catch (error) {
+      recordPowerError(error instanceof Error ? error.message : String(error));
+    }
+    return powerStatus();
+  });
   h('copilot:status', async () => getCopilotStatus());
   h('copilot:regenerateToken', async () => regenerateCopilotToken());
   h('copilot:ensureCert', async () => {

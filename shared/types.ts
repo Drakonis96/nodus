@@ -1464,6 +1464,24 @@ export interface AppSettings {
   nodusServerIncludeVectors: boolean;
   /** Low-cost periodic publication while the desktop app remains open. */
   nodusServerAutoSync: boolean;
+  /**
+   * Run Nodus Server on this computer instead of publishing to a Docker deployment.
+   *
+   * App-global rather than per-vault: it is one process per machine that every connected
+   * vault publishes into, so storing it per vault would let two vaults disagree about
+   * whether a single shared process should exist.
+   */
+  localServerEnabled: boolean;
+  /** TCP port the local server listens on. */
+  localServerPort: number;
+  /** How other devices reach the local server. `loopback` shares with nothing. */
+  localServerAccess: LocalServerAccess;
+  /** Administrator account for the local server's own web administration. */
+  localServerAdminEmail: string;
+  /** Hold off idle sleep while the local server is running. */
+  localServerKeepAwake: boolean;
+  /** Disable system sleep entirely, so a closed lid keeps serving. Requires an administrator. */
+  localServerKeepServingOnLidClose: boolean;
   /** Opt-in local HTTPS server that serves the Word writing-copilot add-in + its JSON API. */
   copilotEnabled: boolean;
   /** Localhost TCP port for the copilot HTTPS server (serves /addin and /api). */
@@ -3676,6 +3694,84 @@ export interface McpServerStatus {
   running: boolean;
   port: number | null;
   url: string | null;
+  error: string | null;
+}
+
+// ── Nodus Server, basic mode ───────────────────────────────────────────────
+// The advanced mode publishes to somebody else's Docker deployment. Basic mode runs that
+// same server on this computer, so the state below describes a process Nodus itself owns:
+// whether it is up, how people reach it, and what is keeping the machine awake for it.
+
+export type LocalServerPhase = 'stopped' | 'starting' | 'running' | 'error';
+
+/**
+ * How devices reach the local server.
+ *
+ * There is deliberately no cleartext option. `tailscale` is what Nodus recommends: the
+ * traffic is WireGuard-encrypted, the certificate is a real one, and no port is opened on
+ * the router. `lan` serves HTTPS with a Nodus-generated certificate to the local network,
+ * for people who do not want a second product involved.
+ */
+export type LocalServerAccess = 'loopback' | 'tailscale' | 'lan';
+
+export interface LocalServerTailscale {
+  /** The CLI was found on this machine. Without it nothing else here is meaningful. */
+  installed: boolean;
+  /** The daemon reports this machine as logged in to a tailnet. */
+  connected: boolean;
+  /** MagicDNS name of this machine, e.g. `laptop.tail1234.ts.net`. */
+  dnsName: string | null;
+  /** HTTPS certificates are enabled for the tailnet, so `tailscale serve` can be used. */
+  httpsAvailable: boolean;
+  /** `tailscale serve` is already forwarding the tailnet HTTPS port to our local port. */
+  servingOurPort: boolean;
+  /** The public URL devices should open, when serving is configured. */
+  url: string | null;
+}
+
+export interface LocalServerLan {
+  /** Addresses this machine holds on the local network, in the certificate's SAN. */
+  addresses: string[];
+  /** SHA-256 of the certificate authority, for the user to compare on the other device. */
+  caFingerprint: string | null;
+  /** Where the exportable CA certificate lives, so a phone can trust it once. */
+  caCertPath: string | null;
+}
+
+/** Runtime state of the Nodus Server process running on this computer. */
+export interface LocalServerStatus {
+  phase: LocalServerPhase;
+  /** Persisted preference: start the local server when Nodus opens. */
+  enabled: boolean;
+  port: number;
+  access: LocalServerAccess;
+  /** Loopback origin the desktop publishes to. Null until the process is up. */
+  localUrl: string | null;
+  /** What people type on their phone or tablet. Null when only loopback is reachable. */
+  shareUrl: string | null;
+  /** Web administration sign-in, so the user is never locked out of their own server. */
+  adminEmail: string | null;
+  tailscale: LocalServerTailscale;
+  lan: LocalServerLan;
+  /** Last failure, already stripped of anything secret. */
+  error: string | null;
+}
+
+/** Which sleep defences are currently held, and whether the platform can hold them. */
+export interface LocalServerPowerStatus {
+  /** Idle sleep is blocked. Costs nothing and needs no password. */
+  awake: boolean;
+  /** System sleep is disabled outright, so a closed lid keeps serving. Needs an administrator. */
+  lidOpenServing: boolean;
+  /** This platform can disable lid sleep at all. Linux cannot, from inside the app. */
+  lidSupported: boolean;
+  /** Running on battery. The lid switch refuses to engage here. */
+  onBattery: boolean;
+  /**
+   * The system says sleep is disabled but Nodus did not do it in this run — an earlier
+   * session was killed before it could revert. Surfaced so the user can put it back.
+   */
+  orphaned: boolean;
   error: string | null;
 }
 

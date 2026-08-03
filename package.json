@@ -15,6 +15,7 @@
     "citation:check": "node scripts/sync-citation.mjs --check",
     "version": "npm run citation:sync && git add CITATION.cff",
     "test:e2e": "node scripts/e2e-smoke.mjs",
+    "test:e2e:local-server": "node scripts/e2e-local-server.mjs",
     "test:e2e:prosopography": "node scripts/test-prosopography-e2e.mjs",
     "test:e2e:testimony": "npm run build && node scripts/e2e-testimony.mjs",
     "verify:testimony-performance": "node scripts/verify-testimony-performance.mjs",
@@ -163,6 +164,16 @@
       {
         "from": "dist-zotero/nodus-zotero.xpi",
         "to": "zotero/nodus-zotero.xpi"
+      },
+      {
+        "from": "server",
+        "to": "nodus-server",
+        "filter": [
+          "**/*",
+          "!data",
+          "!data/**/*",
+          "!.env"
+        ]
       }
     ],
     "files": [

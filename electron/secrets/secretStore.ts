@@ -409,6 +409,42 @@ export function clearMcpTunnelApiKey(): void {
   if (fs.existsSync(file)) fs.unlinkSync(file);
 }
 
+// ── Local server administrator password ────────────────────────────────────
+// Basic mode runs Nodus Server on this computer, and that server needs an administrator
+// account for its web administration. Nodus generates the password rather than asking for
+// one — nobody should have to invent a password for a service they did not know they were
+// installing — so it has to be kept somewhere the user can be shown it again. App-global,
+// like the server it belongs to: the process is one per machine, not one per vault.
+
+function localServerAdminPasswordFile(): string {
+  return path.join(globalSecretsDir(), 'local_server_admin.bin');
+}
+
+export function setLocalServerAdminPassword(password: string): void {
+  const clean = password.trim();
+  if (!clean) {
+    clearLocalServerAdminPassword();
+    return;
+  }
+  const file = localServerAdminPasswordFile();
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  writeSecretAtomically(
+    file,
+    safeStorage.isEncryptionAvailable()
+      ? safeStorage.encryptString(clean)
+      : Buffer.from(`b64:${Buffer.from(clean).toString('base64')}`),
+  );
+}
+
+export function getLocalServerAdminPassword(): string | null {
+  return readKeyFile(localServerAdminPasswordFile());
+}
+
+export function clearLocalServerAdminPassword(): void {
+  const file = localServerAdminPasswordFile();
+  if (fs.existsSync(file)) fs.unlinkSync(file);
+}
+
 // ── Nodus Server device token ──────────────────────────────────────────────
 // A shared-server pairing grants one vault permission to publish into one remote
 // space. Keep that credential beside the vault and OS-encrypted: unlike the public
