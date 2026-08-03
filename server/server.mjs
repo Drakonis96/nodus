@@ -7,7 +7,7 @@ import { constants as bufferLimits } from 'node:buffer';
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import { gunzipSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
-import { Store, digest, token } from './lib/store.mjs';
+import { Store, digest, pairingCode, token } from './lib/store.mjs';
 import { body, contentSecurityPolicy, cookies, escapeHtml, form, html, json, jsonBody, redirect } from './lib/http.mjs';
 import { normalizeServerLanguage, serverTranslator } from './lib/i18n.mjs';
 import { helpTip, languagePicker, nodusMark, WEB_STYLES } from './lib/webUi.mjs';
@@ -925,7 +925,7 @@ async function handleLocalProvision(req, res) {
     space.name = vaultName;
   }
 
-  const code = `${token(4).slice(0, 4)}-${token(4).slice(0, 4)}`.toUpperCase();
+  const code = pairingCode();
   store.state.pairingCodes.push({ hash: digest(code), userId: admin.id, spaceId: space.id, expiresAt: new Date(Date.now() + 15 * 60_000).toISOString(), usedAt: null });
   store.save();
   return json(res, 200, { spaceId: space.id, spaceName: space.name, code, publicUrl: publicUrl() });
@@ -1238,7 +1238,7 @@ async function route(req, res) {
     const current = requireSession(req, res, true); if (!current) return;
     const values = await form(req, AUTH_BODY_BYTES); if (!checkCsrf(current, values.csrf)) return html(res, 403, page(tr('error'), `<h1>${tr('sessionExpired')}</h1>`));
     if (!membership(current.user.id, values.spaceId)) return html(res, 403, page(tr('error'), '<h1>No access to that space.</h1>'));
-    const raw = `${token(4).slice(0, 4)}-${token(4).slice(0, 4)}`.toUpperCase();
+    const raw = pairingCode();
     store.state.pairingCodes.push({ hash: digest(raw), userId: current.user.id, spaceId: values.spaceId, expiresAt: new Date(Date.now() + 15 * 60_000).toISOString(), usedAt: null }); store.save();
     return html(res, 200, page(tr('createPairing'), `<div class="page-heading"><div><p class="eyebrow">${tr('publisherDevices')}</p><h1>${tr('connectDesktop')}</h1></div><a class="button-link" href="/">${tr('back')}</a></div><div class="card code-panel"><p>${tr('pairingHelp')}</p><h2><code>${raw}</code></h2><p class="muted">${tr('pairingExpiry')}</p></div>`));
   }

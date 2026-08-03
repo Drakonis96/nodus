@@ -8,6 +8,38 @@ export function token(bytes = 32) {
   return randomBytes(bytes).toString('base64url');
 }
 
+/**
+ * Thirty-two symbols a person can read off a screen and type without a second try.
+ *
+ * No I, O, 0 or 1 — the four that get transcribed as each other — and no lower case, because the
+ * pairing routes uppercase whatever arrives. Exactly 32 so a random byte masked to five bits picks
+ * one uniformly, with no modulo bias and no rejection loop.
+ */
+const PAIRING_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+/**
+ * A pairing code in the shape `XXXX-XXXX`.
+ *
+ * It replaces `` `${token(4).slice(0, 4)}-${token(4).slice(0, 4)}`.toUpperCase() ``, which was
+ * wrong twice. base64url includes `-` and `_`, so 22% of codes carried one *inside* a group,
+ * beside the group separator: `HT5--E2FR` and `-HLJ-VF-Y` are real output, and the administration
+ * page asks somebody to read that off a screen and type it into the desktop. And uppercasing
+ * base64url folds `a` onto `A`, so letters came out twice as likely as digits — an alphabet of 38
+ * symbols that were never worth 38.
+ *
+ * Forty bits, uniform. The code expires in fifteen minutes and the route is rate limited, so the
+ * point of the change is legibility; the entropy simply stopped being a guess.
+ */
+export function pairingCode() {
+  const bytes = randomBytes(8);
+  let code = '';
+  for (let index = 0; index < 8; index += 1) {
+    if (index === 4) code += '-';
+    code += PAIRING_ALPHABET[bytes[index] & 31];
+  }
+  return code;
+}
+
 export function digest(value) {
   return createHash('sha256').update(String(value)).digest('base64url');
 }

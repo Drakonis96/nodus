@@ -8,7 +8,31 @@ import { spawn } from 'node:child_process';
 import { gzipSync } from 'node:zlib';
 import test from 'node:test';
 import { missingServerTranslations } from '../server/lib/i18n.mjs';
-import { Store } from '../server/lib/store.mjs';
+import { Store, pairingCode } from '../server/lib/store.mjs';
+
+/**
+ * The code somebody reads off the administration page and types into the desktop.
+ *
+ * It used to be two base64url slices joined by a hyphen and uppercased, which put a `-` or a `_`
+ * *inside* a group in 22% of codes — `HT5--E2FR`, `-HLJ-VF-Y` — beside the group separator, and
+ * folded `a` onto `A` so letters came out twice as likely as digits. The endpoint test caught it
+ * only when it happened to draw a bad one, so it passed four times before failing on main.
+ *
+ * Ten thousand draws is not proof of a distribution; it is enough to fail loudly the moment
+ * anybody puts a variable-alphabet generator back.
+ */
+test('a pairing code can be read aloud and typed back without a second try', () => {
+  const seen = new Set();
+  for (let index = 0; index < 10_000; index += 1) {
+    const code = pairingCode();
+    assert.match(code, /^[A-Z0-9]{4}-[A-Z0-9]{4}$/, `a person has to type this: ${code}`);
+    assert.doesNotMatch(code, /[IO01]/, `I, O, 0 and 1 get transcribed as each other: ${code}`);
+    for (const character of code.replace('-', '')) seen.add(character);
+  }
+  // Every symbol of the intended alphabet, and nothing else: a generator that quietly narrowed
+  // to hexadecimal would still satisfy every assertion above.
+  assert.equal([...seen].sort().join(''), '23456789ABCDEFGHJKLMNPQRSTUVWXYZ');
+});
 
 test('Nodus Server web translations cover every supported app language', () => {
   assert.deepEqual(missingServerTranslations(), {
