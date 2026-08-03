@@ -180,6 +180,11 @@ export function VaultSwitcher({ anchorEl, onClose, vaults, onVaultsChanged, onAc
       }
     });
 
+  /** Dismiss the add-vault dialog. */
+  const closeAddModal = () => {
+    setAddOpen(false);
+  };
+
   /**
    * Connect to a Nodus Server space, in the two steps the server itself imposes.
    *
@@ -491,7 +496,7 @@ export function VaultSwitcher({ anchorEl, onClose, vaults, onVaultsChanged, onAc
       {/* Add-vault modal */}
       {addOpen &&
         createPortal(
-          <ModalShell title={t('Añadir bóveda')} onCancel={() => { if (!busy) setAddOpen(false); }} wide>
+          <ModalShell title={t('Añadir bóveda')} onCancel={() => { if (!busy) closeAddModal(); }} wide>
             <div className="mb-4 grid grid-cols-2 gap-2" role="radiogroup" aria-label={t('Origen de la bóveda')}>
               {(['local', 'connected'] as const).map((mode) => (
                 <button
@@ -514,6 +519,11 @@ export function VaultSwitcher({ anchorEl, onClose, vaults, onVaultsChanged, onAc
               ))}
             </div>
 
+            {/* Both origins live in one box of fixed height: the connected form is a
+                third as tall as the nine-mode grid, and without this the dialog jumped
+                between two sizes every time you switched origin. The inner padding
+                keeps the selected mode's ring from being clipped by the scroller. */}
+            <div className="-mx-1 h-[min(32rem,58vh)] overflow-y-auto px-1">
             {addMode === 'connected' ? (
               <div className="space-y-3">
                 {!remoteSession ? (
@@ -594,9 +604,10 @@ export function VaultSwitcher({ anchorEl, onClose, vaults, onVaultsChanged, onAc
             </p>
             </>
             )}
+            </div>
             {addError && <p role="alert" data-testid="vault-creation-error" className="mt-3 rounded-lg border border-red-900/60 bg-red-950/20 px-3 py-2 text-xs text-red-300">{addError}</p>}
             <div className="mt-5 flex justify-end gap-2">
-              <button className="btn btn-ghost" onClick={() => setAddOpen(false)} disabled={busy}>
+              <button className="btn btn-ghost" onClick={() => closeAddModal()} disabled={busy}>
                 {t('Cancelar')}
               </button>
               <button
