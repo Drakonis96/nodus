@@ -122,6 +122,17 @@
         }
       }
     },
+    "%lld archived conversations are removed from this device. This cannot be undone.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se eliminan %lld conversaciones archivadas de este dispositivo. No se puede deshacer."
+          }
+        }
+      }
+    },
     "%lld characters": {
       "extractionState": "manual",
       "localizations": {
@@ -635,7 +646,7 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Archivo"
+            "value": "Archivar"
           }
         }
       }
@@ -647,6 +658,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Carpetas de archivo"
+          }
+        }
+      }
+    },
+    "Archived": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Archivadas"
+          }
+        }
+      }
+    },
+    "Archived conversations are kept here, out of the way.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Las conversaciones archivadas se guardan aquí, apartadas."
           }
         }
       }
@@ -702,6 +735,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Escribe una pregunta"
+          }
+        }
+      }
+    },
+    "Ask the vault something and the exchange is kept on this device.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pregúntale algo al vault y la conversación se guarda en este dispositivo."
           }
         }
       }
@@ -1168,6 +1212,17 @@
         }
       }
     },
+    "Conversations": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conversaciones"
+          }
+        }
+      }
+    },
     "Copied": {
       "extractionState": "manual",
       "localizations": {
@@ -1443,6 +1498,17 @@
         }
       }
     },
+    "Delete everything archived?": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Borrar todo lo archivado?"
+          }
+        }
+      }
+    },
     "Delete the copy": {
       "extractionState": "manual",
       "localizations": {
@@ -1461,6 +1527,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Borrar la clave"
+          }
+        }
+      }
+    },
+    "Delete this conversation?": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Borrar esta conversación?"
           }
         }
       }
@@ -1861,6 +1938,28 @@
         }
       }
     },
+    "Filter conversations": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filtrar conversaciones"
+          }
+        }
+      }
+    },
+    "Filter debates": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filtrar debates"
+          }
+        }
+      }
+    },
     "Filter ideas under this theme": {
       "extractionState": "manual",
       "localizations": {
@@ -1901,6 +2000,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Filtrar preguntas"
+          }
+        }
+      }
+    },
+    "Filter reports": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filtrar informes"
+          }
+        }
+      }
+    },
+    "Filter sessions": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filtrar sesiones"
           }
         }
       }
@@ -2165,6 +2286,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ocultar la clave"
+          }
+        }
+      }
+    },
+    "History": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Historial"
           }
         }
       }
@@ -2730,6 +2862,17 @@
         }
       }
     },
+    "New conversation": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conversación nueva"
+          }
+        }
+      }
+    },
     "New note": {
       "extractionState": "manual",
       "localizations": {
@@ -2770,6 +2913,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sin respuesta"
+          }
+        }
+      }
+    },
+    "No conversations yet": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Todavía no hay conversaciones"
           }
         }
       }
@@ -3258,6 +3412,17 @@
         }
       }
     },
+    "Nothing archived": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No hay nada archivado"
+          }
+        }
+      }
+    },
     "Nothing citable was found for that objective in this space.": {
       "extractionState": "manual",
       "localizations": {
@@ -3276,6 +3441,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Nada aquí"
+          }
+        }
+      }
+    },
+    "Nothing here contains “%@”.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aquí no hay nada que contenga «%@»."
           }
         }
       }
@@ -4721,6 +4897,28 @@
         }
       }
     },
+    "Show as a grid": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ver como cuadrícula"
+          }
+        }
+      }
+    },
+    "Show as a list": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ver como lista"
+          }
+        }
+      }
+    },
     "Show the answer": {
       "extractionState": "manual",
       "localizations": {
@@ -5987,6 +6185,17 @@
         }
       }
     },
+    "Unarchive": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Desarchivar"
+          }
+        }
+      }
+    },
     "Unexpected answer from the embedding provider (\\(detail)).": {
       "extractionState": "manual",
       "localizations": {
@@ -6346,6 +6555,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Escribe la nota"
+          }
+        }
+      }
+    },
+    "Writing the answer": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escribiendo la respuesta"
           }
         }
       }
@@ -6924,6 +7144,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "«%@»"
+          }
+        }
+      }
+    },
+    "“%@” is removed from this device. This cannot be undone.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "«%@» se elimina de este dispositivo. No se puede deshacer."
           }
         }
       }

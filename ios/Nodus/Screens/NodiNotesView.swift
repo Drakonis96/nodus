@@ -88,7 +88,9 @@ struct NodiNotesView: View {
         .navigationTitle("Nodi’s notes")
         .navigationBarTitleDisplayMode(.inline)
         .nodusPageBackdrop(accent: session.accent)
-        .searchable(text: $query, prompt: "Filter notes")
+        .safeAreaInset(edge: .top) {
+            NodusSearchField(text: $query, prompt: "Filter notes", accent: session.accent, isBusy: isLoading)
+        }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button { composing = true } label: { Image(systemName: "square.and.pencil") }

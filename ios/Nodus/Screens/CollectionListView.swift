@@ -70,7 +70,9 @@ struct CollectionListView: View {
         .navigationTitle(Text(LocalizedStringKey(collection.label)))
         .navigationBarTitleDisplayMode(.inline)
         .nodusPageBackdrop(accent: session.accent)
-        .searchable(text: $query, prompt: "Filter on any field")
+        .safeAreaInset(edge: .top) {
+            NodusSearchField(text: $query, prompt: "Filter on any field", accent: session.accent, isBusy: isLoading)
+        }
         .onChange(of: query) { _, _ in scheduleReload() }
         .task { if rows.isEmpty { await reload() } }
         .refreshable { await reload() }
@@ -198,6 +200,21 @@ struct SpecialListView: View {
     @State private var composing = false
     @State private var editing: EditableNote?
     @State private var queued = false
+    @State private var query = ""
+
+    /// Filtered on what the row actually shows.
+    ///
+    /// The four resources here are the only lists in the app that had no filter at all, and
+    /// they are the ones a corpus fills fastest: a vault with eighteen reports and a hundred
+    /// debates is a lot of scrolling for a title you already know.
+    private var visible: [Row] {
+        let needle = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !needle.isEmpty else { return rows }
+        return rows.filter { row in
+            let fields = [presenter.title(row), presenter.subtitle(row), presenter.detail(row)]
+            return fields.compactMap { $0 }.contains { $0.lowercased().contains(needle) }
+        }
+    }
 
     var body: some View {
         List {
@@ -206,7 +223,7 @@ struct SpecialListView: View {
                 NodusNotice(tone: .blocked, title: "Could not load", message: LocalizedStringKey(error))
                     .listRowBackground(Color.clear)
             }
-            ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+            ForEach(Array(visible.enumerated()), id: \.offset) { _, row in
                 NavigationLink {
                     // An immersion session is a whole study route — stations, quizzes, an exam
                     // — and rendering it as a column dump showed a wall of JSON. It gets its
@@ -236,14 +253,21 @@ struct SpecialListView: View {
                     }
                 }
             }
-            if rows.isEmpty, !isLoading, error == nil {
-                ContentUnavailableView("Nothing here", systemImage: icon)
-                    .listRowBackground(Color.clear)
+            if visible.isEmpty, !isLoading, error == nil {
+                ContentUnavailableView(
+                    query.isEmpty ? "Nothing here" : "No matches",
+                    systemImage: icon,
+                    description: query.isEmpty ? nil : Text("Nothing here contains “\(query)”.")
+                )
+                .listRowBackground(Color.clear)
             }
         }
         .scrollContentBackground(.hidden)
         .listStyle(.plain)
         .nodusScrollToTop(accent: session.accent)
+        .safeAreaInset(edge: .top) {
+            NodusSearchField(text: $query, prompt: filterPrompt, accent: session.accent, isBusy: isLoading)
+        }
         .navigationTitle(Text(LocalizedStringKey(title)))
         .navigationBarTitleDisplayMode(.inline)
         .nodusPageBackdrop(accent: session.accent)
@@ -312,6 +336,15 @@ struct SpecialListView: View {
         case .notes: return "Notes"
         case .deepResearch: return "Deep Research"
         case .immersion: return "Immersion"
+        }
+    }
+
+    private var filterPrompt: LocalizedStringKey {
+        switch resource {
+        case .debates: return "Filter debates"
+        case .notes: return "Filter notes"
+        case .deepResearch: return "Filter reports"
+        case .immersion: return "Filter sessions"
         }
     }
 

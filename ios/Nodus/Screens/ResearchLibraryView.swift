@@ -87,7 +87,9 @@ struct ResearchLibraryView: View {
         .navigationTitle("Reports")
         .navigationBarTitleDisplayMode(.inline)
         .nodusPageBackdrop(accent: session.accent)
-        .searchable(text: $query, prompt: Text("Search reports"))
+        .safeAreaInset(edge: .top) {
+            NodusSearchField(text: $query, prompt: "Search reports", accent: session.accent, isBusy: isLoading)
+        }
         .task { await load() }
         .refreshable { await load() }
     }

@@ -72,7 +72,9 @@ struct ThemeIdeasView: View {
         .navigationTitle(label)
         .navigationBarTitleDisplayMode(.inline)
         .nodusPageBackdrop(accent: session.accent)
-        .searchable(text: $query, prompt: "Filter ideas under this theme")
+        .safeAreaInset(edge: .top) {
+            NodusSearchField(text: $query, prompt: "Filter ideas under this theme", accent: session.accent)
+        }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 if !ideas.isEmpty {

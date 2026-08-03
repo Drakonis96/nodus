@@ -5,9 +5,16 @@ import SwiftUI
 struct HomeView: View {
     let session: SpaceSession
 
+    @Environment(AppPreferences.self) private var preferences
+
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
+                HStack {
+                    Spacer()
+                    layoutToggle
+                }
+
                 if !session.isPublished {
                     // Not an error. The space exists and this account can read it; its owner
                     // simply has not published yet, and the desktop is the only thing that can.
@@ -36,7 +43,7 @@ struct HomeView: View {
                     NodusGlassContainer(spacing: 16) {
                         // `Self.tileColumns`, not a fresh `[GridItem]` per body pass, and the
                         // same grid every other section on this screen uses.
-                        LazyVGrid(columns: Self.tileColumns, spacing: 12) {
+                        LazyVGrid(columns: tileColumns, spacing: 12) {
                             ForEach(sections, id: \.path) { collection in
                                 NavigationLink {
                                     CollectionListView(session: session, collection: collection)
@@ -59,7 +66,7 @@ struct HomeView: View {
                 if !vaultTools.isEmpty {
                     VStack(alignment: .leading, spacing: 10) {
                         Text(toolsHeading).font(.subheadline.weight(.semibold))
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 12)], spacing: 12) {
+                        LazyVGrid(columns: tileColumns, spacing: 12) {
                             ForEach(vaultTools, id: \.title) { tool in
                                 NavigationLink {
                                     tool.destination()
@@ -155,6 +162,26 @@ struct HomeView: View {
         .refreshable { await session.load() }
     }
 
+    /// Board or list, switched here rather than buried in settings.
+    ///
+    /// A row of its own above the sections rather than floating over them: an overlay in the
+    /// top-right corner sat squarely on the first tile's count.
+    private var layoutToggle: some View {
+        Button {
+            withAnimation(.easeOut(duration: 0.22)) {
+                preferences.homeLayout = preferences.homeLayout.toggled
+            }
+        } label: {
+            Image(systemName: preferences.homeLayout.toggled.systemImage)
+                .font(.footnote.weight(.semibold))
+                .frame(width: 38, height: 38)
+                .contentShape(Circle())
+        }
+        .tint(session.accent)
+        .nodusGlass(NodusGlass(.thin, tint: session.accent), in: Circle())
+        .accessibilityLabel(preferences.homeLayout == .grid ? "Show as a list" : "Show as a grid")
+    }
+
     /// A headed section whose contents sit in the one grid this screen uses.
     ///
     /// Every tile on Home is the same size — that is what makes the screen read as one board
@@ -167,14 +194,23 @@ struct HomeView: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(title).font(.subheadline.weight(.semibold))
-            LazyVGrid(columns: Self.tileColumns, spacing: 12) {
+            LazyVGrid(columns: tileColumns, spacing: 12) {
                 content()
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private static let tileColumns = [GridItem(.adaptive(minimum: 150), spacing: 12)]
+    /// One column when the screen is in list form, two or more when it is a board.
+    ///
+    /// Every section on Home goes through this, which is what keeps the two layouts honest:
+    /// the toggle changes the shape of the whole screen rather than of one grid on it.
+    private var tileColumns: [GridItem] {
+        switch preferences.homeLayout {
+        case .grid: return [GridItem(.adaptive(minimum: 150), spacing: 12)]
+        case .list: return [GridItem(.flexible(), spacing: 12)]
+        }
+    }
 
     /// Read once per body pass rather than three times.
     ///
@@ -270,7 +306,27 @@ struct SectionTile: View {
     let count: Int?
     let accent: Color
 
+    @Environment(AppPreferences.self) private var preferences
+
+    /// Two shapes, one surface.
+    ///
+    /// A square tile stacked in a single column is mostly empty card with a name at the
+    /// bottom, so the list form is not the grid form stretched — it is a row: the icon
+    /// leading, the name reading across, the count trailing, and half the height.
     var body: some View {
+        Group {
+            switch preferences.homeLayout {
+            case .grid: square
+            case .list: row
+            }
+        }
+        .nodusGlass(
+            NodusGlass(.regular, tint: accent, interactive: true),
+            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+        )
+    }
+
+    private var square: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Image(systemName: icon)
@@ -289,6 +345,26 @@ struct SectionTile: View {
         }
         .padding(14)
         .frame(height: 92, alignment: .topLeading)
-        .nodusGlass(NodusGlass(.regular, tint: accent, interactive: true), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
+    private var row: some View {
+        HStack(spacing: 13) {
+            Image(systemName: icon)
+                .font(.title3)
+                .foregroundStyle(accent)
+                .frame(width: 26)
+            Text(title)
+                .font(.subheadline.weight(.medium))
+                .lineLimit(1)
+            Spacer(minLength: 8)
+            if let count {
+                CountBadge(count: count, accent: accent)
+            }
+            Image(systemName: "chevron.right")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.horizontal, 15)
+        .frame(height: 56)
     }
 }

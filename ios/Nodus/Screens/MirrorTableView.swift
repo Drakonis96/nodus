@@ -53,7 +53,9 @@ struct MirrorTableView: View {
         .navigationTitle(Text(LocalizedStringKey(title)))
         .navigationBarTitleDisplayMode(.inline)
         .nodusPageBackdrop(accent: session.accent)
-        .searchable(text: $query, prompt: "Filter on any field")
+        .safeAreaInset(edge: .top) {
+            NodusSearchField(text: $query, prompt: "Filter on any field", accent: session.accent)
+        }
         .onChange(of: query) { _, _ in schedule() }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) { sortMenu }

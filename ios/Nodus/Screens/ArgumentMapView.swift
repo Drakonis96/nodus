@@ -208,15 +208,6 @@ private struct ArgumentSeedPicker: View {
 
     var body: some View {
         List {
-            HStack(spacing: 9) {
-                Image(systemName: "magnifyingglass").foregroundStyle(session.accent)
-                TextField("Find the idea to start from", text: $query)
-                    .textFieldStyle(.plain)
-                    .autocorrectionDisabled()
-                    .submitLabel(.search)
-            }
-            .listRowBackground(Color.clear)
-
             // An ordinary row rather than a section footer: a footer keeps the list's own
             // opaque backing, which over the accent backdrop drew as a black band across the
             // one sentence this screen most wants read.
@@ -271,6 +262,14 @@ private struct ArgumentSeedPicker: View {
         }
         .scrollContentBackground(.hidden)
         .listStyle(.plain)
+        .safeAreaInset(edge: .top) {
+            NodusSearchField(
+                text: $query,
+                prompt: "Find the idea to start from",
+                accent: session.accent,
+                isBusy: isLoading
+            )
+        }
         .onChange(of: query) { _, _ in schedule() }
         .task { if rows.isEmpty { await load(nil) } }
     }

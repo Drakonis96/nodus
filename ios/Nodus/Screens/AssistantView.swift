@@ -28,6 +28,13 @@ struct ChatScreen: View {
     @State private var running: Task<Void, Never>?
     @State private var include: Set<ContextSectionKind> = Set(ContextSectionKind.allCases)
     @State private var showingLayers = false
+    @State private var history: ChatHistoryStore?
+    /// The conversation these turns belong to. Nil until the first question is asked, so an
+    /// opened-and-abandoned tab leaves nothing behind.
+    @State private var conversationId: String?
+    @State private var conversationTitle = ""
+    @State private var conversationCreatedAt = Date()
+    @State private var showingHistory = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -38,6 +45,13 @@ struct ChatScreen: View {
                         ForEach(turns) { turn in
                             TurnBubble(turn: turn, accent: session.accent, session: session)
                                 .id(turn.id)
+                        }
+                        // Only while nothing has arrived: once the first token lands the
+                        // prose itself is the progress, and two indicators is one too many.
+                        if isThinking, turns.last?.text.isEmpty ?? false {
+                            TypingDots(accent: session.accent)
+                                .padding(.leading, 2)
+                                .id("typing")
                         }
                         if let error {
                             NodusNotice(tone: .blocked, title: "The query failed", message: LocalizedStringKey(error))
@@ -55,6 +69,22 @@ struct ChatScreen: View {
         .navigationTitle("Chat")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button { showingHistory = true } label: {
+                    Image(systemName: "clock.arrow.circlepath")
+                }
+                .tint(session.accent)
+                .accessibilityLabel("History")
+            }
+            if !turns.isEmpty {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { startNewConversation() } label: {
+                        Image(systemName: "square.and.pencil")
+                    }
+                    .tint(session.accent)
+                    .accessibilityLabel("New conversation")
+                }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     // Which layers of the corpus enter the payload, the same choice the
@@ -76,6 +106,73 @@ struct ChatScreen: View {
                 .tint(session.accent)
             }
         }
+        .sheet(isPresented: $showingHistory) {
+            if let history {
+                ChatHistoryView(
+                    store: history,
+                    accent: session.accent,
+                    currentId: conversationId,
+                    onOpen: open
+                )
+            }
+        }
+        .task { if history == nil { history = ChatHistoryStore(spaceId: session.connection.spaceId) } }
+    }
+
+    // MARK: - Conversations
+
+    private func startNewConversation() {
+        running?.cancel()
+        turns = []
+        error = nil
+        conversationId = nil
+        conversationTitle = ""
+    }
+
+    private func open(_ conversation: ChatHistoryStore.Conversation) {
+        running?.cancel()
+        error = nil
+        conversationId = conversation.id
+        conversationTitle = conversation.title
+        conversationCreatedAt = conversation.createdAt
+        // The retrieved material is not kept — see `ChatHistoryStore` — so a re-opened
+        // conversation shows what was said and what it cited, and does not pretend to still
+        // hold the corpus rows the answer was built from.
+        turns = conversation.messages.map { message in
+            Turn(
+                role: message.role == .user ? .user : .assistant,
+                text: message.text,
+                citations: message.citations,
+                mode: message.wasSemantic.map { $0 ? .semantic : .lexical },
+                warning: message.warning
+            )
+        }
+    }
+
+    /// Write the exchange down. Called when a turn finishes, not while it streams.
+    private func persist() {
+        guard let history, !turns.isEmpty else { return }
+        let id = conversationId ?? UUID().uuidString
+        conversationId = id
+        if conversationTitle.isEmpty {
+            conversationTitle = ChatHistoryStore.title(from: turns.first?.text ?? "")
+        }
+        history.save(ChatHistoryStore.Conversation(
+            id: id,
+            title: conversationTitle,
+            messages: turns.map { turn in
+                ChatHistoryStore.Message(
+                    role: turn.role == .user ? .user : .assistant,
+                    text: turn.text,
+                    citations: turn.citations,
+                    wasSemantic: turn.mode.map { $0 == .semantic },
+                    warning: turn.warning
+                )
+            },
+            createdAt: conversationCreatedAt,
+            updatedAt: Date(),
+            isArchived: false
+        ))
     }
 
     private var emptyState: some View {
@@ -126,8 +223,14 @@ struct ChatScreen: View {
         turns.append(Turn(role: .assistant, text: ""))
         isThinking = true
 
+        if conversationId == nil { conversationCreatedAt = Date() }
         running = Task {
-            defer { isThinking = false }
+            defer {
+                isThinking = false
+                // Saved on every ending — finished, cancelled or failed. A turn that cost a
+                // retrieval and a model call should not depend on how it stopped.
+                persist()
+            }
             do {
                 let retrieval = CorpusRetrieval(
                     client: session.client,

@@ -85,42 +85,13 @@ struct SearchScreen: View {
         // the tab bar, and the shell hides the navigation bar on those so the custom header can
         // own the top — which took the search drawer with it and left the Search tab with
         // nowhere to type.
-        .safeAreaInset(edge: .top) { field }
+        .safeAreaInset(edge: .top) {
+            NodusSearchField(text: $query, prompt: prompt, accent: session.accent, isBusy: isSearching)
+        }
         .onChange(of: query) { _, _ in schedule() }
         .overlay {
             if query.isEmpty { idleState }
         }
-    }
-
-    private var field: some View {
-        HStack(spacing: 9) {
-            Image(systemName: isSearching ? "ellipsis" : "magnifyingglass")
-                .font(.callout)
-                .foregroundStyle(session.accent)
-                .symbolEffect(.variableColor, isActive: isSearching)
-
-            TextField(prompt, text: $query)
-                .textFieldStyle(.plain)
-                .autocorrectionDisabled()
-                .textInputAutocapitalization(.never)
-                .submitLabel(.search)
-
-            if !query.isEmpty {
-                Button {
-                    query = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.tertiary)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Clear")
-            }
-        }
-        .padding(.horizontal, 13)
-        .padding(.vertical, 10)
-        .nodusGlass(NodusGlass(.regular, tint: session.accent), in: Capsule())
-        .padding(.horizontal, 16)
-        .padding(.bottom, 8)
     }
 
     /// Why the search was lexical, in the phone's language.
@@ -143,8 +114,8 @@ struct SearchScreen: View {
 
     /// What the field promises, decided by what this device can actually do — the vault having
     /// vectors is not enough if the key for them is not on this phone.
-    private var prompt: String {
-        canSearchByMeaning ? String(localized: "Search the corpus") : String(localized: "Search (lexical)")
+    private var prompt: LocalizedStringKey {
+        canSearchByMeaning ? "Search the corpus" : "Search (lexical)"
     }
 
     /// When the search really was lexical, "no results" means "no row contains this string" —

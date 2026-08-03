@@ -323,7 +323,9 @@ struct QuestionBankView: View {
         .navigationTitle("Question bank")
         .navigationBarTitleDisplayMode(.inline)
         .nodusPageBackdrop(accent: session.accent)
-        .searchable(text: $query, prompt: "Filter questions")
+        .safeAreaInset(edge: .top) {
+            NodusSearchField(text: $query, prompt: "Filter questions", accent: session.accent)
+        }
         .task { await load() }
     }
 
