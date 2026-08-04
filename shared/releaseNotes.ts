@@ -653,10 +653,11 @@ const RELEASE_2_7_0_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 /**
- * 3.1.1 is for whoever runs a Nodus Server, and both entries are about the same thing:
- * a server that stops being a good neighbour to itself the moment it has work to do.
+ * 3.2.0 opens with two entries for whoever runs a Nodus Server, and they are about the same
+ * thing: a server that stopped being a good neighbour to itself the moment it had work to do.
+ * More will land beside them before this ships.
  */
-const RELEASE_3_1_1_HIGHLIGHTS: RawReleaseHighlight[] = [
+const RELEASE_3_2_0_HIGHLIGHTS: RawReleaseHighlight[] = [
   {
     scope: 'general',
     es: 'Buscar por significado en un servidor de Nodus ya no lo deja sin atender a nadie más. Antes, mientras resolvía una búsqueda, el resto de peticiones esperaban su turno. Ahora ese cálculo va en hilos aparte y el servidor sigue respondiendo. Se nota sobre todo cuando varias personas consultan a la vez.',
@@ -679,9 +680,9 @@ const RELEASE_3_1_1_HIGHLIGHTS: RawReleaseHighlight[] = [
 
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
   {
-    version: '3.1.1',
+    version: '3.2.0',
     date: '2026-08-04',
-    highlights: RELEASE_3_1_1_HIGHLIGHTS,
+    highlights: RELEASE_3_2_0_HIGHLIGHTS,
   },
   {
     version: '3.1.0',
