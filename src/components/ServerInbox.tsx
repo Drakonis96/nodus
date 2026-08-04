@@ -59,25 +59,29 @@ function shortDevice(clientId: string | null): string | null {
  * scripts/test-i18n-coverage.mjs walks the source for literals and cannot see a key
  * reached through a variable — which is exactly how the sidebar labels once shipped
  * untranslated.
+ *
+ * Coloured light-first with `dark:` overrides, the same way Settings writes its status
+ * chips. Dark-first utilities plus the `.light` remaps left these pale-on-pale and barely
+ * legible in the light theme — checked on screen, not assumed.
  */
 function OutcomeChip({ outcome }: { outcome: ServerInboxEntry['outcome'] }) {
   let label: string;
   let tone: string;
   if (outcome === 'applied') {
     label = t('Aplicado');
-    tone = 'border-emerald-700/60 bg-emerald-950/40 text-emerald-300';
+    tone = 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300';
   } else if (outcome === 'deleted') {
     label = t('Eliminado');
-    tone = 'border-neutral-700 bg-neutral-900 text-neutral-300';
+    tone = 'bg-neutral-200 text-neutral-600 dark:bg-neutral-500/15 dark:text-neutral-300';
   } else if (outcome === 'kept_local') {
     label = t('Se conservó tu versión');
-    tone = 'border-amber-700/60 bg-amber-950/40 text-amber-300';
+    tone = 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300';
   } else {
     label = t('Rechazado');
-    tone = 'border-red-800/70 bg-red-950/40 text-red-300';
+    tone = 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300';
   }
   return (
-    <span className={`shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] font-medium ${tone}`}>{label}</span>
+    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${tone}`}>{label}</span>
   );
 }
 
@@ -177,7 +181,7 @@ export function ServerInbox({ anchorEl, onClose, entries, onMarkRead, onClearOne
                     >
                       <span
                         aria-hidden="true"
-                        className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${entry.read ? 'bg-transparent' : 'bg-indigo-400'}`}
+                        className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${entry.read ? 'bg-transparent' : 'bg-indigo-600 dark:bg-indigo-400'}`}
                       />
                       <button
                         type="button"
@@ -192,7 +196,7 @@ export function ServerInbox({ anchorEl, onClose, entries, onMarkRead, onClearOne
                           <OutcomeChip outcome={entry.outcome} />
                         </div>
                         {entry.entityKind === 'deep_research' && (
-                          <p className="mt-0.5 text-[11px] text-indigo-300">{t('Informe de Deep Research')}</p>
+                          <p className="mt-0.5 text-[11px] text-indigo-600 dark:text-indigo-300">{t('Informe de Deep Research')}</p>
                         )}
                         <p
                           className="mt-0.5 truncate text-[11px] text-neutral-500"
@@ -201,7 +205,7 @@ export function ServerInbox({ anchorEl, onClose, entries, onMarkRead, onClearOne
                           {device ? `${tx('Desde {device}', { device })} · ` : ''}
                           {relativeTime(entry.arrivedAt)}
                         </p>
-                        {entry.reason && <p className="mt-0.5 text-[11px] text-red-300">{entry.reason}</p>}
+                        {entry.reason && <p className="mt-0.5 text-[11px] text-red-700 dark:text-red-300">{entry.reason}</p>}
                       </button>
                       <button
                         type="button"
@@ -224,7 +228,7 @@ export function ServerInbox({ anchorEl, onClose, entries, onMarkRead, onClearOne
                 >
                   {t('Marcar todo como leído')}
                 </button>
-                <button className="btn btn-ghost px-2 py-1 text-xs text-red-300" onClick={onClearAll}>
+                <button className="btn btn-ghost px-2 py-1 text-xs text-red-700 dark:text-red-300" onClick={onClearAll}>
                   {t('Vaciar la bandeja')}
                 </button>
               </div>
