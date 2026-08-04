@@ -46,6 +46,16 @@ function broadcast(channel: string, payload: unknown): void {
   }
 }
 
+/**
+ * Drain once, right now, instead of waiting for the timer.
+ *
+ * Exported so the round-trip can be exercised without sleeping through a thirty-second
+ * interval — the timer's own behaviour is the interval, not what one pass does.
+ */
+export async function drainServerInboxNow(): Promise<void> {
+  await tick();
+}
+
 async function tick(): Promise<void> {
   // A publication holds the database for a long synchronous stretch inside
   // buildServerSnapshot; there is nothing to interleave with, so wait for the next tick.
