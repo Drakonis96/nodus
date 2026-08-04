@@ -524,13 +524,17 @@ function rankedIdeas(tokens: Set<string>, semanticIndex: WorkshopSemanticRanking
           themes: themeList,
           workCount: row.work_count,
           evidenceCount: row.evidence_count,
-          works: ideaWorks(row.global_id),
+          // Filled in below, for the ideas that survive the cut only.
+          works: [],
         },
       };
     })
     .sort(sortScored)
     .slice(0, MAX_IDEAS)
-    .map(({ item, score, reason }) => ({ ...item, score, reason }));
+    // The works behind an idea take a query each and play no part in the ranking, so
+    // they are looked up after it: on a corpus of ten thousand ideas this was ten
+    // thousand queries on the main thread to keep a hundred and twenty of them.
+    .map(({ item, score, reason }) => ({ ...item, score, reason, works: ideaWorks(item.id) }));
 }
 
 function ideaWorks(globalId: string): WritingWorkshopIdeaCandidate['works'] {
