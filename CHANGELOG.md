@@ -1,5 +1,48 @@
 # Changelog
 
+## 3.2.0 — 2026-08-04
+
+Work that arrives from another device has somewhere to land, and the two places
+Nodus used to stop responding — the window while a report is written, the server
+while somebody searches by meaning — keep answering instead.
+
+### Added
+
+- **An Inbox in the header.** What another device sends now lands in a record of
+  arrivals rather than only where you happened to be looking: the chip says what
+  arrived and not just how many, a report can appear while you are elsewhere in
+  the app, and an idle desktop still receives because the ledger is drained on a
+  timer instead of on the next thing you click.
+- **The Deep Research queue says where it stands.** The report being generated
+  carries a bar with its real percentage and the ones waiting say how many are
+  ahead of them, in place of an icon that spun the same way for a report that had
+  just started and one about to finish.
+
+### Changed
+
+- **A semantic search on Nodus Server runs off the event loop.** Working out one
+  search used to hold every other request behind it; the arithmetic now runs on
+  worker threads and the server keeps replying while it happens. The pool also
+  drops a dead thread that was idle, which it previously kept.
+- **The snapshot cache is bounded by what it weighs, not by how many vaults it
+  holds.** Three published vaults of any size went past a gigabyte for a large
+  corpus. The ceiling is memory now, and an administrator can raise it.
+- **The desktop, Nodus Server and the mobile app all state 3.2.0.**
+
+### Fixed
+
+- **Generating a report no longer freezes the window.** Nodus goes through the
+  whole corpus several times per report, and each of those searches blocked the
+  app for as long as it took. They run in parts and hand control back between
+  them. The last two that still blocked are paged as well, and the pass that kept
+  a hundred ideas stopped looking up the works behind all ten thousand.
+- **A finished report appears in the gallery by itself.** With several queued,
+  all but the last stayed out of it until you left the section and came back. A
+  report that generates but cannot be saved now says so instead of disappearing
+  without a trace.
+- **The Inbox chips are legible in the light theme.**
+- **The ledger stopped reissuing sequence numbers it had already handed out.**
+
 ## 3.1.0 — 2026-08-03
 
 Nodus Server stops being a read-only shop window. A vault can now live on a
