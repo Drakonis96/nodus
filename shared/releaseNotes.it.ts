@@ -105,7 +105,12 @@ const RELEASE_3_2_1_IT: string[] = [
   "Una modifica che il server non può accettare ora spiega perché. Prima diceva soltanto che era troppo grande, senza dire quanto occupava né quale fosse il massimo. E una coda di modifiche che non entrava in un invio restava bloccata per sempre. Ora viene divisa in invii più piccoli finché non si svuota.",
 ];
 
+const RELEASE_3_2_2_IT: string[] = [
+  "Un errore di sincronizzazione già risolto smette di essere mostrato. Il pannello del vault poteva mostrare un guasto del server per tutto il resto della sessione, proprio accanto a una pubblicazione andata a buon fine. L'avviso sparisce appena la sincronizzazione torna a funzionare.",
+];
+
 export const RELEASE_NOTES_IT: Record<string, string[]> = {
+  "3.2.2": RELEASE_3_2_2_IT,
   "3.2.1": RELEASE_3_2_1_IT,
   "3.2.0": RELEASE_3_2_0_IT,
   "3.1.0": RELEASE_3_1_0_IT,

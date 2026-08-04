@@ -45,7 +45,12 @@ const RELEASE_3_2_1_TR: string[] = [
   "Sunucunun kabul edemediği bir değişiklik artık nedenini açıklıyor. Önceden yalnızca çok büyük olduğunu söylüyor, ne kadar yer kapladığını da en fazla ne kadar olabileceğini de belirtmiyordu. Ayrıca tek bir gönderime sığmayan bir değişiklik kuyruğu sonsuza kadar takılı kalıyordu. Artık boşalana kadar daha küçük gönderimlere bölünüyor.",
 ];
 
+const RELEASE_3_2_2_TR: string[] = [
+  "Zaten çözülmüş bir eşitleme hatası artık gösterilmiyor. Kasa paneli, başarıyla tamamlanmış bir yayımın hemen yanında, sunucu hatasını oturumun geri kalanı boyunca göstermeye devam edebiliyordu. Uyarı artık eşitleme yeniden çalışır çalışmaz kayboluyor.",
+];
+
 export const RELEASE_NOTES_TR: Record<string, string[]> = {
+  "3.2.2": RELEASE_3_2_2_TR,
   "3.2.1": RELEASE_3_2_1_TR,
   "3.2.0": RELEASE_3_2_0_TR,
   "3.1.0": RELEASE_3_1_0_TR,

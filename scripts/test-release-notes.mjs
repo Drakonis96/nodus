@@ -25,13 +25,13 @@ try {
 
   const { RELEASE_NOTES, releaseNotesForMajor, compareVersions } = await import(pathToFileURL(bundlePath).href);
   const currentRelease = RELEASE_NOTES[0];
-  assert.equal(currentRelease?.version, '3.2.1');
+  assert.equal(currentRelease?.version, '3.2.2');
   assert.equal(currentRelease?.date, '2026-08-04');
-  // One bug from both ends: a Deep Research report written on a phone or a colleague's machine
-  // is a single row larger than the server would accept, and nothing about that was visible
-  // from either side. A floor rather than an exact count, in case more lands here before it
-  // ships.
-  assert.ok(currentRelease?.highlights.length >= 2, 'the release must describe what changed');
+  // A sync error that was written on failure and never taken back, so a server that answered
+  // badly for one tick marked the vault for the rest of the session. One highlight, because
+  // that is genuinely all this release is: the floor is one rather than two so a patch does
+  // not have to invent a second thing to say.
+  assert.ok(currentRelease?.highlights.length >= 1, 'the release must describe what changed');
   for (const highlight of currentRelease.highlights) {
     // Written for the person using Nodus: no module names, no internal vocabulary.
     for (const language of ['es', 'en', 'fr', 'de', 'pt', 'pt-BR']) {
