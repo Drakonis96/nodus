@@ -12,6 +12,11 @@
   <a href="https://drakonis96.github.io/nodus/demo/">Try the interactive tour</a>
 </p>
 
+<p align="center">
+  <a href="https://paypal.me/Jorgepb96"><img src="https://img.shields.io/badge/PayPal-Support-0070BA?logo=paypal&logoColor=white" alt="Support Nodus with PayPal"></a>
+  <a href="https://ko-fi.com/nodus_app"><img src="https://img.shields.io/badge/Ko--fi-Support-FF5E5B?logo=kofi&logoColor=white" alt="Support Nodus on Ko-fi"></a>
+</p>
+
 Nodus is a desktop centre for university work. It brings sources, notes, data, ideas and learning materials together without forcing every project into the same shape.
 
 Each vault is a focused workspace. Researchers can build a connected corpus, historians can document a family tree, teams can explore structured data, teachers can plan and assess their courses, and students can organise an entire degree. You can move between them from one calm, consistent app.
@@ -31,15 +36,7 @@ Download the installer for your computer and open it. There is no server to conf
 
 The standalone Zotero plugin is available from the same release as [nodus-zotero.xpi](https://github.com/Drakonis96/nodus/releases/latest/download/nodus-zotero.xpi). In Zotero, open **Tools → Add-ons**, choose **Install Add-on From File**, and select the downloaded file.
 
-The plugin indexes the complete text of selected PDF, EPUB and HTML attachments, combines semantic and lexical retrieval across documents, and attaches exact passage/page citations to its answers. Multilingual semantic search runs locally through a quantised E5 model—no embedding API key or per-query embedding cost is required—and the compressed text index plus vectors remain in the Zotero profile. Long PDFs are reconstructed by page, column and paragraph, with repeated margins removed and source coordinates retained. A bounded two-round retriever can reformulate searches and inspect specific page ranges before answering. Its evidence audit flags uncited or weakly supported claims. For PDFs, **Vision** reads the rendered page—including scanned text, figures, tables, formulas and diagrams—and merges the extraction into the searchable index; **Index** applies the same OCR fallback to text-poor pages.
-
 The [latest release page](https://github.com/Drakonis96/nodus/releases/latest) always contains the newest available installers and release notes.
-
-## Share a vault with Nodus Server
-
-Nodus Server is an optional, self-hosted companion for courses, research groups and shared Worldbuilding projects. A vault owner can explicitly publish a filtered read-only copy, give each reader access to selected spaces, and connect those spaces to ChatGPT or Claude through OAuth-protected remote MCP. Academic and Worldbuilding vaults expose type-specific read tools; the desktop app sends only outbound HTTPS traffic and keeps this publisher completely separate from its broader localhost MCP server.
-
-The server runs with Docker on Windows, macOS or Linux and supports the bundled Caddy HTTPS proxy as well as an existing Caddy, Nginx or Traefik installation. Setup and user management happen in a web page; starting the containers is the only terminal step. See the [Nodus Server installation guide](server/README.md).
 
 ## One app, five working vaults
 
@@ -85,15 +82,17 @@ Teaching tools cover private student rosters, gradebooks, reusable rubrics and e
 
 ## Nodus Toolkit
 
-The Toolkit provides cross-vault document utilities. **Nodus Convert** converts and processes documents, PDFs, images and text. **Nodus Protect** combines PDFs and images, permanently redacts or blurs sensitive areas, adds watermarks and a legal footer, creates fully rasterised PNG/PDF/ZIP results and can issue or verify IDPS v1 traceable copies. **Nodus Translate** translates pasted text, files and Zotero attachments with a chosen AI model; it preserves DOCX/EPUB structure and includes a rasterised PDF facsimile mode that retains page geometry, backgrounds and images while replacing visible text. PDF Presenter and OCR Workspace are also available.
+The Toolkit brings practical document tools together in every vault. Convert changes files between common formats, Protect combines files and adds permanent redactions, watermarks and traceable copies, and Translate works with text, files and Zotero attachments while preserving DOCX and EPUB structure. PDF Presenter and OCR Workspace complete the set.
 
-Protect can read files selected from disk or compatible sources in the active vault and can save each result back to disk, share it through the operating system or store it in the vault’s Protected Copies library. Its document processing is entirely local: it does not send protected documents to AI providers or any external service. This statement applies specifically to Nodus Protect; other optional Nodus features can use network providers when the user configures and invokes them.
+You can open material from disk or from compatible vault sources, then save the result, share it or return it to the vault. Nodus Protect processes documents entirely on your computer and never sends them to an AI provider. Translate only uses the model you choose when you ask it to.
 
 ![Nodus Toolkit demo showing Convert, Protect, Translate and OCR Workspace](docs/screenshots/readme-toolkit-demo.png)
 
 ## Zotero plugin
 
-The standalone Zotero plugin brings Nodus search into your reference manager. It indexes the complete text of selected PDF, EPUB and HTML attachments, combines semantic and lexical retrieval across documents, and attaches exact passage and page citations to its answers. Multilingual semantic search runs locally through a quantised E5 model—no embedding API key or per-query embedding cost is required—and the compressed text index plus vectors remain in the Zotero profile. Long PDFs are reconstructed by page, column and paragraph, with repeated margins removed and source coordinates retained. A bounded two-round retriever can reformulate searches and inspect specific page ranges before answering. Its evidence audit flags uncited or weakly supported claims. For PDFs, Vision reads the rendered page—including scanned text, figures, tables, formulas and diagrams—and merges the extraction into the searchable index; Index applies the same OCR fallback to text-poor pages.
+The standalone Zotero plugin brings Nodus search into your reference manager. It indexes PDF, EPUB and HTML attachments so you can search across them and receive answers with exact passages and page citations.
+
+Semantic search works across languages and combines with keyword search. The index stays in your Zotero profile, Vision can read scanned pages, figures, tables and formulas, and an evidence audit highlights claims that need stronger support.
 
 ![Zotero plugin demo showing indexed search results with citations](docs/screenshots/readme-zotero-plugin-demo.png)
 
@@ -105,15 +104,11 @@ Nodi is the friendly guide that lives inside Nodus. It helps new users understan
   <img src="docs/screenshots/readme-nodi-demo.jpg" width="900" alt="Nodi introducing itself inside an English demo vault">
 </p>
 
-## Made for serious academic work
+## Share a vault with Nodus Server
 
-- Separate vaults keep unrelated projects and roles from becoming one large, confusing library
-- Local storage and encrypted backups help institutions retain control of their work
-- Demo modes let anyone explore realistic workspaces before importing personal material
-- Spanish, English, French, German, European Portuguese, Brazilian Portuguese and Italian interfaces support international teams and classrooms
-- Light and dark themes make long reading and writing sessions more comfortable
+Nodus Server shares a selected copy of a vault while the original database and documents stay on the owner's computer. Readers can search published spaces from Nodus, ChatGPT or Claude. Owners choose what is included and can give each person reader, writer or owner access.
 
-Nodus is useful for individual work today and is designed with universities, research groups, teaching teams and learning communities in mind.
+Nodus can now start a private server from Settings for access on a phone or tablet through Tailscale or the local network. Groups can instead run the Docker version on their own server and manage spaces, people and devices from the web. Both options are experimental. See the [Nodus Server installation guide](server/README.md).
 
 ## Cite Nodus
 
@@ -123,13 +118,14 @@ If Nodus contributes substantially to research that leads to a publication, plea
 
 Nodus is growing through new vaults rather than adding every possible tool to one menu.
 
-| Vault | What it will bring |
-| --- | --- |
-| Primary sources | Archival description, source criticism and evidence-led work with historical material |
-| Testimonies | Interviews, transcription, coding and oral history workflows |
-| Worldbuilding | Characters, places, rules and narratives for research-based creative projects |
+| Project | Status | What it will bring |
+| --- | --- | --- |
+| Primary sources vault | Alpha | Archival description, source criticism and evidence-led work with historical material |
+| Testimonies vault | Alpha | Interviews, transcription, coding and oral history workflows |
+| Worldbuilding vault | Alpha | Characters, places, rules and narratives for research-based creative projects |
+| iOS, iPadOS and Android companion app | In development | Access to shared vaults from a phone or tablet |
 
-Worldbuilding can already be opened as a preview. Primary Sources and Testimonies are planned next. Preview vaults are clearly marked in the app and are not presented as finished features.
+The three vaults are in alpha and may change as they develop. They are clearly marked in the app and are not presented as finished features.
 
 ## Explore before importing anything
 
