@@ -9,7 +9,7 @@
 // the corpus: a study material and a work both end up as ideas in the same graph,
 // and `queueImportedStudyKnowledge` below is where the two meet.
 import { localizedForUi, type IpcContext } from './context';
-import { shell } from 'electron';
+import { BrowserWindow, shell } from 'electron';
 import { seedTestimonyDemoData } from '../db/testimonyDemoData';
 import type {
   AddProjectLinkInput,
@@ -287,6 +287,20 @@ async function importStudyMaterialPaths(paths: string[], input: StudyMaterialImp
   };
   for (const selected of paths) await visit(selected);
   return results;
+}
+
+/**
+ * Tell every window the saved-drafts table changed.
+ *
+ * The other emitter is the inbox poller, which is how a report sent from the phone reaches
+ * an open Deep Research gallery. Emitting here too means the channel means what its name
+ * says rather than "something arrived from the server", so a second window sees this one's
+ * saves and deletes as well.
+ */
+function announceWritingDrafts(): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed() && !win.webContents.isDestroyed()) win.webContents.send('writing:saved:changed', null);
+  }
 }
 
 export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext): void {
@@ -1195,6 +1209,7 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
   h('writing:saved:list', async () => writingDrafts.listWritingWorkshopDrafts());
   h('writing:saved:save', async (e, request: WritingWorkshopSaveDraftRequest) => {
     const saved = writingDrafts.saveWritingWorkshopDraft(request);
+    announceWritingDrafts();
     if (saved.brief.kind !== 'deep_research') return saved;
     // Like Inmersión, the complete report is durable before image work begins.
     const image = applyDecorativeImageOption('deep_research', saved.id, request.decorativeImage, (next) => {
@@ -1205,7 +1220,9 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
   h('writing:saved:delete', async (_e, id: string) => {
     invalidateDecorativeImageGeneration('deep_research', id);
     translationsRepo.deleteEntityTranslations('deep_research', id);
-    return writingDrafts.deleteWritingWorkshopDraft(id);
+    const removed = writingDrafts.deleteWritingWorkshopDraft(id);
+    announceWritingDrafts();
+    return removed;
   });
 
   // deep research (orchestrated, coverage-guided multi-page report)

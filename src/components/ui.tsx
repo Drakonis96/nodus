@@ -175,6 +175,8 @@ const ICON_PATHS: Record<string, string> = {
   cast: '<path d="M2 16.1A5 5 0 0 1 5.9 20M2 12.05A9 9 0 0 1 9.95 20M2 8V6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6"/><line x1="2" y1="20" x2="2.01" y2="20"/>',
   // System volume (PDF Presenter).
   volume: '<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>',
+  // What has arrived from other devices (the header Inbox).
+  inbox: '<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
 };
 
 /** Complete renderer-owned icon catalogue. Pickers should consume this list so
@@ -292,6 +294,7 @@ export function HoverLabelButton({
   trailing?: React.ReactNode;
   'data-tour'?: string;
   'data-vault-trigger'?: string;
+  'data-inbox-trigger'?: string;
   'data-testid'?: string;
 }) {
   return (
