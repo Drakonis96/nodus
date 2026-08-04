@@ -652,7 +652,37 @@ const RELEASE_2_7_0_HIGHLIGHTS: RawReleaseHighlight[] = [
   },
 ];
 
+/**
+ * 3.1.1 is for whoever runs a Nodus Server, and both entries are about the same thing:
+ * a server that stops being a good neighbour to itself the moment it has work to do.
+ */
+const RELEASE_3_1_1_HIGHLIGHTS: RawReleaseHighlight[] = [
+  {
+    scope: 'general',
+    es: 'Buscar por significado en un servidor de Nodus ya no lo deja sin atender a nadie más. Antes, mientras resolvía una búsqueda, el resto de peticiones esperaban su turno. Ahora ese cálculo va en hilos aparte y el servidor sigue respondiendo. Se nota sobre todo cuando varias personas consultan a la vez.',
+    en: 'A meaning-based search on a Nodus server no longer leaves it unable to answer anybody else. Until now, while it worked out one search, every other request waited its turn. That arithmetic runs on separate threads and the server keeps replying. It shows most when several people ask at once.',
+    fr: 'Une recherche par le sens sur un serveur Nodus ne l’empêche plus de répondre aux autres. Jusqu’ici, pendant qu’il traitait une recherche, toutes les autres requêtes attendaient leur tour. Ce calcul s’exécute désormais sur des fils séparés et le serveur continue de répondre. Cela se voit surtout quand plusieurs personnes interrogent en même temps.',
+    de: 'Eine Suche nach Bedeutung auf einem Nodus-Server blockiert nicht mehr alle anderen Anfragen. Bisher wartete jede weitere Anfrage, solange eine Suche berechnet wurde. Diese Rechenarbeit läuft jetzt in eigenen Threads und der Server antwortet weiter. Am deutlichsten ist das, wenn mehrere Personen gleichzeitig fragen.',
+    pt: 'Procurar por significado num servidor Nodus já não o deixa sem responder a mais ninguém. Até agora, enquanto resolvia uma procura, todos os outros pedidos esperavam a sua vez. Esse cálculo passa a correr em fios separados e o servidor continua a responder. Nota-se sobretudo quando várias pessoas consultam ao mesmo tempo.',
+    'pt-BR': 'Buscar por significado em um servidor Nodus não o deixa mais sem responder a ninguém. Até agora, enquanto resolvia uma busca, todos os outros pedidos esperavam a sua vez. Esse cálculo passa a rodar em threads separadas e o servidor continua respondendo. Aparece principalmente quando várias pessoas consultam ao mesmo tempo.',
+  },
+  {
+    scope: 'general',
+    es: 'El servidor ya no reserva memoria a ciegas. Guardaba tres bóvedas publicadas en memoria, del tamaño que fueran, y con un corpus grande eso pasaba del gigabyte. Ahora el límite se mide en memoria y no en número de bóvedas. Quien administre un servidor puede subirlo si su máquina da para más.',
+    en: 'The server no longer sets memory aside blindly. It kept three published vaults in memory whatever their size, which for a large corpus went past a gigabyte. The ceiling is now measured in memory rather than in a count of vaults. Anyone running a server can raise it if their machine has the room.',
+    fr: 'Le serveur ne réserve plus de mémoire à l’aveugle. Il gardait trois coffres publiés en mémoire quelle que soit leur taille, ce qui dépassait le gigaoctet pour un grand corpus. Le plafond se mesure désormais en mémoire et non en nombre de coffres. Qui administre un serveur peut l’augmenter si sa machine le permet.',
+    de: 'Der Server reserviert Speicher nicht mehr blind. Er hielt drei veröffentlichte Tresore im Speicher, unabhängig von ihrer Größe, was bei einem großen Korpus über ein Gigabyte war. Die Obergrenze wird jetzt in Speicher gemessen und nicht in einer Anzahl von Tresoren. Wer einen Server betreibt, kann sie anheben, wenn die Maschine Platz hat.',
+    pt: 'O servidor já não reserva memória às cegas. Guardava três cofres publicados em memória, fosse qual fosse o tamanho, o que num corpus grande passava do gigabyte. O limite passa a medir-se em memória e não num número de cofres. Quem administra um servidor pode aumentá-lo se a máquina der para mais.',
+    'pt-BR': 'O servidor não reserva mais memória às cegas. Ele mantinha três cofres publicados na memória, de qualquer tamanho, o que em um corpus grande passava do gigabyte. O limite passa a ser medido em memória, e não em número de cofres. Quem administra um servidor pode aumentá-lo se a máquina tiver espaço.',
+  },
+];
+
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
+  {
+    version: '3.1.1',
+    date: '2026-08-04',
+    highlights: RELEASE_3_1_1_HIGHLIGHTS,
+  },
   {
     version: '3.1.0',
     date: '2026-08-03',

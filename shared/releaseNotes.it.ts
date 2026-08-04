@@ -92,7 +92,13 @@ const RELEASE_3_1_0_IT: string[] = [
   "Abbiamo corretto ciò che l’informativa sulla privacy diceva degli embedding. Sosteneva che non vengono mai caricati, e da quando esiste la ricerca semantica condivisa non era più vero. I vettori delle idee viaggiano davvero, per poter cercare per significato da una replica o dal telefono. Il documento ora lo dice, e c’è un nuovo interruttore, «Includi i vettori semantici», che lo ferma sul serio. Inoltre, un vault di studio o insegnamento condiviso non invia più registrazioni delle lezioni, tentativi né voti.",
 ];
 
+const RELEASE_3_1_1_IT: string[] = [
+  "Cercare per significato su un server Nodus non lo lascia più incapace di rispondere agli altri. Finora, mentre risolveva una ricerca, tutte le altre richieste aspettavano il loro turno. Quel calcolo ora gira su thread separati e il server continua a rispondere. Si nota soprattutto quando più persone consultano nello stesso momento.",
+  "Il server non mette più da parte memoria alla cieca. Teneva in memoria tre vault pubblicati, di qualunque dimensione, e con un corpus grande superava il gigabyte. Il limite ora si misura in memoria e non in un numero di vault. Chi amministra un server può alzarlo se la sua macchina ha spazio.",
+];
+
 export const RELEASE_NOTES_IT: Record<string, string[]> = {
+  "3.1.1": RELEASE_3_1_1_IT,
   "3.1.0": RELEASE_3_1_0_IT,
   "3.0.4": RELEASE_3_0_4_IT,
   "3.0.3": RELEASE_3_0_3_IT,

@@ -25,12 +25,12 @@ try {
 
   const { RELEASE_NOTES, releaseNotesForMajor, compareVersions } = await import(pathToFileURL(bundlePath).href);
   const currentRelease = RELEASE_NOTES[0];
-  assert.equal(currentRelease?.version, '3.1.0');
-  assert.equal(currentRelease?.date, '2026-08-03');
-  // Connected vaults, the access level that decides where a person's work ends up, and the
-  // correction to what the privacy notice promised about embeddings. More highlights will
-  // land here before 3.1.0 ships, so this is a floor rather than an exact count.
-  assert.ok(currentRelease?.highlights.length >= 3, 'the release must describe what changed');
+  assert.equal(currentRelease?.version, '3.1.1');
+  assert.equal(currentRelease?.date, '2026-08-04');
+  // A patch release for whoever runs a Nodus Server: a semantic search no longer stops the
+  // server answering anybody else, and its memory ceiling is stated in memory rather than in
+  // a count of published vaults. Two is the floor for a patch, not the floor for a release.
+  assert.ok(currentRelease?.highlights.length >= 2, 'the release must describe what changed');
   for (const highlight of currentRelease.highlights) {
     // Written for the person using Nodus: no module names, no internal vocabulary.
     for (const language of ['es', 'en', 'fr', 'de', 'pt', 'pt-BR']) {
