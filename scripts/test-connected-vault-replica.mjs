@@ -173,6 +173,16 @@ test('a corpus travels to two replicas, a writer sends work back, and a reader n
     assert.equal(summary.applied, 1);
     assert.deepEqual(summary.refused, []);
     assert.equal(summary.cursor, ledger.cursor);
+    // The detail behind the counters: one entry per decision, carrying enough to tell a
+    // person what arrived without re-reading the row it wrote.
+    assert.equal(summary.entries.length, 1);
+    assert.equal(summary.entries[0].outcome, 'applied');
+    assert.equal(summary.entries[0].id, ledger.mutations[0].id);
+    assert.equal(summary.entries[0].seq, ledger.mutations[0].seq);
+    assert.equal(summary.entries[0].table, 'notes');
+    assert.equal(summary.entries[0].entityKind, 'note');
+    assert.equal(summary.entries[0].title, 'Aportación del colaborador');
+    assert.deepEqual(summary.entries[0].key, ['n-writer']);
     const landed = ownerApply.prepare("SELECT * FROM notes WHERE id = 'n-writer'").get();
     assert.ok(landed, "the collaborator's note is now in the owner's own vault");
     assert.equal(landed.updated_at, '2026-03-03T11:00:00.000Z', "the writer's timestamp survives the merge");
@@ -185,6 +195,11 @@ test('a corpus travels to two replicas, a writer sends work back, and a reader n
     const replayed = applyIncomingMutations(ownerApply, ledger.mutations);
     assert.deepEqual(replayed.refused, []);
     assert.deepEqual(ownerApply.prepare("SELECT * FROM notes WHERE id = 'n-writer'").get(), landed);
+    // The replay describes the same mutation under the same id. That identity is the whole
+    // reason applyIncomingMutations does not write the inbox itself: recording is the
+    // caller's job, and recordServerInbox keeps the FIRST account of what happened.
+    assert.equal(replayed.entries.length, 1);
+    assert.equal(replayed.entries[0].id, summary.entries[0].id);
 
     // And a local edit made after the mutation wins: newest-wins protects the owner's own
     // later work from a stale batch arriving late.
@@ -193,6 +208,7 @@ test('a corpus travels to two replicas, a writer sends work back, and a reader n
     const late = applyIncomingMutations(ownerApply, ledger.mutations);
     assert.equal(late.applied, 0);
     assert.equal(late.keptLocal, 1);
+    assert.equal(late.entries[0].outcome, 'keptLocal', 'and the inbox can say so, rather than showing it as applied');
     assert.equal(ownerApply.prepare("SELECT content FROM notes WHERE id = 'n-writer'").get().content, 'El propietario lo revisó después.');
     ownerApply.close();
 

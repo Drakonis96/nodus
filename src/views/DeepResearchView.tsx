@@ -336,33 +336,32 @@ export function DeepResearchView({
   }, [refreshSavedDrafts]);
 
   /**
-   * Surface each finished report in the gallery as soon as it lands.
+   * Every finished report reaches the gallery, whoever wrote it.
    *
-   * Read from the QUEUE, not from the generation job. All reports share one job key,
-   * so when one finishes the next starts in the same tick and React only ever renders
-   * the last state of that tick: the completed snapshot of every report but the final
-   * one was never observed here, and those reports stayed invisible until the user
-   * left the section and came back. The queue keeps its finished entries, so what a
-   * render can miss, this cannot.
+   * This is the one mechanism, on purpose. Watching the generation job instead cannot
+   * work: all queued reports share one job key, so when one finishes the next starts
+   * in the same tick, React renders once per tick, and the completed state of every
+   * report but the last was never observed — those reports stayed out of the gallery
+   * until the section was left and reopened. A save, wherever it happens, is a fact
+   * the main process announces.
+   *
+   * refreshSavedDrafts has no dependencies, so this subscribes exactly once.
    */
-  const seenFinishedRef = useRef<Set<string> | null>(null);
+  useEffect(() => window.nodus.onWritingDraftsChanged(() => void refreshSavedDrafts()), [refreshSavedDrafts]);
+
+  /**
+   * The exception: a report that generated but could not be filed. Nothing was saved,
+   * so nothing is announced, and the queue would otherwise empty with the work lost in
+   * silence. The queue carries the reason (it keeps its finished entries, which is what
+   * a render can miss), and the strip shows the report as failed.
+   */
+  const seenUnsavedRef = useRef<Set<string>>(new Set());
   useEffect(() => {
-    const seen = seenFinishedRef.current;
-    // First snapshot: whatever had already finished predates this view and is
-    // covered by the gallery load above, so it is acknowledged rather than re-read.
-    if (!seen) {
-      seenFinishedRef.current = new Set(queue.filter((item) => item.status === 'completed').map((item) => item.id));
-      return;
-    }
-    const landed = queue.filter((item) => item.status === 'completed' && !seen.has(item.id));
-    if (landed.length === 0) return;
-    for (const item of landed) seen.add(item.id);
-    void refreshSavedDrafts();
-    // A report that generated but could not be filed is not in the gallery and never
-    // will be. Saying so beats a queue that empties leaving nothing behind.
-    const unsaved = landed.find((item) => item.saveError);
-    if (unsaved?.saveError) setError(unsaved.saveError);
-  }, [queue, refreshSavedDrafts]);
+    const unsaved = queue.find((item) => item.saveError && !seenUnsavedRef.current.has(item.id));
+    if (!unsaved?.saveError) return;
+    seenUnsavedRef.current.add(unsaved.id);
+    setError(unsaved.saveError);
+  }, [queue]);
 
   // A report queued over MCP is saved by the main process, so nothing in this window
   // knows about it until the gallery is re-read.

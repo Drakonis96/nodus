@@ -296,6 +296,14 @@ await check('the owner collects it into the canonical vault and republishes', as
     summary = applyIncomingMutations(db, ledger.mutations);
     expect(summary.applied === 1, `applied ${summary.applied}, refused ${JSON.stringify(summary.refused)}`);
     expect(db.prepare('SELECT 1 FROM notes WHERE id = ?').get(writtenNoteId), 'the note is not in the owner vault');
+    // What the Inbox will show for this arrival, against a live server rather than a fixture.
+    expect(summary.entries.length === 1, `${summary.entries.length} inbox entries for one mutation`);
+    expect(summary.entries[0].outcome === 'applied', `inbox says "${summary.entries[0].outcome}"`);
+    expect(summary.entries[0].entityKind === 'note', `inbox kind is "${summary.entries[0].entityKind}"`);
+    // Replaying the batch describes the same mutation under the same id, which is what lets
+    // recordServerInbox keep the first account instead of duplicating or resurrecting it.
+    const again = applyIncomingMutations(db, ledger.mutations);
+    expect(again.entries[0]?.id === summary.entries[0].id, 'a replay changed the mutation id');
   } finally { db.close(); }
   await api(owner.deviceToken, 'POST', `/api/v1/spaces/${SPACE_ID}/mutations/ack`, { json: { cursor: summary.cursor } });
   await publish(owner.deviceToken);

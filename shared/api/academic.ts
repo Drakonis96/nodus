@@ -579,6 +579,15 @@ export interface AcademicApi {
   listWritingWorkshopDrafts(): Promise<WritingWorkshopSavedDraft[]>;
   saveWritingWorkshopDraft(request: WritingWorkshopSaveDraftRequest): Promise<WritingWorkshopSavedDraft>;
   deleteWritingWorkshopDraft(id: string): Promise<void>;
+  /**
+   * Push: the saved-drafts table changed under this window's feet.
+   *
+   * Emitted when the inbox poller applies a mutation to writing_saved_drafts — which is how
+   * a Deep Research report sent from the phone appears without remounting the gallery — and
+   * on this window's own saves and deletes, so the channel means what its name says.
+   * Returns its own unsubscribe.
+   */
+  onWritingDraftsChanged(cb: () => void): () => void;
 
   // deep research (orchestrated, coverage-guided multi-page report over the whole corpus)
   /** Plan → write section by section (guided by coverage) → assemble a fully cited 5–20 page report. */

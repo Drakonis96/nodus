@@ -140,6 +140,36 @@
   background-color: color-mix(in srgb, var(--vault-accent, #6366f1) 11%, white);
 }
 
+/* Unread count on a header action, modelled on Nodi's .nodi-node-badge. Deliberately NOT
+   named header-vault-badge: that class is the centred vault chip, whose markup and rules
+   scripts/test-header-layout.mjs matches by regular expression.
+
+   The ring is the header's own background, so the badge reads as sitting on the bar rather
+   than overlapping whatever is behind it. It is absolutely positioned inside a relative
+   wrapper because HoverLabelButton's `trailing` slot lives inside the label span, which is
+   max-w-0 and transparent until hover. */
+.header-action-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #e2494a;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 16px;
+  text-align: center;
+  box-shadow: 0 0 0 2px #0a0a0a;
+  pointer-events: none;
+}
+
+.light .header-action-badge {
+  box-shadow: 0 0 0 2px #f8fafc;
+}
+
 :root {
   color-scheme: dark;
   --interface-scale: 1;

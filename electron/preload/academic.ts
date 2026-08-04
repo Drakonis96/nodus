@@ -484,6 +484,11 @@ export const academicApi: AcademicApi = {
   listWritingWorkshopDrafts: () => ipcRenderer.invoke('writing:saved:list'),
   saveWritingWorkshopDraft: (request) => ipcRenderer.invoke('writing:saved:save', request),
   deleteWritingWorkshopDraft: (id) => ipcRenderer.invoke('writing:saved:delete', id).then(() => undefined),
+  onWritingDraftsChanged: (cb) => {
+    const listener = () => cb();
+    ipcRenderer.on('writing:saved:changed', listener);
+    return () => ipcRenderer.removeListener('writing:saved:changed', listener);
+  },
 
   generateDeepResearchReport: async (request, handlers) => {
     const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;

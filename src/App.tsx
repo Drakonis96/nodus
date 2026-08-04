@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { AppSettings, CorpusHealthBucketId, DatabaseSummary, RecoveryStatus, SyncLogEntry, VaultSummary } from '@shared/types';
+import type { AppSettings, CorpusHealthBucketId, DatabaseSummary, RecoveryStatus, ServerInboxEntry, SyncLogEntry, VaultSummary } from '@shared/types';
 import type { CsvImportPlanData } from './views/DatabasesView';
 import { FeedbackModal } from './views/FeedbackModal';
 import { RoadmapFeedbackModal, type RoadmapTopicKey } from './views/RoadmapFeedbackModal';
@@ -8,6 +8,7 @@ import { QueueBar } from './components/QueueBar';
 import { EmbeddingProgressBar } from './components/EmbeddingProgressBar';
 import { PassageProgressBar } from './components/PassageProgressBar';
 import { VaultSwitcher, vaultTypeIcon, vaultTypeLabel } from './components/VaultSwitcher';
+import { ServerInbox } from './components/ServerInbox';
 import { DatabasesSidebarExplore } from './components/DatabasesSidebarExplore';
 import { StudySidebar, type StudyNavigationTarget } from './components/StudySidebar';
 import { TeachingSidebar } from './components/TeachingSidebar';
@@ -104,6 +105,7 @@ function HeaderAction({
   dataTour,
   kbd,
   vaultTrigger = false,
+  inboxTrigger = false,
 }: {
   icon: string;
   label: string;
@@ -116,11 +118,14 @@ function HeaderAction({
   dataTour?: string;
   kbd?: string;
   vaultTrigger?: boolean;
+  /** Lets the Inbox panel's outside-click handler ignore its own trigger, so it toggles. */
+  inboxTrigger?: boolean;
 }) {
   return (
     <HoverLabelButton
       data-tour={dataTour}
       data-vault-trigger={vaultTrigger ? '' : undefined}
+      data-inbox-trigger={inboxTrigger ? '' : undefined}
       icon={icon}
       label={label}
       title={title}
@@ -194,6 +199,11 @@ export function App() {
   // The trigger element that opened the vault panel (the centre badge or the
   // right-rail vaults icon), or null when closed. The panel anchors under it.
   const [vaultAnchor, setVaultAnchor] = useState<HTMLElement | null>(null);
+  // What has arrived from other devices. Loaded once and then PUSHED: unlike the Settings
+  // overview, which polls every three seconds, there is nothing here worth asking about
+  // when nothing has happened — the poller tells the window when something has.
+  const [inboxAnchor, setInboxAnchor] = useState<HTMLElement | null>(null);
+  const [inbox, setInbox] = useState<ServerInboxEntry[]>([]);
   // Live placement of the centred vault badge. Both rails around it change width
   // (the logo tracks the sidebar; the action rail grows when a button pins or
   // reveals its label), so the badge is measured rather than pinned at 50% — see
@@ -212,6 +222,10 @@ export function App() {
   const [vaultBadgePlacement, setVaultBadgePlacement] = useState<HeaderBadgePlacement | null>(null);
   const toggleVaults = useCallback(
     (el: HTMLElement) => setVaultAnchor((cur) => (cur === el ? null : el)),
+    []
+  );
+  const toggleInbox = useCallback(
+    (el: HTMLElement) => setInboxAnchor((cur) => (cur === el ? null : el)),
     []
   );
   const [graphTarget, setGraphTarget] = useState<PendingGraphNavigationTarget & { nonce: number } | null>(null);
@@ -290,6 +304,16 @@ export function App() {
     window.addEventListener('pointerup', finish);
     window.addEventListener('pointercancel', finish);
   };
+
+  const unreadInbox = useMemo(() => inbox.reduce((n, e) => n + (e.read ? 0 : 1), 0), [inbox]);
+
+  // Load the inbox once and then let the main process push it. The poller broadcasts after
+  // any batch that produced entries, and the mutators return the fresh list themselves, so
+  // nothing here has to ask on a timer.
+  useEffect(() => {
+    void window.nodus.listServerInbox().then(setInbox).catch(() => undefined);
+    return window.nodus.onServerInboxChanged(setInbox);
+  }, [activeVault?.id]);
 
   // Sidebar sections grouped for rendering (Explorar · Analizar · Escribir),
   // each group in the user's chosen order, minus any hidden sections. Home is
@@ -1175,6 +1199,23 @@ export function App() {
               onClick={() => setCollectionsOpen(true)}
             />
           )}
+          {/* Inside the measured actions box on purpose: the ResizeObserver above feeds
+              placeHeaderBadge, which keeps this rail from ever reaching the centred vault
+              badge. A badge positioned outside this box is exactly what that geometry
+              cannot see. The wrapper is what the count hangs off — HoverLabelButton's
+              `trailing` slot sits inside a label span that is max-w-0 until hover. */}
+          <span className="relative inline-flex">
+            <HeaderAction
+              icon="inbox"
+              label={t('Bandeja')}
+              title={t('Lo que ha llegado de otros dispositivos')}
+              inboxTrigger
+              onClick={(e) => toggleInbox(e.currentTarget)}
+            />
+            {unreadInbox > 0 && (
+              <span className="header-action-badge">{unreadInbox > 9 ? '9+' : unreadInbox}</span>
+            )}
+          </span>
           <HeaderAction
             icon="gitPr"
             label={t('Sugerir / Reportar')}
@@ -1219,6 +1260,24 @@ export function App() {
           vaults={vaults}
           onVaultsChanged={reloadVaults}
           onActiveVaultChanged={handleActiveVaultChanged}
+        />
+
+        <ServerInbox
+          anchorEl={inboxAnchor}
+          onClose={() => setInboxAnchor(null)}
+          entries={inbox}
+          onMarkRead={(id) => void window.nodus.markServerInboxRead(id).then(setInbox)}
+          onClearOne={(id) => void window.nodus.clearServerInbox(id).then(setInbox)}
+          onClearAll={() => void window.nodus.clearServerInbox().then(setInbox)}
+          onOpenEntry={(entry) => {
+            // Reading is per entry, so opening one is what marks that one — never the lot,
+            // and never merely opening the panel.
+            void window.nodus.markServerInboxRead(entry.id).then(setInbox);
+            if (entry.entityKind === 'deep_research' && entry.outcome === 'applied') {
+              setView('deepResearch');
+              setInboxAnchor(null);
+            }
+          }}
         />
       </header>
 

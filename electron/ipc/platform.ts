@@ -22,6 +22,7 @@ import { getDecorativeImage, getDecorativeImageData } from '../db/decorativeImag
 import { clearEntityClips, deleteClip as deleteAudioClip, deleteEntityClips, getEntitySegments, audioClipPath, createStudyAudioBookmark, deleteStudyAudioBookmark, getStudyPronunciations, listStudyAudioBookmarks, listStudyAudioPlaylist, listEntityClips, readClipBytes, saveClip, setStudyPronunciations } from '../audio/audioService';
 import { clearHumeKey, humeHasKey, listHumeVoices, setHumeKey, synthesizeHume } from '../audio/hume';
 import { disconnectNodusServerVault, getNodusServerOverview, pairNodusServer, setNodusServerLanguage, syncNodusServerVaultNow } from '../serverSync/serverSyncService';
+import { clearServerInbox, clearServerInboxEntry, listServerInbox, markServerInboxRead } from '../db/serverInboxRepo';
 import { localServerStatusAsync, restartLocalServer, startLocalServer, stopLocalServer } from '../localServer/process';
 import { connectActiveVaultToLocalServer } from '../localServer/connect';
 import { startTailscaleServe, stopTailscaleServe } from '../localServer/tailscale';
@@ -86,6 +87,16 @@ export function registerPlatformIpc({ h, getWindow }: IpcContext): void {
   h('nodusServer:setLanguage', async (_e, language: AppLanguage, vaultId?: string) => setNodusServerLanguage(language, vaultId));
   h('nodusServer:syncVaultNow', async (_e, vaultId: string) => syncNodusServerVaultNow(vaultId));
   h('nodusServer:disconnectVault', async (_e, vaultId: string) => disconnectNodusServerVault(vaultId));
+  // The Inbox is per-vault: it reads the open vault's own server_inbox, so switching vaults
+  // shows a different one. The mutators return the fresh list rather than making the caller
+  // ask again, the same shape as nodi:notifications:markRead.
+  h('nodusServer:inbox:list', async () => listServerInbox());
+  h('nodusServer:inbox:markRead', async (_e, id?: string) => { markServerInboxRead(id); return listServerInbox(); });
+  h('nodusServer:inbox:clear', async (_e, id?: string) => {
+    if (id) clearServerInboxEntry(id);
+    else clearServerInbox();
+    return listServerInbox();
+  });
   h('localServer:status', async () => localServerStatusAsync());
   h('localServer:start', async () => {
     updateSettings({ localServerEnabled: true });
