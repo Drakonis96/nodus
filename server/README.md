@@ -219,6 +219,21 @@ stops the boot instead of making every publication fail. When a vault no longer 
 says how large it is and which switch to turn off ("Include extracted passages" is usually most of
 the weight).
 
+A third limit bounds how much of that the running process keeps in memory. Parsing a publication
+takes around a second for a large space, so the server caches the parsed object; the parsed object
+is also the biggest thing it ever holds, roughly 3.3 times the expanded JSON.
+
+- `NODUS_MAX_SNAPSHOT_CACHE_BYTES`: how much expanded publication may be cached at once, 128 MiB by
+  default, which is one very large space or a dozen ordinary ones. Least recently used goes first,
+  and the space that was just read is never the one dropped — a corpus larger than the whole budget
+  stays servable, it simply leaves no room for a second one. Raise it on a machine with the memory
+  and several large spaces to serve.
+
+This replaces `NODUS_MAX_CACHED_SNAPSHOTS`, which kept three snapshots of any size: three is a
+gigabyte for a large academic corpus and a needless eviction for a server with eight small spaces.
+A deployment that still sets it is stopped at boot rather than left believing it had capped
+anything.
+
 ## Access levels
 
 A membership grants one of three levels in one space. An account can hold a different level in each
