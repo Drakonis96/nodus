@@ -368,6 +368,12 @@ export interface DeepResearchQueueItem {
   status: DeepResearchQueueStatus;
   error: string | null;
   savedDraftId: string | null;
+  /**
+   * The report was generated but could not be stored as a draft. It is finished work
+   * that will never reach the gallery, so the queue carries the reason rather than
+   * completing as if nothing had happened.
+   */
+  saveError: string | null;
   enqueuedAt: string;
 }
 
@@ -410,6 +416,7 @@ export function enqueueDeepResearch(request: DeepResearchRequest): DeepResearchQ
     status: 'queued',
     error: null,
     savedDraftId: null,
+    saveError: null,
     enqueuedAt: new Date().toISOString(),
   };
   deepQueue.push(item);
@@ -451,6 +458,7 @@ function drainDeepQueue(): void {
       if (current.status === 'completed') {
         next.status = 'completed';
         next.savedDraftId = current.result?.savedDraft?.id ?? null;
+        next.saveError = current.result?.saveError ?? null;
         finish();
       } else if (current.status === 'failed') {
         next.status = 'failed';

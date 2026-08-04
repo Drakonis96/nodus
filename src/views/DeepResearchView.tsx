@@ -336,19 +336,34 @@ export function DeepResearchView({
     void refreshSavedDrafts();
   }, [refreshSavedDrafts]);
 
-  // Surface each finished report in the gallery as soon as it lands.
-  const lastCompletedRef = useRef<string | null>(null);
+  /**
+   * Surface each finished report in the gallery as soon as it lands.
+   *
+   * Read from the QUEUE, not from the generation job. All reports share one job key,
+   * so when one finishes the next starts in the same tick and React only ever renders
+   * the last state of that tick: the completed snapshot of every report but the final
+   * one was never observed here, and those reports stayed invisible until the user
+   * left the section and came back. The queue keeps its finished entries, so what a
+   * render can miss, this cannot.
+   */
+  const seenFinishedRef = useRef<Set<string> | null>(null);
   useEffect(() => {
-    if (deepJob?.status !== 'completed' || deepJob.id === lastCompletedRef.current) return;
-    lastCompletedRef.current = deepJob.id;
-    const saved = deepJob.result?.savedDraft ?? null;
-    if (saved) {
-      setSavedDrafts((current) => [saved, ...current.filter((item) => item.id !== saved.id)]);
-      setOpenDraft((current) => (current?.id === saved.id ? saved : current));
-    } else {
-      void refreshSavedDrafts();
+    const seen = seenFinishedRef.current;
+    // First snapshot: whatever had already finished predates this view and is
+    // covered by the gallery load above, so it is acknowledged rather than re-read.
+    if (!seen) {
+      seenFinishedRef.current = new Set(queue.filter((item) => item.status === 'completed').map((item) => item.id));
+      return;
     }
-  }, [deepJob, refreshSavedDrafts]);
+    const landed = queue.filter((item) => item.status === 'completed' && !seen.has(item.id));
+    if (landed.length === 0) return;
+    for (const item of landed) seen.add(item.id);
+    void refreshSavedDrafts();
+    // A report that generated but could not be filed is not in the gallery and never
+    // will be. Saying so beats a queue that empties leaving nothing behind.
+    const unsaved = landed.find((item) => item.saveError);
+    if (unsaved?.saveError) setError(unsaved.saveError);
+  }, [queue, refreshSavedDrafts]);
 
   // A report queued over MCP is saved by the main process, so nothing in this window
   // knows about it until the gallery is re-read.
@@ -599,9 +614,11 @@ export function DeepResearchView({
     const local = queue.map<QueueStripItem>((item) => ({
       id: item.id,
       title: item.title,
-      status: item.status,
+      // A report that generated but could not be filed is shown as a failure: the
+      // gallery will never hold it, so quietly completing would lose it in silence.
+      status: item.status === 'completed' && item.saveError ? 'failed' : item.status,
       progress: item.status === 'running' ? deepProgress : null,
-      error: item.error,
+      error: item.error ?? item.saveError,
       origin: 'app',
       enqueuedAt: item.enqueuedAt,
     }));
