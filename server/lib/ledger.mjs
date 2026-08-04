@@ -31,9 +31,21 @@ export function readAll(store, spaceId) {
   return entries;
 }
 
+/**
+ * The next sequence number for this space, never one already handed out.
+ *
+ * Seeded from the acknowledged cursor as well as from the file, because `compact` DELETES
+ * the file once it empties. Reading only the file therefore restarted numbering at 1 after
+ * a full compaction, and a client that had remembered "delivered up to 12" would then read
+ * brand-new mutations 1..12 as already delivered. The cursor is the high-water mark of what
+ * this space has ever issued; the file only holds what has not been acknowledged yet.
+ */
 export function nextSeq(store, spaceId) {
   const all = readAll(store, spaceId);
-  return all.length === 0 ? 1 : Math.max(...all.map((entry) => Number(entry.seq) || 0)) + 1;
+  const space = store.state.spaces.find((candidate) => candidate.id === spaceId);
+  const acknowledged = Number(space?.mutationCursor || 0);
+  const highest = all.length === 0 ? 0 : Math.max(...all.map((entry) => Number(entry.seq) || 0));
+  return Math.max(highest, acknowledged) + 1;
 }
 
 export function has(store, spaceId, id) {

@@ -16,6 +16,14 @@ export const platformApi: PlatformApi = {
   setNodusServerLanguage: (language, vaultId) => ipcRenderer.invoke('nodusServer:setLanguage', language, vaultId),
   syncNodusServerVaultNow: (vaultId) => ipcRenderer.invoke('nodusServer:syncVaultNow', vaultId),
   disconnectNodusServerVault: (vaultId) => ipcRenderer.invoke('nodusServer:disconnectVault', vaultId),
+  listServerInbox: () => ipcRenderer.invoke('nodusServer:inbox:list'),
+  markServerInboxRead: (id) => ipcRenderer.invoke('nodusServer:inbox:markRead', id),
+  clearServerInbox: (id) => ipcRenderer.invoke('nodusServer:inbox:clear', id),
+  onServerInboxChanged: (cb) => {
+    const listener = (_e: unknown, entries: Parameters<typeof cb>[0]) => cb(entries);
+    ipcRenderer.on('nodusServer:inbox:changed', listener);
+    return () => ipcRenderer.removeListener('nodusServer:inbox:changed', listener);
+  },
   getLocalServerStatus: () => ipcRenderer.invoke('localServer:status'),
   startLocalServer: () => ipcRenderer.invoke('localServer:start'),
   stopLocalServer: () => ipcRenderer.invoke('localServer:stop'),

@@ -16,6 +16,7 @@ import { generateDemoPortraits, hasDemoPortraitKey, demoPortraitsPending } from 
 import { interruptDecorativeImageGenerations } from './ai/decorativeImages';
 import { startRealtimeSync, stopRealtimeSync } from './sync/syncService';
 import { startNodusServerSync, stopNodusServerSync } from './serverSync/serverSyncService';
+import { startInboxPolling, stopInboxPolling } from './serverSync/inboxPoller';
 import { startReplicaSync, stopReplicaSync } from './serverSync/replicaService';
 import { killMcpTunnelSync, startMcpServer, startMcpTunnelIfConfigured, stopMcpServer } from './mcp';
 import { killLocalServerSync, startLocalServerIfEnabled } from './localServer/process';
@@ -662,6 +663,9 @@ app.whenReady().then(() => {
 
   if (settings.syncMode === 'realtime') startRealtimeSync();
   startNodusServerSync();
+  // And the other direction, on its own timer too: an incoming mutation dirties nothing,
+  // so an idle desktop that only ever published would never collect what was sent to it.
+  startInboxPolling();
   // Connected vaults pull on their own timer: a replica must stay current whichever vault
   // happens to be open, exactly like the publisher already does.
   startReplicaSync();
@@ -712,6 +716,7 @@ app.on('window-all-closed', () => {
     if (autoBackupFirstTimer) clearTimeout(autoBackupFirstTimer);
     stopRealtimeSync();
     stopNodusServerSync();
+    stopInboxPolling();
   stopReplicaSync();
     interruptDecorativeImageGenerations();
     stopAllWhisperCpp();
@@ -732,6 +737,7 @@ app.on('before-quit', () => {
   if (autoBackupFirstTimer) clearTimeout(autoBackupFirstTimer);
   stopRealtimeSync();
   stopNodusServerSync();
+  stopInboxPolling();
   stopReplicaSync();
   interruptDecorativeImageGenerations();
   killMcpTunnelSync();
@@ -757,6 +763,7 @@ updateAwareApp.on('before-quit-for-update', () => {
   if (autoBackupFirstTimer) clearTimeout(autoBackupFirstTimer);
   stopRealtimeSync();
   stopNodusServerSync();
+  stopInboxPolling();
   stopReplicaSync();
   interruptDecorativeImageGenerations();
   stopAllWhisperCpp();

@@ -37,6 +37,7 @@ import type {
   ModelInfo,
   NodusServerOverview,
   NodusServerPairResult,
+  ServerInboxEntry,
   LocalServerStatus,
   LocalServerTailscale,
   LocalServerPowerStatus,
@@ -68,6 +69,17 @@ export interface PlatformApi {
   setNodusServerLanguage(language: AppLanguage, vaultId?: string): Promise<NodusServerOverview>;
   syncNodusServerVaultNow(vaultId: string): Promise<NodusServerOverview>;
   disconnectNodusServerVault(vaultId: string): Promise<NodusServerOverview>;
+  /**
+   * What has arrived from other devices, newest first. PER VAULT: this reads the open
+   * vault's own record, unlike the phone's outbox, which is deliberately global.
+   */
+  listServerInbox(): Promise<ServerInboxEntry[]>;
+  /** Mark one entry read, or all of them when no id is given. Returns the fresh list. */
+  markServerInboxRead(id?: string): Promise<ServerInboxEntry[]>;
+  /** Remove one entry, or empty the inbox when no id is given. Returns the fresh list. */
+  clearServerInbox(id?: string): Promise<ServerInboxEntry[]>;
+  /** Push: the poller applied a batch that produced entries. Returns its own unsubscribe. */
+  onServerInboxChanged(cb: (entries: ServerInboxEntry[]) => void): () => void;
   // ── Nodus Server, basic mode: the server runs on this computer ──────────
   getLocalServerStatus(): Promise<LocalServerStatus>;
   /** Start it and remember the preference, so it comes back with the app. */

@@ -83,6 +83,7 @@ import {
   startNodusServerSync,
   stopNodusServerSync,
 } from './serverSync/serverSyncService';
+import { startInboxPolling, stopInboxPolling } from './serverSync/inboxPoller';
 import {
   createConnectedVault,
   detachReplica,
@@ -261,6 +262,7 @@ export function registerIpc(
 
     stopRealtimeSync();
     stopNodusServerSync();
+    stopInboxPolling();
   stopReplicaSync();
     await stopMcpTunnel();
     await stopMcpServer();
@@ -284,6 +286,9 @@ export function registerIpc(
     const settings = getSettings();
     if (settings.syncMode === 'realtime') startRealtimeSync();
     startNodusServerSync();
+    // The new vault has its own inbox and its own ledger; the first tick lands within
+    // seconds, so switching vaults collects whatever was waiting for that one.
+    startInboxPolling();
   startReplicaSync();
     if (settings.mcpEnabled) void startMcpServer().then(() => startMcpTunnelIfConfigured());
     if (settings.copilotEnabled) void startCopilotServer();
@@ -328,6 +333,8 @@ export function registerIpc(
       patch.nodusServerIncludeVectors !== undefined
     ) {
       restartNodusServerSync();
+      // The pause switch and the space id both change what the poller may ask for.
+      startInboxPolling();
     }
     // The port and the access path decide which addresses the local server binds and whether it
     // presents a certificate at all, so a running one has to come back up under the new setting.
@@ -525,6 +532,7 @@ export function registerIpc(
       if (busy) throw new Error(busy);
       stopRealtimeSync();
       stopNodusServerSync();
+      stopInboxPolling();
       stopReplicaSync();
       await stopMcpTunnel();
       await stopMcpServer();
@@ -538,6 +546,7 @@ export function registerIpc(
       const settings = getSettings();
       if (settings.syncMode === 'realtime') startRealtimeSync();
       startNodusServerSync();
+      startInboxPolling();
   startReplicaSync();
       if (settings.mcpEnabled) void startMcpServer().then(() => startMcpTunnelIfConfigured());
       if (settings.copilotEnabled) void startCopilotServer();
@@ -656,6 +665,7 @@ export function registerIpc(
     const result = await restoreRecoverySnapshot(root, fileName, password, app.getVersion(), language);
     if (result.ok) {
       stopNodusServerSync();
+      stopInboxPolling();
       stopReplicaSync();
       await stopMcpTunnel();
       await stopMcpServer();

@@ -1,10 +1,10 @@
 import os from 'node:os';
 import { gzip } from 'node:zlib';
 import { promisify } from 'node:util';
-import Database from 'better-sqlite3';
+import type Database from 'better-sqlite3';
 import { getDb, withVaultDatabase } from '../db/database';
-import { getActiveVault, getVault, listVaults } from '../vaults/vaultRegistry';
-import { getSettings, updateSettings } from '../db/settingsRepo';
+import { getActiveVault, getVault } from '../vaults/vaultRegistry';
+import { updateSettings } from '../db/settingsRepo';
 import {
   clearNodusServerTokenFor,
   getNodusServerTokenFor,
@@ -13,7 +13,6 @@ import {
 } from '../secrets/secretStore';
 import type {
   AppLanguage,
-  AppSettings,
   NodusServerConnection,
   NodusServerOverview,
   NodusServerPairResult,
@@ -22,9 +21,17 @@ import type {
 } from '@shared/types';
 import { normalizeUiLanguage } from '@shared/uiLanguage';
 import { buildServerSnapshot, lightweightVaultRevision, type SnapshotAsset } from './serverSnapshot';
-import { applyIncomingMutations, type IncomingMutation } from './mutationInbox';
 import { buildVectorSet, vectorRevision, type VectorKind } from './serverVectors';
 import { nodiNotesPending, syncNodiNotes } from './nodiNotesSync';
+import {
+  closeReadOnlyPool,
+  fetchWithTimeout,
+  listVaultConfigs,
+  normalizeUrl,
+  openReadOnly,
+  readVaultConfig,
+  type VaultServerConfig,
+} from './serverSyncShared';
 
 // A Nodus Server pairing belongs to ONE vault and one remote space. Unlike the old
 // single-active-vault publisher, every paired vault keeps publishing in the background
@@ -38,7 +45,6 @@ const gzipAsync = promisify(gzip);
 const CHECK_INTERVAL_MS = 30_000;
 const QUIET_PERIOD_MS = 60_000;
 const MIN_UPLOAD_INTERVAL_MS = 2 * 60_000;
-const REQUEST_TIMEOUT_MS = 60_000;
 const FIRST_TICK_MS = 5_000;
 
 interface VaultRuntime {
@@ -65,7 +71,6 @@ interface VaultRuntime {
 }
 
 const runtimes = new Map<string, VaultRuntime>();
-const readonlyPool = new Map<string, Database.Database>();
 let timer: ReturnType<typeof setInterval> | null = null;
 /** When Nodi's notes last went round, so an idle install is not asking every tick. */
 let lastNodiNotesSyncAt = 0;
@@ -99,6 +104,37 @@ function tooLargeMessage(config: VaultServerConfig, serverError: string, rawByte
   return `${serverError || 'El servidor ha rechazado la publicación por su tamaño.'} ${size} ${lever}`;
 }
 
+/**
+ * Whether a publication is in flight right now.
+ *
+ * The inbox poller skips its tick while this holds. buildServerSnapshot keeps the database
+ * for a long synchronous stretch, and better-sqlite3 gives no way to interleave with it —
+ * so the poller waits thirty seconds rather than queueing behind it.
+ */
+export function isPublishing(): boolean {
+  return publishing;
+}
+
+/**
+ * Say that a vault's contents changed, so the next tick publishes it.
+ *
+ * This is how the inbox poller keeps the promise publishVault used to keep by collecting
+ * mutations itself: what a collaborator sent is applied here, and then travels outward on
+ * the following publication instead of sitting unseen until something else happened to
+ * make the vault look dirty.
+ */
+export function markVaultDirty(vaultId: string): void {
+  ensureRuntime(vaultId).pending = true;
+}
+
+/** Record what the last drain of the mutation ledger did, for the Settings panel. */
+export function noteVaultInbox(
+  vaultId: string,
+  counts: { applied: number; deleted: number; keptLocal: number; refused: number },
+): void {
+  ensureRuntime(vaultId).lastInbox = counts;
+}
+
 /** Whether this address names this very machine, and so never crosses a network. */
 export function isLoopbackUrl(value: string): boolean {
   try {
@@ -107,121 +143,6 @@ export function isLoopbackUrl(value: string): boolean {
   } catch {
     return false;
   }
-}
-
-function normalizeUrl(value: string): string {
-  const clean = value.trim().replace(/\/+$/, '');
-  let parsed: URL;
-  try { parsed = new URL(clean); } catch { throw new Error('Introduce una URL válida del servidor.'); }
-  const local = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1' || parsed.hostname === '::1';
-  if (parsed.protocol !== 'https:' && !(local && parsed.protocol === 'http:')) throw new Error('Nodus Server necesita HTTPS fuera de localhost.');
-  if (parsed.username || parsed.password || parsed.search || parsed.hash) throw new Error('Usa solo la dirección base del servidor, sin credenciales, parámetros ni fragmentos.');
-  return parsed.toString().replace(/\/+$/, '');
-}
-
-async function fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
-  return fetch(url, { ...init, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
-}
-
-// ── Per-vault configuration reads ───────────────────────────────────────────
-// The server URL/space/flags live in each vault's own settings blob (per-vault, not
-// global). The active vault is read through the live connection; siblings are read
-// through a cached read-only handle, exactly like cross-vault relation lookups.
-
-interface VaultServerConfig {
-  vaultId: string;
-  vaultName: string;
-  vaultType: VaultSummary['type'];
-  isActiveVault: boolean;
-  url: string;
-  spaceId: string;
-  spaceName: string;
-  language: AppLanguage;
-  enabled: boolean;
-  autoSync: boolean;
-  includeUserContent: boolean;
-  includePassages: boolean;
-  includeVectors: boolean;
-  hasToken: boolean;
-  configured: boolean;
-}
-
-function openReadOnly(dbPath: string): Database.Database | null {
-  const cached = readonlyPool.get(dbPath);
-  if (cached) {
-    try { cached.prepare('SELECT 1').get(); return cached; }
-    catch { readonlyPool.delete(dbPath); }
-  }
-  try {
-    const db = new Database(dbPath, { readonly: true, fileMustExist: true });
-    readonlyPool.set(dbPath, db);
-    return db;
-  } catch { return null; }
-}
-
-function closeReadOnlyPool(): void {
-  for (const db of readonlyPool.values()) { try { db.close(); } catch { /* ignore */ } }
-  readonlyPool.clear();
-}
-
-function readSiblingServerBlob(vaultPath: string): Partial<AppSettings> {
-  const db = openReadOnly(vaultPath);
-  if (!db) return {};
-  try {
-    const row = db.prepare("SELECT value FROM settings WHERE key = 'app'").get() as { value: string } | undefined;
-    if (!row?.value) return {};
-    return JSON.parse(row.value) as Partial<AppSettings>;
-  } catch { return {}; }
-}
-
-function toConfig(vault: VaultSummary, blob: Partial<AppSettings>): VaultServerConfig {
-  const url = String(blob.nodusServerUrl || '');
-  const spaceId = String(blob.nodusServerSpaceId || '');
-  const hasToken = hasNodusServerTokenFor(vault.id);
-  return {
-    vaultId: vault.id,
-    vaultName: vault.name,
-    vaultType: vault.type,
-    isActiveVault: vault.active,
-    url,
-    spaceId,
-    spaceName: String(blob.nodusServerSpaceName || ''),
-    language: normalizeUiLanguage((blob.nodusServerLanguage as AppLanguage) ?? 'en'),
-    enabled: Boolean(blob.nodusServerEnabled),
-    autoSync: blob.nodusServerAutoSync !== false,
-    includeUserContent: Boolean(blob.nodusServerIncludeUserContent),
-    includePassages: Boolean(blob.nodusServerIncludePassages),
-    includeVectors: blob.nodusServerIncludeVectors !== false,
-    hasToken,
-    configured: Boolean(url && spaceId && hasToken),
-  };
-}
-
-function readVaultConfig(vault: VaultSummary): VaultServerConfig {
-  if (vault.active) {
-    const s = getSettings();
-    return toConfig(vault, {
-      nodusServerUrl: s.nodusServerUrl,
-      nodusServerSpaceId: s.nodusServerSpaceId,
-      nodusServerSpaceName: s.nodusServerSpaceName,
-      nodusServerLanguage: s.nodusServerLanguage,
-      nodusServerEnabled: s.nodusServerEnabled,
-      nodusServerAutoSync: s.nodusServerAutoSync,
-      nodusServerIncludeUserContent: s.nodusServerIncludeUserContent,
-      nodusServerIncludePassages: s.nodusServerIncludePassages,
-      nodusServerIncludeVectors: s.nodusServerIncludeVectors,
-    });
-  }
-  // A sibling connection always has a device token, so skip opening its database (and
-  // caching a read-only handle to it) when there is none — most vaults are not shared.
-  if (!hasNodusServerTokenFor(vault.id)) return toConfig(vault, {});
-  return toConfig(vault, readSiblingServerBlob(vault.path));
-}
-
-function listVaultConfigs(): VaultServerConfig[] {
-  let vaults: VaultSummary[] = [];
-  try { vaults = listVaults(); } catch { vaults = []; }
-  return vaults.map((vault) => readVaultConfig(vault));
 }
 
 // ── Overview surfaced to the renderer ───────────────────────────────────────
@@ -247,6 +168,7 @@ function connectionFrom(config: VaultServerConfig): NodusServerConnection {
     lastSyncAt: rt?.lastSyncAt ?? null,
     lastError: rt?.lastError ?? null,
     lastBytes: rt?.lastBytes ?? null,
+    lastInbox: rt?.lastInbox ?? null,
   };
 }
 
@@ -328,47 +250,6 @@ async function uploadAssets(
 }
 
 /**
- * Take the mutations collaborators have queued, apply them, and acknowledge.
- *
- * Only for the active vault: applying is a write, and a sibling vault is opened read-only
- * by this service. Acknowledgement happens strictly after the transaction commits, and only
- * up to the cursor that was genuinely applied — anything refused stays in the ledger so its
- * author can be told rather than silently losing the work.
- */
-async function collectMutations(
-  config: VaultServerConfig,
-  token: string,
-  db: Database.Database,
-  rt: VaultRuntime,
-): Promise<void> {
-  const endpoint = `${normalizeUrl(config.url)}/api/v1/spaces/${encodeURIComponent(config.spaceId)}/mutations`;
-  try {
-    const response = await fetchWithTimeout(endpoint, { headers: { authorization: `Bearer ${token}` } });
-    // A server that predates the ledger has no such route; publishing carries on regardless.
-    if (response.status === 404 || response.status === 403) return;
-    if (!response.ok) return;
-    const value = await response.json() as { mutations?: IncomingMutation[]; cursor?: number };
-    const mutations = value.mutations ?? [];
-    if (mutations.length === 0) return;
-
-    const summary = applyIncomingMutations(db, mutations);
-    rt.lastInbox = { applied: summary.applied, deleted: summary.deleted, keptLocal: summary.keptLocal, refused: summary.refused.length };
-    if (summary.refused.length > 0) {
-      rt.lastError = `Hay cambios de otro equipo que no se han podido aplicar: ${summary.refused[0].reason}`;
-    }
-    if (summary.cursor > 0) {
-      await fetchWithTimeout(`${endpoint}/ack`, {
-        method: 'POST',
-        headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
-        body: JSON.stringify({ cursor: summary.cursor }),
-      });
-    }
-  } catch {
-    // The next tick tries again; nothing was acknowledged, so nothing was lost.
-  }
-}
-
-/**
  * Publish the corpus embeddings so the server can answer a semantic query.
  *
  * Separate from the snapshot on purpose: the matrix is binary, it is an order of magnitude
@@ -432,12 +313,16 @@ async function publishVault(vaultId: string): Promise<void> {
   rt.lastUploadStartedAt = Date.now();
   rt.phase = 'syncing';
   try {
-    // Collect what collaborators sent BEFORE building the snapshot, so their work travels
-    // back out in this same publication instead of waiting a further two minutes. This is
-    // also the only moment a mutation becomes visible to anyone: the server stores, the
-    // owner decides, and the republication is what everybody else finally reads.
-    if (vault.active) await collectMutations(config, token, db, rt);
-
+    // Collecting what collaborators sent used to happen here, right before the snapshot, so
+    // their work travelled back out in the same publication. It now belongs to inboxPoller,
+    // which drains the ledger every thirty seconds whether or not anything is published —
+    // an idle desktop never published, and so never collected at all. What the comment here
+    // defended is preserved by the poller calling markVaultDirty() after it applies: the
+    // next publication carries the collaborator's work outward exactly as before.
+    //
+    // Splitting them also disposes of the concurrency question rather than answering it.
+    // better-sqlite3 is synchronous and both would run on the one main-process thread, so
+    // "never at the same time" would have to be a flag shared between two modules.
     const snapshot = buildServerSnapshot(
       { ...vault },
       { nodusServerIncludeUserContent: config.includeUserContent, nodusServerIncludePassages: config.includePassages },

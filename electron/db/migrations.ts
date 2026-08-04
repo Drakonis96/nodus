@@ -10,7 +10,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 122;
+export const SCHEMA_VERSION = 123;
 
 export const migrations: Migration[] = [
   {
@@ -6238,6 +6238,42 @@ export const migrations: Migration[] = [
       CREATE INDEX idx_server_outbox_drain ON server_outbox(state, seq);
     `,
   },
+  {
+    version: 123,
+    up: /* sql */ `
+      -- Lo que ha llegado de otro dispositivo a través del ledger, y qué se hizo con ello.
+      --
+      -- Existe porque applyIncomingMutations no dejaba rastro: la fila aplicada es
+      -- indistinguible de una que escribiera el propietario, y el resumen en memoria se
+      -- perdía al cerrar. Sin esto no hay forma de decirle a nadie que ha recibido algo.
+      --
+      -- Es el registro que ESTE ordenador lleva de lo que le llegó, así que no viaja:
+      -- ni en las copias .nodussync (NOT_SYNCED_TABLES) ni en el snapshot publicado, y
+      -- desde luego no en MUTABLE_TABLES. Publicarlo dejaría que la bandeja de una
+      -- máquina sobrescribiera la de otra, que es el mismo argumento que sync_superseded.
+      CREATE TABLE server_inbox (
+        id             TEXT PRIMARY KEY,   -- el id de la mutación: un reintento es idempotente
+        seq            INTEGER NOT NULL,
+        space_id       TEXT,
+        client_id      TEXT,               -- qué dispositivo, no qué persona: el servidor
+                                           -- escribe userId: null siempre
+        table_name     TEXT NOT NULL,
+        row_key        TEXT NOT NULL,      -- JSON.stringify(mutation.key), la MISMA codificación
+                                           -- que server_outbox y las lápidas
+        op             TEXT NOT NULL CHECK (op IN ('upsert','delete')),
+        outcome        TEXT NOT NULL CHECK (outcome IN ('applied','deleted','kept_local','refused')),
+        reason         TEXT,
+        title          TEXT,
+        entity_kind    TEXT,               -- 'deep_research' | 'note' | … para no reparsear brief_json
+        schema_version INTEGER,
+        created_at     TEXT,               -- cuándo lo escribió el teléfono
+        arrived_at     TEXT NOT NULL,      -- cuándo lo aplicó este escritorio
+        read           INTEGER NOT NULL DEFAULT 0
+      );
+      CREATE INDEX idx_server_inbox_recent ON server_inbox(arrived_at DESC);
+      CREATE INDEX idx_server_inbox_unread ON server_inbox(read, arrived_at DESC);
+    `,
+  },
 ];
 
 /**
@@ -6258,9 +6294,16 @@ function isAlreadyAppliedError(error: unknown): boolean {
  * transforms data or rebuilds a table (e.g. copy-into-new-then-drop-old) could destroy
  * data on a database where it already ran. Comments are stripped first so prose that
  * happens to mention "delete" or "update" does not disqualify a pure-CREATE migration.
+ *
+ * String literals are stripped for exactly the same reason, and it is not hypothetical:
+ * `CHECK (op IN ('upsert', 'delete'))` is a pure CREATE TABLE whose only "DELETE" is a
+ * value the column may hold. Both server_outbox and server_inbox declare their operation
+ * that way, and without this they would be excluded from the recovery path that exists
+ * precisely for additive tables like them. Stripping literals can only ever ADD bodies to
+ * the create-only set, and only ones whose sole destructive keyword was never a statement.
  */
 function isCreateOnly(sql: string): boolean {
-  const bare = stripSqlComments(sql);
+  const bare = stripSqlComments(sql).replace(/'(?:[^']|'')*'/g, "''");
   return /\bCREATE\b/i.test(bare) && !/\b(ALTER|DROP|INSERT|UPDATE|DELETE|REPLACE)\b/i.test(bare);
 }
 

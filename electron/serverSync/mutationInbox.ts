@@ -31,6 +31,29 @@ export interface IncomingMutation {
   createdAt?: string;
 }
 
+/**
+ * One decision, in full: what arrived, where it came from, and what became of it.
+ *
+ * The counters below say how many; this says which. Nothing here is written to the
+ * database by this module — see the note on applyIncomingMutations — so an entry is a
+ * plain description the caller may record, show, or ignore.
+ */
+export interface InboxEntry {
+  id: string;
+  seq: number;
+  clientId?: string;
+  table: string;
+  key: unknown[];
+  kind: 'upsert' | 'delete';
+  outcome: 'applied' | 'deleted' | 'keptLocal' | 'refused';
+  reason?: string;
+  /** Something a person would recognise: a report's objective, a note's title. */
+  title?: string | null;
+  entityKind?: string | null;
+  schemaVersion?: number;
+  createdAt?: string;
+}
+
 export interface InboxSummary {
   applied: number;
   deleted: number;
@@ -38,6 +61,46 @@ export interface InboxSummary {
   refused: { id: string; reason: string }[];
   /** Highest sequence number safe to acknowledge; everything above it is still owed. */
   cursor: number;
+  /** Every decision above, in the order it was made. */
+  entries: InboxEntry[];
+}
+
+/**
+ * A human-readable name for an incoming row, and the kind of thing it is.
+ *
+ * Pure and query-free on purpose: it runs inside the apply loop, once per mutation, and a
+ * lookup here would be a second read of a row the caller already holds. A table it does
+ * not know returns nulls, and the inbox falls back to "table · key" — which is honest,
+ * and better than inventing a name.
+ */
+export function titleOf(
+  table: string,
+  row: Record<string, unknown> | null | undefined,
+): { title: string | null; entityKind: string | null } {
+  if (!row) return { title: null, entityKind: null };
+  const text = (value: unknown): string | null => {
+    const trimmed = typeof value === 'string' ? value.trim() : '';
+    return trimmed ? trimmed : null;
+  };
+
+  if (table === 'writing_saved_drafts') {
+    // The one that matters: this is the Deep Research report the phone sends. Its brief
+    // carries the objective the user actually typed, which beats a generated title when
+    // the row arrives without one.
+    let brief: { kind?: unknown; objective?: unknown } = {};
+    try {
+      if (typeof row.brief_json === 'string') brief = JSON.parse(row.brief_json) as typeof brief;
+    } catch {
+      // A brief this build cannot parse still has a row, and the row may have a title.
+    }
+    return {
+      title: text(row.title) ?? text(brief.objective),
+      entityKind: typeof brief.kind === 'string' ? brief.kind : null,
+    };
+  }
+  if (table === 'notes') return { title: text(row.title), entityKind: 'note' };
+  if (table === 'note_folders') return { title: text(row.name), entityKind: 'note_folder' };
+  return { title: null, entityKind: null };
 }
 
 function timestampOf(row: Record<string, unknown> | null | undefined, fallback?: string): number {
@@ -58,12 +121,41 @@ function timestampOf(row: Record<string, unknown> | null | undefined, fallback?:
  * Stopping matters: acknowledging past a refusal would drop it from the ledger forever, and
  * the collaborator who wrote it would never learn it had not landed. The cursor therefore
  * only ever advances over mutations that were genuinely handled.
+ *
+ * This function does NOT write the inbox record itself, and that is deliberate. It has six
+ * callers, five of them test scripts passing throwaway databases, and one of those replays
+ * the very same batch on purpose to prove a retry is safe. An unconditional write here
+ * would manufacture inbox rows during the suite and, on that replay, either collide or
+ * resurrect an entry the user had already dealt with. The caller records what it gets back.
  */
 export function applyIncomingMutations(db: Database.Database, mutations: IncomingMutation[]): InboxSummary {
-  const summary: InboxSummary = { applied: 0, deleted: 0, keptLocal: 0, refused: [], cursor: 0 };
+  const summary: InboxSummary = { applied: 0, deleted: 0, keptLocal: 0, refused: [], cursor: 0, entries: [] };
   const present = new Set(
     (db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[]).map((row) => row.name)
   );
+
+  /** Describe one decision, borrowing the fields every entry shares from the mutation. */
+  const describe = (
+    mutation: IncomingMutation,
+    outcome: InboxEntry['outcome'],
+    extra: { reason?: string; title?: string | null; entityKind?: string | null } = {},
+  ): InboxEntry => ({
+    id: mutation.id,
+    seq: Number(mutation.seq),
+    clientId: mutation.clientId,
+    table: mutation.table,
+    key: mutation.key,
+    kind: mutation.kind,
+    outcome,
+    schemaVersion: mutation.schemaVersion,
+    createdAt: mutation.createdAt,
+    ...extra,
+  });
+
+  const refuse = (mutation: IncomingMutation, reason: string): void => {
+    summary.refused.push({ id: mutation.id, reason });
+    summary.entries.push(describe(mutation, 'refused', { reason }));
+  };
 
   for (const mutation of mutations.slice().sort((a, b) => Number(a.seq) - Number(b.seq))) {
     // A mutation written against a newer schema carries columns this build does not know.
@@ -71,24 +163,27 @@ export function applyIncomingMutations(db: Database.Database, mutations: Incomin
     // timestamp the loss would then propagate — the same reasoning mergeSyncPackage uses to
     // refuse a newer package outright.
     if (Number(mutation.schemaVersion) > SCHEMA_VERSION) {
-      summary.refused.push({ id: mutation.id, reason: `Procede de un esquema más reciente (v${mutation.schemaVersion} frente a v${SCHEMA_VERSION}). Actualiza Nodus para recibir estos cambios.` });
+      refuse(mutation, `Procede de un esquema más reciente (v${mutation.schemaVersion} frente a v${SCHEMA_VERSION}). Actualiza Nodus para recibir estos cambios.`);
       break;
     }
     if (!APPLICABLE.has(mutation.table) || !present.has(mutation.table)) {
-      summary.refused.push({ id: mutation.id, reason: `La tabla ${mutation.table} no se acepta desde una réplica.` });
+      refuse(mutation, `La tabla ${mutation.table} no se acepta desde una réplica.`);
       break;
     }
 
     const identity = identityColumns(mutation.table, undefined, db);
     if (identity.length !== mutation.key.length) {
-      summary.refused.push({ id: mutation.id, reason: 'La clave de fila no coincide con la identidad de esa tabla.' });
+      refuse(mutation, 'La clave de fila no coincide con la identidad de esa tabla.');
       break;
     }
     const where = identity.map((column) => `${quoteIdentifier(column)} IS ?`).join(' AND ');
     const key = mutation.key.map((value) => (value === undefined ? null : value));
 
     try {
-      db.transaction(() => {
+      // The transaction RETURNS its decision, so it is read only after the commit. Counting
+      // inside it would credit a mutation whose commit then failed, and the catch below
+      // would report that very same mutation as refused — two answers for one decision.
+      const outcome = db.transaction((): InboxEntry['outcome'] => {
         db.pragma('defer_foreign_keys = ON');
         const local = db.prepare(`SELECT * FROM ${quoteIdentifier(mutation.table)} WHERE ${where}`).get(...key) as Record<string, unknown> | undefined;
 
@@ -96,24 +191,20 @@ export function applyIncomingMutations(db: Database.Database, mutations: Incomin
           // A local edit made after the remote deletion is the more recent fact, so the row
           // stays — the rule applyIncomingTombstones already applies to package imports.
           if (local && timestampOf(local) > timestampOf(null, mutation.createdAt)) {
-            summary.keptLocal += 1;
-            return;
+            return 'keptLocal';
           }
           db.prepare(`DELETE FROM ${quoteIdentifier(mutation.table)} WHERE ${where}`).run(...key);
-          summary.deleted += 1;
-          return;
+          return 'deleted';
         }
 
         const incoming = mutation.row ?? {};
         if (local && timestampOf(local) > timestampOf(incoming, mutation.createdAt)) {
-          summary.keptLocal += 1;
-          return;
+          return 'keptLocal';
         }
         const localColumns = new Set(tableColumns(mutation.table, db).map((column) => column.name));
         const columns = Object.keys(incoming).filter((column) => localColumns.has(column));
         if (columns.length === 0) {
-          summary.keptLocal += 1;
-          return;
+          return 'keptLocal';
         }
         if (local) {
           // UPDATE the columns the mutation carries, never INSERT OR REPLACE.
@@ -124,8 +215,7 @@ export function applyIncomingMutations(db: Database.Database, mutations: Incomin
           // owner's copy of its illustration. Measured, not hypothetical: it happened.
           const assignable = columns.filter((column) => !identity.includes(column));
           if (assignable.length === 0) {
-            summary.keptLocal += 1;
-            return;
+            return 'keptLocal';
           }
           db.prepare(
             `UPDATE ${quoteIdentifier(mutation.table)} SET ${assignable.map((column) => `${quoteIdentifier(column)} = ?`).join(', ')} WHERE ${where}`
@@ -136,11 +226,16 @@ export function applyIncomingMutations(db: Database.Database, mutations: Incomin
             `VALUES (${columns.map(() => '?').join(', ')})`
           ).run(columns.map((column) => (incoming[column] === undefined ? null : incoming[column])));
         }
-        summary.applied += 1;
+        return 'applied';
       })();
+      if (outcome === 'applied') summary.applied += 1;
+      else if (outcome === 'deleted') summary.deleted += 1;
+      else summary.keptLocal += 1;
+      // A delete carries no row, so it has no name to show. The inbox falls back to the key.
+      summary.entries.push(describe(mutation, outcome, titleOf(mutation.table, mutation.row)));
       summary.cursor = Number(mutation.seq);
     } catch (error) {
-      summary.refused.push({ id: mutation.id, reason: error instanceof Error ? error.message : String(error) });
+      refuse(mutation, error instanceof Error ? error.message : String(error));
       break;
     }
   }

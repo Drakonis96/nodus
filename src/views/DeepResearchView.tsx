@@ -335,6 +335,12 @@ export function DeepResearchView({
     void refreshSavedDrafts();
   }, [refreshSavedDrafts]);
 
+  // A report sent from the phone is written by the main process, straight into
+  // writing_saved_drafts, with nothing in this window involved. Without this the gallery
+  // showed it only after a remount. refreshSavedDrafts has no dependencies, so this
+  // subscribes exactly once.
+  useEffect(() => window.nodus.onWritingDraftsChanged(() => void refreshSavedDrafts()), [refreshSavedDrafts]);
+
   // Surface each finished report in the gallery as soon as it lands.
   const lastCompletedRef = useRef<string | null>(null);
   useEffect(() => {
