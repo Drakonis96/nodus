@@ -21,6 +21,7 @@
     "verify:testimony-performance": "node scripts/verify-testimony-performance.mjs",
     "verify:nodi-overlay": "npm run build && node scripts/verify-nodi-overlay.mjs",
     "verify:deep-research-queue": "npm run build && node scripts/verify-deep-research-mcp-queue.mjs",
+    "verify:vector-scan": "ELECTRON_RUN_AS_NODE=1 ./node_modules/.bin/electron scripts/verify-vector-scan.mjs",
     "verify:study-whisper": "node scripts/verify-study-whisper.mjs",
     "verify:study-improve-local": "node scripts/verify-study-improve-local.mjs",
     "verify:database-records": "node scripts/verify-database-records.mjs",

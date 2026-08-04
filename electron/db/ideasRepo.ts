@@ -1,4 +1,5 @@
 import { getDb } from './database';
+import { scanSimilar } from './vectorScan';
 import { v4 as uuid } from 'uuid';
 import crypto from 'node:crypto';
 import type {
@@ -389,6 +390,47 @@ export function findSimilarIdeas(
     statement: string;
     similarity: number;
   }[];
+}
+
+/**
+ * The same search as `findSimilarIdeas`, paged so it does not hold the main process
+ * for the whole scan (see ./vectorScan.ts). Used by the long generations, which run
+ * several of these per report while the user is still using the app.
+ */
+export async function findSimilarIdeasPaged(
+  queryEmbedding: number[],
+  threshold: number,
+  limit: number
+): Promise<{ global_id: string; type: IdeaType; label: string; statement: string; similarity: number }[]> {
+  const config = currentEmbeddingConfig();
+  const ranked = await scanSimilar<{ global_id: string; rid: number; similarity: number }>({
+    table: 'ideas',
+    sql: `SELECT global_id, rowid AS rid, vec_scan(embedding) AS similarity
+            FROM ideas
+           WHERE rowid > ? AND rowid <= ?
+             AND embedding IS NOT NULL
+             AND embedding_provider = ?
+             AND embedding_model = ?
+             AND embedding_dim = ?
+             AND orphaned_at IS NULL`,
+    params: [config.provider, config.model, queryEmbedding.length],
+    query: queryEmbedding,
+    threshold,
+    limit,
+  });
+  if (ranked.length === 0) return [];
+
+  const byId = new Map(ranked.map((row) => [row.global_id, row.similarity]));
+  const rows = getDb()
+    .prepare(
+      `SELECT global_id, type, label, statement
+         FROM ideas
+        WHERE global_id IN (${ranked.map(() => '?').join(',')})`
+    )
+    .all(...ranked.map((row) => row.global_id)) as { global_id: string; type: IdeaType; label: string; statement: string }[];
+  return rows
+    .map((row) => ({ ...row, similarity: byId.get(row.global_id) ?? 0 }))
+    .sort((a, b) => b.similarity - a.similarity);
 }
 
 /**

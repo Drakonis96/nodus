@@ -33,7 +33,7 @@ import { listPersons, getPerson, listEvents, listEvidenceFor } from '../db/entit
 import { allRelationships } from '../db/relationshipsRepo';
 import { allSocialRelations } from '../db/socialRepo';
 import { listItems, listItemsForPerson, findArchiveItemsSimilar } from '../db/archiveRepo';
-import { findSimilarWorks } from '../db/workSummariesRepo';
+import { findSimilarWorksPaged } from '../db/workSummariesRepo';
 import { getWork } from '../db/worksRepo';
 import { resolveWorkText } from '../extraction/textExtractor';
 import { LOCAL_USER_ID } from '../zotero/zoteroClient';
@@ -177,7 +177,8 @@ export async function buildGenealogySourcePool(objective: string, focusPersonId?
 
   // Zotero library (secondary sources), if any, retrieved by summary similarity.
   if (objVec) {
-    for (const row of findSimilarWorks(objVec, 0.2, MAX_WORK_SOURCES)) {
+    // Paged, so gathering the sources does not freeze the window (see db/vectorScan.ts).
+    for (const row of await findSimilarWorksPaged(objVec, 0.2, MAX_WORK_SOURCES)) {
       const w = getWork(row.nodus_id);
       if (!w) continue;
       const authors = parseAuthors((w as { authors_json?: string }).authors_json ?? '[]');

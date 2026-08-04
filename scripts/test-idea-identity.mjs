@@ -178,7 +178,12 @@ async function migration28Sql() {
 /** Bundle the real ideasRepo with database/settings/works stubbed out. */
 async function bundleIdeasRepo() {
   const dbStub = path.join(root, 'stub-database.js');
-  await writeFile(dbStub, 'export function getDb() { return globalThis.__ideaIdentityTestDb; }\n');
+  await writeFile(
+    dbStub,
+    'export function getDb() { return globalThis.__ideaIdentityTestDb; }\n' +
+      // Armed by the paged similarity scan before each statement; no-op here.
+      'export function setVectorScanQuery() {}\n'
+  );
   const settingsStub = path.join(root, 'stub-settings.js');
   await writeFile(settingsStub, "export function getSettings() { return { embeddingProvider: 'openai', embeddingModel: 'test-model' }; }\n");
   const worksStub = path.join(root, 'stub-works.js');
