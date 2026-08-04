@@ -25,12 +25,12 @@ try {
 
   const { RELEASE_NOTES, releaseNotesForMajor, compareVersions } = await import(pathToFileURL(bundlePath).href);
   const currentRelease = RELEASE_NOTES[0];
-  assert.equal(currentRelease?.version, '3.2.0');
+  assert.equal(currentRelease?.version, '3.2.1');
   assert.equal(currentRelease?.date, '2026-08-04');
-  // Opened for whoever runs a Nodus Server: a semantic search no longer stops the server
-  // answering anybody else, and its memory ceiling is stated in memory rather than in a count
-  // of published vaults. A floor rather than an exact count, because more will land here
-  // before 3.2.0 ships.
+  // One bug from both ends: a Deep Research report written on a phone or a colleague's machine
+  // is a single row larger than the server would accept, and nothing about that was visible
+  // from either side. A floor rather than an exact count, in case more lands here before it
+  // ships.
   assert.ok(currentRelease?.highlights.length >= 2, 'the release must describe what changed');
   for (const highlight of currentRelease.highlights) {
     // Written for the person using Nodus: no module names, no internal vocabulary.

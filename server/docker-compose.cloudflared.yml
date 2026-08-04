@@ -46,6 +46,11 @@ services:
       NODUS_MAX_SNAPSHOT_JSON_BYTES: ${NODUS_MAX_SNAPSHOT_JSON_BYTES:-}
       # How much expanded publication stays parsed in memory, 128 MiB by default.
       NODUS_MAX_SNAPSHOT_CACHE_BYTES: ${NODUS_MAX_SNAPSHOT_CACHE_BYTES:-}
+      # What a collaborator may send back: 256 KiB per row, 16 MiB per request, and 256 MiB
+      # of changes held per space while the owner is away. Raise the first two together.
+      NODUS_MAX_MUTATION_BYTES: ${NODUS_MAX_MUTATION_BYTES:-}
+      NODUS_MAX_MUTATION_BATCH_BYTES: ${NODUS_MAX_MUTATION_BATCH_BYTES:-}
+      NODUS_MAX_LEDGER_BYTES: ${NODUS_MAX_LEDGER_BYTES:-}
       # Threads for semantic search. Unset is one, or two where there are cores spare.
       NODUS_VECTOR_WORKERS: ${NODUS_VECTOR_WORKERS:-}
     volumes:

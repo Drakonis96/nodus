@@ -234,6 +234,27 @@ gigabyte for a large academic corpus and a needless eviction for a server with e
 A deployment that still sets it is stopped at boot rather than left believing it had capped
 anything.
 
+### Change size
+
+A publication travels one way. The other way — a collaborator sending changes back — has its own
+three limits, because a single change is no longer necessarily small: a Deep Research report is one
+row whose text column holds the whole report, and fifteen pages of it measure around 190 KiB.
+
+- `NODUS_MAX_MUTATION_BYTES`: largest single row accepted, 256 KiB by default. A row past it is
+  refused with its own size and this limit in the reply, so the sender can say what happened rather
+  than only that something did.
+- `NODUS_MAX_MUTATION_BATCH_BYTES`: largest request full of them, 16 MiB by default. It also bounds
+  the page the owner reads back, which is built as a single JSON string and so can never approach
+  the 512 MiB Node can hold. Raise it whenever you raise the row limit: a client that batches by
+  count can hand over 200 rows at once.
+- `NODUS_MAX_LEDGER_BYTES`: how many undelivered changes one space may hold, 256 MiB by default.
+  The ledger only grows while the owner is away, so a space at its limit answers `507 ledger_full`,
+  which asks the sender to try later and keeps their work, instead of rejecting it.
+
+All three take a whole number of bytes, at least 65536, and refuse to boot on a value the server
+cannot use. `GET /api/v1/capabilities` publishes the three of them, so a client can measure a change
+before making it rather than discovering the limit by being refused.
+
 ## Access levels
 
 A membership grants one of three levels in one space. An account can hold a different level in each

@@ -709,7 +709,42 @@ const RELEASE_3_2_0_HIGHLIGHTS: RawReleaseHighlight[] = [
   },
 ];
 
+/**
+ * 3.2.1 is one bug, told from both ends.
+ *
+ * The Deep Research a phone or a colleague's machine writes is a single row carrying the whole
+ * report, and the server would not take a row that large. Nothing about it was visible from
+ * either side: the limit was not published, the refusal carried no numbers, and a queue that
+ * did not fit gave up quietly and retried forever. The first note is the limit, the second is
+ * everything that made the limit impossible to diagnose.
+ */
+const RELEASE_3_2_1_HIGHLIGHTS: RawReleaseHighlight[] = [
+  {
+    scope: 'general',
+    es: 'Un informe de Deep Research escrito en el móvil o en otro equipo ya llega a la bóveda. El servidor solo aceptaba cambios de 64 KB y un informe de quince páginas ocupa casi el triple, así que se rechazaba siempre. El límite sube a 256 KB por cambio y quien administre un servidor puede ajustarlo.',
+    en: 'A Deep Research report written on the phone or on another machine now reaches the vault. The server only accepted changes of 64 KB and a fifteen-page report is nearly three times that, so it was refused every time. The limit rises to 256 KB per change and anyone running a server can adjust it.',
+    fr: 'Un rapport Deep Research rédigé sur le téléphone ou sur une autre machine parvient désormais au coffre. Le serveur n’acceptait que des modifications de 64 Ko et un rapport de quinze pages en fait presque le triple, il était donc toujours refusé. La limite passe à 256 Ko par modification et qui administre un serveur peut l’ajuster.',
+    de: 'Ein Deep-Research-Bericht, der auf dem Telefon oder auf einem anderen Rechner entsteht, erreicht jetzt den Tresor. Der Server nahm nur Änderungen von 64 KB an, und ein Bericht über fünfzehn Seiten ist fast dreimal so groß, also wurde er jedes Mal abgewiesen. Die Grenze steigt auf 256 KB pro Änderung und wer einen Server betreibt, kann sie anpassen.',
+    pt: 'Um relatório de Deep Research escrito no telemóvel ou noutro equipamento já chega ao cofre. O servidor só aceitava alterações de 64 KB e um relatório de quinze páginas ocupa quase o triplo, por isso era sempre recusado. O limite sobe para 256 KB por alteração e quem administra um servidor pode ajustá-lo.',
+    'pt-BR': 'Um relatório de Deep Research escrito no celular ou em outro computador agora chega ao cofre. O servidor só aceitava mudanças de 64 KB e um relatório de quinze páginas ocupa quase o triplo, então era sempre recusado. O limite sobe para 256 KB por mudança e quem administra um servidor pode ajustá-lo.',
+  },
+  {
+    scope: 'general',
+    es: 'Un cambio que el servidor no puede aceptar ya explica por qué. Antes solo decía que era demasiado grande, sin decir cuánto ocupaba ni cuál era el máximo. Y una cola de cambios que no cabía en un envío se quedaba atascada para siempre. Ahora se reparte en envíos más pequeños hasta vaciarse.',
+    en: 'A change the server cannot accept now explains why. Before it only said the change was too large, without saying how large it was or what the maximum is. And a queue of changes too big for one delivery used to get stuck forever. It is now split into smaller deliveries until it empties.',
+    fr: 'Une modification que le serveur ne peut pas accepter explique désormais pourquoi. Auparavant, elle indiquait seulement qu’elle était trop volumineuse, sans dire sa taille ni le maximum. Et une file de modifications trop grosse pour un seul envoi restait bloquée pour toujours. Elle se répartit maintenant en envois plus petits jusqu’à se vider.',
+    de: 'Eine Änderung, die der Server nicht annehmen kann, erklärt jetzt warum. Vorher hieß es nur, sie sei zu groß, ohne ihre Größe und ohne das Maximum zu nennen. Und eine Warteschlange, die nicht in eine Sendung passte, blieb für immer stecken. Sie wird jetzt auf kleinere Sendungen verteilt, bis sie leer ist.',
+    pt: 'Uma alteração que o servidor não pode aceitar já explica porquê. Antes apenas dizia que era demasiado grande, sem dizer quanto ocupava nem qual era o máximo. E uma fila de alterações que não cabia num envio ficava encravada para sempre. Agora reparte-se em envios mais pequenos até esvaziar.',
+    'pt-BR': 'Uma mudança que o servidor não pode aceitar agora explica por quê. Antes só dizia que era grande demais, sem dizer quanto ocupava nem qual era o máximo. E uma fila de mudanças que não cabia em um envio ficava travada para sempre. Agora ela é dividida em envios menores até esvaziar.',
+  },
+];
+
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
+  {
+    version: '3.2.1',
+    date: '2026-08-04',
+    highlights: RELEASE_3_2_1_HIGHLIGHTS,
+  },
   {
     version: '3.2.0',
     date: '2026-08-04',
