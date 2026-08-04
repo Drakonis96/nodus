@@ -8,6 +8,7 @@ import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import { gunzipSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { Store, digest, pairingCode, token } from './lib/store.mjs';
+import { DEFAULT_MAX_MUTATION_BYTES } from './lib/core/mutations.mjs';
 import { SnapshotCache } from './lib/snapshotCache.mjs';
 import { body, contentSecurityPolicy, cookies, escapeHtml, form, html, json, jsonBody, redirect } from './lib/http.mjs';
 import { normalizeServerLanguage, serverTranslator } from './lib/i18n.mjs';
@@ -88,6 +89,32 @@ const MAX_ASSET_BYTES = byteLimit('NODUS_MAX_ASSET_BYTES', 8 * 1024 * 1024, buff
 /** Total image budget for one space, so a shared server cannot be filled from one vault. */
 const MAX_SPACE_ASSET_BYTES = byteLimit('NODUS_MAX_SPACE_ASSET_BYTES', 2 * 1024 * 1024 * 1024, bufferLimits.MAX_LENGTH);
 const MAX_VECTOR_BYTES = byteLimit('NODUS_MAX_VECTOR_BYTES', 512 * 1024 * 1024, bufferLimits.MAX_LENGTH);
+/**
+ * One row a collaborator may send. See DEFAULT_MAX_MUTATION_BYTES for why 256 KiB and why it
+ * does not move alone.
+ */
+const MAX_MUTATION_BYTES = byteLimit('NODUS_MAX_MUTATION_BYTES', DEFAULT_MAX_MUTATION_BYTES, bufferLimits.MAX_LENGTH);
+/**
+ * One request full of them, on the wire.
+ *
+ * Deliberately not `MAX_MUTATION_BYTES * MAX_MUTATION_BATCH`: that product is the worst case a
+ * client batching by count can hand over, and honouring it in full would mean accepting 50 MiB
+ * of body, expanded to a string and then to objects — several hundred megabytes of peak for one
+ * request, on a route that anyone with write access can call. 16 MiB accepts around sixty
+ * maximum-size rows at once, which is far past any real queue, and refuses the rest with a
+ * cursor the client keeps rather than losing.
+ */
+const MAX_MUTATION_BATCH_BYTES = byteLimit('NODUS_MAX_MUTATION_BATCH_BYTES', 16 * 1024 * 1024, bufferLimits.MAX_LENGTH);
+/**
+ * How much undrained ledger one space may hold.
+ *
+ * The ledger was the only write channel here with neither a quota nor a rate limit, which was
+ * survivable only because a mutation could not be large. Images have had both for as long as
+ * they have existed; this is the same idea. It fills only while the owner is away, and it is
+ * refused with "come back later" rather than a rejection, because the condition resolves
+ * itself the moment the owner opens Nodus and drains.
+ */
+const MAX_LEDGER_BYTES = byteLimit('NODUS_MAX_LEDGER_BYTES', 256 * 1024 * 1024, bufferLimits.MAX_LENGTH);
 /**
  * How long an unreferenced image survives before the sweeper takes it.
  *
@@ -896,6 +923,9 @@ const apiRoutes = createApiRoutes({
     maxAssetBytes: MAX_ASSET_BYTES,
     maxSpaceAssetBytes: MAX_SPACE_ASSET_BYTES,
     maxVectorBytes: MAX_VECTOR_BYTES,
+    maxMutationBytes: MAX_MUTATION_BYTES,
+    maxMutationBatchBytes: MAX_MUTATION_BATCH_BYTES,
+    maxLedgerBytes: MAX_LEDGER_BYTES,
     assetGraceMs: ASSET_GRACE_MS,
   },
 });

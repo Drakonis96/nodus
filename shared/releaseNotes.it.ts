@@ -100,7 +100,13 @@ const RELEASE_3_2_0_IT: string[] = [
   "Generare un rapporto non blocca più la finestra. Nodus percorre l'intero corpus più volte per ogni rapporto, e ognuna di quelle ricerche lasciava l'applicazione ferma per tutta la sua durata. Ora procedono a tratti e restituiscono il controllo tra l'una e l'altra, così puoi continuare a lavorare mentre il rapporto viene scritto.",
 ];
 
+const RELEASE_3_2_1_IT: string[] = [
+  "Un rapporto di Deep Research scritto sul telefono o su un altro computer ora arriva al vault. Il server accettava soltanto modifiche da 64 KB e un rapporto di quindici pagine occupa quasi il triplo, quindi veniva sempre rifiutato. Il limite sale a 256 KB per modifica e chi amministra un server può regolarlo.",
+  "Una modifica che il server non può accettare ora spiega perché. Prima diceva soltanto che era troppo grande, senza dire quanto occupava né quale fosse il massimo. E una coda di modifiche che non entrava in un invio restava bloccata per sempre. Ora viene divisa in invii più piccoli finché non si svuota.",
+];
+
 export const RELEASE_NOTES_IT: Record<string, string[]> = {
+  "3.2.1": RELEASE_3_2_1_IT,
   "3.2.0": RELEASE_3_2_0_IT,
   "3.1.0": RELEASE_3_1_0_IT,
   "3.0.4": RELEASE_3_0_4_IT,

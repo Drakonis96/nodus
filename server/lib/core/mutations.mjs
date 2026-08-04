@@ -39,7 +39,22 @@ export const MUTABLE_TABLES = {
 };
 
 export const MUTATION_KINDS = new Set(['upsert', 'delete']);
-export const MAX_MUTATION_BYTES = 64 * 1024;
+/**
+ * How large one row may be, by default.
+ *
+ * It used to be 64 KiB, which predates anything long travelling this channel and turned out to
+ * be below the size of the thing it most needed to carry: a Deep Research report is one row of
+ * `writing_saved_drafts` whose `draft_json` holds the entire markdown. Five pages of Spanish
+ * prose with accented characters escaped into JSON already reach 40-60 KiB, and a real
+ * fifteen-page report measured 187 KiB. The feature and the limit were incompatible by design.
+ *
+ * The number is not free to raise on its own, because until every client batches by bytes the
+ * worst request this server can be handed is MAX_MUTATION_BATCH rows of this size. 256 KiB
+ * therefore buys comfortable headroom over the largest report anybody has produced while
+ * keeping that product at 50 MiB, which is a request a modest machine can still hold.
+ * Raise both together or not at all, and see NODUS_MAX_MUTATION_BATCH_BYTES.
+ */
+export const DEFAULT_MAX_MUTATION_BYTES = 256 * 1024;
 export const MAX_MUTATION_BATCH = 200;
 
 export function isMutableTable(table) {
@@ -59,7 +74,7 @@ export function rowKey(table, key) {
  * looks like, but the snapshot it already holds IS that schema, expressed as data. A
  * column nobody has ever published cannot be written.
  */
-export function validateMutation(mutation, { snapshot, hasAsset }) {
+export function validateMutation(mutation, { snapshot, hasAsset, maxBytes = DEFAULT_MAX_MUTATION_BYTES }) {
   const fail = (reason) => ({ ok: false, reason });
 
   if (!mutation || typeof mutation !== 'object') return fail('malformed');
@@ -106,8 +121,12 @@ export function validateMutation(mutation, { snapshot, hasAsset }) {
     if (!hasAsset(asset.hash)) return { ok: false, reason: 'missing_asset', missing: asset.hash };
   }
 
-  if (Buffer.byteLength(JSON.stringify(mutation)) > MAX_MUTATION_BYTES) return fail('too_large');
-  return { ok: true, table, definition };
+  // Measured and reported, not just compared. A rejection that says only "too large" leaves
+  // the sender with nothing to act on; the phone showed exactly that, and there was no way
+  // from the screen to learn whether the row missed by a kilobyte or by a factor of three.
+  const bytes = Buffer.byteLength(JSON.stringify(mutation));
+  if (bytes > maxBytes) return { ok: false, reason: 'too_large', bytes, limit: maxBytes };
+  return { ok: true, table, definition, bytes };
 }
 
 /**

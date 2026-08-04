@@ -12,4 +12,4 @@
  * this drifts from the root `package.json`, from `server/package.json`, or from the two iOS
  * targets in `ios/project.yml`.
  */
-export const NODUS_VERSION = '3.2.0';
+export const NODUS_VERSION = '3.2.1';

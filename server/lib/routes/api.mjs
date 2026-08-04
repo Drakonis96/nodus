@@ -21,7 +21,6 @@ import { NODUS_VERSION } from '../version.mjs';
 
 const AUTH_BODY_BYTES = 32 * 1024;
 const TICKET_TTL_MS = 5 * 60_000;
-const MUTATION_BATCH_BYTES = 2 * 1024 * 1024;
 const VECTOR_QUERY_BYTES = 256 * 1024;
 /** Matches the desktop research assistant's ceiling (electron/ai/researchAssistant.ts). */
 const MAX_CONTEXT_CHARS = 600_000;
@@ -78,6 +77,11 @@ export function createApiRoutes(ctx) {
       maxSnapshotBytes: limits.maxSnapshotBytes,
       maxSnapshotJsonBytes: limits.maxSnapshotJsonBytes,
       maxMutationBatch: MAX_MUTATION_BATCH,
+      // Published so a client can measure a row before spending twenty minutes generating it.
+      // Their absence is why the only way to discover this limit was to be refused by it.
+      maxMutationBytes: limits.maxMutationBytes,
+      maxMutationBatchBytes: limits.maxMutationBatchBytes,
+      maxLedgerBytes: limits.maxLedgerBytes,
     };
   }
 
@@ -400,7 +404,10 @@ export function createApiRoutes(ctx) {
   // ── Mutations ─────────────────────────────────────────────────────────────
 
   async function postMutations(req, res, space) {
-    const input = await jsonBody(req, MUTATION_BATCH_BYTES);
+    // The one write route that had no rate limit, which was tolerable only while a mutation
+    // could not be large. It can now, and the body this accepts is measured in megabytes.
+    if (!rateLimit(req, res, 'mutations', 120, 60_000)) return true;
+    const input = await jsonBody(req, limits.maxMutationBatchBytes);
     const batch = Array.isArray(input.mutations) ? input.mutations : [];
     if (batch.length === 0) {
       json(res, 400, { error: 'empty_batch' });
@@ -422,10 +429,14 @@ export function createApiRoutes(ctx) {
         duplicate.push(mutation.id);
         continue;
       }
-      const verdict = validateMutation(mutation, { snapshot, hasAsset });
+      const verdict = validateMutation(mutation, { snapshot, hasAsset, maxBytes: limits.maxMutationBytes });
       if (!verdict.ok) {
         if (verdict.missing) missingAssets.add(verdict.missing);
-        rejected.push({ id: mutation?.id ?? null, reason: verdict.reason });
+        // Only `too_large` carries numbers, and only because they are the whole difference
+        // between a dead end and an explanation. Every other reason stays a bare code.
+        rejected.push(verdict.reason === 'too_large'
+          ? { id: mutation?.id ?? null, reason: verdict.reason, bytes: verdict.bytes, limitBytes: verdict.limit, error_description: `This row is ${mib(verdict.bytes)} and this server accepts up to ${mib(verdict.limit)} per row (NODUS_MAX_MUTATION_BYTES).` }
+          : { id: mutation?.id ?? null, reason: verdict.reason });
         continue;
       }
       accepted.push({
@@ -447,6 +458,20 @@ export function createApiRoutes(ctx) {
       return true;
     }
 
+    // A full ledger is a temporary condition, not a bad request: it fills because the owner
+    // has not opened Nodus, and it empties when they do. So this refuses the batch whole and
+    // keeps nothing, which leaves the sender's queue intact to retry — deliberately unlike a
+    // rejection, which would throw away a colleague's work over the owner's holiday.
+    const incoming = accepted.reduce((total, entry) => total + Buffer.byteLength(JSON.stringify(entry)) + 1, 0);
+    if (ledger.bytes(store, space.id) + incoming > limits.maxLedgerBytes) {
+      json(res, 507, {
+        error: 'ledger_full',
+        error_description: `This space is holding ${mib(limits.maxLedgerBytes)} of changes that its owner has not collected yet. Nothing was lost. Send again once they have opened Nodus.`,
+        limitBytes: limits.maxLedgerBytes,
+      });
+      return true;
+    }
+
     const stamped = ledger.append(store, space.id, accepted);
     json(res, 200, {
       accepted: stamped.map((entry) => entry.id),
@@ -460,7 +485,10 @@ export function createApiRoutes(ctx) {
   function getMutations(req, res, space, url) {
     const cursor = Number(url.searchParams.get('since') || 0);
     const limit = Math.max(1, Math.min(MAX_MUTATION_BATCH, Number(url.searchParams.get('limit')) || MAX_MUTATION_BATCH));
-    json(res, 200, { ...ledger.since(store, space.id, cursor, limit), spaceSchemaVersion: space.schemaVersion ?? 0 });
+    // Bounded by bytes as well as by count, so a page of large rows cannot become a response
+    // this process is unable to serialize. Callers follow `hasMore`; a short page is normal.
+    const page = ledger.since(store, space.id, cursor, limit, limits.maxMutationBatchBytes);
+    json(res, 200, { ...page, spaceSchemaVersion: space.schemaVersion ?? 0 });
     return true;
   }
 

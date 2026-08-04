@@ -11,7 +11,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { MUTABLE_TABLES, rowKey, validateMutation } from '../server/lib/core/mutations.mjs';
+import { DEFAULT_MAX_MUTATION_BYTES, MUTABLE_TABLES, rowKey, validateMutation } from '../server/lib/core/mutations.mjs';
 import * as ledger from '../server/lib/ledger.mjs';
 import { Store } from '../server/lib/store.mjs';
 import { academicSnapshot, publish } from './lib/nodusServerFixtures.mjs';
@@ -98,6 +98,52 @@ test('validation refuses everything the ledger must not carry', () => {
   assert.equal(empty.ok, true);
 });
 
+/** A Deep Research report of `words` words, in the shape the phone and the desktop both send. */
+function reportMutation(words, overrides = {}) {
+  // Accented Spanish on purpose: these are two bytes each once JSON-escaped, and that is half
+  // the reason a report measured far larger than its word count suggested.
+  const markdown = Array.from({ length: words }, (_, index) => (index % 7 === 0 ? 'investigación' : 'análisis')).join(' ');
+  return mutation({
+    id: 'mut-report',
+    table: 'writing_saved_drafts',
+    key: ['dr-2'],
+    row: {
+      id: 'dr-2',
+      title: 'Omisiones en la literatura y fotografía de viaje',
+      brief_json: JSON.stringify({ kind: 'deep_research', objective: 'Omisiones', language: 'es' }),
+      selection_json: '{}',
+      model_json: '{}',
+      draft_json: JSON.stringify({ title: 'Omisiones', draftMarkdown: markdown, bibliography: [] }),
+      created_at: '2026-02-02T00:00:00.000Z',
+      updated_at: '2026-02-02T00:00:00.000Z',
+    },
+    ...overrides,
+  });
+}
+
+test('a Deep Research report fits, and a row that does not says by how much', () => {
+  const { payload } = academicSnapshot();
+  const hasAsset = () => true;
+  const check = (input, maxBytes) => validateMutation(input, { snapshot: payload, hasAsset, ...(maxBytes ? { maxBytes } : {}) });
+
+  // The regression this whole change exists for. Fifteen pages at 450 words a page is what
+  // `targetPages(.exhaustive)` promises, and at 64 KiB it was refused every single time.
+  const exhaustive = reportMutation(15 * 450);
+  assert.ok(check(exhaustive).bytes > 64 * 1024, 'a real report is larger than the old ceiling');
+  assert.equal(check(exhaustive).ok, true, 'and the feature the app ships must fit the limit it ships with');
+
+  // A row past the ceiling reports both numbers, because "too large" alone is a dead end.
+  const refused = check(exhaustive, 32 * 1024);
+  assert.equal(refused.ok, false);
+  assert.equal(refused.reason, 'too_large');
+  assert.equal(refused.limit, 32 * 1024);
+  assert.ok(refused.bytes > refused.limit);
+
+  // The default is not free to raise alone: it is chosen against the worst batch a client
+  // that still counts rows can send. If this product grows, MAX_MUTATION_BATCH_BYTES must too.
+  assert.ok(DEFAULT_MAX_MUTATION_BYTES * 200 <= 64 * 1024 * 1024, 'worst-case batch must stay servable');
+});
+
 test('the ledger is append-only, idempotent, and compacts on acknowledgement', async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), 'nodus-ledger-'));
   try {
@@ -131,6 +177,36 @@ test('the ledger is append-only, idempotent, and compacts on acknowledgement', a
     store.state.spaces.push({ id: spaceId, name: 'Ledger', mutationCursor: 3 });
     const afterCompaction = ledger.append(store, spaceId, [{ id: 'd' }]);
     assert.equal(afterCompaction[0].seq, 4, 'a compacted ledger must not reissue sequence numbers');
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('a page of mutations is bounded by bytes, and never by so much that it stalls', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'nodus-ledger-bytes-'));
+  try {
+    const store = new Store(root);
+    const spaceId = 'space-bytes';
+    const filler = (size) => ({ id: `e-${size}`, row: { content: 'x'.repeat(size) } });
+    ledger.append(store, spaceId, [filler(4_000), filler(4_001), filler(4_002)]);
+
+    // Counting rows alone could not bound this response, and the response is built as one
+    // string: past 512 MiB Node cannot hold it at all.
+    const page = ledger.since(store, spaceId, 0, 200, 9_000);
+    assert.equal(page.mutations.length, 2, 'the byte budget cuts the page before the count does');
+    assert.equal(page.hasMore, true);
+    assert.equal(page.cursor, 2, 'the cursor follows what was actually handed over');
+    assert.equal(ledger.since(store, spaceId, page.cursor, 200, 9_000).mutations.length, 1);
+
+    // The rule that keeps a big row from becoming a permanently undeliverable one: the owner
+    // acknowledges by cursor, so an entry never handed over can never be acknowledged, and
+    // the ledger would stop draining at that row forever.
+    const alone = ledger.since(store, spaceId, 0, 200, 10);
+    assert.equal(alone.mutations.length, 1, 'an entry larger than the whole budget still ships');
+    assert.equal(alone.hasMore, true);
+
+    assert.equal(ledger.bytes(store, spaceId) > 12_000, true, 'the quota measures the file, not a parse');
+    assert.equal(ledger.bytes(store, 'space-that-never-wrote'), 0);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -183,6 +259,67 @@ test('a writer sends, the owner drains and acknowledges, and a replay changes no
     });
     assert.equal(enormous.status, 413);
     assert.equal((await enormous.json()).limit, 200);
+  });
+});
+
+test('the size limits are published, explained on refusal, and a full ledger is retryable', { timeout: 60_000 }, async () => {
+  await withServer({
+    label: 'mutations-limits',
+    // The floor byteLimit() enforces is 64 KiB, so these are the smallest testable values.
+    env: { NODUS_MAX_MUTATION_BYTES: String(64 * 1024), NODUS_MAX_LEDGER_BYTES: String(64 * 1024) },
+  }, async (server) => {
+    const spaceId = await server.createSpace('Corpus');
+    const owner = await server.deviceToken(server.adminEmail, server.adminPassword, spaceId);
+    await server.createUser('escritor@example.test', 'escritor-account-password', [{ spaceId, role: 'writer' }]);
+    const writer = await server.deviceToken('escritor@example.test', 'escritor-account-password', spaceId);
+    await publish(server.origin, owner.deviceToken, spaceId, academicSnapshot());
+
+    // A client can now learn the limit without being refused by it first.
+    const capabilities = await (await server.api(writer.deviceToken, 'GET', '/api/v1/capabilities')).json();
+    assert.equal(capabilities.maxMutationBytes, 64 * 1024);
+    assert.ok(capabilities.maxMutationBatchBytes > 0);
+    assert.ok(capabilities.maxLedgerBytes > 0);
+
+    // And a refusal says which row, how big it was, and how big it may be.
+    const refused = await (await server.api(writer.deviceToken, 'POST', `/api/v1/spaces/${spaceId}/mutations`, {
+      json: { mutations: [reportMutation(15 * 450)] },
+    })).json();
+    assert.deepEqual(refused.accepted, []);
+    assert.equal(refused.rejected[0].reason, 'too_large');
+    assert.equal(refused.rejected[0].limitBytes, 64 * 1024);
+    assert.ok(refused.rejected[0].bytes > 64 * 1024);
+    assert.match(refused.rejected[0].error_description, /per row/);
+
+    // Filling the ledger is answered "later", not "no": the batch is refused whole and
+    // nothing is stored, so the sender keeps work that would otherwise be lost while the
+    // owner is away. Fifty small notes comfortably pass 64 KiB of ledger.
+    const notes = Array.from({ length: 50 }, (_, index) => mutation({
+      id: `fill-${index}`, key: [`n-fill-${index}`], row: { ...NOTE_ROW, id: `n-fill-${index}`, content: 'x'.repeat(1_200) },
+    }));
+    let full = null;
+    for (let attempt = 0; attempt < 6 && !full; attempt += 1) {
+      const response = await server.api(writer.deviceToken, 'POST', `/api/v1/spaces/${spaceId}/mutations`, {
+        json: { mutations: notes.map((entry) => ({ ...entry, id: `${entry.id}-${attempt}`, key: [`${entry.key[0]}-${attempt}`], row: { ...entry.row, id: `${entry.row.id}-${attempt}` } })) },
+      });
+      if (response.status === 507) full = await response.json();
+      else assert.equal(response.status, 200);
+    }
+    assert.ok(full, 'a ledger nobody drains eventually refuses more');
+    assert.equal(full.error, 'ledger_full');
+    assert.match(full.error_description, /Nothing was lost/);
+
+    // Draining frees it, which is the whole reason this is a 507 and not a rejection.
+    let cursor = 0;
+    for (let page = 0; page < 20; page += 1) {
+      const drained = await (await server.api(owner.deviceToken, 'GET', `/api/v1/spaces/${spaceId}/mutations?since=${cursor}`)).json();
+      cursor = drained.cursor;
+      if (!drained.hasMore) break;
+    }
+    await server.api(owner.deviceToken, 'POST', `/api/v1/spaces/${spaceId}/mutations/ack`, { json: { cursor } });
+    const afterDrain = await server.api(writer.deviceToken, 'POST', `/api/v1/spaces/${spaceId}/mutations`, {
+      json: { mutations: [mutation({ id: 'after-drain', key: ['n-after'], row: { ...NOTE_ROW, id: 'n-after' } })] },
+    });
+    assert.equal(afterDrain.status, 200, 'once the owner has collected, the space accepts again');
   });
 });
 

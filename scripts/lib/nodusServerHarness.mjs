@@ -53,6 +53,7 @@ export function serverEnvironment(overrides = {}) {
     'NODUS_SETUP_TOKEN', 'NODUS_PUBLIC_URL', 'NODUS_DATA_DIR', 'NODUS_HOST', 'NODUS_PORT',
     'NODUS_MAX_SNAPSHOT_BYTES', 'NODUS_MAX_SNAPSHOT_JSON_BYTES',
     'NODUS_MAX_ASSET_BYTES', 'NODUS_MAX_SPACE_ASSET_BYTES', 'NODUS_MAX_VECTOR_BYTES',
+    'NODUS_MAX_MUTATION_BYTES', 'NODUS_MAX_MUTATION_BATCH_BYTES', 'NODUS_MAX_LEDGER_BYTES',
     // NODUS_MAX_CACHED_SNAPSHOTS is refused by the server now, so a developer who still has
     // it exported would fail every boot here rather than see one clear message once.
     'NODUS_MAX_CACHED_SNAPSHOTS', 'NODUS_MAX_SNAPSHOT_CACHE_BYTES', 'NODUS_VECTOR_WORKERS',

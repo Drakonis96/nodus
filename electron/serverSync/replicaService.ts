@@ -315,6 +315,62 @@ async function refreshRole(vault: VaultSummary, token: string): Promise<void> {
 
 // ── Draining the outgoing queue ─────────────────────────────────────────────
 
+/**
+ * What the space at the other end says it will accept.
+ *
+ * Asked once per vault and kept, because it changes only when the server is upgraded. A server
+ * too old to publish these answers `null` for them, and every use below falls back to a
+ * conservative guess rather than to an assumption — see SAFE_BATCH_BYTES.
+ */
+interface RemoteLimits {
+  maxMutationBytes: number | null;
+  maxMutationBatchBytes: number | null;
+  maxMutationBatch: number;
+}
+
+const remoteLimits = new Map<string, { limits: RemoteLimits; at: number }>();
+/**
+ * How long a remembered answer is trusted.
+ *
+ * Not forever, for two reasons that point the same way: the server may be upgraded under a
+ * desktop that stays open for weeks, and the shrunken budget a 413 leaves behind would
+ * otherwise never grow back even once the cause is gone.
+ */
+const LIMITS_TTL_MS = 60 * 60_000;
+
+/**
+ * What to send in one request to a server that has not told us its ceiling.
+ *
+ * Servers before 3.2.1 accepted a 2 MiB body and said so nowhere, so this stays under it. The
+ * cost of guessing low is an extra request; the cost of guessing high was a 413 that marked
+ * nothing, kept everything pending, and re-sent the identical batch every thirty seconds
+ * forever. One of those is a queue that drains slowly and the other is a queue that never
+ * drains at all.
+ */
+const SAFE_BATCH_BYTES = 1_500_000;
+
+async function limitsFor(vault: VaultSummary, token: string): Promise<RemoteLimits> {
+  const cached = remoteLimits.get(vault.id);
+  if (cached && Date.now() - cached.at < LIMITS_TTL_MS) return cached.limits;
+  const fallback: RemoteLimits = { maxMutationBytes: null, maxMutationBatchBytes: null, maxMutationBatch: 100 };
+  try {
+    const response = await request(`${normalizeUrl(vault.remote!.url)}/api/v1/capabilities`, { headers: { authorization: `Bearer ${token}` } });
+    if (!response.ok) return fallback;
+    const value = await response.json() as Partial<Record<keyof RemoteLimits, unknown>>;
+    const positive = (input: unknown): number | null => (typeof input === 'number' && Number.isFinite(input) && input > 0 ? input : null);
+    const limits: RemoteLimits = {
+      maxMutationBytes: positive(value.maxMutationBytes),
+      maxMutationBatchBytes: positive(value.maxMutationBatchBytes),
+      maxMutationBatch: positive(value.maxMutationBatch) ?? 100,
+    };
+    remoteLimits.set(vault.id, { limits, at: Date.now() });
+    return limits;
+  } catch {
+    // Offline. Not cached, so the next tick asks again.
+    return fallback;
+  }
+}
+
 /** Read the live row a queued entry points at, so what is sent is never a stale copy. */
 function readRow(db: Database.Database, table: string, rowKey: string): Record<string, unknown> | null {
   let key: unknown[];
@@ -348,8 +404,12 @@ export async function drainOutbox(vaultId: string): Promise<void> {
   runtime.rejectedMutations = counts.rejected;
   if (pending.length === 0) return;
 
+  const limits = await limitsFor(vault, token);
+  const batchBudget = limits.maxMutationBatchBytes ?? SAFE_BATCH_BYTES;
+
   const mutations = [];
   const sendable: string[] = [];
+  let batchBytes = 0;
   for (const entry of pending) {
     let key: unknown[];
     try { key = JSON.parse(entry.row_key) as unknown[]; } catch { continue; }
@@ -357,7 +417,7 @@ export async function drainOutbox(vaultId: string): Promise<void> {
     // An upsert whose row is gone was deleted after being queued; the delete entry that
     // replaced it carries the truth, so this one is simply dropped.
     if (entry.op === 'upsert' && !row) { markOutboxSent(db, [entry.id]); continue; }
-    mutations.push({
+    const mutation = {
       id: entry.id,
       clientId: clientIdFor(vaultId),
       kind: entry.op,
@@ -366,10 +426,34 @@ export async function drainOutbox(vaultId: string): Promise<void> {
       ...(entry.op === 'upsert' ? { row } : {}),
       schemaVersion: entry.schema_version,
       createdAt: entry.created_at,
-    });
+    };
+
+    // Measured here, where the row is in hand. A Deep Research report is one row carrying its
+    // whole markdown, so a queue of them is megabytes and counting entries says nothing about
+    // the size of the request they make.
+    const size = Buffer.byteLength(JSON.stringify(mutation), 'utf8');
+    if (limits.maxMutationBytes !== null && size > limits.maxMutationBytes) {
+      // Only when the server has actually told us its ceiling. Refusing a row locally against
+      // a guessed limit would throw away work the server would have taken.
+      markOutboxRejected(db, [entry.id], `Este cambio ocupa ${Math.round(size / 1024)} KB y el servidor acepta ${Math.round(limits.maxMutationBytes / 1024)} KB por fila.`);
+      continue;
+    }
+    if (mutations.length >= limits.maxMutationBatch) break;
+    // Always send at least one, so a row larger than a whole batch is still attempted rather
+    // than blocking everything queued behind it.
+    if (mutations.length > 0 && batchBytes + size > batchBudget) break;
+    batchBytes += size;
+    mutations.push(mutation);
     sendable.push(entry.id);
   }
-  if (mutations.length === 0) return;
+  if (mutations.length === 0) {
+    // Everything pending was refused locally for size. The counters still have to move, or
+    // the interface goes on showing changes as queued when nothing is going to be sent.
+    const afterRefusals = countOutbox(db);
+    runtime.pendingMutations = afterRefusals.pending;
+    runtime.rejectedMutations = afterRefusals.rejected;
+    return;
+  }
 
   try {
     const response = await request(
@@ -390,10 +474,28 @@ export async function drainOutbox(vaultId: string): Promise<void> {
       runtime.lastError = 'Faltan imágenes por subir antes de enviar estos cambios.';
       return;
     }
+    if (response.status === 413) {
+      // The batch was too big for this server as a whole. Nothing was stored and nothing is
+      // marked, so the work is safe; what must not happen is re-sending the identical batch
+      // every tick forever, which is exactly what this used to do. Halving the budget makes
+      // the queue converge on a size this server will take.
+      const shrunk = Math.max(64 * 1024, Math.floor(batchBudget / 2));
+      remoteLimits.set(vault.id, { limits: { ...limits, maxMutationBatchBytes: shrunk }, at: Date.now() });
+      runtime.lastError = `El servidor ha rechazado un envío de ${Math.round(batchBytes / 1024)} KB por tamaño. Se reintentará en envíos más pequeños.`;
+      return;
+    }
+    if (response.status === 507) {
+      // The space holds more undelivered changes than it is allowed to. Not a rejection: it
+      // clears when the owner opens Nodus and collects, so the queue is kept whole.
+      runtime.lastError = 'El espacio remoto acumula cambios que su propietario aún no ha recogido. Tus cambios se conservan y se reintentarán.';
+      return;
+    }
     if (!response.ok) throw new Error(`El servidor respondió con HTTP ${response.status}.`);
-    const value = await response.json() as { accepted?: string[]; duplicate?: string[]; rejected?: { id: string; reason: string }[] };
+    const value = await response.json() as { accepted?: string[]; duplicate?: string[]; rejected?: { id: string; reason: string; error_description?: string }[] };
     markOutboxSent(db, [...(value.accepted ?? []), ...(value.duplicate ?? [])]);
-    for (const rejection of value.rejected ?? []) markOutboxRejected(db, [rejection.id], rejection.reason);
+    // The server explains the reasons it can explain; the bare code is the fallback for the
+    // ones it cannot, and for servers that do not send an explanation at all.
+    for (const rejection of value.rejected ?? []) markOutboxRejected(db, [rejection.id], rejection.error_description ?? rejection.reason);
     pruneSentOutbox(db);
     const after = countOutbox(db);
     runtime.pendingMutations = after.pending;

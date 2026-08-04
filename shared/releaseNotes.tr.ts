@@ -40,7 +40,13 @@ const RELEASE_3_2_0_TR: string[] = [
   "Bir rapor oluşturmak artık pencereyi dondurmuyor. Nodus her rapor için bütün külliyatı birkaç kez tarıyor ve bu aramaların her biri sürdüğü müddetçe uygulamayı durduruyordu. Artık parça parça ilerliyorlar ve aralarında denetimi geri veriyorlar, böylece rapor yazılırken çalışmaya devam edebilirsiniz.",
 ];
 
+const RELEASE_3_2_1_TR: string[] = [
+  "Telefonda veya başka bir bilgisayarda yazılan bir Deep Research raporu artık kasaya ulaşıyor. Sunucu yalnızca 64 KB boyutundaki değişiklikleri kabul ediyordu ve on beş sayfalık bir rapor bunun neredeyse üç katı yer kaplıyor, bu yüzden her seferinde geri çevriliyordu. Sınır değişiklik başına 256 KB'ye çıkıyor ve sunucuyu yöneten kişi bunu ayarlayabilir.",
+  "Sunucunun kabul edemediği bir değişiklik artık nedenini açıklıyor. Önceden yalnızca çok büyük olduğunu söylüyor, ne kadar yer kapladığını da en fazla ne kadar olabileceğini de belirtmiyordu. Ayrıca tek bir gönderime sığmayan bir değişiklik kuyruğu sonsuza kadar takılı kalıyordu. Artık boşalana kadar daha küçük gönderimlere bölünüyor.",
+];
+
 export const RELEASE_NOTES_TR: Record<string, string[]> = {
+  "3.2.1": RELEASE_3_2_1_TR,
   "3.2.0": RELEASE_3_2_0_TR,
   "3.1.0": RELEASE_3_1_0_TR,
   "3.0.4": RELEASE_3_0_4_TR,
