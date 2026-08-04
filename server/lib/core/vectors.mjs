@@ -87,19 +87,45 @@ export function encodeVectorSet({ kind, provider, model, dim, entries }) {
   return Buffer.concat([headerLength, header, idsLength, idTable, matrix]);
 }
 
-export function searchVectors(set, queryVector, { limit = 20, threshold = 0 } = {}) {
+/**
+ * The arithmetic on its own: row numbers and scores, best first.
+ *
+ * Split out of `searchVectors` so a worker thread can run it without being handed the id
+ * table. The ids are thirty thousand strings for a real corpus, and structured-cloning them
+ * into the worker on every query would cost more than the dot products they accompany. The
+ * worker returns at most `limit` row numbers and the thread that owns the set resolves them.
+ */
+export function scoreVectors({ dim, count, matrix }, queryVector, { limit = 20, threshold = 0 } = {}) {
   const query = normalize(queryVector);
-  const { dim, count, matrix, ids } = set;
   const scored = [];
   for (let row = 0; row < count; row += 1) {
     let dot = 0;
     const base = row * dim;
     for (let column = 0; column < dim; column += 1) dot += query[column] * matrix[base + column];
     const score = dot / 127;
-    if (score >= threshold) scored.push({ id: ids[row], score });
+    if (score >= threshold) scored.push({ row, score });
   }
   scored.sort((a, b) => b.score - a.score);
   return scored.slice(0, limit);
+}
+
+export function searchVectors(set, queryVector, options = {}) {
+  return scoreVectors(set, queryVector, options).map(({ row, score }) => ({ id: set.ids[row], score }));
+}
+
+/**
+ * The same set with its matrix in shared memory.
+ *
+ * A decoded set views the file buffer, which belongs to the thread that read it. Copying it
+ * once into a `SharedArrayBuffer` lets every worker read the matrix in place: a query then
+ * posts a handle rather than thirty-three megabytes, so the cost of using a worker at all
+ * does not grow with the corpus. The copy happens once per published matrix, not per query.
+ */
+export function withSharedMatrix(set) {
+  if (set.matrix.buffer instanceof SharedArrayBuffer) return set;
+  const shared = new Int8Array(new SharedArrayBuffer(set.matrix.length));
+  shared.set(set.matrix);
+  return { ...set, matrix: shared };
 }
 
 /**

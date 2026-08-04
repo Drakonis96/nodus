@@ -95,7 +95,7 @@ function serverEnvironment(overrides = {}) {
   for (const name of [
     'NODUS_ADMIN_EMAIL', 'NODUS_ADMIN_PASSWORD', 'NODUS_ADMIN_EMAIL_FILE', 'NODUS_ADMIN_PASSWORD_FILE',
     'NODUS_SETUP_TOKEN', 'NODUS_PUBLIC_URL', 'NODUS_DATA_DIR', 'NODUS_HOST', 'NODUS_PORT',
-    'NODUS_MAX_SNAPSHOT_BYTES', 'NODUS_MAX_SNAPSHOT_JSON_BYTES',
+    'NODUS_MAX_SNAPSHOT_BYTES', 'NODUS_MAX_SNAPSHOT_JSON_BYTES', 'NODUS_VECTOR_WORKERS',
   ]) delete env[name];
   return { ...env, ...overrides };
 }

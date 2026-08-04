@@ -262,6 +262,16 @@ the other. An AI client reads; only an application can write.
   semantic search. A client whose embedding provider does not match the published one is told so
   explicitly and given a lexical fallback, never a silent empty list.
 
+A semantic query compares the posted vector against every vector in the space, which for a corpus
+of thirty thousand passages is around 200 ms of arithmetic. That work runs on worker threads, so
+the rest of the server keeps answering while it happens; the matrix is shared between them rather
+than copied, so the threads cost no extra memory.
+
+- `NODUS_VECTOR_WORKERS`: how many threads do that arithmetic. Left unset it is one, or two where
+  there are cores to spare. `0` runs the search inline on the main thread, which blocks every other
+  request for the duration and exists only as an escape hatch. Anything that is not a whole number
+  of threads between 0 and 64 stops the boot rather than quietly falling back to a default.
+
 ### Images, and what never travels
 
 Documents never reach the server. No PDFs, no audio, no recordings. Three kinds of image do: the
