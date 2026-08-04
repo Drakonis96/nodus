@@ -2754,6 +2754,8 @@ export const FR: Record<string, string> = {
   'Aún no hay informes. Crea el primero y quedará aquí, listo para leerse a pantalla completa.':
     'Aucun rapport pour l\'instant. Créez le premier et il restera ici, prêt à être lu en plein écran.',
   'Cola de generación · {n} en curso': 'File de génération · {n} en cours',
+  'En cola · {n} por delante': 'En file · {n} devant',
+  'Progreso del informe en curso': 'Progression du rapport en cours',
   'Limpiar fallidos': 'Effacer les échecs',
   'pág.': 'p.',
   'Pedido desde un cliente MCP': 'Demandé depuis un client MCP',

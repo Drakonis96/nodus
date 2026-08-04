@@ -2824,6 +2824,8 @@ export const EN: Record<string, string> = {
   'Aún no hay informes. Crea el primero y quedará aquí, listo para leerse a pantalla completa.':
     'No reports yet. Create the first one and it will live here, ready to read full-screen.',
   'Cola de generación · {n} en curso': 'Generation queue · {n} in progress',
+  'En cola · {n} por delante': 'Queued · {n} ahead',
+  'Progreso del informe en curso': 'Progress of the report being generated',
   'Limpiar fallidos': 'Clear failed',
   'pág.': 'pp.',
   'Pedido desde un cliente MCP': 'Requested from an MCP client',

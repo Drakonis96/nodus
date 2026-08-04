@@ -321,7 +321,17 @@ export async function orchestrateGenealogyDeepResearch(
     const isConclusion = i === plan.sections.length - 1;
     const targetWords = clamp(Math.round(maxWords / Math.max(sectionTarget, 1)), SECTION_WORDS.min, SECTION_WORDS.max);
 
-    emit({ phase: 'section', message: `Redactando: ${section.title}`, sectionIndex: written.length + 1, sectionTitle: section.title, wordsSoFar: totalWords, pagesSoFar: pages(totalWords) });
+    emit({
+      phase: 'section',
+      message: `Redactando: ${section.title}`,
+      sectionIndex: written.length + 1,
+      // What the progress bar divides by. The plan is the honest denominator: the
+      // caps above can end the report early, but never make it longer.
+      sectionTotal: Math.min(plan.sections.length, sectionHardCap),
+      sectionTitle: section.title,
+      wordsSoFar: totalWords,
+      pagesSoFar: pages(totalWords),
+    });
 
     // Dynamic full text: pull each assigned source's full text (docs stored; works
     // resolved now), clipped per document and per section.
