@@ -278,9 +278,11 @@ the other. An AI client reads; only an application can write.
   explicitly and given a lexical fallback, never a silent empty list.
 
 A semantic query compares the posted vector against every vector in the space, which for a corpus
-of thirty thousand passages is around 200 ms of arithmetic. That work runs on worker threads, so
-the rest of the server keeps answering while it happens; the matrix is shared between them rather
-than copied, so the threads cost no extra memory.
+of 33,000 passages at 1024 dimensions is 52 ms of arithmetic on an idle laptop and several times
+that on a busy machine. That work runs on worker threads, so the rest of the server keeps answering
+while it happens; the matrix is shared between them rather than copied, so the threads cost no
+extra memory. `scripts/bench-server-search.mjs` measures the difference against a real server: with
+eight concurrent searches on that corpus it answered 14 health checks inline and 873 on threads.
 
 - `NODUS_VECTOR_WORKERS`: how many threads do that arithmetic. Left unset it is one, or two where
   there are cores to spare. `0` runs the search inline on the main thread, which blocks every other

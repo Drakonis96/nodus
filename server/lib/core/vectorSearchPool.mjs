@@ -1,11 +1,14 @@
 // Keeping semantic search off the event loop.
 //
 // The server is one Node process with one event loop, and a semantic query is a brute-force
-// pass over the whole corpus matrix: measured at 195 ms for 33,016 passages at 1024
-// dimensions. Run on the main thread that is 195 ms in which nothing else is answered — a
-// health check, a phone opening a screen, somebody else's search, all of it waits. A class
-// of thirty asking at once turned a 200 ms operation into a six-second stall for every
-// unrelated request on the server.
+// pass over the whole corpus matrix: 52 ms for 33,016 passages at 1024 dimensions on an idle
+// laptop, and several times that on a machine with anything else to do — the same call
+// measured 195 ms on a host under load, which is exactly when a class is using the server.
+// Run on the main thread that is 52 ms in which nothing else is answered: a health check, a
+// phone opening a screen, somebody else's search, all of it waits.
+//
+// scripts/bench-server-search.mjs measures what that costs. Eight concurrent searches against
+// that corpus, while polling /healthz: 14 health checks answered inline, 873 on threads.
 //
 // So the arithmetic moves to worker threads and the main loop stays free. The matrix is
 // shared rather than copied (see `withSharedMatrix`), so posting a job costs the same whether

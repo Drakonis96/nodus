@@ -1,9 +1,10 @@
 // One thread that does nothing but multiply.
 //
-// Its whole reason to exist is that `scoreVectors` over a real corpus takes around 200 ms of
-// straight-line arithmetic, and Node runs one event loop: on the main thread that is 200 ms
-// in which the server answers nobody — not the phone loading a screen, not the health check,
-// not another person's search. Here it costs the requester its own latency and nobody else's.
+// Its whole reason to exist is that `scoreVectors` over a real corpus is tens of milliseconds
+// of straight-line arithmetic — 52 ms for 33,016 passages at 1024 dimensions on an idle
+// laptop — and Node runs one event loop: on the main thread that is 52 ms in which the server
+// answers nobody, not the phone loading a screen, not the health check, not another person's
+// search. Here it costs the requester its own latency and nobody else's.
 //
 // The worker holds no state. The matrix arrives as a `SharedArrayBuffer` handle, which is not
 // copied, so a job message is a few kilobytes whatever the corpus weighs.

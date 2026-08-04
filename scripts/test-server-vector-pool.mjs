@@ -1,9 +1,11 @@
 // Semantic search must not stop the server.
 //
-// A brute-force pass over a real corpus matrix is around 200 ms of straight-line arithmetic.
-// Run on the main thread it is 200 ms in which this process answers nothing at all: not the
-// health check the container polls every 30 s, not a phone opening a screen, not a second
-// person's search. That is the defect these tests describe.
+// A brute-force pass over a real corpus matrix is tens of milliseconds of straight-line
+// arithmetic: 52 ms for 33,016 passages at 1024 dimensions on an idle laptop, and 195 ms for
+// the same call on a host under load. Run on the main thread that is time in which this
+// process answers nothing at all: not the health check the container polls every 30 s, not a
+// phone opening a screen, not a second person's search. That is the defect these tests
+// describe.
 //
 // The measurement is not a stopwatch. A heartbeat on the macrotask queue counts how many
 // times the event loop came around while the search was in flight, which is a count of the
