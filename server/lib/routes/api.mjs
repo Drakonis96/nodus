@@ -48,6 +48,11 @@ export function createApiRoutes(ctx) {
           updatedAt: space.updatedAt,
           revision: space.revision ?? '',
           schemaVersion: space.schemaVersion ?? 0,
+          // How far the owner has acknowledged. A sender keeps the cursor its own POST
+          // returned and compares, which is what lets a phone say "delivered" rather than
+          // only "on the server". Readable by any member, and it reveals nothing but a
+          // count. Only meaningful because nextSeq is seeded from this same value.
+          mutationCursor: Number(space.mutationCursor || 0),
           hasSnapshot: Boolean(space.updatedAt),
         };
       })

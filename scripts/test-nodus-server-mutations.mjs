@@ -123,6 +123,14 @@ test('the ledger is append-only, idempotent, and compacts on acknowledgement', a
     assert.deepEqual(ledger.readAll(store, spaceId).map((entry) => entry.id), ['c']);
     assert.equal(ledger.compact(store, spaceId, 3), 0);
     assert.deepEqual(ledger.readAll(store, spaceId), []);
+
+    // Emptying the ledger DELETES the file, so numbering used to restart at 1 here. That
+    // is only invisible while nobody remembers a cursor — and spacesFor now publishes one,
+    // so a sender that had been told "delivered up to 3" would read the next three brand
+    // new mutations as already delivered. nextSeq is seeded from the acknowledged cursor.
+    store.state.spaces.push({ id: spaceId, name: 'Ledger', mutationCursor: 3 });
+    const afterCompaction = ledger.append(store, spaceId, [{ id: 'd' }]);
+    assert.equal(afterCompaction[0].seq, 4, 'a compacted ledger must not reissue sequence numbers');
   } finally {
     await rm(root, { recursive: true, force: true });
   }
