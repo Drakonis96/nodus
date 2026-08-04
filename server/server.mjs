@@ -8,6 +8,7 @@ import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import { gunzipSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { Store, digest, pairingCode, token } from './lib/store.mjs';
+import { SnapshotCache } from './lib/snapshotCache.mjs';
 import { body, contentSecurityPolicy, cookies, escapeHtml, form, html, json, jsonBody, redirect } from './lib/http.mjs';
 import { normalizeServerLanguage, serverTranslator } from './lib/i18n.mjs';
 import { helpTip, languagePicker, nodusMark, WEB_STYLES } from './lib/webUi.mjs';
@@ -96,13 +97,23 @@ const MAX_VECTOR_BYTES = byteLimit('NODUS_MAX_VECTOR_BYTES', 512 * 1024 * 1024, 
  */
 const ASSET_GRACE_MS = 24 * 60 * 60_000;
 const store = new Store(DATA_DIR);
-const snapshotCache = new Map();
 /**
- * A parsed snapshot can be hundreds of megabytes. MCP touched it rarely; the REST API is hit
- * on every screen a phone opens, so the cache needs a ceiling or a server with several large
- * spaces runs itself out of memory.
+ * How much expanded publication the parsed-snapshot cache may hold.
+ *
+ * A parsed snapshot is the largest thing this process ever holds — 331 MB of heap for a real
+ * academic corpus of 1,214 works — so the cache needs a ceiling. It used to be a count of
+ * three, which is a different amount of memory for every deployment that has ever run this
+ * server: a gigabyte for that corpus, and a needless eviction for anybody with eight small
+ * spaces. The budget is measured in expanded JSON bytes, and the heap it implies is roughly
+ * 3.3x that. 128 MiB therefore holds one very large space or a dozen ordinary ones; raise it
+ * on a machine that has the memory and several large spaces to serve.
  */
-const MAX_CACHED_SNAPSHOTS = Math.max(1, Number(process.env.NODUS_MAX_CACHED_SNAPSHOTS || 3));
+const MAX_SNAPSHOT_CACHE_BYTES = byteLimit('NODUS_MAX_SNAPSHOT_CACHE_BYTES', 128 * 1024 * 1024, bufferLimits.MAX_LENGTH);
+if (String(process.env.NODUS_MAX_CACHED_SNAPSHOTS ?? '').trim()) {
+  // Silently ignoring it would leave an operator believing they had capped this process.
+  throw new Error('NODUS_MAX_CACHED_SNAPSHOTS has been replaced by NODUS_MAX_SNAPSHOT_CACHE_BYTES, which bounds the cache by the memory it uses instead of by a count of snapshots of any size.');
+}
+const snapshotCache = new SnapshotCache(MAX_SNAPSHOT_CACHE_BYTES);
 const rateBuckets = new Map();
 const SCOPES = new Set(['profile', 'spaces.read', 'materials.read', 'materials.write', 'assets.read']);
 const MCP_PROTOCOLS = new Set(['2025-11-25', '2025-06-18', '2025-03-26']);
@@ -400,21 +411,17 @@ function readSnapshot(spaceId) {
   const target = store.snapshotPath(spaceId);
   if (!fs.existsSync(target)) return null;
   const stat = fs.statSync(target);
-  const cached = snapshotCache.get(spaceId);
-  if (cached?.mtimeMs === stat.mtimeMs) return cached.value;
+  const cached = snapshotCache.get(spaceId, stat.mtimeMs);
+  if (cached) return cached;
   // Stored publications passed the publish-time limit already, so read them against
   // the hard ceiling: lowering NODUS_MAX_SNAPSHOT_JSON_BYTES must not make a space
   // that is already on disk unreadable to every MCP client.
-  const value = JSON.parse(gunzipSync(fs.readFileSync(target), { maxOutputLength: bufferLimits.MAX_STRING_LENGTH }).toString('utf8'));
-  snapshotCache.set(spaceId, { mtimeMs: stat.mtimeMs, value });
-  // Insertion-ordered Map, so the first key is the least recently loaded. Without this the
-  // cache is unbounded, and a server holding several large spaces would grow until the REST
-  // API — which reads a snapshot on every request, unlike MCP — exhausted its memory.
-  while (snapshotCache.size > MAX_CACHED_SNAPSHOTS) {
-    const oldest = snapshotCache.keys().next().value;
-    if (oldest === spaceId) break;
-    snapshotCache.delete(oldest);
-  }
+  const json = gunzipSync(fs.readFileSync(target), { maxOutputLength: bufferLimits.MAX_STRING_LENGTH });
+  const value = JSON.parse(json.toString('utf8'));
+  // The expanded length is what the cache charges this space, which is why it is measured
+  // here rather than guessed from the size of the file on disk: gzip on this shape ranges
+  // from four to fifteen times depending on how much of it is prose.
+  snapshotCache.set(spaceId, stat.mtimeMs, value, json.length);
   return value;
 }
 

@@ -219,6 +219,21 @@ stops the boot instead of making every publication fail. When a vault no longer 
 says how large it is and which switch to turn off ("Include extracted passages" is usually most of
 the weight).
 
+A third limit bounds how much of that the running process keeps in memory. Parsing a publication
+takes around a second for a large space, so the server caches the parsed object; the parsed object
+is also the biggest thing it ever holds, roughly 3.3 times the expanded JSON.
+
+- `NODUS_MAX_SNAPSHOT_CACHE_BYTES`: how much expanded publication may be cached at once, 128 MiB by
+  default, which is one very large space or a dozen ordinary ones. Least recently used goes first,
+  and the space that was just read is never the one dropped — a corpus larger than the whole budget
+  stays servable, it simply leaves no room for a second one. Raise it on a machine with the memory
+  and several large spaces to serve.
+
+This replaces `NODUS_MAX_CACHED_SNAPSHOTS`, which kept three snapshots of any size: three is a
+gigabyte for a large academic corpus and a needless eviction for a server with eight small spaces.
+A deployment that still sets it is stopped at boot rather than left believing it had capped
+anything.
+
 ## Access levels
 
 A membership grants one of three levels in one space. An account can hold a different level in each
@@ -261,6 +276,18 @@ the other. An AI client reads; only an application can write.
 - `PUT /api/v1/spaces/:id/vectors` (owner) and `POST .../search/semantic` — quantized embeddings for
   semantic search. A client whose embedding provider does not match the published one is told so
   explicitly and given a lexical fallback, never a silent empty list.
+
+A semantic query compares the posted vector against every vector in the space, which for a corpus
+of 33,000 passages at 1024 dimensions is 52 ms of arithmetic on an idle laptop and several times
+that on a busy machine. That work runs on worker threads, so the rest of the server keeps answering
+while it happens; the matrix is shared between them rather than copied, so the threads cost no
+extra memory. `scripts/bench-server-search.mjs` measures the difference against a real server: with
+eight concurrent searches on that corpus it answered 14 health checks inline and 873 on threads.
+
+- `NODUS_VECTOR_WORKERS`: how many threads do that arithmetic. Left unset it is one, or two where
+  there are cores to spare. `0` runs the search inline on the main thread, which blocks every other
+  request for the duration and exists only as an escape hatch. Anything that is not a whole number
+  of threads between 0 and 64 stops the boot rather than quietly falling back to a default.
 
 ### Images, and what never travels
 

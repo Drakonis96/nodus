@@ -32,7 +32,13 @@ const RELEASE_3_1_0_TR: string[] = [
   "Gizlilik politikasının gömmeler hakkında söylediğini düzelttik. Asla yüklenmediklerini söylüyordu ve paylaşılan anlamsal arama geldiğinden beri bu artık doğru değildi. Fikirlerin vektörleri gerçekten yolculuk ediyor, böylece bir kopyadan ya da telefondan anlama göre arama yapabiliyorsunuz. Belge artık bunu söylüyor ve yeni bir düğme, «Anlamsal vektörleri dahil et», bunu gerçekten durduruyor. Ayrıca paylaşılan bir çalışma ya da öğretim kasası artık ders kayıtlarını, denemeleri ve notları göndermiyor.",
 ];
 
+const RELEASE_3_2_0_TR: string[] = [
+  "Bir Nodus sunucusunda anlama göre arama yapmak artık sunucuyu başka kimseye yanıt veremez hâle getirmiyor. Şimdiye kadar bir arama hesaplanırken diğer bütün istekler sırasını bekliyordu. Bu hesaplama artık ayrı iş parçacıklarında çalışıyor ve sunucu yanıt vermeyi sürdürüyor. Özellikle birkaç kişi aynı anda sorguladığında fark ediliyor.",
+  "Sunucu artık körlemesine bellek ayırmıyor. Boyutu ne olursa olsun yayımlanmış üç kasayı bellekte tutuyordu, bu da büyük bir külliyatta bir gigabaytı aşıyordu. Sınır artık kasa sayısıyla değil bellekle ölçülüyor. Sunucuyu yöneten kişi, makinesinde yer varsa bu sınırı yükseltebilir.",
+];
+
 export const RELEASE_NOTES_TR: Record<string, string[]> = {
+  "3.2.0": RELEASE_3_2_0_TR,
   "3.1.0": RELEASE_3_1_0_TR,
   "3.0.4": RELEASE_3_0_4_TR,
   "3.0.3": RELEASE_3_0_3_TR,

@@ -13,7 +13,8 @@ import { MAX_MUTATION_BATCH, validateMutation } from '../core/mutations.mjs';
 import {
   MAX_NODI_NOTES, mergeNodiNotes, notesSince, validateNodiNote,
 } from '../core/nodiNotes.mjs';
-import { decodeVectorSet, embeddingMatches, searchVectors } from '../core/vectors.mjs';
+import { decodeVectorSet, embeddingMatches } from '../core/vectors.mjs';
+import { searchVectorsOffThread } from '../core/vectorSearchPool.mjs';
 import { lexicalSearch } from '../core/search.mjs';
 import { rows } from '../core/snapshot.mjs';
 import { NODUS_VERSION } from '../version.mjs';
@@ -326,7 +327,9 @@ export function createApiRoutes(ctx) {
       json(res, 400, { error: 'bad_vector', error_description: `This space is indexed at ${set.dim} dimensions and the query vector has ${vector.length}.` });
       return true;
     }
-    const matches = searchVectors(set, vector, {
+    // Off the event loop: the dot products are the one piece of work here that is measured in
+    // hundreds of milliseconds, and every other request on the server waits behind it.
+    const matches = await searchVectorsOffThread(set, vector, {
       limit: Math.max(1, Math.min(100, Number(input.limit) || 20)),
       threshold: Number.isFinite(Number(input.threshold)) ? Number(input.threshold) : 0,
     });
