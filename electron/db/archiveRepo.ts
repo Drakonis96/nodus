@@ -6,6 +6,7 @@
 import { getDb } from './database';
 import { v4 as uuid } from 'uuid';
 import { currentEmbeddingConfig, encodeEmbedding } from './ideasRepo';
+import { scanSimilar } from './vectorScan';
 import { sanitizeDocMetadata, extractItemYear } from '@shared/archiveDocTypes';
 import { archiveEmbeddingText } from '@shared/archiveDiscovery';
 import { applyArchiveFilters, sortArchiveItems } from '@shared/archiveFilters';
@@ -687,14 +688,18 @@ export function archiveEmbeddingCount(): { indexed: number; total: number } {
 }
 
 /**
- * Archive items most similar to a query vector, computed inside SQLite via vec_cosine.
- * Optionally excludes items already linked to a given person (so discovery only ever
- * proposes NEW links). Returns metadata items plus their similarity, strongest first.
+ * Archive items most similar to a query vector. Optionally excludes items already
+ * linked to a given person (so discovery only ever proposes NEW links). Returns
+ * metadata items plus their similarity, strongest first.
+ *
+ * Paged, like every other similarity search (see ./vectorScan.ts): the archive has
+ * no vector index either, so scanning it in one go held the main process for as long
+ * as the scan took, with the window frozen behind it.
  */
-export function findArchiveItemsSimilar(
+export async function findArchiveItemsSimilar(
   queryVec: number[],
   opts: { limit?: number; minSimilarity?: number; excludePersonId?: string; excludeItemIds?: string[] } = {}
-): (ArchiveItem & { similarity: number })[] {
+): Promise<(ArchiveItem & { similarity: number })[]> {
   const limit = opts.limit ?? 8;
   const minSim = opts.minSimilarity ?? 0.35;
   if (queryVec.length === 0) return [];
@@ -705,7 +710,7 @@ export function findArchiveItemsSimilar(
     'embedding_model = ?',
     'embedding_dim = ?',
   ];
-  const params: unknown[] = [encodeEmbedding(queryVec), config.provider, config.model, queryVec.length];
+  const params: unknown[] = [config.provider, config.model, queryVec.length];
   if (opts.excludePersonId) {
     where.push('item_id NOT IN (SELECT item_id FROM archive_item_persons WHERE person_id = ?)');
     params.push(opts.excludePersonId);
@@ -714,16 +719,19 @@ export function findArchiveItemsSimilar(
     where.push(`item_id NOT IN (${opts.excludeItemIds.map(() => '?').join(',')})`);
     params.push(...opts.excludeItemIds);
   }
-  const rows = getDb()
-    .prepare(
-      `SELECT item_id, vec_cosine(embedding, ?) AS similarity
-       FROM archive_items WHERE ${where.join(' AND ')}
-       ORDER BY similarity DESC LIMIT ?`
-    )
-    .all(...params, limit * 2) as { item_id: string; similarity: number }[];
+  const ranked = await scanSimilar<{ item_id: string; rid: number; similarity: number }>({
+    table: 'archive_items',
+    sql: `SELECT item_id, rowid AS rid, vec_scan(embedding) AS similarity
+            FROM archive_items
+           WHERE rowid > ? AND rowid <= ? AND ${where.join(' AND ')}`,
+    params,
+    query: queryVec,
+    // Twice the asked-for count, as before: some winners have no metadata row left.
+    threshold: minSim,
+    limit: limit * 2,
+  });
   const out: (ArchiveItem & { similarity: number })[] = [];
-  for (const r of rows) {
-    if (r.similarity < minSim) continue;
+  for (const r of ranked) {
     const item = getItem(r.item_id);
     if (item) out.push({ ...item, similarity: r.similarity });
     if (out.length >= limit) break;

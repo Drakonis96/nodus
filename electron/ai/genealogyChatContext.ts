@@ -137,7 +137,7 @@ export async function buildGenealogyContext(question: string): Promise<Genealogy
   };
   for (const p of relevant) for (const item of listItemsForPerson(p.personId)) addDoc(item);
   const qVec = question.trim() ? await embed(question.trim()) : null;
-  if (qVec) for (const item of findArchiveItemsSimilar(qVec, { limit: MAX_DOCUMENTS, minSimilarity: 0.25 })) addDoc(item);
+  if (qVec) for (const item of await findArchiveItemsSimilar(qVec, { limit: MAX_DOCUMENTS, minSimilarity: 0.25 })) addDoc(item);
   // Backfill with recent documents so an empty question still has material.
   if (documentos.length < 6) for (const item of listItems({}).slice(0, MAX_DOCUMENTS)) addDoc(item);
 

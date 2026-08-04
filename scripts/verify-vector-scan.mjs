@@ -173,6 +173,31 @@ const CASES = [
         limit,
       }),
   },
+  {
+    name: 'archive items',
+    id: 'item_id',
+    limit: 16,
+    embeddedFrom: 'archive_items',
+    blocking: (buf, cfg, limit) =>
+      db
+        .prepare(
+          `SELECT item_id, vec_cosine(embedding, ?) AS similarity FROM archive_items
+            WHERE embedding IS NOT NULL AND embedding_provider = ? AND embedding_model = ? AND embedding_dim = ?
+            ORDER BY similarity DESC LIMIT ?`
+        )
+        .all(buf, cfg.provider, cfg.model, cfg.dim, limit),
+    paged: (vector, cfg, limit) =>
+      scanModule.scanSimilar({
+        table: 'archive_items',
+        sql: `SELECT item_id, rowid AS rid, vec_scan(embedding) AS similarity FROM archive_items
+               WHERE rowid > ? AND rowid <= ? AND embedding IS NOT NULL
+                 AND embedding_provider = ? AND embedding_model = ? AND embedding_dim = ?`,
+        params: [cfg.provider, cfg.model, cfg.dim],
+        query: vector,
+        threshold: -1,
+        limit,
+      }),
+  },
 ];
 
 console.log(`vault: ${file}\n`);

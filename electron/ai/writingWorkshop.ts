@@ -25,7 +25,7 @@ import { completeJson } from './aiClient';
 import { embed, embedMany } from './aiClient';
 import { findSimilarIdeasPaged } from '../db/ideasRepo';
 import { findSimilarWorksPaged } from '../db/workSummariesRepo';
-import { findSimilarPassages, findSimilarPassagesPaged, type SimilarPassage } from '../db/passagesRepo';
+import { findSimilarPassagesPaged, type SimilarPassage } from '../db/passagesRepo';
 
 const MAX_IDEAS = 120;
 const MAX_THEMES = 30;
@@ -1097,7 +1097,7 @@ async function selectedPassagesForDraft(
       const work = passage.obra;
       if (work && typeof work === 'object' && 'id' in work && typeof work.id === 'string') scope.add(work.id);
     }
-    const hits = findSimilarPassages(query, 0.18, 12, scope.size ? { nodusIds: [...scope] } : {});
+    const hits = await findSimilarPassagesPaged(query, 0.18, 12, scope.size ? { nodusIds: [...scope] } : {});
     for (const hit of hits) {
       if (!byId.has(hit.passage_id)) byId.set(hit.passage_id, passageContext(hit));
     }

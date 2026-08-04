@@ -2514,7 +2514,7 @@ export function registerTools(server: McpServer): void {
             'No embeddings available. Configure the embedding provider and key in Nodus Settings.'
           );
         }
-        const hits = archive.findArchiveItemsSimilar(vector, { limit, minSimilarity });
+        const hits = await archive.findArchiveItemsSimilar(vector, { limit, minSimilarity });
         const folderNames = archiveFolderNames();
         const embedding = archive.archiveEmbeddingCount();
         return {

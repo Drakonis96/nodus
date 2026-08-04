@@ -100,9 +100,12 @@ export function findSimilarPassages(
 export async function findSimilarPassagesPaged(
   queryEmbedding: number[],
   threshold: number,
-  limit: number
+  limit: number,
+  opts: { nodusIds?: string[] } = {}
 ): Promise<SimilarPassage[]> {
   const config = currentEmbeddingConfig();
+  const nodusIds = [...new Set(opts.nodusIds ?? [])];
+  const scoped = nodusIds.length ? ` AND p.nodus_id IN (${nodusIds.map(() => '?').join(',')})` : '';
   const ranked = await scanSimilar<{ passage_id: string; rid: number; similarity: number }>({
     table: 'passages',
     sql: `SELECT p.passage_id, p.rowid AS rid, vec_scan(p.embedding) AS similarity
@@ -114,8 +117,8 @@ export async function findSimilarPassagesPaged(
              AND (w.deep_hash IS NULL OR p.content_hash = w.deep_hash)
              AND p.embedding_provider = ?
              AND p.embedding_model = ?
-             AND p.embedding_dim = ?`,
-    params: [config.provider, config.model, queryEmbedding.length],
+             AND p.embedding_dim = ?${scoped}`,
+    params: [config.provider, config.model, queryEmbedding.length, ...nodusIds],
     query: queryEmbedding,
     threshold,
     limit,

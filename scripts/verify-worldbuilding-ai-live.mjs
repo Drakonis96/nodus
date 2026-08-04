@@ -161,7 +161,7 @@ try {
   assert.deepEqual(archiveDiscovery.archiveIndexStatus(), { indexed: 2, total: 2 });
   const archiveQuery = await retryOnce(() => aiClient.embed('cartógrafa que navega para encontrar a su hermana'));
   assert.ok(archiveQuery?.length);
-  const retrieved = archiveRepo.findArchiveItemsSimilar(archiveQuery, { limit: 2, minSimilarity: 0 });
+  const retrieved = await archiveRepo.findArchiveItemsSimilar(archiveQuery, { limit: 2, minSimilarity: 0 });
   assert.equal(retrieved[0]?.itemId, loreDocument.itemId);
   record('embedding_indexing_and_semantic_retrieval', {
     indexed: archiveIndex.indexed,

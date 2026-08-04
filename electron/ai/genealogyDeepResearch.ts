@@ -171,7 +171,7 @@ export async function buildGenealogySourcePool(objective: string, focusPersonId?
 
   const queryText = focusPerson ? `${objective.trim()}\n${focusPerson.displayName}`.trim() : objective.trim();
   const objVec = queryText ? await embed(queryText) : null;
-  if (objVec) for (const item of findArchiveItemsSimilar(objVec, { limit: MAX_DOC_SOURCES, minSimilarity: 0.2 })) addDoc(item);
+  if (objVec) for (const item of await findArchiveItemsSimilar(objVec, { limit: MAX_DOC_SOURCES, minSimilarity: 0.2 })) addDoc(item);
   // Fallback / backfill: recent documents so the report always has primary material.
   for (const item of listItems({}).slice(0, MAX_DOC_SOURCES)) addDoc(item);
 

@@ -195,7 +195,7 @@ export async function buildPrimarySourcesChatContext(question: string): Promise<
   try {
     const vector = question.trim() ? await embed(question.trim()) : null;
     if (vector) {
-      const similar = findArchiveItemsSimilar(vector, { limit: MAX_SOURCES * 2, minSimilarity: 0.25 });
+      const similar = await findArchiveItemsSimilar(vector, { limit: MAX_SOURCES * 2, minSimilarity: 0.25 });
       semanticAvailable = similar.length > 0;
       for (const item of similar) {
         if (!externallySafe(sourceRow(item.itemId))) continue;

@@ -78,7 +78,7 @@ try {
   archive.setItemEmbedding(censo.itemId, [1, 0, 0], 'openrouter', 'test-model', 'h1');
   archive.setItemEmbedding(cartaRosa.itemId, [0, 1, 0], 'openrouter', 'test-model', 'h2');
   assert.equal(archive.getItem(censo.itemId).hasEmbedding, true, 'embedding flag surfaces on the item');
-  const near = archive.findArchiveItemsSimilar([0.9, 0.1, 0], { limit: 5, minSimilarity: 0.5 });
+  const near = await archive.findArchiveItemsSimilar([0.9, 0.1, 0], { limit: 5, minSimilarity: 0.5 });
   assert.equal(near[0].itemId, censo.itemId, 'nearest item by cosine similarity is the padrón');
   assert.ok(near[0].similarity > 0.9);
   const status = archive.archiveEmbeddingCount();
@@ -91,7 +91,7 @@ try {
   archive.updateItem(censo.itemId, { description: 'Descripción revisada' });
   assert.equal(archive.getItem(censo.itemId).hasEmbedding, false, 'semantic source edit clears the embedding');
   assert.ok(
-    !archive.findArchiveItemsSimilar([1, 0, 0], { limit: 5, minSimilarity: 0 }).some((item) => item.itemId === censo.itemId),
+    !(await archive.findArchiveItemsSimilar([1, 0, 0], { limit: 5, minSimilarity: 0 })).some((item) => item.itemId === censo.itemId),
     'stale vector cannot remain in retrieval'
   );
   archive.setItemEmbedding(censo.itemId, [1, 0, 0], 'openrouter', 'test-model', 'h1-reindexed');
@@ -99,7 +99,7 @@ try {
   // A vector from another provider/model is stale data, not a partial-coordinate
   // neighbour. It must disappear from both ranking and the coverage counter.
   archive.setItemEmbedding(cartaRosa.itemId, [1, 0], 'openai', 'test-model', 'h2-old-provider');
-  assert.equal(archive.findArchiveItemsSimilar([1, 0, 0], { limit: 5, minSimilarity: 0 }).length, 1);
+  assert.equal((await archive.findArchiveItemsSimilar([1, 0, 0], { limit: 5, minSimilarity: 0 })).length, 1);
   assert.equal(archive.archiveEmbeddingCount().indexed, 1);
 
   console.log('Archive discovery test passed!');

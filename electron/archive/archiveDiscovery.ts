@@ -149,7 +149,7 @@ export async function suggestDocumentsForPerson(personId: string): Promise<Docum
   const profile = personProfileText({ name: person.displayName, variants, birthDate: person.birthDate, deathDate: person.deathDate, events, places });
   const vec = profile ? await embed(profile) : null;
   if (vec) {
-    const similar = findArchiveItemsSimilar(vec, {
+    const similar = await findArchiveItemsSimilar(vec, {
       limit: 8,
       excludePersonId: personId,
       excludeItemIds: [...matched],
