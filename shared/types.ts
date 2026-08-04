@@ -3828,6 +3828,40 @@ export interface NodusServerConnection {
   lastSyncAt: string | null;
   lastError: string | null;
   lastBytes: number | null;
+  /** What the last collection from the mutation ledger did; null until one has run. */
+  lastInbox: { applied: number; deleted: number; keptLocal: number; refused: number } | null;
+}
+
+/**
+ * One thing that arrived from another device, and what this desktop did with it.
+ *
+ * PER VAULT, unlike the phone's outbox, which is deliberately global: an entry belongs to
+ * the vault it landed in, and lives in that vault's own database. Switching vaults
+ * therefore shows a different Inbox, which is the truth — the mutation was applied to one
+ * corpus and to no other.
+ */
+export interface ServerInboxEntry {
+  /** The mutation's id. A retry carries the same one, which is what makes recording idempotent. */
+  id: string;
+  seq: number;
+  spaceId: string | null;
+  /** Which DEVICE sent it. The server never attributes a mutation to a person. */
+  clientId: string | null;
+  table: string;
+  /** The row's identity, decoded from the stored JSON. */
+  key: unknown[];
+  op: 'upsert' | 'delete';
+  outcome: 'applied' | 'deleted' | 'kept_local' | 'refused';
+  reason: string | null;
+  /** The row's own name when it has one, so the panel need not show a raw key. */
+  title: string | null;
+  entityKind: string | null;
+  schemaVersion: number | null;
+  /** When the sending device wrote it. */
+  createdAt: string | null;
+  /** When this desktop applied it. */
+  arrivedAt: string;
+  read: boolean;
 }
 
 /** Every Nodus Server connection across all vaults, plus what the active vault can pair. */

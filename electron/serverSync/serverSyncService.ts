@@ -247,6 +247,7 @@ function connectionFrom(config: VaultServerConfig): NodusServerConnection {
     lastSyncAt: rt?.lastSyncAt ?? null,
     lastError: rt?.lastError ?? null,
     lastBytes: rt?.lastBytes ?? null,
+    lastInbox: rt?.lastInbox ?? null,
   };
 }
 

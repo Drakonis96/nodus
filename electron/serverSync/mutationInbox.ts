@@ -180,11 +180,10 @@ export function applyIncomingMutations(db: Database.Database, mutations: Incomin
     const key = mutation.key.map((value) => (value === undefined ? null : value));
 
     try {
-      // What the transaction decided, read only after it commits. Counting inside it would
-      // credit a mutation whose commit then failed, and the catch below would report the
-      // very same mutation as refused — two answers for one decision.
-      let outcome: InboxEntry['outcome'] = 'keptLocal';
-      db.transaction(() => {
+      // The transaction RETURNS its decision, so it is read only after the commit. Counting
+      // inside it would credit a mutation whose commit then failed, and the catch below
+      // would report that very same mutation as refused — two answers for one decision.
+      const outcome = db.transaction((): InboxEntry['outcome'] => {
         db.pragma('defer_foreign_keys = ON');
         const local = db.prepare(`SELECT * FROM ${quoteIdentifier(mutation.table)} WHERE ${where}`).get(...key) as Record<string, unknown> | undefined;
 
@@ -192,24 +191,20 @@ export function applyIncomingMutations(db: Database.Database, mutations: Incomin
           // A local edit made after the remote deletion is the more recent fact, so the row
           // stays — the rule applyIncomingTombstones already applies to package imports.
           if (local && timestampOf(local) > timestampOf(null, mutation.createdAt)) {
-            outcome = 'keptLocal';
-            return;
+            return 'keptLocal';
           }
           db.prepare(`DELETE FROM ${quoteIdentifier(mutation.table)} WHERE ${where}`).run(...key);
-          outcome = 'deleted';
-          return;
+          return 'deleted';
         }
 
         const incoming = mutation.row ?? {};
         if (local && timestampOf(local) > timestampOf(incoming, mutation.createdAt)) {
-          outcome = 'keptLocal';
-          return;
+          return 'keptLocal';
         }
         const localColumns = new Set(tableColumns(mutation.table, db).map((column) => column.name));
         const columns = Object.keys(incoming).filter((column) => localColumns.has(column));
         if (columns.length === 0) {
-          outcome = 'keptLocal';
-          return;
+          return 'keptLocal';
         }
         if (local) {
           // UPDATE the columns the mutation carries, never INSERT OR REPLACE.
@@ -220,8 +215,7 @@ export function applyIncomingMutations(db: Database.Database, mutations: Incomin
           // owner's copy of its illustration. Measured, not hypothetical: it happened.
           const assignable = columns.filter((column) => !identity.includes(column));
           if (assignable.length === 0) {
-            outcome = 'keptLocal';
-            return;
+            return 'keptLocal';
           }
           db.prepare(
             `UPDATE ${quoteIdentifier(mutation.table)} SET ${assignable.map((column) => `${quoteIdentifier(column)} = ?`).join(', ')} WHERE ${where}`
@@ -232,7 +226,7 @@ export function applyIncomingMutations(db: Database.Database, mutations: Incomin
             `VALUES (${columns.map(() => '?').join(', ')})`
           ).run(columns.map((column) => (incoming[column] === undefined ? null : incoming[column])));
         }
-        outcome = 'applied';
+        return 'applied';
       })();
       if (outcome === 'applied') summary.applied += 1;
       else if (outcome === 'deleted') summary.deleted += 1;
