@@ -100,8 +100,11 @@ function spawn() {
     pump();
   });
   worker.on('error', (error) => retire(slot, error));
+  // Unconditionally, even with no job in flight. A dead thread left in `workers` still looks
+  // idle to `pump`, which would post the next query into a channel nobody is listening on and
+  // hang that request for good — a worse failure than the crash that caused it.
   worker.on('exit', (code) => {
-    if (slot.job) retire(slot, new Error(`The vector search worker exited with code ${code}.`));
+    retire(slot, new Error(`The vector search worker exited with code ${code}.`));
   });
   // The HTTP listener is what keeps this process alive; an idle pool must not.
   worker.unref();
