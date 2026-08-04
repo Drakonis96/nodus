@@ -35,6 +35,9 @@ const RELEASE_3_1_0_TR: string[] = [
 const RELEASE_3_2_0_TR: string[] = [
   "Bir Nodus sunucusunda anlama göre arama yapmak artık sunucuyu başka kimseye yanıt veremez hâle getirmiyor. Şimdiye kadar bir arama hesaplanırken diğer bütün istekler sırasını bekliyordu. Bu hesaplama artık ayrı iş parçacıklarında çalışıyor ve sunucu yanıt vermeyi sürdürüyor. Özellikle birkaç kişi aynı anda sorguladığında fark ediliyor.",
   "Sunucu artık körlemesine bellek ayırmıyor. Boyutu ne olursa olsun yayımlanmış üç kasayı bellekte tutuyordu, bu da büyük bir külliyatta bir gigabaytı aşıyordu. Sınır artık kasa sayısıyla değil bellekle ölçülüyor. Sunucuyu yöneten kişi, makinesinde yer varsa bu sınırı yükseltebilir.",
+  "Deep Research kuyruğu artık nerede olduğunu söylüyor. Oluşturulmakta olan rapor gerçek yüzdesini gösteren bir çubuk taşıyor, bekleyenler ise önlerinde kaç rapor olduğunu belirtiyor. Önceden yalnızca bir simge dönüyordu ve yeni başlamış bir raporu bitmek üzere olandan ayırt etmenin yolu yoktu.",
+  "Biten bir rapor artık galeride kendiliğinden beliriyor. Sıraya birkaç tane koyduğunuzda, sonuncusu dışında hepsi bölümden çıkıp geri dönene kadar dışarıda kalıyordu. Ayrıca oluşturulan ama kaydedilemeyen bir rapor artık bunu söylüyor, iz bırakmadan kaybolmuyor.",
+  "Bir rapor oluşturmak artık pencereyi dondurmuyor. Nodus her rapor için bütün külliyatı birkaç kez tarıyor ve bu aramaların her biri sürdüğü müddetçe uygulamayı durduruyordu. Artık parça parça ilerliyorlar ve aralarında denetimi geri veriyorlar, böylece rapor yazılırken çalışmaya devam edebilirsiniz.",
 ];
 
 export const RELEASE_NOTES_TR: Record<string, string[]> = {

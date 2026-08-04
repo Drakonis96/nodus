@@ -95,6 +95,9 @@ const RELEASE_3_1_0_IT: string[] = [
 const RELEASE_3_2_0_IT: string[] = [
   "Cercare per significato su un server Nodus non lo lascia più incapace di rispondere agli altri. Finora, mentre risolveva una ricerca, tutte le altre richieste aspettavano il loro turno. Quel calcolo ora gira su thread separati e il server continua a rispondere. Si nota soprattutto quando più persone consultano nello stesso momento.",
   "Il server non mette più da parte memoria alla cieca. Teneva in memoria tre vault pubblicati, di qualunque dimensione, e con un corpus grande superava il gigabyte. Il limite ora si misura in memoria e non in un numero di vault. Chi amministra un server può alzarlo se la sua macchina ha spazio.",
+  "La coda di Deep Research ora dice a che punto è. Il rapporto in corso di generazione ha una barra con la sua percentuale reale, e quelli in attesa indicano quanti li precedono. Prima girava soltanto un'icona, senza modo di distinguere uno appena avviato da uno che stava per finire.",
+  "Un rapporto finito appare da solo nella galleria. Se ne mettevi in coda diversi, tutti tranne l'ultimo restavano fuori finché non uscivi dalla sezione e rientravi. E un rapporto che viene generato ma non può essere salvato ora lo dice, invece di sparire senza lasciare traccia.",
+  "Generare un rapporto non blocca più la finestra. Nodus percorre l'intero corpus più volte per ogni rapporto, e ognuna di quelle ricerche lasciava l'applicazione ferma per tutta la sua durata. Ora procedono a tratti e restituiscono il controllo tra l'una e l'altra, così puoi continuare a lavorare mentre il rapporto viene scritto.",
 ];
 
 export const RELEASE_NOTES_IT: Record<string, string[]> = {

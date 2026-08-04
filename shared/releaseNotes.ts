@@ -653,9 +653,13 @@ const RELEASE_2_7_0_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 /**
- * 3.2.0 opens with two entries for whoever runs a Nodus Server, and they are about the same
- * thing: a server that stopped being a good neighbour to itself the moment it had work to do.
- * More will land beside them before this ships.
+ * 3.2.0 is about work that takes minutes and what the app does with you while it runs.
+ *
+ * The first two are for whoever runs a Nodus Server, and are the same thing said twice: a
+ * server that stopped being a good neighbour to itself the moment it had work to do. The
+ * three after them are the desktop half of that story, in Deep Research: a queue that says
+ * where it is, reports that arrive by themselves, and a window that keeps moving while a
+ * report is written. More may land beside them before this ships.
  */
 const RELEASE_3_2_0_HIGHLIGHTS: RawReleaseHighlight[] = [
   {
@@ -675,6 +679,33 @@ const RELEASE_3_2_0_HIGHLIGHTS: RawReleaseHighlight[] = [
     de: 'Der Server reserviert Speicher nicht mehr blind. Er hielt drei veröffentlichte Tresore im Speicher, unabhängig von ihrer Größe, was bei einem großen Korpus über ein Gigabyte war. Die Obergrenze wird jetzt in Speicher gemessen und nicht in einer Anzahl von Tresoren. Wer einen Server betreibt, kann sie anheben, wenn die Maschine Platz hat.',
     pt: 'O servidor já não reserva memória às cegas. Guardava três cofres publicados em memória, fosse qual fosse o tamanho, o que num corpus grande passava do gigabyte. O limite passa a medir-se em memória e não num número de cofres. Quem administra um servidor pode aumentá-lo se a máquina der para mais.',
     'pt-BR': 'O servidor não reserva mais memória às cegas. Ele mantinha três cofres publicados na memória, de qualquer tamanho, o que em um corpus grande passava do gigabyte. O limite passa a ser medido em memória, e não em número de cofres. Quem administra um servidor pode aumentá-lo se a máquina tiver espaço.',
+  },
+  {
+    scope: 'general',
+    es: 'La cola de Deep Research ya dice por dónde va. El informe que se está generando lleva una barra con su porcentaje real, y los que esperan indican cuántos tienen por delante. Antes solo giraba un icono, sin forma de distinguir uno que acababa de empezar de otro a punto de terminar.',
+    en: 'The Deep Research queue now says where it stands. The report being generated carries a bar with its real percentage, and the ones waiting say how many are ahead of them. Before there was only a spinning icon, with no way to tell one that had just started from one about to finish.',
+    fr: 'La file de Deep Research indique désormais où elle en est. Le rapport en cours de génération porte une barre avec son pourcentage réel, et ceux qui attendent indiquent combien les précèdent. Auparavant, une icône tournait sans permettre de distinguer un rapport qui venait de commencer d’un autre sur le point de finir.',
+    de: 'Die Deep-Research-Warteschlange sagt jetzt, wo sie steht. Der Bericht, der gerade erzeugt wird, trägt einen Balken mit seinem tatsächlichen Prozentsatz, und die wartenden nennen die Anzahl vor ihnen. Vorher drehte sich nur ein Symbol, ohne Unterschied zwischen einem eben gestarteten und einem fast fertigen Bericht.',
+    pt: 'A fila do Deep Research já diz por onde vai. O relatório que está a ser gerado tem uma barra com a sua percentagem real, e os que esperam indicam quantos têm à frente. Antes apenas rodava um ícone, sem forma de distinguir um que tinha acabado de começar de outro prestes a terminar.',
+    'pt-BR': 'A fila do Deep Research agora diz onde está. O relatório que está sendo gerado tem uma barra com a porcentagem real, e os que esperam indicam quantos estão à frente deles. Antes só girava um ícone, sem como distinguir um que tinha acabado de começar de outro prestes a terminar.',
+  },
+  {
+    scope: 'general',
+    es: 'Un informe terminado aparece solo en la galería. Si encolabas varios, todos menos el último se quedaban fuera hasta que salías de la sección y volvías a entrar. Y un informe que se genera pero no se puede guardar ahora lo dice, en vez de desaparecer sin dejar rastro.',
+    en: 'A finished report now appears in the gallery by itself. With several queued, all but the last stayed out of it until you left the section and came back. And a report that generates but cannot be saved now says so, instead of disappearing without a trace.',
+    fr: 'Un rapport terminé apparaît désormais tout seul dans la galerie. Quand plusieurs étaient en file, tous sauf le dernier en restaient absents jusqu’à ce que vous quittiez la section et y reveniez. Et un rapport qui se génère mais ne peut pas être enregistré le dit maintenant, au lieu de disparaître sans laisser de trace.',
+    de: 'Ein fertiger Bericht erscheint jetzt von selbst in der Galerie. Standen mehrere in der Warteschlange, blieben alle außer dem letzten draußen, bis man den Bereich verließ und zurückkam. Und ein Bericht, der erzeugt, aber nicht gespeichert werden kann, sagt das jetzt, statt spurlos zu verschwinden.',
+    pt: 'Um relatório terminado aparece sozinho na galeria. Quando havia vários em fila, todos menos o último ficavam de fora até sair da secção e voltar a entrar. E um relatório que se gera mas não pode ser guardado agora di-lo, em vez de desaparecer sem deixar rasto.',
+    'pt-BR': 'Um relatório terminado aparece sozinho na galeria. Quando havia vários na fila, todos menos o último ficavam de fora até você sair da seção e voltar. E um relatório que é gerado mas não pode ser salvo agora avisa, em vez de sumir sem deixar rastro.',
+  },
+  {
+    scope: 'general',
+    es: 'Generar un informe ya no congela la ventana. Nodus recorre el corpus entero varias veces por informe, y cada una de esas búsquedas dejaba la aplicación parada mientras duraba. Ahora van por partes y devuelven el control entre una y otra, así que puedes seguir trabajando mientras se escribe.',
+    en: 'Generating a report no longer freezes the window. Nodus goes through the whole corpus several times per report, and each of those searches left the app stuck for as long as it took. They now run in parts and hand control back between them, so you can carry on working while a report is written.',
+    fr: 'Générer un rapport ne fige plus la fenêtre. Nodus parcourt tout le corpus plusieurs fois par rapport, et chacune de ces recherches laissait l’application bloquée le temps qu’elle durait. Elles se font désormais par morceaux et rendent la main entre chacun, vous pouvez donc continuer à travailler pendant la rédaction.',
+    de: 'Einen Bericht zu erzeugen friert das Fenster nicht mehr ein. Nodus durchläuft pro Bericht mehrmals den gesamten Korpus, und jede dieser Suchen ließ die Anwendung so lange stehen, wie sie dauerte. Sie laufen jetzt in Teilen und geben zwischendurch die Kontrolle zurück, sodass Sie weiterarbeiten können, während geschrieben wird.',
+    pt: 'Gerar um relatório já não congela a janela. O Nodus percorre todo o corpus várias vezes por relatório, e cada uma dessas procuras deixava a aplicação parada enquanto durava. Agora fazem-se por partes e devolvem o controlo entre elas, por isso pode continuar a trabalhar enquanto o relatório se escreve.',
+    'pt-BR': 'Gerar um relatório não congela mais a janela. O Nodus percorre todo o corpus várias vezes por relatório, e cada uma dessas buscas deixava o aplicativo parado enquanto durava. Agora elas são feitas por partes e devolvem o controle entre uma e outra, então você pode continuar trabalhando enquanto o relatório é escrito.',
   },
 ];
 
