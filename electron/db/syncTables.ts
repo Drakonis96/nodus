@@ -216,6 +216,11 @@ const NOT_SYNCED_TABLES = new Set([
   // Carrying it in a .nodussync package would make the receiving machine re-send work it
   // never did, and the sender would then see its own edits arrive back as someone else's.
   'server_outbox',
+  // Y su reverso: THIS machine's record of what arrived from another device and what
+  // was done with it. An entry belongs to the vault it landed in, on the computer that
+  // applied it — carrying it would tell a second machine it had received work it never
+  // received, and its read/unread state is one person's, on one screen.
+  'server_inbox',
   // TESTIMONIOS NO SE SINCRONIZA, y es una decision, no una omision (decision 18 del
   // plan). Antes de activarlo hay que demostrar que TODAS estas tablas viajan, que los
   // blobs de los maestros tienen una politica explicita, y sobre todo que las
