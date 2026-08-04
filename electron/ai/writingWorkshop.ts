@@ -23,9 +23,9 @@ import { getContradictions } from '../graph/graphService';
 import { listTutorRoutes } from '../db/tutorRepo';
 import { completeJson } from './aiClient';
 import { embed, embedMany } from './aiClient';
-import { findSimilarIdeas } from '../db/ideasRepo';
-import { findSimilarWorks } from '../db/workSummariesRepo';
-import { findSimilarPassages, type SimilarPassage } from '../db/passagesRepo';
+import { findSimilarIdeasPaged } from '../db/ideasRepo';
+import { findSimilarWorksPaged } from '../db/workSummariesRepo';
+import { findSimilarPassages, findSimilarPassagesPaged, type SimilarPassage } from '../db/passagesRepo';
 
 const MAX_IDEAS = 120;
 const MAX_THEMES = 30;
@@ -300,9 +300,11 @@ async function buildSemanticRanking(queries: string[]): Promise<WorkshopSemantic
     // item in the objective's own full-size result set. A sub-question may add
     // anything that clears it and nothing that does not, so the pool gains breadth
     // without ever lowering its standard of relevance.
-    const objectiveIdeas = findSimilarIdeas(vectors[0], -1, MAX_IDEAS);
-    const objectiveWorks = findSimilarWorks(vectors[0], -1, MAX_WORKS);
-    const objectivePassages = findSimilarPassages(vectors[0], -1, MAX_PASSAGES * 2);
+    // Paged: each of these walks the whole index, and a snapshot runs one set per
+    // probe. Run as a single blocking scan they froze the window for the duration.
+    const objectiveIdeas = await findSimilarIdeasPaged(vectors[0], -1, MAX_IDEAS);
+    const objectiveWorks = await findSimilarWorksPaged(vectors[0], -1, MAX_WORKS);
+    const objectivePassages = await findSimilarPassagesPaged(vectors[0], -1, MAX_PASSAGES * 2);
     const weakest = <T extends { similarity: number }>(hits: T[]) => (hits.length ? hits[hits.length - 1].similarity : -1);
     const floors = {
       ideas: weakest(objectiveIdeas),
@@ -310,17 +312,17 @@ async function buildSemanticRanking(queries: string[]): Promise<WorkshopSemantic
       passages: weakest(objectivePassages),
     };
 
-    vectors.forEach((vector, index) => {
+    for (const [index, vector] of vectors.entries()) {
       const isObjective = index === 0;
       const ideaHits = isObjective
         ? objectiveIdeas.slice(0, quotaFor(MAX_IDEAS, index))
-        : findSimilarIdeas(vector, floors.ideas, quotaFor(MAX_IDEAS, index));
+        : await findSimilarIdeasPaged(vector, floors.ideas, quotaFor(MAX_IDEAS, index));
       const workHits = isObjective
         ? objectiveWorks.slice(0, quotaFor(MAX_WORKS, index))
-        : findSimilarWorks(vector, floors.works, quotaFor(MAX_WORKS, index));
+        : await findSimilarWorksPaged(vector, floors.works, quotaFor(MAX_WORKS, index));
       const passageHits = isObjective
         ? objectivePassages.slice(0, quotaFor(MAX_PASSAGES * 2, index))
-        : findSimilarPassages(vector, floors.passages, quotaFor(MAX_PASSAGES * 2, index));
+        : await findSimilarPassagesPaged(vector, floors.passages, quotaFor(MAX_PASSAGES * 2, index));
       for (const hit of ideaHits) {
         if (reserve(ideaScores, MAX_IDEAS) || ideaScores.has(hit.global_id)) {
           ideaScores.set(hit.global_id, Math.max(ideaScores.get(hit.global_id) ?? 0, semanticStrength(hit.similarity)));
@@ -340,7 +342,7 @@ async function buildSemanticRanking(queries: string[]): Promise<WorkshopSemantic
           passages.set(hit.passage_id, hit);
         }
       }
-    });
+    }
 
     // Pass two: the objective fills any slots the quotas left unused.
     for (const hit of objectiveIdeas) {
@@ -437,8 +439,11 @@ export async function retrieveSectionMaterial(input: {
 
   const skipIdeas = new Set(input.excludeIdeaIds);
   const skipPassages = new Set(input.excludePassageIds);
-  const ideaHits = findSimilarIdeas(vector, -1, input.limits.ideas * 4).filter((hit) => !skipIdeas.has(hit.global_id));
-  const passageHits = findSimilarPassages(vector, -1, input.limits.passages * 4).filter((hit) => !skipPassages.has(hit.passage_id));
+  // Paged: this runs once per section, on top of the snapshot's own scans.
+  const ideaHits = (await findSimilarIdeasPaged(vector, -1, input.limits.ideas * 4)).filter((hit) => !skipIdeas.has(hit.global_id));
+  const passageHits = (await findSimilarPassagesPaged(vector, -1, input.limits.passages * 4)).filter(
+    (hit) => !skipPassages.has(hit.passage_id)
+  );
 
   return {
     ideas: ideaHits.slice(0, input.limits.ideas).map((hit) => ideaCandidateById(hit.global_id, semanticStrength(hit.similarity))).filter((idea): idea is WritingWorkshopIdeaCandidate => !!idea),
@@ -519,13 +524,17 @@ function rankedIdeas(tokens: Set<string>, semanticIndex: WorkshopSemanticRanking
           themes: themeList,
           workCount: row.work_count,
           evidenceCount: row.evidence_count,
-          works: ideaWorks(row.global_id),
+          // Filled in below, for the ideas that survive the cut only.
+          works: [],
         },
       };
     })
     .sort(sortScored)
     .slice(0, MAX_IDEAS)
-    .map(({ item, score, reason }) => ({ ...item, score, reason }));
+    // The works behind an idea take a query each and play no part in the ranking, so
+    // they are looked up after it: on a corpus of ten thousand ideas this was ten
+    // thousand queries on the main thread to keep a hundred and twenty of them.
+    .map(({ item, score, reason }) => ({ ...item, score, reason, works: ideaWorks(item.id) }));
 }
 
 function ideaWorks(globalId: string): WritingWorkshopIdeaCandidate['works'] {

@@ -1,6 +1,7 @@
 import type { PassageDetail, WorkPassageStatus } from '@shared/types';
 import { getDb } from './database';
 import { currentEmbeddingConfig, embeddingTextHash, encodeEmbedding } from './ideasRepo';
+import { scanSimilar } from './vectorScan';
 
 export interface PassageInsert {
   text: string;
@@ -85,6 +86,56 @@ export function findSimilarPassages(
        LIMIT ?`
     )
     .all(encodeEmbedding(queryEmbedding), config.provider, config.model, queryEmbedding.length, ...nodusIds, threshold, limit) as SimilarPassage[];
+}
+
+/**
+ * The same search as `findSimilarPassages`, paged so it does not hold the main
+ * process for the whole scan (see ./vectorScan.ts). Used by the long generations —
+ * Deep Research runs one of these per probe and per section, and the passage index
+ * is the largest table of all.
+ *
+ * Ranking reads ids only; the text and its work are fetched for the winners alone,
+ * instead of dragging every passage in the corpus through SQLite's sorter.
+ */
+export async function findSimilarPassagesPaged(
+  queryEmbedding: number[],
+  threshold: number,
+  limit: number
+): Promise<SimilarPassage[]> {
+  const config = currentEmbeddingConfig();
+  const ranked = await scanSimilar<{ passage_id: string; rid: number; similarity: number }>({
+    table: 'passages',
+    sql: `SELECT p.passage_id, p.rowid AS rid, vec_scan(p.embedding) AS similarity
+            FROM passages p
+            JOIN works w ON w.nodus_id = p.nodus_id
+           WHERE p.rowid > ? AND p.rowid <= ?
+             AND p.embedding IS NOT NULL
+             AND w.archived = 0
+             AND (w.deep_hash IS NULL OR p.content_hash = w.deep_hash)
+             AND p.embedding_provider = ?
+             AND p.embedding_model = ?
+             AND p.embedding_dim = ?`,
+    params: [config.provider, config.model, queryEmbedding.length],
+    query: queryEmbedding,
+    threshold,
+    limit,
+  });
+  if (ranked.length === 0) return [];
+
+  const byId = new Map(ranked.map((row) => [row.passage_id, row.similarity]));
+  const rows = getDb()
+    .prepare(
+      `SELECT p.passage_id, p.nodus_id, p.text, p.page_label,
+              w.title, w.authors_json, w.year, w.zotero_key
+         FROM passages p
+         JOIN works w ON w.nodus_id = p.nodus_id
+        WHERE p.passage_id IN (${ranked.map(() => '?').join(',')})`
+    )
+    .all(...ranked.map((row) => row.passage_id)) as Omit<SimilarPassage, 'similarity'>[];
+  // Back into the ranked order the scan produced; the IN clause has none of its own.
+  return rows
+    .map((row) => ({ ...row, similarity: byId.get(row.passage_id) ?? 0 }))
+    .sort((a, b) => b.similarity - a.similarity);
 }
 
 /**

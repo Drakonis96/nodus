@@ -79,15 +79,19 @@ try {
         handlers?.onProgress?.({ phase: 'done', message: 'Lista' });
         return fakeSession;
       },
-      generateDeepResearchReport: async (_request, handlers) => {
+      generateDeepResearchReport: async (request, handlers) => {
         deepCalls += 1;
         handlers?.onProgress?.({ phase: 'section', message: 'Sección 3', sectionIndex: 3, sectionTotal: 4 });
         await Promise.resolve();
+        if (request?.objective === 'no archivable') {
+          return { ...fakeReport, draft: { ...fakeReport.draft, title: 'Informe no archivable' } };
+        }
         return fakeReport;
       },
-      saveWritingWorkshopDraft: async () => {
+      saveWritingWorkshopDraft: async (request) => {
         saveCalls += 1;
-        return fakeSaved;
+        if (request?.draft?.title === 'Informe no archivable') throw new Error('El disco está lleno.');
+        return { ...fakeSaved, id: `saved-${saveCalls}` };
       },
       runDatabaseAiCell: async (rowId, columnId) => {
         databaseTextCalls += 1;
@@ -199,6 +203,71 @@ try {
   assert.equal(jobs.getBackgroundJob(jobs.DEEP_RESEARCH_MAIN_JOB_KEY).request.objective, 'Pregunta principal');
   assert.equal(jobs.getBackgroundJob(dossierKey).request.objective, 'Dossier');
   assert.equal(saveCalls, 2, 'the immersion dossier is also saved automatically');
+
+  // ── A queue of several reports: every one of them must be findable afterwards ──
+  //
+  // The bug this pins: all queued reports share ONE job key, so the moment a report
+  // completes the next one replaces it under that key in the same tick. React batches
+  // state updates per tick, so a view watching the job only ever renders the LAST
+  // state of the tick — the completion of every report but the final one was never
+  // observed, and those reports did not appear in the gallery until the user left the
+  // section and came back. The queue keeps its finished entries; the view reads those.
+  const deepCallsBeforeQueue = deepCalls;
+  // Two subscribers that, like React, only render the last snapshot of each tick:
+  // one watching the shared job (how the view used to learn about a finished report)
+  // and one watching the queue (how it learns now).
+  let renderedQueue = [];
+  let pendingQueue = null;
+  const unsubscribeQueue = jobs.subscribeDeepResearchQueue((items) => {
+    pendingQueue = items;
+    queueMicrotask(() => {
+      if (!pendingQueue) return;
+      renderedQueue = pendingQueue;
+      pendingQueue = null;
+    });
+  });
+  const completionsSeenOnJob = new Set();
+  let pendingJob = null;
+  const unsubscribeJobWatch = jobs.subscribeBackgroundJob(jobs.DEEP_RESEARCH_MAIN_JOB_KEY, (job) => {
+    pendingJob = job;
+    queueMicrotask(() => {
+      if (!pendingJob) return;
+      if (pendingJob.status === 'completed') completionsSeenOnJob.add(pendingJob.id);
+      pendingJob = null;
+    });
+  });
+  const queued = ['uno', 'dos', 'tres'].map((objective) => jobs.enqueueDeepResearch({ objective, model: null }));
+  await waitFor(
+    () => jobs.getDeepResearchQueue().filter((item) => item.status === 'completed').length === 3,
+    'three queued reports finish'
+  );
+  assert.equal(deepCalls, deepCallsBeforeQueue + 3, 'each queued report is generated exactly once');
+  const finished = jobs.getDeepResearchQueue().filter((item) => queued.some((q) => q.id === item.id));
+  assert.equal(finished.length, 3, 'the queue keeps every finished report');
+  assert.ok(finished.every((item) => item.status === 'completed'), 'all three completed');
+  assert.equal(new Set(finished.map((item) => item.savedDraftId)).size, 3, 'each kept its own saved draft');
+  assert.ok(finished.every((item) => item.saveError === null), 'nothing failed to be filed');
+  // The real assertion: what a batched React render can actually see.
+  await waitFor(
+    () => renderedQueue.filter((item) => item.status === 'completed' && queued.some((q) => q.id === item.id)).length === 3,
+    'a batched subscriber of the queue sees all three completions'
+  );
+  assert.ok(
+    completionsSeenOnJob.size < 3,
+    'watching the shared job instead misses completions — which is why the view reads the queue'
+  );
+  unsubscribeJobWatch();
+
+  // A report that generates but cannot be filed keeps the reason, so the view can say
+  // so instead of emptying the queue with nothing to show for it.
+  jobs.enqueueDeepResearch({ objective: 'no archivable', model: null });
+  await waitFor(() => jobs.getDeepResearchQueue().some((item) => item.saveError), 'the unsaveable report reports why');
+  const unsaved = jobs.getDeepResearchQueue().find((item) => item.request.objective === 'no archivable');
+  assert.equal(unsaved.status, 'completed', 'the report itself was generated');
+  assert.equal(unsaved.savedDraftId, null, 'but nothing was filed');
+  assert.equal(unsaved.saveError, 'El disco está lleno.', 'and the reason travels with it');
+  unsubscribeQueue();
+  jobs.clearFinishedDeepResearch();
 
   // Database cell jobs survive the initiating cell's unmount. A remounted cell
   // immediately receives the running snapshot, then the retained result, and a

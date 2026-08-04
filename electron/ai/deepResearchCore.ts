@@ -361,6 +361,10 @@ export async function orchestrateDeepResearch(
       phase: 'section',
       message: `${L.writing}: ${section.title}`,
       sectionIndex: written.length + 1,
+      // What the progress bar divides by. The plan is the honest denominator: the
+      // budget caps below can end the report early, but never make it longer, and a
+      // coverage top-up merges into a section that has already been counted.
+      sectionTotal: Math.min(plan.sections.length, sectionHardCap),
       sectionTitle: section.title,
       wordsSoFar: totalWords,
       pagesSoFar: pagesFromWords(totalWords),

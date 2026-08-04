@@ -312,7 +312,9 @@ async function bundleModules() {
   await writeFile(
     dbStub,
     'export function getDb() { return globalThis.__backupTestDb; }\nexport const SCHEMA_VERSION = 28;\n' +
-      'export function closeDb() {}\nexport function replaceDbFile() {}\n'
+      'export function closeDb() {}\nexport function replaceDbFile() {}\n' +
+      // Armed by the paged similarity scan before each statement; no-op here.
+      'export function setVectorScanQuery() {}\n'
   );
   const secretsStub = path.join(root, 'stub-secrets.js');
   await writeFile(

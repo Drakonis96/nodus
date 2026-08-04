@@ -1,6 +1,7 @@
 import type { ModelRef, WorkSummary } from '@shared/types';
 import { getDb } from './database';
 import { currentEmbeddingConfig, embeddingTextHash, encodeEmbedding } from './ideasRepo';
+import { scanSimilar } from './vectorScan';
 
 interface WorkSummaryRow extends WorkSummary {
   model_json: string | null;
@@ -133,6 +134,41 @@ export function findSimilarWorks(
     summary: string;
     similarity: number;
   }[];
+}
+
+/**
+ * The same search as `findSimilarWorks`, paged so it does not hold the main process
+ * for the whole scan (see ./vectorScan.ts).
+ */
+export async function findSimilarWorksPaged(
+  queryEmbedding: number[],
+  threshold: number,
+  limit: number
+): Promise<{ nodus_id: string; summary: string; similarity: number }[]> {
+  const config = currentEmbeddingConfig();
+  const ranked = await scanSimilar<{ nodus_id: string; rid: number; similarity: number }>({
+    table: 'work_summaries',
+    sql: `SELECT nodus_id, rowid AS rid, vec_scan(embedding) AS similarity
+            FROM work_summaries
+           WHERE rowid > ? AND rowid <= ?
+             AND embedding IS NOT NULL
+             AND embedding_provider = ?
+             AND embedding_model = ?
+             AND embedding_dim = ?`,
+    params: [config.provider, config.model, queryEmbedding.length],
+    query: queryEmbedding,
+    threshold,
+    limit,
+  });
+  if (ranked.length === 0) return [];
+
+  const byId = new Map(ranked.map((row) => [row.nodus_id, row.similarity]));
+  const rows = getDb()
+    .prepare(`SELECT nodus_id, summary FROM work_summaries WHERE nodus_id IN (${ranked.map(() => '?').join(',')})`)
+    .all(...ranked.map((row) => row.nodus_id)) as { nodus_id: string; summary: string }[];
+  return rows
+    .map((row) => ({ ...row, similarity: byId.get(row.nodus_id) ?? 0 }))
+    .sort((a, b) => b.similarity - a.similarity);
 }
 
 export function clearAllWorkSummaryEmbeddings(): void {

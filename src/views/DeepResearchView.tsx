@@ -8,7 +8,6 @@ import type {
   DeepResearchArchiveFormat,
   DeepResearchJobRecord,
   DeepResearchOutlineSection,
-  DeepResearchProgress,
   DeepResearchSectionLimit,
   DeepResearchTargetLength,
   Person,
@@ -31,6 +30,7 @@ import { SaveToNotesModal } from '../components/SaveToNotesModal';
 import { TranslationModal } from '../components/TranslationModal';
 import { Markdown } from '../components/Markdown';
 import { DraftActionBar, DraftResultMain, SupportMatrix } from './writingShared';
+import { DeepResearchQueueStrip, type QueueStripItem } from '../components/DeepResearchQueueStrip';
 import { DecorativeImageCard } from '../components/DecorativeImageCard';
 import { AudioPanel } from '../components/AudioPanel';
 import { FindInPage } from '../components/FindInPage';
@@ -335,25 +335,33 @@ export function DeepResearchView({
     void refreshSavedDrafts();
   }, [refreshSavedDrafts]);
 
-  // A report sent from the phone is written by the main process, straight into
-  // writing_saved_drafts, with nothing in this window involved. Without this the gallery
-  // showed it only after a remount. refreshSavedDrafts has no dependencies, so this
-  // subscribes exactly once.
+  /**
+   * Every finished report reaches the gallery, whoever wrote it.
+   *
+   * This is the one mechanism, on purpose. Watching the generation job instead cannot
+   * work: all queued reports share one job key, so when one finishes the next starts
+   * in the same tick, React renders once per tick, and the completed state of every
+   * report but the last was never observed — those reports stayed out of the gallery
+   * until the section was left and reopened. A save, wherever it happens, is a fact
+   * the main process announces.
+   *
+   * refreshSavedDrafts has no dependencies, so this subscribes exactly once.
+   */
   useEffect(() => window.nodus.onWritingDraftsChanged(() => void refreshSavedDrafts()), [refreshSavedDrafts]);
 
-  // Surface each finished report in the gallery as soon as it lands.
-  const lastCompletedRef = useRef<string | null>(null);
+  /**
+   * The exception: a report that generated but could not be filed. Nothing was saved,
+   * so nothing is announced, and the queue would otherwise empty with the work lost in
+   * silence. The queue carries the reason (it keeps its finished entries, which is what
+   * a render can miss), and the strip shows the report as failed.
+   */
+  const seenUnsavedRef = useRef<Set<string>>(new Set());
   useEffect(() => {
-    if (deepJob?.status !== 'completed' || deepJob.id === lastCompletedRef.current) return;
-    lastCompletedRef.current = deepJob.id;
-    const saved = deepJob.result?.savedDraft ?? null;
-    if (saved) {
-      setSavedDrafts((current) => [saved, ...current.filter((item) => item.id !== saved.id)]);
-      setOpenDraft((current) => (current?.id === saved.id ? saved : current));
-    } else {
-      void refreshSavedDrafts();
-    }
-  }, [deepJob, refreshSavedDrafts]);
+    const unsaved = queue.find((item) => item.saveError && !seenUnsavedRef.current.has(item.id));
+    if (!unsaved?.saveError) return;
+    seenUnsavedRef.current.add(unsaved.id);
+    setError(unsaved.saveError);
+  }, [queue]);
 
   // A report queued over MCP is saved by the main process, so nothing in this window
   // knows about it until the gallery is re-read.
@@ -604,9 +612,11 @@ export function DeepResearchView({
     const local = queue.map<QueueStripItem>((item) => ({
       id: item.id,
       title: item.title,
-      status: item.status,
-      detail: item.status === 'running' ? progressDetail(deepProgress) : null,
-      error: item.error,
+      // A report that generated but could not be filed is shown as a failure: the
+      // gallery will never hold it, so quietly completing would lose it in silence.
+      status: item.status === 'completed' && item.saveError ? 'failed' : item.status,
+      progress: item.status === 'running' ? deepProgress : null,
+      error: item.error ?? item.saveError,
       origin: 'app',
       enqueuedAt: item.enqueuedAt,
     }));
@@ -616,7 +626,7 @@ export function DeepResearchView({
         id: job.id,
         title: job.title,
         status: job.status === 'cancelled' ? 'failed' : job.status,
-        detail: job.status === 'running' || job.status === 'queued' ? progressDetail(job.progress) : null,
+        progress: job.status === 'running' || job.status === 'queued' ? job.progress : null,
         error: job.error,
         origin: 'mcp',
         enqueuedAt: job.enqueuedAt,
@@ -735,7 +745,7 @@ export function DeepResearchView({
       )}
 
       {(activeQueue.length > 0 || finishedQueue.length > 0) && (
-        <QueueStrip
+        <DeepResearchQueueStrip
           active={activeQueue}
           failed={finishedQueue}
           running={deepRunning || activeQueue.some((item) => item.status === 'running')}
@@ -922,97 +932,6 @@ export function DeepResearchView({
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Queue strip
-// ─────────────────────────────────────────────────────────────────────────────
-
-/** One row of the strip, whichever lane it came from. */
-interface QueueStripItem {
-  id: string;
-  title: string;
-  status: 'queued' | 'running' | 'completed' | 'failed';
-  /** Already-resolved progress line, so the strip does not need to know whose progress it is. */
-  detail: string | null;
-  error: string | null;
-  origin: 'app' | 'mcp';
-  enqueuedAt: string;
-}
-
-/** Marks a report someone asked for through MCP, so a queue the user did not fill is not a mystery. */
-function OriginBadge() {
-  return (
-    <span
-      className="shrink-0 rounded border border-indigo-800/70 bg-indigo-950/40 px-1 py-px text-[10px] font-semibold uppercase tracking-wide text-indigo-300"
-      title={t('Pedido desde un cliente MCP')}
-    >
-      MCP
-    </span>
-  );
-}
-
-function progressDetail(progress: DeepResearchProgress | null): string | null {
-  if (!progress) return null;
-  return progress.pagesSoFar != null ? `${progress.message} · ~${progress.pagesSoFar} ${t('pág.')}` : progress.message;
-}
-
-function QueueStrip({
-  active,
-  failed,
-  running,
-  onRemove,
-  onClearFinished,
-}: {
-  active: QueueStripItem[];
-  failed: QueueStripItem[];
-  running: boolean;
-  onRemove: (item: QueueStripItem) => void;
-  onClearFinished: () => void;
-}) {
-  return (
-    <div className="border-b border-neutral-800 bg-indigo-950/15 px-4 py-2.5">
-      <div className="mb-1.5 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-indigo-300">
-        <Icon name={running ? 'sync' : 'layers'} size={12} className={running ? 'animate-spin' : ''} />
-        {tx('Cola de generación · {n} en curso', { n: active.length })}
-        {failed.length > 0 && (
-          <button className="ml-auto text-[11px] font-medium text-neutral-500 hover:text-neutral-300" onClick={onClearFinished}>
-            {t('Limpiar fallidos')}
-          </button>
-        )}
-      </div>
-      <div className="flex flex-col gap-1.5">
-        {active.map((item) => (
-          <div key={item.id} className="flex items-center gap-2 rounded-md border border-neutral-800 bg-neutral-950/40 px-2.5 py-1.5 text-xs">
-            <Icon
-              name={item.status === 'running' ? 'sync' : 'clock'}
-              size={12}
-              className={item.status === 'running' ? 'animate-spin text-indigo-300' : 'text-neutral-500'}
-            />
-            <span className="min-w-0 flex-1 truncate text-neutral-300" title={item.title}>{item.title}</span>
-            {item.origin === 'mcp' && <OriginBadge />}
-            {item.status === 'running' ? (
-              <span className="shrink-0 text-[11px] text-indigo-300">{item.detail ?? t('Generando…')}</span>
-            ) : (
-              <>
-                {item.detail && <span className="shrink-0 text-[11px] text-neutral-500">{item.detail}</span>}
-                <button className="shrink-0 text-neutral-500 hover:text-red-400" onClick={() => onRemove(item)} title={t('Quitar de la cola')}>
-                  <Icon name="x" size={13} />
-                </button>
-              </>
-            )}
-          </div>
-        ))}
-        {failed.map((item) => (
-          <div key={item.id} className="flex items-center gap-2 rounded-md border border-red-900/50 bg-red-950/20 px-2.5 py-1.5 text-xs">
-            <Icon name="alert" size={12} className="text-red-400" />
-            <span className="min-w-0 flex-1 truncate text-red-300" title={item.error ?? item.title}>{item.title}</span>
-            {item.origin === 'mcp' && <OriginBadge />}
-            <span className="shrink-0 text-[11px] text-red-400/80">{t('Falló')}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Gallery cards

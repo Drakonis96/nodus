@@ -33,7 +33,7 @@ import { listPersons, getPerson, listEvents, listEvidenceFor } from '../db/entit
 import { allRelationships } from '../db/relationshipsRepo';
 import { allSocialRelations } from '../db/socialRepo';
 import { listItems, listItemsForPerson, findArchiveItemsSimilar } from '../db/archiveRepo';
-import { findSimilarWorks } from '../db/workSummariesRepo';
+import { findSimilarWorksPaged } from '../db/workSummariesRepo';
 import { getWork } from '../db/worksRepo';
 import { resolveWorkText } from '../extraction/textExtractor';
 import { LOCAL_USER_ID } from '../zotero/zoteroClient';
@@ -177,7 +177,8 @@ export async function buildGenealogySourcePool(objective: string, focusPersonId?
 
   // Zotero library (secondary sources), if any, retrieved by summary similarity.
   if (objVec) {
-    for (const row of findSimilarWorks(objVec, 0.2, MAX_WORK_SOURCES)) {
+    // Paged, so gathering the sources does not freeze the window (see db/vectorScan.ts).
+    for (const row of await findSimilarWorksPaged(objVec, 0.2, MAX_WORK_SOURCES)) {
       const w = getWork(row.nodus_id);
       if (!w) continue;
       const authors = parseAuthors((w as { authors_json?: string }).authors_json ?? '[]');
@@ -321,7 +322,17 @@ export async function orchestrateGenealogyDeepResearch(
     const isConclusion = i === plan.sections.length - 1;
     const targetWords = clamp(Math.round(maxWords / Math.max(sectionTarget, 1)), SECTION_WORDS.min, SECTION_WORDS.max);
 
-    emit({ phase: 'section', message: `Redactando: ${section.title}`, sectionIndex: written.length + 1, sectionTitle: section.title, wordsSoFar: totalWords, pagesSoFar: pages(totalWords) });
+    emit({
+      phase: 'section',
+      message: `Redactando: ${section.title}`,
+      sectionIndex: written.length + 1,
+      // What the progress bar divides by. The plan is the honest denominator: the
+      // caps above can end the report early, but never make it longer.
+      sectionTotal: Math.min(plan.sections.length, sectionHardCap),
+      sectionTitle: section.title,
+      wordsSoFar: totalWords,
+      pagesSoFar: pages(totalWords),
+    });
 
     // Dynamic full text: pull each assigned source's full text (docs stored; works
     // resolved now), clipped per document and per section.

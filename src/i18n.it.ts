@@ -2468,6 +2468,8 @@ export const IT: Record<string, string> = {
   "Aún no hay informes. Crea el primero y quedará aquí, listo para leerse a pantalla completa.": "Nessuna segnalazione ancora. Crea il primo e vivrà qui, pronto per essere letto a schermo intero.",
   "Pedido desde un cliente MCP": "Richiesto da un client MCP",
   "Cola de generación · {n} en curso": "Coda di generazione · {n} in corso",
+  "En cola · {n} por delante": "In coda · {n} davanti",
+  "Progreso del informe en curso": "Avanzamento del rapporto in corso",
   "Limpiar fallidos": "Cancellazione non riuscita",
   "pág.": "pag.",
   "Quitar de la cola": "Rimuovi dalla coda",

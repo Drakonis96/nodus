@@ -14,6 +14,40 @@ export function dbPath(): string {
   return activeVaultDbPath();
 }
 
+/**
+ * The query vector of the paged scan in flight (see ./vectorScan.ts), unit length.
+ *
+ * A query vector bound as a SQL parameter is materialised into a fresh Buffer on
+ * EVERY row, which on a 33k-row scan is a third of the whole cost. Holding it here
+ * instead is safe for one reason only: it is written immediately before a SYNCHRONOUS
+ * statement execution and cleared straight after, so nothing can run in between.
+ */
+let scanQuery: Float32Array | null = null;
+
+/** Arms `vec_scan` for the statement about to be executed. Nothing else may call this. */
+export function setVectorScanQuery(query: Float32Array | null): void {
+  scanQuery = query;
+}
+
+/**
+ * `vec_scan(embedding)`: the same cosine as `vec_cosine`, against the armed query.
+ * One blob per row instead of two, and one square root instead of two — the query
+ * side is already normalised.
+ */
+function vecScan(stored: Buffer | null): number {
+  const query = scanQuery;
+  if (!stored || !query) return 0;
+  if (stored.byteLength === 0 || stored.byteLength !== query.length * 4) return 0;
+  const vector = new Float32Array(stored.buffer, stored.byteOffset, stored.byteLength / 4);
+  let dot = 0;
+  let norm = 0;
+  for (let i = 0; i < query.length; i++) {
+    dot += vector[i] * query[i];
+    norm += vector[i] * vector[i];
+  }
+  return norm === 0 ? 0 : dot / Math.sqrt(norm);
+}
+
 /** Cosine similarity between two Float32 BLOBs, computed inside SQLite. */
 function vecCosine(a: Buffer | null, b: Buffer | null): number {
   if (!a || !b) return 0;
@@ -70,6 +104,7 @@ function openDatabase(file: string): Database.Database {
   next.pragma('mmap_size = 268435456');
   next.pragma('wal_autocheckpoint = 1000');
   next.function('vec_cosine', vecCosine);
+  next.function('vec_scan', vecScan);
   const optimizeTimer = setTimeout(() => {
     try {
       if (next.open) next.pragma('optimize');
