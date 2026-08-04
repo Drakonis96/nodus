@@ -289,6 +289,12 @@ test('the size limits are published, explained on refusal, and a full ledger is 
     assert.equal(refused.rejected[0].limitBytes, 64 * 1024);
     assert.ok(refused.rejected[0].bytes > 64 * 1024);
     assert.match(refused.rejected[0].error_description, /per row/);
+    // Both numbers, and two different numbers. Rendered in MiB to one decimal, a 187 KiB row
+    // and a 256 KiB ceiling both read "0.2 MiB", and the sentence written to end the guessing
+    // would have printed the same figure twice.
+    const figures = refused.rejected[0].error_description.match(/\d+(?:\.\d+)? [KM]iB/g);
+    assert.equal(figures.length, 2, 'the sentence states the size and the ceiling');
+    assert.notEqual(figures[0], figures[1], 'and they must be distinguishable');
 
     // Filling the ledger is answered "later", not "no": the batch is refused whole and
     // nothing is stored, so the sender keeps work that would otherwise be lost while the

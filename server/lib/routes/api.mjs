@@ -22,6 +22,17 @@ import { NODUS_VERSION } from '../version.mjs';
 const AUTH_BODY_BYTES = 32 * 1024;
 const TICKET_TTL_MS = 5 * 60_000;
 const VECTOR_QUERY_BYTES = 256 * 1024;
+
+/**
+ * A size a person can act on, in the unit that distinguishes it from its neighbours.
+ *
+ * `mib()` is right for an image ceiling of 8 MiB and useless here: a 187 KiB report and a
+ * 256 KiB limit both render as "0.2 MiB", so the sentence meant to end the guessing would have
+ * printed the same number twice.
+ */
+function sizeLabel(bytes) {
+  return bytes < 1024 * 1024 ? `${Math.round(bytes / 1024)} KiB` : `${(bytes / (1024 * 1024)).toFixed(1)} MiB`;
+}
 /** Matches the desktop research assistant's ceiling (electron/ai/researchAssistant.ts). */
 const MAX_CONTEXT_CHARS = 600_000;
 
@@ -435,7 +446,7 @@ export function createApiRoutes(ctx) {
         // Only `too_large` carries numbers, and only because they are the whole difference
         // between a dead end and an explanation. Every other reason stays a bare code.
         rejected.push(verdict.reason === 'too_large'
-          ? { id: mutation?.id ?? null, reason: verdict.reason, bytes: verdict.bytes, limitBytes: verdict.limit, error_description: `This row is ${mib(verdict.bytes)} and this server accepts up to ${mib(verdict.limit)} per row (NODUS_MAX_MUTATION_BYTES).` }
+          ? { id: mutation?.id ?? null, reason: verdict.reason, bytes: verdict.bytes, limitBytes: verdict.limit, error_description: `This row is ${sizeLabel(verdict.bytes)} and this server accepts up to ${sizeLabel(verdict.limit)} per row (NODUS_MAX_MUTATION_BYTES).` }
           : { id: mutation?.id ?? null, reason: verdict.reason });
         continue;
       }
