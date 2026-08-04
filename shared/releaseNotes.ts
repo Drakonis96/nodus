@@ -739,7 +739,31 @@ const RELEASE_3_2_1_HIGHLIGHTS: RawReleaseHighlight[] = [
   },
 ];
 
+/**
+ * 3.2.2 is one line of the interface telling the truth again.
+ *
+ * A server that answers badly for a moment is ordinary and says so; a panel that goes on saying
+ * it long after the server recovered is not, because nothing on screen tells the two apart. The
+ * message was written on failure and never taken back.
+ */
+const RELEASE_3_2_2_HIGHLIGHTS: RawReleaseHighlight[] = [
+  {
+    scope: 'general',
+    es: 'Un error de sincronización que ya se ha resuelto deja de mostrarse. El panel del vault podía enseñar un fallo del servidor durante el resto de la sesión, justo al lado de una publicación que había ido bien. El aviso se retira en cuanto la sincronización vuelve a funcionar.',
+    en: 'A sync error that has already been resolved stops being shown. The vault panel could display a server failure for the rest of the session, right beside a publication that had gone through. The notice now clears as soon as syncing works again.',
+    fr: 'Une erreur de synchronisation déjà résolue cesse de s’afficher. Le panneau du coffre pouvait montrer une panne du serveur pendant tout le reste de la session, juste à côté d’une publication qui avait réussi. L’avis disparaît dès que la synchronisation refonctionne.',
+    de: 'Ein Synchronisationsfehler, der längst behoben ist, wird nicht mehr angezeigt. Das Panel des Tresors konnte einen Serverfehler für den Rest der Sitzung zeigen, direkt neben einer Veröffentlichung, die gelungen war. Der Hinweis verschwindet jetzt, sobald die Synchronisation wieder funktioniert.',
+    pt: 'Um erro de sincronização já resolvido deixa de ser mostrado. O painel do cofre podia exibir uma falha do servidor durante o resto da sessão, mesmo ao lado de uma publicação que tinha corrido bem. O aviso desaparece assim que a sincronização volta a funcionar.',
+    'pt-BR': 'Um erro de sincronização já resolvido deixa de ser mostrado. O painel do cofre podia exibir uma falha do servidor pelo resto da sessão, bem ao lado de uma publicação que tinha dado certo. O aviso some assim que a sincronização volta a funcionar.',
+  },
+];
+
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
+  {
+    version: '3.2.2',
+    date: '2026-08-04',
+    highlights: RELEASE_3_2_2_HIGHLIGHTS,
+  },
   {
     version: '3.2.1',
     date: '2026-08-04',

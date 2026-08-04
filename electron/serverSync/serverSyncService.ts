@@ -377,6 +377,12 @@ async function publishVault(vaultId: string): Promise<void> {
     rt.dirtySince = 0;
     rt.pending = false;
     rt.phase = 'ok';
+    // Cleared here and nowhere else it mattered: this was written on failure and never taken
+    // back, so one 502 while the server restarted stayed on the panel for the rest of the
+    // session — beside a publication that had just succeeded and an inbox that had just
+    // applied a change. An error that outlives its cause is worse than no error at all,
+    // because the reader cannot tell it is over.
+    rt.lastError = null;
     rt.lastSyncAt = result.updatedAt || new Date().toISOString();
     rt.lastBytes = compressed.length;
     // After the snapshot, so a client that sees the new revision already has rows for

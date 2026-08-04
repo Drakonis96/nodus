@@ -497,6 +497,10 @@ export async function drainOutbox(vaultId: string): Promise<void> {
     // ones it cannot, and for servers that do not send an explanation at all.
     for (const rejection of value.rejected ?? []) markOutboxRejected(db, [rejection.id], rejection.error_description ?? rejection.reason);
     pruneSentOutbox(db);
+    // The batch went out, so whatever the last attempt complained about is over. Without this
+    // the "sending in smaller batches" and "the owner has not collected yet" notices above
+    // would survive the condition that caused them and sit on the panel indefinitely.
+    runtime.lastError = null;
     const after = countOutbox(db);
     runtime.pendingMutations = after.pending;
     runtime.rejectedMutations = after.rejected;

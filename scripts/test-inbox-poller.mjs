@@ -40,7 +40,8 @@ const { updateSettings } = require(path.join(repoRoot, 'electron/db/settingsRepo
 const { setNodusServerToken } = require(path.join(repoRoot, 'electron/secrets/secretStore.ts'));
 const { listServerInbox, unreadServerInboxCount } = require(path.join(repoRoot, 'electron/db/serverInboxRepo.ts'));
 const { drainServerInboxNow } = require(path.join(repoRoot, 'electron/serverSync/inboxPoller.ts'));
-const { getNodusServerOverview } = require(path.join(repoRoot, 'electron/serverSync/serverSyncService.ts'));
+const { getNodusServerOverview, syncNodusServerVaultNow } = require(path.join(repoRoot, 'electron/serverSync/serverSyncService.ts'));
+const { getActiveVault } = require(path.join(repoRoot, 'electron/vaults/vaultRegistry.ts'));
 
 const STAMP = '2026-08-04T09:00:00.000Z';
 
@@ -203,6 +204,38 @@ test('a refused mutation is recorded once, however often it comes back', { timeo
     // It is still in the ledger, because refusing does not acknowledge.
     const remaining = await (await server.api(desktop.accessToken, 'GET', `/api/v1/spaces/${spaceId}/mutations`)).json();
     assert.equal(remaining.mutations.length, 1, 'a refusal must never be acknowledged away');
+  });
+  await rm(userData, { recursive: true, force: true });
+});
+
+test('a sync error goes away when the sync works again', { timeout: 120_000 }, async () => {
+  await withServer({ label: 'stale-error' }, async (server) => {
+    const spaceId = await server.createSpace('Estado');
+    const desktop = await server.pair(await server.pairingCode(spaceId), 'Nodus Desktop');
+    setNodusServerToken(desktop.accessToken);
+    updateSettings({
+      nodusServerUrl: server.origin,
+      nodusServerSpaceId: spaceId,
+      nodusServerSpaceName: 'Estado',
+      nodusServerEnabled: true,
+      nodusServerAutoSync: false,
+    });
+    const vaultId = getActiveVault().id;
+
+    // Whatever went wrong: a server restarting behind its proxy answers 502, and the desktop
+    // reports it. That part was never in doubt.
+    const connection = () => getNodusServerOverview().connections.find((entry) => entry.vaultId === vaultId);
+    updateSettings({ nodusServerUrl: 'http://127.0.0.1:9' });
+    await syncNodusServerVaultNow(vaultId).catch(() => {});
+    assert.ok(connection()?.lastError, 'a failed publication has to say so');
+
+    // What was missing is the other half. The error was written on failure and never taken
+    // back, so one restart left the panel showing a problem for the rest of the session —
+    // next to a publication that had since succeeded and an inbox that had applied a change.
+    updateSettings({ nodusServerUrl: server.origin });
+    await syncNodusServerVaultNow(vaultId);
+    assert.equal(connection()?.phase, 'ok');
+    assert.equal(connection()?.lastError, null, 'an error that outlives its cause cannot be told apart from a live one');
   });
   await rm(userData, { recursive: true, force: true });
 });
