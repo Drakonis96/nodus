@@ -1643,6 +1643,17 @@ export function Settings({
                               ? `${t('Última publicación')}: ${new Date(conn.lastSyncAt).toLocaleString()}${conn.lastBytes != null ? ` · ${Math.max(1, Math.round(conn.lastBytes / 1024))} KiB` : ''}`
                               : t('Pendiente de la primera publicación.')}
                       </p>
+                      {/* What the ledger drain last did. It only means something now that
+                          there is an Inbox to open; before, it was written and never read. */}
+                      {conn.lastInbox && (
+                        <p className="mt-0.5 text-xs text-neutral-500">
+                          {tx('Recibido de otros dispositivos: {applied} aplicados, {kept} conservados, {refused} rechazados', {
+                            applied: String(conn.lastInbox.applied + conn.lastInbox.deleted),
+                            kept: String(conn.lastInbox.keptLocal),
+                            refused: String(conn.lastInbox.refused),
+                          })}
+                        </p>
+                      )}
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <button

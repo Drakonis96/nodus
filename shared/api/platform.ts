@@ -78,6 +78,8 @@ export interface PlatformApi {
   markServerInboxRead(id?: string): Promise<ServerInboxEntry[]>;
   /** Remove one entry, or empty the inbox when no id is given. Returns the fresh list. */
   clearServerInbox(id?: string): Promise<ServerInboxEntry[]>;
+  /** Push: the poller applied a batch that produced entries. Returns its own unsubscribe. */
+  onServerInboxChanged(cb: (entries: ServerInboxEntry[]) => void): () => void;
   // ── Nodus Server, basic mode: the server runs on this computer ──────────
   getLocalServerStatus(): Promise<LocalServerStatus>;
   /** Start it and remember the preference, so it comes back with the app. */

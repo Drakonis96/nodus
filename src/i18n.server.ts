@@ -68,6 +68,7 @@ const EN: Record<string, string> = {
   'Regla de seguridad': 'Security rule',
   'Solo el reverse proxy o el túnel debe ser público y siempre con HTTPS. Restringe el acceso a Docker o Portainer, protege las variables de credenciales y no compartas contraseñas por mensajes sin cifrar.': 'Only the reverse proxy or tunnel should be public, always over HTTPS. Restrict access to Docker or Portainer, protect credential variables, and do not share passwords through unencrypted messages.',
   'Abrir guía completa': 'Open full guide',
+  'Recibido de otros dispositivos: {applied} aplicados, {kept} conservados, {refused} rechazados': 'Received from other devices: {applied} applied, {kept} kept, {refused} refused',
 };
 
 const complete = (values: Record<string, string>): Record<string, string> => ({ ...EN, ...values });
@@ -75,6 +76,7 @@ const complete = (values: Record<string, string>): Record<string, string> => ({ 
 export const SERVER_TRANSLATIONS = {
   en: EN,
   fr: complete({
+    'Recibido de otros dispositivos: {applied} aplicados, {kept} conservados, {refused} rechazados': 'Reçu d’autres appareils : {applied} appliqués, {kept} conservés, {refused} refusés',
     'Cómo funciona': 'Comment ça marche',
     'Cada vault se conecta por separado y sigue publicándose en segundo plano aunque estés trabajando en otro vault.': 'Chaque coffre se connecte séparément et continue de publier en arrière-plan même pendant que vous travaillez dans un autre coffre.',
     'Tu ordenador es quien publica: mantenlo encendido y con Nodus abierto para enviar las novedades.': "C'est votre ordinateur qui publie : gardez-le allumé avec Nodus ouvert pour envoyer les nouveautés.",
@@ -121,6 +123,7 @@ export const SERVER_TRANSLATIONS = {
     'se ejecuta con Docker en otro equipo o VPS. Puede usar el Caddy incluido o tu Caddy/Nginx existente con un dominio o subdominio y HTTPS. La configuración inicial y la gestión de usuarios se hacen desde el navegador.': "s'exécute avec Docker sur un autre ordinateur ou VPS. Il peut utiliser le Caddy inclus ou votre Caddy/Nginx existant avec un domaine ou sous-domaine et HTTPS. La configuration initiale et la gestion des utilisateurs se font dans le navigateur.",
   }),
   de: complete({
+    'Recibido de otros dispositivos: {applied} aplicados, {kept} conservados, {refused} rechazados': 'Von anderen Geräten empfangen: {applied} übernommen, {kept} behalten, {refused} abgelehnt',
     'Cómo funciona': 'So funktioniert es',
     'Cada vault se conecta por separado y sigue publicándose en segundo plano aunque estés trabajando en otro vault.': 'Jeder Tresor wird separat verbunden und veröffentlicht weiter im Hintergrund, auch während Sie in einem anderen Tresor arbeiten.',
     'Tu ordenador es quien publica: mantenlo encendido y con Nodus abierto para enviar las novedades.': 'Ihr Computer ist es, der veröffentlicht: Lassen Sie ihn eingeschaltet und Nodus geöffnet, um Neuigkeiten zu senden.',
@@ -167,6 +170,7 @@ export const SERVER_TRANSLATIONS = {
     'se ejecuta con Docker en otro equipo o VPS. Puede usar el Caddy incluido o tu Caddy/Nginx existente con un dominio o subdominio y HTTPS. La configuración inicial y la gestión de usuarios se hacen desde el navegador.': 'läuft mit Docker auf einem anderen Computer oder VPS. Es kann das enthaltene Caddy oder Ihr vorhandenes Caddy/Nginx mit Domain bzw. Subdomain und HTTPS verwenden. Ersteinrichtung und Benutzerverwaltung erfolgen im Browser.',
   }),
   pt: complete({
+    'Recibido de otros dispositivos: {applied} aplicados, {kept} conservados, {refused} rechazados': 'Recebido de outros dispositivos: {applied} aplicados, {kept} mantidos, {refused} recusados',
     'Cómo funciona': 'Como funciona',
     'Cada vault se conecta por separado y sigue publicándose en segundo plano aunque estés trabajando en otro vault.': 'Cada cofre liga-se separadamente e continua a publicar em segundo plano mesmo enquanto trabalha noutro cofre.',
     'Tu ordenador es quien publica: mantenlo encendido y con Nodus abierto para enviar las novedades.': 'É o seu computador que publica: mantenha-o ligado e com o Nodus aberto para enviar as novidades.',
@@ -213,6 +217,7 @@ export const SERVER_TRANSLATIONS = {
     'se ejecuta con Docker en otro equipo o VPS. Puede usar el Caddy incluido o tu Caddy/Nginx existente con un dominio o subdominio y HTTPS. La configuración inicial y la gestión de usuarios se hacen desde el navegador.': 'é executado com Docker noutro computador ou VPS. Pode usar o Caddy incluído ou o teu Caddy/Nginx existente com um domínio ou subdomínio e HTTPS. A configuração inicial e a gestão de utilizadores são feitas no navegador.',
   }),
   'pt-BR': complete({
+    'Recibido de otros dispositivos: {applied} aplicados, {kept} conservados, {refused} rechazados': 'Recebido de outros dispositivos: {applied} aplicados, {kept} mantidos, {refused} recusados',
     'Cómo funciona': 'Como funciona',
     'Cada vault se conecta por separado y sigue publicándose en segundo plano aunque estés trabajando en otro vault.': 'Cada cofre se conecta separadamente e continua publicando em segundo plano mesmo enquanto você trabalha em outro cofre.',
     'Tu ordenador es quien publica: mantenlo encendido y con Nodus abierto para enviar las novedades.': 'É o seu computador que publica: mantenha-o ligado e com o Nodus aberto para enviar as novidades.',
@@ -259,6 +264,7 @@ export const SERVER_TRANSLATIONS = {
     'se ejecuta con Docker en otro equipo o VPS. Puede usar el Caddy incluido o tu Caddy/Nginx existente con un dominio o subdominio y HTTPS. La configuración inicial y la gestión de usuarios se hacen desde el navegador.': 'é executado com Docker em outro computador ou VPS. Pode usar o Caddy incluído ou seu Caddy/Nginx existente com domínio ou subdomínio e HTTPS. A configuração inicial e o gerenciamento de usuários são feitos no navegador.',
   }),
   it: complete({
+    'Recibido de otros dispositivos: {applied} aplicados, {kept} conservados, {refused} rechazados': 'Ricevuto da altri dispositivi: {applied} applicati, {kept} conservati, {refused} rifiutati',
     'Cómo funciona': 'Come funziona',
     'Cada vault se conecta por separado y sigue publicándose en segundo plano aunque estés trabajando en otro vault.': 'Ogni vault si connette separatamente e continua a pubblicare in background anche mentre lavori in un altro vault.',
     'Tu ordenador es quien publica: mantenlo encendido y con Nodus abierto para enviar las novedades.': 'È il tuo computer a pubblicare: tienilo acceso con Nodus aperto per inviare le novità.',
@@ -305,6 +311,7 @@ export const SERVER_TRANSLATIONS = {
     'se ejecuta con Docker en otro equipo o VPS. Puede usar el Caddy incluido o tu Caddy/Nginx existente con un dominio o subdominio y HTTPS. La configuración inicial y la gestión de usuarios se hacen desde el navegador.': 'viene eseguito con Docker su un altro computer o VPS. Può usare Caddy incluso oppure il tuo Caddy/Nginx esistente con un dominio o sottodominio e HTTPS. La configurazione iniziale e la gestione degli utenti avvengono nel browser.',
   }),
   tr: complete({
+    'Recibido de otros dispositivos: {applied} aplicados, {kept} conservados, {refused} rechazados': 'Diğer cihazlardan alınan: {applied} uygulandı, {kept} korundu, {refused} reddedildi',
     'Cómo funciona': 'Nasıl çalışır',
     'Cada vault se conecta por separado y sigue publicándose en segundo plano aunque estés trabajando en otro vault.': 'Her kasa ayrı ayrı bağlanır ve başka bir kasada çalışıyor olsanız bile arka planda yayınlanmaya devam eder.',
     'Tu ordenador es quien publica: mantenlo encendido y con Nodus abierto para enviar las novedades.': 'Yayınlayan sizin bilgisayarınızdır: yenilikleri göndermek için bilgisayarınızı açık ve Nodus’u çalışır durumda tutun.',
