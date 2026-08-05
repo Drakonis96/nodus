@@ -33,6 +33,10 @@ const SYNC_GROUPS: { key: SyncGroupKey; prefix?: string; tables?: string[] }[] =
     key: 'writing',
     tables: [
       'writing_saved_drafts',
+      // Having read a report is true of the person, not of the machine, so it travels
+      // beside the report it is about. Why it is a table and not a column on the row
+      // above is in the migration that creates it.
+      'writing_draft_reads',
       'projects',
       'project_sections',
       'project_chapters',

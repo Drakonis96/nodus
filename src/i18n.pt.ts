@@ -7832,4 +7832,7 @@ export const PT: Record<string, string> = {
   "Avanzado · Docker y dominio propio": "Avançado · Docker e domínio próprio",
   "Un servidor independiente que sigue disponible aunque apagues este ordenador.": "Um servidor independente que continua disponível mesmo que desligue este computador.",
   "Abrir la administración web": "Abrir a administração web",
+  "Marcar como leído": "Marcar como lido",
+  "Marcar como no leído": "Marcar como não lido",
+  "Ya has leído este informe": "Já leu este relatório",
 };

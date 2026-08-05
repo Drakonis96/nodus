@@ -432,6 +432,25 @@ export function DeepResearchView({
     setComposerOpen(true);
   };
 
+  /**
+   * Read, or not read after all.
+   *
+   * The main process announces the change and the gallery re-reads itself, so the two
+   * writes here are only about the wait: the badge flips under the cursor rather than a
+   * round trip later. `openDraft` is separate state and would otherwise keep showing the
+   * old mark until the reader was closed — which is precisely where this is pressed.
+   */
+  const toggleRead = async (saved: WritingWorkshopSavedDraft) => {
+    try {
+      const next = await window.nodus.setWritingWorkshopDraftRead(saved.id, !saved.readAt);
+      if (!next) return;
+      setSavedDrafts((current) => current.map((item) => (item.id === next.id ? next : item)));
+      setOpenDraft((current) => (current?.id === next.id ? next : current));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
   const deleteDraft = async (saved: WritingWorkshopSavedDraft) => {
     const ok = await confirm({
       title: t(copy.deleteTitle),
@@ -663,6 +682,7 @@ export function DeepResearchView({
           onCopy={() => void copyDraft()}
           onCopyReading={() => void copyForListening()}
           onSaveToNotes={() => setSavingToNotes(true)}
+          onToggleRead={() => void toggleRead(openDraft)}
           onTranslate={() => setTranslationOpen(true)}
           onExport={(format) => void exportDraft(format)}
           onCitation={setCitation}
@@ -859,6 +879,7 @@ export function DeepResearchView({
                 onOpen={() => openReader(saved)}
                 onReuse={() => reusePrompt(saved)}
                 onDownload={() => void downloadDraft(saved)}
+                onToggleRead={() => void toggleRead(saved)}
                 onDelete={() => void deleteDraft(saved)}
               />
             ))}
@@ -877,6 +898,7 @@ export function DeepResearchView({
                 onOpen={() => openReader(saved)}
                 onReuse={() => reusePrompt(saved)}
                 onDownload={() => void downloadDraft(saved)}
+                onToggleRead={() => void toggleRead(saved)}
                 onDelete={() => void deleteDraft(saved)}
               />
             ))}
@@ -949,6 +971,40 @@ function SelectCheck({ checked }: { checked: boolean }) {
   );
 }
 
+/**
+ * The mark a report wears once it has been read, over its cover.
+ *
+ * On the illustration rather than beside the title, because the question it answers —
+ * which of these have I already been through? — is asked of the whole gallery at a
+ * glance, and a badge among the metadata has to be read one card at a time.
+ */
+function ReadBadge() {
+  return (
+    <span
+      className="pointer-events-none absolute right-2 top-2 z-10 flex items-center gap-1 rounded-full bg-emerald-950/80 px-2 py-0.5 text-[10px] font-medium text-emerald-200 ring-1 ring-emerald-700/60"
+      title={t('Ya has leído este informe')}
+    >
+      <Icon name="check" size={10} /> {t('Leído')}
+    </span>
+  );
+}
+
+/** The toggle itself, identical wherever a report is listed. */
+function ReadToggle({ read, onToggle }: { read: boolean; onToggle: () => void }) {
+  return (
+    <button
+      className={`btn btn-ghost !py-1 gap-1 border text-xs ${
+        read ? 'border-emerald-700/60 text-emerald-300' : 'border-neutral-700 text-neutral-400'
+      }`}
+      onClick={onToggle}
+      title={read ? t('Marcar como no leído') : t('Marcar como leído')}
+      aria-pressed={read}
+    >
+      <Icon name={read ? 'eyeOff' : 'check'} size={12} />
+    </button>
+  );
+}
+
 function DraftGridCard({
   saved,
   settings,
@@ -959,6 +1015,7 @@ function DraftGridCard({
   onOpen,
   onReuse,
   onDownload,
+  onToggleRead,
   onDelete,
 }: {
   saved: WritingWorkshopSavedDraft;
@@ -970,6 +1027,7 @@ function DraftGridCard({
   onOpen: () => void;
   onReuse: () => void;
   onDownload: () => void;
+  onToggleRead: () => void;
   onDelete: () => void;
 }) {
   const primary = selecting ? onToggle : onOpen;
@@ -1000,10 +1058,18 @@ function DraftGridCard({
             <SelectCheck checked={selected} />
           </span>
         )}
+        {saved.readAt && <ReadBadge />}
       </button>
       <div className="flex flex-1 flex-col p-3">
         <button className="text-left" onClick={primary}>
-          <div className="line-clamp-2 text-sm font-medium text-neutral-200" title={saved.title}>{saved.title}</div>
+          {/* A read report steps back a shade. Not struck through and not hidden: it is
+              still the same report, it is simply no longer one of the ones waiting. */}
+          <div
+            className={`line-clamp-2 text-sm ${saved.readAt ? 'font-normal text-neutral-400' : 'font-medium text-neutral-200'}`}
+            title={saved.title}
+          >
+            {saved.title}
+          </div>
         </button>
         <div className="mt-1 flex items-center gap-1.5 text-[11px] text-neutral-500">
           <Icon name="clock" size={11} /> {formatDate(saved.updatedAt)}
@@ -1025,6 +1091,7 @@ function DraftGridCard({
             >
               <Icon name={downloading ? 'sync' : 'download'} size={12} className={downloading ? 'animate-spin' : ''} />
             </button>
+            <ReadToggle read={!!saved.readAt} onToggle={onToggleRead} />
             <div className="flex-1" />
             <button className="btn btn-ghost !py-1 text-xs text-neutral-500 hover:text-red-400" onClick={onDelete} title={t('Eliminar informe')}>
               <Icon name="trash" size={12} />
@@ -1046,6 +1113,7 @@ function DraftListRow({
   onOpen,
   onReuse,
   onDownload,
+  onToggleRead,
   onDelete,
 }: {
   saved: WritingWorkshopSavedDraft;
@@ -1057,6 +1125,7 @@ function DraftListRow({
   onOpen: () => void;
   onReuse: () => void;
   onDownload: () => void;
+  onToggleRead: () => void;
   onDelete: () => void;
 }) {
   const primary = selecting ? onToggle : onOpen;
@@ -1089,10 +1158,21 @@ function DraftListRow({
         />
       </button>
       <button className="min-w-0 flex-1 text-left" onClick={primary}>
-        <div className="truncate text-sm font-medium text-neutral-200" title={saved.title}>{saved.title}</div>
+        <div
+          className={`truncate text-sm ${saved.readAt ? 'font-normal text-neutral-400' : 'font-medium text-neutral-200'}`}
+          title={saved.title}
+        >
+          {saved.title}
+        </div>
         <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-neutral-500">
           <Icon name="clock" size={11} /> {formatDate(saved.updatedAt)}
           {saved.model && <><span>·</span><span className="truncate">{modelLabel(saved.model)}</span></>}
+          {saved.readAt && (
+            <span className="flex items-center gap-1 text-emerald-400">
+              <span>·</span>
+              <Icon name="check" size={11} /> {t('Leído')}
+            </span>
+          )}
         </div>
       </button>
       {!selecting && (
@@ -1111,6 +1191,7 @@ function DraftListRow({
           >
             <Icon name={downloading ? 'sync' : 'download'} size={12} className={downloading ? 'animate-spin' : ''} />
           </button>
+          <ReadToggle read={!!saved.readAt} onToggle={onToggleRead} />
           <button className="btn btn-ghost !py-1 text-xs text-neutral-500 hover:text-red-400" onClick={onDelete} title={t('Eliminar informe')}>
             <Icon name="trash" size={12} />
           </button>
@@ -1239,6 +1320,7 @@ function ReaderView({
   onCopy,
   onCopyReading,
   onSaveToNotes,
+  onToggleRead,
   onTranslate,
   onExport,
   onCitation,
@@ -1259,6 +1341,7 @@ function ReaderView({
   onCopy: () => void;
   onCopyReading: () => void;
   onSaveToNotes: () => void;
+  onToggleRead: () => void;
   onTranslate: () => void;
   onExport: (format: 'markdown' | 'pdf') => void;
   onCitation: (target: CitationTarget) => void;
@@ -1288,6 +1371,16 @@ function ReaderView({
           onCopyReading={onCopyReading}
           onSaveToNotes={onSaveToNotes}
           onExport={onExport}
+        />
+        {/* Beside the reading actions, where somebody who has just finished the report
+            is already looking, rather than back in the gallery they would have to
+            return to first. */}
+        <HoverLabelButton
+          icon={saved.readAt ? 'eyeOff' : 'check'}
+          label={saved.readAt ? t('Marcar como no leído') : t('Marcar como leído')}
+          onClick={onToggleRead}
+          showLabel={!!saved.readAt}
+          className={`btn-ghost h-9 min-h-9 border ${saved.readAt ? 'border-emerald-700/60 text-emerald-300' : 'border-neutral-700'}`}
         />
         <HoverLabelButton
           icon="languages"
