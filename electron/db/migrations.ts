@@ -10,7 +10,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 123;
+export const SCHEMA_VERSION = 124;
 
 export const migrations: Migration[] = [
   {
@@ -6272,6 +6272,30 @@ export const migrations: Migration[] = [
       );
       CREATE INDEX idx_server_inbox_recent ON server_inbox(arrived_at DESC);
       CREATE INDEX idx_server_inbox_unread ON server_inbox(read, arrived_at DESC);
+    `,
+  },
+  {
+    version: 124,
+    up: /* sql */ `
+      -- Which saved reports have been read. The ROW's existence is what "read" means:
+      -- there is nothing else to store, and a boolean column would need a row for every
+      -- report merely to say "not yet".
+      --
+      -- A table of its own rather than a column on writing_saved_drafts, and that is the
+      -- whole point. That table is in MUTABLE_TABLES: an UPDATE on it fires the outbox
+      -- trigger, so on a connected vault every tick of a checkbox would put the entire
+      -- report back on the wire for the owner to receive again. Reading is not an edit of
+      -- the report.
+      --
+      -- It does travel in a .nodussync package, in the 'writing' group beside the reports
+      -- themselves — that is one person's two machines, and having read something on the
+      -- laptop is still true at the desk. Which is also why 'updated_at' carries the
+      -- moment it was marked rather than a second column repeating it: the merge compares
+      -- that name and no other, and unmarking is a DELETE the tombstones already carry.
+      CREATE TABLE writing_draft_reads (
+        draft_id   TEXT PRIMARY KEY,
+        updated_at TEXT NOT NULL
+      );
     `,
   },
 ];

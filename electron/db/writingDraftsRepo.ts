@@ -19,7 +19,16 @@ interface SavedWritingDraftRow {
   draft_json: string;
   created_at: string;
   updated_at: string;
+  /** From the LEFT JOIN below: when this report was marked read, or null. */
+  read_at?: string | null;
 }
+
+/** Every list goes through the same join, so a report can never be listed without
+ *  knowing whether it has been read — which is what made the badge and the button in
+ *  the gallery disagree the one time it was fetched separately. */
+const SELECT_DRAFTS =
+  'SELECT d.*, r.updated_at AS read_at FROM writing_saved_drafts d ' +
+  'LEFT JOIN writing_draft_reads r ON r.draft_id = d.id';
 
 function toSavedDraft(row: SavedWritingDraftRow): WritingWorkshopSavedDraft | null {
   try {
@@ -31,6 +40,7 @@ function toSavedDraft(row: SavedWritingDraftRow): WritingWorkshopSavedDraft | nu
       model: row.model_json ? (JSON.parse(row.model_json) as ModelRef) : null,
       draft: JSON.parse(row.draft_json) as WritingWorkshopDraft,
       image: getDecorativeImage('deep_research', row.id),
+      readAt: row.read_at ?? null,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
@@ -42,7 +52,7 @@ function toSavedDraft(row: SavedWritingDraftRow): WritingWorkshopSavedDraft | nu
 
 export function listWritingWorkshopDrafts(): WritingWorkshopSavedDraft[] {
   const rows = getDb()
-    .prepare('SELECT * FROM writing_saved_drafts ORDER BY updated_at DESC, created_at DESC')
+    .prepare(`${SELECT_DRAFTS} ORDER BY d.updated_at DESC, d.created_at DESC`)
     .all() as SavedWritingDraftRow[];
   return rows.map(toSavedDraft).filter((draft): draft is WritingWorkshopSavedDraft => draft !== null);
 }
@@ -73,11 +83,39 @@ export function saveWritingWorkshopDraft(request: WritingWorkshopSaveDraftReques
 }
 
 export function getWritingWorkshopDraft(id: string): WritingWorkshopSavedDraft | null {
-  const row = getDb().prepare('SELECT * FROM writing_saved_drafts WHERE id = ?').get(id) as SavedWritingDraftRow | undefined;
+  const row = getDb().prepare(`${SELECT_DRAFTS} WHERE d.id = ?`).get(id) as SavedWritingDraftRow | undefined;
   return row ? toSavedDraft(row) : null;
+}
+
+/**
+ * Mark a saved report read, or take the mark back.
+ *
+ * Returns the report as it now stands, or null when there is no such report — the
+ * gallery can have a stale id after a delete on another machine, and inserting a read
+ * mark for a report that is gone would leave a row nothing ever reads.
+ *
+ * There is no foreign key, deliberately: `writing_saved_drafts` rows also arrive by
+ * merge and by the ledger, and a constraint would decide the order those two have to
+ * land in. The delete below is what keeps a mark from outliving its report.
+ */
+export function setWritingWorkshopDraftRead(id: string, read: boolean): WritingWorkshopSavedDraft | null {
+  const db = getDb();
+  const exists = db.prepare('SELECT 1 FROM writing_saved_drafts WHERE id = ?').get(id);
+  if (!exists) return null;
+  if (read) {
+    db.prepare(
+      'INSERT INTO writing_draft_reads (draft_id, updated_at) VALUES (?, ?) ' +
+        'ON CONFLICT(draft_id) DO UPDATE SET updated_at = excluded.updated_at'
+    ).run(id, new Date().toISOString());
+  } else {
+    db.prepare('DELETE FROM writing_draft_reads WHERE draft_id = ?').run(id);
+  }
+  return getWritingWorkshopDraft(id);
 }
 
 export function deleteWritingWorkshopDraft(id: string): boolean {
   deleteDecorativeImageRow('deep_research', id);
+  // Before the report, so a mark can never be left pointing at nothing.
+  getDb().prepare('DELETE FROM writing_draft_reads WHERE draft_id = ?').run(id);
   return getDb().prepare('DELETE FROM writing_saved_drafts WHERE id = ?').run(id).changes > 0;
 }

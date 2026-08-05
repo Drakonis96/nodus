@@ -8117,4 +8117,7 @@ export const EN: Record<string, string> = {
   "Avanzado · Docker y dominio propio": "Advanced · Docker and your own domain",
   "Un servidor independiente que sigue disponible aunque apagues este ordenador.": "An independent server that stays available even if you switch this computer off.",
   "Abrir la administración web": "Open the web administration",
+  "Marcar como leído": "Mark as read",
+  "Marcar como no leído": "Mark as unread",
+  "Ya has leído este informe": "You have already read this report",
 };

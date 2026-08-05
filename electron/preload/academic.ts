@@ -483,6 +483,7 @@ export const academicApi: AcademicApi = {
   },
   listWritingWorkshopDrafts: () => ipcRenderer.invoke('writing:saved:list'),
   saveWritingWorkshopDraft: (request) => ipcRenderer.invoke('writing:saved:save', request),
+  setWritingWorkshopDraftRead: (id, read) => ipcRenderer.invoke('writing:saved:read', id, read),
   deleteWritingWorkshopDraft: (id) => ipcRenderer.invoke('writing:saved:delete', id).then(() => undefined),
   onWritingDraftsChanged: (cb) => {
     const listener = () => cb();

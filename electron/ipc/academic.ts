@@ -1217,6 +1217,13 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
     });
     return { ...saved, image };
   });
+  h('writing:saved:read', async (_e, id: string, read: boolean) => {
+    const saved = writingDrafts.setWritingWorkshopDraftRead(id, read);
+    // The same announcement a save makes, so a report marked read while reading it is
+    // already wearing its badge when the gallery comes back.
+    if (saved) announceWritingDrafts();
+    return saved;
+  });
   h('writing:saved:delete', async (_e, id: string) => {
     invalidateDecorativeImageGeneration('deep_research', id);
     translationsRepo.deleteEntityTranslations('deep_research', id);

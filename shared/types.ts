@@ -6044,6 +6044,14 @@ export interface WritingWorkshopSavedDraft {
   model: ModelRef | null;
   draft: WritingWorkshopDraft;
   image: DecorativeImage | null;
+  /**
+   * When the reader marked this report read, or null while they have not.
+   *
+   * Separate from `updatedAt`: reading a report does not change it, and the two would
+   * otherwise fight over the same field — sorting by "most recent" would put whatever
+   * you last opened at the top of the gallery.
+   */
+  readAt: string | null;
   createdAt: string;
   updatedAt: string;
 }

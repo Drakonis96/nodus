@@ -7640,4 +7640,7 @@ export const TR: Record<string, string> = {
   "Avanzado · Docker y dominio propio": "Gelişmiş · Docker ve kendi alan adınız",
   "Un servidor independiente que sigue disponible aunque apagues este ordenador.": "Bu bilgisayarı kapatsanız bile erişilebilir kalan bağımsız bir sunucu.",
   "Abrir la administración web": "Web yönetimini aç",
+  "Marcar como leído": "Okundu olarak işaretle",
+  "Marcar como no leído": "Okunmadı olarak işaretle",
+  "Ya has leído este informe": "Bu raporu zaten okudunuz",
 };

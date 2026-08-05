@@ -578,6 +578,12 @@ export interface AcademicApi {
   ): Promise<DeepResearchArchiveResult | null>;
   listWritingWorkshopDrafts(): Promise<WritingWorkshopSavedDraft[]>;
   saveWritingWorkshopDraft(request: WritingWorkshopSaveDraftRequest): Promise<WritingWorkshopSavedDraft>;
+  /**
+   * Mark a saved report read, or take the mark back. Resolves to the report as it now
+   * stands, or `null` when it no longer exists — which is the honest answer for a
+   * gallery holding an id another machine has since deleted.
+   */
+  setWritingWorkshopDraftRead(id: string, read: boolean): Promise<WritingWorkshopSavedDraft | null>;
   deleteWritingWorkshopDraft(id: string): Promise<void>;
   /**
    * Push: the saved-drafts table changed under this window's feet.
