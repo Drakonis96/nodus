@@ -111,6 +111,9 @@ const RELEASE_3_2_2_IT: string[] = [
 
 const RELEASE_3_2_3_IT: string[] = [
   "La ricerca sul telefono smette di fallire quando ciò che cerchi compare in un tema, in un personaggio o in una scena. Bastava una sola di quelle schede perché l'app non riuscisse a leggere la risposta e non mostrasse alcun risultato. Ora ogni risultato arriva identificato e l'elenco si apre per intero.",
+  "Un rapporto di Deep Research si può contrassegnare come letto, sul computer e sul telefono. La galleria lo dice a colpo d'occhio, con un contrassegno sulla copertina e il titolo più leggero, così non serve più aprire venti rapporti per capire quale resta da leggere.",
+  "Sul telefono, seleziona un passaggio di un rapporto e conservalo come segnalibro di lettura. Ce n'è uno solo per rapporto, resta segnato nel testo stesso e riaprendo il rapporto si arriva proprio lì. Toccando il passaggio segnato lo puoi togliere.",
+  "Ogni opera sul telefono ha ora un pulsante che la apre in Zotero per iPhone e iPad. La chiave di Zotero smette di essere una riga morta della scheda e diventa la via di ritorno al PDF, alle note e alle annotazioni che stanno nell'altra applicazione.",
 ];
 
 export const RELEASE_NOTES_IT: Record<string, string[]> = {

@@ -27,10 +27,11 @@ try {
   const currentRelease = RELEASE_NOTES[0];
   assert.equal(currentRelease?.version, '3.2.3');
   assert.equal(currentRelease?.date, '2026-08-05');
-  // A search result whose row the server could not name, so the phone discarded the whole
-  // answer rather than one line of it. One highlight: the floor stays at one so a patch does
-  // not have to invent a second thing to say.
-  assert.ok(currentRelease?.highlights.length >= 1, 'the release must describe what changed');
+  // A search result whose row the server could not name, and then three things about reading
+  // rather than finding: a report marked as read, a passage kept as the place you stopped, and
+  // a work that leads back to its item in Zotero. A floor rather than an exact count, in case
+  // more lands here before it ships.
+  assert.ok(currentRelease?.highlights.length >= 4, 'the release must describe what changed');
   for (const highlight of currentRelease.highlights) {
     // Written for the person using Nodus: no module names, no internal vocabulary.
     for (const language of ['es', 'en', 'fr', 'de', 'pt', 'pt-BR']) {

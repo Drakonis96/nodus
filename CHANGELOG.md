@@ -1,5 +1,32 @@
 # Changelog
 
+## 3.2.3 — 2026-08-05
+
+Reading, rather than finding. A report can be marked as read, a passage on the
+phone can be kept as the place you stopped, and a work on the phone leads back to
+its item in Zotero. Search on a connected phone also answers at all again.
+
+### Added
+
+- **A Deep Research report can be marked as read**, on the desktop and on the
+  phone. The gallery says so at a glance — a badge over the cover, a lighter
+  title — so the question a list of twenty reports raises is answered by
+  scanning rather than by opening each one. On the desktop the mark travels
+  between your own machines in a sync package; it is deliberately not an edit of
+  the report, so it never goes back on the wire to a connected vault.
+- **A reading bookmark on the phone.** Select a passage in a report and keep it.
+  There is one per report, it is marked in the text itself, reopening the report
+  goes straight to it, and tapping the marked words offers to remove it.
+- **A work on the phone opens in Zotero.** The Zotero key stops being a dead line
+  of the record and becomes the way back to the PDF, the notes and the
+  annotations that live in the other app.
+
+### Fixed
+
+- **Search on a connected phone answers again** when what you are looking for
+  appears in a theme, a character or a scene. One such match was enough for the
+  app to be unable to read the answer, so it showed no results at all.
+
 ## 3.2.0 — 2026-08-04
 
 Work that arrives from another device has somewhere to land, and the two places
