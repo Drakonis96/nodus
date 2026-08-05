@@ -49,7 +49,12 @@ const RELEASE_3_2_2_TR: string[] = [
   "Zaten çözülmüş bir eşitleme hatası artık gösterilmiyor. Kasa paneli, başarıyla tamamlanmış bir yayımın hemen yanında, sunucu hatasını oturumun geri kalanı boyunca göstermeye devam edebiliyordu. Uyarı artık eşitleme yeniden çalışır çalışmaz kayboluyor.",
 ];
 
+const RELEASE_3_2_3_TR: string[] = [
+  "Telefondaki arama, aradığınız şey bir temada, bir karakterde ya da bir sahnede geçtiğinde artık başarısız olmuyor. Bu kartlardan yalnızca birinin eşleşmesi, uygulamanın yanıtı okuyamamasına ve hiçbir sonuç göstermemesine yetiyordu. Artık her sonuç kimliğiyle geliyor ve liste eksiksiz açılıyor.",
+];
+
 export const RELEASE_NOTES_TR: Record<string, string[]> = {
+  "3.2.3": RELEASE_3_2_3_TR,
   "3.2.2": RELEASE_3_2_2_TR,
   "3.2.1": RELEASE_3_2_1_TR,
   "3.2.0": RELEASE_3_2_0_TR,

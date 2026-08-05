@@ -402,6 +402,28 @@ test('the REST API and the MCP tools answer the same questions the same way', { 
       'both surfaces share one lexical search implementation',
     );
 
+    // Every hit must be nameable, on both surfaces. This is not decoration: the mobile
+    // client types `id` as a plain string, so ONE hit without it fails the decode and the
+    // reader gets "Unexpected answer from the server" instead of any of the results. The
+    // interpolation above cannot see the difference — a missing id renders as the string
+    // "undefined" on both sides and the comparison still passes.
+    for (const [surface, results] of [['REST', restSearch.results], ['MCP', mcpSearch.result.structuredContent.results]]) {
+      assert.ok(results.length > 0, `${surface} search found something to check`);
+      for (const hit of results) {
+        assert.ok(Object.hasOwn(hit, 'id'), `${surface}: a ${hit.type} hit was serialised without an id`);
+        assert.equal(typeof hit.id, 'string', `${surface}: the id of a ${hit.type} hit is not a string`);
+        assert.ok(hit.id.length > 0, `${surface}: a ${hit.type} hit carries an empty id`);
+      }
+    }
+
+    // The two tables the guessed fallback chain got wrong. `themes` is keyed on theme_id
+    // and had no id at all; `passages` is keyed on passage_id but also carries the
+    // nodus_id of the work it was cut from, so every passage hit was named after its
+    // source work — an answer that looks right and opens the wrong record.
+    const named = new Map(restSearch.results.map((hit) => [hit.type, hit.id]));
+    assert.equal(named.get('themes'), 't-2', 'a theme hit is named by its theme_id');
+    assert.equal(named.get('passages'), 'p-1', 'a passage hit is named by its passage_id, not by its work');
+
     const mcpSummary = await mcp(server.origin, mcpTokens.access_token, 'tools/call', { name: 'nodus_get_space_summary', arguments: { spaceId } }, 3);
     const restSummary = await readJson(await server.api(owner.deviceToken, 'GET', `/api/v1/spaces/${spaceId}`));
     assert.deepEqual(restSummary.counts, mcpSummary.result.structuredContent.counts);

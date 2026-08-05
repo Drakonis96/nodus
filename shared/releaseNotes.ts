@@ -758,7 +758,33 @@ const RELEASE_3_2_2_HIGHLIGHTS: RawReleaseHighlight[] = [
   },
 ];
 
+/**
+ * 3.2.3 is search on a connected phone answering at all.
+ *
+ * Each result carries the identifier of the row it found, and for a theme, a character or a
+ * scene the server had none to give: those rows are keyed on a column of their own, and the
+ * generic guess came up empty. The app cannot read a result without one, so it discarded the
+ * whole answer, and a single theme whose name contained the query took every other result down
+ * with it.
+ */
+const RELEASE_3_2_3_HIGHLIGHTS: RawReleaseHighlight[] = [
+  {
+    scope: 'general',
+    es: 'La búsqueda en el móvil deja de fallar cuando lo que se busca aparece en un tema, un personaje o una escena. Bastaba con que una de esas fichas coincidiera para que la app no pudiera leer la respuesta del servidor y no mostrara ningún resultado. Ahora cada resultado llega identificado y la lista se abre entera.',
+    en: 'Search on the phone stops failing when what you are looking for appears in a theme, a character or a scene. One matching card was enough for the app to be unable to read the answer, so it showed no results at all. Every result now arrives properly identified and the list opens in full.',
+    fr: 'La recherche sur le téléphone cesse d’échouer quand ce que vous cherchez apparaît dans un thème, un personnage ou une scène. Il suffisait d’une seule de ces fiches pour que l’application ne puisse pas lire la réponse et n’affiche aucun résultat. Chaque résultat arrive désormais identifié et la liste s’ouvre en entier.',
+    de: 'Die Suche auf dem Telefon scheitert nicht mehr, wenn das Gesuchte in einem Thema, einer Figur oder einer Szene vorkommt. Eine einzige solche Karte reichte, damit die App die Antwort nicht lesen konnte und gar keine Ergebnisse zeigte. Jedes Ergebnis kommt jetzt eindeutig benannt an und die Liste öffnet sich vollständig.',
+    pt: 'A pesquisa no telemóvel deixa de falhar quando o que procura aparece num tema, numa personagem ou numa cena. Bastava uma dessas fichas coincidir para a aplicação não conseguir ler a resposta e não mostrar resultado nenhum. Agora cada resultado chega identificado e a lista abre por inteiro.',
+    'pt-BR': 'A busca no celular deixa de falhar quando o que você procura aparece em um tema, um personagem ou uma cena. Bastava uma dessas fichas coincidir para o aplicativo não conseguir ler a resposta e não mostrar resultado nenhum. Agora cada resultado chega identificado e a lista abre por inteiro.',
+  },
+];
+
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
+  {
+    version: '3.2.3',
+    date: '2026-08-05',
+    highlights: RELEASE_3_2_3_HIGHLIGHTS,
+  },
   {
     version: '3.2.2',
     date: '2026-08-04',
