@@ -51,6 +51,9 @@ const RELEASE_3_2_2_TR: string[] = [
 
 const RELEASE_3_2_3_TR: string[] = [
   "Telefondaki arama, aradığınız şey bir temada, bir karakterde ya da bir sahnede geçtiğinde artık başarısız olmuyor. Bu kartlardan yalnızca birinin eşleşmesi, uygulamanın yanıtı okuyamamasına ve hiçbir sonuç göstermemesine yetiyordu. Artık her sonuç kimliğiyle geliyor ve liste eksiksiz açılıyor.",
+  "Bir Deep Research raporu artık okundu olarak işaretlenebiliyor, hem masaüstünde hem telefonda. Galeri bunu bir bakışta söylüyor, kapağın üzerindeki bir rozetle ve daha hafif bir başlıkla. Böylece hangisinin beklediğini anlamak için yirmi raporu açmak gerekmiyor.",
+  "Telefonda, bir rapordaki pasajı seçip okuma yer imi olarak saklayabilirsiniz. Her rapor için yalnızca bir tane var, metnin kendisinde işaretli duruyor ve raporu yeniden açtığınızda tam oraya geliyorsunuz. İşaretli pasaja dokunmak onu kaldırmayı öneriyor.",
+  "Telefondaki her eser artık onu iPhone ve iPad için Zotero'da açan bir düğme taşıyor. Zotero anahtarı kayıttaki ölü bir satır olmaktan çıkıp diğer uygulamadaki PDF'e, notlara ve işaretlemelere dönüş yolu oluyor.",
 ];
 
 export const RELEASE_NOTES_TR: Record<string, string[]> = {

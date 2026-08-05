@@ -759,13 +759,18 @@ const RELEASE_3_2_2_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 /**
- * 3.2.3 is search on a connected phone answering at all.
+ * 3.2.3 is search on a connected phone answering at all, and three things a reader can now do
+ * with what they are reading.
  *
- * Each result carries the identifier of the row it found, and for a theme, a character or a
- * scene the server had none to give: those rows are keyed on a column of their own, and the
- * generic guess came up empty. The app cannot read a result without one, so it discarded the
- * whole answer, and a single theme whose name contained the query took every other result down
- * with it.
+ * The search: each result carries the identifier of the row it found, and for a theme, a
+ * character or a scene the server had none to give — those rows are keyed on a column of their
+ * own, and the generic guess came up empty. The app cannot read a result without one, so it
+ * discarded the whole answer, and a single theme whose name contained the query took every other
+ * result down with it.
+ *
+ * The other three are about reading rather than finding: a report can be marked as read, a
+ * passage on the phone can be kept as the place you stopped, and a work on the phone leads back
+ * to its item in Zotero.
  */
 const RELEASE_3_2_3_HIGHLIGHTS: RawReleaseHighlight[] = [
   {
@@ -776,6 +781,33 @@ const RELEASE_3_2_3_HIGHLIGHTS: RawReleaseHighlight[] = [
     de: 'Die Suche auf dem Telefon scheitert nicht mehr, wenn das Gesuchte in einem Thema, einer Figur oder einer Szene vorkommt. Eine einzige solche Karte reichte, damit die App die Antwort nicht lesen konnte und gar keine Ergebnisse zeigte. Jedes Ergebnis kommt jetzt eindeutig benannt an und die Liste öffnet sich vollständig.',
     pt: 'A pesquisa no telemóvel deixa de falhar quando o que procura aparece num tema, numa personagem ou numa cena. Bastava uma dessas fichas coincidir para a aplicação não conseguir ler a resposta e não mostrar resultado nenhum. Agora cada resultado chega identificado e a lista abre por inteiro.',
     'pt-BR': 'A busca no celular deixa de falhar quando o que você procura aparece em um tema, um personagem ou uma cena. Bastava uma dessas fichas coincidir para o aplicativo não conseguir ler a resposta e não mostrar resultado nenhum. Agora cada resultado chega identificado e a lista abre por inteiro.',
+  },
+  {
+    scope: 'general',
+    es: 'Un informe de Deep Research se puede marcar como leído, en el escritorio y en el móvil. La galería lo dice de un vistazo, con una insignia sobre la portada y el título un punto más ligero, así que ya no hay que abrir veinte informes para saber cuál queda pendiente.',
+    en: 'A Deep Research report can be marked as read, on the desktop and on the phone. The gallery says so at a glance, with a badge over the cover and a lighter title, so you no longer have to open twenty reports to find out which one is still waiting.',
+    fr: 'Un rapport de Deep Research peut être marqué comme lu, sur l’ordinateur comme sur le téléphone. La galerie le dit d’un coup d’œil, avec une pastille sur la couverture et un titre plus léger, et il n’y a plus besoin d’ouvrir vingt rapports pour savoir lequel attend encore.',
+    de: 'Ein Deep-Research-Bericht lässt sich als gelesen markieren, am Schreibtisch und am Telefon. Die Galerie zeigt es auf einen Blick, mit einer Plakette über dem Titelbild und einem leichteren Titel. So müssen Sie nicht mehr zwanzig Berichte öffnen, um zu sehen, welcher noch wartet.',
+    pt: 'Um relatório de Deep Research pode ser marcado como lido, no computador e no telemóvel. A galeria di-lo num relance, com um selo sobre a capa e o título mais leve, por isso já não é preciso abrir vinte relatórios para saber qual ainda está por ler.',
+    'pt-BR': 'Um relatório de Deep Research pode ser marcado como lido, no computador e no celular. A galeria mostra isso num relance, com um selo sobre a capa e o título mais leve, então não é mais preciso abrir vinte relatórios para saber qual ainda está esperando.',
+  },
+  {
+    scope: 'general',
+    es: 'En el móvil, selecciona un pasaje de un informe y guárdalo como marcador de lectura. Solo hay uno por informe, se ve marcado en el propio texto y, al volver a abrir el informe, se abre justo ahí. Tocando el pasaje marcado puedes quitarlo.',
+    en: 'On the phone, select a passage in a report and keep it as a reading bookmark. There is only one per report, it is marked in the text itself, and reopening the report takes you straight to it. Tapping the marked passage offers to remove it.',
+    fr: 'Sur le téléphone, sélectionnez un passage d’un rapport et gardez-le comme marque-page de lecture. Il n’y en a qu’un par rapport, il est signalé dans le texte, et rouvrir le rapport vous y ramène directement. Toucher le passage marqué propose de l’enlever.',
+    de: 'Wählen Sie am Telefon eine Passage in einem Bericht aus und behalten Sie sie als Lesezeichen. Es gibt nur eines pro Bericht, es ist im Text selbst markiert, und beim erneuten Öffnen landen Sie genau dort. Ein Tippen auf die markierte Stelle bietet an, sie zu entfernen.',
+    pt: 'No telemóvel, selecione uma passagem de um relatório e guarde-a como marcador de leitura. Só existe um por relatório, fica assinalado no próprio texto e, ao reabrir o relatório, este abre precisamente aí. Tocar na passagem marcada permite removê-la.',
+    'pt-BR': 'No celular, selecione um trecho de um relatório e guarde como marcador de leitura. Só existe um por relatório, ele fica marcado no próprio texto e, ao reabrir o relatório, ele abre exatamente ali. Tocar no trecho marcado permite removê-lo.',
+  },
+  {
+    scope: 'general',
+    es: 'Cada obra en el móvil lleva ahora un botón que la abre en Zotero para iPhone y iPad. La clave de Zotero deja de ser un dato muerto de la ficha y pasa a ser el camino de vuelta al PDF, a las notas y a las anotaciones que están en la otra aplicación.',
+    en: 'Every work on the phone now carries a control that opens it in Zotero for iPhone and iPad. The Zotero key stops being a dead line of the record and becomes the way back to the PDF, the notes and the annotations that live in the other app.',
+    fr: 'Chaque œuvre sur le téléphone porte désormais un bouton qui l’ouvre dans Zotero pour iPhone et iPad. La clé Zotero cesse d’être une ligne morte de la fiche et devient le chemin de retour vers le PDF, les notes et les annotations qui vivent dans l’autre application.',
+    de: 'Jedes Werk auf dem Telefon hat jetzt eine Schaltfläche, die es in Zotero für iPhone und iPad öffnet. Der Zotero-Schlüssel ist keine tote Zeile des Datensatzes mehr, sondern der Weg zurück zum PDF, zu den Notizen und zu den Anmerkungen in der anderen App.',
+    pt: 'Cada obra no telemóvel passa a ter um botão que a abre no Zotero para iPhone e iPad. A chave do Zotero deixa de ser uma linha morta da ficha e passa a ser o caminho de volta ao PDF, às notas e às anotações que estão na outra aplicação.',
+    'pt-BR': 'Cada obra no celular agora tem um botão que a abre no Zotero para iPhone e iPad. A chave do Zotero deixa de ser uma linha morta da ficha e vira o caminho de volta ao PDF, às notas e às anotações que estão no outro aplicativo.',
   },
 ];
 
