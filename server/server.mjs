@@ -9,6 +9,7 @@ import { gunzipSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { Store, digest, pairingCode, token } from './lib/store.mjs';
 import { DEFAULT_MAX_MUTATION_BYTES } from './lib/core/mutations.mjs';
+import { lexicalSearch } from './lib/core/search.mjs';
 import { SnapshotCache } from './lib/snapshotCache.mjs';
 import { body, contentSecurityPolicy, cookies, escapeHtml, form, html, json, jsonBody, redirect } from './lib/http.mjs';
 import { normalizeServerLanguage, serverTranslator } from './lib/i18n.mjs';
@@ -582,28 +583,12 @@ function callTool(auth, name, args) {
     return toolResult({ space: { id: space.id, name: space.name, description: space.description, updatedAt: space.updatedAt }, vault: snapshot.vault, generatedAt: snapshot.generatedAt, counts: Object.fromEntries(Object.entries(snapshot.tables ?? {}).map(([key, value]) => [key, Array.isArray(value) ? value.length : 0])) });
   }
   if (name === 'nodus_search') {
-    const query = String(args.query ?? '').trim().toLowerCase();
+    // Shared with GET /api/v1/spaces/:id/search rather than copied beside it. The copy
+    // that used to live here is exactly what lib/core/search.mjs was extracted to
+    // prevent, and it drifted: the fix that gave a theme or a passage hit a usable id
+    // landed in one surface and not the other.
     const limit = Math.max(1, Math.min(50, Number(args.limit) || 20));
-    if (!query) return toolResult({ results: [] });
-    const definitions = [
-      ['works', ['title', 'abstract', 'citation']], ['ideas', ['label', 'statement']], ['themes', ['label', 'description']],
-      ['gaps', ['text', 'description']], ['notes', ['title', 'content']], ['passages', ['text']],
-      ['persons', ['display_name', 'notes', 'biography']], ['character_profiles', ['species', 'gender', 'pronouns', 'appearance', 'personality', 'backstory']],
-      ['places', ['name', 'kind', 'notes']], ['place_profiles', ['appearance', 'atmosphere', 'history']],
-      ['world_groups', ['name', 'summary', 'description', 'notes']], ['world_scenes', ['title', 'summary', 'notes']],
-      ['world_scene_text', ['text']], ['world_articles', ['title', 'summary', 'body', 'aka', 'notes']],
-      ['world_threads', ['title', 'pitch', 'stakes', 'outcome']], ['world_rules', ['title', 'statement', 'cost', 'limits']],
-      ['world_questions', ['question']], ['world_secrets', ['title', 'content', 'notes']],
-    ];
-    const results = [];
-    for (const [table, fields] of definitions) {
-      for (const row of rows(snapshot, table)) {
-        const text = fields.map((field) => row[field]).filter((value) => typeof value === 'string').join('\n');
-        if (text.toLowerCase().includes(query)) results.push({ type: table, id: row.id ?? row.nodus_id ?? row.global_id ?? row.passage_id, title: row.title ?? row.label ?? text.slice(0, 120), excerpt: text.slice(0, 600) });
-        if (results.length >= limit) return toolResult({ results });
-      }
-    }
-    return toolResult({ results });
+    return toolResult({ results: lexicalSearch(snapshot, args.query, limit) });
   }
   if (name === 'nodus_get_work') {
     const work = rows(snapshot, 'works').find((entry) => String(entry.nodus_id ?? entry.id) === String(args.id));
