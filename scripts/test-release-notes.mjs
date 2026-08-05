@@ -25,11 +25,10 @@ try {
 
   const { RELEASE_NOTES, releaseNotesForMajor, compareVersions } = await import(pathToFileURL(bundlePath).href);
   const currentRelease = RELEASE_NOTES[0];
-  assert.equal(currentRelease?.version, '3.2.2');
-  assert.equal(currentRelease?.date, '2026-08-04');
-  // A sync error that was written on failure and never taken back, so a server that answered
-  // badly for one tick marked the vault for the rest of the session. One highlight, because
-  // that is genuinely all this release is: the floor is one rather than two so a patch does
+  assert.equal(currentRelease?.version, '3.2.3');
+  assert.equal(currentRelease?.date, '2026-08-05');
+  // A search result whose row the server could not name, so the phone discarded the whole
+  // answer rather than one line of it. One highlight: the floor stays at one so a patch does
   // not have to invent a second thing to say.
   assert.ok(currentRelease?.highlights.length >= 1, 'the release must describe what changed');
   for (const highlight of currentRelease.highlights) {

@@ -109,7 +109,12 @@ const RELEASE_3_2_2_IT: string[] = [
   "Un errore di sincronizzazione già risolto smette di essere mostrato. Il pannello del vault poteva mostrare un guasto del server per tutto il resto della sessione, proprio accanto a una pubblicazione andata a buon fine. L'avviso sparisce appena la sincronizzazione torna a funzionare.",
 ];
 
+const RELEASE_3_2_3_IT: string[] = [
+  "La ricerca sul telefono smette di fallire quando ciò che cerchi compare in un tema, in un personaggio o in una scena. Bastava una sola di quelle schede perché l'app non riuscisse a leggere la risposta e non mostrasse alcun risultato. Ora ogni risultato arriva identificato e l'elenco si apre per intero.",
+];
+
 export const RELEASE_NOTES_IT: Record<string, string[]> = {
+  "3.2.3": RELEASE_3_2_3_IT,
   "3.2.2": RELEASE_3_2_2_IT,
   "3.2.1": RELEASE_3_2_1_IT,
   "3.2.0": RELEASE_3_2_0_IT,
