@@ -281,8 +281,14 @@ test('primary_sources uses a dedicated documentary shell and keeps optional auth
   assert.match(vt.vaultTypePromptPack('primary_sources'), /propuesta pendiente de revisión/i);
 });
 
-test('academic shows the full sidebar; estudio uses its dedicated learning workspace', () => {
-  assert.deepEqual(vt.defaultHiddenViewsForType('academic'), []);
+test('academic hides only what an immature corpus cannot feed; estudio uses its dedicated learning workspace', () => {
+  // The Hypothesis lab and the Reading path answer with noise until the corpus has
+  // been analysed in depth, which reads as broken rather than empty. Everything else
+  // an academic vault owns stays visible.
+  assert.deepEqual(vt.defaultHiddenViewsForType('academic'), ['hypothesis', 'reading']);
+  for (const kept of ['search', 'library', 'graph', 'argument', 'ideas', 'authors', 'immersion', 'debate', 'research', 'deepResearch', 'writing', 'projects', 'notes', 'toolkit']) {
+    assert.ok(!vt.defaultHiddenViewsForType('academic').includes(kept), `${kept} stays visible in academic`);
+  }
   const estudioHidden = vt.defaultHiddenViewsForType('estudio');
   for (const hidden of ['search', 'library', 'graph', 'debate', 'deepResearch', 'writing', 'notes']) {
     assert.ok(estudioHidden.includes(hidden), `${hidden} replaced by a study-specific surface`);
@@ -401,7 +407,7 @@ test('viewsDisallowedForType lists the scoped views not applicable to a type', (
 test('effectiveSidebarHidden: preset when untouched, user choice once customised', () => {
   // Untouched → the type preset drives visibility.
   assert.deepEqual(vt.effectiveSidebarHidden([], false, 'estudio'), vt.defaultHiddenViewsForType('estudio'));
-  assert.deepEqual(vt.effectiveSidebarHidden([], false, 'academic'), []);
+  assert.deepEqual(vt.effectiveSidebarHidden([], false, 'academic'), ['hypothesis', 'reading']);
   // Customised → the user's explicit set wins, regardless of type.
   assert.deepEqual(vt.effectiveSidebarHidden(['graph'], true, 'estudio'), ['graph']);
   assert.deepEqual(vt.effectiveSidebarHidden([], true, 'estudio'), []);

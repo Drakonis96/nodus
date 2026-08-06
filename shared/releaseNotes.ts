@@ -864,6 +864,15 @@ const RELEASE_3_2_4_HIGHLIGHTS: RawReleaseHighlight[] = [
     pt: 'O Nodus passa a dizer onde encontrá-lo fora da aplicação. O modal de novidades e as Definições, em Acerca do Nodus, levam ao Reddit, ao YouTube e ao X com o ícone de cada rede. As ligações abrem no seu navegador e a aplicação não envia nada para essas redes.',
     'pt-BR': 'O Nodus agora diz onde encontrá-lo fora do aplicativo. O modal de novidades e as Configurações, em Sobre o Nodus, levam ao Reddit, ao YouTube e ao X com o ícone de cada rede. Os links abrem no seu navegador e o aplicativo não envia nada para essas redes.',
   },
+  {
+    scope: 'academic',
+    es: 'Un vault académico abre con menos secciones. Huecos pasa a ser una pestaña dentro de Cobertura, porque un hueco solo significa algo mirando qué le falta a tu pregunta. Hipótesis y Ruta de lectura quedan ocultas de entrada, ya que con un corpus recién sincronizado respondían con ruido. Las dos vuelven desde Ajustes.',
+    en: 'An academic vault opens with fewer sections. Gaps becomes a tab inside Coverage, because a gap only means something when you are looking at what your own question is missing. Hypotheses and Reading path start hidden, since on a freshly synced corpus they answered with noise. Both come back from Settings.',
+    fr: 'Un coffre académique s’ouvre avec moins de sections. Lacunes devient un onglet dans Couverture, car une lacune n’a de sens que face à ce qui manque à votre propre question. Hypothèses et Parcours de lecture sont masqués au départ, car sur un corpus fraîchement synchronisé ils répondaient par du bruit. Les deux reviennent depuis les Paramètres.',
+    de: 'Ein akademischer Tresor öffnet mit weniger Abschnitten. Lücken wird zu einem Reiter innerhalb von Abdeckung, denn eine Lücke bedeutet nur etwas im Blick darauf, was der eigenen Frage fehlt. Hypothesen und Lesepfad sind anfangs ausgeblendet, da sie bei einem frisch synchronisierten Korpus mit Rauschen antworteten. Beide kommen über die Einstellungen zurück.',
+    pt: 'Um cofre académico abre com menos secções. Lacunas passa a ser um separador dentro de Cobertura, porque uma lacuna só significa algo olhando para o que falta à sua pergunta. Hipóteses e Percurso de leitura ficam ocultos à partida, já que num corpus acabado de sincronizar respondiam com ruído. Ambos voltam a partir das Definições.',
+    'pt-BR': 'Um cofre acadêmico abre com menos seções. Lacunas passa a ser uma aba dentro de Cobertura, porque uma lacuna só significa algo olhando para o que falta à sua pergunta. Hipóteses e Caminho de leitura começam ocultos, já que em um corpus recém-sincronizado respondiam com ruído. Os dois voltam pelas Configurações.',
+  },
 ];
 
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
