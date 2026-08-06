@@ -26,6 +26,7 @@ import { PRIMARY_SOURCES_RELEASE_TRANSLATIONS } from './i18n.primarySourcesRelea
 import { TESTIMONY_TRANSLATIONS } from './i18n.testimonies';
 import { NEW_VAULT_COMPLETION_TRANSLATIONS } from './i18n.newVaultCompletion';
 import { NODI_NOTIFICATION_TRANSLATIONS } from './i18n.nodiNotifications';
+import { ANNOUNCEMENT_TRANSLATIONS } from './i18n.announcements';
 
 export const DE: Record<string, string> = {
   ...DIARIZATION_TRANSLATIONS.de,
@@ -44,6 +45,7 @@ export const DE: Record<string, string> = {
   ...TESTIMONY_TRANSLATIONS.de,
   ...NEW_VAULT_COMPLETION_TRANSLATIONS.de,
   ...NODI_NOTIFICATION_TRANSLATIONS['de'],
+  ...ANNOUNCEMENT_TRANSLATIONS['de'],
   ...WORLD_CHAT_TRANSLATIONS.de,
   "Lo que cuenta el mapa": "Was die Karte erzählt",
   "Ver dónde ocurren las escenas ({n})": "Zeigen, wo die Szenen spielen ({n})",
@@ -1805,8 +1807,8 @@ export const DE: Record<string, string> = {
   '¿Es tu primera vez? En menos de un minuto te enseño cómo convertir tu biblioteca de Zotero en un grafo de ideas. Puedes saltártelo cuando quieras.':
     'Ist das Ihr erstes Mal? In weniger als einer Minute zeige ich Ihnen, wie Sie Ihre Zotero-Bibliothek in einen Ideengraphen verwandeln. Sie können es jederzeit überspringen.',
   'Bóvedas independientes': 'Unabhängige Arbeitsbereiche',
-  'Cada bóveda es un espacio separado: biblioteca, grafo, notas, proyectos, chats, ajustes, embeddings y claves API pueden vivir aislados. Usa este selector para crear otra, cambiar de bóveda o cargar claves desde una bóveda anterior.':
-    'Jeder Arbeitsbereich ist ein eigener Bereich: Bibliothek, Graph, Notizen, Projekte, Chats, Einstellungen, Embeddings und API-Schlüssel können isoliert bleiben. Verwenden Sie diese Auswahl, um einen weiteren zu erstellen, den Arbeitsbereich zu wechseln oder Schlüssel aus einem früheren Arbeitsbereich zu laden.',
+  'Cada bóveda es un espacio separado: biblioteca, grafo, notas, proyectos, chats, ajustes, embeddings y claves API pueden vivir aislados. Pulsa esta insignia para crear otra, cambiar de bóveda o cargar claves desde una bóveda anterior.':
+    'Jeder Arbeitsbereich ist ein eigener Bereich: Bibliothek, Graph, Notizen, Projekte, Chats, Einstellungen, Embeddings und API-Schlüssel können isoliert bleiben. Klicken Sie auf dieses Abzeichen, um einen weiteren zu erstellen, den Arbeitsbereich zu wechseln oder Schlüssel aus einem früheren Arbeitsbereich zu laden.',
   'El grafo de ideas': 'Der Ideengraph',
   'Es el corazón de Nodus. Cada nodo es una idea extraída de tus lecturas y cada arista una relación entre ellas. Empieza vacío: se llena a medida que escaneas obras a fondo.':
     'Er ist das Herzstück von Nodus. Jeder Knoten ist eine Idee aus Ihrer Lektüre, und jede Kante eine Beziehung zwischen ihnen. Er beginnt leer und füllt sich, während Sie Werke gründlich scannen.',
@@ -1814,8 +1816,8 @@ export const DE: Record<string, string> = {
   'Este botón trae las obras de tus colecciones monitorizadas. Por defecto solo incorpora metadatos; puedes activar análisis automático en Ajustes.':
     'Diese Schaltfläche holt die Werke aus Ihren überwachten Sammlungen. Standardmäßig werden nur Metadaten übernommen; Sie können die automatische Analyse in den Einstellungen aktivieren.',
   'Elegir colecciones': 'Sammlungen auswählen',
-  'Aquí decides qué colecciones o subcolecciones de Zotero vigila Nodus. Empieza con una pequeña para probar; sus subcolecciones se incluyen solas.':
-    'Hier entscheiden Sie, welche Zotero-Sammlungen oder -Untersammlungen Nodus überwacht. Beginnen Sie zum Testen mit einer kleinen; ihre Untersammlungen werden automatisch einbezogen.',
+  'Decide qué colecciones o subcolecciones de Zotero vigila Nodus. Ábrelo desde la paleta de comandos (⌘K o Ctrl+K) buscando «Colecciones». Empieza con una pequeña para probar; sus subcolecciones se incluyen solas.':
+    'Entscheiden Sie, welche Zotero-Sammlungen oder -Untersammlungen Nodus überwacht. Öffnen Sie es über die Befehlspalette (⌘K oder Strg+K), indem Sie nach „Sammlungen“ suchen. Beginnen Sie zum Testen mit einer kleinen; ihre Untersammlungen werden automatisch einbezogen.',
   'Tu biblioteca': 'Ihre Bibliothek',
   'Aquí tienes todas tus obras con su estado de escaneo: ligero (temas) y profundo (ideas). Desde aquí decides qué llevar al grafo.':
     'Hier finden Sie alle Ihre Werke mit ihrem Scan-Status: leicht (Themen) und tief (Ideen). Von hier aus entscheiden Sie, was in den Graphen übernommen wird.',

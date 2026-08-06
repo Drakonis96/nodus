@@ -26,6 +26,7 @@ import { PRIMARY_SOURCES_RELEASE_TRANSLATIONS } from './i18n.primarySourcesRelea
 import { TESTIMONY_TRANSLATIONS } from './i18n.testimonies';
 import { NEW_VAULT_COMPLETION_TRANSLATIONS } from './i18n.newVaultCompletion';
 import { NODI_NOTIFICATION_TRANSLATIONS } from './i18n.nodiNotifications';
+import { ANNOUNCEMENT_TRANSLATIONS } from './i18n.announcements';
 
 export const PT_BR: Record<string, string> = {
   ...DIARIZATION_TRANSLATIONS['pt-BR'],
@@ -44,6 +45,7 @@ export const PT_BR: Record<string, string> = {
   ...TESTIMONY_TRANSLATIONS.ptBR,
   ...NEW_VAULT_COMPLETION_TRANSLATIONS['pt-BR'],
   ...NODI_NOTIFICATION_TRANSLATIONS['pt-BR'],
+  ...ANNOUNCEMENT_TRANSLATIONS['pt-BR'],
   ...WORLD_CHAT_TRANSLATIONS.ptBR,
   "Lo que cuenta el mapa": "O que o mapa conta",
   "Ver dónde ocurren las escenas ({n})": "Ver onde acontecem as cenas ({n})",
@@ -1791,8 +1793,8 @@ export const PT_BR: Record<string, string> = {
   '¿Es tu primera vez? En menos de un minuto te enseño cómo convertir tu biblioteca de Zotero en un grafo de ideas. Puedes saltártelo cuando quieras.':
     'É a sua primeira vez? Em menos de um minuto eu mostro como transformar sua biblioteca do Zotero em um grafo de ideias. Você pode pular quando quiser.',
   'Bóvedas independientes': 'Espaços independentes',
-  'Cada bóveda es un espacio separado: biblioteca, grafo, notas, proyectos, chats, ajustes, embeddings y claves API pueden vivir aislados. Usa este selector para crear otra, cambiar de bóveda o cargar claves desde una bóveda anterior.':
-    'Cada espaço é um ambiente separado: biblioteca, grafo, notas, projetos, chats, configurações, embeddings e chaves de API podem ficar isolados. Use este seletor para criar outro, trocar de espaço ou carregar chaves de um espaço anterior.',
+  'Cada bóveda es un espacio separado: biblioteca, grafo, notas, proyectos, chats, ajustes, embeddings y claves API pueden vivir aislados. Pulsa esta insignia para crear otra, cambiar de bóveda o cargar claves desde una bóveda anterior.':
+    'Cada espaço é um ambiente separado: biblioteca, grafo, notas, projetos, chats, configurações, embeddings e chaves de API podem ficar isolados. Clique neste selo para criar outro, trocar de espaço ou carregar chaves de um espaço anterior.',
   'El grafo de ideas': 'O grafo de ideias',
   'Es el corazón de Nodus. Cada nodo es una idea extraída de tus lecturas y cada arista una relación entre ellas. Empieza vacío: se llena a medida que escaneas obras a fondo.':
     'É o coração do Nodus. Cada nó é uma ideia extraída das suas leituras e cada aresta uma relação entre elas. Começa vazio: vai se preenchendo à medida que você escaneia obras a fundo.',
@@ -1800,8 +1802,8 @@ export const PT_BR: Record<string, string> = {
   'Este botón trae las obras de tus colecciones monitorizadas. Por defecto solo incorpora metadatos; puedes activar análisis automático en Ajustes.':
     'Este botão traz as obras das suas coleções monitoradas. Por padrão, incorpora apenas metadados; você pode ativar a análise automática em Configurações.',
   'Elegir colecciones': 'Escolher coleções',
-  'Aquí decides qué colecciones o subcolecciones de Zotero vigila Nodus. Empieza con una pequeña para probar; sus subcolecciones se incluyen solas.':
-    'Aqui você decide quais coleções ou subcoleções do Zotero o Nodus monitora. Comece com uma pequena para testar; suas subcoleções são incluídas automaticamente.',
+  'Decide qué colecciones o subcolecciones de Zotero vigila Nodus. Ábrelo desde la paleta de comandos (⌘K o Ctrl+K) buscando «Colecciones». Empieza con una pequeña para probar; sus subcolecciones se incluyen solas.':
+    'Decida quais coleções ou subcoleções do Zotero o Nodus monitora. Abra pela paleta de comandos (⌘K ou Ctrl+K) buscando «Coleções». Comece com uma pequena para testar; suas subcoleções são incluídas automaticamente.',
   'Tu biblioteca': 'Sua biblioteca',
   'Aquí tienes todas tus obras con su estado de escaneo: ligero (temas) y profundo (ideas). Desde aquí decides qué llevar al grafo.':
     'Aqui estão todas as suas obras com o status de escaneamento: leve (temas) e profundo (ideias). A partir daqui você decide o que levar para o grafo.',

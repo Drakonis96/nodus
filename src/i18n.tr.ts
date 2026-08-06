@@ -20,6 +20,7 @@ import { PRIMARY_SOURCES_RELEASE_TRANSLATIONS } from './i18n.primarySourcesRelea
 import { TESTIMONY_TRANSLATIONS } from './i18n.testimonies';
 import { NEW_VAULT_COMPLETION_TRANSLATIONS } from './i18n.newVaultCompletion';
 import { NODI_NOTIFICATION_TRANSLATIONS } from './i18n.nodiNotifications';
+import { ANNOUNCEMENT_TRANSLATIONS } from './i18n.announcements';
 
 /** Complete static Turkish interface table; coverage prohibits runtime fallbacks. */
 export const TR: Record<string, string> = {
@@ -39,6 +40,7 @@ export const TR: Record<string, string> = {
   ...TESTIMONY_TRANSLATIONS.tr,
   ...NEW_VAULT_COMPLETION_TRANSLATIONS.tr,
   ...NODI_NOTIFICATION_TRANSLATIONS['tr'],
+  ...ANNOUNCEMENT_TRANSLATIONS['tr'],
   ...WORLD_CHAT_TRANSLATIONS.tr,
   "Lo que cuenta el mapa": "Haritanın anlattıkları",
   "Ver dónde ocurren las escenas ({n})": "Sahnelerin nerede geçtiğini gör ({n})",
@@ -2018,13 +2020,13 @@ export const TR: Record<string, string> = {
   "¡Bienvenido a Nodus!": "Nodus'a hoş geldiniz!",
   "¿Es tu primera vez? En menos de un minuto te enseño cómo convertir tu biblioteca de Zotero en un grafo de ideas. Puedes saltártelo cuando quieras.": "İlk seferin mi? Bir dakikadan kısa bir süre içinde size Zotero kitaplığınızı bir fikir grafiğine nasıl dönüştüreceğinizi göstereceğim. İstediğiniz zaman atlayabilirsiniz.",
   "Bóvedas independientes": "Bağımsız kasalar",
-  "Cada bóveda es un espacio separado: biblioteca, grafo, notas, proyectos, chats, ajustes, embeddings y claves API pueden vivir aislados. Usa este selector para crear otra, cambiar de bóveda o cargar claves desde una bóveda anterior.": "Her kasa ayrı bir alandır: kitaplık, grafik, notlar, projeler, sohbetler, ayarlar, yerleştirmeler ve API anahtarları ayrı ayrı yaşayabilir. Başka bir kasa oluşturmak, kasaları değiştirmek veya önceki kasanın anahtarlarını yüklemek için bu seçiciyi kullanın.",
+  "Cada bóveda es un espacio separado: biblioteca, grafo, notas, proyectos, chats, ajustes, embeddings y claves API pueden vivir aislados. Pulsa esta insignia para crear otra, cambiar de bóveda o cargar claves desde una bóveda anterior.": "Her kasa ayrı bir alandır: kitaplık, grafik, notlar, projeler, sohbetler, ayarlar, yerleştirmeler ve API anahtarları ayrı ayrı yaşayabilir. Başka bir kasa oluşturmak, kasaları değiştirmek veya önceki kasanın anahtarlarını yüklemek için bu rozete tıklayın.",
   "El grafo de ideas": "Fikir grafiği",
   "Es el corazón de Nodus. Cada nodo es una idea extraída de tus lecturas y cada arista una relación entre ellas. Empieza vacío: se llena a medida que escaneas obras a fondo.": "Nodus'un kalbidir. Her düğüm, okumalarınızdan çıkarılan bir fikirdir ve her kenar, bunlar arasındaki bir ilişkidir. Boş başlar: Siz taradıkça doldurur, eksiksiz çalışır.",
   "Actualizar desde Zotero": "Zotero'dan güncelleme",
   "Este botón trae las obras de tus colecciones monitorizadas. Por defecto solo incorpora metadatos; puedes activar análisis automático en Ajustes.": "Bu buton izlenen koleksiyonlarınızdaki çalışmaları getirir. Varsayılan olarak yalnızca meta verileri içerir; Otomatik analizi Ayarlar'dan etkinleştirebilirsiniz.",
   "Elegir colecciones": "Koleksiyonları seçin",
-  "Aquí decides qué colecciones o subcolecciones de Zotero vigila Nodus. Empieza con una pequeña para probar; sus subcolecciones se incluyen solas.": "Burada Nodus'un hangi Zotero koleksiyonlarını veya alt koleksiyonlarını takip edeceğine karar verirsiniz. Test etmek için küçük bir taneyle başlayın; alt koleksiyonları tek başınadır.",
+  "Decide qué colecciones o subcolecciones de Zotero vigila Nodus. Ábrelo desde la paleta de comandos (⌘K o Ctrl+K) buscando «Colecciones». Empieza con una pequeña para probar; sus subcolecciones se incluyen solas.": "Nodus'un hangi Zotero koleksiyonlarını veya alt koleksiyonlarını takip edeceğine karar verin. Komut paletinden (⌘K veya Ctrl+K) «Koleksiyonlar» arayarak açın. Test etmek için küçük bir taneyle başlayın; alt koleksiyonları otomatik olarak dahil edilir.",
   "Tu biblioteca": "Kitaplığınız",
   "Aquí tienes todas tus obras con su estado de escaneo: ligero (temas) y profundo (ideas). Desde aquí decides qué llevar al grafo.": "Burada tüm çalışmalarınızı tarama durumlarıyla birlikte bulabilirsiniz: hafif (temalar) ve derin (fikirler). Buradan grafiğe ne getireceğinize karar verirsiniz.",
   "Añadir una obra al grafo": "Ağa bir iş ekleme",

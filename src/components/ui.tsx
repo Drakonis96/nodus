@@ -295,6 +295,7 @@ export function HoverLabelButton({
   'data-tour'?: string;
   'data-vault-trigger'?: string;
   'data-inbox-trigger'?: string;
+  'data-notifications-trigger'?: string;
   'data-testid'?: string;
 }) {
   return (

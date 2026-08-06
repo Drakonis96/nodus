@@ -93,6 +93,14 @@ export const nodusApi: NodusApi = {
     ipcRenderer.on('nodi:notifications:changed', listener);
     return () => ipcRenderer.removeListener('nodi:notifications:changed', listener);
   },
+  // Published announcements
+  listAnnouncements: () => ipcRenderer.invoke('announcements:list'),
+  markAnnouncementRead: (id) => ipcRenderer.invoke('announcements:markRead', id),
+  onAnnouncementsChanged: (cb) => {
+    const listener = (_e: unknown, list: Parameters<typeof cb>[0]) => cb(list);
+    ipcRenderer.on('announcements:changed', listener);
+    return () => ipcRenderer.removeListener('announcements:changed', listener);
+  },
   // Nodi companion: chat (streaming) + overlay-window helpers
   nodiChatStream: async (request, handlers) => {
     const requestId = `nodi-${Date.now()}-${Math.random().toString(36).slice(2)}`;

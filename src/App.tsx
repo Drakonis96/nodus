@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { AppSettings, CorpusHealthBucketId, DatabaseSummary, RecoveryStatus, ServerInboxEntry, SyncLogEntry, VaultSummary } from '@shared/types';
+import type { AppSettings, CorpusHealthBucketId, DatabaseSummary, NodiNotification, RecoveryStatus, ServerInboxEntry, SyncLogEntry, VaultSummary } from '@shared/types';
 import type { CsvImportPlanData } from './views/DatabasesView';
 import { FeedbackModal } from './views/FeedbackModal';
 import { RoadmapFeedbackModal, type RoadmapTopicKey } from './views/RoadmapFeedbackModal';
@@ -9,6 +9,7 @@ import { EmbeddingProgressBar } from './components/EmbeddingProgressBar';
 import { PassageProgressBar } from './components/PassageProgressBar';
 import { VaultSwitcher, vaultTypeIcon, vaultTypeLabel } from './components/VaultSwitcher';
 import { ServerInbox } from './components/ServerInbox';
+import { NotificationsPanel, useAnnouncements } from './components/NotificationsPanel';
 import { DatabasesSidebarExplore } from './components/DatabasesSidebarExplore';
 import { StudySidebar, type StudyNavigationTarget } from './components/StudySidebar';
 import { TeachingSidebar } from './components/TeachingSidebar';
@@ -106,6 +107,7 @@ function HeaderAction({
   kbd,
   vaultTrigger = false,
   inboxTrigger = false,
+  notificationsTrigger = false,
 }: {
   icon: string;
   label: string;
@@ -120,12 +122,15 @@ function HeaderAction({
   vaultTrigger?: boolean;
   /** Lets the Inbox panel's outside-click handler ignore its own trigger, so it toggles. */
   inboxTrigger?: boolean;
+  /** Same, for the notifications panel. */
+  notificationsTrigger?: boolean;
 }) {
   return (
     <HoverLabelButton
       data-tour={dataTour}
       data-vault-trigger={vaultTrigger ? '' : undefined}
       data-inbox-trigger={inboxTrigger ? '' : undefined}
+      data-notifications-trigger={notificationsTrigger ? '' : undefined}
       icon={icon}
       label={label}
       title={title}
@@ -204,6 +209,10 @@ export function App() {
   // when nothing has happened — the poller tells the window when something has.
   const [inboxAnchor, setInboxAnchor] = useState<HTMLElement | null>(null);
   const [inbox, setInbox] = useState<ServerInboxEntry[]>([]);
+  // The notification centre. Same two lists Nodi shows, reachable without Nodi.
+  const [notificationsAnchor, setNotificationsAnchor] = useState<HTMLElement | null>(null);
+  const [notifications, setNotifications] = useState<NodiNotification[]>([]);
+  const { announcements, unread: unreadAnnouncements, markRead: markAnnouncementRead } = useAnnouncements();
   // Live placement of the centred vault badge. Both rails around it change width
   // (the logo tracks the sidebar; the action rail grows when a button pins or
   // reveals its label), so the badge is measured rather than pinned at 50% — see
@@ -228,6 +237,17 @@ export function App() {
     (el: HTMLElement) => setInboxAnchor((cur) => (cur === el ? null : el)),
     []
   );
+  // Opening the panel clears the ACTIVITY feed only — "I have seen these" is all that
+  // list ever means. An announcement stays unread until it is read one at a time.
+  const toggleNotifications = useCallback((el: HTMLElement) => {
+    setNotificationsAnchor((cur) => {
+      if (cur === el) return null;
+      if (notifications.some((notification) => !notification.read)) {
+        void window.nodus.markNotificationsRead().then(setNotifications).catch(() => {});
+      }
+      return el;
+    });
+  }, [notifications]);
   const [graphTarget, setGraphTarget] = useState<PendingGraphNavigationTarget & { nonce: number } | null>(null);
   const [ideaTarget, setIdeaTarget] = useState<PendingIdeaNavigationTarget & { nonce: number } | null>(null);
   const [libraryTarget, setLibraryTarget] = useState<PendingLibraryNavigationTarget & { nonce: number } | null>(null);
@@ -306,6 +326,12 @@ export function App() {
   };
 
   const unreadInbox = useMemo(() => inbox.reduce((n, e) => n + (e.read ? 0 : 1), 0), [inbox]);
+  // One count for one button: an unread announcement and an unread activity line both
+  // mean "there is something here you have not seen".
+  const unreadNotifications = useMemo(
+    () => unreadAnnouncements + notifications.reduce((n, x) => n + (x.read ? 0 : 1), 0),
+    [unreadAnnouncements, notifications]
+  );
 
   // Load the inbox once and then let the main process push it. The poller broadcasts after
   // any batch that produced entries, and the mutators return the fresh list themselves, so
@@ -314,6 +340,13 @@ export function App() {
     void window.nodus.listServerInbox().then(setInbox).catch(() => undefined);
     return window.nodus.onServerInboxChanged(setInbox);
   }, [activeVault?.id]);
+
+  // Same pattern for the activity feed, which the main process pushes whenever a job
+  // finishes. Nodi subscribes to the very same channel, so both stay in step.
+  useEffect(() => {
+    void window.nodus.listNotifications().then(setNotifications).catch(() => undefined);
+    return window.nodus.onNotificationsChanged(setNotifications);
+  }, []);
 
   // Sidebar sections grouped for rendering (Explorar · Analizar · Escribir),
   // each group in the user's chosen order, minus any hidden sections. Home is
@@ -966,6 +999,9 @@ export function App() {
       run: () => setView(n.id),
     }));
     const actions: Command[] = [
+      // The last resort for the vault panel: the badge that opens it is placed by
+      // measurement and can, in a window narrow enough, have nowhere to go.
+      { id: 'act:vaults', label: t('Bóvedas'), section: t('Acciones'), icon: 'archive', keywords: 'vaults bovedas boveda cambiar crear renombrar duplicar eliminar', run: () => { const badge = document.querySelector<HTMLElement>('[data-testid="header-vault-badge"]'); if (badge) toggleVaults(badge); } },
       { id: 'act:assistant', label: t(isWorldbuilding ? 'Chat del mundo' : 'Asistente de investigación'), section: t('Acciones'), icon: 'chat', keywords: 'assistant chat', run: () => openAssistant() },
       { id: 'act:presenter', label: 'PDF Presenter', section: t('Acciones'), icon: 'presentation', keywords: 'presentar diapositivas slides pdf presenter proyector herramientas toolkit', run: () => { setToolkitPage('presenter'); setView('toolkit'); } },
       { id: 'act:feedback', label: t('Sugerir función o reportar error'), section: t('Acciones'), icon: 'gitPr', keywords: 'feedback github pr bug feature sugerencia error', run: () => setFeedbackOpen(true) },
@@ -983,7 +1019,7 @@ export function App() {
       );
     }
     return [...navCommands, ...actions];
-  }, [settings?.uiLanguage, settings?.reduceMotion, settings?.readingFocusMode, activeVault?.type, isPrimarySources, isGenealogy, isDatabases, isEstudio, isDocencia, isWorldbuilding, isProsopography, isTestimonios, isDark, onSync, openAssistant, reloadSettings]);
+  }, [settings?.uiLanguage, settings?.reduceMotion, settings?.readingFocusMode, activeVault?.type, isPrimarySources, isGenealogy, isDatabases, isEstudio, isDocencia, isWorldbuilding, isProsopography, isTestimonios, isDark, onSync, openAssistant, reloadSettings, toggleVaults]);
 
   // The startup sequence, as an ordered list of guards rather than a run of early
   // returns. It also sets this render's authoritative language, which is why it is
@@ -1069,6 +1105,7 @@ export function App() {
     setPendingRecordId,
     setCollectionsOpen,
     setManualWhatsNewOpen,
+    setRoadmapOpen,
     createDatabase,
     importCsv,
     loadDemo,
@@ -1126,6 +1163,7 @@ export function App() {
           <button
             ref={setVaultBadgeEl}
             data-vault-trigger
+            data-tour="vault-badge"
             data-testid="header-vault-badge"
             data-badge-fits={vaultBadgePlacement ? String(vaultBadgePlacement.fits) : undefined}
             aria-expanded={Boolean(vaultAnchor)}
@@ -1133,12 +1171,16 @@ export function App() {
               left: vaultBadgePlacement ? `${vaultBadgePlacement.left}px` : '50%',
               visibility: vaultBadgePlacement?.fits ? 'visible' : 'hidden',
             }}
-            className="header-vault-badge absolute top-1/2 hidden -translate-y-1/2 items-center gap-1.5 rounded-full border border-indigo-700/60 bg-indigo-950/30 px-3 py-0.5 text-xs font-semibold uppercase tracking-wide text-indigo-200 transition-colors hover:border-indigo-500 hover:bg-indigo-900/40 xl:inline-flex"
+            className="header-vault-badge absolute top-1/2 inline-flex -translate-y-1/2 items-center gap-1.5 rounded-full border border-indigo-700/60 bg-indigo-950/30 px-3 py-0.5 text-xs font-semibold uppercase tracking-wide text-indigo-200 transition-colors hover:border-indigo-500 hover:bg-indigo-900/40"
             title={t('Bóveda activa')}
             onClick={(e) => toggleVaults(e.currentTarget)}
           >
             <Icon name={vaultTypeIcon(activeVault.type)} size={13} />
-            {vaultTypeLabel(activeVault.type)}
+            {/* The badge is now the only permanent way into the vault panel, so it is
+                shown at every width — the LABEL is what gives way on a narrow window,
+                not the button. Dropping the word leaves an icon-and-chevron chip that
+                fits in a band where the full badge would not. */}
+            <span className="hidden xl:inline">{vaultTypeLabel(activeVault.type)}</span>
             <Icon name="chevronDown" size={12} className={`transition-transform ${vaultAnchor ? 'rotate-180' : ''}`} />
           </button>
         )}
@@ -1149,14 +1191,8 @@ export function App() {
             grows leftwards as labels open, which is why the centre badge measures
             it instead of assuming a fixed clearance. */}
         <div ref={setHeaderActionsEl} data-testid="header-actions" className="flex items-center gap-0.5 pr-4">
-          <HeaderAction
-            dataTour="vaults"
-            vaultTrigger
-            icon="archive"
-            label={t('Bóvedas')}
-            title={t('Bóveda activa')}
-            onClick={(e) => toggleVaults(e.currentTarget)}
-          />
+          {/* No Bóvedas button: the centred badge is the way in, and it is now shown at
+              every width for exactly that reason (see the badge above). */}
           <HeaderAction
             icon="search"
             label={t('Comandos')}
@@ -1188,41 +1224,41 @@ export function App() {
             title={t('Abrir Nodus Toolkit')}
             onClick={() => { setToolkitPage('home'); setView('toolkit'); }}
           />
-          {/* Colecciones y Actualizar dependen de Zotero → solo en bóvedas
-              académicas; genealogía, bases de datos, estudio y docencia no
-              sincronizan con Zotero. */}
-          {!isPrimarySources && !isGenealogy && !isDatabases && !isEstudio && !isDocencia && !isWorldbuilding && !isProsopography && !isTestimonios && (
-            <HeaderAction
-              dataTour="collections"
-              icon="folder"
-              label={t('Colecciones')}
-              onClick={() => setCollectionsOpen(true)}
-            />
-          )}
+          {/* Colecciones ya no vive aquí: sigue a un comando de distancia («Colecciones»
+              en la paleta) y su sitio natural es la configuración de Zotero. */}
           {/* Inside the measured actions box on purpose: the ResizeObserver above feeds
               placeHeaderBadge, which keeps this rail from ever reaching the centred vault
               badge. A badge positioned outside this box is exactly what that geometry
               cannot see. The wrapper is what the count hangs off — HoverLabelButton's
-              `trailing` slot sits inside a label span that is max-w-0 until hover. */}
-          <span className="relative inline-flex">
-            <HeaderAction
-              icon="inbox"
-              label={t('Bandeja')}
-              title={t('Lo que ha llegado de otros dispositivos')}
-              inboxTrigger
-              onClick={(e) => toggleInbox(e.currentTarget)}
-            />
-            {unreadInbox > 0 && (
-              <span className="header-action-badge">{unreadInbox > 9 ? '9+' : unreadInbox}</span>
-            )}
-          </span>
+              `trailing` slot sits inside a label span that is max-w-0 until hover.
+
+              Only shown once something has actually arrived: the inbox is per vault and
+              only means anything for a connected one, so on a local install it was a
+              permanently empty icon sitting next to a bell that is never empty. */}
+          {inbox.length > 0 && (
+            <span className="relative inline-flex">
+              <HeaderAction
+                icon="inbox"
+                label={t('Bandeja')}
+                title={t('Lo que ha llegado de otros dispositivos')}
+                inboxTrigger
+                onClick={(e) => toggleInbox(e.currentTarget)}
+              />
+              {unreadInbox > 0 && (
+                <span className="header-action-badge">{unreadInbox > 9 ? '9+' : unreadInbox}</span>
+              )}
+            </span>
+          )}
           <HeaderAction
             icon="gitPr"
             label={t('Sugerir / Reportar')}
             title={t('Enviar una propuesta o reporte a GitHub')}
             onClick={() => setFeedbackOpen(true)}
           />
-          {!isGenealogy && !isDatabases && !isEstudio && !isDocencia && !isWorldbuilding && !isProsopography && !isTestimonios && (
+          {/* Actualizar depende de Zotero igual que Colecciones dependía, así que la
+              condición es ahora la misma: fuentes primarias no sincroniza con Zotero y
+              antes mostraba este botón por una asimetría entre el comentario y el código. */}
+          {!isPrimarySources && !isGenealogy && !isDatabases && !isEstudio && !isDocencia && !isWorldbuilding && !isProsopography && !isTestimonios && (
             <HeaderAction
               dataTour="sync"
               icon="refresh"
@@ -1234,18 +1270,27 @@ export function App() {
             />
           )}
           <HeaderAction
-            icon="route"
-            label={t('Roadmap')}
-            title={t('Ver roadmap de Nodus')}
-            onClick={() => setRoadmapOpen(true)}
-          />
-          <HeaderAction
             icon={isDark ? 'sun' : 'moon'}
             label={isDark ? t('Usar tema claro') : t('Usar tema oscuro')}
             title={isDark ? t('Cambiar a modo claro') : t('Cambiar a modo oscuro')}
             onClick={() => void toggleTheme()}
             dataTour="theme-toggle"
           />
+          {/* The notification centre, reachable whether or not Nodi is enabled — turning
+              the mascot off used to take the only way to read these with it. */}
+          <span className="relative inline-flex">
+            <HeaderAction
+              dataTour="notifications"
+              icon="bell"
+              label={t('Notificaciones')}
+              title={t('Avisos de Nodus y actividad reciente')}
+              notificationsTrigger
+              onClick={(e) => toggleNotifications(e.currentTarget)}
+            />
+            {unreadNotifications > 0 && (
+              <span className="header-action-badge">{unreadNotifications > 9 ? '9+' : unreadNotifications}</span>
+            )}
+          </span>
           <HeaderAction
             icon="settings"
             label={t('Ajustes')}
@@ -1278,6 +1323,16 @@ export function App() {
               setInboxAnchor(null);
             }
           }}
+        />
+
+        <NotificationsPanel
+          anchorEl={notificationsAnchor}
+          onClose={() => setNotificationsAnchor(null)}
+          notifications={notifications}
+          announcements={announcements}
+          language={settings.uiLanguage}
+          onMarkAnnouncementRead={markAnnouncementRead}
+          onClearActivity={() => void window.nodus.clearNotifications().then(setNotifications).catch(() => {})}
         />
       </header>
 

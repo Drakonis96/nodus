@@ -454,7 +454,8 @@ try {
 
   // ── Vault wizard: independent, required text + embedding models ───────────
   const originalVaultId = (await page.evaluate(() => window.nodus.getActiveVault())).id;
-  await page.locator('[data-tour="vaults"]').click();
+  // The right-rail Bóvedas button is gone; the centred badge is the way into the panel.
+  await page.locator('[data-testid="header-vault-badge"]').click();
   await page.getByRole('button', { name: 'Añadir', exact: true }).click();
   const vaultDialog = page.getByRole('dialog', { name: 'Añadir bóveda' });
   await vaultDialog.waitFor();
@@ -856,8 +857,21 @@ try {
     assert.fail(`the header badge never settled clear of the rails (${label}): ${safety.why}`);
   };
 
+  const setWindowWidth = async (width) => {
+    await app.evaluate(({ BrowserWindow }, w) => {
+      const win = BrowserWindow.getAllWindows()[0];
+      if (win) win.setBounds({ width: w, height: Math.max(win.getBounds().height, 900) });
+    }, width).catch(() => {});
+    await page.waitForTimeout(300);
+  };
+  const badgeCentreOffset = async () => {
+    const g = await readHeaderGeometry();
+    if (!g?.visible) return null;
+    return Math.abs((g.badge.left + g.badge.width / 2) - (g.header.left + g.header.width / 2));
+  };
+
   if (headerViewportWidth < 1280) {
-    console.log(`[e2e] header centre badge steps skipped: window is ${headerViewportWidth}px (< xl), where the badge is display:none by design; geometry covered by scripts/test-header-layout.mjs`);
+    console.log(`[e2e] header centre badge steps skipped: the window is ${headerViewportWidth}px and the resize did not take; geometry covered by scripts/test-header-layout.mjs`);
   } else {
     // The model warning is pinned open in this profile (no synthesis model yet at
     // first launch) — the exact state that used to overlap. Force both cases.
@@ -865,8 +879,19 @@ try {
     await page.evaluate(() => window.nodus.updateSettings({ synthesisModel: null }));
     await waitForCondition('aviso de modelo de IA visible', async () =>
       (await page.getByText('Configura un modelo de IA', { exact: true }).count()) > 0);
-    const withAlert = await assertHeaderBadgeSafe('con el aviso de IA abierto');
+    // Since three icons left the rail, the pinned alert alone no longer crowds the badge
+    // at 1440, so the tight case is made by narrowing the window too. That is the state
+    // the clamp exists for: the badge must leave the true centre rather than slide under
+    // a rail. Asserted as an offset from centre, not as an absolute left, because a
+    // narrower window moves the centre as well and would make a raw comparison pass for
+    // the wrong reason.
+    await setWindowWidth(980);
+    const tight = await assertHeaderBadgeSafe('con el aviso de IA abierto y la ventana estrecha');
+    assert.ok(tight.visible, 'the badge stays visible on a tight header');
+    const tightOffset = Math.abs((tight.badge.left + tight.badge.width / 2) - (tight.header.left + tight.header.width / 2));
+    assert.ok(tightOffset > 1, `the tight header must clamp the badge off the true centre (offset ${tightOffset.toFixed(1)}px)`);
 
+    await setWindowWidth(1440);
     await page.evaluate((model) => window.nodus.updateSettings({ synthesisModel: model }), originalSynthesis);
     await waitForCondition('aviso de modelo de IA retirado', async () =>
       (await page.getByText('Configura un modelo de IA', { exact: true }).count()) === 0);
@@ -874,21 +899,12 @@ try {
     // centre — the resting position the design calls for. Waited for rather than
     // sampled: the clamped spot it is leaving is itself "clear of the rails", so a
     // single read could catch it mid-return.
-    const badgeCentreOffset = async () => {
-      const g = await readHeaderGeometry();
-      if (!g?.visible) return null;
-      return Math.abs((g.badge.left + g.badge.width / 2) - (g.header.left + g.header.width / 2));
-    };
     await waitForCondition('el badge vuelve al centro exacto', async () => {
       const offset = await badgeCentreOffset();
       return offset !== null && offset <= 1;
     });
     const roomy = await assertHeaderBadgeSafe('sin el aviso');
     assert.ok(roomy.visible, 'the badge shows on a roomy header');
-    assert.ok(
-      withAlert.badge.left < roomy.badge.left,
-      `the alert pushed the badge off centre (${withAlert.badge.left}) and it came back (${roomy.badge.left})`
-    );
 
     // Hovering a rail button opens its label and widens the rail mid-flight.
     await page.locator('[data-tour="toolkit"]').hover();

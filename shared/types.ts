@@ -164,6 +164,7 @@ export type {
 import type { VaultType } from './vaultTypes';
 import type { TutorialVideo } from './tutorialVideos';
 import type { NodiNotificationText } from './nodiNotifications';
+import type { AnnouncementEntry } from './announcements';
 import type {
 } from './toolkitApps';
 import type {
@@ -1331,6 +1332,12 @@ export interface AppSettings {
   reduceMotion: boolean;
   /** Reduces visual noise and gives study reading surfaces a calmer measure. */
   readingFocusMode: boolean;
+  /**
+   * Whether to fetch the published announcements (see shared/announcements.ts). On by
+   * default; when off the app makes no request for them at all, which is the only
+   * promise worth making about a network call.
+   */
+  announcementsEnabled: boolean;
   // Nodi mascot: show the floating companion (visual/animation only for now — no wired
   // behaviour yet). App-wide preference, on by default.
   mascotEnabled: boolean;
@@ -7550,6 +7557,10 @@ export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, 
   markNotificationsRead(): Promise<NodiNotification[]>;
   clearNotifications(): Promise<NodiNotification[]>;
   onNotificationsChanged(cb: (list: NodiNotification[]) => void): () => void;
+  /** Published announcements. Read state is per notice, unlike the activity feed. */
+  listAnnouncements(): Promise<AnnouncementEntry[]>;
+  markAnnouncementRead(id: string): Promise<AnnouncementEntry[]>;
+  onAnnouncementsChanged(cb: (list: AnnouncementEntry[]) => void): () => void;
   listNodiConversations(): Promise<NodiConversation[]>;
   getNodiConversation(id: string): Promise<NodiConversation | null>;
   saveNodiConversation(input: NodiConversationInput): Promise<NodiConversation>;

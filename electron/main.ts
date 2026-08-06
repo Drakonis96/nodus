@@ -25,6 +25,7 @@ import { setCopilotWindowProvider, startCopilotServer, stopCopilotServer } from 
 import { setZoteroPluginWindowProvider, startZoteroPluginServer, stopZoteroPluginServer } from './zotero-plugin/server';
 import { applyMascotWindow, destroyMascotWindow, setMascotTutorialVisible } from './mascotWindow';
 import { seedWelcomeNotification } from './notifications';
+import { refreshAnnouncements } from './announcements';
 import { startStudyCalendarReminders, stopStudyCalendarReminders } from './studyCalendarReminders';
 import { restorePersistedDockIcon } from './dockIcon';
 import { stopAllWhisperCpp } from './stt/whisperCpp';
@@ -109,10 +110,13 @@ let useUnsignedMacUpdaterFallback = false;
 let autoBackupTimer: NodeJS.Timeout | null = null;
 let autoBackupFirstTimer: NodeJS.Timeout | null = null;
 let autoBackupRunning = false;
+let announcementsFirstTimer: NodeJS.Timeout | null = null;
 /** Set once shutdown starts, so timers that fire mid-quit do not reopen the DB. */
 let quitting = false;
 
 const UPDATE_CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000;
+/** Long enough that the first window has painted and a vault is open. */
+const ANNOUNCEMENTS_STARTUP_DELAY_MS = 45 * 1000;
 
 function macAppBundlePath(): string | null {
   if (process.platform !== 'darwin') return null;
@@ -545,7 +549,16 @@ function setupAutoUpdates(): void {
 
   // The renderer's cinematic startup modal performs the immediate check and
   // presents its result. Keep the long-running scheduled checks here.
-  updateCheckTimer = setInterval(() => void checkForUpdates('scheduled'), UPDATE_CHECK_INTERVAL_MS);
+  //
+  // Announcements ride this timer rather than starting a second one: they change a few
+  // times a year, so a tick of their own would be a wake-up bought for nothing. The
+  // first check is delayed instead of immediate — startup is the one moment the main
+  // process's single event loop is genuinely contended, and nothing here is urgent.
+  updateCheckTimer = setInterval(() => {
+    void checkForUpdates('scheduled');
+    void refreshAnnouncements('scheduled');
+  }, UPDATE_CHECK_INTERVAL_MS);
+  announcementsFirstTimer = setTimeout(() => void refreshAnnouncements('startup'), ANNOUNCEMENTS_STARTUP_DELAY_MS);
 }
 
 // A second copy of this profile tried to start. It has already quit; bring the
@@ -731,6 +744,7 @@ app.on('before-quit', () => {
   stopAllWhisperCpp();
   if (updateCheckTimer) clearInterval(updateCheckTimer);
   if (installUpdateTimer) clearTimeout(installUpdateTimer);
+  if (announcementsFirstTimer) clearTimeout(announcementsFirstTimer);
   // getDb() reopens (and re-migrates) lazily, so a backup tick landing after
   // closeDb() would resurrect the database on a shutting-down process.
   if (autoBackupTimer) clearInterval(autoBackupTimer);
@@ -759,6 +773,7 @@ const updateAwareApp = app as typeof app & { on(event: 'before-quit-for-update',
 updateAwareApp.on('before-quit-for-update', () => {
   quitting = true;
   if (updateCheckTimer) clearInterval(updateCheckTimer);
+  if (announcementsFirstTimer) clearTimeout(announcementsFirstTimer);
   if (autoBackupTimer) clearInterval(autoBackupTimer);
   if (autoBackupFirstTimer) clearTimeout(autoBackupFirstTimer);
   stopRealtimeSync();

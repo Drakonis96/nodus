@@ -20,6 +20,7 @@ import { PRIMARY_SOURCES_RELEASE_TRANSLATIONS } from './i18n.primarySourcesRelea
 import { TESTIMONY_TRANSLATIONS } from './i18n.testimonies';
 import { NEW_VAULT_COMPLETION_TRANSLATIONS } from './i18n.newVaultCompletion';
 import { NODI_NOTIFICATION_TRANSLATIONS } from './i18n.nodiNotifications';
+import { ANNOUNCEMENT_TRANSLATIONS } from './i18n.announcements';
 
 /** Complete static Italian interface table; coverage prohibits runtime fallbacks. */
 export const IT: Record<string, string> = {
@@ -39,6 +40,7 @@ export const IT: Record<string, string> = {
   ...TESTIMONY_TRANSLATIONS.it,
   ...NEW_VAULT_COMPLETION_TRANSLATIONS.it,
   ...NODI_NOTIFICATION_TRANSLATIONS['it'],
+  ...ANNOUNCEMENT_TRANSLATIONS['it'],
   ...WORLD_CHAT_TRANSLATIONS.it,
   "Lo que cuenta el mapa": "Cosa racconta la mappa",
   "Ver dónde ocurren las escenas ({n})": "Vedi dove accadono le scene ({n})",
@@ -1634,13 +1636,13 @@ export const IT: Record<string, string> = {
   "¡Bienvenido a Nodus!": "Benvenuto su Nodus!",
   "¿Es tu primera vez? En menos de un minuto te enseño cómo convertir tu biblioteca de Zotero en un grafo de ideas. Puedes saltártelo cuando quieras.": "Prima volta qui? In meno di un minuto ti mostrerò come trasformare la tua libreria Zotero in un grafico di idee. Puoi saltarlo in qualsiasi momento.",
   "Bóvedas independientes": "Volte indipendenti",
-  "Cada bóveda es un espacio separado: biblioteca, grafo, notas, proyectos, chats, ajustes, embeddings y claves API pueden vivir aislados. Usa este selector para crear otra, cambiar de bóveda o cargar claves desde una bóveda anterior.": "Ogni deposito è uno spazio separato: libreria, grafico, note, progetti, chat, impostazioni, incorporamenti e chiavi API possono rimanere isolati. Utilizza questo selettore per creare un altro deposito, cambiare deposito o caricare chiavi da uno precedente.",
+  "Cada bóveda es un espacio separado: biblioteca, grafo, notas, proyectos, chats, ajustes, embeddings y claves API pueden vivir aislados. Pulsa esta insignia para crear otra, cambiar de bóveda o cargar claves desde una bóveda anterior.": "Ogni deposito è uno spazio separato: libreria, grafico, note, progetti, chat, impostazioni, incorporamenti e chiavi API possono rimanere isolati. Fai clic su questo distintivo per creare un altro deposito, cambiare deposito o caricare chiavi da uno precedente.",
   "El grafo de ideas": "Il grafico delle idee",
   "Es el corazón de Nodus. Cada nodo es una idea extraída de tus lecturas y cada arista una relación entre ellas. Empieza vacío: se llena a medida que escaneas obras a fondo.": "È il cuore di Nodus. Ogni nodo è un'idea tratta dalla tua lettura e ogni bordo una relazione tra loro. Inizia vuoto e si riempie man mano che la scansione approfondita funziona.",
   "Actualizar desde Zotero": "Rinfrescati da Zotero",
   "Este botón trae las obras de tus colecciones monitorizadas. Por defecto solo incorpora metadatos; puedes activar análisis automático en Ajustes.": "Questo pulsante estrae le opere dalle tue collezioni monitorate. Per impostazione predefinita, acquisisce solo metadati; puoi abilitare l'analisi automatica nelle Impostazioni.",
   "Elegir colecciones": "Scegli le collezioni",
-  "Aquí decides qué colecciones o subcolecciones de Zotero vigila Nodus. Empieza con una pequeña para probar; sus subcolecciones se incluyen solas.": "Qui decidi quali collezioni o sottocollezioni Zotero Nodus orologi. Inizia con uno piccolo per provarlo; le sue sottoraccolte vengono incluse automaticamente.",
+  "Decide qué colecciones o subcolecciones de Zotero vigila Nodus. Ábrelo desde la paleta de comandos (⌘K o Ctrl+K) buscando «Colecciones». Empieza con una pequeña para probar; sus subcolecciones se incluyen solas.": "Decidi quali collezioni o sottocollezioni di Zotero Nodus sorveglia. Aprilo dalla palette dei comandi (⌘K o Ctrl+K) cercando «Collezioni». Inizia con una piccola per provare; le sue sottocollezioni vengono incluse automaticamente.",
   "Tu biblioteca": "La tua biblioteca",
   "Aquí tienes todas tus obras con su estado de escaneo: ligero (temas) y profundo (ideas). Desde aquí decides qué llevar al grafo.": "Ecco tutti i tuoi lavori con il loro stato di scansione: leggeri (temi) e profondi (idee). Da qui decidi cosa portare nel grafico.",
   "Añadir una obra al grafo": "Aggiungi un lavoro al grafico",

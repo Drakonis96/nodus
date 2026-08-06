@@ -207,9 +207,15 @@ test('the worldbuilding prompt pack makes the author the source of truth', () =>
   assert.match(pack, /calendario/);
 });
 
-test('the header vault action uses a stable localized label', async () => {
+test('the header vault entry point uses a stable localized label', async () => {
   const app = await Promise.resolve(readSource('@shell'));
-  assert.match(app, /icon="archive"\s+label=\{t\('Bóvedas'\)\}/s);
+  // The right-rail Bóvedas button is gone; the centred badge is the permanent way in,
+  // with the command palette as the last resort when the badge has nowhere to sit.
+  assert.match(app, /data-testid="header-vault-badge"/);
+  assert.match(app, /\{vaultTypeLabel\(activeVault\.type\)\}/);
+  assert.match(app, /id: 'act:vaults', label: t\('Bóvedas'\)/);
+  // The badge must not be hidden below a breakpoint now that nothing else opens the panel.
+  assert.doesNotMatch(app, /header-vault-badge[^"]*\bhidden\b/);
   assert.doesNotMatch(app, /label=\{activeVault\?\.name \?\? t\('Bóveda'\)\}/);
 });
 

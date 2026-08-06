@@ -7,7 +7,7 @@ const Settings = lazy(() => import('../../views/Settings').then((module) => ({ d
 
 export const shellViews = {
   toolkit: ({ setToolkitPage, settings, toolkitPage }) => <ToolkitView page={toolkitPage} onNavigate={setToolkitPage} settings={settings} />,
-  settings: ({ activeVault, recoveryStatus, reloadSettings, reloadVaults, setManualWhatsNewOpen, settings, vaults }) => (
+  settings: ({ activeVault, recoveryStatus, reloadSettings, reloadVaults, setManualWhatsNewOpen, setRoadmapOpen, settings, vaults }) => (
     <Settings
       settings={settings}
       vaults={vaults}
@@ -16,6 +16,7 @@ export const shellViews = {
       onChange={reloadSettings}
       onVaultsChanged={reloadVaults}
       onOpenWhatsNew={() => setManualWhatsNewOpen(true)}
+      onOpenRoadmap={() => setRoadmapOpen(true)}
     />
   ),
 } satisfies Record<string, ViewRenderer>;

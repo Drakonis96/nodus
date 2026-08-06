@@ -20,6 +20,7 @@ import { PRIMARY_SOURCES_RELEASE_TRANSLATIONS } from './i18n.primarySourcesRelea
 import { TESTIMONY_TRANSLATIONS } from './i18n.testimonies';
 import { NEW_VAULT_COMPLETION_TRANSLATIONS } from './i18n.newVaultCompletion';
 import { NODI_NOTIFICATION_TRANSLATIONS } from './i18n.nodiNotifications';
+import { ANNOUNCEMENT_TRANSLATIONS } from './i18n.announcements';
 
 /**
  * English translations keyed by the Spanish source string (see {@link ../i18n}).
@@ -43,6 +44,7 @@ export const EN: Record<string, string> = {
   ...TESTIMONY_TRANSLATIONS.en,
   ...NEW_VAULT_COMPLETION_TRANSLATIONS.en,
   ...NODI_NOTIFICATION_TRANSLATIONS['en'],
+  ...ANNOUNCEMENT_TRANSLATIONS['en'],
   ...WORLD_CHAT_TRANSLATIONS.en,
   "Lo que cuenta el mapa": "What the map tells you",
   "Ver dónde ocurren las escenas ({n})": "See where the scenes happen ({n})",
@@ -1821,8 +1823,8 @@ export const EN: Record<string, string> = {
   '¿Es tu primera vez? En menos de un minuto te enseño cómo convertir tu biblioteca de Zotero en un grafo de ideas. Puedes saltártelo cuando quieras.':
     'First time here? In under a minute I’ll show you how to turn your Zotero library into a graph of ideas. You can skip it anytime.',
   'Bóvedas independientes': 'Independent vaults',
-  'Cada bóveda es un espacio separado: biblioteca, grafo, notas, proyectos, chats, ajustes, embeddings y claves API pueden vivir aislados. Usa este selector para crear otra, cambiar de bóveda o cargar claves desde una bóveda anterior.':
-    'Each vault is a separate space: library, graph, notes, projects, chats, settings, embeddings and API keys can stay isolated. Use this selector to create another vault, switch vaults or load keys from a previous one.',
+  'Cada bóveda es un espacio separado: biblioteca, grafo, notas, proyectos, chats, ajustes, embeddings y claves API pueden vivir aislados. Pulsa esta insignia para crear otra, cambiar de bóveda o cargar claves desde una bóveda anterior.':
+    'Each vault is a separate space: library, graph, notes, projects, chats, settings, embeddings and API keys can stay isolated. Click this badge to create another vault, switch vaults or load keys from a previous one.',
   'El grafo de ideas': 'The idea graph',
   'Es el corazón de Nodus. Cada nodo es una idea extraída de tus lecturas y cada arista una relación entre ellas. Empieza vacío: se llena a medida que escaneas obras a fondo.':
     'It’s the heart of Nodus. Each node is an idea drawn from your reading and each edge a relationship between them. It starts empty and fills up as you deep-scan works.',
@@ -1830,8 +1832,8 @@ export const EN: Record<string, string> = {
   'Este botón trae las obras de tus colecciones monitorizadas. Por defecto solo incorpora metadatos; puedes activar análisis automático en Ajustes.':
     'This button pulls the works from your monitored collections. By default it only ingests metadata; you can enable automatic analysis in Settings.',
   'Elegir colecciones': 'Choose collections',
-  'Aquí decides qué colecciones o subcolecciones de Zotero vigila Nodus. Empieza con una pequeña para probar; sus subcolecciones se incluyen solas.':
-    'Here you decide which Zotero collections or subcollections Nodus watches. Start with a small one to try it out; its subcollections are included automatically.',
+  'Decide qué colecciones o subcolecciones de Zotero vigila Nodus. Ábrelo desde la paleta de comandos (⌘K o Ctrl+K) buscando «Colecciones». Empieza con una pequeña para probar; sus subcolecciones se incluyen solas.':
+    'Decide which Zotero collections or subcollections Nodus watches. Open it from the command palette (⌘K or Ctrl+K) by searching for “Collections”. Start with a small one to try it out; its subcollections are included automatically.',
   'Tu biblioteca': 'Your library',
   'Aquí tienes todas tus obras con su estado de escaneo: ligero (temas) y profundo (ideas). Desde aquí decides qué llevar al grafo.':
     'Here are all your works with their scan status: light (themes) and deep (ideas). From here you decide what to bring into the graph.',
