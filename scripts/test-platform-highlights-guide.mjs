@@ -54,7 +54,7 @@ test('existing users get the cinematic summary directly after release notes and 
   assert.equal((guide.match(/markSeen\(\);/g) ?? []).length, 1, 'seen state is written only by the explicit finish action');
 
   assert.match(app, /<PlatformHighlightsUpdateTour/);
-  assert.match(app, /whatsNewSettled && !platformHighlightsSettled/);
+  assert.match(app, /whatsNewSettled && mobileTeaserSettled && !platformHighlightsSettled/);
   assert.match(app, /platformHighlightsSettled && !toolkitBetaTourSettled/);
   assert.ok(app.indexOf('<WhatsNewModal') < app.indexOf('<PlatformHighlightsUpdateTour'));
   assert.ok(app.indexOf('<PlatformHighlightsUpdateTour') < app.indexOf('<ToolkitBetaUpdateTour'));

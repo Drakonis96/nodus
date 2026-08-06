@@ -3499,6 +3499,39 @@ select.input optgroup {
 @media (max-width: 660px) { .toolkit-guide-backdrop { padding: 10px; } .toolkit-guide-cinema { max-height: 95vh; border-radius: 20px; } .toolkit-guide-hero { min-height: 170px; grid-template-columns: 1fr 120px; padding: 24px 20px; } .toolkit-guide-nodi svg { height: 130px !important; } .toolkit-guide-stage { padding: 19px; } .toolkit-guide-tools, .toolkit-guide-models, .toolkit-guide-remote-models, .toolkit-guide-subscriptions, .platform-guide-pair, .platform-guide-feature-list, .platform-guide-feature-list.compact, .platform-guide-tool-grid { grid-template-columns: 1fr; } .toolkit-guide-subscription { grid-template-columns: 38px minmax(0, 1fr); } .toolkit-guide-subscription em { display: none; } }
 @media (prefers-reduced-motion: reduce) { .toolkit-guide-aurora { animation: none; } }
 
+/* "A tease of what's coming" — the App Store screenshots beside the copy that explains
+   them. The shots are portrait (1320 x 2868), so they get their own narrow column and
+   the prose takes the rest of the 840px stage; stacking them would push the survey below
+   the fold. The stage stops scrolling because the frame is height-capped, not the page. */
+.mobile-teaser-stage { display: flex; align-items: center; }
+.mobile-teaser-layout { display: grid; width: 100%; grid-template-columns: 236px minmax(0, 1fr); gap: 26px; align-items: center; }
+.mobile-teaser-frame { display: grid; gap: 9px; margin: 0; justify-items: center; }
+/* Fixed box, contained image: the slides are all one size, and reserving it stops the
+   column from resizing as the carousel advances. */
+.mobile-teaser-frame img { width: 100%; height: 380px; border: 1px solid var(--tg-border); border-radius: 15px; object-fit: contain; background: rgb(255 255 255 / .04); }
+.light .mobile-teaser-frame img { background: #fff; }
+.mobile-teaser-frame figcaption { color: var(--tg-muted); font-size: 11px; font-weight: 750; letter-spacing: .01em; text-align: center; }
+.mobile-teaser-controls { display: flex; align-items: center; justify-content: center; gap: 10px; }
+.mobile-teaser-controls > button { display: grid; width: 27px; height: 27px; flex: 0 0 auto; place-items: center; border: 1px solid var(--tg-border); border-radius: 999px; color: var(--tg-text); background: var(--tg-card); }
+.mobile-teaser-controls > button:hover { filter: brightness(1.25); }
+.mobile-teaser-dots { display: flex; align-items: center; gap: 5px; }
+.mobile-teaser-dots button { width: 6px; height: 6px; border-radius: 999px; background: color-mix(in srgb, var(--tg-muted) 34%, transparent); transition: width .18s ease, background .18s ease; }
+.mobile-teaser-dots button.active { width: 17px; background: linear-gradient(90deg, #f59e0b, #2dd4bf); }
+.mobile-teaser-copy { display: grid; gap: 10px; align-content: center; }
+.mobile-teaser-copy h3 { margin-top: 4px; color: var(--tg-text); font-size: clamp(20px, 2.3vw, 26px); font-weight: 760; line-height: 1.1; letter-spacing: -.02em; }
+.mobile-teaser-copy .toolkit-guide-summary { margin-top: 0; font-size: 13px; }
+.mobile-teaser-survey { display: grid; gap: 5px; border: 1px solid var(--tg-border); border-radius: 14px; padding: 13px 14px; background: var(--tg-card); }
+.mobile-teaser-survey b { color: var(--tg-text); font-size: 13px; font-weight: 800; }
+.mobile-teaser-survey small { color: var(--tg-muted); font-size: 11.5px; line-height: 1.55; }
+.mobile-teaser-survey-cta { display: inline-flex; min-height: 34px; align-items: center; justify-content: center; gap: 7px; margin-top: 5px; border: 0; border-radius: 10px; padding: 8px 13px; color: #07151a; background: linear-gradient(135deg, #fcd34d, #5eead4); font-size: 11px; font-weight: 850; }
+.mobile-teaser-survey-cta:hover { transform: translateY(-1px); filter: brightness(1.04); }
+.mobile-teaser-footer span { color: var(--tg-muted); font-size: 11px; }
+@media (max-width: 760px) {
+  .mobile-teaser-stage { align-items: flex-start; }
+  .mobile-teaser-layout { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  .mobile-teaser-frame img { height: 300px; }
+}
+
 /* Cinematic, app-wide essentials tutorial. It deliberately owns the full viewport so
    existing tours and clickable application chrome cannot compete for focus. */
 .tutorial-cinema { position: fixed; inset: 0; z-index: 190; display: flex; min-height: 0; flex-direction: column; overflow: hidden; color: #f5f5f4; background: radial-gradient(circle at 15% 20%, #18333b 0, #0c1824 30%, #080b12 72%); }

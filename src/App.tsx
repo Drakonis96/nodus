@@ -38,6 +38,7 @@ import { TutorialVideosUpdateTour } from './components/TutorialVideosGuide';
 import { PlatformHighlightsUpdateTour } from './components/PlatformHighlightsGuide';
 import { ToolkitBetaUpdateTour } from './components/ToolkitBetaGuide';
 import { StartupUpdateModal } from './components/StartupUpdateModal';
+import { MobileTeaserGuide } from './components/MobileTeaserGuide';
 import { recoveryHealthAdvice, recoveryHealthHeadline } from './recoveryHealth';
 import { NodiMascot } from './components/nodi/NodiMascot';
 import { NodiStyleModal } from './components/NodiStyleModal';
@@ -152,6 +153,9 @@ export function App() {
   const [backupWarningDismissed, setBackupWarningDismissed] = useState(false);
   const [whatsNewSettled, setWhatsNewSettled] = useState(() => !hasPendingWhatsNew());
   const [manualWhatsNewOpen, setManualWhatsNewOpen] = useState(false);
+  // The mobile app does not exist in this build, so there is no tutorial chapter that
+  // could have covered it: every 3.2.4 user gets the teaser once, new install or not.
+  const [mobileTeaserSettled, setMobileTeaserSettled] = useState(false);
   // Existing users receive the current MCP/Server/Zotero/Toolkit overview directly
   // after release notes. Fresh installs already saw the same three chapters in v5.
   const [platformHighlightsSettled, setPlatformHighlightsSettled] = useState(false);
@@ -1834,7 +1838,14 @@ export function App() {
         />
       )}
 
-      {whatsNewSettled && !platformHighlightsSettled && !manualWhatsNewOpen && (
+      {whatsNewSettled && !mobileTeaserSettled && !manualWhatsNewOpen && (
+        <MobileTeaserGuide
+          uiLanguage={settings.uiLanguage}
+          onSettled={() => setMobileTeaserSettled(true)}
+        />
+      )}
+
+      {whatsNewSettled && mobileTeaserSettled && !platformHighlightsSettled && !manualWhatsNewOpen && (
         <PlatformHighlightsUpdateTour
           uiLanguage={settings.uiLanguage}
           previousTutorialVersion={settings.basicsTutorialVersion}
@@ -1842,7 +1853,7 @@ export function App() {
         />
       )}
 
-      {whatsNewSettled && platformHighlightsSettled && !toolkitBetaTourSettled && !manualWhatsNewOpen && (
+      {whatsNewSettled && mobileTeaserSettled && platformHighlightsSettled && !toolkitBetaTourSettled && !manualWhatsNewOpen && (
         <ToolkitBetaUpdateTour
           uiLanguage={settings.uiLanguage}
           previousTutorialVersion={settings.basicsTutorialVersion}
@@ -1850,7 +1861,7 @@ export function App() {
         />
       )}
 
-      {whatsNewSettled && platformHighlightsSettled && toolkitBetaTourSettled && !tutorialVideosSettled && !manualWhatsNewOpen && (
+      {whatsNewSettled && mobileTeaserSettled && platformHighlightsSettled && toolkitBetaTourSettled && !tutorialVideosSettled && !manualWhatsNewOpen && (
         <TutorialVideosUpdateTour
           uiLanguage={settings.uiLanguage}
           previousTutorialVersion={settings.basicsTutorialVersion}
@@ -1858,7 +1869,7 @@ export function App() {
         />
       )}
 
-      {whatsNewSettled && platformHighlightsSettled && toolkitBetaTourSettled && tutorialVideosSettled && !manualWhatsNewOpen && <StartupUpdateModal onSettled={() => setUpdateSettled(true)} />}
+      {whatsNewSettled && mobileTeaserSettled && platformHighlightsSettled && toolkitBetaTourSettled && tutorialVideosSettled && !manualWhatsNewOpen && <StartupUpdateModal onSettled={() => setUpdateSettled(true)} />}
 
       {/* Users who already saw the cinematic tutorial were never offered the choice of
           Nodi, so it is made here instead — once, behind the update check. New users

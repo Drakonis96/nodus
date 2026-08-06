@@ -22,7 +22,11 @@ test('generic CSS presence waits select one match instead of relying on Playwrig
 
 test('the smoke test suppresses release notes with the exact app version before reloading', () => {
   assert.match(smoke, /const appVersion = require\(path\.join\(repoRoot, 'package\.json'\)\)\.version/);
-  assert.match(smoke, /localStorage\.setItem\('nodus\.lastSeenVersion', version\), appVersion/);
+  // The real version, never a fake one. The suppression now seeds the mobile-teaser
+  // sentinel from the same argument, so the setItem and the `appVersion` it is called
+  // with are asserted separately rather than as one line.
+  assert.match(smoke, /localStorage\.setItem\('nodus\.lastSeenVersion', version\);[\s\S]{0,400}?\}, appVersion\)/);
+  assert.match(smoke, /localStorage\.setItem\(`nodus\.mobileTeaserSeen\.\$\{version\}`, '1'\)/);
   assert.doesNotMatch(smoke, /nodus\.lastSeenVersion', '9999\.0\.0'/);
   assert.match(smoke, /whats-new-cinematic-modal/);
 });
