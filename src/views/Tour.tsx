@@ -13,9 +13,9 @@ const STEPS: TourStep[] = [
     body: '¿Es tu primera vez? En menos de un minuto te enseño cómo convertir tu biblioteca de Zotero en un grafo de ideas. Puedes saltártelo cuando quieras.',
   },
   {
-    target: 'vaults',
+    target: 'vault-badge',
     title: 'Bóvedas independientes',
-    body: 'Cada bóveda es un espacio separado: biblioteca, grafo, notas, proyectos, chats, ajustes, embeddings y claves API pueden vivir aislados. Usa este selector para crear otra, cambiar de bóveda o cargar claves desde una bóveda anterior.',
+    body: 'Cada bóveda es un espacio separado: biblioteca, grafo, notas, proyectos, chats, ajustes, embeddings y claves API pueden vivir aislados. Pulsa esta insignia para crear otra, cambiar de bóveda o cargar claves desde una bóveda anterior.',
   },
   {
     target: 'nav-graph',
@@ -29,9 +29,10 @@ const STEPS: TourStep[] = [
     body: 'Este botón trae las obras de tus colecciones monitorizadas. Por defecto solo incorpora metadatos; puedes activar análisis automático en Ajustes.',
   },
   {
-    target: 'collections',
+    // Sin ancla: Colecciones ya no tiene icono propio en la cabecera. Se abre desde la
+    // paleta de comandos, que no es un elemento que se pueda señalar en pantalla.
     title: 'Elegir colecciones',
-    body: 'Aquí decides qué colecciones o subcolecciones de Zotero vigila Nodus. Empieza con una pequeña para probar; sus subcolecciones se incluyen solas.',
+    body: 'Decide qué colecciones o subcolecciones de Zotero vigila Nodus. Ábrelo desde la paleta de comandos (⌘K o Ctrl+K) buscando «Colecciones». Empieza con una pequeña para probar; sus subcolecciones se incluyen solas.',
   },
   {
     target: 'nav-library',

@@ -811,7 +811,67 @@ const RELEASE_3_2_3_HIGHLIGHTS: RawReleaseHighlight[] = [
   },
 ];
 
+/**
+ * 3.2.4 — the header stops being a shelf, and Nodus gains a way to say something.
+ *
+ * Four entries because four things change for the reader: a button that always reaches
+ * the notification centre, a channel that can warn about something between releases, a
+ * rail with three fewer icons, and an inbox that only shows up when it holds something.
+ */
+const RELEASE_3_2_4_HIGHLIGHTS: RawReleaseHighlight[] = [
+  {
+    scope: 'general',
+    es: 'Las notificaciones tienen su propio botón en la cabecera, justo antes de Ajustes. Abre las mismas dos listas que enseña Nodi: los avisos publicados por Nodus y lo que ha estado haciendo la aplicación. Funciona con la mascota desactivada, que era justo cuando no había forma de llegar a ellas.',
+    en: 'Notifications now have their own button in the header, right before Settings. It opens the same two lists Nodi shows: the announcements published by Nodus and what the app has been doing. It works with the mascot turned off, which was exactly when there was no way to reach them.',
+    fr: 'Les notifications ont désormais leur propre bouton dans l’en-tête, juste avant Paramètres. Il ouvre les deux mêmes listes que Nodi affiche: les annonces publiées par Nodus et ce que l’application a fait. Il fonctionne avec la mascotte désactivée, ce qui était justement le cas où rien n’y donnait accès.',
+    de: 'Benachrichtigungen haben jetzt eine eigene Schaltfläche in der Kopfzeile, direkt vor Einstellungen. Sie öffnet dieselben zwei Listen, die Nodi zeigt: die von Nodus veröffentlichten Mitteilungen und das, was die App getan hat. Sie funktioniert auch bei abgeschalteter Maskottchenfigur, und genau dann kam man vorher gar nicht heran.',
+    pt: 'As notificações passam a ter um botão próprio no cabeçalho, mesmo antes de Definições. Abre as mesmas duas listas que o Nodi mostra: os avisos publicados pelo Nodus e o que a aplicação tem andado a fazer. Funciona com a mascote desativada, que era precisamente quando não havia forma de lá chegar.',
+    'pt-BR': 'As notificações agora têm um botão próprio no cabeçalho, logo antes de Configurações. Ele abre as mesmas duas listas que o Nodi mostra: os avisos publicados pelo Nodus e o que o aplicativo andou fazendo. Funciona com o mascote desativado, que era justamente quando não havia como chegar até elas.',
+  },
+  {
+    scope: 'general',
+    es: 'Nodus ya puede avisarte de algo entre una versión y la siguiente: una encuesta, un problema conocido, un cambio importante. Cada aviso llega en tu idioma, puede traer un enlace y sigue sin leer hasta que lo lees, uno a uno. Se desactiva en Ajustes, y al desactivarlo Nodus deja de pedirlo.',
+    en: 'Nodus can now tell you something between one release and the next: a survey, a known problem, an important change. Each notice arrives in your language, may carry a link, and stays unread until you read it, one at a time. You can turn it off in Settings, and once it is off Nodus stops asking for it.',
+    fr: 'Nodus peut désormais vous signaler quelque chose entre deux versions: une enquête, un problème connu, un changement important. Chaque annonce arrive dans votre langue, peut contenir un lien et reste non lue tant que vous ne l’avez pas lue, une par une. Elle se désactive dans les Paramètres, et Nodus cesse alors de la demander.',
+    de: 'Nodus kann dir jetzt zwischen zwei Versionen etwas mitteilen: eine Umfrage, ein bekanntes Problem, eine wichtige Änderung. Jede Mitteilung kommt in deiner Sprache an, kann einen Link enthalten und bleibt ungelesen, bis du sie liest, eine nach der anderen. In den Einstellungen lässt sich das abschalten, und dann fragt Nodus gar nicht mehr danach.',
+    pt: 'O Nodus já pode avisar-te de algo entre uma versão e a seguinte: um inquérito, um problema conhecido, uma alteração importante. Cada aviso chega no teu idioma, pode trazer uma ligação e continua por ler até o leres, um a um. Desativa-se nas Definições, e a partir daí o Nodus deixa de o pedir.',
+    'pt-BR': 'O Nodus já pode avisar você de algo entre uma versão e a seguinte: uma pesquisa, um problema conhecido, uma mudança importante. Cada aviso chega no seu idioma, pode trazer um link e continua não lido até você lê-lo, um a um. Dá para desativar nas Configurações, e aí o Nodus para de pedir.',
+  },
+  {
+    scope: 'general',
+    es: 'La cabecera se queda con menos iconos. Bóvedas, Colecciones y Roadmap salen del extremo derecho. La bóveda activa se abre desde la insignia del centro, que ahora se ve en cualquier anchura de ventana. Colecciones vive en la paleta de comandos y el roadmap está en Ajustes, dentro de Acerca de Nodus.',
+    en: 'The header keeps fewer icons. Vaults, Collections and Roadmap leave the right rail. The active vault opens from the badge in the centre, which is now shown at every window width. Collections lives in the command palette, and the roadmap is in Settings, under About Nodus.',
+    fr: 'L’en-tête garde moins d’icônes. Coffres, Collections et Feuille de route quittent la barre de droite. Le coffre actif s’ouvre depuis le badge central, désormais visible quelle que soit la largeur de la fenêtre. Collections vit dans la palette de commandes et la feuille de route se trouve dans les Paramètres, sous À propos de Nodus.',
+    de: 'Die Kopfzeile behält weniger Symbole. Tresore, Sammlungen und Roadmap verlassen die rechte Leiste. Der aktive Tresor öffnet sich über das Abzeichen in der Mitte, das jetzt bei jeder Fensterbreite sichtbar ist. Sammlungen liegt in der Befehlspalette, und die Roadmap steht in den Einstellungen unter Über Nodus.',
+    pt: 'O cabeçalho fica com menos ícones. Cofres, Coleções e Roadmap saem da barra da direita. O cofre ativo abre a partir do emblema do centro, que passa a ver-se em qualquer largura de janela. Coleções vive na paleta de comandos e o roadmap está nas Definições, dentro de Acerca do Nodus.',
+    'pt-BR': 'O cabeçalho fica com menos ícones. Cofres, Coleções e Roadmap saem da barra da direita. O cofre ativo abre pelo selo do centro, que agora aparece em qualquer largura de janela. Coleções vive na paleta de comandos e o roadmap está nas Configurações, dentro de Sobre o Nodus.',
+  },
+  {
+    scope: 'general',
+    es: 'La bandeja solo aparece cuando ha llegado algo desde otro dispositivo. En un equipo sin bóvedas conectadas era un icono permanentemente vacío al lado de otro que nunca lo está. Además, el botón de actualizar deja de mostrarse en las bóvedas de fuentes primarias, que no sincronizan con Zotero.',
+    en: 'The inbox only appears once something has arrived from another device. On a machine with no connected vaults it was a permanently empty icon sitting next to one that never is. The refresh button also stops showing in primary-sources vaults, which do not sync with Zotero.',
+    fr: 'La boîte de réception n’apparaît que lorsque quelque chose est arrivé d’un autre appareil. Sur une machine sans coffre connecté, c’était une icône vide en permanence à côté d’une autre qui ne l’est jamais. Le bouton d’actualisation disparaît aussi des coffres de sources primaires, qui ne se synchronisent pas avec Zotero.',
+    de: 'Der Posteingang erscheint erst, wenn etwas von einem anderen Gerät angekommen ist. Auf einem Rechner ohne verbundene Tresore war er ein dauerhaft leeres Symbol neben einem, das es nie ist. Auch die Aktualisieren-Schaltfläche verschwindet aus Tresoren für Primärquellen, die sich nicht mit Zotero abgleichen.',
+    pt: 'A caixa de entrada só aparece quando chegou algo de outro dispositivo. Num computador sem cofres ligados era um ícone permanentemente vazio ao lado de outro que nunca está. O botão de atualizar também deixa de aparecer nos cofres de fontes primárias, que não sincronizam com o Zotero.',
+    'pt-BR': 'A caixa de entrada só aparece quando chegou algo de outro dispositivo. Em um computador sem cofres conectados era um ícone permanentemente vazio ao lado de outro que nunca está. O botão de atualizar também deixa de aparecer nos cofres de fontes primárias, que não sincronizam com o Zotero.',
+  },
+  {
+    scope: 'general',
+    es: 'Nodus ya dice dónde encontrarlo fuera de la aplicación. El modal de novedades y Ajustes, en Acerca de Nodus, llevan a Reddit, YouTube y X con el icono de cada red. Los enlaces se abren en tu navegador y la aplicación no envía nada a esas redes.',
+    en: 'Nodus now says where to find it outside the application. The release modal and Settings, under About Nodus, lead to Reddit, YouTube and X with each network’s own icon. The links open in your browser and the application sends nothing to those networks.',
+    fr: 'Nodus indique enfin où le trouver en dehors de l’application. Le modal des nouveautés et les Paramètres, dans À propos de Nodus, mènent à Reddit, YouTube et X avec l’icône de chaque réseau. Les liens s’ouvrent dans votre navigateur et l’application n’envoie rien à ces réseaux.',
+    de: 'Nodus sagt jetzt, wo es außerhalb der Anwendung zu finden ist. Das Neuigkeiten-Fenster und die Einstellungen unter Über Nodus führen zu Reddit, YouTube und X mit dem Symbol des jeweiligen Netzwerks. Die Links öffnen sich in Ihrem Browser und die Anwendung sendet nichts an diese Netzwerke.',
+    pt: 'O Nodus passa a dizer onde encontrá-lo fora da aplicação. O modal de novidades e as Definições, em Acerca do Nodus, levam ao Reddit, ao YouTube e ao X com o ícone de cada rede. As ligações abrem no seu navegador e a aplicação não envia nada para essas redes.',
+    'pt-BR': 'O Nodus agora diz onde encontrá-lo fora do aplicativo. O modal de novidades e as Configurações, em Sobre o Nodus, levam ao Reddit, ao YouTube e ao X com o ícone de cada rede. Os links abrem no seu navegador e o aplicativo não envia nada para essas redes.',
+  },
+];
+
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
+  {
+    version: '3.2.4',
+    date: '2026-08-06',
+    highlights: RELEASE_3_2_4_HIGHLIGHTS,
+  },
   {
     version: '3.2.3',
     date: '2026-08-05',

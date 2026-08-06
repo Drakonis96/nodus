@@ -26,6 +26,7 @@ import { PRIMARY_SOURCES_RELEASE_TRANSLATIONS } from './i18n.primarySourcesRelea
 import { TESTIMONY_TRANSLATIONS } from './i18n.testimonies';
 import { NEW_VAULT_COMPLETION_TRANSLATIONS } from './i18n.newVaultCompletion';
 import { NODI_NOTIFICATION_TRANSLATIONS } from './i18n.nodiNotifications';
+import { ANNOUNCEMENT_TRANSLATIONS } from './i18n.announcements';
 
 export const FR: Record<string, string> = {
   ...DIARIZATION_TRANSLATIONS.fr,
@@ -44,6 +45,7 @@ export const FR: Record<string, string> = {
   ...TESTIMONY_TRANSLATIONS.fr,
   ...NEW_VAULT_COMPLETION_TRANSLATIONS.fr,
   ...NODI_NOTIFICATION_TRANSLATIONS['fr'],
+  ...ANNOUNCEMENT_TRANSLATIONS['fr'],
   ...WORLD_CHAT_TRANSLATIONS.fr,
   "Lo que cuenta el mapa": "Ce que raconte la carte",
   "Ver dónde ocurren las escenas ({n})": "Voir où se passent les scènes ({n})",
@@ -1808,8 +1810,8 @@ export const FR: Record<string, string> = {
   '¿Es tu primera vez? En menos de un minuto te enseño cómo convertir tu biblioteca de Zotero en un grafo de ideas. Puedes saltártelo cuando quieras.':
     'C\'est votre première visite ? En moins d\'une minute, je vous montre comment transformer votre bibliothèque Zotero en un graphe d\'idées. Vous pouvez passer cette étape à tout moment.',
   'Bóvedas independientes': 'Espaces indépendants',
-  'Cada bóveda es un espacio separado: biblioteca, grafo, notas, proyectos, chats, ajustes, embeddings y claves API pueden vivir aislados. Usa este selector para crear otra, cambiar de bóveda o cargar claves desde una bóveda anterior.':
-    'Chaque espace est un environnement séparé : bibliothèque, graphe, notes, projets, chats, paramètres, embeddings et clés API peuvent rester isolés. Utilisez ce sélecteur pour créer un autre espace, en changer ou charger des clés depuis un espace précédent.',
+  'Cada bóveda es un espacio separado: biblioteca, grafo, notas, proyectos, chats, ajustes, embeddings y claves API pueden vivir aislados. Pulsa esta insignia para crear otra, cambiar de bóveda o cargar claves desde una bóveda anterior.':
+    'Chaque espace est un environnement séparé : bibliothèque, graphe, notes, projets, chats, paramètres, embeddings et clés API peuvent rester isolés. Cliquez sur ce badge pour créer un autre espace, en changer ou charger des clés depuis un espace précédent.',
   'El grafo de ideas': 'Le graphe d\'idées',
   'Es el corazón de Nodus. Cada nodo es una idea extraída de tus lecturas y cada arista una relación entre ellas. Empieza vacío: se llena a medida que escaneas obras a fondo.':
     'C\'est le cœur de Nodus. Chaque nœud est une idée extraite de vos lectures et chaque arête une relation entre elles. Il démarre vide et se remplit au fur et à mesure que vous analysez des œuvres en profondeur.',
@@ -1817,8 +1819,8 @@ export const FR: Record<string, string> = {
   'Este botón trae las obras de tus colecciones monitorizadas. Por defecto solo incorpora metadatos; puedes activar análisis automático en Ajustes.':
     'Ce bouton récupère les œuvres de vos collections surveillées. Par défaut, seules les métadonnées sont importées ; vous pouvez activer l\'analyse automatique dans les paramètres.',
   'Elegir colecciones': 'Choisir les collections',
-  'Aquí decides qué colecciones o subcolecciones de Zotero vigila Nodus. Empieza con una pequeña para probar; sus subcolecciones se incluyen solas.':
-    'Vous décidez ici quelles collections ou sous-collections Zotero Nodus surveille. Commencez par une petite collection pour tester ; ses sous-collections sont incluses automatiquement.',
+  'Decide qué colecciones o subcolecciones de Zotero vigila Nodus. Ábrelo desde la paleta de comandos (⌘K o Ctrl+K) buscando «Colecciones». Empieza con una pequeña para probar; sus subcolecciones se incluyen solas.':
+    'Décidez quelles collections ou sous-collections Zotero Nodus surveille. Ouvrez-le depuis la palette de commandes (⌘K ou Ctrl+K) en cherchant « Collections ». Commencez par une petite collection pour tester ; ses sous-collections sont incluses automatiquement.',
   'Tu biblioteca': 'Votre bibliothèque',
   'Aquí tienes todas tus obras con su estado de escaneo: ligero (temas) y profundo (ideas). Desde aquí decides qué llevar al grafo.':
     'Voici toutes vos œuvres avec leur état d\'analyse : léger (thèmes) et profond (idées). C\'est ici que vous décidez ce qui rejoint le graphe.',

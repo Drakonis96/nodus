@@ -68,16 +68,18 @@ export const NODUS_DOCUMENTATION = `# Guía interna verificable de Nodus
 - Crear o cargar datos de demostración no abre el tutorial. El tutorial aparece al crear un vault o cuando el usuario lo abre expresamente desde Ajustes > Tutoriales.
 
 ## Cabecera y controles globales
-- En el extremo derecho de la cabecera están, en este orden general: Bóvedas, Comandos, Asistente, Herramientas, controles condicionales del vault, Sugerir / Reportar, Roadmap, selector de tema claro/oscuro y Ajustes.
+- En el extremo derecho de la cabecera están, en este orden general: Comandos, Asistente, Herramientas, controles condicionales del vault, Sugerir / Reportar, selector de tema claro/oscuro, Notificaciones y Ajustes.
 - Herramientas abre el hub Nodus Toolkit; está justo después del botón Asistente.
-- Roadmap está en la parte superior derecha, antes del selector de tema y del icono de Ajustes.
-- El selector de tema claro/oscuro está inmediatamente antes de Ajustes.
-- Bóvedas abre el selector para cambiar, crear, renombrar, duplicar, restablecer o eliminar bóvedas según la acción disponible.
+- Notificaciones está inmediatamente antes de Ajustes y es el último icono antes de él. Abre un panel con dos listas: «Avisos de Nodus» (avisos publicados entre versiones, que se marcan como leídos uno a uno) y «Actividad» (lo que ha hecho la aplicación, que se marca como leído al abrir el panel). Muestra las mismas notificaciones que Nodi, y funciona aunque la mascota esté desactivada.
+- El selector de tema claro/oscuro está justo antes de Notificaciones.
+- La bóveda activa se abre desde la insignia centrada en la cabecera, no desde un icono del extremo derecho: esa insignia abre el selector para cambiar, crear, renombrar, duplicar, restablecer o eliminar bóvedas según la acción disponible. En la paleta de comandos también existe la acción «Bóvedas».
+- Colecciones ya no tiene icono propio en la cabecera; se abre desde la paleta de comandos, en bóvedas académicas.
+- Bandeja solo aparece cuando ha llegado algo desde otro dispositivo; es propia de cada bóveda conectada a Nodus Server.
 - Comandos abre la paleta global; su atajo visible es ⌘K en macOS.
 - El botón Asistente de la cabecera abre el asistente de investigación. Nodi es la mascota independiente situada en la zona inferior derecha cuando está habilitada.
 
 ## Roadmap oficial visible
-El botón Roadmap abre un modal. El orden vigente es:
+El roadmap se abre desde Ajustes > Acerca de Nodus > Ver roadmap de Nodus, y también desde la paleta de comandos. El orden vigente es:
 ${ROADMAP_GUIDE}
 
 ## Ajustes

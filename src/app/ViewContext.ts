@@ -115,6 +115,7 @@ export interface ViewContext extends VaultFlags {
   // Modals and one-off actions the shell hosts.
   setCollectionsOpen: (open: boolean) => void;
   setManualWhatsNewOpen: (open: boolean) => void;
+  setRoadmapOpen: (open: boolean) => void;
   createDatabase: () => Promise<void>;
   importCsv: () => Promise<void>;
 

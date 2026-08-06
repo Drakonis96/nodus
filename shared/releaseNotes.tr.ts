@@ -56,7 +56,16 @@ const RELEASE_3_2_3_TR: string[] = [
   "Telefondaki her eser artık onu iPhone ve iPad için Zotero'da açan bir düğme taşıyor. Zotero anahtarı kayıttaki ölü bir satır olmaktan çıkıp diğer uygulamadaki PDF'e, notlara ve işaretlemelere dönüş yolu oluyor.",
 ];
 
+const RELEASE_3_2_4_TR: string[] = [
+  "Bildirimlerin artık başlıkta kendi düğmesi var, Ayarlar'ın hemen öncesinde. Nodi'nin gösterdiği aynı iki listeyi açıyor: Nodus'un yayımladığı duyurular ve uygulamanın neler yaptığı. Maskot kapalıyken de çalışıyor, ki bunlara ulaşmanın hiçbir yolunun olmadığı durum tam da buydu.",
+  "Nodus artık bir sürümle diğeri arasında size bir şey söyleyebiliyor: bir anket, bilinen bir sorun, önemli bir değişiklik. Her duyuru kendi dilinizde geliyor, bir bağlantı taşıyabiliyor ve siz okuyana kadar tek tek okunmamış kalıyor. Ayarlar'dan kapatılabiliyor ve kapatıldığında Nodus onu istemeyi bırakıyor.",
+  "Başlıkta daha az simge kalıyor. Kasalar, Koleksiyonlar ve Yol haritası sağ şeritten çıkıyor. Etkin kasa ortadaki rozetten açılıyor ve bu rozet artık her pencere genişliğinde görünüyor. Koleksiyonlar komut paletinde yaşıyor, yol haritası ise Ayarlar içindeki Nodus Hakkında bölümünde.",
+  "Gelen kutusu yalnızca başka bir cihazdan bir şey geldiğinde görünüyor. Bağlı kasası olmayan bir bilgisayarda, hiç boş kalmayan bir simgenin yanında sürekli boş duran bir simgeydi. Yenileme düğmesi de Zotero ile eşitlenmeyen birincil kaynak kasalarında artık gösterilmiyor.",
+  "Nodus artık uygulamanın dışında nerede bulunacağını da söylüyor. Yenilikler penceresi ve Ayarlar içindeki Nodus Hakkında bölümü, her birinin kendi simgesiyle Reddit, YouTube ve X hesaplarına götürüyor. Bağlantılar tarayıcınızda açılır ve uygulama bu ağlara hiçbir şey göndermez.",
+];
+
 export const RELEASE_NOTES_TR: Record<string, string[]> = {
+  "3.2.4": RELEASE_3_2_4_TR,
   "3.2.3": RELEASE_3_2_3_TR,
   "3.2.2": RELEASE_3_2_2_TR,
   "3.2.1": RELEASE_3_2_1_TR,
