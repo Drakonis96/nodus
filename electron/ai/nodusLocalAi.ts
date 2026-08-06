@@ -40,7 +40,13 @@ interface ActiveServer {
   key: string;
   modelId: string;
   mode: 'chat' | 'embedding';
+  // llama-server answers /health at the root but serves the OpenAI-compatible
+  // surface under /v1, and the two disagree: /embeddings returns a bare array of
+  // per-token vectors while /v1/embeddings returns the OpenAI envelope callers
+  // parse. Deriving the API URL once, here, is what keeps a caller that reaches a
+  // running server from silently talking to the wrong one.
   baseUrl: string;
+  apiUrl: string;
   child: ChildProcess;
 }
 
@@ -477,7 +483,7 @@ export async function ensureNodusLocalServer(modelId: string, mode: 'chat' | 'em
     throw new Error(`El modelo «${modelId}» no puede ejecutarse como ${mode}.`);
   }
   const key = `${mode}:${modelId}`;
-  if (activeServer?.key === key && activeServer.child.exitCode == null) return `${activeServer.baseUrl}/v1`;
+  if (activeServer?.key === key && activeServer.child.exitCode == null) return activeServer.apiUrl;
   stopNodusLocalServer();
   const executable = await llamaServerPath();
   if (!executable) throw new Error('Instala primero el motor local de Nodus desde Ajustes → Modelos IA.');
@@ -503,12 +509,12 @@ export async function ensureNodusLocalServer(modelId: string, mode: 'chat' | 'em
   const capture = (chunk: unknown) => { output = `${output}${String(chunk)}`.slice(-12_000); };
   child.stdout?.on('data', capture);
   child.stderr?.on('data', capture);
-  const server: ActiveServer = { key, modelId, mode, baseUrl, child };
+  const server: ActiveServer = { key, modelId, mode, baseUrl, apiUrl: `${baseUrl}/v1`, child };
   activeServer = server;
   child.once('exit', () => { if (activeServer === server) activeServer = null; });
   try {
     await waitForServer(baseUrl, child, () => output);
-    return `${baseUrl}/v1`;
+    return server.apiUrl;
   } catch (error) {
     if (activeServer === server) stopNodusLocalServer();
     throw error;
