@@ -121,7 +121,7 @@ export function CharacterVoiceSection({
               className="btn btn-ghost h-8 gap-1.5 border border-neutral-700 text-xs"
               onClick={() => (speaking ? (window.speechSynthesis.cancel(), setSpeaking(false)) : speak())}
             >
-              <Icon name={speaking ? 'x' : 'audio'} size={12} />
+              <Icon name={speaking ? 'x' : 'volume'} size={12} />
               {speaking ? t('Parar') : t('Escuchar la muestra')}
             </button>
           )}

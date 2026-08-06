@@ -7,7 +7,7 @@ const steps: Array<{ label: string; icon: string; view: View }> = [
   { label: 'Definir población', icon: 'users', view: 'prosopPopulation' },
   { label: 'Diseñar cuestionario', icon: 'table', view: 'prosopPopulation' },
   { label: 'Registrar fuentes', icon: 'archive', view: 'prosopSources' },
-  { label: 'Resolver identidades', icon: 'person', view: 'prosopPersons' },
+  { label: 'Resolver identidades', icon: 'user', view: 'prosopPersons' },
   { label: 'Analizar cohortes', icon: 'chartBar', view: 'prosopAnalysis' },
 ];
 

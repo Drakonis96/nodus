@@ -18,7 +18,7 @@ export const PROSOPOGRAPHY_GROUPS: ProsopographyGroup[] = [
   { id: 'explore', label: 'Explorar', items: [
     { label: 'Buscar', icon: 'search', view: 'prosopSearch' },
     { label: 'Población', icon: 'users', view: 'prosopPopulation' },
-    { label: 'Personas', icon: 'person', view: 'prosopPersons' },
+    { label: 'Personas', icon: 'user', view: 'prosopPersons' },
     { label: 'Fuentes', icon: 'archive', view: 'prosopSources' },
   ] },
   { id: 'analyze', label: 'Analizar', items: [

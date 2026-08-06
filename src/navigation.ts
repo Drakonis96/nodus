@@ -48,7 +48,7 @@ export const NAV_ITEMS: NavItem[] = [
   // through to the genealogical dossier or generic archive.
   { id: 'prosopSearch', label: 'Buscar', icon: 'search', group: 'explore' },
   { id: 'prosopPopulation', label: 'Población', icon: 'users', group: 'explore' },
-  { id: 'prosopPersons', label: 'Personas', icon: 'person', group: 'explore' },
+  { id: 'prosopPersons', label: 'Personas', icon: 'user', group: 'explore' },
   { id: 'prosopSources', label: 'Fuentes', icon: 'archive', group: 'explore' },
   { id: 'prosopAnalysis', label: 'Análisis', icon: 'chartBar', group: 'analyze' },
   { id: 'prosopNetworks', label: 'Redes', icon: 'network', group: 'analyze' },

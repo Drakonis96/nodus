@@ -217,7 +217,7 @@ export function PrimarySourcesTimelineView() {
     { id: 'timeline', label: 'Cronología', icon: 'clock' },
     { id: 'table', label: 'Tabla', icon: 'table' },
     { id: 'periods', label: 'Periodos', icon: 'calendar' },
-    { id: 'undated', label: 'Sin fecha', icon: 'help-circle' },
+    { id: 'undated', label: 'Sin fecha', icon: 'help' },
   ];
 
   return (
@@ -382,7 +382,7 @@ export function PrimarySourcesTimelineView() {
                   <h2 className="mt-1 text-lg font-semibold">{selected.label}</h2>
                   <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-300">{humanInterval(selected)}</p>
                 </div>
-                {selected.hasContradiction && <Icon name="alert-triangle" className="text-rose-500" size={18} />}
+                {selected.hasContradiction && <Icon name="alert" className="text-rose-500" size={18} />}
               </div>
               <dl className="mt-5 grid grid-cols-2 gap-3 text-xs">
                 <div><dt className="text-neutral-500">{t('Certeza')}</dt><dd className="mt-1 font-medium">{certaintyLabel(selected.dateCertainty)}</dd></div>

@@ -704,7 +704,7 @@ function MultiFormatViewer({ selected, files }: { selected: ArchiveItemFile; fil
     return (
       <div className="grid h-full place-items-center bg-gradient-to-br from-indigo-50 to-stone-100 p-8 dark:from-indigo-950/30 dark:to-neutral-950" data-testid="primary-source-audio-viewer">
         <div className="w-full max-w-2xl rounded-2xl border border-neutral-200 bg-white p-8 shadow-xl dark:border-neutral-800 dark:bg-neutral-900">
-          <Icon name="audio" size={42} className="mx-auto text-indigo-500" />
+          <Icon name="volume" size={42} className="mx-auto text-indigo-500" />
           <p className="mt-4 truncate text-center font-medium">{file.originalFileName}</p>
           <audio aria-label={file.originalFileName || t('Fuente de audio')} className="mt-6 w-full" controls preload="metadata" src={url}>{t('Tu sistema no puede reproducir este audio.')}</audio>
           <p className="mt-4 text-center text-xs text-neutral-500">{t('La reproducción usa rangos; el archivo completo no se carga en memoria.')}</p>
@@ -2098,7 +2098,7 @@ function ProposalReviewCard({
           <h3 className="mt-2 text-sm font-semibold">{proposalTitle(proposal)}</h3>
           <p className="mt-1 text-[10px] text-neutral-500">{proposal.sourceEngine ?? t('motor desconocido')} · {proposal.sourceModel ?? t('modelo desconocido')} · {proposal.rationale ?? t('sin justificación')}</p>
         </div>
-        {proposal.excerptId && <button className="btn btn-ghost h-8 gap-1 px-2 text-[10px]" onClick={() => onOpenExcerpt(proposal.excerptId!)}><Icon name="locate" size={12} />{t('Abrir fragmento')}</button>}
+        {proposal.excerptId && <button className="btn btn-ghost h-8 gap-1 px-2 text-[10px]" onClick={() => onOpenExcerpt(proposal.excerptId!)}><Icon name="target" size={12} />{t('Abrir fragmento')}</button>}
       </div>
 
       {editable ? (

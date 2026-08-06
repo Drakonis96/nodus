@@ -341,7 +341,7 @@ function SearchResultCard({ result, onOpen }: { result: PrimarySourceSearchResul
           </div>
         </div>
         <button className="btn btn-ghost h-8 shrink-0 gap-1 px-2 text-[10px]" onClick={onOpen}>
-          <Icon name="locate" size={12} /> {t('Abrir contexto')}
+          <Icon name="target" size={12} /> {t('Abrir contexto')}
         </button>
       </div>
     </article>

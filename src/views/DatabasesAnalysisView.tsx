@@ -176,7 +176,7 @@ function ManualBuilder({ dbId, profile }: { dbId: string; profile: DatabaseProfi
   return (
     <section className="card p-4">
       <div className="flex items-center gap-2 mb-3">
-        <Icon name="construct" size={16} className="text-neutral-400" />
+        <Icon name="tools" size={16} className="text-neutral-400" />
         <h2 className="font-semibold">{t('Análisis manual')}</h2>
       </div>
       <div className="flex flex-wrap items-end gap-3">

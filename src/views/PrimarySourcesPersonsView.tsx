@@ -407,7 +407,7 @@ export function PrimarySourcesPersonsView() {
                         onClick={() => openExcerpt(mention.itemId, mention.excerptId)}
                         className="btn btn-ghost h-7 shrink-0 px-2 text-[10px]"
                       >
-                        <Icon name="external-link" size={12} /> {t('Abrir fragmento')}
+                        <Icon name="external" size={12} /> {t('Abrir fragmento')}
                       </button>
                     </div>
                   </article>
@@ -452,7 +452,7 @@ export function PrimarySourcesPersonsView() {
                 : 'border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900',
             ].join(' ')}>
               <div className="flex items-center gap-2">
-                <Icon name="alert-triangle" size={16} />
+                <Icon name="alert" size={16} />
                 <h3 className="text-sm font-semibold">{t('Discrepancias explícitas')}</h3>
               </div>
               <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">{t('Las versiones incompatibles permanecen visibles; reunir identidades no decide cuál es correcta.')}</p>
