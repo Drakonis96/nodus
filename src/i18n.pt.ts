@@ -26,6 +26,7 @@ import { PRIMARY_SOURCES_RELEASE_TRANSLATIONS } from './i18n.primarySourcesRelea
 import { TESTIMONY_TRANSLATIONS } from './i18n.testimonies';
 import { NEW_VAULT_COMPLETION_TRANSLATIONS } from './i18n.newVaultCompletion';
 import { NODI_NOTIFICATION_TRANSLATIONS } from './i18n.nodiNotifications';
+import { ANNOUNCEMENT_TRANSLATIONS } from './i18n.announcements';
 
 export const PT: Record<string, string> = {
   ...DIARIZATION_TRANSLATIONS.pt,
@@ -44,6 +45,7 @@ export const PT: Record<string, string> = {
   ...TESTIMONY_TRANSLATIONS.pt,
   ...NEW_VAULT_COMPLETION_TRANSLATIONS.pt,
   ...NODI_NOTIFICATION_TRANSLATIONS['pt'],
+  ...ANNOUNCEMENT_TRANSLATIONS['pt'],
   ...WORLD_CHAT_TRANSLATIONS.pt,
   "Lo que cuenta el mapa": "O que conta o mapa",
   "Ver dónde ocurren las escenas ({n})": "Ver onde acontecem as cenas ({n})",
@@ -1789,8 +1791,8 @@ export const PT: Record<string, string> = {
   '¿Es tu primera vez? En menos de un minuto te enseño cómo convertir tu biblioteca de Zotero en un grafo de ideas. Puedes saltártelo cuando quieras.':
     'É a primeira vez? Em menos de um minuto mostro-lhe como transformar a sua biblioteca do Zotero num grafo de ideias. Pode saltar isto quando quiser.',
   'Bóvedas independientes': 'Espaços independentes',
-  'Cada bóveda es un espacio separado: biblioteca, grafo, notas, proyectos, chats, ajustes, embeddings y claves API pueden vivir aislados. Usa este selector para crear otra, cambiar de bóveda o cargar claves desde una bóveda anterior.':
-    'Cada espaço é um ambiente separado: biblioteca, grafo, notas, projetos, chats, definições, embeddings e chaves API podem permanecer isolados. Utilize este seletor para criar outro espaço, mudar de espaço ou carregar chaves de um espaço anterior.',
+  'Cada bóveda es un espacio separado: biblioteca, grafo, notas, proyectos, chats, ajustes, embeddings y claves API pueden vivir aislados. Pulsa esta insignia para crear otra, cambiar de bóveda o cargar claves desde una bóveda anterior.':
+    'Cada espaço é um ambiente separado: biblioteca, grafo, notas, projetos, chats, definições, embeddings e chaves API podem permanecer isolados. Clique neste emblema para criar outro espaço, mudar de espaço ou carregar chaves de um espaço anterior.',
   'El grafo de ideas': 'O grafo de ideias',
   'Es el corazón de Nodus. Cada nodo es una idea extraída de tus lecturas y cada arista una relación entre ellas. Empieza vacío: se llena a medida que escaneas obras a fondo.':
     'É o coração do Nodus. Cada nó é uma ideia extraída das suas leituras e cada aresta uma relação entre elas. Começa vazio: enche-se à medida que analisa obras em profundidade.',
@@ -1798,8 +1800,8 @@ export const PT: Record<string, string> = {
   'Este botón trae las obras de tus colecciones monitorizadas. Por defecto solo incorpora metadatos; puedes activar análisis automático en Ajustes.':
     'Este botão traz as obras das suas coleções monitorizadas. Por predefinição, incorpora apenas metadados; pode ativar a análise automática nas Definições.',
   'Elegir colecciones': 'Escolher coleções',
-  'Aquí decides qué colecciones o subcolecciones de Zotero vigila Nodus. Empieza con una pequeña para probar; sus subcolecciones se incluyen solas.':
-    'Aqui decide que coleções ou subcoleções do Zotero o Nodus vigia. Comece com uma pequena para experimentar; as suas subcoleções são incluídas automaticamente.',
+  'Decide qué colecciones o subcolecciones de Zotero vigila Nodus. Ábrelo desde la paleta de comandos (⌘K o Ctrl+K) buscando «Colecciones». Empieza con una pequeña para probar; sus subcolecciones se incluyen solas.':
+    'Decide que coleções ou subcoleções do Zotero o Nodus vigia. Abre-o a partir da paleta de comandos (⌘K ou Ctrl+K) procurando «Coleções». Comece com uma pequena para experimentar; as suas subcoleções são incluídas automaticamente.',
   'Tu biblioteca': 'A sua biblioteca',
   'Aquí tienes todas tus obras con su estado de escaneo: ligero (temas) y profundo (ideas). Desde aquí decides qué llevar al grafo.':
     'Aqui tem todas as suas obras com o respetivo estado de análise: ligeira (temas) e profunda (ideias). A partir daqui decide o que levar para o grafo.',

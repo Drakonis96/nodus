@@ -58,6 +58,12 @@ import {
   clearNotifications,
   setNotificationsNotifier,
 } from './notifications';
+import {
+  listAnnouncements,
+  markAnnouncementRead,
+  refreshAnnouncements,
+  setAnnouncementsNotifier,
+} from './announcements';
 import { getNodiViewContext, setNodiViewContext, streamNodiChat } from './ai/nodiChat';
 import type { NodiChatRequest } from '@shared/types';
 import { clearNodiConversations, deleteNodiConversation, getNodiConversation, listNodiConversations, saveNodiConversation } from './nodiConversations';
@@ -364,6 +370,9 @@ export function registerIpc(
     if (patch.mascotEnabled !== undefined || patch.mascotAlwaysOnTop !== undefined) {
       applyMascotWindow();
     }
+    // Turning announcements back on asks straight away. The alternative is a panel that
+    // stays empty for up to four hours after the user opted in, which reads as broken.
+    if (patch.announcementsEnabled === true) void refreshAnnouncements('setting enabled');
     // Let other windows (the Nodi overlay) react to setting changes, e.g. costumes.
     for (const win of BrowserWindow.getAllWindows()) {
       if (!win.isDestroyed()) win.webContents.send('settings:changed', next);
@@ -388,6 +397,14 @@ export function registerIpc(
     clearNotifications();
     return listNotifications();
   });
+  setAnnouncementsNotifier(() => {
+    const list = listAnnouncements();
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) win.webContents.send('announcements:changed', list);
+    }
+  });
+  h('announcements:list', async () => listAnnouncements());
+  h('announcements:markRead', async (_e, id: string) => markAnnouncementRead(String(id)));
   h('nodi:conversations:list', async () => listNodiConversations());
   h('nodi:conversations:get', async (_e, id: string) => getNodiConversation(id));
   h('nodi:conversations:save', async (_e, input) => saveNodiConversation(input));

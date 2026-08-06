@@ -25,13 +25,17 @@ try {
 
   const { RELEASE_NOTES, releaseNotesForMajor, compareVersions } = await import(pathToFileURL(bundlePath).href);
   const currentRelease = RELEASE_NOTES[0];
-  assert.equal(currentRelease?.version, '3.2.3');
-  assert.equal(currentRelease?.date, '2026-08-05');
-  // A search result whose row the server could not name, and then three things about reading
-  // rather than finding: a report marked as read, a passage kept as the place you stopped, and
-  // a work that leads back to its item in Zotero. A floor rather than an exact count, in case
-  // more lands here before it ships.
+  assert.equal(currentRelease?.version, '3.2.4');
+  assert.equal(currentRelease?.date, '2026-08-06');
+  // The notification centre reachable from the header, the announcements channel behind
+  // it, a right rail with three fewer icons, and an inbox that only shows up when it holds
+  // something. A floor rather than an exact count, in case more lands here before it ships.
   assert.ok(currentRelease?.highlights.length >= 4, 'the release must describe what changed');
+
+  // 3.2.3 keeps its own four highlights underneath.
+  const readMarkersRelease = RELEASE_NOTES.find((note) => note.version === '3.2.3');
+  assert.equal(readMarkersRelease?.date, '2026-08-05');
+  assert.equal(readMarkersRelease?.highlights.length, 4);
   for (const highlight of currentRelease.highlights) {
     // Written for the person using Nodus: no module names, no internal vocabulary.
     for (const language of ['es', 'en', 'fr', 'de', 'pt', 'pt-BR']) {

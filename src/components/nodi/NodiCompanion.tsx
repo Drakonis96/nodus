@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { deriveNodiNoteTitle } from '@shared/nodiNotes';
+import { announcementCopyFor } from '@shared/announcements';
 import type { AppSettings, ModelRef, NodiChatMessage, NodiContextKind, NodiConversation, NodiNote, NodiNotification, NodiOverlayPlacement, VaultType } from '@shared/types';
 import { vaultTypeColor } from '@shared/vaultTypes';
 import { type NodiRole, type NodiState } from './Nodi';
@@ -7,6 +8,7 @@ import { NodiAvatar } from './NodiAvatar';
 import { NodiCitationCard } from './NodiCitationCard';
 import { Markdown, type MarkdownCitation } from '../Markdown';
 import { ModelPicker } from '../ModelPicker';
+import { useAnnouncements } from '../NotificationsPanel';
 import { Icon } from '../ui';
 import { errorText, notificationLine, setActiveLang, t, tx } from '../../i18n';
 import './companion.css';
@@ -139,7 +141,10 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
   const [panel, setPanel] = useState<'none' | 'notifications' | 'chat' | 'notes'>('none');
   const [helpOpen, setHelpOpen] = useState(false);
   const [ntfs, setNtfs] = useState<NodiNotification[]>([]);
-  const unread = ntfs.reduce((n, x) => n + (x.read ? 0 : 1), 0);
+  // The published announcements, from the same hook the header panel uses, so the two
+  // surfaces can never disagree about what is unread.
+  const { announcements, unread: unreadAnnouncements, markRead: markAnnouncementRead } = useAnnouncements();
+  const unread = unreadAnnouncements + ntfs.reduce((n, x) => n + (x.read ? 0 : 1), 0);
 
   const [messages, setMessages] = useState<NodiChatMessage[]>([]);
   const [input, setInput] = useState('');
@@ -664,7 +669,10 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
   const openNotifications = () => {
     setPanel((p) => (p === 'notifications' ? 'none' : 'notifications'));
     setHelpOpen(false);
-    if (panel !== 'notifications' && unread > 0) window.nodus.markNotificationsRead().then(setNtfs).catch(() => {});
+    // Only the activity feed clears on open. An announcement is read one at a time.
+    if (panel !== 'notifications' && ntfs.some((x) => !x.read)) {
+      window.nodus.markNotificationsRead().then(setNtfs).catch(() => {});
+    }
   };
 
   const nodiState: NodiState = closing ? 'closing' : streaming ? 'thinking' : greet ? 'waving' : celebrate ? 'discovering' : 'idle';
@@ -869,7 +877,41 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
               <button onClick={() => setPanel('none')} aria-label={t('Cerrar')}>✕</button>
             </div>
             <div className="nodi-panel-body">
-              {ntfs.length === 0 ? (
+              {announcements.length > 0 && (
+                <>
+                  <div className="nodi-ntf-section">{t('Avisos de Nodus')}</div>
+                  {announcements.map((entry) => {
+                    const copy = announcementCopyFor(entry, settings?.uiLanguage ?? 'es');
+                    return (
+                      <div key={entry.id} className={`nodi-ntf${entry.read ? '' : ' unread'}`}>
+                        <span className="nodi-ntf-dot" style={{ background: entry.severity === 'warning' ? DOT.warning : DOT.info }} />
+                        <div style={{ minWidth: 0 }}>
+                          {/* Plain text: this came off the network. */}
+                          <div className="nodi-ntf-title">{copy.title}</div>
+                          <div className="nodi-ntf-body">{copy.body}</div>
+                          <div className="nodi-ntf-actions">
+                            {entry.url && (
+                              <button
+                                onClick={() => {
+                                  markAnnouncementRead(entry.id);
+                                  void window.nodus.openExternal(entry.url!);
+                                }}
+                              >
+                                {copy.linkLabel ?? t('Abrir enlace')}
+                              </button>
+                            )}
+                            {!entry.read && (
+                              <button onClick={() => markAnnouncementRead(entry.id)}>{t('Marcar como leído')}</button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {ntfs.length > 0 && <div className="nodi-ntf-section">{t('Actividad')}</div>}
+                </>
+              )}
+              {ntfs.length === 0 && announcements.length === 0 ? (
                 <div className="nodi-empty">{t('No hay notificaciones.')}</div>
               ) : (
                 ntfs.map((n) => (

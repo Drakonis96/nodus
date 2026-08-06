@@ -52,11 +52,12 @@ test('feedback offers an optional 0–10 product survey in one permanent thread'
   assert.match(styles, /data-score='9'.+data-score='10'/);
 });
 
-test('roadmap follows the requested sequence and is opened from the header', async () => {
-  const [roadmap, roadmapSource, app, english] = await Promise.all([
+test('roadmap follows the requested sequence and is opened from Settings › About', async () => {
+  const [roadmap, roadmapSource, app, settings, english] = await Promise.all([
     read('src/views/RoadmapModal.tsx'),
     read('shared/nodiDocumentation.ts'),
     read('src/App.tsx'),
+    read('src/views/Settings.tsx'),
     read('src/i18n.en.ts'),
   ]);
   const steps = [
@@ -121,8 +122,17 @@ test('roadmap follows the requested sequence and is opened from the header', asy
   }
   assert.match(app, /import \{ RoadmapModal \}/);
   assert.match(app, /roadmapOpen && <RoadmapModal/);
-  const roadmapAction = app.lastIndexOf(`label={t('Roadmap')}`);
+  // The roadmap left the header rail for Settings › About Nodus; the modal still lives
+  // in App, opened through the view context.
+  assert.doesNotMatch(app, /label=\{t\('Roadmap'\)\}/);
+  assert.match(app, /id: 'act:roadmap'/, 'the command palette still opens the roadmap');
+  assert.match(settings, /data-testid="about-roadmap"/);
+  assert.match(settings, /data-testid="open-roadmap"[\s\S]{0,200}onClick=\{onOpenRoadmap\}/);
+
+  // Settings is still the rightmost action, and the notification centre sits just left
+  // of it — the one place a user can always reach announcements, Nodi enabled or not.
+  const notificationsAction = app.lastIndexOf(`label={t('Notificaciones')}`);
   const settingsAction = app.lastIndexOf(`label={t('Ajustes')}`);
-  assert.ok(roadmapAction > 0 && settingsAction > roadmapAction, 'Settings is the rightmost action after Roadmap');
+  assert.ok(notificationsAction > 0 && settingsAction > notificationsAction, 'Settings is the rightmost action, after Notificaciones');
   assert.match(app.slice(settingsAction, settingsAction + 220), /setView\('settings'\)/);
 });

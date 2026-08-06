@@ -169,6 +169,13 @@ specified operation:
 - **GitHub:** Check and download updates, open incidents and downloads of the project. It also hosts
   the official download of the OpenAI tunnel client, whose integrity checks Nodus before executing
   it. GitHub can receive network data such as IP address.
+- **Nodus announcements:** Nodus downloads a public, static file of announcements published on the
+  project website (GitHub Pages) so it can warn about surveys, known issues or important changes
+  between releases. The request is a plain conditional GET made at most once every four hours, plus
+  one shortly after startup. It sends no identifier, no account, no vault name and no data of any
+  kind about the user's corpus; the server can see only what any web request exposes, such as the IP
+  address. It can be turned off completely in Settings > Updates and news, and when it is off no
+  request is made at all.
 - **Hugging Face or other fixed repositories:** optional download of models, voices and runtimes.
   The repository can receive network data.
 - **OpenAI Secure MCP Tunnel and ChatGPT:** If the user expressly configures this integration, Nodus

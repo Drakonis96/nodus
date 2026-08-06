@@ -1,6 +1,6 @@
 {
   "name": "nodus",
-  "version": "3.2.3",
+  "version": "3.2.4",
   "description": "Local-first desktop app that turns a Zotero library into a navigable graph of ideas and authors.",
   "author": "Nodus",
   "license": "MIT",
@@ -28,6 +28,7 @@
     "verify:gallery-virtualization": "node scripts/verify-gallery-virtualization.mjs",
     "verify:debates-payload": "node scripts/verify-debates-payload.mjs",
     "verify:single-instance": "node scripts/verify-single-instance.mjs",
+    "verify:announcements": "npm run build && node scripts/verify-announcements.mjs",
     "verify:api-key-recovery-macos": "node scripts/verify-api-key-recovery-macos.mjs",
     "verify:toolkit-heic": "node scripts/verify-toolkit-heic.mjs",
     "capture:worldbuilding-site": "npm run build && electron-rebuild -f -w better-sqlite3 && node scripts/capture-worldbuilding-site-demo.mjs",

@@ -93,6 +93,7 @@ export function Settings({
   onChange,
   onVaultsChanged: _onVaultsChanged,
   onOpenWhatsNew,
+  onOpenRoadmap,
 }: {
   settings: AppSettings;
   vaults: VaultSummary[];
@@ -102,6 +103,8 @@ export function Settings({
   onChange: () => Promise<unknown>;
   onVaultsChanged: () => Promise<unknown>;
   onOpenWhatsNew: () => void;
+  /** The roadmap left the header rail for this section; the modal still lives in App. */
+  onOpenRoadmap: () => void;
 }) {
   const [saved, setSaved] = useState<string | null>(null);
   const [supersededReloadKey, setSupersededReloadKey] = useState(0);
@@ -626,8 +629,8 @@ export function Settings({
     visibleSettingsSection('models', 'Modelos de IA', 'basico avanzado modelo general extraccion sintesis tutor resumen fusion embeddings transcripcion voz imagen'),
     visibleSettingsSection('extraction', 'Extracción de texto PDFs grandes', 'pdf texto zotero ocr tesseract paginas idiomas'),
     visibleSettingsSection('data', 'Zona de peligro', 'reinicializar grafo borrar ideas temas conexiones autores huecos'),
-    visibleSettingsSection('about', 'Acerca de Nodus', 'proyecto independiente codigo abierto open source gratuito privacidad privacy rgpd gdpr datos alumnado licencia'),
-    visibleSettingsSection('updates', 'Actualizaciones y novedades', 'actualizaciones update version novedades ultimos cambios latest changes changelog buscar instalar reiniciar'),
+    visibleSettingsSection('about', 'Acerca de Nodus', 'proyecto independiente codigo abierto open source gratuito privacidad privacy rgpd gdpr datos alumnado licencia roadmap hoja de ruta futuro'),
+    visibleSettingsSection('updates', 'Actualizaciones y novedades', 'actualizaciones update version novedades ultimos cambios latest changes changelog buscar instalar reiniciar avisos anuncios encuestas noticias'),
   ].filter(Boolean).length;
 
   return (
@@ -1208,7 +1211,7 @@ export function Settings({
           </Section>
       )}
 
-      {visibleSettingsSection('about', 'Acerca de Nodus', 'proyecto independiente codigo abierto open source gratuito privacidad privacy rgpd gdpr datos alumnado licencia terceros legal actualizaciones update version novedades') && (
+      {visibleSettingsSection('about', 'Acerca de Nodus', 'proyecto independiente codigo abierto open source gratuito privacidad privacy rgpd gdpr datos alumnado licencia terceros legal actualizaciones update version novedades roadmap hoja de ruta futuro') && (
         <Section title={t('Acerca de Nodus')}>
           <div className={ABOUT_CARD_CLASS}>
             <div className="flex items-start gap-3">
@@ -1348,6 +1351,29 @@ export function Settings({
             </div>
           </div>
 
+          <div data-testid="about-roadmap" className={ABOUT_CARD_CLASS}>
+            <div className="flex items-start gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300">
+                <Icon name="route" size={19} />
+              </div>
+              <div className="max-w-3xl">
+                <h3 className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{t('Roadmap')}</h3>
+                <p className="mt-1 text-xs leading-5 text-neutral-600 dark:text-neutral-400">
+                  {t('Consulta qué está en desarrollo, qué está planificado y qué ya se ha implementado. El roadmap no atribuye fechas ni versiones.')}
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+              <button
+                data-testid="open-roadmap"
+                className={ABOUT_ACTION_BUTTON_CLASS}
+                onClick={onOpenRoadmap}
+              >
+                <Icon name="route" /> {t('Ver roadmap de Nodus')}
+              </button>
+            </div>
+          </div>
+
           <div data-testid="about-transparency-security" className={ABOUT_CARD_CLASS}>
             <div className="flex items-start gap-3">
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300">
@@ -1384,7 +1410,7 @@ export function Settings({
         </Section>
       )}
 
-      {visibleSettingsSection('updates', 'Actualizaciones y novedades', 'actualizaciones update version novedades ultimos cambios latest changes changelog buscar instalar reiniciar') && (
+      {visibleSettingsSection('updates', 'Actualizaciones y novedades', 'actualizaciones update version novedades ultimos cambios latest changes changelog buscar instalar reiniciar avisos anuncios encuestas noticias') && (
         <Section title={t('Actualizaciones y novedades')}>
           <div data-testid="about-latest-changes" className="flex flex-col gap-4 rounded-xl border border-neutral-200 bg-neutral-50 p-5 dark:border-neutral-800 dark:bg-neutral-900/50 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -1398,6 +1424,23 @@ export function Settings({
             >
               <Icon name="star" /> {t('Ver últimos cambios')}
             </button>
+          </div>
+          <div data-testid="about-announcements" className="flex flex-col gap-4 rounded-xl border border-neutral-200 bg-neutral-50 p-5 dark:border-neutral-800 dark:bg-neutral-900/50 sm:flex-row sm:items-center sm:justify-between">
+            <div className="max-w-2xl">
+              <label className="text-sm text-neutral-700 dark:text-neutral-300">{t('Avisos de Nodus')}</label>
+              <p className="mt-0.5 text-xs text-neutral-500">
+                {t('Avisos publicados entre versiones (encuestas, incidencias conocidas, cambios importantes). Se consulta un archivo público cada cuatro horas, sin enviar ningún identificador ni dato de tu bóveda. Al desactivarlo, Nodus deja de hacer esa consulta.')}
+              </p>
+            </div>
+            <label className="flex shrink-0 items-center gap-2 text-sm text-neutral-700 dark:text-neutral-300">
+              <input
+                data-testid="toggle-announcements"
+                type="checkbox"
+                checked={settings.announcementsEnabled}
+                onChange={(e) => void patch({ announcementsEnabled: e.target.checked })}
+              />
+              {t('Recibir avisos')}
+            </label>
           </div>
           <div data-testid="about-updates" className="flex flex-col gap-4 rounded-xl border border-neutral-200 bg-neutral-50 p-5 dark:border-neutral-800 dark:bg-neutral-900/50 sm:flex-row sm:items-center sm:justify-between">
             <div>

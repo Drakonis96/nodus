@@ -332,6 +332,25 @@
 .nodi-ntf-title { font-size: 13px; font-weight: 600; }
 .nodi-ntf-body { font-size: 12px; color: #aab4c4; margin-top: 1px; }
 .nodi-ntf-time { font-size: 10px; color: #6b7688; margin-top: 3px; }
+/* Separates the published announcements from the activity feed below them. */
+.nodi-ntf-section {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #6b7688;
+  padding: 6px 8px 3px;
+}
+.nodi-ntf-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 5px; }
+.nodi-ntf-actions button {
+  font-size: 11px;
+  color: var(--nodi-vault-accent, #8ea2ff);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+.nodi-ntf-actions button:hover { text-decoration: underline; }
 .nodi-empty { padding: 22px 12px; text-align: center; color: #7a8598; font-size: 12px; }
 
 /* Chat */
@@ -806,6 +825,7 @@
 .nodi-theme-light .nodi-ntf.unread { background: color-mix(in srgb, var(--nodi-vault-accent, #6366f1) 9%, transparent); }
 .nodi-theme-light .nodi-ntf-body { color: #64748b; }
 .nodi-theme-light .nodi-ntf-time,
+.nodi-theme-light .nodi-ntf-section,
 .nodi-theme-light .nodi-empty,
 .nodi-theme-light .nodi-chat-status,
 .nodi-theme-light .nodi-typing { color: #94a3b8; }

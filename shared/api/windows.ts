@@ -21,6 +21,13 @@ export const NODI_WINDOW_METHODS = [
   'markNotificationsRead',
   'clearNotifications',
   'onNotificationsChanged',
+  // published announcements, shown in the same panel
+  'listAnnouncements',
+  'markAnnouncementRead',
+  'onAnnouncementsChanged',
+  // an announcement may carry a link; the main process still refuses any scheme
+  // that is not http/https/mailto (see shell:openExternal)
+  'openExternal',
   // conversations and notes
   'listNodiConversations',
   'saveNodiConversation',

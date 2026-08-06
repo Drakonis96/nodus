@@ -30,6 +30,7 @@ export const GLOBAL_PREF_KEYS = [
   'highContrast',
   'reduceMotion',
   'readingFocusMode',
+  'announcementsEnabled',
   'favorites',
   'mascotEnabled',
   'mascotAlwaysOnTop',
