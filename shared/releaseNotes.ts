@@ -814,9 +814,13 @@ const RELEASE_3_2_3_HIGHLIGHTS: RawReleaseHighlight[] = [
 /**
  * 3.2.4 — the header stops being a shelf, and Nodus gains a way to say something.
  *
- * Four entries because four things change for the reader: a button that always reaches
- * the notification centre, a channel that can warn about something between releases, a
- * rail with three fewer icons, and an inbox that only shows up when it holds something.
+ * The first four entries are that change: a button that always reaches the notification
+ * centre, a channel that can warn about something between releases, a rail with three
+ * fewer icons, and an inbox that only shows up when it holds something. Then the links
+ * to the project's accounts, the first look at Nodus on a phone and what changed in
+ * reading a report there, and the two fixes that arrived on their own: the local AI
+ * engine addressed on the wrong interface once it was already running, and the buttons
+ * that were laying out without their icon.
  */
 const RELEASE_3_2_4_HIGHLIGHTS: RawReleaseHighlight[] = [
   {
@@ -863,6 +867,42 @@ const RELEASE_3_2_4_HIGHLIGHTS: RawReleaseHighlight[] = [
     de: 'Nodus sagt jetzt, wo es außerhalb der Anwendung zu finden ist. Das Neuigkeiten-Fenster und die Einstellungen unter Über Nodus führen zu Reddit, YouTube und X mit dem Symbol des jeweiligen Netzwerks. Die Links öffnen sich in Ihrem Browser und die Anwendung sendet nichts an diese Netzwerke.',
     pt: 'O Nodus passa a dizer onde encontrá-lo fora da aplicação. O modal de novidades e as Definições, em Acerca do Nodus, levam ao Reddit, ao YouTube e ao X com o ícone de cada rede. As ligações abrem no seu navegador e a aplicação não envia nada para essas redes.',
     'pt-BR': 'O Nodus agora diz onde encontrá-lo fora do aplicativo. O modal de novidades e as Configurações, em Sobre o Nodus, levam ao Reddit, ao YouTube e ao X com o ícone de cada rede. Os links abrem no seu navegador e o aplicativo não envia nada para essas redes.',
+  },
+  {
+    scope: 'general',
+    es: 'Nodus enseña cómo se ve en el móvil. Una galería que aparece una sola vez recorre nueve pantallas de la aplicación para el teléfono, cuenta qué hace ya y qué todavía no, y enlaza una encuesta corta sobre si la quieres. Las capturas y el formulario están en inglés, y la propia galería lo advierte.',
+    en: 'Nodus shows what it looks like on a phone. A gallery that appears once walks through nine screens of the mobile app, says what it already does and what it does not do yet, and links to a short survey about whether you want it. The screenshots and the form are in English, and the gallery says so.',
+    fr: 'Nodus montre à quoi il ressemble sur un téléphone. Une galerie qui n’apparaît qu’une fois parcourt neuf écrans de l’application mobile, dit ce qu’elle fait déjà et ce qu’elle ne fait pas encore, et renvoie vers un court sondage sur votre envie de l’avoir. Les captures et le formulaire sont en anglais, et la galerie le précise.',
+    de: 'Nodus zeigt, wie es auf einem Telefon aussieht. Eine Galerie, die einmal erscheint, führt durch neun Bildschirme der mobilen App, sagt, was sie schon kann und was noch nicht, und verweist auf eine kurze Umfrage dazu, ob Sie sie haben wollen. Die Aufnahmen und das Formular sind auf Englisch, und die Galerie sagt das auch.',
+    pt: 'O Nodus mostra o aspeto que tem num telemóvel. Uma galeria que aparece uma única vez percorre nove ecrãs da aplicação para o telefone, diz o que já faz e o que ainda não faz, e liga a um inquérito curto sobre se a quer. As capturas e o formulário estão em inglês, e a própria galeria avisa.',
+    'pt-BR': 'O Nodus mostra como ele fica no celular. Uma galeria que aparece uma única vez percorre nove telas do aplicativo para o telefone, diz o que ele já faz e o que ainda não faz, e leva a uma pesquisa curta sobre se você o quer. As capturas e o formulário estão em inglês, e a própria galeria avisa.',
+  },
+  {
+    scope: 'general',
+    es: 'Leer un informe en el móvil cambia en tres cosas. Selecciona un pasaje y pregunta por él: las palabras entran en la conversación de ese informe como cita. Marcador y Preguntar van ahora los primeros del menú de selección, antes que Copiar. Una fuente se abre en el instante en que se pulsa, y las citas que habían dejado de responder vuelven a abrirse.',
+    en: 'Reading a report on the phone changes in three ways. Select a passage and ask about it, and the words enter that report’s conversation as a quotation. Bookmark and Ask now come first in the selection menu, ahead of Copy. A source opens the instant it is pressed, and citations that had stopped responding open again.',
+    fr: 'Lire un rapport sur le téléphone change de trois façons. Sélectionnez un passage et posez une question à son sujet: les mots entrent dans la conversation de ce rapport sous forme de citation. Marque-page et Demander passent en tête du menu de sélection, avant Copier. Une source s’ouvre à l’instant où on la presse, et les citations qui ne répondaient plus s’ouvrent de nouveau.',
+    de: 'Das Lesen eines Berichts am Telefon ändert sich in drei Punkten. Wählen Sie eine Passage aus und fragen Sie danach, und die Worte gehen als Zitat in das Gespräch zu diesem Bericht. Lesezeichen und Fragen stehen jetzt vorn im Auswahlmenü, vor Kopieren. Eine Quelle öffnet sich in dem Augenblick, in dem man sie drückt, und Zitate, die nicht mehr reagierten, öffnen wieder.',
+    pt: 'Ler um relatório no telemóvel muda em três pontos. Selecione uma passagem e pergunte sobre ela: as palavras entram na conversa desse relatório como citação. Marcador e Perguntar passam a vir primeiro no menu de seleção, antes de Copiar. Uma fonte abre no instante em que é premida, e as citações que tinham deixado de responder voltam a abrir.',
+    'pt-BR': 'Ler um relatório no celular muda em três pontos. Selecione um trecho e pergunte sobre ele: as palavras entram na conversa daquele relatório como citação. Marcador e Perguntar agora vêm primeiro no menu de seleção, antes de Copiar. Uma fonte abre no instante em que é tocada, e as citações que tinham parado de responder voltam a abrir.',
+  },
+  {
+    scope: 'general',
+    es: 'El motor de IA local de Nodus deja de contestar en la dirección equivocada cuando ya estaba en marcha. La petición que arrancaba el servidor llegaba a la interfaz buena, las que lo encontraban encendido no, y de ahí salían vectores vacíos sin ningún aviso. Ahora las dos rutas leen la misma dirección y hay una prueba que las mantiene juntas.',
+    en: 'The local AI engine in Nodus stops answering at the wrong address once it is already running. The request that started the server reached the right interface, the ones that found it running did not, and that is where empty vectors came from, with nothing said about it. Both paths now read the same address, and a test keeps them together.',
+    fr: 'Le moteur d’IA locale de Nodus cesse de répondre à la mauvaise adresse quand il tourne déjà. La requête qui démarrait le serveur atteignait la bonne interface, celles qui le trouvaient allumé non, et c’est de là que venaient des vecteurs vides, sans le moindre avertissement. Les deux chemins lisent désormais la même adresse, et un test les garde ensemble.',
+    de: 'Die lokale KI-Engine von Nodus antwortet nicht mehr an der falschen Adresse, wenn sie schon läuft. Die Anfrage, die den Server startete, erreichte die richtige Schnittstelle, die folgenden nicht, und daher kamen leere Vektoren, ohne dass etwas dazu gesagt wurde. Beide Wege lesen jetzt dieselbe Adresse, und ein Test hält sie zusammen.',
+    pt: 'O motor de IA local do Nodus deixa de responder no endereço errado quando já estava a correr. O pedido que arrancava o servidor chegava à interface certa, os que o encontravam ligado não, e era daí que vinham vetores vazios, sem aviso nenhum. Agora os dois caminhos leem o mesmo endereço, e há um teste que os mantém juntos.',
+    'pt-BR': 'O motor de IA local do Nodus deixa de responder no endereço errado quando já estava rodando. O pedido que iniciava o servidor chegava à interface certa, os que o encontravam ligado não, e era daí que vinham vetores vazios, sem aviso nenhum. Agora os dois caminhos leem o mesmo endereço, e um teste os mantém juntos.',
+  },
+  {
+    scope: 'general',
+    es: 'Los botones que llegaban sin su icono ya lo tienen. Un nombre que el juego de iconos no tiene no dibuja nada, así que el botón se colocaba y se pulsaba enseñando un hueco, como le pasaba a Siguiente en Huecos al lado de un Anterior que sí tenía flecha. Doce nombres repartidos por veintiséis sitios vuelven a estar dibujados, y una prueba rechaza cualquier icono que no exista.',
+    en: 'Buttons that were arriving without their icon now have one. A name the icon set does not have draws nothing, so the button laid out and clicked while showing a gap, as Next did in Gaps beside a Previous that had its arrow. Twelve names across twenty-six places are drawn again, and a test refuses any icon that does not exist.',
+    fr: 'Les boutons qui arrivaient sans leur icône en ont une. Un nom que le jeu d’icônes ne possède pas ne dessine rien, si bien que le bouton se plaçait et se cliquait en montrant un vide, comme Suivant dans Lacunes à côté d’un Précédent qui avait sa flèche. Douze noms répartis sur vingt-six endroits sont de nouveau dessinés, et un test refuse toute icône inexistante.',
+    de: 'Schaltflächen, die ohne ihr Symbol ankamen, haben jetzt eines. Ein Name, den der Symbolsatz nicht hat, zeichnet gar nichts, also lag die Schaltfläche da und ließ sich anklicken, zeigte aber eine Lücke, wie Weiter in Lücken neben einem Zurück mit Pfeil. Zwölf Namen an sechsundzwanzig Stellen sind wieder gezeichnet, und ein Test weist jedes Symbol zurück, das es nicht gibt.',
+    pt: 'Os botões que chegavam sem o seu ícone passam a tê-lo. Um nome que o conjunto de ícones não tem não desenha nada, por isso o botão ficava colocado e clicável a mostrar um espaço vazio, como acontecia a Seguinte em Lacunas ao lado de um Anterior que tinha seta. Doze nomes espalhados por vinte e seis sítios voltam a estar desenhados, e um teste recusa qualquer ícone que não exista.',
+    'pt-BR': 'Os botões que chegavam sem o seu ícone agora o têm. Um nome que o conjunto de ícones não tem não desenha nada, então o botão ficava posicionado e clicável mostrando um espaço vazio, como acontecia com Próximo em Lacunas ao lado de um Anterior que tinha seta. Doze nomes espalhados por vinte e seis lugares voltam a ser desenhados, e um teste recusa qualquer ícone que não exista.',
   },
   {
     scope: 'academic',

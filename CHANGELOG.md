@@ -1,5 +1,66 @@
 # Changelog
 
+## 3.2.4 — 2026-08-06
+
+The header stops being a shelf, and Nodus gains a way to say something between
+releases. Around that: the project's own accounts, a first look at Nodus on a
+phone, and an academic vault that opens with fewer sections than it can fill.
+
+### Added
+
+- **A notification centre button in the header**, immediately left of Settings.
+  It shows the same two lists Nodi shows — the announcements published by Nodus
+  and what the app has been doing — which matters because Nodi is optional: with
+  the mascot disabled the centre was unreachable entirely.
+- **An announcements channel.** Nodus can now say something between one release
+  and the next: a survey, a known problem, an important change. Notices carry
+  their own copy per language, may carry an https link, expire on their own and
+  can target a version range. Reading is per notice. The whole thing switches off
+  in Settings, and off means no request at all.
+- **Links to the project's accounts** from the release modal and from Settings ›
+  About Nodus: Reddit, YouTube and X, each with its own mark. The links open in
+  your browser and nothing is sent to those networks.
+- **A first look at Nodus on a phone**, shown once on this release: nine screens
+  of the mobile app, what it does and what it does not do yet, and a short survey
+  about whether anybody wants it. The screenshots and the form are English only,
+  and the gallery around them says so in all eight languages.
+- **On the phone, ask a report about the words you have selected.** The passage
+  travels into that report's conversation as a quotation, and the question is
+  already about something. Bookmark and Ask now sit at the front of the selection
+  menu, ahead of Copy.
+
+### Changed
+
+- **Three icons leave the right rail.** Vaults goes because the centred badge
+  opens the same panel, and that badge is now shown at every window width.
+  Collections was already in the command palette; Roadmap gains a card in
+  Settings › About Nodus.
+- **The inbox is conditional on having entries**, since it is per vault and means
+  nothing on a local install, and Refresh stops showing in primary-sources
+  vaults, which do not sync with Zotero.
+- **An academic vault opens with fewer sections.** Gaps becomes a tab inside
+  Coverage, because a gap only means something against what your own question is
+  missing. Hypotheses and Reading path start hidden, since on a freshly synced
+  corpus they answered with noise. Both come back from Settings.
+
+### Fixed
+
+- **The local AI engine answered at the wrong address once it was already
+  running.** The request that started the server reached the OpenAI-compatible
+  interface, the ones that found it running reached the native one, and that is
+  where empty embedding vectors came from, silently. Both exits now derive the
+  URL from the same field, with a test that reproduces the difference against a
+  stand-in for llama-server.
+- **Buttons that laid out without their icon.** A name the icon set does not have
+  draws nothing at all, so the control still laid out and still clicked while
+  showing a gap — as Next did in Gaps, beside a Previous that had its arrow.
+  Twelve names across twenty-six call sites are named again, and a test now walks
+  every `<Icon>` tag to keep them that way.
+- **On the phone, a citation stopped opening** when the reading bookmark shipped,
+  because the two tap recognizers competed. A source now opens the instant it is
+  pressed rather than after UIKit has ruled out a double tap, and reading a
+  report no longer re-parses its prose every time something on the page changes.
+
 ## 3.2.3 — 2026-08-05
 
 Reading, rather than finding. A report can be marked as read, a passage on the
