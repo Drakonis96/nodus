@@ -3197,7 +3197,21 @@ select.input optgroup {
 .whats-new-footer > button:last-child { justify-self: end; }
 /* PayPal and Ko-fi ride together in the middle column, so the pair stays centred
    under the modal rather than each drifting to one side. */
-.whats-new-footer-support-group { display: flex; align-items: center; justify-self: center; gap: 8px; }
+.whats-new-footer-support-group { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; justify-self: center; gap: 8px; }
+/* Square, glyph-only siblings of the two support buttons: the footer has room
+   for three more marks but not for three more words, and the mark is what the
+   reader is scanning for anyway. Every rule here needs the two-class form —
+   `.whats-new-footer button` would otherwise paint them all teal. */
+.whats-new-footer .whats-new-footer-social { display: grid; place-items: center; align-self: stretch; min-width: 34px; min-height: 32px; border-radius: 9px; padding: 0 9px; color: white; }
+.whats-new-footer .whats-new-social-reddit { background: #ff4500; box-shadow: 0 9px 22px rgb(255 69 0 / .2); }
+.whats-new-footer .whats-new-social-reddit:hover { background: #d93a00; }
+.whats-new-footer .whats-new-social-youtube { background: #ff0000; box-shadow: 0 9px 22px rgb(255 0 0 / .2); }
+.whats-new-footer .whats-new-social-youtube:hover { background: #cc0000; }
+.whats-new-footer .whats-new-social-x { background: #0f0f0f; box-shadow: 0 9px 22px rgb(15 15 15 / .22); }
+.whats-new-footer .whats-new-social-x:hover { background: #262626; }
+.dark .whats-new-footer .whats-new-social-x { background: #1c1c1f; box-shadow: inset 0 0 0 1px #52525b; }
+.dark .whats-new-footer .whats-new-social-x:hover { background: #2a2a2e; }
+.whats-new-footer-divider { width: 1px; height: 20px; flex: 0 0 auto; background: var(--wn-border); }
 .whats-new-footer .whats-new-footer-support { margin-left: 0; color: white; background: #0070ba; box-shadow: 0 9px 22px rgb(0 112 186 / .2); }
 .whats-new-footer .whats-new-footer-support:hover { background: #005ea6; }
 .whats-new-footer .whats-new-footer-support-kofi { color: white; background: #ff5e5b; box-shadow: 0 9px 22px rgb(255 94 91 / .2); }

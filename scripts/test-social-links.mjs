@@ -91,6 +91,28 @@ test('the What\'s New modal maps over the table instead of listing links again',
   }
 });
 
+test('the modal footer carries the same accounts as square marks', () => {
+  assert.match(modal, /data-testid=\{`whats-new-footer-social-\$\{link\.id\}`\}/);
+  // They ride in the centre column with PayPal and Ko-fi, after a rule.
+  assert.match(
+    modal,
+    /<div className="whats-new-footer-support-group">[\s\S]*whats-new-footer-support-kofi[\s\S]*whats-new-footer-divider[\s\S]*whats-new-footer-social/
+  );
+  // Square, and as tall as the two support buttons it lines up with — measured
+  // off them rather than pinned to a number that goes stale when their padding
+  // changes, with a floor for when the group wraps onto its own line.
+  assert.match(styles, /\.whats-new-footer \.whats-new-footer-social \{[^}]*align-self: stretch[^}]*min-width:[^}]*min-height:/);
+  for (const link of NODUS_SOCIAL_LINKS) {
+    // `.whats-new-footer button` paints every footer button teal, so a
+    // single-class brand rule loses to it and the mark arrives mint green.
+    assert.match(
+      styles,
+      new RegExp(`\\.whats-new-footer \\.whats-new-social-${link.id} \\{[^}]*background:`),
+      `${link.id}'s footer colour must outrank .whats-new-footer button`
+    );
+  }
+});
+
 test('About Nodus offers the same three accounts', () => {
   assert.match(settings, /import \{ NODUS_SOCIAL_LINKS \} from '@shared\/socialLinks';/);
   assert.match(settings, /data-testid="about-social"/);

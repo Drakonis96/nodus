@@ -415,6 +415,22 @@ export function WhatsNewModal({
             >
               <Icon name="kofi" size={16} /> Ko-fi
             </button>
+            {/* The two ways of giving and the three ways of following share the
+                centre column, told apart by a rule rather than by reading them. */}
+            <span className="whats-new-footer-divider" aria-hidden="true" />
+            {NODUS_SOCIAL_LINKS.map((link) => (
+              <button
+                key={link.id}
+                type="button"
+                className={`whats-new-footer-social whats-new-social-${link.id}`}
+                data-testid={`whats-new-footer-social-${link.id}`}
+                aria-label={link.label}
+                title={link.label}
+                onClick={() => void window.nodus.openExternal(link.url)}
+              >
+                <Icon name={link.icon} size={15} />
+              </button>
+            ))}
           </div>
           <button onClick={close}>{t('Explorar las novedades')} <Icon name="chevronRight" size={14} /></button>
         </footer>
