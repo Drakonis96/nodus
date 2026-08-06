@@ -890,6 +890,7 @@ export const EN: Record<string, string> = {
   import: 'import',
   command: 'command',
   Huecos: 'Gaps',
+  'Cobertura y huecos': 'Coverage and gaps',
   'Ruta de lectura': 'Reading path',
   Escritura: 'Writing',
   Debates: 'Debates',

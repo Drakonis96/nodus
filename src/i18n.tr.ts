@@ -1242,6 +1242,7 @@ export const TR: Record<string, string> = {
   "import": "ithalat",
   "command": "komut",
   "Huecos": "Boşluklar",
+  "Cobertura y huecos": "Kapsam ve boşluklar",
   "Escritura": "Yazma",
   "Debates": "Tartışmalar",
   "Ajustes": "Ayarlar",

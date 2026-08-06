@@ -908,6 +908,7 @@ export const FR: Record<string, string> = {
   'import': 'import',
   'command': 'command',
   'Huecos': 'Lacunes',
+  'Cobertura y huecos': 'Couverture et lacunes',
   'Ruta de lectura': 'Parcours de lecture',
   'Escritura': 'Écriture',
   'Debates': 'Débats',

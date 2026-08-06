@@ -904,6 +904,7 @@ export const PT: Record<string, string> = {
   'import': 'import',
   'command': 'command',
   'Huecos': 'Lacunas',
+  'Cobertura y huecos': 'Cobertura e lacunas',
   'Ruta de lectura': 'Percurso de leitura',
   'Escritura': 'Escrita',
   'Debates': 'Debates',

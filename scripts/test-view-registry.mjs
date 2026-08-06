@@ -66,3 +66,42 @@ test('the registry adds the render and nothing else: labels and gating stay put'
   assert.match(readSource('src/navigation.ts'), /export const NAV_ITEMS: NavItem\[\]/);
   assert.match(readSource('shared/vaultTypes.ts'), /VAULT_TYPE_SCOPED_VIEWS/);
 });
+
+// Gaps is the one view deliberately reachable without a sidebar entry of its own:
+// it is a tab inside Coverage. What makes that safe is that it stays a routable
+// view — Home, Search and the advanced tour all navigate to it — so the guard has
+// to hold BOTH halves at once. Losing the renderer would 404 those callers; growing
+// a NAV_ITEM back would put a second, full-screen Huecos beside the tab.
+test('gaps is routable without a sidebar section, and lands on the Coverage tab', () => {
+  const navigation = readSource('src/navigation.ts');
+  assert.ok(viewUnion().includes('gaps'), 'gaps must stay in the View union');
+  assert.ok(
+    !/\{ id: 'gaps',/.test(navigation),
+    'gaps must NOT have a NAV_ITEM: it is a tab inside Coverage, not a section'
+  );
+
+  // Both ids render the same workspace, each entering by its own tab.
+  const corpus = readSource('src/app/views/corpus.tsx');
+  assert.match(corpus, /gaps: \([^)]*\) => \(\s*<CoverageWorkspace\s+vaultId=\{[^}]*\}\s+initialTab="gaps"/);
+  assert.match(corpus, /research: \([^)]*\) => \(\s*<CoverageWorkspace\s+vaultId=\{[^}]*\}\s+initialTab="map"/);
+  assert.equal(registeredViews().get('gaps'), 'corpus.tsx');
+
+  // The callers that still navigate to it must keep working.
+  assert.match(readSource('src/app/views/corpus.tsx'), /onOpenGaps=\{\(\) => setView\('gaps'\)\}/);
+  assert.match(readSource('src/views/AdvancedTour.tsx'), /view: 'gaps'/);
+});
+
+// The two labs that need a deeply analysed corpus are hidden by default, but hiding
+// is a SIDEBAR preset — it must never make them unroutable, or the advanced tour
+// walks into a section that cannot render.
+test('the views academic hides by default are still routable', () => {
+  const registered = registeredViews();
+  for (const view of ['hypothesis', 'reading']) {
+    assert.ok(registered.has(view), `${view} is hidden from the sidebar, not removed`);
+    assert.ok(/\{ id: '(hypothesis|reading)',/.test(readSource('src/navigation.ts')));
+  }
+  // The tour still walks through both, so a preset that blocked navigation would break it.
+  const tour = readSource('src/views/AdvancedTour.tsx');
+  assert.match(tour, /view: 'hypothesis'/);
+  assert.match(tour, /view: 'reading'/);
+});

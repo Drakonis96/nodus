@@ -109,7 +109,10 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'teachingUnits', label: 'Diseño de unidades', icon: 'compass', group: 'create' },
   // Analizar — superficies derivadas del grafo y síntesis.
   { id: 'immersion', label: 'Inmersión', icon: 'target', group: 'analyze' },
-  { id: 'gaps', label: 'Huecos', icon: 'gap', group: 'analyze' },
+  // 'gaps' NO tiene entrada propia: los huecos son una pestaña dentro de Cobertura,
+  // porque solo significan algo mirando qué le falta a una pregunta concreta. Sigue
+  // siendo una vista enrutable —Inicio, Buscar y el tour navegan a ella— y aterriza
+  // en esa pestaña; ver src/app/views/corpus.tsx.
   { id: 'debate', label: 'Debates', icon: 'scale', group: 'analyze' },
   { id: 'research', label: 'Cobertura', icon: 'help', group: 'analyze' },
   { id: 'hypothesis', label: 'Hipótesis', icon: 'flask', group: 'analyze' },
