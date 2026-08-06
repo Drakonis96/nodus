@@ -62,6 +62,7 @@ const RELEASE_3_2_4_TR: string[] = [
   "Başlıkta daha az simge kalıyor. Kasalar, Koleksiyonlar ve Yol haritası sağ şeritten çıkıyor. Etkin kasa ortadaki rozetten açılıyor ve bu rozet artık her pencere genişliğinde görünüyor. Koleksiyonlar komut paletinde yaşıyor, yol haritası ise Ayarlar içindeki Nodus Hakkında bölümünde.",
   "Gelen kutusu yalnızca başka bir cihazdan bir şey geldiğinde görünüyor. Bağlı kasası olmayan bir bilgisayarda, hiç boş kalmayan bir simgenin yanında sürekli boş duran bir simgeydi. Yenileme düğmesi de Zotero ile eşitlenmeyen birincil kaynak kasalarında artık gösterilmiyor.",
   "Nodus artık uygulamanın dışında nerede bulunacağını da söylüyor. Yenilikler penceresi ve Ayarlar içindeki Nodus Hakkında bölümü, her birinin kendi simgesiyle Reddit, YouTube ve X hesaplarına götürüyor. Bağlantılar tarayıcınızda açılır ve uygulama bu ağlara hiçbir şey göndermez.",
+  "Akademik bir kasa daha az bölümle açılıyor. Boşluklar, Kapsam içinde bir sekmeye dönüşüyor, çünkü bir boşluk ancak kendi sorunuza neyin eksik olduğuna bakarken anlam taşır. Hipotez ve Okuma yolu başlangıçta gizli geliyor, çünkü yeni eşitlenmiş bir külliyatta gürültüyle yanıt veriyorlardı. İkisi de Ayarlar üzerinden geri gelir.",
 ];
 
 export const RELEASE_NOTES_TR: Record<string, string[]> = {

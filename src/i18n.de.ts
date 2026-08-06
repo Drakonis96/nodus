@@ -909,6 +909,7 @@ export const DE: Record<string, string> = {
   'import': 'import',
   'command': 'command',
   'Huecos': 'Lücken',
+  'Cobertura y huecos': 'Abdeckung und Lücken',
   'Ruta de lectura': 'Lesepfad',
   'Escritura': 'Schreiben',
   'Debates': 'Debatten',

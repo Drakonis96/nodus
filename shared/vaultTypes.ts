@@ -67,7 +67,14 @@ export const VAULT_TYPES: VaultTypeDef[] = [
   {
     id: 'academic',
     available: true,
-    defaultHiddenViews: [],
+    // The Hypothesis lab and the Reading path both need a corpus that has already
+    // been analysed in depth: on a freshly synced library they answer with noise,
+    // which reads as a broken section rather than an empty one. They are hidden by
+    // default and stay one click away in the sidebar configurator — and, as with
+    // every preset, the moment the user customises the sidebar this no longer
+    // applies (see effectiveSidebarHidden). Gaps is absent from here because it is
+    // no longer a section at all: it is a tab inside Coverage.
+    defaultHiddenViews: ['hypothesis', 'reading'],
     promptPack: '',
   },
   {
