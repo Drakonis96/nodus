@@ -171,7 +171,11 @@ try {
   // Suppress the "what's new" modal: a fresh profile has no last-seen version, so it
   // would otherwise overlay the app and intercept later clicks. localStorage persists
   // across the reloads below (same origin).
-  await page.evaluate((version) => localStorage.setItem('nodus.lastSeenVersion', version), appVersion);
+  await page.evaluate((version) => {
+    localStorage.setItem('nodus.lastSeenVersion', version);
+    // The mobile teaser sits between release notes and everything behind it.
+    localStorage.setItem(`nodus.mobileTeaserSeen.${version}`, '1');
+  }, appVersion);
 
   // ── Preload bridge ──────────────────────────────────────────────────────────
   const bridge = await page.evaluate(() => ({
@@ -332,7 +336,7 @@ try {
   // Existing users (tutorial v4) receive the new three-part connected-workflows
   // summary immediately after release notes. This profile is throwaway, so the
   // seen key exercised here never touches the developer's real Nodus profile.
-  await page.evaluate(async () => {
+  await page.evaluate(async (version) => {
     localStorage.removeItem('nodus.lastSeenVersion');
     localStorage.removeItem('nodus.platformHighlightsSeen.2026-07');
     // Walking the tutorial above marked the videos announcement seen, exactly as it
@@ -340,12 +344,48 @@ try {
     // never got is exercised too — it must be cleared BEFORE the render, since
     // eligibility is read once, when the modal mounts.
     localStorage.removeItem('nodus.tutorialVideosAnnouncementSeen.2026-07');
+    localStorage.removeItem(`nodus.mobileTeaserSeen.${version}`);
     await window.nodus.updateSettings({ uiLanguage: 'es', promptLanguage: 'es', basicsTutorialVersion: 4 });
-  });
+  }, appVersion);
   await page.reload();
   const whatsNewForExistingUser = page.getByTestId('whats-new-cinematic-modal');
   await whatsNewForExistingUser.waitFor();
   await whatsNewForExistingUser.getByRole('button', { name: 'Explorar las novedades', exact: true }).click();
+
+  // First behind release notes: the look at the mobile app. Unlike its neighbours it has
+  // no tutorial-version guard — the app it previews is in no tutorial — so every 3.2.4
+  // user meets it once.
+  const teaser = page.getByTestId('mobile-teaser-guide');
+  await teaser.waitFor();
+  await teaser.getByRole('heading', { name: 'Un adelanto de lo que viene', exact: true }).waitFor();
+  const teaserCaption = () => teaser.locator('.mobile-teaser-frame figcaption').innerText();
+  const teaserShot = () => teaser.locator('.mobile-teaser-frame img').getAttribute('src');
+  assert.equal(await teaser.locator('.mobile-teaser-dots button').count(), 9, 'nine App Store shots');
+  const firstCaption = await teaserCaption();
+  const firstShot = await teaserShot();
+  await teaser.getByTestId('mobile-teaser-next').click();
+  // Picture and caption must move together. Held behind an exit animation, the image
+  // lagged its caption by the length of the transition and showed the previous screen.
+  await page.waitForFunction(
+    (previous) => document.querySelector('.mobile-teaser-frame figcaption')?.textContent !== previous,
+    firstCaption,
+  );
+  assert.notEqual(await teaserShot(), firstShot, 'the shot changes with its caption, not after it');
+  assert.notEqual(await teaserCaption(), firstCaption);
+  // The survey is the one outbound link, and it must not be the retired forms.gle
+  // short-link domain: that resolves through Firebase Dynamic Links, which is shut down.
+  const survey = teaser.getByTestId('mobile-teaser-survey');
+  assert.equal(await survey.count(), 1, 'the survey call to action is present');
+  assert.equal(await teaser.locator('a[href*="forms.gle"], [data-href*="forms.gle"]').count(), 0);
+  await teaser.getByTestId('mobile-teaser-complete').click();
+  await teaser.waitFor({ state: 'detached' });
+  assert.equal(
+    await page.evaluate((version) => localStorage.getItem(`nodus.mobileTeaserSeen.${version}`), appVersion),
+    '1',
+    'the teaser is marked seen only when dismissed',
+  );
+  console.log('[e2e] the mobile teaser shows once behind release notes, and its carousel keeps shot and caption in step');
+
   const platformTour = page.getByTestId('platform-highlights-update-tour');
   await platformTour.waitFor();
   assert.equal(await platformTour.locator('.toolkit-guide-progress button').count(), 3, 'existing-user summary has three ordered chapters');

@@ -40,6 +40,7 @@ try {
   await page.evaluate((version) => {
     localStorage.setItem('nodus.lastSeenVersion', version);
     localStorage.setItem('nodus.tutorialVideosAnnouncementSeen.2026-07', '1');
+    localStorage.setItem(`nodus.mobileTeaserSeen.${version}`, '1');
   }, appVersion);
 
   const bridge = await page.evaluate(() => ({

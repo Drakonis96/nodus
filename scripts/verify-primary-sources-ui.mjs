@@ -37,6 +37,7 @@ try {
     localStorage.setItem('nodus.platformHighlightsSeen.2026-07', '1');
     localStorage.setItem('nodus.toolkitBetaGuideSeen.2.4.0', '1');
     localStorage.setItem('nodus.tutorialVideosAnnouncementSeen.2026-07', '1');
+    localStorage.setItem(`nodus.mobileTeaserSeen.${version}`, '1');
   }, appVersion);
   await page.evaluate(async () => {
     const created = await window.nodus.createVault({

@@ -93,7 +93,10 @@ try {
   // would sit over the app and swallow every later click. The sentinel is an exact
   // match against the app version, so it has to be the real one.
   const appVersion = require(path.join(repoRoot, 'package.json')).version;
-  await page.evaluate((version) => localStorage.setItem('nodus.lastSeenVersion', version), appVersion);
+  await page.evaluate((version) => {
+    localStorage.setItem('nodus.lastSeenVersion', version);
+    localStorage.setItem(`nodus.mobileTeaserSeen.${version}`, '1');
+  }, appVersion);
 
   // ── 1. the three gates, in order ──────────────────────────────────────────────
   await page.getByTestId('basics-tutorial-language').waitFor();
