@@ -360,6 +360,10 @@ export const EN: Record<string, string> = {
   'APOYO OPCIONAL': 'OPTIONAL SUPPORT',
   'Explorar las novedades': 'Explore what is new',
   'El enlace se abrirá en tu navegador. Nodus no procesa pagos ni recibe información de pago.': 'The link will open in your browser. Nodus does not process payments or receive payment information.',
+  'COMUNIDAD': 'COMMUNITY',
+  'Sigue a Nodus': 'Follow Nodus',
+  'Cada versión, los tutoriales nuevos y las dudas de otras personas se comentan en los perfiles públicos del proyecto.': 'Every release, the new tutorials and other people’s questions are discussed on the project’s public profiles.',
+  'El enlace se abrirá en tu navegador. Seguir el proyecto es opcional y la aplicación no envía nada a estas redes.': 'The link will open in your browser. Following the project is optional and the application sends nothing to these networks.',
   // ── Nodi mascot (settings) ─────────────────────────────────────────────────
   'Mascota Nodi': 'Nodi mascot',
   'Nodi es el nodo que acompaña la app, flotando abajo a la derecha. Haz clic en Nodi para abrir el chat, tus notificaciones y la ayuda.':

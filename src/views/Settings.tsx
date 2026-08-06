@@ -21,6 +21,7 @@ import type {
   VaultType,
 } from '@shared/types';
 import type { PrimarySourcePolicySettings } from '@shared/primarySourcesTypes';
+import { NODUS_SOCIAL_LINKS } from '@shared/socialLinks';
 import { recoveryHealthAdvice, recoveryHealthAge, recoveryHealthHeadline } from '../recoveryHealth';
 import { ImageGenerationSettings, ProvidersSettings } from './ProvidersSettings';
 import { AudioGenerationSettings } from './AudioGenerationSettings';
@@ -63,7 +64,7 @@ const SETTINGS_TABS: { id: SettingsTabId; label: string; icon: string; keywords:
   { id: 'server', label: 'Servidor', icon: 'globe', keywords: 'servidor docker compartir vault boveda estudiantes investigadores dominio subdominio oauth claude chatgpt reverse proxy caddy nginx publicar sincronizar' },
   { id: 'system', label: 'Tutoriales', icon: 'graduation', keywords: 'sistema ayuda tutorial' },
   { id: 'data', label: 'Backup / copia de seguridad', icon: 'download', keywords: 'datos backup exportar importar demo copia cifrada peligro reinicializar grafo borrar' },
-  { id: 'about', label: 'Acerca de Nodus', icon: 'info', keywords: 'acerca proyecto codigo abierto open source gratuito privacidad privacy rgpd gdpr datos alumnado inteligencia artificial licencia terceros legal' },
+  { id: 'about', label: 'Acerca de Nodus', icon: 'info', keywords: 'acerca proyecto codigo abierto open source gratuito privacidad privacy rgpd gdpr datos alumnado inteligencia artificial licencia terceros legal redes sociales social reddit youtube comunidad' },
   { id: 'updates', label: 'Actualizaciones y novedades', icon: 'sync', keywords: 'actualizaciones update actualizar version novedades ultimos cambios latest changes changelog buscar instalar reiniciar' },
 ];
 
@@ -629,7 +630,7 @@ export function Settings({
     visibleSettingsSection('models', 'Modelos de IA', 'basico avanzado modelo general extraccion sintesis tutor resumen fusion embeddings transcripcion voz imagen'),
     visibleSettingsSection('extraction', 'Extracción de texto PDFs grandes', 'pdf texto zotero ocr tesseract paginas idiomas'),
     visibleSettingsSection('data', 'Zona de peligro', 'reinicializar grafo borrar ideas temas conexiones autores huecos'),
-    visibleSettingsSection('about', 'Acerca de Nodus', 'proyecto independiente codigo abierto open source gratuito privacidad privacy rgpd gdpr datos alumnado licencia roadmap hoja de ruta futuro'),
+    visibleSettingsSection('about', 'Acerca de Nodus', 'proyecto independiente codigo abierto open source gratuito privacidad privacy rgpd gdpr datos alumnado licencia roadmap hoja de ruta futuro redes sociales social reddit youtube comunidad'),
     visibleSettingsSection('updates', 'Actualizaciones y novedades', 'actualizaciones update version novedades ultimos cambios latest changes changelog buscar instalar reiniciar avisos anuncios encuestas noticias'),
   ].filter(Boolean).length;
 
@@ -1211,7 +1212,7 @@ export function Settings({
           </Section>
       )}
 
-      {visibleSettingsSection('about', 'Acerca de Nodus', 'proyecto independiente codigo abierto open source gratuito privacidad privacy rgpd gdpr datos alumnado licencia terceros legal actualizaciones update version novedades roadmap hoja de ruta futuro') && (
+      {visibleSettingsSection('about', 'Acerca de Nodus', 'proyecto independiente codigo abierto open source gratuito privacidad privacy rgpd gdpr datos alumnado licencia terceros legal actualizaciones update version novedades roadmap hoja de ruta futuro redes sociales social reddit youtube comunidad') && (
         <Section title={t('Acerca de Nodus')}>
           <div className={ABOUT_CARD_CLASS}>
             <div className="flex items-start gap-3">
@@ -1253,6 +1254,38 @@ export function Settings({
             </div>
             <p className="mt-2 text-xs text-neutral-500">
               {t('El enlace se abrirá en tu navegador. Nodus no procesa pagos ni recibe información de pago.')}
+            </p>
+          </div>
+          <div data-testid="about-social" className={ABOUT_CARD_CLASS}>
+            <div className="flex items-start gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300">
+                <Icon name="share" size={19} />
+              </div>
+              <div className="max-w-3xl">
+                <h3 className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{t('Sigue a Nodus')}</h3>
+                <p className="mt-1 text-xs leading-5 text-neutral-600 dark:text-neutral-400">
+                  {t('Cada versión, los tutoriales nuevos y las dudas de otras personas se comentan en los perfiles públicos del proyecto.')}
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {NODUS_SOCIAL_LINKS.map((link) => (
+                <button
+                  key={link.id}
+                  data-testid={`about-social-${link.id}`}
+                  className={`btn btn-social btn-social-${link.id}`}
+                  aria-label={link.label}
+                  title={link.label}
+                  onClick={() => void window.nodus.openExternal(link.url)}
+                >
+                  <Icon name={link.icon} size={17} />
+                  {!link.glyphIsWordmark && link.label}
+                  <Icon name="external" size={13} className="opacity-70" />
+                </button>
+              ))}
+            </div>
+            <p className="mt-2 text-xs text-neutral-500">
+              {t('El enlace se abrirá en tu navegador. Seguir el proyecto es opcional y la aplicación no envía nada a estas redes.')}
             </p>
           </div>
           <div data-testid="about-privacy" className={ABOUT_CARD_CLASS}>

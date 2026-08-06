@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { releaseNotesForMajor, releaseNotesSince, type ReleaseNote, type ReleaseNoteScope } from '@shared/releaseNotes';
+import { NODUS_SOCIAL_LINKS } from '@shared/socialLinks';
 import type { AppLanguage, VaultType } from '@shared/types';
 import { VAULT_TYPE_COLORS } from '@shared/vaultTypes';
 import { Icon } from './ui';
@@ -371,6 +372,30 @@ export function WhatsNewModal({
               </p>
             </div>
           </aside>
+
+          <aside className="whats-new-social" data-testid="whats-new-social">
+            <div className="min-w-0 flex-1">
+              <span className="whats-new-social-label">{t('COMUNIDAD')}</span>
+              <h3>{t('Sigue a Nodus')}</h3>
+              <p>{t('Cada versión, los tutoriales nuevos y las dudas de otras personas se comentan en los perfiles públicos del proyecto.')}</p>
+            </div>
+            <div className="whats-new-social-links">
+              {NODUS_SOCIAL_LINKS.map((link) => (
+                <button
+                  key={link.id}
+                  type="button"
+                  className={`whats-new-social-button whats-new-social-${link.id}`}
+                  data-testid={`whats-new-social-${link.id}`}
+                  aria-label={link.label}
+                  title={link.label}
+                  onClick={() => void window.nodus.openExternal(link.url)}
+                >
+                  <Icon name={link.icon} size={15} />
+                  {!link.glyphIsWordmark && link.label}
+                </button>
+              ))}
+            </div>
+          </aside>
         </div>
 
         <footer className="whats-new-footer">
@@ -390,6 +415,22 @@ export function WhatsNewModal({
             >
               <Icon name="kofi" size={16} /> Ko-fi
             </button>
+            {/* The two ways of giving and the three ways of following share the
+                centre column, told apart by a rule rather than by reading them. */}
+            <span className="whats-new-footer-divider" aria-hidden="true" />
+            {NODUS_SOCIAL_LINKS.map((link) => (
+              <button
+                key={link.id}
+                type="button"
+                className={`whats-new-footer-social whats-new-social-${link.id}`}
+                data-testid={`whats-new-footer-social-${link.id}`}
+                aria-label={link.label}
+                title={link.label}
+                onClick={() => void window.nodus.openExternal(link.url)}
+              >
+                <Icon name={link.icon} size={15} />
+              </button>
+            ))}
           </div>
           <button onClick={close}>{t('Explorar las novedades')} <Icon name="chevronRight" size={14} /></button>
         </footer>

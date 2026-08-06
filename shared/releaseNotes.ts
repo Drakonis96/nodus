@@ -855,6 +855,15 @@ const RELEASE_3_2_4_HIGHLIGHTS: RawReleaseHighlight[] = [
     pt: 'A caixa de entrada só aparece quando chegou algo de outro dispositivo. Num computador sem cofres ligados era um ícone permanentemente vazio ao lado de outro que nunca está. O botão de atualizar também deixa de aparecer nos cofres de fontes primárias, que não sincronizam com o Zotero.',
     'pt-BR': 'A caixa de entrada só aparece quando chegou algo de outro dispositivo. Em um computador sem cofres conectados era um ícone permanentemente vazio ao lado de outro que nunca está. O botão de atualizar também deixa de aparecer nos cofres de fontes primárias, que não sincronizam com o Zotero.',
   },
+  {
+    scope: 'general',
+    es: 'Nodus ya dice dónde encontrarlo fuera de la aplicación. El modal de novedades y Ajustes, en Acerca de Nodus, llevan a Reddit, YouTube y X con el icono de cada red. Los enlaces se abren en tu navegador y la aplicación no envía nada a esas redes.',
+    en: 'Nodus now says where to find it outside the application. The release modal and Settings, under About Nodus, lead to Reddit, YouTube and X with each network’s own icon. The links open in your browser and the application sends nothing to those networks.',
+    fr: 'Nodus indique enfin où le trouver en dehors de l’application. Le modal des nouveautés et les Paramètres, dans À propos de Nodus, mènent à Reddit, YouTube et X avec l’icône de chaque réseau. Les liens s’ouvrent dans votre navigateur et l’application n’envoie rien à ces réseaux.',
+    de: 'Nodus sagt jetzt, wo es außerhalb der Anwendung zu finden ist. Das Neuigkeiten-Fenster und die Einstellungen unter Über Nodus führen zu Reddit, YouTube und X mit dem Symbol des jeweiligen Netzwerks. Die Links öffnen sich in Ihrem Browser und die Anwendung sendet nichts an diese Netzwerke.',
+    pt: 'O Nodus passa a dizer onde encontrá-lo fora da aplicação. O modal de novidades e as Definições, em Acerca do Nodus, levam ao Reddit, ao YouTube e ao X com o ícone de cada rede. As ligações abrem no seu navegador e a aplicação não envia nada para essas redes.',
+    'pt-BR': 'O Nodus agora diz onde encontrá-lo fora do aplicativo. O modal de novidades e as Configurações, em Sobre o Nodus, levam ao Reddit, ao YouTube e ao X com o ícone de cada rede. Os links abrem no seu navegador e o aplicativo não envia nada para essas redes.',
+  },
 ];
 
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [

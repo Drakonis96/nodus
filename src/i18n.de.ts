@@ -375,6 +375,10 @@ export const DE: Record<string, string> = {
   'Explorar las novedades': 'Neuigkeiten entdecken',
   'El enlace se abrirá en tu navegador. Nodus no procesa pagos ni recibe información de pago.':
     'Der Link öffnet sich in Ihrem Browser. Nodus verarbeitet keine Zahlungen und erhält keine Zahlungsinformationen.',
+  'COMUNIDAD': 'COMMUNITY',
+  'Sigue a Nodus': 'Nodus folgen',
+  'Cada versión, los tutoriales nuevos y las dudas de otras personas se comentan en los perfiles públicos del proyecto.': 'Jede Version, die neuen Tutorials und die Fragen anderer werden in den öffentlichen Profilen des Projekts besprochen.',
+  'El enlace se abrirá en tu navegador. Seguir el proyecto es opcional y la aplicación no envía nada a estas redes.': 'Der Link öffnet sich in Ihrem Browser. Dem Projekt zu folgen ist freiwillig und die Anwendung sendet nichts an diese Netzwerke.',
   'Mascota Nodi': 'Maskottchen Nodi',
   'Nodi es el nodo que acompaña la app, flotando abajo a la derecha. Haz clic en Nodi para abrir el chat, tus notificaciones y la ayuda.':
     'Nodi ist der Knoten, der die App begleitet und unten rechts schwebt. Klicken Sie auf Nodi, um den Chat, Ihre Benachrichtigungen und die Hilfe zu öffnen.',

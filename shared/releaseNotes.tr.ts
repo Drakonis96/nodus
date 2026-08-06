@@ -61,6 +61,7 @@ const RELEASE_3_2_4_TR: string[] = [
   "Nodus artık bir sürümle diğeri arasında size bir şey söyleyebiliyor: bir anket, bilinen bir sorun, önemli bir değişiklik. Her duyuru kendi dilinizde geliyor, bir bağlantı taşıyabiliyor ve siz okuyana kadar tek tek okunmamış kalıyor. Ayarlar'dan kapatılabiliyor ve kapatıldığında Nodus onu istemeyi bırakıyor.",
   "Başlıkta daha az simge kalıyor. Kasalar, Koleksiyonlar ve Yol haritası sağ şeritten çıkıyor. Etkin kasa ortadaki rozetten açılıyor ve bu rozet artık her pencere genişliğinde görünüyor. Koleksiyonlar komut paletinde yaşıyor, yol haritası ise Ayarlar içindeki Nodus Hakkında bölümünde.",
   "Gelen kutusu yalnızca başka bir cihazdan bir şey geldiğinde görünüyor. Bağlı kasası olmayan bir bilgisayarda, hiç boş kalmayan bir simgenin yanında sürekli boş duran bir simgeydi. Yenileme düğmesi de Zotero ile eşitlenmeyen birincil kaynak kasalarında artık gösterilmiyor.",
+  "Nodus artık uygulamanın dışında nerede bulunacağını da söylüyor. Yenilikler penceresi ve Ayarlar içindeki Nodus Hakkında bölümü, her birinin kendi simgesiyle Reddit, YouTube ve X hesaplarına götürüyor. Bağlantılar tarayıcınızda açılır ve uygulama bu ağlara hiçbir şey göndermez.",
 ];
 
 export const RELEASE_NOTES_TR: Record<string, string[]> = {

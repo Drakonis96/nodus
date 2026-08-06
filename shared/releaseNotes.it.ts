@@ -121,6 +121,7 @@ const RELEASE_3_2_4_IT: string[] = [
   "Nodus può ora dirti qualcosa tra una versione e l'altra: un sondaggio, un problema noto, una modifica importante. Ogni avviso arriva nella tua lingua, può contenere un link e resta da leggere finché non lo leggi, uno alla volta. Si disattiva nelle Impostazioni, e da quel momento Nodus smette di richiederlo.",
   "L'intestazione resta con meno icone. Depositi, Collezioni e Roadmap escono dalla barra di destra. Il deposito attivo si apre dal distintivo al centro, che ora si vede a qualsiasi larghezza di finestra. Collezioni vive nella palette dei comandi e la roadmap si trova nelle Impostazioni, dentro Informazioni su Nodus.",
   "La casella in arrivo compare solo quando è arrivato qualcosa da un altro dispositivo. Su un computer senza depositi collegati era un'icona perennemente vuota accanto a un'altra che non lo è mai. Anche il pulsante di aggiornamento sparisce dai depositi di fonti primarie, che non si sincronizzano con Zotero.",
+  "Nodus dice finalmente dove trovarlo fuori dall'applicazione. La finestra delle novità e le Impostazioni, in Informazioni su Nodus, portano a Reddit, YouTube e X con l'icona di ogni rete. I collegamenti si aprono nel tuo browser e l'applicazione non invia nulla a quelle reti.",
 ];
 
 export const RELEASE_NOTES_IT: Record<string, string[]> = {
