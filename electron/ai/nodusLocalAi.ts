@@ -477,7 +477,7 @@ export async function ensureNodusLocalServer(modelId: string, mode: 'chat' | 'em
     throw new Error(`El modelo «${modelId}» no puede ejecutarse como ${mode}.`);
   }
   const key = `${mode}:${modelId}`;
-  if (activeServer?.key === key && activeServer.child.exitCode == null) return activeServer.baseUrl;
+  if (activeServer?.key === key && activeServer.child.exitCode == null) return `${activeServer.baseUrl}/v1`;
   stopNodusLocalServer();
   const executable = await llamaServerPath();
   if (!executable) throw new Error('Instala primero el motor local de Nodus desde Ajustes → Modelos IA.');
