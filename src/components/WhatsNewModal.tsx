@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { releaseNotesForMajor, releaseNotesSince, type ReleaseNote, type ReleaseNoteScope } from '@shared/releaseNotes';
+import { NODUS_SOCIAL_LINKS } from '@shared/socialLinks';
 import type { AppLanguage, VaultType } from '@shared/types';
 import { VAULT_TYPE_COLORS } from '@shared/vaultTypes';
 import { Icon } from './ui';
@@ -369,6 +370,30 @@ export function WhatsNewModal({
               <p>
                 {t('Si Nodus te ayuda a estudiar, investigar o escribir y quieres contribuir voluntariamente a su desarrollo, puedes apoyar el proyecto mediante PayPal o Ko-fi. La donación es completamente opcional: no desbloquea funciones ni cambia el acceso a la aplicación.')}
               </p>
+            </div>
+          </aside>
+
+          <aside className="whats-new-social" data-testid="whats-new-social">
+            <div className="min-w-0 flex-1">
+              <span className="whats-new-social-label">{t('COMUNIDAD')}</span>
+              <h3>{t('Sigue a Nodus')}</h3>
+              <p>{t('Cada versión, los tutoriales nuevos y las dudas de otras personas se comentan en los perfiles públicos del proyecto.')}</p>
+            </div>
+            <div className="whats-new-social-links">
+              {NODUS_SOCIAL_LINKS.map((link) => (
+                <button
+                  key={link.id}
+                  type="button"
+                  className={`whats-new-social-button whats-new-social-${link.id}`}
+                  data-testid={`whats-new-social-${link.id}`}
+                  aria-label={link.label}
+                  title={link.label}
+                  onClick={() => void window.nodus.openExternal(link.url)}
+                >
+                  <Icon name={link.icon} size={15} />
+                  {!link.glyphIsWordmark && link.label}
+                </button>
+              ))}
             </div>
           </aside>
         </div>
