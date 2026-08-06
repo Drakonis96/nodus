@@ -66,7 +66,7 @@ export function EvidenceTraceList({
             </blockquote>
           )}
           <div className="mt-2 flex items-center gap-1 text-[10px] font-medium text-indigo-600 dark:text-indigo-300">
-            <Icon name="external-link" size={11} /> {t('Abrir fragmento exacto')}
+            <Icon name="external" size={11} /> {t('Abrir fragmento exacto')}
           </div>
         </button>
       ))}

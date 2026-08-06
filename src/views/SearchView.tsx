@@ -15,7 +15,7 @@ const KIND_META: Record<SearchResultKind, { label: string; icon: string }> = {
   work: { label: 'Obras', icon: 'book' },
   passage: { label: 'Pasajes', icon: 'quote' },
   gap: { label: 'Huecos', icon: 'gap' },
-  theme: { label: 'Temas', icon: 'theme' },
+  theme: { label: 'Temas', icon: 'tag' },
   author: { label: 'Autores', icon: 'graduation' },
   person: { label: 'Personas', icon: 'users' },
   event: { label: 'Eventos', icon: 'clock' },

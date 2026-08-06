@@ -147,7 +147,7 @@ export function ToolkitAppPreview({
           data-testid="toolkit-app-iframe"
         />
       </div>
-      {runtimeError && <div className="absolute bottom-3 right-3 flex max-w-md items-start gap-2 rounded-xl bg-rose-700 px-3 py-2 text-xs text-white shadow-lg"><Icon name="warning" size={14} className="mt-0.5 shrink-0" /><div className="min-w-0 flex-1"><strong className="block">{t('La app ha encontrado un problema')}</strong><span className="mt-0.5 block break-words text-white/80">{runtimeError}</span>{onRequestRepair && <button data-testid="toolkit-app-repair" type="button" className="mt-2 rounded-lg bg-white px-2.5 py-1.5 font-medium text-rose-700" onClick={() => onRequestRepair(runtimeError)}>{t('Reparar con IA')}</button>}</div><button type="button" aria-label={t('Cerrar')} onClick={() => setRuntimeError('')}><Icon name="x" size={12} /></button></div>}
+      {runtimeError && <div className="absolute bottom-3 right-3 flex max-w-md items-start gap-2 rounded-xl bg-rose-700 px-3 py-2 text-xs text-white shadow-lg"><Icon name="alert" size={14} className="mt-0.5 shrink-0" /><div className="min-w-0 flex-1"><strong className="block">{t('La app ha encontrado un problema')}</strong><span className="mt-0.5 block break-words text-white/80">{runtimeError}</span>{onRequestRepair && <button data-testid="toolkit-app-repair" type="button" className="mt-2 rounded-lg bg-white px-2.5 py-1.5 font-medium text-rose-700" onClick={() => onRequestRepair(runtimeError)}>{t('Reparar con IA')}</button>}</div><button type="button" aria-label={t('Cerrar')} onClick={() => setRuntimeError('')}><Icon name="x" size={12} /></button></div>}
     </div>
   );
 }
