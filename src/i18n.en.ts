@@ -1370,10 +1370,8 @@ export const EN: Record<string, string> = {
   'Límite principal': 'Primary limit',
   'Límite secundario': 'Secondary limit',
   'Cargar modelos de Codex': 'Load Codex models',
-  'Cada modelo muestra únicamente los niveles de razonamiento publicados por Codex. «Predeterminado» usa el nivel recomendado por el modelo.':
-    'Each model shows only the reasoning levels published by Codex. “Default” uses the model’s recommended level.',
-  'Nivel de razonamiento. Menos razonamiento responde antes y el nivel es del modelo, así que cambia en todas las tareas que lo usen.':
-    'Reasoning level. Less reasoning answers sooner, and the level belongs to the model, so it changes for every task that uses it.',
+  'Cada modelo muestra únicamente los niveles de razonamiento publicados por Codex. Lo que elijas aquí es el predeterminado del modelo: cada tarea puede fijar el suyo propio en Modelos.': 'Each model shows only the reasoning levels Codex publishes. What you choose here is the model\'s default: every task can set its own in Models.',
+  'Nivel de razonamiento de esta tarea. Menos razonamiento responde antes y solo afecta a esta tarea, aunque otras usen el mismo modelo.': 'Reasoning level for this task. Less reasoning answers sooner, and it applies to this task alone, even when other tasks run the same model.',
   'Razonamiento de {model}': 'Reasoning for {model}',
   '{level} (predeterminado)': '{level} (default)',
   Ninguno: 'None',
@@ -1750,8 +1748,7 @@ export const EN: Record<string, string> = {
   'Reindexar todo': 'Reindex all',
   'Llamadas simultáneas': 'Concurrent calls',
   'Razonamiento (chat/tutor/escritura)': 'Reasoning (chat/tutor/writing)',
-  'Los escaneos siempre usan razonamiento desactivado para ir más rápido. Esto solo afecta a las respuestas conversacionales. En Codex se configura por modelo dentro de Proveedores.':
-    'Scans always run with reasoning off for speed. This only affects conversational responses. For Codex, configure it per model under Providers.',
+  'Los escaneos van sin razonamiento para ir más rápido; esto solo afecta a las respuestas conversacionales. En Codex, el nivel que fijes a cada tarea en Modelos manda también en sus escaneos.': 'Scans run without reasoning to go faster; this only affects conversational answers. On Codex, the level you set for a task in Models governs its scans too.',
   'Desactivado (más rápido)': 'Off (faster)',
   Bajo: 'Low',
   Medio: 'Medium',

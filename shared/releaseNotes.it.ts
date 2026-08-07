@@ -116,6 +116,11 @@ const RELEASE_3_2_3_IT: string[] = [
   "Ogni opera sul telefono ha ora un pulsante che la apre in Zotero per iPhone e iPad. La chiave di Zotero smette di essere una riga morta della scheda e diventa la via di ritorno al PDF, alle note e alle annotazioni che stanno nell'altra applicazione.",
 ];
 
+const RELEASE_3_2_6_IT: string[] = [
+  "Il livello di ragionamento appartiene ora a ogni attività. Prima, alzarlo su Immersione lo alzava anche su Deep Research e su tutte le altre che usavano quel modello. Ora ogni attività conserva il proprio, e in Fornitori si continua a fissare il valore predefinito del modello.",
+  "Quel livello comanda anche sulle scansioni. L'estrazione, i riassunti e la fusione lo ignoravano del tutto e giravano sempre al livello più economico, qualunque cosa dicesse il selettore. Se non ne scegli nessuno, continuano a girare senza ragionamento ed esattamente alla stessa velocità.",
+];
+
 const RELEASE_3_2_5_IT: string[] = [
   "Le analisi tornano a creare idee nuove nei corpora grandi. Superate le 9999 idee, Nodus non sapeva più numerare la successiva e l'analisi approfondita di ogni opera falliva proprio alla fine, quando tutto il lavoro dell'IA era già stato speso. Un corpus fermo da settimane torna a crescere.",
   "La coda di analisi dice perché qualcosa è fallito. Prima mostrava solo «Fallito» e il motivo restava nella console di sviluppo, dove nessuno sarebbe andato a guardare. Lo stato di un'opera fallita porta ora il messaggio al passaggio del mouse, senza uscire dalla barra.",
@@ -137,6 +142,7 @@ const RELEASE_3_2_4_IT: string[] = [
 ];
 
 export const RELEASE_NOTES_IT: Record<string, string[]> = {
+  "3.2.6": RELEASE_3_2_6_IT,
   "3.2.5": RELEASE_3_2_5_IT,
   "3.2.4": RELEASE_3_2_4_IT,
   "3.2.3": RELEASE_3_2_3_IT,

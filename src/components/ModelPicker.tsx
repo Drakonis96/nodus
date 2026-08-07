@@ -4,8 +4,8 @@ import { isSubscriptionProvider } from '@shared/providers';
 import { modelRefSupportsExtraction } from '@shared/localAiModels';
 import {
   codexReasoningCatalog,
+  modelRefWithReasoning,
   reasoningChoiceFor,
-  withCodexReasoning,
   type CodexReasoningCatalog,
 } from '@shared/codexReasoning';
 import { modelLabel, sameModel, sortModelRefs } from './ui';
@@ -72,12 +72,16 @@ export function codexReasoningLabel(effort: CodexReasoningEffort): string {
  * the cache so the next picker to mount can try again instead of being stuck empty.
  */
 let catalogRequest: Promise<CodexReasoningCatalog> | null = null;
+/** What the request resolved to, kept so a picker mounting later can render its level on
+ *  the first paint instead of appearing empty and filling in a tick afterwards. */
+let catalogSnapshot: CodexReasoningCatalog | null = null;
 
 function loadCodexReasoningCatalog(): Promise<CodexReasoningCatalog> {
   if (!catalogRequest) {
     catalogRequest = window.nodus
       .listModels('codex')
       .then(codexReasoningCatalog)
+      .then((catalog) => { catalogSnapshot = catalog; return catalog; })
       .catch(() => { catalogRequest = null; return {}; });
   }
   return catalogRequest;
@@ -86,11 +90,12 @@ function loadCodexReasoningCatalog(): Promise<CodexReasoningCatalog> {
 /** Test seam: hand the catalogue in directly instead of going through the provider. */
 export function primeCodexReasoningCatalog(catalog: CodexReasoningCatalog | null): void {
   catalogRequest = catalog ? Promise.resolve(catalog) : null;
+  catalogSnapshot = catalog;
 }
 
 function useCodexReasoningCatalog(model: ModelRef | null | undefined): CodexReasoningCatalog | null {
-  const [catalog, setCatalog] = useState<CodexReasoningCatalog | null>(null);
   const isCodex = model?.provider === 'codex';
+  const [catalog, setCatalog] = useState<CodexReasoningCatalog | null>(() => (isCodex ? catalogSnapshot : null));
   useEffect(() => {
     if (!isCodex) return;
     let alive = true;
@@ -101,25 +106,37 @@ function useCodexReasoningCatalog(model: ModelRef | null | undefined): CodexReas
 }
 
 /**
- * The reasoning level for the model a role is using, rendered beside its picker so the
- * choice lives where the model is chosen. It writes the same per-model map the
- * Providers tab writes, so the two screens are never out of step. Renders nothing when
- * the selected model publishes no levels, which is every provider except Codex today.
+ * The reasoning level for one role, rendered beside its picker so the choice lives
+ * where the model is chosen. It writes through the role's own `onChange` — the same
+ * one the picker writes through — so the level lands on that role's selection and
+ * nowhere else: two roles running one model choose their levels independently.
+ *
+ * «Predeterminado» names what the role would actually fall back to: the model-wide
+ * level from the Providers tab when one is set, otherwise the provider's own
+ * recommendation. Renders nothing when the selected model publishes no levels, which
+ * is every provider except Codex today.
  */
 export function ReasoningPicker({
   settings,
   model,
-  patch,
+  onChange,
   compact,
 }: {
   settings: AppSettings;
   model: ModelRef | null | undefined;
-  patch: (value: Partial<AppSettings>) => Promise<void> | void;
+  onChange: (m: ModelRef) => void;
   compact?: boolean;
 }) {
   const catalog = useCodexReasoningCatalog(model);
   const choice = reasoningChoiceFor(catalog, model);
   if (!choice || !model) return null;
+  const inherited = settings.codexReasoningEfforts?.[model.model] ?? choice.fallback;
+  // A level the model no longer publishes (Codex retires them) must read as
+  // «Predeterminado» rather than as a blank box — which is also what the completion
+  // call does with it, since it validates against the same live catalogue.
+  const chosen = choice.supported.some((option) => option.reasoningEffort === model.reasoningEffort)
+    ? model.reasoningEffort
+    : undefined;
   return (
     <select
       // Wide enough for the longest level plus its "(default)" suffix in every
@@ -128,19 +145,16 @@ export function ReasoningPicker({
       className={`input w-48 shrink-0 ${compact ? 'py-1 text-xs' : 'text-xs'}`}
       data-testid={`model-reasoning-${model.model}`}
       aria-label={tx('Razonamiento de {model}', { model: modelLabel(model) })}
-      title={t('Nivel de razonamiento. Menos razonamiento responde antes y el nivel es del modelo, así que cambia en todas las tareas que lo usen.')}
-      value={settings.codexReasoningEfforts?.[model.model] ?? ''}
-      onChange={(event) => void patch({
-        codexReasoningEfforts: withCodexReasoning(
-          settings.codexReasoningEfforts,
-          model.model,
-          event.target.value ? (event.target.value as CodexReasoningEffort) : null
-        ),
-      })}
+      title={t('Nivel de razonamiento de esta tarea. Menos razonamiento responde antes y solo afecta a esta tarea, aunque otras usen el mismo modelo.')}
+      value={chosen ?? ''}
+      onChange={(event) => onChange(modelRefWithReasoning(
+        model,
+        event.target.value ? (event.target.value as CodexReasoningEffort) : null
+      ))}
     >
       <option value="">
-        {choice.fallback
-          ? tx('{level} (predeterminado)', { level: codexReasoningLabel(choice.fallback) })
+        {inherited
+          ? tx('{level} (predeterminado)', { level: codexReasoningLabel(inherited) })
           : t('Predeterminado')}
       </option>
       {choice.supported.map((option) => (
@@ -153,15 +167,15 @@ export function ReasoningPicker({
 }
 
 /**
- * A role's model picker with its reasoning level next to it. The reasoning selector
- * only takes width when the chosen model actually offers levels, so rows for models
- * without them look exactly as they did.
+ * A role's model picker with its reasoning level next to it. Both write through the
+ * same `onChange`, so a role's level is stored with the role's model and travels with
+ * it. The reasoning selector only takes width when the chosen model actually offers
+ * levels, so rows for models without them look exactly as they did.
  */
 export function ModelWithReasoning({
   settings,
   value,
   onChange,
-  patch,
   compact,
   allowEmpty = true,
   emptyLabel,
@@ -170,7 +184,6 @@ export function ModelWithReasoning({
   settings: AppSettings;
   value: ModelRef | null;
   onChange: (m: ModelRef | null) => void;
-  patch: (value: Partial<AppSettings>) => Promise<void> | void;
   compact?: boolean;
   allowEmpty?: boolean;
   emptyLabel?: string;
@@ -188,7 +201,7 @@ export function ModelWithReasoning({
         emptyLabel={emptyLabel}
         requireExtraction={requireExtraction}
       />
-      <ReasoningPicker settings={settings} model={value} patch={patch} compact={compact} />
+      <ReasoningPicker settings={settings} model={value} onChange={onChange} compact={compact} />
     </div>
   );
 }

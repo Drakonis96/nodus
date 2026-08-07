@@ -336,7 +336,12 @@ export function getSettings(): AppSettings {
   for (const key of GRANULAR_MODEL_KEYS) {
     const current = merged[key];
     const general = merged.synthesisModel;
-    const differsFromGeneral = current?.provider !== general?.provider || current?.model !== general?.model;
+    // The reasoning level is part of the selection, so basic mode has to level it too:
+    // otherwise a per-task level chosen in advanced mode would keep running invisibly
+    // behind the single picker basic mode shows.
+    const differsFromGeneral = current?.provider !== general?.provider
+      || current?.model !== general?.model
+      || current?.reasoningEffort !== general?.reasoningEffort;
     const shouldMaterialize = merged.modelSettingsMode === 'advanced' && current == null && general != null;
     if ((merged.modelSettingsMode === 'basic' && differsFromGeneral) || shouldMaterialize) {
       merged[key] = general;

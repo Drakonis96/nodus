@@ -1361,10 +1361,8 @@ export const FR: Record<string, string> = {
   'Límite principal': 'Limite principale',
   'Límite secundario': 'Limite secondaire',
   'Cargar modelos de Codex': 'Charger les modèles Codex',
-  'Cada modelo muestra únicamente los niveles de razonamiento publicados por Codex. «Predeterminado» usa el nivel recomendado por el modelo.':
-    'Chaque modèle affiche uniquement les niveaux de raisonnement publiés par Codex. « Par défaut » utilise le niveau recommandé par le modèle.',
-  'Nivel de razonamiento. Menos razonamiento responde antes y el nivel es del modelo, así que cambia en todas las tareas que lo usen.':
-    'Niveau de raisonnement. Moins de raisonnement répond plus vite, et le niveau appartient au modèle, il change donc pour toutes les tâches qui l\'utilisent.',
+  'Cada modelo muestra únicamente los niveles de razonamiento publicados por Codex. Lo que elijas aquí es el predeterminado del modelo: cada tarea puede fijar el suyo propio en Modelos.': 'Chaque modèle n\'affiche que les niveaux de raisonnement publiés par Codex. Ce que vous choisissez ici est la valeur par défaut du modèle : chaque tâche peut fixer la sienne dans Modèles.',
+  'Nivel de razonamiento de esta tarea. Menos razonamiento responde antes y solo afecta a esta tarea, aunque otras usen el mismo modelo.': 'Niveau de raisonnement de cette tâche. Moins de raisonnement répond plus vite, et cela ne concerne que cette tâche, même si d\'autres utilisent le même modèle.',
   'Razonamiento de {model}': 'Raisonnement pour {model}',
   '{level} (predeterminado)': '{level} (par défaut)',
   Ninguno: 'Aucun',
@@ -1737,8 +1735,7 @@ export const FR: Record<string, string> = {
   'Reindexar todo': 'Tout réindexer',
   'Llamadas simultáneas': 'Appels simultanés',
   'Razonamiento (chat/tutor/escritura)': 'Raisonnement (chat/tuteur/écriture)',
-  'Los escaneos siempre usan razonamiento desactivado para ir más rápido. Esto solo afecta a las respuestas conversacionales. En Codex se configura por modelo dentro de Proveedores.':
-    'Les analyses désactivent toujours le raisonnement pour aller plus vite. Cela n\'affecte que les réponses conversationnelles. Pour Codex, réglez-le par modèle dans Fournisseurs.',
+  'Los escaneos van sin razonamiento para ir más rápido; esto solo afecta a las respuestas conversacionales. En Codex, el nivel que fijes a cada tarea en Modelos manda también en sus escaneos.': 'Les analyses tournent sans raisonnement pour aller plus vite ; cela ne concerne que les réponses conversationnelles. Sur Codex, le niveau fixé pour une tâche dans Modèles gouverne aussi ses analyses.',
   'Desactivado (más rápido)': 'Désactivé (plus rapide)',
   'Bajo': 'Bas',
   'Medio': 'Moyen',

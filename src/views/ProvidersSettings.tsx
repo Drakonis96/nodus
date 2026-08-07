@@ -311,7 +311,7 @@ function ChatGptSubscriptionRow({
               {models && (
                 <>
                   <p className="text-[11px] leading-5 text-neutral-500">
-                    {t('Cada modelo muestra únicamente los niveles de razonamiento publicados por Codex. «Predeterminado» usa el nivel recomendado por el modelo.')}
+                    {t('Cada modelo muestra únicamente los niveles de razonamiento publicados por Codex. Lo que elijas aquí es el predeterminado del modelo: cada tarea puede fijar el suyo propio en Modelos.')}
                   </p>
                   <SettingsModelList className="max-h-72 overflow-y-auto" data-testid="provider-model-list-codex">
                     <ModelList
