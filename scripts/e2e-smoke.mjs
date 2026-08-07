@@ -352,42 +352,23 @@ try {
   await whatsNewForExistingUser.waitFor();
   await whatsNewForExistingUser.getByRole('button', { name: 'Explorar las novedades', exact: true }).click();
 
-  // First behind release notes: the look at the mobile app. Unlike its neighbours it has
-  // no tutorial-version guard — the app it previews is in no tutorial — so every 3.2.4
-  // user meets it once.
-  const teaser = page.getByTestId('mobile-teaser-guide');
-  await teaser.waitFor();
-  await teaser.getByRole('heading', { name: 'Un adelanto de lo que viene', exact: true }).waitFor();
-  const teaserCaption = () => teaser.locator('.mobile-teaser-frame figcaption').innerText();
-  const teaserShot = () => teaser.locator('.mobile-teaser-frame img').getAttribute('src');
-  assert.equal(await teaser.locator('.mobile-teaser-dots button').count(), 9, 'nine App Store shots');
-  const firstCaption = await teaserCaption();
-  const firstShot = await teaserShot();
-  await teaser.getByTestId('mobile-teaser-next').click();
-  // Picture and caption must move together. Held behind an exit animation, the image
-  // lagged its caption by the length of the transition and showed the previous screen.
-  await page.waitForFunction(
-    (previous) => document.querySelector('.mobile-teaser-frame figcaption')?.textContent !== previous,
-    firstCaption,
-  );
-  assert.notEqual(await teaserShot(), firstShot, 'the shot changes with its caption, not after it');
-  assert.notEqual(await teaserCaption(), firstCaption);
-  // The survey is the one outbound link, and it must not be the retired forms.gle
-  // short-link domain: that resolves through Firebase Dynamic Links, which is shut down.
-  const survey = teaser.getByTestId('mobile-teaser-survey');
-  assert.equal(await survey.count(), 1, 'the survey call to action is present');
-  assert.equal(await teaser.locator('a[href*="forms.gle"], [data-href*="forms.gle"]').count(), 0);
-  await teaser.getByTestId('mobile-teaser-complete').click();
-  await teaser.waitFor({ state: 'detached' });
-  assert.equal(
-    await page.evaluate((version) => localStorage.getItem(`nodus.mobileTeaserSeen.${version}`), appVersion),
-    '1',
-    'the teaser is marked seen only when dismissed',
-  );
-  console.log('[e2e] the mobile teaser shows once behind release notes, and its carousel keeps shot and caption in step');
-
+  // First behind release notes sat the look at the mobile app, and it was a 3.2.4
+  // one-off: it presents only on the version it names, and its seen-key carries that
+  // version, so pointing the constant at a later release would show the gallery again to
+  // everyone who already met it. Past 3.2.4 the step must retire WITHOUT stalling the
+  // chain it holds — it sits between release notes and the connected-workflows summary,
+  // so a retired modal that forgets to settle strands everything behind it. Reaching the
+  // summary at all is the proof; the carousel itself is covered by
+  // scripts/test-mobile-teaser-guide.mjs, which still pins all nine shipped screenshots.
   const platformTour = page.getByTestId('platform-highlights-update-tour');
   await platformTour.waitFor();
+  assert.equal(
+    await page.getByTestId('mobile-teaser-guide').count(),
+    0,
+    'the 3.2.4 teaser must not come back on a later release',
+  );
+  console.log('[e2e] the retired mobile teaser hands the chain straight to the summary');
+
   assert.equal(await platformTour.locator('.toolkit-guide-progress button').count(), 3, 'existing-user summary has three ordered chapters');
   await platformTour.getByRole('heading', { name: 'MCP local y Nodus Server', exact: true }).waitFor();
   await platformTour.getByRole('button', { name: 'Siguiente', exact: true }).click();
