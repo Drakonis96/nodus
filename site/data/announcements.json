@@ -1,4 +1,53 @@
 {
   "version": 1,
-  "notices": []
+  "notices": [
+    {
+      "id": "2026-08-nodus-mobile-interest-survey",
+      "date": "2026-08-07",
+      "severity": "info",
+      "url": "https://docs.google.com/forms/d/e/1FAIpQLSf-wHGtAbQV3Kc0J1hgzXBpj8oV1ky9xbuyNJMQ467X7rUYBw/viewform?usp=dialog",
+      "copy": {
+        "es": {
+          "title": "Aplicación móvil de Nodus | Encuesta de interés",
+          "body": "Estamos desarrollando la aplicación móvil de Nodus y nos encantaría conocer tu opinión.",
+          "linkLabel": "Responder la encuesta"
+        },
+        "en": {
+          "title": "Nodus Mobile App | Interest Survey",
+          "body": "We are developing the Nodus mobile app and would love your input.",
+          "linkLabel": "Take the survey"
+        },
+        "fr": {
+          "title": "Application mobile Nodus | Enquête d’intérêt",
+          "body": "Nous développons l’application mobile Nodus et aimerions beaucoup connaître votre avis.",
+          "linkLabel": "Répondre à l’enquête"
+        },
+        "de": {
+          "title": "Nodus Mobile-App | Interessenumfrage",
+          "body": "Wir entwickeln die mobile Nodus-App und würden uns sehr über deine Meinung freuen.",
+          "linkLabel": "An der Umfrage teilnehmen"
+        },
+        "pt": {
+          "title": "Aplicação móvel Nodus | Inquérito de interesse",
+          "body": "Estamos a desenvolver a aplicação móvel Nodus e gostaríamos muito de conhecer a tua opinião.",
+          "linkLabel": "Responder ao inquérito"
+        },
+        "pt-BR": {
+          "title": "Aplicativo móvel Nodus | Pesquisa de interesse",
+          "body": "Estamos desenvolvendo o aplicativo móvel Nodus e adoraríamos saber a sua opinião.",
+          "linkLabel": "Responder à pesquisa"
+        },
+        "it": {
+          "title": "App mobile di Nodus | Sondaggio d’interesse",
+          "body": "Stiamo sviluppando l’app mobile di Nodus e ci farebbe piacere conoscere la tua opinione.",
+          "linkLabel": "Rispondi al sondaggio"
+        },
+        "tr": {
+          "title": "Nodus Mobil Uygulaması | İlgi Anketi",
+          "body": "Nodus mobil uygulamasını geliştiriyoruz ve görüşlerinizi duymaktan memnuniyet duyarız.",
+          "linkLabel": "Ankete katılın"
+        }
+      }
+    }
+  ]
 }
