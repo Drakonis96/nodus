@@ -116,6 +116,13 @@ const RELEASE_3_2_3_IT: string[] = [
   "Ogni opera sul telefono ha ora un pulsante che la apre in Zotero per iPhone e iPad. La chiave di Zotero smette di essere una riga morta della scheda e diventa la via di ritorno al PDF, alle note e alle annotazioni che stanno nell'altra applicazione.",
 ];
 
+const RELEASE_3_2_5_IT: string[] = [
+  "Le analisi tornano a creare idee nuove nei corpora grandi. Superate le 9999 idee, Nodus non sapeva più numerare la successiva e l'analisi approfondita di ogni opera falliva proprio alla fine, quando tutto il lavoro dell'IA era già stato speso. Un corpus fermo da settimane torna a crescere.",
+  "La coda di analisi dice perché qualcosa è fallito. Prima mostrava solo «Fallito» e il motivo restava nella console di sviluppo, dove nessuno sarebbe andato a guardare. Lo stato di un'opera fallita porta ora il messaggio al passaggio del mouse, senza uscire dalla barra.",
+  "Il livello di ragionamento si sceglie dove si sceglie il modello. In Impostazioni › Modelli, ogni attività che usa un modello Codex porta il suo livello accanto, da Basso a Massimo. Meno ragionamento risponde prima, e in un'analisi lunga quella differenza si misura in ore.",
+  "Quel livello appartiene al modello, non all'attività. Sceglierlo in Modelli o in Fornitori è la stessa scelta, e tutte le attività che usano quel modello rileggono lo stesso valore. Lasciato su Predefinito, continua a seguire la raccomandazione del modello stesso anche se Codex la cambia.",
+];
+
 const RELEASE_3_2_4_IT: string[] = [
   "Le notifiche hanno ora un pulsante tutto loro nell'intestazione, subito prima di Impostazioni. Apre le stesse due liste che mostra Nodi: gli avvisi pubblicati da Nodus e quello che l'applicazione ha fatto. Funziona anche con la mascotte disattivata, che era proprio il caso in cui non c'era modo di raggiungerle.",
   "Nodus può ora dirti qualcosa tra una versione e l'altra: un sondaggio, un problema noto, una modifica importante. Ogni avviso arriva nella tua lingua, può contenere un link e resta da leggere finché non lo leggi, uno alla volta. Si disattiva nelle Impostazioni, e da quel momento Nodus smette di richiederlo.",
@@ -130,6 +137,7 @@ const RELEASE_3_2_4_IT: string[] = [
 ];
 
 export const RELEASE_NOTES_IT: Record<string, string[]> = {
+  "3.2.5": RELEASE_3_2_5_IT,
   "3.2.4": RELEASE_3_2_4_IT,
   "3.2.3": RELEASE_3_2_3_IT,
   "3.2.2": RELEASE_3_2_2_IT,
