@@ -151,11 +151,15 @@ export function QueueBar() {
                   <span className="truncate flex-1">{queueTitle(it)}</span>
                   <span className="uppercase text-[10px] text-neutral-500 mx-2">{t(KIND_LABELS[it.kind]) ?? it.kind}</span>
                   <span
+                    // The queue has always carried why an item failed and never shown it,
+                    // so a failure read as a bare "Fallido" and the reason lived only in
+                    // the DevTools console. Hover the state to read it.
+                    title={it.error ?? undefined}
                     className={
                       it.state === 'done'
                         ? 'text-emerald-400'
                         : it.state === 'failed'
-                          ? 'text-red-400'
+                          ? 'cursor-help text-red-400 underline decoration-dotted underline-offset-2'
                           : it.state === 'running'
                             ? 'text-indigo-400'
                             : 'text-neutral-500'

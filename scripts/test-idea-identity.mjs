@@ -158,6 +158,18 @@ try {
     assert.equal(db.prepare(`SELECT COUNT(*) n FROM ${table} WHERE ${where}`).get(...parameters).n, 0, `${table} no longer references the deleted idea`);
   }
 
+  // ── 7. Allocation keeps counting past the four-digit ceiling ───────────────
+  // Ids are padded to four digits, so ordering them as TEXT is only honest up to
+  // g-9999: past it 'g-9999' > 'g-10000'. A corpus that crossed 9,999 ideas then
+  // got g-10000 proposed on every call, and every deep scan with a genuinely new
+  // idea to record died on UNIQUE constraint failed: ideas.global_id.
+  db.prepare("INSERT INTO ideas (global_id, type, label, statement, created_at) VALUES ('g-9999', 'claim', 'Techo', 'x', ?)")
+    .run(new Date().toISOString());
+  const crossing = repo.createIdea({ type: 'claim', label: 'Cruza el techo', statement: 'x', embedding: null });
+  assert.equal(crossing.global_id, 'g-10000', 'the id after g-9999 is g-10000');
+  const beyond = repo.createIdea({ type: 'claim', label: 'Y sigue', statement: 'x', embedding: null });
+  assert.equal(beyond.global_id, 'g-10001', 'allocation keeps counting once ids outgrow four digits');
+
   db.close();
   console.log('idea identity (dormancy + revival) test passed');
 } finally {
