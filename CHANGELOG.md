@@ -1,5 +1,39 @@
 # Changelog
 
+## 3.2.5 — 2026-08-07
+
+A corpus that had quietly stopped growing a month ago, the blindfold that kept it
+quiet, and the setting that decides how long a scan takes finally sitting where a
+model is chosen.
+
+### Added
+
+- **The reasoning level beside the model, in Settings › Models.** Every picker
+  that assigns a model to a job now carries its level: the general text model,
+  the five shared advanced roles, the per-vault overrides, and the study vault's
+  primary and fallback columns. It appears only for models that publish levels,
+  which today is Codex and nothing else, so every other row is unchanged.
+- **One level per model, shared by both screens.** The level belongs to the model
+  rather than to the role using it, and Models and Providers now write it through
+  a single function, so setting it in either place sets it for every job running
+  that model. Left on «Default» it stores nothing, which keeps it following the
+  model's own recommendation when Codex changes it.
+
+### Fixed
+
+- **Deep scans could no longer create ideas once a vault passed 9,999 of them.**
+  The id counter was read as text, and the four-digit zero padding keeps a text
+  sort honest only up to `g-9999`: past it `'g-9999'` sorts above `'g-10000'`, so
+  the allocator kept proposing an id that already existed and every scan with a
+  genuinely new idea to record died on `UNIQUE constraint failed: ideas.global_id`.
+  It failed at the very end, after the whole extraction had been paid for, and a
+  work whose ideas all fused into existing ones still went through, so it read as
+  intermittent rather than total. The counter is now read as a number. No
+  migration: ids keep their padding and grow to five digits on their own.
+- **A failed scan said only "Failed".** The queue has always carried the reason
+  and never rendered it, leaving it in the developer console. The state label now
+  carries the message on hover.
+
 ## 3.2.4 — 2026-08-06
 
 The header stops being a shelf, and Nodus gains a way to say something between

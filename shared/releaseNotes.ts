@@ -822,6 +822,54 @@ const RELEASE_3_2_3_HIGHLIGHTS: RawReleaseHighlight[] = [
  * engine addressed on the wrong interface once it was already running, and the buttons
  * that were laying out without their icon.
  */
+/**
+ * v3.2.5 — a corpus that had quietly stopped growing, and the setting that decides
+ * how long a scan takes finally sitting where the model is chosen.
+ *
+ * The first two are one bug and the blindfold that hid it for a month: ideas could not
+ * be numbered past 9,999, and a failed scan only ever said "Failed". The last two are
+ * the reasoning level, which until now lived one tab away from every screen that
+ * assigns a model to a job.
+ */
+const RELEASE_3_2_5_HIGHLIGHTS: RawReleaseHighlight[] = [
+  {
+    scope: 'academic',
+    es: 'Los escaneos vuelven a crear ideas nuevas en corpus grandes. Al pasar de 9.999 ideas, Nodus ya no sabía numerar la siguiente y el análisis profundo de cada obra fallaba al final, cuando ya se había gastado todo el trabajo de IA. Un corpus que llevaba semanas sin crecer vuelve a crecer.',
+    en: 'Scans can create new ideas again in large corpora. Past 9,999 ideas Nodus could no longer number the next one, and the deep analysis of every work failed at the very end, once all of the AI work had been spent. A corpus that had quietly stopped growing grows again.',
+    fr: 'Les analyses créent de nouveau des idées dans les grands corpus. Au-delà de 9 999 idées, Nodus ne savait plus numéroter la suivante et l’analyse approfondie de chaque œuvre échouait tout à la fin, une fois tout le travail de l’IA dépensé. Un corpus qui avait cessé de grandir grandit à nouveau.',
+    de: 'Scans legen in großen Korpora wieder neue Ideen an. Ab 9.999 Ideen konnte Nodus die nächste nicht mehr nummerieren, und die Tiefenanalyse jedes Werks scheiterte ganz am Ende, wenn die gesamte KI-Arbeit bereits verbraucht war. Ein Korpus, das still stehen geblieben war, wächst wieder.',
+    pt: 'As análises voltam a criar ideias novas em corpora grandes. A partir de 9999 ideias, o Nodus já não sabia numerar a seguinte e a análise profunda de cada obra falhava mesmo no fim, quando já se tinha gasto todo o trabalho de IA. Um corpus que há semanas não crescia volta a crescer.',
+    'pt-BR': 'As análises voltam a criar ideias novas em corpora grandes. A partir de 9999 ideias, o Nodus não sabia mais numerar a seguinte e a análise profunda de cada obra falhava bem no fim, quando já tinha gasto todo o trabalho de IA. Um corpus que havia semanas não crescia volta a crescer.',
+  },
+  {
+    scope: 'academic',
+    es: 'La cola de escaneo dice por qué ha fallado algo. Antes solo ponía «Fallido» y el motivo se quedaba en la consola de desarrollo, donde nadie iba a mirar. Ahora el estado de una obra fallida lleva el mensaje encima, sin salir de la barra.',
+    en: 'The scan queue now says why something failed. It used to say only "Failed", with the reason left in the developer console, where nobody was going to look. The state of a failed work now carries the message on hover, without leaving the bar.',
+    fr: 'La file d’analyse dit pourquoi quelque chose a échoué. Elle n’affichait que «Échec», la raison restant dans la console de développement, où personne n’allait regarder. L’état d’une œuvre en échec porte désormais le message au survol, sans quitter la barre.',
+    de: 'Die Scan-Warteschlange sagt jetzt, warum etwas fehlgeschlagen ist. Vorher stand dort nur «Fehlgeschlagen», und der Grund blieb in der Entwicklerkonsole, wo niemand nachsehen würde. Der Status eines gescheiterten Werks trägt die Meldung nun beim Überfahren, ohne die Leiste zu verlassen.',
+    pt: 'A fila de análise diz porque é que algo falhou. Antes mostrava apenas «Falhou» e o motivo ficava na consola de desenvolvimento, onde ninguém ia ver. O estado de uma obra falhada passa a trazer a mensagem por cima, sem sair da barra.',
+    'pt-BR': 'A fila de análise diz por que algo falhou. Antes mostrava apenas «Falhou» e o motivo ficava no console de desenvolvimento, onde ninguém ia olhar. O estado de uma obra que falhou passa a trazer a mensagem por cima, sem sair da barra.',
+  },
+  {
+    scope: 'general',
+    es: 'El nivel de razonamiento se elige donde se elige el modelo. En Ajustes › Modelos, cada tarea que usa un modelo de Codex lleva su nivel al lado, de Bajo a Máximo. Menos razonamiento contesta antes, y en un escaneo largo esa diferencia se mide en horas.',
+    en: 'The reasoning level is chosen where the model is chosen. In Settings › Models, every job running a Codex model now carries its level beside it, from Low to Max. Less reasoning answers sooner, and across a long scan that difference is measured in hours.',
+    fr: 'Le niveau de raisonnement se choisit là où se choisit le modèle. Dans Paramètres › Modèles, chaque tâche qui utilise un modèle Codex porte son niveau à côté, de Bas à Maximum. Moins de raisonnement répond plus vite, et sur une longue analyse cet écart se compte en heures.',
+    de: 'Die Reasoning-Stufe wird dort gewählt, wo das Modell gewählt wird. Unter Einstellungen › Modelle trägt jede Aufgabe mit einem Codex-Modell ihre Stufe daneben, von Niedrig bis Maximal. Weniger Reasoning antwortet schneller, und über einen langen Scan macht das Stunden aus.',
+    pt: 'O nível de raciocínio escolhe-se onde se escolhe o modelo. Em Definições › Modelos, cada tarefa que usa um modelo Codex passa a ter o seu nível ao lado, de Baixo a Máximo. Menos raciocínio responde mais depressa, e numa análise longa essa diferença mede-se em horas.',
+    'pt-BR': 'O nível de raciocínio é escolhido onde o modelo é escolhido. Em Configurações › Modelos, cada tarefa que usa um modelo Codex passa a ter seu nível ao lado, de Baixo a Máximo. Menos raciocínio responde mais rápido, e numa análise longa essa diferença se mede em horas.',
+  },
+  {
+    scope: 'general',
+    es: 'Ese nivel pertenece al modelo, no a la tarea. Elegirlo en Modelos o en Proveedores es elegir lo mismo, y todas las tareas que usen ese modelo lo leen igual. Si lo dejas en Predeterminado, sigue la recomendación del propio modelo aunque Codex la cambie.',
+    en: 'That level belongs to the model, not to the job. Choosing it in Models or in Providers is the same choice, and every job running that model reads back the same value. Left on Default, it keeps following the model own recommendation even when Codex changes it.',
+    fr: 'Ce niveau appartient au modèle, pas à la tâche. Le choisir dans Modèles ou dans Fournisseurs revient au même, et toutes les tâches qui utilisent ce modèle lisent la même valeur. Laissé sur Par défaut, il suit la recommandation du modèle lui-même, même si Codex la change.',
+    de: 'Diese Stufe gehört zum Modell, nicht zur Aufgabe. Sie in Modelle oder in Anbieter zu wählen ist dieselbe Wahl, und jede Aufgabe mit diesem Modell liest denselben Wert zurück. Auf Standard belassen, folgt sie weiter der Empfehlung des Modells selbst, auch wenn Codex sie ändert.',
+    pt: 'Esse nível pertence ao modelo, não à tarefa. Escolhê-lo em Modelos ou em Fornecedores é a mesma escolha, e todas as tarefas que usem esse modelo leem o mesmo valor. Deixado em Predefinido, continua a seguir a recomendação do próprio modelo mesmo que o Codex a mude.',
+    'pt-BR': 'Esse nível pertence ao modelo, não à tarefa. Escolhê-lo em Modelos ou em Provedores é a mesma escolha, e todas as tarefas que usem esse modelo leem o mesmo valor. Deixado em Padrão, continua seguindo a recomendação do próprio modelo mesmo que o Codex a mude.',
+  },
+];
+
 const RELEASE_3_2_4_HIGHLIGHTS: RawReleaseHighlight[] = [
   {
     scope: 'general',
@@ -916,6 +964,11 @@ const RELEASE_3_2_4_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
+  {
+    version: '3.2.5',
+    date: '2026-08-07',
+    highlights: RELEASE_3_2_5_HIGHLIGHTS,
+  },
   {
     version: '3.2.4',
     date: '2026-08-06',

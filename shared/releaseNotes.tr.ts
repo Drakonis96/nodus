@@ -56,6 +56,13 @@ const RELEASE_3_2_3_TR: string[] = [
   "Telefondaki her eser artık onu iPhone ve iPad için Zotero'da açan bir düğme taşıyor. Zotero anahtarı kayıttaki ölü bir satır olmaktan çıkıp diğer uygulamadaki PDF'e, notlara ve işaretlemelere dönüş yolu oluyor.",
 ];
 
+const RELEASE_3_2_5_TR: string[] = [
+  "Taramalar büyük derlemlerde yeniden yeni fikirler oluşturuyor. 9999 fikri aştıktan sonra Nodus bir sonrakini numaralandıramıyor ve her eserin derin analizi, tüm yapay zekâ işi harcandıktan sonra tam sonda başarısız oluyordu. Haftalardır büyümeyen bir derlem yeniden büyüyor.",
+  "Tarama kuyruğu artık bir şeyin neden başarısız olduğunu söylüyor. Önceden yalnızca «Başarısız» yazıyor, gerekçe ise kimsenin bakmayacağı geliştirici konsolunda kalıyordu. Başarısız bir eserin durumu artık mesajı üzerinde taşıyor, çubuktan hiç çıkmadan.",
+  "Akıl yürütme düzeyi, modelin seçildiği yerde seçiliyor. Ayarlar › Modeller içinde Codex modeli çalıştıran her görev düzeyini yanında taşıyor, Düşük'ten Azami'ye. Daha az akıl yürütme daha erken yanıt verir ve uzun bir taramada bu fark saatlerle ölçülür.",
+  "Bu düzey göreve değil modele aittir. Modeller'de ya da Sağlayıcılar'da seçmek aynı seçimdir ve o modeli çalıştıran her görev aynı değeri okur. Varsayılan'da bırakılırsa, Codex önerisini değiştirse bile modelin kendi önerisini izlemeye devam eder.",
+];
+
 const RELEASE_3_2_4_TR: string[] = [
   "Bildirimlerin artık başlıkta kendi düğmesi var, Ayarlar'ın hemen öncesinde. Nodi'nin gösterdiği aynı iki listeyi açıyor: Nodus'un yayımladığı duyurular ve uygulamanın neler yaptığı. Maskot kapalıyken de çalışıyor, ki bunlara ulaşmanın hiçbir yolunun olmadığı durum tam da buydu.",
   "Nodus artık bir sürümle diğeri arasında size bir şey söyleyebiliyor: bir anket, bilinen bir sorun, önemli bir değişiklik. Her duyuru kendi dilinizde geliyor, bir bağlantı taşıyabiliyor ve siz okuyana kadar tek tek okunmamış kalıyor. Ayarlar'dan kapatılabiliyor ve kapatıldığında Nodus onu istemeyi bırakıyor.",
@@ -70,6 +77,7 @@ const RELEASE_3_2_4_TR: string[] = [
 ];
 
 export const RELEASE_NOTES_TR: Record<string, string[]> = {
+  "3.2.5": RELEASE_3_2_5_TR,
   "3.2.4": RELEASE_3_2_4_TR,
   "3.2.3": RELEASE_3_2_3_TR,
   "3.2.2": RELEASE_3_2_2_TR,

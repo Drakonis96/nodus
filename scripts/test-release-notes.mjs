@@ -25,12 +25,17 @@ try {
 
   const { RELEASE_NOTES, releaseNotesForMajor, compareVersions } = await import(pathToFileURL(bundlePath).href);
   const currentRelease = RELEASE_NOTES[0];
-  assert.equal(currentRelease?.version, '3.2.4');
-  assert.equal(currentRelease?.date, '2026-08-06');
-  // The notification centre reachable from the header, the announcements channel behind
-  // it, a right rail with three fewer icons, and an inbox that only shows up when it holds
-  // something. A floor rather than an exact count, in case more lands here before it ships.
+  assert.equal(currentRelease?.version, '3.2.5');
+  assert.equal(currentRelease?.date, '2026-08-07');
+  // Ideas that can be numbered past 9,999 again, a failed scan that says why, the
+  // reasoning level beside the model it belongs to, and the fact that it belongs to the
+  // model. A floor rather than an exact count, in case more lands here before it ships.
   assert.ok(currentRelease?.highlights.length >= 4, 'the release must describe what changed');
+
+  // 3.2.4 keeps the ten it shipped with.
+  const headerRelease = RELEASE_NOTES.find((note) => note.version === '3.2.4');
+  assert.equal(headerRelease?.date, '2026-08-06');
+  assert.equal(headerRelease?.highlights.length, 10);
 
   // 3.2.3 keeps its own four highlights underneath.
   const readMarkersRelease = RELEASE_NOTES.find((note) => note.version === '3.2.3');

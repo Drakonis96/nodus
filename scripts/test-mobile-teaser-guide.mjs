@@ -21,7 +21,14 @@ const SHOTS = [
 test('the teaser belongs to 3.2.4, shows once, and is gated on nothing else', async () => {
   const [guide, pkg] = await Promise.all([read('src/components/MobileTeaserGuide.tsx'), read('package.json')]);
   assert.match(guide, /MOBILE_TEASER_RELEASE = '3\.2\.4'/);
-  assert.equal(JSON.parse(pkg).version, '3.2.4', 'the teaser only presents on the version it names');
+  // It presents on the version it names and on no other, so shipping 3.2.5 retires it
+  // rather than showing it a second time. Pin that instead of pinning the app to 3.2.4:
+  // bumping the constant to follow a release is how a one-off teaser becomes permanent.
+  assert.notEqual(
+    JSON.parse(pkg).version,
+    '3.2.4',
+    'once the app moves past 3.2.4 the teaser must stay behind, not follow the release',
+  );
   assert.match(guide, /nodus\.mobileTeaserSeen/);
   assert.match(guide, /__APP_VERSION__ !== MOBILE_TEASER_RELEASE/);
   // Seen once, and only when actually dismissed — a launch that never reached the
