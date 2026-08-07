@@ -152,14 +152,16 @@ export function cosineSimilarity(a: number[], b: number[]): number {
 
 export function nextGlobalId(): string {
   const db = getDb();
-  const row = db.prepare("SELECT global_id FROM ideas WHERE global_id LIKE 'g-%' ORDER BY global_id DESC LIMIT 1").get() as
-    | { global_id: string }
-    | undefined;
-  let n = 1;
-  if (row) {
-    const parsed = parseInt(row.global_id.slice(2), 10);
-    if (!Number.isNaN(parsed)) n = parsed + 1;
-  }
+  // The counter has to be read as a NUMBER, not as text. Ids are padded to four
+  // digits, which keeps a text sort honest only up to g-9999: past that ceiling
+  // 'g-9999' > 'g-10000' character by character, so ORDER BY global_id DESC kept
+  // answering g-9999 forever and every new idea collided with the existing
+  // g-10000 ("UNIQUE constraint failed: ideas.global_id"), failing every deep
+  // scan that had a genuinely new idea to record.
+  const row = db
+    .prepare("SELECT MAX(CAST(substr(global_id, 3) AS INTEGER)) AS n FROM ideas WHERE global_id GLOB 'g-[0-9]*'")
+    .get() as { n: number | null } | undefined;
+  const n = (row?.n ?? 0) + 1;
   return `g-${String(n).padStart(4, '0')}`;
 }
 
