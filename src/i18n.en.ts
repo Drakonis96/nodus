@@ -1372,6 +1372,8 @@ export const EN: Record<string, string> = {
   'Cargar modelos de Codex': 'Load Codex models',
   'Cada modelo muestra únicamente los niveles de razonamiento publicados por Codex. «Predeterminado» usa el nivel recomendado por el modelo.':
     'Each model shows only the reasoning levels published by Codex. “Default” uses the model’s recommended level.',
+  'Nivel de razonamiento. Menos razonamiento responde antes y el nivel es del modelo, así que cambia en todas las tareas que lo usen.':
+    'Reasoning level. Less reasoning answers sooner, and the level belongs to the model, so it changes for every task that uses it.',
   'Razonamiento de {model}': 'Reasoning for {model}',
   '{level} (predeterminado)': '{level} (default)',
   Ninguno: 'None',

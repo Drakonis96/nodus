@@ -1252,6 +1252,8 @@ export const IT: Record<string, string> = {
   "Límite secundario": "Limite secondario",
   "Cargar modelos de Codex": "Carica i modelli del Codice",
   "Cada modelo muestra únicamente los niveles de razonamiento publicados por Codex. «Predeterminado» usa el nivel recomendado por el modelo.": "Ogni modello mostra solo i livelli di ragionamento pubblicati dal Codex. \"Default\" utilizza il livello consigliato dal modello.",
+  "Nivel de razonamiento. Menos razonamiento responde antes y el nivel es del modelo, así que cambia en todas las tareas que lo usen.":
+    "Livello di ragionamento. Meno ragionamento risponde prima e il livello appartiene al modello, quindi cambia in tutte le attività che lo usano.",
   "Razonamiento de {model}": "Ragionamento per {model}",
   "{level} (predeterminado)": "{level} (predefinito)",
   "Ninguno": "Nessuno",

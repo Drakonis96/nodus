@@ -1353,6 +1353,8 @@ export const PT_BR: Record<string, string> = {
   'Cargar modelos de Codex': 'Carregar modelos do Codex',
   'Cada modelo muestra únicamente los niveles de razonamiento publicados por Codex. «Predeterminado» usa el nivel recomendado por el modelo.':
     'Cada modelo mostra apenas os níveis de raciocínio publicados pelo Codex. “Padrão” usa o nível recomendado pelo modelo.',
+  'Nivel de razonamiento. Menos razonamiento responde antes y el nivel es del modelo, así que cambia en todas las tareas que lo usen.':
+    'Nível de raciocínio. Menos raciocínio responde mais rápido e o nível pertence ao modelo, então muda em todas as tarefas que o usam.',
   'Razonamiento de {model}': 'Raciocínio para {model}',
   '{level} (predeterminado)': '{level} (padrão)',
   Ninguno: 'Nenhum',
