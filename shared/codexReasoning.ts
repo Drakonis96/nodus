@@ -35,10 +35,9 @@ export function reasoningChoiceFor(
 }
 
 /**
- * The single writer for the per-model reasoning map. Providers and Models both go
- * through it, which is what makes the two screens agree: the level belongs to the
- * model, not to the role that happens to be using it, so choosing it once in either
- * place is choosing it everywhere that model runs.
+ * The writer for the per-MODEL reasoning map, which the Providers tab owns. That screen
+ * lists the subscription's models, not the jobs they run, so a level chosen there is a
+ * default for every role that has not chosen one of its own.
  *
  * Null clears the entry rather than storing a sentinel, so «Predeterminado» stays the
  * absence of a choice and keeps following the model's own recommendation when Codex
@@ -53,4 +52,38 @@ export function withCodexReasoning(
   if (effort) next[model] = effort;
   else delete next[model];
   return next;
+}
+
+/**
+ * The writer for a single role's level, which the Models tab owns. The level is stored
+ * on that role's own model selection, so it reaches the provider through the same
+ * `ModelRef` the role already hands to the AI client, and two roles pointed at one model
+ * stay independent — the whole point of choosing it beside the picker.
+ *
+ * Null removes the property instead of storing a sentinel: «Predeterminado» is an
+ * absence here too, so the role drops back to the model-wide default.
+ */
+export function modelRefWithReasoning(
+  model: ModelRef,
+  effort: CodexReasoningEffort | null
+): ModelRef {
+  const { reasoningEffort: _previous, ...rest } = model;
+  return effort ? { ...rest, reasoningEffort: effort } : rest;
+}
+
+/**
+ * The level a selection actually runs at, or null to let the provider pick. Read at the
+ * two ends that must agree — the selector's «Predeterminado» label and the completion
+ * call — so neither can claim a level the other would not use.
+ *
+ * A role's own choice wins; failing that the model-wide default from Providers applies;
+ * failing that the provider's own recommendation does. Non-Codex providers publish no
+ * levels, so they always resolve to null.
+ */
+export function codexReasoningFor(
+  model: ModelRef | null | undefined,
+  perModel: Record<string, CodexReasoningEffort> | undefined
+): CodexReasoningEffort | null {
+  if (model?.provider !== 'codex') return null;
+  return model.reasoningEffort ?? perModel?.[model.model] ?? null;
 }

@@ -1351,10 +1351,8 @@ export const PT_BR: Record<string, string> = {
   'Límite principal': 'Limite principal',
   'Límite secundario': 'Limite secundário',
   'Cargar modelos de Codex': 'Carregar modelos do Codex',
-  'Cada modelo muestra únicamente los niveles de razonamiento publicados por Codex. «Predeterminado» usa el nivel recomendado por el modelo.':
-    'Cada modelo mostra apenas os níveis de raciocínio publicados pelo Codex. “Padrão” usa o nível recomendado pelo modelo.',
-  'Nivel de razonamiento. Menos razonamiento responde antes y el nivel es del modelo, así que cambia en todas las tareas que lo usen.':
-    'Nível de raciocínio. Menos raciocínio responde mais rápido e o nível pertence ao modelo, então muda em todas as tarefas que o usam.',
+  'Cada modelo muestra únicamente los niveles de razonamiento publicados por Codex. Lo que elijas aquí es el predeterminado del modelo: cada tarea puede fijar el suyo propio en Modelos.': 'Cada modelo mostra apenas os níveis de raciocínio publicados pelo Codex. O que você escolher aqui é o padrão do modelo: cada tarefa pode fixar o seu próprio em Modelos.',
+  'Nivel de razonamiento de esta tarea. Menos razonamiento responde antes y solo afecta a esta tarea, aunque otras usen el mismo modelo.': 'Nível de raciocínio desta tarefa. Menos raciocínio responde mais rápido e vale só para esta tarefa, mesmo que outras usem o mesmo modelo.',
   'Razonamiento de {model}': 'Raciocínio para {model}',
   '{level} (predeterminado)': '{level} (padrão)',
   Ninguno: 'Nenhum',
@@ -1724,8 +1722,7 @@ export const PT_BR: Record<string, string> = {
   'Reindexar todo': 'Reindexar tudo',
   'Llamadas simultáneas': 'Chamadas simultâneas',
   'Razonamiento (chat/tutor/escritura)': 'Raciocínio (chat/tutor/escrita)',
-  'Los escaneos siempre usan razonamiento desactivado para ir más rápido. Esto solo afecta a las respuestas conversacionales. En Codex se configura por modelo dentro de Proveedores.':
-    'Os escaneamentos sempre usam raciocínio desativado para ir mais rápido. Isso afeta somente as respostas conversacionais. No Codex, configure por modelo em Provedores.',
+  'Los escaneos van sin razonamiento para ir más rápido; esto solo afecta a las respuestas conversacionales. En Codex, el nivel que fijes a cada tarea en Modelos manda también en sus escaneos.': 'As varreduras rodam sem raciocínio para ir mais rápido; isso só afeta as respostas conversacionais. No Codex, o nível que você fixar para cada tarefa em Modelos manda também nas varreduras dela.',
   'Desactivado (más rápido)': 'Desativado (mais rápido)',
   'Bajo': 'Baixo',
   'Medio': 'Médio',

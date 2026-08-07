@@ -1361,10 +1361,8 @@ export const DE: Record<string, string> = {
   'Límite principal': 'Primäres Limit',
   'Límite secundario': 'Sekundäres Limit',
   'Cargar modelos de Codex': 'Codex-Modelle laden',
-  'Cada modelo muestra únicamente los niveles de razonamiento publicados por Codex. «Predeterminado» usa el nivel recomendado por el modelo.':
-    'Jedes Modell zeigt nur die von Codex veröffentlichten Reasoning-Stufen. „Standard“ verwendet die vom Modell empfohlene Stufe.',
-  'Nivel de razonamiento. Menos razonamiento responde antes y el nivel es del modelo, así que cambia en todas las tareas que lo usen.':
-    'Reasoning-Stufe. Weniger Reasoning antwortet schneller, und die Stufe gehört zum Modell, ändert sich also für jede Aufgabe, die es verwendet.',
+  'Cada modelo muestra únicamente los niveles de razonamiento publicados por Codex. Lo que elijas aquí es el predeterminado del modelo: cada tarea puede fijar el suyo propio en Modelos.': 'Jedes Modell zeigt nur die von Codex veröffentlichten Reasoning-Stufen. Was Sie hier wählen, ist die Vorgabe des Modells: Jede Aufgabe kann ihre eigene unter Modelle festlegen.',
+  'Nivel de razonamiento de esta tarea. Menos razonamiento responde antes y solo afecta a esta tarea, aunque otras usen el mismo modelo.': 'Reasoning-Stufe dieser Aufgabe. Weniger Reasoning antwortet schneller und gilt nur für diese Aufgabe, auch wenn andere dasselbe Modell verwenden.',
   'Razonamiento de {model}': 'Reasoning für {model}',
   '{level} (predeterminado)': '{level} (Standard)',
   Ninguno: 'Keines',
@@ -1738,8 +1736,7 @@ export const DE: Record<string, string> = {
   'Reindexar todo': 'Alles neu indexieren',
   'Llamadas simultáneas': 'Gleichzeitige Aufrufe',
   'Razonamiento (chat/tutor/escritura)': 'Reasoning (Chat/Tutor/Schreiben)',
-  'Los escaneos siempre usan razonamiento desactivado para ir más rápido. Esto solo afecta a las respuestas conversacionales. En Codex se configura por modelo dentro de Proveedores.':
-    'Scans laufen zur Beschleunigung immer mit deaktiviertem Reasoning. Dies betrifft nur die Chat-Antworten. Für Codex wird es pro Modell unter Anbieter eingestellt.',
+  'Los escaneos van sin razonamiento para ir más rápido; esto solo afecta a las respuestas conversacionales. En Codex, el nivel que fijes a cada tarea en Modelos manda también en sus escaneos.': 'Scans laufen ohne Reasoning, um schneller zu sein; das betrifft nur konversationelle Antworten. Bei Codex gilt die Stufe, die Sie einer Aufgabe unter Modelle geben, auch für ihre Scans.',
   'Desactivado (más rápido)': 'Deaktiviert (schneller)',
   'Bajo': 'Niedrig',
   'Medio': 'Mittel',

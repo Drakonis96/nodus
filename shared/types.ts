@@ -991,6 +991,15 @@ export type PromptLanguage = (typeof PROMPT_LANGUAGES)[number];
 export interface ModelRef {
   provider: AiProvider;
   model: string;
+  /**
+   * The reasoning level chosen for THIS assignment. It rides on the selection rather
+   * than living in a map keyed by model id, which is what keeps two roles running the
+   * same model independent: the Models tab stores one of these per role, so raising
+   * Immersion to «Alto» cannot reach into Deep Research. Absent means «Predeterminado»
+   * — fall back to the model's level in `codexReasoningEfforts` and then to the level
+   * the provider recommends. Only Codex publishes levels today.
+   */
+  reasoningEffort?: CodexReasoningEffort;
 }
 
 /** One model as returned by a provider's model-list endpoint. */

@@ -17,6 +17,7 @@ import {
 import { DEFAULT_EMBEDDING_MODELS, normalizeEmbeddingModel, PROVIDER_LABELS, supportsSamplingControls } from '@shared/providers';
 import type { AiProvider, CodexReasoningEffort, EmbeddingProvider, LocalProvider, ModelRef, PromptLanguage, ReasoningEffort } from '@shared/types';
 import { vaultTypePromptPack } from '@shared/vaultTypes';
+import { codexReasoningFor } from '@shared/codexReasoning';
 import { anthropicVisionContent, openAiVisionContent, type VisionImagePart } from '@shared/imageAnalysis';
 import { getActiveVault } from '../vaults/vaultRegistry';
 import { jsonrepair } from 'jsonrepair';
@@ -287,6 +288,16 @@ function resolveModel(override?: ModelRef | null): ModelRef {
  *  effective model the completion calls will use, to size its payload accordingly. */
 export function resolveModelRef(override?: ModelRef | null): ModelRef {
   return resolveModel(override);
+}
+
+/**
+ * The Codex reasoning level this call runs at, or null to leave it to the provider.
+ * The role's own choice travels on the `ModelRef` the caller handed us, so the level a
+ * user set beside one task's picker cannot leak into another task that happens to run
+ * the same model; the Providers tab's per-model entry remains the default underneath.
+ */
+function configuredCodexReasoning(model: ModelRef): CodexReasoningEffort | null {
+  return codexReasoningFor(model, getSettings().codexReasoningEfforts);
 }
 
 /**
@@ -769,6 +780,11 @@ export async function completeJson<T>(
   const langOpts = withPromptContext(opts);
   // JSON/structured calls (scans, extraction) default to reasoning off for speed.
   const reasoning = langOpts.reasoning ?? 'off';
+  // An explicit level chosen for this role (or for the model in Providers) is honoured
+  // here too, or the selector beside the extraction and scan pickers would silently
+  // govern nothing. Absent a choice this stays undefined and `off` keeps driving, so
+  // the fast default for a corpus-wide run is unchanged.
+  const codexReasoning = configuredCodexReasoning(resolved) ?? undefined;
   let lastErr: unknown;
   // Each rung escalates by lowering temperature, then by dropping JSON mode. A
   // provider that honours neither (the subscription runtimes) would send the exact
@@ -789,7 +805,7 @@ export async function completeJson<T>(
     const retryDone = startPerf('JSON retry', langOpts.perf, { attempt: i + 1, jsonMode: attempt.jsonMode });
     let text: string;
     try {
-      text = await rawComplete(resolved, { ...langOpts, temperature: attempt.temperature }, attempt.jsonMode, reasoning);
+      text = await rawComplete(resolved, { ...langOpts, temperature: attempt.temperature }, attempt.jsonMode, reasoning, codexReasoning);
     } catch (e) {
       // Provider/transport failure (timeout, empty response, rate limit, 5xx, bad key).
       // Each call can burn the full 180s timeout, so looping here would let a hung
@@ -814,8 +830,8 @@ export async function completeJson<T>(
 export async function completeText(opts: CallOpts, model?: ModelRef | null): Promise<string> {
   const resolved = resolveModel(model);
   const reasoning = opts.reasoning ?? getSettings().chatReasoning ?? 'off';
-  const codexReasoning = resolved.provider === 'codex' && (opts.reasoning === undefined || opts.useConfiguredCodexReasoning)
-    ? getSettings().codexReasoningEfforts?.[resolved.model] ?? null
+  const codexReasoning = opts.reasoning === undefined || opts.useConfiguredCodexReasoning
+    ? configuredCodexReasoning(resolved)
     : undefined;
   return deanonymizeResult(await rawComplete(resolved, withPromptContext(opts), false, reasoning, codexReasoning));
 }
@@ -840,8 +856,8 @@ export async function completeTextStream(
 ): Promise<string> {
   const resolved = resolveModel(model);
   const reasoning = opts.reasoning ?? getSettings().chatReasoning ?? 'off';
-  const codexReasoning = resolved.provider === 'codex' && (opts.reasoning === undefined || opts.useConfiguredCodexReasoning)
-    ? getSettings().codexReasoningEfforts?.[resolved.model] ?? null
+  const codexReasoning = opts.reasoning === undefined || opts.useConfiguredCodexReasoning
+    ? configuredCodexReasoning(resolved)
     : undefined;
   return rawCompleteStream(resolved, withPromptContext(opts), onDelta, reasoning, signal, codexReasoning);
 }
