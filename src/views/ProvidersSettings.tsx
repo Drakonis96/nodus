@@ -19,6 +19,8 @@ import { DEFAULT_LOCAL_BASE_URLS, supportsFreeTierShaping } from '@shared/provid
 import { AI_PROVIDERS, PROVIDER_LABELS, isLocalAiProvider, modelLabel, sameModel } from '../components/ui';
 import { IMAGE_PROVIDER_LABELS } from '@shared/providers';
 import { SettingsModelDot, SettingsModelList, settingsModelRowClass } from '../components/SettingsModelList';
+import { codexReasoningLabel } from '../components/ModelPicker';
+import { withCodexReasoning } from '@shared/codexReasoning';
 import { t, tx } from '../i18n';
 
 export function ProvidersSettings({
@@ -228,10 +230,11 @@ function ChatGptSubscriptionRow({
   };
 
   const setReasoning = async (model: string, effort: CodexReasoningEffort | null) => {
-    const next = { ...(settings.codexReasoningEfforts ?? {}) };
-    if (effort) next[model] = effort;
-    else delete next[model];
-    await window.nodus.updateSettings({ codexReasoningEfforts: next });
+    // Same writer the Models tab uses: the level belongs to the model, so choosing it
+    // in either screen is choosing it for every task that runs that model.
+    await window.nodus.updateSettings({
+      codexReasoningEfforts: withCodexReasoning(settings.codexReasoningEfforts, model, effort),
+    });
     await onChange();
   };
 
@@ -1137,16 +1140,3 @@ function ModelList({
   return <div>{rows}</div>;
 }
 
-function codexReasoningLabel(effort: CodexReasoningEffort): string {
-  switch (effort) {
-    case 'none': return t('Ninguno');
-    case 'minimal': return t('Mínimo');
-    case 'low': return t('Bajo');
-    case 'medium': return t('Medio');
-    case 'high': return t('Alto');
-    case 'xhigh': return t('Muy alto');
-    case 'max': return t('Máximo');
-    case 'ultra': return t('Ultra');
-    default: return effort.replace(/[_-]+/g, ' ').replace(/^./, (letter) => letter.toUpperCase());
-  }
-}

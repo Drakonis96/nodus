@@ -1,10 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
-import type { AppSettings, ModelRef } from '@shared/types';
+import type { AppSettings, CodexReasoningEffort, ModelRef } from '@shared/types';
 import { isSubscriptionProvider } from '@shared/providers';
 import { modelRefSupportsExtraction } from '@shared/localAiModels';
+import {
+  codexReasoningCatalog,
+  reasoningChoiceFor,
+  withCodexReasoning,
+  type CodexReasoningCatalog,
+} from '@shared/codexReasoning';
 import { modelLabel, sameModel, sortModelRefs } from './ui';
 import { Icon } from './ui';
-import { t } from '../i18n';
+import { t, tx } from '../i18n';
 import './modelPicker.css';
 
 /**
@@ -42,6 +48,148 @@ export function ExtractionCapabilityNotice({ model }: { model: ModelRef | null |
     >
       {t('Este modelo local es de visión y no extrae ideas de forma fiable (tiende a divagar y no cerrar el JSON). Para extracción, elige Gemma 4 E2B u otro modelo mayor.')}
     </p>
+  );
+}
+
+export function codexReasoningLabel(effort: CodexReasoningEffort): string {
+  switch (effort) {
+    case 'none': return t('Ninguno');
+    case 'minimal': return t('Mínimo');
+    case 'low': return t('Bajo');
+    case 'medium': return t('Medio');
+    case 'high': return t('Alto');
+    case 'xhigh': return t('Muy alto');
+    case 'max': return t('Máximo');
+    case 'ultra': return t('Ultra');
+    default: return effort.replace(/[_-]+/g, ' ').replace(/^./, (letter) => letter.toUpperCase());
+  }
+}
+
+/**
+ * One catalogue read per app session, shared by every picker on screen. Codex is the
+ * only provider that publishes reasoning levels, so nothing is fetched until a Codex
+ * model is actually selected somewhere. A failure (no subscription connected) clears
+ * the cache so the next picker to mount can try again instead of being stuck empty.
+ */
+let catalogRequest: Promise<CodexReasoningCatalog> | null = null;
+
+function loadCodexReasoningCatalog(): Promise<CodexReasoningCatalog> {
+  if (!catalogRequest) {
+    catalogRequest = window.nodus
+      .listModels('codex')
+      .then(codexReasoningCatalog)
+      .catch(() => { catalogRequest = null; return {}; });
+  }
+  return catalogRequest;
+}
+
+/** Test seam: hand the catalogue in directly instead of going through the provider. */
+export function primeCodexReasoningCatalog(catalog: CodexReasoningCatalog | null): void {
+  catalogRequest = catalog ? Promise.resolve(catalog) : null;
+}
+
+function useCodexReasoningCatalog(model: ModelRef | null | undefined): CodexReasoningCatalog | null {
+  const [catalog, setCatalog] = useState<CodexReasoningCatalog | null>(null);
+  const isCodex = model?.provider === 'codex';
+  useEffect(() => {
+    if (!isCodex) return;
+    let alive = true;
+    void loadCodexReasoningCatalog().then((loaded) => { if (alive) setCatalog(loaded); });
+    return () => { alive = false; };
+  }, [isCodex]);
+  return catalog;
+}
+
+/**
+ * The reasoning level for the model a role is using, rendered beside its picker so the
+ * choice lives where the model is chosen. It writes the same per-model map the
+ * Providers tab writes, so the two screens are never out of step. Renders nothing when
+ * the selected model publishes no levels, which is every provider except Codex today.
+ */
+export function ReasoningPicker({
+  settings,
+  model,
+  patch,
+  compact,
+}: {
+  settings: AppSettings;
+  model: ModelRef | null | undefined;
+  patch: (value: Partial<AppSettings>) => Promise<void> | void;
+  compact?: boolean;
+}) {
+  const catalog = useCodexReasoningCatalog(model);
+  const choice = reasoningChoiceFor(catalog, model);
+  if (!choice || !model) return null;
+  return (
+    <select
+      // Wide enough for the longest level plus its "(default)" suffix in every
+      // language, and never allowed to shrink: a truncated level reads as a different
+      // level. The picker beside it keeps a floor of its own so neither can vanish.
+      className={`input w-48 shrink-0 ${compact ? 'py-1 text-xs' : 'text-xs'}`}
+      data-testid={`model-reasoning-${model.model}`}
+      aria-label={tx('Razonamiento de {model}', { model: modelLabel(model) })}
+      title={t('Nivel de razonamiento. Menos razonamiento responde antes y el nivel es del modelo, así que cambia en todas las tareas que lo usen.')}
+      value={settings.codexReasoningEfforts?.[model.model] ?? ''}
+      onChange={(event) => void patch({
+        codexReasoningEfforts: withCodexReasoning(
+          settings.codexReasoningEfforts,
+          model.model,
+          event.target.value ? (event.target.value as CodexReasoningEffort) : null
+        ),
+      })}
+    >
+      <option value="">
+        {choice.fallback
+          ? tx('{level} (predeterminado)', { level: codexReasoningLabel(choice.fallback) })
+          : t('Predeterminado')}
+      </option>
+      {choice.supported.map((option) => (
+        <option key={option.reasoningEffort} value={option.reasoningEffort} title={option.description}>
+          {codexReasoningLabel(option.reasoningEffort)}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+/**
+ * A role's model picker with its reasoning level next to it. The reasoning selector
+ * only takes width when the chosen model actually offers levels, so rows for models
+ * without them look exactly as they did.
+ */
+export function ModelWithReasoning({
+  settings,
+  value,
+  onChange,
+  patch,
+  compact,
+  allowEmpty = true,
+  emptyLabel,
+  requireExtraction = false,
+}: {
+  settings: AppSettings;
+  value: ModelRef | null;
+  onChange: (m: ModelRef | null) => void;
+  patch: (value: Partial<AppSettings>) => Promise<void> | void;
+  compact?: boolean;
+  allowEmpty?: boolean;
+  emptyLabel?: string;
+  requireExtraction?: boolean;
+}) {
+  return (
+    <div className="flex w-full min-w-0 flex-wrap items-center gap-2">
+      <ModelPicker
+        className="min-w-[8rem] flex-1"
+        settings={settings}
+        value={value}
+        onChange={onChange}
+        compact={compact}
+        allowEmpty={allowEmpty}
+        emptyLabel={emptyLabel}
+        requireExtraction={requireExtraction}
+      />
+      <ReasoningPicker settings={settings} model={value} patch={patch} compact={compact} />
+    </div>
   );
 }
 

@@ -32,7 +32,7 @@ import { LegalDocModal } from '../components/LegalDocModal';
 import { LEGAL_DOCS, type LegalDocId } from '../legalDocs';
 import { confirm } from '../components/feedback';
 import { Icon, PROVIDER_LABELS } from '../components/ui';
-import { ModelPicker, SubscriptionQuotaNotice, ExtractionCapabilityNotice } from '../components/ModelPicker';
+import { ModelPicker, ModelWithReasoning, SubscriptionQuotaNotice, ExtractionCapabilityNotice } from '../components/ModelPicker';
 import { NodiStylePicker } from '../components/nodi/NodiStylePicker';
 import { TutorialVideoGrid } from '../components/TutorialVideos';
 import { vaultTypeLabel } from '../components/VaultSwitcher';
@@ -2393,7 +2393,7 @@ export function Settings({
             </p>
             {settings.modelSettingsMode === 'basic' && <>
               <Row label={t('Modelo general de texto')} hint={t('Conversación, análisis, resúmenes y demás tareas de texto.')}>
-                <ModelPicker settings={settings} value={settings.synthesisModel} onChange={(m) => patch({ synthesisModel: m })} requireExtraction />
+                <ModelWithReasoning settings={settings} patch={patch} value={settings.synthesisModel} onChange={(m) => patch({ synthesisModel: m })} requireExtraction />
               </Row>
               {/* In basic mode this one model runs the scans too, so it is the single
                   most expensive place to pick a subscription-billed provider — and it must be able
@@ -2427,17 +2427,17 @@ export function Settings({
                 <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('Ajustes avanzados comunes')}</h3>
                 {/* The four selectors below drive the scan pipeline: one run covers a
                     whole corpus, so a subscription plan's quota is the real limit. */}
-                <Row label={t('Extracción de temas, ideas y evidencias')}><ModelPicker className="w-full" allowEmpty={false} settings={settings} value={settings.extractionModel} onChange={(extractionModel) => void patch({ extractionModel })} emptyLabel="Seleccionar modelo" requireExtraction /></Row>
+                <Row label={t('Extracción de temas, ideas y evidencias')}><ModelWithReasoning allowEmpty={false} settings={settings} patch={patch} value={settings.extractionModel} onChange={(extractionModel) => void patch({ extractionModel })} emptyLabel="Seleccionar modelo" requireExtraction /></Row>
                 <ExtractionCapabilityNotice model={settings.extractionModel} />
                 <SubscriptionQuotaNotice model={settings.extractionModel} />
-                <Row label={t('Visión y OCR de imágenes')}><ModelPicker className="w-full" allowEmpty={false} settings={settings} value={settings.visionModel} onChange={(visionModel) => void patch({ visionModel })} emptyLabel="Seleccionar modelo" /></Row>
+                <Row label={t('Visión y OCR de imágenes')}><ModelWithReasoning allowEmpty={false} settings={settings} patch={patch} value={settings.visionModel} onChange={(visionModel) => void patch({ visionModel })} emptyLabel="Seleccionar modelo" /></Row>
                 <SubscriptionQuotaNotice model={settings.visionModel} />
-                <Row label={t('Resúmenes de obras')}><ModelPicker className="w-full" allowEmpty={false} settings={settings} value={settings.summaryModel} onChange={(summaryModel) => void patch({ summaryModel })} emptyLabel="Seleccionar modelo" /></Row>
+                <Row label={t('Resúmenes de obras')}><ModelWithReasoning allowEmpty={false} settings={settings} patch={patch} value={settings.summaryModel} onChange={(summaryModel) => void patch({ summaryModel })} emptyLabel="Seleccionar modelo" /></Row>
                 <SubscriptionQuotaNotice model={settings.summaryModel} />
-                <Row label={t('Fusión y deduplicación')}><ModelPicker className="w-full" allowEmpty={false} settings={settings} value={settings.fusionModel} onChange={(fusionModel) => void patch({ fusionModel })} emptyLabel="Seleccionar modelo" requireExtraction /></Row>
+                <Row label={t('Fusión y deduplicación')}><ModelWithReasoning allowEmpty={false} settings={settings} patch={patch} value={settings.fusionModel} onChange={(fusionModel) => void patch({ fusionModel })} emptyLabel="Seleccionar modelo" requireExtraction /></Row>
                 <ExtractionCapabilityNotice model={settings.fusionModel} />
                 <SubscriptionQuotaNotice model={settings.fusionModel} />
-                <Row label={t('Asistente Nodi')}><ModelPicker className="w-full" allowEmpty={false} settings={settings} value={settings.nodiModel} onChange={(nodiModel) => void patch({ nodiModel })} emptyLabel="Seleccionar modelo" /></Row>
+                <Row label={t('Asistente Nodi')}><ModelWithReasoning allowEmpty={false} settings={settings} patch={patch} value={settings.nodiModel} onChange={(nodiModel) => void patch({ nodiModel })} emptyLabel="Seleccionar modelo" /></Row>
               </div>
               <VaultModelOverrides settings={settings} vaultType={activeVault?.type ?? 'academic'} vaultName={activeVault?.name ?? t('Vault actual')} patch={patch} />
             </>}
@@ -3105,7 +3105,7 @@ function VaultModelOverrides({ settings, vaultType, vaultName, patch }: {
     <p className="mb-3 mt-1 text-xs text-neutral-600">{t('Estos cambios no modifican los demás vaults.')}</p>
     {vaultType === 'estudio' ? <StudyVaultModelOverrides settings={settings} patch={patch} /> : <div className="space-y-3">
       {keys.map((key) => <Row key={key} label={t(VAULT_MODEL_FIELDS[key])}>
-        <ModelPicker allowEmpty={false} settings={settings} value={settings[key]} onChange={(model) => void patch({ [key]: model })} emptyLabel="Seleccionar modelo" />
+        <ModelWithReasoning allowEmpty={false} settings={settings} patch={patch} value={settings[key]} onChange={(model) => void patch({ [key]: model })} emptyLabel="Seleccionar modelo" />
       </Row>)}
     </div>}
   </div>;
@@ -3128,8 +3128,8 @@ function StudyVaultModelOverrides({ settings, patch }: {
     <b className="text-neutral-600">{t('Alternativo ante error')}</b>
     {STUDY_VAULT_MODEL_FIELDS.map((item) => <div key={item.task} className="contents">
       <span className="self-center text-neutral-300">{t(item.label)}</span>
-      <ModelPicker compact allowEmpty={false} settings={settings} value={settings[item.key]} onChange={(model) => void patch({ [item.key]: model })} emptyLabel="Seleccionar modelo" />
-      <ModelPicker compact settings={settings} value={settings.studyAiFallbackModels[item.task] ?? null} onChange={(model) => void patch({ studyAiFallbackModels: { ...settings.studyAiFallbackModels, [item.task]: model } })} emptyLabel="Sin modelo alternativo" />
+      <ModelWithReasoning compact allowEmpty={false} settings={settings} patch={patch} value={settings[item.key]} onChange={(model) => void patch({ [item.key]: model })} emptyLabel="Seleccionar modelo" />
+      <ModelWithReasoning compact settings={settings} patch={patch} value={settings.studyAiFallbackModels[item.task] ?? null} onChange={(model) => void patch({ studyAiFallbackModels: { ...settings.studyAiFallbackModels, [item.task]: model } })} emptyLabel="Sin modelo alternativo" />
     </div>)}
   </div>;
 }

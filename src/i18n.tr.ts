@@ -1640,6 +1640,8 @@ export const TR: Record<string, string> = {
   "Límite secundario": "İkincil sınır",
   "Cargar modelos de Codex": "Codex Modellerini Yükle",
   "Cada modelo muestra únicamente los niveles de razonamiento publicados por Codex. «Predeterminado» usa el nivel recomendado por el modelo.": "Her model yalnızca Codex tarafından yayınlanan muhakeme seviyelerini görüntüler. “Varsayılan” model tarafından önerilen düzeyi kullanır.",
+  "Nivel de razonamiento. Menos razonamiento responde antes y el nivel es del modelo, así que cambia en todas las tareas que lo usen.":
+    "Akıl yürütme düzeyi. Daha az akıl yürütme daha hızlı yanıt verir ve düzey modele aittir, bu yüzden onu kullanan tüm görevlerde değişir.",
   "Razonamiento de {model}": "{model} gerekçesi",
   "{level} (predeterminado)": "{level} (varsayılan)",
   "Ninguno": "Yok",
