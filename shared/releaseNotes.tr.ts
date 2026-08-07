@@ -56,6 +56,11 @@ const RELEASE_3_2_3_TR: string[] = [
   "Telefondaki her eser artık onu iPhone ve iPad için Zotero'da açan bir düğme taşıyor. Zotero anahtarı kayıttaki ölü bir satır olmaktan çıkıp diğer uygulamadaki PDF'e, notlara ve işaretlemelere dönüş yolu oluyor.",
 ];
 
+const RELEASE_3_2_6_TR: string[] = [
+  "Akıl yürütme düzeyi artık her görevin kendisine ait. Önceden Daldırma'da yükseltmek onu Deep Research'te ve o modeli kullanan diğer bütün görevlerde de yükseltiyordu. Artık her görev kendi düzeyini saklıyor, Sağlayıcılar'da ise modelin varsayılanını belirlemeye devam ediyorsunuz.",
+  "Bu düzey artık taramalarda da geçerli. Çıkarım, özetler ve birleştirme onu tamamen yok sayıyor ve seçici ne derse desin hep en ucuz düzeyde çalışıyordu. Hiçbirini seçmezseniz akıl yürütmesiz ve tam olarak eskisi kadar hızlı çalışmaya devam ederler.",
+];
+
 const RELEASE_3_2_5_TR: string[] = [
   "Taramalar büyük derlemlerde yeniden yeni fikirler oluşturuyor. 9999 fikri aştıktan sonra Nodus bir sonrakini numaralandıramıyor ve her eserin derin analizi, tüm yapay zekâ işi harcandıktan sonra tam sonda başarısız oluyordu. Haftalardır büyümeyen bir derlem yeniden büyüyor.",
   "Tarama kuyruğu artık bir şeyin neden başarısız olduğunu söylüyor. Önceden yalnızca «Başarısız» yazıyor, gerekçe ise kimsenin bakmayacağı geliştirici konsolunda kalıyordu. Başarısız bir eserin durumu artık mesajı üzerinde taşıyor, çubuktan hiç çıkmadan.",
@@ -77,6 +82,7 @@ const RELEASE_3_2_4_TR: string[] = [
 ];
 
 export const RELEASE_NOTES_TR: Record<string, string[]> = {
+  "3.2.6": RELEASE_3_2_6_TR,
   "3.2.5": RELEASE_3_2_5_TR,
   "3.2.4": RELEASE_3_2_4_TR,
   "3.2.3": RELEASE_3_2_3_TR,

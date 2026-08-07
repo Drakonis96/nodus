@@ -831,6 +831,27 @@ const RELEASE_3_2_3_HIGHLIGHTS: RawReleaseHighlight[] = [
  * the reasoning level, which until now lived one tab away from every screen that
  * assigns a model to a job.
  */
+const RELEASE_3_2_6_HIGHLIGHTS: RawReleaseHighlight[] = [
+  {
+    scope: 'general',
+    es: 'El nivel de razonamiento ya es de cada tarea. Antes, subirlo en Inmersión lo subía también en Deep Research y en todas las demás que usaran ese modelo. Ahora cada tarea guarda el suyo, y en Proveedores sigues fijando el predeterminado del modelo.',
+    en: 'The reasoning level now belongs to each job. Raising it on Immersion used to raise it on Deep Research and on every other job running that model. Each job now keeps its own, and Providers still sets the default for the model.',
+    fr: 'Le niveau de raisonnement appartient désormais à chaque tâche. L’augmenter sur Immersion l’augmentait aussi sur Deep Research et sur toutes les autres tâches utilisant ce modèle. Chaque tâche garde maintenant le sien, et Fournisseurs fixe toujours la valeur par défaut du modèle.',
+    de: 'Die Reasoning-Stufe gehört jetzt zu jeder Aufgabe. Sie bei Immersion anzuheben hob sie auch bei Deep Research und bei jeder anderen Aufgabe mit demselben Modell. Jede Aufgabe behält nun ihre eigene, und unter Anbieter legen Sie weiterhin die Vorgabe des Modells fest.',
+    pt: 'O nível de raciocínio passa a ser de cada tarefa. Antes, subi-lo na Imersão subia-o também no Deep Research e em todas as outras que usassem esse modelo. Agora cada tarefa guarda o seu, e em Fornecedores continua a fixar a predefinição do modelo.',
+    'pt-BR': 'O nível de raciocínio agora é de cada tarefa. Antes, aumentá-lo na Imersão aumentava também no Deep Research e em todas as outras que usassem esse modelo. Agora cada tarefa guarda o seu, e em Provedores você continua fixando o padrão do modelo.',
+  },
+  {
+    scope: 'academic',
+    es: 'Ese nivel manda también en los escaneos. La extracción, los resúmenes y la fusión lo ignoraban por completo y corrían siempre al nivel más barato dijera lo que dijera el selector. Si no eliges ninguno, siguen yendo sin razonamiento y exactamente igual de rápido.',
+    en: 'That level now governs the scans too. Extraction, summaries and fusion ignored it entirely and always ran at the cheapest level, whatever the selector said. Choose none and they still run without reasoning, exactly as fast as before.',
+    fr: 'Ce niveau gouverne désormais aussi les analyses. L’extraction, les résumés et la fusion l’ignoraient totalement et tournaient toujours au niveau le moins cher, quoi qu’affiche le sélecteur. Sans choix de votre part, elles tournent toujours sans raisonnement et tout aussi vite.',
+    de: 'Diese Stufe bestimmt jetzt auch die Scans. Extraktion, Zusammenfassungen und Fusion ignorierten sie völlig und liefen immer auf der günstigsten Stufe, was der Auswahlfeld auch anzeigte. Wählen Sie keine, laufen sie weiterhin ohne Reasoning und genauso schnell.',
+    pt: 'Esse nível manda também nas análises. A extração, os resumos e a fusão ignoravam-no por completo e corriam sempre no nível mais barato, dissesse o que dissesse o seletor. Se não escolher nenhum, continuam a correr sem raciocínio e exatamente à mesma velocidade.',
+    'pt-BR': 'Esse nível manda também nas varreduras. A extração, os resumos e a fusão o ignoravam por completo e rodavam sempre no nível mais barato, dissesse o que dissesse o seletor. Se você não escolher nenhum, continuam rodando sem raciocínio e exatamente na mesma velocidade.',
+  },
+];
+
 const RELEASE_3_2_5_HIGHLIGHTS: RawReleaseHighlight[] = [
   {
     scope: 'academic',
@@ -964,6 +985,11 @@ const RELEASE_3_2_4_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
+  {
+    version: '3.2.6',
+    date: '2026-08-07',
+    highlights: RELEASE_3_2_6_HIGHLIGHTS,
+  },
   {
     version: '3.2.5',
     date: '2026-08-07',

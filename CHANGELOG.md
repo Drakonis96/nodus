@@ -1,5 +1,34 @@
 # Changelog
 
+## 3.2.6 — 2026-08-07
+
+The level that decides how long a job thinks now belongs to the job, and reaches
+the scans it always claimed to govern.
+
+### Changed
+
+- **The reasoning level is per job, not per model.** 3.2.5 put it beside every
+  picker in Settings › Models and made it belong to the model, so raising
+  Immersion to High raised Deep Research, the writing workshop and every other
+  job pointed at that model with it. A control rendered once per row, inside
+  that row, reads as belonging to that row. It now does: the level is stored
+  with the job's own model selection. Providers keeps its per-model level as the
+  default a job falls back to, and «Default» in Models names whichever of the two
+  it would really use. Nothing to migrate, and no job starts out with a level of
+  its own.
+
+### Fixed
+
+- **The level did not reach the scans at all.** Extraction, summaries, fusion,
+  immersion generation and every other structured call never passed it to the
+  provider, so the selector next to the scan pickers ran at the cheapest
+  advertised level whatever it displayed. An explicit level now applies there
+  too. With none chosen, reasoning stays off and a corpus-wide run is exactly as
+  fast as before.
+- **Basic mode left a per-job level running behind its single picker.** Switching
+  back from advanced synchronised the model but not the level, so a job could
+  keep thinking at a level nothing on screen showed.
+
 ## 3.2.5 — 2026-08-07
 
 A corpus that had quietly stopped growing a month ago, the blindfold that kept it

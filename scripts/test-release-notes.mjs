@@ -25,12 +25,17 @@ try {
 
   const { RELEASE_NOTES, releaseNotesForMajor, compareVersions } = await import(pathToFileURL(bundlePath).href);
   const currentRelease = RELEASE_NOTES[0];
-  assert.equal(currentRelease?.version, '3.2.5');
+  assert.equal(currentRelease?.version, '3.2.6');
   assert.equal(currentRelease?.date, '2026-08-07');
-  // Ideas that can be numbered past 9,999 again, a failed scan that says why, the
-  // reasoning level beside the model it belongs to, and the fact that it belongs to the
-  // model. A floor rather than an exact count, in case more lands here before it ships.
-  assert.ok(currentRelease?.highlights.length >= 4, 'the release must describe what changed');
+  // A reasoning level that is each job's own, and a level that finally governs the scans.
+  // A floor rather than an exact count, in case more lands here before it ships.
+  assert.ok(currentRelease?.highlights.length >= 2, 'the release must describe what changed');
+
+  // 3.2.5 keeps the four it shipped with, including the two that describe the rule this
+  // release reverses. They are published history and stay as they were written.
+  const perModelReasoningRelease = RELEASE_NOTES.find((note) => note.version === '3.2.5');
+  assert.equal(perModelReasoningRelease?.date, '2026-08-07');
+  assert.equal(perModelReasoningRelease?.highlights.length, 4);
 
   // 3.2.4 keeps the ten it shipped with.
   const headerRelease = RELEASE_NOTES.find((note) => note.version === '3.2.4');
