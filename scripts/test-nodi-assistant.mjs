@@ -76,7 +76,7 @@ test('Nodi context is explicit, bounded and rejects invented product claims', as
   assert.match(backend, /relevant_materials/);
 });
 
-test('report selection offers icon-only copy, bookmark and Nodi quote actions', async () => {
+test('report selection offers icon-only copy, margin bookmark and Nodi quote actions', async () => {
   const [actions, css, companion, ipc, preload, types, windows, deepResearch, immersion] = await Promise.all([
     read('src/components/ReaderSelectionActions.tsx'),
     read('src/components/readerSelectionActions.css'),
@@ -93,14 +93,14 @@ test('report selection offers icon-only copy, bookmark and Nodi quote actions', 
   assert.match(actions, /name="quote"/);
   assert.match(actions, /role="toolbar"/);
   assert.match(actions, /contextmenu/);
-  assert.match(actions, /navigator\.clipboard\.writeText\(active\.text\)/);
+  assert.match(actions, /navigator\.clipboard\.writeText\(active\.selectedText\)/);
   assert.match(actions, /localStorage\.setItem\(storageKey\(contextId\)/);
   assert.match(actions, /localStorage\.removeItem\(storageKey\(contextId\)/);
-  assert.match(actions, /range\.getClientRects\(\)/, 'the painted bookmark is hit-tested so it can be clicked');
+  assert.match(actions, /range\.getClientRects\(\)/, 'the margin markers stay aligned with their text ranges');
   assert.match(actions, /useImperativeHandle\(ref, \(\) => \(\{ goToMark \}\)/);
   assert.match(actions, /updateSettings\(\{ mascotEnabled: true \}\)/);
   assert.match(actions, /quoteNodiSelection\(text\)/);
-  assert.match(css, /::highlight\(nodus-reader-mark\)/);
+  assert.match(css, /\.reader-margin-marker-bookmark/);
   assert.match(companion, /consumeNodiQuoteSelection/);
   assert.match(companion, /setQuotedSelection\(selection\.text\)/);
   assert.match(companion, /setPanel\('chat'\)/);
@@ -111,7 +111,8 @@ test('report selection offers icon-only copy, bookmark and Nodi quote actions', 
   assert.match(ipc, /nodi:quoteSelection:set/);
   assert.match(ipc, /webContents\.send\('nodi:quoteSelection'/);
   assert.match(windows, /'consumeNodiQuoteSelection'/);
-  assert.match(deepResearch, /ReaderSelectionActions[^>]*targetRef=\{mainRef\}/);
+  assert.match(deepResearch, /ReaderSelectionActions[^>]*targetRef=\{documentRef\}/);
+  assert.match(deepResearch, /ReaderSelectionActions[^>]*scrollRef=\{mainRef\}/);
   assert.match(deepResearch, /label=\{t\('Ir al marcador de lectura'\)\}/);
   assert.match(deepResearch, /markActionsRef\.current\?\.goToMark\(\)/);
   assert.match(immersion, /ReaderSelectionActions[^>]*contextId=\{`immersion:/);
