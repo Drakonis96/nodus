@@ -29,7 +29,58 @@ installRuntimeHooks(root);
 let stopServer = null;
 try {
   const { getDb, closeDb } = require(path.join(repoRoot, 'electron/db/database.ts'));
-  getDb(); // migrate the throwaway profile before touching settings
+  const db = getDb(); // migrate the throwaway profile before touching settings
+  // Reproduce the catalogue that exposed the bug: Docencia used to advertise only
+  // 23 tools. If a client cached that list and the user switched to an academic vault,
+  // capabilities could count thousands of ideas while no idea reader existed.
+  const { getActiveVault, setVaultType } = require(path.join(repoRoot, 'electron/vaults/vaultRegistry.ts'));
+  setVaultType(getActiveVault().id, 'docencia');
+  db.prepare('INSERT INTO ideas (global_id, type, label, statement, created_at) VALUES (?, ?, ?, ?, ?)').run(
+    'idea-visible-after-switch',
+    'claim',
+    'Spain is different',
+    'The MCP must retrieve a generated idea even when its cached catalogue originated in another vault type.',
+    new Date().toISOString(),
+  );
+  const savedReportId = 'deep-report-visible-over-http';
+  const savedReportBrief = {
+    kind: 'deep_research',
+    objective: 'Audit persistent Deep Research access over MCP',
+    language: 'en',
+  };
+  const savedReportSelection = {
+    ideaIds: [], themeIds: [], gapIds: [], contradictionIds: [], workIds: [], passageIds: [], tutorRouteIds: [],
+  };
+  const savedReportDraft = {
+    generatedAt: new Date().toISOString(),
+    brief: savedReportBrief,
+    selection: savedReportSelection,
+    title: 'Persistent MCP report',
+    abstract: 'A saved report must remain visible even when the generation lane is empty.',
+    outline: [],
+    draftMarkdown: '# Persistent MCP report\n\nFull report body.',
+    matrix: [],
+    bibliography: [],
+    nextSteps: [],
+    limitations: [],
+    stats: {
+      selectedIdeas: 0, selectedThemes: 0, selectedGaps: 0, selectedContradictions: 0,
+      selectedWorks: 0, selectedPassages: 0, selectedTutorRoutes: 0, contextChars: 0, truncated: false,
+    },
+  };
+  db.prepare(
+    `INSERT INTO writing_saved_drafts
+       (id, title, brief_json, selection_json, model_json, draft_json, created_at, updated_at)
+     VALUES (?, ?, ?, ?, NULL, ?, ?, ?)`
+  ).run(
+    savedReportId,
+    savedReportDraft.title,
+    JSON.stringify(savedReportBrief),
+    JSON.stringify(savedReportSelection),
+    JSON.stringify(savedReportDraft),
+    savedReportDraft.generatedAt,
+    savedReportDraft.generatedAt,
+  );
   const { updateSettings } = require(path.join(repoRoot, 'electron/db/settingsRepo.ts'));
   const port = 4319 + Math.floor(Math.random() * 200);
   const token = 'ttl-test-token';
@@ -54,7 +105,29 @@ try {
   await client.connect(transport);
 
   const tools = await client.listTools();
-  assert.ok(tools.tools.some((t) => t.name === 'nodus_get_capabilities'), 'tools/list works over HTTP');
+  const toolNames = new Set(tools.tools.map((tool) => tool.name));
+  assert.ok(toolNames.has('nodus_get_capabilities'), 'tools/list works over HTTP');
+  for (const name of [
+    'nodus_list_ideas',
+    'nodus_get_idea',
+    'nodus_search_ideas',
+    'nodus_list_works',
+    'nodus_read_author_synthesis',
+    'nodus_list_writing_drafts',
+    'nodus_get_writing_draft',
+    'nodus_list_deep_research_reports',
+    'nodus_get_deep_research_report',
+    'nodus_get_passage',
+    'nodus_search_notes',
+    'nodus_list_persons',
+    'nodus_list_databases',
+    'nodus_study_get_document',
+    'nodus_teaching_get_gradebook',
+    'nodus_world_search',
+    'nodus_prosop_search',
+  ]) assert.ok(toolNames.has(name), `${name} remains readable in the Docencia catalogue`);
+  assert.ok(!toolNames.has('nodus_create_database_row'), 'an incompatible database write stays hidden');
+  assert.ok(!toolNames.has('nodus_world_create_character'), 'an incompatible worldbuilding write stays hidden');
   assert.equal(server.__sessionCountForTest(), 1, 'one live session after connect');
 
   // The real McpServer must forward structuredContent end-to-end (not just the
@@ -62,6 +135,32 @@ try {
   const caps = await client.callTool({ name: 'nodus_get_capabilities', arguments: {} });
   assert.ok(caps.structuredContent, 'structuredContent reaches the client over HTTP');
   assert.equal(typeof caps.structuredContent.version, 'string', 'structured capabilities carry the version');
+  assert.equal(caps.structuredContent.vault.active.type, 'docencia', 'the protocol test really uses the formerly narrow Docencia surface');
+  assert.match(caps.structuredContent.access.read, /stay available across vault switches/);
+  assert.equal(caps.structuredContent.counts.ideas, 1, 'capabilities reports the deliberately cross-layer idea');
+  assert.equal(caps.structuredContent.counts.deepResearchReports, 1, 'capabilities reports the persistent report gallery');
+
+  const ideas = await client.callTool({ name: 'nodus_list_ideas', arguments: { query: 'Spain is different', limit: 10, offset: 0 } });
+  assert.notEqual(ideas.isError, true, 'a cross-layer read is callable over the real protocol');
+  assert.equal(ideas.structuredContent.total, 1, 'the idea counted by capabilities is retrievable through the same session');
+  assert.equal(ideas.structuredContent.ideas[0].global_id, 'idea-visible-after-switch');
+
+  const jobs = await client.callTool({ name: 'nodus_list_deep_research_jobs', arguments: { status: 'all' } });
+  assert.equal(jobs.structuredContent.jobs.length, 0, 'the protocol fixture deliberately has an empty generation lane');
+  const reports = await client.callTool({
+    name: 'nodus_list_deep_research_reports',
+    arguments: { query: 'Persistent', sort: 'newest', limit: 10, offset: 0 },
+  });
+  assert.notEqual(reports.isError, true, 'the saved-report catalogue is callable over the real protocol');
+  assert.equal(reports.structuredContent.total, 1, 'a saved report is visible independently of the empty generation lane');
+  assert.equal(reports.structuredContent.reports[0].id, savedReportId);
+  assert.equal('draft' in reports.structuredContent.reports[0], false, 'the catalogue response is compact');
+  const report = await client.callTool({
+    name: 'nodus_get_deep_research_report',
+    arguments: { reportId: savedReportId },
+  });
+  assert.notEqual(report.isError, true, 'saved-report detail is callable over the real protocol');
+  assert.equal(report.structuredContent.report.draft.draftMarkdown, savedReportDraft.draftMarkdown);
 
   // A fresh session is under the default TTL, so the sweep must not touch it.
   server.sweepIdleSessions();

@@ -3,6 +3,7 @@ import type {
   ModelRef,
   WritingWorkshopBrief,
   WritingWorkshopDraft,
+  WritingWorkshopKind,
   WritingWorkshopSavedDraft,
   WritingWorkshopSaveDraftRequest,
   WritingWorkshopSelection,
@@ -21,6 +22,47 @@ interface SavedWritingDraftRow {
   updated_at: string;
   /** From the LEFT JOIN below: when this report was marked read, or null. */
   read_at?: string | null;
+}
+
+interface SavedWritingDraftSummaryRow {
+  id: string;
+  title: string;
+  brief_json: string;
+  model_json: string | null;
+  abstract_snippet: string | null;
+  abstract_length: number;
+  generated_at: string | null;
+  stats_json: string | null;
+  content_chars: number;
+  created_at: string;
+  updated_at: string;
+  read_at: string | null;
+}
+
+export interface WritingWorkshopDraftSummary {
+  id: string;
+  title: string;
+  kind: WritingWorkshopKind;
+  objective: string;
+  audience: string | null;
+  tone: WritingWorkshopBrief['tone'] | null;
+  language: WritingWorkshopBrief['language'] | null;
+  model: ModelRef | null;
+  abstractSnippet: string;
+  generatedAt: string | null;
+  stats: WritingWorkshopDraft['stats'] | null;
+  contentChars: number;
+  readAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ListWritingWorkshopDraftSummariesOptions {
+  query?: string;
+  kind?: WritingWorkshopKind;
+  sort?: 'newest' | 'oldest' | 'title';
+  limit: number;
+  offset: number;
 }
 
 /** Every list goes through the same join, so a report can never be listed without
@@ -55,6 +97,96 @@ export function listWritingWorkshopDrafts(): WritingWorkshopSavedDraft[] {
     .prepare(`${SELECT_DRAFTS} ORDER BY d.updated_at DESC, d.created_at DESC`)
     .all() as SavedWritingDraftRow[];
   return rows.map(toSavedDraft).filter((draft): draft is WritingWorkshopSavedDraft => draft !== null);
+}
+
+function toDraftSummary(row: SavedWritingDraftSummaryRow): WritingWorkshopDraftSummary | null {
+  try {
+    const brief = JSON.parse(row.brief_json) as WritingWorkshopBrief;
+    const abstract = (row.abstract_snippet ?? '').replace(/\s+/g, ' ').trim();
+    return {
+      id: row.id,
+      title: row.title,
+      kind: brief.kind,
+      objective: brief.objective,
+      audience: brief.audience ?? null,
+      tone: brief.tone ?? null,
+      language: brief.language ?? null,
+      model: row.model_json ? (JSON.parse(row.model_json) as ModelRef) : null,
+      abstractSnippet: row.abstract_length > 500 ? `${abstract}…` : abstract,
+      generatedAt: row.generated_at,
+      stats: row.stats_json ? (JSON.parse(row.stats_json) as WritingWorkshopDraft['stats']) : null,
+      contentChars: row.content_chars,
+      readAt: row.read_at,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Compact, bounded catalogue for MCP and other remote readers.
+ *
+ * The gallery needs whole reports because it renders them locally. An MCP list does
+ * not: returning every `draft_json` made a modest archive exceed the transport's 1 MB
+ * response ceiling. SQLite extracts only the fields needed for discovery here; the
+ * full report stays behind `getWritingWorkshopDraft`.
+ */
+export function listWritingWorkshopDraftSummaries(
+  options: ListWritingWorkshopDraftSummariesOptions
+): { drafts: WritingWorkshopDraftSummary[]; total: number } {
+  const where = ['json_valid(d.brief_json)', 'json_valid(d.draft_json)'];
+  const values: Array<string | number> = [];
+  if (options.kind) {
+    where.push("json_extract(d.brief_json, '$.kind') = ?");
+    values.push(options.kind);
+  }
+  const query = options.query?.trim().toLowerCase();
+  if (query) {
+    where.push(
+      "(instr(lower(d.title), ?) > 0 OR instr(lower(COALESCE(json_extract(d.brief_json, '$.objective'), '')), ?) > 0)"
+    );
+    values.push(query, query);
+  }
+  const predicate = `WHERE ${where.join(' AND ')}`;
+  const countRow = getDb()
+    .prepare(`SELECT COUNT(*) AS total FROM writing_saved_drafts d ${predicate}`)
+    .get(...values) as { total: number };
+  const orderBy =
+    options.sort === 'oldest'
+      ? 'd.updated_at ASC, d.created_at ASC'
+      : options.sort === 'title'
+        ? 'd.title COLLATE NOCASE ASC, d.updated_at DESC'
+        : 'd.updated_at DESC, d.created_at DESC';
+  const rows = getDb()
+    .prepare(
+      `SELECT d.id, d.title, d.brief_json, d.model_json,
+              substr(COALESCE(json_extract(d.draft_json, '$.abstract'), ''), 1, 500) AS abstract_snippet,
+              length(COALESCE(json_extract(d.draft_json, '$.abstract'), '')) AS abstract_length,
+              COALESCE(json_extract(d.draft_json, '$.generatedAt'), d.created_at) AS generated_at,
+              json_extract(d.draft_json, '$.stats') AS stats_json,
+              length(COALESCE(json_extract(d.draft_json, '$.draftMarkdown'), '')) AS content_chars,
+              d.created_at, d.updated_at, r.updated_at AS read_at
+         FROM writing_saved_drafts d
+         LEFT JOIN writing_draft_reads r ON r.draft_id = d.id
+         ${predicate}
+        ORDER BY ${orderBy}
+        LIMIT ? OFFSET ?`
+    )
+    .all(...values, options.limit, options.offset) as SavedWritingDraftSummaryRow[];
+  return {
+    drafts: rows.map(toDraftSummary).filter((draft): draft is WritingWorkshopDraftSummary => draft !== null),
+    total: countRow.total,
+  };
+}
+
+export function countWritingWorkshopDrafts(kind?: WritingWorkshopKind): number {
+  const kindPredicate = kind ? " AND json_extract(brief_json, '$.kind') = ?" : '';
+  const row = getDb()
+    .prepare(`SELECT COUNT(*) AS total FROM writing_saved_drafts WHERE json_valid(brief_json)${kindPredicate}`)
+    .get(...(kind ? [kind] : [])) as { total: number };
+  return row.total;
 }
 
 export function saveWritingWorkshopDraft(request: WritingWorkshopSaveDraftRequest): WritingWorkshopSavedDraft {

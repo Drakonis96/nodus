@@ -205,6 +205,7 @@ const WRITING_KINDS = [
   'chapter_section',
   'research_question',
 ] as const;
+const SAVED_WRITING_KINDS = [...WRITING_KINDS, 'deep_research'] as const;
 const EVENT_TYPES = [
   'birth',
   'baptism',
@@ -464,6 +465,10 @@ const paginationSchema = {
   offset: z.number().int().min(0).default(0),
 };
 const compactLimitSchema = z.number().int().min(1).max(100).default(25);
+const savedDraftSortSchema = z
+  .enum(['newest', 'oldest', 'title'])
+  .default('newest')
+  .describe('Sort by most recently updated, oldest updated, or title.');
 const querySchema = z
   .string()
   .trim()
@@ -907,13 +912,14 @@ function asDraft(draft: z.infer<typeof writingDraftSchema>): WritingWorkshopDraf
 
 // ── Tool surface scoped to the active vault type ─────────────────────────────
 // A Nodus install holds vaults of different types, and each type only populates
-// some of the data layers. Advertising every tool in every vault clutters the
-// calling model's tool list with 30+ tools that can only ever return empty, so the
-// surface is filtered to the layers the active vault type actually has — the same
-// principle behind VAULT_TYPE_SCOPED_VIEWS in the app. A tool NOT listed here is
-// universal (capabilities, notes/folders) and shows in every vault. The gate is
-// resolved once, when the session's server is built; a mid-session vault switch is
-// covered by the `warning` on nodus_get_capabilities, exactly as data reads are.
+// some of the data layers. Mutating/action tools are filtered to the active vault
+// type, but every read-only tool is deliberately stable across vaults. MCP clients
+// commonly cache tools/list across reconnects: when the old implementation built a
+// session in Docencia and the user later switched to an academic vault, the client
+// kept Docencia's 23-tool catalogue while nodus_get_capabilities and tool handlers
+// correctly read the new vault. That advertised thousands of ideas without exposing
+// any way to retrieve them. Stable reads make a cached catalogue safe; empty layers
+// simply return an empty page or not-found, while writes remain fail-closed.
 
 /** Vault types whose corpus is analysed works (the research/authoring graph). */
 const RESEARCH_VAULTS: VaultType[] = ['academic', 'primary_sources', 'genealogy', 'testimonios'];
@@ -971,6 +977,9 @@ const TOOL_VAULT_SCOPE: Record<string, VaultType[]> = {
   nodus_generate_writing_draft: RESEARCH_VAULTS,
   nodus_save_writing_draft: RESEARCH_VAULTS,
   nodus_list_writing_drafts: RESEARCH_VAULTS,
+  nodus_get_writing_draft: RESEARCH_VAULTS,
+  nodus_list_deep_research_reports: RESEARCH_VAULTS,
+  nodus_get_deep_research_report: RESEARCH_VAULTS,
   nodus_generate_deep_research: RESEARCH_VAULTS,
   nodus_finalize_deep_research: RESEARCH_VAULTS,
   nodus_enqueue_deep_research: RESEARCH_VAULTS,
@@ -1011,8 +1020,8 @@ const TOOL_VAULT_SCOPE: Record<string, VaultType[]> = {
   nodus_teaching_get_rubric: TEACHING_VAULTS,
 };
 
-/** Whether a tool is offered for a vault type. Universal tools (absent from the map)
- *  are always offered; a preview vault type still gets only its universal tools. */
+/** Whether a vault-specific action is offered for a vault type. Universal tools
+ *  (absent from the map) are always offered. Read tools bypass this gate below. */
 export function isToolAllowedForVaultType(toolName: string, vaultType: VaultType): boolean {
   // Worldbuilding has a deliberately namespaced surface. Keeping the prefix as the
   // scope boundary makes adding a new world tool fail closed: it cannot accidentally
@@ -1023,11 +1032,19 @@ export function isToolAllowedForVaultType(toolName: string, vaultType: VaultType
   return scope ? scope.includes(vaultType) : true;
 }
 
+function isReadOnlyToolMeta(value: unknown): boolean {
+  if (!value || typeof value !== 'object') return false;
+  const annotations = (value as { annotations?: unknown }).annotations;
+  return !!annotations
+    && typeof annotations === 'object'
+    && (annotations as { readOnlyHint?: unknown }).readOnlyHint === true;
+}
+
 /**
  * Registers the surface scoped to one vault type. Passing `null` registers every tool
  * (used by the test harness and any caller that wants the full surface). Wraps the
- * server so a disallowed `registerTool` call is skipped without touching a single one
- * of the ~60 call sites in registerTools, keeping their strong typing intact.
+ * server so every read-only registration is stable and a disallowed action is skipped,
+ * without weakening the strong typing of the individual registerTools call sites.
  */
 export function registerToolsForVault(server: McpServer, vaultType: VaultType | null): void {
   if (!vaultType) {
@@ -1039,7 +1056,9 @@ export function registerToolsForVault(server: McpServer, vaultType: VaultType | 
       if (prop !== 'registerTool') return Reflect.get(target, prop, receiver);
       const original = Reflect.get(target, prop, receiver) as (name: string, ...rest: unknown[]) => unknown;
       return (name: string, ...rest: unknown[]) =>
-        isToolAllowedForVaultType(name, vaultType) ? original.call(target, name, ...rest) : undefined;
+        isReadOnlyToolMeta(rest[0]) || isToolAllowedForVaultType(name, vaultType)
+          ? original.call(target, name, ...rest)
+          : undefined;
     },
   });
   registerTools(gated);
@@ -1064,6 +1083,12 @@ export function registerTools(server: McpServer): void {
       return {
         version: app.getVersion(),
         vault: vaultContext(),
+        access: {
+          read:
+            'All read-only MCP tools stay available across vault switches and read the active vault. Layers without data return an empty page or not-found.',
+          write:
+            'Write and action tools remain limited to the active vault type and to the narrow operations explicitly exposed by Nodus.',
+        },
         counts: {
           ideas: count('ideas'),
           works: count('works'),
@@ -1073,6 +1098,8 @@ export function registerTools(server: McpServer): void {
           authors: count('authors'),
           passages: count('passages'),
           notes: count('notes'),
+          writingDrafts: writingDrafts.countWritingWorkshopDrafts(),
+          deepResearchReports: writingDrafts.countWritingWorkshopDrafts('deep_research'),
           persons: records.persons,
           events: records.events,
           archiveItems: archive.archiveCounts().items,
@@ -1365,6 +1392,34 @@ export function registerTools(server: McpServer): void {
           .filter((author) => authorMatchesQuery(author, query))
           .filter((author) => synthesis === 'all' || (synthesis === 'with' ? author.hasSynthesis : !author.hasSynthesis));
         return page('authors', all, limit, offset);
+      })()
+  );
+
+  server.registerTool(
+    'nodus_read_author_synthesis',
+    {
+      title: 'Read stored author synthesis',
+      description:
+        'Resolves an author by author_id or name and returns the dossier synthesis already stored in Nodus, or source="missing" when none exists. This never generates, refreshes or saves anything; use nodus_get_author_synthesis only when the user explicitly wants generation that may consume provider tokens.',
+      inputSchema: { author: z.string().trim().min(1).max(500) },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ author }) =>
+      tool(() => {
+        const resolved = resolveAuthor(author);
+        const dossier = buildAuthorDossier(resolved.author_id);
+        if (!dossier) throw notFound('author', author);
+        return {
+          source: dossier.synthesis ? 'cached' : 'missing',
+          author: resolved,
+          synthesis: dossier.synthesis ?? null,
+          counts: {
+            works: dossier.works.length,
+            ideas: dossier.ideas.length,
+            relations: dossier.relations.length,
+            themes: dossier.themes.length,
+          },
+        };
       })()
   );
 
@@ -1988,11 +2043,95 @@ export function registerTools(server: McpServer): void {
     'nodus_list_writing_drafts',
     {
       title: 'List saved writing drafts',
-      description: 'Lists drafts saved by the Nodus writing workshop. Read-only.',
-      inputSchema: {},
+      description:
+        'Lists a compact, paginated catalogue of drafts saved by the Nodus writing workshop. It never returns full report bodies, so large libraries remain below MCP response limits; use nodus_get_writing_draft for one complete draft. Filter by kind or title/objective. For completed Deep Research reports prefer nodus_list_deep_research_reports. Read-only.',
+      inputSchema: {
+        query: querySchema,
+        kind: z.enum(SAVED_WRITING_KINDS).optional(),
+        sort: savedDraftSortSchema,
+        limit: compactLimitSchema,
+        offset: z.number().int().min(0).default(0),
+      },
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    tool(() => ({ drafts: writingDrafts.listWritingWorkshopDrafts() }))
+    ({ query, kind, sort, limit, offset }) =>
+      tool(() => {
+        const result = writingDrafts.listWritingWorkshopDraftSummaries({ query, kind, sort, limit, offset });
+        return {
+          drafts: result.drafts,
+          total: result.total,
+          limit,
+          offset,
+          hasMore: offset + limit < result.total,
+        };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_get_writing_draft',
+    {
+      title: 'Get a saved writing draft',
+      description:
+        'Returns one complete saved writing draft, including its Markdown, evidence selection, traceability matrix and bibliography. Obtain the id from nodus_list_writing_drafts. Read-only.',
+      inputSchema: { draftId: z.string().trim().min(1).max(200) },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ draftId }) =>
+      tool(() => {
+        const draft = writingDrafts.getWritingWorkshopDraft(draftId);
+        if (!draft) throw notFound('writing draft', draftId);
+        return { draft };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_list_deep_research_reports',
+    {
+      title: 'List saved Deep Research reports',
+      description:
+        'Lists completed Deep Research reports persisted in the active vault gallery. This is the durable report catalogue, independent of the temporary generation lane returned by nodus_list_deep_research_jobs. Results are compact, searchable and paginated so every report remains discoverable without crossing MCP response limits; use nodus_get_deep_research_report for the full text. Read-only.',
+      inputSchema: {
+        query: querySchema,
+        sort: savedDraftSortSchema,
+        limit: compactLimitSchema,
+        offset: z.number().int().min(0).default(0),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ query, sort, limit, offset }) =>
+      tool(() => {
+        const result = writingDrafts.listWritingWorkshopDraftSummaries({
+          query,
+          kind: 'deep_research',
+          sort,
+          limit,
+          offset,
+        });
+        return {
+          reports: result.drafts,
+          total: result.total,
+          limit,
+          offset,
+          hasMore: offset + limit < result.total,
+        };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_get_deep_research_report',
+    {
+      title: 'Get a saved Deep Research report',
+      description:
+        'Returns one complete persisted Deep Research report from the active vault, including its Markdown, source selection, traceability matrix and bibliography. Obtain the reportId from nodus_list_deep_research_reports or use a completed queue job\'s savedDraftId. Read-only.',
+      inputSchema: { reportId: z.string().trim().min(1).max(200) },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ reportId }) =>
+      tool(() => {
+        const report = writingDrafts.getWritingWorkshopDraft(reportId);
+        if (!report || report.brief.kind !== 'deep_research') throw notFound('Deep Research report', reportId);
+        return { report };
+      })()
   );
 
   server.registerTool(
@@ -2122,7 +2261,7 @@ export function registerTools(server: McpServer): void {
     {
       title: 'List queued Deep Research reports',
       description:
-        'Lists the Deep Research reports in the generation lane — queued, running and recently finished — including those started from the Nodus window rather than over MCP (`origin`). Read-only. Finished jobs are kept for a while and then dropped; a report saved as a draft remains available through nodus_list_writing_drafts.',
+        'Lists only the temporary Deep Research generation lane — queued, running and recently finished — including jobs started from the Nodus window rather than over MCP (`origin`). An empty lane does NOT mean the vault has no completed reports. Use nodus_list_deep_research_reports for the persistent gallery. Read-only.',
       inputSchema: {
         status: z
           .enum(['all', 'active', 'finished'])
@@ -2147,7 +2286,7 @@ export function registerTools(server: McpServer): void {
       title: 'Get a queued Deep Research report',
       description:
         'Returns one job from the Deep Research lane: its status, live progress, and the error or saved draft id it ended with. Read-only. ' +
-        'With includeReport=true a completed job also returns the full report (kept in memory for the last few finished jobs only — after that read it through nodus_list_writing_drafts using `savedDraftId`). ' +
+        'With includeReport=true a completed job also returns the full report (kept in memory for the last few finished jobs only — after that call nodus_get_deep_research_report with `savedDraftId`). ' +
         'A `queued` job has not started; `ahead` says how many reports are in front of it.',
       inputSchema: {
         jobId: z.string().trim().min(1).max(200),
@@ -2162,7 +2301,7 @@ export function registerTools(server: McpServer): void {
         if (!found) {
           return {
             job: null,
-            error: 'No job with that id is in the Deep Research lane. Finished jobs are eventually dropped; look for the report in nodus_list_writing_drafts.',
+            error: 'No job with that id is in the Deep Research lane. Finished jobs are eventually dropped; list persistent reports with nodus_list_deep_research_reports.',
           };
         }
         return {
