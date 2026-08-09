@@ -7304,4 +7304,10 @@ export const IT: Record<string, string> = {
   "Marcar como leído": "Segna come letto",
   "Marcar como no leído": "Segna come da leggere",
   "Ya has leído este informe": "Hai già letto questo report",
+  "Acciones de selección": "Azioni sulla selezione",
+  "Añadir marcador de lectura": "Aggiungi segnalibro di lettura",
+  "Mover marcador aquí": "Sposta qui il segnalibro",
+  "Citar en Nodi": "Cita in Nodi",
+  "Quitar cita": "Rimuovi citazione",
+  "Texto visible de la sección abierta o documento completo en los lectores.": "Testo visibile della sezione aperta o documento completo nei lettori.",
 };

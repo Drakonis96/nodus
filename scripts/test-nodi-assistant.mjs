@@ -30,13 +30,17 @@ test('Nodi owns an independent persisted model and chat history', async () => {
 });
 
 test('Nodi context is explicit, bounded and rejects invented product claims', async () => {
-  const [backend, documentation, app] = await Promise.all([
+  const [backend, documentation, app, deepResearch, immersion, contextSource] = await Promise.all([
     read('electron/ai/nodiChat.ts'),
     read('shared/nodiDocumentation.ts'),
     read('src/App.tsx'),
+    read('src/views/DeepResearchView.tsx'),
+    read('src/views/ImmersionView.tsx'),
+    read('src/components/NodiViewContextSource.tsx'),
   ]);
   for (const context of ['documentation', 'current_view', 'vault', 'all_vaults']) assert.match(backend, new RegExp(`'${context}'`));
-  assert.match(backend, /MAX_TOTAL_CONTEXT_CHARS = 55_000/);
+  assert.match(backend, /MAX_DOCUMENT_VIEW_CHARS = 120_000/);
+  assert.match(backend, /MAX_TOTAL_CONTEXT_CHARS = 150_000/);
   assert.match(backend, /buildNodiResearchContext/);
   assert.match(backend, /buildNodiAllVaultsContext/);
   assert.match(backend, /Tu prioridad absoluta es la fiabilidad/);
@@ -63,8 +67,49 @@ test('Nodi context is explicit, bounded and rejects invented product claims', as
   assert.match(app, /data-nodi-view=\{view\}/);
   assert.match(app, /setNodiViewContext/);
   assert.match(app, /slice\(0, 12_000\)/);
+  assert.match(app, /data-nodi-context-source="document"/);
+  assert.match(app, /complete \? \(explicit\?\.textContent \|\| ''\)/);
+  assert.match(contextSource, /data-nodi-context-source="document"/);
+  assert.match(deepResearch, /NodiViewContextSource title=\{contextTitle\} text=\{contextMarkdown\}/);
+  assert.match(immersion, /contextMarkdown = appliedTranslation\?\.markdown \?\? sessionMarkdown\(session\)/);
   assert.match(backend, /retrieveStudyAssistantEntries/);
   assert.match(backend, /relevant_materials/);
+});
+
+test('report selection offers icon-only copy, bookmark and Nodi quote actions', async () => {
+  const [actions, css, companion, ipc, preload, types, windows, deepResearch, immersion] = await Promise.all([
+    read('src/components/ReaderSelectionActions.tsx'),
+    read('src/components/readerSelectionActions.css'),
+    read('src/components/nodi/NodiCompanion.tsx'),
+    read('@main'),
+    read('@bridge'),
+    read('@api'),
+    read('shared/api/windows.ts'),
+    read('src/views/DeepResearchView.tsx'),
+    read('src/views/ImmersionView.tsx'),
+  ]);
+  assert.match(actions, /name="copy"/);
+  assert.match(actions, /name=\{mark \? 'bookmarkFill' : 'bookmark'\}/);
+  assert.match(actions, /name="quote"/);
+  assert.match(actions, /role="toolbar"/);
+  assert.match(actions, /contextmenu/);
+  assert.match(actions, /navigator\.clipboard\.writeText\(active\.text\)/);
+  assert.match(actions, /localStorage\.setItem\(storageKey\(contextId\)/);
+  assert.match(actions, /updateSettings\(\{ mascotEnabled: true \}\)/);
+  assert.match(actions, /quoteNodiSelection\(text\)/);
+  assert.match(css, /::highlight\(nodus-reader-mark\)/);
+  assert.match(companion, /consumeNodiQuoteSelection/);
+  assert.match(companion, /setQuotedSelection\(selection\.text\)/);
+  assert.match(companion, /setPanel\('chat'\)/);
+  for (const contract of ['quoteNodiSelection', 'consumeNodiQuoteSelection', 'onNodiQuoteSelection']) {
+    assert.match(types, new RegExp(contract));
+    assert.match(preload, new RegExp(contract));
+  }
+  assert.match(ipc, /nodi:quoteSelection:set/);
+  assert.match(ipc, /webContents\.send\('nodi:quoteSelection'/);
+  assert.match(windows, /'consumeNodiQuoteSelection'/);
+  assert.match(deepResearch, /ReaderSelectionActions[^>]*targetRef=\{mainRef\}/);
+  assert.match(immersion, /ReaderSelectionActions[^>]*contextId=\{`immersion:/);
 });
 
 test('Nodi cites corpus sources like the research assistant, adapted to its own light/dark UI', async () => {

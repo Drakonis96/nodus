@@ -40,6 +40,8 @@ export const NODI_WINDOW_METHODS = [
   'nodiChatStream',
   'cancelNodiChat',
   'getNodiViewContext',
+  'consumeNodiQuoteSelection',
+  'onNodiQuoteSelection',
   // the overlay window itself
   'nodiGetOverlayPlacement',
   'nodiRefreshOverlayPlacement',

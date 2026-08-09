@@ -23,7 +23,7 @@ import {
   validateCitations as validateWorldCitations,
 } from '@shared/worldChatContext';
 import { NODUS_DOCUMENTATION } from '@shared/nodiDocumentation';
-import type { NodiChatRequest, NodiContextKind, NodiViewContext } from '@shared/types';
+import type { NodiChatRequest, NodiContextKind, NodiQuoteSelection, NodiViewContext } from '@shared/types';
 
 const VAULT_TYPE_LABEL: Record<string, string> = {
   academic: 'investigación académica',
@@ -49,26 +49,50 @@ const RESPONSE_LANGUAGE: Record<string, string> = {
 };
 
 const MAX_VIEW_CHARS = 12_000;
+// A generated report tops out at roughly twenty pages. Keeping a separate,
+// generous budget lets Current view carry the whole reader document without
+// turning every ordinary screen snapshot into an oversized prompt.
+const MAX_DOCUMENT_VIEW_CHARS = 120_000;
 const MAX_SECTION_CHARS = 30_000;
-const MAX_TOTAL_CONTEXT_CHARS = 55_000;
+const MAX_TOTAL_CONTEXT_CHARS = 150_000;
 const MAX_HISTORY_MESSAGES = 12;
 let latestViewContext: NodiViewContext | null = null;
+let pendingQuoteSelection: NodiQuoteSelection | null = null;
 
 function clip(value: string, limit: number): string {
   const clean = value.split('\u0000').join('').trim();
   return clean.length > limit ? `${clean.slice(0, limit)}\n[…contenido acotado…]` : clean;
 }
 export function setNodiViewContext(context: NodiViewContext): void {
+  const complete = Boolean(context.complete);
   latestViewContext = {
     viewId: String(context.viewId || 'unknown').slice(0, 80),
     title: String(context.title || context.viewId || 'Vista actual').slice(0, 160),
-    text: clip(String(context.text || ''), MAX_VIEW_CHARS),
+    text: clip(String(context.text || ''), complete ? MAX_DOCUMENT_VIEW_CHARS : MAX_VIEW_CHARS),
     capturedAt: Number(context.capturedAt) || Date.now(),
+    ...(complete ? { complete: true } : {}),
   };
 }
 
 export function getNodiViewContext(): NodiViewContext | null {
   return latestViewContext ? { ...latestViewContext } : null;
+}
+
+export function setNodiQuoteSelection(value: unknown): NodiQuoteSelection | null {
+  const text = clip(String(value || '').replace(/\s+/g, ' '), MAX_VIEW_CHARS);
+  if (!text) return null;
+  pendingQuoteSelection = {
+    id: `quote-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+    text,
+    createdAt: Date.now(),
+  };
+  return { ...pendingQuoteSelection };
+}
+
+export function consumeNodiQuoteSelection(): NodiQuoteSelection | null {
+  const selection = pendingQuoteSelection ? { ...pendingQuoteSelection } : null;
+  pendingQuoteSelection = null;
+  return selection;
 }
 
 /**
@@ -226,11 +250,20 @@ async function buildContext(
     sections.push({ name, content: clip(raw, limit) });
   };
 
-  if (selected.has('documentation')) add('DOCUMENTACIÓN DE NODUS', NODUS_DOCUMENTATION, 24_000);
   if (selected.has('current_view')) {
     const current = request.currentView ?? getNodiViewContext();
-    if (current) add('VISTA ACTUAL', current, MAX_VIEW_CHARS + 1_000);
+    if (current) {
+      add(
+        'VISTA ACTUAL',
+        `Vista: ${current.title}\nId: ${current.viewId}\n\n${current.text}`,
+        (current.complete ? MAX_DOCUMENT_VIEW_CHARS : MAX_VIEW_CHARS) + 1_000,
+      );
+    }
   }
+  // The document the user is asking about wins the context budget. Product
+  // documentation follows it, so a long report is never silently clipped merely
+  // because both default context toggles are enabled.
+  if (selected.has('documentation')) add('DOCUMENTACIÓN DE NODUS', NODUS_DOCUMENTATION, 24_000);
   if (selected.has('vault') || selected.has('all_vaults')) {
     try {
       add('BÓVEDA ACTIVA · RECUPERACIÓN RELEVANTE', await buildActiveVaultContext(question, channel));

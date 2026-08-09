@@ -7890,4 +7890,10 @@ export const FR: Record<string, string> = {
   "Marcar como leído": "Marquer comme lu",
   "Marcar como no leído": "Marquer comme non lu",
   "Ya has leído este informe": "Vous avez déjà lu ce rapport",
+  "Acciones de selección": "Actions sur la sélection",
+  "Añadir marcador de lectura": "Ajouter un signet de lecture",
+  "Mover marcador aquí": "Déplacer le signet ici",
+  "Citar en Nodi": "Citer dans Nodi",
+  "Quitar cita": "Retirer la citation",
+  "Texto visible de la sección abierta o documento completo en los lectores.": "Texte visible de la section ouverte, ou document complet dans les lecteurs.",
 };

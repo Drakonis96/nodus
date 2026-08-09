@@ -384,8 +384,11 @@ export function App() {
   }, [activeVault?.type, view]);
 
   // Publish a bounded snapshot of the visible main view for Nodi's opt-in
-  // "Vista actual" context. It remains in memory only and is never added to chat
-  // history unless the user explicitly sends a message with that context enabled.
+  // "Vista actual" context. Document readers instead expose a hidden,
+  // explicit source containing the complete report/immersion instead. It remains
+  // in memory only and is never added to chat history unless the user sends with
+  // that context enabled. Quoting enables Nodi first, which mounts this publisher
+  // and captures the document synchronously before the user can send the question.
   useEffect(() => {
     if (!settings?.mascotEnabled) return;
     let timer: number | null = null;
@@ -397,15 +400,19 @@ export function App() {
       idleId = null;
       const main = document.querySelector<HTMLElement>('main[data-nodi-view]');
       if (!main) return;
-      const text = (main.innerText || '').slice(0, 12_000);
+      const explicit = main.querySelector<HTMLElement>('[data-nodi-context-source="document"]');
+      const complete = Boolean(explicit);
+      const text = complete ? (explicit?.textContent || '') : (main.innerText || '').slice(0, 12_000);
+      const explicitTitle = explicit?.dataset.nodiContextTitle?.trim();
       if (text === lastText) return;
       lastText = text;
       const item = NAV_ITEMS.find((candidate) => candidate.id === view);
       void window.nodus.setNodiViewContext({
         viewId: view,
-        title: item ? t(item.label) : view,
+        title: explicitTitle || (item ? t(item.label) : view),
         text,
         capturedAt: Date.now(),
+        ...(complete ? { complete: true } : {}),
       });
     };
     const schedule = () => {
