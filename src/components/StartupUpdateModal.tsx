@@ -127,7 +127,7 @@ export function StartupUpdateModal({ onSettled }: { onSettled?: () => void } = {
   }, [shouldShow, onSettled]);
 
   useEffect(() => {
-    if (!shouldShow) return;
+    if (!shouldShow || !open) return;
     let active = true;
     const unsubscribe = window.nodus.onUpdateProgress((event) => {
       if (active) setUpdate(event);
@@ -142,7 +142,7 @@ export function StartupUpdateModal({ onSettled }: { onSettled?: () => void } = {
       active = false;
       unsubscribe();
     };
-  }, [attempt, shouldShow]);
+  }, [attempt, open, shouldShow]);
 
   const presentation = useMemo(() => presentationFor(update.status, update.version), [update.status, update.version]);
   const progress = update.status === 'downloading'
@@ -199,7 +199,7 @@ export function StartupUpdateModal({ onSettled }: { onSettled?: () => void } = {
             <p>{t('Comprobamos automáticamente que tengas la versión más reciente y segura de Nodus.')}</p>
           </div>
           <div className="startup-update-nodi">
-            <NodiAvatar state={presentation.nodiState} height={162} />
+            <NodiAvatar state={presentation.nodiState} height={162} restAfterMs={2_400} />
           </div>
         </header>
 

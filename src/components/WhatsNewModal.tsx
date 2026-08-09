@@ -312,7 +312,7 @@ export function WhatsNewModal({
           </div>
           <motion.div className="whats-new-nodi" initial={{ opacity: 0, scale: .7, rotate: -8 }} animate={{ opacity: 1, scale: 1, rotate: 0 }} transition={{ delay: .18, duration: .5, type: 'spring', stiffness: 170 }}>
             <div className="whats-new-nodi-glow" />
-            <NodiAvatar state="celebrating" height={205} />
+            <NodiAvatar state="celebrating" height={205} restAfterMs={2_400} />
             <span>{t('¡Tenemos novedades!')}</span>
           </motion.div>
         </header>

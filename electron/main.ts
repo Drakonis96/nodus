@@ -105,6 +105,8 @@ let installingUpdate = false;
 let downloadedUpdateVersion: string | null = null;
 let downloadedUpdateFile: string | null = null;
 let lastUpdateEvent: UpdateProgressEvent | null = null;
+let lastDownloadProgressEmitAt = 0;
+let lastDownloadProgressPercent = -1;
 let installUpdateTimer: NodeJS.Timeout | null = null;
 let useUnsignedMacUpdaterFallback = false;
 let autoBackupTimer: NodeJS.Timeout | null = null;
@@ -115,6 +117,7 @@ let announcementsFirstTimer: NodeJS.Timeout | null = null;
 let quitting = false;
 
 const UPDATE_CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000;
+const UPDATE_PROGRESS_MIN_INTERVAL_MS = 200;
 /** Long enough that the first window has painted and a vault is open. */
 const ANNOUNCEMENTS_STARTUP_DELAY_MS = 45 * 1000;
 
@@ -490,6 +493,8 @@ function setupAutoUpdates(): void {
   autoUpdater.on('checking-for-update', () => console.log('[updates] checking for update'));
   autoUpdater.on('update-available', (info) => {
     console.log(`[updates] update available: ${info.version}`);
+    lastDownloadProgressEmitAt = 0;
+    lastDownloadProgressPercent = -1;
     emitUpdate({
       status: 'available',
       message: `Actualización ${info.version} encontrada. Descargando…`,
@@ -508,10 +513,19 @@ function setupAutoUpdates(): void {
   });
   autoUpdater.on('download-progress', (p) => {
     const percent = Math.max(0, Math.min(100, p.percent ?? 0));
-    console.log(`[updates] downloading ${Math.round(percent)}% (${Math.round((p.bytesPerSecond ?? 0) / 1024)} KiB/s)`);
+    const roundedPercent = Math.round(percent);
+    const now = Date.now();
+    // electron-updater can report several byte-level samples per animation frame on
+    // fast links. The UI only displays whole percentages, so repeated or sub-200 ms
+    // samples buy no visible fidelity and otherwise cause IPC, React and log churn.
+    if (roundedPercent === lastDownloadProgressPercent
+      || (roundedPercent < 100 && now - lastDownloadProgressEmitAt < UPDATE_PROGRESS_MIN_INTERVAL_MS)) return;
+    lastDownloadProgressPercent = roundedPercent;
+    lastDownloadProgressEmitAt = now;
+    console.log(`[updates] downloading ${roundedPercent}% (${Math.round((p.bytesPerSecond ?? 0) / 1024)} KiB/s)`);
     emitUpdate({
       status: 'downloading',
-      message: `Descargando actualización… ${Math.round(percent)}%`,
+      message: `Descargando actualización… ${roundedPercent}%`,
       version: downloadedUpdateVersion ?? undefined,
       progress: percent,
       bytesPerSecond: p.bytesPerSecond ?? null,
