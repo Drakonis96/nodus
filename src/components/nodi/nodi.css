@@ -240,7 +240,7 @@
    above survives and resumes where it left off. See nodiOrb.css for the measurements
    that made this necessary; the classic Nodi pays the same per-frame SVG repaint. */
 .nodi-svg.nodi-at-rest,
-.nodi-svg.nodi-at-rest * { animation-play-state: paused; }
+.nodi-svg.nodi-at-rest * { animation-play-state: paused !important; }
 
 @media (prefers-reduced-motion: reduce) {
   .nodi-svg * { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }

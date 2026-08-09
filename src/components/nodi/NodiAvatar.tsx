@@ -25,18 +25,30 @@ const QUIESCENT: ReadonlySet<NodiState> = new Set<NodiState>(['idle', 'sleeping'
  * the last of those. `animation-play-state: paused` freezes it mid-keyframe and
  * resumes exactly there, so nothing is lost and no animation is removed.
  */
-function useAtRest(state: NodiState, raiseArm: boolean, hovered: boolean, reduceMotion: boolean): boolean {
-  const settled = QUIESCENT.has(state) && !raiseArm && !hovered;
+function useAtRest(
+  state: NodiState,
+  raiseArm: boolean,
+  hovered: boolean,
+  reduceMotion: boolean,
+  restAfterMs?: number,
+): boolean {
+  const mayRest = QUIESCENT.has(state) || restAfterMs !== undefined;
+  const settled = mayRest && !raiseArm && !hovered;
   const [atRest, setAtRest] = useState(false);
   useEffect(() => {
     if (!settled) {
       setAtRest(false);
       return;
     }
+    // A bounded active state starts its allowance again whenever the state changes.
+    // This lets an update visibly move from checking to downloading, for example,
+    // without leaving a costly SVG repaint running for the lifetime of the modal.
+    setAtRest(false);
     // Someone who asked for less motion gets the still pose immediately.
-    const timer = window.setTimeout(() => setAtRest(true), reduceMotion ? 0 : REST_DELAY_MS);
+    const delay = reduceMotion ? 0 : restAfterMs ?? REST_DELAY_MS;
+    const timer = window.setTimeout(() => setAtRest(true), Math.max(0, delay));
     return () => window.clearTimeout(timer);
-  }, [settled, reduceMotion]);
+  }, [state, settled, reduceMotion, restAfterMs]);
   return atRest;
 }
 
@@ -55,6 +67,7 @@ export function NodiAvatar({
   height = 200,
   draggable = false,
   raiseArm = false,
+  restAfterMs,
   className,
   style,
 }: {
@@ -69,6 +82,8 @@ export function NodiAvatar({
   height?: number;
   draggable?: boolean;
   raiseArm?: boolean;
+  /** Pause all internal SVG motion after this many milliseconds, even in an active state. */
+  restAfterMs?: number;
   className?: string;
   style?: CSSProperties;
 }) {
@@ -90,7 +105,7 @@ export function NodiAvatar({
   }, []);
 
   const [hovered, setHovered] = useState(false);
-  const atRest = useAtRest(state, raiseArm, hovered, resolved?.reduceMotion ?? false);
+  const atRest = useAtRest(state, raiseArm, hovered, resolved?.reduceMotion ?? false, restAfterMs);
   // Reaching for Nodi wakes it before the pointer arrives, so it is already moving
   // by the time it is grabbed rather than starting with a jolt.
   const wake = {

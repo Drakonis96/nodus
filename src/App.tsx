@@ -1876,7 +1876,7 @@ export function App() {
         />
       )}
 
-      {whatsNewSettled && mobileTeaserSettled && platformHighlightsSettled && toolkitBetaTourSettled && tutorialVideosSettled && !manualWhatsNewOpen && <StartupUpdateModal onSettled={() => setUpdateSettled(true)} />}
+      {whatsNewSettled && mobileTeaserSettled && platformHighlightsSettled && toolkitBetaTourSettled && tutorialVideosSettled && !manualWhatsNewOpen && !updateSettled && <StartupUpdateModal onSettled={() => setUpdateSettled(true)} />}
 
       {/* Users who already saw the cinematic tutorial were never offered the choice of
           Nodi, so it is made here instead — once, behind the update check. New users

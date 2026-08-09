@@ -336,7 +336,7 @@
  * Zero is the only cheap number, which is why this is a switch rather than a diet.
  */
 .nodi-orb.nodi-at-rest,
-.nodi-orb.nodi-at-rest * { animation-play-state: paused; }
+.nodi-orb.nodi-at-rest * { animation-play-state: paused !important; }
 
 @media (prefers-reduced-motion: reduce) {
   .nodi-orb, .nodi-orb * { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
