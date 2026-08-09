@@ -119,6 +119,12 @@ const RELEASE_3_2_3_IT: string[] = [
 const RELEASE_3_2_6_IT: string[] = [
   "Il livello di ragionamento appartiene ora a ogni attività. Prima, alzarlo su Immersione lo alzava anche su Deep Research e su tutte le altre che usavano quel modello. Ora ogni attività conserva il proprio, e in Fornitori si continua a fissare il valore predefinito del modello.",
   "Quel livello comanda anche sulle scansioni. L'estrazione, i riassunti e la fusione lo ignoravano del tutto e giravano sempre al livello più economico, qualunque cosa dicesse il selettore. Se non ne scegli nessuno, continuano a girare senza ragionamento ed esattamente alla stessa velocità.",
+  "Idee consulta ora il deposito ogni volta che vi entri. Se una scansione terminava mentre eri in un'altra sezione, al ritorno poteva continuare a mostrare a lungo il conteggio precedente. Il primo caricamento riporta sempre le idee e il totale attuali.",
+  "Svuotare le notifiche funziona allo stesso modo da Nodi e dall'intestazione. Dopo la conferma rimuove l'attività recente e scarta gli avvisi già visibili, mentre quelli futuri possono ancora arrivare. Le anteprime delle citazioni nella finestra mobile non restano più bloccate sul caricamento.",
+  "Nodi può leggere per intero i rapporti di Deep Research e le Immersioni della vista corrente. Selezionando un passaggio compare una barra per copiarlo, lasciare un segnalibro persistente o chiedere a Nodi con quelle parole già citate. Funziona dentro Nodus e nella finestra mobile.",
+  "Autori guadagna una vista Salvati accanto alle schede e alla matrice di sintesi. Puoi salvare qualcuno dalla scheda o dal dossier e ritrovarlo anche dopo una nuova scansione del deposito. Ricerca, filtri, esportazione e navigazione nel grafo restano disponibili dentro quella selezione.",
+  "Novità e l'aggiornamento smettono di consumare risorse dopo essersi presentati. Le animazioni decorative si fermano, l'avanzamento del download si aggiorna a un ritmo ragionevole e la finestra di aggiornamento viene smontata alla chiusura. Anche la vecchia galleria mobile non ricompare nelle versioni successive.",
+  "Gli assistenti collegati tramite MCP possono consultare ogni livello leggibile del deposito attivo, anche dopo aver cambiato tipo di deposito quando il client conserva un catalogo precedente. Possono anche elencare i Deep Research salvati e aprire il contenuto completo di ciascun rapporto. Le grandi raccolte si percorrono pagina per pagina senza raggiungere il limite di risposta.",
 ];
 
 const RELEASE_3_2_5_IT: string[] = [

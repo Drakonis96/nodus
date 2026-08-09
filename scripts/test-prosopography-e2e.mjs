@@ -39,8 +39,10 @@ try {
   await page.waitForFunction(() => Boolean(document.getElementById('root')?.children.length));
   await page.evaluate((version) => {
     localStorage.setItem('nodus.lastSeenVersion', version);
+    localStorage.setItem('nodus.mobileTeaserSeen.3.2.4', '1');
+    localStorage.setItem('nodus.platformHighlightsSeen.2026-07', '1');
+    localStorage.setItem('nodus.toolkitBetaGuideSeen.2.4.0', '1');
     localStorage.setItem('nodus.tutorialVideosAnnouncementSeen.2026-07', '1');
-    localStorage.setItem(`nodus.mobileTeaserSeen.${version}`, '1');
   }, appVersion);
 
   const bridge = await page.evaluate(() => ({
@@ -75,6 +77,9 @@ try {
       theme: 'light',
     });
   });
+  // The test deliberately validates the startup update modal after vault setup.
+  // Treat this reload as a fresh app session, matching the dedicated smoke test.
+  await page.evaluate(() => sessionStorage.removeItem('nodus.startupUpdateChecked'));
   await page.reload();
   await page.getByTestId('prosopography-home').waitFor();
   await page.getByTestId('prosopography-sidebar').waitFor();

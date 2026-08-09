@@ -10,7 +10,7 @@ authors:
   - name: "Nodus contributors"
 type: software
 version: "3.2.6"
-date-released: "2026-08-07"
+date-released: "2026-08-09"
 license: MIT
 repository-code: "https://github.com/Drakonis96/nodus"
 url: "https://drakonis96.github.io/nodus/"

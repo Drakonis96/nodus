@@ -1,33 +1,61 @@
 # Changelog
 
-## 3.2.6 — 2026-08-07
+## 3.2.6 — 2026-08-09
 
-The level that decides how long a job thinks now belongs to the job, and reaches
-the scans it always claimed to govern.
+Nodi becomes a real report reader, authors gain a persistent shelf, and MCP
+clients can finally read the same vault content that Nodus itself can see. The
+release also makes model reasoning honest and stops two startup modals from
+spending resources after they have finished presenting themselves.
+
+### Added
+
+- **Full report context and selection actions for Nodi.** With Current view
+  enabled, complete Deep Research reports and Immersion sessions now take
+  priority in Nodi's context. Selecting text opens actions to copy it, keep one
+  persistent reading bookmark per document, or quote it into Nodi. The same flow
+  works in the embedded companion and the always-on-top window.
+- **A Saved workspace for authors.** Authors can be saved from cards and dossiers
+  and remain saved across rescans through their canonical identity. The saved
+  view reuses search, sorting, synthesis filters, pagination, export, dossiers
+  and graph navigation, with bulk export scoped to the saved selection.
+- **Persistent Deep Research retrieval through MCP.** Dedicated list and detail
+  tools expose the saved report gallery independently of the temporary generation
+  queue. Catalogues are compact, searchable and paginated, while an individual
+  report returns its complete Markdown, evidence selection, traceability matrix
+  and bibliography.
 
 ### Changed
 
-- **The reasoning level is per job, not per model.** 3.2.5 put it beside every
-  picker in Settings › Models and made it belong to the model, so raising
-  Immersion to High raised Deep Research, the writing workshop and every other
-  job pointed at that model with it. A control rendered once per row, inside
-  that row, reads as belonging to that row. It now does: the level is stored
-  with the job's own model selection. Providers keeps its per-model level as the
-  default a job falls back to, and «Default» in Models names whichever of the two
-  it would really use. Nothing to migrate, and no job starts out with a level of
-  its own.
+- **The reasoning level is per job, not per model.** Raising Immersion to High no
+  longer raises Deep Research, the writing workshop and every other job pointed
+  at the same model. Each job keeps its own level, while Providers retains the
+  per-model default used when a job stays on Default.
+- **Every MCP read remains available across vault switches.** Clients that cache
+  an older tool catalogue can still retrieve ideas, works, passages, notes,
+  authors and every other read-only layer from the vault Nodus is serving.
+  Mutating and action tools remain restricted to compatible vault types.
+- **What’s New and the startup updater settle after their active moment.** Nodi's
+  SVG animation and the decorative aurora and confetti now stop, updater progress
+  is throttled, and closing the updater detaches its listener and unmounts the
+  modal. The one-off 3.2.4 mobile preview also stays retired in later versions.
 
 ### Fixed
 
-- **The level did not reach the scans at all.** Extraction, summaries, fusion,
-  immersion generation and every other structured call never passed it to the
-  provider, so the selector next to the scan pickers ran at the cheapest
-  advertised level whatever it displayed. An explicit level now applies there
-  too. With none chosen, reasoning stays off and a corpus-wide run is exactly as
-  fast as before.
-- **Basic mode left a per-job level running behind its single picker.** Switching
-  back from advanced synchronised the model but not the level, so a job could
-  keep thinking at a level nothing on screen showed.
+- **Reasoning levels did not reach scans.** Extraction, summaries, fusion,
+  Immersion generation and other structured calls ignored the selected level.
+  An explicit level now applies, while leaving it unset keeps the previous fast
+  no-reasoning behavior. Returning to Basic mode also clears any hidden per-job
+  level that the single picker cannot show.
+- **Ideas could reopen with a stale total after a background scan.** The first
+  request of every visit now bypasses the vault query cache, while pagination and
+  sorting inside the mounted view retain the existing cache.
+- **Clearing notifications left announcements behind.** Clear now behaves the
+  same in Nodi and in the header, asks for confirmation, removes recent activity
+  and persistently dismisses only the announcements currently visible. Future
+  announcements remain eligible to arrive.
+- **Citation previews in floating Nodi could remain on Loading.** The restricted
+  preload now exposes citation previews, and synchronous bridge failures can no
+  longer strand the hover card.
 
 ## 3.2.5 — 2026-08-07
 

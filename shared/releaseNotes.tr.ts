@@ -59,6 +59,12 @@ const RELEASE_3_2_3_TR: string[] = [
 const RELEASE_3_2_6_TR: string[] = [
   "Akıl yürütme düzeyi artık her görevin kendisine ait. Önceden Daldırma'da yükseltmek onu Deep Research'te ve o modeli kullanan diğer bütün görevlerde de yükseltiyordu. Artık her görev kendi düzeyini saklıyor, Sağlayıcılar'da ise modelin varsayılanını belirlemeye devam ediyorsunuz.",
   "Bu düzey artık taramalarda da geçerli. Çıkarım, özetler ve birleştirme onu tamamen yok sayıyor ve seçici ne derse desin hep en ucuz düzeyde çalışıyordu. Hiçbirini seçmezseniz akıl yürütmesiz ve tam olarak eskisi kadar hızlı çalışmaya devam ederler.",
+  "Fikirler artık her girişinizde kasayı yeniden sorguluyor. Siz başka bir bölümdeyken bir tarama biterse geri döndüğünüzde eski sayı uzun süre ekranda kalabiliyordu. İlk yükleme artık her zaman güncel fikirleri ve doğru toplamı getiriyor.",
+  "Bildirimleri temizlemek Nodi'den ve başlıktan artık aynı şekilde çalışıyor. Onaydan sonra son etkinlikleri kaldırıyor ve görünür duyuruları kapatıyor, gelecekteki duyurular ise gelmeye devam edebiliyor. Yüzen penceredeki alıntı önizlemeleri de artık Yükleniyor durumunda takılı kalmıyor.",
+  "Nodi artık geçerli görünümdeki Deep Research raporlarını ve Daldırmaları eksiksiz okuyabiliyor. Bir pasaj seçildiğinde onu kopyalamak, kalıcı yer imi bırakmak veya bu sözler alıntılanmış halde Nodi'ye sormak için bir çubuk açılıyor. Nodus içinde ve yüzen pencerede çalışıyor.",
+  "Yazarlar, kartların ve sentez matrisinin yanında Kaydedilenler görünümüne kavuşuyor. Birini kartından veya dosyasından kaydedebilir ve kasayı yeniden taradıktan sonra da orada bulabilirsiniz. Arama, süzgeçler, dışa aktarma ve grafik gezintisi bu seçimin içinde kullanılmaya devam ediyor.",
+  "Yenilikler ve güncelleme penceresi kendini gösterdikten sonra kaynak tüketmeyi bırakıyor. Dekoratif animasyonlar duruyor, indirme ilerlemesi makul bir hızda güncelleniyor ve güncelleme penceresi kapatılınca kaldırılıyor. Eski mobil galeri de sonraki sürümlerde yeniden görünmüyor.",
+  "MCP ile bağlı asistanlar, istemci eski bir kataloğu korusa ve kasa türü değişse bile etkin kasanın okunabilir bütün katmanlarını sorgulayabiliyor. Kaydedilmiş Deep Research raporlarını listeleyip her birinin tam içeriğini de açabiliyorlar. Büyük arşivler yanıt sınırına çarpmadan sayfa sayfa geziliyor.",
 ];
 
 const RELEASE_3_2_5_TR: string[] = [

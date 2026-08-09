@@ -823,13 +823,9 @@ const RELEASE_3_2_3_HIGHLIGHTS: RawReleaseHighlight[] = [
  * that were laying out without their icon.
  */
 /**
- * v3.2.5 — a corpus that had quietly stopped growing, and the setting that decides
- * how long a scan takes finally sitting where the model is chosen.
- *
- * The first two are one bug and the blindfold that hid it for a month: ideas could not
- * be numbered past 9,999, and a failed scan only ever said "Failed". The last two are
- * the reasoning level, which until now lived one tab away from every screen that
- * assigns a model to a job.
+ * v3.2.6 — each job owns its reasoning level, Nodi becomes a real report reader,
+ * authors can be kept on a shelf, startup modals settle down, and MCP clients can
+ * retrieve every readable layer and every saved Deep Research report.
  */
 const RELEASE_3_2_6_HIGHLIGHTS: RawReleaseHighlight[] = [
   {
@@ -849,6 +845,60 @@ const RELEASE_3_2_6_HIGHLIGHTS: RawReleaseHighlight[] = [
     de: 'Diese Stufe bestimmt jetzt auch die Scans. Extraktion, Zusammenfassungen und Fusion ignorierten sie völlig und liefen immer auf der günstigsten Stufe, was der Auswahlfeld auch anzeigte. Wählen Sie keine, laufen sie weiterhin ohne Reasoning und genauso schnell.',
     pt: 'Esse nível manda também nas análises. A extração, os resumos e a fusão ignoravam-no por completo e corriam sempre no nível mais barato, dissesse o que dissesse o seletor. Se não escolher nenhum, continuam a correr sem raciocínio e exatamente à mesma velocidade.',
     'pt-BR': 'Esse nível manda também nas varreduras. A extração, os resumos e a fusão o ignoravam por completo e rodavam sempre no nível mais barato, dissesse o que dissesse o seletor. Se você não escolher nenhum, continuam rodando sem raciocínio e exatamente na mesma velocidade.',
+  },
+  {
+    scope: 'academic',
+    es: 'Ideas vuelve a consultar el vault cada vez que entras. Si un escaneo terminaba mientras estabas en otra sección, al volver podía enseñar durante mucho tiempo el recuento anterior. Ahora la primera carga siempre trae las ideas y el total actuales.',
+    en: 'Ideas now checks the vault every time you enter. If a scan finished while you were in another section, returning could keep showing the previous count for a long time. The first load now always brings back the current ideas and total.',
+    fr: 'Idées consulte désormais le coffre chaque fois que vous y entrez. Si une analyse finissait pendant que vous étiez ailleurs, le retour pouvait longtemps afficher l’ancien total. Le premier chargement récupère maintenant toujours les idées et le total actuels.',
+    de: 'Ideen fragt den Tresor jetzt bei jedem Öffnen neu ab. Endete ein Scan in einem anderen Bereich, konnte nach der Rückkehr lange noch der alte Stand erscheinen. Der erste Ladevorgang holt nun immer die aktuellen Ideen und ihre richtige Anzahl.',
+    pt: 'Ideias volta a consultar o cofre sempre que entra. Se uma análise terminasse enquanto estava noutra secção, ao regressar podia continuar a mostrar a contagem anterior durante muito tempo. O primeiro carregamento traz agora sempre as ideias e o total atuais.',
+    'pt-BR': 'Ideias volta a consultar o cofre sempre que você entra. Se uma varredura terminasse enquanto você estava em outra seção, ao voltar podia continuar mostrando a contagem anterior por muito tempo. O primeiro carregamento agora sempre traz as ideias e o total atuais.',
+  },
+  {
+    scope: 'nodi',
+    es: 'Vaciar notificaciones funciona igual desde Nodi y desde la cabecera. Con una confirmación elimina la actividad reciente y descarta los avisos que ya estaban visibles, pero los avisos futuros pueden llegar. Las vistas previas de citas de la ventana flotante también dejan de quedarse cargando.',
+    en: 'Clearing notifications now works the same from Nodi and from the header. After confirmation it removes recent activity and dismisses notices already on screen, while future notices can still arrive. Citation previews in the floating window also stop getting stuck on Loading.',
+    fr: 'Vider les notifications fonctionne désormais de la même façon depuis Nodi et depuis l’en-tête. Après confirmation, l’activité récente disparaît et les annonces déjà visibles sont écartées, tandis que les futures peuvent encore arriver. Les aperçus de citations de la fenêtre flottante ne restent plus bloqués sur le chargement.',
+    de: 'Benachrichtigungen lassen sich nun in Nodi und in der Kopfzeile auf dieselbe Weise leeren. Nach einer Bestätigung verschwinden letzte Aktivitäten und bereits sichtbare Hinweise, neue Hinweise können aber weiter ankommen. Zitatvorschauen im schwebenden Fenster bleiben außerdem nicht mehr beim Laden hängen.',
+    pt: 'Limpar notificações funciona agora da mesma forma no Nodi e no cabeçalho. Depois de confirmar, remove a atividade recente e dispensa os avisos já visíveis, mas os avisos futuros continuam a poder chegar. As pré-visualizações de citações da janela flutuante também deixam de ficar presas no carregamento.',
+    'pt-BR': 'Limpar notificações agora funciona da mesma forma no Nodi e no cabeçalho. Depois da confirmação, remove a atividade recente e dispensa os avisos já visíveis, mas avisos futuros ainda podem chegar. As prévias de citações da janela flutuante também deixam de ficar presas no carregamento.',
+  },
+  {
+    scope: 'nodi',
+    es: 'Nodi puede leer completos los informes de Deep Research y las inmersiones de la vista actual. Al seleccionar un pasaje aparece una barra para copiarlo, dejar un marcador persistente o preguntarle a Nodi con esas palabras ya citadas. Funciona tanto dentro de Nodus como en la ventana flotante.',
+    en: 'Nodi can now read complete Deep Research reports and Immersion sessions from the current view. Selecting a passage opens a bar to copy it, leave a persistent bookmark, or ask Nodi with those words already quoted. It works inside Nodus and in the floating window.',
+    fr: 'Nodi peut désormais lire en entier les rapports Deep Research et les immersions de la vue actuelle. Sélectionner un passage ouvre une barre pour le copier, poser un signet persistant ou interroger Nodi avec ces mots déjà cités. Cela fonctionne dans Nodus comme dans la fenêtre flottante.',
+    de: 'Nodi kann jetzt vollständige Deep-Research-Berichte und Immersionen aus der aktuellen Ansicht lesen. Beim Markieren einer Passage erscheint eine Leiste zum Kopieren, für ein dauerhaftes Lesezeichen oder für eine Frage an Nodi mit dem bereits zitierten Text. Das funktioniert in Nodus und im schwebenden Fenster.',
+    pt: 'O Nodi já pode ler por inteiro os relatórios de Deep Research e as imersões da vista atual. Ao selecionar uma passagem aparece uma barra para a copiar, deixar um marcador persistente ou perguntar ao Nodi com essas palavras já citadas. Funciona dentro do Nodus e na janela flutuante.',
+    'pt-BR': 'O Nodi agora pode ler por inteiro os relatórios de Deep Research e as imersões da tela atual. Ao selecionar uma passagem aparece uma barra para copiá-la, deixar um marcador persistente ou perguntar ao Nodi com essas palavras já citadas. Funciona dentro do Nodus e na janela flutuante.',
+  },
+  {
+    scope: 'academic',
+    es: 'Autores estrena una vista de guardados junto a las fichas y la matriz. Puedes guardar a alguien desde su tarjeta o su dossier y encontrarlo allí incluso después de volver a escanear el vault. La búsqueda, los filtros, la exportación y el grafo siguen disponibles dentro de esa selección.',
+    en: 'Authors gains a Saved view beside cards and the synthesis matrix. You can save someone from their card or dossier and find them there even after scanning the vault again. Search, filters, export, and graph navigation all remain available inside that selection.',
+    fr: 'Auteurs gagne une vue Enregistrés à côté des fiches et de la matrice de synthèse. Vous pouvez enregistrer une personne depuis sa fiche ou son dossier et la retrouver même après une nouvelle analyse du coffre. La recherche, les filtres, l’exportation et le graphe restent disponibles dans cette sélection.',
+    de: 'Autoren erhält neben Karten und Synthesematrix eine Ansicht Gespeichert. Sie können jemanden auf der Karte oder im Dossier speichern und auch nach einem erneuten Scan des Tresors dort wiederfinden. Suche, Filter, Export und Graphnavigation bleiben in dieser Auswahl verfügbar.',
+    pt: 'Autores ganha uma vista de Guardados junto às fichas e à matriz de síntese. Pode guardar alguém a partir da ficha ou do dossiê e voltar a encontrá-lo mesmo depois de analisar novamente o cofre. A pesquisa, os filtros, a exportação e o grafo continuam disponíveis nessa seleção.',
+    'pt-BR': 'Autores ganha uma tela de Salvos junto aos cartões e à matriz de síntese. Você pode salvar alguém pelo cartão ou dossiê e encontrá-lo ali mesmo depois de analisar novamente o cofre. A busca, os filtros, a exportação e o grafo continuam disponíveis nessa seleção.',
+  },
+  {
+    scope: 'general',
+    es: 'Novedades y la actualización dejan de gastar recursos después de presentarse. Las animaciones decorativas se detienen, el progreso de descarga se actualiza a un ritmo razonable y la ventana de actualización se desmonta al cerrarla. La antigua galería del móvil tampoco vuelve a aparecer en versiones posteriores.',
+    en: 'What’s New and the updater stop spending resources after presenting themselves. Decorative animations settle, download progress updates at a sensible rate, and the update window unmounts when closed. The old mobile gallery also stays retired on later versions.',
+    fr: 'Nouveautés et la mise à jour cessent de consommer des ressources après leur présentation. Les animations décoratives s’arrêtent, la progression du téléchargement suit un rythme raisonnable et la fenêtre de mise à jour se démonte à la fermeture. L’ancienne galerie mobile ne réapparaît pas non plus dans les versions suivantes.',
+    de: 'Neuigkeiten und die Aktualisierung verbrauchen nach ihrer Anzeige keine weiteren Ressourcen. Dekorative Animationen enden, der Downloadfortschritt wird in vernünftigem Takt aktualisiert und das Aktualisierungsfenster wird beim Schließen entfernt. Auch die alte Mobilgalerie bleibt in späteren Versionen verschwunden.',
+    pt: 'As Novidades e a atualização deixam de gastar recursos depois de se apresentarem. As animações decorativas param, o progresso da transferência atualiza-se a um ritmo razoável e a janela de atualização é desmontada ao fechar. A antiga galeria do telemóvel também não volta a aparecer em versões posteriores.',
+    'pt-BR': 'As Novidades e a atualização deixam de gastar recursos depois de aparecerem. As animações decorativas param, o progresso do download é atualizado em um ritmo razoável e a janela de atualização é desmontada ao fechar. A antiga galeria do celular também não volta a aparecer em versões posteriores.',
+  },
+  {
+    scope: 'mcp',
+    es: 'Los asistentes conectados por MCP pueden consultar todas las capas de lectura del vault activo, aunque hayas cambiado de tipo de vault y el cliente conserve su catálogo anterior. También pueden enumerar los Deep Research guardados y abrir el contenido completo de cada informe. Las bibliotecas grandes se recorren por páginas sin chocar con el límite de respuesta.',
+    en: 'Assistants connected through MCP can query every readable layer of the active vault, even after changing vault type when the client keeps an older catalogue. They can also list saved Deep Research reports and open the complete contents of each one. Large libraries are traversed page by page without hitting the response limit.',
+    fr: 'Les assistants connectés par MCP peuvent consulter toutes les couches lisibles du coffre actif, même après un changement de type de coffre lorsque le client conserve un ancien catalogue. Ils peuvent aussi lister les rapports Deep Research enregistrés et ouvrir le contenu complet de chacun. Les grandes bibliothèques se parcourent page par page sans atteindre la limite de réponse.',
+    de: 'Über MCP verbundene Assistenten können jede lesbare Ebene des aktiven Tresors abfragen, auch nach einem Wechsel des Tresortyps, wenn der Client einen älteren Katalog behält. Sie können gespeicherte Deep-Research-Berichte auflisten und jeden vollständig öffnen. Große Bibliotheken werden seitenweise durchlaufen, ohne das Antwortlimit zu erreichen.',
+    pt: 'Os assistentes ligados por MCP podem consultar todas as camadas de leitura do cofre ativo, mesmo depois de mudar o tipo de cofre quando o cliente conserva um catálogo anterior. Também podem listar os Deep Research guardados e abrir o conteúdo completo de cada relatório. As bibliotecas grandes percorrem-se página a página sem atingir o limite de resposta.',
+    'pt-BR': 'Os assistentes conectados por MCP podem consultar todas as camadas de leitura do cofre ativo, mesmo depois de mudar o tipo de cofre quando o cliente conserva um catálogo anterior. Também podem listar os Deep Research salvos e abrir o conteúdo completo de cada relatório. Bibliotecas grandes são percorridas página por página sem atingir o limite de resposta.',
   },
 ];
 
@@ -987,7 +1037,7 @@ const RELEASE_3_2_4_HIGHLIGHTS: RawReleaseHighlight[] = [
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
   {
     version: '3.2.6',
-    date: '2026-08-07',
+    date: '2026-08-09',
     highlights: RELEASE_3_2_6_HIGHLIGHTS,
   },
   {

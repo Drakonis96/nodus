@@ -26,10 +26,12 @@ try {
   const { RELEASE_NOTES, releaseNotesForMajor, compareVersions } = await import(pathToFileURL(bundlePath).href);
   const currentRelease = RELEASE_NOTES[0];
   assert.equal(currentRelease?.version, '3.2.6');
-  assert.equal(currentRelease?.date, '2026-08-07');
-  // A reasoning level that is each job's own, and a level that finally governs the scans.
-  // A floor rather than an exact count, in case more lands here before it ships.
-  assert.ok(currentRelease?.highlights.length >= 2, 'the release must describe what changed');
+  assert.equal(currentRelease?.date, '2026-08-09');
+  // Reasoning by job, fresh ideas, both Nodi improvements, saved authors, calm startup
+  // modals, and complete MCP reads. A floor leaves room for a last release-day fix.
+  assert.ok(currentRelease?.highlights.length >= 8, 'the release must describe everything shipped since 3.2.5');
+  assert.ok(currentRelease?.highlights.some((highlight) => highlight.scope === 'mcp'));
+  assert.ok(currentRelease?.highlights.filter((highlight) => highlight.scope === 'nodi').length >= 2);
 
   // 3.2.5 keeps the four it shipped with, including the two that describe the rule this
   // release reverses. They are published history and stay as they were written.
