@@ -10,7 +10,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 125;
+export const SCHEMA_VERSION = 126;
 
 export const migrations: Migration[] = [
   {
@@ -6309,6 +6309,36 @@ export const migrations: Migration[] = [
         saved_at   TEXT NOT NULL
       );
       CREATE INDEX idx_saved_authors_saved_at ON saved_authors(saved_at DESC);
+    `,
+  },
+  {
+    version: 126,
+    up: /* sql */ `
+      -- Persistent, syncable annotations over saved Deep Research text. They live in
+      -- their own small rows rather than rewriting draft_json for every highlight: a
+      -- fifteen-page report must not go back over the wire because one pastel colour
+      -- or one comment changed.
+      --
+      -- No foreign key on purpose. A connected replica can receive child and parent
+      -- mutations in either order, just as writing_draft_reads can. Repository deletes
+      -- still remove annotations before their report so local data never leaves orphans.
+      CREATE TABLE writing_draft_annotations (
+        id            TEXT PRIMARY KEY,
+        draft_id      TEXT NOT NULL,
+        scope         TEXT NOT NULL DEFAULT 'source',
+        kind          TEXT NOT NULL CHECK (kind IN ('highlight','comment')),
+        color         TEXT CHECK (color IS NULL OR color IN ('yellow','rose','blue','mint','lavender','peach')),
+        start_offset  INTEGER NOT NULL CHECK (start_offset >= 0),
+        end_offset    INTEGER NOT NULL CHECK (end_offset > start_offset),
+        selected_text TEXT NOT NULL,
+        prefix        TEXT NOT NULL DEFAULT '',
+        suffix        TEXT NOT NULL DEFAULT '',
+        comment_text  TEXT,
+        created_at    TEXT NOT NULL,
+        updated_at    TEXT NOT NULL
+      );
+      CREATE INDEX idx_writing_draft_annotations_draft
+        ON writing_draft_annotations(draft_id, scope, start_offset, created_at);
     `,
   },
 ];

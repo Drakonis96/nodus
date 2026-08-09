@@ -29,6 +29,7 @@ export const MUTABLE_TABLES = {
   note_folders: { key: ['id'] },
   note_links: { key: ['link_id'] },
   writing_saved_drafts: { key: ['id'] },
+  writing_draft_annotations: { key: ['id'] },
   decorative_images: { key: ['entity_kind', 'entity_id'], require: { entity_kind: 'deep_research' } },
   immersion_sessions: { key: ['id'] },
   saved_searches: { key: ['id'] },

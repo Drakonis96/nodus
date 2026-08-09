@@ -16,6 +16,9 @@ import type {
   DecorativeImage,
   DecorativeImageStyle,
   ContentTranslation,
+  WritingDraftAnnotation,
+  WritingDraftAnnotationColor,
+  WritingDraftAnnotationInput,
 } from '@shared/types';
 import type { StudyDeepResearchAudience } from '@shared/studyDeepResearchAudience';
 import { DECORATIVE_IMAGE_STYLES } from '@shared/imageStyles';
@@ -35,7 +38,11 @@ import { DecorativeImageCard } from '../components/DecorativeImageCard';
 import { AudioPanel } from '../components/AudioPanel';
 import { FindInPage } from '../components/FindInPage';
 import { NodiViewContextSource } from '../components/NodiViewContextSource';
-import { ReaderSelectionActions, type ReaderSelectionActionsHandle } from '../components/ReaderSelectionActions';
+import {
+  ReaderHighlighterControl,
+  ReaderSelectionActions,
+  type ReaderSelectionActionsHandle,
+} from '../components/ReaderSelectionActions';
 import { t, tx, getActiveLang } from '../i18n';
 import {
   DEEP_RESEARCH_MAIN_JOB_KEY,
@@ -1371,8 +1378,54 @@ function ReaderView({
   onOpenStudyRecording?: (id: string, timestamp?: number | null) => void;
 }) {
   const mainRef = useRef<HTMLElement | null>(null);
+  const documentRef = useRef<HTMLDivElement | null>(null);
   const markActionsRef = useRef<ReaderSelectionActionsHandle | null>(null);
   const [hasReaderMark, setHasReaderMark] = useState(false);
+  const [annotations, setAnnotations] = useState<WritingDraftAnnotation[]>([]);
+  const [highlighterColor, setHighlighterColor] = useState<WritingDraftAnnotationColor | null>(null);
+  const [annotationError, setAnnotationError] = useState<string | null>(null);
+  const annotationScope = appliedTranslation ? `translation:${appliedTranslation.id}` : 'source';
+  const visibleAnnotations = useMemo(
+    () => annotations.filter((annotation) => annotation.scope === annotationScope),
+    [annotationScope, annotations],
+  );
+  const refreshAnnotations = useCallback(async () => {
+    try {
+      setAnnotations(await window.nodus.listWritingDraftAnnotations(saved.id));
+      setAnnotationError(null);
+    } catch (nextError) {
+      setAnnotationError(nextError instanceof Error ? nextError.message : String(nextError));
+    }
+  }, [saved.id]);
+
+  useEffect(() => {
+    void refreshAnnotations();
+    return window.nodus.onWritingDraftAnnotationsChanged((draftId) => {
+      if (draftId === null || draftId === saved.id) void refreshAnnotations();
+    });
+  }, [refreshAnnotations, saved.id]);
+
+  const createAnnotation = async (input: Omit<WritingDraftAnnotationInput, 'draftId' | 'scope'>) => {
+    const created = await window.nodus.createWritingDraftAnnotation({ ...input, draftId: saved.id, scope: annotationScope });
+    setAnnotations((current) => [...current.filter((item) => item.id !== created.id), created]);
+    setAnnotationError(null);
+  };
+
+  const updateComment = async (id: string, comment: string) => {
+    const updated = await window.nodus.updateWritingDraftComment(id, comment);
+    if (!updated) {
+      await refreshAnnotations();
+      return;
+    }
+    setAnnotations((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+    setAnnotationError(null);
+  };
+
+  const deleteAnnotation = async (id: string) => {
+    await window.nodus.deleteWritingDraftAnnotation(id);
+    setAnnotations((current) => current.filter((item) => item.id !== id));
+    setAnnotationError(null);
+  };
   const contextTitle = appliedTranslation?.title ?? saved.draft.title;
   const contextMarkdown = appliedTranslation?.markdown
     ?? `# ${saved.draft.title}\n\n${saved.draft.abstract ? `${saved.draft.abstract}\n\n` : ''}${stripLeadingAbstract(saved.draft.draftMarkdown, saved.draft.abstract)}`;
@@ -1398,6 +1451,7 @@ function ReaderView({
           onSaveToNotes={onSaveToNotes}
           onExport={onExport}
         />
+        <ReaderHighlighterControl value={highlighterColor} onChange={setHighlighterColor} />
         <HoverLabelButton
           icon={hasReaderMark ? 'bookmarkFill' : 'bookmark'}
           label={t('Ir al marcador de lectura')}
@@ -1430,9 +1484,9 @@ function ReaderView({
         />
       </header>
 
-      {(message || error) && (
-        <div className={`px-4 py-2 text-sm border-b ${error ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-200' : 'border-neutral-200 text-neutral-500 dark:border-neutral-800 dark:text-neutral-400'}`}>
-          {error ?? message}
+      {(message || error || annotationError) && (
+        <div className={`px-4 py-2 text-sm border-b ${(error || annotationError) ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-200' : 'border-neutral-200 text-neutral-500 dark:border-neutral-800 dark:text-neutral-400'}`}>
+          {error ?? annotationError ?? message}
         </div>
       )}
 
@@ -1448,28 +1502,37 @@ function ReaderView({
               onChange={onImageChange}
             />
             <AudioPanel entityKind="deep_research" entityId={saved.id} />
-            {appliedTranslation ? <Markdown content={appliedTranslation.markdown} className="text-[15px] leading-7" onCitation={(citation) => onCitation(citation)} onStudyDocument={onOpenStudyDocument} onStudyMaterial={onOpenStudyMaterial} onStudyRecording={onOpenStudyRecording} /> : <DraftResultMain
-              draft={saved.draft}
-              exporting={exporting}
-              savingDraft={false}
-              draftSaved
-              hideActions
-              justify
-              onCopy={onCopy}
-              onSaveToNotes={onSaveToNotes}
-              onExport={onExport}
-              onCitation={onCitation}
-              onStudyDocument={onOpenStudyDocument}
-              onStudyMaterial={onOpenStudyMaterial}
-              onStudyRecording={onOpenStudyRecording}
-            />}
+            <div ref={documentRef} className="relative" data-testid="deep-research-reader-document">
+              {appliedTranslation ? <Markdown content={appliedTranslation.markdown} className="text-[15px] leading-7" onCitation={(citation) => onCitation(citation)} onStudyDocument={onOpenStudyDocument} onStudyMaterial={onOpenStudyMaterial} onStudyRecording={onOpenStudyRecording} /> : <DraftResultMain
+                draft={saved.draft}
+                exporting={exporting}
+                savingDraft={false}
+                draftSaved
+                hideActions
+                justify
+                onCopy={onCopy}
+                onSaveToNotes={onSaveToNotes}
+                onExport={onExport}
+                onCitation={onCitation}
+                onStudyDocument={onOpenStudyDocument}
+                onStudyMaterial={onOpenStudyMaterial}
+                onStudyRecording={onOpenStudyRecording}
+              />}
+            </div>
           </div>
         </main>
         <ReaderSelectionActions
           key={appliedTranslation?.id ?? 'source'}
           ref={markActionsRef}
-          targetRef={mainRef}
-          contextId={`deep-research:${saved.id}`}
+          targetRef={documentRef}
+          scrollRef={mainRef}
+          contextId={appliedTranslation ? `deep-research:${saved.id}:translation:${appliedTranslation.id}` : `deep-research:${saved.id}`}
+          annotations={visibleAnnotations}
+          highlighterColor={highlighterColor}
+          onCreateAnnotation={createAnnotation}
+          onUpdateComment={updateComment}
+          onDeleteAnnotation={deleteAnnotation}
+          onAnnotationError={setAnnotationError}
           onMarkChange={setHasReaderMark}
         />
         {showMatrix && (

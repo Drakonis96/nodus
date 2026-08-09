@@ -111,6 +111,7 @@ import type {
   WritingWorkshopDraftRequest,
   WritingWorkshopExportRequest,
   WritingWorkshopSaveDraftRequest,
+  WritingDraftAnnotationInput,
   ZoteroItem,
   ZoteroStudyMaterialImportInput,
 } from '@shared/types';
@@ -125,6 +126,7 @@ import { ingestZoteroItem } from '../sync/syncService';
 import { buildIdeaGraph, buildIdeaGraphOverview, buildIdeaThemeGraph, buildAuthorGraph, getContradictions, getDebates, buildReadingPath } from '../graph/graphService';
 import { streamDebateAnalysis } from '../ai/debate';
 import * as rqRepo from '../db/researchMapRepo';
+import * as writingAnnotations from '../db/writingAnnotationsRepo';
 import { decomposeQuestion, mapCoverage } from '../ai/researchMap';
 import { exportResearchCoverage } from '../export/researchMapExport';
 import { exportData, importData } from '../export/exportImport';
@@ -301,6 +303,14 @@ async function importStudyMaterialPaths(paths: string[], input: StudyMaterialImp
 function announceWritingDrafts(): void {
   for (const win of BrowserWindow.getAllWindows()) {
     if (!win.isDestroyed() && !win.webContents.isDestroyed()) win.webContents.send('writing:saved:changed', null);
+  }
+}
+
+function announceWritingDraftAnnotations(draftId: string | null): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed() && !win.webContents.isDestroyed()) {
+      win.webContents.send('writing:annotations:changed', draftId);
+    }
   }
 }
 
@@ -1226,11 +1236,28 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
     if (saved) announceWritingDrafts();
     return saved;
   });
+  h('writing:annotations:list', async (_e, draftId: string) => writingAnnotations.listWritingDraftAnnotations(draftId));
+  h('writing:annotations:create', async (_e, input: WritingDraftAnnotationInput) => {
+    const annotation = writingAnnotations.createWritingDraftAnnotation(input);
+    announceWritingDraftAnnotations(annotation.draftId);
+    return annotation;
+  });
+  h('writing:annotations:updateComment', async (_e, id: string, comment: string) => {
+    const annotation = writingAnnotations.updateWritingDraftComment(id, comment);
+    if (annotation) announceWritingDraftAnnotations(annotation.draftId);
+    return annotation;
+  });
+  h('writing:annotations:delete', async (_e, id: string) => {
+    const draftId = writingAnnotations.deleteWritingDraftAnnotation(id);
+    if (draftId) announceWritingDraftAnnotations(draftId);
+    return !!draftId;
+  });
   h('writing:saved:delete', async (_e, id: string) => {
     invalidateDecorativeImageGeneration('deep_research', id);
     translationsRepo.deleteEntityTranslations('deep_research', id);
     const removed = writingDrafts.deleteWritingWorkshopDraft(id);
     announceWritingDrafts();
+    announceWritingDraftAnnotations(id);
     return removed;
   });
 

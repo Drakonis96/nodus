@@ -32,7 +32,7 @@ function mutation(overrides = {}) {
 
 test('the whitelist covers user-authored tables and nothing derived from the corpus', () => {
   const tables = Object.keys(MUTABLE_TABLES);
-  for (const allowed of ['notes', 'note_folders', 'writing_saved_drafts', 'immersion_sessions', 'edge_feedback']) {
+  for (const allowed of ['notes', 'note_folders', 'writing_saved_drafts', 'writing_draft_annotations', 'immersion_sessions', 'edge_feedback']) {
     assert.ok(tables.includes(allowed), `${allowed} is authored by the user and may travel back`);
   }
   // Everything below is produced by the owner's analysis pipeline, or is not shareable at
@@ -52,6 +52,7 @@ test('row keys serialize exactly as the tombstone triggers write them', () => {
   // a delete silently fails to match the row it means.
   assert.equal(rowKey('notes', ['n-1']), '["n-1"]');
   assert.equal(rowKey('decorative_images', ['deep_research', 'dr-1']), '["deep_research","dr-1"]');
+  assert.equal(rowKey('writing_draft_annotations', ['ann-1']), '["ann-1"]');
   assert.equal(rowKey('edge_feedback', ['i-a', 'i-b', 'contradicts']), '["i-a","i-b","contradicts"]');
   assert.equal(rowKey('notes', [null]), '[null]');
   assert.equal(rowKey('notes', [42]), '["42"]', 'numeric ids are stringified, as SQLite hands them over');
@@ -71,6 +72,18 @@ test('validation refuses everything the ledger must not carry', () => {
   assert.equal(check(mutation({ key: [] })).reason, 'bad_key');
   assert.equal(check(mutation({ key: ['a', 'b'] })).reason, 'bad_key', 'notes has a single-column identity');
   assert.equal(check(mutation({ row: undefined })).reason, 'missing_row');
+
+  const annotation = mutation({
+    table: 'writing_draft_annotations',
+    key: ['ann-2'],
+    row: {
+      id: 'ann-2', draft_id: 'dr-1', scope: 'source', kind: 'comment', color: null,
+      start_offset: 2, end_offset: 7, selected_text: 'Texto', prefix: '', suffix: '.',
+      comment_text: 'Revisar esta afirmación.',
+      created_at: '2026-02-02T00:00:00.000Z', updated_at: '2026-02-02T00:00:00.000Z',
+    },
+  });
+  assert.equal(check(annotation).ok, true, 'a small report annotation travels through the existing ledger');
 
   // The column check reads the shape of the published snapshot, so a column nobody has ever
   // published cannot be written — without the server knowing any SQL.

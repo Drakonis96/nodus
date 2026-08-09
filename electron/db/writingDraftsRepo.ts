@@ -10,6 +10,7 @@ import type {
 } from '@shared/types';
 import { getDb } from './database';
 import { deleteDecorativeImageRow, getDecorativeImage } from './decorativeImagesRepo';
+import { deleteAnnotationsForWritingDraft } from './writingAnnotationsRepo';
 
 interface SavedWritingDraftRow {
   id: string;
@@ -247,6 +248,7 @@ export function setWritingWorkshopDraftRead(id: string, read: boolean): WritingW
 
 export function deleteWritingWorkshopDraft(id: string): boolean {
   deleteDecorativeImageRow('deep_research', id);
+  deleteAnnotationsForWritingDraft(id);
   // Before the report, so a mark can never be left pointing at nothing.
   getDb().prepare('DELETE FROM writing_draft_reads WHERE draft_id = ?').run(id);
   return getDb().prepare('DELETE FROM writing_saved_drafts WHERE id = ?').run(id).changes > 0;

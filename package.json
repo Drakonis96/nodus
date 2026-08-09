@@ -16,6 +16,7 @@
     "version": "npm run citation:sync && git add CITATION.cff",
     "test:e2e": "node scripts/e2e-smoke.mjs",
     "test:e2e:saved-authors": "node scripts/e2e-saved-authors.mjs",
+    "test:e2e:deep-research-annotations": "npm run build && node scripts/e2e-deep-research-annotations.mjs",
     "test:e2e:local-server": "node scripts/e2e-local-server.mjs",
     "test:e2e:prosopography": "node scripts/test-prosopography-e2e.mjs",
     "test:e2e:testimony": "npm run build && node scripts/e2e-testimony.mjs",

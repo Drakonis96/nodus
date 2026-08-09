@@ -108,6 +108,14 @@ export function academicSnapshot(overrides = {}) {
         created_at: '2026-01-01T00:00:00.000Z', updated_at: '2026-01-01T00:00:00.000Z',
       },
     ],
+    writing_draft_annotations: [
+      {
+        id: 'ann-1', draft_id: 'dr-1', scope: 'source', kind: 'highlight', color: 'yellow',
+        start_offset: 0, end_offset: 5, selected_text: 'Texto', prefix: '', suffix: '.',
+        comment_text: null,
+        created_at: '2026-01-01T00:00:00.000Z', updated_at: '2026-01-01T00:00:00.000Z',
+      },
+    ],
     immersion_sessions: [
       { id: 'im-1', topic: 'Archivo', title: 'Inmersión en el archivo', language: 'es', minutes: 20, model_json: '{}', plan_json: JSON.stringify({ stations: [] }), progress_json: '{}', stats_json: JSON.stringify({ stations: 3 }), created_at: '2026-01-01T00:00:00.000Z', updated_at: '2026-01-01T00:00:00.000Z' },
     ],
