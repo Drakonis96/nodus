@@ -37,8 +37,8 @@ export interface SigmaGraphApi {
   reset: () => void;
 }
 
-/** Semantic-zoom level currently on screen. 'full' is the classic idea graph. */
-export type GraphViewLevel = 'corpus' | 'theme' | 'full';
+/** Semantic-zoom level currently on screen. `atlas` is a bounded preset scene. */
+export type GraphViewLevel = 'corpus' | 'theme' | 'atlas' | 'full';
 
 interface SigmaGraphProps {
   data: GraphData;
@@ -143,6 +143,14 @@ interface LabelCollisionState {
   boxes: RenderedLabelBox[];
 }
 
+interface AtlasFieldPoint {
+  x: number;
+  y: number;
+  size: number;
+  color: string;
+  theme: boolean;
+}
+
 type SigmaNodeLabelData = Parameters<NodeLabelDrawingFunction>[1];
 type SigmaLabelSettings = Parameters<NodeLabelDrawingFunction>[2];
 
@@ -213,6 +221,22 @@ function hexLightness(hex: string): number {
   const g = parseInt(value.slice(2, 4), 16);
   const b = parseInt(value.slice(4, 6), 16);
   return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+}
+
+function colorWithAlpha(color: string, alpha: number): string {
+  const value = color.replace('#', '');
+  if (!/^[\da-f]{6}$/i.test(value)) return `rgba(99,102,241,${alpha})`;
+  return `rgba(${parseInt(value.slice(0, 2), 16)},${parseInt(value.slice(2, 4), 16)},${parseInt(value.slice(4, 6), 16)},${alpha})`;
+}
+
+function atlasFieldRadius(points: AtlasFieldPoint[], centerX: number, centerY: number, viewLevel: GraphViewLevel): number {
+  const distances = points
+    .map((point) => Math.hypot(point.x - centerX, point.y - centerY) + point.size)
+    .sort((a, b) => a - b);
+  const representative = distances[Math.min(distances.length - 1, Math.floor(distances.length * 0.86))] ?? 0;
+  if (viewLevel === 'corpus') return Math.max(44, Math.min(118, representative + 28));
+  if (viewLevel === 'atlas') return Math.max(68, Math.min(290, representative + 44));
+  return Math.max(78, Math.min(340, representative + 52));
 }
 
 function drawWrappedNodeLabel(
@@ -305,6 +329,7 @@ export function SigmaGraph({
   showMinimap = true,
 }: SigmaGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const atlasCanvasRef = useRef<HTMLCanvasElement>(null);
   const minimapRef = useRef<HTMLCanvasElement>(null);
   const sigmaRef = useRef<Sigma | null>(null);
   const detailGraphRef = useRef<Graph | null>(null);
@@ -324,6 +349,7 @@ export function SigmaGraph({
   const cameraRafRef = useRef<number | null>(null);
   const clusterTimerRef = useRef<number | null>(null);
   const minimapRafRef = useRef<number | null>(null);
+  const atlasRafRef = useRef<number | null>(null);
   const minimapFrameRef = useRef<MinimapFrame | null>(null);
   const searchRef = useRef(filters.search);
   const [revealedNodeIds, setRevealedNodeIds] = useState<Set<string>>(() => new Set());
@@ -387,6 +413,7 @@ export function SigmaGraph({
       graph.addNode(n.id, {
         label: n.label,
         kind: n.type,
+        group: n.group,
         // Theme hubs read as bubbles, so give them a larger on-screen radius than ideas.
         size: Math.max(4, n.size / (n.type === 'theme' ? 1.7 : 2.4)),
         color: n.color ?? nodeColor(n.type),
@@ -440,7 +467,9 @@ export function SigmaGraph({
       // Corpus level: only a handful of theme nodes — always keep their captions
       // so the overview reads at a glance (labels sit on Sigma's top canvas, so a
       // neighbouring node can never paint over them).
-      if (viewLevelRef.current === 'corpus') res.forceLabel = true;
+      if (viewLevelRef.current === 'corpus' || (viewLevelRef.current === 'atlas' && dataAttrs.kind === 'theme')) {
+        res.forceLabel = true;
+      }
       const focus = focusRef.current;
       const hover = hoverRef.current;
       // Cross-theme satellites stay quiet (no caption) until a connected idea is
@@ -698,6 +727,101 @@ export function SigmaGraph({
   useEffect(() => {
     onCameraUpdatedRef.current = onCameraUpdated;
   }, [onCameraUpdated]);
+
+  const drawAtlasFields = useCallback(() => {
+    const sigma = sigmaRef.current;
+    const graph = detailGraphRef.current;
+    const canvas = atlasCanvasRef.current;
+    if (!sigma || !graph || !canvas) return;
+    const { width, height } = sigma.getDimensions();
+    const pixelRatio = Math.min(2, window.devicePixelRatio || 1);
+    const targetWidth = Math.max(1, Math.round(width * pixelRatio));
+    const targetHeight = Math.max(1, Math.round(height * pixelRatio));
+    if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
+    }
+    const context = canvas.getContext('2d');
+    if (!context) return;
+    context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+    context.clearRect(0, 0, width, height);
+    if (graph.order === 0) return;
+
+    const groups = new Map<string, AtlasFieldPoint[]>();
+    graph.forEachNode((_id, attrs) => {
+      if (attrs.historyVisible === false) return;
+      const group = String(attrs.group ?? '').trim();
+      if (!group) return;
+      const rawX = Number(attrs.x);
+      const rawY = Number(attrs.y);
+      if (!Number.isFinite(rawX) || !Number.isFinite(rawY)) return;
+      const point = sigma.graphToViewport({ x: rawX, y: rawY });
+      if (point.x < -380 || point.x > width + 380 || point.y < -380 || point.y > height + 380) return;
+      const list = groups.get(group) ?? [];
+      list.push({
+        x: point.x,
+        y: point.y,
+        size: Math.max(3, Number(attrs.size ?? 3)),
+        color: String(attrs.color ?? nodeColor(String(attrs.kind ?? ''))),
+        theme: attrs.kind === 'theme',
+      });
+      groups.set(group, list);
+    });
+
+    const fieldAlpha = lightTheme ? 0.048 : 0.075;
+    for (const points of groups.values()) {
+      if (points.length === 1 && !points[0].theme && viewLevel === 'full') continue;
+      let weightedX = 0;
+      let weightedY = 0;
+      let totalWeight = 0;
+      for (const point of points) {
+        const weight = point.theme ? 3 : 1;
+        weightedX += point.x * weight;
+        weightedY += point.y * weight;
+        totalWeight += weight;
+      }
+      const centerX = weightedX / Math.max(1, totalWeight);
+      const centerY = weightedY / Math.max(1, totalWeight);
+      const radius = atlasFieldRadius(points, centerX, centerY, viewLevel);
+      const color = points.find((point) => point.theme)?.color ?? points[0].color;
+      const gradient = context.createRadialGradient(centerX, centerY, radius * 0.12, centerX, centerY, radius);
+      gradient.addColorStop(0, colorWithAlpha(color, fieldAlpha * 1.8));
+      gradient.addColorStop(0.68, colorWithAlpha(color, fieldAlpha));
+      gradient.addColorStop(1, colorWithAlpha(color, 0));
+      context.fillStyle = gradient;
+      context.beginPath();
+      context.arc(centerX, centerY, radius, 0, Math.PI * 2);
+      context.fill();
+      context.strokeStyle = colorWithAlpha(color, lightTheme ? 0.16 : 0.2);
+      context.lineWidth = 1;
+      context.setLineDash([3, 8]);
+      context.beginPath();
+      context.arc(centerX, centerY, Math.max(20, radius - 9), 0, Math.PI * 2);
+      context.stroke();
+    }
+    context.setLineDash([]);
+
+    for (const points of groups.values()) {
+      for (const point of points) {
+        if (!point.theme) continue;
+        context.strokeStyle = colorWithAlpha(point.color, lightTheme ? 0.2 : 0.28);
+        context.lineWidth = 1;
+        for (const offset of [8, 15]) {
+          context.beginPath();
+          context.arc(point.x, point.y, point.size + offset, 0, Math.PI * 2);
+          context.stroke();
+        }
+      }
+    }
+  }, [lens, lightTheme, viewLevel]);
+
+  const scheduleAtlasDraw = useCallback(() => {
+    if (atlasRafRef.current != null) return;
+    atlasRafRef.current = window.requestAnimationFrame(() => {
+      atlasRafRef.current = null;
+      drawAtlasFields();
+    });
+  }, [drawAtlasFields]);
 
   // ── Sigma minimap ───────────────────────────────────────────────────────────
   const drawMinimap = useCallback(() => {
@@ -1136,6 +1260,20 @@ export function SigmaGraph({
   useEffect(() => {
     const sigma = sigmaRef.current;
     if (!sigma) return;
+    sigma.on('afterRender', scheduleAtlasDraw);
+    scheduleAtlasDraw();
+    return () => {
+      sigma.removeListener('afterRender', scheduleAtlasDraw);
+      if (atlasRafRef.current != null) {
+        window.cancelAnimationFrame(atlasRafRef.current);
+        atlasRafRef.current = null;
+      }
+    };
+  }, [scheduleAtlasDraw]);
+
+  useEffect(() => {
+    const sigma = sigmaRef.current;
+    if (!sigma) return;
     sigma.on('afterRender', scheduleMinimapDraw);
     scheduleMinimapDraw();
     return () => {
@@ -1414,6 +1552,7 @@ export function SigmaGraph({
   useEffect(() => {
     return () => {
       if (cameraRafRef.current != null) window.cancelAnimationFrame(cameraRafRef.current);
+      if (atlasRafRef.current != null) window.cancelAnimationFrame(atlasRafRef.current);
       if (clusterTimerRef.current != null) window.clearTimeout(clusterTimerRef.current);
       if (minimapRafRef.current != null) window.cancelAnimationFrame(minimapRafRef.current);
       if (historyTimerRef.current != null) window.clearInterval(historyTimerRef.current);
@@ -1424,7 +1563,8 @@ export function SigmaGraph({
 
   return (
     <>
-      <div ref={containerRef} className="absolute inset-0" data-testid="sigma-graph-engine" />
+      <canvas ref={atlasCanvasRef} className="nodus-graph-territories absolute inset-0 size-full" aria-hidden="true" />
+      <div ref={containerRef} className="nodus-graph-engine absolute inset-0" data-testid="sigma-graph-engine" />
       <canvas
         ref={minimapRef}
         width={156}

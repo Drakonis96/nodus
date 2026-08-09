@@ -11,6 +11,13 @@
   -webkit-app-region: drag;
 }
 
+/* hiddenInset puts the macOS traffic lights inside the renderer. Keep the brand
+   centred in the usable part of the sidebar button instead of letting the red,
+   yellow and green controls sit on top of its logo and label. */
+.app-titlebar[data-platform='macos'] [data-testid='sidebar-header-toggle'] {
+  padding-left: 76px;
+}
+
 /* ── Recovery-folder cinematic wizard ─────────────────────────────────────── */
 .recovery-cinema { position: fixed; inset: 0; z-index: 230; display: grid; place-items: center; overflow: auto; padding: 28px; background: #070911; color: #e5e7eb; }
 .recovery-aurora { position: fixed; inset: 0; pointer-events: none; background: radial-gradient(circle at 15% 15%, rgba(45,212,191,.16), transparent 32%), radial-gradient(circle at 85% 75%, rgba(99,102,241,.18), transparent 36%); }
@@ -2478,6 +2485,217 @@ select.input optgroup {
 .light select.input optgroup {
   background-color: #ffffff;
   color: #171717;
+}
+
+/* Knowledge atlas: Sigma stays the rendering engine, while this chrome turns the
+   graph into a layered research landscape with its own hierarchy and atmosphere. */
+.nodus-graph-view {
+  background: #070910;
+}
+.nodus-graph-toolbar {
+  position: relative;
+  z-index: 20;
+  border-color: rgb(38 38 38 / .78);
+  background: rgb(10 12 20 / .94);
+  box-shadow: 0 14px 34px rgb(0 0 0 / .16);
+  backdrop-filter: blur(18px);
+}
+.nodus-graph-toolbar .btn,
+.nodus-graph-toolbar .input {
+  border-radius: 10px;
+}
+.nodus-graph-workspace {
+  background: #070910;
+}
+.nodus-graph-stage {
+  isolation: isolate;
+  background-color: #070910;
+  background-image:
+    radial-gradient(circle at 22% 22%, rgb(79 70 229 / .1), transparent 34%),
+    radial-gradient(circle at 76% 70%, rgb(8 145 178 / .07), transparent 36%),
+    radial-gradient(circle, rgb(148 163 184 / .13) .7px, transparent .8px);
+  background-size: auto, auto, 22px 22px;
+}
+.nodus-graph-stage::after {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  background: radial-gradient(circle at 50% 46%, transparent 48%, rgb(3 5 12 / .34) 100%);
+  content: '';
+  pointer-events: none;
+}
+.nodus-graph-territories {
+  z-index: 0;
+  pointer-events: none;
+}
+.nodus-graph-engine {
+  z-index: 1;
+}
+.nodus-graph-atlas-card,
+.nodus-graph-density-card,
+.nodus-graph-legend,
+.nodus-graph-viewport-controls {
+  border: 1px solid rgb(148 163 184 / .16);
+  background: linear-gradient(145deg, rgb(18 21 34 / .9), rgb(9 11 20 / .84));
+  box-shadow: 0 18px 50px rgb(0 0 0 / .28), inset 0 1px 0 rgb(255 255 255 / .04);
+  backdrop-filter: blur(18px) saturate(130%);
+}
+.nodus-graph-atlas-card {
+  min-width: 232px;
+  padding: 12px 14px 11px;
+  border-radius: 15px;
+}
+.nodus-graph-atlas-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #818cf8;
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: .15em;
+  text-transform: uppercase;
+}
+.nodus-graph-atlas-mark {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border: 1px solid rgb(129 140 248 / .32);
+  border-radius: 7px;
+  background: rgb(79 70 229 / .16);
+  box-shadow: 0 0 22px rgb(99 102 241 / .18);
+}
+.nodus-graph-atlas-title {
+  margin-top: 9px;
+  color: #f5f7ff;
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: -.01em;
+}
+.nodus-graph-atlas-description {
+  max-width: 290px;
+  margin-top: 3px;
+  color: #8d95a8;
+  font-size: 10px;
+  line-height: 1.45;
+}
+.nodus-graph-atlas-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 8px 0 1px -5px;
+  padding: 4px 6px;
+  border-radius: 7px;
+  color: #c7d2fe;
+}
+.nodus-graph-atlas-back:hover {
+  background: rgb(99 102 241 / .12);
+  color: #fff;
+}
+.nodus-graph-atlas-metrics {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 5px;
+  color: #71798b;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.nodus-graph-density-card {
+  width: max-content;
+  padding: 8px 11px;
+  border-radius: 12px;
+}
+.nodus-graph-viewport-controls {
+  overflow: hidden;
+  padding: 4px;
+  border-radius: 14px;
+}
+.nodus-graph-viewport-button {
+  display: grid;
+  width: 31px;
+  height: 31px;
+  place-items: center;
+  border-radius: 9px;
+  color: #a5adbd;
+  transition: background-color .16s ease, color .16s ease, transform .16s ease;
+}
+.nodus-graph-viewport-button:hover {
+  background: rgb(99 102 241 / .17);
+  color: #eef2ff;
+  transform: translateY(-1px);
+}
+.nodus-graph-legend {
+  max-height: min(54vh, 420px);
+  overflow: auto;
+  border-radius: 14px;
+  color: #a5adbd;
+}
+.light .nodus-graph-view,
+.light .nodus-graph-workspace {
+  background: #f7f8fc;
+}
+.light .nodus-graph-toolbar {
+  border-color: rgb(203 213 225 / .72);
+  background: rgb(255 255 255 / .9);
+  box-shadow: 0 12px 32px rgb(51 65 85 / .08);
+}
+.light .nodus-graph-stage {
+  background-color: #f8fafc;
+  background-image:
+    radial-gradient(circle at 22% 22%, rgb(99 102 241 / .08), transparent 34%),
+    radial-gradient(circle at 76% 70%, rgb(14 165 233 / .055), transparent 36%),
+    radial-gradient(circle, rgb(100 116 139 / .16) .7px, transparent .8px);
+}
+.light .nodus-graph-stage::after {
+  background: radial-gradient(circle at 50% 46%, transparent 54%, rgb(226 232 240 / .28) 100%);
+}
+.light .nodus-graph-atlas-card,
+.light .nodus-graph-density-card,
+.light .nodus-graph-legend,
+.light .nodus-graph-viewport-controls {
+  border-color: rgb(148 163 184 / .28);
+  background: linear-gradient(145deg, rgb(255 255 255 / .94), rgb(248 250 252 / .88));
+  box-shadow: 0 16px 42px rgb(51 65 85 / .1), inset 0 1px 0 rgb(255 255 255 / .9);
+}
+.light .nodus-graph-atlas-eyebrow {
+  color: #4f46e5;
+}
+.light .nodus-graph-atlas-mark {
+  border-color: rgb(79 70 229 / .22);
+  background: rgb(99 102 241 / .08);
+}
+.light .nodus-graph-atlas-title {
+  color: #172033;
+}
+.light .nodus-graph-atlas-description {
+  color: #64748b;
+}
+.light .nodus-graph-atlas-back {
+  color: #4338ca;
+}
+.light .nodus-graph-atlas-back:hover {
+  background: rgb(99 102 241 / .08);
+  color: #312e81;
+}
+.light .nodus-graph-atlas-metrics {
+  color: #64748b;
+}
+.light .nodus-graph-viewport-button {
+  color: #64748b;
+}
+.light .nodus-graph-viewport-button:hover {
+  background: rgb(99 102 241 / .09);
+  color: #312e81;
+}
+.light .nodus-graph-legend {
+  color: #475569;
+}
+
+@media (max-width: 900px) {
+  .nodus-graph-atlas-hud { max-width: calc(100% - 76px); }
+  .nodus-graph-atlas-card { min-width: 190px; }
+  .nodus-graph-legend { max-width: 184px; }
 }
 
 .graph-detail-panel {

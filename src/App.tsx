@@ -1142,7 +1142,11 @@ export function App() {
       {/* Top bar. `app-titlebar` makes the empty header area a drag region so the
           window can be moved (its interactive children are auto-marked no-drag in
           index.css). On macOS the traffic lights sit at the very top-left. */}
-      <header ref={setHeaderEl} className="app-titlebar relative flex h-11 items-center border-b border-neutral-800">
+      <header
+        ref={setHeaderEl}
+        className="app-titlebar relative flex h-11 items-center border-b border-neutral-800"
+        data-platform={IS_MAC ? 'macos' : 'other'}
+      >
         <button
           ref={setHeaderLogoEl}
           data-testid="sidebar-header-toggle"
