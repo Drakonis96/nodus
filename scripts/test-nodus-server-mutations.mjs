@@ -84,6 +84,24 @@ test('validation refuses everything the ledger must not carry', () => {
     },
   });
   assert.equal(check(annotation).ok, true, 'a small report annotation travels through the existing ledger');
+  const bookmarkId = 'reader-bookmark:dr-1:source';
+  const bookmark = mutation({
+    id: 'mut-bookmark',
+    table: 'writing_draft_annotations',
+    key: [bookmarkId],
+    row: {
+      ...annotation.row,
+      id: bookmarkId,
+      kind: 'bookmark',
+      color: null,
+      comment_text: null,
+    },
+  });
+  assert.equal(check(bookmark).ok, true, 'the shared deterministic bookmark row travels');
+  assert.equal(check(mutation({ ...bookmark, key: ['another-bookmark'] })).reason, 'constraint');
+  assert.equal(check(mutation({ ...annotation, row: { ...annotation.row, kind: 'highlight', color: 'neon' } })).reason, 'constraint');
+  assert.equal(check(mutation({ ...annotation, row: { ...annotation.row, kind: 'highlight', color: 'mint' } })).reason, 'constraint', 'highlights cannot smuggle comment text');
+  assert.equal(check(mutation({ ...annotation, row: { ...annotation.row, color: 'mint' } })).reason, 'constraint', 'comments have no highlight color');
 
   // The column check reads the shape of the published snapshot, so a column nobody has ever
   // published cannot be written — without the server knowing any SQL.
@@ -272,6 +290,83 @@ test('a writer sends, the owner drains and acknowledges, and a replay changes no
     });
     assert.equal(enormous.status, 413);
     assert.equal((await enormous.json()).limit, 200);
+  });
+});
+
+test('reader annotations cross the server in both directions without changing shape', { timeout: 60_000 }, async () => {
+  await withServer({ label: 'reader-annotation-sync' }, async (server) => {
+    const spaceId = await server.createSpace('Corpus');
+    const owner = await server.deviceToken(server.adminEmail, server.adminPassword, spaceId);
+    await server.createUser('movil@example.test', 'mobile-account-password', [{ spaceId, role: 'writer' }]);
+    const mobile = await server.deviceToken('movil@example.test', 'mobile-account-password', spaceId);
+    const initial = academicSnapshot();
+    await publish(server.origin, owner.deviceToken, spaceId, initial);
+
+    // Desktop → mobile: annotations are part of the report detail, not a device-local sidecar.
+    const firstRead = await (await server.api(
+      mobile.deviceToken,
+      'GET',
+      `/api/v1/spaces/${spaceId}/deep-research/dr-1`,
+    )).json();
+    assert.deepEqual(firstRead.annotations.map((row) => row.id), ['ann-1']);
+
+    const stamp = '2026-08-10T00:00:00.000Z';
+    const row = (overrides) => ({
+      id: 'mobile-highlight', draft_id: 'dr-1', scope: 'source', kind: 'highlight', color: 'mint',
+      start_offset: 0, end_offset: 5, selected_text: 'Texto', prefix: '', suffix: '.',
+      comment_text: null, created_at: stamp, updated_at: stamp, ...overrides,
+    });
+    const mobileRows = [
+      row({}),
+      row({ id: 'mobile-comment', kind: 'comment', color: null, comment_text: 'Comprobar en la fuente.' }),
+      row({ id: 'reader-bookmark:dr-1:source', kind: 'bookmark', color: null, comment_text: null }),
+    ];
+    const changes = mobileRows.map((annotation, index) => mutation({
+      id: `mobile-annotation-${index}`,
+      table: 'writing_draft_annotations',
+      key: [annotation.id],
+      row: annotation,
+      schemaVersion: 127,
+      createdAt: stamp,
+    }));
+    const receipt = await (await server.api(
+      mobile.deviceToken,
+      'POST',
+      `/api/v1/spaces/${spaceId}/mutations`,
+      { json: { mutations: changes } },
+    )).json();
+    assert.deepEqual(receipt.accepted, changes.map((change) => change.id));
+
+    // Mobile → desktop: the owner drains the exact scalar rows the phone wrote.
+    const drained = await (await server.api(
+      owner.deviceToken,
+      'GET',
+      `/api/v1/spaces/${spaceId}/mutations?since=0`,
+    )).json();
+    assert.deepEqual(drained.mutations.map((change) => change.row), mobileRows);
+    await server.api(owner.deviceToken, 'POST', `/api/v1/spaces/${spaceId}/mutations/ack`, {
+      json: { cursor: drained.cursor },
+    });
+
+    // The owner's ensuing publication is what makes the rows readable everywhere,
+    // including back on their authoring phone.
+    await publish(server.origin, owner.deviceToken, spaceId, academicSnapshot({
+      tables: {
+        writing_draft_annotations: [
+          ...initial.payload.tables.writing_draft_annotations,
+          ...mobileRows,
+        ],
+      },
+    }));
+    const republished = await (await server.api(
+      mobile.deviceToken,
+      'GET',
+      `/api/v1/spaces/${spaceId}/deep-research/dr-1`,
+    )).json();
+    assert.deepEqual(
+      republished.annotations.map((annotation) => annotation.kind).sort(),
+      ['bookmark', 'comment', 'highlight', 'highlight'],
+    );
   });
 });
 

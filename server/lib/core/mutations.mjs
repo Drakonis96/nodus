@@ -40,6 +40,8 @@ export const MUTABLE_TABLES = {
 };
 
 export const MUTATION_KINDS = new Set(['upsert', 'delete']);
+const ANNOTATION_KINDS = new Set(['highlight', 'comment', 'bookmark']);
+const ANNOTATION_COLORS = new Set(['yellow', 'rose', 'blue', 'mint', 'lavender', 'peach']);
 /**
  * How large one row may be, by default.
  *
@@ -108,6 +110,25 @@ export function validateMutation(mutation, { snapshot, hasAsset, maxBytes = DEFA
 
   const row = mutation.row;
   if (!row || typeof row !== 'object' || Array.isArray(row)) return fail('missing_row');
+
+  if (table === 'writing_draft_annotations') {
+    const start = Number(row.start_offset);
+    const end = Number(row.end_offset);
+    const selected = typeof row.selected_text === 'string' ? row.selected_text : '';
+    const kind = String(row.kind ?? '');
+    if (String(row.id ?? '') !== String(mutation.key[0] ?? '')) return fail('constraint');
+    if (typeof row.draft_id !== 'string' || !row.draft_id || typeof row.scope !== 'string' || !row.scope) return fail('constraint');
+    if (!ANNOTATION_KINDS.has(kind) || !Number.isInteger(start) || !Number.isInteger(end)
+        || start < 0 || end <= start || !selected.trim() || selected.length !== end - start) return fail('constraint');
+    if (kind === 'highlight'
+        && (!ANNOTATION_COLORS.has(row.color) || row.comment_text !== null)) return fail('constraint');
+    if (kind === 'comment'
+        && (row.color !== null || typeof row.comment_text !== 'string' || !row.comment_text.trim())) return fail('constraint');
+    if (kind === 'bookmark') {
+      const expected = `reader-bookmark:${row.draft_id}:${row.scope}`;
+      if (row.id !== expected || row.color !== null || row.comment_text !== null) return fail('constraint');
+    }
+  }
 
   const known = knownColumns(snapshot, table);
   for (const [column, value] of Object.entries(row)) {

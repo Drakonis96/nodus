@@ -25,13 +25,23 @@ try {
 
   const { RELEASE_NOTES, releaseNotesForMajor, compareVersions } = await import(pathToFileURL(bundlePath).href);
   const currentRelease = RELEASE_NOTES[0];
-  assert.equal(currentRelease?.version, '3.2.6');
-  assert.equal(currentRelease?.date, '2026-08-09');
-  // Reasoning by job, fresh ideas, both Nodi improvements, saved authors, calm startup
-  // modals, and complete MCP reads. A floor leaves room for a last release-day fix.
-  assert.ok(currentRelease?.highlights.length >= 8, 'the release must describe everything shipped since 3.2.5');
-  assert.ok(currentRelease?.highlights.some((highlight) => highlight.scope === 'mcp'));
-  assert.ok(currentRelease?.highlights.filter((highlight) => highlight.scope === 'nodi').length >= 2);
+  assert.equal(currentRelease?.version, '3.2.7');
+  assert.equal(currentRelease?.date, '2026-08-10');
+  assert.equal(currentRelease?.highlights.length, 4);
+  assert.deepEqual(currentRelease?.highlights.map((highlight) => highlight.scope), [
+    'academic',
+    'academic',
+    'academic',
+    'nodi',
+  ]);
+
+  // 3.2.6 keeps the eight it shipped with, including its MCP and Nodi improvements.
+  // They are published history and stay as they were written.
+  const previousRelease = RELEASE_NOTES.find((note) => note.version === '3.2.6');
+  assert.equal(previousRelease?.date, '2026-08-09');
+  assert.equal(previousRelease?.highlights.length, 8);
+  assert.ok(previousRelease?.highlights.some((highlight) => highlight.scope === 'mcp'));
+  assert.ok(previousRelease?.highlights.filter((highlight) => highlight.scope === 'nodi').length >= 2);
 
   // 3.2.5 keeps the four it shipped with, including the two that describe the rule this
   // release reverses. They are published history and stay as they were written.

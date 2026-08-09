@@ -86,6 +86,8 @@ test('every collection endpoint answers with the MCP page envelope and honours i
 
     const report = await readJson(await server.api(reader.deviceToken, 'GET', `/api/v1/spaces/${spaceId}/deep-research/dr-1`));
     assert.match(report.report.draft.draftMarkdown, /## Resumen/);
+    assert.deepEqual(report.annotations.map((annotation) => annotation.id), ['ann-1']);
+    assert.equal(report.annotations[0].kind, 'highlight');
 
     const session = await readJson(await server.api(reader.deviceToken, 'GET', `/api/v1/spaces/${spaceId}/immersion/im-1`));
     assert.ok(session.session.plan, 'the immersion plan replays without new AI calls');

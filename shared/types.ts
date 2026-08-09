@@ -6087,7 +6087,7 @@ export interface WritingDraftAnnotation {
   id: string;
   draftId: string;
   scope: string;
-  kind: 'highlight' | 'comment';
+  kind: 'highlight' | 'comment' | 'bookmark';
   color: WritingDraftAnnotationColor | null;
   startOffset: number;
   endOffset: number;

@@ -33,7 +33,7 @@ try {
   const { runMigrations, SCHEMA_VERSION } = require(path.join(repoRoot, 'electron/db/migrations.ts'));
   const db = new Database(path.join(root, 'vault.sqlite'));
   runMigrations(db);
-  assert.ok(SCHEMA_VERSION >= 126);
+  assert.ok(SCHEMA_VERSION >= 127);
 
   stubModule('electron/db/database.ts', { getDb: () => db });
   const drafts = require(path.join(repoRoot, 'electron/db/writingDraftsRepo.ts'));
@@ -73,7 +73,31 @@ try {
   });
   assert.equal(comment.kind, 'comment');
   assert.equal(comment.color, null);
-  assert.equal(annotations.listWritingDraftAnnotations(saved.id).length, 2);
+  const bookmark = annotations.createWritingDraftAnnotation({
+    draftId: saved.id,
+    scope: 'source',
+    kind: 'bookmark',
+    startOffset: 19,
+    endOffset: 20,
+    selectedText: 'y',
+    prefix: 'Memoria compartida ',
+    suffix: ' archivo',
+  });
+  assert.equal(bookmark.id, `reader-bookmark:${saved.id}:source`);
+  assert.equal(bookmark.color, null);
+  const movedBookmark = annotations.createWritingDraftAnnotation({
+    draftId: saved.id,
+    scope: 'source',
+    kind: 'bookmark',
+    startOffset: 21,
+    endOffset: 28,
+    selectedText: 'archivo',
+    prefix: 'Memoria compartida y ',
+    suffix: '.',
+  });
+  assert.equal(movedBookmark.id, bookmark.id, 'moving a bookmark updates the cross-device row');
+  assert.equal(movedBookmark.selectedText, 'archivo');
+  assert.equal(annotations.listWritingDraftAnnotations(saved.id).length, 3);
   assert.equal(reportRow(), before, 'annotations never rewrite the multi-page report row');
 
   const updated = annotations.updateWritingDraftComment(comment.id, 'Añadir una referencia cruzada.');
@@ -88,7 +112,7 @@ try {
   );
 
   assert.equal(annotations.deleteWritingDraftAnnotation(highlight.id), saved.id);
-  assert.equal(annotations.listWritingDraftAnnotations(saved.id).length, 1);
+  assert.equal(annotations.listWritingDraftAnnotations(saved.id).length, 2);
 
   const { syncedTableNames, syncedTablesByGroup } = require(path.join(repoRoot, 'electron/db/syncTables.ts'));
   assert.ok(syncedTableNames(db).includes('writing_draft_annotations'));
