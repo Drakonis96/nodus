@@ -22,6 +22,7 @@ import type {
 } from '@shared/types';
 import { getDb } from '../db/database';
 import { getSettings } from '../db/settingsRepo';
+import { savedAuthorIds } from '../db/savedAuthorsRepo';
 import { completeJson } from './aiClient';
 
 const STATEMENT_CLIP = 220;
@@ -144,6 +145,7 @@ export function listAuthors(): AuthorSummary[] {
 
   const synthRows = db.prepare('SELECT author_id FROM author_dossier_synthesis').all() as { author_id: string }[];
   const hasSynth = new Set(synthRows.map((r) => r.author_id));
+  const saved = savedAuthorIds();
 
   return authors
     .map((a): AuthorSummary => {
@@ -162,6 +164,7 @@ export function listAuthors(): AuthorSummary[] {
         topThemes: themesByAuthor.get(a.author_id) ?? [],
         read: w.total > 0 && w.read === w.total,
         hasSynthesis: hasSynth.has(a.author_id),
+        saved: saved.has(a.author_id),
       };
     })
     .filter((a) => a.workCount > 0)
@@ -174,6 +177,7 @@ export function listAuthorsPage(request: AuthorPageRequest): AuthorPage {
   if (query) authors = authors.filter((author) => author.fullName.toLowerCase().includes(query) || author.name.toLowerCase().includes(query));
   if (request.synthesis === 'with') authors = authors.filter((author) => author.hasSynthesis);
   else if (request.synthesis === 'without') authors = authors.filter((author) => !author.hasSynthesis);
+  if (request.savedOnly) authors = authors.filter((author) => author.saved);
   authors.sort((a, b) => {
     switch (request.sort) {
       case 'name':

@@ -275,6 +275,7 @@ export interface AcademicApi {
   /** Lightweight list of every author with their corpus footprint. */
   listAuthors(): Promise<AuthorSummary[]>;
   listAuthorsPage(request: AuthorPageRequest): Promise<AuthorPage>;
+  setAuthorSaved(authorId: string, saved: boolean): Promise<void>;
   /** Full study card for one author (ideas, relations, themes, cached synthesis). */
   getAuthorDossier(authorId: string): Promise<AuthorDossier | null>;
   /** Generate (and cache) the AI thesis/remember/positioning for one author. */

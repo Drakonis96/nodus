@@ -207,6 +207,7 @@ const SYNC_GROUPS: { key: SyncGroupKey; prefix?: string; tables?: string[] }[] =
 const NOT_SYNCED_TABLES = new Set([
   'works', 'work_aliases', 'work_authors', 'work_collections', 'work_idea_synthesis', 'work_summaries',
   'work_themes', 'work_zotero_tags', 'authors', 'author_relations', 'author_dossier_synthesis',
+  'saved_authors',
   'ideas', 'idea_occurrences', 'idea_theme_links', 'themes', 'edges', 'edge_traces', 'gaps',
   'passages', 'collections', 'zotero_tags', 'external_refs', 'extraction_cache', 'scan_checkpoints',
   'sync_log', 'settings',

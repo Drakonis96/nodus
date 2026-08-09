@@ -20,7 +20,7 @@ export interface SynthRow {
   generated_at: string;
 }
 
-function loadSyntheses(authorIds: string[]): SynthRow[] {
+function loadSyntheses(authorIds: string[], savedOnly = false): SynthRow[] {
   const db = getDb();
   const base =
     `SELECT s.author_id, a.name, a.affiliation, s.thesis, s.remember_json, s.positioning, s.generated_at
@@ -28,6 +28,15 @@ function loadSyntheses(authorIds: string[]): SynthRow[] {
   if (authorIds.length > 0) {
     const placeholders = authorIds.map(() => '?').join(',');
     return db.prepare(`${base} WHERE s.author_id IN (${placeholders})`).all(...authorIds) as SynthRow[];
+  }
+  if (savedOnly) {
+    return db.prepare(
+      `${base}
+        WHERE EXISTS (
+          SELECT 1 FROM saved_authors saved
+           WHERE saved.author_key = COALESCE(a.canonical_key, 'id:' || a.author_id)
+        )`
+    ).all() as SynthRow[];
   }
   return db.prepare(base).all() as SynthRow[];
 }
@@ -62,7 +71,7 @@ export function renderSynthesesMarkdown(rows: SynthRow[]): string {
 export async function exportAuthorSyntheses(
   request: AuthorSynthesisExportRequest
 ): Promise<{ path: string } | null> {
-  const rows = loadSyntheses(request.authorIds ?? []);
+  const rows = loadSyntheses(request.authorIds ?? [], request.savedOnly === true);
   if (rows.length === 0) throw new Error('No hay síntesis generadas para exportar.');
 
   const markdown = renderSynthesesMarkdown(rows);

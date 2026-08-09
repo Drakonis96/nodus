@@ -6288,6 +6288,8 @@ export interface AuthorSummary {
   topThemes: string[];
   read: boolean;
   hasSynthesis: boolean;
+  /** Reader-curated bookmark stored in this vault. */
+  saved: boolean;
 }
 
 export interface AuthorPageRequest {
@@ -6296,6 +6298,7 @@ export interface AuthorPageRequest {
   query?: string;
   sort: 'name' | 'surname' | 'works' | 'ideas' | 'connections';
   synthesis: 'all' | 'with' | 'without';
+  savedOnly?: boolean;
 }
 
 export interface AuthorPage {
@@ -6386,9 +6389,11 @@ export interface AuthorDossier {
 }
 
 export interface AuthorSynthesisExportRequest {
-  /** Authors to export. Empty = every author that has a generated synthesis. */
+  /** Authors to export. Empty = all syntheses, optionally restricted by savedOnly. */
   authorIds: string[];
   format: 'markdown' | 'pdf';
+  /** When authorIds is empty, restrict the export to reader-saved authors. */
+  savedOnly?: boolean;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
