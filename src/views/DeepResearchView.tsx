@@ -68,6 +68,7 @@ const DEEP_SECTION_OPTIONS: { value: DeepResearchSectionLimit; label: string }[]
 ];
 
 type SortKey = 'recent' | 'oldest' | 'title';
+type ReadFilter = 'all' | 'read' | 'unread';
 
 /**
  * One surface, four readers. The machinery is identical — queue, gallery, reader,
@@ -278,6 +279,7 @@ export function DeepResearchView({
 
   // Gallery controls.
   const [search, setSearch] = useState('');
+  const [readFilter, setReadFilter] = useState<ReadFilter>('all');
   const [sortKey, setSortKey] = useState<SortKey>('recent');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [showTutorial, setShowTutorial] = useState(false);
@@ -613,17 +615,20 @@ export function DeepResearchView({
 
   const visibleDrafts = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const filtered = q
-      ? savedDrafts.filter(
-          (d) => d.title.toLowerCase().includes(q) || d.brief.objective.toLowerCase().includes(q)
-        )
-      : savedDrafts;
+    const filtered = savedDrafts.filter((draft) => {
+      const matchesSearch = !q
+        || draft.title.toLowerCase().includes(q)
+        || draft.brief.objective.toLowerCase().includes(q);
+      const matchesReadState = readFilter === 'all'
+        || (readFilter === 'read' ? !!draft.readAt : !draft.readAt);
+      return matchesSearch && matchesReadState;
+    });
     const sorted = [...filtered];
     if (sortKey === 'title') sorted.sort((a, b) => a.title.localeCompare(b.title));
     else if (sortKey === 'oldest') sorted.sort((a, b) => a.updatedAt.localeCompare(b.updatedAt));
     else sorted.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
     return sorted;
-  }, [savedDrafts, search, sortKey]);
+  }, [savedDrafts, search, readFilter, sortKey]);
 
   // The strip shows one lane, not two. Reports queued from this window come from the
   // renderer store; reports queued by an MCP client live in the main process and arrive
@@ -786,6 +791,17 @@ export function DeepResearchView({
             placeholder={t(copy.searchPlaceholder)}
           />
         </div>
+        <select
+          className="input !py-1.5 text-xs"
+          value={readFilter}
+          onChange={(e) => setReadFilter(e.target.value as ReadFilter)}
+          aria-label={t('Filtrar por estado')}
+          title={t('Filtrar por estado')}
+        >
+          <option value="all">{t('Leído + no leído')}</option>
+          <option value="read">{t('Solo leído')}</option>
+          <option value="unread">{t('Solo no leído')}</option>
+        </select>
         <select className="input !py-1.5 text-xs" value={sortKey} onChange={(e) => setSortKey(e.target.value as SortKey)}>
           <option value="recent">{t('Más recientes')}</option>
           <option value="oldest">{t('Más antiguos')}</option>
@@ -857,11 +873,13 @@ export function DeepResearchView({
             <div className="max-w-md text-sm text-neutral-500">
               {loadingSavedDrafts
                 ? t(copy.loading)
-                : search.trim()
+                : readFilter !== 'all'
+                  ? t('No hay elementos con estos filtros.')
+                  : search.trim()
                   ? t(copy.noMatch)
                   : t(copy.empty)}
             </div>
-            {!search.trim() && !loadingSavedDrafts && (
+            {!search.trim() && readFilter === 'all' && !loadingSavedDrafts && (
               <button className="btn btn-primary gap-1.5" onClick={() => setComposerOpen(true)}>
                 <Icon name="plus" /> {t(copy.newAction)}
               </button>
