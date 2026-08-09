@@ -412,6 +412,22 @@
 .nodi-msg .md th { color: #f3e6c2; background: rgba(255,255,255,.04); }
 .nodi-msg .md a { color: #8ec5ff; text-decoration: underline; text-underline-offset: 2px; }
 .nodi-chat-foot { border-top: 0.5px solid rgba(255, 255, 255, 0.08); padding: 8px; }
+.nodi-chat-quote {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 6px;
+  border-left: 2px solid var(--nodi-vault-accent, #d4af37);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.055);
+  padding: 6px 7px;
+  color: #b8c1cf;
+  font-size: 11px;
+}
+.nodi-chat-quote span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nodi-chat-quote button { display: grid; width: 22px; height: 22px; place-items: center; border: 0; border-radius: 5px; background: transparent; color: #98a3b5; }
+.nodi-chat-quote button:hover { background: rgba(255,255,255,.08); color: #fff; }
 .nodi-chat-row { display: flex; gap: 6px; align-items: center; }
 .nodi-chat-input {
   flex: 1;
@@ -867,6 +883,9 @@
 .nodi-theme-light .nodi-panel-body::-webkit-scrollbar-thumb:hover,
 .nodi-theme-light .nodi-msg .md pre::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 .nodi-theme-light .nodi-chat-foot { border-top-color: rgba(15, 23, 42, .08); }
+.nodi-theme-light .nodi-chat-quote { background: rgba(15, 23, 42, .045); color: #475569; }
+.nodi-theme-light .nodi-chat-quote button { color: #64748b; }
+.nodi-theme-light .nodi-chat-quote button:hover { background: rgba(15, 23, 42, .08); color: #0f172a; }
 .nodi-theme-light .nodi-chat-input {
   background: #f8fafc;
   color: #1f2937;

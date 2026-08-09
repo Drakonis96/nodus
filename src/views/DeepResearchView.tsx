@@ -34,6 +34,8 @@ import { DeepResearchQueueStrip, type QueueStripItem } from '../components/DeepR
 import { DecorativeImageCard } from '../components/DecorativeImageCard';
 import { AudioPanel } from '../components/AudioPanel';
 import { FindInPage } from '../components/FindInPage';
+import { NodiViewContextSource } from '../components/NodiViewContextSource';
+import { ReaderSelectionActions } from '../components/ReaderSelectionActions';
 import { t, tx, getActiveLang } from '../i18n';
 import {
   DEEP_RESEARCH_MAIN_JOB_KEY,
@@ -1351,8 +1353,12 @@ function ReaderView({
   onOpenStudyRecording?: (id: string, timestamp?: number | null) => void;
 }) {
   const mainRef = useRef<HTMLElement | null>(null);
+  const contextTitle = appliedTranslation?.title ?? saved.draft.title;
+  const contextMarkdown = appliedTranslation?.markdown
+    ?? `# ${saved.draft.title}\n\n${saved.draft.abstract ? `${saved.draft.abstract}\n\n` : ''}${stripLeadingAbstract(saved.draft.draftMarkdown, saved.draft.abstract)}`;
   return (
     <div className="h-full flex flex-col min-h-0">
+      <NodiViewContextSource title={contextTitle} text={contextMarkdown} />
       <header className="flex flex-wrap items-center gap-2 border-b border-neutral-800 px-4 py-2.5">
         <button className="btn btn-ghost gap-1.5" onClick={onBack}>
           <Icon name="chevronLeft" /> {t('Volver a la galería')}
@@ -1432,6 +1438,7 @@ function ReaderView({
             />}
           </div>
         </main>
+        <ReaderSelectionActions key={appliedTranslation?.id ?? 'source'} targetRef={mainRef} contextId={`deep-research:${saved.id}`} />
         {showMatrix && (
           <aside className="w-80 shrink-0 overflow-y-auto border-l border-neutral-800 p-4 max-lg:hidden">
             <SupportMatrix draft={saved.draft} onCitation={onCitation} />

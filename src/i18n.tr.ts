@@ -7651,4 +7651,10 @@ export const TR: Record<string, string> = {
   "Marcar como leído": "Okundu olarak işaretle",
   "Marcar como no leído": "Okunmadı olarak işaretle",
   "Ya has leído este informe": "Bu raporu zaten okudunuz",
+  "Acciones de selección": "Seçim eylemleri",
+  "Añadir marcador de lectura": "Okuma yer imi ekle",
+  "Mover marcador aquí": "Yer imini buraya taşı",
+  "Citar en Nodi": "Nodi'de alıntıla",
+  "Quitar cita": "Alıntıyı kaldır",
+  "Texto visible de la sección abierta o documento completo en los lectores.": "Açık bölümün görünen metni veya okuyuculardaki belgenin tamamı.",
 };

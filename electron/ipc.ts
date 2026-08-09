@@ -64,7 +64,7 @@ import {
   refreshAnnouncements,
   setAnnouncementsNotifier,
 } from './announcements';
-import { getNodiViewContext, setNodiViewContext, streamNodiChat } from './ai/nodiChat';
+import { consumeNodiQuoteSelection, getNodiViewContext, setNodiQuoteSelection, setNodiViewContext, streamNodiChat } from './ai/nodiChat';
 import type { NodiChatRequest } from '@shared/types';
 import { clearNodiConversations, deleteNodiConversation, getNodiConversation, listNodiConversations, saveNodiConversation } from './nodiConversations';
 import { deleteNodiNote, listNodiNotes, saveNodiNote } from './nodiNotes';
@@ -427,6 +427,15 @@ export function registerIpc(
   });
   h('nodi:viewContext:set', async (_e, context) => setNodiViewContext(context));
   h('nodi:viewContext:get', async () => getNodiViewContext());
+  h('nodi:quoteSelection:set', async (_e, text: string) => {
+    const selection = setNodiQuoteSelection(text);
+    if (!selection) return null;
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) win.webContents.send('nodi:quoteSelection', selection);
+    }
+    return selection;
+  });
+  h('nodi:quoteSelection:consume', async () => consumeNodiQuoteSelection());
   // The overlay's mouse hit-test transition. Asynchronous on purpose: the flag is
   // applied when the main process next reaches its event loop, which is exactly
   // when a `sendSync` would have been serviced too — the synchronous form only

@@ -58,6 +58,8 @@ import { useFeatureModel } from '../hooks/useFeatureModel';
 import { DecorativeImageCard } from '../components/DecorativeImageCard';
 import { AudioPanel } from '../components/AudioPanel';
 import { FindInPage } from '../components/FindInPage';
+import { NodiViewContextSource } from '../components/NodiViewContextSource';
+import { ReaderSelectionActions } from '../components/ReaderSelectionActions';
 
 // Wide-open filters: visibility is controlled by the data subset we feed in.
 const OPEN_FILTERS: GraphFilters = {
@@ -1314,6 +1316,8 @@ function ImmersionPlayer({
     0
   );
   const nextMeta = current < steps.length - 1 ? stepMeta(steps[current + 1], session) : null;
+  const contextTitle = appliedTranslation?.title ?? session.plan.title;
+  const contextMarkdown = appliedTranslation?.markdown ?? sessionMarkdown(session);
 
   // Rail entries grouped as apertura → estaciones → cierre.
   const railGroups = useMemo(() => {
@@ -1330,6 +1334,7 @@ function ImmersionPlayer({
   if (!progress.startedAt) {
     return (
       <div className="h-full flex flex-col min-h-0">
+        <NodiViewContextSource title={contextTitle} text={contextMarkdown} />
         <header className="flex items-center gap-3 border-b border-neutral-800 px-4 py-3">
           <button className="btn btn-ghost gap-1.5" onClick={onExit}>
             <Icon name="chevronLeft" /> {t('Volver')}
@@ -1385,6 +1390,7 @@ function ImmersionPlayer({
 
   return (
     <div className="h-full flex flex-col min-h-0">
+      <NodiViewContextSource title={contextTitle} text={contextMarkdown} />
       {/* Top bar */}
       <header className="flex items-center gap-3 border-b border-neutral-800 px-4 py-2.5">
         <button className="btn btn-ghost gap-1.5" onClick={onExit} title={t('El progreso se guarda automáticamente')}>
@@ -1506,6 +1512,7 @@ function ImmersionPlayer({
             </motion.div>
           </AnimatePresence>
         </main>
+        <ReaderSelectionActions key={`${current}:${appliedTranslation?.id ?? 'source'}`} targetRef={mainRef} contextId={`immersion:${session.id}:step:${current}`} />
       </div>
 
       {/* Compact footer navigation */}

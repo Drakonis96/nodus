@@ -121,6 +121,13 @@ export const nodusApi: NodusApi = {
   },
   setNodiViewContext: (context) => ipcRenderer.invoke('nodi:viewContext:set', context).then(() => undefined),
   getNodiViewContext: () => ipcRenderer.invoke('nodi:viewContext:get'),
+  quoteNodiSelection: (text) => ipcRenderer.invoke('nodi:quoteSelection:set', text),
+  consumeNodiQuoteSelection: () => ipcRenderer.invoke('nodi:quoteSelection:consume'),
+  onNodiQuoteSelection: (cb) => {
+    const listener = (_e: unknown, selection: Parameters<typeof cb>[0]) => cb(selection);
+    ipcRenderer.on('nodi:quoteSelection', listener);
+    return () => ipcRenderer.removeListener('nodi:quoteSelection', listener);
+  },
   setNodiTutorialVisible: (visible) => ipcRenderer.invoke('nodi:tutorialVisible', visible).then(() => undefined),
   // Deliberately fire-and-forget. `sendSync` was used here to make the hit-test
   // transition land before a following physical mouse-down, but it cannot buy

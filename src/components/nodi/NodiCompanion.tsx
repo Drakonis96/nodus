@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { deriveNodiNoteTitle } from '@shared/nodiNotes';
 import { announcementCopyFor } from '@shared/announcements';
-import type { AppSettings, ModelRef, NodiChatMessage, NodiContextKind, NodiConversation, NodiNote, NodiNotification, NodiOverlayPlacement, VaultType } from '@shared/types';
+import type { AppSettings, ModelRef, NodiChatMessage, NodiContextKind, NodiConversation, NodiNote, NodiNotification, NodiOverlayPlacement, NodiQuoteSelection, VaultType } from '@shared/types';
 import { vaultTypeColor } from '@shared/vaultTypes';
 import { type NodiRole, type NodiState } from './Nodi';
 import { NodiAvatar } from './NodiAvatar';
@@ -148,6 +148,7 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
 
   const [messages, setMessages] = useState<NodiChatMessage[]>([]);
   const [input, setInput] = useState('');
+  const [quotedSelection, setQuotedSelection] = useState<string | null>(null);
   const [streaming, setStreaming] = useState(false);
   const [contexts, setContexts] = useState<NodiContextKind[]>(['documentation', 'current_view']);
   const [conversations, setConversations] = useState<NodiConversation[]>([]);
@@ -162,6 +163,8 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
   const [closing, setClosing] = useState(false);
   const msgsRef = useRef<HTMLDivElement | null>(null);
+  const chatInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const handledQuoteIdRef = useRef<string | null>(null);
   const hasOpenSurface = menuOpen || helpOpen || panel !== 'none' || contextMenuOpen || closing;
 
   // ── Quick notes ────────────────────────────────────────────────────────────
@@ -245,6 +248,30 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
     window.nodus.getSettings().then(apply).catch(() => {});
     return window.nodus.onSettingsChanged(apply);
   }, [costumes]);
+
+  const openQuotedSelection = useCallback((selection: NodiQuoteSelection | null) => {
+    if (!selection || handledQuoteIdRef.current === selection.id || Date.now() - selection.createdAt > 60_000) return;
+    handledQuoteIdRef.current = selection.id;
+    setQuotedSelection(selection.text);
+    setContexts((current) => current.includes('current_view') ? current : [...current, 'current_view']);
+    setPanel('chat');
+    setChatTool('none');
+    setHelpOpen(false);
+    setMenuOpen(false);
+    window.setTimeout(() => chatInputRef.current?.focus(), 0);
+  }, []);
+
+  // The event handles an already-visible companion; consuming the pending value
+  // handles the race where quoting first had to enable/mount Nodi (including the
+  // independent always-on-top renderer).
+  useEffect(() => {
+    const off = window.nodus.onNodiQuoteSelection((selection) => {
+      openQuotedSelection(selection);
+      void window.nodus.consumeNodiQuoteSelection();
+    });
+    void window.nodus.consumeNodiQuoteSelection().then(openQuotedSelection).catch(() => {});
+    return off;
+  }, [openQuotedSelection]);
 
   const refreshConversations = useCallback(() => {
     void window.nodus.listNodiConversations().then(setConversations).catch(() => {});
@@ -700,6 +727,7 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
     setActiveConversationId(null);
     setMessages([]);
     setInput('');
+    setQuotedSelection(null);
     setCopiedMessageIndex(null);
     setChatTool('none');
     setCitation(null);
@@ -709,6 +737,7 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
     if (streaming) return;
     setActiveConversationId(conversation.id);
     setMessages(conversation.messages);
+    setQuotedSelection(null);
     setContexts(conversation.contexts);
     setNodiModel(conversation.model ?? settings?.nodiModel ?? settings?.synthesisModel ?? null);
     setCopiedMessageIndex(null);
@@ -754,19 +783,24 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
   };
 
   const send = async (explicit?: string) => {
-    const text = (explicit ?? input).trim();
-    if (!text || streaming) return;
+    const question = (explicit ?? input).trim();
+    if (!question || streaming) return;
+    const quotation = quotedSelection;
+    const text = quotation
+      ? `> ${quotation.replace(/\n/g, '\n> ')}\n\n${question}`
+      : question;
     const next: NodiChatMessage[] = [...messages, { role: 'user', content: text }];
     setMessages([...next, { role: 'assistant', content: '' }]);
     // A starter chip passes its text explicitly; don't wipe a draft the user may be typing.
     if (!explicit) setInput('');
+    setQuotedSelection(null);
     setStreaming(true);
     let conversationId = activeConversationId;
     let assistantText = '';
     try {
       const saved = await window.nodus.saveNodiConversation({
         id: conversationId,
-        title: next.find((message) => message.role === 'user')?.content.slice(0, 72),
+        title: (messages.find((message) => message.role === 'user')?.content ?? question).slice(0, 72),
         messages: next,
         contexts,
         model: nodiModel,
@@ -959,7 +993,7 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
                 <div className="nodi-context-grid">
                   {([
                     ['documentation', t('Documentación de Nodus'), t('Funciones y rutas verificadas de la aplicación.')],
-                    ['current_view', t('Vista actual'), t('Texto visible de la sección abierta, acotado.')],
+                    ['current_view', t('Vista actual'), t('Texto visible de la sección abierta o documento completo en los lectores.')],
                     ['vault', t('Bóveda actual'), t('Recuperación semántica relevante, no el vault completo.')],
                     ['all_vaults', t('Todos los vaults'), t('Inventario transversal con conteos y elementos relevantes de cada vault.')],
                   ] as Array<[NodiContextKind, string, string]>).map(([kind, label, description]) => (
@@ -1026,15 +1060,23 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
                         onCitation={citesCorpus ? setCitation : undefined}
                         onWorldEntry={citesWorld ? (kind, id) => void window.nodus.nodiOpenWorldEntry(kind, id) : undefined}
                       />
-                    ) : m.content
+                    ) : m.content.startsWith('> ') ? <Markdown content={m.content} verify={false} /> : m.content
                     : streaming && i === messages.length - 1 ? <span className="nodi-typing">{t('escribiendo…')}</span> : ''}
                 </div>
               ))}
             </div>
             {citation && <NodiCitationCard citation={citation} isOverlay={isOverlay} onClose={() => setCitation(null)} />}
             <div className="nodi-chat-foot">
+              {quotedSelection && (
+                <div className="nodi-chat-quote">
+                  <Icon name="quote" size={13} />
+                  <span>{quotedSelection}</span>
+                  <button type="button" onClick={() => setQuotedSelection(null)} title={t('Quitar cita')} aria-label={t('Quitar cita')}><Icon name="x" size={12} /></button>
+                </div>
+              )}
               <div className="nodi-chat-row">
                 <textarea
+                  ref={chatInputRef}
                   className="nodi-chat-input"
                   value={input}
                   placeholder={t('Escribe a Nodi…')}

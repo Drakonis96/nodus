@@ -6940,6 +6940,15 @@ export interface NodiViewContext {
   title: string;
   text: string;
   capturedAt: number;
+  /** Full reader documents (Deep Research and Immersion) use the larger document
+   * budget instead of the small, generic visible-DOM snapshot. */
+  complete?: boolean;
+}
+
+export interface NodiQuoteSelection {
+  id: string;
+  text: string;
+  createdAt: number;
 }
 
 export interface TestimonyIndexReport {
@@ -7582,6 +7591,9 @@ export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, 
   cancelNodiChat(): Promise<void>;
   setNodiViewContext(context: NodiViewContext): Promise<void>;
   getNodiViewContext(): Promise<NodiViewContext | null>;
+  quoteNodiSelection(text: string): Promise<NodiQuoteSelection | null>;
+  consumeNodiQuoteSelection(): Promise<NodiQuoteSelection | null>;
+  onNodiQuoteSelection(cb: (selection: NodiQuoteSelection) => void): () => void;
   setNodiTutorialVisible(visible: boolean): Promise<void>;
   nodiOpenSettings(): Promise<void>;
   nodiOpenWorldEntry(kind: string, id: string): Promise<void>;
