@@ -54,6 +54,7 @@ try {
     'nodus_get_gap',
     'nodus_get_author_relations',
     'nodus_search_authors',
+    'nodus_read_author_synthesis',
     'nodus_get_author_synthesis',
     'nodus_list_works',
     'nodus_get_work',
@@ -76,6 +77,9 @@ try {
     'nodus_generate_writing_draft',
     'nodus_save_writing_draft',
     'nodus_list_writing_drafts',
+    'nodus_get_writing_draft',
+    'nodus_list_deep_research_reports',
+    'nodus_get_deep_research_report',
     'nodus_generate_deep_research',
     'nodus_finalize_deep_research',
     'nodus_enqueue_deep_research',
@@ -171,28 +175,55 @@ try {
   ];
   assert.deepEqual([...server.tools.keys()], expectedTools);
 
-  // Vault-type gating: the surface a session advertises is scoped to the active
-  // vault type. Universal tools (capabilities, notes) are everywhere; layer tools
-  // only appear in the vault types that own the layer. Registering with null keeps
-  // the full surface (what the FakeServer above exercises).
+  // MCP clients can cache tools/list across reconnects. The complete read-only
+  // surface therefore has to remain stable when the active vault changes, while
+  // writes/actions keep their vault-type gate. Registering with null still keeps
+  // the complete surface (what the FakeServer above exercises).
   const surfaceFor = (vaultType) => {
     const scoped = new FakeServer();
     registerToolsForVault(scoped, vaultType);
     return new Set(scoped.tools.keys());
   };
+  const readOnlyTools = [...server.tools]
+    .filter(([, entry]) => entry.meta.annotations?.readOnlyHint === true)
+    .map(([name]) => name);
+  const retrievalVerbs = new Set(['get', 'list', 'search', 'query']);
+  const hybridGetTools = new Set(['nodus_get_author_synthesis']);
+  assert.deepEqual(
+    [...server.tools]
+      .filter(([name, entry]) =>
+        name.split('_').some((part) => retrievalVerbs.has(part))
+          && !hybridGetTools.has(name)
+          && entry.meta.annotations?.readOnlyHint !== true)
+      .map(([name]) => name),
+    [],
+    'every get/list/search/query tool must declare itself read-only so it joins the stable cross-vault surface',
+  );
+  assert.ok(server.tools.get('nodus_read_author_synthesis').meta.annotations.readOnlyHint, 'the hybrid author getter has a stable read-only alternative');
+  const assertStableReads = (surface, label) => {
+    assert.deepEqual(
+      readOnlyTools.filter((name) => !surface.has(name)),
+      [],
+      `${label} must retain every read-only tool so a cached MCP catalogue remains valid after a vault switch`,
+    );
+  };
   const docencia = surfaceFor('docencia');
   assert.ok(docencia.has('nodus_get_capabilities') && docencia.has('nodus_create_note'), 'docencia keeps the universal tools');
   assert.ok(docencia.has('nodus_teaching_get_gradebook') && docencia.has('nodus_study_get_workspace'), 'docencia exposes teaching + study layers');
-  assert.ok(!docencia.has('nodus_list_ideas') && !docencia.has('nodus_list_databases') && !docencia.has('nodus_list_persons'), 'docencia hides research/database/records tools');
+  assert.ok(docencia.has('nodus_list_ideas') && docencia.has('nodus_list_databases') && docencia.has('nodus_list_persons'), 'docencia retains every readable layer');
+  assert.ok(!docencia.has('nodus_create_database_row') && !docencia.has('nodus_world_create_character'), 'docencia still hides incompatible writes');
   const databases = surfaceFor('databases');
   assert.ok(databases.has('nodus_create_database_row') && databases.has('nodus_set_database_cell'), 'databases exposes the additive write tools');
-  assert.ok(!databases.has('nodus_teaching_get_gradebook') && !databases.has('nodus_list_ideas') && !databases.has('nodus_study_get_workspace'), 'databases hides teaching/research/study tools');
+  assert.ok(databases.has('nodus_teaching_get_gradebook') && databases.has('nodus_list_ideas') && databases.has('nodus_study_get_workspace'), 'databases retains every readable layer');
+  assert.ok(!databases.has('nodus_prosop_run_analysis') && !databases.has('nodus_world_create_character'), 'databases hides incompatible actions');
   const academic = surfaceFor('academic');
   assert.ok(academic.has('nodus_list_ideas') && academic.has('nodus_search_passages'), 'academic exposes the research surface');
-  assert.ok(!academic.has('nodus_list_databases') && !academic.has('nodus_teaching_get_gradebook') && !academic.has('nodus_list_persons'), 'academic hides database/teaching/records tools');
+  assert.ok(academic.has('nodus_list_databases') && academic.has('nodus_teaching_get_gradebook') && academic.has('nodus_list_persons'), 'academic retains every readable layer');
+  assert.ok(!academic.has('nodus_create_database_row') && !academic.has('nodus_prosop_run_analysis'), 'academic hides incompatible actions');
   const genealogy = surfaceFor('genealogy');
   assert.ok(genealogy.has('nodus_list_persons') && genealogy.has('nodus_list_ideas'), 'genealogy exposes records + research layers');
-  assert.ok(!genealogy.has('nodus_list_databases') && !genealogy.has('nodus_teaching_get_gradebook'), 'genealogy hides database/teaching tools');
+  assert.ok(genealogy.has('nodus_list_databases') && genealogy.has('nodus_teaching_get_gradebook'), 'genealogy retains other readable layers');
+  assert.ok(!genealogy.has('nodus_create_database_row') && !genealogy.has('nodus_world_create_character'), 'genealogy hides incompatible writes');
   const prosopography = surfaceFor('prosopography');
   assert.ok(
     prosopography.has('nodus_prosop_get_design')
@@ -201,10 +232,10 @@ try {
     'prosopography exposes its evidence-first read and analysis surface',
   );
   assert.ok(
-    !prosopography.has('nodus_list_persons')
-      && !prosopography.has('nodus_list_databases')
-      && !prosopography.has('nodus_teaching_get_gradebook'),
-    'prosopography does not inherit genealogy, database or teaching tools',
+    prosopography.has('nodus_list_persons')
+      && prosopography.has('nodus_list_databases')
+      && prosopography.has('nodus_teaching_get_gradebook'),
+    'prosopography retains every readable layer',
   );
   const worldbuilding = surfaceFor('worldbuilding');
   assert.ok(
@@ -215,16 +246,24 @@ try {
     'worldbuilding exposes its complete namespaced read and non-destructive authoring surface',
   );
   assert.ok(
-    !worldbuilding.has('nodus_list_ideas')
-      && !worldbuilding.has('nodus_list_persons')
-      && !worldbuilding.has('nodus_list_databases')
-      && !worldbuilding.has('nodus_prosop_search'),
-    'worldbuilding does not inherit unrelated research, records, database or prosopography tools',
+    worldbuilding.has('nodus_list_ideas')
+      && worldbuilding.has('nodus_list_persons')
+      && worldbuilding.has('nodus_list_databases')
+      && worldbuilding.has('nodus_prosop_search'),
+    'worldbuilding retains every readable layer',
   );
   assert.ok(
-    [...academic].every((name) => !name.startsWith('nodus_world_')),
-    'world tools fail closed outside a Worldbuilding vault',
+    !academic.has('nodus_world_create_character') && !academic.has('nodus_world_update_character'),
+    'worldbuilding writes fail closed outside a Worldbuilding vault',
   );
+  for (const [label, surface] of [
+    ['docencia', docencia],
+    ['databases', databases],
+    ['academic', academic],
+    ['genealogy', genealogy],
+    ['prosopography', prosopography],
+    ['worldbuilding', worldbuilding],
+  ]) assertStableReads(surface, label);
   assert.equal(surfaceFor(null).size, expectedTools.length, 'a null vault type registers the full surface');
 
   seedMcpDatabase(getDb());
@@ -240,8 +279,12 @@ try {
   );
   const capabilities = capabilitiesRaw.structuredContent;
   assert.equal(capabilities.version, '0.0.0-test', 'capabilities reports the running app version');
+  assert.match(capabilities.access.read, /All read-only MCP tools stay available across vault switches/);
+  assert.match(capabilities.access.write, /limited to the active vault type/);
   assert.equal(capabilities.counts.works, 3);
   assert.equal(capabilities.counts.notes, 1);
+  assert.equal(capabilities.counts.writingDrafts, 0, 'capabilities reports the saved writing catalogue size');
+  assert.equal(capabilities.counts.deepResearchReports, 0, 'capabilities reports the persistent Deep Research gallery size');
   assert.equal(capabilities.counts.themes, 1);
   assert.equal(capabilities.counts.passages, 2);
   assert.equal(capabilities.counts.databases, 0, 'capabilities reports the databases count');
@@ -829,6 +872,14 @@ try {
   assert.equal(authors.authors[0].author_id, 'author-1');
   assert.equal(authors.authors[0].hasSynthesis, true);
 
+  const storedAuthorSynthesis = await callTool(server, 'nodus_read_author_synthesis', { author: 'author-1' });
+  assert.equal(storedAuthorSynthesis.source, 'cached');
+  assert.match(storedAuthorSynthesis.synthesis.thesis, /memoria visual/);
+  assert.equal(storedAuthorSynthesis.counts.works, 1);
+  const absentStoredSynthesis = await callTool(server, 'nodus_read_author_synthesis', { author: 'author-2' });
+  assert.equal(absentStoredSynthesis.source, 'missing');
+  assert.equal(absentStoredSynthesis.synthesis, null);
+
   const authorSynthesis = await callTool(server, 'nodus_get_author_synthesis', {
     author: 'author-1',
     generateIfMissing: false,
@@ -958,15 +1009,100 @@ try {
   assert.equal(finished.job.status, 'completed', `queued report failed: ${finished.job.error}`);
   assert.ok(finished.job.savedDraftId, 'save=true files the finished report as a draft');
   assert.ok(finished.report.draft.title, 'includeReport returns the report itself');
-  const savedByQueue = await callTool(server, 'nodus_list_writing_drafts', {});
+  const savedByQueue = await callTool(server, 'nodus_list_writing_drafts', {
+    sort: 'newest',
+    limit: 25,
+    offset: 0,
+  });
   assert.ok(
     savedByQueue.drafts.some((draft) => draft.id === finished.job.savedDraftId),
     'the queued report is readable through the ordinary drafts tool once the job is dropped'
   );
+  assert.equal('draft' in savedByQueue.drafts[0], false, 'catalogue rows never carry a full report body');
+
+  const persistedReports = await callTool(server, 'nodus_list_deep_research_reports', {
+    sort: 'newest',
+    limit: 25,
+    offset: 0,
+  });
+  assert.ok(
+    persistedReports.reports.some((report) => report.id === finished.job.savedDraftId),
+    'the dedicated persistent catalogue includes a completed queued report'
+  );
+  const persistedReport = await callTool(server, 'nodus_get_deep_research_report', {
+    reportId: finished.job.savedDraftId,
+  });
+  assert.equal(persistedReport.report.id, finished.job.savedDraftId);
+  assert.equal(
+    persistedReport.report.draft.draftMarkdown,
+    finished.report.draft.draftMarkdown,
+    'detail retrieval returns the complete persisted report'
+  );
+
+  // Regression for the failure seen by real clients: an archive containing several
+  // long reports used to be returned whole and crossed the 1 MB MCP response ceiling.
+  // The catalogue must stay compact and traversable while detail remains lossless.
+  const writingDraftRepo = require(path.join(repoRoot, 'electron/db/writingDraftsRepo.ts'));
+  const longMarkdown = `# Long report\n\n${'evidence '.repeat(18_000)}`;
+  for (let i = 0; i < 12; i += 1) {
+    writingDraftRepo.saveWritingWorkshopDraft({
+      title: `Archived report ${String(i).padStart(2, '0')}`,
+      draft: {
+        ...finished.report.draft,
+        title: `Archived report ${String(i).padStart(2, '0')}`,
+        abstract: `Archive summary ${i}. ${'context '.repeat(800)}`,
+        draftMarkdown: `${longMarkdown}\n\nReport ${i}`,
+        brief: { ...finished.report.draft.brief, objective: `Archived objective ${i}` },
+      },
+    });
+  }
+  const ordinaryDraft = writingDraftRepo.saveWritingWorkshopDraft({
+    title: 'Ordinary literature review',
+    draft: {
+      ...finished.report.draft,
+      title: 'Ordinary literature review',
+      brief: { ...finished.report.draft.brief, kind: 'literature_review', objective: 'A normal workshop draft' },
+    },
+  });
+  const firstArchivePage = await callTool(server, 'nodus_list_deep_research_reports', {
+    query: 'Archived',
+    sort: 'title',
+    limit: 5,
+    offset: 0,
+  });
+  assert.equal(firstArchivePage.total, 12);
+  assert.equal(firstArchivePage.reports.length, 5);
+  assert.equal(firstArchivePage.hasMore, true);
+  assert.equal(firstArchivePage.reports[0].title, 'Archived report 00');
+  assert.equal('draft' in firstArchivePage.reports[0], false);
+  assert.ok(
+    Buffer.byteLength(JSON.stringify(firstArchivePage), 'utf8') < 50_000,
+    'a page of long reports remains comfortably below the MCP response ceiling'
+  );
+  const secondArchivePage = await callTool(server, 'nodus_list_deep_research_reports', {
+    query: 'Archived',
+    sort: 'title',
+    limit: 5,
+    offset: 5,
+  });
+  assert.equal(secondArchivePage.reports[0].title, 'Archived report 05', 'offset traverses the complete archive');
+  const archivedDetail = await callTool(server, 'nodus_get_deep_research_report', {
+    reportId: firstArchivePage.reports[0].id,
+  });
+  assert.equal(archivedDetail.report.draft.draftMarkdown.length, longMarkdown.length + '\n\nReport 0'.length);
+  const ordinaryList = await callTool(server, 'nodus_list_writing_drafts', {
+    kind: 'literature_review',
+    sort: 'newest',
+    limit: 10,
+    offset: 0,
+  });
+  assert.equal(ordinaryList.total, 1, 'the generic catalogue can filter non-Deep-Research drafts');
+  const ordinaryDetail = await callTool(server, 'nodus_get_writing_draft', { draftId: ordinaryDraft.id });
+  assert.equal(ordinaryDetail.draft.draft.title, 'Ordinary literature review');
 
   const missing = await callTool(server, 'nodus_get_deep_research_job', { jobId: 'drj-does-not-exist' });
   assert.equal(missing.job, null);
-  assert.match(missing.error, /nodus_list_writing_drafts/, 'a dropped job points the client at where the report lives');
+  assert.match(missing.error, /nodus_list_deep_research_reports/, 'a dropped job points the client at the persistent gallery');
 
   // Semantic passage search: unconfigured provider must fail cleanly…
   const passageAiError = await callToolRaw(server, 'nodus_search_passages', {
