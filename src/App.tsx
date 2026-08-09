@@ -1336,7 +1336,7 @@ export function App() {
           announcements={announcements}
           language={settings.uiLanguage}
           onMarkAnnouncementRead={markAnnouncementRead}
-          onClearActivity={() => void window.nodus.clearNotifications().then(setNotifications).catch(() => {})}
+          onClearAll={() => void window.nodus.clearNotifications().then(setNotifications).catch(() => {})}
         />
       </header>
 

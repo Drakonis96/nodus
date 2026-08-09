@@ -232,10 +232,16 @@ try {
       'nodiOpenMainWindow', 'nodiOpenSettings', 'nodiOpenWorldEntry',
       'getSettings', 'updateSettings', 'onSettingsChanged', 'getActiveVault', 'onVaultChanged',
       'getIdeaDetail', 'getEdgeDetail', 'getGapDetail', 'getWork', 'getPassage', 'openInZotero',
+      'getCitationPreview',
     ];
     return names.filter((name) => typeof window.nodus?.[name] !== 'function');
   });
   assert.deepEqual(exposed, [], 'the overlay preload is missing methods Nodi calls');
+  assert.equal(
+    await overlay.evaluate(() => window.nodus.getCitationPreview({ kind: 'idea', id: 'missing-preview' })),
+    null,
+    'the citation hover preview did not round-trip through the overlay bridge',
+  );
 
   const closePanel = async () => {
     await overlay.locator('.nodi-panel [aria-label="Cerrar"]').last().click();
@@ -243,13 +249,19 @@ try {
   };
 
   // Notifications: listNotifications on open, markNotificationsRead behind it, and
-  // clearNotifications on the Limpiar button.
+  // clearNotifications behind the Limpiar confirmation.
   await openPanel('ntf');
   assert.equal(await overlay.locator('.nodi-panel').count(), 1, 'the notifications panel did not open');
   console.log('[verify] notifications panel ->', JSON.stringify(await overlay.locator('.nodi-panel-body').innerText()));
   await overlay.locator('.nodi-panel-head button', { hasText: 'Limpiar' }).click();
+  const clearConfirmation = overlay.locator('.nodi-confirm-dialog');
+  await clearConfirmation.waitFor();
+  assert.match(await clearConfirmation.innerText(), /avisos de Nodus y la actividad reciente/);
+  await clearConfirmation.getByRole('button', { name: 'Cancelar' }).click();
+  await overlay.locator('.nodi-panel-head button', { hasText: 'Limpiar' }).click();
+  await overlay.locator('.nodi-confirm-dialog button.danger').click();
   await overlay.locator('.nodi-empty').waitFor();
-  console.log('[verify] clearNotifications -> empty');
+  console.log('[verify] clearNotifications confirmation -> empty');
   await closePanel();
 
   // Chat: opening it reads the conversations, the view context and the settings. The

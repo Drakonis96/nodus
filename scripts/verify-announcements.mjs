@@ -142,6 +142,21 @@ try {
   assert.equal(hostile.url, undefined, 'a javascript: link must never reach the renderer');
   console.log('[announcements] expired, version-targeted and javascript: entries filtered as designed');
 
+  // The header surface exposes the same destructive action as Nodi and asks before
+  // touching either store.
+  // A one-time toolkit guide can still own the pointer in this synthetic profile;
+  // invoke the underlying button because this check targets the notification panel.
+  await page.evaluate(() => document.querySelector('[data-notifications-trigger]')?.click());
+  const panel = page.getByTestId('header-notifications-panel');
+  await panel.waitFor({ timeout: 5_000 });
+  await panel.getByRole('button', { name: 'Limpiar' }).evaluate((button) => button.click());
+  const confirmation = page.getByRole('dialog', { name: 'Limpiar notificaciones' });
+  await confirmation.waitFor({ timeout: 5_000 });
+  await confirmation.getByRole('button', { name: 'Cancelar' }).evaluate((button) => button.click());
+  assert.equal((await page.evaluate(() => window.nodus.listAnnouncements())).length, 2, 'cancel must keep every notice');
+  await page.keyboard.press('Escape');
+  console.log('[announcements] header clear action requires confirmation and cancel is non-destructive');
+
   // ── 2. The second check is conditional and answered with 304 ───────────────
   await refresh(page);
   const second = requests[requests.length - 1];
@@ -161,16 +176,25 @@ try {
   assert.equal(afterRestart.find((entry) => entry.id === 'hostile-notice').read, false);
   console.log('[announcements] per-notice read state survived a restart');
 
-  // ── 4. Turned off means no request at all ─────────────────────────────────
+  // ── 4. Clearing the notification centre dismisses notices permanently ───────
+  await page.evaluate(() => window.nodus.clearNotifications());
+  assert.deepEqual(await page.evaluate(() => window.nodus.listAnnouncements()), [], 'clear must dismiss every visible notice');
+
+  await closeElectronApp(app);
+  ({ app } = await launch());
+  page = await app.firstWindow();
+  assert.deepEqual(await page.evaluate(() => window.nodus.listAnnouncements()), [], 'dismissed notices must stay hidden after restart');
+  console.log('[announcements] clearing the notification centre dismissed notices across a restart');
+
+  // ── 5. Turned off means no request at all ─────────────────────────────────
   await page.evaluate(() => window.nodus.updateSettings({ announcementsEnabled: false }));
   requests = [];
   await page.evaluate(() => window.nodus.updateSettings({ announcementsEnabled: false }));
   await new Promise((resolve) => setTimeout(resolve, 4_000));
   assert.deepEqual(requests, [], `the setting is off, so nothing may be requested (got ${requests.length})`);
-  // And the notices already downloaded stay readable — turning it off stops the asking,
-  // it does not erase what arrived.
+  // Turning it off stops the asking and does not resurrect notices dismissed earlier.
   const offline = await page.evaluate(() => window.nodus.listAnnouncements());
-  assert.equal(offline.length, 2, 'notices already downloaded stay available with the setting off');
+  assert.equal(offline.length, 0, 'dismissed notices stay hidden with the setting off');
   console.log('[announcements] with the setting off: 0 requests, list still readable');
 
   console.log('announcements live verification passed');

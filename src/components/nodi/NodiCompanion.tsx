@@ -145,6 +145,7 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
   // surfaces can never disagree about what is unread.
   const { announcements, unread: unreadAnnouncements, markRead: markAnnouncementRead } = useAnnouncements();
   const unread = unreadAnnouncements + ntfs.reduce((n, x) => n + (x.read ? 0 : 1), 0);
+  const [clearNotificationsConfirmation, setClearNotificationsConfirmation] = useState(false);
 
   const [messages, setMessages] = useState<NodiChatMessage[]>([]);
   const [input, setInput] = useState('');
@@ -873,7 +874,9 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
             <div className="nodi-panel-head">
               <span>{t('Notificaciones')}</span>
               <span className="grow" />
-              <button onClick={() => window.nodus.clearNotifications().then(setNtfs)}>{t('Limpiar')}</button>
+              {(announcements.length > 0 || ntfs.length > 0) && (
+                <button onClick={() => setClearNotificationsConfirmation(true)}>{t('Limpiar')}</button>
+              )}
               <button onClick={() => setPanel('none')} aria-label={t('Cerrar')}>✕</button>
             </div>
             <div className="nodi-panel-body">
@@ -928,6 +931,27 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
                 ))
               )}
             </div>
+            {clearNotificationsConfirmation && (
+              <div className="nodi-confirm-overlay">
+                <div className="nodi-confirm-dialog" role="dialog" aria-modal="true" aria-label={t('Limpiar notificaciones')}>
+                  <Icon name="trash" size={18} />
+                  <h3>{t('Limpiar notificaciones')}</h3>
+                  <p>{t('Se eliminarán todos los avisos de Nodus y la actividad reciente. Esta acción no se puede deshacer.')}</p>
+                  <div>
+                    <button onClick={() => setClearNotificationsConfirmation(false)}>{t('Cancelar')}</button>
+                    <button
+                      className="danger"
+                      onClick={() => {
+                        setClearNotificationsConfirmation(false);
+                        void window.nodus.clearNotifications().then(setNtfs);
+                      }}
+                    >
+                      {t('Limpiar')}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

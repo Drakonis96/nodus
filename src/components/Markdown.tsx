@@ -251,10 +251,22 @@ function CitationLink({
     if (!fetchedRef.current) {
       fetchedRef.current = true;
       setPreview('loading');
-      void window.nodus
-        .getCitationPreview({ kind: citation.kind, id: citation.id })
-        .then((value) => setPreview(value))
-        .catch(() => setPreview(null));
+      // Secondary windows intentionally expose a narrowed bridge. If that contract
+      // ever drifts again, invoking a missing method throws synchronously — before a
+      // Promise exists for `.catch()` — and would otherwise strand the card on
+      // "Loading…" forever.
+      try {
+        void window.nodus
+          .getCitationPreview({ kind: citation.kind, id: citation.id })
+          .then((value) => setPreview(value))
+          .catch(() => {
+            fetchedRef.current = false;
+            setPreview(null);
+          });
+      } catch {
+        fetchedRef.current = false;
+        setPreview(null);
+      }
     }
   };
 

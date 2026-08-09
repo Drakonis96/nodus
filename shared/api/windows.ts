@@ -59,6 +59,7 @@ export const NODI_WINDOW_METHODS = [
   'getActiveVault',
   'onVaultChanged',
   // the citation card
+  'getCitationPreview',
   'getIdeaDetail',
   'getEdgeDetail',
   'getGapDetail',
