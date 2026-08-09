@@ -159,6 +159,7 @@ import { listAuthors, listAuthorsPage, buildAuthorDossier, synthesizeAuthorDossi
 import { buildSynthesisMatrix, synthesizeMatrixCell } from '../ai/synthesisMatrix';
 import { getCachedWorkIdeaSynthesis, synthesizeWorkIdeas } from '../ai/workIdeaSynthesis';
 import { exportAuthorSyntheses } from '../export/authorSynthesisExport';
+import { setAuthorSaved } from '../db/savedAuthorsRepo';
 import { buildStudyPlan, generateStudySession } from '../ai/studyGuide';
 import { buildImmersionScope, evaluateImmersionAnswer, generateImmersionSession } from '../ai/immersion';
 import * as immersionRepo from '../db/immersionRepo';
@@ -559,6 +560,7 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
   // authors (dossier + synthesis matrix)
   h('authors:list', async () => listAuthors());
   h('authors:listPage', async (_e, request) => listAuthorsPage(request));
+  h('authors:setSaved', async (_e, authorId: string, saved: boolean) => setAuthorSaved(authorId, saved));
   h('authors:dossier', async (_e, authorId: string) => buildAuthorDossier(authorId));
   h('authors:synthesize', async (_e, authorId: string, model?: ModelRef | null) =>
     synthesizeAuthorDossier(authorId, model)

@@ -10,7 +10,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 124;
+export const SCHEMA_VERSION = 125;
 
 export const migrations: Migration[] = [
   {
@@ -6296,6 +6296,19 @@ export const migrations: Migration[] = [
         draft_id   TEXT PRIMARY KEY,
         updated_at TEXT NOT NULL
       );
+    `,
+  },
+  {
+    version: 125,
+    up: /* sql */ `
+      -- Reader-curated author bookmarks. The canonical key survives author-layer
+      -- reconciliation and rescans; legacy/demo authors fall back to their local id.
+      -- This remains vault-local because the derived author layer itself is not synced.
+      CREATE TABLE saved_authors (
+        author_key TEXT PRIMARY KEY,
+        saved_at   TEXT NOT NULL
+      );
+      CREATE INDEX idx_saved_authors_saved_at ON saved_authors(saved_at DESC);
     `,
   },
 ];

@@ -17,9 +17,9 @@ import { useDataRefresh, useScanComplete } from '../hooks';
 import { useFeatureModel } from '../hooks/useFeatureModel';
 import type { PendingGraphNavigationTarget } from '../navigation';
 import { t, tx } from '../i18n';
-import { getVaultQueryCache, setVaultQueryCache } from '../vaultQueryCache';
+import { getVaultQueryCache, invalidateVaultQueryCache, setVaultQueryCache } from '../vaultQueryCache';
 
-type Tab = 'dossier' | 'matrix';
+type Tab = 'dossier' | 'matrix' | 'saved';
 
 const RELATION_LABELS: Record<string, string> = {
   contradicts: 'contradice a',
@@ -78,16 +78,26 @@ export function AuthorsView({
         </div>
         <div className="flex rounded-lg bg-neutral-900 p-0.5 text-sm">
           <button
+            data-testid="authors-tab-dossier"
             className={`px-3 py-1 rounded-md ${tab === 'dossier' ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:text-neutral-200'}`}
             onClick={() => setTab('dossier')}
           >
             {t('Fichas de autor')}
           </button>
           <button
+            data-testid="authors-tab-matrix"
             className={`px-3 py-1 rounded-md ${tab === 'matrix' ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:text-neutral-200'}`}
             onClick={() => setTab('matrix')}
           >
             {t('Matriz de síntesis')}
+          </button>
+          <button
+            data-testid="authors-tab-saved"
+            className={`px-3 py-1 rounded-md flex items-center gap-1.5 ${tab === 'saved' ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:text-neutral-200'}`}
+            onClick={() => setTab('saved')}
+          >
+            <Icon name="star" size={12} />
+            {t('Autores guardados')}
           </button>
         </div>
         <div className="flex-1" />
@@ -98,9 +108,11 @@ export function AuthorsView({
       </div>
 
       {tab === 'dossier' ? (
-        <DossierTab vaultId={vaultId} onOpenGraph={onOpenGraph} model={model} />
-      ) : (
+        <DossierTab key="all-authors" vaultId={vaultId} onOpenGraph={onOpenGraph} model={model} savedOnly={false} />
+      ) : tab === 'matrix' ? (
         <MatrixTab onOpenGraph={onOpenGraph} model={model} />
+      ) : (
+        <DossierTab key="saved-authors" vaultId={vaultId} onOpenGraph={onOpenGraph} model={model} savedOnly />
       )}
     </div>
   );
@@ -112,10 +124,12 @@ function DossierTab({
   vaultId,
   onOpenGraph,
   model,
+  savedOnly,
 }: {
   vaultId: string | null;
   onOpenGraph: (target: PendingGraphNavigationTarget) => void;
   model: ModelRef | null;
+  savedOnly: boolean;
 }) {
   const [authors, setAuthors] = useState<AuthorSummary[]>([]);
   const [totalAuthors, setTotalAuthors] = useState(0);
@@ -133,6 +147,7 @@ function DossierTab({
   const [exportFormat, setExportFormat] = useState<'markdown' | 'pdf'>('markdown');
   const [exporting, setExporting] = useState(false);
   const [exportMsg, setExportMsg] = useState<string | null>(null);
+  const [savingAuthorIds, setSavingAuthorIds] = useState<Set<string>>(new Set());
 
   const reloadAuthors = useCallback(async (force = true) => {
     const request = {
@@ -141,6 +156,7 @@ function DossierTab({
       query: queryFilter || undefined,
       sort: sortBy,
       synthesis: synthFilter,
+      savedOnly,
     } as const;
     const cacheKey = `authors:${JSON.stringify(request)}`;
     if (!force) {
@@ -148,7 +164,11 @@ function DossierTab({
       if (cached) {
         setAuthors(cached.items);
         setTotalAuthors(cached.total);
-        setSelectedId((current) => current ?? cached.items[0]?.author_id ?? null);
+        setSelectedId((current) =>
+          current && cached.items.some((author) => author.author_id === current)
+            ? current
+            : cached.items[0]?.author_id ?? null
+        );
         return;
       }
     }
@@ -162,8 +182,12 @@ function DossierTab({
     setAuthors(page.items);
     setTotalAuthors(page.total);
     setVaultQueryCache(vaultId, cacheKey, { items: page.items, total: page.total });
-    setSelectedId((cur) => cur ?? page.items[0]?.author_id ?? null);
-  }, [pageOffset, queryFilter, sortBy, synthFilter, vaultId]);
+    setSelectedId((current) =>
+      current && page.items.some((author) => author.author_id === current)
+        ? current
+        : page.items[0]?.author_id ?? null
+    );
+  }, [pageOffset, queryFilter, savedOnly, sortBy, synthFilter, vaultId]);
 
   useEffect(() => {
     const handle = setTimeout(() => setQueryFilter(query.trim()), 250);
@@ -227,6 +251,33 @@ function DossierTab({
 
   const filtered = authors;
 
+  const toggleAuthorSaved = useCallback(async (authorId: string) => {
+    const author = authors.find((candidate) => candidate.author_id === authorId);
+    if (!author || savingAuthorIds.has(authorId)) return;
+    setSavingAuthorIds((current) => new Set(current).add(authorId));
+    setError(null);
+    try {
+      await window.nodus.setAuthorSaved(authorId, !author.saved);
+      if (savedOnly && author.saved) {
+        setSelected((current) => {
+          const next = new Set(current);
+          next.delete(authorId);
+          return next;
+        });
+      }
+      invalidateVaultQueryCache(vaultId);
+      await reloadAuthors(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSavingAuthorIds((current) => {
+        const next = new Set(current);
+        next.delete(authorId);
+        return next;
+      });
+    }
+  }, [authors, reloadAuthors, savedOnly, savingAuthorIds, vaultId]);
+
   const toggleSelect = useCallback((id: string) => {
     setSelected((cur) => {
       const next = new Set(cur);
@@ -251,20 +302,25 @@ function DossierTab({
     setExporting(true);
     setExportMsg(null);
     try {
-      const res = await window.nodus.exportAuthorSyntheses({ authorIds: [...selected], format: exportFormat });
+      const res = await window.nodus.exportAuthorSyntheses({
+        authorIds: [...selected],
+        format: exportFormat,
+        savedOnly: savedOnly && selected.size === 0,
+      });
       setExportMsg(res ? tx('Exportado a {path}', { path: res.path }) : null);
     } catch (e) {
       setExportMsg(e instanceof Error ? e.message : String(e));
     } finally {
       setExporting(false);
     }
-  }, [selected, exportFormat]);
+  }, [exportFormat, savedOnly, selected]);
 
   return (
     <div className="flex-1 min-h-0 flex gap-4">
       {/* Author list */}
       <div className="w-80 shrink-0 flex flex-col min-h-0">
         <input
+          data-testid="authors-search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={t('Buscar autor…')}
@@ -335,10 +391,21 @@ function DossierTab({
         {exportMsg && <p className="text-[11px] text-neutral-500 mb-2 break-words">{exportMsg}</p>}
 
         <div className="flex-1 min-h-0 overflow-y-auto space-y-1 pr-1">
-          {filtered.length === 0 && <p className="text-sm text-neutral-500 px-1">{t('No hay autores todavía.')}</p>}
+          {filtered.length === 0 && (
+            <p className="text-sm text-neutral-500 px-1">
+              {t(
+                savedOnly
+                  ? queryFilter || synthFilter !== 'all'
+                    ? 'No hay autores guardados que coincidan con los filtros.'
+                    : 'No has guardado ningún autor todavía.'
+                  : 'No hay autores todavía.'
+              )}
+            </p>
+          )}
           {filtered.map((a) => (
             <div
               key={a.author_id}
+              data-testid={`author-card-${a.author_id}`}
               className={`flex items-start gap-2 px-2 py-2 rounded-lg border transition ${
                 selectedId === a.author_id
                   ? 'bg-neutral-800 border-indigo-600'
@@ -368,6 +435,18 @@ function DossierTab({
                     </>
                   )}
                 </div>
+              </button>
+              <button
+                data-testid={`author-save-${a.author_id}`}
+                type="button"
+                onClick={() => void toggleAuthorSaved(a.author_id)}
+                disabled={savingAuthorIds.has(a.author_id)}
+                aria-pressed={a.saved}
+                aria-label={t(a.saved ? 'Quitar de autores guardados' : 'Guardar autor')}
+                title={t(a.saved ? 'Quitar de autores guardados' : 'Guardar autor')}
+                className={`mt-0.5 shrink-0 rounded p-1 transition disabled:opacity-50 ${a.saved ? 'text-amber-400 hover:text-amber-300' : 'text-neutral-600 hover:text-amber-400'}`}
+              >
+                <Icon name="star" size={15} className={a.saved ? 'fill-current' : ''} />
               </button>
             </div>
           ))}
@@ -402,6 +481,9 @@ function DossierTab({
             onSynthesize={synthesize}
             onOpenGraph={onOpenGraph}
             onSelectAuthor={setSelectedId}
+            saved={authors.find((author) => author.author_id === dossier.author.author_id)?.saved ?? false}
+            savingSaved={savingAuthorIds.has(dossier.author.author_id)}
+            onToggleSaved={() => void toggleAuthorSaved(dossier.author.author_id)}
           />
         )}
       </div>
@@ -417,6 +499,9 @@ function AuthorDossierDetail({
   onSynthesize,
   onOpenGraph,
   onSelectAuthor,
+  saved,
+  savingSaved,
+  onToggleSaved,
 }: {
   dossier: AuthorDossier;
   model: ModelRef | null;
@@ -425,6 +510,9 @@ function AuthorDossierDetail({
   onSynthesize: () => void;
   onOpenGraph: (target: PendingGraphNavigationTarget) => void;
   onSelectAuthor: (id: string) => void;
+  saved: boolean;
+  savingSaved: boolean;
+  onToggleSaved: () => void;
 }) {
   const [worksOpen, setWorksOpen] = useState(false);
   const [selectedIdeaId, setSelectedIdeaId] = useState<string | null>(null);
@@ -445,6 +533,18 @@ function AuthorDossierDetail({
       <div>
         <div className="flex items-start gap-3">
           <h3 className="text-xl font-semibold">{dossier.fullName || author.name}</h3>
+          <button
+            data-testid="author-detail-save"
+            type="button"
+            onClick={onToggleSaved}
+            disabled={savingSaved}
+            aria-pressed={saved}
+            aria-label={t(saved ? 'Quitar de autores guardados' : 'Guardar autor')}
+            title={t(saved ? 'Quitar de autores guardados' : 'Guardar autor')}
+            className={`shrink-0 rounded-md p-1 transition disabled:opacity-50 ${saved ? 'text-amber-400 hover:text-amber-300' : 'text-neutral-500 hover:text-amber-400'}`}
+          >
+            <Icon name="star" size={18} className={saved ? 'fill-current' : ''} />
+          </button>
           <button
             className="ml-auto shrink-0 text-xs px-2 py-1 rounded-md bg-neutral-800 hover:bg-neutral-700 flex items-center gap-1"
             onClick={() => onOpenGraph({ preset: 'authors', nodeId: author.author_id, label: author.name })}

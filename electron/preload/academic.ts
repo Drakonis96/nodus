@@ -86,6 +86,7 @@ export const academicApi: AcademicApi = {
 
   listAuthors: () => ipcRenderer.invoke('authors:list'),
   listAuthorsPage: (request) => ipcRenderer.invoke('authors:listPage', request),
+  setAuthorSaved: (authorId, saved) => ipcRenderer.invoke('authors:setSaved', authorId, saved).then(() => undefined),
   getAuthorDossier: (authorId) => ipcRenderer.invoke('authors:dossier', authorId),
   synthesizeAuthor: (authorId, model) => ipcRenderer.invoke('authors:synthesize', authorId, model),
   getSynthesisMatrix: () => ipcRenderer.invoke('authors:matrix'),
