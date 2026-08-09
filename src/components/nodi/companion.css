@@ -614,8 +614,6 @@
 .nodi-history::-webkit-scrollbar-thumb:hover,
 .nodi-panel-body::-webkit-scrollbar-thumb:hover,
 .nodi-msg .md pre::-webkit-scrollbar-thumb:hover { background: #748198; }
-.nodi-typing { display: inline-block; color: #8b96a8; font-size: 12px; }
-
 /* Quick notes ───────────────────────────────────────────────────────────── */
 .nodi-panel.nodi-notes-panel { width: 372px; max-height: 480px; }
 
@@ -843,8 +841,7 @@
 .nodi-theme-light .nodi-ntf-time,
 .nodi-theme-light .nodi-ntf-section,
 .nodi-theme-light .nodi-empty,
-.nodi-theme-light .nodi-chat-status,
-.nodi-theme-light .nodi-typing { color: #94a3b8; }
+.nodi-theme-light .nodi-chat-status { color: #94a3b8; }
 
 .nodi-theme-light .nodi-msg.user { background: var(--nodi-vault-accent, #6366f1); color: #ffffff; }
 .nodi-theme-light .nodi-msg.assistant { background: #f1f5f9; color: #1f2937; }

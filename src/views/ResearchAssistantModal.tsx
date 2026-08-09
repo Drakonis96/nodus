@@ -11,6 +11,7 @@ import type {
 import { Icon, modelLabel, sortModelRefs } from '../components/ui';
 import { Markdown, type MarkdownCitation } from '../components/Markdown';
 import { ConfirmModal } from '../components/ConfirmModal';
+import { ChatTypingIndicator } from '../components/ChatTypingIndicator';
 import { SaveToNotesModal } from '../components/SaveToNotesModal';
 import { SourceCitationModal, type CitationTarget } from '../components/SourceCitationModal';
 import { VirtualList } from '../components/VirtualList';
@@ -749,11 +750,7 @@ export function ResearchAssistantModal({
                             {message.id === streamingId && <span aria-hidden className="stream-caret" />}
                           </div>
                         ) : message.id === streamingId ? (
-                          <span className="stream-dots" aria-label={t('Generando…')}>
-                            <i />
-                            <i />
-                            <i />
-                          </span>
+                          <ChatTypingIndicator label={t('Generando…')} />
                         ) : null
                       ) : (
                         message.content
