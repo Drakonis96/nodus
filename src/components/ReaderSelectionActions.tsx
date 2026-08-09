@@ -325,19 +325,59 @@ export const ReaderSelectionActions = forwardRef<ReaderSelectionActionsHandle, {
   const [commentEditor, setCommentEditor] = useState<CommentEditor | null>(null);
   const [savingComment, setSavingComment] = useState(false);
   const [commentError, setCommentError] = useState<string | null>(null);
-  const [mark, setMark] = useState<ReaderMark | null>(() => loadMark(contextId));
+  const [localMark, setLocalMark] = useState<ReaderMark | null>(() => loadMark(contextId));
   const [marginPositions, setMarginPositions] = useState<MarginPosition[]>([]);
+  const migratedBookmark = useRef<string | null>(null);
+  const usesSyncedBookmark = !!onCreateAnnotation && !!onDeleteAnnotation;
+  const bookmarkAnnotation = annotations.find((item) => item.kind === 'bookmark') ?? null;
+  const mark = usesSyncedBookmark
+    ? bookmarkAnnotation && {
+      start: bookmarkAnnotation.startOffset,
+      end: bookmarkAnnotation.endOffset,
+      text: bookmarkAnnotation.selectedText,
+    }
+    : localMark;
+  const hasMark = !!mark;
   const markLabel = t(mark ? 'Mover marcador aquí' : 'Añadir marcador de lectura');
 
   useEffect(() => {
-    const next = loadMark(contextId);
+    const next = usesSyncedBookmark ? null : loadMark(contextId);
     setActive(null);
     setActiveMarkActions(null);
     setActiveHighlightActions(null);
     setCommentEditor(null);
-    setMark(next);
-    onMarkChange?.(!!next);
-  }, [contextId, onMarkChange]);
+    setLocalMark(next);
+  }, [contextId, usesSyncedBookmark]);
+
+  useEffect(() => {
+    onMarkChange?.(hasMark);
+  }, [hasMark, onMarkChange]);
+
+  // Bookmarks created by the first reader implementation lived in localStorage.
+  // Move one into the syncable row the first time this saved report opens, so the
+  // server-backed feature does not make an existing place silently disappear.
+  useEffect(() => {
+    if (!usesSyncedBookmark || bookmarkAnnotation || !onCreateAnnotation) return;
+    if (migratedBookmark.current === contextId) return;
+    const legacy = loadMark(contextId);
+    if (!legacy) return;
+    migratedBookmark.current = contextId;
+    const content = targetRef.current?.textContent || '';
+    void onCreateAnnotation({
+      kind: 'bookmark',
+      color: null,
+      startOffset: legacy.start,
+      endOffset: legacy.end,
+      selectedText: legacy.text,
+      prefix: content.slice(Math.max(0, legacy.start - 64), legacy.start),
+      suffix: content.slice(legacy.end, legacy.end + 64),
+    }).then(() => {
+      localStorage.removeItem(storageKey(contextId));
+    }).catch((error) => {
+      migratedBookmark.current = null;
+      onAnnotationError?.(errorMessage(error));
+    });
+  }, [bookmarkAnnotation, contextId, onAnnotationError, onCreateAnnotation, targetRef, usesSyncedBookmark]);
 
   useEffect(() => {
     if (activeHighlightActions && !annotations.some((item) => item.id === activeHighlightActions.value.id)) {
@@ -543,17 +583,27 @@ export const ReaderSelectionActions = forwardRef<ReaderSelectionActionsHandle, {
   const saveMark = () => {
     if (!active) return;
     const next: ReaderMark = { start: active.startOffset, end: active.endOffset, text: active.selectedText };
-    localStorage.setItem(storageKey(contextId), JSON.stringify(next));
-    setMark(next);
-    onMarkChange?.(true);
     clearSelection();
+    if (usesSyncedBookmark && onCreateAnnotation) {
+      void onCreateAnnotation({ ...active, kind: 'bookmark', color: null }).catch((error) => {
+        onAnnotationError?.(errorMessage(error));
+      });
+      return;
+    }
+    localStorage.setItem(storageKey(contextId), JSON.stringify(next));
+    setLocalMark(next);
   };
 
   const deleteMark = () => {
+    if (usesSyncedBookmark && bookmarkAnnotation && onDeleteAnnotation) {
+      const id = bookmarkAnnotation.id;
+      setActiveMarkActions(null);
+      void onDeleteAnnotation(id).catch((error) => onAnnotationError?.(errorMessage(error)));
+      return;
+    }
     localStorage.removeItem(storageKey(contextId));
-    setMark(null);
+    setLocalMark(null);
     setActiveMarkActions(null);
-    onMarkChange?.(false);
   };
 
   const goToMark = useCallback(() => {

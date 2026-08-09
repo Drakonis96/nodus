@@ -515,6 +515,9 @@ export function createCorpusRoutes({ readSnapshot, readAssetBytes }) {
         report: { ...draftSummary(row), draft },
         image: assets.get(wanted) ?? null,
         translations: rows(snapshot, 'content_translations').filter((entry) => entry.entity_kind === 'deep_research' && String(entry.entity_id) === wanted),
+        // Small anchored rows, included with the document they decorate. A phone
+        // should not need a full snapshot merely to draw a comment in this report.
+        annotations: rows(snapshot, 'writing_draft_annotations').filter((entry) => String(entry.draft_id) === wanted),
         revision: space.revision,
       });
     }
