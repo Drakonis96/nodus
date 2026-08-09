@@ -41,6 +41,12 @@ try {
     assert.match(source, /getVaultQueryCache/, `${name} must reuse a valid cached query`);
     assert.match(source, /setVaultQueryCache/, `${name} must populate the vault cache`);
   }
+  assert.match(ideas, /const initialListLoad = useRef\(true\)/, 'Ideas must track the first list request of each visit');
+  assert.match(
+    ideas,
+    /const force = initialListLoad\.current;[\s\S]*?initialListLoad\.current = false;[\s\S]*?reload\(force\)/,
+    'entering Ideas must bypass a stale cached list before later requests may reuse it',
+  );
   console.log('Vault query cache tests passed.');
 } finally {
   await rm(temp, { recursive: true, force: true });

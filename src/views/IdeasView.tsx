@@ -62,6 +62,11 @@ export function IdeasView({
   const [savingIdea, setSavingIdea] = useState(false);
   const [deletingIdea, setDeletingIdea] = useState(false);
   const [confirmDeleteIdea, setConfirmDeleteIdea] = useState(false);
+  // A cached page is useful while the reader changes pages or returns to a previous
+  // sort during the same visit. It must not survive leaving and re-entering Ideas,
+  // though: deep scans can finish while the view is unmounted, so the queue-idle
+  // transition that normally invalidates query caches may never be observed here.
+  const initialListLoad = useRef(true);
   const [detailWidth, setDetailWidth] = useState(() =>
     loadNumber(IDEAS_DETAIL_WIDTH_KEY, IDEAS_DETAIL_DEFAULT_WIDTH, DETAIL_MIN_WIDTH, DETAIL_MAX_WIDTH)
   );
@@ -136,7 +141,9 @@ export function IdeasView({
   }, [searchQuery, sortKey, typeFilter]);
 
   useEffect(() => {
-    reload(false);
+    const force = initialListLoad.current;
+    initialListLoad.current = false;
+    reload(force);
   }, [reload]);
   useDataRefresh(reload);
   useScanComplete(reload);
