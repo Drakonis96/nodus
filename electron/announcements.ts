@@ -26,9 +26,9 @@ import { getSettings } from './db/settingsRepo';
  * Main-process only, like the tutorial catalogue and for the same reason: fetching from
  * the renderer would mean widening the CSP for another remote host.
  *
- * State (last good payload, its ETag, and which notices this person has read) is a single
- * JSON in userData. It is deliberately NOT the Nodi notification store: that one is capped
- * at 50 and has a "Clear" button, and an announcement must survive both.
+ * State (last good payload, its ETag, and which notices this person has read or dismissed) is a single
+ * JSON in userData. It is deliberately NOT the Nodi notification store: activity is capped
+ * at 50, while announcements retain their own read and dismissal state.
  */
 
 const STATE_FILE = 'announcements.json';
@@ -43,6 +43,8 @@ interface AnnouncementsState {
   payload?: unknown;
   /** id → when it was read, in ms. Pruned to the ids still being published. */
   read?: Record<string, number>;
+  /** id → when it was dismissed, in ms. Pruned to the ids still being published. */
+  dismissed?: Record<string, number>;
 }
 
 let notify: (() => void) | null = null;
@@ -98,10 +100,11 @@ export function listAnnouncements(): AnnouncementEntry[] {
   const state = readState();
   const { announcements } = parseAnnouncements(state.payload);
   const read = state.read ?? {};
+  const dismissed = state.dismissed ?? {};
   const visible = announcements.filter((announcement) => isAnnouncementVisible(announcement, {
     now: Date.now(),
     version: app.getVersion(),
-  }));
+  }) && !dismissed[announcement.id]);
   return sortAnnouncements(visible).map((announcement) => ({
     ...announcement,
     read: Boolean(read[announcement.id]),
@@ -128,11 +131,30 @@ export function markAnnouncementRead(id: string): AnnouncementEntry[] {
   return listAnnouncements();
 }
 
-/** Drop read marks for notices that are no longer published, so the map stays small. */
-function pruneRead(read: Record<string, number>, announcements: readonly Announcement[]): Record<string, number> {
+/**
+ * Dismiss every notice currently visible in the notification centre. The ids are
+ * persisted rather than deleting the cached payload: otherwise the next conditional
+ * refresh would download (and show) the same notices again. Notices published later
+ * have new ids and remain unaffected.
+ */
+export function clearAnnouncements(): AnnouncementEntry[] {
+  const visible = listAnnouncements();
+  if (visible.length === 0) return visible;
+
+  const state = readState();
+  const dismissed = { ...(state.dismissed ?? {}) };
+  const now = Date.now();
+  for (const announcement of visible) dismissed[announcement.id] = now;
+  writeState({ ...state, dismissed });
+  notify?.();
+  return listAnnouncements();
+}
+
+/** Drop stored marks for notices that are no longer published, so the maps stay small. */
+function pruneMarks(marks: Record<string, number>, announcements: readonly Announcement[]): Record<string, number> {
   const live = new Set(announcements.map((announcement) => announcement.id));
   const kept: Record<string, number> = {};
-  for (const [id, at] of Object.entries(read)) if (live.has(id)) kept[id] = at;
+  for (const [id, at] of Object.entries(marks)) if (live.has(id)) kept[id] = at;
   return kept;
 }
 
@@ -167,7 +189,8 @@ export async function refreshAnnouncements(reason: string): Promise<void> {
       etag: response.headers.get('etag') ?? undefined,
       checkedAt: Date.now(),
       payload,
-      read: pruneRead(state.read ?? {}, announcements),
+      read: pruneMarks(state.read ?? {}, announcements),
+      dismissed: pruneMarks(state.dismissed ?? {}, announcements),
     });
     console.log(`[announcements] ${announcements.length} notice(s) after check (${reason})`);
     notify?.();

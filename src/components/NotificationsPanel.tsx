@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import type { NodiNotification } from '@shared/types';
 import { announcementCopyFor, type AnnouncementEntry } from '@shared/announcements';
 import { notificationLine, t } from '../i18n';
+import { ConfirmModal } from './ConfirmModal';
 import { Icon } from './ui';
 
 /**
@@ -19,7 +20,7 @@ import { Icon } from './ui';
  *
  *  • Avisos — published between releases, kept in their own store, read one at a time.
  *    A survey link that got buried under fifty "queue finished" lines would be a survey
- *    nobody answered, so they sit on top and stay until they are read or expire.
+ *    nobody answered, so they sit on top and stay until they are explicitly cleared or expire.
  *  • Actividad — what the app has been doing. Ephemeral, capped at 50, and marked read
  *    in bulk when the panel opens, because "I have seen these" is all it ever means.
  */
@@ -121,7 +122,7 @@ interface NotificationsPanelProps {
   announcements: AnnouncementEntry[];
   language: string;
   onMarkAnnouncementRead: (id: string) => void;
-  onClearActivity: () => void;
+  onClearAll: () => void;
 }
 
 export function NotificationsPanel({
@@ -131,11 +132,12 @@ export function NotificationsPanel({
   announcements,
   language,
   onMarkAnnouncementRead,
-  onClearActivity,
+  onClearAll,
 }: NotificationsPanelProps) {
   const open = anchorEl != null;
   const panelRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ left: number; top: number; width: number; originX: number } | null>(null);
+  const [clearConfirmation, setClearConfirmation] = useState(false);
 
   // Placement, Escape and outside-click are ServerInbox's, deliberately: two panels
   // hanging off the same header should behave identically, and that one already solved it.
@@ -161,7 +163,7 @@ export function NotificationsPanel({
   }, [open, anchorEl]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || clearConfirmation) return;
     const onDown = (event: MouseEvent) => {
       const target = event.target;
       if (!(target instanceof Node)) return;
@@ -178,7 +180,11 @@ export function NotificationsPanel({
       document.removeEventListener('mousedown', onDown, true);
       window.removeEventListener('keydown', onKey);
     };
-  }, [open, onClose]);
+  }, [clearConfirmation, open, onClose]);
+
+  useEffect(() => {
+    if (!open) setClearConfirmation(false);
+  }, [open]);
 
   const empty = announcements.length === 0 && notifications.length === 0;
 
@@ -207,9 +213,16 @@ export function NotificationsPanel({
         >
           <div className="flex items-center justify-between gap-2 border-b border-neutral-800 px-3 py-2">
             <div className="text-sm font-semibold text-neutral-200">{t('Notificaciones')}</div>
-            <button className="btn btn-ghost px-2 py-1" onClick={onClose} title={t('Cerrar')}>
-              <Icon name="x" />
-            </button>
+            <div className="flex items-center gap-1">
+              {!empty && (
+                <button className="btn btn-ghost px-2 py-1 text-xs" onClick={() => setClearConfirmation(true)}>
+                  {t('Limpiar')}
+                </button>
+              )}
+              <button className="btn btn-ghost px-2 py-1" onClick={onClose} title={t('Cerrar')}>
+                <Icon name="x" />
+              </button>
+            </div>
           </div>
 
           {empty ? (
@@ -231,9 +244,8 @@ export function NotificationsPanel({
 
               {notifications.length > 0 && (
                 <>
-                  <div className="flex items-center justify-between gap-2 border-y border-neutral-900 bg-neutral-900/40 px-3 py-1">
+                  <div className="border-y border-neutral-900 bg-neutral-900/40 px-3 py-1">
                     <span className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500">{t('Actividad')}</span>
-                    <button className="btn btn-ghost px-1.5 py-0 text-[10px]" onClick={onClearActivity}>{t('Limpiar')}</button>
                   </div>
                   <ul>
                     {notifications.map((notification) => (
@@ -269,6 +281,19 @@ export function NotificationsPanel({
                 </>
               )}
             </div>
+          )}
+          {clearConfirmation && (
+            <ConfirmModal
+              title={t('Limpiar notificaciones')}
+              message={t('Se eliminarán todos los avisos de Nodus y la actividad reciente. Esta acción no se puede deshacer.')}
+              confirmLabel={t('Limpiar')}
+              danger
+              onCancel={() => setClearConfirmation(false)}
+              onConfirm={() => {
+                setClearConfirmation(false);
+                onClearAll();
+              }}
+            />
           )}
         </motion.div>
       )}

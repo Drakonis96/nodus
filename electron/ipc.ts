@@ -59,6 +59,7 @@ import {
   setNotificationsNotifier,
 } from './notifications';
 import {
+  clearAnnouncements,
   listAnnouncements,
   markAnnouncementRead,
   refreshAnnouncements,
@@ -395,6 +396,7 @@ export function registerIpc(
   });
   h('nodi:notifications:clear', async () => {
     clearNotifications();
+    clearAnnouncements();
     return listNotifications();
   });
   setAnnouncementsNotifier(() => {
