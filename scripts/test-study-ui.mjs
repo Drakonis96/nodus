@@ -1,11 +1,7 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
-import path from 'node:path';
 import test from 'node:test';
-import { fileURLToPath } from 'node:url';
 import { readSource } from './ipc-channel-census.mjs';
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = async (file) => readSource(file);
 
 test('study vault uses its teal header logo and the shared dock accent', async () => {
@@ -71,7 +67,7 @@ test('left sidebar is resizable and remembers the selected width', async () => {
 });
 
 test('sidebar header keeps the Nodus brand centered, stable when hidden and fully clickable', async () => {
-  const app = await read('@shell');
+  const [app, css] = await Promise.all([read('@shell'), read('src/index.css')]);
   assert.match(app, /data-testid="sidebar-header-toggle"/);
   assert.match(
     app,
@@ -81,6 +77,12 @@ test('sidebar header keeps the Nodus brand centered, stable when hidden and full
   assert.ok(
     app.indexOf('data-testid="sidebar-header-toggle"') < app.indexOf('data-testid="nodus-logo"'),
     'the Nodus logo should remain inside the full-width sidebar header control',
+  );
+  assert.match(app, /data-platform=\{IS_MAC \? 'macos' : 'other'\}/);
+  assert.match(
+    css,
+    /\.app-titlebar\[data-platform='macos'\] \[data-testid='sidebar-header-toggle'\]\s*\{[^}]*padding-left:\s*76px/s,
+    'the macOS titlebar must reserve the hiddenInset traffic-light area',
   );
 });
 

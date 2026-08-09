@@ -52,6 +52,8 @@ export interface NodeModel {
   id: string;
   label: string;
   type: GraphNodeType;
+  /** Primary semantic territory used by the renderer's knowledge-atlas layer. */
+  group?: string;
   createdAt?: string | null;
   workCount: number;
   degree: number;
@@ -329,6 +331,7 @@ export function buildGraphModel(
       id: n.id,
       label: n.label,
       type: n.type,
+      group: n.type === 'theme' ? n.label : n.themes[0],
       createdAt: n.createdAt,
       workCount: n.workCount,
       degree,
@@ -427,6 +430,7 @@ export function buildThemeConstellation(data: GraphData): GraphModel {
       id: theme.id,
       label: theme.label,
       type: 'theme',
+      group: theme.label,
       createdAt: theme.createdAt,
       workCount: count,
       degree: count,
@@ -464,6 +468,278 @@ export function buildThemeConstellation(data: GraphData): GraphModel {
     });
   }
   return { nodes, edges };
+}
+
+// ── Compact atlas scenes for the graph presets ───────────────────────────────
+// The presets used to feed their filtered *complete* graph to Sigma. That kept
+// the WebGL renderer fast, but visually they fell back to the old hairball: no
+// hierarchy, no bounded scene and no thematic geography. These builders retain
+// the precise preset filters while selecting a representative, deterministic
+// scene that the atlas renderer can settle and frame in one pass.
+
+const IDEA_ATLAS_GLOBAL_CAP = 126;
+const GAP_ATLAS_GLOBAL_CAP = 112;
+const AUTHOR_ATLAS_CAP = 144;
+const AUTHOR_ATLAS_MAX_TERRITORIES = 8;
+
+function atlasThemeColorMap(data: GraphData): Map<string, string> {
+  const colors = new Map<string, string>();
+  let index = 0;
+  for (const node of data.nodes) {
+    if (node.type !== 'theme') continue;
+    colors.set(normalizeThemeKey(node.label), THEME_CONSTELLATION_PALETTE[index % THEME_CONSTELLATION_PALETTE.length]);
+    index++;
+  }
+  return colors;
+}
+
+function syntheticThemeId(group: string): string {
+  return `atlas-theme:${Math.round(stableUnit(group) * 1_000_000_000)}`;
+}
+
+function buildIdeaPresetAtlas(
+  data: GraphData,
+  base: GraphModel,
+  preset: Extract<GraphPresetId, 'gaps' | 'reading' | 'unread'>
+): GraphModel {
+  const candidates = base.nodes.filter((node) => node.type !== 'theme');
+  if (candidates.length === 0) return { nodes: [], edges: [] };
+
+  const byGroup = new Map<string, NodeModel[]>();
+  for (const node of candidates) {
+    const group = node.group?.trim() || '∅';
+    const bucket = byGroup.get(group) ?? [];
+    bucket.push(node);
+    byGroup.set(group, bucket);
+  }
+
+  const groupEntries = [...byGroup.entries()].sort((a, b) =>
+    b[1].length - a[1].length || a[0].localeCompare(b[0])
+  );
+  const globalCap = preset === 'gaps' ? GAP_ATLAS_GLOBAL_CAP : IDEA_ATLAS_GLOBAL_CAP;
+  const perGroupCap = preset === 'gaps' ? 8 : 9;
+  const selected: NodeModel[] = [];
+  const totalByGroup = new Map<string, number>();
+
+  for (const [group, nodes] of groupEntries) {
+    totalByGroup.set(group, nodes.length);
+    nodes.sort((a, b) => {
+      if (preset === 'gaps') {
+        // Sparse, unread and low-confidence-peripheral ideas are the places where
+        // the corpus has the least connective tissue — the useful gap signal the
+        // legacy preset was trying to expose with edge filters alone.
+        return a.degree - b.degree || Number(a.read) - Number(b.read)
+          || b.labelRank - a.labelRank || a.label.localeCompare(b.label);
+      }
+      // Reading atlases lead with the ideas that best connect their territory.
+      return b.degree - a.degree || b.workCount - a.workCount
+        || b.labelRank - a.labelRank || a.label.localeCompare(b.label);
+    });
+    const room = Math.max(0, globalCap - selected.length);
+    if (room === 0) break;
+    selected.push(...nodes.slice(0, Math.min(perGroupCap, room)));
+  }
+
+  const selectedIds = new Set(selected.map((node) => node.id));
+  const selectedGroups = new Set(selected.map((node) => node.group?.trim() || '∅'));
+  const themeByKey = new Map(
+    data.nodes
+      .filter((node) => node.type === 'theme')
+      .map((node) => [normalizeThemeKey(node.label), node] as const)
+  );
+  const colorByTheme = atlasThemeColorMap(data);
+  const themeIdByGroup = new Map<string, string>();
+  const themeNodes: NodeModel[] = [];
+
+  for (const group of selectedGroups) {
+    const source = group === '∅' ? undefined : themeByKey.get(normalizeThemeKey(group));
+    const id = source?.id ?? syntheticThemeId(group);
+    themeIdByGroup.set(group, id);
+    const total = totalByGroup.get(group) ?? 0;
+    themeNodes.push({
+      id,
+      label: source?.label ?? '∅',
+      type: 'theme',
+      group,
+      createdAt: source?.createdAt,
+      workCount: total,
+      degree: total,
+      labelRank: 1.2,
+      size: themeConstellationSize(total),
+      read: preset !== 'unread',
+      color: colorByTheme.get(normalizeThemeKey(group))
+        ?? THEME_CONSTELLATION_PALETTE[themeNodes.length % THEME_CONSTELLATION_PALETTE.length],
+    });
+  }
+
+  const rankedSelected = [...selected].sort((a, b) => {
+    if (preset === 'gaps') return a.degree - b.degree || a.label.localeCompare(b.label);
+    return b.degree - a.degree || a.label.localeCompare(b.label);
+  });
+  const selectedNodes = rankedSelected.map((node, index) => ({
+    ...node,
+    size: Math.max(9, Math.min(18, node.size)),
+    labelRank: rankedSelected.length <= 1 ? 1 : 1 - index / (rankedSelected.length - 1),
+  }));
+
+  const semanticEdges = base.edges
+    .filter((edge) => edge.type !== 'contains' && selectedIds.has(edge.source) && selectedIds.has(edge.target))
+    .sort((a, b) => Number(b.layoutEdge) - Number(a.layoutEdge) || b.confidence - a.confidence)
+    .slice(0, 260)
+    .map((edge) => ({ ...edge, layoutEdge: true }));
+  const membershipEdges: EdgeModel[] = selectedNodes.flatMap((node) => {
+    const group = node.group?.trim() || '∅';
+    const source = themeIdByGroup.get(group);
+    if (!source) return [];
+    return [{
+      id: `atlas-membership:${source}:${node.id}`,
+      source,
+      target: node.id,
+      type: 'contains',
+      basis: 'inferred',
+      confidence: 0.72,
+      layoutEdge: true,
+    }];
+  });
+
+  return { nodes: [...themeNodes, ...selectedNodes], edges: [...membershipEdges, ...semanticEdges] };
+}
+
+function buildAuthorPresetAtlas(base: GraphModel): GraphModel {
+  const ranked = base.nodes
+    .filter((node) => node.type === 'author')
+    .sort((a, b) => b.degree - a.degree || b.workCount - a.workCount || a.label.localeCompare(b.label))
+    .slice(0, AUTHOR_ATLAS_CAP);
+  if (ranked.length === 0) return { nodes: [], edges: [] };
+
+  const kept = new Set(ranked.map((node) => node.id));
+  const edges = base.edges
+    .filter((edge) => kept.has(edge.source) && kept.has(edge.target))
+    .sort((a, b) => b.confidence - a.confidence || stableUnit(a.id) - stableUnit(b.id))
+    .slice(0, 120)
+    .map((edge) => ({ ...edge, layoutEdge: true }));
+
+  // Small deterministic label propagation gives the author lens real visual
+  // territories without importing another clustering runtime into the renderer.
+  const adjacency = new Map<string, Array<{ id: string; weight: number }>>();
+  for (const node of ranked) adjacency.set(node.id, []);
+  for (const edge of edges) {
+    const weight = Math.max(0.05, edge.confidence);
+    adjacency.get(edge.source)?.push({ id: edge.target, weight });
+    adjacency.get(edge.target)?.push({ id: edge.source, weight });
+  }
+  const labels = new Map(ranked.map((node) => [node.id, node.id]));
+  const ids = ranked.map((node) => node.id).sort();
+  for (let iteration = 0; iteration < 8; iteration++) {
+    let changed = false;
+    for (const id of ids) {
+      const scores = new Map<string, number>();
+      for (const neighbor of adjacency.get(id) ?? []) {
+        const label = labels.get(neighbor.id) ?? neighbor.id;
+        scores.set(label, (scores.get(label) ?? 0) + neighbor.weight);
+      }
+      let best = labels.get(id) ?? id;
+      let bestScore = -1;
+      for (const [label, score] of [...scores].sort((a, b) => a[0].localeCompare(b[0]))) {
+        if (score > bestScore) {
+          best = label;
+          bestScore = score;
+        }
+      }
+      if (best !== labels.get(id)) {
+        labels.set(id, best);
+        changed = true;
+      }
+    }
+    if (!changed) break;
+  }
+
+  const membersByLabel = new Map<string, string[]>();
+  for (const id of ids) {
+    const label = labels.get(id) ?? id;
+    const members = membersByLabel.get(label) ?? [];
+    members.push(id);
+    membersByLabel.set(label, members);
+  }
+  const communities = [...membersByLabel.entries()].sort((a, b) =>
+    b[1].length - a[1].length || a[0].localeCompare(b[0])
+  );
+  const retainedLabels = new Set(communities.slice(0, AUTHOR_ATLAS_MAX_TERRITORIES - 1).map(([label]) => label));
+  const territoryById = new Map<string, string>();
+  for (const [label, members] of communities) {
+    const territory = retainedLabels.has(label) ? `author-network:${label}` : 'author-network:periphery';
+    for (const id of members) territoryById.set(id, territory);
+  }
+  const territories = [...new Set(territoryById.values())].sort();
+  const colorByTerritory = new Map(territories.map((territory, index) => [
+    territory,
+    THEME_CONSTELLATION_PALETTE[index % THEME_CONSTELLATION_PALETTE.length],
+  ]));
+  const degreeById = new Map(ranked.map((node) => [node.id, 0]));
+  for (const edge of edges) {
+    degreeById.set(edge.source, (degreeById.get(edge.source) ?? 0) + 1);
+    degreeById.set(edge.target, (degreeById.get(edge.target) ?? 0) + 1);
+  }
+
+  const nodes = ranked.map((node, index) => {
+    const territory = territoryById.get(node.id) ?? 'author-network:periphery';
+    const degree = degreeById.get(node.id) ?? 0;
+    return {
+      ...node,
+      group: territory,
+      color: colorByTerritory.get(territory),
+      degree,
+      size: authorNodeSize(node.workCount, degree),
+      labelRank: ranked.length <= 1 ? 1 : 1 - index / (ranked.length - 1),
+    };
+  });
+  const territoryIndex = new Map(territories.map((territory, index) => [territory, index]));
+  const hubByTerritory = new Map<string, string>();
+  const hubNodes: NodeModel[] = territories.map((territory, index) => {
+    const memberCount = nodes.filter((node) => node.group === territory).length;
+    const id = `author-territory:${index}`;
+    hubByTerritory.set(territory, id);
+    return {
+      id,
+      label: `C${index + 1}`,
+      type: 'theme',
+      group: territory,
+      createdAt: null,
+      workCount: memberCount,
+      degree: memberCount,
+      labelRank: 1.2,
+      size: themeConstellationSize(memberCount),
+      read: true,
+      color: colorByTerritory.get(territory),
+    };
+  });
+  const membershipEdges: EdgeModel[] = nodes.map((node) => {
+    const territory = node.group ?? 'author-network:periphery';
+    const hub = hubByTerritory.get(territory) ?? `author-territory:${territoryIndex.get(territory) ?? 0}`;
+    return {
+      id: `author-membership:${hub}:${node.id}`,
+      source: hub,
+      target: node.id,
+      type: 'contains',
+      basis: 'inferred',
+      confidence: 0.78,
+      layoutEdge: true,
+    };
+  });
+  return { nodes: [...hubNodes, ...nodes], edges: [...membershipEdges, ...edges] };
+}
+
+/** Build the compact semantic scene for a non-overview graph preset. */
+export function buildPresetAtlas(
+  data: GraphData,
+  filters: GraphFilters,
+  lens: GraphLens,
+  preset: GraphPresetId
+): GraphModel | null {
+  if (preset !== 'gaps' && preset !== 'reading' && preset !== 'unread' && preset !== 'authors') return null;
+  const base = buildGraphModel(data, filters, lens, preset);
+  if (preset === 'authors') return buildAuthorPresetAtlas(base);
+  return buildIdeaPresetAtlas(data, base, preset);
 }
 
 function largestComponent(ids: Set<string>, adjacency: Map<string, Set<string>>): Set<string> {
@@ -552,6 +828,7 @@ export function buildThemeBackbone(data: GraphData, themeLabel: string, cap = 90
       id,
       label: node.label,
       type: node.type,
+      group: themeLabel,
       createdAt: node.createdAt,
       workCount: node.workCount,
       degree,
@@ -619,6 +896,7 @@ export function buildThemeBackbone(data: GraphData, themeLabel: string, cap = 90
         id,
         label: node.label,
         type: node.type,
+        group: firstTheme,
         createdAt: node.createdAt,
         workCount: node.workCount,
         degree: bridgeStat.get(id)!.count,

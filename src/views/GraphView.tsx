@@ -9,7 +9,7 @@ import { IdeaDuplicatesModal } from './IdeaDuplicatesModal';
 import { EdgeAuditModal } from './EdgeAuditModal';
 import { TutorPanel } from './TutorPanel';
 import { SigmaGraph, type SigmaGraphApi, type GraphViewLevel } from './graph/SigmaGraph';
-import { buildThemeConstellation, buildThemeBackbone } from './graph/model';
+import { buildThemeConstellation, buildThemeBackbone, buildPresetAtlas } from './graph/model';
 import { GraphErrorBoundary } from './graph/GraphErrorBoundary';
 import type { GraphNavigationTarget, GraphPresetId } from '../navigation';
 import { t, tx } from '../i18n';
@@ -1068,7 +1068,9 @@ function graphPreset(id: GraphPresetId, target?: GraphNavigationTarget): { lens:
     case 'reading':
       return {
         lens: 'ideas',
-        filters: withTarget,
+        // A direct link to one work keeps all of that work's context. The plain
+        // preset instead maps knowledge grounded only in completed reading.
+        filters: target?.workId ? withTarget : { ...withTarget, readState: 'read' },
         depth: 1,
         layoutMode: 'force',
       };
@@ -1861,13 +1863,25 @@ export function GraphView({
   }, [activeThemeLabel, constellationModel]);
   const backboneShown = backboneModel?.nodes.filter((node) => !node.bridge).length ?? 0;
   const maximumThemeIdeas = Math.min(250, activeThemeTotal);
-  const graphOverrideModel = !levelsActive || graphLevel.level === 'full'
+  const semanticOverrideModel = !levelsActive || graphLevel.level === 'full'
     ? null
     : activeThemeLabel
       ? backboneModel ?? constellationModel
       : constellationModel;
+  const presetAtlasModel = useMemo(
+    () => (USE_SIGMA && !levelsActive && !filters.search.trim()
+      ? buildPresetAtlas(data, filters, lens, activePreset)
+      : null),
+    [activePreset, data, filters, lens, levelsActive]
+  );
+  const graphOverrideModel = semanticOverrideModel ?? presetAtlasModel;
   const graphViewLevel: GraphViewLevel =
-    !levelsActive || graphLevel.level === 'full' ? 'full' : activeThemeLabel && backboneModel ? 'theme' : 'corpus';
+    presetAtlasModel ? 'atlas'
+      : !levelsActive || graphLevel.level === 'full' ? 'full'
+        : activeThemeLabel && backboneModel ? 'theme' : 'corpus';
+  const visibleGraphNodeCount = graphOverrideModel?.nodes.length ?? data.nodes.length;
+  const visibleGraphEdgeCount = graphOverrideModel?.edges.length ?? data.edges.length;
+  const activePresetDefinition = GRAPH_PRESETS.find((preset) => preset.id === activePreset);
 
   const drillIntoTheme = useCallback((_nodeId: string, label: string) => {
     setIdeaDetail(null);
@@ -3229,9 +3243,9 @@ export function GraphView({
   }, [ideaDetail, edgeDetail, detailLoading]);
 
   return (
-    <div className="h-full flex flex-col min-h-0" data-testid={testId}>
+    <div className="nodus-graph-view h-full flex flex-col min-h-0" data-testid={testId}>
       {/* Filter bar */}
-      <div className="border-b border-neutral-800 p-2 text-xs">
+      <div className="nodus-graph-toolbar border-b border-neutral-800 p-2 text-xs">
         <div className="flex flex-wrap gap-2 items-center">
           {scopeControl}
           <div className="flex flex-wrap gap-1">
@@ -3319,9 +3333,7 @@ export function GraphView({
           )}
           <div className="flex-1" />
           <span className="text-neutral-500">{tx('{n} nodos', {
-            n: USE_SIGMA
-              ? (graphOverrideModel?.nodes.length ?? data.nodes.length)
-              : elements.filter((e) => !(e.data as any).source).length,
+            n: USE_SIGMA ? visibleGraphNodeCount : elements.filter((e) => !(e.data as any).source).length,
           })}</span>
         </div>
 
@@ -3417,7 +3429,7 @@ export function GraphView({
         )}
       </div>
 
-      <div className="flex-1 flex min-h-0 relative">
+      <div className="nodus-graph-workspace flex-1 flex min-h-0 relative">
         {lens === 'ideas' && dataSource.capabilities.tutor && tutorOpen && (
           <TutorPanel
             settings={settings}
@@ -3430,7 +3442,7 @@ export function GraphView({
             onClose={() => setTutorOpen(false)}
           />
         )}
-        <div className="flex-1 min-w-0 relative">
+        <div className="nodus-graph-stage flex-1 min-w-0 relative overflow-hidden">
           {USE_SIGMA ? (
             <GraphErrorBoundary>
               <SigmaGraph
@@ -3473,18 +3485,33 @@ export function GraphView({
             </div>
           )}
 
-          {/* Semantic-zoom breadcrumb (Sigma overview) */}
-          {USE_SIGMA && levelsActive && (
-            <div className="absolute top-3 left-3 z-10 flex max-w-[70%] flex-col gap-1.5">
-              {graphViewLevel === 'corpus' ? (
-                <div className="card flex items-center gap-1.5 bg-neutral-900/90 px-2.5 py-1.5 text-xs text-neutral-400">
-                  <Icon name="layers" size={13} />
-                  {tx('{n} temas · haz clic para explorar', { n: themes.length })}
+          {/* Semantic atlas HUD: progressive overview + compact preset scenes. */}
+          {USE_SIGMA && (levelsActive || presetAtlasModel) && (
+            <div
+              className="nodus-graph-atlas-hud absolute top-4 left-4 z-10 flex max-w-[72%] flex-col gap-2"
+              data-testid="knowledge-atlas-hud"
+              data-preset={activePreset}
+            >
+              <div className="nodus-graph-atlas-card">
+                <div className="nodus-graph-atlas-eyebrow">
+                  <span className="nodus-graph-atlas-mark"><Icon name={activePresetDefinition?.icon ?? 'layers'} size={12} /></span>
+                  <span>NODUS · {t('Grafo')}</span>
                 </div>
-              ) : (
-                <div className="card flex items-center gap-0.5 bg-neutral-900/90 px-1 py-1 text-xs">
+                {presetAtlasModel ? (
+                  <>
+                    <div className="nodus-graph-atlas-title">{t(activePresetDefinition?.label ?? activePreset)}</div>
+                    <div className="nodus-graph-atlas-description">
+                      {t(activePresetDefinition?.description ?? '')}
+                    </div>
+                  </>
+                ) : graphViewLevel === 'corpus' ? (
+                  <div className="nodus-graph-atlas-title">
+                    {tx('{n} temas · haz clic para explorar', { n: themes.length })}
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1 text-xs">
                   <button
-                    className="flex items-center gap-1 rounded px-1.5 py-1 text-neutral-300 hover:bg-neutral-800"
+                    className="nodus-graph-atlas-back"
                     onClick={backToCorpus}
                     title={t('Volver a los temas del corpus')}
                   >
@@ -3502,12 +3529,18 @@ export function GraphView({
                   {graphViewLevel === 'full' && (
                     <span className="px-1 text-neutral-400">{t('Idea enfocada')}</span>
                   )}
+                  </div>
+                )}
+                <div className="nodus-graph-atlas-metrics">
+                  <span>{tx('{n} nodos', { n: visibleGraphNodeCount })}</span>
+                  <span aria-hidden="true">·</span>
+                  <span>{tx('{n} relaciones', { n: visibleGraphEdgeCount })}</span>
                 </div>
-              )}
+              </div>
 
               {/* Level-2 density control: how many of the theme's ideas to show. */}
               {graphViewLevel === 'theme' && activeThemeTotal > 0 && (
-                <div className="card flex items-center gap-2.5 bg-neutral-900/90 px-2.5 py-1.5 text-xs text-neutral-300">
+                <div className="nodus-graph-density-card flex items-center gap-2.5 text-xs text-neutral-300">
                   <span className="whitespace-nowrap tabular-nums text-neutral-400">
                     {backboneCap >= maximumThemeIdeas && activeThemeTotal <= 250
                       ? tx('Todas · {n} ideas', { n: activeThemeTotal })
@@ -3537,19 +3570,19 @@ export function GraphView({
           )}
 
           {/* Zoom / fit controls */}
-          <div className="absolute top-3 right-3 flex flex-col gap-1">
-            <button className="card bg-neutral-900/90 p-1.5 hover:bg-neutral-800" title={t('Acercar')} onClick={() => zoomBy(1.25)}>
+          <div className="nodus-graph-viewport-controls absolute top-4 right-4 z-10 flex flex-col gap-1">
+            <button className="nodus-graph-viewport-button" title={t('Acercar')} onClick={() => zoomBy(1.25)}>
               <Icon name="plus" size={16} />
             </button>
-            <button className="card bg-neutral-900/90 p-1.5 hover:bg-neutral-800" title={t('Alejar')} onClick={() => zoomBy(0.8)}>
+            <button className="nodus-graph-viewport-button" title={t('Alejar')} onClick={() => zoomBy(0.8)}>
               <Icon name="minus" size={16} />
             </button>
-            <button className="card bg-neutral-900/90 p-1.5 hover:bg-neutral-800" title={t('Ajustar a la pantalla')} onClick={fitGraph}>
+            <button className="nodus-graph-viewport-button" title={t('Ajustar a la pantalla')} onClick={fitGraph}>
               <Icon name="fit" size={16} />
             </button>
             {USE_SIGMA && lens === 'ideas' && layoutMode === 'force' && (
               <button
-                className="card bg-neutral-900/90 p-1.5 hover:bg-neutral-800"
+                className="nodus-graph-viewport-button"
                 title={t('Animar la evolución del grafo por fecha de creación')}
                 onClick={playGraphHistory}
               >
@@ -3557,7 +3590,7 @@ export function GraphView({
               </button>
             )}
             <button
-              className="card bg-neutral-900/90 p-1.5 hover:bg-neutral-800"
+              className="nodus-graph-viewport-button"
               title={t('Reiniciar grafo (vista y disposición originales)')}
               onClick={resetGraph}
             >
@@ -3578,7 +3611,7 @@ export function GraphView({
           )}
 
           {/* Legend */}
-          <div className="absolute bottom-3 left-3 card p-2 text-[10px] bg-neutral-900/90 max-w-[220px]">
+          <div className="nodus-graph-legend absolute bottom-4 left-4 z-10 max-w-[220px] p-2.5 text-[10px]">
             <div className="flex items-center gap-2">
               <span className="font-medium text-neutral-300">{t('Leyenda')}</span>
               <button
@@ -3591,21 +3624,31 @@ export function GraphView({
             </div>
             {!legendCollapsed && (
               <div className="mt-1 space-y-1">
-                {GRAPH_NODE_TYPES.map((nt) => (
-                  <div key={nt} className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: NODE_COLORS[nt] }} />
-                    {t(NODE_LABELS[nt])}
-                  </div>
-                ))}
-                <div className="pt-1 border-t border-neutral-800 text-neutral-500">{t('○ borde punteado: no leída')}</div>
-                <div className="pt-1 border-t border-neutral-800 space-y-0.5">
-                  {Object.entries(EDGE_TYPE_COLORS).filter(([et]) => et !== 'contains').map(([type, color]) => (
-                    <div key={type} className="flex items-center gap-1.5 text-neutral-400">
-                      <span className="w-3 h-0.5 rounded" style={{ backgroundColor: color }} />
-                      {t(EDGE_LABELS[type as keyof typeof EDGE_LABELS]) ?? type}
+                {lens === 'authors' ? (
+                  <>
+                    <div className="flex items-center gap-1.5">
+                      <span className="h-2.5 w-2.5 rounded-full bg-indigo-500" />
+                      {t('Autores')}
+                    </div>
+                    <div className="text-neutral-500">{t('Relaciones entre autores del corpus.')}</div>
+                  </>
+                ) : GRAPH_NODE_TYPES.map((nt) => (
+                    <div key={nt} className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: NODE_COLORS[nt] }} />
+                      {t(NODE_LABELS[nt])}
                     </div>
                   ))}
-                </div>
+                <div className="pt-1 border-t border-neutral-800 text-neutral-500">{t('○ borde punteado: no leída')}</div>
+                {lens === 'ideas' && (
+                  <div className="pt-1 border-t border-neutral-800 space-y-0.5">
+                    {Object.entries(EDGE_TYPE_COLORS).filter(([et]) => et !== 'contains').map(([type, color]) => (
+                      <div key={type} className="flex items-center gap-1.5 text-neutral-400">
+                        <span className="w-3 h-0.5 rounded" style={{ backgroundColor: color }} />
+                        {t(EDGE_LABELS[type as keyof typeof EDGE_LABELS]) ?? type}
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <div className="text-neutral-500">{t('— sólida: explícita · ·· punteada: inferida')}</div>
               </div>
             )}
