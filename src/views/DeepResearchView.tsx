@@ -983,7 +983,7 @@ function SelectCheck({ checked }: { checked: boolean }) {
 function ReadBadge() {
   return (
     <span
-      className="pointer-events-none absolute right-2 top-2 z-10 flex items-center gap-1 rounded-full bg-emerald-950/80 px-2 py-0.5 text-[10px] font-medium text-emerald-200 ring-1 ring-emerald-700/60"
+      className="pointer-events-none absolute right-2 top-2 z-10 flex items-center gap-1 rounded-full bg-emerald-100/90 px-2 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-emerald-300/80 dark:bg-emerald-950/80 dark:text-emerald-200 dark:ring-emerald-700/60"
       title={t('Ya has leído este informe')}
     >
       <Icon name="check" size={10} /> {t('Leído')}
