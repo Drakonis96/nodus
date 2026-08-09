@@ -7907,6 +7907,8 @@ export const DE: Record<string, string> = {
   "Acciones de selección": "Auswahlaktionen",
   "Añadir marcador de lectura": "Lesemarke hinzufügen",
   "Mover marcador aquí": "Lesezeichen hierher verschieben",
+  "Ir al marcador de lectura": "Zur Lesemarke springen",
+  "Eliminar marcador de lectura": "Lesemarke löschen",
   "Citar en Nodi": "In Nodi zitieren",
   "Quitar cita": "Zitat entfernen",
   "Texto visible de la sección abierta o documento completo en los lectores.": "Sichtbarer Text des geöffneten Bereichs oder das vollständige Dokument in den Leseansichten.",

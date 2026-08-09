@@ -30,6 +30,16 @@
   outline: none;
 }
 
+.reader-selection-actions button[data-tone='danger'] {
+  color: #f87171;
+}
+
+.reader-selection-actions button[data-tone='danger']:hover,
+.reader-selection-actions button[data-tone='danger']:focus-visible {
+  background: #7f1d1d;
+  color: #fff;
+}
+
 ::highlight(nodus-reader-mark) {
   background-color: rgb(250 204 21 / 0.42);
   color: inherit;
@@ -42,4 +52,14 @@
   background: rgb(255 255 255 / 0.98);
   box-shadow: 0 12px 30px rgb(24 24 27 / 0.16);
   color: #27272a;
+}
+
+.light .reader-selection-actions button[data-tone='danger'] {
+  color: #dc2626;
+}
+
+.light .reader-selection-actions button[data-tone='danger']:hover,
+.light .reader-selection-actions button[data-tone='danger']:focus-visible {
+  background: #fee2e2;
+  color: #991b1b;
 }

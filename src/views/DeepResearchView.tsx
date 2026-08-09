@@ -35,7 +35,7 @@ import { DecorativeImageCard } from '../components/DecorativeImageCard';
 import { AudioPanel } from '../components/AudioPanel';
 import { FindInPage } from '../components/FindInPage';
 import { NodiViewContextSource } from '../components/NodiViewContextSource';
-import { ReaderSelectionActions } from '../components/ReaderSelectionActions';
+import { ReaderSelectionActions, type ReaderSelectionActionsHandle } from '../components/ReaderSelectionActions';
 import { t, tx, getActiveLang } from '../i18n';
 import {
   DEEP_RESEARCH_MAIN_JOB_KEY,
@@ -1371,6 +1371,8 @@ function ReaderView({
   onOpenStudyRecording?: (id: string, timestamp?: number | null) => void;
 }) {
   const mainRef = useRef<HTMLElement | null>(null);
+  const markActionsRef = useRef<ReaderSelectionActionsHandle | null>(null);
+  const [hasReaderMark, setHasReaderMark] = useState(false);
   const contextTitle = appliedTranslation?.title ?? saved.draft.title;
   const contextMarkdown = appliedTranslation?.markdown
     ?? `# ${saved.draft.title}\n\n${saved.draft.abstract ? `${saved.draft.abstract}\n\n` : ''}${stripLeadingAbstract(saved.draft.draftMarkdown, saved.draft.abstract)}`;
@@ -1395,6 +1397,13 @@ function ReaderView({
           onCopyReading={onCopyReading}
           onSaveToNotes={onSaveToNotes}
           onExport={onExport}
+        />
+        <HoverLabelButton
+          icon={hasReaderMark ? 'bookmarkFill' : 'bookmark'}
+          label={t('Ir al marcador de lectura')}
+          onClick={() => markActionsRef.current?.goToMark()}
+          disabled={!hasReaderMark}
+          className={`btn-ghost h-9 min-h-9 border ${hasReaderMark ? 'border-amber-300 text-amber-700 dark:border-amber-700/60 dark:text-amber-300' : 'border-neutral-700 text-neutral-500'}`}
         />
         {/* Beside the reading actions, where somebody who has just finished the report
             is already looking, rather than back in the gallery they would have to
@@ -1456,7 +1465,13 @@ function ReaderView({
             />}
           </div>
         </main>
-        <ReaderSelectionActions key={appliedTranslation?.id ?? 'source'} targetRef={mainRef} contextId={`deep-research:${saved.id}`} />
+        <ReaderSelectionActions
+          key={appliedTranslation?.id ?? 'source'}
+          ref={markActionsRef}
+          targetRef={mainRef}
+          contextId={`deep-research:${saved.id}`}
+          onMarkChange={setHasReaderMark}
+        />
         {showMatrix && (
           <aside className="w-80 shrink-0 overflow-y-auto border-l border-neutral-800 p-4 max-lg:hidden">
             <SupportMatrix draft={saved.draft} onCitation={onCitation} />

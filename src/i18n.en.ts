@@ -8134,6 +8134,8 @@ export const EN: Record<string, string> = {
   "Acciones de selección": "Selection actions",
   "Añadir marcador de lectura": "Add reading bookmark",
   "Mover marcador aquí": "Move bookmark here",
+  "Ir al marcador de lectura": "Go to reading bookmark",
+  "Eliminar marcador de lectura": "Delete reading bookmark",
   "Citar en Nodi": "Quote in Nodi",
   "Quitar cita": "Remove quote",
   "Texto visible de la sección abierta o documento completo en los lectores.": "Visible text from the open section, or the complete document in readers.",

@@ -7898,6 +7898,8 @@ export const FR: Record<string, string> = {
   "Acciones de selección": "Actions sur la sélection",
   "Añadir marcador de lectura": "Ajouter un signet de lecture",
   "Mover marcador aquí": "Déplacer le signet ici",
+  "Ir al marcador de lectura": "Aller au signet de lecture",
+  "Eliminar marcador de lectura": "Supprimer le signet de lecture",
   "Citar en Nodi": "Citer dans Nodi",
   "Quitar cita": "Retirer la citation",
   "Texto visible de la sección abierta o documento completo en los lectores.": "Texte visible de la section ouverte, ou document complet dans les lecteurs.",
