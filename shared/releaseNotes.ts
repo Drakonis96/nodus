@@ -823,6 +823,49 @@ const RELEASE_3_2_3_HIGHLIGHTS: RawReleaseHighlight[] = [
  * that were laying out without their icon.
  */
 /**
+ * v3.2.7 — Deep Research annotations synchronize with mobile, the library and graph
+ * become easier to navigate, and assistant activity is visible while replies stream.
+ */
+const RELEASE_3_2_7_HIGHLIGHTS: RawReleaseHighlight[] = [
+  {
+    scope: 'academic',
+    es: 'Deep Research estrena subrayados en seis colores, comentarios laterales y un subrayador que puede quedarse encendido. Los marcadores también pasan al margen. Todo se guarda en el vault y se sincroniza por Nodus Server entre el escritorio y el móvil, incluso si el teléfono pierde la conexión mientras anotas.',
+    en: 'Deep Research gains highlights in six colors, margin comments, and a highlighter that can stay on. Bookmarks move to the margin too. Everything is stored in the vault and synchronized through Nodus Server between desktop and mobile, even if the phone loses its connection while you annotate.',
+    fr: 'Deep Research accueille des surlignages en six couleurs, des commentaires en marge et un surligneur qui peut rester actif. Les marque-pages passent eux aussi dans la marge. Tout est conservé dans le coffre et synchronisé par Nodus Server entre l’ordinateur et le mobile, même si le téléphone perd sa connexion pendant que vous annotez.',
+    de: 'Deep Research erhält Hervorhebungen in sechs Farben, Randkommentare und einen Textmarker, der eingeschaltet bleiben kann. Auch Lesezeichen wandern an den Rand. Alles wird im Tresor gespeichert und über Nodus Server zwischen Desktop und Mobilgerät synchronisiert, selbst wenn das Telefon beim Annotieren die Verbindung verliert.',
+    pt: 'O Deep Research ganha sublinhados em seis cores, comentários laterais e um marcador que pode ficar ligado. Os marcadores de leitura também passam para a margem. Tudo fica guardado no cofre e é sincronizado pelo Nodus Server entre o computador e o telemóvel, mesmo que o telefone perca a ligação enquanto anota.',
+    'pt-BR': 'O Deep Research ganha destaques em seis cores, comentários laterais e um marcador que pode ficar ligado. Os marcadores de leitura também passam para a margem. Tudo fica salvo no cofre e é sincronizado pelo Nodus Server entre o computador e o celular, mesmo que o telefone perca a conexão enquanto você anota.',
+  },
+  {
+    scope: 'academic',
+    es: 'Volver a un informe es más fácil. La biblioteca puede separar los informes leídos de los pendientes, y sus distintivos se leen igual de bien en claro y oscuro. El marcador te lleva al pasaje exacto desde la barra y se elimina desde su icono del margen. Los subrayados se borran con un clic y los comentarios se pueden editar o eliminar con confirmación.',
+    en: 'Returning to a report is easier. The library can separate read reports from those still waiting, and their badges remain clear in light and dark mode. The bookmark takes you to the exact passage from the toolbar and can be removed from its margin icon. Highlights disappear with one click, while comments can be edited or deleted with confirmation.',
+    fr: 'Revenir à un rapport est plus simple. La bibliothèque peut séparer les rapports lus de ceux qui restent à lire, et leurs badges restent lisibles en mode clair comme sombre. Le marque-page ramène au passage exact depuis la barre et se retire par son icône en marge. Les surlignages se suppriment en un clic, tandis que les commentaires se modifient ou se suppriment après confirmation.',
+    de: 'Zu einem Bericht zurückzukehren ist einfacher. Die Bibliothek kann gelesene Berichte von noch offenen trennen, und ihre Kennzeichen bleiben im hellen wie im dunklen Modus gut lesbar. Das Lesezeichen führt über die Leiste zur genauen Passage und lässt sich über sein Randsymbol entfernen. Hervorhebungen verschwinden mit einem Klick, Kommentare lassen sich bearbeiten oder nach Bestätigung löschen.',
+    pt: 'Voltar a um relatório é mais fácil. A biblioteca pode separar os relatórios lidos dos que ainda aguardam, e os seus distintivos continuam legíveis nos modos claro e escuro. O marcador leva à passagem exata a partir da barra e remove-se pelo ícone da margem. Os sublinhados apagam-se com um clique, enquanto os comentários podem ser editados ou eliminados com confirmação.',
+    'pt-BR': 'Voltar a um relatório ficou mais fácil. A biblioteca pode separar os relatórios lidos dos que ainda aguardam, e seus indicadores continuam legíveis nos modos claro e escuro. O marcador leva ao trecho exato pela barra e pode ser removido pelo ícone da margem. Os destaques são apagados com um clique, enquanto os comentários podem ser editados ou excluídos com confirmação.',
+  },
+  {
+    scope: 'academic',
+    es: 'El Grafo abre ahora como un atlas legible del corpus. Primero muestra una constelación de temas, al entrar en uno enseña sus ideas más conectadas y las vistas de contradicciones, lectura, pendientes y autores presentan escenas acotadas. Los corpus grandes cargan por niveles en vez de convertirse en una maraña.',
+    en: 'The Graph now opens as a readable atlas of the corpus. It first shows a constellation of themes, entering one reveals its most connected ideas, and the contradiction, reading, waiting, and author views present bounded scenes. Large corpora load in levels instead of turning into a hairball.',
+    fr: 'Le Graphe s’ouvre désormais comme un atlas lisible du corpus. Il montre d’abord une constellation de thèmes, entrer dans l’un révèle ses idées les plus connectées, et les vues des contradictions, de lecture, d’attente et des auteurs présentent des scènes limitées. Les grands corpus se chargent par niveaux au lieu de devenir un enchevêtrement.',
+    de: 'Der Graph öffnet sich jetzt als lesbarer Atlas des Korpus. Zuerst zeigt er eine Konstellation von Themen, beim Öffnen eines Themas erscheinen dessen am stärksten vernetzte Ideen, und die Ansichten für Widersprüche, Lesen, Offenes und Autoren zeigen begrenzte Szenen. Große Korpora laden stufenweise, statt zu einem unlesbaren Knäuel zu werden.',
+    pt: 'O Grafo abre agora como um atlas legível do corpus. Primeiro mostra uma constelação de temas, entrar num deles revela as ideias mais ligadas, e as vistas de contradições, leitura, pendentes e autores apresentam cenas limitadas. Os corpora grandes carregam por níveis em vez de se transformarem num emaranhado.',
+    'pt-BR': 'O Grafo agora abre como um atlas legível do corpus. Primeiro mostra uma constelação de temas, entrar em um deles revela as ideias mais conectadas, e as telas de contradições, leitura, pendentes e autores apresentam cenas limitadas. Os corpus grandes carregam por níveis em vez de virarem um emaranhado.',
+  },
+  {
+    scope: 'nodi',
+    es: 'Las respuestas en curso ya no se confunden con un mensaje vacío. Nodi y el Asistente de investigación muestran el mismo indicador animado de tres puntos mientras piensan, adaptado a la ventana principal y a la flotante.',
+    en: 'Replies in progress no longer look like an empty message. Nodi and the Research Assistant show the same animated three-dot indicator while they think, adapted to both the main window and the floating one.',
+    fr: 'Les réponses en cours ne ressemblent plus à un message vide. Nodi et l’Assistant de recherche affichent le même indicateur animé à trois points pendant leur réflexion, adapté à la fenêtre principale comme à la fenêtre flottante.',
+    de: 'Laufende Antworten sehen nicht mehr wie eine leere Nachricht aus. Nodi und der Forschungsassistent zeigen beim Denken denselben animierten Dreipunkt-Indikator, angepasst an das Hauptfenster und das schwebende Fenster.',
+    pt: 'As respostas em curso deixam de parecer uma mensagem vazia. O Nodi e o Assistente de investigação mostram o mesmo indicador animado de três pontos enquanto pensam, adaptado à janela principal e à flutuante.',
+    'pt-BR': 'As respostas em andamento não parecem mais uma mensagem vazia. O Nodi e o Assistente de pesquisa mostram o mesmo indicador animado de três pontos enquanto pensam, adaptado à janela principal e à flutuante.',
+  },
+];
+
+/**
  * v3.2.6 — each job owns its reasoning level, Nodi becomes a real report reader,
  * authors can be kept on a shelf, startup modals settle down, and MCP clients can
  * retrieve every readable layer and every saved Deep Research report.
@@ -1035,6 +1078,11 @@ const RELEASE_3_2_4_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
+  {
+    version: '3.2.7',
+    date: '2026-08-10',
+    highlights: RELEASE_3_2_7_HIGHLIGHTS,
+  },
   {
     version: '3.2.6',
     date: '2026-08-09',

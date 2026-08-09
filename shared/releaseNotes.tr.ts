@@ -56,6 +56,13 @@ const RELEASE_3_2_3_TR: string[] = [
   "Telefondaki her eser artık onu iPhone ve iPad için Zotero'da açan bir düğme taşıyor. Zotero anahtarı kayıttaki ölü bir satır olmaktan çıkıp diğer uygulamadaki PDF'e, notlara ve işaretlemelere dönüş yolu oluyor.",
 ];
 
+const RELEASE_3_2_7_TR: string[] = [
+  "Deep Research altı renkli vurgulara, kenar yorumlarına ve açık bırakılabilen bir vurgulayıcıya kavuşuyor. Yer imleri de kenara taşınıyor. Her şey kasada saklanıp Nodus Server üzerinden masaüstü ile mobil arasında eşitleniyor, telefon siz not alırken bağlantısını kaybetse bile.",
+  "Bir rapora geri dönmek artık daha kolay. Kitaplık okunan raporları bekleyenlerden ayırabiliyor ve rozetleri açık ya da koyu modda aynı ölçüde okunaklı kalıyor. Yer imi çubuktan tam pasaja götürüyor ve kenardaki simgesinden kaldırılabiliyor. Vurgular tek tıklamayla siliniyor, yorumlar ise düzenlenebiliyor ya da onayla silinebiliyor.",
+  "Grafik artık derlemin okunabilir bir atlası olarak açılıyor. Önce temalardan oluşan bir takımyıldız gösteriyor, birine girince en bağlantılı fikirlerini açıyor ve çelişkiler, okuma, bekleyenler ile yazar görünümleri sınırlı sahneler sunuyor. Büyük derlemler bir düğüme dönüşmek yerine katman katman yükleniyor.",
+  "Sürmekte olan yanıtlar artık boş bir ileti gibi görünmüyor. Nodi ile Araştırma Asistanı düşünürken aynı hareketli üç nokta göstergesini kullanıyor ve gösterge hem ana pencereye hem de yüzen pencereye uyum sağlıyor.",
+];
+
 const RELEASE_3_2_6_TR: string[] = [
   "Akıl yürütme düzeyi artık her görevin kendisine ait. Önceden Daldırma'da yükseltmek onu Deep Research'te ve o modeli kullanan diğer bütün görevlerde de yükseltiyordu. Artık her görev kendi düzeyini saklıyor, Sağlayıcılar'da ise modelin varsayılanını belirlemeye devam ediyorsunuz.",
   "Bu düzey artık taramalarda da geçerli. Çıkarım, özetler ve birleştirme onu tamamen yok sayıyor ve seçici ne derse desin hep en ucuz düzeyde çalışıyordu. Hiçbirini seçmezseniz akıl yürütmesiz ve tam olarak eskisi kadar hızlı çalışmaya devam ederler.",
@@ -88,6 +95,7 @@ const RELEASE_3_2_4_TR: string[] = [
 ];
 
 export const RELEASE_NOTES_TR: Record<string, string[]> = {
+  "3.2.7": RELEASE_3_2_7_TR,
   "3.2.6": RELEASE_3_2_6_TR,
   "3.2.5": RELEASE_3_2_5_TR,
   "3.2.4": RELEASE_3_2_4_TR,
