@@ -6,6 +6,7 @@ import { vaultTypeColor } from '@shared/vaultTypes';
 import { type NodiRole, type NodiState } from './Nodi';
 import { NodiAvatar } from './NodiAvatar';
 import { NodiCitationCard } from './NodiCitationCard';
+import { ChatTypingIndicator } from '../ChatTypingIndicator';
 import { Markdown, type MarkdownCitation } from '../Markdown';
 import { ModelPicker } from '../ModelPicker';
 import { useAnnouncements } from '../NotificationsPanel';
@@ -1085,7 +1086,7 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
                         onWorldEntry={citesWorld ? (kind, id) => void window.nodus.nodiOpenWorldEntry(kind, id) : undefined}
                       />
                     ) : m.content.startsWith('> ') ? <Markdown content={m.content} verify={false} /> : m.content
-                    : streaming && i === messages.length - 1 ? <span className="nodi-typing">{t('escribiendo…')}</span> : ''}
+                    : streaming && i === messages.length - 1 ? <ChatTypingIndicator label={t('escribiendo…')} /> : ''}
                 </div>
               ))}
             </div>
