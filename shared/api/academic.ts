@@ -177,6 +177,8 @@ import type {
   WritingWorkshopExportRequest,
   WritingWorkshopSaveDraftRequest,
   WritingWorkshopSavedDraft,
+  WritingDraftAnnotation,
+  WritingDraftAnnotationInput,
   WritingWorkshopSnapshot,
   ZoteroItem,
   ZoteroTag,
@@ -595,6 +597,13 @@ export interface AcademicApi {
    * Returns its own unsubscribe.
    */
   onWritingDraftsChanged(cb: () => void): () => void;
+  /** Persistent highlights and margin comments attached to one saved report. */
+  listWritingDraftAnnotations(draftId: string): Promise<WritingDraftAnnotation[]>;
+  createWritingDraftAnnotation(input: WritingDraftAnnotationInput): Promise<WritingDraftAnnotation>;
+  updateWritingDraftComment(id: string, comment: string): Promise<WritingDraftAnnotation | null>;
+  deleteWritingDraftAnnotation(id: string): Promise<void>;
+  /** Push notification for local edits and annotations received through server sync. */
+  onWritingDraftAnnotationsChanged(cb: (draftId: string | null) => void): () => void;
 
   // deep research (orchestrated, coverage-guided multi-page report over the whole corpus)
   /** Plan → write section by section (guided by coverage) → assemble a fully cited 5–20 page report. */

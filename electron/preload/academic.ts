@@ -491,6 +491,15 @@ export const academicApi: AcademicApi = {
     ipcRenderer.on('writing:saved:changed', listener);
     return () => ipcRenderer.removeListener('writing:saved:changed', listener);
   },
+  listWritingDraftAnnotations: (draftId) => ipcRenderer.invoke('writing:annotations:list', draftId),
+  createWritingDraftAnnotation: (input) => ipcRenderer.invoke('writing:annotations:create', input),
+  updateWritingDraftComment: (id, comment) => ipcRenderer.invoke('writing:annotations:updateComment', id, comment),
+  deleteWritingDraftAnnotation: (id) => ipcRenderer.invoke('writing:annotations:delete', id).then(() => undefined),
+  onWritingDraftAnnotationsChanged: (cb) => {
+    const listener = (_event: unknown, draftId: string | null) => cb(draftId);
+    ipcRenderer.on('writing:annotations:changed', listener);
+    return () => ipcRenderer.removeListener('writing:annotations:changed', listener);
+  },
 
   generateDeepResearchReport: async (request, handlers) => {
     const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;

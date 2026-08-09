@@ -37,6 +37,9 @@ const SYNC_GROUPS: { key: SyncGroupKey; prefix?: string; tables?: string[] }[] =
       // beside the report it is about. Why it is a table and not a column on the row
       // above is in the migration that creates it.
       'writing_draft_reads',
+      // Highlights and comments are authored reading work. Small independent rows keep
+      // their newest-wins merge from rewriting the multi-page report they annotate.
+      'writing_draft_annotations',
       'projects',
       'project_sections',
       'project_chapters',

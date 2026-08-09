@@ -21,7 +21,7 @@ const CORE_TABLES = [
 // agree. The rows carry no prose beyond an optional note.
 
 const USER_TABLES = [
-  'note_folders', 'notes', 'writing_saved_drafts', 'projects', 'project_sections',
+  'note_folders', 'notes', 'writing_saved_drafts', 'writing_draft_annotations', 'projects', 'project_sections',
   'project_chapters', 'project_chapter_versions', 'project_chapter_chunks',
   'project_chapter_ideas', 'project_chapter_idea_relations', 'project_links',
   'project_insertion_suggestions', 'saved_searches', 'immersion_sessions',

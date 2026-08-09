@@ -6072,6 +6072,46 @@ export interface WritingWorkshopSavedDraft {
   updatedAt: string;
 }
 
+/** The six quiet colours offered by the Deep Research reader highlighter. */
+export type WritingDraftAnnotationColor = 'yellow' | 'rose' | 'blue' | 'mint' | 'lavender' | 'peach';
+
+/**
+ * A text annotation belongs to one immutable rendering of a saved report.
+ *
+ * `scope` is `source` for the original report and `translation:<id>` for a saved
+ * translation. Offsets make the common path exact and cheap; the selected text plus
+ * its two short contexts let the reader recover the range if Markdown changes how it
+ * splits text nodes between releases.
+ */
+export interface WritingDraftAnnotation {
+  id: string;
+  draftId: string;
+  scope: string;
+  kind: 'highlight' | 'comment';
+  color: WritingDraftAnnotationColor | null;
+  startOffset: number;
+  endOffset: number;
+  selectedText: string;
+  prefix: string;
+  suffix: string;
+  comment: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WritingDraftAnnotationInput {
+  draftId: string;
+  scope: string;
+  kind: WritingDraftAnnotation['kind'];
+  color?: WritingDraftAnnotationColor | null;
+  startOffset: number;
+  endOffset: number;
+  selectedText: string;
+  prefix?: string;
+  suffix?: string;
+  comment?: string | null;
+}
+
 export interface WritingWorkshopSaveDraftRequest {
   draft: WritingWorkshopDraft;
   model?: ModelRef | null;

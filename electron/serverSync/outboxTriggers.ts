@@ -34,6 +34,7 @@ export const MUTABLE_TABLES = [
   'note_folders',
   'note_links',
   'writing_saved_drafts',
+  'writing_draft_annotations',
   'decorative_images',
   'immersion_sessions',
   'saved_searches',

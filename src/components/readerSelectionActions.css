@@ -2,8 +2,10 @@
   position: fixed;
   z-index: 2147482500;
   display: flex;
+  align-items: center;
   gap: 3px;
   width: max-content;
+  max-width: calc(100vw - 16px);
   padding: 5px;
   border: 1px solid rgb(82 82 91 / 0.9);
   border-radius: 11px;
@@ -16,6 +18,7 @@
   display: grid;
   width: 31px;
   height: 31px;
+  flex: 0 0 auto;
   place-items: center;
   border: 0;
   border-radius: 7px;
@@ -30,36 +33,98 @@
   outline: none;
 }
 
-.reader-selection-actions button[data-tone='danger'] {
-  color: #f87171;
-}
-
+.reader-selection-actions button[data-tone='danger'] { color: #f87171; }
 .reader-selection-actions button[data-tone='danger']:hover,
-.reader-selection-actions button[data-tone='danger']:focus-visible {
-  background: #7f1d1d;
-  color: #fff;
-}
+.reader-selection-actions button[data-tone='danger']:focus-visible { background: #7f1d1d; color: #fff; }
 
-::highlight(nodus-reader-mark) {
-  background-color: rgb(250 204 21 / 0.42);
-  color: inherit;
-  text-decoration: underline 2px rgb(234 179 8 / 0.9);
-  text-underline-offset: 3px;
+.reader-selection-colors { display: flex; gap: 1px; }
+.reader-selection-actions .reader-selection-color { width: 25px; }
+.reader-selection-color span,
+.reader-highlighter-palette button span {
+  width: 16px;
+  height: 16px;
+  border: 1px solid rgb(255 255 255 / 0.42);
+  border-radius: 999px;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.18);
 }
+.reader-selection-divider { width: 1px; height: 21px; margin: 0 2px; background: rgb(82 82 91 / 0.75); }
 
-.light .reader-selection-actions {
+.reader-highlighter-control { position: relative; }
+.reader-active-color { width: 9px; height: 9px; border-radius: 999px; box-shadow: 0 0 0 1px rgb(255 255 255 / 0.45); }
+.reader-highlighter-palette {
+  position: absolute;
+  z-index: 80;
+  top: calc(100% + 7px);
+  right: 0;
+  display: flex;
+  gap: 3px;
+  padding: 6px;
+  border: 1px solid rgb(82 82 91 / 0.9);
+  border-radius: 10px;
+  background: rgb(24 24 27 / 0.98);
+  box-shadow: 0 12px 30px rgb(0 0 0 / 0.32);
+}
+.reader-highlighter-palette button { display: grid; width: 28px; height: 28px; place-items: center; border-radius: 7px; color: #d4d4d8; }
+.reader-highlighter-palette button:hover,
+.reader-highlighter-palette button.is-active { background: #3730a3; }
+.reader-highlighter-palette .reader-highlighter-off { margin-left: 2px; border-left: 1px solid #52525b; border-radius: 0 7px 7px 0; }
+
+.reader-margin-marker {
+  position: fixed;
+  z-index: 75;
+  display: grid;
+  width: 25px;
+  height: 25px;
+  place-items: center;
+  border: 1px solid;
+  border-radius: 7px;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.18);
+  transition: transform 120ms ease, filter 120ms ease;
+}
+.reader-margin-marker:hover { transform: translateX(2px); filter: brightness(1.08); }
+.reader-margin-marker-bookmark { border-color: #d97706; background: #fef3c7; color: #92400e; }
+.reader-margin-marker-comment { border-color: #6366f1; background: #e0e7ff; color: #3730a3; }
+
+.reader-comment-editor {
+  position: fixed;
+  z-index: 2147482600;
+  width: min(330px, calc(100vw - 16px));
+  padding: 12px;
+  border: 1px solid rgb(82 82 91 / 0.92);
+  border-radius: 12px;
+  background: rgb(24 24 27 / 0.99);
+  box-shadow: 0 18px 42px rgb(0 0 0 / 0.42);
+  color: #e4e4e7;
+}
+.reader-comment-editor header { display: flex; align-items: center; gap: 7px; color: #c7d2fe; }
+.reader-comment-editor header strong { flex: 1; font-size: 12px; }
+.reader-comment-editor header button { display: grid; width: 26px; height: 26px; place-items: center; border-radius: 6px; color: #a1a1aa; }
+.reader-comment-editor header button:hover { background: #27272a; color: #f4f4f5; }
+.reader-comment-quote { overflow: hidden; margin: 7px 0; color: #a1a1aa; font-size: 11px; font-style: italic; line-height: 1.45; text-overflow: ellipsis; white-space: nowrap; }
+.reader-comment-editor textarea { min-height: 98px; width: 100%; resize: vertical; font-size: 13px; line-height: 1.45; }
+.reader-comment-editor footer { display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 6px; margin-top: 9px; }
+.reader-comment-editor footer .btn { min-height: 31px; padding: 5px 9px; font-size: 12px; }
+.reader-comment-error { margin-top: 6px; color: #fca5a5; font-size: 11px; }
+
+::highlight(nodus-reader-yellow) { background-color: rgb(253 230 138 / 0.47); color: inherit; text-decoration: underline 2px rgb(217 119 6 / 0.78); text-underline-offset: 3px; }
+::highlight(nodus-reader-rose) { background-color: rgb(254 205 211 / 0.45); color: inherit; text-decoration: underline 2px rgb(225 29 72 / 0.7); text-underline-offset: 3px; }
+::highlight(nodus-reader-blue) { background-color: rgb(191 219 254 / 0.43); color: inherit; text-decoration: underline 2px rgb(37 99 235 / 0.7); text-underline-offset: 3px; }
+::highlight(nodus-reader-mint) { background-color: rgb(187 247 208 / 0.4); color: inherit; text-decoration: underline 2px rgb(22 163 74 / 0.68); text-underline-offset: 3px; }
+::highlight(nodus-reader-lavender) { background-color: rgb(221 214 254 / 0.43); color: inherit; text-decoration: underline 2px rgb(124 58 237 / 0.68); text-underline-offset: 3px; }
+::highlight(nodus-reader-peach) { background-color: rgb(254 215 170 / 0.44); color: inherit; text-decoration: underline 2px rgb(234 88 12 / 0.68); text-underline-offset: 3px; }
+::highlight(nodus-reader-comment) { color: inherit; text-decoration: underline 2px dotted rgb(129 140 248 / 0.86); text-underline-offset: 4px; }
+
+.light .reader-selection-actions,
+.light .reader-highlighter-palette,
+.light .reader-comment-editor {
   border-color: rgb(212 212 216 / 0.95);
-  background: rgb(255 255 255 / 0.98);
+  background: rgb(255 255 255 / 0.99);
   box-shadow: 0 12px 30px rgb(24 24 27 / 0.16);
   color: #27272a;
 }
-
-.light .reader-selection-actions button[data-tone='danger'] {
-  color: #dc2626;
-}
-
+.light .reader-selection-actions button[data-tone='danger'] { color: #dc2626; }
 .light .reader-selection-actions button[data-tone='danger']:hover,
-.light .reader-selection-actions button[data-tone='danger']:focus-visible {
-  background: #fee2e2;
-  color: #991b1b;
-}
+.light .reader-selection-actions button[data-tone='danger']:focus-visible { background: #fee2e2; color: #991b1b; }
+.light .reader-selection-divider { background: #d4d4d8; }
+.light .reader-highlighter-palette button { color: #52525b; }
+.light .reader-comment-editor header button:hover { background: #f4f4f5; color: #18181b; }

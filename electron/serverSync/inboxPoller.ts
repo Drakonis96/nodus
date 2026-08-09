@@ -128,6 +128,12 @@ async function tick(): Promise<void> {
       if (summary.entries.some((entry) => entry.table === 'writing_saved_drafts' && (entry.outcome === 'applied' || entry.outcome === 'deleted'))) {
         broadcast('writing:saved:changed', null);
       }
+      if (summary.entries.some((entry) => entry.table === 'writing_draft_annotations' && (entry.outcome === 'applied' || entry.outcome === 'deleted'))) {
+        // A deletion carries only its annotation id, so the renderer treats null as
+        // "refresh the report you currently have open". Upserts could be narrowed by
+        // draft_id, but one channel shape keeps both paths honest.
+        broadcast('writing:annotations:changed', null);
+      }
 
       // A refusal did not advance the cursor, so the very same batch would come back.
       if (summary.refused.length > 0) break;
