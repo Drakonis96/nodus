@@ -7849,6 +7849,8 @@ export const PT: Record<string, string> = {
   "Acciones de selección": "Ações da seleção",
   "Añadir marcador de lectura": "Adicionar marcador de leitura",
   "Mover marcador aquí": "Mover marcador para aqui",
+  "Ir al marcador de lectura": "Ir para o marcador de leitura",
+  "Eliminar marcador de lectura": "Eliminar marcador de leitura",
   "Citar en Nodi": "Citar no Nodi",
   "Quitar cita": "Remover citação",
   "Texto visible de la sección abierta o documento completo en los lectores.": "Texto visível da secção aberta ou documento completo nos leitores.",

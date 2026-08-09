@@ -7312,6 +7312,8 @@ export const IT: Record<string, string> = {
   "Acciones de selección": "Azioni sulla selezione",
   "Añadir marcador de lectura": "Aggiungi segnalibro di lettura",
   "Mover marcador aquí": "Sposta qui il segnalibro",
+  "Ir al marcador de lectura": "Vai al segnalibro di lettura",
+  "Eliminar marcador de lectura": "Elimina segnalibro di lettura",
   "Citar en Nodi": "Cita in Nodi",
   "Quitar cita": "Rimuovi citazione",
   "Texto visible de la sección abierta o documento completo en los lectores.": "Testo visibile della sezione aperta o documento completo nei lettori.",

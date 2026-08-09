@@ -95,6 +95,9 @@ test('report selection offers icon-only copy, bookmark and Nodi quote actions', 
   assert.match(actions, /contextmenu/);
   assert.match(actions, /navigator\.clipboard\.writeText\(active\.text\)/);
   assert.match(actions, /localStorage\.setItem\(storageKey\(contextId\)/);
+  assert.match(actions, /localStorage\.removeItem\(storageKey\(contextId\)/);
+  assert.match(actions, /range\.getClientRects\(\)/, 'the painted bookmark is hit-tested so it can be clicked');
+  assert.match(actions, /useImperativeHandle\(ref, \(\) => \(\{ goToMark \}\)/);
   assert.match(actions, /updateSettings\(\{ mascotEnabled: true \}\)/);
   assert.match(actions, /quoteNodiSelection\(text\)/);
   assert.match(css, /::highlight\(nodus-reader-mark\)/);
@@ -109,6 +112,8 @@ test('report selection offers icon-only copy, bookmark and Nodi quote actions', 
   assert.match(ipc, /webContents\.send\('nodi:quoteSelection'/);
   assert.match(windows, /'consumeNodiQuoteSelection'/);
   assert.match(deepResearch, /ReaderSelectionActions[^>]*targetRef=\{mainRef\}/);
+  assert.match(deepResearch, /label=\{t\('Ir al marcador de lectura'\)\}/);
+  assert.match(deepResearch, /markActionsRef\.current\?\.goToMark\(\)/);
   assert.match(immersion, /ReaderSelectionActions[^>]*contextId=\{`immersion:/);
 });
 

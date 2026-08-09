@@ -35,7 +35,7 @@ import { DecorativeImageCard } from '../components/DecorativeImageCard';
 import { AudioPanel } from '../components/AudioPanel';
 import { FindInPage } from '../components/FindInPage';
 import { NodiViewContextSource } from '../components/NodiViewContextSource';
-import { ReaderSelectionActions } from '../components/ReaderSelectionActions';
+import { ReaderSelectionActions, type ReaderSelectionActionsHandle } from '../components/ReaderSelectionActions';
 import { t, tx, getActiveLang } from '../i18n';
 import {
   DEEP_RESEARCH_MAIN_JOB_KEY,
@@ -68,6 +68,7 @@ const DEEP_SECTION_OPTIONS: { value: DeepResearchSectionLimit; label: string }[]
 ];
 
 type SortKey = 'recent' | 'oldest' | 'title';
+type ReadFilter = 'all' | 'read' | 'unread';
 
 /**
  * One surface, four readers. The machinery is identical — queue, gallery, reader,
@@ -278,6 +279,7 @@ export function DeepResearchView({
 
   // Gallery controls.
   const [search, setSearch] = useState('');
+  const [readFilter, setReadFilter] = useState<ReadFilter>('all');
   const [sortKey, setSortKey] = useState<SortKey>('recent');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [showTutorial, setShowTutorial] = useState(false);
@@ -613,17 +615,20 @@ export function DeepResearchView({
 
   const visibleDrafts = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const filtered = q
-      ? savedDrafts.filter(
-          (d) => d.title.toLowerCase().includes(q) || d.brief.objective.toLowerCase().includes(q)
-        )
-      : savedDrafts;
+    const filtered = savedDrafts.filter((draft) => {
+      const matchesSearch = !q
+        || draft.title.toLowerCase().includes(q)
+        || draft.brief.objective.toLowerCase().includes(q);
+      const matchesReadState = readFilter === 'all'
+        || (readFilter === 'read' ? !!draft.readAt : !draft.readAt);
+      return matchesSearch && matchesReadState;
+    });
     const sorted = [...filtered];
     if (sortKey === 'title') sorted.sort((a, b) => a.title.localeCompare(b.title));
     else if (sortKey === 'oldest') sorted.sort((a, b) => a.updatedAt.localeCompare(b.updatedAt));
     else sorted.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
     return sorted;
-  }, [savedDrafts, search, sortKey]);
+  }, [savedDrafts, search, readFilter, sortKey]);
 
   // The strip shows one lane, not two. Reports queued from this window come from the
   // renderer store; reports queued by an MCP client live in the main process and arrive
@@ -786,6 +791,17 @@ export function DeepResearchView({
             placeholder={t(copy.searchPlaceholder)}
           />
         </div>
+        <select
+          className="input !py-1.5 text-xs"
+          value={readFilter}
+          onChange={(e) => setReadFilter(e.target.value as ReadFilter)}
+          aria-label={t('Filtrar por estado')}
+          title={t('Filtrar por estado')}
+        >
+          <option value="all">{t('Leído + no leído')}</option>
+          <option value="read">{t('Solo leído')}</option>
+          <option value="unread">{t('Solo no leído')}</option>
+        </select>
         <select className="input !py-1.5 text-xs" value={sortKey} onChange={(e) => setSortKey(e.target.value as SortKey)}>
           <option value="recent">{t('Más recientes')}</option>
           <option value="oldest">{t('Más antiguos')}</option>
@@ -857,11 +873,13 @@ export function DeepResearchView({
             <div className="max-w-md text-sm text-neutral-500">
               {loadingSavedDrafts
                 ? t(copy.loading)
-                : search.trim()
+                : readFilter !== 'all'
+                  ? t('No hay elementos con estos filtros.')
+                  : search.trim()
                   ? t(copy.noMatch)
                   : t(copy.empty)}
             </div>
-            {!search.trim() && !loadingSavedDrafts && (
+            {!search.trim() && readFilter === 'all' && !loadingSavedDrafts && (
               <button className="btn btn-primary gap-1.5" onClick={() => setComposerOpen(true)}>
                 <Icon name="plus" /> {t(copy.newAction)}
               </button>
@@ -983,7 +1001,7 @@ function SelectCheck({ checked }: { checked: boolean }) {
 function ReadBadge() {
   return (
     <span
-      className="pointer-events-none absolute right-2 top-2 z-10 flex items-center gap-1 rounded-full bg-emerald-950/80 px-2 py-0.5 text-[10px] font-medium text-emerald-200 ring-1 ring-emerald-700/60"
+      className="pointer-events-none absolute right-2 top-2 z-10 flex items-center gap-1 rounded-full bg-emerald-100/90 px-2 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-emerald-300/80 dark:bg-emerald-950/80 dark:text-emerald-200 dark:ring-emerald-700/60"
       title={t('Ya has leído este informe')}
     >
       <Icon name="check" size={10} /> {t('Leído')}
@@ -1353,6 +1371,8 @@ function ReaderView({
   onOpenStudyRecording?: (id: string, timestamp?: number | null) => void;
 }) {
   const mainRef = useRef<HTMLElement | null>(null);
+  const markActionsRef = useRef<ReaderSelectionActionsHandle | null>(null);
+  const [hasReaderMark, setHasReaderMark] = useState(false);
   const contextTitle = appliedTranslation?.title ?? saved.draft.title;
   const contextMarkdown = appliedTranslation?.markdown
     ?? `# ${saved.draft.title}\n\n${saved.draft.abstract ? `${saved.draft.abstract}\n\n` : ''}${stripLeadingAbstract(saved.draft.draftMarkdown, saved.draft.abstract)}`;
@@ -1377,6 +1397,13 @@ function ReaderView({
           onCopyReading={onCopyReading}
           onSaveToNotes={onSaveToNotes}
           onExport={onExport}
+        />
+        <HoverLabelButton
+          icon={hasReaderMark ? 'bookmarkFill' : 'bookmark'}
+          label={t('Ir al marcador de lectura')}
+          onClick={() => markActionsRef.current?.goToMark()}
+          disabled={!hasReaderMark}
+          className={`btn-ghost h-9 min-h-9 border ${hasReaderMark ? 'border-amber-300 text-amber-700 dark:border-amber-700/60 dark:text-amber-300' : 'border-neutral-700 text-neutral-500'}`}
         />
         {/* Beside the reading actions, where somebody who has just finished the report
             is already looking, rather than back in the gallery they would have to
@@ -1438,7 +1465,13 @@ function ReaderView({
             />}
           </div>
         </main>
-        <ReaderSelectionActions key={appliedTranslation?.id ?? 'source'} targetRef={mainRef} contextId={`deep-research:${saved.id}`} />
+        <ReaderSelectionActions
+          key={appliedTranslation?.id ?? 'source'}
+          ref={markActionsRef}
+          targetRef={mainRef}
+          contextId={`deep-research:${saved.id}`}
+          onMarkChange={setHasReaderMark}
+        />
         {showMatrix && (
           <aside className="w-80 shrink-0 overflow-y-auto border-l border-neutral-800 p-4 max-lg:hidden">
             <SupportMatrix draft={saved.draft} onCitation={onCitation} />

@@ -7659,6 +7659,8 @@ export const TR: Record<string, string> = {
   "Acciones de selección": "Seçim eylemleri",
   "Añadir marcador de lectura": "Okuma yer imi ekle",
   "Mover marcador aquí": "Yer imini buraya taşı",
+  "Ir al marcador de lectura": "Okuma yer imine git",
+  "Eliminar marcador de lectura": "Okuma yer imini sil",
   "Citar en Nodi": "Nodi'de alıntıla",
   "Quitar cita": "Alıntıyı kaldır",
   "Texto visible de la sección abierta o documento completo en los lectores.": "Açık bölümün görünen metni veya okuyuculardaki belgenin tamamı.",
