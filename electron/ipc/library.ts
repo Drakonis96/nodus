@@ -7,6 +7,10 @@ import {
   cancelZoteroLibraryImport,
   listZoteroImportLibraries,
   startZoteroLibraryImport,
+  enqueueLibraryExtraction,
+  listLibraryExtractionJobs,
+  cancelLibraryExtraction,
+  retryLibraryExtraction,
 } from '../library/libraryService';
 
 export function registerLibraryIpc({ h }: IpcContext): void {
@@ -21,4 +25,8 @@ export function registerLibraryIpc({ h }: IpcContext): void {
     },
   ));
   h('library:cancelZoteroImport', async (_event, requestId) => cancelZoteroLibraryImport(requestId));
+  h('library:enqueueExtraction', async (_event, itemIds, options, priority) => enqueueLibraryExtraction(itemIds, options, priority));
+  h('library:extractionJobs', async () => listLibraryExtractionJobs());
+  h('library:cancelExtraction', async (_event, jobId) => cancelLibraryExtraction(jobId));
+  h('library:retryExtraction', async (_event, jobId) => retryLibraryExtraction(jobId));
 }

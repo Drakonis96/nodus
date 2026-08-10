@@ -9,6 +9,10 @@ import type {
   ZoteroImportReport,
   ZoteroImportSelection,
   ZoteroLibraryPreview,
+  LibraryExtractionEnqueueResult,
+  LibraryExtractionJob,
+  LibraryExtractionOptions,
+  LibraryExtractionProgress,
 } from '../libraryTypes';
 
 /** Global bibliography. It deliberately has no vault id in any method. */
@@ -21,6 +25,11 @@ export interface LibraryApi {
   importZoteroLibrary(requestId: string, selection?: ZoteroImportSelection): Promise<ZoteroImportReport>;
   cancelZoteroLibraryImport(requestId: string): Promise<boolean>;
   onZoteroImportProgress(cb: (progress: ZoteroImportProgress) => void): () => void;
+  enqueueLibraryExtraction(itemIds: string[], options?: Partial<LibraryExtractionOptions>, priority?: number): Promise<LibraryExtractionEnqueueResult>;
+  listLibraryExtractionJobs(): Promise<LibraryExtractionJob[]>;
+  cancelLibraryExtraction(jobId: string): Promise<boolean>;
+  retryLibraryExtraction(jobId: string): Promise<boolean>;
+  onLibraryExtractionProgress(cb: (progress: LibraryExtractionProgress) => void): () => void;
   onLibraryMigrationProgress(cb: (progress: LibraryMigrationProgress) => void): () => void;
   onGlobalLibraryChanged(cb: (status: LibraryStatus) => void): () => void;
 }

@@ -10,6 +10,10 @@ import type {
   ZoteroImportReport,
   ZoteroImportSelection,
   ZoteroLibraryPreview,
+  LibraryExtractionEnqueueResult,
+  LibraryExtractionJob,
+  LibraryExtractionOptions,
+  LibraryExtractionProgress,
 } from '@shared/libraryTypes';
 import { LibraryCatalog } from './libraryCatalog';
 import { LibraryDiskStore } from './libraryStorage';
@@ -21,10 +25,27 @@ import {
 import { listVaults } from '../vaults/vaultRegistry';
 import { migrateVaultLibraries } from './libraryMigration';
 import { importZoteroLibraries, previewZoteroLibraries } from './zoteroLibraryImport';
+import { LibraryExtractionQueue } from './libraryExtractionQueue';
+import { completeTextNeutral } from '../ai/aiClient';
+import { getSettings } from '../db/settingsRepo';
+import { buildOcrTextPrompt, OCR_USER_PROMPT } from '@shared/aiOcrPrompt';
+import { DEFAULT_OCR_OPTIONS } from '@shared/aiOcrTypes';
 
-let live: { root: string; deviceId: string; store: LibraryDiskStore; catalog: LibraryCatalog } | null = null;
+let live: { root: string; deviceId: string; store: LibraryDiskStore; catalog: LibraryCatalog; extraction: LibraryExtractionQueue } | null = null;
 let migration: Promise<LibraryMigrationReport> | null = null;
 const zoteroImports = new Map<string, AbortController>();
+
+async function libraryRemoteOcr(input: { image: Buffer; mimeType: 'image/png' }): Promise<string> {
+  const settings = getSettings();
+  const model = settings.visionModel ?? settings.extractionModel ?? null;
+  if (!model) throw new Error('No hay un modelo de visión configurado para el OCR remoto explícito.');
+  return completeTextNeutral({
+    system: buildOcrTextPrompt({ ...DEFAULT_OCR_OPTIONS, outputMode: 'text' }),
+    user: OCR_USER_PROMPT,
+    images: [{ base64: input.image.toString('base64'), mediaType: input.mimeType }],
+    temperature: 0.1, maxTokens: 8000, plainContext: true,
+  }, model);
+}
 
 function unavailableStatus(): LibraryStatus {
   return {
@@ -44,16 +65,20 @@ function unavailableStatus(): LibraryStatus {
 function service(): NonNullable<typeof live> | null {
   const root = configuredLibraryRoot();
   if (!root) {
+    live?.extraction.dispose();
     live?.catalog.close();
     live = null;
     return null;
   }
   if (live?.root === root) return live;
+  live?.extraction.dispose();
   live?.catalog.close();
   const deviceId = libraryDeviceId();
   const store = new LibraryDiskStore(root, deviceId);
   store.initialize();
-  live = { root, deviceId, store, catalog: new LibraryCatalog(localLibraryDatabasePath()) };
+  const catalog = new LibraryCatalog(localLibraryDatabasePath());
+  const extraction = new LibraryExtractionQueue({ store, catalog, onProgress: broadcastExtraction, remoteOcr: libraryRemoteOcr });
+  live = { root, deviceId, store, catalog, extraction };
   return live;
 }
 
@@ -70,6 +95,12 @@ function broadcastMigration(progress: LibraryMigrationProgress): void {
     if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
       window.webContents.send('library:migrationProgress', progress);
     }
+  }
+}
+
+function broadcastExtraction(progress: LibraryExtractionProgress): void {
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (!window.isDestroyed() && !window.webContents.isDestroyed()) window.webContents.send('library:extractionProgress', progress);
   }
 }
 
@@ -104,6 +135,10 @@ export function migrateExistingVaultLibraries(): Promise<LibraryMigrationReport>
     catalog: current.catalog,
     onProgress: broadcastMigration,
   }).then((report) => {
+    const readyToExtract = current.store.scanMaterializedItems().records
+      .filter((item) => !item.deletedAt && item.source === 'zotero' && item.extraction?.status === 'pending' && !!item.files?.original)
+      .map((item) => item.id);
+    if (readyToExtract.length) current.extraction.enqueue(readyToExtract);
     broadcast(current.catalog.status(current.root, current.deviceId));
     return report;
   }).finally(() => { migration = null; });
@@ -131,6 +166,10 @@ export function startZoteroLibraryImport(
     requestId, selection, store: current.store, catalog: current.catalog,
     signal: controller.signal, onProgress,
   }).then((report) => {
+    const readyToExtract = current.store.scanMaterializedItems().records
+      .filter((item) => !item.deletedAt && item.source === 'zotero' && item.extraction?.status === 'pending' && !!item.files?.original)
+      .map((item) => item.id);
+    if (readyToExtract.length) current.extraction.enqueue(readyToExtract);
     broadcast(current.catalog.status(current.root, current.deviceId));
     return report;
   }).finally(() => { zoteroImports.delete(requestId); });
@@ -143,9 +182,32 @@ export function cancelZoteroLibraryImport(requestId: string): boolean {
   return true;
 }
 
+export function enqueueLibraryExtraction(
+  itemIds: string[],
+  options?: Partial<LibraryExtractionOptions>,
+  priority?: number,
+): LibraryExtractionEnqueueResult {
+  const current = service();
+  if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
+  return current.extraction.enqueue(itemIds, options, priority);
+}
+
+export function listLibraryExtractionJobs(): LibraryExtractionJob[] {
+  return service()?.extraction.list() ?? [];
+}
+
+export function cancelLibraryExtraction(jobId: string): boolean {
+  return service()?.extraction.cancel(jobId) ?? false;
+}
+
+export function retryLibraryExtraction(jobId: string): boolean {
+  return service()?.extraction.retry(jobId) ?? false;
+}
+
 export function closeGlobalLibrary(): void {
   for (const controller of zoteroImports.values()) controller.abort();
   zoteroImports.clear();
+  live?.extraction.dispose();
   live?.catalog.close();
   live = null;
 }

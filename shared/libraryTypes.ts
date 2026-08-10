@@ -192,6 +192,77 @@ export interface ZoteroImportReport {
   durationMs: number;
 }
 
+export interface LibraryExtractionOptions {
+  ocrMode: 'off' | 'local' | 'remote';
+  ocrLanguages: string;
+  maxOcrPages: number;
+  extractImages: boolean;
+  detectTables: boolean;
+  force: boolean;
+}
+
+export interface LibrarySourceAnchor {
+  page: number;
+  bbox: [number, number, number, number];
+}
+
+export interface LibrarySourceBlock {
+  id: string;
+  kind: 'title' | 'heading' | 'paragraph' | 'quote' | 'list' | 'table' | 'figure' | 'note' | 'code';
+  markdown: { start: number; end: number };
+  anchors: LibrarySourceAnchor[];
+  textSha256: string;
+}
+
+export interface LibrarySourceMap {
+  version: 1;
+  source: { file: string; sha256: string };
+  reader: { file: string; sha256: string };
+  pages: Array<{ page: number; width: number; height: number }>;
+  blocks: LibrarySourceBlock[];
+}
+
+export interface LibraryQualityReport {
+  status: 'passed' | 'needs-review' | 'failed';
+  characters: number;
+  words: number;
+  blocks: number;
+  headings: number;
+  figures: number;
+  tables: number;
+  ocrPages: number;
+  blankPages: number;
+  doubleSpaces: number;
+  decomposedUnicodeMarks: number;
+  softHyphens: number;
+  brokenWordLineWraps: number;
+  warnings: string[];
+}
+
+export interface LibraryExtractionJob {
+  id: string;
+  itemId: string;
+  status: 'queued' | 'processing' | 'done' | 'failed' | 'canceled';
+  phase: 'queued' | 'analyze' | 'extract' | 'ocr' | 'assets' | 'write' | 'done';
+  progress: number;
+  priority: number;
+  options: LibraryExtractionOptions;
+  attempts: number;
+  error: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LibraryExtractionProgress extends LibraryExtractionJob {
+  message: string;
+}
+
+export interface LibraryExtractionEnqueueResult {
+  queued: number;
+  skipped: number;
+  jobIds: string[];
+}
+
 export interface LibraryCatalogQuery {
   search?: string;
   collectionId?: string | null;

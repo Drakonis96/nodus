@@ -8,6 +8,7 @@ import type {
   LibraryCollectionRecord,
   LibraryItemRecord,
   LibraryImportSourceState,
+  LibraryExtractionJob,
   LibraryRebuildResult,
   LibraryStatus,
   LibraryVaultLink,
@@ -130,6 +131,20 @@ export class LibraryCatalog {
         imported_at TEXT NOT NULL,
         configuration_json TEXT NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS library_extraction_jobs (
+        id TEXT PRIMARY KEY,
+        item_id TEXT NOT NULL,
+        status TEXT NOT NULL,
+        phase TEXT NOT NULL,
+        progress REAL NOT NULL,
+        priority INTEGER NOT NULL,
+        options_json TEXT NOT NULL,
+        attempts INTEGER NOT NULL,
+        error TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS library_extraction_jobs_queue ON library_extraction_jobs (status, priority DESC, created_at);
       CREATE VIRTUAL TABLE IF NOT EXISTS library_items_fts USING fts5(
         item_id UNINDEXED,
         title,
@@ -350,6 +365,60 @@ export class LibraryCatalog {
         source=excluded.source, library_id=excluded.library_id, library_name=excluded.library_name,
         version=excluded.version, imported_at=excluded.imported_at, configuration_json=excluded.configuration_json
     `).run({ ...state, configurationJson: JSON.stringify(state.configuration) });
+  }
+
+  putExtractionJob(job: LibraryExtractionJob): void {
+    this.handle.prepare(`
+      INSERT INTO library_extraction_jobs (
+        id, item_id, status, phase, progress, priority, options_json, attempts, error, created_at, updated_at
+      ) VALUES (@id, @itemId, @status, @phase, @progress, @priority, @optionsJson, @attempts, @error, @createdAt, @updatedAt)
+      ON CONFLICT(id) DO UPDATE SET
+        item_id=excluded.item_id, status=excluded.status, phase=excluded.phase,
+        progress=excluded.progress, priority=excluded.priority, options_json=excluded.options_json,
+        attempts=excluded.attempts, error=excluded.error, updated_at=excluded.updated_at
+    `).run({ ...job, optionsJson: JSON.stringify(job.options) });
+  }
+
+  private extractionJob(row: Record<string, unknown>): LibraryExtractionJob {
+    return {
+      id: String(row.id), itemId: String(row.item_id),
+      status: row.status as LibraryExtractionJob['status'],
+      phase: row.phase as LibraryExtractionJob['phase'],
+      progress: Number(row.progress), priority: Number(row.priority),
+      options: json(row.options_json, {
+        ocrMode: 'local', ocrLanguages: 'spa+eng', maxOcrPages: 500,
+        extractImages: true, detectTables: true, force: false,
+      }),
+      attempts: Number(row.attempts), error: row.error == null ? null : String(row.error),
+      createdAt: String(row.created_at), updatedAt: String(row.updated_at),
+    };
+  }
+
+  getExtractionJob(id: string): LibraryExtractionJob | null {
+    const row = this.handle.prepare('SELECT * FROM library_extraction_jobs WHERE id=?').get(id) as Record<string, unknown> | undefined;
+    return row ? this.extractionJob(row) : null;
+  }
+
+  findActiveExtractionJob(itemId: string): LibraryExtractionJob | null {
+    const row = this.handle.prepare(`
+      SELECT * FROM library_extraction_jobs WHERE item_id=? AND status IN ('queued', 'processing')
+      ORDER BY created_at DESC LIMIT 1
+    `).get(itemId) as Record<string, unknown> | undefined;
+    return row ? this.extractionJob(row) : null;
+  }
+
+  listExtractionJobs(status?: LibraryExtractionJob['status']): LibraryExtractionJob[] {
+    const rows = (status
+      ? this.handle.prepare('SELECT * FROM library_extraction_jobs WHERE status=? ORDER BY priority DESC, created_at').all(status)
+      : this.handle.prepare('SELECT * FROM library_extraction_jobs ORDER BY updated_at DESC, priority DESC').all()
+    ) as Record<string, unknown>[];
+    return rows.map((row) => this.extractionJob(row));
+  }
+
+  resumeInterruptedExtractionJobs(now = new Date().toISOString()): number {
+    return Number(this.handle.prepare(`
+      UPDATE library_extraction_jobs SET status='queued', phase='queued', error=NULL, updated_at=? WHERE status='processing'
+    `).run(now).changes);
   }
 
   list(query: LibraryCatalogQuery = {}): LibraryCatalogPage {
