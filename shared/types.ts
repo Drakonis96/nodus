@@ -27,9 +27,12 @@ export type {
   LibraryItemRecord,
   LibraryItemSource,
   LibraryItemType,
+  LibraryMigrationProgress,
+  LibraryMigrationReport,
   LibraryRebuildResult,
   LibraryRecordClock,
   LibraryStatus,
+  LibraryVaultLink,
 } from './libraryTypes';
 
 // Testimonios (historia oral). Las REGLAS del dominio — transiciones, normalización de

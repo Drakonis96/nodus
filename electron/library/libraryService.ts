@@ -1,5 +1,12 @@
 import { BrowserWindow } from 'electron';
-import type { LibraryCatalogPage, LibraryCatalogQuery, LibraryRebuildResult, LibraryStatus } from '@shared/libraryTypes';
+import type {
+  LibraryCatalogPage,
+  LibraryCatalogQuery,
+  LibraryMigrationProgress,
+  LibraryMigrationReport,
+  LibraryRebuildResult,
+  LibraryStatus,
+} from '@shared/libraryTypes';
 import { LibraryCatalog } from './libraryCatalog';
 import { LibraryDiskStore } from './libraryStorage';
 import {
@@ -7,8 +14,11 @@ import {
   libraryDeviceId,
   localLibraryDatabasePath,
 } from './libraryPaths';
+import { listVaults } from '../vaults/vaultRegistry';
+import { migrateVaultLibraries } from './libraryMigration';
 
 let live: { root: string; deviceId: string; store: LibraryDiskStore; catalog: LibraryCatalog } | null = null;
+let migration: Promise<LibraryMigrationReport> | null = null;
 
 function unavailableStatus(): LibraryStatus {
   return {
@@ -49,6 +59,14 @@ function broadcast(status: LibraryStatus): void {
   }
 }
 
+function broadcastMigration(progress: LibraryMigrationProgress): void {
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
+      window.webContents.send('library:migrationProgress', progress);
+    }
+  }
+}
+
 export function getGlobalLibraryStatus(): LibraryStatus {
   const current = service();
   return current ? current.catalog.status(current.root, current.deviceId) : unavailableStatus();
@@ -68,6 +86,22 @@ export function listGlobalLibraryItems(query?: LibraryCatalogQuery): LibraryCata
   const status = current.catalog.status(current.root, current.deviceId);
   if (!status.lastRebuiltAt) current.catalog.rebuild(current.store);
   return current.catalog.list(query);
+}
+
+export function migrateExistingVaultLibraries(): Promise<LibraryMigrationReport> {
+  if (migration) return migration;
+  const current = service();
+  if (!current) return Promise.reject(new Error('Configura primero la carpeta de copias de seguridad de Nodus.'));
+  migration = migrateVaultLibraries({
+    vaults: listVaults(),
+    store: current.store,
+    catalog: current.catalog,
+    onProgress: broadcastMigration,
+  }).then((report) => {
+    broadcast(current.catalog.status(current.root, current.deviceId));
+    return report;
+  }).finally(() => { migration = null; });
+  return migration;
 }
 
 export function closeGlobalLibrary(): void {

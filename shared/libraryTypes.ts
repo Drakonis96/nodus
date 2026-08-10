@@ -169,3 +169,49 @@ export interface LibraryStatus {
   invalidRecords: number;
   lastRebuiltAt: string | null;
 }
+
+export interface LibraryVaultLink {
+  itemId: string;
+  vaultId: string;
+  vaultName: string;
+  vaultType: string;
+  workId: string;
+  analysis: {
+    lightStatus: string;
+    deepStatus: string;
+    summaryStatus: string;
+    ideaCount: number;
+    passageCount: number;
+    evidenceCount: number;
+    gapCount: number;
+    hasSummary: boolean;
+    hasNotes: boolean;
+    archived: boolean;
+  };
+}
+
+export interface LibraryMigrationProgress {
+  phase: 'inventory' | 'collections' | 'items' | 'catalog' | 'complete';
+  vaultIndex: number;
+  vaultCount: number;
+  vaultId: string | null;
+  vaultName: string | null;
+  processedItems: number;
+  totalItems: number;
+  percent: number;
+}
+
+export interface LibraryMigrationReport {
+  vaultsScanned: number;
+  itemsDiscovered: number;
+  itemsCreated: number;
+  itemsUpdated: number;
+  itemsUnchanged: number;
+  collectionsCreated: number;
+  collectionsUpdated: number;
+  collectionsUnchanged: number;
+  vaultLinks: number;
+  preservedAnalyses: number;
+  warnings: string[];
+  durationMs: number;
+}

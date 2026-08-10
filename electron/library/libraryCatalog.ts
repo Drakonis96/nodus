@@ -9,6 +9,7 @@ import type {
   LibraryItemRecord,
   LibraryRebuildResult,
   LibraryStatus,
+  LibraryVaultLink,
 } from '@shared/libraryTypes';
 import { LibraryDiskStore } from './libraryStorage';
 
@@ -107,6 +108,16 @@ export class LibraryCatalog {
         PRIMARY KEY (item_id, id)
       );
       CREATE INDEX IF NOT EXISTS library_attachments_hash ON library_attachments (sha256);
+      CREATE TABLE IF NOT EXISTS library_vault_links (
+        item_id TEXT NOT NULL,
+        vault_id TEXT NOT NULL,
+        vault_name TEXT NOT NULL,
+        vault_type TEXT NOT NULL,
+        work_id TEXT NOT NULL,
+        analysis_json TEXT NOT NULL,
+        PRIMARY KEY (item_id, vault_id, work_id)
+      );
+      CREATE INDEX IF NOT EXISTS library_vault_links_vault ON library_vault_links (vault_id, work_id);
       CREATE VIRTUAL TABLE IF NOT EXISTS library_items_fts USING fts5(
         item_id UNINDEXED,
         title,
@@ -264,6 +275,35 @@ export class LibraryCatalog {
       invalidRecords: Number(this.getMeta('invalidRecords')) || 0,
       lastRebuiltAt: this.getMeta('lastRebuiltAt'),
     };
+  }
+
+  replaceVaultLinks(links: LibraryVaultLink[]): void {
+    const insert = this.handle.prepare(`
+      INSERT INTO library_vault_links (item_id, vault_id, vault_name, vault_type, work_id, analysis_json)
+      VALUES (@itemId, @vaultId, @vaultName, @vaultType, @workId, @analysisJson)
+    `);
+    this.handle.transaction(() => {
+      this.handle.prepare('DELETE FROM library_vault_links').run();
+      for (const link of links) insert.run({ ...link, analysisJson: JSON.stringify(link.analysis) });
+    })();
+  }
+
+  listVaultLinks(itemId?: string): LibraryVaultLink[] {
+    const rows = (itemId
+      ? this.handle.prepare('SELECT * FROM library_vault_links WHERE item_id=? ORDER BY vault_name, work_id').all(itemId)
+      : this.handle.prepare('SELECT * FROM library_vault_links ORDER BY item_id, vault_name, work_id').all()
+    ) as Record<string, unknown>[];
+    return rows.map((row) => ({
+      itemId: String(row.item_id),
+      vaultId: String(row.vault_id),
+      vaultName: String(row.vault_name),
+      vaultType: String(row.vault_type),
+      workId: String(row.work_id),
+      analysis: json(row.analysis_json, {
+        lightStatus: 'none', deepStatus: 'none', summaryStatus: 'none', ideaCount: 0,
+        passageCount: 0, evidenceCount: 0, gapCount: 0, hasSummary: false, hasNotes: false, archived: false,
+      }),
+    }));
   }
 
   list(query: LibraryCatalogQuery = {}): LibraryCatalogPage {

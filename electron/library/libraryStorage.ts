@@ -93,6 +93,11 @@ export class LibraryDiskStore {
     return legacyMetadataToRecord(parsed, path.basename(folder));
   }
 
+  readMaterializedCollection(id: string): LibraryCollectionRecord | null {
+    const value = readJsonFile<unknown>(path.join(this.root, '.nodus', 'collections', `${safeLibraryFolderName(id)}.json`));
+    return isLibraryCollectionRecord(value) ? value : null;
+  }
+
   private versionsDirectory(kind: RecordKind, id: string): string {
     return path.join(this.root, '.nodus', 'records', kind, safeLibraryFolderName(id));
   }
