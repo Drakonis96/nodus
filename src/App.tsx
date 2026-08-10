@@ -943,6 +943,15 @@ export function App() {
     });
   }, [navigate]);
 
+  useEffect(() => {
+    if (!window.nodus?.onZoteroPluginOpen) return undefined;
+    return window.nodus.onZoteroPluginOpen((target) => {
+      if (target.kind !== 'library-reader' || !target.id) return;
+      setLibraryTarget({ readerItemId: target.id, nonce: Date.now() });
+      setView('library');
+    });
+  }, []);
+
   const openNoteFromSearch = useCallback((id: string) => {
     setNoteTarget({ id, nonce: Date.now() });
     setView('notes');

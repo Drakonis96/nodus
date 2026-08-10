@@ -351,6 +351,8 @@ export interface AssistantNavigationTarget {
 export interface LibraryNavigationTarget {
   nonce: number;
   healthBucket?: CorpusHealthBucketId;
+  /** Open a transverse Library item, entering its clean reader when available. */
+  readerItemId?: string;
 }
 
 /** Navigation into Ideas that opens the complete detail panel for one idea. */

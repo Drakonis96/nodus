@@ -22,7 +22,10 @@ import type {
   LibraryItemMetadata,
   LibraryMetadataIdentifierKind,
   LibraryMetadataLookupResult,
+  LibraryVaultLink,
+  LibraryVaultLinkReport,
 } from '../libraryTypes';
+import type { VaultSummary } from '../types';
 
 /** Global bibliography. It deliberately has no vault id in any method. */
 export interface LibraryApi {
@@ -52,6 +55,9 @@ export interface LibraryApi {
   resolveGlobalLibraryMetadata(kind: LibraryMetadataIdentifierKind, value: string): Promise<LibraryMetadataLookupResult>;
   listGlobalLibraryDuplicates(): Promise<LibraryDuplicateGroup[]>;
   mergeGlobalLibraryItems(canonicalId: string, duplicateIds: string[]): Promise<LibraryItemRecord>;
+  listGlobalLibraryVaults(): Promise<VaultSummary[]>;
+  listGlobalLibraryVaultLinks(itemId?: string): Promise<LibraryVaultLink[]>;
+  linkGlobalLibraryItemsToVault(itemIds: string[], vaultId: string): Promise<LibraryVaultLinkReport>;
   onLibraryMigrationProgress(cb: (progress: LibraryMigrationProgress) => void): () => void;
   onGlobalLibraryChanged(cb: (status: LibraryStatus) => void): () => void;
 }

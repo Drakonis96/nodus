@@ -26,6 +26,9 @@ import {
   resolveGlobalLibraryMetadata,
   listGlobalLibraryDuplicates,
   mergeGlobalLibraryItems,
+  listGlobalLibraryVaults,
+  listGlobalLibraryVaultLinks,
+  linkGlobalLibraryItemsToVault,
 } from '../library/libraryService';
 
 export function registerLibraryIpc({ h }: IpcContext): void {
@@ -80,4 +83,7 @@ export function registerLibraryIpc({ h }: IpcContext): void {
   h('library:resolveMetadata', async (_event, kind, value) => resolveGlobalLibraryMetadata(kind, value));
   h('library:duplicates', async () => listGlobalLibraryDuplicates());
   h('library:mergeItems', async (_event, canonicalId, duplicateIds) => mergeGlobalLibraryItems(canonicalId, duplicateIds));
+  h('library:vaults', async () => listGlobalLibraryVaults());
+  h('library:vaultLinks', async (_event, itemId) => listGlobalLibraryVaultLinks(itemId));
+  h('library:linkToVault', async (_event, itemIds, vaultId) => linkGlobalLibraryItemsToVault(itemIds, vaultId));
 }

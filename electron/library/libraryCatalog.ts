@@ -326,6 +326,23 @@ export class LibraryCatalog {
     })();
   }
 
+  upsertVaultLinks(links: LibraryVaultLink[]): void {
+    const insert = this.handle.prepare(`
+      INSERT INTO library_vault_links (item_id, vault_id, vault_name, vault_type, work_id, analysis_json)
+      VALUES (@itemId, @vaultId, @vaultName, @vaultType, @workId, @analysisJson)
+      ON CONFLICT(item_id, vault_id, work_id) DO UPDATE SET
+        vault_name=excluded.vault_name, vault_type=excluded.vault_type,
+        analysis_json=excluded.analysis_json
+    `);
+    this.handle.transaction(() => {
+      for (const link of links) {
+        this.handle.prepare('DELETE FROM library_vault_links WHERE item_id=? AND vault_id=? AND work_id<>?')
+          .run(link.itemId, link.vaultId, link.workId);
+        insert.run({ ...link, analysisJson: JSON.stringify(link.analysis) });
+      }
+    })();
+  }
+
   listVaultLinks(itemId?: string): LibraryVaultLink[] {
     const rows = (itemId
       ? this.handle.prepare('SELECT * FROM library_vault_links WHERE item_id=? ORDER BY vault_name, work_id').all(itemId)

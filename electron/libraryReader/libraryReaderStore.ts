@@ -3,6 +3,7 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type {
   LibraryReaderDocument,
+  LibraryReaderChatMessage,
   LibraryReaderSection,
   WritingDraftAnnotation,
   WritingDraftAnnotationColor,
@@ -21,7 +22,7 @@ interface ReaderMetadata {
   authors?: string[];
   year?: number | null;
   zotero?: { itemKey?: string; attachmentKey?: string };
-  files?: { reader?: string; original?: string; sourceMap?: string; annotations?: string };
+  files?: { reader?: string; original?: string; sourceMap?: string; annotations?: string; chat?: string };
 }
 
 interface SourceMapBlock {
@@ -96,7 +97,7 @@ function recordIdentity(record: LibraryItemRecord): ReaderIdentity {
   return {
     workId: record.id,
     storageId: record.storageId,
-    zoteroKey: record.source === 'zotero' ? record.sourceKey?.trim() || null : null,
+    zoteroKey: record.source === 'zotero' ? record.storageId.trim() || record.sourceKey?.trim() || null : null,
     title: record.metadata.title,
     authors: record.metadata.creators.map(creatorName).filter(Boolean),
     year: record.metadata.year ?? null,
@@ -242,11 +243,15 @@ function inlineDocumentImages(markdown: string, folder: string): string {
 function globalDocument(documentId: string): ResolvedReaderDocument | null {
   const root = libraryRoot();
   if (!fs.existsSync(root)) return null;
+  let canonicalId = documentId;
+  if (documentId.startsWith('nodus-library:')) {
+    try { canonicalId = decodeURIComponent(documentId.slice('nodus-library:'.length)); } catch { /* keep input */ }
+  }
   const inspect = (folder: string): ResolvedReaderDocument | null => {
     const raw = readJson<unknown>(path.join(folder, 'metadata.json'));
     const record = isLibraryItemRecord(raw) ? raw : legacyMetadataToRecord(raw, path.basename(folder));
     if (!record || record.deletedAt) return null;
-    const matches = record.id === documentId || record.storageId === documentId || record.sourceKey === documentId;
+    const matches = record.id === canonicalId || record.storageId === canonicalId || record.sourceKey === canonicalId;
     if (!matches) return null;
     const metadata = recordReaderMetadata(record);
     const reader = documentFile(folder, metadata.files?.reader, 'reader.md');
@@ -254,7 +259,7 @@ function globalDocument(documentId: string): ResolvedReaderDocument | null {
     return { identity: recordIdentity(record), folder, metadata };
   };
   const directNames = new Set([
-    safeLibraryFolderName(documentId),
+    safeLibraryFolderName(canonicalId),
     ...(documentId.startsWith('zotero:') ? [safeLibraryFolderName(documentId.slice('zotero:'.length))] : []),
   ]);
   for (const name of directNames) {
@@ -323,6 +328,22 @@ export function getLibraryReaderDocument(documentId: string): LibraryReaderDocum
     originalMimeType: originalAvailable ? mimeForOriginal(originalPath) : null,
     sourceMapAvailable: sourceMap !== null,
   };
+}
+
+/** Main-process-only clean content. Unlike getLibraryReaderDocument this never
+ * expands image files into base64, so it is safe to feed into retrieval and chat. */
+export function getLibraryReaderRawContent(documentId: string): {
+  document: LibraryReaderDocument;
+  markdown: string;
+  folder: string;
+} | null {
+  const resolved = resolvedDocument(documentId);
+  const document = getLibraryReaderDocument(documentId);
+  if (!resolved || !document) return null;
+  const markdownPath = documentFile(resolved.folder, resolved.metadata.files?.reader, 'reader.md');
+  if (!fs.existsSync(markdownPath)) return null;
+  const markdown = fs.readFileSync(markdownPath, 'utf8');
+  return { document: { ...document, markdown }, markdown, folder: resolved.folder };
 }
 
 function mimeForOriginal(filePath: string): string {
@@ -451,4 +472,43 @@ export function deleteLibraryReaderAnnotation(workId: string, id: string): boole
   if (next.length === annotations.length) return false;
   atomicWriteJson(target.filePath, next);
   return true;
+}
+
+function chatPath(documentId: string): string | null {
+  const resolved = resolvedDocument(documentId);
+  return resolved ? documentFile(resolved.folder, resolved.metadata.files?.chat, 'chat.json') : null;
+}
+
+function validChatMessage(value: unknown): value is LibraryReaderChatMessage {
+  if (!value || typeof value !== 'object') return false;
+  const item = value as Partial<LibraryReaderChatMessage>;
+  return typeof item.id === 'string'
+    && (item.role === 'user' || item.role === 'assistant')
+    && typeof item.content === 'string'
+    && typeof item.createdAt === 'string'
+    && (item.error === undefined || typeof item.error === 'boolean');
+}
+
+export function listLibraryReaderChatMessages(documentId: string): LibraryReaderChatMessage[] {
+  const filePath = chatPath(documentId);
+  if (!filePath) return [];
+  const parsed = readJson<unknown>(filePath);
+  if (!Array.isArray(parsed)) return [];
+  return parsed.filter(validChatMessage).slice(-100);
+}
+
+export function saveLibraryReaderChatMessages(documentId: string, messages: LibraryReaderChatMessage[]): void {
+  const filePath = chatPath(documentId);
+  if (!filePath) throw new Error('La versión de lectura ya no existe.');
+  const safe = messages.filter(validChatMessage).slice(-100).map((message) => ({
+    ...message,
+    content: message.content.slice(0, 200_000),
+  }));
+  atomicWriteJson(filePath, safe);
+}
+
+export function clearLibraryReaderChat(documentId: string): void {
+  const filePath = chatPath(documentId);
+  if (!filePath) return;
+  atomicWriteJson(filePath, []);
 }

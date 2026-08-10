@@ -36,6 +36,9 @@ export const libraryApi: LibraryApi = {
   resolveGlobalLibraryMetadata: (kind, value) => ipcRenderer.invoke('library:resolveMetadata', kind, value),
   listGlobalLibraryDuplicates: () => ipcRenderer.invoke('library:duplicates'),
   mergeGlobalLibraryItems: (canonicalId, duplicateIds) => ipcRenderer.invoke('library:mergeItems', canonicalId, duplicateIds),
+  listGlobalLibraryVaults: () => ipcRenderer.invoke('library:vaults'),
+  listGlobalLibraryVaultLinks: (itemId) => ipcRenderer.invoke('library:vaultLinks', itemId),
+  linkGlobalLibraryItemsToVault: (itemIds, vaultId) => ipcRenderer.invoke('library:linkToVault', itemIds, vaultId),
   onLibraryMigrationProgress: (cb) => {
     const listener = (_event: unknown, progress: Parameters<typeof cb>[0]) => cb(progress);
     ipcRenderer.on('library:migrationProgress', listener);

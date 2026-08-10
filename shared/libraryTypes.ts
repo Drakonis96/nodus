@@ -89,6 +89,7 @@ export interface LibraryItemRecord {
     sourceMap?: string;
     qualityReport?: string;
     annotations?: string;
+    chat?: string;
   };
   extraction?: {
     status: 'pending' | 'processing' | 'ready' | 'needs-review' | 'failed' | 'unsupported';
@@ -386,6 +387,14 @@ export interface LibraryVaultLink {
     hasNotes: boolean;
     archived: boolean;
   };
+}
+
+export interface LibraryVaultLinkReport {
+  requested: number;
+  linked: number;
+  existing: number;
+  vaultId: string;
+  links: LibraryVaultLink[];
 }
 
 export interface LibraryMigrationProgress {

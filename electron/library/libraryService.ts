@@ -23,6 +23,8 @@ import type {
   LibraryItemMetadata,
   LibraryMetadataIdentifierKind,
   LibraryMetadataLookupResult,
+  LibraryVaultLink,
+  LibraryVaultLinkReport,
 } from '@shared/libraryTypes';
 import { LibraryCatalog } from './libraryCatalog';
 import { LibraryDiskStore } from './libraryStorage';
@@ -31,7 +33,9 @@ import {
   libraryDeviceId,
   localLibraryDatabasePath,
 } from './libraryPaths';
-import { listVaults } from '../vaults/vaultRegistry';
+import { getVault, listVaults } from '../vaults/vaultRegistry';
+import { withVaultDatabase, getDb } from '../db/database';
+import { getWork, getWorkByZoteroKey, upsertWork } from '../db/worksRepo';
 import { migrateVaultLibraries } from './libraryMigration';
 import { importZoteroLibraries, previewZoteroLibraries } from './zoteroLibraryImport';
 import { LibraryExtractionQueue } from './libraryExtractionQueue';
@@ -314,6 +318,99 @@ export function mergeGlobalLibraryItems(canonicalId: string, duplicateIds: strin
   const result = current.operations.mergeItems(canonicalId, duplicateIds);
   broadcast(current.catalog.status(current.root, current.deviceId));
   return result;
+}
+
+export function listGlobalLibraryVaults() {
+  return listVaults();
+}
+
+export function listGlobalLibraryVaultLinks(itemId?: string): LibraryVaultLink[] {
+  return service()?.catalog.listVaultLinks(itemId) ?? [];
+}
+
+function creatorDisplayName(creator: LibraryItemRecord['metadata']['creators'][number]): string {
+  return creator.name?.trim() || [creator.firstName, creator.lastName].filter(Boolean).join(' ').trim();
+}
+
+function vaultAnalysis(itemId: string, vaultId: string, vaultName: string, vaultType: string, workId: string): LibraryVaultLink {
+  const db = getDb();
+  const work = getWork(workId);
+  if (!work) throw new Error('No se pudo crear la referencia dentro del vault.');
+  const count = (table: string): number => Number((db.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE nodus_id=?`).get(workId) as { n: number }).n);
+  return {
+    itemId, vaultId, vaultName, vaultType, workId,
+    analysis: {
+      lightStatus: work.light_status,
+      deepStatus: work.deep_status,
+      summaryStatus: work.summary_status,
+      ideaCount: count('idea_occurrences'),
+      passageCount: count('passages'),
+      evidenceCount: count('evidence'),
+      gapCount: count('gaps'),
+      hasSummary: count('work_summaries') > 0,
+      hasNotes: Boolean(work.notes?.trim()),
+      archived: work.archived === 1,
+    },
+  };
+}
+
+/** Materialize references in a vault without duplicating the immutable global
+ * files. Analysis resolves the clean Markdown through the stable zotero_key. */
+export async function linkGlobalLibraryItemsToVault(itemIds: string[], vaultId: string): Promise<LibraryVaultLinkReport> {
+  const current = service();
+  if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
+  const vault = getVault(vaultId);
+  if (!vault) throw new Error('El vault seleccionado ya no existe.');
+  if (vault.origin === 'connected' && (vault.remote?.role === 'reader' || vault.remote?.state !== 'active')) {
+    throw new Error('Este vault conectado es de solo lectura o no está activo.');
+  }
+  const uniqueIds = [...new Set(itemIds.filter(Boolean))];
+  const records = current.store.scanMaterializedItems().records.filter((item) => uniqueIds.includes(item.id) && !item.deletedAt);
+  if (records.length !== uniqueIds.length) throw new Error('Alguno de los documentos seleccionados ya no existe.');
+  const prior = new Set(current.catalog.listVaultLinks().filter((link) => link.vaultId === vaultId).map((link) => link.itemId));
+  const links = await withVaultDatabase(vaultId, async () => records.map((record) => {
+    const zoteroKey = record.source === 'zotero' && record.storageId
+      ? record.storageId
+      : `nodus-library:${encodeURIComponent(record.id)}`;
+    const existing = getWorkByZoteroKey(zoteroKey);
+    const authors = record.metadata.creators.map(creatorDisplayName).filter(Boolean);
+    const creators = record.metadata.creators.flatMap((creator) => {
+      const role = creator.creatorType === 'editor' ? 'editor' as const : creator.creatorType === 'author' ? 'author' as const : null;
+      if (!role) return [];
+      return [{
+        lastName: creator.lastName?.trim() || '',
+        firstName: creator.firstName?.trim() || '',
+        name: creator.name?.trim() || null,
+        role,
+      }];
+    });
+    upsertWork({
+      nodus_id: existing?.nodus_id ?? record.id,
+      zotero_key: zoteroKey,
+      zotero_version: null,
+      title: record.metadata.title,
+      authors,
+      creators,
+      year: record.metadata.year ?? null,
+      item_type: record.metadata.itemType,
+      doi: record.metadata.doi?.trim() || null,
+      read_tag: false,
+      zoteroTags: record.metadata.tags ?? [],
+    });
+    const linked = getWorkByZoteroKey(zoteroKey);
+    if (!linked) throw new Error('No se pudo vincular el documento al vault.');
+    getDb().prepare("UPDATE works SET source_type='markdown' WHERE nodus_id=?").run(linked.nodus_id);
+    return vaultAnalysis(record.id, vault.id, vault.name, String(vault.type), linked.nodus_id);
+  }));
+  current.catalog.upsertVaultLinks(links);
+  broadcast(current.catalog.status(current.root, current.deviceId));
+  return {
+    requested: uniqueIds.length,
+    linked: links.filter((link) => !prior.has(link.itemId)).length,
+    existing: links.filter((link) => prior.has(link.itemId)).length,
+    vaultId,
+    links,
+  };
 }
 
 export function closeGlobalLibrary(): void {

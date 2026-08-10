@@ -93,6 +93,10 @@ import type {
   ImmersionStreamHandlers,
   ImportProjectChapterInput,
   LibraryReaderDocument,
+  LibraryReaderChatMessage,
+  LibraryReaderChatRequest,
+  LibraryReaderChatResponse,
+  LibraryReaderChatStreamHandlers,
   ManagedTheme,
   ManualIdeaPayload,
   ManuscriptVerificationRequest,
@@ -236,6 +240,10 @@ export interface AcademicApi {
   updateLibraryReaderComment(nodusId: string, id: string, comment: string): Promise<WritingDraftAnnotation | null>;
   deleteLibraryReaderAnnotation(nodusId: string, id: string): Promise<void>;
   onLibraryReaderAnnotationsChanged(cb: (nodusId: string | null) => void): () => void;
+  listLibraryReaderChatMessages(nodusId: string): Promise<LibraryReaderChatMessage[]>;
+  libraryReaderChatStream(request: LibraryReaderChatRequest, handlers: LibraryReaderChatStreamHandlers): Promise<LibraryReaderChatResponse>;
+  cancelLibraryReaderChat(): Promise<void>;
+  clearLibraryReaderChat(nodusId: string): Promise<void>;
   /** Open an http(s)/mailto link in the user's default browser (used by rendered Markdown). */
   onStudyMaterialAiProcessingRequest(cb: (request: StudyMaterialAiProcessingPrompt) => void): () => void;
   resolveStudyMaterialAiProcessingRequest(requestId: string, decision: StudyMaterialAiProcessingDecision): Promise<void>;

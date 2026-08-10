@@ -54,6 +54,7 @@ import type {
   ZoteroItem,
   ZoteroLibrary,
   ZoteroPluginServerStatus,
+  ZoteroPluginOpenTarget,
 } from '../types';
 
 export interface PlatformApi {
@@ -123,6 +124,8 @@ export interface PlatformApi {
   installLibreOfficeCopilot(): Promise<CopilotInstallResult>;
   /** Fired when the Word add-in asks Nodus to open an idea in the graph. */
   onCopilotOpenIdea(cb: (target: CopilotOpenIdeaTarget) => void): () => void;
+  /** Fired when Zotero asks the desktop app to reveal a clean Library item. */
+  onZoteroPluginOpen(cb: (target: ZoteroPluginOpenTarget) => void): () => void;
   setApiKey(provider: AiProvider, key: string): Promise<void>;
   clearApiKey(provider: AiProvider): Promise<void>;
   recoverApiKeys(): Promise<{ recoveredProviders: AiProvider[]; remainingLockedProviders: AiProvider[] }>;

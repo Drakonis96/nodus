@@ -50,7 +50,7 @@ try {
       id: 'zotero:PDF1', title: 'PDF', fileName: 'original.pdf', relativePath: 'original.pdf',
       mimeType: 'application/pdf', byteSize: 1, sha256: 'a'.repeat(64), role: 'original',
     }],
-    files: { reader: 'reader.md', original: 'original.pdf', sourceMap: 'source-map.json', annotations: 'annotations.json' },
+    files: { reader: 'reader.md', original: 'original.pdf', sourceMap: 'source-map.json', annotations: 'annotations.json', chat: 'chat.json' },
     extraction: { status: 'ready' },
   });
 
@@ -78,7 +78,16 @@ try {
   assert.equal(persisted[0].documentId, 'E7FGXJFE', 'annotation identity remains the stable Zotero storage key');
   assert.equal(readerStore.deleteLibraryReaderAnnotation('zotero:E7FGXJFE', created.id), true);
   assert.equal(readerStore.listLibraryReaderAnnotations('zotero:E7FGXJFE').length, 0);
-  console.log('Global reader resolution, source mapping, original URL and annotation persistence tests passed!');
+  const chat = [
+    { id: 'u1', role: 'user', content: '¿Cuál es la conclusión?', createdAt: new Date().toISOString() },
+    { id: 'a1', role: 'assistant', content: 'El documento presenta un resultado final.', createdAt: new Date().toISOString() },
+  ];
+  readerStore.saveLibraryReaderChatMessages('zotero:E7FGXJFE', chat);
+  assert.deepEqual(readerStore.listLibraryReaderChatMessages('E7FGXJFE'), chat, 'chat follows the stable document identity');
+  assert.equal((readerStore.getLibraryReaderRawContent('zotero:E7FGXJFE')).markdown, markdown);
+  readerStore.clearLibraryReaderChat('zotero:E7FGXJFE');
+  assert.deepEqual(readerStore.listLibraryReaderChatMessages('zotero:E7FGXJFE'), []);
+  console.log('Global reader resolution, source mapping, original URL, annotations and chat persistence tests passed!');
 } finally {
   await rm(scratch, { recursive: true, force: true });
 }

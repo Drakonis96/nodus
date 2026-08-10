@@ -299,7 +299,7 @@ export class LibraryOperations {
     let desired: LibraryItemRecord = canonical;
     const folder = this.store.itemFolder(canonical.storageId);
     const attachments = [...canonical.attachments]; const hashes = new Set(attachments.map((entry) => entry.sha256));
-    let files = { ...(canonical.files ?? {}) }; let extraction = canonical.extraction;
+    const files = { ...(canonical.files ?? {}) }; let extraction = canonical.extraction;
     for (const duplicate of duplicates) {
       const duplicateFolder = this.store.itemFolder(duplicate.storageId);
       for (const attachment of duplicate.attachments) {

@@ -6,10 +6,12 @@ import type {
   LibraryItemRecord,
   LibraryItemSource,
   LibraryStatus,
+  LibraryVaultLink,
   ZoteroImportProgress,
   ZoteroImportSelection,
   ZoteroLibraryPreview,
 } from '@shared/libraryTypes';
+import type { VaultSummary } from '@shared/types';
 import { Icon, Spinner } from '../components/ui';
 import { LibraryDuplicatesDialog, LibraryMetadataEditor } from '../components/library/LibraryMetadataDialogs';
 import { LibraryDocumentReader } from './LibraryDocumentReader';
@@ -17,6 +19,7 @@ import { VirtualList } from '../components/VirtualList';
 import { confirm, promptText, toast } from '../components/feedback';
 import { t, tx } from '../i18n';
 import type { PendingAssistantNavigationTarget } from '../navigation';
+import type { PendingLibraryNavigationTarget } from '../navigation';
 
 const PAGE_SIZE = 250;
 
@@ -181,9 +184,50 @@ function ZoteroImportDialog({ onClose, onFinished }: { onClose: () => void; onFi
   );
 }
 
+function VaultLinkDialog({ itemIds, onClose, onLinked }: {
+  itemIds: string[];
+  onClose: () => void;
+  onLinked: (links: LibraryVaultLink[]) => void;
+}) {
+  const [vaults, setVaults] = useState<VaultSummary[]>([]);
+  const [vaultId, setVaultId] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    void window.nodus.listGlobalLibraryVaults().then((entries) => {
+      setVaults(entries);
+      setVaultId(entries.find((vault) => !(vault.origin === 'connected' && (vault.remote?.role === 'reader' || vault.remote?.state !== 'active')))?.id ?? '');
+    }).catch((nextError) => setError(nextError instanceof Error ? nextError.message : String(nextError)));
+  }, []);
+  const link = async () => {
+    if (!vaultId || busy) return;
+    setBusy(true); setError(null);
+    try {
+      const report = await window.nodus.linkGlobalLibraryItemsToVault(itemIds, vaultId);
+      toast(report.linked
+        ? tx('{n} documento(s) añadidos al vault.', { n: report.linked })
+        : t('Los documentos ya estaban vinculados a ese vault.'));
+      onLinked(report.links);
+      onClose();
+    } catch (nextError) { setError(nextError instanceof Error ? nextError.message : String(nextError)); }
+    finally { setBusy(false); }
+  };
+  return <div className="fixed inset-0 z-[85] grid place-items-center bg-black/65 p-6" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose(); }}>
+    <section data-testid="global-library-vault-dialog" className="card w-full max-w-lg overflow-hidden shadow-2xl">
+      <header className="flex items-start gap-3 border-b border-neutral-800 p-5"><span className="grid h-10 w-10 place-items-center rounded-xl bg-indigo-500/15 text-indigo-300"><Icon name="vault" /></span><div className="min-w-0 flex-1"><h2 className="font-semibold">{t('Añadir al vault')}</h2><p className="mt-1 text-xs leading-5 text-neutral-500">{tx('{n} documento(s) conservarán su copia global; el vault recibirá una referencia analizable al Markdown limpio.', { n: itemIds.length })}</p></div><button className="btn btn-ghost" onClick={onClose} disabled={busy} aria-label={t('Cerrar')}><Icon name="x" /></button></header>
+      <div className="space-y-2 p-5">{vaults.map((vault) => {
+        const readOnly = vault.origin === 'connected' && (vault.remote?.role === 'reader' || vault.remote?.state !== 'active');
+        return <label key={vault.id} className={`flex items-center gap-3 rounded-xl border p-3 ${readOnly ? 'border-neutral-900 opacity-55' : vaultId === vault.id ? 'border-indigo-500/50 bg-indigo-500/5' : 'border-neutral-800 hover:bg-neutral-900/50'}`}><input type="radio" name="library-vault" value={vault.id} checked={vaultId === vault.id} disabled={readOnly || busy} onChange={() => setVaultId(vault.id)} /><Icon name="vault" size={15} className="text-neutral-500" /><span className="min-w-0 flex-1"><b className="block truncate text-sm font-medium">{vault.name}</b><span className="text-[10px] text-neutral-600">{vault.type} · {vault.origin === 'connected' ? `${vault.remote?.role ?? 'reader'} · ${vault.remote?.spaceName ?? ''}` : t('local')}</span></span>{vault.active && <span className="rounded-full bg-emerald-500/10 px-2 py-1 text-[9px] text-emerald-300">{t('Activo')}</span>}{readOnly && <span className="text-[9px] text-neutral-600">{t('Solo lectura')}</span>}</label>;
+      })}{!vaults.length && !error && <p className="py-5 text-center text-sm text-neutral-500">{t('No hay vaults disponibles.')}</p>}{error && <p role="alert" className="rounded-lg bg-red-500/10 p-3 text-xs text-red-300">{error}</p>}</div>
+      <footer className="flex justify-end gap-2 border-t border-neutral-800 p-4"><button className="btn btn-ghost" disabled={busy} onClick={onClose}>{t('Cancelar')}</button><button data-testid="confirm-global-library-vault-link" className="btn btn-primary" disabled={!vaultId || busy} onClick={() => void link()}>{busy ? <Spinner /> : <Icon name="plus" />} {t('Añadir')}</button></footer>
+    </section>
+  </div>;
+}
+
 export function GlobalLibraryView({
-  onOpenSettings, onOpenAssistant,
+  target, onOpenSettings, onOpenAssistant,
 }: {
+  target?: (PendingLibraryNavigationTarget & { nonce: number }) | null;
   onOpenSettings: () => void;
   onOpenAssistant: (target?: PendingAssistantNavigationTarget) => void;
 }) {
@@ -212,6 +256,8 @@ export function GlobalLibraryView({
   const [readerItem, setReaderItem] = useState<LibraryItemRecord | null>(null);
   const [metadataItem, setMetadataItem] = useState<LibraryItemRecord | null>(null);
   const [duplicatesOpen, setDuplicatesOpen] = useState(false);
+  const [vaultLinkItems, setVaultLinkItems] = useState<string[] | null>(null);
+  const [detailLinks, setDetailLinks] = useState<LibraryVaultLink[]>([]);
 
   const load = useCallback(async () => {
     try {
@@ -243,9 +289,21 @@ export function GlobalLibraryView({
     return () => { offChanged(); offExtraction(); };
   }, [load]);
   useEffect(() => {
-    if (!detailId) { setDetail(null); return; }
-    void window.nodus.getGlobalLibraryItem(detailId).then(setDetail);
+    if (!detailId) { setDetail(null); setDetailLinks([]); return; }
+    void Promise.all([
+      window.nodus.getGlobalLibraryItem(detailId),
+      window.nodus.listGlobalLibraryVaultLinks(detailId),
+    ]).then(([item, links]) => { setDetail(item); setDetailLinks(links); });
   }, [detailId, status?.lastRebuiltAt]);
+  useEffect(() => {
+    const itemId = target?.readerItemId;
+    if (!itemId) return;
+    void window.nodus.getGlobalLibraryItem(itemId).then((item) => {
+      if (!item) return;
+      if (item.files?.reader) setReaderItem(item);
+      else setDetailId(item.id);
+    });
+  }, [target?.nonce, target?.readerItemId]);
 
   const children = useMemo(() => collectionChildren(collections), [collections]);
   const localCollections = useMemo(() => collections.filter((entry) => entry.source === 'nodus'), [collections]);
@@ -386,7 +444,7 @@ export function GlobalLibraryView({
             </div>}
           </div>
 
-          {selected.size > 0 && <div data-testid="global-library-bulk-actions" className="flex flex-wrap items-center gap-2 border-b border-indigo-500/20 bg-indigo-500/5 px-3 py-2 text-xs"><b>{tx('{n} seleccionados', { n: selected.size })}</b><select className="input ml-2 h-8 min-w-44 text-xs" value={collectionTarget} onChange={(event) => setCollectionTarget(event.target.value)}><option value="">{t('Añadir a colección…')}</option>{localCollections.map((collection) => <option key={collection.id} value={collection.id}>{collection.name}</option>)}</select><button className="btn btn-ghost h-8" disabled={!collectionTarget} onClick={() => void addSelectedToCollection()}>{t('Aplicar')}</button><button className="btn btn-ghost h-8" onClick={() => void processSelected()}><Icon name="refresh" size={13} /> {t('Procesar de nuevo')}</button><button className="btn btn-ghost h-8 text-red-400" onClick={() => void deleteSelected()}><Icon name="trash" size={13} /> {t('Papelera')}</button><button className="ml-auto text-neutral-500 hover:text-neutral-200" onClick={() => setSelected(new Set())}>{t('Limpiar selección')}</button></div>}
+          {selected.size > 0 && <div data-testid="global-library-bulk-actions" className="flex flex-wrap items-center gap-2 border-b border-indigo-500/20 bg-indigo-500/5 px-3 py-2 text-xs"><b>{tx('{n} seleccionados', { n: selected.size })}</b><select className="input ml-2 h-8 min-w-44 text-xs" value={collectionTarget} onChange={(event) => setCollectionTarget(event.target.value)}><option value="">{t('Añadir a colección…')}</option>{localCollections.map((collection) => <option key={collection.id} value={collection.id}>{collection.name}</option>)}</select><button className="btn btn-ghost h-8" disabled={!collectionTarget} onClick={() => void addSelectedToCollection()}>{t('Aplicar')}</button><button data-testid="bulk-add-library-to-vault" className="btn btn-ghost h-8" onClick={() => setVaultLinkItems([...selected])}><Icon name="vault" size={13} /> {t('Añadir al vault')}</button><button className="btn btn-ghost h-8" onClick={() => void processSelected()}><Icon name="refresh" size={13} /> {t('Procesar de nuevo')}</button><button className="btn btn-ghost h-8 text-red-400" onClick={() => void deleteSelected()}><Icon name="trash" size={13} /> {t('Papelera')}</button><button className="ml-auto text-neutral-500 hover:text-neutral-200" onClick={() => setSelected(new Set())}>{t('Limpiar selección')}</button></div>}
 
           <div className="grid h-9 grid-cols-[2.2rem_minmax(16rem,2fr)_minmax(9rem,1fr)_4.5rem_7rem_7.5rem] items-center border-b border-neutral-800 px-3 text-[10px] font-semibold uppercase tracking-wider text-neutral-600">
             <input type="checkbox" checked={items.length > 0 && items.every((item) => selected.has(item.id))} onChange={(event) => setSelected((current) => { const next = new Set(current); for (const item of items) { if (event.target.checked) next.add(item.id); else next.delete(item.id); } return next; })} aria-label={t('Seleccionar página')} />
@@ -416,14 +474,19 @@ export function GlobalLibraryView({
             ].filter(([, value]) => value != null && value !== '').map(([label, value]) => <div key={String(label)}><dt className="text-[10px] uppercase tracking-wider text-neutral-600">{label}</dt><dd className="mt-1 break-words text-neutral-300">{String(value)}</dd></div>)}</dl>
             {detail.metadata.abstract && <div className="mt-5"><h3 className="text-[10px] font-semibold uppercase tracking-wider text-neutral-600">{t('Resumen')}</h3><p className="mt-2 text-xs leading-5 text-neutral-400">{detail.metadata.abstract}</p></div>}
             {detail.metadata.tags?.length ? <div className="mt-5 flex flex-wrap gap-1">{detail.metadata.tags.map((tag) => <span key={tag} className="rounded-full bg-neutral-900 px-2 py-1 text-[10px] text-neutral-400">{tag}</span>)}</div> : null}
+            <div className="mt-5"><h3 className="text-[10px] font-semibold uppercase tracking-wider text-neutral-600">{t('Disponible en vaults')}</h3>{detailLinks.length ? <div className="mt-2 space-y-1.5">{detailLinks.map((link) => <div key={`${link.vaultId}:${link.workId}`} className="flex items-center gap-2 rounded-lg border border-neutral-800 px-2.5 py-2 text-[10px]"><Icon name="vault" size={12} className="text-indigo-400" /><span className="min-w-0 flex-1 truncate text-neutral-400">{link.vaultName}</span><span className="text-neutral-600">{link.analysis.deepStatus === 'done' ? t('analizado') : t('vinculado')}</span></div>)}</div> : <p className="mt-2 text-[10px] leading-4 text-neutral-600">{t('Aún no está añadido a ningún vault.')}</p>}</div>
             <div className="mt-5 rounded-xl border border-neutral-800 p-3"><div className="flex items-center justify-between text-xs"><span>{t('Versión limpia')}</span><b className={detail.extraction?.status === 'ready' ? 'text-emerald-400' : 'text-neutral-500'}>{t(EXTRACTION_LABEL[detail.extraction?.status ?? 'pending'])}</b></div>{detail.extraction?.error && <p className="mt-2 text-[10px] text-red-400">{detail.extraction.error}</p>}<p className="mt-2 text-[10px] text-neutral-600">{detail.attachments.length} {t('adjuntos')} · {detail.files?.reader ? t('Markdown disponible') : t('Sin Markdown')}</p></div>
           </div>
-          <footer className="grid grid-cols-2 gap-2 border-t border-neutral-800 p-3"><button data-testid="edit-library-metadata" className="btn btn-ghost col-span-2 border border-neutral-700" onClick={() => setMetadataItem(detail)}><Icon name="edit" /> {t('Editar metadatos')}</button><button className="btn btn-primary" disabled={!detail.files?.reader} title={!detail.files?.reader ? t('Procesa el documento primero') : undefined} onClick={() => void openReader(detail.id)}><Icon name="bookOpen" /> {t('Leer')}</button><button className="btn btn-ghost border border-neutral-700" onClick={() => void processSelected()}><Icon name="refresh" /> {t('Procesar')}</button><button className="btn btn-ghost col-span-2 text-red-400" onClick={() => void deleteSelected()}><Icon name="trash" /> {t('Enviar a la papelera')}</button></footer>
+          <footer className="grid grid-cols-2 gap-2 border-t border-neutral-800 p-3"><button data-testid="edit-library-metadata" className="btn btn-ghost col-span-2 border border-neutral-700" onClick={() => setMetadataItem(detail)}><Icon name="edit" /> {t('Editar metadatos')}</button><button data-testid="add-library-item-to-vault" className="btn btn-ghost col-span-2 border border-neutral-700" onClick={() => setVaultLinkItems([detail.id])}><Icon name="vault" /> {t('Añadir al vault')}</button><button className="btn btn-primary" disabled={!detail.files?.reader} title={!detail.files?.reader ? t('Procesa el documento primero') : undefined} onClick={() => void openReader(detail.id)}><Icon name="bookOpen" /> {t('Leer')}</button><button className="btn btn-ghost border border-neutral-700" onClick={() => void processSelected()}><Icon name="refresh" /> {t('Procesar')}</button><button className="btn btn-ghost col-span-2 text-red-400" onClick={() => void deleteSelected()}><Icon name="trash" /> {t('Enviar a la papelera')}</button></footer>
         </aside>}
       </div>
       {zoteroOpen && <ZoteroImportDialog onClose={() => setZoteroOpen(false)} onFinished={() => void load()} />}
       {metadataItem && <LibraryMetadataEditor item={metadataItem} onClose={() => setMetadataItem(null)} onSaved={(saved) => { setDetail(saved); void load(); }} />}
       {duplicatesOpen && <LibraryDuplicatesDialog onClose={() => setDuplicatesOpen(false)} onChanged={() => void load()} />}
+      {vaultLinkItems && <VaultLinkDialog itemIds={vaultLinkItems} onClose={() => setVaultLinkItems(null)} onLinked={(links) => {
+        if (detailId && links.some((link) => link.itemId === detailId)) setDetailLinks((current) => [...current.filter((existing) => !links.some((link) => link.itemId === existing.itemId && link.vaultId === existing.vaultId)), ...links.filter((link) => link.itemId === detailId)]);
+        setSelected(new Set());
+      }} />}
     </div>
   );
 }

@@ -44,6 +44,8 @@ import type {
   ImmersionRequest,
   ImmersionScopeRequest,
   ImportProjectChapterInput,
+  LibraryReaderChatMessage,
+  LibraryReaderChatRequest,
   ManualIdeaPayload,
   ManuscriptVerificationRequest,
   NotesExportOptions,
@@ -128,6 +130,7 @@ import { streamDebateAnalysis } from '../ai/debate';
 import * as rqRepo from '../db/researchMapRepo';
 import * as writingAnnotations from '../db/writingAnnotationsRepo';
 import * as libraryReader from '../libraryReader/libraryReaderStore';
+import { streamLibraryReaderChat } from '../ai/libraryReaderChat';
 import { decomposeQuestion, mapCoverage } from '../ai/researchMap';
 import { exportResearchCoverage } from '../export/researchMapExport';
 import { exportData, importData } from '../export/exportImport';
@@ -326,6 +329,7 @@ function announceLibraryReaderAnnotations(nodusId: string | null): void {
 export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext): void {
   const studyImproveAborters = new Map<string, AbortController>();
   const studyAssistantAborters = new Map<string, AbortController>();
+  const libraryReaderChatAborters = new Map<string, AbortController>();
 
   const queueImportedStudyKnowledge = async (
     results: Awaited<ReturnType<typeof importStudyMaterialPaths>>,
@@ -546,6 +550,43 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
     const deleted = libraryReader.deleteLibraryReaderAnnotation(nodusId, id);
     if (deleted) announceLibraryReaderAnnotations(nodusId);
     return deleted;
+  });
+  h('libraryReader:chat:list', async (_e, nodusId: string) =>
+    libraryReader.listLibraryReaderChatMessages(nodusId)
+  );
+  h('libraryReader:chat:clear', async (_e, nodusId: string) => {
+    libraryReader.clearLibraryReaderChat(nodusId);
+  });
+  h('libraryReader:chat:stream', async (event, requestId: string, request: LibraryReaderChatRequest) => {
+    const controller = new AbortController();
+    libraryReaderChatAborters.set(requestId, controller);
+    try {
+      const response = await streamLibraryReaderChat(
+        request,
+        (delta, kind) => event.sender.send(
+          kind === 'reasoning' ? 'libraryReader:chat:reasoning' : 'libraryReader:chat:delta',
+          requestId,
+          delta,
+        ),
+        controller.signal,
+      );
+      const persisted: LibraryReaderChatMessage[] = [
+        ...request.messages,
+        ...(response.answer ? [{
+          id: `assistant:${requestId}`,
+          role: 'assistant' as const,
+          content: response.answer,
+          createdAt: new Date().toISOString(),
+        }] : []),
+      ];
+      libraryReader.saveLibraryReaderChatMessages(request.documentId, persisted);
+      return response;
+    } finally {
+      libraryReaderChatAborters.delete(requestId);
+    }
+  });
+  h('libraryReader:chat:cancel', async (_e, requestId: string) => {
+    libraryReaderChatAborters.get(requestId)?.abort();
   });
   h('study:knowledge:processing:resolve', async (event, requestId: string, decision) => {
     resolveStudyMaterialAiProcessingRequest(event.sender.id, requestId, decision);

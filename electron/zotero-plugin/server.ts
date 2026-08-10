@@ -24,6 +24,10 @@ import { searchCopilotIdeas, searchCopilotPassages } from '../ai/liveRelations';
 import { completeTextStream } from '../ai/aiClient';
 import { getActiveVault } from '../vaults/vaultRegistry';
 import type { VisionImagePart } from '@shared/imageAnalysis';
+import {
+  getGlobalLibraryItem,
+  startZoteroLibraryImport,
+} from '../library/libraryService';
 
 const MAX_REQUEST_BYTES = 20 * 1024 * 1024; // full text plus several bounded page images
 
@@ -124,6 +128,26 @@ function resolveWork(body: Record<string, unknown>): Work | null {
     if (w) return w;
   }
   return null;
+}
+
+function canonicalLibraryItemKey(body: Record<string, unknown>): string {
+  const key = typeof body.zoteroKey === 'string' ? body.zoteroKey.trim() : '';
+  const libraryId = typeof body.libraryId === 'string' ? body.libraryId.trim() : 'users/0';
+  const group = /^groups\/(.+)$/.exec(libraryId);
+  return group && key && !key.startsWith('groups:') ? `groups:${group[1]}:${key}` : key;
+}
+
+function globalLibraryItemStatus(body: Record<string, unknown>) {
+  const canonicalKey = canonicalLibraryItemKey(body);
+  const item = canonicalKey ? getGlobalLibraryItem(`zotero:${canonicalKey}`) : null;
+  return {
+    imported: Boolean(item),
+    itemId: item?.id ?? null,
+    title: item?.metadata.title ?? null,
+    extractionStatus: item?.extraction?.status ?? null,
+    readerAvailable: Boolean(item?.files?.reader),
+    originalAvailable: Boolean(item?.files?.original),
+  };
 }
 
 function toModelRef(value: unknown): ModelRef | null {
@@ -342,6 +366,31 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, _port: n
         hasAnalysis: work.deep_status === 'done',
         ideaCount,
       });
+      return;
+    }
+
+    if (urlPath === '/api/z/library/status' && req.method === 'POST') {
+      const body = await readJsonBody(req);
+      sendJson(res, 200, globalLibraryItemStatus(body));
+      return;
+    }
+
+    if (urlPath === '/api/z/library/import' && req.method === 'POST') {
+      const body = await readJsonBody(req);
+      const libraryId = typeof body.libraryId === 'string' && body.libraryId.trim() ? body.libraryId.trim() : 'users/0';
+      const requestId = `zotero-plugin-${Date.now()}-${randomBytes(5).toString('hex')}`;
+      const report = await startZoteroLibraryImport(requestId, {
+        libraryIds: [libraryId], includeUnfiled: true, copyAttachments: true,
+      }, () => undefined);
+      sendJson(res, 200, { ...globalLibraryItemStatus(body), report });
+      return;
+    }
+
+    if (urlPath === '/api/z/library/open' && req.method === 'POST') {
+      const body = await readJsonBody(req);
+      const item = globalLibraryItemStatus(body);
+      if (!item.itemId) { sendJson(res, 404, { ok: false, ...item }); return; }
+      sendJson(res, 200, { ...(await openInNodus({ kind: 'library-reader', id: item.itemId })), ...item });
       return;
     }
 

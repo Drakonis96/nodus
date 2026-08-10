@@ -9,6 +9,7 @@ import type { AcademicApi } from '@shared/api/academic';
 // button can abort it without the renderer having to juggle request ids. One
 // stream at a time per surface (the composer is disabled while sending).
 let activeChatRequestId: string | null = null;
+let activeLibraryReaderChatRequestId: string | null = null;
 let activeStudyImproveRequestId: string | null = null;
 let activeStudyAssistantRequestId: string | null = null;
 let activeStudySttRequestId: string | null = null;
@@ -53,6 +54,30 @@ export const academicApi: AcademicApi = {
     ipcRenderer.on('libraryReader:annotations:changed', listener);
     return () => ipcRenderer.removeListener('libraryReader:annotations:changed', listener);
   },
+  listLibraryReaderChatMessages: (nodusId) => ipcRenderer.invoke('libraryReader:chat:list', nodusId),
+  libraryReaderChatStream: async (request, handlers) => {
+    const requestId = `library-reader-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const onDelta = (_event: unknown, id: string, delta: string) => {
+      if (id === requestId) handlers.onDelta(delta);
+    };
+    const onReasoning = (_event: unknown, id: string, delta: string) => {
+      if (id === requestId) handlers.onReasoning?.(delta);
+    };
+    ipcRenderer.on('libraryReader:chat:delta', onDelta);
+    ipcRenderer.on('libraryReader:chat:reasoning', onReasoning);
+    activeLibraryReaderChatRequestId = requestId;
+    try {
+      return await ipcRenderer.invoke('libraryReader:chat:stream', requestId, request);
+    } finally {
+      if (activeLibraryReaderChatRequestId === requestId) activeLibraryReaderChatRequestId = null;
+      ipcRenderer.removeListener('libraryReader:chat:delta', onDelta);
+      ipcRenderer.removeListener('libraryReader:chat:reasoning', onReasoning);
+    }
+  },
+  cancelLibraryReaderChat: async () => {
+    if (activeLibraryReaderChatRequestId) await ipcRenderer.invoke('libraryReader:chat:cancel', activeLibraryReaderChatRequestId);
+  },
+  clearLibraryReaderChat: (nodusId) => ipcRenderer.invoke('libraryReader:chat:clear', nodusId).then(() => undefined),
   onStudyMaterialAiProcessingRequest: (cb) => {
     const listener = (_e: unknown, request: Parameters<typeof cb>[0]) => cb(request);
     ipcRenderer.on('study:knowledge:processing:request', listener);

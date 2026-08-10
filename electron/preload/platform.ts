@@ -50,6 +50,11 @@ export const platformApi: PlatformApi = {
     ipcRenderer.on('copilot:openIdea', listener);
     return () => ipcRenderer.removeListener('copilot:openIdea', listener);
   },
+  onZoteroPluginOpen: (cb) => {
+    const listener = (_event: unknown, target: import('@shared/types').ZoteroPluginOpenTarget) => cb(target);
+    ipcRenderer.on('zoteroPlugin:open', listener);
+    return () => ipcRenderer.removeListener('zoteroPlugin:open', listener);
+  },
   setApiKey: (provider, key) => ipcRenderer.invoke('settings:setApiKey', provider, key),
   clearApiKey: (provider) => ipcRenderer.invoke('settings:clearApiKey', provider),
   recoverApiKeys: () => ipcRenderer.invoke('settings:recoverApiKeys'),

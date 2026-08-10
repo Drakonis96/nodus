@@ -649,6 +649,32 @@ export interface LibraryReaderDocument {
   sourceMapAvailable: boolean;
 }
 
+/** A document-scoped conversation stored beside the clean Markdown copy. */
+export interface LibraryReaderChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  createdAt: string;
+  error?: boolean;
+}
+
+export interface LibraryReaderChatRequest {
+  documentId: string;
+  messages: LibraryReaderChatMessage[];
+  model?: ModelRef | null;
+}
+
+export interface LibraryReaderChatResponse {
+  answer: string;
+  model: ModelRef;
+}
+
+export interface LibraryReaderChatStreamHandlers {
+  onDelta(delta: string): void;
+  /** Provider reasoning is deliberately transient and is never written to chat.json. */
+  onReasoning?(delta: string): void;
+}
+
 /** One work inside a duplicate group, with enough metadata to choose a canonical. */
 export interface DuplicateWorkMember {
   nodus_id: string;
@@ -4051,6 +4077,12 @@ export interface CopilotOpenIdeaTarget {
   label: string | null;
   /** Word opens full development in Ideas; legacy callers keep the graph destination. */
   destination?: 'ideas' | 'graph';
+}
+
+/** Navigation request emitted by the local Zotero sidebar server. */
+export interface ZoteroPluginOpenTarget {
+  kind: 'library-reader' | 'work' | 'idea' | 'gap' | string;
+  id: string;
 }
 
 /** One typed relation between the edited paragraph and a library entity (Word copilot). */

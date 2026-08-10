@@ -160,7 +160,11 @@ La segunda sección permite comprobar el índice, la página de origen y el marc
   await readerSidebar.getByRole('tab', { name: 'Metadatos' }).click();
   assert.match(await page.getByTestId('library-reader-metadata').innerText(), new RegExp(work.zotero_key));
   await readerSidebar.getByRole('tab', { name: 'Chat' }).click();
-  await page.getByTestId('library-reader-chat').getByRole('button', { name: 'Abrir chat con contexto' }).waitFor();
+  const chatInput = page.getByTestId('library-reader-chat-input');
+  await chatInput.waitFor();
+  await chatInput.fill('¿Cuál es la tesis principal?');
+  assert.equal(await page.getByTestId('library-reader-chat-send').isEnabled(), true, 'the embedded contextual chat composer is interactive');
+  await chatInput.fill('');
   await readerSidebar.getByRole('tab', { name: 'Notas' }).click();
 
   async function selectCandidate(index) {
@@ -211,6 +215,8 @@ La segunda sección permite comprobar el índice, la página de origen y el marc
   assert.equal(diskAnnotations.length, 3);
   assert.ok(diskAnnotations.every((item) => item.documentId === work.zotero_key), 'annotations retain the stable Zotero identifier');
 
+  await readerSidebar.getByRole('tab', { name: 'Chat' }).click();
+  await page.getByTestId('library-reader-chat-input').waitFor();
   await page.screenshot({ path: screenshotPath, fullPage: true });
   assert.deepEqual(pageErrors, [], pageErrors.map((error) => error.stack ?? String(error)).join('\n'));
   console.log(`library reader UI test passed; screenshot: ${screenshotPath}`);

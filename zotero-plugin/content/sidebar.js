@@ -67,6 +67,8 @@ const I18N = {
     "conn.detailOn": "Connected to Nodus on port", "conn.detailOff": "Looking for Nodus… Start the app and enable Nodus → Settings → Nodus for Zotero; the sidebar connects on its own.",
     "conn.autoOn": "Connected to Nodus.", "conn.autoOff": "Lost the connection to Nodus. Retrying automatically.",
     "item.none": "Select a document in Zotero.", "item.analyzed": "Full analysis in Nodus", "item.notAnalyzed": "Not analyzed in Nodus", "item.ideas": "ideas",
+    "library.save": "Save clean copy", "library.update": "Update copy", "library.open": "Open clean reader",
+    "library.saving": "Importing…", "library.saved": "Saved in the Nodus Library", "library.processing": "Preparing clean Markdown…", "library.failed": "The clean copy needs review",
     "prompt.summary": "Summary", "prompt.ideas": "Main ideas", "prompt.connections": "Connections", "prompt.selection": "Explain selection", "prompt.quotes": "Key quotes",
     "p.summary": "Summarize this document.", "p.ideas": "What are the main ideas of this document?",
     "p.explainSel": "Explain the selected passage in detail: what it means, its significance in the context of this document, and define any key terms or concepts it uses.",
@@ -165,6 +167,8 @@ const I18N = {
     "conn.detailOn": "Conectado a Nodus en el puerto", "conn.detailOff": "Buscando Nodus… Abre la app y actívalo en Nodus → Ajustes → Nodus para Zotero; la barra se conecta sola.",
     "conn.autoOn": "Conectado con Nodus.", "conn.autoOff": "Se perdió la conexión con Nodus. Reintentando automáticamente.",
     "item.none": "Selecciona un documento en Zotero.", "item.analyzed": "Análisis completo en Nodus", "item.notAnalyzed": "Sin analizar en Nodus", "item.ideas": "ideas",
+    "library.save": "Guardar copia limpia", "library.update": "Actualizar copia", "library.open": "Abrir lector limpio",
+    "library.saving": "Importando…", "library.saved": "Guardado en la Biblioteca de Nodus", "library.processing": "Preparando Markdown limpio…", "library.failed": "La copia limpia necesita revisión",
     "prompt.summary": "Resumen", "prompt.ideas": "Ideas principales", "prompt.connections": "Conexiones", "prompt.selection": "Explicar selección", "prompt.quotes": "Citas clave",
     "p.summary": "Haz un resumen de este documento.", "p.ideas": "¿Cuáles son las ideas principales de este documento?",
     "p.explainSel": "Explica en detalle el pasaje seleccionado: qué significa, su relevancia en el contexto de este documento, y define los términos o conceptos clave que usa.",
@@ -468,6 +472,37 @@ function getCurrentItem() {
   } catch (e) {}
   return { item: null, attachment: null, reader: null };
 }
+function zoteroLibraryId(item) {
+  try {
+    const library = Zotero.Libraries && Zotero.Libraries.get ? Zotero.Libraries.get(item.libraryID) : null;
+    if (library && library.libraryType === "group") return "groups/" + String(library.groupID || item.libraryID);
+  } catch (e) {}
+  return "users/0";
+}
+function renderLibraryActions(box, status) {
+  if (!state.item || state.mode !== "connected" || !state.connected) return;
+  const badge = el("span", "nd-badge " + (status.imported ? "nd-badge--yes" : "nd-badge--no"));
+  badge.textContent = status.readerAvailable ? "✓ " + t("library.saved") : status.imported
+    ? (status.extractionStatus === "failed" || status.extractionStatus === "needs-review" ? t("library.failed") : t("library.processing"))
+    : t("library.save");
+  box.appendChild(badge);
+  const row = el("div", "nd-library-actions");
+  const save = el("button", "nd-library-btn", status.imported ? t("library.update") : t("library.save"));
+  save.onclick = async () => {
+    save.disabled = true; save.textContent = t("library.saving");
+    try {
+      await apiJson("/api/z/library/import", { method: "POST", body: JSON.stringify(state.item) });
+      await refreshItem(true);
+    } catch (e) { save.disabled = false; save.textContent = status.imported ? t("library.update") : t("library.save"); showToast(String(e && e.message ? e.message : e)); }
+  };
+  row.appendChild(save);
+  if (status.readerAvailable) {
+    const open = el("button", "nd-library-btn nd-library-btn--primary", t("library.open"));
+    open.onclick = async () => { try { await apiJson("/api/z/library/open", { method: "POST", body: JSON.stringify(state.item) }); } catch (e) { showToast(String(e && e.message ? e.message : e)); } };
+    row.appendChild(open);
+  }
+  box.appendChild(row);
+}
 // Info for every item currently selected in the library (for multi-item chat).
 // Regular items only; a single reader tab is handled by getCurrentItem.
 function getSelectedItemInfos() {
@@ -510,7 +545,7 @@ async function refreshItem(force) {
   let title = "", doi = "";
   try { title = cur.item.getDisplayTitle ? cur.item.getDisplayTitle() : cur.item.getField("title"); } catch (e) {}
   try { doi = cur.item.getField ? cur.item.getField("DOI") : ""; } catch (e) {}
-  state.item = { key: cur.item.key, doi: doi || "", title: title || "" };
+  state.item = { zoteroKey: cur.item.key, key: cur.item.key, libraryId: zoteroLibraryId(cur.item), doi: doi || "", title: title || "" };
   state.attachmentKey = cur.attachment ? cur.attachment.key : null;
   box.innerHTML = "";
   box.appendChild(el("div", "nd-item-title", title || cur.item.key));
@@ -520,6 +555,10 @@ async function refreshItem(force) {
       const badge = el("span", "nd-badge " + (r.matched && r.hasAnalysis ? "nd-badge--yes" : "nd-badge--no"));
       badge.textContent = r.matched && r.hasAnalysis ? "✓ " + t("item.analyzed") + " · " + (r.ideaCount || 0) + " " + t("item.ideas") : t("item.notAnalyzed");
       box.appendChild(badge);
+    } catch (e) {}
+    try {
+      const libraryStatus = await apiJson("/api/z/library/status", { method: "POST", body: JSON.stringify(state.item) });
+      renderLibraryActions(box, libraryStatus);
     } catch (e) {}
   }
 }

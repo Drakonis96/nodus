@@ -4,6 +4,7 @@ import type { PDFDocumentProxy } from 'pdfjs-dist';
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import type {
   LibraryReaderDocument,
+  LibraryReaderChatMessage,
   LibraryReaderReference,
   WritingDraftAnnotation,
   WritingDraftAnnotationColor,
@@ -170,6 +171,7 @@ export function LibraryDocumentReader({
   const scrollRef = useRef<HTMLElement | null>(null);
   const documentRef = useRef<HTMLDivElement | null>(null);
   const markActionsRef = useRef<ReaderSelectionActionsHandle | null>(null);
+  const chatBottomRef = useRef<HTMLDivElement | null>(null);
   const [reader, setReader] = useState<LibraryReaderDocument | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -183,6 +185,11 @@ export function LibraryDocumentReader({
   const [notesOpen, setNotesOpen] = useState(true);
   const [sidebarTab, setSidebarTab] = useState<'annotations' | 'metadata' | 'chat'>('annotations');
   const [previewPage, setPreviewPage] = useState<number | null>(null);
+  const [chatMessages, setChatMessages] = useState<LibraryReaderChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [chatSending, setChatSending] = useState(false);
+  const [chatStreaming, setChatStreaming] = useState('');
+  const [chatError, setChatError] = useState<string | null>(null);
 
   const loadReader = useCallback(async () => {
     setLoading(true);
@@ -207,6 +214,18 @@ export function LibraryDocumentReader({
   }, [reference.id]);
 
   useEffect(() => { void loadReader(); }, [loadReader]);
+  useEffect(() => {
+    if (!reader) return;
+    let alive = true;
+    void window.nodus.listLibraryReaderChatMessages(reference.id)
+      .then((messages) => { if (alive) setChatMessages(messages); })
+      .catch((nextError) => { if (alive) setChatError(nextError instanceof Error ? nextError.message : String(nextError)); });
+    return () => { alive = false; };
+  }, [reader, reference.id]);
+
+  useEffect(() => {
+    if (sidebarTab === 'chat') chatBottomRef.current?.scrollIntoView({ block: 'end' });
+  }, [chatMessages, chatStreaming, sidebarTab]);
   useEffect(() => {
     if (!reader) return;
     void refreshAnnotations();
@@ -313,7 +332,12 @@ export function LibraryDocumentReader({
     else void window.nodus.openLibraryReaderOriginal(reference.id);
   };
 
-  const askDocument = () => {
+  const openDocumentChat = () => {
+    setNotesOpen(true);
+    setSidebarTab('chat');
+  };
+
+  const openFullAssistant = () => {
     onOpenAssistant({
       title: `${t('Lectura:')} ${reader?.title ?? reference.title}`,
       selection: ASSISTANT_CONTEXTS.reading,
@@ -322,6 +346,50 @@ export function LibraryDocumentReader({
         + `\n\n${reader?.title ?? reference.title}\n${(reader?.authors ?? reference.authors).join(', ')}`
         + `${reader?.zoteroKey ? `\nZotero: ${reader.zoteroKey}` : ''}`,
     });
+  };
+
+  const sendChat = async () => {
+    const content = chatInput.trim();
+    if (!content || chatSending || !reader) return;
+    const user: LibraryReaderChatMessage = {
+      id: crypto.randomUUID(), role: 'user', content, createdAt: new Date().toISOString(),
+    };
+    const requestMessages = [...chatMessages.filter((message) => !message.error), user];
+    setChatMessages(requestMessages);
+    setChatInput('');
+    setChatStreaming('');
+    setChatError(null);
+    setChatSending(true);
+    try {
+      const response = await window.nodus.libraryReaderChatStream(
+        { documentId: reference.id, messages: requestMessages },
+        { onDelta: (delta) => setChatStreaming((current) => current + delta) },
+      );
+      if (response.answer) setChatMessages((current) => [...current, {
+        id: crypto.randomUUID(), role: 'assistant', content: response.answer, createdAt: new Date().toISOString(),
+      }]);
+    } catch (nextError) {
+      const message = nextError instanceof Error ? nextError.message : String(nextError);
+      setChatError(message);
+      setChatMessages((current) => [...current, {
+        id: crypto.randomUUID(), role: 'assistant', content: message, createdAt: new Date().toISOString(), error: true,
+      }]);
+    } finally {
+      setChatSending(false);
+      setChatStreaming('');
+    }
+  };
+
+  const clearChat = async () => {
+    if (!chatMessages.length || !(await confirm({
+      title: t('Vaciar conversación'),
+      message: t('Se eliminará el chat guardado junto a este documento.'),
+      confirmLabel: t('Vaciar'), danger: true,
+    }))) return;
+    await window.nodus.clearLibraryReaderChat(reference.id);
+    setChatMessages([]);
+    setChatStreaming('');
+    setChatError(null);
   };
 
   if (loading) {
@@ -372,7 +440,7 @@ export function LibraryDocumentReader({
         <HoverLabelButton icon={hasReaderMark ? 'bookmarkFill' : 'bookmark'} label={t('Ir al marcador de lectura')} onClick={() => markActionsRef.current?.goToMark()} disabled={!hasReaderMark} className={`btn-ghost h-9 min-h-9 border ${hasReaderMark ? 'border-amber-700/60 text-amber-300' : 'border-neutral-700 text-neutral-600'}`} />
         <HoverLabelButton icon="file" label={currentPage ? tx('Ver página {n}', { n: currentPage }) : t('Ver página original')} onClick={() => openCurrentPage(currentPage)} disabled={!reader.originalAvailable} showLabel={!!currentPage} className="btn-ghost h-9 min-h-9 border border-neutral-700" />
         <HoverLabelButton icon="external" label={t('Abrir original completo')} onClick={() => void window.nodus.openLibraryReaderOriginal(reference.id)} disabled={!reader.originalAvailable} className="btn-ghost h-9 min-h-9 border border-neutral-700" />
-        <HoverLabelButton icon="chat" label={t('Preguntar al chat')} onClick={askDocument} showLabel className="btn-primary h-9 min-h-9" />
+        <HoverLabelButton icon="chat" label={t('Preguntar al chat')} onClick={openDocumentChat} showLabel className="btn-primary h-9 min-h-9" />
         <button className={`btn btn-ghost h-9 w-9 p-0 xl:hidden ${notesOpen ? 'text-indigo-300' : ''}`} onClick={() => setNotesOpen((value) => !value)} aria-label={t('Anotaciones')}><Icon name="notebook" /></button>
         <div className="absolute inset-x-0 bottom-0 h-px bg-neutral-800"><div className="h-full bg-indigo-500 transition-[width]" style={{ width: `${progress}%` }} /></div>
       </header>
@@ -467,11 +535,28 @@ export function LibraryDocumentReader({
                 ].filter(([, value]) => value != null && value !== '').map(([label, value]) => <div key={String(label)}><dt className="text-[10px] uppercase tracking-wider text-neutral-600">{label}</dt><dd className="mt-1 break-words text-neutral-300">{String(value)}</dd></div>)}</dl>
                 <p className="rounded-xl border border-neutral-800 p-3 text-[10px] leading-5 text-neutral-600">{t('El Markdown, los recursos y las anotaciones se guardan junto al original dentro de nodus-library.')}</p>
               </div>}
-              {sidebarTab === 'chat' && <div data-testid="library-reader-chat" className="flex min-h-64 flex-col rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-4">
-                <span className="grid h-9 w-9 place-items-center rounded-xl bg-indigo-500/15 text-indigo-300"><Icon name="chat" /></span>
-                <h3 className="mt-3 text-sm font-semibold">{t('Pregunta sobre esta lectura')}</h3>
-                <p className="mt-2 text-xs leading-5 text-neutral-500">{t('El asistente recibirá el texto limpio, este documento y tus anotaciones como contexto de lectura.')}</p>
-                <button className="btn btn-primary mt-5 w-full" onClick={askDocument}><Icon name="chat" size={13} /> {t('Abrir chat con contexto')}</button>
+              {sidebarTab === 'chat' && <div data-testid="library-reader-chat" className="flex min-h-full flex-col">
+                <div className="mb-3 flex items-center gap-2">
+                  <span className="grid h-8 w-8 place-items-center rounded-xl bg-indigo-500/15 text-indigo-300"><Icon name="chat" size={14} /></span>
+                  <div className="min-w-0 flex-1"><h3 className="text-xs font-semibold">{t('Chat de la lectura')}</h3><p className="truncate text-[9px] text-neutral-600">{t('Texto limpio y anotaciones incluidos')}</p></div>
+                  {chatMessages.length > 0 && <button className="rounded p-1.5 text-neutral-600 hover:bg-red-950 hover:text-red-400" aria-label={t('Vaciar conversación')} onClick={() => void clearChat()}><Icon name="trash" size={12} /></button>}
+                </div>
+                <div className="min-h-0 flex-1 space-y-3" aria-live="polite">
+                  {!chatMessages.length && !chatSending && <div className="rounded-xl border border-dashed border-indigo-500/20 bg-indigo-500/5 px-4 py-6 text-center"><p className="text-xs leading-5 text-neutral-500">{t('Pregunta por la tesis, un concepto o la relación entre tus subrayados.')}</p></div>}
+                  {chatMessages.map((message) => <article key={message.id} className={message.role === 'user' ? 'ml-5 rounded-xl bg-indigo-600/20 px-3 py-2.5 text-xs leading-5 text-indigo-100' : `mr-1 rounded-xl border px-3 py-2.5 text-xs leading-5 ${message.error ? 'border-red-500/25 bg-red-500/5 text-red-300' : 'border-neutral-800 bg-neutral-950/45 text-neutral-300'}`}>
+                    {message.role === 'assistant' && !message.error ? <Markdown content={message.content} verify={false} className="text-xs leading-5" /> : <p className="whitespace-pre-wrap">{message.content}</p>}
+                  </article>)}
+                  {chatSending && <article data-testid="library-reader-chat-stream" className="mr-1 rounded-xl border border-neutral-800 bg-neutral-950/45 px-3 py-2.5 text-xs leading-5 text-neutral-300">{chatStreaming ? <Markdown content={chatStreaming} verify={false} className="text-xs leading-5" /> : <span className="flex items-center gap-2 text-neutral-500"><Spinner /> {t('Leyendo el documento…')}</span>}</article>}
+                  <div ref={chatBottomRef} />
+                </div>
+                {chatError && <p role="alert" className="mt-2 text-[10px] leading-4 text-red-400">{chatError}</p>}
+                <div className="mt-4 rounded-xl border border-neutral-800 bg-neutral-950/55 p-2 focus-within:border-indigo-500/50">
+                  <textarea data-testid="library-reader-chat-input" rows={3} className="block w-full resize-none bg-transparent px-1 text-xs leading-5 text-neutral-200 outline-none placeholder:text-neutral-700" value={chatInput} disabled={chatSending} onChange={(event) => setChatInput(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void sendChat(); } }} placeholder={t('Pregunta sobre este documento…')} />
+                  <div className="mt-2 flex items-center justify-between border-t border-neutral-800 pt-2">
+                    <button className="text-[9px] text-neutral-600 hover:text-indigo-300" onClick={openFullAssistant}>{t('Abrir en Asistente')}</button>
+                    {chatSending ? <button data-testid="library-reader-chat-stop" className="btn btn-secondary h-7 px-2 text-[10px]" onClick={() => void window.nodus.cancelLibraryReaderChat()}><Icon name="stop" size={11} /> {t('Detener')}</button> : <button data-testid="library-reader-chat-send" className="btn btn-primary h-7 px-2 text-[10px]" disabled={!chatInput.trim()} onClick={() => void sendChat()}><Icon name="arrowUp" size={11} /> {t('Enviar')}</button>}
+                  </div>
+                </div>
               </div>}
             </div>
           </aside>
