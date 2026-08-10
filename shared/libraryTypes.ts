@@ -44,6 +44,11 @@ export interface LibraryItemMetadata {
   extra?: Record<string, string>;
 }
 
+/** A `null` override intentionally removes a field supplied by an external manager. */
+export type LibraryMetadataOverrides = {
+  [Key in keyof LibraryItemMetadata]?: LibraryItemMetadata[Key] | null;
+};
+
 export interface LibraryAttachmentRecord {
   id: string;
   title: string;
@@ -74,6 +79,8 @@ export interface LibraryItemRecord {
   sourceKey?: string;
   citationKey?: string;
   metadata: LibraryItemMetadata;
+  /** User-owned corrections layered over a mirrored manager record. */
+  metadataOverrides?: LibraryMetadataOverrides;
   collectionIds: string[];
   attachments: LibraryAttachmentRecord[];
   files?: {
@@ -305,6 +312,38 @@ export interface LibraryLocalImportReport {
   skipped: number;
   itemIds: string[];
   warnings: string[];
+}
+
+export type LibraryMetadataIdentifierKind = 'doi' | 'isbn' | 'issn';
+
+export interface LibraryMetadataCandidate {
+  id: string;
+  source: 'crossref' | 'open-library';
+  confidence: number;
+  sourceUrl: string | null;
+  metadata: LibraryItemMetadata;
+}
+
+export interface LibraryMetadataLookupResult {
+  kind: LibraryMetadataIdentifierKind;
+  value: string;
+  candidates: LibraryMetadataCandidate[];
+  queriedAt: string;
+}
+
+export interface LibraryBibliographyImportReport {
+  created: number;
+  updated: number;
+  duplicates: number;
+  skipped: number;
+  itemIds: string[];
+  warnings: string[];
+}
+
+export interface LibraryDuplicateGroup {
+  key: string;
+  reason: 'doi' | 'isbn' | 'metadata';
+  items: LibraryCatalogItem[];
 }
 
 export interface LibraryRebuildResult {

@@ -72,7 +72,7 @@ try {
     format: 'nodus.library-item', formatVersion: 1, id: itemId, storageId,
     source: 'zotero', sourceLibraryId: 'users/0', sourceKey: storageId,
     metadata: {
-      title: 'Mujeres solas en la posguerra', itemType: 'journalArticle',
+      title: 'Mujeres solas en la posguerra', itemType: 'article-journal',
       creators: [{ creatorType: 'author', firstName: 'María', lastName: 'Aliaga' }],
       date: '2017', year: 2017, publicationTitle: 'Arenal', doi: '10.0000/nodus.fixture',
       isbn: [], issn: ['1134-6396'], tags: ['mujeres', 'posguerra'],
@@ -119,6 +119,23 @@ try {
   assert.match(await detail.innerText(), /10\.0000\/nodus\.fixture/);
   assert.match(await detail.innerText(), /1134-6396/);
   assert.match(await detail.innerText(), /Markdown disponible/);
+
+  await page.getByTestId('edit-library-metadata').click();
+  const metadataEditor = page.getByTestId('library-metadata-editor');
+  await metadataEditor.waitFor({ state: 'visible' });
+  await metadataEditor.getByLabel('Editorial', { exact: true }).fill('Editorial corregida en Nodus');
+  await metadataEditor.getByRole('button', { name: 'Guardar metadatos' }).click();
+  await metadataEditor.waitFor({ state: 'detached' });
+  await page.getByText('Editorial corregida en Nodus', { exact: true }).waitFor();
+  assert.equal((await page.evaluate((id) => window.nodus.getGlobalLibraryItem(id), itemId)).metadata.publisher, 'Editorial corregida en Nodus');
+  console.log('[global-library-e2e] local metadata correction persisted');
+
+  await page.getByTestId('open-library-duplicates').click();
+  const duplicatesDialog = page.getByTestId('library-duplicates-dialog');
+  await duplicatesDialog.waitFor({ state: 'visible' });
+  await duplicatesDialog.getByText('No se han detectado duplicados.').waitFor();
+  await duplicatesDialog.getByRole('button').first().click();
+  await duplicatesDialog.waitFor({ state: 'detached' });
 
   await row.locator('input[type="checkbox"]').check();
   await page.getByTestId('global-library-bulk-actions').waitFor({ state: 'visible' });

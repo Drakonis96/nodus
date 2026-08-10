@@ -53,7 +53,7 @@ function normalizeCreators(value: unknown): LibraryCreator[] {
   });
 }
 
-function normalizeMetadata(value: unknown, fallbackTitle = 'Documento sin título'): LibraryItemMetadata {
+export function normalizeLibraryMetadata(value: unknown, fallbackTitle = 'Documento sin título'): LibraryItemMetadata {
   const input = value && typeof value === 'object' ? value as Record<string, unknown> : {};
   const rawYear = Number(input.year);
   const itemType = ITEM_TYPES.has(input.itemType as LibraryItemType) ? input.itemType as LibraryItemType : 'document';
@@ -148,7 +148,7 @@ export function legacyMetadataToRecord(value: unknown, folderName: string): Libr
       ? String((input.zotero as { itemKey: string }).itemKey)
       : undefined,
     citationKey: stringValue(input.citationKey, 1_000),
-    metadata: normalizeMetadata(input, stringValue(input.title, 10_000) ?? folderName),
+    metadata: normalizeLibraryMetadata(input, stringValue(input.title, 10_000) ?? folderName),
     collectionIds: stringArray(input.collectionIds),
     attachments: [],
     files,

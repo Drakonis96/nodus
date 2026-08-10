@@ -7,6 +7,7 @@ import type {
   LibraryItemMetadata,
   LibraryItemRecord,
   LibraryItemType,
+  LibraryMetadataOverrides,
   ZoteroImportProgress,
   ZoteroImportReport,
   ZoteroImportSelection,
@@ -16,7 +17,7 @@ import type { ZoteroAttachmentInfo, ZoteroCollection, ZoteroItem, ZoteroLibrary 
 import * as zotero from '../zotero/zoteroClient';
 import { LibraryCatalog } from './libraryCatalog';
 import { assertInside, safeLibraryFolderName } from './libraryPaths';
-import { canonicalJson } from './libraryRecord';
+import { canonicalJson, normalizeLibraryMetadata } from './libraryRecord';
 import { LibraryDiskStore } from './libraryStorage';
 
 export interface ZoteroImportClient {
@@ -123,6 +124,16 @@ function metadata(item: ZoteroItem): LibraryItemMetadata {
     tags: [...new Set(item.tags.map((tag) => tag.trim()).filter(Boolean))],
     ...(extra ? { extra } : {}),
   };
+}
+
+function applyMetadataOverrides(base: LibraryItemMetadata, overrides?: LibraryMetadataOverrides): LibraryItemMetadata {
+  if (!overrides) return base;
+  const values = { ...base } as Record<string, unknown>;
+  for (const [key, value] of Object.entries(overrides)) {
+    if (value === null) delete values[key];
+    else values[key] = value;
+  }
+  return normalizeLibraryMetadata(values, base.title);
 }
 
 function comparableItem(record: LibraryItemRecord): string {
@@ -327,7 +338,8 @@ export async function importZoteroLibraries(options: {
           id: itemId(item.key), storageId: item.key, source: 'zotero' as const,
           sourceLibraryId, sourceKey: item.itemKey,
           ...(current?.citationKey ? { citationKey: current.citationKey } : {}),
-          metadata: metadata(item),
+          metadata: applyMetadataOverrides(metadata(item), current?.metadataOverrides),
+          ...(current?.metadataOverrides ? { metadataOverrides: current.metadataOverrides } : {}),
           collectionIds: [...new Set([
             ...localCollectionIds,
             ...item.collections.filter((key) => !subset || selectedKeys.has(key)).map(collectionId),

@@ -18,6 +18,11 @@ import type {
   LibraryItemCollectionPatch,
   LibraryItemRecord,
   LibraryLocalImportReport,
+  LibraryBibliographyImportReport,
+  LibraryDuplicateGroup,
+  LibraryItemMetadata,
+  LibraryMetadataIdentifierKind,
+  LibraryMetadataLookupResult,
 } from '@shared/libraryTypes';
 import { LibraryCatalog } from './libraryCatalog';
 import { LibraryDiskStore } from './libraryStorage';
@@ -35,6 +40,7 @@ import { getSettings } from '../db/settingsRepo';
 import { buildOcrTextPrompt, OCR_USER_PROMPT } from '@shared/aiOcrPrompt';
 import { DEFAULT_OCR_OPTIONS } from '@shared/aiOcrTypes';
 import { LibraryOperations } from './libraryOperations';
+import { resolveLibraryMetadata } from './libraryMetadataResolver';
 
 let live: {
   root: string;
@@ -276,6 +282,38 @@ export function importGlobalLibraryFiles(files: string[], collectionId?: string 
   if (report.itemIds.length) current.extraction.enqueue(report.itemIds);
   broadcast(current.catalog.status(current.root, current.deviceId));
   return report;
+}
+
+export function importGlobalBibliographyFiles(files: string[], collectionId?: string | null): LibraryBibliographyImportReport {
+  const current = service();
+  if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
+  const report = current.operations.importBibliographyFiles(files, collectionId);
+  broadcast(current.catalog.status(current.root, current.deviceId));
+  return report;
+}
+
+export function updateGlobalLibraryItemMetadata(itemId: string, patch: Partial<LibraryItemMetadata>): LibraryItemRecord {
+  const current = service();
+  if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
+  const result = current.operations.updateItemMetadata(itemId, patch);
+  broadcast(current.catalog.status(current.root, current.deviceId));
+  return result;
+}
+
+export function resolveGlobalLibraryMetadata(kind: LibraryMetadataIdentifierKind, value: string): Promise<LibraryMetadataLookupResult> {
+  return resolveLibraryMetadata(kind, value);
+}
+
+export function listGlobalLibraryDuplicates(): LibraryDuplicateGroup[] {
+  return service()?.operations.listDuplicateGroups() ?? [];
+}
+
+export function mergeGlobalLibraryItems(canonicalId: string, duplicateIds: string[]): LibraryItemRecord {
+  const current = service();
+  if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
+  const result = current.operations.mergeItems(canonicalId, duplicateIds);
+  broadcast(current.catalog.status(current.root, current.deviceId));
+  return result;
 }
 
 export function closeGlobalLibrary(): void {

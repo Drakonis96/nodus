@@ -11,6 +11,7 @@ import type {
   ZoteroLibraryPreview,
 } from '@shared/libraryTypes';
 import { Icon, Spinner } from '../components/ui';
+import { LibraryDuplicatesDialog, LibraryMetadataEditor } from '../components/library/LibraryMetadataDialogs';
 import { LibraryDocumentReader } from './LibraryDocumentReader';
 import { VirtualList } from '../components/VirtualList';
 import { confirm, promptText, toast } from '../components/feedback';
@@ -209,6 +210,8 @@ export function GlobalLibraryView({
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [collectionTarget, setCollectionTarget] = useState('');
   const [readerItem, setReaderItem] = useState<LibraryItemRecord | null>(null);
+  const [metadataItem, setMetadataItem] = useState<LibraryItemRecord | null>(null);
+  const [duplicatesOpen, setDuplicatesOpen] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -282,6 +285,16 @@ export function GlobalLibraryView({
     } catch (nextError) { toast(nextError instanceof Error ? nextError.message : String(nextError), { tone: 'error' }); }
   };
 
+  const importBibliography = async () => {
+    try {
+      const report = await window.nodus.importGlobalBibliographyFiles(selectedCollection);
+      if (report.created) toast(tx('{n} referencia(s) importada(s).', { n: report.created }));
+      else if (report.duplicates) toast(tx('{n} referencia(s) ya estaban en la Biblioteca.', { n: report.duplicates }), { tone: 'info' });
+      else if (report.warnings.length) toast(report.warnings[0], { tone: 'info' });
+      await load();
+    } catch (nextError) { toast(nextError instanceof Error ? nextError.message : String(nextError), { tone: 'error' }); }
+  };
+
   const processSelected = async () => {
     const ids = selected.size ? [...selected] : detailId ? [detailId] : [];
     if (!ids.length) return;
@@ -339,6 +352,8 @@ export function GlobalLibraryView({
         <div className="min-w-0"><h1 className="flex items-center gap-2 text-lg font-semibold"><Icon name="book" className="text-indigo-400" /> {t('Biblioteca')}</h1><p className="text-[11px] text-neutral-500">{tx('{n} documentos · disponible en todos los vaults', { n: status.items })}</p></div>
         <div className="flex-1" />
         {activeJobs.length > 0 && <span className="flex items-center gap-2 rounded-full bg-indigo-500/10 px-3 py-1.5 text-xs text-indigo-300"><Spinner /> {tx('{n} tarea(s) en segundo plano', { n: activeJobs.length })}</span>}
+        <button data-testid="open-library-duplicates" className="btn btn-ghost border border-neutral-700" onClick={() => setDuplicatesOpen(true)}><Icon name="copy" /> {t('Duplicados')}</button>
+        <button data-testid="import-library-bibliography" className="btn btn-ghost border border-neutral-700" onClick={() => void importBibliography()}><Icon name="fileText" /> {t('Importar referencias')}</button>
         <button className="btn btn-ghost border border-neutral-700" onClick={() => void importFiles()}><Icon name="upload" /> {t('Añadir archivos')}</button>
         <button data-testid="open-zotero-global-import" className="btn btn-primary" onClick={() => setZoteroOpen(true)}><Icon name="refresh" /> {t('Zotero')}</button>
       </header>
@@ -403,10 +418,12 @@ export function GlobalLibraryView({
             {detail.metadata.tags?.length ? <div className="mt-5 flex flex-wrap gap-1">{detail.metadata.tags.map((tag) => <span key={tag} className="rounded-full bg-neutral-900 px-2 py-1 text-[10px] text-neutral-400">{tag}</span>)}</div> : null}
             <div className="mt-5 rounded-xl border border-neutral-800 p-3"><div className="flex items-center justify-between text-xs"><span>{t('Versión limpia')}</span><b className={detail.extraction?.status === 'ready' ? 'text-emerald-400' : 'text-neutral-500'}>{t(EXTRACTION_LABEL[detail.extraction?.status ?? 'pending'])}</b></div>{detail.extraction?.error && <p className="mt-2 text-[10px] text-red-400">{detail.extraction.error}</p>}<p className="mt-2 text-[10px] text-neutral-600">{detail.attachments.length} {t('adjuntos')} · {detail.files?.reader ? t('Markdown disponible') : t('Sin Markdown')}</p></div>
           </div>
-          <footer className="grid grid-cols-2 gap-2 border-t border-neutral-800 p-3"><button className="btn btn-primary" disabled={!detail.files?.reader} title={!detail.files?.reader ? t('Procesa el documento primero') : undefined} onClick={() => void openReader(detail.id)}><Icon name="bookOpen" /> {t('Leer')}</button><button className="btn btn-ghost border border-neutral-700" onClick={() => void processSelected()}><Icon name="refresh" /> {t('Procesar')}</button><button className="btn btn-ghost col-span-2 text-red-400" onClick={() => void deleteSelected()}><Icon name="trash" /> {t('Enviar a la papelera')}</button></footer>
+          <footer className="grid grid-cols-2 gap-2 border-t border-neutral-800 p-3"><button data-testid="edit-library-metadata" className="btn btn-ghost col-span-2 border border-neutral-700" onClick={() => setMetadataItem(detail)}><Icon name="edit" /> {t('Editar metadatos')}</button><button className="btn btn-primary" disabled={!detail.files?.reader} title={!detail.files?.reader ? t('Procesa el documento primero') : undefined} onClick={() => void openReader(detail.id)}><Icon name="bookOpen" /> {t('Leer')}</button><button className="btn btn-ghost border border-neutral-700" onClick={() => void processSelected()}><Icon name="refresh" /> {t('Procesar')}</button><button className="btn btn-ghost col-span-2 text-red-400" onClick={() => void deleteSelected()}><Icon name="trash" /> {t('Enviar a la papelera')}</button></footer>
         </aside>}
       </div>
       {zoteroOpen && <ZoteroImportDialog onClose={() => setZoteroOpen(false)} onFinished={() => void load()} />}
+      {metadataItem && <LibraryMetadataEditor item={metadataItem} onClose={() => setMetadataItem(null)} onSaved={(saved) => { setDetail(saved); void load(); }} />}
+      {duplicatesOpen && <LibraryDuplicatesDialog onClose={() => setDuplicatesOpen(false)} onChanged={() => void load()} />}
     </div>
   );
 }

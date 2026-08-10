@@ -91,6 +91,7 @@ try {
 
   const { LibraryDiskStore } = require(path.join(repoRoot, 'electron/library/libraryStorage.ts'));
   const { LibraryCatalog } = require(path.join(repoRoot, 'electron/library/libraryCatalog.ts'));
+  const { LibraryOperations } = require(path.join(repoRoot, 'electron/library/libraryOperations.ts'));
   const { importZoteroLibraries, previewZoteroLibraries } = require(path.join(repoRoot, 'electron/library/zoteroLibraryImport.ts'));
   const store = new LibraryDiskStore(root, 'zotero-import-device-0001');
   const catalog = new LibraryCatalog(path.join(userData, 'library', 'catalog.sqlite'));
@@ -128,6 +129,11 @@ try {
   assert.equal(catalog.getImportSource('zotero:users/0').version, 10);
   assert.equal(catalog.getImportSource('zotero:groups/42').version, 7);
 
+  const operations = new LibraryOperations(store, catalog);
+  operations.updateItemMetadata('zotero:A', { publisher: 'Corrección local de Nodus', language: 'ca', rights: undefined });
+  assert.equal(store.readMaterializedItem('A').metadataOverrides.publisher, 'Corrección local de Nodus');
+  assert.equal(store.readMaterializedItem('A').metadataOverrides.rights, null, 'cleared manager fields use an explicit durable tombstone');
+
   const groupRevision = store.readMaterializedItem('groups:42:G1').clock.revision;
   state.personalVersion = 12;
   state.personalItems = [item({ version: 12, title: 'Norma y deseo — revisado', dateModified: '2026-03-01' })];
@@ -139,6 +145,9 @@ try {
   assert.equal(second.attachmentsCopied, 0);
   assert.equal(second.attachmentsUnchanged, 2);
   assert.equal(store.readMaterializedItem('A').metadata.title, 'Norma y deseo — revisado');
+  assert.equal(store.readMaterializedItem('A').metadata.publisher, 'Corrección local de Nodus', 'a Zotero refresh preserves local metadata corrections');
+  assert.equal(store.readMaterializedItem('A').metadata.language, 'ca');
+  assert.equal(store.readMaterializedItem('A').metadata.rights, undefined);
   assert.ok(store.readMaterializedItem('B').deletedAt);
   assert.equal(store.readMaterializedItem('groups:42:G1').clock.revision, groupRevision, 'an unchanged group item receives no phantom revision');
   assert.equal(catalog.list().total, 2);

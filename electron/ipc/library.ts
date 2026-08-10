@@ -1,5 +1,6 @@
 import type { IpcContext } from './context';
-import { BrowserWindow, dialog } from 'electron';
+import { BrowserWindow } from 'electron';
+import { showImportOpenDialog } from '../privacy';
 import {
   getGlobalLibraryStatus,
   listGlobalLibraryItems,
@@ -20,6 +21,11 @@ import {
   patchGlobalLibraryItemCollections,
   setGlobalLibraryItemsDeleted,
   importGlobalLibraryFiles,
+  importGlobalBibliographyFiles,
+  updateGlobalLibraryItemMetadata,
+  resolveGlobalLibraryMetadata,
+  listGlobalLibraryDuplicates,
+  mergeGlobalLibraryItems,
 } from '../library/libraryService';
 
 export function registerLibraryIpc({ h }: IpcContext): void {
@@ -55,7 +61,23 @@ export function registerLibraryIpc({ h }: IpcContext): void {
         extensions: ['pdf', 'epub', 'md', 'markdown', 'txt', 'html', 'htm', 'xml', 'jats', 'docx', 'csv', 'tsv', 'xlsx', 'xls', 'ods'],
       }],
     };
-    const selected = owner ? await dialog.showOpenDialog(owner, options) : await dialog.showOpenDialog(options);
+    const selected = owner ? await showImportOpenDialog(owner, options) : await showImportOpenDialog(options);
     return selected.canceled ? { created: 0, skipped: 0, itemIds: [], warnings: [] } : importGlobalLibraryFiles(selected.filePaths, collectionId);
   });
+  h('library:importBibliography', async (event, collectionId) => {
+    const owner = BrowserWindow.fromWebContents(event.sender) ?? undefined;
+    const options = {
+      title: 'Importar referencias bibliográficas',
+      properties: ['openFile', 'multiSelections'] as Array<'openFile' | 'multiSelections'>,
+      filters: [{ name: 'RIS, BibTeX, CSL JSON o Mendeley', extensions: ['ris', 'bib', 'bibtex', 'json'] }],
+    };
+    const selected = owner ? await showImportOpenDialog(owner, options) : await showImportOpenDialog(options);
+    return selected.canceled
+      ? { created: 0, updated: 0, duplicates: 0, skipped: 0, itemIds: [], warnings: [] }
+      : importGlobalBibliographyFiles(selected.filePaths, collectionId);
+  });
+  h('library:updateMetadata', async (_event, itemId, patch) => updateGlobalLibraryItemMetadata(itemId, patch));
+  h('library:resolveMetadata', async (_event, kind, value) => resolveGlobalLibraryMetadata(kind, value));
+  h('library:duplicates', async () => listGlobalLibraryDuplicates());
+  h('library:mergeItems', async (_event, canonicalId, duplicateIds) => mergeGlobalLibraryItems(canonicalId, duplicateIds));
 }

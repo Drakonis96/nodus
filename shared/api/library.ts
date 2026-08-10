@@ -17,6 +17,11 @@ import type {
   LibraryItemCollectionPatch,
   LibraryItemRecord,
   LibraryLocalImportReport,
+  LibraryBibliographyImportReport,
+  LibraryDuplicateGroup,
+  LibraryItemMetadata,
+  LibraryMetadataIdentifierKind,
+  LibraryMetadataLookupResult,
 } from '../libraryTypes';
 
 /** Global bibliography. It deliberately has no vault id in any method. */
@@ -42,6 +47,11 @@ export interface LibraryApi {
   patchGlobalLibraryItemCollections(itemIds: string[], patch: LibraryItemCollectionPatch): Promise<number>;
   setGlobalLibraryItemsDeleted(itemIds: string[], deleted: boolean): Promise<number>;
   importGlobalLibraryFiles(collectionId?: string | null): Promise<LibraryLocalImportReport>;
+  importGlobalBibliographyFiles(collectionId?: string | null): Promise<LibraryBibliographyImportReport>;
+  updateGlobalLibraryItemMetadata(itemId: string, patch: Partial<LibraryItemMetadata>): Promise<LibraryItemRecord>;
+  resolveGlobalLibraryMetadata(kind: LibraryMetadataIdentifierKind, value: string): Promise<LibraryMetadataLookupResult>;
+  listGlobalLibraryDuplicates(): Promise<LibraryDuplicateGroup[]>;
+  mergeGlobalLibraryItems(canonicalId: string, duplicateIds: string[]): Promise<LibraryItemRecord>;
   onLibraryMigrationProgress(cb: (progress: LibraryMigrationProgress) => void): () => void;
   onGlobalLibraryChanged(cb: (status: LibraryStatus) => void): () => void;
 }

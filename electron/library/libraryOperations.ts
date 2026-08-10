@@ -3,15 +3,21 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type {
   LibraryCollectionView,
+  LibraryBibliographyImportReport,
+  LibraryCatalogItem,
+  LibraryDuplicateGroup,
   LibraryItemCollectionPatch,
+  LibraryItemMetadata,
   LibraryItemRecord,
   LibraryItemType,
+  LibraryMetadataOverrides,
   LibraryLocalImportReport,
 } from '@shared/libraryTypes';
-import { canonicalJson } from './libraryRecord';
+import { canonicalJson, normalizeLibraryMetadata } from './libraryRecord';
 import { LibraryCatalog } from './libraryCatalog';
-import { assertInside, safeLibraryFolderName } from './libraryPaths';
+import { assertInside, atomicWriteJson, safeLibraryFolderName } from './libraryPaths';
 import { LibraryDiskStore } from './libraryStorage';
+import { importBibliographyFiles } from './libraryBibliographyImport';
 
 function comparable(value: LibraryItemRecord): string {
   const { clock: _clock, createdAt: _createdAt, ...rest } = value;
@@ -43,6 +49,44 @@ function copyImmutable(source: string, destination: string): void {
     fs.renameSync(temporary, destination);
   } finally {
     if (fs.existsSync(temporary)) fs.unlinkSync(temporary);
+  }
+}
+
+function normalizedIdentity(value: string | undefined): string {
+  return String(value ?? '').normalize('NFKD').replace(/\p{M}/gu, '').toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+}
+
+function compactIdentifier(value: string | undefined): string {
+  return normalizedIdentity(value).replace(/\s+/g, '');
+}
+
+function creatorLabel(record: LibraryItemRecord): string {
+  const creator = record.metadata.creators[0];
+  return creator?.name || [creator?.firstName, creator?.lastName].filter(Boolean).join(' ');
+}
+
+function recordCatalogItem(record: LibraryItemRecord, store: LibraryDiskStore): LibraryCatalogItem {
+  const reader = record.files?.reader ?? 'reader.md';
+  return {
+    id: record.id, storageId: record.storageId, source: record.source,
+    sourceLibraryId: record.sourceLibraryId ?? null, sourceKey: record.sourceKey ?? null,
+    citationKey: record.citationKey ?? null, title: record.metadata.title,
+    itemType: record.metadata.itemType, creators: record.metadata.creators, year: record.metadata.year ?? null,
+    date: record.metadata.date ?? null, doi: record.metadata.doi ?? null,
+    isbn: record.metadata.isbn ?? [], issn: record.metadata.issn ?? [], tags: record.metadata.tags ?? [],
+    collectionIds: record.collectionIds, attachmentCount: record.attachments.length,
+    readerAvailable: fs.existsSync(path.join(store.itemFolder(record.storageId), reader)),
+    extractionStatus: record.extraction?.status ?? 'pending', updatedAt: record.clock.updatedAt,
+  };
+}
+
+function copyDirectoryIfMissing(source: string, destination: string): void {
+  if (!fs.existsSync(source) || !fs.statSync(source).isDirectory()) return;
+  fs.mkdirSync(destination, { recursive: true });
+  for (const entry of fs.readdirSync(source, { withFileTypes: true })) {
+    const from = path.join(source, entry.name); const to = path.join(destination, entry.name);
+    if (entry.isDirectory()) copyDirectoryIfMissing(from, to);
+    else if (entry.isFile() && !fs.existsSync(to)) copyImmutable(from, to);
   }
 }
 
@@ -199,4 +243,113 @@ export class LibraryOperations {
     if (report.created) this.catalog.rebuild(this.store);
     return report;
   }
+
+  importBibliographyFiles(files: string[], collectionId?: string | null): LibraryBibliographyImportReport {
+    return importBibliographyFiles({ files, collectionId, store: this.store, catalog: this.catalog });
+  }
+
+  updateItemMetadata(itemId: string, patch: Partial<LibraryItemMetadata>): LibraryItemRecord {
+    const current = this.store.scanMaterializedItems().records.find((item) => item.id === itemId && !item.deletedAt);
+    if (!current) throw new Error('El documento ya no existe.');
+    const merged = normalizeLibraryMetadata({ ...current.metadata, ...patch }, current.metadata.title);
+    const overridePatch = Object.fromEntries(Object.keys(patch).map((key) => {
+      const value = (patch as Record<string, unknown>)[key];
+      return [key, value === undefined ? null : value];
+    })) as LibraryMetadataOverrides;
+    const imported = current.source !== 'nodus';
+    const desired = this.store.upsertItem({
+      ...current, metadata: merged,
+      ...(imported ? { metadataOverrides: { ...(current.metadataOverrides ?? {}), ...overridePatch } } : {}),
+    }, current.clock.revision);
+    this.catalog.rebuild(this.store);
+    return desired;
+  }
+
+  listDuplicateGroups(): LibraryDuplicateGroup[] {
+    const records = this.store.scanMaterializedItems().records.filter((item) => !item.deletedAt);
+    const emitted = new Set<string>(); const groups: LibraryDuplicateGroup[] = [];
+    const collect = (reason: LibraryDuplicateGroup['reason'], keyFor: (item: LibraryItemRecord) => string) => {
+      const map = new Map<string, LibraryItemRecord[]>();
+      for (const item of records) {
+        const key = keyFor(item); if (!key) continue;
+        map.set(key, [...(map.get(key) ?? []), item]);
+      }
+      for (const [key, members] of map) {
+        const fresh = members.filter((item) => !emitted.has(item.id));
+        if (fresh.length < 2) continue;
+        for (const item of fresh) emitted.add(item.id);
+        groups.push({ key: `${reason}:${key}`, reason, items: fresh.map((item) => recordCatalogItem(item, this.store)) });
+      }
+    };
+    collect('doi', (item) => compactIdentifier(item.metadata.doi?.replace(/^https?:\/\/(?:dx\.)?doi\.org\//i, '')));
+    collect('isbn', (item) => compactIdentifier(item.metadata.isbn?.[0]));
+    collect('metadata', (item) => {
+      const title = normalizedIdentity(item.metadata.title); const creator = normalizedIdentity(creatorLabel(item));
+      return title && creator && item.metadata.year != null ? `${title}|${item.metadata.year}|${creator}` : '';
+    });
+    return groups.sort((a, b) => a.items[0].title.localeCompare(b.items[0].title));
+  }
+
+  mergeItems(canonicalId: string, duplicateIds: string[]): LibraryItemRecord {
+    const all = this.store.scanMaterializedItems().records;
+    const canonical = all.find((item) => item.id === canonicalId && !item.deletedAt);
+    if (!canonical) throw new Error('El documento canónico ya no existe.');
+    const duplicates = all.filter((item) => duplicateIds.includes(item.id) && item.id !== canonicalId && !item.deletedAt);
+    if (!duplicates.length) return canonical;
+    let desired: LibraryItemRecord = canonical;
+    const folder = this.store.itemFolder(canonical.storageId);
+    const attachments = [...canonical.attachments]; const hashes = new Set(attachments.map((entry) => entry.sha256));
+    let files = { ...(canonical.files ?? {}) }; let extraction = canonical.extraction;
+    for (const duplicate of duplicates) {
+      const duplicateFolder = this.store.itemFolder(duplicate.storageId);
+      for (const attachment of duplicate.attachments) {
+        if (hashes.has(attachment.sha256)) continue;
+        const source = assertInside(duplicateFolder, path.join(duplicateFolder, attachment.relativePath));
+        if (!fs.existsSync(source)) continue;
+        const relativePath = path.join('attachments', 'merged', `${safeLibraryFolderName(duplicate.storageId)}-${safeLibraryFolderName(attachment.fileName)}`);
+        copyImmutable(source, assertInside(folder, path.join(folder, relativePath)));
+        const role = !files.original && attachment.role === 'original' ? 'original' : attachment.role === 'original' ? 'supplement' : attachment.role;
+        attachments.push({ ...attachment, id: `merged:${randomUUID()}`, relativePath, role }); hashes.add(attachment.sha256);
+        if (!files.original && role === 'original') files.original = relativePath;
+      }
+      if (!files.reader && duplicate.files?.reader) {
+        for (const key of ['reader', 'sourceMap', 'qualityReport'] as const) {
+          const relative = duplicate.files?.[key]; if (!relative) continue;
+          const source = assertInside(duplicateFolder, path.join(duplicateFolder, relative));
+          if (fs.existsSync(source)) { copyImmutable(source, assertInside(folder, path.join(folder, relative))); files[key] = relative; }
+        }
+        copyDirectoryIfMissing(path.join(duplicateFolder, 'assets'), path.join(folder, 'assets'));
+        extraction = duplicate.extraction;
+      }
+      const canonicalAnnotations = readJsonArray(path.join(folder, files.annotations ?? 'annotations.json'));
+      const duplicateAnnotations = readJsonArray(path.join(duplicateFolder, duplicate.files?.annotations ?? 'annotations.json'));
+      const annotationIds = new Set(canonicalAnnotations.map((entry) => String((entry as { id?: unknown }).id ?? '')));
+      for (const annotation of duplicateAnnotations) {
+        const id = String((annotation as { id?: unknown }).id ?? ''); if (!id || annotationIds.has(id)) continue;
+        canonicalAnnotations.push({ ...(annotation as Record<string, unknown>), documentId: canonical.storageId }); annotationIds.add(id);
+      }
+      if (duplicateAnnotations.length) { files.annotations = files.annotations ?? 'annotations.json'; atomicWriteJson(path.join(folder, files.annotations), canonicalAnnotations); }
+    }
+    const fill = (key: keyof LibraryItemMetadata) => desired.metadata[key] || duplicates.map((item) => item.metadata[key]).find(Boolean);
+    const metadata = normalizeLibraryMetadata({
+      ...desired.metadata,
+      abstract: fill('abstract'), date: fill('date'), year: desired.metadata.year ?? duplicates.map((item) => item.metadata.year).find((value) => value != null),
+      language: fill('language'), publisher: fill('publisher'), publicationTitle: fill('publicationTitle'), volume: fill('volume'), issue: fill('issue'), pages: fill('pages'),
+      doi: fill('doi'), url: fill('url'), isbn: [...new Set(all.flatMap((item) => item.id === canonicalId || duplicateIds.includes(item.id) ? item.metadata.isbn ?? [] : []))],
+      issn: [...new Set(all.flatMap((item) => item.id === canonicalId || duplicateIds.includes(item.id) ? item.metadata.issn ?? [] : []))],
+      tags: [...new Set(all.flatMap((item) => item.id === canonicalId || duplicateIds.includes(item.id) ? item.metadata.tags ?? [] : []))],
+    }, desired.metadata.title);
+    desired = this.store.upsertItem({
+      ...desired, metadata, collectionIds: [...new Set([canonical, ...duplicates].flatMap((item) => item.collectionIds))],
+      attachments, files, extraction,
+    }, desired.clock.revision);
+    const now = new Date().toISOString();
+    for (const duplicate of duplicates) this.store.upsertItem({ ...duplicate, deletedAt: now }, duplicate.clock.revision);
+    this.catalog.rebuild(this.store);
+    return desired;
+  }
+}
+
+function readJsonArray(file: string): unknown[] {
+  try { const value = JSON.parse(fs.readFileSync(file, 'utf8')); return Array.isArray(value) ? value : []; } catch { return []; }
 }

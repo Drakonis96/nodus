@@ -18,11 +18,13 @@ test('the Library UI exposes hierarchy, search, bulk operations, imports and bac
   for (const marker of [
     'global-library-view', 'global-library-search', 'global-library-bulk-actions',
     'global-library-detail', 'zotero-global-import-dialog', 'open-zotero-global-import',
+    'import-library-bibliography', 'open-library-duplicates', 'edit-library-metadata',
   ]) assert.match(view, new RegExp(`data-testid=(?:"|\{\`)[^\n]*${marker}`));
   for (const method of [
     'getGlobalLibraryStatus', 'listGlobalLibraryItems', 'listGlobalLibraryCollections',
     'importGlobalLibraryFiles', 'listZoteroImportLibraries', 'importZoteroLibrary',
     'enqueueLibraryExtraction', 'patchGlobalLibraryItemCollections', 'setGlobalLibraryItemsDeleted',
+    'importGlobalBibliographyFiles',
   ]) assert.match(view, new RegExp(String.raw`window\.nodus\.${method}\b`));
   assert.match(view, /CollectionBranch[\s\S]*<CollectionBranch/, 'collection rendering is recursively unbounded');
   assert.match(view, /La importación se canceló; el catálogo ya recuperado se conserva/);
@@ -52,10 +54,24 @@ test('the typed bridge covers every global management operation', async () => {
     'listGlobalLibraryCollections', 'getGlobalLibraryItem', 'createGlobalLibraryCollection',
     'updateGlobalLibraryCollection', 'deleteGlobalLibraryCollection', 'patchGlobalLibraryItemCollections',
     'setGlobalLibraryItemsDeleted', 'importGlobalLibraryFiles',
+    'importGlobalBibliographyFiles', 'updateGlobalLibraryItemMetadata', 'resolveGlobalLibraryMetadata',
+    'listGlobalLibraryDuplicates', 'mergeGlobalLibraryItems',
   ];
   assertApiMethods(assert, methods);
   assertChannelsWired(assert, [
     'library:collections', 'library:item', 'library:createCollection', 'library:updateCollection',
     'library:deleteCollection', 'library:patchItemCollections', 'library:setItemsDeleted', 'library:importFiles',
+    'library:importBibliography', 'library:updateMetadata', 'library:resolveMetadata', 'library:duplicates', 'library:mergeItems',
   ]);
+});
+
+test('metadata management previews remote candidates and requires an explicit duplicate merge', async () => {
+  const dialogs = await readSource('src/components/library/LibraryMetadataDialogs.tsx');
+  for (const marker of ['library-metadata-editor', 'library-duplicates-dialog']) assert.match(dialogs, new RegExp(marker));
+  assert.match(dialogs, /Vista previa de cambios/);
+  assert.match(dialogs, /Nada se aplica sin tu revisión/);
+  assert.match(dialogs, /updateGlobalLibraryItemMetadata/);
+  assert.match(dialogs, /resolveGlobalLibraryMetadata/);
+  assert.match(dialogs, /mergeGlobalLibraryItems/);
+  assert.match(dialogs, /Los demás pasarán a la papelera/);
 });
