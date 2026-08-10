@@ -23,7 +23,7 @@ test('the complete Global Library ships with recovery, privacy, hardening and re
     'Crossref', 'Open Library', 'read-only', 'local model', 'remote provider',
   ]) assert.match(guide, new RegExp(contract.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'));
 
-  for (const phase of ['Storage', 'Zotero', 'Extraction', 'Reader', 'Metadata', 'Vaults', 'Privacy', 'Licenses']) {
+  for (const phase of ['Storage', 'Zotero', 'Extraction', 'Reader', 'Metadata', 'Vaults', 'Reuse', 'Privacy', 'Licenses']) {
     assert.match(acceptance, new RegExp(`\\| ${phase} \\|`));
   }
   assert.match(readme, /docs\/global-library\.md/);

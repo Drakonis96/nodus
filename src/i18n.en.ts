@@ -1230,6 +1230,7 @@ export const EN: Record<string, string> = {
   'Busca coincidencias en otras bóvedas y, si encuentra ideas, embeddings, resúmenes o pasajes ya generados, los importa antes de usar IA.':
     'Looks for matches in other vaults and, if it finds ideas, embeddings, summaries or passages that were already generated, imports them before using AI.',
   'Análisis reutilizado desde otras bóvedas para {n} obra(s).': 'Analysis reused from other vaults for {n} work(s).',
+  '{n} documento(s) añadidos; {reused} componente(s) reutilizados con huellas exactas.': '{n} document(s) added; {reused} component(s) reused with exact fingerprints.',
   'No se encontró análisis reutilizable en otras bóvedas para la selección.':
     'No reusable analysis was found in other vaults for the selection.',
   'Zona peligrosa': 'Danger zone',
@@ -8151,4 +8152,6 @@ export const EN: Record<string, string> = {
   "Global reúne originales y Markdown limpio para todos tus vaults.": "Global brings originals and clean Markdown together for all your vaults.",
   "Este vault conserva colecciones, scans, resúmenes, embeddings y análisis existentes.": "This vault preserves existing collections, scans, summaries, embeddings, and analyses.",
   "Activa la Biblioteca global cuando quieras; este vault no cambiará.": "Enable the Global Library whenever you want; this vault will not change.",
+  "Light": "Light",
+  "Deep": "Deep",
 };

@@ -586,10 +586,24 @@ export function registerIpc(
     }
     return withVaultKeyProviders(resetVaultDatabase(id));
   });
-  h('vaults:reuseAnalysis', async (_e, nodusIds: string[]) => {
+  const analysisReuseControllers = new Map<string, AbortController>();
+  h('vaults:reuseAnalysis', async (_e, nodusIds: string[], operationId?: string) => {
     const busy = vaultBusyMessage();
     if (busy) throw new Error(busy);
-    return reuseVaultAnalysisForWorks(nodusIds);
+    const id = operationId?.trim();
+    const controller = new AbortController();
+    if (id) analysisReuseControllers.set(id, controller);
+    try {
+      return await reuseVaultAnalysisForWorks(nodusIds, { signal: controller.signal });
+    } finally {
+      if (id && analysisReuseControllers.get(id) === controller) analysisReuseControllers.delete(id);
+    }
+  });
+  h('vaults:cancelReuseAnalysis', async (_e, operationId: string) => {
+    const controller = analysisReuseControllers.get(operationId.trim());
+    if (!controller) return false;
+    controller.abort();
+    return true;
   });
   h('vaults:copyApiKeys', async (_e, sourceVaultId: string, targetVaultId: string) => ({
     copiedProviders: copyApiKeysBetweenVaults(sourceVaultId, targetVaultId),

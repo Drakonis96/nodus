@@ -10,7 +10,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 128;
+export const SCHEMA_VERSION = 129;
 
 export const migrations: Migration[] = [
   {
@@ -6392,6 +6392,29 @@ export const migrations: Migration[] = [
       );
       CREATE INDEX idx_library_analysis_freshness_state
         ON library_analysis_freshness(freshness, component, work_id);
+    `,
+  },
+  {
+    version: 129,
+    up: /* sql */ `
+      -- Exact cross-vault reuse is opt-in per derived component. A result without
+      -- this complete provenance remains readable locally but is never copied.
+      CREATE TABLE library_analysis_provenance (
+        work_id                         TEXT NOT NULL,
+        component                       TEXT NOT NULL CHECK (component IN ('light','deep','summary','ideas','passages','embeddings')),
+        document_fingerprint            TEXT NOT NULL,
+        library_item_id                 TEXT,
+        library_revision_fingerprint    TEXT,
+        pipeline_version                TEXT NOT NULL,
+        model_fingerprint               TEXT NOT NULL,
+        output_fingerprint              TEXT NOT NULL,
+        source_vault_id                 TEXT,
+        source_work_id                  TEXT,
+        updated_at                      TEXT NOT NULL,
+        PRIMARY KEY (work_id, component)
+      );
+      CREATE INDEX library_analysis_provenance_library
+        ON library_analysis_provenance(library_item_id, library_revision_fingerprint, component);
     `,
   },
 ];

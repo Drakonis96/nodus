@@ -7676,4 +7676,7 @@ export const TR: Record<string, string> = {
   "Global reúne originales y Markdown limpio para todos tus vaults.": "Global kapsamı, tüm kasalarınız için orijinalleri ve temiz Markdown'ı bir araya getirir.",
   "Este vault conserva colecciones, scans, resúmenes, embeddings y análisis existentes.": "Bu kasa mevcut koleksiyonları, taramaları, özetleri, embedding'leri ve analizleri korur.",
   "Activa la Biblioteca global cuando quieras; este vault no cambiará.": "Global Kütüphaneyi istediğiniz zaman etkinleştirin; bu kasa değişmez.",
+  "{n} documento(s) añadidos; {reused} componente(s) reutilizados con huellas exactas.": "{n} belge eklendi; {reused} bileşen tam parmak izleriyle yeniden kullanıldı.",
+  "Light": "Hafif",
+  "Deep": "Derin",
 };

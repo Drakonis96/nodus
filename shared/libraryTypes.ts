@@ -434,6 +434,17 @@ export interface LibraryStatus {
   lastRebuiltAt: string | null;
 }
 
+export type LibraryAnalysisReuseComponent = 'light' | 'deep' | 'summary' | 'ideas' | 'passages' | 'embeddings';
+export type LibraryAnalysisReuseState = 'current' | 'reused' | 'pending' | 'incompatible' | 'unavailable' | 'canceled';
+
+export interface LibraryAnalysisReuseStatus {
+  state: LibraryAnalysisReuseState;
+  reason: string;
+  sourceVaultId: string | null;
+  sourceWorkId: string | null;
+  reusedAt: string | null;
+}
+
 export interface LibraryVaultLink {
   itemId: string;
   vaultId: string;
@@ -451,6 +462,7 @@ export interface LibraryVaultLink {
     hasSummary: boolean;
     hasNotes: boolean;
     archived: boolean;
+    reuse?: Record<LibraryAnalysisReuseComponent, LibraryAnalysisReuseStatus>;
   };
 }
 
@@ -460,6 +472,9 @@ export interface LibraryVaultLinkReport {
   existing: number;
   vaultId: string;
   links: LibraryVaultLink[];
+  reusedComponents: number;
+  pendingComponents: number;
+  canceled: boolean;
 }
 
 export interface LibraryMigrationProgress {

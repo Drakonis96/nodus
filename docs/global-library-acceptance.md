@@ -70,6 +70,12 @@ button exists.
 | Vaults | Linking is idempotent and does not duplicate the original | Verified | `test-global-library-vault-integration` |
 | Vaults | Analysis resolves the global clean Markdown | Verified | `test-global-library-vault-integration` |
 | Vaults | A connected read-only vault rejects writes | Verified | `test-global-library-vault-integration` |
+| Reuse | Canonical identities and permanent aliases resolve existing references without approximate metadata matching | Verified | `test-vaults`, `test-global-library-vault-integration` |
+| Reuse | Light, deep, summary, ideas, passages, and embeddings require exact document, pipeline, and model provenance independently | Verified | `test-vaults`, `test-global-library-vault-integration` |
+| Reuse | Incompatible components stay pending while exact components avoid duplicate work | Verified | `test-global-library-vault-integration` |
+| Reuse | Per-work copies are atomic and cancellation cannot leave partial rows | Verified | `test-vaults` |
+| Reuse | Private notes, manual flags, pinned state, and scan checkpoints are not copied | Verified | `test-vaults`, `test-global-library-vault-integration` |
+| Reuse | Every linked vault exposes component state and cause | Verified | `test-global-library-ui`, `e2e-global-library` |
 | Navigation | Library is cross-vault and available in every sidebar | Verified | `test-global-library-ui` |
 | Accessibility | Primary controls have roles, labels, and keyboard navigation | Verified | UI and i18n coverage, Electron E2E |
 | Languages | Every UI string is covered in all eight interface languages | Verified | `test-i18n-coverage` |

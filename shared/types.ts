@@ -1917,12 +1917,17 @@ export interface VaultAnalysisReuseWorkResult {
   imported: VaultAnalysisReuseKind[];
   importedRows: number;
   tableRows: Record<string, number>;
+  compatibility: Partial<Record<VaultAnalysisReuseKind, {
+    state: 'reused' | 'pending' | 'incompatible' | 'unavailable' | 'canceled';
+    reason: string;
+  }>>;
 }
 
 export interface VaultAnalysisReuseResult {
   requested: number;
   matched: number;
   imported: number;
+  canceled: boolean;
   works: VaultAnalysisReuseWorkResult[];
 }
 
@@ -7809,7 +7814,8 @@ export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, 
   duplicateVault(id: string, name: string, options?: VaultSwitchOptions): Promise<VaultDuplicateResult>;
   deleteVault(id: string, deleteFiles?: boolean): Promise<void>;
   resetVault(id: string): Promise<VaultSummary>;
-  reuseVaultAnalysis(nodusIds: string[]): Promise<VaultAnalysisReuseResult>;
+  reuseVaultAnalysis(nodusIds: string[], operationId?: string): Promise<VaultAnalysisReuseResult>;
+  cancelVaultAnalysisReuse(operationId: string): Promise<boolean>;
   copyVaultApiKeys(sourceVaultId: string, targetVaultId: string): Promise<{ copiedProviders: AiProvider[] }>;
 
 

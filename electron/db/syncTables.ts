@@ -216,6 +216,7 @@ const NOT_SYNCED_TABLES = new Set([
   // Rebuilt from canonical Library manifests for this vault. Syncing transient
   // freshness would let one machine incorrectly mark another machine's output current.
   'library_analysis_freshness',
+  'library_analysis_provenance',
   'sync_log', 'settings',
   // Explicitly local, opt-in and content-free beta performance observations.
   'primary_source_local_metrics',

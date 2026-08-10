@@ -25,6 +25,7 @@ import { getSettings } from '../db/settingsRepo';
 import type { Work, IdeaType, EdgeType, EdgeBasis, EvidenceKind, GapKind, ModelRef } from '@shared/types';
 import { planTextChunks, ExtractedDoc } from '../extraction/textExtractor';
 import { perfLog, startPerf } from '../perf';
+import { recordLinkedLibraryAnalysis } from '../library/libraryVaultProvenance';
 
 // ── Prompt 1 output shapes ────────────────────────────────────────────────────
 
@@ -412,6 +413,11 @@ export async function runDeepScan(
     linkZoteroAuthors(work.nodus_id, { createIfMissing: true, affiliationByKey });
 
     setDeepResult(work.nodus_id, 'done', hash, doc.sourceType, merged.ideas.size === 0 ? doc.notes ?? null : null);
+    recordLinkedLibraryAnalysis({
+      workId: work.nodus_id,
+      components: ['deep', 'ideas', 'embeddings'],
+      documentFingerprint: hash,
+    });
 
     // Author-relations layer is derived; recompute after each deep scan.
     const recomputeDone = startPerf('recomputeAuthorRelations', perf);

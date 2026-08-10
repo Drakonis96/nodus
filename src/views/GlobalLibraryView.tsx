@@ -38,6 +38,25 @@ const EXTRACTION_LABEL: Record<LibraryCatalogItem['extractionStatus'], string> =
   pending: 'Pendiente', processing: 'Procesando…', ready: 'Lista', 'needs-review': 'Revisar', failed: 'Con error', unsupported: 'No compatible',
 };
 
+const REUSE_COMPONENT_LABELS = {
+  light: 'Light', deep: 'Deep', summary: 'Resumen', ideas: 'Ideas', passages: 'Pasajes', embeddings: 'Embeddings',
+} as const;
+
+function VaultReuseBadges({ link }: { link: LibraryVaultLink }) {
+  if (!link.analysis.reuse) return null;
+  return <div data-testid={`vault-reuse-${link.vaultId}`} className="mt-2 grid grid-cols-2 gap-1">
+    {Object.entries(link.analysis.reuse).map(([component, status]) => <span
+      key={component}
+      title={status.reason}
+      className={`flex min-w-0 items-center justify-between gap-1 rounded px-1.5 py-1 text-[9px] ${
+        status.state === 'reused' || status.state === 'current' ? 'bg-emerald-500/10 text-emerald-300'
+          : status.state === 'incompatible' ? 'bg-amber-500/10 text-amber-300'
+            : 'bg-neutral-900 text-neutral-500'
+      }`}
+    ><span className="truncate">{t(REUSE_COMPONENT_LABELS[component as keyof typeof REUSE_COMPONENT_LABELS])}</span><span aria-hidden="true">{status.state === 'reused' ? '↗' : status.state === 'current' ? '✓' : status.state === 'incompatible' ? '!' : '·'}</span></span>)}
+  </div>;
+}
+
 function creatorText(item: LibraryCatalogItem): string {
   return item.creators.map((creator) => creator.name || [creator.firstName, creator.lastName].filter(Boolean).join(' ')).filter(Boolean).join('; ');
 }
@@ -317,7 +336,9 @@ function VaultLinkDialog({ itemIds, onClose, onLinked }: {
     try {
       const report = await window.nodus.linkGlobalLibraryItemsToVault(itemIds, vaultId);
       toast(report.linked
-        ? tx('{n} documento(s) añadidos al vault.', { n: report.linked })
+        ? report.reusedComponents
+          ? tx('{n} documento(s) añadidos; {reused} componente(s) reutilizados con huellas exactas.', { n: report.linked, reused: report.reusedComponents })
+          : tx('{n} documento(s) añadidos al vault.', { n: report.linked })
         : t('Los documentos ya estaban vinculados a ese vault.'));
       onLinked(report.links);
       onClose();
@@ -589,7 +610,7 @@ function GlobalLibraryContent({
             ].filter(([, value]) => value != null && value !== '').map(([label, value]) => <div key={String(label)}><dt className="text-[10px] uppercase tracking-wider text-neutral-600">{label}</dt><dd className="mt-1 break-words text-neutral-300">{String(value)}</dd></div>)}</dl>
             {detail.metadata.abstract && <div className="mt-5"><h3 className="text-[10px] font-semibold uppercase tracking-wider text-neutral-600">{t('Resumen')}</h3><p className="mt-2 text-xs leading-5 text-neutral-400">{detail.metadata.abstract}</p></div>}
             {detail.metadata.tags?.length ? <div className="mt-5 flex flex-wrap gap-1">{detail.metadata.tags.map((tag) => <span key={tag} className="rounded-full bg-neutral-900 px-2 py-1 text-[10px] text-neutral-400">{tag}</span>)}</div> : null}
-            <div className="mt-5"><h3 className="text-[10px] font-semibold uppercase tracking-wider text-neutral-600">{t('Disponible en vaults')}</h3>{detailLinks.length ? <div className="mt-2 space-y-1.5">{detailLinks.map((link) => <div key={`${link.vaultId}:${link.workId}`} className="flex items-center gap-2 rounded-lg border border-neutral-800 px-2.5 py-2 text-[10px]"><Icon name="vault" size={12} className="text-indigo-400" /><span className="min-w-0 flex-1 truncate text-neutral-400">{link.vaultName}</span><span className="text-neutral-600">{link.analysis.deepStatus === 'done' ? t('analizado') : t('vinculado')}</span></div>)}</div> : <p className="mt-2 text-[10px] leading-4 text-neutral-600">{t('Aún no está añadido a ningún vault.')}</p>}</div>
+            <div className="mt-5"><h3 className="text-[10px] font-semibold uppercase tracking-wider text-neutral-600">{t('Disponible en vaults')}</h3>{detailLinks.length ? <div className="mt-2 space-y-1.5">{detailLinks.map((link) => <div key={`${link.vaultId}:${link.workId}`} className="rounded-lg border border-neutral-800 px-2.5 py-2 text-[10px]"><div className="flex items-center gap-2"><Icon name="vault" size={12} className="text-indigo-400" /><span className="min-w-0 flex-1 truncate text-neutral-400">{link.vaultName}</span><span className="text-neutral-600">{link.analysis.deepStatus === 'done' ? t('analizado') : t('vinculado')}</span></div><VaultReuseBadges link={link} /></div>)}</div> : <p className="mt-2 text-[10px] leading-4 text-neutral-600">{t('Aún no está añadido a ningún vault.')}</p>}</div>
             <div className="mt-5 rounded-xl border border-neutral-800 p-3"><div className="flex items-center justify-between text-xs"><span>{t('Versión limpia')}</span><b className={detail.extraction?.status === 'ready' ? 'text-emerald-400' : 'text-neutral-500'}>{t(EXTRACTION_LABEL[detail.extraction?.status ?? 'pending'])}</b></div>{detail.extraction?.error && <p className="mt-2 text-[10px] text-red-400">{detail.extraction.error}</p>}<p className="mt-2 text-[10px] text-neutral-600">{detail.attachments.length} {t('adjuntos')} · {detail.files?.reader ? t('Markdown disponible') : t('Sin Markdown')}</p></div>
           </div>
           <footer className="grid grid-cols-2 gap-2 border-t border-neutral-800 p-3"><button data-testid="edit-library-metadata" className="btn btn-ghost col-span-2 border border-neutral-700" onClick={() => setMetadataItem(detail)}><Icon name="edit" /> {t('Editar metadatos')}</button><button data-testid="add-library-item-to-vault" className="btn btn-ghost col-span-2 border border-neutral-700" onClick={() => setVaultLinkItems([detail.id])}><Icon name="vault" /> {t('Añadir al vault')}</button><button className="btn btn-primary" disabled={!detail.files?.reader} title={!detail.files?.reader ? t('Procesa el documento primero') : undefined} onClick={() => void openReader(detail.id)}><Icon name="bookOpen" /> {t('Leer')}</button><button className="btn btn-ghost border border-neutral-700" onClick={() => void processSelected()}><Icon name="refresh" /> {t('Procesar')}</button><button className="btn btn-ghost col-span-2 text-red-400" onClick={() => void deleteSelected()}><Icon name="trash" /> {t('Enviar a la papelera')}</button></footer>

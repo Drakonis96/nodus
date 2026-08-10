@@ -260,6 +260,33 @@ and the state of their analysis.
 Connected read-only vaults reject this write. Deleting the working reference
 inside a vault does not destroy the global copy.
 
+### Exact cross-vault analysis reuse
+
+Linking resolves a work through its canonical Library identity, permanent
+aliases, Zotero library identity, and migrated `workId`. A title, DOI, author,
+or year similarity is never enough to copy derived data.
+
+Nodus evaluates light analysis, deep analysis, summaries, ideas, passages, and
+embeddings independently. Automatic reuse requires all of the following for
+that component:
+
+- the same canonical Library item and exact content or bibliographic revision;
+- the same pipeline version;
+- the same provider, model, and applicable configuration;
+- a complete provenance record produced by Nodus 4.
+
+Older results without provenance remain readable in their original vault but
+are reported as pending and are not copied. An incompatible component also
+stays pending while compatible components can be reused in the same operation.
+Each target-vault transaction is atomic and the multi-item operation can be
+canceled between transactions.
+
+The copy includes derived rows only. It never copies work notes, read flags,
+manual deep-scan choices, archive state, pinned themes, or in-flight scan
+checkpoints. Connected reader vaults and inactive replicas reject the operation.
+The item inspector exposes a component-by-component state and the reason a
+result is current, reused, pending, unavailable, or incompatible.
+
 ## Backup, synchronization, and recovery
 
 `nodus-library` is part of the selected backup folder. If another service
@@ -314,6 +341,7 @@ The main tests are:
 - `test-library-metadata.mjs`: identifiers, formats, and duplicates;
 - `test-global-library-reader.mjs`: reader, pages, annotations, and chat;
 - `test-global-library-vault-integration.mjs`: vault linking and analysis;
+- `test-vaults.mjs`: exact component reuse, cancellation, aliases, and private-state isolation;
 - `test-global-library-hardening.mjs`: path containment and private sidecars;
 - `e2e-global-library.mjs` and `e2e-library-reader.mjs`: the real Electron UI.
 

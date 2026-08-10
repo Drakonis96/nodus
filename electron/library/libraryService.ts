@@ -49,6 +49,11 @@ import { DEFAULT_OCR_OPTIONS } from '@shared/aiOcrTypes';
 import { LibraryOperations } from './libraryOperations';
 import { resolveLibraryMetadata } from './libraryMetadataResolver';
 import { propagateLibraryInvalidations, settleActiveVaultLibraryInvalidations } from './libraryInvalidation';
+import { listLibraryAnalysisProvenance } from '../db/libraryAnalysisProvenance';
+import type { LibraryAnalysisReuseComponent, LibraryAnalysisReuseStatus } from '@shared/libraryTypes';
+import { reuseVaultAnalysisForWorks } from '../vaults/vaultAnalysisImport';
+import { libraryRevisionFingerprint } from './libraryVaultProvenance';
+export { recordLinkedLibraryAnalysis } from './libraryVaultProvenance';
 
 let live: {
   root: string;
@@ -385,6 +390,22 @@ function vaultAnalysis(itemId: string, vaultId: string, vaultName: string, vault
   const work = getWork(workId);
   if (!work) throw new Error('No se pudo crear la referencia dentro del vault.');
   const count = (table: string): number => Number((db.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE nodus_id=?`).get(workId) as { n: number }).n);
+  const provenance = new Map(listLibraryAnalysisProvenance(workId).map((entry) => [entry.component, entry]));
+  const reuse = Object.fromEntries((['light', 'deep', 'summary', 'ideas', 'passages', 'embeddings'] as const).map((component) => {
+    const entry = provenance.get(component);
+    const status: LibraryAnalysisReuseStatus = entry
+      ? {
+        state: entry.sourceVaultId && entry.sourceVaultId !== vaultId ? 'reused' : 'current',
+        reason: entry.sourceVaultId && entry.sourceVaultId !== vaultId
+          ? `Exact ${component} provenance reused from ${entry.sourceVaultId}.`
+          : `Current ${component} output has complete provenance.`,
+        sourceVaultId: entry.sourceVaultId,
+        sourceWorkId: entry.sourceWorkId,
+        reusedAt: entry.sourceVaultId && entry.sourceVaultId !== vaultId ? entry.updatedAt : null,
+      }
+      : { state: 'pending', reason: `No reusable ${component} output with complete provenance.`, sourceVaultId: null, sourceWorkId: null, reusedAt: null };
+    return [component, status];
+  })) as Record<LibraryAnalysisReuseComponent, LibraryAnalysisReuseStatus>;
   return {
     itemId, vaultId, vaultName, vaultType, workId,
     analysis: {
@@ -398,9 +419,11 @@ function vaultAnalysis(itemId: string, vaultId: string, vaultName: string, vault
       hasSummary: count('work_summaries') > 0,
       hasNotes: Boolean(work.notes?.trim()),
       archived: work.archived === 1,
+      reuse,
     },
   };
 }
+
 
 /** Materialize references in a vault without duplicating the immutable global
  * files. Analysis resolves the clean Markdown through the stable zotero_key. */
@@ -417,7 +440,9 @@ export async function linkGlobalLibraryItemsToVault(itemIds: string[], vaultId: 
   const records = current.store.scanMaterializedItems().records.filter((item) => canonicalIds.includes(item.id) && !item.deletedAt);
   if (records.length !== canonicalIds.length) throw new Error('Alguno de los documentos seleccionados ya no existe.');
   const prior = new Set(current.catalog.listVaultLinks().filter((link) => link.vaultId === vaultId).map((link) => link.itemId));
-  const links = await withVaultDatabase(vaultId, async () => records.map((record) => {
+  const links = await withVaultDatabase(vaultId, async () => {
+    const nextLinks: LibraryVaultLink[] = [];
+    for (const record of records) {
     const zoteroIdentity = record.sourceIdentities.find((identity) => identity.source === 'zotero');
     const zoteroKey = zoteroIdentity
       ? zoteroIdentity.libraryType === 'group'
@@ -452,8 +477,16 @@ export async function linkGlobalLibraryItemsToVault(itemIds: string[], vaultId: 
     const linked = getWorkByZoteroKey(zoteroKey);
     if (!linked) throw new Error('No se pudo vincular el documento al vault.');
     getDb().prepare("UPDATE works SET source_type='markdown' WHERE nodus_id=?").run(linked.nodus_id);
-    return vaultAnalysis(record.id, vault.id, vault.name, String(vault.type), linked.nodus_id);
-  }));
+    const revisionFingerprints = Object.fromEntries((['light', 'deep', 'summary', 'ideas', 'passages', 'embeddings'] as const)
+      .map((component) => [component, libraryRevisionFingerprint(record, component)])) as Record<LibraryAnalysisReuseComponent, string | null>;
+    await reuseVaultAnalysisForWorks([linked.nodus_id], {
+      targetVaultId: vault.id,
+      context: { libraryItemId: record.id, revisionFingerprints },
+    });
+      nextLinks.push(vaultAnalysis(record.id, vault.id, vault.name, String(vault.type), linked.nodus_id));
+    }
+    return nextLinks;
+  });
   current.catalog.upsertVaultLinks(links);
   broadcast(current.catalog.status(current.root, current.deviceId));
   return {
@@ -462,6 +495,9 @@ export async function linkGlobalLibraryItemsToVault(itemIds: string[], vaultId: 
     existing: links.filter((link) => prior.has(link.itemId)).length,
     vaultId,
     links,
+    reusedComponents: links.reduce((sum, link) => sum + Object.values(link.analysis.reuse ?? {}).filter((entry) => entry.state === 'reused').length, 0),
+    pendingComponents: links.reduce((sum, link) => sum + Object.values(link.analysis.reuse ?? {}).filter((entry) => ['pending', 'incompatible', 'unavailable'].includes(entry.state)).length, 0),
+    canceled: false,
   };
 }
 

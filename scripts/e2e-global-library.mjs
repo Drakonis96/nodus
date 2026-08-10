@@ -174,6 +174,18 @@ try {
   assert.match(await detail.innerText(), /1134-6396/);
   assert.match(await detail.innerText(), /Markdown disponible/);
 
+  await page.getByTestId('add-library-item-to-vault').click();
+  const vaultDialog = page.getByTestId('global-library-vault-dialog');
+  await vaultDialog.waitFor({ state: 'visible' });
+  await page.getByTestId('confirm-global-library-vault-link').click();
+  await vaultDialog.waitFor({ state: 'detached' });
+  const reuseBadges = detail.locator('[data-testid^="vault-reuse-"]');
+  await reuseBadges.waitFor({ state: 'visible' });
+  assert.equal(await reuseBadges.locator('span[title]').count(), 6, 'every reusable component exposes state and cause');
+  await reuseBadges.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(250);
+  await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-reuse-status-dark-wide.png'), fullPage: true });
+
   await page.getByTestId('edit-library-metadata').click();
   const metadataEditor = page.getByTestId('library-metadata-editor');
   await metadataEditor.waitFor({ state: 'visible' });

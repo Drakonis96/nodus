@@ -7924,4 +7924,7 @@ export const DE: Record<string, string> = {
   "Global reúne originales y Markdown limpio para todos tus vaults.": "Global bündelt Originale und bereinigtes Markdown für alle Vaults.",
   "Este vault conserva colecciones, scans, resúmenes, embeddings y análisis existentes.": "Dieser Vault behält vorhandene Sammlungen, Scans, Zusammenfassungen, Embeddings und Analysen.",
   "Activa la Biblioteca global cuando quieras; este vault no cambiará.": "Aktivieren Sie die globale Bibliothek jederzeit; dieser Vault bleibt unverändert.",
+  "{n} documento(s) añadidos; {reused} componente(s) reutilizados con huellas exactas.": "{n} Dokument(e) hinzugefügt; {reused} Komponente(n) mit exakten Fingerabdrücken wiederverwendet.",
+  "Light": "Leicht",
+  "Deep": "Tief",
 };
