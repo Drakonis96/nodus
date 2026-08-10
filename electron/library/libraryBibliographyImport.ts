@@ -221,7 +221,7 @@ export function importBibliographyFiles(options: {
     for (const entry of entries) {
       const same = duplicate(records, entry.metadata);
       if (same) { report.duplicates += 1; report.itemIds.push(same.id); continue; }
-      const uuid = randomUUID(); const id = `${entry.source}:${uuid}`;
+      const uuid = randomUUID(); const id = `nodus:${uuid}`;
       const created = options.store.upsertItem({
         id, storageId: id, source: entry.source, ...(entry.citationKey ? { citationKey: entry.citationKey } : {}),
         metadata: entry.metadata, collectionIds: options.collectionId ? [options.collectionId] : [], attachments: [],

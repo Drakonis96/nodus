@@ -100,13 +100,16 @@ try {
   assert.equal(page.total, 1);
   assert.equal(catalog.list().total, 2, 'global catalog deduplicates the shared Zotero item');
   assert.deepEqual(new Set(page.items[0].tags), new Set(['posguerra', 'mujeres']));
-  assert.deepEqual(new Set(page.items[0].collectionIds), new Set(['zotero:SUBCOLL']));
+  assert.deepEqual(new Set(page.items[0].collectionIds), new Set([catalog.resolveCollectionId('zotero:SUBCOLL')]));
   const links = catalog.listVaultLinks('zotero:SAME1234');
   assert.equal(links.length, 2);
   assert.equal(links.find((link) => link.vaultId === 'vault-a').analysis.ideaCount, 1);
   assert.equal(links.find((link) => link.vaultId === 'vault-a').analysis.hasSummary, true);
   assert.equal(await readFile(path.join(existingFolder, 'reader.md'), 'utf8'), '# Mujeres solas\n\nVersión limpia ya revisada.\n');
   assert.ok(existsSync(path.join(existingFolder, 'original.pdf')));
+  const localRecord = store.scanMaterializedItems().records.find((item) => item.metadata.title === 'Documento local');
+  assert.equal(localRecord.vaultWorkIds['vault-a'], 'local-a', 'a migrated Nodus work keeps its original vault workId for relinking');
+  assert.equal(localRecord.formatVersion, 2);
 
   // Source databases are read-only inputs: every analysis row remains where it was.
   const Database = require('better-sqlite3');

@@ -15,12 +15,18 @@ button exists.
 | Storage | Originals and derived files share a folder and stable identity | Verified | `test-library-storage`, `test-global-library-reader` |
 | Storage | The SQLite catalog is excluded from backups and can be rebuilt | Verified | `test-library-storage` |
 | Storage | Invalid records are counted and excluded | Verified | `test-library-storage` |
+| Identity | v1 manifests read safely and publish as v2 without folder renames | Verified | `test-library-identity-v2` |
+| Identity | Nodus IDs are independent from exact manager identities | Verified | `test-library-identity-v2`, `test-zotero-library-import` |
+| Identity | Equal Zotero keys in different libraries do not collide | Verified | `test-library-identity-v2` |
+| Identity | Former and merged IDs remain permanent aliases after a cache rebuild | Verified | `test-library-identity-v2`, `test-library-metadata` |
+| Identity | Unicode, dot segments, and reserved cross-platform paths are encoded safely | Verified | `test-library-identity-v2`, `test-global-library-hardening` |
 | Synchronization | Divergent edits are preserved and exposed as conflicts | Verified | `test-library-storage` |
 | Security | Identifiers and paths cannot escape the Library | Verified | `test-global-library-hardening` |
 | Security | External symbolic links are neither read nor written | Verified | `test-global-library-hardening` |
 | Security | New sidecars are written atomically and privately | Verified | `test-global-library-hardening` |
 | Migration | Two vaults migrate without duplicating the same Zotero item | Verified | `test-library-migration` |
 | Migration | Existing Markdown and originals are not overwritten | Verified | `test-library-migration` |
+| Migration | Nodus-only works retain their original per-vault `workId` | Verified | `test-library-migration` |
 | Zotero | Personal and group libraries are discovered | Verified | `test-zotero-library-import` |
 | Zotero | Keys, hierarchy, and membership retain unlimited depth | Verified | `test-zotero-library-import`, `test-global-library-ui` |
 | Zotero | Version-based refresh resumes and does not duplicate attachments | Verified | `test-zotero-library-import` |

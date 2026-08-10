@@ -6,6 +6,7 @@ import type {
   LibraryItemRecord,
   LibraryItemSource,
   LibraryItemType,
+  LibrarySourceIdentity,
 } from '@shared/libraryTypes';
 
 const SOURCES = new Set<LibraryItemSource>(['nodus', 'zotero', 'mendeley', 'ris', 'bibtex', 'csl-json', 'legacy']);
@@ -33,6 +34,60 @@ function stringValue(value: unknown, max = 10_000): string | undefined {
 function stringArray(value: unknown, maxItems = 256): string[] {
   if (!Array.isArray(value)) return [];
   return [...new Set(value.map((item) => stringValue(item, 1_000)).filter((item): item is string => !!item))].slice(0, maxItems);
+}
+
+export function normalizeLibrarySourceIdentity(value: unknown): LibrarySourceIdentity | null {
+  if (!value || typeof value !== 'object') return null;
+  const input = value as Record<string, unknown>;
+  const source = input.source as LibrarySourceIdentity['source'];
+  const libraryType = input.libraryType as LibrarySourceIdentity['libraryType'];
+  const libraryId = stringValue(input.libraryId, 1_000);
+  const itemKey = stringValue(input.itemKey, 2_000);
+  if (!['zotero', 'mendeley', 'ris', 'bibtex', 'csl-json'].includes(source)) return null;
+  if (!['user', 'group', 'personal', 'shared', 'import'].includes(libraryType)) return null;
+  return libraryId && itemKey ? { source, libraryType, libraryId, itemKey } : null;
+}
+
+export function librarySourceIdentityKey(identity: LibrarySourceIdentity): string {
+  return [identity.source, identity.libraryType, identity.libraryId, identity.itemKey]
+    .map((part) => `${part.length}:${part}`).join('|');
+}
+
+export function zoteroSourceIdentity(libraryId: string, itemKey: string): LibrarySourceIdentity {
+  const group = /^groups\/(.+)$/.exec(libraryId);
+  const user = /^users\/(.*)$/.exec(libraryId);
+  return {
+    source: 'zotero',
+    libraryType: group ? 'group' : 'user',
+    libraryId: group?.[1] || user?.[1] || libraryId || '0',
+    itemKey,
+  };
+}
+
+function normalizeSourceIdentities(value: unknown): LibrarySourceIdentity[] {
+  if (!Array.isArray(value)) return [];
+  const unique = new Map<string, LibrarySourceIdentity>();
+  for (const entry of value) {
+    const identity = normalizeLibrarySourceIdentity(entry);
+    if (identity) unique.set(librarySourceIdentityKey(identity), identity);
+  }
+  return [...unique.values()];
+}
+
+function legacySourceIdentity(input: Record<string, unknown>): LibrarySourceIdentity | null {
+  const source = input.source as LibraryItemSource;
+  const sourceKey = stringValue(input.sourceKey, 2_000);
+  const sourceLibraryId = stringValue(input.sourceLibraryId, 1_000);
+  if (source === 'zotero' && sourceKey) return zoteroSourceIdentity(sourceLibraryId ?? 'users/0', sourceKey);
+  if (source && source !== 'nodus' && source !== 'legacy' && sourceKey) {
+    return normalizeLibrarySourceIdentity({
+      source,
+      libraryType: 'import',
+      libraryId: sourceLibraryId ?? 'default',
+      itemKey: sourceKey,
+    });
+  }
+  return null;
 }
 
 function normalizeCreators(value: unknown): LibraryCreator[] {
@@ -93,9 +148,11 @@ export function isLibraryItemRecord(value: unknown): value is LibraryItemRecord 
   if (!value || typeof value !== 'object') return false;
   const item = value as Partial<LibraryItemRecord>;
   return item.format === 'nodus.library-item'
-    && item.formatVersion === 1
+    && item.formatVersion === 2
     && typeof item.id === 'string'
     && typeof item.storageId === 'string'
+    && Array.isArray(item.aliases)
+    && Array.isArray(item.sourceIdentities)
     && SOURCES.has(item.source as LibraryItemSource)
     && !!item.metadata && typeof item.metadata.title === 'string'
     && Array.isArray(item.collectionIds)
@@ -114,8 +171,9 @@ export function isLibraryCollectionRecord(value: unknown): value is LibraryColle
   if (!value || typeof value !== 'object') return false;
   const item = value as Partial<LibraryCollectionRecord>;
   return item.format === 'nodus.library-collection'
-    && item.formatVersion === 1
+    && item.formatVersion === 2
     && typeof item.id === 'string'
+    && Array.isArray(item.aliases)
     && typeof item.name === 'string'
     && (item.parentId === null || typeof item.parentId === 'string')
     && Number.isFinite(item.position)
@@ -130,6 +188,62 @@ export function isLibraryCollectionRecord(value: unknown): value is LibraryColle
     && /^[a-f0-9]{64}$/i.test(item.clock.contentHash);
 }
 
+/** Normalize both v2 and the published v1 contract without changing IDs or folders. */
+export function normalizeLibraryItemRecord(value: unknown): LibraryItemRecord | null {
+  if (!value || typeof value !== 'object') return null;
+  const input = value as Record<string, unknown>;
+  if (input.format !== 'nodus.library-item' || ![1, 2].includes(Number(input.formatVersion))) return null;
+  const aliases = stringArray(input.aliases, 2_000).filter((alias) => alias !== input.id);
+  const identities = normalizeSourceIdentities(input.sourceIdentities);
+  const inferred = legacySourceIdentity(input);
+  if (inferred && !identities.some((entry) => librarySourceIdentityKey(entry) === librarySourceIdentityKey(inferred))) identities.push(inferred);
+  const { clock: rawClock, ...withoutClock } = input;
+  const base = {
+    ...withoutClock,
+    formatVersion: 2 as const,
+    aliases,
+    sourceIdentities: identities,
+  } as unknown as Omit<LibraryItemRecord, 'clock'>;
+  const clock = rawClock as LibraryItemRecord['clock'] | undefined;
+  const normalized = {
+    ...base,
+    clock: Number(input.formatVersion) === 1 && clock
+      ? {
+        ...clock,
+        revision: clock.revision + 1,
+        baseRevision: clock.revision,
+        contentHash: recordContentHash(base),
+      }
+      : clock,
+  } as LibraryItemRecord;
+  return isLibraryItemRecord(normalized) ? normalized : null;
+}
+
+export function normalizeLibraryCollectionRecord(value: unknown): LibraryCollectionRecord | null {
+  if (!value || typeof value !== 'object') return null;
+  const input = value as Record<string, unknown>;
+  if (input.format !== 'nodus.library-collection' || ![1, 2].includes(Number(input.formatVersion))) return null;
+  const { clock: rawClock, ...withoutClock } = input;
+  const base = {
+    ...withoutClock,
+    formatVersion: 2 as const,
+    aliases: stringArray(input.aliases, 2_000).filter((alias) => alias !== input.id),
+  } as unknown as Omit<LibraryCollectionRecord, 'clock'>;
+  const clock = rawClock as LibraryCollectionRecord['clock'] | undefined;
+  const normalized = {
+    ...base,
+    clock: Number(input.formatVersion) === 1 && clock
+      ? {
+        ...clock,
+        revision: clock.revision + 1,
+        baseRevision: clock.revision,
+        contentHash: recordContentHash(base),
+      }
+      : clock,
+  } as LibraryCollectionRecord;
+  return isLibraryCollectionRecord(normalized) ? normalized : null;
+}
+
 /** Read pre-contract prototype folders without mutating or losing them. */
 export function legacyMetadataToRecord(value: unknown, folderName: string): LibraryItemRecord | null {
   if (!value || typeof value !== 'object') return null;
@@ -138,15 +252,18 @@ export function legacyMetadataToRecord(value: unknown, folderName: string): Libr
   const id = stringValue(input.id, 2_000) ?? storageId;
   const now = stringValue(input.updatedAt, 100) ?? new Date(0).toISOString();
   const files = input.files && typeof input.files === 'object' ? input.files as LibraryItemRecord['files'] : undefined;
+  const zoteroKey = typeof (input.zotero as { itemKey?: unknown } | undefined)?.itemKey === 'string'
+    ? String((input.zotero as { itemKey: string }).itemKey)
+    : undefined;
   const base = {
     format: 'nodus.library-item' as const,
-    formatVersion: 1 as const,
+    formatVersion: 2 as const,
     id,
     storageId,
-    source: 'legacy' as const,
-    sourceKey: typeof (input.zotero as { itemKey?: unknown } | undefined)?.itemKey === 'string'
-      ? String((input.zotero as { itemKey: string }).itemKey)
-      : undefined,
+    aliases: [],
+    sourceIdentities: zoteroKey ? [zoteroSourceIdentity('users/0', zoteroKey)] : [],
+    source: zoteroKey ? 'zotero' as const : 'legacy' as const,
+    ...(zoteroKey ? { sourceLibraryId: 'users/0', sourceKey: zoteroKey } : {}),
     citationKey: stringValue(input.citationKey, 1_000),
     metadata: normalizeLibraryMetadata(input, stringValue(input.title, 10_000) ?? folderName),
     collectionIds: stringArray(input.collectionIds),

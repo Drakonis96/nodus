@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3';
+import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import type {
   LibraryCollectionRecord,
@@ -11,7 +12,7 @@ import type {
   LibraryVaultLink,
 } from '@shared/libraryTypes';
 import type { VaultSummary } from '@shared/types';
-import { canonicalJson } from './libraryRecord';
+import { canonicalJson, librarySourceIdentityKey, zoteroSourceIdentity } from './libraryRecord';
 import { LibraryDiskStore } from './libraryStorage';
 import { LibraryCatalog } from './libraryCatalog';
 
@@ -150,7 +151,9 @@ function zoteroParts(key: string | null): { libraryId: string; rawKey: string } 
 }
 
 function globalCollectionId(key: string, vaultId: string): string {
-  return key ? `zotero:${key}` : `nodus:${vaultId}:collection`;
+  if (!key) return `nodus:${vaultId}:collection`;
+  const source = zoteroParts(key) ?? { libraryId: 'users/0', rawKey: key };
+  return `zotero:collection:${source.libraryId.replace('/', ':')}:${source.rawKey}`;
 }
 
 function metadataScore(metadata: LibraryItemMetadata): number {
@@ -233,17 +236,29 @@ export async function migrateVaultLibraries(options: {
     for (let vaultIndex = 0; vaultIndex < inventories.length; vaultIndex += 1) {
       const inventory = inventories[vaultIndex];
       onProgress?.(migrationProgress('collections', vaultIndex, inventories.length, inventory.vault, processedItems, totalItems));
+      const canonicalCollectionIds = new Map<string, string>();
+      for (const collection of inventory.collections) {
+        const parts = zoteroParts(collection.collection_key) ?? { libraryId: 'users/0', rawKey: collection.collection_key };
+        const current = store.findCollectionBySource('zotero', parts.libraryId, parts.rawKey)
+          ?? store.readMaterializedCollection(`zotero:${collection.collection_key}`);
+        canonicalCollectionIds.set(collection.collection_key, current?.id ?? globalCollectionId(collection.collection_key, inventory.vault.id));
+      }
       const positions = new Map<string | null, number>();
       for (const collection of inventory.collections) {
-        const id = globalCollectionId(collection.collection_key, inventory.vault.id);
-        const parentId = collection.parent_key ? globalCollectionId(collection.parent_key, inventory.vault.id) : null;
-        const current = store.readMaterializedCollection(id);
+        const id = canonicalCollectionIds.get(collection.collection_key)!;
+        const parentId = collection.parent_key ? canonicalCollectionIds.get(collection.parent_key) ?? null : null;
+        const parts = zoteroParts(collection.collection_key) ?? { libraryId: 'users/0', rawKey: collection.collection_key };
+        const current = store.findCollectionBySource('zotero', parts.libraryId, parts.rawKey)
+          ?? store.readMaterializedCollection(`zotero:${collection.collection_key}`)
+          ?? store.readMaterializedCollection(id);
         const source = 'zotero' as const;
         const desired = {
-          id, name: collection.name?.trim() || collection.collection_key, parentId,
+          id,
+          aliases: [...new Set([...(current?.aliases ?? []), `zotero:${collection.collection_key}`].filter((alias) => alias !== id))],
+          name: collection.name?.trim() || collection.collection_key, parentId,
           position: positions.get(parentId) ?? 0, source,
-          sourceLibraryId: zoteroParts(collection.collection_key)?.libraryId ?? 'users/0',
-          sourceKey: zoteroParts(collection.collection_key)?.rawKey ?? collection.collection_key,
+          sourceLibraryId: parts.libraryId,
+          sourceKey: parts.rawKey,
           deletedAt: null,
         };
         positions.set(parentId, desired.position + 1);
@@ -257,9 +272,14 @@ export async function migrateVaultLibraries(options: {
 
       for (const row of inventory.works) {
         const zotero = zoteroParts(row.zotero_key);
-        const itemId = zotero ? `zotero:${row.zotero_key}` : `nodus:${inventory.vault.id}:${row.nodus_id}`;
-        const storageId = zotero ? String(row.zotero_key) : itemId;
-        const current = store.readMaterializedItem(storageId);
+        const legacyItemId = zotero ? `zotero:${row.zotero_key}` : `nodus:${inventory.vault.id}:${row.nodus_id}`;
+        const identity = zotero ? zoteroSourceIdentity(zotero.libraryId, zotero.rawKey) : null;
+        const legacyAtStorage = zotero ? store.readMaterializedItem(String(row.zotero_key)) : null;
+        const current = (identity ? store.findItemBySourceIdentity(identity) : store.findItemByIdOrAlias(legacyItemId))
+          ?? (legacyAtStorage && (!identity || legacyAtStorage.sourceIdentities.some((entry) => librarySourceIdentityKey(entry) === librarySourceIdentityKey(identity)))
+            ? legacyAtStorage : null);
+        const itemId = current?.id ?? `nodus:${randomUUID()}`;
+        const storageId = current?.storageId ?? itemId;
         const incomingMetadata: LibraryItemMetadata = {
           title: row.title?.trim() || 'Documento sin título',
           itemType: itemType(row.item_type),
@@ -269,10 +289,17 @@ export async function migrateVaultLibraries(options: {
           isbn: [], issn: [], tags: inventory.tags.get(row.nodus_id) ?? [],
         };
         const collectionIds = (inventory.memberships.get(row.nodus_id) ?? [])
-          .map((key) => globalCollectionId(key, inventory.vault.id));
+          .flatMap((key) => {
+            const id = canonicalCollectionIds.get(key);
+            return id ? [id] : [];
+          });
         const desiredInput = {
           id: itemId,
           storageId,
+          aliases: [...new Set([...(current?.aliases ?? []), legacyItemId].filter((alias) => alias !== itemId))],
+          sourceIdentities: identity
+            ? [...new Map([...(current?.sourceIdentities ?? []), identity].map((entry) => [librarySourceIdentityKey(entry), entry])).values()]
+            : current?.sourceIdentities ?? [],
           source: zotero ? 'zotero' as const : 'nodus' as const,
           ...(zotero ? { sourceLibraryId: zotero.libraryId, sourceKey: zotero.rawKey } : {}),
           ...(current?.citationKey ? { citationKey: current.citationKey } : {}),
@@ -281,6 +308,7 @@ export async function migrateVaultLibraries(options: {
           attachments: current?.attachments ?? [],
           ...(current?.files ? { files: current.files } : {}),
           extraction: current?.extraction ?? { status: 'pending' as const },
+          vaultWorkIds: { ...(current?.vaultWorkIds ?? {}), [inventory.vault.id]: row.nodus_id },
           deletedAt: null,
         };
         if (!current) { store.upsertItem(desiredInput); itemsCreated += 1; }

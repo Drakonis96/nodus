@@ -69,15 +69,30 @@ or annotations.
 
 ### Identity
 
-- A personal Zotero item keeps its key, for example `E7FGXJFE`, as both its
-  folder name and `storageId`.
-- A group item keeps its full canonical identifier in metadata. Only the
-  physical folder name is encoded when it contains characters that are not
-  portable across Windows, macOS, and Linux.
-- A file added from Nodus receives a stable identifier derived from its record,
-  not from its visible title.
+- Format-v2 manifests assign every new work an immutable Nodus ID. A Zotero,
+  Mendeley, or import key is a `LibrarySourceIdentity`; it never becomes the
+  canonical ID.
+- Zotero equality uses library type, library ID, and item key together. Equal
+  item keys in a personal and group library are therefore distinct.
+- `storageId` resolves the physical folder independently. A v1 upgrade retains
+  its existing folder byte-for-byte; Nodus does not rename it to match a new
+  identity convention.
+- Former IDs and IDs merged as duplicates become permanent aliases. Legacy IPC,
+  reader links, and vault links resolve an alias to the live canonical record.
+- A file added from Nodus receives a stable Nodus ID that is independent from
+  its visible title.
 - The `citationKey`, when available, is retained as bibliographic data but does
   not replace the stable identifier.
+
+Both v1 and v2 item and collection manifests are readable. The next ordinary
+write publishes a normalized v2 manifest in the same location. The local SQLite
+cache indexes aliases and source identities, but those mappings are rebuilt
+entirely from the manifests. Folder encoding handles Unicode, path separators,
+dot segments, and Windows device names such as `CON`, `NUL`, `COM1`, and `LPT1`.
+
+Legacy vault migration records the original `workId` per vault in the canonical
+item manifest. Relinking that item reuses the original work instead of creating
+a second corpus entry.
 
 ## Import and organization
 

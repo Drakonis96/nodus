@@ -5,6 +5,7 @@ import path from 'node:path';
 import { readGlobalPrefsRaw } from '../db/appPrefs';
 
 const SAFE_FOLDER = /^[A-Za-z0-9._-]+$/;
+const WINDOWS_RESERVED = /^(?:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\..*)?$/i;
 
 export function configuredLibraryRoot(): string | null {
   const configured = readGlobalPrefsRaw().autoBackupFolder;
@@ -28,9 +29,13 @@ export function localLibraryDatabasePath(): string {
 
 export function safeLibraryFolderName(value: string): string {
   const clean = value.trim();
-  if (clean && clean !== '.' && clean !== '..' && SAFE_FOLDER.test(clean)) return clean;
+  if (clean && clean !== '.' && clean !== '..' && SAFE_FOLDER.test(clean)
+    && !WINDOWS_RESERVED.test(clean) && !/[. ]$/.test(clean)) return clean;
   const encoded = encodeURIComponent(clean).replace(/\./g, '%2E');
-  return encoded || `document-${createHash('sha256').update(value).digest('hex').slice(0, 16)}`;
+  if (!encoded) return `document-${createHash('sha256').update(value).digest('hex').slice(0, 16)}`;
+  return WINDOWS_RESERVED.test(encoded)
+    ? `%${encoded.codePointAt(0)!.toString(16).toUpperCase().padStart(2, '0')}${encoded.slice(1)}`
+    : encoded;
 }
 
 export function assertInside(root: string, target: string): string {

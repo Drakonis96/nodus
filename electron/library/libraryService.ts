@@ -73,7 +73,7 @@ function unavailableStatus(): LibraryStatus {
   return {
     configured: false,
     root: null,
-    formatVersion: 1,
+    formatVersion: 2,
     deviceId: null,
     items: 0,
     collections: 0,
@@ -211,7 +211,7 @@ export function enqueueLibraryExtraction(
 ): LibraryExtractionEnqueueResult {
   const current = service();
   if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
-  return current.extraction.enqueue(itemIds, options, priority);
+  return current.extraction.enqueue(itemIds.map((id) => current.catalog.resolveItemId(id) ?? id), options, priority);
 }
 
 export function listLibraryExtractionJobs(): LibraryExtractionJob[] {
@@ -233,7 +233,7 @@ export function listGlobalLibraryCollections(): LibraryCollectionView[] {
 export function getGlobalLibraryItem(itemId: string): LibraryItemRecord | null {
   const current = service();
   if (!current) return null;
-  return current.store.scanMaterializedItems().records.find((item) => item.id === itemId) ?? null;
+  return current.store.findItemByIdOrAlias(current.catalog.resolveItemId(itemId) ?? itemId);
 }
 
 export function createGlobalLibraryCollection(name: string, parentId: string | null): LibraryCollectionView {
@@ -365,12 +365,16 @@ export async function linkGlobalLibraryItemsToVault(itemIds: string[], vaultId: 
     throw new Error('Este vault conectado es de solo lectura o no está activo.');
   }
   const uniqueIds = [...new Set(itemIds.filter(Boolean))];
-  const records = current.store.scanMaterializedItems().records.filter((item) => uniqueIds.includes(item.id) && !item.deletedAt);
-  if (records.length !== uniqueIds.length) throw new Error('Alguno de los documentos seleccionados ya no existe.');
+  const canonicalIds = [...new Set(uniqueIds.map((id) => current.catalog.resolveItemId(id) ?? id))];
+  const records = current.store.scanMaterializedItems().records.filter((item) => canonicalIds.includes(item.id) && !item.deletedAt);
+  if (records.length !== canonicalIds.length) throw new Error('Alguno de los documentos seleccionados ya no existe.');
   const prior = new Set(current.catalog.listVaultLinks().filter((link) => link.vaultId === vaultId).map((link) => link.itemId));
   const links = await withVaultDatabase(vaultId, async () => records.map((record) => {
-    const zoteroKey = record.source === 'zotero' && record.storageId
-      ? record.storageId
+    const zoteroIdentity = record.sourceIdentities.find((identity) => identity.source === 'zotero');
+    const zoteroKey = zoteroIdentity
+      ? zoteroIdentity.libraryType === 'group'
+        ? `groups:${zoteroIdentity.libraryId}:${zoteroIdentity.itemKey}`
+        : zoteroIdentity.itemKey
       : `nodus-library:${encodeURIComponent(record.id)}`;
     const existing = getWorkByZoteroKey(zoteroKey);
     const authors = record.metadata.creators.map(creatorDisplayName).filter(Boolean);
@@ -385,7 +389,7 @@ export async function linkGlobalLibraryItemsToVault(itemIds: string[], vaultId: 
       }];
     });
     upsertWork({
-      nodus_id: existing?.nodus_id ?? record.id,
+      nodus_id: existing?.nodus_id ?? record.vaultWorkIds?.[vaultId] ?? record.id,
       zotero_key: zoteroKey,
       zotero_version: null,
       title: record.metadata.title,
@@ -405,7 +409,7 @@ export async function linkGlobalLibraryItemsToVault(itemIds: string[], vaultId: 
   current.catalog.upsertVaultLinks(links);
   broadcast(current.catalog.status(current.root, current.deviceId));
   return {
-    requested: uniqueIds.length,
+    requested: canonicalIds.length,
     linked: links.filter((link) => !prior.has(link.itemId)).length,
     existing: links.filter((link) => prior.has(link.itemId)).length,
     vaultId,

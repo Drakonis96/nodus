@@ -3,6 +3,14 @@ export type LibraryScope = 'global' | 'vault';
 
 export type LibraryItemSource = 'nodus' | 'zotero' | 'mendeley' | 'ris' | 'bibtex' | 'csl-json' | 'legacy';
 
+/** External identity is never the Nodus item ID. All fields participate in equality. */
+export interface LibrarySourceIdentity {
+  source: Exclude<LibraryItemSource, 'nodus' | 'legacy'>;
+  libraryType: 'user' | 'group' | 'personal' | 'shared' | 'import';
+  libraryId: string;
+  itemKey: string;
+}
+
 export type LibraryItemType =
   | 'article-journal'
   | 'book'
@@ -73,9 +81,14 @@ export interface LibraryRecordClock {
 
 export interface LibraryItemRecord {
   format: 'nodus.library-item';
-  formatVersion: 1;
+  formatVersion: 2;
+  /** Immutable identifier owned by Nodus, independent from every manager. */
   id: string;
+  /** Stable folder lookup. Existing folders are never renamed during migration. */
   storageId: string;
+  /** Permanent former IDs, including IDs of records merged into this item. */
+  aliases: string[];
+  sourceIdentities: LibrarySourceIdentity[];
   source: LibraryItemSource;
   sourceLibraryId?: string;
   sourceKey?: string;
@@ -100,6 +113,8 @@ export interface LibraryItemRecord {
     updatedAt?: string;
     error?: string;
   };
+  /** Original work IDs discovered in legacy vaults, used for idempotent relinking. */
+  vaultWorkIds?: Record<string, string>;
   createdAt: string;
   deletedAt: string | null;
   clock: LibraryRecordClock;
@@ -107,8 +122,9 @@ export interface LibraryItemRecord {
 
 export interface LibraryCollectionRecord {
   format: 'nodus.library-collection';
-  formatVersion: 1;
+  formatVersion: 2;
   id: string;
+  aliases: string[];
   name: string;
   parentId: string | null;
   position: number;

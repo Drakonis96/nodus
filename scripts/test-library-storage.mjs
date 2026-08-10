@@ -27,6 +27,7 @@ try {
   storeA.initialize();
   const manifest = JSON.parse(await (await import('node:fs/promises')).readFile(path.join(root, 'library.json'), 'utf8'));
   assert.equal(manifest.format, 'nodus.library');
+  assert.equal(manifest.formatVersion, 2);
   assert.equal(manifest.storage.localCatalog, false, 'the synchronized folder never carries live SQLite');
   assert.equal(manifest.sync.strategy, 'immutable-records');
 

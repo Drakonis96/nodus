@@ -115,26 +115,29 @@ try {
   assert.ok(events.every((value, index) => index === 0 || value.percent >= events[index - 1].percent), 'progress is monotonic across personal and group libraries');
   assert.equal(events.at(-1).phase, 'complete');
   assert.equal(events.at(-1).percent, 100);
-  assert.deepEqual(catalog.list({ collectionId: 'zotero:ROOT' }).items.map((entry) => entry.id), ['zotero:A']);
+  const canonicalAId = catalog.resolveItemId('zotero:A');
+  assert.ok(canonicalAId?.startsWith('nodus:'), 'a manager key is an alias, never the canonical Nodus ID');
+  assert.deepEqual(catalog.list({ collectionId: 'zotero:ROOT' }).items.map((entry) => entry.id), [canonicalAId]);
 
-  const storedA = store.readMaterializedItem('A');
-  assert.equal(storedA.id, 'zotero:A');
+  const storedA = store.findItemByIdOrAlias(canonicalAId);
+  assert.equal(storedA.id, canonicalAId);
   assert.equal(storedA.sourceLibraryId, 'users/0');
   assert.equal(storedA.metadata.issn[0], '1234-5678');
   assert.equal(storedA.metadata.extra['Citation Key'], 'garciafernandezEntreNormaDeseo2020');
   assert.equal(storedA.attachments[0].sourceKey, 'PDF', 'PDF wins original-format priority even if Zotero returned an image first');
   assert.equal(storedA.attachments[0].role, 'original');
-  assert.ok(existsSync(path.join(store.itemFolder('A'), storedA.files.original)));
-  assert.ok(existsSync(path.join(store.itemFolder('groups:42:G1'), 'attachments', 'EPUB-grupo.epub')));
+  assert.ok(existsSync(path.join(store.itemFolder(storedA.storageId), storedA.files.original)));
+  const storedGroup = store.findItemBySourceIdentity({ source: 'zotero', libraryType: 'group', libraryId: '42', itemKey: 'G1' });
+  assert.ok(existsSync(path.join(store.itemFolder(storedGroup.storageId), 'attachments', 'EPUB-grupo.epub')));
   assert.equal(catalog.getImportSource('zotero:users/0').version, 10);
   assert.equal(catalog.getImportSource('zotero:groups/42').version, 7);
 
   const operations = new LibraryOperations(store, catalog);
   operations.updateItemMetadata('zotero:A', { publisher: 'Corrección local de Nodus', language: 'ca', rights: undefined });
-  assert.equal(store.readMaterializedItem('A').metadataOverrides.publisher, 'Corrección local de Nodus');
-  assert.equal(store.readMaterializedItem('A').metadataOverrides.rights, null, 'cleared manager fields use an explicit durable tombstone');
+  assert.equal(store.findItemByIdOrAlias(canonicalAId).metadataOverrides.publisher, 'Corrección local de Nodus');
+  assert.equal(store.findItemByIdOrAlias(canonicalAId).metadataOverrides.rights, null, 'cleared manager fields use an explicit durable tombstone');
 
-  const groupRevision = store.readMaterializedItem('groups:42:G1').clock.revision;
+  const groupRevision = storedGroup.clock.revision;
   state.personalVersion = 12;
   state.personalItems = [item({ version: 12, title: 'Norma y deseo — revisado', dateModified: '2026-03-01' })];
   state.deletedPersonal = ['B'];
@@ -144,12 +147,12 @@ try {
   assert.equal(second.itemsDeleted, 1);
   assert.equal(second.attachmentsCopied, 0);
   assert.equal(second.attachmentsUnchanged, 2);
-  assert.equal(store.readMaterializedItem('A').metadata.title, 'Norma y deseo — revisado');
-  assert.equal(store.readMaterializedItem('A').metadata.publisher, 'Corrección local de Nodus', 'a Zotero refresh preserves local metadata corrections');
-  assert.equal(store.readMaterializedItem('A').metadata.language, 'ca');
-  assert.equal(store.readMaterializedItem('A').metadata.rights, undefined);
-  assert.ok(store.readMaterializedItem('B').deletedAt);
-  assert.equal(store.readMaterializedItem('groups:42:G1').clock.revision, groupRevision, 'an unchanged group item receives no phantom revision');
+  assert.equal(store.findItemByIdOrAlias(canonicalAId).metadata.title, 'Norma y deseo — revisado');
+  assert.equal(store.findItemByIdOrAlias(canonicalAId).metadata.publisher, 'Corrección local de Nodus', 'a Zotero refresh preserves local metadata corrections');
+  assert.equal(store.findItemByIdOrAlias(canonicalAId).metadata.language, 'ca');
+  assert.equal(store.findItemByIdOrAlias(canonicalAId).metadata.rights, undefined);
+  assert.ok(store.findItemByIdOrAlias(catalog.resolveItemId('zotero:B') ?? 'zotero:B')?.deletedAt ?? store.scanMaterializedItems().records.find((entry) => entry.aliases.includes('zotero:B'))?.deletedAt);
+  assert.equal(store.findItemByIdOrAlias(storedGroup.id).clock.revision, groupRevision, 'an unchanged group item receives no phantom revision');
   assert.equal(catalog.list().total, 2);
   assert.equal(catalog.getImportSource('zotero:users/0').version, 12);
 

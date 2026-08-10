@@ -27,6 +27,8 @@ try {
   writeGlobalPrefsRaw({ autoBackupFolder: backupRoot });
   const store = new LibraryDiskStore(path.join(backupRoot, 'nodus-library'), 'vault-link-device');
   store.initialize();
+  const vault = library.listGlobalLibraryVaults()[0];
+  assert.ok(vault?.id);
   const folder = store.itemFolder('LIBKEY01');
   await mkdir(folder, { recursive: true });
   const markdown = '# Documento transversal\n\nTexto limpio usado por todos los análisis.\n';
@@ -40,10 +42,14 @@ try {
     },
     collectionIds: [], attachments: [], files: { reader: 'reader.md', annotations: 'annotations.json', chat: 'chat.json' }, extraction: { status: 'ready' },
   });
+  store.upsertItem({
+    id: 'nodus:canonical-local', storageId: 'legacy-local-folder', source: 'nodus',
+    aliases: ['nodus:old-local-alias'], sourceIdentities: [], vaultWorkIds: { [vault.id]: 'legacy-local-work' },
+    metadata: { title: 'Legacy local work', itemType: 'report', creators: [], year: 2025, isbn: [], issn: [], tags: [] },
+    collectionIds: [], attachments: [], extraction: { status: 'unsupported' },
+  });
 
   library.rebuildGlobalLibrary();
-  const vault = library.listGlobalLibraryVaults()[0];
-  assert.ok(vault?.id);
   const report = await library.linkGlobalLibraryItemsToVault(['zotero:LIBKEY01'], vault.id);
   assert.equal(report.linked, 1);
   assert.equal(report.links[0].itemId, 'zotero:LIBKEY01');
@@ -63,6 +69,10 @@ try {
 
   const again = await library.linkGlobalLibraryItemsToVault(['zotero:LIBKEY01'], vault.id);
   assert.equal(again.existing, 1, 'linking twice is idempotent');
+  const local = await library.linkGlobalLibraryItemsToVault(['nodus:old-local-alias'], vault.id);
+  assert.equal(local.links[0].workId, 'legacy-local-work', 'a migrated Nodus alias relinks to its original vault workId');
+  const localAgain = await library.linkGlobalLibraryItemsToVault(['nodus:canonical-local'], vault.id);
+  assert.equal(localAgain.links[0].workId, 'legacy-local-work');
   const connectedReader = createVault('Connected reader', 'academic', {
     origin: 'connected',
     remote: {

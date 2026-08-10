@@ -116,16 +116,19 @@ export class LibraryOperations {
   createCollection(name: string, parentId: string | null): LibraryCollectionView {
     const clean = name.trim().replace(/\s+/g, ' ');
     if (!clean) throw new Error('La colección necesita un nombre.');
-    const parent = parentId ? this.store.readMaterializedCollection(parentId) : null;
-    if (parentId && (!parent || parent.deletedAt)) throw new Error('La colección superior ya no existe.');
-    const siblings = this.catalog.listCollections().filter((entry) => entry.parentId === parentId);
+    const canonicalParentId = parentId ? this.catalog.resolveCollectionId(parentId) ?? parentId : null;
+    const parent = canonicalParentId ? this.store.readMaterializedCollection(canonicalParentId) : null;
+    if (canonicalParentId && (!parent || parent.deletedAt)) throw new Error('La colección superior ya no existe.');
+    const siblings = this.catalog.listCollections().filter((entry) => entry.parentId === canonicalParentId);
     const id = `nodus:collection:${randomUUID()}`;
-    this.store.upsertCollection({ id, name: clean, parentId, position: siblings.length, source: 'nodus', deletedAt: null });
+    this.store.upsertCollection({ id, name: clean, parentId: canonicalParentId, position: siblings.length, source: 'nodus', deletedAt: null });
     this.catalog.rebuild(this.store);
     return this.catalog.listCollections().find((entry) => entry.id === id)!;
   }
 
   updateCollection(id: string, patch: { name?: string; parentId?: string | null; position?: number }): LibraryCollectionView {
+    id = this.catalog.resolveCollectionId(id) ?? id;
+    if (patch.parentId) patch = { ...patch, parentId: this.catalog.resolveCollectionId(patch.parentId) ?? patch.parentId };
     const current = this.store.readMaterializedCollection(id);
     if (!current || current.deletedAt) throw new Error('La colección ya no existe.');
     if (current.source !== 'nodus') throw new Error('Las colecciones importadas se reflejan desde su gestor; crea una colección de Nodus para organizarlas aquí.');
@@ -146,6 +149,7 @@ export class LibraryOperations {
   }
 
   deleteCollection(id: string, deleteItems = false): number {
+    id = this.catalog.resolveCollectionId(id) ?? id;
     const root = this.store.readMaterializedCollection(id);
     if (!root || root.deletedAt) return 0;
     if (root.source !== 'nodus') throw new Error('Una colección importada solo puede eliminarse en su gestor de origen.');
@@ -173,15 +177,16 @@ export class LibraryOperations {
   }
 
   patchItemCollections(itemIds: string[], patch: LibraryItemCollectionPatch): number {
-    const add = new Set(patch.add ?? []);
-    const remove = new Set(patch.remove ?? []);
+    const canonicalItemIds = new Set(itemIds.map((id) => this.catalog.resolveItemId(id) ?? id));
+    const add = new Set((patch.add ?? []).map((id) => this.catalog.resolveCollectionId(id) ?? id));
+    const remove = new Set((patch.remove ?? []).map((id) => this.catalog.resolveCollectionId(id) ?? id));
     for (const id of add) {
       const collection = this.store.readMaterializedCollection(id);
       if (!collection || collection.deletedAt) throw new Error('Una de las colecciones de destino ya no existe.');
     }
     let updated = 0;
     for (const item of this.store.scanMaterializedItems().records) {
-      if (!itemIds.includes(item.id) || item.deletedAt) continue;
+      if (!canonicalItemIds.has(item.id) || item.deletedAt) continue;
       const collectionIds = [...new Set([...item.collectionIds.filter((id) => !remove.has(id)), ...add])];
       const desired = { ...item, collectionIds };
       if (comparable(item) !== comparable(desired)) { this.store.upsertItem(desired, item.clock.revision); updated += 1; }
@@ -191,10 +196,11 @@ export class LibraryOperations {
   }
 
   setItemsDeleted(itemIds: string[], deleted: boolean): number {
+    const canonicalItemIds = new Set(itemIds.map((id) => this.catalog.resolveItemId(id) ?? id));
     let updated = 0;
     const now = new Date().toISOString();
     for (const item of this.store.scanMaterializedItems().records) {
-      if (!itemIds.includes(item.id) || Boolean(item.deletedAt) === deleted) continue;
+      if (!canonicalItemIds.has(item.id) || Boolean(item.deletedAt) === deleted) continue;
       this.store.upsertItem({ ...item, deletedAt: deleted ? now : null }, item.clock.revision);
       updated += 1;
     }
@@ -249,7 +255,8 @@ export class LibraryOperations {
   }
 
   updateItemMetadata(itemId: string, patch: Partial<LibraryItemMetadata>): LibraryItemRecord {
-    const current = this.store.scanMaterializedItems().records.find((item) => item.id === itemId && !item.deletedAt);
+    const canonicalItemId = this.catalog.resolveItemId(itemId) ?? itemId;
+    const current = this.store.scanMaterializedItems().records.find((item) => item.id === canonicalItemId && !item.deletedAt);
     if (!current) throw new Error('El documento ya no existe.');
     const merged = normalizeLibraryMetadata({ ...current.metadata, ...patch }, current.metadata.title);
     const overridePatch = Object.fromEntries(Object.keys(patch).map((key) => {
@@ -292,9 +299,11 @@ export class LibraryOperations {
 
   mergeItems(canonicalId: string, duplicateIds: string[]): LibraryItemRecord {
     const all = this.store.scanMaterializedItems().records;
-    const canonical = all.find((item) => item.id === canonicalId && !item.deletedAt);
+    const resolvedCanonicalId = this.catalog.resolveItemId(canonicalId) ?? canonicalId;
+    const resolvedDuplicateIds = new Set(duplicateIds.map((id) => this.catalog.resolveItemId(id) ?? id));
+    const canonical = all.find((item) => item.id === resolvedCanonicalId && !item.deletedAt);
     if (!canonical) throw new Error('El documento canónico ya no existe.');
-    const duplicates = all.filter((item) => duplicateIds.includes(item.id) && item.id !== canonicalId && !item.deletedAt);
+    const duplicates = all.filter((item) => resolvedDuplicateIds.has(item.id) && item.id !== resolvedCanonicalId && !item.deletedAt);
     if (!duplicates.length) return canonical;
     let desired: LibraryItemRecord = canonical;
     const folder = this.store.itemFolder(canonical.storageId);
@@ -335,12 +344,16 @@ export class LibraryOperations {
       ...desired.metadata,
       abstract: fill('abstract'), date: fill('date'), year: desired.metadata.year ?? duplicates.map((item) => item.metadata.year).find((value) => value != null),
       language: fill('language'), publisher: fill('publisher'), publicationTitle: fill('publicationTitle'), volume: fill('volume'), issue: fill('issue'), pages: fill('pages'),
-      doi: fill('doi'), url: fill('url'), isbn: [...new Set(all.flatMap((item) => item.id === canonicalId || duplicateIds.includes(item.id) ? item.metadata.isbn ?? [] : []))],
-      issn: [...new Set(all.flatMap((item) => item.id === canonicalId || duplicateIds.includes(item.id) ? item.metadata.issn ?? [] : []))],
-      tags: [...new Set(all.flatMap((item) => item.id === canonicalId || duplicateIds.includes(item.id) ? item.metadata.tags ?? [] : []))],
+      doi: fill('doi'), url: fill('url'), isbn: [...new Set(all.flatMap((item) => item.id === resolvedCanonicalId || resolvedDuplicateIds.has(item.id) ? item.metadata.isbn ?? [] : []))],
+      issn: [...new Set(all.flatMap((item) => item.id === resolvedCanonicalId || resolvedDuplicateIds.has(item.id) ? item.metadata.issn ?? [] : []))],
+      tags: [...new Set(all.flatMap((item) => item.id === resolvedCanonicalId || resolvedDuplicateIds.has(item.id) ? item.metadata.tags ?? [] : []))],
     }, desired.metadata.title);
     desired = this.store.upsertItem({
       ...desired, metadata, collectionIds: [...new Set([canonical, ...duplicates].flatMap((item) => item.collectionIds))],
+      aliases: [...new Set([...(desired.aliases ?? []), ...duplicates.flatMap((item) => [item.id, ...item.aliases])])],
+      sourceIdentities: [...new Map([desired, ...duplicates].flatMap((item) => item.sourceIdentities)
+        .map((identity) => [JSON.stringify(identity), identity])).values()],
+      vaultWorkIds: Object.assign({}, ...[...duplicates, desired].map((item) => item.vaultWorkIds ?? {})),
       attachments, files, extraction,
     }, desired.clock.revision);
     const now = new Date().toISOString();

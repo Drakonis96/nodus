@@ -11,19 +11,22 @@ import {
   safeLibraryFolderName,
 } from './libraryPaths';
 import {
-  isLibraryCollectionRecord,
   isLibraryItemRecord,
   legacyMetadataToRecord,
+  librarySourceIdentityKey,
+  normalizeLibraryCollectionRecord,
+  normalizeLibraryItemRecord,
   recordContentHash,
+  zoteroSourceIdentity,
 } from './libraryRecord';
 
 interface LibraryRootManifest {
   format: 'nodus.library';
-  formatVersion: 1;
+  formatVersion: 2;
   createdAt: string;
   updatedAt: string;
   storage: {
-    itemFolders: 'stable-source-id';
+    itemFolders: 'stable-storage-id';
     originals: 'immutable';
     localCatalog: false;
   };
@@ -73,10 +76,10 @@ export class LibraryDiskStore {
     const manifest: LibraryRootManifest = {
       ...previous,
       format: 'nodus.library',
-      formatVersion: 1,
+      formatVersion: 2,
       createdAt: typeof previous.createdAt === 'string' ? previous.createdAt : now,
       updatedAt: now,
-      storage: { itemFolders: 'stable-source-id', originals: 'immutable', localCatalog: false },
+      storage: { itemFolders: 'stable-storage-id', originals: 'immutable', localCatalog: false },
       sync: { strategy: 'immutable-records', conflictPolicy: 'preserve-and-last-write-wins' },
     };
     atomicWriteJson(file, manifest);
@@ -89,13 +92,14 @@ export class LibraryDiskStore {
   readMaterializedItem(storageId: string): LibraryItemRecord | null {
     const folder = this.itemFolder(storageId);
     const parsed = readJsonFile<unknown>(path.join(folder, 'metadata.json'));
-    if (isLibraryItemRecord(parsed)) return parsed;
+    const normalized = normalizeLibraryItemRecord(parsed);
+    if (normalized) return normalized;
     return legacyMetadataToRecord(parsed, path.basename(folder));
   }
 
   readMaterializedCollection(id: string): LibraryCollectionRecord | null {
     const value = readJsonFile<unknown>(path.join(this.root, '.nodus', 'collections', `${safeLibraryFolderName(id)}.json`));
-    return isLibraryCollectionRecord(value) ? value : null;
+    return normalizeLibraryCollectionRecord(value);
   }
 
   private versionsDirectory(kind: RecordKind, id: string): string {
@@ -121,8 +125,8 @@ export class LibraryDiskStore {
   }
 
   upsertItem(
-    input: Omit<LibraryItemRecord, 'format' | 'formatVersion' | 'createdAt' | 'deletedAt' | 'clock'>
-      & Partial<Pick<LibraryItemRecord, 'createdAt' | 'deletedAt'>>,
+    input: Omit<LibraryItemRecord, 'format' | 'formatVersion' | 'aliases' | 'sourceIdentities' | 'createdAt' | 'deletedAt' | 'clock'>
+      & Partial<Pick<LibraryItemRecord, 'aliases' | 'sourceIdentities' | 'createdAt' | 'deletedAt'>>,
     expectedRevision?: number,
     now = new Date().toISOString(),
   ): LibraryItemRecord {
@@ -133,10 +137,17 @@ export class LibraryDiskStore {
       throw new Error('El documento cambió en otro dispositivo. Actualiza la biblioteca antes de volver a guardar.');
     }
     const revision = (current?.clock.revision ?? 0) + 1;
+    const inferredIdentity = cleanInput.source === 'zotero' && cleanInput.sourceKey
+      ? zoteroSourceIdentity(cleanInput.sourceLibraryId ?? 'users/0', cleanInput.sourceKey)
+      : null;
+    const sourceIdentities = [...(cleanInput.sourceIdentities ?? current?.sourceIdentities ?? []), ...(inferredIdentity ? [inferredIdentity] : [])];
     const base = {
       ...cleanInput,
       format: 'nodus.library-item' as const,
-      formatVersion: 1 as const,
+      formatVersion: 2 as const,
+      aliases: [...new Set((cleanInput.aliases ?? current?.aliases ?? []).filter((alias) => alias && alias !== cleanInput.id))],
+      sourceIdentities: [...new Map(sourceIdentities
+        .map((identity) => [librarySourceIdentityKey(identity), identity])).values()],
       createdAt: cleanInput.createdAt ?? current?.createdAt ?? now,
       deletedAt: cleanInput.deletedAt ?? null,
     };
@@ -166,22 +177,23 @@ export class LibraryDiskStore {
   }
 
   upsertCollection(
-    input: Omit<LibraryCollectionRecord, 'format' | 'formatVersion' | 'createdAt' | 'deletedAt' | 'clock'>
-      & Partial<Pick<LibraryCollectionRecord, 'createdAt' | 'deletedAt'>>,
+    input: Omit<LibraryCollectionRecord, 'format' | 'formatVersion' | 'aliases' | 'createdAt' | 'deletedAt' | 'clock'>
+      & Partial<Pick<LibraryCollectionRecord, 'aliases' | 'createdAt' | 'deletedAt'>>,
     expectedRevision?: number,
     now = new Date().toISOString(),
   ): LibraryCollectionRecord {
     this.initialize();
     const { format: _format, formatVersion: _formatVersion, clock: _clock, ...cleanInput } = input as typeof input & Partial<Pick<LibraryCollectionRecord, 'format' | 'formatVersion' | 'clock'>>;
     const current = readJsonFile<unknown>(path.join(this.root, '.nodus', 'collections', `${safeLibraryFolderName(cleanInput.id)}.json`));
-    const previous = isLibraryCollectionRecord(current) ? current : null;
+    const previous = normalizeLibraryCollectionRecord(current);
     if (expectedRevision !== undefined && (previous?.clock.revision ?? 0) !== expectedRevision) {
       throw new Error('La colección cambió en otro dispositivo. Actualiza la biblioteca antes de volver a guardar.');
     }
     const base = {
       ...cleanInput,
       format: 'nodus.library-collection' as const,
-      formatVersion: 1 as const,
+      formatVersion: 2 as const,
+      aliases: [...new Set((cleanInput.aliases ?? previous?.aliases ?? []).filter((alias) => alias && alias !== cleanInput.id))],
       createdAt: cleanInput.createdAt ?? previous?.createdAt ?? now,
       deletedAt: cleanInput.deletedAt ?? null,
     };
@@ -202,7 +214,7 @@ export class LibraryDiskStore {
 
   private readVersions<T extends LibraryItemRecord | LibraryCollectionRecord>(
     kind: RecordKind,
-    validate: (value: unknown) => value is T,
+    normalize: (value: unknown) => T | null,
   ): { records: T[]; invalid: number } {
     const root = path.join(this.root, '.nodus', 'records', kind);
     if (!fs.existsSync(root)) return { records: [], invalid: 0 };
@@ -214,7 +226,8 @@ export class LibraryDiskStore {
       for (const entry of fs.readdirSync(folder, { withFileTypes: true })) {
         if (!entry.isFile() || !entry.name.endsWith('.json') || entry.name.includes('.tmp-')) continue;
         const value = readJsonFile<unknown>(path.join(folder, entry.name));
-        if (validate(value)) records.push(value);
+        const record = normalize(value);
+        if (record) records.push(record);
         else invalid += 1;
       }
     }
@@ -248,8 +261,8 @@ export class LibraryDiskStore {
 
   reconcile(): LibraryReconcileResult {
     this.initialize();
-    const items = this.readVersions('items', isLibraryItemRecord);
-    const collections = this.readVersions('collections', isLibraryCollectionRecord);
+    const items = this.readVersions('items', normalizeLibraryItemRecord);
+    const collections = this.readVersions('collections', normalizeLibraryCollectionRecord);
     const selectedItems = this.selectWinners(items.records);
     const selectedCollections = this.selectWinners(collections.records);
     for (const item of selectedItems.winners) this.materializeItem(item);
@@ -272,7 +285,7 @@ export class LibraryDiskStore {
       const file = path.join(this.root, entry.name, 'metadata.json');
       if (!fs.existsSync(file)) continue;
       const value = readJsonFile<unknown>(file);
-      const record = isLibraryItemRecord(value) ? value : legacyMetadataToRecord(value, entry.name);
+      const record = normalizeLibraryItemRecord(value) ?? legacyMetadataToRecord(value, entry.name);
       if (record) records.push(record);
       else invalid += 1;
     }
@@ -287,10 +300,25 @@ export class LibraryDiskStore {
     for (const entry of fs.readdirSync(folder, { withFileTypes: true })) {
       if (!entry.isFile() || !entry.name.endsWith('.json') || entry.name.includes('.tmp-')) continue;
       const value = readJsonFile<unknown>(path.join(folder, entry.name));
-      if (isLibraryCollectionRecord(value)) records.push(value);
+      const record = normalizeLibraryCollectionRecord(value);
+      if (record) records.push(record);
       else invalid += 1;
     }
     return { records, invalid };
+  }
+
+  findItemByIdOrAlias(reference: string): LibraryItemRecord | null {
+    return this.scanMaterializedItems().records.find((item) => item.id === reference || item.aliases.includes(reference)) ?? null;
+  }
+
+  findItemBySourceIdentity(identity: LibraryItemRecord['sourceIdentities'][number]): LibraryItemRecord | null {
+    const key = librarySourceIdentityKey(identity);
+    return this.scanMaterializedItems().records.find((item) => item.sourceIdentities.some((entry) => librarySourceIdentityKey(entry) === key)) ?? null;
+  }
+
+  findCollectionBySource(source: LibraryCollectionRecord['source'], libraryId: string, sourceKey: string): LibraryCollectionRecord | null {
+    return this.scanMaterializedCollections().records.find((collection) => collection.source === source
+      && collection.sourceLibraryId === libraryId && collection.sourceKey === sourceKey) ?? null;
   }
 }
 

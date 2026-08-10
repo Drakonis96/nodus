@@ -15,6 +15,7 @@ import type {
   LibraryCollectionView,
 } from '@shared/libraryTypes';
 import { LibraryDiskStore } from './libraryStorage';
+import { librarySourceIdentityKey } from './libraryRecord';
 
 type CountRow = { count: number };
 
@@ -95,6 +96,26 @@ export class LibraryCatalog {
         deleted_at TEXT
       );
       CREATE INDEX IF NOT EXISTS library_collections_parent ON library_collections (parent_id, position, name);
+      CREATE TABLE IF NOT EXISTS library_item_aliases (
+        alias TEXT PRIMARY KEY,
+        item_id TEXT NOT NULL REFERENCES library_items(id) ON DELETE CASCADE
+      );
+      CREATE INDEX IF NOT EXISTS library_item_aliases_item ON library_item_aliases (item_id);
+      CREATE TABLE IF NOT EXISTS library_source_identities (
+        identity_key TEXT PRIMARY KEY,
+        item_id TEXT NOT NULL REFERENCES library_items(id) ON DELETE CASCADE,
+        source TEXT NOT NULL,
+        library_type TEXT NOT NULL,
+        library_id TEXT NOT NULL,
+        item_key TEXT NOT NULL
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS library_source_identity_parts
+        ON library_source_identities (source, library_type, library_id, item_key);
+      CREATE TABLE IF NOT EXISTS library_collection_aliases (
+        alias TEXT PRIMARY KEY,
+        collection_id TEXT NOT NULL REFERENCES library_collections(id) ON DELETE CASCADE
+      );
+      CREATE INDEX IF NOT EXISTS library_collection_aliases_collection ON library_collection_aliases (collection_id);
       CREATE TABLE IF NOT EXISTS library_item_collections (
         item_id TEXT NOT NULL REFERENCES library_items(id) ON DELETE CASCADE,
         collection_id TEXT NOT NULL,
@@ -208,13 +229,27 @@ export class LibraryCatalog {
       INSERT INTO library_attachments (id, item_id, file_name, relative_path, mime_type, byte_size, sha256, role)
       VALUES (@id, @itemId, @fileName, @relativePath, @mimeType, @byteSize, @sha256, @role)
     `);
+    const insertItemAlias = this.handle.prepare(
+      'INSERT OR IGNORE INTO library_item_aliases (alias, item_id) VALUES (?, ?)'
+    );
+    const insertSourceIdentity = this.handle.prepare(`
+      INSERT OR IGNORE INTO library_source_identities
+        (identity_key, item_id, source, library_type, library_id, item_key)
+      VALUES (@identityKey, @itemId, @source, @libraryType, @libraryId, @itemKey)
+    `);
     const insertCollection = this.handle.prepare(`
       INSERT INTO library_collections (id, name, parent_id, position, source, source_library_id, source_key, revision, updated_at, deleted_at)
       VALUES (@id, @name, @parentId, @position, @source, @sourceLibraryId, @sourceKey, @revision, @updatedAt, @deletedAt)
     `);
+    const insertCollectionAlias = this.handle.prepare(
+      'INSERT OR IGNORE INTO library_collection_aliases (alias, collection_id) VALUES (?, ?)'
+    );
     const rebuiltAt = new Date().toISOString();
     this.handle.transaction(() => {
       this.handle.exec(`
+        DELETE FROM library_item_aliases;
+        DELETE FROM library_source_identities;
+        DELETE FROM library_collection_aliases;
         DELETE FROM library_item_collections;
         DELETE FROM library_attachments;
         DELETE FROM library_items;
@@ -261,20 +296,29 @@ export class LibraryCatalog {
         });
         for (const collectionId of record.collectionIds) insertMembership.run(record.id, collectionId);
         for (const attachment of record.attachments) insertAttachment.run({ ...attachment, itemId: record.id });
+        if (!record.deletedAt) {
+          for (const alias of record.aliases) insertItemAlias.run(alias, record.id);
+          for (const identity of record.sourceIdentities) insertSourceIdentity.run({
+            identityKey: librarySourceIdentityKey(identity), itemId: record.id, ...identity,
+          });
+        }
       }
-      for (const record of collections.records) insertCollection.run({
-        id: record.id,
-        name: record.name,
-        parentId: record.parentId,
-        position: record.position,
-        source: record.source,
-        sourceLibraryId: record.sourceLibraryId ?? null,
-        sourceKey: record.sourceKey ?? null,
-        revision: record.clock.revision,
-        updatedAt: record.clock.updatedAt,
-        deletedAt: record.deletedAt,
-      });
-      this.putMeta('formatVersion', '1');
+      for (const record of collections.records) {
+        insertCollection.run({
+          id: record.id,
+          name: record.name,
+          parentId: record.parentId,
+          position: record.position,
+          source: record.source,
+          sourceLibraryId: record.sourceLibraryId ?? null,
+          sourceKey: record.sourceKey ?? null,
+          revision: record.clock.revision,
+          updatedAt: record.clock.updatedAt,
+          deletedAt: record.deletedAt,
+        });
+        if (!record.deletedAt) for (const alias of record.aliases) insertCollectionAlias.run(alias, record.id);
+      }
+      this.putMeta('formatVersion', '2');
       this.putMeta('root', store.root);
       this.putMeta('lastRebuiltAt', rebuiltAt);
       this.putMeta('conflicts', String(reconciled.conflicts));
@@ -297,14 +341,14 @@ export class LibraryCatalog {
     const indexedRoot = this.getMeta('root');
     if (indexedRoot !== root) {
       return {
-        configured: true, root, formatVersion: 1, deviceId,
+        configured: true, root, formatVersion: 2, deviceId,
         items: 0, collections: 0, attachments: 0, conflicts: 0, invalidRecords: 0, lastRebuiltAt: null,
       };
     }
     return {
       configured: true,
       root,
-      formatVersion: Number(this.getMeta('formatVersion')) || 1,
+      formatVersion: Number(this.getMeta('formatVersion')) || 2,
       deviceId,
       items: count('library_items', 'WHERE deleted_at IS NULL'),
       collections: count('library_collections', 'WHERE deleted_at IS NULL'),
@@ -336,16 +380,18 @@ export class LibraryCatalog {
     `);
     this.handle.transaction(() => {
       for (const link of links) {
+        const itemId = this.resolveItemId(link.itemId) ?? link.itemId;
         this.handle.prepare('DELETE FROM library_vault_links WHERE item_id=? AND vault_id=? AND work_id<>?')
-          .run(link.itemId, link.vaultId, link.workId);
-        insert.run({ ...link, analysisJson: JSON.stringify(link.analysis) });
+          .run(itemId, link.vaultId, link.workId);
+        insert.run({ ...link, itemId, analysisJson: JSON.stringify(link.analysis) });
       }
     })();
   }
 
   listVaultLinks(itemId?: string): LibraryVaultLink[] {
+    const canonicalItemId = itemId ? this.resolveItemId(itemId) ?? itemId : undefined;
     const rows = (itemId
-      ? this.handle.prepare('SELECT * FROM library_vault_links WHERE item_id=? ORDER BY vault_name, work_id').all(itemId)
+      ? this.handle.prepare('SELECT * FROM library_vault_links WHERE item_id=? ORDER BY vault_name, work_id').all(canonicalItemId)
       : this.handle.prepare('SELECT * FROM library_vault_links ORDER BY item_id, vault_name, work_id').all()
     ) as Record<string, unknown>[];
     return rows.map((row) => ({
@@ -453,7 +499,7 @@ export class LibraryCatalog {
     if (query.hasAttachments === false) where.push('i.attachment_count=0');
     if (query.collectionId) {
       where.push('EXISTS (SELECT 1 FROM library_item_collections ic WHERE ic.item_id=i.id AND ic.collection_id=@collectionId)');
-      params.collectionId = query.collectionId;
+      params.collectionId = this.resolveCollectionId(query.collectionId) ?? query.collectionId;
     }
     const normalizedSearch = query.search?.trim();
     let join = '';
@@ -513,6 +559,36 @@ export class LibraryCatalog {
       sourceKey: row.source_key == null ? null : String(row.source_key),
       directItemCount: Number(row.direct_item_count), updatedAt: String(row.updated_at),
     }));
+  }
+
+  resolveItemId(reference: string): string | null {
+    const direct = this.handle.prepare('SELECT id FROM library_items WHERE id=? AND deleted_at IS NULL')
+      .get(reference) as { id: string } | undefined;
+    if (direct) return direct.id;
+    const alias = this.handle.prepare(`
+      SELECT a.item_id AS id FROM library_item_aliases a
+      JOIN library_items i ON i.id=a.item_id
+      WHERE a.alias=? AND i.deleted_at IS NULL
+    `).get(reference) as { id: string } | undefined;
+    return alias?.id ?? null;
+  }
+
+  resolveCollectionId(reference: string): string | null {
+    const direct = this.handle.prepare('SELECT id FROM library_collections WHERE id=? AND deleted_at IS NULL')
+      .get(reference) as { id: string } | undefined;
+    if (direct) return direct.id;
+    const alias = this.handle.prepare(`
+      SELECT a.collection_id AS id FROM library_collection_aliases a
+      JOIN library_collections c ON c.id=a.collection_id
+      WHERE a.alias=? AND c.deleted_at IS NULL
+    `).get(reference) as { id: string } | undefined;
+    return alias?.id ?? null;
+  }
+
+  findItemIdBySourceIdentity(identity: LibraryItemRecord['sourceIdentities'][number]): string | null {
+    const row = this.handle.prepare('SELECT item_id FROM library_source_identities WHERE identity_key=?')
+      .get(librarySourceIdentityKey(identity)) as { item_id: string } | undefined;
+    return row?.item_id ?? null;
   }
 }
 

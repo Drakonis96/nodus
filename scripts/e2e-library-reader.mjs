@@ -134,6 +134,7 @@ La segunda sección permite comprobar el índice, la página de origen y el marc
   assert.equal(globalPage.items[0]?.id, globalItemId);
 
   await page.locator('[data-tour="nav-library"]').click();
+  await page.getByTestId('library-scope-global').click();
   const globalRow = page.getByTestId(`global-library-item-${globalItemId}`);
   await globalRow.waitFor({ state: 'visible' });
   await globalRow.getByRole('button').click();

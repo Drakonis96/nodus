@@ -17,7 +17,12 @@ import type { ZoteroAttachmentInfo, ZoteroCollection, ZoteroItem, ZoteroLibrary 
 import * as zotero from '../zotero/zoteroClient';
 import { LibraryCatalog } from './libraryCatalog';
 import { assertInside, safeLibraryFolderName } from './libraryPaths';
-import { canonicalJson, normalizeLibraryMetadata } from './libraryRecord';
+import {
+  canonicalJson,
+  librarySourceIdentityKey,
+  normalizeLibraryMetadata,
+  zoteroSourceIdentity,
+} from './libraryRecord';
 import { LibraryDiskStore } from './libraryStorage';
 
 export interface ZoteroImportClient {
@@ -56,12 +61,24 @@ function importSourceId(library: ZoteroLibrary): string {
   return `zotero:${libraryId(library)}`;
 }
 
-function collectionId(key: string): string {
+function legacyCollectionAlias(key: string): string {
   return `zotero:${key}`;
 }
 
-function itemId(key: string): string {
-  return `zotero:${key}`;
+function qualifiedCollectionAlias(library: ZoteroLibrary, itemKey: string): string {
+  return `zotero:collection:${library.type}:${library.id || '0'}:${itemKey}`;
+}
+
+function qualifiedItemAlias(library: ZoteroLibrary, itemKey: string): string {
+  return `zotero:item:${library.type}:${library.id || '0'}:${itemKey}`;
+}
+
+function legacyAliasIsUnambiguous(library: ZoteroLibrary, transportKey: string): boolean {
+  return library.type === 'user' || transportKey !== transportKey.split(':').at(-1);
+}
+
+function rawZoteroKey(key: string): string {
+  return /^groups:[^:]+:(.+)$/.exec(key)?.[1] ?? key;
 }
 
 function itemType(value: string): LibraryItemType {
@@ -286,19 +303,34 @@ export async function importZoteroLibraries(options: {
           selectedKeys.add(key);
           for (const child of byParent.get(key) ?? []) visit(child);
         };
-        for (const id of selectedCollectionIds) visit(id.startsWith('zotero:') ? id.slice(7) : id);
+        for (const id of selectedCollectionIds) {
+          const known = store.scanMaterializedCollections().records.find((entry) => entry.id === id || entry.aliases.includes(id));
+          visit(known?.sourceKey ?? (id.startsWith('zotero:') ? id.slice(7) : id));
+        }
       }
       const visibleCollections = subset ? collections.filter((entry) => selectedKeys.has(entry.key)) : collections;
+      const collectionIds = new Map<string, string>();
+      for (const collection of visibleCollections) {
+        const current = store.findCollectionBySource('zotero', sourceLibraryId, collection.itemKey)
+          ?? store.readMaterializedCollection(legacyCollectionAlias(collection.key));
+        collectionIds.set(collection.key, current?.id ?? `nodus:collection:${randomUUID()}`);
+      }
       const positionByParent = new Map<string | null, number>();
       for (const collection of visibleCollections) {
-        const id = collectionId(collection.key);
+        const id = collectionIds.get(collection.key)!;
         const parentId = collection.parentCollection && (!subset || selectedKeys.has(collection.parentCollection))
-          ? collectionId(collection.parentCollection) : null;
-        const current = store.readMaterializedCollection(id);
+          ? collectionIds.get(collection.parentCollection) ?? null : null;
+        const current = store.findCollectionBySource('zotero', sourceLibraryId, collection.itemKey)
+          ?? store.readMaterializedCollection(id);
+        const aliases = [...new Set([
+          ...(current?.aliases ?? []),
+          qualifiedCollectionAlias(library, collection.itemKey),
+          ...(legacyAliasIsUnambiguous(library, collection.key) ? [legacyCollectionAlias(collection.key)] : []),
+        ].filter((alias) => alias !== id))];
         const desired = {
           id, name: collection.name.trim() || '(sin nombre)', parentId,
           position: positionByParent.get(parentId) ?? 0, source: 'zotero' as const,
-          sourceLibraryId, sourceKey: collection.itemKey, deletedAt: null,
+          sourceLibraryId, sourceKey: collection.itemKey, aliases, deletedAt: null,
         };
         positionByParent.set(parentId, desired.position + 1);
         if (!current) { store.upsertCollection(desired); report.collectionsCreated += 1; }
@@ -306,7 +338,7 @@ export async function importZoteroLibraries(options: {
         else { store.upsertCollection(desired, current.clock.revision); report.collectionsUpdated += 1; }
       }
       if (!since && !subset) {
-        const visibleIds = new Set(visibleCollections.map((entry) => collectionId(entry.key)));
+        const visibleIds = new Set(collectionIds.values());
         for (const current of store.scanMaterializedCollections().records) {
           if (current.source !== 'zotero' || current.sourceLibraryId !== sourceLibraryId || current.deletedAt || visibleIds.has(current.id)) continue;
           store.upsertCollection({ ...current, deletedAt: new Date().toISOString() }, current.clock.revision);
@@ -329,20 +361,35 @@ export async function importZoteroLibraries(options: {
       const desiredByKey = new Map<string, LibraryItemRecord>();
       for (const item of changedItems) {
         abortIfNeeded(signal);
-        const current = store.readMaterializedItem(item.key);
+        const identity = zoteroSourceIdentity(sourceLibraryId, item.itemKey);
+        const legacyAtTransportKey = store.readMaterializedItem(item.key);
+        const current = store.findItemBySourceIdentity(identity)
+          ?? (legacyAtTransportKey?.sourceIdentities.some((entry) => librarySourceIdentityKey(entry) === librarySourceIdentityKey(identity))
+            ? legacyAtTransportKey : null);
         const localCollectionIds = (current?.collectionIds ?? []).filter((id) => {
           const collection = store.readMaterializedCollection(id);
           return collection?.source !== 'zotero' || collection.sourceLibraryId !== sourceLibraryId;
         });
+        const id = current?.id ?? `nodus:${randomUUID()}`;
+        const aliases = [...new Set([
+          ...(current?.aliases ?? []),
+          qualifiedItemAlias(library, item.itemKey),
+          ...(legacyAliasIsUnambiguous(library, item.key) ? [`zotero:${item.key}`] : []),
+        ].filter((alias) => alias !== id))];
+        const sourceIdentities = [...new Map([...(current?.sourceIdentities ?? []), identity]
+          .map((entry) => [librarySourceIdentityKey(entry), entry])).values()];
         const desired = {
-          id: itemId(item.key), storageId: item.key, source: 'zotero' as const,
+          id, storageId: current?.storageId ?? id, aliases, sourceIdentities, source: 'zotero' as const,
           sourceLibraryId, sourceKey: item.itemKey,
           ...(current?.citationKey ? { citationKey: current.citationKey } : {}),
           metadata: applyMetadataOverrides(metadata(item), current?.metadataOverrides),
           ...(current?.metadataOverrides ? { metadataOverrides: current.metadataOverrides } : {}),
           collectionIds: [...new Set([
             ...localCollectionIds,
-            ...item.collections.filter((key) => !subset || selectedKeys.has(key)).map(collectionId),
+            ...item.collections.filter((key) => !subset || selectedKeys.has(key)).flatMap((key) => {
+              const collectionId = collectionIds.get(key);
+              return collectionId ? [collectionId] : [];
+            }),
           ])],
           attachments: current?.attachments ?? [],
           ...(current?.files ? { files: current.files } : {}),
@@ -360,23 +407,23 @@ export async function importZoteroLibraries(options: {
       }
 
       const deleted = since > 0 ? await client.deletedSince(library, since, signal) : { version: 0, items: [], collections: [] };
-      const deletedItemKeys = new Set(deleted.items);
+      const deletedItemKeys = new Set(deleted.items.map(rawZoteroKey));
       if (!since && !subset) {
-        const currentKeys = new Set(page.items.map((item) => item.key));
+        const currentKeys = new Set(page.items.map((item) => item.itemKey));
         for (const current of store.scanMaterializedItems().records) {
-          if (current.source === 'zotero' && current.sourceLibraryId === sourceLibraryId && current.sourceKey && !currentKeys.has(
-            library.type === 'group' ? `groups:${library.id}:${current.sourceKey}` : current.sourceKey
-          )) deletedItemKeys.add(current.storageId);
+          const belongsToLibrary = current.sourceIdentities.some((entry) => entry.source === 'zotero'
+            && entry.libraryType === library.type && entry.libraryId === String(library.id || '0'));
+          if (belongsToLibrary && current.sourceKey && !currentKeys.has(current.sourceKey)) deletedItemKeys.add(current.sourceKey);
         }
       }
       for (const key of deletedItemKeys) {
-        const current = store.readMaterializedItem(key);
+        const current = store.findItemBySourceIdentity(zoteroSourceIdentity(sourceLibraryId, key));
         if (!current || current.deletedAt || current.sourceLibraryId !== sourceLibraryId) continue;
         store.upsertItem({ ...current, deletedAt: new Date().toISOString() }, current.clock.revision);
         report.itemsDeleted += 1;
       }
       for (const key of deleted.collections) {
-        const current = store.readMaterializedCollection(collectionId(key));
+        const current = store.findCollectionBySource('zotero', sourceLibraryId, rawZoteroKey(key));
         if (!current || current.deletedAt || current.sourceLibraryId !== sourceLibraryId) continue;
         store.upsertCollection({ ...current, deletedAt: new Date().toISOString() }, current.clock.revision);
       }
@@ -389,7 +436,8 @@ export async function importZoteroLibraries(options: {
           abortIfNeeded(signal);
           const attachments = (await client.itemAttachments(library.id, item.key, library)).sort((a, b) => priority(a) - priority(b) || a.key.localeCompare(b.key));
           totalAttachments += attachments.length;
-          let current = desiredByKey.get(item.key) ?? store.readMaterializedItem(item.key);
+          let current = desiredByKey.get(item.key)
+            ?? store.findItemBySourceIdentity(zoteroSourceIdentity(sourceLibraryId, item.itemKey));
           if (!current) continue;
           const copied: LibraryAttachmentRecord[] = [];
           for (let index = 0; index < attachments.length; index += 1) {

@@ -144,6 +144,8 @@ ER  -`);
   const annotations = JSON.parse(await readFile(path.join(store.itemFolder(merged.storageId), merged.files.annotations), 'utf8'));
   assert.equal(annotations[0].documentId, merged.storageId);
   assert.ok(store.readMaterializedItem('zotero:DUP').deletedAt);
+  assert.ok(merged.aliases.includes('zotero:DUP'), 'merged IDs remain permanent aliases of the canonical record');
+  assert.equal(catalog.resolveItemId('zotero:DUP'), canonical.id);
   assert.equal(catalog.list().items.some((item) => item.id === 'zotero:DUP'), false);
 
   catalog.close();

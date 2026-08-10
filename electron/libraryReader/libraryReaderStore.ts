@@ -13,7 +13,7 @@ import type {
 import type { LibraryItemRecord } from '@shared/libraryTypes';
 import { getWork } from '../db/worksRepo';
 import { atomicWriteJson, configuredLibraryRootOrThrow, safeLibraryFolderName } from '../library/libraryPaths';
-import { isLibraryItemRecord, legacyMetadataToRecord } from '../library/libraryRecord';
+import { legacyMetadataToRecord, normalizeLibraryItemRecord } from '../library/libraryRecord';
 
 interface ReaderMetadata {
   citationKey?: string;
@@ -291,9 +291,11 @@ function globalDocument(documentId: string): ResolvedReaderDocument | null {
     const metadataPath = optionalDocumentFile(folder, 'metadata.json', 'metadata.json');
     if (!metadataPath) return null;
     const raw = readJson<unknown>(metadataPath);
-    const record = isLibraryItemRecord(raw) ? raw : legacyMetadataToRecord(raw, path.basename(folder));
+    const record = normalizeLibraryItemRecord(raw) ?? legacyMetadataToRecord(raw, path.basename(folder));
     if (!record || record.deletedAt) return null;
-    const matches = record.id === canonicalId || record.storageId === canonicalId || record.sourceKey === canonicalId;
+    const matches = record.id === canonicalId || record.storageId === canonicalId || record.sourceKey === canonicalId
+      || record.aliases.includes(canonicalId)
+      || record.sourceIdentities.some((identity) => identity.itemKey === canonicalId);
     if (!matches) return null;
     const metadata = recordReaderMetadata(record);
     const reader = optionalDocumentFile(folder, metadata.files?.reader, 'reader.md');
