@@ -30,6 +30,7 @@ import { registerWorldbuildingIpc } from './ipc/worldbuilding';
 import { registerPlatformIpc } from './ipc/platform';
 import { registerRecordsIpc } from './ipc/records';
 import { registerAcademicIpc } from './ipc/academic';
+import { registerLibraryIpc } from './ipc/library';
 import {
   restartMcpServer,
   startMcpServer,
@@ -194,6 +195,7 @@ export function registerIpc(
   // imports. What remains below is everything not yet split out.
   registerProsopographyIpc(context);
   registerAcademicIpc(context);
+  registerLibraryIpc(context);
   registerRecordsIpc(context);
   registerPlatformIpc(context);
   registerWorldbuildingIpc(context);

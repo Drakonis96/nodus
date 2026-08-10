@@ -1,0 +1,160 @@
+import { createHash } from 'node:crypto';
+import type {
+  LibraryCollectionRecord,
+  LibraryCreator,
+  LibraryItemMetadata,
+  LibraryItemRecord,
+  LibraryItemSource,
+  LibraryItemType,
+} from '@shared/libraryTypes';
+
+const SOURCES = new Set<LibraryItemSource>(['nodus', 'zotero', 'mendeley', 'ris', 'bibtex', 'csl-json', 'legacy']);
+const ITEM_TYPES = new Set<LibraryItemType>([
+  'article-journal', 'book', 'chapter', 'conference-paper', 'thesis', 'report', 'webpage', 'document', 'dataset', 'other',
+]);
+
+export function canonicalJson(value: unknown): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  const object = value as Record<string, unknown>;
+  return `{${Object.keys(object).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(object[key])}`).join(',')}}`;
+}
+
+export function recordContentHash(value: Omit<LibraryItemRecord, 'clock'> | Omit<LibraryCollectionRecord, 'clock'>): string {
+  return createHash('sha256').update(canonicalJson(value)).digest('hex');
+}
+
+function stringValue(value: unknown, max = 10_000): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const clean = value.trim().replace(/\s+/g, ' ');
+  return clean ? clean.slice(0, max) : undefined;
+}
+
+function stringArray(value: unknown, maxItems = 256): string[] {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.map((item) => stringValue(item, 1_000)).filter((item): item is string => !!item))].slice(0, maxItems);
+}
+
+function normalizeCreators(value: unknown): LibraryCreator[] {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 512).flatMap((entry) => {
+    if (typeof entry === 'string') {
+      const name = stringValue(entry, 1_000);
+      return name ? [{ creatorType: 'author', name }] : [];
+    }
+    if (!entry || typeof entry !== 'object') return [];
+    const source = entry as Record<string, unknown>;
+    const creatorType = stringValue(source.creatorType, 80) ?? 'author';
+    const firstName = stringValue(source.firstName, 500);
+    const lastName = stringValue(source.lastName, 500);
+    const name = stringValue(source.name, 1_000);
+    if (!firstName && !lastName && !name) return [];
+    return [{ creatorType, ...(firstName ? { firstName } : {}), ...(lastName ? { lastName } : {}), ...(name ? { name } : {}) }];
+  });
+}
+
+function normalizeMetadata(value: unknown, fallbackTitle = 'Documento sin título'): LibraryItemMetadata {
+  const input = value && typeof value === 'object' ? value as Record<string, unknown> : {};
+  const rawYear = Number(input.year);
+  const itemType = ITEM_TYPES.has(input.itemType as LibraryItemType) ? input.itemType as LibraryItemType : 'document';
+  const extra = input.extra && typeof input.extra === 'object' && !Array.isArray(input.extra)
+    ? Object.fromEntries(Object.entries(input.extra as Record<string, unknown>)
+      .flatMap(([key, entry]) => {
+        const normalized = stringValue(entry, 10_000);
+        return normalized ? [[key.slice(0, 200), normalized]] : [];
+      }))
+    : undefined;
+  return {
+    title: stringValue(input.title, 10_000) ?? fallbackTitle,
+    itemType,
+    creators: normalizeCreators(input.creators ?? input.authors),
+    ...(stringValue(input.abstract, 500_000) ? { abstract: stringValue(input.abstract, 500_000) } : {}),
+    ...(stringValue(input.date, 200) ? { date: stringValue(input.date, 200) } : {}),
+    year: Number.isInteger(rawYear) && rawYear > -10_000 && rawYear < 10_000 ? rawYear : null,
+    ...(stringValue(input.language, 100) ? { language: stringValue(input.language, 100) } : {}),
+    ...(stringValue(input.publisher, 2_000) ? { publisher: stringValue(input.publisher, 2_000) } : {}),
+    ...(stringValue(input.publicationTitle, 2_000) ? { publicationTitle: stringValue(input.publicationTitle, 2_000) } : {}),
+    ...(stringValue(input.volume, 200) ? { volume: stringValue(input.volume, 200) } : {}),
+    ...(stringValue(input.issue, 200) ? { issue: stringValue(input.issue, 200) } : {}),
+    ...(stringValue(input.pages, 200) ? { pages: stringValue(input.pages, 200) } : {}),
+    ...(stringValue(input.edition, 200) ? { edition: stringValue(input.edition, 200) } : {}),
+    ...(stringValue(input.place, 1_000) ? { place: stringValue(input.place, 1_000) } : {}),
+    ...(stringValue(input.rights, 4_000) ? { rights: stringValue(input.rights, 4_000) } : {}),
+    ...(stringValue(input.url, 10_000) ? { url: stringValue(input.url, 10_000) } : {}),
+    ...(stringValue(input.doi, 1_000) ? { doi: stringValue(input.doi, 1_000) } : {}),
+    isbn: stringArray(input.isbn),
+    issn: stringArray(input.issn),
+    tags: stringArray(input.tags),
+    ...(extra && Object.keys(extra).length ? { extra } : {}),
+  };
+}
+
+export function isLibraryItemRecord(value: unknown): value is LibraryItemRecord {
+  if (!value || typeof value !== 'object') return false;
+  const item = value as Partial<LibraryItemRecord>;
+  return item.format === 'nodus.library-item'
+    && item.formatVersion === 1
+    && typeof item.id === 'string'
+    && typeof item.storageId === 'string'
+    && SOURCES.has(item.source as LibraryItemSource)
+    && !!item.metadata && typeof item.metadata.title === 'string'
+    && Array.isArray(item.collectionIds)
+    && Array.isArray(item.attachments)
+    && typeof item.createdAt === 'string'
+    && (item.deletedAt === null || typeof item.deletedAt === 'string')
+    && !!item.clock
+    && typeof item.clock.deviceId === 'string'
+    && Number.isInteger(item.clock.revision)
+    && Number.isInteger(item.clock.baseRevision)
+    && typeof item.clock.updatedAt === 'string'
+    && /^[a-f0-9]{64}$/i.test(item.clock.contentHash);
+}
+
+export function isLibraryCollectionRecord(value: unknown): value is LibraryCollectionRecord {
+  if (!value || typeof value !== 'object') return false;
+  const item = value as Partial<LibraryCollectionRecord>;
+  return item.format === 'nodus.library-collection'
+    && item.formatVersion === 1
+    && typeof item.id === 'string'
+    && typeof item.name === 'string'
+    && (item.parentId === null || typeof item.parentId === 'string')
+    && Number.isFinite(item.position)
+    && SOURCES.has(item.source as LibraryItemSource)
+    && typeof item.createdAt === 'string'
+    && (item.deletedAt === null || typeof item.deletedAt === 'string')
+    && !!item.clock
+    && typeof item.clock.deviceId === 'string'
+    && Number.isInteger(item.clock.revision)
+    && Number.isInteger(item.clock.baseRevision)
+    && typeof item.clock.updatedAt === 'string'
+    && /^[a-f0-9]{64}$/i.test(item.clock.contentHash);
+}
+
+/** Read pre-contract prototype folders without mutating or losing them. */
+export function legacyMetadataToRecord(value: unknown, folderName: string): LibraryItemRecord | null {
+  if (!value || typeof value !== 'object') return null;
+  const input = value as Record<string, unknown>;
+  const storageId = stringValue(input.storageId, 2_000) ?? folderName;
+  const id = stringValue(input.id, 2_000) ?? storageId;
+  const now = stringValue(input.updatedAt, 100) ?? new Date(0).toISOString();
+  const files = input.files && typeof input.files === 'object' ? input.files as LibraryItemRecord['files'] : undefined;
+  const base = {
+    format: 'nodus.library-item' as const,
+    formatVersion: 1 as const,
+    id,
+    storageId,
+    source: 'legacy' as const,
+    sourceKey: typeof (input.zotero as { itemKey?: unknown } | undefined)?.itemKey === 'string'
+      ? String((input.zotero as { itemKey: string }).itemKey)
+      : undefined,
+    citationKey: stringValue(input.citationKey, 1_000),
+    metadata: normalizeMetadata(input, stringValue(input.title, 10_000) ?? folderName),
+    collectionIds: stringArray(input.collectionIds),
+    attachments: [],
+    files,
+    extraction: { status: files?.reader ? 'ready' as const : 'pending' as const },
+    createdAt: stringValue(input.createdAt, 100) ?? now,
+    deletedAt: null,
+  };
+  return { ...base, clock: { deviceId: 'legacy', revision: 1, baseRevision: 0, updatedAt: now, contentHash: recordContentHash(base) } };
+}

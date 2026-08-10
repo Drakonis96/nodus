@@ -9,8 +9,8 @@ import type {
   WritingDraftAnnotationInput,
   WorkView,
 } from '@shared/types';
-import { getSettings } from '../db/settingsRepo';
 import { getWork } from '../db/worksRepo';
+import { configuredLibraryRootOrThrow, safeLibraryFolderName } from '../library/libraryPaths';
 
 interface ReaderMetadata {
   citationKey?: string;
@@ -50,20 +50,16 @@ interface DiskAnnotation {
 }
 
 const COLORS = new Set<WritingDraftAnnotationColor>(['yellow', 'rose', 'blue', 'mint', 'lavender', 'peach']);
-const SAFE_STORAGE_ID = /^[A-Za-z0-9._-]+$/;
 
 function libraryRoot(): string {
-  const backupRoot = getSettings().autoBackupFolder?.trim();
-  if (!backupRoot) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
-  return path.join(backupRoot, 'nodus-library');
+  return configuredLibraryRootOrThrow();
 }
 
 /** Personal-library Zotero keys remain byte-for-byte identical on disk. Group keys
  * contain characters Windows reserves, so only those exceptional ids are encoded;
  * their original canonical id remains in metadata as `storageId`. */
 function storageFolderName(storageId: string): string {
-  if (SAFE_STORAGE_ID.test(storageId) && storageId !== '.' && storageId !== '..') return storageId;
-  return encodeURIComponent(storageId).replace(/\./g, '%2E') || '_document';
+  return safeLibraryFolderName(storageId);
 }
 
 function storageIdFor(work: WorkView): string {

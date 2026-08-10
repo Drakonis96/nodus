@@ -38,6 +38,7 @@ import { installProcessSafetyNet } from './util/processSafety';
 import { restoreAppWindows } from './windowLifecycle';
 import { registerImageProtocol, registerImageSchemePrivileges } from './imageProtocol';
 import { registerArchiveProtocol, registerArchiveSchemePrivileges } from './archiveProtocol';
+import { closeGlobalLibrary } from './library/libraryService';
 import {
   upgradeWorldbuildingDemoDynasties,
   upgradeWorldbuildingDemoImageQuality,
@@ -747,6 +748,7 @@ app.on('window-all-closed', () => {
   stopReplicaSync();
     interruptDecorativeImageGenerations();
     stopAllWhisperCpp();
+    closeGlobalLibrary();
     closeDb();
     app.quit();
   }
@@ -780,6 +782,7 @@ app.on('before-quit', () => {
   // be abandoned mid-drain and leave the vendor runtimes running as orphans.
   killChatGptSubscriptionServer();
   void stopGitHubCopilotSubscription();
+  closeGlobalLibrary();
   closeDb();
 });
 
@@ -808,5 +811,6 @@ updateAwareApp.on('before-quit-for-update', () => {
   // be abandoned mid-drain and leave the vendor runtimes running as orphans.
   killChatGptSubscriptionServer();
   void stopGitHubCopilotSubscription();
+  closeGlobalLibrary();
   closeDb();
 });

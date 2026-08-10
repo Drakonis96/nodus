@@ -14,6 +14,23 @@ import type { DatabasesApi } from './api/databases';
 import type { TeachingApi } from './api/teaching';
 import type { ToolkitApi } from './api/toolkit';
 import type { TestimoniesApi } from './api/testimonies';
+import type { LibraryApi } from './api/library';
+
+export type {
+  LibraryAttachmentRecord,
+  LibraryCatalogItem,
+  LibraryCatalogPage,
+  LibraryCatalogQuery,
+  LibraryCollectionRecord,
+  LibraryCreator,
+  LibraryItemMetadata,
+  LibraryItemRecord,
+  LibraryItemSource,
+  LibraryItemType,
+  LibraryRebuildResult,
+  LibraryRecordClock,
+  LibraryStatus,
+} from './libraryTypes';
 
 // Testimonios (historia oral). Las REGLAS del dominio — transiciones, normalización de
 // códigos, remapeo de citas, la puerta de acceso — viven en './testimonies' y
@@ -7642,7 +7659,7 @@ export interface TestimonyExportResult {
 // IPC API surface exposed on window.nodus via the preload bridge.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, TeachingApi, DatabasesApi, PrimarySourcesApi, ArchiveApi, WorldbuildingApi, PlatformApi, RecordsApi, AcademicApi {
+export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, TeachingApi, DatabasesApi, PrimarySourcesApi, ArchiveApi, WorldbuildingApi, PlatformApi, RecordsApi, AcademicApi, LibraryApi {
   // settings + secrets
   getSettings(): Promise<AppSettings>;
   updateSettings(patch: Partial<AppSettings>): Promise<AppSettings>;
