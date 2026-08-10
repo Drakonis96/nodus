@@ -172,7 +172,13 @@ La segunda sección permite comprobar el índice, la página de origen y el marc
   await originalPreview.getByRole('button', { name: 'Cerrar' }).click();
 
   const readerSidebar = page.getByTestId('library-reader-sidebar');
-  await readerSidebar.getByRole('tab', { name: 'Metadatos' }).click();
+  const notesTab = readerSidebar.getByRole('tab', { name: 'Notas' });
+  const infoTab = readerSidebar.getByRole('tab', { name: 'Info' });
+  assert.equal((await notesTab.innerText()).trim(), 'Notas', 'the active sidebar tab shows its label');
+  assert.equal((await infoTab.innerText()).trim(), '', 'inactive sidebar tabs stay icon-only');
+  await infoTab.click();
+  assert.equal((await infoTab.innerText()).trim(), 'Info', 'the selected information tab reveals its compact label');
+  assert.equal((await notesTab.innerText()).trim(), '', 'the previous tab collapses back to its icon');
   assert.match(await page.getByTestId('library-reader-metadata').innerText(), new RegExp(work.zotero_key));
   await readerSidebar.getByRole('tab', { name: 'Chat' }).click();
   const chatInput = page.getByTestId('library-reader-chat-input');

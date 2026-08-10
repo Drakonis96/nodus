@@ -62,6 +62,7 @@ const LIBRARY_MANAGEMENT_EN: Record<string, string> = {
   'Añade archivos o importa una biblioteca de Zotero.': 'Add files or import a Zotero library.',
   '{start}–{end} de {total}': '{start}–{end} of {total}',
   'Detalles': 'Details',
+  'Info': 'Info',
   'Sin autoría': 'No authorship',
   'DOI': 'DOI',
   'ISBN': 'ISBN',

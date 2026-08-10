@@ -554,10 +554,22 @@ export function LibraryDocumentReader({
               <h2 className="text-xs font-semibold text-neutral-200">{t('Documento')}</h2>
               <button className="rounded-lg p-1.5 text-neutral-600 hover:bg-neutral-900 hover:text-neutral-300" onClick={() => setNotesOpen(false)} aria-label={t('Cerrar')}><Icon name="chevronRight" size={14} /></button>
             </div>
-            <div className="grid grid-cols-3 gap-1 border-b border-neutral-800 p-2" role="tablist">
+            <div className="flex items-center gap-1 border-b border-neutral-800 p-2" role="tablist">
               {([
-                ['annotations', 'notebook', t('Notas')], ['metadata', 'info', t('Metadatos')], ['chat', 'chat', t('Chat')],
-              ] as const).map(([id, icon, label]) => <button key={id} role="tab" aria-selected={sidebarTab === id} className={`btn h-8 min-w-0 px-2 text-[10px] ${sidebarTab === id ? 'btn-secondary' : 'btn-ghost'}`} onClick={() => setSidebarTab(id)}><Icon name={icon} size={12} /><span className="truncate">{label}</span></button>)}
+                ['annotations', 'notebook', t('Notas')], ['metadata', 'info', t('Info')], ['chat', 'chat', t('Chat')],
+              ] as const).map(([id, icon, label]) => {
+                const selected = sidebarTab === id;
+                return <button
+                  key={id}
+                  role="tab"
+                  aria-selected={selected}
+                  aria-label={label}
+                  title={label}
+                  data-testid={`library-reader-sidebar-tab-${id}`}
+                  className={`btn h-8 min-w-0 text-[10px] transition-[width,padding] ${selected ? 'btn-secondary flex-1 px-3' : 'btn-ghost w-8 shrink-0 p-0'}`}
+                  onClick={() => setSidebarTab(id)}
+                ><Icon name={icon} size={12} />{selected && <span className="truncate">{label}</span>}</button>;
+              })}
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto p-4">
               {sidebarTab === 'annotations' && <div className="space-y-2">

@@ -49,6 +49,9 @@ test('the global reader exposes annotations, metadata, chat and a temporary orig
   assert.match(reader, /data-testid="library-reader-open-chat"/);
   assert.match(reader, /aria-haspopup="menu"/);
   assert.match(reader, /role="menuitem"/);
+  assert.match(reader, /library-reader-sidebar-tab-/);
+  assert.match(reader, /selected && <span/);
+  assert.match(reader, /t\('Info'\)/);
   assert.match(reader, /OriginalPagePreview/);
   assert.match(reader, /ReaderSelectionActions/);
   assert.match(reader, /libraryReaderChatStream/);
