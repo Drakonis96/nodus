@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Jorge Pérez Burgueño and Nodus contributors
+// SPDX-License-Identifier: AGPL-3.0-only
+
 import { useEffect, useRef, useState } from 'react';
 import type {
   AppSettings,
@@ -75,7 +78,8 @@ const ABOUT_CARD_CLASS = 'rounded-xl border border-neutral-200 bg-neutral-50 p-5
 const NODUS_REPOSITORY_URL = 'https://github.com/Drakonis96/nodus';
 const NODUS_SERVER_GUIDE_URL = `${NODUS_REPOSITORY_URL}/blob/main/server/README.md`;
 const NODUS_PRIVACY_URL = `${NODUS_REPOSITORY_URL}/blob/main/PRIVACY.md`;
-const NODUS_LICENSE_URL = `${NODUS_REPOSITORY_URL}/blob/main/LICENSE`;
+const NODUS_VERSION_SOURCE_URL = `${NODUS_REPOSITORY_URL}/tree/v${__APP_VERSION__}`;
+const NODUS_LICENSE_URL = `${NODUS_REPOSITORY_URL}/blob/v${__APP_VERSION__}/LICENSE`;
 const NODUS_SECURITY_REPORT_URL = `${NODUS_REPOSITORY_URL}/security/advisories/new`;
 
 function normalizeSettingsText(value: string): string {
@@ -1362,8 +1366,9 @@ export function Settings({
               <div className="max-w-3xl">
                 <h3 className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{t('Licencias y atribuciones')}</h3>
                 <p className="mt-1 text-xs leading-5 text-neutral-600 dark:text-neutral-400">
-                  {t('Nodus se publica con licencia MIT. Las licencias, atribuciones y textos exigidos por cada componente, modelo, voz o conjunto de datos de terceros se incluyen con cada versión.')}
+                  {t('Nodus se publica exclusivamente con GNU AGPL v3. El código fuente exacto de esta versión y las licencias, atribuciones y textos exigidos por cada componente de terceros se incluyen con cada versión.')}
                 </p>
+                <p className="mt-2 text-xs text-neutral-500">Copyright (C) 2026 Jorge Pérez Burgueño and Nodus contributors</p>
               </div>
             </div>
             <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
@@ -1379,7 +1384,14 @@ export function Settings({
                 className={ABOUT_ACTION_BUTTON_CLASS}
                 onClick={() => void window.nodus.openExternal(NODUS_LICENSE_URL)}
               >
-                <Icon name="external" /> {t('Licencia MIT')}
+                <Icon name="external" /> {t('Licencia AGPL-3.0')}
+              </button>
+              <button
+                data-testid="source-code"
+                className={ABOUT_ACTION_BUTTON_CLASS}
+                onClick={() => void window.nodus.openExternal(NODUS_VERSION_SOURCE_URL)}
+              >
+                <Icon name="code" /> {t('Código fuente de esta versión')}
               </button>
             </div>
           </div>
@@ -1418,7 +1430,7 @@ export function Settings({
                   {t('El código, el historial y los documentos legales son públicos y auditables. Las vulnerabilidades pueden comunicarse de forma privada mediante GitHub Security Advisories.')}
                 </p>
                 <p className="mt-2 text-xs leading-5 text-neutral-500">
-                  {t('La exclusión de garantías de la licencia MIT se aplica solo en la medida permitida por la ley y no elimina obligaciones legales imperativas.')}
+                  {t('La exclusión de garantías de GNU AGPL v3 se aplica solo en la medida permitida por la ley y no elimina obligaciones legales imperativas.')}
                 </p>
               </div>
             </div>

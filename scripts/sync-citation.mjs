@@ -20,6 +20,7 @@ function readQuotedScalar(key) {
 }
 
 const citationVersion = readQuotedScalar('version');
+const citationLicense = readQuotedScalar('license');
 const releaseDate = readQuotedScalar('date-released');
 const tagVersion = process.env.GITHUB_REF_NAME?.match(/^v(.+)$/)?.[1];
 
@@ -28,6 +29,9 @@ if (checkOnly) {
 
   if (citationVersion !== packageJson.version) {
     errors.push(`CITATION.cff is ${citationVersion}, but package.json is ${packageJson.version}.`);
+  }
+  if (citationLicense !== packageJson.license) {
+    errors.push(`CITATION.cff license is ${citationLicense}, but package.json is ${packageJson.license}.`);
   }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(releaseDate)) {
     errors.push(`CITATION.cff has an invalid date-released value: ${releaseDate}.`);

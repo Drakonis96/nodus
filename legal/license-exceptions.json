@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "projectLicense": "AGPL-3.0-only",
+  "projectCopyright": "Copyright (C) 2026 Jorge Pérez Burgueño and Nodus contributors",
+  "historicalReleaseBoundary": {
+    "throughVersion": "3.2.7",
+    "license": "MIT",
+    "reason": "Published release history remains under the terms shipped with each release."
+  },
+  "entries": [
+    {
+      "paths": ["legal/generated/**", "legal/templates/**"],
+      "classification": "third-party-license-text",
+      "license": "See each file and THIRD_PARTY_NOTICES.md"
+    },
+    {
+      "paths": ["node_modules/**", "release/**", "dist/**", "dist-electron/**", "dist-zotero/**"],
+      "classification": "generated-or-third-party",
+      "license": "Not relicensed; see package metadata and generated notices"
+    },
+    {
+      "paths": ["scripts/fixtures/**", "output/**"],
+      "classification": "test-fixture-or-local-output",
+      "license": "Not part of the distributed Nodus program unless an individual notice says otherwise"
+    },
+    {
+      "paths": ["build/icon.*", "site/assets/**", "zotero-plugin/icons/**"],
+      "classification": "artwork-or-binary-asset",
+      "license": "See repository history and THIRD_PARTY_NOTICES.md; trademark rights are not granted by AGPL"
+    },
+    {
+      "paths": ["zotero-plugin/content/icons.js"],
+      "classification": "third-party-derived-icon-paths",
+      "license": "MIT portions preserved in the file notice; Nodus glue remains AGPL-3.0-only"
+    }
+  ]
+}

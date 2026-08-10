@@ -1,9 +1,9 @@
 {
   "name": "nodus",
-  "version": "3.2.7",
+  "version": "4.0.0",
   "description": "Local-first desktop app that turns a Zotero library into a navigable graph of ideas and authors.",
   "author": "Nodus",
-  "license": "MIT",
+  "license": "AGPL-3.0-only",
   "private": true,
   "main": "dist-electron/main.js",
   "type": "module",
@@ -13,6 +13,7 @@
     "test": "node --test scripts/test-*.mjs",
     "citation:sync": "node scripts/sync-citation.mjs",
     "citation:check": "node scripts/sync-citation.mjs --check",
+    "release:verify-source": "node scripts/verify-source-offer.mjs",
     "version": "npm run citation:sync && git add CITATION.cff",
     "test:e2e": "node scripts/e2e-smoke.mjs",
     "test:e2e:saved-authors": "node scripts/e2e-saved-authors.mjs",
@@ -155,6 +156,10 @@
       {
         "from": "LICENSE",
         "to": "legal/NODUS_LICENSE.txt"
+      },
+      {
+        "from": "SOURCE_CODE.md",
+        "to": "legal/SOURCE_CODE.md"
       },
       {
         "from": "THIRD_PARTY_NOTICES.md",

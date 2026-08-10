@@ -68,7 +68,7 @@ processing.
 ## Release audit
 
 - Run `npm run privacy:verify` and `npm run licenses:verify`.
-- Confirm `PRIVACY.md`, `THIRD_PARTY_NOTICES.md`, the Nodus MIT licence and all
+- Confirm `PRIVACY.md`, `THIRD_PARTY_NOTICES.md`, the Nodus AGPL licence, the Corresponding Source offer and all
   generated third-party notices are present in the installer.
 - Review this checklist whenever processing, providers, defaults or applicable law
   changes.

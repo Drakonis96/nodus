@@ -1,5 +1,11 @@
 # Nodus Server
 
+Nodus Server 4 is licensed under `AGPL-3.0-only`. Its web footer and `/healthz`
+response offer the exact Corresponding Source. Official builds point to their
+immutable version tag. If you deploy modified code, set `NODUS_SOURCE_URL` to a
+stable public URL containing the complete source for those modifications. See
+[`SOURCE_CODE.md`](SOURCE_CODE.md).
+
 > **Experimental and unstable.** This version is intended for testing only.
 > Keep backups, don't use it as your only access to
 > important materials and expect incompatible changes before the stable version.
@@ -71,6 +77,7 @@ able to set or restore a particular test. Define these variables in the Stack:
 - `NODUS_DOMAIN`: domain without `https://`, for example `nodus.example.com`.
 - `NODUS_ADMIN_EMAIL`: email address for the administrator account.
 - `NODUS_ADMIN_PASSWORD`: unique and long password, of at least 12 characters.
+- `NODUS_SOURCE_URL`: required for modified deployments; URL of the exact Corresponding Source.
 
 These two variables must be defined together. In the first boot they create the account; in later
 deployments they update the mail or rotate the password if you change their values. The password is

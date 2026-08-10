@@ -95,6 +95,7 @@ const RELEASE_3_2_4_TR: string[] = [
 ];
 
 export const RELEASE_NOTES_TR: Record<string, string[]> = {
+  "4.0.0": ["Nodus 4 yalnızca AGPL-3.0 kapsamında yayımlanır. Nodus Hakkında bölümü bu sürümün lisansını ve tam kaynak kodunu gösterir, Nodus Server da ağ üzerinden kullanan herkese aynı bağlantıyı sunar."],
   "3.2.7": RELEASE_3_2_7_TR,
   "3.2.6": RELEASE_3_2_6_TR,
   "3.2.5": RELEASE_3_2_5_TR,

@@ -704,6 +704,42 @@ try {
   console.log('[e2e] image provider settings rendered');
   await page.getByRole('button', { name: 'Acerca de Nodus', exact: true }).click();
   await page.getByTestId('about-privacy').waitFor();
+  const sourceCodeButton = page.getByTestId('source-code');
+  await sourceCodeButton.waitFor();
+  assert.match(await page.getByTestId('about-third-party-licenses').innerText(), /GNU AGPL v3/);
+  assert.match(await sourceCodeButton.innerText(), /Código fuente de esta versión/);
+  const originalAboutWindow = await app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows()[0];
+    return win ? { bounds: win.getBounds(), minimumSize: win.getMinimumSize() } : null;
+  });
+  const originalRootClasses = await page.evaluate(() => document.documentElement.className);
+  for (const theme of ['dark', 'light']) {
+    await page.evaluate((selectedTheme) => {
+      document.documentElement.classList.toggle('dark', selectedTheme === 'dark');
+      document.documentElement.classList.toggle('light', selectedTheme === 'light');
+    }, theme);
+    for (const viewport of [{ name: 'wide', width: 1540, height: 940 }, { name: 'narrow', width: 760, height: 900 }]) {
+      await app.evaluate(({ BrowserWindow }, size) => {
+        const win = BrowserWindow.getAllWindows()[0];
+        if (!win) return;
+        win.setMinimumSize(640, 480);
+        win.setBounds({ width: size.width, height: size.height });
+      }, viewport);
+      await page.waitForTimeout(250);
+      await sourceCodeButton.scrollIntoViewIfNeeded();
+      await page.screenshot({ path: path.join(os.tmpdir(), `nodus-about-license-${theme}-${viewport.name}.png`), fullPage: true });
+      const box = await sourceCodeButton.boundingBox();
+      assert.ok(box && box.width >= 180 && box.height >= 32, `source offer remains usable in ${theme} ${viewport.name}`);
+    }
+  }
+  await app.evaluate(({ BrowserWindow }, original) => {
+    const win = BrowserWindow.getAllWindows()[0];
+    if (!win || !original) return;
+    win.setMinimumSize(original.minimumSize[0], original.minimumSize[1]);
+    win.setBounds(original.bounds);
+  }, originalAboutWindow);
+  await page.evaluate((className) => { document.documentElement.className = className; }, originalRootClasses);
+  await page.waitForTimeout(250);
   assert.equal(await page.getByTestId('about-updates').count(), 0, 'Updates moved out of About Nodus into its own section');
   // The privacy card opens a localized in-app modal instead of launching an external markdown file.
   await page.getByTestId('open-privacy-policy').click();

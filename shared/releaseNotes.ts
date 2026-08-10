@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Jorge Pérez Burgueño and Nodus contributors
+// SPDX-License-Identifier: AGPL-3.0-only
+
 // Human-facing "what's new" notes shown once after the app updates to a new
 // version. Newest first. Each highlight covers every supported UI language so
 // the modal follows the interface. Keep these short and user-facing — they are
@@ -1077,7 +1080,24 @@ const RELEASE_3_2_4_HIGHLIGHTS: RawReleaseHighlight[] = [
   },
 ];
 
+const RELEASE_4_0_0_HIGHLIGHTS: RawReleaseHighlight[] = [
+  {
+    scope: 'general',
+    es: 'Nodus 4 se publica bajo AGPL-3.0 exclusivamente. Acerca de Nodus muestra la licencia y el código fuente exacto de la versión, y Nodus Server ofrece el mismo enlace a toda persona que lo usa por red.',
+    en: 'Nodus 4 is released exclusively under AGPL-3.0. About Nodus shows the license and exact source code for this version, and Nodus Server offers the same link to everyone who uses it over a network.',
+    fr: 'Nodus 4 est publié exclusivement sous AGPL-3.0. À propos de Nodus affiche la licence et le code source exact de cette version, et Nodus Server propose le même lien à toute personne qui l’utilise par le réseau.',
+    de: 'Nodus 4 wird ausschließlich unter AGPL-3.0 veröffentlicht. Über Nodus zeigt die Lizenz und den genauen Quellcode dieser Version, und Nodus Server bietet denselben Link allen an, die ihn über ein Netzwerk nutzen.',
+    pt: 'O Nodus 4 é publicado exclusivamente sob AGPL-3.0. Acerca do Nodus mostra a licença e o código-fonte exato desta versão, e o Nodus Server oferece a mesma ligação a todas as pessoas que o usam pela rede.',
+    'pt-BR': 'O Nodus 4 é publicado exclusivamente sob AGPL-3.0. Sobre o Nodus mostra a licença e o código-fonte exato desta versão, e o Nodus Server oferece o mesmo link a todas as pessoas que o usam pela rede.',
+  },
+];
+
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
+  {
+    version: '4.0.0',
+    date: '2026-08-10',
+    highlights: RELEASE_4_0_0_HIGHLIGHTS,
+  },
   {
     version: '3.2.7',
     date: '2026-08-10',

@@ -16,6 +16,14 @@ const buildManifest = json('legal/generated/LEGAL_MANIFEST.json');
 
 assert.equal(buildManifest.schemaVersion, 1);
 assert.equal(buildManifest.nodusVersion, packageJson.version);
+assert.equal(packageJson.license, 'AGPL-3.0-only');
+assert.equal(
+  sha256(fs.readFileSync(path.join(root, 'LICENSE'))),
+  '0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0',
+  'the Nodus license text must be the unmodified GNU AGPL v3 text',
+);
+assert.equal(text('server/LICENSE'), text('LICENSE'), 'server distribution has a stale project license');
+assert.equal(text('server/SOURCE_CODE.md'), text('SOURCE_CODE.md'), 'server distribution has a stale source offer');
 assert.ok(buildManifest.packageInventory.packages > 500, 'production package inventory is unexpectedly small');
 
 for (const expected of sourceManifest.files) {
@@ -53,6 +61,7 @@ for (const electronFile of ['ELECTRON_LICENSE.txt', 'ELECTRON_CHROMIUM_LICENSES.
 
 const configuredResources = packageJson.build.extraResources.map((entry) => `${entry.from}:${entry.to}`);
 assert.ok(configuredResources.includes('LICENSE:legal/NODUS_LICENSE.txt'));
+assert.ok(configuredResources.includes('SOURCE_CODE.md:legal/SOURCE_CODE.md'));
 assert.ok(configuredResources.includes('THIRD_PARTY_NOTICES.md:legal/THIRD_PARTY_NOTICES.md'));
 assert.ok(configuredResources.includes('legal:legal'));
 

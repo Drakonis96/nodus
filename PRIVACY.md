@@ -258,7 +258,7 @@ process and not to use Nodus for unlawful or incompatible purposes. The controll
 his or her own obligations of information, legality, minimization, contracts, security, rights care
 and impact assessment.
 
-The MIT license delivers the software "as is", without technical warranty, to the maximum extent
+The GNU Affero General Public License v3.0 only delivers the software "as is", without technical warranty, to the maximum extent
 permitted by law. **This clause does not eliminate mandatory legal obligations, does not
 automatically make the user solely responsible and does not exclude liability that the law does not
 allow to exclude**.

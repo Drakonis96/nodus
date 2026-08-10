@@ -25,15 +25,16 @@ try {
 
   const { RELEASE_NOTES, releaseNotesForMajor, compareVersions } = await import(pathToFileURL(bundlePath).href);
   const currentRelease = RELEASE_NOTES[0];
-  assert.equal(currentRelease?.version, '3.2.7');
+  assert.equal(currentRelease?.version, '4.0.0');
   assert.equal(currentRelease?.date, '2026-08-10');
-  assert.equal(currentRelease?.highlights.length, 4);
+  assert.equal(currentRelease?.highlights.length, 1);
   assert.deepEqual(currentRelease?.highlights.map((highlight) => highlight.scope), [
-    'academic',
-    'academic',
-    'academic',
-    'nodi',
+    'general',
   ]);
+
+  const previousCurrentRelease = RELEASE_NOTES.find((note) => note.version === '3.2.7');
+  assert.equal(previousCurrentRelease?.date, '2026-08-10');
+  assert.equal(previousCurrentRelease?.highlights.length, 4);
 
   // 3.2.6 keeps the eight it shipped with, including its MCP and Nodi improvements.
   // They are published history and stay as they were written.

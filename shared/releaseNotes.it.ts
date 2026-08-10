@@ -155,6 +155,7 @@ const RELEASE_3_2_4_IT: string[] = [
 ];
 
 export const RELEASE_NOTES_IT: Record<string, string[]> = {
+  "4.0.0": ["Nodus 4 è pubblicato esclusivamente con licenza AGPL-3.0. Informazioni su Nodus mostra la licenza e il codice sorgente esatto di questa versione, e Nodus Server offre lo stesso collegamento a chiunque lo utilizzi tramite la rete."],
   "3.2.7": RELEASE_3_2_7_IT,
   "3.2.6": RELEASE_3_2_6_IT,
   "3.2.5": RELEASE_3_2_5_IT,

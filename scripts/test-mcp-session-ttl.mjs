@@ -7,6 +7,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
+import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -82,7 +83,7 @@ try {
     savedReportDraft.generatedAt,
   );
   const { updateSettings } = require(path.join(repoRoot, 'electron/db/settingsRepo.ts'));
-  const port = 4319 + Math.floor(Math.random() * 200);
+  const port = await findFreeLoopbackPort();
   const token = 'ttl-test-token';
   updateSettings({ mcpEnabled: true, mcpPort: port, mcpToken: token });
 
@@ -177,6 +178,19 @@ try {
 } finally {
   if (stopServer) await stopServer().catch(() => {});
   await rm(root, { recursive: true, force: true });
+}
+
+async function findFreeLoopbackPort() {
+  const probe = net.createServer();
+  await new Promise((resolve, reject) => {
+    probe.once('error', reject);
+    probe.listen(0, '127.0.0.1', resolve);
+  });
+  const address = probe.address();
+  const port = typeof address === 'object' && address ? address.port : 0;
+  await new Promise((resolve, reject) => probe.close((error) => error ? reject(error) : resolve()));
+  assert.ok(port > 0, 'the operating system allocated an MCP test port');
+  return port;
 }
 
 function installRuntimeHooks(userDataPath) {

@@ -1,7 +1,7 @@
 # LGPL compliance and replacement instructions
 
 Nodus uses unmodified LGPL libraries while keeping the Nodus application code
-under MIT. The LGPL components are unpacked from Electron's `app.asar`, so they
+under `AGPL-3.0-only`. The LGPL components are unpacked from Electron's `app.asar`, so they
 remain separately replaceable. Nodus permits reverse engineering when needed
 to debug modifications to those libraries. This distribution uses the suitable
 shared-library mechanism described by LGPLv3 section 4(d)(1): the application

@@ -149,6 +149,6 @@ You can also visit the [interactive browser tour](https://drakonis96.github.io/n
 
 ## Open and evolving
 
-Nodus is released under the [MIT License](LICENSE). Its [privacy policy](PRIVACY.md), [third-party notices](THIRD_PARTY_NOTICES.md) and [deployment checklist](legal/RGPD_DEPLOYMENT_CHECKLIST.md) document the privacy and licensing boundaries of each installation. Ideas, bug reports and academic use cases are welcome through [GitHub Issues](https://github.com/Drakonis96/nodus/issues).
+Nodus 4.0.0 and later are released exclusively under [GNU AGPL v3](LICENSE), SPDX `AGPL-3.0-only`. Published versions through 3.2.7 remain under MIT. Every build links to its [Corresponding Source](SOURCE_CODE.md). The [privacy policy](PRIVACY.md), [third-party notices](THIRD_PARTY_NOTICES.md) and [deployment checklist](legal/RGPD_DEPLOYMENT_CHECKLIST.md) document the privacy and licensing boundaries of each installation. Ideas, bug reports and academic use cases are welcome through [GitHub Issues](https://github.com/Drakonis96/nodus/issues).
 
 Before participating, read the [contribution guide](CONTRIBUTING.md) and [Code of Conduct](CODE_OF_CONDUCT.md). Report vulnerabilities privately according to the [security policy](SECURITY.md).

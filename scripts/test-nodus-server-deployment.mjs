@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { withServer } from './lib/nodusServerHarness.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (relative) => fs.readFileSync(path.join(root, relative), 'utf8');
@@ -61,4 +62,22 @@ test('desktop settings include a beginner-friendly server deployment guide', () 
   assert.match(settings, /ChatGPT o Claude/);
   assert.match(translations, /Step-by-step installation guide/);
   assert.match(read('server/README.md'), /My account/);
+});
+
+test('every remote user receives the exact AGPL license and Corresponding Source offer', async () => {
+  const sourceCodeUrl = 'https://code.example.test/nodus/modified-revision-42';
+  await withServer({ label: 'source-offer', env: { NODUS_SOURCE_URL: sourceCodeUrl } }, async ({ origin, dashboard }) => {
+    for (const endpoint of ['/healthz', '/about']) {
+      const response = await fetch(`${origin}${endpoint}`);
+      assert.equal(response.status, 200);
+      const info = await response.json();
+      assert.equal(info.version, '4.0.0');
+      assert.equal(info.license, 'AGPL-3.0-only');
+      assert.equal(info.sourceCodeUrl, sourceCodeUrl);
+    }
+    const html = await dashboard();
+    assert.match(html, /data-testid="source-code"/);
+    assert.ok(html.includes(sourceCodeUrl));
+    assert.match(html, /AGPL-3\.0-only/);
+  });
 });
