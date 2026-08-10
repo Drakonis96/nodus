@@ -46,6 +46,7 @@ export const academicApi: AcademicApi = {
   getLibraryReaderDocument: (nodusId) => ipcRenderer.invoke('libraryReader:get', nodusId),
   openLibraryReaderOriginal: (nodusId) => ipcRenderer.invoke('libraryReader:openOriginal', nodusId),
   listLibraryReaderAnnotations: (nodusId) => ipcRenderer.invoke('libraryReader:annotations:list', nodusId),
+  listLibraryReaderOrphanedAnnotations: (nodusId) => ipcRenderer.invoke('libraryReader:annotations:listOrphaned', nodusId),
   createLibraryReaderAnnotation: (nodusId, input) => ipcRenderer.invoke('libraryReader:annotations:create', nodusId, input),
   updateLibraryReaderComment: (nodusId, id, comment) => ipcRenderer.invoke('libraryReader:annotations:updateComment', nodusId, id, comment),
   deleteLibraryReaderAnnotation: (nodusId, id) => ipcRenderer.invoke('libraryReader:annotations:delete', nodusId, id).then(() => undefined),

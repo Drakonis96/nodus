@@ -236,6 +236,7 @@ export interface AcademicApi {
   getLibraryReaderDocument(nodusId: string): Promise<LibraryReaderDocument | null>;
   openLibraryReaderOriginal(nodusId: string): Promise<boolean>;
   listLibraryReaderAnnotations(nodusId: string): Promise<WritingDraftAnnotation[]>;
+  listLibraryReaderOrphanedAnnotations(nodusId: string): Promise<WritingDraftAnnotation[]>;
   createLibraryReaderAnnotation(nodusId: string, input: WritingDraftAnnotationInput): Promise<WritingDraftAnnotation>;
   updateLibraryReaderComment(nodusId: string, id: string, comment: string): Promise<WritingDraftAnnotation | null>;
   deleteLibraryReaderAnnotation(nodusId: string, id: string): Promise<void>;

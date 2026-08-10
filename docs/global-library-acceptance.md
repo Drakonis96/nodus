@@ -49,12 +49,18 @@ button exists.
 | Extraction | Remote OCR requires an explicitly selected model | Verified | `test-library-extraction`, service contract |
 | Extraction | The queue resumes, cancels, retries, and publishes progress | Verified | `test-library-extraction`, `test-global-library-ui` |
 | Quality | The report measures Unicode, whitespace, hyphens, empty pages, and assets | Verified | `test-library-extraction` |
+| Revisions | Independent bibliographic, extraction, content, embedding, and summary fingerprints drive narrow invalidation | Verified | `test-library-revisions` |
+| Revisions | Organizational changes leave analysis current while content changes stale every content derivative | Verified | `test-library-revisions` |
+| Revisions | Replacement extraction is staged atomically and a failure retains the last readable copy | Verified | `test-library-extraction` |
+| Revisions | Active vault invalidation retains prior results and closed vaults receive durable pending work | Verified | `test-library-revisions`, vault integration suite |
 | Reader | Markdown, images, and tables render | Verified | `e2e-library-reader` |
 | Reader | A temporary page and the complete original open separately | Verified | `test-global-library-reader`, `e2e-library-reader` |
 | Reader | Highlights, comments, and bookmarks persist | Verified | `test-global-library-reader`, `e2e-library-reader` |
 | Reader | Both sidebars can be independently shown and hidden | Verified | `test-global-library-ui`, `e2e-library-reader` |
 | Reader | The bookmark icon exposes marking and return actions | Verified | `test-global-library-ui`, `e2e-library-reader` |
 | Reader | Inactive document tabs are icons and the active tab shows its label | Verified | `test-global-library-ui`, `e2e-library-reader` |
+| Reader | Annotations reanchor to the exact content fingerprint or remain in an orphan inbox | Verified | `test-library-revisions`, `e2e-library-reader` |
+| Reader | The Info tab exposes clean-content and extraction provenance | Verified | `test-global-library-reader`, `e2e-library-reader` |
 | Chat | The shared engine and model receive document context | Verified | `test-global-library-ui`, `test-global-library-reader` |
 | Chat | History persists beside the document and can be cleared | Verified | `test-global-library-reader` |
 | Metadata | Local edits survive future source refreshes | Verified | `test-library-metadata`, `e2e-global-library` |

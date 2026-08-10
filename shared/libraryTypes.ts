@@ -79,6 +79,49 @@ export interface LibraryRecordClock {
   contentHash: string;
 }
 
+export type LibraryAnalysisFreshness = 'none' | 'queued' | 'running' | 'current' | 'stale' | 'failed' | 'unavailable';
+
+export type LibraryAnalysisComponent = 'extraction' | 'light' | 'deep' | 'passages' | 'ideas' | 'embeddings' | 'summary';
+
+export interface LibraryComponentRevision {
+  freshness: LibraryAnalysisFreshness;
+  fingerprint: string | null;
+  reason: string | null;
+  generatedAt: string | null;
+  provider?: string | null;
+  model?: string | null;
+  dimension?: number | null;
+  pipeline?: string | null;
+  promptHash?: string | null;
+}
+
+export interface LibraryPendingInvalidation {
+  vaultId: string;
+  components: LibraryAnalysisComponent[];
+  reason: 'bibliographic-change' | 'content-change' | 'primary-attachment-change' | 'embedding-config-change' | 'summary-config-change';
+  requestedAt: string;
+}
+
+/** Provenance for every derived output visible in the Library or a linked vault. */
+export interface LibraryContentRevision {
+  format: 'nodus.library-content-revision';
+  formatVersion: 1;
+  revision: number;
+  extractionFingerprint: string | null;
+  bibliographicFingerprint: string;
+  contentFingerprint: string | null;
+  embeddingFingerprint: string | null;
+  summaryFingerprint: string | null;
+  components: Record<LibraryAnalysisComponent, LibraryComponentRevision>;
+  previousReadable: {
+    contentFingerprint: string;
+    files: NonNullable<LibraryItemRecord['files']>;
+    supersededAt: string;
+  } | null;
+  pendingInvalidations: LibraryPendingInvalidation[];
+  updatedAt: string;
+}
+
 export interface LibraryItemRecord {
   format: 'nodus.library-item';
   formatVersion: 2;
@@ -105,6 +148,7 @@ export interface LibraryItemRecord {
     qualityReport?: string;
     annotations?: string;
     chat?: string;
+    orphanedAnnotations?: string;
   };
   extraction?: {
     status: 'pending' | 'processing' | 'ready' | 'needs-review' | 'failed' | 'unsupported';
@@ -112,7 +156,10 @@ export interface LibraryItemRecord {
     engine?: string;
     updatedAt?: string;
     error?: string;
+    lastSuccessfulAt?: string;
+    lastSuccessfulFingerprint?: string;
   };
+  contentRevision?: LibraryContentRevision;
   /** Original work IDs discovered in legacy vaults, used for idempotent relinking. */
   vaultWorkIds?: Record<string, string>;
   createdAt: string;

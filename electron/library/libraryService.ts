@@ -48,6 +48,7 @@ import { buildOcrTextPrompt, OCR_USER_PROMPT } from '@shared/aiOcrPrompt';
 import { DEFAULT_OCR_OPTIONS } from '@shared/aiOcrTypes';
 import { LibraryOperations } from './libraryOperations';
 import { resolveLibraryMetadata } from './libraryMetadataResolver';
+import { propagateLibraryInvalidations, settleActiveVaultLibraryInvalidations } from './libraryInvalidation';
 
 let live: {
   root: string;
@@ -125,6 +126,7 @@ function broadcastMigration(progress: LibraryMigrationProgress): void {
 }
 
 function broadcastExtraction(progress: LibraryExtractionProgress): void {
+  if (progress.status === 'done' && live) settleActiveVaultLibraryInvalidations(live.store, live.catalog);
   for (const window of BrowserWindow.getAllWindows()) {
     if (!window.isDestroyed() && !window.webContents.isDestroyed()) window.webContents.send('library:extractionProgress', progress);
   }
@@ -132,6 +134,7 @@ function broadcastExtraction(progress: LibraryExtractionProgress): void {
 
 export function getGlobalLibraryStatus(): LibraryStatus {
   const current = service();
+  if (current) settleActiveVaultLibraryInvalidations(current.store, current.catalog);
   return current ? current.catalog.status(current.root, current.deviceId) : unavailableStatus();
 }
 
@@ -339,7 +342,12 @@ export function importGlobalBibliographyFiles(files: string[], collectionId?: st
 export function updateGlobalLibraryItemMetadata(itemId: string, patch: Partial<LibraryItemMetadata>): LibraryItemRecord {
   const current = service();
   if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
-  const result = current.operations.updateItemMetadata(itemId, patch);
+  let result = current.operations.updateItemMetadata(itemId, patch);
+  const propagated = propagateLibraryInvalidations(result, current.store, current.catalog);
+  if (propagated.clock.revision !== result.clock.revision) {
+    result = propagated;
+    current.catalog.rebuild(current.store);
+  }
   broadcast(current.catalog.status(current.root, current.deviceId));
   return result;
 }

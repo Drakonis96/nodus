@@ -536,6 +536,9 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
   h('libraryReader:annotations:list', async (_e, nodusId: string) =>
     libraryReader.listLibraryReaderAnnotations(nodusId)
   );
+  h('libraryReader:annotations:listOrphaned', async (_e, nodusId: string) =>
+    libraryReader.listLibraryReaderOrphanedAnnotations(nodusId)
+  );
   h('libraryReader:annotations:create', async (_e, nodusId: string, input: WritingDraftAnnotationInput) => {
     const annotation = libraryReader.createLibraryReaderAnnotation(nodusId, { ...input, draftId: nodusId });
     announceLibraryReaderAnnotations(nodusId);

@@ -47,9 +47,15 @@ and from the This-vault toolbar.
     │   ├── source-map.json
     │   ├── quality-report.json
     │   ├── annotations.json
+    │   ├── orphaned-annotations.json
     │   ├── chat.json
     │   ├── attachments/
-    │   └── assets/
+    │   └── .nodus/extractions/
+    │       └── <extraction-fingerprint>/
+    │           ├── reader.md
+    │           ├── source-map.json
+    │           ├── quality-report.json
+    │           └── assets/
     └── .nodus/
         ├── collections/
         ├── records/
@@ -163,6 +169,30 @@ each document, it:
    `quality-report.json` with metrics and warnings;
 8. publishes all derived files atomically and updates the item state.
 
+An extraction is built in a private staging directory and is renamed to an
+immutable fingerprinted directory only after its Markdown, map, report, and
+assets have been flushed successfully. The manifest pointer changes last. A
+failed or canceled replacement therefore leaves the last readable copy intact;
+the reader labels that copy as previous instead of presenting it as current.
+
+### Revisions and invalidation
+
+Each manifest records independent SHA-256 provenance for extraction settings,
+analytical bibliography, published clean content, embedding configuration, and
+summary configuration. Organizational collection, order, and tag changes do
+not affect analysis. Analytical title, abstract, or creator changes stale only
+light analysis and summaries. A primary attachment or clean-content change
+stales deep analysis, passages, ideas, embeddings, and summaries. Changing an
+embedding model affects only embeddings; changing a summary model or prompt
+affects only summaries.
+
+The active writable vault receives these state changes in one transaction while
+retaining the preceding rows and hashes. Closed, unavailable, or read-only
+vaults receive explicit pending invalidations in the canonical manifest, which
+are settled when the vault is next active. A derived result is marked
+`current`, `stale`, `failed`, or another explicit freshness state and retains
+the fingerprint and generation time needed to prove its source revision.
+
 The quality report counts double spaces, decomposed Unicode, soft hyphens,
 broken words, empty pages, blocks, figures, tables, and OCR pages. A doubtful
 result is marked `needs-review`; it is never silently presented as perfect. An
@@ -188,6 +218,12 @@ includes:
 Saved selections include offsets, text, and surrounding context so they can be
 re-anchored. Every annotation retains the document's stable identifier,
 including when the item comes from Zotero.
+
+When clean Markdown changes, Nodus scores the saved quote, prefix, suffix, and
+relative position against the new copy. Recovered annotations receive the new
+content fingerprint. Unrecoverable selections are not deleted: they appear in
+the right sidebar's orphaned-annotation inbox and remain in the dedicated
+recovery sidecar until the user reviews them.
 
 Chat reuses the Nodus AI engine and model settings. It receives the clean
 Markdown, annotations, and a bounded history window. It does not invent pages

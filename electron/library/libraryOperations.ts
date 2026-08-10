@@ -18,6 +18,7 @@ import { LibraryCatalog } from './libraryCatalog';
 import { assertInside, atomicWriteJson, safeLibraryFolderName } from './libraryPaths';
 import { LibraryDiskStore } from './libraryStorage';
 import { importBibliographyFiles } from './libraryBibliographyImport';
+import { bibliographicFingerprint } from './libraryRevision';
 
 function comparable(value: LibraryItemRecord): string {
   const { clock: _clock, createdAt: _createdAt, ...rest } = value;
@@ -309,6 +310,7 @@ export class LibraryOperations {
     const folder = this.store.itemFolder(canonical.storageId);
     const attachments = [...canonical.attachments]; const hashes = new Set(attachments.map((entry) => entry.sha256));
     const files = { ...(canonical.files ?? {}) }; let extraction = canonical.extraction;
+    let adoptedRevision: LibraryItemRecord['contentRevision'] | undefined;
     for (const duplicate of duplicates) {
       const duplicateFolder = this.store.itemFolder(duplicate.storageId);
       for (const attachment of duplicate.attachments) {
@@ -329,6 +331,7 @@ export class LibraryOperations {
         }
         copyDirectoryIfMissing(path.join(duplicateFolder, 'assets'), path.join(folder, 'assets'));
         extraction = duplicate.extraction;
+        adoptedRevision = duplicate.contentRevision;
       }
       const canonicalAnnotations = readJsonArray(path.join(folder, files.annotations ?? 'annotations.json'));
       const duplicateAnnotations = readJsonArray(path.join(duplicateFolder, duplicate.files?.annotations ?? 'annotations.json'));
@@ -348,15 +351,22 @@ export class LibraryOperations {
       issn: [...new Set(all.flatMap((item) => item.id === resolvedCanonicalId || resolvedDuplicateIds.has(item.id) ? item.metadata.issn ?? [] : []))],
       tags: [...new Set(all.flatMap((item) => item.id === resolvedCanonicalId || resolvedDuplicateIds.has(item.id) ? item.metadata.tags ?? [] : []))],
     }, desired.metadata.title);
+    const now = new Date().toISOString();
+    const contentRevision = adoptedRevision ? {
+      ...adoptedRevision,
+      revision: Math.max(adoptedRevision.revision, desired.contentRevision?.revision ?? 0) + 1,
+      bibliographicFingerprint: bibliographicFingerprint({ metadata }),
+      previousReadable: null,
+      updatedAt: now,
+    } : desired.contentRevision;
     desired = this.store.upsertItem({
       ...desired, metadata, collectionIds: [...new Set([canonical, ...duplicates].flatMap((item) => item.collectionIds))],
       aliases: [...new Set([...(desired.aliases ?? []), ...duplicates.flatMap((item) => [item.id, ...item.aliases])])],
       sourceIdentities: [...new Map([desired, ...duplicates].flatMap((item) => item.sourceIdentities)
         .map((identity) => [JSON.stringify(identity), identity])).values()],
       vaultWorkIds: Object.assign({}, ...[...duplicates, desired].map((item) => item.vaultWorkIds ?? {})),
-      attachments, files, extraction,
-    }, desired.clock.revision);
-    const now = new Date().toISOString();
+      attachments, files, extraction, contentRevision,
+    }, desired.clock.revision, now);
     for (const duplicate of duplicates) this.store.upsertItem({ ...duplicate, deletedAt: now }, duplicate.clock.revision);
     this.catalog.rebuild(this.store);
     return desired;

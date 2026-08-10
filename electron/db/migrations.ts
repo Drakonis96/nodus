@@ -10,7 +10,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 127;
+export const SCHEMA_VERSION = 128;
 
 export const migrations: Migration[] = [
   {
@@ -6374,6 +6374,24 @@ export const migrations: Migration[] = [
       DROP TABLE writing_draft_annotations_v126;
       CREATE INDEX idx_writing_draft_annotations_draft
         ON writing_draft_annotations(draft_id, scope, start_offset, created_at);
+    `,
+  },
+  {
+    version: 128,
+    up: /* sql */ `
+      -- Derived library analysis is retained when its source changes, but this
+      -- provenance gate prevents a retained result from being presented as current.
+      CREATE TABLE library_analysis_freshness (
+        work_id       TEXT NOT NULL,
+        component     TEXT NOT NULL CHECK (component IN ('extraction','light','deep','passages','ideas','embeddings','summary')),
+        freshness     TEXT NOT NULL CHECK (freshness IN ('none','queued','running','current','stale','failed','unavailable')),
+        fingerprint   TEXT,
+        reason        TEXT,
+        updated_at    TEXT NOT NULL,
+        PRIMARY KEY (work_id, component)
+      );
+      CREATE INDEX idx_library_analysis_freshness_state
+        ON library_analysis_freshness(freshness, component, work_id);
     `,
   },
 ];

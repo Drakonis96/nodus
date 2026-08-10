@@ -87,17 +87,18 @@ try {
   assert.equal(enqueued.queued, 1);
   await queue.waitForIdle(30_000);
   assert.equal(catalog.getExtractionJob(enqueued.jobIds[0]).status, 'done');
-  const markdown = await readFile(path.join(folder, 'reader.md'), 'utf8');
+  const extractedRecord = store.readMaterializedItem('EXTRACT01');
+  const markdown = await readFile(path.join(folder, extractedRecord.files.reader), 'utf8');
   assert.match(markdown, /^# Entre norma y deseo/m);
   assert.match(markdown, /interdisciplinar evita espacios dobles/);
   assert.doesNotMatch(markdown, /REVISTA DE HISTORIA/, 'repeated page chrome is removed');
   assert.doesNotMatch(markdown, / {2,}/, 'normalizer leaves no accidental double spaces');
   assert.match(markdown, /\| Año \| Mujeres \| Total \|/);
   assert.match(markdown, /!\[Figura 1\. Distribución de resultados\]\(assets\//);
-  const assets = await readdir(path.join(folder, 'assets'));
+  const assets = await readdir(path.join(path.dirname(path.join(folder, extractedRecord.files.reader)), 'assets'));
   assert.ok(assets.some((file) => file.endsWith('.png')));
-  const sourceMap = JSON.parse(await readFile(path.join(folder, 'source-map.json'), 'utf8'));
-  const quality = JSON.parse(await readFile(path.join(folder, 'quality-report.json'), 'utf8'));
+  const sourceMap = JSON.parse(await readFile(path.join(folder, extractedRecord.files.sourceMap), 'utf8'));
+  const quality = JSON.parse(await readFile(path.join(folder, extractedRecord.files.qualityReport), 'utf8'));
   assert.equal(sourceMap.pages.length, 3);
   assert.equal(sourceMap.source.sha256, originalHash);
   assert.equal(sourceMap.reader.sha256, createHash('sha256').update(markdown).digest('hex'));
@@ -109,7 +110,21 @@ try {
   assert.ok(quality.figures >= 1);
   assert.equal(createHash('sha256').update(await readFile(original)).digest('hex'), originalHash, 'extraction never mutates the original');
   assert.ok(['ready', 'needs-review'].includes(store.readMaterializedItem('EXTRACT01').extraction.status));
+  assert.equal(extractedRecord.contentRevision.components.extraction.freshness, 'current');
+  assert.equal(extractedRecord.contentRevision.contentFingerprint, sourceMap.reader.sha256);
+  assert.match(extractedRecord.files.reader, /^\.nodus[/\\]extractions[/\\][a-f0-9]{64}[/\\]reader\.md$/);
   assert.ok(progress.some((value) => value.phase === 'assets'));
+
+  // A failed replacement keeps the published readable revision and its files.
+  await writeFile(original, Buffer.from('not a pdf'));
+  const failedReplacement = queue.enqueue([item.id], { ocrMode: 'off', force: true });
+  await queue.waitForIdle(30_000);
+  assert.equal(catalog.getExtractionJob(failedReplacement.jobIds[0]).status, 'failed');
+  const retained = store.readMaterializedItem('EXTRACT01');
+  assert.equal(retained.files.reader, extractedRecord.files.reader);
+  assert.equal(retained.contentRevision.contentFingerprint, extractedRecord.contentRevision.contentFingerprint);
+  assert.equal(retained.contentRevision.components.extraction.freshness, 'failed');
+  assert.equal(await readFile(path.join(folder, retained.files.reader), 'utf8'), markdown);
 
   // A job left processing by a shutdown is reset to queued and resumed by the next queue.
   queue.dispose();
@@ -130,7 +145,8 @@ try {
   const resumedQueue = new LibraryExtractionQueue({ store, catalog });
   await resumedQueue.waitForIdle(10_000);
   assert.equal(catalog.getExtractionJob('interrupted-job').status, 'done');
-  assert.match(await readFile(path.join(textFolder, 'reader.md'), 'utf8'), /sin espacios dobles/);
+  const resumedItem = store.readMaterializedItem('TEXT01');
+  assert.match(await readFile(path.join(textFolder, resumedItem.files.reader), 'utf8'), /sin espacios dobles/);
 
   // Cancellation is durable and returns a processing item to pending.
   resumedQueue.dispose();

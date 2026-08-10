@@ -20,6 +20,7 @@ import {
   recordContentHash,
   zoteroSourceIdentity,
 } from './libraryRecord';
+import { reconcileLibraryContentRevision } from './libraryRevision';
 
 interface LibraryRootManifest {
   format: 'nodus.library';
@@ -142,6 +143,9 @@ export class LibraryDiskStore {
       ? zoteroSourceIdentity(cleanInput.sourceLibraryId ?? 'users/0', cleanInput.sourceKey)
       : null;
     const sourceIdentities = [...(cleanInput.sourceIdentities ?? current?.sourceIdentities ?? []), ...(inferredIdentity ? [inferredIdentity] : [])];
+    const contentRevision = reconcileLibraryContentRevision(current, cleanInput, now);
+    const extractionWasQueued = contentRevision.components.extraction.freshness === 'queued'
+      && current?.contentRevision?.components.extraction.freshness !== 'queued';
     const base = {
       ...cleanInput,
       format: 'nodus.library-item' as const,
@@ -149,6 +153,10 @@ export class LibraryDiskStore {
       aliases: [...new Set((cleanInput.aliases ?? current?.aliases ?? []).filter((alias) => alias && alias !== cleanInput.id))],
       sourceIdentities: [...new Map(sourceIdentities
         .map((identity) => [librarySourceIdentityKey(identity), identity])).values()],
+      contentRevision,
+      extraction: extractionWasQueued
+        ? { ...(cleanInput.extraction ?? { status: 'pending' as const }), status: 'pending' as const, progress: 0, error: undefined, updatedAt: now }
+        : cleanInput.extraction,
       createdAt: cleanInput.createdAt ?? current?.createdAt ?? now,
       deletedAt: cleanInput.deletedAt ?? null,
     };

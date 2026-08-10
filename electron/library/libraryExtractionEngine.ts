@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -17,6 +17,12 @@ import { ocrPdfPages } from '../extraction/ocr';
 import { csvFileToText, xlsxFileToText } from '../extraction/tabular';
 import { atomicWriteFile, atomicWriteJson, assertInside, safeLibraryFolderName } from './libraryPaths';
 import { LibraryDiskStore } from './libraryStorage';
+import {
+  extractionFingerprint,
+  LIBRARY_EXTRACTION_PIPELINE,
+  publishLibraryContentRevision,
+} from './libraryRevision';
+import { reanchorLibraryAnnotations } from './libraryAnnotationReanchor';
 
 export const DEFAULT_LIBRARY_EXTRACTION_OPTIONS: LibraryExtractionOptions = {
   ocrMode: 'local',
@@ -637,58 +643,120 @@ export async function extractLibraryItem(options: {
   const settings = { ...DEFAULT_LIBRARY_EXTRACTION_OPTIONS, ...(options.extractionOptions ?? {}) };
   const source = originalPath(options.item, store);
   const folder = store.itemFolder(options.item.storageId);
-  abortIfNeeded(signal);
-  onProgress?.({ phase: 'analyze', progress: 0.02, message: `Analizando ${path.basename(source)}…` });
-  const extracted = path.extname(source).toLowerCase() === '.pdf'
-    ? await pdfBlocks(source, folder, settings, onProgress, signal, options.remoteOcr)
-    : { ...(await nonPdfBlocks(source, folder)), ocrPages: 0, blankPages: 0 };
-  abortIfNeeded(signal);
-  const blocks = extracted.blocks.filter((block) => block.markdown.trim());
-  if (!blocks.length) throw new Error('No se pudo recuperar texto ni contenido legible del original.');
-  const rendered: string[] = [];
-  const sourceBlocks: LibrarySourceBlock[] = [];
-  let cursor = 0;
-  for (let index = 0; index < blocks.length; index += 1) {
-    const block = blocks[index];
-    const markdown = normalizeCleanMarkdown(block.markdown).trim();
-    if (!markdown) continue;
-    const chunk = `${markdown}\n\n`;
-    sourceBlocks.push({
-      id: `${safeLibraryFolderName(options.item.storageId).slice(0, 20)}-${sha256Buffer(`${block.kind}\0${index}\0${block.text}`).slice(0, 16)}`,
-      kind: block.kind, markdown: { start: cursor, end: cursor + markdown.length },
-      anchors: block.anchors, textSha256: sha256Buffer(block.text),
+  const extractionRoot = assertInside(folder, path.join(folder, '.nodus', 'extractions'));
+  const staging = assertInside(extractionRoot, path.join(extractionRoot, `.staging-${randomUUID()}`));
+  fs.mkdirSync(staging, { recursive: true });
+  try {
+    abortIfNeeded(signal);
+    onProgress?.({ phase: 'analyze', progress: 0.02, message: `Analizando ${path.basename(source)}…` });
+    const extracted = path.extname(source).toLowerCase() === '.pdf'
+      ? await pdfBlocks(source, staging, settings, onProgress, signal, options.remoteOcr)
+      : { ...(await nonPdfBlocks(source, staging)), ocrPages: 0, blankPages: 0 };
+    abortIfNeeded(signal);
+    const blocks = extracted.blocks.filter((block) => block.markdown.trim());
+    if (!blocks.length) throw new Error('No se pudo recuperar texto ni contenido legible del original.');
+    const rendered: string[] = [];
+    const sourceBlocks: LibrarySourceBlock[] = [];
+    let cursor = 0;
+    for (let index = 0; index < blocks.length; index += 1) {
+      const block = blocks[index];
+      const markdown = normalizeCleanMarkdown(block.markdown).trim();
+      if (!markdown) continue;
+      const chunk = `${markdown}\n\n`;
+      sourceBlocks.push({
+        id: `${safeLibraryFolderName(options.item.storageId).slice(0, 20)}-${sha256Buffer(`${block.kind}\0${index}\0${block.text}`).slice(0, 16)}`,
+        kind: block.kind, markdown: { start: cursor, end: cursor + markdown.length },
+        anchors: block.anchors, textSha256: sha256Buffer(block.text),
+      });
+      rendered.push(chunk);
+      cursor += chunk.length;
+    }
+    const markdown = normalizeCleanMarkdown(rendered.join(''));
+    const quality = qualityReport(markdown, blocks, extracted.ocrPages, extracted.blankPages);
+    const readableBefore = store.readMaterializedItem(options.item.storageId) ?? options.item;
+    if (quality.status === 'failed' && readableBefore.files?.reader) {
+      throw new Error(quality.warnings.join(' ') || 'La extracción no produjo una copia legible.');
+    }
+    const sourceSha256 = sha256File(source);
+    const cleanContentFingerprint = sha256Buffer(markdown);
+    const cleanExtractionFingerprint = extractionFingerprint({ sourceSha256, options: settings });
+    const versionFolder = assertInside(extractionRoot, path.join(extractionRoot, cleanExtractionFingerprint));
+    const readerFile = path.join(staging, 'reader.md');
+    const mapFile = path.join(staging, 'source-map.json');
+    const reportFile = path.join(staging, 'quality-report.json');
+    onProgress?.({ phase: 'write', progress: 0.96, message: 'Guardando Markdown y trazabilidad…' });
+    atomicWriteFile(readerFile, markdown);
+    const sourceMap: LibrarySourceMap = {
+      version: 1,
+      source: { file: path.relative(folder, source), sha256: sourceSha256 },
+      reader: { file: 'reader.md', sha256: cleanContentFingerprint },
+      pages: extracted.pages,
+      blocks: sourceBlocks,
+    };
+    atomicWriteJson(mapFile, sourceMap);
+    atomicWriteJson(reportFile, quality);
+    abortIfNeeded(signal);
+    if (fs.existsSync(versionFolder)) fs.rmSync(staging, { recursive: true, force: true });
+    else fs.renameSync(staging, versionFolder);
+    const relativeVersion = path.relative(folder, versionFolder).split(path.sep).join('/');
+    const now = new Date().toISOString();
+    const current = store.readMaterializedItem(options.item.storageId) ?? options.item;
+    const files = {
+      ...(current.files ?? {}),
+      reader: path.join(relativeVersion, 'reader.md'),
+      sourceMap: path.join(relativeVersion, 'source-map.json'),
+      qualityReport: path.join(relativeVersion, 'quality-report.json'),
+      annotations: current.files?.annotations ?? 'annotations.json',
+      orphanedAnnotations: current.files?.orphanedAnnotations ?? 'orphaned-annotations.json',
+    };
+    let contentRevision = publishLibraryContentRevision({
+      item: current,
+      extractionFingerprint: cleanExtractionFingerprint,
+      contentFingerprint: cleanContentFingerprint,
+      files,
+      now,
     });
-    rendered.push(chunk);
-    cursor += chunk.length;
+    if (quality.status === 'failed') contentRevision = {
+      ...contentRevision,
+      components: {
+        ...contentRevision.components,
+        extraction: {
+          ...contentRevision.components.extraction,
+          freshness: 'failed',
+          reason: quality.warnings.join(' ') || 'The extraction did not produce a complete readable copy.',
+        },
+      },
+    };
+    const annotationsFile = assertInside(folder, path.join(folder, files.annotations));
+    const orphanedFile = assertInside(folder, path.join(folder, files.orphanedAnnotations));
+    const priorReader = current.files?.reader
+      ? assertInside(folder, path.join(folder, current.files.reader))
+      : null;
+    if (fs.existsSync(annotationsFile)) reanchorLibraryAnnotations({
+      annotationsFile,
+      orphanedFile,
+      oldText: priorReader && fs.existsSync(priorReader) ? fs.readFileSync(priorReader, 'utf8') : '',
+      newText: markdown,
+      contentFingerprint: cleanContentFingerprint,
+      now,
+    });
+    const item = store.upsertItem({
+      ...current,
+      files,
+      contentRevision,
+      extraction: {
+        status: quality.status === 'passed' ? 'ready' : quality.status === 'needs-review' ? 'needs-review' : 'failed',
+        progress: 1,
+        engine: `${LIBRARY_EXTRACTION_PIPELINE} (${settings.ocrMode})`,
+        updatedAt: now,
+        ...(quality.status === 'failed' ? { error: quality.warnings.join(' ') } : {
+          lastSuccessfulAt: now,
+          lastSuccessfulFingerprint: cleanExtractionFingerprint,
+        }),
+      },
+    }, current.clock.revision, now);
+    return { item, quality, sourceMap };
+  } finally {
+    if (fs.existsSync(staging)) fs.rmSync(staging, { recursive: true, force: true });
   }
-  const markdown = normalizeCleanMarkdown(rendered.join(''));
-  const quality = qualityReport(markdown, blocks, extracted.ocrPages, extracted.blankPages);
-  const readerFile = path.join(folder, 'reader.md');
-  const mapFile = path.join(folder, 'source-map.json');
-  const reportFile = path.join(folder, 'quality-report.json');
-  onProgress?.({ phase: 'write', progress: 0.96, message: 'Guardando Markdown y trazabilidad…' });
-  atomicWriteFile(readerFile, markdown);
-  const sourceMap: LibrarySourceMap = {
-    version: 1,
-    source: { file: path.relative(folder, source), sha256: sha256File(source) },
-    reader: { file: 'reader.md', sha256: sha256Buffer(markdown) },
-    pages: extracted.pages,
-    blocks: sourceBlocks,
-  };
-  atomicWriteJson(mapFile, sourceMap);
-  atomicWriteJson(reportFile, quality);
-  const current = store.readMaterializedItem(options.item.storageId) ?? options.item;
-  const item = store.upsertItem({
-    ...current,
-    files: {
-      ...(current.files ?? {}), reader: 'reader.md', sourceMap: 'source-map.json',
-      qualityReport: 'quality-report.json', annotations: current.files?.annotations ?? 'annotations.json',
-    },
-    extraction: {
-      status: quality.status === 'passed' ? 'ready' : quality.status === 'needs-review' ? 'needs-review' : 'failed',
-      progress: 1, engine: `nodus-clean-markdown/1 (${settings.ocrMode})`, updatedAt: new Date().toISOString(),
-      ...(quality.status === 'failed' ? { error: quality.warnings.join(' ') } : {}),
-    },
-  }, current.clock.revision);
-  return { item, quality, sourceMap };
 }

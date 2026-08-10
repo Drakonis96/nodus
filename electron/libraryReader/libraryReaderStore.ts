@@ -10,7 +10,7 @@ import type {
   WritingDraftAnnotationInput,
   WorkView,
 } from '@shared/types';
-import type { LibraryItemRecord } from '@shared/libraryTypes';
+import type { LibraryContentRevision, LibraryItemRecord } from '@shared/libraryTypes';
 import { getWork } from '../db/worksRepo';
 import { atomicWriteJson, configuredLibraryRootOrThrow, safeLibraryFolderName } from '../library/libraryPaths';
 import { legacyMetadataToRecord, normalizeLibraryItemRecord } from '../library/libraryRecord';
@@ -22,7 +22,9 @@ interface ReaderMetadata {
   authors?: string[];
   year?: number | null;
   zotero?: { itemKey?: string; attachmentKey?: string };
-  files?: { reader?: string; original?: string; sourceMap?: string; annotations?: string; chat?: string };
+  files?: { reader?: string; original?: string; sourceMap?: string; annotations?: string; chat?: string; orphanedAnnotations?: string };
+  contentRevision?: LibraryContentRevision;
+  extraction?: LibraryItemRecord['extraction'];
 }
 
 interface SourceMapBlock {
@@ -34,6 +36,7 @@ interface SourceMapBlock {
 interface ReaderSourceMap {
   pages?: Array<{ page?: number; width?: number; height?: number }>;
   blocks?: SourceMapBlock[];
+  reader?: { sha256?: string };
 }
 
 interface ReaderIdentity {
@@ -65,6 +68,9 @@ interface DiskAnnotation {
   comment: string | null;
   createdAt: string;
   updatedAt: string;
+  anchorStatus?: 'current' | 'orphaned';
+  contentFingerprint?: string | null;
+  orphanReason?: string | null;
 }
 
 const COLORS = new Set<WritingDraftAnnotationColor>(['yellow', 'rose', 'blue', 'mint', 'lavender', 'peach']);
@@ -114,6 +120,8 @@ function recordReaderMetadata(record: LibraryItemRecord): ReaderMetadata {
     year: identity.year,
     zotero: identity.zoteroKey ? { itemKey: identity.zoteroKey } : undefined,
     files: record.files,
+    contentRevision: record.contentRevision,
+    extraction: record.extraction,
   };
 }
 
@@ -265,13 +273,13 @@ function mimeForAsset(filePath: string): string | null {
 
 /** Markdown assets never become arbitrary file:// access in the renderer. Only
  * images below this document folder are converted to an inert data URL. */
-function inlineDocumentImages(markdown: string, folder: string): string {
+function inlineDocumentImages(markdown: string, folder: string, markdownFolder: string): string {
   return markdown.replace(/(!\[[^\]]*\]\()([^\s)]+)(\))/g, (whole, before: string, rawTarget: string, after: string) => {
     if (/^[a-z][a-z0-9+.-]*:/i.test(rawTarget) || rawTarget.startsWith('#')) return whole;
     let decoded = rawTarget;
     try { decoded = decodeURIComponent(rawTarget); } catch { /* keep the literal path */ }
-    const target = optionalDocumentFile(folder, decoded, '.missing-reader-asset');
-    if (!target) return whole;
+    const target = path.resolve(markdownFolder, decoded);
+    if (!pathStaysInside(folder, target)) return whole;
     if (!fs.existsSync(target) || !fs.statSync(target).isFile()) return whole;
     const mime = mimeForAsset(target);
     if (!mime) return whole;
@@ -357,6 +365,9 @@ export function getLibraryReaderDocument(documentId: string): LibraryReaderDocum
   const rawMarkdown = fs.readFileSync(markdownPath, 'utf8');
   const sourceMap = sourceMapPath ? readJson<ReaderSourceMap>(sourceMapPath) : null;
   const originalAvailable = !!originalPath && fs.existsSync(originalPath) && fs.statSync(originalPath).isFile();
+  const extractionRevision = metadata.contentRevision?.components.extraction;
+  const freshness = extractionRevision?.freshness ?? (metadata.files?.reader ? 'unavailable' : 'none');
+  const sourceContentFingerprint = metadata.contentRevision?.contentFingerprint ?? sourceMap?.reader?.sha256 ?? null;
   return {
     workId: identity.workId,
     storageId: identity.storageId,
@@ -365,7 +376,7 @@ export function getLibraryReaderDocument(documentId: string): LibraryReaderDocum
     title: metadata.title?.trim() || identity.title,
     authors: Array.isArray(metadata.authors) && metadata.authors.length ? metadata.authors : identity.authors,
     year: typeof metadata.year === 'number' ? metadata.year : identity.year,
-    markdown: inlineDocumentImages(rawMarkdown, folder),
+    markdown: inlineDocumentImages(rawMarkdown, folder, path.dirname(markdownPath)),
     sections: sectionsFromMarkdown(rawMarkdown, sourceMap),
     pageCount: sourceMap?.pages?.length || null,
     wordCount: rawMarkdown.split(/\s+/).filter(Boolean).length,
@@ -374,6 +385,11 @@ export function getLibraryReaderDocument(documentId: string): LibraryReaderDocum
     originalUrl: originalAvailable && originalPath ? `nodus-library://original/${encodeURIComponent(identity.workId)}?v=${encodeURIComponent(path.basename(originalPath))}` : null,
     originalMimeType: originalAvailable && originalPath ? mimeForOriginal(originalPath) : null,
     sourceMapAvailable: sourceMap !== null,
+    contentFingerprint: sourceContentFingerprint,
+    extractionFingerprint: metadata.contentRevision?.extractionFingerprint ?? metadata.extraction?.lastSuccessfulFingerprint ?? null,
+    freshness,
+    generatedAt: extractionRevision?.generatedAt ?? metadata.extraction?.lastSuccessfulAt ?? null,
+    previousReadable: !!metadata.contentRevision?.contentFingerprint && freshness !== 'current',
   };
 }
 
@@ -409,14 +425,17 @@ export function libraryReaderOriginalPath(documentId: string): string | null {
   return target && fs.existsSync(target) && fs.statSync(target).isFile() ? target : null;
 }
 
-function annotationsPath(documentId: string): { filePath: string; documentId: string } | null {
+function annotationsPath(documentId: string): { filePath: string; orphanedFilePath: string; documentId: string; contentFingerprint: string | null } | null {
   const resolved = resolvedDocument(documentId);
   if (!resolved) return null;
   const filePath = optionalDocumentFile(resolved.folder, resolved.metadata.files?.annotations, 'annotations.json');
   if (!filePath) return null;
   return {
     filePath,
+    orphanedFilePath: optionalDocumentFile(resolved.folder, resolved.metadata.files?.orphanedAnnotations, 'orphaned-annotations.json')
+      ?? path.join(resolved.folder, 'orphaned-annotations.json'),
     documentId: resolved.identity.storageId,
+    contentFingerprint: resolved.metadata.contentRevision?.contentFingerprint ?? null,
   };
 }
 
@@ -453,7 +472,17 @@ export function listLibraryReaderAnnotations(workId: string): WritingDraftAnnota
   const target = annotationsPath(workId);
   if (!target) return [];
   return readDiskAnnotations(target.filePath)
+    .filter((annotation) => annotation.anchorStatus !== 'orphaned')
     .sort((a, b) => a.scope.localeCompare(b.scope) || a.startOffset - b.startOffset || a.createdAt.localeCompare(b.createdAt))
+    .map((annotation) => publicAnnotation(workId, annotation));
+}
+
+export function listLibraryReaderOrphanedAnnotations(workId: string): WritingDraftAnnotation[] {
+  const target = annotationsPath(workId);
+  if (!target) return [];
+  return readDiskAnnotations(target.filePath)
+    .filter((annotation) => annotation.anchorStatus === 'orphaned')
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
     .map((annotation) => publicAnnotation(workId, annotation));
 }
 
@@ -489,13 +518,17 @@ export function createLibraryReaderAnnotation(workId: string, input: WritingDraf
   const value = normalizedAnnotationInput(input);
   const now = new Date().toISOString();
   const id = value.kind === 'bookmark' ? `reader-bookmark:${target.documentId}:${value.scope}` : randomUUID();
-  const next: DiskAnnotation = { id, documentId: target.documentId, ...value, createdAt: now, updatedAt: now };
+  const next: DiskAnnotation = {
+    id, documentId: target.documentId, ...value, createdAt: now, updatedAt: now,
+    anchorStatus: 'current', contentFingerprint: target.contentFingerprint, orphanReason: null,
+  };
   const annotations = readDiskAnnotations(target.filePath);
   const existing = annotations.findIndex((annotation) => annotation.id === id);
   if (existing >= 0) next.createdAt = annotations[existing].createdAt;
   if (existing >= 0) annotations[existing] = next;
   else annotations.push(next);
   atomicWriteJson(target.filePath, annotations);
+  atomicWriteJson(target.orphanedFilePath, annotations.filter((annotation) => annotation.anchorStatus === 'orphaned'));
   return publicAnnotation(workId, next);
 }
 
@@ -510,6 +543,7 @@ export function updateLibraryReaderComment(workId: string, id: string, comment: 
   annotation.comment = value;
   annotation.updatedAt = new Date().toISOString();
   atomicWriteJson(target.filePath, annotations);
+  atomicWriteJson(target.orphanedFilePath, annotations.filter((entry) => entry.anchorStatus === 'orphaned'));
   return publicAnnotation(workId, annotation);
 }
 
@@ -520,6 +554,7 @@ export function deleteLibraryReaderAnnotation(workId: string, id: string): boole
   const next = annotations.filter((annotation) => annotation.id !== id);
   if (next.length === annotations.length) return false;
   atomicWriteJson(target.filePath, next);
+  atomicWriteJson(target.orphanedFilePath, next.filter((annotation) => annotation.anchorStatus === 'orphaned'));
   return true;
 }
 

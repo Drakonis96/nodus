@@ -13,6 +13,7 @@ import {
   type LibraryRemoteOcr,
 } from './libraryExtractionEngine';
 import { LibraryDiskStore } from './libraryStorage';
+import { failLibraryExtractionRevision, markLibraryExtractionRevision } from './libraryRevision';
 
 type ExtractFn = typeof extractLibraryItem;
 
@@ -144,10 +145,14 @@ export class LibraryExtractionQueue {
       const item = this.item(job.itemId);
       if (!item) throw new Error('El documento ya no existe en la biblioteca.');
       const current = this.store.readMaterializedItem(item.storageId) ?? item;
-      if (current.extraction?.status !== 'processing') this.store.upsertItem({
-        ...current,
-        extraction: { ...current.extraction, status: 'processing', progress: 0, updatedAt: new Date().toISOString() },
-      }, current.clock.revision);
+      if (current.extraction?.status !== 'processing') {
+        const now = new Date().toISOString();
+        this.store.upsertItem({
+          ...current,
+          contentRevision: markLibraryExtractionRevision(current, 'running', 'A replacement extraction is running.', now),
+          extraction: { ...current.extraction, status: 'processing', progress: 0, error: undefined, updatedAt: now },
+        }, current.clock.revision, now);
+      }
       await this.extract({
         item: this.store.readMaterializedItem(item.storageId) ?? item,
         store: this.store,
@@ -182,10 +187,14 @@ export class LibraryExtractionQueue {
         const item = this.item(job.itemId);
         if (item) {
           const current = this.store.readMaterializedItem(item.storageId) ?? item;
-          if (current.extraction?.status === 'processing') this.store.upsertItem({
-            ...current,
-            extraction: { ...current.extraction, status: 'pending', progress: job.progress, updatedAt: new Date().toISOString() },
-          }, current.clock.revision);
+          if (current.extraction?.status === 'processing') {
+            const now = new Date().toISOString();
+            this.store.upsertItem({
+              ...current,
+              contentRevision: markLibraryExtractionRevision(current, 'queued', 'Replacement extraction was canceled.', now),
+              extraction: { ...current.extraction, status: 'pending', progress: job.progress, error: undefined, updatedAt: now },
+            }, current.clock.revision, now);
+          }
           this.catalog.rebuild(this.store);
         }
       } else {
@@ -197,8 +206,12 @@ export class LibraryExtractionQueue {
           const current = this.store.readMaterializedItem(item.storageId) ?? item;
           this.store.upsertItem({
             ...current,
-            extraction: { status: 'failed', progress: job.progress, updatedAt: job.updatedAt, error: message },
-          }, current.clock.revision);
+            contentRevision: failLibraryExtractionRevision(current, message, job.updatedAt),
+            extraction: {
+              ...current.extraction,
+              status: 'failed', progress: job.progress, updatedAt: job.updatedAt, error: message,
+            },
+          }, current.clock.revision, job.updatedAt);
           this.catalog.rebuild(this.store);
         }
         this.emit(job, message);

@@ -177,6 +177,7 @@ export function LibraryDocumentReader({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [annotations, setAnnotations] = useState<WritingDraftAnnotation[]>([]);
+  const [orphanedAnnotations, setOrphanedAnnotations] = useState<WritingDraftAnnotation[]>([]);
   const [annotationError, setAnnotationError] = useState<string | null>(null);
   const [highlighterColor, setHighlighterColor] = useState<WritingDraftAnnotationColor | null>(null);
   const [hasReaderMark, setHasReaderMark] = useState(false);
@@ -208,7 +209,12 @@ export function LibraryDocumentReader({
 
   const refreshAnnotations = useCallback(async () => {
     try {
-      setAnnotations(await window.nodus.listLibraryReaderAnnotations(reference.id));
+      const [current, orphaned] = await Promise.all([
+        window.nodus.listLibraryReaderAnnotations(reference.id),
+        window.nodus.listLibraryReaderOrphanedAnnotations(reference.id),
+      ]);
+      setAnnotations(current);
+      setOrphanedAnnotations(orphaned);
       setAnnotationError(null);
     } catch (nextError) {
       setAnnotationError(nextError instanceof Error ? nextError.message : String(nextError));
@@ -228,6 +234,14 @@ export function LibraryDocumentReader({
   useEffect(() => {
     if (sidebarTab === 'chat') chatBottomRef.current?.scrollIntoView({ block: 'end' });
   }, [chatMessages, chatStreaming, sidebarTab]);
+  useEffect(() => {
+    const keepOneNarrowSidebar = () => {
+      if (window.innerWidth < 1024 && outlineOpen && notesOpen) setOutlineOpen(false);
+    };
+    keepOneNarrowSidebar();
+    window.addEventListener('resize', keepOneNarrowSidebar);
+    return () => window.removeEventListener('resize', keepOneNarrowSidebar);
+  }, [notesOpen, outlineOpen]);
   useEffect(() => {
     if (!bookmarkMenuOpen) return;
     const dismiss = (event: PointerEvent) => {
@@ -271,6 +285,7 @@ export function LibraryDocumentReader({
   const deleteAnnotation = async (id: string) => {
     await window.nodus.deleteLibraryReaderAnnotation(reference.id, id);
     setAnnotations((current) => current.filter((item) => item.id !== id));
+    setOrphanedAnnotations((current) => current.filter((item) => item.id !== id));
     setAnnotationError(null);
   };
 
@@ -350,6 +365,7 @@ export function LibraryDocumentReader({
   };
 
   const openDocumentChat = () => {
+    if (window.innerWidth < 1024) setOutlineOpen(false);
     setNotesOpen(true);
     setSidebarTab('chat');
   };
@@ -447,7 +463,11 @@ export function LibraryDocumentReader({
         <button
           className={`btn btn-ghost h-9 w-9 shrink-0 p-0 ${outlineOpen ? 'text-indigo-300' : ''}`}
           data-testid="library-reader-outline-toggle"
-          onClick={() => setOutlineOpen((value) => !value)}
+          onClick={() => setOutlineOpen((value) => {
+            const next = !value;
+            if (next && window.innerWidth < 1024) setNotesOpen(false);
+            return next;
+          })}
           aria-controls="library-reader-outline"
           aria-expanded={outlineOpen}
           aria-label={t('Índice')}
@@ -459,7 +479,10 @@ export function LibraryDocumentReader({
             {reader.authors.join(', ')}{reader.year ? ` · ${reader.year}` : ''} · {reader.wordCount.toLocaleString()} {t('palabras')}
           </p>
         </div>
-        <span className="hidden rounded-full border border-emerald-900/70 bg-emerald-950/30 px-2 py-1 text-[10px] font-medium text-emerald-300 md:inline-flex">{t('Markdown limpio')}</span>
+        <span
+          data-testid="library-reader-freshness"
+          className={`hidden rounded-full border px-2 py-1 text-[10px] font-medium md:inline-flex ${reader.freshness === 'current' ? 'border-emerald-900/70 bg-emerald-950/30 text-emerald-300' : 'border-amber-800/70 bg-amber-950/35 text-amber-300'}`}
+        >{reader.freshness === 'current' ? t('Markdown limpio') : t('Última copia legible')}</span>
         <ReaderHighlighterControl value={highlighterColor} onChange={setHighlighterColor} />
         <div ref={bookmarkMenuRef} className="relative">
           <button
@@ -486,7 +509,11 @@ export function LibraryDocumentReader({
         <button
           className={`btn btn-ghost h-9 w-9 shrink-0 p-0 ${notesOpen ? 'text-indigo-300' : ''}`}
           data-testid="library-reader-sidebar-toggle"
-          onClick={() => setNotesOpen((value) => !value)}
+          onClick={() => setNotesOpen((value) => {
+            const next = !value;
+            if (next && window.innerWidth < 1024) setOutlineOpen(false);
+            return next;
+          })}
           aria-controls="library-reader-sidebar"
           aria-expanded={notesOpen}
           aria-label={t('Anotaciones')}
@@ -496,6 +523,9 @@ export function LibraryDocumentReader({
       </header>
 
       {(error || annotationError) && <div className="border-b border-red-900 bg-red-950/30 px-4 py-2 text-xs text-red-200">{error ?? annotationError}</div>}
+      {reader.previousReadable && <div data-testid="library-reader-previous-copy" className="border-b border-amber-800/50 bg-amber-950/25 px-4 py-2 text-xs text-amber-200">
+        {t('La sustitución todavía no está validada. Se muestra la última copia legible y sus resultados no se presentan como actuales.')}
+      </div>}
 
       <div className="relative flex min-h-0 flex-1">
         {outlineOpen && (
@@ -589,13 +619,31 @@ export function LibraryDocumentReader({
                   </article>;
                 })}
                 {!sidebarAnnotations.length && <div className="rounded-xl border border-dashed border-neutral-800 px-4 py-8 text-center text-xs leading-5 text-neutral-600">{t('Selecciona texto para subrayarlo, anotarlo o preguntarle a Nodi.')}</div>}
+                {orphanedAnnotations.length > 0 && <section data-testid="library-reader-orphaned-annotations" className="mt-5 border-t border-amber-800/40 pt-4">
+                  <h3 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-400">{t('Anotaciones sin ancla')}</h3>
+                  <p className="mt-1 text-[10px] leading-4 text-neutral-600">{t('Se conserva la cita original para que puedas revisarla o eliminarla.')}</p>
+                  <div className="mt-3 space-y-2">{orphanedAnnotations.map((annotation) => <article key={annotation.id} className="rounded-xl border border-amber-800/35 bg-amber-950/10 p-3">
+                    <span className="line-clamp-4 block border-l-2 border-amber-700/50 pl-2 text-[11px] italic leading-5 text-neutral-400">“{annotation.selectedText.replace(/\s+/g, ' ').trim()}”</span>
+                    {annotation.comment && <p className="mt-2 text-xs leading-5 text-neutral-300">{annotation.comment}</p>}
+                    <div className="mt-2 flex items-center justify-between gap-2"><span className="text-[9px] leading-4 text-amber-500/80">{annotation.orphanReason ?? t('No se encontró el texto en la revisión actual.')}</span><button className="shrink-0 rounded p-1 text-neutral-600 hover:bg-red-950 hover:text-red-400" aria-label={t('Eliminar')} onClick={() => void deleteAnnotation(annotation.id)}><Icon name="trash" size={12} /></button></div>
+                  </article>)}</div>
+                </section>}
               </div>}
               {sidebarTab === 'metadata' && <div data-testid="library-reader-metadata" className="space-y-5">
-                <div><span className="rounded-full bg-emerald-500/10 px-2 py-1 text-[10px] text-emerald-300">{t('Markdown limpio')}</span><h3 className="mt-3 text-sm font-semibold leading-5">{reader.title}</h3><p className="mt-2 text-xs leading-5 text-neutral-500">{reader.authors.join('; ') || t('Sin autoría')}</p></div>
+                <div><span className={`rounded-full px-2 py-1 text-[10px] ${reader.freshness === 'current' ? 'bg-emerald-500/10 text-emerald-300' : 'bg-amber-500/10 text-amber-300'}`}>{reader.freshness === 'current' ? t('Markdown limpio') : t('Última copia legible')}</span><h3 className="mt-3 text-sm font-semibold leading-5">{reader.title}</h3><p className="mt-2 text-xs leading-5 text-neutral-500">{reader.authors.join('; ') || t('Sin autoría')}</p></div>
                 <dl className="space-y-3 text-xs">{[
                   [t('Año'), reader.year], [t('Identificador'), reader.storageId], [t('Clave Zotero'), reader.zoteroKey],
                   [t('Clave de cita'), reader.citationKey], [t('Original'), reader.originalFileName], [t('Palabras'), reader.wordCount], [t('Páginas'), reader.pageCount],
                 ].filter(([, value]) => value != null && value !== '').map(([label, value]) => <div key={String(label)}><dt className="text-[10px] uppercase tracking-wider text-neutral-600">{label}</dt><dd className="mt-1 break-words text-neutral-300">{String(value)}</dd></div>)}</dl>
+                <section data-testid="library-reader-provenance" className="rounded-xl border border-neutral-800 bg-neutral-950/30 p-3">
+                  <h3 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-neutral-500">{t('Procedencia de esta revisión')}</h3>
+                  <dl className="mt-3 space-y-3 text-[10px]">
+                    <div><dt className="text-neutral-600">{t('Estado')}</dt><dd className="mt-1 text-neutral-300">{reader.freshness}</dd></div>
+                    {reader.generatedAt && <div><dt className="text-neutral-600">{t('Generada')}</dt><dd className="mt-1 text-neutral-300">{new Date(reader.generatedAt).toLocaleString()}</dd></div>}
+                    {reader.contentFingerprint && <div><dt className="text-neutral-600">{t('Huella del contenido')}</dt><dd className="mt-1 break-all font-mono text-neutral-400">sha256:{reader.contentFingerprint}</dd></div>}
+                    {reader.extractionFingerprint && <div><dt className="text-neutral-600">{t('Huella de extracción')}</dt><dd className="mt-1 break-all font-mono text-neutral-400">sha256:{reader.extractionFingerprint}</dd></div>}
+                  </dl>
+                </section>
                 <p className="rounded-xl border border-neutral-800 p-3 text-[10px] leading-5 text-neutral-600">{t('El Markdown, los recursos y las anotaciones se guardan junto al original dentro de nodus-library.')}</p>
               </div>}
               {sidebarTab === 'chat' && <div data-testid="library-reader-chat" className="flex min-h-full flex-col">

@@ -2,6 +2,7 @@
 // an isolated backup folder so the test exercises the same nodus-library contract as
 // a Zotero import without touching a user's documents.
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import os from 'node:os';
@@ -16,6 +17,7 @@ const testRoot = await mkdtemp(path.join(os.tmpdir(), 'nodus-library-reader-ui-'
 const userData = path.join(testRoot, 'profile');
 const backupRoot = path.join(testRoot, 'backups');
 const screenshotPath = path.join(os.tmpdir(), 'nodus-library-reader-e2e.png');
+const lightScreenshotPath = path.join(os.tmpdir(), 'nodus-library-reader-light-narrow-e2e.png');
 const childEnv = {
   ...process.env,
   NODUS_USERDATA: userData,
@@ -93,8 +95,20 @@ La segunda sección permite comprobar el índice, la página de origen y el marc
   await writeFile(path.join(documentFolder, 'reader.md'), markdown, 'utf8');
   await buildTextPdf(documentFolder, 'original.pdf');
   await writeFile(path.join(documentFolder, 'assets', 'figura.png'), tinyPng);
-  await writeFile(path.join(documentFolder, 'annotations.json'), '[]\n', 'utf8');
   const now = new Date().toISOString();
+  const contentFingerprint = createHash('sha256').update(markdown).digest('hex');
+  const components = Object.fromEntries(['extraction', 'light', 'deep', 'passages', 'ideas', 'embeddings', 'summary'].map((component) => [component, {
+    freshness: component === 'extraction' ? 'current' : 'none',
+    fingerprint: component === 'extraction' ? 'c'.repeat(64) : null,
+    reason: null,
+    generatedAt: component === 'extraction' ? now : null,
+  }]));
+  await writeFile(path.join(documentFolder, 'annotations.json'), `${JSON.stringify([{
+    id: 'orphaned-fixture', documentId: work.zotero_key, scope: 'source', kind: 'comment', color: null,
+    startOffset: 0, endOffset: 16, selectedText: 'Fragmento antiguo', prefix: '', suffix: '',
+    comment: 'Comentario recuperable', anchorStatus: 'orphaned', contentFingerprint,
+    orphanReason: 'The quoted text could not be located in the new clean Markdown.', createdAt: now, updatedAt: now,
+  }], null, 2)}\n`, 'utf8');
   const globalItemId = `zotero:${work.zotero_key}`;
   await writeFile(path.join(documentFolder, 'metadata.json'), `${JSON.stringify({
     format: 'nodus.library-item', formatVersion: 1,
@@ -105,11 +119,18 @@ La segunda sección permite comprobar el índice, la página de origen y el marc
       creators: work.authors.map((name) => ({ creatorType: 'author', name })), isbn: [], issn: [], tags: ['lector'],
     },
     collectionIds: [], attachments: [{ id: 'zotero:READERPDF', title: 'PDF', fileName: 'original.pdf', relativePath: 'original.pdf', mimeType: 'application/pdf', byteSize: 1, sha256: 'a'.repeat(64), role: 'original' }],
-    files: { reader: 'reader.md', original: 'original.pdf', sourceMap: 'source-map.json' },
-    extraction: { status: 'ready' }, createdAt: now, deletedAt: null,
+    files: { reader: 'reader.md', original: 'original.pdf', sourceMap: 'source-map.json', annotations: 'annotations.json', orphanedAnnotations: 'orphaned-annotations.json' },
+    extraction: { status: 'ready', lastSuccessfulAt: now, lastSuccessfulFingerprint: 'c'.repeat(64) },
+    contentRevision: {
+      format: 'nodus.library-content-revision', formatVersion: 1, revision: 1,
+      extractionFingerprint: 'c'.repeat(64), bibliographicFingerprint: 'd'.repeat(64), contentFingerprint,
+      embeddingFingerprint: null, summaryFingerprint: null, components, previousReadable: null,
+      pendingInvalidations: [], updatedAt: now,
+    }, createdAt: now, deletedAt: null,
     clock: { deviceId: 'reader-e2e-device', revision: 1, baseRevision: 0, updatedAt: now, contentHash: 'b'.repeat(64) },
   }, null, 2)}\n`, 'utf8');
   await writeFile(path.join(documentFolder, 'source-map.json'), `${JSON.stringify({
+    reader: { file: 'reader.md', sha256: contentFingerprint },
     pages: [{ page: 1, width: 612, height: 792 }, { page: 2, width: 612, height: 792 }],
     blocks: [
       { kind: 'title', markdown: { start: titleOffset, end: titleOffset + work.title.length + 2 }, anchors: [{ page: 1 }] },
@@ -141,6 +162,7 @@ La segunda sección permite comprobar el índice, la página de origen y el marc
   await page.getByTestId('global-library-detail').getByRole('button', { name: 'Leer', exact: true }).click();
   const documentRoot = page.getByTestId('library-reader-document');
   await documentRoot.waitFor({ state: 'visible' });
+  assert.match(await page.getByTestId('library-reader-freshness').innerText(), /Markdown limpio/);
 
   assert.match(await documentRoot.innerText(), /Texto introductorio/);
   assert.equal(await documentRoot.locator('img').count(), 1, 'local extracted images render inside the clean document');
@@ -181,6 +203,8 @@ La segunda sección permite comprobar el índice, la página de origen y el marc
   assert.equal((await infoTab.innerText()).trim(), 'Info', 'the selected information tab reveals its compact label');
   assert.equal((await notesTab.innerText()).trim(), '', 'the previous tab collapses back to its icon');
   assert.match(await page.getByTestId('library-reader-metadata').innerText(), new RegExp(work.zotero_key));
+  const provenance = page.getByTestId('library-reader-provenance');
+  assert.match(await provenance.innerText(), new RegExp(contentFingerprint));
   await readerSidebar.getByRole('tab', { name: 'Chat' }).click();
   const chatInput = page.getByTestId('library-reader-chat-input');
   await chatInput.waitFor();
@@ -188,6 +212,8 @@ La segunda sección permite comprobar el índice, la página de origen y el marc
   assert.equal(await page.getByTestId('library-reader-chat-send').isEnabled(), true, 'the embedded contextual chat composer is interactive');
   await chatInput.fill('');
   await readerSidebar.getByRole('tab', { name: 'Notas' }).click();
+  await page.getByTestId('library-reader-orphaned-annotations').waitFor({ state: 'visible' });
+  assert.match(await page.getByTestId('library-reader-orphaned-annotations').innerText(), /Comentario recuperable/);
 
   async function selectCandidate(index) {
     return page.evaluate((candidateIndex) => {
@@ -240,14 +266,18 @@ La segunda sección permite comprobar el índice, la página de origen y el marc
   assert.match(await page.locator('.library-reader-notes').innerText(), /2 fragmentos guardados/);
 
   const diskAnnotations = JSON.parse(await readFile(path.join(documentFolder, 'annotations.json'), 'utf8'));
-  assert.equal(diskAnnotations.length, 3);
+  assert.equal(diskAnnotations.length, 4);
   assert.ok(diskAnnotations.every((item) => item.documentId === work.zotero_key), 'annotations retain the stable Zotero identifier');
 
   await readerSidebar.getByRole('tab', { name: 'Chat' }).click();
   await page.getByTestId('library-reader-chat-input').waitFor();
   await page.screenshot({ path: screenshotPath, fullPage: true });
+  await readerSidebar.getByRole('tab', { name: 'Notas' }).click();
+  await page.evaluate(() => { document.documentElement.classList.add('light'); document.documentElement.classList.remove('dark'); });
+  await page.setViewportSize({ width: 860, height: 820 });
+  await page.screenshot({ path: lightScreenshotPath, fullPage: true });
   assert.deepEqual(pageErrors, [], pageErrors.map((error) => error.stack ?? String(error)).join('\n'));
-  console.log(`library reader UI test passed; screenshot: ${screenshotPath}`);
+  console.log(`library reader UI test passed; screenshots: ${screenshotPath}, ${lightScreenshotPath}`);
 } finally {
   if (app) await app.close().catch(() => undefined);
   await rm(testRoot, { recursive: true, force: true });

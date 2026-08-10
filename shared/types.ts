@@ -650,6 +650,12 @@ export interface LibraryReaderDocument {
   originalUrl: string | null;
   originalMimeType: string | null;
   sourceMapAvailable: boolean;
+  /** Exact provenance of the clean copy currently shown. */
+  contentFingerprint: string | null;
+  extractionFingerprint: string | null;
+  freshness: 'none' | 'queued' | 'running' | 'current' | 'stale' | 'failed' | 'unavailable';
+  generatedAt: string | null;
+  previousReadable: boolean;
 }
 
 /** A document-scoped conversation stored beside the clean Markdown copy. */
@@ -6218,6 +6224,10 @@ export interface WritingDraftAnnotation {
   comment: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Library-reader annotations are reanchored whenever clean Markdown changes. */
+  anchorStatus?: 'current' | 'orphaned';
+  contentFingerprint?: string | null;
+  orphanReason?: string | null;
 }
 
 export interface WritingDraftAnnotationInput {

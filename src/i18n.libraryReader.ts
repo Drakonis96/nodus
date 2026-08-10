@@ -128,6 +128,16 @@ const LIBRARY_MANAGEMENT_EN: Record<string, string> = {
   'Migrar vaults': 'Migrate vaults',
   'Nueva simulación': 'New preview',
   'No se encontraron tablas de Biblioteca académica.': 'No academic Library tables were found.',
+  'Última copia legible': 'Last readable copy',
+  'La sustitución todavía no está validada. Se muestra la última copia legible y sus resultados no se presentan como actuales.': 'The replacement has not been validated yet. The last readable copy is shown and its results are not presented as current.',
+  'Anotaciones sin ancla': 'Orphaned annotations',
+  'Se conserva la cita original para que puedas revisarla o eliminarla.': 'The original quote is retained so you can review or delete it.',
+  'No se encontró el texto en la revisión actual.': 'The text was not found in the current revision.',
+  'Procedencia de esta revisión': 'Revision provenance',
+  'Estado': 'Status',
+  'Generada': 'Generated',
+  'Huella del contenido': 'Content fingerprint',
+  'Huella de extracción': 'Extraction fingerprint',
 };
 
 /** Copy introduced by the clean Markdown library reader. */

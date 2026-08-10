@@ -213,6 +213,9 @@ const NOT_SYNCED_TABLES = new Set([
   'saved_authors',
   'ideas', 'idea_occurrences', 'idea_theme_links', 'themes', 'edges', 'edge_traces', 'gaps',
   'passages', 'collections', 'zotero_tags', 'external_refs', 'extraction_cache', 'scan_checkpoints',
+  // Rebuilt from canonical Library manifests for this vault. Syncing transient
+  // freshness would let one machine incorrectly mark another machine's output current.
+  'library_analysis_freshness',
   'sync_log', 'settings',
   // Explicitly local, opt-in and content-free beta performance observations.
   'primary_source_local_metrics',
