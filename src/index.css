@@ -369,7 +369,8 @@ body {
 .light .bg-neutral-950\/40,
 .light .bg-neutral-950\/50,
 .light .bg-neutral-950\/60,
-.light .bg-neutral-950\/70 {
+.light .bg-neutral-950\/70,
+.light .bg-neutral-950\/80 {
   background-color: rgba(248, 250, 252, 0.86);
 }
 .light .bg-neutral-900,
@@ -377,7 +378,8 @@ body {
 .light .bg-neutral-900\/90,
 .light .bg-neutral-900\/80,
 .light .bg-neutral-900\/55,
-.light .bg-neutral-900\/60 {
+.light .bg-neutral-900\/60,
+.light .bg-neutral-900\/70 {
   background-color: rgba(255, 255, 255, 0.96);
 }
 .light .bg-neutral-900\/50,

@@ -1,4 +1,6 @@
 /** Canonical, vault-independent bibliography stored in `nodus-library`. */
+export type LibraryScope = 'global' | 'vault';
+
 export type LibraryItemSource = 'nodus' | 'zotero' | 'mendeley' | 'ris' | 'bibtex' | 'csl-json' | 'legacy';
 
 export type LibraryItemType =

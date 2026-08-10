@@ -1,12 +1,27 @@
-# Cross-vault Library and clean reader
+# Unified Library and clean reader
 
-The Library is Nodus's global document catalog. It does not belong to the open
-vault: it appears in every vault and keeps one canonical copy of each document.
-A vault can link one of those documents for analysis without duplicating or
-modifying the original.
+The Library is one screen with two explicit scopes. **This vault** is the full
+traditional Nodus corpus, including monitored Zotero collections, scans,
+summaries, embeddings, passages, analyses, health filters, and bulk actions.
+**Global** is the optional cross-vault catalog: it keeps one canonical copy of
+each document and lets vaults link that copy for analysis without modifying the
+original.
+
+Nodus 3 users start in **This vault** after updating. Global is never enabled by
+the upgrade itself. The scope bar offers it as a non-blocking option; selecting
+it either activates the already configured backup location or opens backup
+settings. After activation Nodus remembers the last scope across vaults.
+Contextual navigation remains deterministic: a corpus-health card opens the
+matching traditional filter, while a Zotero clean-reader link opens Global.
+The Zotero collections manager also remains available from the command palette
+and from the This-vault toolbar.
 
 ## Architecture decisions
 
+- The two scopes share navigation but not ownership: vault analysis remains in
+  the vault database, while canonical documents remain in `nodus-library`.
+- All pre-v4 corpus IPC channels remain registered as compatibility adapters;
+  the This-vault scope uses the same typed calls and repositories as Nodus 3.
 - The source of truth lives in the backup folder selected by the user, inside
   `nodus-library`.
 - The SQLite catalog is a disposable local cache. It is rebuilt from manifests

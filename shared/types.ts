@@ -1301,6 +1301,12 @@ export type NodiStyle = 'classic' | 'orb';
 export type NodiOrbColorMode = 'auto' | 'manual';
 
 export interface AppSettings {
+  /** Whether the user explicitly enabled the cross-vault catalogue. */
+  libraryGlobalEnabled: boolean;
+  /** Last scope selected after the compatibility-first Library introduction. */
+  libraryScope: import('./libraryTypes').LibraryScope;
+  /** Completed version of the optional global-Library activation contract. */
+  libraryScopeOnboardingVersion: number;
   embeddingProvider: EmbeddingProvider;
   embeddingModel: string;
   // Per-provider key presence (the keys themselves never cross IPC).

@@ -923,7 +923,7 @@ export function App() {
   }, []);
 
   const openLibraryBucket = useCallback((healthBucket: CorpusHealthBucketId) => {
-    setLibraryTarget({ healthBucket, nonce: Date.now() });
+    setLibraryTarget({ scope: 'vault', healthBucket, nonce: Date.now() });
     setView('library');
   }, []);
 
@@ -947,7 +947,7 @@ export function App() {
     if (!window.nodus?.onZoteroPluginOpen) return undefined;
     return window.nodus.onZoteroPluginOpen((target) => {
       if (target.kind !== 'library-reader' || !target.id) return;
-      setLibraryTarget({ readerItemId: target.id, nonce: Date.now() });
+      setLibraryTarget({ scope: 'global', readerItemId: target.id, nonce: Date.now() });
       setView('library');
     });
   }, []);
@@ -1036,7 +1036,7 @@ export function App() {
     if (!isPrimarySources && !isGenealogy && !isDatabases && !isEstudio && !isDocencia && !isWorldbuilding && !isProsopography && !isTestimonios) {
       actions.unshift(
         { id: 'act:sync', label: t('Actualizar (sincronizar Zotero)'), section: t('Acciones'), icon: 'sync', keywords: 'sync sincronizar', run: () => void onSync() },
-        { id: 'act:collections', label: t('Colecciones'), section: t('Acciones'), icon: 'folder', keywords: 'collections zotero', run: () => setCollectionsOpen(true) },
+        { id: 'act:collections', label: t('Colecciones de Zotero'), section: t('Acciones'), icon: 'folder', keywords: 'collections zotero', run: () => setCollectionsOpen(true) },
       );
     }
     return [...navCommands, ...actions];

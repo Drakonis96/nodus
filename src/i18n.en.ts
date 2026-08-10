@@ -8142,4 +8142,13 @@ export const EN: Record<string, string> = {
   "Citar en Nodi": "Quote in Nodi",
   "Quitar cita": "Remove quote",
   "Texto visible de la sección abierta o documento completo en los lectores.": "Visible text from the open section, or the complete document in readers.",
+  "Ámbito de la Biblioteca": "Library scope",
+  "Este vault": "This vault",
+  "Global": "Global",
+  "Activar Global": "Enable Global",
+  "Configura las copias de seguridad para activar Global.": "Configure backups to enable Global.",
+  "Biblioteca global activada.": "Global Library enabled.",
+  "Global reúne originales y Markdown limpio para todos tus vaults.": "Global brings originals and clean Markdown together for all your vaults.",
+  "Este vault conserva colecciones, scans, resúmenes, embeddings y análisis existentes.": "This vault preserves existing collections, scans, summaries, embeddings, and analyses.",
+  "Activa la Biblioteca global cuando quieras; este vault no cambiará.": "Enable the Global Library whenever you want; this vault will not change.",
 };

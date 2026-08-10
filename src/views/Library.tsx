@@ -1016,7 +1016,7 @@ export function Library({
           <Icon name="wand" /> {t('Operaciones')}
         </button>
         <button className="btn btn-ghost border border-neutral-700" onClick={onOpenCollections}>
-          <Icon name="folder" /> {t('Colecciones')}
+          <Icon name="folder" /> {t('Colecciones de Zotero')}
         </button>
       </div>
 

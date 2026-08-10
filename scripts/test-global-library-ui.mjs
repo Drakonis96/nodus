@@ -2,12 +2,12 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readSource, assertApiMethods, assertChannelsWired } from './ipc-channel-census.mjs';
 
-test('the global Library is independent from the active vault and pinned in every sidebar', async () => {
+test('the unified Library keeps the global catalogue independent and the vault corpus available', async () => {
   const [registry, app, vaultTypes] = await Promise.all([
     readSource('src/app/views/corpus.tsx'), readSource('@shell'), readSource('shared/vaultTypes.ts'),
   ]);
-  assert.match(registry, /GlobalLibraryView[^>]*onOpenSettings/);
-  assert.doesNotMatch(registry, /library:[\s\S]{0,250}vaultId=/, 'the global Library receives no vault id');
+  assert.match(registry, /GlobalLibraryView[\s\S]*onOpenSettings/);
+  assert.match(registry, /vaultId=\{activeVault\?\.id \?\? null\}/, 'the same screen receives the active vault for its compatibility scope');
   assert.match(app, /const libraryItem = NAV_ITEMS\.find/);
   assert.ok((app.match(/navButton\(libraryItem\)/g) ?? []).length >= 8, 'every dedicated and standard sidebar pins the Library');
   assert.match(vaultTypes, /'prosopSources', 'prosopAnalysis', 'prosopNetworks', 'library'/, 'prosopography allows the global Library route');

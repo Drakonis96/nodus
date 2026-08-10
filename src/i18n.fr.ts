@@ -7906,4 +7906,13 @@ export const FR: Record<string, string> = {
   "Citar en Nodi": "Citer dans Nodi",
   "Quitar cita": "Retirer la citation",
   "Texto visible de la sección abierta o documento completo en los lectores.": "Texte visible de la section ouverte, ou document complet dans les lecteurs.",
+  "Ámbito de la Biblioteca": "Portée de la Bibliothèque",
+  "Este vault": "Ce coffre",
+  "Global": "Globale",
+  "Activar Global": "Activer Globale",
+  "Configura las copias de seguridad para activar Global.": "Configurez les sauvegardes pour activer la portée globale.",
+  "Biblioteca global activada.": "Bibliothèque globale activée.",
+  "Global reúne originales y Markdown limpio para todos tus vaults.": "La portée globale réunit les originaux et le Markdown propre de tous vos coffres.",
+  "Este vault conserva colecciones, scans, resúmenes, embeddings y análisis existentes.": "Ce coffre conserve les collections, analyses, résumés, embeddings et résultats existants.",
+  "Activa la Biblioteca global cuando quieras; este vault no cambiará.": "Activez la Bibliothèque globale quand vous le souhaitez ; ce coffre ne changera pas.",
 };

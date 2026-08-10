@@ -5,13 +5,14 @@ import type {
   LibraryExtractionJob,
   LibraryItemRecord,
   LibraryItemSource,
+  LibraryScope,
   LibraryStatus,
   LibraryVaultLink,
   ZoteroImportProgress,
   ZoteroImportSelection,
   ZoteroLibraryPreview,
 } from '@shared/libraryTypes';
-import type { VaultSummary } from '@shared/types';
+import type { AppSettings, VaultSummary, VaultType } from '@shared/types';
 import { Icon, Spinner } from '../components/ui';
 import { LibraryDuplicatesDialog, LibraryMetadataEditor } from '../components/library/LibraryMetadataDialogs';
 import { LibraryDocumentReader } from './LibraryDocumentReader';
@@ -20,6 +21,8 @@ import { confirm, promptText, toast } from '../components/feedback';
 import { t, tx } from '../i18n';
 import type { PendingAssistantNavigationTarget } from '../navigation';
 import type { PendingLibraryNavigationTarget } from '../navigation';
+import type { PendingGraphNavigationTarget } from '../navigation';
+import { Library } from './Library';
 
 const PAGE_SIZE = 250;
 
@@ -224,7 +227,7 @@ function VaultLinkDialog({ itemIds, onClose, onLinked }: {
   </div>;
 }
 
-export function GlobalLibraryView({
+function GlobalLibraryContent({
   target, onOpenSettings, onOpenAssistant,
 }: {
   target?: (PendingLibraryNavigationTarget & { nonce: number }) | null;
@@ -419,7 +422,7 @@ export function GlobalLibraryView({
       {error && <div role="alert" className="border-b border-red-500/30 bg-red-500/10 px-5 py-2 text-xs text-red-300">{error}</div>}
       {(status.conflicts > 0 || status.invalidRecords > 0) && <div data-testid="global-library-integrity-warning" role="status" className="flex items-start gap-2 border-b border-amber-500/30 bg-amber-500/10 px-5 py-2 text-xs text-amber-200"><Icon name="alert" size={14} className="mt-0.5 shrink-0" /><span><b>{t('La Biblioteca necesita revisión.')}</b> {tx('{conflicts} conflicto(s) conservado(s) · {invalid} registro(s) inválido(s) excluido(s). Los originales no se han modificado.', { conflicts: status.conflicts, invalid: status.invalidRecords })}</span></div>}
       <div className="flex min-h-0 flex-1">
-        <aside className="flex w-[238px] shrink-0 flex-col border-r border-neutral-800 bg-neutral-950/80">
+        <aside className="hidden w-[238px] shrink-0 flex-col border-r border-neutral-800 bg-neutral-950/80 lg:flex">
           <div className="flex items-center gap-1 px-3 py-3"><b className="min-w-0 flex-1 text-[11px] uppercase tracking-wider text-neutral-500">{t('Colecciones')}</b><button className="grid h-7 w-7 place-items-center rounded hover:bg-neutral-900" title={t('Nueva colección')} onClick={() => void createCollection()}><Icon name="folderPlus" size={14} /></button></div>
           <div className="px-2 pb-2">
             <button className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs ${selectedCollection === null ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:bg-neutral-900'}`} onClick={() => { setSelectedCollection(null); setOffset(0); }}><Icon name="library" size={14} /><span className="flex-1">{t('Todos los documentos')}</span><span className="text-[10px] opacity-60">{status.items}</span></button>
@@ -447,19 +450,19 @@ export function GlobalLibraryView({
 
           {selected.size > 0 && <div data-testid="global-library-bulk-actions" className="flex flex-wrap items-center gap-2 border-b border-indigo-500/20 bg-indigo-500/5 px-3 py-2 text-xs"><b>{tx('{n} seleccionados', { n: selected.size })}</b><select className="input ml-2 h-8 min-w-44 text-xs" value={collectionTarget} onChange={(event) => setCollectionTarget(event.target.value)}><option value="">{t('Añadir a colección…')}</option>{localCollections.map((collection) => <option key={collection.id} value={collection.id}>{collection.name}</option>)}</select><button className="btn btn-ghost h-8" disabled={!collectionTarget} onClick={() => void addSelectedToCollection()}>{t('Aplicar')}</button><button data-testid="bulk-add-library-to-vault" className="btn btn-ghost h-8" onClick={() => setVaultLinkItems([...selected])}><Icon name="vault" size={13} /> {t('Añadir al vault')}</button><button className="btn btn-ghost h-8" onClick={() => void processSelected()}><Icon name="refresh" size={13} /> {t('Procesar de nuevo')}</button><button className="btn btn-ghost h-8 text-red-400" onClick={() => void deleteSelected()}><Icon name="trash" size={13} /> {t('Papelera')}</button><button className="ml-auto text-neutral-500 hover:text-neutral-200" onClick={() => setSelected(new Set())}>{t('Limpiar selección')}</button></div>}
 
-          <div className="grid h-9 grid-cols-[2.2rem_minmax(16rem,2fr)_minmax(9rem,1fr)_4.5rem_7rem_7.5rem] items-center border-b border-neutral-800 px-3 text-[10px] font-semibold uppercase tracking-wider text-neutral-600">
+          <div className="grid h-9 grid-cols-[2.2rem_minmax(12rem,1fr)_7.5rem] items-center border-b border-neutral-800 px-3 text-[10px] font-semibold uppercase tracking-wider text-neutral-600 xl:grid-cols-[2.2rem_minmax(16rem,2fr)_minmax(9rem,1fr)_4.5rem_7rem_7.5rem]">
             <input type="checkbox" checked={items.length > 0 && items.every((item) => selected.has(item.id))} onChange={(event) => setSelected((current) => { const next = new Set(current); for (const item of items) { if (event.target.checked) next.add(item.id); else next.delete(item.id); } return next; })} aria-label={t('Seleccionar página')} />
-            <span>{t('Documento')}</span><span>{t('Autoría')}</span><span>{t('Año')}</span><span>{t('Origen')}</span><span>{t('Estado')}</span>
+            <span>{t('Documento')}</span><span className="hidden xl:block">{t('Autoría')}</span><span className="hidden xl:block">{t('Año')}</span><span className="hidden xl:block">{t('Origen')}</span><span>{t('Estado')}</span>
           </div>
           <VirtualList
             items={items} itemHeight={62} getKey={(item) => item.id} className="min-h-0 flex-1"
             empty={<div className="grid h-full place-items-center p-8 text-center"><div><Icon name="book" size={28} className="mx-auto text-neutral-700" /><p className="mt-3 text-sm text-neutral-400">{t('No hay documentos que coincidan.')}</p><p className="mt-1 text-xs text-neutral-600">{t('Añade archivos o importa una biblioteca de Zotero.')}</p></div></div>}
             renderItem={(item) => {
               const activeJob = jobs.find((job) => job.itemId === item.id && ['queued', 'processing'].includes(job.status));
-              return <div data-testid={`global-library-item-${item.id}`} className={`grid h-[62px] grid-cols-[2.2rem_minmax(16rem,2fr)_minmax(9rem,1fr)_4.5rem_7rem_7.5rem] items-center border-b border-neutral-900 px-3 text-xs ${detailId === item.id ? 'bg-indigo-500/10' : 'hover:bg-neutral-900/55'}`} onDoubleClick={() => item.readerAvailable ? void openReader(item.id) : setDetailId(item.id)}>
+              return <div data-testid={`global-library-item-${item.id}`} className={`grid h-[62px] grid-cols-[2.2rem_minmax(12rem,1fr)_7.5rem] items-center border-b border-neutral-900 px-3 text-xs xl:grid-cols-[2.2rem_minmax(16rem,2fr)_minmax(9rem,1fr)_4.5rem_7rem_7.5rem] ${detailId === item.id ? 'bg-indigo-500/10' : 'hover:bg-neutral-900/55'}`} onDoubleClick={() => item.readerAvailable ? void openReader(item.id) : setDetailId(item.id)}>
                 <input type="checkbox" checked={selected.has(item.id)} onChange={(event) => setSelected((current) => { const next = new Set(current); if (event.target.checked) next.add(item.id); else next.delete(item.id); return next; })} />
                 <button className="min-w-0 pr-4 text-left" onClick={() => setDetailId(item.id)}><b className="block truncate font-medium text-neutral-200">{item.title}</b><span className="mt-1 block truncate text-[10px] text-neutral-600">{item.doi || item.isbn[0] || item.issn[0] || item.sourceKey || item.id}</span></button>
-                <span className="truncate pr-3 text-neutral-500">{creatorText(item) || '—'}</span><span className="tabular-nums text-neutral-500">{item.year ?? '—'}</span><span className="w-fit rounded bg-neutral-900 px-2 py-1 text-[10px] text-neutral-400">{SOURCE_LABEL[item.source]}</span>
+                <span className="hidden truncate pr-3 text-neutral-500 xl:block">{creatorText(item) || '—'}</span><span className="hidden tabular-nums text-neutral-500 xl:block">{item.year ?? '—'}</span><span className="hidden w-fit rounded bg-neutral-900 px-2 py-1 text-[10px] text-neutral-400 xl:block">{SOURCE_LABEL[item.source]}</span>
                 <span className={`flex items-center gap-1.5 text-[10px] ${activeJob ? 'text-indigo-300' : item.extractionStatus === 'ready' ? 'text-emerald-400' : item.extractionStatus === 'failed' ? 'text-red-400' : 'text-neutral-500'}`}>{activeJob && <Spinner />} {activeJob ? `${Math.round(activeJob.progress * 100)}%` : t(EXTRACTION_LABEL[item.extractionStatus])}</span>
               </div>;
             }}
@@ -488,6 +491,112 @@ export function GlobalLibraryView({
         if (detailId && links.some((link) => link.itemId === detailId)) setDetailLinks((current) => [...current.filter((existing) => !links.some((link) => link.itemId === existing.itemId && link.vaultId === existing.vaultId)), ...links.filter((link) => link.itemId === detailId)]);
         setSelected(new Set());
       }} />}
+    </div>
+  );
+}
+
+export function GlobalLibraryView({
+  target,
+  settings,
+  vaultId,
+  vaultType,
+  onSettingsChange,
+  onOpenSettings,
+  onOpenCollections,
+  onOpenGraph,
+  onOpenAssistant,
+  onOpenArchive,
+}: {
+  target?: (PendingLibraryNavigationTarget & { nonce: number }) | null;
+  settings: AppSettings;
+  vaultId: string | null;
+  vaultType?: VaultType;
+  onSettingsChange: () => Promise<AppSettings | undefined>;
+  onOpenSettings: () => void;
+  onOpenCollections: () => void;
+  onOpenGraph: (target: PendingGraphNavigationTarget) => void;
+  onOpenAssistant: (target?: PendingAssistantNavigationTarget) => void;
+  onOpenArchive?: () => void;
+}) {
+  const requestedScope = target?.healthBucket ? 'vault' : target?.scope;
+  const preferredScope = requestedScope ?? (settings.libraryGlobalEnabled ? settings.libraryScope : 'vault');
+  const [scope, setScope] = useState<LibraryScope>(preferredScope);
+  const [switching, setSwitching] = useState(false);
+
+  // Contextual entries (Home health buckets and Zotero reader links) choose their
+  // scope once. After arrival the user remains free to change the switcher.
+  useEffect(() => setScope(preferredScope), [target?.nonce]);
+
+  const chooseScope = async (next: 'global' | 'vault') => {
+    if (switching || next === scope) return;
+    if (next === 'global' && !settings.libraryGlobalEnabled && !settings.autoBackupFolder.trim()) {
+      toast(t('Configura las copias de seguridad para activar Global.'), { tone: 'info' });
+      onOpenSettings();
+      return;
+    }
+    setSwitching(true);
+    try {
+      await window.nodus.updateSettings({
+        libraryGlobalEnabled: next === 'global' ? true : settings.libraryGlobalEnabled,
+        libraryScope: next,
+        libraryScopeOnboardingVersion: next === 'global' ? 1 : settings.libraryScopeOnboardingVersion,
+      });
+      await onSettingsChange();
+      setScope(next);
+      if (next === 'global' && !settings.libraryGlobalEnabled) toast(t('Biblioteca global activada.'));
+    } finally {
+      setSwitching(false);
+    }
+  };
+
+  return (
+    <div data-testid="library-scope-shell" data-library-scope={scope} className="flex h-full min-h-0 flex-col">
+      <div data-testid="library-scope-switcher" className="flex min-h-12 shrink-0 items-center gap-3 border-b border-neutral-800 bg-neutral-950 px-5 py-2">
+        <span className="hidden text-[10px] font-semibold uppercase tracking-wider text-neutral-600 sm:inline">{t('Ámbito de la Biblioteca')}</span>
+        <div className="flex rounded-lg border border-neutral-800 bg-neutral-900/70 p-0.5" role="group" aria-label={t('Ámbito de la Biblioteca')}>
+          <button
+            data-testid="library-scope-vault"
+            className={`rounded-md px-3 py-1.5 text-xs font-medium ${scope === 'vault' ? 'bg-indigo-600 text-white shadow-sm' : 'text-neutral-400 hover:text-neutral-200'}`}
+            aria-pressed={scope === 'vault'}
+            disabled={switching}
+            onClick={() => void chooseScope('vault')}
+          >
+            <span className="inline-flex items-center gap-1.5"><Icon name="vault" size={13} /> {t('Este vault')}</span>
+          </button>
+          <button
+            data-testid="library-scope-global"
+            className={`rounded-md px-3 py-1.5 text-xs font-medium ${scope === 'global' ? 'bg-indigo-600 text-white shadow-sm' : 'text-neutral-400 hover:text-neutral-200'}`}
+            aria-pressed={scope === 'global'}
+            disabled={switching}
+            onClick={() => void chooseScope('global')}
+          >
+            <span className="inline-flex items-center gap-1.5"><Icon name="library" size={13} /> {settings.libraryGlobalEnabled ? t('Global') : t('Activar Global')}</span>
+          </button>
+        </div>
+        <p className="hidden min-w-0 flex-1 truncate text-[11px] text-neutral-600 lg:block">
+          {scope === 'global'
+            ? t('Global reúne originales y Markdown limpio para todos tus vaults.')
+            : t('Este vault conserva colecciones, scans, resúmenes, embeddings y análisis existentes.')}
+        </p>
+        {!settings.libraryGlobalEnabled && scope === 'vault' && (
+          <span className="ml-auto hidden text-[10px] text-neutral-600 xl:inline">{t('Activa la Biblioteca global cuando quieras; este vault no cambiará.')}</span>
+        )}
+      </div>
+      <div className="min-h-0 flex-1 overflow-hidden">
+        {scope === 'vault' ? (
+          <Library
+            vaultId={vaultId}
+            target={target}
+            vaultType={vaultType}
+            onOpenCollections={onOpenCollections}
+            onOpenGraph={onOpenGraph}
+            onOpenAssistant={onOpenAssistant}
+            onOpenArchive={onOpenArchive}
+          />
+        ) : (
+          <GlobalLibraryContent target={target} onOpenSettings={onOpenSettings} onOpenAssistant={onOpenAssistant} />
+        )}
+      </div>
     </div>
   );
 }

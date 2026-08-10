@@ -23,7 +23,20 @@ const PrimarySourcesNotesView = lazy(() => import('../../views/PrimarySourcesNot
 const TestimonySearchView = lazy(() => import('../../views/TestimonySearchView').then((module) => ({ default: module.TestimonySearchView })));
 
 export const corpusViews = {
-  library: ({ libraryTarget, openAssistant, setView }) => <GlobalLibraryView target={libraryTarget} onOpenSettings={() => setView('settings')} onOpenAssistant={openAssistant} />,
+  library: ({ activeVault, isPrimarySources, libraryTarget, navigate, openAssistant, reloadSettings, setCollectionsOpen, settings, setView }) => (
+    <GlobalLibraryView
+      target={libraryTarget}
+      settings={settings}
+      vaultId={activeVault?.id ?? null}
+      vaultType={activeVault?.type}
+      onSettingsChange={reloadSettings}
+      onOpenSettings={() => setView('settings')}
+      onOpenCollections={() => setCollectionsOpen(true)}
+      onOpenGraph={(target) => navigate('graph', target)}
+      onOpenAssistant={openAssistant}
+      onOpenArchive={isPrimarySources ? () => setView('archive') : undefined}
+    />
+  ),
   graph: ({ graphTarget, reloadSettings, settings }) => <GraphView settings={settings} onSettingsChange={reloadSettings} target={graphTarget} />,
   argument: ({ settings }) => <ArgumentMapView settings={settings} />,
   ideas: ({ activeVault, ideaTarget, navigate, openAssistant }) => (

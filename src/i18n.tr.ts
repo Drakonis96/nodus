@@ -7667,4 +7667,13 @@ export const TR: Record<string, string> = {
   "Citar en Nodi": "Nodi'de alıntıla",
   "Quitar cita": "Alıntıyı kaldır",
   "Texto visible de la sección abierta o documento completo en los lectores.": "Açık bölümün görünen metni veya okuyuculardaki belgenin tamamı.",
+  "Ámbito de la Biblioteca": "Kütüphane kapsamı",
+  "Este vault": "Bu kasa",
+  "Global": "Global",
+  "Activar Global": "Global'i etkinleştir",
+  "Configura las copias de seguridad para activar Global.": "Global kapsamını etkinleştirmek için yedeklemeleri yapılandırın.",
+  "Biblioteca global activada.": "Global Kütüphane etkinleştirildi.",
+  "Global reúne originales y Markdown limpio para todos tus vaults.": "Global kapsamı, tüm kasalarınız için orijinalleri ve temiz Markdown'ı bir araya getirir.",
+  "Este vault conserva colecciones, scans, resúmenes, embeddings y análisis existentes.": "Bu kasa mevcut koleksiyonları, taramaları, özetleri, embedding'leri ve analizleri korur.",
+  "Activa la Biblioteca global cuando quieras; este vault no cambiará.": "Global Kütüphaneyi istediğiniz zaman etkinleştirin; bu kasa değişmez.",
 };

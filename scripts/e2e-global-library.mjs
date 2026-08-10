@@ -102,8 +102,44 @@ try {
   }
 
   await page.locator('[data-tour="nav-library"]').click();
+  const scopeSwitcher = page.getByTestId('library-scope-switcher');
+  await scopeSwitcher.waitFor({ state: 'visible' });
+  assert.equal(await page.getByTestId('library-scope-vault').getAttribute('aria-pressed'), 'true', 'a v3-style profile starts in the unchanged vault corpus');
+  await page.getByRole('button', { name: 'Colecciones de Zotero', exact: true }).waitFor();
+  await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-scope-vault-dark-wide.png'), fullPage: true });
+  await page.getByTestId('library-scope-global').click();
   const library = page.getByTestId('global-library-view');
   await library.waitFor({ state: 'visible' });
+  assert.equal(await page.getByTestId('library-scope-global').getAttribute('aria-pressed'), 'true');
+  const scopeSettings = await page.evaluate(() => window.nodus.getSettings());
+  assert.equal(scopeSettings.libraryGlobalEnabled, true, 'global activation is opt-in');
+  assert.equal(scopeSettings.libraryScope, 'global', 'the chosen scope is remembered');
+  await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-scope-global-dark-wide.png'), fullPage: true });
+  await page.evaluate(() => {
+    document.documentElement.classList.add('light');
+    document.documentElement.classList.remove('dark');
+  });
+  await page.setViewportSize({ width: 760, height: 900 });
+  await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-scope-global-light-narrow.png'), fullPage: true });
+  await page.getByTestId('library-scope-vault').click();
+  await page.waitForFunction(() => document.querySelector('[data-testid="library-scope-shell"]')?.getAttribute('data-library-scope') === 'vault');
+  await page.evaluate(() => {
+    document.documentElement.classList.add('light');
+    document.documentElement.classList.remove('dark');
+  });
+  await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-scope-vault-light-narrow.png'), fullPage: true });
+  await page.getByTestId('library-scope-global').click();
+  await library.waitFor({ state: 'visible' });
+  await page.evaluate(() => {
+    document.documentElement.classList.add('dark');
+    document.documentElement.classList.remove('light');
+  });
+  await page.setViewportSize({ width: 1540, height: 940 });
+  await page.reload();
+  await page.waitForFunction(() => Boolean(document.getElementById('root')?.children.length));
+  await page.locator('[data-tour="nav-library"]').click();
+  await page.getByTestId('global-library-view').waitFor({ state: 'visible' });
+  assert.equal(await page.getByTestId('library-scope-global').getAttribute('aria-pressed'), 'true', 'Global remains selected after a renderer restart');
   console.log('[global-library-e2e] global Library visible');
   await page.getByText('Historia contemporánea', { exact: true }).waitFor();
   await page.getByText('Mujeres y posguerra', { exact: true }).click();

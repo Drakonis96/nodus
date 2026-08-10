@@ -41,6 +41,11 @@ function sanitizeTranscriptionModel(value: unknown): ModelRef | null {
 }
 
 const DEFAULTS: Omit<AppSettings, 'providerKeys' | 'lockedProviderKeys'> = {
+  // Compatibility first: a v3 settings blob has none of these keys, therefore its
+  // first Nodus 4 Library visit remains the unchanged vault corpus.
+  libraryGlobalEnabled: false,
+  libraryScope: 'vault',
+  libraryScopeOnboardingVersion: 0,
   embeddingProvider: 'openai',
   embeddingModel: DEFAULT_EMBEDDING_MODELS.openai,
   localProviders: DEFAULT_LOCAL_PROVIDERS,
@@ -251,6 +256,11 @@ export function getSettings(): AppSettings {
     }
   }
   const merged = { ...DEFAULTS, ...parsed };
+  if (merged.libraryScope !== 'global' && merged.libraryScope !== 'vault') merged.libraryScope = 'vault';
+  if (typeof merged.libraryGlobalEnabled !== 'boolean') merged.libraryGlobalEnabled = false;
+  if (!Number.isInteger(merged.libraryScopeOnboardingVersion) || merged.libraryScopeOnboardingVersion < 0) {
+    merged.libraryScopeOnboardingVersion = 0;
+  }
   merged.codexReasoningEfforts = sanitizeCodexReasoningEfforts(parsed.codexReasoningEfforts);
   merged.studyImproveToolbarStyleIds = [...new Set((Array.isArray(merged.studyImproveToolbarStyleIds) ? merged.studyImproveToolbarStyleIds : [])
     .filter((value): value is string => typeof value === 'string' && value.trim().length > 0))].slice(0, 4);
@@ -290,6 +300,13 @@ export function getSettings(): AppSettings {
   for (const key of GLOBAL_PREF_KEYS) {
     if (globalPrefs[key] === undefined) seed[key] = merged[key];
     else (merged as Record<string, unknown>)[key] = globalPrefs[key];
+  }
+  // Global preferences are user-editable JSON on disk. Fail closed to the v3-safe
+  // vault scope if those three values are missing or malformed.
+  if (merged.libraryScope !== 'global' && merged.libraryScope !== 'vault') merged.libraryScope = 'vault';
+  if (typeof merged.libraryGlobalEnabled !== 'boolean') merged.libraryGlobalEnabled = false;
+  if (!Number.isInteger(merged.libraryScopeOnboardingVersion) || merged.libraryScopeOnboardingVersion < 0) {
+    merged.libraryScopeOnboardingVersion = 0;
   }
   // AI model configuration is shared too (API keys already are). Overlay the shared
   // store when it holds a real value; otherwise seed it — but ONLY from a vault that has

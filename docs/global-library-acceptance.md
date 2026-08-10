@@ -1,11 +1,16 @@
 # Cross-vault Library acceptance
 
-This matrix closes implementation phases 0–9. `Verified` means the behavior is
+This matrix tracks the complete Nodus 4 Library. `Verified` means the behavior is
 executed by a mechanical or end-to-end test; it does not merely mean that a
 button exists.
 
 | Area | Criterion | Status | Primary evidence |
 |---|---|---|---|
+| Compatibility | A v3 profile opens the complete This-vault corpus by default | Verified | `test-library-scope-compatibility`, `e2e-global-library` |
+| Compatibility | Global activation is optional and the last scope is shared across vaults | Verified | `test-library-scope-compatibility`, `e2e-global-library` |
+| Compatibility | Health cards enter the exact traditional filter | Verified | `test-library-scope-compatibility`, `test-search-health` |
+| Compatibility | Legacy corpus and Zotero-collection IPC remains wired | Verified | `test-library-scope-compatibility`, `test-ipc-contract` |
+| Compatibility | Zotero reader links enter Global without changing ordinary defaults | Verified | `test-library-scope-compatibility` |
 | Storage | `nodus-library` is created inside the backup folder | Verified | `test-library-storage`, `e2e-global-library` |
 | Storage | Originals and derived files share a folder and stable identity | Verified | `test-library-storage`, `test-global-library-reader` |
 | Storage | The SQLite catalog is excluded from backups and can be rebuilt | Verified | `test-library-storage` |

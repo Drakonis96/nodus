@@ -7320,4 +7320,13 @@ export const IT: Record<string, string> = {
   "Citar en Nodi": "Cita in Nodi",
   "Quitar cita": "Rimuovi citazione",
   "Texto visible de la sección abierta o documento completo en los lectores.": "Testo visibile della sezione aperta o documento completo nei lettori.",
+  "Ámbito de la Biblioteca": "Ambito della Biblioteca",
+  "Este vault": "Questo vault",
+  "Global": "Globale",
+  "Activar Global": "Attiva Globale",
+  "Configura las copias de seguridad para activar Global.": "Configura i backup per attivare l'ambito globale.",
+  "Biblioteca global activada.": "Biblioteca globale attivata.",
+  "Global reúne originales y Markdown limpio para todos tus vaults.": "L'ambito globale riunisce originali e Markdown pulito per tutti i vault.",
+  "Este vault conserva colecciones, scans, resúmenes, embeddings y análisis existentes.": "Questo vault conserva raccolte, scansioni, riepiloghi, embedding e analisi esistenti.",
+  "Activa la Biblioteca global cuando quieras; este vault no cambiará.": "Attiva la Biblioteca globale quando vuoi; questo vault non cambierà.",
 };
