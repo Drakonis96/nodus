@@ -20,10 +20,10 @@ test('the complete Global Library ships with recovery, privacy, hardening and re
   for (const contract of [
     'nodus-library', 'catalog.sqlite', 'metadata.json', 'reader.md', 'source-map.json',
     'quality-report.json', 'annotations.json', 'chat.json', '.nodus/conflicts/',
-    'Crossref', 'Open Library', 'solo lectura', 'modelo local', 'proveedor remoto',
+    'Crossref', 'Open Library', 'read-only', 'local model', 'remote provider',
   ]) assert.match(guide, new RegExp(contract.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'));
 
-  for (const phase of ['Almacenamiento', 'Zotero', 'Extracción', 'Lector', 'Metadatos', 'Vaults', 'Privacidad', 'Licencias']) {
+  for (const phase of ['Storage', 'Zotero', 'Extraction', 'Reader', 'Metadata', 'Vaults', 'Privacy', 'Licenses']) {
     assert.match(acceptance, new RegExp(`\\| ${phase} \\|`));
   }
   assert.match(readme, /docs\/global-library\.md/);

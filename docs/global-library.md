@@ -1,34 +1,33 @@
-# Biblioteca transversal y lector limpio
+# Cross-vault Library and clean reader
 
-La Biblioteca es el catálogo documental global de Nodus. No pertenece al vault
-abierto: aparece en todos los vaults y mantiene una sola copia canónica de cada
-documento. Un vault puede enlazar uno de esos documentos para analizarlo sin
-duplicar ni modificar el original.
+The Library is Nodus's global document catalog. It does not belong to the open
+vault: it appears in every vault and keeps one canonical copy of each document.
+A vault can link one of those documents for analysis without duplicating or
+modifying the original.
 
-## Decisiones de arquitectura
+## Architecture decisions
 
-- La fuente de verdad vive en la carpeta de copias de seguridad elegida por la
-  persona usuaria, dentro de `nodus-library`.
-- El catálogo SQLite es una caché local descartable. Se reconstruye a partir de
-  los manifiestos y no se sincroniza.
-- El original, el Markdown limpio, los recursos extraídos, el mapa hacia las
-  páginas, las anotaciones y el chat se guardan juntos bajo un identificador
-  estable.
-- Zotero se consulta en modo de solo lectura. Una actualización nunca escribe
-  en Zotero ni elimina las correcciones propias de Nodus.
-- La Biblioteca y los vaults tienen responsabilidades distintas: la primera
-  conserva y organiza documentos; los segundos contienen análisis, ideas,
-  pasajes, notas y demás trabajo específico.
+- The source of truth lives in the backup folder selected by the user, inside
+  `nodus-library`.
+- The SQLite catalog is a disposable local cache. It is rebuilt from manifests
+  and is not synchronized.
+- The original, clean Markdown, extracted assets, page map, annotations, and
+  chat are stored together under one stable identifier.
+- Zotero is accessed in read-only mode. A refresh never writes to Zotero or
+  removes Nodus-owned corrections.
+- The Library and vaults have different responsibilities: the former preserves
+  and organizes documents; the latter hold analysis, ideas, passages, notes,
+  and other vault-specific work.
 
-## Estructura en disco
+## On-disk structure
 
 ```text
-<carpeta-de-backups>/
+<backup-folder>/
 └── nodus-library/
     ├── library.json
-    ├── <identificador-estable>/
+    ├── <stable-identifier>/
     │   ├── metadata.json
-    │   ├── original.pdf                 # o la ruta declarada en metadata.json
+    │   ├── original.pdf                 # or the path declared in metadata.json
     │   ├── reader.md
     │   ├── source-map.json
     │   ├── quality-report.json
@@ -44,192 +43,191 @@ duplicar ni modificar el original.
         └── conflicts/
 ```
 
-Los nombres concretos de los derivados se declaran en `metadata.json`. Todas
-las rutas se resuelven dentro de la carpeta del documento; una ruta o enlace
-simbólico que intente salir de ella se ignora. Los sidecars nuevos de
-anotaciones y chat se escriben de forma atómica y, en sistemas POSIX, con modo
-`0600`.
+The exact names of derived files are declared in `metadata.json`. Every path is
+resolved inside the document folder; paths or symbolic links that attempt to
+escape it are ignored. New annotation and chat sidecars are written atomically
+and, on POSIX systems, with mode `0600`.
 
-El catálogo local está en el perfil de Nodus, en `library/catalog.sqlite`. Es
-deliberadamente regenerable: borrarlo no borra documentos, colecciones ni
-anotaciones.
+The local catalog lives in the Nodus profile at `library/catalog.sqlite`. It is
+deliberately disposable: deleting it does not delete documents, collections,
+or annotations.
 
-### Identidad
+### Identity
 
-- Un ítem personal de Zotero conserva su clave, por ejemplo `E7FGXJFE`, como
-  carpeta y `storageId`.
-- Un ítem de grupo conserva el identificador canónico completo en los
-  metadatos. Solo se codifica el nombre físico si contiene caracteres no
-  portables entre Windows, macOS y Linux.
-- Un archivo añadido desde Nodus recibe un identificador estable derivado de su
-  registro, no de su título visible.
-- El `citationKey`, cuando existe, se conserva como dato bibliográfico, pero no
-  sustituye al identificador estable.
+- A personal Zotero item keeps its key, for example `E7FGXJFE`, as both its
+  folder name and `storageId`.
+- A group item keeps its full canonical identifier in metadata. Only the
+  physical folder name is encoded when it contains characters that are not
+  portable across Windows, macOS, and Linux.
+- A file added from Nodus receives a stable identifier derived from its record,
+  not from its visible title.
+- The `citationKey`, when available, is retained as bibliographic data but does
+  not replace the stable identifier.
 
-## Importación y organización
+## Import and organization
 
 ### Zotero
 
-El diálogo de Zotero descubre la biblioteca personal y las bibliotecas de
-grupo, permite seleccionar cuáles importar, copiar adjuntos e incluir ítems sin
-colección. La jerarquía de colecciones no tiene límite artificial de niveles.
+The Zotero dialog discovers personal and group libraries. Users can select
+which libraries to import, whether to copy attachments, and whether to include
+unfiled items. Collection hierarchy has no artificial depth limit.
 
-La importación usa las versiones de Zotero para recuperar solo cambios cuando
-es posible. La barra informa de conexión, colecciones, catálogo, adjuntos,
-reconstrucción y finalización. Cancelar conserva lo ya recuperado; reanudar no
-duplica documentos ni adjuntos. Las colecciones importadas son un espejo de
-solo lectura. Se pueden combinar con colecciones propias de Nodus, que sí se
-pueden crear, anidar, mover, renombrar y eliminar.
+The importer uses Zotero versions to retrieve only changes when possible. Its
+progress bar reports connection, collections, catalog, attachments, rebuilding,
+and completion. Canceling preserves everything already retrieved; resuming does
+not duplicate documents or attachments. Imported collections are a read-only
+mirror. They can coexist with Nodus-owned collections, which can be created,
+nested, moved, renamed, and deleted.
 
-El plugin de Zotero expone tres acciones coordinadas con el escritorio:
-consultar el estado de la copia limpia, importar o actualizar la biblioteca y
-abrir el documento actual en el lector limpio. El original en Zotero nunca se
-edita.
+The Zotero plugin exposes three coordinated desktop actions: check clean-copy
+status, import or refresh the library, and open the current document in the
+clean reader. The Zotero original is never edited.
 
-### Mendeley y otros gestores
+### Mendeley and other managers
 
-La importación interoperable acepta RIS, BibTeX y CSL JSON. Mendeley y otros
-gestores pueden exportar en uno de esos formatos; Nodus importa las fichas,
-detecta duplicados y permite añadir después los archivos correspondientes. No
-se requiere entregar credenciales de Mendeley a Nodus.
+The interoperable importer accepts RIS, BibTeX, and CSL JSON. Mendeley and other
+managers can export one of these formats; Nodus imports the records, detects
+duplicates, and lets users attach the corresponding files later. Nodus does not
+need Mendeley credentials.
 
-También se pueden añadir directamente PDF, EPUB, HTML, Markdown, texto e
-imágenes compatibles. El hash del contenido impide importar dos veces el mismo
-archivo.
+Users can also add PDF, EPUB, HTML, Markdown, plain text, and supported images
+directly. A content hash prevents the same file from being imported twice.
 
-## Extracción a Markdown limpio
+## Clean Markdown extraction
 
-El pipeline trabaja en segundo plano y conserva siempre el original separado.
-Para cada documento:
+The pipeline runs in the background and always keeps the original separate. For
+each document, it:
 
-1. identifica el formato y recupera texto y disposición;
-2. elimina ruido repetido de cabeceras y pies, normaliza Unicode, espacios,
-   guiones de final de línea y saltos de párrafo;
-3. conserva títulos, listas, citas y tablas como Markdown estructurado;
-4. extrae figuras e imágenes a `assets/` y las referencia con rutas relativas;
-5. aplica OCR local a páginas sin texto cuando está habilitado;
-6. usa OCR remoto únicamente si la persona lo elige y ha configurado un modelo
-   de visión;
-7. escribe `source-map.json` con páginas y coordenadas y
-   `quality-report.json` con métricas y avisos;
-8. publica todos los derivados de forma atómica y actualiza el estado del ítem.
+1. identifies the format and retrieves text and layout;
+2. removes repeated header and footer noise and normalizes Unicode, whitespace,
+   end-of-line hyphenation, and paragraph breaks;
+3. preserves headings, lists, quotations, and tables as structured Markdown;
+4. extracts figures and images into `assets/` and references them with relative
+   paths;
+5. applies local OCR to pages without a text layer when enabled;
+6. uses remote OCR only when the user explicitly selects it and has configured
+   a vision model;
+7. writes `source-map.json` with page and coordinate mappings and
+   `quality-report.json` with metrics and warnings;
+8. publishes all derived files atomically and updates the item state.
 
-El informe de calidad cuenta espacios dobles, caracteres Unicode descompuestos,
-guiones blandos, palabras partidas, páginas vacías, bloques, figuras, tablas y
-páginas OCR. Un resultado dudoso queda como `needs-review`; no se presenta como
-perfecto de forma silenciosa. Una tarea interrumpida se puede reanudar y una
-tarea fallida se puede reintentar.
+The quality report counts double spaces, decomposed Unicode, soft hyphens,
+broken words, empty pages, blocks, figures, tables, and OCR pages. A doubtful
+result is marked `needs-review`; it is never silently presented as perfect. An
+interrupted job can resume, and a failed job can be retried.
 
-## Lector
+## Reader
 
-El lector representa `reader.md`, no una capa superpuesta al PDF. Incluye:
+The reader renders `reader.md`; it is not a layer placed over the PDF. It
+includes:
 
-- índice de secciones y navegación al punto exacto;
-- figuras y tablas estructuradas;
-- apertura temporal de la página original asociada;
-- apertura independiente del original completo;
-- subrayados de seis colores, comentarios y un marcador de lectura por sección;
-- panel derecho con metadatos, notas y chat;
-- conversación persistente junto al documento;
-- apertura de la misma conversación en el Asistente general.
+- a collapsible section outline with exact navigation;
+- structured figures and tables;
+- a temporary view of the matching original page;
+- independent opening of the complete original;
+- six highlight colors, comments, and one reading bookmark per section;
+- one compact bookmark menu for marking the current section or returning to the
+  saved bookmark;
+- a collapsible right sidebar whose inactive tabs are icons and whose active
+  `Info`, `Notes`, or `Chat` tab displays its label;
+- persistent document chat stored beside the document;
+- an option to continue the same conversation in the main Assistant.
 
-Las selecciones guardan offsets, texto y contexto para poder reanclarse. La
-identidad de cada anotación sigue siendo la clave estable del documento, también
-cuando el ítem procede de Zotero.
+Saved selections include offsets, text, and surrounding context so they can be
+re-anchored. Every annotation retains the document's stable identifier,
+including when the item comes from Zotero.
 
-El chat reutiliza el motor y la configuración de modelos de Nodus. Recibe el
-Markdown limpio, las anotaciones y una ventana limitada del historial. No
-inventa páginas o citas: el prompt exige distinguir el contenido disponible de
-una inferencia. Si se usa un modelo local, el contexto no sale del equipo. Si se
-elige un proveedor remoto, el texto necesario se envía a ese proveedor solo al
-formular una pregunta.
+Chat reuses the Nodus AI engine and model settings. It receives the clean
+Markdown, annotations, and a bounded history window. It does not invent pages
+or quotations: the prompt requires it to distinguish available content from
+inference. With a local model, the context stays on the device. A remote provider
+receives only the text needed for the question when the user asks it.
 
-## Metadatos y duplicados
+## Metadata and duplicates
 
-La ficha de Nodus admite título, tipo, autoría, fecha, publicación, editorial,
-volumen, número, páginas, edición, lugar, idioma, derechos, URL, DOI, ISBN,
-ISSN, resumen y etiquetas.
+The Nodus record supports title, type, creators, date, publication, publisher,
+volume, issue, pages, edition, place, language, rights, URL, DOI, ISBN, ISSN,
+abstract, and tags.
 
-Las búsquedas por identificador consultan:
+Identifier lookup uses:
 
-- Crossref para DOI e ISSN;
-- Open Library para ISBN.
+- Crossref for DOI and ISSN;
+- Open Library for ISBN.
 
-Nodus muestra candidatos y una vista previa; nada se aplica sin revisión. Las
-correcciones quedan en una capa propia y sobreviven a futuras sincronizaciones
-con el gestor de origen. La detección de duplicados usa DOI, ISBN o una ficha
-normalizada. Fusionar es una acción explícita: conserva colecciones, adjuntos,
-Markdown, anotaciones y chat en el registro elegido y envía los demás a la
-papelera recuperable.
+Nodus shows candidates and a change preview; nothing is applied without review.
+Corrections live in a Nodus-owned layer and survive future source-manager
+refreshes. Duplicate detection uses DOI, ISBN, or a normalized bibliographic
+record. Merging is explicit: it preserves collections, attachments, Markdown,
+annotations, and chat in the chosen record and moves the others to recoverable
+trash.
 
-## Relación con los vaults
+## Relationship with vaults
 
-`Añadir al vault` materializa una referencia analizable con la identidad del
-documento. No copia el original ni mueve `reader.md`. Extracción, búsqueda,
-resúmenes, pasajes y análisis del vault resuelven el texto desde la Biblioteca.
-La operación es idempotente y la ficha global muestra en qué vaults está
-disponible y el estado de sus análisis.
+`Add to vault` creates an analyzable reference with the document's identity. It
+does not copy the original or move `reader.md`. Vault extraction, search,
+summaries, passages, and analysis resolve text from the Library. The operation
+is idempotent, and the global record shows which vaults contain the reference
+and the state of their analysis.
 
-Los vaults conectados de solo lectura no aceptan esta escritura. Borrar la
-referencia de trabajo dentro de un vault no destruye la copia global.
+Connected read-only vaults reject this write. Deleting the working reference
+inside a vault does not destroy the global copy.
 
-## Copia, sincronización y recuperación
+## Backup, synchronization, and recovery
 
-`nodus-library` forma parte de la carpeta de backups elegida. Si esa carpeta se
-sincroniza mediante otro servicio, se sincronizan manifiestos, originales y
-sidecars, pero no el SQLite local. Cada cambio de ítem o colección crea un
-registro inmutable con reloj, revisión, dispositivo y hash. Dos ediciones
-offline divergentes se conservan; Nodus elige una de forma determinista y deja
-la otra en `.nodus/conflicts/` para revisión.
+`nodus-library` is part of the selected backup folder. If another service
+synchronizes that folder, it synchronizes manifests, originals, and sidecars,
+but not the local SQLite catalog. Every item or collection change creates an
+immutable record with a clock, revision, device, and hash. Divergent offline
+edits are preserved; Nodus selects one deterministically and leaves the other
+in `.nodus/conflicts/` for review.
 
-Para recuperar la Biblioteca:
+To recover the Library:
 
-1. conserva una copia sin modificar de la carpeta afectada;
-2. restaura la carpeta de backups completa, incluida `nodus-library`;
-3. selecciona esa carpeta en Ajustes de Nodus;
-4. abre Biblioteca; un cambio de raíz invalida la caché y reconstruye el
-   catálogo desde los manifiestos;
-5. comprueba los contadores de registros inválidos y conflictos;
-6. abre una muestra de originales, Markdown, figuras, anotaciones y chats;
-7. reintenta únicamente las extracciones que indiquen revisión o error.
+1. preserve an unchanged copy of the affected folder;
+2. restore the complete backup folder, including `nodus-library`;
+3. select that folder in Nodus Settings;
+4. open Library; changing the root invalidates the cache and rebuilds the
+   catalog from manifests;
+5. check the invalid-record and conflict counters;
+6. open a sample of originals, Markdown files, figures, annotations, and chats;
+7. retry only extractions marked for review or reported as failed.
 
-Enviar un ítem a la papelera solo lo oculta y conserva sus archivos. La
-eliminación física de un backup debe hacerse fuera de Nodus y solo después de
-verificar la política de conservación aplicable.
+Moving an item to trash only hides it and preserves its files. Physical deletion
+of a backup must happen outside Nodus and only after checking the applicable
+retention policy.
 
-## Privacidad, red y licencias
+## Privacy, network access, and licenses
 
-- Catalogación, lectura, anotaciones, OCR local y reconstrucción funcionan en
-  el equipo.
-- Zotero se consulta localmente o a través de la API que la persona ya haya
-  autorizado, siempre en modo de lectura.
-- Crossref y Open Library reciben únicamente el identificador solicitado.
-- El OCR remoto y el chat solo contactan el proveedor de IA elegido al ejecutar
-  la acción correspondiente.
-- Los originales y derivados no se publican en Nodus Server por enlazarlos a un
-  vault.
-- Esta implementación no añade Firecrawl, Anydoc ni otra dependencia de
-  extracción. Reutiliza el pipeline ya incluido en Nodus; no se incorporó una
-  nueva herramienta con licencia incompatible.
+- Cataloging, reading, annotation, local OCR, and rebuilding run on the device.
+- Zotero is accessed locally or through an API already authorized by the user,
+  always in read-only mode.
+- Crossref and Open Library receive only the requested identifier.
+- Remote OCR and chat contact the selected AI provider only when the user runs
+  the corresponding action.
+- Linking a Library item to a vault does not publish originals or derived files
+  to Nodus Server.
+- This implementation adds no Firecrawl, Anydoc, or other extraction
+  dependency. It reuses the pipeline already included in Nodus and introduces
+  no tool with an incompatible license.
 
-La carpeta de backups puede contener documentos sujetos a derechos de autor o
-datos personales. Debe protegerse con permisos adecuados, cifrado de disco y
-la política de copias de la organización.
+The backup folder may contain copyrighted documents or personal data. Protect
+it with appropriate permissions, disk encryption, and the organization's backup
+policy.
 
-## Pruebas y mantenimiento
+## Tests and maintenance
 
-Las pruebas principales son:
+The main tests are:
 
-- `test-library-storage.mjs`: manifiestos, conflictos y reconstrucción;
-- `test-library-migration.mjs`: migración desde vaults sin pérdida;
-- `test-zotero-library-import.mjs`: importación diferencial y adjuntos;
-- `test-library-extraction.mjs`: Markdown, recursos, OCR, calidad y cola;
-- `test-global-library-operations.mjs`: colecciones, importación y papelera;
-- `test-library-metadata.mjs`: identificadores, formatos y duplicados;
-- `test-global-library-reader.mjs`: lector, páginas, anotaciones y chat;
-- `test-global-library-vault-integration.mjs`: enlace y análisis desde un vault;
-- `test-global-library-hardening.mjs`: contención de rutas y sidecars privados;
-- `e2e-global-library.mjs` y `e2e-library-reader.mjs`: interfaz Electron real.
+- `test-library-storage.mjs`: manifests, conflicts, and rebuilding;
+- `test-library-migration.mjs`: lossless migration from vaults;
+- `test-zotero-library-import.mjs`: differential import and attachments;
+- `test-library-extraction.mjs`: Markdown, assets, OCR, quality, and queue;
+- `test-global-library-operations.mjs`: collections, import, and trash;
+- `test-library-metadata.mjs`: identifiers, formats, and duplicates;
+- `test-global-library-reader.mjs`: reader, pages, annotations, and chat;
+- `test-global-library-vault-integration.mjs`: vault linking and analysis;
+- `test-global-library-hardening.mjs`: path containment and private sidecars;
+- `e2e-global-library.mjs` and `e2e-library-reader.mjs`: the real Electron UI.
 
-La matriz de entrega está en
+The delivery matrix is in
 [global-library-acceptance.md](global-library-acceptance.md).
