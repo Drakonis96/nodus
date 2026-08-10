@@ -222,8 +222,14 @@ La segunda sección permite comprobar el índice, la página de origen y el marc
   await commentEditor.getByRole('button', { name: 'Guardar', exact: true }).click();
   await page.waitForFunction(async (id) => (await window.nodus.listLibraryReaderAnnotations(id)).some((item) => item.kind === 'comment'), globalItemId);
 
-  await page.getByRole('button', { name: 'Marcar esta sección' }).click();
+  const bookmarkMenu = page.getByTestId('library-reader-bookmark-menu');
+  await bookmarkMenu.click();
+  await page.getByRole('menuitem', { name: 'Marcar esta sección' }).click();
   await page.waitForFunction(async (id) => (await window.nodus.listLibraryReaderAnnotations(id)).some((item) => item.kind === 'bookmark'), globalItemId);
+  await bookmarkMenu.click();
+  const goToBookmark = page.getByRole('menuitem', { name: 'Ir al marcador de lectura' });
+  assert.equal(await goToBookmark.isEnabled(), true, 'the bookmark menu exposes navigation once a mark exists');
+  await goToBookmark.click();
   assert.match(await page.locator('.library-reader-notes').innerText(), /2 fragmentos guardados/);
 
   const diskAnnotations = JSON.parse(await readFile(path.join(documentFolder, 'annotations.json'), 'utf8'));

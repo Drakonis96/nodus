@@ -45,6 +45,10 @@ test('the global reader exposes annotations, metadata, chat and a temporary orig
   for (const marker of ['library-reader-document', 'library-reader-outline-toggle', 'library-reader-sidebar-toggle', 'library-reader-sidebar', 'library-reader-metadata', 'library-reader-chat', 'library-original-preview']) assert.match(reader, new RegExp(marker));
   assert.match(reader, /aria-expanded=\{outlineOpen\}/);
   assert.match(reader, /aria-expanded=\{notesOpen\}/);
+  assert.match(reader, /data-testid="library-reader-bookmark-menu"/);
+  assert.match(reader, /data-testid="library-reader-open-chat"/);
+  assert.match(reader, /aria-haspopup="menu"/);
+  assert.match(reader, /role="menuitem"/);
   assert.match(reader, /OriginalPagePreview/);
   assert.match(reader, /ReaderSelectionActions/);
   assert.match(reader, /libraryReaderChatStream/);

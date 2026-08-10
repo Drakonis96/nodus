@@ -171,6 +171,7 @@ export function LibraryDocumentReader({
   const scrollRef = useRef<HTMLElement | null>(null);
   const documentRef = useRef<HTMLDivElement | null>(null);
   const markActionsRef = useRef<ReaderSelectionActionsHandle | null>(null);
+  const bookmarkMenuRef = useRef<HTMLDivElement | null>(null);
   const chatBottomRef = useRef<HTMLDivElement | null>(null);
   const [reader, setReader] = useState<LibraryReaderDocument | null>(null);
   const [loading, setLoading] = useState(true);
@@ -183,6 +184,7 @@ export function LibraryDocumentReader({
   const [progress, setProgress] = useState(0);
   const [outlineOpen, setOutlineOpen] = useState(true);
   const [notesOpen, setNotesOpen] = useState(true);
+  const [bookmarkMenuOpen, setBookmarkMenuOpen] = useState(false);
   const [sidebarTab, setSidebarTab] = useState<'annotations' | 'metadata' | 'chat'>('annotations');
   const [previewPage, setPreviewPage] = useState<number | null>(null);
   const [chatMessages, setChatMessages] = useState<LibraryReaderChatMessage[]>([]);
@@ -226,6 +228,21 @@ export function LibraryDocumentReader({
   useEffect(() => {
     if (sidebarTab === 'chat') chatBottomRef.current?.scrollIntoView({ block: 'end' });
   }, [chatMessages, chatStreaming, sidebarTab]);
+  useEffect(() => {
+    if (!bookmarkMenuOpen) return;
+    const dismiss = (event: PointerEvent) => {
+      if (!bookmarkMenuRef.current?.contains(event.target as Node)) setBookmarkMenuOpen(false);
+    };
+    const dismissWithKeyboard = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setBookmarkMenuOpen(false);
+    };
+    window.addEventListener('pointerdown', dismiss);
+    window.addEventListener('keydown', dismissWithKeyboard);
+    return () => {
+      window.removeEventListener('pointerdown', dismiss);
+      window.removeEventListener('keydown', dismissWithKeyboard);
+    };
+  }, [bookmarkMenuOpen]);
   useEffect(() => {
     if (!reader) return;
     void refreshAnnotations();
@@ -425,7 +442,7 @@ export function LibraryDocumentReader({
   return (
     <div className="library-document-reader flex h-full min-h-0 flex-col">
       <NodiViewContextSource title={reader.title} text={contextMarkdown} />
-      <header className="relative flex flex-wrap items-center gap-2 border-b border-neutral-800 bg-neutral-950/60 px-4 py-2.5 backdrop-blur">
+      <header className="relative z-40 flex flex-wrap items-center gap-2 border-b border-neutral-800 bg-neutral-950/60 px-4 py-2.5 backdrop-blur">
         <button className="btn btn-ghost gap-1.5" onClick={onBack}><Icon name="chevronLeft" /> {t('Biblioteca')}</button>
         <button
           className={`btn btn-ghost h-9 w-9 shrink-0 p-0 ${outlineOpen ? 'text-indigo-300' : ''}`}
@@ -444,11 +461,28 @@ export function LibraryDocumentReader({
         </div>
         <span className="hidden rounded-full border border-emerald-900/70 bg-emerald-950/30 px-2 py-1 text-[10px] font-medium text-emerald-300 md:inline-flex">{t('Markdown limpio')}</span>
         <ReaderHighlighterControl value={highlighterColor} onChange={setHighlighterColor} />
-        <HoverLabelButton icon="bookmark" label={t('Marcar esta sección')} onClick={() => void markCurrentSection()} className="btn-ghost h-9 min-h-9 border border-neutral-700" />
-        <HoverLabelButton icon={hasReaderMark ? 'bookmarkFill' : 'bookmark'} label={t('Ir al marcador de lectura')} onClick={() => markActionsRef.current?.goToMark()} disabled={!hasReaderMark} className={`btn-ghost h-9 min-h-9 border ${hasReaderMark ? 'border-amber-700/60 text-amber-300' : 'border-neutral-700 text-neutral-600'}`} />
+        <div ref={bookmarkMenuRef} className="relative">
+          <button
+            className={`btn btn-ghost h-9 w-10 gap-0.5 border p-0 ${hasReaderMark ? 'border-amber-700/60 text-amber-300' : 'border-neutral-700'}`}
+            data-testid="library-reader-bookmark-menu"
+            onClick={() => setBookmarkMenuOpen((value) => !value)}
+            aria-haspopup="menu"
+            aria-expanded={bookmarkMenuOpen}
+            aria-label={t('Marcar esta sección')}
+            title={t('Marcar esta sección')}
+          ><Icon name={hasReaderMark ? 'bookmarkFill' : 'bookmark'} size={14} /><Icon name="chevronDown" size={10} /></button>
+          {bookmarkMenuOpen && <div className="absolute right-0 top-full z-50 mt-2 w-56 rounded-xl border border-neutral-700 bg-neutral-950 p-1.5 shadow-2xl" role="menu">
+            <button className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs text-neutral-300 hover:bg-neutral-900" role="menuitem" onClick={() => { setBookmarkMenuOpen(false); void markCurrentSection(); }}>
+              <Icon name="bookmark" size={13} /><span>{t('Marcar esta sección')}</span>
+            </button>
+            <button className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs text-neutral-300 hover:bg-neutral-900 disabled:cursor-not-allowed disabled:text-neutral-700" role="menuitem" disabled={!hasReaderMark} onClick={() => { setBookmarkMenuOpen(false); markActionsRef.current?.goToMark(); }}>
+              <Icon name="bookmarkFill" size={13} /><span>{t('Ir al marcador de lectura')}</span>
+            </button>
+          </div>}
+        </div>
         <HoverLabelButton icon="file" label={currentPage ? tx('Ver página {n}', { n: currentPage }) : t('Ver página original')} onClick={() => openCurrentPage(currentPage)} disabled={!reader.originalAvailable} showLabel={!!currentPage} className="btn-ghost h-9 min-h-9 border border-neutral-700" />
         <HoverLabelButton icon="external" label={t('Abrir original completo')} onClick={() => void window.nodus.openLibraryReaderOriginal(reference.id)} disabled={!reader.originalAvailable} className="btn-ghost h-9 min-h-9 border border-neutral-700" />
-        <HoverLabelButton icon="chat" label={t('Preguntar al chat')} onClick={openDocumentChat} showLabel className="btn-primary h-9 min-h-9" />
+        <button className="btn btn-primary h-9 w-9 shrink-0 p-0" data-testid="library-reader-open-chat" onClick={openDocumentChat} aria-label={t('Preguntar al chat')} title={t('Preguntar al chat')}><Icon name="chat" size={14} /></button>
         <button
           className={`btn btn-ghost h-9 w-9 shrink-0 p-0 ${notesOpen ? 'text-indigo-300' : ''}`}
           data-testid="library-reader-sidebar-toggle"
