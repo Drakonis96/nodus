@@ -12,7 +12,7 @@ import type {
 } from '@shared/types';
 import type { LibraryItemRecord } from '@shared/libraryTypes';
 import { getWork } from '../db/worksRepo';
-import { configuredLibraryRootOrThrow, safeLibraryFolderName } from '../library/libraryPaths';
+import { atomicWriteJson, configuredLibraryRootOrThrow, safeLibraryFolderName } from '../library/libraryPaths';
 import { isLibraryItemRecord, legacyMetadataToRecord } from '../library/libraryRecord';
 
 interface ReaderMetadata {
@@ -125,19 +125,49 @@ function readJson<T>(filePath: string): T | null {
   }
 }
 
-function atomicWriteJson(filePath: string, value: unknown): void {
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  const temporary = `${filePath}.tmp-${process.pid}-${randomUUID()}`;
-  fs.writeFileSync(temporary, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
-  fs.renameSync(temporary, filePath);
+function pathEntryExists(filePath: string): boolean {
+  try {
+    fs.lstatSync(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Resolve the closest existing ancestor so both existing symlinks and symlinked
+ * parent directories are rejected before a reader can read or create a file. */
+function pathStaysInside(root: string, target: string): boolean {
+  const resolvedRoot = path.resolve(root);
+  const resolvedTarget = path.resolve(target);
+  if (resolvedTarget !== resolvedRoot && !resolvedTarget.startsWith(`${resolvedRoot}${path.sep}`)) return false;
+  let probe = resolvedTarget;
+  while (!pathEntryExists(probe) && probe !== path.dirname(probe)) probe = path.dirname(probe);
+  try {
+    const realRoot = fs.realpathSync.native(resolvedRoot);
+    const realProbe = fs.realpathSync.native(probe);
+    return realProbe === realRoot || realProbe.startsWith(`${realRoot}${path.sep}`);
+  } catch {
+    return false;
+  }
+}
+
+function safeDocumentFolder(root: string, folder: string): boolean {
+  return pathStaysInside(root, folder) && pathEntryExists(folder) && fs.statSync(folder).isDirectory();
 }
 
 /** Metadata may name a nested file, but it can never escape its document folder. */
 function documentFile(folder: string, declaredName: string | undefined, fallbackName: string): string {
   const folderPath = path.resolve(folder);
   const target = path.resolve(folderPath, declaredName?.trim() || fallbackName);
-  if (target !== folderPath && target.startsWith(`${folderPath}${path.sep}`)) return target;
-  return path.join(folderPath, fallbackName);
+  if (target !== folderPath && pathStaysInside(folderPath, target)) return target;
+  const fallback = path.join(folderPath, fallbackName);
+  if (pathStaysInside(folderPath, fallback)) return fallback;
+  throw new Error('La ruta del documento no es válida.');
+}
+
+function optionalDocumentFile(folder: string, declaredName: string | undefined, fallbackName: string): string | null {
+  try { return documentFile(folder, declaredName, fallbackName); }
+  catch { return null; }
 }
 
 function metadataMatchesWork(metadata: ReaderMetadata, work: WorkView): boolean {
@@ -152,19 +182,28 @@ function documentFolder(work: WorkView): string | null {
   const root = libraryRoot();
   const storageId = storageIdFor(work);
   const canonical = path.join(root, storageFolderName(storageId));
-  if (fs.existsSync(path.join(canonical, 'reader.md'))) return canonical;
   if (!fs.existsSync(root)) return null;
+  if (safeDocumentFolder(root, canonical)) {
+    const reader = optionalDocumentFile(canonical, 'reader.md', 'reader.md');
+    if (reader && fs.existsSync(reader)) return canonical;
+  }
 
   for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
     if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
     const candidate = path.join(root, entry.name);
-    const metadataPath = path.join(candidate, 'metadata.json');
+    if (!safeDocumentFolder(root, candidate)) continue;
+    const metadataPath = optionalDocumentFile(candidate, 'metadata.json', 'metadata.json');
+    if (!metadataPath) continue;
     const metadata = readJson<ReaderMetadata>(metadataPath);
-    if (!metadata || !metadataMatchesWork(metadata, work) || !fs.existsSync(path.join(candidate, 'reader.md'))) continue;
+    const reader = optionalDocumentFile(candidate, metadata?.files?.reader, 'reader.md');
+    if (!metadata || !metadataMatchesWork(metadata, work) || !reader || !fs.existsSync(reader)) continue;
     if (candidate !== canonical && !fs.existsSync(canonical)) fs.renameSync(candidate, canonical);
     const resolved = fs.existsSync(canonical) ? canonical : candidate;
+    if (!safeDocumentFolder(root, resolved)) continue;
     const nextMetadata = { ...metadata, storageId };
-    atomicWriteJson(path.join(resolved, 'metadata.json'), nextMetadata);
+    const resolvedMetadata = optionalDocumentFile(resolved, 'metadata.json', 'metadata.json');
+    if (!resolvedMetadata) continue;
+    atomicWriteJson(resolvedMetadata, nextMetadata);
     return resolved;
   }
   return null;
@@ -227,13 +266,13 @@ function mimeForAsset(filePath: string): string | null {
 /** Markdown assets never become arbitrary file:// access in the renderer. Only
  * images below this document folder are converted to an inert data URL. */
 function inlineDocumentImages(markdown: string, folder: string): string {
-  const folderPrefix = `${path.resolve(folder)}${path.sep}`;
   return markdown.replace(/(!\[[^\]]*\]\()([^\s)]+)(\))/g, (whole, before: string, rawTarget: string, after: string) => {
     if (/^[a-z][a-z0-9+.-]*:/i.test(rawTarget) || rawTarget.startsWith('#')) return whole;
     let decoded = rawTarget;
     try { decoded = decodeURIComponent(rawTarget); } catch { /* keep the literal path */ }
-    const target = path.resolve(folder, decoded);
-    if (!target.startsWith(folderPrefix) || !fs.existsSync(target) || !fs.statSync(target).isFile()) return whole;
+    const target = optionalDocumentFile(folder, decoded, '.missing-reader-asset');
+    if (!target) return whole;
+    if (!fs.existsSync(target) || !fs.statSync(target).isFile()) return whole;
     const mime = mimeForAsset(target);
     if (!mime) return whole;
     return `${before}data:${mime};base64,${fs.readFileSync(target).toString('base64')}${after}`;
@@ -248,14 +287,17 @@ function globalDocument(documentId: string): ResolvedReaderDocument | null {
     try { canonicalId = decodeURIComponent(documentId.slice('nodus-library:'.length)); } catch { /* keep input */ }
   }
   const inspect = (folder: string): ResolvedReaderDocument | null => {
-    const raw = readJson<unknown>(path.join(folder, 'metadata.json'));
+    if (!safeDocumentFolder(root, folder)) return null;
+    const metadataPath = optionalDocumentFile(folder, 'metadata.json', 'metadata.json');
+    if (!metadataPath) return null;
+    const raw = readJson<unknown>(metadataPath);
     const record = isLibraryItemRecord(raw) ? raw : legacyMetadataToRecord(raw, path.basename(folder));
     if (!record || record.deletedAt) return null;
     const matches = record.id === canonicalId || record.storageId === canonicalId || record.sourceKey === canonicalId;
     if (!matches) return null;
     const metadata = recordReaderMetadata(record);
-    const reader = documentFile(folder, metadata.files?.reader, 'reader.md');
-    if (!fs.existsSync(reader)) return null;
+    const reader = optionalDocumentFile(folder, metadata.files?.reader, 'reader.md');
+    if (!reader || !fs.existsSync(reader)) return null;
     return { identity: recordIdentity(record), folder, metadata };
   };
   const directNames = new Set([
@@ -291,7 +333,10 @@ function resolvedDocument(documentId: string): ResolvedReaderDocument | null {
       title: work.title, authors: work.authors, year: work.year,
     },
     folder,
-    metadata: readJson<ReaderMetadata>(path.join(folder, 'metadata.json')) ?? {},
+    metadata: (() => {
+      const metadataPath = optionalDocumentFile(folder, 'metadata.json', 'metadata.json');
+      return metadataPath ? readJson<ReaderMetadata>(metadataPath) ?? {} : {};
+    })(),
   };
 }
 
@@ -302,14 +347,14 @@ export function getLibraryReaderDocument(documentId: string): LibraryReaderDocum
   const readerName = metadata.files?.reader || 'reader.md';
   const originalName = metadata.files?.original || 'original.pdf';
   const sourceMapName = metadata.files?.sourceMap || 'source-map.json';
-  const markdownPath = documentFile(folder, readerName, 'reader.md');
-  const sourceMapPath = documentFile(folder, sourceMapName, 'source-map.json');
-  const originalPath = documentFile(folder, originalName, 'original.pdf');
-  if (!fs.existsSync(markdownPath)) return null;
+  const markdownPath = optionalDocumentFile(folder, readerName, 'reader.md');
+  const sourceMapPath = optionalDocumentFile(folder, sourceMapName, 'source-map.json');
+  const originalPath = optionalDocumentFile(folder, originalName, 'original.pdf');
+  if (!markdownPath || !fs.existsSync(markdownPath)) return null;
 
   const rawMarkdown = fs.readFileSync(markdownPath, 'utf8');
-  const sourceMap = readJson<ReaderSourceMap>(sourceMapPath);
-  const originalAvailable = fs.existsSync(originalPath) && fs.statSync(originalPath).isFile();
+  const sourceMap = sourceMapPath ? readJson<ReaderSourceMap>(sourceMapPath) : null;
+  const originalAvailable = !!originalPath && fs.existsSync(originalPath) && fs.statSync(originalPath).isFile();
   return {
     workId: identity.workId,
     storageId: identity.storageId,
@@ -323,9 +368,9 @@ export function getLibraryReaderDocument(documentId: string): LibraryReaderDocum
     pageCount: sourceMap?.pages?.length || null,
     wordCount: rawMarkdown.split(/\s+/).filter(Boolean).length,
     originalAvailable,
-    originalFileName: originalAvailable ? path.basename(originalPath) : null,
-    originalUrl: originalAvailable ? `nodus-library://original/${encodeURIComponent(identity.workId)}?v=${encodeURIComponent(path.basename(originalPath))}` : null,
-    originalMimeType: originalAvailable ? mimeForOriginal(originalPath) : null,
+    originalFileName: originalAvailable && originalPath ? path.basename(originalPath) : null,
+    originalUrl: originalAvailable && originalPath ? `nodus-library://original/${encodeURIComponent(identity.workId)}?v=${encodeURIComponent(path.basename(originalPath))}` : null,
+    originalMimeType: originalAvailable && originalPath ? mimeForOriginal(originalPath) : null,
     sourceMapAvailable: sourceMap !== null,
   };
 }
@@ -340,8 +385,8 @@ export function getLibraryReaderRawContent(documentId: string): {
   const resolved = resolvedDocument(documentId);
   const document = getLibraryReaderDocument(documentId);
   if (!resolved || !document) return null;
-  const markdownPath = documentFile(resolved.folder, resolved.metadata.files?.reader, 'reader.md');
-  if (!fs.existsSync(markdownPath)) return null;
+  const markdownPath = optionalDocumentFile(resolved.folder, resolved.metadata.files?.reader, 'reader.md');
+  if (!markdownPath || !fs.existsSync(markdownPath)) return null;
   const markdown = fs.readFileSync(markdownPath, 'utf8');
   return { document: { ...document, markdown }, markdown, folder: resolved.folder };
 }
@@ -358,15 +403,17 @@ export function libraryReaderOriginalPath(documentId: string): string | null {
   const resolved = resolvedDocument(documentId);
   if (!resolved) return null;
   const name = resolved.metadata.files?.original || 'original.pdf';
-  const target = documentFile(resolved.folder, name, 'original.pdf');
-  return fs.existsSync(target) && fs.statSync(target).isFile() ? target : null;
+  const target = optionalDocumentFile(resolved.folder, name, 'original.pdf');
+  return target && fs.existsSync(target) && fs.statSync(target).isFile() ? target : null;
 }
 
 function annotationsPath(documentId: string): { filePath: string; documentId: string } | null {
   const resolved = resolvedDocument(documentId);
   if (!resolved) return null;
+  const filePath = optionalDocumentFile(resolved.folder, resolved.metadata.files?.annotations, 'annotations.json');
+  if (!filePath) return null;
   return {
-    filePath: documentFile(resolved.folder, resolved.metadata.files?.annotations, 'annotations.json'),
+    filePath,
     documentId: resolved.identity.storageId,
   };
 }
@@ -476,7 +523,7 @@ export function deleteLibraryReaderAnnotation(workId: string, id: string): boole
 
 function chatPath(documentId: string): string | null {
   const resolved = resolvedDocument(documentId);
-  return resolved ? documentFile(resolved.folder, resolved.metadata.files?.chat, 'chat.json') : null;
+  return resolved ? optionalDocumentFile(resolved.folder, resolved.metadata.files?.chat, 'chat.json') : null;
 }
 
 function validChatMessage(value: unknown): value is LibraryReaderChatMessage {

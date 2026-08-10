@@ -100,6 +100,8 @@ const LIBRARY_MANAGEMENT_EN: Record<string, string> = {
   'analizado': 'analyzed',
   'vinculado': 'linked',
   'Aún no está añadido a ningún vault.': 'It has not been added to any vault yet.',
+  'La Biblioteca necesita revisión.': 'The Library needs review.',
+  '{conflicts} conflicto(s) conservado(s) · {invalid} registro(s) inválido(s) excluido(s). Los originales no se han modificado.': '{conflicts} preserved conflict(s) · {invalid} invalid record(s) excluded. The originals were not modified.',
 };
 
 /** Copy introduced by the clean Markdown library reader. */

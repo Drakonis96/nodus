@@ -1,8 +1,8 @@
 # Nodus Privacy Policy
 
-**Version:** 1.2
+**Version:** 1.3
 
-** Date of validity:** 22 July 2026
+**Date of validity:** 10 August 2026
 
 **Scope:** Desktop application Nodus 2.5 and later
 
@@ -18,6 +18,13 @@ optional features can contact third-party services: for example, a user-chosen c
 Zotero, Unpaywall, GitHub to check updates, Hugging Face to download models or OpenAI secure MCP
 tunnel to use Nodus from ChatGPT. These services receive the necessary data for the requested
 operation and apply their own conditions and policies.
+
+**Cross-vault Library.** When a backup folder is configured, Nodus stores the global document
+library in its nested `nodus-library` folder. That folder can contain originals, clean Markdown,
+extracted images, page maps, bibliographic metadata, highlights, comments and saved document-chat
+history. It is local unless the user chooses a backup or synchronization provider for that folder;
+that provider then receives the files under its own terms. Linking a Library item to a vault does
+not upload or duplicate its original.
 
 **Nodus Server is optional and self-hosted.** If the user connects it in Settings, the application
 publishes a logical and minimized copy of the vault on the server chosen by the user or his/her
@@ -164,6 +171,13 @@ specified operation:
   the user's request are sent.The provider, model and account is chosen by the user. Local models do
   not make that submission.
 - **Zotero:** consults libraries and files authorized by the user.
+- **Crossref and Open Library:** when the user requests bibliographic metadata, Nodus sends only the
+  DOI, ISBN or ISSN entered for that lookup. Candidates are shown for review and are not applied
+  automatically.
+- **Clean-reader chat and remote OCR:** these actions use the AI model explicitly configured by the
+  user. A remote chat provider receives the clean document text, relevant annotations and recent
+  conversation needed to answer; remote OCR receives the selected page image. A local model keeps
+  that content on the device. Opening, reading, highlighting or annotating alone invokes no model.
 - **Unpaywall and publishing servers:** consult a DOI and you can download the accessible text; the
   mail configured for Unpaywall is included in the request.
 - **GitHub:** Check and download updates, open incidents and downloads of the project. It also hosts

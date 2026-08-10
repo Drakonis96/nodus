@@ -417,6 +417,7 @@ export function GlobalLibraryView({
       </header>
 
       {error && <div role="alert" className="border-b border-red-500/30 bg-red-500/10 px-5 py-2 text-xs text-red-300">{error}</div>}
+      {(status.conflicts > 0 || status.invalidRecords > 0) && <div data-testid="global-library-integrity-warning" role="status" className="flex items-start gap-2 border-b border-amber-500/30 bg-amber-500/10 px-5 py-2 text-xs text-amber-200"><Icon name="alert" size={14} className="mt-0.5 shrink-0" /><span><b>{t('La Biblioteca necesita revisión.')}</b> {tx('{conflicts} conflicto(s) conservado(s) · {invalid} registro(s) inválido(s) excluido(s). Los originales no se han modificado.', { conflicts: status.conflicts, invalid: status.invalidRecords })}</span></div>}
       <div className="flex min-h-0 flex-1">
         <aside className="flex w-[238px] shrink-0 flex-col border-r border-neutral-800 bg-neutral-950/80">
           <div className="flex items-center gap-1 px-3 py-3"><b className="min-w-0 flex-1 text-[11px] uppercase tracking-wider text-neutral-500">{t('Colecciones')}</b><button className="grid h-7 w-7 place-items-center rounded hover:bg-neutral-900" title={t('Nueva colección')} onClick={() => void createCollection()}><Icon name="folderPlus" size={14} /></button></div>

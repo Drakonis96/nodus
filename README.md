@@ -23,6 +23,20 @@ Each vault is a focused workspace. Researchers can build a connected corpus, his
 
 Nodus is local first. Your vaults and search indexes live on your computer. You decide when a feature may use an online AI provider, and you can also work with compatible local models.
 
+## A library shared by every vault
+
+Nodus keeps one cross-vault Library inside `nodus-library`, nested under the
+backup folder you choose. It can mirror a complete Zotero library with its
+collection hierarchy and stable item keys, import RIS, BibTeX and CSL JSON from
+Mendeley or other managers, or accept local documents directly.
+
+Each original remains separate from a clean Markdown reading copy, extracted
+figures, structured tables, page mappings, highlights, notes and document chat.
+The reader can briefly show the matching original page or open the full original
+without modifying it. A document can then be linked into any compatible vault
+for search and analysis without duplicating the global copy. See the
+[architecture, recovery and privacy guide](docs/global-library.md).
+
 ## Install Nodus
 
 Download the installer for your computer and open it. There is no server to configure and no account is required to begin.

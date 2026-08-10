@@ -22,6 +22,7 @@ try {
   const { withVaultDatabase, getDb, closeDb } = require(path.join(repoRoot, 'electron/db/database.ts'));
   const { getWorkByZoteroKey } = require(path.join(repoRoot, 'electron/db/worksRepo.ts'));
   const { resolveWorkText } = require(path.join(repoRoot, 'electron/extraction/textExtractor.ts'));
+  const { createVault } = require(path.join(repoRoot, 'electron/vaults/vaultRegistry.ts'));
 
   writeGlobalPrefsRaw({ autoBackupFolder: backupRoot });
   const store = new LibraryDiskStore(path.join(backupRoot, 'nodus-library'), 'vault-link-device');
@@ -62,6 +63,19 @@ try {
 
   const again = await library.linkGlobalLibraryItemsToVault(['zotero:LIBKEY01'], vault.id);
   assert.equal(again.existing, 1, 'linking twice is idempotent');
+  const connectedReader = createVault('Connected reader', 'academic', {
+    origin: 'connected',
+    remote: {
+      url: 'https://server.invalid', spaceId: 'space-reader', spaceName: 'Read only',
+      serverName: 'Fixture', userEmail: 'reader@example.invalid', role: 'reader', state: 'active',
+      lastPulledRevision: null, lastPulledAt: null,
+    },
+  });
+  await assert.rejects(
+    library.linkGlobalLibraryItemsToVault(['zotero:LIBKEY01'], connectedReader.id),
+    /solo lectura|no está activo/,
+    'a connected reader vault never receives a local write',
+  );
   library.closeGlobalLibrary();
   closeDb();
   console.log('Global Library → vault reference, clean Markdown resolution and idempotency tests passed!');

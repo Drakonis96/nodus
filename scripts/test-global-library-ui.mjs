@@ -20,6 +20,7 @@ test('the Library UI exposes hierarchy, search, bulk operations, imports and bac
     'global-library-detail', 'zotero-global-import-dialog', 'open-zotero-global-import',
     'import-library-bibliography', 'open-library-duplicates', 'edit-library-metadata',
     'add-library-item-to-vault', 'global-library-vault-dialog',
+    'global-library-integrity-warning',
   ]) assert.match(view, new RegExp(`data-testid=(?:"|\{\`)[^\n]*${marker}`));
   for (const method of [
     'getGlobalLibraryStatus', 'listGlobalLibraryItems', 'listGlobalLibraryCollections',
@@ -31,6 +32,7 @@ test('the Library UI exposes hierarchy, search, bulk operations, imports and bac
   assert.match(view, /CollectionBranch[\s\S]*<CollectionBranch/, 'collection rendering is recursively unbounded');
   assert.match(view, /La importación se canceló; el catálogo ya recuperado se conserva/);
   assert.match(view, /Copia de solo lectura: Nodus nunca modifica Zotero/);
+  assert.match(view, /status\.conflicts > 0 \|\| status\.invalidRecords > 0/);
   assert.match(view, /LibraryDocumentReader/);
   assert.match(view, /onDoubleClick=\{\(\) => item\.readerAvailable/);
 });
