@@ -42,7 +42,9 @@ test('the global reader exposes annotations, metadata, chat and a temporary orig
     readSource('src/views/LibraryDocumentReader.tsx'), readSource('electron/libraryReader/libraryReaderStore.ts'),
     readSource('electron/libraryProtocol.ts'), readSource('electron/main.ts'), readSource('index.html'),
   ]);
-  for (const marker of ['library-reader-document', 'library-reader-sidebar', 'library-reader-metadata', 'library-reader-chat', 'library-original-preview']) assert.match(reader, new RegExp(marker));
+  for (const marker of ['library-reader-document', 'library-reader-outline-toggle', 'library-reader-sidebar-toggle', 'library-reader-sidebar', 'library-reader-metadata', 'library-reader-chat', 'library-original-preview']) assert.match(reader, new RegExp(marker));
+  assert.match(reader, /aria-expanded=\{outlineOpen\}/);
+  assert.match(reader, /aria-expanded=\{notesOpen\}/);
   assert.match(reader, /OriginalPagePreview/);
   assert.match(reader, /ReaderSelectionActions/);
   assert.match(reader, /libraryReaderChatStream/);

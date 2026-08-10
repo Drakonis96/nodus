@@ -427,7 +427,15 @@ export function LibraryDocumentReader({
       <NodiViewContextSource title={reader.title} text={contextMarkdown} />
       <header className="relative flex flex-wrap items-center gap-2 border-b border-neutral-800 bg-neutral-950/60 px-4 py-2.5 backdrop-blur">
         <button className="btn btn-ghost gap-1.5" onClick={onBack}><Icon name="chevronLeft" /> {t('Biblioteca')}</button>
-        <button className={`btn btn-ghost h-9 w-9 p-0 lg:hidden ${outlineOpen ? 'text-indigo-300' : ''}`} onClick={() => setOutlineOpen((value) => !value)} aria-label={t('Índice')}><Icon name="list" /></button>
+        <button
+          className={`btn btn-ghost h-9 w-9 shrink-0 p-0 ${outlineOpen ? 'text-indigo-300' : ''}`}
+          data-testid="library-reader-outline-toggle"
+          onClick={() => setOutlineOpen((value) => !value)}
+          aria-controls="library-reader-outline"
+          aria-expanded={outlineOpen}
+          aria-label={t('Índice')}
+          title={t('Índice')}
+        ><Icon name="list" /></button>
         <div className="min-w-[12rem] flex-1">
           <h1 className="truncate text-sm font-semibold text-neutral-100" title={reader.title}>{reader.title}</h1>
           <p className="truncate text-[11px] text-neutral-500">
@@ -441,7 +449,15 @@ export function LibraryDocumentReader({
         <HoverLabelButton icon="file" label={currentPage ? tx('Ver página {n}', { n: currentPage }) : t('Ver página original')} onClick={() => openCurrentPage(currentPage)} disabled={!reader.originalAvailable} showLabel={!!currentPage} className="btn-ghost h-9 min-h-9 border border-neutral-700" />
         <HoverLabelButton icon="external" label={t('Abrir original completo')} onClick={() => void window.nodus.openLibraryReaderOriginal(reference.id)} disabled={!reader.originalAvailable} className="btn-ghost h-9 min-h-9 border border-neutral-700" />
         <HoverLabelButton icon="chat" label={t('Preguntar al chat')} onClick={openDocumentChat} showLabel className="btn-primary h-9 min-h-9" />
-        <button className={`btn btn-ghost h-9 w-9 p-0 xl:hidden ${notesOpen ? 'text-indigo-300' : ''}`} onClick={() => setNotesOpen((value) => !value)} aria-label={t('Anotaciones')}><Icon name="notebook" /></button>
+        <button
+          className={`btn btn-ghost h-9 w-9 shrink-0 p-0 ${notesOpen ? 'text-indigo-300' : ''}`}
+          data-testid="library-reader-sidebar-toggle"
+          onClick={() => setNotesOpen((value) => !value)}
+          aria-controls="library-reader-sidebar"
+          aria-expanded={notesOpen}
+          aria-label={t('Anotaciones')}
+          title={t('Anotaciones')}
+        ><Icon name="columns" /></button>
         <div className="absolute inset-x-0 bottom-0 h-px bg-neutral-800"><div className="h-full bg-indigo-500 transition-[width]" style={{ width: `${progress}%` }} /></div>
       </header>
 
@@ -449,10 +465,11 @@ export function LibraryDocumentReader({
 
       <div className="relative flex min-h-0 flex-1">
         {outlineOpen && (
-          <aside className="library-reader-outline w-64 shrink-0 overflow-y-auto border-r border-neutral-800 bg-neutral-950/25 px-3 py-4 max-lg:absolute max-lg:inset-y-[3.75rem] max-lg:left-0 max-lg:z-30 max-lg:shadow-2xl">
+          <aside id="library-reader-outline" className="library-reader-outline w-64 shrink-0 overflow-y-auto border-r border-neutral-800 bg-neutral-950/25 px-3 py-4 max-lg:absolute max-lg:inset-y-[3.75rem] max-lg:left-0 max-lg:z-30 max-lg:shadow-2xl">
             <div className="mb-3 flex items-center justify-between px-2">
               <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-500">{t('En este documento')}</span>
-              <span className="text-[10px] tabular-nums text-neutral-600">{Math.round(progress)}%</span>
+              <span className="ml-auto text-[10px] tabular-nums text-neutral-600">{Math.round(progress)}%</span>
+              <button className="ml-1.5 rounded-lg p-1 text-neutral-600 hover:bg-neutral-900 hover:text-neutral-300" onClick={() => setOutlineOpen(false)} aria-label={t('Cerrar')}><Icon name="chevronLeft" size={13} /></button>
             </div>
             <nav className="space-y-0.5">
               {reader.sections.map((section, index) => (
@@ -498,10 +515,10 @@ export function LibraryDocumentReader({
         />
 
         {notesOpen && (
-          <aside className="library-reader-notes flex w-80 shrink-0 flex-col overflow-hidden border-l border-neutral-800 bg-neutral-950/25 max-xl:absolute max-xl:inset-y-[3.75rem] max-xl:right-0 max-xl:z-30 max-xl:shadow-2xl" data-testid="library-reader-sidebar">
+          <aside id="library-reader-sidebar" className="library-reader-notes flex w-80 shrink-0 flex-col overflow-hidden border-l border-neutral-800 bg-neutral-950/25 max-xl:absolute max-xl:inset-y-[3.75rem] max-xl:right-0 max-xl:z-30 max-xl:shadow-2xl" data-testid="library-reader-sidebar">
             <div className="flex items-center justify-between border-b border-neutral-800 px-3 py-2.5">
               <h2 className="text-xs font-semibold text-neutral-200">{t('Documento')}</h2>
-              <button className="rounded-lg p-1.5 text-neutral-600 hover:bg-neutral-900 hover:text-neutral-300 xl:hidden" onClick={() => setNotesOpen(false)} aria-label={t('Cerrar')}><Icon name="x" size={14} /></button>
+              <button className="rounded-lg p-1.5 text-neutral-600 hover:bg-neutral-900 hover:text-neutral-300" onClick={() => setNotesOpen(false)} aria-label={t('Cerrar')}><Icon name="chevronRight" size={14} /></button>
             </div>
             <div className="grid grid-cols-3 gap-1 border-b border-neutral-800 p-2" role="tablist">
               {([

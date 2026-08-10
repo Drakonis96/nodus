@@ -145,6 +145,21 @@ La segunda sección permite comprobar el índice, la página de origen y el marc
   assert.equal(await documentRoot.locator('img').count(), 1, 'local extracted images render inside the clean document');
   assert.equal(await documentRoot.locator('table').count(), 1, 'Markdown tables remain structured');
   assert.equal(await page.locator('.library-reader-outline nav button').count(), 6, 'three headings expose a title and page action each');
+  const outlineToggle = page.getByTestId('library-reader-outline-toggle');
+  assert.equal(await outlineToggle.getAttribute('aria-expanded'), 'true');
+  await outlineToggle.click();
+  await page.locator('.library-reader-outline').waitFor({ state: 'detached' });
+  assert.equal(await outlineToggle.getAttribute('aria-expanded'), 'false');
+  await outlineToggle.click();
+  await page.locator('.library-reader-outline').waitFor({ state: 'visible' });
+
+  const sidebarToggle = page.getByTestId('library-reader-sidebar-toggle');
+  assert.equal(await sidebarToggle.getAttribute('aria-expanded'), 'true');
+  await sidebarToggle.click();
+  await page.getByTestId('library-reader-sidebar').waitFor({ state: 'detached' });
+  assert.equal(await sidebarToggle.getAttribute('aria-expanded'), 'false');
+  await sidebarToggle.click();
+  await page.getByTestId('library-reader-sidebar').waitFor({ state: 'visible' });
   await page.getByText(work.zotero_key, { exact: true }).waitFor();
   await page.getByRole('button', { name: 'Preguntar al chat' }).waitFor();
   await page.getByRole('button', { name: 'Abrir original completo' }).waitFor();
