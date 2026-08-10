@@ -6,6 +6,14 @@ export const libraryApi: LibraryApi = {
   rebuildGlobalLibrary: () => ipcRenderer.invoke('library:rebuild'),
   listGlobalLibraryItems: (query) => ipcRenderer.invoke('library:list', query),
   migrateExistingVaultLibraries: () => ipcRenderer.invoke('library:migrateVaults'),
+  listZoteroImportLibraries: () => ipcRenderer.invoke('library:zoteroLibraries'),
+  importZoteroLibrary: (requestId, selection) => ipcRenderer.invoke('library:importZotero', requestId, selection),
+  cancelZoteroLibraryImport: (requestId) => ipcRenderer.invoke('library:cancelZoteroImport', requestId),
+  onZoteroImportProgress: (cb) => {
+    const listener = (_event: unknown, progress: Parameters<typeof cb>[0]) => cb(progress);
+    ipcRenderer.on('library:zoteroImportProgress', listener);
+    return () => ipcRenderer.removeListener('library:zoteroImportProgress', listener);
+  },
   onLibraryMigrationProgress: (cb) => {
     const listener = (_event: unknown, progress: Parameters<typeof cb>[0]) => cb(progress);
     ipcRenderer.on('library:migrationProgress', listener);

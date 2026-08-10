@@ -22,8 +22,8 @@ const HEADERS: Record<string, string> = {
   'Zotero-Allowed-Request': '1',
 };
 
-async function zfetch(url: string): Promise<Response> {
-  return fetch(url, { headers: HEADERS });
+async function zfetch(url: string, signal?: AbortSignal): Promise<Response> {
+  return fetch(url, { headers: HEADERS, signal });
 }
 
 function libraryPrefix(library: ZoteroLibrary): string {
@@ -140,8 +140,94 @@ function mapItem(raw: any, library: ZoteroLibrary): ZoteroItem {
     publisher: d.publisher ?? null,
     publicationTitle: d.publicationTitle ?? d.bookTitle ?? d.proceedingsTitle ?? null,
     isbn: d.ISBN ?? null,
+    issn: d.ISSN ?? null,
     url: d.url ?? null,
+    date: d.date ?? null,
+    language: d.language ?? null,
+    volume: d.volume ?? null,
+    issue: d.issue ?? null,
+    pages: d.pages ?? null,
+    edition: d.edition ?? null,
+    place: d.place ?? null,
+    rights: d.rights ?? null,
+    extra: d.extra ?? null,
+    dateAdded: d.dateAdded ?? null,
+    dateModified: d.dateModified ?? null,
   };
+}
+
+export interface ZoteroLibraryItemsPage {
+  items: ZoteroItem[];
+  version: number;
+  total: number;
+}
+
+/** All top-level bibliographic items in a library, or its incremental changes. */
+export async function libraryItems(
+  library: ZoteroLibrary,
+  opts: { since?: number; signal?: AbortSignal; onProgress?: (loaded: number, total: number) => void } = {},
+): Promise<ZoteroLibraryItemsPage> {
+  const items: ZoteroItem[] = [];
+  let start = 0;
+  let version = 0;
+  let total = 0;
+  const limit = 100;
+  for (;;) {
+    const params = new URLSearchParams({ limit: String(limit), start: String(start), sort: 'dateModified', direction: 'asc' });
+    if (opts.since && opts.since > 0) params.set('since', String(opts.since));
+    const res = await zfetch(`${BASE}/${libraryPrefix(library)}/items/top?${params}`, opts.signal);
+    if (!res.ok) throw new Error(`Zotero items HTTP ${res.status}`);
+    const data = (await res.json()) as any[];
+    version = Number(res.headers.get('Last-Modified-Version')) || version;
+    total = Number(res.headers.get('Total-Results')) || data.length;
+    items.push(...data
+      .filter((raw) => !['attachment', 'note', 'annotation'].includes(raw.data?.itemType))
+      .map((raw) => mapItem(raw, library)));
+    start += data.length;
+    opts.onProgress?.(Math.min(start, total), total);
+    if (data.length < limit || start >= total) break;
+  }
+  return { items, version, total };
+}
+
+export interface ZoteroDeletedObjects {
+  version: number;
+  items: string[];
+  collections: string[];
+}
+
+/** Tombstones since a saved library version. Empty on the first full import. */
+export async function deletedSince(
+  library: ZoteroLibrary,
+  since: number,
+  signal?: AbortSignal,
+): Promise<ZoteroDeletedObjects> {
+  if (since <= 0) return { version: 0, items: [], collections: [] };
+  const res = await zfetch(`${BASE}/${libraryPrefix(library)}/deleted?since=${encodeURIComponent(String(since))}`, signal);
+  if (!res.ok) throw new Error(`Zotero deleted objects HTTP ${res.status}`);
+  const data = (await res.json().catch(() => ({}))) as { items?: string[]; collections?: string[] };
+  return {
+    version: Number(res.headers.get('Last-Modified-Version')) || since,
+    items: (data.items ?? []).map((key) => canonicalKey(library, key)),
+    collections: (data.collections ?? []).map((key) => canonicalKey(library, key)),
+  };
+}
+
+/** Complete collection tree. Pagination is explicit so libraries over 100 nodes are never truncated. */
+export async function allCollections(library: ZoteroLibrary, signal?: AbortSignal): Promise<ZoteroCollection[]> {
+  const out: ZoteroCollection[] = [];
+  let start = 0;
+  const limit = 100;
+  for (;;) {
+    const res = await zfetch(`${BASE}/${libraryPrefix(library)}/collections?limit=${limit}&start=${start}&sort=title`, signal);
+    if (!res.ok) throw new Error(`Zotero collections HTTP ${res.status}`);
+    const data = (await res.json()) as any[];
+    out.push(...data.map((raw) => mapCollection(raw, library)));
+    const total = Number(res.headers.get('Total-Results')) || data.length;
+    start += data.length;
+    if (data.length < limit || start >= total) break;
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /** Page through a collection's items (limit=100), skipping attachments/notes. */
@@ -289,6 +375,9 @@ export async function itemChildren(userId: string, itemKey: string): Promise<Zot
       linkMode: c.data.linkMode ?? null,
       filename: c.data.filename ?? null,
       available: Boolean(c.data.filename),
+      version: c.data.version ?? c.version ?? 0,
+      parentItem: c.data.parentItem ?? null,
+      dateModified: c.data.dateModified ?? null,
     }));
 }
 
@@ -362,6 +451,9 @@ export async function itemAsAttachment(userId: string, itemKey: string): Promise
     linkMode: d.linkMode ?? null,
     filename: d.filename ?? null,
     available: Boolean(d.filename),
+    version: d.version ?? raw.version ?? 0,
+    parentItem: d.parentItem ?? null,
+    dateModified: d.dateModified ?? null,
   };
 }
 

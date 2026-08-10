@@ -114,6 +114,7 @@ export interface LibraryCatalogItem {
   id: string;
   storageId: string;
   source: LibraryItemSource;
+  sourceLibraryId: string | null;
   sourceKey: string | null;
   citationKey: string | null;
   title: string;
@@ -130,6 +131,65 @@ export interface LibraryCatalogItem {
   readerAvailable: boolean;
   extractionStatus: NonNullable<LibraryItemRecord['extraction']>['status'];
   updatedAt: string;
+}
+
+export interface LibraryImportSourceState {
+  sourceId: string;
+  source: LibraryItemSource;
+  libraryId: string;
+  libraryName: string;
+  version: number;
+  importedAt: string;
+  configuration: Record<string, unknown>;
+}
+
+export interface ZoteroLibraryPreview {
+  id: string;
+  type: 'user' | 'group';
+  name: string;
+  version: number;
+  lastImportedVersion: number;
+}
+
+export interface ZoteroImportSelection {
+  libraryIds?: string[];
+  collectionIds?: string[];
+  includeUnfiled?: boolean;
+  copyAttachments?: boolean;
+  /** Ignore the saved Zotero version and create a new full snapshot. */
+  fullRefresh?: boolean;
+}
+
+export interface ZoteroImportProgress {
+  requestId: string;
+  phase: 'connecting' | 'collections' | 'catalog' | 'attachments' | 'rebuild' | 'complete' | 'canceled';
+  libraryId: string | null;
+  libraryName: string | null;
+  processedItems: number;
+  totalItems: number;
+  processedAttachments: number;
+  totalAttachments: number;
+  percent: number;
+  message: string;
+}
+
+export interface ZoteroImportReport {
+  requestId: string;
+  libraries: number;
+  itemsDiscovered: number;
+  itemsCreated: number;
+  itemsUpdated: number;
+  itemsUnchanged: number;
+  itemsDeleted: number;
+  collectionsCreated: number;
+  collectionsUpdated: number;
+  collectionsUnchanged: number;
+  attachmentsCopied: number;
+  attachmentsUnchanged: number;
+  attachmentsUnavailable: number;
+  warnings: string[];
+  canceled: boolean;
+  durationMs: number;
 }
 
 export interface LibraryCatalogQuery {

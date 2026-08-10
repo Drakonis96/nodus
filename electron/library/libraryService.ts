@@ -6,6 +6,10 @@ import type {
   LibraryMigrationReport,
   LibraryRebuildResult,
   LibraryStatus,
+  ZoteroImportProgress,
+  ZoteroImportReport,
+  ZoteroImportSelection,
+  ZoteroLibraryPreview,
 } from '@shared/libraryTypes';
 import { LibraryCatalog } from './libraryCatalog';
 import { LibraryDiskStore } from './libraryStorage';
@@ -16,9 +20,11 @@ import {
 } from './libraryPaths';
 import { listVaults } from '../vaults/vaultRegistry';
 import { migrateVaultLibraries } from './libraryMigration';
+import { importZoteroLibraries, previewZoteroLibraries } from './zoteroLibraryImport';
 
 let live: { root: string; deviceId: string; store: LibraryDiskStore; catalog: LibraryCatalog } | null = null;
 let migration: Promise<LibraryMigrationReport> | null = null;
+const zoteroImports = new Map<string, AbortController>();
 
 function unavailableStatus(): LibraryStatus {
   return {
@@ -104,7 +110,42 @@ export function migrateExistingVaultLibraries(): Promise<LibraryMigrationReport>
   return migration;
 }
 
+export function listZoteroImportLibraries(): Promise<ZoteroLibraryPreview[]> {
+  const current = service();
+  if (!current) return Promise.reject(new Error('Configura primero la carpeta de copias de seguridad de Nodus.'));
+  return previewZoteroLibraries(current.catalog);
+}
+
+export function startZoteroLibraryImport(
+  requestId: string,
+  selection: ZoteroImportSelection | undefined,
+  onProgress: (progress: ZoteroImportProgress) => void,
+): Promise<ZoteroImportReport> {
+  if (!requestId?.trim()) return Promise.reject(new Error('La importación necesita un identificador de solicitud.'));
+  if (zoteroImports.has(requestId)) return Promise.reject(new Error('Esa importación de Zotero ya está en curso.'));
+  const current = service();
+  if (!current) return Promise.reject(new Error('Configura primero la carpeta de copias de seguridad de Nodus.'));
+  const controller = new AbortController();
+  zoteroImports.set(requestId, controller);
+  return importZoteroLibraries({
+    requestId, selection, store: current.store, catalog: current.catalog,
+    signal: controller.signal, onProgress,
+  }).then((report) => {
+    broadcast(current.catalog.status(current.root, current.deviceId));
+    return report;
+  }).finally(() => { zoteroImports.delete(requestId); });
+}
+
+export function cancelZoteroLibraryImport(requestId: string): boolean {
+  const controller = zoteroImports.get(requestId);
+  if (!controller) return false;
+  controller.abort();
+  return true;
+}
+
 export function closeGlobalLibrary(): void {
+  for (const controller of zoteroImports.values()) controller.abort();
+  zoteroImports.clear();
   live?.catalog.close();
   live = null;
 }

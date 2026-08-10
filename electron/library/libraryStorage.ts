@@ -127,17 +127,18 @@ export class LibraryDiskStore {
     now = new Date().toISOString(),
   ): LibraryItemRecord {
     this.initialize();
-    const current = this.readMaterializedItem(input.storageId);
+    const { format: _format, formatVersion: _formatVersion, clock: _clock, ...cleanInput } = input as typeof input & Partial<Pick<LibraryItemRecord, 'format' | 'formatVersion' | 'clock'>>;
+    const current = this.readMaterializedItem(cleanInput.storageId);
     if (expectedRevision !== undefined && (current?.clock.revision ?? 0) !== expectedRevision) {
       throw new Error('El documento cambió en otro dispositivo. Actualiza la biblioteca antes de volver a guardar.');
     }
     const revision = (current?.clock.revision ?? 0) + 1;
     const base = {
-      ...input,
+      ...cleanInput,
       format: 'nodus.library-item' as const,
       formatVersion: 1 as const,
-      createdAt: input.createdAt ?? current?.createdAt ?? now,
-      deletedAt: input.deletedAt ?? null,
+      createdAt: cleanInput.createdAt ?? current?.createdAt ?? now,
+      deletedAt: cleanInput.deletedAt ?? null,
     };
     const record: LibraryItemRecord = {
       ...base,
@@ -171,17 +172,18 @@ export class LibraryDiskStore {
     now = new Date().toISOString(),
   ): LibraryCollectionRecord {
     this.initialize();
-    const current = readJsonFile<unknown>(path.join(this.root, '.nodus', 'collections', `${safeLibraryFolderName(input.id)}.json`));
+    const { format: _format, formatVersion: _formatVersion, clock: _clock, ...cleanInput } = input as typeof input & Partial<Pick<LibraryCollectionRecord, 'format' | 'formatVersion' | 'clock'>>;
+    const current = readJsonFile<unknown>(path.join(this.root, '.nodus', 'collections', `${safeLibraryFolderName(cleanInput.id)}.json`));
     const previous = isLibraryCollectionRecord(current) ? current : null;
     if (expectedRevision !== undefined && (previous?.clock.revision ?? 0) !== expectedRevision) {
       throw new Error('La colección cambió en otro dispositivo. Actualiza la biblioteca antes de volver a guardar.');
     }
     const base = {
-      ...input,
+      ...cleanInput,
       format: 'nodus.library-collection' as const,
       formatVersion: 1 as const,
-      createdAt: input.createdAt ?? previous?.createdAt ?? now,
-      deletedAt: input.deletedAt ?? null,
+      createdAt: cleanInput.createdAt ?? previous?.createdAt ?? now,
+      deletedAt: cleanInput.deletedAt ?? null,
     };
     const record: LibraryCollectionRecord = {
       ...base,

@@ -4115,6 +4115,9 @@ export interface ZoteroAttachmentInfo {
   linkMode: string | null;
   filename: string | null;
   available: boolean;
+  version?: number;
+  parentItem?: string | null;
+  dateModified?: string | null;
 }
 
 /** Rich bibliographic metadata for one work, read live from Zotero for the detail panel. */
@@ -4152,7 +4155,19 @@ export interface ZoteroItem {
   publisher: string | null;
   publicationTitle: string | null;
   isbn: string | null;
+  issn: string | null;
   url: string | null;
+  date: string | null;
+  language: string | null;
+  volume: string | null;
+  issue: string | null;
+  pages: string | null;
+  edition: string | null;
+  place: string | null;
+  rights: string | null;
+  extra: string | null;
+  dateAdded: string | null;
+  dateModified: string | null;
 }
 
 /** A raw Zotero creator. `creatorType` distinguishes author/editor/translator/… */

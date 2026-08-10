@@ -7,6 +7,7 @@ import type {
   LibraryCatalogQuery,
   LibraryCollectionRecord,
   LibraryItemRecord,
+  LibraryImportSourceState,
   LibraryRebuildResult,
   LibraryStatus,
   LibraryVaultLink,
@@ -54,6 +55,7 @@ export class LibraryCatalog {
         storage_id TEXT NOT NULL UNIQUE,
         folder_name TEXT NOT NULL,
         source TEXT NOT NULL,
+        source_library_id TEXT,
         source_key TEXT,
         citation_key TEXT,
         title TEXT NOT NULL,
@@ -84,6 +86,7 @@ export class LibraryCatalog {
         parent_id TEXT,
         position INTEGER NOT NULL,
         source TEXT NOT NULL,
+        source_library_id TEXT,
         source_key TEXT,
         revision INTEGER NOT NULL,
         updated_at TEXT NOT NULL,
@@ -118,6 +121,15 @@ export class LibraryCatalog {
         PRIMARY KEY (item_id, vault_id, work_id)
       );
       CREATE INDEX IF NOT EXISTS library_vault_links_vault ON library_vault_links (vault_id, work_id);
+      CREATE TABLE IF NOT EXISTS library_import_sources (
+        source_id TEXT PRIMARY KEY,
+        source TEXT NOT NULL,
+        library_id TEXT NOT NULL,
+        library_name TEXT NOT NULL,
+        version INTEGER NOT NULL,
+        imported_at TEXT NOT NULL,
+        configuration_json TEXT NOT NULL
+      );
       CREATE VIRTUAL TABLE IF NOT EXISTS library_items_fts USING fts5(
         item_id UNINDEXED,
         title,
@@ -128,6 +140,14 @@ export class LibraryCatalog {
         tokenize='unicode61 remove_diacritics 2'
       );
     `);
+    this.ensureColumn('library_items', 'source_library_id', 'TEXT');
+    this.ensureColumn('library_collections', 'source_library_id', 'TEXT');
+    this.handle.exec('CREATE INDEX IF NOT EXISTS library_items_source_library ON library_items (source, source_library_id, source_key);');
+  }
+
+  private ensureColumn(table: string, column: string, definition: string): void {
+    const columns = this.handle.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+    if (!columns.some((entry) => entry.name === column)) this.handle.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
   }
 
   close(): void {
@@ -150,12 +170,12 @@ export class LibraryCatalog {
     const collections = store.scanMaterializedCollections();
     const insertItem = this.handle.prepare(`
       INSERT INTO library_items (
-        id, storage_id, folder_name, source, source_key, citation_key, title, item_type,
+        id, storage_id, folder_name, source, source_library_id, source_key, citation_key, title, item_type,
         creators_json, abstract, date_value, year, doi, isbn_json, issn_json, tags_json,
         metadata_json, collection_ids_json, attachment_count, reader_available,
         extraction_status, revision, updated_at, deleted_at
       ) VALUES (
-        @id, @storageId, @folderName, @source, @sourceKey, @citationKey, @title, @itemType,
+        @id, @storageId, @folderName, @source, @sourceLibraryId, @sourceKey, @citationKey, @title, @itemType,
         @creatorsJson, @abstract, @date, @year, @doi, @isbnJson, @issnJson, @tagsJson,
         @metadataJson, @collectionIdsJson, @attachmentCount, @readerAvailable,
         @extractionStatus, @revision, @updatedAt, @deletedAt
@@ -173,8 +193,8 @@ export class LibraryCatalog {
       VALUES (@id, @itemId, @fileName, @relativePath, @mimeType, @byteSize, @sha256, @role)
     `);
     const insertCollection = this.handle.prepare(`
-      INSERT INTO library_collections (id, name, parent_id, position, source, source_key, revision, updated_at, deleted_at)
-      VALUES (@id, @name, @parentId, @position, @source, @sourceKey, @revision, @updatedAt, @deletedAt)
+      INSERT INTO library_collections (id, name, parent_id, position, source, source_library_id, source_key, revision, updated_at, deleted_at)
+      VALUES (@id, @name, @parentId, @position, @source, @sourceLibraryId, @sourceKey, @revision, @updatedAt, @deletedAt)
     `);
     const rebuiltAt = new Date().toISOString();
     this.handle.transaction(() => {
@@ -193,6 +213,7 @@ export class LibraryCatalog {
           storageId: record.storageId,
           folderName: path.basename(folder),
           source: record.source,
+          sourceLibraryId: record.sourceLibraryId ?? null,
           sourceKey: record.sourceKey ?? null,
           citationKey: record.citationKey ?? null,
           title: record.metadata.title,
@@ -231,6 +252,7 @@ export class LibraryCatalog {
         parentId: record.parentId,
         position: record.position,
         source: record.source,
+        sourceLibraryId: record.sourceLibraryId ?? null,
         sourceKey: record.sourceKey ?? null,
         revision: record.clock.revision,
         updatedAt: record.clock.updatedAt,
@@ -306,6 +328,30 @@ export class LibraryCatalog {
     }));
   }
 
+  getImportSource(sourceId: string): LibraryImportSourceState | null {
+    const row = this.handle.prepare('SELECT * FROM library_import_sources WHERE source_id=?').get(sourceId) as Record<string, unknown> | undefined;
+    if (!row) return null;
+    return {
+      sourceId: String(row.source_id),
+      source: row.source as LibraryImportSourceState['source'],
+      libraryId: String(row.library_id),
+      libraryName: String(row.library_name),
+      version: Number(row.version),
+      importedAt: String(row.imported_at),
+      configuration: json(row.configuration_json, {}),
+    };
+  }
+
+  putImportSource(state: LibraryImportSourceState): void {
+    this.handle.prepare(`
+      INSERT INTO library_import_sources (source_id, source, library_id, library_name, version, imported_at, configuration_json)
+      VALUES (@sourceId, @source, @libraryId, @libraryName, @version, @importedAt, @configurationJson)
+      ON CONFLICT(source_id) DO UPDATE SET
+        source=excluded.source, library_id=excluded.library_id, library_name=excluded.library_name,
+        version=excluded.version, imported_at=excluded.imported_at, configuration_json=excluded.configuration_json
+    `).run({ ...state, configurationJson: JSON.stringify(state.configuration) });
+  }
+
   list(query: LibraryCatalogQuery = {}): LibraryCatalogPage {
     const limit = Math.max(1, Math.min(500, Math.trunc(query.limit ?? 100)));
     const offset = Math.max(0, Math.trunc(query.offset ?? 0));
@@ -337,6 +383,7 @@ export class LibraryCatalog {
       id: String(row.id),
       storageId: String(row.storage_id),
       source: row.source as LibraryCatalogItem['source'],
+      sourceLibraryId: row.source_library_id == null ? null : String(row.source_library_id),
       sourceKey: row.source_key == null ? null : String(row.source_key),
       citationKey: row.citation_key == null ? null : String(row.citation_key),
       title: String(row.title),
