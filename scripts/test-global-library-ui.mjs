@@ -27,6 +27,24 @@ test('the Library UI exposes hierarchy, search, bulk operations, imports and bac
   assert.match(view, /CollectionBranch[\s\S]*<CollectionBranch/, 'collection rendering is recursively unbounded');
   assert.match(view, /La importación se canceló; el catálogo ya recuperado se conserva/);
   assert.match(view, /Copia de solo lectura: Nodus nunca modifica Zotero/);
+  assert.match(view, /LibraryDocumentReader/);
+  assert.match(view, /onDoubleClick=\{\(\) => item\.readerAvailable/);
+});
+
+test('the global reader exposes annotations, metadata, chat and a temporary original-page viewer', async () => {
+  const [reader, store, protocol, main, html] = await Promise.all([
+    readSource('src/views/LibraryDocumentReader.tsx'), readSource('electron/libraryReader/libraryReaderStore.ts'),
+    readSource('electron/libraryProtocol.ts'), readSource('electron/main.ts'), readSource('index.html'),
+  ]);
+  for (const marker of ['library-reader-document', 'library-reader-sidebar', 'library-reader-metadata', 'library-reader-chat', 'library-original-preview']) assert.match(reader, new RegExp(marker));
+  assert.match(reader, /OriginalPagePreview/);
+  assert.match(reader, /ReaderSelectionActions/);
+  assert.match(store, /function globalDocument/);
+  assert.match(store, /nodus-library:\/\/original/);
+  assert.match(protocol, /Accept-Ranges/);
+  assert.match(main, /registerLibrarySchemePrivileges/);
+  assert.match(main, /registerLibraryProtocol/);
+  assert.match(html, /connect-src[^\"]*nodus-library:/);
 });
 
 test('the typed bridge covers every global management operation', async () => {

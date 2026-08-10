@@ -8,6 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { _electron as electron } from 'playwright-core';
+import { buildTextPdf } from './toolkit-fixtures.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
@@ -90,17 +91,23 @@ La segunda sección permite comprobar el índice, la página de origen y el marc
   const resultsOffset = markdown.indexOf('## Resultados');
   await mkdir(path.join(documentFolder, 'assets'), { recursive: true });
   await writeFile(path.join(documentFolder, 'reader.md'), markdown, 'utf8');
-  await writeFile(path.join(documentFolder, 'original.pdf'), '%PDF-1.4\n% isolated reader fixture\n', 'utf8');
+  await buildTextPdf(documentFolder, 'original.pdf');
   await writeFile(path.join(documentFolder, 'assets', 'figura.png'), tinyPng);
   await writeFile(path.join(documentFolder, 'annotations.json'), '[]\n', 'utf8');
+  const now = new Date().toISOString();
+  const globalItemId = `zotero:${work.zotero_key}`;
   await writeFile(path.join(documentFolder, 'metadata.json'), `${JSON.stringify({
-    storageId: work.zotero_key,
+    format: 'nodus.library-item', formatVersion: 1,
+    id: globalItemId, storageId: work.zotero_key, source: 'zotero', sourceLibraryId: 'users/0', sourceKey: work.zotero_key,
     citationKey: 'readerFixture2026',
-    title: work.title,
-    authors: work.authors,
-    year: work.year,
-    zotero: { itemKey: work.zotero_key },
+    metadata: {
+      title: work.title, itemType: 'article-journal', year: work.year,
+      creators: work.authors.map((name) => ({ creatorType: 'author', name })), isbn: [], issn: [], tags: ['lector'],
+    },
+    collectionIds: [], attachments: [{ id: 'zotero:READERPDF', title: 'PDF', fileName: 'original.pdf', relativePath: 'original.pdf', mimeType: 'application/pdf', byteSize: 1, sha256: 'a'.repeat(64), role: 'original' }],
     files: { reader: 'reader.md', original: 'original.pdf', sourceMap: 'source-map.json' },
+    extraction: { status: 'ready' }, createdAt: now, deletedAt: null,
+    clock: { deviceId: 'reader-e2e-device', revision: 1, baseRevision: 0, updatedAt: now, contentHash: 'b'.repeat(64) },
   }, null, 2)}\n`, 'utf8');
   await writeFile(path.join(documentFolder, 'source-map.json'), `${JSON.stringify({
     pages: [{ page: 1, width: 612, height: 792 }, { page: 2, width: 612, height: 792 }],
@@ -111,6 +118,8 @@ La segunda sección permite comprobar el índice, la página de origen y el marc
     ],
   }, null, 2)}\n`, 'utf8');
 
+  await page.evaluate(() => window.nodus.rebuildGlobalLibrary());
+
   await page.reload();
   await page.waitForFunction(() => Boolean(document.getElementById('root')?.children.length));
   const updateModal = page.getByTestId('startup-update-modal');
@@ -120,8 +129,15 @@ La segunda sección permite comprobar el índice, la página de origen y el marc
     await updateModal.waitFor({ state: 'detached' });
   }
 
+  const globalPage = await page.evaluate(() => window.nodus.listGlobalLibraryItems({ limit: 10, offset: 0 }));
+  assert.equal(globalPage.total, 1, `expected the isolated global reader fixture; catalog contained ${JSON.stringify(globalPage.items)}`);
+  assert.equal(globalPage.items[0]?.id, globalItemId);
+
   await page.locator('[data-tour="nav-library"]').click();
-  await page.getByRole('button', { name: work.title, exact: true }).click();
+  const globalRow = page.getByTestId(`global-library-item-${globalItemId}`);
+  await globalRow.waitFor({ state: 'visible' });
+  await globalRow.getByRole('button').click();
+  await page.getByTestId('global-library-detail').getByRole('button', { name: 'Leer', exact: true }).click();
   const documentRoot = page.getByTestId('library-reader-document');
   await documentRoot.waitFor({ state: 'visible' });
 
@@ -131,7 +147,21 @@ La segunda sección permite comprobar el índice, la página de origen y el marc
   assert.equal(await page.locator('.library-reader-outline nav button').count(), 6, 'three headings expose a title and page action each');
   await page.getByText(work.zotero_key, { exact: true }).waitFor();
   await page.getByRole('button', { name: 'Preguntar al chat' }).waitFor();
-  await page.getByRole('button', { name: 'Abrir PDF completo' }).waitFor();
+  await page.getByRole('button', { name: 'Abrir original completo' }).waitFor();
+
+  await page.getByRole('button', { name: 'Ver página 1' }).click();
+  const originalPreview = page.getByTestId('library-original-preview');
+  await originalPreview.waitFor({ state: 'visible' });
+  await originalPreview.locator('canvas').waitFor({ state: 'visible' });
+  assert.equal(await originalPreview.locator('canvas').getAttribute('data-page'), '1');
+  await originalPreview.getByRole('button', { name: 'Cerrar' }).click();
+
+  const readerSidebar = page.getByTestId('library-reader-sidebar');
+  await readerSidebar.getByRole('tab', { name: 'Metadatos' }).click();
+  assert.match(await page.getByTestId('library-reader-metadata').innerText(), new RegExp(work.zotero_key));
+  await readerSidebar.getByRole('tab', { name: 'Chat' }).click();
+  await page.getByTestId('library-reader-chat').getByRole('button', { name: 'Abrir chat con contexto' }).waitFor();
+  await readerSidebar.getByRole('tab', { name: 'Notas' }).click();
 
   async function selectCandidate(index) {
     return page.evaluate((candidateIndex) => {
@@ -163,7 +193,7 @@ La segunda sección permite comprobar el índice, la página de origen y el marc
   await selectionBar.waitFor({ state: 'visible' });
   assert.equal(await selectionBar.locator('.reader-selection-color').count(), 6);
   await selectionBar.locator('.reader-selection-color').first().click();
-  await page.waitForFunction(async (id) => (await window.nodus.listLibraryReaderAnnotations(id)).some((item) => item.kind === 'highlight'), work.nodus_id);
+  await page.waitForFunction(async (id) => (await window.nodus.listLibraryReaderAnnotations(id)).some((item) => item.kind === 'highlight'), globalItemId);
 
   await selectCandidate(2);
   await selectionBar.waitFor({ state: 'visible' });
@@ -171,10 +201,10 @@ La segunda sección permite comprobar el índice, la página de origen y el marc
   const commentEditor = page.locator('.reader-comment-editor');
   await commentEditor.locator('textarea').fill('Una nota vinculada al fragmento seleccionado.');
   await commentEditor.getByRole('button', { name: 'Guardar', exact: true }).click();
-  await page.waitForFunction(async (id) => (await window.nodus.listLibraryReaderAnnotations(id)).some((item) => item.kind === 'comment'), work.nodus_id);
+  await page.waitForFunction(async (id) => (await window.nodus.listLibraryReaderAnnotations(id)).some((item) => item.kind === 'comment'), globalItemId);
 
   await page.getByRole('button', { name: 'Marcar esta sección' }).click();
-  await page.waitForFunction(async (id) => (await window.nodus.listLibraryReaderAnnotations(id)).some((item) => item.kind === 'bookmark'), work.nodus_id);
+  await page.waitForFunction(async (id) => (await window.nodus.listLibraryReaderAnnotations(id)).some((item) => item.kind === 'bookmark'), globalItemId);
   assert.match(await page.locator('.library-reader-notes').innerText(), /2 fragmentos guardados/);
 
   const diskAnnotations = JSON.parse(await readFile(path.join(documentFolder, 'annotations.json'), 'utf8'));

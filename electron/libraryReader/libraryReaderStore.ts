@@ -9,8 +9,10 @@ import type {
   WritingDraftAnnotationInput,
   WorkView,
 } from '@shared/types';
+import type { LibraryItemRecord } from '@shared/libraryTypes';
 import { getWork } from '../db/worksRepo';
 import { configuredLibraryRootOrThrow, safeLibraryFolderName } from '../library/libraryPaths';
+import { isLibraryItemRecord, legacyMetadataToRecord } from '../library/libraryRecord';
 
 interface ReaderMetadata {
   citationKey?: string;
@@ -19,7 +21,7 @@ interface ReaderMetadata {
   authors?: string[];
   year?: number | null;
   zotero?: { itemKey?: string; attachmentKey?: string };
-  files?: { reader?: string; original?: string; sourceMap?: string };
+  files?: { reader?: string; original?: string; sourceMap?: string; annotations?: string };
 }
 
 interface SourceMapBlock {
@@ -31,6 +33,21 @@ interface SourceMapBlock {
 interface ReaderSourceMap {
   pages?: Array<{ page?: number; width?: number; height?: number }>;
   blocks?: SourceMapBlock[];
+}
+
+interface ReaderIdentity {
+  workId: string;
+  storageId: string;
+  zoteroKey: string | null;
+  title: string;
+  authors: string[];
+  year: number | null;
+}
+
+interface ResolvedReaderDocument {
+  identity: ReaderIdentity;
+  folder: string;
+  metadata: ReaderMetadata;
 }
 
 interface DiskAnnotation {
@@ -69,6 +86,34 @@ function storageIdFor(work: WorkView): string {
 function rawZoteroKey(key: string): string {
   const match = /^groups:[^:]+:(.+)$/.exec(key);
   return match?.[1] ?? key;
+}
+
+function creatorName(creator: LibraryItemRecord['metadata']['creators'][number]): string {
+  return creator.name?.trim() || [creator.firstName, creator.lastName].filter(Boolean).join(' ').trim();
+}
+
+function recordIdentity(record: LibraryItemRecord): ReaderIdentity {
+  return {
+    workId: record.id,
+    storageId: record.storageId,
+    zoteroKey: record.source === 'zotero' ? record.sourceKey?.trim() || null : null,
+    title: record.metadata.title,
+    authors: record.metadata.creators.map(creatorName).filter(Boolean),
+    year: record.metadata.year ?? null,
+  };
+}
+
+function recordReaderMetadata(record: LibraryItemRecord): ReaderMetadata {
+  const identity = recordIdentity(record);
+  return {
+    citationKey: record.citationKey,
+    storageId: record.storageId,
+    title: identity.title,
+    authors: identity.authors,
+    year: identity.year,
+    zotero: identity.zoteroKey ? { itemKey: identity.zoteroKey } : undefined,
+    files: record.files,
+  };
 }
 
 function readJson<T>(filePath: string): T | null {
@@ -194,18 +239,61 @@ function inlineDocumentImages(markdown: string, folder: string): string {
   });
 }
 
-function resolvedDocument(workId: string): { work: WorkView; folder: string; metadata: ReaderMetadata } | null {
-  const work = getWork(workId);
+function globalDocument(documentId: string): ResolvedReaderDocument | null {
+  const root = libraryRoot();
+  if (!fs.existsSync(root)) return null;
+  const inspect = (folder: string): ResolvedReaderDocument | null => {
+    const raw = readJson<unknown>(path.join(folder, 'metadata.json'));
+    const record = isLibraryItemRecord(raw) ? raw : legacyMetadataToRecord(raw, path.basename(folder));
+    if (!record || record.deletedAt) return null;
+    const matches = record.id === documentId || record.storageId === documentId || record.sourceKey === documentId;
+    if (!matches) return null;
+    const metadata = recordReaderMetadata(record);
+    const reader = documentFile(folder, metadata.files?.reader, 'reader.md');
+    if (!fs.existsSync(reader)) return null;
+    return { identity: recordIdentity(record), folder, metadata };
+  };
+  const directNames = new Set([
+    safeLibraryFolderName(documentId),
+    ...(documentId.startsWith('zotero:') ? [safeLibraryFolderName(documentId.slice('zotero:'.length))] : []),
+  ]);
+  for (const name of directNames) {
+    const folder = path.join(root, name);
+    if (fs.existsSync(folder)) {
+      const found = inspect(folder);
+      if (found) return found;
+    }
+  }
+  for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
+    if (!entry.isDirectory() || entry.name.startsWith('.') || directNames.has(entry.name)) continue;
+    const found = inspect(path.join(root, entry.name));
+    if (found) return found;
+  }
+  return null;
+}
+
+function resolvedDocument(documentId: string): ResolvedReaderDocument | null {
+  const global = globalDocument(documentId);
+  if (global) return global;
+  let work: WorkView | null = null;
+  try { work = getWork(documentId); } catch { return null; }
   if (!work) return null;
   const folder = documentFolder(work);
   if (!folder) return null;
-  return { work, folder, metadata: readJson<ReaderMetadata>(path.join(folder, 'metadata.json')) ?? {} };
+  return {
+    identity: {
+      workId: work.nodus_id, storageId: storageIdFor(work), zoteroKey: work.zotero_key || null,
+      title: work.title, authors: work.authors, year: work.year,
+    },
+    folder,
+    metadata: readJson<ReaderMetadata>(path.join(folder, 'metadata.json')) ?? {},
+  };
 }
 
-export function getLibraryReaderDocument(workId: string): LibraryReaderDocument | null {
-  const resolved = resolvedDocument(workId);
+export function getLibraryReaderDocument(documentId: string): LibraryReaderDocument | null {
+  const resolved = resolvedDocument(documentId);
   if (!resolved) return null;
-  const { work, folder, metadata } = resolved;
+  const { identity, folder, metadata } = resolved;
   const readerName = metadata.files?.reader || 'reader.md';
   const originalName = metadata.files?.original || 'original.pdf';
   const sourceMapName = metadata.files?.sourceMap || 'source-map.json';
@@ -216,37 +304,50 @@ export function getLibraryReaderDocument(workId: string): LibraryReaderDocument 
 
   const rawMarkdown = fs.readFileSync(markdownPath, 'utf8');
   const sourceMap = readJson<ReaderSourceMap>(sourceMapPath);
-  const storageId = storageIdFor(work);
+  const originalAvailable = fs.existsSync(originalPath) && fs.statSync(originalPath).isFile();
   return {
-    workId: work.nodus_id,
-    storageId,
-    zoteroKey: work.zotero_key || null,
+    workId: identity.workId,
+    storageId: identity.storageId,
+    zoteroKey: identity.zoteroKey,
     citationKey: metadata.citationKey?.trim() || null,
-    title: metadata.title?.trim() || work.title,
-    authors: Array.isArray(metadata.authors) && metadata.authors.length ? metadata.authors : work.authors,
-    year: typeof metadata.year === 'number' ? metadata.year : work.year,
+    title: metadata.title?.trim() || identity.title,
+    authors: Array.isArray(metadata.authors) && metadata.authors.length ? metadata.authors : identity.authors,
+    year: typeof metadata.year === 'number' ? metadata.year : identity.year,
     markdown: inlineDocumentImages(rawMarkdown, folder),
     sections: sectionsFromMarkdown(rawMarkdown, sourceMap),
     pageCount: sourceMap?.pages?.length || null,
     wordCount: rawMarkdown.split(/\s+/).filter(Boolean).length,
-    originalAvailable: fs.existsSync(originalPath),
-    originalFileName: fs.existsSync(originalPath) ? path.basename(originalPath) : null,
+    originalAvailable,
+    originalFileName: originalAvailable ? path.basename(originalPath) : null,
+    originalUrl: originalAvailable ? `nodus-library://original/${encodeURIComponent(identity.workId)}?v=${encodeURIComponent(path.basename(originalPath))}` : null,
+    originalMimeType: originalAvailable ? mimeForOriginal(originalPath) : null,
     sourceMapAvailable: sourceMap !== null,
   };
 }
 
-export function libraryReaderOriginalPath(workId: string): string | null {
-  const resolved = resolvedDocument(workId);
+function mimeForOriginal(filePath: string): string {
+  return ({
+    '.pdf': 'application/pdf', '.epub': 'application/epub+zip', '.md': 'text/markdown', '.markdown': 'text/markdown',
+    '.txt': 'text/plain', '.html': 'text/html', '.htm': 'text/html', '.png': 'image/png', '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif',
+  } as Record<string, string>)[path.extname(filePath).toLowerCase()] ?? 'application/octet-stream';
+}
+
+export function libraryReaderOriginalPath(documentId: string): string | null {
+  const resolved = resolvedDocument(documentId);
   if (!resolved) return null;
   const name = resolved.metadata.files?.original || 'original.pdf';
   const target = documentFile(resolved.folder, name, 'original.pdf');
   return fs.existsSync(target) && fs.statSync(target).isFile() ? target : null;
 }
 
-function annotationsPath(workId: string): { filePath: string; documentId: string } | null {
-  const resolved = resolvedDocument(workId);
+function annotationsPath(documentId: string): { filePath: string; documentId: string } | null {
+  const resolved = resolvedDocument(documentId);
   if (!resolved) return null;
-  return { filePath: path.join(resolved.folder, 'annotations.json'), documentId: storageIdFor(resolved.work) };
+  return {
+    filePath: documentFile(resolved.folder, resolved.metadata.files?.annotations, 'annotations.json'),
+    documentId: resolved.identity.storageId,
+  };
 }
 
 function validDiskAnnotation(value: unknown): value is DiskAnnotation {

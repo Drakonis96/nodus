@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { GlobalWorkerOptions, getDocument } from 'pdfjs-dist';
+import type { PDFDocumentProxy } from 'pdfjs-dist';
+import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import type {
   LibraryReaderDocument,
+  LibraryReaderReference,
   WritingDraftAnnotation,
   WritingDraftAnnotationColor,
   WritingDraftAnnotationInput,
-  WorkView,
 } from '@shared/types';
 import { ASSISTANT_CONTEXTS, type PendingAssistantNavigationTarget } from '../navigation';
 import { FindInPage } from '../components/FindInPage';
@@ -19,6 +22,8 @@ import {
 import { HoverLabelButton, Icon, Spinner } from '../components/ui';
 import { confirm } from '../components/feedback';
 import { t, tx } from '../i18n';
+
+GlobalWorkerOptions.workerSrc = pdfWorker;
 
 function readingPositionKey(storageId: string): string {
   return `nodus.libraryReader.position.${storageId}`;
@@ -86,12 +91,79 @@ function anchorForElement(root: HTMLElement, element: HTMLElement) {
   };
 }
 
+function OriginalPagePreview({
+  url, initialPage, title, onClose, onOpenFull,
+}: {
+  url: string; initialPage: number; title: string; onClose: () => void; onOpenFull: () => void;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
+  const [pageNumber, setPageNumber] = useState(Math.max(1, initialPage));
+  const [scale, setScale] = useState(1.2);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let current: PDFDocumentProxy | null = null;
+    const task = getDocument({ url });
+    setLoading(true); setError('');
+    void task.promise.then((document) => {
+      current = document; setPdf(document); setPageNumber((value) => Math.min(document.numPages, Math.max(1, value))); setLoading(false);
+    }).catch((cause) => { setError(cause instanceof Error ? cause.message : String(cause)); setLoading(false); });
+    return () => { void task.destroy(); void current?.destroy(); };
+  }, [url]);
+
+  useEffect(() => { setPageNumber(Math.max(1, initialPage)); }, [initialPage]);
+  useEffect(() => {
+    if (!pdf || !canvasRef.current) return;
+    let canceled = false;
+    void pdf.getPage(pageNumber).then(async (page) => {
+      if (canceled || !canvasRef.current) return;
+      const viewport = page.getViewport({ scale });
+      const ratio = Math.min(window.devicePixelRatio || 1, 2);
+      const canvas = canvasRef.current;
+      canvas.width = Math.ceil(viewport.width * ratio); canvas.height = Math.ceil(viewport.height * ratio);
+      canvas.style.width = `${Math.ceil(viewport.width)}px`; canvas.style.height = `${Math.ceil(viewport.height)}px`;
+      await page.render({ canvasContext: canvas.getContext('2d')!, viewport, transform: ratio === 1 ? undefined : [ratio, 0, 0, ratio, 0, 0] }).promise;
+      page.cleanup();
+    }).catch((cause) => { if (!canceled) setError(cause instanceof Error ? cause.message : String(cause)); });
+    return () => { canceled = true; };
+  }, [pdf, pageNumber, scale]);
+  useEffect(() => {
+    const key = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', key); return () => window.removeEventListener('keydown', key);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-[90] flex flex-col bg-black/80 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label={t('Página del original')} data-testid="library-original-preview" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+      <section className="card mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col overflow-hidden shadow-2xl">
+        <header className="flex flex-wrap items-center gap-2 border-b border-neutral-800 px-4 py-2.5">
+          <div className="min-w-0 flex-1"><h2 className="truncate text-sm font-semibold">{title}</h2><p className="text-[10px] text-neutral-500">{t('Vista temporal del original; no se modifica el archivo.')}</p></div>
+          <button className="btn btn-ghost h-8" disabled={pageNumber <= 1} onClick={() => setPageNumber((value) => Math.max(1, value - 1))}><Icon name="chevronLeft" size={13} /> {t('Anterior')}</button>
+          <label className="flex items-center gap-1 text-xs text-neutral-500">{t('Página')}<input className="input h-8 w-16 text-center" type="number" min="1" max={pdf?.numPages ?? 1} value={pageNumber} onChange={(event) => setPageNumber(Math.min(pdf?.numPages ?? 1, Math.max(1, Number(event.target.value) || 1)))} /></label>
+          <span className="text-xs text-neutral-600">/ {pdf?.numPages ?? '—'}</span>
+          <button className="btn btn-ghost h-8 w-8 p-0" aria-label={t('Alejar')} onClick={() => setScale((value) => Math.max(0.55, value - 0.15))}>−</button>
+          <button className="text-[11px] text-neutral-500" onClick={() => setScale(1.2)}>{Math.round(scale * 100)}%</button>
+          <button className="btn btn-ghost h-8 w-8 p-0" aria-label={t('Acercar')} onClick={() => setScale((value) => Math.min(2.5, value + 0.15))}>+</button>
+          <button className="btn btn-ghost h-8 border border-neutral-700" onClick={onOpenFull}><Icon name="external" size={13} /> {t('Abrir completo')}</button>
+          <button className="btn btn-ghost h-8 w-8 p-0" onClick={onClose} aria-label={t('Cerrar')}><Icon name="x" size={14} /></button>
+        </header>
+        <div className="min-h-0 flex-1 overflow-auto bg-neutral-900/70 p-6 text-center">
+          {loading && <div className="grid h-full place-items-center"><Spinner label={t('Cargando página original…')} /></div>}
+          {error && <div role="alert" className="mx-auto max-w-lg rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">{error}</div>}
+          {!loading && !error && <canvas ref={canvasRef} className="mx-auto bg-white shadow-2xl" data-page={pageNumber} />}
+        </div>
+      </section>
+    </div>
+  );
+}
+
 export function LibraryDocumentReader({
-  work,
+  reference,
   onBack,
   onOpenAssistant,
 }: {
-  work: WorkView;
+  reference: LibraryReaderReference;
   onBack: () => void;
   onOpenAssistant: (target?: PendingAssistantNavigationTarget) => void;
 }) {
@@ -109,42 +181,44 @@ export function LibraryDocumentReader({
   const [progress, setProgress] = useState(0);
   const [outlineOpen, setOutlineOpen] = useState(true);
   const [notesOpen, setNotesOpen] = useState(true);
+  const [sidebarTab, setSidebarTab] = useState<'annotations' | 'metadata' | 'chat'>('annotations');
+  const [previewPage, setPreviewPage] = useState<number | null>(null);
 
   const loadReader = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      setReader(await window.nodus.getLibraryReaderDocument(work.nodus_id));
+      setReader(await window.nodus.getLibraryReaderDocument(reference.id));
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : String(nextError));
       setReader(null);
     } finally {
       setLoading(false);
     }
-  }, [work.nodus_id]);
+  }, [reference.id]);
 
   const refreshAnnotations = useCallback(async () => {
     try {
-      setAnnotations(await window.nodus.listLibraryReaderAnnotations(work.nodus_id));
+      setAnnotations(await window.nodus.listLibraryReaderAnnotations(reference.id));
       setAnnotationError(null);
     } catch (nextError) {
       setAnnotationError(nextError instanceof Error ? nextError.message : String(nextError));
     }
-  }, [work.nodus_id]);
+  }, [reference.id]);
 
   useEffect(() => { void loadReader(); }, [loadReader]);
   useEffect(() => {
     if (!reader) return;
     void refreshAnnotations();
     return window.nodus.onLibraryReaderAnnotationsChanged((nodusId) => {
-      if (nodusId === null || nodusId === work.nodus_id) void refreshAnnotations();
+      if (nodusId === null || nodusId === reference.id) void refreshAnnotations();
     });
-  }, [reader, refreshAnnotations, work.nodus_id]);
+  }, [reader, refreshAnnotations, reference.id]);
 
   const createAnnotation = async (input: Omit<WritingDraftAnnotationInput, 'draftId' | 'scope'>) => {
-    const created = await window.nodus.createLibraryReaderAnnotation(work.nodus_id, {
+    const created = await window.nodus.createLibraryReaderAnnotation(reference.id, {
       ...input,
-      draftId: work.nodus_id,
+      draftId: reference.id,
       scope: 'source',
     });
     setAnnotations((current) => [...current.filter((item) => item.id !== created.id), created]);
@@ -152,14 +226,14 @@ export function LibraryDocumentReader({
   };
 
   const updateComment = async (id: string, comment: string) => {
-    const updated = await window.nodus.updateLibraryReaderComment(work.nodus_id, id, comment);
+    const updated = await window.nodus.updateLibraryReaderComment(reference.id, id, comment);
     if (!updated) return void refreshAnnotations();
     setAnnotations((current) => current.map((item) => item.id === updated.id ? updated : item));
     setAnnotationError(null);
   };
 
   const deleteAnnotation = async (id: string) => {
-    await window.nodus.deleteLibraryReaderAnnotation(work.nodus_id, id);
+    await window.nodus.deleteLibraryReaderAnnotation(reference.id, id);
     setAnnotations((current) => current.filter((item) => item.id !== id));
     setAnnotationError(null);
   };
@@ -234,21 +308,18 @@ export function LibraryDocumentReader({
     await createAnnotation({ ...anchor, kind: 'bookmark', color: null });
   };
 
-  const openCurrentPage = async (page: number | null) => {
-    if (page && reader?.zoteroKey) {
-      await window.nodus.openEvidenceAtPage(work.nodus_id, `p. ${page}`);
-      return;
-    }
-    await window.nodus.openLibraryReaderOriginal(work.nodus_id);
+  const openCurrentPage = (page: number | null) => {
+    if (reader?.originalMimeType === 'application/pdf' && reader.originalUrl) setPreviewPage(page ?? 1);
+    else void window.nodus.openLibraryReaderOriginal(reference.id);
   };
 
   const askDocument = () => {
     onOpenAssistant({
-      title: `${t('Lectura:')} ${reader?.title ?? work.title}`,
+      title: `${t('Lectura:')} ${reader?.title ?? reference.title}`,
       selection: ASSISTANT_CONTEXTS.reading,
       prompt:
         `${t('Quiero conversar sobre este documento. Prioriza su texto, sus anotaciones y su relación con el resto del corpus.')}`
-        + `\n\n${reader?.title ?? work.title}\n${(reader?.authors ?? work.authors).join(', ')}`
+        + `\n\n${reader?.title ?? reference.title}\n${(reader?.authors ?? reference.authors).join(', ')}`
         + `${reader?.zoteroKey ? `\nZotero: ${reader.zoteroKey}` : ''}`,
     });
   };
@@ -267,9 +338,9 @@ export function LibraryDocumentReader({
           <div className="max-w-lg rounded-2xl border border-dashed border-neutral-700 bg-neutral-950/30 p-8 text-center">
             <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-indigo-950 text-indigo-300"><Icon name="book" size={21} /></span>
             <h2 className="mt-4 text-base font-semibold text-neutral-100">{t('Todavía no hay una versión limpia de esta obra')}</h2>
-            <p className="mt-2 text-sm leading-6 text-neutral-500">{error ?? tx('El lector buscará el documento en nodus-library/{id}, conservando su identificador estable.', { id: work.zotero_key || work.nodus_id })}</p>
+            <p className="mt-2 text-sm leading-6 text-neutral-500">{error ?? tx('El lector buscará el documento en nodus-library/{id}, conservando su identificador estable.', { id: reference.zoteroKey || reference.id })}</p>
             <div className="mt-5 flex justify-center gap-2">
-              {work.zotero_key && <button className="btn btn-ghost border border-neutral-700" onClick={() => void window.nodus.openInZotero(work.zotero_key)}><Icon name="external" /> {t('Abrir en Zotero')}</button>}
+              {reference.zoteroKey && <button className="btn btn-ghost border border-neutral-700" onClick={() => void window.nodus.openInZotero(reference.zoteroKey!)}><Icon name="external" /> {t('Abrir en Zotero')}</button>}
               <button className="btn btn-primary" onClick={() => void loadReader()}><Icon name="refresh" /> {t('Volver a comprobar')}</button>
             </div>
           </div>
@@ -299,8 +370,8 @@ export function LibraryDocumentReader({
         <ReaderHighlighterControl value={highlighterColor} onChange={setHighlighterColor} />
         <HoverLabelButton icon="bookmark" label={t('Marcar esta sección')} onClick={() => void markCurrentSection()} className="btn-ghost h-9 min-h-9 border border-neutral-700" />
         <HoverLabelButton icon={hasReaderMark ? 'bookmarkFill' : 'bookmark'} label={t('Ir al marcador de lectura')} onClick={() => markActionsRef.current?.goToMark()} disabled={!hasReaderMark} className={`btn-ghost h-9 min-h-9 border ${hasReaderMark ? 'border-amber-700/60 text-amber-300' : 'border-neutral-700 text-neutral-600'}`} />
-        <HoverLabelButton icon="file" label={currentPage ? tx('Ver página {n}', { n: currentPage }) : t('Ver página original')} onClick={() => void openCurrentPage(currentPage)} disabled={!reader.originalAvailable} showLabel={!!currentPage} className="btn-ghost h-9 min-h-9 border border-neutral-700" />
-        <HoverLabelButton icon="external" label={t('Abrir PDF completo')} onClick={() => void window.nodus.openLibraryReaderOriginal(work.nodus_id)} disabled={!reader.originalAvailable} className="btn-ghost h-9 min-h-9 border border-neutral-700" />
+        <HoverLabelButton icon="file" label={currentPage ? tx('Ver página {n}', { n: currentPage }) : t('Ver página original')} onClick={() => openCurrentPage(currentPage)} disabled={!reader.originalAvailable} showLabel={!!currentPage} className="btn-ghost h-9 min-h-9 border border-neutral-700" />
+        <HoverLabelButton icon="external" label={t('Abrir original completo')} onClick={() => void window.nodus.openLibraryReaderOriginal(reference.id)} disabled={!reader.originalAvailable} className="btn-ghost h-9 min-h-9 border border-neutral-700" />
         <HoverLabelButton icon="chat" label={t('Preguntar al chat')} onClick={askDocument} showLabel className="btn-primary h-9 min-h-9" />
         <button className={`btn btn-ghost h-9 w-9 p-0 xl:hidden ${notesOpen ? 'text-indigo-300' : ''}`} onClick={() => setNotesOpen((value) => !value)} aria-label={t('Anotaciones')}><Icon name="notebook" /></button>
         <div className="absolute inset-x-0 bottom-0 h-px bg-neutral-800"><div className="h-full bg-indigo-500 transition-[width]" style={{ width: `${progress}%` }} /></div>
@@ -321,7 +392,7 @@ export function LibraryDocumentReader({
                   <button className="min-w-0 flex-1 px-2 py-2 text-left text-xs leading-4" style={{ paddingLeft: `${8 + Math.max(0, section.level - 1) * 10}px` }} onClick={() => scrollToSection(index)}>
                     <span className="line-clamp-2">{section.title}</span>
                   </button>
-                  {section.page && <button className="mr-1 shrink-0 rounded px-1.5 py-1 text-[9px] tabular-nums text-neutral-600 opacity-0 hover:bg-neutral-800 hover:text-indigo-300 group-hover:opacity-100" title={tx('Abrir página {n} del original', { n: section.page })} onClick={() => void openCurrentPage(section.page)}>p. {section.page}</button>}
+                  {section.page && <button className="mr-1 shrink-0 rounded px-1.5 py-1 text-[9px] tabular-nums text-neutral-600 opacity-0 hover:bg-neutral-800 hover:text-indigo-300 group-hover:opacity-100" title={tx('Abrir página {n} del original', { n: section.page })} onClick={() => openCurrentPage(section.page)}>p. {section.page}</button>}
                 </div>
               ))}
             </nav>
@@ -359,42 +430,55 @@ export function LibraryDocumentReader({
         />
 
         {notesOpen && (
-          <aside className="library-reader-notes w-72 shrink-0 overflow-y-auto border-l border-neutral-800 bg-neutral-950/25 p-4 max-xl:absolute max-xl:inset-y-[3.75rem] max-xl:right-0 max-xl:z-30 max-xl:shadow-2xl">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-xs font-semibold text-neutral-200">{t('Subrayados y anotaciones')}</h2>
-                <p className="mt-0.5 text-[10px] text-neutral-600">{tx('{n} fragmentos guardados', { n: sidebarAnnotations.length })}</p>
-              </div>
+          <aside className="library-reader-notes flex w-80 shrink-0 flex-col overflow-hidden border-l border-neutral-800 bg-neutral-950/25 max-xl:absolute max-xl:inset-y-[3.75rem] max-xl:right-0 max-xl:z-30 max-xl:shadow-2xl" data-testid="library-reader-sidebar">
+            <div className="flex items-center justify-between border-b border-neutral-800 px-3 py-2.5">
+              <h2 className="text-xs font-semibold text-neutral-200">{t('Documento')}</h2>
               <button className="rounded-lg p-1.5 text-neutral-600 hover:bg-neutral-900 hover:text-neutral-300 xl:hidden" onClick={() => setNotesOpen(false)} aria-label={t('Cerrar')}><Icon name="x" size={14} /></button>
             </div>
-            <div className="mt-4 space-y-2">
-              {sidebarAnnotations.map((annotation) => {
-                const color = READER_ANNOTATION_COLORS.find((item) => item.id === annotation.color)?.hex;
-                return (
-                  <article key={annotation.id} className="group rounded-xl border border-neutral-800 bg-neutral-950/35 p-3 hover:border-neutral-700">
+            <div className="grid grid-cols-3 gap-1 border-b border-neutral-800 p-2" role="tablist">
+              {([
+                ['annotations', 'notebook', t('Notas')], ['metadata', 'info', t('Metadatos')], ['chat', 'chat', t('Chat')],
+              ] as const).map(([id, icon, label]) => <button key={id} role="tab" aria-selected={sidebarTab === id} className={`btn h-8 min-w-0 px-2 text-[10px] ${sidebarTab === id ? 'btn-secondary' : 'btn-ghost'}`} onClick={() => setSidebarTab(id)}><Icon name={icon} size={12} /><span className="truncate">{label}</span></button>)}
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto p-4">
+              {sidebarTab === 'annotations' && <div className="space-y-2">
+                <p className="mb-3 text-[10px] text-neutral-600">{tx('{n} fragmentos guardados', { n: sidebarAnnotations.length })}</p>
+                {sidebarAnnotations.map((annotation) => {
+                  const color = READER_ANNOTATION_COLORS.find((item) => item.id === annotation.color)?.hex;
+                  return <article key={annotation.id} className="group rounded-xl border border-neutral-800 bg-neutral-950/35 p-3 hover:border-neutral-700">
                     <button className="block w-full text-left" onClick={() => goToAnnotation(annotation)}>
-                      <span className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-wide text-neutral-600">
-                        {color ? <i className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} /> : <Icon name="chat" size={11} />}
-                        {annotation.kind === 'comment' ? t('Anotación') : t('Subrayado')}
-                      </span>
+                      <span className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-wide text-neutral-600">{color ? <i className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} /> : <Icon name="chat" size={11} />}{annotation.kind === 'comment' ? t('Anotación') : t('Subrayado')}</span>
                       <span className="mt-2 line-clamp-3 block border-l-2 border-neutral-700 pl-2 text-[11px] italic leading-5 text-neutral-400">“{annotation.selectedText.replace(/\s+/g, ' ').trim()}”</span>
                       {annotation.comment && <span className="mt-2 line-clamp-4 block text-xs leading-5 text-neutral-300">{annotation.comment}</span>}
                     </button>
-                    <div className="mt-2 flex justify-end opacity-0 group-hover:opacity-100">
-                      <button className="rounded p-1 text-neutral-600 hover:bg-red-950 hover:text-red-400" aria-label={t('Eliminar')} onClick={async () => {
-                        const accepted = await confirm({ title: t('Eliminar'), message: t('¿Eliminar esta anotación? No se puede deshacer.'), confirmLabel: t('Eliminar'), danger: true });
-                        if (accepted) await deleteAnnotation(annotation.id);
-                      }}><Icon name="trash" size={12} /></button>
-                    </div>
-                  </article>
-                );
-              })}
-              {!sidebarAnnotations.length && <div className="rounded-xl border border-dashed border-neutral-800 px-4 py-8 text-center text-xs leading-5 text-neutral-600">{t('Selecciona texto para subrayarlo, anotarlo o preguntarle a Nodi.')}</div>}
+                    <div className="mt-2 flex justify-end opacity-0 group-hover:opacity-100"><button className="rounded p-1 text-neutral-600 hover:bg-red-950 hover:text-red-400" aria-label={t('Eliminar')} onClick={async () => {
+                      const accepted = await confirm({ title: t('Eliminar'), message: t('¿Eliminar esta anotación? No se puede deshacer.'), confirmLabel: t('Eliminar'), danger: true });
+                      if (accepted) await deleteAnnotation(annotation.id);
+                    }}><Icon name="trash" size={12} /></button></div>
+                  </article>;
+                })}
+                {!sidebarAnnotations.length && <div className="rounded-xl border border-dashed border-neutral-800 px-4 py-8 text-center text-xs leading-5 text-neutral-600">{t('Selecciona texto para subrayarlo, anotarlo o preguntarle a Nodi.')}</div>}
+              </div>}
+              {sidebarTab === 'metadata' && <div data-testid="library-reader-metadata" className="space-y-5">
+                <div><span className="rounded-full bg-emerald-500/10 px-2 py-1 text-[10px] text-emerald-300">{t('Markdown limpio')}</span><h3 className="mt-3 text-sm font-semibold leading-5">{reader.title}</h3><p className="mt-2 text-xs leading-5 text-neutral-500">{reader.authors.join('; ') || t('Sin autoría')}</p></div>
+                <dl className="space-y-3 text-xs">{[
+                  [t('Año'), reader.year], [t('Identificador'), reader.storageId], [t('Clave Zotero'), reader.zoteroKey],
+                  [t('Clave de cita'), reader.citationKey], [t('Original'), reader.originalFileName], [t('Palabras'), reader.wordCount], [t('Páginas'), reader.pageCount],
+                ].filter(([, value]) => value != null && value !== '').map(([label, value]) => <div key={String(label)}><dt className="text-[10px] uppercase tracking-wider text-neutral-600">{label}</dt><dd className="mt-1 break-words text-neutral-300">{String(value)}</dd></div>)}</dl>
+                <p className="rounded-xl border border-neutral-800 p-3 text-[10px] leading-5 text-neutral-600">{t('El Markdown, los recursos y las anotaciones se guardan junto al original dentro de nodus-library.')}</p>
+              </div>}
+              {sidebarTab === 'chat' && <div data-testid="library-reader-chat" className="flex min-h-64 flex-col rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-4">
+                <span className="grid h-9 w-9 place-items-center rounded-xl bg-indigo-500/15 text-indigo-300"><Icon name="chat" /></span>
+                <h3 className="mt-3 text-sm font-semibold">{t('Pregunta sobre esta lectura')}</h3>
+                <p className="mt-2 text-xs leading-5 text-neutral-500">{t('El asistente recibirá el texto limpio, este documento y tus anotaciones como contexto de lectura.')}</p>
+                <button className="btn btn-primary mt-5 w-full" onClick={askDocument}><Icon name="chat" size={13} /> {t('Abrir chat con contexto')}</button>
+              </div>}
             </div>
           </aside>
         )}
       </div>
       <FindInPage targetRef={scrollRef} />
+      {previewPage && reader.originalUrl && <OriginalPagePreview url={reader.originalUrl} initialPage={previewPage} title={reader.title} onClose={() => setPreviewPage(null)} onOpenFull={() => void window.nodus.openLibraryReaderOriginal(reference.id)} />}
     </div>
   );
 }

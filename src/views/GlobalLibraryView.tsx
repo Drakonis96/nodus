@@ -11,9 +11,11 @@ import type {
   ZoteroLibraryPreview,
 } from '@shared/libraryTypes';
 import { Icon, Spinner } from '../components/ui';
+import { LibraryDocumentReader } from './LibraryDocumentReader';
 import { VirtualList } from '../components/VirtualList';
 import { confirm, promptText, toast } from '../components/feedback';
 import { t, tx } from '../i18n';
+import type { PendingAssistantNavigationTarget } from '../navigation';
 
 const PAGE_SIZE = 250;
 
@@ -178,7 +180,12 @@ function ZoteroImportDialog({ onClose, onFinished }: { onClose: () => void; onFi
   );
 }
 
-export function GlobalLibraryView({ onOpenSettings }: { onOpenSettings: () => void }) {
+export function GlobalLibraryView({
+  onOpenSettings, onOpenAssistant,
+}: {
+  onOpenSettings: () => void;
+  onOpenAssistant: (target?: PendingAssistantNavigationTarget) => void;
+}) {
   const [status, setStatus] = useState<LibraryStatus | null>(null);
   const [collections, setCollections] = useState<LibraryCollectionView[]>([]);
   const [items, setItems] = useState<LibraryCatalogItem[]>([]);
@@ -201,6 +208,7 @@ export function GlobalLibraryView({ onOpenSettings }: { onOpenSettings: () => vo
   const [zoteroOpen, setZoteroOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [collectionTarget, setCollectionTarget] = useState('');
+  const [readerItem, setReaderItem] = useState<LibraryItemRecord | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -293,6 +301,26 @@ export function GlobalLibraryView({ onOpenSettings }: { onOpenSettings: () => vo
     await window.nodus.setGlobalLibraryItemsDeleted(ids, true); setSelected(new Set()); setDetailId(null); await load();
   };
 
+  const openReader = async (itemId: string) => {
+    const item = detail?.id === itemId ? detail : await window.nodus.getGlobalLibraryItem(itemId);
+    if (!item?.files?.reader) return;
+    setReaderItem(item);
+  };
+
+  if (readerItem) {
+    return <LibraryDocumentReader
+      reference={{
+        id: readerItem.id,
+        zoteroKey: readerItem.source === 'zotero' ? readerItem.sourceKey ?? null : null,
+        title: readerItem.metadata.title,
+        authors: readerItem.metadata.creators.map((creator) => creator.name || [creator.firstName, creator.lastName].filter(Boolean).join(' ')).filter(Boolean),
+        year: readerItem.metadata.year ?? null,
+      }}
+      onBack={() => setReaderItem(null)}
+      onOpenAssistant={onOpenAssistant}
+    />;
+  }
+
   if (loading && !status) return <div className="grid h-full place-items-center text-sm text-neutral-500"><span className="flex items-center gap-2"><Spinner /> {t('Cargando Biblioteca…')}</span></div>;
   if (!status?.configured) return (
     <div className="grid h-full place-items-center p-8">
@@ -354,7 +382,7 @@ export function GlobalLibraryView({ onOpenSettings }: { onOpenSettings: () => vo
             empty={<div className="grid h-full place-items-center p-8 text-center"><div><Icon name="book" size={28} className="mx-auto text-neutral-700" /><p className="mt-3 text-sm text-neutral-400">{t('No hay documentos que coincidan.')}</p><p className="mt-1 text-xs text-neutral-600">{t('Añade archivos o importa una biblioteca de Zotero.')}</p></div></div>}
             renderItem={(item) => {
               const activeJob = jobs.find((job) => job.itemId === item.id && ['queued', 'processing'].includes(job.status));
-              return <div data-testid={`global-library-item-${item.id}`} className={`grid h-[62px] grid-cols-[2.2rem_minmax(16rem,2fr)_minmax(9rem,1fr)_4.5rem_7rem_7.5rem] items-center border-b border-neutral-900 px-3 text-xs ${detailId === item.id ? 'bg-indigo-500/10' : 'hover:bg-neutral-900/55'}`} onDoubleClick={() => setDetailId(item.id)}>
+              return <div data-testid={`global-library-item-${item.id}`} className={`grid h-[62px] grid-cols-[2.2rem_minmax(16rem,2fr)_minmax(9rem,1fr)_4.5rem_7rem_7.5rem] items-center border-b border-neutral-900 px-3 text-xs ${detailId === item.id ? 'bg-indigo-500/10' : 'hover:bg-neutral-900/55'}`} onDoubleClick={() => item.readerAvailable ? void openReader(item.id) : setDetailId(item.id)}>
                 <input type="checkbox" checked={selected.has(item.id)} onChange={(event) => setSelected((current) => { const next = new Set(current); if (event.target.checked) next.add(item.id); else next.delete(item.id); return next; })} />
                 <button className="min-w-0 pr-4 text-left" onClick={() => setDetailId(item.id)}><b className="block truncate font-medium text-neutral-200">{item.title}</b><span className="mt-1 block truncate text-[10px] text-neutral-600">{item.doi || item.isbn[0] || item.issn[0] || item.sourceKey || item.id}</span></button>
                 <span className="truncate pr-3 text-neutral-500">{creatorText(item) || '—'}</span><span className="tabular-nums text-neutral-500">{item.year ?? '—'}</span><span className="w-fit rounded bg-neutral-900 px-2 py-1 text-[10px] text-neutral-400">{SOURCE_LABEL[item.source]}</span>
@@ -375,7 +403,7 @@ export function GlobalLibraryView({ onOpenSettings }: { onOpenSettings: () => vo
             {detail.metadata.tags?.length ? <div className="mt-5 flex flex-wrap gap-1">{detail.metadata.tags.map((tag) => <span key={tag} className="rounded-full bg-neutral-900 px-2 py-1 text-[10px] text-neutral-400">{tag}</span>)}</div> : null}
             <div className="mt-5 rounded-xl border border-neutral-800 p-3"><div className="flex items-center justify-between text-xs"><span>{t('Versión limpia')}</span><b className={detail.extraction?.status === 'ready' ? 'text-emerald-400' : 'text-neutral-500'}>{t(EXTRACTION_LABEL[detail.extraction?.status ?? 'pending'])}</b></div>{detail.extraction?.error && <p className="mt-2 text-[10px] text-red-400">{detail.extraction.error}</p>}<p className="mt-2 text-[10px] text-neutral-600">{detail.attachments.length} {t('adjuntos')} · {detail.files?.reader ? t('Markdown disponible') : t('Sin Markdown')}</p></div>
           </div>
-          <footer className="grid grid-cols-2 gap-2 border-t border-neutral-800 p-3"><button className="btn btn-primary" disabled={!detail.files?.reader} title={!detail.files?.reader ? t('Procesa el documento primero') : undefined}><Icon name="bookOpen" /> {t('Leer')}</button><button className="btn btn-ghost border border-neutral-700" onClick={() => void processSelected()}><Icon name="refresh" /> {t('Procesar')}</button><button className="btn btn-ghost col-span-2 text-red-400" onClick={() => void deleteSelected()}><Icon name="trash" /> {t('Enviar a la papelera')}</button></footer>
+          <footer className="grid grid-cols-2 gap-2 border-t border-neutral-800 p-3"><button className="btn btn-primary" disabled={!detail.files?.reader} title={!detail.files?.reader ? t('Procesa el documento primero') : undefined} onClick={() => void openReader(detail.id)}><Icon name="bookOpen" /> {t('Leer')}</button><button className="btn btn-ghost border border-neutral-700" onClick={() => void processSelected()}><Icon name="refresh" /> {t('Procesar')}</button><button className="btn btn-ghost col-span-2 text-red-400" onClick={() => void deleteSelected()}><Icon name="trash" /> {t('Enviar a la papelera')}</button></footer>
         </aside>}
       </div>
       {zoteroOpen && <ZoteroImportDialog onClose={() => setZoteroOpen(false)} onFinished={() => void load()} />}

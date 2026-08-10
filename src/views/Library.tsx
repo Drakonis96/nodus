@@ -987,7 +987,13 @@ export function Library({
   if (readerWork) {
     return (
       <LibraryDocumentReader
-        work={readerWork}
+        reference={{
+          id: readerWork.nodus_id,
+          zoteroKey: readerWork.zotero_key,
+          title: readerWork.title,
+          authors: readerWork.authors,
+          year: readerWork.year,
+        }}
         onBack={() => setReaderWork(null)}
         onOpenAssistant={onOpenAssistant}
       />

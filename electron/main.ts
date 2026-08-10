@@ -38,6 +38,7 @@ import { installProcessSafetyNet } from './util/processSafety';
 import { restoreAppWindows } from './windowLifecycle';
 import { registerImageProtocol, registerImageSchemePrivileges } from './imageProtocol';
 import { registerArchiveProtocol, registerArchiveSchemePrivileges } from './archiveProtocol';
+import { registerLibraryProtocol, registerLibrarySchemePrivileges } from './libraryProtocol';
 import { closeGlobalLibrary } from './library/libraryService';
 import {
   upgradeWorldbuildingDemoDynasties,
@@ -59,6 +60,7 @@ const { autoUpdater } = require('electron-updater') as typeof import('electron-u
 app.setName('Nodus');
 registerImageSchemePrivileges();
 registerArchiveSchemePrivileges();
+registerLibrarySchemePrivileges();
 
 if (process.platform === 'linux') {
   app.commandLine.appendSwitch('ozone-platform-hint', 'auto');
@@ -625,6 +627,7 @@ app.whenReady().then(() => {
   relocalizeWorldbuildingDemoData();
   registerImageProtocol();
   registerArchiveProtocol();
+  registerLibraryProtocol();
   reconcileAuthorLayerOnce(); // one-time: collapse duplicate author nodes onto Zotero identity
   // Maintenance: drop ideas that have sat dormant (no occurrences) for >30 days.
   // Recent dormancy is kept — it lets fusion revive an idea with the same

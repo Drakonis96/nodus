@@ -23,7 +23,7 @@ const PrimarySourcesNotesView = lazy(() => import('../../views/PrimarySourcesNot
 const TestimonySearchView = lazy(() => import('../../views/TestimonySearchView').then((module) => ({ default: module.TestimonySearchView })));
 
 export const corpusViews = {
-  library: ({ setView }) => <GlobalLibraryView onOpenSettings={() => setView('settings')} />,
+  library: ({ openAssistant, setView }) => <GlobalLibraryView onOpenSettings={() => setView('settings')} onOpenAssistant={openAssistant} />,
   graph: ({ graphTarget, reloadSettings, settings }) => <GraphView settings={settings} onSettingsChange={reloadSettings} target={graphTarget} />,
   argument: ({ settings }) => <ArgumentMapView settings={settings} />,
   ideas: ({ activeVault, ideaTarget, navigate, openAssistant }) => (

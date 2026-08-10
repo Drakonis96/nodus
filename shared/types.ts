@@ -612,6 +612,16 @@ export interface LibraryReaderSection {
   page: number | null;
 }
 
+/** Minimal stable identity accepted by the reader from either the global catalog
+ * or a legacy vault work. It deliberately carries no vault-specific state. */
+export interface LibraryReaderReference {
+  id: string;
+  zoteroKey: string | null;
+  title: string;
+  authors: string[];
+  year: number | null;
+}
+
 /**
  * A durable, clean reading copy stored beside its immutable original.
  *
@@ -633,6 +643,9 @@ export interface LibraryReaderDocument {
   wordCount: number;
   originalAvailable: boolean;
   originalFileName: string | null;
+  /** Narrow internal URL served only for this preserved original. */
+  originalUrl: string | null;
+  originalMimeType: string | null;
   sourceMapAvailable: boolean;
 }
 
