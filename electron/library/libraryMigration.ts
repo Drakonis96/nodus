@@ -8,6 +8,7 @@ import type {
   LibraryItemRecord,
   LibraryItemType,
   LibraryMigrationProgress,
+  LibraryMigrationPreview,
   LibraryMigrationReport,
   LibraryVaultLink,
 } from '@shared/libraryTypes';
@@ -16,7 +17,19 @@ import { canonicalJson, librarySourceIdentityKey, zoteroSourceIdentity } from '.
 import { LibraryDiskStore } from './libraryStorage';
 import { LibraryCatalog } from './libraryCatalog';
 
-type VaultDescriptor = Pick<VaultSummary, 'id' | 'name' | 'path' | 'type'>;
+export type VaultDescriptor = Pick<VaultSummary, 'id' | 'name' | 'path' | 'type'>
+  & Partial<Pick<VaultSummary, 'origin' | 'remote'>>;
+
+export type LibraryMigrationMutation =
+  | { kind: 'item-created'; id: string; storageId: string; revision: number; contentHash: string }
+  | { kind: 'item-updated'; id: string; storageId: string; revision: number; contentHash: string }
+  | { kind: 'collection-created'; id: string; revision: number; contentHash: string }
+  | { kind: 'collection-updated'; id: string; revision: number; contentHash: string }
+  | { kind: 'link-created'; itemId: string; vaultId: string; workId: string };
+
+export class LibraryMigrationCanceledError extends Error {
+  constructor() { super('La migración se canceló de forma segura en el último checkpoint.'); this.name = 'LibraryMigrationCanceledError'; }
+}
 
 interface LegacyWorkRow extends Record<string, unknown> {
   nodus_id: string;
@@ -202,18 +215,73 @@ function migrationProgress(
   };
 }
 
+function throwIfCanceled(signal?: AbortSignal): void {
+  if (signal?.aborted) throw new LibraryMigrationCanceledError();
+}
+
+export function previewVaultLibraries(vaults: VaultDescriptor[], store: LibraryDiskStore): LibraryMigrationPreview {
+  const createdAt = new Date().toISOString();
+  const seen = new Set(store.scanMaterializedItems().records.flatMap((item) => item.sourceIdentities.map(librarySourceIdentityKey)));
+  const previews: LibraryMigrationPreview['vaults'] = [];
+  for (const vault of vaults) {
+    const warnings: string[] = [];
+    let inventory: VaultInventory | null = null;
+    try { inventory = readInventory(vault); }
+    catch (error) { warnings.push(error instanceof Error ? error.message : String(error)); }
+    let duplicateItems = 0;
+    if (inventory) {
+      for (const row of inventory.works) {
+        const zotero = zoteroParts(row.zotero_key);
+        if (!zotero) continue;
+        const key = librarySourceIdentityKey(zoteroSourceIdentity(zotero.libraryId, zotero.rawKey));
+        if (seen.has(key)) duplicateItems += 1;
+        else seen.add(key);
+      }
+    } else if (!warnings.length) warnings.push('No se encontraron tablas de Biblioteca académica.');
+    const itemCount = inventory?.works.length ?? 0;
+    const collectionCount = inventory?.collections.length ?? 0;
+    inventory?.db.close();
+    const available = Boolean(inventory);
+    const origin = vault.origin === 'connected' ? 'connected' : 'local';
+    const readOnly = origin === 'connected' && (vault.remote?.role === 'reader' || vault.remote?.state !== 'active');
+    let sourceBytes = 0;
+    try { sourceBytes = fs.statSync(vault.path).size; } catch { /* The warning above already makes an inaccessible source explicit. */ }
+    previews.push({
+      id: vault.id, name: vault.name, path: vault.path, type: String(vault.type), origin, readOnly,
+      available, defaultSelected: available && origin === 'local' && vault.type === 'academic',
+      itemCount, collectionCount,
+      sourceBytes,
+      estimatedAdditionalBytes: itemCount * 4096 + collectionCount * 1024,
+      duplicateItems, warnings,
+    });
+  }
+  const selectedVaultIds = previews.filter((vault) => vault.defaultSelected).map((vault) => vault.id);
+  const selected = previews.filter((vault) => selectedVaultIds.includes(vault.id));
+  return {
+    format: 'nodus.library-migration-preview', formatVersion: 1, createdAt, vaults: previews, selectedVaultIds,
+    totalItems: selected.reduce((total, vault) => total + vault.itemCount, 0),
+    totalCollections: selected.reduce((total, vault) => total + vault.collectionCount, 0),
+    estimatedAdditionalBytes: selected.reduce((total, vault) => total + vault.estimatedAdditionalBytes, 0),
+    expectedDuplicateItems: selected.reduce((total, vault) => total + vault.duplicateItems, 0),
+    warnings: previews.flatMap((vault) => vault.warnings.map((warning) => `${vault.name}: ${warning}`)),
+  };
+}
+
 export async function migrateVaultLibraries(options: {
   vaults: VaultDescriptor[];
   store: LibraryDiskStore;
   catalog: LibraryCatalog;
   onProgress?: (progress: LibraryMigrationProgress) => void;
+  onMutation?: (mutation: LibraryMigrationMutation) => void;
+  signal?: AbortSignal;
 }): Promise<LibraryMigrationReport> {
   const started = Date.now();
-  const { vaults, store, catalog, onProgress } = options;
+  const { vaults, store, catalog, onProgress, onMutation, signal } = options;
   const warnings: string[] = [];
   const inventories: VaultInventory[] = [];
   onProgress?.(migrationProgress('inventory', 0, vaults.length, null, 0, 0));
   for (const vault of vaults) {
+    throwIfCanceled(signal);
     try {
       const inventory = readInventory(vault);
       if (inventory) inventories.push(inventory);
@@ -234,10 +302,12 @@ export async function migrateVaultLibraries(options: {
   const links: LibraryVaultLink[] = [];
   try {
     for (let vaultIndex = 0; vaultIndex < inventories.length; vaultIndex += 1) {
+      throwIfCanceled(signal);
       const inventory = inventories[vaultIndex];
       onProgress?.(migrationProgress('collections', vaultIndex, inventories.length, inventory.vault, processedItems, totalItems));
       const canonicalCollectionIds = new Map<string, string>();
       for (const collection of inventory.collections) {
+        throwIfCanceled(signal);
         const parts = zoteroParts(collection.collection_key) ?? { libraryId: 'users/0', rawKey: collection.collection_key };
         const current = store.findCollectionBySource('zotero', parts.libraryId, parts.rawKey)
           ?? store.readMaterializedCollection(`zotero:${collection.collection_key}`);
@@ -262,15 +332,22 @@ export async function migrateVaultLibraries(options: {
           deletedAt: null,
         };
         positions.set(parentId, desired.position + 1);
-        if (!current) { store.upsertCollection(desired); collectionsCreated += 1; }
+        if (!current) {
+          const created = store.upsertCollection(desired); collectionsCreated += 1;
+          onMutation?.({ kind: 'collection-created', id: created.id, revision: created.clock.revision, contentHash: created.clock.contentHash });
+        }
         else {
           const candidate = { ...current, ...desired };
           if (comparableCollection(current) === comparableCollection(candidate)) collectionsUnchanged += 1;
-          else { store.upsertCollection(desired, current.clock.revision); collectionsUpdated += 1; }
+          else {
+            const updated = store.upsertCollection(desired, current.clock.revision); collectionsUpdated += 1;
+            onMutation?.({ kind: 'collection-updated', id: updated.id, revision: updated.clock.revision, contentHash: updated.clock.contentHash });
+          }
         }
       }
 
       for (const row of inventory.works) {
+        throwIfCanceled(signal);
         const zotero = zoteroParts(row.zotero_key);
         const legacyItemId = zotero ? `zotero:${row.zotero_key}` : `nodus:${inventory.vault.id}:${row.nodus_id}`;
         const identity = zotero ? zoteroSourceIdentity(zotero.libraryId, zotero.rawKey) : null;
@@ -311,11 +388,17 @@ export async function migrateVaultLibraries(options: {
           vaultWorkIds: { ...(current?.vaultWorkIds ?? {}), [inventory.vault.id]: row.nodus_id },
           deletedAt: null,
         };
-        if (!current) { store.upsertItem(desiredInput); itemsCreated += 1; }
+        if (!current) {
+          const created = store.upsertItem(desiredInput); itemsCreated += 1;
+          onMutation?.({ kind: 'item-created', id: created.id, storageId: created.storageId, revision: created.clock.revision, contentHash: created.clock.contentHash });
+        }
         else {
           const candidate = { ...current, ...desiredInput } as LibraryItemRecord;
           if (comparableItem(current) === comparableItem(candidate)) itemsUnchanged += 1;
-          else { store.upsertItem(desiredInput, current.clock.revision); itemsUpdated += 1; }
+          else {
+            const updated = store.upsertItem(desiredInput, current.clock.revision); itemsUpdated += 1;
+            onMutation?.({ kind: 'item-updated', id: updated.id, storageId: updated.storageId, revision: updated.clock.revision, contentHash: updated.clock.contentHash });
+          }
         }
         const analysis = {
           lightStatus: row.light_status ?? 'none', deepStatus: row.deep_status ?? 'none',
@@ -336,9 +419,16 @@ export async function migrateVaultLibraries(options: {
         if (processedItems % 100 === 0) await new Promise<void>((resolve) => setImmediate(resolve));
       }
     }
+    throwIfCanceled(signal);
     onProgress?.(migrationProgress('catalog', inventories.length, inventories.length, null, processedItems, totalItems));
+    const existingLinks = catalog.listVaultLinks();
+    const existingLinkKeys = new Set(existingLinks.map((link) => `${link.itemId}\u0000${link.vaultId}\u0000${link.workId}`));
+    for (const link of links) {
+      const key = `${link.itemId}\u0000${link.vaultId}\u0000${link.workId}`;
+      if (!existingLinkKeys.has(key)) onMutation?.({ kind: 'link-created', itemId: link.itemId, vaultId: link.vaultId, workId: link.workId });
+    }
     catalog.rebuild(store);
-    catalog.replaceVaultLinks(links);
+    catalog.upsertVaultLinks(links);
     onProgress?.(migrationProgress('complete', inventories.length, inventories.length, null, processedItems, totalItems));
   } finally {
     for (const inventory of inventories) inventory.db.close();

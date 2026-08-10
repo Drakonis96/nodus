@@ -5,6 +5,9 @@ import type {
   LibraryExtractionJob,
   LibraryItemRecord,
   LibraryItemSource,
+  LibraryMigrationPreview,
+  LibraryMigrationProgress,
+  LibraryMigrationSession,
   LibraryScope,
   LibraryStatus,
   LibraryVaultLink,
@@ -187,6 +190,112 @@ function ZoteroImportDialog({ onClose, onFinished }: { onClose: () => void; onFi
   );
 }
 
+function migrationBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.ceil(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function LibraryMigrationDialog({ onClose, onFinished }: { onClose: () => void; onFinished: () => void }) {
+  const [preview, setPreview] = useState<LibraryMigrationPreview | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [session, setSession] = useState<LibraryMigrationSession | null>(null);
+  const [progress, setProgress] = useState<LibraryMigrationProgress | null>(null);
+  const [busy, setBusy] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    void Promise.all([window.nodus.previewLibraryMigration(), window.nodus.listLibraryMigrationSessions()])
+      .then(([nextPreview, sessions]) => {
+        if (!alive) return;
+        setPreview(nextPreview); setSelected(new Set(nextPreview.selectedVaultIds));
+        setSession(sessions.find((entry) => entry.status !== 'rolled-back') ?? null);
+      })
+      .catch((nextError) => alive && setError(nextError instanceof Error ? nextError.message : String(nextError)))
+      .finally(() => alive && setBusy(false));
+    const off = window.nodus.onLibraryMigrationProgress((next) => {
+      setProgress(next);
+      setSession((current) => !current || current.id !== next.sessionId ? current : {
+        ...current,
+        checkpoint: { phase: next.phase, vaultId: next.vaultId, processedItems: next.processedItems, totalItems: next.totalItems, percent: next.percent, recordedAt: new Date().toISOString() },
+      });
+    });
+    return () => { alive = false; off(); };
+  }, []);
+
+  const execute = async (resume = false) => {
+    if (!preview || busy) return;
+    setBusy(true); setError(null);
+    try {
+      const result = resume && session
+        ? await window.nodus.resumeLibraryMigration(session.id)
+        : await window.nodus.startLibraryMigration({ preview, selectedVaultIds: [...selected] });
+      setSession(result);
+      if (result.status === 'completed') {
+        toast(tx('Migración verificada: {n} documentos enlazados.', { n: result.report?.vaultLinks ?? 0 }));
+        onFinished();
+      }
+    } catch (nextError) { setError(nextError instanceof Error ? nextError.message : String(nextError)); }
+    finally { setBusy(false); }
+  };
+
+  const rollback = async () => {
+    if (!session || busy) return;
+    setBusy(true); setError(null);
+    try {
+      const result = await window.nodus.rollbackLibraryMigration(session.id);
+      setSession(result); onFinished();
+      toast(result.rollbackConflicts.length
+        ? tx('Rollback terminado con {n} conflicto(s) conservado(s).', { n: result.rollbackConflicts.length })
+        : t('Rollback terminado sin pérdida de datos.'));
+    } catch (nextError) { setError(nextError instanceof Error ? nextError.message : String(nextError)); }
+    finally { setBusy(false); }
+  };
+
+  const active = busy && Boolean(progress?.sessionId) && progress?.phase !== 'complete';
+  const shownProgress = progress?.sessionId === session?.id || active ? progress : null;
+  return <div className="fixed inset-0 z-[86] grid place-items-center bg-black/65 p-4" onMouseDown={(event) => { if (event.target === event.currentTarget && !active) onClose(); }}>
+    <section data-testid="library-migration-dialog" className="card flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden shadow-2xl">
+      <header className="flex items-start gap-3 border-b border-neutral-800 p-5"><span className="grid h-10 w-10 place-items-center rounded-xl bg-indigo-500/15 text-indigo-300"><Icon name="vault" /></span><div className="min-w-0 flex-1"><h2 className="font-semibold">{t('Migrar vaults a la Biblioteca global')}</h2><p className="mt-1 text-xs leading-5 text-neutral-500">{t('Simula primero, lee los vaults sin modificarlos y conserva análisis, notas y documentos existentes.')}</p></div><button className="btn btn-ghost" onClick={onClose} disabled={active} aria-label={t('Cerrar')}><Icon name="x" /></button></header>
+      <div className="min-h-0 flex-1 overflow-y-auto p-5">
+        {busy && !preview ? <div className="flex items-center gap-2 py-8 text-sm text-neutral-500"><Spinner /> {t('Creando inventario de solo lectura…')}</div> : preview && <>
+          <div className="grid gap-2 sm:grid-cols-4">
+            {[
+              [t('Documentos'), preview.vaults.filter((vault) => selected.has(vault.id)).reduce((sum, vault) => sum + vault.itemCount, 0)],
+              [t('Colecciones'), preview.vaults.filter((vault) => selected.has(vault.id)).reduce((sum, vault) => sum + vault.collectionCount, 0)],
+              [t('Duplicados previstos'), preview.vaults.filter((vault) => selected.has(vault.id)).reduce((sum, vault) => sum + vault.duplicateItems, 0)],
+              [t('Espacio estimado'), migrationBytes(preview.vaults.filter((vault) => selected.has(vault.id)).reduce((sum, vault) => sum + vault.estimatedAdditionalBytes, 0))],
+            ].map(([label, value]) => <div key={String(label)} className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-3"><span className="block text-[9px] uppercase tracking-wider text-neutral-600">{label}</span><b className="mt-1 block text-sm tabular-nums">{value}</b></div>)}
+          </div>
+          <div className="mt-4 space-y-2">{preview.vaults.map((vault) => <label key={vault.id} className={`flex items-center gap-3 rounded-xl border p-3 ${selected.has(vault.id) ? 'border-indigo-500/40 bg-indigo-500/5' : 'border-neutral-800'}`}>
+            <input type="checkbox" checked={selected.has(vault.id)} disabled={active || !vault.available} onChange={(event) => setSelected((current) => { const next = new Set(current); if (event.target.checked) next.add(vault.id); else next.delete(vault.id); return next; })} />
+            <Icon name="vault" size={15} className="text-neutral-500" /><span className="min-w-0 flex-1"><b className="block truncate text-sm font-medium">{vault.name}</b><span className="text-[10px] text-neutral-600">{vault.type} · {vault.origin === 'local' ? t('local') : t('conectado')} · {vault.itemCount} {t('documentos')}</span>{vault.warnings.map((warning) => <span key={warning} className="mt-1 block text-[10px] text-amber-400">{t(warning)}</span>)}</span>
+            {vault.defaultSelected && <span className="rounded-full bg-emerald-500/10 px-2 py-1 text-[9px] text-emerald-300">{t('Recomendado')}</span>}
+          </label>)}</div>
+        </>}
+        {(shownProgress || session) && <div data-testid="library-migration-progress" className="mt-5 rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-4">
+          <div className="flex items-center justify-between gap-3 text-xs"><b>{session?.status === 'completed' ? t('Migración verificada') : session?.status === 'rolled-back' ? t('Migración revertida') : session?.status === 'canceled' ? t('Migración pausada de forma segura') : t('Migrando Biblioteca…')}</b><span className="tabular-nums">{shownProgress?.percent ?? session?.checkpoint.percent ?? 0}%</span></div>
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-neutral-800"><div className="h-full bg-indigo-500 transition-[width]" style={{ width: `${shownProgress?.percent ?? session?.checkpoint.percent ?? 0}%` }} /></div>
+          <p className="mt-2 text-[10px] text-neutral-500">{shownProgress?.processedItems ?? session?.checkpoint.processedItems ?? 0}/{shownProgress?.totalItems || session?.checkpoint.totalItems || '—'} {t('documentos')} · {t('checkpoint recuperable')}</p>
+          {session?.verification && <div className="mt-3 grid grid-cols-2 gap-1 text-[10px] text-emerald-400"><span>✓ {t('Catálogo')}</span><span>✓ {t('Manifiestos')}</span><span>✓ {t('Archivos')}</span><span>✓ {t('Enlaces')}</span></div>}
+          {session?.rollbackConflicts.length ? <p className="mt-3 text-[10px] text-amber-300">{tx('{n} registro(s) modificados después de migrar se conservaron para revisión.', { n: session.rollbackConflicts.length })}</p> : null}
+        </div>}
+        {error && <p role="alert" className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-300">{error}</p>}
+      </div>
+      <footer className="flex flex-wrap justify-end gap-2 border-t border-neutral-800 p-4">
+        {active && progress?.sessionId ? <button className="btn btn-ghost border border-neutral-700" onClick={() => void window.nodus.cancelLibraryMigration(progress.sessionId!)}><Icon name="x" /> {t('Cancelar con seguridad')}</button> : <>
+          {session && ['canceled', 'failed'].includes(session.status) && <button className="btn btn-primary" disabled={busy} onClick={() => void execute(true)}><Icon name="refresh" /> {t('Reanudar')}</button>}
+          {session && ['completed', 'canceled', 'failed'].includes(session.status) && <button className="btn btn-ghost border border-amber-500/30 text-amber-300" disabled={busy} onClick={() => void rollback()}><Icon name="undo" /> {t('Revertir esta migración')}</button>}
+          {session?.status === 'completed' && <button className="btn btn-ghost border border-neutral-700" disabled={busy} onClick={() => { setSession(null); setProgress(null); }}>{t('Nueva simulación')}</button>}
+          <button className="btn btn-ghost" disabled={busy} onClick={onClose}>{t('Cerrar')}</button>
+          {(!session || session.status === 'rolled-back') && <button data-testid="start-library-migration" className="btn btn-primary" disabled={busy || selected.size === 0} onClick={() => void execute()}><Icon name="check" /> {t('Migrar y verificar')}</button>}
+        </>}
+      </footer>
+    </section>
+  </div>;
+}
+
 function VaultLinkDialog({ itemIds, onClose, onLinked }: {
   itemIds: string[];
   onClose: () => void;
@@ -254,6 +363,7 @@ function GlobalLibraryContent({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [zoteroOpen, setZoteroOpen] = useState(false);
+  const [migrationOpen, setMigrationOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [collectionTarget, setCollectionTarget] = useState('');
   const [readerItem, setReaderItem] = useState<LibraryItemRecord | null>(null);
@@ -413,6 +523,7 @@ function GlobalLibraryContent({
         <div className="min-w-0"><h1 className="flex items-center gap-2 text-lg font-semibold"><Icon name="book" className="text-indigo-400" /> {t('Biblioteca')}</h1><p className="text-[11px] text-neutral-500">{tx('{n} documentos · disponible en todos los vaults', { n: status.items })}</p></div>
         <div className="flex-1" />
         {activeJobs.length > 0 && <span className="flex items-center gap-2 rounded-full bg-indigo-500/10 px-3 py-1.5 text-xs text-indigo-300"><Spinner /> {tx('{n} tarea(s) en segundo plano', { n: activeJobs.length })}</span>}
+        <button data-testid="open-library-migration" className="btn btn-ghost border border-neutral-700" onClick={() => setMigrationOpen(true)}><Icon name="vault" /> {t('Migrar vaults')}</button>
         <button data-testid="open-library-duplicates" className="btn btn-ghost border border-neutral-700" onClick={() => setDuplicatesOpen(true)}><Icon name="copy" /> {t('Duplicados')}</button>
         <button data-testid="import-library-bibliography" className="btn btn-ghost border border-neutral-700" onClick={() => void importBibliography()}><Icon name="fileText" /> {t('Importar referencias')}</button>
         <button className="btn btn-ghost border border-neutral-700" onClick={() => void importFiles()}><Icon name="upload" /> {t('Añadir archivos')}</button>
@@ -485,6 +596,7 @@ function GlobalLibraryContent({
         </aside>}
       </div>
       {zoteroOpen && <ZoteroImportDialog onClose={() => setZoteroOpen(false)} onFinished={() => void load()} />}
+      {migrationOpen && <LibraryMigrationDialog onClose={() => setMigrationOpen(false)} onFinished={() => void load()} />}
       {metadataItem && <LibraryMetadataEditor item={metadataItem} onClose={() => setMetadataItem(null)} onSaved={(saved) => { setDetail(saved); void load(); }} />}
       {duplicatesOpen && <LibraryDuplicatesDialog onClose={() => setDuplicatesOpen(false)} onChanged={() => void load()} />}
       {vaultLinkItems && <VaultLinkDialog itemIds={vaultLinkItems} onClose={() => setVaultLinkItems(null)} onLinked={(links) => {

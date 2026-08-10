@@ -5,6 +5,12 @@ import {
   getGlobalLibraryStatus,
   listGlobalLibraryItems,
   migrateExistingVaultLibraries,
+  previewLibraryMigration,
+  startLibraryMigration,
+  resumeLibraryMigration,
+  cancelLibraryMigration,
+  rollbackLibraryMigration,
+  listLibraryMigrationSessions,
   rebuildGlobalLibrary,
   cancelZoteroLibraryImport,
   listZoteroImportLibraries,
@@ -36,6 +42,12 @@ export function registerLibraryIpc({ h }: IpcContext): void {
   h('library:rebuild', async () => rebuildGlobalLibrary());
   h('library:list', async (_event, query) => listGlobalLibraryItems(query));
   h('library:migrateVaults', async () => migrateExistingVaultLibraries());
+  h('library:migrationPreview', async () => previewLibraryMigration());
+  h('library:startMigration', async (_event, request) => startLibraryMigration(request));
+  h('library:resumeMigration', async (_event, sessionId) => resumeLibraryMigration(sessionId));
+  h('library:cancelMigration', async (_event, sessionId) => cancelLibraryMigration(sessionId));
+  h('library:rollbackMigration', async (_event, sessionId) => rollbackLibraryMigration(sessionId));
+  h('library:migrationSessions', async () => listLibraryMigrationSessions());
   h('library:zoteroLibraries', async () => listZoteroImportLibraries());
   h('library:importZotero', async (event, requestId, selection) => startZoteroLibraryImport(
     requestId, selection, (progress) => {

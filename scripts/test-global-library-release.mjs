@@ -35,6 +35,7 @@ test('the complete Global Library ships with recovery, privacy, hardening and re
   for (const file of [
     'scripts/test-library-storage.mjs',
     'scripts/test-library-migration.mjs',
+    'scripts/test-library-migration-sessions.mjs',
     'scripts/test-zotero-library-import.mjs',
     'scripts/test-library-extraction.mjs',
     'scripts/test-global-library-operations.mjs',

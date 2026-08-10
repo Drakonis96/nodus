@@ -7,6 +7,7 @@ import type {
 } from '@shared/libraryTypes';
 import {
   atomicWriteJson,
+  assertInside,
   readJsonFile,
   safeLibraryFolderName,
 } from './libraryPaths';
@@ -319,6 +320,29 @@ export class LibraryDiskStore {
   findCollectionBySource(source: LibraryCollectionRecord['source'], libraryId: string, sourceKey: string): LibraryCollectionRecord | null {
     return this.scanMaterializedCollections().records.find((collection) => collection.source === source
       && collection.sourceLibraryId === libraryId && collection.sourceKey === sourceKey) ?? null;
+  }
+
+  /** Remove a record created by a migration only while its exact revision is still current. */
+  rollbackCreatedItem(input: { id: string; storageId: string; revision: number; contentHash: string }): boolean {
+    const current = this.readMaterializedItem(input.storageId);
+    if (!current || current.id !== input.id || current.clock.revision !== input.revision
+      || current.clock.contentHash !== input.contentHash) return false;
+    const folder = assertInside(this.root, this.itemFolder(input.storageId));
+    const versions = assertInside(this.root, this.versionsDirectory('items', input.id));
+    fs.rmSync(folder, { recursive: true, force: true });
+    fs.rmSync(versions, { recursive: true, force: true });
+    return true;
+  }
+
+  /** Collection counterpart to rollbackCreatedItem, with the same optimistic guard. */
+  rollbackCreatedCollection(input: { id: string; revision: number; contentHash: string }): boolean {
+    const current = this.readMaterializedCollection(input.id);
+    if (!current || current.clock.revision !== input.revision || current.clock.contentHash !== input.contentHash) return false;
+    const materialized = assertInside(this.root, path.join(this.root, '.nodus', 'collections', `${safeLibraryFolderName(input.id)}.json`));
+    const versions = assertInside(this.root, this.versionsDirectory('collections', input.id));
+    fs.rmSync(materialized, { force: true });
+    fs.rmSync(versions, { recursive: true, force: true });
+    return true;
   }
 }
 

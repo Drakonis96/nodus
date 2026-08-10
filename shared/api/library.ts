@@ -4,6 +4,9 @@ import type {
   LibraryRebuildResult,
   LibraryMigrationProgress,
   LibraryMigrationReport,
+  LibraryMigrationPreview,
+  LibraryMigrationSession,
+  LibraryMigrationStartRequest,
   LibraryStatus,
   ZoteroImportProgress,
   ZoteroImportReport,
@@ -33,6 +36,12 @@ export interface LibraryApi {
   rebuildGlobalLibrary(): Promise<LibraryRebuildResult>;
   listGlobalLibraryItems(query?: LibraryCatalogQuery): Promise<LibraryCatalogPage>;
   migrateExistingVaultLibraries(): Promise<LibraryMigrationReport>;
+  previewLibraryMigration(): Promise<LibraryMigrationPreview>;
+  startLibraryMigration(request: LibraryMigrationStartRequest): Promise<LibraryMigrationSession>;
+  resumeLibraryMigration(sessionId: string): Promise<LibraryMigrationSession>;
+  cancelLibraryMigration(sessionId: string): Promise<boolean>;
+  rollbackLibraryMigration(sessionId: string): Promise<LibraryMigrationSession>;
+  listLibraryMigrationSessions(): Promise<LibraryMigrationSession[]>;
   listZoteroImportLibraries(): Promise<ZoteroLibraryPreview[]>;
   importZoteroLibrary(requestId: string, selection?: ZoteroImportSelection): Promise<ZoteroImportReport>;
   cancelZoteroLibraryImport(requestId: string): Promise<boolean>;

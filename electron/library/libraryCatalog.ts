@@ -202,6 +202,10 @@ export class LibraryCatalog {
 
   rebuild(store: LibraryDiskStore): LibraryRebuildResult {
     const started = Date.now();
+    // Vault links are rebuildable cache state, but their source vaults may be closed.
+    // Preserve them inside the same SQLite transaction that replaces the item index,
+    // so a crash between rebuild and a migration refresh cannot erase valid links.
+    const preservedVaultLinks = this.listVaultLinks();
     const reconciled = store.reconcile();
     const items = store.scanMaterializedItems();
     const collections = store.scanMaterializedCollections();
@@ -244,6 +248,10 @@ export class LibraryCatalog {
     const insertCollectionAlias = this.handle.prepare(
       'INSERT OR IGNORE INTO library_collection_aliases (alias, collection_id) VALUES (?, ?)'
     );
+    const restoreVaultLink = this.handle.prepare(`
+      INSERT OR IGNORE INTO library_vault_links (item_id, vault_id, vault_name, vault_type, work_id, analysis_json)
+      VALUES (@itemId, @vaultId, @vaultName, @vaultType, @workId, @analysisJson)
+    `);
     const rebuiltAt = new Date().toISOString();
     this.handle.transaction(() => {
       this.handle.exec(`
@@ -317,6 +325,10 @@ export class LibraryCatalog {
           deletedAt: record.deletedAt,
         });
         if (!record.deletedAt) for (const alias of record.aliases) insertCollectionAlias.run(alias, record.id);
+      }
+      const liveItemIds = new Set(items.records.map((record) => record.id));
+      for (const link of preservedVaultLinks) if (liveItemIds.has(link.itemId)) {
+        restoreVaultLink.run({ ...link, analysisJson: JSON.stringify(link.analysis) });
       }
       this.putMeta('formatVersion', '2');
       this.putMeta('root', store.root);

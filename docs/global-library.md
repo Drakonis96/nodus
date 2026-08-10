@@ -94,6 +94,28 @@ Legacy vault migration records the original `workId` per vault in the canonical
 item manifest. Relinking that item reuses the original work instead of creating
 a second corpus entry.
 
+### Opt-in migration sessions
+
+The Global Library migration is an explicit assistant, not an upgrade side
+effect. Its first step opens every candidate SQLite vault in read-only mode and
+shows an inventory, projected deduplication, warnings, and an estimated storage
+cost. Local academic vaults are initially selected; teaching, creative, remote,
+or unavailable vaults remain visible but are not silently included.
+
+Each run is stored under `.nodus/migrations/` as a session plus an append-only
+mutation journal. Checkpoints make cancellation and process interruption safe:
+resuming replays the same idempotent identities, so an item or collection is not
+created twice. Source vaults are never written. Their scans, summaries, notes,
+ideas, passages, embeddings, existing Markdown, and files remain authoritative
+and are represented by durable vault links.
+
+Completion requires a verification pass across the catalog, manifests, declared
+files, and vault links. Rollback removes only records and links created by that
+session. A record edited after migration fails its optimistic revision check and
+is retained as an explicit rollback conflict instead of being overwritten or
+deleted. The historical `library:migrateVaults` IPC remains an adapter over the
+same session engine for older clients.
+
 ## Import and organization
 
 ### Zotero

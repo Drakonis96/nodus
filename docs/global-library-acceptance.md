@@ -27,6 +27,10 @@ button exists.
 | Migration | Two vaults migrate without duplicating the same Zotero item | Verified | `test-library-migration` |
 | Migration | Existing Markdown and originals are not overwritten | Verified | `test-library-migration` |
 | Migration | Nodus-only works retain their original per-vault `workId` | Verified | `test-library-migration` |
+| Migration | Preview is read-only, estimates space and initially selects local academic vaults | Verified | `test-library-migration-sessions`, `e2e-global-library` |
+| Migration | Cancellation persists a recoverable checkpoint and resume remains idempotent | Verified | `test-library-migration-sessions` |
+| Migration | Completion verifies catalog, manifests, files and links | Verified | `test-library-migration-sessions`, `e2e-global-library` |
+| Migration | Rollback removes only session-created state and retains later edits as conflicts | Verified | `test-library-migration-sessions` |
 | Zotero | Personal and group libraries are discovered | Verified | `test-zotero-library-import` |
 | Zotero | Keys, hierarchy, and membership retain unlimited depth | Verified | `test-zotero-library-import`, `test-global-library-ui` |
 | Zotero | Version-based refresh resumes and does not duplicate attachments | Verified | `test-zotero-library-import` |

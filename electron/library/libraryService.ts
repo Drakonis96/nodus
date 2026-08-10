@@ -3,7 +3,10 @@ import type {
   LibraryCatalogPage,
   LibraryCatalogQuery,
   LibraryMigrationProgress,
+  LibraryMigrationPreview,
   LibraryMigrationReport,
+  LibraryMigrationSession,
+  LibraryMigrationStartRequest,
   LibraryRebuildResult,
   LibraryStatus,
   ZoteroImportProgress,
@@ -36,7 +39,7 @@ import {
 import { getVault, listVaults } from '../vaults/vaultRegistry';
 import { withVaultDatabase, getDb } from '../db/database';
 import { getWork, getWorkByZoteroKey, upsertWork } from '../db/worksRepo';
-import { migrateVaultLibraries } from './libraryMigration';
+import { LibraryMigrationSessionManager } from './libraryMigrationSessions';
 import { importZoteroLibraries, previewZoteroLibraries } from './zoteroLibraryImport';
 import { LibraryExtractionQueue } from './libraryExtractionQueue';
 import { completeTextNeutral } from '../ai/aiClient';
@@ -53,8 +56,8 @@ let live: {
   catalog: LibraryCatalog;
   extraction: LibraryExtractionQueue;
   operations: LibraryOperations;
+  migrations: LibraryMigrationSessionManager;
 } | null = null;
-let migration: Promise<LibraryMigrationReport> | null = null;
 const zoteroImports = new Map<string, AbortController>();
 
 async function libraryRemoteOcr(input: { image: Buffer; mimeType: 'image/png' }): Promise<string> {
@@ -100,7 +103,8 @@ function service(): NonNullable<typeof live> | null {
   store.initialize();
   const catalog = new LibraryCatalog(localLibraryDatabasePath());
   const extraction = new LibraryExtractionQueue({ store, catalog, onProgress: broadcastExtraction, remoteOcr: libraryRemoteOcr });
-  live = { root, deviceId, store, catalog, extraction, operations: new LibraryOperations(store, catalog) };
+  const migrations = new LibraryMigrationSessionManager(store, catalog, listVaults, broadcastMigration);
+  live = { root, deviceId, store, catalog, extraction, operations: new LibraryOperations(store, catalog), migrations };
   return live;
 }
 
@@ -148,23 +152,59 @@ export function listGlobalLibraryItems(query?: LibraryCatalogQuery): LibraryCata
 }
 
 export function migrateExistingVaultLibraries(): Promise<LibraryMigrationReport> {
-  if (migration) return migration;
   const current = service();
   if (!current) return Promise.reject(new Error('Configura primero la carpeta de copias de seguridad de Nodus.'));
-  migration = migrateVaultLibraries({
-    vaults: listVaults(),
-    store: current.store,
-    catalog: current.catalog,
-    onProgress: broadcastMigration,
-  }).then((report) => {
+  const preview = current.migrations.preview();
+  const selectedVaultIds = preview.vaults.filter((vault) => vault.available).map((vault) => vault.id);
+  return current.migrations.start({ preview, selectedVaultIds }).then((session) => {
+    if (!session.report || session.status !== 'completed') throw new Error(session.error ?? 'La migración no se completó.');
     const readyToExtract = current.store.scanMaterializedItems().records
       .filter((item) => !item.deletedAt && item.source === 'zotero' && item.extraction?.status === 'pending' && !!item.files?.original)
       .map((item) => item.id);
     if (readyToExtract.length) current.extraction.enqueue(readyToExtract);
     broadcast(current.catalog.status(current.root, current.deviceId));
-    return report;
-  }).finally(() => { migration = null; });
-  return migration;
+    return session.report;
+  });
+}
+
+export function previewLibraryMigration(): LibraryMigrationPreview {
+  const current = service();
+  if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
+  return current.migrations.preview();
+}
+
+export function startLibraryMigration(request: LibraryMigrationStartRequest): Promise<LibraryMigrationSession> {
+  const current = service();
+  if (!current) return Promise.reject(new Error('Configura primero la carpeta de copias de seguridad de Nodus.'));
+  return current.migrations.start(request).then((session) => {
+    broadcast(current.catalog.status(current.root, current.deviceId));
+    return session;
+  });
+}
+
+export function resumeLibraryMigration(sessionId: string): Promise<LibraryMigrationSession> {
+  const current = service();
+  if (!current) return Promise.reject(new Error('Configura primero la carpeta de copias de seguridad de Nodus.'));
+  return current.migrations.resume(sessionId).then((session) => {
+    broadcast(current.catalog.status(current.root, current.deviceId));
+    return session;
+  });
+}
+
+export function cancelLibraryMigration(sessionId: string): boolean {
+  return service()?.migrations.cancel(sessionId) ?? false;
+}
+
+export function rollbackLibraryMigration(sessionId: string): LibraryMigrationSession {
+  const current = service();
+  if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
+  const session = current.migrations.rollback(sessionId);
+  broadcast(current.catalog.status(current.root, current.deviceId));
+  return session;
+}
+
+export function listLibraryMigrationSessions(): LibraryMigrationSession[] {
+  return service()?.migrations.list() ?? [];
 }
 
 export function listZoteroImportLibraries(): Promise<ZoteroLibraryPreview[]> {

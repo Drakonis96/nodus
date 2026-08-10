@@ -416,7 +416,8 @@ export interface LibraryVaultLinkReport {
 }
 
 export interface LibraryMigrationProgress {
-  phase: 'inventory' | 'collections' | 'items' | 'catalog' | 'complete';
+  sessionId?: string;
+  phase: 'inventory' | 'collections' | 'items' | 'catalog' | 'verify' | 'rollback' | 'complete';
   vaultIndex: number;
   vaultCount: number;
   vaultId: string | null;
@@ -424,6 +425,96 @@ export interface LibraryMigrationProgress {
   processedItems: number;
   totalItems: number;
   percent: number;
+}
+
+export type LibraryMigrationSessionStatus =
+  | 'preview'
+  | 'running'
+  | 'canceled'
+  | 'failed'
+  | 'completed'
+  | 'rolled-back';
+
+export interface LibraryMigrationVaultPreview {
+  id: string;
+  name: string;
+  path: string;
+  type: string;
+  origin: 'local' | 'connected';
+  readOnly: boolean;
+  available: boolean;
+  defaultSelected: boolean;
+  itemCount: number;
+  collectionCount: number;
+  sourceBytes: number;
+  estimatedAdditionalBytes: number;
+  duplicateItems: number;
+  warnings: string[];
+}
+
+export interface LibraryMigrationPreview {
+  format: 'nodus.library-migration-preview';
+  formatVersion: 1;
+  createdAt: string;
+  vaults: LibraryMigrationVaultPreview[];
+  selectedVaultIds: string[];
+  totalItems: number;
+  totalCollections: number;
+  estimatedAdditionalBytes: number;
+  expectedDuplicateItems: number;
+  warnings: string[];
+}
+
+export interface LibraryMigrationCheckpoint {
+  phase: LibraryMigrationProgress['phase'];
+  vaultId: string | null;
+  processedItems: number;
+  totalItems: number;
+  percent: number;
+  recordedAt: string;
+}
+
+export interface LibraryMigrationCreatedRecord {
+  kind: 'item' | 'collection';
+  id: string;
+  storageId?: string;
+  revision: number;
+  contentHash: string;
+}
+
+export interface LibraryMigrationCreatedLink {
+  itemId: string;
+  vaultId: string;
+  workId: string;
+}
+
+export interface LibraryMigrationSession {
+  format: 'nodus.library-migration-session';
+  formatVersion: 1;
+  id: string;
+  status: LibraryMigrationSessionStatus;
+  createdAt: string;
+  updatedAt: string;
+  selectedVaultIds: string[];
+  preview: LibraryMigrationPreview;
+  checkpoint: LibraryMigrationCheckpoint;
+  createdRecords: LibraryMigrationCreatedRecord[];
+  createdLinks: LibraryMigrationCreatedLink[];
+  report: LibraryMigrationReport | null;
+  verification: {
+    catalogMatches: boolean;
+    manifestsValid: boolean;
+    filesPresent: boolean;
+    linksValid: boolean;
+    checkedAt: string | null;
+  } | null;
+  rollbackConflicts: string[];
+  error: string | null;
+}
+
+export interface LibraryMigrationStartRequest {
+  preview: LibraryMigrationPreview;
+  selectedVaultIds: string[];
 }
 
 export interface LibraryMigrationReport {

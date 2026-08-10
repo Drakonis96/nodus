@@ -21,6 +21,7 @@ test('the Library UI exposes hierarchy, search, bulk operations, imports and bac
     'import-library-bibliography', 'open-library-duplicates', 'edit-library-metadata',
     'add-library-item-to-vault', 'global-library-vault-dialog',
     'global-library-integrity-warning',
+    'open-library-migration', 'library-migration-dialog', 'start-library-migration',
   ]) assert.match(view, new RegExp(`data-testid=(?:"|\{\`)[^\n]*${marker}`));
   for (const method of [
     'getGlobalLibraryStatus', 'listGlobalLibraryItems', 'listGlobalLibraryCollections',
@@ -28,6 +29,8 @@ test('the Library UI exposes hierarchy, search, bulk operations, imports and bac
     'enqueueLibraryExtraction', 'patchGlobalLibraryItemCollections', 'setGlobalLibraryItemsDeleted',
     'importGlobalBibliographyFiles',
     'listGlobalLibraryVaultLinks', 'linkGlobalLibraryItemsToVault',
+    'previewLibraryMigration', 'startLibraryMigration', 'resumeLibraryMigration',
+    'cancelLibraryMigration', 'rollbackLibraryMigration', 'listLibraryMigrationSessions',
   ]) assert.match(view, new RegExp(String.raw`window\.nodus\.${method}\b`));
   assert.match(view, /CollectionBranch[\s\S]*<CollectionBranch/, 'collection rendering is recursively unbounded');
   assert.match(view, /La importación se canceló; el catálogo ya recuperado se conserva/);
@@ -72,6 +75,8 @@ test('the typed bridge covers every global management operation', async () => {
     'importGlobalBibliographyFiles', 'updateGlobalLibraryItemMetadata', 'resolveGlobalLibraryMetadata',
     'listGlobalLibraryDuplicates', 'mergeGlobalLibraryItems',
     'listGlobalLibraryVaults', 'listGlobalLibraryVaultLinks', 'linkGlobalLibraryItemsToVault',
+    'previewLibraryMigration', 'startLibraryMigration', 'resumeLibraryMigration',
+    'cancelLibraryMigration', 'rollbackLibraryMigration', 'listLibraryMigrationSessions',
   ];
   assertApiMethods(assert, methods);
   assertChannelsWired(assert, [
@@ -79,6 +84,8 @@ test('the typed bridge covers every global management operation', async () => {
     'library:deleteCollection', 'library:patchItemCollections', 'library:setItemsDeleted', 'library:importFiles',
     'library:importBibliography', 'library:updateMetadata', 'library:resolveMetadata', 'library:duplicates', 'library:mergeItems',
     'library:vaults', 'library:vaultLinks', 'library:linkToVault',
+    'library:migrationPreview', 'library:startMigration', 'library:resumeMigration',
+    'library:cancelMigration', 'library:rollbackMigration', 'library:migrationSessions',
   ]);
 });
 
