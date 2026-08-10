@@ -374,7 +374,7 @@ export function App() {
     const outsideDedicatedWorkspace = dedicatedIds
       ? NAV_ITEMS.filter((item) => item.id !== 'home' && item.id !== 'settings' && !dedicatedIds.includes(item.id)).map((item) => item.id)
       : [];
-    return groupedNav(settings?.sidebarOrder ?? [], [...activeSidebarHidden, ...disallowed, ...outsideDedicatedWorkspace]);
+    return groupedNav(settings?.sidebarOrder ?? [], ['library', ...activeSidebarHidden, ...disallowed, ...outsideDedicatedWorkspace]);
   }, [settings?.sidebarOrder, activeSidebarHidden, activeVault?.type]);
 
   // If the active vault type doesn't allow the current view (e.g. switching from a
@@ -584,6 +584,7 @@ export function App() {
   }, []);
 
   const homeItem = NAV_ITEMS.find((n) => n.id === 'home')!;
+  const libraryItem = NAV_ITEMS.find((n) => n.id === 'library')!;
   const settingsItem = NAV_ITEMS.find((n) => n.id === 'settings')!;
   const dbSearchItem = NAV_ITEMS.find((n) => n.id === 'dbSearch')!;
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -1469,6 +1470,7 @@ export function App() {
                 return (
                   <>
                     {navButton(homeItem)}
+                    {navButton(libraryItem)}
                     <WorldbuildingSidebar
                       activeView={view}
                       onNavigate={(targetView) => setView(targetView)}
@@ -1486,6 +1488,7 @@ export function App() {
                 return (
                   <>
                     {navButton(homeItem)}
+                    {navButton(libraryItem)}
                     <ProsopographySidebar
                       activeView={view}
                       onNavigate={(targetView) => setView(targetView)}
@@ -1501,6 +1504,7 @@ export function App() {
                 return (
                   <>
                     {navButton(homeItem)}
+                    {navButton(libraryItem)}
                     <TestimonySidebar
                       activeView={view}
                       onNavigate={(targetView) => setView(targetView)}
@@ -1518,6 +1522,7 @@ export function App() {
                 return (
                   <>
                     {navButton(homeItem)}
+                    {navButton(libraryItem)}
                     <PrimarySourcesSidebar
                       activeView={view}
                       onNavigate={(targetView) => setView(targetView)}
@@ -1541,6 +1546,7 @@ export function App() {
                 return (
                   <>
                     {navButton(homeItem)}
+                    {navButton(libraryItem)}
                     <div className="mt-2 flex flex-col gap-1" data-tour="db-list">
                       <div className="flex items-center px-3">
                         {groupHeaderButton('explore', exploreLabel, exploreCollapsed, view === 'databases')}
@@ -1574,6 +1580,7 @@ export function App() {
                 return (
                   <>
                     {navButton(homeItem)}
+                    {navButton(libraryItem)}
                     <StudySidebar
                       activeView={view}
                       onNavigate={(targetView) => { setStudyTarget(null); if (targetView !== 'studyLibrary') setStudyMaterialTarget(null); if (targetView !== 'studyRecordings') setStudyRecordingTarget(null); setStudyGraphTarget(null); setView(targetView); }}
@@ -1589,6 +1596,7 @@ export function App() {
                 return (
                   <>
                     {navButton(homeItem)}
+                    {navButton(libraryItem)}
                     <TeachingSidebar
                       activeView={view}
                       onNavigate={(targetView) => { setStudyTarget(null); if (targetView !== 'studyLibrary') setStudyMaterialTarget(null); if (targetView !== 'studyRecordings') setStudyRecordingTarget(null); setStudyGraphTarget(null); setView(targetView); }}
@@ -1606,6 +1614,7 @@ export function App() {
               return (
                 <>
                   {navButton(homeItem)}
+                  {navButton(libraryItem)}
                   {navGroups.map((group) => renderGroup(group))}
                   <div className="mt-2 flex flex-col gap-1">{navButton(settingsItem)}</div>
                 </>

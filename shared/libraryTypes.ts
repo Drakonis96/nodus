@@ -270,6 +270,10 @@ export interface LibraryCatalogQuery {
   limit?: number;
   offset?: number;
   includeDeleted?: boolean;
+  extractionStatus?: NonNullable<LibraryItemRecord['extraction']>['status'] | null;
+  yearFrom?: number | null;
+  yearTo?: number | null;
+  hasAttachments?: boolean | null;
 }
 
 export interface LibraryCatalogPage {
@@ -277,6 +281,30 @@ export interface LibraryCatalogPage {
   total: number;
   limit: number;
   offset: number;
+}
+
+export interface LibraryCollectionView {
+  id: string;
+  name: string;
+  parentId: string | null;
+  position: number;
+  source: LibraryItemSource;
+  sourceLibraryId: string | null;
+  sourceKey: string | null;
+  directItemCount: number;
+  updatedAt: string;
+}
+
+export interface LibraryItemCollectionPatch {
+  add?: string[];
+  remove?: string[];
+}
+
+export interface LibraryLocalImportReport {
+  created: number;
+  skipped: number;
+  itemIds: string[];
+  warnings: string[];
 }
 
 export interface LibraryRebuildResult {

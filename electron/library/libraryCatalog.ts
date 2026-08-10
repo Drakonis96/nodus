@@ -12,6 +12,7 @@ import type {
   LibraryRebuildResult,
   LibraryStatus,
   LibraryVaultLink,
+  LibraryCollectionView,
 } from '@shared/libraryTypes';
 import { LibraryDiskStore } from './libraryStorage';
 
@@ -428,6 +429,11 @@ export class LibraryCatalog {
     const params: Record<string, unknown> = { limit, offset };
     if (!query.includeDeleted) where.push('i.deleted_at IS NULL');
     if (query.source) { where.push('i.source=@source'); params.source = query.source; }
+    if (query.extractionStatus) { where.push('i.extraction_status=@extractionStatus'); params.extractionStatus = query.extractionStatus; }
+    if (Number.isInteger(query.yearFrom)) { where.push('i.year>=@yearFrom'); params.yearFrom = query.yearFrom; }
+    if (Number.isInteger(query.yearTo)) { where.push('i.year<=@yearTo'); params.yearTo = query.yearTo; }
+    if (query.hasAttachments === true) where.push('i.attachment_count>0');
+    if (query.hasAttachments === false) where.push('i.attachment_count=0');
     if (query.collectionId) {
       where.push('EXISTS (SELECT 1 FROM library_item_collections ic WHERE ic.item_id=i.id AND ic.collection_id=@collectionId)');
       params.collectionId = query.collectionId;
@@ -471,6 +477,25 @@ export class LibraryCatalog {
       updatedAt: String(row.updated_at),
     }));
     return { items, total, limit, offset };
+  }
+
+  listCollections(includeDeleted = false): LibraryCollectionView[] {
+    const rows = this.handle.prepare(`
+      SELECT c.*, COUNT(DISTINCT CASE WHEN i.deleted_at IS NULL THEN i.id END) AS direct_item_count
+      FROM library_collections c
+      LEFT JOIN library_item_collections ic ON ic.collection_id=c.id
+      LEFT JOIN library_items i ON i.id=ic.item_id
+      ${includeDeleted ? '' : 'WHERE c.deleted_at IS NULL'}
+      GROUP BY c.id
+      ORDER BY c.parent_id, c.position, c.name COLLATE NOCASE, c.id
+    `).all() as Record<string, unknown>[];
+    return rows.map((row) => ({
+      id: String(row.id), name: String(row.name), parentId: row.parent_id == null ? null : String(row.parent_id),
+      position: Number(row.position), source: row.source as LibraryCollectionView['source'],
+      sourceLibraryId: row.source_library_id == null ? null : String(row.source_library_id),
+      sourceKey: row.source_key == null ? null : String(row.source_key),
+      directItemCount: Number(row.direct_item_count), updatedAt: String(row.updated_at),
+    }));
   }
 }
 

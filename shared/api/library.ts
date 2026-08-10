@@ -13,6 +13,10 @@ import type {
   LibraryExtractionJob,
   LibraryExtractionOptions,
   LibraryExtractionProgress,
+  LibraryCollectionView,
+  LibraryItemCollectionPatch,
+  LibraryItemRecord,
+  LibraryLocalImportReport,
 } from '../libraryTypes';
 
 /** Global bibliography. It deliberately has no vault id in any method. */
@@ -30,6 +34,14 @@ export interface LibraryApi {
   cancelLibraryExtraction(jobId: string): Promise<boolean>;
   retryLibraryExtraction(jobId: string): Promise<boolean>;
   onLibraryExtractionProgress(cb: (progress: LibraryExtractionProgress) => void): () => void;
+  listGlobalLibraryCollections(): Promise<LibraryCollectionView[]>;
+  getGlobalLibraryItem(itemId: string): Promise<LibraryItemRecord | null>;
+  createGlobalLibraryCollection(name: string, parentId: string | null): Promise<LibraryCollectionView>;
+  updateGlobalLibraryCollection(id: string, patch: { name?: string; parentId?: string | null; position?: number }): Promise<LibraryCollectionView>;
+  deleteGlobalLibraryCollection(id: string, deleteItems?: boolean): Promise<number>;
+  patchGlobalLibraryItemCollections(itemIds: string[], patch: LibraryItemCollectionPatch): Promise<number>;
+  setGlobalLibraryItemsDeleted(itemIds: string[], deleted: boolean): Promise<number>;
+  importGlobalLibraryFiles(collectionId?: string | null): Promise<LibraryLocalImportReport>;
   onLibraryMigrationProgress(cb: (progress: LibraryMigrationProgress) => void): () => void;
   onGlobalLibraryChanged(cb: (status: LibraryStatus) => void): () => void;
 }

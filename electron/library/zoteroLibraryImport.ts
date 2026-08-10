@@ -319,12 +319,19 @@ export async function importZoteroLibraries(options: {
       for (const item of changedItems) {
         abortIfNeeded(signal);
         const current = store.readMaterializedItem(item.key);
+        const localCollectionIds = (current?.collectionIds ?? []).filter((id) => {
+          const collection = store.readMaterializedCollection(id);
+          return collection?.source !== 'zotero' || collection.sourceLibraryId !== sourceLibraryId;
+        });
         const desired = {
           id: itemId(item.key), storageId: item.key, source: 'zotero' as const,
           sourceLibraryId, sourceKey: item.itemKey,
           ...(current?.citationKey ? { citationKey: current.citationKey } : {}),
           metadata: metadata(item),
-          collectionIds: item.collections.filter((key) => !subset || selectedKeys.has(key)).map(collectionId),
+          collectionIds: [...new Set([
+            ...localCollectionIds,
+            ...item.collections.filter((key) => !subset || selectedKeys.has(key)).map(collectionId),
+          ])],
           attachments: current?.attachments ?? [],
           ...(current?.files ? { files: current.files } : {}),
           extraction: current?.extraction ?? { status: 'pending' as const },

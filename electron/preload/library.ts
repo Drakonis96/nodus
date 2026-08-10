@@ -23,6 +23,14 @@ export const libraryApi: LibraryApi = {
     ipcRenderer.on('library:extractionProgress', listener);
     return () => ipcRenderer.removeListener('library:extractionProgress', listener);
   },
+  listGlobalLibraryCollections: () => ipcRenderer.invoke('library:collections'),
+  getGlobalLibraryItem: (itemId) => ipcRenderer.invoke('library:item', itemId),
+  createGlobalLibraryCollection: (name, parentId) => ipcRenderer.invoke('library:createCollection', name, parentId),
+  updateGlobalLibraryCollection: (id, patch) => ipcRenderer.invoke('library:updateCollection', id, patch),
+  deleteGlobalLibraryCollection: (id, deleteItems) => ipcRenderer.invoke('library:deleteCollection', id, deleteItems),
+  patchGlobalLibraryItemCollections: (itemIds, patch) => ipcRenderer.invoke('library:patchItemCollections', itemIds, patch),
+  setGlobalLibraryItemsDeleted: (itemIds, deleted) => ipcRenderer.invoke('library:setItemsDeleted', itemIds, deleted),
+  importGlobalLibraryFiles: (collectionId) => ipcRenderer.invoke('library:importFiles', collectionId),
   onLibraryMigrationProgress: (cb) => {
     const listener = (_event: unknown, progress: Parameters<typeof cb>[0]) => cb(progress);
     ipcRenderer.on('library:migrationProgress', listener);

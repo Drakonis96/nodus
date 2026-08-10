@@ -14,6 +14,10 @@ import type {
   LibraryExtractionJob,
   LibraryExtractionOptions,
   LibraryExtractionProgress,
+  LibraryCollectionView,
+  LibraryItemCollectionPatch,
+  LibraryItemRecord,
+  LibraryLocalImportReport,
 } from '@shared/libraryTypes';
 import { LibraryCatalog } from './libraryCatalog';
 import { LibraryDiskStore } from './libraryStorage';
@@ -30,8 +34,16 @@ import { completeTextNeutral } from '../ai/aiClient';
 import { getSettings } from '../db/settingsRepo';
 import { buildOcrTextPrompt, OCR_USER_PROMPT } from '@shared/aiOcrPrompt';
 import { DEFAULT_OCR_OPTIONS } from '@shared/aiOcrTypes';
+import { LibraryOperations } from './libraryOperations';
 
-let live: { root: string; deviceId: string; store: LibraryDiskStore; catalog: LibraryCatalog; extraction: LibraryExtractionQueue } | null = null;
+let live: {
+  root: string;
+  deviceId: string;
+  store: LibraryDiskStore;
+  catalog: LibraryCatalog;
+  extraction: LibraryExtractionQueue;
+  operations: LibraryOperations;
+} | null = null;
 let migration: Promise<LibraryMigrationReport> | null = null;
 const zoteroImports = new Map<string, AbortController>();
 
@@ -78,7 +90,7 @@ function service(): NonNullable<typeof live> | null {
   store.initialize();
   const catalog = new LibraryCatalog(localLibraryDatabasePath());
   const extraction = new LibraryExtractionQueue({ store, catalog, onProgress: broadcastExtraction, remoteOcr: libraryRemoteOcr });
-  live = { root, deviceId, store, catalog, extraction };
+  live = { root, deviceId, store, catalog, extraction, operations: new LibraryOperations(store, catalog) };
   return live;
 }
 
@@ -202,6 +214,68 @@ export function cancelLibraryExtraction(jobId: string): boolean {
 
 export function retryLibraryExtraction(jobId: string): boolean {
   return service()?.extraction.retry(jobId) ?? false;
+}
+
+export function listGlobalLibraryCollections(): LibraryCollectionView[] {
+  return service()?.operations.listCollections() ?? [];
+}
+
+export function getGlobalLibraryItem(itemId: string): LibraryItemRecord | null {
+  const current = service();
+  if (!current) return null;
+  return current.store.scanMaterializedItems().records.find((item) => item.id === itemId) ?? null;
+}
+
+export function createGlobalLibraryCollection(name: string, parentId: string | null): LibraryCollectionView {
+  const current = service();
+  if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
+  const result = current.operations.createCollection(name, parentId);
+  broadcast(current.catalog.status(current.root, current.deviceId));
+  return result;
+}
+
+export function updateGlobalLibraryCollection(
+  id: string,
+  patch: { name?: string; parentId?: string | null; position?: number },
+): LibraryCollectionView {
+  const current = service();
+  if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
+  const result = current.operations.updateCollection(id, patch);
+  broadcast(current.catalog.status(current.root, current.deviceId));
+  return result;
+}
+
+export function deleteGlobalLibraryCollection(id: string, deleteItems?: boolean): number {
+  const current = service();
+  if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
+  const result = current.operations.deleteCollection(id, deleteItems);
+  broadcast(current.catalog.status(current.root, current.deviceId));
+  return result;
+}
+
+export function patchGlobalLibraryItemCollections(itemIds: string[], patch: LibraryItemCollectionPatch): number {
+  const current = service();
+  if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
+  const result = current.operations.patchItemCollections(itemIds, patch);
+  broadcast(current.catalog.status(current.root, current.deviceId));
+  return result;
+}
+
+export function setGlobalLibraryItemsDeleted(itemIds: string[], deleted: boolean): number {
+  const current = service();
+  if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
+  const result = current.operations.setItemsDeleted(itemIds, deleted);
+  broadcast(current.catalog.status(current.root, current.deviceId));
+  return result;
+}
+
+export function importGlobalLibraryFiles(files: string[], collectionId?: string | null): LibraryLocalImportReport {
+  const current = service();
+  if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
+  const report = current.operations.importLocalFiles(files, collectionId);
+  if (report.itemIds.length) current.extraction.enqueue(report.itemIds);
+  broadcast(current.catalog.status(current.root, current.deviceId));
+  return report;
 }
 
 export function closeGlobalLibrary(): void {

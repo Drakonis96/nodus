@@ -3,7 +3,7 @@
 import { lazy } from 'react';
 import type { ViewRenderer } from '../ViewContext';
 
-const Library = lazy(() => import('../../views/Library').then((module) => ({ default: module.Library })));
+const GlobalLibraryView = lazy(() => import('../../views/GlobalLibraryView').then((module) => ({ default: module.GlobalLibraryView })));
 const GraphView = lazy(() => import('../../views/GraphView').then((module) => ({ default: module.GraphView })));
 const ArgumentMapView = lazy(() => import('../../views/ArgumentMapView').then((module) => ({ default: module.ArgumentMapView })));
 const IdeasView = lazy(() => import('../../views/IdeasView').then((module) => ({ default: module.IdeasView })));
@@ -23,17 +23,7 @@ const PrimarySourcesNotesView = lazy(() => import('../../views/PrimarySourcesNot
 const TestimonySearchView = lazy(() => import('../../views/TestimonySearchView').then((module) => ({ default: module.TestimonySearchView })));
 
 export const corpusViews = {
-  library: ({ activeVault, libraryTarget, navigate, openAssistant, setCollectionsOpen, setView }) => (
-    <Library
-      vaultId={activeVault?.id ?? null}
-      target={libraryTarget}
-      vaultType={activeVault?.type}
-      onOpenCollections={() => setCollectionsOpen(true)}
-      onOpenGraph={(target) => navigate('graph', target)}
-      onOpenAssistant={openAssistant}
-      onOpenArchive={() => setView('archive')}
-    />
-  ),
+  library: ({ setView }) => <GlobalLibraryView onOpenSettings={() => setView('settings')} />,
   graph: ({ graphTarget, reloadSettings, settings }) => <GraphView settings={settings} onSettingsChange={reloadSettings} target={graphTarget} />,
   argument: ({ settings }) => <ArgumentMapView settings={settings} />,
   ideas: ({ activeVault, ideaTarget, navigate, openAssistant }) => (

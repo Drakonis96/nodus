@@ -1,8 +1,9 @@
 import { createHash } from 'node:crypto';
+import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
 import AdmZip from 'adm-zip';
-import TurndownService from 'turndown';
+import type TurndownServiceType from 'turndown';
 import type {
   LibraryExtractionOptions,
   LibraryItemRecord,
@@ -80,6 +81,20 @@ export interface LibraryRemoteOcrPage {
 }
 
 export type LibraryRemoteOcr = (input: LibraryRemoteOcrPage, signal?: AbortSignal) => Promise<string>;
+
+type TurndownConstructor = typeof TurndownServiceType;
+let turndownConstructor: TurndownConstructor | null = null;
+
+function createTurndown(): TurndownServiceType {
+  if (!turndownConstructor) {
+    // The package's Node fallback contains a real CommonJS require(), so load it
+    // through Node's module bridge instead of embedding it in the ESM main bundle.
+    const packageName = ['turn', 'down'].join('');
+    const loaded = createRequire(import.meta.url)(packageName) as TurndownConstructor | { default: TurndownConstructor };
+    turndownConstructor = 'default' in loaded ? loaded.default : loaded;
+  }
+  return new turndownConstructor({ headingStyle: 'atx', bulletListMarker: '-' });
+}
 
 function abortIfNeeded(signal?: AbortSignal): void {
   if (signal?.aborted) throw new DOMException('Extracción cancelada', 'AbortError');
@@ -393,7 +408,10 @@ async function extractPdfAssets(pdf: any, folder: string, layouts: PageLayout[],
     }
     for (const name of names) {
       const image = await new Promise<any>((resolve) => {
-        try { page.objs.has(name) ? resolve(page.objs.get(name)) : page.objs.get(name, resolve); } catch { resolve(null); }
+        try {
+          if (page.objs.has(name)) resolve(page.objs.get(name));
+          else page.objs.get(name, resolve);
+        } catch { resolve(null); }
       });
       const png = await imageObjToPng(image);
       if (!png) continue;
@@ -408,7 +426,7 @@ async function extractPdfAssets(pdf: any, folder: string, layouts: PageLayout[],
       const caption = captionLine?.text ?? `Figura de la página ${pageNumber}`;
       results.push({
         kind: 'figure', text: caption,
-        markdown: `![${caption.replace(/[\[\]]/g, '')}](assets/${fileName})`,
+        markdown: `![${caption.replaceAll('[', '').replaceAll(']', '')}](assets/${fileName})`,
         anchors: captionLine ? [anchor(captionLine)] : [{ page: pageNumber, bbox: [0, rounded((layout?.height ?? 0) / 2), rounded(layout?.width ?? 0), rounded(layout?.height ?? 0)] }],
         order: captionLine && layout ? readingOrder(layout).indexOf(captionLine) + 0.5 : Number.MAX_SAFE_INTEGER,
       });
@@ -441,7 +459,7 @@ function markdownBlocks(markdown: string): OutputBlock[] {
     const table = /^\|.+\|\n\|(?:\s*:?-+:?\s*\|)+/m.test(part);
     const image = /^!\[/.test(part);
     const kind: OutputBlock['kind'] = heading ? (heading[1].length === 1 && cursor === 0 ? 'title' : 'heading') : table ? 'table' : image ? 'figure' : part.startsWith('>') ? 'quote' : 'paragraph';
-    blocks.push({ kind, text: heading?.[2] ?? part.replace(/[*_`>#|\[\]()!-]/g, ' '), markdown: part, anchors: [{ page: 1, bbox: [0, 0, 0, 0] }] });
+    blocks.push({ kind, text: heading?.[2] ?? part.replace(/[*_`>#|[\]()!-]/g, ' '), markdown: part, anchors: [{ page: 1, bbox: [0, 0, 0, 0] }] });
     cursor += part.length + 2;
   }
   return blocks;
@@ -472,7 +490,7 @@ async function nonPdfBlocks(source: string, folder: string): Promise<{ blocks: O
     const html = String((await mammoth.convertToHtml({ path: source })).value ?? '');
     const zip = new AdmZip(source);
     const assets = copyZipAssets(zip, folder, /^word\/media\//i);
-    const service = new TurndownService({ headingStyle: 'atx', bulletListMarker: '-' });
+    const service = createTurndown();
     let markdown = service.turndown(html);
     if (assets.length) markdown += `\n\n## Recursos extraídos\n\n${assets.map((asset, index) => `![Recurso ${index + 1}](${asset.target})`).join('\n\n')}`;
     return { blocks: markdownBlocks(markdown), pages: [{ page: 1, width: 0, height: 0 }] };
@@ -481,7 +499,7 @@ async function nonPdfBlocks(source: string, folder: string): Promise<{ blocks: O
     const zip = new AdmZip(source);
     const assets = copyZipAssets(zip, folder, /\.(png|jpe?g|gif|webp|svg)$/i);
     const lookup = new Map(assets.map((asset) => [asset.source, asset.target]));
-    const service = new TurndownService({ headingStyle: 'atx', bulletListMarker: '-' });
+    const service = createTurndown();
     const chapters = zip.getEntries().filter((entry) => !entry.isDirectory && /\.(xhtml|html?)$/i.test(entry.entryName) && !/(^|\/)(nav|toc)\./i.test(entry.entryName));
     const markdown = chapters.map((entry) => {
       let html = entry.getData().toString('utf8');
@@ -494,7 +512,7 @@ async function nonPdfBlocks(source: string, folder: string): Promise<{ blocks: O
     return { blocks: markdownBlocks(markdown), pages: [{ page: 1, width: 0, height: 0 }] };
   }
   if (['.html', '.htm', '.xml', '.jats'].includes(extension)) {
-    const service = new TurndownService({ headingStyle: 'atx', bulletListMarker: '-' });
+    const service = createTurndown();
     return { blocks: markdownBlocks(service.turndown(fs.readFileSync(source, 'utf8'))), pages: [{ page: 1, width: 0, height: 0 }] };
   }
   throw new Error(`Formato de extracción no compatible: ${extension || '(sin extensión)'}`);
