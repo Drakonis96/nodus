@@ -38,6 +38,7 @@ export function Markdown({
   onWorldEntry,
   onTestimonyLink,
   verify = true,
+  allowDataImages = false,
 }: {
   content: string;
   className?: string;
@@ -53,6 +54,8 @@ export function Markdown({
   onStudyEvidence?: (citationId: string) => void;
   /** Resolve each `nodus://` citation against the corpus and flag unresolved ones. */
   verify?: boolean;
+  /** Only for trusted local reader assets already confined by the main process. */
+  allowDataImages?: boolean;
 }) {
   // Validity of each citation, keyed by `${kind}:${id}`. A key absent from the map
   // is still being checked (treated as neutral); `false` means it did not resolve.
@@ -99,7 +102,10 @@ export function Markdown({
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[rehypeKatex]}
-        urlTransform={nodusUrlTransform}
+        urlTransform={(value, key) => {
+          if (allowDataImages && key === 'src' && /^data:image\/(?:png|jpeg|gif|webp|svg\+xml);base64,/i.test(value)) return value;
+          return nodusUrlTransform(value);
+        }}
         components={{
           a: ({ href, children }) => {
             const studyMaterial = href?.match(/^nodus:\/\/study\/material\/([^?]+)(?:\?.*)?$/);

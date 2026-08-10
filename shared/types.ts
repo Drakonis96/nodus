@@ -584,6 +584,38 @@ export interface WorkView extends Omit<Work, 'authors_json'> {
   ideaCount: number;
 }
 
+/** One heading in the clean Markdown reader, linked back to its physical PDF page. */
+export interface LibraryReaderSection {
+  id: string;
+  title: string;
+  level: number;
+  page: number | null;
+}
+
+/**
+ * A durable, clean reading copy stored beside its immutable original.
+ *
+ * Zotero-backed documents keep the Zotero item key as `storageId`; local-only
+ * documents use their Nodus id. The renderer never receives filesystem paths —
+ * opening the original remains a narrowly-scoped main-process operation.
+ */
+export interface LibraryReaderDocument {
+  workId: string;
+  storageId: string;
+  zoteroKey: string | null;
+  citationKey: string | null;
+  title: string;
+  authors: string[];
+  year: number | null;
+  markdown: string;
+  sections: LibraryReaderSection[];
+  pageCount: number | null;
+  wordCount: number;
+  originalAvailable: boolean;
+  originalFileName: string | null;
+  sourceMapAvailable: boolean;
+}
+
 /** One work inside a duplicate group, with enough metadata to choose a canonical. */
 export interface DuplicateWorkMember {
   nodus_id: string;

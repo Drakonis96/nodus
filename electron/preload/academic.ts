@@ -42,6 +42,17 @@ export const academicApi: AcademicApi = {
   getWorkMeta: (nodusId) => ipcRenderer.invoke('works:meta', nodusId),
   openInZotero: (zoteroKey) => ipcRenderer.invoke('works:openInZotero', zoteroKey).then(() => undefined),
   openEvidenceAtPage: (nodusId, location) => ipcRenderer.invoke('works:openAtPage', nodusId, location),
+  getLibraryReaderDocument: (nodusId) => ipcRenderer.invoke('libraryReader:get', nodusId),
+  openLibraryReaderOriginal: (nodusId) => ipcRenderer.invoke('libraryReader:openOriginal', nodusId),
+  listLibraryReaderAnnotations: (nodusId) => ipcRenderer.invoke('libraryReader:annotations:list', nodusId),
+  createLibraryReaderAnnotation: (nodusId, input) => ipcRenderer.invoke('libraryReader:annotations:create', nodusId, input),
+  updateLibraryReaderComment: (nodusId, id, comment) => ipcRenderer.invoke('libraryReader:annotations:updateComment', nodusId, id, comment),
+  deleteLibraryReaderAnnotation: (nodusId, id) => ipcRenderer.invoke('libraryReader:annotations:delete', nodusId, id).then(() => undefined),
+  onLibraryReaderAnnotationsChanged: (cb) => {
+    const listener = (_e: unknown, nodusId: string | null) => cb(nodusId);
+    ipcRenderer.on('libraryReader:annotations:changed', listener);
+    return () => ipcRenderer.removeListener('libraryReader:annotations:changed', listener);
+  },
   onStudyMaterialAiProcessingRequest: (cb) => {
     const listener = (_e: unknown, request: Parameters<typeof cb>[0]) => cb(request);
     ipcRenderer.on('study:knowledge:processing:request', listener);

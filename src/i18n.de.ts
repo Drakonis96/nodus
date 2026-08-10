@@ -27,8 +27,10 @@ import { TESTIMONY_TRANSLATIONS } from './i18n.testimonies';
 import { NEW_VAULT_COMPLETION_TRANSLATIONS } from './i18n.newVaultCompletion';
 import { NODI_NOTIFICATION_TRANSLATIONS } from './i18n.nodiNotifications';
 import { ANNOUNCEMENT_TRANSLATIONS } from './i18n.announcements';
+import { LIBRARY_READER_TRANSLATIONS } from './i18n.libraryReader';
 
 export const DE: Record<string, string> = {
+  ...LIBRARY_READER_TRANSLATIONS.de,
   ...DIARIZATION_TRANSLATIONS.de,
   ...PROSOPOGRAPHY_TRANSLATIONS.de,
   ...PRIMARY_SOURCES_TRANSLATIONS.de,

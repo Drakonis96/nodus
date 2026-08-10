@@ -127,6 +127,7 @@ import { buildIdeaGraph, buildIdeaGraphOverview, buildIdeaThemeGraph, buildAutho
 import { streamDebateAnalysis } from '../ai/debate';
 import * as rqRepo from '../db/researchMapRepo';
 import * as writingAnnotations from '../db/writingAnnotationsRepo';
+import * as libraryReader from '../libraryReader/libraryReaderStore';
 import { decomposeQuestion, mapCoverage } from '../ai/researchMap';
 import { exportResearchCoverage } from '../export/researchMapExport';
 import { exportData, importData } from '../export/exportImport';
@@ -310,6 +311,14 @@ function announceWritingDraftAnnotations(draftId: string | null): void {
   for (const win of BrowserWindow.getAllWindows()) {
     if (!win.isDestroyed() && !win.webContents.isDestroyed()) {
       win.webContents.send('writing:annotations:changed', draftId);
+    }
+  }
+}
+
+function announceLibraryReaderAnnotations(nodusId: string | null): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed() && !win.webContents.isDestroyed()) {
+      win.webContents.send('libraryReader:annotations:changed', nodusId);
     }
   }
 }
@@ -513,6 +522,30 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
     }
     await shell.openExternal(zoteroSelectUrl(work.zotero_key));
     return { ok: true, mode: 'select' as const, page };
+  });
+  h('libraryReader:get', async (_e, nodusId: string) => libraryReader.getLibraryReaderDocument(nodusId));
+  h('libraryReader:openOriginal', async (_e, nodusId: string) => {
+    const originalPath = libraryReader.libraryReaderOriginalPath(nodusId);
+    if (!originalPath) return false;
+    return (await shell.openPath(originalPath)) === '';
+  });
+  h('libraryReader:annotations:list', async (_e, nodusId: string) =>
+    libraryReader.listLibraryReaderAnnotations(nodusId)
+  );
+  h('libraryReader:annotations:create', async (_e, nodusId: string, input: WritingDraftAnnotationInput) => {
+    const annotation = libraryReader.createLibraryReaderAnnotation(nodusId, { ...input, draftId: nodusId });
+    announceLibraryReaderAnnotations(nodusId);
+    return annotation;
+  });
+  h('libraryReader:annotations:updateComment', async (_e, nodusId: string, id: string, comment: string) => {
+    const annotation = libraryReader.updateLibraryReaderComment(nodusId, id, comment);
+    if (annotation) announceLibraryReaderAnnotations(nodusId);
+    return annotation;
+  });
+  h('libraryReader:annotations:delete', async (_e, nodusId: string, id: string) => {
+    const deleted = libraryReader.deleteLibraryReaderAnnotation(nodusId, id);
+    if (deleted) announceLibraryReaderAnnotations(nodusId);
+    return deleted;
   });
   h('study:knowledge:processing:resolve', async (event, requestId: string, decision) => {
     resolveStudyMaterialAiProcessingRequest(event.sender.id, requestId, decision);

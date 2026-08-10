@@ -2835,6 +2835,87 @@ select.input optgroup {
   margin: 0.9em 0;
 }
 
+/* Clean-library reader: the document remains Markdown, but it should feel like a
+   quiet reading surface rather than another dashboard card. The outline and note
+   rails carry navigation; the paper carries only the source. */
+.library-reader-document .md {
+  color: rgb(212 212 216);
+  font-family: ui-serif, Georgia, Cambria, "Times New Roman", serif;
+  text-wrap: pretty;
+}
+.library-reader-document .md h1,
+.library-reader-document .md h2,
+.library-reader-document .md h3,
+.library-reader-document .md h4,
+.library-reader-document .md h5,
+.library-reader-document .md h6 {
+  scroll-margin-top: 6rem;
+  color: rgb(244 244 245);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: -0.012em;
+}
+.library-reader-document .md h1 {
+  margin-bottom: 0.7em;
+  font-size: clamp(1.75rem, 3vw, 2.35rem);
+  line-height: 1.12;
+  letter-spacing: -0.035em;
+}
+.library-reader-document .md h2 {
+  margin-top: 2.4em;
+  padding-top: 0.9em;
+  border-top: 1px solid rgb(63 63 70 / 0.62);
+  font-size: 1.38em;
+}
+.library-reader-document .md h3 { margin-top: 1.8em; font-size: 1.17em; }
+.library-reader-document .md p { margin: 0.9em 0; }
+.library-reader-document .md blockquote {
+  margin: 1.3em 0;
+  padding: 0.55em 1.2em;
+  border-left-color: rgb(129 140 248 / 0.75);
+  background: rgb(49 46 129 / 0.12);
+}
+.library-reader-document .md img {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  max-height: 72vh;
+  margin: 1.75rem auto;
+  border-radius: 0.8rem;
+  background: white;
+  box-shadow: 0 18px 50px -30px rgb(0 0 0 / 0.9);
+}
+.library-reader-document .md table {
+  display: block;
+  width: 100%;
+  margin: 1.5em 0;
+  overflow-x: auto;
+  border-collapse: collapse;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.82em;
+}
+.library-reader-document .md th { background: rgb(39 39 42 / 0.72); color: rgb(228 228 231); }
+.library-reader-document .md th,
+.library-reader-document .md td { padding: 0.58em 0.72em; }
+.library-reader-document .md > p:last-of-type { margin-bottom: 1.2em; }
+.library-reader-outline,
+.library-reader-notes { scrollbar-width: thin; scrollbar-color: rgb(63 63 70) transparent; }
+
+.light .library-reader-paper {
+  border-color: rgb(226 232 240);
+  background: rgb(255 255 255 / 0.88);
+  box-shadow: 0 24px 70px -45px rgb(15 23 42 / 0.38);
+}
+.light .library-reader-document .md { color: #334155; }
+.light .library-reader-document .md h1,
+.light .library-reader-document .md h2,
+.light .library-reader-document .md h3,
+.light .library-reader-document .md h4,
+.light .library-reader-document .md h5,
+.light .library-reader-document .md h6 { color: #0f172a; }
+.light .library-reader-document .md h2 { border-top-color: rgb(226 232 240); }
+.light .library-reader-document .md blockquote { background: rgb(238 242 255 / 0.7); }
+.light .library-reader-document .md th { background: #f1f5f9; color: #1e293b; }
+
 /* NotebookLM-style inline source citation. Rendered as a small pill that opens a
    source modal instead of navigating. */
 .md .citation-link {

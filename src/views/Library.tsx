@@ -20,6 +20,7 @@ import { WorkGraphModal } from './WorkGraphModal';
 import { WorkIdeasModal } from './WorkIdeasModal';
 import { WorkStatusModal } from './WorkStatusModal';
 import { DuplicatesModal } from './DuplicatesModal';
+import { LibraryDocumentReader } from './LibraryDocumentReader';
 import { VirtualList } from '../components/VirtualList';
 import { anchorStyle, useAnchoredCoords } from '../components/dbGrid';
 import { useDataRefresh, useDismissableLayer, useScanComplete } from '../hooks';
@@ -439,6 +440,7 @@ export function Library({
   const [graphWork, setGraphWork] = useState<{ nodus_id: string; title: string } | null>(null);
   const [ideasWork, setIdeasWork] = useState<{ nodus_id: string; title: string } | null>(null);
   const [statusWork, setStatusWork] = useState<WorkView | null>(null);
+  const [readerWork, setReaderWork] = useState<WorkView | null>(null);
   const [duplicatesOpen, setDuplicatesOpen] = useState(false);
   // Live scan-queue items indexed by work. The persisted *_status fields go
   // 'pending' when a job is enqueued but never say whether it is waiting in line
@@ -981,6 +983,16 @@ export function Library({
     }
     return map;
   }, [works, embeddingStatuses, passageStatuses, queuedByWork]);
+
+  if (readerWork) {
+    return (
+      <LibraryDocumentReader
+        work={readerWork}
+        onBack={() => setReaderWork(null)}
+        onOpenAssistant={onOpenAssistant}
+      />
+    );
+  }
 
   return (
     <div className="h-full flex flex-col p-6 min-h-0">
@@ -1555,8 +1567,8 @@ export function Library({
                 <div className="min-w-0 p-1">
                   <button
                     className="block w-full truncate text-left hover:text-indigo-300 hover:underline"
-                    title={t('Ver las ideas de esta obra')}
-                    onClick={() => setIdeasWork({ nodus_id: w.nodus_id, title: w.title })}
+                    title={t('Abrir lector limpio')}
+                    onClick={() => setReaderWork(w)}
                   >
                     {w.title}
                   </button>
@@ -1592,6 +1604,12 @@ export function Library({
                     >
                       {t('Analizar')}
                     </button>
+                    <RowIconButton
+                      title={t('Abrir lector limpio')}
+                      icon="book"
+                      tone="cyan"
+                      onClick={() => setReaderWork(w)}
+                    />
                     {/* The column is nullable in SQLite despite the non-null type, and demo
                         vaults carry synthetic keys that open nothing. */}
                     {w.zotero_key && (
@@ -1605,6 +1623,11 @@ export function Library({
                     <RowMenu
                       label={t('Más acciones')}
                       items={[
+                        {
+                          label: t('Abrir lector limpio'),
+                          icon: 'book',
+                          onClick: () => setReaderWork(w),
+                        },
                         ...(isRecordsVault
                           ? [{
                               label: t('Extraer personas y eventos'),
