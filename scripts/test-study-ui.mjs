@@ -617,6 +617,11 @@ test('study material state reuses database select chips', async () => {
   assert.match(materials, /material\.extension === 'md' \|\| material\.extension === 'markdown'/);
   assert.match(materials, /bg-white p-8 text-sm leading-7 text-neutral-900[^"\n]*dark:bg-neutral-900 dark:text-neutral-100/);
   assert.match(pdf, /data-testid="study-pdf-continuous-mode"/);
+  assert.match(pdf, /data-testid="study-pdf-single-mode"/);
+  assert.match(pdf, /key=\{`\$\{number\}:\$\{scale\}:\$\{viewMode\}`\}/,
+    'study PDFs remount their canvas for every scale and view lifecycle');
+  assert.match(pdf, /renderTask\?\.cancel\(\)/,
+    'study PDF render tasks are explicitly cancelled');
   assert.match(pdf, /data-testid="study-pdf-zoom-out"/);
   assert.match(pdf, /data-testid="study-pdf-zoom-in"/);
   assert.match(pdf, /IntersectionObserver/);

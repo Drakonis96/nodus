@@ -135,6 +135,7 @@ test('the global reader exposes annotations, metadata, chat and native attachmen
     'library-reader-document', 'library-reader-outline-toggle', 'library-reader-sidebar-toggle',
     'library-reader-sidebar', 'library-reader-metadata', 'library-reader-chat', 'library-original-preview',
     'library-reader-source-picker', 'library-reader-pdf-viewer', 'library-reader-epub-viewer',
+    'library-reader-pdf-view-single', 'library-reader-pdf-view-continuous',
     'library-reader-image-viewer', 'library-reader-text-viewer', 'library-reader-open-external',
     'library-reader-files-toggle', 'library-reader-chat-model',
     'library-reader-online-source', 'find-in-page', 'find-in-page-input',
@@ -147,6 +148,14 @@ test('the global reader exposes annotations, metadata, chat and native attachmen
   assert.match(reader, /aria-haspopup="menu"/);
   assert.match(reader, /role="menuitem"/);
   assert.match(reader, /library-reader-sidebar-tab-/);
+  assert.match(attachmentViewer, /key=\{`\$\{number\}:\$\{scale\}:\$\{viewMode\}`\}/,
+    'every PDF page and scale owns a fresh canvas lifecycle');
+  assert.match(attachmentViewer, /renderTask\?\.cancel\(\)/,
+    'in-flight PDF renders are cancelled when their canvas unmounts');
+  assert.match(attachmentViewer, /data-library-pdf-page=\{pageNumber\}/,
+    'continuous mode exposes stable page targets');
+  assert.match(selectionSource, /READER_HIGHLIGHTS_BY_CONTEXT/,
+    'annotations from multiple visible PDF pages share the CSS Highlight registry');
   assert.match(reader, /selected && <span/);
   assert.match(reader, /t\('Info'\)/);
   assert.match(reader, /OriginalPagePreview/);

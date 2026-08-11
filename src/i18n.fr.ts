@@ -5113,6 +5113,8 @@ export const FR: Record<string, string> = {
   '¿Crear también un apunte enlazado desde este fragmento?': 'Créer aussi une note liée à partir de ce fragment ?',
   'Cargando visor PDF…': 'Chargement de la visionneuse PDF…',
   'Vista continua': 'Vue continue',
+  'Vista individual': 'Vue page par page',
+  'Modo de visualización': 'Mode d’affichage',
   'Ir a página': 'Aller à la page',
   'Restablecer zoom': 'Réinitialiser le zoom',
   'Miniaturas': 'Miniatures',

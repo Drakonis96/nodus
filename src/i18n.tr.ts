@@ -4977,6 +4977,8 @@ export const TR: Record<string, string> = {
   "¿Crear también un apunte enlazado desde este fragmento?": "Ayrıca bu parçadan bağlantılı bir not oluşturulsun mu?",
   "Cargando visor PDF…": "PDF görüntüleyici yükleniyor…",
   "Vista continua": "Sürekli görünüm",
+  "Vista individual": "Tek sayfa görünümü",
+  "Modo de visualización": "Görünüm modu",
   "Ir a página": "Sayfaya git",
   "Restablecer zoom": "Yakınlaştırmayı sıfırla",
   "Miniaturas": "Minyatürler",

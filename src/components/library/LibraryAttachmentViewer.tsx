@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from 'react';
 import { GlobalWorkerOptions, getDocument, TextLayer } from 'pdfjs-dist';
 import type { PDFDocumentProxy, RenderTask } from 'pdfjs-dist';
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
@@ -53,76 +53,145 @@ function TextSurface({
 }
 
 function PdfViewer(props: ViewerProps) {
-  const { attachment } = props; const canvasRef = useRef<HTMLCanvasElement | null>(null); const textRef = useRef<HTMLDivElement | null>(null);
-  const scrollRef = useRef<HTMLElement | null>(null); const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
+  const { attachment } = props; const scrollRef = useRef<HTMLElement | null>(null); const activeTextRef = useRef<HTMLDivElement | null>(null); const currentPageRef = useRef(1);
+  const textLayersRef = useRef(new Map<number, HTMLDivElement>()); const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
   const findSegmentsRef = useRef<{ pdf: PDFDocumentProxy; promise: Promise<FindTextSegment[]> } | null>(null);
-  const [pageNumber, setPageNumber] = useState(1); const [scale, setScale] = useState(1.25); const [renderedScale, setRenderedScale] = useState(0); const [loading, setLoading] = useState(true); const [error, setError] = useState('');
-  const scope = `attachment:${attachment.id}:page:${pageNumber}`;
+  const [pageNumber, setPageNumber] = useState(1); const [scale, setScale] = useState(1.25);
+  const [viewMode, setViewMode] = useState<'single' | 'continuous'>(() => localStorage.getItem('nodus.library.pdfViewMode') === 'continuous' ? 'continuous' : 'single');
+  const [renderedScales, setRenderedScales] = useState<Record<number, number>>({}); const [renderRevision, setRenderRevision] = useState(0);
+  const [loading, setLoading] = useState(true); const [error, setError] = useState('');
   useEffect(() => {
     if (!attachment.url) return;
     const task = getDocument({ url: attachment.url }); let current: PDFDocumentProxy | null = null; setLoading(true); setError('');
-    void task.promise.then((document) => { current = document; setPdf(document); setLoading(false); }).catch((cause) => { setError(cause instanceof Error ? cause.message : String(cause)); setLoading(false); });
+    void task.promise.then((document) => { current = document; setPdf(document); setPageNumber(1); setRenderedScales({}); setLoading(false); }).catch((cause) => { setError(cause instanceof Error ? cause.message : String(cause)); setLoading(false); });
     return () => { void task.destroy(); void current?.destroy(); };
   }, [attachment.url]);
+  const selectTextLayer = useCallback((number: number, layer: HTMLDivElement | null) => {
+    if (layer) textLayersRef.current.set(number, layer); else {
+      textLayersRef.current.delete(number);
+      setRenderedScales((current) => {
+        if (!(number in current)) return current;
+        const next = { ...current }; delete next[number]; return next;
+      });
+    }
+    if (number === currentPageRef.current) activeTextRef.current = layer;
+    setRenderRevision((value) => value + 1);
+  }, []);
   useEffect(() => {
-    if (!pdf || !canvasRef.current || !textRef.current) return;
-    let canceled = false; let textLayer: TextLayer | null = null; let renderTask: RenderTask | null = null;
-    setRenderedScale(0);
-    void pdf.getPage(pageNumber).then(async (page) => {
-      if (canceled || !canvasRef.current || !textRef.current) return;
-      const viewport = page.getViewport({ scale }); const ratio = Math.min(window.devicePixelRatio || 1, 2); const canvas = canvasRef.current;
-      canvas.width = Math.ceil(viewport.width * ratio); canvas.height = Math.ceil(viewport.height * ratio); canvas.style.width = `${viewport.width}px`; canvas.style.height = `${viewport.height}px`;
-      textRef.current.replaceChildren(); textRef.current.style.width = `${viewport.width}px`; textRef.current.style.height = `${viewport.height}px`;
-      renderTask = page.render({ canvasContext: canvas.getContext('2d')!, viewport, transform: ratio === 1 ? undefined : [ratio, 0, 0, ratio, 0, 0] });
-      await renderTask.promise;
-      if (canceled || !textRef.current) return;
-      textLayer = new TextLayer({ textContentSource: await page.getTextContent(), container: textRef.current, viewport }); await textLayer.render();
-      if (!canceled) setRenderedScale(scale);
-    }).catch((cause) => { if (!canceled) setError(cause instanceof Error ? cause.message : String(cause)); });
-    return () => { canceled = true; renderTask?.cancel(); textLayer?.cancel(); };
-  }, [pageNumber, pdf, scale]);
+    currentPageRef.current = pageNumber;
+    activeTextRef.current = textLayersRef.current.get(pageNumber) ?? null;
+    setRenderRevision((value) => value + 1);
+  }, [pageNumber]);
+  const markRendered = useCallback((renderedPage: number, rendered: number) => {
+    setRenderedScales((current) => current[renderedPage] === rendered ? current : { ...current, [renderedPage]: rendered });
+  }, []);
+  const goToPage = useCallback((requested: number, smooth = true) => {
+    const next = Math.min(pdf?.numPages ?? 1, Math.max(1, requested || 1)); setPageNumber(next);
+    if (viewMode === 'continuous') window.requestAnimationFrame(() => scrollRef.current?.querySelector<HTMLElement>(`[data-library-pdf-page="${next}"]`)?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'start' }));
+  }, [pdf?.numPages, viewMode]);
+  useEffect(() => {
+    localStorage.setItem('nodus.library.pdfViewMode', viewMode);
+    if (viewMode !== 'continuous') return;
+    const frame = window.requestAnimationFrame(() => scrollRef.current?.querySelector<HTMLElement>(`[data-library-pdf-page="${currentPageRef.current}"]`)?.scrollIntoView({ behavior: 'auto', block: 'start' }));
+    return () => window.cancelAnimationFrame(frame);
+  }, [viewMode]);
+  useEffect(() => {
+    const scroller = scrollRef.current; if (!scroller || viewMode !== 'continuous') return;
+    let frame = 0;
+    const updateCurrentPage = () => {
+      window.cancelAnimationFrame(frame); frame = window.requestAnimationFrame(() => {
+        const top = scroller.getBoundingClientRect().top + 24;
+        const closest = Array.from(scroller.querySelectorAll<HTMLElement>('[data-library-pdf-page]')).reduce<{ page: number; distance: number } | null>((best, element) => {
+          const page = Number(element.dataset.libraryPdfPage || 0); const distance = Math.abs(element.getBoundingClientRect().top - top);
+          return page && (!best || distance < best.distance) ? { page, distance } : best;
+        }, null);
+        if (closest) setPageNumber((current) => current === closest.page ? current : closest.page);
+      });
+    };
+    updateCurrentPage(); scroller.addEventListener('scroll', updateCurrentPage, { passive: true });
+    return () => { window.cancelAnimationFrame(frame); scroller.removeEventListener('scroll', updateCurrentPage); };
+  }, [viewMode]);
   const loadFindSegments = useCallback(async (): Promise<FindTextSegment[]> => {
     if (!pdf) return [];
     if (findSegmentsRef.current?.pdf === pdf) return findSegmentsRef.current.promise;
     const promise = (async () => {
       const next: FindTextSegment[] = [];
       for (let pageIndex = 1; pageIndex <= pdf.numPages; pageIndex += 1) {
-        const page = await pdf.getPage(pageIndex);
-        const content = await page.getTextContent();
-        next.push({
-          id: String(pageIndex),
-          text: content.items.map((item) => 'str' in item && typeof item.str === 'string' ? item.str : '').join(' '),
-        });
-        // Yield periodically: indexing a long PDF must never monopolise Electron's
-        // renderer or bring back the foreground stalls fixed in the Library.
+        const page = await pdf.getPage(pageIndex); const content = await page.getTextContent();
+        next.push({ id: String(pageIndex), text: content.items.map((item) => 'str' in item && typeof item.str === 'string' ? item.str : '').join(' ') });
         if (pageIndex % 4 === 0) await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
       }
       return next;
     })();
-    findSegmentsRef.current = { pdf, promise };
-    return promise;
+    findSegmentsRef.current = { pdf, promise }; return promise;
   }, [pdf]);
-  return <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" data-testid="library-reader-pdf-viewer" data-rendered-scale={renderedScale || undefined}>
-    <div className="flex flex-wrap items-center justify-center gap-2 border-b border-neutral-800 px-3 py-2">
-      <div className="flex items-center gap-1 rounded-lg border border-neutral-800 p-0.5">
-        <button className="btn btn-ghost h-8 w-8 p-0" aria-label={t('Anterior')} title={t('Anterior')} disabled={pageNumber <= 1} onClick={() => setPageNumber((value) => Math.max(1, value - 1))}><Icon name="arrowLeft" size={13} /></button>
-        <label><span className="sr-only">{t('Página')}</span><input aria-label={t('Página')} className="input h-8 w-14 text-center" type="number" min="1" max={pdf?.numPages ?? 1} value={pageNumber} onChange={(event) => setPageNumber(Math.min(pdf?.numPages ?? 1, Math.max(1, Number(event.target.value) || 1)))} /></label>
+  const renderedScale = renderedScales[pageNumber] === scale ? scale : 0;
+  const pageNumbers = pdf ? (viewMode === 'continuous' ? Array.from({ length: pdf.numPages }, (_, index) => index + 1) : [pageNumber]) : [];
+  return <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" data-testid="library-reader-pdf-viewer" data-view-mode={viewMode} data-rendered-scale={renderedScale || undefined}>
+    <div className="flex flex-wrap items-center justify-center gap-2 border-b border-neutral-200 px-3 py-2 dark:border-neutral-800">
+      <div className="flex items-center gap-1 rounded-lg border border-neutral-200 p-0.5 dark:border-neutral-800">
+        <button className="btn btn-ghost h-8 w-8 p-0" aria-label={t('Anterior')} title={t('Anterior')} disabled={pageNumber <= 1} onClick={() => goToPage(pageNumber - 1)}><Icon name="arrowLeft" size={13} /></button>
+        <label><span className="sr-only">{t('Página')}</span><input aria-label={t('Página')} className="input h-8 w-14 text-center" type="number" min="1" max={pdf?.numPages ?? 1} value={pageNumber} onChange={(event) => goToPage(Number(event.target.value))} /></label>
         <span className="min-w-8 text-center text-xs tabular-nums text-neutral-500">/ {pdf?.numPages ?? '—'}</span>
-        <button className="btn btn-ghost h-8 w-8 p-0" aria-label={t('Siguiente')} title={t('Siguiente')} disabled={pageNumber >= (pdf?.numPages ?? 1)} onClick={() => setPageNumber((value) => Math.min(pdf?.numPages ?? 1, value + 1))}><Icon name="arrowRight" size={13} /></button>
+        <button className="btn btn-ghost h-8 w-8 p-0" aria-label={t('Siguiente')} title={t('Siguiente')} disabled={pageNumber >= (pdf?.numPages ?? 1)} onClick={() => goToPage(pageNumber + 1)}><Icon name="arrowRight" size={13} /></button>
       </div>
-      <div className="flex items-center gap-1 rounded-lg border border-neutral-800 p-0.5">
+      <div className="flex items-center gap-1 rounded-lg border border-neutral-200 p-0.5 dark:border-neutral-800">
         <button data-testid="library-reader-pdf-zoom-out" className="btn btn-ghost h-8 w-8 p-0" aria-label={t('Alejar')} title={t('Alejar')} onClick={() => setScale((value) => Math.max(.6, value - .15))}><Icon name="minus" size={13} /></button><button className="min-w-12 text-xs tabular-nums text-neutral-500" onClick={() => setScale(1.25)}>{Math.round(scale * 100)}%</button><button data-testid="library-reader-pdf-zoom-in" className="btn btn-ghost h-8 w-8 p-0" aria-label={t('Acercar')} title={t('Acercar')} onClick={() => setScale((value) => Math.min(2.5, value + .15))}><Icon name="plus" size={13} /></button>
+      </div>
+      <div className="flex items-center rounded-lg border border-neutral-200 p-0.5 dark:border-neutral-800" role="group" aria-label={t('Modo de visualización')}>
+        <button data-testid="library-reader-pdf-view-single" className={`btn h-8 w-8 p-0 ${viewMode === 'single' ? 'btn-secondary' : 'btn-ghost'}`} aria-label={t('Vista individual')} title={t('Vista individual')} aria-pressed={viewMode === 'single'} onClick={() => setViewMode('single')}><Icon name="fileText" size={13} /></button>
+        <button data-testid="library-reader-pdf-view-continuous" className={`btn h-8 w-8 p-0 ${viewMode === 'continuous' ? 'btn-secondary' : 'btn-ghost'}`} aria-label={t('Vista continua')} title={t('Vista continua')} aria-pressed={viewMode === 'continuous'} onClick={() => setViewMode('continuous')}><Icon name="layers" size={13} /></button>
       </div>
       <button data-testid="library-reader-open-external" className="btn btn-ghost h-8" onClick={props.onOpenExternal} title={t('Abrir fuera de Nodus')}><Icon name="external" /><span className="max-md:hidden">{t('Abrir fuera de Nodus')}</span></button>
     </div>
     <main ref={scrollRef} className="relative min-h-0 min-w-0 flex-1 overflow-auto bg-neutral-200 p-6 dark:bg-black">
       {loading && <Spinner label={t('Cargando documento…')} />}{error && <p role="alert" className="text-sm text-red-400">{error}</p>}
-      <div className="pdf-annotation-page relative mx-auto w-fit bg-white shadow-2xl"><canvas ref={canvasRef} /><div ref={textRef} className="textLayer" /></div>
-      <ReaderSelectionActions targetRef={textRef} scrollRef={scrollRef} contextId={`${props.documentId}:${scope}`} annotations={props.annotations.filter((entry) => entry.scope === scope)} highlighterColor={props.highlighterColor}
-        onCreateAnnotation={(input) => props.onCreate(scope, { ...input, target: { type: 'text', attachmentId: attachment.id, page: pageNumber } })}
-        onUpdateComment={props.onUpdateComment} onDeleteAnnotation={props.onDelete} onAnnotationError={props.onError} />
+      <div className={viewMode === 'continuous' ? 'space-y-6' : ''}>{pageNumbers.map((number) => <LibraryPdfPage key={`${number}:${scale}:${viewMode}`} pdf={pdf!} pageNumber={number} scale={scale} continuous={viewMode === 'continuous'} scrollRef={scrollRef} props={props} onTextLayer={selectTextLayer} onRendered={markRendered} onError={setError} />)}</div>
     </main>
-    <FindInPage targetRef={textRef} loadSegments={loadFindSegments} activeSegmentId={String(pageNumber)} onActivateSegment={(id) => setPageNumber(Math.min(pdf?.numPages ?? 1, Math.max(1, Number(id) || 1)))} sourceRevision={`${pageNumber}:${renderedScale}`} ready={!loading && renderedScale > 0} emptyTextMessage={t('Este PDF no contiene texto buscable. Abre el Markdown limpio para consultar el OCR.')} placement="reader" />
+    <FindInPage targetRef={activeTextRef} loadSegments={loadFindSegments} activeSegmentId={String(pageNumber)} onActivateSegment={(id) => goToPage(Number(id), false)} sourceRevision={`${pageNumber}:${renderedScale}:${renderRevision}`} ready={!loading && renderedScale > 0 && !!activeTextRef.current} emptyTextMessage={t('Este PDF no contiene texto buscable. Abre el Markdown limpio para consultar el OCR.')} placement="reader" />
+  </section>;
+}
+
+function renderWasCancelled(cause: unknown): boolean {
+  return cause instanceof Error && (cause.name === 'RenderingCancelledException' || /rendering cancelled/i.test(cause.message));
+}
+
+function LibraryPdfPage({ pdf, pageNumber, scale, continuous, scrollRef, props, onTextLayer, onRendered, onError }: {
+  pdf: PDFDocumentProxy; pageNumber: number; scale: number; continuous: boolean; scrollRef: RefObject<HTMLElement | null>; props: ViewerProps;
+  onTextLayer(pageNumber: number, layer: HTMLDivElement | null): void; onRendered(pageNumber: number, scale: number): void; onError(message: string): void;
+}) {
+  const shellRef = useRef<HTMLDivElement | null>(null); const canvasRef = useRef<HTMLCanvasElement | null>(null); const textRef = useRef<HTMLDivElement | null>(null);
+  const [nearViewport, setNearViewport] = useState(!continuous); const [size, setSize] = useState({ width: 612 * scale, height: 792 * scale }); const [textReady, setTextReady] = useState(false);
+  const scope = `attachment:${props.attachment.id}:page:${pageNumber}`;
+  useEffect(() => {
+    if (!continuous) { setNearViewport(true); return; }
+    const shell = shellRef.current; if (!shell) return;
+    const observer = new IntersectionObserver((entries) => setNearViewport(entries.some((entry) => entry.isIntersecting)), { root: scrollRef.current, rootMargin: '1000px 0px' });
+    observer.observe(shell); return () => observer.disconnect();
+  }, [continuous, scrollRef]);
+  useEffect(() => {
+    let cancelled = false; let renderTask: RenderTask | null = null; let textLayer: TextLayer | null = null;
+    setTextReady(false); onTextLayer(pageNumber, null);
+    void pdf.getPage(pageNumber).then(async (page) => {
+      const viewport = page.getViewport({ scale }); if (cancelled) return;
+      setSize({ width: viewport.width, height: viewport.height });
+      if (!nearViewport || !canvasRef.current || !textRef.current) return;
+      const canvas = canvasRef.current; const layer = textRef.current; const ratio = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.ceil(viewport.width * ratio); canvas.height = Math.ceil(viewport.height * ratio); canvas.style.width = `${viewport.width}px`; canvas.style.height = `${viewport.height}px`;
+      layer.replaceChildren(); layer.style.width = `${viewport.width}px`; layer.style.height = `${viewport.height}px`;
+      const context = canvas.getContext('2d'); if (!context) throw new Error('Canvas 2D is not available.');
+      renderTask = page.render({ canvasContext: context, viewport, transform: ratio === 1 ? undefined : [ratio, 0, 0, ratio, 0, 0] }); await renderTask.promise;
+      if (cancelled) return;
+      textLayer = new TextLayer({ textContentSource: await page.getTextContent(), container: layer, viewport }); await textLayer.render();
+      if (cancelled) return;
+      setTextReady(true); onTextLayer(pageNumber, layer); onRendered(pageNumber, scale);
+    }).catch((cause) => { if (!cancelled && !renderWasCancelled(cause)) onError(cause instanceof Error ? cause.message : String(cause)); });
+    return () => { cancelled = true; textLayer?.cancel(); renderTask?.cancel(); onTextLayer(pageNumber, null); };
+  }, [nearViewport, onError, onRendered, onTextLayer, pageNumber, pdf, scale]);
+  return <section className={continuous ? 'scroll-mt-6' : ''}>
+    <div ref={shellRef} data-library-pdf-page={pageNumber} className="pdf-annotation-page relative mx-auto bg-white shadow-2xl" style={size}><canvas ref={canvasRef} className="block" /><div ref={textRef} className="textLayer" />{nearViewport && !textReady && <div className="absolute inset-0 grid place-items-center bg-white/80"><Spinner label={t('Renderizando PDF…')} /></div>}</div>
+    {continuous && <p className="mt-2 text-center text-[10px] tabular-nums text-neutral-500">{t('Página')} {pageNumber}</p>}
+    {textReady && <ReaderSelectionActions targetRef={textRef} scrollRef={scrollRef} contextId={`${props.documentId}:${scope}`} annotations={props.annotations.filter((entry) => entry.scope === scope)} highlighterColor={props.highlighterColor} onCreateAnnotation={(input) => props.onCreate(scope, { ...input, target: { type: 'text', attachmentId: props.attachment.id, page: pageNumber } })} onUpdateComment={props.onUpdateComment} onDeleteAnnotation={props.onDelete} onAnnotationError={props.onError} />}
   </section>;
 }
 

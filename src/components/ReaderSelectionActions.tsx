@@ -86,6 +86,20 @@ const HIGHLIGHT_NAMES: Record<WritingDraftAnnotationColor, string> = {
 };
 const COMMENT_HIGHLIGHT_NAME = 'nodus-reader-comment';
 const ALL_HIGHLIGHT_NAMES = [...Object.values(HIGHLIGHT_NAMES), COMMENT_HIGHLIGHT_NAME];
+const READER_HIGHLIGHTS_BY_CONTEXT = new Map<string, Map<string, Range[]>>();
+
+interface HighlightRegistry {
+  delete(name: string): boolean;
+  set(name: string, value: unknown): unknown;
+}
+
+function repaintReaderHighlights(registry: HighlightRegistry, HighlightConstructor: new (...ranges: Range[]) => unknown): void {
+  for (const name of ALL_HIGHLIGHT_NAMES) {
+    registry.delete(name);
+    const ranges = Array.from(READER_HIGHLIGHTS_BY_CONTEXT.values()).flatMap((context) => context.get(name) ?? []).filter((range) => range.startContainer.isConnected && range.endContainer.isConnected);
+    if (ranges.length) registry.set(name, new HighlightConstructor(...ranges));
+  }
+}
 
 function storageKey(contextId: string): string {
   return `nodus.readerMark.${contextId}`;
@@ -618,30 +632,33 @@ export const ReaderSelectionActions = forwardRef<ReaderSelectionActionsHandle, {
 
   useEffect(() => {
     const root = targetRef.current;
-    const registry = (CSS as unknown as { highlights?: Map<string, unknown> }).highlights;
+    const registry = (CSS as unknown as { highlights?: HighlightRegistry }).highlights;
     const HighlightConstructor = (window as unknown as { Highlight?: new (...ranges: Range[]) => unknown }).Highlight;
     // PDF.js replaces the complete text layer whenever its scale or page changes.
     // Rebuild the CSS Highlight ranges against those new nodes instead of leaving
     // registrations attached to the disconnected previous text layer.
     void contentRevision;
-    for (const name of ALL_HIGHLIGHT_NAMES) registry?.delete(name);
     if (!root || !registry || !HighlightConstructor) return;
+    const contextHighlights = new Map<string, Range[]>();
     for (const item of READER_ANNOTATION_COLORS) {
       const ranges = annotations
         .filter((annotation) => annotation.kind === 'highlight' && annotation.color === item.id)
         .map((annotation) => annotationRange(root, annotation))
         .filter((range): range is Range => range !== null);
-      if (ranges.length > 0) registry.set(HIGHLIGHT_NAMES[item.id], new HighlightConstructor(...ranges));
+      contextHighlights.set(HIGHLIGHT_NAMES[item.id], ranges);
     }
     const commentRanges = annotations
       .filter((annotation) => annotation.kind === 'comment')
       .map((annotation) => annotationRange(root, annotation))
       .filter((range): range is Range => range !== null);
-    if (commentRanges.length > 0) registry.set(COMMENT_HIGHLIGHT_NAME, new HighlightConstructor(...commentRanges));
+    contextHighlights.set(COMMENT_HIGHLIGHT_NAME, commentRanges);
+    READER_HIGHLIGHTS_BY_CONTEXT.set(contextId, contextHighlights);
+    repaintReaderHighlights(registry, HighlightConstructor);
     return () => {
-      for (const name of ALL_HIGHLIGHT_NAMES) registry.delete(name);
+      READER_HIGHLIGHTS_BY_CONTEXT.delete(contextId);
+      repaintReaderHighlights(registry, HighlightConstructor);
     };
-  }, [annotations, contentRevision, targetRef]);
+  }, [annotations, contentRevision, contextId, targetRef]);
 
   const copy = async () => {
     if (!active) return;

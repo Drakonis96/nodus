@@ -36,6 +36,7 @@ const pdfFindScreenshotPath = path.join(screenshotDirectory, '14-reader-find-pdf
 const epubFindScreenshotPath = path.join(screenshotDirectory, '15-reader-find-epub.png');
 const imageFindScreenshotPath = path.join(screenshotDirectory, '16-reader-find-image.png');
 const lightFindScreenshotPath = path.join(screenshotDirectory, '17-reader-find-light-narrow.png');
+const pdfContinuousScreenshotPath = path.join(screenshotDirectory, '18-reader-pdf-continuous.png');
 const childEnv = {
   ...process.env,
   NODUS_USERDATA: userData,
@@ -539,6 +540,23 @@ ${longReaderBody}
   await pdfViewer.waitFor({ state: 'visible' });
   await pdfViewer.locator('canvas').waitFor({ state: 'visible' });
   await page.waitForFunction(() => document.querySelectorAll('[data-testid="library-reader-pdf-viewer"] .textLayer span').length > 0);
+  assert.equal(await pdfViewer.getAttribute('data-view-mode'), 'single', 'the focused single-page view remains the default');
+  assert.equal(await page.getByTestId('library-reader-pdf-view-single').getAttribute('aria-pressed'), 'true');
+  // Change scale and view while PDF.js is still painting. Every transition must
+  // receive its own canvas rather than racing a previous render on the same one.
+  for (let index = 0; index < 3; index += 1) {
+    await page.getByTestId('library-reader-pdf-zoom-in').click();
+    await page.getByTestId('library-reader-pdf-zoom-out').click();
+    await page.getByTestId('library-reader-pdf-view-continuous').click();
+    await page.getByTestId('library-reader-pdf-view-single').click();
+  }
+  await page.getByTestId('library-reader-pdf-view-continuous').click();
+  await page.waitForFunction(() => document.querySelectorAll('[data-library-pdf-page]').length === 3);
+  assert.equal(await pdfViewer.getAttribute('data-view-mode'), 'continuous');
+  assert.equal(await page.getByTestId('library-reader-pdf-view-continuous').getAttribute('aria-pressed'), 'true');
+  await page.screenshot({ path: pdfContinuousScreenshotPath, fullPage: true });
+  await page.getByTestId('library-reader-pdf-view-single').click();
+  await page.waitForFunction(() => document.querySelectorAll('[data-library-pdf-page]').length === 1);
   await page.keyboard.press('Control+f');
   const pdfFindPanel = page.getByTestId('find-in-page');
   await pdfFindPanel.waitFor({ state: 'visible' });
@@ -550,8 +568,8 @@ ${longReaderBody}
   await page.keyboard.press('Escape');
   await pdfFindPanel.waitFor({ state: 'detached' });
   await pdfViewer.getByRole('spinbutton', { name: 'Página' }).fill('1');
-  await page.waitForFunction(() => !document.querySelector('[data-testid="library-reader-pdf-viewer"]')?.getAttribute('data-rendered-scale'));
-  await page.waitForFunction(() => document.querySelector('[data-testid="library-reader-pdf-viewer"]')?.getAttribute('data-rendered-scale'));
+  await page.waitForFunction(() => document.querySelector('[data-testid="library-reader-pdf-viewer"] input[aria-label="Página"]')?.value === '1');
+  await page.waitForFunction(() => document.querySelector('[data-testid="library-reader-pdf-viewer"]')?.getAttribute('data-rendered-scale') && document.querySelector('[data-testid="library-reader-pdf-viewer"] .textLayer')?.textContent?.includes('rapido zorro'));
   assert.match(await page.getByTestId('library-reader-freshness').innerText(), /Archivo original/);
   assert.match(await page.locator('.library-reader-outline').innerText(), /Introducción[\s\S]*Resultados/, 'the clean-document outline remains available while the PDF is open');
   assert.equal((await pdfViewer.getByRole('button', { name: 'Anterior' }).innerText()).trim(), '');
