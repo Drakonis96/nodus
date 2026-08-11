@@ -96,6 +96,7 @@ import type {
   StudyStyleAssociationKind,
   StudyStyleExport,
   StudyStyleInput,
+  StudySynonymRequest,
   StudyTestBuildRequest,
   StudyTranscriptInput,
   StudyTranscriptSegmentInput,
@@ -180,6 +181,7 @@ import { transcribeStudyAudio as transcribeOpenAiStudyAudio } from '../ai/studyT
 import { diarizeStudyRecording } from '../ai/studyDiarization';
 import { cancelWhisperCpp, deleteWhisperCppModel, downloadWhisperCppModel, getWhisperCppStatus, transcribeWhisperCpp, installWhisperCpp, uninstallWhisperCpp } from '../stt/whisperCpp';
 import { improveStudyText } from '../ai/studyImprove';
+import { suggestStudySynonyms } from '../ai/studySynonyms';
 import * as studySearch from '../ai/studySearch';
 import * as studyAssistant from '../ai/studyAssistant';
 import * as studyQuestions from '../db/studyQuestionsRepo';
@@ -825,6 +827,7 @@ export function registerAcademicIpc({ h, getWindow, chatAborters }: IpcContext):
       studyImproveAborters.delete(requestId);
     }
   });
+  h('study:synonyms', async (_e, request: StudySynonymRequest) => suggestStudySynonyms(request));
   h('study:improve:cancel', async (_e, requestId: string) => studyImproveAborters.get(requestId)?.abort());
   h('study:improve:log', async (_e, documentId: string) => studyStyles.listStudyImprovementLog(documentId));
   h('study:improve:action', async (_e, id: string, action: StudyImprovementLog['action']) => studyStyles.updateStudyImprovementAction(id, action));

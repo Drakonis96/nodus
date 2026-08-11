@@ -10,6 +10,7 @@ import { TOOLKIT_APPS_TRANSLATIONS } from './i18n.toolkitApps';
 import { SERVER_TRANSLATIONS } from './i18n.server';
 import { TRANSLATE_TRANSLATIONS } from './i18n.translate';
 import { WORLD_CHAT_TRANSLATIONS } from './i18n.worldChat';
+import { STUDY_SYNONYM_TRANSLATIONS } from './i18n.studySynonyms';
 import { PROSOPOGRAPHY_TRANSLATIONS } from './i18n.prosopography';
 import { DIARIZATION_TRANSLATIONS } from './i18n.diarization';
 import { WORLDBUILDING_TRANSLATIONS } from './i18n.worldbuilding';
@@ -53,6 +54,7 @@ export const FR: Record<string, string> = {
   ...NODI_NOTIFICATION_TRANSLATIONS['fr'],
   ...ANNOUNCEMENT_TRANSLATIONS['fr'],
   ...WORLD_CHAT_TRANSLATIONS.fr,
+  ...STUDY_SYNONYM_TRANSLATIONS.fr,
   "Lo que cuenta el mapa": "Ce que raconte la carte",
   "Ver dónde ocurren las escenas ({n})": "Voir où se passent les scènes ({n})",
   "Viajes imposibles": "Trajets impossibles",

@@ -187,6 +187,7 @@ try {
     hasSearchDetail: typeof window.nodus?.getSearchResultDetail === 'function',
     hasStudyStt: typeof window.nodus?.transcribeStudyAudio === 'function',
     hasStudyImprove: typeof window.nodus?.improveStudyText === 'function' && typeof window.nodus?.listStudyStyles === 'function',
+    hasStudySynonyms: typeof window.nodus?.suggestStudySynonyms === 'function',
     hasStudyRecordings: typeof window.nodus?.createStudyRecording === 'function' && typeof window.nodus?.saveStudyTranscript === 'function',
     hasStudySearch: typeof window.nodus?.searchStudyCorpus === 'function' && typeof window.nodus?.rebuildStudySearchIndex === 'function',
     hasStudyKnowledge: typeof window.nodus?.listStudyIdeas === 'function' && typeof window.nodus?.getStudyKnowledgeGraph === 'function' && typeof window.nodus?.reanalyzeStudyKnowledgeSource === 'function',
@@ -208,6 +209,7 @@ try {
   assert.equal(bridge.hasSearchDetail, true, 'search detail modal bridge available');
   assert.equal(bridge.hasStudyStt, true, 'study speech-to-text bridge available');
   assert.equal(bridge.hasStudyImprove, true, 'study improvement and style bridge available');
+  assert.equal(bridge.hasStudySynonyms, true, 'contextual study synonyms bridge available');
   assert.equal(bridge.hasStudyRecordings, true, 'study recording and transcript bridge available');
   assert.equal(bridge.hasStudySearch, true, 'study hybrid-search bridge available');
   assert.equal(bridge.hasStudyKnowledge, true, 'study ideas and knowledge-graph bridge available');
@@ -1954,6 +1956,12 @@ try {
   });
   await page.getByTestId('study-selection-text-color').waitFor();
   assert.equal(await page.locator('[data-testid^="study-quick-improve-"]').count(), 4, 'the selection exposes exactly the four configured prompt shortcuts');
+  assert.equal(await page.getByTestId('study-synonyms-toggle').count(), 1, 'the selection exposes the contextual synonyms action');
+  await page.getByTestId('study-synonyms-toggle').click();
+  await page.getByTestId('study-synonyms-panel').waitFor();
+  assert.equal(await page.getByTestId('study-synonyms-regenerate').count(), 1, 'the contextual synonyms dropdown opens with regeneration controls');
+  await page.keyboard.press('Escape');
+  await page.getByTestId('study-synonyms-panel').waitFor({ state: 'detached' });
   const failedImprovement = await page.evaluate(async () => {
     const workspace = await window.nodus.getStudyWorkspace();
     const document = workspace.documents.find((item) => item.title === 'Apunte smoke');

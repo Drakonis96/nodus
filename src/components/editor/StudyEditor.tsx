@@ -24,6 +24,8 @@ import { deleteLastStudySentence } from '@shared/sttModels';
 import type { StudyDocument, StudyDocumentKind, StudyTag } from '@shared/studyOrg';
 import { STUDY_DOCUMENT_KINDS } from '@shared/studyOrg';
 import type { StudyImproveScope, StudyStyle } from '@shared/studyImprove';
+import type { StudySentenceContext, StudySynonymAlternative } from '@shared/studySynonyms';
+import { studySentenceContext } from '@shared/studySynonyms';
 import type { AppSettings } from '@shared/types';
 import { Markdown } from '../Markdown';
 import { ModelPicker } from '../ModelPicker';
@@ -52,6 +54,18 @@ interface ImproveTarget {
   visual?: boolean;
 }
 
+interface SynonymPanelState {
+  sessionId: number;
+  x: number;
+  y: number;
+  base: string;
+  target: ImproveTarget;
+  context: StudySentenceContext;
+  rounds: StudySynonymAlternative[][];
+  loading: boolean;
+  error: string;
+}
+
 function ImproveStyleMark({ style, size = 16 }: { style: Pick<StudyStyle, 'icon'>; size?: number }) {
   return (ICON_NAMES as readonly string[]).includes(style.icon)
     ? <Icon name={style.icon} size={size} />
@@ -66,7 +80,7 @@ const STUDY_KIND_LABEL: Record<StudyDocumentKind, string> = {
 interface MilkdownCanvasHandle {
   insertText: (text: string, replaceSelection: boolean) => void;
   insertMarkdown: (markdown: string) => void;
-  selectedText: () => string;
+  selectionSnapshot: () => { text: string; occurrence: number };
   runInlineCommand: (command: 'code' | 'formula') => void;
   setHeading: (level: number) => void;
   setTextColor: (color: string) => void;
@@ -157,13 +171,21 @@ const MilkdownCanvas = forwardRef<MilkdownCanvasHandle, {
         ctx.get(editorViewCtx).focus();
       });
     },
-    selectedText() {
-      let text = '';
+    selectionSnapshot() {
+      let snapshot = { text: '', occurrence: 0 };
       crepeRef.current?.editor.action((ctx) => {
         const view = ctx.get(editorViewCtx);
-        text = view.state.doc.textBetween(view.state.selection.from, view.state.selection.to, '\n');
+        const text = view.state.doc.textBetween(view.state.selection.from, view.state.selection.to, '\n');
+        const before = view.state.doc.textBetween(0, view.state.selection.from, '\n');
+        let occurrence = 0;
+        let cursor = text ? before.indexOf(text) : -1;
+        while (cursor >= 0) {
+          occurrence += 1;
+          cursor = before.indexOf(text, cursor + text.length);
+        }
+        snapshot = { text, occurrence };
       });
-      return text;
+      return snapshot;
     },
     runInlineCommand(command) {
       crepeRef.current?.editor.action((ctx) => {
@@ -247,6 +269,33 @@ function VersionDiff({ version, current }: { version: StudyDocVersion; current: 
   );
 }
 
+function SynonymAlternativeList({
+  alternatives,
+  selectedText,
+  historical = false,
+  onSelect,
+}: {
+  alternatives: StudySynonymAlternative[];
+  selectedText: string;
+  historical?: boolean;
+  onSelect: (alternative: StudySynonymAlternative) => void;
+}) {
+  return <div className="space-y-1">
+    {alternatives.map((alternative, index) => (
+      <button
+        type="button"
+        key={`${alternative.from}:${alternative.to}:${alternative.replacement}:${index}`}
+        data-testid={historical ? 'study-synonyms-history-option' : 'study-synonyms-option'}
+        className={`group w-full rounded-lg border px-2.5 py-2 text-left transition ${historical ? 'border-transparent bg-stone-50 hover:border-teal-200 hover:bg-teal-50 dark:bg-neutral-900/60 dark:hover:border-teal-900 dark:hover:bg-teal-950/30' : 'border-stone-200 bg-white hover:border-teal-300 hover:bg-teal-50 dark:border-neutral-800 dark:bg-neutral-950 dark:hover:border-teal-800 dark:hover:bg-teal-950/30'}`}
+        onClick={() => onSelect(alternative)}
+      >
+        <span className="block text-sm text-stone-800 group-hover:text-teal-900 dark:text-neutral-100 dark:group-hover:text-teal-100">{alternative.replacement}</span>
+        {alternative.target !== selectedText && <span className="mt-0.5 block truncate text-[10px] text-neutral-500">{t('Sustituye')} «{alternative.target}»</span>}
+      </button>
+    ))}
+  </div>;
+}
+
 export function StudyEditor({
   settings,
   documents,
@@ -312,6 +361,7 @@ export function StudyEditor({
   const [quickImproveStyles, setQuickImproveStyles] = useState<StudyStyle[]>([]);
   const [selectionImprove, setSelectionImprove] = useState<{ x: number; y: number; target: ImproveTarget } | null>(null);
   const [selectionToolbar, setSelectionToolbar] = useState<HTMLElement | null>(null);
+  const [synonymPanel, setSynonymPanel] = useState<SynonymPanelState | null>(null);
   const [improveStreamingStyleId, setImproveStreamingStyleId] = useState<string | null>(null);
   const [improveStreamError, setImproveStreamError] = useState('');
   const [historyState, setHistoryState] = useState<EditorHistoryState>({ canUndo: false, canRedo: false });
@@ -326,6 +376,8 @@ export function StudyEditor({
   const rawRef = useRef(raw);
   const milkdownRef = useRef<MilkdownCanvasHandle>(null);
   const rawTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const synonymPanelRef = useRef<HTMLDivElement>(null);
+  const synonymSessionRef = useRef(0);
   const turndown = useMemo(() => new TurndownService({ headingStyle: 'atx', bulletListMarker: '-', codeBlockStyle: 'fenced' }), []);
 
   const loadData = useCallback(async (documentId: string) => {
@@ -370,9 +422,17 @@ export function StudyEditor({
       to = nextLine === -1 ? draft.length : nextLine;
       if (draft.slice(from, to).trim()) return { from, to, text: draft.slice(from, to), scope: 'paragraph' };
     }
-    const selection = milkdownRef.current?.selectedText() || window.getSelection()?.toString() || '';
+    const snapshot = milkdownRef.current?.selectionSnapshot();
+    const selection = snapshot?.text || window.getSelection()?.toString() || '';
     if (selection.trim()) {
-      const from = draft.indexOf(selection);
+      let from = -1;
+      let cursor = 0;
+      for (let occurrence = 0; occurrence <= (snapshot?.occurrence ?? 0); occurrence += 1) {
+        from = draft.indexOf(selection, cursor);
+        if (from < 0) break;
+        cursor = from + selection.length;
+      }
+      if (from < 0) from = draft.indexOf(selection);
       if (from >= 0) return { from, to: from + selection.length, text: selection, scope: 'selection', visual: !raw };
     }
     if (!allowFallback) return null;
@@ -431,6 +491,99 @@ export function StudyEditor({
       setImproveStreamError(cause instanceof Error ? cause.message : String(cause));
     } finally { setImproveStreamingStyleId(null); }
   };
+
+  const closeSynonymPanel = () => {
+    synonymSessionRef.current += 1;
+    setSynonymPanel(null);
+  };
+
+  const loadSynonymRound = async (panel: SynonymPanelState, previousAlternatives: string[]) => {
+    if (!active) return;
+    setSynonymPanel((current) => current?.sessionId === panel.sessionId ? { ...current, loading: true, error: '' } : current);
+    try {
+      const result = await window.nodus.suggestStudySynonyms({
+        documentId: active.id,
+        subjectId,
+        sentence: panel.context.sentence,
+        selectedText: panel.target.text,
+        selectionFrom: panel.context.selectionFrom,
+        selectionTo: panel.context.selectionTo,
+        previousAlternatives,
+        model: aiModel,
+      });
+      if (synonymSessionRef.current !== panel.sessionId) return;
+      setSynonymPanel((current) => current?.sessionId === panel.sessionId
+        ? { ...current, rounds: [...current.rounds, result.alternatives], loading: false, error: '' }
+        : current);
+    } catch (cause) {
+      if (synonymSessionRef.current !== panel.sessionId) return;
+      setSynonymPanel((current) => current?.sessionId === panel.sessionId
+        ? { ...current, loading: false, error: cause instanceof Error ? cause.message : String(cause) }
+        : current);
+    }
+  };
+
+  const openSynonymPanel = (button: HTMLElement, target: ImproveTarget) => {
+    const context = studySentenceContext(draft, target.from, target.to);
+    const rect = button.getBoundingClientRect();
+    const width = Math.min(368, window.innerWidth - 24);
+    const x = Math.max(12, Math.min(window.innerWidth - width - 12, rect.left + rect.width / 2 - width / 2));
+    const y = window.innerHeight - rect.bottom >= 380 ? rect.bottom + 8 : Math.max(12, rect.top - 372);
+    const panel: SynonymPanelState = {
+      sessionId: synonymSessionRef.current + 1,
+      x,
+      y,
+      base: draft,
+      target,
+      context,
+      rounds: [],
+      loading: true,
+      error: '',
+    };
+    synonymSessionRef.current = panel.sessionId;
+    setSynonymPanel(panel);
+    void loadSynonymRound(panel, []);
+  };
+
+  const regenerateSynonyms = () => {
+    if (!synonymPanel || synonymPanel.loading) return;
+    const previous = synonymPanel.rounds.flat().map((alternative) => alternative.replacement);
+    void loadSynonymRound(synonymPanel, previous);
+  };
+
+  const applySynonymAlternative = (alternative: StudySynonymAlternative) => {
+    if (!synonymPanel) return;
+    const from = synonymPanel.context.sentenceFrom + alternative.from;
+    const to = synonymPanel.context.sentenceFrom + alternative.to;
+    replaceImprovedSelection(synonymPanel.base, {
+      from,
+      to,
+      text: synonymPanel.base.slice(from, to),
+      scope: 'selection',
+      visual: synonymPanel.target.visual,
+    }, alternative.replacement, true);
+    setSelectionImprove(null);
+    closeSynonymPanel();
+  };
+
+  useEffect(() => {
+    if (!synonymPanel) return;
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      if (!synonymPanelRef.current?.contains(event.target as Node)) closeSynonymPanel();
+    };
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') closeSynonymPanel(); };
+    document.addEventListener('pointerdown', closeOnOutsidePointer);
+    window.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsidePointer);
+      window.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [synonymPanel?.sessionId]);
+
+  // The request and its ephemeral history belong to this exact document
+  // snapshot. Any edit invalidates the source ranges, so close instead of ever
+  // applying an alternative to stale text.
+  useEffect(() => { closeSynonymPanel(); }, [active?.id, draft]);
 
   const currentSignature = JSON.stringify({ title, content: draft, style, language: data?.spellcheckLanguage, dictionary: data?.customDictionary });
   activeIdRef.current = active?.id ?? '';
@@ -871,8 +1024,32 @@ export function StudyEditor({
             )}
           </aside>
         )}
-        {selectionImprove && selectionToolbar && createPortal(<><div className="divider" data-testid="study-selection-tools-divider" />{quickImproveStyles.map((prompt) => <button type="button" key={prompt.id} data-testid={`study-quick-improve-${prompt.id.replace(':', '-')}`} className="toolbar-item study-selection-tool" title={`${prompt.name} · ${prompt.description}`} aria-label={prompt.name} disabled={Boolean(improveStreamingStyleId)} onPointerDown={(event) => { event.preventDefault(); void runQuickImprovement(prompt, selectionImprove.target); }}><ImproveStyleMark style={prompt} /></button>)}<label className="toolbar-item study-selection-color" title={t('Color del texto')} aria-label={t('Color del texto')}><Icon name="palette" size={16} /><input data-testid="study-selection-text-color" type="color" defaultValue="#0f766e" onInput={(event) => milkdownRef.current?.setTextColor((event.target as HTMLInputElement).value)} /></label><select data-testid="study-selection-heading" className="study-selection-heading" defaultValue="" title={t('Nivel de título')} aria-label={t('Nivel de título')} onPointerDown={(event) => event.stopPropagation()} onChange={(event) => { milkdownRef.current?.setHeading(Number(event.target.value)); event.target.value = ''; }}><option value="" disabled>H</option><option value="0">{t('Párrafo')}</option>{[1, 2, 3, 4, 5, 6].map((level) => <option key={level} value={level}>H{level}</option>)}</select></>, selectionToolbar)}
+        {selectionImprove && selectionToolbar && createPortal(<><div className="divider" data-testid="study-selection-tools-divider" />{quickImproveStyles.map((prompt) => <button type="button" key={prompt.id} data-testid={`study-quick-improve-${prompt.id.replace(':', '-')}`} className="toolbar-item study-selection-tool" title={`${prompt.name} · ${prompt.description}`} aria-label={prompt.name} disabled={Boolean(improveStreamingStyleId)} onPointerDown={(event) => { event.preventDefault(); void runQuickImprovement(prompt, selectionImprove.target); }}><ImproveStyleMark style={prompt} /></button>)}<button type="button" data-testid="study-synonyms-toggle" className="toolbar-item study-selection-tool" title={t('Sinónimos con IA')} aria-label={t('Sinónimos con IA')} disabled={Boolean(improveStreamingStyleId)} onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); openSynonymPanel(event.currentTarget, selectionImprove.target); }}><Icon name="thesaurus" size={16} /></button><label className="toolbar-item study-selection-color" title={t('Color del texto')} aria-label={t('Color del texto')}><Icon name="palette" size={16} /><input data-testid="study-selection-text-color" type="color" defaultValue="#0f766e" onInput={(event) => milkdownRef.current?.setTextColor((event.target as HTMLInputElement).value)} /></label><select data-testid="study-selection-heading" className="study-selection-heading" defaultValue="" title={t('Nivel de título')} aria-label={t('Nivel de título')} onPointerDown={(event) => event.stopPropagation()} onChange={(event) => { milkdownRef.current?.setHeading(Number(event.target.value)); event.target.value = ''; }}><option value="" disabled>H</option><option value="0">{t('Párrafo')}</option>{[1, 2, 3, 4, 5, 6].map((level) => <option key={level} value={level}>H{level}</option>)}</select></>, selectionToolbar)}
       </div>
+      {synonymPanel && createPortal(
+        <div ref={synonymPanelRef} data-testid="study-synonyms-panel" role="dialog" aria-label={t('Alternativas de sinónimos')} className="study-synonyms-panel" style={{ left: synonymPanel.x, top: synonymPanel.y }}>
+          <div className="study-synonyms-header">
+            <span className="flex min-w-0 items-center gap-2"><Icon name="thesaurus" size={16} className="text-teal-600 dark:text-teal-300" /><span className="truncate font-semibold">{t('Sinónimos y reformulaciones')}</span></span>
+            <button type="button" className="rounded-md p-1 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800 dark:hover:bg-neutral-800 dark:hover:text-neutral-100" onClick={closeSynonymPanel} aria-label={t('Cerrar')}><Icon name="x" size={13} /></button>
+          </div>
+          <p className="px-3 pb-2 text-[11px] leading-4 text-neutral-500">{t('Cinco alternativas en el idioma original, elegidas con el contexto de la frase.')}</p>
+          {synonymPanel.loading && synonymPanel.rounds.length === 0 && <div className="flex items-center gap-2 px-3 py-6 text-xs text-neutral-500" data-testid="study-synonyms-loading"><Spinner label={t('Buscando alternativas…')} /></div>}
+          {synonymPanel.rounds.length > 0 && <div className="max-h-72 overflow-y-auto px-2 pb-2">
+            <div className="px-1 pb-1 text-[10px] font-semibold uppercase tracking-wider text-neutral-500">{t('Alternativas actuales')}</div>
+            <SynonymAlternativeList alternatives={synonymPanel.rounds.at(-1) ?? []} selectedText={synonymPanel.target.text} onSelect={applySynonymAlternative} />
+            {synonymPanel.rounds.length > 1 && <details className="mt-2 border-t border-stone-200 pt-2 dark:border-neutral-800" open>
+              <summary className="cursor-pointer px-1 text-[10px] font-semibold uppercase tracking-wider text-neutral-500">{t('Historial de esta apertura')}</summary>
+              <div className="mt-1 space-y-2">{synonymPanel.rounds.slice(0, -1).reverse().map((round, index) => <div key={`${synonymPanel.sessionId}-${index}`}><SynonymAlternativeList alternatives={round} selectedText={synonymPanel.target.text} onSelect={applySynonymAlternative} historical /></div>)}</div>
+            </details>}
+          </div>}
+          {synonymPanel.error && <div data-testid="study-synonyms-error" className="mx-3 mb-2 rounded-lg bg-red-50 px-2.5 py-2 text-xs text-red-700 dark:bg-red-950/40 dark:text-red-300">{synonymPanel.error}</div>}
+          <div className="flex items-center justify-between border-t border-stone-200 px-3 py-2 dark:border-neutral-800">
+            <span className="text-[10px] text-neutral-500">{synonymPanel.rounds.length > 1 ? `${synonymPanel.rounds.length * 5} ${t('alternativas en memoria')}` : ''}</span>
+            <button type="button" data-testid="study-synonyms-regenerate" className="btn btn-ghost h-8 gap-1.5 px-2 text-xs text-teal-700 dark:text-teal-300" disabled={synonymPanel.loading} onClick={regenerateSynonyms}><Icon name="refresh" size={13} className={synonymPanel.loading ? 'animate-spin' : ''} />{t('Regenerar alternativas')}</button>
+          </div>
+        </div>,
+        document.body,
+      )}
       {pendingCloseId && <ConfirmModal
         title={t('Cerrar apunte')}
         message={pendingCloseId === active.id && saveState !== 'saved'

@@ -3,6 +3,7 @@
 import type { StudyAnnotation, StudyAnnotationInput, StudyDocEditorData, StudyDocUpdateInput } from '../studyEditor';
 import type { StudySttRequest, StudySttResult, StudySttStreamHandlers, WhisperCppStatus } from '../sttModels';
 import type { StudyImproveRequest, StudyImproveResult, StudyImproveStreamHandlers, StudyImprovementLog, StudyStyle, StudyStyleAssociation, StudyStyleAssociationKind, StudyStyleInput, StudyStyleVersion } from '../studyImprove';
+import type { StudySynonymRequest, StudySynonymResult } from '../studySynonyms';
 import type { StudyMaterialAnnotation, StudyMaterialAnnotationInput, StudyMaterialContent, StudyMaterialDetail, StudyMaterialImportInput, StudyMaterialImportResult, StudyMaterialIndexResult, StudyMaterialListOptions, StudyMaterialPlacement, StudyMaterialSummary, StudyMaterialUpdateInput, ZoteroStudyMaterialImportInput } from '../studyMaterials';
 import type { StudyAudioMarker, StudyAudioMarkerInput, StudyDiarizationRequest, StudyDiarizationResult, StudyRecordingContent, StudyRecordingCreateInput, StudyRecordingDetail, StudyRecordingImportResult, StudyRecordingListOptions, StudyRecordingSummary, StudyRecordingUpdateInput, StudyTranscript, StudyTranscriptInput, StudyTranscriptSegment, StudyTranscriptSegmentInput } from '../studyRecordings';
 import type { StudySavedSearch, StudySearchHistoryEntry, StudySearchIndexStatus, StudySearchOptions, StudySearchProgress, StudySearchResponse } from '../studySearch';
@@ -372,6 +373,7 @@ export interface AcademicApi {
   exportStudyStyles(styleIds?: string[]): Promise<{ path: string } | null>;
   importStudyStyles(): Promise<StudyStyle[]>;
   improveStudyText(request: StudyImproveRequest, handlers: StudyImproveStreamHandlers): Promise<StudyImproveResult>;
+  suggestStudySynonyms(request: StudySynonymRequest): Promise<StudySynonymResult>;
   cancelStudyImprove(): Promise<void>;
   listStudyImprovementLog(documentId: string): Promise<StudyImprovementLog[]>;
   updateStudyImprovementAction(id: string, action: StudyImprovementLog['action']): Promise<void>;
