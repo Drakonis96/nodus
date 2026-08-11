@@ -165,7 +165,7 @@ La segunda sección permite comprobar el índice, la página de origen y el marc
     citationKey: 'readerFixture2026',
     metadata: {
       title: work.title, itemType: 'article-journal', year: work.year,
-      creators: work.authors.map((name) => ({ creatorType: 'author', name })), isbn: [], issn: [], tags: ['lector'],
+      creators: work.authors.map((name) => ({ creatorType: 'author', name })), url: 'https://doi.org/10.0000/nodus-reader-fixture', isbn: [], issn: [], tags: ['lector'],
     },
     collectionIds: [], attachments: [
       { id: 'zotero:READERPDF', title: 'PDF original', fileName: 'original.pdf', relativePath: 'original.pdf', mimeType: 'application/pdf', byteSize: 1, sha256: 'a'.repeat(64), role: 'original', position: 0 },
@@ -281,6 +281,8 @@ La segunda sección permite comprobar el índice, la página de origen y el marc
   assert.equal((await infoTab.innerText()).trim(), 'Info', 'the selected information tab reveals its compact label');
   assert.equal((await notesTab.innerText()).trim(), '', 'the previous tab collapses back to its icon');
   assert.match(await page.getByTestId('library-reader-metadata').innerText(), new RegExp(work.zotero_key));
+  await page.getByTestId('library-reader-online-source').waitFor({ state: 'visible' });
+  assert.match(await page.getByTestId('library-reader-online-source').innerText(), /doi\.org/);
   const provenance = page.getByTestId('library-reader-provenance');
   assert.match(await provenance.innerText(), new RegExp(contentFingerprint));
   await readerSidebar.getByRole('tab', { name: 'Chat' }).click();

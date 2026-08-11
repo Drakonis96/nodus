@@ -734,6 +734,7 @@ export function LibraryDocumentReader({
               </div>}
               {sidebarTab === 'metadata' && <div data-testid="library-reader-metadata" className="h-full space-y-5 overflow-y-auto p-4">
                 <div><span className={`rounded-full px-2 py-1 text-[10px] ${reader.freshness === 'current' ? 'bg-emerald-500/10 text-emerald-300' : 'bg-amber-500/10 text-amber-300'}`}>{reader.freshness === 'current' ? t('Markdown limpio') : t('Última copia legible')}</span><h3 className="mt-3 text-sm font-semibold leading-5">{reader.title}</h3><p className="mt-2 text-xs leading-5 text-neutral-500">{reader.authors.join('; ') || t('Sin autoría')}</p></div>
+                {reader.sourceUrl && <button data-testid="library-reader-online-source" className="flex w-full items-center gap-2 rounded-xl border border-neutral-800 px-3 py-2.5 text-left text-xs text-neutral-400 hover:border-indigo-500/40 hover:text-indigo-300" onClick={() => void window.nodus.openExternal(reader.sourceUrl!)}><Icon name="external" size={13} /><span className="min-w-0 flex-1 truncate">{reader.sourceUrl}</span></button>}
                 <dl className="space-y-3 text-xs">{[
                   [t('Año'), reader.year], [t('Identificador'), reader.storageId], [t('Clave Zotero'), reader.zoteroKey],
                   [t('Clave de cita'), reader.citationKey], [t('Original'), reader.originalFileName], [t('Palabras'), reader.wordCount], [t('Páginas'), reader.pageCount],

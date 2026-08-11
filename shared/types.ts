@@ -673,6 +673,8 @@ export interface LibraryReaderDocument {
   title: string;
   authors: string[];
   year: number | null;
+  /** Canonical online record discovered from DOI, ISBN, PMID, PMCID, arXiv, or another provider. */
+  sourceUrl: string | null;
   markdown: string;
   cleanAvailable: boolean;
   sections: LibraryReaderSection[];

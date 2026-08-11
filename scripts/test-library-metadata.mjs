@@ -98,12 +98,14 @@ try {
   assert.equal(doi.candidates[0].metadata.creators[0].lastName, 'García Fernández');
   assert.equal(doi.candidates[0].metadata.abstract, 'Texto limpio');
   assert.equal(doi.candidates[0].metadata.year, 2020);
+  assert.equal(doi.candidates[0].metadata.url, doi.candidates[0].sourceUrl, 'a DOI record keeps its canonical online source');
   assert.match(requested[0].pathname, /works\/10\.5555%2Fnorma\.1/);
 
   const isbn = await resolveLibraryMetadata('isbn', '978-84-0000-000-0', { fetcher });
   assert.equal(isbn.candidates[0].source, 'open-library');
   assert.equal(isbn.candidates[0].metadata.itemType, 'book');
   assert.equal(isbn.candidates[0].metadata.publisher, 'Editorial Sur');
+  assert.equal(isbn.candidates[0].metadata.url, 'https://openlibrary.org/works/OL1W', 'an ISBN record links back to the located catalogue work');
   assert.equal(requested.at(-1).searchParams.get('isbn'), '9788400000000');
 
   const issn = await resolveLibraryMetadata('issn', '1234-567X', { fetcher });
@@ -115,12 +117,15 @@ try {
   assert.equal(pmid.candidates[0].source, 'pubmed');
   assert.equal(pmid.candidates[0].metadata.pmcid, 'PMC7654321');
   assert.equal(pmid.candidates[0].metadata.title, 'A PubMed paper');
+  assert.equal(pmid.candidates[0].metadata.url, 'https://pubmed.ncbi.nlm.nih.gov/12345678/', 'a PMID record keeps its PubMed landing page');
   const pmcid = await resolveLibraryMetadata('pmcid', 'PMC7654321', { fetcher });
   assert.equal(pmcid.candidates[0].metadata.pmid, '12345678');
+  assert.equal(pmcid.candidates[0].metadata.url, 'https://pubmed.ncbi.nlm.nih.gov/12345678/');
   const arxiv = await resolveLibraryMetadata('arxiv', 'https://arxiv.org/abs/2401.01234', { fetcher });
   assert.equal(arxiv.candidates[0].source, 'arxiv');
   assert.equal(arxiv.candidates[0].metadata.abstract, 'Double spaces cleaned.');
   assert.equal(arxiv.candidates[0].metadata.arxiv, '2401.01234');
+  assert.equal(arxiv.candidates[0].metadata.url, 'https://arxiv.org/abs/2401.01234');
   await assert.rejects(resolveLibraryMetadata('pmcid', '7654', { fetcher }), /formato PMC/);
   const mergedCandidate = mergeLibraryMetadataCandidate(
     { title: 'Local title', itemType: 'article-journal', creators: [{ creatorType: 'author', name: 'Local Author' }], year: 2020, isbn: ['LOCAL'], issn: [], tags: ['local'], extra: { local: 'kept' } },

@@ -19,6 +19,7 @@ test('the Library UI exposes hierarchy, search, bulk operations, imports and bac
   for (const marker of [
     'global-library-view', 'global-library-search', 'global-library-bulk-actions',
     'global-library-detail', 'zotero-global-import-dialog', 'open-zotero-global-import',
+    'library-online-source',
     'import-library-bibliography', 'open-library-duplicates', 'edit-library-metadata',
     'add-library-item-to-vault', 'global-library-vault-dialog',
     'global-library-integrity-warning',
@@ -67,6 +68,7 @@ test('the Library UI exposes hierarchy, search, bulk operations, imports and bac
   assert.match(view, /collectionSearchIds/, 'move search preserves matching collections and their hierarchical ancestors');
   assert.match(view, /COLLECTION_COLOR_PRESETS\.map/, 'collection styling exposes the six predefined colors');
   assert.match(view, /type="color"/, 'collection styling includes a custom native color palette');
+  assert.match(view, /candidate\.metadata\.url \?\? candidate\.sourceUrl/, 'identifier creation retains the canonical source even when the provider metadata omits its URL');
   assert.match(view, /data-testid="open-library-trash"[\s\S]*?<Icon name="folder"/, 'trash is rendered as the final collection-tree folder');
   assert.match(view, /library-trash-folder[\s\S]*aria-current=\{trashMode \? 'page'/, 'the trash folder exposes its selected state');
   assert.doesNotMatch(view, /\{!trashMode && <aside/, 'the collection tree remains visible while trash is open');
@@ -95,6 +97,7 @@ test('the global reader exposes annotations, metadata, chat and native attachmen
     'library-reader-source-picker', 'library-reader-pdf-viewer', 'library-reader-epub-viewer',
     'library-reader-image-viewer', 'library-reader-text-viewer', 'library-reader-open-external',
     'library-reader-files-toggle', 'library-reader-chat-model',
+    'library-reader-online-source',
   ]) assert.match(reader, new RegExp(marker));
   assert.match(reader, /aria-expanded=\{outlineOpen\}/);
   assert.match(reader, /aria-expanded=\{notesOpen\}/);

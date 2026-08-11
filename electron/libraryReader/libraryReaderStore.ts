@@ -25,6 +25,7 @@ interface ReaderMetadata {
   title?: string;
   authors?: string[];
   year?: number | null;
+  url?: string;
   zotero?: { itemKey?: string; attachmentKey?: string };
   files?: { reader?: string; original?: string; sourceMap?: string; annotations?: string; chat?: string; orphanedAnnotations?: string };
   contentRevision?: LibraryContentRevision;
@@ -124,6 +125,7 @@ function recordReaderMetadata(record: LibraryItemRecord): ReaderMetadata {
     title: identity.title,
     authors: identity.authors,
     year: identity.year,
+    url: record.metadata.url,
     zotero: identity.zoteroKey ? { itemKey: identity.zoteroKey } : undefined,
     files: record.files,
     contentRevision: record.contentRevision,
@@ -395,6 +397,7 @@ export function getLibraryReaderDocument(documentId: string): LibraryReaderDocum
     title: metadata.title?.trim() || identity.title,
     authors: Array.isArray(metadata.authors) && metadata.authors.length ? metadata.authors : identity.authors,
     year: typeof metadata.year === 'number' ? metadata.year : identity.year,
+    sourceUrl: metadata.url?.trim() || null,
     markdown: cleanAvailable && markdownPath ? inlineDocumentImages(rawMarkdown, folder, path.dirname(markdownPath)) : '',
     cleanAvailable,
     sections: sectionsFromMarkdown(rawMarkdown, sourceMap),

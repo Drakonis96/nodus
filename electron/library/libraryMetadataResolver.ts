@@ -111,14 +111,16 @@ function openLibraryCandidate(raw: unknown, isbn: string, index: number): Librar
   const years = (Array.isArray(item.publish_year) ? item.publish_year : []).map(Number).filter(Number.isInteger);
   const year = Number.isInteger(Number(item.first_publish_year)) ? Number(item.first_publish_year) : years[0] ?? null;
   const key = plain(item.key);
+  const sourceUrl = key ? `https://openlibrary.org${key}` : null;
   return {
     id: key ?? `open-library:${isbn}:${index}`, source: 'open-library', confidence: Math.max(0.65, 0.96 - index * 0.05),
-    sourceUrl: key ? `https://openlibrary.org${key}` : null,
+    sourceUrl,
     metadata: {
       title, itemType: 'book', year,
       creators: strings(item.author_name).map((name) => ({ creatorType: 'author', name })),
       ...(strings(item.publisher)[0] ? { publisher: strings(item.publisher)[0] } : {}),
       ...(strings(item.language)[0] ? { language: strings(item.language)[0] } : {}),
+      ...(sourceUrl ? { url: sourceUrl } : {}),
       isbn: [...new Set([isbn, ...strings(item.isbn)])], issn: [], tags: strings(item.subject).slice(0, 40),
     },
   };
@@ -170,13 +172,14 @@ function pubmedCandidate(raw: unknown, requested: { pmid?: string; pmcid?: strin
   const rawDate = plain(item.pubdate) ?? plain(item.epubdate);
   const parsedYear = Number(/\b(\d{4})\b/.exec(rawDate ?? '')?.[1]) || null;
   const doi = findId('doi'); const pmid = requested.pmid ?? findId('pubmed'); const pmcid = requested.pmcid ?? findId('pmc');
+  const sourceUrl = pmid ? `https://pubmed.ncbi.nlm.nih.gov/${pmid}/` : pmcid ? `https://www.ncbi.nlm.nih.gov/pmc/articles/${pmcid}/` : null;
   return {
     id: `pubmed:${pmid ?? pmcid ?? title}`, source: 'pubmed', confidence: 1,
-    sourceUrl: pmid ? `https://pubmed.ncbi.nlm.nih.gov/${pmid}/` : pmcid ? `https://www.ncbi.nlm.nih.gov/pmc/articles/${pmcid}/` : null,
+    sourceUrl,
     metadata: {
       title, itemType: 'article-journal', creators: authors, date: rawDate, year: parsedYear,
       publicationTitle: plain(item.fulljournalname) ?? plain(item.source), volume: plain(item.volume), issue: plain(item.issue), pages: plain(item.pages),
-      ...(doi ? { doi } : {}), ...(pmid ? { pmid } : {}), ...(pmcid ? { pmcid } : {}),
+      ...(sourceUrl ? { url: sourceUrl } : {}), ...(doi ? { doi } : {}), ...(pmid ? { pmid } : {}), ...(pmcid ? { pmcid } : {}),
       isbn: [], issn: strings(item.issn), tags: [],
     },
   };
@@ -260,5 +263,12 @@ export async function resolveLibraryMetadata(
     if (candidate) candidates = [candidate];
   }
   if (!candidates.length) throw new Error('No se encontraron metadatos para ese identificador.');
+  candidates = candidates.map((candidate) => ({
+    ...candidate,
+    metadata: {
+      ...candidate.metadata,
+      ...(candidate.metadata.url || !candidate.sourceUrl ? {} : { url: candidate.sourceUrl }),
+    },
+  }));
   return { kind, value, candidates, queriedAt: new Date().toISOString() };
 }

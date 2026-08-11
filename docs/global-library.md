@@ -381,7 +381,11 @@ best matching record, and creates it on Enter. The adjacent manual action first
 selects any supported item type and then opens the complete metadata editor.
 The metadata editor resolves DOI and ISSN through Crossref, ISBN through Open
 Library, PMID and PMCID through the public NCBI services, and arXiv identifiers
-through the arXiv Atom API. Every individual lookup produces a field-by-field
+through the arXiv Atom API. The canonical landing page returned by any provider
+is persisted in the item URL field and remains directly accessible from both
+the Library detail panel and the reader's Info tab. A linked catalogue or
+publisher page is not presented as a downloaded full-text file. Every
+individual lookup produces a field-by-field
 preview. Bulk lookup is sequential and rate-limited, can be canceled, retains a
 partial result report, and still requires explicit confirmation before writing
 any candidate to a manifest.

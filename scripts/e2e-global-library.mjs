@@ -77,6 +77,7 @@ try {
       title: 'Mujeres solas en la posguerra', itemType: 'article-journal',
       creators: [{ creatorType: 'author', firstName: 'María', lastName: 'Aliaga' }],
       date: '2017', year: 2017, publicationTitle: 'Arenal', doi: '10.0000/nodus.fixture',
+      url: 'https://doi.org/10.0000/nodus.fixture',
       isbn: [], issn: ['1134-6396'], tags: ['mujeres', 'posguerra'],
       abstract: 'Resumen de prueba para comprobar el panel de metadatos.',
     },
@@ -456,6 +457,8 @@ try {
   assert.match(await detail.innerText(), /10\.0000\/nodus\.fixture/);
   assert.match(await detail.innerText(), /1134-6396/);
   assert.match(await detail.innerText(), /Markdown disponible/);
+  await detail.getByTestId('library-online-source').waitFor({ state: 'visible' });
+  assert.equal(await detail.getByTestId('library-online-source').getAttribute('title'), 'Abrir fuera de Nodus');
 
   await page.getByTestId('add-library-item-to-vault').click();
   const vaultDialog = page.getByTestId('global-library-vault-dialog');

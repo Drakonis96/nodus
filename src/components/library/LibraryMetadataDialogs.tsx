@@ -72,7 +72,11 @@ export function LibraryCreateReferenceDialog({ defaultMode = 'identifier', colle
       const result = await window.nodus.resolveGlobalLibraryMetadata(detected.kind, detected.value);
       const candidate = result.candidates[0];
       if (!candidate) throw new Error(t('No se encontró ninguna ficha bibliográfica.'));
-      const created = await window.nodus.createGlobalLibraryItem(candidate.metadata, collectionIds);
+      const sourceUrl = candidate.metadata.url ?? candidate.sourceUrl ?? undefined;
+      const created = await window.nodus.createGlobalLibraryItem({
+        ...candidate.metadata,
+        ...(sourceUrl ? { url: sourceUrl } : {}),
+      }, collectionIds);
       toast(tx('Referencia añadida desde {kind}.', { kind: detected.kind.toUpperCase() }));
       onCreated(created, false); onClose();
     } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
