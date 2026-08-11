@@ -1188,7 +1188,7 @@ function GlobalLibraryContent({
               {selectedSavedSearch && savedSearches.find((entry) => entry.id === selectedSavedSearch) && <div className="flex shrink-0 gap-1 border-t border-neutral-800 py-2"><button className="btn btn-ghost flex-1 text-xs" onClick={() => setSmartSearchEditor(savedSearches.find((entry) => entry.id === selectedSavedSearch) ?? null)}><Icon name="edit" size={13} /> {t('Editar')}</button><button className="btn btn-ghost text-red-400" onClick={() => { const record = savedSearches.find((entry) => entry.id === selectedSavedSearch); if (record) void removeSavedSearch(record); }} title={t('Eliminar')}><Icon name="trash" size={13} /></button></div>}
             </div>
           </div>
-          <div data-testid="library-trash-section" className="shrink-0 border-t border-red-500/15 p-2">
+          <div data-testid="library-trash-section" className="flex h-10 shrink-0 items-center border-t border-red-500/15 px-2">
             <button
               data-testid="open-library-trash"
               className={`library-trash-folder flex h-8 w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs ${trashMode ? 'is-active' : ''}`}
@@ -1253,7 +1253,7 @@ function GlobalLibraryContent({
             }}
           />
           </div>
-          <footer className="flex h-10 items-center border-t border-neutral-800 px-3 text-xs text-neutral-500"><span>{tx('{start}–{end} de {total}', { start: total ? offset + 1 : 0, end: Math.min(offset + items.length, total), total })}</span><div className="flex-1" /><button className="btn btn-ghost h-7" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}><Icon name="chevronLeft" size={13} /></button><button className="btn btn-ghost h-7" disabled={offset + items.length >= total} onClick={() => setOffset(offset + PAGE_SIZE)}><Icon name="chevronRight" size={13} /></button></footer>
+          <footer data-testid="library-table-footer" className="flex h-10 items-center border-t border-neutral-800 px-3 text-xs text-neutral-500"><span>{tx('{start}–{end} de {total}', { start: total ? offset + 1 : 0, end: Math.min(offset + items.length, total), total })}</span><div className="flex-1" /><button className="btn btn-ghost h-7" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}><Icon name="chevronLeft" size={13} /></button><button className="btn btn-ghost h-7" disabled={offset + items.length >= total} onClick={() => setOffset(offset + PAGE_SIZE)}><Icon name="chevronRight" size={13} /></button></footer>
         </section>
 
         {detail && <aside data-testid="global-library-detail" className="library-theme-panel flex w-[340px] max-w-[45vw] shrink-0 flex-col border-l border-neutral-800 bg-neutral-950">

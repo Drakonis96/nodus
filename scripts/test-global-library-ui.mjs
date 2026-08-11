@@ -79,7 +79,8 @@ test('the Library UI exposes hierarchy, search, bulk operations, imports and bac
   assert.match(view, /candidate\.metadata\.url \?\? candidate\.sourceUrl/, 'identifier creation retains the canonical source even when the provider metadata omits its URL');
   assert.match(view, /data-testid="open-library-trash"[\s\S]*?<Icon name="folder"/, 'trash is rendered as the final collection-tree folder');
   assert.match(view, /library-trash-folder[\s\S]*aria-current=\{trashMode \? 'page'/, 'the trash folder exposes its selected state');
-  assert.match(view, /library-trash-section[\s\S]*shrink-0[\s\S]*h-8/, 'trash remains a compact fixed row below both adjustable panes');
+  assert.match(view, /library-trash-section[\s\S]*h-10 shrink-0[\s\S]*library-trash-folder[\s\S]*h-8/, 'trash uses the same fixed height as the table footer');
+  assert.match(view, /library-table-footer[\s\S]*h-10/, 'the table footer exposes its shared height to visual tests');
   assert.match(view, /t\('Añadir'\)[\s\S]*t\('Sincronizar Zotero'\)[\s\S]*library-more-menu-toggle/, 'the main toolbar is reduced to Add, Zotero sync, and an overflow menu');
   assert.match(view, /t\('Reconstruir versión limpia'\)/, 'clean Markdown rebuilding is named explicitly');
   assert.match(view, /window\.nodus\.cancelLibraryExtraction/, 'visible background preparation can be canceled');

@@ -261,6 +261,7 @@ try {
   const collectionsPane = page.getByTestId('library-collections-pane');
   const sidebarResizer = page.getByTestId('library-sidebar-section-resizer');
   const trashSection = page.getByTestId('library-trash-section');
+  const tableFooter = page.getByTestId('library-table-footer');
   await sidebarResizer.waitFor({ state: 'visible' });
   const beforeCollectionHeight = (await collectionsPane.boundingBox()).height;
   const resizeBox = await sidebarResizer.boundingBox();
@@ -271,7 +272,9 @@ try {
   const afterCollectionHeight = (await collectionsPane.boundingBox()).height;
   assert.ok(afterCollectionHeight > beforeCollectionHeight + 40, `the splitter resizes the collection pane (${beforeCollectionHeight}px → ${afterCollectionHeight}px)`);
   assert.ok(Number(await page.evaluate(() => localStorage.getItem('nodus.library.collectionsPaneRatio'))) > 48, 'the splitter persists its ratio');
-  assert.ok((await trashSection.boundingBox()).height <= 50, 'trash stays a compact fixed row');
+  const trashHeight = (await trashSection.boundingBox()).height;
+  const tableFooterHeight = (await tableFooter.boundingBox()).height;
+  assert.ok(Math.abs(trashHeight - tableFooterHeight) < 0.5, `trash and table footer have the same height (${trashHeight}px / ${tableFooterHeight}px)`);
   assert.ok((await sidebarNavigation.boundingBox()).height > afterCollectionHeight, 'smart searches retain their own remaining scroll area');
   await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-adjustable-sidebar-dark-wide.png'), fullPage: true });
   await page.evaluate(() => { document.documentElement.classList.add('light'); document.documentElement.classList.remove('dark'); });
