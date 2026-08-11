@@ -23,6 +23,8 @@ export function updateStatusMessage(update: UpdateCheckResponse): string {
       });
     case 'downloaded':
       return tx('Actualización {version} descargada. Reiniciando para instalarla…', { version });
+    case 'backing-up':
+      return t('Creando y verificando una copia de seguridad antes de actualizar…');
     case 'installing':
       return tx('Instalando Nodus {version} y reiniciando…', { version });
     case 'not-available':
@@ -30,6 +32,12 @@ export function updateStatusMessage(update: UpdateCheckResponse): string {
     case 'disabled':
       return t('Las actualizaciones solo están disponibles en la app empaquetada.');
     case 'error':
+      if (update.errorCode === 'pre-update-backup-required') {
+        return t('Configura Recuperación antes de instalar una beta. La actualización permanece descargada y tus datos no se han modificado.');
+      }
+      if (update.errorCode === 'pre-update-backup-failed') {
+        return t('La beta no se instaló porque no pudo crearse y verificarse la copia de seguridad previa. Tus datos no se han modificado.');
+      }
       return update.message || t('No se pudo comprobar si hay actualizaciones.');
     default:
       return update.message;

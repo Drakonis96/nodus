@@ -71,19 +71,19 @@ test('sidebar header keeps the Nodus brand centered, stable when hidden and full
   assert.match(app, /data-testid="sidebar-header-toggle"/);
   assert.match(
     app,
-    /data-testid="sidebar-header-toggle"[\s\S]*?className="[^"]*h-full[^"]*justify-center[^"]*"[\s\S]*?style=\{\{ width: sidebarWidth \}\}/,
+    /data-testid="sidebar-header-toggle"[\s\S]*?className="[^"]*relative[^"]*h-full[^"]*justify-center[^"]*"[\s\S]*?style=\{\{ width: sidebarWidth \}\}/,
   );
   assert.doesNotMatch(app, /style=\{\{ width: navCollapsed \?/);
   assert.ok(
-    app.indexOf('data-testid="sidebar-header-toggle"') < app.indexOf('data-testid="nodus-logo"'),
-    'the Nodus logo should remain inside the full-width sidebar header control',
+    app.indexOf('data-testid="sidebar-header-toggle"') < app.indexOf('data-testid="sidebar-header-brand"')
+      && app.indexOf('data-testid="sidebar-header-brand"') < app.indexOf('data-testid="nodus-logo"'),
+    'the centred Nodus brand should remain inside the full-width sidebar header control',
   );
+  assert.match(app, /data-testid="sidebar-header-brand" className="flex items-center justify-center gap-2"/);
+  assert.match(app, /className="absolute right-2 text-neutral-600"/);
   assert.match(app, /data-platform=\{IS_MAC \? 'macos' : 'other'\}/);
-  assert.match(
-    css,
-    /\.app-titlebar\[data-platform='macos'\] \[data-testid='sidebar-header-toggle'\]\s*\{[^}]*padding-left:\s*76px/s,
-    'the macOS titlebar must reserve the hiddenInset traffic-light area',
-  );
+  assert.match(app, /MACOS_FULL_SIDEBAR_BRAND_MIN_WIDTH = 248/);
+  assert.doesNotMatch(css, /\[data-testid='sidebar-header-toggle'\]\s*\{[^}]*padding-left/s);
 });
 
 test('study home cards expose dedicated light-theme surfaces', async () => {
