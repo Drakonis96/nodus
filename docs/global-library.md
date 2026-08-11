@@ -314,9 +314,14 @@ installed. A reference can be created before it has a file, duplicated as an
 independent Nodus record, or copied out of an imported read-only mirror. The
 source mirror remains intact so a later refresh cannot overwrite the Nodus copy.
 
-The metadata editor supports the common academic item types and an ordered list
-of personal or institutional creators. Author, editor, translator, contributor,
-and specialist Zotero roles remain distinct and preserve their order.
+The creation and metadata editors expose every current citeable Zotero item
+type. Nodus stores `bookSection` as the clearer canonical `book-chapter` while
+continuing to read the older `book-section` and `chapter` aliases. Preprints,
+standards, datasets, broadcasts, legal records, software, and the complete
+bibliographic set can be created without Zotero. Personal and institutional
+creators are ordered, and all current Zotero creator roles remain distinct.
+Source-specific primitive fields that do not have a common Nodus field are
+preserved in `metadata.extra` and can also be edited manually.
 
 Each record accepts multiple PDF, EPUB, office, text, HTML/XML/JATS, spreadsheet,
 dataset, and image attachments. The item manager can add, open, reveal, rename,
@@ -333,6 +338,10 @@ library-wide color registry stored in `.nodus/tags.json`.
 
 ### Identifiers, citations, and file exchange
 
+The Library toolbar includes a Zotero-style magic-add action. Pasting a DOI,
+ISBN, ISSN, PMID, PMCID, or arXiv identifier detects its kind, retrieves the
+best matching record, and creates it on Enter. The adjacent manual action first
+selects any supported item type and then opens the complete metadata editor.
 The metadata editor resolves DOI and ISSN through Crossref, ISBN through Open
 Library, PMID and PMCID through the public NCBI services, and arXiv identifiers
 through the arXiv Atom API. Every individual lookup produces a field-by-field
@@ -368,7 +377,12 @@ counts are evaluated against the current SQLite cache and are never materialized
 as item copies. Deleting a saved search therefore cannot delete an item.
 
 The result page returns live source, type, extraction, attachment, year, tag,
-and vault facets. Table columns and up to three stable sort keys are stored in
+and vault facets. Its Zotero-style column chooser covers title, creators, item
+type, publication, publisher, date, year, edition, volume, issue, pages, every
+supported identifier, language, citation key, tags, source, analysis state,
+attachments, and created/modified dates. Columns can be shown, hidden,
+drag-reordered, moved accessibly with buttons, and assigned a custom width.
+The exact order, widths, and up to three stable sort keys are stored in
 `.nodus/view-preferences.json`. These two small JSON files are source data in
 `nodus-library`; rebuilding the SQLite catalog does not discard them.
 
@@ -486,6 +500,9 @@ The main tests are:
 - `test-library-storage.mjs`: manifests, conflicts, and rebuilding;
 - `test-library-migration.mjs`: lossless migration from vaults;
 - `test-zotero-library-import.mjs`: differential import and attachments;
+- `test-zotero-isolated-copy.mjs`: a read-only filesystem snapshot of an
+  available real Zotero database, SQLite integrity, real item-type mapping,
+  collection hierarchy, and an import into temporary Nodus storage only;
 - `test-library-extraction.mjs`: Markdown, assets, OCR, quality, and queue;
 - `test-global-library-operations.mjs`: collections, import, and trash;
 - `test-library-item-management.mjs`: Nodus-only records, creators, attachments,
@@ -493,7 +510,9 @@ The main tests are:
 - `test-library-smart-collections.mjs`: cycle-safe movement, reversible item
   memberships, nested live rules, facets, and persisted table preferences;
 - `test-library-metadata.mjs`: six identifier kinds, cancelable bulk lookup,
-  eight import/export formats, five local citation styles, keys, and duplicates;
+  all Zotero record types, eight import/export formats, five local citation
+  styles, keys, and duplicates. `verify-library-metadata-live.mjs` is the
+  explicit network smoke test for live DOI and ISBN recovery;
 - `test-library-recovery.mjs`: trash impact, linked-vault purge blocking,
   recoverable emptying, lossless duplicate merges, checksum audits, and rebuilds;
 - `test-pre-v4-recovery.mjs`: first-launch snapshot, disk-full interruption,

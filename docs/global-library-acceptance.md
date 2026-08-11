@@ -44,6 +44,7 @@ button exists.
 | Zotero | Local metadata, collections, tags, notes, and attachments survive every refresh | Verified | `test-zotero-library-import`, `test-library-item-management` |
 | Zotero | Attachment hashes reuse unchanged files and invalidate content derivatives after primary-file changes | Verified | `test-zotero-library-import`, `test-library-revisions` |
 | Zotero | Interrupted and partial sessions persist reports and can resume from the import dialog | Verified | `test-zotero-library-import`, `test-global-library-ui` |
+| Zotero | A real local library is validated only through an integrity-checked temporary SQLite copy; the source database and original vault are never opened for writes | Verified | `test-zotero-isolated-copy` |
 | Plugin | Status, import, and reader opening reach the desktop | Verified | `test-global-library-ui`, Zotero plugin suite |
 | Plugin | Protocol capabilities let v4 desktop/plugin degrade non-blockingly with their v3 counterpart | Verified | `test-global-library-ui`, Zotero plugin suite |
 | Interoperability | RIS, BibTeX/BibLaTeX, CSL-JSON, EndNote XML, Zotero RDF, CSV, and Markdown import and export | Verified | `test-library-metadata`, `test-global-library-ui` |
@@ -59,9 +60,10 @@ button exists.
 | Organization | Individual and bulk membership copy, move, and removal do not invalidate analysis | Verified | `test-library-smart-collections` |
 | Smart searches | Nested all/any/not rules cover metadata, authors, tags, dates, sources, attachments, extraction, trash, vaults, and analysis | Verified | `test-library-smart-collections`, `test-global-library-ui` |
 | Smart searches | Results and counts are live and never materialize duplicate item records | Verified | `test-library-smart-collections` |
-| Catalogue view | Facets, multi-column sorting, and visible-column preferences persist across restart | Verified | `test-library-smart-collections`, `e2e-global-library` |
+| Catalogue view | Zotero-style bibliography columns can be shown, hidden, drag-reordered, keyboard/button-reordered, resized, and multi-sorted, with the complete view persisting across restart | Verified | `test-library-smart-collections`, `e2e-global-library` |
 | Item management | Empty references, independent duplicates, and Nodus copies work without Zotero | Verified | `test-library-item-management`, `test-global-library-ui` |
-| Item management | Academic types and ordered personal or institutional creator roles round-trip | Verified | `test-library-item-management`, `test-library-metadata` |
+| Item management | All 37 current citeable Zotero types, including canonical `book-chapter`, and ordered personal or institutional creator roles round-trip | Verified | `test-library-item-management`, `test-library-metadata`, `test-zotero-isolated-copy` |
+| Item management | Magic add auto-detects DOI, ISBN, ISSN, PMID, PMCID, and arXiv; manual creation exposes the complete type and metadata flow | Verified | `test-library-metadata`, `verify-library-metadata-live`, `e2e-global-library` |
 | Attachments | Multiple supported files can be added, opened, revealed, renamed, reordered, classified, replaced, and removed | Verified | `test-library-item-management`, `e2e-global-library` |
 | Attachments | Selecting or replacing the primary file drives revision invalidation and extraction | Verified | `test-library-item-management`, `test-library-revisions` |
 | Notes | Local Markdown notes are editable and Zotero notes remain read-only | Verified | `test-library-item-management`, `test-zotero-library-import` |
