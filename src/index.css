@@ -3175,12 +3175,47 @@ select.input optgroup {
   font-size: 1.38em;
 }
 .library-reader-document .md h3 { margin-top: 1.8em; font-size: 1.17em; }
-.library-reader-document .md p { margin: 0.9em 0; }
+.library-reader-document .md p {
+  margin: 1.05em 0;
+  overflow-wrap: anywhere;
+  text-align: justify;
+  text-align-last: start;
+  text-indent: 1.5em;
+  hyphens: auto;
+}
+.library-reader-document .md :is(li, td, th, blockquote) p,
+.library-reader-document .md p:has(> img),
+.library-reader-document .md [data-footnotes] p { text-indent: 0; }
+.library-reader-document .md p:has(> img) { text-align: center; }
 .library-reader-document .md blockquote {
-  margin: 1.3em 0;
-  padding: 0.55em 1.2em;
+  margin: 1.4em 2em;
+  padding: 0.65em 1.25em;
   border-left-color: rgb(129 140 248 / 0.75);
   background: rgb(49 46 129 / 0.12);
+}
+.library-reader-document .md blockquote p { margin: 0; }
+.library-reader-document .md sup a[data-footnote-ref],
+.library-reader-document .md a[href^="#nodus-reference-"] {
+  border-radius: 0.25em;
+  color: rgb(165 180 252);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-weight: 650;
+  text-decoration: none;
+}
+.library-reader-document .md sup a[data-footnote-ref]:hover,
+.library-reader-document .md a[href^="#nodus-reference-"]:hover { background: rgb(79 70 229 / 0.22); color: rgb(199 210 254); }
+.library-reader-document .md [data-footnotes] {
+  margin-top: 3rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid rgb(63 63 70 / 0.62);
+  font-size: 0.86em;
+}
+.library-reader-document .md [data-footnotes] ol { padding-left: 1.5rem; }
+.library-reader-document .md [data-footnote-backref] { margin-left: 0.35em; }
+.library-reader-document .md p[id^="nodus-reference-"] {
+  scroll-margin-top: 6rem;
+  padding-left: 1.7em;
+  text-indent: -1.7em;
 }
 .library-reader-document .md img {
   display: block;
@@ -3253,6 +3288,11 @@ select.input optgroup {
 .light .library-reader-document .md h6 { color: #0f172a; }
 .light .library-reader-document .md h2 { border-top-color: rgb(226 232 240); }
 .light .library-reader-document .md blockquote { background: rgb(238 242 255 / 0.7); }
+.light .library-reader-document .md sup a[data-footnote-ref],
+.light .library-reader-document .md a[href^="#nodus-reference-"] { color: #4338ca; }
+.light .library-reader-document .md sup a[data-footnote-ref]:hover,
+.light .library-reader-document .md a[href^="#nodus-reference-"]:hover { background: #eef2ff; color: #312e81; }
+.light .library-reader-document .md [data-footnotes] { border-top-color: #e2e8f0; }
 .light .library-reader-document .md th { background: #f1f5f9; color: #1e293b; }
 .light .library-reader-source-badge.is-original {
   border-color: #d4d4d8;

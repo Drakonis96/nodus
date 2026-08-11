@@ -99,6 +99,10 @@ try {
 
 Texto introductorio para comprobar una lectura limpia, cómoda y persistente.
 
+La afirmación principal conserva una nota al pie navegable[^1] y remite a una referencia bibliográfica [[1]](#nodus-reference-1).
+
+> “Una cita textual independiente debe permanecer sangrada y claramente separada del cuerpo.”
+
 ## Introducción
 
 Este fragmento se puede subrayar y anotar sin modificar el PDF original. La selección conserva su posición y su contexto.
@@ -115,6 +119,16 @@ Este fragmento se puede subrayar y anotar sin modificar el PDF original. La sele
 | Fidelidad | 98 |
 
 La segunda sección permite comprobar el índice, la página de origen y el marcador de lectura.
+
+Este párrafo adicional conserva el ritmo de lectura académica y hace visible la separación regular entre párrafos sin introducir controles innecesarios.
+
+Otro párrafo de comprobación confirma que la primera línea se sangra, que el texto se justifica y que la composición sigue siendo legible en ventanas estrechas.
+
+## Referencias
+
+[[1]](#nodus-reference-1) Pérez, J. *Referencia académica de prueba*. Nodus, 2026.
+
+[^1]: Nota al pie con retorno bidireccional a la afirmación documentada.
 `;
   const titleOffset = markdown.indexOf('# ');
   const introOffset = markdown.indexOf('## Introducción');
@@ -222,6 +236,44 @@ La segunda sección permite comprobar el índice, la página de origen y el marc
   assert.match(await documentRoot.innerText(), /Texto introductorio/);
   assert.equal(await documentRoot.locator('img').count(), 1, 'local extracted images render inside the clean document');
   assert.equal(await documentRoot.locator('table').count(), 1, 'Markdown tables remain structured');
+  const academicProseLayout = await documentRoot.evaluate((root) => {
+    const paragraph = root.querySelector('.md > p');
+    const quotation = root.querySelector('.md blockquote');
+    if (!(paragraph instanceof HTMLElement) || !(quotation instanceof HTMLElement)) throw new Error('academic prose fixture missing');
+    return {
+      alignment: getComputedStyle(paragraph).textAlign,
+      lastAlignment: getComputedStyle(paragraph).textAlignLast,
+      indent: Number.parseFloat(getComputedStyle(paragraph).textIndent),
+      quoteInset: Number.parseFloat(getComputedStyle(quotation).marginLeft),
+    };
+  });
+  assert.equal(academicProseLayout.alignment, 'justify');
+  assert.match(academicProseLayout.lastAlignment, /^(?:start|left)$/);
+  assert.ok(academicProseLayout.indent >= 20, 'reader prose has a visible first-line indent');
+  assert.ok(academicProseLayout.quoteInset >= 24, 'standalone quotations are inset from the prose column');
+
+  const cleanSurface = page.locator('.library-reader-clean-surface');
+  const numericReference = documentRoot.locator('a[href="#nodus-reference-1"]').first();
+  assert.equal(await numericReference.evaluate((element) => element.closest('#nodus-reference-1') !== null), false, 'the first numeric link is the in-text citation');
+  await numericReference.click();
+  await page.waitForTimeout(750);
+  const numericForwardScroll = await cleanSurface.evaluate((element) => element.scrollTop);
+  assert.ok(numericForwardScroll > 100, 'numeric citation scrolls to the final reference');
+  const numericTarget = documentRoot.locator('#nodus-reference-1');
+  await numericTarget.locator('a[href="#nodus-reference-1"]').click();
+  await page.waitForTimeout(750);
+  const numericReturnScroll = await cleanSurface.evaluate((element) => element.scrollTop);
+  assert.ok(numericReturnScroll < numericForwardScroll - 50, `numeric reference returns to its citation (${numericReturnScroll} < ${numericForwardScroll})`);
+  const footnoteReference = documentRoot.locator('a[data-footnote-ref]').first();
+  await footnoteReference.click();
+  await page.waitForTimeout(750);
+  const footnoteForwardScroll = await cleanSurface.evaluate((element) => element.scrollTop);
+  assert.ok(footnoteForwardScroll > 100, 'footnote citation scrolls to its definition');
+  await documentRoot.locator('a[data-footnote-backref]').first().click();
+  await page.waitForTimeout(750);
+  const footnoteReturnScroll = await cleanSurface.evaluate((element) => element.scrollTop);
+  assert.ok(footnoteReturnScroll < footnoteForwardScroll - 50, `footnote returns to its citation (${footnoteReturnScroll} < ${footnoteForwardScroll})`);
+  await cleanSurface.evaluate((element) => element.scrollTo({ top: 0 }));
   const readerOutline = page.locator('.library-reader-outline');
   assert.match(await readerOutline.innerText(), /Índice del documento[\s\S]*Introducción[\s\S]*Resultados/i, 'traced headings lead the reader rail');
   const filesToggle = page.getByTestId('library-reader-files-toggle');
@@ -439,7 +491,10 @@ La segunda sección permite comprobar el índice, la página de origen y el marc
   await page.screenshot({ path: spreadsheetScreenshotPath, fullPage: true });
 
   await page.getByTestId('library-scope-shell').getByRole('button', { name: 'Biblioteca', exact: true }).click();
+  await globalRow.waitFor({ state: 'visible' });
+  await globalRow.getByRole('button').click();
   const detail = page.getByTestId('global-library-detail'); await detail.waitFor({ state: 'visible' });
+  await detail.getByTestId('library-detail-actions-toggle').click();
   await detail.getByTestId('cite-library-item').click();
   const citationDialog = page.getByTestId('library-citation-export-dialog'); await citationDialog.waitFor({ state: 'visible' });
   await citationDialog.getByRole('button', { name: 'Gestionar estilos' }).click();

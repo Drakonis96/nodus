@@ -122,8 +122,9 @@ test('Library file mutations automatically prepare the clean reading version', a
 });
 
 test('the global reader exposes annotations, metadata, chat and native attachment viewers', async () => {
-  const [readerSource, attachmentViewer, selectionCss, appCss, store, protocol, main, html] = await Promise.all([
+  const [readerSource, attachmentViewer, markdownSource, selectionCss, appCss, store, protocol, main, html] = await Promise.all([
     readSource('src/views/LibraryDocumentReader.tsx'), readSource('src/components/library/LibraryAttachmentViewer.tsx'),
+    readSource('src/components/Markdown.tsx'),
     readSource('src/components/readerSelectionActions.css'), readSource('src/index.css'),
     readSource('electron/libraryReader/libraryReaderStore.ts'), readSource('electron/libraryProtocol.ts'), readSource('electron/main.ts'), readSource('index.html'),
   ]);
@@ -165,6 +166,11 @@ test('the global reader exposes annotations, metadata, chat and native attachmen
   assert.match(selectionCss, /\.light \.reader-highlighter-palette button:hover,[\s\S]*background: #eef2ff; color: #4338ca;/);
   assert.match(appCss, /\.light \.library-reader-source-badge\.is-original[\s\S]*background: #ffffff;[\s\S]*color: #52525b;/);
   assert.match(appCss, /\.light \.library-reader-file-option\.is-active \{ background: #eef2ff; color: #4338ca; \}/);
+  assert.match(appCss, /\.library-reader-document \.md p \{[\s\S]*text-align: justify;[\s\S]*text-indent: 1\.5em;/, 'clean prose is justified with a first-line indent');
+  assert.match(appCss, /\.library-reader-document \.md blockquote \{[\s\S]*margin: 1\.4em 2em;/, 'standalone quotations are visibly inset');
+  assert.match(markdownSource, /href\.startsWith\('#'\)/, 'local note and bibliography anchors never leave the reader');
+  assert.match(markdownSource, /internalBackTargets/, 'end references can return to the last in-text citation');
+  assert.match(markdownSource, /nodus-reference-/, 'numbered bibliography entries receive stable document anchors');
   assert.match(store, /function globalDocument/);
   assert.match(store, /nodus-library:\/\/original/);
   assert.match(store, /nodus-library:\/\/attachment/);
