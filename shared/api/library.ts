@@ -12,6 +12,7 @@ import type {
   ZoteroImportReport,
   ZoteroImportSelection,
   ZoteroLibraryPreview,
+  ZoteroSyncSession,
   LibraryExtractionEnqueueResult,
   LibraryExtractionJob,
   LibraryExtractionOptions,
@@ -52,6 +53,8 @@ export interface LibraryApi {
   listLibraryMigrationSessions(): Promise<LibraryMigrationSession[]>;
   listZoteroImportLibraries(): Promise<ZoteroLibraryPreview[]>;
   importZoteroLibrary(requestId: string, selection?: ZoteroImportSelection): Promise<ZoteroImportReport>;
+  listZoteroSyncSessions(): Promise<ZoteroSyncSession[]>;
+  resumeZoteroLibraryImport(requestId: string): Promise<ZoteroImportReport>;
   cancelZoteroLibraryImport(requestId: string): Promise<boolean>;
   onZoteroImportProgress(cb: (progress: ZoteroImportProgress) => void): () => void;
   enqueueLibraryExtraction(itemIds: string[], options?: Partial<LibraryExtractionOptions>, priority?: number): Promise<LibraryExtractionEnqueueResult>;

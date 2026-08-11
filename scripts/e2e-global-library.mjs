@@ -89,6 +89,18 @@ try {
     createdAt: now, deletedAt: null,
     clock: { deviceId: 'e2e-device-0001', revision: 1, baseRevision: 0, updatedAt: now, contentHash: 'b'.repeat(64) },
   }, null, 2)}\n`, 'utf8');
+  const syncFolder = path.join(backupRoot, 'nodus-library', '.nodus', 'zotero-sync');
+  await mkdir(syncFolder, { recursive: true });
+  await writeFile(path.join(syncFolder, 'e2e-interrupted.json'), `${JSON.stringify({
+    format: 'nodus.zotero-sync', formatVersion: 1, id: 'e2e-interrupted', status: 'failed',
+    selection: { libraryIds: ['users/0'], copyAttachments: true, includeUnfiled: true },
+    progress: {
+      requestId: 'e2e-interrupted', phase: 'failed', libraryId: null, libraryName: null,
+      processedItems: 12, totalItems: 20, processedAttachments: 4, totalAttachments: 9,
+      percent: 100, message: 'Zotero was closed; local progress is retained.',
+    },
+    report: null, startedAt: now, updatedAt: now, error: 'Zotero was closed.',
+  }, null, 2)}\n`, 'utf8');
 
   await page.evaluate(() => window.nodus.rebuildGlobalLibrary());
   console.log('[global-library-e2e] fixture catalog rebuilt');
@@ -254,8 +266,15 @@ try {
   await page.getByTestId(`global-library-item-${itemId}`).waitFor({ state: 'visible' });
 
   await page.getByTestId('open-zotero-global-import').click();
-  await page.getByTestId('zotero-global-import-dialog').waitFor({ state: 'visible' });
-  assert.match(await page.getByTestId('zotero-global-import-dialog').innerText(), /solo lectura/);
+  const zoteroDialog = page.getByTestId('zotero-global-import-dialog');
+  await zoteroDialog.waitFor({ state: 'visible' });
+  assert.match(await zoteroDialog.innerText(), /solo lectura/);
+  await page.getByTestId('zotero-sync-resume').waitFor({ state: 'visible' });
+  await page.getByTestId('resume-zotero-sync').waitFor({ state: 'visible' });
+  await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-zotero-resume-dark-wide.png'), fullPage: true });
+  await page.evaluate(() => { document.documentElement.classList.add('light'); document.documentElement.classList.remove('dark'); });
+  await page.setViewportSize({ width: 760, height: 900 });
+  await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-zotero-resume-light-narrow.png'), fullPage: true });
   await page.keyboard.press('Escape');
   await page.screenshot({ path: screenshotPath, fullPage: true });
   assert.deepEqual(pageErrors, [], pageErrors.map((error) => error.stack ?? String(error)).join('\n'));

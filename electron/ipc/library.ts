@@ -14,6 +14,8 @@ import {
   rebuildGlobalLibrary,
   cancelZoteroLibraryImport,
   listZoteroImportLibraries,
+  listZoteroSyncSessions,
+  resumeZoteroLibraryImport,
   startZoteroLibraryImport,
   enqueueLibraryExtraction,
   listLibraryExtractionJobs,
@@ -78,6 +80,10 @@ export function registerLibraryIpc({ h }: IpcContext): void {
       if (!event.sender.isDestroyed()) event.sender.send('library:zoteroImportProgress', progress);
     },
   ));
+  h('library:zoteroSyncSessions', async () => listZoteroSyncSessions());
+  h('library:resumeZoteroImport', async (event, requestId) => resumeZoteroLibraryImport(requestId, (progress) => {
+    if (!event.sender.isDestroyed()) event.sender.send('library:zoteroImportProgress', progress);
+  }));
   h('library:cancelZoteroImport', async (_event, requestId) => cancelZoteroLibraryImport(requestId));
   h('library:enqueueExtraction', async (_event, itemIds, options, priority) => enqueueLibraryExtraction(itemIds, options, priority));
   h('library:extractionJobs', async () => listLibraryExtractionJobs());

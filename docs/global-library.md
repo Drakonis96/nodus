@@ -132,14 +132,32 @@ unfiled items. Collection hierarchy has no artificial depth limit.
 
 The importer uses Zotero versions to retrieve only changes when possible. Its
 progress bar reports connection, collections, catalog, attachments, rebuilding,
-and completion. Canceling preserves everything already retrieved; resuming does
-not duplicate documents or attachments. Imported collections are a read-only
-mirror. They can coexist with Nodus-owned collections, which can be created,
-nested, moved, renamed, and deleted.
+and completion. Each run is checkpointed under `.nodus/zotero-sync`; canceled
+and failed sessions can be resumed from the import dialog without duplicating
+documents or attachments. A partial run commits the valid libraries and returns
+a structured report for unavailable libraries, credentials, rate limits, files,
+and conflicts.
+
+A Zotero deletion never becomes a Nodus deletion. The record is retained with a
+`source-missing` state, including local files, notes, corrections, tags, Nodus
+collection memberships, aliases, and vault links. A missing group library is
+handled the same way at library scope. When the source reappears, its stable
+identity reactivates the existing record.
+
+Attachments are compared by SHA-256. An unchanged file reuses its immutable
+copy; a changed primary file queues extraction and marks content-derived output
+stale through the revision contract. A file not downloaded by Zotero retains
+its previous readable copy with `not-downloaded` state. Imported collections
+are a read-only mirror. They coexist with Nodus-owned collections, which can be
+created, nested, moved, renamed, and deleted.
 
 The Zotero plugin exposes three coordinated desktop actions: check clean-copy
 status, import or refresh the library, and open the current document in the
-clean reader. The Zotero original is never edited.
+clean reader. Desktop and plugin advertise a numeric protocol and capabilities.
+Desktop v4 keeps plugin-v3 chat available and displays a non-blocking update
+warning; plugin v4 keeps desktop-v3 chat available and omits unsupported Global
+Library actions. The traditional monitored-collection flow and its IPC adapters
+remain available. The Zotero original is never edited.
 
 ### Mendeley and other managers
 

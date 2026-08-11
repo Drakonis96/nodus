@@ -35,7 +35,12 @@ button exists.
 | Zotero | Keys, hierarchy, and membership retain unlimited depth | Verified | `test-zotero-library-import`, `test-global-library-ui` |
 | Zotero | Version-based refresh resumes and does not duplicate attachments | Verified | `test-zotero-library-import` |
 | Zotero | Cancellation preserves retrieved progress | Verified | `test-zotero-library-import` |
+| Zotero | Deleted items and libraries become source-missing without deleting Nodus content | Verified | `test-zotero-library-import` |
+| Zotero | Local metadata, collections, tags, notes, and attachments survive every refresh | Verified | `test-zotero-library-import`, `test-library-item-management` |
+| Zotero | Attachment hashes reuse unchanged files and invalidate content derivatives after primary-file changes | Verified | `test-zotero-library-import`, `test-library-revisions` |
+| Zotero | Interrupted and partial sessions persist reports and can resume from the import dialog | Verified | `test-zotero-library-import`, `test-global-library-ui` |
 | Plugin | Status, import, and reader opening reach the desktop | Verified | `test-global-library-ui`, Zotero plugin suite |
+| Plugin | Protocol capabilities let v4 desktop/plugin degrade non-blockingly with their v3 counterpart | Verified | `test-global-library-ui`, Zotero plugin suite |
 | Interoperability | RIS, BibTeX, and CSL JSON are imported | Verified | `test-library-metadata` |
 | Interoperability | Repeated local files are detected by hash | Verified | `test-global-library-operations` |
 | Organization | Collections and subcollections support arbitrary depth | Verified | `test-global-library-operations`, `test-global-library-ui` |

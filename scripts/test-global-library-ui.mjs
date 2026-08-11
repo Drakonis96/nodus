@@ -25,10 +25,13 @@ test('the Library UI exposes hierarchy, search, bulk operations, imports and bac
     'library-notes', 'library-relations', 'library-tag-manager',
     'open-library-migration', 'library-migration-dialog', 'start-library-migration',
     'library-smart-search-dialog', 'smart-search-preview', 'library-table-settings', 'library-table-preferences',
+    'zotero-sync-resume', 'resume-zotero-sync',
+    'library-source-missing',
   ]) assert.match(view, new RegExp(`data-testid=(?:"|\{\`)[^\n]*${marker}`));
   for (const method of [
     'getGlobalLibraryStatus', 'listGlobalLibraryItems', 'listGlobalLibraryCollections',
     'importGlobalLibraryFiles', 'listZoteroImportLibraries', 'importZoteroLibrary',
+    'listZoteroSyncSessions', 'resumeZoteroLibraryImport',
     'enqueueLibraryExtraction', 'patchGlobalLibraryItemCollections', 'setGlobalLibraryItemsDeleted',
     'importGlobalBibliographyFiles',
     'createGlobalLibraryItem', 'duplicateGlobalLibraryItem', 'convertGlobalLibraryItemToNodus',
@@ -94,6 +97,7 @@ test('the typed bridge covers every global management operation', async () => {
     'cancelLibraryMigration', 'rollbackLibraryMigration', 'listLibraryMigrationSessions',
     'listGlobalLibrarySavedSearches', 'saveGlobalLibrarySavedSearch', 'deleteGlobalLibrarySavedSearch',
     'getGlobalLibraryViewPreferences', 'setGlobalLibraryViewPreferences',
+    'listZoteroSyncSessions', 'resumeZoteroLibraryImport',
   ];
   assertApiMethods(assert, methods);
   assertChannelsWired(assert, [
@@ -109,6 +113,7 @@ test('the typed bridge covers every global management operation', async () => {
     'library:cancelMigration', 'library:rollbackMigration', 'library:migrationSessions',
     'library:savedSearches', 'library:saveSavedSearch', 'library:deleteSavedSearch',
     'library:viewPreferences', 'library:setViewPreferences',
+    'library:zoteroSyncSessions', 'library:resumeZoteroImport',
   ]);
 });
 
@@ -135,6 +140,13 @@ test('Zotero bridge exposes import, status and clean-reader navigation', async (
   assert.match(server, /startZoteroLibraryImport/);
   assert.match(sidebar, /renderLibraryActions/);
   assert.match(sidebar, /library\.open/);
+  assert.match(server, /ZOTERO_PLUGIN_PROTOCOL_VERSION = 4/);
+  assert.match(server, /minimumPluginProtocol/);
+  assert.match(server, /librarySyncV2: true/);
+  assert.match(server, /lastClientProtocol < ZOTERO_PLUGIN_PROTOCOL_VERSION/);
+  assert.match(sidebar, /X-Nodus-Zotero-Protocol": "4"/);
+  assert.match(sidebar, /serverInfo\.capabilities\.globalLibrary/,
+    'plugin v4 hides global-Library actions when a v3 desktop does not advertise them');
 });
 
 test('metadata management previews remote candidates and requires an explicit duplicate merge', async () => {

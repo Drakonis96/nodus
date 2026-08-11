@@ -20,6 +20,7 @@ import type {
   ZoteroImportProgress,
   ZoteroImportSelection,
   ZoteroLibraryPreview,
+  ZoteroSyncSession,
 } from '@shared/libraryTypes';
 import type { AppSettings, VaultSummary, VaultType } from '@shared/types';
 import { Icon, Spinner } from '../components/ui';
@@ -160,36 +161,51 @@ function ZoteroImportDialog({ onClose, onFinished }: { onClose: () => void; onFi
   const [progress, setProgress] = useState<ZoteroImportProgress | null>(null);
   const [copyAttachments, setCopyAttachments] = useState(true);
   const [includeUnfiled, setIncludeUnfiled] = useState(true);
+  const [sessions, setSessions] = useState<ZoteroSyncSession[]>([]);
+  const [lastReport, setLastReport] = useState<ZoteroSyncSession['report']>(null);
 
   useEffect(() => {
     let alive = true;
-    void window.nodus.listZoteroImportLibraries().then((entries) => {
+    void Promise.allSettled([
+      window.nodus.listZoteroImportLibraries(),
+      window.nodus.listZoteroSyncSessions(),
+    ]).then(([libraryResult, sessionResult]) => {
       if (!alive) return;
-      setLibraries(entries);
-      setSelected(new Set(entries.map((entry) => entry.id)));
-    }).catch((nextError) => alive && setError(nextError instanceof Error ? nextError.message : String(nextError))).finally(() => alive && setLoading(false));
+      if (libraryResult.status === 'fulfilled') {
+        setLibraries(libraryResult.value);
+        setSelected(new Set(libraryResult.value.map((entry) => entry.id)));
+      } else setError(libraryResult.reason instanceof Error ? libraryResult.reason.message : String(libraryResult.reason));
+      if (sessionResult.status === 'fulfilled') setSessions(sessionResult.value);
+    }).finally(() => alive && setLoading(false));
     const off = window.nodus.onZoteroImportProgress((value) => {
       if (!requestId || value.requestId === requestId) setProgress(value);
     });
     return () => { alive = false; off(); };
   }, [requestId]);
 
-  const start = async () => {
-    const id = crypto.randomUUID();
+  const run = async (id: string, selection?: ZoteroImportSelection) => {
     setRequestId(id);
     setError(null);
-    const selection: ZoteroImportSelection = { libraryIds: [...selected], copyAttachments, includeUnfiled };
+    setLastReport(null);
     try {
-      const report = await window.nodus.importZoteroLibrary(id, selection);
-      toast(report.canceled
-        ? t('La importación se canceló; el catálogo ya recuperado se conserva.')
-        : tx('Importación terminada: {n} documentos.', { n: report.itemsDiscovered }));
+      const report = selection
+        ? await window.nodus.importZoteroLibrary(id, selection)
+        : await window.nodus.resumeZoteroLibraryImport(id);
+      setLastReport(report);
+      toast(report.canceled ? t('La importación se canceló; el catálogo ya recuperado se conserva.')
+        : report.partial ? t('La sincronización terminó parcialmente; los datos locales se conservan.')
+          : tx('Importación terminada: {n} documentos.', { n: report.itemsDiscovered }));
       onFinished();
-      if (!report.canceled) onClose();
+      if (!report.canceled && !report.partial) onClose();
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : String(nextError));
-    } finally { setRequestId(null); }
+    } finally {
+      setRequestId(null);
+      void window.nodus.listZoteroSyncSessions().then(setSessions).catch(() => undefined);
+    }
   };
+  const start = () => run(crypto.randomUUID(), { libraryIds: [...selected], copyAttachments, includeUnfiled });
+  const resumable = sessions.find((session) => session.status === 'canceled' || session.status === 'failed');
 
   return (
     <div className="fixed inset-0 z-[80] grid place-items-center bg-black/65 p-6" onMouseDown={(event) => { if (event.target === event.currentTarget && !requestId) onClose(); }}>
@@ -203,6 +219,13 @@ function ZoteroImportDialog({ onClose, onFinished }: { onClose: () => void; onFi
           <button className="btn btn-ghost" onClick={onClose} disabled={!!requestId} aria-label={t('Cerrar')}><Icon name="x" /></button>
         </header>
         <div className="min-h-0 flex-1 overflow-y-auto p-5">
+          {resumable && !requestId && (
+            <div data-testid="zotero-sync-resume" className="mb-4 flex items-center gap-3 rounded-xl border border-amber-500/35 bg-amber-500/10 p-3">
+              <Icon name="refresh" className="shrink-0 text-amber-700 dark:text-amber-300" />
+              <div className="min-w-0 flex-1 text-xs"><b className="block text-amber-950 dark:text-amber-100">{t('Sincronización interrumpida')}</b><span className="text-amber-800 dark:text-amber-200/80">{resumable.progress.message}</span></div>
+              <button data-testid="resume-zotero-sync" className="btn btn-ghost border border-amber-500/25" onClick={() => void run(resumable.id)}>{t('Reanudar')}</button>
+            </div>
+          )}
           {loading ? <div className="flex items-center gap-2 py-8 text-sm text-neutral-500"><Spinner /> {t('Buscando bibliotecas…')}</div> : (
             <div className="space-y-2">
               {libraries.map((library) => (
@@ -231,6 +254,14 @@ function ZoteroImportDialog({ onClose, onFinished }: { onClose: () => void; onFi
             </div>
           )}
           {error && <p role="alert" className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-300">{error}</p>}
+          {lastReport?.partial && (
+            <div role="status" className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-950 dark:text-amber-100">
+              <b>{t('Sincronización parcial')}</b>
+              <p className="mt-1">{tx('{n} incidencia(s); {missing} fuente(s) ausente(s); {attachments} adjunto(s) no disponible(s).', {
+                n: lastReport.failures.length, missing: lastReport.itemsSourceMissing, attachments: lastReport.attachmentsUnavailable,
+              })}</p>
+            </div>
+          )}
         </div>
         <footer className="flex justify-end gap-2 border-t border-neutral-800 px-5 py-4">
           {requestId ? <button className="btn btn-ghost border border-neutral-700" onClick={() => void window.nodus.cancelZoteroLibraryImport(requestId)}><Icon name="x" /> {t('Cancelar')}</button> : (
@@ -738,7 +769,7 @@ function GlobalLibraryContent({
               return <div data-testid={`global-library-item-${item.id}`} draggable className={`grid h-[62px] items-center border-b border-neutral-900 px-3 text-xs ${detailId === item.id ? 'bg-indigo-500/10' : 'hover:bg-neutral-900/55'}`} style={{ gridTemplateColumns: tableGrid }} onDragStart={(event) => { const itemIds = selected.has(item.id) ? [...selected] : [item.id]; event.dataTransfer.effectAllowed = 'copyMove'; event.dataTransfer.setData('application/x-nodus-library-items', JSON.stringify(itemIds)); }} onDoubleClick={() => item.readerAvailable ? void openReader(item.id) : setDetailId(item.id)}>
                 <input type="checkbox" checked={selected.has(item.id)} onChange={(event) => setSelected((current) => { const next = new Set(current); if (event.target.checked) next.add(item.id); else next.delete(item.id); return next; })} />
                 {visibleColumns.map((column) => {
-                  if (column === 'title') return <button key={column} className="min-w-0 pr-4 text-left" onClick={() => setDetailId(item.id)}><b className="block truncate font-medium text-neutral-200">{item.title}</b><span className="mt-1 block truncate text-[10px] text-neutral-600">{item.doi || item.isbn[0] || item.issn[0] || item.sourceKey || item.id}</span></button>;
+                  if (column === 'title') return <button key={column} className="min-w-0 pr-4 text-left" onClick={() => setDetailId(item.id)}><b className="flex min-w-0 items-center gap-1.5 font-medium text-neutral-200"><span className="truncate">{item.title}</span>{item.sourceState && item.sourceState !== 'current' && <Icon name="alert" size={11} className="shrink-0 text-amber-400" />}</b><span className="mt-1 block truncate text-[10px] text-neutral-600">{item.doi || item.isbn[0] || item.issn[0] || item.sourceKey || item.id}</span></button>;
                   if (column === 'creator') return <span key={column} className="truncate pr-3 text-neutral-500">{creatorText(item) || '—'}</span>;
                   if (column === 'year') return <span key={column} className="tabular-nums text-neutral-500">{item.year ?? '—'}</span>;
                   if (column === 'source') return <span key={column} className="w-fit rounded bg-neutral-900 px-2 py-1 text-[10px] text-neutral-400">{SOURCE_LABEL[item.source]}</span>;
@@ -756,6 +787,7 @@ function GlobalLibraryContent({
         {detail && <aside data-testid="global-library-detail" className="flex w-[310px] shrink-0 flex-col border-l border-neutral-800 bg-neutral-950">
           <header className="flex items-center gap-2 border-b border-neutral-800 p-3"><b className="min-w-0 flex-1 truncate text-sm">{t('Detalles')}</b><button className="grid h-7 w-7 place-items-center rounded hover:bg-neutral-900" onClick={() => setDetailId(null)}><Icon name="x" size={14} /></button></header>
           <div className="min-h-0 flex-1 overflow-y-auto p-4"><span className="rounded bg-indigo-500/10 px-2 py-1 text-[10px] font-medium text-indigo-300">{SOURCE_LABEL[detail.source]}</span><h2 className="mt-3 text-base font-semibold leading-6">{detail.metadata.title}</h2><p className="mt-2 text-xs leading-5 text-neutral-500">{detail.metadata.creators.map((creator) => creator.name || [creator.firstName, creator.lastName].filter(Boolean).join(' ')).filter(Boolean).join('; ') || t('Sin autoría')}</p>
+            {detail.sourceState && detail.sourceState !== 'current' && <div data-testid="library-source-missing" role="status" className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5 text-[11px] text-amber-950 dark:text-amber-100"><b>{t(detail.sourceState === 'library-missing' ? 'Biblioteca de origen no disponible' : 'Elemento ausente en el origen')}</b><p className="mt-1 opacity-80">{t('El contenido de Nodus se conserva y volverá a vincularse si reaparece en Zotero.')}</p></div>}
             <dl className="mt-5 space-y-3 text-xs">{[
               [t('Tipo'), detail.metadata.itemType], [t('Fecha'), detail.metadata.date || detail.metadata.year], [t('Publicación'), detail.metadata.publicationTitle], [t('Editorial'), detail.metadata.publisher], [t('DOI'), detail.metadata.doi], [t('ISBN'), detail.metadata.isbn?.join('; ')], [t('ISSN'), detail.metadata.issn?.join('; ')], [t('Idioma'), detail.metadata.language], [t('Identificador'), detail.sourceKey || detail.id],
             ].filter(([, value]) => value != null && value !== '').map(([label, value]) => <div key={String(label)}><dt className="text-[10px] uppercase tracking-wider text-neutral-600">{label}</dt><dd className="mt-1 break-words text-neutral-300">{String(value)}</dd></div>)}</dl>

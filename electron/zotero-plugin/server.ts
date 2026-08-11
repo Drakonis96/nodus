@@ -30,9 +30,19 @@ import {
 } from '../library/libraryService';
 
 const MAX_REQUEST_BYTES = 20 * 1024 * 1024; // full text plus several bounded page images
+export const ZOTERO_PLUGIN_PROTOCOL_VERSION = 4;
+export const ZOTERO_PLUGIN_MINIMUM_PROTOCOL = 3;
+export const ZOTERO_PLUGIN_CAPABILITIES = Object.freeze({
+  chat: true,
+  evidence: true,
+  globalLibrary: true,
+  librarySyncV2: true,
+  cleanReader: true,
+});
 
 let httpServer: Server | null = null;
 let status: ZoteroPluginServerStatus = { running: false, port: null, url: null, error: null };
+let lastClientProtocol: number | null = null;
 let lifecycle = Promise.resolve();
 let getMainWindow: (() => BrowserWindow | null) | null = null;
 
@@ -63,7 +73,7 @@ function setCors(req: IncomingMessage, res: ServerResponse): void {
   res.setHeader('Access-Control-Allow-Origin', origin ?? '*');
   res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-Nodus-Zotero-Protocol');
 }
 
 function describeError(error: unknown): string {
@@ -321,6 +331,9 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, _port: n
     res.end();
     return;
   }
+  const announcedProtocol = Number(req.headers['x-nodus-zotero-protocol']);
+  lastClientProtocol = Number.isInteger(announcedProtocol) && announcedProtocol > 0
+    ? announcedProtocol : ZOTERO_PLUGIN_MINIMUM_PROTOCOL;
   const urlPath = (req.url ?? '/').split('?')[0];
 
   // Health is tokenless so the plugin can probe connectivity + report the vault.
@@ -330,6 +343,9 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, _port: n
       ok: true,
       app: 'nodus',
       version: app.getVersion?.() ?? null,
+      protocolVersion: ZOTERO_PLUGIN_PROTOCOL_VERSION,
+      minimumPluginProtocol: ZOTERO_PLUGIN_MINIMUM_PROTOCOL,
+      capabilities: ZOTERO_PLUGIN_CAPABILITIES,
       vault,
       corpusSize: (getDb().prepare('SELECT COUNT(*) AS n FROM works WHERE archived = 0').get() as { n: number }).n,
       embeddingsConfigured: embeddedIdeaCount() > 0,
@@ -951,7 +967,14 @@ export function restartZoteroPluginServer(): Promise<void> {
   return lifecycle;
 }
 export function getZoteroPluginStatus(): ZoteroPluginServerStatus {
-  return { ...status };
+  return {
+    ...status,
+    protocolVersion: ZOTERO_PLUGIN_PROTOCOL_VERSION,
+    clientProtocolVersion: lastClientProtocol,
+    compatibilityWarning: lastClientProtocol !== null && lastClientProtocol < ZOTERO_PLUGIN_PROTOCOL_VERSION
+      ? 'El plugin de Zotero es anterior a Nodus 4. El chat seguirá funcionando, pero la Biblioteca global requiere actualizar el plugin.'
+      : null,
+  };
 }
 export async function regenerateZoteroPluginToken(): Promise<string> {
   const token = randomBytes(24).toString('base64url');

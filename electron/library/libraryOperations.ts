@@ -81,6 +81,7 @@ function recordCatalogItem(record: LibraryItemRecord, store: LibraryDiskStore): 
   return {
     id: record.id, storageId: record.storageId, source: record.source,
     sourceLibraryId: record.sourceLibraryId ?? null, sourceKey: record.sourceKey ?? null,
+    sourceState: record.sourceState ?? null,
     citationKey: record.citationKey ?? null, title: record.metadata.title,
     itemType: record.metadata.itemType, creators: record.metadata.creators, year: record.metadata.year ?? null,
     date: record.metadata.date ?? null, doi: record.metadata.doi ?? null,
@@ -511,7 +512,18 @@ export class LibraryOperations {
       if (!ids.has(item.id) || item.deletedAt) continue;
       const tags = [...new Set([...(item.metadata.tags ?? []), ...add])].filter((tag) => !remove.has(tag));
       if (canonicalJson(tags) === canonicalJson(item.metadata.tags ?? [])) continue;
-      this.store.upsertItem({ ...item, metadata: { ...item.metadata, tags } }, item.clock.revision); count += 1;
+      const sourceManaged = item.source === 'zotero';
+      const localTags = sourceManaged
+        ? [...new Set([...(item.localTags ?? []), ...add])].filter((tag) => !remove.has(tag))
+        : item.localTags;
+      const suppressedSourceTags = sourceManaged
+        ? [...new Set([...(item.suppressedSourceTags ?? []).filter((tag) => !add.includes(tag)), ...remove])]
+        : item.suppressedSourceTags;
+      this.store.upsertItem({
+        ...item,
+        metadata: { ...item.metadata, tags },
+        ...(sourceManaged ? { localTags, suppressedSourceTags } : {}),
+      }, item.clock.revision); count += 1;
     }
     if (count) this.catalog.rebuild(this.store); return count;
   }

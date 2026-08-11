@@ -12,6 +12,7 @@ import type {
   ZoteroImportReport,
   ZoteroImportSelection,
   ZoteroLibraryPreview,
+  ZoteroSyncFailure,
 } from '@shared/libraryTypes';
 import type { ZoteroAttachmentInfo, ZoteroCollection, ZoteroItem, ZoteroLibrary } from '@shared/types';
 import * as zotero from '../zotero/zoteroClient';
@@ -24,6 +25,7 @@ import {
   zoteroSourceIdentity,
 } from './libraryRecord';
 import { LibraryDiskStore } from './libraryStorage';
+import { ZoteroSyncSessionStore } from './libraryZoteroSyncSessions';
 
 export interface ZoteroImportClient {
   libraries(): Promise<ZoteroLibrary[]>;
@@ -220,6 +222,14 @@ function abortIfNeeded(signal?: AbortSignal): void {
   if (signal?.aborted) throw new DOMException('Importación cancelada', 'AbortError');
 }
 
+function syncFailure(error: unknown, sourceLibraryId: string | null): ZoteroSyncFailure {
+  const candidate = error as { code?: ZoteroSyncFailure['code']; retryable?: boolean; message?: string };
+  const message = error instanceof Error ? error.message : String(error);
+  const code = candidate.code && ['zotero-closed', 'credentials-expired', 'rate-limited', 'library-missing', 'permission', 'network', 'invalid-response'].includes(candidate.code)
+    ? candidate.code : /ECONNREFUSED|fetch failed|socket/i.test(message) ? 'zotero-closed' : 'unknown';
+  return { libraryId: sourceLibraryId, code, message, retryable: candidate.retryable ?? ['zotero-closed', 'rate-limited', 'network'].includes(code) };
+}
+
 function progress(
   requestId: string,
   phase: ZoteroImportProgress['phase'],
@@ -230,7 +240,7 @@ function progress(
   totalAttachments: number,
   message: string,
 ): ZoteroImportProgress {
-  const phaseBase = { connecting: 0, collections: 5, catalog: 15, attachments: 45, rebuild: 95, complete: 100, canceled: 100 }[phase];
+  const phaseBase = { connecting: 0, collections: 5, catalog: 15, attachments: 45, rebuild: 95, complete: 100, canceled: 100, failed: 100 }[phase];
   const portion = phase === 'catalog' && totalItems ? Math.round((processedItems / totalItems) * 28)
     : phase === 'attachments' && totalAttachments ? Math.round((processedAttachments / totalAttachments) * 48)
       : 0;
@@ -270,30 +280,58 @@ export async function importZoteroLibraries(options: {
   const selection = options.selection ?? {};
   const report: ZoteroImportReport = {
     requestId, libraries: 0, itemsDiscovered: 0, itemsCreated: 0, itemsUpdated: 0,
-    itemsUnchanged: 0, itemsDeleted: 0, collectionsCreated: 0, collectionsUpdated: 0,
+    itemsUnchanged: 0, itemsDeleted: 0, itemsSourceMissing: 0, collectionsCreated: 0, collectionsUpdated: 0,
     collectionsUnchanged: 0, attachmentsCopied: 0, attachmentsUnchanged: 0,
-    attachmentsUnavailable: 0, warnings: [], canceled: false, durationMs: 0,
+    attachmentsUnavailable: 0, attachmentsChanged: 0, conflicts: 0, librariesMissing: [], failures: [], partial: false,
+    warnings: [], canceled: false, durationMs: 0,
   };
+  const sessions = new ZoteroSyncSessionStore(store.root);
   let processedItems = 0;
   let totalItems = 0;
   let processedAttachments = 0;
   let totalAttachments = 0;
   let lastPercent = 0;
+  let lastCheckpointAt = 0;
+  let lastCheckpointPhase: ZoteroImportProgress['phase'] | null = null;
+  let completedLibraries = 0;
   const emit = (value: ZoteroImportProgress): void => {
     value.percent = Math.max(lastPercent, value.percent);
     lastPercent = value.percent;
     onProgress?.(value);
+    const now = Date.now();
+    if (value.phase !== lastCheckpointPhase || now - lastCheckpointAt >= 500 || ['complete', 'canceled', 'failed'].includes(value.phase)) {
+      sessions.progress(requestId, value);
+      lastCheckpointAt = now; lastCheckpointPhase = value.phase;
+    }
   };
-  emit(progress(requestId, 'connecting', null, 0, 0, 0, 0, 'Conectando con Zotero…'));
+  const initialProgress = progress(requestId, 'connecting', null, 0, 0, 0, 0, 'Conectando con Zotero…');
+  sessions.begin(requestId, selection, initialProgress);
+  emit(initialProgress);
   try {
     abortIfNeeded(signal);
     const available = await client.libraries();
     const selectedIds = new Set(selection.libraryIds ?? available.map(libraryId));
     const libraries = available.filter((library) => selectedIds.has(libraryId(library)));
+    const availableIds = new Set(available.map(libraryId));
+    report.librariesMissing = [...selectedIds].filter((id) => !availableIds.has(id));
+    for (const missingId of report.librariesMissing) {
+      const missingAt = new Date().toISOString();
+      for (const current of store.scanMaterializedItems().records) {
+        if (current.source !== 'zotero' || current.sourceLibraryId !== missingId || current.sourceState === 'library-missing') continue;
+        store.upsertItem({ ...current, sourceState: 'library-missing', sourceMissingAt: missingAt }, current.clock.revision);
+        report.itemsSourceMissing += 1;
+      }
+      for (const current of store.scanMaterializedCollections().records) {
+        if (current.source !== 'zotero' || current.sourceLibraryId !== missingId || current.sourceState === 'library-missing') continue;
+        store.upsertCollection({ ...current, sourceState: 'library-missing', sourceMissingAt: missingAt }, current.clock.revision);
+      }
+      report.failures.push({ libraryId: missingId, code: 'library-missing', message: `La biblioteca ${missingId} ya no está disponible en Zotero.`, retryable: false });
+    }
     report.libraries = libraries.length;
     for (const library of libraries) {
       abortIfNeeded(signal);
       const sourceLibraryId = libraryId(library);
+      try {
       const saved = catalog.getImportSource(importSourceId(library));
       const selectedCollectionIds = new Set(selection.collectionIds ?? []);
       const subset = selectedCollectionIds.size > 0;
@@ -339,7 +377,10 @@ export async function importZoteroLibraries(options: {
         const desired = {
           id, name: collection.name.trim() || '(sin nombre)', parentId,
           position: positionByParent.get(parentId) ?? 0, source: 'zotero' as const,
-          sourceLibraryId, sourceKey: collection.itemKey, aliases, deletedAt: null,
+          sourceLibraryId, sourceKey: collection.itemKey, aliases,
+          sourceState: 'current' as const,
+          ...(current?.sourceMissingAt ? { sourceMissingAt: undefined } : {}),
+          deletedAt: null,
         };
         positionByParent.set(parentId, desired.position + 1);
         if (!current) { store.upsertCollection(desired); report.collectionsCreated += 1; }
@@ -350,7 +391,7 @@ export async function importZoteroLibraries(options: {
         const visibleIds = new Set(collectionIds.values());
         for (const current of store.scanMaterializedCollections().records) {
           if (current.source !== 'zotero' || current.sourceLibraryId !== sourceLibraryId || current.deletedAt || visibleIds.has(current.id)) continue;
-          store.upsertCollection({ ...current, deletedAt: new Date().toISOString() }, current.clock.revision);
+          store.upsertCollection({ ...current, sourceState: 'source-missing', sourceMissingAt: new Date().toISOString() }, current.clock.revision);
         }
       }
 
@@ -387,12 +428,21 @@ export async function importZoteroLibraries(options: {
         ].filter((alias) => alias !== id))];
         const sourceIdentities = [...new Map([...(current?.sourceIdentities ?? []), identity]
           .map((entry) => [librarySourceIdentityKey(entry), entry])).values()];
+        const localTags = current?.localTags ?? [];
+        const suppressedSourceTags = current?.suppressedSourceTags ?? [];
+        const sourceMetadata = metadata(item);
+        sourceMetadata.tags = [...new Set([
+          ...(sourceMetadata.tags ?? []).filter((tag) => !suppressedSourceTags.includes(tag)),
+          ...localTags,
+        ])];
         const desired = {
           id, storageId: current?.storageId ?? id, aliases, sourceIdentities, source: 'zotero' as const,
           sourceLibraryId, sourceKey: item.itemKey,
           ...(current?.citationKey ? { citationKey: current.citationKey } : {}),
-          metadata: applyMetadataOverrides(metadata(item), current?.metadataOverrides),
+          metadata: applyMetadataOverrides(sourceMetadata, current?.metadataOverrides),
           ...(current?.metadataOverrides ? { metadataOverrides: current.metadataOverrides } : {}),
+          ...(localTags.length ? { localTags } : {}),
+          ...(suppressedSourceTags.length ? { suppressedSourceTags } : {}),
           collectionIds: [...new Set([
             ...localCollectionIds,
             ...item.collections.filter((key) => !subset || selectedKeys.has(key)).flatMap((key) => {
@@ -403,13 +453,20 @@ export async function importZoteroLibraries(options: {
           attachments: current?.attachments ?? [],
           ...(current?.files ? { files: current.files } : {}),
           extraction: current?.extraction ?? { status: 'pending' as const },
+          sourceState: 'current' as const,
+          ...(current?.sourceMissingAt ? { sourceMissingAt: undefined } : {}),
+          lastSourceSyncAt: current?.sourceVersion === item.version ? current.lastSourceSyncAt : new Date().toISOString(),
+          sourceVersion: item.version,
           deletedAt: null,
         };
         let stored: LibraryItemRecord;
         if (!current) { stored = store.upsertItem(desired); report.itemsCreated += 1; }
         else if (comparableItem(current) === comparableItem({ ...current, ...desired })) {
           stored = current; report.itemsUnchanged += 1;
-        } else { stored = store.upsertItem(desired, current.clock.revision); report.itemsUpdated += 1; }
+        } else {
+          if (current.sourceVersion !== item.version && (current.metadataOverrides || localCollectionIds.length > 0)) report.conflicts += 1;
+          stored = store.upsertItem(desired, current.clock.revision); report.itemsUpdated += 1;
+        }
         desiredByKey.set(item.key, stored);
         processedItems += 1;
         emit(progress(requestId, 'catalog', library, processedItems, totalItems, processedAttachments, totalAttachments, `Catálogo disponible: ${item.title}`));
@@ -427,14 +484,14 @@ export async function importZoteroLibraries(options: {
       }
       for (const key of deletedItemKeys) {
         const current = store.findItemBySourceIdentity(zoteroSourceIdentity(sourceLibraryId, key));
-        if (!current || current.deletedAt || current.sourceLibraryId !== sourceLibraryId) continue;
-        store.upsertItem({ ...current, deletedAt: new Date().toISOString() }, current.clock.revision);
-        report.itemsDeleted += 1;
+        if (!current || current.deletedAt || current.sourceLibraryId !== sourceLibraryId || current.sourceState === 'source-missing') continue;
+        store.upsertItem({ ...current, sourceState: 'source-missing', sourceMissingAt: new Date().toISOString() }, current.clock.revision);
+        report.itemsSourceMissing += 1;
       }
       for (const key of deleted.collections) {
         const current = store.findCollectionBySource('zotero', sourceLibraryId, rawZoteroKey(key));
-        if (!current || current.deletedAt || current.sourceLibraryId !== sourceLibraryId) continue;
-        store.upsertCollection({ ...current, deletedAt: new Date().toISOString() }, current.clock.revision);
+        if (!current || current.deletedAt || current.sourceLibraryId !== sourceLibraryId || current.sourceState === 'source-missing') continue;
+        store.upsertCollection({ ...current, sourceState: 'source-missing', sourceMissingAt: new Date().toISOString() }, current.clock.revision);
       }
 
       // Deliberate checkpoint: the complete bibliography appears before any file copy begins.
@@ -447,42 +504,72 @@ export async function importZoteroLibraries(options: {
           abortIfNeeded(signal);
           const current = desiredByKey.get(item.key) ?? store.findItemBySourceIdentity(zoteroSourceIdentity(sourceLibraryId, item.itemKey));
           if (!current) continue;
-          const mirrored = (await client.itemNotes(library.id, item.key, library)).map((note) => ({
-            id: `zotero-note:${note.key}`, title: note.title, markdown: turndown.turndown(note.html).trim(),
-            source: 'zotero' as const, sourceKey: note.key, readOnly: true,
-            createdAt: (current.notes ?? []).find((entry) => entry.id === `zotero-note:${note.key}`)?.createdAt ?? new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          }));
-          const notes = [...(current.notes ?? []).filter((note) => note.source !== 'zotero'), ...mirrored];
-          if (comparableItem(current) !== comparableItem({ ...current, notes })) {
-            const stored = store.upsertItem({ ...current, notes }, current.clock.revision);
-            desiredByKey.set(item.key, stored);
+          try {
+            const mirrored = (await client.itemNotes(library.id, item.key, library)).map((note) => ({
+              id: `zotero-note:${note.key}`, title: note.title, markdown: turndown.turndown(note.html).trim(),
+              source: 'zotero' as const, sourceKey: note.key, readOnly: true,
+              createdAt: (current.notes ?? []).find((entry) => entry.id === `zotero-note:${note.key}`)?.createdAt ?? new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            }));
+            const notes = [...(current.notes ?? []).filter((note) => note.source !== 'zotero'), ...mirrored];
+            if (comparableItem(current) !== comparableItem({ ...current, notes })) {
+              const stored = store.upsertItem({ ...current, notes }, current.clock.revision);
+              desiredByKey.set(item.key, stored);
+            }
+          } catch (error) {
+            const failure = syncFailure(error, sourceLibraryId);
+            report.failures.push(failure);
+            report.warnings.push(`No se pudieron actualizar las notas de ${item.title}: ${failure.message}`);
+            report.partial = true;
           }
         }
       }
       if (selection.copyAttachments !== false) {
         for (const item of changedItems) {
           abortIfNeeded(signal);
-          const attachments = (await client.itemAttachments(library.id, item.key, library)).sort((a, b) => priority(a) - priority(b) || a.key.localeCompare(b.key));
+          let attachments: ZoteroAttachmentInfo[];
+          try {
+            attachments = (await client.itemAttachments(library.id, item.key, library)).sort((a, b) => priority(a) - priority(b) || a.key.localeCompare(b.key));
+          } catch (error) {
+            const failure = syncFailure(error, sourceLibraryId);
+            report.failures.push(failure);
+            report.warnings.push(`No se pudieron consultar los adjuntos de ${item.title}: ${failure.message}`);
+            report.partial = true;
+            continue;
+          }
           totalAttachments += attachments.length;
           let current = desiredByKey.get(item.key)
             ?? store.findItemBySourceIdentity(zoteroSourceIdentity(sourceLibraryId, item.itemKey));
           if (!current) continue;
-          const copied: LibraryAttachmentRecord[] = [];
+          const copied: LibraryAttachmentRecord[] = current.attachments
+            .filter((entry) => !entry.sourceKey)
+            .map((entry) => ({ ...entry }));
+          const seenSourceKeys = new Set<string>();
           for (let index = 0; index < attachments.length; index += 1) {
             abortIfNeeded(signal);
             const attachment = attachments[index];
-            const sourcePath = await client.attachmentFilePath(library.id, attachment.key);
+            seenSourceKeys.add(attachment.itemKey);
+            const previousBySource = current.attachments.find((entry) => entry.sourceKey === attachment.itemKey);
+            let sourcePath: string | null = null;
+            try {
+              sourcePath = await client.attachmentFilePath(library.id, attachment.key);
+            } catch (error) {
+              const failure = syncFailure(error, sourceLibraryId);
+              report.failures.push(failure);
+              report.partial = true;
+            }
             if (!sourcePath || !fs.existsSync(sourcePath) || !fs.statSync(sourcePath).isFile()) {
               report.attachmentsUnavailable += 1;
+              report.partial = true;
               report.warnings.push(`Adjunto no disponible: ${item.title} — ${attachment.title}`);
+              if (previousBySource) copied.push({ ...previousBySource, sourceState: 'not-downloaded' });
               processedAttachments += 1;
               continue;
             }
             const sourceHash = await sha256(sourcePath);
-            const previous = current.attachments.find((entry) => entry.sourceKey === attachment.itemKey && entry.sha256 === sourceHash);
+            const previous = previousBySource?.sha256 === sourceHash ? previousBySource : undefined;
             if (previous && fs.existsSync(path.join(store.itemFolder(current.storageId), previous.relativePath))) {
-              copied.push({ ...previous, role: attachmentRole(attachment, index), position: index });
+              copied.push({ ...previous, sourceState: 'available' });
               report.attachmentsUnchanged += 1;
               processedAttachments += 1;
               continue;
@@ -500,16 +587,28 @@ export async function importZoteroLibraries(options: {
               id: attachment.key, title: attachment.title, fileName,
               relativePath: path.relative(store.itemFolder(current.storageId), destination),
               mimeType: attachment.contentType || 'application/octet-stream', byteSize: stat.size,
-              sha256: sourceHash, role: attachmentRole(attachment, index), position: index,
-              addedAt: new Date().toISOString(), sourceKey: attachment.itemKey,
+              sha256: sourceHash, role: previousBySource?.role ?? attachmentRole(attachment, index), position: previousBySource?.position ?? index,
+              addedAt: previousBySource?.addedAt ?? new Date().toISOString(), sourceKey: attachment.itemKey, sourceState: 'available',
             });
             report.attachmentsCopied += 1;
+            if (previousBySource) report.attachmentsChanged += 1;
             processedAttachments += 1;
             emit(progress(requestId, 'attachments', library, processedItems, totalItems, processedAttachments, totalAttachments, `Copiado: ${fileName}`));
           }
+          copied.push(...current.attachments
+            .filter((entry) => entry.sourceKey && !seenSourceKeys.has(entry.sourceKey))
+            .map((entry) => ({ ...entry, sourceState: 'source-missing' as const })));
+          copied.sort((a, b) => (a.position ?? Number.MAX_SAFE_INTEGER) - (b.position ?? Number.MAX_SAFE_INTEGER)
+            || (a.addedAt ?? '').localeCompare(b.addedAt ?? ''));
+          copied.forEach((attachment, index) => { attachment.position = index; });
+          const previousOriginalPath = current.files?.original;
+          const previousOriginal = previousOriginalPath
+            ? copied.find((attachment) => attachment.relativePath === previousOriginalPath)
+            : undefined;
+          const original = previousOriginal ?? copied.find((attachment) => attachment.role === 'original') ?? copied[0];
           const files = {
             ...(current.files ?? {}),
-            ...(copied[0] ? { original: copied[0].relativePath } : {}),
+            ...(original ? { original: original.relativePath } : {}),
             annotations: current.files?.annotations ?? 'annotations.json',
           };
           const desired = { ...current, attachments: copied, files };
@@ -526,19 +625,43 @@ export async function importZoteroLibraries(options: {
         libraryName: library.name, version: importedVersion, importedAt: new Date().toISOString(),
         configuration: { ...selection, libraryIds: [sourceLibraryId] },
       });
+      completedLibraries += 1;
+      } catch (error) {
+        if (signal?.aborted || (error instanceof Error && error.name === 'AbortError')) throw error;
+        const failure = syncFailure(error, sourceLibraryId);
+        report.failures.push(failure);
+        report.warnings.push(failure.message);
+        report.partial = true;
+        catalog.rebuild(store);
+      }
     }
     emit(progress(requestId, 'rebuild', null, processedItems, totalItems, processedAttachments, totalAttachments, 'Reconstruyendo el índice local…'));
     catalog.rebuild(store);
-    emit(progress(requestId, 'complete', null, processedItems, totalItems, processedAttachments, totalAttachments, 'Importación de Zotero completada.'));
+    report.partial = report.partial || report.failures.length > 0 || report.librariesMissing.length > 0;
+    const failed = report.failures.length > 0 && completedLibraries === 0;
+    emit(progress(requestId, failed ? 'failed' : 'complete', null, processedItems, totalItems, processedAttachments, totalAttachments,
+      failed ? 'Zotero no está disponible; los datos locales se conservan.'
+        : report.partial ? 'Sincronización parcial completada; revisa el informe.' : 'Importación de Zotero completada.'));
+    report.durationMs = Date.now() - started;
+    sessions.finish(requestId, failed ? 'failed' : 'completed', report, failed ? report.failures[0]?.message ?? 'Sincronización fallida.' : null);
   } catch (error) {
     if (signal?.aborted || (error instanceof Error && error.name === 'AbortError')) {
       report.canceled = true;
       catalog.rebuild(store);
       emit(progress(requestId, 'canceled', null, processedItems, totalItems, processedAttachments, totalAttachments, 'Importación cancelada; el catálogo ya importado se conserva.'));
+      report.durationMs = Date.now() - started;
+      sessions.finish(requestId, 'canceled', report);
     } else {
-      throw error;
+      const failure = syncFailure(error, null);
+      report.failures.push(failure);
+      report.warnings.push(failure.message);
+      report.partial = true;
+      catalog.rebuild(store);
+      emit(progress(requestId, 'failed', null, processedItems, totalItems, processedAttachments, totalAttachments, 'No se pudo conectar con Zotero; los datos locales se conservan.'));
+      report.durationMs = Date.now() - started;
+      sessions.finish(requestId, 'failed', report, failure.message);
     }
   }
-  report.durationMs = Date.now() - started;
+  if (!report.durationMs) report.durationMs = Date.now() - started;
   return report;
 }

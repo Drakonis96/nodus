@@ -4059,6 +4059,9 @@ export interface ZoteroPluginServerStatus {
   port: number | null;
   url: string | null;
   error: string | null;
+  protocolVersion?: number;
+  clientProtocolVersion?: number | null;
+  compatibilityWarning?: string | null;
 }
 
 /** Whether Zotero + its profile are detected, and whether Zotero is running now. */

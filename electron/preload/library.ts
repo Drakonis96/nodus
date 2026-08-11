@@ -14,6 +14,8 @@ export const libraryApi: LibraryApi = {
   listLibraryMigrationSessions: () => ipcRenderer.invoke('library:migrationSessions'),
   listZoteroImportLibraries: () => ipcRenderer.invoke('library:zoteroLibraries'),
   importZoteroLibrary: (requestId, selection) => ipcRenderer.invoke('library:importZotero', requestId, selection),
+  listZoteroSyncSessions: () => ipcRenderer.invoke('library:zoteroSyncSessions'),
+  resumeZoteroLibraryImport: (requestId) => ipcRenderer.invoke('library:resumeZoteroImport', requestId),
   cancelZoteroLibraryImport: (requestId) => ipcRenderer.invoke('library:cancelZoteroImport', requestId),
   onZoteroImportProgress: (cb) => {
     const listener = (_event: unknown, progress: Parameters<typeof cb>[0]) => cb(progress);

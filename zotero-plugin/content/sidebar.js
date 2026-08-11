@@ -232,6 +232,7 @@ const I18N = {
 
 const state = {
   mode: "connected", lang: "en", connected: false, config: null,
+  serverInfo: null,
   connAttempts: 0, connMisses: 0, connOkAt: 0,
   modelsConnected: [], model: null,
   item: null, attachmentKey: null, selection: "", ideaLabels: {},
@@ -264,7 +265,7 @@ async function api(pathname, opts) {
   const cfg = state.config;
   if (!cfg) throw new Error("not connected");
   const init = Object.assign({ method: "GET" }, opts || {});
-  init.headers = Object.assign({ "Content-Type": "application/json", Authorization: "Bearer " + cfg.token }, (opts && opts.headers) || {});
+  init.headers = Object.assign({ "Content-Type": "application/json", Authorization: "Bearer " + cfg.token, "X-Nodus-Zotero-Protocol": "4" }, (opts && opts.headers) || {});
   return fetch("http://127.0.0.1:" + cfg.port + pathname, init);
 }
 async function apiJson(pathname, opts) { const r = await api(pathname, opts); if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); }
@@ -280,23 +281,23 @@ function timeoutSignal(ms) {
 async function probeGet(cfg, pathname) {
   const r = await fetch("http://127.0.0.1:" + cfg.port + pathname, {
     method: "GET",
-    headers: { "Content-Type": "application/json", Authorization: "Bearer " + cfg.token },
+    headers: { "Content-Type": "application/json", Authorization: "Bearer " + cfg.token, "X-Nodus-Zotero-Protocol": "4" },
     signal: timeoutSignal(HEALTH_TIMEOUT_MS),
   });
   if (!r.ok) return null;
   return r.json();
 }
 async function probeConfig(cfg) {
-  if (!cfg || !cfg.port || !cfg.token) return false;
+  if (!cfg || !cfg.port || !cfg.token) return null;
   try {
     // /health is tokenless (it only proves *something* Nodus-shaped is on that
     // port), so the token is validated against a guarded endpoint: otherwise a
     // stale manual token would show "connected" and 401 on every real call.
     const h = await probeGet(cfg, "/api/z/health");
-    if (!h || !h.ok || (h.app && h.app !== "nodus")) return false;
+    if (!h || !h.ok || (h.app && h.app !== "nodus")) return null;
     const m = await probeGet(cfg, "/api/z/models");
-    return Boolean(m && Array.isArray(m.models));
-  } catch (e) { return false; }
+    return m && Array.isArray(m.models) ? h : null;
+  } catch (e) { return null; }
 }
 
 // One connection attempt. Always re-reads the bridge file first, so a Nodus
@@ -325,9 +326,11 @@ async function attemptConnect(opts) {
   // HTTP once in a while. `force` is the user asking explicitly.
   const revalidateMs = (NU && NU.CONNECT_DELAYS && NU.CONNECT_DELAYS.revalidate) || 300000;
   if (state.connected && !moved && !(opts && opts.force) && Date.now() - state.connOkAt < revalidateMs) return;
-  const ok = await probeConfig(cfg);
+  const serverInfo = await probeConfig(cfg);
+  const ok = Boolean(serverInfo);
   state.config = cfg;
   if (ok) {
+    state.serverInfo = serverInfo;
     state.connected = true; state.connMisses = 0; state.connAttempts = 0; state.connOkAt = Date.now();
   } else {
     state.connAttempts++;
@@ -335,7 +338,7 @@ async function attemptConnect(opts) {
     // Tolerate ONE miss on an established link (a busy server, a bridge file
     // being rewritten) so the composer doesn't flicker off mid-conversation.
     // A config change is not a hiccup: drop the link immediately.
-    if (!wasConnected || moved || state.connMisses >= 2) state.connected = false;
+    if (!wasConnected || moved || state.connMisses >= 2) { state.connected = false; state.serverInfo = null; }
   }
   renderConn();
   // `quiet` = the caller (boot, mode switch, Test button) refreshes the model
@@ -480,7 +483,7 @@ function zoteroLibraryId(item) {
   return "users/0";
 }
 function renderLibraryActions(box, status) {
-  if (!state.item || state.mode !== "connected" || !state.connected) return;
+  if (!state.item || state.mode !== "connected" || !state.connected || !state.serverInfo || !state.serverInfo.capabilities || !state.serverInfo.capabilities.globalLibrary) return;
   const badge = el("span", "nd-badge " + (status.imported ? "nd-badge--yes" : "nd-badge--no"));
   badge.textContent = status.readerAvailable ? "✓ " + t("library.saved") : status.imported
     ? (status.extractionStatus === "failed" || status.extractionStatus === "needs-review" ? t("library.failed") : t("library.processing"))

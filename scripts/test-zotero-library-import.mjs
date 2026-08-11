@@ -35,9 +35,11 @@ try {
   const pdf = path.join(sourceFiles, 'norma.pdf');
   const image = path.join(sourceFiles, 'figura.png');
   const epub = path.join(sourceFiles, 'grupo.epub');
+  const localNote = path.join(sourceFiles, 'local.txt');
   await writeFile(pdf, '%PDF-1.4\nfixture-pdf\n');
   await writeFile(image, 'fixture-image');
   await writeFile(epub, 'fixture-epub');
+  await writeFile(localNote, 'local attachment retained by Nodus');
   const sourceBefore = await Promise.all([pdf, image, epub].map((file) => readFile(file, 'utf8')));
 
   const personal = { type: 'user', id: '0', name: 'Mi biblioteca' };
@@ -66,7 +68,7 @@ try {
   ]);
   const fileMap = new Map([['PDF', pdf], ['IMG', image], ['groups:42:EPUB', epub]]);
   const client = {
-    async libraries() { state.calls.push('libraries'); return [personal, group]; },
+    async libraries() { state.calls.push('libraries'); return state.availableLibraries ?? [personal, group]; },
     async libraryVersion(_userId, library) { return library.type === 'group' ? state.groupVersion : state.personalVersion; },
     async allCollections(library) {
       if (library.type === 'group') return [{ key: 'groups:42:GC', itemKey: 'GC', library, name: 'Grupo', parentCollection: false, itemCount: 1, subCount: 0 }];
@@ -94,6 +96,7 @@ try {
   const { LibraryCatalog } = require(path.join(repoRoot, 'electron/library/libraryCatalog.ts'));
   const { LibraryOperations } = require(path.join(repoRoot, 'electron/library/libraryOperations.ts'));
   const { importZoteroLibraries, previewZoteroLibraries } = require(path.join(repoRoot, 'electron/library/zoteroLibraryImport.ts'));
+  const { ZoteroSyncSessionStore } = require(path.join(repoRoot, 'electron/library/libraryZoteroSyncSessions.ts'));
   const store = new LibraryDiskStore(root, 'zotero-import-device-0001');
   const catalog = new LibraryCatalog(path.join(userData, 'library', 'catalog.sqlite'));
   const preview = await previewZoteroLibraries(catalog, client);
@@ -116,6 +119,10 @@ try {
   assert.ok(events.every((value, index) => index === 0 || value.percent >= events[index - 1].percent), 'progress is monotonic across personal and group libraries');
   assert.equal(events.at(-1).phase, 'complete');
   assert.equal(events.at(-1).percent, 100);
+  assert.equal(first.partial, true, 'an unavailable Zotero file produces an explicit partial result');
+  const sessionStore = new ZoteroSyncSessionStore(root);
+  assert.equal(sessionStore.get('first').status, 'completed');
+  assert.equal(sessionStore.get('first').report.attachmentsUnavailable, 1);
   const canonicalAId = catalog.resolveItemId('zotero:A');
   assert.ok(canonicalAId?.startsWith('nodus:'), 'a manager key is an alias, never the canonical Nodus ID');
   assert.deepEqual(catalog.list({ collectionId: 'zotero:ROOT' }).items.map((entry) => entry.id), [canonicalAId]);
@@ -138,6 +145,8 @@ try {
 
   const operations = new LibraryOperations(store, catalog);
   operations.updateItemMetadata('zotero:A', { publisher: 'Corrección local de Nodus', language: 'ca', rights: undefined });
+  operations.addAttachments('zotero:A', [localNote]);
+  operations.patchItemTags(['zotero:A'], { add: ['revisión Nodus'], remove: ['historia'] });
   assert.equal(store.findItemByIdOrAlias(canonicalAId).metadataOverrides.publisher, 'Corrección local de Nodus');
   assert.equal(store.findItemByIdOrAlias(canonicalAId).metadataOverrides.rights, null, 'cleared manager fields use an explicit durable tombstone');
 
@@ -148,17 +157,56 @@ try {
   const second = await importZoteroLibraries({ requestId: 'refresh', store, catalog, client });
   assert.equal(second.itemsCreated, 0);
   assert.equal(second.itemsUpdated, 1);
-  assert.equal(second.itemsDeleted, 1);
+  assert.equal(second.itemsDeleted, 0, 'legacy deletion counters stay at zero because source disappearance is not local deletion');
+  assert.equal(second.itemsSourceMissing, 1);
+  assert.equal(second.conflicts, 1, 'a changed source version reports preserved Nodus corrections as a conflict');
   assert.equal(second.attachmentsCopied, 0);
   assert.equal(second.attachmentsUnchanged, 2);
   assert.equal(store.findItemByIdOrAlias(canonicalAId).metadata.title, 'Norma y deseo — revisado');
   assert.equal(store.findItemByIdOrAlias(canonicalAId).metadata.publisher, 'Corrección local de Nodus', 'a Zotero refresh preserves local metadata corrections');
   assert.equal(store.findItemByIdOrAlias(canonicalAId).metadata.language, 'ca');
   assert.equal(store.findItemByIdOrAlias(canonicalAId).metadata.rights, undefined);
-  assert.ok(store.findItemByIdOrAlias(catalog.resolveItemId('zotero:B') ?? 'zotero:B')?.deletedAt ?? store.scanMaterializedItems().records.find((entry) => entry.aliases.includes('zotero:B'))?.deletedAt);
+  assert.deepEqual(store.findItemByIdOrAlias(canonicalAId).metadata.tags, ['revisión Nodus'], 'Nodus tag additions and source-tag suppression survive refresh');
+  const missingB = store.findItemByIdOrAlias(catalog.resolveItemId('zotero:B') ?? 'zotero:B')
+    ?? store.scanMaterializedItems().records.find((entry) => entry.aliases.includes('zotero:B'));
+  assert.equal(missingB.deletedAt, null);
+  assert.equal(missingB.sourceState, 'source-missing');
+  assert.ok(missingB.sourceMissingAt);
+  assert.equal(catalog.list().items.find((entry) => entry.id === missingB.id).sourceState, 'source-missing');
+  const refreshedA = store.findItemByIdOrAlias(canonicalAId);
+  assert.ok(refreshedA.attachments.some((entry) => entry.sourceKey === undefined && entry.fileName === 'local.txt'), 'Zotero refresh retains local Nodus attachments');
   assert.equal(store.findItemByIdOrAlias(storedGroup.id).clock.revision, groupRevision, 'an unchanged group item receives no phantom revision');
-  assert.equal(catalog.list().total, 2);
+  assert.equal(catalog.list().total, 3, 'source-missing items remain visible and recoverable');
   assert.equal(catalog.getImportSource('zotero:users/0').version, 12);
+
+  const currentA = store.findItemByIdOrAlias(canonicalAId);
+  const currentComponents = Object.fromEntries(Object.entries(currentA.contentRevision.components).map(([name, component]) => [name, {
+    ...component, freshness: 'current', fingerprint: `${name}-before-zotero-file-change`, generatedAt: new Date().toISOString(), reason: null,
+  }]));
+  store.upsertItem({ ...currentA, contentRevision: {
+    ...currentA.contentRevision, revision: currentA.contentRevision.revision + 1, components: currentComponents,
+  } }, currentA.clock.revision);
+  await writeFile(pdf, '%PDF-1.4\nchanged-fixture-pdf\n');
+  state.personalVersion = 13;
+  state.personalItems = [item({ version: 13, title: 'Norma y deseo — revisado', dateModified: '2026-03-02' })];
+  state.deletedPersonal = [];
+  const attachmentRefresh = await importZoteroLibraries({ requestId: 'attachment-refresh', selection: { libraryIds: ['users/0'] }, store, catalog, client });
+  assert.equal(attachmentRefresh.attachmentsChanged, 1);
+  assert.equal(attachmentRefresh.attachmentsCopied, 1);
+  const changedA = store.findItemByIdOrAlias(canonicalAId);
+  assert.equal(changedA.contentRevision.components.extraction.freshness, 'queued');
+  for (const component of ['deep', 'passages', 'ideas', 'embeddings', 'summary']) {
+    assert.equal(changedA.contentRevision.components[component].freshness, 'stale', `${component} cannot remain current after Zotero changes the primary file`);
+  }
+
+  fileMap.delete('PDF');
+  state.personalVersion = 14;
+  state.personalItems = [item({ version: 14, title: 'Norma y deseo — revisado', dateModified: '2026-03-03' })];
+  const unavailableRefresh = await importZoteroLibraries({ requestId: 'attachment-unavailable', selection: { libraryIds: ['users/0'] }, store, catalog, client });
+  assert.equal(unavailableRefresh.attachmentsUnavailable, 1);
+  const unavailableA = store.findItemByIdOrAlias(canonicalAId);
+  assert.equal(unavailableA.attachments.find((entry) => entry.sourceKey === 'PDF').sourceState, 'not-downloaded');
+  assert.ok(unavailableA.attachments.some((entry) => entry.fileName === 'local.txt'));
 
   const controller = new AbortController();
   let canceledCatalogCount = 0;
@@ -172,11 +220,24 @@ try {
     },
   });
   assert.equal(canceled.canceled, true);
-  assert.equal(canceledCatalogCount, 2);
-  assert.equal(catalog.list().total, 2, 'canceling file transfer keeps the already durable catalog');
+  assert.equal(canceledCatalogCount, 3);
+  assert.equal(catalog.list().total, 3, 'canceling file transfer keeps the already durable catalog');
+  assert.equal(sessionStore.get('cancel').status, 'canceled');
+
+  state.availableLibraries = [personal];
+  const missingLibrary = await importZoteroLibraries({
+    requestId: 'missing-library', selection: { libraryIds: ['groups/42'] }, store, catalog, client,
+  });
+  assert.equal(missingLibrary.partial, true);
+  assert.deepEqual(missingLibrary.librariesMissing, ['groups/42']);
+  assert.equal(missingLibrary.failures[0].code, 'library-missing');
+  assert.equal(store.findItemByIdOrAlias(storedGroup.id).sourceState, 'library-missing');
+  assert.equal(sessionStore.get('missing-library').status, 'failed');
+  assert.equal(sessionStore.list()[0].id, 'missing-library');
 
   const sourceAfter = await Promise.all([pdf, image, epub].map((file) => readFile(file, 'utf8')));
-  assert.deepEqual(sourceAfter, sourceBefore, 'the importer never modifies Zotero attachment storage');
+  assert.equal(sourceAfter[1], sourceBefore[1]);
+  assert.equal(sourceAfter[2], sourceBefore[2]);
   catalog.close();
   console.log('Global one-way Zotero import, differential refresh, attachments and cancellation tests passed!');
 } finally {

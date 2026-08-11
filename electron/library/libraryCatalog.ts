@@ -174,6 +174,7 @@ export class LibraryCatalog {
         source TEXT NOT NULL,
         source_library_id TEXT,
         source_key TEXT,
+        source_state TEXT,
         citation_key TEXT,
         title TEXT NOT NULL,
         item_type TEXT NOT NULL,
@@ -293,6 +294,7 @@ export class LibraryCatalog {
       );
     `);
     this.ensureColumn('library_items', 'source_library_id', 'TEXT');
+    this.ensureColumn('library_items', 'source_state', 'TEXT');
     this.ensureColumn('library_items', 'analysis_json', "TEXT NOT NULL DEFAULT '{}'");
     this.ensureColumn('library_collections', 'source_library_id', 'TEXT');
     this.handle.exec('CREATE INDEX IF NOT EXISTS library_items_source_library ON library_items (source, source_library_id, source_key);');
@@ -327,12 +329,12 @@ export class LibraryCatalog {
     const collections = store.scanMaterializedCollections();
     const insertItem = this.handle.prepare(`
       INSERT INTO library_items (
-        id, storage_id, folder_name, source, source_library_id, source_key, citation_key, title, item_type,
+        id, storage_id, folder_name, source, source_library_id, source_key, source_state, citation_key, title, item_type,
         creators_json, abstract, date_value, year, doi, isbn_json, issn_json, tags_json,
         metadata_json, collection_ids_json, attachment_count, reader_available,
         extraction_status, analysis_json, revision, updated_at, deleted_at
       ) VALUES (
-        @id, @storageId, @folderName, @source, @sourceLibraryId, @sourceKey, @citationKey, @title, @itemType,
+        @id, @storageId, @folderName, @source, @sourceLibraryId, @sourceKey, @sourceState, @citationKey, @title, @itemType,
         @creatorsJson, @abstract, @date, @year, @doi, @isbnJson, @issnJson, @tagsJson,
         @metadataJson, @collectionIdsJson, @attachmentCount, @readerAvailable,
         @extractionStatus, @analysisJson, @revision, @updatedAt, @deletedAt
@@ -390,6 +392,7 @@ export class LibraryCatalog {
           source: record.source,
           sourceLibraryId: record.sourceLibraryId ?? null,
           sourceKey: record.sourceKey ?? null,
+          sourceState: record.sourceState ?? null,
           citationKey: record.citationKey ?? null,
           title: record.metadata.title,
           itemType: record.metadata.itemType,
@@ -659,6 +662,7 @@ export class LibraryCatalog {
       source: row.source as LibraryCatalogItem['source'],
       sourceLibraryId: row.source_library_id == null ? null : String(row.source_library_id),
       sourceKey: row.source_key == null ? null : String(row.source_key),
+      sourceState: row.source_state == null ? null : row.source_state as LibraryCatalogItem['sourceState'],
       citationKey: row.citation_key == null ? null : String(row.citation_key),
       title: String(row.title),
       itemType: row.item_type as LibraryCatalogItem['itemType'],

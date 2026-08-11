@@ -1915,6 +1915,7 @@ export function Settings({
               ) : (
                 <span className="text-neutral-500">{t('Apagado')}</span>
               )}
+              {zoteroStatus.compatibilityWarning && <p role="status" className="mt-2 text-amber-300">{t(zoteroStatus.compatibilityWarning)}</p>}
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <button

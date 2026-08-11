@@ -13,6 +13,7 @@ import type {
   ZoteroImportReport,
   ZoteroImportSelection,
   ZoteroLibraryPreview,
+  ZoteroSyncSession,
   LibraryExtractionEnqueueResult,
   LibraryExtractionJob,
   LibraryExtractionOptions,
@@ -49,6 +50,7 @@ import { withVaultDatabase, getDb } from '../db/database';
 import { getWork, getWorkByZoteroKey, upsertWork } from '../db/worksRepo';
 import { LibraryMigrationSessionManager } from './libraryMigrationSessions';
 import { importZoteroLibraries, previewZoteroLibraries } from './zoteroLibraryImport';
+import { ZoteroSyncSessionStore } from './libraryZoteroSyncSessions';
 import { LibraryExtractionQueue } from './libraryExtractionQueue';
 import { completeTextNeutral } from '../ai/aiClient';
 import { getSettings } from '../db/settingsRepo';
@@ -260,6 +262,24 @@ export function startZoteroLibraryImport(
     broadcast(current.catalog.status(current.root, current.deviceId));
     return report;
   }).finally(() => { zoteroImports.delete(requestId); });
+}
+
+export function listZoteroSyncSessions(): ZoteroSyncSession[] {
+  const current = service();
+  return current ? new ZoteroSyncSessionStore(current.root).list() : [];
+}
+
+export function resumeZoteroLibraryImport(
+  requestId: string,
+  onProgress: (progress: ZoteroImportProgress) => void,
+): Promise<ZoteroImportReport> {
+  const current = service();
+  if (!current) return Promise.reject(new Error('Configura primero la carpeta de copias de seguridad de Nodus.'));
+  const session = new ZoteroSyncSessionStore(current.root).get(requestId);
+  if (!session) return Promise.reject(new Error('No se encontró esa sesión de sincronización.'));
+  if (session.status === 'running') return Promise.reject(new Error('Esa sincronización todavía está en curso.'));
+  if (session.status === 'completed') return Promise.reject(new Error('Esa sincronización ya se completó.'));
+  return startZoteroLibraryImport(requestId, session.selection, onProgress);
 }
 
 export function cancelZoteroLibraryImport(requestId: string): boolean {

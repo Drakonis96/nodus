@@ -108,6 +108,7 @@ export interface LibraryAttachmentRecord {
   position?: number;
   addedAt?: string;
   sourceKey?: string;
+  sourceState?: 'available' | 'not-downloaded' | 'source-missing' | 'corrupt';
 }
 
 export interface LibraryAttachmentPatch {
@@ -213,10 +214,18 @@ export interface LibraryItemRecord {
   source: LibraryItemSource;
   sourceLibraryId?: string;
   sourceKey?: string;
+  sourceState?: 'current' | 'source-missing' | 'library-missing' | 'partial';
+  sourceMissingAt?: string;
+  lastSourceSyncAt?: string;
+  sourceVersion?: number;
   citationKey?: string;
   metadata: LibraryItemMetadata;
   /** User-owned corrections layered over a mirrored manager record. */
   metadataOverrides?: LibraryMetadataOverrides;
+  /** User-owned tags remain independent from the read-only source mirror. */
+  localTags?: string[];
+  /** Source tags explicitly hidden by the user remain hidden after refresh. */
+  suppressedSourceTags?: string[];
   collectionIds: string[];
   attachments: LibraryAttachmentRecord[];
   notes?: LibraryNoteRecord[];
@@ -258,6 +267,8 @@ export interface LibraryCollectionRecord {
   source: LibraryItemSource;
   sourceLibraryId?: string;
   sourceKey?: string;
+  sourceState?: 'current' | 'source-missing' | 'library-missing' | 'partial';
+  sourceMissingAt?: string;
   createdAt: string;
   deletedAt: string | null;
   clock: LibraryRecordClock;
@@ -269,6 +280,7 @@ export interface LibraryCatalogItem {
   source: LibraryItemSource;
   sourceLibraryId: string | null;
   sourceKey: string | null;
+  sourceState: LibraryItemRecord['sourceState'] | null;
   citationKey: string | null;
   title: string;
   itemType: LibraryItemType;
@@ -315,7 +327,7 @@ export interface ZoteroImportSelection {
 
 export interface ZoteroImportProgress {
   requestId: string;
-  phase: 'connecting' | 'collections' | 'catalog' | 'attachments' | 'rebuild' | 'complete' | 'canceled';
+  phase: 'connecting' | 'collections' | 'catalog' | 'attachments' | 'rebuild' | 'complete' | 'canceled' | 'failed';
   libraryId: string | null;
   libraryName: string | null;
   processedItems: number;
@@ -334,15 +346,41 @@ export interface ZoteroImportReport {
   itemsUpdated: number;
   itemsUnchanged: number;
   itemsDeleted: number;
+  itemsSourceMissing: number;
   collectionsCreated: number;
   collectionsUpdated: number;
   collectionsUnchanged: number;
   attachmentsCopied: number;
   attachmentsUnchanged: number;
   attachmentsUnavailable: number;
+  attachmentsChanged: number;
+  conflicts: number;
+  librariesMissing: string[];
+  failures: ZoteroSyncFailure[];
+  partial: boolean;
   warnings: string[];
   canceled: boolean;
   durationMs: number;
+}
+
+export interface ZoteroSyncFailure {
+  libraryId: string | null;
+  code: 'zotero-closed' | 'credentials-expired' | 'rate-limited' | 'library-missing' | 'permission' | 'network' | 'invalid-response' | 'unknown';
+  message: string;
+  retryable: boolean;
+}
+
+export interface ZoteroSyncSession {
+  format: 'nodus.zotero-sync';
+  formatVersion: 1;
+  id: string;
+  status: 'running' | 'canceled' | 'failed' | 'completed';
+  selection: ZoteroImportSelection;
+  progress: ZoteroImportProgress;
+  report: ZoteroImportReport | null;
+  startedAt: string;
+  updatedAt: string;
+  error: string | null;
 }
 
 export interface LibraryExtractionOptions {
