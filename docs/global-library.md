@@ -227,7 +227,9 @@ one available attachment. A persistent source chooser in the top toolbar and a
 matching **Versions and files** group in the left sidebar switch between the
 clean `reader.md` copy and every preserved attachment. The last selection is
 remembered per stable item identifier. The clean copy is not a layer placed
-over the original.
+over the original. The source selector reserves a fixed icon gutter, and its
+status badge, file list, annotation palette, and document surface use explicit
+light and dark palettes so switching themes never leaves dark controls behind.
 
 The internal viewers include:
 

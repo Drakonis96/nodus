@@ -3012,6 +3012,34 @@ select.input optgroup {
 .library-reader-outline,
 .library-reader-notes { scrollbar-width: thin; scrollbar-color: rgb(63 63 70) transparent; }
 
+/* Source status and file selection are semantic reader controls. Keeping their
+   palettes here prevents generic dark utility classes from leaking into the
+   light reader when an original or preserved attachment is active. */
+.library-reader-source-badge.is-original {
+  border-color: #52525b;
+  background: #18181b;
+  color: #d4d4d8;
+}
+.library-reader-source-badge.is-attachment {
+  border-color: #4338ca;
+  background: rgb(49 46 129 / 0.45);
+  color: #c7d2fe;
+}
+.library-reader-source-badge.is-current {
+  border-color: rgb(6 95 70 / 0.7);
+  background: rgb(2 44 34 / 0.3);
+  color: #6ee7b7;
+}
+.library-reader-source-badge.is-previous {
+  border-color: rgb(146 64 14 / 0.7);
+  background: rgb(69 26 3 / 0.35);
+  color: #fcd34d;
+}
+.library-reader-file-option { color: #71717a; }
+.library-reader-file-option:hover { background: #18181b; color: #e4e4e7; }
+.library-reader-file-option.is-active { background: rgb(49 46 129 / 0.45); color: #c7d2fe; }
+.library-reader-file-kind { color: #52525b; }
+
 .light .library-reader-paper {
   border-color: rgb(226 232 240);
   background: rgb(255 255 255 / 0.88);
@@ -3030,6 +3058,31 @@ select.input optgroup {
 .light .library-reader-document .md h2 { border-top-color: rgb(226 232 240); }
 .light .library-reader-document .md blockquote { background: rgb(238 242 255 / 0.7); }
 .light .library-reader-document .md th { background: #f1f5f9; color: #1e293b; }
+.light .library-reader-source-badge.is-original {
+  border-color: #d4d4d8;
+  background: #ffffff;
+  color: #52525b;
+}
+.light .library-reader-source-badge.is-attachment {
+  border-color: #c7d2fe;
+  background: #eef2ff;
+  color: #4338ca;
+}
+.light .library-reader-source-badge.is-current {
+  border-color: #a7f3d0;
+  background: #ecfdf5;
+  color: #047857;
+}
+.light .library-reader-source-badge.is-previous {
+  border-color: #fde68a;
+  background: #fffbeb;
+  color: #b45309;
+}
+.light .library-reader-file-option { color: #52525b; }
+.light .library-reader-file-option:hover { background: #f4f4f5; color: #27272a; }
+.light .library-reader-file-option.is-active { background: #eef2ff; color: #4338ca; }
+.light .library-reader-file-kind { color: #737373; }
+.light .library-reader-file-option.is-active .library-reader-file-kind { color: #6366f1; }
 
 /* The reader has its own fully grounded chat. Keeping the floating mascot out of
    this one surface prevents it from covering the compact sidebar composer. */

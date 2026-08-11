@@ -27,6 +27,7 @@ const spreadsheetScreenshotPath = path.join(screenshotDirectory, '07-spreadsheet
 const citationScreenshotPath = path.join(screenshotDirectory, '08-csl-style-manager.png');
 const lightScreenshotPath = path.join(screenshotDirectory, '09-clean-reader-light-narrow.png');
 const responsiveChatScreenshotPath = path.join(screenshotDirectory, '10-reader-chat-responsive.png');
+const lightControlsScreenshotPath = path.join(screenshotDirectory, '11-reader-controls-light.png');
 const childEnv = {
   ...process.env,
   NODUS_USERDATA: userData,
@@ -449,9 +450,59 @@ La segunda sección permite comprobar el índice, la página de origen y el marc
   await citationDialog.locator('header button').click();
 
   await detail.getByRole('button', { name: 'Leer', exact: true }).click();
-  await page.getByTestId('library-reader-source-picker').locator('select').selectOption('clean');
+  const lightSourcePicker = page.getByTestId('library-reader-source-picker');
+  const lightSourceSelect = lightSourcePicker.locator('select');
+  await lightSourceSelect.selectOption('clean');
   await page.getByTestId('library-reader-sidebar').getByRole('tab', { name: 'Notas' }).click();
   await page.evaluate(() => { document.documentElement.classList.add('light'); document.documentElement.classList.remove('dark'); });
+  await page.setViewportSize({ width: 1500, height: 820 });
+  const sourcePickerGeometry = await lightSourcePicker.evaluate((picker) => {
+    const select = picker.querySelector('select');
+    const icon = picker.querySelector('svg');
+    if (!(select instanceof HTMLSelectElement) || !(icon instanceof SVGElement)) throw new Error('source picker controls missing');
+    const selectRect = select.getBoundingClientRect();
+    const iconRect = icon.getBoundingClientRect();
+    return {
+      iconRight: iconRect.right,
+      textStart: selectRect.left + Number.parseFloat(getComputedStyle(select).paddingLeft),
+      paddingLeft: Number.parseFloat(getComputedStyle(select).paddingLeft),
+    };
+  });
+  assert.ok(sourcePickerGeometry.paddingLeft >= 32, 'the source picker reserves a leading-icon gutter');
+  assert.ok(sourcePickerGeometry.iconRight + 4 <= sourcePickerGeometry.textStart, 'the source icon never overlaps the selected filename');
+
+  await lightSourceSelect.selectOption('zotero:READERPDF');
+  await page.getByTestId('library-reader-pdf-viewer').waitFor({ state: 'visible' });
+  const lightSourceBadge = page.getByTestId('library-reader-freshness');
+  assert.equal(await lightSourceBadge.getAttribute('data-source-kind'), 'original');
+  const originalBadgeColors = await lightSourceBadge.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { background: style.backgroundColor, color: style.color };
+  });
+  assert.deepEqual(originalBadgeColors, { background: 'rgb(255, 255, 255)', color: 'rgb(82, 82, 91)' }, 'the original-file badge uses the light semantic palette');
+
+  const lightFilesToggle = page.getByTestId('library-reader-files-toggle');
+  if (await lightFilesToggle.getAttribute('aria-expanded') !== 'true') await lightFilesToggle.click();
+  const activeOriginal = page.getByTestId('library-reader-file-zotero:READERPDF');
+  const activeFileColors = await activeOriginal.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { background: style.backgroundColor, color: style.color };
+  });
+  assert.deepEqual(activeFileColors, { background: 'rgb(238, 242, 255)', color: 'rgb(67, 56, 202)' }, 'the selected file remains light and legible');
+
+  const highlighter = page.getByTestId('deep-research-fixed-highlighter');
+  await highlighter.click();
+  const cursorMode = page.locator('.reader-highlighter-palette .reader-highlighter-off');
+  await cursorMode.hover();
+  const cursorColors = await cursorMode.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { background: style.backgroundColor, color: style.color };
+  });
+  assert.deepEqual(cursorColors, { background: 'rgb(238, 242, 255)', color: 'rgb(67, 56, 202)' }, 'the light highlighter menu keeps the cursor arrow visible');
+  await page.screenshot({ path: lightControlsScreenshotPath, fullPage: true });
+  await highlighter.click();
+
+  await lightSourceSelect.selectOption('clean');
   await page.setViewportSize({ width: 860, height: 820 });
   await page.screenshot({ path: lightScreenshotPath, fullPage: true });
   assert.deepEqual(pageErrors, [], pageErrors.map((error) => error.stack ?? String(error)).join('\n'));

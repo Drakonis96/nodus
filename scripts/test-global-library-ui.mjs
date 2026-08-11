@@ -73,8 +73,9 @@ test('the Library UI exposes hierarchy, search, bulk operations, imports and bac
 });
 
 test('the global reader exposes annotations, metadata, chat and native attachment viewers', async () => {
-  const [readerSource, attachmentViewer, store, protocol, main, html] = await Promise.all([
+  const [readerSource, attachmentViewer, selectionCss, appCss, store, protocol, main, html] = await Promise.all([
     readSource('src/views/LibraryDocumentReader.tsx'), readSource('src/components/library/LibraryAttachmentViewer.tsx'),
+    readSource('src/components/readerSelectionActions.css'), readSource('src/index.css'),
     readSource('electron/libraryReader/libraryReaderStore.ts'), readSource('electron/libraryProtocol.ts'), readSource('electron/main.ts'), readSource('index.html'),
   ]);
   const reader = `${readerSource}\n${attachmentViewer}`;
@@ -107,6 +108,13 @@ test('the global reader exposes annotations, metadata, chat and native attachmen
   assert.match(reader, /library-reader-chat-input/);
   assert.match(reader, /data-testid="library-reader-empty-card"/);
   assert.match(reader, /library-reader-empty-icon/);
+  assert.match(reader, /input input-with-leading-icon/);
+  assert.match(reader, /data-source-kind=\{sourceKind\}/);
+  assert.match(reader, /library-reader-source-badge is-/);
+  assert.match(reader, /library-reader-file-option/);
+  assert.match(selectionCss, /\.light \.reader-highlighter-palette button:hover,[\s\S]*background: #eef2ff; color: #4338ca;/);
+  assert.match(appCss, /\.light \.library-reader-source-badge\.is-original[\s\S]*background: #ffffff;[\s\S]*color: #52525b;/);
+  assert.match(appCss, /\.light \.library-reader-file-option\.is-active \{ background: #eef2ff; color: #4338ca; \}/);
   assert.match(store, /function globalDocument/);
   assert.match(store, /nodus-library:\/\/original/);
   assert.match(store, /nodus-library:\/\/attachment/);

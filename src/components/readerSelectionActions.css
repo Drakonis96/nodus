@@ -66,7 +66,8 @@
 }
 .reader-highlighter-palette button { display: grid; width: 28px; height: 28px; place-items: center; border-radius: 7px; color: #d4d4d8; }
 .reader-highlighter-palette button:hover,
-.reader-highlighter-palette button.is-active { background: #3730a3; }
+.reader-highlighter-palette button:focus-visible,
+.reader-highlighter-palette button.is-active { background: #3730a3; color: #fff; outline: none; }
 .reader-highlighter-palette .reader-highlighter-off { margin-left: 2px; border-left: 1px solid #52525b; border-radius: 0 7px 7px 0; }
 
 .reader-margin-marker {
@@ -127,4 +128,8 @@
 .light .reader-selection-actions button[data-tone='danger']:focus-visible { background: #fee2e2; color: #991b1b; }
 .light .reader-selection-divider { background: #d4d4d8; }
 .light .reader-highlighter-palette button { color: #52525b; }
+.light .reader-highlighter-palette button:hover,
+.light .reader-highlighter-palette button:focus-visible,
+.light .reader-highlighter-palette button.is-active { background: #eef2ff; color: #4338ca; }
+.light .reader-highlighter-palette .reader-highlighter-off { border-left-color: #e4e4e7; }
 .light .reader-comment-editor header button:hover { background: #f4f4f5; color: #18181b; }

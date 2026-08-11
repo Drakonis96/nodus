@@ -520,6 +520,12 @@ export function LibraryDocumentReader({
     : annotation.scope === `attachment:${selectedSource}` || annotation.scope.startsWith(`attachment:${selectedSource}:`));
   const sidebarAnnotations = visibleAnnotations.filter((annotation) => annotation.kind !== 'bookmark');
   const contextMarkdown = reader.markdown.replace(/data:image\/[^;]+;base64,[^)\s]+/g, '[imagen extraída]');
+  const sourceKind = selectedAttachment
+    ? selectedAttachment.role === 'original' ? 'original' : 'attachment'
+    : reader.freshness === 'current' ? 'current' : 'previous';
+  const sourceLabel = selectedAttachment
+    ? t(selectedAttachment.role === 'original' ? 'Archivo original' : 'Adjunto conservado')
+    : t(reader.freshness === 'current' ? 'Markdown limpio' : 'Última copia legible');
 
   return (
     <div className="library-document-reader flex h-full min-h-0 flex-col">
@@ -547,15 +553,16 @@ export function LibraryDocumentReader({
         </div>
         <label className="relative flex min-w-44 max-w-72 items-center" data-testid="library-reader-source-picker">
           <Icon name={selectedAttachment ? 'archive' : 'book'} size={13} className="pointer-events-none absolute left-2.5 z-10 text-neutral-500" />
-          <select className="input h-9 w-full truncate pl-8 pr-7 text-xs" value={selectedSource} onChange={(event) => selectReaderSource(event.target.value)} aria-label={t('Versión o archivo')}>
+          <select className="input input-with-leading-icon h-9 w-full truncate text-xs" value={selectedSource} onChange={(event) => selectReaderSource(event.target.value)} aria-label={t('Versión o archivo')}>
             <option value="clean" disabled={!reader.cleanAvailable}>{t('Markdown limpio')}</option>
             {reader.attachments.map((attachment) => <option key={attachment.id} value={attachment.id} disabled={!attachment.available}>{attachment.title} · {attachment.fileName}</option>)}
           </select>
         </label>
         <span
           data-testid="library-reader-freshness"
-          className={`hidden rounded-full border px-2 py-1 text-[10px] font-medium md:inline-flex ${reader.freshness === 'current' ? 'border-emerald-900/70 bg-emerald-950/30 text-emerald-300' : 'border-amber-800/70 bg-amber-950/35 text-amber-300'}`}
-        >{selectedAttachment ? t(selectedAttachment.role === 'original' ? 'Archivo original' : 'Adjunto conservado') : reader.freshness === 'current' ? t('Markdown limpio') : t('Última copia legible')}</span>
+          data-source-kind={sourceKind}
+          className={`library-reader-source-badge is-${sourceKind} hidden rounded-full border px-2 py-1 text-[10px] font-medium md:inline-flex`}
+        >{sourceLabel}</span>
         <ReaderHighlighterControl value={highlighterColor} onChange={setHighlighterColor} />
         {selectedSource === 'clean' && <div ref={bookmarkMenuRef} className="relative">
           <button
@@ -632,8 +639,8 @@ export function LibraryDocumentReader({
                   <Icon name={filesOpen ? 'chevronUp' : 'chevronDown'} size={12} className="text-neutral-600" />
                 </button>
                 {filesOpen && <div id="library-reader-files" data-testid="library-reader-files" className="mt-2 space-y-0.5">
-                  <button className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-xs ${selectedSource === 'clean' ? 'bg-indigo-950/45 text-indigo-200' : 'text-neutral-500 hover:bg-neutral-900'}`} disabled={!reader.cleanAvailable} onClick={() => selectReaderSource('clean')}><Icon name="book" size={12} /><span className="truncate">{t('Markdown limpio')}</span></button>
-                  {reader.attachments.map((attachment) => <button key={attachment.id} className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-xs ${selectedSource === attachment.id ? 'bg-indigo-950/45 text-indigo-200' : 'text-neutral-500 hover:bg-neutral-900'} disabled:opacity-40`} disabled={!attachment.available} onClick={() => selectReaderSource(attachment.id)}><Icon name={attachment.viewer === 'image' ? 'image' : attachment.viewer === 'pdf' || attachment.viewer === 'epub' ? 'book' : 'archive'} size={12} /><span className="min-w-0 flex-1 truncate">{attachment.title}</span><span className="text-[9px] uppercase text-neutral-700">{attachment.viewer}</span></button>)}
+                  <button data-testid="library-reader-file-clean" className={`library-reader-file-option flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-xs ${selectedSource === 'clean' ? 'is-active' : ''}`} disabled={!reader.cleanAvailable} onClick={() => selectReaderSource('clean')}><Icon name="book" size={12} /><span className="truncate">{t('Markdown limpio')}</span></button>
+                  {reader.attachments.map((attachment) => <button key={attachment.id} data-testid={`library-reader-file-${attachment.id}`} className={`library-reader-file-option flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-xs ${selectedSource === attachment.id ? 'is-active' : ''} disabled:opacity-40`} disabled={!attachment.available} onClick={() => selectReaderSource(attachment.id)}><Icon name={attachment.viewer === 'image' ? 'image' : attachment.viewer === 'pdf' || attachment.viewer === 'epub' ? 'book' : 'archive'} size={12} /><span className="min-w-0 flex-1 truncate">{attachment.title}</span><span className="library-reader-file-kind text-[9px] uppercase">{attachment.viewer}</span></button>)}
                 </div>}
               </div>
             </nav>
