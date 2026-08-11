@@ -202,6 +202,21 @@ cancellation are available on the selected item. A manual **Rebuild clean
 reading version** command remains under collapsed technical details for recovery
 and extractor-setting changes.
 
+Extraction is executed in a dedicated Node worker thread. PDF.js layout work,
+Canvas rendering, figure reconstruction, and local OCR never execute on
+Electron's main thread. Cancellation first requests a cooperative stop and then
+terminates an unresponsive worker after a short grace period; atomic staging
+keeps the last readable version safe in either case.
+
+The same rule applies to catalogue rebuilds, bibliography imports and exports,
+file hashing and copying, duplicate audits and merges, trash audits and purges,
+and bulk collection, deletion, attachment, and tag changes. These operations run
+through a serialized Library worker so independent SQLite writers cannot race.
+Routine single-record changes update only that record, its FTS row,
+memberships, attachments, aliases, and source identities instead of scanning or
+rebuilding the complete Library. Zotero refresh and vault migration index each
+checkpoint incrementally and yield to Electron between bounded batches.
+
 The Library recognizes encoded legacy storage suffixes such as `%2Epdf` without
 renaming the immutable stored file. This closes the compatibility case in which
 a Unicode source name had been safely encoded but subsequently appeared to have
@@ -605,6 +620,9 @@ The main tests are:
   available real Zotero database, SQLite integrity, real item-type mapping,
   collection hierarchy, and an import into temporary Nodus storage only;
 - `test-library-extraction.mjs`: Markdown, assets, OCR, quality, and queue;
+- `test-library-responsiveness.mjs`: worker isolation under sustained CPU load,
+  packaged-worker execution with Electron's native SQLite ABI, and proof that a
+  single-item mutation does not perform a whole-Library scan;
 - `test-global-library-operations.mjs`: collections, import, and trash;
 - `test-library-item-management.mjs`: Nodus-only records, creators, attachments,
   notes, symmetric relations, and colored tags;

@@ -130,6 +130,10 @@ button exists.
 | Reuse | Every linked vault exposes component state and cause | Verified | `test-global-library-ui`, `e2e-global-library` |
 | Navigation | Library is cross-vault and available in every sidebar | Verified | `test-global-library-ui` |
 | Accessibility | Primary controls have roles, labels, and keyboard navigation | Verified | UI and i18n coverage, Electron E2E |
+| Responsiveness | PDF layout, rendering, figure reconstruction, and OCR run outside Electron's main thread | Verified | `test-library-responsiveness`, `test-library-extraction` |
+| Responsiveness | Rebuilds, bulk mutations, file copies, imports, exports, recovery, duplicate, and trash operations run in a serialized worker | Verified | `test-library-responsiveness`, Library operation suites |
+| Responsiveness | Routine item changes use incremental SQLite/FTS indexing and never rescan or rebuild the complete Library | Verified | `test-library-responsiveness`, `test-global-library-operations` |
+| Responsiveness | Zotero refresh and vault migration expose incremental checkpoints and yield between bounded batches | Verified | `test-zotero-library-import`, `test-library-migration-sessions` |
 | Languages | Every UI string is covered in all eight interface languages | Verified | `test-i18n-coverage` |
 | Privacy | Network, AI, backups, and sidecars are documented | Verified | `PRIVACY.md`, `global-library.md` |
 | Licenses | Nodus 4 is AGPL-3.0-only, every distribution offers exact source, and no external extraction engine was added | Verified | `test-agpl-release`, `release:verify-source`, license verification |
