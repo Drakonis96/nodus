@@ -311,6 +311,27 @@ to both records with the correct inverse (`cites`/`is-cited-by` and
 `corrects`/`is-corrected-by`). Tags support bulk add/remove operations and a
 library-wide color registry stored in `.nodus/tags.json`.
 
+## Editable collections and live smart searches
+
+Nodus collections can be nested, reordered, and moved with drag and drop. A
+drop reorders beside the target; holding Shift nests under it. Dropping one or
+more document rows copies their memberships without changing their files or
+analysis. The bulk bar also exposes explicit copy, move, and remove operations.
+Imported Zotero collection nodes and their mirrored memberships are locked;
+local organization belongs in Nodus collections and survives source refreshes.
+
+Saved searches are declarative records in `.nodus/saved-searches.json`. Their
+recursive rule tree supports `all`, `any`, and `not` groups over metadata,
+creators, tags, dates, source, item type, collections, attachments, extraction,
+trash state, vault links, and per-component analysis freshness. Results and
+counts are evaluated against the current SQLite cache and are never materialized
+as item copies. Deleting a saved search therefore cannot delete an item.
+
+The result page returns live source, type, extraction, attachment, year, tag,
+and vault facets. Table columns and up to three stable sort keys are stored in
+`.nodus/view-preferences.json`. These two small JSON files are source data in
+`nodus-library`; rebuilding the SQLite catalog does not discard them.
+
 ## Backup, synchronization, and recovery
 
 `nodus-library` is part of the selected backup folder. If another service
@@ -364,6 +385,8 @@ The main tests are:
 - `test-global-library-operations.mjs`: collections, import, and trash;
 - `test-library-item-management.mjs`: Nodus-only records, creators, attachments,
   notes, symmetric relations, and colored tags;
+- `test-library-smart-collections.mjs`: cycle-safe movement, reversible item
+  memberships, nested live rules, facets, and persisted table preferences;
 - `test-library-metadata.mjs`: identifiers, formats, and duplicates;
 - `test-global-library-reader.mjs`: reader, pages, annotations, and chat;
 - `test-global-library-vault-integration.mjs`: vault linking and analysis;

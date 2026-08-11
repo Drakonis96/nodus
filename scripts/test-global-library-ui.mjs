@@ -14,7 +14,7 @@ test('the unified Library keeps the global catalogue independent and the vault c
 });
 
 test('the Library UI exposes hierarchy, search, bulk operations, imports and background state', async () => {
-  const view = `${await readSource('src/views/GlobalLibraryView.tsx')}\n${await readSource('src/components/library/LibraryItemManager.tsx')}`;
+  const view = `${await readSource('src/views/GlobalLibraryView.tsx')}\n${await readSource('src/components/library/LibraryItemManager.tsx')}\n${await readSource('src/components/library/LibrarySmartSearchDialog.tsx')}`;
   for (const marker of [
     'global-library-view', 'global-library-search', 'global-library-bulk-actions',
     'global-library-detail', 'zotero-global-import-dialog', 'open-zotero-global-import',
@@ -24,6 +24,7 @@ test('the Library UI exposes hierarchy, search, bulk operations, imports and bac
     'create-library-reference', 'library-item-manager', 'library-attachments',
     'library-notes', 'library-relations', 'library-tag-manager',
     'open-library-migration', 'library-migration-dialog', 'start-library-migration',
+    'library-smart-search-dialog', 'smart-search-preview', 'library-table-settings', 'library-table-preferences',
   ]) assert.match(view, new RegExp(`data-testid=(?:"|\{\`)[^\n]*${marker}`));
   for (const method of [
     'getGlobalLibraryStatus', 'listGlobalLibraryItems', 'listGlobalLibraryCollections',
@@ -38,6 +39,8 @@ test('the Library UI exposes hierarchy, search, bulk operations, imports and bac
     'listGlobalLibraryVaultLinks', 'linkGlobalLibraryItemsToVault',
     'previewLibraryMigration', 'startLibraryMigration', 'resumeLibraryMigration',
     'cancelLibraryMigration', 'rollbackLibraryMigration', 'listLibraryMigrationSessions',
+    'listGlobalLibrarySavedSearches', 'saveGlobalLibrarySavedSearch', 'deleteGlobalLibrarySavedSearch',
+    'getGlobalLibraryViewPreferences', 'setGlobalLibraryViewPreferences',
   ]) assert.match(view, new RegExp(String.raw`window\.nodus\.${method}\b`));
   assert.match(view, /CollectionBranch[\s\S]*<CollectionBranch/, 'collection rendering is recursively unbounded');
   assert.match(view, /La importación se canceló; el catálogo ya recuperado se conserva/);
@@ -89,6 +92,8 @@ test('the typed bridge covers every global management operation', async () => {
     'listGlobalLibraryVaults', 'listGlobalLibraryVaultLinks', 'linkGlobalLibraryItemsToVault',
     'previewLibraryMigration', 'startLibraryMigration', 'resumeLibraryMigration',
     'cancelLibraryMigration', 'rollbackLibraryMigration', 'listLibraryMigrationSessions',
+    'listGlobalLibrarySavedSearches', 'saveGlobalLibrarySavedSearch', 'deleteGlobalLibrarySavedSearch',
+    'getGlobalLibraryViewPreferences', 'setGlobalLibraryViewPreferences',
   ];
   assertApiMethods(assert, methods);
   assertChannelsWired(assert, [
@@ -102,6 +107,8 @@ test('the typed bridge covers every global management operation', async () => {
     'library:vaults', 'library:vaultLinks', 'library:linkToVault',
     'library:migrationPreview', 'library:startMigration', 'library:resumeMigration',
     'library:cancelMigration', 'library:rollbackMigration', 'library:migrationSessions',
+    'library:savedSearches', 'library:saveSavedSearch', 'library:deleteSavedSearch',
+    'library:viewPreferences', 'library:setViewPreferences',
   ]);
 });
 

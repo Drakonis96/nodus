@@ -41,6 +41,11 @@ button exists.
 | Organization | Collections and subcollections support arbitrary depth | Verified | `test-global-library-operations`, `test-global-library-ui` |
 | Organization | Zotero collections are mirrored and Nodus collections are editable | Verified | `test-global-library-operations` |
 | Organization | Search, filters, pagination, and bulk actions work | Verified | `test-global-library-ui`, `e2e-global-library` |
+| Organization | Drag-and-drop moves and reorders Nodus collections while rejecting cycles and imported collection edits | Verified | `test-library-smart-collections`, `e2e-global-library` |
+| Organization | Individual and bulk membership copy, move, and removal do not invalidate analysis | Verified | `test-library-smart-collections` |
+| Smart searches | Nested all/any/not rules cover metadata, authors, tags, dates, sources, attachments, extraction, trash, vaults, and analysis | Verified | `test-library-smart-collections`, `test-global-library-ui` |
+| Smart searches | Results and counts are live and never materialize duplicate item records | Verified | `test-library-smart-collections` |
+| Catalogue view | Facets, multi-column sorting, and visible-column preferences persist across restart | Verified | `test-library-smart-collections`, `e2e-global-library` |
 | Item management | Empty references, independent duplicates, and Nodus copies work without Zotero | Verified | `test-library-item-management`, `test-global-library-ui` |
 | Item management | Academic types and ordered personal or institutional creator roles round-trip | Verified | `test-library-item-management`, `test-library-metadata` |
 | Attachments | Multiple supported files can be added, opened, revealed, renamed, reordered, classified, replaced, and removed | Verified | `test-library-item-management`, `e2e-global-library` |

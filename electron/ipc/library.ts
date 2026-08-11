@@ -20,6 +20,11 @@ import {
   cancelLibraryExtraction,
   retryLibraryExtraction,
   listGlobalLibraryCollections,
+  listGlobalLibrarySavedSearches,
+  saveGlobalLibrarySavedSearch,
+  deleteGlobalLibrarySavedSearch,
+  getGlobalLibraryViewPreferences,
+  setGlobalLibraryViewPreferences,
   getGlobalLibraryItem,
   createGlobalLibraryCollection,
   updateGlobalLibraryCollection,
@@ -79,6 +84,11 @@ export function registerLibraryIpc({ h }: IpcContext): void {
   h('library:cancelExtraction', async (_event, jobId) => cancelLibraryExtraction(jobId));
   h('library:retryExtraction', async (_event, jobId) => retryLibraryExtraction(jobId));
   h('library:collections', async () => listGlobalLibraryCollections());
+  h('library:savedSearches', async () => listGlobalLibrarySavedSearches());
+  h('library:saveSavedSearch', async (_event, input) => saveGlobalLibrarySavedSearch(input));
+  h('library:deleteSavedSearch', async (_event, id) => deleteGlobalLibrarySavedSearch(id));
+  h('library:viewPreferences', async () => getGlobalLibraryViewPreferences());
+  h('library:setViewPreferences', async (_event, preferences) => setGlobalLibraryViewPreferences(preferences));
   h('library:item', async (_event, itemId) => getGlobalLibraryItem(itemId));
   h('library:createCollection', async (_event, name, parentId) => createGlobalLibraryCollection(name, parentId));
   h('library:updateCollection', async (_event, id, patch) => updateGlobalLibraryCollection(id, patch));

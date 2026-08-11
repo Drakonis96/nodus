@@ -32,6 +32,9 @@ import type {
   LibraryItemRelationType,
   LibraryTagPatch,
   LibraryTagRecord,
+  LibrarySavedSearchRecord,
+  LibrarySmartSearchGroup,
+  LibraryViewPreferences,
 } from '../libraryTypes';
 import type { VaultSummary } from '../types';
 
@@ -57,6 +60,11 @@ export interface LibraryApi {
   retryLibraryExtraction(jobId: string): Promise<boolean>;
   onLibraryExtractionProgress(cb: (progress: LibraryExtractionProgress) => void): () => void;
   listGlobalLibraryCollections(): Promise<LibraryCollectionView[]>;
+  listGlobalLibrarySavedSearches(): Promise<LibrarySavedSearchRecord[]>;
+  saveGlobalLibrarySavedSearch(input: { id?: string; name: string; query: LibrarySmartSearchGroup }): Promise<LibrarySavedSearchRecord>;
+  deleteGlobalLibrarySavedSearch(id: string): Promise<boolean>;
+  getGlobalLibraryViewPreferences(): Promise<LibraryViewPreferences>;
+  setGlobalLibraryViewPreferences(preferences: LibraryViewPreferences): Promise<LibraryViewPreferences>;
   getGlobalLibraryItem(itemId: string): Promise<LibraryItemRecord | null>;
   createGlobalLibraryCollection(name: string, parentId: string | null): Promise<LibraryCollectionView>;
   updateGlobalLibraryCollection(id: string, patch: { name?: string; parentId?: string | null; position?: number }): Promise<LibraryCollectionView>;

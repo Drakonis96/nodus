@@ -33,6 +33,9 @@ import type {
   LibraryItemRelationType,
   LibraryTagPatch,
   LibraryTagRecord,
+  LibrarySavedSearchRecord,
+  LibrarySmartSearchGroup,
+  LibraryViewPreferences,
 } from '@shared/libraryTypes';
 import { LibraryCatalog } from './libraryCatalog';
 import { LibraryDiskStore } from './libraryStorage';
@@ -158,10 +161,19 @@ export function rebuildGlobalLibrary(): LibraryRebuildResult {
 
 export function listGlobalLibraryItems(query?: LibraryCatalogQuery): LibraryCatalogPage {
   const current = service();
-  if (!current) return { items: [], total: 0, limit: Math.max(1, Math.min(500, query?.limit ?? 100)), offset: Math.max(0, query?.offset ?? 0) };
+  if (!current) return {
+    items: [], total: 0, limit: Math.max(1, Math.min(500, query?.limit ?? 100)), offset: Math.max(0, query?.offset ?? 0),
+    facets: { sources: [], itemTypes: [], extraction: [], attachments: [], years: [], tags: [], vaults: [] },
+  };
   const status = current.catalog.status(current.root, current.deviceId);
   if (!status.lastRebuiltAt) current.catalog.rebuild(current.store);
-  return current.catalog.list(query);
+  let resolved = query;
+  if (query?.savedSearchId) {
+    const saved = current.operations.listSavedSearches().find((entry) => entry.id === query.savedSearchId);
+    if (!saved) throw new Error('La búsqueda guardada ya no existe.');
+    resolved = { ...query, smartSearch: saved.query };
+  }
+  return current.catalog.list(resolved);
 }
 
 export function migrateExistingVaultLibraries(): Promise<LibraryMigrationReport> {
@@ -281,6 +293,39 @@ export function retryLibraryExtraction(jobId: string): boolean {
 
 export function listGlobalLibraryCollections(): LibraryCollectionView[] {
   return service()?.operations.listCollections() ?? [];
+}
+
+export function listGlobalLibrarySavedSearches(): LibrarySavedSearchRecord[] {
+  return service()?.operations.listSavedSearches() ?? [];
+}
+
+export function saveGlobalLibrarySavedSearch(input: { id?: string; name: string; query: LibrarySmartSearchGroup }): LibrarySavedSearchRecord {
+  const current = service();
+  if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
+  const record = current.operations.saveSavedSearch(input);
+  broadcast(current.catalog.status(current.root, current.deviceId));
+  return record;
+}
+
+export function deleteGlobalLibrarySavedSearch(id: string): boolean {
+  const current = service();
+  if (!current) return false;
+  const deleted = current.operations.deleteSavedSearch(id);
+  if (deleted) broadcast(current.catalog.status(current.root, current.deviceId));
+  return deleted;
+}
+
+export function getGlobalLibraryViewPreferences(): LibraryViewPreferences {
+  return service()?.operations.getViewPreferences() ?? {
+    visibleColumns: ['title', 'creator', 'year', 'source', 'status'],
+    sort: [{ field: 'updatedAt', direction: 'desc' }, { field: 'title', direction: 'asc' }],
+  };
+}
+
+export function setGlobalLibraryViewPreferences(preferences: LibraryViewPreferences): LibraryViewPreferences {
+  const current = service();
+  if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
+  return current.operations.setViewPreferences(preferences);
 }
 
 export function getGlobalLibraryItem(itemId: string): LibraryItemRecord | null {

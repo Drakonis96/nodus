@@ -419,7 +419,12 @@ export interface LibraryExtractionEnqueueResult {
 export interface LibraryCatalogQuery {
   search?: string;
   collectionId?: string | null;
+  savedSearchId?: string | null;
+  smartSearch?: LibrarySmartSearchGroup | null;
   source?: LibraryItemSource | null;
+  itemType?: LibraryItemType | null;
+  tag?: string | null;
+  vaultId?: string | null;
   limit?: number;
   offset?: number;
   includeDeleted?: boolean;
@@ -427,6 +432,60 @@ export interface LibraryCatalogQuery {
   yearFrom?: number | null;
   yearTo?: number | null;
   hasAttachments?: boolean | null;
+  sort?: LibrarySortRule[];
+  includeFacets?: boolean;
+}
+
+export type LibrarySortField = 'title' | 'creator' | 'year' | 'source' | 'updatedAt' | 'extraction' | 'attachments';
+
+export interface LibrarySortRule {
+  field: LibrarySortField;
+  direction: 'asc' | 'desc';
+}
+
+export type LibrarySmartSearchField =
+  | 'title' | 'abstract' | 'creator' | 'tag' | 'date' | 'year' | 'source' | 'itemType'
+  | 'collection' | 'attachment' | 'extraction' | 'trash' | 'vault' | 'analysis';
+
+export type LibrarySmartSearchOperator =
+  | 'contains' | 'equals' | 'not-equals' | 'before' | 'after' | 'is-true' | 'is-false';
+
+export interface LibrarySmartSearchCondition {
+  id: string;
+  field: LibrarySmartSearchField;
+  operator: LibrarySmartSearchOperator;
+  value?: string | number | boolean | null;
+}
+
+export interface LibrarySmartSearchGroup {
+  id: string;
+  mode: 'all' | 'any' | 'not';
+  rules: Array<LibrarySmartSearchCondition | LibrarySmartSearchGroup>;
+}
+
+export interface LibrarySavedSearchRecord {
+  format: 'nodus.library-saved-search';
+  formatVersion: 1;
+  id: string;
+  name: string;
+  query: LibrarySmartSearchGroup;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LibraryFacetValue {
+  value: string;
+  count: number;
+}
+
+export interface LibraryCatalogFacets {
+  sources: LibraryFacetValue[];
+  itemTypes: LibraryFacetValue[];
+  extraction: LibraryFacetValue[];
+  attachments: LibraryFacetValue[];
+  years: LibraryFacetValue[];
+  tags: LibraryFacetValue[];
+  vaults: LibraryFacetValue[];
 }
 
 export interface LibraryCatalogPage {
@@ -434,6 +493,7 @@ export interface LibraryCatalogPage {
   total: number;
   limit: number;
   offset: number;
+  facets: LibraryCatalogFacets;
 }
 
 export interface LibraryCollectionView {
@@ -451,6 +511,13 @@ export interface LibraryCollectionView {
 export interface LibraryItemCollectionPatch {
   add?: string[];
   remove?: string[];
+}
+
+export type LibraryColumnId = 'title' | 'creator' | 'year' | 'source' | 'status' | 'attachments' | 'updatedAt';
+
+export interface LibraryViewPreferences {
+  visibleColumns: LibraryColumnId[];
+  sort: LibrarySortRule[];
 }
 
 export interface LibraryLocalImportReport {

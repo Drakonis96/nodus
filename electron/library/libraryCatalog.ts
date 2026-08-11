@@ -13,9 +13,14 @@ import type {
   LibraryStatus,
   LibraryVaultLink,
   LibraryCollectionView,
+  LibraryCatalogFacets,
+  LibrarySmartSearchCondition,
+  LibrarySmartSearchGroup,
+  LibrarySortRule,
 } from '@shared/libraryTypes';
 import { LibraryDiskStore } from './libraryStorage';
 import { librarySourceIdentityKey } from './libraryRecord';
+import { validateLibrarySmartSearchGroup } from './librarySmartCollections';
 
 type CountRow = { count: number };
 
@@ -36,6 +41,115 @@ function creatorsText(record: LibraryItemRecord): string {
 function ftsQuery(value: string): string {
   return value.normalize('NFKC').trim().split(/\s+/).filter(Boolean).slice(0, 20)
     .map((term) => `"${term.replace(/"/g, '""')}"*`).join(' AND ');
+}
+
+function emptyFacets(): LibraryCatalogFacets {
+  return { sources: [], itemTypes: [], extraction: [], attachments: [], years: [], tags: [], vaults: [] };
+}
+
+function smartSearchUsesTrash(group: LibrarySmartSearchGroup): boolean {
+  return group.rules.some((rule) => 'rules' in rule ? smartSearchUsesTrash(rule) : rule.field === 'trash');
+}
+
+function smartSearchSql(group: LibrarySmartSearchGroup, params: Record<string, unknown>, sequence = { value: 0 }): string {
+  const conditionSql = (rule: LibrarySmartSearchCondition): string => {
+    const key = `smart${sequence.value++}`;
+    const raw = rule.value == null ? '' : String(rule.value);
+    const value = raw.trim();
+    const lower = value.toLocaleLowerCase();
+    const like = `%${lower.replace(/[\\%_]/g, '\\$&')}%`;
+    const compareText = (column: string) => {
+      params[key] = rule.operator === 'contains' ? like : lower;
+      const base = rule.operator === 'contains'
+        ? `LOWER(COALESCE(${column}, '')) LIKE @${key} ESCAPE '\\'`
+        : `LOWER(COALESCE(${column}, '')) = @${key}`;
+      return rule.operator === 'not-equals' ? `NOT (${base})` : base;
+    };
+    if (rule.field === 'title') return compareText('i.title');
+    if (rule.field === 'abstract') return compareText('i.abstract');
+    if (rule.field === 'creator') return compareText('i.creators_json');
+    if (rule.field === 'source') return compareText('i.source');
+    if (rule.field === 'itemType') return compareText('i.item_type');
+    if (rule.field === 'extraction') return compareText('i.extraction_status');
+    if (rule.field === 'date') {
+      params[key] = value;
+      if (rule.operator === 'before') return `COALESCE(i.date_value, '') < @${key}`;
+      if (rule.operator === 'after') return `COALESCE(i.date_value, '') > @${key}`;
+      return compareText('i.date_value');
+    }
+    if (rule.field === 'year') {
+      params[key] = Number(value);
+      if (!Number.isFinite(params[key])) return '0';
+      const operator = rule.operator === 'before' ? '<' : rule.operator === 'after' ? '>' : rule.operator === 'not-equals' ? '<>' : '=';
+      return `i.year ${operator} @${key}`;
+    }
+    if (rule.field === 'tag') {
+      params[key] = rule.operator === 'contains' ? like : lower;
+      const compare = rule.operator === 'contains'
+        ? `LOWER(CAST(tag.value AS TEXT)) LIKE @${key} ESCAPE '\\'`
+        : `LOWER(CAST(tag.value AS TEXT)) = @${key}`;
+      const exists = `EXISTS (SELECT 1 FROM json_each(i.tags_json) tag WHERE ${compare})`;
+      return rule.operator === 'not-equals' ? `NOT (${exists})` : exists;
+    }
+    if (rule.field === 'collection') {
+      params[key] = value;
+      const exists = `EXISTS (SELECT 1 FROM library_item_collections smart_collection WHERE smart_collection.item_id=i.id AND smart_collection.collection_id=@${key})`;
+      return rule.operator === 'not-equals' ? `NOT (${exists})` : exists;
+    }
+    if (rule.field === 'attachment') {
+      if (rule.operator === 'is-true') return 'i.attachment_count > 0';
+      if (rule.operator === 'is-false') return 'i.attachment_count = 0';
+      params[key] = rule.operator === 'contains' ? like : lower;
+      const compare = rule.operator === 'contains'
+        ? `(LOWER(a.file_name) LIKE @${key} ESCAPE '\\' OR LOWER(a.mime_type) LIKE @${key} ESCAPE '\\' OR LOWER(a.role) LIKE @${key} ESCAPE '\\')`
+        : `(LOWER(a.mime_type)=@${key} OR LOWER(a.role)=@${key})`;
+      const exists = `EXISTS (SELECT 1 FROM library_attachments a WHERE a.item_id=i.id AND ${compare})`;
+      return rule.operator === 'not-equals' ? `NOT (${exists})` : exists;
+    }
+    if (rule.field === 'trash') {
+      const truthy = rule.operator === 'is-true' || value === 'true';
+      return truthy ? 'i.deleted_at IS NOT NULL' : 'i.deleted_at IS NULL';
+    }
+    if (rule.field === 'vault') {
+      params[key] = rule.operator === 'contains' ? like : lower;
+      const compare = rule.operator === 'contains'
+        ? `(LOWER(v.vault_name) LIKE @${key} ESCAPE '\\' OR LOWER(v.vault_id) LIKE @${key} ESCAPE '\\')`
+        : `LOWER(v.vault_id)=@${key}`;
+      const exists = `EXISTS (SELECT 1 FROM library_vault_links v WHERE v.item_id=i.id AND ${compare})`;
+      return rule.operator === 'not-equals' ? `NOT (${exists})` : exists;
+    }
+    if (rule.field === 'analysis') {
+      const [component, freshness] = lower.includes(':') ? lower.split(':', 2) : ['', lower];
+      params[key] = freshness;
+      if (component && ['extraction', 'light', 'deep', 'passages', 'ideas', 'embeddings', 'summary'].includes(component)) {
+        const expression = `LOWER(COALESCE(json_extract(i.analysis_json, '$.components.${component}.freshness'), 'none'))=@${key}`;
+        return rule.operator === 'not-equals' ? `NOT (${expression})` : expression;
+      }
+      const exists = `EXISTS (SELECT 1 FROM json_each(i.analysis_json, '$.components') component WHERE LOWER(COALESCE(json_extract(component.value, '$.freshness'), 'none'))=@${key})`;
+      return rule.operator === 'not-equals' ? `NOT (${exists})` : exists;
+    }
+    return '0';
+  };
+  const clauses = group.rules.map((rule) => 'rules' in rule ? smartSearchSql(rule, params, sequence) : conditionSql(rule));
+  const usesOr = group.mode === 'any' || group.mode === 'not';
+  const combined = clauses.length ? `(${clauses.join(usesOr ? ' OR ' : ' AND ')})` : (usesOr ? '0' : '1');
+  return group.mode === 'not' ? `NOT ${combined}` : combined;
+}
+
+function orderBySql(sort: LibrarySortRule[] | undefined): string {
+  const expressions: Record<LibrarySortRule['field'], string> = {
+    title: 'i.title COLLATE NOCASE',
+    creator: "LOWER(COALESCE(json_extract(i.creators_json, '$[0].lastName'), json_extract(i.creators_json, '$[0].name'), ''))",
+    year: 'i.year', source: 'i.source', updatedAt: 'i.updated_at', extraction: 'i.extraction_status', attachments: 'i.attachment_count',
+  };
+  const unique = new Set<string>();
+  const clauses = (sort ?? []).filter((entry) => {
+    if (!expressions[entry.field] || unique.has(entry.field)) return false;
+    unique.add(entry.field);
+    return true;
+  })
+    .slice(0, 3).map((entry) => `${expressions[entry.field]} ${entry.direction === 'asc' ? 'ASC' : 'DESC'}`);
+  return [...clauses, 'i.id ASC'].join(', ');
 }
 
 export class LibraryCatalog {
@@ -76,6 +190,7 @@ export class LibraryCatalog {
         attachment_count INTEGER NOT NULL,
         reader_available INTEGER NOT NULL,
         extraction_status TEXT NOT NULL,
+        analysis_json TEXT NOT NULL DEFAULT '{}',
         revision INTEGER NOT NULL,
         updated_at TEXT NOT NULL,
         deleted_at TEXT
@@ -178,6 +293,7 @@ export class LibraryCatalog {
       );
     `);
     this.ensureColumn('library_items', 'source_library_id', 'TEXT');
+    this.ensureColumn('library_items', 'analysis_json', "TEXT NOT NULL DEFAULT '{}'");
     this.ensureColumn('library_collections', 'source_library_id', 'TEXT');
     this.handle.exec('CREATE INDEX IF NOT EXISTS library_items_source_library ON library_items (source, source_library_id, source_key);');
   }
@@ -214,12 +330,12 @@ export class LibraryCatalog {
         id, storage_id, folder_name, source, source_library_id, source_key, citation_key, title, item_type,
         creators_json, abstract, date_value, year, doi, isbn_json, issn_json, tags_json,
         metadata_json, collection_ids_json, attachment_count, reader_available,
-        extraction_status, revision, updated_at, deleted_at
+        extraction_status, analysis_json, revision, updated_at, deleted_at
       ) VALUES (
         @id, @storageId, @folderName, @source, @sourceLibraryId, @sourceKey, @citationKey, @title, @itemType,
         @creatorsJson, @abstract, @date, @year, @doi, @isbnJson, @issnJson, @tagsJson,
         @metadataJson, @collectionIdsJson, @attachmentCount, @readerAvailable,
-        @extractionStatus, @revision, @updatedAt, @deletedAt
+        @extractionStatus, @analysisJson, @revision, @updatedAt, @deletedAt
       )
     `);
     const insertFts = this.handle.prepare(`
@@ -290,6 +406,7 @@ export class LibraryCatalog {
           attachmentCount: record.attachments.length,
           readerAvailable: fs.existsSync(path.join(folder, readerName)) ? 1 : 0,
           extractionStatus: record.extraction?.status ?? 'pending',
+          analysisJson: JSON.stringify(record.contentRevision ?? {}),
           revision: record.clock.revision,
           updatedAt: record.clock.updatedAt,
           deletedAt: record.deletedAt,
@@ -502,8 +619,11 @@ export class LibraryCatalog {
     const offset = Math.max(0, Math.trunc(query.offset ?? 0));
     const where: string[] = [];
     const params: Record<string, unknown> = { limit, offset };
-    if (!query.includeDeleted) where.push('i.deleted_at IS NULL');
+    if (!query.includeDeleted && !(query.smartSearch && smartSearchUsesTrash(query.smartSearch))) where.push('i.deleted_at IS NULL');
     if (query.source) { where.push('i.source=@source'); params.source = query.source; }
+    if (query.itemType) { where.push('i.item_type=@itemType'); params.itemType = query.itemType; }
+    if (query.tag) { where.push('EXISTS (SELECT 1 FROM json_each(i.tags_json) query_tag WHERE LOWER(CAST(query_tag.value AS TEXT))=LOWER(@tag))'); params.tag = query.tag; }
+    if (query.vaultId) { where.push('EXISTS (SELECT 1 FROM library_vault_links query_vault WHERE query_vault.item_id=i.id AND query_vault.vault_id=@vaultId)'); params.vaultId = query.vaultId; }
     if (query.extractionStatus) { where.push('i.extraction_status=@extractionStatus'); params.extractionStatus = query.extractionStatus; }
     if (Number.isInteger(query.yearFrom)) { where.push('i.year>=@yearFrom'); params.yearFrom = query.yearFrom; }
     if (Number.isInteger(query.yearTo)) { where.push('i.year<=@yearTo'); params.yearTo = query.yearTo; }
@@ -512,6 +632,10 @@ export class LibraryCatalog {
     if (query.collectionId) {
       where.push('EXISTS (SELECT 1 FROM library_item_collections ic WHERE ic.item_id=i.id AND ic.collection_id=@collectionId)');
       params.collectionId = this.resolveCollectionId(query.collectionId) ?? query.collectionId;
+    }
+    if (query.smartSearch) {
+      if (!validateLibrarySmartSearchGroup(query.smartSearch)) throw new Error('La búsqueda inteligente no es válida.');
+      where.push(smartSearchSql(query.smartSearch, params));
     }
     const normalizedSearch = query.search?.trim();
     let join = '';
@@ -526,7 +650,7 @@ export class LibraryCatalog {
     ).get(params) as CountRow).count);
     const rows = this.handle.prepare(`
       SELECT i.* FROM library_items i ${join} ${clause}
-      ORDER BY i.updated_at DESC, i.title COLLATE NOCASE, i.id
+      ORDER BY ${orderBySql(query.sort)}
       LIMIT @limit OFFSET @offset
     `).all(params) as Record<string, unknown>[];
     const items: LibraryCatalogItem[] = rows.map((row) => ({
@@ -551,7 +675,23 @@ export class LibraryCatalog {
       extractionStatus: row.extraction_status as LibraryCatalogItem['extractionStatus'],
       updatedAt: String(row.updated_at),
     }));
-    return { items, total, limit, offset };
+    const facets = query.includeFacets === false ? emptyFacets() : this.facets(join, clause, params);
+    return { items, total, limit, offset, facets };
+  }
+
+  private facets(join: string, clause: string, params: Record<string, unknown>): LibraryCatalogFacets {
+    const values = (sql: string): Array<{ value: string; count: number }> => (this.handle.prepare(sql).all(params) as Array<Record<string, unknown>>)
+      .map((row) => ({ value: String(row.value), count: Number(row.count) }));
+    const base = `FROM library_items i ${join}`;
+    return {
+      sources: values(`SELECT i.source value, COUNT(*) count ${base} ${clause} GROUP BY i.source ORDER BY count DESC, value`),
+      itemTypes: values(`SELECT i.item_type value, COUNT(*) count ${base} ${clause} GROUP BY i.item_type ORDER BY count DESC, value`),
+      extraction: values(`SELECT i.extraction_status value, COUNT(*) count ${base} ${clause} GROUP BY i.extraction_status ORDER BY count DESC, value`),
+      attachments: values(`SELECT CASE WHEN i.attachment_count>0 THEN 'with' ELSE 'without' END value, COUNT(*) count ${base} ${clause} GROUP BY value ORDER BY value`),
+      years: values(`SELECT CAST(i.year AS TEXT) value, COUNT(*) count ${base} ${clause ? `${clause} AND` : 'WHERE'} i.year IS NOT NULL GROUP BY i.year ORDER BY i.year DESC`).slice(0, 100),
+      tags: values(`SELECT CAST(tag.value AS TEXT) value, COUNT(DISTINCT i.id) count ${base} JOIN json_each(i.tags_json) tag ${clause} GROUP BY tag.value ORDER BY count DESC, value COLLATE NOCASE`).slice(0, 100),
+      vaults: values(`SELECT vf.vault_id value, COUNT(DISTINCT i.id) count ${base} JOIN library_vault_links vf ON vf.item_id=i.id ${clause} GROUP BY vf.vault_id ORDER BY count DESC, value`).slice(0, 100),
+    };
   }
 
   listCollections(includeDeleted = false): LibraryCollectionView[] {

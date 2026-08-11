@@ -30,6 +30,11 @@ export const libraryApi: LibraryApi = {
     return () => ipcRenderer.removeListener('library:extractionProgress', listener);
   },
   listGlobalLibraryCollections: () => ipcRenderer.invoke('library:collections'),
+  listGlobalLibrarySavedSearches: () => ipcRenderer.invoke('library:savedSearches'),
+  saveGlobalLibrarySavedSearch: (input) => ipcRenderer.invoke('library:saveSavedSearch', input),
+  deleteGlobalLibrarySavedSearch: (id) => ipcRenderer.invoke('library:deleteSavedSearch', id),
+  getGlobalLibraryViewPreferences: () => ipcRenderer.invoke('library:viewPreferences'),
+  setGlobalLibraryViewPreferences: (preferences) => ipcRenderer.invoke('library:setViewPreferences', preferences),
   getGlobalLibraryItem: (itemId) => ipcRenderer.invoke('library:item', itemId),
   createGlobalLibraryCollection: (name, parentId) => ipcRenderer.invoke('library:createCollection', name, parentId),
   updateGlobalLibraryCollection: (id, patch) => ipcRenderer.invoke('library:updateCollection', id, patch),

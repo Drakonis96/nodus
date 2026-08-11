@@ -18,6 +18,9 @@ import type {
   LibraryItemRelationType,
   LibraryTagPatch,
   LibraryTagRecord,
+  LibrarySavedSearchRecord,
+  LibrarySmartSearchGroup,
+  LibraryViewPreferences,
 } from '@shared/libraryTypes';
 import { canonicalJson, normalizeLibraryMetadata } from './libraryRecord';
 import { LibraryCatalog } from './libraryCatalog';
@@ -25,6 +28,7 @@ import { assertInside, atomicWriteJson, safeLibraryFolderName } from './libraryP
 import { LibraryDiskStore } from './libraryStorage';
 import { importBibliographyFiles } from './libraryBibliographyImport';
 import { bibliographicFingerprint } from './libraryRevision';
+import { LibrarySmartCollectionStore } from './librarySmartCollections';
 
 function comparable(value: LibraryItemRecord): string {
   const { clock: _clock, createdAt: _createdAt, ...rest } = value;
@@ -140,7 +144,11 @@ function inverseRelation(type: LibraryItemRelationType): LibraryItemRelationType
 }
 
 export class LibraryOperations {
-  constructor(private readonly store: LibraryDiskStore, private readonly catalog: LibraryCatalog) {}
+  private readonly smartCollections: LibrarySmartCollectionStore;
+
+  constructor(private readonly store: LibraryDiskStore, private readonly catalog: LibraryCatalog) {
+    this.smartCollections = new LibrarySmartCollectionStore(store.root);
+  }
 
   listCollections(): LibraryCollectionView[] {
     return this.catalog.listCollections();
@@ -152,6 +160,7 @@ export class LibraryOperations {
     const canonicalParentId = parentId ? this.catalog.resolveCollectionId(parentId) ?? parentId : null;
     const parent = canonicalParentId ? this.store.readMaterializedCollection(canonicalParentId) : null;
     if (canonicalParentId && (!parent || parent.deletedAt)) throw new Error('La colección superior ya no existe.');
+    if (parent && parent.source !== 'nodus') throw new Error('Las colecciones importadas son de solo lectura en Nodus.');
     const siblings = this.catalog.listCollections().filter((entry) => entry.parentId === canonicalParentId);
     const id = `nodus:collection:${randomUUID()}`;
     this.store.upsertCollection({ id, name: clean, parentId: canonicalParentId, position: siblings.length, source: 'nodus', deletedAt: null });
@@ -169,14 +178,31 @@ export class LibraryOperations {
     if (!name) throw new Error('La colección necesita un nombre.');
     const parentId = patch.parentId === undefined ? current.parentId : patch.parentId;
     if (parentId === id) throw new Error('Una colección no puede contenerse a sí misma.');
+    const parent = parentId ? this.store.readMaterializedCollection(parentId) : null;
+    if (parentId && (!parent || parent.deletedAt)) throw new Error('La colección superior ya no existe.');
+    if (parent && parent.source !== 'nodus') throw new Error('Las colecciones importadas son de solo lectura en Nodus.');
     let cursor = parentId;
     while (cursor) {
       if (cursor === id) throw new Error('Ese movimiento crearía un ciclo de colecciones.');
       cursor = this.store.readMaterializedCollection(cursor)?.parentId ?? null;
     }
-    this.store.upsertCollection({
-      ...current, name, parentId, position: Number.isFinite(patch.position) ? Math.max(0, Math.trunc(patch.position!)) : current.position,
-    }, current.clock.revision);
+    const all = this.store.scanMaterializedCollections().records.filter((entry) => !entry.deletedAt);
+    const oldSiblings = all.filter((entry) => entry.parentId === current.parentId && entry.id !== id)
+      .sort((a, b) => a.position - b.position || a.name.localeCompare(b.name));
+    const targetSiblings = (parentId === current.parentId ? oldSiblings : all.filter((entry) => entry.parentId === parentId && entry.id !== id))
+      .sort((a, b) => a.position - b.position || a.name.localeCompare(b.name));
+    const requestedPosition = patch.position === undefined
+      ? (parentId === current.parentId ? current.position : targetSiblings.length)
+      : Math.max(0, Math.trunc(patch.position));
+    targetSiblings.splice(Math.min(requestedPosition, targetSiblings.length), 0, { ...current, name, parentId });
+    const desiredPositions = new Map(targetSiblings.map((entry, position) => [entry.id, position]));
+    const write = (entry: typeof current, desiredParentId: string | null, desiredPosition: number, desiredName = entry.name) => {
+      if (entry.parentId === desiredParentId && entry.position === desiredPosition && entry.name === desiredName) return;
+      this.store.upsertCollection({ ...entry, name: desiredName, parentId: desiredParentId, position: desiredPosition }, entry.clock.revision);
+    };
+    write(current, parentId, desiredPositions.get(id) ?? requestedPosition, name);
+    for (const sibling of targetSiblings) if (sibling.id !== id) write(sibling, parentId, desiredPositions.get(sibling.id)!);
+    if (parentId !== current.parentId) for (const [position, sibling] of oldSiblings.entries()) write(sibling, current.parentId, position);
     this.catalog.rebuild(this.store);
     return this.catalog.listCollections().find((entry) => entry.id === id)!;
   }
@@ -213,9 +239,10 @@ export class LibraryOperations {
     const canonicalItemIds = new Set(itemIds.map((id) => this.catalog.resolveItemId(id) ?? id));
     const add = new Set((patch.add ?? []).map((id) => this.catalog.resolveCollectionId(id) ?? id));
     const remove = new Set((patch.remove ?? []).map((id) => this.catalog.resolveCollectionId(id) ?? id));
-    for (const id of add) {
+    for (const id of new Set([...add, ...remove])) {
       const collection = this.store.readMaterializedCollection(id);
       if (!collection || collection.deletedAt) throw new Error('Una de las colecciones de destino ya no existe.');
+      if (collection.source !== 'nodus') throw new Error('Las colecciones importadas son de solo lectura en Nodus.');
     }
     let updated = 0;
     for (const item of this.store.scanMaterializedItems().records) {
@@ -226,6 +253,26 @@ export class LibraryOperations {
     }
     if (updated) this.catalog.rebuild(this.store);
     return updated;
+  }
+
+  listSavedSearches(): LibrarySavedSearchRecord[] {
+    return this.smartCollections.list();
+  }
+
+  saveSavedSearch(input: { id?: string; name: string; query: LibrarySmartSearchGroup }): LibrarySavedSearchRecord {
+    return this.smartCollections.save(input);
+  }
+
+  deleteSavedSearch(id: string): boolean {
+    return this.smartCollections.delete(id);
+  }
+
+  getViewPreferences(): LibraryViewPreferences {
+    return this.smartCollections.preferences();
+  }
+
+  setViewPreferences(value: LibraryViewPreferences): LibraryViewPreferences {
+    return this.smartCollections.setPreferences(value);
   }
 
   setItemsDeleted(itemIds: string[], deleted: boolean): number {
