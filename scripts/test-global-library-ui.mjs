@@ -36,6 +36,7 @@ test('the Library UI exposes hierarchy, search, bulk operations, imports and bac
     'library-collection-edit-', 'library-collection-move-', 'library-collection-delete-',
     'library-collection-move-dialog', 'library-collection-move-search', 'library-collection-move-root', 'confirm-library-collection-move',
     'library-collection-style-', 'library-collection-style-dialog', 'library-collection-custom-color', 'save-library-collection-style',
+    'library-sidebar-navigation', 'library-collections-pane', 'library-sidebar-section-resizer', 'library-saved-searches-pane',
   ]) assert.match(view, new RegExp(`data-testid=(?:"|\{\`)[^\n]*${marker}`));
   for (const method of [
     'getGlobalLibraryStatus', 'listGlobalLibraryItems', 'listGlobalLibraryCollections',
@@ -68,9 +69,14 @@ test('the Library UI exposes hierarchy, search, bulk operations, imports and bac
   assert.match(view, /collectionSearchIds/, 'move search preserves matching collections and their hierarchical ancestors');
   assert.match(view, /COLLECTION_COLOR_PRESETS\.map/, 'collection styling exposes the six predefined colors');
   assert.match(view, /type="color"/, 'collection styling includes a custom native color palette');
+  assert.match(view, /role="separator"[\s\S]*aria-orientation="horizontal"/, 'collections and smart searches use an accessible horizontal splitter');
+  assert.match(view, /setPointerCapture/, 'the Library navigation splitter supports pointer dragging');
+  assert.match(view, /ArrowUp[\s\S]*ArrowDown/, 'the Library navigation splitter supports keyboard resizing');
+  assert.match(view, /localStorage\.setItem\(LIBRARY_COLLECTION_PANE_RATIO_KEY/, 'the chosen pane ratio persists locally');
   assert.match(view, /candidate\.metadata\.url \?\? candidate\.sourceUrl/, 'identifier creation retains the canonical source even when the provider metadata omits its URL');
   assert.match(view, /data-testid="open-library-trash"[\s\S]*?<Icon name="folder"/, 'trash is rendered as the final collection-tree folder');
   assert.match(view, /library-trash-folder[\s\S]*aria-current=\{trashMode \? 'page'/, 'the trash folder exposes its selected state');
+  assert.match(view, /library-trash-section[\s\S]*shrink-0[\s\S]*h-8/, 'trash remains a compact fixed row below both adjustable panes');
   assert.doesNotMatch(view, /\{!trashMode && <aside/, 'the collection tree remains visible while trash is open');
   assert.match(appCss, /\.library-trash-folder\.is-active[\s\S]*background: rgb\(127 29 29 \/ 0\.32\)/);
   assert.match(appCss, /\.light \.library-trash-folder\.is-active[\s\S]*background: #fee2e2/);

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type DragEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react';
 import type {
   LibraryCatalogItem,
   LibraryCollectionView,
@@ -40,6 +40,14 @@ import { Library } from './Library';
 import { LIBRARY_COLUMN_BY_ID, libraryItemTypeLabel } from '@shared/libraryBibliography';
 
 const PAGE_SIZE = 250;
+const LIBRARY_COLLECTION_PANE_RATIO_KEY = 'nodus.library.collectionsPaneRatio';
+const DEFAULT_LIBRARY_COLLECTION_PANE_RATIO = 48;
+const MIN_LIBRARY_COLLECTION_PANE_RATIO = 22;
+const MAX_LIBRARY_COLLECTION_PANE_RATIO = 76;
+
+function clampCollectionPaneRatio(value: number): number {
+  return Math.min(MAX_LIBRARY_COLLECTION_PANE_RATIO, Math.max(MIN_LIBRARY_COLLECTION_PANE_RATIO, Math.round(value)));
+}
 const TRASH_SEARCH = { id: 'library-trash', mode: 'all' as const, rules: [{ id: 'library-trash-only', field: 'trash' as const, operator: 'is-true' as const, value: true }] };
 
 const SOURCE_LABEL: Record<LibraryItemSource, string> = {
@@ -756,7 +764,24 @@ function GlobalLibraryContent({
   const [stylingCollection, setStylingCollection] = useState<LibraryCollectionView | null>(null);
   const [smartSearchEditor, setSmartSearchEditor] = useState<LibrarySavedSearchRecord | 'new' | null>(null);
   const [tablePreferencesOpen, setTablePreferencesOpen] = useState(false);
+  const sidebarNavigationRef = useRef<HTMLDivElement>(null);
+  const [collectionPaneRatio, setCollectionPaneRatio] = useState(() => {
+    const stored = Number(window.localStorage.getItem(LIBRARY_COLLECTION_PANE_RATIO_KEY));
+    return Number.isFinite(stored) && stored > 0 ? clampCollectionPaneRatio(stored) : DEFAULT_LIBRARY_COLLECTION_PANE_RATIO;
+  });
   const sortKey = JSON.stringify(viewPreferences.sort);
+
+  const resizeCollectionPane = (value: number) => {
+    const next = clampCollectionPaneRatio(value);
+    setCollectionPaneRatio(next);
+    window.localStorage.setItem(LIBRARY_COLLECTION_PANE_RATIO_KEY, String(next));
+  };
+
+  const resizeCollectionPaneFromPointer = (clientY: number) => {
+    const box = sidebarNavigationRef.current?.getBoundingClientRect();
+    if (!box?.height) return;
+    resizeCollectionPane(((clientY - box.top) / box.height) * 100);
+  };
 
   const load = useCallback(async () => {
     try {
@@ -1055,25 +1080,51 @@ function GlobalLibraryContent({
           <div className="px-2 pb-2" onDragOver={(event) => event.preventDefault()} onDrop={(event) => void dropCollectionAtRoot(event)}>
             <button className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs ${!trashMode && selectedCollection === null && selectedSavedSearch === null ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:bg-neutral-900'}`} onClick={() => { setTrashMode(false); setSelectedCollection(null); setSelectedSavedSearch(null); setSelected(new Set()); setDetailId(null); setOffset(0); }}><Icon name="library" size={14} /><span className="flex-1">{t('Todos los documentos')}</span><span className="text-[10px] opacity-60">{status.items}</span></button>
           </div>
-          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-2 pb-3">
-            {(children.get(null) ?? []).map((collection) => <CollectionBranch key={collection.id} collection={collection} children={children} selected={trashMode ? null : selectedCollection} expanded={expanded} onSelect={(id) => { setTrashMode(false); setSelectedCollection(id); setSelectedSavedSearch(null); setSelected(new Set()); setDetailId(null); setOffset(0); }} onToggle={(id) => setExpanded((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; })} onDrop={(event, entry) => void dropOnCollection(event, entry)} onRename={(entry) => void renameCollection(entry.id)} onMove={setMovingCollection} onStyle={setStylingCollection} onDelete={(entry) => void deleteCollection(entry.id)} depth={0} />)}
-            {collections.length === 0 && <p className="px-3 py-4 text-xs leading-5 text-neutral-600">{t('Crea colecciones propias o importa la jerarquía completa de Zotero.')}</p>}
-            <div className="mt-4 flex items-center gap-1 border-t border-neutral-800 px-1 pt-3"><b className="min-w-0 flex-1 text-[10px] uppercase tracking-wider text-neutral-600">{t('Búsquedas inteligentes')}</b><button className="grid h-7 w-7 place-items-center rounded hover:bg-neutral-900" onClick={() => setSmartSearchEditor('new')} title={t('Nueva búsqueda inteligente')}><Icon name="plus" size={13} /></button></div>
-            <div className="mt-1 space-y-0.5">{savedSearches.map((record) => <button key={record.id} data-testid={`library-saved-search-${record.id}`} className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs ${!trashMode && selectedSavedSearch === record.id ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:bg-neutral-900'}`} onClick={() => { setTrashMode(false); setSelectedSavedSearch(record.id); setSelectedCollection(null); setSelected(new Set()); setDetailId(null); setOffset(0); }}><Icon name="search" size={12} /><span className="min-w-0 flex-1 truncate">{record.name}</span></button>)}</div>
-            <div className="mt-auto border-t border-red-500/15 px-1 pt-3">
-              <button
-                data-testid="open-library-trash"
-                className={`library-trash-folder flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs ${trashMode ? 'is-active' : ''}`}
-                onClick={openTrash}
-                aria-current={trashMode ? 'page' : undefined}
-              >
-                <Icon name="folder" size={14} className="shrink-0" />
-                <span className="min-w-0 flex-1 truncate">{t('Papelera')}</span>
-                {trashCount ? <span className="library-trash-folder-count rounded-full px-1.5 text-[10px] tabular-nums">{trashCount}</span> : null}
-              </button>
+          <div ref={sidebarNavigationRef} data-testid="library-sidebar-navigation" className="flex min-h-0 flex-1 flex-col">
+            <div data-testid="library-collections-pane" className="min-h-0 shrink-0 overflow-y-auto px-2 pb-1" style={{ flexBasis: `${collectionPaneRatio}%` }}>
+              {(children.get(null) ?? []).map((collection) => <CollectionBranch key={collection.id} collection={collection} children={children} selected={trashMode ? null : selectedCollection} expanded={expanded} onSelect={(id) => { setTrashMode(false); setSelectedCollection(id); setSelectedSavedSearch(null); setSelected(new Set()); setDetailId(null); setOffset(0); }} onToggle={(id) => setExpanded((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; })} onDrop={(event, entry) => void dropOnCollection(event, entry)} onRename={(entry) => void renameCollection(entry.id)} onMove={setMovingCollection} onStyle={setStylingCollection} onDelete={(entry) => void deleteCollection(entry.id)} depth={0} />)}
+              {collections.length === 0 && <p className="px-3 py-4 text-xs leading-5 text-neutral-600">{t('Crea colecciones propias o importa la jerarquía completa de Zotero.')}</p>}
+            </div>
+            <div
+              data-testid="library-sidebar-section-resizer"
+              role="separator"
+              aria-orientation="horizontal"
+              aria-label={`${t('Colecciones')} · ${t('Búsquedas inteligentes')}`}
+              aria-valuemin={MIN_LIBRARY_COLLECTION_PANE_RATIO}
+              aria-valuemax={MAX_LIBRARY_COLLECTION_PANE_RATIO}
+              aria-valuenow={collectionPaneRatio}
+              tabIndex={0}
+              className="group grid h-3 shrink-0 cursor-row-resize touch-none place-items-center px-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500/60"
+              onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); resizeCollectionPaneFromPointer(event.clientY); }}
+              onPointerMove={(event) => { if (event.currentTarget.hasPointerCapture(event.pointerId)) resizeCollectionPaneFromPointer(event.clientY); }}
+              onPointerUp={(event) => { if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId); }}
+              onDoubleClick={() => resizeCollectionPane(DEFAULT_LIBRARY_COLLECTION_PANE_RATIO)}
+              onKeyDown={(event) => {
+                if (event.key === 'ArrowUp') { event.preventDefault(); resizeCollectionPane(collectionPaneRatio - 4); }
+                else if (event.key === 'ArrowDown') { event.preventDefault(); resizeCollectionPane(collectionPaneRatio + 4); }
+                else if (event.key === 'Home') { event.preventDefault(); resizeCollectionPane(MIN_LIBRARY_COLLECTION_PANE_RATIO); }
+                else if (event.key === 'End') { event.preventDefault(); resizeCollectionPane(MAX_LIBRARY_COLLECTION_PANE_RATIO); }
+              }}
+              title={`${t('Colecciones')} · ${t('Búsquedas inteligentes')}`}
+            ><span className="h-px w-full bg-neutral-800 transition-colors group-hover:bg-indigo-500/60" /></div>
+            <div data-testid="library-saved-searches-pane" className="flex min-h-0 flex-1 flex-col overflow-hidden px-2">
+              <div className="flex shrink-0 items-center gap-1 px-1 py-2"><b className="min-w-0 flex-1 text-[10px] uppercase tracking-wider text-neutral-600">{t('Búsquedas inteligentes')}</b><button className="grid h-7 w-7 place-items-center rounded hover:bg-neutral-900" onClick={() => setSmartSearchEditor('new')} title={t('Nueva búsqueda inteligente')}><Icon name="plus" size={13} /></button></div>
+              <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto pb-2">{savedSearches.map((record) => <button key={record.id} data-testid={`library-saved-search-${record.id}`} className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs ${!trashMode && selectedSavedSearch === record.id ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:bg-neutral-900'}`} onClick={() => { setTrashMode(false); setSelectedSavedSearch(record.id); setSelectedCollection(null); setSelected(new Set()); setDetailId(null); setOffset(0); }}><Icon name="search" size={12} /><span className="min-w-0 flex-1 truncate">{record.name}</span></button>)}</div>
+              {selectedSavedSearch && savedSearches.find((entry) => entry.id === selectedSavedSearch) && <div className="flex shrink-0 gap-1 border-t border-neutral-800 py-2"><button className="btn btn-ghost flex-1 text-xs" onClick={() => setSmartSearchEditor(savedSearches.find((entry) => entry.id === selectedSavedSearch) ?? null)}><Icon name="edit" size={13} /> {t('Editar')}</button><button className="btn btn-ghost text-red-400" onClick={() => { const record = savedSearches.find((entry) => entry.id === selectedSavedSearch); if (record) void removeSavedSearch(record); }} title={t('Eliminar')}><Icon name="trash" size={13} /></button></div>}
             </div>
           </div>
-          {selectedSavedSearch && savedSearches.find((entry) => entry.id === selectedSavedSearch) && <div className="flex gap-1 border-t border-neutral-800 p-2"><button className="btn btn-ghost flex-1 text-xs" onClick={() => setSmartSearchEditor(savedSearches.find((entry) => entry.id === selectedSavedSearch) ?? null)}><Icon name="edit" size={13} /> {t('Editar')}</button><button className="btn btn-ghost text-red-400" onClick={() => { const record = savedSearches.find((entry) => entry.id === selectedSavedSearch); if (record) void removeSavedSearch(record); }} title={t('Eliminar')}><Icon name="trash" size={13} /></button></div>}
+          <div data-testid="library-trash-section" className="shrink-0 border-t border-red-500/15 p-2">
+            <button
+              data-testid="open-library-trash"
+              className={`library-trash-folder flex h-8 w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs ${trashMode ? 'is-active' : ''}`}
+              onClick={openTrash}
+              aria-current={trashMode ? 'page' : undefined}
+            >
+              <Icon name="folder" size={14} className="shrink-0" />
+              <span className="min-w-0 flex-1 truncate">{t('Papelera')}</span>
+              {trashCount ? <span className="library-trash-folder-count rounded-full px-1.5 text-[10px] tabular-nums">{trashCount}</span> : null}
+            </button>
+          </div>
         </aside>
 
         <section className="flex min-w-0 flex-1 flex-col">

@@ -244,6 +244,27 @@ try {
   await page.getByTestId('global-library-view').waitFor({ state: 'visible' });
   assert.equal(await page.getByTestId('library-scope-global').getAttribute('aria-pressed'), 'true', 'Global remains selected after a renderer restart');
   console.log('[global-library-e2e] global Library visible');
+
+  const sidebarNavigation = page.getByTestId('library-sidebar-navigation');
+  const collectionsPane = page.getByTestId('library-collections-pane');
+  const sidebarResizer = page.getByTestId('library-sidebar-section-resizer');
+  const trashSection = page.getByTestId('library-trash-section');
+  await sidebarResizer.waitFor({ state: 'visible' });
+  const beforeCollectionHeight = (await collectionsPane.boundingBox()).height;
+  const resizeBox = await sidebarResizer.boundingBox();
+  await page.mouse.move(resizeBox.x + resizeBox.width / 2, resizeBox.y + resizeBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(resizeBox.x + resizeBox.width / 2, resizeBox.y + resizeBox.height / 2 + 72, { steps: 5 });
+  await page.mouse.up();
+  const afterCollectionHeight = (await collectionsPane.boundingBox()).height;
+  assert.ok(afterCollectionHeight > beforeCollectionHeight + 40, `the splitter resizes the collection pane (${beforeCollectionHeight}px → ${afterCollectionHeight}px)`);
+  assert.ok(Number(await page.evaluate(() => localStorage.getItem('nodus.library.collectionsPaneRatio'))) > 48, 'the splitter persists its ratio');
+  assert.ok((await trashSection.boundingBox()).height <= 50, 'trash stays a compact fixed row');
+  assert.ok((await sidebarNavigation.boundingBox()).height > afterCollectionHeight, 'smart searches retain their own remaining scroll area');
+  await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-adjustable-sidebar-dark-wide.png'), fullPage: true });
+  await page.evaluate(() => { document.documentElement.classList.add('light'); document.documentElement.classList.remove('dark'); });
+  await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-adjustable-sidebar-light-wide.png'), fullPage: true });
+  await page.evaluate(() => { document.documentElement.classList.add('dark'); document.documentElement.classList.remove('light'); });
   await page.getByTitle('Nueva búsqueda inteligente').click();
   const smartSearch = page.getByTestId('library-smart-search-dialog');
   await smartSearch.waitFor({ state: 'visible' });

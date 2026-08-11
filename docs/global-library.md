@@ -418,6 +418,10 @@ the generated file deterministic.
 ## Editable collections and live smart searches
 
 Nodus collections can be nested, reordered, and moved with drag and drop.
+Collections and smart searches have independent scroll areas separated by an
+accessible draggable splitter. Its bounded ratio is remembered locally and can
+also be adjusted with the arrow, Home, and End keys. Trash remains a compact,
+fixed row below both panes instead of consuming either pane's flexible height.
 Dropping a collection on another collection nests it directly; dropping it on
 the Library root moves it back to the top level. Every local collection and
 subcollection also exposes compact rename, move, and delete controls. The move
