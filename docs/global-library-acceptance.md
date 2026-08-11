@@ -50,7 +50,7 @@ button exists.
 | Interoperability | RIS, BibTeX/BibLaTeX, CSL-JSON, EndNote XML, Zotero RDF, CSV, and Markdown import and export | Verified | `test-library-metadata`, `test-global-library-ui` |
 | Interoperability | Unknown fields survive same-format import, editing, and export through `metadata.extra` | Verified | `test-library-metadata` |
 | Citations | Citation keys are stable, editable, and collision-free | Verified | `test-library-metadata` |
-| Citations | APA 7, Chicago author-date, MLA 9, IEEE, and Vancouver render deterministically without network access | Verified | `test-library-metadata`, `e2e-global-library` |
+| Citations | APA 7, Chicago author-date, MLA 9, IEEE, and Vancouver render offline; repository, local-file, dependent-parent, and Zotero-profile styles preserve their metadata | Verified | `test-global-library-reader`, `test-global-library-ui`, `e2e-library-reader`, `e2e-global-library` |
 | Citations | Selection, collection, and smart-search exports use the same typed export contract | Verified | `test-global-library-ui`, `e2e-global-library` |
 | Interoperability | Repeated local files are detected by hash | Verified | `test-global-library-operations` |
 | Organization | Collections and subcollections support arbitrary depth | Verified | `test-global-library-operations`, `test-global-library-ui` |
@@ -82,6 +82,9 @@ button exists.
 | Revisions | Replacement extraction is staged atomically and a failure retains the last readable copy | Verified | `test-library-extraction` |
 | Revisions | Active vault invalidation retains prior results and closed vaults receive durable pending work | Verified | `test-library-revisions`, vault integration suite |
 | Reader | Markdown, images, and tables render | Verified | `e2e-library-reader` |
+| Reader | The source chooser switches between clean Markdown and every preserved attachment and remembers the selection per item | Verified | `test-global-library-reader`, `e2e-library-reader` |
+| Reader | PDF, EPUB, HTML/text, DOCX/OpenDocument/PowerPoint, spreadsheets, and images have safe internal viewers; legacy binaries expose an explicit external fallback | Verified | `test-global-library-reader`, `e2e-library-reader` |
+| Reader | Text-bearing viewers support scoped highlights/comments and images support durable normalized region highlights | Verified | `test-global-library-reader`, `e2e-library-reader` |
 | Reader | A temporary page and the complete original open separately | Verified | `test-global-library-reader`, `e2e-library-reader` |
 | Reader | Highlights, comments, and bookmarks persist | Verified | `test-global-library-reader`, `e2e-library-reader` |
 | Reader | Both sidebars can be independently shown and hidden | Verified | `test-global-library-ui`, `e2e-library-reader` |

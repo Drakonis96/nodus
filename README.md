@@ -32,8 +32,12 @@ Mendeley or other managers, or accept local documents directly.
 
 Each original remains separate from a clean Markdown reading copy, extracted
 figures, structured tables, page mappings, highlights, notes and document chat.
-The reader can briefly show the matching original page or open the full original
-without modifying it. A document can then be linked into any compatible vault
+The reader's file chooser switches between the clean copy and preserved PDF,
+EPUB, image, web, text and office attachments. Text can be highlighted in the
+reflowable and PDF viewers, while images accept region highlights. Unsupported
+legacy binaries open in their associated application without modifying them.
+The citation manager uses real CSL styles, including custom `.csl` files copied
+from Zotero, and formats them locally after installation. A document can then be linked into any compatible vault
 for search and analysis without duplicating the global copy. See the
 [architecture, recovery and privacy guide](docs/global-library.md).
 

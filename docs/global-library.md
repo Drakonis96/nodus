@@ -166,8 +166,12 @@ managers can export one of these formats; Nodus imports the records, detects
 duplicates, and lets users attach the corresponding files later. Nodus does not
 need Mendeley credentials.
 
-Users can also add PDF, EPUB, HTML, Markdown, plain text, and supported images
-directly. A content hash prevents the same file from being imported twice.
+Users can also add PDF, EPUB, HTML/XML/JATS, Markdown, plain text, Word,
+OpenDocument, PowerPoint, spreadsheets, and supported images directly. A
+content hash prevents the same file from being imported twice. Formats that do
+not have a safe internal renderer remain available through the operating
+system's associated application; Nodus never converts that fallback into an
+unsafe embedded browser document.
 
 ## Clean Markdown extraction
 
@@ -218,8 +222,24 @@ interrupted job can resume, and a failed job can be retried.
 
 ## Reader
 
-The reader renders `reader.md`; it is not a layer placed over the PDF. It
-includes:
+The reader opens from any Library row that has either clean Markdown or at least
+one available attachment. A persistent source chooser in the top toolbar and a
+matching **Versions and files** group in the left sidebar switch between the
+clean `reader.md` copy and every preserved attachment. The last selection is
+remembered per stable item identifier. The clean copy is not a layer placed
+over the original.
+
+The internal viewers include:
+
+- PDF rendering with a selectable text layer, page navigation, zoom, comments,
+  and highlights scoped to the exact page;
+- reflowable EPUB chapters with selectable text and chapter-scoped annotations;
+- HTML, XML/JATS, Markdown, plain text, DOCX, RTF, ODT, PPTX/ODP, CSV/TSV,
+  XLSX, and ODS as safe, selectable reading surfaces;
+- supported images with normalized rectangular region highlights;
+- an explicit **Open outside Nodus** fallback for legacy or unknown binaries.
+
+The reader also includes:
 
 - a collapsible section outline with exact navigation;
 - structured figures and tables;
@@ -230,7 +250,9 @@ includes:
   saved bookmark;
 - a collapsible right sidebar whose inactive tabs are icons and whose active
   `Info`, `Notes`, or `Chat` tab displays its label;
-- persistent document chat stored beside the document;
+- persistent document chat stored beside the document and grounded in the
+  currently selected clean or attached source, with a safe fallback to the
+  clean copy when a binary source cannot yield readable text;
 - an option to continue the same conversation in the main Assistant.
 
 Saved selections include offsets, text, and surrounding context so they can be
@@ -350,9 +372,23 @@ partial result report, and still requires explicit confirmation before writing
 any candidate to a manifest.
 
 Every live record has a stable, editable, collision-free citation key. Nodus
-formats in-text citations and bibliography entries locally for APA 7, Chicago
-author-date, MLA 9, IEEE, and Vancouver. The formatter does not use Citation.js,
-citeproc, an online citation service, or arbitrary CSL styles.
+formats in-text citations and bibliography entries locally with citeproc-js and
+standard Citation Style Language files. APA 7, Chicago author-date, MLA 9, IEEE,
+and Vancouver ship in the local style data; any other style can be cached from
+the Zotero Style Repository. Once a style and any independent parent are
+installed, formatting is deterministic and requires no network connection.
+
+The style manager can install a repository style by identifier or URL, import a
+local `.csl`, or copy the complete set of custom styles from the user's Zotero
+profile. Dependent institutional styles automatically resolve and cache their
+independent parent. Original CSL XML, embedded authors/contributors, rights,
+license, and update metadata are preserved. Unlicensed private styles remain
+only in the user's `nodus-library` and are never redistributed by Nodus.
+
+Official CSL styles are CC BY-SA 3.0 and require attribution to the
+[Citation Style Language project](https://citationstyles.org/). citeproc-js is
+used under its GNU AGPL v3 option. These terms are compatible with Nodus 4's
+AGPL distribution; full details are recorded in `THIRD_PARTY_NOTICES.md`.
 
 RIS, BibTeX, BibLaTeX, CSL-JSON, EndNote XML, Zotero RDF, CSV, and Markdown can
 be imported and exported. Unknown source fields are stored in `metadata.extra`
