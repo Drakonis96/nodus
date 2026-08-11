@@ -40,6 +40,7 @@ test('the Library UI exposes hierarchy, search, bulk operations, imports and bac
     'library-add-menu-toggle', 'library-add-menu', 'library-more-menu-toggle', 'library-more-menu',
     'library-detail-primary-action', 'library-detail-actions-toggle', 'library-detail-actions-menu',
     'library-reading-status', 'library-extraction-advanced', 'cancel-library-preparation',
+    'library-catalog-scroll',
   ]) assert.match(view, new RegExp(`data-testid=(?:"|\{\`)[^\n]*${marker}`));
   for (const method of [
     'getGlobalLibraryStatus', 'listGlobalLibraryItems', 'listGlobalLibraryCollections',
@@ -91,6 +92,9 @@ test('the Library UI exposes hierarchy, search, bulk operations, imports and bac
   assert.doesNotMatch(view, /\{!trashMode && <aside/, 'the collection tree remains visible while trash is open');
   assert.match(appCss, /\.library-trash-folder\.is-active[\s\S]*background: rgb\(127 29 29 \/ 0\.32\)/);
   assert.match(appCss, /\.light \.library-trash-folder\.is-active[\s\S]*background: #fee2e2/);
+  assert.match(appCss, /\.library-catalog-scroll::\-webkit-scrollbar \{ height: 4px; \}/, 'the catalogue horizontal scrollbar stays visually minimal');
+  assert.match(appCss, /\.library-catalog-scroll::\-webkit-scrollbar-track \{ background: transparent; \}/, 'the scrollbar does not render a second opaque rail');
+  assert.match(view, /className="library-catalog-list[^\"]*overflow-x-hidden"/, 'the virtualized rows cannot render a second horizontal scrollbar');
   assert.match(view, /La importación se canceló; el catálogo ya recuperado se conserva/);
   assert.match(view, /Copia de solo lectura: Nodus nunca modifica Zotero/);
   assert.match(view, /status\.conflicts > 0 \|\| status\.invalidRecords > 0/);

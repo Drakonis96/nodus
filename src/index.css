@@ -3032,6 +3032,21 @@ select.input optgroup {
   color: #991b1b;
 }
 .light .library-trash-folder-count { background: #fecaca; }
+.library-catalog-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(82 82 91 / 0.72) transparent;
+  overscroll-behavior-x: contain;
+}
+.library-catalog-scroll::-webkit-scrollbar { height: 4px; }
+.library-catalog-scroll::-webkit-scrollbar-track { background: transparent; }
+.library-catalog-scroll::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background: rgb(82 82 91 / 0.72);
+}
+.library-catalog-scroll:hover::-webkit-scrollbar-thumb { background: rgb(113 113 122 / 0.9); }
+.light .library-catalog-scroll { scrollbar-color: rgb(161 161 170 / 0.72) transparent; }
+.light .library-catalog-scroll::-webkit-scrollbar-thumb { background: rgb(161 161 170 / 0.72); }
+.light .library-catalog-scroll:hover::-webkit-scrollbar-thumb { background: rgb(113 113 122 / 0.78); }
 .library-action-menu-item {
   display: flex;
   width: 100%;

@@ -262,6 +262,8 @@ try {
   const sidebarResizer = page.getByTestId('library-sidebar-section-resizer');
   const trashSection = page.getByTestId('library-trash-section');
   const tableFooter = page.getByTestId('library-table-footer');
+  const catalogScroll = page.getByTestId('library-catalog-scroll');
+  const catalogList = page.locator('.library-catalog-list');
   await sidebarResizer.waitFor({ state: 'visible' });
   const beforeCollectionHeight = (await collectionsPane.boundingBox()).height;
   const resizeBox = await sidebarResizer.boundingBox();
@@ -275,6 +277,9 @@ try {
   const trashHeight = (await trashSection.boundingBox()).height;
   const tableFooterHeight = (await tableFooter.boundingBox()).height;
   assert.ok(Math.abs(trashHeight - tableFooterHeight) < 0.5, `trash and table footer have the same height (${trashHeight}px / ${tableFooterHeight}px)`);
+  const horizontalScrollbarHeight = await catalogScroll.evaluate((element) => Number.parseFloat(getComputedStyle(element, '::-webkit-scrollbar').height));
+  assert.ok(horizontalScrollbarHeight <= 4, `the catalogue scrollbar is no thicker than 4px (${horizontalScrollbarHeight}px)`);
+  assert.equal(await catalogList.evaluate((element) => getComputedStyle(element).overflowX), 'hidden', 'virtualized rows do not create a duplicate horizontal scrollbar');
   assert.ok((await sidebarNavigation.boundingBox()).height > afterCollectionHeight, 'smart searches retain their own remaining scroll area');
   await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-adjustable-sidebar-dark-wide.png'), fullPage: true });
   await page.evaluate(() => { document.documentElement.classList.add('light'); document.documentElement.classList.remove('dark'); });
