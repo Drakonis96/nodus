@@ -49,7 +49,7 @@ try {
   const theory = operations.createItem({
     title: 'Desire and norms', abstract: 'Gender theory', itemType: 'book',
     creators: [{ creatorType: 'author', firstName: 'Elena', lastName: 'García' }],
-    date: '2020', year: 2020, isbn: ['9780000000000'], issn: [], tags: ['gender', 'theory'],
+    date: '2020', year: 2020, edition: '2', doi: '10.5555/desire', isbn: ['9780000000000'], issn: [], tags: ['gender', 'theory'],
   }, [reading.id]);
   const beforeOrganization = store.readMaterializedItem(woman.storageId).contentRevision;
   operations.patchItemCollections([woman.id], { add: [reading.id] });
@@ -96,10 +96,16 @@ try {
   assert.ok(sorted.facets.vaults.some((facet) => facet.value === 'vault-academic'));
 
   const preferences = operations.setViewPreferences({
-    visibleColumns: ['title', 'creator', 'attachments'],
-    sort: [{ field: 'creator', direction: 'asc' }, { field: 'year', direction: 'desc' }],
+    visibleColumns: ['doi', 'title', 'edition', 'creator', 'attachments'],
+    columnWidths: { title: 320, doi: 180 },
+    sort: [{ field: 'edition', direction: 'desc' }, { field: 'creator', direction: 'asc' }, { field: 'year', direction: 'desc' }],
   });
   assert.deepEqual(new LibraryOperations(store, catalog).getViewPreferences(), preferences, 'column and multi-sort preferences survive restart');
+  assert.deepEqual(preferences.visibleColumns.slice(0, 3), ['doi', 'title', 'edition'], 'the user-defined column order is preserved');
+  assert.deepEqual(preferences.columnWidths, { title: 320, doi: 180 }, 'column widths survive restart');
+  const theoryCatalog = catalog.list({ includeDeleted: true, sort: [{ field: 'doi', direction: 'asc' }] }).items.find((entry) => entry.id === theory.id);
+  assert.equal(theoryCatalog.metadata.edition, '2');
+  assert.equal(theoryCatalog.createdAt, theory.createdAt);
   assert.equal(operations.deleteSavedSearch(saved.id), true);
   assert.equal(operations.listSavedSearches().length, 0);
   catalog.close();

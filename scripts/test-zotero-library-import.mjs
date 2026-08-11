@@ -25,7 +25,7 @@ function item(overrides) {
     tags: ['historia'], collections: ['ROOT'], publisher: 'Editorial', publicationTitle: 'Revista',
     isbn: '978-84-0000-000-0', issn: '1234-5678', url: 'https://example.test/a', date: '2020-05-10',
     language: 'es', volume: '4', issue: '2', pages: '10-30', edition: null, place: 'Madrid', rights: 'CC BY',
-    extra: 'Citation Key: garciafernandezEntreNormaDeseo2020', dateAdded: '2026-01-01', dateModified: '2026-02-01',
+    extra: 'Citation Key: garciafernandezEntreNormaDeseo2020', fields: { series: 'Historia contemporánea', numPages: '312' }, dateAdded: '2026-01-01', dateModified: '2026-02-01',
     ...overrides,
   };
 }
@@ -132,6 +132,8 @@ try {
   assert.equal(storedA.sourceLibraryId, 'users/0');
   assert.equal(storedA.metadata.issn[0], '1234-5678');
   assert.equal(storedA.metadata.extra['Citation Key'], 'garciafernandezEntreNormaDeseo2020');
+  assert.equal(storedA.metadata.extra['Zotero field: series'], 'Historia contemporánea');
+  assert.equal(storedA.metadata.extra['Zotero field: numPages'], '312');
   assert.equal(storedA.attachments[0].sourceKey, 'PDF', 'PDF wins original-format priority even if Zotero returned an image first');
   assert.equal(storedA.attachments[0].role, 'original');
   assert.equal(storedA.notes[0].source, 'zotero');

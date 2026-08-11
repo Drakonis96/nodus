@@ -168,10 +168,27 @@ try {
   await page.getByTestId('library-table-settings').click();
   const tablePreferences = page.getByTestId('library-table-preferences');
   await tablePreferences.waitFor({ state: 'visible' });
-  await tablePreferences.getByLabel('Adjuntos', { exact: true }).check();
+  await tablePreferences.getByRole('button', { name: 'Adjuntos', exact: true }).click();
+  await tablePreferences.getByRole('button', { name: 'DOI', exact: true }).click();
+  await tablePreferences.getByRole('button', { name: 'Edición', exact: true }).click();
+  await tablePreferences.locator('[data-column-id="doi"]').dragTo(tablePreferences.locator('[data-column-id="title"]'));
+  await tablePreferences.getByLabel('Ancho de columna Título', { exact: true }).fill('320');
+  assert.deepEqual(await tablePreferences.locator('[data-testid="library-visible-column-order"] [data-column-id]').evaluateAll((nodes) => nodes.slice(0, 2).map((node) => node.getAttribute('data-column-id'))), ['doi', 'title'], 'columns can be reordered by drag and drop');
+  await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-columns-dark-wide.png'), fullPage: true });
+  await page.evaluate(() => { document.documentElement.classList.add('light'); document.documentElement.classList.remove('dark'); });
+  await page.setViewportSize({ width: 760, height: 900 });
+  await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-columns-light-narrow.png'), fullPage: true });
+  await page.evaluate(() => { document.documentElement.classList.add('dark'); document.documentElement.classList.remove('light'); });
+  await page.setViewportSize({ width: 1540, height: 940 });
   await tablePreferences.getByRole('button', { name: 'Guardar', exact: true }).click();
   await tablePreferences.waitFor({ state: 'detached' });
   await page.getByRole('button', { name: 'Adjuntos', exact: true }).first().waitFor();
+  assert.deepEqual(await page.getByTestId('global-library-table-header').locator('button > span.truncate').evaluateAll((labels) => labels.slice(0, 2).map((label) => label.textContent?.trim())), ['DOI', 'Título'], 'the stored column order is rendered in the table');
+  const searchLayout = await page.getByTestId('global-library-search').evaluate((input) => {
+    const icon = input.parentElement?.querySelector('svg'); const inputBox = input.getBoundingClientRect(); const iconBox = icon?.getBoundingClientRect();
+    return { paddingLeft: parseFloat(getComputedStyle(input).paddingLeft), iconRight: iconBox ? iconBox.right - inputBox.left : 0 };
+  });
+  assert.ok(searchLayout.paddingLeft >= searchLayout.iconRight + 4, `search text starts after its icon (${JSON.stringify(searchLayout)})`);
   await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-smart-search-dark-wide.png'), fullPage: true });
   await page.setViewportSize({ width: 760, height: 900 });
   await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-smart-search-dark-narrow.png'), fullPage: true });
@@ -200,6 +217,37 @@ try {
   await row.waitFor({ state: 'visible' });
   assert.match(await row.innerText(), /Mujeres solas en la posguerra/);
   assert.match(await row.innerText(), /María Aliaga/);
+
+  await page.getByTestId('create-library-reference').click();
+  const createReference = page.getByTestId('library-create-reference-dialog');
+  await createReference.waitFor({ state: 'visible' });
+  await createReference.getByTestId('library-manual-item-type').selectOption('book-chapter');
+  await createReference.getByTestId('library-manual-title').fill('Capítulo creado manualmente');
+  await createReference.getByTestId('confirm-create-library-reference').click();
+  await createReference.waitFor({ state: 'detached' });
+  const manualEditor = page.getByTestId('library-metadata-editor');
+  await manualEditor.waitFor({ state: 'visible' });
+  assert.equal(await manualEditor.getByTestId('library-metadata-item-type').inputValue(), 'book-chapter');
+  await manualEditor.getByLabel('Edición', { exact: true }).fill('2');
+  await manualEditor.getByRole('button', { name: 'Guardar metadatos' }).click();
+  await manualEditor.waitFor({ state: 'detached' });
+  const manualRecord = await page.evaluate(async () => (await window.nodus.listGlobalLibraryItems({ search: 'Capítulo creado manualmente', limit: 5 })).items[0]);
+  assert.equal(manualRecord.itemType, 'book-chapter');
+  assert.equal(manualRecord.metadata.edition, '2');
+
+  await page.getByTestId('magic-add-library-reference').click();
+  const magicAdd = page.getByTestId('library-create-reference-dialog');
+  await magicAdd.getByTestId('library-magic-identifier').fill('not-an-identifier');
+  await magicAdd.getByTestId('confirm-create-library-reference').click();
+  await magicAdd.getByRole('alert').getByText(/DOI, ISBN, ISSN, PMID, PMCID o arXiv/).waitFor();
+  await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-magic-add-dark-wide.png'), fullPage: true });
+  await page.evaluate(() => { document.documentElement.classList.add('light'); document.documentElement.classList.remove('dark'); });
+  await page.setViewportSize({ width: 760, height: 900 });
+  await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-magic-add-light-narrow.png'), fullPage: true });
+  await page.evaluate(() => { document.documentElement.classList.add('dark'); document.documentElement.classList.remove('light'); });
+  await page.setViewportSize({ width: 1540, height: 940 });
+  await magicAdd.getByLabel('Cerrar', { exact: true }).click();
+  await magicAdd.waitFor({ state: 'detached' });
 
   await row.getByRole('button').click();
   const detail = page.getByTestId('global-library-detail');

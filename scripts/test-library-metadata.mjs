@@ -27,9 +27,45 @@ try {
   const { exportLibraryBibliography, formatLibraryCitation, generateCitationKey } = require(path.join(repoRoot, 'electron/library/libraryCitation.ts'));
   const { runLibraryMetadataBatch } = require(path.join(repoRoot, 'electron/library/libraryMetadataBatch.ts'));
   const { mergeLibraryMetadataCandidate } = require(path.join(repoRoot, 'shared/libraryMetadata.ts'));
+  const { detectLibraryMetadataIdentifier, LIBRARY_COLUMNS, LIBRARY_ITEM_TYPES } = require(path.join(repoRoot, 'shared/libraryBibliography.ts'));
+  const languageTables = {
+    en: require(path.join(repoRoot, 'src/i18n.en.ts')).EN,
+    fr: require(path.join(repoRoot, 'src/i18n.fr.ts')).FR,
+    de: require(path.join(repoRoot, 'src/i18n.de.ts')).DE,
+    pt: require(path.join(repoRoot, 'src/i18n.pt.ts')).PT,
+    'pt-BR': require(path.join(repoRoot, 'src/i18n.pt-BR.ts')).PT_BR,
+    it: require(path.join(repoRoot, 'src/i18n.it.ts')).IT,
+    tr: require(path.join(repoRoot, 'src/i18n.tr.ts')).TR,
+  };
+  const { mapZoteroLibraryItemType } = require(path.join(repoRoot, 'electron/library/zoteroLibraryImport.ts'));
   const { LibraryDiskStore } = require(path.join(repoRoot, 'electron/library/libraryStorage.ts'));
   const { LibraryCatalog } = require(path.join(repoRoot, 'electron/library/libraryCatalog.ts'));
   const { LibraryOperations } = require(path.join(repoRoot, 'electron/library/libraryOperations.ts'));
+  const { normalizeLibraryMetadata } = require(path.join(repoRoot, 'electron/library/libraryRecord.ts'));
+
+  assert.equal(normalizeLibraryMetadata({ title: 'Undated', itemType: 'document', creators: [], year: null }).year, null, 'an empty year never becomes year zero');
+
+  const zoteroTypes = LIBRARY_ITEM_TYPES.filter((entry) => entry.zoteroType);
+  assert.equal(zoteroTypes.length, 37, 'every current citeable Zotero type is available');
+  assert.equal(zoteroTypes.find((entry) => entry.zoteroType === 'bookSection').id, 'book-chapter');
+  assert.equal(zoteroTypes.find((entry) => entry.zoteroType === 'bookSection').label, 'Capítulo de libro');
+  for (const definition of zoteroTypes) assert.notEqual(mapZoteroLibraryItemType(definition.zoteroType), 'other', definition.zoteroType);
+  for (const [locale, translations] of Object.entries(languageTables)) {
+    for (const definition of LIBRARY_ITEM_TYPES) assert.ok(translations[definition.label], `${locale} translates item type ${definition.label}`);
+    for (const column of LIBRARY_COLUMNS) assert.ok(translations[column.label], `${locale} translates column ${column.label}`);
+  }
+  assert.equal(mapZoteroLibraryItemType('preprint'), 'preprint');
+  assert.equal(mapZoteroLibraryItemType('standard'), 'standard');
+  assert.ok(LIBRARY_COLUMNS.some((column) => column.id === 'doi'));
+  assert.ok(LIBRARY_COLUMNS.some((column) => column.id === 'edition'));
+  assert.ok(LIBRARY_COLUMNS.every((column) => column.sort), 'every visible bibliography column supports header sorting');
+  assert.deepEqual(detectLibraryMetadataIdentifier('https://doi.org/10.5555/norma.1').kind, 'doi');
+  assert.deepEqual(detectLibraryMetadataIdentifier('978-0-306-40615-7').kind, 'isbn');
+  assert.deepEqual(detectLibraryMetadataIdentifier('ISSN: 1234-567X').kind, 'issn');
+  assert.deepEqual(detectLibraryMetadataIdentifier('PMID: 12345678').kind, 'pmid');
+  assert.deepEqual(detectLibraryMetadataIdentifier('PMC7654321').kind, 'pmcid');
+  assert.deepEqual(detectLibraryMetadataIdentifier('arXiv:2401.01234').kind, 'arxiv');
+  assert.equal(detectLibraryMetadataIdentifier('not an identifier'), null);
 
   const requested = [];
   const fetcher = async (input) => {
