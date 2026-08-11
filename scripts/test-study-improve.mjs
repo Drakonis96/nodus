@@ -26,7 +26,9 @@ installRuntimeHooks(root);
 try {
   const Database = require('better-sqlite3');
   const shared = require(path.join(repoRoot, 'shared/studyImprove.ts'));
+  const synonymShared = require(path.join(repoRoot, 'shared/studySynonyms.ts'));
   const improve = require(path.join(repoRoot, 'electron/ai/studyImprove.ts'));
+  const synonyms = require(path.join(repoRoot, 'electron/ai/studySynonyms.ts'));
   const org = require(path.join(repoRoot, 'electron/db/studyOrgRepo.ts'));
   const styles = require(path.join(repoRoot, 'electron/db/studyStylesRepo.ts'));
   const settingsRepo = require(path.join(repoRoot, 'electron/db/settingsRepo.ts'));
@@ -49,6 +51,10 @@ try {
   assert.match(shared.renderStudyStylePrompt('Para {{subject}}: {{selectedText}}', { subject: 'Historia', selectedText: 'Texto' }), /Historia: Texto/);
   assert.ok(shared.validateStudyStylePrompt('Inventa nuevas citas y datos para ampliar el texto seleccionado.').length > 0, 'unsafe custom prompt is warned');
   assert.ok(shared.studyImprovementWarnings('Hubo 37 casos.', 'Hubo 41 casos.', [], 'preserve').length >= 2, 'changed and new numbers are warned');
+  const sentenceContext = synonymShared.studySentenceContext('Primera frase. El argumento es sólido y convincente. Última.', 31, 37);
+  assert.equal(sentenceContext.sentence, 'El argumento es sólido y convincente.');
+  assert.equal(sentenceContext.sentence.slice(sentenceContext.selectionFrom, sentenceContext.selectionTo), 'sólido');
+  assert.deepEqual(synonymShared.resolveStudySynonymTarget(sentenceContext.sentence, 'es sólido', sentenceContext.selectionFrom, sentenceContext.selectionTo), { from: 13, to: 22 });
   settingsRepo.updateSettings({ studyImproveToolbarStyleIds: ['builtin:formal', 'builtin:academic', 'builtin:clear', 'builtin:concise', 'builtin:summary'] });
   assert.deepEqual(settingsRepo.getSettings().studyImproveToolbarStyleIds,
     ['builtin:formal', 'builtin:academic', 'builtin:clear', 'builtin:concise'], 'the prompt toolbar persists at most four styles');
@@ -118,6 +124,19 @@ try {
   assert.ok(improved.protectedSpanCount >= 6);
   assert.equal(styles.listStudyImprovementLog(document.id).some((entry) => entry.id === improved.logId), true, 'full rewrite records provenance');
 
+  const synonymResult = await synonyms.suggestStudySynonyms({
+    documentId: document.id,
+    sentence: sentenceContext.sentence,
+    selectedText: 'sólido',
+    selectionFrom: sentenceContext.selectionFrom,
+    selectionTo: sentenceContext.selectionTo,
+    previousAlternatives: [],
+    model: { provider: 'ollama', model: 'controlled-local-verifier' },
+  });
+  assert.equal(synonymResult.alternatives.length, 5, 'the contextual thesaurus always returns five alternatives');
+  assert.deepEqual(synonymResult.alternatives.at(-1), { target: 'es sólido', replacement: 'está bien fundamentado', from: 13, to: 22 }, 'an alternative may expand the exact replacement target');
+  assert.match(synonyms.buildStudySynonymPrompt({ sentence: sentenceContext.sentence, selectedText: 'sólido', selectionFrom: sentenceContext.selectionFrom, selectionTo: sentenceContext.selectionTo }).user, /<<<SELECCIÓN>>>sólido<<<FIN_SELECCIÓN>>>/);
+
   const exported = styles.exportStudyStyles([custom.id]);
   assert.equal(exported.format, 'nodus-study-styles');
   assert.equal(styles.importStudyStyles(exported).length, 1, 'style files round-trip');
@@ -183,6 +202,17 @@ function installRuntimeHooks(userDataPath) {
           onDelta(result.slice(midpoint), 'content');
           return result;
         },
+      };
+    }
+    if (request === './aiClient' && parent?.filename?.endsWith('/electron/ai/studySynonyms.ts')) {
+      return {
+        completeTextNeutral: async () => JSON.stringify({ alternatives: [
+          { target: 'sólido', replacement: 'robusto' },
+          { target: 'sólido', replacement: 'consistente' },
+          { target: 'sólido', replacement: 'firme' },
+          { target: 'sólido', replacement: 'fundado' },
+          { target: 'es sólido', replacement: 'está bien fundamentado' },
+        ] }),
       };
     }
     return originalLoad.call(this, request, parent, isMain);

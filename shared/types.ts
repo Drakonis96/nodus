@@ -382,6 +382,12 @@ export type {
   StudyStyleVersion,
 } from './studyImprove';
 export type {
+  StudySentenceContext,
+  StudySynonymAlternative,
+  StudySynonymRequest,
+  StudySynonymResult,
+} from './studySynonyms';
+export type {
   StudyDictationAction,
   StudyDictationTransform,
   StudyDictationTransformOptions,

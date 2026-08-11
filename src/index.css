@@ -1269,6 +1269,35 @@ body {
   background: #262626;
 }
 
+.study-synonyms-panel {
+  position: fixed;
+  z-index: 160;
+  width: min(23rem, calc(100vw - 1.5rem));
+  overflow: hidden;
+  border: 1px solid #d6d3d1;
+  border-radius: 0.85rem;
+  background: rgba(255, 255, 255, 0.98);
+  color: #1c1917;
+  box-shadow: 0 18px 48px rgba(28, 25, 23, 0.22), 0 4px 12px rgba(28, 25, 23, 0.12);
+  backdrop-filter: blur(14px);
+}
+
+.dark .study-synonyms-panel {
+  border-color: #404040;
+  background: rgba(10, 10, 10, 0.98);
+  color: #f5f5f5;
+  box-shadow: 0 18px 52px rgba(0, 0, 0, 0.56);
+}
+
+.study-synonyms-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.7rem 0.75rem 0.35rem;
+  font-size: 0.8rem;
+}
+
 /* Subtle, minimalist scrollbars. */
 ::-webkit-scrollbar {
   width: 8px;

@@ -30,6 +30,15 @@ test('study improvement is selection-first, streamed in place and committed to t
   assert.match(editor, /bg-teal-50[^]*dark:bg-teal-950/);
   assert.match(editor, /data-testid="study-editor-undo"/);
   assert.match(editor, /data-testid="study-editor-redo"/);
+  assert.match(editor, /data-testid="study-synonyms-toggle"/);
+  assert.match(editor, /name="thesaurus"/);
+  assert.match(editor, /data-testid="study-synonyms-panel"/);
+  assert.match(editor, /study-synonyms-option/);
+  assert.match(editor, /data-testid="study-synonyms-regenerate"/);
+  assert.match(editor, /Historial de esta apertura/);
+  assert.match(editor, /previousAlternatives/);
+  assert.match(editor, /studySentenceContext/);
+  assert.match(editor, /suggestStudySynonyms/);
   assert.doesNotMatch(editor, /study-improve-undo|improveUndo|undoImprovement/);
   assert.doesNotMatch(editor, /event\.key\.toLowerCase\(\) === 'z'/);
   assert.match(editor, /El original permanece intacto/);
