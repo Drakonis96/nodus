@@ -25,6 +25,39 @@ function attachment(file, mime) {
 }
 
 try {
+  const { orderOcrLayoutLines } = require(path.join(repoRoot, 'electron/extraction/ocr.ts'));
+  const ocrLine = (text, x0, y0, x1 = x0 + 180) => ({
+    text, bbox: { x0, y0, x1, y1: y0 + 16 }, fontSize: 11, paragraphBreakBefore: false,
+  });
+  assert.deepEqual(
+    orderOcrLayoutLines([
+      ocrLine('Left one', 40, 120), ocrLine('Right one', 340, 120),
+      ocrLine('Left two', 40, 145), ocrLine('Right two', 340, 145),
+      ocrLine('Left next section', 40, 260), ocrLine('Right next section', 340, 260),
+      ocrLine('Left continuation', 40, 285), ocrLine('Right continuation', 340, 285),
+    ], 640).map((line) => line.text),
+    ['Left one', 'Left two', 'Right one', 'Right two', 'Left next section', 'Left continuation', 'Right next section', 'Right continuation'],
+    'OCR reading order keeps columns intact and respects large horizontal section breaks',
+  );
+  const { refineDocumentHeadings } = require(path.join(repoRoot, 'electron/library/libraryExtractionEngine.ts'));
+  const sourceBlock = (kind, text, page) => ({
+    kind, text, markdown: kind === 'heading' ? `## ${text}` : text,
+    anchors: [{ page, bbox: [40, 40, 540, 60] }],
+  });
+  const ocrHeadingBlocks = [
+    sourceBlock('heading', 'EXCURSIÓN FIN DE SEMANA ESTANCIA CIRCUITOS CULTURALES', 1),
+    sourceBlock('heading', 'CIUDADES HISTÓRICAS', 1),
+    sourceBlock('paragraph', 'Único Múltiple Visita en Ruta Excursión Pernoctación', 1),
+    sourceBlock('paragraph', 'ALMAGRO X X ANTEQUERA X', 1),
+    sourceBlock('heading', 'BIBLIOGRAFÍA', 2),
+    sourceBlock('heading', 'AIEST (1996):', 2),
+  ];
+  refineDocumentHeadings(ocrHeadingBlocks, [{ ocr: true }, { ocr: true }]);
+  assert.deepEqual(
+    ocrHeadingBlocks.map((block) => block.kind),
+    ['paragraph', 'paragraph', 'paragraph', 'paragraph', 'heading', 'paragraph'],
+    'OCR table headers and bibliography entries never pollute the document outline',
+  );
   const { PDFDocument, StandardFonts, rgb } = require('pdf-lib');
   const { createCanvas } = require('@napi-rs/canvas');
   const pdf = await PDFDocument.create();
@@ -36,29 +69,65 @@ try {
   context.fillStyle = '#2563eb'; context.fillRect(20, 140, 40, 60);
   context.fillStyle = '#16a34a'; context.fillRect(90, 80, 40, 120);
   context.fillStyle = '#f97316'; context.fillRect(160, 30, 40, 170);
-  const embedded = await pdf.embedPng(canvas.toBuffer('image/png'));
+  const tile = (x, y, width, height) => {
+    const output = createCanvas(width, height);
+    output.getContext('2d').drawImage(canvas, x, y, width, height, 0, 0, width, height);
+    return output.toBuffer('image/png');
+  };
+  // Reproduce a real InDesign export: one logical illustration is stored as
+  // three adjacent XObjects (main tile, right strip, bottom strip).
+  const embeddedMain = await pdf.embedPng(tile(0, 0, 160, 160));
+  const embeddedRight = await pdf.embedPng(tile(160, 0, 60, 220));
+  const embeddedBottom = await pdf.embedPng(tile(0, 160, 160, 60));
   for (let pageNumber = 1; pageNumber <= 3; pageNumber += 1) {
     const page = pdf.addPage([595, 842]);
     page.drawText('REVISTA DE HISTORIA · 2026', { x: 80, y: 810, size: 8, font });
     page.drawText(String(pageNumber), { x: 290, y: 18, size: 8, font });
     if (pageNumber === 1) {
+      page.drawText('ISSN 2254-6901 | pp. 1-3 | https://doi.org/10.0000/nodus', { x: 80, y: 790, size: 8, font });
       page.drawText('Entre norma y deseo', { x: 70, y: 760, size: 24, font: bold });
-      page.drawText('Introducción', { x: 70, y: 715, size: 16, font: bold });
+      page.drawText('Quantitative analysis: A methodological', { x: 70, y: 738, size: 11, font });
+      page.drawText('Proposal', { x: 70, y: 722, size: 13, font: bold });
+      page.drawText('Introducción', { x: 70, y: 695, size: 16, font: bold });
       page.drawText('Este estudio inter-', { x: 70, y: 680, size: 11, font });
       page.drawText('disciplinar evita  espacios dobles y conserva la puntuación .', { x: 70, y: 664, size: 11, font });
-      page.drawText('Tabla 1. Resultados', { x: 70, y: 610, size: 11, font: bold });
+      page.drawText('Un argumento documentado', { x: 90, y: 640, size: 11, font });
+      page.drawText('1', { x: 224, y: 646, size: 7, font });
+      page.drawText(' continúa en esta misma línea.', { x: 228, y: 640, size: 11, font });
+      page.drawText('y conserva la continuidad del primer párrafo.', { x: 70, y: 624, size: 11, font });
+      page.drawText('Otra afirmación documentada', { x: 70, y: 612, size: 11, font });
+      page.drawText('2', { x: 220, y: 618, size: 7, font });
+      page.drawText(' completa la prueba.', { x: 224, y: 612, size: 11, font });
+      page.drawText('Segundo párrafo con una primera línea sangrada.', { x: 90, y: 596, size: 11, font });
+      page.drawText('Su separación debe sobrevivir a la extracción.', { x: 70, y: 580, size: 11, font });
+      page.drawText('“Esta cita textual ocupa un párrafo independiente', { x: 100, y: 540, size: 10, font });
+      page.drawText('y debe mostrarse como una cita sangrada.”', { x: 100, y: 525, size: 10, font });
+      page.drawText('Tabla 1. Resultados', { x: 70, y: 480, size: 11, font: bold });
       const rows = [['Año', 'Mujeres', 'Total'], ['1940', '120', '500'], ['1941', '135', '520']];
       rows.forEach((row, rowIndex) => row.forEach((cell, column) => page.drawText(cell, {
-        x: [70, 220, 370][column], y: 585 - rowIndex * 20, size: 10, font,
+        x: [70, 220, 370][column], y: 455 - rowIndex * 20, size: 10, font,
       })));
+      page.drawText('1', { x: 70, y: 78, size: 8, font });
+      page.drawText('Nota al pie conservada al final del documento.', { x: 82, y: 78, size: 8, font });
+      page.drawText('2. Nota numerada con punto y enlace de retorno.', { x: 70, y: 64, size: 8, font });
     } else if (pageNumber === 2) {
       page.drawText('Resultados', { x: 70, y: 760, size: 16, font: bold });
       page.drawText('Los resultados confirman la hipótesis planteada.', { x: 70, y: 725, size: 11, font });
-      page.drawImage(embedded, { x: 180, y: 420, width: 220, height: 220 });
+      page.drawImage(embeddedMain, { x: 180, y: 480, width: 160, height: 160 });
+      page.drawImage(embeddedRight, { x: 340, y: 420, width: 60, height: 220 });
+      page.drawImage(embeddedBottom, { x: 180, y: 420, width: 160, height: 60 });
       page.drawText('Figura 1. Distribución de resultados', { x: 170, y: 400, size: 10, font });
+      page.drawText('Tabla 2. Matriz compleja preservada visualmente', { x: 70, y: 360, size: 11, font: bold });
+      for (let row = 0; row < 10; row += 1) {
+        page.drawText(`Categoría extensa ${row + 1}`, { x: 70, y: 335 - row * 20, size: 9, font });
+        page.drawText(`Resultado ${100 + row}`, { x: 350, y: 335 - row * 20, size: 9, font });
+      }
+      page.drawText('Fuente: elaboración de prueba', { x: 70, y: 120, size: 9, font });
     } else {
       page.drawText('Conclusiones', { x: 70, y: 760, size: 16, font: bold });
-      page.drawText('La conclusión mantiene separado el original del texto limpio.', { x: 70, y: 725, size: 11, font });
+      page.drawText('La conclusión mantiene separado el original del texto limpio [1].', { x: 70, y: 725, size: 11, font });
+      page.drawText('Referencias', { x: 70, y: 680, size: 16, font: bold });
+      page.drawText('[1] Pérez, J. Una referencia de prueba. 2026.', { x: 70, y: 650, size: 10, font });
     }
   }
   const pdfBytes = Buffer.from(await pdf.save());
@@ -90,13 +159,26 @@ try {
   const extractedRecord = store.readMaterializedItem('EXTRACT01');
   const markdown = await readFile(path.join(folder, extractedRecord.files.reader), 'utf8');
   assert.match(markdown, /^# Entre norma y deseo/m);
+  assert.doesNotMatch(markdown, /ISSN 2254-6901/, 'one-off first-page journal chrome is removed');
+  assert.match(markdown, /^Quantitative analysis: A methodological Proposal$/m, 'a short orphaned title continuation is rejoined');
+  assert.doesNotMatch(markdown, /^## Proposal$/m);
   assert.match(markdown, /interdisciplinar evita espacios dobles/);
   assert.doesNotMatch(markdown, /REVISTA DE HISTORIA/, 'repeated page chrome is removed');
   assert.doesNotMatch(markdown, / {2,}/, 'normalizer leaves no accidental double spaces');
+  assert.match(markdown, /documentado\[\^1\][\s\S]*\n\nSegundo párrafo/, 'first-line indentation becomes a real paragraph boundary');
+  assert.match(markdown, /^> “Esta cita textual ocupa un párrafo independiente y debe mostrarse como una cita sangrada\.”$/m);
+  assert.match(markdown, /^## Notas$/m);
+  assert.match(markdown, /^\[\^1\]: Nota al pie conservada al final del documento\.$/m);
+  assert.match(markdown, /^\[\^2\]: Nota numerada con punto y enlace de retorno\.$/m);
+  assert.match(markdown, /texto limpio \[\[1\]\]\(#nodus-reference-1\)\./, 'numeric citations link to their final reference');
+  assert.match(markdown, /^\[\[1\]\]\(#nodus-reference-1\) Pérez, J\. Una referencia de prueba\. 2026\.$/m);
   assert.match(markdown, /\| Año \| Mujeres \| Total \|/);
+  assert.match(markdown, /!\[Table · page 2\]\(assets\/table-p0002-/);
+  assert.match(markdown, /<!-- nodus-table-transcription/);
   assert.match(markdown, /!\[Figura 1\. Distribución de resultados\]\(assets\//);
   const assets = await readdir(path.join(path.dirname(path.join(folder, extractedRecord.files.reader)), 'assets'));
-  assert.ok(assets.some((file) => file.endsWith('.png')));
+  assert.equal(assets.filter((file) => file.startsWith('figure-') && file.endsWith('.png')).length, 1, 'adjacent InDesign image tiles render as one logical figure');
+  assert.equal(assets.filter((file) => file.startsWith('table-') && file.endsWith('.png')).length, 1, 'complex tables use one faithful visual while retaining a hidden text transcript');
   const sourceMap = JSON.parse(await readFile(path.join(folder, extractedRecord.files.sourceMap), 'utf8'));
   const quality = JSON.parse(await readFile(path.join(folder, extractedRecord.files.qualityReport), 'utf8'));
   assert.equal(sourceMap.pages.length, 3);
@@ -106,6 +188,9 @@ try {
   assert.equal(quality.doubleSpaces, 0);
   assert.equal(quality.softHyphens, 0);
   assert.equal(quality.brokenWordLineWraps, 0);
+  assert.equal(quality.footnoteReferences, 2);
+  assert.equal(quality.footnoteDefinitions, 2);
+  assert.equal(quality.unresolvedFootnotes, 0);
   assert.ok(quality.tables >= 1);
   assert.ok(quality.figures >= 1);
   assert.equal(createHash('sha256').update(await readFile(original)).digest('hex'), originalHash, 'extraction never mutates the original');

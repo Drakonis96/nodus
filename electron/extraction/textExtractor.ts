@@ -227,9 +227,9 @@ export async function extractPdfStreaming(
       const map = await ocrPdfPages(pdf, toOcr, opts.ocr.languages, ({ page, totalPages }) =>
         opts.onProgress?.({ phase: 'ocr', detail: `OCR p. ${page}/${totalPages}`, pct: page / totalPages })
       );
-      for (const [p, t] of map) {
-        if (t && t.length >= MIN_CHARS_TEXT_PAGE) {
-          pageTexts.set(p, t);
+      for (const [p, result] of map) {
+        if (result.text && result.text.length >= MIN_CHARS_TEXT_PAGE) {
+          pageTexts.set(p, result.text);
           ocredPages++;
         }
       }

@@ -455,6 +455,9 @@ export interface LibraryQualityReport {
   decomposedUnicodeMarks: number;
   softHyphens: number;
   brokenWordLineWraps: number;
+  footnoteReferences: number;
+  footnoteDefinitions: number;
+  unresolvedFootnotes: number;
   warnings: string[];
 }
 
