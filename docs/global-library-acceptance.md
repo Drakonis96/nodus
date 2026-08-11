@@ -88,11 +88,17 @@ button exists.
 | Reader | A temporary page and the complete original open separately | Verified | `test-global-library-reader`, `e2e-library-reader` |
 | Reader | Highlights, comments, and bookmarks persist | Verified | `test-global-library-reader`, `e2e-library-reader` |
 | Reader | Both sidebars can be independently shown and hidden | Verified | `test-global-library-ui`, `e2e-library-reader` |
+| Reader | The traced outline stays above a collapsible file chooser for every selected source | Verified | `test-global-library-ui`, `e2e-library-reader` |
+| Reader | Dark and light clean-reading surfaces follow the application theme | Verified | `e2e-library-reader` |
+| Reader | Paged viewers use balanced icon-only navigation controls | Verified | `test-global-library-ui`, `e2e-library-reader` |
+| Reader | The right rail and chat composer remain reachable after resizing and notifications never cover them | Verified | `e2e-library-reader` |
 | Reader | The bookmark icon exposes marking and return actions | Verified | `test-global-library-ui`, `e2e-library-reader` |
 | Reader | Inactive document tabs are icons and the active tab shows its label | Verified | `test-global-library-ui`, `e2e-library-reader` |
 | Reader | Annotations reanchor to the exact content fingerprint or remain in an orphan inbox | Verified | `test-library-revisions`, `e2e-library-reader` |
 | Reader | The Info tab exposes clean-content and extraction provenance | Verified | `test-global-library-reader`, `e2e-library-reader` |
 | Chat | The shared engine and model receive document context | Verified | `test-global-library-ui`, `test-global-library-reader` |
+| Chat | The reader uses Nodi's active-vault retrieval and opens stable reader and vault citations | Verified | `test-global-library-reader`, `e2e-library-reader` |
+| Chat | The reader model menu exposes the configured featured models and persists the Nodi selection | Verified | `test-global-library-ui`, `e2e-library-reader` |
 | Chat | History persists beside the document and can be cleared | Verified | `test-global-library-reader` |
 | Metadata | Local edits survive future source refreshes | Verified | `test-library-metadata`, `e2e-global-library` |
 | Metadata | DOI/ISSN use Crossref, ISBN uses Open Library, PMID/PMCID use NCBI, and arXiv uses its Atom API | Verified | `test-library-metadata` |

@@ -241,18 +241,26 @@ The internal viewers include:
 
 The reader also includes:
 
-- a collapsible section outline with exact navigation;
+- a traced section outline at the top of the left rail, independent of the
+  selected source, with exact navigation back to clean Markdown;
+- a compact, collapsible **Versions and files** control below the outline;
 - structured figures and tables;
 - a temporary view of the matching original page;
 - independent opening of the complete original;
+- icon-only previous/next controls in paged viewers;
 - six highlight colors, comments, and one reading bookmark per section;
 - one compact bookmark menu for marking the current section or returning to the
   saved bookmark;
 - a collapsible right sidebar whose inactive tabs are icons and whose active
   `Info`, `Notes`, or `Chat` tab displays its label;
-- persistent document chat stored beside the document and grounded in the
-  currently selected clean or attached source, with a safe fallback to the
-  clean copy when a binary source cannot yield readable text;
+- persistent document chat stored beside the document and run through the same
+  Nodi engine as the main Assistant. It combines the currently selected clean
+  or attached source, annotations, and active-vault context; cites traced
+  sections, pages, passages, works, ideas, authors, gaps, and contradictions;
+  and safely falls back to the clean copy when a binary source cannot yield
+  readable text;
+- a compact model menu containing the user's featured chat models, with the
+  selection shared with Nodi;
 - an option to continue the same conversation in the main Assistant.
 
 Saved selections include offsets, text, and surrounding context so they can be
@@ -265,11 +273,13 @@ content fingerprint. Unrecoverable selections are not deleted: they appear in
 the right sidebar's orphaned-annotation inbox and remain in the dedicated
 recovery sidecar until the user reviews them.
 
-Chat reuses the Nodus AI engine and model settings. It receives the clean
-Markdown, annotations, and a bounded history window. It does not invent pages
-or quotations: the prompt requires it to distinguish available content from
-inference. With a local model, the context stays on the device. A remote provider
-receives only the text needed for the question when the user asks it.
+Chat reuses the Nodi engine, active-vault retrieval, featured model settings,
+and a bounded history window. Reader citations return to the exact traced
+section or page; vault citations open the existing source modal. It does not
+invent pages or quotations: the prompt requires it to distinguish available
+content from inference. With a local model, the context stays on the device. A
+remote provider receives only the text needed for the question when the user
+asks it.
 
 ## Metadata and duplicates
 
