@@ -149,7 +149,27 @@ try {
   await vaultScopeTooltip.waitFor({ state: 'visible' });
   assert.match(await vaultScopeTooltip.innerText(), /colecciones|collections/i, 'This vault explanation appears on hover');
   assert.equal(await page.getByTestId('library-scope-vault').getAttribute('aria-pressed'), 'true', 'a v3-style profile starts in the unchanged vault corpus');
-  await page.getByRole('button', { name: 'Colecciones de Zotero', exact: true }).waitFor();
+  const vaultSearch = page.getByTestId('library-vault-search');
+  const vaultFiltersToggle = page.getByTestId('library-vault-filters-toggle');
+  await vaultSearch.waitFor({ state: 'visible' });
+  assert.equal(await page.getByTestId('library-vault-filters-panel').count(), 0, 'secondary filters start collapsed');
+  const vaultFilterGeometry = await page.evaluate(() => {
+    const search = document.querySelector('[data-testid="library-vault-search"]');
+    const card = search?.closest('.card');
+    if (!(search instanceof HTMLElement) || !(card instanceof HTMLElement)) throw new Error('Vault search surface not found');
+    return { searchWidth: search.getBoundingClientRect().width, cardWidth: card.getBoundingClientRect().width };
+  });
+  assert.ok(vaultFilterGeometry.searchWidth > vaultFilterGeometry.cardWidth * 0.7, `search owns the filter row (${JSON.stringify(vaultFilterGeometry)})`);
+  await vaultFiltersToggle.click();
+  await page.getByTestId('library-vault-filters-panel').waitFor({ state: 'visible' });
+  await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-vault-filters-dark-wide.png'), fullPage: true });
+  await vaultFiltersToggle.click();
+  await page.getByTestId('library-collections-menu-toggle').click();
+  await page.getByTestId('library-collections-menu').waitFor({ state: 'visible' });
+  assert.match(await page.getByTestId('open-nodus-collections').innerText(), /Colecciones de Nodus[\s\S]*Global/);
+  assert.match(await page.getByTestId('open-zotero-collections').innerText(), /Colecciones de Zotero[\s\S]*Este vault/);
+  await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-collection-sources-dark-wide.png'), fullPage: true });
+  await page.getByTestId('library-collections-menu-toggle').click();
   await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-scope-vault-dark-wide.png'), fullPage: true });
   await page.getByTestId('library-scope-global').click();
   await page.mouse.move(0, 0);
@@ -251,6 +271,25 @@ try {
   assert.equal(narrowVaultScopeLayout.insideHeader, true, `compact This-vault scope control must stay within a narrow header (${JSON.stringify(narrowVaultScopeLayout)})`);
   assert.equal(narrowVaultScopeLayout.pageOverflow, false, `compact This-vault scope control must not overflow the page (${JSON.stringify(narrowVaultScopeLayout)})`);
   assert.ok(narrowVaultScopeLayout.centerDelta < 1, `compact This-vault scope control remains centered (${JSON.stringify(narrowVaultScopeLayout)})`);
+  const narrowVaultFilters = await page.evaluate(() => {
+    const search = document.querySelector('[data-testid="library-vault-search"]');
+    const toggle = document.querySelector('[data-testid="library-vault-filters-toggle"]');
+    const card = search?.closest('.card');
+    if (!(search instanceof HTMLElement) || !(toggle instanceof HTMLElement) || !(card instanceof HTMLElement)) throw new Error('Narrow vault filters not found');
+    const searchRect = search.getBoundingClientRect();
+    const toggleRect = toggle.getBoundingClientRect();
+    const cardRect = card.getBoundingClientRect();
+    return {
+      searchWidth: searchRect.width,
+      insideCard: searchRect.left >= cardRect.left && toggleRect.right <= cardRect.right,
+      overlap: searchRect.right > toggleRect.left,
+    };
+  });
+  assert.equal(narrowVaultFilters.insideCard, true, `search and filters stay inside the narrow card (${JSON.stringify(narrowVaultFilters)})`);
+  assert.equal(narrowVaultFilters.overlap, false, `search and filters do not overlap (${JSON.stringify(narrowVaultFilters)})`);
+  assert.ok(narrowVaultFilters.searchWidth >= 180, `search remains usable at narrow width (${JSON.stringify(narrowVaultFilters)})`);
+  await page.getByTestId('library-vault-filters-toggle').click();
+  await page.getByTestId('library-vault-filters-panel').waitFor({ state: 'visible' });
   await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-scope-vault-light-narrow.png'), fullPage: true });
   await page.getByTestId('library-scope-global').click();
   await library.waitFor({ state: 'visible' });

@@ -2664,6 +2664,7 @@ export const TR: Record<string, string> = {
   "Monitorizar": "Monitör",
   "ítems directos · subcolecciones": "doğrudan öğeler · alt koleksiyonlar",
   "Colecciones de Zotero": "Zotero Koleksiyonları",
+  "Colecciones de Nodus": "Nodus Koleksiyonları",
   "Monitorizando:": "İzleme:",
   "Ninguna colección": "Koleksiyon yok",
   "Quitar del monitoreo": "İzlemeden kaldır",

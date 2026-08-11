@@ -26,6 +26,11 @@ test('the single Library screen owns explicit global and vault scopes', async ()
   assert.match(styles, /\.library-header-bar > \.library-scope-switcher \{[\s\S]*?grid-column: 2;[\s\S]*?justify-self: center/, 'the scope selector owns the center column');
   assert.match(styles, /@media \(max-width: 1100px\)[\s\S]*?\.library-header-bar > \.library-scope-switcher \{[\s\S]*?grid-column: 1 \/ -1;[\s\S]*?grid-row: 2;/, 'narrow headers keep the selector centered on its own row');
   assert.match(library, /<Icon name="book" className="text-indigo-400" \/> \{t\('Biblioteca'\)\}/, 'This vault uses the same Library title treatment as Global');
+  assert.match(library, /data-testid="library-vault-search"[\s\S]*?input-with-leading-icon w-full/, 'the traditional corpus gives search the full available row');
+  assert.match(library, /data-testid="library-vault-filters-toggle"[\s\S]*?aria-controls="library-vault-filters-panel"/, 'secondary filters are grouped behind one accessible control');
+  assert.match(library, /filtersOpen && \([\s\S]*?data-testid="library-vault-filters-panel"/, 'the dense filter controls are progressively disclosed');
+  assert.match(library, /data-testid="library-collections-menu-toggle"[\s\S]*?data-testid="open-nodus-collections"[\s\S]*?data-testid="open-zotero-collections"/, 'one coherent collections menu exposes both sources');
+  assert.match(view, /onOpenNodusCollections=\{\(\) => void chooseScope\('global'\)\}/, 'the Nodus collection selector opens the editable Global hierarchy');
   assert.doesNotMatch(view, /className="library-theme-bar[^"]*min-h-12/, 'scope selection must not consume a separate full-width row');
   assert.match(view, /<Library[\s\S]*target=\{target\}/, 'the vault scope renders the complete traditional Library');
   assert.match(registry, /activeVault[\s\S]*setCollectionsOpen[\s\S]*GlobalLibraryView/);

@@ -1450,6 +1450,7 @@ export function GlobalLibraryView({
             target={target}
             vaultType={vaultType}
             onOpenCollections={onOpenCollections}
+            onOpenNodusCollections={() => void chooseScope('global')}
             onOpenGraph={onOpenGraph}
             onOpenAssistant={onOpenAssistant}
             onOpenArchive={onOpenArchive}

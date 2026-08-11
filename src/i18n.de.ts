@@ -2546,6 +2546,7 @@ export const DE: Record<string, string> = {
   'Monitorizar': 'Überwachen',
   'ítems directos · subcolecciones': 'direkte Elemente · Untersammlungen',
   'Colecciones de Zotero': 'Zotero-Sammlungen',
+  'Colecciones de Nodus': 'Nodus-Sammlungen',
   'Monitorizando:': 'Überwacht:',
   'Ninguna colección': 'Keine Sammlung',
   'Quitar del monitoreo': 'Aus der Überwachung entfernen',

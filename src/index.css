@@ -619,6 +619,10 @@ body {
   border-color: #d4d4d4;
   box-shadow: 0 20px 40px rgba(15, 23, 42, 0.14);
 }
+.light .library-vault-filter-panel {
+  background-color: #fafafa;
+  border-color: #e5e5e5;
+}
 .light .zotero-tag-option.is-selected {
   background-color: #eef2ff;
   color: #3730a3;

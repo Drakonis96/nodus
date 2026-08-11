@@ -399,6 +399,7 @@ export function Library({
   target,
   vaultType,
   onOpenCollections,
+  onOpenNodusCollections,
   onOpenGraph,
   onOpenAssistant,
   onOpenArchive,
@@ -410,6 +411,7 @@ export function Library({
   target?: LibraryNavigationTarget | null;
   vaultType?: VaultType;
   onOpenCollections: () => void;
+  onOpenNodusCollections: () => void;
   onOpenGraph: (target: PendingGraphNavigationTarget) => void;
   onOpenAssistant: (target?: PendingAssistantNavigationTarget) => void;
   onOpenArchive?: () => void;
@@ -440,7 +442,9 @@ export function Library({
   const [reuseAnalysisFromVaults, setReuseAnalysisFromVaults] = useState(false);
   const [reuseNotice, setReuseNotice] = useState<string | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
+  const [collectionsMenuOpen, setCollectionsMenuOpen] = useState(false);
   const [graphWork, setGraphWork] = useState<{ nodus_id: string; title: string } | null>(null);
   const [ideasWork, setIdeasWork] = useState<{ nodus_id: string; title: string } | null>(null);
   const [statusWork, setStatusWork] = useState<WorkView | null>(null);
@@ -462,6 +466,11 @@ export function Library({
     open: collectionFilterOpen,
     onDismiss: () => setCollectionFilterOpen(false),
     group: 'library-filters',
+  });
+  const collectionsMenuRef = useDismissableLayer<HTMLDivElement>({
+    open: collectionsMenuOpen,
+    onDismiss: () => setCollectionsMenuOpen(false),
+    group: 'library-header-menus',
   });
 
   // Only the works list depends on the active filter, so typing in the search
@@ -880,6 +889,12 @@ export function Library({
     selectedCollections.length > 0 ||
     selectedReadiness !== null ||
     selectedHealthBucket !== null;
+  const activeFilterCount =
+    selectedStatusFlags.length +
+    selectedZoteroTags.length +
+    selectedCollections.length +
+    (selectedReadiness !== null ? 1 : 0) +
+    (selectedHealthBucket !== null ? 1 : 0);
   const clearHealthBucket = () => setFilter((c) => ({ ...c, healthBucket: undefined }));
   const toggleStatusFlag = (f: StatusFlag) =>
     setFilter((cur) => {
@@ -904,6 +919,15 @@ export function Library({
     setSearchDraft('');
     setTagSearch('');
     setCollectionSearch('');
+  };
+  const toggleFilterPanel = () => {
+    const nextOpen = !filtersOpen;
+    setFiltersOpen(nextOpen);
+    if (!nextOpen) {
+      setTagFilterOpen(false);
+      setCollectionFilterOpen(false);
+      setAdvancedFiltersOpen(false);
+    }
   };
 
   // A batch action must only operate on the current result set.  Otherwise a
@@ -1011,20 +1035,95 @@ export function Library({
           >
             <Icon name="wand" /> {t('Operaciones')}
           </button>
-          <button className="btn btn-ghost border border-neutral-700" onClick={onOpenCollections}>
-            <Icon name="folder" /> {t('Colecciones de Zotero')}
-          </button>
+          <div className="relative z-40" ref={collectionsMenuRef}>
+            <button
+              data-testid="library-collections-menu-toggle"
+              className={`btn border border-neutral-700 gap-1.5 ${collectionsMenuOpen ? 'bg-neutral-800 text-neutral-100' : 'btn-ghost'}`}
+              onClick={() => setCollectionsMenuOpen((open) => !open)}
+              aria-expanded={collectionsMenuOpen}
+              aria-haspopup="menu"
+            >
+              <Icon name="folder" /> {t('Colecciones')}
+              <Icon name="chevronDown" size={12} className={`transition-transform ${collectionsMenuOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {collectionsMenuOpen && (
+              <div
+                data-testid="library-collections-menu"
+                role="menu"
+                className="library-action-menu absolute right-0 z-50 mt-2 w-64 rounded-xl border border-neutral-800 bg-neutral-950 p-1.5 shadow-2xl"
+              >
+                <button
+                  data-testid="open-nodus-collections"
+                  role="menuitem"
+                  className="library-action-menu-item"
+                  onClick={() => {
+                    setCollectionsMenuOpen(false);
+                    onOpenNodusCollections();
+                  }}
+                >
+                  <Icon name="library" />
+                  <span><b>{t('Colecciones de Nodus')}</b><small>{t('Global')}</small></span>
+                </button>
+                <button
+                  data-testid="open-zotero-collections"
+                  role="menuitem"
+                  className="library-action-menu-item"
+                  onClick={() => {
+                    setCollectionsMenuOpen(false);
+                    onOpenCollections();
+                  }}
+                >
+                  <Icon name="folder" />
+                  <span><b>{t('Colecciones de Zotero')}</b><small>{t('Este vault')}</small></span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
       <div className="card p-3 mb-3">
-        <div className="flex flex-wrap gap-2 items-center">
-          <input
-            className="input"
-            value={searchDraft}
-            placeholder={t('Buscar título o autor…')}
-            onChange={(e) => setSearchDraft(e.target.value)}
-          />
+        <div className="flex items-center gap-2">
+          <div className="relative min-w-[18rem] flex-1">
+            <Icon name="search" size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
+            <input
+              data-testid="library-vault-search"
+              className="input input-with-leading-icon w-full"
+              value={searchDraft}
+              placeholder={t('Buscar título o autor…')}
+              onChange={(e) => setSearchDraft(e.target.value)}
+            />
+          </div>
+          <button
+            data-testid="library-vault-filters-toggle"
+            type="button"
+            className={`library-filter-button tone-indigo btn shrink-0 border gap-1.5 ${filtersOpen || activeFilterCount > 0 ? 'is-active border-indigo-700 bg-indigo-950/40 text-indigo-100' : 'btn-ghost border-neutral-700'}`}
+            onClick={toggleFilterPanel}
+            aria-expanded={filtersOpen}
+            aria-controls="library-vault-filters-panel"
+          >
+            <Icon name="filter" /> {t('Filtros')}
+            {activeFilterCount > 0 && (
+              <span className="library-filter-count tone-indigo rounded bg-indigo-800/80 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+          {hasActiveFilters && (
+            <button
+              type="button"
+              className="btn btn-ghost shrink-0 border border-neutral-700 px-2"
+              onClick={clearAllFilters}
+              aria-label={t('Limpiar filtros')}
+              title={t('Limpiar filtros')}
+            >
+              <Icon name="x" />
+            </button>
+          )}
+        </div>
+        {filtersOpen && (
+          <div id="library-vault-filters-panel" data-testid="library-vault-filters-panel" className="library-vault-filter-panel mt-3 rounded-xl border border-neutral-800 bg-neutral-950/35 p-3">
+            <div className="flex flex-wrap items-center gap-2">
           <div className="relative" ref={tagFilterRef}>
             <button
               type="button"
@@ -1202,17 +1301,8 @@ export function Library({
               </div>
             )}
           </div>
-          {hasActiveFilters && (
-            <button
-              type="button"
-              className="btn btn-ghost border border-neutral-700 gap-1.5"
-              onClick={clearAllFilters}
-            >
-              <Icon name="x" /> {t('Limpiar filtros')}
-            </button>
-          )}
           <div className="flex-1" />
-        </div>
+            </div>
         {/* One-click status filters. These replaced a row of counters that showed
             the same information but could not be clicked, sitting next to a
             separate control that filtered by it. */}
@@ -1268,6 +1358,8 @@ export function Library({
             <span className="text-xs text-neutral-500">
               {t('Combina condiciones sueltas de la tubería de análisis. Los presets de arriba cubren los casos habituales.')}
             </span>
+          </div>
+        )}
           </div>
         )}
         {selectedZoteroTags.length > 0 && (

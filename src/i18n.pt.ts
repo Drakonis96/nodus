@@ -2524,6 +2524,7 @@ export const PT: Record<string, string> = {
   'Monitorizar': 'Monitorizar',
   'ítems directos · subcolecciones': 'itens diretos · subcoleções',
   'Colecciones de Zotero': 'Coleções do Zotero',
+  'Colecciones de Nodus': 'Coleções do Nodus',
   'Monitorizando:': 'A monitorizar:',
   'Ninguna colección': 'Nenhuma coleção',
   'Quitar del monitoreo': 'Remover da monitorização',
