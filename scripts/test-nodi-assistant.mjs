@@ -390,6 +390,11 @@ test('Nodi drags in absolute screen space and closes through an animated context
   assert.match(companionCss, /\.nodi-theme-light \.nodi-node\s*\{[^}]*var\(--nodi-vault-accent/s, 'light radial actions use the vault accent');
   assert.match(companionCss, /\.nodi-theme-light \.nodi-panel\s*\{[^}]*background:\s*#ffffff/s, 'chat, notifications and notes share the light panel surface');
   assert.match(companionCss, /\.nodi-theme-light \.nodi-msg\.user\s*\{[^}]*var\(--nodi-vault-accent/s, 'light chat messages use the vault accent');
+  assert.match(
+    companionCss,
+    /\.nodi-theme-light \.nodi-msg\.user \.md blockquote\s*\{[^}]*background:\s*rgba\(15, 23, 42, \.18\);[^}]*color:\s*inherit;[^}]*opacity:\s*1;/s,
+    'reader quotations keep the user bubble foreground instead of becoming grey on the vault accent',
+  );
   assert.match(figure, /closing-accessory-smoke/);
   assert.match(figure, /closing-body-smoke/);
   for (const animation of ['nodi-close-limb', 'nodi-close-accessory', 'nodi-close-face', 'nodi-close-core', 'nodi-close-smoke']) {

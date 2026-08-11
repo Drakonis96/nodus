@@ -10,7 +10,7 @@
 // notes and the native drag, and fails on any TypeError the overlay logs.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdir, mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
@@ -29,6 +29,26 @@ if (!process.argv.includes('--child')) {
 
 const userData = await mkdtemp(path.join(os.tmpdir(), 'nodus-overlay-'));
 await mkdir(shots, { recursive: true });
+const quotedConversationTitle = 'Cita visible del documento';
+const quotedExcerpt = 'Los diarios permiten conocer los pensamientos y emociones de sus autores.';
+const now = Date.now();
+await writeFile(path.join(userData, 'nodi-chat-history.json'), JSON.stringify({
+  version: 1,
+  conversations: [{
+    id: 'quoted-reader-selection',
+    title: quotedConversationTitle,
+    messages: [
+      { role: 'user', content: `> ${quotedExcerpt}\n\nResume la metodología.` },
+      { role: 'assistant', content: 'La metodología combina lectura cualitativa y clasificación sistemática.' },
+    ],
+    contexts: ['current_view', 'vault'],
+    model: null,
+    vaultId: null,
+    vaultName: 'Vault de prueba',
+    createdAt: now,
+    updatedAt: now,
+  }],
+}), 'utf8');
 const childEnv = { ...process.env, NODUS_USERDATA: userData, NODUS_DISABLE_AUTO_UPDATE: '1', NODUS_E2E_UPDATE_STATUS: 'not-available' };
 delete childEnv.ELECTRON_RUN_AS_NODE;
 
@@ -41,7 +61,7 @@ try {
   await page.evaluate(() => window.nodus.updateSettings({
     onboardingComplete: true, recoverySetupVersion: 1, tourComplete: true, advancedTourComplete: true,
     basicsTutorialVersion: 5, uiLanguage: 'es', mascotEnabled: true, mascotAlwaysOnTop: true,
-    mascotStyle: 'orb', reduceMotion: false,
+    mascotStyle: 'orb', reduceMotion: false, theme: 'light',
   }));
   await page.reload();
   await page.getByTestId('app-shell').waitFor();
@@ -264,10 +284,25 @@ try {
   console.log('[verify] clearNotifications confirmation -> empty');
   await closePanel();
 
-  // Chat: opening it reads the conversations, the view context and the settings. The
-  // message is never sent — no provider is configured in a clean profile — but the
-  // composer becoming enabled proves the panel finished loading.
+  // Chat: open a persisted reader quotation and verify its real computed colours.
+  // This catches the former grey-on-purple quote even though the Markdown content
+  // itself was present and correctly persisted.
   await openPanel('chat');
+  await overlay.getByRole('button', { name: 'Historial de chats' }).click();
+  await overlay.locator('.nodi-history-open', { hasText: quotedConversationTitle }).click();
+  const readerQuote = overlay.locator('.nodi-msg.user .md blockquote');
+  await readerQuote.waitFor();
+  assert.match(await readerQuote.innerText(), new RegExp(quotedExcerpt));
+  const quoteAppearance = await readerQuote.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { color: style.color, background: style.backgroundColor, opacity: style.opacity };
+  });
+  assert.deepEqual(quoteAppearance, {
+    color: 'rgb(255, 255, 255)',
+    background: 'rgba(15, 23, 42, 0.18)',
+    opacity: '1',
+  }, 'quoted document text must retain the readable foreground of the user bubble');
+  await overlay.screenshot({ path: `${shots}/overlay-4-chat-quote.png` });
   await overlay.locator('.nodi-panel textarea').first().fill('Hola Nodi');
   await overlay.waitForFunction(() => {
     const send = document.querySelector('.nodi-chat-send');
