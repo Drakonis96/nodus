@@ -3280,6 +3280,42 @@ select.input optgroup {
 .library-reader-document .md > p:last-of-type { margin-bottom: 1.2em; }
 .library-reader-outline,
 .library-reader-notes { scrollbar-width: thin; scrollbar-color: rgb(63 63 70) transparent; }
+.library-reader-outline-close { color: #52525b; }
+.library-reader-outline-close:hover,
+.library-reader-outline-close:focus-visible { background: #18181b; color: #d4d4d8; }
+.library-reader-outline-section { color: #71717a; }
+.library-reader-outline-section:hover,
+.library-reader-outline-section:focus-within { background: #18181b; color: #e4e4e7; }
+.library-reader-outline-section.is-active { background: rgb(49 46 129 / 0.45); color: #c7d2fe; }
+.library-reader-outline-page { color: #52525b; }
+.library-reader-outline-section:hover .library-reader-outline-page,
+.library-reader-outline-section:focus-within .library-reader-outline-page { opacity: 1; color: #a1a1aa; }
+.library-reader-outline-page:hover,
+.library-reader-outline-page:focus-visible { background: #27272a; color: #a5b4fc !important; }
+.light .library-reader-outline-close,
+.light .library-theme .library-reader-outline-close { color: #52525b; }
+.light .library-reader-outline-close:hover,
+.light .library-reader-outline-close:focus-visible,
+.light .library-theme .library-reader-outline-close:hover,
+.light .library-theme .library-reader-outline-close:focus-visible { background: #f4f4f5; color: #27272a; }
+.light .library-reader-outline-section,
+.light .library-theme .library-reader-outline-section { color: #52525b; }
+.light .library-reader-outline-section:hover,
+.light .library-reader-outline-section:focus-within,
+.light .library-theme .library-reader-outline-section:hover,
+.light .library-theme .library-reader-outline-section:focus-within { background: #f4f4f5; color: #27272a; }
+.light .library-reader-outline-section.is-active,
+.light .library-theme .library-reader-outline-section.is-active { background: #e0e7ff; color: #4338ca; }
+.light .library-reader-outline-page,
+.light .library-theme .library-reader-outline-page { color: #64748b; }
+.light .library-reader-outline-section:hover .library-reader-outline-page,
+.light .library-reader-outline-section:focus-within .library-reader-outline-page,
+.light .library-theme .library-reader-outline-section:hover .library-reader-outline-page,
+.light .library-theme .library-reader-outline-section:focus-within .library-reader-outline-page { color: #52525b; }
+.light .library-reader-outline-page:hover,
+.light .library-reader-outline-page:focus-visible,
+.light .library-theme .library-reader-outline-page:hover,
+.light .library-theme .library-reader-outline-page:focus-visible { background: #e5e7eb; color: #4338ca !important; }
 @media (max-width: 1279px) {
   .library-reader-outline,
   .library-reader-notes { background-color: #09090b; }

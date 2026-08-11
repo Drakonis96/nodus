@@ -728,17 +728,17 @@ export function LibraryDocumentReader({
             <div className="mb-3 flex items-center justify-between px-2">
               <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-500">{t('En este documento')}</span>
               <span className="ml-auto text-[10px] tabular-nums text-neutral-600">{Math.round(progress)}%</span>
-              <button className="ml-1.5 rounded-lg p-1 text-neutral-600 hover:bg-neutral-900 hover:text-neutral-300" onClick={() => setOutlineOpen(false)} aria-label={t('Cerrar')}><Icon name="chevronLeft" size={13} /></button>
+              <button className="library-reader-outline-close ml-1.5 rounded-lg p-1" onClick={() => setOutlineOpen(false)} aria-label={t('Cerrar')}><Icon name="chevronLeft" size={13} /></button>
             </div>
             <nav className="space-y-0.5">
               {reader.sections.length > 0 ? <>
                 <p className="px-2 pb-1 pt-1 text-[9px] font-semibold uppercase tracking-[.14em] text-neutral-600">{t('Índice del documento')}</p>
                 {reader.sections.map((section, index) => (
-                <div key={section.id} className={`group flex items-center rounded-lg ${index === activeSection ? 'bg-indigo-950/45 text-indigo-200' : 'text-neutral-500 hover:bg-neutral-900 hover:text-neutral-300'}`}>
+                <div key={section.id} className={`library-reader-outline-section group flex items-center rounded-lg ${index === activeSection ? 'is-active' : ''}`}>
                   <button className="min-w-0 flex-1 px-2 py-2 text-left text-xs leading-4" style={{ paddingLeft: `${8 + Math.max(0, section.level - 1) * 10}px` }} onClick={() => scrollToSection(index)}>
                     <span className="line-clamp-2">{section.title}</span>
                   </button>
-                  {section.page && <button className="mr-1 shrink-0 rounded px-1.5 py-1 text-[9px] tabular-nums text-neutral-600 opacity-0 hover:bg-neutral-800 hover:text-indigo-300 group-hover:opacity-100" title={tx('Abrir página {n} del original', { n: section.page })} onClick={() => openCurrentPage(section.page)}>p. {section.page}</button>}
+                  {section.page && <button className="library-reader-outline-page mr-1 shrink-0 rounded px-1.5 py-1 text-[9px] tabular-nums opacity-0" title={tx('Abrir página {n} del original', { n: section.page })} onClick={() => openCurrentPage(section.page)}>p. {section.page}</button>}
                 </div>
                 ))}
               </> : <p className="px-2 py-3 text-[10px] leading-4 text-neutral-600">{t('Añade títulos para crear un índice navegable.')}</p>}

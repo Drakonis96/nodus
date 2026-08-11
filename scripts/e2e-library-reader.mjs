@@ -30,6 +30,7 @@ const citationScreenshotPath = path.join(screenshotDirectory, '08-csl-style-mana
 const lightScreenshotPath = path.join(screenshotDirectory, '09-clean-reader-light-narrow.png');
 const responsiveChatScreenshotPath = path.join(screenshotDirectory, '10-reader-chat-responsive.png');
 const lightControlsScreenshotPath = path.join(screenshotDirectory, '11-reader-controls-light.png');
+const lightOutlineScreenshotPath = path.join(screenshotDirectory, '12-reader-outline-light-hover.png');
 const childEnv = {
   ...process.env,
   NODUS_USERDATA: userData,
@@ -614,6 +615,16 @@ ${longReaderBody}
   await page.getByTestId('library-reader-sidebar').getByRole('tab', { name: 'Notas' }).click();
   await page.evaluate(() => { document.documentElement.classList.add('light'); document.documentElement.classList.remove('dark'); });
   await page.setViewportSize({ width: 1500, height: 820 });
+  const lightOutlineRow = page.locator('.library-reader-outline-section:not(.is-active)').first();
+  await lightOutlineRow.hover();
+  const lightOutlineHoverColors = await lightOutlineRow.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { background: style.backgroundColor, color: style.color };
+  });
+  assert.deepEqual(lightOutlineHoverColors, { background: 'rgb(244, 244, 245)', color: 'rgb(39, 39, 42)' }, 'hovered outline rows stay legible in light mode');
+  const lightOutlinePage = lightOutlineRow.locator('.library-reader-outline-page');
+  if (await lightOutlinePage.count()) assert.equal(await lightOutlinePage.evaluate((element) => getComputedStyle(element).opacity), '1', 'hover reveals the original-page shortcut without dimming its label');
+  await page.screenshot({ path: lightOutlineScreenshotPath, fullPage: true });
   const sourcePickerGeometry = await lightSourcePicker.evaluate((picker) => {
     const select = picker.querySelector('select');
     const icon = picker.querySelector('svg');

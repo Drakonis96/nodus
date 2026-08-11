@@ -172,6 +172,9 @@ test('the global reader exposes annotations, metadata, chat and native attachmen
   assert.match(selectionCss, /\.light \.reader-highlighter-palette button:hover,[\s\S]*background: #eef2ff; color: #4338ca;/);
   assert.match(appCss, /\.light \.library-reader-source-badge\.is-original[\s\S]*background: #ffffff;[\s\S]*color: #52525b;/);
   assert.match(appCss, /\.light \.library-reader-file-option\.is-active \{ background: #eef2ff; color: #4338ca; \}/);
+  assert.match(readerSource, /library-reader-outline-section[\s\S]*index === activeSection \? 'is-active' : ''/, 'outline rows use semantic interaction states instead of dark-only hover utilities');
+  assert.match(appCss, /\.light \.library-theme \.library-reader-outline-section:hover,[\s\S]*background: #f4f4f5; color: #27272a;/, 'light outline hover text has strong contrast against its surface');
+  assert.match(appCss, /\.light \.library-theme \.library-reader-outline-section\.is-active \{ background: #e0e7ff; color: #4338ca; \}/, 'the current outline section remains distinguishable in light mode');
   assert.match(appCss, /@media \(max-width: 1279px\)[\s\S]*?\.library-reader-notes \{ background-color: #09090b; \}[\s\S]*?\.light \.library-theme \.library-reader-notes \{ background-color: #ffffff; \}/, 'overlay reader rails are opaque in dark and light themes');
   assert.match(appCss, /\.library-reader-document \.md p \{[\s\S]*text-align: justify;[\s\S]*text-indent: 1\.5em;/, 'clean prose is justified with a first-line indent');
   assert.match(appCss, /\.library-reader-document \.md blockquote \{[\s\S]*margin: 1\.4em 2em;/, 'standalone quotations are visibly inset');
