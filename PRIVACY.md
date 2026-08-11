@@ -25,6 +25,10 @@ extracted images, page maps, bibliographic metadata, highlights, comments and sa
 history. It is local unless the user chooses a backup or synchronization provider for that folder;
 that provider then receives the files under its own terms. Linking a Library item to a vault does
 not upload or duplicate its original.
+Items manually emptied from the Library trash are retained locally in a dated
+`nodus-library/.nodus/recovery/purged` package so the catalogue operation remains
+recoverable. Those packages remain part of the selected backup until the user or
+data controller removes them under the applicable retention policy.
 
 **Nodus Server is optional and self-hosted.** If the user connects it in Settings, the application
 publishes a logical and minimized copy of the vault on the server chosen by the user or his/her

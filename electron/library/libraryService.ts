@@ -45,6 +45,10 @@ import type {
   LibraryMetadataBatchEntry,
   LibraryMetadataBatchProgress,
   LibraryMetadataBatchResult,
+  LibraryTrashImpact,
+  LibraryPurgeReport,
+  LibraryMergeImpact,
+  LibraryRecoveryReport,
 } from '@shared/libraryTypes';
 import { LibraryCatalog } from './libraryCatalog';
 import { LibraryDiskStore } from './libraryStorage';
@@ -411,6 +415,21 @@ export function setGlobalLibraryItemsDeleted(itemIds: string[], deleted: boolean
   return result;
 }
 
+export function previewGlobalLibraryTrash(itemIds: string[]): LibraryTrashImpact {
+  const current = service(); if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
+  return current.operations.trashImpact(itemIds);
+}
+
+export function purgeGlobalLibraryTrash(itemIds: string[]): LibraryPurgeReport {
+  const current = service(); if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
+  const result = current.operations.purgeTrash(itemIds); broadcast(current.catalog.status(current.root, current.deviceId)); return result;
+}
+
+export function auditGlobalLibraryRecovery(): LibraryRecoveryReport {
+  const current = service(); if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
+  return current.operations.auditRecovery();
+}
+
 export function importGlobalLibraryFiles(files: string[], collectionId?: string | null): LibraryLocalImportReport {
   const current = service();
   if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
@@ -599,6 +618,11 @@ export function exportGlobalLibraryBibliography(request: LibraryBibliographyExpo
 
 export function listGlobalLibraryDuplicates(): LibraryDuplicateGroup[] {
   return service()?.operations.listDuplicateGroups() ?? [];
+}
+
+export function previewGlobalLibraryMerge(canonicalId: string, duplicateIds: string[]): LibraryMergeImpact {
+  const current = service(); if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
+  return current.operations.mergeImpact(canonicalId, duplicateIds);
 }
 
 export function mergeGlobalLibraryItems(canonicalId: string, duplicateIds: string[]): LibraryItemRecord {

@@ -392,9 +392,33 @@ To recover the Library:
 6. open a sample of originals, Markdown files, figures, annotations, and chats;
 7. retry only extractions marked for review or reported as failed.
 
-Moving an item to trash only hides it and preserves its files. Physical deletion
-of a backup must happen outside Nodus and only after checking the applicable
-retention policy.
+Moving an item to trash only hides it and preserves its files. The Trash view can
+restore individual or bulk selections and shows an exact impact preview before
+manual emptying: attachments and bytes, annotations, orphaned annotations,
+reader chats, local notes, aliases, relations, and linked vault works. An active
+vault link blocks emptying. Nodus never cascades that action into a vault or its
+analysis tables.
+
+Manual emptying removes the selected record from the active manifests and
+catalogue, but moves its item folder and immutable record history to a dated
+`.nodus/recovery/purged/` package. This makes the operation recoverable and keeps
+it separate from normal search and rebuild. Apply the organization's retention
+policy before deleting those recovery packages from the backup itself.
+
+Duplicate merging has a separate impact preview. It copies unique attachments,
+clean Markdown and assets, annotations, orphaned annotations, chat messages,
+local notes, metadata, collections, identities, aliases, and relations into the
+chosen canonical record. Inbound relations and catalogue vault links are
+remapped to the permanent canonical alias. Nodus does not merge or delete the
+corresponding works inside a vault; those remain available until a user performs
+an explicit vault reconciliation.
+
+The Review and recovery panel checks attachment existence and SHA-256 hashes,
+missing clean Markdown, invalid records, offline conflicts, orphan folders,
+saved-search JSON, and the durable vault-link manifest. Vault links are stored in
+`.nodus/vault-links.json`, while smart searches remain in
+`.nodus/saved-searches.json`; both survive deletion and reconstruction of the
+local SQLite cache.
 
 ## Privacy, network access, and licenses
 
@@ -430,6 +454,8 @@ The main tests are:
   memberships, nested live rules, facets, and persisted table preferences;
 - `test-library-metadata.mjs`: six identifier kinds, cancelable bulk lookup,
   eight import/export formats, five local citation styles, keys, and duplicates;
+- `test-library-recovery.mjs`: trash impact, linked-vault purge blocking,
+  recoverable emptying, lossless duplicate merges, checksum audits, and rebuilds;
 - `test-global-library-reader.mjs`: reader, pages, annotations, and chat;
 - `test-global-library-vault-integration.mjs`: vault linking and analysis;
 - `test-vaults.mjs`: exact component reuse, cancellation, aliases, and private-state isolation;

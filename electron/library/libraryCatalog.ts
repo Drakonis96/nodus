@@ -21,6 +21,7 @@ import type {
 import { LibraryDiskStore } from './libraryStorage';
 import { librarySourceIdentityKey } from './libraryRecord';
 import { validateLibrarySmartSearchGroup } from './librarySmartCollections';
+import { atomicWriteJson } from './libraryPaths';
 
 type CountRow = { count: number };
 
@@ -318,12 +319,43 @@ export class LibraryCatalog {
     return row?.value ?? null;
   }
 
+  private vaultLinksFile(root: string): string {
+    return path.join(root, '.nodus', 'vault-links.json');
+  }
+
+  private readPersistedVaultLinks(root: string): { exists: boolean; valid: boolean; links: LibraryVaultLink[] } {
+    const file = this.vaultLinksFile(root);
+    if (!fs.existsSync(file)) return { exists: false, valid: true, links: [] };
+    try {
+      const parsed = JSON.parse(fs.readFileSync(file, 'utf8')) as { links?: unknown };
+      if (!Array.isArray(parsed?.links)) return { exists: true, valid: false, links: [] };
+      const links = parsed.links.filter((entry): entry is LibraryVaultLink => {
+        if (!entry || typeof entry !== 'object') return false;
+        const value = entry as Partial<LibraryVaultLink>;
+        return typeof value.itemId === 'string' && typeof value.vaultId === 'string'
+          && typeof value.vaultName === 'string' && typeof value.vaultType === 'string'
+          && typeof value.workId === 'string' && !!value.analysis && typeof value.analysis === 'object';
+      });
+      return { exists: true, valid: links.length === parsed.links.length, links };
+    } catch { return { exists: true, valid: false, links: [] }; }
+  }
+
+  private persistVaultLinks(links = this.listVaultLinks()): void {
+    const root = this.getMeta('root'); if (!root) return;
+    atomicWriteJson(this.vaultLinksFile(root), {
+      format: 'nodus.library-vault-links', formatVersion: 1,
+      updatedAt: new Date().toISOString(), links,
+    });
+  }
+
   rebuild(store: LibraryDiskStore): LibraryRebuildResult {
     const started = Date.now();
     // Vault links are rebuildable cache state, but their source vaults may be closed.
     // Preserve them inside the same SQLite transaction that replaces the item index,
     // so a crash between rebuild and a migration refresh cannot erase valid links.
-    const preservedVaultLinks = this.listVaultLinks();
+    const cachedVaultLinks = this.listVaultLinks();
+    const persistedVaultLinks = this.readPersistedVaultLinks(store.root);
+    const preservedVaultLinks = persistedVaultLinks.exists && persistedVaultLinks.valid ? persistedVaultLinks.links : cachedVaultLinks;
     const reconciled = store.reconcile();
     const items = store.scanMaterializedItems();
     const collections = store.scanMaterializedCollections();
@@ -447,8 +479,10 @@ export class LibraryCatalog {
         if (!record.deletedAt) for (const alias of record.aliases) insertCollectionAlias.run(alias, record.id);
       }
       const liveItemIds = new Set(items.records.map((record) => record.id));
-      for (const link of preservedVaultLinks) if (liveItemIds.has(link.itemId)) {
-        restoreVaultLink.run({ ...link, analysisJson: JSON.stringify(link.analysis) });
+      for (const link of preservedVaultLinks) {
+        const itemId = this.resolveItemId(link.itemId) ?? link.itemId;
+        if (!liveItemIds.has(itemId)) continue;
+        restoreVaultLink.run({ ...link, itemId, analysisJson: JSON.stringify(link.analysis) });
       }
       this.putMeta('formatVersion', '2');
       this.putMeta('root', store.root);
@@ -456,6 +490,7 @@ export class LibraryCatalog {
       this.putMeta('conflicts', String(reconciled.conflicts));
       this.putMeta('invalidRecords', String(reconciled.invalidRecords + items.invalid + collections.invalid));
     })();
+    if (persistedVaultLinks.valid) this.persistVaultLinks();
     return {
       items: items.records.filter((item) => !item.deletedAt).length,
       collections: collections.records.filter((collection) => !collection.deletedAt).length,
@@ -500,6 +535,7 @@ export class LibraryCatalog {
       this.handle.prepare('DELETE FROM library_vault_links').run();
       for (const link of links) insert.run({ ...link, analysisJson: JSON.stringify(link.analysis) });
     })();
+    this.persistVaultLinks();
   }
 
   upsertVaultLinks(links: LibraryVaultLink[]): void {
@@ -518,6 +554,29 @@ export class LibraryCatalog {
         insert.run({ ...link, itemId, analysisJson: JSON.stringify(link.analysis) });
       }
     })();
+    this.persistVaultLinks();
+  }
+
+  remapVaultLinks(fromItemIds: string[], toItemId: string): number {
+    const from = [...new Set(fromItemIds.filter((id) => id && id !== toItemId))];
+    if (!from.length) return 0;
+    const placeholders = from.map(() => '?').join(',');
+    const links = this.handle.prepare(`SELECT * FROM library_vault_links WHERE item_id IN (${placeholders})`).all(...from) as Record<string, unknown>[];
+    const insert = this.handle.prepare(`
+      INSERT INTO library_vault_links (item_id, vault_id, vault_name, vault_type, work_id, analysis_json)
+      VALUES (@itemId, @vaultId, @vaultName, @vaultType, @workId, @analysisJson)
+      ON CONFLICT(item_id, vault_id, work_id) DO UPDATE SET
+        vault_name=excluded.vault_name, vault_type=excluded.vault_type, analysis_json=excluded.analysis_json
+    `);
+    this.handle.transaction(() => {
+      for (const row of links) insert.run({
+        itemId: toItemId, vaultId: row.vault_id, vaultName: row.vault_name,
+        vaultType: row.vault_type, workId: row.work_id, analysisJson: row.analysis_json,
+      });
+      this.handle.prepare(`DELETE FROM library_vault_links WHERE item_id IN (${placeholders})`).run(...from);
+    })();
+    this.persistVaultLinks();
+    return links.length;
   }
 
   listVaultLinks(itemId?: string): LibraryVaultLink[] {
@@ -678,6 +737,7 @@ export class LibraryCatalog {
       readerAvailable: Number(row.reader_available) === 1,
       extractionStatus: row.extraction_status as LibraryCatalogItem['extractionStatus'],
       updatedAt: String(row.updated_at),
+      deletedAt: row.deleted_at == null ? null : String(row.deleted_at),
     }));
     const facets = query.includeFacets === false ? emptyFacets() : this.facets(join, clause, params);
     return { items, total, limit, offset, facets };

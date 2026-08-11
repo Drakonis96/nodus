@@ -42,6 +42,10 @@ import type {
   LibraryCitationStyle,
   LibraryMetadataBatchProgress,
   LibraryMetadataBatchResult,
+  LibraryTrashImpact,
+  LibraryPurgeReport,
+  LibraryMergeImpact,
+  LibraryRecoveryReport,
 } from '../libraryTypes';
 import type { VaultSummary } from '../types';
 
@@ -80,6 +84,9 @@ export interface LibraryApi {
   deleteGlobalLibraryCollection(id: string, deleteItems?: boolean): Promise<number>;
   patchGlobalLibraryItemCollections(itemIds: string[], patch: LibraryItemCollectionPatch): Promise<number>;
   setGlobalLibraryItemsDeleted(itemIds: string[], deleted: boolean): Promise<number>;
+  previewGlobalLibraryTrash(itemIds: string[]): Promise<LibraryTrashImpact>;
+  purgeGlobalLibraryTrash(itemIds: string[]): Promise<LibraryPurgeReport>;
+  auditGlobalLibraryRecovery(): Promise<LibraryRecoveryReport>;
   importGlobalLibraryFiles(collectionId?: string | null): Promise<LibraryLocalImportReport>;
   importGlobalBibliographyFiles(collectionId?: string | null): Promise<LibraryBibliographyImportReport>;
   createGlobalLibraryItem(metadata: LibraryItemMetadata, collectionIds?: string[]): Promise<LibraryItemRecord>;
@@ -107,6 +114,7 @@ export interface LibraryApi {
   formatGlobalLibraryCitation(itemIds: string[], style: LibraryCitationStyle, kind: 'citation' | 'bibliography'): Promise<LibraryCitationResult>;
   exportGlobalLibraryBibliography(request: LibraryBibliographyExportRequest): Promise<LibraryBibliographyExportReport>;
   listGlobalLibraryDuplicates(): Promise<LibraryDuplicateGroup[]>;
+  previewGlobalLibraryMerge(canonicalId: string, duplicateIds: string[]): Promise<LibraryMergeImpact>;
   mergeGlobalLibraryItems(canonicalId: string, duplicateIds: string[]): Promise<LibraryItemRecord>;
   listGlobalLibraryVaults(): Promise<VaultSummary[]>;
   listGlobalLibraryVaultLinks(itemId?: string): Promise<LibraryVaultLink[]>;

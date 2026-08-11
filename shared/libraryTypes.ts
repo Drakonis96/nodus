@@ -301,6 +301,7 @@ export interface LibraryCatalogItem {
   readerAvailable: boolean;
   extractionStatus: NonNullable<LibraryItemRecord['extraction']>['status'];
   updatedAt: string;
+  deletedAt: string | null;
 }
 
 export interface LibraryImportSourceState {
@@ -656,6 +657,83 @@ export interface LibraryDuplicateGroup {
   key: string;
   reason: 'doi' | 'isbn' | 'metadata';
   items: LibraryCatalogItem[];
+}
+
+export interface LibraryTrashItemImpact {
+  itemId: string;
+  title: string;
+  attachmentCount: number;
+  attachmentBytes: number;
+  annotationCount: number;
+  orphanedAnnotationCount: number;
+  chatMessageCount: number;
+  noteCount: number;
+  aliasCount: number;
+  relationCount: number;
+  linkedVaults: Array<{ vaultId: string; vaultName: string; workId: string }>;
+}
+
+export interface LibraryTrashImpact {
+  itemIds: string[];
+  items: LibraryTrashItemImpact[];
+  attachmentCount: number;
+  attachmentBytes: number;
+  annotationCount: number;
+  orphanedAnnotationCount: number;
+  chatMessageCount: number;
+  noteCount: number;
+  aliasCount: number;
+  relationCount: number;
+  linkedVaultCount: number;
+  purgeBlocked: boolean;
+  blockers: string[];
+}
+
+export interface LibraryPurgeReport {
+  requested: number;
+  purged: number;
+  archivedRecoveryCopies: number;
+  blocked: number;
+  warnings: string[];
+}
+
+export interface LibraryMergeImpact {
+  canonicalId: string;
+  duplicateIds: string[];
+  attachmentCount: number;
+  annotationCount: number;
+  orphanedAnnotationCount: number;
+  chatMessageCount: number;
+  noteCount: number;
+  aliasCount: number;
+  relationCount: number;
+  linkedVaultCount: number;
+  vaultWorksPreserved: number;
+  warnings: string[];
+}
+
+export type LibraryRecoveryIssueCode =
+  | 'conflict' | 'invalid-record' | 'missing-attachment' | 'corrupt-attachment'
+  | 'missing-reader' | 'orphan-folder' | 'invalid-saved-search' | 'invalid-vault-link';
+
+export interface LibraryRecoveryIssue {
+  code: LibraryRecoveryIssueCode;
+  itemId: string | null;
+  path: string | null;
+  message: string;
+  recoverable: boolean;
+}
+
+export interface LibraryRecoveryReport {
+  auditedAt: string;
+  checkedItems: number;
+  checkedAttachments: number;
+  conflicts: number;
+  invalidRecords: number;
+  missingFiles: number;
+  corruptFiles: number;
+  orphanFolders: number;
+  issues: LibraryRecoveryIssue[];
 }
 
 export interface LibraryRebuildResult {

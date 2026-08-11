@@ -27,6 +27,7 @@ import { Icon, Spinner } from '../components/ui';
 import { LibraryCitationExportDialog, LibraryDuplicatesDialog, LibraryMetadataBatchDialog, LibraryMetadataEditor } from '../components/library/LibraryMetadataDialogs';
 import { LibraryItemManager } from '../components/library/LibraryItemManager';
 import { LibrarySmartSearchDialog, LibraryTablePreferencesDialog } from '../components/library/LibrarySmartSearchDialog';
+import { LibraryRecoveryDialog, LibraryTrashImpactDialog } from '../components/library/LibraryRecoveryDialogs';
 import { LibraryDocumentReader } from './LibraryDocumentReader';
 import { VirtualList } from '../components/VirtualList';
 import { confirm, promptText, toast } from '../components/feedback';
@@ -37,6 +38,7 @@ import type { PendingGraphNavigationTarget } from '../navigation';
 import { Library } from './Library';
 
 const PAGE_SIZE = 250;
+const TRASH_SEARCH = { id: 'library-trash', mode: 'all' as const, rules: [{ id: 'library-trash-only', field: 'trash' as const, operator: 'is-true' as const, value: true }] };
 
 const SOURCE_LABEL: Record<LibraryItemSource, string> = {
   nodus: 'Nodus', zotero: 'Zotero', mendeley: 'Mendeley', ris: 'RIS', bibtex: 'BibTeX',
@@ -465,6 +467,10 @@ function GlobalLibraryContent({
   const [metadataBatchItems, setMetadataBatchItems] = useState<string[] | null>(null);
   const [citationItems, setCitationItems] = useState<string[] | null>(null);
   const [duplicatesOpen, setDuplicatesOpen] = useState(false);
+  const [trashMode, setTrashMode] = useState(false);
+  const [trashCount, setTrashCount] = useState(0);
+  const [trashImpactItems, setTrashImpactItems] = useState<string[] | null>(null);
+  const [recoveryOpen, setRecoveryOpen] = useState(false);
   const [vaultLinkItems, setVaultLinkItems] = useState<string[] | null>(null);
   const [detailLinks, setDetailLinks] = useState<LibraryVaultLink[]>([]);
   const [manager, setManager] = useState<{ item: LibraryItemRecord; tab?: 'attachments' | 'notes' | 'relations' | 'tags' } | null>(null);
@@ -476,10 +482,11 @@ function GlobalLibraryContent({
 
   const load = useCallback(async () => {
     try {
-      const [nextStatus, page, nextCollections, nextJobs, nextSavedSearches, nextViewPreferences] = await Promise.all([
+      const [nextStatus, page, nextCollections, nextJobs, nextSavedSearches, nextViewPreferences, trashPage] = await Promise.all([
         window.nodus.getGlobalLibraryStatus(),
         window.nodus.listGlobalLibraryItems({
-          search: search || undefined, collectionId: selectedCollection, savedSearchId: selectedSavedSearch, source: source || null,
+          search: search || undefined, collectionId: trashMode ? null : selectedCollection, savedSearchId: trashMode ? null : selectedSavedSearch,
+          smartSearch: trashMode ? TRASH_SEARCH : null, includeDeleted: trashMode, source: source || null,
           extractionStatus: extraction || null,
           yearFrom: yearFrom ? Number(yearFrom) : null, yearTo: yearTo ? Number(yearTo) : null,
           itemType: itemType || null, tag: facetTag || null, vaultId: facetVault || null,
@@ -490,13 +497,15 @@ function GlobalLibraryContent({
         window.nodus.listLibraryExtractionJobs(),
         window.nodus.listGlobalLibrarySavedSearches(),
         window.nodus.getGlobalLibraryViewPreferences(),
+        window.nodus.listGlobalLibraryItems({ includeDeleted: true, smartSearch: TRASH_SEARCH, limit: 1, includeFacets: false }),
       ]);
       setStatus(nextStatus); setItems(page.items); setTotal(page.total); setCollections(nextCollections); setJobs(nextJobs);
       setSavedSearches(nextSavedSearches); setFacets(page.facets); setViewPreferences(nextViewPreferences); setError(null);
+      setTrashCount(trashPage.total);
       if (!expanded.size && nextCollections.length) setExpanded(new Set(nextCollections.filter((entry) => !entry.parentId).map((entry) => entry.id)));
     } catch (nextError) { setError(nextError instanceof Error ? nextError.message : String(nextError)); }
     finally { setLoading(false); }
-  }, [search, selectedCollection, selectedSavedSearch, source, extraction, yearFrom, yearTo, itemType, facetTag, facetVault, attachmentFilter, offset, expanded.size, sortKey]);
+  }, [search, selectedCollection, selectedSavedSearch, trashMode, source, extraction, yearFrom, yearTo, itemType, facetTag, facetVault, attachmentFilter, offset, expanded.size, sortKey]);
 
   useEffect(() => { const timer = window.setTimeout(() => { setOffset(0); setSearch(searchDraft.trim()); }, 220); return () => window.clearTimeout(timer); }, [searchDraft]);
   useEffect(() => { void load(); }, [load]);
@@ -676,6 +685,21 @@ function GlobalLibraryContent({
     await window.nodus.setGlobalLibraryItemsDeleted(ids, true); setSelected(new Set()); setDetailId(null); await load();
   };
 
+  const restoreSelected = async (only?: string[]) => {
+    const ids = only ?? (selected.size ? [...selected] : detailId ? [detailId] : []);
+    if (!ids.length) return;
+    await window.nodus.setGlobalLibraryItemsDeleted(ids, false); setSelected(new Set()); setDetailId(null);
+    toast(tx('{n} elemento(s) restaurado(s).', { n: ids.length })); await load();
+  };
+
+  const openTrash = () => {
+    setTrashMode(true); setSelectedCollection(null); setSelectedSavedSearch(null); setSelected(new Set()); setDetailId(null); setOffset(0);
+  };
+
+  const closeTrash = () => {
+    setTrashMode(false); setSelected(new Set()); setDetailId(null); setOffset(0);
+  };
+
   const openReader = async (itemId: string) => {
     const item = detail?.id === itemId ? detail : await window.nodus.getGlobalLibraryItem(itemId);
     if (!item?.files?.reader) return;
@@ -711,9 +735,10 @@ function GlobalLibraryContent({
   return (
     <div data-testid="global-library-view" className="flex h-full min-h-0 flex-col bg-neutral-950">
       <header className="flex flex-wrap items-center gap-3 border-b border-neutral-800 px-5 py-3">
-        <div className="min-w-0"><h1 className="flex items-center gap-2 text-lg font-semibold"><Icon name="book" className="text-indigo-400" /> {t('Biblioteca')}</h1><p className="text-[11px] text-neutral-500">{tx('{n} documentos · disponible en todos los vaults', { n: status.items })}</p></div>
+        <div className="min-w-0"><h1 className="flex items-center gap-2 text-lg font-semibold"><Icon name={trashMode ? 'trash' : 'book'} className={trashMode ? 'text-amber-400' : 'text-indigo-400'} /> {t(trashMode ? 'Papelera' : 'Biblioteca')}</h1><p className="text-[11px] text-neutral-500">{trashMode ? tx('{n} elemento(s) recuperable(s)', { n: trashCount }) : tx('{n} documentos · disponible en todos los vaults', { n: status.items })}</p></div>
         <div className="flex-1" />
         {activeJobs.length > 0 && <span className="flex items-center gap-2 rounded-full bg-indigo-500/10 px-3 py-1.5 text-xs text-indigo-300"><Spinner /> {tx('{n} tarea(s) en segundo plano', { n: activeJobs.length })}</span>}
+        {trashMode ? <><button data-testid="close-library-trash" className="btn btn-ghost border border-neutral-700" onClick={closeTrash}><Icon name="chevronLeft" /> {t('Volver a la Biblioteca')}</button><button data-testid="empty-library-trash" className="btn btn-ghost border border-red-500/30 text-red-400" disabled={!trashCount} onClick={() => setTrashImpactItems([])}><Icon name="trash" /> {t('Vaciar papelera')}</button></> : <>
         <button data-testid="create-library-reference" className="btn btn-ghost border border-neutral-700" onClick={() => void createReference()}><Icon name="plus" /> {t('Nueva referencia')}</button>
         <button data-testid="open-library-migration" className="btn btn-ghost border border-neutral-700" onClick={() => setMigrationOpen(true)}><Icon name="vault" /> {t('Migrar vaults')}</button>
         <button data-testid="open-library-duplicates" className="btn btn-ghost border border-neutral-700" onClick={() => setDuplicatesOpen(true)}><Icon name="copy" /> {t('Duplicados')}</button>
@@ -721,12 +746,14 @@ function GlobalLibraryContent({
         <button data-testid="open-library-export" className="btn btn-ghost border border-neutral-700" onClick={() => setCitationItems([])}><Icon name="download" /> {t('Exportar')}</button>
         <button className="btn btn-ghost border border-neutral-700" onClick={() => void importFiles()}><Icon name="upload" /> {t('Añadir archivos')}</button>
         <button data-testid="open-zotero-global-import" className="btn btn-primary" onClick={() => setZoteroOpen(true)}><Icon name="refresh" /> {t('Zotero')}</button>
+        <button data-testid="open-library-trash" className="btn btn-ghost border border-neutral-700" onClick={openTrash}><Icon name="trash" /> {t('Papelera')} {trashCount ? <span className="rounded-full bg-neutral-800 px-1.5 text-[10px]">{trashCount}</span> : null}</button>
+        <button data-testid="open-library-recovery" className="btn btn-ghost border border-neutral-700" onClick={() => setRecoveryOpen(true)} title={t('Revisión y recuperación')}><Icon name="shield" /></button></>}
       </header>
 
       {error && <div role="alert" className="border-b border-red-500/30 bg-red-500/10 px-5 py-2 text-xs text-red-300">{error}</div>}
       {(status.conflicts > 0 || status.invalidRecords > 0) && <div data-testid="global-library-integrity-warning" role="status" className="flex items-start gap-2 border-b border-amber-500/30 bg-amber-500/10 px-5 py-2 text-xs text-amber-200"><Icon name="alert" size={14} className="mt-0.5 shrink-0" /><span><b>{t('La Biblioteca necesita revisión.')}</b> {tx('{conflicts} conflicto(s) conservado(s) · {invalid} registro(s) inválido(s) excluido(s). Los originales no se han modificado.', { conflicts: status.conflicts, invalid: status.invalidRecords })}</span></div>}
       <div className="flex min-h-0 flex-1">
-        <aside className="hidden w-[238px] shrink-0 flex-col border-r border-neutral-800 bg-neutral-950/80 lg:flex">
+        {!trashMode && <aside className="hidden w-[238px] shrink-0 flex-col border-r border-neutral-800 bg-neutral-950/80 lg:flex">
           <div className="flex items-center gap-1 px-3 py-3"><b className="min-w-0 flex-1 text-[11px] uppercase tracking-wider text-neutral-500">{t('Colecciones')}</b><button className="grid h-7 w-7 place-items-center rounded hover:bg-neutral-900" title={t('Nueva colección')} onClick={() => void createCollection()}><Icon name="folderPlus" size={14} /></button></div>
           <div className="px-2 pb-2" onDragOver={(event) => event.preventDefault()} onDrop={(event) => void dropCollectionAtRoot(event)}>
             <button className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs ${selectedCollection === null && selectedSavedSearch === null ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:bg-neutral-900'}`} onClick={() => { setSelectedCollection(null); setSelectedSavedSearch(null); setOffset(0); }}><Icon name="library" size={14} /><span className="flex-1">{t('Todos los documentos')}</span><span className="text-[10px] opacity-60">{status.items}</span></button>
@@ -739,7 +766,7 @@ function GlobalLibraryContent({
           </div>
           {collections.find((entry) => entry.id === selectedCollection)?.source === 'nodus' && <div className="flex gap-1 border-t border-neutral-800 p-2"><button className="btn btn-ghost flex-1 text-xs" onClick={() => void renameCollection()}><Icon name="edit" size={13} /> {t('Renombrar')}</button><button className="btn btn-ghost text-red-400" onClick={() => void deleteCollection()} title={t('Eliminar colección')}><Icon name="trash" size={13} /></button></div>}
           {selectedSavedSearch && savedSearches.find((entry) => entry.id === selectedSavedSearch) && <div className="flex gap-1 border-t border-neutral-800 p-2"><button className="btn btn-ghost flex-1 text-xs" onClick={() => setSmartSearchEditor(savedSearches.find((entry) => entry.id === selectedSavedSearch) ?? null)}><Icon name="edit" size={13} /> {t('Editar')}</button><button className="btn btn-ghost text-red-400" onClick={() => { const record = savedSearches.find((entry) => entry.id === selectedSavedSearch); if (record) void removeSavedSearch(record); }} title={t('Eliminar')}><Icon name="trash" size={13} /></button></div>}
-        </aside>
+        </aside>}
 
         <section className="flex min-w-0 flex-1 flex-col">
           <div className="border-b border-neutral-800 p-3">
@@ -758,7 +785,7 @@ function GlobalLibraryContent({
             </div><div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px]"><span className="text-neutral-600">{t('Etiquetas')}</span>{facets.tags.slice(0, 8).map((entry) => <button key={entry.value} className={`rounded-full px-2 py-1 ${facetTag === entry.value ? 'bg-indigo-600 text-white' : 'bg-neutral-950 text-neutral-500 hover:text-neutral-200'}`} onClick={() => { setFacetTag((current) => current === entry.value ? '' : entry.value); setOffset(0); }}>{entry.value} · {entry.count}</button>)}{facets.vaults.map((entry) => <button key={entry.value} className={`rounded-full px-2 py-1 ${facetVault === entry.value ? 'bg-indigo-600 text-white' : 'bg-neutral-950 text-neutral-500 hover:text-neutral-200'}`} onClick={() => { setFacetVault((current) => current === entry.value ? '' : entry.value); setOffset(0); }}><Icon name="vault" size={9} /> {entry.value} · {entry.count}</button>)}{(source || extraction || yearFrom || yearTo || itemType || facetTag || facetVault || attachmentFilter) && <button className="ml-auto text-indigo-300" onClick={() => { setSource(''); setExtraction(''); setYearFrom(''); setYearTo(''); setItemType(''); setFacetTag(''); setFacetVault(''); setAttachmentFilter(''); setOffset(0); }}>{t('Limpiar filtros')}</button>}</div></div>}
           </div>
 
-          {selected.size > 0 && <div data-testid="global-library-bulk-actions" className="flex flex-wrap items-center gap-2 border-b border-indigo-500/20 bg-indigo-500/5 px-3 py-2 text-xs"><b>{tx('{n} seleccionados', { n: selected.size })}</b><select aria-label={t('Acción de colección')} className="input ml-2 h-8 text-xs" value={collectionAction} onChange={(event) => setCollectionAction(event.target.value as typeof collectionAction)}><option value="copy">{t('Copiar a')}</option><option value="move">{t('Mover a')}</option><option value="remove">{t('Quitar de esta colección')}</option></select>{collectionAction !== 'remove' && <select className="input h-8 min-w-44 text-xs" value={collectionTarget} onChange={(event) => setCollectionTarget(event.target.value)}><option value="">{t('Elegir colección…')}</option>{localCollections.map((collection) => <option key={collection.id} value={collection.id}>{collection.name}</option>)}</select>}<button className="btn btn-ghost h-8" disabled={collectionAction === 'remove' ? collections.find((entry) => entry.id === selectedCollection)?.source !== 'nodus' : !collectionTarget} onClick={() => void addSelectedToCollection()}>{t('Aplicar')}</button><input className="input h-8 w-32 text-xs" value={bulkTag} onChange={(event) => setBulkTag(event.target.value)} placeholder={t('Etiqueta…')} /><button className="btn btn-ghost h-8" disabled={!bulkTag.trim()} onClick={() => void applyBulkTag()}><Icon name="tag" size={13} /> {t('Etiquetar')}</button><button data-testid="bulk-resolve-library-metadata" className="btn btn-ghost h-8" onClick={() => setMetadataBatchItems([...selected])}><Icon name="search" size={13} /> {t('Completar metadatos')}</button><button data-testid="bulk-library-citations" className="btn btn-ghost h-8" onClick={() => setCitationItems([...selected])}><Icon name="quote" size={13} /> {t('Citar / exportar')}</button><button data-testid="bulk-add-library-to-vault" className="btn btn-ghost h-8" onClick={() => setVaultLinkItems([...selected])}><Icon name="vault" size={13} /> {t('Añadir al vault')}</button><button className="btn btn-ghost h-8" onClick={() => void processSelected()}><Icon name="refresh" size={13} /> {t('Procesar de nuevo')}</button><button className="btn btn-ghost h-8 text-red-400" onClick={() => void deleteSelected()}><Icon name="trash" size={13} /> {t('Papelera')}</button><button className="ml-auto text-neutral-500 hover:text-neutral-200" onClick={() => setSelected(new Set())}>{t('Limpiar selección')}</button></div>}
+          {selected.size > 0 && <div data-testid="global-library-bulk-actions" className="flex flex-wrap items-center gap-2 border-b border-indigo-500/20 bg-indigo-500/5 px-3 py-2 text-xs"><b>{tx('{n} seleccionados', { n: selected.size })}</b>{trashMode ? <><button data-testid="bulk-restore-library-trash" className="btn btn-secondary h-8" onClick={() => void restoreSelected()}><Icon name="refresh" size={13} /> {t('Restaurar')}</button><button data-testid="bulk-purge-library-trash" className="btn btn-ghost h-8 text-red-400" onClick={() => setTrashImpactItems([...selected])}><Icon name="trash" size={13} /> {t('Revisar y vaciar')}</button></> : <><select aria-label={t('Acción de colección')} className="input ml-2 h-8 text-xs" value={collectionAction} onChange={(event) => setCollectionAction(event.target.value as typeof collectionAction)}><option value="copy">{t('Copiar a')}</option><option value="move">{t('Mover a')}</option><option value="remove">{t('Quitar de esta colección')}</option></select>{collectionAction !== 'remove' && <select className="input h-8 min-w-44 text-xs" value={collectionTarget} onChange={(event) => setCollectionTarget(event.target.value)}><option value="">{t('Elegir colección…')}</option>{localCollections.map((collection) => <option key={collection.id} value={collection.id}>{collection.name}</option>)}</select>}<button className="btn btn-ghost h-8" disabled={collectionAction === 'remove' ? collections.find((entry) => entry.id === selectedCollection)?.source !== 'nodus' : !collectionTarget} onClick={() => void addSelectedToCollection()}>{t('Aplicar')}</button><input className="input h-8 w-32 text-xs" value={bulkTag} onChange={(event) => setBulkTag(event.target.value)} placeholder={t('Etiqueta…')} /><button className="btn btn-ghost h-8" disabled={!bulkTag.trim()} onClick={() => void applyBulkTag()}><Icon name="tag" size={13} /> {t('Etiquetar')}</button><button data-testid="bulk-resolve-library-metadata" className="btn btn-ghost h-8" onClick={() => setMetadataBatchItems([...selected])}><Icon name="search" size={13} /> {t('Completar metadatos')}</button><button data-testid="bulk-library-citations" className="btn btn-ghost h-8" onClick={() => setCitationItems([...selected])}><Icon name="quote" size={13} /> {t('Citar / exportar')}</button><button data-testid="bulk-add-library-to-vault" className="btn btn-ghost h-8" onClick={() => setVaultLinkItems([...selected])}><Icon name="vault" size={13} /> {t('Añadir al vault')}</button><button className="btn btn-ghost h-8" onClick={() => void processSelected()}><Icon name="refresh" size={13} /> {t('Procesar de nuevo')}</button><button className="btn btn-ghost h-8 text-red-400" onClick={() => void deleteSelected()}><Icon name="trash" size={13} /> {t('Papelera')}</button></>}<button className="ml-auto text-neutral-500 hover:text-neutral-200" onClick={() => setSelected(new Set())}>{t('Limpiar selección')}</button></div>}
 
           <div className="min-h-0 flex-1 overflow-x-auto">
           <div className="grid h-9 items-center border-b border-neutral-800 px-3 text-[10px] font-semibold uppercase tracking-wider text-neutral-600" style={{ gridTemplateColumns: tableGrid, minWidth: tableMinWidth }}>
@@ -767,7 +794,7 @@ function GlobalLibraryContent({
           </div>
           <VirtualList
             items={items} itemHeight={62} getKey={(item) => item.id} className="h-[calc(100%-2.25rem)] min-h-0" style={{ minWidth: tableMinWidth }}
-            empty={<div className="grid h-full place-items-center p-8 text-center"><div><Icon name="book" size={28} className="mx-auto text-neutral-700" /><p className="mt-3 text-sm text-neutral-400">{t('No hay documentos que coincidan.')}</p><p className="mt-1 text-xs text-neutral-600">{t('Añade archivos o importa una biblioteca de Zotero.')}</p></div></div>}
+            empty={<div className="grid h-full place-items-center p-8 text-center"><div><Icon name={trashMode ? 'trash' : 'book'} size={28} className="mx-auto text-neutral-700" /><p className="mt-3 text-sm text-neutral-400">{t(trashMode ? 'La papelera está vacía.' : 'No hay documentos que coincidan.')}</p><p className="mt-1 text-xs text-neutral-600">{t(trashMode ? 'Los elementos enviados aquí podrán restaurarse antes del vaciado manual.' : 'Añade archivos o importa una biblioteca de Zotero.')}</p></div></div>}
             renderItem={(item) => {
               const activeJob = jobs.find((job) => job.itemId === item.id && ['queued', 'processing'].includes(job.status));
               return <div data-testid={`global-library-item-${item.id}`} draggable className={`grid h-[62px] items-center border-b border-neutral-900 px-3 text-xs ${detailId === item.id ? 'bg-indigo-500/10' : 'hover:bg-neutral-900/55'}`} style={{ gridTemplateColumns: tableGrid }} onDragStart={(event) => { const itemIds = selected.has(item.id) ? [...selected] : [item.id]; event.dataTransfer.effectAllowed = 'copyMove'; event.dataTransfer.setData('application/x-nodus-library-items', JSON.stringify(itemIds)); }} onDoubleClick={() => item.readerAvailable ? void openReader(item.id) : setDetailId(item.id)}>
@@ -800,7 +827,7 @@ function GlobalLibraryContent({
             <div className="mt-5"><h3 className="text-[10px] font-semibold uppercase tracking-wider text-neutral-600">{t('Disponible en vaults')}</h3>{detailLinks.length ? <div className="mt-2 space-y-1.5">{detailLinks.map((link) => <div key={`${link.vaultId}:${link.workId}`} className="rounded-lg border border-neutral-800 px-2.5 py-2 text-[10px]"><div className="flex items-center gap-2"><Icon name="vault" size={12} className="text-indigo-400" /><span className="min-w-0 flex-1 truncate text-neutral-400">{link.vaultName}</span><span className="text-neutral-600">{link.analysis.deepStatus === 'done' ? t('analizado') : t('vinculado')}</span></div><VaultReuseBadges link={link} /></div>)}</div> : <p className="mt-2 text-[10px] leading-4 text-neutral-600">{t('Aún no está añadido a ningún vault.')}</p>}</div>
             <div className="mt-5 rounded-xl border border-neutral-800 p-3"><div className="flex items-center justify-between text-xs"><span>{t('Versión limpia')}</span><b className={detail.extraction?.status === 'ready' ? 'text-emerald-400' : 'text-neutral-500'}>{t(EXTRACTION_LABEL[detail.extraction?.status ?? 'pending'])}</b></div>{detail.extraction?.error && <p className="mt-2 text-[10px] text-red-400">{detail.extraction.error}</p>}<p className="mt-2 text-[10px] text-neutral-600">{detail.attachments.length} {t('adjuntos')} · {detail.files?.reader ? t('Markdown disponible') : t('Sin Markdown')}</p></div>
           </div>
-          <footer className="grid grid-cols-2 gap-2 border-t border-neutral-800 p-3"><button data-testid="edit-library-metadata" className="btn btn-ghost col-span-2 border border-neutral-700" onClick={() => setMetadataItem(detail)}><Icon name="edit" /> {t('Editar metadatos')}</button><button className="btn btn-ghost border border-neutral-700" onClick={() => setManager({ item: detail, tab: 'attachments' })}><Icon name="file" /> {t('Adjuntos')}</button><button className="btn btn-ghost border border-neutral-700" onClick={() => setManager({ item: detail, tab: 'notes' })}><Icon name="notebook" /> {t('Notas')}</button><button data-testid="cite-library-item" className="btn btn-ghost col-span-2 border border-neutral-700" onClick={() => setCitationItems([detail.id])}><Icon name="quote" /> {t('Citar / exportar')}</button><button data-testid="add-library-item-to-vault" className="btn btn-ghost col-span-2 border border-neutral-700" onClick={() => setVaultLinkItems([detail.id])}><Icon name="vault" /> {t('Añadir al vault')}</button><button className="btn btn-primary" disabled={!detail.files?.reader} title={!detail.files?.reader ? t('Procesa el documento primero') : undefined} onClick={() => void openReader(detail.id)}><Icon name="bookOpen" /> {t('Leer')}</button><button className="btn btn-ghost border border-neutral-700" onClick={() => void processSelected()}><Icon name="refresh" /> {t('Procesar')}</button><button className="btn btn-ghost border border-neutral-700" onClick={() => void duplicateDetail()}><Icon name="copy" /> {t('Duplicar')}</button>{detail.source !== 'nodus' && <button className="btn btn-ghost border border-neutral-700" onClick={() => void convertDetail()}><Icon name="library" /> {t('Copia Nodus')}</button>}<button className="btn btn-ghost col-span-2 text-red-400" onClick={() => void deleteSelected()}><Icon name="trash" /> {t('Enviar a la papelera')}</button></footer>
+          <footer className="grid grid-cols-2 gap-2 border-t border-neutral-800 p-3">{trashMode ? <><button data-testid="restore-library-trash-item" className="btn btn-secondary" onClick={() => void restoreSelected([detail.id])}><Icon name="refresh" /> {t('Restaurar')}</button><button data-testid="review-library-trash-item" className="btn btn-ghost text-red-400" onClick={() => setTrashImpactItems([detail.id])}><Icon name="trash" /> {t('Revisar y vaciar')}</button></> : <><button data-testid="edit-library-metadata" className="btn btn-ghost col-span-2 border border-neutral-700" onClick={() => setMetadataItem(detail)}><Icon name="edit" /> {t('Editar metadatos')}</button><button className="btn btn-ghost border border-neutral-700" onClick={() => setManager({ item: detail, tab: 'attachments' })}><Icon name="file" /> {t('Adjuntos')}</button><button className="btn btn-ghost border border-neutral-700" onClick={() => setManager({ item: detail, tab: 'notes' })}><Icon name="notebook" /> {t('Notas')}</button><button data-testid="cite-library-item" className="btn btn-ghost col-span-2 border border-neutral-700" onClick={() => setCitationItems([detail.id])}><Icon name="quote" /> {t('Citar / exportar')}</button><button data-testid="add-library-item-to-vault" className="btn btn-ghost col-span-2 border border-neutral-700" onClick={() => setVaultLinkItems([detail.id])}><Icon name="vault" /> {t('Añadir al vault')}</button><button className="btn btn-primary" disabled={!detail.files?.reader} title={!detail.files?.reader ? t('Procesa el documento primero') : undefined} onClick={() => void openReader(detail.id)}><Icon name="bookOpen" /> {t('Leer')}</button><button className="btn btn-ghost border border-neutral-700" onClick={() => void processSelected()}><Icon name="refresh" /> {t('Procesar')}</button><button className="btn btn-ghost border border-neutral-700" onClick={() => void duplicateDetail()}><Icon name="copy" /> {t('Duplicar')}</button>{detail.source !== 'nodus' && <button className="btn btn-ghost border border-neutral-700" onClick={() => void convertDetail()}><Icon name="library" /> {t('Copia Nodus')}</button>}<button className="btn btn-ghost col-span-2 text-red-400" onClick={() => void deleteSelected()}><Icon name="trash" /> {t('Enviar a la papelera')}</button></>}</footer>
         </aside>}
       </div>
       {zoteroOpen && <ZoteroImportDialog onClose={() => setZoteroOpen(false)} onFinished={() => void load()} />}
@@ -812,6 +839,8 @@ function GlobalLibraryContent({
       {smartSearchEditor && <LibrarySmartSearchDialog initial={smartSearchEditor === 'new' ? null : smartSearchEditor} onClose={() => setSmartSearchEditor(null)} onSaved={(record) => { setSelectedSavedSearch(record.id); setSelectedCollection(null); void load(); }} />}
       {tablePreferencesOpen && <LibraryTablePreferencesDialog preferences={viewPreferences} onClose={() => setTablePreferencesOpen(false)} onSaved={(preferences) => { setViewPreferences(preferences); setOffset(0); }} />}
       {duplicatesOpen && <LibraryDuplicatesDialog onClose={() => setDuplicatesOpen(false)} onChanged={() => void load()} />}
+      {trashImpactItems && <LibraryTrashImpactDialog itemIds={trashImpactItems} onClose={() => setTrashImpactItems(null)} onChanged={() => { setSelected(new Set()); setDetailId(null); void load(); }} />}
+      {recoveryOpen && <LibraryRecoveryDialog onClose={() => setRecoveryOpen(false)} onRebuilt={() => void load()} />}
       {vaultLinkItems && <VaultLinkDialog itemIds={vaultLinkItems} onClose={() => setVaultLinkItems(null)} onLinked={(links) => {
         if (detailId && links.some((link) => link.itemId === detailId)) setDetailLinks((current) => [...current.filter((existing) => !links.some((link) => link.itemId === existing.itemId && link.vaultId === existing.vaultId)), ...links.filter((link) => link.itemId === detailId)]);
         setSelected(new Set());

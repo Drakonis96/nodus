@@ -14,7 +14,7 @@ test('the unified Library keeps the global catalogue independent and the vault c
 });
 
 test('the Library UI exposes hierarchy, search, bulk operations, imports and background state', async () => {
-  const view = `${await readSource('src/views/GlobalLibraryView.tsx')}\n${await readSource('src/components/library/LibraryItemManager.tsx')}\n${await readSource('src/components/library/LibrarySmartSearchDialog.tsx')}\n${await readSource('src/components/library/LibraryMetadataDialogs.tsx')}`;
+  const view = `${await readSource('src/views/GlobalLibraryView.tsx')}\n${await readSource('src/components/library/LibraryItemManager.tsx')}\n${await readSource('src/components/library/LibrarySmartSearchDialog.tsx')}\n${await readSource('src/components/library/LibraryMetadataDialogs.tsx')}\n${await readSource('src/components/library/LibraryRecoveryDialogs.tsx')}`;
   for (const marker of [
     'global-library-view', 'global-library-search', 'global-library-bulk-actions',
     'global-library-detail', 'zotero-global-import-dialog', 'open-zotero-global-import',
@@ -29,6 +29,8 @@ test('the Library UI exposes hierarchy, search, bulk operations, imports and bac
     'library-source-missing',
     'library-metadata-batch-dialog', 'start-library-metadata-batch', 'apply-library-metadata-batch',
     'library-citation-export-dialog', 'copy-library-citation', 'export-library-bibliography',
+    'open-library-trash', 'empty-library-trash', 'library-trash-impact-dialog', 'restore-library-trash', 'purge-library-trash',
+    'open-library-recovery', 'library-recovery-dialog', 'rebuild-library-recovery', 'library-merge-impact',
   ]) assert.match(view, new RegExp(`data-testid=(?:"|\{\`)[^\n]*${marker}`));
   for (const method of [
     'getGlobalLibraryStatus', 'listGlobalLibraryItems', 'listGlobalLibraryCollections',
@@ -48,6 +50,8 @@ test('the Library UI exposes hierarchy, search, bulk operations, imports and bac
     'getGlobalLibraryViewPreferences', 'setGlobalLibraryViewPreferences',
     'startGlobalLibraryMetadataBatch', 'applyGlobalLibraryMetadataBatch', 'cancelGlobalLibraryMetadataBatch',
     'updateGlobalLibraryCitationKey', 'formatGlobalLibraryCitation', 'exportGlobalLibraryBibliography',
+    'previewGlobalLibraryTrash', 'purgeGlobalLibraryTrash', 'auditGlobalLibraryRecovery', 'rebuildGlobalLibrary',
+    'previewGlobalLibraryMerge',
   ]) assert.match(view, new RegExp(String.raw`window\.nodus\.${method}\b`));
   assert.match(view, /CollectionBranch[\s\S]*<CollectionBranch/, 'collection rendering is recursively unbounded');
   assert.match(view, /La importación se canceló; el catálogo ya recuperado se conserva/);
@@ -104,6 +108,8 @@ test('the typed bridge covers every global management operation', async () => {
     'listZoteroSyncSessions', 'resumeZoteroLibraryImport',
     'startGlobalLibraryMetadataBatch', 'applyGlobalLibraryMetadataBatch', 'cancelGlobalLibraryMetadataBatch',
     'updateGlobalLibraryCitationKey', 'formatGlobalLibraryCitation', 'exportGlobalLibraryBibliography',
+    'previewGlobalLibraryTrash', 'purgeGlobalLibraryTrash', 'auditGlobalLibraryRecovery',
+    'previewGlobalLibraryMerge',
   ];
   assertApiMethods(assert, methods);
   assertChannelsWired(assert, [
@@ -122,6 +128,7 @@ test('the typed bridge covers every global management operation', async () => {
     'library:zoteroSyncSessions', 'library:resumeZoteroImport',
     'library:startMetadataBatch', 'library:applyMetadataBatch', 'library:cancelMetadataBatch',
     'library:updateCitationKey', 'library:formatCitation', 'library:exportBibliography',
+    'library:trashImpact', 'library:purgeTrash', 'library:auditRecovery', 'library:mergeImpact',
   ]);
 });
 
@@ -169,5 +176,6 @@ test('metadata management previews candidates, supports bulk confirmation and re
   assert.match(dialogs, /'apa-7'[^\n]*'chicago-author-date'[^\n]*'mla-9'[^\n]*'ieee'[^\n]*'vancouver'/);
   assert.match(dialogs, /'endnote-xml'[^\n]*'zotero-rdf'[^\n]*'csv'[^\n]*'markdown'/);
   assert.match(dialogs, /mergeGlobalLibraryItems/);
-  assert.match(dialogs, /Los demás pasarán a la papelera/);
+  assert.match(dialogs, /Las obras de vault permanecen separadas/);
+  assert.match(dialogs, /previewGlobalLibraryMerge/);
 });

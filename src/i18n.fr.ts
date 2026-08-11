@@ -29,10 +29,12 @@ import { NODI_NOTIFICATION_TRANSLATIONS } from './i18n.nodiNotifications';
 import { ANNOUNCEMENT_TRANSLATIONS } from './i18n.announcements';
 import { LIBRARY_READER_TRANSLATIONS } from './i18n.libraryReader';
 import { LIBRARY_BIBLIOGRAPHY_TRANSLATIONS } from './i18n.libraryBibliography';
+import { LIBRARY_RECOVERY_TRANSLATIONS } from './i18n.libraryRecovery';
 
 export const FR: Record<string, string> = {
   ...LIBRARY_READER_TRANSLATIONS.fr,
   ...LIBRARY_BIBLIOGRAPHY_TRANSLATIONS.fr,
+  ...LIBRARY_RECOVERY_TRANSLATIONS.fr,
   ...DIARIZATION_TRANSLATIONS.fr,
   ...PROSOPOGRAPHY_TRANSLATIONS.fr,
   ...PRIMARY_SOURCES_TRANSLATIONS.fr,

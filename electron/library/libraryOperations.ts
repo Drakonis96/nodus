@@ -24,6 +24,11 @@ import type {
   LibraryBibliographyExportRequest,
   LibraryCitationResult,
   LibraryCitationStyle,
+  LibraryTrashImpact,
+  LibraryPurgeReport,
+  LibraryMergeImpact,
+  LibraryRecoveryReport,
+  LibraryRecoveryIssue,
 } from '@shared/libraryTypes';
 import { canonicalJson, normalizeLibraryMetadata } from './libraryRecord';
 import { LibraryCatalog } from './libraryCatalog';
@@ -93,6 +98,7 @@ function recordCatalogItem(record: LibraryItemRecord, store: LibraryDiskStore): 
     collectionIds: record.collectionIds, attachmentCount: record.attachments.length,
     readerAvailable: fs.existsSync(path.join(store.itemFolder(record.storageId), reader)),
     extractionStatus: record.extraction?.status ?? 'pending', updatedAt: record.clock.updatedAt,
+    deletedAt: record.deletedAt,
   };
 }
 
@@ -304,6 +310,106 @@ export class LibraryOperations {
     }
     if (updated) this.catalog.rebuild(this.store);
     return updated;
+  }
+
+  trashImpact(itemIds: string[]): LibraryTrashImpact {
+    const all = this.store.scanMaterializedItems().records;
+    const requested = new Set(itemIds.map((id) => this.catalog.resolveItemId(id) ?? id));
+    const records = all.filter((item) => item.deletedAt && (!requested.size || requested.has(item.id)));
+    const items = records.map((item) => {
+      const folder = this.store.itemFolder(item.storageId);
+      const annotations = readJsonArray(path.join(folder, item.files?.annotations ?? 'annotations.json')).length;
+      const orphaned = readJsonArray(path.join(folder, item.files?.orphanedAnnotations ?? 'orphaned-annotations.json')).length;
+      const chat = readJsonArray(path.join(folder, item.files?.chat ?? 'chat.json')).length;
+      const linkedVaults = this.catalog.listVaultLinks(item.id).map((link) => ({
+        vaultId: link.vaultId, vaultName: link.vaultName, workId: link.workId,
+      }));
+      return {
+        itemId: item.id, title: item.metadata.title,
+        attachmentCount: item.attachments.length,
+        attachmentBytes: item.attachments.reduce((sum, entry) => sum + Math.max(0, entry.byteSize), 0),
+        annotationCount: annotations, orphanedAnnotationCount: orphaned,
+        chatMessageCount: chat, noteCount: item.notes?.length ?? 0,
+        aliasCount: item.aliases.length, relationCount: item.relations?.length ?? 0,
+        linkedVaults,
+      };
+    });
+    const linked = items.flatMap((item) => item.linkedVaults);
+    return {
+      itemIds: records.map((item) => item.id), items,
+      attachmentCount: items.reduce((sum, item) => sum + item.attachmentCount, 0),
+      attachmentBytes: items.reduce((sum, item) => sum + item.attachmentBytes, 0),
+      annotationCount: items.reduce((sum, item) => sum + item.annotationCount, 0),
+      orphanedAnnotationCount: items.reduce((sum, item) => sum + item.orphanedAnnotationCount, 0),
+      chatMessageCount: items.reduce((sum, item) => sum + item.chatMessageCount, 0),
+      noteCount: items.reduce((sum, item) => sum + item.noteCount, 0),
+      aliasCount: items.reduce((sum, item) => sum + item.aliasCount, 0),
+      relationCount: items.reduce((sum, item) => sum + item.relationCount, 0),
+      linkedVaultCount: new Set(linked.map((link) => link.vaultId)).size,
+      purgeBlocked: linked.length > 0,
+      blockers: [...new Set(linked.map((link) => `${link.vaultName} (${link.workId})`))],
+    };
+  }
+
+  purgeTrash(itemIds: string[]): LibraryPurgeReport {
+    const impact = this.trashImpact(itemIds);
+    if (impact.purgeBlocked) throw new Error(`No se puede vaciar: hay contenido vinculado en ${impact.blockers.join(', ')}.`);
+    const selected = new Set(impact.itemIds); const warnings: string[] = []; let purged = 0; let archivedRecoveryCopies = 0;
+    for (const record of this.store.scanMaterializedItems().records) {
+      if (selected.has(record.id) || !(record.relations ?? []).some((relation) => selected.has(relation.targetItemId))) continue;
+      this.store.upsertItem({ ...record, relations: (record.relations ?? []).filter((relation) => !selected.has(relation.targetItemId)) }, record.clock.revision);
+    }
+    for (const id of impact.itemIds) {
+      const record = this.store.scanMaterializedItems().records.find((item) => item.id === id && item.deletedAt);
+      if (!record) { warnings.push(`El elemento ${id} ya no estaba en la papelera.`); continue; }
+      try { this.store.archivePurgedItem(record); purged += 1; archivedRecoveryCopies += 1; }
+      catch (error) { warnings.push(error instanceof Error ? error.message : String(error)); }
+    }
+    this.catalog.rebuild(this.store);
+    return { requested: impact.itemIds.length, purged, archivedRecoveryCopies, blocked: impact.itemIds.length - purged, warnings };
+  }
+
+  auditRecovery(): LibraryRecoveryReport {
+    const issues: LibraryRecoveryIssue[] = [];
+    const scanned = this.store.scanMaterializedItems(); let checkedAttachments = 0; let missingFiles = 0; let corruptFiles = 0;
+    for (const item of scanned.records) {
+      const folder = this.store.itemFolder(item.storageId);
+      for (const attachment of item.attachments) {
+        checkedAttachments += 1;
+        const file = assertInside(folder, path.join(folder, attachment.relativePath));
+        if (!fs.existsSync(file) || !fs.statSync(file).isFile()) {
+          missingFiles += 1; issues.push({ code: 'missing-attachment', itemId: item.id, path: file, message: `Missing attachment: ${attachment.fileName}`, recoverable: true }); continue;
+        }
+        if (sha256File(file) !== attachment.sha256) {
+          corruptFiles += 1; issues.push({ code: 'corrupt-attachment', itemId: item.id, path: file, message: `Attachment checksum mismatch: ${attachment.fileName}`, recoverable: true });
+        }
+      }
+      if (item.files?.reader) {
+        const reader = assertInside(folder, path.join(folder, item.files.reader));
+        if (!fs.existsSync(reader)) { missingFiles += 1; issues.push({ code: 'missing-reader', itemId: item.id, path: reader, message: 'Clean Markdown is missing.', recoverable: true }); }
+      }
+    }
+    let orphanFolders = 0;
+    if (fs.existsSync(this.store.root)) for (const entry of fs.readdirSync(this.store.root, { withFileTypes: true })) {
+      if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
+      const folder = path.join(this.store.root, entry.name);
+      if (!fs.existsSync(path.join(folder, 'metadata.json'))) { orphanFolders += 1; issues.push({ code: 'orphan-folder', itemId: null, path: folder, message: 'Folder has no readable item manifest.', recoverable: true }); }
+    }
+    const conflictsRoot = path.join(this.store.root, '.nodus', 'conflicts');
+    const conflicts = countFiles(conflictsRoot, '.json');
+    if (conflicts) issues.push({ code: 'conflict', itemId: null, path: conflictsRoot, message: `${conflicts} offline conflict record(s) require review.`, recoverable: true });
+    const status = this.catalog.status(this.store.root, this.store.deviceId);
+    const invalidRecords = Math.max(scanned.invalid, status.invalidRecords);
+    if (invalidRecords) issues.push({ code: 'invalid-record', itemId: null, path: path.join(this.store.root, '.nodus', 'records'), message: `${invalidRecords} invalid record(s) were excluded.`, recoverable: true });
+    const searchesFile = path.join(this.store.root, '.nodus', 'saved-searches.json');
+    if (fs.existsSync(searchesFile) && !Array.isArray(readJsonValue(searchesFile))) issues.push({ code: 'invalid-saved-search', itemId: null, path: searchesFile, message: 'Saved-search definitions are not a valid record array.', recoverable: true });
+    const linksFile = path.join(this.store.root, '.nodus', 'vault-links.json');
+    const linksValue = readJsonValue(linksFile) as { links?: unknown } | undefined;
+    if (fs.existsSync(linksFile) && (!linksValue || !Array.isArray(linksValue.links))) issues.push({ code: 'invalid-vault-link', itemId: null, path: linksFile, message: 'Vault-link manifest is not a valid link array.', recoverable: true });
+    return {
+      auditedAt: new Date().toISOString(), checkedItems: scanned.records.length, checkedAttachments,
+      conflicts, invalidRecords, missingFiles, corruptFiles, orphanFolders, issues,
+    };
   }
 
   importLocalFiles(files: string[], collectionId?: string | null): LibraryLocalImportReport {
@@ -646,6 +752,40 @@ export class LibraryOperations {
     return groups.sort((a, b) => a.items[0].title.localeCompare(b.items[0].title));
   }
 
+  mergeImpact(canonicalId: string, duplicateIds: string[]): LibraryMergeImpact {
+    const all = this.store.scanMaterializedItems().records;
+    const resolvedCanonicalId = this.catalog.resolveItemId(canonicalId) ?? canonicalId;
+    const resolvedDuplicates = new Set(duplicateIds.map((id) => this.catalog.resolveItemId(id) ?? id));
+    const canonical = all.find((item) => item.id === resolvedCanonicalId && !item.deletedAt);
+    if (!canonical) throw new Error('El documento canónico ya no existe.');
+    const records = all.filter((item) => (item.id === resolvedCanonicalId || resolvedDuplicates.has(item.id)) && !item.deletedAt);
+    const counts = records.map((item) => {
+      const folder = this.store.itemFolder(item.storageId);
+      return {
+        attachments: item.attachments.length,
+        annotations: readJsonArray(path.join(folder, item.files?.annotations ?? 'annotations.json')).length,
+        orphaned: readJsonArray(path.join(folder, item.files?.orphanedAnnotations ?? 'orphaned-annotations.json')).length,
+        chats: readJsonArray(path.join(folder, item.files?.chat ?? 'chat.json')).length,
+        notes: item.notes?.length ?? 0, aliases: item.aliases.length,
+        relations: item.relations?.length ?? 0,
+      };
+    });
+    const links = records.flatMap((item) => this.catalog.listVaultLinks(item.id));
+    return {
+      canonicalId: canonical.id, duplicateIds: records.filter((item) => item.id !== canonical.id).map((item) => item.id),
+      attachmentCount: counts.reduce((sum, entry) => sum + entry.attachments, 0),
+      annotationCount: counts.reduce((sum, entry) => sum + entry.annotations, 0),
+      orphanedAnnotationCount: counts.reduce((sum, entry) => sum + entry.orphaned, 0),
+      chatMessageCount: counts.reduce((sum, entry) => sum + entry.chats, 0),
+      noteCount: counts.reduce((sum, entry) => sum + entry.notes, 0),
+      aliasCount: counts.reduce((sum, entry) => sum + entry.aliases, 0) + Math.max(0, records.length - 1),
+      relationCount: counts.reduce((sum, entry) => sum + entry.relations, 0),
+      linkedVaultCount: new Set(links.map((link) => link.vaultId)).size,
+      vaultWorksPreserved: new Set(links.map((link) => `${link.vaultId}:${link.workId}`)).size,
+      warnings: links.length ? ['Vault works and their analyses remain separate until an explicit vault reconciliation.'] : [],
+    };
+  }
+
   mergeItems(canonicalId: string, duplicateIds: string[]): LibraryItemRecord {
     const all = this.store.scanMaterializedItems().records;
     const resolvedCanonicalId = this.catalog.resolveItemId(canonicalId) ?? canonicalId;
@@ -658,6 +798,8 @@ export class LibraryOperations {
     const folder = this.store.itemFolder(canonical.storageId);
     const attachments = [...canonical.attachments]; const hashes = new Set(attachments.map((entry) => entry.sha256));
     const files = { ...(canonical.files ?? {}) }; let extraction = canonical.extraction;
+    const notes = [...(canonical.notes ?? [])];
+    const relations = [...(canonical.relations ?? [])];
     let adoptedRevision: LibraryItemRecord['contentRevision'] | undefined;
     for (const duplicate of duplicates) {
       const duplicateFolder = this.store.itemFolder(duplicate.storageId);
@@ -689,6 +831,26 @@ export class LibraryOperations {
         canonicalAnnotations.push({ ...(annotation as Record<string, unknown>), documentId: canonical.storageId }); annotationIds.add(id);
       }
       if (duplicateAnnotations.length) { files.annotations = files.annotations ?? 'annotations.json'; atomicWriteJson(path.join(folder, files.annotations), canonicalAnnotations); }
+      const orphaned = mergeJsonArrayFiles(
+        path.join(folder, files.orphanedAnnotations ?? 'orphaned-annotations.json'),
+        path.join(duplicateFolder, duplicate.files?.orphanedAnnotations ?? 'orphaned-annotations.json'),
+        canonical.storageId,
+      );
+      if (orphaned) files.orphanedAnnotations = files.orphanedAnnotations ?? 'orphaned-annotations.json';
+      const chats = mergeJsonArrayFiles(
+        path.join(folder, files.chat ?? 'chat.json'),
+        path.join(duplicateFolder, duplicate.files?.chat ?? 'chat.json'),
+      );
+      if (chats) files.chat = files.chat ?? 'chat.json';
+      const noteIds = new Set(notes.map((note) => note.id));
+      for (const note of duplicate.notes ?? []) {
+        if (noteIds.has(note.id)) {
+          if (notes.some((entry) => entry.id === note.id && entry.markdown === note.markdown && entry.title === note.title)) continue;
+          notes.push({ ...note, id: `merged-note:${randomUUID()}` });
+        } else notes.push(note);
+        noteIds.add(notes[notes.length - 1].id);
+      }
+      for (const relation of duplicate.relations ?? []) relations.push(relation);
     }
     const fill = (key: keyof LibraryItemMetadata) => desired.metadata[key] || duplicates.map((item) => item.metadata[key]).find(Boolean);
     const metadata = normalizeLibraryMetadata({
@@ -713,8 +875,22 @@ export class LibraryOperations {
       sourceIdentities: [...new Map([desired, ...duplicates].flatMap((item) => item.sourceIdentities)
         .map((identity) => [JSON.stringify(identity), identity])).values()],
       vaultWorkIds: Object.assign({}, ...[...duplicates, desired].map((item) => item.vaultWorkIds ?? {})),
-      attachments, files, extraction, contentRevision,
+      attachments, files, extraction, contentRevision, notes,
+      relations: [...new Map(relations
+        .map((relation) => ({ ...relation, targetItemId: resolvedDuplicateIds.has(relation.targetItemId) ? resolvedCanonicalId : relation.targetItemId }))
+        .filter((relation) => relation.targetItemId !== resolvedCanonicalId)
+        .map((relation) => [`${relation.relationType}:${relation.targetItemId}`, relation])).values()],
     }, desired.clock.revision, now);
+    for (const record of all) {
+      if (record.id === resolvedCanonicalId || resolvedDuplicateIds.has(record.id)) continue;
+      const relations = record.relations ?? [];
+      const remapped = relations.map((relation) => resolvedDuplicateIds.has(relation.targetItemId)
+        ? { ...relation, targetItemId: resolvedCanonicalId }
+        : relation);
+      const deduplicated = [...new Map(remapped.map((relation) => [`${relation.relationType}:${relation.targetItemId}`, relation])).values()];
+      if (canonicalJson(relations) !== canonicalJson(deduplicated)) this.store.upsertItem({ ...record, relations: deduplicated }, record.clock.revision, now);
+    }
+    this.catalog.remapVaultLinks(duplicates.map((item) => item.id), desired.id);
     for (const duplicate of duplicates) this.store.upsertItem({ ...duplicate, deletedAt: now }, duplicate.clock.revision);
     this.catalog.rebuild(this.store);
     return desired;
@@ -727,4 +903,37 @@ function asciiCitationKey(value: string): string {
 
 function readJsonArray(file: string): unknown[] {
   try { const value = JSON.parse(fs.readFileSync(file, 'utf8')); return Array.isArray(value) ? value : []; } catch { return []; }
+}
+
+function readJsonValue(file: string): unknown | undefined {
+  try { return JSON.parse(fs.readFileSync(file, 'utf8')) as unknown; } catch { return undefined; }
+}
+
+function mergeJsonArrayFiles(target: string, source: string, documentId?: string): number {
+  const current = readJsonArray(target); const incoming = readJsonArray(source);
+  if (!incoming.length) return 0;
+  const byId = new Map(current.map((entry) => [String((entry as { id?: unknown })?.id ?? ''), entry]));
+  let added = 0;
+  for (const value of incoming) {
+    if (!value || typeof value !== 'object') continue;
+    let entry: Record<string, unknown> = { ...(value as Record<string, unknown>), ...(documentId ? { documentId } : {}) };
+    let id = String(entry.id ?? '');
+    const existing = id ? byId.get(id) : undefined;
+    if (existing && canonicalJson(existing) === canonicalJson(entry)) continue;
+    if (!id || existing) { id = `merged:${randomUUID()}`; entry = { ...entry, id }; }
+    current.push(entry); byId.set(id, entry); added += 1;
+  }
+  if (added) atomicWriteJson(target, current);
+  return added;
+}
+
+function countFiles(root: string, suffix: string): number {
+  if (!fs.existsSync(root)) return 0;
+  let count = 0;
+  for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
+    const file = path.join(root, entry.name);
+    if (entry.isDirectory()) count += countFiles(file, suffix);
+    else if (entry.isFile() && entry.name.endsWith(suffix)) count += 1;
+  }
+  return count;
 }

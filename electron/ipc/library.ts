@@ -34,11 +34,15 @@ import {
   deleteGlobalLibraryCollection,
   patchGlobalLibraryItemCollections,
   setGlobalLibraryItemsDeleted,
+  previewGlobalLibraryTrash,
+  purgeGlobalLibraryTrash,
+  auditGlobalLibraryRecovery,
   importGlobalLibraryFiles,
   importGlobalBibliographyFiles,
   updateGlobalLibraryItemMetadata,
   resolveGlobalLibraryMetadata,
   listGlobalLibraryDuplicates,
+  previewGlobalLibraryMerge,
   mergeGlobalLibraryItems,
   createGlobalLibraryItem,
   duplicateGlobalLibraryItem,
@@ -108,6 +112,9 @@ export function registerLibraryIpc({ h }: IpcContext): void {
   h('library:deleteCollection', async (_event, id, deleteItems) => deleteGlobalLibraryCollection(id, deleteItems));
   h('library:patchItemCollections', async (_event, itemIds, patch) => patchGlobalLibraryItemCollections(itemIds, patch));
   h('library:setItemsDeleted', async (_event, itemIds, deleted) => setGlobalLibraryItemsDeleted(itemIds, deleted));
+  h('library:trashImpact', async (_event, itemIds) => previewGlobalLibraryTrash(itemIds));
+  h('library:purgeTrash', async (_event, itemIds) => purgeGlobalLibraryTrash(itemIds));
+  h('library:auditRecovery', async () => auditGlobalLibraryRecovery());
   h('library:importFiles', async (event, collectionId) => {
     const owner = BrowserWindow.fromWebContents(event.sender) ?? undefined;
     const options = {
@@ -184,6 +191,7 @@ export function registerLibraryIpc({ h }: IpcContext): void {
     return report;
   });
   h('library:duplicates', async () => listGlobalLibraryDuplicates());
+  h('library:mergeImpact', async (_event, canonicalId, duplicateIds) => previewGlobalLibraryMerge(canonicalId, duplicateIds));
   h('library:mergeItems', async (_event, canonicalId, duplicateIds) => mergeGlobalLibraryItems(canonicalId, duplicateIds));
   h('library:vaults', async () => listGlobalLibraryVaults());
   h('library:vaultLinks', async (_event, itemId) => listGlobalLibraryVaultLinks(itemId));

@@ -330,6 +330,26 @@ export class LibraryDiskStore {
       && collection.sourceLibraryId === libraryId && collection.sourceKey === sourceKey) ?? null;
   }
 
+  /** Remove a trashed item from the active manifests while retaining a verified,
+   * user-recoverable copy under `.nodus/recovery`. Vault analyses are never touched. */
+  archivePurgedItem(record: LibraryItemRecord, now = new Date().toISOString()): string {
+    if (!record.deletedAt) throw new Error('Solo se pueden vaciar elementos que ya estén en la papelera.');
+    const recoveryId = `${now.replace(/[^0-9A-Za-z]/g, '')}-${safeLibraryFolderName(record.id)}-${record.clock.contentHash.slice(0, 12)}`;
+    const recoveryRoot = assertInside(this.root, path.join(this.root, '.nodus', 'recovery', 'purged', recoveryId));
+    fs.mkdirSync(recoveryRoot, { recursive: true });
+    const materialized = assertInside(this.root, this.itemFolder(record.storageId));
+    const versions = assertInside(this.root, this.versionsDirectory('items', record.id));
+    if (fs.existsSync(materialized)) fs.renameSync(materialized, path.join(recoveryRoot, 'item'));
+    if (fs.existsSync(versions)) fs.renameSync(versions, path.join(recoveryRoot, 'versions'));
+    atomicWriteJson(path.join(recoveryRoot, 'recovery.json'), {
+      format: 'nodus.library-purged-recovery', formatVersion: 1,
+      archivedAt: now, itemId: record.id, storageId: record.storageId,
+      aliases: record.aliases, sourceIdentities: record.sourceIdentities,
+      deletedAt: record.deletedAt, clock: record.clock,
+    });
+    return recoveryRoot;
+  }
+
   /** Remove a record created by a migration only while its exact revision is still current. */
   rollbackCreatedItem(input: { id: string; storageId: string; revision: number; contentHash: string }): boolean {
     const current = this.readMaterializedItem(input.storageId);

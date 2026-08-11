@@ -89,6 +89,13 @@ button exists.
 | Metadata | Candidates require review before being applied | Verified | `test-global-library-ui`, `e2e-global-library` |
 | Metadata | Bulk resolution is rate-limited, cancelable, partial-result safe, and requires a second confirmation | Verified | `test-library-metadata`, `test-global-library-ui`, `e2e-global-library` |
 | Duplicates | Explicit detection and merging preserve derived files | Verified | `test-library-metadata`, `test-global-library-ui` |
+| Trash | A dedicated view restores individual or bulk records and manual emptying requires an impact preview | Verified | `test-library-recovery`, `test-global-library-ui`, `e2e-global-library` |
+| Trash | Active vault links block emptying and vault analyses are never cascade-deleted | Verified | `test-library-recovery` |
+| Trash | Emptying archives a recoverable package outside the active catalogue instead of destroying the only copy | Verified | `test-library-recovery` |
+| Duplicates | Merge impact covers attachments, annotations, chats, notes, aliases, relations, and vault works | Verified | `test-library-recovery`, `test-global-library-ui` |
+| Duplicates | Aliases and inbound relations remap to the canonical record while vault works remain separate | Verified | `test-library-recovery` |
+| Recovery | Attachment hashes, missing files, invalid records, conflicts, and orphan folders are auditable | Verified | `test-library-recovery`, `test-global-library-ui` |
+| Recovery | Catalogue, aliases, searches, and vault links rebuild from `nodus-library` without SQLite | Verified | `test-library-recovery`, `test-library-storage` |
 | Vaults | Linking is idempotent and does not duplicate the original | Verified | `test-global-library-vault-integration` |
 | Vaults | Analysis resolves the global clean Markdown | Verified | `test-global-library-vault-integration` |
 | Vaults | A connected read-only vault rejects writes | Verified | `test-global-library-vault-integration` |
