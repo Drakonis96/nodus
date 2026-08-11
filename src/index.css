@@ -2865,6 +2865,15 @@ select.input optgroup {
 /* Clean-library reader: the document remains Markdown, but it should feel like a
    quiet reading surface rather than another dashboard card. The outline and note
    rails carry navigation; the paper carries only the source. */
+.library-reader-clean-surface {
+  background: #09090b;
+  color-scheme: dark;
+}
+.library-reader-paper {
+  background: #111114;
+  color: rgb(228 228 231);
+  color-scheme: dark;
+}
 .library-reader-document .md {
   color: rgb(212 212 216);
   font-family: ui-serif, Georgia, Cambria, "Times New Roman", serif;
@@ -2931,7 +2940,10 @@ select.input optgroup {
   border-color: rgb(226 232 240);
   background: rgb(255 255 255 / 0.88);
   box-shadow: 0 24px 70px -45px rgb(15 23 42 / 0.38);
+  color: #334155;
+  color-scheme: light;
 }
+.light .library-reader-clean-surface { background: #f4f4f5; color-scheme: light; }
 .light .library-reader-document .md { color: #334155; }
 .light .library-reader-document .md h1,
 .light .library-reader-document .md h2,
@@ -2942,6 +2954,22 @@ select.input optgroup {
 .light .library-reader-document .md h2 { border-top-color: rgb(226 232 240); }
 .light .library-reader-document .md blockquote { background: rgb(238 242 255 / 0.7); }
 .light .library-reader-document .md th { background: #f1f5f9; color: #1e293b; }
+
+/* The reader has its own fully grounded chat. Keeping the floating mascot out of
+   this one surface prevents it from covering the compact sidebar composer. */
+body:has(.library-document-reader) .nodi-companion { display: none; }
+
+/* Reader notifications must not cover the fixed chat composer. The toast host
+   returns to its normal corner as soon as the document sidebar is closed. */
+body:has(.library-document-reader [data-testid="library-reader-sidebar"]) .app-toast-stack {
+  right: 22rem;
+}
+@media (max-width: 640px) {
+  body:has(.library-document-reader [data-testid="library-reader-sidebar"]) .app-toast-stack {
+    inset: 4.5rem 1rem auto;
+    align-items: center;
+  }
+}
 
 /* NotebookLM-style inline source citation. Rendered as a small pill that opens a
    source modal instead of navigating. */

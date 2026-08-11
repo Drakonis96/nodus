@@ -27,10 +27,17 @@ export interface MarkdownCitation {
   id: string;
 }
 
+export interface MarkdownReaderCitation {
+  documentId: string;
+  sectionId?: string;
+  page?: number;
+}
+
 export function Markdown({
   content,
   className = '',
   onCitation,
+  onReaderCitation,
   onStudyDocument,
   onStudyMaterial,
   onStudyRecording,
@@ -43,6 +50,9 @@ export function Markdown({
   content: string;
   className?: string;
   onCitation?: (citation: MarkdownCitation) => void;
+  /** `nodus://reader/<document>[/section/<id>|/page/<n>]` returns to traced
+   * evidence inside the currently open Library document. */
+  onReaderCitation?: (citation: MarkdownReaderCitation) => void;
   /** `nodus://world/<kind>/<id>`. `kind` is `new` when the entry does not exist yet. */
   onWorldEntry?: (kind: string, id: string) => void;
   /** `nodus://testimonios/...`: abre la entrevista, el participante o el contraste, y
@@ -108,6 +118,22 @@ export function Markdown({
         }}
         components={{
           a: ({ href, children }) => {
+            const readerCitation = href?.match(/^nodus:\/\/reader\/([^/?]+)(?:\/(section|page)\/([^?]+))?$/);
+            if (readerCitation && onReaderCitation) {
+              const documentId = decodeURIComponent(readerCitation[1]);
+              const target = readerCitation[2];
+              const value = readerCitation[3] ? decodeURIComponent(readerCitation[3]) : undefined;
+              return <button
+                className="citation-link"
+                data-citation-kind="reader"
+                title={t('Abrir cita en el lector')}
+                onClick={() => onReaderCitation({
+                  documentId,
+                  ...(target === 'section' && value ? { sectionId: value } : {}),
+                  ...(target === 'page' && value && Number.isFinite(Number(value)) ? { page: Number(value) } : {}),
+                })}
+              >{children}</button>;
+            }
             const studyMaterial = href?.match(/^nodus:\/\/study\/material\/([^?]+)(?:\?.*)?$/);
             if (studyMaterial && onStudyMaterial) {
               return <button className="text-teal-400 underline decoration-teal-700 underline-offset-2 hover:text-teal-300" onClick={() => onStudyMaterial(decodeURIComponent(studyMaterial[1]))}>{children}</button>;
