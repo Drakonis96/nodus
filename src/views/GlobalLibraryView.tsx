@@ -784,6 +784,8 @@ function GlobalLibraryContent({
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [detailActionsOpen, setDetailActionsOpen] = useState(false);
   const sidebarNavigationRef = useRef<HTMLDivElement>(null);
+  const selectedDetailIdRef = useRef<string | null>(null);
+  selectedDetailIdRef.current = detailId;
   const [collectionPaneRatio, setCollectionPaneRatio] = useState(() => {
     const stored = Number(window.localStorage.getItem(LIBRARY_COLLECTION_PANE_RATIO_KEY));
     return Number.isFinite(stored) && stored > 0 ? clampCollectionPaneRatio(stored) : DEFAULT_LIBRARY_COLLECTION_PANE_RATIO;
@@ -829,23 +831,38 @@ function GlobalLibraryContent({
     finally { setLoading(false); }
   }, [search, selectedCollection, selectedSavedSearch, trashMode, source, extraction, yearFrom, yearTo, itemType, facetTag, facetVault, attachmentFilter, offset, expanded.size, sortKey]);
 
+  const refreshSelectedLibraryDetail = useCallback(async (changedItemId?: string) => {
+    const selectedId = selectedDetailIdRef.current;
+    if (!selectedId || (changedItemId && changedItemId !== selectedId)) return;
+    const [item, links] = await Promise.all([
+      window.nodus.getGlobalLibraryItem(selectedId),
+      window.nodus.listGlobalLibraryVaultLinks(selectedId),
+    ]);
+    if (selectedDetailIdRef.current !== selectedId) return;
+    setDetail(item);
+    setDetailLinks(links);
+  }, []);
+
   useEffect(() => { const timer = window.setTimeout(() => { setOffset(0); setSearch(searchDraft.trim()); }, 220); return () => window.clearTimeout(timer); }, [searchDraft]);
   useEffect(() => { void load(); }, [load]);
   useEffect(() => {
-    const offChanged = window.nodus.onGlobalLibraryChanged(() => void load());
+    const offChanged = window.nodus.onGlobalLibraryChanged(() => {
+      void load();
+      void refreshSelectedLibraryDetail();
+    });
     const offExtraction = window.nodus.onLibraryExtractionProgress((progress) => {
       setJobs((current) => [progress, ...current.filter((job) => job.id !== progress.id)]);
-      if (progress.status === 'done' || progress.status === 'failed') void load();
+      if (progress.status === 'done' || progress.status === 'failed' || progress.status === 'canceled') {
+        void load();
+        void refreshSelectedLibraryDetail(progress.itemId);
+      }
     });
     return () => { offChanged(); offExtraction(); };
-  }, [load]);
+  }, [load, refreshSelectedLibraryDetail]);
   useEffect(() => {
     if (!detailId) { setDetail(null); setDetailLinks([]); return; }
-    void Promise.all([
-      window.nodus.getGlobalLibraryItem(detailId),
-      window.nodus.listGlobalLibraryVaultLinks(detailId),
-    ]).then(([item, links]) => { setDetail(item); setDetailLinks(links); });
-  }, [detailId, status?.lastRebuiltAt]);
+    void refreshSelectedLibraryDetail();
+  }, [detailId, refreshSelectedLibraryDetail, status?.lastRebuiltAt]);
   useEffect(() => { setDetailActionsOpen(false); }, [detailId]);
   useEffect(() => {
     const closeMenus = (event: KeyboardEvent) => {

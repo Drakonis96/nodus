@@ -87,6 +87,8 @@ test('the Library UI exposes hierarchy, search, bulk operations, imports and bac
   assert.match(view, /t\('Añadir'\)[\s\S]*t\('Sincronizar Zotero'\)[\s\S]*library-more-menu-toggle/, 'the main toolbar is reduced to Add, Zotero sync, and an overflow menu');
   assert.match(view, /t\('Reconstruir versión limpia'\)/, 'clean Markdown rebuilding is named explicitly');
   assert.match(view, /window\.nodus\.cancelLibraryExtraction/, 'visible background preparation can be canceled');
+  assert.match(view, /refreshSelectedLibraryDetail/, 'terminal extraction progress refreshes the selected detail in place');
+  assert.match(view, /progress\.status === 'done' \|\| progress\.status === 'failed' \|\| progress\.status === 'canceled'/, 'every terminal extraction state reconciles stale detail state');
   assert.match(view, /detail\.attachments\.length === 0[\s\S]*addGlobalLibraryAttachments/, 'a record without a file exposes Add file as its primary action');
   assert.match(view, /detail\.extraction\?\.status === 'failed'[\s\S]*Intentar de nuevo/, 'a failed preparation exposes a plain-language retry action');
   assert.match(view, /detail\.extraction\?\.status === 'needs-review'[\s\S]*Leer y revisar/, 'reviewable Markdown remains directly readable');

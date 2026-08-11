@@ -14,6 +14,8 @@ const backupRoot = path.join(testRoot, 'backups');
 const screenshotPath = path.join(os.tmpdir(), 'nodus-global-library-e2e.png');
 const itemId = 'zotero:E7FGXJFE';
 const storageId = 'E7FGXJFE';
+const pendingItemId = 'nodus:E2E-PENDING-READING';
+const pendingStorageId = 'E2E-PENDING-READING';
 const childEnv = {
   ...process.env,
   NODUS_USERDATA: userData,
@@ -32,6 +34,39 @@ async function closeElectronApp(instance) {
   const clean = await Promise.race([closed, new Promise((resolve) => { timer = setTimeout(() => resolve(false), 5_000); })]);
   clearTimeout(timer);
   if (!clean && child.exitCode === null && !child.killed) child.kill('SIGKILL');
+}
+
+async function writePendingReadingFixture(collectionId, now) {
+  const pendingItemFolder = path.join(backupRoot, 'nodus-library', pendingStorageId);
+  const pendingMarkdown = [
+    '# Lectura pendiente E2E',
+    '',
+    'Este documento se prepara mientras su panel de detalle permanece abierto. La prueba conserva la selección durante toda la extracción y comprueba que la interfaz recibe el resultado sin cambiar de sección.',
+    '',
+    'Cuando finaliza el trabajo en segundo plano, tanto la fila del catálogo como la acción principal del panel deben indicar inmediatamente que la lectura está disponible.',
+    '',
+  ].join('\n');
+  await mkdir(pendingItemFolder, { recursive: true });
+  await writeFile(path.join(pendingItemFolder, 'original.md'), pendingMarkdown, 'utf8');
+  await writeFile(path.join(pendingItemFolder, 'annotations.json'), '[]\n', 'utf8');
+  await writeFile(path.join(pendingItemFolder, 'metadata.json'), `${JSON.stringify({
+    format: 'nodus.library-item', formatVersion: 1, id: pendingItemId, storageId: pendingStorageId,
+    source: 'nodus', sourceLibraryId: null, sourceKey: null,
+    metadata: {
+      title: 'Lectura pendiente E2E', itemType: 'document', creators: [],
+      date: '2026', year: 2026, isbn: [], issn: [], tags: [],
+    },
+    collectionIds: [collectionId],
+    attachments: [{
+      id: 'nodus:E2E-PENDING-ATTACHMENT', title: 'Original Markdown', fileName: 'original.md',
+      relativePath: 'original.md', mimeType: 'text/markdown', byteSize: Buffer.byteLength(pendingMarkdown),
+      sha256: 'c'.repeat(64), role: 'original',
+    }],
+    files: { original: 'original.md', annotations: 'annotations.json' },
+    extraction: { status: 'pending' },
+    createdAt: now, deletedAt: null,
+    clock: { deviceId: 'e2e-device-0001', revision: 1, baseRevision: 0, updatedAt: now, contentHash: 'd'.repeat(64) },
+  }, null, 2)}\n`, 'utf8');
 }
 
 try {
@@ -576,6 +611,20 @@ try {
   assert.match(await detail.getByTestId('library-reading-status').innerText(), /Lista para leer/);
   assert.match(await detail.getByTestId('library-detail-primary-action').innerText(), /Leer/);
   assert.equal(await detail.getByTestId('library-extraction-advanced').getAttribute('open'), null, 'technical extraction details start collapsed');
+  await writePendingReadingFixture(collections.child.id, now);
+  await page.evaluate(() => window.nodus.rebuildGlobalLibrary());
+  const pendingRow = page.getByTestId(`global-library-item-${pendingItemId}`);
+  await pendingRow.waitFor({ state: 'visible' });
+  await pendingRow.getByRole('button').click();
+  const pendingDetail = page.getByTestId('global-library-detail');
+  assert.match(await pendingDetail.getByTestId('library-reading-status').innerText(), /Preparación pendiente/);
+  const pendingEnqueue = await page.evaluate((id) => window.nodus.enqueueLibraryExtraction([id]), pendingItemId);
+  assert.equal(pendingEnqueue.queued, 1, 'the pending reading enters the extraction queue');
+  await page.waitForFunction(async (id) => (await window.nodus.getGlobalLibraryItem(id))?.extraction?.status === 'ready', pendingItemId);
+  await page.waitForFunction((id) => document.querySelector(`[data-testid="global-library-item-${id}"]`)?.textContent?.includes('Lista para leer'), pendingItemId);
+  await pendingDetail.getByTestId('library-reading-status').getByText('Lista para leer', { exact: true }).waitFor();
+  assert.match(await pendingDetail.getByTestId('library-detail-primary-action').innerText(), /Leer/, 'the selected detail refreshes without leaving Library');
+  await row.getByRole('button').click();
   const toastDismissButtons = page.getByTestId('app-toast-stack').getByRole('button', { name: 'Cerrar' });
   while (await toastDismissButtons.count()) {
     await toastDismissButtons.first().evaluate((button) => (button instanceof HTMLButtonElement ? button.click() : undefined)).catch(() => undefined);
