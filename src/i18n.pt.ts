@@ -10,6 +10,7 @@ import { TOOLKIT_APPS_TRANSLATIONS } from './i18n.toolkitApps';
 import { SERVER_TRANSLATIONS } from './i18n.server';
 import { TRANSLATE_TRANSLATIONS } from './i18n.translate';
 import { WORLD_CHAT_TRANSLATIONS } from './i18n.worldChat';
+import { STUDY_SYNONYM_TRANSLATIONS } from './i18n.studySynonyms';
 import { PROSOPOGRAPHY_TRANSLATIONS } from './i18n.prosopography';
 import { DIARIZATION_TRANSLATIONS } from './i18n.diarization';
 import { WORLDBUILDING_TRANSLATIONS } from './i18n.worldbuilding';
@@ -47,6 +48,7 @@ export const PT: Record<string, string> = {
   ...NODI_NOTIFICATION_TRANSLATIONS['pt'],
   ...ANNOUNCEMENT_TRANSLATIONS['pt'],
   ...WORLD_CHAT_TRANSLATIONS.pt,
+  ...STUDY_SYNONYM_TRANSLATIONS.pt,
   "Lo que cuenta el mapa": "O que conta o mapa",
   "Ver dónde ocurren las escenas ({n})": "Ver onde acontecem as cenas ({n})",
   "Viajes imposibles": "Viagens impossíveis",

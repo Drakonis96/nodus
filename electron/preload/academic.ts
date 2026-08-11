@@ -194,6 +194,7 @@ export const academicApi: AcademicApi = {
       ipcRenderer.removeListener('study:improve:delta', onDelta);
     }
   },
+  suggestStudySynonyms: (request) => ipcRenderer.invoke('study:synonyms', request),
   cancelStudyImprove: async () => {
     if (activeStudyImproveRequestId) await ipcRenderer.invoke('study:improve:cancel', activeStudyImproveRequestId);
   },
