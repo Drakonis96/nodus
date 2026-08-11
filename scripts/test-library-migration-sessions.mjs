@@ -80,7 +80,7 @@ try {
   manager = new LibraryMigrationSessionManager(store, catalog, () => vaults);
   assert.equal(manager.list().find((session) => session.id === interrupted.id)?.status, 'canceled', 'an orphaned running checkpoint becomes resumable after a process crash');
   const completed = await manager.resume(interrupted.id);
-  assert.equal(completed.status, 'completed');
+  assert.equal(completed.status, 'completed', `${completed.error ?? 'migration did not complete'} ${JSON.stringify(completed.verification)}`);
   assert.equal(completed.checkpoint.percent, 100);
   assert.deepEqual(completed.verification, {
     catalogMatches: true, manifestsValid: true, filesPresent: true, linksValid: true,

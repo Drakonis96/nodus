@@ -8,7 +8,7 @@ import type {
   LibrarySortField,
   LibraryViewPreferences,
 } from '@shared/libraryTypes';
-import { atomicWriteJson, readJsonFile } from './libraryPaths';
+import { atomicWriteJson, readJsonFile } from './libraryFileUtils';
 import { LIBRARY_COLUMNS } from '@shared/libraryBibliography';
 
 const COLUMNS = new Set<LibraryColumnId>(LIBRARY_COLUMNS.map((column) => column.id));

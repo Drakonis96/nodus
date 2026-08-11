@@ -22,7 +22,7 @@ import type {
 import { LibraryDiskStore } from './libraryStorage';
 import { librarySourceIdentityKey } from './libraryRecord';
 import { validateLibrarySmartSearchGroup } from './librarySmartCollections';
-import { atomicWriteJson } from './libraryPaths';
+import { atomicWriteJson } from './libraryFileUtils';
 
 type CountRow = { count: number };
 
@@ -173,6 +173,7 @@ export class LibraryCatalog {
     fs.mkdirSync(path.dirname(this.file), { recursive: true });
     this.handle = new Database(this.file);
     this.handle.pragma('journal_mode = WAL');
+    this.handle.pragma('busy_timeout = 5000');
     this.handle.pragma('foreign_keys = ON');
     this.handle.exec(`
       CREATE TABLE IF NOT EXISTS library_meta (
@@ -334,6 +335,22 @@ export class LibraryCatalog {
   private getMeta(key: string): string | null {
     const row = this.handle.prepare('SELECT value FROM library_meta WHERE key=?').get(key) as { value: string } | undefined;
     return row?.value ?? null;
+  }
+
+  /** Register a newly-created cache that is being populated record by record. */
+  initializeIncrementalStore(store: LibraryDiskStore): void {
+    const root = this.getMeta('root');
+    if (root && root !== store.root) throw new Error('El catálogo local pertenece a otra biblioteca y debe reconstruirse.');
+    if (root) return;
+    const now = new Date().toISOString();
+    this.handle.transaction(() => {
+      this.putMeta('root', store.root);
+      this.putMeta('formatVersion', '2');
+      this.putMeta('deviceId', store.deviceId);
+      this.putMeta('conflicts', '0');
+      this.putMeta('invalidRecords', '0');
+      this.putMeta('lastRebuiltAt', now);
+    })();
   }
 
   private vaultLinksFile(root: string): string {
@@ -519,6 +536,181 @@ export class LibraryCatalog {
       invalidRecords: reconciled.invalidRecords + items.invalid + collections.invalid,
       durationMs: Date.now() - started,
     };
+  }
+
+  /**
+   * Refresh one materialized item without reconciling every immutable manifest.
+   * Routine Library edits use this path; `rebuild` remains the explicit recovery
+   * operation for startup repair, migrations and offline conflict reconciliation.
+   */
+  indexItem(record: LibraryItemRecord, store: LibraryDiskStore): void {
+    const folder = store.itemFolder(record.storageId);
+    const readerName = record.files?.reader ?? 'reader.md';
+    const upsert = this.handle.prepare(`
+      INSERT INTO library_items (
+        id, storage_id, folder_name, source, source_library_id, source_key, source_state, citation_key, title, item_type,
+        creators_json, abstract, date_value, year, doi, isbn_json, issn_json, tags_json,
+        metadata_json, collection_ids_json, attachment_count, reader_available,
+        extraction_status, analysis_json, revision, created_at, updated_at, deleted_at
+      ) VALUES (
+        @id, @storageId, @folderName, @source, @sourceLibraryId, @sourceKey, @sourceState, @citationKey, @title, @itemType,
+        @creatorsJson, @abstract, @date, @year, @doi, @isbnJson, @issnJson, @tagsJson,
+        @metadataJson, @collectionIdsJson, @attachmentCount, @readerAvailable,
+        @extractionStatus, @analysisJson, @revision, @createdAt, @updatedAt, @deletedAt
+      ) ON CONFLICT(id) DO UPDATE SET
+        storage_id=excluded.storage_id, folder_name=excluded.folder_name, source=excluded.source,
+        source_library_id=excluded.source_library_id, source_key=excluded.source_key, source_state=excluded.source_state,
+        citation_key=excluded.citation_key, title=excluded.title, item_type=excluded.item_type,
+        creators_json=excluded.creators_json, abstract=excluded.abstract, date_value=excluded.date_value,
+        year=excluded.year, doi=excluded.doi, isbn_json=excluded.isbn_json, issn_json=excluded.issn_json,
+        tags_json=excluded.tags_json, metadata_json=excluded.metadata_json,
+        collection_ids_json=excluded.collection_ids_json, attachment_count=excluded.attachment_count,
+        reader_available=excluded.reader_available, extraction_status=excluded.extraction_status,
+        analysis_json=excluded.analysis_json, revision=excluded.revision, created_at=excluded.created_at,
+        updated_at=excluded.updated_at, deleted_at=excluded.deleted_at
+    `);
+    const insertFts = this.handle.prepare(`
+      INSERT INTO library_items_fts (item_id, title, creators, abstract, tags, identifiers)
+      VALUES (@id, @title, @creators, @abstract, @tags, @identifiers)
+    `);
+    const insertMembership = this.handle.prepare('INSERT OR IGNORE INTO library_item_collections (item_id, collection_id) VALUES (?, ?)');
+    const insertAttachment = this.handle.prepare(`
+      INSERT INTO library_attachments (id, item_id, file_name, relative_path, mime_type, byte_size, sha256, role)
+      VALUES (@id, @itemId, @fileName, @relativePath, @mimeType, @byteSize, @sha256, @role)
+    `);
+    const insertAlias = this.handle.prepare('INSERT OR IGNORE INTO library_item_aliases (alias, item_id) VALUES (?, ?)');
+    const insertIdentity = this.handle.prepare(`
+      INSERT OR IGNORE INTO library_source_identities
+        (identity_key, item_id, source, library_type, library_id, item_key)
+      VALUES (@identityKey, @itemId, @source, @libraryType, @libraryId, @itemKey)
+    `);
+    this.handle.transaction(() => {
+      this.handle.prepare('DELETE FROM library_item_aliases WHERE item_id=?').run(record.id);
+      this.handle.prepare('DELETE FROM library_source_identities WHERE item_id=?').run(record.id);
+      this.handle.prepare('DELETE FROM library_item_collections WHERE item_id=?').run(record.id);
+      this.handle.prepare('DELETE FROM library_attachments WHERE item_id=?').run(record.id);
+      this.handle.prepare('DELETE FROM library_items_fts WHERE item_id=?').run(record.id);
+      upsert.run({
+        id: record.id, storageId: record.storageId, folderName: path.basename(folder), source: record.source,
+        sourceLibraryId: record.sourceLibraryId ?? null, sourceKey: record.sourceKey ?? null,
+        sourceState: record.sourceState ?? null, citationKey: record.citationKey ?? null,
+        title: record.metadata.title, itemType: record.metadata.itemType,
+        creatorsJson: JSON.stringify(record.metadata.creators), abstract: record.metadata.abstract ?? null,
+        date: record.metadata.date ?? null, year: record.metadata.year ?? null, doi: record.metadata.doi ?? null,
+        isbnJson: JSON.stringify(record.metadata.isbn ?? []), issnJson: JSON.stringify(record.metadata.issn ?? []),
+        tagsJson: JSON.stringify(record.metadata.tags ?? []), metadataJson: JSON.stringify(record.metadata),
+        collectionIdsJson: JSON.stringify(record.collectionIds), attachmentCount: record.attachments.length,
+        readerAvailable: fs.existsSync(path.join(folder, readerName)) ? 1 : 0,
+        extractionStatus: record.extraction?.status ?? 'pending', analysisJson: JSON.stringify(record.contentRevision ?? {}),
+        revision: record.clock.revision, createdAt: record.createdAt, updatedAt: record.clock.updatedAt, deletedAt: record.deletedAt,
+      });
+      insertFts.run({
+        id: record.id, title: record.metadata.title, creators: creatorsText(record),
+        abstract: record.metadata.abstract ?? '', tags: (record.metadata.tags ?? []).join(' '),
+        identifiers: [record.metadata.doi, record.metadata.pmid, record.metadata.pmcid, record.metadata.arxiv,
+          ...(record.metadata.isbn ?? []), ...(record.metadata.issn ?? [])].filter(Boolean).join(' '),
+      });
+      for (const collectionId of record.collectionIds) insertMembership.run(record.id, collectionId);
+      for (const attachment of record.attachments) insertAttachment.run({ ...attachment, itemId: record.id });
+      if (!record.deletedAt) {
+        for (const alias of record.aliases) insertAlias.run(alias, record.id);
+        for (const identity of record.sourceIdentities) insertIdentity.run({
+          identityKey: librarySourceIdentityKey(identity), itemId: record.id, ...identity,
+        });
+      }
+    })();
+  }
+
+  indexItems(records: LibraryItemRecord[], store: LibraryDiskStore): void {
+    for (const record of records) this.indexItem(record, store);
+  }
+
+  indexCollection(record: LibraryCollectionRecord): void {
+    const upsert = this.handle.prepare(`
+      INSERT INTO library_collections (id, name, icon, color, parent_id, position, source, source_library_id, source_key, revision, updated_at, deleted_at)
+      VALUES (@id, @name, @icon, @color, @parentId, @position, @source, @sourceLibraryId, @sourceKey, @revision, @updatedAt, @deletedAt)
+      ON CONFLICT(id) DO UPDATE SET name=excluded.name, icon=excluded.icon, color=excluded.color,
+        parent_id=excluded.parent_id, position=excluded.position, source=excluded.source,
+        source_library_id=excluded.source_library_id, source_key=excluded.source_key,
+        revision=excluded.revision, updated_at=excluded.updated_at, deleted_at=excluded.deleted_at
+    `);
+    this.handle.transaction(() => {
+      this.handle.prepare('DELETE FROM library_collection_aliases WHERE collection_id=?').run(record.id);
+      upsert.run({
+        id: record.id, name: record.name, icon: record.icon ?? null, color: record.color ?? null,
+        parentId: record.parentId, position: record.position, source: record.source,
+        sourceLibraryId: record.sourceLibraryId ?? null, sourceKey: record.sourceKey ?? null,
+        revision: record.clock.revision, updatedAt: record.clock.updatedAt, deletedAt: record.deletedAt,
+      });
+      if (!record.deletedAt) for (const alias of record.aliases) {
+        this.handle.prepare('INSERT OR IGNORE INTO library_collection_aliases (alias, collection_id) VALUES (?, ?)').run(alias, record.id);
+      }
+    })();
+  }
+
+  indexCollections(records: LibraryCollectionRecord[]): void {
+    for (const record of records) this.indexCollection(record);
+  }
+
+  removeItem(itemId: string): void {
+    this.handle.transaction(() => {
+      this.handle.prepare('DELETE FROM library_items_fts WHERE item_id=?').run(itemId);
+      this.handle.prepare('DELETE FROM library_items WHERE id=?').run(itemId);
+    })();
+  }
+
+  itemStorageId(reference: string): string | null {
+    const itemId = this.resolveItemId(reference) ?? reference;
+    const row = this.handle.prepare('SELECT storage_id FROM library_items WHERE id=?').get(itemId) as { storage_id: string } | undefined;
+    return row?.storage_id ?? null;
+  }
+
+  citationKeys(exceptItemId?: string): string[] {
+    const rows = (exceptItemId
+      ? this.handle.prepare('SELECT citation_key FROM library_items WHERE deleted_at IS NULL AND id<>? AND citation_key IS NOT NULL').all(exceptItemId)
+      : this.handle.prepare('SELECT citation_key FROM library_items WHERE deleted_at IS NULL AND citation_key IS NOT NULL').all()
+    ) as Array<{ citation_key: string }>;
+    return rows.map((row) => row.citation_key);
+  }
+
+  attachmentHashes(): string[] {
+    return (this.handle.prepare('SELECT DISTINCT sha256 FROM library_attachments').all() as Array<{ sha256: string }>).map((row) => row.sha256);
+  }
+
+  pendingExtractionItemIds(source?: LibraryItemRecord['source']): string[] {
+    const rows = (source
+      ? this.handle.prepare(`
+          SELECT DISTINCT i.id FROM library_items i
+          JOIN library_attachments a ON a.item_id=i.id
+          WHERE i.deleted_at IS NULL AND i.source=? AND i.extraction_status='pending' AND a.role='original'
+        `).all(source)
+      : this.handle.prepare(`
+          SELECT DISTINCT i.id FROM library_items i
+          JOIN library_attachments a ON a.item_id=i.id
+          WHERE i.deleted_at IS NULL AND i.extraction_status='pending' AND a.role='original'
+        `).all()
+    ) as Array<{ id: string }>;
+    return rows.map((row) => row.id);
+  }
+
+  sourceItemStorageIds(source: string, libraryId: string): string[] {
+    return (this.handle.prepare(`
+      SELECT storage_id FROM library_items WHERE source=? AND source_library_id=?
+    `).all(source, libraryId) as Array<{ storage_id: string }>).map((row) => row.storage_id);
+  }
+
+  sourceCollectionIds(source: string, libraryId: string): string[] {
+    return (this.handle.prepare(`
+      SELECT id FROM library_collections WHERE source=? AND source_library_id=?
+    `).all(source, libraryId) as Array<{ id: string }>).map((row) => row.id);
+  }
+
+  tagCounts(): Array<{ name: string; count: number }> {
+    return (this.handle.prepare(`
+      SELECT CAST(tag.value AS TEXT) AS name, COUNT(DISTINCT i.id) AS count
+      FROM library_items i JOIN json_each(i.tags_json) tag
+      WHERE i.deleted_at IS NULL GROUP BY tag.value ORDER BY name COLLATE NOCASE
+    `).all() as Array<{ name: string; count: number }>);
   }
 
   status(root: string, deviceId: string): LibraryStatus {
@@ -829,6 +1021,14 @@ export class LibraryCatalog {
     const row = this.handle.prepare('SELECT item_id FROM library_source_identities WHERE identity_key=?')
       .get(librarySourceIdentityKey(identity)) as { item_id: string } | undefined;
     return row?.item_id ?? null;
+  }
+
+  findCollectionIdBySource(source: string, libraryId: string, sourceKey: string): string | null {
+    const row = this.handle.prepare(`
+      SELECT id FROM library_collections
+      WHERE source=? AND source_library_id=? AND source_key=? AND deleted_at IS NULL
+    `).get(source, libraryId, sourceKey) as { id: string } | undefined;
+    return row?.id ?? null;
   }
 }
 

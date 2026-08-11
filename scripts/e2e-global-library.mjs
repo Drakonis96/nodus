@@ -457,11 +457,17 @@ try {
   assert.match(await deleteDialog.innerText(), /No se borrará ningún ítem, archivo, nota, anotación ni análisis/);
   await deleteDialog.getByRole('button', { name: 'Eliminar', exact: true }).click();
   await deleteDialog.waitFor({ state: 'detached' });
+  await page.getByText('Colección eliminada; sus ítems siguen en la Biblioteca.', { exact: true }).waitFor();
+  await page.waitForFunction(async (id) => !(await window.nodus.listGlobalLibraryCollections()).some((entry) => entry.id === id), collections.disposable.id);
   const collectionDeleteState = await page.evaluate(async () => ({
     collections: await window.nodus.listGlobalLibraryCollections(),
     items: (await window.nodus.listGlobalLibraryItems({ limit: 1 })).total,
   }));
-  assert.equal(collectionDeleteState.collections.some((entry) => entry.id === collections.disposable.id), false);
+  assert.equal(
+    collectionDeleteState.collections.some((entry) => entry.id === collections.disposable.id),
+    false,
+    `deleted ${collections.disposable.id} remained visible: ${JSON.stringify(collectionDeleteState.collections.map((entry) => entry.id))}`,
+  );
   assert.equal(collectionDeleteState.items, itemCountBeforeCollectionDelete, 'deleting a collection leaves every Library item intact');
 
   await page.getByText('Mujeres y posguerra revisada', { exact: true }).click();

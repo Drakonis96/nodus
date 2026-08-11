@@ -84,6 +84,7 @@ try {
   };
   const catalogFile = path.join(userData, 'library', 'catalog.sqlite');
   let catalog = new LibraryCatalog(catalogFile);
+  catalog.rebuild(store);
   const first = await importZoteroLibraries({ requestId: 'identity-first', store, catalog, client });
   assert.equal(first.itemsCreated, 2);
   assert.equal(catalog.list().total, 3);

@@ -10,7 +10,7 @@ import {
   assertInside,
   readJsonFile,
   safeLibraryFolderName,
-} from './libraryPaths';
+} from './libraryFileUtils';
 import {
   isLibraryItemRecord,
   legacyMetadataToRecord,

@@ -110,12 +110,23 @@ export function propagateLibraryInvalidations(
 }
 
 export function settleActiveVaultLibraryInvalidations(store: LibraryDiskStore, catalog: LibraryCatalog): number {
-  let settled = 0;
+  const indexed: LibraryItemRecord[] = [];
   for (const item of store.scanMaterializedItems().records) {
     if (item.deletedAt || !item.contentRevision?.pendingInvalidations.length) continue;
     const next = propagateLibraryInvalidations(item, store, catalog);
-    if (next.clock.revision !== item.clock.revision) settled += 1;
+    if (next.clock.revision !== item.clock.revision) indexed.push(next);
   }
-  if (settled) catalog.rebuild(store);
-  return settled;
+  if (indexed.length) catalog.indexItems(indexed, store);
+  return indexed.length;
+}
+
+/** Settle the item that just changed without scanning every Library manifest. */
+export function settleLibraryInvalidationsForItem(itemId: string, store: LibraryDiskStore, catalog: LibraryCatalog): boolean {
+  const storageId = catalog.itemStorageId(itemId);
+  const item = storageId ? store.readMaterializedItem(storageId) : null;
+  if (!item || item.deletedAt || !item.contentRevision?.pendingInvalidations.length) return false;
+  const next = propagateLibraryInvalidations(item, store, catalog);
+  if (next.clock.revision === item.clock.revision) return false;
+  catalog.indexItem(next, store);
+  return true;
 }

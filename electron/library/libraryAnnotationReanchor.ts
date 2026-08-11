@@ -1,5 +1,5 @@
 import fs from 'node:fs';
-import { atomicWriteJson } from './libraryPaths';
+import { atomicWriteJson } from './libraryFileUtils';
 
 interface ReanchorableAnnotation {
   id: string;

@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import { showImportOpenDialog } from '../privacy';
 import {
   getGlobalLibraryStatus,
-  listGlobalLibraryItems,
+  listGlobalLibraryItemsResponsive,
   migrateExistingVaultLibraries,
   previewLibraryMigration,
   startLibraryMigration,
@@ -12,7 +12,7 @@ import {
   cancelLibraryMigration,
   rollbackLibraryMigration,
   listLibraryMigrationSessions,
-  rebuildGlobalLibrary,
+  rebuildGlobalLibraryInBackground,
   cancelZoteroLibraryImport,
   listZoteroImportLibraries,
   listZoteroSyncSessions,
@@ -81,8 +81,8 @@ export function registerLibraryIpc({ h }: IpcContext): void {
     return item;
   };
   h('library:status', async () => getGlobalLibraryStatus());
-  h('library:rebuild', async () => rebuildGlobalLibrary());
-  h('library:list', async (_event, query) => listGlobalLibraryItems(query));
+  h('library:rebuild', async () => rebuildGlobalLibraryInBackground());
+  h('library:list', async (_event, query) => listGlobalLibraryItemsResponsive(query));
   h('library:migrateVaults', async () => migrateExistingVaultLibraries());
   h('library:migrationPreview', async () => previewLibraryMigration());
   h('library:startMigration', async (_event, request) => startLibraryMigration(request));
@@ -208,7 +208,7 @@ export function registerLibraryIpc({ h }: IpcContext): void {
     const options = { title: 'Exportar referencias bibliográficas', defaultPath: `nodus-library.${extension}`, filters: [{ name: request.format, extensions: [extension] }] };
     const selected = owner ? await dialog.showSaveDialog(owner, options) : await dialog.showSaveDialog(options);
     if (selected.canceled || !selected.filePath) return { format: request.format, exported: 0, filePath: null, canceled: true, warnings: [] };
-    const report = exportGlobalLibraryBibliography(request, selected.filePath);
+    const report = await exportGlobalLibraryBibliography(request, selected.filePath);
     if (!fs.existsSync(selected.filePath)) throw new Error('No se pudo verificar el archivo exportado.');
     return report;
   });

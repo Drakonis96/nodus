@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type {
   LibraryCollectionView,
+  LibraryCollectionRecord,
   LibraryCollectionPatch,
   LibraryCollectionIcon,
   LibraryBibliographyImportReport,
@@ -34,7 +35,7 @@ import type {
 } from '@shared/libraryTypes';
 import { canonicalJson, normalizeLibraryMetadata } from './libraryRecord';
 import { LibraryCatalog } from './libraryCatalog';
-import { assertInside, atomicWriteJson, safeLibraryFolderName } from './libraryPaths';
+import { assertInside, atomicWriteJson, safeLibraryFolderName } from './libraryFileUtils';
 import { LibraryDiskStore } from './libraryStorage';
 import { importBibliographyFiles } from './libraryBibliographyImport';
 import { bibliographicFingerprint } from './libraryRevision';
@@ -187,13 +188,14 @@ export class LibraryOperations {
     const records = this.store.scanMaterializedItems().records.filter((record) => !record.deletedAt)
       .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
     const used = new Set<string>(); let changed = 0;
+    const indexed: LibraryItemRecord[] = [];
     for (const record of records) {
       const citationKey = generateCitationKey(record.metadata, used, record.citationKey);
       used.add(citationKey);
       if (record.citationKey === citationKey) continue;
-      this.store.upsertItem({ ...record, citationKey }, record.clock.revision); changed += 1;
+      indexed.push(this.store.upsertItem({ ...record, citationKey }, record.clock.revision)); changed += 1;
     }
-    if (changed) this.catalog.rebuild(this.store); return changed;
+    if (indexed.length) this.catalog.indexItems(indexed, this.store); return changed;
   }
 
   listCollections(): LibraryCollectionView[] {
@@ -209,8 +211,8 @@ export class LibraryOperations {
     if (parent && parent.source !== 'nodus') throw new Error('Las colecciones importadas son de solo lectura en Nodus.');
     const siblings = this.catalog.listCollections().filter((entry) => entry.parentId === canonicalParentId);
     const id = `nodus:collection:${randomUUID()}`;
-    this.store.upsertCollection({ id, name: clean, parentId: canonicalParentId, position: siblings.length, source: 'nodus', deletedAt: null });
-    this.catalog.rebuild(this.store);
+    const record = this.store.upsertCollection({ id, name: clean, parentId: canonicalParentId, position: siblings.length, source: 'nodus', deletedAt: null });
+    this.catalog.indexCollection(record);
     return this.catalog.listCollections().find((entry) => entry.id === id)!;
   }
 
@@ -244,17 +246,18 @@ export class LibraryOperations {
       : Math.max(0, Math.trunc(patch.position));
     targetSiblings.splice(Math.min(requestedPosition, targetSiblings.length), 0, { ...current, name, parentId, icon, color });
     const desiredPositions = new Map(targetSiblings.map((entry, position) => [entry.id, position]));
+    const indexed: LibraryCollectionRecord[] = [];
     const write = (entry: typeof current, desiredParentId: string | null, desiredPosition: number, desiredName: string, desiredIcon: LibraryCollectionIcon | undefined, desiredColor: string | undefined) => {
       if (entry.parentId === desiredParentId && entry.position === desiredPosition && entry.name === desiredName && entry.icon === desiredIcon && entry.color === desiredColor) return;
       const next = { ...entry, name: desiredName, parentId: desiredParentId, position: desiredPosition, icon: desiredIcon, color: desiredColor };
       if (!desiredIcon) delete next.icon;
       if (!desiredColor) delete next.color;
-      this.store.upsertCollection(next, entry.clock.revision);
+      indexed.push(this.store.upsertCollection(next, entry.clock.revision));
     };
     write(current, parentId, desiredPositions.get(id) ?? requestedPosition, name, icon, color);
     for (const sibling of targetSiblings) if (sibling.id !== id) write(sibling, parentId, desiredPositions.get(sibling.id)!, sibling.name, sibling.icon, sibling.color);
     if (parentId !== current.parentId) for (const [position, sibling] of oldSiblings.entries()) write(sibling, current.parentId, position, sibling.name, sibling.icon, sibling.color);
-    this.catalog.rebuild(this.store);
+    this.catalog.indexCollections(indexed);
     return this.catalog.listCollections().find((entry) => entry.id === id)!;
   }
 
@@ -271,18 +274,21 @@ export class LibraryOperations {
       for (const collection of all) if (collection.parentId && ids.has(collection.parentId) && !ids.has(collection.id)) { ids.add(collection.id); changed = true; }
     }
     const now = new Date().toISOString();
+    const indexedCollections: LibraryCollectionRecord[] = [];
+    const indexedItems: LibraryItemRecord[] = [];
     for (const collectionId of ids) {
       const current = this.store.readMaterializedCollection(collectionId);
-      if (current && !current.deletedAt) this.store.upsertCollection({ ...current, deletedAt: now }, current.clock.revision);
+      if (current && !current.deletedAt) indexedCollections.push(this.store.upsertCollection({ ...current, deletedAt: now }, current.clock.revision));
     }
     for (const item of this.store.scanMaterializedItems().records) {
       if (item.deletedAt || !item.collectionIds.some((collectionId) => ids.has(collectionId))) continue;
       const desired = deleteItems
         ? { ...item, deletedAt: now }
         : { ...item, collectionIds: item.collectionIds.filter((collectionId) => !ids.has(collectionId)) };
-      this.store.upsertItem(desired, item.clock.revision);
+      indexedItems.push(this.store.upsertItem(desired, item.clock.revision));
     }
-    this.catalog.rebuild(this.store);
+    this.catalog.indexCollections(indexedCollections);
+    this.catalog.indexItems(indexedItems, this.store);
     return ids.size;
   }
 
@@ -295,14 +301,14 @@ export class LibraryOperations {
       if (!collection || collection.deletedAt) throw new Error('Una de las colecciones de destino ya no existe.');
       if (collection.source !== 'nodus') throw new Error('Las colecciones importadas son de solo lectura en Nodus.');
     }
-    let updated = 0;
+    let updated = 0; const indexed: LibraryItemRecord[] = [];
     for (const item of this.store.scanMaterializedItems().records) {
       if (!canonicalItemIds.has(item.id) || item.deletedAt) continue;
       const collectionIds = [...new Set([...item.collectionIds.filter((id) => !remove.has(id)), ...add])];
       const desired = { ...item, collectionIds };
-      if (comparable(item) !== comparable(desired)) { this.store.upsertItem(desired, item.clock.revision); updated += 1; }
+      if (comparable(item) !== comparable(desired)) { indexed.push(this.store.upsertItem(desired, item.clock.revision)); updated += 1; }
     }
-    if (updated) this.catalog.rebuild(this.store);
+    if (indexed.length) this.catalog.indexItems(indexed, this.store);
     return updated;
   }
 
@@ -328,14 +334,14 @@ export class LibraryOperations {
 
   setItemsDeleted(itemIds: string[], deleted: boolean): number {
     const canonicalItemIds = new Set(itemIds.map((id) => this.catalog.resolveItemId(id) ?? id));
-    let updated = 0;
+    let updated = 0; const indexed: LibraryItemRecord[] = [];
     const now = new Date().toISOString();
     for (const item of this.store.scanMaterializedItems().records) {
       if (!canonicalItemIds.has(item.id) || Boolean(item.deletedAt) === deleted) continue;
-      this.store.upsertItem({ ...item, deletedAt: deleted ? now : null }, item.clock.revision);
+      indexed.push(this.store.upsertItem({ ...item, deletedAt: deleted ? now : null }, item.clock.revision));
       updated += 1;
     }
-    if (updated) this.catalog.rebuild(this.store);
+    if (indexed.length) this.catalog.indexItems(indexed, this.store);
     return updated;
   }
 
@@ -382,17 +388,19 @@ export class LibraryOperations {
     const impact = this.trashImpact(itemIds);
     if (impact.purgeBlocked) throw new Error(`No se puede vaciar: hay contenido vinculado en ${impact.blockers.join(', ')}.`);
     const selected = new Set(impact.itemIds); const warnings: string[] = []; let purged = 0; let archivedRecoveryCopies = 0;
-    for (const record of this.store.scanMaterializedItems().records) {
+    const allRecords = this.store.scanMaterializedItems().records;
+    const relatedUpdates: LibraryItemRecord[] = [];
+    for (const record of allRecords) {
       if (selected.has(record.id) || !(record.relations ?? []).some((relation) => selected.has(relation.targetItemId))) continue;
-      this.store.upsertItem({ ...record, relations: (record.relations ?? []).filter((relation) => !selected.has(relation.targetItemId)) }, record.clock.revision);
+      relatedUpdates.push(this.store.upsertItem({ ...record, relations: (record.relations ?? []).filter((relation) => !selected.has(relation.targetItemId)) }, record.clock.revision));
     }
     for (const id of impact.itemIds) {
-      const record = this.store.scanMaterializedItems().records.find((item) => item.id === id && item.deletedAt);
+      const record = allRecords.find((item) => item.id === id && item.deletedAt);
       if (!record) { warnings.push(`El elemento ${id} ya no estaba en la papelera.`); continue; }
-      try { this.store.archivePurgedItem(record); purged += 1; archivedRecoveryCopies += 1; }
+      try { this.store.archivePurgedItem(record); this.catalog.removeItem(record.id); purged += 1; archivedRecoveryCopies += 1; }
       catch (error) { warnings.push(error instanceof Error ? error.message : String(error)); }
     }
-    this.catalog.rebuild(this.store);
+    this.catalog.indexItems(relatedUpdates, this.store);
     return { requested: impact.itemIds.length, purged, archivedRecoveryCopies, blocked: impact.itemIds.length - purged, warnings };
   }
 
@@ -441,7 +449,8 @@ export class LibraryOperations {
 
   importLocalFiles(files: string[], collectionId?: string | null): LibraryLocalImportReport {
     const report: LibraryLocalImportReport = { created: 0, skipped: 0, itemIds: [], warnings: [] };
-    const knownHashes = new Set(this.store.scanMaterializedItems().records.flatMap((item) => item.attachments.map((entry) => entry.sha256)));
+    const knownHashes = new Set(this.catalog.attachmentHashes());
+    const indexed: LibraryItemRecord[] = [];
     for (const raw of files) {
       const source = path.resolve(raw);
       const extension = path.extname(source).toLowerCase();
@@ -459,7 +468,7 @@ export class LibraryOperations {
       const destination = assertInside(folder, path.join(folder, relativePath));
       copyImmutable(source, destination);
       const stat = fs.statSync(destination);
-      this.store.upsertItem({
+      indexed.push(this.store.upsertItem({
         id, storageId, source: 'nodus',
         metadata: {
           title: path.basename(source, extension).replace(/[_-]+/g, ' ').trim() || 'Documento sin título',
@@ -471,12 +480,12 @@ export class LibraryOperations {
           mimeType: mimeType(extension), byteSize: stat.size, sha256: hash, role: 'original', position: 0, addedAt: new Date().toISOString(),
         }],
         files: { original: relativePath, annotations: 'annotations.json' }, extraction: { status: 'pending' }, deletedAt: null,
-      });
+      }));
       knownHashes.add(hash);
       report.created += 1;
       report.itemIds.push(id);
     }
-    if (report.created) this.catalog.rebuild(this.store);
+    if (indexed.length) this.catalog.indexItems(indexed, this.store);
     return report;
   }
 
@@ -490,20 +499,21 @@ export class LibraryOperations {
       if (!collection || collection.deletedAt) throw new Error('Una de las colecciones de destino ya no existe.');
     }
     const id = `nodus:${randomUUID()}`;
-    const citationKey = generateCitationKey(metadata, this.store.scanMaterializedItems().records.map((record) => record.citationKey).filter((value): value is string => !!value));
+    const citationKey = generateCitationKey(metadata, this.catalog.citationKeys());
     const result = this.store.upsertItem({
       id, storageId: id, source: 'nodus', citationKey, metadata: normalizeLibraryMetadata(metadata),
       collectionIds: [...new Set(collectionIds.map((entry) => this.catalog.resolveCollectionId(entry) ?? entry))],
       attachments: [], notes: [], relations: [], files: { annotations: 'annotations.json' },
       extraction: { status: 'pending' }, deletedAt: null,
     });
-    this.catalog.rebuild(this.store);
+    this.catalog.indexItem(result, this.store);
     return result;
   }
 
   private item(itemId: string): LibraryItemRecord {
     const id = this.catalog.resolveItemId(itemId) ?? itemId;
-    const item = this.store.scanMaterializedItems().records.find((entry) => entry.id === id && !entry.deletedAt);
+    const storageId = this.catalog.itemStorageId(id);
+    const item = storageId ? this.store.readMaterializedItem(storageId) : null;
     if (!item) throw new Error('El documento ya no existe.');
     return item;
   }
@@ -524,7 +534,7 @@ export class LibraryOperations {
     }
     copyDirectoryIfMissing(path.join(sourceFolder, 'assets'), path.join(destinationFolder, 'assets'));
     const now = new Date().toISOString();
-    const citationKey = generateCitationKey(current.metadata, this.store.scanMaterializedItems().records.map((record) => record.citationKey).filter((value): value is string => !!value), current.citationKey);
+    const citationKey = generateCitationKey(current.metadata, this.catalog.citationKeys(), current.citationKey);
     const result = this.store.upsertItem({
       id, storageId: id, source: 'nodus', citationKey,
       metadata: current.metadata, collectionIds: current.collectionIds,
@@ -533,7 +543,7 @@ export class LibraryOperations {
       relations: [], files: current.files, extraction: current.extraction, contentRevision: current.contentRevision,
       deletedAt: null,
     });
-    this.catalog.rebuild(this.store);
+    this.catalog.indexItem(result, this.store);
     return result;
   }
 
@@ -566,7 +576,7 @@ export class LibraryOperations {
     const attachments = orderedAttachments([...current.attachments, ...additions]);
     const primary = attachments.find((entry) => entry.role === 'original') ?? attachments[0];
     const result = this.store.upsertItem({ ...current, attachments, files: { ...(current.files ?? {}), original: primary.relativePath } }, current.clock.revision);
-    this.catalog.rebuild(this.store); return result;
+    this.catalog.indexItem(result, this.store); return result;
   }
 
   updateAttachment(itemId: string, attachmentId: string, patch: LibraryAttachmentPatch): LibraryItemRecord {
@@ -587,7 +597,7 @@ export class LibraryOperations {
     const attachments = remaining.map((entry, position) => ({ ...entry, position }));
     const primary = attachments.find((entry) => entry.role === 'original') ?? attachments[0];
     const result = this.store.upsertItem({ ...current, attachments, files: { ...(current.files ?? {}), ...(primary ? { original: primary.relativePath } : {}) } }, current.clock.revision);
-    this.catalog.rebuild(this.store); return result;
+    this.catalog.indexItem(result, this.store); return result;
   }
 
   replaceAttachment(itemId: string, attachmentId: string, file: string): LibraryItemRecord {
@@ -604,7 +614,7 @@ export class LibraryOperations {
     } : entry));
     const primary = attachments.find((entry) => entry.role === 'original') ?? attachments[0];
     const result = this.store.upsertItem({ ...current, attachments, files: { ...(current.files ?? {}), ...(primary ? { original: primary.relativePath } : {}) } }, current.clock.revision);
-    this.catalog.rebuild(this.store); return result;
+    this.catalog.indexItem(result, this.store); return result;
   }
 
   removeAttachment(itemId: string, attachmentId: string): LibraryItemRecord {
@@ -615,7 +625,7 @@ export class LibraryOperations {
     const primary = attachments.find((entry) => entry.role === 'original');
     const { original: _original, ...otherFiles } = current.files ?? {};
     const result = this.store.upsertItem({ ...current, attachments, files: primary ? { ...otherFiles, original: primary.relativePath } : otherFiles }, current.clock.revision);
-    this.catalog.rebuild(this.store); return result;
+    this.catalog.indexItem(result, this.store); return result;
   }
 
   attachmentPath(itemId: string, attachmentId: string): string {
@@ -633,14 +643,14 @@ export class LibraryOperations {
     const note: LibraryNoteRecord = { id, title: input.title.trim() || 'Nota sin título', markdown: input.markdown.replace(/\r\n?/g, '\n'),
       source: 'nodus', readOnly: false, createdAt: existing?.createdAt ?? now, updatedAt: now };
     const notes = [...(current.notes ?? []).filter((entry) => entry.id !== id), note];
-    const result = this.store.upsertItem({ ...current, notes }, current.clock.revision); this.catalog.rebuild(this.store); return result;
+    const result = this.store.upsertItem({ ...current, notes }, current.clock.revision); this.catalog.indexItem(result, this.store); return result;
   }
 
   deleteNote(itemId: string, noteId: string): LibraryItemRecord {
     const current = this.item(itemId); const note = (current.notes ?? []).find((entry) => entry.id === noteId);
     if (note?.readOnly) throw new Error('Las notas de Zotero son de solo lectura.');
     const result = this.store.upsertItem({ ...current, notes: (current.notes ?? []).filter((entry) => entry.id !== noteId) }, current.clock.revision);
-    this.catalog.rebuild(this.store); return result;
+    this.catalog.indexItem(result, this.store); return result;
   }
 
   setRelation(itemId: string, targetItemId: string, relationType: LibraryItemRelationType, enabled: boolean): LibraryItemRecord {
@@ -652,14 +662,14 @@ export class LibraryOperations {
       if (enabled) relations.push({ id: `relation:${randomUUID()}`, targetItemId: target.id, relationType: type, createdAt: now });
       return this.store.upsertItem({ ...record, relations }, record.clock.revision, now);
     };
-    const result = update(left, right, relationType); update(right, left, inverseRelation(relationType));
-    this.catalog.rebuild(this.store); return result;
+    const result = update(left, right, relationType); const inverse = update(right, left, inverseRelation(relationType));
+    this.catalog.indexItems([result, inverse], this.store); return result;
   }
 
   patchItemTags(itemIds: string[], patch: LibraryTagPatch): number {
     const ids = new Set(itemIds.map((entry) => this.catalog.resolveItemId(entry) ?? entry));
     const add = [...new Set((patch.add ?? []).map((tag) => tag.trim()).filter(Boolean))]; const remove = new Set((patch.remove ?? []).map((tag) => tag.trim()));
-    let count = 0;
+    let count = 0; const indexed: LibraryItemRecord[] = [];
     for (const item of this.store.scanMaterializedItems().records) {
       if (!ids.has(item.id) || item.deletedAt) continue;
       const tags = [...new Set([...(item.metadata.tags ?? []), ...add])].filter((tag) => !remove.has(tag));
@@ -671,13 +681,13 @@ export class LibraryOperations {
       const suppressedSourceTags = sourceManaged
         ? [...new Set([...(item.suppressedSourceTags ?? []).filter((tag) => !add.includes(tag)), ...remove])]
         : item.suppressedSourceTags;
-      this.store.upsertItem({
+      indexed.push(this.store.upsertItem({
         ...item,
         metadata: { ...item.metadata, tags },
         ...(sourceManaged ? { localTags, suppressedSourceTags } : {}),
-      }, item.clock.revision); count += 1;
+      }, item.clock.revision)); count += 1;
     }
-    if (count) this.catalog.rebuild(this.store); return count;
+    if (indexed.length) this.catalog.indexItems(indexed, this.store); return count;
   }
 
   private tagColors(): Record<string, string> {
@@ -685,8 +695,7 @@ export class LibraryOperations {
   }
 
   listTagRecords(): LibraryTagRecord[] {
-    const counts = new Map<string, number>(); const colors = this.tagColors();
-    for (const item of this.store.scanMaterializedItems().records) if (!item.deletedAt) for (const tag of item.metadata.tags ?? []) counts.set(tag, (counts.get(tag) ?? 0) + 1);
+    const counts = new Map(this.catalog.tagCounts().map((entry) => [entry.name, entry.count])); const colors = this.tagColors();
     return [...new Set([...counts.keys(), ...Object.keys(colors)])].sort((a, b) => a.localeCompare(b)).map((name) => ({ name, color: colors[name] ?? null, itemCount: counts.get(name) ?? 0 }));
   }
 
@@ -698,9 +707,7 @@ export class LibraryOperations {
   }
 
   updateItemMetadata(itemId: string, patch: Partial<LibraryItemMetadata>): LibraryItemRecord {
-    const canonicalItemId = this.catalog.resolveItemId(itemId) ?? itemId;
-    const current = this.store.scanMaterializedItems().records.find((item) => item.id === canonicalItemId && !item.deletedAt);
-    if (!current) throw new Error('El documento ya no existe.');
+    const current = this.item(itemId);
     const merged = normalizeLibraryMetadata({ ...current.metadata, ...patch }, current.metadata.title);
     const overridePatch = Object.fromEntries(Object.keys(patch).map((key) => {
       const value = (patch as Record<string, unknown>)[key];
@@ -711,25 +718,24 @@ export class LibraryOperations {
       ...current, metadata: merged,
       ...(imported ? { metadataOverrides: { ...(current.metadataOverrides ?? {}), ...overridePatch } } : {}),
     }, current.clock.revision);
-    this.catalog.rebuild(this.store);
+    this.catalog.indexItem(desired, this.store);
     return desired;
   }
 
   updateCitationKey(itemId: string, preferred: string): LibraryItemRecord {
     const current = this.item(itemId);
-    const used = this.store.scanMaterializedItems().records.filter((entry) => entry.id !== current.id && !entry.deletedAt)
-      .map((entry) => entry.citationKey).filter((value): value is string => !!value);
+    const used = this.catalog.citationKeys(current.id);
     const citationKey = generateCitationKey(current.metadata, used, preferred);
     if (asciiCitationKey(preferred) !== citationKey) throw new Error('La clave de cita ya existe o no contiene caracteres válidos.');
     const result = this.store.upsertItem({ ...current, citationKey }, current.clock.revision);
-    this.catalog.rebuild(this.store); return result;
+    this.catalog.indexItem(result, this.store); return result;
   }
 
   bibliographyRecords(request: Omit<LibraryBibliographyExportRequest, 'format'>): LibraryItemRecord[] {
-    const records = this.store.scanMaterializedItems().records;
     if (request.itemIds?.length) {
-      const ids = new Set(request.itemIds.map((id) => this.catalog.resolveItemId(id) ?? id));
-      return records.filter((record) => ids.has(record.id) && !record.deletedAt);
+      return [...new Set(request.itemIds)].flatMap((id) => {
+        try { return [this.item(id)]; } catch { return []; }
+      });
     }
     const smartSearch = request.smartSearch ?? (request.savedSearchId ? this.listSavedSearches().find((entry) => entry.id === request.savedSearchId)?.query ?? null : null);
     const ids = new Set<string>(); let offset = 0;
@@ -741,7 +747,9 @@ export class LibraryOperations {
       for (const item of page.items) ids.add(item.id);
       offset += page.items.length; if (!page.items.length || offset >= page.total) break;
     }
-    return records.filter((record) => ids.has(record.id) && !record.deletedAt);
+    return [...ids].flatMap((id) => {
+      try { return [this.item(id)]; } catch { return []; }
+    });
   }
 
   exportBibliography(request: LibraryBibliographyExportRequest): { content: string; exported: number } {
@@ -908,6 +916,7 @@ export class LibraryOperations {
         .filter((relation) => relation.targetItemId !== resolvedCanonicalId)
         .map((relation) => [`${relation.relationType}:${relation.targetItemId}`, relation])).values()],
     }, desired.clock.revision, now);
+    const relationUpdates: LibraryItemRecord[] = [];
     for (const record of all) {
       if (record.id === resolvedCanonicalId || resolvedDuplicateIds.has(record.id)) continue;
       const relations = record.relations ?? [];
@@ -915,11 +924,11 @@ export class LibraryOperations {
         ? { ...relation, targetItemId: resolvedCanonicalId }
         : relation);
       const deduplicated = [...new Map(remapped.map((relation) => [`${relation.relationType}:${relation.targetItemId}`, relation])).values()];
-      if (canonicalJson(relations) !== canonicalJson(deduplicated)) this.store.upsertItem({ ...record, relations: deduplicated }, record.clock.revision, now);
+      if (canonicalJson(relations) !== canonicalJson(deduplicated)) relationUpdates.push(this.store.upsertItem({ ...record, relations: deduplicated }, record.clock.revision, now));
     }
     this.catalog.remapVaultLinks(duplicates.map((item) => item.id), desired.id);
-    for (const duplicate of duplicates) this.store.upsertItem({ ...duplicate, deletedAt: now }, duplicate.clock.revision);
-    this.catalog.rebuild(this.store);
+    const deletedDuplicates = duplicates.map((duplicate) => this.store.upsertItem({ ...duplicate, deletedAt: now }, duplicate.clock.revision));
+    this.catalog.indexItems([desired, ...relationUpdates, ...deletedDuplicates], this.store);
     return desired;
   }
 }

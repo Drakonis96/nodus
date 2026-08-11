@@ -132,7 +132,15 @@ export default defineConfig({
         // computeWorker.ts is a worker_threads entry: it must land in
         // dist-electron as its own file (computeWorker.js) so the main process
         // can spawn it with `new Worker(...)`.
-        entry: ['electron/main.ts', 'electron/workers/computeWorker.ts'],
+        // Use named entries rather than a positional array. Besides keeping the
+        // packaged filenames stable, this prevents Rollup from coalescing
+        // worker entries that share most of their Library dependency graph.
+        entry: {
+          main: 'electron/main.ts',
+          computeWorker: 'electron/workers/computeWorker.ts',
+          libraryExtractionWorker: 'electron/workers/libraryExtractionWorker.ts',
+          libraryOperationWorker: 'electron/workers/libraryOperationWorker.ts',
+        },
         vite: {
           // The top-level resolve.alias only applies to the renderer build;
           // main-process code importing @shared at RUNTIME needs its own copy.

@@ -296,6 +296,15 @@ export async function importZoteroLibraries(options: {
   let lastCheckpointAt = 0;
   let lastCheckpointPhase: ZoteroImportProgress['phase'] | null = null;
   let completedLibraries = 0;
+  const catalogItem = (identity: LibraryItemRecord['sourceIdentities'][number]): LibraryItemRecord | null => {
+    const itemId = catalog.findItemIdBySourceIdentity(identity);
+    const storageId = itemId ? catalog.itemStorageId(itemId) : null;
+    return storageId ? store.readMaterializedItem(storageId) : null;
+  };
+  const catalogCollection = (sourceLibraryId: string, sourceKey: string) => {
+    const id = catalog.findCollectionIdBySource('zotero', sourceLibraryId, sourceKey);
+    return id ? store.readMaterializedCollection(id) : null;
+  };
   const emit = (value: ZoteroImportProgress): void => {
     value.percent = Math.max(lastPercent, value.percent);
     lastPercent = value.percent;
@@ -318,14 +327,20 @@ export async function importZoteroLibraries(options: {
     report.librariesMissing = [...selectedIds].filter((id) => !availableIds.has(id));
     for (const missingId of report.librariesMissing) {
       const missingAt = new Date().toISOString();
-      for (const current of store.scanMaterializedItems().records) {
+      for (const [index, storageId] of catalog.sourceItemStorageIds('zotero', missingId).entries()) {
+        const current = store.readMaterializedItem(storageId);
+        if (!current) continue;
         if (current.source !== 'zotero' || current.sourceLibraryId !== missingId || current.sourceState === 'library-missing') continue;
-        store.upsertItem({ ...current, sourceState: 'library-missing', sourceMissingAt: missingAt }, current.clock.revision);
+        catalog.indexItem(store.upsertItem({ ...current, sourceState: 'library-missing', sourceMissingAt: missingAt }, current.clock.revision), store);
         report.itemsSourceMissing += 1;
+        if (index && index % 50 === 0) await new Promise<void>((resolve) => setImmediate(resolve));
       }
-      for (const current of store.scanMaterializedCollections().records) {
+      for (const [index, collectionId] of catalog.sourceCollectionIds('zotero', missingId).entries()) {
+        const current = store.readMaterializedCollection(collectionId);
+        if (!current) continue;
         if (current.source !== 'zotero' || current.sourceLibraryId !== missingId || current.sourceState === 'library-missing') continue;
-        store.upsertCollection({ ...current, sourceState: 'library-missing', sourceMissingAt: missingAt }, current.clock.revision);
+        catalog.indexCollection(store.upsertCollection({ ...current, sourceState: 'library-missing', sourceMissingAt: missingAt }, current.clock.revision));
+        if (index && index % 50 === 0) await new Promise<void>((resolve) => setImmediate(resolve));
       }
       report.failures.push({ libraryId: missingId, code: 'library-missing', message: `La biblioteca ${missingId} ya no está disponible en Zotero.`, retryable: false });
     }
@@ -353,23 +368,25 @@ export async function importZoteroLibraries(options: {
           for (const child of byParent.get(key) ?? []) visit(child);
         };
         for (const id of selectedCollectionIds) {
-          const known = store.scanMaterializedCollections().records.find((entry) => entry.id === id || entry.aliases.includes(id));
+          const knownId = catalog.resolveCollectionId(id) ?? id;
+          const known = store.readMaterializedCollection(knownId);
           visit(known?.sourceKey ?? (id.startsWith('zotero:') ? id.slice(7) : id));
         }
       }
       const visibleCollections = subset ? collections.filter((entry) => selectedKeys.has(entry.key)) : collections;
       const collectionIds = new Map<string, string>();
-      for (const collection of visibleCollections) {
-        const current = store.findCollectionBySource('zotero', sourceLibraryId, collection.itemKey)
+      for (const [collectionIndex, collection] of visibleCollections.entries()) {
+        const current = catalogCollection(sourceLibraryId, collection.itemKey)
           ?? store.readMaterializedCollection(legacyCollectionAlias(collection.key));
         collectionIds.set(collection.key, current?.id ?? `nodus:collection:${randomUUID()}`);
+        if (collectionIndex && collectionIndex % 100 === 0) await new Promise<void>((resolve) => setImmediate(resolve));
       }
       const positionByParent = new Map<string | null, number>();
-      for (const collection of visibleCollections) {
+      for (const [collectionIndex, collection] of visibleCollections.entries()) {
         const id = collectionIds.get(collection.key)!;
         const parentId = collection.parentCollection && (!subset || selectedKeys.has(collection.parentCollection))
           ? collectionIds.get(collection.parentCollection) ?? null : null;
-        const current = store.findCollectionBySource('zotero', sourceLibraryId, collection.itemKey)
+        const current = catalogCollection(sourceLibraryId, collection.itemKey)
           ?? store.readMaterializedCollection(id);
         const aliases = [...new Set([
           ...(current?.aliases ?? []),
@@ -385,15 +402,19 @@ export async function importZoteroLibraries(options: {
           deletedAt: null,
         };
         positionByParent.set(parentId, desired.position + 1);
-        if (!current) { store.upsertCollection(desired); report.collectionsCreated += 1; }
+        if (!current) { catalog.indexCollection(store.upsertCollection(desired)); report.collectionsCreated += 1; }
         else if (comparableCollection(current) === comparableCollection({ ...current, ...desired })) report.collectionsUnchanged += 1;
-        else { store.upsertCollection(desired, current.clock.revision); report.collectionsUpdated += 1; }
+        else { catalog.indexCollection(store.upsertCollection(desired, current.clock.revision)); report.collectionsUpdated += 1; }
+        if (collectionIndex && collectionIndex % 50 === 0) await new Promise<void>((resolve) => setImmediate(resolve));
       }
       if (!since && !subset) {
         const visibleIds = new Set(collectionIds.values());
-        for (const current of store.scanMaterializedCollections().records) {
+        for (const [index, collectionId] of catalog.sourceCollectionIds('zotero', sourceLibraryId).entries()) {
+          const current = store.readMaterializedCollection(collectionId);
+          if (!current) continue;
           if (current.source !== 'zotero' || current.sourceLibraryId !== sourceLibraryId || current.deletedAt || visibleIds.has(current.id)) continue;
-          store.upsertCollection({ ...current, sourceState: 'source-missing', sourceMissingAt: new Date().toISOString() }, current.clock.revision);
+          catalog.indexCollection(store.upsertCollection({ ...current, sourceState: 'source-missing', sourceMissingAt: new Date().toISOString() }, current.clock.revision));
+          if (index && index % 100 === 0) await new Promise<void>((resolve) => setImmediate(resolve));
         }
       }
 
@@ -415,7 +436,7 @@ export async function importZoteroLibraries(options: {
         abortIfNeeded(signal);
         const identity = zoteroSourceIdentity(sourceLibraryId, item.itemKey);
         const legacyAtTransportKey = store.readMaterializedItem(item.key);
-        const current = store.findItemBySourceIdentity(identity)
+        const current = catalogItem(identity)
           ?? (legacyAtTransportKey?.sourceIdentities.some((entry) => librarySourceIdentityKey(entry) === librarySourceIdentityKey(identity))
             ? legacyAtTransportKey : null);
         const localCollectionIds = (current?.collectionIds ?? []).filter((id) => {
@@ -470,41 +491,46 @@ export async function importZoteroLibraries(options: {
           stored = store.upsertItem(desired, current.clock.revision); report.itemsUpdated += 1;
         }
         desiredByKey.set(item.key, stored);
+        catalog.indexItem(stored, store);
         processedItems += 1;
         emit(progress(requestId, 'catalog', library, processedItems, totalItems, processedAttachments, totalAttachments, `Catálogo disponible: ${item.title}`));
+        if (processedItems % 25 === 0) await new Promise<void>((resolve) => setImmediate(resolve));
       }
 
       const deleted = since > 0 ? await client.deletedSince(library, since, signal) : { version: 0, items: [], collections: [] };
       const deletedItemKeys = new Set(deleted.items.map(rawZoteroKey));
       if (!since && !subset) {
         const currentKeys = new Set(page.items.map((item) => item.itemKey));
-        for (const current of store.scanMaterializedItems().records) {
+        for (const [index, storageId] of catalog.sourceItemStorageIds('zotero', sourceLibraryId).entries()) {
+          const current = store.readMaterializedItem(storageId);
+          if (!current) continue;
           const belongsToLibrary = current.sourceIdentities.some((entry) => entry.source === 'zotero'
             && entry.libraryType === library.type && entry.libraryId === String(library.id || '0'));
           if (belongsToLibrary && current.sourceKey && !currentKeys.has(current.sourceKey)) deletedItemKeys.add(current.sourceKey);
+          if (index && index % 100 === 0) await new Promise<void>((resolve) => setImmediate(resolve));
         }
       }
       for (const key of deletedItemKeys) {
-        const current = store.findItemBySourceIdentity(zoteroSourceIdentity(sourceLibraryId, key));
+        const current = catalogItem(zoteroSourceIdentity(sourceLibraryId, key));
         if (!current || current.deletedAt || current.sourceLibraryId !== sourceLibraryId || current.sourceState === 'source-missing') continue;
-        store.upsertItem({ ...current, sourceState: 'source-missing', sourceMissingAt: new Date().toISOString() }, current.clock.revision);
+        catalog.indexItem(store.upsertItem({ ...current, sourceState: 'source-missing', sourceMissingAt: new Date().toISOString() }, current.clock.revision), store);
         report.itemsSourceMissing += 1;
       }
       for (const key of deleted.collections) {
-        const current = store.findCollectionBySource('zotero', sourceLibraryId, rawZoteroKey(key));
+        const current = catalogCollection(sourceLibraryId, rawZoteroKey(key));
         if (!current || current.deletedAt || current.sourceLibraryId !== sourceLibraryId || current.sourceState === 'source-missing') continue;
-        store.upsertCollection({ ...current, sourceState: 'source-missing', sourceMissingAt: new Date().toISOString() }, current.clock.revision);
+        catalog.indexCollection(store.upsertCollection({ ...current, sourceState: 'source-missing', sourceMissingAt: new Date().toISOString() }, current.clock.revision));
       }
 
-      // Deliberate checkpoint: the complete bibliography appears before any file copy begins.
-      catalog.rebuild(store);
+      // Deliberate checkpoint: every changed record is already visible through
+      // incremental indexing before any file copy begins.
       emit(progress(requestId, 'attachments', library, processedItems, totalItems, processedAttachments, totalAttachments, 'Catálogo listo; copiando adjuntos…'));
       if (client.itemNotes) {
         const { default: TurndownService } = await import('turndown');
         const turndown = new TurndownService({ headingStyle: 'atx', bulletListMarker: '-' });
         for (const item of changedItems) {
           abortIfNeeded(signal);
-          const current = desiredByKey.get(item.key) ?? store.findItemBySourceIdentity(zoteroSourceIdentity(sourceLibraryId, item.itemKey));
+          const current = desiredByKey.get(item.key) ?? catalogItem(zoteroSourceIdentity(sourceLibraryId, item.itemKey));
           if (!current) continue;
           try {
             const mirrored = (await client.itemNotes(library.id, item.key, library)).map((note) => ({
@@ -517,6 +543,7 @@ export async function importZoteroLibraries(options: {
             if (comparableItem(current) !== comparableItem({ ...current, notes })) {
               const stored = store.upsertItem({ ...current, notes }, current.clock.revision);
               desiredByKey.set(item.key, stored);
+              catalog.indexItem(stored, store);
             }
           } catch (error) {
             const failure = syncFailure(error, sourceLibraryId);
@@ -541,7 +568,7 @@ export async function importZoteroLibraries(options: {
           }
           totalAttachments += attachments.length;
           let current = desiredByKey.get(item.key)
-            ?? store.findItemBySourceIdentity(zoteroSourceIdentity(sourceLibraryId, item.itemKey));
+            ?? catalogItem(zoteroSourceIdentity(sourceLibraryId, item.itemKey));
           if (!current) continue;
           const copied: LibraryAttachmentRecord[] = current.attachments
             .filter((entry) => !entry.sourceKey)
@@ -617,6 +644,7 @@ export async function importZoteroLibraries(options: {
           if (comparableItem(current) !== comparableItem(desired)) {
             current = store.upsertItem(desired, current.clock.revision);
             desiredByKey.set(item.key, current);
+            catalog.indexItem(current, store);
           }
         }
       }
@@ -634,11 +662,11 @@ export async function importZoteroLibraries(options: {
         report.failures.push(failure);
         report.warnings.push(failure.message);
         report.partial = true;
-        catalog.rebuild(store);
+        await new Promise<void>((resolve) => setImmediate(resolve));
       }
     }
-    emit(progress(requestId, 'rebuild', null, processedItems, totalItems, processedAttachments, totalAttachments, 'Reconstruyendo el índice local…'));
-    catalog.rebuild(store);
+    emit(progress(requestId, 'rebuild', null, processedItems, totalItems, processedAttachments, totalAttachments, 'Verificando el índice local…'));
+    await new Promise<void>((resolve) => setImmediate(resolve));
     report.partial = report.partial || report.failures.length > 0 || report.librariesMissing.length > 0;
     const failed = report.failures.length > 0 && completedLibraries === 0;
     emit(progress(requestId, failed ? 'failed' : 'complete', null, processedItems, totalItems, processedAttachments, totalAttachments,
@@ -649,7 +677,7 @@ export async function importZoteroLibraries(options: {
   } catch (error) {
     if (signal?.aborted || (error instanceof Error && error.name === 'AbortError')) {
       report.canceled = true;
-      catalog.rebuild(store);
+      await new Promise<void>((resolve) => setImmediate(resolve));
       emit(progress(requestId, 'canceled', null, processedItems, totalItems, processedAttachments, totalAttachments, 'Importación cancelada; el catálogo ya importado se conserva.'));
       report.durationMs = Date.now() - started;
       sessions.finish(requestId, 'canceled', report);
@@ -658,7 +686,7 @@ export async function importZoteroLibraries(options: {
       report.failures.push(failure);
       report.warnings.push(failure.message);
       report.partial = true;
-      catalog.rebuild(store);
+      await new Promise<void>((resolve) => setImmediate(resolve));
       emit(progress(requestId, 'failed', null, processedItems, totalItems, processedAttachments, totalAttachments, 'No se pudo conectar con Zotero; los datos locales se conservan.'));
       report.durationMs = Date.now() - started;
       sessions.finish(requestId, 'failed', report, failure.message);

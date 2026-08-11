@@ -15,7 +15,7 @@ import type {
 import { openPdf, loadPdfjs } from '../extraction/pdfjsLoader';
 import { ocrPdfPages } from '../extraction/ocr';
 import { csvFileToText, xlsxFileToText } from '../extraction/tabular';
-import { atomicWriteFile, atomicWriteJson, assertInside, safeLibraryFolderName } from './libraryPaths';
+import { atomicWriteFile, atomicWriteJson, assertInside, safeLibraryFolderName } from './libraryFileUtils';
 import { LibraryDiskStore } from './libraryStorage';
 import {
   extractionFingerprint,

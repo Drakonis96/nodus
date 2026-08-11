@@ -14,6 +14,7 @@ import {
 } from './libraryExtractionEngine';
 import { LibraryDiskStore } from './libraryStorage';
 import { failLibraryExtractionRevision, markLibraryExtractionRevision } from './libraryRevision';
+import { disposeLibraryExtractionWorkers, extractLibraryItemInWorker } from './libraryExtractionWorkerHost';
 
 type ExtractFn = typeof extractLibraryItem;
 
@@ -41,7 +42,7 @@ export class LibraryExtractionQueue {
     this.store = options.store;
     this.catalog = options.catalog;
     this.concurrency = Math.max(1, Math.min(4, Math.trunc(options.concurrency ?? 1)));
-    this.extract = options.extract ?? extractLibraryItem;
+    this.extract = options.extract ?? extractLibraryItemInWorker;
     this.remoteOcr = options.remoteOcr;
     this.onProgress = options.onProgress;
     this.catalog.resumeInterruptedExtractionJobs();
@@ -53,7 +54,10 @@ export class LibraryExtractionQueue {
   }
 
   private item(itemId: string): LibraryItemRecord | null {
-    return this.store.scanMaterializedItems().records.find((entry) => entry.id === itemId && !entry.deletedAt) ?? null;
+    const storageId = this.catalog.itemStorageId(itemId);
+    if (!storageId) return null;
+    const item = this.store.readMaterializedItem(storageId);
+    return item && !item.deletedAt ? item : null;
   }
 
   enqueue(
@@ -147,13 +151,14 @@ export class LibraryExtractionQueue {
       const current = this.store.readMaterializedItem(item.storageId) ?? item;
       if (current.extraction?.status !== 'processing') {
         const now = new Date().toISOString();
-        this.store.upsertItem({
+        const processing = this.store.upsertItem({
           ...current,
           contentRevision: markLibraryExtractionRevision(current, 'running', 'A replacement extraction is running.', now),
           extraction: { ...current.extraction, status: 'processing', progress: 0, error: undefined, updatedAt: now },
         }, current.clock.revision, now);
+        this.catalog.indexItem(processing, this.store);
       }
-      await this.extract({
+      const extractionResult = await this.extract({
         item: this.store.readMaterializedItem(item.storageId) ?? item,
         store: this.store,
         extractionOptions: job.options,
@@ -174,7 +179,7 @@ export class LibraryExtractionQueue {
       if (live?.status === 'canceled' || controller.signal.aborted) return;
       job = { ...job, status: 'done', phase: 'done', progress: 1, error: null, updatedAt: new Date().toISOString() };
       this.catalog.putExtractionJob(job);
-      this.catalog.rebuild(this.store);
+      this.catalog.indexItem(extractionResult.item, this.store);
       this.emit(job, 'Extracción completada.');
     } catch (error) {
       const live = this.catalog.getExtractionJob(job.id);
@@ -189,13 +194,13 @@ export class LibraryExtractionQueue {
           const current = this.store.readMaterializedItem(item.storageId) ?? item;
           if (current.extraction?.status === 'processing') {
             const now = new Date().toISOString();
-            this.store.upsertItem({
+            const canceledItem = this.store.upsertItem({
               ...current,
               contentRevision: markLibraryExtractionRevision(current, 'queued', 'Replacement extraction was canceled.', now),
               extraction: { ...current.extraction, status: 'pending', progress: job.progress, error: undefined, updatedAt: now },
             }, current.clock.revision, now);
+            this.catalog.indexItem(canceledItem, this.store);
           }
-          this.catalog.rebuild(this.store);
         }
       } else {
         const message = error instanceof Error ? error.message : String(error);
@@ -204,7 +209,7 @@ export class LibraryExtractionQueue {
         const item = this.item(job.itemId);
         if (item) {
           const current = this.store.readMaterializedItem(item.storageId) ?? item;
-          this.store.upsertItem({
+          const failedItem = this.store.upsertItem({
             ...current,
             contentRevision: failLibraryExtractionRevision(current, message, job.updatedAt),
             extraction: {
@@ -212,7 +217,7 @@ export class LibraryExtractionQueue {
               status: 'failed', progress: job.progress, updatedAt: job.updatedAt, error: message,
             },
           }, current.clock.revision, job.updatedAt);
-          this.catalog.rebuild(this.store);
+          this.catalog.indexItem(failedItem, this.store);
         }
         this.emit(job, message);
       }
@@ -234,5 +239,6 @@ export class LibraryExtractionQueue {
     this.disposed = true;
     for (const controller of this.active.values()) controller.abort();
     this.active.clear();
+    disposeLibraryExtractionWorkers();
   }
 }

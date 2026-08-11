@@ -239,6 +239,7 @@ try {
     metadata: { title: 'Documento de texto', itemType: 'document', creators: [], year: 2026, isbn: [], issn: [], tags: [] },
     collectionIds: [], attachments: [attachment('original.txt', 'text/plain')], files: { original: 'original.txt' }, extraction: { status: 'pending' },
   });
+  catalog.indexItem(textItem, store);
   const interrupted = {
     id: 'interrupted-job', itemId: textItem.id, status: 'processing', phase: 'extract', progress: 0.4, priority: 2,
     options: { ocrMode: 'off', ocrLanguages: 'spa+eng', maxOcrPages: 10, extractImages: true, detectTables: true, force: false },
@@ -261,6 +262,7 @@ try {
     metadata: { title: 'Cancelar', itemType: 'document', creators: [], year: 2026, isbn: [], issn: [], tags: [] },
     collectionIds: [], attachments: [attachment('original.txt', 'text/plain')], files: { original: 'original.txt' }, extraction: { status: 'pending' },
   });
+  catalog.indexItem(cancelItem, store);
   const slowExtract = async ({ signal }) => {
     for (let index = 0; index < 100; index += 1) {
       if (signal.aborted) throw new DOMException('cancelled', 'AbortError');

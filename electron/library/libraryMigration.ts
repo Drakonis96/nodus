@@ -277,6 +277,7 @@ export async function migrateVaultLibraries(options: {
 }): Promise<LibraryMigrationReport> {
   const started = Date.now();
   const { vaults, store, catalog, onProgress, onMutation, signal } = options;
+  catalog.initializeIncrementalStore(store);
   const warnings: string[] = [];
   const inventories: VaultInventory[] = [];
   onProgress?.(migrationProgress('inventory', 0, vaults.length, null, 0, 0));
@@ -306,15 +307,16 @@ export async function migrateVaultLibraries(options: {
       const inventory = inventories[vaultIndex];
       onProgress?.(migrationProgress('collections', vaultIndex, inventories.length, inventory.vault, processedItems, totalItems));
       const canonicalCollectionIds = new Map<string, string>();
-      for (const collection of inventory.collections) {
+      for (const [collectionIndex, collection] of inventory.collections.entries()) {
         throwIfCanceled(signal);
         const parts = zoteroParts(collection.collection_key) ?? { libraryId: 'users/0', rawKey: collection.collection_key };
         const current = store.findCollectionBySource('zotero', parts.libraryId, parts.rawKey)
           ?? store.readMaterializedCollection(`zotero:${collection.collection_key}`);
         canonicalCollectionIds.set(collection.collection_key, current?.id ?? globalCollectionId(collection.collection_key, inventory.vault.id));
+        if (collectionIndex && collectionIndex % 100 === 0) await new Promise<void>((resolve) => setImmediate(resolve));
       }
       const positions = new Map<string | null, number>();
-      for (const collection of inventory.collections) {
+      for (const [collectionIndex, collection] of inventory.collections.entries()) {
         const id = canonicalCollectionIds.get(collection.collection_key)!;
         const parentId = collection.parent_key ? canonicalCollectionIds.get(collection.parent_key) ?? null : null;
         const parts = zoteroParts(collection.collection_key) ?? { libraryId: 'users/0', rawKey: collection.collection_key };
@@ -334,16 +336,22 @@ export async function migrateVaultLibraries(options: {
         positions.set(parentId, desired.position + 1);
         if (!current) {
           const created = store.upsertCollection(desired); collectionsCreated += 1;
+          catalog.indexCollection(created);
           onMutation?.({ kind: 'collection-created', id: created.id, revision: created.clock.revision, contentHash: created.clock.contentHash });
         }
         else {
           const candidate = { ...current, ...desired };
-          if (comparableCollection(current) === comparableCollection(candidate)) collectionsUnchanged += 1;
+          if (comparableCollection(current) === comparableCollection(candidate)) {
+            collectionsUnchanged += 1;
+            catalog.indexCollection(current);
+          }
           else {
             const updated = store.upsertCollection(desired, current.clock.revision); collectionsUpdated += 1;
+            catalog.indexCollection(updated);
             onMutation?.({ kind: 'collection-updated', id: updated.id, revision: updated.clock.revision, contentHash: updated.clock.contentHash });
           }
         }
+        if (collectionIndex && collectionIndex % 50 === 0) await new Promise<void>((resolve) => setImmediate(resolve));
       }
 
       for (const row of inventory.works) {
@@ -390,13 +398,18 @@ export async function migrateVaultLibraries(options: {
         };
         if (!current) {
           const created = store.upsertItem(desiredInput); itemsCreated += 1;
+          catalog.indexItem(created, store);
           onMutation?.({ kind: 'item-created', id: created.id, storageId: created.storageId, revision: created.clock.revision, contentHash: created.clock.contentHash });
         }
         else {
           const candidate = { ...current, ...desiredInput } as LibraryItemRecord;
-          if (comparableItem(current) === comparableItem(candidate)) itemsUnchanged += 1;
+          if (comparableItem(current) === comparableItem(candidate)) {
+            itemsUnchanged += 1;
+            catalog.indexItem(current, store);
+          }
           else {
             const updated = store.upsertItem(desiredInput, current.clock.revision); itemsUpdated += 1;
+            catalog.indexItem(updated, store);
             onMutation?.({ kind: 'item-updated', id: updated.id, storageId: updated.storageId, revision: updated.clock.revision, contentHash: updated.clock.contentHash });
           }
         }
@@ -416,7 +429,7 @@ export async function migrateVaultLibraries(options: {
         });
         processedItems += 1;
         onProgress?.(migrationProgress('items', vaultIndex, inventories.length, inventory.vault, processedItems, totalItems));
-        if (processedItems % 100 === 0) await new Promise<void>((resolve) => setImmediate(resolve));
+        if (processedItems % 25 === 0) await new Promise<void>((resolve) => setImmediate(resolve));
       }
     }
     throwIfCanceled(signal);
@@ -427,7 +440,6 @@ export async function migrateVaultLibraries(options: {
       const key = `${link.itemId}\u0000${link.vaultId}\u0000${link.workId}`;
       if (!existingLinkKeys.has(key)) onMutation?.({ kind: 'link-created', itemId: link.itemId, vaultId: link.vaultId, workId: link.workId });
     }
-    catalog.rebuild(store);
     catalog.upsertVaultLinks(links);
     onProgress?.(migrationProgress('complete', inventories.length, inventories.length, null, processedItems, totalItems));
   } finally {

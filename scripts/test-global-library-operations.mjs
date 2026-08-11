@@ -86,6 +86,7 @@ try {
     metadata: { title: 'Documento Zotero', itemType: 'book', creators: [], year: 2020, isbn: [], issn: [], tags: [] },
     collectionIds: ['zotero:ROOT', history.id], attachments: [], extraction: { status: 'pending' },
   });
+  catalog.indexItem(zotero, store);
   assert.deepEqual(new Set(zotero.collectionIds), new Set(['zotero:ROOT', history.id]));
 
   assert.equal(operations.setItemsDeleted([first.id], true), 1);

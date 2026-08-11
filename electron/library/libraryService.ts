@@ -75,7 +75,7 @@ import { LibraryOperations } from './libraryOperations';
 import { resolveLibraryMetadata } from './libraryMetadataResolver';
 import { libraryItemIdentifier, runLibraryMetadataBatch } from './libraryMetadataBatch';
 import { mergeLibraryMetadataCandidate } from '@shared/libraryMetadata';
-import { propagateLibraryInvalidations, settleActiveVaultLibraryInvalidations } from './libraryInvalidation';
+import { propagateLibraryInvalidations, settleLibraryInvalidationsForItem } from './libraryInvalidation';
 import { listLibraryAnalysisProvenance } from '../db/libraryAnalysisProvenance';
 import type { LibraryAnalysisReuseComponent, LibraryAnalysisReuseStatus } from '@shared/libraryTypes';
 import { reuseVaultAnalysisForWorks } from '../vaults/vaultAnalysisImport';
@@ -89,6 +89,7 @@ import {
   listLibraryCitationStyles,
   removeLibraryCitationStyle,
 } from './libraryCslStyles';
+import { disposeLibraryOperationWorkers, runLibraryOperationInWorker } from './libraryOperationWorkerHost';
 export { recordLinkedLibraryAnalysis } from './libraryVaultProvenance';
 
 let live: {
@@ -148,9 +149,28 @@ function service(): NonNullable<typeof live> | null {
   const extraction = new LibraryExtractionQueue({ store, catalog, onProgress: broadcastExtraction, remoteOcr: libraryRemoteOcr });
   const migrations = new LibraryMigrationSessionManager(store, catalog, listVaults, broadcastMigration);
   const operations = new LibraryOperations(store, catalog);
-  operations.ensureCitationKeys();
   live = { root, deviceId, store, catalog, extraction, operations, migrations };
+  if (catalog.status(root, deviceId).lastRebuiltAt) {
+    setImmediate(() => {
+      if (live?.root !== root) return;
+      void runLibraryOperationInWorker(
+        { root, deviceId, catalogFile: catalog.file }, 'ensure-citation-keys', [],
+        () => operations.ensureCitationKeys(),
+      ).catch(() => undefined);
+    });
+  }
   return live;
+}
+
+function workerContext(current: NonNullable<ReturnType<typeof service>>) {
+  return { root: current.root, deviceId: current.deviceId, catalogFile: current.catalog.file };
+}
+
+async function ensureCatalogReady(current: NonNullable<ReturnType<typeof service>>): Promise<void> {
+  if (current.catalog.status(current.root, current.deviceId).lastRebuiltAt) return;
+  await runLibraryOperationInWorker(
+    workerContext(current), 'rebuild', [], () => current.catalog.rebuild(current.store),
+  );
 }
 
 function broadcast(status: LibraryStatus): void {
@@ -170,7 +190,7 @@ function broadcastMigration(progress: LibraryMigrationProgress): void {
 }
 
 function broadcastExtraction(progress: LibraryExtractionProgress): void {
-  if (progress.status === 'done' && live) settleActiveVaultLibraryInvalidations(live.store, live.catalog);
+  if (progress.status === 'done' && live) settleLibraryInvalidationsForItem(progress.itemId, live.store, live.catalog);
   for (const window of BrowserWindow.getAllWindows()) {
     if (!window.isDestroyed() && !window.webContents.isDestroyed()) window.webContents.send('library:extractionProgress', progress);
   }
@@ -178,7 +198,6 @@ function broadcastExtraction(progress: LibraryExtractionProgress): void {
 
 export function getGlobalLibraryStatus(): LibraryStatus {
   const current = service();
-  if (current) settleActiveVaultLibraryInvalidations(current.store, current.catalog);
   return current ? current.catalog.status(current.root, current.deviceId) : unavailableStatus();
 }
 
@@ -186,6 +205,16 @@ export function rebuildGlobalLibrary(): LibraryRebuildResult {
   const current = service();
   if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
   const result = current.catalog.rebuild(current.store);
+  broadcast(current.catalog.status(current.root, current.deviceId));
+  return result;
+}
+
+export async function rebuildGlobalLibraryInBackground(): Promise<LibraryRebuildResult> {
+  const current = service();
+  if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
+  const result = await runLibraryOperationInWorker(
+    workerContext(current), 'rebuild', [], () => current.catalog.rebuild(current.store),
+  );
   broadcast(current.catalog.status(current.root, current.deviceId));
   return result;
 }
@@ -207,20 +236,28 @@ export function listGlobalLibraryItems(query?: LibraryCatalogQuery): LibraryCata
   return current.catalog.list(resolved);
 }
 
-export function migrateExistingVaultLibraries(): Promise<LibraryMigrationReport> {
+export async function listGlobalLibraryItemsResponsive(query?: LibraryCatalogQuery): Promise<LibraryCatalogPage> {
   const current = service();
-  if (!current) return Promise.reject(new Error('Configura primero la carpeta de copias de seguridad de Nodus.'));
+  if (current && !current.catalog.status(current.root, current.deviceId).lastRebuiltAt) {
+    await runLibraryOperationInWorker(
+      workerContext(current), 'rebuild', [], () => current.catalog.rebuild(current.store),
+    );
+  }
+  return listGlobalLibraryItems(query);
+}
+
+export async function migrateExistingVaultLibraries(): Promise<LibraryMigrationReport> {
+  const current = service();
+  if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
+  await ensureCatalogReady(current);
   const preview = current.migrations.preview();
   const selectedVaultIds = preview.vaults.filter((vault) => vault.available).map((vault) => vault.id);
-  return current.migrations.start({ preview, selectedVaultIds }).then((session) => {
-    if (!session.report || session.status !== 'completed') throw new Error(session.error ?? 'La migración no se completó.');
-    const readyToExtract = current.store.scanMaterializedItems().records
-      .filter((item) => !item.deletedAt && item.source === 'zotero' && item.extraction?.status === 'pending' && !!item.files?.original)
-      .map((item) => item.id);
-    if (readyToExtract.length) current.extraction.enqueue(readyToExtract);
-    broadcast(current.catalog.status(current.root, current.deviceId));
-    return session.report;
-  });
+  const session = await current.migrations.start({ preview, selectedVaultIds });
+  if (!session.report || session.status !== 'completed') throw new Error(session.error ?? 'La migración no se completó.');
+  const readyToExtract = current.catalog.pendingExtractionItemIds('zotero');
+  if (readyToExtract.length) current.extraction.enqueue(readyToExtract);
+  broadcast(current.catalog.status(current.root, current.deviceId));
+  return session.report;
 }
 
 export function previewLibraryMigration(): LibraryMigrationPreview {
@@ -229,22 +266,22 @@ export function previewLibraryMigration(): LibraryMigrationPreview {
   return current.migrations.preview();
 }
 
-export function startLibraryMigration(request: LibraryMigrationStartRequest): Promise<LibraryMigrationSession> {
+export async function startLibraryMigration(request: LibraryMigrationStartRequest): Promise<LibraryMigrationSession> {
   const current = service();
-  if (!current) return Promise.reject(new Error('Configura primero la carpeta de copias de seguridad de Nodus.'));
-  return current.migrations.start(request).then((session) => {
-    broadcast(current.catalog.status(current.root, current.deviceId));
-    return session;
-  });
+  if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
+  await ensureCatalogReady(current);
+  const session = await current.migrations.start(request);
+  broadcast(current.catalog.status(current.root, current.deviceId));
+  return session;
 }
 
-export function resumeLibraryMigration(sessionId: string): Promise<LibraryMigrationSession> {
+export async function resumeLibraryMigration(sessionId: string): Promise<LibraryMigrationSession> {
   const current = service();
-  if (!current) return Promise.reject(new Error('Configura primero la carpeta de copias de seguridad de Nodus.'));
-  return current.migrations.resume(sessionId).then((session) => {
-    broadcast(current.catalog.status(current.root, current.deviceId));
-    return session;
-  });
+  if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
+  await ensureCatalogReady(current);
+  const session = await current.migrations.resume(sessionId);
+  broadcast(current.catalog.status(current.root, current.deviceId));
+  return session;
 }
 
 export function cancelLibraryMigration(sessionId: string): boolean {
@@ -269,29 +306,37 @@ export function listZoteroImportLibraries(): Promise<ZoteroLibraryPreview[]> {
   return previewZoteroLibraries(current.catalog);
 }
 
-export function startZoteroLibraryImport(
+export async function startZoteroLibraryImport(
   requestId: string,
   selection: ZoteroImportSelection | undefined,
   onProgress: (progress: ZoteroImportProgress) => void,
 ): Promise<ZoteroImportReport> {
-  if (!requestId?.trim()) return Promise.reject(new Error('La importación necesita un identificador de solicitud.'));
-  if (zoteroImports.has(requestId)) return Promise.reject(new Error('Esa importación de Zotero ya está en curso.'));
+  if (!requestId?.trim()) throw new Error('La importación necesita un identificador de solicitud.');
+  if (zoteroImports.has(requestId)) throw new Error('Esa importación de Zotero ya está en curso.');
   const current = service();
-  if (!current) return Promise.reject(new Error('Configura primero la carpeta de copias de seguridad de Nodus.'));
+  if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
+  if (!current.catalog.status(current.root, current.deviceId).lastRebuiltAt) {
+    await runLibraryOperationInWorker(
+      workerContext(current), 'rebuild', [], () => current.catalog.rebuild(current.store),
+    );
+  }
   const controller = new AbortController();
   zoteroImports.set(requestId, controller);
-  return importZoteroLibraries({
-    requestId, selection, store: current.store, catalog: current.catalog,
-    signal: controller.signal, onProgress,
-  }).then((report) => {
-    current.operations.ensureCitationKeys();
-    const readyToExtract = current.store.scanMaterializedItems().records
-      .filter((item) => !item.deletedAt && item.source === 'zotero' && item.extraction?.status === 'pending' && !!item.files?.original)
-      .map((item) => item.id);
+  try {
+    const report = await importZoteroLibraries({
+      requestId, selection, store: current.store, catalog: current.catalog,
+      signal: controller.signal, onProgress,
+    });
+    await runLibraryOperationInWorker(
+      workerContext(current), 'ensure-citation-keys', [], () => current.operations.ensureCitationKeys(),
+    );
+    const readyToExtract = current.catalog.pendingExtractionItemIds('zotero');
     if (readyToExtract.length) current.extraction.enqueue(readyToExtract);
     broadcast(current.catalog.status(current.root, current.deviceId));
     return report;
-  }).finally(() => { zoteroImports.delete(requestId); });
+  } finally {
+    zoteroImports.delete(requestId);
+  }
 }
 
 export function listZoteroSyncSessions(): ZoteroSyncSession[] {
@@ -382,7 +427,8 @@ export function setGlobalLibraryViewPreferences(preferences: LibraryViewPreferen
 export function getGlobalLibraryItem(itemId: string): LibraryItemRecord | null {
   const current = service();
   if (!current) return null;
-  return current.store.findItemByIdOrAlias(current.catalog.resolveItemId(itemId) ?? itemId);
+  const storageId = current.catalog.itemStorageId(itemId);
+  return storageId ? current.store.readMaterializedItem(storageId) : null;
 }
 
 export function createGlobalLibraryCollection(name: string, parentId: string | null): LibraryCollectionView {
@@ -393,76 +439,89 @@ export function createGlobalLibraryCollection(name: string, parentId: string | n
   return result;
 }
 
-export function updateGlobalLibraryCollection(
+export async function updateGlobalLibraryCollection(
   id: string,
   patch: LibraryCollectionPatch,
-): LibraryCollectionView {
+): Promise<LibraryCollectionView> {
   const current = service();
   if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
-  const result = current.operations.updateCollection(id, patch);
+  const result = await runLibraryOperationInWorker(
+    workerContext(current), 'update-collection', [id, patch], () => current.operations.updateCollection(id, patch),
+  );
   broadcast(current.catalog.status(current.root, current.deviceId));
   return result;
 }
 
-export function deleteGlobalLibraryCollection(id: string, deleteItems?: boolean): number {
+export async function deleteGlobalLibraryCollection(id: string, deleteItems?: boolean): Promise<number> {
   const current = service();
   if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
-  const result = current.operations.deleteCollection(id, deleteItems);
+  const result = await runLibraryOperationInWorker(
+    workerContext(current), 'delete-collection', [id, deleteItems], () => current.operations.deleteCollection(id, deleteItems),
+  );
   broadcast(current.catalog.status(current.root, current.deviceId));
   return result;
 }
 
-export function patchGlobalLibraryItemCollections(itemIds: string[], patch: LibraryItemCollectionPatch): number {
+export async function patchGlobalLibraryItemCollections(itemIds: string[], patch: LibraryItemCollectionPatch): Promise<number> {
   const current = service();
   if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
-  const result = current.operations.patchItemCollections(itemIds, patch);
+  const result = await runLibraryOperationInWorker(
+    workerContext(current), 'patch-item-collections', [itemIds, patch], () => current.operations.patchItemCollections(itemIds, patch),
+  );
   broadcast(current.catalog.status(current.root, current.deviceId));
   return result;
 }
 
-export function setGlobalLibraryItemsDeleted(itemIds: string[], deleted: boolean): number {
+export async function setGlobalLibraryItemsDeleted(itemIds: string[], deleted: boolean): Promise<number> {
   const current = service();
   if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
-  const result = current.operations.setItemsDeleted(itemIds, deleted);
+  const result = await runLibraryOperationInWorker(
+    workerContext(current), 'set-items-deleted', [itemIds, deleted], () => current.operations.setItemsDeleted(itemIds, deleted),
+  );
   broadcast(current.catalog.status(current.root, current.deviceId));
   return result;
 }
 
-export function previewGlobalLibraryTrash(itemIds: string[]): LibraryTrashImpact {
+export async function previewGlobalLibraryTrash(itemIds: string[]): Promise<LibraryTrashImpact> {
   const current = service(); if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
-  return current.operations.trashImpact(itemIds);
+  return runLibraryOperationInWorker(workerContext(current), 'trash-impact', [itemIds], () => current.operations.trashImpact(itemIds));
 }
 
-export function purgeGlobalLibraryTrash(itemIds: string[]): LibraryPurgeReport {
+export async function purgeGlobalLibraryTrash(itemIds: string[]): Promise<LibraryPurgeReport> {
   const current = service(); if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
-  const result = current.operations.purgeTrash(itemIds); broadcast(current.catalog.status(current.root, current.deviceId)); return result;
+  const result = await runLibraryOperationInWorker(workerContext(current), 'purge-trash', [itemIds], () => current.operations.purgeTrash(itemIds));
+  broadcast(current.catalog.status(current.root, current.deviceId)); return result;
 }
 
-export function auditGlobalLibraryRecovery(): LibraryRecoveryReport {
+export async function auditGlobalLibraryRecovery(): Promise<LibraryRecoveryReport> {
   const current = service(); if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
-  return current.operations.auditRecovery();
+  return runLibraryOperationInWorker(workerContext(current), 'audit-recovery', [], () => current.operations.auditRecovery());
 }
 
-export function importGlobalLibraryFiles(files: string[], collectionId?: string | null): LibraryLocalImportReport {
+export async function importGlobalLibraryFiles(files: string[], collectionId?: string | null): Promise<LibraryLocalImportReport> {
   const current = service();
   if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
-  const report = current.operations.importLocalFiles(files, collectionId);
+  const report = await runLibraryOperationInWorker(
+    workerContext(current), 'import-files', [files, collectionId], () => current.operations.importLocalFiles(files, collectionId),
+  );
   if (report.itemIds.length) current.extraction.enqueue(report.itemIds);
   broadcast(current.catalog.status(current.root, current.deviceId));
   return report;
 }
 
-export function importGlobalBibliographyFiles(files: string[], collectionId?: string | null): LibraryBibliographyImportReport {
+export async function importGlobalBibliographyFiles(files: string[], collectionId?: string | null): Promise<LibraryBibliographyImportReport> {
   const current = service();
   if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
-  const report = current.operations.importBibliographyFiles(files, collectionId);
+  const report = await runLibraryOperationInWorker(
+    workerContext(current), 'import-bibliography', [files, collectionId], () => current.operations.importBibliographyFiles(files, collectionId),
+  );
   broadcast(current.catalog.status(current.root, current.deviceId));
   return report;
 }
 
 function finishItemMutation(current: NonNullable<ReturnType<typeof service>>, result: LibraryItemRecord): LibraryItemRecord {
   const final = propagateLibraryInvalidations(result, current.store, current.catalog);
-  if (final.clock.revision !== result.clock.revision) current.catalog.rebuild(current.store);
+  if (final.clock.revision !== result.clock.revision) current.catalog.indexItem(final, current.store);
   if (final.contentRevision?.components.extraction.freshness === 'queued' && final.attachments.length) current.extraction.enqueue([final.id]);
   broadcast(current.catalog.status(current.root, current.deviceId));
   return final;
@@ -473,34 +532,55 @@ export function createGlobalLibraryItem(metadata: LibraryItemMetadata, collectio
   return finishItemMutation(current, current.operations.createItem(metadata, collectionIds));
 }
 
-export function duplicateGlobalLibraryItem(itemId: string): LibraryItemRecord {
+export async function duplicateGlobalLibraryItem(itemId: string): Promise<LibraryItemRecord> {
   const current = service(); if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
-  return finishItemMutation(current, current.operations.duplicateItem(itemId));
+  const result = await runLibraryOperationInWorker(
+    workerContext(current), 'duplicate-item', [itemId], () => current.operations.duplicateItem(itemId),
+  );
+  return finishItemMutation(current, result);
 }
 
-export function convertGlobalLibraryItemToNodus(itemId: string): LibraryItemRecord {
+export async function convertGlobalLibraryItemToNodus(itemId: string): Promise<LibraryItemRecord> {
   const current = service(); if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
-  return finishItemMutation(current, current.operations.convertItemToNodus(itemId));
+  const existing = getGlobalLibraryItem(itemId);
+  if (!existing) throw new Error('El documento ya no existe.');
+  if (existing.source === 'nodus') return existing;
+  const result = await runLibraryOperationInWorker(
+    workerContext(current), 'duplicate-item', [itemId], () => current.operations.duplicateItem(itemId),
+  );
+  return finishItemMutation(current, result);
 }
 
-export function addGlobalLibraryAttachments(itemId: string, files: string[]): LibraryItemRecord {
+export async function addGlobalLibraryAttachments(itemId: string, files: string[]): Promise<LibraryItemRecord> {
   const current = service(); if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
-  return finishItemMutation(current, current.operations.addAttachments(itemId, files));
+  const result = await runLibraryOperationInWorker(
+    workerContext(current), 'add-attachments', [itemId, files], () => current.operations.addAttachments(itemId, files),
+  );
+  return finishItemMutation(current, result);
 }
 
-export function updateGlobalLibraryAttachment(itemId: string, attachmentId: string, patch: LibraryAttachmentPatch): LibraryItemRecord {
+export async function updateGlobalLibraryAttachment(itemId: string, attachmentId: string, patch: LibraryAttachmentPatch): Promise<LibraryItemRecord> {
   const current = service(); if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
-  return finishItemMutation(current, current.operations.updateAttachment(itemId, attachmentId, patch));
+  const result = await runLibraryOperationInWorker(
+    workerContext(current), 'update-attachment', [itemId, attachmentId, patch], () => current.operations.updateAttachment(itemId, attachmentId, patch),
+  );
+  return finishItemMutation(current, result);
 }
 
-export function replaceGlobalLibraryAttachment(itemId: string, attachmentId: string, file: string): LibraryItemRecord {
+export async function replaceGlobalLibraryAttachment(itemId: string, attachmentId: string, file: string): Promise<LibraryItemRecord> {
   const current = service(); if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
-  return finishItemMutation(current, current.operations.replaceAttachment(itemId, attachmentId, file));
+  const result = await runLibraryOperationInWorker(
+    workerContext(current), 'replace-attachment', [itemId, attachmentId, file], () => current.operations.replaceAttachment(itemId, attachmentId, file),
+  );
+  return finishItemMutation(current, result);
 }
 
-export function removeGlobalLibraryAttachment(itemId: string, attachmentId: string): LibraryItemRecord {
+export async function removeGlobalLibraryAttachment(itemId: string, attachmentId: string): Promise<LibraryItemRecord> {
   const current = service(); if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
-  return finishItemMutation(current, current.operations.removeAttachment(itemId, attachmentId));
+  const result = await runLibraryOperationInWorker(
+    workerContext(current), 'remove-attachment', [itemId, attachmentId], () => current.operations.removeAttachment(itemId, attachmentId),
+  );
+  return finishItemMutation(current, result);
 }
 
 export function globalLibraryAttachmentPath(itemId: string, attachmentId: string): string {
@@ -523,9 +603,12 @@ export function setGlobalLibraryItemRelation(itemId: string, targetItemId: strin
   return finishItemMutation(current, current.operations.setRelation(itemId, targetItemId, relationType, enabled));
 }
 
-export function patchGlobalLibraryItemTags(itemIds: string[], patch: LibraryTagPatch): number {
+export async function patchGlobalLibraryItemTags(itemIds: string[], patch: LibraryTagPatch): Promise<number> {
   const current = service(); if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
-  const count = current.operations.patchItemTags(itemIds, patch); broadcast(current.catalog.status(current.root, current.deviceId)); return count;
+  const count = await runLibraryOperationInWorker(
+    workerContext(current), 'patch-tags', [itemIds, patch], () => current.operations.patchItemTags(itemIds, patch),
+  );
+  broadcast(current.catalog.status(current.root, current.deviceId)); return count;
 }
 
 export function listGlobalLibraryTags(): LibraryTagRecord[] { return service()?.operations.listTagRecords() ?? []; }
@@ -542,7 +625,7 @@ export function updateGlobalLibraryItemMetadata(itemId: string, patch: Partial<L
   const propagated = propagateLibraryInvalidations(result, current.store, current.catalog);
   if (propagated.clock.revision !== result.clock.revision) {
     result = propagated;
-    current.catalog.rebuild(current.store);
+    current.catalog.indexItem(result, current.store);
   }
   broadcast(current.catalog.status(current.root, current.deviceId));
   return result;
@@ -637,31 +720,45 @@ export function removeGlobalLibraryCitationStyle(styleId: string): boolean {
 
 export async function formatGlobalLibraryCitation(itemIds: string[], style: LibraryCitationStyle, kind: 'citation' | 'bibliography', locale = 'es-ES'): Promise<LibraryCitationResult> {
   const current = service(); if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
-  current.operations.ensureCitationKeys();
-  return formatLibraryCitationCsl(current.operations.bibliographyRecords({ itemIds }), style, kind, locale);
+  const records = await runLibraryOperationInWorker<LibraryItemRecord[]>(
+    workerContext(current), 'bibliography-records', [{ itemIds }], () => {
+      current.operations.ensureCitationKeys();
+      return current.operations.bibliographyRecords({ itemIds });
+    },
+  );
+  return formatLibraryCitationCsl(records, style, kind, locale);
 }
 
-export function exportGlobalLibraryBibliography(request: LibraryBibliographyExportRequest, filePath: string): LibraryBibliographyExportReport {
+export async function exportGlobalLibraryBibliography(request: LibraryBibliographyExportRequest, filePath: string): Promise<LibraryBibliographyExportReport> {
   const current = service(); if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
-  current.operations.ensureCitationKeys();
-  const exported = current.operations.exportBibliography(request);
-  fs.writeFileSync(filePath, exported.content, 'utf8');
+  const exported = await runLibraryOperationInWorker<{ content: string; exported: number }>(
+    workerContext(current), 'export-bibliography', [request], () => {
+      current.operations.ensureCitationKeys();
+      return current.operations.exportBibliography(request);
+    },
+  );
+  await fs.promises.writeFile(filePath, exported.content, 'utf8');
   return { format: request.format, exported: exported.exported, filePath, canceled: false, warnings: [] };
 }
 
-export function listGlobalLibraryDuplicates(): LibraryDuplicateGroup[] {
-  return service()?.operations.listDuplicateGroups() ?? [];
+export async function listGlobalLibraryDuplicates(): Promise<LibraryDuplicateGroup[]> {
+  const current = service(); if (!current) return [];
+  return runLibraryOperationInWorker(workerContext(current), 'list-duplicates', [], () => current.operations.listDuplicateGroups());
 }
 
-export function previewGlobalLibraryMerge(canonicalId: string, duplicateIds: string[]): LibraryMergeImpact {
+export async function previewGlobalLibraryMerge(canonicalId: string, duplicateIds: string[]): Promise<LibraryMergeImpact> {
   const current = service(); if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
-  return current.operations.mergeImpact(canonicalId, duplicateIds);
+  return runLibraryOperationInWorker(
+    workerContext(current), 'merge-impact', [canonicalId, duplicateIds], () => current.operations.mergeImpact(canonicalId, duplicateIds),
+  );
 }
 
-export function mergeGlobalLibraryItems(canonicalId: string, duplicateIds: string[]): LibraryItemRecord {
+export async function mergeGlobalLibraryItems(canonicalId: string, duplicateIds: string[]): Promise<LibraryItemRecord> {
   const current = service();
   if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
-  const result = current.operations.mergeItems(canonicalId, duplicateIds);
+  const result = await runLibraryOperationInWorker(
+    workerContext(current), 'merge-items', [canonicalId, duplicateIds], () => current.operations.mergeItems(canonicalId, duplicateIds),
+  );
   broadcast(current.catalog.status(current.root, current.deviceId));
   return result;
 }
@@ -730,7 +827,11 @@ export async function linkGlobalLibraryItemsToVault(itemIds: string[], vaultId: 
   }
   const uniqueIds = [...new Set(itemIds.filter(Boolean))];
   const canonicalIds = [...new Set(uniqueIds.map((id) => current.catalog.resolveItemId(id) ?? id))];
-  const records = current.store.scanMaterializedItems().records.filter((item) => canonicalIds.includes(item.id) && !item.deletedAt);
+  const records = canonicalIds.flatMap((itemId) => {
+    const storageId = current.catalog.itemStorageId(itemId);
+    const item = storageId ? current.store.readMaterializedItem(storageId) : null;
+    return item && !item.deletedAt ? [item] : [];
+  });
   if (records.length !== canonicalIds.length) throw new Error('Alguno de los documentos seleccionados ya no existe.');
   const prior = new Set(current.catalog.listVaultLinks().filter((link) => link.vaultId === vaultId).map((link) => link.itemId));
   const links = await withVaultDatabase(vaultId, async () => {
@@ -798,6 +899,7 @@ export function closeGlobalLibrary(): void {
   for (const controller of zoteroImports.values()) controller.abort();
   zoteroImports.clear();
   live?.extraction.dispose();
+  disposeLibraryOperationWorkers();
   live?.catalog.close();
   live = null;
 }
