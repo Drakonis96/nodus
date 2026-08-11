@@ -11,7 +11,11 @@ import type {
 
 const SOURCES = new Set<LibraryItemSource>(['nodus', 'zotero', 'mendeley', 'ris', 'bibtex', 'csl-json', 'legacy']);
 const ITEM_TYPES = new Set<LibraryItemType>([
-  'article-journal', 'book', 'chapter', 'conference-paper', 'thesis', 'report', 'webpage', 'document', 'dataset', 'other',
+  'article-journal', 'journal-article', 'magazine-article', 'newspaper-article', 'book', 'chapter', 'book-section',
+  'conference-paper', 'thesis', 'report', 'manuscript', 'presentation', 'interview', 'letter', 'email', 'instant-message',
+  'encyclopedia-article', 'dictionary-entry', 'case', 'hearing', 'bill', 'statute', 'patent', 'artwork', 'map', 'film',
+  'audio-recording', 'video-recording', 'radio-broadcast', 'tv-broadcast', 'podcast', 'blog-post', 'forum-post',
+  'computer-program', 'webpage', 'document', 'dataset', 'other',
 ]);
 
 export function canonicalJson(value: unknown): string {
@@ -92,7 +96,7 @@ function legacySourceIdentity(input: Record<string, unknown>): LibrarySourceIden
 
 function normalizeCreators(value: unknown): LibraryCreator[] {
   if (!Array.isArray(value)) return [];
-  return value.slice(0, 512).flatMap((entry) => {
+  return value.slice(0, 512).flatMap<LibraryCreator>((entry) => {
     if (typeof entry === 'string') {
       const name = stringValue(entry, 1_000);
       return name ? [{ creatorType: 'author', name }] : [];
@@ -104,7 +108,8 @@ function normalizeCreators(value: unknown): LibraryCreator[] {
     const lastName = stringValue(source.lastName, 500);
     const name = stringValue(source.name, 1_000);
     if (!firstName && !lastName && !name) return [];
-    return [{ creatorType, ...(firstName ? { firstName } : {}), ...(lastName ? { lastName } : {}), ...(name ? { name } : {}) }];
+    const fieldMode = source.fieldMode === 1 || name && !firstName && !lastName ? 1 as const : 0 as const;
+    return [{ creatorType, ...(firstName ? { firstName } : {}), ...(lastName ? { lastName } : {}), ...(name ? { name } : {}), fieldMode }];
   });
 }
 
@@ -203,6 +208,12 @@ export function normalizeLibraryItemRecord(value: unknown): LibraryItemRecord | 
     formatVersion: 2 as const,
     aliases,
     sourceIdentities: identities,
+    metadata: normalizeLibraryMetadata(input.metadata, stringValue((input.metadata as Record<string, unknown> | undefined)?.title, 10_000)),
+    attachments: Array.isArray(input.attachments) ? input.attachments.map((entry, position) => ({
+      ...(entry as object), position: Number.isFinite(Number((entry as { position?: unknown }).position)) ? Number((entry as { position?: unknown }).position) : position,
+    })) : [],
+    notes: Array.isArray(input.notes) ? input.notes : [],
+    relations: Array.isArray(input.relations) ? input.relations : [],
   } as unknown as Omit<LibraryItemRecord, 'clock'>;
   const clock = rawClock as LibraryItemRecord['clock'] | undefined;
   const normalized = {

@@ -3,6 +3,7 @@ import type {
   LibraryDuplicateGroup,
   LibraryItemMetadata,
   LibraryItemRecord,
+  LibraryCreator,
   LibraryMetadataCandidate,
   LibraryMetadataIdentifierKind,
 } from '@shared/libraryTypes';
@@ -37,6 +38,7 @@ export function LibraryMetadataEditor({ item, onClose, onSaved }: {
   item: LibraryItemRecord; onClose: () => void; onSaved: (item: LibraryItemRecord) => void;
 }) {
   const [draft, setDraft] = useState(() => metadataDraft(item.metadata));
+  const [creators, setCreators] = useState<LibraryCreator[]>(item.metadata.creators);
   const initialKind: LibraryMetadataIdentifierKind = item.metadata.doi ? 'doi' : item.metadata.isbn?.[0] ? 'isbn' : 'issn';
   const [kind, setKind] = useState<LibraryMetadataIdentifierKind>(initialKind);
   const [lookupValue, setLookupValue] = useState(item.metadata[initialKind] instanceof Array ? item.metadata[initialKind]?.[0] ?? '' : String(item.metadata[initialKind] ?? ''));
@@ -57,17 +59,13 @@ export function LibraryMetadataEditor({ item, onClose, onSaved }: {
   };
 
   const applyCandidate = (candidate: LibraryMetadataCandidate) => {
-    setDraft(metadataDraft(candidate.metadata)); setSelectedCandidate(candidate);
+    setDraft(metadataDraft(candidate.metadata)); setCreators(candidate.metadata.creators); setSelectedCandidate(candidate);
   };
 
   const save = async () => {
     if (!draft.title.trim()) return;
     setSaving(true); setError('');
     try {
-      const creators = draft.authors.split(';').map((name) => name.trim()).filter(Boolean).map((name) => {
-        const comma = /^([^,]+),\s*(.+)$/.exec(name);
-        return comma ? { creatorType: 'author', firstName: comma[2], lastName: comma[1] } : { creatorType: 'author', name };
-      });
       const saved = await window.nodus.updateGlobalLibraryItemMetadata(item.id, {
         title: draft.title.trim(), itemType: draft.itemType, creators, abstract: draft.abstract?.trim() || undefined,
         date: draft.date?.trim() || undefined, year: draft.year == null || !Number.isFinite(Number(draft.year)) ? null : Number(draft.year),
@@ -98,8 +96,16 @@ export function LibraryMetadataEditor({ item, onClose, onSaved }: {
       <header className="flex items-center gap-3 border-b border-neutral-800 px-5 py-4"><span className="grid h-9 w-9 place-items-center rounded-xl bg-indigo-500/15 text-indigo-300"><Icon name="edit" /></span><div className="min-w-0 flex-1"><h2 className="font-semibold">{t('Editar y completar metadatos')}</h2><p className="mt-1 text-xs text-neutral-500">{item.source === 'nodus' ? t('Ficha propia de Nodus.') : t('Tus cambios se conservan aunque vuelvas a sincronizar el gestor de origen.')}</p></div><button className="btn btn-ghost" onClick={onClose}><Icon name="x" /></button></header>
       <div className="grid min-h-0 flex-1 lg:grid-cols-[1.25fr_.9fr]">
         <div className="min-h-0 overflow-y-auto p-5"><div className="grid gap-3 sm:grid-cols-2">
-          {input('title', 'Título', { wide: true })}{input('authors', 'Autoría', { wide: true })}
-          <label className="block text-[10px] uppercase tracking-wider text-neutral-500">{t('Tipo')}<select className="input mt-1 w-full normal-case tracking-normal" value={draft.itemType} onChange={(event) => setDraft((current) => ({ ...current, itemType: event.target.value as LibraryItemMetadata['itemType'] }))}>{['article-journal', 'book', 'chapter', 'conference-paper', 'thesis', 'report', 'webpage', 'document', 'dataset', 'other'].map((value) => <option key={value}>{value}</option>)}</select></label>
+          {input('title', 'Título', { wide: true })}
+          <fieldset className="sm:col-span-2" data-testid="library-creator-editor"><div className="flex items-center justify-between"><legend className="text-[10px] uppercase tracking-wider text-neutral-500">{t('Autoría y contribuciones')}</legend><button type="button" className="btn btn-ghost h-7 text-[10px]" onClick={() => setCreators((current) => [...current, { creatorType: 'author', firstName: '', lastName: '', fieldMode: 0 }])}><Icon name="plus" size={12} /> {t('Añadir persona')}</button></div>
+            <div className="mt-2 space-y-2">{creators.map((creator, index) => <div key={`${index}:${creator.creatorType}`} className="grid gap-2 rounded-xl border border-neutral-800 p-2 sm:grid-cols-[8rem_7rem_1fr_1fr_auto]">
+              <select aria-label={t('Rol')} className="input text-xs" value={creator.creatorType} onChange={(event) => setCreators((current) => current.map((entry, position) => position === index ? { ...entry, creatorType: event.target.value } : entry))}>{['author', 'editor', 'translator', 'contributor', 'bookAuthor', 'seriesEditor', 'reviewedAuthor', 'inventor', 'director', 'scriptwriter', 'producer', 'performer', 'composer', 'cartographer', 'programmer', 'artist', 'presenter', 'interviewer', 'interviewee', 'recipient', 'sponsor'].map((role) => <option key={role} value={role}>{role}</option>)}</select>
+              <select aria-label={t('Tipo de autoría')} className="input text-xs" value={creator.fieldMode === 1 || creator.name ? 'organization' : 'person'} onChange={(event) => setCreators((current) => current.map((entry, position) => position === index ? event.target.value === 'organization' ? { creatorType: entry.creatorType, name: entry.name || [entry.firstName, entry.lastName].filter(Boolean).join(' '), fieldMode: 1 } : { creatorType: entry.creatorType, firstName: '', lastName: entry.name ?? '', fieldMode: 0 } : entry))}><option value="person">{t('Persona')}</option><option value="organization">{t('Institución')}</option></select>
+              {creator.fieldMode === 1 || creator.name ? <input aria-label={t('Nombre institucional')} className="input sm:col-span-2" value={creator.name ?? ''} onChange={(event) => setCreators((current) => current.map((entry, position) => position === index ? { ...entry, name: event.target.value, fieldMode: 1 } : entry))} /> : <><input aria-label={t('Nombre')} className="input" value={creator.firstName ?? ''} onChange={(event) => setCreators((current) => current.map((entry, position) => position === index ? { ...entry, firstName: event.target.value } : entry))} /><input aria-label={t('Apellidos')} className="input" value={creator.lastName ?? ''} onChange={(event) => setCreators((current) => current.map((entry, position) => position === index ? { ...entry, lastName: event.target.value } : entry))} /></>}
+              <span className="flex items-center"><button type="button" className="grid h-7 w-7 place-items-center" aria-label={t('Subir')} disabled={!index} onClick={() => setCreators((current) => { const next = [...current]; [next[index - 1], next[index]] = [next[index], next[index - 1]]; return next; })}><Icon name="chevronUp" size={12} /></button><button type="button" className="grid h-7 w-7 place-items-center" aria-label={t('Bajar')} disabled={index === creators.length - 1} onClick={() => setCreators((current) => { const next = [...current]; [next[index], next[index + 1]] = [next[index + 1], next[index]]; return next; })}><Icon name="chevronDown" size={12} /></button><button type="button" className="grid h-7 w-7 place-items-center text-red-400" aria-label={t('Eliminar')} onClick={() => setCreators((current) => current.filter((_, position) => position !== index))}><Icon name="trash" size={12} /></button></span>
+            </div>)}</div>
+          </fieldset>
+          <label className="block text-[10px] uppercase tracking-wider text-neutral-500">{t('Tipo')}<select className="input mt-1 w-full normal-case tracking-normal" value={draft.itemType} onChange={(event) => setDraft((current) => ({ ...current, itemType: event.target.value as LibraryItemMetadata['itemType'] }))}>{['journal-article', 'magazine-article', 'newspaper-article', 'book', 'book-section', 'chapter', 'conference-paper', 'thesis', 'report', 'manuscript', 'presentation', 'interview', 'letter', 'email', 'encyclopedia-article', 'dictionary-entry', 'case', 'hearing', 'bill', 'statute', 'patent', 'artwork', 'map', 'film', 'audio-recording', 'video-recording', 'podcast', 'blog-post', 'forum-post', 'computer-program', 'webpage', 'document', 'dataset', 'other'].map((value) => <option key={value}>{value}</option>)}</select></label>
           {input('year', 'Año', { type: 'number' })}{input('date', 'Fecha')}{input('language', 'Idioma')}{input('publicationTitle', 'Publicación', { wide: true })}{input('publisher', 'Editorial')}{input('place', 'Lugar')}{input('volume', 'Volumen')}{input('issue', 'Número')}{input('pages', 'Páginas')}{input('edition', 'Edición')}{input('doi', 'DOI', { wide: true })}{input('isbnText', 'ISBN', { wide: true })}{input('issnText', 'ISSN', { wide: true })}{input('url', 'URL', { wide: true })}{input('tagsText', 'Etiquetas', { wide: true })}{input('abstract', 'Resumen', { wide: true, textarea: true })}
         </div></div>
         <aside className="min-h-0 overflow-y-auto border-l border-neutral-800 bg-neutral-950/35 p-5">

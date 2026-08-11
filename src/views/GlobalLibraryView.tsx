@@ -18,6 +18,7 @@ import type {
 import type { AppSettings, VaultSummary, VaultType } from '@shared/types';
 import { Icon, Spinner } from '../components/ui';
 import { LibraryDuplicatesDialog, LibraryMetadataEditor } from '../components/library/LibraryMetadataDialogs';
+import { LibraryItemManager } from '../components/library/LibraryItemManager';
 import { LibraryDocumentReader } from './LibraryDocumentReader';
 import { VirtualList } from '../components/VirtualList';
 import { confirm, promptText, toast } from '../components/feedback';
@@ -392,6 +393,8 @@ function GlobalLibraryContent({
   const [duplicatesOpen, setDuplicatesOpen] = useState(false);
   const [vaultLinkItems, setVaultLinkItems] = useState<string[] | null>(null);
   const [detailLinks, setDetailLinks] = useState<LibraryVaultLink[]>([]);
+  const [manager, setManager] = useState<{ item: LibraryItemRecord; tab?: 'attachments' | 'notes' | 'relations' | 'tags' } | null>(null);
+  const [bulkTag, setBulkTag] = useState('');
 
   const load = useCallback(async () => {
     try {
@@ -487,6 +490,28 @@ function GlobalLibraryContent({
     } catch (nextError) { toast(nextError instanceof Error ? nextError.message : String(nextError), { tone: 'error' }); }
   };
 
+  const createReference = async () => {
+    const title = await promptText({ title: t('Nueva referencia'), placeholder: t('Título de la referencia'), confirmLabel: t('Crear') });
+    if (!title?.trim()) return;
+    const created = await window.nodus.createGlobalLibraryItem({ title: title.trim(), itemType: 'document', creators: [], year: null, isbn: [], issn: [], tags: [] }, selectedCollection ? [selectedCollection] : []);
+    setDetailId(created.id); setDetail(created); setMetadataItem(created); await load();
+  };
+
+  const duplicateDetail = async () => {
+    if (!detail) return; const created = await window.nodus.duplicateGlobalLibraryItem(detail.id);
+    setDetailId(created.id); setDetail(created); toast(t('Se creó una copia independiente de Nodus.')); await load();
+  };
+
+  const convertDetail = async () => {
+    if (!detail || detail.source === 'nodus') return; const created = await window.nodus.convertGlobalLibraryItemToNodus(detail.id);
+    setDetailId(created.id); setDetail(created); toast(t('Se creó una ficha Nodus independiente; el espejo de origen se conserva.')); await load();
+  };
+
+  const applyBulkTag = async () => {
+    if (!selected.size || !bulkTag.trim()) return;
+    await window.nodus.patchGlobalLibraryItemTags([...selected], { add: [bulkTag.trim()] }); setBulkTag(''); await load();
+  };
+
   const processSelected = async () => {
     const ids = selected.size ? [...selected] : detailId ? [detailId] : [];
     if (!ids.length) return;
@@ -544,6 +569,7 @@ function GlobalLibraryContent({
         <div className="min-w-0"><h1 className="flex items-center gap-2 text-lg font-semibold"><Icon name="book" className="text-indigo-400" /> {t('Biblioteca')}</h1><p className="text-[11px] text-neutral-500">{tx('{n} documentos · disponible en todos los vaults', { n: status.items })}</p></div>
         <div className="flex-1" />
         {activeJobs.length > 0 && <span className="flex items-center gap-2 rounded-full bg-indigo-500/10 px-3 py-1.5 text-xs text-indigo-300"><Spinner /> {tx('{n} tarea(s) en segundo plano', { n: activeJobs.length })}</span>}
+        <button data-testid="create-library-reference" className="btn btn-ghost border border-neutral-700" onClick={() => void createReference()}><Icon name="plus" /> {t('Nueva referencia')}</button>
         <button data-testid="open-library-migration" className="btn btn-ghost border border-neutral-700" onClick={() => setMigrationOpen(true)}><Icon name="vault" /> {t('Migrar vaults')}</button>
         <button data-testid="open-library-duplicates" className="btn btn-ghost border border-neutral-700" onClick={() => setDuplicatesOpen(true)}><Icon name="copy" /> {t('Duplicados')}</button>
         <button data-testid="import-library-bibliography" className="btn btn-ghost border border-neutral-700" onClick={() => void importBibliography()}><Icon name="fileText" /> {t('Importar referencias')}</button>
@@ -580,7 +606,7 @@ function GlobalLibraryContent({
             </div>}
           </div>
 
-          {selected.size > 0 && <div data-testid="global-library-bulk-actions" className="flex flex-wrap items-center gap-2 border-b border-indigo-500/20 bg-indigo-500/5 px-3 py-2 text-xs"><b>{tx('{n} seleccionados', { n: selected.size })}</b><select className="input ml-2 h-8 min-w-44 text-xs" value={collectionTarget} onChange={(event) => setCollectionTarget(event.target.value)}><option value="">{t('Añadir a colección…')}</option>{localCollections.map((collection) => <option key={collection.id} value={collection.id}>{collection.name}</option>)}</select><button className="btn btn-ghost h-8" disabled={!collectionTarget} onClick={() => void addSelectedToCollection()}>{t('Aplicar')}</button><button data-testid="bulk-add-library-to-vault" className="btn btn-ghost h-8" onClick={() => setVaultLinkItems([...selected])}><Icon name="vault" size={13} /> {t('Añadir al vault')}</button><button className="btn btn-ghost h-8" onClick={() => void processSelected()}><Icon name="refresh" size={13} /> {t('Procesar de nuevo')}</button><button className="btn btn-ghost h-8 text-red-400" onClick={() => void deleteSelected()}><Icon name="trash" size={13} /> {t('Papelera')}</button><button className="ml-auto text-neutral-500 hover:text-neutral-200" onClick={() => setSelected(new Set())}>{t('Limpiar selección')}</button></div>}
+          {selected.size > 0 && <div data-testid="global-library-bulk-actions" className="flex flex-wrap items-center gap-2 border-b border-indigo-500/20 bg-indigo-500/5 px-3 py-2 text-xs"><b>{tx('{n} seleccionados', { n: selected.size })}</b><select className="input ml-2 h-8 min-w-44 text-xs" value={collectionTarget} onChange={(event) => setCollectionTarget(event.target.value)}><option value="">{t('Añadir a colección…')}</option>{localCollections.map((collection) => <option key={collection.id} value={collection.id}>{collection.name}</option>)}</select><button className="btn btn-ghost h-8" disabled={!collectionTarget} onClick={() => void addSelectedToCollection()}>{t('Aplicar')}</button><input className="input h-8 w-32 text-xs" value={bulkTag} onChange={(event) => setBulkTag(event.target.value)} placeholder={t('Etiqueta…')} /><button className="btn btn-ghost h-8" disabled={!bulkTag.trim()} onClick={() => void applyBulkTag()}><Icon name="tag" size={13} /> {t('Etiquetar')}</button><button data-testid="bulk-add-library-to-vault" className="btn btn-ghost h-8" onClick={() => setVaultLinkItems([...selected])}><Icon name="vault" size={13} /> {t('Añadir al vault')}</button><button className="btn btn-ghost h-8" onClick={() => void processSelected()}><Icon name="refresh" size={13} /> {t('Procesar de nuevo')}</button><button className="btn btn-ghost h-8 text-red-400" onClick={() => void deleteSelected()}><Icon name="trash" size={13} /> {t('Papelera')}</button><button className="ml-auto text-neutral-500 hover:text-neutral-200" onClick={() => setSelected(new Set())}>{t('Limpiar selección')}</button></div>}
 
           <div className="grid h-9 grid-cols-[2.2rem_minmax(12rem,1fr)_7.5rem] items-center border-b border-neutral-800 px-3 text-[10px] font-semibold uppercase tracking-wider text-neutral-600 xl:grid-cols-[2.2rem_minmax(16rem,2fr)_minmax(9rem,1fr)_4.5rem_7rem_7.5rem]">
             <input type="checkbox" checked={items.length > 0 && items.every((item) => selected.has(item.id))} onChange={(event) => setSelected((current) => { const next = new Set(current); for (const item of items) { if (event.target.checked) next.add(item.id); else next.delete(item.id); } return next; })} aria-label={t('Seleccionar página')} />
@@ -613,12 +639,13 @@ function GlobalLibraryContent({
             <div className="mt-5"><h3 className="text-[10px] font-semibold uppercase tracking-wider text-neutral-600">{t('Disponible en vaults')}</h3>{detailLinks.length ? <div className="mt-2 space-y-1.5">{detailLinks.map((link) => <div key={`${link.vaultId}:${link.workId}`} className="rounded-lg border border-neutral-800 px-2.5 py-2 text-[10px]"><div className="flex items-center gap-2"><Icon name="vault" size={12} className="text-indigo-400" /><span className="min-w-0 flex-1 truncate text-neutral-400">{link.vaultName}</span><span className="text-neutral-600">{link.analysis.deepStatus === 'done' ? t('analizado') : t('vinculado')}</span></div><VaultReuseBadges link={link} /></div>)}</div> : <p className="mt-2 text-[10px] leading-4 text-neutral-600">{t('Aún no está añadido a ningún vault.')}</p>}</div>
             <div className="mt-5 rounded-xl border border-neutral-800 p-3"><div className="flex items-center justify-between text-xs"><span>{t('Versión limpia')}</span><b className={detail.extraction?.status === 'ready' ? 'text-emerald-400' : 'text-neutral-500'}>{t(EXTRACTION_LABEL[detail.extraction?.status ?? 'pending'])}</b></div>{detail.extraction?.error && <p className="mt-2 text-[10px] text-red-400">{detail.extraction.error}</p>}<p className="mt-2 text-[10px] text-neutral-600">{detail.attachments.length} {t('adjuntos')} · {detail.files?.reader ? t('Markdown disponible') : t('Sin Markdown')}</p></div>
           </div>
-          <footer className="grid grid-cols-2 gap-2 border-t border-neutral-800 p-3"><button data-testid="edit-library-metadata" className="btn btn-ghost col-span-2 border border-neutral-700" onClick={() => setMetadataItem(detail)}><Icon name="edit" /> {t('Editar metadatos')}</button><button data-testid="add-library-item-to-vault" className="btn btn-ghost col-span-2 border border-neutral-700" onClick={() => setVaultLinkItems([detail.id])}><Icon name="vault" /> {t('Añadir al vault')}</button><button className="btn btn-primary" disabled={!detail.files?.reader} title={!detail.files?.reader ? t('Procesa el documento primero') : undefined} onClick={() => void openReader(detail.id)}><Icon name="bookOpen" /> {t('Leer')}</button><button className="btn btn-ghost border border-neutral-700" onClick={() => void processSelected()}><Icon name="refresh" /> {t('Procesar')}</button><button className="btn btn-ghost col-span-2 text-red-400" onClick={() => void deleteSelected()}><Icon name="trash" /> {t('Enviar a la papelera')}</button></footer>
+          <footer className="grid grid-cols-2 gap-2 border-t border-neutral-800 p-3"><button data-testid="edit-library-metadata" className="btn btn-ghost col-span-2 border border-neutral-700" onClick={() => setMetadataItem(detail)}><Icon name="edit" /> {t('Editar metadatos')}</button><button className="btn btn-ghost border border-neutral-700" onClick={() => setManager({ item: detail, tab: 'attachments' })}><Icon name="file" /> {t('Adjuntos')}</button><button className="btn btn-ghost border border-neutral-700" onClick={() => setManager({ item: detail, tab: 'notes' })}><Icon name="notebook" /> {t('Notas')}</button><button data-testid="add-library-item-to-vault" className="btn btn-ghost col-span-2 border border-neutral-700" onClick={() => setVaultLinkItems([detail.id])}><Icon name="vault" /> {t('Añadir al vault')}</button><button className="btn btn-primary" disabled={!detail.files?.reader} title={!detail.files?.reader ? t('Procesa el documento primero') : undefined} onClick={() => void openReader(detail.id)}><Icon name="bookOpen" /> {t('Leer')}</button><button className="btn btn-ghost border border-neutral-700" onClick={() => void processSelected()}><Icon name="refresh" /> {t('Procesar')}</button><button className="btn btn-ghost border border-neutral-700" onClick={() => void duplicateDetail()}><Icon name="copy" /> {t('Duplicar')}</button>{detail.source !== 'nodus' && <button className="btn btn-ghost border border-neutral-700" onClick={() => void convertDetail()}><Icon name="library" /> {t('Copia Nodus')}</button>}<button className="btn btn-ghost col-span-2 text-red-400" onClick={() => void deleteSelected()}><Icon name="trash" /> {t('Enviar a la papelera')}</button></footer>
         </aside>}
       </div>
       {zoteroOpen && <ZoteroImportDialog onClose={() => setZoteroOpen(false)} onFinished={() => void load()} />}
       {migrationOpen && <LibraryMigrationDialog onClose={() => setMigrationOpen(false)} onFinished={() => void load()} />}
       {metadataItem && <LibraryMetadataEditor item={metadataItem} onClose={() => setMetadataItem(null)} onSaved={(saved) => { setDetail(saved); void load(); }} />}
+      {manager && <LibraryItemManager item={manager.item} initialTab={manager.tab} onClose={() => setManager(null)} onChanged={(saved) => { setManager((value) => value ? { ...value, item: saved } : null); setDetail(saved); void load(); }} />}
       {duplicatesOpen && <LibraryDuplicatesDialog onClose={() => setDuplicatesOpen(false)} onChanged={() => void load()} />}
       {vaultLinkItems && <VaultLinkDialog itemIds={vaultLinkItems} onClose={() => setVaultLinkItems(null)} onLinked={(links) => {
         if (detailId && links.some((link) => link.itemId === detailId)) setDetailLinks((current) => [...current.filter((existing) => !links.some((link) => link.itemId === existing.itemId && link.vaultId === existing.vaultId)), ...links.filter((link) => link.itemId === detailId)]);

@@ -13,21 +13,58 @@ export interface LibrarySourceIdentity {
 
 export type LibraryItemType =
   | 'article-journal'
+  | 'journal-article'
+  | 'magazine-article'
+  | 'newspaper-article'
   | 'book'
   | 'chapter'
+  | 'book-section'
   | 'conference-paper'
   | 'thesis'
   | 'report'
+  | 'manuscript'
+  | 'presentation'
+  | 'interview'
+  | 'letter'
+  | 'email'
+  | 'instant-message'
+  | 'encyclopedia-article'
+  | 'dictionary-entry'
+  | 'case'
+  | 'hearing'
+  | 'bill'
+  | 'statute'
+  | 'patent'
+  | 'artwork'
+  | 'map'
+  | 'film'
+  | 'audio-recording'
+  | 'video-recording'
+  | 'radio-broadcast'
+  | 'tv-broadcast'
+  | 'podcast'
+  | 'blog-post'
+  | 'forum-post'
+  | 'computer-program'
   | 'webpage'
   | 'document'
   | 'dataset'
   | 'other';
 
+export type LibraryCreatorRole =
+  | 'author' | 'contributor' | 'editor' | 'seriesEditor' | 'translator'
+  | 'reviewedAuthor' | 'bookAuthor' | 'inventor' | 'director' | 'scriptwriter'
+  | 'producer' | 'performer' | 'composer' | 'wordsBy' | 'cartographer'
+  | 'programmer' | 'artist' | 'podcaster' | 'presenter' | 'interviewer'
+  | 'interviewee' | 'recipient' | 'sponsor' | 'counsel' | (string & {});
+
 export interface LibraryCreator {
-  creatorType: string;
+  creatorType: LibraryCreatorRole;
   firstName?: string;
   lastName?: string;
   name?: string;
+  /** Zotero-compatible corporate-name mode. */
+  fieldMode?: 0 | 1;
 }
 
 export interface LibraryItemMetadata {
@@ -67,8 +104,49 @@ export interface LibraryAttachmentRecord {
   mimeType: string;
   byteSize: number;
   sha256: string;
-  role: 'original' | 'supplement' | 'snapshot' | 'image' | 'other';
+  role: 'original' | 'supplement' | 'snapshot' | 'image' | 'dataset' | 'transcript' | 'other';
+  position?: number;
+  addedAt?: string;
   sourceKey?: string;
+}
+
+export interface LibraryAttachmentPatch {
+  title?: string;
+  fileName?: string;
+  role?: LibraryAttachmentRecord['role'];
+  position?: number;
+  makePrimary?: boolean;
+}
+
+export interface LibraryNoteRecord {
+  id: string;
+  title: string;
+  markdown: string;
+  source: 'nodus' | 'zotero';
+  sourceKey?: string;
+  readOnly: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type LibraryItemRelationType = 'related' | 'cites' | 'is-cited-by' | 'corrects' | 'is-corrected-by';
+
+export interface LibraryItemRelation {
+  id: string;
+  targetItemId: string;
+  relationType: LibraryItemRelationType;
+  createdAt: string;
+}
+
+export interface LibraryTagRecord {
+  name: string;
+  color: string | null;
+  itemCount: number;
+}
+
+export interface LibraryTagPatch {
+  add?: string[];
+  remove?: string[];
 }
 
 export interface LibraryRecordClock {
@@ -141,6 +219,8 @@ export interface LibraryItemRecord {
   metadataOverrides?: LibraryMetadataOverrides;
   collectionIds: string[];
   attachments: LibraryAttachmentRecord[];
+  notes?: LibraryNoteRecord[];
+  relations?: LibraryItemRelation[];
   files?: {
     reader?: string;
     original?: string;

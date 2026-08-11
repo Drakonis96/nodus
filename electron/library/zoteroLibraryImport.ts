@@ -41,6 +41,7 @@ export interface ZoteroImportClient {
   }>;
   itemAttachments(userId: string, itemKey: string, library?: ZoteroLibrary): Promise<ZoteroAttachmentInfo[]>;
   attachmentFilePath(userId: string, attachmentKey: string): Promise<string | null>;
+  itemNotes?(userId: string, itemKey: string, library?: ZoteroLibrary): Promise<zotero.ZoteroChildNote[]>;
 }
 
 const defaultClient: ZoteroImportClient = {
@@ -51,6 +52,7 @@ const defaultClient: ZoteroImportClient = {
   deletedSince: zotero.deletedSince,
   itemAttachments: zotero.itemAttachments,
   attachmentFilePath: zotero.attachmentFilePath,
+  itemNotes: zotero.itemNotes,
 };
 
 function libraryId(library: ZoteroLibrary): string {
@@ -83,14 +85,20 @@ function rawZoteroKey(key: string): string {
 
 function itemType(value: string): LibraryItemType {
   const type = value.toLowerCase().replace(/[^a-z]/g, '');
-  if (['journalarticle', 'articlejournal', 'magazinearticle', 'newspaperarticle'].includes(type)) return 'article-journal';
+  if (['journalarticle', 'articlejournal'].includes(type)) return 'journal-article';
+  if (type === 'magazinearticle') return 'magazine-article';
+  if (type === 'newspaperarticle') return 'newspaper-article';
   if (type === 'book') return 'book';
-  if (['booksection', 'chapter'].includes(type)) return 'chapter';
-  if (['conferencepaper', 'proceedings'].includes(type)) return 'conference-paper';
-  if (type === 'thesis') return 'thesis';
-  if (type === 'report') return 'report';
-  if (['webpage', 'blogpost', 'forumpost'].includes(type)) return 'webpage';
-  if (type === 'dataset') return 'dataset';
+  const mapped: Record<string, LibraryItemType> = {
+    booksection: 'book-section', chapter: 'chapter', conferencepaper: 'conference-paper', proceedings: 'conference-paper',
+    thesis: 'thesis', report: 'report', manuscript: 'manuscript', presentation: 'presentation', interview: 'interview',
+    letter: 'letter', email: 'email', instantmessage: 'instant-message', encyclopediaarticle: 'encyclopedia-article',
+    dictionaryentry: 'dictionary-entry', case: 'case', hearing: 'hearing', bill: 'bill', statute: 'statute', patent: 'patent',
+    artwork: 'artwork', map: 'map', film: 'film', audiorecording: 'audio-recording', videorecording: 'video-recording',
+    radiobroadcast: 'radio-broadcast', tvbroadcast: 'tv-broadcast', podcast: 'podcast', blogpost: 'blog-post',
+    forumpost: 'forum-post', computerprogram: 'computer-program', webpage: 'webpage', dataset: 'dataset', document: 'document',
+  };
+  if (mapped[type]) return mapped[type];
   return type ? 'document' : 'other';
 }
 
@@ -121,6 +129,7 @@ function metadata(item: ZoteroItem): LibraryItemMetadata {
       ...(creator.firstName?.trim() ? { firstName: creator.firstName.trim() } : {}),
       ...(creator.lastName?.trim() ? { lastName: creator.lastName.trim() } : {}),
       ...(creator.name?.trim() ? { name: creator.name.trim() } : {}),
+      fieldMode: creator.name?.trim() ? 1 as const : 0 as const,
     })),
     ...(item.abstract?.trim() ? { abstract: item.abstract.trim() } : {}),
     ...(item.date?.trim() ? { date: item.date.trim() } : {}),
@@ -431,6 +440,26 @@ export async function importZoteroLibraries(options: {
       // Deliberate checkpoint: the complete bibliography appears before any file copy begins.
       catalog.rebuild(store);
       emit(progress(requestId, 'attachments', library, processedItems, totalItems, processedAttachments, totalAttachments, 'Catálogo listo; copiando adjuntos…'));
+      if (client.itemNotes) {
+        const { default: TurndownService } = await import('turndown');
+        const turndown = new TurndownService({ headingStyle: 'atx', bulletListMarker: '-' });
+        for (const item of changedItems) {
+          abortIfNeeded(signal);
+          const current = desiredByKey.get(item.key) ?? store.findItemBySourceIdentity(zoteroSourceIdentity(sourceLibraryId, item.itemKey));
+          if (!current) continue;
+          const mirrored = (await client.itemNotes(library.id, item.key, library)).map((note) => ({
+            id: `zotero-note:${note.key}`, title: note.title, markdown: turndown.turndown(note.html).trim(),
+            source: 'zotero' as const, sourceKey: note.key, readOnly: true,
+            createdAt: (current.notes ?? []).find((entry) => entry.id === `zotero-note:${note.key}`)?.createdAt ?? new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          }));
+          const notes = [...(current.notes ?? []).filter((note) => note.source !== 'zotero'), ...mirrored];
+          if (comparableItem(current) !== comparableItem({ ...current, notes })) {
+            const stored = store.upsertItem({ ...current, notes }, current.clock.revision);
+            desiredByKey.set(item.key, stored);
+          }
+        }
+      }
       if (selection.copyAttachments !== false) {
         for (const item of changedItems) {
           abortIfNeeded(signal);
@@ -453,7 +482,7 @@ export async function importZoteroLibraries(options: {
             const sourceHash = await sha256(sourcePath);
             const previous = current.attachments.find((entry) => entry.sourceKey === attachment.itemKey && entry.sha256 === sourceHash);
             if (previous && fs.existsSync(path.join(store.itemFolder(current.storageId), previous.relativePath))) {
-              copied.push({ ...previous, role: attachmentRole(attachment, index) });
+              copied.push({ ...previous, role: attachmentRole(attachment, index), position: index });
               report.attachmentsUnchanged += 1;
               processedAttachments += 1;
               continue;
@@ -471,7 +500,8 @@ export async function importZoteroLibraries(options: {
               id: attachment.key, title: attachment.title, fileName,
               relativePath: path.relative(store.itemFolder(current.storageId), destination),
               mimeType: attachment.contentType || 'application/octet-stream', byteSize: stat.size,
-              sha256: sourceHash, role: attachmentRole(attachment, index), sourceKey: attachment.itemKey,
+              sha256: sourceHash, role: attachmentRole(attachment, index), position: index,
+              addedAt: new Date().toISOString(), sourceKey: attachment.itemKey,
             });
             report.attachmentsCopied += 1;
             processedAttachments += 1;

@@ -381,6 +381,27 @@ export async function itemChildren(userId: string, itemKey: string): Promise<Zot
     }));
 }
 
+export interface ZoteroChildNote {
+  key: string;
+  title: string;
+  html: string;
+  version: number;
+}
+
+/** Child notes remain a read-only mirror in Nodus. */
+export async function itemNotes(userId: string, itemKey: string, library?: ZoteroLibrary): Promise<ZoteroChildNote[]> {
+  const parsed = parseCanonicalKey(itemKey, library ?? { ...PERSONAL_LIBRARY, id: userId });
+  const res = await zfetch(`${BASE}/${libraryPrefix(parsed.library)}/items/${encodeURIComponent(parsed.rawKey)}/children`);
+  if (!res.ok) return [];
+  const data = (await res.json()) as any[];
+  return data.filter((child) => child.data?.itemType === 'note' && child.data?.parentItem === parsed.rawKey).map((child) => ({
+    key: canonicalKey(parsed.library, child.data.key),
+    title: String(child.data.title || 'Zotero note'),
+    html: String(child.data.note || ''),
+    version: Number(child.data.version ?? child.version ?? 0),
+  }));
+}
+
 export async function itemAttachments(userId: string, itemKey: string, library?: ZoteroLibrary): Promise<ZoteroAttachment[]> {
   const parsed = parseCanonicalKey(itemKey, library ?? { ...PERSONAL_LIBRARY, id: userId });
   const canonical = canonicalKey(parsed.library, parsed.rawKey);

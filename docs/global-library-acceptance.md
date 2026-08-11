@@ -41,6 +41,13 @@ button exists.
 | Organization | Collections and subcollections support arbitrary depth | Verified | `test-global-library-operations`, `test-global-library-ui` |
 | Organization | Zotero collections are mirrored and Nodus collections are editable | Verified | `test-global-library-operations` |
 | Organization | Search, filters, pagination, and bulk actions work | Verified | `test-global-library-ui`, `e2e-global-library` |
+| Item management | Empty references, independent duplicates, and Nodus copies work without Zotero | Verified | `test-library-item-management`, `test-global-library-ui` |
+| Item management | Academic types and ordered personal or institutional creator roles round-trip | Verified | `test-library-item-management`, `test-library-metadata` |
+| Attachments | Multiple supported files can be added, opened, revealed, renamed, reordered, classified, replaced, and removed | Verified | `test-library-item-management`, `e2e-global-library` |
+| Attachments | Selecting or replacing the primary file drives revision invalidation and extraction | Verified | `test-library-item-management`, `test-library-revisions` |
+| Notes | Local Markdown notes are editable and Zotero notes remain read-only | Verified | `test-library-item-management`, `test-zotero-library-import` |
+| Relations | Item relations are symmetric and inverse relation types remain consistent | Verified | `test-library-item-management` |
+| Tags | Colored tags and bulk add/remove remain user-owned | Verified | `test-library-item-management`, `test-global-library-ui` |
 | Extraction | Text-based PDFs produce normalized Markdown | Verified | `test-library-extraction` |
 | Extraction | Text contains no double spaces or avoidable broken words | Verified | `test-library-extraction`, phase 0 prototypes |
 | Extraction | Figures are extracted and tables retain structure | Verified | `test-library-extraction`, `e2e-library-reader` |

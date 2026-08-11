@@ -28,6 +28,11 @@ import type {
   LibraryMetadataLookupResult,
   LibraryVaultLink,
   LibraryVaultLinkReport,
+  LibraryAttachmentPatch,
+  LibraryNoteRecord,
+  LibraryItemRelationType,
+  LibraryTagPatch,
+  LibraryTagRecord,
 } from '@shared/libraryTypes';
 import { LibraryCatalog } from './libraryCatalog';
 import { LibraryDiskStore } from './libraryStorage';
@@ -342,6 +347,81 @@ export function importGlobalBibliographyFiles(files: string[], collectionId?: st
   const report = current.operations.importBibliographyFiles(files, collectionId);
   broadcast(current.catalog.status(current.root, current.deviceId));
   return report;
+}
+
+function finishItemMutation(current: NonNullable<ReturnType<typeof service>>, result: LibraryItemRecord): LibraryItemRecord {
+  const final = propagateLibraryInvalidations(result, current.store, current.catalog);
+  if (final.clock.revision !== result.clock.revision) current.catalog.rebuild(current.store);
+  if (final.contentRevision?.components.extraction.freshness === 'queued' && final.attachments.length) current.extraction.enqueue([final.id]);
+  broadcast(current.catalog.status(current.root, current.deviceId));
+  return final;
+}
+
+export function createGlobalLibraryItem(metadata: LibraryItemMetadata, collectionIds?: string[]): LibraryItemRecord {
+  const current = service(); if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
+  return finishItemMutation(current, current.operations.createItem(metadata, collectionIds));
+}
+
+export function duplicateGlobalLibraryItem(itemId: string): LibraryItemRecord {
+  const current = service(); if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
+  return finishItemMutation(current, current.operations.duplicateItem(itemId));
+}
+
+export function convertGlobalLibraryItemToNodus(itemId: string): LibraryItemRecord {
+  const current = service(); if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
+  return finishItemMutation(current, current.operations.convertItemToNodus(itemId));
+}
+
+export function addGlobalLibraryAttachments(itemId: string, files: string[]): LibraryItemRecord {
+  const current = service(); if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
+  return finishItemMutation(current, current.operations.addAttachments(itemId, files));
+}
+
+export function updateGlobalLibraryAttachment(itemId: string, attachmentId: string, patch: LibraryAttachmentPatch): LibraryItemRecord {
+  const current = service(); if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
+  return finishItemMutation(current, current.operations.updateAttachment(itemId, attachmentId, patch));
+}
+
+export function replaceGlobalLibraryAttachment(itemId: string, attachmentId: string, file: string): LibraryItemRecord {
+  const current = service(); if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
+  return finishItemMutation(current, current.operations.replaceAttachment(itemId, attachmentId, file));
+}
+
+export function removeGlobalLibraryAttachment(itemId: string, attachmentId: string): LibraryItemRecord {
+  const current = service(); if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
+  return finishItemMutation(current, current.operations.removeAttachment(itemId, attachmentId));
+}
+
+export function globalLibraryAttachmentPath(itemId: string, attachmentId: string): string {
+  const current = service(); if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
+  return current.operations.attachmentPath(itemId, attachmentId);
+}
+
+export function upsertGlobalLibraryNote(itemId: string, note: Partial<LibraryNoteRecord> & Pick<LibraryNoteRecord, 'title' | 'markdown'>): LibraryItemRecord {
+  const current = service(); if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
+  return finishItemMutation(current, current.operations.upsertNote(itemId, note));
+}
+
+export function deleteGlobalLibraryNote(itemId: string, noteId: string): LibraryItemRecord {
+  const current = service(); if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
+  return finishItemMutation(current, current.operations.deleteNote(itemId, noteId));
+}
+
+export function setGlobalLibraryItemRelation(itemId: string, targetItemId: string, relationType: LibraryItemRelationType, enabled: boolean): LibraryItemRecord {
+  const current = service(); if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
+  return finishItemMutation(current, current.operations.setRelation(itemId, targetItemId, relationType, enabled));
+}
+
+export function patchGlobalLibraryItemTags(itemIds: string[], patch: LibraryTagPatch): number {
+  const current = service(); if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
+  const count = current.operations.patchItemTags(itemIds, patch); broadcast(current.catalog.status(current.root, current.deviceId)); return count;
+}
+
+export function listGlobalLibraryTags(): LibraryTagRecord[] { return service()?.operations.listTagRecords() ?? []; }
+
+export function setGlobalLibraryTagColor(tag: string, color: string | null): LibraryTagRecord[] {
+  const current = service(); if (!current) throw new Error('Configura primero la carpeta de copias de seguridad de Nodus.');
+  const result = current.operations.setTagColor(tag, color); broadcast(current.catalog.status(current.root, current.deviceId)); return result;
 }
 
 export function updateGlobalLibraryItemMetadata(itemId: string, patch: Partial<LibraryItemMetadata>): LibraryItemRecord {

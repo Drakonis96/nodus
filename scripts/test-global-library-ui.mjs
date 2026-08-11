@@ -14,13 +14,15 @@ test('the unified Library keeps the global catalogue independent and the vault c
 });
 
 test('the Library UI exposes hierarchy, search, bulk operations, imports and background state', async () => {
-  const view = await readSource('src/views/GlobalLibraryView.tsx');
+  const view = `${await readSource('src/views/GlobalLibraryView.tsx')}\n${await readSource('src/components/library/LibraryItemManager.tsx')}`;
   for (const marker of [
     'global-library-view', 'global-library-search', 'global-library-bulk-actions',
     'global-library-detail', 'zotero-global-import-dialog', 'open-zotero-global-import',
     'import-library-bibliography', 'open-library-duplicates', 'edit-library-metadata',
     'add-library-item-to-vault', 'global-library-vault-dialog',
     'global-library-integrity-warning',
+    'create-library-reference', 'library-item-manager', 'library-attachments',
+    'library-notes', 'library-relations', 'library-tag-manager',
     'open-library-migration', 'library-migration-dialog', 'start-library-migration',
   ]) assert.match(view, new RegExp(`data-testid=(?:"|\{\`)[^\n]*${marker}`));
   for (const method of [
@@ -28,6 +30,11 @@ test('the Library UI exposes hierarchy, search, bulk operations, imports and bac
     'importGlobalLibraryFiles', 'listZoteroImportLibraries', 'importZoteroLibrary',
     'enqueueLibraryExtraction', 'patchGlobalLibraryItemCollections', 'setGlobalLibraryItemsDeleted',
     'importGlobalBibliographyFiles',
+    'createGlobalLibraryItem', 'duplicateGlobalLibraryItem', 'convertGlobalLibraryItemToNodus',
+    'addGlobalLibraryAttachments', 'updateGlobalLibraryAttachment', 'replaceGlobalLibraryAttachment',
+    'removeGlobalLibraryAttachment', 'openGlobalLibraryAttachment', 'revealGlobalLibraryAttachment',
+    'upsertGlobalLibraryNote', 'deleteGlobalLibraryNote', 'setGlobalLibraryItemRelation',
+    'patchGlobalLibraryItemTags', 'listGlobalLibraryTags', 'setGlobalLibraryTagColor',
     'listGlobalLibraryVaultLinks', 'linkGlobalLibraryItemsToVault',
     'previewLibraryMigration', 'startLibraryMigration', 'resumeLibraryMigration',
     'cancelLibraryMigration', 'rollbackLibraryMigration', 'listLibraryMigrationSessions',
@@ -73,6 +80,11 @@ test('the typed bridge covers every global management operation', async () => {
     'updateGlobalLibraryCollection', 'deleteGlobalLibraryCollection', 'patchGlobalLibraryItemCollections',
     'setGlobalLibraryItemsDeleted', 'importGlobalLibraryFiles',
     'importGlobalBibliographyFiles', 'updateGlobalLibraryItemMetadata', 'resolveGlobalLibraryMetadata',
+    'createGlobalLibraryItem', 'duplicateGlobalLibraryItem', 'convertGlobalLibraryItemToNodus',
+    'addGlobalLibraryAttachments', 'updateGlobalLibraryAttachment', 'replaceGlobalLibraryAttachment',
+    'removeGlobalLibraryAttachment', 'openGlobalLibraryAttachment', 'revealGlobalLibraryAttachment',
+    'upsertGlobalLibraryNote', 'deleteGlobalLibraryNote', 'setGlobalLibraryItemRelation',
+    'patchGlobalLibraryItemTags', 'listGlobalLibraryTags', 'setGlobalLibraryTagColor',
     'listGlobalLibraryDuplicates', 'mergeGlobalLibraryItems',
     'listGlobalLibraryVaults', 'listGlobalLibraryVaultLinks', 'linkGlobalLibraryItemsToVault',
     'previewLibraryMigration', 'startLibraryMigration', 'resumeLibraryMigration',
@@ -82,6 +94,10 @@ test('the typed bridge covers every global management operation', async () => {
   assertChannelsWired(assert, [
     'library:collections', 'library:item', 'library:createCollection', 'library:updateCollection',
     'library:deleteCollection', 'library:patchItemCollections', 'library:setItemsDeleted', 'library:importFiles',
+    'library:createItem', 'library:duplicateItem', 'library:convertItemToNodus',
+    'library:addAttachments', 'library:updateAttachment', 'library:replaceAttachment', 'library:removeAttachment',
+    'library:openAttachment', 'library:revealAttachment', 'library:upsertNote', 'library:deleteNote',
+    'library:setRelation', 'library:patchTags', 'library:tags', 'library:setTagColor',
     'library:importBibliography', 'library:updateMetadata', 'library:resolveMetadata', 'library:duplicates', 'library:mergeItems',
     'library:vaults', 'library:vaultLinks', 'library:linkToVault',
     'library:migrationPreview', 'library:startMigration', 'library:resumeMigration',

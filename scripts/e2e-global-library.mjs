@@ -196,6 +196,24 @@ try {
   assert.equal((await page.evaluate((id) => window.nodus.getGlobalLibraryItem(id), itemId)).metadata.publisher, 'Editorial corregida en Nodus');
   console.log('[global-library-e2e] local metadata correction persisted');
 
+  await detail.getByRole('button', { name: 'Adjuntos', exact: true }).click();
+  const itemManager = page.getByTestId('library-item-manager');
+  await itemManager.waitFor({ state: 'visible' });
+  await page.getByTestId('library-attachments').waitFor({ state: 'visible' });
+  assert.ok(await page.getByTestId('library-attachments').locator('article').count(), 'the attachment manager renders the imported original');
+  await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-item-manager-dark-wide.png'), fullPage: true });
+  await page.setViewportSize({ width: 760, height: 900 });
+  await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-item-manager-dark-narrow.png'), fullPage: true });
+  await page.setViewportSize({ width: 1540, height: 940 });
+  await itemManager.getByRole('button', { name: 'Notas', exact: true }).click();
+  await page.getByTestId('library-notes').getByLabel('Título', { exact: true }).fill('Nota E2E');
+  await page.getByTestId('library-notes').getByLabel('Markdown', { exact: true }).fill('# Nota\n\nContenido local.');
+  await page.getByTestId('library-notes').getByRole('button', { name: 'Guardar nota' }).click();
+  await itemManager.getByText('Nota E2E', { exact: true }).waitFor();
+  assert.equal((await page.evaluate((id) => window.nodus.getGlobalLibraryItem(id), itemId)).notes.some((note) => note.title === 'Nota E2E'), true);
+  await itemManager.getByRole('button', { name: 'Cerrar', exact: true }).click();
+  await itemManager.waitFor({ state: 'detached' });
+
   await page.getByTestId('open-library-duplicates').click();
   const duplicatesDialog = page.getByTestId('library-duplicates-dialog');
   await duplicatesDialog.waitFor({ state: 'visible' });

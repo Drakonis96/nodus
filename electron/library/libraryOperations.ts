@@ -12,6 +12,12 @@ import type {
   LibraryItemType,
   LibraryMetadataOverrides,
   LibraryLocalImportReport,
+  LibraryAttachmentPatch,
+  LibraryAttachmentRecord,
+  LibraryNoteRecord,
+  LibraryItemRelationType,
+  LibraryTagPatch,
+  LibraryTagRecord,
 } from '@shared/libraryTypes';
 import { canonicalJson, normalizeLibraryMetadata } from './libraryRecord';
 import { LibraryCatalog } from './libraryCatalog';
@@ -101,10 +107,36 @@ function mimeType(extension: string): string {
   return ({
     '.pdf': 'application/pdf', '.epub': 'application/epub+zip', '.md': 'text/markdown', '.markdown': 'text/markdown',
     '.txt': 'text/plain', '.html': 'text/html', '.htm': 'text/html', '.xml': 'application/xml', '.jats': 'application/xml',
-    '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', '.csv': 'text/csv',
+    '.doc': 'application/msword', '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    '.odt': 'application/vnd.oasis.opendocument.text', '.rtf': 'application/rtf',
+    '.ppt': 'application/vnd.ms-powerpoint', '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    '.odp': 'application/vnd.oasis.opendocument.presentation', '.csv': 'text/csv',
     '.tsv': 'text/tab-separated-values', '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.tif': 'image/tiff', '.tiff': 'image/tiff',
+    '.xls': 'application/vnd.ms-excel', '.ods': 'application/vnd.oasis.opendocument.spreadsheet',
+    '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp',
+    '.bmp': 'image/bmp', '.svg': 'image/svg+xml', '.heic': 'image/heic', '.tif': 'image/tiff', '.tiff': 'image/tiff',
   } as Record<string, string>)[extension] ?? 'application/octet-stream';
+}
+
+const SUPPORTED_ATTACHMENTS = new Set([
+  '.pdf', '.epub', '.md', '.markdown', '.txt', '.html', '.htm', '.xml', '.jats',
+  '.doc', '.docx', '.odt', '.rtf', '.ppt', '.pptx', '.odp',
+  '.csv', '.tsv', '.xlsx', '.xls', '.ods',
+  '.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.svg', '.heic', '.tif', '.tiff',
+]);
+
+function orderedAttachments(attachments: LibraryAttachmentRecord[]): LibraryAttachmentRecord[] {
+  return attachments.map((entry, index) => ({ ...entry, position: entry.position ?? index }))
+    .sort((a, b) => (a.position ?? 0) - (b.position ?? 0) || a.id.localeCompare(b.id))
+    .map((entry, position) => ({ ...entry, position }));
+}
+
+function inverseRelation(type: LibraryItemRelationType): LibraryItemRelationType {
+  if (type === 'cites') return 'is-cited-by';
+  if (type === 'is-cited-by') return 'cites';
+  if (type === 'corrects') return 'is-corrected-by';
+  if (type === 'is-corrected-by') return 'corrects';
+  return 'related';
 }
 
 export class LibraryOperations {
@@ -211,12 +243,11 @@ export class LibraryOperations {
 
   importLocalFiles(files: string[], collectionId?: string | null): LibraryLocalImportReport {
     const report: LibraryLocalImportReport = { created: 0, skipped: 0, itemIds: [], warnings: [] };
-    const supported = new Set(['.pdf', '.epub', '.md', '.markdown', '.txt', '.html', '.htm', '.xml', '.jats', '.docx', '.csv', '.tsv', '.xlsx', '.xls', '.ods']);
     const knownHashes = new Set(this.store.scanMaterializedItems().records.flatMap((item) => item.attachments.map((entry) => entry.sha256)));
     for (const raw of files) {
       const source = path.resolve(raw);
       const extension = path.extname(source).toLowerCase();
-      if (!fs.existsSync(source) || !fs.statSync(source).isFile() || !supported.has(extension)) {
+      if (!fs.existsSync(source) || !fs.statSync(source).isFile() || !SUPPORTED_ATTACHMENTS.has(extension)) {
         report.skipped += 1; report.warnings.push(`Formato no compatible: ${path.basename(source)}`); continue;
       }
       const hash = sha256File(source);
@@ -239,7 +270,7 @@ export class LibraryOperations {
         collectionIds: collectionId ? [collectionId] : [],
         attachments: [{
           id: `local:${uuid}`, title: path.basename(source), fileName: path.basename(source), relativePath,
-          mimeType: mimeType(extension), byteSize: stat.size, sha256: hash, role: 'original',
+          mimeType: mimeType(extension), byteSize: stat.size, sha256: hash, role: 'original', position: 0, addedAt: new Date().toISOString(),
         }],
         files: { original: relativePath, annotations: 'annotations.json' }, extraction: { status: 'pending' }, deletedAt: null,
       });
@@ -253,6 +284,206 @@ export class LibraryOperations {
 
   importBibliographyFiles(files: string[], collectionId?: string | null): LibraryBibliographyImportReport {
     return importBibliographyFiles({ files, collectionId, store: this.store, catalog: this.catalog });
+  }
+
+  createItem(metadata: LibraryItemMetadata, collectionIds: string[] = []): LibraryItemRecord {
+    for (const collectionId of collectionIds) {
+      const collection = this.store.readMaterializedCollection(this.catalog.resolveCollectionId(collectionId) ?? collectionId);
+      if (!collection || collection.deletedAt) throw new Error('Una de las colecciones de destino ya no existe.');
+    }
+    const id = `nodus:${randomUUID()}`;
+    const result = this.store.upsertItem({
+      id, storageId: id, source: 'nodus', metadata: normalizeLibraryMetadata(metadata),
+      collectionIds: [...new Set(collectionIds.map((entry) => this.catalog.resolveCollectionId(entry) ?? entry))],
+      attachments: [], notes: [], relations: [], files: { annotations: 'annotations.json' },
+      extraction: { status: 'pending' }, deletedAt: null,
+    });
+    this.catalog.rebuild(this.store);
+    return result;
+  }
+
+  private item(itemId: string): LibraryItemRecord {
+    const id = this.catalog.resolveItemId(itemId) ?? itemId;
+    const item = this.store.scanMaterializedItems().records.find((entry) => entry.id === id && !entry.deletedAt);
+    if (!item) throw new Error('El documento ya no existe.');
+    return item;
+  }
+
+  duplicateItem(itemId: string): LibraryItemRecord {
+    const current = this.item(itemId);
+    const id = `nodus:${randomUUID()}`;
+    const destinationFolder = this.store.itemFolder(id);
+    const sourceFolder = this.store.itemFolder(current.storageId);
+    for (const attachment of current.attachments) {
+      const source = assertInside(sourceFolder, path.join(sourceFolder, attachment.relativePath));
+      if (fs.existsSync(source)) copyImmutable(source, assertInside(destinationFolder, path.join(destinationFolder, attachment.relativePath)));
+    }
+    for (const relative of Object.values(current.files ?? {})) {
+      if (!relative) continue;
+      const source = assertInside(sourceFolder, path.join(sourceFolder, relative));
+      if (fs.existsSync(source) && fs.statSync(source).isFile()) copyImmutable(source, assertInside(destinationFolder, path.join(destinationFolder, relative)));
+    }
+    copyDirectoryIfMissing(path.join(sourceFolder, 'assets'), path.join(destinationFolder, 'assets'));
+    const now = new Date().toISOString();
+    const result = this.store.upsertItem({
+      id, storageId: id, source: 'nodus', citationKey: undefined,
+      metadata: current.metadata, collectionIds: current.collectionIds,
+      attachments: orderedAttachments(current.attachments.map((entry) => ({ ...entry, id: `local:${randomUUID()}`, sourceKey: undefined }))),
+      notes: (current.notes ?? []).filter((note) => note.source === 'nodus').map((note) => ({ ...note, id: `note:${randomUUID()}`, createdAt: now, updatedAt: now })),
+      relations: [], files: current.files, extraction: current.extraction, contentRevision: current.contentRevision,
+      deletedAt: null,
+    });
+    this.catalog.rebuild(this.store);
+    return result;
+  }
+
+  convertItemToNodus(itemId: string): LibraryItemRecord {
+    const current = this.item(itemId);
+    return current.source === 'nodus' ? current : this.duplicateItem(current.id);
+  }
+
+  addAttachments(itemId: string, files: string[]): LibraryItemRecord {
+    const current = this.item(itemId);
+    const folder = this.store.itemFolder(current.storageId);
+    const hashes = new Set(current.attachments.map((entry) => entry.sha256));
+    const additions: LibraryAttachmentRecord[] = [];
+    const now = new Date().toISOString();
+    for (const raw of files) {
+      const source = path.resolve(raw); const extension = path.extname(source).toLowerCase();
+      if (!fs.existsSync(source) || !fs.statSync(source).isFile() || !SUPPORTED_ATTACHMENTS.has(extension)) throw new Error(`Formato no compatible: ${path.basename(source)}`);
+      const sha256 = sha256File(source); if (hashes.has(sha256)) continue;
+      const id = `local:${randomUUID()}`; const fileName = path.basename(source);
+      const relativePath = path.join('attachments', `${id.slice(6, 14)}-${safeLibraryFolderName(fileName)}`);
+      const destination = assertInside(folder, path.join(folder, relativePath)); copyImmutable(source, destination);
+      const detectedMime = mimeType(extension);
+      additions.push({ id, title: fileName, fileName, relativePath, mimeType: detectedMime,
+        byteSize: fs.statSync(destination).size, sha256,
+        role: current.attachments.length + additions.length === 0 ? 'original' : detectedMime.startsWith('image/') ? 'image' : 'supplement',
+        position: current.attachments.length + additions.length, addedAt: now });
+      hashes.add(sha256);
+    }
+    if (!additions.length) return current;
+    const attachments = orderedAttachments([...current.attachments, ...additions]);
+    const primary = attachments.find((entry) => entry.role === 'original') ?? attachments[0];
+    const result = this.store.upsertItem({ ...current, attachments, files: { ...(current.files ?? {}), original: primary.relativePath } }, current.clock.revision);
+    this.catalog.rebuild(this.store); return result;
+  }
+
+  updateAttachment(itemId: string, attachmentId: string, patch: LibraryAttachmentPatch): LibraryItemRecord {
+    const current = this.item(itemId); const target = current.attachments.find((entry) => entry.id === attachmentId);
+    if (!target) throw new Error('El adjunto ya no existe.');
+    const folder = this.store.itemFolder(current.storageId); let relativePath = target.relativePath;
+    const fileName = patch.fileName?.trim() ? safeLibraryFolderName(path.basename(patch.fileName.trim())) : target.fileName;
+    if (fileName !== target.fileName) {
+      const source = assertInside(folder, path.join(folder, target.relativePath));
+      relativePath = path.join('attachments', `${target.id.replace(/[^a-z0-9]/gi, '').slice(-8)}-${fileName}`);
+      if (fs.existsSync(source)) copyImmutable(source, assertInside(folder, path.join(folder, relativePath)));
+    }
+    const desired = { ...target, title: patch.title?.trim() || target.title, fileName, relativePath,
+      role: patch.makePrimary ? 'original' as const : patch.role ?? target.role };
+    const remaining = orderedAttachments(current.attachments.filter((entry) => entry.id !== attachmentId)
+      .map((entry) => patch.makePrimary && entry.role === 'original' ? { ...entry, role: 'supplement' as const } : entry));
+    remaining.splice(Math.max(0, Math.min(remaining.length, patch.position ?? target.position ?? remaining.length)), 0, desired);
+    const attachments = remaining.map((entry, position) => ({ ...entry, position }));
+    const primary = attachments.find((entry) => entry.role === 'original') ?? attachments[0];
+    const result = this.store.upsertItem({ ...current, attachments, files: { ...(current.files ?? {}), ...(primary ? { original: primary.relativePath } : {}) } }, current.clock.revision);
+    this.catalog.rebuild(this.store); return result;
+  }
+
+  replaceAttachment(itemId: string, attachmentId: string, file: string): LibraryItemRecord {
+    const current = this.item(itemId); const target = current.attachments.find((entry) => entry.id === attachmentId);
+    if (!target) throw new Error('El adjunto ya no existe.');
+    const source = path.resolve(file); const extension = path.extname(source).toLowerCase();
+    if (!fs.existsSync(source) || !fs.statSync(source).isFile() || !SUPPORTED_ATTACHMENTS.has(extension)) throw new Error(`Formato no compatible: ${path.basename(source)}`);
+    const sha256 = sha256File(source); const fileName = path.basename(source);
+    const relativePath = path.join('attachments', `${attachmentId.replace(/[^a-z0-9]/gi, '').slice(-8)}-${sha256.slice(0, 10)}-${safeLibraryFolderName(fileName)}`);
+    const folder = this.store.itemFolder(current.storageId); const destination = assertInside(folder, path.join(folder, relativePath));
+    copyImmutable(source, destination);
+    const attachments = orderedAttachments(current.attachments.map((entry) => entry.id === attachmentId ? {
+      ...entry, title: fileName, fileName, relativePath, mimeType: mimeType(extension), byteSize: fs.statSync(destination).size, sha256, addedAt: new Date().toISOString(),
+    } : entry));
+    const primary = attachments.find((entry) => entry.role === 'original') ?? attachments[0];
+    const result = this.store.upsertItem({ ...current, attachments, files: { ...(current.files ?? {}), ...(primary ? { original: primary.relativePath } : {}) } }, current.clock.revision);
+    this.catalog.rebuild(this.store); return result;
+  }
+
+  removeAttachment(itemId: string, attachmentId: string): LibraryItemRecord {
+    const current = this.item(itemId); const removed = current.attachments.find((entry) => entry.id === attachmentId);
+    if (!removed) return current;
+    let attachments = orderedAttachments(current.attachments.filter((entry) => entry.id !== attachmentId));
+    if (removed.role === 'original' && attachments.length && !attachments.some((entry) => entry.role === 'original')) attachments = attachments.map((entry, index) => index ? entry : { ...entry, role: 'original' });
+    const primary = attachments.find((entry) => entry.role === 'original');
+    const { original: _original, ...otherFiles } = current.files ?? {};
+    const result = this.store.upsertItem({ ...current, attachments, files: primary ? { ...otherFiles, original: primary.relativePath } : otherFiles }, current.clock.revision);
+    this.catalog.rebuild(this.store); return result;
+  }
+
+  attachmentPath(itemId: string, attachmentId: string): string {
+    const current = this.item(itemId); const attachment = current.attachments.find((entry) => entry.id === attachmentId);
+    if (!attachment) throw new Error('El adjunto ya no existe.');
+    const file = assertInside(this.store.itemFolder(current.storageId), path.join(this.store.itemFolder(current.storageId), attachment.relativePath));
+    if (!fs.existsSync(file)) throw new Error('El archivo adjunto no está disponible.');
+    return file;
+  }
+
+  upsertNote(itemId: string, input: Partial<LibraryNoteRecord> & Pick<LibraryNoteRecord, 'title' | 'markdown'>): LibraryItemRecord {
+    const current = this.item(itemId); const existing = input.id ? (current.notes ?? []).find((entry) => entry.id === input.id) : null;
+    if (input.source === 'zotero' || input.readOnly || existing?.readOnly) throw new Error('Las notas de Zotero son de solo lectura.');
+    const now = new Date().toISOString(); const id = existing?.id ?? `note:${randomUUID()}`;
+    const note: LibraryNoteRecord = { id, title: input.title.trim() || 'Nota sin título', markdown: input.markdown.replace(/\r\n?/g, '\n'),
+      source: 'nodus', readOnly: false, createdAt: existing?.createdAt ?? now, updatedAt: now };
+    const notes = [...(current.notes ?? []).filter((entry) => entry.id !== id), note];
+    const result = this.store.upsertItem({ ...current, notes }, current.clock.revision); this.catalog.rebuild(this.store); return result;
+  }
+
+  deleteNote(itemId: string, noteId: string): LibraryItemRecord {
+    const current = this.item(itemId); const note = (current.notes ?? []).find((entry) => entry.id === noteId);
+    if (note?.readOnly) throw new Error('Las notas de Zotero son de solo lectura.');
+    const result = this.store.upsertItem({ ...current, notes: (current.notes ?? []).filter((entry) => entry.id !== noteId) }, current.clock.revision);
+    this.catalog.rebuild(this.store); return result;
+  }
+
+  setRelation(itemId: string, targetItemId: string, relationType: LibraryItemRelationType, enabled: boolean): LibraryItemRecord {
+    const left = this.item(itemId); const right = this.item(targetItemId);
+    if (left.id === right.id) throw new Error('Un documento no puede relacionarse consigo mismo.');
+    const now = new Date().toISOString();
+    const update = (record: LibraryItemRecord, target: LibraryItemRecord, type: LibraryItemRelationType) => {
+      const relations = (record.relations ?? []).filter((entry) => !(entry.targetItemId === target.id && entry.relationType === type));
+      if (enabled) relations.push({ id: `relation:${randomUUID()}`, targetItemId: target.id, relationType: type, createdAt: now });
+      return this.store.upsertItem({ ...record, relations }, record.clock.revision, now);
+    };
+    const result = update(left, right, relationType); update(right, left, inverseRelation(relationType));
+    this.catalog.rebuild(this.store); return result;
+  }
+
+  patchItemTags(itemIds: string[], patch: LibraryTagPatch): number {
+    const ids = new Set(itemIds.map((entry) => this.catalog.resolveItemId(entry) ?? entry));
+    const add = [...new Set((patch.add ?? []).map((tag) => tag.trim()).filter(Boolean))]; const remove = new Set((patch.remove ?? []).map((tag) => tag.trim()));
+    let count = 0;
+    for (const item of this.store.scanMaterializedItems().records) {
+      if (!ids.has(item.id) || item.deletedAt) continue;
+      const tags = [...new Set([...(item.metadata.tags ?? []), ...add])].filter((tag) => !remove.has(tag));
+      if (canonicalJson(tags) === canonicalJson(item.metadata.tags ?? [])) continue;
+      this.store.upsertItem({ ...item, metadata: { ...item.metadata, tags } }, item.clock.revision); count += 1;
+    }
+    if (count) this.catalog.rebuild(this.store); return count;
+  }
+
+  private tagColors(): Record<string, string> {
+    try { return JSON.parse(fs.readFileSync(path.join(this.store.root, '.nodus', 'tags.json'), 'utf8')) as Record<string, string>; } catch { return {}; }
+  }
+
+  listTagRecords(): LibraryTagRecord[] {
+    const counts = new Map<string, number>(); const colors = this.tagColors();
+    for (const item of this.store.scanMaterializedItems().records) if (!item.deletedAt) for (const tag of item.metadata.tags ?? []) counts.set(tag, (counts.get(tag) ?? 0) + 1);
+    return [...new Set([...counts.keys(), ...Object.keys(colors)])].sort((a, b) => a.localeCompare(b)).map((name) => ({ name, color: colors[name] ?? null, itemCount: counts.get(name) ?? 0 }));
+  }
+
+  setTagColor(tag: string, color: string | null): LibraryTagRecord[] {
+    const name = tag.trim(); if (!name) throw new Error('La etiqueta necesita un nombre.');
+    if (color && !/^#[0-9a-f]{6}$/i.test(color)) throw new Error('El color debe usar el formato hexadecimal #RRGGBB.');
+    const colors = this.tagColors(); if (color) colors[name] = color.toLowerCase(); else delete colors[name];
+    atomicWriteJson(path.join(this.store.root, '.nodus', 'tags.json'), colors); return this.listTagRecords();
   }
 
   updateItemMetadata(itemId: string, patch: Partial<LibraryItemMetadata>): LibraryItemRecord {

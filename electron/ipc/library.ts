@@ -1,5 +1,5 @@
 import type { IpcContext } from './context';
-import { BrowserWindow } from 'electron';
+import { BrowserWindow, shell } from 'electron';
 import { showImportOpenDialog } from '../privacy';
 import {
   getGlobalLibraryStatus,
@@ -32,12 +32,31 @@ import {
   resolveGlobalLibraryMetadata,
   listGlobalLibraryDuplicates,
   mergeGlobalLibraryItems,
+  createGlobalLibraryItem,
+  duplicateGlobalLibraryItem,
+  convertGlobalLibraryItemToNodus,
+  addGlobalLibraryAttachments,
+  updateGlobalLibraryAttachment,
+  replaceGlobalLibraryAttachment,
+  removeGlobalLibraryAttachment,
+  globalLibraryAttachmentPath,
+  upsertGlobalLibraryNote,
+  deleteGlobalLibraryNote,
+  setGlobalLibraryItemRelation,
+  patchGlobalLibraryItemTags,
+  listGlobalLibraryTags,
+  setGlobalLibraryTagColor,
   listGlobalLibraryVaults,
   listGlobalLibraryVaultLinks,
   linkGlobalLibraryItemsToVault,
 } from '../library/libraryService';
 
 export function registerLibraryIpc({ h }: IpcContext): void {
+  const existingItem = async (itemId: string) => {
+    const item = await getGlobalLibraryItem(itemId);
+    if (!item) throw new Error('El documento ya no existe.');
+    return item;
+  };
   h('library:status', async () => getGlobalLibraryStatus());
   h('library:rebuild', async () => rebuildGlobalLibrary());
   h('library:list', async (_event, query) => listGlobalLibraryItems(query));
@@ -73,7 +92,7 @@ export function registerLibraryIpc({ h }: IpcContext): void {
       properties: ['openFile', 'multiSelections'] as Array<'openFile' | 'multiSelections'>,
       filters: [{
         name: 'Documentos compatibles',
-        extensions: ['pdf', 'epub', 'md', 'markdown', 'txt', 'html', 'htm', 'xml', 'jats', 'docx', 'csv', 'tsv', 'xlsx', 'xls', 'ods'],
+        extensions: ['pdf', 'epub', 'md', 'markdown', 'txt', 'html', 'htm', 'xml', 'jats', 'doc', 'docx', 'odt', 'rtf', 'ppt', 'pptx', 'odp', 'csv', 'tsv', 'xlsx', 'xls', 'ods', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'heic', 'tif', 'tiff'],
       }],
     };
     const selected = owner ? await showImportOpenDialog(owner, options) : await showImportOpenDialog(options);
@@ -91,6 +110,34 @@ export function registerLibraryIpc({ h }: IpcContext): void {
       ? { created: 0, updated: 0, duplicates: 0, skipped: 0, itemIds: [], warnings: [] }
       : importGlobalBibliographyFiles(selected.filePaths, collectionId);
   });
+  h('library:createItem', async (_event, metadata, collectionIds) => createGlobalLibraryItem(metadata, collectionIds));
+  h('library:duplicateItem', async (_event, itemId) => duplicateGlobalLibraryItem(itemId));
+  h('library:convertItemToNodus', async (_event, itemId) => convertGlobalLibraryItemToNodus(itemId));
+  h('library:addAttachments', async (event, itemId) => {
+    const owner = BrowserWindow.fromWebContents(event.sender) ?? undefined;
+    const options = {
+      title: 'Añadir adjuntos a la referencia', properties: ['openFile', 'multiSelections'] as Array<'openFile' | 'multiSelections'>,
+      filters: [{ name: 'Documentos, datos e imágenes', extensions: ['pdf', 'epub', 'md', 'markdown', 'txt', 'html', 'htm', 'xml', 'jats', 'doc', 'docx', 'odt', 'rtf', 'ppt', 'pptx', 'odp', 'csv', 'tsv', 'xlsx', 'xls', 'ods', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'heic', 'tif', 'tiff'] }],
+    };
+    const selected = owner ? await showImportOpenDialog(owner, options) : await showImportOpenDialog(options);
+    return selected.canceled ? existingItem(itemId) : addGlobalLibraryAttachments(itemId, selected.filePaths);
+  });
+  h('library:updateAttachment', async (_event, itemId, attachmentId, patch) => updateGlobalLibraryAttachment(itemId, attachmentId, patch));
+  h('library:replaceAttachment', async (event, itemId, attachmentId) => {
+    const owner = BrowserWindow.fromWebContents(event.sender) ?? undefined;
+    const options = { title: 'Sustituir adjunto', properties: ['openFile'] as Array<'openFile'> };
+    const selected = owner ? await showImportOpenDialog(owner, options) : await showImportOpenDialog(options);
+    return selected.canceled ? existingItem(itemId) : replaceGlobalLibraryAttachment(itemId, attachmentId, selected.filePaths[0]);
+  });
+  h('library:removeAttachment', async (_event, itemId, attachmentId) => removeGlobalLibraryAttachment(itemId, attachmentId));
+  h('library:openAttachment', async (_event, itemId, attachmentId) => (await shell.openPath(globalLibraryAttachmentPath(itemId, attachmentId))) === '');
+  h('library:revealAttachment', async (_event, itemId, attachmentId) => { shell.showItemInFolder(globalLibraryAttachmentPath(itemId, attachmentId)); return true; });
+  h('library:upsertNote', async (_event, itemId, note) => upsertGlobalLibraryNote(itemId, note));
+  h('library:deleteNote', async (_event, itemId, noteId) => deleteGlobalLibraryNote(itemId, noteId));
+  h('library:setRelation', async (_event, itemId, targetItemId, relationType, enabled) => setGlobalLibraryItemRelation(itemId, targetItemId, relationType, enabled));
+  h('library:patchTags', async (_event, itemIds, patch) => patchGlobalLibraryItemTags(itemIds, patch));
+  h('library:tags', async () => listGlobalLibraryTags());
+  h('library:setTagColor', async (_event, tag, color) => setGlobalLibraryTagColor(tag, color));
   h('library:updateMetadata', async (_event, itemId, patch) => updateGlobalLibraryItemMetadata(itemId, patch));
   h('library:resolveMetadata', async (_event, kind, value) => resolveGlobalLibraryMetadata(kind, value));
   h('library:duplicates', async () => listGlobalLibraryDuplicates());

@@ -27,6 +27,11 @@ import type {
   LibraryMetadataLookupResult,
   LibraryVaultLink,
   LibraryVaultLinkReport,
+  LibraryAttachmentPatch,
+  LibraryNoteRecord,
+  LibraryItemRelationType,
+  LibraryTagPatch,
+  LibraryTagRecord,
 } from '../libraryTypes';
 import type { VaultSummary } from '../types';
 
@@ -60,7 +65,22 @@ export interface LibraryApi {
   setGlobalLibraryItemsDeleted(itemIds: string[], deleted: boolean): Promise<number>;
   importGlobalLibraryFiles(collectionId?: string | null): Promise<LibraryLocalImportReport>;
   importGlobalBibliographyFiles(collectionId?: string | null): Promise<LibraryBibliographyImportReport>;
+  createGlobalLibraryItem(metadata: LibraryItemMetadata, collectionIds?: string[]): Promise<LibraryItemRecord>;
+  duplicateGlobalLibraryItem(itemId: string): Promise<LibraryItemRecord>;
+  convertGlobalLibraryItemToNodus(itemId: string): Promise<LibraryItemRecord>;
   updateGlobalLibraryItemMetadata(itemId: string, patch: Partial<LibraryItemMetadata>): Promise<LibraryItemRecord>;
+  addGlobalLibraryAttachments(itemId: string): Promise<LibraryItemRecord>;
+  updateGlobalLibraryAttachment(itemId: string, attachmentId: string, patch: LibraryAttachmentPatch): Promise<LibraryItemRecord>;
+  replaceGlobalLibraryAttachment(itemId: string, attachmentId: string): Promise<LibraryItemRecord>;
+  removeGlobalLibraryAttachment(itemId: string, attachmentId: string): Promise<LibraryItemRecord>;
+  openGlobalLibraryAttachment(itemId: string, attachmentId: string): Promise<boolean>;
+  revealGlobalLibraryAttachment(itemId: string, attachmentId: string): Promise<boolean>;
+  upsertGlobalLibraryNote(itemId: string, note: Partial<LibraryNoteRecord> & Pick<LibraryNoteRecord, 'title' | 'markdown'>): Promise<LibraryItemRecord>;
+  deleteGlobalLibraryNote(itemId: string, noteId: string): Promise<LibraryItemRecord>;
+  setGlobalLibraryItemRelation(itemId: string, targetItemId: string, relationType: LibraryItemRelationType, enabled: boolean): Promise<LibraryItemRecord>;
+  patchGlobalLibraryItemTags(itemIds: string[], patch: LibraryTagPatch): Promise<number>;
+  listGlobalLibraryTags(): Promise<LibraryTagRecord[]>;
+  setGlobalLibraryTagColor(tag: string, color: string | null): Promise<LibraryTagRecord[]>;
   resolveGlobalLibraryMetadata(kind: LibraryMetadataIdentifierKind, value: string): Promise<LibraryMetadataLookupResult>;
   listGlobalLibraryDuplicates(): Promise<LibraryDuplicateGroup[]>;
   mergeGlobalLibraryItems(canonicalId: string, duplicateIds: string[]): Promise<LibraryItemRecord>;

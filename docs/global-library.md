@@ -287,6 +287,30 @@ checkpoints. Connected reader vaults and inactive replicas reject the operation.
 The item inspector exposes a component-by-component state and the reason a
 result is current, reused, pending, unavailable, or incompatible.
 
+## Nodus-only bibliography management
+
+The Global scope is a complete local reference manager even when Zotero is not
+installed. A reference can be created before it has a file, duplicated as an
+independent Nodus record, or copied out of an imported read-only mirror. The
+source mirror remains intact so a later refresh cannot overwrite the Nodus copy.
+
+The metadata editor supports the common academic item types and an ordered list
+of personal or institutional creators. Author, editor, translator, contributor,
+and specialist Zotero roles remain distinct and preserve their order.
+
+Each record accepts multiple PDF, EPUB, office, text, HTML/XML/JATS, spreadsheet,
+dataset, and image attachments. The item manager can add, open, reveal, rename,
+reorder, classify, replace, remove, and select the primary attachment. A rename
+or replacement publishes a new referenced copy; the old immutable blob is left
+unreferenced for recovery and later safe trash collection. Changing the primary
+attachment queues extraction and invalidates only its content-derived outputs.
+
+Local notes are Markdown and editable. Imported Zotero child notes are converted
+to readable Markdown but remain a read-only mirror. Item relations are written
+to both records with the correct inverse (`cites`/`is-cited-by` and
+`corrects`/`is-corrected-by`). Tags support bulk add/remove operations and a
+library-wide color registry stored in `.nodus/tags.json`.
+
 ## Backup, synchronization, and recovery
 
 `nodus-library` is part of the selected backup folder. If another service
@@ -338,6 +362,8 @@ The main tests are:
 - `test-zotero-library-import.mjs`: differential import and attachments;
 - `test-library-extraction.mjs`: Markdown, assets, OCR, quality, and queue;
 - `test-global-library-operations.mjs`: collections, import, and trash;
+- `test-library-item-management.mjs`: Nodus-only records, creators, attachments,
+  notes, symmetric relations, and colored tags;
 - `test-library-metadata.mjs`: identifiers, formats, and duplicates;
 - `test-global-library-reader.mjs`: reader, pages, annotations, and chat;
 - `test-global-library-vault-integration.mjs`: vault linking and analysis;

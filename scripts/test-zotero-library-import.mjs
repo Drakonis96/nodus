@@ -86,6 +86,7 @@ try {
       return { version: library.type === 'group' ? state.groupVersion : state.personalVersion, items: library.type === 'group' || since <= 0 ? [] : state.deletedPersonal, collections: [] };
     },
     async itemAttachments(_userId, key) { return attachmentMap.get(key) ?? []; },
+    async itemNotes(_userId, key) { return key === 'A' ? [{ key: 'NOTE1', title: 'Nota Zotero', html: '<h2>Fuente</h2><p>No editable</p>', version: 1 }] : []; },
     async attachmentFilePath(_userId, key) { return fileMap.get(key) ?? null; },
   };
 
@@ -126,6 +127,9 @@ try {
   assert.equal(storedA.metadata.extra['Citation Key'], 'garciafernandezEntreNormaDeseo2020');
   assert.equal(storedA.attachments[0].sourceKey, 'PDF', 'PDF wins original-format priority even if Zotero returned an image first');
   assert.equal(storedA.attachments[0].role, 'original');
+  assert.equal(storedA.notes[0].source, 'zotero');
+  assert.equal(storedA.notes[0].readOnly, true);
+  assert.match(storedA.notes[0].markdown, /## Fuente/);
   assert.ok(existsSync(path.join(store.itemFolder(storedA.storageId), storedA.files.original)));
   const storedGroup = store.findItemBySourceIdentity({ source: 'zotero', libraryType: 'group', libraryId: '42', itemKey: 'G1' });
   assert.ok(existsSync(path.join(store.itemFolder(storedGroup.storageId), 'attachments', 'EPUB-grupo.epub')));
