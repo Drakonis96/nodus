@@ -74,6 +74,7 @@ test('the global reader exposes annotations, metadata, chat and native attachmen
     'library-reader-sidebar', 'library-reader-metadata', 'library-reader-chat', 'library-original-preview',
     'library-reader-source-picker', 'library-reader-pdf-viewer', 'library-reader-epub-viewer',
     'library-reader-image-viewer', 'library-reader-text-viewer', 'library-reader-open-external',
+    'library-reader-files-toggle', 'library-reader-chat-model',
   ]) assert.match(reader, new RegExp(marker));
   assert.match(reader, /aria-expanded=\{outlineOpen\}/);
   assert.match(reader, /aria-expanded=\{notesOpen\}/);
@@ -91,6 +92,9 @@ test('the global reader exposes annotations, metadata, chat and native attachmen
   assert.match(reader, /ReaderSelectionActions/);
   assert.match(reader, /libraryReaderChatStream/);
   assert.match(reader, /sourceId: selectedSource/);
+  assert.match(reader, /model: chatModel/);
+  assert.match(reader, /ModelPicker/);
+  assert.match(reader, /onReaderCitation={openReaderCitation}/);
   assert.match(reader, /library-reader-chat-input/);
   assert.match(store, /function globalDocument/);
   assert.match(store, /nodus-library:\/\/original/);
@@ -101,6 +105,9 @@ test('the global reader exposes annotations, metadata, chat and native attachmen
   assert.match(chat, /getLibraryReaderAttachmentContent/);
   assert.match(chat, /extractFromPath/);
   assert.match(chat, /contextSourceId/);
+  assert.match(chat, /streamNodiChat/);
+  assert.match(chat, /contexts: \['current_view', 'vault'\]/);
+  assert.match(chat, /readerGrounding/);
   assert.match(protocol, /Accept-Ranges/);
   assert.match(main, /registerLibrarySchemePrivileges/);
   assert.match(main, /registerLibraryProtocol/);
@@ -177,9 +184,11 @@ test('reader chat uses the shared AI engine and persists beside the document', a
     readSource('electron/preload/academic.ts'), readSource('shared/api/academic.ts'),
     readSource('electron/libraryReader/libraryReaderStore.ts'),
   ]);
-  assert.match(ai, /completeTextStream/);
-  assert.match(ai, /settings\.chatModel \?\? settings\.nodiModel/);
+  assert.match(ai, /streamNodiChat/);
+  assert.match(ai, /settings\.nodiModel \?\? settings\.chatModel/);
   assert.match(ai, /listLibraryReaderAnnotations/);
+  assert.match(ai, /contexts: \['current_view', 'vault'\]/);
+  assert.match(ai, /nodus:\/\/reader/);
   assert.match(ipc, /libraryReader:chat:stream/);
   assert.match(preload, /libraryReaderChatStream/);
   assert.match(types, /libraryReaderChatStream/);

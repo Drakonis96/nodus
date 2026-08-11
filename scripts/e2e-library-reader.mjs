@@ -26,6 +26,7 @@ const docxScreenshotPath = path.join(screenshotDirectory, '06-docx-reader.png');
 const spreadsheetScreenshotPath = path.join(screenshotDirectory, '07-spreadsheet-reader.png');
 const citationScreenshotPath = path.join(screenshotDirectory, '08-csl-style-manager.png');
 const lightScreenshotPath = path.join(screenshotDirectory, '09-clean-reader-light-narrow.png');
+const responsiveChatScreenshotPath = path.join(screenshotDirectory, '10-reader-chat-responsive.png');
 const childEnv = {
   ...process.env,
   NODUS_USERDATA: userData,
@@ -81,6 +82,11 @@ try {
       mascotEnabled: false,
       reduceMotion: true,
       autoBackupFolder: backup,
+      favorites: [
+        { provider: 'openai', model: 'gpt-5.2' },
+        { provider: 'anthropic', model: 'claude-sonnet-4-5' },
+      ],
+      nodiModel: { provider: 'openai', model: 'gpt-5.2' },
     });
     await window.nodus.seedDemoData();
     return (await window.nodus.listWorksPage(undefined, { offset: 0, limit: 1 })).items[0];
@@ -148,6 +154,10 @@ La segunda sección permite comprobar el índice, la página de origen y el marc
     orphanReason: 'The quoted text could not be located in the new clean Markdown.', createdAt: now, updatedAt: now,
   }], null, 2)}\n`, 'utf8');
   const globalItemId = `zotero:${work.zotero_key}`;
+  await writeFile(path.join(documentFolder, 'chat.json'), `${JSON.stringify([{
+    id: 'assistant:grounded-fixture', role: 'assistant', createdAt: now,
+    content: `La lectura distingue la introducción del bloque de resultados ([§ Introducción](nodus://reader/${encodeURIComponent(globalItemId)}/section/reader-section-2)). El documento abierto sigue siendo la fuente verificable ([${work.authors[0]}, ${work.year}](nodus://work/${globalItemId})).`,
+  }], null, 2)}\n`, 'utf8');
   await writeFile(path.join(documentFolder, 'metadata.json'), `${JSON.stringify({
     format: 'nodus.library-item', formatVersion: 1,
     id: globalItemId, storageId: work.zotero_key, source: 'zotero', sourceLibraryId: 'users/0', sourceKey: work.zotero_key,
@@ -163,7 +173,7 @@ La segunda sección permite comprobar el índice, la página de origen y el marc
       { id: 'local:READERDOCX', title: 'Documento Word', fileName: 'reader.docx', relativePath: 'reader.docx', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', byteSize: 1, sha256: 'd'.repeat(64), role: 'supplement', position: 3 },
       { id: 'local:READERXLSX', title: 'Datos XLSX', fileName: 'reader.xlsx', relativePath: 'reader.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', byteSize: 1, sha256: 'e'.repeat(64), role: 'supplement', position: 4 },
     ],
-    files: { reader: 'reader.md', original: 'original.pdf', sourceMap: 'source-map.json', annotations: 'annotations.json', orphanedAnnotations: 'orphaned-annotations.json' },
+    files: { reader: 'reader.md', original: 'original.pdf', sourceMap: 'source-map.json', annotations: 'annotations.json', orphanedAnnotations: 'orphaned-annotations.json', chat: 'chat.json' },
     extraction: { status: 'ready', lastSuccessfulAt: now, lastSuccessfulFingerprint: 'c'.repeat(64) },
     contentRevision: {
       format: 'nodus.library-content-revision', formatVersion: 1, revision: 1,
@@ -211,8 +221,28 @@ La segunda sección permite comprobar el índice, la página de origen y el marc
   assert.match(await documentRoot.innerText(), /Texto introductorio/);
   assert.equal(await documentRoot.locator('img').count(), 1, 'local extracted images render inside the clean document');
   assert.equal(await documentRoot.locator('table').count(), 1, 'Markdown tables remain structured');
-  assert.equal(await page.locator('.library-reader-outline nav button').count(), 12, 'six source choices and three headings with page actions are visible');
+  const readerOutline = page.locator('.library-reader-outline');
+  assert.match(await readerOutline.innerText(), /Índice del documento[\s\S]*Introducción[\s\S]*Resultados/i, 'traced headings lead the reader rail');
+  const filesToggle = page.getByTestId('library-reader-files-toggle');
+  assert.equal(await filesToggle.getAttribute('aria-expanded'), 'false', 'preserved files start in one compact control');
+  assert.equal(await page.getByTestId('library-reader-files').count(), 0);
+  await filesToggle.click();
+  assert.equal(await page.getByTestId('library-reader-files').getByRole('button').count(), 6, 'the compact file control reveals every preserved source');
+  assert.equal(await filesToggle.getAttribute('aria-expanded'), 'true');
   assert.equal(await page.getByTestId('library-reader-source-picker').locator('option').count(), 6, 'clean Markdown and five preserved attachments are directly selectable');
+  const darkReaderColors = await page.evaluate(() => {
+    const surface = document.querySelector('.library-reader-clean-surface');
+    const paper = document.querySelector('.library-reader-paper');
+    const text = document.querySelector('.library-reader-document .md');
+    if (!surface || !paper || !text) throw new Error('clean reader colors unavailable');
+    return {
+      surface: getComputedStyle(surface).backgroundColor,
+      paper: getComputedStyle(paper).backgroundColor,
+      text: getComputedStyle(text).color,
+    };
+  });
+  assert.notEqual(darkReaderColors.paper, 'rgb(255, 255, 255)', 'dark mode never renders a white clean page');
+  assert.match(darkReaderColors.surface, /rgb\((?:9, 9, 11|10, 10, 10)\)/);
   const outlineToggle = page.getByTestId('library-reader-outline-toggle');
   assert.equal(await outlineToggle.getAttribute('aria-expanded'), 'true');
   await outlineToggle.click();
@@ -236,6 +266,8 @@ La segunda sección permite comprobar el índice, la página de origen y el marc
   await originalPreview.waitFor({ state: 'visible' });
   await originalPreview.locator('canvas').waitFor({ state: 'visible' });
   assert.equal(await originalPreview.locator('canvas').getAttribute('data-page'), '1');
+  assert.equal((await originalPreview.getByRole('button', { name: 'Anterior' }).innerText()).trim(), '', 'page navigation uses an icon-only previous control');
+  assert.equal((await originalPreview.getByRole('button', { name: 'Siguiente' }).innerText()).trim(), '', 'page navigation uses an icon-only next control');
   await page.screenshot({ path: originalScreenshotPath, fullPage: true });
   await originalPreview.getByRole('button', { name: 'Cerrar' }).click();
 
@@ -251,11 +283,34 @@ La segunda sección permite comprobar el índice, la página de origen y el marc
   const provenance = page.getByTestId('library-reader-provenance');
   assert.match(await provenance.innerText(), new RegExp(contentFingerprint));
   await readerSidebar.getByRole('tab', { name: 'Chat' }).click();
+  const readerCitation = page.getByTestId('library-reader-chat').locator('[data-citation-kind="reader"]');
+  await readerCitation.waitFor({ state: 'visible' });
+  assert.match(await readerCitation.innerText(), /Introducción/);
+  await readerCitation.click();
+  await page.waitForFunction(() => (document.querySelector('.library-reader-clean-surface')?.scrollTop ?? 0) > 0);
+  await page.locator('.library-reader-clean-surface').evaluate((element) => element.scrollTo({ top: 0 }));
+  const chatModel = page.getByTestId('library-reader-chat-model');
+  await chatModel.getByRole('button', { name: /OpenAI · gpt-5.2/ }).click();
+  assert.equal(await chatModel.getByRole('option').count(), 2, 'the reader model menu lists the configured featured models');
+  await chatModel.getByRole('option', { name: /Anthropic · claude-sonnet-4-5/ }).click();
+  assert.match(await chatModel.innerText(), /Anthropic · claude-sonnet-4-5/);
   const chatInput = page.getByTestId('library-reader-chat-input');
   await chatInput.waitFor();
   await chatInput.fill('¿Cuál es la tesis principal?');
   assert.equal(await page.getByTestId('library-reader-chat-send').isEnabled(), true, 'the embedded contextual chat composer is interactive');
   await chatInput.fill('');
+  await page.setViewportSize({ width: 1120, height: 680 });
+  const responsiveSidebar = await readerSidebar.boundingBox();
+  const responsiveComposer = await page.getByTestId('library-reader-chat-input').boundingBox();
+  assert.ok(responsiveSidebar && responsiveComposer);
+  assert.ok(responsiveSidebar.y >= 0 && responsiveSidebar.y + responsiveSidebar.height <= 681, 'the resized right rail remains inside the reader viewport');
+  assert.ok(responsiveComposer.y + responsiveComposer.height <= responsiveSidebar.y + responsiveSidebar.height, 'the chat composer remains fully reachable after resizing');
+  const toastStack = await page.getByTestId('app-toast-stack').boundingBox();
+  if (toastStack && toastStack.width > 0 && toastStack.height > 0) {
+    assert.ok(toastStack.x + toastStack.width <= responsiveSidebar.x, 'transient notifications do not cover the reader chat rail');
+  }
+  await page.screenshot({ path: responsiveChatScreenshotPath, fullPage: true });
+  await page.setViewportSize({ width: 1500, height: 980 });
   await readerSidebar.getByRole('tab', { name: 'Notas' }).click();
   await page.getByTestId('library-reader-orphaned-annotations').waitFor({ state: 'visible' });
   assert.match(await page.getByTestId('library-reader-orphaned-annotations').innerText(), /Comentario recuperable/);
@@ -316,6 +371,7 @@ La segunda sección permite comprobar el índice, la página de origen y el marc
 
   await readerSidebar.getByRole('tab', { name: 'Chat' }).click();
   await page.getByTestId('library-reader-chat-input').waitFor();
+  await page.locator('.library-reader-clean-surface').evaluate((element) => element.scrollTo({ top: 0 }));
   await page.screenshot({ path: screenshotPath, fullPage: true });
 
   const sourceChooser = page.getByTestId('library-reader-source-picker').locator('select');
@@ -325,6 +381,9 @@ La segunda sección permite comprobar el índice, la página de origen y el marc
   await pdfViewer.locator('canvas').waitFor({ state: 'visible' });
   await page.waitForFunction(() => document.querySelectorAll('[data-testid="library-reader-pdf-viewer"] .textLayer span').length > 0);
   assert.match(await page.getByTestId('library-reader-freshness').innerText(), /Archivo original/);
+  assert.match(await page.locator('.library-reader-outline').innerText(), /Introducción[\s\S]*Resultados/, 'the clean-document outline remains available while the PDF is open');
+  assert.equal((await pdfViewer.getByRole('button', { name: 'Anterior' }).innerText()).trim(), '');
+  assert.equal((await pdfViewer.getByRole('button', { name: 'Siguiente' }).innerText()).trim(), '');
   await page.evaluate(() => {
     const span = document.querySelector('[data-testid="library-reader-pdf-viewer"] .textLayer span');
     if (!(span instanceof HTMLElement) || !span.firstChild?.textContent) throw new Error('PDF text layer is empty');

@@ -27,6 +27,7 @@ try {
   const { writeGlobalPrefsRaw } = require(path.join(repoRoot, 'electron/db/appPrefs.ts'));
   const { LibraryDiskStore } = require(path.join(repoRoot, 'electron/library/libraryStorage.ts'));
   const readerStore = require(path.join(repoRoot, 'electron/libraryReader/libraryReaderStore.ts'));
+  const readerChat = require(path.join(repoRoot, 'electron/ai/libraryReaderChat.ts'));
   const cslStyles = require(path.join(repoRoot, 'electron/library/libraryCslStyles.ts'));
   writeGlobalPrefsRaw({ autoBackupFolder: backupRoot });
   const store = new LibraryDiskStore(path.join(backupRoot, 'nodus-library'), 'reader-device-0001');
@@ -113,6 +114,23 @@ try {
   assert.match((await readerStore.getLibraryReaderAttachmentContent('E7FGXJFE', 'local:DOCX1')).text, /Documento Word seleccionable/);
   assert.match((await readerStore.getLibraryReaderAttachmentContent('E7FGXJFE', 'local:XLSX1')).text, /Autor: María Aliaga/);
   assert.equal(readerStore.libraryReaderOriginalPath('E7FGXJFE'), path.join(folder, 'original.pdf'), 'storage id resolves to the same global document');
+
+  const groundedChat = readerChat.buildLibraryReaderNodiContext({
+    documentId: document.workId,
+    title: document.title,
+    authors: document.authors,
+    year: document.year,
+    markdown,
+    sourceLabel: 'Markdown limpio',
+    sourceId: 'clean',
+    annotations: [],
+    sections: document.sections.map((section) => ({ id: section.id, title: section.title, page: section.page })),
+  });
+  assert.equal(groundedChat.currentView.complete, true);
+  assert.match(groundedChat.currentView.text, /Mujeres solas en la posguerra/);
+  assert.match(groundedChat.currentView.text, /tracedOutline/);
+  assert.match(groundedChat.readerGrounding.citationUri, /^nodus:\/\/reader\/zotero%3AE7FGXJFE$/);
+  assert.deepEqual(groundedChat.readerGrounding.sections.map((section) => section.page), [1, 1, 2]);
 
   const selectedText = 'Texto limpio';
   const startOffset = markdown.indexOf(selectedText);
